@@ -4,7 +4,7 @@ using Test
 
 @testset "Optimization.jl" begin
 
-errorThreshold = 5e-15
+errorThreshold = 1e-12
 
 nucCoords = [[-0.7,0.0,0.0], [0.7,0.0,0.0]]
 
