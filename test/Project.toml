@@ -1,0 +1,5 @@
+[deps]
+Quiqbox = "7cb8c394-fae1-4ab9-92f2-30189d7746cd"
+Rotations = "6038ab10-8711-5258-84ad-4b1120ba62dc"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+DelimitedFiles = "8bb1440f-4735-579b-a4ab-409b98df4dab"
