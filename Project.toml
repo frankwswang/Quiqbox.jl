@@ -17,6 +17,7 @@ libcint_jll = "574b78ca-bebd-517c-801d-4735c93a9686"
 
 [compat]
 Rotations = "1"
+COSMO = "0.8"
 SymbolicUtils = "~0.12.1"
 Symbolics = "~1.1.0"
 julia = "^1.5"
