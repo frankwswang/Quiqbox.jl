@@ -516,7 +516,7 @@ function getVar(pb::ParamBox; markUndifferentiable::Bool=false, includeMapping::
     varName = typeof(pb).parameters[1]
     superscript = (pb.canDiff[] == true || !markUndifferentiable) ? "" : NoDiffMark
     varSymbol = Symbol((varName |> string) * superscript)
-    vr = (pb.index isa Int) ? Num(Variable(varSymbol, pb.index)) : Num(Variable(varName))
+    vr = (pb.index isa Int) ? Num(Symbolics.variable(varSymbol, pb.index)) : Num(Symbolics.variable(varName))
     mapName = pb.map[] |> nameof
     dvr = Num(Variable{Symbolics.FnType{Tuple{Any}, Real}}(mapName))(vr)
     expr = pb.map[](vr)
@@ -525,7 +525,7 @@ function getVar(pb::ParamBox; markUndifferentiable::Bool=false, includeMapping::
     res
 end
 
-getVar(pbType::Type{<:ParamBox}) = Num(Variable(pbType.parameters[1]))
+getVar(pbType::Type{<:ParamBox}) = Num(Symbolics.variable(pbType.parameters[1]))
 
 
 getVars(gf::GaussFunc; markUndifferentiable::Bool=false, includeMapping::Bool=false) = 

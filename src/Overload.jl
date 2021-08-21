@@ -12,9 +12,9 @@ import Base: show
 function show(io::IO, pb::ParamBox)
     v = typeof(pb).parameters[1]
     if pb.index === nothing 
-        i = Symbolics.Variable(v)
+        i = Symbolics.variable(v)
     else
-        i = Symbolics.Variable(v, pb.index)
+        i = Symbolics.variable(v, pb.index)
     end
     c = pb.canDiff[] ? :green : :light_black
     if typeof(pb.map[]) == typeof(itself)
