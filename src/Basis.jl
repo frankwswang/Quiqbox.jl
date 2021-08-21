@@ -518,7 +518,7 @@ function getVar(pb::ParamBox; markUndifferentiable::Bool=false, includeMapping::
     varSymbol = Symbol((varName |> string) * superscript)
     vr = (pb.index isa Int) ? Num(Symbolics.variable(varSymbol, pb.index)) : Num(Symbolics.variable(varName))
     mapName = pb.map[] |> nameof
-    dvr = Num(Variable{Symbolics.FnType{Tuple{Any}, Real}}(mapName))(vr)
+    dvr = Num(Symbolics.variable(mapName, T=Symbolics.FnType{Tuple{Any}, Real}))(vr)
     expr = pb.map[](vr)
     res = Pair[vr => pb[]]
     includeMapping && !(pb.map[] isa typeof(itself)) && (pushfirst!(res, dvr=>expr, expr=>pb()) |> unique!)
