@@ -16,7 +16,12 @@ Symbolics = "0c5d862f-8b57-4792-8d23-62f2024744c7"
 libcint_jll = "574b78ca-bebd-517c-801d-4735c93a9686"
 
 [compat]
-SymbolicUtils = "~0.12.1"
+StaticArrays = "1"
+SeparableOptimization = "0.1"
+PiecewiseQuadratics = "0.1"
+Rotations = "1"
+COSMO = "0.8"
+SymbolicUtils = "~0.12.1, 0.13"
 Symbolics = "~1.1.0, 3"
 julia = "^1.5"
 libcint_jll = "~3.0.0"
