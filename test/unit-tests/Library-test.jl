@@ -1,5 +1,5 @@
 using Quiqbox: checkBSList
 
 @testset "Library.jl tests" begin
-    checkBSList()
+    @test try checkBSList(); true catch; false end
 end

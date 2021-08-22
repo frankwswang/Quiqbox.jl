@@ -1,5 +1,3 @@
-using Symbolics
-
 # Julia internal methods overload.
 import Base: ==
 ==(pb1::ParamBox, pb2::ParamBox) = (pb1[] == pb2[] && 
@@ -12,9 +10,9 @@ import Base: show
 function show(io::IO, pb::ParamBox)
     v = typeof(pb).parameters[1]
     if pb.index === nothing 
-        i = Symbolics.Variable(v)
+        i = v
     else
-        i = Symbolics.Variable(v, pb.index)
+        i = string(v)*numToSubs(pb.index)
     end
     c = pb.canDiff[] ? :green : :light_black
     if typeof(pb.map[]) == typeof(itself)

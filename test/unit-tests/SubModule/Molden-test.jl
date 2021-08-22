@@ -1,7 +1,6 @@
-push!(LOAD_PATH, "./Quiqbox")
+using Test
 using Quiqbox
 using Quiqbox.Molden
-using Test
 
 @testset "Molden.jl test" begin
 

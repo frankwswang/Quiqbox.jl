@@ -1,7 +1,6 @@
-push!(LOAD_PATH, "./Quiqbox")
+using Test
 using Quiqbox.Coordinate
 using Rotations
-using Test
 
 @testset "BoxControl.jl test" begin
 

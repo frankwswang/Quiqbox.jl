@@ -236,13 +236,11 @@ BasisFunc(center, gExpANDgCon::NTuple{2, Real}, ijkOrSubshell ="S"; kw...) =
 BasisFunc(center, ([gExpANDgCon[1]], [gExpANDgCon[2]]), ijkOrSubshell; kw...)
 
 function BasisFunc(center, BSKeyANDnuc::Array{Tuple{String, String}, 1})
-    # @show BSKeyANDnuc
     bases = FloatingGTBasisFunc[]
     for k in BSKeyANDnuc
         BFMcontent = BasisSetList[k[1]][AtomicNumberList[k[2]]]
         append!(bases, genBFuncsFromText(BFMcontent, alterContent=true, excludeLastNlines=1, center=center))
     end
-    # mergeBasisFuncs(bases...)
     bases
 end
 
@@ -477,7 +475,6 @@ function markParams!(parArray::Array{<:ParamBox{V}, 1};
     for i=1:length(parArray)
         parArray[i].index = res[i]
     end
-    # @show list
     if filter
         _, cmprList = markUnique(parArray, compareFunction=hasIdentical, ignoreFunction=ignoreMapping; ignoreContainerType)
         return cmprList
@@ -516,16 +513,16 @@ function getVar(pb::ParamBox; markUndifferentiable::Bool=false, includeMapping::
     varName = typeof(pb).parameters[1]
     superscript = (pb.canDiff[] == true || !markUndifferentiable) ? "" : NoDiffMark
     varSymbol = Symbol((varName |> string) * superscript)
-    vr = (pb.index isa Int) ? Num(Variable(varSymbol, pb.index)) : Num(Variable(varName))
+    vr = (pb.index isa Int) ? Symbolics.variable(varSymbol, pb.index) : Symbolics.variable(varName)
     mapName = pb.map[] |> nameof
-    dvr = Num(Variable{Symbolics.FnType{Tuple{Any}, Real}}(mapName))(vr)
+    dvr = Symbolics.variable(mapName, T=Symbolics.FnType{Tuple{Any}, Real})(vr)
     expr = pb.map[](vr)
     res = Pair[vr => pb[]]
     includeMapping && !(pb.map[] isa typeof(itself)) && (pushfirst!(res, dvr=>expr, expr=>pb()) |> unique!)
     res
 end
 
-getVar(pbType::Type{<:ParamBox}) = Num(Variable(pbType.parameters[1]))
+getVar(pbType::Type{<:ParamBox}) = Symbolics.variable(pbType.parameters[1])
 
 
 getVars(gf::GaussFunc; markUndifferentiable::Bool=false, includeMapping::Bool=false) = 
@@ -586,7 +583,7 @@ normOfGTOin(b::FloatingGTBasisFunc{S, GN, ON}) where {S, GN, ON} = Nlα.(b.subsh
 
 
 function expressionOf(gf::GaussFunc; markUndifferentiable::Bool=false, substituteValue::Bool=false)
-    r = Variable.(:r, [1:3;]) .|> Num
+    r = Symbolics.variable.(:r, [1:3;])
     includeMapping = true
     index = substituteValue ? 2 : 1
     cgf(r, getVar(gf.xpn; markUndifferentiable, includeMapping)[1][index], 
@@ -613,7 +610,7 @@ function expressionOf(bf::FloatingGTBasisFunc; markUndifferentiable::Bool=false,
     R = [getVar(bf.center[1]; markUndifferentiable, includeMapping)[1][index], 
          getVar(bf.center[2]; markUndifferentiable, includeMapping)[1][index], 
          getVar(bf.center[3]; markUndifferentiable, includeMapping)[1][index]]
-    r = Variable.(:r, [1:3;]) .|> Num
+    r = Symbolics.variable.(:r, [1:3;])
     f2 = onlyParameter ? (α, d, i, j, k)->cgo2(-R, α, d, i, j, k, N(i,j,k,α)) : (α, d, i, j, k)->fgo2(r, R, α, d, i, j, k, N(i,j,k,α))
     for ijk in bf.ijk
         i, j, k = ijkOrbitalList[ijk]
@@ -685,7 +682,7 @@ inSymbols(vr::Num, pool::Array{Symbol, 1}=ParamNames) = inSymbols(vr.val, pool)
 function varVal(vr::SymbolicUtils.Sym, varDict::Dict{Num, <:Real})
     res = recursivelyGet(varDict, vr |> Num)
     if res === nothing
-        res = recursivelyGet(varDict, symbolReplace(Symbolics.tosymbol(vr), NoDiffMark=>"") |> Variable |> Num)
+        res = recursivelyGet(varDict, symbolReplace(Symbolics.tosymbol(vr), NoDiffMark=>"") |> Symbolics.variable)
     end
     if res === nothing
         str = Symbolics.tosymbol(vr) |> string
@@ -693,7 +690,7 @@ function varVal(vr::SymbolicUtils.Sym, varDict::Dict{Num, <:Real})
         pos = findfirst(r"[₁₂₃₄₅₆₇₈₉₀]", str)[1]
         front = split(str,str[pos])[1]
         var = front*NoDiffMark*str[pos:end] |> Symbol
-        recursivelyGet(varDict, var |> Variable |> Num)
+        recursivelyGet(varDict, var |> Symbolics.variable)
     end
     @assert res !== nothing "Can NOT find the value of $(vr)::$(typeof(vr)) in the given Dict $(varDict)."
     res
@@ -761,7 +758,7 @@ function detectXYZ(i::SymbolicUtils.Symbolic)
             end
         end
     end
-    (false, 1, nothing)    
+    (false, 1, nothing)
 end
 
 detectXYZ(::Real) = (false, 1, nothing)
@@ -770,7 +767,7 @@ detectXYZ(::Real) = (false, 1, nothing)
 function diffTransferCore(term::SymbolicUtils.Symbolic, varDict::Dict{Num, <:Real})
     res = Real[1,0,0,0]
     r = Symbolics.@rule *(~~xs) => ~~xs
-    terms = simplify(term, rewriter=r)
+    terms = SymbolicUtils.simplify(term, rewriter=r)
     !(terms isa SubArray) && (terms = [terms])
     for vr in terms
         isXYZ, sign, xpns = detectXYZ(vr)
@@ -784,20 +781,18 @@ function diffTransferCore(term::SymbolicUtils.Symbolic, varDict::Dict{Num, <:Rea
     res
 end
 
-diffTransferCore(term::Real, args...) = Real[Float64(term), 0,0,0]
+diffTransferCore(term::Symbolics.Num, args...) = diffTransferCore(term.val, args...)
+
+diffTransferCore(term::Real, _...) = Real[Float64(term), 0,0,0]
+
 
 function diffTransfer(term::Num, varDict::Dict{Num, <:Real})
-    r1 = Symbolics.@rule +(~(~xs)) => [i for i in ~(~xs)]
-    r2 = Symbolics.@rule *(~(~xs)) => [[i for i in ~(~xs)] |> prod]
-    r3 = Symbolics.@rule ~x::(x->!(x isa Array)) => [~x]
-    for r in [r1, r2, r3]
-        term = simplify(term, rewriter = r)    
-    end
-    diffTransferCore.(term.val, Ref(varDict))
+    terms = splitTerm(term)
+    diffTransferCore.(terms, Ref(varDict))
 end
 
 
 function diffInfo(exprs::Array{Num, N}, vr, varDict) where {N}
-    relDiffs = simplify.(Symbolics.derivative.(log.(exprs), vr), expand=true)
+    relDiffs = Symbolics.simplify.(Symbolics.derivative.(log.(exprs), vr), expand=true)
     diffTransfer.(relDiffs, Ref(varDict))
 end
