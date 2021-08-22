@@ -1,7 +1,5 @@
 export gridBoxCoords, GridBox, gridPoint
 
-using Symbolics: Variable
-
 #===== Grid-based coordinates =====#
 struct GridBox{NX, NY, NZ}
     num::Int
@@ -17,15 +15,15 @@ struct GridBox{NX, NY, NZ}
         boxes = NTuple{3, ParamBox{sym, Float64}}[]
         coords = Array{Float64, 1}[]
         n = 0
-        supIndex = "ᴳ"*num2sups(nGrids[1])*superscriptSym['-']*num2sups(nGrids[2])*superscriptSym['-']*num2sups(nGrids[3])
+        supIndex = "ᴳ"*numToSups(nGrids[1])*superscriptSym['-']*numToSups(nGrids[2])*superscriptSym['-']*numToSups(nGrids[3])
         for i=0:nGrids[1], j=0:nGrids[2], k=0:nGrids[3]
             n += 1
             fX0 = L -> centerCoord[1] + (i / nGrids[1] - 0.5) * L
             fY0 = L -> centerCoord[2] + (j / nGrids[2] - 0.5) * L
             fZ0 = L -> centerCoord[3] + (k / nGrids[3] - 0.5) * L
-            fXname = (ParamList[:X] |> string) * supIndex * num2subs(n)
-            fYname = (ParamList[:Y] |> string) * supIndex * num2subs(n)
-            fZname = (ParamList[:Z] |> string) * supIndex * num2subs(n)
+            fXname = (ParamList[:X] |> string) * supIndex * numToSubs(n)
+            fYname = (ParamList[:Y] |> string) * supIndex * numToSubs(n)
+            fZname = (ParamList[:Z] |> string) * supIndex * numToSubs(n)
             fX = renameFunc(fXname, fX0)
             fY = renameFunc(fYname, fY0)
             fZ = renameFunc(fZname, fZ0)

@@ -36,13 +36,13 @@ function adaptiveParse(content::AbstractString)
 end
 
 
-function num2sups(num::Int)
+function numToSups(num::Int)
     str = string(num)
     [superscriptNum[i] for i in str] |> prod
 end
 
 
-function num2subs(num::Int)
+function numToSubs(num::Int)
     str = string(num)
     [subscriptNum[i] for i in str] |> prod
 end
