@@ -1,6 +1,7 @@
-export hasEqual, hasIdentical, hasBoolRelation, ArrayPointer, markUnique, flatten
+export hasEqual, hasIdentical, hasBoolRelation, ArrayPointer, markUnique, flatten, splitTerm
 
 using Statistics: std, mean
+using Symbolics
 
 """
 
@@ -620,4 +621,20 @@ function isOscillateConverged(sequence::Array{<:Real, 1}, threshold1::Real, thre
     remained = sort(lastPortion)[end÷2+1 : end]
     b = std(remained) < threshold1 && abs(sequence[end] - mean(remained)) < threshold2
     returnStd ? (b, std(lastPortion)) : b
+end
+
+
+function splitTerm(term::Num)
+    r1 = Symbolics.@rule +(~(~xs)) => [i for i in ~(~xs)]
+    r2 = Symbolics.@rule *(~(~xs)) => [[i for i in ~(~xs)] |> prod]
+    for r in [r1, r2]
+        term = Symbolics.simplify(term, rewriter = r)
+    end
+    # Converting Symbolics.Arr to Base.Array
+    if term isa Symbolics.Arr
+        terms = term |> collect
+    else
+        terms = [term]
+    end
+    terms
 end
