@@ -1,4 +1,4 @@
-include("setup.jl")
+using Test
 
 @testset "Quiqbox tests" begin
 

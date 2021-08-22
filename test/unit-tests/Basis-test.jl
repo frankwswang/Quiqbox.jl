@@ -1,7 +1,5 @@
-push!(LOAD_PATH, "./Quiqbox")
-using Quiqbox
 using Test
-# using Quiqbox: ParamBox
+using Quiqbox
 
 @testset "Basis.jl" begin
 
