@@ -1,6 +1,5 @@
-push!(LOAD_PATH, "./Quiqbox")
-using Quiqbox
 using Test
+using Quiqbox
 
 @testset "Tools.jl" begin
     points = [[-2.5, -2.5, -2.5], [-2.5, -2.5, 2.5], [-2.5, 2.5, -2.5], [-2.5, 2.5, 2.5], 

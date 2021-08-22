@@ -6,7 +6,7 @@ using Symbolics: Num
 # Julia supports 0-D arrays but we need to differentiate parameters that are allowed to be tuned from them.
 """
 
-    ParamBox{T<:Number}
+    ParamBox{V, T}
 
 Parameter container that enables parameter differentiations.
 

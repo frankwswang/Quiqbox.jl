@@ -1,4 +1,3 @@
-push!(LOAD_PATH, "./Quiqbox")
 using Quiqbox
 using Quiqbox.Molden
 

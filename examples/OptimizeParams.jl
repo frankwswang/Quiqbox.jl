@@ -1,4 +1,3 @@
-push!(LOAD_PATH, "./Quiqbox")
 using Quiqbox
 nucCoords = [[-0.7,0.0,0.0], [0.7,0.0,0.0]]
 mol = ["H", "H"]
