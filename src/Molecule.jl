@@ -14,11 +14,11 @@ struct MolOrbital{N} <: AbstractMolOrbital
 end
 
 
-function getMolOrbitals(ens::Union{Array{Float64, 1}, Tuple{Vararg{Float64}}}, 
-                        occus::Union{Array{<:Real, 1}, Tuple{Vararg{Real}}}, 
+function getMolOrbitals(ens::Array{Float64, 1}, 
+                        occus::Array{<:Real, 1}, 
                         C::Array{Float64, 2}, 
-                        spins::Union{Array{String, 1}, Tuple{Vararg{String}}}=repeat(["Alpha"], length(occus)), 
-                        symms::Union{Array{String, 1}, Tuple{Vararg{String}}}=repeat(["A"], length(occus)))
+                        spins::Array{String, 1}=repeat(["Alpha"], length(occus)), 
+                        symms::Array{String, 1}=repeat(["A"], length(occus)))
     MolOrbital.(ens, occus, [ C[:,i] for i = 1:size(C, 2) ], spins, symms) |> Tuple
 end
 
@@ -55,5 +55,6 @@ function Molecule(basis, nuc, nucCoords, HFfVars)
         C = HFfVars.C
         spins = fill("Alpha", len)
     end
-    Molecule(basis, nuc, nucCoords, t.parameters[2], Emos, occus, C, spins, fill("A", length(spins)))
+    Molecule(basis, nuc, nucCoords, t.parameters[2], Emos|>collect, 
+             occus|>collect, C, spins, fill("A", length(spins)))
 end
