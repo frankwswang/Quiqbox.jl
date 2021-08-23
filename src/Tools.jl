@@ -25,42 +25,6 @@ end
 
 """
 
-    @catchStdout expressions... -> String 
-
-A macro that redirects the stdout of any wrapped expressions into a `String`.
-
-≡≡≡ Example(s) ≡≡≡
-
-```
-julia> @catchStdout print("as")
-"as"
-
-julia> @catchStdout a=0
-""
-
-julia> @catchStdout begin
-           a=0
-           print("a = \$a")
-       end
-"a = 0"
-```
-"""
-macro catchStdout(expr)
-    quote
-        original_stdout = stdout
-        read_pipe, write_pipe = redirect_stdout()
-        $(esc(expr))
-        content = @async read(read_pipe, String)
-        redirect_stdout(original_stdout) # It's vital that this is before closing the redireted pipes.
-        close(write_pipe)
-        res = try fetch(content) catch; "" end
-        close(read_pipe)
-        res
-    end
-end
-
-"""
-
     @compareLength inputArg1 inputArg2 argNames::String... -> length(inputArg1)
     
 A macro that checks whether the lengths of 2 `Arrays`/`Tuples` are equal. It throws a detailed ERROR message when the lengths are not equal. 

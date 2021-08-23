@@ -1,15 +1,17 @@
 using Test
-using Quiqbox: @catchStdout, tryIncluding, markUnique, flatten, alignSignedNum, 
+using Quiqbox: tryIncluding, markUnique, flatten, alignSignedNum, 
                symbolReplace, splitTerm
 using Symbolics
+using Suppressor: @capture_out
 
 @testset "Tools.jl" begin
 
-    # function tryIncluding & macro @catchStdout
-    errStr = @catchStdout (bl = tryIncluding("someMod"))
-    @test bl == false
+    # function tryIncluding
+    local isIncluded
+    errStr = @capture_out begin isIncluded = tryIncluding("someMod") end
+    @test isIncluded == false
     pkgDir = @__DIR__
-    @test length(errStr) > 184
+    @test length(errStr) > length(@capture_out tryIncluding("someMod", subModulePath=""))
     
     # function markUnique
     @test markUnique([1,3,2,2,5]) == ([1,2,3,3,4], [1,3,2,5])
