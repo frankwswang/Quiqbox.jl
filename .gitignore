@@ -1,2 +1,3 @@
 legacy/
 Manifest.toml
+__test__*
