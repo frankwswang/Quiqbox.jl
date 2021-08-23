@@ -1,9 +1,11 @@
-const superscriptNum = Dict(['0'=>'⁰', '1'=>'¹', '2'=>'²', '3'=>'³', '4'=>'⁴', '5'=>'⁵', '6'=>'⁶', '7'=>'⁷', '8'=>'⁸', '9'=>'⁹'])
-const subscriptNum   = Dict(['0'=>'₀', '1'=>'₁', '2'=>'₂', '3'=>'₃', '4'=>'₄', '5'=>'₅', '6'=>'₆', '7'=>'₇', '8'=>'₈', '9'=>'₉'])
+const superscriptNum = Dict(['0'=>'⁰', '1'=>'¹', '2'=>'²', '3'=>'³', '4'=>'⁴', '5'=>'⁵', 
+                             '6'=>'⁶', '7'=>'⁷', '8'=>'⁸', '9'=>'⁹'])
+const subscriptNum   = Dict(['0'=>'₀', '1'=>'₁', '2'=>'₂', '3'=>'₃', '4'=>'₄', '5'=>'₅', 
+                             '6'=>'₆', '7'=>'₇', '8'=>'₈', '9'=>'₉'])
 const superscriptSym = Dict(['+'=>'⁺', '-'=>'⁻', '('=>'⁽', ')'=>'⁾', '!'=>'ꜝ'])
 
 
-function checkFname(Fname::String)
+function checkFname(Fname::String; showWarning::Bool=true)
     FnameN = Fname 
     while isfile(FnameN) == true
         i=0
@@ -13,10 +15,10 @@ function checkFname(Fname::String)
     FnamePrint, FnameNPrint = map([Fname, FnameN]) do f 
         contains(f, "/") ? f[(findlast("/", f) |> last)+1 : end] : f
     end
-    FnameN != Fname && (@warn """The file expected to create already exists. 
-                                 Adding another suffix.
-                                 Old name: $(FnamePrint)
-                                 New name: $(FnameNPrint)""")
+    FnameN != Fname && showWarning && (@warn """The file expected to create already exists. 
+                                                Adding another suffix.
+                                                Old name: $(FnamePrint)
+                                                New name: $(FnameNPrint)""")
     FnameN
 end
 

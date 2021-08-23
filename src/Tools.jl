@@ -3,6 +3,26 @@ export hasEqual, hasIdentical, hasBoolRelation, ArrayPointer, markUnique, flatte
 using Statistics: std, mean
 using Symbolics
 
+
+# Function for submudole loading and integrity checking.
+function tryIncluding(subModuleName::String; subModulePath=(@__DIR__)[:]*"/SubModule")
+    try
+        include(subModulePath*"/"*subModuleName*".jl")
+        return true
+    catch err
+        warning = """
+        Submodule `$(subModuleName)` failed loading and won't be useable:
+
+            Failed $(err.prefix).
+
+        `///magenta///However, this DOES NOT affect the functionality of the main module.`
+        """
+        printStyledInfo(warning, title="WARNING:\n", titleColor=:light_yellow)
+        return false
+    end
+end
+
+
 """
 
     @catchStdout expressions... -> String 
@@ -335,24 +355,6 @@ hasIdentical(obj1, obj2, obj3...; ignoreFunction=false, ignoreContainerType=fals
 hasBoolRelation(===, obj1, obj2, obj3...; ignoreFunction, ignoreContainerType)
 
 
-# Match floating-point digits for a math operation of two real numbers.  
-function properMathOp(a::Real, b::Real, operation::Function)
-    aStr = string(a)
-    bStr = string(b)
-    if contains(aStr, ".")
-        aDigitsLen = aStr[(findfirst(".", aStr) |> last) + 1 : end] |> length
-    else
-        aDigitsLen = 0
-    end
-    if contains(bStr, ".")
-        bDigitsLen = bStr[(findfirst(".", bStr) |> last) + 1 : end] |> length
-    else
-        bDigitsLen = 0
-    end
-    round(operation(a,b); digits=max(aDigitsLen, bDigitsLen))
-end
-
-
 """
 
     printStyledInfo(str::String; title::String="INFO:\\n", titleColor::Symbol=:light_blue) -> nothing
@@ -587,8 +589,8 @@ itself(x) = x
 """
 Similar as `replace` but for Symbols.
 """
-function symbolReplace(sym::Symbol, pair::Pair)
-    replace(sym |> string, pair) |> Symbol
+function symbolReplace(sym::Symbol, pair::Pair{String, String}; count::Int=typemax(Int))
+    replace(sym |> string, pair; count) |> Symbol
 end
 
 

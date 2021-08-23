@@ -7,6 +7,7 @@ import Base: ==
 
 
 import Base: show
+const nSigShown = 10
 function show(io::IO, pb::ParamBox)
     v = typeof(pb).parameters[1]
     if pb.index === nothing 
@@ -21,7 +22,7 @@ function show(io::IO, pb::ParamBox)
         j = " -> $(Symbol(pb.map[]))($i)"
     end
     print(io, typeof(pb))
-    print(io, "($(pb.data[]))[$i$j]")
+    print(io, "($(round(pb.data[], sigdigits=nSigShown)))[$i$j]")
     printstyled(io, "[∂]", color=c)
 end
 
@@ -40,7 +41,9 @@ function show(io::IO, bf::BasisFunc)
     print(io, "(gauss, subshell, center)[")
     printstyled(io, xyz1, color=:cyan)
     print(io, xyz2)
-    print(io, "][$(bf.center[1]()), $(bf.center[2]()), $(bf.center[3]())]")
+    print(io, "][$(round(bf.center[1](), sigdigits=nSigShown)), "*
+                "$(round(bf.center[2](), sigdigits=nSigShown)), "*
+                "$(round(bf.center[3](), sigdigits=nSigShown))]")
 end
 
 function show(io::IO, bf::BasisFuncs)
@@ -57,7 +60,9 @@ function show(io::IO, bf::BasisFuncs)
     print(io, "(gauss, subshell, center)[")
     printstyled(io, xyz1, color=:cyan)
     print(io, xyz2)
-    print(io, "][$(bf.center[1]()), $(bf.center[2]()), $(bf.center[3]())]")
+    print(io, "][$(round(bf.center[1](), sigdigits=nSigShown)), "*
+                "$(round(bf.center[2](), sigdigits=nSigShown)), "*
+                "$(round(bf.center[3](), sigdigits=nSigShown))]")
 end
 
 function show(io::IO, bfm::BasisFuncMix)
@@ -77,13 +82,15 @@ end
 
 function show(io::IO, vars::HFtempVars)
     print(io, typeof(vars))
-    print(io, "(shared.Etot=[$(vars.shared.Etots[1]), … , $(vars.shared.Etots[end])], shared.Dtots, ")
-    print(io, "Cs, Es, Ds, Fs)")
+    print(io, "(shared.Etot=[$(round(vars.shared.Etots[1], sigdigits=nSigShown)), … , "*
+                            "$(round(vars.shared.Etots[end], sigdigits=nSigShown))], "*
+                            "shared.Dtots, Cs, Es, Ds, Fs)")
 end
 
 function show(io::IO, vars::HFfinalVars)
     print(io, typeof(vars))
-    print(io, "(E0HF=$(vars.E0HF), C, F, D, Emo, occu, temp, isConverged)")
+    print(io, "(E0HF=$(round(vars.E0HF, sigdigits=nSigShown)), C, F, D, Emo, occu, temp, "*
+              "isConverged)")
 end
 
 
@@ -96,6 +103,9 @@ setindex!(a::ParamBox, b) = begin a.data[] = b end
 
 # Quiqboc methods overload.
 ## Method overload of `hasBoolRelation` from Tools.jl.
+## If `ignoreContainerType = true`, then `ignoreFunction` is automitically set to be `true` 
+## as the `map` function for `ParamBox` is considered as a type of container for the actual
+## stored data.
 function hasBoolRelation(boolFunc::Function, pb1::ParamBox, pb2::ParamBox; 
                          ignoreFunction=false, ignoreContainerType=false)
     if ignoreContainerType
