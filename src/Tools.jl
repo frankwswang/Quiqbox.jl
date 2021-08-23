@@ -13,7 +13,7 @@ function tryIncluding(subModuleName::String; subModulePath=(@__DIR__)[:]*"/SubMo
         warning = """
         Submodule `$(subModuleName)` failed loading and won't be useable:
 
-            Failed $(err.prefix).
+            $(err)
 
         `///magenta///However, this DOES NOT affect the functionality of the main module.`
         """
