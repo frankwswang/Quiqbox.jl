@@ -699,13 +699,13 @@ end
 function varVal(vr::SymbolicUtils.Add, varDict::Dict{Num, <:Real})
     r = Symbolics.@rule +(~(~xs)) => [i for i in ~(~xs)]
     vrs = r(vr)
-    varVal.(vrs, varDict) |> sum
+    varVal.(vrs, Ref(varDict)) |> sum
 end
 
 function varVal(vr::SymbolicUtils.Mul, varDict::Dict{Num, <:Real})
     r = Symbolics.@rule *(~(~xs)) => [i for i in ~(~xs)]
     vrs = r(vr)
-    varVal.(vrs, varDict) |> prod
+    varVal.(vrs, Ref(varDict)) |> prod
 end
 
 function varVal(vr::SymbolicUtils.Pow, varDict::Dict{Num, <:Real})
