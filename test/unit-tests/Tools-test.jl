@@ -1,17 +1,34 @@
 using Test
-using Quiqbox
-using Quiqbox: alignSignedNum
+using Quiqbox: @catchStdout, tryIncluding, markUnique, flatten, alignSignedNum, 
+               symbolReplace, splitTerm
 using Symbolics
 
 @testset "Tools.jl" begin
+
+    # function tryIncluding & macro @catchStdout
+    errStr = @catchStdout (bl = tryIncluding("someMod"))
+    @test bl == false
+    pkgDir = @__DIR__
+    @test length(errStr) > 184
+    
+    # function markUnique
     @test markUnique([1,3,2,2,5]) == ([1,2,3,3,4], [1,3,2,5])
 
+
+    # function flatten
     @test [(1,2), 3, [3,4]] |> flatten == [1,2,3,3,4]
 
+
+    # function alignSignedNum
     @test alignSignedNum(-1) == "-1"
     @test alignSignedNum( 1) == " 1"
 
-    # Symbolic representation related functions
+
+    # function symbolReplace
+    @test symbolReplace(:sombol, "o"=>"y", count=1) == :symbol
+
+
+    # function splitTerm
     Symbolics.@variables X Y Z
     vec0 = splitTerm(Num(1))
     @test ( string.(vec0) .== string.([Num(1)]) ) |> prod
@@ -25,4 +42,5 @@ using Symbolics
     @test ( string.(vec4) .== string.([X^2, -(Z^2), -X*Y]) ) |> prod
     @test ([vec0, vec1, vec2, vec3, vec4] .|> length) == [1,1,1,1,3]
     @test ([vec0, vec1, vec2, vec3, vec4] |> eltype) ==  Array{Num, 1}
+
 end
