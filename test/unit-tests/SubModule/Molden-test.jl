@@ -20,7 +20,8 @@ br = 0.529177210903
 molCoords = [
              [[0.3705,0.0,0.0], [-0.3705,0.0,0.0]],
              [[0.4585,0.0,0.0], [-0.4585,0.0,0.0]], 
-             [[0.0, 0.0, 0.1111], [0.0, 0.9316, -0.2592], [0.8068, -0.4658, -0.2592], [-0.8068, -0.4658, -0.2592]]
+             [[0.0, 0.0, 0.1111], [0.0, 0.9316, -0.2592], 
+              [0.8068, -0.4658, -0.2592], [-0.8068, -0.4658, -0.2592]]
              ] ./ br
 
 bfCoords = [molCoords..., GridBox(1, 2.4).coord]
@@ -46,9 +47,11 @@ for (nuc, nucCoords, molName, iMol) in zip(mols, molCoords, molNames, 1:length(m
     fVars = try runHF(bs, nuc, nucCoords; HFtype, printInfo=false) catch; continue end
 
     mol = Molecule(bs, nuc, nucCoords, fVars)
-    fn = makeMoldenFile(mol; recordUMO=true, fileName=prefix*"_"*molName*"_"*bf*bsName*"_"*string(HFtype))
+    fn = makeMoldenFile(mol; recordUMO=true, fileName=prefix*"_"*molName*"_"*bf*bsName*
+                                                      "_"*string(HFtype))
     rm(fn)
 end
 
+@test true
 
 end
