@@ -6,29 +6,51 @@ using Suppressor: @suppress_out
 
 errorThreshold = 1e-12
 
+# Floating basis set
 nucCoords = [[-0.7,0.0,0.0], [0.7,0.0,0.0]]
 mol = ["H", "H"]
-bfSource = BasisFunc(("STO-2G", "H"))[]
-gfs = [bfSource.gauss...]
+bfSource1 = BasisFunc(("STO-2G", "H"))[]
+gfs1 = [bfSource1.gauss...]
 cens = gridPoint.(nucCoords)
-bs = BasisFunc.(cens, Ref(gfs))
-pars = uniqueParams!(bs, ignoreMapping=true)
+bs1 = BasisFunc.(cens, Ref(gfs1))
+pars1 = uniqueParams!(bs1, ignoreMapping=true)
 
-local Es, pars, grads
+local Es1L, pars1L, grads1L
 @suppress_out begin
-    Es, pars, grads = optimizeParams!(bs, pars, mol, nucCoords, maxSteps = 500)
+    Es1L, pars1L, grads1L = optimizeParams!(bs1, pars1, mol, nucCoords, maxSteps = 200)
 end
 
-E_t = -1.7828659178214732
-par_t = [1.3683913812855784,  0.3058302439403923, 0.48622948741096983, 
-         0.6399410170157525, -0.6716612345728881, 0.6716612345728885, 
-         0.0, 0.0, 0.0, 0.0]
-grad_t = [-0.11951740070926406,  0.02005079056112935, -0.1016591886019295, 
-           0.07724101729724206, -0.04376145807934295,  0.04376145807934384, 
-           0.0, 0.0, 0.0, 0.0]
+E_t1 = -1.77568255622806
+par_t1 = [1.3316366727278381,  0.3118586357035099, 0.45479844661867297, 
+          0.6626439317879435, -0.6866294612074542, 0.6866294612074546, 
+          0.0, 0.0, 0.0, 0.0]
+grad_t1 = [-0.1251882751182149,   0.017527948866820964, -0.10779722878571235, 
+            0.07398545410241009, -0.05647593609221346,   0.05647593609221585, 
+            0.0, 0.0, 0.0, 0.0]
 
-@test isapprox(Es[end], E_t, atol=errorThreshold)
-@test isapprox(pars[end, :], par_t, atol=errorThreshold)
-@test isapprox(grads[end, :], grad_t, atol=errorThreshold)
+@test isapprox(Es1L[end], E_t1, atol=errorThreshold)
+@test isapprox(pars1L[end, :], par_t1, atol=errorThreshold)
+@test isapprox(grads1L[end, :], grad_t1, atol=errorThreshold)
+
+
+# Grid-based basis set
+grid = GridBox(1, 3.0)
+gf2 = GaussFunc(0.7,1)
+bs2 = BasisFunc.(grid.box, Ref([gf2]))
+
+pars2 = uniqueParams!(bs2, ignoreMapping=true)[[1,3]]
+
+local Es2L, pars2L, grads2L
+@suppress_out begin
+    Es2L, pars2L, grads2L = optimizeParams!(bs2, pars2, mol, nucCoords, maxSteps = 200)
+end
+
+E_t2 = -1.1804184294076494
+par_t2 = [0.1792288515300005, 2.8537000394661676]
+grad_t2 = [-0.05218998970360911, 0.4901549373691791]
+
+@test isapprox(Es2L[end], E_t2, atol=errorThreshold)
+@test isapprox(pars2L[end, :], par_t2, atol=errorThreshold)
+@test isapprox(grads2L[end, :], grad_t2, atol=errorThreshold)
 
 end

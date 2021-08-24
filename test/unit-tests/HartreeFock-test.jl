@@ -4,7 +4,7 @@ using Suppressor: @suppress_out
 
 @testset "HartreeFock.jl" begin
 
-    errorThreshold = 1e-8
+    errorThresholds = (1e-6, 1e-8)
 
     nucCoords = [[-0.7,0.0,0.0], [0.7,0.0,0.0]]
     mol = ["H", "H"]
@@ -12,7 +12,7 @@ using Suppressor: @suppress_out
 
     local res1, res2
     @suppress_out begin
-        res1 = runHF(bs, mol, nucCoords; HFtype=:RHF, 
+        res1 = runHF(bs, mol, nucCoords; HFtype=:RHF, initialC=:GWH,
                     scfConfig=Quiqbox.SCFconfig([:ADIIS, :DIIS, :EDIIS, :SD], 
                                                 [1e-4, 1e-8, 1e-10, 1e-12]))
         res2 = runHF(bs, mol, nucCoords; HFtype=:RHF, 
@@ -23,8 +23,8 @@ using Suppressor: @suppress_out
                                                      3=>[:solver=>:Convex],
                                                      4=>[:solver=>:Convex])))
     end
-    
-    for res in (res1, res2)
+
+    for (res, errorThreshold) in zip((res1, res2), errorThresholds)
         @test isapprox(res.E0HF, -1.8310000393482668, atol=errorThreshold)
         @test isapprox(res.C, [-0.54893404 -1.21146407; -0.54893404 1.21146407], 
                        atol=errorThreshold)

@@ -1,6 +1,7 @@
 using Test
 using Quiqbox
-using Quiqbox: isFull, getBasisFuncs
+using Quiqbox: isFull, getBasisFuncs, inSymbols, varVal
+using Symbolics
 
 @testset "Basis.jl" begin
 
@@ -133,6 +134,19 @@ assignCenter!(coord, bf5)
 @test hasEqual(bf5, bf5_1)
 
 
+# function getVars
+pb1 = ParamBox(2, :p)
+@test getVar(pb1)[][1].val.name == :p
+@test getVar(pb1)[][2] == 2.0
+@test getVar(pb1)[] isa Pair{Num, Float64}
+
+gf11 = GaussFunc(3,1)
+gf12 = GaussFunc(3,0.5)
+@test getVars([bf1]) == getVars(bf1)
+@test getVars([gf11, gf12]) == merge(getVars(gf11), getVars(gf12))
+@test getVars(gf1.param |> collect) == Dict(getVar(ParamBox(1, :d))[], getVar(ParamBox(2, :α))[])
+
+
 # function expressionOf
 @test expressionOf(gf1) |> string == "d*exp(-α*(r₁^2 + r₂^2 + r₃^2))"
 @test expressionOf(bf1)[] |> string == "d*exp(-α*((r₁ - X)^2 + (r₂ - Y)^2 + (r₃ - Z)^2))"
@@ -146,5 +160,50 @@ idx = findfirst('d', expStr)
 @test expressionOf(bfm2)[] |> string == "d*exp(-α*((r₁ - X)^2 + (r₂ - Y)^2 + (r₃ - Z)^2))"*
                                         "*(r₁ - X)"
 
+
+# function inSymbols
+sym1 = :a1
+sym2 = :d
+syms = [:a, :b, :c]
+@test inSymbols(sym1, syms) == :a
+@test !inSymbols(sym2, syms)
+
+sym3 = Symbolics.variable(:a)
+@test inSymbols(sym3, syms) == :a
+@test inSymbols(sym3.val, syms) == :a
+@test inSymbols(log(sym3).val, syms) == false
+
+@test inSymbols(abs, syms) == false
+
+
+# function varVal
+vars = @variables X, Y, Z, F(X)
+F = vars[end]
+vars = vars[1:end-1]
+f1(X,Y,Z) = log(X+0.5Y*Z)
+expr = f1(X,Y,Z)
+vals = [1, 3.334, -0.2]
+d1 = Dict(vars .=> vals)
+errT = 1e-10
+@test varVal.(vars, Ref(d1)) == vals
+@test isapprox(varVal(sum(vars), d1), sum(vals), atol=errT)
+@test isapprox(varVal(prod(vars), d1), prod(vals), atol=errT)
+@test isapprox(varVal(vars[1]^vars[2], d1), vals[1]^vals[2], atol=errT)
+@test isapprox(varVal(expr, d1), f1(vals...), atol=errT)
+
+gb1 = GridBox(1,3.0)
+d2 = getVars(gb1.box |> flatten, includeMapping=true)
+l = Symbolics.variable(:L,0)
+vars2 = [i.val for i in keys(d2)]
+diffs2 = Differential(l).(vars2)
+exprs2 = map(x -> (x isa SymbolicUtils.Term) ? d2[x] : x, vars2)
+diffExprs2 = Symbolics.derivative.(exprs2, Ref(l))
+excs2 = Symbolics.build_function.(exprs2, l) .|> eval
+vals2 = [f(3.0) for f in excs2]
+excdiffs2 = Symbolics.build_function.(diffExprs2, l) .|> eval
+diffvals2 = [f(3.0) for f in excdiffs2]
+
+@test varVal.(vars2, Ref(d2)) == vals2
+@test varVal.(diffs2, Ref(d2)) == diffvals2
 
 end
