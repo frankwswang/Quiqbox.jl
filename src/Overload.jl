@@ -27,7 +27,7 @@ function show(io::IO, pb::ParamBox)
 end
 
 function show(io::IO, gf::GaussFunc)
-    print(io, "GaussFunc(xpn=")
+    print(io, typeof(gf), "(xpn=")
     show(io, gf.xpn)
     print(io, ", con=")
     show(io, gf.con)
