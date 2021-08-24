@@ -16,8 +16,9 @@ using Suppressor: @capture_out
 
     bf1 = BasisFunc([1,2,1], (2,1))
     gf1 = bf1.gauss[1]
-    @test (@capture_out show(gf1)) == string(typeof(gf1))*"(xpn=ParamBox{:α, Float64}(2.0)"*
-                                      "[α][∂], con=ParamBox{:d, Float64}(1.0)[d][∂])"
+    @test (@capture_out show(gf1)) == string(typeof(gf1))*"(xpn="*
+                                      string(typeof(gf1.param[1]))*"(2.0)[α][∂], con="*
+                                      string(typeof(gf1.param[2]))*"(1.0)[d][∂])"
     @test (@capture_out show(bf1)) == string(typeof(bf1))*"(gauss, subshell, center)"*
                                       "[X⁰Y⁰Z⁰][1.0, 2.0, 1.0]"
     
