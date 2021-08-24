@@ -18,7 +18,7 @@ A Julia software package that aims for floating Gaussian-type orbital (GTO) opti
 * Standalone 1-electron and 2-electron integral functions (powered by [libcint_jll](https://github.com/JuliaBinaryWrappers/libcint_jll.jl)).
 * Variational orbital geometry optimization based on Automatic differentiation (AD).
 
-[GA-CI-img]:   https://github.com/frankwswang/Quiqbox.jl/actions/workflows/CI.yml/badge.svg
+[GA-CI-img]:   https://github.com/frankwswang/Quiqbox.jl/actions/workflows/CI.yml/badge.svg?branch=main
 [GA-CI-url]:   https://github.com/frankwswang/Quiqbox.jl/actions/workflows/CI.yml
 [codecov-img]: https://codecov.io/gh/frankwswang/Quiqbox.jl/branch/main/graph/badge.svg?token=Z1XOA39DV2
 [codecov-url]: https://codecov.io/gh/frankwswang/Quiqbox.jl
