@@ -531,7 +531,7 @@ getVar.(gf.param; markUndifferentiable, includeMapping) |> flatten |> Dict
 getVars(bf::BasisFunc; markUndifferentiable::Bool=false, includeMapping::Bool=false) = 
 getVar.(bf.param; markUndifferentiable, includeMapping) |> flatten |> Dict
 
-getVars(pbs::Array{ParamBox, 1}; markUndifferentiable::Bool=false, includeMapping::Bool=false) = 
+getVars(pbs::Array{<:ParamBox, 1}; markUndifferentiable::Bool=false, includeMapping::Bool=false) = 
 getVar.(pbs; markUndifferentiable, includeMapping) |> flatten |> Dict
 
 getVars(fs::Array{<:Union{GaussFunc, BasisFunc}, 1}; markUndifferentiable::Bool=false, includeMapping::Bool=false) = 
@@ -714,23 +714,28 @@ function varVal(vr::SymbolicUtils.Pow, varDict::Dict{Num, <:Real})
     varVal(vrs[1], varDict)^varVal(vrs[2], varDict)
 end
 
+
 function varVal(vr::SymbolicUtils.Term, varDict::Dict{Num, <:Real})
-    getF = (fSym) -> try getfield(Quiqbox, fSym) catch; getfield(Main, fSym) end
-    if vr.f isa SymbolicUtils.Sym
-        fSymbol = vr.f |> Symbolics.tosymbol
-        f = getF(fSymbol)
-        v = varVal(vr.arguments[], varDict)
-        res = f(v)
-    elseif  vr.f isa Function
-        fVar = vr.arguments[]
-        fSymbol = fVar.f |> Symbolics.tosymbol
-        f = getF(fSymbol)
-        v = fVar.arguments[]
-        res = varVal(Symbolics.derivative(f(v), v), varDict)
+    getFunc = (fSym) -> try getfield(Quiqbox, fSym) catch; getfield(Main, fSym) end
+    getFsym = (t) -> t isa SymbolicUtils.Sym ? Symbolics.tosymbol(t) : Symbol(t)
+    if vr.f isa Symbolics.Differential
+        dvr = vr.arguments[]
+        vr = vr.f.x
+        if dvr isa SymbolicUtils.Term
+            f = getFunc(dvr.f |> getFsym)
+            expr = f(dvr.arguments[]) # assumming AD propagates only through 1 var: f(g(x)).
+        else
+            expr = dvr
+        end
+        return varVal(Symbolics.derivative(expr, vr), varDict)
     else
-        res = NaN
+        if vr.f isa Union{SymbolicUtils.Sym, Function}
+            fSymbol = vr.f |> getFsym
+        else return NaN end
+        f = getFunc(fSymbol)
+        v = varVal(vr.arguments[], varDict)
+        return f(v)
     end
-    res
 end
 
 varVal(vr::Num, varDict::Dict{Num, <:Real}) = varVal(vr.val, varDict)
