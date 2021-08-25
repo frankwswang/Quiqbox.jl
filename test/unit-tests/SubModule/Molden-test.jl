@@ -37,9 +37,9 @@ for (nuc, nucCoords, molName, iMol) in zip(mols, molCoords, molNames, 1:length(m
     flag = (bfCoord == nucCoords)
     if flag
         nucConfig = [(bf, i) for i in nuc]
-        bs = BasisFunc.(bfCoord, nucConfig) |> flatten
+        bs = genBasisFunc.(bfCoord, nucConfig) |> flatten
     else
-        bs = BasisFunc.(bfCoord, bf) |> flatten
+        bs = genBasisFunc.(bfCoord, bf) |> flatten
         bsName = "-Float"*bsName
     end
     

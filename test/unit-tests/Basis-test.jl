@@ -34,17 +34,17 @@ for i=1:2 gf1.param[i][] = x[i] end
 @test hasEqual(gf1, gf2)
 
 
-# struct BasisFunc
+# struct BasisFunc and function genBasisFunc
 cen = [1,2,3]
 using Quiqbox: ParamList
 cenParNames = [ParamList[:X], ParamList[:Y], ParamList[:Z]]
 cenPar = ParamBox.(cen, cenParNames) |> Tuple
-bf1 = BasisFunc(cen, [gf1])
-bf1_1 = BasisFunc(cen, [gf1])
-bf1_2 = BasisFunc(bf1)
-bf1_3 = BasisFunc(cenPar, gf1)
-bf1_4 = BasisFunc(cenPar, gf1)
-bf2 = BasisFunc(cen, [gf2])
+bf1 = genBasisFunc(cen, [gf1])
+bf1_1 = genBasisFunc(cen, [gf1])
+bf1_2 = genBasisFunc(bf1)
+bf1_3 = genBasisFunc(cenPar, gf1)
+bf1_4 = genBasisFunc(cenPar, gf1)
+bf2 = genBasisFunc(cen, [gf2])
 @test bf1 !== bf2
 @test hasEqual(bf1, bf1_1, bf1_2, bf1_3, bf1_4, bf2)
 @test hasIdentical(bf1, bf1_2)
@@ -55,28 +55,28 @@ bf2 = BasisFunc(cen, [gf2])
 @test bf1.subshell == "S"
 @test bf1 isa BasisFunc
 
-bf11 = BasisFunc(cen, [gf1, gf1])
-bf1_3 = BasisFunc(cen, (exp1, con1))
+bf11 = genBasisFunc(cen, [gf1, gf1])
+bf1_3 = genBasisFunc(cen, (exp1, con1))
 @test hasEqual(bf1, bf1_3)
 @test !hasIdentical(bf1, bf1_3)
-bf11_2 = BasisFunc(cen, ([exp1, exp1], [con1, con1]))
+bf11_2 = genBasisFunc(cen, ([exp1, exp1], [con1, con1]))
 @test hasEqual(bf11, bf11_2)
 @test !hasIdentical(bf11, bf11_2)
-bf2_P_norm2 = BasisFunc(cen, [gf2], "P")
+bf2_P_norm2 = genBasisFunc(cen, [gf2], "P")
 @test bf2_P_norm2.subshell == "P"
 @test bf2_P_norm2 isa BasisFuncs
 
-bf3_1 = BasisFunc([0,0,0], (3,1))
-bf3_2 = BasisFunc([1,0,0], (2,1))
-bf3_3 = BasisFunc([0,0,0], (2,1), "P")
-bf3_4 = BasisFunc([0,0,0], (1,1))
-@test BasisFunc([bf3_1, bf3_2, bf3_3, bf3_4]) == [bf3_1, bf3_4, bf3_3, bf3_2]
+bf3_1 = genBasisFunc([0,0,0], (3,1))
+bf3_2 = genBasisFunc([1,0,0], (2,1))
+bf3_3 = genBasisFunc([0,0,0], (2,1), "P")
+bf3_4 = genBasisFunc([0,0,0], (1,1))
+@test genBasisFunc([bf3_1, bf3_2, bf3_3, bf3_4]) == [bf3_1, bf3_4, bf3_3, bf3_2]
 
 
 # function isFull
 @test isFull(bf3_1) == true
 @test isFull(bf3_3) == true
-bf4 = BasisFunc([0,0,0], (2,1), [1,0,0])
+bf4 = genBasisFunc([0,0,0], (2,1), [1,0,0])
 @test isFull(bf4) == false
 @test isFull(1) == false
 
@@ -85,7 +85,7 @@ bf4 = BasisFunc([0,0,0], (2,1), [1,0,0])
 bfm1 = BasisFuncMix(bf1)
 @test bfm1 == BasisFuncMix([bf1])
 @test BasisFuncMix(BasisFuncMix(bf3_1)) == BasisFuncMix(bf3_1)
-bf4_2 = BasisFunc([0,0,0], (2,1), [[1,0,0]])
+bf4_2 = genBasisFunc([0,0,0], (2,1), [[1,0,0]])
 bfm2 = BasisFuncMix(bf4)
 @test hasEqual(bfm2, BasisFuncMix(bf4_2)[])
 
@@ -126,9 +126,9 @@ lines = (content |> IOBuffer |> readlines)
 
 
 # function assignCenter!
-bf5 = BasisFunc("STO-3G")[]
+bf5 = genBasisFunc("STO-3G")[]
 coord = [1,0,0]
-bf5_1 = BasisFunc(coord, "STO-3G")[]
+bf5_1 = genBasisFunc(coord, "STO-3G")[]
 @test !hasEqual(bf5, bf5_1)
 assignCenter!(coord, bf5)
 @test hasEqual(bf5, bf5_1)

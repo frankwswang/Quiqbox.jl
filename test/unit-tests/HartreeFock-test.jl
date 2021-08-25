@@ -8,7 +8,7 @@ using Suppressor: @suppress_out
 
     nucCoords = [[-0.7,0.0,0.0], [0.7,0.0,0.0]]
     mol = ["H", "H"]
-    bs = BasisFunc.(nucCoords, Ref(("STO-3G", "H"))) |> flatten
+    bs = genBasisFunc.(nucCoords, Ref(("STO-3G", "H"))) |> flatten
 
     local res1, res2
     @suppress_out begin

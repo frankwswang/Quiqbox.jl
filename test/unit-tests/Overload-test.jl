@@ -14,7 +14,7 @@ using Suppressor: @capture_out
     pb3 = ParamBox(-1, :x, mapFunction=abs)
     @test (@capture_out show(pb3)) == string(typeof(pb3))*"(-1.0)[x -> abs(x)][∂]"
 
-    bf1 = BasisFunc([1,2,1], (2,1))
+    bf1 = genBasisFunc([1,2,1], (2,1))
     gf1 = bf1.gauss[1]
     @test (@capture_out show(gf1)) == string(typeof(gf1))*"(xpn="*
                                       string(typeof(gf1.param[1]))*"(2.0)[α][∂], con="*
@@ -22,15 +22,15 @@ using Suppressor: @capture_out
     @test (@capture_out show(bf1)) == string(typeof(bf1))*"(gauss, subshell, center)"*
                                       "[X⁰Y⁰Z⁰][1.0, 2.0, 1.0]"
     
-    bf2 = BasisFunc("STO-3G")[]
+    bf2 = genBasisFunc("STO-3G")[]
     @test (@capture_out show(bf2)) == string(typeof(bf2))*"(gauss, subshell, center)"*
                                       "[X⁰Y⁰Z⁰]"*"[NaN, NaN, NaN]"
     
-    bfs1 = BasisFunc([0,0,0], (2,1), "P")
+    bfs1 = genBasisFunc([0,0,0], (2,1), "P")
     @test (@capture_out show(bfs1)) == string(typeof(bfs1))*"(gauss, subshell, center)"*
                                        "[3/3]"*"[0.0, 0.0, 0.0]"
 
-    bfs2 = BasisFunc([0,0,0], (2,1), [[2,0,0]])
+    bfs2 = genBasisFunc([0,0,0], (2,1), [[2,0,0]])
     @test (@capture_out show(bfs2)) == string(typeof(bfs2))*"(gauss, subshell, center)"*
                                        "[X²Y⁰Z⁰]"*"[0.0, 0.0, 0.0]"
 

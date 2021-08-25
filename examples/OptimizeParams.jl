@@ -6,7 +6,7 @@ grid = GridBox(1, 3.0)
 
 gf1 = GaussFunc(0.7,1)
 
-bs = BasisFunc.(grid.box, Ref([gf1]))
+bs = genBasisFunc.(grid.box, Ref([gf1]))
 
 pars = uniqueParams!(bs, ignoreMapping=true)
 

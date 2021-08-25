@@ -9,10 +9,10 @@ errorThreshold = 1e-12
 # Floating basis set
 nucCoords = [[-0.7,0.0,0.0], [0.7,0.0,0.0]]
 mol = ["H", "H"]
-bfSource1 = BasisFunc(("STO-2G", "H"))[]
+bfSource1 = genBasisFunc(("STO-2G", "H"))[]
 gfs1 = [bfSource1.gauss...]
 cens = gridPoint.(nucCoords)
-bs1 = BasisFunc.(cens, Ref(gfs1))
+bs1 = genBasisFunc.(cens, Ref(gfs1))
 pars1 = uniqueParams!(bs1, ignoreMapping=true)
 
 local Es1L, pars1L, grads1L
@@ -36,7 +36,7 @@ grad_t1 = [-0.1251882751182149,   0.017527948866820964, -0.10779722878571235,
 # Grid-based basis set
 grid = GridBox(1, 3.0)
 gf2 = GaussFunc(0.7,1)
-bs2 = BasisFunc.(grid.box, Ref([gf2]))
+bs2 = genBasisFunc.(grid.box, Ref([gf2]))
 
 pars2 = uniqueParams!(bs2, ignoreMapping=true)[[1,3]]
 
