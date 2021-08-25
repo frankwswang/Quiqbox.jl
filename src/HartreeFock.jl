@@ -200,9 +200,12 @@ end
 guessCcore(::Val{:Hcore}, S, Hcore; X=getX(S), _kws...) = getC(X, Hcore)
 
 
+const defaultSCFconfig = SCFconfig([:ADIIS, :DIIS, :SD], [1e-4, 1e-8, 1e-12])
+
+
 function runHF(bs::Array{<:AbstractFloatingGTBasisFunc, 1}, 
                mol, nucCoords, N=getCharge(mol); initialC=:Hcore, getXmethod=getX, 
-               scfConfig=SCFconfig([:ADIIS, :DIIS, :SD], [1e-4, 1e-8, 1e-12]), 
+               scfConfig=defaultSCFconfig, 
                HFtype=:RHF, printInfo::Bool=true, maxSteps::Int=1000)
     @assert length(mol) == length(nucCoords)
     @assert (basisSize(bs) |> sum) >= ceil(N/2)
@@ -219,7 +222,7 @@ function runHF(gtb::BasisSetData,
                                NTuple{2, Array{<:Number, 2}}, 
                                Symbol}=:Hcore, 
                getXmethod::Function=getX, 
-               scfConfig::SCFconfig=SCFconfig([:ADIIS, :DIIS, :SD], [1e-4, 1e-8, 1e-12]), 
+               scfConfig::SCFconfig=defaultSCFconfig, 
                HFtype::Symbol=:RHF, printInfo::Bool=true, maxSteps::Int=1000)
     @assert length(mol) == length(nucCoords)
     @assert typeof(gtb).parameters[1] >= ceil(N/2)
