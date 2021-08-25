@@ -126,7 +126,7 @@ lines = (content |> IOBuffer |> readlines)
 
 
 # function assignCenter!
-bf5 = genBasisFunc("STO-3G")[]
+bf5 = genBasisFunc(missing, "STO-3G")[]
 coord = [1,0,0]
 bf5_1 = genBasisFunc(coord, "STO-3G")[]
 @test !hasEqual(bf5, bf5_1)

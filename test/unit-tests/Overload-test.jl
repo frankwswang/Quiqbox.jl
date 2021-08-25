@@ -22,7 +22,7 @@ using Suppressor: @capture_out
     @test (@capture_out show(bf1)) == string(typeof(bf1))*"(gauss, subshell, center)"*
                                       "[X⁰Y⁰Z⁰][1.0, 2.0, 1.0]"
     
-    bf2 = genBasisFunc("STO-3G")[]
+    bf2 = genBasisFunc(missing, "STO-3G")[]
     @test (@capture_out show(bf2)) == string(typeof(bf2))*"(gauss, subshell, center)"*
                                       "[X⁰Y⁰Z⁰]"*"[NaN, NaN, NaN]"
     

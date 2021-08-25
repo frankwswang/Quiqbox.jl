@@ -220,7 +220,10 @@ function genBasisFunc(coord::AbstractArray, gs::Array{<:GaussFunc, 1}, ijkOrijks
     genBasisFunc((x,y,z), gs, ijkOrijks; normalizeGTO)
 end
 
-# center::Union{AbstractArray, Tuple{Vararg{<:ParamBox}}}
+genBasisFunc(::Missing, gs::Array{<:GaussFunc, 1}, ijkOrijks::Array; normalizeGTO::Bool=false) = 
+genBasisFunc([NaN, NaN, NaN], gs, ijkOrijks; normalizeGTO)
+
+# center::Union{AbstractArray, Tuple{Vararg{<:ParamBox}}, Missing}
 function genBasisFunc(center, gs::Array{<:GaussFunc, 1}, subshell::String="S"; 
                    ijkFilter::Array{Bool, 1}=fill(true, SubshellDimList[subshell]), normalizeGTO::Bool=false)
     ijkLen = length(ijkFilter)
@@ -245,7 +248,7 @@ function genBasisFunc(center, BSKeyANDnuc::Array{Tuple{String, String}, 1})
     bases = FloatingGTBasisFunc[]
     for k in BSKeyANDnuc
         BFMcontent = BasisSetList[k[1]][AtomicNumberList[k[2]]]
-        append!(bases, genBFuncsFromText(BFMcontent, alterContent=true, excludeLastNlines=1, center=center))
+        append!(bases, genBFuncsFromText(BFMcontent; alterContent=true, excludeLastNlines=1, center))
     end
     bases
 end
@@ -260,7 +263,6 @@ genBasisFunc(center, BSkey::String; nucleus::String="H") =
 genBasisFunc(center, [BSkey]; nucleus)
 
 # A few methods for convenient arguments omissions and mutations.
-genBasisFunc(arg) = genBasisFunc([NaN, NaN, NaN], arg)
 genBasisFunc(arg1, g::GaussFunc, args...; kws...) = genBasisFunc(arg1, [g], args...; kws...)
 genBasisFunc(bf::FloatingGTBasisFunc) = itself(bf)
 genBasisFunc(bs::Array{<:FloatingGTBasisFunc, 1}) = sortBasisFuncs(bs)
@@ -417,9 +419,12 @@ end
 
 function genBFuncsFromText(content::String;
                            alterContent::Bool=false,
-                           contentAlterFunc::Function=(txt)->replace(txt, SciNotMarker => "e"), 
+                           contentAlterFunc::Function=(txt)->
+                                                      replace(txt, SciNotMarker => "e"), 
                            excludeFirstNlines=0, excludeLastNlines=0, 
-                           center::Union{AbstractArray, Tuple{Vararg{<:ParamBox}}}=[NaN, NaN, NaN])
+                           center::Union{AbstractArray, 
+                                         Tuple{Vararg{<:ParamBox}}, 
+                                         Missing}=missing)
     alterContent && (content = contentAlterFunc(content))
     lines = split.(content |> IOBuffer |> readlines)[1+excludeFirstNlines : end-excludeLastNlines]
     data = [advancedParse.(i) for i in lines]

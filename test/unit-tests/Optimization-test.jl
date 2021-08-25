@@ -9,7 +9,7 @@ errorThreshold = 1e-12
 # Floating basis set
 nucCoords = [[-0.7,0.0,0.0], [0.7,0.0,0.0]]
 mol = ["H", "H"]
-bfSource1 = genBasisFunc(("STO-2G", "H"))[]
+bfSource1 = genBasisFunc(missing, ("STO-2G", "H"))[]
 gfs1 = [bfSource1.gauss...]
 cens = gridPoint.(nucCoords)
 bs1 = genBasisFunc.(cens, Ref(gfs1))
