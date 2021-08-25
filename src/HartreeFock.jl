@@ -226,24 +226,25 @@ function runHF(gtb::BasisSetData,
     Hcore = gtb.getHcore(mol, nucCoords)
     X = getXmethod(gtb.S)
     initialC isa Symbol && (initialC = guessC(gtb.S, Hcore; X, method=initialC))
-    runHFcore(Val(HFtype), N, initialC, Hcore, gtb.eeI, gtb.S, X; 
+    runHFcore(Val(HFtype), N, Hcore, gtb.eeI, gtb.S, X, initialC; 
               scfConfig, printInfo, maxSteps)
 end
 
-runHFcore(::Val{:RHF}, N::Int, C, Hcore, HeeI, S, X; 
+runHFcore(::Val{:RHF}, N::Int, Hcore, HeeI, S, X=getX(S), C=guessC(S, Hcore; X); 
           scfConfig, printInfo::Bool=true, maxSteps::Int=1000) = 
-runHFcore(N, C, Hcore, HeeI, S, X; scfConfig, printInfo, maxSteps)
+runHFcore(N, Hcore, HeeI, S, X, C; scfConfig, printInfo, maxSteps)
 
-runHFcore(::Val{:UHF}, N, C, Hcore, HeeI, S, X; 
+runHFcore(::Val{:UHF}, N, Hcore, HeeI, S, X=getX(S), C=guessC(S, Hcore; X); 
           scfConfig, printInfo::Bool=true, maxSteps::Int=1000) = 
-runHFcore((N isa Tuple ? N : (N÷2, N-N÷2)), C, Hcore, HeeI, S, X; 
+runHFcore((N isa Tuple ? N : (N÷2, N-N÷2)), Hcore, HeeI, S, X, C; 
           scfConfig, printInfo, maxSteps)
 
-function runHFcore(N::Union{NTuple{2, Int}, Int}, 
-                   C::Union{Array{<:Number, 2}, NTuple{2, Array{<:Number, 2}}}, 
+function runHFcore(N::Union{NTuple{2, Int}, Int},  
                    Hcore::Array{<:Number, 2}, HeeI::Array{<:Number, 4}, 
-                   S::Array{<:Number, 2}, X::Array{<:Number, 2}; scfConfig::SCFconfig{L}, 
-                   printInfo::Bool=true, maxSteps::Int=1000) where {L}
+                   S::Array{<:Number, 2}, X::Array{<:Number, 2}, 
+                   C::Union{Array{<:Number, 2}, NTuple{2, Array{<:Number, 2}}}; 
+                   scfConfig::SCFconfig{L}, printInfo::Bool=true, 
+                   maxSteps::Int=1000) where {L}
     @assert maxSteps > 0
     vars = initializeSCF(Hcore, HeeI, C, N)
     Etots = (vars isa Tuple) ? vars[1].shared.Etots : vars.shared.Etots

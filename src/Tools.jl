@@ -1,4 +1,4 @@
-export hasEqual, hasIdentical, hasBoolRelation, ArrayPointer, markUnique, flatten, splitTerm
+export hasEqual, hasIdentical, hasBoolRelation, markUnique, getUnique!, flatten, splitTerm
 
 using Statistics: std, mean
 using Symbolics
@@ -27,9 +27,11 @@ end
 
     @compareLength inputArg1 inputArg2 argNames::String... -> length(inputArg1)
     
-A macro that checks whether the lengths of 2 `Arrays`/`Tuples` are equal. It throws a detailed ERROR message when the lengths are not equal. 
+A macro that checks whether the lengths of 2 `Arrays`/`Tuples` are equal. It throws 
+a detailed ERROR message when the lengths are not equal. 
 
-You can specify the name for the compared variables in arguments for better ERROR information.
+You can specify the name for the compared variables in arguments for better ERROR 
+information.
 
 ≡≡≡ Example(s) ≡≡≡
 
@@ -63,11 +65,13 @@ macro compareLength(inputArg1, inputArg2, argNames...)
         local arg1 = $(esc(inputArg1))
         local arg2 = $(esc(inputArg2))
         type = Union{AbstractArray, Tuple}
-        (!(arg1 isa type && arg2 isa type)) && error("The compared objects have to be Arrays or Tuples!\n")
+        (!(arg1 isa type && arg2 isa type)) && error("The compared objects have to be ", 
+                                                     "Arrays or Tuples!\n")
         if length(arg1) != length(arg2)
             for i = 1:length($argNames)
                 # Replace the defualt type control ERROR message.
-                !($argNames[i] isa String) && error("The object's name has to be a String!\n")
+                !($argNames[i] isa String) && error("The object's name has to be a "*
+                                                    "`String`!\n")
                 $ns[i] = $argNames[i]*" ($($ns0[i]))" 
             end
             error("""The lengths of $($ns[1]) and $($ns[2]) are NOT equal.
@@ -82,13 +86,18 @@ end
 
 """
     
-    hasBoolRelation(boolOp::Function, obj1, obj2; ignoreFunction=false, ignoreContainerType=false) -> Bool
+    hasBoolRelation(boolOp::Function, obj1, obj2; ignoreFunction=false, 
+                    ignoreContainerType=false) -> Bool
 
-Recursively apply the specified boolean operator to all the fields within 2 objects (normally 2 `struct`s in the same type). It returns `true` only if all comparisons performed return `true`.
+Recursively apply the specified boolean operator to all the fields within 2 objects 
+(normally 2 `struct`s in the same type). It returns `true` only if all comparisons 
+performed return `true`.
 
-If `ignoreFunction = true`, the function will ignore comparisons between Function-type fields.
+If `ignoreFunction = true`, the function will ignore comparisons between Function-type 
+fields.
 
-If `ignoreContainerType = true`, the funtion will ignore the type difference of the (outermost) container as long as the boolean operator returns true for inside fields. 
+If `ignoreContainerType = true`, the funtion will ignore the type difference of the 
+(outermost) container as long as the boolean operator returns true for inside fields. 
 
 
 ≡≡≡ Example(s) ≡≡≡
@@ -134,27 +143,18 @@ function hasBoolRelation(boolOp::Function, obj1, obj2;
     res = true
     t1 = typeof(obj1)
     t2 = typeof(obj2)
-    # println("s0")
-    # @show obj1 obj2
     if (t1 <: Function) && (t2 <: Function)
-        # println("s1")
-        # println("res 1 = $(res)")
         ignoreFunction ? (return true) : (return boolOp(obj1, obj2))
     elseif (t1 <: Number) && (t2 <: Number)
         return boolOp(obj1, obj2)
     elseif t1 != t2 && !ignoreContainerType
-        # println("s2")
-        # println("res 2 = $(res)")
         return false
     elseif obj1 isa Union{Array, Tuple}
-        # println("s3")
         length(obj1) != length(obj2) && (return false)
         if ([i isa Number for i in obj1] |> prod) && ([i isa Number for i in obj2] |> prod)
-            # println("s3-1")
             return boolOp.(obj1, obj2) |> prod
         end
         if obj1 isa Matrix
-            # println("s3-2")
             size(obj1) != size(obj2) && (return false)
             obj1 = vec(obj1) # Still linked to the original container.
             obj2 = vec(obj2)
@@ -164,27 +164,21 @@ function hasBoolRelation(boolOp::Function, obj1, obj2;
             !res && (return false)
         end
     else
-        # println("s4")
         fs1 = fieldnames(t1)
         fs2 = fieldnames(t2)
-        # @show fs1 fs2
         if fs1 == fs2
-            # println("s4-1")
             if length(fs1) == 0
-                # println("s4-1-1")
-                # @show obj1 obj2
                 res = boolOp(obj1, obj2)
             else
-                # println("s4-1-2")
                 for i in fs1
-                    isdefined(obj1, i) == (fieldDefined = isdefined(obj2, i)) && (fieldDefined ? nothing : continue)
-                    res *= hasBoolRelation(boolOp, getproperty(obj1, i), getproperty(obj2, i); ignoreFunction)
+                    isdefined(obj1, i) == (fieldDefined = isdefined(obj2, i)) && 
+                    (fieldDefined ? nothing : continue)
+                    res *= hasBoolRelation(boolOp, getproperty(obj1, i), 
+                                           getproperty(obj2, i); ignoreFunction)
                     !res && (return false)        
                 end
             end 
         else
-            # println("s4-2")
-            # println("res 3 = $(res)")
             return false
         end
     end
@@ -194,9 +188,11 @@ end
 
 """
 
-    hasBoolRelation(boolOp::Function, obj1, obj2, obj3...; ignoreFunction=false, ignoreContainerType=false) -> Bool
+    hasBoolRelation(boolOp::Function, obj1, obj2, obj3...; 
+                    ignoreFunction=false, ignoreContainerType=false) -> Bool
 
-hasBoolRelation for more than 2 objects. E.g.: `hasBoolRelation(>, a, b, c)` is equivalent to `hasBoolRelation(>, a, b) && hasBoolRelation(>, b, c)`.
+hasBoolRelation for more than 2 objects. E.g.: `hasBoolRelation(>, a, b, c)` is equivalent 
+to `hasBoolRelation(>, a, b) && hasBoolRelation(>, b, c)`.
 
 ≡≡≡ Example(s) ≡≡≡
 
@@ -223,17 +219,8 @@ true
 function hasBoolRelation(boolOp::Function, obj1, obj2, obj3...; 
                          ignoreFunction=false, ignoreContainerType=false) 
     res = hasBoolRelation(boolOp, obj1, obj2; ignoreFunction, ignoreContainerType)
-    # println("s1")
-    # len = length(obj3)
-    # if len > 0 
-    #     # println("s2")
-    #     tmp = obj3[1]
-    #     res *= hasBoolRelation(boolOp, obj2, tmp; ignoreFunction, ignoreContainerType)
-    # end
     tmp = obj2
-    # if res && len > 1
     if res
-        # println("s3")
         for i in obj3[1:end]
             res *= hasBoolRelation(boolOp, tmp, i; ignoreFunction, ignoreContainerType)
             !res && break
@@ -250,9 +237,11 @@ end
 
 Compare if two objects are the euqal. 
 
-If `ignoreFunction = true` then the function will pop up a warning message when a field is a function.
+If `ignoreFunction = true` then the function will pop up a warning message when a field is 
+a function.
 
-If `ignoreContainerType = true` then the funtion will ignore the type difference of the (outermost) container as long as the inside fields are euqal. 
+If `ignoreContainerType = true` then the funtion will ignore the type difference of the 
+(outermost) container as long as the inside fields are euqal. 
 
 This function is an instantiation of `hasBoolRelation`.
 
@@ -283,13 +272,16 @@ hasBoolRelation(==, obj1, obj2, obj3...; ignoreFunction, ignoreContainerType)
 
 """
 
-    hasIdentical(obj1, obj2, obj3...; ignoreFunction=false, ignoreContainerType=false) -> Bool
+    hasIdentical(obj1, obj2, obj3...; 
+                 ignoreFunction=false, ignoreContainerType=false) -> Bool
 
 Compare if two objects are the Identical. An instantiation of `hasBoolRelation`.
 
-If `ignoreFunction = true` then the function will pop up a warning message when a field is a function.
+If `ignoreFunction = true` then the function will pop up a warning message when a field is 
+a function.
 
-If `ignoreContainerType = true` then the funtion will ignore the type difference of the (outermost) container as long as the inside fields are identical.
+If `ignoreContainerType = true` then the funtion will ignore the type difference of the 
+(outermost) container as long as the inside fields are identical.
 
 This function is an instantiation of `hasBoolRelation`.
 
@@ -321,12 +313,14 @@ hasBoolRelation(===, obj1, obj2, obj3...; ignoreFunction, ignoreContainerType)
 
 """
 
-    printStyledInfo(str::String; title::String="INFO:\\n", titleColor::Symbol=:light_blue) -> nothing
+    printStyledInfo(str::String; 
+                    title::String="INFO:\\n", titleColor::Symbol=:light_blue) -> nothing
 
 Print info with colorful title and automatically highlighted code blocks enclosed by ` `. 
 
-If you want to highlight other contents in different colors, you can also put them inside ` ` and start it with "///theColorSymbolName///". 
-The available color names follows the values of `color` keyword arguement in function `printstyled`. 
+If you want to highlight other contents in different colors, you can also put them inside 
+` ` and start it with "///theColorSymbolName///". The available color names follows the 
+values of `color` keyword arguement in function `printstyled`. 
 
 NOTE: There can only be one color in one ` ` quote.
 
@@ -350,9 +344,6 @@ function printStyledInfo(str::String;
         for i = 1:2:l-1
             subStr1 = str[codeQuotes[i][]+1:end]
             blockStr = subStr1[1 : findfirst("`", subStr1)[]-1]
-            # println("\n1")
-            # @show blockStr
-            # println()
             blockColor = codeColor
             startLoc = findfirst("///", blockStr)
             if startLoc !== nothing
@@ -361,9 +352,6 @@ function printStyledInfo(str::String;
                     colorKey = Symbol(blockStr[startLoc[3]+1 : endLoc[1]-1])
                     blockColor = colorKey
                     blockStr = blockStr[1 : startLoc[1]-1]*blockStr[endLoc[3]+1 : end]
-                    # println("\n2")
-                    # @show blockStr
-                    # println()
                 end
             end
             printstyled(blockStr, color=blockColor)
@@ -384,7 +372,8 @@ end
 
     flatten(a::Array) -> Array
 
-Flatten `a::Union{Array, Tuple}` that contains `Array`s and/or `Tuple`s. Only operate on the outermost layer.
+Flatten `a::Union{Array, Tuple}` that contains `Array`s and/or `Tuple`s. Only operate on 
+the outermost layer.
 
 ≡≡≡ Example(s) ≡≡≡
 
@@ -416,11 +405,11 @@ end
 
 """
 
-    arrayAlloc(arrayLength::Int, NumberExample::T) where {T<:Real} -> Ptr{T}
+    arrayAlloc(arrayLength::Int, 
+               anExampleOrType::Union{T, Type{T}}) where {T<:Real} -> Ptr{T}
 
-    arrayAlloc(arrayLength::Int, elementType::Type{T}) where {T<:Real} -> Ptr{T}
-
-Allocate the memory for an array of specified length and element type, then return the pointer to it.
+Allocate the memory for an array of specified length and element type, then return the 
+pointer to it.
 """
 function arrayAlloc(arrayLength::Int, elementType::Type{T}) where {T<:Real}
     memoryLen = arrayLength*sizeof(elementType) |> Cint
@@ -440,16 +429,22 @@ Stores a pointer to the actual address of an array.
 
 `ptr::Ptr{T}`: Pointer pointing to the memory address of the first element of the array.
 
-`arr::Array{T, N}`: The mutable array linked to the pointer. As long as the pointer (memory) is not freed, the array is safely preserved.
+`arr::Array{T, N}`: The mutable array linked to the pointer. As long as the pointer 
+                    (memory) is not freed, the array is safely preserved.
 
 ≡≡≡ Initialization Method(s) ≡≡≡
 
-    ArrayPointer(arr::Array{<:Real, N}; showReminder::Bool=true) where {N} -> ArrayPointer{T, N}
+    ArrayPointer(arr::Array{<:Real, N}; 
+                 showReminder::Bool=true) where {N} -> ArrayPointer{T, N}
 
-Create a `ArrayPointer` that contains a `Ptr` pointing to the actual memory address of the (1st element of the) `Array`.
+Create a `ArrayPointer` that contains a `Ptr` pointing to the actual memory address of the 
+(1st element of the) `Array`.
 
-To avoid memory leaking, the user should use `free(x.ptr)` after the usage of `x::ArrayPointer` to free the occupied memory.
-If `showReminder=true`, the constuctor will pop up a message to remind the user of such operation.
+To avoid memory leaking, the user should use `free(x.ptr)` after the usage of 
+`x::ArrayPointer` to free the occupied memory.
+
+If `showReminder=true`, the constuctor will pop up a message to remind the user of 
+such operation.
 """
 struct ArrayPointer{T, N} <: Any
     ptr::Ptr{T}
@@ -474,11 +469,12 @@ end
 
     markUnique(arr::AbstractArray, args...; compareFunction::Function = hasEqual, kws...)
 
-Return a `markingList` using `Int` number to mark each different elements from (and inside) the input argument(s) and 
-a `uniqueList` to contain all the unique elements when `compareFunction` is set to `hasEqual` (in default).
+Return a `markingList` using `Int` number to mark each different elements from 
+(and inside) the input argument(s) and a `uniqueList` to contain all the unique 
+elements when `compareFunction` is set to `hasEqual` (in default).
 
-`args` and `kws` are positional arguments and keywords argguments respectively as parameters of the specified 
-`compareFunction`.
+`args` and `kws` are positional arguments and keywords argguments respectively as 
+parameters of the specified `compareFunction`.
 
 ≡≡≡ Example(s) ≡≡≡
 
@@ -539,7 +535,6 @@ function getUnique!(arr::Array, args...; compareFunction::Function = hasEqual, k
         isNew && push!(cmprList, arr[i])
         push!(delList, !isNew)
     end
-    # @show delList
     deleteat!(arr, delList)
 end
 
@@ -564,7 +559,8 @@ end
 
 
 """
-Recursively find the final value using the value of each iteration as the key for the next search.
+Recursively find the final value using the value of each iteration as the key for the 
+next search.
 """
 function recursivelyGet(dict::Dict, startKey)
     res = nothing
