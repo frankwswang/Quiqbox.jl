@@ -428,7 +428,7 @@ function genBFuncsFromText(content::String;
     alterContent && (content = contentAlterFunc(content))
     lines = split.(content |> IOBuffer |> readlines)[1+excludeFirstNlines : end-excludeLastNlines]
     data = [advancedParse.(i) for i in lines]
-    index = findall(x -> typeof(x) != Array{Float64, 1}, data)[2:end]
+    index = findall(x -> typeof(x) != Array{Float64, 1} && length(x)==3, data)
     bfs = []
     for i in index
         gs1 = GaussFunc[]
