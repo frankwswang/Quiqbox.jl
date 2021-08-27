@@ -1,7 +1,7 @@
 export overlap, overlaps, nucAttraction, nucAttractions, elecKinetic, elecKinetics, coreH, coreHij
 
 
-function oneBodyBFTensorCore(libcinFunc::Symbol, bf1::FloatingGTBasisFunc, bf2::FloatingGTBasisFunc, 
+function oneBodyBFTensorCore(libcinFunc::Val, bf1::FloatingGTBasisFunc, bf2::FloatingGTBasisFunc, 
                              nuclei::Array{String, 1}, nucleiCoords::Array{<:AbstractArray, 1};
                              isGradient::Bool=false)
     env = Float64[]
@@ -24,7 +24,7 @@ function oneBodyBFTensorCore(libcinFunc::Symbol, bf1::FloatingGTBasisFunc, bf2::
 end
 
 
-function oneBodyBFTensor(libcinFunc::Symbol, b1::AbstractFloatingGTBasisFunc, b2::AbstractFloatingGTBasisFunc, 
+function oneBodyBFTensor(libcinFunc::Val, b1::AbstractFloatingGTBasisFunc, b2::AbstractFloatingGTBasisFunc, 
                          nuclei::Array{String, 1}, nucleiCoords::Array{<:AbstractArray, 1};
                          isGradient::Bool=false)
     f = @inline function (i,j)
@@ -62,7 +62,7 @@ end
 Return the orbital overlap matrix (an N×N×1 Tensor where N is the number of spatial orbitals) given 2 basis functions.
 """
 overlap(bf1::AbstractFloatingGTBasisFunc, bf2::AbstractFloatingGTBasisFunc) = 
-oneBodyBFTensor(:cint1e_ovlp_cart, bf1, bf2, String[], Array[])
+oneBodyBFTensor(Val(:cint1e_ovlp_cart), bf1, bf2, String[], Array[])
 
 
 """
@@ -83,7 +83,7 @@ Return the nuclear attraction matrix (an N×N×1 Tensor where N is the number of
 and the nuclei with their coordinates (in atomic unit).
 """
 nucAttraction(bf1::AbstractFloatingGTBasisFunc, bf2::AbstractFloatingGTBasisFunc, nuc::Array{String, 1}, nucCoords::Array{<:AbstractArray, 1}) = 
-oneBodyBFTensor(:cint1e_nuc_cart, bf1, bf2, nuc, nucCoords)
+oneBodyBFTensor(Val(:cint1e_nuc_cart), bf1, bf2, nuc, nucCoords)
 
 
 """
@@ -94,7 +94,7 @@ Return the nuclear attraction matrix (an N×N×1 Tensor where N is the number of
 and the nuclei with their coordinates (in atomic unit).
 """
 nucAttractions(BSet::Array{<:AbstractFloatingGTBasisFunc, 1}, nuc::Array{String, 1}, nucCoords::Array{<:AbstractArray, 1}) = 
-oneBodyBSTensor(BSet, (bf1, bf2)->oneBodyBFTensor(:cint1e_nuc_cart, bf1, bf2, nuc, nucCoords))
+oneBodyBSTensor(BSet, (bf1, bf2)->oneBodyBFTensor(Val(:cint1e_nuc_cart), bf1, bf2, nuc, nucCoords))
 
 
 """
@@ -104,7 +104,7 @@ oneBodyBSTensor(BSet, (bf1, bf2)->oneBodyBFTensor(:cint1e_nuc_cart, bf1, bf2, nu
 Return the electron kinetic energy matrix (an N×N×1 Tensor where N is the number of spatial orbitals) given 2 basis functions.
 """
 elecKinetic(bf1::AbstractFloatingGTBasisFunc, bf2::AbstractFloatingGTBasisFunc) = 
-oneBodyBFTensor(:cint1e_kin_cart, bf1, bf2, String[], Array[])
+oneBodyBFTensor(Val(:cint1e_kin_cart), bf1, bf2, String[], Array[])
 
 
 """

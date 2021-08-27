@@ -18,9 +18,7 @@ end
 
 function defaultECmethod(HFtype, Hcore, HeeI, S, Ne)
     X = getX(S)
-    res = runHFcore(Val(HFtype), Ne, Hcore, HeeI, S, X, guessC(S, Hcore; X),
-                    scfConfig=SCFconfig([:ADIIS, :DIIS,   :SD], 
-                                        [  1e-4,  1e-8, 1e-12]), printInfo=false)
+    res = runHFcore(Ne, Hcore, HeeI, S, X, guessC(S, Hcore; X); printInfo=false, HFtype)
     res.E0HF, res.C
 end
 

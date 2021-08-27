@@ -1,7 +1,7 @@
 export eeInteraction, eeInteractions, uniqueTwoBodyBFints
 
 
-function twoBodyBFTensorCore(libcinFunc::Symbol, 
+function twoBodyBFTensorCore(libcinFunc::Val, 
                          bf1::FloatingGTBasisFunc, bf2::FloatingGTBasisFunc, 
                          bf3::FloatingGTBasisFunc, bf4::FloatingGTBasisFunc; isGradient::Bool=false)                                      
     env = Float64[]
@@ -19,7 +19,7 @@ function twoBodyBFTensorCore(libcinFunc::Symbol,
 end
 
 
-function twoBodyBFTensor(libcinFunc::Symbol, 
+function twoBodyBFTensor(libcinFunc::Val, 
                          b1::AbstractFloatingGTBasisFunc, b2::AbstractFloatingGTBasisFunc, 
                          b3::AbstractFloatingGTBasisFunc, b4::AbstractFloatingGTBasisFunc; isGradient::Bool=false)                                      
     f = @inline function (i,j,k,l)
@@ -74,7 +74,7 @@ end
 Return the electron-electron interaction tensor (an N×N×N×N×1 Tensor where N is the number of spatial orbitals) given 4 basis functions.
 """
 eeInteraction(bf1::AbstractFloatingGTBasisFunc, bf2::AbstractFloatingGTBasisFunc, bf3::AbstractFloatingGTBasisFunc, bf4::AbstractFloatingGTBasisFunc) = 
-twoBodyBFTensor(:cint2e_cart, bf1, bf2, bf3, bf4)
+twoBodyBFTensor(Val(:cint2e_cart), bf1, bf2, bf3, bf4)
 
 
 """
