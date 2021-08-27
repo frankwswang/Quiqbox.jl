@@ -1,6 +1,6 @@
 using Test
 using Quiqbox
-using Quiqbox: isFull, getBasisFuncs, inSymbols, varVal
+using Quiqbox: isFull, getBasisFuncs, inSymbols, varVal, ElementNames
 using Symbolics
 
 @testset "Basis.jl" begin
@@ -123,6 +123,21 @@ P    2   1.0
 lines = (content |> IOBuffer |> readlines)
 @test map(i->Quiqbox.genGaussFuncText(bfCoeff2[i,:]...), 1:size(bfCoeff2)[1] |> collect) == 
       [lines[2], lines[3], lines[5], lines[6], lines[8], lines[9]].*"\n"
+
+
+# function genBasisFuncText & genBFuncsFromText
+randElement = ElementNames[rand(1:length(ElementNames))]
+bs1 = genBasisFunc(missing, ("6-31G", "H"))
+cens = [rand(3) for _=1:length(bs1)]
+assignCenter!.(cens, bs1)
+txt1 = genBasisFuncText(bs1, printCenter=false, groupCenters=false) |> join
+txt2 = genBasisFuncText(bs1, printCenter=false) |> join
+bs2_1 = genBFuncsFromText(txt1)
+bs2_2 = genBFuncsFromText(txt2)
+assignCenter!.(cens, bs2_1)
+assignCenter!.(cens, bs2_2)
+@test hasEqual(bs1, bs2_2, ignoreContainerType=true)
+@test hasEqual(bs1, bs2_1, ignoreContainerType=true)
 
 
 # function assignCenter!
