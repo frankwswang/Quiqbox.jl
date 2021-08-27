@@ -79,7 +79,7 @@ twoBodyBFTensor(:cint2e_cart, bf1, bf2, bf3, bf4)
 
 """
 
-    eeInteractions(BSet::Array{<:AbstractFloatingGTBasisFunc, 1}; outputUniqueIndices::Bool=false) -> Array{Float64, 5}, [Vector{Vector{Int64}}]
+    eeInteractions(BSet::Array{<:AbstractFloatingGTBasisFunc, 1}; outputUniqueIndices::Bool=false) -> Array{Float64, 5}, [Array{<:Array{Int, 1}, 1}]
 
 Return the electron-electron interaction tensor (an N×N×N×N×1 Tensor where N is the number of spatial orbitals) given a basis set in the form of an `Array`.
 

@@ -1,4 +1,4 @@
-export runHF, runHFcore
+export runHF, runHFcore, SCFconfig
 
 using LinearAlgebra: dot, Hermitian
 using PiecewiseQuadratics: indicator
@@ -25,8 +25,8 @@ getD(X, F, Nˢ) = getD(getC(X, F), Nˢ)
 function getGcore(HeeI, DJ, DK)
     G = zero(DJ)
     l = size(G)[1]
-    @views for μ = 1:l, ν = 1:l
-        G[μ, ν] = dot(transpose(DJ), HeeI[μ,ν,:,:]) - dot(DK, HeeI[μ,:,:,ν]) # fastest
+    for μ = 1:l, ν = 1:l # fastest
+        G[μ, ν] = dot(transpose(DJ), @view HeeI[μ,ν,:,:]) - dot(DK, @view HeeI[μ,:,:,ν]) 
     end
     G |> Hermitian |> Array
 end
@@ -260,7 +260,7 @@ function runHFcore(N::Union{NTuple{2, Int}, Int},
         while true
             iStep = length(Etots)
             iStep <= maxSteps || (isConverged = false) || break
-            SCFcore!(method, N, Hcore, HeeI, S, X, vars; kws...)
+            SCF!(method, N, Hcore, HeeI, S, X, vars; kws...)
             printInfo && (iStep % floor(log(4, iStep) + 1) == 0 || iStep == maxSteps) && 
             println(rpad("Step $(iStep)", 10), 
                     rpad("#$(i) ($(method))", 12), 
@@ -304,10 +304,11 @@ function xDIIScore(ValHF::Val, ValDIIS::Val, Nˢ::Int,
                    Es::Array{Float64, 1}, 
                    Ds::Array{<:Array{<:Number, 2}, 1}; 
                    DIISsize::Int=15, solver::Symbol=:default, _kws...)
-    ∇s = Fs[1:end .> end-DIISsize]
-    Es = Es[1:end .> end-DIISsize]
-    Ds = Ds[1:end .> end-DIISsize]
-    DIISmethod, convexConstraint = DIISselector(ValDIIS)
+    DIISmethod, convexConstraint, permuteData = DIISselector(ValDIIS)
+    is = permuteData ? sortperm(Es) : (:)
+    ∇s = (@view Fs[is])[1:end .> end-DIISsize]
+    Es = (@view Es[is])[1:end .> end-DIISsize]
+    Ds = (@view Ds[is])[1:end .> end-DIISsize]
     vec, B = DIISmethod(Ds, ∇s, Es, S)
     c = constraintSolver(vec, B; convexConstraint, solver)
     grad = c.*∇s |> sum
@@ -322,11 +323,11 @@ function xDIIScore(ValHF::Val, ValDIIS::Val, Nˢ::Int,
 end
 
 
-DIISselector(::Val{:DIIS}) = ((Ds, ∇s, _, S) -> DIIScore(Ds, ∇s, S), false)
+DIISselector(::Val{:DIIS}) = ((Ds, ∇s, _, S) -> DIIScore(Ds, ∇s, S), false, true)
 
-DIISselector(::Val{:EDIIS}) = ((Ds, ∇s, Es, _) -> EDIIScore(Ds, ∇s, Es), true)
+DIISselector(::Val{:EDIIS}) = ((Ds, ∇s, Es, _) -> EDIIScore(Ds, ∇s, Es), true, false)
 
-DIISselector(::Val{:ADIIS}) = ((Ds, ∇s, _, _) -> ADIIScore(Ds, ∇s), true)
+DIISselector(::Val{:ADIIS}) = ((Ds, ∇s, _, _) -> ADIIScore(Ds, ∇s), true, false)
 
 
 function EDIIScore(Ds, ∇s, Es)
@@ -376,47 +377,52 @@ SCFmethodSelector(ValDIIS::Val, ::typeof(xDIIScore)) =
 
 
 # RHF
-function SCFcore!(SCFmethod::Symbol, N::Int, 
-                  Hcore::Array{<:Number, 2}, HeeI::Array{<:Number, 4}, 
-                  S::Array{<:Number, 2}, X::Array{<:Number, 2}, 
-                  rVars::HFtempVars{:RHF}; kws...)
+function SCF!(SCFmethod::Symbol, N::Int, 
+              Hcore::Array{<:Number, 2}, HeeI::Array{<:Number, 4}, 
+              S::Array{<:Number, 2}, X::Array{<:Number, 2}, 
+              rVars::HFtempVars{:RHF}; kws...)
+    res = RHFcore(SCFmethod, N, Hcore, HeeI, S, X, rVars; kws...)
+    push!(rVars.Cs, res[1])
+    push!(rVars.Fs, res[2])
+    push!(rVars.Ds, res[3])
+    push!(rVars.Es, res[4])
+    push!(rVars.shared.Dtots, res[5])
+    push!(rVars.shared.Etots, res[6])
+end
+
+function RHFcore(SCFmethod::Symbol, N::Int, 
+                 Hcore::Array{<:Number, 2}, HeeI::Array{<:Number, 4}, 
+                 S::Array{<:Number, 2}, X::Array{<:Number, 2}, 
+                 rVars::HFtempVars{:RHF}; kws...)
     f, D = SCFmethodSelector(SCFmethod)(Val(:RHF), N÷2, Hcore, HeeI, S, X, rVars; kws...)
     Dᵀnew = 2D
     Cnew, Fnew, Dnew, Enew = f(Dᵀnew)
     Eᵀnew = 2Enew
-    push!(rVars.Cs, Cnew)
-    push!(rVars.Fs, Fnew)
-    push!(rVars.Ds, Dnew)
-    push!(rVars.Es, Enew)
-    push!(rVars.shared.Dtots, Dᵀnew)
-    push!(rVars.shared.Etots, Eᵀnew)
+    Cnew, Fnew, Dnew, Enew, Dᵀnew, Eᵀnew
 end
 
 # UHF
-function SCFcore!(SCFmethod::Symbol, Ns::NTuple{2, Int}, 
-                  Hcore::Array{<:Number, 2}, HeeI::Array{<:Number, 4}, 
-                  S::Array{<:Number, 2}, X::Array{<:Number, 2}, 
-                  uVars::NTuple{2, HFtempVars{:UHF}}; kws...) 
-    fs = Function[]
-    Dᵀ = uVars[1].shared.Dtots
-    Eᵀ = uVars[1].shared.Etots
-    Dᵀnew = zero(Dᵀ[end])
-    Eᵀnew = zero(Eᵀ[end])
-    for (Nˢ, vars) in zip(Ns, uVars)
-        res = SCFmethodSelector(SCFmethod)(Val(:UHF), Nˢ, Hcore, HeeI, S, X, vars; kws...)
-        push!(fs, res[1])
-        Dᵀnew += res[2]
+function SCF!(SCFmethod::Symbol, Ns::NTuple{2, Int}, 
+              Hcore::Array{<:Number, 2}, HeeI::Array{<:Number, 4}, 
+              S::Array{<:Number, 2}, X::Array{<:Number, 2}, 
+              uVars::NTuple{2, HFtempVars{:UHF}}; kws...) 
+    res = UHFcore(SCFmethod, Ns, Hcore, HeeI, S, X, uVars; kws...)
+    fields = [:Cs, :Fs, :Ds, :Es]
+    for (field, vars) in zip(fields, @view res[1:4])
+        push!.(getfield.(uVars, field), vars)
     end
-    for (f, vars) in zip(fs, uVars)
-        Cnew, Fnew, Dnew, Enew = f(Dᵀnew)
-        push!(vars.Cs, Cnew)
-        push!(vars.Fs, Fnew)
-        push!(vars.Ds, Dnew)
-        push!(vars.Es, Enew)
-        Eᵀnew += Enew
-    end
-    push!(Dᵀ, Dᵀnew)
-    push!(Eᵀ, Eᵀnew)
+    push!(uVars[1].shared.Dtots, res[5])
+    push!(uVars[1].shared.Etots, res[6])
+end
+
+function UHFcore(SCFmethod::Symbol, Ns::NTuple{2, Int}, 
+                 Hcore::Array{<:Number, 2}, HeeI::Array{<:Number, 4}, 
+                 S::Array{<:Number, 2}, X::Array{<:Number, 2}, 
+                 uVars::NTuple{2, HFtempVars{:UHF}}; kws...) 
+    res = SCFmethodSelector(SCFmethod).(Val(:UHF), Ns, Ref(Hcore), Ref(HeeI), 
+                                        Ref(S), Ref(X), uVars; kws...)
+    partRes = hcat(res[1][1](Dᵀnew), res[2][1](Dᵀnew)) |> eachrow |> collect 
+    partRes..., res[1][2]+res[2][1], Enew1+Enew2
 end
 
 
@@ -449,5 +455,5 @@ end
 function constraintSolverCore(ConvexSupportedSolver::Val, vec, B; convexConstraint=true)
     mod = getfield(Quiqbox, string(ConvexSupportedSolver)[6:end-3] |> Symbol)
     method = getfield(mod, :Optimizer)
-    constraintSolverCore(Val(:convex), vec, B; convexConstraint, method)
+    constraintSolverCore(Val(:Convex), vec, B; convexConstraint, method)
 end

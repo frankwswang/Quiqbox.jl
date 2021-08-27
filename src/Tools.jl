@@ -35,7 +35,7 @@ information.
 
 ≡≡≡ Example(s) ≡≡≡
 
-```
+```jldoctest
 julia> @compareLength [1,2] [3,4]
 2
 

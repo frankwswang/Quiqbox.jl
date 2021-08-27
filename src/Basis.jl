@@ -248,7 +248,7 @@ function genBasisFunc(center, BSKeyANDnuc::Array{Tuple{String, String}, 1})
     bases = FloatingGTBasisFunc[]
     for k in BSKeyANDnuc
         BFMcontent = BasisSetList[k[1]][AtomicNumberList[k[2]]]
-        append!(bases, genBFuncsFromText(BFMcontent; alterContent=true, excludeLastNlines=1, center))
+        append!(bases, genBFuncsFromText(BFMcontent; adjustContent=true, excludeLastNlines=1, center))
     end
     bases
 end
@@ -410,7 +410,7 @@ function genBasisFuncText(bs::Array{<:FloatingGTBasisFunc, 1}; norm=1.0, printCe
         end
     else
         for b in bfBlocks
-            push!(strs, genBasisFuncText(b[1]; norm, printCenter))
+            push!(strs, genBasisFuncText(b; norm, printCenter))
         end
     end
     strs
@@ -418,14 +418,14 @@ end
 
 
 function genBFuncsFromText(content::String;
-                           alterContent::Bool=false,
-                           contentAlterFunc::Function=(txt)->
+                           adjustContent::Bool=false,
+                           adjustFunction::Function=(txt)->
                                                       replace(txt, SciNotMarker => "e"), 
                            excludeFirstNlines=0, excludeLastNlines=0, 
                            center::Union{AbstractArray, 
                                          Tuple{Vararg{<:ParamBox}}, 
                                          Missing}=missing)
-    alterContent && (content = contentAlterFunc(content))
+    adjustContent && (content = adjustFunction(content))
     lines = split.(content |> IOBuffer |> readlines)[1+excludeFirstNlines : end-excludeLastNlines]
     data = [advancedParse.(i) for i in lines]
     index = findall(x -> typeof(x) != Array{Float64, 1} && length(x)==3, data)
