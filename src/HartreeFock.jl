@@ -3,6 +3,7 @@ export runHF, runHFcore, SCFconfig
 using LinearAlgebra: dot, Hermitian
 using PiecewiseQuadratics: indicator
 using SeparableOptimization, Convex, COSMO
+using Statistics: median
 
 getXcore1(S) = S^(-0.5) |> Array
 
@@ -17,9 +18,25 @@ function getC(X, F; outputCx::Bool=false, outputEmo::Bool=false)
     outputEmo ? (outC, ϵ) : outC
 end
 
+function getCfromGWH(S, Hcore; K=1.75, X=getX(S), _kws...)
+    l = size(Hcore)[1]
+    H = zero(Hcore)
+    for i in 1:l, j in 1:l
+        H[i,j] = K * S[i,j] * (Hcore[i,i] + Hcore[j,j]) / 2
+    end
+    getC(X, H)
+end
+
+getCfromHcore(S, Hcore; X=getX(S), _kws...) = getC(X, Hcore)
+
+const guessCmethods = Dict(:GWH=>getCfromGWH, :Hcore=>getCfromHcore)
+
+
+guessC(S, Hcore; method::Symbol=:GWH, kws...) = guessCmethods[method](S, Hcore; kws...)
+
 
 getD(C, Nˢ) = @views (C[:,1:Nˢ]*C[:,1:Nˢ]') |> Hermitian |> Array
-# Nˢ: number of electrons with the same spin
+# Nˢ: number of electrons with the same spin.
 
 getD(X, F, Nˢ) = getD(getC(X, F), Nˢ)
 
@@ -43,12 +60,14 @@ end
 @inline getF(Hcore, G) = Hcore + G
 
 # RHF
-@inline getF(Hcore, HeeI, D::Array{<:Number, 2}, Dᵀ::Array{<:Number, 2}) = getF(Hcore, getG(HeeI, D, Dᵀ))
+@inline getF(Hcore, HeeI, D::Array{<:Number, 2}, Dᵀ::Array{<:Number, 2}) = 
+getF(Hcore, getG(HeeI, D, Dᵀ))
 
 # UHF
 @inline getF(Hcore, HeeI, D::Array{<:Number, 2}) = getF(Hcore, getG(HeeI, D))
 
-@inline getF(Hcore, HeeI, Ds::Tuple{Vararg{Array{<:Number, 2}}}) = getF(Hcore, getG(HeeI, Ds...))
+@inline getF(Hcore, HeeI, Ds::Tuple{Vararg{Array{<:Number, 2}}}) = 
+getF(Hcore, getG(HeeI, Ds...))
 
 
 @inline getE(Hcore, F, D) = dot(transpose(D), 0.5*(Hcore + F))
@@ -202,34 +221,18 @@ struct HFfinalVars{T, N, Nb} <: HartreeFockFinalValue{T}
 end
 
 
-function guessCcore1(S, Hcore; K=1.75, X=getX(S), _kws...)
-    l = size(Hcore)[1]
-    H = zero(Hcore)
-    for i in 1:l, j in 1:l
-        H[i,j] = K * S[i,j] * (Hcore[i,i] + Hcore[j,j]) / 2
-    end
-    getC(X, H)
-end
-
-guessCcore2(S, Hcore; X=getX(S), _kws...) = getC(X, Hcore)
-
-const guessCmethods = Dict(:GWH=>guessCcore1, :Hcore=>guessCcore2)
-
-guessC(S, Hcore; method::Symbol=:GWH, kws...) = guessCmethods[method](S, Hcore; kws...)
-
-
-const defaultSCFconfig = SCFconfig([:ADIIS, :DIIS, :SD], [1e-4, 1e-8, 1e-12])
+const defaultSCFconfig = SCFconfig([:ADIIS, :DIIS, :ADIIS], [1e-4, 1e-6, 1e-12])
 
 
 function runHF(bs::Array{<:AbstractFloatingGTBasisFunc, 1}, 
                mol, nucCoords, N=getCharge(mol); initialC=:GWH, getXmethod=getX, 
-               scfConfig=defaultSCFconfig, 
+               scfConfig=defaultSCFconfig, earlyTermination::Bool=true,
                HFtype=:RHF, printInfo::Bool=true, maxSteps::Int=1000)
     @assert length(mol) == length(nucCoords)
     @assert (basisSize(bs) |> sum) >= ceil(N/2)
     gtb = GTBasis(bs)
     runHF(gtb, mol, nucCoords, N; initialC, scfConfig, 
-          getXmethod, HFtype, printInfo, maxSteps)
+          getXmethod, HFtype, printInfo, maxSteps, earlyTermination)
 end
 
 function runHF(gtb::BasisSetData, 
@@ -240,14 +243,14 @@ function runHF(gtb::BasisSetData,
                                NTuple{2, Array{<:Number, 2}}, 
                                Symbol}=:GWH, 
                getXmethod::Function=getX, 
-               scfConfig::SCFconfig=defaultSCFconfig, 
+               scfConfig::SCFconfig=defaultSCFconfig, earlyTermination::Bool=true,
                HFtype::Symbol=:RHF, printInfo::Bool=true, maxSteps::Int=1000)
     @assert length(mol) == length(nucCoords)
     @assert typeof(gtb).parameters[1] >= ceil(N/2)
     Hcore = gtb.getHcore(mol, nucCoords)
     X = getXmethod(gtb.S)
     initialC isa Symbol && (initialC = guessC(gtb.S, Hcore; X, method=initialC))
-    runHFcore(N, Hcore, gtb.eeI, gtb.S, X, initialC; scfConfig, printInfo, maxSteps, HFtype)
+    runHFcore(N, Hcore, gtb.eeI, gtb.S, X, initialC; scfConfig, printInfo, maxSteps, HFtype, earlyTermination)
 end
 
 
@@ -259,20 +262,21 @@ function runHFcore(N::Union{NTuple{2, Int}, Int},
                             NTuple{2, Array{<:Number, 2}}}=guessC(S, Hcore; X);
                    HFtype::Symbol=:RHF,  
                    scfConfig::SCFconfig{L}, printInfo::Bool=true, 
-                   maxSteps::Int=1000) where {L}
+                   maxSteps::Int=1000, earlyTermination::Bool=true) where {L}
     @assert maxSteps > 0
     HFtype == :UHF && (N isa Int) && (N = (N÷2, N-N÷2))
     vars = initializeSCF(Hcore, HeeI, C, N)
     Etots = (vars isa Tuple) ? vars[1].shared.Etots : vars.shared.Etots
     printInfo && println(rpad("$(HFtype) Initial Gauss", 22), "E = $(Etots[end])")
     isConverged = true
+    EtotMin = Etots[]
     for (method, kws, breakPoint, i) in 
         zip(scfConfig.methods, scfConfig.methodConfigs, scfConfig.intervals, 1:L)
-        
+
         while true
             iStep = length(Etots)
             iStep <= maxSteps || (isConverged = false) || break
-            SCF!(method, N, Hcore, HeeI, S, X, vars; kws...)
+            HF!(method, N, Hcore, HeeI, S, X, vars; kws...)
             printInfo && (iStep % floor(log(4, iStep) + 1) == 0 || iStep == maxSteps) && 
             println(rpad("Step $(iStep)", 10), 
                     rpad("#$(i) ($(method))", 12), 
@@ -282,6 +286,9 @@ function runHFcore(N::Union{NTuple{2, Int}, Int},
                                              10^(log(10, breakPoint)÷2), 
                                              returnStd=true)
             flag && (isConverged = Std > scfConfig.oscillateThreshold ? false : true; break)
+            earlyTermination && (Etots[end] - EtotMin) / abs(EtotMin) > 0.2 && 
+            (printInfo && println("Early termination of method $(method) due to the poor"*
+            " performance."); break)
         end
 
     end
@@ -305,26 +312,27 @@ end
 function xDIIScore(method::Symbol, Nˢ::Int, Hcore::Array{<:Number, 2}, 
                    HeeI::Array{<:Number, 4}, 
                    S::Array{<:Number, 2}, X::Array{<:Number, 2}, 
-                   Fs::Array{<:Array{<:Number, 2}, 1}, Es::Array{Float64, 1}, 
-                   Ds::Array{<:Array{<:Number, 2}, 1}; 
+                   Fs::Array{<:Array{<:Number, 2}, 1}, 
+                   Ds::Array{<:Array{<:Number, 2}, 1},
+                   Es::Array{Float64, 1}; 
                    DIISsize::Int=15, solver=:default, _kws...)
     DIISmethod, convexConstraint, permuteData = DIISmethods[method]
     is = permuteData ? sortperm(Es) : (:)
     ∇s = (@view Fs[is])[1:end .> end-DIISsize]
-    Es = (@view Es[is])[1:end .> end-DIISsize]
     Ds = (@view Ds[is])[1:end .> end-DIISsize]
-    vec, B = DIISmethod(Ds, ∇s, Es, S)
+    Es = (@view Es[is])[1:end .> end-DIISsize]
+    vec, B = DIISmethod(∇s, Ds, Es, S)
     c = constraintSolver(vec, B, solver; convexConstraint)
     grad = c.*∇s |> sum
     getD(X, grad |> Hermitian |> Array, Nˢ) # grad == F.
 end
 
-const DIISmethods = Dict( :DIIS => ((Ds, ∇s,  _, S)->DIIScore(Ds, ∇s, S),   false, true ),
-                         :EDIIS => ((Ds, ∇s, Es, _)->EDIIScore(Ds, ∇s, Es), true,  false),
-                         :ADIIS => ((Ds, ∇s,  _, _)->ADIIScore(Ds, ∇s),     true,  false))
+const DIISmethods = Dict( :DIIS => ((∇s, Ds,  _, S)->DIIScore(∇s, Ds, S),   false, true ),
+                         :EDIIS => ((∇s, Ds, Es, _)->EDIIScore(∇s, Ds, Es), true,  false),
+                         :ADIIS => ((∇s, Ds,  _, _)->ADIIScore(∇s, Ds),     true,  false))
 
 
-function EDIIScore(Ds, ∇s, Es)
+function EDIIScore(∇s, Ds, Es)
     len = length(Ds)
     B = ones(len, len)
     for i=1:len, j=1:len
@@ -334,7 +342,7 @@ function EDIIScore(Ds, ∇s, Es)
 end
 
 
-function ADIIScore(Ds, ∇s)
+function ADIIScore(∇s, Ds)
     len = length(Ds)
     B = ones(len, len)
     vec = [dot(D - Ds[end], ∇s[end]) for D in Ds]
@@ -345,7 +353,7 @@ function ADIIScore(Ds, ∇s)
 end
 
 
-function DIIScore(Ds, ∇s, S)
+function DIIScore(∇s, Ds, S)
     len = length(Ds)
     B = ones(len, len)
     vec = zeros(len)
@@ -356,32 +364,35 @@ function DIIScore(Ds, ∇s, S)
 end
 
 
-const SD = (Nˢ, Hcore, HeeI, _dm, X, tmpVars::HFtempVars; kws...) -> 
-           SDcore(Nˢ, Hcore, HeeI, X, tmpVars.Fs[end], tmpVars.Ds[end]; kws...)
+const SD = (Nˢ, Hcore, HeeI, _dm, X, tVars::HFtempVars; kws...) -> 
+           SDcore(Nˢ, Hcore, HeeI, X, tVars.Fs[end], tVars.Ds[end]; kws...)
 
-const xDIIS = (method::Symbol) -> (Nˢ, Hcore, HeeI, S, X, tmpVars::HFtempVars; kws...) -> 
-                                  xDIIScore(method, Nˢ, Hcore, HeeI, S, X, tmpVars.Fs, 
-                                            tmpVars.Es, tmpVars.Ds; kws...)
+const xDIIS = (method::Symbol) -> 
+              (Nˢ, Hcore, HeeI, S, X, tVars::HFtempVars; kws...) -> 
+              xDIIScore(method, Nˢ, Hcore, HeeI, S, X, tVars.Fs, tVars.Ds, tVars.Es; kws...)
 
 const SCFmethods = Dict( [:SD, :DIIS,        :ADIIS,        :EDIIS] .=> 
                          [ SD, xDIIS(:DIIS), xDIIS(:ADIIS), xDIIS(:EDIIS)])
 
 
+function HF!(SCFmethod::Symbol, N, Hcore::Array{<:Number, 2}, HeeI::Array{<:Number, 4}, 
+             S::Array{<:Number, 2}, X::Array{<:Number, 2}, 
+             tVars::HFtempVars{:RHF}; kws...)
+    res = HFcore(SCFmethod, N, Hcore, HeeI, S, X, tVars; kws...)
+    pushHFtempVars!(tVars, res)
+end
+
 # RHF
-function RHFcore(SCFmethod::Symbol, N::Int, 
-                 Hcore::Array{<:Number, 2}, HeeI::Array{<:Number, 4}, 
-                 S::Array{<:Number, 2}, X::Array{<:Number, 2}, 
-                 rVars::HFtempVars{:RHF}; kws...)
+function HFcore(SCFmethod::Symbol, N::Int, 
+                Hcore::Array{<:Number, 2}, HeeI::Array{<:Number, 4}, 
+                S::Array{<:Number, 2}, X::Array{<:Number, 2}, 
+                rVars::HFtempVars{:RHF}; kws...)
     D = SCFmethods[SCFmethod](N÷2, Hcore, HeeI, S, X, rVars; kws...)
     partRes = getCFDE(Hcore, HeeI, X, D)
     partRes..., 2D, 2partRes[end]
 end
 
-function SCF!(SCFmethod::Symbol, N::Int, 
-              Hcore::Array{<:Number, 2}, HeeI::Array{<:Number, 4}, 
-              S::Array{<:Number, 2}, X::Array{<:Number, 2}, 
-              rVars::HFtempVars{:RHF}; kws...)
-    res = RHFcore(SCFmethod, N, Hcore, HeeI, S, X, rVars; kws...)
+function pushHFtempVars!(rVars::HFtempVars, res::Tuple)
     push!(rVars.Cs, res[1])
     push!(rVars.Fs, res[2])
     push!(rVars.Ds, res[3])
@@ -390,12 +401,11 @@ function SCF!(SCFmethod::Symbol, N::Int,
     push!(rVars.shared.Etots, res[6])
 end
 
-
 # UHF
-function UHFcore(SCFmethod::Symbol, Ns::NTuple{2, Int}, 
-                 Hcore::Array{<:Number, 2}, HeeI::Array{<:Number, 4}, 
-                 S::Array{<:Number, 2}, X::Array{<:Number, 2}, 
-                 uVars::NTuple{2, HFtempVars{:UHF}}; kws...) 
+function HFcore(SCFmethod::Symbol, Ns::NTuple{2, Int}, 
+                Hcore::Array{<:Number, 2}, HeeI::Array{<:Number, 4}, 
+                S::Array{<:Number, 2}, X::Array{<:Number, 2}, 
+                uVars::NTuple{2, HFtempVars{:UHF}}; kws...) 
     Ds = SCFmethods[SCFmethod].(Ns, Ref(Hcore), Ref(HeeI), 
                                 Ref(S), Ref(X), uVars; kws...)
     Dᵀnew = Ds |> sum
@@ -403,11 +413,7 @@ function UHFcore(SCFmethod::Symbol, Ns::NTuple{2, Int},
     partRes..., Dᵀnew, sum(partRes[end])
 end
 
-function SCF!(SCFmethod::Symbol, Ns::NTuple{2, Int}, 
-              Hcore::Array{<:Number, 2}, HeeI::Array{<:Number, 4}, 
-              S::Array{<:Number, 2}, X::Array{<:Number, 2}, 
-              uVars::NTuple{2, HFtempVars{:UHF}}; kws...) 
-    res = UHFcore(SCFmethod, Ns, Hcore, HeeI, S, X, uVars; kws...)
+function pushHFtempVars!(uVars::NTuple{2, HFtempVars{:UHF}}, res::Tuple)
     fields = [:Cs, :Fs, :Ds, :Es]
     for (field, vars) in zip(fields, @view res[1:4])
         push!.(getfield.(uVars, field), vars)
@@ -417,7 +423,24 @@ function SCF!(SCFmethod::Symbol, Ns::NTuple{2, Int},
 end
 
 
-# Fastest
+function popHFtempVars!(rVars::HFtempVars)
+    pop!(rVars.Cs)
+    pop!(rVars.Fs)
+    pop!(rVars.Ds)
+    pop!(rVars.Es)
+    pop!(rVars.shared.Dtots)
+    pop!(rVars.shared.Etots)
+end
+
+function popHFtempVars!(uVars::NTuple{2, HFtempVars{:UHF}})
+    fields = [:Cs, :Fs, :Ds, :Es]
+    for field in fields pop!.(getfield.(uVars, field)) end
+    pop!(uVars[1].shared.Dtots)
+    pop!(uVars[1].shared.Etots)
+end
+
+
+# Default
 function ADMMSolver(vec, B; convexConstraint=true)
     len = length(vec)
     A = ones(len) |> transpose |> Array
