@@ -35,7 +35,8 @@ function oneBodyBFTensor(libcinFunc::Val, b1::AbstractFloatingGTBasisFunc, b2::A
 end
 
 
-function oneBodyBSTensor(BasisSet::Array{<:AbstractFloatingGTBasisFunc, 1}, intFunc::Function)
+function oneBodyBSTensor(BasisSet::Array{<:AbstractFloatingGTBasisFunc, 1}, 
+                         intFunc::F) where {F<:Function}
     subSize = basisSize(BasisSet) |> collect
     accuSize = vcat(0, accumulate(+, subSize))
     len = subSize |> sum

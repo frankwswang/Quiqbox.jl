@@ -6,7 +6,8 @@ function gradDescent!(pars::Array{<:Real, 1}, grads::Array{<:Real, 1}, η=0.001)
 end
 
 
-function updateParams!(pbs::Array{<:ParamBox, 1}, grads::Array{<:Real, 1}; method::Function=gradDescent!)
+function updateParams!(pbs::Array{<:ParamBox, 1}, grads::Array{<:Real, 1}; 
+                       method::F=gradDescent!) where {F<:Function}
     parVals = [i[] for i in pbs]
     method(parVals, grads)
     for (m,n) in zip(pbs, parVals)
@@ -18,7 +19,8 @@ end
 
 function defaultECmethod(HFtype, Hcore, HeeI, S, Ne)
     X = getX(S)
-    res = runHFcore(Ne, Hcore, HeeI, S, X, guessC(S, Hcore; X); printInfo=false, HFtype)
+    res = runHFcore(Ne, Hcore, HeeI, S, X, guessC(S, Hcore; X); 
+                    printInfo=false, HFtype, scfConfig=defaultSCFconfig)
     res.E0HF, res.C
 end
 
@@ -27,8 +29,8 @@ function optimizeParams!(bs::Array{<:FloatingGTBasisFunc, 1}, pbs::Array{<:Param
                          mol::Array{String, 1}, nucCoords::Array{<:AbstractArray, 1}, 
                          Ne::Union{NTuple{2, Int}, Int}=getCharge(mol);
                          Etarget::Float64=NaN, threshold::Float64=0.0001, maxSteps::Int=2000, 
-                         printInfo::Bool=true, GDmethod::Function=gradDescent!, HFtype=:RHF, 
-                         ECmethod::Function=defaultECmethod)
+                         printInfo::Bool=true, GDmethod::F1=gradDescent!, HFtype=:RHF, 
+                         ECmethod::F2=defaultECmethod) where {F1<:Function, F2<:Function}
     tAll = @elapsed begin
         
         i = 0
@@ -48,9 +50,9 @@ function optimizeParams!(bs::Array{<:FloatingGTBasisFunc, 1}, pbs::Array{<:Param
         Npars = length(parsL)
 
         while true
-            S = overlaps(bs)[:,:,1]
-            Hcore = coreH(bs, mol, nucCoords)[:,:,1]
-            HeeI = eeInteractions(bs)[:,:,:,:,1]
+            S = dropdims(overlaps(bs), dims=3)
+            Hcore = dropdims(coreH(bs, mol, nucCoords), dims=3)
+            HeeI = dropdims(eeInteractions(bs), dims=5)
             E, C = ECmethod(HFtype, Hcore, HeeI, S, Ne)
 
             t = @elapsed begin
@@ -67,8 +69,7 @@ function optimizeParams!(bs::Array{<:FloatingGTBasisFunc, 1}, pbs::Array{<:Param
                 println(IOContext(stdout, :limit => true), parsL)
                 print(rpad("", 12), "grad = ")
                 println(IOContext(stdout, :limit => true), grad)
-                println("Step duration: $(t) seconds.")
-                println("\n")
+                println("Step duration: ", t, " seconds.\n")
             end
 
             parsL = updateParams!(pbs, grad, method=GDmethod)
@@ -89,7 +90,7 @@ function optimizeParams!(bs::Array{<:FloatingGTBasisFunc, 1}, pbs::Array{<:Param
         println(IOContext(stdout, :limit => true), pars[end, :])
         print(rpad("", 12), "grad = ")
         println(IOContext(stdout, :limit => true), grads[end, :])
-        println("Optimization duration: $(tAll/60) minutes.")
+        println("Optimization duration: ", tAll/60, " minutes.")
         !isConverged(Es) && println("The result has not converged.")
     end
 

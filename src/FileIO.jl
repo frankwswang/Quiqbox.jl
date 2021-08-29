@@ -23,7 +23,8 @@ function checkFname(Fname::String; showWarning::Bool=true)
 end
 
 
-function advancedParse(content::AbstractString, ParseFunc::Function=adaptiveParse)
+function advancedParse(content::AbstractString, 
+                       ParseFunc::F=adaptiveParse) where {F<:Function}
     res = ParseFunc(content)
     res === nothing && (res = content)
     res

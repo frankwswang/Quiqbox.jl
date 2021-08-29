@@ -279,13 +279,15 @@ struct GTBasis{N, BT} <: BasisSetData{N}
     function GTBasis(basis::Array{<:AbstractFloatingGTBasisFunc, 1},
                      S::Array{<:Number, 2}, Te::Array{<:Number, 2}, eeI::Array{<:Number, 4})
         new{basisSize(basis) |> sum, typeof(basis)}(basis, S, Te, eeI, 
-            (mol, nucCoords)->nucAttractions(basis, mol, nucCoords)[:,:,1],
-            (mol, nucCoords)->nucAttractions(basis, mol, nucCoords)[:,:,1] + Te)
+            (mol, nucCoords)->dropdims(nucAttractions(basis, mol, nucCoords), dims=3),
+            (mol, nucCoords)->dropdims(nucAttractions(basis, mol, nucCoords), dims=3) + Te)
     end
 end
 
 GTBasis(basis::Array{<:AbstractFloatingGTBasisFunc, 1}) = 
-GTBasis(basis, overlaps(basis)[:,:,1], elecKinetics(basis)[:,:,1], eeInteractions(basis)[:,:,:,:,1])
+GTBasis(basis, dropdims(overlaps(basis), dims=3), 
+               dropdims(elecKinetics(basis), dims=3), 
+               dropdims(eeInteractions(basis), dims=5))
 
 
 function sortBasisFuncs(bs::Array{<:FloatingGTBasisFunc, 1}; groupCenters::Bool=false)
@@ -419,12 +421,11 @@ end
 
 function genBFuncsFromText(content::String;
                            adjustContent::Bool=false,
-                           adjustFunction::Function=(txt)->
-                                                      replace(txt, SciNotMarker => "e"), 
+                           adjustFunction::F=sciNotReplace, 
                            excludeFirstNlines=0, excludeLastNlines=0, 
                            center::Union{AbstractArray, 
                                          Tuple{Vararg{<:ParamBox}}, 
-                                         Missing}=missing)
+                                         Missing}=missing) where {F<:Function}
     adjustContent && (content = adjustFunction(content))
     lines = split.(content |> IOBuffer |> readlines)[1+excludeFirstNlines : end-excludeLastNlines]
     data = [advancedParse.(i) for i in lines]

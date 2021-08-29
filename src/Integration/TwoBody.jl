@@ -30,8 +30,8 @@ function twoBodyBFTensor(libcinFunc::Val,
 end
 
 
-function twoBodyBSTensor(BasisSet::Array{<:AbstractFloatingGTBasisFunc, 1}, intFunc::Function; 
-                         outputUniqueIndices::Bool=false)
+function twoBodyBSTensor(BasisSet::Array{<:AbstractFloatingGTBasisFunc, 1}, intFunc::F; 
+                         outputUniqueIndices::Bool=false) where {F<:Function}
     subSize = basisSize(BasisSet) |> collect
     accuSize = vcat(0, accumulate(+, subSize))
     totalSize = subSize |> sum

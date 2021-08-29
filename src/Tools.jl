@@ -2,6 +2,7 @@ export hasEqual, hasIdentical, hasBoolRelation, markUnique, getUnique!, flatten,
 
 using Statistics: std, mean
 using Symbolics
+using LinearAlgebra: eigvals, svdvals, eigen
 
 
 # Function for submudole loading and integrity checking.
@@ -138,8 +139,9 @@ julia> begin
 true
 ```
 """
-function hasBoolRelation(boolOp::Function, obj1, obj2;
-                         ignoreFunction=false, ignoreContainerType=false)
+function hasBoolRelation(boolOp::F, obj1, obj2;
+                         ignoreFunction=false, 
+                         ignoreContainerType=false) where {F<:Function}
     res = true
     t1 = typeof(obj1)
     t2 = typeof(obj2)
@@ -216,8 +218,9 @@ hasBooleanRelation(>=, d, c, b) = true
 true
 ```
 """
-function hasBoolRelation(boolOp::Function, obj1, obj2, obj3...; 
-                         ignoreFunction=false, ignoreContainerType=false) 
+function hasBoolRelation(boolOp::F, obj1, obj2, obj3...; 
+                         ignoreFunction=false, 
+                         ignoreContainerType=false) where {F<:Function}
     res = hasBoolRelation(boolOp, obj1, obj2; ignoreFunction, ignoreContainerType)
     tmp = obj2
     if res
@@ -498,7 +501,8 @@ julia> begin
 ([1, 1, 2, 1], Any[S(1, 2.0), S(1, 2.1)])
 ```
 """
-function markUnique(arr::AbstractArray, args...; compareFunction::Function = hasEqual, kws...)
+function markUnique(arr::AbstractArray, args...; 
+                    compareFunction::F=hasEqual, kws...) where {F<:Function}
     @assert length(arr) >= 1 "The length of input array should be not less than 1."
     f = (b...)->compareFunction((b..., args...)...; kws...)
     res = Int[1]
@@ -519,7 +523,8 @@ function markUnique(arr::AbstractArray, args...; compareFunction::Function = has
     res, cmprList
 end
 
-function getUnique!(arr::Array, args...; compareFunction::Function = hasEqual, kws...)
+function getUnique!(arr::Array, args...; 
+                    compareFunction::F = hasEqual, kws...) where {F<:Function}
     @assert length(arr) > 1 "The length of input array should be larger than 1."
     f = (b...)->compareFunction((b..., args...)...; kws...)
     cmprList = eltype(arr)[arr[1]]
@@ -553,7 +558,7 @@ function symbolReplace(sym::Symbol, pair::Pair{String, String}; count::Int=typem
 end
 
 
-function renameFunc(fName::String, f::Function)
+function renameFunc(fName::String, f::F) where {F<:Function}
     @eval ($(Symbol(fName)))(a...; b...) = $f(a...; b...)
 end
 
@@ -599,4 +604,39 @@ function splitTerm(term::Num)
         terms = [term]
     end
     terms
+end
+
+
+trDistance(A::Matrix{<:Number}, B::Matrix{<:Number}) = 0.5*sum(svdvals(A-B))
+
+
+
+function semidefiniteCore(B, value=1e-6; posORneg=0)
+    Hupper = B  |> Hermitian |> Array
+    e, u = eigen(Hupper, sortby=x->x)
+    i1 = findall(x->x>0, e)
+    i2 = findall(x->x<0, e)
+    if posORneg > 0
+        e[i2] .= value
+    elseif posORneg < 0
+        e[i1] .= -value
+    else
+        length(i1) > length(i2) ? e[i2] .= value : e[i1] .= -value
+    end
+    u*diagm(e)*inv(u) |> Hermitian |> Array
+end
+
+function semidefinite(B, value=1e-6; posORneg=0)
+    Hupper = semidefiniteCore(B, value; posORneg)
+    Hlower = semidefiniteCore(B', value; posORneg)
+    trDistance(Hupper, B) > trDistance(Hlower, B) ? Hlower : Hupper
+end
+
+
+function isSemdefinite(B)
+    ishermitian(B) &&
+    begin
+        λs = eigvals(B)
+        (filter(x->x!=0, sign.(λs)) |> unique! |> length) == 1
+    end
 end

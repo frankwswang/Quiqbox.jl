@@ -69,6 +69,7 @@ const BasisFuncNames =
 
 
 const SciNotMarker = r"D(?=[\+\-])"
+const sciNotReplace = (txt)->replace(txt, SciNotMarker => "e")
 const BStextEndingMarker = "****"
 const BasisSetList = Dict(BasisFuncNames .=> BasisFuncTexts)
 const AtomicNumberList = Dict(ElementNames .=> collect(1 : length(ElementNames)))
@@ -83,7 +84,6 @@ const SubshellDimList = Dict(SubshellNames .=> length.(SubshellOrbitals))
 const ParamNames = [:X, :Y, :Z, :d, :α, :L]
 const ParamSymbols = [:X, :Y, :Z, :con, :xpn, :len]
 const ParamList = Dict(ParamSymbols .=> ParamNames)
-
 
 getCharge(nucs::Array{String, 1}) = getCharge.(nucs) |> sum
 

@@ -55,12 +55,13 @@ end
 # In order to solve world age problem from `GridBox`
 (pb::ParamBox)() = Base.invokelatest(pb.map[], pb.data[])
 
-ParamBox(x::Number, name::Symbol=:undef; mapFunction::Function=itself, 
-         canDiff::Bool=true, index::Union{Int, Nothing}=nothing, paramType::Type{<:Number}=Float64) = 
+ParamBox(x::Number, name::Symbol=:undef; mapFunction::F=itself, 
+         canDiff::Bool=true, index::Union{Int, Nothing}=nothing, 
+         paramType::Type{<:Number}=Float64) where {F<:Function}= 
 ParamBox(fill(x |> paramType), Ref(mapFunction), Ref(canDiff), index; name)
 
-ParamBox(data::Array{<:Number, 0}, name::Symbol=:undef; mapFunction::Function=itself, 
-         canDiff::Bool=true, index::Union{Int, Nothing}=nothing) = 
+ParamBox(data::Array{<:Number, 0}, name::Symbol=:undef; mapFunction::F=itself, 
+         canDiff::Bool=true, index::Union{Int, Nothing}=nothing) where {F<:Function} = 
 ParamBox(data, Ref(mapFunction), Ref(canDiff), index; name)
 
 
@@ -79,7 +80,7 @@ end
 function oneBodyDerivativeCore(∂bfs::Array{<:AbstractFloatingGTBasisFunc, 1}, 
                                bfs::Array{<:AbstractFloatingGTBasisFunc, 1}, 
                                X::Array{Float64, 2}, ∂X::Array{Float64, 2},
-                               ʃ::Function, isGradient::Bool = false)
+                               ʃ::F, isGradient::Bool = false) where {F<:Function}
     dimOfʃ = 1+isGradient*2
     bsSize = ∂bfs |> length
     ∂ʃ = ones(bsSize, bsSize, dimOfʃ)
@@ -110,7 +111,7 @@ end
 function twoBodyDerivativeCore(∂bfs::Array{<:AbstractFloatingGTBasisFunc, 1}, 
                                bfs::Array{<:AbstractFloatingGTBasisFunc, 1}, 
                                X::Array{Float64, 2}, ∂X::Array{Float64, 2},
-                               ʃ::Function, isGradient::Bool = false)
+                               ʃ::F, isGradient::Bool = false) where {F<:Function}
     dimOfʃ = 1+isGradient*2
     bsSize = ∂bfs |> length
     ∂ʃ = ones(bsSize, bsSize, bsSize, bsSize, dimOfʃ)
@@ -147,8 +148,10 @@ function twoBodyDerivativeCore(∂bfs::Array{<:AbstractFloatingGTBasisFunc, 1},
 end
 
 
-function derivativeCore(bs::Array{<:AbstractFloatingGTBasisFunc, 1}, par::ParamBox, S::Array{Float64, 2};
-                        oneBodyFunc::Function=itself, twoBodyFunc::Function=itself, oneBodyGrad::Bool=false, twoBodyGrad::Bool=false)
+function derivativeCore(bs::Array{<:AbstractFloatingGTBasisFunc, 1}, par::ParamBox, 
+                        S::Array{Float64, 2}; oneBodyFunc::F1=itself, 
+                        twoBodyFunc::F2=itself, oneBodyGrad::Bool=false, 
+                        twoBodyGrad::Bool=false) where {F1<:Function, F2<:Function}
     # ijkl in chemists' notation of spatial bases (ij|kl).
     ∂bfs = deriveBasisFunc.(bs, Ref(par)) |> flatten
     # println("S1_1")
@@ -197,7 +200,7 @@ function ∂HFenergy(bs::Array{<:AbstractFloatingGTBasisFunc, 1}, par::ParamBox,
     Cₓ = (C isa Tuple) ? (Ref(Xinv) .* C) : (Xinv * C)
     # println("S1")
     ∂hij, ∂hijkl = derivativeCore(bs, par, S, oneBodyFunc=(i,j)->coreHij(i,j,mol,nucCoords), twoBodyFunc=eeInteraction)
-    getEᵀ(∂hij, ∂hijkl, Cₓ, nElectron)
+    getEᵀ(dropdims(∂hij, dims=3), dropdims(∂hijkl, dims=5), Cₓ, nElectron)
 end
 
 
