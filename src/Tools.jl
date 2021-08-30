@@ -419,7 +419,8 @@ function arrayAlloc(arrayLength::Int, elementType::Type{T}) where {T<:Real}
     ccall(:malloc, Ptr{T}, (Cint,), memoryLen)
 end
 
-arrayAlloc(arrayLength::Int, NumberExample::T) where {T<:Real} = arrayAlloc(arrayLength, typeof(NumberExample))
+arrayAlloc(arrayLength::Int, NumberExample::T) where {T<:Real} = 
+arrayAlloc(arrayLength, typeof(NumberExample))
 
 
 """
@@ -578,7 +579,7 @@ function recursivelyGet(dict::Dict, startKey)
 end
 
 
-function isOscillateConverged(sequence::Array{<:Real, 1}, threshold1::Real, threshold2::Real=threshold1; 
+function isOscillateConverged(sequence::Vector{<:Real}, threshold1::Real, threshold2::Real=threshold1; 
                               leastCycles::Int=1, nPartition::Int=5, returnStd::Bool=false)
     @assert leastCycles>0 && nPartition>1
     len = length(sequence)

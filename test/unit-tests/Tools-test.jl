@@ -43,6 +43,6 @@ using Suppressor: @capture_out
     vec4 = splitTerm(X^2 - X*Y - Z^2)
     @test ( string.(vec4) .== string.([X^2, -(Z^2), -X*Y]) ) |> prod
     @test ([vec0, vec1, vec2, vec3, vec4] .|> length) == [1,1,1,1,3]
-    @test ([vec0, vec1, vec2, vec3, vec4] |> eltype) ==  Array{Num, 1}
+    @test ([vec0, vec1, vec2, vec3, vec4] |> eltype) ==  Vector{Num}
 
 end

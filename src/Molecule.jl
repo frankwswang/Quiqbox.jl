@@ -9,7 +9,7 @@ struct MolOrbital{N} <: AbstractMolOrbital
     occupancy::Real
     orbitalCoeffs::NTuple{N, Float64}
 
-    function MolOrbital(energy::Float64, occupancy::Real, orbitalCoeffs::Array{Float64, 1}, 
+    function MolOrbital(energy::Float64, occupancy::Real, orbitalCoeffs::Vector{Float64}, 
                         spin::String="Alpha", symmetry::String="A")
         spin != "Alpha" && spin != "Beta" && error("Keyword arguement \"spin\" can only"*
                                                    " be \"Alpha\" or \"Beta\"")
@@ -18,11 +18,11 @@ struct MolOrbital{N} <: AbstractMolOrbital
 end
 
 
-function getMolOrbitals(ens::Array{Float64, 1}, 
-                        occus::Array{<:Real, 1}, 
-                        C::Array{Float64, 2}, 
-                        spins::Array{String, 1}=repeat(["Alpha"], length(occus)), 
-                        symms::Array{String, 1}=repeat(["A"], length(occus)))
+function getMolOrbitals(ens::Vector{Float64}, 
+                        occus::Vector{<:Real}, 
+                        C::Matrix{Float64}, 
+                        spins::Vector{String}=repeat(["Alpha"], length(occus)), 
+                        symms::Vector{String}=repeat(["A"], length(occus)))
     MolOrbital.(ens, occus, [ C[:,i] for i = 1:size(C, 2) ], spins, symms) |> Tuple
 end
 

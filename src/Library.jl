@@ -85,7 +85,7 @@ const ParamNames = [:X, :Y, :Z, :d, :α, :L]
 const ParamSymbols = [:X, :Y, :Z, :con, :xpn, :len]
 const ParamList = Dict(ParamSymbols .=> ParamNames)
 
-getCharge(nucs::Array{String, 1}) = getCharge.(nucs) |> sum
+getCharge(nucs::Vector{String}) = getCharge.(nucs) |> sum
 
 getCharge(nucStr::String) = AtomicNumberList[nucStr]
 

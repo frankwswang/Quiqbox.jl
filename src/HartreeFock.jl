@@ -157,7 +157,7 @@ function initializeSCF(Hcore::Matrix{T1}, HeeI::Array{T2, 4},
                        Cs::Union{Matrix{T3}, NTuple{2, Matrix{T3}}}, 
                        Ns::NTuple{2, Int}) where 
                        {TelLB<:T1<:TelUB, TelLB<:T2<:TelUB, TelLB<:T3<:TelUB}
-    if Cs isa Array{<:Number, 2}
+    if Cs isa Matrix{<:Number}
         C2 = copy(Cs)
         l = min(size(C2)[1], 2)
         C2[1:l, 1:l] .= 0 # Breaking spin symmetry.
@@ -341,7 +341,8 @@ function runHFcore(N::Union{NTuple{2, Int}, Int},
             flag && (isConverged = Std > scfConfig.oscillateThreshold ? false : true; break)
             earlyTermination && (Etots[end] - EtotMin) / abs(EtotMin) > 0.2 && 
             (printInfo && println("Early termination of method ", method, 
-                                  " due to the poor performance."); break)
+                                  " due to the poor performance."); 
+             isConverged = false; break)
         end
 
     end

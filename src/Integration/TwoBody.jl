@@ -30,7 +30,7 @@ function twoBodyBFTensor(libcinFunc::Val,
 end
 
 
-function twoBodyBSTensor(BasisSet::Array{<:AbstractFloatingGTBasisFunc, 1}, intFunc::F; 
+function twoBodyBSTensor(BasisSet::Vector{<:AbstractFloatingGTBasisFunc}, intFunc::F; 
                          outputUniqueIndices::Bool=false) where {F<:Function}
     subSize = basisSize(BasisSet) |> collect
     accuSize = vcat(0, accumulate(+, subSize))
@@ -85,5 +85,5 @@ Return the electron-electron interaction tensor (an N×N×N×N×1 Tensor where N
 
 If `outputUniqueIndices=ture`, additionally return the indices for all the unique integrals. 
 """
-eeInteractions(BSet::Array{<:AbstractFloatingGTBasisFunc, 1}; outputUniqueIndices::Bool=false) = 
+eeInteractions(BSet::Vector{<:AbstractFloatingGTBasisFunc}; outputUniqueIndices::Bool=false) = 
 twoBodyBSTensor(BSet, eeInteraction; outputUniqueIndices)

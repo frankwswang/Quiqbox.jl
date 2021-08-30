@@ -1,4 +1,4 @@
-function addToDataChain!(env::Array{Float64, 1}, atm::Array{Int32, 1}, bas::Array{Int32, 1}, 
+function addToDataChain!(env::Vector{Float64}, atm::Vector{Int32}, bas::Vector{Int32}, 
                          bf::FloatingGTBasisFunc)
     center = [bf.center[1](), bf.center[2](), bf.center[3]()]
     xpns = Float64[]
@@ -24,8 +24,8 @@ function addToDataChain!(env::Array{Float64, 1}, atm::Array{Int32, 1}, bas::Arra
 end
 
 
-function addToDataChain!(env::Array{Float64, 1}, atm::Array{Int32, 1}, 
-                         nuclei::Array{String, 1}, nucleiCoords::Array{<:AbstractArray, 1})
+function addToDataChain!(env::Vector{Float64}, atm::Vector{Int32}, 
+                         nuclei::Vector{String}, nucleiCoords::Vector{<:AbstractArray})
     @compareLength nuclei nucleiCoords "nuclei" "their coordinates"
     envEndIndex = length(env)
     len = length(nuclei)

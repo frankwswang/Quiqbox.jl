@@ -4,8 +4,8 @@ export gridBoxCoords, GridBox, gridPoint
 struct GridBox{NX, NY, NZ}
     num::Int
     len::Real
-    box::Array{NTuple{3, ParamBox}, 1}
-    coord::Array{Array{Float64, 1}, 1}
+    box::Vector{NTuple{3, ParamBox}}
+    coord::Vector{Vector{Float64}}
 
     function GridBox(nGrids::NTuple{3, Int}, edgeLength::Real=10, centerCoord::Array{<:Real,1}=[0.0,0.0,0.0];
                      canDiff::Bool=true, index::Int=0)
@@ -13,7 +13,7 @@ struct GridBox{NX, NY, NZ}
         sym = ParamList[:len]
         pbRef = ParamBox(edgeLength, sym; canDiff, index)
         boxes = NTuple{3, ParamBox{sym, Float64}}[]
-        coords = Array{Float64, 1}[]
+        coords = Vector{Float64}[]
         n = 0
         supIndex = "ᴳ"*numToSups(nGrids[1])*superscriptSym['-']*numToSups(nGrids[2])*superscriptSym['-']*numToSups(nGrids[3])
         for i=0:nGrids[1], j=0:nGrids[2], k=0:nGrids[3]

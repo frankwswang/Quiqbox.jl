@@ -2,7 +2,7 @@ export overlap, overlaps, nucAttraction, nucAttractions, elecKinetic, elecKineti
 
 
 function oneBodyBFTensorCore(libcinFunc::Val, bf1::FloatingGTBasisFunc, bf2::FloatingGTBasisFunc, 
-                             nuclei::Array{String, 1}, nucleiCoords::Array{<:AbstractArray, 1};
+                             nuclei::Vector{String}, nucleiCoords::Vector{<:AbstractArray};
                              isGradient::Bool=false)
     env = Float64[]
     atm = Int32[]
@@ -25,7 +25,7 @@ end
 
 
 function oneBodyBFTensor(libcinFunc::Val, b1::AbstractFloatingGTBasisFunc, b2::AbstractFloatingGTBasisFunc, 
-                         nuclei::Array{String, 1}, nucleiCoords::Array{<:AbstractArray, 1};
+                         nuclei::Vector{String}, nucleiCoords::Vector{<:AbstractArray};
                          isGradient::Bool=false)
     f = @inline function (i,j)
         ints = oneBodyBFTensorCore(libcinFunc, i, j, nuclei, nucleiCoords; isGradient)
@@ -35,7 +35,7 @@ function oneBodyBFTensor(libcinFunc::Val, b1::AbstractFloatingGTBasisFunc, b2::A
 end
 
 
-function oneBodyBSTensor(BasisSet::Array{<:AbstractFloatingGTBasisFunc, 1}, 
+function oneBodyBSTensor(BasisSet::Vector{<:AbstractFloatingGTBasisFunc}, 
                          intFunc::F) where {F<:Function}
     subSize = basisSize(BasisSet) |> collect
     accuSize = vcat(0, accumulate(+, subSize))
@@ -72,7 +72,7 @@ oneBodyBFTensor(Val(:cint1e_ovlp_cart), bf1, bf2, String[], Array[])
 
 Return the orbital overlap matrix (an N×N×1 Tensor where N is the number of spatial orbitals) given a basis set in the form of an `Array`.
 """
-overlaps(BSet::Array{<:AbstractFloatingGTBasisFunc, 1}) = 
+overlaps(BSet::Vector{<:AbstractFloatingGTBasisFunc}) = 
 oneBodyBSTensor(BSet, overlap)
 
 
@@ -83,7 +83,7 @@ oneBodyBSTensor(BSet, overlap)
 Return the nuclear attraction matrix (an N×N×1 Tensor where N is the number of spatial orbitals) given 2 basis functions, 
 and the nuclei with their coordinates (in atomic unit).
 """
-nucAttraction(bf1::AbstractFloatingGTBasisFunc, bf2::AbstractFloatingGTBasisFunc, nuc::Array{String, 1}, nucCoords::Array{<:AbstractArray, 1}) = 
+nucAttraction(bf1::AbstractFloatingGTBasisFunc, bf2::AbstractFloatingGTBasisFunc, nuc::Vector{String}, nucCoords::Vector{<:AbstractArray}) = 
 oneBodyBFTensor(Val(:cint1e_nuc_cart), bf1, bf2, nuc, nucCoords)
 
 
@@ -94,7 +94,7 @@ oneBodyBFTensor(Val(:cint1e_nuc_cart), bf1, bf2, nuc, nucCoords)
 Return the nuclear attraction matrix (an N×N×1 Tensor where N is the number of spatial orbitals) given a basis set in the form of an `Array`, 
 and the nuclei with their coordinates (in atomic unit).
 """
-nucAttractions(BSet::Array{<:AbstractFloatingGTBasisFunc, 1}, nuc::Array{String, 1}, nucCoords::Array{<:AbstractArray, 1}) = 
+nucAttractions(BSet::Vector{<:AbstractFloatingGTBasisFunc}, nuc::Vector{String}, nucCoords::Vector{<:AbstractArray}) = 
 oneBodyBSTensor(BSet, (bf1, bf2)->oneBodyBFTensor(Val(:cint1e_nuc_cart), bf1, bf2, nuc, nucCoords))
 
 
@@ -114,7 +114,7 @@ oneBodyBFTensor(Val(:cint1e_kin_cart), bf1, bf2, String[], Array[])
 
 Return the electron kinetic energy matrix (an N×N×1 Tensor where N is the number of spatial orbitals) given a basis set in the form of an `Array`.
 """
-elecKinetics(BSet::Array{<:AbstractFloatingGTBasisFunc, 1}) = 
+elecKinetics(BSet::Vector{<:AbstractFloatingGTBasisFunc}) = 
 oneBodyBSTensor(BSet, elecKinetic)
 
 
@@ -124,7 +124,7 @@ oneBodyBSTensor(BSet, elecKinetic)
 
 Return a matrix element or block of the core Hamiltonian (an N×N×1 Tensor where N is the number of spatial orbitals) given 2 basis functions.
 """
-coreHij(bf1::AbstractFloatingGTBasisFunc, bf2::AbstractFloatingGTBasisFunc, nuc::Array{String, 1}, nucCoords::Array{<:AbstractArray, 1}) = 
+coreHij(bf1::AbstractFloatingGTBasisFunc, bf2::AbstractFloatingGTBasisFunc, nuc::Vector{String}, nucCoords::Vector{<:AbstractArray}) = 
 elecKinetic(bf1, bf2) + nucAttraction(bf1, bf2, nuc, nucCoords)
 
 
@@ -134,5 +134,5 @@ elecKinetic(bf1, bf2) + nucAttraction(bf1, bf2, nuc, nucCoords)
 
 Return the core Hamiltonian matrix (an N×N×1 Tensor where N is the number of spatial orbitals) given a basis set in the form of an `Array`.
 """
-coreH(BSet::Array{<:AbstractFloatingGTBasisFunc, 1}, nuc::Array{String, 1}, nucCoords::Array{<:AbstractArray, 1}) = 
+coreH(BSet::Vector{<:AbstractFloatingGTBasisFunc}, nuc::Vector{String}, nucCoords::Vector{<:AbstractArray}) = 
 elecKinetics(BSet) + nucAttractions(BSet, nuc, nucCoords)

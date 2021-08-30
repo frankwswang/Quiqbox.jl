@@ -1,6 +1,7 @@
 function cintFunc!(libcintFunc::Val, 
-                   buf::Array{Float64, N}, shls::Array{<:Signed, 1}, atm::Array{<:Signed, 1}, natm::Signed, 
-                   bas::Array{<:Signed, 1}, nbas::Signed, env::Array{Float64, 1}, opt::Ptr=C_NULL) where {N}
+                   buf::Array{Float64, N}, shls::Vector{<:Signed}, atm::Vector{<:Signed}, 
+                   natm::Signed, bas::Vector{<:Signed}, nbas::Signed, env::Vector{Float64}, 
+                   opt::Ptr=C_NULL) where {N}
     shls = shls .|> Cint
     atm = atm .|> Cint
     natm = natm |> Cint

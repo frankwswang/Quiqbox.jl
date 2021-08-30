@@ -1,12 +1,12 @@
 export gradDescent!, updateParams!, optimizeParams!
 
-function gradDescent!(pars::Array{<:Real, 1}, grads::Array{<:Real, 1}, η=0.001)
+function gradDescent!(pars::Vector{<:Real}, grads::Vector{<:Real}, η=0.001)
     @assert length(pars) == length(grads) "The length of gradients and correponding parameters should be the same."
     pars .-= η*grads
 end
 
 
-function updateParams!(pbs::Array{<:ParamBox, 1}, grads::Array{<:Real, 1}; 
+function updateParams!(pbs::Vector{<:ParamBox}, grads::Vector{<:Real}; 
                        method::F=gradDescent!) where {F<:Function}
     parVals = [i[] for i in pbs]
     method(parVals, grads)
@@ -25,8 +25,8 @@ function defaultECmethod(HFtype, Hcore, HeeI, S, Ne)
 end
 
 
-function optimizeParams!(bs::Array{<:FloatingGTBasisFunc, 1}, pbs::Array{<:ParamBox, 1},
-                         mol::Array{String, 1}, nucCoords::Array{<:AbstractArray, 1}, 
+function optimizeParams!(bs::Vector{<:FloatingGTBasisFunc}, pbs::Vector{<:ParamBox},
+                         mol::Vector{String}, nucCoords::Vector{<:AbstractArray}, 
                          Ne::Union{NTuple{2, Int}, Int}=getCharge(mol);
                          Etarget::Float64=NaN, threshold::Float64=0.0001, maxSteps::Int=2000, 
                          printInfo::Bool=true, GDmethod::F1=gradDescent!, HFtype=:RHF, 

@@ -77,9 +77,9 @@ function deriveBasisFunc(bf::FloatingGTBasisFunc, par::ParamBox)
 end
 
 
-function oneBodyDerivativeCore(∂bfs::Array{<:AbstractFloatingGTBasisFunc, 1}, 
-                               bfs::Array{<:AbstractFloatingGTBasisFunc, 1}, 
-                               X::Array{Float64, 2}, ∂X::Array{Float64, 2},
+function oneBodyDerivativeCore(∂bfs::Vector{<:AbstractFloatingGTBasisFunc}, 
+                               bfs::Vector{<:AbstractFloatingGTBasisFunc}, 
+                               X::Matrix{Float64}, ∂X::Matrix{Float64}, 
                                ʃ::F, isGradient::Bool = false) where {F<:Function}
     dimOfʃ = 1+isGradient*2
     bsSize = ∂bfs |> length
@@ -108,9 +108,9 @@ function oneBodyDerivativeCore(∂bfs::Array{<:AbstractFloatingGTBasisFunc, 1},
 end
 
 
-function twoBodyDerivativeCore(∂bfs::Array{<:AbstractFloatingGTBasisFunc, 1}, 
-                               bfs::Array{<:AbstractFloatingGTBasisFunc, 1}, 
-                               X::Array{Float64, 2}, ∂X::Array{Float64, 2},
+function twoBodyDerivativeCore(∂bfs::Vector{<:AbstractFloatingGTBasisFunc}, 
+                               bfs::Vector{<:AbstractFloatingGTBasisFunc}, 
+                               X::Matrix{Float64}, ∂X::Matrix{Float64}, 
                                ʃ::F, isGradient::Bool = false) where {F<:Function}
     dimOfʃ = 1+isGradient*2
     bsSize = ∂bfs |> length
@@ -148,8 +148,8 @@ function twoBodyDerivativeCore(∂bfs::Array{<:AbstractFloatingGTBasisFunc, 1},
 end
 
 
-function derivativeCore(bs::Array{<:AbstractFloatingGTBasisFunc, 1}, par::ParamBox, 
-                        S::Array{Float64, 2}; oneBodyFunc::F1=itself, 
+function derivativeCore(bs::Vector{<:AbstractFloatingGTBasisFunc}, par::ParamBox, 
+                        S::Matrix{Float64}; oneBodyFunc::F1=itself, 
                         twoBodyFunc::F2=itself, oneBodyGrad::Bool=false, 
                         twoBodyGrad::Bool=false) where {F1<:Function, F2<:Function}
     # ijkl in chemists' notation of spatial bases (ij|kl).
@@ -192,9 +192,10 @@ function derivativeCore(bs::Array{<:AbstractFloatingGTBasisFunc, 1}, par::ParamB
 end
 
 
-function ∂HFenergy(bs::Array{<:AbstractFloatingGTBasisFunc, 1}, par::ParamBox, 
-                   C::Union{Array{Float64, 2}, NTuple{2, Array{Float64, 2}}}, S::Array{Float64, 2},
-                   mol::Array{String, 1}, nucCoords::Array{<:AbstractArray, 1}; 
+function ∂HFenergy(bs::Vector{<:AbstractFloatingGTBasisFunc}, par::ParamBox, 
+                   C::Union{Matrix{Float64}, NTuple{2, Matrix{Float64}}}, 
+                   S::Matrix{Float64}, mol::Vector{String}, 
+                   nucCoords::Vector{<:AbstractArray}; 
                    nElectron::Union{Int, NTuple{2, Int}})
     Xinv = S^(0.5)
     Cₓ = (C isa Tuple) ? (Ref(Xinv) .* C) : (Xinv * C)
@@ -204,9 +205,10 @@ function ∂HFenergy(bs::Array{<:AbstractFloatingGTBasisFunc, 1}, par::ParamBox,
 end
 
 
-function gradHFenegy(bs::Array{<:AbstractFloatingGTBasisFunc, 1}, par::Array{<:ParamBox, 1}, 
-                     C::Union{Array{Float64, 2}, NTuple{2, Array{Float64, 2}}}, S::Array{Float64, 2}, 
-                     mol::Array{String, 1}, nucCoords::Array{<:AbstractArray, 1}; 
+function gradHFenegy(bs::Vector{<:AbstractFloatingGTBasisFunc}, par::Vector{<:ParamBox}, 
+                     C::Union{Matrix{Float64}, NTuple{2, Matrix{Float64}}}, 
+                     S::Matrix{Float64}, mol::Vector{String}, 
+                     nucCoords::Vector{<:AbstractArray}; 
                      nElectron::Union{Int, NTuple{2, Int}}=getCharge(mol))
     if length(C) == 2 && nElectron isa Int
         nElectron = (nElectron÷2, nElectron-nElectron÷2)
@@ -214,8 +216,8 @@ function gradHFenegy(bs::Array{<:AbstractFloatingGTBasisFunc, 1}, par::Array{<:P
     ∂HFenergy.(Ref(bs), par, Ref(C), Ref(S), Ref(mol), Ref(nucCoords); nElectron)
 end
 
-gradHFenegy(bs::Array{<:AbstractFloatingGTBasisFunc, 1}, par::ParamBox, 
-            C::Union{Array{Float64, 2}, NTuple{2, Array{Float64, 2}}}, S::Array{Float64, 2}, 
-            mol::Array{String, 1}, nucCoords::Array{<:AbstractArray, 1}; 
+gradHFenegy(bs::Vector{<:AbstractFloatingGTBasisFunc}, par::ParamBox, 
+            C::Union{Matrix{Float64}, NTuple{2, Matrix{Float64}}}, S::Matrix{Float64}, 
+            mol::Vector{String}, nucCoords::Vector{<:AbstractArray}; 
             nElectron::Union{Int, NTuple{2, Int}}=getCharge(mol)) = 
 gradHFenegy(bs, [par], C, S, mol, nucCoords; nElectron)
