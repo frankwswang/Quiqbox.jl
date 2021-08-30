@@ -605,38 +605,3 @@ function splitTerm(term::Num)
     end
     terms
 end
-
-
-trDistance(A::Matrix{<:Number}, B::Matrix{<:Number}) = 0.5*sum(svdvals(A-B))
-
-
-
-function semidefiniteCore(B, value=1e-6; posORneg=0)
-    Hupper = B  |> Hermitian |> Array
-    e, u = eigen(Hupper, sortby=x->x)
-    i1 = findall(x->x>0, e)
-    i2 = findall(x->x<0, e)
-    if posORneg > 0
-        e[i2] .= value
-    elseif posORneg < 0
-        e[i1] .= -value
-    else
-        length(i1) > length(i2) ? e[i2] .= value : e[i1] .= -value
-    end
-    u*diagm(e)*inv(u) |> Hermitian |> Array
-end
-
-function semidefinite(B, value=1e-6; posORneg=0)
-    Hupper = semidefiniteCore(B, value; posORneg)
-    Hlower = semidefiniteCore(B', value; posORneg)
-    trDistance(Hupper, B) > trDistance(Hlower, B) ? Hlower : Hupper
-end
-
-
-function isSemdefinite(B)
-    ishermitian(B) &&
-    begin
-        λs = eigvals(B)
-        (filter(x->x!=0, sign.(λs)) |> unique! |> length) == 1
-    end
-end

@@ -1,9 +1,9 @@
 export runHF, runHFcore, SCFconfig
 
-using LinearAlgebra: dot, Hermitian, ishermitian
+using LinearAlgebra: dot, Hermitian, \, det, I
 using PiecewiseQuadratics: indicator
-using SeparableOptimization, Convex, COSMO
-using Statistics: median
+using SeparableOptimization
+using Combinatorics: powerset
 
 const TelLB = Float64 # Union{} to loose constraint
 const TelUB = Float64 # Any to loose constraint
@@ -364,11 +364,11 @@ end
 function xDIIScore(method::Symbol, Nˢ::Int, Hcore::Matrix{T1}, HeeI::Array{T2, 4}, 
                    S::Matrix{T3}, X::Matrix{T4}, Fs::Vector{Matrix{T5}}, 
                    Ds::Vector{Matrix{T6}},Es::Vector{Float64}; 
-                   DIISsize::Int=15, solver=:default, convexConstraint::Bool=true, 
+                   DIISsize::Int=15, solver=:default, 
                    _kws...) where 
                   {TelLB<:T1<:TelUB, TelLB<:T2<:TelUB, TelLB<:T3<:TelUB, TelLB<:T4<:TelUB, 
                    TelLB<:T5<:TelUB, TelLB<:T6<:TelUB}
-    DIISmethod, permuteData = DIISmethods[method]
+    DIISmethod, convexConstraint, permuteData = DIISmethods[method]
     is = permuteData ? sortperm(Es) : (:)
     ∇s = (@view Fs[is])[1:end .> end-DIISsize]
     Ds = (@view Ds[is])[1:end .> end-DIISsize]
@@ -379,9 +379,9 @@ function xDIIScore(method::Symbol, Nˢ::Int, Hcore::Matrix{T1}, HeeI::Array{T2, 
     getD(X, grad |> Hermitian |> Array, Nˢ) # grad == F.
 end
 
-const DIISmethods = Dict( :DIIS => ((∇s, Ds,  _, S)->DIIScore(∇s, Ds, S),   true ),
-                         :EDIIS => ((∇s, Ds, Es, _)->EDIIScore(∇s, Ds, Es), false),
-                         :ADIIS => ((∇s, Ds,  _, _)->ADIIScore(∇s, Ds),     false))
+const DIISmethods = Dict( :DIIS => ((∇s, Ds,  _, S)->DIIScore(∇s, Ds, S),   false, true),
+                         :EDIIS => ((∇s, Ds, Es, _)->EDIIScore(∇s, Ds, Es), true, false),
+                         :ADIIS => ((∇s, Ds,  _, _)->ADIIScore(∇s, Ds),     true, false))
 
 
 function EDIIScore(∇s::Vector{Matrix{T1}}, Ds::Vector{Matrix{T2}}, 
@@ -520,26 +520,44 @@ function ADMMSolver(vec::Vector{Float64}, B::Matrix{Float64}; convexConstraint::
 end
 
 
-# With Convex.jl, more flexible with solvers, less flexible with input values.
-function ConvexSolver(vec::Vector{<:Number}, B::Matrix{<:Number}; 
-                      convexConstraint::Bool=true, method::Any=COSMO.Optimizer)
+function CMSolver(vec::Vector, B::Matrix; convexConstraint=true, ϵ::Float64=1e-5)
     len = length(vec)
-    c = convexConstraint ? Convex.Variable(len, Positive()) : Convex.Variable(len)
-    B = (convexConstraint && isSemdefinite(B)) ? B : semidefinite(B)
-    f = 0.5* Convex.quadform(c, B) + dot(c,vec)
-    o = Convex.minimize(f, sum(c)==1)
-    Convex.solve!(o, method, silent_solver=true)
-    evaluate(c)
+    getA = (B)->[B  ones(len); ones(1, len) 0]
+    b = vcat(-vec, 1)
+    local c
+    while true
+        A = getA(B)
+        while det(A) == 0
+            B += ϵ*I
+            A = getA(B)
+        end
+        x = A \ b
+        c = x[1:end-1]
+        (findfirst(x->x<0, c) !== nothing && convexConstraint) || (return c)
+        idx = (sortperm(abs.(c)) |> powerset |> collect)
+        popfirst!(idx)
+
+        for is in idx
+            Atemp = A[1:end .∉ Ref(is), 1:end .∉ Ref(is)]
+            btemp = b[begin:end .∉ Ref(is)]
+            det(Atemp) == 0 && continue
+            xtemp = Atemp \ btemp
+            c = xtemp[1:end-1]
+            for i in sort(is)
+                insert!(c, i, 0.0)
+            end
+            (findfirst(x->x<0, c) !== nothing) || (return c)
+        end
+
+        B += ϵ*I
+    end
+    c
 end
 
 
-const ConstraintSolvers = Dict(:default=>ADMMSolver, :Convex=>ConvexSolver)
+const ConstraintSolvers = Dict(:default=>ADMMSolver, :Direct=>CMSolver)
 
 constraintSolver(vec::Vector{T1}, B::Matrix{T2}, 
                  solver::Symbol=:default; convexConstraint::Bool=true) where 
                 {TelLB<:T1<:TelUB, TelLB<:T2<:TelUB} = 
 ConstraintSolvers[solver](vec, B; convexConstraint)
-
-constraintSolver(vec::Vector{T1}, B::Matrix{T2}, ConvexMethod; convexConstraint=true) where 
-                {TelLB<:T1<:TelUB, TelLB<:T2<:TelUB} = 
-ConvexSolver(vec, B; convexConstraint, method=ConvexMethod)
