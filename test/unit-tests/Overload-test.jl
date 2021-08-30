@@ -44,13 +44,13 @@ using Suppressor: @capture_out
     box1 = GridBox(2, 3.5)
     @test (@capture_out show(box1)) == string(typeof(box1))*"(num, len, coord)"
 
-    fVar1 = runHF(GTb1, ["H", "H"], [[0, 0, 0], [1,2,1]], printInfo=false)
+    fVar1 = runHF(GTb1, ["H", "H"], [[0, 0, 0], [1,2,1]], printInfo=false, initialC=:Hcore)
 
     @test (@capture_out show(fVar1.temp)) == string(typeof(fVar1.temp))*"(shared.Etot="*
-                                             "[2.263712269, … , 2.262890817], shared.Dtots"*
+                                             "[2.263712269, … , 2.262890978], shared.Dtots"*
                                              ", Cs, Es, Ds, Fs)"
 
-    @test (@capture_out show(fVar1)) == string(typeof(fVar1))*"(E0HF=2.262890817, C, F, D,"*
+    @test (@capture_out show(fVar1)) == string(typeof(fVar1))*"(E0HF=2.262890978, C, F, D,"*
                                         " Emo, occu, temp, isConverged)"
 
     
