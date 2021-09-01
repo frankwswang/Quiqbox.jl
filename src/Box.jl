@@ -1,26 +1,58 @@
 export gridBoxCoords, GridBox, gridPoint
 
-#===== Grid-based coordinates =====#
-struct GridBox{NX, NY, NZ}
+"""
+
+    GridBox{NX, NY, NZ} <: SemiMutableParameter{GridBox, Float64}
+
+A `struct` that stores coordinates of grid points in terms of both `Vector`s and 
+`ParamBox`s.
+
+≡≡≡ Field(s) ≡≡≡
+
+`num::Int`: Total number of the grid points.
+
+`spacing::Float64`: The edge length of the grid box.
+
+`box::Vector{NTuple{3, ParamBox}}`: The coordinates of grid points in terms of `ParamBox`s.
+
+`coord::Array{Array{Float64, 1}, 1}`: The coordinates of grid points in terms of `Vector`s.
+
+≡≡≡ Initialization Method(s) ≡≡≡
+
+    GridBox(nGrids::NTuple{3, Int}, spacing::Real=10, 
+            centerCoord::Array{<:Real, 1}=[0.0,0.0,0.0];
+            canDiff::Bool=true, index::Int=0) -> GridBox
+
+Constructor of a general `GridBox` that doesn't have to shape as a cube. `nGrid` is a 
+3-element `Tuple` that specifies the number of grids (number of grid points - 1) along 
+3 dimensions. `spacing` specifies the length between adjacent grid points. 
+`centerCoord` specifies the geometry center coordinate of the box. `canDiff` determines 
+whether the `ParamBox` should be marked as differentiable. `index` defines the index 
+number for the actual parameter: spacing `L`, with the default value 0 it would be `L₀`.
+"""
+struct GridBox{NX, NY, NZ} <: SemiMutableParameter{GridBox, Float64}
     num::Int
-    len::Real
+    spacing::Float64
     box::Vector{NTuple{3, ParamBox}}
     coord::Vector{Vector{Float64}}
 
-    function GridBox(nGrids::NTuple{3, Int}, edgeLength::Real=10, centerCoord::Array{<:Real,1}=[0.0,0.0,0.0];
+    function GridBox(nGrids::NTuple{3, Int}, spacing::Real=10, 
+                     centerCoord::Vector{<:Real}=[0.0,0.0,0.0];
                      canDiff::Bool=true, index::Int=0)
         @assert prod(nGrids .> 0) "The number of gird of each edge should be larger than 0."
-        sym = ParamList[:len]
-        pbRef = ParamBox(edgeLength, sym; canDiff, index)
+        sym = ParamList[:spacing]
+        spc = spacing |> Float64
+        pbRef = ParamBox(spc, sym; canDiff, index)
         boxes = NTuple{3, ParamBox{sym, Float64}}[]
         coords = Vector{Float64}[]
         n = 0
-        supIndex = "ᴳ"*numToSups(nGrids[1])*superscriptSym['-']*numToSups(nGrids[2])*superscriptSym['-']*numToSups(nGrids[3])
+        supIndex = "ᴳ"*numToSups(nGrids[1])*superscriptSym['-']*numToSups(nGrids[2])*
+                   superscriptSym['-']*numToSups(nGrids[3])
         for i=0:nGrids[1], j=0:nGrids[2], k=0:nGrids[3]
             n += 1
-            fX0 = L -> centerCoord[1] + (i / nGrids[1] - 0.5) * L
-            fY0 = L -> centerCoord[2] + (j / nGrids[2] - 0.5) * L
-            fZ0 = L -> centerCoord[3] + (k / nGrids[3] - 0.5) * L
+            fX0 = L -> centerCoord[1] + (i - 0.5*nGrids[1]) * L
+            fY0 = L -> centerCoord[2] + (j - 0.5*nGrids[2]) * L
+            fZ0 = L -> centerCoord[3] + (k - 0.5*nGrids[3]) * L
             fXname = (ParamList[:X] |> string) * supIndex * numToSubs(n)
             fYname = (ParamList[:Y] |> string) * supIndex * numToSubs(n)
             fZname = (ParamList[:Z] |> string) * supIndex * numToSubs(n)
@@ -35,16 +67,34 @@ struct GridBox{NX, NY, NZ}
             push!(boxes, (X, Y, Z))
             push!(coords, [X(), Y(), Z()])
         end
-        new{nGrids[1], nGrids[2], nGrids[3]}(prod(nGrids .+ 1), edgeLength, boxes, coords)
+        new{nGrids[1], nGrids[2], nGrids[3]}(prod(nGrids .+ 1), spc, boxes, coords)
     end
 end
 
-GridBox(nGridPerEdge::Int, edgeLength::Real=10, centerCoord::Array{<:Real,1}=[0.0,0.0,0.0];
+"""
+
+    GridBox(nGridPerEdge::Int, spacing::Real=10, 
+            centerCoord::Array{<:Real, 1}=[0.0,0.0,0.0]; 
+            canDiff::Bool=true, index::Int=0) -> GridBox
+    
+Method of generating a cubic `GridBox`. `nGridPerEdge` specifies the number of grids 
+(number of grid points - 1) along each dimension.`spacing` specifies the length between 
+adjacent grid points. `centerCoord` specifies the geometry center coordinate of the box. 
+`canDiff` determines whether the `ParamBox` should be marked as differentiable. `index` 
+defines the index number for the actual parameter: spacing `L`, with the default value 0 
+it would be `L₀`.
+"""
+GridBox(nGridPerEdge::Int, spacing::Real=10, centerCoord::Vector{<:Real}=[0.0,0.0,0.0];
         canDiff::Bool=true, index::Int=0) = 
-GridBox(fill(nGridPerEdge, 3) |> Tuple, edgeLength, centerCoord; canDiff, index)
+GridBox(fill(nGridPerEdge, 3) |> Tuple, spacing, centerCoord; canDiff, index)
 
+"""
 
-function gridPoint(coord::Array{<:Real,1})
+    gridPoint(coord::Array{<:Real, 1}) -> NTuple{3, ParamBox}
+
+Generate a `Tuple` of coordinate `ParamBox`s given a `Vector`.
+"""
+function gridPoint(coord::Vector{<:Real})
     @assert length(coord) == 3
     x = ParamBox(coord[1], ParamList[:X])
     y = ParamBox(coord[2], ParamList[:Y])
