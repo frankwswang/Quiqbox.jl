@@ -1,5 +1,5 @@
 <p align="center">
-  <img width="400" src="docs/src/assets/logo.svg">
+  <img width="500" src="docs/src/assets/logo.png">
 </p>
 
 **Quiqbox** is a quantum chemistry and quantum computing software package that starts off around Gaussian basis set optimization of molecular electronic-structure problems. Quiqbox is written in pure [Julia](https://julialang.org/).
@@ -51,14 +51,14 @@ julia> using Quiqbox
 
 # Use cases
 
-## Apply existed basis sets
+## Apply existed basis set
 ```julia
 coords = [[-0.7,0,0], [0.7,0,0]]
 
-bsH2O = genBasisFunc.(coords, "STO-3G") |> flatten
+bsH₂ = genBasisFunc.(coords, "STO-3G") |> flatten
 ```
 
-## Build your own basis sets
+## Build your own basis set
 ```julia
 bs = genBasisFunc.(coords, fill(GaussFunc(1, 0.75), 2))
 ```
@@ -70,7 +70,7 @@ nuc = ["H", "H"]
 runHF(bs, nuc, coords)
 ```
 
-## Optimize the basis set
+## Optimize a basis set
 ```
 pars = uniqueParams!(bs, filterMapping=true)
 
@@ -80,8 +80,8 @@ optimizeParams!(bs, pars[1:4], nuc, coords)
 For more basic usage of the programming language behind Quiqbox, Julia, please refer to [the official documentation](https://docs.julialang.org/) or [one official tutorial](https://juliaacademy.com/p/intro-to-julia).
 
 
-[Doc-stable]:  https://github.com/frankwswang/Quiqbox.jl/stable
-[Doc-latest]:  https://github.com/frankwswang/Quiqbox.jl/latest
+[Doc-stable]:  https://frankwswang.github.io/Quiqbox.jl/stable
+[Doc-latest]:  https://frankwswang.github.io/Quiqbox.jl/dev
 [Doc-s-img]:   https://img.shields.io/badge/docs-stable-blue.svg
 [Doc-l-img]:   https://img.shields.io/badge/docs-latest-blue.svg
 [GA-CI-img]:   https://github.com/frankwswang/Quiqbox.jl/actions/workflows/CI.yml/badge.svg?branch=main
