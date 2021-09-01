@@ -101,9 +101,9 @@ getindex(m::ParamBox) = m.data[]
 setindex!(a::ParamBox, b) = begin a.data[] = b end
 
 
-# Quiqboc methods overload.
+# Quiqbox methods overload.
 ## Method overload of `hasBoolRelation` from Tools.jl.
-## If `ignoreContainerType = true`, then `ignoreFunction` is automitically set to be `true` 
+## If `ignoreContainerType = true`, then `ignoreFunction` is automatically set to be `true` 
 ## as the `map` function for `ParamBox` is considered as a type of container for the actual
 ## stored data.
 function hasBoolRelation(boolFunc::F, pb1::ParamBox, pb2::ParamBox; 

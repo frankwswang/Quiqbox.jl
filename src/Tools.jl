@@ -5,7 +5,7 @@ using Symbolics
 using LinearAlgebra: eigvals, svdvals, eigen
 
 
-# Function for submudole loading and integrity checking.
+# Function for submodule loading and integrity checking.
 function tryIncluding(subModuleName::String; subModulePath=(@__DIR__)[:]*"/SubModule")
     try
         include(subModulePath*"/"*subModuleName*".jl")
@@ -36,23 +36,23 @@ information.
 
 ≡≡≡ Example(s) ≡≡≡
 
-```jldoctest
-julia> @compareLength [1,2] [3,4]
+```
+julia> Quiqbox.@compareLength [1,2] [3,4]
 2
 
 julia> let a = [1,2], b = [3]
-           @compareLength a b
+           Quiqbox.@compareLength a b
        end
 ERROR: The lengths of a and b are NOT equal.
        a::Vector{Int64}   length: 2
        b::Vector{Int64}   length: 1
 
-julia> @compareLength [1,2] [3] "a"
+julia> Quiqbox.@compareLength [1,2] [3] "a"
 ERROR: The lengths of a ([1, 2]) and [3] are NOT equal.
        a ([1, 2])::Vector{Int64}   length: 2
        [3]::Vector{Int64}   length: 1
 
-julia> @compareLength [1,2] [3] "a" "b"
+julia> Quiqbox.@compareLength [1,2] [3] "a" "b"
 ERROR: The lengths of a ([1, 2]) and b ([3]) are NOT equal.
        a ([1, 2])::Vector{Int64}   length: 2
        b ([3])::Vector{Int64}   length: 1
@@ -70,7 +70,7 @@ macro compareLength(inputArg1, inputArg2, argNames...)
                                                      "Arrays or Tuples!\n")
         if length(arg1) != length(arg2)
             for i = 1:length($argNames)
-                # Replace the defualt type control ERROR message.
+                # Replace the default type control ERROR message.
                 !($argNames[i] isa String) && error("The object's name has to be a "*
                                                     "`String`!\n")
                 $ns[i] = $argNames[i]*" ($($ns0[i]))" 
@@ -97,7 +97,7 @@ performed return `true`.
 If `ignoreFunction = true`, the function will ignore comparisons between Function-type 
 fields.
 
-If `ignoreContainerType = true`, the funtion will ignore the type difference of the 
+If `ignoreContainerType = true`, the function will ignore the type difference of the 
 (outermost) container as long as the boolean operator returns true for inside fields. 
 
 
@@ -238,13 +238,13 @@ end
 
    hasEqual(obj1, obj2, obj3...; ignoreFunction=false, ignoreContainerType=false) -> Bool
 
-Compare if two objects are the euqal. 
+Compare if two objects are the equal. 
 
 If `ignoreFunction = true` then the function will pop up a warning message when a field is 
 a function.
 
-If `ignoreContainerType = true` then the funtion will ignore the type difference of the 
-(outermost) container as long as the inside fields are euqal. 
+If `ignoreContainerType = true` then the function will ignore the type difference of the 
+(outermost) container as long as the inside fields are equal. 
 
 This function is an instantiation of `hasBoolRelation`.
 
@@ -283,7 +283,7 @@ Compare if two objects are the Identical. An instantiation of `hasBoolRelation`.
 If `ignoreFunction = true` then the function will pop up a warning message when a field is 
 a function.
 
-If `ignoreContainerType = true` then the funtion will ignore the type difference of the 
+If `ignoreContainerType = true` then the function will ignore the type difference of the 
 (outermost) container as long as the inside fields are identical.
 
 This function is an instantiation of `hasBoolRelation`.
@@ -323,7 +323,7 @@ Print info with colorful title and automatically highlighted code blocks enclose
 
 If you want to highlight other contents in different colors, you can also put them inside 
 ` ` and start it with "///theColorSymbolName///". The available color names follows the 
-values of `color` keyword arguement in function `printstyled`. 
+values of `color` keyword argument in function `printstyled`. 
 
 NOTE: There can only be one color in one ` ` quote.
 
@@ -447,7 +447,7 @@ Create a `ArrayPointer` that contains a `Ptr` pointing to the actual memory addr
 To avoid memory leaking, the user should use `free(x.ptr)` after the usage of 
 `x::ArrayPointer` to free the occupied memory.
 
-If `showReminder=true`, the constuctor will pop up a message to remind the user of 
+If `showReminder=true`, the constructor will pop up a message to remind the user of 
 such operation.
 """
 struct ArrayPointer{T, N} <: Any
@@ -477,7 +477,7 @@ Return a `markingList` using `Int` number to mark each different elements from
 (and inside) the input argument(s) and a `uniqueList` to contain all the unique 
 elements when `compareFunction` is set to `hasEqual` (in default).
 
-`args` and `kws` are positional arguments and keywords argguments respectively as 
+`args` and `kws` are positional arguments and keywords arguments respectively as 
 parameters of the specified `compareFunction`.
 
 ≡≡≡ Example(s) ≡≡≡
