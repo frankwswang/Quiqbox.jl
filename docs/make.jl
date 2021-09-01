@@ -24,4 +24,6 @@ makedocs(
     ]
 )
 
-deploydocs(repo="github.com/frankwswang/Quiqbox.jl.git")
+deploydocs(repo="github.com/frankwswang/Quiqbox.jl.git", 
+           branch = "gh-pages",
+           devbranch = "main")
