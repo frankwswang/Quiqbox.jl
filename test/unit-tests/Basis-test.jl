@@ -82,6 +82,7 @@ bf4 = genBasisFunc([0,0,0], (2,1), [1,0,0])
 
 
 # struct BasisFuncMix
+using Quiqbox: BasisFuncMix
 bfm1 = BasisFuncMix(bf1)
 @test bfm1 == BasisFuncMix([bf1])
 @test BasisFuncMix(BasisFuncMix(bf3_1)) == BasisFuncMix(bf3_1)
@@ -206,7 +207,8 @@ errT = 1e-10
 @test isapprox(varVal(vars[1]^vars[2], d1), vals[1]^vals[2], atol=errT)
 @test isapprox(varVal(expr, d1), f1(vals...), atol=errT)
 
-gb1 = GridBox(1,3.0)
+sp = 1.5
+gb1 = GridBox(1,sp)
 d2 = getVars(gb1.box |> flatten, includeMapping=true)
 l = Symbolics.variable(:L,0)
 vars2 = [i.val for i in keys(d2)]
@@ -214,9 +216,9 @@ diffs2 = Differential(l).(vars2)
 exprs2 = map(x -> (x isa SymbolicUtils.Term) ? d2[x] : x, vars2)
 diffExprs2 = Symbolics.derivative.(exprs2, Ref(l))
 excs2 = Symbolics.build_function.(exprs2, l) .|> eval
-vals2 = [f(3.0) for f in excs2]
+vals2 = [f(sp) for f in excs2]
 excdiffs2 = Symbolics.build_function.(diffExprs2, l) .|> eval
-diffvals2 = [f(3.0) for f in excdiffs2]
+diffvals2 = [f(sp) for f in excdiffs2]
 
 @test varVal.(vars2, Ref(d2)) == vals2
 @test varVal.(diffs2, Ref(d2)) == diffvals2

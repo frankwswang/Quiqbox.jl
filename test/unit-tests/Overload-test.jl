@@ -34,14 +34,14 @@ using Suppressor: @capture_out
     @test (@capture_out show(bfs2)) == string(typeof(bfs2))*"(gauss, subshell, center)"*
                                        "[X²Y⁰Z⁰]"*"[0.0, 0.0, 0.0]"
 
-    bfm1 = BasisFuncMix([bf1, bf2])
+    bfm1 = Quiqbox.BasisFuncMix([bf1, bf2])
     @test (@capture_out show(bfm1)) == string(typeof(bfm1))*"(BasisFunc, param)"
 
     GTb1 = GTBasis([bf1, bfs2])
     @test (@capture_out show(GTb1)) == string(typeof(GTb1))*"(basis, S, Te, eeI, getVne, "*
                                        "getHcore)"
     
-    box1 = GridBox(2, 3.5)
+    box1 = GridBox(2, 1.5)
     @test (@capture_out show(box1)) == string(typeof(box1))*"(num, len, coord)"
 
     fVar1 = runHF(GTb1, ["H", "H"], [[0, 0, 0], [1,2,1]], printInfo=false, initialC=:Hcore)

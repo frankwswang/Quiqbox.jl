@@ -13,7 +13,7 @@ bfSource1 = genBasisFunc(missing, ("STO-2G", "H"))[]
 gfs1 = [bfSource1.gauss...]
 cens = gridPoint.(nucCoords)
 bs1 = genBasisFunc.(cens, Ref(gfs1))
-pars1 = uniqueParams!(bs1, ignoreMapping=true)
+pars1 = uniqueParams!(bs1, filterMapping=true)
 
 local Es1L, pars1L, grads1L
 @suppress_out begin
@@ -34,20 +34,20 @@ grad_t1 = [-0.12518827510873726,  0.017527948869488608, -0.10779722877906275,
 
 
 # Grid-based basis set
-grid = GridBox(1, 3.0)
+grid = GridBox(1, 1.5)
 gf2 = GaussFunc(0.7,1)
 bs2 = genBasisFunc.(grid.box, Ref([gf2]))
 
-pars2 = uniqueParams!(bs2, ignoreMapping=true)[[1,3]]
+pars2 = uniqueParams!(bs2, filterMapping=true)[[1,3]]
 
 local Es2L, pars2L, grads2L
 @suppress_out begin
     Es2L, pars2L, grads2L = optimizeParams!(bs2, pars2, mol, nucCoords, maxSteps = 200)
 end
 
-E_t2 = -1.1804180821543429
-par_t2  = [ 0.17922884951410853, 2.853700041948111]
-grad_t2 = [-0.05218995522865333, 0.490154922874182]
+E_t2 = -1.6227282934931644
+par_t2  = [0.49801096561597613, 1.408314680969665]
+grad_t2 = [0.4557364086913408, 0.32317362845855635]
 
 @test isapprox(Es2L[end], E_t2, atol=errorThreshold)
 @test isapprox(pars2L[end, :], par_t2, atol=errorThreshold)

@@ -9,20 +9,20 @@ using Suppressor: @suppress_out
     nucCoords = [[-0.7,0.0,0.0], [0.7,0.0,0.0], [0.0, 0.0, 0.0]]
     mol = ["H", "H", "O"]
     bs = genBasisFunc.(nucCoords, ("STO-3G", "STO-3G", ("STO-3G", "O"))) |> flatten
-    S = dropdims(overlaps(bs), dims=3)
+    S = overlaps(bs)
 
     local res1, res2
     @suppress_out begin
         res1 = runHF(bs, mol, nucCoords; HFtype=:RHF, initialC=:Hcore,
-                    scfConfig=Quiqbox.SCFconfig([:ADIIS, :DIIS, :EDIIS, :SD], 
-                                                [1e-4, 1e-8, 1e-10, 1e-12]))
+                    scfConfig=SCFconfig([:ADIIS, :DIIS, :EDIIS, :SD], 
+                                        [1e-4, 1e-8, 1e-10, 1e-12]))
         res2 = runHF(bs, mol, nucCoords; HFtype=:UHF, 
-                    scfConfig=Quiqbox.SCFconfig([:ADIIS, :DIIS, :EDIIS, :SD], 
-                                                [1e-4, 1e-8, 1e-10, 1e-12],
-                                                Dict(1=>[:solver=>:Direct],
-                                                     2=>[:solver=>:Direct],
-                                                     3=>[:solver=>:Direct],
-                                                     4=>[:solver=>:Direct])))
+                    scfConfig=SCFconfig([:ADIIS, :DIIS, :EDIIS, :SD], 
+                                        [1e-4, 1e-8, 1e-10, 1e-12],
+                                        Dict(1=>[:solver=>:LCM],
+                                             2=>[:solver=>:LCM],
+                                             3=>[:solver=>:LCM],
+                                             4=>[:solver=>:LCM])))
     end
 
     @test isapprox(res1.E0HF, -93.7878386326277, atol=errorThreshold)

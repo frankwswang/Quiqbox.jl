@@ -77,7 +77,8 @@ using Quiqbox
     randVal = eeI[randIdx...,1] * ones(1,1,1,1,1)
     @test isapprox(eeInteraction(bs[randIdx]...), randVal, atol=errT)
 
-    eeI1, uniqueIdx1 = eeInteractions(bs, outputUniqueIndices=true)
+    eeI1, uniqueIdx1 = Quiqbox.eeInteractionsCore(bs, outputUniqueIndices=true)
+    isapprox(eeInteractions(bs), eeI1[:,:,:,:,1], atol=1e-15)
     @test isapprox(eeI1, eeI, atol=errT)
     uniqueInts1 = [eeI1[i...] for i in uniqueIdx1]
     @test unique(eeI1) ⊆ uniqueInts1
@@ -87,7 +88,7 @@ using Quiqbox
                                         for l = 1:(k==i ? j : k)]), 
                    sort(uniqueInts1), atol=errT)
     
-    eeI2, uniqueIdx2 = eeInteractions(bs[[1,3,2,4]], outputUniqueIndices=true)
+    eeI2, uniqueIdx2 = Quiqbox.eeInteractionsCore(bs[[1,3,2,4]], outputUniqueIndices=true)
     uniqueInts2 = [eeI2[i...] for i in uniqueIdx2]
     @test isapprox(sort(uniqueInts1), sort(uniqueInts2), atol=errT)
 end
