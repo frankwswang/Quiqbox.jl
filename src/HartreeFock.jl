@@ -16,10 +16,14 @@ getX(S::Matrix{T}; method::Int=1) where {TelLB<:T<:TelUB} = getXmethods[method](
 
 
 function getC(X::Matrix{T1}, F::Matrix{T2}; 
-              outputCx::Bool=false, outputEmo::Bool=false) where 
+              outputCx::Bool=false, outputEmo::Bool=false, stabilizeSign::Bool=true) where 
              {TelLB<:T1<:TelUB, TelLB<:T2<:TelUB}
     ϵ, Cₓ = eigen(X'*F*X |> Hermitian, sortby=x->x)
     outC = outputCx ? Cₓ : X*Cₓ
+    # Stabilize the sign factor of each column.
+    stabilizeSign && for j = 1:size(outC, 2)
+       outC[:, j] *= (outC[1,j] < 0 ? -1 : 1)
+    end
     outputEmo ? (outC, ϵ) : outC
 end
 
