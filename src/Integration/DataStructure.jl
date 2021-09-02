@@ -18,7 +18,8 @@ function addToDataChain!(env::Vector{Float64}, atm::Vector{Int32}, bas::Vector{I
     append!(env, xpns)
     norm = bf.normalizeGTO ? normOfGTOin(bf) : 1.0
     append!(env, cons.*norm)
-    append!(bas, Int32[gAtmIndex, SubshellNumberList[bf.subshell], nGauss, 1, 0, envEndIndex, envEndIndex+nGauss, 0])
+    append!(bas, Int32[gAtmIndex, SubshellNumberList[bf.subshell], nGauss, 1, 0, 
+                       envEndIndex, envEndIndex+nGauss, 0])
     envEndIndex += nGauss*2
     (env, atm, bas)
 end
