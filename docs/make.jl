@@ -14,8 +14,8 @@ makedocs(
         ]
         "Base"=>[
             "coreFunction.md"
-            "toolFunction.md"
             "coreType.md"
+            "toolFunction.md"
         ]
         "Submodule"=>[
             "molden.md"
