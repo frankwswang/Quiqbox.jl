@@ -521,8 +521,8 @@ end
                       adjustFunction::F=sciNotReplace, 
                       excludeFirstNlines=0, excludeLastNlines=0, 
                       center::Union{AbstractArray, 
-                                    Tuple{Vararg{<:ParamBox}}, 
-                                    Missing}=missing) where {F<:Function} -> 
+                                    Tuple{N, ParamBox}, 
+                                    Missing}=missing) where {N, F<:Function} -> 
     Array{<:FloatingGTBasisFunc, 1}
 
 Generate the basis set from a `String` of basis set in Gaussian format or the String output 
@@ -541,8 +541,8 @@ function genBFuncsFromText(content::String;
                            adjustFunction::F=sciNotReplace, 
                            excludeFirstNlines=0, excludeLastNlines=0, 
                            center::Union{AbstractArray, 
-                                         Tuple{Vararg{<:ParamBox}}, 
-                                         Missing}=missing) where {F<:Function}
+                                         NTuple{N, ParamBox}, 
+                                         Missing}=missing) where {N, F<:Function}
     adjustContent && (content = adjustFunction(content))
     lines = split.(content |> IOBuffer |> readlines)
     lines = lines[1+excludeFirstNlines : end-excludeLastNlines]
