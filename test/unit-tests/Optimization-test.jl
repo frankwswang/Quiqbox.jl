@@ -5,7 +5,7 @@ using Suppressor: @suppress_out
 @testset "Optimization.jl" begin
 
 errorThreshold1 = 1e-10
-errorThreshold2 = 1e-6
+errorThreshold2 = 1e-3
 
 # Floating basis set
 nucCoords = [[-0.7,0.0,0.0], [0.7,0.0,0.0]]
@@ -43,12 +43,12 @@ pars2 = uniqueParams!(bs2, filterMapping=true)[[1,3]]
 
 local Es2L, pars2L, grads2L
 @suppress_out begin
-    Es2L, pars2L, grads2L = optimizeParams!(bs2, pars2, mol, nucCoords, maxSteps = 100)
+    Es2L, pars2L, grads2L = optimizeParams!(bs2, pars2, mol, nucCoords, maxSteps = 50)
 end
 
-E_t2 = -1.60187771
-par_t2  = [0.56510208, 1.44471987]
-grad_t2 = [0.92745609, 0.42017915]
+E_t2 = -1.57792401
+par_t2  = [0.62080541, 1.46823536]
+grad_t2 = [1.30731332, 0.53205019]
 
 @test isapprox(Es2L[end], E_t2, atol=errorThreshold2)
 @test isapprox(pars2L[end, :], par_t2, atol=errorThreshold2)

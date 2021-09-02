@@ -5,7 +5,7 @@ using Suppressor: @suppress_out
 @testset "HartreeFock.jl" begin
 
     errorThreshold1 = 1e-8
-    errorThreshold2 = 1e-6
+    errorThreshold2 = 1e-5
 
     nucCoords = [[-0.7,0.0,0.0], [0.7,0.0,0.0], [0.0, 0.0, 0.0]]
     mol = ["H", "H", "O"]
@@ -28,16 +28,23 @@ using Suppressor: @suppress_out
 
     @test isapprox(res1.E0HF, -93.7878386326277, atol=errorThreshold1)
 
-    @test isapprox(res1.C, 
+    # Note: the molecular energies of 4th and 5th columns are so close that based on the 
+    # numerical error of each machine the position of them might switch.
+
+    @test isapprox(res1.C[1:5, [1,2,3,6,7]], 
     [ 0.010895948  0.088981718  0.121610580  0.0  0.0  1.914545170  3.615733228; 
       0.010895948  0.088981718 -0.121610580  0.0  0.0  1.914545170 -3.615733228; 
      -0.994229856 -0.263439202  0.0          0.0  0.0  0.049696590 -0.0; 
      -0.041593119  0.872248048  0.0          0.0  0.0 -3.396657723 -0.0; 
       0.0         -0.0          1.094022537  0.0  0.0  0.0          2.778671730; 
       0.0          0.0          0.0          1.0  0.0  0.0          0.0; 
-      0.0          0.0          0.0          0.0  1.0  0.0          0.0], 
+      0.0          0.0          0.0          0.0  1.0  0.0          0.0][1:5, [1,2,3,6,7]], 
     atol=errorThreshold2)
     
+    @test  isapprox(vcat(res1.C[6:7,:][:], res1.C[1:5, 4:5][:]) |> sort, 
+                    vcat(fill(0,22), fill(1,2)), atol=errorThreshold1)
+    @test  isapprox(res1.C[6:7, 4:5][:] |> sort, [0,0,1,1], atol=errorThreshold1)
+
     @test isapprox(res1.F, 
     [-2.255355742 -1.960980213  -4.484367700 -2.511687004  0.483602713  0.0  0.0; 
      -1.960980213 -2.255355742  -4.484367700 -2.511687004 -0.483602713  0.0  0.0; 
@@ -61,22 +68,30 @@ using Suppressor: @suppress_out
 
     @test isapprox(res2.E0HF, -93.7878386328625, atol=errorThreshold1)
     
-    @test isapprox.(res2.C, 
+    @test isapprox.((res2.C[1][1:5, [1,2,3,6,7]], res2.C[2][1:5, [1,2,3,6,7]]), 
     ([ 0.01089592  0.08898109  0.12160791  0.0  0.0  1.91454520  3.61573332; 
        0.01089592  0.08898109 -0.12160791  0.0  0.0  1.91454520 -3.61573332; 
       -0.99422987 -0.26343918  0.0         0.0  0.0  0.04969649  0.0; 
       -0.04159303  0.87224917  0.0         0.0  0.0 -3.39665744 -0.0; 
        0.0         0.0         1.09402049  0.0  0.0  0.0         2.77867254; 
        0.0         0.0         0.0         1.0  0.0  0.0         0.0; 
-       0.0         0.0         0.0         0.0  1.0  0.0         0.0], 
+       0.0         0.0         0.0         0.0  1.0  0.0         0.0][1:5, [1,2,3,6,7]], 
      [ 0.01089592  0.08898112  0.12160785  0.0  0.0  1.91454520  3.61573332; 
        0.01089592  0.08898112 -0.12160785  0.0  0.0  1.91454520 -3.61573332; 
       -0.99422987 -0.26343918 -0.0         0.0  0.0  0.04969649  0.0; 
       -0.04159303  0.87224912 -0.0         0.0  0.0 -3.39665745  0.0; 
        0.0        -0.0         1.09402044  0.0  0.0  0.0         2.77867255; 
        0.0         0.0         0.0         1.0  0.0  0.0         0.0; 
-       0.0         0.0         0.0         0.0  1.0  0.0         0.0]), 
+       0.0         0.0         0.0         0.0  1.0  0.0         0.0][1:5, [1,2,3,6,7]]), 
     atol=errorThreshold2) |> prod
+
+    @test  isapprox(vcat(res2.C[1][6:7,:][:], res2.C[1][1:5, 4:5][:]) |> sort, 
+                    vcat(fill(0,22), fill(1,2)), atol=errorThreshold1)
+    @test  isapprox(res2.C[1][6:7, 4:5][:] |> sort, [0,0,1,1], atol=errorThreshold1)
+
+    @test  isapprox(vcat(res2.C[2][6:7,:][:], res2.C[2][1:5, 4:5][:]) |> sort, 
+                    vcat(fill(0,22), fill(1,2)), atol=errorThreshold1)
+    @test  isapprox(res2.C[2][6:7, 4:5][:] |> sort, [0,0,1,1], atol=errorThreshold1)
     
     @test isapprox.(res2.F, 
     ([-2.25535869 -1.96098203  -4.48436922 -2.51168980  0.48360380  0.0  0.0; 
@@ -100,7 +115,7 @@ using Suppressor: @suppress_out
        -0.661307611,  1.060815275,  1.847804069],
      [-20.930384496, -1.616675722, -1.284466197, -0.661307600, 
        -0.661307600,  1.060815276,  1.847804076]), 
-    atol=errorThreshold1) |> prod
+    atol=errorThreshold2) |> prod
     
     @test ( res2.occu .== ([1, 1, 1, 1, 1, 0, 0], [1, 1, 1, 1, 1, 0, 0]) ) |> prod
     
