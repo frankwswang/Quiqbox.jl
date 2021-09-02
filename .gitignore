@@ -1,4 +1,5 @@
 legacy/
 docs/build/
 Manifest.toml
+.vscode/
 __test__*
