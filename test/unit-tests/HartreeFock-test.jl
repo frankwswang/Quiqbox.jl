@@ -5,7 +5,7 @@ using Suppressor: @suppress_out
 @testset "HartreeFock.jl" begin
 
     errorThreshold1 = 1e-8
-    errorThreshold2 = 1e-5
+    errorThreshold2 = 1e-4
 
     nucCoords = [[-0.7,0.0,0.0], [0.7,0.0,0.0], [0.0, 0.0, 0.0]]
     mol = ["H", "H", "O"]
