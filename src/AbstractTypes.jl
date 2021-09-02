@@ -7,6 +7,7 @@ abstract type QuiqboxParameter{ParameterT, ContainerT} <: QuiqboxVariableBox end
 abstract type QuiqboxDataBox <: QuiqboxVariableBox end
 
 abstract type ImmutableParameter{ContainerT, DataT} <: QuiqboxParameter{ImmutableParameter, ContainerT} end
+abstract type SemiMutableParameter{ContainerT, DataT} <: QuiqboxParameter{SemiMutableParameter, ContainerT} end
 abstract type MutableParameter{ContainerT, DataT} <: QuiqboxParameter{MutableParameter, ContainerT} end
 
 abstract type ImmutableDataBox <: QuiqboxDataBox end

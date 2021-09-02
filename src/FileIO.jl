@@ -5,6 +5,14 @@ const subscriptNum   = Dict(['0'=>'₀', '1'=>'₁', '2'=>'₂', '3'=>'₃', '4'
 const superscriptSym = Dict(['+'=>'⁺', '-'=>'⁻', '('=>'⁽', ')'=>'⁾', '!'=>'ꜝ'])
 
 
+"""
+
+    checkFname(Fname::String; showWarning::Bool=true) -> String
+
+Check if there is a file with the same name in the current directory. If so, will add an 
+`"_N"` at the end of the file name `String`. `showWarning` determines whether prints out 
+the WARNING info when there is a file with the same name.
+"""
 function checkFname(Fname::String; showWarning::Bool=true)
     FnameN = Fname 
     while isfile(FnameN) == true
@@ -23,7 +31,8 @@ function checkFname(Fname::String; showWarning::Bool=true)
 end
 
 
-function advancedParse(content::AbstractString, ParseFunc::Function=adaptiveParse)
+function advancedParse(content::AbstractString, 
+                       ParseFunc::F=adaptiveParse) where {F<:Function}
     res = ParseFunc(content)
     res === nothing && (res = content)
     res

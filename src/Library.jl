@@ -69,6 +69,7 @@ const BasisFuncNames =
 
 
 const SciNotMarker = r"D(?=[\+\-])"
+const sciNotReplace = (txt)->replace(txt, SciNotMarker => "e")
 const BStextEndingMarker = "****"
 const BasisSetList = Dict(BasisFuncNames .=> BasisFuncTexts)
 const AtomicNumberList = Dict(ElementNames .=> collect(1 : length(ElementNames)))
@@ -81,11 +82,10 @@ const ijkStringList = Dict(flatten(SubshellOrbitals) .=> flatten(SubshellAngular
 const SubshellDimList = Dict(SubshellNames .=> length.(SubshellOrbitals))
 # const ParamNames = [:𝑋, :𝑌, :𝑍, :𝑑, :𝛼, :𝐿]
 const ParamNames = [:X, :Y, :Z, :d, :α, :L]
-const ParamSymbols = [:X, :Y, :Z, :con, :xpn, :len]
+const ParamSymbols = [:X, :Y, :Z, :con, :xpn, :spacing]
 const ParamList = Dict(ParamSymbols .=> ParamNames)
 
-
-getCharge(nucs::Array{String, 1}) = getCharge.(nucs) |> sum
+getCharge(nucs::Vector{String}) = getCharge.(nucs) |> sum
 
 getCharge(nucStr::String) = AtomicNumberList[nucStr]
 
@@ -104,5 +104,5 @@ function checkBSList(;printInfo::Bool=false)
             """
         end
     end
-    printInfo && println("Basis fucntion list checked.")
+    printInfo && println("Basis function list checked.")
 end

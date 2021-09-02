@@ -16,10 +16,10 @@ molCoords = [
              [[0.0, 0.0, 0.1111], [0.0, 0.9316, -0.2592], [0.8068, -0.4658, -0.2592], [-0.8068, -0.4658, -0.2592]]
              ] ./ br
 
-bfCoords = [molCoords..., GridBox(1, 2.4).coord]
+bfCoords = [molCoords..., GridBox(1, 1.2).coord]
 bfs = ["STO-3G"]
 bsNames = push!(("-" .*molNames), "-Grid")
-prefix = "Exmaple"
+prefix = "Example"
 for (nuc, nucCoords, molName, iMol) in zip(mols, molCoords, molNames, 1:length(mols)), 
     (bfCoord, bsName) in zip(bfCoords[iMol:end], bsNames[iMol:end]), 
     bf in bfs
@@ -27,9 +27,9 @@ for (nuc, nucCoords, molName, iMol) in zip(mols, molCoords, molNames, 1:length(m
     flag = (bfCoord == nucCoords)
     if flag
         nucConfig = [(bf, i) for i in nuc]
-        bs = BasisFunc.(bfCoord, nucConfig) |> flatten
+        bs = genBasisFunc.(bfCoord, nucConfig) |> flatten
     else
-        bs = BasisFunc.(bfCoord, bf) |> flatten
+        bs = genBasisFunc.(bfCoord, bf) |> flatten
         bsName = "-Float"*bsName
     end
     
