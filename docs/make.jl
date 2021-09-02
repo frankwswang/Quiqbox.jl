@@ -25,5 +25,6 @@ makedocs(
 )
 
 deploydocs(repo="github.com/frankwswang/Quiqbox.jl.git", 
-           branch = "gh-pages", 
-           devbranch = "main")
+           devbranch = "main",
+           target = "build",
+           push_preview = true)
