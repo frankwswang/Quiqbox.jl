@@ -254,7 +254,6 @@ mutable struct HFinterrelatedVars <: HartreeFockintermediateData
     Etots::Vector{Float64}
 
     HFinterrelatedVars() = new()
-    HFinterrelatedVars(Dtots) = new(Dtots)
     HFinterrelatedVars(Dtots, Etots) = new(Dtots, Etots)
 end
 

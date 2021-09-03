@@ -77,6 +77,8 @@ pars = uniqueParams!(bs, filterMapping=true)
 optimizeParams!(bs, pars[1:4], nuc, coords)
 ```
 
+# Documentation
+
 For more information on how to use the package, please read the [documentation of released versions][Doc-stable]. For unreleased/experimental features, please refer to the [latest documentation][Doc-latest].
 
 To learn more about the basic usage of the programming language behind Quiqbox, **Julia**, [the official documentation](https://docs.julialang.org/) or [this official tutorial](https://juliaacademy.com/p/intro-to-julia) is recommended.
