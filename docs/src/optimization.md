@@ -12,7 +12,7 @@ nuc = ["H", "H"]
 
 nucCoords = [[-0.7,0.0,0.0], [0.7,0.0,0.0]]
 
-grid = GridBox(1, 1.5)
+grid = GridBox(1, 3.0)
 
 gf1 = GaussFunc(0.7,1)
 
