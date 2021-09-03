@@ -16,7 +16,7 @@ molCoords = [
              [[0.0, 0.0, 0.1111], [0.0, 0.9316, -0.2592], [0.8068, -0.4658, -0.2592], [-0.8068, -0.4658, -0.2592]]
              ] ./ br
 
-bfCoords = [molCoords..., GridBox(1, 1.2).coord]
+bfCoords = [molCoords..., GridBox(1, 1.2) |> gridCoords]
 bfs = ["STO-3G"]
 bsNames = push!(("-" .*molNames), "-Grid")
 prefix = "Example"

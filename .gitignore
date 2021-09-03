@@ -3,3 +3,4 @@ docs/build/
 Manifest.toml
 .vscode/
 __test__*
+Example_*
