@@ -33,6 +33,10 @@ assignCenter!
 ```
 
 ```@docs
+getParams
+```
+
+```@docs
 uniqueParams!
 ```
 
@@ -57,6 +61,10 @@ GridBox(nGridPerEdge::Int, spacing::Real=10,
 
 ```@docs
 gridPoint
+```
+
+```@docs
+gridCoords(gb::GridBox)
 ```
 
 
