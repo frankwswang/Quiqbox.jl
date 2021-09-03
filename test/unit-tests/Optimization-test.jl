@@ -5,7 +5,7 @@ using Suppressor: @suppress_out
 @testset "Optimization.jl" begin
 
 errorThreshold1 = 1e-10
-errorThreshold2 = 1e-3
+errorThreshold2 = 1e-4
 
 # Floating basis set
 nucCoords = [[-0.7,0.0,0.0], [0.7,0.0,0.0]]
@@ -35,7 +35,7 @@ grad_t1 = [-0.125188275109,  0.017527948869, -0.107797228779,
 
 
 # Grid-based basis set
-grid = GridBox(1, 1.5)
+grid = GridBox(1, 3.0)
 gf2 = GaussFunc(0.7,1)
 bs2 = genBasisFunc.(grid.box, Ref([gf2]))
 
@@ -43,12 +43,12 @@ pars2 = uniqueParams!(bs2, filterMapping=true)[[1,3]]
 
 local Es2L, pars2L, grads2L
 @suppress_out begin
-    Es2L, pars2L, grads2L = optimizeParams!(bs2, pars2, mol, nucCoords, maxSteps = 50)
+    Es2L, pars2L, grads2L = optimizeParams!(bs2, pars2, mol, nucCoords, maxSteps = 100)
 end
 
-E_t2 = -1.57792401
-par_t2  = [0.62080541, 1.46823536]
-grad_t2 = [1.30731332, 0.53205019]
+E_t2 = -1.16666630
+par_t2  = [0.17642659, 2.90239973]
+grad_t2 = [0.10233850, 0.48936670]
 
 @test isapprox(Es2L[end], E_t2, atol=errorThreshold2)
 @test isapprox(pars2L[end, :], par_t2, atol=errorThreshold2)

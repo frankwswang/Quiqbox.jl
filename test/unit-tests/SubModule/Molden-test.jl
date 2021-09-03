@@ -24,7 +24,7 @@ molCoords = [
               [0.8068, -0.4658, -0.2592], [-0.8068, -0.4658, -0.2592]]
              ] ./ br
 
-bfCoords = [molCoords..., GridBox(1, 1.2).coord]
+bfCoords = [molCoords..., GridBox(1, 1.2) |> gridCoords]
 bfs = ["STO-3G", "STO-2G"]
 bsNames = push!(("-" .*molNames), "-Grid")
 HFtypes = [:RHF, :UHF]

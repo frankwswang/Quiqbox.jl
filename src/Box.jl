@@ -1,4 +1,4 @@
-export gridBoxCoords, GridBox, gridPoint
+export gridBoxCoords, GridBox, gridPoint, gridCoords
 
 """
 
@@ -11,7 +11,7 @@ A `struct` that stores coordinates of grid points in terms of both `Vector`s and
 
 `num::Int`: Total number of the grid points.
 
-`spacing::Float64`: The edge length of the grid box.
+`spacing::Float64`: The length between adjacent grid points.
 
 `box::Vector{NTuple{3, ParamBox}}`: The coordinates of grid points in terms of `ParamBox`s.
 
@@ -34,7 +34,6 @@ struct GridBox{NX, NY, NZ} <: SemiMutableParameter{GridBox, Float64}
     num::Int
     spacing::Float64
     box::Vector{NTuple{3, ParamBox}}
-    coord::Vector{Vector{Float64}}
 
     function GridBox(nGrids::NTuple{3, Int}, spacing::Real=10, 
                      centerCoord::Vector{<:Real}=[0.0,0.0,0.0];
@@ -44,7 +43,6 @@ struct GridBox{NX, NY, NZ} <: SemiMutableParameter{GridBox, Float64}
         spc = spacing |> Float64
         pbRef = ParamBox(spc, sym; canDiff, index)
         boxes = NTuple{3, ParamBox{sym, Float64}}[]
-        coords = Vector{Float64}[]
         n = 0
         supIndex = "ᴳ"*numToSups(nGrids[1])*superscriptSym['-']*numToSups(nGrids[2])*
                    superscriptSym['-']*numToSups(nGrids[3])
@@ -65,9 +63,8 @@ struct GridBox{NX, NY, NZ} <: SemiMutableParameter{GridBox, Float64}
             X.canDiff = Y.canDiff = Z.canDiff = pbRef.canDiff
             X.index = Y.index = Z.index = pbRef.index
             push!(boxes, (X, Y, Z))
-            push!(coords, [X(), Y(), Z()])
         end
-        new{nGrids[1], nGrids[2], nGrids[3]}(prod(nGrids .+ 1), spc, boxes, coords)
+        new{nGrids[1], nGrids[2], nGrids[3]}(prod(nGrids .+ 1), spc, boxes)
     end
 end
 
@@ -100,4 +97,19 @@ function gridPoint(coord::Vector{<:Real})
     y = ParamBox(coord[2], ParamList[:Y])
     z = ParamBox(coord[3], ParamList[:Z])
     (x,y,z)
+end
+
+
+"""
+
+    gridCoords(gb::GridBox) -> Array{Array{Float64, 1}, 1}
+
+Return the grid-point coordinates in `Vector`s given the `GriBox`.
+"""
+function gridCoords(gb::GridBox)
+    coords = Vector{Float64}[]
+    for point in gb.box
+        push!(coords, [point[1](), point[2](), point[3]()])
+    end
+    coords
 end

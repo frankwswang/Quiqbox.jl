@@ -5,7 +5,7 @@
 **Quiqbox** is a quantum chemistry and quantum computing software package that starts off around Gaussian basis set optimization of molecular electronic-structure problems. Quiqbox is written in pure [Julia](https://julialang.org/).
 
 | Documentation | Code Status | License |
-| :--- | :---: | ---: |
+| :---: | :---: | :---: |
 | [![][Doc-l-img]][Doc-latest] | [![codecov][codecov-img]][codecov-url] [![CI][GA-CI-img]][GA-CI-url] | [![License: MIT][License-img]][License-url] |
 
 <br />
@@ -49,7 +49,7 @@ After the installation completes, hit *Backspace* key to go back to Julia REPL a
 julia> using Quiqbox
 ```
 
-# Use cases
+# Showcase
 
 ## Apply existed basis set
 ```julia
@@ -77,7 +77,9 @@ pars = uniqueParams!(bs, filterMapping=true)
 optimizeParams!(bs, pars[1:4], nuc, coords)
 ```
 
-For more basic usage of the programming language behind Quiqbox, Julia, please refer to [the official documentation](https://docs.julialang.org/) or [one official tutorial](https://juliaacademy.com/p/intro-to-julia).
+For more information on how to use the package, please read the [documentation of released versions][Doc-stable]. For unreleased/experimental features, please refer to the [latest documentation][Doc-latest].
+
+To learn more about the basic usage of the programming language behind Quiqbox, **Julia**, [the official documentation](https://docs.julialang.org/) or [this official tutorial](https://juliaacademy.com/p/intro-to-julia) is recommended.
 
 
 [Doc-stable]:  https://frankwswang.github.io/Quiqbox.jl/stable

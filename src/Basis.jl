@@ -1,6 +1,6 @@
 export GaussFunc, BasisFunc, BasisFuncs, genBasisFunc, centerOf, GTBasis, 
        decomposeBasisFunc, basisSize, genBasisFuncText, genBFuncsFromText, assignCenter!, 
-       uniqueParams!, getVar, getVars, expressionOf
+       getParams, uniqueParams!, getVar, getVars, expressionOf
 
 using Symbolics
 using SymbolicUtils
@@ -585,6 +585,18 @@ function assignCenter!(center::AbstractArray, b::FloatingGTBasisFunc)
 end
 
 
+"""
+
+    getParams(pbc::Union{ParamBox, GaussFunc, FloatingGTBasisFunc}, 
+              symbol::Union{Symbol, Nothing}=nothing; onlyDifferentiable::Bool=false) -> 
+    Union{ParamBox, Array{<:ParamBox, 1}}
+
+Return the parameter(s)`::ParamBox` stored in the input container. If keyword argument 
+`symbol` is `nothing`, then return all the different parameters; if it's set to the 
+`Symbol` type of a parameter (e.g. the symbol of `ParamBox{T}` would be `T`), the function 
+will only search for that type of parameters (which might have different indices). 
+`onlyDifferentiable` determines whether ignore non-differentiable parameters.
+"""
 function getParams(pb::ParamBox, symbol::Union{Symbol, Nothing}=nothing; 
                    onlyDifferentiable::Bool=false)
     !(onlyDifferentiable ? pb.canDiff[] : true) && (return nothing)
@@ -611,12 +623,21 @@ getParams(bf::FloatingGTBasisFunc, symbol::Union{Symbol, Nothing}=nothing;
 vcat( getParams.(bf.gauss, symbol; onlyDifferentiable)..., 
       getParams(bf.center |> collect, symbol; onlyDifferentiable) )
 
-getParams(ds, symbols::Vector{Symbol}; onlyDifferentiable::Bool=false) = 
-getParams.(Ref(ds), symbols; onlyDifferentiable) |> flatten
+getParams(cs, symbols::Vector{Symbol}; onlyDifferentiable::Bool=false) = 
+getParams.(Ref(cs), symbols; onlyDifferentiable) |> flatten
 
-getParams(ds::Array, symbol::Union{Symbol, Nothing}=nothing; 
+"""
+
+    getParams(cs::Array, symbol::Union{Symbol, Nothing}=nothing; 
+              onlyDifferentiable::Bool=false) -> 
+    Array{<:ParamBox, 1}
+
+Method of `getParams` when the 1st argument is an `Array` of `ParamBox`, `GaussFunc`, 
+`FloatingGTBasisFunc` or any of them.
+"""
+getParams(cs::Array, symbol::Union{Symbol, Nothing}=nothing; 
           onlyDifferentiable::Bool=false) = 
-getParams.(ds, symbol; onlyDifferentiable) |> flatten
+getParams.(cs, symbol; onlyDifferentiable) |> flatten
 
 
 function markParams!(parArray::Vector{<:ParamBox{V}}; 
