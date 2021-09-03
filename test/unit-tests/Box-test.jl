@@ -18,7 +18,7 @@ using Quiqbox
     
     @test grid.num == num
     @test grid.spacing == 3.0
-    @test grid.coord == points
+    @test gridCoords(grid) == points
     @test map(i-> [j() for j in i], grid.box) == points
 
     gPoints = gridPoint.(points) |> flatten
