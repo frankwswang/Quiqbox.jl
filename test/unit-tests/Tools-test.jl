@@ -1,6 +1,6 @@
 using Test
-using Quiqbox: tryIncluding, markUnique, flatten, alignSignedNum, 
-               symbolReplace, splitTerm
+using Quiqbox: tryIncluding, @compareLength, hasBoolRelation, markUnique, flatten, 
+               alignSignedNum, symbolReplace, splitTerm
 using Symbolics
 using Suppressor: @capture_out
 
@@ -13,6 +13,18 @@ using Suppressor: @capture_out
     pkgDir = @__DIR__
     @test length(errStr) > length(@capture_out tryIncluding("someMod", subModulePath=""))
     
+
+    # macro @compareLength
+    @test try @compareLength [1] [1,2] "a" "b"; catch; true end
+
+
+    # function hasBoolRelation
+    @test hasBoolRelation(===, 1, 1) == (1 === 1)
+    @test hasBoolRelation(===, [1,2], [1,2]) == ([1,2] .=== [1,2]) |> prod
+    @test !hasBoolRelation(===, [1 x->x^2], [1 x->abs(x)])
+    @test hasBoolRelation(===, [1 x->x^2], [1 x->abs(x)], ignoreFunction=true)
+
+
     # function markUnique
     @test markUnique([1,3,2,2,5]) == ([1,2,3,3,4], [1,3,2,5])
 

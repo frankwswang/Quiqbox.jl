@@ -150,8 +150,38 @@ assignCenter!(coord, bf5)
 @test hasEqual(bf5, bf5_1)
 
 
-# function getVars
-pb1 = ParamBox(2, :p)
+# function getParams
+pb1 = ParamBox(2, :p, canDiff=false)
+@test getParams(pb1) == pb1
+@test getParams(pb1, :p) == pb1
+@test getParams(pb1, :P) === nothing
+@test getParams(pb1, onlyDifferentiable=true) === nothing
+
+pb2 = ParamBox(2, :q)
+@test getParams([pb1, pb2]) == [pb1, pb2]
+@test getParams([pb1, pb2], :p) == [pb1]
+
+gf_pbTest1 = GaussFunc(2,1)
+@test getParams(gf_pbTest1) == gf_pbTest1.param |> collect
+
+gf_pbTest2 = GaussFunc(1.5,0.5)
+bf_pbTest1 = genBasisFunc([1,0,0], [gf_pbTest1, gf_pbTest2])
+@test getParams(bf_pbTest1) == [gf_pbTest1.param..., gf_pbTest2.param..., 
+                                bf_pbTest1.center...]
+
+@test getParams([gf_pbTest1, gf_pbTest2, bf_pbTest1.center...]) == getParams(bf_pbTest1)
+
+alpha = Quiqbox.ParamList[:xpn]
+@test getParams(bf_pbTest1, alpha) == 
+      vcat(getParams(gf_pbTest1, alpha), getParams(gf_pbTest2, alpha)) == 
+      [gf_pbTest1.param[1], gf_pbTest2.param[1]]
+
+@test getParams([pb1, bf_pbTest1], [:X, :Y, :Z]) == [nothing, bf_pbTest1.center[1],
+                                                     nothing, bf_pbTest1.center[2],
+                                                     nothing, bf_pbTest1.center[3]]
+
+# function getVar & getVars
+@test getVar(pb1 |> typeof).val.name == :p
 @test getVar(pb1)[][1].val.name == :p
 @test getVar(pb1)[][2] == 2.0
 @test getVar(pb1)[] isa Pair{Num, Float64}

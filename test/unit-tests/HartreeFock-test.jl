@@ -8,16 +8,19 @@ using Suppressor: @suppress_out
     errorThreshold2 = 1e-4
 
     nucCoords = [[-0.7,0.0,0.0], [0.7,0.0,0.0], [0.0, 0.0, 0.0]]
-    mol = ["H", "H", "O"]
+    nuc = ["H", "H", "O"]
     bs = genBasisFunc.(nucCoords, ("STO-3G", "STO-3G", ("STO-3G", "O"))) |> flatten
     S = overlaps(bs)
+    Hcore = coreH(bs, nuc, nucCoords)
+    HeeI = eeInteractions(bs)
+    Ne = getCharge(nuc)
 
     local res1, res2
     @suppress_out begin
-        res1 = runHF(bs, mol, nucCoords; HFtype=:RHF, initialC=:Hcore,
+        res1 = runHF(bs, nuc, nucCoords; HFtype=:RHF, initialC=:Hcore,
                     scfConfig=SCFconfig([:ADIIS, :DIIS, :EDIIS, :SD], 
                                         [1e-4, 1e-8, 1e-10, 1e-12]))
-        res2 = runHF(bs, mol, nucCoords; HFtype=:UHF, 
+        res2 = runHF(bs, nuc, nucCoords; HFtype=:UHF, 
                     scfConfig=SCFconfig([:ADIIS, :DIIS, :EDIIS, :SD], 
                                         [1e-4, 1e-8, 1e-10, 1e-12],
                                         Dict(1=>[:solver=>:LCM],
@@ -25,6 +28,21 @@ using Suppressor: @suppress_out
                                              3=>[:solver=>:LCM],
                                              4=>[:solver=>:LCM])))
     end
+
+
+    @test begin
+        tVars1 = deepcopy(res1.temp)
+        Quiqbox.popHFtempVars!(tVars1)
+        push!(tVars1.Cs, res1.temp.Cs[end])
+        push!(tVars1.Fs, res1.temp.Fs[end])
+        push!(tVars1.Ds, res1.temp.Ds[end])
+        push!(tVars1.Es, res1.temp.Es[end])
+        push!(tVars1.shared.Dtots, res1.temp.shared.Dtots[end])
+        push!(tVars1.shared.Etots, res1.temp.shared.Etots[end])
+        hasEqual(tVars1, res1.temp)
+    end
+
+    @test isapprox(res1.E0HF, Quiqbox.getEᵀ(Hcore, HeeI, res1.C, Ne), atol=errorThreshold1)
 
     @test isapprox(res1.E0HF, -93.7878386326277, atol=errorThreshold1)
 
@@ -65,6 +83,25 @@ using Suppressor: @suppress_out
     D1 = res1.D
     @test isapprox(D1*S*D1, D1, atol=errorThreshold1)
 
+
+    @test begin
+        tVars2 = deepcopy(res2.temp)
+        Quiqbox.popHFtempVars!(tVars2)
+        push!(tVars2[1].Cs, res2.temp[1].Cs[end])
+        push!(tVars2[1].Fs, res2.temp[1].Fs[end])
+        push!(tVars2[1].Ds, res2.temp[1].Ds[end])
+        push!(tVars2[1].Es, res2.temp[1].Es[end])
+        push!(tVars2[2].Cs, res2.temp[2].Cs[end])
+        push!(tVars2[2].Fs, res2.temp[2].Fs[end])
+        push!(tVars2[2].Ds, res2.temp[2].Ds[end])
+        push!(tVars2[2].Es, res2.temp[2].Es[end])
+        push!(tVars2[2].shared.Dtots, res2.temp[2].shared.Dtots[end])
+        push!(tVars2[2].shared.Etots, res2.temp[2].shared.Etots[end])
+        hasEqual(tVars2, res2.temp)
+    end
+
+    @test isapprox(res2.E0HF, Quiqbox.getEᵀ(Hcore, HeeI, res2.C, (Ne÷2, Ne-Ne÷2)), 
+                   atol=errorThreshold1)
 
     @test isapprox(res2.E0HF, -93.7878386328625, atol=errorThreshold1)
     
