@@ -41,4 +41,4 @@ After the installation completes, hit *Backspace* key to go back to Julia REPL a
 julia> using Quiqbox
 ```
 
-For more basic usage of the programming language behind Quiqbox, Julia, please refer to [the official documentation](https://docs.julialang.org/) or [one official tutorial](https://juliaacademy.com/p/intro-to-julia).
+For more basic usage of the programming language behind Quiqbox, **Julia**, please refer to [the official documentation](https://docs.julialang.org/) or [this official tutorial](https://juliaacademy.com/p/intro-to-julia).
