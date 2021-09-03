@@ -170,11 +170,13 @@ gf12 = GaussFunc(3,0.5)
 expStr = expressionOf(bf5)[] |> string
 idx = findfirst('d', expStr)
 @test isapprox(parse(Float64, expStr[1:idx-1]), 7.579425332952777, atol=1e-12)
-@test expStr[idx:end] == "d*exp(-α*((r₁ - X)^2 + (r₂ - Y)^2 + (r₃ - Z)^2))*(α^0.75)"
+@test expStr[idx:end] == "d*exp(-α*((r₁ - X)^2 + (r₂ - Y)^2 + (r₃ - Z)^2))*(α^0.75)" || 
+      expStr[idx:end] == "d*(α^0.75)*exp(-α*((r₁ - X)^2 + (r₂ - Y)^2 + (r₃ - Z)^2))"
 
 @test expressionOf(bfm1)[] |> string == "d*exp(-α*((r₁ - X)^2 + (r₂ - Y)^2 + (r₃ - Z)^2))"
-@test expressionOf(bfm2)[] |> string == "d*exp(-α*((r₁ - X)^2 + (r₂ - Y)^2 + (r₃ - Z)^2))"*
-                                        "*(r₁ - X)"
+expr_bfm2 =  expressionOf(bfm2)[] |> string
+@test expr_bfm2 == "d*exp(-α*((r₁ - X)^2 + (r₂ - Y)^2 + (r₃ - Z)^2))*(r₁ - X)" || 
+      expr_bfm2 == "d*(r₁ - X)*exp(-α*((r₁ - X)^2 + (r₂ - Y)^2 + (r₃ - Z)^2))"
 
 
 # function inSymbols
