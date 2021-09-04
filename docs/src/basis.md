@@ -209,7 +209,7 @@ pb1 = gf4.xpn
 pb1.map
 ```
 
-The `map` field of a `ParamBox` stores a `RefValue{<:Function}`, referencing the `Function` that maps the actual stored value to another value through math operations (``R \to R``). The output value can be access through syntax `()`. In default the the variable is mapped to itself:
+The `map` field of a `ParamBox` stores a `RefValue{<:Function}`, referencing the `Function` that maps the actual stored value to another value through math operations (``R \to R``). The output value can be access through syntax `()`. In default the variable is mapped to itself:
 ```@repl 2
 pb1[] == pb1()
 ```
