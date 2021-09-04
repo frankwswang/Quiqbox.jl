@@ -6,7 +6,7 @@
 
 | Documentation | Code Status | License |
 | :---: | :---: | :---: |
-| [![][Doc-l-img]][Doc-latest] | [![codecov][codecov-img]][codecov-url] [![CI][GA-CI-img]][GA-CI-url] | [![License: MIT][License-img]][License-url] |
+| [![][Doc-s-img]][Doc-stable] | [![codecov][codecov-img]][codecov-url] [![CI][GA-CI-img]][GA-CI-url] [![CI-JN][GA-CI-JN-img]][GA-CI-JN-url] | [![License: MIT][License-img]][License-url] |
 
 <br />
 
@@ -71,7 +71,7 @@ runHF(bs, nuc, coords)
 ```
 
 ## Optimize a basis set
-```
+```julia
 pars = uniqueParams!(bs, filterMapping=true)
 
 optimizeParams!(bs, pars[1:4], nuc, coords)
@@ -86,11 +86,13 @@ To learn more about the basic usage of the programming language behind Quiqbox, 
 
 [Doc-stable]:  https://frankwswang.github.io/Quiqbox.jl/stable
 [Doc-latest]:  https://frankwswang.github.io/Quiqbox.jl/dev
-[Doc-s-img]:   https://img.shields.io/badge/docs-stable-blue.svg
+[Doc-s-img]:   https://img.shields.io/github/v/release/frankwswang/Quiqbox.jl?label=Latest%20release
 [Doc-l-img]:   https://img.shields.io/badge/docs-latest-blue.svg
-[GA-CI-img]:   https://github.com/frankwswang/Quiqbox.jl/actions/workflows/CI.yml/badge.svg?branch=main
+[GA-CI-img]:   https://img.shields.io/github/workflow/status/frankwswang/Quiqbox.jl/CI?label=Julia%201.5%2B
 [GA-CI-url]:   https://github.com/frankwswang/Quiqbox.jl/actions/workflows/CI.yml
-[codecov-img]: https://codecov.io/gh/frankwswang/Quiqbox.jl/branch/main/graph/badge.svg?token=Z1XOA39DV2
+[GA-CI-JN-img]:https://img.shields.io/github/workflow/status/frankwswang/Quiqbox.jl/CI-JN?label=Julia%20nightly
+[GA-CI-JN-url]:https://github.com/frankwswang/Quiqbox.jl/actions/workflows/CI-JN.yml
+[codecov-img]: https://img.shields.io/codecov/c/github/frankwswang/Quiqbox.jl/main?label=Coverage&token=Z1XOA39DV2
 [codecov-url]: https://codecov.io/gh/frankwswang/Quiqbox.jl
 [License-img]: https://img.shields.io/badge/License-MIT-blueviolet.svg
-[License-url]: https://opensource.org/licenses/MIT
+[License-url]: https://github.com/frankwswang/Quiqbox.jl/blob/main/LICENSE
