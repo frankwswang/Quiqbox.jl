@@ -54,8 +54,7 @@ expressionOf
 
 
 ```@docs
-GridBox(nGridPerEdge::Int, spacing::Real=10, 
-        centerCoord::Array{<:Real, 1}=[0.0,0.0,0.0]; 
+GridBox(nGridPerEdge::Int, spacing::Real=10, centerCoord::Vector{<:Real}=[0.0,0.0,0.0];
         canDiff::Bool=true, index::Int=0)
 ```
 
@@ -78,8 +77,8 @@ runHFcore
 
 
 ```@docs
-Molecule(basis::Array{<:Quiqbox.FloatingGTBasisFunc, 1}, nuc::Array{String, 1}, 
-         nucCoords::Array{<:AbstractArray, 1}, HFfVars::Quiqbox.HFfinalVars)
+Molecule(basis::Vector{<:Quiqbox.FloatingGTBasisFunc}, nuc::Vector{String}, 
+         nucCoords::Vector{<:AbstractArray}, HFfVars::Quiqbox.HFfinalVars)
 ```
 
 ```@docs
@@ -142,6 +141,11 @@ eeInteraction
 
 ```@docs
 eeInteractions
+```
+
+```@docs
+Quiqbox.eeInteractionsCore(BSet::Vector{<:Quiqbox.AbstractFloatingGTBasisFunc}; 
+                           outputUniqueIndices::Bool=false)
 ```
 
 ```@docs

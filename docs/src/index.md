@@ -14,11 +14,13 @@
 ## Setup
 
 ### Supported system platforms (64-bit)
+
 * Linux
 * Mac OS
 * [Windows Subsystem for Linux](https://docs.microsoft.com/en-us/windows/wsl/about)
 
 ### Julia Environment
+
 * [1.5+](https://github.com/frankwswang/Quiqbox.jl/actions/workflows/CI.yml)
 
 ### Installation in Julia [REPL](https://docs.julialang.org/en/v1/manual/getting-started/)

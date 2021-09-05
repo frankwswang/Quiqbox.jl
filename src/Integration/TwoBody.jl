@@ -31,8 +31,8 @@ end
 
 Core function for one-electron integrals.
 
-`libcinFunc::Symbol` specifies the backend libcint (https://github.com/sunqm/libcint) 
-function name, e.g. "cint2e_cart" should be converted to `:cint2e_cart`as the input 
+`libcinFunc::Symbol` specifies the backend [libcint](https://github.com/sunqm/libcint) 
+function name, e.g. `"cint2e_cart"` should be converted to `:cint2e_cart` as the input 
 argument. 
 """
 @inline function twoBodyBFTensor(libcinFunc::Symbol, 

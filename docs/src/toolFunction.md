@@ -21,5 +21,10 @@ markUnique
 ```
 
 ```@docs
+getUnique!(arr::Array, args...; compareFunction::F = hasEqual, kws...) where
+          {F<:Function} 
+```
+
+```@docs
 Quiqbox.itself
 ```
