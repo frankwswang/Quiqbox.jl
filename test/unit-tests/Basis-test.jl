@@ -137,8 +137,8 @@ bs2_1 = genBFuncsFromText(txt1)
 bs2_2 = genBFuncsFromText(txt2)
 assignCenter!.(cens, bs2_1)
 assignCenter!.(cens, bs2_2)
-@test hasEqual(bs1, bs2_2, ignoreContainerType=true)
-@test hasEqual(bs1, bs2_1, ignoreContainerType=true)
+@test hasEqual(bs1, bs2_2, ignoreContainer=true)
+@test hasEqual(bs1, bs2_1, ignoreContainer=true)
 
 
 # function assignCenter!

@@ -38,11 +38,11 @@ end
 
 Core function for one-electron integrals.
 
-`libcinFunc::Symbol` specifies the backend libcint (https://github.com/sunqm/libcint) 
-function name, e.g. "int1e_nuc_cart" should be converted to `:int1e_nuc_cart`as the input 
-argument. If the integral does not need the information of nuclei and their coordinates, 
-those 2 arguments can be omitted. If the integral is a spacial gradient, `isGradient` 
-should be set to `true`.
+`libcinFunc::Symbol` specifies the backend [libcint](https://github.com/sunqm/libcint) 
+function name, e.g. `"int1e_nuc_cart"` should be converted to `:int1e_nuc_cart` as the 
+input argument. If the integral does not need the information of nuclei and their 
+coordinates, those 2 arguments can be omitted. If the integral is a spacial gradient, 
+`isGradient` should be set to `true`.
 """
 @inline function oneBodyBFTensor(libcinFunc::Symbol, 
                                  b1::AbstractFloatingGTBasisFunc, 

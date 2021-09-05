@@ -56,11 +56,11 @@ using Suppressor: @capture_out
     
     # function hasBoolRelation
     pb4 = deepcopy(pb1)
-    @test true  == hasBoolRelation(==, pb1, pb4)
-    @test false == hasBoolRelation(===, pb1, pb4)
-    @test false == hasBoolRelation(==, pb2, pb3)
-    @test true  == hasBoolRelation(==, pb2, pb3, ignoreFunction = true)
-    @test false == hasBoolRelation(==, pb1, pb2)
-    @test true  == hasBoolRelation(==, pb1, pb2, ignoreContainerType=true)
+    @test true  == Quiqbox.hasBoolRelation(==, pb1, pb4)
+    @test false == Quiqbox.hasBoolRelation(===, pb1, pb4)
+    @test false == Quiqbox.hasBoolRelation(==, pb2, pb3)
+    @test true  == Quiqbox.hasBoolRelation(==, pb2, pb3, ignoreFunction = true)
+    @test false == Quiqbox.hasBoolRelation(==, pb1, pb2)
+    @test true  == Quiqbox.hasBoolRelation(==, pb1, pb2, ignoreContainer=true)
     
 end
