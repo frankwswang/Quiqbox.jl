@@ -2,5 +2,6 @@ legacy/
 docs/build/
 Manifest.toml
 .vscode/
+.VSCodeCounter/
 __test__*
 Example_*
