@@ -307,14 +307,18 @@ The container to store basis set information.
 ≡≡≡ Field(s) ≡≡≡
 
 `basis::Array{<:AbstractFloatingGTBasisFunc, 1}`: Basis set.
+
 `S::Array{<:Number, 2}`: Overlap matrix.
+
 `Te::Array{<:Number, 2}`: Kinetic energy part of the electronic core Hamiltonian.
+
 `eeI::Array{<:Number, 4}`: Electron-electron interaction.
+
 `getVne::Function`: A `Function` that returns the nuclear attraction Hamiltonian when 
-                    nuclei`::Array{String, 1}` and 
-                    their coordinates`::Array{<:AbstractArray, 1}` are input.
+nuclei`::Array{String, 1}` and their coordinates`::Array{<:AbstractArray, 1}` are input.
+
 getHcore::Function: Similar as `getVne`, a `Function` that returns the core Hamiltonian 
-                    when nuclei and their coordinates of same `DataType` are input.
+when nuclei and their coordinates of same `DataType` are input.
 
 ≡≡≡ Initialization Method(s) ≡≡≡
 
@@ -341,7 +345,7 @@ end
 
 """
 
-    GTBasis(basis::Vector{<:AbstractFloatingGTBasisFunc}) -> GTBasis
+    GTBasis(basis::Array{<:AbstractFloatingGTBasisFunc}, 1) -> GTBasis
 
 Directly construct a `GTBasis` given a basis set.
 
@@ -641,23 +645,23 @@ getParams.(cs, symbol; onlyDifferentiable) |> flatten
 
 
 function markParams!(parArray::Vector{<:ParamBox{V}}; 
-                     ignoreContainerType::Bool=false, filter::Bool=true, 
+                     ignoreContainer::Bool=false, filter::Bool=true, 
                      filterMapping::Bool=false) where {V}
     res, _ = markUnique(parArray, compareFunction=hasIdentical, ignoreFunction=true; 
-                        ignoreContainerType)
+                        ignoreContainer)
     for i=1:length(parArray)
         parArray[i].index = res[i]
     end
     if filter
         _, cmprList = markUnique(parArray, compareFunction=hasIdentical, 
-                                 ignoreFunction=filterMapping; ignoreContainerType)
+                                 ignoreFunction=filterMapping; ignoreContainer)
         return cmprList
     end
     parArray
 end
 
 function markParams!(parArray::Vector{<:ParamBox}; 
-                     ignoreContainerType::Bool=false, filter::Bool=true, 
+                     ignoreContainer::Bool=false, filter::Bool=true, 
                      filterMapping::Bool=false)
     pars = ParamBox[]
     syms = getUnique!([typeof(i).parameters[1] for i in parArray])
@@ -673,14 +677,14 @@ function markParams!(parArray::Vector{<:ParamBox};
             end
         end
         deleteat!(arr, ids)
-        append!(pars, markParams!(subArr; ignoreContainerType, filter, filterMapping))
+        append!(pars, markParams!(subArr; ignoreContainer, filter, filterMapping))
     end
     pars
 end
 
 """
 
-    uniqueParams!(bs; onlyDifferentiable::Bool=false, ignoreContainerType::Bool=false, 
+    uniqueParams!(bs; onlyDifferentiable::Bool=false, ignoreContainer::Bool=false, 
                   filter::Bool=true, filterMapping::Bool=false) -> Array{<:ParamBox, 1}
 
 Mark the parameters (`ParamBox`) in input bs which can a `Vector` of `GaussFunc` or 
@@ -690,8 +694,8 @@ Mark the parameters (`ParamBox`) in input bs which can a `Vector` of `GaussFunc`
 
 `onlyDifferentiable`: Determine whether ignore un-differentiable parameters.
 
-`ignoreContainerType`: If set to `true`, then only the field `data` of the `ParamBox`s will 
-be compared to determine whether each `ParamBox` are unique. 
+`ignoreContainer`: If set to `true`, then only the field `data` of the `ParamBox`s will be 
+compared to determine whether each `ParamBox` are unique. 
 
 `filter`: Determine whether filter out the identical `ParamBox`s and only return the unique 
 ones.
@@ -699,10 +703,10 @@ ones.
 `filterMapping`: Determine wether return the `ParamBox`s with identical fields except the 
 `map` field. When `filter=false`, this argument is automatically overwritten to be `false`.
 """
-function uniqueParams!(bs; onlyDifferentiable::Bool=false, ignoreContainerType::Bool=false, 
+function uniqueParams!(bs; onlyDifferentiable::Bool=false, ignoreContainer::Bool=false, 
                        filter::Bool=true, filterMapping::Bool=false)
     markParams!(getParams(bs; onlyDifferentiable); 
-                ignoreContainerType, filter, filterMapping)
+                ignoreContainer, filter, filterMapping)
 end
 
 

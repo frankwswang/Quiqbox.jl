@@ -1,4 +1,4 @@
-export hasEqual, hasIdentical, hasBoolRelation, markUnique, getUnique!, flatten, splitTerm
+export hasEqual, hasIdentical, flatten, markUnique, getUnique!
 
 using Statistics: std, mean
 using Symbolics
@@ -28,15 +28,16 @@ end
 
     @compareLength inputArg1 inputArg2 argNames::String... -> length(inputArg1)
     
-A macro that checks whether the lengths of 2 `Arrays`/`Tuples` are equal. It throws 
-a detailed ERROR message when the lengths are not equal. 
+A macro that checks whether the lengths of 2 `Arrays`/`Tuples` are equal. It returns the 
+lengths of the compared objects are the same; it throws a detailed ERROR message when they 
+are not equal. 
 
 You can specify the name for the compared variables in arguments for better ERROR 
 information.
 
 ≡≡≡ Example(s) ≡≡≡
 
-```
+```jldoctest; setup = :(push!(LOAD_PATH, "../../src/"); using Quiqbox)
 julia> Quiqbox.@compareLength [1,2] [3,4]
 2
 
@@ -58,7 +59,7 @@ ERROR: The lengths of a ([1, 2]) and b ([3]) are NOT equal.
        b ([3])::Vector{Int64}   length: 1
 ```
 """
-macro compareLength(inputArg1, inputArg2, argNames...)
+macro compareLength(inputArg1, inputArg2, argNames::String...)
     # In a macro you must escape all the user inputs once and exactly once.
     ns0 = [string(inputArg1), string(inputArg2)]
     ns = ns0
@@ -87,61 +88,72 @@ end
 
 """
     
-    hasBoolRelation(boolOp::Function, obj1, obj2; ignoreFunction=false, 
-                    ignoreContainerType=false) -> Bool
+    hasBoolRelation(boolOp::Function, obj1, obj2; ignoreFunction::Bool=false, 
+                    ignoreContainer::Bool=false, decomposeNumberCollection::Bool=false) -> 
+    Bool
 
 Recursively apply the specified boolean operator to all the fields within 2 objects 
 (normally 2 `struct`s in the same type). It returns `true` only if all comparisons 
-performed return `true`.
+performed return `true`. Note that the boolean operator should have method(s) defined for 
+all the possible elements inside the compared objects.
 
 If `ignoreFunction = true`, the function will ignore comparisons between Function-type 
 fields.
 
-If `ignoreContainerType = true`, the function will ignore the type difference of the 
-(outermost) container as long as the boolean operator returns true for inside fields. 
+If `ignoreContainer = true`, the function will ignore the difference of the container(s) as 
+long as the boolean operator returns true for the field(s)/entry(s) from two objects 
+respectively.
 
+If `decomposeNumberCollection = true`, then `Tuple{Vararg{Number}}` and `Array{<:Number}` 
+will be treated as decomposable containers.
 
 ≡≡≡ Example(s) ≡≡≡
 
-```
-julia> begin
-           struct S
-               a::Int
-               b::Float64
-           end
+```jldoctest; setup = :(push!(LOAD_PATH, "../../src/"); using Quiqbox)
+begin
+    struct S
+        a::Int
+        b::Float64
+    end
 
-           a = S(1, 1.0)
-           b = S(2, 0.5)
-           c = S(2, 1.5)
-           
-           @show hasBoolRelation(>, a, b)
-           @show hasBoolRelation(>, b, a)
-           @show hasBoolRelation(>, c, a)
-       end
-hasBoolRelation(>, a, b) = false
-hasBoolRelation(>, b, a) = false
-hasBoolRelation(>, c, a) = true
+    a = S(1, 1.0)
+    b = S(2, 0.5)
+    c = S(2, 1.5)
+    
+    Quiqbox.hasBoolRelation(>, a, b) |> println
+    Quiqbox.hasBoolRelation(>, b, a) |> println
+    Quiqbox.hasBoolRelation(>, c, a) |> println
+end
+
+# output
+false
+false
 true
+```
 
-julia> begin
-           struct S 
-               a::Int
-               b::Float64
-           end 
-            
-           struct S2 
-               a::Int
-               b::Float64
-           end
-              
-           hasBoolRelation(==, S(1,2), S2(1,2), ignoreContainerType=true)
-       end
+```jldoctest; setup = :(push!(LOAD_PATH, "../../src/"); using Quiqbox)
+begin
+    struct S 
+        a::Int
+        b::Float64
+    end 
+    
+    struct S2 
+        a::Int
+        b::Float64
+    end
+        
+    Quiqbox.hasBoolRelation(==, S(1,2), S2(1,2), ignoreContainer=true)
+end
+
+# output
 true
 ```
 """
 function hasBoolRelation(boolOp::F, obj1, obj2;
-                         ignoreFunction=false, 
-                         ignoreContainerType=false) where {F<:Function}
+                         ignoreFunction::Bool=false, 
+                         ignoreContainer::Bool=false,
+                         decomposeNumberCollection::Bool=false) where {F<:Function}
     res = true
     t1 = typeof(obj1)
     t2 = typeof(obj2)
@@ -149,20 +161,18 @@ function hasBoolRelation(boolOp::F, obj1, obj2;
         ignoreFunction ? (return true) : (return boolOp(obj1, obj2))
     elseif (t1 <: Number) && (t2 <: Number)
         return boolOp(obj1, obj2)
-    elseif t1 != t2 && !ignoreContainerType
+    elseif t1 != t2 && !ignoreContainer
         return false
     elseif obj1 isa Union{Array, Tuple}
+        if !decomposeNumberCollection && 
+           (eltype(obj1) <: Number) && (eltype(obj2) <: Number)
+            return boolOp(obj1, obj2)
+        end
         length(obj1) != length(obj2) && (return false)
-        if ([i isa Number for i in obj1] |> prod) && ([i isa Number for i in obj2] |> prod)
-            return boolOp.(obj1, obj2) |> prod
-        end
-        if obj1 isa Matrix
-            size(obj1) != size(obj2) && (return false)
-            obj1 = vec(obj1) # Still linked to the original container.
-            obj2 = vec(obj2)
-        end
+        !ignoreContainer && obj1 isa Matrix && (size(obj1) != size(obj2)) && (return false)
         for (i,j) in zip(obj1, obj2)
-            res *= hasBoolRelation(boolOp, i, j; ignoreFunction)
+            res *= hasBoolRelation(boolOp, i, j; ignoreFunction, ignoreContainer, 
+                                   decomposeNumberCollection)
             !res && (return false)
         end
     else
@@ -176,7 +186,8 @@ function hasBoolRelation(boolOp::F, obj1, obj2;
                     isdefined(obj1, i) == (fieldDefined = isdefined(obj2, i)) && 
                     (fieldDefined ? nothing : continue)
                     res *= hasBoolRelation(boolOp, getproperty(obj1, i), 
-                                           getproperty(obj2, i); ignoreFunction)
+                                           getproperty(obj2, i); ignoreFunction, 
+                                           ignoreContainer, decomposeNumberCollection)
                     !res && (return false)        
                 end
             end 
@@ -190,42 +201,48 @@ end
 
 """
 
-    hasBoolRelation(boolOp::Function, obj1, obj2, obj3...; 
-                    ignoreFunction=false, ignoreContainerType=false) -> Bool
+    hasBoolRelation(boolOp::F, obj1, obj2, obj3...; 
+                    ignoreFunction::Bool=false, 
+                    ignoreContainer::Bool=false,
+                    decomposeNumberCollection::Bool=false) where {F<:Function} -> 
+    Bool
 
-hasBoolRelation for more than 2 objects. E.g.: `hasBoolRelation(>, a, b, c)` is equivalent 
-to `hasBoolRelation(>, a, b) && hasBoolRelation(>, b, c)`.
+Method for more than 2 objects. E.g.: `hasBoolRelation(>, a, b, c)` is equivalent to 
+`hasBoolRelation(>, a, b) && hasBoolRelation(>, b, c)`.
 
 ≡≡≡ Example(s) ≡≡≡
 
-```
-julia> begin
-           struct S
-               a::Int
-               b::Float64
-           end
+```jldoctest; setup = :(push!(LOAD_PATH, "../../src/"); using Quiqbox)
+begin
+    struct S
+        a::Int
+        b::Float64
+    end
 
-           a = S(1, 1.0)
-           b = S(2, 0.5)
-           c = S(2, 1.5)
-           d = S(3, 2.0)
-              
-           @show hasBooleanRelation(>=, c, b, a)
-           @show hasBooleanRelation(>=, d, c, b)
-       end
-hasBooleanRelation(>=, c, b, a) = false
-hasBooleanRelation(>=, d, c, b) = true
+    a = S(1, 1.0)
+    b = S(2, 0.5)
+    c = S(2, 1.5)
+    d = S(3, 2.0)
+        
+    Quiqbox.hasBoolRelation(>=, c, b, a) |> println
+    Quiqbox.hasBoolRelation(>=, d, c, b) |> println
+end
+
+# output
+false
 true
 ```
 """
 function hasBoolRelation(boolOp::F, obj1, obj2, obj3...; 
-                         ignoreFunction=false, 
-                         ignoreContainerType=false) where {F<:Function}
-    res = hasBoolRelation(boolOp, obj1, obj2; ignoreFunction, ignoreContainerType)
+                         ignoreFunction::Bool=false, 
+                         ignoreContainer::Bool=false,
+                         decomposeNumberCollection::Bool=false) where {F<:Function}
+    res = hasBoolRelation(boolOp, obj1, obj2; ignoreFunction, ignoreContainer)
     tmp = obj2
     if res
         for i in obj3[1:end]
-            res *= hasBoolRelation(boolOp, tmp, i; ignoreFunction, ignoreContainerType)
+            res *= hasBoolRelation(boolOp, tmp, i; ignoreFunction, ignoreContainer,
+                                   decomposeNumberCollection)
             !res && break
             tmp = i
         end
@@ -236,88 +253,107 @@ end
 
 """
 
-   hasEqual(obj1, obj2, obj3...; ignoreFunction=false, ignoreContainerType=false) -> Bool
+    hasEqual(obj1, obj2, obj3...; 
+             ignoreFunction::Bool=false, 
+             ignoreContainer::Bool=false,
+             decomposeNumberCollection::Bool=false) -> 
+    Bool
 
 Compare if two objects are the equal. 
 
 If `ignoreFunction = true` then the function will pop up a warning message when a field is 
-a function.
+a function. 
 
-If `ignoreContainerType = true` then the function will ignore the type difference of the 
-(outermost) container as long as the inside fields are equal. 
+If `ignoreContainer = true`, the function will ignore the difference of the container(s) 
+and only compare the field(s)/entry(s) from two objects respectively. 
 
-This function is an instantiation of `hasBoolRelation`.
+If `decomposeNumberCollection = true`, then `Tuple{Vararg{Number}}` and `Array{<:Number}` 
+will be treated as decomposable containers.
+
+This is an instantiation of `Quiqbox.hasBoolRelation`.
 
 ≡≡≡ Example(s) ≡≡≡
 
-```
-julia> begin
-           struct S
-               a::Int
-               b::Float64
-           end
-           a = S(1, 1.0)
-           b = S(1, 1.0)
-           c = S(1, 1.0)
-           d = S(1, 1.1)
+```jldoctest; setup = :(push!(LOAD_PATH, "../../src/"); using Quiqbox)
+begin
+    struct S
+        a::Int
+        b::Float64
+    end
+    a = S(1, 1.0)
+    b = S(1, 1.0)
+    c = S(1, 1.0)
+    d = S(1, 1.1)
 
-           @show hasEqual(a, b, c)
-           @show hasEqual(a, b, c, d)
-       end
-hasEqual(a, b, c) = true
-hasEqual(a, b, c, d) = false
+    hasEqual(a, b, c) |> println
+    hasEqual(a, b, c, d) |> println
+end
+
+# output
+true
 false
 ```
 """
-hasEqual(obj1, obj2, obj3...; ignoreFunction=false, ignoreContainerType=false) = 
-hasBoolRelation(==, obj1, obj2, obj3...; ignoreFunction, ignoreContainerType)
+hasEqual(obj1, obj2, obj3...; ignoreFunction::Bool=false, ignoreContainer::Bool=false, 
+        decomposeNumberCollection::Bool=false) = 
+hasBoolRelation(==, obj1, obj2, obj3...; ignoreFunction, ignoreContainer, 
+                decomposeNumberCollection)
 
 
 """
 
     hasIdentical(obj1, obj2, obj3...; 
-                 ignoreFunction=false, ignoreContainerType=false) -> Bool
+                 ignoreFunction::Bool=false, 
+                 ignoreContainer::Bool=false,
+                 decomposeNumberCollection::Bool=false) -> 
+    Bool
 
 Compare if two objects are the Identical. An instantiation of `hasBoolRelation`.
 
 If `ignoreFunction = true` then the function will pop up a warning message when a field is 
-a function.
+a function. 
 
-If `ignoreContainerType = true` then the function will ignore the type difference of the 
-(outermost) container as long as the inside fields are identical.
+If `ignoreContainer = true`, the function will ignore the difference of the container(s) 
+and only compare the field(s)/entry(s) from two objects respectively. 
 
-This function is an instantiation of `hasBoolRelation`.
+If `decomposeNumberCollection = true`, then `Tuple{Vararg{Number}}` and `Array{<:Number}` 
+will be treated as decomposable containers.
+
+This is an instantiation of `Quiqbox.hasBoolRelation`.
 
 ≡≡≡ Example(s) ≡≡≡
 
-```
-julia> begin
-           struct S
-               a::Int
-               b::Array{Float64, 1}
-           end
-            
-           a = S(1, [1.0, 1.1])
-           b = a
-           c = b
-           d = S(1, [1.0, 1.1])
+```jldoctest; setup = :(push!(LOAD_PATH, "../../src/"); using Quiqbox)
+begin
+    struct S
+        a::Int
+        b::Array{Float64, 1}
+    end
+    
+    a = S(1, [1.0, 1.1])
+    b = a
+    c = b
+    d = S(1, [1.0, 1.1])
 
-           @show hasIdentical(a, b, c)
-           @show hasIdentical(a, b, c, d)
-       end
-hasIdentical(a, b, c) = true
-hasIdentical(a, b, c, d) = false
+    hasIdentical(a, b, c) |> println
+    hasIdentical(a, b, c, d) |> println
+end
+
+# output
+true
 false
 ```
 """
-hasIdentical(obj1, obj2, obj3...; ignoreFunction=false, ignoreContainerType=false) = 
-hasBoolRelation(===, obj1, obj2, obj3...; ignoreFunction, ignoreContainerType)
+hasIdentical(obj1, obj2, obj3...; ignoreFunction::Bool=false, ignoreContainer::Bool=false,
+             decomposeNumberCollection::Bool=false) = 
+hasBoolRelation(===, obj1, obj2, obj3...; ignoreFunction, ignoreContainer,
+                decomposeNumberCollection)
 
 
 """
 
-    printStyledInfo(str::String; 
-                    title::String="INFO:\\n", titleColor::Symbol=:light_blue) -> nothing
+    printStyledInfo(str::String; title::String="", titleColor::Symbol=:light_blue) -> 
+    Nothing
 
 Print info with colorful title and automatically highlighted code blocks enclosed by ` `. 
 
@@ -329,12 +365,10 @@ NOTE: There can only be one color in one ` ` quote.
 
 ≡≡≡ Example(s) ≡≡≡
 
-```
+```jldoctest; setup = :(push!(LOAD_PATH, "../../src/"); using Quiqbox)
 julia> Quiqbox.printStyledInfo("This `///magenta///word` is in color magenta.")
-INFO:
+This word is in color magenta.
 ```
-`This` ``word`` `is in color magenta.`
-
 """
 function printStyledInfo(str::String; 
                          title::String="", titleColor::Symbol=:light_blue)
@@ -380,7 +414,7 @@ the outermost layer.
 
 ≡≡≡ Example(s) ≡≡≡
 
-```
+```jldoctest; setup = :(push!(LOAD_PATH, "../../src/"); using Quiqbox)
 julia> flatten((:one, 2, [3, 4.0], ([5], "six"), "7"))
 (:one, 2, 3.0, 4.0, [5], "six", "7")
 
@@ -409,10 +443,11 @@ end
 """
 
     arrayAlloc(arrayLength::Int, 
-               anExampleOrType::Union{T, Type{T}}) where {T<:Real} -> Ptr{T}
+               anExampleOrType::Union{T, Type{T}}) where {T<:Real} -> 
+    Ptr{T}
 
 Allocate the memory for an array of specified length and element type, then return the 
-pointer to it.
+pointer `Ptr` to it.
 """
 function arrayAlloc(arrayLength::Int, elementType::Type{T}) where {T<:Real}
     memoryLen = arrayLength*sizeof(elementType) |> Cint
@@ -471,7 +506,9 @@ end
 
 """
 
-    markUnique(arr::AbstractArray, args...; compareFunction::Function = hasEqual, kws...)
+    markUnique(arr::AbstractArray, args...; 
+               compareFunction::Function = hasEqual, kws...) -> 
+    markingList:: Array{Int, 1}, uniqueList::Array
 
 Return a `markingList` using `Int` number to mark each different elements from 
 (and inside) the input argument(s) and a `uniqueList` to contain all the unique 
@@ -482,24 +519,30 @@ parameters of the specified `compareFunction`.
 
 ≡≡≡ Example(s) ≡≡≡
 
-```
-julia> markUnique([1, [1, 2],"s", [1, 2]])
-([1, 2, 3, 2], Any[1, [1, 2], "s"])
+```jldoctest; setup = :(push!(LOAD_PATH, "../../src/"); using Quiqbox)
+markUnique([1, [1, 2],"s", [1, 2]])
 
-julia> begin 
-           struct S
-               a::Int
-               b::Float64
-           end
-           
-           a = S(1, 2.0)
-           b = S(1, 2.0)
-           c = S(1, 2.1)
-           d = a
-           
-           markUnique(a,b,c,d)
-       end
-([1, 1, 2, 1], Any[S(1, 2.0), S(1, 2.1)])
+# output
+([1, 2, 3, 2], Any[1, [1, 2], "s"])
+```
+
+```jldoctest; setup = :(push!(LOAD_PATH, "../../src/"); using Quiqbox)
+begin 
+    struct S
+        a::Int
+        b::Float64
+    end
+    
+    a = S(1, 2.0)
+    b = S(1, 2.0)
+    c = S(1, 2.1)
+    d = a
+    
+    markUnique([a,b,c,d])
+end
+
+# output
+([1, 1, 2, 1], S[S(1, 2.0), S(1, 2.1)])
 ```
 """
 function markUnique(arr::AbstractArray, args...; 
@@ -524,6 +567,34 @@ function markUnique(arr::AbstractArray, args...;
     res, cmprList
 end
 
+"""
+
+    getUnique!(arr::Array, args...; compareFunction::F = hasEqual, kws...) where 
+              {F<:Function} -> 
+    arr::Array
+
+Similar to [`markUnique`](@ref) but instead, just directly return the input `Array` with 
+repeated entries deleted.
+
+≡≡≡ Example(s) ≡≡≡
+
+```jldoctest; setup = :(push!(LOAD_PATH, "../../src/"); using Quiqbox)
+julia> arr = [1, [1, 2],"s", [1, 2]]
+4-element Vector{Any}:
+ 1
+  [1, 2]
+  "s"
+  [1, 2]
+
+julia> getUnique!(arr);
+
+julia> arr
+3-element Vector{Any}:
+ 1
+  [1, 2]
+  "s"
+```
+"""
 function getUnique!(arr::Array, args...; 
                     compareFunction::F = hasEqual, kws...) where {F<:Function}
     @assert length(arr) > 1 "The length of input array should be larger than 1."
@@ -568,7 +639,7 @@ end
 Recursively find the final value using the value of each iteration as the key for the 
 next search.
 """
-function recursivelyGet(dict::Dict, startKey)
+function recursivelyGet(dict::Dict, startKey::Any)
     res = nothing
     val = get(dict, startKey, false)
     while val != false
@@ -579,7 +650,8 @@ function recursivelyGet(dict::Dict, startKey)
 end
 
 
-function isOscillateConverged(sequence::Vector{<:Real}, threshold1::Real, threshold2::Real=threshold1; 
+function isOscillateConverged(sequence::Vector{<:Real}, 
+                              threshold1::Real, threshold2::Real=threshold1; 
                               leastCycles::Int=1, nPartition::Int=5, returnStd::Bool=false)
     @assert leastCycles>0 && nPartition>1
     len = length(sequence)

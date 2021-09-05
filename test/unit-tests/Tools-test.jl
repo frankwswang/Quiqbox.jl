@@ -19,10 +19,14 @@ using Suppressor: @capture_out
 
 
     # function hasBoolRelation
-    @test hasBoolRelation(===, 1, 1) == (1 === 1)
-    @test hasBoolRelation(===, [1,2], [1,2]) == ([1,2] .=== [1,2]) |> prod
+    @test  hasBoolRelation(===, 1, 1) == (1 === 1)
+    @test !hasBoolRelation(===, [1,2], [1,2])
+    @test  hasBoolRelation(===, [1,2], [1,2], decomposeNumberCollection=true)
+    @test !hasBoolRelation(===, [1,2], (1,2), decomposeNumberCollection=true)
+    @test  hasBoolRelation(===, [1,2], (1,2), decomposeNumberCollection=true, 
+                           ignoreContainer=true)
     @test !hasBoolRelation(===, [1 x->x^2], [1 x->abs(x)])
-    @test hasBoolRelation(===, [1 x->x^2], [1 x->abs(x)], ignoreFunction=true)
+    @test  hasBoolRelation(===, [1 x->x^2], [1 x->abs(x)], ignoreFunction=true)
 
 
     # function markUnique
