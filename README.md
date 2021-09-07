@@ -1,5 +1,7 @@
 <p align="center">
-  <img width="500" src="docs/src/assets/logo.png">
+    <a href="https://frankwswang.github.io/Quiqbox.jl/stable/">
+        <img width="500" src="docs/src/assets/logo.png" alt="Quiqbox.jl">
+    </a>
 </p>
 
 **Quiqbox** is a quantum chemistry and quantum computing software package that starts off around Gaussian basis set optimization of molecular electronic-structure problems. Quiqbox is written in pure [Julia](https://julialang.org/).
@@ -82,6 +84,16 @@ optimizeParams!(bs, pars[1:4], nuc, coords)
 For more information on how to use the package, please read the [documentation of released versions][Doc-stable]. For unreleased/experimental features, please refer to the [latest documentation][Doc-latest].
 
 To learn more about the basic usage of the programming language behind Quiqbox, **Julia**, [the official documentation](https://docs.julialang.org/) or [this official tutorial](https://juliaacademy.com/p/intro-to-julia) is recommended.
+
+<br />
+
+<br />
+
+<p align="center">
+    <a href="https://jdwhitfield.com/">
+        <img width=400 src="docs/src/assets/groupLogo.svg" alt="Whitfield Group">
+    </a>
+</p>
 
 
 [Doc-stable]:  https://frankwswang.github.io/Quiqbox.jl/stable
