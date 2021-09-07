@@ -249,6 +249,9 @@ struct SCFconfig{N} <: ImmutableParameter{SCFconfig, Any}
 end
 
 
+const defaultSCFconfig = SCFconfig([:ADIIS, :DIIS, :ADIIS], [1e-4, 1e-6, 1e-10])
+
+
 mutable struct HFinterrelatedVars <: HartreeFockintermediateData
     Dtots::Vector{Matrix{T}} where {TelLB<:T<:TelUB}
     Etots::Vector{Float64}
@@ -370,8 +373,6 @@ struct HFfinalVars{T, N, Nb} <: HartreeFockFinalValue{T}
     end
 end
 
-
-const defaultSCFconfig = SCFconfig([:ADIIS, :DIIS, :ADIIS], [1e-4, 1e-6, 1e-10])
 
 """
     runHF(bs::Union{BasisSetData, Array{<:AbstractFloatingGTBasisFunc, 1}}, 
