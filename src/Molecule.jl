@@ -76,7 +76,7 @@ Container for the information of a molecule.
 
 `orbital::Tuple{Vararg{MolOrbital}}`: Molecular orbitals.
 
-`basis::Tuple{Vararg{FloatingGTBasisFunc}}`: The basis set for the molecular orbitals.
+`basis::Tuple{Vararg{FloatingGTBasisFuncs}}`: The basis set for the molecular orbitals.
 
 `E0HF::Float64`: Hartree-Fock energy of the electronic Hamiltonian from the basis set.
 
@@ -84,7 +84,7 @@ Container for the information of a molecule.
 
 ≡≡≡ Initialization Method(s) ≡≡≡
 
-    Molecule(basis::Array{FloatingGTBasisFunc, 1}, nuc::Array{String, 1}, 
+    Molecule(basis::Array{FloatingGTBasisFuncs, 1}, nuc::Array{String, 1}, 
              nucCoords::Array{<:AbstractArray, 1}, Ne::Int, E0HF::Float64, 
              Emos::Array{Float64, 1}, occus::Array{<:Real, 1}, C::Array{Float64, 2}, 
              spins::Array{String, 1}, 
@@ -103,11 +103,11 @@ struct Molecule{Nc, Ne, Nb} <:MolecularHartreeFockCoefficient{Nc, Ne}
     nucCoords::Tuple{Vararg{NTuple{3, Real}}}
     Ne::Int
     orbital::Tuple{Vararg{MolOrbital}}
-    basis::Tuple{Vararg{FloatingGTBasisFunc}}
+    basis::Tuple{Vararg{FloatingGTBasisFuncs}}
     E0HF::Float64
     EnnR::Float64
 
-    function Molecule(basis::Vector{<:FloatingGTBasisFunc}, nuc::Vector{String}, 
+    function Molecule(basis::Vector{<:FloatingGTBasisFuncs}, nuc::Vector{String}, 
                       nucCoords::Vector{<:AbstractArray}, Ne::Int, E0HF::Float64, 
                       Emos::Vector{Float64}, occus::Vector{<:Real}, C::Matrix{Float64}, 
                       spins::Vector{String}, 
@@ -131,13 +131,13 @@ end
 
 """
 
-    Molecule(basis::Array{<:FloatingGTBasisFunc, 1}, nuc::Array{String, 1}, 
+    Molecule(basis::Array{<:FloatingGTBasisFuncs, 1}, nuc::Array{String, 1}, 
              nucCoords::Array{<:AbstractArray, 1}, HFfVars::HFfinalVars) -> Molecule
 
 Construct a `Molecule` from a basis set, nuclei information, and the result from the 
 corresponding Hartree-Fock SCF procedure, specifically a `HFfinalVars` `struct`.
 """
-function Molecule(basis::Vector{<:FloatingGTBasisFunc}, nuc::Vector{String}, 
+function Molecule(basis::Vector{<:FloatingGTBasisFuncs}, nuc::Vector{String}, 
                   nucCoords::Vector{<:AbstractArray}, HFfVars::HFfinalVars)
     t = typeof(HFfVars)
     len = t.parameters[3]

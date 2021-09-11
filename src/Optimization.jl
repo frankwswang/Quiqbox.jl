@@ -52,7 +52,7 @@ end
 
 """
 
-    optimizeParams!(bs::Array{<:FloatingGTBasisFunc, 1}, pbs::Array{<:ParamBox, 1},
+    optimizeParams!(bs::Array{<:FloatingGTBasisFuncs, 1}, pbs::Array{<:ParamBox, 1},
                     nuc::Array{String, 1}, nucCoords::Array{<:AbstractArray, 1}, 
                     Ne::Union{NTuple{2, Int}, Int}=getCharge(nuc);
                     Etarget::Float64=NaN, threshold::Float64=1e-4, maxSteps::Int=2000, 
@@ -65,7 +65,7 @@ The main function to optimize the parameters of a given basis set.
 
 === Positional argument(s) ===
 
-`bs::Array{<:FloatingGTBasisFunc, 1}`: Basis set.
+`bs::Array{<:FloatingGTBasisFuncs, 1}`: Basis set.
 
 `pbs::Array{<:ParamBox, 1}`: The parameters to be optimized that are extracted from the 
 basis set.
@@ -97,7 +97,7 @@ iteration converges.
 during the optimization iterations.
 === Keyword argument(s) ===
 """
-function optimizeParams!(bs::Vector{<:FloatingGTBasisFunc}, pbs::Vector{<:ParamBox},
+function optimizeParams!(bs::Vector{<:FloatingGTBasisFuncs}, pbs::Vector{<:ParamBox},
                          nuc::Vector{String}, nucCoords::Vector{<:AbstractArray}, 
                          Ne::Union{NTuple{2, Int}, Int}=getCharge(nuc);
                          Etarget::Float64=NaN, threshold::Float64=1e-4, maxSteps::Int=2000, 

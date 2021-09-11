@@ -1,5 +1,5 @@
 function addToDataChain!(env::Vector{Float64}, atm::Vector{Int32}, bas::Vector{Int32}, 
-                         bf::FloatingGTBasisFunc)
+                         bf::FloatingGTBasisFuncs)
     center = [bf.center[1](), bf.center[2](), bf.center[3]()]
     xpns = Float64[]
     cons = Float64[]

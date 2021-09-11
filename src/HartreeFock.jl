@@ -27,7 +27,7 @@ function getC(X::Matrix{T1}, F::Matrix{T2};
     outputEmo ? (outC, ϵ) : outC
 end
 
-function getCfromGWH(S::Matrix{T1}, Hcore::Matrix{T2}; K=1.75, X=getX(S), _kws...) where
+function getCfromGWH(S::Matrix{T1}, Hcore::Matrix{T2}; K=1.75, X=getX(S), _kws...) where 
          {TelLB<:T1<:TelUB, TelLB<:T2<:TelUB}
     l = size(Hcore)[1]
     H = zero(Hcore)
@@ -57,7 +57,7 @@ getD(X::Matrix{T1}, F::Matrix{T2}, Nˢ::Int) where {TelLB<:T1<:TelUB, TelLB<:T2<
 getD(getC(X, F), Nˢ)
 
 
-function getGcore(HeeI::Array{T1, 4}, DJ::Matrix{T2}, DK::Matrix{T3}) where
+function getGcore(HeeI::Array{T1, 4}, DJ::Matrix{T2}, DK::Matrix{T3}) where 
     {TelLB<:T1<:TelUB, TelLB<:T2<:TelUB, TelLB<:T3<:TelUB}
     G = zero(DJ)
     l = size(G)[1]
@@ -147,7 +147,7 @@ end
 
 
 # RHF
-function initializeSCF(Hcore::Matrix{T1}, HeeI::Array{T2, 4}, C::Matrix{T3}, N::Int) where
+function initializeSCF(Hcore::Matrix{T1}, HeeI::Array{T2, 4}, C::Matrix{T3}, N::Int) where 
                       {TelLB<:T1<:TelUB, TelLB<:T2<:TelUB, TelLB<:T3<:TelUB}
     Nˢ = N÷2
     D = getD(C, Nˢ)
@@ -375,7 +375,7 @@ end
 
 
 """
-    runHF(bs::Union{BasisSetData, Array{<:AbstractFloatingGTBasisFunc, 1}}, 
+    runHF(bs::Union{BasisSetData, Array{<:AbstractGTBasisFuncs, 1}}, 
           nuc::Array{String, 1}, 
           nucCoords::Array{<:AbstractArray, 1}, 
           N::Union{NTuple{2, Int}, Int}=getCharge(nuc); 
@@ -390,7 +390,7 @@ Main function to run Hartree-Fock in Quiqbox.
 
 === Positional argument(s) ===
 
-`bs::Union{BasisSetData, Array{<:AbstractFloatingGTBasisFunc, 1}}`: Basis set.
+`bs::Union{BasisSetData, Array{<:AbstractGTBasisFuncs, 1}}`: Basis set.
 
 `nuc::Array{String, 1}`: The element symbols of the nuclei for the Molecule.
 
@@ -415,7 +415,7 @@ when its performance becomes unstable or poor.
 
 `maxSteps::Int`: Maximum allowed iteration steps regardless of whether the SCF converges.
 """
-function runHF(bs::Vector{<:AbstractFloatingGTBasisFunc}, 
+function runHF(bs::Vector{<:AbstractGTBasisFuncs}, 
                nuc::Vector{String}, 
                nucCoords::Vector{<:AbstractArray}, 
                N::Union{NTuple{2, Int}, Int}=getCharge(nuc); 
@@ -594,7 +594,7 @@ function EDIIScore(∇s::Vector{Matrix{T1}}, Ds::Vector{Matrix{T2}},
 end
 
 
-function ADIIScore(∇s::Vector{Matrix{T1}}, Ds::Vector{Matrix{T2}}) where
+function ADIIScore(∇s::Vector{Matrix{T1}}, Ds::Vector{Matrix{T2}}) where 
                   {TelLB<:T1<:TelUB, TelLB<:T2<:TelUB}
     len = length(Ds)
     B = ones(len, len)
@@ -606,7 +606,7 @@ function ADIIScore(∇s::Vector{Matrix{T1}}, Ds::Vector{Matrix{T2}}) where
 end
 
 
-function DIIScore(∇s::Vector{Matrix{T1}}, Ds::Vector{Matrix{T2}}, S::Matrix{T3}) where
+function DIIScore(∇s::Vector{Matrix{T1}}, Ds::Vector{Matrix{T2}}, S::Matrix{T3}) where 
                  {TelLB<:T1<:TelUB, TelLB<:T2<:TelUB, TelLB<:T3<:TelUB}
     len = length(Ds)
     B = ones(len, len)
@@ -625,7 +625,7 @@ const SD = ((Nˢ::Int, Hcore::Matrix{T1}, HeeI::Array{T2, 4}, _dm::Any, X::Matri
 
 const xDIIS = (method::Symbol) -> 
               ((Nˢ::Int, Hcore::Matrix{T1}, HeeI::Array{T2, 4}, S::Matrix{T3}, 
-                X::Matrix{T4}, tVars::HFtempVars; kws...) where
+                X::Matrix{T4}, tVars::HFtempVars; kws...) where 
                {TelLB<:T1<:TelUB, TelLB<:T2<:TelUB, 
                 TelLB<:T3<:TelUB, TelLB<:T4<:TelUB}) ->
               xDIIScore(method, Nˢ, Hcore, HeeI, S, X, tVars.Fs, tVars.Ds, tVars.Es; kws...)
@@ -648,7 +648,7 @@ end
 # RHF
 function HFcore(SCFmethod::Symbol, N::Int, 
                 Hcore::Matrix{T1}, HeeI::Array{T2, 4}, S::Matrix{T3}, X::Matrix{T4}, 
-                rVars::HFtempVars{:RHF}; kws...) where
+                rVars::HFtempVars{:RHF}; kws...) where 
                {TelLB<:T1<:TelUB, TelLB<:T2<:TelUB, TelLB<:T3<:TelUB, TelLB<:T4<:TelUB}
     D = SCFmethodSelector[SCFmethod](N÷2, Hcore, HeeI, S, X, rVars; kws...)
     partRes = getCFDE(Hcore, HeeI, X, D)
