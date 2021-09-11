@@ -1,5 +1,5 @@
 # Data collected from https://www.basissetexchange.org.
-# The texts are based on the Gaussian Format. 
+# The texts are based on the Gaussian Format.
 # If element does not support certain basis set. Fill the entry with `nothing`.
 const BasisFuncTexts = 
 [

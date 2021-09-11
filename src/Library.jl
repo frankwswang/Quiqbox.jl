@@ -57,7 +57,7 @@ const SubshellOrbitals =
 
 const BasisFuncNames = 
 [
-"STO-2G",
+"STO-2G", 
 "STO-3G", 
 "STO-6G", 
 "3-21G", 
