@@ -1,4 +1,5 @@
 [deps]
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 Quiqbox = "7cb8c394-fae1-4ab9-92f2-30189d7746cd"
 Suppressor = "fd094767-a336-5f1f-9728-57cf17d0bbfb"
 Symbolics = "0c5d862f-8b57-4792-8d23-62f2024744c7"
