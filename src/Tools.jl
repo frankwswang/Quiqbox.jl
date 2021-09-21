@@ -27,10 +27,10 @@ end
 """
 
     @compareLength inputArg1 inputArg2 argNames::String... -> length(inputArg1)
-    
+
 A macro that checks whether the lengths of 2 `Arrays`/`Tuples` are equal. It returns the 
 lengths of the compared objects are the same; it throws a detailed ERROR message when they 
-are not equal. 
+are not equal.
 
 You can specify the name for the compared variables in arguments for better ERROR 
 information.
@@ -74,7 +74,7 @@ macro compareLength(inputArg1, inputArg2, argNames::String...)
                 # Replace the default type control ERROR message.
                 !($argNames[i] isa String) && error("The object's name has to be a "*
                                                     "`String`!\n")
-                $ns[i] = $argNames[i]*" ($($ns0[i]))" 
+                $ns[i] = $argNames[i]*" ($($ns0[i]))"
             end
             error("""The lengths of $($ns[1]) and $($ns[2]) are NOT equal.
                            $($ns0[1])::$(typeof(arg1))   length: $(length(arg1))
@@ -87,7 +87,7 @@ end
 
 
 """
-    
+
     hasBoolRelation(boolOp::Function, obj1, obj2; ignoreFunction::Bool=false, 
                     ignoreContainer::Bool=false, decomposeNumberCollection::Bool=false) -> 
     Bool
@@ -119,7 +119,7 @@ begin
     a = S(1, 1.0)
     b = S(2, 0.5)
     c = S(2, 1.5)
-    
+
     Quiqbox.hasBoolRelation(>, a, b) |> println
     Quiqbox.hasBoolRelation(>, b, a) |> println
     Quiqbox.hasBoolRelation(>, c, a) |> println
@@ -133,16 +133,16 @@ true
 
 ```jldoctest; setup = :(push!(LOAD_PATH, "../../src/"); using Quiqbox)
 begin
-    struct S 
-        a::Int
-        b::Float64
-    end 
-    
-    struct S2 
+    struct S
         a::Int
         b::Float64
     end
-        
+
+    struct S2
+        a::Int
+        b::Float64
+    end
+
     Quiqbox.hasBoolRelation(==, S(1,2), S2(1,2), ignoreContainer=true)
 end
 
@@ -188,14 +188,14 @@ function hasBoolRelation(boolOp::F, obj1, obj2;
                     res *= hasBoolRelation(boolOp, getproperty(obj1, i), 
                                            getproperty(obj2, i); ignoreFunction, 
                                            ignoreContainer, decomposeNumberCollection)
-                    !res && (return false)        
+                    !res && (return false)
                 end
-            end 
+            end
         else
             return false
         end
     end
-    res         
+    res
 end
 ## Refer overload for `ParamBox` to Overload.jl.
 
@@ -223,7 +223,7 @@ begin
     b = S(2, 0.5)
     c = S(2, 1.5)
     d = S(3, 2.0)
-        
+
     Quiqbox.hasBoolRelation(>=, c, b, a) |> println
     Quiqbox.hasBoolRelation(>=, d, c, b) |> println
 end
@@ -259,13 +259,13 @@ end
              decomposeNumberCollection::Bool=false) -> 
     Bool
 
-Compare if two objects are the equal. 
+Compare if two objects are the equal.
 
 If `ignoreFunction = true` then the function will pop up a warning message when a field is 
-a function. 
+a function.
 
 If `ignoreContainer = true`, the function will ignore the difference of the container(s) 
-and only compare the field(s)/entry(s) from two objects respectively. 
+and only compare the field(s)/entry(s) from two objects respectively.
 
 If `decomposeNumberCollection = true`, then `Tuple{Vararg{Number}}` and `Array{<:Number}` 
 will be treated as decomposable containers.
@@ -311,10 +311,10 @@ hasBoolRelation(==, obj1, obj2, obj3...; ignoreFunction, ignoreContainer,
 Compare if two objects are the Identical. An instantiation of `hasBoolRelation`.
 
 If `ignoreFunction = true` then the function will pop up a warning message when a field is 
-a function. 
+a function.
 
 If `ignoreContainer = true`, the function will ignore the difference of the container(s) 
-and only compare the field(s)/entry(s) from two objects respectively. 
+and only compare the field(s)/entry(s) from two objects respectively.
 
 If `decomposeNumberCollection = true`, then `Tuple{Vararg{Number}}` and `Array{<:Number}` 
 will be treated as decomposable containers.
@@ -329,7 +329,7 @@ begin
         a::Int
         b::Array{Float64, 1}
     end
-    
+
     a = S(1, [1.0, 1.1])
     b = a
     c = b
@@ -355,11 +355,11 @@ hasBoolRelation(===, obj1, obj2, obj3...; ignoreFunction, ignoreContainer,
     printStyledInfo(str::String; title::String="", titleColor::Symbol=:light_blue) -> 
     Nothing
 
-Print info with colorful title and automatically highlighted code blocks enclosed by ` `. 
+Print info with colorful title and automatically highlighted code blocks enclosed by ` `.
 
 If you want to highlight other contents in different colors, you can also put them inside 
 ` ` and start it with "///theColorSymbolName///". The available color names follows the 
-values of `color` keyword argument in function `printstyled`. 
+values of `color` keyword argument in function `printstyled`.
 
 NOTE: There can only be one color in one ` ` quote.
 
@@ -392,7 +392,7 @@ function printStyledInfo(str::String;
                 end
             end
             printstyled(blockStr, color=blockColor)
-            subStr2 = str[codeQuotes[i+1][]+1:end] 
+            subStr2 = str[codeQuotes[i+1][]+1:end]
             loc = findfirst("`", subStr2)
             unBlockStr = subStr2[1 : ((loc===nothing) ? (subStr2|>length) : (loc[]-1))]
             print(unBlockStr)
@@ -496,8 +496,8 @@ struct ArrayPointer{T, N} <: Any
         unsafe_copyto!(ptr, pointer(arr |> copy), len)
         arr2 = unsafe_wrap(Array, ptr, size(arr))
         showReminder && printStyledInfo("""
-            Generating a C-array pointer-like object x`::ArrayPointer{$(elt)}`... 
-            Remember to use free(x.ptr) afterwards to prevent potential memory leaking. 
+            Generating a C-array pointer-like object x`::ArrayPointer{$(elt)}`...
+            Remember to use free(x.ptr) afterwards to prevent potential memory leaking.
             """)
         new{elt, N}(ptr, arr2)
     end
@@ -510,9 +510,9 @@ end
                compareFunction::Function = hasEqual, kws...) -> 
     markingList:: Array{Int, 1}, uniqueList::Array
 
-Return a `markingList` using `Int` number to mark each different elements from 
-(and inside) the input argument(s) and a `uniqueList` to contain all the unique 
-elements when `compareFunction` is set to `hasEqual` (in default).
+Return a `markingList` using `Int` number to mark each different elements from (and inside) 
+the input argument(s) and a `uniqueList` to contain all the unique elements when 
+`compareFunction` is set to `hasEqual` (in default).
 
 `args` and `kws` are positional arguments and keywords arguments respectively as 
 parameters of the specified `compareFunction`.
@@ -527,17 +527,17 @@ markUnique([1, [1, 2],"s", [1, 2]])
 ```
 
 ```jldoctest; setup = :(push!(LOAD_PATH, "../../src/"); using Quiqbox)
-begin 
+begin
     struct S
         a::Int
         b::Float64
     end
-    
+
     a = S(1, 2.0)
     b = S(1, 2.0)
     c = S(1, 2.1)
     d = a
-    
+
     markUnique([a,b,c,d])
 end
 
@@ -555,7 +555,7 @@ function markUnique(arr::AbstractArray, args...;
         local j
         isNew = true
         for outer j = 1:length(cmprList)
-            if f(cmprList[j], arr[i]) 
+            if f(cmprList[j], arr[i])
                 isNew = false
                 break
             end
@@ -604,7 +604,7 @@ function getUnique!(arr::Array, args...;
     for i = 2:length(arr)
         isNew = true
         for j = 1:length(cmprList)
-            if f(cmprList[j], arr[i]) 
+            if f(cmprList[j], arr[i])
                 isNew = false
                 break
             end
@@ -619,7 +619,7 @@ end
 """
 A function that only returns its argument.
 """
-itself(x) = x 
+itself(x) = x
 
 
 """

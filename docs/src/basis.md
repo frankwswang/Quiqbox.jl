@@ -7,7 +7,7 @@ The data structure formularized by Quiqbox in each step, namely the level of dat
 | level  | objective  |  product examples | abstract type  | type instances |
 | :---: | :---:   | :---:           | :---: | :---:          |
 | 4 | basis set | Array of basis functions (with reusable integrals) | `Array`, `GTBasis` | `Array{<:BasisFunc, 1}`...|
-| 3 | basis functions | single or linear combination of Gaussian functions | `FloatingGTBasisFunc` | `BasisFunc{:S, 1}`, `BasisFuncs{:P, 3, 3}`...|
+| 3 | basis functions | single or linear combination of Gaussian functions | `FloatingGTBasisFuncs` | `BasisFunc{:S, 1}`, `BasisFuncs{:P, 3, 3}`...|
 | 2 | Gaussian functions | (primitive) Gaussian functions | `AbstractGaussFunc` | `GaussFunc`|
 | 1 |  a pool of parameters | center coordinates, function coefficients | `ParamBox` | `ParamBox{:xpn, Float64}`... |
 

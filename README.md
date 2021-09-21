@@ -86,7 +86,7 @@ For more information on how to use the package, please read the [documentation o
 To learn more about the basic usage of the programming language behind Quiqbox, **Julia**, [the official documentation](https://docs.julialang.org/) or [this official tutorial](https://juliaacademy.com/p/intro-to-julia) is recommended.
 
 <br />
-
+<br />
 <br />
 
 <p align="center">
@@ -95,6 +95,8 @@ To learn more about the basic usage of the programming language behind Quiqbox, 
     </a>
 </p>
 
+<br />
+<br />
 
 [Doc-stable]:  https://frankwswang.github.io/Quiqbox.jl/stable
 [Doc-latest]:  https://frankwswang.github.io/Quiqbox.jl/dev

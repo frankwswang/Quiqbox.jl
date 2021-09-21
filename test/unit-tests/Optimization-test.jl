@@ -11,7 +11,7 @@ errorThreshold2 = 1e-4
 nucCoords = [[-0.7,0.0,0.0], [0.7,0.0,0.0]]
 mol = ["H", "H"]
 bfSource1 = genBasisFunc(missing, ("STO-2G", "H"))[]
-gfs1 = [bfSource1.gauss...]
+gfs1 = bfSource1.gauss |> collect
 cens = gridPoint.(nucCoords)
 bs1 = genBasisFunc.(cens, Ref(gfs1))
 pars1 = uniqueParams!(bs1, filterMapping=true)
