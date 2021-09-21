@@ -1,4 +1,4 @@
-export ParamBox, gradHFenegy
+export ParamBox, isDiffParam, toggleDiff!, gradHFenegy
 
 using LinearAlgebra: eigen
 using Symbolics: Num
@@ -31,7 +31,7 @@ linked to the f(x) via the `mapFunction`. After initializing the `ParamBox`, e.g
 `pb1 = ParamBox(x, mapFunction=f)`, `pb.data[]` returns `x`, and `pb.data()` returns `f(x)`.
 
 `canDiff` is used to mark the (independent) variable as differentiable when set to `true`, 
-otherwise the `ParamBox` will be ignored in any differentiation process.
+otherwise the `ParamBox` will be ignored in any differentiation process like a constant.
 
 `paramType` specifies the type of the stored variable to avoid data type mutation.
 
@@ -73,10 +73,29 @@ ParamBox(data, Ref(mapFunction), Ref(canDiff), index; name)
 const NoDiffMark = superscriptSym['!']
 
 
+"""
+
+    isDiffParam(pb::ParamBox) -> Bool
+
+Return `true` if the input `ParamBox` is differentiable.
+"""
+isDiffParam(pb::ParamBox) = pb.canDiff[]
+
+
+"""
+
+    toggleDiff!(pb::ParamBox) -> Bool
+
+Toggle the differentiability (`pb.canDiff[]`) of the input `ParamBox` and return the 
+altered result.
+"""
+toggleDiff!(pb::ParamBox) = begin pb.canDiff[] = !pb.canDiff[] end
+
+
 function deriveBasisFunc(bf::FloatingGTBasisFuncs, par::ParamBox)
-    varDict = getVars(bf, markUndifferentiable=true, includeMapping=true)
+    varDict = getVars(bf, includeMapping=true)
     vr = getVar(par)[1][1]
-    exprs = expressionOf(bf, onlyParameter=true, expand=true, markUndifferentiable=true)
+    exprs = expressionOfCore(bf, onlyParameter=true, expand=true)
     info = diffInfo(exprs, vr, varDict)
     diffInfoToBasisFunc(bf, info)
 end
@@ -202,6 +221,8 @@ function gradHFenegy(bs::Vector{<:AbstractGTBasisFuncs}, par::Vector{<:ParamBox}
                      S::Matrix{Float64}, mol::Vector{String}, 
                      nucCoords::Vector{<:AbstractArray}; 
                      nElectron::Union{Int, NTuple{2, Int}}=getCharge(mol))
+    @assert isDiffParam.(par) == fill(true, length(par)) "Input `ParamBox`(s) contains "*
+                                                         "non-differentiable `ParamBox`(s)!"
     if length(C) == 2 && nElectron isa Int
         nElectron = (nElectron÷2, nElectron-nElectron÷2)
     end
