@@ -872,8 +872,8 @@ function markParams!(parArray::Vector{<:ParamBox};
         subArr = typ[]
         ids = Int[]
         for i = 1:length(arr)
-            if arr[i] isa typ 
-                push!(subArr, arr[i]) 
+            if arr[i] isa typ
+                push!(subArr, arr[i])
                 push!(ids, i)
             end
         end
@@ -885,15 +885,14 @@ end
 
 """
 
-    uniqueParams!(bs; onlyDifferentiable::Bool=false, ignoreContainer::Bool=false, 
-                  filter::Bool=true, filterMapping::Bool=false) -> Array{<:ParamBox, 1}
+    uniqueParams!(bs; ignoreContainer::Bool=false, filter::Bool=true, 
+                  filterMapping::Bool=false) -> 
+    Array{<:ParamBox, 1}
 
 Mark the parameters (`ParamBox`) in input bs which can a `Vector` of `GaussFunc` or 
 `FloatingGTBasisFuncs`. The identical parameters will be marked with same index.
 
 === Keyword argument(s) ===
-
-`onlyDifferentiable`: Determine whether ignore un-differentiable parameters.
 
 `ignoreContainer`: If set to `true`, then only the field `data` of the `ParamBox`s will be 
 compared to determine whether each `ParamBox` are unique. 
@@ -904,27 +903,26 @@ ones.
 `filterMapping`: Determine wether return the `ParamBox`s with identical fields except the 
 `map` field. When `filter=false`, this argument is automatically overwritten to be `false`.
 """
-function uniqueParams!(bs; onlyDifferentiable::Bool=false, ignoreContainer::Bool=false, 
-                       filter::Bool=true, filterMapping::Bool=false)
-    markParams!(getParams(bs; onlyDifferentiable); 
-                ignoreContainer, filter, filterMapping)
-end
+uniqueParams!(bs; ignoreContainer::Bool=false, filter::Bool=true, 
+              filterMapping::Bool=false) = 
+markParams!(getParams(bs); ignoreContainer, filter, filterMapping)
 
 
 """
 
-    getVar(pb::ParamBox; markUndifferentiable::Bool=false, includeMapping::Bool=false) -> 
+    getVar(pb::ParamBox; includeMapping::Bool=false) -> 
     Array{<:Pair{Symbolics.Num, <:Number}, 1}
 
 Return a 1-element `Vector` of `Pair` to show the `Symbol::Symbolics.Num` of the stored 
-variable and the corresponding values.
+variable and the corresponding values. `includeMapping` determines whether mappings from 
+the variable to the dependent variable if there is one.
 """
-function getVar(pb::ParamBox; markUndifferentiable::Bool=false, includeMapping::Bool=false)
+function getVar(pb::ParamBox; includeMapping::Bool=false)
     varName = typeof(pb).parameters[1]
-    superscript = (pb.canDiff[] == true || !markUndifferentiable) ? "" : NoDiffMark
+    superscript = pb.canDiff[] ? "" : NoDiffMark
     varSymbol = Symbol((varName |> string) * superscript)
     vr = (pb.index isa Int) ? Symbolics.variable(varSymbol, pb.index) : 
-                              Symbolics.variable(varName)
+                              Symbolics.variable(varSymbol)
     mapName = pb.map[] |> nameof
     dvr = Symbolics.variable(mapName, T=Symbolics.FnType{Tuple{Any}, Real})(vr)
     expr = pb.map[](vr)
@@ -938,29 +936,28 @@ getVar(pbType::Type{<:ParamBox}) = Symbolics.variable(pbType.parameters[1])
 
 """
 
-    getVars(obj::Union{GaussFunc, BasisFunc}; markUndifferentiable::Bool=false, 
-            includeMapping::Bool=false) -> Array{<:Pair, 1}
-
-    getVars(collection::Array{<:Union{GaussFunc, BasisFunc, ParamBox}, 1}; 
-            markUndifferentiable::Bool=false, includeMapping::Bool=false) -> 
+    getVars(obj::Union{GaussFunc, BasisFunc}; includeMapping::Bool=false) -> 
     Array{<:Pair, 1}
 
-Return a `Vector` of `Pair` to indicate the mapping relations of and between the variables 
-stored in the `ParamBox`s in the given input.
+    getVars(collection::Array{<:Union{GaussFunc, BasisFunc, ParamBox}, 1}; 
+            includeMapping::Bool=false) -> 
+    Array{<:Pair, 1}
+
+Return a `Vector` of `Pair` to of the mapping relations between the variables stored in the 
+`ParamBox`s and the corresponding values. `includeMapping` determines whether mappings from 
+the variable(s) to the dependent variable(s) if exists.
 """
-getVars(gf::GaussFunc; markUndifferentiable::Bool=false, includeMapping::Bool=false) = 
-getVar.(gf.param; markUndifferentiable, includeMapping) |> flatten |> Dict
+getVars(gf::GaussFunc; includeMapping::Bool=false) = 
+getVar.(gf.param; includeMapping) |> flatten |> Dict
 
-getVars(bf::BasisFunc; markUndifferentiable::Bool=false, includeMapping::Bool=false) = 
-getVar.(bf.param; markUndifferentiable, includeMapping) |> flatten |> Dict
+getVars(bf::BasisFunc; includeMapping::Bool=false) = 
+getVar.(bf.param; includeMapping) |> flatten |> Dict
 
-getVars(pbs::Vector{<:ParamBox}; 
-        markUndifferentiable::Bool=false, includeMapping::Bool=false) = 
-getVar.(pbs; markUndifferentiable, includeMapping) |> flatten |> Dict
+getVars(pbs::Vector{<:ParamBox}; includeMapping::Bool=false) = 
+getVar.(pbs; includeMapping) |> flatten |> Dict
 
-getVars(fs::Vector{<:Union{GaussFunc, BasisFunc}}; 
-        markUndifferentiable::Bool=false, includeMapping::Bool=false) = 
-merge(getVars.(fs; markUndifferentiable, includeMapping)...)
+getVars(fs::Vector{<:Union{GaussFunc, BasisFunc}}; includeMapping::Bool=false) = 
+merge(getVars.(fs; includeMapping)...)
 
 
 function Nlα(l, α)
@@ -1016,45 +1013,12 @@ normOfGTOin(b::FloatingGTBasisFuncs{S, GN, ON}) where {S, GN, ON} =
 Nlα.(b.subshell, [g.xpn() for g in b.gauss])
 
 
-"""
-
-    expressionOf(gf::GaussFunc; markUndifferentiable::Bool=false, 
-                 substituteValue::Bool=false) -> 
-    Symbolics.Num
-
-Return the expression of a given `GaussFunc`.
-"""
-function expressionOf(gf::GaussFunc; 
-                      markUndifferentiable::Bool=false, substituteValue::Bool=false)
-    r = Symbolics.variable.(:r, [1:3;])
-    includeMapping = true
-    index = substituteValue ? 2 : 1
-    cgf(r, getVar(gf.xpn; markUndifferentiable, includeMapping)[1][index], 
-           getVar(gf.con; markUndifferentiable, includeMapping)[1][index])
-end
-
-"""
-
-    expressionOf(bf::CompositeGTBasisFuncs; 
-                 markUndifferentiable::Bool=false, substituteValue::Bool=false, 
-                 onlyParameter::Bool=false, expand::Bool=false) -> 
-    Array{<:Symbolics.Num, 2}
-
-Return the expression(s) of a given `BasisFuncMix` or `FloatingGTBasisFuncs` as a 
-`Matrix{<:Symbolics.Num}`of which the column(s) corresponds to different orbitals. When 
-`expand` is set to `true`, the column(s) will be expanded such that the entries are 
-`GaussFunc` inside the corresponding orbital.
-
-row(s) is(are) one orbital with the 
-expression(s) of its Gaussian function(s) as entry(entries).
-"""
-function expressionOf(bf::FloatingGTBasisFuncs; 
-                      markUndifferentiable::Bool=false, substituteValue::Bool=false, 
-                      onlyParameter::Bool=false, expand::Bool=false)
+function expressionOfCore(bf::FloatingGTBasisFuncs; substituteValue::Bool=false, 
+                          onlyParameter::Bool=false, expand::Bool=false)
     if bf.normalizeGTO
         N = (bf isa BasisFunc) ? Nijkα : (i,j,k,α) -> Nlα(i+j+k, α)
     else
-        N = (_...)->1
+        N = (_...) -> 1
     end
     nOrbital = bf.ijk |> length
     nGaussFunc = bf.gauss |> length
@@ -1066,9 +1030,9 @@ function expressionOf(bf::FloatingGTBasisFuncs;
     end
     includeMapping = true
     index = substituteValue ? 2 : 1
-    R = [getVar(bf.center[1]; markUndifferentiable, includeMapping)[1][index], 
-         getVar(bf.center[2]; markUndifferentiable, includeMapping)[1][index], 
-         getVar(bf.center[3]; markUndifferentiable, includeMapping)[1][index]]
+    R = [getVar(bf.center[1]; includeMapping)[1][index], 
+         getVar(bf.center[2]; includeMapping)[1][index], 
+         getVar(bf.center[3]; includeMapping)[1][index]]
     r = Symbolics.variable.(:r, [1:3;])
     f2 = onlyParameter ? (α, d, i, j, k)->cgo2(-R, α, d, i, j, k, N(i,j,k,α)) : 
                          (α, d, i, j, k)->fgo2(r, R, α, d, i, j, k, N(i,j,k,α))
@@ -1076,8 +1040,8 @@ function expressionOf(bf::FloatingGTBasisFuncs;
         i, j, k = ijkOrbitalList[ijk]
         gfs = Num[]
         for g in bf.gauss
-            α = getVar(g.xpn; markUndifferentiable, includeMapping)[1][index]
-            d = getVar(g.con; markUndifferentiable, includeMapping)[1][index]
+            α = getVar(g.xpn; includeMapping)[1][index]
+            d = getVar(g.con; includeMapping)[1][index]
             push!(gfs, f2(α, d, i, j, k))
         end
         f1(res, gfs)
@@ -1085,13 +1049,45 @@ function expressionOf(bf::FloatingGTBasisFuncs;
     expand ? reshape(res, (nGaussFunc, nOrbital)) : (res |> transpose |> Array)
 end
 
-function expressionOf(bfm::BasisFuncMix; markUndifferentiable::Bool=false, 
-                      substituteValue::Bool=false, onlyParameter::Bool=false, 
-                      expand::Bool=false)
-    exprs = [expressionOf(bf; markUndifferentiable, substituteValue, onlyParameter, expand)
+function expressionOfCore(bfm::BasisFuncMix; substituteValue::Bool=false, 
+                          onlyParameter::Bool=false, expand::Bool=false)
+    exprs = [expressionOfCore(bf; substituteValue, onlyParameter, expand)
              for bf in bfm.BasisFunc]
     expand ? vcat(exprs...) : sum(exprs)
 end
+
+
+"""
+
+    expressionOf(bf::CompositeGTBasisFuncs; 
+                 substituteValue::Bool=false, expand::Bool=false) -> 
+    Array{<:Symbolics.Num, 2}
+
+Return the expression(s) of a given `CompositeGTBasisFuncs` (e.g. `BasisFuncMix` or 
+`FloatingGTBasisFuncs`) as a `Matrix{<:Symbolics.Num}`of which the column(s) corresponds to 
+different orbitals. If `substituteValue` is `true`, the variables inside each expression 
+will be substituted by their values. If `expand` is `true`, the column(s) will be expanded 
+such that its entries are `GaussFunc` inside the corresponding orbital.
+"""
+expressionOf(bf::CompositeGTBasisFuncs; substituteValue::Bool=false, expand::Bool=false) = 
+expressionOfCore(bf; substituteValue, expand, onlyParameter=false)
+
+"""
+
+    expressionOf(gf::GaussFunc; substituteValue::Bool=false) -> 
+    Symbolics.Num
+
+Return the expression of a given `GaussFunc`. If `substituteValue` is `true`, the variables 
+inside the expression will be substituted by their values.
+"""
+function expressionOf(gf::GaussFunc; substituteValue::Bool=false)
+    r = Symbolics.variable.(:r, [1:3;])
+    includeMapping = true
+    index = substituteValue ? 2 : 1
+    cgf(r, getVar(gf.xpn; includeMapping)[1][index], 
+           getVar(gf.con; includeMapping)[1][index])
+end
+
 
 #! Optimize
 function shift(bf::FloatingGTBasisFuncs{S, GN, 1}; ijkShift::Vector{Int}, 
@@ -1107,7 +1103,7 @@ function shift(bf::FloatingGTBasisFuncs{S, GN, 1}; ijkShift::Vector{Int},
             i.con.map[] = itself
         end
     end
-    for (i,j) in zip(gfs,conRatio)
+    for (i,j) in zip(gfs, conRatio)
         i.con[] *= j
     end
     BasisFunc(bf.center, gfs, ijkOrbitalList[bf.ijk[1]] + ijkShift, normalizeGTO)

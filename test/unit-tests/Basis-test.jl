@@ -269,7 +269,7 @@ alpha = Quiqbox.ParamList[:xpn]
 
 # function getVar & getVars
 @test getVar(pb1 |> typeof).val.name == :p
-@test getVar(pb1)[][1].val.name == :p
+@test getVar(pb1)[][1].val.name == :pꜝ
 @test getVar(pb1)[][2] == 2.0
 @test getVar(pb1)[] isa Pair{Num, Float64}
 
