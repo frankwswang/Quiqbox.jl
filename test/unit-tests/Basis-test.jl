@@ -1,7 +1,7 @@
 using Test
 using Quiqbox
 using Quiqbox: isFull, BasisFuncMix, getBasisFuncs, inSymbols, varVal, ElementNames, 
-               sortBasisFuncs
+               sortBasisFuncs, ParamList, sumOf
 using Symbolics
 using LinearAlgebra
 
@@ -38,7 +38,6 @@ for i=1:2 gf1.param[i][] = x[i] end
 
 # struct BasisFunc and function genBasisFunc
 cen = [1,2,3]
-using Quiqbox: ParamList
 cenParNames = [ParamList[:X], ParamList[:Y], ParamList[:Z]]
 cenPar = ParamBox.(cen, cenParNames) |> Tuple
 bf1 = genBasisFunc(cen, [gf1])
@@ -156,15 +155,25 @@ eeI = eeInteractions([bfm])[]
 @test isapprox(eeI, eeInteractions(bs1) |> sum, atol=errorThreshold2)
 
 
-# function add mul
-bs2 = [genBasisFunc([1,1,1], (2,1), [1,0,0]), genBasisFunc([1,1,1], (3,1), [2,0,0]), 
-       genBasisFunc([1,1,2], (3,1), [0,0,0]), genBasisFunc([1,1,1], (3,1), [0,1,0])]
-bs3 = [genBasisFunc([1,1,1], (2,1), [1,0,0]), genBasisFunc([1,1,1], (3,1), [0,1,0]), 
-       genBasisFunc([1,1,1], (3,1), [2,0,0]), genBasisFunc([1,1,2], (3,1), [0,0,0])]
-@test !hasEqual(add(bs2), BasisFuncMix(bs3))
-@test  hasEqual(add(bs2, sort=true), BasisFuncMix(bs3))
+# function sumOf, add, mul
+bs2 = [genBasisFunc([1,1,1], (2,1), [1,0,0], normalizeGTO=true), 
+       genBasisFunc([1,1,1], (3,1), [2,0,0], normalizeGTO=true), 
+       genBasisFunc([1,1,2], (3,1), [0,0,0], normalizeGTO=true), 
+       genBasisFunc([1,1,1], (3,1), [0,1,0], normalizeGTO=true)]
+bs3 = [genBasisFunc([1,1,1], (2,1), [1,0,0], normalizeGTO=true), 
+       genBasisFunc([1,1,1], (3,1), [0,1,0], normalizeGTO=true), 
+       genBasisFunc([1,1,1], (3,1), [2,0,0], normalizeGTO=true), 
+       genBasisFunc([1,1,2], (3,1), [0,0,0], normalizeGTO=true)]
+
+bfm_1 = +(bs2...,)
+bfm_2 = sumOf(bs2)
+bfm_3 = BasisFuncMix(bs3)
+@test hasEqual(bfm_1, bfm_3)
+@test hasEqual(bfm_2, bfm_3)
+
+# @test  hasEqual(add(bs2, sort=true), BasisFuncMix(bs3))
 X = overlaps(bs2)^(-0.5)
-bsNew = add.([mul.(bs2, @view X[:,i]) for i in 1:size(X,2)])
+bsNew = [mul.(bs2, @view X[:,i]) for i in 1:size(X,2)] .|> sum
 SNew = overlaps(bsNew)
 @test isapprox(SNew, LinearAlgebra.I, atol=1e-14)
 
@@ -286,6 +295,11 @@ expr_bfm2 =  expressionOf(bfm2)[] |> string
 @test expr_bfm2 == "d*exp(-α*((r₁ - X)^2 + (r₂ - Y)^2 + (r₃ - Z)^2))*(r₁ - X)" || 
       expr_bfm2 == "d*(r₁ - X)*exp(-α*((r₁ - X)^2 + (r₂ - Y)^2 + (r₃ - Z)^2))"
 
+
+#! function shift test incomplete
+# ijk = [1,0,0]
+# bf_os1 = genBasisFunc([0,0,0], (2,1), ijk)
+# shift(bf_os1, ijkShift)
 
 # function inSymbols
 sym1 = :a1

@@ -94,11 +94,110 @@ function show(io::IO, vars::HFfinalVars)
 end
 
 
-import Base: getindex, setindex!
-getindex(m::ParamBox) = m.data[]
+# import Base: sum
+# sum(bfs::Array{<:FloatingGTBasisFuncs{<:Any, <:Any, 1}, N}) where {N} = sumOf(bfs)
 
 
-setindex!(a::ParamBox, b) = begin a.data[] = b end
+import Base: +
++(bfm1::CompositeGTBasisFuncs{<:Any, 1}, bfm2::CompositeGTBasisFuncs{<:Any, 1}) = 
+add(bfm1, bfm2)
+
+
+import Base: *
+*(bfm1::GaussFunc, bfm2::GaussFunc) = mul(bfm1, bfm2)
+
+*(bfm::GaussFunc, coeff::Real) = mul(bfm, coeff)
+
+*(coeff::Real, bfm::GaussFunc) = mul(coeff, bfm)
+
+*(bfm1::CompositeGTBasisFuncs{<:Any, 1}, bfm2::CompositeGTBasisFuncs{<:Any, 1}) = 
+mul(bfm1, bfm2)
+
+*(bfm::CompositeGTBasisFuncs{<:Any, 1}, coeff::Real) = 
+mul(bfm, coeff)
+
+*(coeff::Real, bfm::CompositeGTBasisFuncs{<:Any, 1}) = 
+mul(coeff, bfm)
+
+
+# Iteration Interface
+import Base: iterate, size, length, ndims
+iterate(pb::ParamBox) = (pb.data[], nothing)
+iterate(::ParamBox, _) = nothing
+size(::ParamBox) = ()
+length(::ParamBox) = 1
+ndims(::ParamBox) = 0
+
+iterate(gf::GaussFunc) = (gf, nothing)
+iterate(::GaussFunc, _) = nothing
+size(::GaussFunc) = ()
+length(::GaussFunc) = 1
+
+iterate(bf::BasisFunc) = (bf, nothing)
+iterate(::BasisFunc, _) = nothing
+size(::BasisFunc) = ()
+length(::BasisFunc) = 1
+
+iterate(bfm::BasisFuncMix) = (bfm, nothing)
+iterate(::BasisFuncMix, _) = nothing
+size(::BasisFuncMix) = ()
+length(::BasisFuncMix) = 1
+
+function iterate(bfs::CompositeGTBasisFuncs{<:Any, N}) where {N}
+    item, state = iterate(bfs.ijk)
+    (BasisFunc(bfs.center, bfs.gauss|>collect, 
+               ijkOrbitalList[item], bfs.normalizeGTO), state)
+end
+function iterate(bfs::CompositeGTBasisFuncs{<:Any, N}, state) where {N}
+    iter = iterate(bfs.ijk, state)
+    iter !== nothing ? (BasisFunc(bfs.center, bfs.gauss|>collect, ijkOrbitalList[iter[1]], 
+                                  bfs.normalizeGTO), iter[2]) : nothing
+end
+size(::CompositeGTBasisFuncs{<:Any, N}) where {N} = (N,)
+length(::CompositeGTBasisFuncs{<:Any, N}) where {N} = N
+
+# Indexing Interface
+import Base: getindex, setindex!, firstindex, lastindex, eachindex, axes
+getindex(pb::ParamBox) = pb.data[]
+getindex(pb::ParamBox, ::Val{:first}) = getindex(pb)
+getindex(pb::ParamBox, ::Val{:last}) = getindex(pb)
+setindex!(pb::ParamBox, d) = begin pb.data[] = d end
+firstindex(::ParamBox) = Val(:first)
+lastindex(::ParamBox) = Val(:last)
+axes(::ParamBox) = ()
+
+getindex(gf::GaussFunc) = gf.param |> collect
+getindex(gf::GaussFunc, ::Val{:first}) = getindex(gf)
+getindex(gf::GaussFunc, ::Val{:last}) = getindex(gf)
+firstindex(::GaussFunc) = Val(:first)
+lastindex(::GaussFunc) = Val(:last)
+
+getindex(bf::BasisFunc) = bf.gauss |> collect
+getindex(bf::BasisFunc, ::Val{:first}) = getindex(bf)
+getindex(bf::BasisFunc, ::Val{:last}) = getindex(bf)
+firstindex(::BasisFunc) = Val(:first)
+lastindex(::BasisFunc) = Val(:last)
+
+getindex(bfm::BasisFuncMix) = 
+(getUnique! ∘ collect ∘ flatten)( getfield.(bfm.BasisFunc, :gauss) )
+getindex(bfm::BasisFuncMix, ::Val{:first}) = getindex(bfm)
+getindex(bfm::BasisFuncMix, ::Val{:last}) = getindex(bfm)
+firstindex(::BasisFuncMix) = Val(:first)
+lastindex(::BasisFuncMix) = Val(:last)
+
+getindex(bfs::BasisFuncs, i) = 
+BasisFunc(bfs.center, bfs.gauss|>collect, ijkOrbitalList[bfs.ijk[i]], bfs.normalizeGTO)
+getindex(bfs::BasisFuncs{<:Any, <:Any, N}, ::Colon) where {N} = [getindex(bfs, i) for i=1:N]
+firstindex(bfs::BasisFuncs) = 1
+lastindex(::BasisFuncs{<:Any, <:Any, N}) where {N} = N
+
+
+# Broadcasting Interface
+import Base: broadcastable
+broadcastable(pb::ParamBox) = Ref(pb)
+broadcastable(gf::GaussFunc) = Ref(gf)
+broadcastable(bf::CompositeGTBasisFuncs{<:Any, 1}) = Ref(bf)
+broadcastable(bfs::BasisFuncs) = getindex(bfs, :)
 
 
 # Quiqbox methods overload.
@@ -114,7 +213,7 @@ function hasBoolRelation(boolFunc::F, pb1::ParamBox, pb2::ParamBox;
         boolFunc(pb1.data, pb2.data)
     elseif ignoreFunction
         boolFunc(pb1.data, pb2.data) && 
-        boolFunc(pb1.canDiff[],pb2.canDiff[]) 
+        boolFunc(pb1.canDiff[],pb2.canDiff[])
     else
         boolFunc(pb1.map[], pb2.map[]) && 
         boolFunc(pb1.data, pb2.data) && 
