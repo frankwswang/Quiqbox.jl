@@ -75,8 +75,8 @@ momentum orientation. E.g., s would be ("X⁰Y⁰Z⁰")
 
 ≡≡≡ Initialization Method(s) ≡≡≡
 
-    BasisFunc(center::Tuple{Vararg{<:ParamBox}}, gauss::Array{<:GaussFunc, 1}, 
-              ijk::Array{Int, 1}, normalizeGTO::Bool) -> 
+    BasisFunc(center::Tuple{Vararg{<:ParamBox}}, gauss::NTuple{GN, GaussFunc}, 
+              ijk::Array{Int, 1}, normalizeGTO::Bool) where {GN} -> 
     BasisFunc{S, GN}
 
 """
@@ -90,8 +90,8 @@ struct BasisFunc{S, GN} <: FloatingGTBasisFuncs{S, GN, 1}
     normalizeGTO::Bool
     param::Tuple{Vararg{<:ParamBox}}
 
-    function BasisFunc(cen::Tuple{Vararg{<:ParamBox}}, gs::Vector{<:GaussFunc}, 
-                       ijk::Vector{Int}, normalizeGTO::Bool)
+    function BasisFunc(cen::Tuple{Vararg{<:ParamBox}}, gs::NTuple{GN, GaussFunc}, 
+                       ijk::Vector{Int}, normalizeGTO::Bool) where {GN}
         @assert length(ijk) == 3 "The length of `ijk` should be 3."
         subshell = SubshellNames[sum(ijk)+1]
         pars = ParamBox[]
@@ -99,7 +99,7 @@ struct BasisFunc{S, GN} <: FloatingGTBasisFuncs{S, GN, 1}
         for g in gs
             append!(pars, g.param)
         end
-        new{Symbol(subshell), length(gs)}(cen, gs|>Tuple, subshell, (ijkStringList[ijk],), 
+        new{Symbol(subshell), GN}(cen, gs, subshell, (ijkStringList[ijk],), 
                                           normalizeGTO, pars |> Tuple)
     end
 end
@@ -124,8 +124,8 @@ struct BasisFuncs{S, GN, ON} <: FloatingGTBasisFuncs{S, GN, ON}
     normalizeGTO::Bool
     param::Tuple{Vararg{<:ParamBox}}
 
-    function BasisFuncs(cen::Tuple{Vararg{<:ParamBox}}, gs::Vector{<:GaussFunc}, 
-                        ijks::Vector{Vector{Int}}, normalizeGTO::Bool=false)
+    function BasisFuncs(cen::Tuple{Vararg{<:ParamBox}}, gs::NTuple{GN, GaussFunc}, 
+                        ijks::Vector{Vector{Int}}, normalizeGTO::Bool=false) where {GN}
         @assert prod(length.(ijks) .== 3) "The length of each `ijk` should be 3."
         ls = sum.(ijks)
         @assert prod(ls .== ls[1]) "The total angular momentums (of each ijk) should be "*
@@ -141,9 +141,8 @@ struct BasisFuncs{S, GN, ON} <: FloatingGTBasisFuncs{S, GN, ON}
         for g in gs
             append!(pars, g.param)
         end
-        new{Symbol(subshell), length(gs), length(ijks)}(cen, gs |> Tuple, subshell, 
-                                                        ijkStrs, normalizeGTO, 
-                                                        pars |> Tuple)
+        new{Symbol(subshell), GN, length(ijks)}(cen, gs, subshell, ijkStrs, normalizeGTO, 
+                                                pars|>Tuple)
     end
 end
 
@@ -235,11 +234,11 @@ is used.
 """
 genBasisFunc(cen::Tuple{Vararg{<:ParamBox}}, gs::Vector{<:GaussFunc}, 
           ijk::Vector{Int}; normalizeGTO::Bool=false) = 
-BasisFunc(cen, gs, ijk, normalizeGTO)
+BasisFunc(cen, gs|>Tuple, ijk, normalizeGTO)
 
 genBasisFunc(cen::Tuple{Vararg{<:ParamBox}}, gs::Vector{<:GaussFunc}, 
           ijks::Vector{Vector{Int}}; normalizeGTO::Bool=false) = 
-BasisFuncs(cen, gs, ijks, normalizeGTO)
+BasisFuncs(cen, gs|>Tuple, ijks, normalizeGTO)
 
 # ijkOrijks::Union{Vector{Int}, Vector{Vector{Int}}}
 function genBasisFunc(coord::AbstractArray, gs::Vector{<:GaussFunc}, ijkOrijks::Array; 
@@ -429,24 +428,6 @@ getBasisFuncs(bf::FloatingGTBasisFuncs) = (bf,)
 getBasisFuncs(::Any) = ()
 
 
-# function sumOf(bfs::Array{<:BasisFunc, N}) where {N}
-#     len = length(bfs)
-#     bfs = sortBasisFuncs(bfs[:])
-#     if (length ∘ unique)(getfield.(bfs, :ijk)) == len && 
-#        (length ∘ unique)(getfield.(bfs, :normalizeGTO)) == len && 
-#        (length ∘ unique)(centerOf.(bfs)) == len
-#         head = BasisFuncMix(bfs)
-#     else
-#         head = bfs[1]
-#         body = @view bfs[2:end]
-#         for bf in body
-#             head = add(head, bf)
-#         end
-#     end
-#     head
-# end
-
-
 function sumOf(bfs::Array{<:BasisFunc, N}) where {N}
     bfs = sortBasisFuncs(bfs[:])
     head = bfs[1]
@@ -462,14 +443,14 @@ end
 add(bf::BasisFunc) = itself(bf)
 
 add(bf::BasisFuncs{<:Any, <:Any, 1}) = 
-BasisFunc(bf.center, bf.gauss|>collect, ijkOrbitalList[bf.ijk[1]], bf.normalizeGTO)
+BasisFunc(bf.center, bf.gauss, ijkOrbitalList[bf.ijk[1]], bf.normalizeGTO)
 
 function add(bf1::BasisFunc{T}, bf2::BasisFunc{T}) where {T}
     if bf1.ijk == bf2.ijk && 
        bf1.normalizeGTO == bf2.normalizeGTO && 
        centerOf(bf1) == centerOf(bf2)
 
-        BasisFunc(bf1.center, [bf1.gauss..., bf2.gauss...], 
+        BasisFunc(bf1.center, (bf1.gauss..., bf2.gauss...,), 
                   ijkOrbitalList[bf1.ijk[1]], bf1.normalizeGTO)
     else
         BasisFuncMix([bf1, bf2])
@@ -499,12 +480,6 @@ add(bfm1::BasisFuncMix, bfm2::BasisFuncMix) =
 
 add(bf1::BasisFuncs{<:Any, <:Any, 1}, bf2::BasisFuncs{<:Any, <:Any, 1}) = 
 [[bf1, bf2] .|> add |> sumOf]
-
-# add(gf1::GaussFunc, gf2::GaussFunc) -> BasisFunc
-# add(gf::GaussFunc, BasisFunc::BasisFunc) -> BasisFunc
-
-# add(bfm1::CompositeGTBasisFuncs{<:Any, 1}, bfm2::CompositeGTBasisFuncs{<:Any, 1}...) = 
-# vcat( ([bfm1, bfm2...] .|> decomposeBasisFunc .|> vec)... ) |> sumOf
 
 
 function mul(gf::GaussFunc, coeff::Real)
@@ -540,7 +515,7 @@ function mul(sgf1::BasisFunc{<:Any, 1}, sgf2::BasisFunc{<:Any, 1};
 end
 
 function mul(bf::BasisFunc, coeff::Real; normalizeGTO::Union{Bool, Missing}=missing)
-    gfs = mul.(bf.gauss, coeff) |> collect
+    gfs = mul.(bf.gauss, coeff)
     normalizeGTO isa Missing && (normalizeGTO = bf.normalizeGTO)
     BasisFunc(bf.center, gfs, ijkOrbitalList[bf.ijk[1]], normalizeGTO)
 end
@@ -555,8 +530,8 @@ function mul(bf1::BasisFunc, bf2::BasisFunc; normalizeGTO::Union{Bool, Missing}=
     normalizeGTO isa Missing && (normalizeGTO = bf.normalizeGTO)
     bfs = BasisFunc[]
     for gf1 in bf1.gauss, gf2 in bf2.gauss
-        push!(bfs, mul(BasisFunc(cen1, [gf1], ijk1, normalizeGTO), 
-                       BasisFunc(cen2, [gf2], ijk2, normalizeGTO)))
+        push!(bfs, mul(BasisFunc(cen1, (gf1,), ijk1, normalizeGTO), 
+                       BasisFunc(cen2, (gf2,), ijk2, normalizeGTO)))
     end
     sumOf(bfs)
 end
@@ -609,12 +584,12 @@ function decomposeBasisFunc(bf::FloatingGTBasisFuncs; splitGaussFunc::Bool=false
     nRow = 1
     if splitGaussFunc
         for ijk in bf.ijk, g in bf.gauss
-            push!(res, BasisFunc(cen, [g], ijkOrbitalList[ijk], bf.normalizeGTO))
+            push!(res, BasisFunc(cen, (g,), ijkOrbitalList[ijk], bf.normalizeGTO))
         end
         nRow = bf.gauss |> length
     else
         for ijk in bf.ijk
-            push!(res, BasisFunc(cen, bf.gauss|>collect, ijkOrbitalList[ijk], 
+            push!(res, BasisFunc(cen, bf.gauss, ijkOrbitalList[ijk], 
                   bf.normalizeGTO))
         end
     end
@@ -717,7 +692,7 @@ end
 
     genBFuncsFromText(content::String; adjustContent::Bool=false, 
                       adjustFunction::F=sciNotReplace, 
-                      excludeFirstNlines=0, excludeLastNlines=0, 
+                      excludeFirstNlines::Int=0, excludeLastNlines::Int=0, 
                       center::Union{AbstractArray, 
                                     Tuple{N, ParamBox}, 
                                     Missing}=missing) where {N, F<:Function} -> 
@@ -737,7 +712,7 @@ the positional `ParamBox`s, or simply (in default) set to `missing` for later as
 function genBFuncsFromText(content::String;
                            adjustContent::Bool=false,
                            adjustFunction::F=sciNotReplace, 
-                           excludeFirstNlines=0, excludeLastNlines=0, 
+                           excludeFirstNlines::Int=0, excludeLastNlines::Int=0, 
                            center::Union{AbstractArray, 
                                          NTuple{N, ParamBox}, 
                                          Missing}=missing) where {N, F<:Function}
@@ -1093,7 +1068,7 @@ end
 function shift(bf::FloatingGTBasisFuncs{S, GN, 1}; ijkShift::Vector{Int}, 
                       conRatio::Vector{<:Real}, fixNorm::Bool=false) where {S, GN}
     @assert ijkShift |> length == 3 "The length of `ijkShift` should be 3."
-    gfs = bf.gauss |> collect |> deepcopy
+    gfs = bf.gauss |> deepcopy
     @assert length(conRatio) == length(gfs)
     normalizeGTO = bf.normalizeGTO
     if fixNorm && normalizeGTO

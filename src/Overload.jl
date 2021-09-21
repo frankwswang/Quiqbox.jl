@@ -145,12 +145,11 @@ length(::BasisFuncMix) = 1
 
 function iterate(bfs::CompositeGTBasisFuncs{<:Any, N}) where {N}
     item, state = iterate(bfs.ijk)
-    (BasisFunc(bfs.center, bfs.gauss|>collect, 
-               ijkOrbitalList[item], bfs.normalizeGTO), state)
+    (BasisFunc(bfs.center, bfs.gauss, ijkOrbitalList[item], bfs.normalizeGTO), state)
 end
 function iterate(bfs::CompositeGTBasisFuncs{<:Any, N}, state) where {N}
     iter = iterate(bfs.ijk, state)
-    iter !== nothing ? (BasisFunc(bfs.center, bfs.gauss|>collect, ijkOrbitalList[iter[1]], 
+    iter !== nothing ? (BasisFunc(bfs.center, bfs.gauss, ijkOrbitalList[iter[1]], 
                                   bfs.normalizeGTO), iter[2]) : nothing
 end
 size(::CompositeGTBasisFuncs{<:Any, N}) where {N} = (N,)
@@ -186,7 +185,7 @@ firstindex(::BasisFuncMix) = Val(:first)
 lastindex(::BasisFuncMix) = Val(:last)
 
 getindex(bfs::BasisFuncs, i) = 
-BasisFunc(bfs.center, bfs.gauss|>collect, ijkOrbitalList[bfs.ijk[i]], bfs.normalizeGTO)
+BasisFunc(bfs.center, bfs.gauss, ijkOrbitalList[bfs.ijk[i]], bfs.normalizeGTO)
 getindex(bfs::BasisFuncs{<:Any, <:Any, N}, ::Colon) where {N} = [getindex(bfs, i) for i=1:N]
 firstindex(bfs::BasisFuncs) = 1
 lastindex(::BasisFuncs{<:Any, <:Any, N}) where {N} = N
