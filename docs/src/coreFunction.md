@@ -36,6 +36,10 @@ assignCenter!
 getParams
 ```
 
+```@doc
+dataCopy
+```
+
 ```@docs
 uniqueParams!
 ```
@@ -59,7 +63,7 @@ GridBox(nGridPerEdge::Int, spacing::Real=10, centerCoord::Vector{<:Real}=[0.0,0.
 ```
 
 ```@docs
-gridPoint
+makeCenter
 ```
 
 ```@docs

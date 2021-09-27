@@ -51,7 +51,7 @@ mutable struct ParamBox{V, T} <: DifferentiableParameter{ParamBox, T}
     map::Base.RefValue{<:Function}
     canDiff::Base.RefValue{Bool}
     index::Union{Int, Nothing}
-    ParamBox(data::Array{T, 0}, map, canDiff, index=Ref(nothing); 
+    ParamBox(data::Array{T, 0}, map, canDiff, index=nothing; 
              name::Symbol=:undef) where {T<:Number} = 
     new{name, T}(data, map, canDiff, index)
 end

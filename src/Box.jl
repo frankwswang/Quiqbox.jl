@@ -1,4 +1,4 @@
-export gridBoxCoords, GridBox, gridPoint, gridCoords
+export gridBoxCoords, GridBox, gridCoords
 
 """
 
@@ -84,20 +84,6 @@ it would be `L₀`.
 GridBox(nGridPerEdge::Int, spacing::Real=10, centerCoord::Vector{<:Real}=[0.0,0.0,0.0];
         canDiff::Bool=true, index::Int=0) = 
 GridBox(fill(nGridPerEdge, 3) |> Tuple, spacing, centerCoord; canDiff, index)
-
-"""
-
-    gridPoint(coord::Array{<:Real, 1}) -> NTuple{3, ParamBox}
-
-Generate a `Tuple` of coordinate `ParamBox`s given a `Vector`.
-"""
-function gridPoint(coord::Vector{<:Real})
-    @assert length(coord) == 3
-    x = ParamBox(coord[1], ParamList[:X])
-    y = ParamBox(coord[2], ParamList[:Y])
-    z = ParamBox(coord[3], ParamList[:Z])
-    (x,y,z)
-end
 
 
 """

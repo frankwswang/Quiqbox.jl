@@ -94,10 +94,6 @@ function show(io::IO, vars::HFfinalVars)
 end
 
 
-# import Base: sum
-# sum(bfs::Array{<:FloatingGTBasisFuncs{<:Any, <:Any, 1}, N}) where {N} = sumOf(bfs)
-
-
 import Base: +
 +(bfm1::CompositeGTBasisFuncs{<:Any, 1}, bfm2::CompositeGTBasisFuncs{<:Any, 1}) = 
 add(bfm1, bfm2)
@@ -202,7 +198,7 @@ broadcastable(bfs::BasisFuncs) = getindex(bfs, :)
 # Quiqbox methods overload.
 ## Method overload of `hasBoolRelation` from Tools.jl.
 ## If `ignoreContainer = true`, then `ignoreFunction` is automatically set to be `true` 
-## as the `map` function for `ParamBox` is considered as a type of container for the actual
+## as the `map` function for `ParamBox` is considered as a type of container for the actual 
 ## stored data.
 function hasBoolRelation(boolFunc::F, pb1::ParamBox, pb2::ParamBox; 
                          ignoreFunction::Bool=false, 
