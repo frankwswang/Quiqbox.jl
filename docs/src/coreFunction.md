@@ -13,7 +13,7 @@ GTBasis(basis::Vector{<:Quiqbox.AbstractGTBasisFuncs})
 ```
 
 ```@docs
-decomposeBasisFunc
+decompose
 ```
 
 ```@docs

@@ -1,5 +1,5 @@
 export GaussFunc, Exponent, Contraction, BasisFunc, BasisFuncs, genBasisFunc, centerOf, 
-       GTBasis, add, mul, shift, decomposeBasisFunc, basisSize, genBasisFuncText, 
+       GTBasis, add, mul, shift, decompose, basisSize, genBasisFuncText, 
        genBFuncsFromText, assignCenter!, makeCenter, getParams, dataCopy, uniqueParams!, 
        getVar, getVars, expressionOf
 
@@ -453,7 +453,7 @@ struct BasisFuncMix{BN, GN} <: CompositeGTBasisFuncs{BN, 1}
     end
 end
 BasisFuncMix(bf::BasisFunc) = BasisFuncMix([bf])
-BasisFuncMix(bfs::BasisFuncs) = BasisFuncMix.(decomposeBasisFunc(bfs))
+BasisFuncMix(bfs::BasisFuncs) = BasisFuncMix.(decompose(bfs))
 BasisFuncMix(bfm::BasisFuncMix) = itself(bfm)
 
 
@@ -699,14 +699,14 @@ end
 
 """
 
-    decomposeBasisFunc(bf::FloatingGTBasisFuncs; splitGaussFunc::Bool=false) -> 
+    decompose(bf::FloatingGTBasisFuncs; splitGaussFunc::Bool=false) -> 
     Array{<:FloatingGTBasisFuncs, 2}
 
 Decompose a `FloatingGTBasisFuncs` into an `Array` of `BasisFunc`s. Each column represents 
 one orbital of the input basis function(s). If `splitGaussFunc` is `true`, then each column 
 consists of the `BasisFunc`s each with only 1 `GaussFunc`.
 """
-function decomposeBasisFunc(bf::FloatingGTBasisFuncs; splitGaussFunc::Bool=false)
+function decompose(bf::FloatingGTBasisFuncs; splitGaussFunc::Bool=false)
     cen = bf.center
     res = BasisFunc[]
     nRow = 1
@@ -726,15 +726,16 @@ end
 
 """
 
-    decomposeBasisFunc(bf::BasisFuncMix; splitGaussFunc::Bool=false) -> 
+    decompose(bf::BasisFuncMix; splitGaussFunc::Bool=false) -> 
     Array{<:FloatingGTBasisFuncs, 3}
 
 Return a 3-dimensional `Array` of `BasisFunc`s of which the pages (3rd dim) are the 
 decomposed terms of the `BasisFunc`s stored in the input `BasisFuncMix`.
 """
-function decomposeBasisFunc(bfm::BasisFuncMix; splitGaussFunc::Bool=false)
-    bfs = decomposeBasisFunc.(getBasisFuncs(bfm) |> collect; splitGaussFunc)
-    cat(bfs..., dims=3)
+function decompose(bfm::BasisFuncMix; splitGaussFunc::Bool=false)
+    bfs = decompose.(getBasisFuncs(bfm) |> collect; splitGaussFunc)
+    # cat(bfs..., dims=3)
+    vcat(bfs...)
 end
 
 
@@ -1255,7 +1256,7 @@ expressionOf(gf::GaussFunc) = expressionOfCore(gf, substituteValue=true)
 
 
 function diffInfoToBasisFunc(bf::FloatingGTBasisFuncs, info::Matrix{<:Any})
-    bs = decomposeBasisFunc(bf, splitGaussFunc=true)
+    bs = decompose(bf, splitGaussFunc=true)
     bfs = [map(x->shift(mul(bf, x[1]), Int[x[2], x[3], x[4]]), dijks) 
            for (dijks, bf) in zip(info, bs)]
     [i |> collect |> flatten for i in eachcol(bfs)] .|> BasisFuncMix
