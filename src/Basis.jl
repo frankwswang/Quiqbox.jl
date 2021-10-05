@@ -97,6 +97,9 @@ momentum orientation. E.g., s would be ("X⁰Y⁰Z⁰")
               ijk::Array{Int, 1}, normalizeGTO::Bool) where {GN} -> 
     BasisFunc{S, GN}
 
+    BasisFunc(cen::Tuple{Vararg{<:ParamBox}}, gauss::GaussFunc, ijk::Vector{Int}, 
+              normalizeGTO::Bool) ->
+    BasisFunc{S, 1}
 """
 struct BasisFunc{S, GN} <: FloatingGTBasisFuncs{S, GN, 1}
     center::Tuple{ParamBox{<:Any, Float64}, 
@@ -121,6 +124,10 @@ struct BasisFunc{S, GN} <: FloatingGTBasisFuncs{S, GN, 1}
                                           normalizeGTO, pars |> Tuple)
     end
 end
+
+BasisFunc(cen::Tuple{Vararg{<:ParamBox}}, g::GaussFunc, ijk::Vector{Int}, 
+          normalizeGTO::Bool) = 
+BasisFunc(cen, (g,), ijk, normalizeGTO)
 
 
 """
@@ -163,6 +170,10 @@ struct BasisFuncs{S, GN, ON} <: FloatingGTBasisFuncs{S, GN, ON}
                                                 pars|>Tuple)
     end
 end
+
+BasisFuncs(cen::Tuple{Vararg{<:ParamBox}}, g::GaussFunc, ijks::Vector{Vector{Int}}, 
+          normalizeGTO::Bool=false) = 
+BasisFuncs(cen, (g,), ijks, normalizeGTO)
 
 
 """
@@ -649,8 +660,8 @@ function mul(bf1::BasisFunc, bf2::BasisFunc; normalizeGTO::Union{Bool, Missing}=
     normalizeGTO isa Missing && (normalizeGTO = bf.normalizeGTO)
     bfs = BasisFunc[]
     for gf1 in bf1.gauss, gf2 in bf2.gauss
-        push!(bfs, mul(BasisFunc(cen1, (gf1,), ijk1, normalizeGTO), 
-                       BasisFunc(cen2, (gf2,), ijk2, normalizeGTO)))
+        push!(bfs, mul(BasisFunc(cen1, gf1, ijk1, normalizeGTO), 
+                       BasisFunc(cen2, gf2, ijk2, normalizeGTO)))
     end
     sumOf(bfs)
 end
@@ -699,43 +710,38 @@ end
 
 """
 
-    decompose(bf::FloatingGTBasisFuncs; splitGaussFunc::Bool=false) -> 
+    decompose(bf::CompositeGTBasisFuncs; splitGaussFunc::Bool=false) -> 
     Array{<:FloatingGTBasisFuncs, 2}
 
 Decompose a `FloatingGTBasisFuncs` into an `Array` of `BasisFunc`s. Each column represents 
 one orbital of the input basis function(s). If `splitGaussFunc` is `true`, then each column 
 consists of the `BasisFunc`s each with only 1 `GaussFunc`.
 """
-function decompose(bf::FloatingGTBasisFuncs; splitGaussFunc::Bool=false)
-    cen = bf.center
-    res = BasisFunc[]
-    nRow = 1
+function decompose(bf::FloatingGTBasisFuncs{S, GN, ON}; 
+                   splitGaussFunc::Bool=false) where {S, GN, ON}
     if splitGaussFunc
-        for ijk in bf.ijk, g in bf.gauss
-            push!(res, BasisFunc(cen, (g,), ijkOrbitalList[ijk], bf.normalizeGTO))
-        end
-        nRow = bf.gauss |> length
+        nRow = GN
+        nG = 1
+        gs = bf.gauss
     else
-        for ijk in bf.ijk
-            push!(res, BasisFunc(cen, bf.gauss, ijkOrbitalList[ijk], 
-                  bf.normalizeGTO))
-        end
+        nRow = 1
+        nG = GN
+        gs = Ref(bf.gauss)
     end
-    reshape(res, (nRow, bf.ijk |> length))
+    res = Array{BasisFunc{S, nG}, 2}(undef, nRow, ON)
+    for (c, ijk) in zip(eachcol(res), bf.ijk)
+        c .= BasisFunc.(Ref(bf.center), gs, Ref(ijkOrbitalList[ijk]), bf.normalizeGTO)
+    end
+    res
 end
 
-"""
-
-    decompose(bf::BasisFuncMix; splitGaussFunc::Bool=false) -> 
-    Array{<:FloatingGTBasisFuncs, 3}
-
-Return a 3-dimensional `Array` of `BasisFunc`s of which the pages (3rd dim) are the 
-decomposed terms of the `BasisFunc`s stored in the input `BasisFuncMix`.
-"""
 function decompose(bfm::BasisFuncMix; splitGaussFunc::Bool=false)
-    bfs = decompose.(getBasisFuncs(bfm) |> collect; splitGaussFunc)
-    # cat(bfs..., dims=3)
-    vcat(bfs...)
+    if splitGaussFunc
+        bfs = decompose.(bfm.BasisFunc |> collect; splitGaussFunc)
+        vcat(bfs...)
+    else
+        bfm
+    end
 end
 
 
@@ -1174,58 +1180,83 @@ Nlα.(b.subshell, [g.xpn() for g in b.gauss])
 
 # If `substituteValue` is `true`, the variables inside each expression will be substituted 
 # by their values. If `onlyParameter` is `true`, r₁, r₂, r₃ will all be set to 0.
-function expressionOfCore(bf::FloatingGTBasisFuncs; substituteValue::Bool=false, 
-                          onlyParameter::Bool=false, expand::Bool=false)
+# function expressionOfCore(bf::FloatingGTBasisFuncs, substituteValue::Bool=false, 
+#                           onlyParameter::Bool=false, splitGaussFunc::Bool=false)
+#     if bf.normalizeGTO
+#         N = (bf isa BasisFunc) ? Nijkα : (i,j,k,α) -> Nlα(i+j+k, α)
+#     else
+#         N = (_...) -> 1
+#     end
+#     res = Num[]
+#     if splitGaussFunc
+#         f1 = (x, y) -> append!(x, y)
+#     else
+#         f1 = (x, y) -> push!(x, sum(y))
+#     end
+#     includeMapping = true
+#     index = substituteValue ? 2 : 1
+#     R = [getVar(bf.center[1]; includeMapping)[1][index], 
+#          getVar(bf.center[2]; includeMapping)[1][index], 
+#          getVar(bf.center[3]; includeMapping)[1][index]]
+#     f2 = onlyParameter ? (α, d, i, j, k)->cgo2(-R, α, d, i, j, k, N(i,j,k,α)) : 
+#                          (α, d, i, j, k)->fgo2(Symbolics.variable.(:r, [1:3;]), 
+#                                                 R, α, d, i, j, k, N(i,j,k,α))
+#     for ijk in bf.ijk
+#         i, j, k = ijkOrbitalList[ijk]
+#         gfs = Num[]
+#         for g in bf.gauss
+#             α = getVar(g.xpn; includeMapping)[1][index]
+#             d = getVar(g.con; includeMapping)[1][index]
+#             push!(gfs, f2(α, d, i, j, k))
+#         end
+#         f1(res, gfs)
+#     end
+#     splitGaussFunc ? reshape(res, (bf.gauss|>length, bf.ijk|>length)) : (res |> transpose |> Array)
+# end
+function expressionOfCore(bf::FloatingGTBasisFuncs, substituteValue::Bool=false, 
+                          onlyParameter::Bool=false, splitGaussFunc::Bool=false)
     if bf.normalizeGTO
         N = (bf isa BasisFunc) ? Nijkα : (i,j,k,α) -> Nlα(i+j+k, α)
     else
         N = (_...) -> 1
-    end
-    nOrbital = bf.ijk |> length
-    nGaussFunc = bf.gauss |> length
-    res = Num[]
-    if expand
-        f1 = (x, y) -> append!(x, y)
-    else
-        f1 = (x, y) -> push!(x, sum(y))
     end
     includeMapping = true
     index = substituteValue ? 2 : 1
     R = [getVar(bf.center[1]; includeMapping)[1][index], 
          getVar(bf.center[2]; includeMapping)[1][index], 
          getVar(bf.center[3]; includeMapping)[1][index]]
-    r = Symbolics.variable.(:r, [1:3;])
-    f2 = onlyParameter ? (α, d, i, j, k)->cgo2(-R, α, d, i, j, k, N(i,j,k,α)) : 
-                         (α, d, i, j, k)->fgo2(r, R, α, d, i, j, k, N(i,j,k,α))
-    for ijk in bf.ijk
-        i, j, k = ijkOrbitalList[ijk]
-        gfs = Num[]
-        for g in bf.gauss
+    f = onlyParameter ? (α, d, i, j, k)->cgo2(-R, α, d, i, j, k, N(i,j,k,α)) : 
+                        (α, d, i, j, k)->fgo2(Symbolics.variable.(:r, [1:3;]), 
+                                               R, α, d, i, j, k, N(i,j,k,α))
+    bfs = decompose(bf; splitGaussFunc)
+    map(bfs) do b
+        i, j, k = ijkOrbitalList[b.ijk[1]]
+        expr = 0
+        for g in b.gauss
             α = getVar(g.xpn; includeMapping)[1][index]
             d = getVar(g.con; includeMapping)[1][index]
-            push!(gfs, f2(α, d, i, j, k))
+            expr += f(α, d, i, j, k)
         end
-        f1(res, gfs)
+        expr
     end
-    expand ? reshape(res, (nGaussFunc, nOrbital)) : (res |> transpose |> Array)
 end
 
-function expressionOfCore(bfm::BasisFuncMix; substituteValue::Bool=false, 
-                          onlyParameter::Bool=false, expand::Bool=false)
-    exprs = [expressionOfCore(bf; substituteValue, onlyParameter, expand)
+function expressionOfCore(bfm::BasisFuncMix, substituteValue::Bool=false, 
+                          onlyParameter::Bool=false, splitGaussFunc::Bool=false)
+    exprs = [expressionOfCore(bf, substituteValue, onlyParameter, splitGaussFunc)
              for bf in bfm.BasisFunc]
-    expand ? vcat(exprs...) : sum(exprs)
+    splitGaussFunc ? vcat(exprs...) : sum(exprs)
 end
 
 """
 
-    expressionOfCore(gf::GaussFunc; substituteValue::Bool=false) -> 
+    expressionOfCore(gf::GaussFunc, substituteValue::Bool=false) -> 
     Symbolics.Num
 
 Return the expression of a given `GaussFunc`. If `substituteValue` is `true`, the variables 
 inside the expression will be substituted by their values.
 """
-function expressionOfCore(gf::GaussFunc; substituteValue::Bool=false)
+function expressionOfCore(gf::GaussFunc, substituteValue::Bool=false)
     r = Symbolics.variable.(:r, [1:3;])
     includeMapping = true
     index = substituteValue ? 2 : 1
@@ -1236,15 +1267,15 @@ end
 
 """
 
-    expressionOf(bf::CompositeGTBasisFuncs; expand::Bool=false) -> Array{<:Symbolics.Num, 2}
+    expressionOf(bf::CompositeGTBasisFuncs; splitGaussFunc::Bool=false) -> Array{<:Symbolics.Num, 2}
 
 Return the expression(s) of a given `CompositeGTBasisFuncs` (e.g. `BasisFuncMix` or 
 `FloatingGTBasisFuncs`) as a `Matrix{<:Symbolics.Num}`of which the column(s) corresponds to 
-different orbitals. If `expand` is `true`, the column(s) will be expanded such that its 
+different orbitals. If `splitGaussFunc` is `true`, the column(s) will be expanded such that its 
 entries are `GaussFunc` inside the corresponding orbital.
 """
-expressionOf(bf::CompositeGTBasisFuncs; expand::Bool=false) = 
-expressionOfCore(bf; expand, substituteValue=true, onlyParameter=false)
+expressionOf(bf::CompositeGTBasisFuncs; splitGaussFunc::Bool=false) = 
+expressionOfCore(bf, true, false, splitGaussFunc)
 
 """
 
@@ -1252,12 +1283,12 @@ expressionOfCore(bf; expand, substituteValue=true, onlyParameter=false)
 
 Return the expression of a given `GaussFunc`.
 """
-expressionOf(gf::GaussFunc) = expressionOfCore(gf, substituteValue=true)
+expressionOf(gf::GaussFunc) = expressionOfCore(gf, true)
 
 
 function diffInfoToBasisFunc(bf::FloatingGTBasisFuncs, info::Matrix{<:Any})
     bs = decompose(bf, splitGaussFunc=true)
-    bfs = [map(x->shift(mul(bf, x[1]), Int[x[2], x[3], x[4]]), dijks) 
+    bfs = [map(x->shift(mul(bf, x[1]), Int[x[2], x[3], x[4]]), dijks)
            for (dijks, bf) in zip(info, bs)]
     [i |> collect |> flatten for i in eachcol(bfs)] .|> BasisFuncMix
 end

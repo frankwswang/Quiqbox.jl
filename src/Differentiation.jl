@@ -95,7 +95,7 @@ toggleDiff!(pb::ParamBox) = begin pb.canDiff[] = !pb.canDiff[] end
 function deriveBasisFunc(bf::FloatingGTBasisFuncs, par::ParamBox)
     varDict = getVars(bf, includeMapping=true)
     vr = getVar(par)[1][1]
-    exprs = expressionOfCore(bf, onlyParameter=true, expand=true)
+    exprs = expressionOfCore(bf, false, true, true)
     info = diffInfo(exprs, vr, varDict)
     diffInfoToBasisFunc(bf, info)
 end
