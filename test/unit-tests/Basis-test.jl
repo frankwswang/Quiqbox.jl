@@ -321,9 +321,13 @@ gf12 = GaussFunc(3,0.5)
 
 
 # function expressionOf, expressionOfCore
-@test expressionOf(gf1) |> string == "exp(-2.0(r₁^2) - (2.0(r₂^2)) - (2.0(r₃^2)))"
-@test expressionOf(bf1)[]|>string == "exp(-2.0((r₁ - 1.0)^2) - (2.0((r₂ - 2.0)^2)) - "*
-                                     "(2.0((r₃ - 3.0)^2)))"
+expr1 = expressionOf(gf1) |> string
+@test expr1 == "exp(-2.0(r₁^2) - 2.0(r₂^2) - 2.0(r₃^2))" || 
+      expr1 == "exp(-2.0(r₁^2) - (2.0(r₂^2)) - (2.0(r₃^2)))"
+
+expr2 = expressionOf(bf1)[]|>string
+@test expr2 == "exp(-2.0((r₁ - 1.0)^2) - 2.0((r₂ - 2.0)^2) - 2.0((r₃ - 3.0)^2))" || 
+      expr2 == "exp(-2.0((r₁ - 1.0)^2) - (2.0((r₂ - 2.0)^2)) - (2.0((r₃ - 3.0)^2)))"
 @test expressionOfCore(gf1) |> string == "d*exp(-α*(r₁^2 + r₂^2 + r₃^2))"
 @test expressionOfCore(bf1)[]|>string == "d*exp(-α*((r₁ - X)^2 + (r₂ - Y)^2 + (r₃ - Z)^2))"
 
