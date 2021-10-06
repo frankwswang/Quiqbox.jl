@@ -1,6 +1,6 @@
 using Test
 using Quiqbox
-using Quiqbox: isFull, BasisFuncMix, getBasisFuncs, inSymbols, varVal, ElementNames, 
+using Quiqbox: isFull, BasisFuncMix, unpackBasisFuncs, inSymbols, varVal, ElementNames, 
                sortBasisFuncs, ParamList, sumOf, expressionOfCore, mergeGaussFuncs
 using Symbolics
 using LinearAlgebra
@@ -207,10 +207,10 @@ bf_os2S = genBasisFunc([0,0,0], (2,1), ijk+ijkShift, normalizeGTO=true)
 @test hasEqual(shift(bf_os2, ijkShift), bf_os2S)
 
 
-# func getBasisFuncs
-@test getBasisFuncs(bfm1)[1] == bf1
-@test getBasisFuncs(bf1) == (bf1,)
-@test getBasisFuncs(0) == ()
+# func unpackBasisFuncs
+@test unpackBasisFuncs(bfm1)[1] == bf1
+@test unpackBasisFuncs(bf1) == (bf1,)
+@test unpackBasisFuncs(0) == ()
 
 
 # basisSize

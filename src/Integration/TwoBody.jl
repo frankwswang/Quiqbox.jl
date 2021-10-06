@@ -45,8 +45,8 @@ argument.
         ints = twoBodyBFTensorCore(libcinFunc, i, j, k, l; isGradient)
         ints[ijkIndex(i), ijkIndex(j), ijkIndex(k), ijkIndex(l),:]
     end
-    sum([f(i,j,k,l) for i in getBasisFuncs(b1), j in getBasisFuncs(b2), 
-                        k in getBasisFuncs(b3), l in getBasisFuncs(b4)])
+    sum([f(i,j,k,l) for i in unpackBasisFuncs(b1), j in unpackBasisFuncs(b2), 
+                        k in unpackBasisFuncs(b3), l in unpackBasisFuncs(b4)])
 end
 
 

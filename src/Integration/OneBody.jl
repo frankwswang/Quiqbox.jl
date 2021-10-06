@@ -54,7 +54,7 @@ coordinates, those 2 arguments can be omitted. If the integral is a spacial grad
         ints = oneBodyBFTensorCore(libcinFunc, i, j, nuclei, nucleiCoords; isGradient)
         ints[ijkIndex(i), ijkIndex(j), :]
     end
-    sum([f(i,j) for i in getBasisFuncs(b1), j in getBasisFuncs(b2)])
+    sum([f(i,j) for i in unpackBasisFuncs(b1), j in unpackBasisFuncs(b2)])
 end
 
 
