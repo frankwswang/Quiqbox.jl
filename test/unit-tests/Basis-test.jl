@@ -1,7 +1,9 @@
 using Test
 using Quiqbox
-using Quiqbox: isFull, getBasisFuncs, inSymbols, varVal, ElementNames
+using Quiqbox: isFull, BasisFuncMix, unpackBasisFuncs, inSymbols, varVal, ElementNames, 
+               sortBasisFuncs, ParamList, sumOf, expressionOfCore, mergeGaussFuncs
 using Symbolics
+using LinearAlgebra
 
 @testset "Basis.jl" begin
 
@@ -36,7 +38,6 @@ for i=1:2 gf1.param[i][] = x[i] end
 
 # struct BasisFunc and function genBasisFunc
 cen = [1,2,3]
-using Quiqbox: ParamList
 cenParNames = [ParamList[:X], ParamList[:Y], ParamList[:Z]]
 cenPar = ParamBox.(cen, cenParNames) |> Tuple
 bf1 = genBasisFunc(cen, [gf1])
@@ -69,32 +70,147 @@ bf2_P_norm2 = genBasisFunc(cen, [gf2], "P")
 bf3_1 = genBasisFunc([0,0,0], (3,1))
 bf3_2 = genBasisFunc([1,0,0], (2,1))
 bf3_3 = genBasisFunc([0,0,0], (2,1), "P")
-bf3_4 = genBasisFunc([0,0,0], (1,1))
-@test genBasisFunc([bf3_1, bf3_2, bf3_3, bf3_4]) == [bf3_1, bf3_4, bf3_3, bf3_2]
+bf3_4 = genBasisFunc([0,0,0], (1,1), "D")
+@test genBasisFunc([bf3_1, bf3_4, bf3_3, bf3_2]) == [bf3_1, bf3_3, bf3_4, bf3_2]
+
+bf4_1 = genBasisFunc([0,0,0], "STO-3G")[]
+bf4_2 = genBasisFunc([0,0,0], ("STO-3G", "He"))[]
+bf4_3 = genBasisFunc([0,0,0], "STO-3G", nucleus = "He")[]
+bf4s1 = genBasisFunc([0,0,0], ["STO-3G", "STO-3G"])
+bf4s2 = genBasisFunc([0,0,0], ["STO-3G", "STO-3G"], nucleus = "He")
+bf4s3 = genBasisFunc([0,0,0], [("STO-3G", "H"), ("STO-3G", "He")])
+@test hasEqual.(Ref(bf4_1), bf4s1, Ref(bf4s3[1])) |> prod
+@test hasEqual.(Ref(bf4_2), Ref(bf4_3), bf4s2, Ref(bf4s3[2])) |> prod
+@test isapprox(1, overlap(bf4_1, bf4_1)[], atol=1e-8)
+@test isapprox(1, overlap(bf4_2, bf4_2)[], atol=1e-8)
+
+errorThreshold1 = 1e-11
+bf3_2_2 = genBasisFunc([1,0,0], (2,1), normalizeGTO=true)
+@test isapprox(1, overlap(bf3_2_2, bf3_2_2)[], atol=errorThreshold1)
+@test isapprox(0.0553891828418, overlap(bf3_2, bf3_2)[], atol=errorThreshold1)
+bf3_3_2 = genBasisFunc([0,0,0], (2,1), "P", normalizeGTO=true)
+@test isapprox(LinearAlgebra.I, overlap(bf3_3_2, bf3_3_2), atol=errorThreshold1)
+@test isapprox(0.0207709435653*LinearAlgebra.I, overlap(bf3_3, bf3_3), atol=errorThreshold1)
+bf3_4_2 = genBasisFunc([0,0,0], (1,1), "D", normalizeGTO=true)
+@test isapprox([1.0 0.0 0.0 1/3 0.0 1/3; 
+                0.0 1/3 0.0 0.0 0.0 0.0; 
+                0.0 0.0 1/3 0.0 0.0 0.0; 
+                1/3 0.0 0.0 1.0 0.0 1/3; 
+                0.0 0.0 0.0 0.0 1/3 0.0; 
+                1/3 0.0 0.0 1/3 0.0 1.0], 
+                overlap(bf3_4_2, bf3_4_2), atol=errorThreshold1)
+@test isapprox([0.3691314831028692 0.0 0.0 0.1230438277009564 0.0 0.1230438277009564; 
+                0.0 0.1230438277009564 0.0 0.0 0.0 0.0; 
+                0.0 0.0 0.1230438277009564 0.0 0.0 0.0; 
+                0.1230438277009564 0.0 0.0 0.3691314831028692 0.0 0.1230438277009564; 
+                0.0 0.0 0.0 0.0 0.1230438277009564 0.0; 
+                0.1230438277009564 0.0 0.0 0.1230438277009564 0.0 0.3691314831028692], 
+                overlap(bf3_4, bf3_4), atol=errorThreshold1)
+
+
+# function sortBasisFuncs
+bfs1 = [genBasisFunc([1,1,1], (2,1), [1,0,0]), genBasisFunc([1,1,1], (3,1), [2,0,0]), 
+        genBasisFunc([1,1,2], (3,1), [0,0,0]), genBasisFunc([1,1,1], (3,1), "P")]
+bfs2 = [genBasisFunc([1,1,1], (2,1), [1,0,0]), genBasisFunc([1,1,1], (3,1), "P"), 
+        genBasisFunc([1,1,1], (3,1), [2,0,0]), genBasisFunc([1,1,2], (3,1), [0,0,0])]
+bfs3 = sortBasisFuncs(bfs1, groupCenters=true)
+@test length.(bfs3) == [3,1]
+bfs3 = bfs3 |> flatten
+@test !hasEqual(bfs1, bfs2)
+@test  hasEqual(bfs3, bfs2)
 
 
 # function isFull
 @test isFull(bf3_1) == true
 @test isFull(bf3_3) == true
-bf4 = genBasisFunc([0,0,0], (2,1), [1,0,0])
-@test isFull(bf4) == false
+bf5 = genBasisFunc([0,0,0], (2,1), [1,0,0])
+@test isFull(bf5) == false
 @test isFull(1) == false
 
 
 # struct BasisFuncMix
-using Quiqbox: BasisFuncMix
 bfm1 = BasisFuncMix(bf1)
 @test bfm1 == BasisFuncMix([bf1])
 @test BasisFuncMix(BasisFuncMix(bf3_1)) == BasisFuncMix(bf3_1)
-bf4_2 = genBasisFunc([0,0,0], (2,1), [[1,0,0]])
-bfm2 = BasisFuncMix(bf4)
-@test hasEqual(bfm2, BasisFuncMix(bf4_2)[])
+bf5_2 = genBasisFunc([0,0,0], (2,1), [[1,0,0]])
+bfm2 = BasisFuncMix(bf5)
+@test hasEqual(bfm2, BasisFuncMix(bf5_2)[])
+
+errorThreshold2 = 1e-15
+bs1 = genBasisFunc.(gridCoords(GridBox(1,1.5)), Ref(GaussFunc(1.0, 0.5)))
+nuc = ["H", "H"]
+nucCoords = [rand(3), rand(3)]
+bfm = BasisFuncMix(bs1)
+S = overlaps([bfm])[]
+@test S == overlap(bfm, bfm)[]
+@test isapprox(S, overlaps(bs1) |> sum, atol=errorThreshold2)
+T = elecKinetics([bfm])[]
+@test T == elecKinetic(bfm, bfm)[]
+@test isapprox(T, elecKinetics(bs1) |> sum, atol=errorThreshold2)
+V = nucAttractions([bfm], nuc, nucCoords)[]
+@test V == nucAttraction(bfm, bfm, nuc, nucCoords)[]
+@test isapprox(V, nucAttractions(bs1, nuc, nucCoords) |> sum, atol=errorThreshold2)
+eeI = eeInteractions([bfm])[]
+@test eeI == eeInteraction(bfm, bfm, bfm, bfm)[]
+@test isapprox(eeI, eeInteractions(bs1) |> sum, atol=errorThreshold2)
 
 
-# func getBasisFuncs
-@test getBasisFuncs(bfm1)[1] == bf1
-@test getBasisFuncs(bf1) == (bf1,)
-@test getBasisFuncs(0) == ()
+# function sumOf, add, mul
+bs2 = [genBasisFunc([1,1,1], (2,1), [1,0,0], normalizeGTO=true), 
+       genBasisFunc([1,1,1], (3,1), [2,0,0], normalizeGTO=true), 
+       genBasisFunc([1,1,2], (3,1), [0,0,0], normalizeGTO=true), 
+       genBasisFunc([1,1,1], (3,1), [0,1,0], normalizeGTO=true)]
+bs2_2 = [genBasisFunc([1,1,1], (2,1), [1,0,0]), 
+         genBasisFunc([1,1,1], (3,1), [2,0,0]), 
+         genBasisFunc([1,1,2], (3,1), [0,0,0]), 
+         genBasisFunc([1,1,1], (3,1), [0,1,0])]
+bs2_3 = [genBasisFunc([1,1,1], (2,1), [1,0,0]), 
+         genBasisFunc([1,1,1], (3,1), [2,0,0], normalizeGTO=true), 
+         genBasisFunc([1,1,2], (3,1), [0,0,0]), 
+         genBasisFunc([1,1,1], (3,1), [0,1,0], normalizeGTO=true)]
+bs3 = [genBasisFunc([1,1,1], (2,1), [1,0,0], normalizeGTO=true), 
+       genBasisFunc([1,1,1], (3,1), [0,1,0], normalizeGTO=true), 
+       genBasisFunc([1,1,1], (3,1), [2,0,0], normalizeGTO=true), 
+       genBasisFunc([1,1,2], (3,1), [0,0,0], normalizeGTO=true)]
+bs3_2 = [genBasisFunc([1,1,1], (2,1), [1,0,0]), 
+       genBasisFunc([1,1,1], (3,1), [0,1,0]), 
+       genBasisFunc([1,1,1], (3,1), [2,0,0]), 
+       genBasisFunc([1,1,2], (3,1), [0,0,0])]
+
+bfm_1 = +(bs2...,)
+bfm_2 = sumOf(bs2)
+bfm_3 = BasisFuncMix(bs3)
+bfm_4 = +(bs2_2...,)
+bfm_5 = sumOf(bs2_2)
+bfm_6 = BasisFuncMix(bs3_2)
+@test hasEqual(bfm_1, bfm_3)
+@test hasEqual(bfm_2, bfm_3)
+@test hasEqual(bfm_4, bfm_6)
+@test hasEqual(bfm_5, bfm_6)
+
+for bs in (bs2, bs2_2, bs2_3)
+    X = overlaps(bs)^(-0.5)
+    bsNew = [mul.(bs, @view X[:,i]) for i in 1:size(X, 2)] .|> sum
+    SNew = overlaps(bsNew)
+    @test isapprox(SNew, LinearAlgebra.I, atol=1e-14)
+end
+
+
+# function shift
+ijk = [1,0,0]
+ijkShift = [0,1,1]
+bf_os1 = genBasisFunc([0,0,0], (2,1), ijk)
+bf_os2 = genBasisFunc([0,0,0], (2,1), ijk, normalizeGTO=true)
+bf_os1S = genBasisFunc([0,0,0], (2,1), ijk+ijkShift)
+bf_os2S = genBasisFunc([0,0,0], (2,1), ijk+ijkShift, normalizeGTO=true)
+@test hasEqual(shift(bf_os1, ijkShift), bf_os1S)
+@test hasEqual(shift(bf_os2, ijkShift), bf_os2S)
+
+
+# func unpackBasisFuncs
+@test unpackBasisFuncs(bfm1)[1] == bf1
+@test unpackBasisFuncs(bf1) == (bf1,)
+@test unpackBasisFuncs(0) == ()
 
 
 # basisSize
@@ -102,7 +218,7 @@ bfm2 = BasisFuncMix(bf4)
 @test basisSize(["S", "P", "D"]) == (1, 3, 6)
 @test basisSize(bf1) == (1,)
 @test basisSize(bfm1) == (1,) == basisSize(bfm2)
-@test basisSize([bf1, bf2, bf3_3, bf4]) == (1,1,3,1)
+@test basisSize([bf1, bf2, bf3_3, bf5]) == (1,1,3,1)
 
 
 # function genGaussFuncText
@@ -142,12 +258,12 @@ assignCenter!.(cens, bs2_2)
 
 
 # function assignCenter!
-bf5 = genBasisFunc(missing, "STO-3G")[]
+bf6 = genBasisFunc(missing, "STO-3G")[]
 coord = [1,0,0]
-bf5_1 = genBasisFunc(coord, "STO-3G")[]
-@test !hasEqual(bf5, bf5_1)
-assignCenter!(coord, bf5)
-@test hasEqual(bf5, bf5_1)
+bf6_1 = genBasisFunc(coord, "STO-3G")[]
+@test !hasEqual(bf6, bf6_1)
+assignCenter!(coord, bf6)
+@test hasEqual(bf6, bf6_1)
 
 
 # function getParams
@@ -180,9 +296,19 @@ alpha = Quiqbox.ParamList[:xpn]
                                                      nothing, bf_pbTest1.center[2],
                                                      nothing, bf_pbTest1.center[3]]
 
+
+# function dataCopy
+e = Exponent(3.0, mapFunction=x -> x^2 + 1)
+c = Contraction(2.0)
+gf_dc1 = GaussFunc(e, c)
+gf_dc2 = dataCopy(gf_dc1)
+@test hasEqual(gf_dc1.con, gf_dc2.con)
+@test gf_dc1.xpn() == gf_dc2.xpn() == gf_dc2.xpn[]
+
+
 # function getVar & getVars
 @test getVar(pb1 |> typeof).val.name == :p
-@test getVar(pb1)[][1].val.name == :p
+@test getVar(pb1)[][1].val.name == :pꜝ
 @test getVar(pb1)[][2] == 2.0
 @test getVar(pb1)[] isa Pair{Num, Float64}
 
@@ -190,21 +316,29 @@ gf11 = GaussFunc(3,1)
 gf12 = GaussFunc(3,0.5)
 @test getVars([bf1]) == getVars(bf1)
 @test getVars([gf11, gf12]) == merge(getVars(gf11), getVars(gf12))
-@test getVars(gf1.param |> collect) == Dict(getVar(ParamBox(1, :d))[], getVar(ParamBox(2, :α))[])
+@test getVars(gf1.param |> collect) == Dict(getVar(ParamBox(1, :d))[], 
+                                            getVar(ParamBox(2, :α))[])
 
 
-# function expressionOf
-@test expressionOf(gf1) |> string == "d*exp(-α*(r₁^2 + r₂^2 + r₃^2))"
-@test expressionOf(bf1)[] |> string == "d*exp(-α*((r₁ - X)^2 + (r₂ - Y)^2 + (r₃ - Z)^2))"
+# function expressionOf, expressionOfCore
+expr1 = expressionOf(gf1) |> string
+@test expr1 == "exp(-2.0(r₁^2) - 2.0(r₂^2) - 2.0(r₃^2))" || 
+      expr1 == "exp(-2.0(r₁^2) - (2.0(r₂^2)) - (2.0(r₃^2)))"
 
-expStr = expressionOf(bf5)[] |> string
+expr2 = expressionOf(bf1)[]|>string
+@test expr2 == "exp(-2.0((r₁ - 1.0)^2) - 2.0((r₂ - 2.0)^2) - 2.0((r₃ - 3.0)^2))" || 
+      expr2 == "exp(-2.0((r₁ - 1.0)^2) - (2.0((r₂ - 2.0)^2)) - (2.0((r₃ - 3.0)^2)))"
+@test expressionOfCore(gf1) |> string == "d*exp(-α*(r₁^2 + r₂^2 + r₃^2))"
+@test expressionOfCore(bf1)[]|>string == "d*exp(-α*((r₁ - X)^2 + (r₂ - Y)^2 + (r₃ - Z)^2))"
+
+expStr = expressionOfCore(bf6)[] |> string
 idx = findfirst('d', expStr)
 @test isapprox(parse(Float64, expStr[1:idx-1]), 7.579425332952777, atol=1e-12)
 @test expStr[idx:end] == "d*exp(-α*((r₁ - X)^2 + (r₂ - Y)^2 + (r₃ - Z)^2))*(α^0.75)" || 
       expStr[idx:end] == "d*(α^0.75)*exp(-α*((r₁ - X)^2 + (r₂ - Y)^2 + (r₃ - Z)^2))"
 
-@test expressionOf(bfm1)[] |> string == "d*exp(-α*((r₁ - X)^2 + (r₂ - Y)^2 + (r₃ - Z)^2))"
-expr_bfm2 =  expressionOf(bfm2)[] |> string
+@test expressionOfCore(bfm1)[]|>string == "d*exp(-α*((r₁ - X)^2 + (r₂ - Y)^2 + (r₃ - Z)^2))"
+expr_bfm2 =  expressionOfCore(bfm2)[] |> string
 @test expr_bfm2 == "d*exp(-α*((r₁ - X)^2 + (r₂ - Y)^2 + (r₃ - Z)^2))*(r₁ - X)" || 
       expr_bfm2 == "d*(r₁ - X)*exp(-α*((r₁ - X)^2 + (r₂ - Y)^2 + (r₃ - Z)^2))"
 

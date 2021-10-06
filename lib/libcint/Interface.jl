@@ -12,7 +12,8 @@ function cintFunc!(libcintFunc::Val,
     atmAP = ArrayPointer(atm, showReminder=false)
     basAP = ArrayPointer(bas, showReminder=false)
     envAP = ArrayPointer(env, showReminder=false)
-    intPtrFunc!(libcintFunc, bufAP.ptr, shlsAP.ptr, atmAP.ptr, natm, basAP.ptr, nbas, envAP.ptr, opt)
+    intPtrFunc!(libcintFunc, 
+                bufAP.ptr, shlsAP.ptr, atmAP.ptr, natm, basAP.ptr, nbas, envAP.ptr, opt)
     copyto!(buf, bufAP.arr)
     Libc.free(bufAP.ptr)
     Libc.free(shlsAP.ptr)

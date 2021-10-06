@@ -42,8 +42,12 @@ abstract type FloatingBasis <: StructSpatialBasis end
 
 abstract type AbstractGaussFunc <: NucleusCenteredBasis end
 
-abstract type AbstractFloatingGTBasisFunc <: FloatingBasis end
+abstract type AbstractGTBasisFuncs <: FloatingBasis end
 
 abstract type MolecularHartreeFockCoefficient{NucleiC, ElectronC} <: MolecularCoefficients end
 
-abstract type FloatingGTBasisFunc{Subshell, GaussFuncN, OrbitalN} <: AbstractFloatingGTBasisFunc end
+abstract type GTBasisFuncs{OrbitalN}  <: AbstractGTBasisFuncs end
+
+abstract type CompositeGTBasisFuncs{NofLinearlyCombinedBasis, NofOrbital}  <: GTBasisFuncs{NofOrbital} end
+
+abstract type FloatingGTBasisFuncs{Subshell, GaussFuncN, OrbitalN} <: CompositeGTBasisFuncs{1, OrbitalN} end

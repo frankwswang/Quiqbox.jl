@@ -15,7 +15,7 @@ file, which is also the returned value.
 """
 function makeMoldenFile(mol::Molecule; recordUMO::Bool=false, fileName::String = "MO")
     nucCoords = mol.nucCoords
-    basis = [mol.basis...]
+    basis = mol.basis |> collect
     MOs = mol.orbital
     iNucPoint = 0
     strs = genBasisFuncText(basis)
@@ -29,7 +29,7 @@ function makeMoldenFile(mol::Molecule; recordUMO::Bool=false, fileName::String =
            [Atoms] (AU)
            """
 
-    nucCs = [flatten(nucCoords)...]
+    nucCs = flatten(nucCoords) |> collect
     basCs = centerOf.(basis) |> unique |> flatten
     if length(nucCs) != length(basCs) || !(nucCs ≈ basCs)
         centers = getindex.(strs, 1)

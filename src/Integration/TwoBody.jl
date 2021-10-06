@@ -2,8 +2,8 @@ export eeInteraction, eeInteractions
 
 
 @inline function twoBodyBFTensorCore(libcinFunc::Symbol, 
-                                     bf1::FloatingGTBasisFunc, bf2::FloatingGTBasisFunc, 
-                                     bf3::FloatingGTBasisFunc, bf4::FloatingGTBasisFunc; 
+                                     bf1::FloatingGTBasisFuncs, bf2::FloatingGTBasisFuncs, 
+                                     bf3::FloatingGTBasisFuncs, bf4::FloatingGTBasisFuncs; 
                                      isGradient::Bool=false)                                      
     env = Float64[]
     atm = Int32[]
@@ -24,8 +24,8 @@ end
 """
 
     twoBodyBFTensor(libcinFunc::Symbol, 
-                    b1::AbstractFloatingGTBasisFunc, b2::AbstractFloatingGTBasisFunc, 
-                    b3::AbstractFloatingGTBasisFunc, b4::AbstractFloatingGTBasisFunc; 
+                    b1::AbstractGTBasisFuncs, b2::AbstractGTBasisFuncs, 
+                    b3::AbstractGTBasisFuncs, b4::AbstractGTBasisFuncs; 
                     isGradient::Bool=false) -> 
     Array{Float64, 5}
 
@@ -36,21 +36,21 @@ function name, e.g. `"cint2e_cart"` should be converted to `:cint2e_cart` as the
 argument. 
 """
 @inline function twoBodyBFTensor(libcinFunc::Symbol, 
-                                 b1::AbstractFloatingGTBasisFunc, 
-                                 b2::AbstractFloatingGTBasisFunc, 
-                                 b3::AbstractFloatingGTBasisFunc, 
-                                 b4::AbstractFloatingGTBasisFunc; 
+                                 b1::AbstractGTBasisFuncs, 
+                                 b2::AbstractGTBasisFuncs, 
+                                 b3::AbstractGTBasisFuncs, 
+                                 b4::AbstractGTBasisFuncs; 
                                  isGradient::Bool=false)                                      
     f = @inline function (i,j,k,l)
         ints = twoBodyBFTensorCore(libcinFunc, i, j, k, l; isGradient)
         ints[ijkIndex(i), ijkIndex(j), ijkIndex(k), ijkIndex(l),:]
     end
-    sum([f(i,j,k,l) for i in getBasisFuncs(b1), j in getBasisFuncs(b2), 
-                        k in getBasisFuncs(b3), l in getBasisFuncs(b4)])
+    sum([f(i,j,k,l) for i in unpackBasisFuncs(b1), j in unpackBasisFuncs(b2), 
+                        k in unpackBasisFuncs(b3), l in unpackBasisFuncs(b4)])
 end
 
 
-@inline function twoBodyBSTensor(BasisSet::Vector{<:AbstractFloatingGTBasisFunc}, 
+@inline function twoBodyBSTensor(BasisSet::Vector{<:AbstractGTBasisFuncs}, 
                                  intFunc::F; outputUniqueIndices::Bool=false) where 
                                 {F<:Function}
     subSize = basisSize(BasisSet) |> collect
@@ -89,32 +89,32 @@ end
 end
 
 
-@inline eeInteractionCore(bf1::AbstractFloatingGTBasisFunc, 
-                          bf2::AbstractFloatingGTBasisFunc, 
-                          bf3::AbstractFloatingGTBasisFunc, 
-                          bf4::AbstractFloatingGTBasisFunc) = 
+@inline eeInteractionCore(bf1::AbstractGTBasisFuncs, 
+                          bf2::AbstractGTBasisFuncs, 
+                          bf3::AbstractGTBasisFuncs, 
+                          bf4::AbstractGTBasisFuncs) = 
 twoBodyBFTensor(:cint2e_cart, bf1, bf2, bf3, bf4)
 
 """
 
-    eeInteraction(bf1::AbstractFloatingGTBasisFunc, 
-                  bf2::AbstractFloatingGTBasisFunc, 
-                  bf3::AbstractFloatingGTBasisFunc, 
-                  bf4::AbstractFloatingGTBasisFunc) -> 
+    eeInteraction(bf1::AbstractGTBasisFuncs, 
+                  bf2::AbstractGTBasisFuncs, 
+                  bf3::AbstractGTBasisFuncs, 
+                  bf4::AbstractGTBasisFuncs) -> 
     Array{Float64, 4}
 
 Return the electron-electron interaction tensor (an N×N×N×N Tensor where N is the number of 
 spatial orbitals) given 4 basis functions.
 """
-eeInteraction(bf1::AbstractFloatingGTBasisFunc, 
-              bf2::AbstractFloatingGTBasisFunc, 
-              bf3::AbstractFloatingGTBasisFunc, 
-              bf4::AbstractFloatingGTBasisFunc) = 
+eeInteraction(bf1::AbstractGTBasisFuncs, 
+              bf2::AbstractGTBasisFuncs, 
+              bf3::AbstractGTBasisFuncs, 
+              bf4::AbstractGTBasisFuncs) = 
 dropdims(eeInteractionCore(bf1, bf2, bf3, bf4), dims=5)
 
 """
 
-    eeInteractionsCore(BSet::Array{<:AbstractFloatingGTBasisFunc, 1}; 
+    eeInteractionsCore(BSet::Array{<:AbstractGTBasisFuncs, 1}; 
                        outputUniqueIndices::Bool=false) -> 
     Array{Float64, 5}, [Array{<:Array{Int, 1}, 1}]
 
@@ -123,16 +123,16 @@ of spatial orbitals) given a basis set in the form of an `Array`.
 
 If `outputUniqueIndices=true`, additionally return the indices for all the unique integrals.
 """
-@inline eeInteractionsCore(BSet::Vector{<:AbstractFloatingGTBasisFunc}; 
+@inline eeInteractionsCore(BSet::Vector{<:AbstractGTBasisFuncs}; 
                           outputUniqueIndices::Bool=false) = 
         twoBodyBSTensor(BSet, eeInteractionCore; outputUniqueIndices)
 
 """
 
-    eeInteractions(BSet::Array{<:AbstractFloatingGTBasisFunc, 1}) -> Array{Float64, 4}
+    eeInteractions(BSet::Array{<:AbstractGTBasisFuncs, 1}) -> Array{Float64, 4}
 
 Return the electron-electron interaction tensor (an N×N×N×N Tensor where N is the number 
 of spatial orbitals) given a basis set in the form of an `Array`. 
 """
-eeInteractions(BSet::Vector{<:AbstractFloatingGTBasisFunc}) = 
+eeInteractions(BSet::Vector{<:AbstractGTBasisFuncs}) = 
 dropdims(eeInteractionsCore(BSet), dims=5)

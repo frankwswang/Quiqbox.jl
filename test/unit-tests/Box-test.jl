@@ -21,6 +21,6 @@ using Quiqbox
     @test gridCoords(grid) == points
     @test map(i-> [j() for j in i], grid.box) == points
 
-    gPoints = gridPoint.(points) |> flatten
+    gPoints = makeCenter.(points) |> flatten
     @test [i[] for i in gPoints] == [i() for i in gPoints] == (points |> flatten)
 end

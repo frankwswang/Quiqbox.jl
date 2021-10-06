@@ -9,11 +9,11 @@ centerOf
 ```
 
 ```@doc
-GTBasis(basis::Vector{<:Quiqbox.AbstractFloatingGTBasisFunc})
+GTBasis(basis::Vector{<:Quiqbox.AbstractGTBasisFuncs})
 ```
 
 ```@docs
-decomposeBasisFunc
+decompose
 ```
 
 ```@docs
@@ -34,6 +34,10 @@ assignCenter!
 
 ```@docs
 getParams
+```
+
+```@doc
+dataCopy
 ```
 
 ```@docs
@@ -59,7 +63,7 @@ GridBox(nGridPerEdge::Int, spacing::Real=10, centerCoord::Vector{<:Real}=[0.0,0.
 ```
 
 ```@docs
-gridPoint
+makeCenter
 ```
 
 ```@docs
@@ -77,7 +81,7 @@ runHFcore
 
 
 ```@docs
-Molecule(basis::Vector{<:Quiqbox.FloatingGTBasisFunc}, nuc::Vector{String}, 
+Molecule(basis::Vector{<:Quiqbox.FloatingGTBasisFuncs}, nuc::Vector{String}, 
          nucCoords::Vector{<:AbstractArray}, HFfVars::Quiqbox.HFfinalVars)
 ```
 
@@ -144,7 +148,7 @@ eeInteractions
 ```
 
 ```@docs
-Quiqbox.eeInteractionsCore(BSet::Vector{<:Quiqbox.AbstractFloatingGTBasisFunc}; 
+Quiqbox.eeInteractionsCore(BSet::Vector{<:Quiqbox.AbstractGTBasisFuncs}; 
                            outputUniqueIndices::Bool=false)
 ```
 

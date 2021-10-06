@@ -1,10 +1,10 @@
 function addToDataChain!(env::Vector{Float64}, atm::Vector{Int32}, bas::Vector{Int32}, 
-                         bf::FloatingGTBasisFunc)
+                         bf::FloatingGTBasisFuncs)
     center = [bf.center[1](), bf.center[2](), bf.center[3]()]
     xpns = Float64[]
     cons = Float64[]
     for i in bf.gauss
-        push!(xpns, i.xpn()) 
+        push!(xpns, i.xpn())
         push!(cons, i.con())
     end
     nGauss = bf.gauss |> length
@@ -14,7 +14,7 @@ function addToDataChain!(env::Vector{Float64}, atm::Vector{Int32}, bas::Vector{I
     append!(env, center)
     append!(atm, Int32[0, envEndIndex, 1, 0, 0, 0])
     envEndIndex += 3
-    
+
     append!(env, xpns)
     norm = bf.normalizeGTO ? normOfGTOin(bf) : 1.0
     append!(env, cons.*norm)

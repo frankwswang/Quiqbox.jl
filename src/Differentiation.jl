@@ -1,4 +1,4 @@
-export ParamBox, gradHFenegy
+export ParamBox, isDiffParam, toggleDiff!, gradHFenegy
 
 using LinearAlgebra: eigen
 using Symbolics: Num
@@ -31,7 +31,7 @@ linked to the f(x) via the `mapFunction`. After initializing the `ParamBox`, e.g
 `pb1 = ParamBox(x, mapFunction=f)`, `pb.data[]` returns `x`, and `pb.data()` returns `f(x)`.
 
 `canDiff` is used to mark the (independent) variable as differentiable when set to `true`, 
-otherwise the `ParamBox` will be ignored in any differentiation process.
+otherwise the `ParamBox` will be ignored in any differentiation process like a constant.
 
 `paramType` specifies the type of the stored variable to avoid data type mutation.
 
@@ -51,7 +51,7 @@ mutable struct ParamBox{V, T} <: DifferentiableParameter{ParamBox, T}
     map::Base.RefValue{<:Function}
     canDiff::Base.RefValue{Bool}
     index::Union{Int, Nothing}
-    ParamBox(data::Array{T, 0}, map, canDiff, index=Ref(nothing); 
+    ParamBox(data::Array{T, 0}, map, canDiff, index=nothing; 
              name::Symbol=:undef) where {T<:Number} = 
     new{name, T}(data, map, canDiff, index)
 end
@@ -62,7 +62,7 @@ end
 
 ParamBox(x::Number, name::Symbol=:undef; mapFunction::F=itself, 
          canDiff::Bool=true, index::Union{Int, Nothing}=nothing, 
-         paramType::Type{<:Number}=Float64) where {F<:Function}= 
+         paramType::Type{<:Number}=Float64) where {F<:Function} = 
 ParamBox(fill(x |> paramType), Ref(mapFunction), Ref(canDiff), index; name)
 
 ParamBox(data::Array{<:Number, 0}, name::Symbol=:undef; mapFunction::F=itself, 
@@ -73,17 +73,35 @@ ParamBox(data, Ref(mapFunction), Ref(canDiff), index; name)
 const NoDiffMark = superscriptSym['!']
 
 
-function deriveBasisFunc(bf::FloatingGTBasisFunc, par::ParamBox)
-    varDict = getVars(bf, markUndifferentiable=true, includeMapping=true)
+"""
+
+    isDiffParam(pb::ParamBox) -> Bool
+
+Return `true` if the input `ParamBox` is differentiable.
+"""
+isDiffParam(pb::ParamBox) = pb.canDiff[]
+
+
+"""
+
+    toggleDiff!(pb::ParamBox) -> Bool
+
+Toggle the differentiability (`pb.canDiff[]`) of the input `ParamBox` and return the 
+altered result.
+"""
+toggleDiff!(pb::ParamBox) = begin pb.canDiff[] = !pb.canDiff[] end
+
+
+function deriveBasisFunc(bf::CompositeGTBasisFuncs, par::ParamBox) where {N}
+    varDict = getVars(bf, includeMapping=true)
     vr = getVar(par)[1][1]
-    exprs = expressionOf(bf, onlyParameter=true, expand=true, markUndifferentiable=true)
-    info = diffInfo(exprs, vr, varDict)
+    info = diffInfo(bf, vr, varDict)
     diffInfoToBasisFunc(bf, info)
 end
 
 
-function oneBodyDerivativeCore(∂bfs::Vector{<:AbstractFloatingGTBasisFunc}, 
-                               bfs::Vector{<:AbstractFloatingGTBasisFunc}, 
+function oneBodyDerivativeCore(∂bfs::Vector{<:CompositeGTBasisFuncs}, 
+                               bfs::Vector{<:CompositeGTBasisFuncs}, 
                                X::Matrix{Float64}, ∂X::Matrix{Float64}, 
                                ʃ::F, isGradient::Bool = false) where {F<:Function}
     dimOfʃ = 1+isGradient*2
@@ -112,8 +130,8 @@ function oneBodyDerivativeCore(∂bfs::Vector{<:AbstractFloatingGTBasisFunc},
 end
 
 
-function twoBodyDerivativeCore(∂bfs::Vector{<:AbstractFloatingGTBasisFunc}, 
-                               bfs::Vector{<:AbstractFloatingGTBasisFunc}, 
+function twoBodyDerivativeCore(∂bfs::Vector{<:CompositeGTBasisFuncs}, 
+                               bfs::Vector{<:CompositeGTBasisFuncs}, 
                                X::Matrix{Float64}, ∂X::Matrix{Float64}, 
                                ʃ::F, isGradient::Bool = false) where {F<:Function}
     dimOfʃ = 1+isGradient*2
@@ -151,13 +169,13 @@ function twoBodyDerivativeCore(∂bfs::Vector{<:AbstractFloatingGTBasisFunc},
 end
 
 
-function derivativeCore(bs::Vector{<:AbstractFloatingGTBasisFunc}, par::ParamBox, 
+function derivativeCore(bs::Vector{<:CompositeGTBasisFuncs}, par::ParamBox, 
                         S::Matrix{Float64}; oneBodyFunc::F1, twoBodyFunc::F2, 
                         oneBodyGrad::Bool=false, 
                         twoBodyGrad::Bool=false) where {F1<:Function, F2<:Function}
     # ijkl in chemists' notation of spatial bases (ij|kl).
     ∂bfs = deriveBasisFunc.(bs, Ref(par)) |> flatten
-    bfs = decomposeBasisFunc.(bs) |> flatten
+    bfs = decompose.(bs) |> flatten
     bsSize = basisSize(bs) |> sum
     ∂S = ones(bsSize, bsSize)
     ∂X = ones(bsSize, bsSize) # ∂X corresponds to the derivative of X = S^(-0.5)
@@ -183,10 +201,10 @@ function derivativeCore(bs::Vector{<:AbstractFloatingGTBasisFunc}, par::ParamBox
 end
 
 
-function ∂HFenergy(bs::Vector{<:AbstractFloatingGTBasisFunc}, par::ParamBox, 
+function ∂HFenergy(bs::Vector{<:CompositeGTBasisFuncs}, par::ParamBox, 
                    C::Union{Matrix{Float64}, NTuple{2, Matrix{Float64}}}, 
                    S::Matrix{Float64}, mol::Vector{String}, 
-                   nucCoords::Vector{<:AbstractArray}; 
+                   nucCoords::Vector{<:AbstractArray}, 
                    nElectron::Union{Int, NTuple{2, Int}})
     Xinv = S^(0.5)
     Cₓ = (C isa Tuple) ? (Ref(Xinv) .* C) : (Xinv * C)
@@ -197,18 +215,20 @@ function ∂HFenergy(bs::Vector{<:AbstractFloatingGTBasisFunc}, par::ParamBox,
 end
 
 
-function gradHFenegy(bs::Vector{<:AbstractFloatingGTBasisFunc}, par::Vector{<:ParamBox}, 
+function gradHFenegy(bs::Vector{<:CompositeGTBasisFuncs}, par::Vector{<:ParamBox}, 
                      C::Union{Matrix{Float64}, NTuple{2, Matrix{Float64}}}, 
                      S::Matrix{Float64}, mol::Vector{String}, 
                      nucCoords::Vector{<:AbstractArray}; 
                      nElectron::Union{Int, NTuple{2, Int}}=getCharge(mol))
+    @assert isDiffParam.(par) == fill(true, length(par)) "Input `ParamBox`(s) contains "*
+                                                         "non-differentiable `ParamBox`(s)!"
     if length(C) == 2 && nElectron isa Int
         nElectron = (nElectron÷2, nElectron-nElectron÷2)
     end
-    ∂HFenergy.(Ref(bs), par, Ref(C), Ref(S), Ref(mol), Ref(nucCoords); nElectron)
+    ∂HFenergy.(Ref(bs), par, Ref(C), Ref(S), Ref(mol), Ref(nucCoords), nElectron)
 end
 
-gradHFenegy(bs::Vector{<:AbstractFloatingGTBasisFunc}, par::ParamBox, 
+gradHFenegy(bs::Vector{<:CompositeGTBasisFuncs}, par::ParamBox, 
             C::Union{Matrix{Float64}, NTuple{2, Matrix{Float64}}}, S::Matrix{Float64}, 
             mol::Vector{String}, nucCoords::Vector{<:AbstractArray}; 
             nElectron::Union{Int, NTuple{2, Int}}=getCharge(mol)) = 
