@@ -664,7 +664,7 @@ function isOscillateConverged(sequence::Vector{<:Real},
 end
 
 
-function splitTerm(term::Num)
+function splitTerm(term::Symbolics.Num)
     r1 = Symbolics.@rule +(~(~xs)) => [i for i in ~(~xs)]
     r2 = Symbolics.@rule *(~(~xs)) => [[i for i in ~(~xs)] |> prod]
     for r in [r1, r2]
