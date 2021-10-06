@@ -1495,7 +1495,8 @@ end
 function diffInfoToBasisFunc(bf::FloatingGTBasisFuncs, info::Matrix{<:Any})
     bs = decompose(bf, splitGaussFunc=true)
     mat = map(function (x, y)
-                  shiftCore.(x .* getindex.(y, 1), getindex.(y, Ref(2:4))) |> sum
+                  shiftCore.(x .* getindex.(y, 1), getindex.(y, Ref(2:4))) |> BasisFuncMix
               end, bs, info)
+    # [i |> collect |> flatten for i in eachcol(mat)] .|> sum
     eachcol(mat) .|> sum
 end
