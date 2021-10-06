@@ -8,7 +8,7 @@
 
 | Documentation | Code Status | License |
 | :---: | :---: | :---: |
-| [![][Doc-s-img]][Doc-stable] | [![codecov][codecov-img]][codecov-url] [![CI][GA-CI-img]][GA-CI-url] [![CI-JN][GA-CI-JN-img]][GA-CI-JN-url] | [![License: MIT][License-img]][License-url] |
+| [![][Doc-s-img]][Doc-stable] | [![CI][GA-CI-img]][GA-CI-url] [![codecov][codecov-img]][codecov-url] [![CI-JN][GA-CI-JN-img]][GA-CI-JN-url] | [![License: MIT][License-img]][License-url] |
 
 <br />
 
