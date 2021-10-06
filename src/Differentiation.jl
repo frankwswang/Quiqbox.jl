@@ -92,17 +92,16 @@ altered result.
 toggleDiff!(pb::ParamBox) = begin pb.canDiff[] = !pb.canDiff[] end
 
 
-function deriveBasisFunc(bf::FloatingGTBasisFuncs, par::ParamBox)
+function deriveBasisFunc(bf::CompositeGTBasisFuncs, par::ParamBox) where {N}
     varDict = getVars(bf, includeMapping=true)
     vr = getVar(par)[1][1]
-    exprs = expressionOfCore(bf, false, true, true)
-    info = diffInfo(exprs, vr, varDict)
+    info = diffInfo(bf, vr, varDict)
     diffInfoToBasisFunc(bf, info)
 end
 
 
-function oneBodyDerivativeCore(∂bfs::Vector{<:AbstractGTBasisFuncs}, 
-                               bfs::Vector{<:AbstractGTBasisFuncs}, 
+function oneBodyDerivativeCore(∂bfs::Vector{<:CompositeGTBasisFuncs}, 
+                               bfs::Vector{<:CompositeGTBasisFuncs}, 
                                X::Matrix{Float64}, ∂X::Matrix{Float64}, 
                                ʃ::F, isGradient::Bool = false) where {F<:Function}
     dimOfʃ = 1+isGradient*2
@@ -131,8 +130,8 @@ function oneBodyDerivativeCore(∂bfs::Vector{<:AbstractGTBasisFuncs},
 end
 
 
-function twoBodyDerivativeCore(∂bfs::Vector{<:AbstractGTBasisFuncs}, 
-                               bfs::Vector{<:AbstractGTBasisFuncs}, 
+function twoBodyDerivativeCore(∂bfs::Vector{<:CompositeGTBasisFuncs}, 
+                               bfs::Vector{<:CompositeGTBasisFuncs}, 
                                X::Matrix{Float64}, ∂X::Matrix{Float64}, 
                                ʃ::F, isGradient::Bool = false) where {F<:Function}
     dimOfʃ = 1+isGradient*2
@@ -170,7 +169,7 @@ function twoBodyDerivativeCore(∂bfs::Vector{<:AbstractGTBasisFuncs},
 end
 
 
-function derivativeCore(bs::Vector{<:AbstractGTBasisFuncs}, par::ParamBox, 
+function derivativeCore(bs::Vector{<:CompositeGTBasisFuncs}, par::ParamBox, 
                         S::Matrix{Float64}; oneBodyFunc::F1, twoBodyFunc::F2, 
                         oneBodyGrad::Bool=false, 
                         twoBodyGrad::Bool=false) where {F1<:Function, F2<:Function}
@@ -202,10 +201,10 @@ function derivativeCore(bs::Vector{<:AbstractGTBasisFuncs}, par::ParamBox,
 end
 
 
-function ∂HFenergy(bs::Vector{<:AbstractGTBasisFuncs}, par::ParamBox, 
+function ∂HFenergy(bs::Vector{<:CompositeGTBasisFuncs}, par::ParamBox, 
                    C::Union{Matrix{Float64}, NTuple{2, Matrix{Float64}}}, 
                    S::Matrix{Float64}, mol::Vector{String}, 
-                   nucCoords::Vector{<:AbstractArray}; 
+                   nucCoords::Vector{<:AbstractArray}, 
                    nElectron::Union{Int, NTuple{2, Int}})
     Xinv = S^(0.5)
     Cₓ = (C isa Tuple) ? (Ref(Xinv) .* C) : (Xinv * C)
@@ -216,7 +215,7 @@ function ∂HFenergy(bs::Vector{<:AbstractGTBasisFuncs}, par::ParamBox,
 end
 
 
-function gradHFenegy(bs::Vector{<:AbstractGTBasisFuncs}, par::Vector{<:ParamBox}, 
+function gradHFenegy(bs::Vector{<:CompositeGTBasisFuncs}, par::Vector{<:ParamBox}, 
                      C::Union{Matrix{Float64}, NTuple{2, Matrix{Float64}}}, 
                      S::Matrix{Float64}, mol::Vector{String}, 
                      nucCoords::Vector{<:AbstractArray}; 
@@ -226,10 +225,10 @@ function gradHFenegy(bs::Vector{<:AbstractGTBasisFuncs}, par::Vector{<:ParamBox}
     if length(C) == 2 && nElectron isa Int
         nElectron = (nElectron÷2, nElectron-nElectron÷2)
     end
-    ∂HFenergy.(Ref(bs), par, Ref(C), Ref(S), Ref(mol), Ref(nucCoords); nElectron)
+    ∂HFenergy.(Ref(bs), par, Ref(C), Ref(S), Ref(mol), Ref(nucCoords), nElectron)
 end
 
-gradHFenegy(bs::Vector{<:AbstractGTBasisFuncs}, par::ParamBox, 
+gradHFenegy(bs::Vector{<:CompositeGTBasisFuncs}, par::ParamBox, 
             C::Union{Matrix{Float64}, NTuple{2, Matrix{Float64}}}, S::Matrix{Float64}, 
             mol::Vector{String}, nucCoords::Vector{<:AbstractArray}; 
             nElectron::Union{Int, NTuple{2, Int}}=getCharge(mol)) = 

@@ -704,8 +704,12 @@ mul(bf1::BasisFuncs{<:Any, <:Any, 1}, bf2::BasisFuncs{<:Any, <:Any, 1};
 
 function shift(bf::FloatingGTBasisFuncs{S, GN, 1}, ijkShift::Vector{Int}) where {S, GN}
     @assert ijkShift |> length == 3 "The length of `ijkShift` should be 3."
-    BasisFunc(bf.center, bf.gauss, ijkOrbitalList[bf.ijk[1]] + ijkShift, bf.normalizeGTO)
+    shiftCore(bf, ijkShift)
 end
+
+shiftCore(bf::FloatingGTBasisFuncs{S, GN, 1}, ijkShift::Vector{<:Real}) where {S, GN} = 
+BasisFunc(bf.center, bf.gauss, 
+          ijkOrbitalList[bf.ijk[1]] + convert(Vector{Int}, ijkShift), bf.normalizeGTO)
 
 
 """
@@ -735,9 +739,12 @@ function decompose(bf::FloatingGTBasisFuncs{S, GN, ON};
     res
 end
 
+# decompose(bf::BasisFunc{S, 1}; splitGaussFunc::Bool=false) where {S} = 
+# reshape(BasisFunc[bf], 1, 1)
+
 function decompose(bfm::BasisFuncMix; splitGaussFunc::Bool=false)
     if splitGaussFunc
-        bfs = decompose.(bfm.BasisFunc |> collect; splitGaussFunc)
+        bfs = decompose.(bfm.BasisFunc; splitGaussFunc)
         vcat(bfs...)
     else
         bfm
@@ -1088,12 +1095,13 @@ function getVar(pb::ParamBox; includeMapping::Bool=false)
     varSymbol = Symbol((varName |> string) * superscript)
     vr = (pb.index isa Int) ? Symbolics.variable(varSymbol, pb.index) : 
                               Symbolics.variable(varSymbol)
-    mapName = pb.map[] |> nameof
-    dvr = Symbolics.variable(mapName, T=Symbolics.FnType{Tuple{Any}, Real})(vr)
-    expr = pb.map[](vr)
     res = Pair[vr => pb[]]
-    includeMapping && !(pb.map[] isa typeof(itself)) && 
+    if includeMapping && !(pb.map[] isa typeof(itself))
+        mapName = pb.map[] |> nameof
+        dvr = Symbolics.variable(mapName, T=Symbolics.FnType{Tuple{Any}, Real})(vr)
+        expr = pb.map[](vr)
         (pushfirst!(res, dvr=>expr, expr=>pb()) |> unique!)
+    end
     res
 end
 
@@ -1158,17 +1166,17 @@ end
 pgf0(x, y, z, α) = exp( -α * (x^2 + y^2 + z^2) )
 cgf0(x, y, z, α, d) = d * pgf0(x, y, z, α)
 cgo0(x, y, z, α, d, i, j, k, N=1.0) = N * x^i * y^j * z^k * cgf0(x, y, z, α, d)
-fgo0(x, y, z, Rx, Ry, Rz, α, d, i, j, k, N=1.0) = cgo0(x-Rx, y-Ry, z-Rz, α, d, i, j, k, N)
+# fgo0(x, y, z, Rx, Ry, Rz, α, d, i, j, k, N=1.0) = cgo0(x-Rx, y-Ry, z-Rz, α, d, i, j, k, N)
 
 
 pgf(r, α) = pgf0(r[1], r[2], r[3], α)
 cgf(r, α, d) = cgf0(r[1], r[2], r[3], α, d)
 cgo(r, α, d, l, N=Nijkα(i,j,k,α)) = cgo0(r[1], r[2], r[3], α, d, l[1], l[2], l[3], N)
-fgo(r, R, α, d, l, N=Nijkα(i,j,k,α)) = fgo0(r[1], r[2], r[3], R[1], R[2], R[3], 
-                                            α, d, l[1], l[2], l[3], N)
+# fgo(r, R, α, d, l, N=Nijkα(i,j,k,α)) = fgo0(r[1], r[2], r[3], R[1], R[2], R[3], 
+#                                             α, d, l[1], l[2], l[3], N)
 cgo2(r, α, d, i, j, k, N=Nijkα(i,j,k,α)) = cgo0(r[1], r[2], r[3], α, d, i, j, k, N)
-fgo2(r, R, α, d, i, j, k, N=Nijkα(i,j,k,α)) = fgo0(r[1], r[2], r[3], R[1], R[2], R[3], 
-                                                   α, d, i, j, k, N)
+# fgo2(r, R, α, d, i, j, k, N=Nijkα(i,j,k,α)) = fgo0(r[1], r[2], r[3], R[1], R[2], R[3], 
+#                                                    α, d, i, j, k, N)
 
 
 normOfGTOin(b::FloatingGTBasisFuncs{S, GN, 1})  where {S, GN} = 
@@ -1213,38 +1221,88 @@ Nlα.(b.subshell, [g.xpn() for g in b.gauss])
 #     end
 #     splitGaussFunc ? reshape(res, (bf.gauss|>length, bf.ijk|>length)) : (res |> transpose |> Array)
 # end
-function expressionOfCore(bf::FloatingGTBasisFuncs, substituteValue::Bool=false, 
-                          onlyParameter::Bool=false, splitGaussFunc::Bool=false)
-    if bf.normalizeGTO
-        N = (bf isa BasisFunc) ? Nijkα : (i,j,k,α) -> Nlα(i+j+k, α)
-    else
-        N = (_...) -> 1
-    end
+
+
+# function expressionOfCore(bf::FloatingGTBasisFuncs, substituteValue::Bool=false, 
+#                           onlyParameter::Bool=false, splitGaussFunc::Bool=false)
+#     if bf.normalizeGTO
+#         N = (bf isa BasisFunc) ? Nijkα : (i,j,k,α) -> Nlα(i+j+k, α)
+#     else
+#         N = (_...) -> 1
+#     end
+#     includeMapping = true
+#     index = substituteValue ? 2 : 1
+#     R = [getVar(bf.center[1]; includeMapping)[1][index], 
+#          getVar(bf.center[2]; includeMapping)[1][index], 
+#          getVar(bf.center[3]; includeMapping)[1][index]]
+#     f = onlyParameter ? (α, d, i, j, k)->cgo2(-R, α, d, i, j, k, N(i,j,k,α)) : 
+#                         (α, d, i, j, k)->fgo2(Symbolics.variable.(:r, [1:3;]), 
+#                                                R, α, d, i, j, k, N(i,j,k,α))
+#     bfs = decompose(bf; splitGaussFunc)
+#     map(bfs) do b
+#         i, j, k = ijkOrbitalList[b.ijk[1]]
+#         expr = 0
+#         for g in b.gauss
+#             α = getVar(g.xpn; includeMapping)[1][index]
+#             d = getVar(g.con; includeMapping)[1][index]
+#             expr += f(α, d, i, j, k)
+#         end
+#         expr
+#     end
+# end
+
+function expressionOfCore(bf::FloatingGTBasisFuncs{S, GN, ON}, substituteValue::Bool=false, 
+                          onlyParameter::Bool=false, splitGaussFunc::Bool=false) where 
+                         {S, GN, ON}
     includeMapping = true
     index = substituteValue ? 2 : 1
-    R = [getVar(bf.center[1]; includeMapping)[1][index], 
-         getVar(bf.center[2]; includeMapping)[1][index], 
-         getVar(bf.center[3]; includeMapping)[1][index]]
-    f = onlyParameter ? (α, d, i, j, k)->cgo2(-R, α, d, i, j, k, N(i,j,k,α)) : 
-                        (α, d, i, j, k)->fgo2(Symbolics.variable.(:r, [1:3;]), 
-                                               R, α, d, i, j, k, N(i,j,k,α))
-    bfs = decompose(bf; splitGaussFunc)
-    map(bfs) do b
-        i, j, k = ijkOrbitalList[b.ijk[1]]
-        expr = 0
-        for g in b.gauss
-            α = getVar(g.xpn; includeMapping)[1][index]
-            d = getVar(g.con; includeMapping)[1][index]
-            expr += f(α, d, i, j, k)
-        end
-        expr
+    N = bf.normalizeGTO  ?  (ON == 1 ? Nijkα : (i,j,k,α)->Nlα(i+j+k, α))  :  (_...) -> 1
+    R = getindex.(getindex.(getVar.(bf.center |> collect; includeMapping), 1), index)
+    pars = getfield.(bf.gauss, :param)
+    α = getindex.(getindex.(getVar.(getindex.(pars, 1); includeMapping), 1), index)
+    d = getindex.(getindex.(getVar.(getindex.(pars, 2); includeMapping), 1), index)
+    x = onlyParameter ? -R : Symbolics.variable.(:r, [1:3;]) - R
+    res = map(bf.ijk) do ijk
+        i, j, k = ijkOrbitalList[ijk]
+        exprs = cgo2.(Ref(x), α, d, i, j, k, N.(i,j,k,α)) |> collect
+        splitGaussFunc ? exprs : sum(exprs)
     end
+    hcat(res...)
 end
+
+# function expressionOfCore(bf::FloatingGTBasisFuncs{S, GN, ON}, substituteValue::Bool=false, 
+#                           onlyParameter::Bool=false, splitGaussFunc::Bool=false) where 
+#                          {S, GN, ON}
+#     bfs = decompose(bf)[:]
+#     exprs = expressionOfCore.(bfs, substituteValue, onlyParameter, splitGaussFunc)
+#     hcat(exprs...)
+# end
+
+# function expressionOfCore(bf::FloatingGTBasisFuncs{S, GN, 1}, substituteValue::Bool=false, 
+#                           onlyParameter::Bool=false, splitGaussFunc::Bool=false) where 
+#                          {S, GN}
+#     includeMapping = true
+#     index = substituteValue ? 2 : 1
+#     N = bf.normalizeGTO ? Nijkα : (_...) -> 1
+#     R = getindex.(getindex.(getVar.(bf.center |> collect; includeMapping), 1), index)
+#     pars = getfield.(bf.gauss, :param)
+#     α = getindex.(getindex.(getVar.(getindex.(pars, 1); includeMapping), 1), index)
+#     d = getindex.(getindex.(getVar.(getindex.(pars, 2); includeMapping), 1), index)
+#     x = onlyParameter ? -R : Symbolics.variable.(:r, [1:3;]) - R
+#     i, j, k = ijkOrbitalList[bf.ijk[1]]
+#     exprs = cgo2.(Ref(x), α, d, i, j, k, N.(i,j,k,α)) |> collect
+#     if splitGaussFunc
+#         reshape(exprs, GN, 1)
+#     else
+#         reshape(sum(exprs), 1, 1)
+#     end
+# end
 
 function expressionOfCore(bfm::BasisFuncMix, substituteValue::Bool=false, 
                           onlyParameter::Bool=false, splitGaussFunc::Bool=false)
-    exprs = [expressionOfCore(bf, substituteValue, onlyParameter, splitGaussFunc)
-             for bf in bfm.BasisFunc]
+    exprs = Matrix{Symbolics.Num}[expressionOfCore(bf, substituteValue, 
+                                                   onlyParameter, splitGaussFunc)
+                                  for bf in bfm.BasisFunc]
     splitGaussFunc ? vcat(exprs...) : sum(exprs)
 end
 
@@ -1284,14 +1342,6 @@ expressionOfCore(bf, true, false, splitGaussFunc)
 Return the expression of a given `GaussFunc`.
 """
 expressionOf(gf::GaussFunc) = expressionOfCore(gf, true)
-
-
-function diffInfoToBasisFunc(bf::FloatingGTBasisFuncs, info::Matrix{<:Any})
-    bs = decompose(bf, splitGaussFunc=true)
-    bfs = [map(x->shift(mul(bf, x[1]), Int[x[2], x[3], x[4]]), dijks)
-           for (dijks, bf) in zip(info, bs)]
-    [i |> collect |> flatten for i in eachcol(bfs)] .|> BasisFuncMix
-end
 
 
 function inSymbols(sym::Symbol, pool::Vector{Symbol}=ParamNames)
@@ -1435,7 +1485,17 @@ function diffTransfer(term::Num, varDict::Dict{Num, <:Real})
 end
 
 
-function diffInfo(exprs::Array{Num, N}, vr, varDict) where {N}
+function diffInfo(bf::CompositeGTBasisFuncs, vr, varDict)
+    exprs = expressionOfCore(bf, false, true, true)
     relDiffs = Symbolics.simplify.(Symbolics.derivative.(log.(exprs), vr), expand=true)
     diffTransfer.(relDiffs, Ref(varDict))
+end
+
+
+function diffInfoToBasisFunc(bf::FloatingGTBasisFuncs, info::Matrix{<:Any})
+    bs = decompose(bf, splitGaussFunc=true)
+    mat = map(function (x, y)
+                  shiftCore.(x .* getindex.(y, 1), getindex.(y, Ref(2:4))) |> sum
+              end, bs, info)
+    eachcol(mat) .|> sum
 end
