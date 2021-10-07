@@ -491,7 +491,7 @@ function mergeGaussFuncs(gf1::GaussFunc, gf2::GaussFunc)
     con1 = gf1.con
     con2 = gf2.con
     if xpn1() === xpn2()
-        if xpn1 === xpn1 || hasIdentical(xpn1, xpn2)
+        if xpn1 === xpn2 || hasIdentical(xpn1, xpn2)
             xpn = xpn1
         elseif hasEqual(xpn1, xpn2)
             xpn = deepcopy(xpn1)
@@ -499,7 +499,7 @@ function mergeGaussFuncs(gf1::GaussFunc, gf2::GaussFunc)
             xpn = Exponent(xpn1)
         end
 
-        if con1 === con1 || hasIdentical(con1, con2)
+        if con1 === con2 || hasIdentical(con1, con2)
             res = GaussFunc(xpn, con1) * 2
         elseif hasEqual(con1, con2)
             res = GaussFunc(xpn, deepcopy(con1)) * 2
