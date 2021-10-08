@@ -1,7 +1,8 @@
 using Test
 using Quiqbox
 using Quiqbox: isFull, BasisFuncMix, unpackBasisFuncs, inSymbols, varVal, ElementNames, 
-               sortBasisFuncs, ParamList, sumOf, expressionOfCore, mergeGaussFuncs
+               sortBasisFuncs, ParamList, sumOf, expressionOfCore, mergeGaussFuncs, 
+               ijkOrbitalList
 using Symbolics
 using LinearAlgebra
 
@@ -155,6 +156,27 @@ eeI = eeInteractions([bfm])[]
 @test isapprox(eeI, eeInteractions(bs1) |> sum, atol=errorThreshold2)
 
 
+# mergeGaussFuncs
+gf_merge1 = GaussFunc(2,1)
+gf_merge2 = GaussFunc(2,1)
+@test mergeGaussFuncs(gf_merge1) === gf_merge1
+
+mgf1 = mergeGaussFuncs(gf_merge1, gf_merge1)
+mgf2 = mergeGaussFuncs(gf_merge1, gf_merge2)
+@test mgf1.xpn() == 2 == mgf1.con()
+@test !hasIdentical(mgf1, mgf2)
+gf_merge1_2 = GaussFunc(gf_merge1.xpn, gf_merge2.con)
+gf_merge1_3 = GaussFunc(gf_merge2.xpn, gf_merge1.con)
+mgf1_2 = mergeGaussFuncs(gf_merge1, gf_merge1_2)
+mgf1_3 = mergeGaussFuncs(gf_merge1, gf_merge1_3)
+@test mgf1_2.xpn() == 2 == mgf1_2.con()
+@test !hasIdentical(mgf1, mgf1_2)
+@test !hasIdentical(mgf1_2, mgf1_3)
+@test hasEqual(mgf1, mgf1_2, mgf1_3)
+
+gf_merge3 = GaussFunc(1.5,1)
+@test hasIdentical(mergeGaussFuncs(gf_merge1, gf_merge3), [gf_merge1, gf_merge3])
+
 # function sumOf, add, mul
 bs2 = [genBasisFunc([1,1,1], (2,1), [1,0,0], normalizeGTO=true), 
        genBasisFunc([1,1,1], (3,1), [2,0,0], normalizeGTO=true), 
@@ -176,6 +198,10 @@ bs3_2 = [genBasisFunc([1,1,1], (2,1), [1,0,0]),
        genBasisFunc([1,1,1], (3,1), [0,1,0]), 
        genBasisFunc([1,1,1], (3,1), [2,0,0]), 
        genBasisFunc([1,1,2], (3,1), [0,0,0])]
+
+@test add(bs2[1]) === bs2[1]
+bf1s = BasisFuncs(bf1.center, bf1.gauss, [ijkOrbitalList[bf1.ijk[1]]], bf1.normalizeGTO)
+@test hasIdentical(add(bf1s), bf1)
 
 bfm_1 = +(bs2...,)
 bfm_2 = sumOf(bs2)
@@ -209,8 +235,8 @@ bf_os2S = genBasisFunc([0,0,0], (2,1), ijk+ijkShift, normalizeGTO=true)
 
 # func unpackBasisFuncs
 @test unpackBasisFuncs(bfm1)[1] == bf1
-@test unpackBasisFuncs(bf1) == (bf1,)
-@test unpackBasisFuncs(0) == ()
+@test unpackBasisFuncs(bf1) == [bf1]
+@test unpackBasisFuncs(0) == []
 
 
 # basisSize

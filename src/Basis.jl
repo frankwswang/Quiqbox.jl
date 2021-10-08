@@ -48,24 +48,34 @@ end
 
 """
 
-    Exponent(e::Real; mapFunction::Function=itself, canDiff::Bool=true) -> 
+    Exponent(e::Real; mapFunction::Function=itself, canDiff::Bool=true, 
+             roundDigits::Int=15) -> 
     ParamBox{:α, Float64}
 
-Return a `ParamBox` for the input value for an Exponent coefficient.
+Return a `ParamBox` for the input value for an Exponent coefficient. If `roundDigits < 0` 
+then there won't be rounding for input data.
 """
-Exponent(e::Real; mapFunction::F=itself, canDiff::Bool=true) where {F<:Function} = 
-ParamBox(e, ParamList[:xpn]; mapFunction, canDiff)
+function Exponent(e::Real; mapFunction::F=itself, canDiff::Bool=true, 
+                  roundDigits::Int=15) where {F<:Function}
+    n = roundDigits < 0 ? Float64(e) : round(e, digits=roundDigits)
+    ParamBox(n, ParamList[:xpn]; mapFunction, canDiff)
+end
 
 
 """
 
-    Contraction(c::Real; mapFunction::Function=itself, canDiff::Bool=true) -> 
+    Contraction(c::Real; mapFunction::Function=itself, canDiff::Bool=true, 
+                roundDigits::Int=15) -> 
     ParamBox{:d, Float64}
 
-Return a `ParamBox` for the input value for an contraction coefficient.
+Return a `ParamBox` for the input value for an contraction coefficient. If 
+`roundDigits < 0` then there won't be rounding for input data.
 """
-Contraction(c::Real; mapFunction::F=itself, canDiff::Bool=true) where {F<:Function} = 
-ParamBox(c, ParamList[:con]; mapFunction, canDiff)
+function Contraction(c::Real; mapFunction::F=itself, canDiff::Bool=true, 
+                     roundDigits::Int=15) where {F<:Function}
+    n = roundDigits < 0 ? Float64(c) : round(c, digits=roundDigits)
+    ParamBox(n, ParamList[:con]; mapFunction, canDiff)
+end
 
 
 """
@@ -390,20 +400,21 @@ GTBasis(basis, overlaps(basis), elecKinetics(basis), eeInteractions(basis))
 
 function sortBasisFuncs(bs::Vector{<:FloatingGTBasisFuncs}; groupCenters::Bool=false)
     cens = centerOf.(bs)
+    uniqueCens = cens |> sort |> unique!
+    # uniqueCens = cens |> unique
     bfBlocks = Vector{<:FloatingGTBasisFuncs}[]
-    mark, _ = markUnique(cens, compareFunction=isequal)
-    m = max(mark...)
-    for i=1:m
-        idx = findall(x->x==i, mark)
+    for i in uniqueCens
+        idx = findall(x->x==i, cens)
         subbs = bs[idx]
         # SubShells = [i.subshell for i in subbs] # compare ijkOrbitalList[ijk][end]
         # sortVec = sortperm([SubshellNumberList[i] for i in SubShells])
 
-        ijks = [i.ijk[1] for i in subbs]
+        ijkn = [(i.ijk[1], typeof(i).parameters[2]) for i in subbs]
+
         # Reversed order within same subshell but ordinary order among different subshells.
-        sortVec = sortperm(map(ijks) do x
-                               val = ijkOrbitalList[x]
-                               [-sum(val); val]
+        sortVec = sortperm(map(ijkn) do x
+                               val = ijkOrbitalList[x[1]]
+                               [-sum(val); val; -x[2]]
                            end, 
                            rev=true)
         push!(bfBlocks, subbs[sortVec])
@@ -468,21 +479,32 @@ BasisFuncMix(bfs::BasisFuncs) = BasisFuncMix.(decompose(bfs))
 BasisFuncMix(bfm::BasisFuncMix) = itself(bfm)
 
 
-unpackBasisFuncs(bfm::BasisFuncMix) = bfm.BasisFunc
-unpackBasisFuncs(bf::FloatingGTBasisFuncs) = (bf,)
-unpackBasisFuncs(::Any) = ()
+unpackBasisFuncs(bfm::BasisFuncMix) = bfm.BasisFunc |> collect
+unpackBasisFuncs(bf::FloatingGTBasisFuncs) = typeof(bf)[bf]
+unpackBasisFuncs(::Any) = FloatingGTBasisFuncs[]
 
 
 function sumOf(bfs::Array{<:BasisFunc, N}) where {N}
-    bfs = sortBasisFuncs(bfs[:])
-    head = bfs[1]
-    body = @view bfs[2:end]
-    for bf in body
-        head = (head isa BasisFuncMix) ? 
-               BasisFuncMix([head.BasisFunc..., bf]) : add(head, bf)
+    arr1 = convert(Vector{BasisFunc}, sortBasisFuncs(bfs[:]))
+    arr2 = BasisFunc[]
+    while length(arr1) > 1
+        temp = add(arr1[1], arr1[2])
+        if temp isa BasisFunc
+            arr1[1] = temp
+            popat!(arr1, 2)
+        else
+            push!(arr2, popfirst!(arr1))
+        end
     end
-    head
+    if length(arr2) == 0
+        arr1[]
+    else
+        vcat((vcat(arr2, arr1) .|> unpackBasisFuncs)...) |> BasisFuncMix
+    end
 end
+
+sumOf(bfms::Array{<:CompositeGTBasisFuncs{<:Any, 1}, N}) where {N} = 
+vcat((bfms .|> unpackBasisFuncs)...) |> sumOf
 
 
 function mergeGaussFuncs(gf1::GaussFunc, gf2::GaussFunc)
@@ -496,13 +518,13 @@ function mergeGaussFuncs(gf1::GaussFunc, gf2::GaussFunc)
         elseif hasEqual(xpn1, xpn2)
             xpn = deepcopy(xpn1)
         else
-            xpn = Exponent(xpn1)
+            xpn = Exponent(xpn1())
         end
 
         if con1 === con2 || hasIdentical(con1, con2)
-            res = GaussFunc(xpn, con1) * 2
+            res = GaussFunc(xpn, con1) * 2.0
         elseif hasEqual(con1, con2)
-            res = GaussFunc(xpn, deepcopy(con1)) * 2
+            res = GaussFunc(xpn, deepcopy(con1)) * 2.0
         else
             res = GaussFunc(xpn, Contraction(con1()+con2()))
         end
@@ -514,8 +536,8 @@ function mergeGaussFuncs(gf1::GaussFunc, gf2::GaussFunc)
 end
 
 function mergeGaussFuncs(gf1::GaussFunc, gf2::GaussFunc, gf3::GaussFunc...)
-    gfs = [gf1, gf2, gf3...]
-    xpns = [i.xpn() for i in gfs]
+    gfs = GaussFunc[gf1, gf2, gf3...]
+    xpns = Float64[i.xpn() for i in gfs]
     res = GaussFunc[]
     _, uList = markUnique(xpns, compareFunction=(==))
     for val in uList
@@ -529,14 +551,14 @@ function mergeGaussFuncs(gf1::GaussFunc, gf2::GaussFunc, gf3::GaussFunc...)
         elseif (markUnique(gxpns)[2] |> length) == 1
             xpn = uxpns[1] |> deepcopy
         else
-            xpn = Exponent(xpn1)
+            xpn = Exponent(val())
         end
         if length(ucons) == 1
             push!( res, GaussFunc(xpn, ucons[1]) * length(group) )
         elseif (markUnique(gcons)[2] |> length) == 1
             push!( res, GaussFunc(xpn, ucons[1] |> deepcopy) * length(group) )
         else
-            push!( res, GaussFunc(xpn, Contraction([i() for i in gcons] |> sum)) )
+            push!( res, GaussFunc(xpn, Contraction(Float64[i() for i in gcons] |> sum)) )
         end
     end
     res
@@ -568,11 +590,11 @@ function add(bf1::BasisFunc{T}, bf2::BasisFunc{T}) where {T}
         gfsN = mergeGaussFuncs(gfs...) |> Tuple
         BasisFunc(cen, gfsN, ijkOrbitalList[bf1.ijk[1]], bf1.normalizeGTO)
     else
-        BasisFuncMix([bf1, bf2])
+        BasisFuncMix([bf1, bf2] |> sortBasisFuncs)
     end
 end
 
-add(bf1::BasisFunc, bf2::BasisFunc) = BasisFuncMix([bf1, bf2])
+add(bf1::BasisFunc, bf2::BasisFunc) = BasisFuncMix([bf1, bf2] |> sortBasisFuncs)
 
 add(bfm::BasisFuncMix) = unpackBasisFuncs(bfm) |> sumOf
 
@@ -580,7 +602,7 @@ add(bf1::BasisFuncMix{1}, bf2::BasisFunc) = add(bf1.BasisFunc[1], bf2)
 
 add(bf1::BasisFunc, bf2::BasisFuncMix{1}) = add(bf2, bf1)
 
-add(bf::BasisFunc, bfm::BasisFuncMix) = [bf, bfm.BasisFunc...] |> sumOf
+add(bf::BasisFunc, bfm::BasisFuncMix) = BasisFunc[bf, bfm.BasisFunc...] |> sumOf
 
 add(bfm::BasisFuncMix, bf::BasisFunc) = add(bf, bfm)
 
@@ -591,10 +613,10 @@ add(bf::BasisFuncMix{1}, bfm::BasisFuncMix) = add(bf.BasisFunc[1], bfm)
 add(bfm::BasisFuncMix, bf::BasisFuncMix{1}) = add(bf, bfm)
 
 add(bfm1::BasisFuncMix, bfm2::BasisFuncMix) = 
-[bfm1.BasisFunc..., bfm2.BasisFunc...] |> sumOf
+BasisFunc[bfm1.BasisFunc..., bfm2.BasisFunc...] |> sumOf
 
 add(bf1::BasisFuncs{<:Any, <:Any, 1}, bf2::BasisFuncs{<:Any, <:Any, 1}) = 
-[[bf1, bf2] .|> add |> sumOf]
+BasisFunc[[bf1, bf2] .|> add |> sumOf]
 
 
 function mul(gf::GaussFunc, coeff::Real)
@@ -603,7 +625,7 @@ function mul(gf::GaussFunc, coeff::Real)
     if conNew.map[] == itself
         conNew[] *= c
     else
-        conNew.map = Ref((x)->c*gf.con.map(x))
+        conNew.map = Ref((x)->c*gf.con.map[](x))
         conNew.data = gf.con.data
     end
     GaussFunc(gf.xpn, conNew)
@@ -611,7 +633,8 @@ end
 
 mul(coeff::Real, gf::GaussFunc) = mul(gf, coeff)
 
-mul(gf1::GaussFunc, gf2::GaussFunc) = GaussFunc(gf1.xpn()+gf2.xpn(), gf1.con()*gf2.con())
+mul(gf1::GaussFunc, gf2::GaussFunc) = 
+GaussFunc(Exponent(gf1.xpn()+gf2.xpn()), Contraction(gf1.con()*gf2.con()))
 
 function mul(sgf1::BasisFunc{<:Any, 1}, sgf2::BasisFunc{<:Any, 1}; 
              normalizeGTO::Union{Bool, Missing}=missing)
@@ -630,7 +653,8 @@ function mul(sgf1::BasisFunc{<:Any, 1}, sgf2::BasisFunc{<:Any, 1};
     xpn = α₁ + α₂
     con = d₁ * d₂ * exp(-α₁ * α₂ / xpn * sum(abs2, R₁-R₂))
     normalizeGTO isa Missing && (normalizeGTO = n₁*n₂)
-    genBasisFunc(cen, (xpn, con), ijk; normalizeGTO)
+    BasisFunc(makeCenter(cen), GaussFunc(Exponent(xpn), Contraction(con)), 
+              ijk, normalizeGTO)
 end
 
 function mul(bf::BasisFunc, coeff::Real; normalizeGTO::Union{Bool, Missing}=missing)
@@ -657,7 +681,7 @@ function mul(bf1::BasisFunc, bf2::BasisFunc; normalizeGTO::Union{Bool, Missing}=
     ijk1 = ijkOrbitalList[bf1.ijk[1]]
     cen2 = bf2.center
     ijk2 = ijkOrbitalList[bf2.ijk[1]]
-    normalizeGTO isa Missing && (normalizeGTO = bf.normalizeGTO)
+    normalizeGTO isa Missing && (normalizeGTO = bf1.normalizeGTO * bf2.normalizeGTO)
     bfs = BasisFunc[]
     for gf1 in bf1.gauss, gf2 in bf2.gauss
         push!(bfs, mul(BasisFunc(cen1, gf1, ijk1, normalizeGTO), 
@@ -690,11 +714,11 @@ mul(bf, bfm; normalizeGTO)
 
 function mul(bfm1::BasisFuncMix, bfm2::BasisFuncMix; 
              normalizeGTO::Union{Bool, Missing}=missing)
-    bfs = BasisFunc[]
+    bfms = CompositeGTBasisFuncs{<:Any, 1}[]
     for bf1 in bfm1.BasisFunc, bf2 in bfm2.BasisFunc
-        push!(bfs, mul(bf1, bf2; normalizeGTO))
+        push!(bfms, mul(bf1, bf2; normalizeGTO))
     end
-    sumOf(bfs)
+    sumOf(bfms)
 end
 
 mul(bf1::BasisFuncs{<:Any, <:Any, 1}, bf2::BasisFuncs{<:Any, <:Any, 1}; 
@@ -902,15 +926,16 @@ end
 
 """
 
-    makeCenter(coord::Array{<:Real, 1}) -> NTuple{3, ParamBox}
+    makeCenter(coord::Array{<:Real, 1}; roundDigits::Int=-1) -> NTuple{3, ParamBox}
 
-Generate a `Tuple` of coordinate `ParamBox`s for a basis function center coordinate 
-given a `Vector`.
+Generate a `Tuple` of coordinate `ParamBox`s for a basis function center coordinate given a 
+`Vector`. If `roundDigits < 0` then there won't be rounding for input data.
 """
-function makeCenter(coord::Vector{<:Real})
-    x = ParamBox(coord[1], ParamList[:X])
-    y = ParamBox(coord[2], ParamList[:Y])
-    z = ParamBox(coord[3], ParamList[:Z])
+function makeCenter(coord::Vector{<:Real}; roundDigits::Int=-1)
+    c = roundDigits<0 ? convert(Vector{Float64}, coord) : round.(coord, digits=roundDigits)
+    x = ParamBox(c[1], ParamList[:X])
+    y = ParamBox(c[2], ParamList[:Y])
+    z = ParamBox(c[3], ParamList[:Z])
     (x,y,z)
 end
 
