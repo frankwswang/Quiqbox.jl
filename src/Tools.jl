@@ -261,8 +261,8 @@ end
 
 Compare if two objects are the equal.
 
-If `ignoreFunction = true` then the function will pop up a warning message when a field is 
-a function.
+If `ignoreFunction = true`, the function will ignore comparisons between Function-type 
+fields.
 
 If `ignoreContainer = true`, the function will ignore the difference of the container(s) 
 and only compare the field(s)/entry(s) from two objects respectively.
@@ -310,8 +310,8 @@ hasBoolRelation(==, obj1, obj2, obj3...; ignoreFunction, ignoreContainer,
 
 Compare if two objects are the Identical. An instantiation of `hasBoolRelation`.
 
-If `ignoreFunction = true` then the function will pop up a warning message when a field is 
-a function.
+If `ignoreFunction = true`, the function will ignore comparisons between Function-type 
+fields.
 
 If `ignoreContainer = true`, the function will ignore the difference of the container(s) 
 and only compare the field(s)/entry(s) from two objects respectively.
