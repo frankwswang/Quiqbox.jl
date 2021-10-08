@@ -224,13 +224,13 @@ end
 
 # function shift
 ijk = [1,0,0]
-ijkShift = [0,1,1]
+didjdk = [0,1,1]
 bf_os1 = genBasisFunc([0,0,0], (2,1), ijk)
 bf_os2 = genBasisFunc([0,0,0], (2,1), ijk, normalizeGTO=true)
-bf_os1S = genBasisFunc([0,0,0], (2,1), ijk+ijkShift)
-bf_os2S = genBasisFunc([0,0,0], (2,1), ijk+ijkShift, normalizeGTO=true)
-@test hasEqual(shift(bf_os1, ijkShift), bf_os1S)
-@test hasEqual(shift(bf_os2, ijkShift), bf_os2S)
+bf_os1S = genBasisFunc([0,0,0], (2,1), ijk+didjdk)
+bf_os2S = genBasisFunc([0,0,0], (2,1), ijk+didjdk, normalizeGTO=true)
+@test hasEqual(shift(bf_os1, didjdk), bf_os1S)
+@test hasEqual(shift(bf_os2, didjdk), bf_os2S)
 
 
 # func unpackBasisFuncs

@@ -13,9 +13,9 @@ using Quiqbox
               [ 3.0,  3.0, -3.0], [ 3.0,  3.0, 0.0], [ 3.0,  3.0, 3.0]]
     num = length(points)
     grid = GridBox(2, 3.0)
-    
+
     @test hasEqual(grid, GridBox((2,2,2), 3.0))
-    
+
     @test grid.num == num
     @test grid.spacing == 3.0
     @test gridCoords(grid) == points
