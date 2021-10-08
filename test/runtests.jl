@@ -19,6 +19,7 @@ using Test
             include("unit-tests/Integration/OneBody-test.jl")
             include("unit-tests/Integration/TwoBody-test.jl")
             include("unit-tests/Basis-test.jl")
+            include("unit-tests/Differentiation-test.jl")
         end
         println("$(unit2_1) test finished in $t2_1 seconds.\n")
 
@@ -38,7 +39,7 @@ using Test
             include("unit-tests/Optimization-test.jl")
         end
         println("$(unit2_3) test finished in $t2_3 seconds.\n")
-    
+
     end
 
     @testset "Submodule Functions" begin
