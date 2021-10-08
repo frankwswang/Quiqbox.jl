@@ -52,8 +52,9 @@ end
              roundDigits::Int=15) -> 
     ParamBox{:α, Float64}
 
-Return a `ParamBox` for the input value for an Exponent coefficient. If `roundDigits < 0` 
-then there won't be rounding for input data.
+Construct a `ParamBox` for an exponent coefficient given a value. Keywords `mapFunction` 
+and `canDiff` work the same way as in a general constructor of a `ParamBox`. If 
+`roundDigits < 0` then there won't be rounding for input data.
 """
 function Exponent(e::Real; mapFunction::F=itself, canDiff::Bool=true, 
                   roundDigits::Int=15) where {F<:Function}
@@ -68,7 +69,8 @@ end
                 roundDigits::Int=15) -> 
     ParamBox{:d, Float64}
 
-Return a `ParamBox` for the input value for an contraction coefficient. If 
+Construct a `ParamBox` for an contraction coefficient given a value. Keywords `mapFunction` 
+and `canDiff` work the same way as in a general constructor of a `ParamBox`. If 
 `roundDigits < 0` then there won't be rounding for input data.
 """
 function Contraction(c::Real; mapFunction::F=itself, canDiff::Bool=true, 
@@ -189,7 +191,9 @@ BasisFuncs(cen, (g,), ijks, normalizeGTO)
 """
 
     genBasisFunc(args..., kws...) -> BasisFunc
+
     genBasisFunc(args..., kws...) -> BasisFuncs
+
     genBasisFunc(args..., kws...) -> collection
 
 Constructor of `BasisFunc` and `BasisFuncs`, but it also returns different kinds of 
@@ -206,8 +210,10 @@ momentum(s). E.g., s is [0,0,0] and p is [[1,0,0], [0,1,0], [0,0,1]].
 
 ≡≡≡ Example(s) ≡≡≡
 
-    julia> genBasisFunc([0,0,0], GaussFunc(2,1), [0,1,0])
-    BasisFunc{:P, 1}(gauss, subshell, center)[X⁰Y¹Z⁰][0.0, 0.0, 0.0]
+```jldoctest; setup = :(push!(LOAD_PATH, "../../src/"); using Quiqbox)
+julia> genBasisFunc([0,0,0], GaussFunc(2,1), [0,1,0])
+BasisFunc{:P, 1}(gauss, subshell, center)[X⁰Y¹Z⁰][0.0, 0.0, 0.0]
+```
 
 ≡≡≡ Method 2 ≡≡≡
 
@@ -217,11 +223,13 @@ momentum(s). E.g., s is [0,0,0] and p is [[1,0,0], [0,1,0], [0,0,1]].
 
 ≡≡≡ Example(s) ≡≡≡
 
-    julia> genBasisFunc([0,0,0], GaussFunc(2,1), "S")
-    BasisFunc{:S, 1}(gauss, subshell, center)[X⁰Y⁰Z⁰][0.0, 0.0, 0.0]
+```jldoctest; setup = :(push!(LOAD_PATH, "../../src/"); using Quiqbox)
+julia> genBasisFunc([0,0,0], GaussFunc(2,1), "S")
+BasisFunc{:S, 1}(gauss, subshell, center)[X⁰Y⁰Z⁰][0.0, 0.0, 0.0]
 
-    julia> genBasisFunc([0,0,0], GaussFunc(2,1), "P")
-    BasisFuncs{:P, 1, 3}(gauss, subshell, center)[3/3][0.0, 0.0, 0.0]
+julia> genBasisFunc([0,0,0], GaussFunc(2,1), "P")
+BasisFuncs{:P, 1, 3}(gauss, subshell, center)[3/3][0.0, 0.0, 0.0]
+```
 
 ≡≡≡ Method 3 ≡≡≡
 
@@ -233,11 +241,13 @@ exponent(s) and contraction coefficient(s) corresponding to the same `GaussFunc`
 
 ≡≡≡ Example(s) ≡≡≡
 
-    julia> genBasisFunc([0,0,0], (2, 1), "P")
-    BasisFuncs{:P, 1, 3}(gauss, subshell, center)[3/3][0.0, 0.0, 0.0]
+```jldoctest; setup = :(push!(LOAD_PATH, "../../src/"); using Quiqbox)
+julia> genBasisFunc([0,0,0], (2, 1), "P")
+BasisFuncs{:P, 1, 3}(gauss, subshell, center)[3/3][0.0, 0.0, 0.0]
 
-    julia> genBasisFunc([0,0,0], ([2, 1.5], [1, 0.5]), "P")
-    BasisFuncs{:P, 2, 3}(gauss, subshell, center)[3/3][0.0, 0.0, 0.0]
+julia> genBasisFunc([0,0,0], ([2, 1.5], [1, 0.5]), "P")
+BasisFuncs{:P, 2, 3}(gauss, subshell, center)[3/3][0.0, 0.0, 0.0]
+```
 
 ≡≡≡ Method 4 ≡≡≡
 
@@ -249,27 +259,29 @@ is used.
 
 ≡≡≡ Example(s) ≡≡≡
 
-    julia> genBasisFunc([0,0,0], ("STO-3G", "Li"))
-    3-element Vector{Quiqbox.FloatingGTBasisFuncs}:
-    BasisFunc{:S, 3}(gauss, subshell, center)[X⁰Y⁰Z⁰][0.0, 0.0, 0.0]
-    BasisFunc{:S, 3}(gauss, subshell, center)[X⁰Y⁰Z⁰][0.0, 0.0, 0.0]
-    BasisFuncs{:P, 3, 3}(gauss, subshell, center)[3/3][0.0, 0.0, 0.0]
+```jldoctest; setup = :(push!(LOAD_PATH, "../../src/"); using Quiqbox)
+julia> genBasisFunc([0,0,0], ("STO-3G", "Li"))
+3-element Vector{Quiqbox.FloatingGTBasisFuncs}:
+ BasisFunc{:S, 3}(gauss, subshell, center)[X⁰Y⁰Z⁰][0.0, 0.0, 0.0]
+ BasisFunc{:S, 3}(gauss, subshell, center)[X⁰Y⁰Z⁰][0.0, 0.0, 0.0]
+ BasisFuncs{:P, 3, 3}(gauss, subshell, center)[3/3][0.0, 0.0, 0.0]
 
-    julia> genBasisFunc([0,0,0], "STO-3G")
-    1-element Vector{Quiqbox.FloatingGTBasisFuncs}:
-    BasisFunc{:S, 3}(gauss, subshell, center)[X⁰Y⁰Z⁰][0.0, 0.0, 0.0]
+julia> genBasisFunc([0,0,0], "STO-3G")
+1-element Vector{Quiqbox.FloatingGTBasisFuncs}:
+ BasisFunc{:S, 3}(gauss, subshell, center)[X⁰Y⁰Z⁰][0.0, 0.0, 0.0]
 
-    julia> genBasisFunc([0,0,0], ["STO-2G", "STO-3G"])
-    2-element Vector{Quiqbox.FloatingGTBasisFuncs}:
-    BasisFunc{:S, 2}(gauss, subshell, center)[X⁰Y⁰Z⁰][0.0, 0.0, 0.0]
-    BasisFunc{:S, 3}(gauss, subshell, center)[X⁰Y⁰Z⁰][0.0, 0.0, 0.0]
+julia> genBasisFunc([0,0,0], ["STO-2G", "STO-3G"])
+2-element Vector{Quiqbox.FloatingGTBasisFuncs}:
+ BasisFunc{:S, 2}(gauss, subshell, center)[X⁰Y⁰Z⁰][0.0, 0.0, 0.0]
+ BasisFunc{:S, 3}(gauss, subshell, center)[X⁰Y⁰Z⁰][0.0, 0.0, 0.0]
 
-    julia> genBasisFunc([0,0,0], [("STO-2G", "He"), ("STO-3G", "O")])
-    4-element Vector{Quiqbox.FloatingGTBasisFuncs}:
-    BasisFunc{:S, 2}(gauss, subshell, center)[X⁰Y⁰Z⁰][0.0, 0.0, 0.0]
-    BasisFunc{:S, 3}(gauss, subshell, center)[X⁰Y⁰Z⁰][0.0, 0.0, 0.0]
-    BasisFunc{:S, 3}(gauss, subshell, center)[X⁰Y⁰Z⁰][0.0, 0.0, 0.0]
-    BasisFuncs{:P, 3, 3}(gauss, subshell, center)[3/3][0.0, 0.0, 0.0]
+julia> genBasisFunc([0,0,0], [("STO-2G", "He"), ("STO-3G", "O")])
+4-element Vector{Quiqbox.FloatingGTBasisFuncs}:
+ BasisFunc{:S, 2}(gauss, subshell, center)[X⁰Y⁰Z⁰][0.0, 0.0, 0.0]
+ BasisFunc{:S, 3}(gauss, subshell, center)[X⁰Y⁰Z⁰][0.0, 0.0, 0.0]
+ BasisFunc{:S, 3}(gauss, subshell, center)[X⁰Y⁰Z⁰][0.0, 0.0, 0.0]
+ BasisFuncs{:P, 3, 3}(gauss, subshell, center)[3/3][0.0, 0.0, 0.0]
+```
 """
 genBasisFunc(cen::Tuple{Vararg{<:ParamBox}}, gs::Vector{<:GaussFunc}, 
           ijk::Vector{Int}; normalizeGTO::Bool=false) = 
@@ -567,6 +579,35 @@ end
 mergeGaussFuncs(gf::GaussFunc) = itself(gf)
 
 
+"""
+
+    add(b::CompositeGTBasisFuncs{<:Any, 1}) -> CompositeGTBasisFuncs{<:Any, 1}
+
+    add(b1::CompositeGTBasisFuncs{<:Any, 1}, b2::CompositeGTBasisFuncs{<:Any, 1}) ->
+    CompositeGTBasisFuncs{<:Any, 1}
+
+    +(b::CompositeGTBasisFuncs{<:Any, 1}, bs::CompositeGTBasisFuncs{<:Any, 1}...) ->
+    CompositeGTBasisFuncs{<:Any, 1}
+
+Addition between `CompositeGTBasisFuncs{<:Any, 1}` such as `BasisFunc` and 
+`Quiqbox.BasisFuncMix`. It can be called using `+` syntax.
+
+≡≡≡ Example(s) ≡≡≡
+
+```jldoctest; setup = :(push!(LOAD_PATH, "../../src/"); using Quiqbox)
+julia> bf1 = genBasisFunc([1,1,1], (2,1))
+BasisFunc{:S, 1}(gauss, subshell, center)[X⁰Y⁰Z⁰][1.0, 1.0, 1.0]
+
+julia> bf2 = genBasisFunc([1,1,1], (2,2))
+BasisFunc{:S, 1}(gauss, subshell, center)[X⁰Y⁰Z⁰][1.0, 1.0, 1.0]
+
+julia> bf3 = bf1 + bf2
+BasisFunc{:S, 1}(gauss, subshell, center)[X⁰Y⁰Z⁰][1.0, 1.0, 1.0]
+
+julia> bf3.gauss[1].con[]
+3.0
+```
+"""
 add(bf::BasisFunc) = itself(bf)
 
 add(bf::BasisFuncs{<:Any, <:Any, 1}) = 
@@ -619,6 +660,33 @@ add(bf1::BasisFuncs{<:Any, <:Any, 1}, bf2::BasisFuncs{<:Any, <:Any, 1}) =
 BasisFunc[[bf1, bf2] .|> add |> sumOf]
 
 
+"""
+
+    mul(a1::Real, a2::GaussFunc) -> GaussFunc
+
+    mul(a1::GaussFunc, a2::Real) -> GaussFunc
+
+    mul(a1::GaussFunc, a2::GaussFunc) -> GaussFunc
+
+Multiplication between `GaussFunc`s or contraction coefficient multiplication between a 
+`Real` number and a `GaussFunc`. It can be called using `*` syntax.
+
+≡≡≡ Example(s) ≡≡≡
+
+```jldoctest; setup = :(push!(LOAD_PATH, "../../src/"); using Quiqbox)
+julia> gf1 = GaussFunc(3,1)
+GaussFunc(xpn=ParamBox{:α, Float64}(3.0)[α][∂], con=ParamBox{:d, Float64}(1.0)[d][∂])
+
+julia> gf1 * 2
+GaussFunc(xpn=ParamBox{:α, Float64}(3.0)[α][∂], con=ParamBox{:d, Float64}(2.0)[d][∂])
+
+julia> gf1 * gf1
+GaussFunc(xpn=ParamBox{:α, Float64}(6.0)[α][∂], con=ParamBox{:d, Float64}(1.0)[d][∂])
+
+julia> gf1 * 2 * gf1
+GaussFunc(xpn=ParamBox{:α, Float64}(6.0)[α][∂], con=ParamBox{:d, Float64}(2.0)[d][∂])
+```
+"""
 function mul(gf::GaussFunc, coeff::Real)
     c = convert(Float64, coeff)::Float64
     conNew = deepcopy(gf.con)
@@ -636,6 +704,42 @@ mul(coeff::Real, gf::GaussFunc) = mul(gf, coeff)
 mul(gf1::GaussFunc, gf2::GaussFunc) = 
 GaussFunc(Exponent(gf1.xpn()+gf2.xpn()), Contraction(gf1.con()*gf2.con()))
 
+"""
+
+    mul(a1::Real, a2::CompositeGTBasisFuncs{<:Any, 1}; 
+        normalizeGTO::Union{Bool, Missing}=missing) -> 
+    CompositeGTBasisFuncs{<:Any, 1}
+
+    mul(a1::CompositeGTBasisFuncs{<:Any, 1}, a2::Real; 
+        normalizeGTO::Union{Bool, Missing}=missing) -> 
+    CompositeGTBasisFuncs{<:Any, 1}
+
+    mul(a1::CompositeGTBasisFuncs{<:Any, 1}, a2::CompositeGTBasisFuncs{<:Any, 1}; 
+        normalizeGTO::Union{Bool, Missing}=missing) -> 
+    CompositeGTBasisFuncs{<:Any, 1}
+
+Multiplication between `CompositeGTBasisFuncs{<:Any, 1}`s such as `BasisFunc` and 
+`Quiqbox.BasisFuncMix`, or contraction coefficient multiplication between a `Real` number 
+and a `CompositeGTBasisFuncs{<:Any, 1}`. If `normalizeGTO` is set to `missing` (in 
+default), The `GaussFunc` in the output result will be normalized only if all the input 
+bases has `normalizeGTO = true`. The function can be called using `*` syntax.
+
+≡≡≡ Example(s) ≡≡≡
+
+```jldoctest; setup = :(push!(LOAD_PATH, "../../src/"); using Quiqbox)
+julia> bf1 = genBasisFunc([1,1,1], ([2,1], [0.1, 0.2]))
+BasisFunc{:S, 2}(gauss, subshell, center)[X⁰Y⁰Z⁰][1.0, 1.0, 1.0]
+
+julia> bf2 = bf1 * 2
+BasisFunc{:S, 2}(gauss, subshell, center)[X⁰Y⁰Z⁰][1.0, 1.0, 1.0]
+
+julia> getindex.(getfield.(bf2.gauss, :con))
+(0.2, 0.4)
+
+julia> bf3 = bf1 * bf2
+BasisFunc{:S, 3}(gauss, subshell, center)[X⁰Y⁰Z⁰][1.0, 1.0, 1.0]
+```
+"""
 function mul(sgf1::BasisFunc{<:Any, 1}, sgf2::BasisFunc{<:Any, 1}; 
              normalizeGTO::Union{Bool, Missing}=missing)
     ijk = ijkOrbitalList[sgf1.ijk[1]] + ijkOrbitalList[sgf2.ijk[1]]
@@ -726,14 +830,22 @@ mul(bf1::BasisFuncs{<:Any, <:Any, 1}, bf2::BasisFuncs{<:Any, <:Any, 1};
 [mul(add(bf1), add(bf2); normalizeGTO)]
 
 
-function shift(bf::FloatingGTBasisFuncs{S, GN, 1}, ijkShift::Vector{Int}) where {S, GN}
-    @assert ijkShift |> length == 3 "The length of `ijkShift` should be 3."
-    shiftCore(bf, ijkShift)
+"""
+
+    shift(bf::FloatingGTBasisFuncs{S, GN, 1}, didjdk::Vector{Int}) where {S, GN} -> 
+    BasisFunc
+
+Shift (add) the angular momentum (Cartesian representation) given the a vector that 
+specifies the change of each pseudo-quantum number 𝑑i, 𝑑j, 𝑑k.
+"""
+function shift(bf::FloatingGTBasisFuncs{S, GN, 1}, didjdk::Vector{Int}) where {S, GN}
+    @assert didjdk |> length == 3 "The length of `didjdk` should be 3."
+    shiftCore(bf, didjdk)
 end
 
-shiftCore(bf::FloatingGTBasisFuncs{S, GN, 1}, ijkShift::Vector{<:Real}) where {S, GN} = 
+shiftCore(bf::FloatingGTBasisFuncs{S, GN, 1}, didjdk::Vector{<:Real}) where {S, GN} = 
 BasisFunc(bf.center, bf.gauss, 
-          ijkOrbitalList[bf.ijk[1]] + convert(Vector{Int}, ijkShift), bf.normalizeGTO)
+          ijkOrbitalList[bf.ijk[1]] + convert(Vector{Int}, didjdk), bf.normalizeGTO)
 
 
 """

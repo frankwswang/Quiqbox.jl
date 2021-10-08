@@ -1,6 +1,14 @@
 # Core Functions
 
 ```@docs
+Exponent
+```
+
+```@docs
+Contraction
+```
+
+```@docs
 genBasisFunc
 ```
 
@@ -10,6 +18,18 @@ centerOf
 
 ```@doc
 GTBasis(basis::Vector{<:Quiqbox.AbstractGTBasisFuncs})
+```
+
+```@doc
+add
+```
+
+```@doc
+mul
+```
+
+```@doc
+shift
 ```
 
 ```@docs
