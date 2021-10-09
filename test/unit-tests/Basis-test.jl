@@ -1,7 +1,8 @@
 using Test
 using Quiqbox
 using Quiqbox: isFull, BasisFuncMix, unpackBasisFuncs, inSymbols, varVal, ElementNames, 
-               sortBasisFuncs, ParamList, sumOf, expressionOfCore, mergeGaussFuncs
+               sortBasisFuncs, ParamList, sumOf, expressionOfCore, mergeGaussFuncs, 
+               ijkOrbitalList
 using Symbolics
 using LinearAlgebra
 
@@ -155,6 +156,27 @@ eeI = eeInteractions([bfm])[]
 @test isapprox(eeI, eeInteractions(bs1) |> sum, atol=errorThreshold2)
 
 
+# mergeGaussFuncs
+gf_merge1 = GaussFunc(2,1)
+gf_merge2 = GaussFunc(2,1)
+@test mergeGaussFuncs(gf_merge1) === gf_merge1
+
+mgf1 = mergeGaussFuncs(gf_merge1, gf_merge1)
+mgf2 = mergeGaussFuncs(gf_merge1, gf_merge2)
+@test mgf1.xpn() == 2 == mgf1.con()
+@test !hasIdentical(mgf1, mgf2)
+gf_merge1_2 = GaussFunc(gf_merge1.xpn, gf_merge2.con)
+gf_merge1_3 = GaussFunc(gf_merge2.xpn, gf_merge1.con)
+mgf1_2 = mergeGaussFuncs(gf_merge1, gf_merge1_2)
+mgf1_3 = mergeGaussFuncs(gf_merge1, gf_merge1_3)
+@test mgf1_2.xpn() == 2 == mgf1_2.con()
+@test !hasIdentical(mgf1, mgf1_2)
+@test !hasIdentical(mgf1_2, mgf1_3)
+@test hasEqual(mgf1, mgf1_2, mgf1_3)
+
+gf_merge3 = GaussFunc(1.5,1)
+@test hasIdentical(mergeGaussFuncs(gf_merge1, gf_merge3), [gf_merge1, gf_merge3])
+
 # function sumOf, add, mul
 bs2 = [genBasisFunc([1,1,1], (2,1), [1,0,0], normalizeGTO=true), 
        genBasisFunc([1,1,1], (3,1), [2,0,0], normalizeGTO=true), 
@@ -177,6 +199,10 @@ bs3_2 = [genBasisFunc([1,1,1], (2,1), [1,0,0]),
        genBasisFunc([1,1,1], (3,1), [2,0,0]), 
        genBasisFunc([1,1,2], (3,1), [0,0,0])]
 
+@test add(bs2[1]) === bs2[1]
+bf1s = BasisFuncs(bf1.center, bf1.gauss, [ijkOrbitalList[bf1.ijk[1]]], bf1.normalizeGTO)
+@test hasIdentical(add(bf1s), bf1)
+
 bfm_1 = +(bs2...,)
 bfm_2 = sumOf(bs2)
 bfm_3 = BasisFuncMix(bs3)
@@ -198,19 +224,19 @@ end
 
 # function shift
 ijk = [1,0,0]
-ijkShift = [0,1,1]
+didjdk = [0,1,1]
 bf_os1 = genBasisFunc([0,0,0], (2,1), ijk)
 bf_os2 = genBasisFunc([0,0,0], (2,1), ijk, normalizeGTO=true)
-bf_os1S = genBasisFunc([0,0,0], (2,1), ijk+ijkShift)
-bf_os2S = genBasisFunc([0,0,0], (2,1), ijk+ijkShift, normalizeGTO=true)
-@test hasEqual(shift(bf_os1, ijkShift), bf_os1S)
-@test hasEqual(shift(bf_os2, ijkShift), bf_os2S)
+bf_os1S = genBasisFunc([0,0,0], (2,1), ijk+didjdk)
+bf_os2S = genBasisFunc([0,0,0], (2,1), ijk+didjdk, normalizeGTO=true)
+@test hasEqual(shift(bf_os1, didjdk), bf_os1S)
+@test hasEqual(shift(bf_os2, didjdk), bf_os2S)
 
 
 # func unpackBasisFuncs
 @test unpackBasisFuncs(bfm1)[1] == bf1
-@test unpackBasisFuncs(bf1) == (bf1,)
-@test unpackBasisFuncs(0) == ()
+@test unpackBasisFuncs(bf1) == [bf1]
+@test unpackBasisFuncs(0) == []
 
 
 # basisSize
@@ -223,8 +249,8 @@ bf_os2S = genBasisFunc([0,0,0], (2,1), ijk+ijkShift, normalizeGTO=true)
 
 # function genGaussFuncText
 bfCoeff = [[6.163845031, 1.097161308], [0.4301284983, 0.6789135305], 
-           [0.2459163220, 0.06237087296], [0.04947176920, 0.9637824081],
-           [0.2459163220, 0.06237087296], [0.5115407076, 0.6128198961]]
+           [0.245916322, 0.06237087296], [0.0494717692, 0.9637824081],
+           [0.245916322, 0.06237087296], [0.5115407076, 0.6128198961]]
 bfCoeff2 = vcat([[bfCoeff[2i+1]'; bfCoeff[2i+2]']' for i=0:2]...)
 content = """
 S    2   1.0
@@ -246,15 +272,21 @@ lines = (content |> IOBuffer |> readlines)
 randElement = ElementNames[rand(1:length(ElementNames))]
 bs1 = genBasisFunc(missing, ("6-31G", "H"))
 cens = [rand(3) for _=1:length(bs1)]
-assignCenter!.(cens, bs1)
 txt1 = genBasisFuncText(bs1, printCenter=false, groupCenters=false) |> join
 txt2 = genBasisFuncText(bs1, printCenter=false) |> join
 bs2_1 = genBFuncsFromText(txt1)
 bs2_2 = genBFuncsFromText(txt2)
+assignCenter!.(cens, bs1)
 assignCenter!.(cens, bs2_1)
 assignCenter!.(cens, bs2_2)
-@test hasEqual(bs1, bs2_2, ignoreContainer=true)
+txt3 = genBasisFuncText(bs1) |> join
+bs2_3 = genBFuncsFromText(txt3)
 @test hasEqual(bs1, bs2_1, ignoreContainer=true)
+@test hasEqual(bs1, bs2_2, ignoreContainer=true)
+@test hasEqual(sortBasisFuncs(bs1), bs2_3, ignoreFunction=true)
+@test hasEqual.(bs1, bs2_1, ignoreFunction=true) |> prod
+@test hasEqual.(bs1, bs2_2, ignoreFunction=true) |> prod
+@test hasEqual.(sortBasisFuncs(bs1), bs2_3, ignoreFunction=true) |> prod
 
 
 # function assignCenter!

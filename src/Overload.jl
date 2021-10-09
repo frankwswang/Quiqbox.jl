@@ -197,15 +197,13 @@ broadcastable(bfs::BasisFuncs) = getindex(bfs, :)
 
 # Quiqbox methods overload.
 ## Method overload of `hasBoolRelation` from Tools.jl.
-## If `ignoreContainer = true`, then `ignoreFunction` is automatically set to be `true` 
-## as the `map` function for `ParamBox` is considered as a type of container for the actual 
-## stored data.
 function hasBoolRelation(boolFunc::F, pb1::ParamBox, pb2::ParamBox; 
                          ignoreFunction::Bool=false, 
                          ignoreContainer::Bool=false,
                          decomposeNumberCollection::Bool=false) where {F<:Function}
     if ignoreContainer
-        boolFunc(pb1.data, pb2.data)
+        # boolFunc(pb1.data, pb2.data) && 
+        boolFunc(pb1(), pb2())
     elseif ignoreFunction
         boolFunc(pb1.data, pb2.data) && 
         boolFunc(pb1.canDiff[],pb2.canDiff[])
