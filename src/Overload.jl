@@ -203,8 +203,7 @@ function hasBoolRelation(boolFunc::F, pb1::ParamBox, pb2::ParamBox;
                          decomposeNumberCollection::Bool=false) where {F<:Function}
     if ignoreContainer
         # boolFunc(pb1.data, pb2.data) && 
-        # boolFunc(pb1(), pb2())
-        boolFunc(pb1.map[](pb1.data[]), pb2.map[](pb2.data[]))
+        boolFunc(pb1(), pb2())
     elseif ignoreFunction
         boolFunc(pb1.data, pb2.data) && 
         boolFunc(pb1.canDiff[],pb2.canDiff[])

@@ -249,8 +249,8 @@ bf_os2S = genBasisFunc([0,0,0], (2,1), ijk+didjdk, normalizeGTO=true)
 
 # function genGaussFuncText
 bfCoeff = [[6.163845031, 1.097161308], [0.4301284983, 0.6789135305], 
-           [0.2459163220, 0.06237087296], [0.04947176920, 0.9637824081],
-           [0.2459163220, 0.06237087296], [0.5115407076, 0.6128198961]]
+           [0.245916322, 0.06237087296], [0.0494717692, 0.9637824081],
+           [0.245916322, 0.06237087296], [0.5115407076, 0.6128198961]]
 bfCoeff2 = vcat([[bfCoeff[2i+1]'; bfCoeff[2i+2]']' for i=0:2]...)
 content = """
 S    2   1.0
@@ -272,15 +272,21 @@ lines = (content |> IOBuffer |> readlines)
 randElement = ElementNames[rand(1:length(ElementNames))]
 bs1 = genBasisFunc(missing, ("6-31G", "H"))
 cens = [rand(3) for _=1:length(bs1)]
-assignCenter!.(cens, bs1)
 txt1 = genBasisFuncText(bs1, printCenter=false, groupCenters=false) |> join
 txt2 = genBasisFuncText(bs1, printCenter=false) |> join
 bs2_1 = genBFuncsFromText(txt1)
 bs2_2 = genBFuncsFromText(txt2)
+assignCenter!.(cens, bs1)
 assignCenter!.(cens, bs2_1)
 assignCenter!.(cens, bs2_2)
-@test hasEqual(bs1, bs2_2, ignoreContainer=true)
+txt3 = genBasisFuncText(bs1) |> join
+bs2_3 = genBFuncsFromText(txt3)
 @test hasEqual(bs1, bs2_1, ignoreContainer=true)
+@test hasEqual(bs1, bs2_2, ignoreContainer=true)
+@test hasEqual(sortBasisFuncs(bs1), bs2_3, ignoreFunction=true)
+@test hasEqual.(bs1, bs2_1, ignoreFunction=true) |> prod
+@test hasEqual.(bs1, bs2_2, ignoreFunction=true) |> prod
+@test hasEqual.(sortBasisFuncs(bs1), bs2_3, ignoreFunction=true) |> prod
 
 
 # function assignCenter!

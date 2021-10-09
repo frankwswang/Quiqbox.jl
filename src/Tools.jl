@@ -678,3 +678,20 @@ function splitTerm(term::Symbolics.Num)
     end
     terms
 end
+
+
+function groupedSort(v::Array, sortFunction::F=itself) where {F<:Function}
+    sortedArr = sort(v, by=x->sortFunction(x))
+    state1 = 1
+    groups = typeof(v)[]
+    next = iterate(sortedArr)
+    while next !== nothing
+        item, state = next
+        next = iterate(sortedArr, state)
+        if next === nothing || sortFunction(next[1]) != sortFunction(item)
+            push!(groups, sortedArr[state1:state-1])
+            state1 = state
+        end
+    end
+    groups
+end

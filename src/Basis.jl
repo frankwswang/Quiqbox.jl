@@ -411,13 +411,9 @@ GTBasis(basis, overlaps(basis), elecKinetics(basis), eeInteractions(basis))
 
 
 function sortBasisFuncs(bs::Vector{<:FloatingGTBasisFuncs}; groupCenters::Bool=false)
-    cens = centerOf.(bs)
-    uniqueCens = cens |> sort |> unique!
-    # uniqueCens = cens |> unique
     bfBlocks = Vector{<:FloatingGTBasisFuncs}[]
-    for i in uniqueCens
-        idx = findall(x->x==i, cens)
-        subbs = bs[idx]
+    sortedBasis = groupedSort(bs, centerOf)
+    for subbs in sortedBasis
         # SubShells = [i.subshell for i in subbs] # compare ijkOrbitalList[ijk][end]
         # sortVec = sortperm([SubshellNumberList[i] for i in SubShells])
 
@@ -426,7 +422,7 @@ function sortBasisFuncs(bs::Vector{<:FloatingGTBasisFuncs}; groupCenters::Bool=f
         # Reversed order within same subshell but ordinary order among different subshells.
         sortVec = sortperm(map(ijkn) do x
                                val = ijkOrbitalList[x[1]]
-                               [-sum(val); val; -x[2]]
+                               [-sum(val); val; x[2]]
                            end, 
                            rev=true)
         push!(bfBlocks, subbs[sortVec])
@@ -928,7 +924,7 @@ function genBasisFuncText(bf::FloatingGTBasisFuncs;
                           norm::Float64=1.0, printCenter::Bool=true)
     gauss = bf.gauss |> collect
     GFs = map(x -> genGaussFuncText(x.xpn[], x.con[]), gauss)
-    cen = round.(centerOf(bf), sigdigits=15)
+    cen = centerOf(bf)
     firstLine = printCenter ? "X   "*rpad(cen[1]|>alignSignedNum, 20)*
                                      rpad(cen[2]|>alignSignedNum, 20)*
                                      rpad(cen[3]|>alignSignedNum, 20)*"\n" : ""
@@ -982,10 +978,16 @@ from `genBasisFuncText`. For the former, `adjustContent` needs to be set to `tru
 `function` used to detect and convert the format of the scientific notation in the String.
 
 `excludeFirstNlines` and `excludeLastNlines` are used to exclude first or last few lines of 
-the `String` if intent. `genBFuncsFromText` can't directly read center coordinate 
-information from the String even if it's included, so argument `center` is used to assign a 
-coordinate for all the basis functions from the String; it can be a `Vector`, a `Tuple` of 
-the positional `ParamBox`s, or simply (in default) set to `missing` for later assignment.
+the `String` if intent. `center` is used to assign a coordinate for all the basis functions 
+from the String; it can be a `Vector`, a `Tuple` of the positional `ParamBox`s; when it's 
+set to `missing`, it will try to read the center information from the input string, and 
+leave the center as `[NaN, NaN, Nan]` if it can't find one for the corresponding 
+`BasisFunc`. The coordinate information, if included, should be right above the subshell 
+information for the `BasisFunc`. E.g.:
+```
+    "X    1.0                 0.0                 0.0                \nS    1   1.0"*
+    "\n      2.0                 1.0\n"
+```
 """
 function genBFuncsFromText(content::String;
                            adjustContent::Bool=false,
@@ -1003,6 +1005,10 @@ function genBFuncsFromText(content::String;
     for i in index
         gs1 = GaussFunc[]
         ng = data[i][2] |> Int
+        centerOld = center
+        if center isa Missing && i != 1 && data[i-1][1] == "X"
+            center = data[i-1][2:end]
+        end
         if data[i][1] == "SP"
             gs2 = GaussFunc[]
             for j = i+1 : i+ng
@@ -1017,6 +1023,7 @@ function genBFuncsFromText(content::String;
             end
             push!(bfs, genBasisFunc(center, gs1, (data[i][1] |> string), normalizeGTO=true))
         end
+        center = centerOld
     end
     bfs |> flatten
 end
