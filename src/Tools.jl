@@ -175,6 +175,8 @@ function hasBoolRelation(boolOp::F, obj1, obj2;
                                    decomposeNumberCollection)
             !res && (return false)
         end
+    elseif obj1 isa Type || obj2 isa Type
+        return boolOp(obj1, obj2)
     else
         fs1 = fieldnames(t1)
         fs2 = fieldnames(t2)
@@ -619,7 +621,9 @@ end
 """
 A function that only returns its argument.
 """
-itself(x) = x
+function itself(x::T)::T where {T}
+    x
+end
 
 
 """
@@ -641,10 +645,10 @@ next search.
 """
 function recursivelyGet(dict::Dict, startKey::Any)
     res = nothing
-    val = get(dict, startKey, false)
-    while val != false
+    val = get(dict, startKey, missing)
+    while !(val isa Missing)
         res = val
-        val = get(dict, val, false)
+        val = get(dict, val, missing)
     end
     res
 end
@@ -695,3 +699,55 @@ function groupedSort(v::Array, sortFunction::F=itself) where {F<:Function}
     end
     groups
 end
+
+
+function getFunc(fSym::Symbol, failedResult=missing)
+    try
+        getfield(Quiqbox, fSym)
+    catch
+        try
+            getfield(Main, fSym)
+        catch
+            try
+                fSym |> string |> Meta.parse |> eval
+            catch
+                (_) -> failedResult
+            end
+        end
+    end
+end
+
+
+# struct Pf{C, F} <: ParameterizedFunction
+#     c::Val{C}
+#     f::Function
+
+#     Pf(c::Real, f::Function) = new{c, nameOf(f)}(Val(c), f)
+#     Pf(c::Real, f::Pf{C, F}) where {C, F} = new{c*C, F}(Val(c*C), f.f)
+# end
+
+
+struct Pf{C, F} <: ParameterizedFunction
+    f::Function
+
+    Pf(c::Real, f::Function) = new{c, nameOf(f)}(f)
+    Pf(c::Real, f::Pf{C, F}) where {C, F} = new{c*C, F}(f.f)
+end
+
+# (f::Pf{C})(x) where {C} = C * f.f(x)
+(f::Pf{C})(x) where {C} = C * f.f(x)
+# (f::Pf{C, F})(c::Real, f2::Pf{C, F}) where {C, F} = Pf(c, f2)
+(::Type{Pf{C, F}})(x) where {C, F} = C * getFunc(F, NaN)(x)
+
+# Pf(x, t::Type{Pf{C, F}}) where {C, F} = t(x)
+
+
+nameOf(f::T) where {T} = f isa ParameterizedFunction ? typeof(f) : nameof(f)
+
+# function getFunctionNum(f::Function, x::Symbolics.Num)
+
+# end
+
+# function namePf(::Type{Pf{C, F}}) where {C, F}
+
+# end
