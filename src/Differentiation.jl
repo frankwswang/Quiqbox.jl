@@ -1,4 +1,5 @@
-export ParamBox, isDiffParam, toggleDiff!, gradHFenegy
+export ParamBox, inValOf, outValOf, inSymOf, outSymOf, dataOf, mapOf, outValCopy, 
+       inVarCopy, enableDiff!, disableDiff!, isDiffParam, toggleDiff!, gradHFenegy
 
 using LinearAlgebra: eigen
 using Symbolics: Num
@@ -14,7 +15,9 @@ Parameter container that enables parameter differentiations.
 
 `data::T`: Stored parameter. It can be accessed through syntax `[]`.
 
-`canDiff::Bool`: Indicator that whether this container should be marked as differentiable.
+`canDiff::Bool`: Indicator that whether this container should be marked as 
+"differentiable", i.e., whether the math function that consists of it can be taken partial 
+derivative with respect to it or not.
 
 ≡≡≡ Initialization Method(s) ≡≡≡
 
@@ -45,29 +48,96 @@ ParamBox{Float64}(1.0)[∂]
 NOTE: When the parameter inside `x::ParamBox` is marked as "differentiable" (a.k.a. 
 `x.canDiff=true`), "`[∂]`" in the printing info is in color green, otherwise it's in grey.
 """
-mutable struct ParamBox{V, T} <: DifferentiableParameter{ParamBox, T}
-# mutable struct ParamBox{V, T<:Number}
+struct ParamBox{T, V, F, IV} <: DifferentiableParameter{ParamBox, T}
     data::Array{T, 0}
-    map::Base.RefValue{<:Function}
-    canDiff::Base.RefValue{Bool}
-    index::Union{Int, Nothing}
-    ParamBox(data::Array{T, 0}, map, canDiff, index=nothing; 
-             name::Symbol=:undef) where {T<:Number} = 
-    new{name, T}(data, map, canDiff, index)
+    map::Function
+    canDiff::Array{Bool, 0}
+    index::Array{<:Union{Int, Nothing}, 0}
+    function ParamBox(data::Array{T, 0}, map::Function, canDiff, index, name::Symbol=:undef, 
+                      dataName::Symbol=:undef) where {T<:Number}
+        flag = (dataName == :undef)
+        if typeof(map) === typeof(itself)
+            dName = flag ? name : dataName
+        else
+            mapFuncStr = map |> nameOf |> string
+            if startswith(mapFuncStr, '#')
+                idx = parse(Int, mapFuncStr[2:end])
+                fStr = "f_" * string(name) * numToSubs(idx)
+                map = renameFunc(fStr, map)
+            end
+            dName = flag  ?  "x_" * string(name) |> Symbol  :  dataName
+        end
+        f = map
+        new{T, name, nameOf(f), dName}(data, f, canDiff, index)
+    end
 end
 
-# (pb::ParamBox)() = pb.map[](pb.data[])
-# In order to solve world age problem from `GridBox`
-(pb::ParamBox)() = Base.invokelatest(pb.map[], pb.data[])
+(pb::ParamBox)() = Base.invokelatest(pb.map, pb.data[])
 
-ParamBox(x::Number, name::Symbol=:undef; mapFunction::F=itself, 
+function ParamBox(data::Array{<:Number, 0}, name::Symbol=:undef, mapFunction::F=itself, 
+                  dataName::Symbol=:undef; canDiff::Bool=true, 
+                  index::Union{Int, Nothing}=nothing) where {F<:Function}
+    idx = reshape(Union{Int, Nothing}[0], ()) |> collect
+    idx[] = index
+    ParamBox(data, mapFunction, fill(canDiff), idx, name, dataName)
+end
+
+ParamBox(x::Number, name::Symbol=:undef, mapFunction::F=itself, dataName::Symbol=:undef; 
          canDiff::Bool=true, index::Union{Int, Nothing}=nothing, 
          paramType::Type{<:Number}=Float64) where {F<:Function} = 
-ParamBox(fill(x |> paramType), Ref(mapFunction), Ref(canDiff), index; name)
+ParamBox(fill(x |> paramType), name, mapFunction, dataName; canDiff, index)
 
-ParamBox(data::Array{<:Number, 0}, name::Symbol=:undef; mapFunction::F=itself, 
-         canDiff::Bool=true, index::Union{Int, Nothing}=nothing) where {F<:Function} = 
-ParamBox(data, Ref(mapFunction), Ref(canDiff), index; name)
+
+"""
+
+    inValOf(pb::ParamBox) -> Number
+
+Equivalent to `pb[]`.
+"""
+inValOf(pb::ParamBox) = pb.data[]
+
+
+"""
+
+    outValOf(pb::ParamBox) -> Number
+
+Equivalent to `pb()`.
+"""
+outValOf(pb::ParamBox) = pb()
+
+
+"""
+
+    inSymOf(pb::ParamBox) -> Symbol
+
+Return the type (`Symbol`) of the independent variable of the input `ParamBox`.
+"""
+inSymOf(pb::ParamBox) = typeof(pb).parameters[4]
+
+
+"""
+
+    outSymOf(pb::ParamBox) -> Symbol
+
+Return the type (`Symbol`) of the dependent variable of the input `ParamBox`.
+"""
+outSymOf(pb::ParamBox) = typeof(pb).parameters[2]
+
+
+dataOf(pb::ParamBox) = pb.data
+
+mapOf(pb::ParamBox) = pb.map
+
+
+function outValCopy(pb::ParamBox{<:Any, V, 
+                                 <:Any, <:Any})::ParamBox{<:Any, V, :itself, V} where {V}
+    ParamBox(pb(), outSymOf(pb), canDiff=pb.canDiff[])
+end
+
+function inVarCopy(pb::ParamBox{T, <:Any, <:Any, IV})::ParamBox{T, IV, :itself, IV} where 
+                  {T, IV}
+    ParamBox(pb.data, inSymOf(pb), canDiff=pb.canDiff[])
+end
 
 
 const NoDiffMark = superscriptSym['!']
@@ -75,9 +145,36 @@ const NoDiffMark = superscriptSym['!']
 
 """
 
+    enableDiff!(pb::ParamBox) -> ParamBox
+
+Mark the input `ParamBox` as "differentiable" (the math function that consists of it can be 
+taken partial derivative with respect to it). Return the marked `ParamBox`.
+"""
+function enableDiff!(pb::ParamBox)
+    pb.canDiff[] = true
+    pb
+end
+
+
+"""
+
+    disableDiff!(pb::ParamBox) -> ParamBox
+
+Mark the input `ParamBox` as "non-differentiable" (it will be treated as a constant in any 
+math function that consists of it). Return the marked `ParamBox`.
+"""
+function disableDiff!(pb::ParamBox)
+    pb.canDiff[] = false
+    pb
+end
+
+
+"""
+
     isDiffParam(pb::ParamBox) -> Bool
 
-Return `true` if the input `ParamBox` is differentiable.
+Return the Boolean value of if the input `ParamBox` is "differentiable", i.e., whether the 
+math function that consists of it can be taken partial derivative with respect.
 """
 isDiffParam(pb::ParamBox) = pb.canDiff[]
 
@@ -93,8 +190,8 @@ toggleDiff!(pb::ParamBox) = begin pb.canDiff[] = !pb.canDiff[] end
 
 
 function deriveBasisFunc(bf::CompositeGTBasisFuncs, par::ParamBox) where {N}
-    varDict = getVars(bf, includeMapping=true)
-    vr = getVar(par)[1][1]
+    varDict = getVarDictCore(bf)
+    vr = getVar(par)
     info = diffInfo(bf, vr, varDict)
     diffInfoToBasisFunc(bf, info)
 end
@@ -220,8 +317,6 @@ function gradHFenegy(bs::Vector{<:CompositeGTBasisFuncs}, par::Vector{<:ParamBox
                      S::Matrix{Float64}, mol::Vector{String}, 
                      nucCoords::Vector{<:AbstractArray}; 
                      nElectron::Union{Int, NTuple{2, Int}}=getCharge(mol))
-    @assert isDiffParam.(par) == fill(true, length(par)) "Input `ParamBox`(s) contains "*
-                                                         "non-differentiable `ParamBox`(s)!"
     if length(C) == 2 && nElectron isa Int
         nElectron = (nElectron÷2, nElectron-nElectron÷2)
     end

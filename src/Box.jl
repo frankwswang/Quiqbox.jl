@@ -41,8 +41,8 @@ struct GridBox{NX, NY, NZ} <: SemiMutableParameter{GridBox, Float64}
         @assert prod(nGrids .> 0) "The number of gird of each edge should be larger than 0."
         sym = ParamList[:spacing]
         spc = spacing |> Float64
-        pbRef = ParamBox(spc, sym; canDiff, index)
-        boxes = NTuple{3, ParamBox{sym, Float64}}[]
+        pbRef = ParamBox(spc; canDiff, index)
+        boxes = NTuple{3, ParamBox{Float64}}[]
         n = 0
         supIndex = "ᴳ"*numToSups(nGrids[1])*superscriptSym['-']*numToSups(nGrids[2])*
                    superscriptSym['-']*numToSups(nGrids[3])
@@ -57,11 +57,9 @@ struct GridBox{NX, NY, NZ} <: SemiMutableParameter{GridBox, Float64}
             fX = renameFunc(fXname, fX0)
             fY = renameFunc(fYname, fY0)
             fZ = renameFunc(fZname, fZ0)
-            X = ParamBox(pbRef.data, sym, mapFunction = fX)
-            Y = ParamBox(pbRef.data, sym, mapFunction = fY)
-            Z = ParamBox(pbRef.data, sym, mapFunction = fZ)
-            X.canDiff = Y.canDiff = Z.canDiff = pbRef.canDiff
-            X.index = Y.index = Z.index = pbRef.index
+            X = ParamBox(pbRef.data, ParamList[:X], fX, sym; canDiff, index)
+            Y = ParamBox(pbRef.data, ParamList[:Y], fY, sym; canDiff, index)
+            Z = ParamBox(pbRef.data, ParamList[:Z], fZ, sym; canDiff, index)
             push!(boxes, (X, Y, Z))
         end
         new{nGrids[1], nGrids[2], nGrids[3]}(prod(nGrids .+ 1), spc, boxes)

@@ -2,28 +2,21 @@
 import Base: ==
 ==(pb1::ParamBox, pb2::ParamBox) = (pb1[] == pb2[] && 
                                     pb1.canDiff[] == pb2.canDiff[] && 
-                                    pb1.index == pb2.index && 
-                                    pb1.map[] == pb2.map[])
+                                    pb1.index[] == pb2.index[] && 
+                                    typeof(pb1.map) === typeof(pb2.map))
 
 
 import Base: show
 const nSigShown = 10
 function show(io::IO, pb::ParamBox)
-    v = typeof(pb).parameters[1]
-    if pb.index === nothing 
-        i = v
-    else
-        i = string(v)*numToSubs(pb.index)
-    end
     c = pb.canDiff[] ? :green : :light_black
-    if typeof(pb.map[]) == typeof(itself)
-        j = ""
-    else
-        j = " -> $(Symbol(pb.map[]))($i)"
-    end
     print(io, typeof(pb))
-    print(io, "(", round(pb.data[], sigdigits=nSigShown), ")[", i, j, "]")
-    printstyled(io, "[∂]", color=c)
+    print(io, "(", round(pb.data[], sigdigits=nSigShown), ")")
+    print(io, "[")
+    printstyled(io, "∂", color=c)
+    print(io, "][")
+    printstyled(io, "$(pb|>getVar)", color=:cyan)
+    print(io, "]")
 end
 
 function show(io::IO, gf::GaussFunc)
@@ -204,12 +197,13 @@ function hasBoolRelation(boolFunc::F, pb1::ParamBox, pb2::ParamBox;
     if ignoreContainer
         # boolFunc(pb1.data, pb2.data) && 
         boolFunc(pb1(), pb2())
-    elseif ignoreFunction
-        boolFunc(pb1.data, pb2.data) && 
-        boolFunc(pb1.canDiff[],pb2.canDiff[])
+    elseif boolFunc(pb1.canDiff[], pb2.canDiff[])
+        if ignoreFunction
+            return boolFunc(pb1.data, pb2.data)
+        else
+            return (boolFunc(pb1.map, pb2.map) && boolFunc(pb1.data, pb2.data))
+        end
     else
-        boolFunc(pb1.map[], pb2.map[]) && 
-        boolFunc(pb1.data, pb2.data) && 
-        boolFunc(pb1.canDiff[],pb2.canDiff[])
+        false
     end
 end
