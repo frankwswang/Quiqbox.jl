@@ -7,19 +7,19 @@ using Suppressor: @capture_out
 
     # function show
     pb1 = ParamBox(-1, canDiff=false)
-    @test (@capture_out show(pb1)) == string(typeof(pb1))*"(-1.0)[undef][∂]"
+    @test (@capture_out show(pb1)) == string(typeof(pb1))*"(-1.0)[∂][undef]"
 
     pb2 = ParamBox(-1, :a, index=1)
-    @test (@capture_out show(pb2)) == string(typeof(pb2))*"(-1.0)[a₁][∂]"
+    @test (@capture_out show(pb2)) == string(typeof(pb2))*"(-1.0)[∂][a₁]"
 
-    pb3 = ParamBox(-1, :x, mapFunction=abs)
-    @test (@capture_out show(pb3)) == string(typeof(pb3))*"(-1.0)[x -> abs(x)][∂]"
+    pb3 = ParamBox(-1, :x, abs)
+    @test (@capture_out show(pb3)) == string(typeof(pb3))*"(-1.0)[∂][x_x]"
 
     bf1 = genBasisFunc([1,2,1], (2,1))
     gf1 = bf1.gauss[1]
     @test (@capture_out show(gf1)) == string(typeof(gf1))*"(xpn="*
-                                      string(typeof(gf1.param[1]))*"(2.0)[α][∂], con="*
-                                      string(typeof(gf1.param[2]))*"(1.0)[d][∂])"
+                                      string(typeof(gf1.param[1]))*"(2.0)[∂][α], con="*
+                                      string(typeof(gf1.param[2]))*"(1.0)[∂][d])"
     @test (@capture_out show(bf1)) == string(typeof(bf1))*"(gauss, subshell, center)"*
                                       "[X⁰Y⁰Z⁰][1.0, 2.0, 1.0]"
 
@@ -101,40 +101,40 @@ using Suppressor: @capture_out
     boolFunc(x, y) = (==)(x,y)
     boolFunc(x::Array{<:Real, 0}, y::Array{<:Real, 0}) = isapprox(x, y, atol=1e-12)
     boolFunc(x::Real, y::Real) = isapprox(x, y, atol=1e-12)
-    testMul = function (a1, a2)
+    testMul = function (a1, a2, ignoreContainer=false)
         r1 = hasBoolRelation(boolFunc, 
                              a1*(a1 + a2), 
                              (a1 + a2)*a1, 
                              a1*a1 + a1*a2, 
                              a1*a1 + a2*a1, 
                              mul(a1, add(a1, a2)), 
-                             mul(add(a1, a2), a1))
+                             mul(add(a1, a2), a1); ignoreContainer)
 
         r2 = hasBoolRelation(boolFunc, a1 *  a2 * a1, 
                              a1 * (a2 * a1), 
                              mul(mul(a1, a2), a1),
-                             mul(a1, mul(a2, a1)))
+                             mul(a1, mul(a2, a1)); ignoreContainer)
         r1 * r2
     end
 
     bf5 = genBasisFunc([1,1,1], GaussFunc(Exponent(3), Contraction(0.2, mapFunction=x->5x)))
     bfm4 = BasisFuncMix([bf4, bf5, bf4])
 
-    @test testMul(bf1, bf3)
-    @test testMul(bf1, bf4)
-    @test testMul(bf1, bf5)
-    @test testMul(bf3, bf4)
-    @test testMul(bf3, bf5)
-    @test testMul(bf4, bf5)
-    @test testMul(bf1, bfm2)
-    @test testMul(bf3, bfm2)
-    @test testMul(bf4, bfm2)
-    @test testMul(bf1, bfm3)
-    @test testMul(bf3, bfm3)
-    @test testMul(bf4, bfm3)
-    @test testMul(bf1, bfm4)
-    @test testMul(bf3, bfm4)
-    @test testMul(bf4, bfm4)
+    @test testMul(bf1,  bf3)
+    @test testMul(bf1,  bf4)
+    @test testMul(bf1,  bf5)
+    @test testMul(bf3,  bf4)
+    @test testMul(bf3,  bf5)
+    @test testMul(bf4,  bf5)
+    @test testMul(bf1,  bfm2)
+    @test testMul(bf3,  bfm2)
+    @test testMul(bf4,  bfm2)
+    @test testMul(bf1,  bfm3)
+    @test testMul(bf3,  bfm3)
+    @test testMul(bf4,  bfm3)
+    @test testMul(bf1,  bfm4)
+    @test testMul(bf3,  bfm4)
+    @test testMul(bf4,  bfm4)
     @test testMul(bfm2, bfm3)
     @test testMul(bfm2, bfm4)
     @test testMul(bfm3, bfm4)

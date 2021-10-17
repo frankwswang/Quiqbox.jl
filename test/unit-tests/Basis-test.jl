@@ -156,28 +156,7 @@ eeI = eeInteractions([bfm])[]
 @test isapprox(eeI, eeInteractions(bs1) |> sum, atol=errorThreshold2)
 
 
-# mergeGaussFuncs
-gf_merge1 = GaussFunc(2,1)
-gf_merge2 = GaussFunc(2,1)
-@test mergeGaussFuncs(gf_merge1) === gf_merge1
-
-mgf1 = mergeGaussFuncs(gf_merge1, gf_merge1)
-mgf2 = mergeGaussFuncs(gf_merge1, gf_merge2)
-@test mgf1.xpn() == 2 == mgf1.con()
-@test !hasIdentical(mgf1, mgf2)
-gf_merge1_2 = GaussFunc(gf_merge1.xpn, gf_merge2.con)
-gf_merge1_3 = GaussFunc(gf_merge2.xpn, gf_merge1.con)
-mgf1_2 = mergeGaussFuncs(gf_merge1, gf_merge1_2)
-mgf1_3 = mergeGaussFuncs(gf_merge1, gf_merge1_3)
-@test mgf1_2.xpn() == 2 == mgf1_2.con()
-@test !hasIdentical(mgf1, mgf1_2)
-@test !hasIdentical(mgf1_2, mgf1_3)
-@test hasEqual(mgf1, mgf1_2, mgf1_3)
-
-gf_merge3 = GaussFunc(1.5,1)
-@test hasIdentical(mergeGaussFuncs(gf_merge1, gf_merge3), [gf_merge1, gf_merge3])
-
-# function sumOf, add, mul
+# function sumOf
 bs2 = [genBasisFunc([1,1,1], (2,1), [1,0,0], normalizeGTO=true), 
        genBasisFunc([1,1,1], (3,1), [2,0,0], normalizeGTO=true), 
        genBasisFunc([1,1,2], (3,1), [0,0,0], normalizeGTO=true), 
@@ -199,20 +178,48 @@ bs3_2 = [genBasisFunc([1,1,1], (2,1), [1,0,0]),
        genBasisFunc([1,1,1], (3,1), [2,0,0]), 
        genBasisFunc([1,1,2], (3,1), [0,0,0])]
 
-@test add(bs2[1]) === bs2[1]
-bf1s = BasisFuncs(bf1.center, bf1.gauss, [ijkOrbitalList[bf1.ijk[1]]], bf1.normalizeGTO)
-@test hasIdentical(add(bf1s), bf1)
-
 bfm_1 = +(bs2...,)
 bfm_2 = sumOf(bs2)
 bfm_3 = BasisFuncMix(bs3)
 bfm_4 = +(bs2_2...,)
 bfm_5 = sumOf(bs2_2)
 bfm_6 = BasisFuncMix(bs3_2)
+bfm_7 = sumOf([bfm_6])
 @test hasEqual(bfm_1, bfm_3)
 @test hasEqual(bfm_2, bfm_3)
 @test hasEqual(bfm_4, bfm_6)
 @test hasEqual(bfm_5, bfm_6)
+@test hasEqual(bfm_6, bfm_7)
+
+
+# function mergeGaussFuncs
+gf_merge1 = GaussFunc(2,1)
+gf_merge2 = GaussFunc(2,1)
+gf_merge3 = GaussFunc(2,1)
+
+@test mergeGaussFuncs(gf_merge1) === gf_merge1
+
+mgf1 = mergeGaussFuncs(gf_merge1, gf_merge1)[]
+mgf2 = mergeGaussFuncs(gf_merge1, gf_merge2)[]
+@test mgf1.xpn() == 2 == mgf1.con()
+@test !hasIdentical(mgf1, mgf2)
+gf_merge1_2 = GaussFunc(gf_merge1.xpn, gf_merge2.con)
+gf_merge1_3 = GaussFunc(gf_merge2.xpn, gf_merge1.con)
+mgf1_2 = mergeGaussFuncs(gf_merge1, gf_merge1_2)[]
+mgf1_3 = mergeGaussFuncs(gf_merge1, gf_merge1_3)[]
+@test mgf1_2.xpn() == 2 == mgf1_2.con()
+@test !hasIdentical(mgf1, mgf1_2)
+@test !hasIdentical(mgf1_2, mgf1_3)
+@test hasEqual(mgf1, mgf1_2, mgf1_3)
+
+gf_merge3 = GaussFunc(1.5,1)
+@test hasIdentical(mergeGaussFuncs(gf_merge1, gf_merge3), [gf_merge1, gf_merge3])
+
+
+# , add, mul
+@test add(bs2[1]) === bs2[1]
+bf1s = BasisFuncs(bf1.center, bf1.gauss, [ijkOrbitalList[bf1.ijk[1]]], bf1.normalizeGTO)
+@test hasIdentical(add(bf1s), bf1)
 
 for bs in (bs2, bs2_2, bs2_3)
     X = overlaps(bs)^(-0.5)
@@ -329,27 +336,26 @@ alpha = Quiqbox.ParamList[:xpn]
                                                      nothing, bf_pbTest1.center[3]]
 
 
-# function dataCopy
+# function copyBasis
 e = Exponent(3.0, mapFunction=x -> x^2 + 1)
 c = Contraction(2.0)
 gf_dc1 = GaussFunc(e, c)
-gf_dc2 = dataCopy(gf_dc1)
+gf_dc2 = copyBasis(gf_dc1)
 @test hasEqual(gf_dc1.con, gf_dc2.con)
 @test gf_dc1.xpn() == gf_dc2.xpn() == gf_dc2.xpn[]
 
 
-# function getVar & getVars
-@test getVar(pb1 |> typeof).val.name == :p
-@test getVar(pb1)[][1].val.name == :pꜝ
-@test getVar(pb1)[][2] == 2.0
-@test getVar(pb1)[] isa Pair{Num, Float64}
+# function getVar & getVarDict
+# @test getVar(pb1)[][1].val.name == :p
+# @test getVar(pb1)[][2] == 2.0
+# @test getVar(pb1)[] isa Pair{Num, Float64}
 
 gf11 = GaussFunc(3,1)
 gf12 = GaussFunc(3,0.5)
-@test getVars([bf1]) == getVars(bf1)
-@test getVars([gf11, gf12]) == merge(getVars(gf11), getVars(gf12))
-@test getVars(gf1.param |> collect) == Dict(getVar(ParamBox(1, :d))[], 
-                                            getVar(ParamBox(2, :α))[])
+# @test getVarDict([bf1]) == getVarDict(bf1)
+# @test getVarDict.([gf11, gf12]) == merge(getVarDict(gf11), getVarDict(gf12))
+# @test getVarDict(gf1.param |> collect) == Dict(getVar(ParamBox(1, :d))[], 
+#                                             getVar(ParamBox(2, :α))[])
 
 
 # function expressionOf, expressionOfCore
@@ -405,9 +411,16 @@ errT = 1e-10
 @test isapprox(varVal(vars[1]^vars[2], d1), vals[1]^vals[2], atol=errT)
 @test isapprox(varVal(expr, d1), f1(vals...), atol=errT)
 
+f1 = Symbolics.variable(abs, T=Symbolics.FnType{Tuple{Any}, Real})(Z)
+f2 = Symbolics.variable(:abs, T=Symbolics.FnType{Tuple{Any}, Real})(Z)
+f1sym = f1.val
+f2sym = f2.val
+@test varVal(f1sym, d1) == abs(d1[Z])
+@test varVal(f2sym, d1) == abs(d1[Z])
+
 sp = 1.5
 gb1 = GridBox(1,sp)
-d2 = getVars(gb1.box |> flatten, includeMapping=true)
+d2 = getVarDict(gb1.box |> flatten)
 l = Symbolics.variable(:L,0)
 vars2 = [i.val for i in keys(d2)]
 diffs2 = Differential(l).(vars2)
