@@ -1,3 +1,5 @@
+push!(LOAD_PATH, ".")
+using Quiqbox
 using Test
 using Quiqbox
 using Suppressor: @suppress_out
@@ -17,9 +19,9 @@ bs1 = genBasisFunc.(cens, Ref(gfs1))
 pars1 = uniqueParams!(bs1, filterMapping=true)
 
 local Es1L, pars1L, grads1L
-@suppress_out begin
-    Es1L, pars1L, grads1L = optimizeParams!(bs1, pars1, mol, nucCoords, maxSteps = 200)
-end
+# @suppress_out begin
+    Es1L, pars1L, grads1L = optimizeParams!(bs1, pars1, mol, nucCoords, maxSteps = 200, printInfo=false)
+# end
 
 E_t1 = -1.775682554420
 par_t1 =  [ 1.331636672727,  0.454798446617,  0.311858635697, 
@@ -42,9 +44,9 @@ bs2 = genBasisFunc.(grid.box, Ref([gf2]))
 pars2 = uniqueParams!(bs2, filterMapping=true)[[1,3]]
 
 local Es2L, pars2L, grads2L
-@suppress_out begin
-    Es2L, pars2L, grads2L = optimizeParams!(bs2, pars2, mol, nucCoords, maxSteps = 100)
-end
+# @suppress_out begin
+    Es2L, pars2L, grads2L = optimizeParams!(bs2, pars2, mol, nucCoords, maxSteps = 100, printInfo=false)
+# end
 
 E_t2 = -1.16666630
 par_t2  = [0.17642659, 2.90239973]

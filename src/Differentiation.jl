@@ -53,8 +53,8 @@ struct ParamBox{T, V, F, IV} <: DifferentiableParameter{ParamBox, T}
     map::Function
     canDiff::Array{Bool, 0}
     index::Array{<:Union{Int, Nothing}, 0}
-    function ParamBox(data::Array{T, 0}, map::Function, canDiff, index, name::Symbol=:undef, 
-                      dataName::Symbol=:undef) where {T<:Number}
+    function ParamBox(data::Array{T, 0}, map::F, canDiff, index, name::Symbol=:undef, 
+                      dataName::Symbol=:undef) where {T<:Number, F<:Function}
         flag = (dataName == :undef)
         if typeof(map) === typeof(itself)
             dName = flag ? name : dataName
@@ -70,6 +70,24 @@ struct ParamBox{T, V, F, IV} <: DifferentiableParameter{ParamBox, T}
         f = map
         new{T, name, nameOf(f), dName}(data, f, canDiff, index)
     end
+
+    # function ParamBox(data::Array{T, 0}, map::typeof(itself), canDiff, index, name::Symbol=:undef, 
+    #                   dataName::Symbol=:undef) where {T<:Number}
+    #     dName = (dataName == :undef) ? name : dataName
+    #     new{T, name, :itself, dName}(data, map, canDiff, index)
+    # end
+
+    # function ParamBox(data::Array{T, 0}, map::F, canDiff, index, name::Symbol=:undef, 
+    #                   dataName::Symbol=:undef) where {T<:Number, F<:Function}
+    #     mapFuncStr = map |> nameOf |> string
+    #     if startswith(mapFuncStr, '#')
+    #         idx = parse(Int, mapFuncStr[2:end])
+    #         fStr = "f_" * string(name) * numToSubs(idx)
+    #         map = renameFunc(fStr, map)
+    #     end
+    #     dName = (dataName == :undef)  ?  "x_" * string(name) |> Symbol  :  dataName
+    #     new{T, name, nameOf(map), dName}(data, map, canDiff, index)
+    # end
 end
 
 (pb::ParamBox)() = Base.invokelatest(pb.map, pb.data[])
