@@ -30,15 +30,15 @@ function.
     GaussFunc(xpn::Real, con::Real) -> GaussFunc
 
 """
-struct GaussFunc{F1, F2} <: AbstractGaussFunc
-    xpn::ParamBox{Float64, ParamList[:xpn], F1}
-    con::ParamBox{Float64, ParamList[:con], F2}
-    param::Tuple{ParamBox{Float64, ParamList[:xpn], F1}, 
-                 ParamBox{Float64, ParamList[:con], F2}}
+struct GaussFunc <: AbstractGaussFunc
+    xpn::ParamBox{Float64, ParamList[:xpn]}
+    con::ParamBox{Float64, ParamList[:con]}
+    param::Tuple{ParamBox{Float64, ParamList[:xpn]}, 
+                 ParamBox{Float64, ParamList[:con]}}
 
-    GaussFunc(xpn::ParamBox{Float64, ParamList[:xpn], F1}, 
-              con::ParamBox{Float64, ParamList[:con], F2}) where {F1, F2} = 
-    new{F1, F2}(xpn, con, (xpn, con))
+    GaussFunc(xpn::ParamBox{Float64, ParamList[:xpn]}, 
+              con::ParamBox{Float64, ParamList[:con]}) = 
+    new(xpn, con, (xpn, con))
 end
 
 function GaussFunc(e::Real, c::Real)
@@ -207,7 +207,7 @@ collections of them based on the applied methods.
 
 ≡≡≡ Method 1 ≡≡≡
 
-    genBasisFunc(coord::AbstractArray, gs::Array{<:GaussFunc, 1}, 
+    genBasisFunc(coord::AbstractArray, gs::Array{GaussFunc, 1}, 
                  ijkOrijks::Union{Array{Int, 1}, Array{Array{Int, 1}, 1}}; 
                  normalizeGTO::Bool=false)
 
@@ -223,7 +223,7 @@ BasisFunc{1, 1}(gauss, subshell, center)[X⁰Y¹Z⁰][0.0, 0.0, 0.0]
 
 ≡≡≡ Method 2 ≡≡≡
 
-    genBasisFunc(coord::AbstractArray, gs::Array{<:GaussFunc, 1}, subshell::String="S"; 
+    genBasisFunc(coord::AbstractArray, gs::Array{GaussFunc, 1}, subshell::String="S"; 
                  ijkFilter::Array{Bool, 1}=fill(true, SubshellDimList[subshell]), 
                  normalizeGTO::Bool=false)
 
@@ -289,16 +289,16 @@ julia> genBasisFunc([0,0,0], [("STO-2G", "He"), ("STO-3G", "O")])
  BasisFuncs{1, 3, 3}(gauss, subshell, center)[3/3][0.0, 0.0, 0.0]
 ```
 """
-genBasisFunc(cen::Tuple{Vararg{<:ParamBox}}, gs::Vector{<:GaussFunc}, 
+genBasisFunc(cen::Tuple{Vararg{<:ParamBox}}, gs::Vector{GaussFunc}, 
           ijk::Vector{Int}; normalizeGTO::Bool=false) = 
 BasisFunc(cen, gs|>Tuple, ijk, normalizeGTO)
 
-genBasisFunc(cen::Tuple{Vararg{<:ParamBox}}, gs::Vector{<:GaussFunc}, 
+genBasisFunc(cen::Tuple{Vararg{<:ParamBox}}, gs::Vector{GaussFunc}, 
           ijks::Vector{Vector{Int}}; normalizeGTO::Bool=false) = 
 BasisFuncs(cen, gs|>Tuple, ijks, normalizeGTO)
 
 # ijkOrijks::Union{Vector{Int}, Vector{Vector{Int}}}
-function genBasisFunc(coord::AbstractArray, gs::Vector{<:GaussFunc}, ijkOrijks::Array; 
+function genBasisFunc(coord::AbstractArray, gs::Vector{GaussFunc}, ijkOrijks::Array; 
                       normalizeGTO::Bool=false)
     @assert length(coord) == 3 "The dimension of the center should be 3."
     x = ParamBox(coord[1], ParamList[:X])
@@ -307,12 +307,12 @@ function genBasisFunc(coord::AbstractArray, gs::Vector{<:GaussFunc}, ijkOrijks::
     genBasisFunc((x,y,z), gs, ijkOrijks; normalizeGTO)
 end
 
-genBasisFunc(::Missing, gs::Vector{<:GaussFunc}, ijkOrijks::Array; 
+genBasisFunc(::Missing, gs::Vector{GaussFunc}, ijkOrijks::Array; 
              normalizeGTO::Bool=false) = 
 genBasisFunc([NaN, NaN, NaN], gs, ijkOrijks; normalizeGTO)
 
 # center::Union{AbstractArray, Tuple{Vararg{<:ParamBox}}, Missing}
-function genBasisFunc(center, gs::Vector{<:GaussFunc}, subshell::String="S"; 
+function genBasisFunc(center, gs::Vector{GaussFunc}, subshell::String="S"; 
                       ijkFilter::Vector{Bool}=fill(true, SubshellDimList[subshell]), 
                       normalizeGTO::Bool=false)
     ijkLen = length(ijkFilter)
@@ -520,7 +520,7 @@ vcat((bfms .|> unpackBasisFuncs)...) |> sumOf
 
 mergeGaussFuncs(gf::GaussFunc) = itself(gf)
 
-function mergeGaussFuncs(gf1::GaussFunc, gf2::GaussFunc)::Vector{<:GaussFunc}
+function mergeGaussFuncs(gf1::GaussFunc, gf2::GaussFunc)::Vector{GaussFunc}
     xpn1 = gf1.xpn
     xpn2 = gf2.xpn
     con1 = gf1.con
@@ -550,7 +550,7 @@ end
 
 function mergeGaussFuncs(gf1::GaussFunc, 
                          gf2::GaussFunc, 
-                         gf3::GaussFunc...)::Vector{<:GaussFunc}
+                         gf3::GaussFunc...)::Vector{GaussFunc}
     gfs = [gf1, gf2, gf3...]
     xpns = Float64[i.xpn() for i in gfs]
     res = GaussFunc[]
@@ -696,154 +696,50 @@ julia> gf1 * 2 * gf1
 GaussFunc(xpn=ParamBox{Float64, :α}(6.0)[α][∂], con=ParamBox{Float64, :d}(2.0)[d][∂])
 ```
 """
-function mul(gf::GaussFunc{<:Any, :itself}, coeff::Real)::GaussFunc
+# function mul(gf::GaussFunc{<:Any, :itself}, coeff::Real)::GaussFunc
+#     c = convert(Float64, coeff)::Float64
+#     conNew = fill(gf.con.data[] * c)
+#     dataName = :undef
+#     mapFunction = itself
+#     conNew = Contraction(conNew; mapFunction, dataName, canDiff=gf.con.canDiff[])
+#     GaussFunc(gf.xpn, conNew)
+# end
+
+function mul(gf::GaussFunc, coeff::Real)::GaussFunc
     c = convert(Float64, coeff)::Float64
-    conNew = fill(gf.con.data[] * c)
-    dataName = :undef
+    # con, mapFunction, dataName = mulCore(Val(c), gf.con)
+    con, mapFunction, dataName = mulCore(c, gf.con)
+    conNew = Contraction(con; mapFunction, dataName, canDiff=gf.con.canDiff[])
+    GaussFunc(gf.xpn, conNew)
+end
+
+# function mulCore(::Val{1.0}, con::ParamBox)
+#     conNew = con.data
+#     mapFunction = con.map
+#     dataName = inSymOf(con)
+#     conNew, mapFunction, dataName
+# end
+
+# function mulCore(::Val{c}, con::ParamBox{<:Any, <:Any, F}) where {c, F}
+#     conNew = con.data
+#     mapFunction = Pf(c, Val(F))
+#     dataName = inSymOf(con)
+#     conNew, mapFunction, dataName
+# end
+
+function mulCore(c::Float64, con::ParamBox{<:Any, <:Any, :itself})
+    conNew = fill(con.data[] * c)
     mapFunction = itself
-    conNew = Contraction(conNew; mapFunction, dataName, canDiff=gf.con.canDiff[])
-    GaussFunc(gf.xpn, conNew)
+    dataName = :undef
+    conNew, mapFunction, dataName
 end
 
-function mul(gf::GaussFunc{<:Any, F}, coeff::Real)::GaussFunc where {F}
-    c = convert(Float64, coeff)::Float64
-    mapFuncOld = gf.con.map
-    conNew = gf.con.data
-    dataName = inSymOf(gf.con)
-    if c == 1.0
-        mapFunction = mapFuncOld
-    else
-        mapFunction = Pf(c, Val(F))
-    end
-    conNew = Contraction(conNew; mapFunction, dataName, canDiff=gf.con.canDiff[])
-    GaussFunc(gf.xpn, conNew)
+function mulCore(c::Float64, con::ParamBox{<:Any, <:Any, F}) where {F}
+    conNew = con.data
+    mapFunction = c == 1.0 ? con.map : Pf(c, Val(F))
+    dataName = inSymOf(con)
+    conNew, mapFunction, dataName
 end
-
-# function mul(gf::GaussFunc{<:Any, F}, coeff::Real)::GaussFunc where {F}
-#     c = convert(Float64, coeff)::Float64
-#     mapFuncOld = gf.con.map
-#     if typeof(mapFuncOld) === typeof(itself)
-#         conNew = fill(gf.con.data[] * c)
-#         dataName = :undef
-#         mapFunction = itself
-#     else
-#         conNew = gf.con.data
-#         dataName = inSymOf(gf.con)
-#         if c == 1.0
-#             mapFunction = mapFuncOld
-#         else
-#             mapFunction = Pf(c, Val(F))
-#         end
-#     end
-#     conNew = Contraction(conNew; mapFunction, dataName, canDiff=gf.con.canDiff[])
-#     GaussFunc(gf.xpn, conNew)
-# end
-
-# function mul(gf::GaussFunc{<:Any, F}, coeff::Real)::GaussFunc where {F}
-#     c = convert(Float64, coeff)::Float64
-#     mapFuncOld = gf.con.map
-#     if typeof(mapFuncOld) === typeof(itself)
-#         conNew = fill(gf.con.data[] * c)
-#         dataName = :undef
-#         mapFunction = itself
-#     else
-#         conNew = gf.con.data
-#         dataName = inSymOf(gf.con)
-#         if c == 1.0
-#             mapFunction = mapFuncOld
-#         else
-#             mapFunction = Pf(c, Val(F))
-#         end
-
-#         # c2 = rand(-10.1:0.2:10.1)
-#         # conNew = fill(gf.con() * c/c2)
-#         # dataName = inSymOf(gf.con)
-#         # mapFunction = Pf(c2, itself)
-
-#         # # conNew = gf.con.data
-#         # c2 = -rand(2:2:8)
-#         # c3 = rand(1:2)
-#         # conNew = fill(gf.con()*c/c2)
-#         # dataName = inSymOf(gf.con)
-#         # if c2 == 1.0
-#         #     mapFunction = mapFuncOld
-#         # else
-#         #     mapFunction = getPf(c3, Pf(Int(c2/c3), itself))
-#         # end
-#     end
-#     conNew = Contraction(conNew; mapFunction, dataName, canDiff=gf.con.canDiff[])
-#     GaussFunc(gf.xpn, conNew)
-# end
-
-
-# function mul(gf::GaussFunc{F1, :itself}, coeff::Real)::GaussFunc{F1} where {F1}
-#     c = convert(Float64, coeff)::Float64
-#     conNew = gf.con.data
-#     dataName = inSymOf(gf.con)
-#     if c == 1.0
-#         mapFunction = gf.con.map
-#     else
-#         mapFunction = Pf(c, itself)
-#     end
-#     conNew = Contraction(conNew; mapFunction, dataName, canDiff=gf.con.canDiff[])
-#     GaussFunc(gf.xpn, conNew)
-# end
-
-# function mul(gf::GaussFunc{F1, Pf{C, :itself}}, coeff::Real)::GaussFunc{F1} where {F1, C}
-#     c = convert(Float64, coeff)::Float64
-#     conNew = gf.con.data
-#     dataName = inSymOf(gf.con)
-#     if c == 1.0
-#         mapFunction = gf.con.map
-#     else
-#         mapFunction = Pf(c, Pf(C, itself)::Pf{C, :itself})
-#     end
-#     conNew = Contraction(conNew; mapFunction, dataName, canDiff=gf.con.canDiff[])
-#     GaussFunc(gf.xpn, conNew)
-# end
-
-# function mul(gf::GaussFunc{F1, F2}, coeff::Real)::GaussFunc{F1} where {F1, F2}
-#     c = convert(Float64, coeff)::Float64
-#     conNew = gf.con.data
-#     dataName = inSymOf(gf.con)
-#     mapFuncOld = gf.con.map::F2
-#     if c == 1.0
-#         mapFunction = mapFuncOld
-#     else
-#         mapFunction = Pf(c, mapFuncOld)
-#     end
-#     conNew = Contraction(conNew; mapFunction, dataName, canDiff=gf.con.canDiff[])
-#     GaussFunc(gf.xpn, conNew)
-# end
-
-# updateConCore(c::Float64, con::ParamBox{Float64, ParamList[:con], :itself}) = 
-# Contraction(fill(con.data[] * c); canDiff=con.canDiff[])
-
-# function updateConCore(c::Float64, con::ParamBox{Float64, ParamList[:con], F, IV}) where {F, IV}
-#     mapFuncOld = con.map
-#     if c == 1.0
-#         mapFunction = mapFuncOld
-#     else
-#         mapFunction = Pf(c, mapFuncOld)
-#     end
-#     Contraction(con.data; mapFunction, dataName=IV, canDiff=con.canDiff[])
-# end
-
-# function updateConCore(c::Float64, con::ParamBox{Float64, ParamList[:con], Pf{C, :itself}, IV}) where {C, IV}
-#     mapFuncOld = con.map
-#     if c == 1.0
-#         mapFunction = mapFuncOld
-#     else
-#         mapFunction = Pf(c*C, itself)
-#     end
-#     Contraction(con.data; mapFunction, dataName=IV, canDiff=con.canDiff[])
-# end
-
-# function mul(gf::GaussFunc, coeff::Real)::GaussFunc
-#     c = convert(Float64, coeff)::Float64
-#     conNew = updateConCore(c, gf.con)
-#     GaussFunc(gf.xpn, conNew)
-# end
 
 mul(coeff::Real, gf::GaussFunc) = mul(gf, coeff)
 
@@ -1167,14 +1063,14 @@ function genBFuncsFromText(content::String;
     index = findall(x -> typeof(x) != Vector{Float64} && length(x)==3, data)
     bfs = []
     for i in index
-        gs1 = GaussFunc{:itself, :itself}[]
+        gs1 = GaussFunc[]
         ng = data[i][2] |> Int
         centerOld = center
         if center isa Missing && i != 1 && data[i-1][1] == "X"
             center = data[i-1][2:end]
         end
         if data[i][1] == "SP"
-            gs2 = GaussFunc{:itself, :itself}[]
+            gs2 = GaussFunc[]
             for j = i+1 : i+ng
                 push!(gs1, GaussFunc(data[j][1], data[j][2]))
                 push!(gs2, GaussFunc(data[j][1], data[j][3]))
@@ -1698,70 +1594,14 @@ function diffInfo(bf::CompositeGTBasisFuncs, vr, varDict)
     diffTransfer.(relDiffs, Ref(varDict))
 end
 
-# global BCNallocs = Int[]
-
 function diffInfoToBasisFunc(bf::FloatingGTBasisFuncs, info::Matrix{<:Any})
     bs = decompose(bf, splitGaussFunc=true)
     mat = map(function (x, y)
-        #   shiftCore.(mul.(x, getindex.(y, 1)), getindex.(y, Ref(2:4))) |> BasisFuncMix
 
-        ## Speed slow to fast:
-        # xs = mul.(x, getindex.(y, 1))
-
-        # xs = typeof(x)[]
-        # for i in y
-        #     b = copyBasis(x)
-        #     b.gauss[1].con[] *= getindex(i, 1)
-        #     push!(xs, b)
-        # end
-
-        # xs = BasisFunc.(Ref(x.center), 
-        #                 GaussFunc.(x.gauss[1].xpn[], 
-        #                            x.gauss[1].con[].*getindex.(y,1)), 
-        #                 Ref(ijkOrbitalList[x.ijk[1]]), x.normalizeGTO)
-
-        # bc = @benchmarkable begin
-        #     x1 = $x
-        #     y1 = $y
-
-        #     xs = [copyBasis(x1) for i = 1:length(y1)]
-        #     for (i,j) in zip(y1, xs)
-        #         j.gauss[1].con[] *= getindex(i, 1)
-        #     end
-
-        #     # xs = BasisFunc.(Ref(x1.center), 
-        #     #     GaussFunc.(x1.gauss[1].xpn[], 
-        #     #                 x1.gauss[1].con[].*getindex.(y1,1)), 
-        #     #     Ref(ijkOrbitalList[x1.ijk[1]]), x1.normalizeGTO)
-
-        #     # xs = mul.(x1, getindex.(y1, 1))
-        # end
-
-        # b = run(bc, samples=2)
-
-        # if !(b.allocs in BCNallocs)
-        #     push!(BCNallocs, b.allocs)
-        #     b2 = run(bc)
-        #     io = IOBuffer()
-        #     show(io, "text/plain", b2)
-        #     strLines = split(String(take!(io)), "\n")
-        #     for i in strLines[[2,4,10]]
-        #         println(i)
-        #     end
-        #     println()
-        # end
-
-        # # println(String(take!(io)))
-
-
-        # xs = [copyBasis(x) for i = 1:length(y)]
-        # for (i,j) in zip(y, xs)
-        #     j.gauss[1].con[] *= getindex(i, 1)
-        # end
-
-        # xs = [mul(x, i[1]) for i in y]
-
-        xs = mul.(x, getindex.(y, 1))
+        xs = [copyBasis(x) for i = 1:length(y)]
+        for (i,j) in zip(y, xs)
+            j.gauss[1].con[] *= getindex(i, 1)
+        end
 
         shiftCore.(xs, getindex.(y, Ref(2:4))) |> BasisFuncMix
     end, bs, info)
