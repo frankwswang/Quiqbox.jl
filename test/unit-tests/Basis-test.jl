@@ -321,19 +321,21 @@ gf_pbTest1 = GaussFunc(2,1)
 
 gf_pbTest2 = GaussFunc(1.5,0.5)
 bf_pbTest1 = genBasisFunc([1,0,0], [gf_pbTest1, gf_pbTest2])
-@test getParams(bf_pbTest1) == [gf_pbTest1.param..., gf_pbTest2.param..., 
-                                bf_pbTest1.center...]
-
-@test getParams([gf_pbTest1, gf_pbTest2, bf_pbTest1.center...]) == getParams(bf_pbTest1)
+@test getParams(bf_pbTest1) == [bf_pbTest1.center..., 
+                                gf_pbTest1.param..., gf_pbTest2.param...]
 
 alpha = Quiqbox.ParamList[:xpn]
 @test getParams(bf_pbTest1, alpha) == 
       vcat(getParams(gf_pbTest1, alpha), getParams(gf_pbTest2, alpha)) == 
       [gf_pbTest1.param[1], gf_pbTest2.param[1]]
 
-@test getParams([pb1, bf_pbTest1], [:X, :Y, :Z]) == [nothing, bf_pbTest1.center[1],
-                                                     nothing, bf_pbTest1.center[2],
-                                                     nothing, bf_pbTest1.center[3]]
+cs = [pb1, bf_pbTest1]
+ss = [:X, :Y, :Z]
+@test [getParams(i, j) for i in cs, j in ss] |> flatten == 
+      [nothing, bf_pbTest1.center[1], nothing, bf_pbTest1.center[2], 
+       nothing, bf_pbTest1.center[3]]
+@test getParams(cs) == vcat(getParams(pb1), getParams(bf_pbTest1))
+@test (getParams.(Ref(cs), ss) |> flatten) == (bf_pbTest1.center |> collect)
 
 
 # function copyBasis

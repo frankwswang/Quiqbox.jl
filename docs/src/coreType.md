@@ -1,7 +1,7 @@
 # Core Types
 
 ```@docs
-ParamBox{V, T}
+ParamBox{V, VI, T}
 ```
 
 ```@docs
@@ -14,6 +14,10 @@ BasisFunc{S, GN}
 
 ```@docs
 BasisFuncs{S, GN, ON}
+```
+
+```@docs
+Quiqbox.BasisFuncMix{BN, GN}
 ```
 
 ```@docs

@@ -12,9 +12,9 @@ bs = genBasisFunc.(grid.box, Ref([gf1]))
 
 pars = uniqueParams!(bs, filterMapping=true)
 
-parsPartial = [pars[1], pars[3]]
+parsPartial = [pars[1], pars[4]]
 
-optimizeParams!(bs, parsPartial, nuc, nucCoords, maxSteps=20)
+Es, pars, grads = optimizeParams!(bs, parsPartial, nuc, nucCoords, maxSteps=20)
 
 # # You can also use more advanced optimizers from other packages.
 # using Flux # First do `Pkg.add("Flux")` if you haven't installed the package.

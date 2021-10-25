@@ -25,11 +25,11 @@ unique parameters that can also be optimized later:
 pars = uniqueParams!(bs, filterMapping=true)
 ```
 
-As expected, there are indeed only 3 unique tunable parameters despite the basis set already has 8 basis functions. (note that keyword argument `filterMapping` in `uniqueParams!` is set to `true` because we want the function to only return independent parameters) However, if we take a step further, we can remove ``d`` since each basis function here is just a single Gaussian function, which means the contraction coefficient won't affect the optimization results. Thus, input the intent parameters (along with other necessary arguments) into the Quiqbox function [`optimizeParams!`](@ref) and we can sit and wait for the optimization iterations to complete.
+As expected, there are indeed only 3 unique tunable parameters despite the basis set already has 8 basis functions. (note that keyword argument `filterMapping` in `uniqueParams!` is set to `true` because we want the function to only return independent parameters) However, if we take a step further, we can remove ``d`` since each basis function here is just a "unique" Gaussian function. Thus, input the intent parameters (along with other necessary arguments) into the Quiqbox function [`optimizeParams!`](@ref) and we can sit and wait for the optimization iterations to complete.
 ```@repl 4
-parsPartial = [pars[1], pars[3]]
+parsPartial = [pars[1], pars[4]]
 
-optimizeParams!(bs, parsPartial, nuc, nucCoords, maxSteps=20);
+Es, pars, grads = optimizeParams!(bs, parsPartial, nuc, nucCoords, maxSteps=20);
 ```
 
 After the optimization, you can check the basis set and we can see the parameters inside of it is also changed. This is because the `!` in the function names indicates that `optimizeParams!` is [a function that modifies its arguments](https://docs.julialang.org/en/v1/manual/style-guide/#bang-convention).

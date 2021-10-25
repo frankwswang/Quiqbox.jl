@@ -23,7 +23,7 @@ prefix = "Example"
 for (nuc, nucCoords, molName, iMol) in zip(mols, molCoords, molNames, 1:length(mols)), 
     (bfCoord, bsName) in zip(bfCoords[iMol:end], bsNames[iMol:end]), 
     bf in bfs
-    
+
     flag = (bfCoord == nucCoords)
     if flag
         nucConfig = [(bf, i) for i in nuc]
@@ -32,7 +32,7 @@ for (nuc, nucCoords, molName, iMol) in zip(mols, molCoords, molNames, 1:length(m
         bs = genBasisFunc.(bfCoord, bf) |> flatten
         bsName = "-Float"*bsName
     end
-    
+
     # Number of spin-orbitals must not be smaller than numbers of electrons.
     fVars = try runHF(bs, nuc, nucCoords; printInfo=false) catch; continue end
 

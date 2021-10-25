@@ -23,12 +23,23 @@ A `struct` that stores coordinates of grid points in terms of both `Vector`s and
             centerCoord::Array{<:Real, 1}=[0.0,0.0,0.0];
             canDiff::Bool=true, index::Int=0) -> GridBox
 
-Constructor of a general `GridBox` that doesn't have to shape as a cube. `nGrid` is a 
-3-element `Tuple` that specifies the number of grids (number of grid points - 1) along 
-3 dimensions. `spacing` specifies the length between adjacent grid points. 
-`centerCoord` specifies the geometry center coordinate of the box. `canDiff` determines 
-whether the `ParamBox` should be marked as differentiable. `index` defines the index 
-number for the actual parameter: spacing `L`, with the default value 0 it would be `L₀`.
+Construct a general `GridBox` that doesn't have to shape as a cube. `nGrid` is a 3-element 
+`Tuple` that specifies the number of grids (number of grid points - 1) along 3 dimensions. 
+`spacing` specifies the length between adjacent grid points. `centerCoord` specifies the 
+geometry center coordinate of the box. `canDiff` determines whether the `ParamBox` should 
+be marked as differentiable. `index` defines the index number for the actual parameter: 
+spacing `L`, with the default value 0 it would be `L₀`.
+
+    GridBox(nGridPerEdge::Int, spacing::Real=10, 
+            centerCoord::Array{<:Real, 1}=[0.0,0.0,0.0]; 
+            canDiff::Bool=true, index::Int=0) -> GridBox
+
+Method of generating a cubic `GridBox`. `nGridPerEdge` specifies the number of grids 
+(number of grid points - 1) along each dimension.`spacing` specifies the length between 
+adjacent grid points. `centerCoord` specifies the geometry center coordinate of the box. 
+`canDiff` determines whether the `ParamBox` should be marked as differentiable. `index` 
+defines the index number for the actual parameter: spacing `L`, with the default value 0 
+it would be `L₀`.
 """
 struct GridBox{NX, NY, NZ} <: SemiMutableParameter{GridBox, Float64}
     num::Int
@@ -66,19 +77,6 @@ struct GridBox{NX, NY, NZ} <: SemiMutableParameter{GridBox, Float64}
     end
 end
 
-"""
-
-    GridBox(nGridPerEdge::Int, spacing::Real=10, 
-            centerCoord::Array{<:Real, 1}=[0.0,0.0,0.0]; 
-            canDiff::Bool=true, index::Int=0) -> GridBox
-    
-Method of generating a cubic `GridBox`. `nGridPerEdge` specifies the number of grids 
-(number of grid points - 1) along each dimension.`spacing` specifies the length between 
-adjacent grid points. `centerCoord` specifies the geometry center coordinate of the box. 
-`canDiff` determines whether the `ParamBox` should be marked as differentiable. `index` 
-defines the index number for the actual parameter: spacing `L`, with the default value 0 
-it would be `L₀`.
-"""
 GridBox(nGridPerEdge::Int, spacing::Real=10, centerCoord::Vector{<:Real}=[0.0,0.0,0.0];
         canDiff::Bool=true, index::Int=0) = 
 GridBox(fill(nGridPerEdge, 3) |> Tuple, spacing, centerCoord; canDiff, index)

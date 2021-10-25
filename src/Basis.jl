@@ -66,6 +66,15 @@ function Exponent(e::Union{Real, Array{Float64, 0}};
     ParamBox(n, ParamList[:xpn], mapFunction, dataName; canDiff)
 end
 
+"""
+
+    Exponent(pb::ParamBox{Float64}) -> ParamBox{Float64, :α}
+
+Convert a `ParamBox` to an exponent coefficient parameter.
+"""
+Exponent(pb::ParamBox{Float64}) = ParamBox(pb.data, pb.map, pb.canDiff, pb.index, 
+                                           ParamList[:xpn], pb.dataName)
+
 
 """
 
@@ -84,6 +93,15 @@ function Contraction(c::Union{Real, Array{Float64, 0}};
     n = (c isa Array) ? c : (roundDigits < 0 ? Float64(c) : round(c[], digits=roundDigits))
     ParamBox(n, ParamList[:con], mapFunction, dataName; canDiff)
 end
+
+"""
+
+    Contraction(pb::ParamBox{Float64}) -> ParamBox{Float64, :α}
+
+Convert a `ParamBox` to an contraction coefficient parameter.
+"""
+Contraction(pb::ParamBox{Float64}) = ParamBox(pb.data, pb.map, pb.canDiff, pb.index, 
+                                              ParamList[:con], pb.dataName)
 
 
 """
@@ -115,7 +133,7 @@ momentum orientation. E.g., s would be ("X⁰Y⁰Z⁰")
               ijk::Array{Int, 1}, normalizeGTO::Bool) where {GN} -> 
     BasisFunc{𝑙, GN} where {𝑙}
 
-    BasisFunc(cen::Tuple{Vararg{<:ParamBox}}, gauss::GaussFunc, ijk::Vector{Int}, 
+    BasisFunc(cen::Tuple{Vararg{<:ParamBox}}, gauss::GaussFunc, ijk::Array{Int, 1}, 
               normalizeGTO::Bool) ->
     BasisFunc{𝑙, 1} where {𝑙}
 """
@@ -384,10 +402,13 @@ when nuclei and their coordinates of same `DataType` are input.
 
 ≡≡≡ Initialization Method(s) ≡≡≡
 
-    GTBasis(basis::Vector{<:AbstractGTBasisFuncs}, S::Matrix{<:Number}, 
+    GTBasis(basis::Array{<:AbstractGTBasisFuncs, 1}, S::Matrix{<:Number}, 
             Te::Matrix{<:Number}, eeI::Array{<:Number, 4}) -> 
     GTBasis
 
+    GTBasis(basis::Array{<:AbstractGTBasisFuncs, 1}) -> GTBasis
+
+Directly construct a `GTBasis` given a basis set.
 """
 struct GTBasis{N, BT} <: BasisSetData{N}
     basis::Vector{<:AbstractGTBasisFuncs}
@@ -405,13 +426,6 @@ struct GTBasis{N, BT} <: BasisSetData{N}
     end
 end
 
-"""
-
-    GTBasis(basis::Array{<:AbstractGTBasisFuncs}, 1) -> GTBasis
-
-Directly construct a `GTBasis` given a basis set.
-
-"""
 GTBasis(basis::Vector{<:AbstractGTBasisFuncs}) = 
 GTBasis(basis, overlaps(basis), elecKinetics(basis), eeInteractions(basis))
 
@@ -551,7 +565,7 @@ end
 function mergeGaussFuncs(gf1::GaussFunc, 
                          gf2::GaussFunc, 
                          gf3::GaussFunc...)::Vector{GaussFunc}
-    gfs = [gf1, gf2, gf3...]
+    gfs = vcat(gf1, gf2, gf3 |> collect)
     xpns = Float64[i.xpn() for i in gfs]
     res = GaussFunc[]
     _, uList = markUnique(xpns, compareFunction=(==))
@@ -587,9 +601,6 @@ end
     add(b1::CompositeGTBasisFuncs{<:Any, 1}, b2::CompositeGTBasisFuncs{<:Any, 1}) ->
     CompositeGTBasisFuncs{<:Any, 1}
 
-    +(b::CompositeGTBasisFuncs{<:Any, 1}, bs::CompositeGTBasisFuncs{<:Any, 1}...) ->
-    CompositeGTBasisFuncs{<:Any, 1}
-
 Addition between `CompositeGTBasisFuncs{<:Any, 1}` such as `BasisFunc` and 
 `Quiqbox.BasisFuncMix`. It can be called using `+` syntax.
 
@@ -609,11 +620,11 @@ julia> bf3.gauss[1].con[]
 3.0
 ```
 """
-add(bf::BasisFunc) = itself(bf)
-
-function add(bf::BasisFuncs{𝑙, GN, 1})::BasisFunc{𝑙, GN} where {𝑙, GN}
-    BasisFunc(bf.center, bf.gauss, ijkOrbitalList[bf.ijk[1]], bf.normalizeGTO)
+function add(b::BasisFuncs{𝑙, GN, 1})::BasisFunc{𝑙, GN} where {𝑙, GN}
+    BasisFunc(b.center, b.gauss, ijkOrbitalList[b.ijk[1]], b.normalizeGTO)
 end
+
+add(b::BasisFunc) = itself(b)
 
 function add(bf1::BasisFunc{𝑙, GN1}, 
              bf2::BasisFunc{𝑙, GN2})::CompositeGTBasisFuncs{<:Any, 1} where {𝑙, GN1, GN2}
@@ -630,7 +641,7 @@ function add(bf1::BasisFunc{𝑙, GN1},
         else
             cen = makeCenter(c)
         end
-        gfs = [bf1.gauss..., bf2.gauss...]
+        gfs = vcat(bf1.gauss |> collect, bf2.gauss |> collect)
         gfsN = mergeGaussFuncs(gfs...) |> Tuple
         BasisFunc(cen, gfsN, ijkOrbitalList[bf1.ijk[1]], bf1.normalizeGTO)
     else
@@ -651,7 +662,8 @@ add(bf1.BasisFunc[1], bf2)
 add(bf1::BasisFunc{𝑙, GN1}, bf2::BasisFuncMix{1, GN2}) where {𝑙, GN1, GN2} = 
 add(bf2, bf1)
 
-add(bf::BasisFunc, bfm::BasisFuncMix{BN}) where {BN} = [bf, bfm.BasisFunc...] |> sumOf
+add(bf::BasisFunc, bfm::BasisFuncMix{BN}) where {BN} = 
+vcat(bf, bfm.BasisFunc |> collect) |> sumOf
 
 add(bfm::BasisFuncMix{BN}, bf::BasisFunc) where {BN} = add(bf, bfm)
 
@@ -663,19 +675,31 @@ add(bf::BasisFuncMix{1}, bfm::BasisFuncMix{BN}) where {BN} = add(bf.BasisFunc[1]
 add(bfm::BasisFuncMix{BN}, bf::BasisFuncMix{1}) where {BN} = add(bf, bfm)
 
 add(bfm1::BasisFuncMix{BN1}, bfm2::BasisFuncMix{BN2}) where {BN1, BN2} = 
-[bfm1.BasisFunc..., bfm2.BasisFunc...] |> sumOf
+vcat(bfm1.BasisFunc |> collect, bfm2.BasisFunc |> collect) |> sumOf
 
 add(bf1::BasisFuncs{𝑙1, GN1, 1}, bf2::BasisFuncs{𝑙2, GN2, 1}) where {𝑙1, 𝑙2, GN1, GN2} = 
 [[bf1, bf2] .|> add |> sumOf]
 
 
+const Doc_mul_Eg1 = "GaussFunc(xpn=ParamBox{Float64, :α, :itself}(3.0)[∂][α], " * 
+                              "con=ParamBox{Float64, :d, :itself}(1.0)[∂][d])"
+
+const Doc_mul_Eg2 = "GaussFunc(xpn=ParamBox{Float64, :α, :itself}(3.0)[∂][α], " * 
+                              "con=ParamBox{Float64, :d, :itself}(2.0)[∂][d])"
+
+const Doc_mul_Eg3 = "GaussFunc(xpn=ParamBox{Float64, :α, :itself}(6.0)[∂][α], " * 
+                              "con=ParamBox{Float64, :d, :itself}(1.0)[∂][d])"
+
+const Doc_mul_Eg4 = "GaussFunc(xpn=ParamBox{Float64, :α, :itself}(6.0)[∂][α], " * 
+                              "con=ParamBox{Float64, :d, :itself}(2.0)[∂][d])"
+
 """
 
-    mul(a1::Real, a2::GaussFunc) -> GaussFunc
+    mul(gf::GaussFunc, coeff::Real) -> GaussFunc
 
-    mul(a1::GaussFunc, a2::Real) -> GaussFunc
+    mul(coeff::Real, gf::GaussFunc) -> GaussFunc
 
-    mul(a1::GaussFunc, a2::GaussFunc) -> GaussFunc
+    mul(gf1::GaussFunc, gf2::GaussFunc) -> GaussFunc
 
 Multiplication between `GaussFunc`s or contraction coefficient multiplication between a 
 `Real` number and a `GaussFunc`. It can be called using `*` syntax.
@@ -684,48 +708,24 @@ Multiplication between `GaussFunc`s or contraction coefficient multiplication be
 
 ```jldoctest; setup = :(push!(LOAD_PATH, "../../src/"); using Quiqbox)
 julia> gf1 = GaussFunc(3,1)
-GaussFunc(xpn=ParamBox{Float64, :α}(3.0)[α][∂], con=ParamBox{Float64, :d}(1.0)[d][∂])
+$(Doc_mul_Eg1)
 
 julia> gf1 * 2
-GaussFunc(xpn=ParamBox{Float64, :α}(3.0)[α][∂], con=ParamBox{Float64, :d}(2.0)[d][∂])
+$(Doc_mul_Eg2)
 
 julia> gf1 * gf1
-GaussFunc(xpn=ParamBox{Float64, :α}(6.0)[α][∂], con=ParamBox{Float64, :d}(1.0)[d][∂])
+$(Doc_mul_Eg3)
 
 julia> gf1 * 2 * gf1
-GaussFunc(xpn=ParamBox{Float64, :α}(6.0)[α][∂], con=ParamBox{Float64, :d}(2.0)[d][∂])
+$(Doc_mul_Eg4)
 ```
 """
-# function mul(gf::GaussFunc{<:Any, :itself}, coeff::Real)::GaussFunc
-#     c = convert(Float64, coeff)::Float64
-#     conNew = fill(gf.con.data[] * c)
-#     dataName = :undef
-#     mapFunction = itself
-#     conNew = Contraction(conNew; mapFunction, dataName, canDiff=gf.con.canDiff[])
-#     GaussFunc(gf.xpn, conNew)
-# end
-
 function mul(gf::GaussFunc, coeff::Real)::GaussFunc
     c = convert(Float64, coeff)::Float64
-    # con, mapFunction, dataName = mulCore(Val(c), gf.con)
     con, mapFunction, dataName = mulCore(c, gf.con)
     conNew = Contraction(con; mapFunction, dataName, canDiff=gf.con.canDiff[])
     GaussFunc(gf.xpn, conNew)
 end
-
-# function mulCore(::Val{1.0}, con::ParamBox)
-#     conNew = con.data
-#     mapFunction = con.map
-#     dataName = inSymOf(con)
-#     conNew, mapFunction, dataName
-# end
-
-# function mulCore(::Val{c}, con::ParamBox{<:Any, <:Any, F}) where {c, F}
-#     conNew = con.data
-#     mapFunction = Pf(c, Val(F))
-#     dataName = inSymOf(con)
-#     conNew, mapFunction, dataName
-# end
 
 function mulCore(c::Float64, con::ParamBox{<:Any, <:Any, :itself})
     conNew = fill(con.data[] * c)
@@ -736,7 +736,7 @@ end
 
 function mulCore(c::Float64, con::ParamBox{<:Any, <:Any, F}) where {F}
     conNew = con.data
-    mapFunction = c == 1.0 ? con.map : Pf(c, Val(F))
+    mapFunction = Pf(c, Val(F))
     dataName = inSymOf(con)
     conNew, mapFunction, dataName
 end
@@ -749,11 +749,10 @@ end
 
 """
 
-    mul(a1::Real, a2::CompositeGTBasisFuncs{<:Any, 1}; 
-        normalizeGTO::Union{Bool, Missing}=missing) -> 
-    CompositeGTBasisFuncs{<:Any, 1}
+    mul(sgf1::BasisFunc{𝑙1, 1}, sgf2::BasisFunc{𝑙2, 1}; 
+             normalizeGTO::Union{Bool, Missing}=missing)::BasisFunc{𝑙1+𝑙2, 1} where {𝑙1, 𝑙2}
 
-    mul(a1::CompositeGTBasisFuncs{<:Any, 1}, a2::Real; 
+    mul(a1::Real, a2::CompositeGTBasisFuncs{<:Any, 1}; 
         normalizeGTO::Union{Bool, Missing}=missing) -> 
     CompositeGTBasisFuncs{<:Any, 1}
 
@@ -762,10 +761,10 @@ end
     CompositeGTBasisFuncs{<:Any, 1}
 
 Multiplication between `CompositeGTBasisFuncs{<:Any, 1}`s such as `BasisFunc` and 
-`Quiqbox.BasisFuncMix`, or contraction coefficient multiplication between a `Real` number 
+`$(BasisFuncMix)`, or contraction coefficient multiplication between a `Real` number 
 and a `CompositeGTBasisFuncs{<:Any, 1}`. If `normalizeGTO` is set to `missing` (in 
 default), The `GaussFunc` in the output result will be normalized only if all the input 
-bases has `normalizeGTO = true`. The function can be called using `*` syntax.
+bases have `normalizeGTO = true`. The function can be called using `*` syntax.
 
 ≡≡≡ Example(s) ≡≡≡
 
@@ -891,7 +890,7 @@ mul(bf1::BasisFuncs{𝑙1, GN1, 1}, bf2::BasisFuncs{𝑙2, GN2, 1};
 
 """
 
-    shift(bf::FloatingGTBasisFuncs{𝑙, GN, 1}, didjdk::Vector{Int}) where {𝑙, GN} -> 
+    shift(bf::FloatingGTBasisFuncs{𝑙, GN, 1}, didjdk::Array{Int, 1}) where {𝑙, GN} -> 
     BasisFunc
 
 Shift (add) the angular momentum (Cartesian representation) given the a vector that 
@@ -1045,8 +1044,11 @@ leave the center as `[NaN, NaN, Nan]` if it can't find one for the corresponding
 `BasisFunc`. The coordinate information, if included, should be right above the subshell 
 information for the `BasisFunc`. E.g.:
 ```
-    "X    1.0                 0.0                 0.0                \nS    1   1.0"*
-    "\n      2.0                 1.0\n"
+    \"\"\"
+    X    1.0                 0.0                 0.0
+    S    1   1.0
+          2.0                 1.0
+    \"\"\"
 ```
 """
 function genBFuncsFromText(content::String;
@@ -1121,69 +1123,68 @@ end
 
 """
 
-    getParams(pbc::Union{ParamBox, GaussFunc, FloatingGTBasisFuncs}, 
-              symbol::Union{Symbol, Nothing}=nothing; onlyDifferentiable::Bool=false) -> 
-    Union{ParamBox, Array{<:ParamBox, 1}}
+    getParams(pbc::ParamBox, symbol::Union{Symbol, Nothing}=nothing; 
+              onlyDifferentiable::Bool=false) -> 
+    Union{ParamBox, Nothing}
 
-Return the parameter(s)`::ParamBox` stored in the input container. If keyword argument 
-`symbol` is `nothing`, then return all the different parameters; if it's set to the 
-`Symbol` type of a parameter (e.g. the symbol of `ParamBox{T, V}` would be `V`), the function 
-will only search for that type of parameters (which might have different indices). 
-`onlyDifferentiable` determines whether ignore non-differentiable parameters.
-"""
-function getParams(pb::ParamBox, symbol::Union{Symbol, Nothing}=nothing; 
-                   onlyDifferentiable::Bool=false)
-    !(onlyDifferentiable ? pb.canDiff[] : true) && (return nothing)
-    !(symbol === nothing ? true : (symbol == outSymOf(pb))) && (return nothing)
-    pb
-end
-
-function getParams(pbs::Vector{<:ParamBox{<:T}}, symbol::Union{Symbol, Nothing}=nothing; 
-                   onlyDifferentiable::Bool=false) where {T}
-    res = symbol === nothing ? ParamBox{T}[] : ParamBox{T, symbol}[]
-    for i in pbs
-        j = getParams(i, symbol; onlyDifferentiable)
-        j !== nothing && push!(res, j)
-    end
-    res
-end
-
-getParams(gf::GaussFunc, symbol::Union{Symbol, Nothing}=nothing; 
-          onlyDifferentiable::Bool=false) = 
-getParams([gf.xpn, gf.con], symbol; onlyDifferentiable)
-
-getParams(bf::FloatingGTBasisFuncs, symbol::Union{Symbol, Nothing}=nothing; 
-          onlyDifferentiable::Bool=false) = 
-vcat( getParams.(bf.gauss, symbol; onlyDifferentiable)..., 
-      getParams(bf.center |> collect, symbol; onlyDifferentiable) )
-
-getParams(bfm::BasisFuncMix, symbol::Union{Symbol, Nothing}=nothing; 
-          onlyDifferentiable::Bool=false) = 
-vcat( getParams.((collect ∘ flatten)( getfield.(bfm.BasisFunc, :gauss) ), symbol; 
-                 onlyDifferentiable)..., 
-      getParams((collect ∘ flatten)( getfield.(bfm.BasisFunc, :center) ), symbol; 
-                 onlyDifferentiable) )
-
-getParams(cs, symbols::Vector{Symbol}; onlyDifferentiable::Bool=false) = 
-getParams.(Ref(cs), symbols; onlyDifferentiable) |> flatten
-
-"""
-
-    getParams(cs::Array, symbol::Union{Symbol, Nothing}=nothing; 
+    getParams(pbc::StructSpatialBasis, symbol::Union{Symbol, Nothing}=nothing; 
               onlyDifferentiable::Bool=false) -> 
     Array{<:ParamBox, 1}
 
-Method of `getParams` when the 1st argument is an `Array` of `ParamBox`, `GaussFunc`, 
-`FloatingGTBasisFuncs` or any of them.
+    getParams(pbc::Array, symbol::Union{Symbol, Nothing}=nothing; 
+              onlyDifferentiable::Bool=false) -> 
+    Array{<:ParamBox, 1}
+
+Return the parameter(s) stored in the input container. If keyword argument `symbol` is set 
+to `nothing`, then return all the different parameters; if it's set to the `Symbol` of a 
+parameter (e.g. the symbol of `ParamBox{T, V}` would be `V`), return only that type of 
+parameters (which might still have different indices). `onlyDifferentiable` determines 
+whether ignore non-differentiable parameters. If the 1st argument is an `Array`, the 
+entries must be `ParamBox` containers.
 """
-getParams(cs::Array, symbol::Union{Symbol, Nothing}=nothing; 
+function getParams(pb::ParamBox, symbol::Union{Symbol, Nothing}=nothing; 
+          onlyDifferentiable::Bool=false)
+    paramFilter(pb, symbol, onlyDifferentiable) ? pb : nothing
+end
+
+function getParams(ssb::StructSpatialBasis, symbol::Union{Symbol, Nothing}=nothing; 
+          onlyDifferentiable::Bool=false)
+    filter(x->paramFilter(x, symbol, onlyDifferentiable), ssb.param) |> collect
+end
+
+function getParams(cs::Array{<:ParamBox}, symbol::Union{Symbol, Nothing}=nothing; 
+          onlyDifferentiable::Bool=false)
+    idx = findall(x->paramFilter(x, symbol, onlyDifferentiable), cs)
+    [cs[i] for i in idx]
+end
+
+getParams(cs::Array{<:StructSpatialBasis}, symbol::Union{Symbol, Nothing}=nothing; 
           onlyDifferentiable::Bool=false) = 
-getParams.(cs, symbol; onlyDifferentiable) |> flatten
+vcat(getParams.(cs, symbol; onlyDifferentiable)...)
 
+function getParams(cs::Array, symbol::Union{Symbol, Nothing}=nothing; 
+                   onlyDifferentiable::Bool=false)
+    pbIdx = findall(x->x isa ParamBox, cs)
+    vcat(getParams(convert(Vector{ParamBox}, cs[pbIdx]), symbol; onlyDifferentiable), 
+         getParams(convert(Vector{StructSpatialBasis}, cs[1:end .∉ [pbIdx]]), symbol; 
+                   onlyDifferentiable))
+end
+
+function paramFilter(pb::ParamBox, outSym::Union{Symbol, Nothing}=nothing, 
+                     canDiff::Bool=false)
+    (outSym === nothing || outSymOf(pb) == outSym) && 
+    (!canDiff || pb.canDiff[])
+end
+
+
+const Doc_copyBasis_Eg1 = "GaussFunc(xpn=ParamBox{Float64, :α, :itself}(9.0)[∂][α], " * 
+                                    "con=ParamBox{Float64, :d, :itself}(2.0)[∂][d])"
 
 """
 
-    copyBasis(b::Union{GaussFunc, CompositeGTBasisFuncs}) -> typeof(b)
+    copyBasis(b::GaussFunc) -> GaussFunc
+
+    copyBasis(b::CompositeGTBasisFuncs) -> CompositeGTBasisFuncs
 
 A deep copy of the input basis function(s) except the mapping relation(s) of stored 
 parameter(s) won't be kept.
@@ -1192,15 +1193,15 @@ parameter(s) won't be kept.
 
 ```jldoctest; setup = :(push!(LOAD_PATH, "../../src/"); using Quiqbox)
 julia> e = Exponent(3.0, mapFunction=x->x^2)
-ParamBox{Float64, :α}(3.0)[α -> #1(α)][∂]
+ParamBox{Float64, :α, :f_α₁}(3.0)[∂][x_α]
 
 julia> c = Contraction(2.0)
-ParamBox{Float64, :d}(2.0)[d][∂]
+ParamBox{Float64, :d, :itself}(2.0)[∂][d]
 
 julia> gf1 = GaussFunc(e, c);
 
 julia> gf2 = copyBasis(gf1)
-GaussFunc(xpn=ParamBox{Float64, :α}(9.0)[α][∂], con=ParamBox{Float64, :d}(2.0)[d][∂])
+$(Doc_copyBasis_Eg1)
 
 julia> gf1.xpn() == gf2.xpn()
 true
@@ -1251,13 +1252,34 @@ function compareParamBox(pb1::ParamBox, pb2::ParamBox)
 end
 
 
-function markParams!(parArray::Vector{<:ParamBox}; 
+function markParams!(parArray::Array{<:ParamBox{<:Any, V}}; 
                      filterMapping::Bool=false) where {V} # ignoreMapping
     res, _ = markUnique(parArray, compareFunction=compareParamBox)
-    for i=1:length(parArray)
-        parArray[i].index[] = res[i]
+    for (idx, i) in zip(parArray, res)
+        idx.index[] = i
     end
     filterMapping ? unique(x->x.index[], parArray) : parArray
+end
+
+function markParams!(parArray::Array{<:ParamBox}; 
+                     filterMapping::Bool=false)
+    pars = eltype(parArray)[]
+    syms = getUnique!(outSymOf.(parArray))
+    arr = parArray |> copy
+    for sym in syms
+        typ = ParamBox{<:Any, sym}
+        subArr = typ[]
+        ids = Int[]
+        for (i, val) in enumerate(arr)
+            if val isa typ
+                push!(subArr, val)
+                push!(ids, i)
+            end
+        end
+        deleteat!(arr, ids)
+        append!(pars, markParams!(subArr; filterMapping))
+    end
+    pars
 end
 
 
@@ -1266,16 +1288,21 @@ end
     uniqueParams!(bs; filterMapping::Bool=false) -> Array{<:ParamBox, 1}
 
 Mark the parameters (`ParamBox`) in input bs which can a `Vector` of `GaussFunc` or 
-`FloatingGTBasisFuncs`. The identical parameters will be marked with same index.
-
-=== Keyword argument(s) ===
-
-`filterMapping`: Determine wether return the `ParamBox`s with identical fields except the 
+`FloatingGTBasisFuncs`. The identical parameters will be marked with same index. 
+`filterMapping`determines wether return the `ParamBox`s with identical fields except the 
 `map` field.
 """
 uniqueParams!(bs; filterMapping::Bool=false) = markParams!(getParams(bs); filterMapping)
 
 
+"""
+
+    getVarCore(pb::ParamBox, expandNonDifferentiable::Bool=false) -> Array{Pair, 1}
+
+Core function of `getVar`, which returns the mapping relations inside the parameter 
+container. `expandNonDifferentiable` determines whether expanding the mapping relations of 
+non-differentiable variable (parameters).
+"""
 function getVarCore(pb::ParamBox, expandNonDifferentiable::Bool=false)
     idx = pb.index[]
     vSym = outSymOf(pb)
@@ -1304,16 +1331,16 @@ end
 
     getVar(pb::ParamBox) -> Symbolics.Num
 
-    getVar(container::ParamBox) -> Array{Symbolics.Num, 1}
+    getVar(container::StructSpatialBasis) -> Array{Symbolics.Num, 1}
 
-Return a 1-element `Vector` of `Pair` to show the `Symbol::Symbolics.Num` of the stored 
-variable and the corresponding values. `includeMapping` determines whether mappings from 
-the variable to the dependent variable if there is one. Non-differentiable parameter will 
-be make with a "$(NoDiffMark)" as if it's an independent variable.
+Return the independent variable(s) of the input parameter container.
 """
 getVar(pb::ParamBox) = getVarCore(pb, false)[end][1]
-getVar(container::CompositeGTBasisFuncs) = 
-getindex.(getindex.(getVarCore.(container, false), lastindex(container)), 1)
+
+function getVar(container::CompositeGTBasisFuncs)
+    vrs = getVarCore.(container |> getParams, false)
+    getindex.(getindex.(vrs, lastindex.(vrs)), 1)
+end
 
 
 getVarDictCore(pb::ParamBox, expandNonDifferentiable::Bool=false) = 
@@ -1324,18 +1351,19 @@ vcat(getVarCore.(containers|>getParams, expandNonDifferentiable)...) |> Dict
 
 """
 
-    getVarDict(obj::Union{ParamBox, CompositeGTBasisFuncs, Array}; includeMapping::Bool=false) -> 
-    Array{<:Pair, 1}
+    getVarDict(obj::Union{ParamBox, StructSpatialBasis, Array}; 
+               includeMapping::Bool=false) -> 
+    Dict{Symbolics.Num, <:Number}
 
-Return a `Vector` of `Pair` to of the mapping relations between the variables stored in the 
-`ParamBox`s and the corresponding values. `includeMapping` determines whether mappings from 
-the variable(s) to the dependent variable(s) if exists. Non-differentiable parameter will 
-be make with a "$(NoDiffMark)" as if it's an independent variable.
+Return a `Dict` that stores the independent variable(s) of the parameter container(s) and 
+its(their) corresponding value(s). If `includeMapping = true`, then the dictionary will 
+also include the mapping relations between the mapped variables and the independent 
+variables.
 """
 getVarDict(pb::ParamBox; includeMapping::Bool=false) = 
 includeMapping ? getVarDictCore(pb, true) : (getVarCore(pb, false)[end] |> Dict)
 
-function getVarDict(containers; includeMapping::Bool=false)
+function getVarDict(containers::Array; includeMapping::Bool=false)
     if includeMapping
         getVarDictCore(containers, true)
     else
@@ -1430,12 +1458,13 @@ end
 
 """
 
-    expressionOf(bf::CompositeGTBasisFuncs; splitGaussFunc::Bool=false) -> Array{<:Symbolics.Num, 2}
+    expressionOf(bf::CompositeGTBasisFuncs; splitGaussFunc::Bool=false) -> 
+    Array{<:Symbolics.Num, 2}
 
 Return the expression(s) of a given `CompositeGTBasisFuncs` (e.g. `BasisFuncMix` or 
 `FloatingGTBasisFuncs`) as a `Matrix{<:Symbolics.Num}`of which the column(s) corresponds to 
-different orbitals. If `splitGaussFunc` is `true`, the column(s) will be expanded such that its 
-entries are `GaussFunc` inside the corresponding orbital.
+different orbitals. If `splitGaussFunc` is `true`, the column(s) will be expanded 
+vertically such that the entries are `GaussFunc` inside the corresponding orbital.
 """
 expressionOf(bf::CompositeGTBasisFuncs; splitGaussFunc::Bool=false) = 
 expressionOfCore(bf, true, false, splitGaussFunc)
@@ -1594,16 +1623,17 @@ function diffInfo(bf::CompositeGTBasisFuncs, vr, varDict)
     diffTransfer.(relDiffs, Ref(varDict))
 end
 
+
 function diffInfoToBasisFunc(bf::FloatingGTBasisFuncs, info::Matrix{<:Any})
     bs = decompose(bf, splitGaussFunc=true)
-    mat = map(function (x, y)
-
+    mat = map(bs, info) do x, y
         xs = [copyBasis(x) for i = 1:length(y)]
+
         for (i,j) in zip(y, xs)
             j.gauss[1].con[] *= getindex(i, 1)
         end
 
         shiftCore.(xs, getindex.(y, Ref(2:4))) |> BasisFuncMix
-    end, bs, info)
+    end
     eachcol(mat) .|> sum
 end
