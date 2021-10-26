@@ -436,17 +436,6 @@ function flatten(c::Array)
     [(c2...)...]
 end
 
-function flatten2(c::Array)
-    c2 = map( x->(x isa Tuple ? Any[i for i in x] : x), c )
-    vcat(c2...)
-end
-
-function flatten3(c::Array)
-    head = c[1] isa Union{Array, Tuple}
-    c2 = map( x->(x isa Tuple ? Any[i for i in x] : x), c )
-    vcat(c2...)
-end
-
 function flatten(c::Tuple)
     c2 = map( x->(x isa Union{Array, Tuple} ? x : [x]), c )
     ((c2...)...,)

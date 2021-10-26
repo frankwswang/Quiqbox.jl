@@ -1,6 +1,6 @@
 using Test
 using Quiqbox: tryIncluding, @compareLength, hasBoolRelation, markUnique, flatten, 
-               alignSignedNum, symbolReplace, splitTerm, groupedSort, mapPermute
+               alignSignedNum, symbolReplace, splitTerm, groupedSort, mapPermute, Pf, itself
 using Quiqbox
 using Symbolics
 using Suppressor: @capture_out
@@ -95,4 +95,16 @@ using Suppressor: @capture_out
     @test bl1
     @test bl2
     @test bl3
+
+    # struct Pf
+    @test Pf(-1.5, abs)(-2) == -3.0
+    @test Pf(-1.0, Pf(-1.5, abs))(-2) == 3.0
+    @test Pf(1.5, Val(:abs))(-2) == 3.0
+    @test Pf(-1.0, Val(Pf{-1.5, :abs}))(-2) == 3.0
+    @test typeof(Pf(-1.5, abs))(-2) == -3.0
+
+    @test Pf(-1.0, Pf(-1.5, itself))(-2) == -3.0
+    @test Pf(1.5, Val(:itself))(-2) == -3.0
+    @test Pf(-1.0, Val(Pf{-1.5, :itself}))(-2) == -3.0
+    @test typeof(Pf(-1.5, itself))(-2) == 3.0
 end
