@@ -222,7 +222,7 @@ using Suppressor: @capture_out
     @test axes(pb1) == ()
 
     @test getindex(gf1) == gf1[] == gf1[begin] == gf1[end] == (gf1.param |> collect)
-    @test getindex(bf1) == bf1[] == bf1[begin] == bf1[end] == (bf1.param |> collect)
+    @test getindex(bf1) == bf1[] == bf1[begin] == bf1[end] == (bf1.gauss |> collect)
     bfm11 = Quiqbox.BasisFuncMix([bf1, bf2, bf1])
     @test getindex(bfm11) == bfm11[] == bfm11[begin] == bfm11[end] == 
           [bf1.gauss[1], bf2.gauss...]
