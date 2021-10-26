@@ -68,16 +68,19 @@ sortBasisFuncs
 centerOf
 ```
 
-```@doc
-add
+```@autodocs
+Modules = [Quiqbox]
+Filter = t -> nameof(t) == :add
 ```
 
-```@doc
-mul
+```@autodocs
+Modules = [Quiqbox]
+Filter = t -> nameof(t) == :mul
 ```
 
-```@doc
-shift
+```@autodocs
+Modules = [Quiqbox]
+Filter = t -> nameof(t) == :shift
 ```
 
 ```@docs
@@ -104,8 +107,9 @@ assignCenter!
 getParams
 ```
 
-```@doc
-copyBasis
+```@autodocs
+Modules = [Quiqbox]
+Filter = t -> nameof(t) == :copyBasis
 ```
 
 ```@docs

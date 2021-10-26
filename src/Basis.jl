@@ -1111,8 +1111,8 @@ end
 
     assignCenter!(center::AbstractArray, b::FloatingGTBasisFuncs) -> NTuple{3, ParamBox}
 
-Assign a new coordinate to the center of the input `FloatingGTBasisFuncs`. 
-Also return the altered center.
+Assign a new coordinate to the center of the input `FloatingGTBasisFuncs`. Also return the 
+altered center.
 """
 function assignCenter!(center::AbstractArray, b::FloatingGTBasisFuncs)
     for (i,j) in zip(b.center, center)
@@ -1199,12 +1199,13 @@ const Doc_copyBasis_Eg1 = "GaussFunc(xpn=ParamBox{Float64, :α, :itself}(9.0)[�
 
 """
 
-    copyBasis(b::GaussFunc) -> GaussFunc
+    copyBasis(b::GaussFunc, copyOutVal::Bool=true) -> GaussFunc
 
-    copyBasis(b::CompositeGTBasisFuncs) -> CompositeGTBasisFuncs
+    copyBasis(b::CompositeGTBasisFuncs, copyOutVal::Bool=true) -> CompositeGTBasisFuncs
 
-A deep copy of the input basis function(s) except the mapping relation(s) of stored 
-parameter(s) won't be kept.
+Return a copy of the input basis. If `copyOutVal` is set to `true`, then only the value(s) 
+of mapped data will be copied, i.e., `outValCopy` is used to copy the `ParamBox`s, 
+otherwise `inVarCopy` is used.
 
 ≡≡≡ Example(s) ≡≡≡
 
@@ -1251,9 +1252,6 @@ function copyBasis(bfm::BasisFuncMix{BN, GN},
     bfs = copyBasis.(bfm.BasisFunc, copyOutVal)
     BasisFuncMix(bfs |> collect)
 end
-
-
-
 
 
 function compareParamBox(pb1::ParamBox, pb2::ParamBox)
