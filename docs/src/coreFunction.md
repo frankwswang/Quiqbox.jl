@@ -61,6 +61,10 @@ genBasisFunc
 ```
 
 ```@docs
+sortBasisFuncs
+```
+
+```@docs
 centerOf
 ```
 

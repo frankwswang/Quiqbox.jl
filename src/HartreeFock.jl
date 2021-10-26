@@ -426,7 +426,7 @@ function runHF(bs::Vector{<:AbstractGTBasisFuncs},
                maxSteps::Int=1000) where {TelLB<:T<:TelUB}
     @assert length(nuc) == length(nucCoords)
     @assert (basisSize(bs) |> sum) >= ceil(sum(N)/2)
-    gtb = GTBasis(bs)
+    gtb = GTBasis(bs, false)
     runHF(gtb, nuc, nucCoords, N; initialC, scfConfig, 
           HFtype, printInfo, maxSteps, earlyTermination)
 end

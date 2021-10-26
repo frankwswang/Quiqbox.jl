@@ -1,5 +1,5 @@
 export GaussFunc, Exponent, Contraction, BasisFunc, BasisFuncs, genBasisFunc, centerOf, 
-       GTBasis, add, mul, shift, decompose, basisSize, genBasisFuncText, 
+       GTBasis, sortBasisFuncs, add, mul, shift, decompose, basisSize, genBasisFuncText, 
        genBFuncsFromText, assignCenter!, makeCenter, getParams, copyBasis, uniqueParams!, 
        getVar, getVarDict, expressionOf
 
@@ -50,18 +50,17 @@ end
 
 """
 
-    Exponent(e::Union{Real, Array{Float64, 0}}; 
-             mapFunction::Function=itself, canDiff::Bool=true, 
-             roundDigits::Int=15, dataName::Symbol=:undef) -> 
+    Exponent(e::Union{Real, Array{Float64, 0}}, mapFunction::Function=itself; 
+             canDiff::Bool=true, roundDigits::Int=15, dataName::Symbol=:undef) -> 
     ParamBox{Float64, :α}
 
 Construct a `ParamBox` for an exponent coefficient given a value. Keywords `mapFunction` 
 and `canDiff` work the same way as in a general constructor of a `ParamBox`. If 
 `roundDigits < 0` or the input `e` is a 0-d `Array`, there won't be rounding for input data.
 """
-function Exponent(e::Union{Real, Array{Float64, 0}}; 
-                  mapFunction::F=itself, canDiff::Bool=true, 
-                  roundDigits::Int=15, dataName::Symbol=:undef) where {F<:Function}
+function Exponent(e::Union{Real, Array{Float64, 0}},mapFunction::F=itself; 
+                  canDiff::Bool=true, roundDigits::Int=15, 
+                  dataName::Symbol=:undef) where {F<:Function}
     n = (e isa Array) ? e : (roundDigits < 0 ? Float64(e) : round(e[], digits=roundDigits))
     ParamBox(n, ParamList[:xpn], mapFunction, dataName; canDiff)
 end
@@ -78,18 +77,17 @@ Exponent(pb::ParamBox{Float64}) = ParamBox(pb.data, pb.map, pb.canDiff, pb.index
 
 """
 
-    Contraction(c::Union{Real, Array{Float64, 0}}; 
-                mapFunction::Function=itself, canDiff::Bool=true, 
-                roundDigits::Int=15, dataName::Symbol=:undef) -> 
+    Contraction(c::Union{Real, Array{Float64, 0}}, mapFunction::Function=itself; 
+                canDiff::Bool=true, roundDigits::Int=15, dataName::Symbol=:undef) -> 
     ParamBox{Float64, :d}
 
 Construct a `ParamBox` for an contraction coefficient given a value. Keywords `mapFunction` 
 and `canDiff` work the same way as in a general constructor of a `ParamBox`. If 
 `roundDigits < 0` or the input `c` is a 0-d `Array`, there won't be rounding for input data.
 """
-function Contraction(c::Union{Real, Array{Float64, 0}}; 
-                     mapFunction::F=itself, canDiff::Bool=true, 
-                     roundDigits::Int=15, dataName::Symbol=:undef) where {F<:Function}
+function Contraction(c::Union{Real, Array{Float64, 0}}, mapFunction::F=itself; 
+                     canDiff::Bool=true, roundDigits::Int=15, 
+                     dataName::Symbol=:undef) where {F<:Function}
     n = (c isa Array) ? c : (roundDigits < 0 ? Float64(c) : round(c[], digits=roundDigits))
     ParamBox(n, ParamList[:con], mapFunction, dataName; canDiff)
 end
@@ -241,7 +239,8 @@ BasisFunc{1, 1}(gauss, subshell, center)[X⁰Y¹Z⁰][0.0, 0.0, 0.0]
 
 ≡≡≡ Method 2 ≡≡≡
 
-    genBasisFunc(coord::AbstractArray, gs::Array{GaussFunc, 1}, subshell::String="S"; 
+    genBasisFunc(coord::AbstractArray, gs::Union{GaussFunc, Array{GaussFunc, 1}}, 
+                 subshell::String="S"; 
                  ijkFilter::Array{Bool, 1}=fill(true, SubshellDimList[subshell]), 
                  normalizeGTO::Bool=false)
 
@@ -406,9 +405,11 @@ when nuclei and their coordinates of same `DataType` are input.
             Te::Matrix{<:Number}, eeI::Array{<:Number, 4}) -> 
     GTBasis
 
-    GTBasis(basis::Array{<:AbstractGTBasisFuncs, 1}) -> GTBasis
+    GTBasis(basis::Array{<:AbstractGTBasisFuncs, 1}, sortBasis::Bool=true) -> GTBasis
 
-Directly construct a `GTBasis` given a basis set.
+Directly construct a `GTBasis` given a basis set. Argument `sortBasis` determines whether 
+the constructor will sort the input basis functions using `sortBasisFuncs` before build 
+a `GTBasis`.
 """
 struct GTBasis{N, BT} <: BasisSetData{N}
     basis::Vector{<:AbstractGTBasisFuncs}
@@ -426,10 +427,20 @@ struct GTBasis{N, BT} <: BasisSetData{N}
     end
 end
 
-GTBasis(basis::Vector{<:AbstractGTBasisFuncs}) = 
-GTBasis(basis, overlaps(basis), elecKinetics(basis), eeInteractions(basis))
+function GTBasis(basis::Vector{<:AbstractGTBasisFuncs}, sortBasis::Bool=true)
+    bs = sortBasis ? sortBasisFuncs(basis) : basis
+    GTBasis(bs, overlaps(bs), elecKinetics(bs), eeInteractions(bs))
+end
 
+"""
 
+    sortBasisFuncs(bs::Array{<:FloatingGTBasisFuncs, 1}; groupCenters::Bool=false) ->
+    Array
+
+Sort basis functions. If `groupCenters = true`, Then the function will return an 
+`Array{<:Array{<:FloatingGTBasisFuncs, 1}, 1}` in which the arrays are grouped basis 
+functions with same center coordinates.
+"""
 function sortBasisFuncs(bs::Vector{<:FloatingGTBasisFuncs}; groupCenters::Bool=false)
     bfBlocks = Vector{<:FloatingGTBasisFuncs}[]
     sortedBasis = groupedSort(bs, centerOf)
@@ -444,7 +455,7 @@ function sortBasisFuncs(bs::Vector{<:FloatingGTBasisFuncs}; groupCenters::Bool=f
                            rev=true)
         push!(bfBlocks, subbs[sortVec])
     end
-    groupCenters ? bfBlocks : (bfBlocks |> flatten)
+    groupCenters ? bfBlocks : vcat(bfBlocks...)
 end
 
 
@@ -723,7 +734,7 @@ $(Doc_mul_Eg4)
 function mul(gf::GaussFunc, coeff::Real)::GaussFunc
     c = convert(Float64, coeff)::Float64
     con, mapFunction, dataName = mulCore(c, gf.con)
-    conNew = Contraction(con; mapFunction, dataName, canDiff=gf.con.canDiff[])
+    conNew = Contraction(con, mapFunction; dataName, canDiff=gf.con.canDiff[])
     GaussFunc(gf.xpn, conNew)
 end
 
@@ -1008,9 +1019,7 @@ function genBasisFuncText(bs::Vector{<:FloatingGTBasisFuncs};
     bfBlocks = sortBasisFuncs(bs; groupCenters)
     if groupCenters
         for b in bfBlocks
-            str = genBasisFuncText(b[1]; norm, printCenter)
-            str *= genBasisFuncText.(b[2:end]; norm, printCenter=false) |> join
-            push!(strs, str)
+            push!(strs, joinConcentricBFuncStr(b, norm, printCenter))
         end
     else
         for b in bfBlocks
@@ -1018,6 +1027,13 @@ function genBasisFuncText(bs::Vector{<:FloatingGTBasisFuncs};
         end
     end
     strs
+end
+
+
+function joinConcentricBFuncStr(bs::Vector{<:FloatingGTBasisFuncs},
+                                norm::Float64=1.0, printFirstBFcenter::Bool=true)
+    str = genBasisFuncText(bs[1]; norm, printCenter=printFirstBFcenter)
+    str *= genBasisFuncText.(bs[2:end]; norm, printCenter=false) |> join
 end
 
 
@@ -1192,7 +1208,7 @@ parameter(s) won't be kept.
 ≡≡≡ Example(s) ≡≡≡
 
 ```jldoctest; setup = :(push!(LOAD_PATH, "../../src/"); using Quiqbox)
-julia> e = Exponent(3.0, mapFunction=x->x^2)
+julia> e = Exponent(3.0, x->x^2)
 ParamBox{Float64, :α, :f_α₁}(3.0)[∂][x_α]
 
 julia> c = Contraction(2.0)

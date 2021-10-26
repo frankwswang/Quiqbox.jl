@@ -116,6 +116,7 @@ iterate(::ParamBox, _) = nothing
 size(::ParamBox) = ()
 length(::ParamBox) = 1
 ndims(::ParamBox) = 0
+size(::ParamBox, d::Integer) = d == 1 ? 1 : throw(BoundsError())
 
 iterate(gf::GaussFunc) = (gf, nothing)
 iterate(::GaussFunc, _) = nothing
@@ -143,6 +144,9 @@ function iterate(bfs::CompositeGTBasisFuncs{<:Any, N}, state) where {N}
 end
 size(::CompositeGTBasisFuncs{<:Any, N}) where {N} = (N,)
 length(::CompositeGTBasisFuncs{<:Any, N}) where {N} = N
+
+size(x::SpatialOrbital, d::Integer) = d == 1 ? length(x) : throw(BoundsError())
+
 
 # Indexing Interface
 import Base: getindex, setindex!, firstindex, lastindex, eachindex, axes
@@ -178,6 +182,7 @@ BasisFunc(bfs.center, bfs.gauss, ijkOrbitalList[bfs.ijk[i]], bfs.normalizeGTO)
 getindex(bfs::BasisFuncs{<:Any, <:Any, N}, ::Colon) where {N} = [getindex(bfs, i) for i=1:N]
 firstindex(bfs::BasisFuncs) = 1
 lastindex(::BasisFuncs{<:Any, <:Any, N}) where {N} = N
+eachindex(bfs::BasisFuncs{<:Any, <:Any, N}) where {N} = Base.OneTo(lastindex(bfs))
 
 
 # Broadcasting Interface

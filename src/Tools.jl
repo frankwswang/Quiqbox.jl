@@ -710,6 +710,19 @@ function groupedSort(v::Array, sortFunction::F=itself) where {F<:Function}
 end
 
 
+function mapPermute(arr, permFunction)
+    ks = [[true, x, i] for (x, i) in zip(arr, eachindex(arr))]
+    arrNew = permFunction(arr)
+    idx = Int[]
+    for ele in arrNew
+        i = findfirst(x -> x[1] == true && hasIdentical(x[2], ele), ks)
+        push!(idx, i)
+        ks[i][1] = false
+    end
+    idx
+end
+
+
 function getFunc(fSym::Symbol, failedResult=missing)
     try
         getfield(Quiqbox, fSym)
