@@ -126,6 +126,19 @@ struct Molecule{Nc, Ne, Nb} <:MolecularHartreeFockCoefficient{Nc, Ne}
                  length.([Emos, occus, C[1,:], spins, symms]) .== 
                  coeff*length(C[:,1])) |> prod
         EnnR = nnRepulsions(nuc, nucCoords)
+        iSorted = mapPermute(basis, sortBasisFuncs)
+        basis = basis[iSorted]
+        offset = pushfirst!(accumulate(+, collect(basisSize(basis)) .- 1), 0)
+        iSortedExtended = Union{Int, Vector{Int}}[]
+        append!(iSortedExtended, iSorted)
+        for (i, idx) in zip(iSorted, 1:length(iSorted))
+            if basis[i] isa BasisFuncs
+                iSortedExtended[idx] = collect(i : i+length(basis[i])-1) .+ offset[i]
+            else
+                iSortedExtended[idx] += offset[i]
+            end
+        end
+        C = C[vcat(iSortedExtended...), :]
         new{getCharge(nuc), Ne, Nb}(nuc |> Tuple, 
                                     nucCoords .|> Tuple |> Tuple, 
                                     Ne, 

@@ -2,8 +2,8 @@ module Molden
 
 export makeMoldenFile
 
-import ..Quiqbox: Molecule, checkFname, AtomicNumberList, genBasisFuncText, centerOf, 
-                  flatten, alignSignedNum
+import ..Quiqbox: Molecule, checkFname, AtomicNumberList, centerOf, flatten, groupedSort, 
+                  joinConcentricBFuncStr, alignSignedNum
 
 """
 
@@ -14,11 +14,13 @@ whether to include the unoccupied molecular orbitals. `fileName` specifies the n
 file, which is also the returned value.
 """
 function makeMoldenFile(mol::Molecule; recordUMO::Bool=false, fileName::String = "MO")
-    nucCoords = mol.nucCoords
+    nucCoords = mol.nucCoords |> collect
+    nuc = mol.nuc |> collect
     basis = mol.basis |> collect
     MOs = mol.orbital
     iNucPoint = 0
-    strs = genBasisFuncText(basis)
+    groups = groupedSort(basis, centerOf)
+    strs = joinConcentricBFuncStr.(groups)
     strs = split.(strs, "\n", limit=2)
     gCoeffs = getindex.(strs, 2)
 
@@ -29,16 +31,27 @@ function makeMoldenFile(mol::Molecule; recordUMO::Bool=false, fileName::String =
            [Atoms] (AU)
            """
 
-    nucCs = flatten(nucCoords) |> collect
-    basCs = centerOf.(basis) |> unique |> flatten
-    if length(nucCs) != length(basCs) || !(nucCs ≈ basCs)
-        centers = getindex.(strs, 1)
-        for cen in centers
-            iNucPoint += 1
-            text *= "X    "*rpad("$iNucPoint", 5)*cen*"\n"
+    centers = getindex.(strs, 1)
+    for cen in centers
+        iNucPoint += 1
+        coord = parse.(Float64, split(cen[5:end]))
+        if (i = findfirst(x->prod(isapprox.(x, coord, atol=1e-15)), nucCoords); 
+            i !== nothing)
+            coord = round.(coord, sigdigits=15)
+            n = popat!(nuc, i)
+            atmName = rpad("$(n)", 5)
+            atmCoord = rpad("$(AtomicNumberList[n])", 4) * 
+                       rpad(coord[1]|>alignSignedNum, 20) * 
+                       rpad(coord[2]|>alignSignedNum, 20) * 
+                       rpad(coord[3]|>alignSignedNum, 20)
+            popat!(nucCoords, i)
+        else
+            atmName = "X    "
+            atmCoord = cen
         end
+        text *= atmName*rpad("$iNucPoint", 5)*atmCoord*"\n"
     end
-    for (n, coord) in zip(mol.nuc, nucCoords)
+    for (n, coord) in zip(nuc, nucCoords)
         cv = round.(coord, sigdigits=15)
         iNucPoint += 1
         text *= rpad("$(n)", 5) * rpad(iNucPoint, 5) * rpad("$(AtomicNumberList[n])", 4)*
