@@ -1,6 +1,7 @@
 using Test
 using Quiqbox: tryIncluding, @compareLength, hasBoolRelation, markUnique, flatten, 
-               alignSignedNum, symbolReplace, splitTerm
+               alignSignedNum, symbolReplace, splitTerm, groupedSort, mapPermute
+using Quiqbox
 using Symbolics
 using Suppressor: @capture_out
 
@@ -12,7 +13,7 @@ using Suppressor: @capture_out
     @test isIncluded == false
     pkgDir = @__DIR__
     @test length(errStr) > length(@capture_out tryIncluding("someMod", subModulePath=""))
-    
+
 
     # macro @compareLength
     @test try @compareLength [1] [1,2] "a" "b"; catch; true end
@@ -61,4 +62,37 @@ using Suppressor: @capture_out
     @test ([vec0, vec1, vec2, vec3, vec4] .|> length) == [1,1,1,1,3]
     @test ([vec0, vec1, vec2, vec3, vec4] |> eltype) ==  Vector{Num}
 
+
+    # function groupedSort
+    a = [rand(1:5, 2) for i=1:20]
+    a2 = groupedSort(a)
+    pushfirst!(a2, [[0,0]])
+    for i in 2:length(a2)
+        if length(a2[i]) > 1
+            @test hasEqual(a2[i]...)
+        end
+        @test a2[i][1][1] >= a2[i-1][1][1]
+    end
+
+
+    # function mapPermute
+    bl1 = true
+    bl2 = true
+    bl3 = true
+    mapPool = [x->x^2, abs, x->-x]
+    for i=1:10
+        arr = rand(50)
+        bs1 = genBasisFunc.([[rand(1:2), rand(1:3), rand(1:3)] for i=1:20], 
+                               [(rand(0.5:0.5:2.5), rand(-0.1:0.2:0.5)) for i=1:20])
+        bs2 = genBasisFunc.([[rand(1:2), rand(1:3), rand(1:3)] for i=1:20], 
+                            [GaussFunc(   Exponent(rand( 0.5:0.5:2.5), mapPool[rand(1:3)]), 
+                                       Contraction(rand(-0.1:0.2:0.5), mapPool[rand(1:3)])) 
+                             for i=1:20])
+        bl1 *= (sortperm(arr) == mapPermute(arr, sort))
+        bl2 *= hasIdentical(bs1[mapPermute(bs1, sortBasisFuncs)], sortBasisFuncs(bs1))
+        bl3 *= hasIdentical(bs2[mapPermute(bs2, sortBasisFuncs)], sortBasisFuncs(bs2))
+    end
+    @test bl1
+    @test bl2
+    @test bl3
 end

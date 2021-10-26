@@ -290,7 +290,7 @@ txt3 = genBasisFuncText(bs1) |> join
 bs2_3 = genBFuncsFromText(txt3)
 @test hasEqual(bs1, bs2_1, ignoreContainer=true)
 @test hasEqual(bs1, bs2_2, ignoreContainer=true)
-@test hasEqual(sortBasisFuncs(bs1), bs2_3, ignoreFunction=true)
+@test hasEqual.(sortBasisFuncs(bs1), bs2_3, ignoreFunction=true) |> prod
 @test hasEqual.(bs1, bs2_1, ignoreFunction=true) |> prod
 @test hasEqual.(bs1, bs2_2, ignoreFunction=true) |> prod
 @test hasEqual.(sortBasisFuncs(bs1), bs2_3, ignoreFunction=true) |> prod
@@ -339,7 +339,7 @@ ss = [:X, :Y, :Z]
 
 
 # function copyBasis
-e = Exponent(3.0, mapFunction=x -> x^2 + 1)
+e = Exponent(3.0, x -> x^2 + 1)
 c = Contraction(2.0)
 gf_dc1 = GaussFunc(e, c)
 gf_dc2 = copyBasis(gf_dc1)
