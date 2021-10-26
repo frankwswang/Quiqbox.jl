@@ -21,33 +21,33 @@
  ParamBox{Float64, :α, :itself}(0.7)[∂][α₁]</code><br/><code class="language-julia-repl hljs" style="display:block;">julia&gt; Es, pars, grads = optimizeParams!(bs, parsPartial, nuc, nucCoords, maxSteps=20);</code><code class="nohighlight hljs ansi" style="display:block;">Step 0:        E = 0.3326885027205543    
           params = [3.0, 0.7]
             grad = [2.175593502100901, 14.359210208372536]
-Step duration: 60.509445162 seconds.
+Step duration: 64.567014185 seconds.
 
 Step 5:        E = 0.034308425298722384  
           params = [2.989243921890807, 0.6288271508488472]
             grad = [2.0999869504970983, 13.976135070351877]
-Step duration: 1.378738784 seconds.
+Step duration: 1.665333187 seconds.
 
 Step 10:       E = -0.24123653283243407  
           params = [2.9790083221392836, 0.5603057122267482]
             grad = [1.9553326109798934, 13.221534570835171]
-Step duration: 1.423345709 seconds.
+Step duration: 1.502369695 seconds.
 
 Step 15:       E = -0.4808156910920818   
           params = [2.9696067735163307, 0.49627696081446465]
             grad = [1.7604628746325097, 12.120831282394015]
-Step duration: 1.410168281 seconds.
+Step duration: 1.509127157 seconds.
 
 Step 20:       E = -0.6765458768268742   
           params = [2.961234239447912, 0.4382901752216646]
             grad = [1.5443215051019936, 10.777171173097601]
-Step duration: 1.454627283 seconds.
+Step duration: 1.46106448 seconds.
 
 The iteration just ended at
 Step 20:       E = -0.6765458768268742   
           params = [2.961234239447912, 0.4382901752216646]
             grad = [1.5443215051019936, 10.777171173097601]
-Optimization duration: 1.61859713415 minutes.
+Optimization duration: 1.7284406052833332 minutes.
 The result has not converged.</code></pre><p>After the optimization, you can check the basis set and we can see the parameters inside of it is also changed. This is because the <code>!</code> in the function names indicates that <code>optimizeParams!</code> is <a href="https://docs.julialang.org/en/v1/manual/style-guide/#bang-convention">a function that modifies its arguments</a>.</p><pre><code class="language-julia-repl hljs" style="display:block;">julia&gt; getParams(bs)</code><code class="nohighlight hljs ansi" style="display:block;">40-element Vector{ParamBox{Float64, V, F} where {V, F}}:
  ParamBox{Float64, :X, :Xᴳ¹⁻¹⁻¹₁}(2.959689918)[∂][L₁]
  ParamBox{Float64, :Y, :Yᴳ¹⁻¹⁻¹₁}(2.959689918)[∂][L₁]
@@ -68,4 +68,4 @@ The result has not converged.</code></pre><p>After the optimization, you can che
  ParamBox{Float64, :Y, :Yᴳ¹⁻¹⁻¹₈}(2.959689918)[∂][L₁]
  ParamBox{Float64, :Z, :Zᴳ¹⁻¹⁻¹₈}(2.959689918)[∂][L₁]
  ParamBox{Float64, :α, :itself}(0.427513004)[∂][α₁]
- ParamBox{Float64, :d, :itself}(1.0)[∂][d₁]</code></pre><p>It you want to go through the above example by yourself, you can also find the script <a href="https://github.com/frankwswang/Quiqbox.jl/blob/main/examples/OptimizeParams.jl">here</a>.</p><h2 id="Store-Customized-Basis-Set"><a class="docs-heading-anchor" href="#Store-Customized-Basis-Set">Store Customized Basis Set</a><a id="Store-Customized-Basis-Set-1"></a><a class="docs-heading-anchor-permalink" href="#Store-Customized-Basis-Set" title="Permalink"></a></h2><p>Now, if you want, you can also store the information of the basis set in an container called <a href="../coreType/#Quiqbox.GTBasis"><code>GTBasis</code></a> that not only includes the basis set, but also the related 1-electron and 2-electron integral values (nuclear attraction is not stored). <code>GTBasis</code> can also be accepted as an argument for <a href="../coreFunction/#Quiqbox.runHF"><code>runHF</code></a> to save the time of calculating the integrals of the basis set.</p><pre><code class="language-julia-repl hljs" style="display:block;">julia&gt; GTBasis(bs)</code><code class="nohighlight hljs ansi" style="display:block;">GTBasis{8, Vector{BasisFunc{0, 1}}}(basis, S, Te, eeI, getVne, getHcore)</code></pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../SCF/">« Self-Consistent Field Methods</a><a class="docs-footer-nextpage" href="../coreFunction/">Core Functions »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 0.27.10 on <span class="colophon-date" title="Tuesday 26 October 2021 06:38">Tuesday 26 October 2021</span>. Using Julia version 1.6.3.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+ ParamBox{Float64, :d, :itself}(1.0)[∂][d₁]</code></pre><p>It you want to go through the above example by yourself, you can also find the script <a href="https://github.com/frankwswang/Quiqbox.jl/blob/main/examples/OptimizeParams.jl">here</a>.</p><h2 id="Store-Customized-Basis-Set"><a class="docs-heading-anchor" href="#Store-Customized-Basis-Set">Store Customized Basis Set</a><a id="Store-Customized-Basis-Set-1"></a><a class="docs-heading-anchor-permalink" href="#Store-Customized-Basis-Set" title="Permalink"></a></h2><p>Now, if you want, you can also store the information of the basis set in an container called <a href="../coreType/#Quiqbox.GTBasis"><code>GTBasis</code></a> that not only includes the basis set, but also the related 1-electron and 2-electron integral values (nuclear attraction is not stored). <code>GTBasis</code> can also be accepted as an argument for <a href="../coreFunction/#Quiqbox.runHF"><code>runHF</code></a> to save the time of calculating the integrals of the basis set.</p><pre><code class="language-julia-repl hljs" style="display:block;">julia&gt; GTBasis(bs)</code><code class="nohighlight hljs ansi" style="display:block;">GTBasis{8, Vector{BasisFunc{0, 1}}}(basis, S, Te, eeI, getVne, getHcore)</code></pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../SCF/">« Self-Consistent Field Methods</a><a class="docs-footer-nextpage" href="../coreFunction/">Core Functions »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 0.27.10 on <span class="colophon-date" title="Tuesday 26 October 2021 06:55">Tuesday 26 October 2021</span>. Using Julia version 1.6.3.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
