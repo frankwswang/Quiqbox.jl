@@ -7,9 +7,9 @@ The data structure formularized by Quiqbox in each step, namely the level of dat
 | level  | objective  |  product examples | abstract type  | type instances |
 | :---: | :---:   | :---:           | :---: | :---:          |
 | 4 | basis set | Array of basis functions (with reusable integrals) | `Array`, `GTBasis` | `Array{<:BasisFunc, 1}`...|
-| 3 | basis functions | single or linear combination of Gaussian functions | `FloatingGTBasisFuncs` | `BasisFunc{:S, 1}`, `BasisFuncs{:P, 3, 3}`...|
+| 3 | basis functions | single or linear combination of Gaussian functions | `FloatingGTBasisFuncs` | `BasisFunc{0, 1}`, `BasisFuncs{1, 3, 3}`...|
 | 2 | Gaussian functions | (primitive) Gaussian functions | `AbstractGaussFunc` | `GaussFunc`|
-| 1 |  a pool of parameters | center coordinates, function coefficients | `ParamBox` | `ParamBox{:xpn, Float64}`... |
+| 1 |  a pool of parameters | center coordinates, function coefficients | `ParamBox` | `ParamBox`... |
 
 
 Depending on how much control the user wants to have over each step, Quiqbox provides several [methods](https://docs.julialang.org/en/v1/manual/methods/) of related functions to leave the user with the freedom to balance between efficiency and customizability. 
@@ -209,23 +209,12 @@ pb1 = gf4.xpn
 pb1.map
 ```
 
-The `map` field of a `ParamBox` stores a `RefValue{<:Function}`, referencing the `Function` that maps the actual stored value to another value through math operations (``R \to R``). The output value can be access through syntax `()`. In default the variable is mapped to itself:
+The `map` field of a `ParamBox` stores a `Function`, referencing the `Function` that can be defined as a mapping of the actual stored data to another output data (``R \to R``). The output value can be access through syntax `()`. In default the variable is mapped to itself:
 ```@repl 2
 pb1[] == pb1()
 ```
 
-Since `ParamBox` is a `mutable struct` you can redefine your own mapping `Functions` for the parameters; thus gain another layer of control over the basis set parameters:
+You can get a clearer view of the mapping relations in a `ParamBox` using `getVarDict`
 ```@repl 2
-squareXpn(x) = x^2
-
-pb1.map = Ref(squareXpn)
-
-pb1[] = 3
-
-pb1()
-```
-
-You can get a clearer view of the mapping relations in a `ParamBox` using `getVar`
-```@repl 2
-getVar(pb1, includeMapping=true)
+getVarDict(pb1)
 ```

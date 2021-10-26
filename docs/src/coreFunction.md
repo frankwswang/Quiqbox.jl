@@ -9,15 +9,63 @@ Contraction
 ```
 
 ```@docs
+inValOf
+```
+
+```@docs
+outValOf
+```
+
+```@docs
+inSymOf
+```
+
+```@docs
+outSymOf
+```
+
+```@docs
+dataOf
+```
+
+```@docs
+mapOf
+```
+
+```@docs
+outValCopy
+```
+
+```@docs
+inVarCopy
+```
+
+```@docs
+enableDiff!
+```
+
+```@docs
+disableDiff!
+```
+
+```@docs
+isDiffParam
+```
+
+```@docs
+toggleDiff!
+```
+
+```@docs
 genBasisFunc
 ```
 
 ```@docs
-centerOf
+sortBasisFuncs
 ```
 
-```@doc
-GTBasis(basis::Vector{<:Quiqbox.AbstractGTBasisFuncs})
+```@docs
+centerOf
 ```
 
 ```@doc
@@ -57,7 +105,7 @@ getParams
 ```
 
 ```@doc
-dataCopy
+copyBasis
 ```
 
 ```@docs
@@ -69,7 +117,7 @@ getVar
 ```
 
 ```@docs
-getVars
+getVarDict
 ```
 
 ```@docs
@@ -78,16 +126,11 @@ expressionOf
 
 
 ```@docs
-GridBox(nGridPerEdge::Int, spacing::Real=10, centerCoord::Vector{<:Real}=[0.0,0.0,0.0];
-        canDiff::Bool=true, index::Int=0)
-```
-
-```@docs
 makeCenter
 ```
 
 ```@docs
-gridCoords(gb::GridBox)
+gridCoords
 ```
 
 
@@ -97,12 +140,6 @@ runHF
 
 ```@docs
 runHFcore
-```
-
-
-```@docs
-Molecule(basis::Vector{<:Quiqbox.FloatingGTBasisFuncs}, nuc::Vector{String}, 
-         nucCoords::Vector{<:AbstractArray}, HFfVars::Quiqbox.HFfinalVars)
 ```
 
 ```@docs
@@ -168,8 +205,7 @@ eeInteractions
 ```
 
 ```@docs
-Quiqbox.eeInteractionsCore(BSet::Vector{<:Quiqbox.AbstractGTBasisFuncs}; 
-                           outputUniqueIndices::Bool=false)
+Quiqbox.eeInteractionsCore
 ```
 
 ```@docs

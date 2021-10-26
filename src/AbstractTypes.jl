@@ -1,6 +1,9 @@
 abstract type QuiqboxContainer <: Any end
 
 
+abstract type ParameterizedFunction <: Function end
+
+
 abstract type QuiqboxVariableBox <: QuiqboxContainer end
 
 abstract type QuiqboxParameter{ParameterT, ContainerT} <: QuiqboxVariableBox end

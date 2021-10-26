@@ -14,13 +14,13 @@ Check if there is a file with the same name in the current directory. If so, wil
 the WARNING info when there is a file with the same name.
 """
 function checkFname(Fname::String; showWarning::Bool=true)
-    FnameN = Fname 
+    FnameN = Fname
     while isfile(FnameN) == true
         i=0
         contains(FnameN, ".") ? i=findlast(".", FnameN)|>last : i=(FnameN|>length)+1
         FnameN = FnameN[1:i-1]*"_N"*FnameN[i:end]
     end
-    FnamePrint, FnameNPrint = map([Fname, FnameN]) do f 
+    FnamePrint, FnameNPrint = map([Fname, FnameN]) do f
         contains(f, "/") ? f[(findlast("/", f) |> last)+1 : end] : f
     end
     FnameN != Fname && showWarning && (@warn """The file expected to create already exists. 

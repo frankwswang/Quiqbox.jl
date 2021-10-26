@@ -175,6 +175,8 @@ function hasBoolRelation(boolOp::F, obj1, obj2;
                                    decomposeNumberCollection)
             !res && (return false)
         end
+    elseif obj1 isa Type || obj2 isa Type
+        return boolOp(obj1, obj2)
     else
         fs1 = fieldnames(t1)
         fs2 = fieldnames(t2)
@@ -434,6 +436,17 @@ function flatten(c::Array)
     [(c2...)...]
 end
 
+function flatten2(c::Array)
+    c2 = map( x->(x isa Tuple ? Any[i for i in x] : x), c )
+    vcat(c2...)
+end
+
+function flatten3(c::Array)
+    head = c[1] isa Union{Array, Tuple}
+    c2 = map( x->(x isa Tuple ? Any[i for i in x] : x), c )
+    vcat(c2...)
+end
+
 function flatten(c::Tuple)
     c2 = map( x->(x isa Union{Array, Tuple} ? x : [x]), c )
     ((c2...)...,)
@@ -617,7 +630,7 @@ end
 
 
 """
-A function that only returns its argument.
+A dummy function that only returns its argument.
 """
 itself(x) = x
 
@@ -641,10 +654,10 @@ next search.
 """
 function recursivelyGet(dict::Dict, startKey::Any)
     res = nothing
-    val = get(dict, startKey, false)
-    while val != false
+    val = get(dict, startKey, missing)
+    while !(val isa Missing)
         res = val
-        val = get(dict, val, false)
+        val = get(dict, val, missing)
     end
     res
 end
@@ -695,3 +708,59 @@ function groupedSort(v::Array, sortFunction::F=itself) where {F<:Function}
     end
     groups
 end
+
+
+function mapPermute(arr, permFunction)
+    ks = [[true, x, i] for (x, i) in zip(arr, eachindex(arr))]
+    arrNew = permFunction(arr)
+    idx = Int[]
+    for ele in arrNew
+        i = findfirst(x -> x[1] == true && hasIdentical(x[2], ele), ks)
+        push!(idx, i)
+        ks[i][1] = false
+    end
+    idx
+end
+
+
+function getFunc(fSym::Symbol, failedResult=missing)
+    try
+        getfield(Quiqbox, fSym)
+    catch
+        try
+            getfield(Main, fSym)
+        catch
+            try
+                fSym |> string |> Meta.parse |> eval
+            catch
+                (_) -> failedResult
+            end
+        end
+    end
+end
+
+
+struct Pf{C, F} <: ParameterizedFunction
+    f::Function
+end
+
+Pf(c::Float64, f::Function) = Pf{c, nameOf(f)}(f)
+Pf(c::Float64, f::Pf{C, F}) where {C, F} = Pf{c*C, F}(f.f)
+Pf(c::Float64, ::Val{T}) where {T} = Pf{c, T}(getFunc(T, NaN))
+Pf(c::Float64, ::Val{Pf{C, F}}) where {C, F} = Pf{c*C, F}(getFunc(F, NaN))
+
+
+(f::Pf{C})(x::Real) where {C} = C * f.f(x)
+(::Type{Pf{C, F}})(x::Real) where {C, F} = C * getFunc(F, NaN)(x)
+
+Pf(c::Float64, ::Pf{C, :itself}) where {C} = Pf{c*C, :itself}(itself)
+Pf(c::Float64, ::Val{:itself}) = Pf{c, :itself}(itself)
+Pf(c::Float64, ::Val{Pf{C, :itself}}) where {C} = Pf{c*C, :itself}(itself)
+
+(f::Pf{C, :itself})(x::Real) where {C} = C * x
+(::Type{Pf{C, :itself}})(x::Real) where {C} = C * x
+
+
+nameOf(f::ParameterizedFunction) = typeof(f)
+
+nameOf(f) = nameof(f)

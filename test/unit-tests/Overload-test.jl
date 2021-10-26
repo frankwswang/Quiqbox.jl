@@ -7,19 +7,19 @@ using Suppressor: @capture_out
 
     # function show
     pb1 = ParamBox(-1, canDiff=false)
-    @test (@capture_out show(pb1)) == string(typeof(pb1))*"(-1.0)[undef][∂]"
+    @test (@capture_out show(pb1)) == string(typeof(pb1))*"(-1.0)[∂][undef]"
 
     pb2 = ParamBox(-1, :a, index=1)
-    @test (@capture_out show(pb2)) == string(typeof(pb2))*"(-1.0)[a₁][∂]"
+    @test (@capture_out show(pb2)) == string(typeof(pb2))*"(-1.0)[∂][a₁]"
 
-    pb3 = ParamBox(-1, :x, mapFunction=abs)
-    @test (@capture_out show(pb3)) == string(typeof(pb3))*"(-1.0)[x -> abs(x)][∂]"
+    pb3 = ParamBox(-1, :x, abs)
+    @test (@capture_out show(pb3)) == string(typeof(pb3))*"(-1.0)[∂][x_x]"
 
     bf1 = genBasisFunc([1,2,1], (2,1))
     gf1 = bf1.gauss[1]
     @test (@capture_out show(gf1)) == string(typeof(gf1))*"(xpn="*
-                                      string(typeof(gf1.param[1]))*"(2.0)[α][∂], con="*
-                                      string(typeof(gf1.param[2]))*"(1.0)[d][∂])"
+                                      string(typeof(gf1.param[1]))*"(2.0)[∂][α], con="*
+                                      string(typeof(gf1.param[2]))*"(1.0)[∂][d])"
     @test (@capture_out show(bf1)) == string(typeof(bf1))*"(gauss, subshell, center)"*
                                       "[X⁰Y⁰Z⁰][1.0, 2.0, 1.0]"
 
@@ -101,40 +101,40 @@ using Suppressor: @capture_out
     boolFunc(x, y) = (==)(x,y)
     boolFunc(x::Array{<:Real, 0}, y::Array{<:Real, 0}) = isapprox(x, y, atol=1e-12)
     boolFunc(x::Real, y::Real) = isapprox(x, y, atol=1e-12)
-    testMul = function (a1, a2)
+    testMul = function (a1, a2, ignoreContainer=false)
         r1 = hasBoolRelation(boolFunc, 
                              a1*(a1 + a2), 
                              (a1 + a2)*a1, 
                              a1*a1 + a1*a2, 
                              a1*a1 + a2*a1, 
                              mul(a1, add(a1, a2)), 
-                             mul(add(a1, a2), a1))
+                             mul(add(a1, a2), a1); ignoreContainer)
 
         r2 = hasBoolRelation(boolFunc, a1 *  a2 * a1, 
                              a1 * (a2 * a1), 
                              mul(mul(a1, a2), a1),
-                             mul(a1, mul(a2, a1)))
+                             mul(a1, mul(a2, a1)); ignoreContainer)
         r1 * r2
     end
 
-    bf5 = genBasisFunc([1,1,1], GaussFunc(Exponent(3), Contraction(0.2, mapFunction=x->5x)))
+    bf5 = genBasisFunc([1,1,1], GaussFunc(Exponent(3), Contraction(0.2, x->5x)))
     bfm4 = BasisFuncMix([bf4, bf5, bf4])
 
-    @test testMul(bf1, bf3)
-    @test testMul(bf1, bf4)
-    @test testMul(bf1, bf5)
-    @test testMul(bf3, bf4)
-    @test testMul(bf3, bf5)
-    @test testMul(bf4, bf5)
-    @test testMul(bf1, bfm2)
-    @test testMul(bf3, bfm2)
-    @test testMul(bf4, bfm2)
-    @test testMul(bf1, bfm3)
-    @test testMul(bf3, bfm3)
-    @test testMul(bf4, bfm3)
-    @test testMul(bf1, bfm4)
-    @test testMul(bf3, bfm4)
-    @test testMul(bf4, bfm4)
+    @test testMul(bf1,  bf3)
+    @test testMul(bf1,  bf4)
+    @test testMul(bf1,  bf5)
+    @test testMul(bf3,  bf4)
+    @test testMul(bf3,  bf5)
+    @test testMul(bf4,  bf5)
+    @test testMul(bf1,  bfm2)
+    @test testMul(bf3,  bfm2)
+    @test testMul(bf4,  bfm2)
+    @test testMul(bf1,  bfm3)
+    @test testMul(bf3,  bfm3)
+    @test testMul(bf4,  bfm3)
+    @test testMul(bf1,  bfm4)
+    @test testMul(bf3,  bfm4)
+    @test testMul(bf4,  bfm4)
     @test testMul(bfm2, bfm3)
     @test testMul(bfm2, bfm4)
     @test testMul(bfm3, bfm4)
@@ -188,4 +188,57 @@ using Suppressor: @capture_out
                      c1, c2) |> prod
 
     @test .!testMul2.([bfm2, bfm3, bfm4], c1, c2) |> prod
+
+
+    # function iterate, size, length, ndims
+    @test iterate(pb1) == (-1, nothing)
+    @test iterate(gf1) == (gf1, nothing)
+    @test iterate(bf1) == (bf1, nothing)
+
+    cs = [pb1, gf1, bf1]
+    @test (iterate.(cs, 1) .=== nothing) |> prod
+    @test (size.(cs) .== Ref(())) |> prod
+    @test (size.(cs, 1) .== 1) |> prod
+    @test (length.(cs) .== 1) |> prod
+    @test ndims(pb1) == 0
+
+    @test iterate(bfm1) == (bfm1, nothing)
+    @test hasEqual(iterate(bfs1), (bfs1[1], 2))
+    @test hasEqual(iterate(bfs1, 1), (bfs1[1], 2))
+    @test hasEqual(iterate(bfs1, length(bfs1.ijk)+1), nothing)
+
+    @test size(bfm1) == ()
+    @test size(bfm1, 1) == 1
+    @test size(bfs1) == (length(bfs1.ijk),)
+    @test size(bfs1, 1) == length(bfs1.ijk)
+
+    @test length(bfm1) == 1
+    @test length(bfs1) == length(bfs1.ijk)
+
+
+    # function getindex, setindex!, firstindex, lastindex, axes
+    @test getindex(pb1) == pb1[] == pb1[begin] == pb1[end] == -1
+    @test (pb1[] = -2; res = (pb1[] == -2); pb1[] = -1; res)
+    @test axes(pb1) == ()
+
+    @test getindex(gf1) == gf1[] == gf1[begin] == gf1[end] == (gf1.param |> collect)
+    bfm11 = Quiqbox.BasisFuncMix([bf1, bf2, bf1])
+    @test getindex(bfm11) == bfm11[] == bfm11[begin] == bfm11[end] == 
+          [bf1.gauss[1], bf2.gauss...]
+    bfs1_alter = genBasisFunc.(Ref([0,0,0]), Ref((2,1)), [[1,0,0], [0,1,0], [0,0,1]])
+    for i in eachindex(bfs1)
+        @test hasEqual(getindex(bfs1, i), bfs1[i], bfs1_alter[i])
+    end
+    @test hasEqual(bfs1[begin], bfs1[1])
+    @test hasEqual(bfs1[end], bfs1[3])
+
+
+    # function broadcastable
+    @test getfield.(pb1, [:data, :map]) == [pb1.data, pb1.map]
+    @test getfield.(gf1, [:xpn, :con]) == [gf1.xpn, gf1.con]
+    @test hasEqual(bf1 .* [1.0, 3.0], [bf1*1.0, bf1*3.0])
+    bfm12 = bf1 + genBasisFunc([1,2,2], (2,3))
+    @test hasEqual(bfm12 .* [1.0, 3.0], [bfm12*1.0, bfm12*3.0])
+    bfs11 = genBasisFunc([1,1,1], (2,3), "P")
+    @test hasEqual(bfs11 .* [1.0, 2.0, 3.0], [i*j for (i,j) in zip(bfs11, 1:3)])
 end

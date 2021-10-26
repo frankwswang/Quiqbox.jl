@@ -89,7 +89,7 @@ Container for the information of a molecule.
              Emos::Array{Float64, 1}, occus::Array{<:Real, 1}, C::Array{Float64, 2}, 
              spins::Array{String, 1}, 
              symms::Array{String, 1}=repeat(["A"], length(occus))) -> 
-    Molecule{Nc, Ne, Nb}
+    Molecule{<:Any, Ne, <:Any}
 
 `Emos` are the energies of corresponding molecular energies. `occus` are the occupation 
 numbers of the orbitals. `C` is the coefficient matrix, which does not need to be a square 
@@ -97,6 +97,13 @@ matrix since the number of rows is the size of the (spatial) basis set whereas t
 of the columns represents the number of molecular orbitals. `spin` specifies the spin 
 functions of the orbitals, entries of which can be set to "Alpha" or "Beta". `symms` are 
 symmetries of the orbitals where the default entry value is "A" for being antisymmetric.
+
+    Molecule(basis::Array{<:FloatingGTBasisFuncs, 1}, nuc::Array{String, 1}, 
+             nucCoords::Array{<:AbstractArray, 1}, HFfVars::HFfinalVars) -> 
+    Molecule
+
+Construct a `Molecule` from a basis set, nuclei information, and the result from the 
+corresponding Hartree-Fock SCF procedure, specifically a `HFfinalVars` `struct`.
 """
 struct Molecule{Nc, Ne, Nb} <:MolecularHartreeFockCoefficient{Nc, Ne}
     nuc::Tuple{Vararg{String}}
@@ -119,6 +126,19 @@ struct Molecule{Nc, Ne, Nb} <:MolecularHartreeFockCoefficient{Nc, Ne}
                  length.([Emos, occus, C[1,:], spins, symms]) .== 
                  coeff*length(C[:,1])) |> prod
         EnnR = nnRepulsions(nuc, nucCoords)
+        iSorted = mapPermute(basis, sortBasisFuncs)
+        basis = basis[iSorted]
+        offset = pushfirst!(accumulate(+, collect(basisSize(basis)) .- 1), 0)
+        iSortedExtended = Union{Int, Vector{Int}}[]
+        append!(iSortedExtended, iSorted)
+        for (i, idx) in zip(iSorted, 1:length(iSorted))
+            if basis[i] isa BasisFuncs
+                iSortedExtended[idx] = collect(i : i+length(basis[i])-1) .+ offset[i]
+            else
+                iSortedExtended[idx] += offset[i]
+            end
+        end
+        C = C[vcat(iSortedExtended...), :]
         new{getCharge(nuc), Ne, Nb}(nuc |> Tuple, 
                                     nucCoords .|> Tuple |> Tuple, 
                                     Ne, 
@@ -129,14 +149,6 @@ struct Molecule{Nc, Ne, Nb} <:MolecularHartreeFockCoefficient{Nc, Ne}
     end
 end
 
-"""
-
-    Molecule(basis::Array{<:FloatingGTBasisFuncs, 1}, nuc::Array{String, 1}, 
-             nucCoords::Array{<:AbstractArray, 1}, HFfVars::HFfinalVars) -> Molecule
-
-Construct a `Molecule` from a basis set, nuclei information, and the result from the 
-corresponding Hartree-Fock SCF procedure, specifically a `HFfinalVars` `struct`.
-"""
 function Molecule(basis::Vector{<:FloatingGTBasisFuncs}, nuc::Vector{String}, 
                   nucCoords::Vector{<:AbstractArray}, HFfVars::HFfinalVars)
     t = typeof(HFfVars)

@@ -76,7 +76,7 @@ runHF(bs, nuc, coords)
 ```julia
 pars = uniqueParams!(bs, filterMapping=true)
 
-optimizeParams!(bs, pars[1:4], nuc, coords)
+optimizeParams!(bs, pars[end-1:end], nuc, coords)
 ```
 
 # Documentation

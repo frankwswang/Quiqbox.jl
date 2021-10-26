@@ -180,11 +180,10 @@ function initializeSCF(Hcore::Matrix{T1}, HeeI::Array{T2, 4},
 end
 
 
-const oneRowTableInSCFconfigDoc = "| `:DIIS`, `:EDIIS`, `:ADIIS` | Subspace size (>1); "*
+const Doc_SCFconfig_OneRowTable = "| `:DIIS`, `:EDIIS`, `:ADIIS` | Subspace size (>1); "*
                                   "Coefficient solver(`:ADMM`-> ADMM solver,"*
                                   " `:LCM` -> Lagrange solver) | "*
                                   "`DIISsize::Int`; `solver::Symbol` | `15`; `:ADMM` |"
-
 
 """
 
@@ -200,7 +199,7 @@ configurations (in terms of keyword arguments):
 | Methods | Configuration(s) | keyword argument(s) | Default value(s) |
 | :----   | :---:            | :---:               | ----:            |
 | `:DS` | Damping strength: [0,1] | `dampingStrength::Float64` | `0.0` |
-$(Quiqbox.oneRowTableInSCFconfigDoc)
+$(Quiqbox.Doc_SCFconfig_OneRowTable)
 
 `intervals`: The stopping (skipping) thresholds for the required methods.
 
@@ -297,7 +296,7 @@ struct HFtempVars{HFtype, N} <: HartreeFockintermediateData
 
     HFtempVars(HFtype::Symbol, N, C, F, D, E, vars...) = 
     new{HFtype, N}([C], [F], [D], [E], HFinterrelatedVars([[x] for x in vars]...))
-    
+
     HFtempVars(HFtype::Symbol, Nˢ::Int, Cs::Vector{Matrix{T1}}, Fs::Vector{Matrix{T2}}, 
                Ds::Vector{Matrix{T3}}, Es::Vector{<:Real}, Dtots::Vector{Matrix{T4}}, 
                Etots::Vector{<:Real}) where 
@@ -427,7 +426,7 @@ function runHF(bs::Vector{<:AbstractGTBasisFuncs},
                maxSteps::Int=1000) where {TelLB<:T<:TelUB}
     @assert length(nuc) == length(nucCoords)
     @assert (basisSize(bs) |> sum) >= ceil(sum(N)/2)
-    gtb = GTBasis(bs)
+    gtb = GTBasis(bs, false)
     runHF(gtb, nuc, nucCoords, N; initialC, scfConfig, 
           HFtype, printInfo, maxSteps, earlyTermination)
 end

@@ -2,28 +2,21 @@
 import Base: ==
 ==(pb1::ParamBox, pb2::ParamBox) = (pb1[] == pb2[] && 
                                     pb1.canDiff[] == pb2.canDiff[] && 
-                                    pb1.index == pb2.index && 
-                                    pb1.map[] == pb2.map[])
+                                    pb1.index[] == pb2.index[] && 
+                                    typeof(pb1.map) === typeof(pb2.map))
 
 
 import Base: show
 const nSigShown = 10
 function show(io::IO, pb::ParamBox)
-    v = typeof(pb).parameters[1]
-    if pb.index === nothing 
-        i = v
-    else
-        i = string(v)*numToSubs(pb.index)
-    end
     c = pb.canDiff[] ? :green : :light_black
-    if typeof(pb.map[]) == typeof(itself)
-        j = ""
-    else
-        j = " -> $(Symbol(pb.map[]))($i)"
-    end
     print(io, typeof(pb))
-    print(io, "(", round(pb.data[], sigdigits=nSigShown), ")[", i, j, "]")
-    printstyled(io, "[∂]", color=c)
+    print(io, "(", round(pb.data[], sigdigits=nSigShown), ")")
+    print(io, "[")
+    printstyled(io, "∂", color=c)
+    print(io, "][")
+    printstyled(io, "$(pb|>getVar)", color=:cyan)
+    print(io, "]")
 end
 
 function show(io::IO, gf::GaussFunc)
@@ -123,6 +116,7 @@ iterate(::ParamBox, _) = nothing
 size(::ParamBox) = ()
 length(::ParamBox) = 1
 ndims(::ParamBox) = 0
+size(::ParamBox, d::Integer) = d == 1 ? 1 : throw(BoundsError())
 
 iterate(gf::GaussFunc) = (gf, nothing)
 iterate(::GaussFunc, _) = nothing
@@ -150,6 +144,9 @@ function iterate(bfs::CompositeGTBasisFuncs{<:Any, N}, state) where {N}
 end
 size(::CompositeGTBasisFuncs{<:Any, N}) where {N} = (N,)
 length(::CompositeGTBasisFuncs{<:Any, N}) where {N} = N
+
+size(x::SpatialOrbital, d::Integer) = d == 1 ? length(x) : throw(BoundsError())
+
 
 # Indexing Interface
 import Base: getindex, setindex!, firstindex, lastindex, eachindex, axes
@@ -185,6 +182,7 @@ BasisFunc(bfs.center, bfs.gauss, ijkOrbitalList[bfs.ijk[i]], bfs.normalizeGTO)
 getindex(bfs::BasisFuncs{<:Any, <:Any, N}, ::Colon) where {N} = [getindex(bfs, i) for i=1:N]
 firstindex(bfs::BasisFuncs) = 1
 lastindex(::BasisFuncs{<:Any, <:Any, N}) where {N} = N
+eachindex(bfs::BasisFuncs{<:Any, <:Any, N}) where {N} = Base.OneTo(lastindex(bfs))
 
 
 # Broadcasting Interface
@@ -204,12 +202,13 @@ function hasBoolRelation(boolFunc::F, pb1::ParamBox, pb2::ParamBox;
     if ignoreContainer
         # boolFunc(pb1.data, pb2.data) && 
         boolFunc(pb1(), pb2())
-    elseif ignoreFunction
-        boolFunc(pb1.data, pb2.data) && 
-        boolFunc(pb1.canDiff[],pb2.canDiff[])
+    elseif boolFunc(pb1.canDiff[], pb2.canDiff[])
+        if ignoreFunction
+            return boolFunc(pb1.data, pb2.data)
+        else
+            return (boolFunc(pb1.map, pb2.map) && boolFunc(pb1.data, pb2.data))
+        end
     else
-        boolFunc(pb1.map[], pb2.map[]) && 
-        boolFunc(pb1.data, pb2.data) && 
-        boolFunc(pb1.canDiff[],pb2.canDiff[])
+        false
     end
 end

@@ -73,7 +73,7 @@ const sciNotReplace = (txt)->replace(txt, SciNotMarker => "e")
 const BStextEndingMarker = "****"
 const BasisSetList = Dict(BasisFuncNames .=> BasisFuncTexts)
 const AtomicNumberList = Dict(ElementNames .=> collect(1 : length(ElementNames)))
-const SubshellNumberList = Dict(SubshellNames .=> collect(0 : length(SubshellNames)-1))
+const AngularMomentumList = Dict(SubshellNames .=> collect(0 : length(SubshellNames)-1))
 const SubshellSuborderList = Dict(SubshellNames .=> SubshellOrbitals)
 const ijkOrderList = Dict(SubshellNames .=> SubshellAngularMomentums)
 const ijkIndexList = Dict(flatten(SubshellAngularMomentums) .=> flatten([collect(1:length(i)) for i in SubshellAngularMomentums]))

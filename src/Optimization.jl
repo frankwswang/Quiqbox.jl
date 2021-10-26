@@ -40,7 +40,7 @@ end
     E::Float64, C::Union{Array{Float64, 1}, NTuple{2, Array{Float64, 2}}}
 
 The default engine (`Function`) in `optimizeParams!` to update Hartree-Fock energy and 
-coefficient matrix(s). 
+coefficient matrix(s).
 """
 function defaultECmethod(HFtype, Hcore, HeeI, S, Ne)
     X = getX(S)
@@ -95,7 +95,6 @@ iteration converges.
 
 `ECmethod::F2`: The `Function` used to update Hartree-Fock energy and coefficient matrix(s) 
 during the optimization iterations.
-=== Keyword argument(s) ===
 """
 function optimizeParams!(bs::Vector{<:FloatingGTBasisFuncs}, pbs::Vector{<:ParamBox},
                          nuc::Vector{String}, nucCoords::Vector{<:AbstractArray}, 
@@ -105,7 +104,7 @@ function optimizeParams!(bs::Vector{<:FloatingGTBasisFuncs}, pbs::Vector{<:Param
                          HFtype::Symbol=:RHF, ECmethod::F2=defaultECmethod) where 
                         {F1<:Function, F2<:Function}
     tAll = @elapsed begin
-        
+
         i = 0
         Es = Float64[]
         pars = zeros(0, length(pbs))
@@ -135,7 +134,7 @@ function optimizeParams!(bs::Vector{<:FloatingGTBasisFuncs}, pbs::Vector{<:Param
             push!(Es, E)
             pars = vcat(pars, parsL |> transpose)
             grads = vcat(grads, grad |> transpose)
-            
+
             if i%gap == 0 && printInfo
                 println(rpad("Step $i: ", 15), rpad("E = $(E)", 26))
                 print(rpad("", 10), "params = ")
@@ -146,9 +145,9 @@ function optimizeParams!(bs::Vector{<:FloatingGTBasisFuncs}, pbs::Vector{<:Param
             end
 
             parsL = updateParams!(pbs, grad, method=GDmethod)
-            
+
             !isConverged(Es) && i < maxSteps || break
-            
+
             i += 1
         end
 
