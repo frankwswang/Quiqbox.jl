@@ -471,6 +471,7 @@ function ijkIndex(b::FloatingGTBasisFuncs)
 end
 
 """
+
     centerOf(bf::FloatingGTBasisFuncs) -> Array{<:Real, 1}
 
 Return the center coordinate of the input `FloatingGTBasisFuncs`.
