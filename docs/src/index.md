@@ -1,6 +1,6 @@
 # Quiqbox.jl
 
-**Quiqbox** is a quantum chemistry and quantum computing software package that starts off around Gaussian basis set optimization of molecular electronic-structure problems. Quiqbox is written in pure [Julia](https://julialang.org/).
+**Quiqbox** is a quantum chemistry and quantum physics software package that starts off around Gaussian basis set optimization for electronic structure problems. Quiqbox is written in pure [Julia](https://julialang.org/).
 
 ## Features
 

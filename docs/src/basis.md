@@ -9,7 +9,7 @@ The data structure formularized by Quiqbox in each step, namely the level of dat
 | 4 | basis set | Array of basis functions (with reusable integrals) | `Array`, `GTBasis` | `Array{<:BasisFunc, 1}`...|
 | 3 | basis functions | single or linear combination of Gaussian functions | `CompositeGTBasisFuncs` | `BasisFunc{0, 1}`, `BasisFuncs{1, 3, 3}`...|
 | 2 | Gaussian functions | (primitive) Gaussian functions | `AbstractGaussFunc` | `GaussFunc`|
-| 1 |  a pool of parameters | center coordinates, function coefficients | `ParamBox` | `ParamBox`... |
+| 1 |  a pool of parameters | center coordinates, function coefficients | `ParamBox` | `ParamBox{Float64, :α, :itself}`... |
 
 
 Depending on how much control the user wants to have over each step, Quiqbox provides several [methods](https://docs.julialang.org/en/v1/manual/methods/) of related functions to leave the user with the freedom to balance between efficiency and customizability.
@@ -198,17 +198,17 @@ uniqueParams!(bs7)
 `uniqueParams!` marks all the parameters of the given basis set and return the unique parameters. As you can see, even though `bs7` has 2 `GaussFunc`s as basis functions, but over all it only has 1 unique coefficient exponent ``\alpha_1`` and 1 unique contraction coefficient ``d_1``.
 
 
-## Dependent Variable as Parameter
+## Dependent Variable as a parameter
 
-Another control the user can have on the parameters in Quiqbox is to not only store the each unique parameter as an independent variable, but also as a dependent variable, i.e., a math function of some more primitive independent variable:
+Another control the user can have on the parameters in Quiqbox is to not only directly store each parameter in a `ParamBox`, but also make it output a dependent variable that is defined by the mapping function of the parameter.
+
+Such a mapping function is stored in the `map` field of a `ParamBox` ( which normally is a ``R \to R`` mapping). The mapped value can be access through 
+syntax `()`. In default the variable is mapped to itself:
 ```@repl 2
 pb1 = gf4.xpn
 
 pb1.map
-```
 
-The `map` field of a `ParamBox` stores a `Function`, referencing the `Function` that can be defined as a mapping of the actual stored data to another output data (``R \to R``). The output value can be access through syntax `()`. In default the variable is mapped to itself:
-```@repl 2
 pb1[] == pb1()
 ```
 
@@ -216,3 +216,5 @@ You can get a clearer view of the mapping relations in a `ParamBox` using `getVa
 ```@repl 2
 getVarDict(pb1)
 ```
+!!! info "Parameter represented by `ParamBox`"
+    The mapped variable (value) of a `ParamBox` is always used as the parameter (parameter value) it represents in the construction of any basis function component. If instead, you want to optimize the variable before the mapping, the `ParamBox` needs to be marked as "differentiable". For more information parameter optimization, please see the docstring of [`ParamBox`](@ref) and section [Parameter Optimization](@ref).

@@ -1304,8 +1304,8 @@ end
 
 Mark the parameters (`ParamBox`) in input bs which can a `Vector` of `GaussFunc` or 
 `FloatingGTBasisFuncs`. The identical parameters will be marked with same index. 
-`filterMapping`determines wether return the `ParamBox`s with identical fields except the 
-`map` field.
+`filterMapping`determines weather filter out (i.e. not return) `ParamBox`s that have same 
+independent variables despite they may have same mapping functions.
 """
 uniqueParams!(bs; filterMapping::Bool=false) = markParams!(getParams(bs); filterMapping)
 

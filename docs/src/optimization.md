@@ -1,9 +1,10 @@
 # Parameter Optimization
 
-## Selectively Optimizing Parameters 
+## Selectively Optimizing Parameters
 
-In the [Basis Sets](@ref) section we have briefly introduced the parameters in terms of 
-[`ParamBox`](@ref) that are embedded in containers such as [`BasisFunc`](@ref) and [`BasisFuncs`](@ref) that are directly used to form a basis set. This means how we construct the basis set using the parameters will determine how large of a parameter space we have to optimize the basis set. For more information please refer to [Constructing basis sets based on ParamBox](@ref). Here is a example to use [`GaussFunc`](@ref) and [`GridBox`](@ref) to quickly generate a grid-based basis set with only 3 actual parameters, 1 determines all the coordinates of basis function centers, the other 2 are the only exponent coefficient ``\alpha`` and contraction coefficient ``d``.
+In the [Basis Sets](@ref) section, we have briefly introduced the parameters in terms of [`ParamBox`](@ref) that are embedded in containers such as [`BasisFunc`](@ref) and [`BasisFuncs`](@ref) that are directly used to form a basis set. This means how we construct the basis set using the parameters will determine the parameter space to optimize the basis set. For more information please refer to [Constructing basis sets based on ParamBox](@ref).
+
+Here is an example of using [`GaussFunc`](@ref) and [`GridBox`](@ref) to quickly generate a grid-based basis set with only 3 actual parameters. One is the spacing ``L`` of the grid points that indirectly determines all the center coordinates of basis function through a series of mapping functions; the other two are one exponent coefficient ``\alpha`` and one contraction coefficient ``d``.
 ```@repl 4
 push!(LOAD_PATH,"../../src/") # hide
 using Quiqbox # hide
@@ -25,7 +26,7 @@ unique parameters that can also be optimized later:
 pars = uniqueParams!(bs, filterMapping=true)
 ```
 
-As expected, there are indeed only 3 unique tunable parameters despite the basis set already has 8 basis functions. (note that keyword argument `filterMapping` in `uniqueParams!` is set to `true` because we want the function to only return independent parameters) However, if we take a step further, we can remove ``d`` since each basis function here is just a "unique" Gaussian function. Thus, input the intent parameters (along with other necessary arguments) into the Quiqbox function [`optimizeParams!`](@ref) and we can sit and wait for the optimization iterations to complete.
+As expected, there are indeed only 3 unique tunable independent parameters despite the basis set has 8 basis functions. However, if we take a step further, we can remove ``d`` since each basis function here is just one same Gaussian function. Thus, input the intent parameters (along with other necessary arguments) into the [`optimizeParams!`](@ref) and we can sit and wait for the optimization iterations to complete.
 ```@repl 4
 parsPartial = [pars[1], pars[4]]
 
@@ -41,7 +42,7 @@ It you want to go through the above example by yourself, you can also find the s
 
 ## Store Customized Basis Set
 
-Now, if you want, you can also store the information of the basis set in an container called [`GTBasis`](@ref) that not only includes the basis set, but also the related 1-electron and 2-electron integral values (nuclear attraction is not stored). `GTBasis` can also be accepted as an argument for [`runHF`](@ref) to save the time of calculating the integrals of the basis set.
+Now, if you want, you can also store the information of the basis set in an container called [`GTBasis`](@ref) that not only includes the basis set, but also the related 1-electron and 2-electron integral values (nuclear attraction is not stored). `GTBasis` can also be accepted as an argument for [`runHF`](@ref) to save the time of recalculating the integrals of the basis set.
 ```@repl 4
 GTBasis(bs)
 ```
