@@ -4,14 +4,14 @@ export eeInteraction, eeInteractions
 @inline function twoBodyBFTensorCore(libcinFunc::Symbol, 
                                      bf1::FloatingGTBasisFuncs, bf2::FloatingGTBasisFuncs, 
                                      bf3::FloatingGTBasisFuncs, bf4::FloatingGTBasisFuncs; 
-                                     isGradient::Bool=false)                                      
+                                     isGradient::Bool=false)
     env = Float64[]
     atm = Int32[]
     bas = Int32[]
     subSize = basisSize([bf1.subshell, bf2.subshell, bf3.subshell, bf4.subshell])
 
     id, uniqueBFs = markUnique([bf1, bf2, bf3, bf4])
-    
+
     for bf in uniqueBFs
         addToDataChain!(env, atm, bas, bf)
     end
@@ -33,14 +33,14 @@ Core function for one-electron integrals.
 
 `libcinFunc::Symbol` specifies the backend [libcint](https://github.com/sunqm/libcint) 
 function name, e.g. `"cint2e_cart"` should be converted to `:cint2e_cart` as the input 
-argument. 
+argument.
 """
 @inline function twoBodyBFTensor(libcinFunc::Symbol, 
                                  b1::AbstractGTBasisFuncs, 
                                  b2::AbstractGTBasisFuncs, 
                                  b3::AbstractGTBasisFuncs, 
                                  b4::AbstractGTBasisFuncs; 
-                                 isGradient::Bool=false)                                      
+                                 isGradient::Bool=false)
     f = @inline function (i,j,k,l)
         ints = twoBodyBFTensorCore(libcinFunc, i, j, k, l; isGradient)
         ints[ijkIndex(i), ijkIndex(j), ijkIndex(k), ijkIndex(l),:]

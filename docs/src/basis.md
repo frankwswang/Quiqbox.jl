@@ -7,12 +7,12 @@ The data structure formularized by Quiqbox in each step, namely the level of dat
 | level  | objective  |  product examples | abstract type  | type instances |
 | :---: | :---:   | :---:           | :---: | :---:          |
 | 4 | basis set | Array of basis functions (with reusable integrals) | `Array`, `GTBasis` | `Array{<:BasisFunc, 1}`...|
-| 3 | basis functions | single or linear combination of Gaussian functions | `FloatingGTBasisFuncs` | `BasisFunc{0, 1}`, `BasisFuncs{1, 3, 3}`...|
+| 3 | basis functions | single or linear combination of Gaussian functions | `CompositeGTBasisFuncs` | `BasisFunc{0, 1}`, `BasisFuncs{1, 3, 3}`...|
 | 2 | Gaussian functions | (primitive) Gaussian functions | `AbstractGaussFunc` | `GaussFunc`|
 | 1 |  a pool of parameters | center coordinates, function coefficients | `ParamBox` | `ParamBox`... |
 
 
-Depending on how much control the user wants to have over each step, Quiqbox provides several [methods](https://docs.julialang.org/en/v1/manual/methods/) of related functions to leave the user with the freedom to balance between efficiency and customizability. 
+Depending on how much control the user wants to have over each step, Quiqbox provides several [methods](https://docs.julialang.org/en/v1/manual/methods/) of related functions to leave the user with the freedom to balance between efficiency and customizability.
 
 Below are some examples from the simplest way to relatively more flexible ways to construct a basis set in Quiqbox. Hopefully these use cases can also work as inspirations for more creative ways to manipulate basis sets.
 
@@ -73,7 +73,7 @@ If the basis set you want to use doesn't exist in Quiqbox's library, you can use
 genBasisFunc(missing, ("6-31G", "Kr"))
 
 # Data from https://www.basissetexchange.org
-txt_Kr_631G = """ 
+txt_Kr_631G = """
 Kr     0
 S    6   1.00
       0.1205524000D+06       0.1714050000D-02
@@ -153,11 +153,11 @@ gf1
 ```
 the 2 fields of a `GaussFunc`, `.xpn` and `.con` are in fact `ParamBox`, and the actual value of them can be accessed through syntax `[]`:
 ```@repl 2
-gf1.xpn 
+gf1.xpn
 
 gf1.con
 
-gf1.xpn[] 
+gf1.xpn[]
 
 gf1.con[]
 ```
@@ -171,7 +171,7 @@ gf3_2 = gf3
 
 gf3.xpn[] *= 2
 
-gf3 
+gf3
 
 gf3_2
 
@@ -195,9 +195,7 @@ bs7 = genBasisFunc.([rand(3) for _=1:2], Ref(gf4))
 uniqueParams!(bs7)
 ```
 
-`uniqueParams!` marks all the parameters of the given basis set and 
-return the unique parameters. As you can see, even though `bs7` has 
-2 `GaussFunc`s as basis functions, but over all it only has 1 unique coefficient exponent ``\alpha_1`` and 1 unique contraction coefficient ``d_1``.
+`uniqueParams!` marks all the parameters of the given basis set and return the unique parameters. As you can see, even though `bs7` has 2 `GaussFunc`s as basis functions, but over all it only has 1 unique coefficient exponent ``\alpha_1`` and 1 unique contraction coefficient ``d_1``.
 
 
 ## Dependent Variable as Parameter

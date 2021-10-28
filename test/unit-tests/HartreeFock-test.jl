@@ -58,7 +58,7 @@ using Suppressor: @suppress_out
       0.0          0.0          0.0          1.0  0.0  0.0          0.0; 
       0.0          0.0          0.0          0.0  1.0  0.0          0.0][1:5, [1,2,3,6,7]], 
     atol=errorThreshold2)
-    
+
     @test  isapprox(vcat(res1.C[6:7,:][:], res1.C[1:5, 4:5][:]) |> sort, 
                     vcat(fill(0,22), fill(1,2)), atol=errorThreshold1)
     @test  isapprox(res1.C[6:7, 4:5][:] |> sort, [0,0,1,1], atol=errorThreshold1)
@@ -72,14 +72,14 @@ using Suppressor: @suppress_out
       0.0          0.0           0.0          0.0          0.0 -0.661303892  0.0; 
       0.0          0.0           0.0          0.0          0.0  0.0 -0.661303892], 
     atol=errorThreshold2)
-    
+
     @test isapprox(res1.Emo, 
     [-20.930374644, -1.616672450, -1.284464364, -0.661303892, 
       -0.661303892,  1.060817046,  1.847805126], 
     atol=errorThreshold1)
-    
+
     @test res1.occu == [2, 2, 2, 2, 2, 0, 0]
-    
+
     D1 = res1.D
     @test isapprox(D1*S*D1, D1, atol=errorThreshold1)
 
@@ -104,7 +104,7 @@ using Suppressor: @suppress_out
                    atol=errorThreshold1)
 
     @test isapprox(res2.E0HF, -93.7878386328625, atol=errorThreshold1)
-    
+
     @test isapprox.((res2.C[1][1:5, [1,2,3,6,7]], res2.C[2][1:5, [1,2,3,6,7]]), 
     ([ 0.01089592  0.08898109  0.12160791  0.0  0.0  1.91454520  3.61573332; 
        0.01089592  0.08898109 -0.12160791  0.0  0.0  1.91454520 -3.61573332; 
@@ -129,7 +129,7 @@ using Suppressor: @suppress_out
     @test  isapprox(vcat(res2.C[2][6:7,:][:], res2.C[2][1:5, 4:5][:]) |> sort, 
                     vcat(fill(0,22), fill(1,2)), atol=errorThreshold1)
     @test  isapprox(res2.C[2][6:7, 4:5][:] |> sort, [0,0,1,1], atol=errorThreshold1)
-    
+
     @test isapprox.(res2.F, 
     ([-2.25535869 -1.96098203  -4.48436922 -2.51168980  0.48360380  0.0  0.0; 
       -1.96098203 -2.25535869  -4.48436922 -2.51168980 -0.48360380  0.0  0.0; 
@@ -146,16 +146,16 @@ using Suppressor: @suppress_out
        0.0         0.0          0.0         0.0         0.0 -0.66130760  0.0; 
        0.0         0.0          0.0         0.0         0.0  0.0 -0.66130760]), 
     atol=errorThreshold2) |> prod
-    
+
     @test isapprox.(res2.Emo, 
     ([-20.930384503, -1.616675737, -1.284466209, -0.661307611, 
        -0.661307611,  1.060815275,  1.847804069],
      [-20.930384496, -1.616675722, -1.284466197, -0.661307600, 
        -0.661307600,  1.060815276,  1.847804076]), 
     atol=errorThreshold2) |> prod
-    
+
     @test ( res2.occu .== ([1, 1, 1, 1, 1, 0, 0], [1, 1, 1, 1, 1, 0, 0]) ) |> prod
-    
+
     D2s = res2.D
     for D in D2s
         @test isapprox(D*S*D, D, atol=errorThreshold1)

@@ -18,7 +18,7 @@ export overlap, overlaps, nucAttraction, nucAttractions, elecKinetic, elecKineti
         natm = length(nuclei) + length(BasisSet) 
     to include ghost atoms.
     =#
-    addToDataChain!(env, atm, nuclei, nucleiCoords) 
+    addToDataChain!(env, atm, nuclei, nucleiCoords)
     addToDataChain!(env, atm, bas, bf1)
     addToDataChain!(env, atm, bas, bf2)
 
@@ -34,7 +34,7 @@ end
                     b2::AbstractGTBasisFuncs, nuclei::Array{String, 1}=String[], 
                     nucleiCoords::Array{<:AbstractArray, 1}=Array[]; 
                     isGradient::Bool=false) -> 
-    Array{Float64, 2}
+    Array{Float64, 3}
 
 Core function for one-electron integrals.
 
@@ -68,7 +68,7 @@ end
     for i = 1:length(BasisSet), j = 1:i
         intTensor =  intFunc(BasisSet[i], BasisSet[j])
         for page = 1:nPage
-            rowRange = accuSize[i]+1 : accuSize[i+1] 
+            rowRange = accuSize[i]+1 : accuSize[i+1]
             colRange = accuSize[j]+1 : accuSize[j+1]
             int = intTensor[:, :, page]
             tensor[rowRange, colRange, page] = int
