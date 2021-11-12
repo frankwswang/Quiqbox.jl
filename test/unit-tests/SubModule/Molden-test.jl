@@ -53,5 +53,5 @@ for (nuc, nucCoords, molName, iMol) in zip(mols, molCoords, molNames, 1:length(m
 end
 
 @test true
-
+# TODO: Add tests to verify content in the files.
 end

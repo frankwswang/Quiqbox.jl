@@ -47,11 +47,11 @@ using Suppressor: @capture_out
 
     fVar1 = runHF(GTb1, ["H", "H"], [[0, 0, 0], [1,2,1]], printInfo=false, initialC=:Hcore)
 
-    @test (@capture_out show(fVar1.temp)) == string(typeof(fVar1.temp))*"(shared.Etot="*
-                                             "[2.263712269, … , 2.262890978], shared.Dtots"*
+    @test (@capture_out show(fVar1.temp)) == string(typeof(fVar1.temp))*"(shared.Etots="*
+                                             "[2.263712269, … , 2.262890932], shared.Dtots"*
                                              ", Cs, Es, Ds, Fs)"
 
-    @test (@capture_out show(fVar1)) == string(typeof(fVar1))*"(E0HF=2.262890978, C, F, D,"*
+    @test (@capture_out show(fVar1)) == string(typeof(fVar1))*"(E0HF=2.262890932, C, F, D,"*
                                         " Emo, occu, temp, isConverged)"
 
 

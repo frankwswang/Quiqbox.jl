@@ -68,7 +68,7 @@ function defaultECmethodCore(Ne, nuc::Vector{String}, nucCoords::Vector{<:Abstra
     function (Hcore, HeeI, bs, S)
         X = getX(S)
         res = runHFcore(defaultSCFconfig, Ne, Hcore, HeeI, S, X, 
-                        guessC(:GWH, (length(Ne)==2), S, X, 
+                        guessC(:SAD, (length(Ne)==2), S, X, 
                                Hcore, HeeI, bs, nuc, nucCoords); 
                         printInfo=false)
         res.E0HF, res.C

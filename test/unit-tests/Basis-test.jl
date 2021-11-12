@@ -2,7 +2,7 @@ using Test
 using Quiqbox
 using Quiqbox: isFull, BasisFuncMix, unpackBasisFuncs, inSymbols, varVal, ElementNames, 
                sortBasisFuncs, ParamList, sumOf, expressionOfCore, mergeGaussFuncs, 
-               ijkOrbitalList
+               ijkOrbitalList, gaussProd
 using Symbolics
 using LinearAlgebra
 
@@ -221,7 +221,7 @@ gf_merge3 = GaussFunc(1.5,1)
 @test hasIdentical(mergeGaussFuncs(gf_merge1, gf_merge3), [gf_merge1, gf_merge3])
 
 
-# , add, mul
+# function add, mul, gaussProd
 @test add(bs2[1]) === bs2[1]
 bf1s = BasisFuncs(bf1.center, bf1.gauss, [ijkOrbitalList[bf1.ijk[1]]], bf1.normalizeGTO)
 @test hasIdentical(add(bf1s), bf1)
@@ -233,7 +233,21 @@ for bs in (bs2, bs2_2, bs2_3)
     @test isapprox(SNew, LinearAlgebra.I, atol=1e-14)
 end
 
-# TODO: add value test of Gaussian function product theorem.
+α₁, α₂ = rand(1:0.01:10, 2)
+d₁, d₂ = rand(2)
+R₁ = rand(-2:0.01:2, 3)
+R₂ = rand(-2:0.01:2, 3)
+xr = -10:0.1:10
+yr = -10:0.1:10
+zr = -10:0.1:10
+bl = true
+for x in xr, y in yr, z in zr
+    xv = [x, y, z]
+    α₃, d₃, R₃ = gaussProd((α₁, d₁, R₁), (α₂, d₂, R₂))
+    bl *= isapprox(d₁*exp(-α₁*sum(abs2, xv-R₁)) * d₂*exp(-α₂*sum(abs2, xv-R₂)), 
+                   d₃*exp(-α₃*sum(abs2, xv-R₃)), atol=1e-16) # limit: atol=1e-20
+end
+@test bl
 
 
 # function shift
@@ -354,6 +368,7 @@ gf_dc2 = copyBasis(gf_dc1)
 @test gf_dc1.xpn() == gf_dc2.xpn() == gf_dc2.xpn[]
 
 
+# TODO: Finish tests.
 # function getVar & getVarDict
 # @test getVar(pb1)[][1].val.name == :p
 # @test getVar(pb1)[][2] == 2.0

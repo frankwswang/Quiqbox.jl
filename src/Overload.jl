@@ -75,9 +75,9 @@ end
 
 function show(io::IO, vars::HFtempVars)
     print(io, typeof(vars))
-    print(io, "(shared.Etot=[", round(vars.shared.Etots[1], sigdigits=nSigShown),", … , ", 
-                                round(vars.shared.Etots[end], sigdigits=nSigShown), "], "*
-                            "shared.Dtots, Cs, Es, Ds, Fs)")
+    print(io, "(shared.Etots=[", round(vars.shared.Etots[1], sigdigits=nSigShown),", … , ", 
+                                 round(vars.shared.Etots[end], sigdigits=nSigShown), "], "*
+              "shared.Dtots, Cs, Es, Ds, Fs)")
 end
 
 function show(io::IO, vars::HFfinalVars)
