@@ -27,26 +27,85 @@ function getC(X::Matrix{T1}, F::Matrix{T2};
     outputEmo ? (outC, ϵ) : outC
 end
 
-function getCfromGWH(S::Matrix{T1}, Hcore::Matrix{T2}; K=1.75, X=getX(S), _kws...) where 
-         {TelLB<:T1<:TelUB, TelLB<:T2<:TelUB}
+
+function breakSymOfC(C::Matrix{T}) where {TelLB<:T<:TelUB}
+    C2 = copy(C)
+    l = min(size(C2)[1], 2)
+    C2[1:l, 1:l] .= 0 # Breaking spin symmetry.
+    # C2[l, :] .= 0 # Another way.
+    (copy(C), C2)
+end
+
+
+function getCfromGWH(S::Matrix{T1}, Hcore::Matrix{T2}, K::Float64=1.75; X=getX(S),
+                     forUHF::Bool=false) where 
+                    {TelLB<:T1<:TelUB, TelLB<:T2<:TelUB}
     l = size(Hcore)[1]
     H = zero(Hcore)
     for i in 1:l, j in 1:l
-        H[i,j] = K * S[i,j] * (Hcore[i,i] + Hcore[j,j]) / 2
+        H[i,j] = K * S[i,j] * (Hcore[i,i] + Hcore[j,j]) * 0.5
     end
-    getC(X, H)
+    C = getC(X, H)
+    forUHF ? breakSymOfC(C) : C
 end
 
-getCfromHcore(S::Matrix{T1}, Hcore::Matrix{T2}; X=getX(S), _kws...) where 
-             {TelLB<:T1<:TelUB, TelLB<:T2<:TelUB} = 
-             getC(X, Hcore)
 
-const guessCmethods = Dict(:GWH=>getCfromGWH, :Hcore=>getCfromHcore)
+function getCfromHcore(X::Matrix{T1}, Hcore::Matrix{T2}; forUHF::Bool=false) where 
+                      {TelLB<:T1<:TelUB, TelLB<:T2<:TelUB}
+    C = getC(X, Hcore)
+    forUHF ? breakSymOfC(C) : C
+end
 
 
-guessC(S::Matrix{T1}, Hcore::Matrix{T2}; method::Symbol=:GWH, kws...) where 
-      {TelLB<:T1<:TelUB, TelLB<:T2<:TelUB} = 
-      guessCmethods[method](S, Hcore; kws...)
+function getCfromSAD(S::Matrix{T1}, Hcore::Matrix{T2}, HeeI::Array{T3, 4},
+                     bs::Vector{<:AbstractGTBasisFuncs}, 
+                     nuc::Vector{String}, nucCoords::Vector{<:AbstractArray}; 
+                     X=getX(S), forUHF::Bool=false) where 
+                    {TelLB<:T1<:TelUB, TelLB<:T2<:TelUB, TelLB<:T3<:TelUB}
+    D₁ = zero(Hcore)
+    D₂ = zero(Hcore)
+    N₁tot = 0
+    N₂tot = 0
+    for (atm, coord) in zip(nuc, nucCoords)
+        N = getCharge(atm)
+        N₁ = N ÷ 2
+        N₂ = N - N₁
+        if N₂ > N₁ && N₂tot > N₁tot
+            temp = N₁
+            N₁ = N₂
+            N₂ = temp
+        end
+        h1 = coreH(bs, [atm], [coord])
+        res = runHFcore(defaultSCFconfig, 
+                        (N₁, N₂), h1, HeeI, S, X, getCfromHcore(X, h1, forUHF=true))
+        D₁ += N₁ .* res.D[1]
+        D₂ += N₂ .* res.D[2]
+        N₁tot += N₁
+        N₂tot += N₂
+    end
+    D₁ ./= N₁tot
+    D₂ ./= N₂tot
+    Dᵀ = D₁ + D₂
+    if forUHF
+        getC.(Ref(X), getF.(Ref(Hcore), Ref(HeeI), (D₁, D₂), Ref(Dᵀ)))
+    else
+        getC(X, getF(Hcore, HeeI, Dᵀ./2, Dᵀ))
+    end
+end
+
+
+const guessCmethods = 
+    Dict(  :GWH => (forUHF, S, X, Hcore, _...) -> getCfromGWH(S, Hcore; X, forUHF),
+         :Hcore => (forUHF, S, X, Hcore, _...) -> getCfromHcore(X, Hcore; forUHF), 
+           :SAD => (forUHF, S, X, Hcore, HeeI, bs, nuc, nucCoords) -> 
+                   getCfromSAD(S, Hcore, HeeI, bs, nuc, nucCoords; X, forUHF))
+
+
+guessC(method::Symbol, forUHF::Bool, S::Matrix{T1}, X::Matrix{T1}, Hcore::Matrix{T2}, 
+       HeeI::Array{T3, 4}, bs::Vector{<:AbstractGTBasisFuncs}, 
+       nuc::Vector{String}, nucCoords::Vector{<:AbstractArray}) where 
+      {TelLB<:T1<:TelUB, TelLB<:T2<:TelUB, TelLB<:T3<:TelUB} = 
+guessCmethods[method](forUHF, S, X, Hcore, HeeI, bs, nuc, nucCoords)
 
 
 getD(C::Matrix{T}, Nˢ::Int) where {TelLB<:T<:TelUB} = 
@@ -83,20 +142,19 @@ getF(Hcore::Matrix{T1}, G::Matrix{T2}) where
         Hcore + G
 
 # RHF
-getF(Hcore::Matrix{T1}, HeeI::Array{T2, 4}, D::Matrix{T3}, Dᵀ::Matrix{T4}) where 
-    {TelLB<:T1<:TelUB, TelLB<:T2<:TelUB, TelLB<:T3<:TelUB, TelLB<:T4<:TelUB} = 
-getF(Hcore, getG(HeeI, D, Dᵀ))
-
-# UHF
 getF(Hcore::Matrix{T1}, HeeI::Array{T2, 4}, D::Matrix{T3}) where 
     {TelLB<:T1<:TelUB, TelLB<:T2<:TelUB, TelLB<:T3<:TelUB} = 
 getF(Hcore, getG(HeeI, D))
 
+# UHF
+getF(Hcore::Matrix{T1}, HeeI::Array{T2, 4}, D::Matrix{T3}, Dᵀ::Matrix{T4}) where 
+    {TelLB<:T1<:TelUB, TelLB<:T2<:TelUB, TelLB<:T3<:TelUB, TelLB<:T4<:TelUB} = 
+getF(Hcore, getG(HeeI, D, Dᵀ))
 
+# RHF or UHF
 getF(Hcore::Matrix{T1}, HeeI::Array{T2, 4}, Ds::NTuple{N, Matrix{T3}}) where 
     {TelLB<:T1<:TelUB, TelLB<:T2<:TelUB, TelLB<:T3<:TelUB, N} = 
 getF(Hcore, getG(HeeI, Ds...))
-
 
 getE(Hcore::Matrix{T1}, F::Matrix{T2}, D::Matrix{T3}) where 
     {TelLB<:T1<:TelUB, TelLB<:T2<:TelUB, TelLB<:T3<:TelUB} = 
@@ -158,16 +216,9 @@ end
 
 # UHF
 function initializeSCF(Hcore::Matrix{T1}, HeeI::Array{T2, 4}, 
-                       Cs::Union{Matrix{T3}, NTuple{2, Matrix{T3}}}, 
+                       Cs::NTuple{2, Matrix{T3}}, 
                        Ns::NTuple{2, Int}) where 
                        {TelLB<:T1<:TelUB, TelLB<:T2<:TelUB, TelLB<:T3<:TelUB}
-    if Cs isa Matrix{<:Number}
-        C2 = copy(Cs)
-        l = min(size(C2)[1], 2)
-        C2[1:l, 1:l] .= 0 # Breaking spin symmetry.
-        # C2[l, :] .= 0 # Another way.
-        Cs = (copy(Cs), C2)
-    end
     Ds = getD.(Cs, Ns)
     Dᵀs = [Ds |> sum]
     Fs = getF.(Ref(Hcore), Ref(HeeI), Ds, Ref(Dᵀs[]))
@@ -248,7 +299,7 @@ struct SCFconfig{N} <: ImmutableParameter{SCFconfig, Any}
 end
 
 
-const defaultSCFconfig = SCFconfig([:ADIIS, :DIIS, :ADIIS], [1e-4, 1e-6, 1e-10])
+const defaultSCFconfig = SCFconfig([:ADIIS, :DIIS, :ADIIS], [1e-4, 1e-6, 1e-15])
 
 
 mutable struct HFinterrelatedVars <: HartreeFockintermediateData
@@ -377,8 +428,8 @@ end
     runHF(bs::Union{BasisSetData, Array{<:AbstractGTBasisFuncs, 1}}, 
           nuc::Array{String, 1}, 
           nucCoords::Array{<:AbstractArray, 1}, 
-          N::Union{NTuple{2, Int}, Int}=getCharge(nuc); 
-          initialC::Union{Array{T, 2}, NTuple{2, Array{T, 2}}, Symbol}=:GWH, 
+          N::Int=getCharge(nuc); 
+          initialC::Union{Array{T, 2}, NTuple{2, Array{T, 2}}, Symbol}=:SAD, 
           HFtype::Symbol=:RHF, 
           scfConfig::SCFconfig=defaultSCFconfig, 
           earlyTermination::Bool=true, 
@@ -395,8 +446,7 @@ Main function to run Hartree-Fock in Quiqbox.
 
 `nucCoords::Array{<:AbstractArray, 1}`: The coordinates of the nuclei.
 
-`N::Union{NTuple{2, Int}, Int}`: The total number of electrons or the numbers of electrons 
-with different spins respectively.
+`N::Int`: The total number of electrons.
 
 === Keyword argument(s) ===
 
@@ -417,25 +467,23 @@ when its performance becomes unstable or poor.
 function runHF(bs::Vector{<:AbstractGTBasisFuncs}, 
                nuc::Vector{String}, 
                nucCoords::Vector{<:AbstractArray}, 
-               N::Union{NTuple{2, Int}, Int}=getCharge(nuc); 
-               initialC::Union{Matrix{T}, NTuple{2, Matrix{T}}, Symbol}=:GWH, 
+               N::Int=getCharge(nuc); 
+               initialC::Union{Matrix{T}, NTuple{2, Matrix{T}}, Symbol}=:SAD, 
                HFtype::Symbol=:RHF, 
                scfConfig::SCFconfig=defaultSCFconfig, 
                earlyTermination::Bool=true, 
                printInfo::Bool=true, 
                maxSteps::Int=1000) where {TelLB<:T<:TelUB}
-    @assert length(nuc) == length(nucCoords)
-    @assert (basisSize(bs) |> sum) >= ceil(sum(N)/2)
     gtb = GTBasis(bs, false)
-    runHF(gtb, nuc, nucCoords, N; initialC, scfConfig, 
-          HFtype, printInfo, maxSteps, earlyTermination)
+    runHF(gtb, nuc, nucCoords, N; initialC, HFtype, scfConfig, 
+          earlyTermination, printInfo, maxSteps)
 end
 
 function runHF(gtb::BasisSetData, 
                nuc::Vector{String}, 
                nucCoords::Vector{<:AbstractArray}, 
-               N::Union{NTuple{2, Int}, Int}=getCharge(nuc); 
-               initialC::Union{Matrix{T}, NTuple{2, Matrix{T}}, Symbol}=:GWH, 
+               N::Int=getCharge(nuc); 
+               initialC::Union{Matrix{T}, NTuple{2, Matrix{T}}, Symbol}=:SAD, 
                HFtype::Symbol=:RHF, 
                scfConfig::SCFconfig=defaultSCFconfig, 
                earlyTermination::Bool=true, 
@@ -443,38 +491,43 @@ function runHF(gtb::BasisSetData,
                maxSteps::Int=1000) where {TelLB<:T<:TelUB}
     @assert length(nuc) == length(nucCoords)
     @assert typeof(gtb).parameters[1] >= ceil(sum(N)/2)
+    @assert N > (HFtype == :RHF) "$(HFtype) requires more than $(LBofN) electron to run."
+    HFtype == :UHF && (N = (N÷2, N-N÷2))
     Hcore = gtb.getHcore(nuc, nucCoords)
     X = getX(gtb.S)
-    initialC isa Symbol && (initialC = guessC(gtb.S, Hcore; X, method=initialC))
-    runHFcore(N, Hcore, gtb.eeI, gtb.S, X, initialC; 
-              scfConfig, printInfo, maxSteps, HFtype, earlyTermination)
+    initialC isa Symbol && (initialC = guessC(initialC, (HFtype == :UHF), gtb.S, X, Hcore, 
+                                              gtb.eeI, gtb.basis, nuc, nucCoords))
+    runHFcore(scfConfig, N, Hcore, gtb.eeI, gtb.S, X, initialC; 
+              printInfo, maxSteps, earlyTermination)
 end
 
 
 """
 
-    runHFcore(N::Union{NTuple{2, Int}, Int}, 
+    runHFcore(scfConfig::SCFconfig{L}, 
+              N::Union{NTuple{2, Int}, Int}, 
               Hcore::Array{T1, 2}, 
               HeeI::Array{T2, 4}, 
               S::Array{T3, 2}, 
               X::Array{T4, 2}=getX(S), 
-              C::Union{Array{T, 2}, NTuple{2, Array{T, 2}}, Symbol}=guessC(S, Hcore; X);
-              HFtype::Symbol=:RHF,  
-              scfConfig::SCFconfig{L}, 
+              C::Union{Array{T, 2}, NTuple{2, Array{T, 2}}}=
+              getCfromGWH(S, Hcore; X, forUHF=(length(N)==2));
               earlyTermination::Bool=true, 
-              printInfo::Bool=true, 
+              printInfo::Bool=false, 
               maxSteps::Int=1000) where {$(TelLB)<:T1<:$(TelUB), 
-              $(TelLB)<:T2<:$(TelUB), 
-              $(TelLB)<:T3<:$(TelUB), 
-              $(TelLB)<:T4<:$(TelUB), 
-              $(TelLB)<:T5<:$(TelUB), L}
+                                         $(TelLB)<:T2<:$(TelUB), 
+                                         $(TelLB)<:T3<:$(TelUB), 
+                                         $(TelLB)<:T4<:$(TelUB), 
+                                         $(TelLB)<:T5<:$(TelUB), L}
 
 The core function of `runHF`.
 
 === Positional argument(s) ===
 
+`scfConfig::SCFconfig`: SCF iteration configuration.
+
 `N::Union{NTuple{2, Int}, Int}`: The total number of electrons or the numbers of electrons 
-with different spins respectively.
+with different spins respectively. When the latter is input, an UHF is performed.
 
 `Hcore::Array{T1, 2}`: Core Hamiltonian of electronic Hamiltonian.
 
@@ -485,14 +538,10 @@ Coulomb interactions and the Exchange Correlations.
 
 `X::Array{T4, 2}`: Orthogonal transformation matrix of S. Default value is S^(-0.5).
 
-`C::Union{Array{T, 2}, NTuple{2, Array{T, 2}}, Symbol}`: Initial guess of the 
-coefficient matrix(s) C of the molecular orbitals.
+`C::Union{Array{T, 2}, NTuple{2, Array{T, 2}}}`: Initial guess of the coefficient matrix(s) 
+C of the molecular orbitals.
 
 === Keyword argument(s) ===
-
-`HFtype::Symbol`: Hartree-Fock type. Available values are `:RHF` and `:UHF`.
-
-`scfConfig::SCFconfig`: SCF iteration configuration.
 
 `earlyTermination::Bool`: Whether automatically early terminate (skip) a convergence method 
 when its performance becomes unstable or poor.
@@ -501,23 +550,24 @@ when its performance becomes unstable or poor.
 
 `maxSteps::Int`: Maximum allowed iteration steps regardless of whether the SCF converges.
 """
-function runHFcore(N::Union{NTuple{2, Int}, Int}, 
+function runHFcore(scfConfig::SCFconfig{L}, 
+                   N::Union{NTuple{2, Int}, Int}, 
                    Hcore::Matrix{T1}, 
                    HeeI::Array{T2, 4}, 
                    S::Matrix{T3}, 
                    X::Matrix{T4}=getX(S), 
-                   C::Union{Matrix{T5}, NTuple{2, Matrix{T5}}}=guessC(S, Hcore; X);
-                   HFtype::Symbol=:RHF,  
-                   scfConfig::SCFconfig{L}, 
+                   C::Union{Matrix{T5}, NTuple{2, Matrix{T5}}}=
+                   getCfromGWH(S, Hcore; X, forUHF=(length(N)==2));
                    earlyTermination::Bool=true, 
-                   printInfo::Bool=true, 
+                   printInfo::Bool=false, 
                    maxSteps::Int=1000) where {TelLB<:T1<:TelUB, TelLB<:T2<:TelUB, 
-                   TelLB<:T3<:TelUB, TelLB<:T4<:TelUB, TelLB<:T5<:TelUB, L}
+                                              TelLB<:T3<:TelUB, TelLB<:T4<:TelUB, 
+                                              TelLB<:T5<:TelUB, L}
     @assert maxSteps > 0
-    HFtype == :UHF && (N isa Int) && (N = (N÷2, N-N÷2))
     vars = initializeSCF(Hcore, HeeI, C, N)
     Etots = (vars isa Tuple) ? vars[1].shared.Etots : vars.shared.Etots
-    printInfo && println(rpad("$(HFtype) Initial Gauss", 22), "E = $(Etots[end])")
+    HFtypeStr =  length(N) == 1 ? "RHF" : "UHF"
+    printInfo && println(rpad(HFtypeStr*" | Initial Gauss", 22), "E = $(Etots[end])")
     isConverged = true
     EtotMin = Etots[]
     for (method, kws, breakPoint, i) in 

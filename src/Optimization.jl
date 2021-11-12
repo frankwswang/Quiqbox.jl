@@ -36,28 +36,53 @@ end
 
 """
 
-    defaultECmethod(HFtype, Hcore, HeeI, S, Ne) -> 
-    E::Float64, C::Union{Array{Float64, 1}, NTuple{2, Array{Float64, 2}}}
+    defaultECmethod(HFtype::Symbol, nuc::Array{String, 1}, 
+                    nucCoords::Array{<:AbstractArray, 1}) -> 
+    fEC::Function
 
-The default engine (`Function`) in `optimizeParams!` to update Hartree-Fock energy and 
-coefficient matrix(s).
+    defaultECmethod(Ne::NTuple{2, Int}, nuc::Array{String, 1}, 
+                    nucCoords::Array{<:AbstractArray, 1}) -> 
+    fEC::Function
+
+Return the default `Function` in `optimizeParams!` that will be used to update Hartree-Fock 
+energy and coefficient matrix(s):
+
+    fEC(Hcore, HeeI, S) -> E::Float64, 
+                           C::Union{Array{Float64, 1}, NTuple{2, Array{Float64, 2}}}
+
+When `HFtype` is set to  `:RHF` or input argument is only a 2-element `Tuple`, the returned 
+function is for RHF methods.
 """
-function defaultECmethod(HFtype, Hcore, HeeI, S, Ne)
-    X = getX(S)
-    res = runHFcore(Ne, Hcore, HeeI, S, X, guessC(S, Hcore; X); 
-                    printInfo=false, HFtype, scfConfig=defaultSCFconfig)
-    res.E0HF, res.C
+function defaultECmethod(HFtype::Symbol, nuc::Vector{String}, 
+                         nucCoords::Vector{<:AbstractArray}, Ne::Int=getCharge(nuc))
+    HFtype == :UHF && ( Ne = (Ne÷2, Ne-Ne÷2) )
+    defaultECmethodCore(Ne, nuc, nucCoords)
+end
+
+# Direct specify number of α and β electrons for UHF.
+defaultECmethod(Nes::NTuple{2, Int}, 
+                nuc::Vector{String}, nucCoords::Vector{<:AbstractArray}) = 
+defaultECmethodCore(Nes, nuc, nucCoords)
+
+function defaultECmethodCore(Ne, nuc::Vector{String}, nucCoords::Vector{<:AbstractArray})
+    function (Hcore, HeeI, bs, S)
+        X = getX(S)
+        res = runHFcore(defaultSCFconfig, Ne, Hcore, HeeI, S, X, 
+                        guessC(:GWH, (length(Ne)==2), S, X, 
+                               Hcore, HeeI, bs, nuc, nucCoords); 
+                        printInfo=false)
+        res.E0HF, res.C
+    end
 end
 
 
 """
 
     optimizeParams!(bs::Array{<:FloatingGTBasisFuncs, 1}, pbs::Array{<:ParamBox, 1},
-                    nuc::Array{String, 1}, nucCoords::Array{<:AbstractArray, 1}, 
-                    Ne::Union{NTuple{2, Int}, Int}=getCharge(nuc);
+                    nuc::Array{String, 1}, nucCoords::Array{<:AbstractArray, 1};
                     Etarget::Float64=NaN, threshold::Float64=1e-4, maxSteps::Int=2000, 
-                    printInfo::Bool=true, GDmethod::F1=gradDescent!, HFtype::Symbol=:RHF, 
-                    ECmethod::F2=Quiqbox.defaultECmethod) where 
+                    printInfo::Bool=true, GDmethod::F1=gradDescent!, 
+                    ECmethod::F2=Quiqbox.defaultECmethod(:RHF, nuc, nucCoords)) where 
                    {F1<:Function, F2<:Function} -> 
     Es::Array{Float64, 1}, pars::Array{Float64, 2}, grads::Array{Float64, 2}
 
@@ -74,8 +99,10 @@ basis set.
 
 `nucCoords::Array{<:AbstractArray, 1}`: The nuclei coordinates.
 
-`Ne::Union{NTuple{2, Int}, Int}`: The total number of electrons or the numbers of electrons 
-with different spins respectively.
+`ECmethod::F2`: The `Function` used to update Hartree-Fock energy and coefficient matrix(s) 
+during the optimization iterations. Default setting is 
+`Quiqbox.defaultECmethod(:RHF, nuc, nucCoords)` for RHF and the number of electron is equal 
+to nuclei charge.
 
 === Keyword argument(s) ===
 
@@ -90,18 +117,12 @@ iteration converges.
 `printInfo::Bool`: Whether print out the information of each iteration step.
 
 `GDmethod::F1`: Applied gradient descent `Function`.
-
-`HFtype::Symbol`: Hartree-Fock type. Available values are `:RHF` and `:UHF`.
-
-`ECmethod::F2`: The `Function` used to update Hartree-Fock energy and coefficient matrix(s) 
-during the optimization iterations.
 """
 function optimizeParams!(bs::Vector{<:FloatingGTBasisFuncs}, pbs::Vector{<:ParamBox},
                          nuc::Vector{String}, nucCoords::Vector{<:AbstractArray}, 
-                         Ne::Union{NTuple{2, Int}, Int}=getCharge(nuc);
+                         ECmethod::F2=defaultECmethod(:RHF, nuc, nucCoords);
                          Etarget::Float64=NaN, threshold::Float64=1e-4, maxSteps::Int=2000, 
-                         printInfo::Bool=true, GDmethod::F1=gradDescent!, 
-                         HFtype::Symbol=:RHF, ECmethod::F2=defaultECmethod) where 
+                         printInfo::Bool=true, GDmethod::F1=gradDescent!) where 
                         {F1<:Function, F2<:Function}
     tAll = @elapsed begin
 
@@ -119,13 +140,11 @@ function optimizeParams!(bs::Vector{<:FloatingGTBasisFuncs}, pbs::Vector{<:Param
 
         parsL = [i[] for i in pbs]
 
-        Npars = length(parsL)
-
         while true
             S = overlaps(bs)
             Hcore = coreH(bs, nuc, nucCoords)
             HeeI = eeInteractions(bs)
-            E, C = ECmethod(HFtype, Hcore, HeeI, S, Ne)
+            E, C = ECmethod(Hcore, HeeI, bs, S)
 
             t = @elapsed begin
                 grad = gradHFenegy(bs, pbs, C, S, nuc, nucCoords)
