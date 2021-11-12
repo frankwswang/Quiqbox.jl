@@ -2,7 +2,7 @@ module Molden
 
 export makeMoldenFile
 
-import ..Quiqbox: Molecule, checkFname, AtomicNumberList, centerOf, flatten, groupedSort, 
+import ..Quiqbox: Molecule, checkFname, AtomicNumberList, centerCoordOf, flatten, groupedSort, 
                   joinConcentricBFuncStr, alignSignedNum
 
 """
@@ -19,7 +19,7 @@ function makeMoldenFile(mol::Molecule; recordUMO::Bool=false, fileName::String =
     basis = mol.basis |> collect
     MOs = mol.orbital
     iNucPoint = 0
-    groups = groupedSort(basis, centerOf)
+    groups = groupedSort(basis, centerCoordOf)
     strs = joinConcentricBFuncStr.(groups)
     strs = split.(strs, "\n", limit=2)
     gCoeffs = getindex.(strs, 2)

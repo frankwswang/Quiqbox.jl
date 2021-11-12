@@ -88,10 +88,4 @@ GridBox(fill(nGridPerEdge, 3) |> Tuple, spacing, centerCoord; canDiff, index)
 
 Return the grid-point coordinates in `Vector`s given the `GriBox`.
 """
-function gridCoords(gb::GridBox)
-    coords = Vector{Float64}[]
-    for point in gb.box
-        push!(coords, [point[1](), point[2](), point[3]()])
-    end
-    coords
-end
+gridCoords(gb::GridBox) = [outValOf.(i) |> collect for i in gb.box]

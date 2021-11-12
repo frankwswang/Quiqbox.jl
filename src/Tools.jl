@@ -432,12 +432,12 @@ julia> flatten([:one, 2, [3, 4.0], ([5], "six"), "7"])
 ```
 """
 function flatten(c::Array)
-    c2 = map( x->(x isa Union{Array, Tuple} ? x : [x]), c )
+    c2 = map( x->(x isa Union{Array, Tuple} ? x : (x,)), c )
     [(c2...)...]
 end
 
 function flatten(c::Tuple)
-    c2 = map( x->(x isa Union{Array, Tuple} ? x : [x]), c )
+    c2 = map( x->(x isa Union{Array, Tuple} ? x : (x,)), c )
     ((c2...)...,)
 end
 
@@ -475,7 +475,7 @@ Stores a pointer to the actual address of an array.
 
 ≡≡≡ Initialization Method(s) ≡≡≡
 
-    ArrayPointer(arr::Array{<:Real, N}; 
+    ArrayPointer(arr::Array{<:Real, N}, 
                  showReminder::Bool=true) where {N} -> ArrayPointer{T, N}
 
 Create a `ArrayPointer` that contains a `Ptr` pointing to the actual memory address of the 
@@ -491,7 +491,7 @@ struct ArrayPointer{T, N} <: Any
     ptr::Ptr{T}
     arr::Array{T, N}
 
-    function ArrayPointer(arr::Array{<:Real, N}; showReminder::Bool=true) where {N}
+    function ArrayPointer(arr::Array{<:Real, N}, showReminder::Bool=true) where {N}
         len = length(arr)
         elt =  eltype(arr)
         ptr = arrayAlloc(len, elt)

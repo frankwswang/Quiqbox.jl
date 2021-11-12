@@ -117,7 +117,7 @@ using Suppressor: @capture_out
         r1 * r2
     end
 
-    bf5 = genBasisFunc([1,1,1], GaussFunc(Exponent(3), Contraction(0.2, x->5x)))
+    bf5 = genBasisFunc([1,1,1], GaussFunc(genExponent(3), genContraction(0.2, x->5x)))
     bfm4 = BasisFuncMix([bf4, bf5, bf4])
 
     @test testMul(bf1,  bf3)

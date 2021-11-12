@@ -129,6 +129,11 @@ bf5 = genBasisFunc([0,0,0], (2,1), [1,0,0])
 @test isFull(1) == false
 
 
+# function centerOf centerCoordOf
+@test centerOf(bf5) == bf5.center
+@test centerCoordOf(bf5) == [0,0,0]
+
+
 # struct BasisFuncMix
 bfm1 = BasisFuncMix(bf1)
 @test bfm1 == BasisFuncMix([bf1])
@@ -227,6 +232,8 @@ for bs in (bs2, bs2_2, bs2_3)
     SNew = overlaps(bsNew)
     @test isapprox(SNew, LinearAlgebra.I, atol=1e-14)
 end
+
+# TODO: add value test of Gaussian function product theorem.
 
 
 # function shift
@@ -339,8 +346,8 @@ ss = [:X, :Y, :Z]
 
 
 # function copyBasis
-e = Exponent(3.0, x -> x^2 + 1)
-c = Contraction(2.0)
+e = genExponent(3.0, x -> x^2 + 1)
+c = genContraction(2.0)
 gf_dc1 = GaussFunc(e, c)
 gf_dc2 = copyBasis(gf_dc1)
 @test hasEqual(gf_dc1.con, gf_dc2.con)

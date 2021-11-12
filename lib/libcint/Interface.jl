@@ -7,11 +7,11 @@ function cintFunc!(libcintFunc::Val,
     natm = natm |> Cint
     bas = bas .|> Cint
     nbas = nbas |> Cint
-    bufAP = ArrayPointer(buf, showReminder=false)
-    shlsAP = ArrayPointer(shls, showReminder=false)
-    atmAP = ArrayPointer(atm, showReminder=false)
-    basAP = ArrayPointer(bas, showReminder=false)
-    envAP = ArrayPointer(env, showReminder=false)
+    bufAP = ArrayPointer(buf, false)
+    shlsAP = ArrayPointer(shls, false)
+    atmAP = ArrayPointer(atm, false)
+    basAP = ArrayPointer(bas, false)
+    envAP = ArrayPointer(env, false)
     intPtrFunc!(libcintFunc, 
                 bufAP.ptr, shlsAP.ptr, atmAP.ptr, natm, basAP.ptr, nbas, envAP.ptr, opt)
     copyto!(buf, bufAP.arr)

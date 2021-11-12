@@ -1,11 +1,15 @@
 # Core Functions
 
 ```@docs
-Exponent
+genExponent
 ```
 
 ```@docs
-Contraction
+genContraction
+```
+
+```@docs
+genSpatialPoint
 ```
 
 ```@docs
@@ -66,6 +70,10 @@ sortBasisFuncs
 
 ```@docs
 centerOf
+```
+
+```@docs
+centerCoordOf
 ```
 
 ```@autodocs

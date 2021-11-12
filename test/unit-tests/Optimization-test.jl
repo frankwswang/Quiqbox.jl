@@ -59,4 +59,5 @@ grad_t2 = [0.48936670, 0.10233850]
 @test isapprox(pars2L[end, :], par_t2, atol=errorThreshold2)
 @test isapprox(grads2L[end, :], grad_t2, atol=errorThreshold2)
 
+# TODO: Add optimization test for UHF
 end
