@@ -6,7 +6,6 @@ using Suppressor: @suppress_out
 
     errorThreshold1 = 1e-8
     errorThreshold2 = 1e-4
-    errorThreshold3 = 1e-5
 
     nucCoords = [[-0.7,0.0,0.0], [0.7,0.0,0.0], [0.0, 0.0, 0.0]]
     nuc = ["H", "H", "O"]
@@ -245,6 +244,6 @@ using Suppressor: @suppress_out
             -0.992397272036, -0.992397272036, -0.992397272036, -0.992397272036, 
             -0.992397272036]
 
-    @test isapprox.(Erhf .+ Enuc, rhfs, atol=errorThreshold3) |> prod
-    @test isapprox.(Euhf .+ Enuc, uhfs, atol=errorThreshold3) |> prod
+    @test isapprox.(Erhf .+ Enuc, rhfs, atol=errorThreshold2) |> prod
+    @test isapprox.(Euhf .+ Enuc, uhfs, atol=errorThreshold2) |> prod
 end
