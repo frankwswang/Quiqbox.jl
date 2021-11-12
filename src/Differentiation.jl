@@ -400,7 +400,7 @@ function gradHFenegy(bs::Vector{<:CompositeGTBasisFuncs}, par::Vector{<:ParamBox
     if length(C) == 2 && nElectron isa Int
         nElectron = (nElectron÷2, nElectron-nElectron÷2)
     end
-    ∂HFenergy.(Ref(bs), par, Ref(C), Ref(S), Ref(mol), Ref(nucCoords), nElectron)
+    ∂HFenergy.(Ref(bs), par, Ref(C), Ref(S), Ref(mol), Ref(nucCoords), Ref(nElectron))
 end
 
 gradHFenegy(bs::Vector{<:CompositeGTBasisFuncs}, par::ParamBox, 
