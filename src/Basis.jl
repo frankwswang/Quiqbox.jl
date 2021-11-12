@@ -925,13 +925,18 @@ function mul(sgf1::BasisFunc{𝑙1, 1}, sgf2::BasisFunc{𝑙2, 1};
     n₂ && (d₂ *= normOfGTOin(sgf2)[1])
     R₁ = centerCoordOf(sgf1)
     R₂ = centerCoordOf(sgf2)
-    # TODO: Separate Gaussian product theorem to another function for future api
-    cen = (α₁*R₁ + α₂*R₂) / (α₁ + α₂)
-    xpn = α₁ + α₂
-    con = d₁ * d₂ * exp(-α₁ * α₂ / xpn * sum(abs2, R₁-R₂))
+    xpn, con, cen = gaussProd((α₁, d₁, R₁), (α₂, d₂, R₂))
     normalizeGTO isa Missing && (normalizeGTO = n₁*n₂)
     BasisFunc(makeCenter(cen), GaussFunc(genExponent(xpn), genContraction(con)), 
               ijk, normalizeGTO)
+end
+
+function gaussProd((α₁, d₁, R₁)::T, (α₂, d₂, R₂)::T) where 
+                     {T<:Tuple{Number, Number, Array{<:Number}}}
+    α = α₁ + α₂
+    d = d₁ * d₂ * exp(-α₁ * α₂ / α * sum(abs2, R₁-R₂))
+    R = (α₁*R₁ + α₂*R₂) / α
+    (α, d, R)
 end
 
 function mul(bf::BasisFunc{𝑙, GN}, coeff::Real; 
