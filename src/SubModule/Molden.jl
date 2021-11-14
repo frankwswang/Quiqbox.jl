@@ -3,17 +3,20 @@ module Molden
 export makeMoldenFile
 
 import ..Quiqbox: Molecule, checkFname, AtomicNumberList, centerCoordOf, flatten, groupedSort, 
-                  joinConcentricBFuncStr, alignSignedNum
+                  joinConcentricBFuncStr, alignNumSign, alignNum
 
 """
 
-    makeMoldenFile(mol::Molecule; recordUMO::Bool=false, fileName::String = "MO") -> String
+    makeMoldenFile(mol::Molecule; roundDigits::Int=15, 
+                   recordUMO::Bool=false, fileName::String = "MO") -> String
 
 Write the information of input `Molecule` into a **Molden** file. `recordUMO` determines 
 whether to include the unoccupied molecular orbitals. `fileName` specifies the name of the 
-file, which is also the returned value.
+file, which is also the returned value. If `roundDigits < 0`, there won't be rounding for 
+recorded data.
 """
-function makeMoldenFile(mol::Molecule; recordUMO::Bool=false, fileName::String = "MO")
+function makeMoldenFile(mol::Molecule; 
+                        roundDigits::Int=15, recordUMO::Bool=false, fileName::String = "MO")
     nucCoords = mol.nucCoords |> collect
     nuc = mol.nuc |> collect
     basis = mol.basis |> collect
@@ -23,6 +26,8 @@ function makeMoldenFile(mol::Molecule; recordUMO::Bool=false, fileName::String =
     strs = joinConcentricBFuncStr.(groups)
     strs = split.(strs, "\n", limit=2)
     gCoeffs = getindex.(strs, 2)
+    rpadN = roundDigits < 0 ? 21 : (roundDigits+1)
+    lpadN = 8
 
     text = """
            [Molden Format]
@@ -37,26 +42,26 @@ function makeMoldenFile(mol::Molecule; recordUMO::Bool=false, fileName::String =
         coord = parse.(Float64, split(cen[5:end]))
         if (i = findfirst(x->prod(isapprox.(x, coord, atol=1e-15)), nucCoords); 
             i !== nothing)
-            coord = round.(coord, sigdigits=15)
             n = popat!(nuc, i)
             atmName = rpad("$(n)", 5)
-            atmCoord = rpad("$(AtomicNumberList[n])", 4) * 
-                       rpad(coord[1]|>alignSignedNum, 20) * 
-                       rpad(coord[2]|>alignSignedNum, 20) * 
-                       rpad(coord[3]|>alignSignedNum, 20)
+            atmNumber = rpad("$(AtomicNumberList[n])", 4)
             popat!(nucCoords, i)
         else
             atmName = "X    "
-            atmCoord = cen
+            atmNumber = "X   "
         end
-        text *= atmName*rpad("$iNucPoint", 5)*atmCoord*"\n"
+        roundDigits > 0 && (coord = round.(coord, digits=roundDigits))
+        coordStr = alignNum(coord[1], lpadN, rpadN) * 
+                   alignNum(coord[2], lpadN, rpadN) * 
+                   alignNum(coord[3], lpadN, 0)
+        text *= atmName*rpad("$iNucPoint", 5)*atmNumber*coordStr*"\n"
     end
     for (n, coord) in zip(nuc, nucCoords)
-        cv = round.(coord, sigdigits=15)
+        roundDigits >= 0 && (cv = round.(coord, digits=roundDigits))
         iNucPoint += 1
         text *= rpad("$(n)", 5) * rpad(iNucPoint, 5) * rpad("$(AtomicNumberList[n])", 4)*
-                rpad(cv[1]|>alignSignedNum, 20) * rpad(cv[2]|>alignSignedNum, 20) * 
-                rpad(cv[3]|>alignSignedNum, 20)*"\n"
+                alignNum(cv[1], lpadN, rpadN) * alignNum(cv[2], lpadN, rpadN) * 
+                alignNum(cv[3], lpadN, 0) * "\n"
     end
     text *= "\n[GTO]"
     for (i, gs) in zip(1:length(gCoeffs), gCoeffs)
@@ -67,11 +72,16 @@ function makeMoldenFile(mol::Molecule; recordUMO::Bool=false, fileName::String =
                                                    [x.occupancy for x in MOs]) - 1)
     for i = 1:l
         text *= "Sym=   $(MOs[i].symmetry)\n"
-        text *= "Ene=  "*alignSignedNum(MOs[i].energy)*"\n"
+        moe = MOs[i].energy
+        MOcoeffs = MOs[i].orbitalCoeffs
+        if roundDigits > 0
+            moe = round(moe, digits=roundDigits)
+            MOcoeffs = round.(MOcoeffs, digits=roundDigits)
+        end
+        text *= "Ene=  "*alignNumSign(moe)*"\n"
         text *= "Spin=  $(MOs[i].spin)\n"
         text *= "Occup= $(MOs[i].occupancy)\n"
-        MOcoeffs = MOs[i].orbitalCoeffs
-        text *= join([rpad("   $j", 9)*alignSignedNum(c)*
+        text *= join([rpad("   $j", 6)*alignNum(c, lpadN, 0)*
                       "\n" for (j,c) in zip(1:length(MOcoeffs), MOcoeffs)])
     end
 

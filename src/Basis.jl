@@ -1100,11 +1100,12 @@ basisSize(basisSet::Vector{<:Any}) = basisSize.(basisSet) |> flatten |> Tuple
 
 
 # Core function to generate a customized X-Gaussian (X>1) basis function.
-function genGaussFuncText(xpn::Real, con::Real)
-    """
-         $(join(map(x -> rpad(round(x, sigdigits=10)|>alignSignedNum, 20), 
-                [xpn, con])) |> rstrip)
-    """
+function genGaussFuncText(xpn::Real, con::Real, roundDigits::Int=-1)
+    if roundDigits >= 0
+        xpn = round(xpn, digits=roundDigits)
+        con = round(con, digits=roundDigits)
+    end
+    "  " * alignNum(xpn) * (alignNum(con) |> rstrip) * "\n"
 end
 
 """
@@ -1118,12 +1119,10 @@ will be added on the first line of the `String`.
 function genBasisFuncText(bf::FloatingGTBasisFuncs; 
                           norm::Float64=1.0, printCenter::Bool=true)
     gauss = bf.gauss |> collect
-    GFs = map(x -> genGaussFuncText(x.xpn[], x.con[]), gauss)
+    GFs = map(x -> genGaussFuncText(x.xpn(), x.con()), gauss)
     cen = centerCoordOf(bf)
-    firstLine = printCenter ? "X   "*rpad(cen[1]|>alignSignedNum, 20)*
-                                     rpad(cen[2]|>alignSignedNum, 20)*
-                                     rpad(cen[3]|>alignSignedNum, 20)*"\n" : ""
-    firstLine*"$(bf.subshell)    $(bf.gauss |> length)   $(norm)\n" * (GFs |> join)
+    firstLine = printCenter ? "X "*(alignNum.(cen) |> join)*"\n" : ""
+    firstLine * "$(bf.subshell)    $(bf.gauss |> length)   $(norm)\n" * (GFs |> join)
 end
 
 """
@@ -1162,6 +1161,9 @@ function joinConcentricBFuncStr(bs::Vector{<:FloatingGTBasisFuncs},
 end
 
 
+const Doc_genBFuncsFromText_strs = split(genBasisFuncText(genBasisFunc([1.0, 0.0, 0.0], 
+                                                                       (2.0, 1.0))), "\n")
+
 """
 
     genBFuncsFromText(content::String; adjustContent::Bool=false, 
@@ -1186,9 +1188,9 @@ leave the center as `[NaN, NaN, Nan]` if it can't find one for the corresponding
 information for the `BasisFunc`. E.g.:
 ```
     \"\"\"
-    X    1.0                 0.0                 0.0
-    S    1   1.0
-          2.0                 1.0
+    $(Doc_genBFuncsFromText_strs[1])
+    $(Doc_genBFuncsFromText_strs[2])
+    $(Doc_genBFuncsFromText_strs[3])
     \"\"\"
 ```
 """

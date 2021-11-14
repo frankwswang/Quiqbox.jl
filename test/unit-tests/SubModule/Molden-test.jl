@@ -28,7 +28,9 @@ bfCoords = [molCoords..., GridBox(1, 1.2) |> gridCoords]
 bfs = ["STO-3G", "STO-2G"]
 bsNames = push!(("-" .*molNames), "-Grid")
 HFtypes = [:RHF, :UHF]
-prefix = "Example"
+dir = @__DIR__
+prefix1 = dir*"/"
+prefix2 = dir*"/Moldens/"
 for (nuc, nucCoords, molName, iMol) in zip(mols, molCoords, molNames, 1:length(mols)), 
     (bfCoord, bsName) in zip(bfCoords[iMol:end], bsNames[iMol:end]), 
     HFtype in HFtypes,
@@ -47,11 +49,12 @@ for (nuc, nucCoords, molName, iMol) in zip(mols, molCoords, molNames, 1:length(m
     fVars = try runHF(bs, nuc, nucCoords; HFtype, printInfo=false) catch; continue end
 
     mol = Molecule(bs, nuc, nucCoords, fVars)
-    fn = makeMoldenFile(mol; recordUMO=true, fileName=prefix*"_"*molName*"_"*bf*bsName*
-                                                      "_"*string(HFtype))
-    rm(fn)
+    fn = "Test_"*molName*"_"*bf*bsName*"_"*string(HFtype)
+    fd = makeMoldenFile(mol; roundDigits=6, recordUMO=true, 
+                        fileName=prefix1*fn)
+    @test read(fd) == read(prefix2*fn*".molden")
+    rm(fd)
 end
 
-@test true
-# TODO: Add tests to verify content in the files.
+
 end

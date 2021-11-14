@@ -1,6 +1,6 @@
 using Test
 using Quiqbox: tryIncluding, @compareLength, hasBoolRelation, markUnique, flatten, 
-               alignSignedNum, symbolReplace, splitTerm, groupedSort, mapPermute, Pf, itself
+               alignNumSign, symbolReplace, splitTerm, groupedSort, mapPermute, Pf, itself
 using Quiqbox
 using Symbolics
 using Suppressor: @capture_out
@@ -38,9 +38,9 @@ using Suppressor: @capture_out
     @test [(1,2), 3, [3,4]] |> flatten == [1,2,3,3,4]
 
 
-    # function alignSignedNum
-    @test alignSignedNum(-1) == "-1"
-    @test alignSignedNum( 1) == " 1"
+    # function alignNumSign
+    @test alignNumSign(-1) == "-1"
+    @test alignNumSign( 1) == " 1"
 
 
     # function symbolReplace

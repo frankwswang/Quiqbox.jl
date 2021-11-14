@@ -59,4 +59,9 @@ function numToSubs(num::Int)
 end
 
 
-alignSignedNum(c::Real) = c < 0 ? "$(c)" : " $(c)"
+alignNumSign(c::Real) = c < 0 ? "$(c)" : " $(c)"
+
+function alignNum(a::Number, lpadN::Int=8, rpadN::Int=21)
+    head, tail = split(a|>string, '.')
+    lpad(head, lpadN) * "." * rpad(tail, rpadN)
+end
