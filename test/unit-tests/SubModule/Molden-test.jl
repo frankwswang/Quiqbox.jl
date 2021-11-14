@@ -52,7 +52,7 @@ for (nuc, nucCoords, molName, iMol) in zip(mols, molCoords, molNames, 1:length(m
     fn = "Test_"*molName*"_"*bf*bsName*"_"*string(HFtype)
     fd = makeMoldenFile(mol; roundDigits=5, recordUMO=true, 
                         fileName=prefix1*fn)
-    @test read(fd) == read(prefix2*fn*".molden")
+    @test read(fd, String) == read(prefix2*fn*".molden", String)
     rm(fd)
 end
 
