@@ -50,7 +50,7 @@ for (nuc, nucCoords, molName, iMol) in zip(mols, molCoords, molNames, 1:length(m
 
     mol = Molecule(bs, nuc, nucCoords, fVars)
     fn = "Test_"*molName*"_"*bf*bsName*"_"*string(HFtype)
-    fd = makeMoldenFile(mol; roundDigits=6, recordUMO=true, 
+    fd = makeMoldenFile(mol; roundDigits=5, recordUMO=true, 
                         fileName=prefix1*fn)
     @test read(fd) == read(prefix2*fn*".molden")
     rm(fd)
