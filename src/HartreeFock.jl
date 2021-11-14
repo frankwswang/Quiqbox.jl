@@ -60,13 +60,15 @@ end
 function getCfromSAD(S::Matrix{T1}, Hcore::Matrix{T2}, HeeI::Array{T3, 4},
                      bs::Vector{<:AbstractGTBasisFuncs}, 
                      nuc::Vector{String}, nucCoords::Vector{<:AbstractArray}; 
-                     X=getX(S), forUHF::Bool=false) where 
+                     X=getX(S), forUHF::Bool=false, 
+                     scfConfig=SCFconfig([:ADIIS], [1e-10])) where 
                     {TelLB<:T1<:TelUB, TelLB<:T2<:TelUB, TelLB<:T3<:TelUB}
     D₁ = zero(Hcore)
     D₂ = zero(Hcore)
     N₁tot = 0
     N₂tot = 0
-    for (atm, coord) in zip(nuc, nucCoords)
+    order = sortperm(nuc, by=x->AtomicNumberList[x])
+    for (atm, coord) in zip(nuc[order], nucCoords[order])
         N = getCharge(atm)
         N₁ = N ÷ 2
         N₂ = N - N₁
@@ -76,20 +78,18 @@ function getCfromSAD(S::Matrix{T1}, Hcore::Matrix{T2}, HeeI::Array{T3, 4},
             N₂ = temp
         end
         h1 = coreH(bs, [atm], [coord])
-        res = runHFcore(defaultSCFconfig, 
+        res = runHFcore(scfConfig, 
                         (N₁, N₂), h1, HeeI, S, X, getCfromHcore(X, h1, forUHF=true))
-        D₁ += N₁ .* res.D[1]
-        D₂ += N₂ .* res.D[2]
+        D₁ += res.D[1]
+        D₂ += res.D[2]
         N₁tot += N₁
         N₂tot += N₂
     end
-    D₁ ./= N₁tot
-    D₂ ./= N₂tot
     Dᵀ = D₁ + D₂
     if forUHF
         getC.(Ref(X), getF.(Ref(Hcore), Ref(HeeI), (D₁, D₂), Ref(Dᵀ)))
     else
-        getC(X, getF(Hcore, HeeI, Dᵀ./2, Dᵀ))
+        getC(X, getF(Hcore, HeeI, Dᵀ.*0.5, Dᵀ))
     end
 end
 
