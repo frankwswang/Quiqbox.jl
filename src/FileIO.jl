@@ -68,8 +68,16 @@ function alignNum(x::Number, lpadN::Int=8, rpadN::Int=21; roundDigits::Int=-1)
         format = "%.$(roundDigits)f"
         str = :(@sprintf($format, $x)) |> eval
     end
-    head, tail = split(str, '.')
-    lpad(head, lpadN) * "." * rpad(tail, rpadN)
+    body = split(str, '.')
+    if length(body) == 2
+        head, tail = body
+        tail = "."*tail
+        rpadN += 1
+    else
+        head = body[]
+        tail = ""
+    end
+    lpad(head, lpadN) * rpad(tail, rpadN)
 end
 
 function alignNumSign(c::Real; roundDigits::Int=-1)
