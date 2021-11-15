@@ -8,7 +8,7 @@ using Combinatorics: powerset
 const TelLB = Float64 # Union{} to loose constraint
 const TelUB = Float64 # Any to loose constraint
 
-getXcore1(S::Matrix{T}) where {TelLB<:T<:TelUB} = S^(-0.5) |> Array 
+getXcore1(S::Matrix{T}) where {TelLB<:T<:TelUB} = S^(-0.5) |> Array
 
 const getXmethods = Dict{Int, Function}(1=>getXcore1)
 
