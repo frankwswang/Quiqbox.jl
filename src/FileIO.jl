@@ -61,9 +61,6 @@ function numToSubs(num::Int)
 end
 
 
-alignNumSign(c::Real) = c < 0 ? "$(c)" : " $(c)"
-
-
 function alignNum(x::Number, lpadN::Int=8, rpadN::Int=21; roundDigits::Int=-1)
     if roundDigits < 0
         str = x |> string
@@ -73,4 +70,12 @@ function alignNum(x::Number, lpadN::Int=8, rpadN::Int=21; roundDigits::Int=-1)
     end
     head, tail = split(str, '.')
     lpad(head, lpadN) * "." * rpad(tail, rpadN)
+end
+
+function alignNumSign(c::Real; roundDigits::Int=-1)
+    if c < 0
+        alignNum(c, 0, 0; roundDigits)
+    else
+        " "*alignNum(c, 0, 0; roundDigits)
+    end
 end

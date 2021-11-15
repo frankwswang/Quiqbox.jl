@@ -79,7 +79,7 @@ function makeMoldenFile(mol::Molecule;
             moe = round(moe, digits=roundDigits)
             MOcoeffs = round.(MOcoeffs, digits=roundDigits)
         end
-        text *= "Ene=  "*alignNumSign(moe)*"\n"
+        text *= "Ene=  "*alignNumSign(moe; roundDigits)*"\n"
         text *= "Spin=  $(MOs[i].spin)\n"
         text *= "Occup= $(MOs[i].occupancy)\n"
         text *= join([rpad("   $j", 6)*alignNum(c, lpadN, 0; roundDigits)*

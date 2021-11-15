@@ -112,7 +112,7 @@ Occup= 0
    7         0.00000
    8        -0.58479
 Sym=   A
-Ene=   2.1859
+Ene=   2.18590
 Spin=  Alpha
 Occup= 0
    1         0.00000
@@ -124,7 +124,7 @@ Occup= 0
    7         1.28004
    8         0.00000
 Sym=   A
-Ene=   2.1859
+Ene=   2.18590
 Spin=  Alpha
 Occup= 0
    1         1.27988
@@ -208,7 +208,7 @@ Occup= 0
    7         0.14804
    8        -0.56611
 Sym=   A
-Ene=   2.1859
+Ene=   2.18590
 Spin=  Beta
 Occup= 0
    1         0.20161
@@ -220,7 +220,7 @@ Occup= 0
    7         1.26390
    8         0.20159
 Sym=   A
-Ene=   2.1859
+Ene=   2.18590
 Spin=  Beta
 Occup= 0
    1         1.26406

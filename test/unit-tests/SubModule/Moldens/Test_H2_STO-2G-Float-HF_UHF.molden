@@ -20,7 +20,7 @@ S    2   1.0
 
 [MO]
 Sym=   A
-Ene=  -0.5528
+Ene=  -0.55280
 Spin=  Alpha
 Occup= 1
    1         0.56886
@@ -32,7 +32,7 @@ Occup= 0
    1        -1.04947
    2         1.04967
 Sym=   A
-Ene=  -0.5528
+Ene=  -0.55280
 Spin=  Beta
 Occup= 1
    1         0.56849
