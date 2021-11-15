@@ -1,3 +1,5 @@
+using Printf: @sprintf
+
 const superscriptNum = Dict(['0'=>'⁰', '1'=>'¹', '2'=>'²', '3'=>'³', '4'=>'⁴', '5'=>'⁵', 
                              '6'=>'⁶', '7'=>'⁷', '8'=>'⁸', '9'=>'⁹'])
 const subscriptNum   = Dict(['0'=>'₀', '1'=>'₁', '2'=>'₂', '3'=>'₃', '4'=>'₄', '5'=>'₅', 
@@ -61,7 +63,14 @@ end
 
 alignNumSign(c::Real) = c < 0 ? "$(c)" : " $(c)"
 
-function alignNum(a::Number, lpadN::Int=8, rpadN::Int=21)
-    head, tail = split(a|>string, '.')
+
+function alignNum(x::Number, lpadN::Int=8, rpadN::Int=21; roundDigits::Int=-1)
+    if roundDigits < 0
+        str = x |> string
+    else
+        format = "%.$(roundDigits)f"
+        str = :(@sprintf($format, $x)) |> eval
+    end
+    head, tail = split(str, '.')
     lpad(head, lpadN) * "." * rpad(tail, rpadN)
 end

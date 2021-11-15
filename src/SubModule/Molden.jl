@@ -51,17 +51,18 @@ function makeMoldenFile(mol::Molecule;
             atmNumber = "X   "
         end
         roundDigits > 0 && (coord = round.(coord, digits=roundDigits))
-        coordStr = alignNum(coord[1], lpadN, rpadN) * 
-                   alignNum(coord[2], lpadN, rpadN) * 
-                   alignNum(coord[3], lpadN, 0)
+        coordStr = alignNum(coord[1], lpadN, rpadN; roundDigits) * 
+                   alignNum(coord[2], lpadN, rpadN; roundDigits) * 
+                   alignNum(coord[3], lpadN, 0; roundDigits)
         text *= atmName*rpad("$iNucPoint", 5)*atmNumber*coordStr*"\n"
     end
     for (n, coord) in zip(nuc, nucCoords)
         roundDigits >= 0 && (cv = round.(coord, digits=roundDigits))
         iNucPoint += 1
         text *= rpad("$(n)", 5) * rpad(iNucPoint, 5) * rpad("$(AtomicNumberList[n])", 4)*
-                alignNum(cv[1], lpadN, rpadN) * alignNum(cv[2], lpadN, rpadN) * 
-                alignNum(cv[3], lpadN, 0) * "\n"
+                alignNum(cv[1], lpadN, rpadN; roundDigits) * 
+                alignNum(cv[2], lpadN, rpadN; roundDigits) * 
+                alignNum(cv[3], lpadN, 0; roundDigits) * "\n"
     end
     text *= "\n[GTO]"
     for (i, gs) in zip(1:length(gCoeffs), gCoeffs)
@@ -81,7 +82,7 @@ function makeMoldenFile(mol::Molecule;
         text *= "Ene=  "*alignNumSign(moe)*"\n"
         text *= "Spin=  $(MOs[i].spin)\n"
         text *= "Occup= $(MOs[i].occupancy)\n"
-        text *= join([rpad("   $j", 6)*alignNum(c, lpadN, 0)*
+        text *= join([rpad("   $j", 6)*alignNum(c, lpadN, 0; roundDigits)*
                       "\n" for (j,c) in zip(1:length(MOcoeffs), MOcoeffs)])
     end
 
