@@ -52,7 +52,8 @@ for (nuc, nucCoords, molName, iMol) in zip(mols, molCoords, molNames, 1:length(m
     fn = "Test_"*molName*"_"*bf*bsName*"_"*string(HFtype)
     fd = makeMoldenFile(mol; roundDigits=5, recordUMO=true, fileName=prefix1*fn)
     str1, str2 = replace.(read.((fd, prefix2*fn*".molden"), String), 
-                         r"[0-9]+\.[0-9]{5}(?![0-9])"=>"X.XXXXX")
+                          r"[0-9]+\.[0-9]{5}(?![0-9])"=>"X.XXXXX")
+    str1, str2 = replace.((str1, str2), "-X.XXXXX"=>" X.XXXXX")
     @test str1 == str2
     rm(fd)
 end
