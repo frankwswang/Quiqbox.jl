@@ -2,8 +2,8 @@
 made by Quiqbox
 
 [Atoms] (AU)
-H    1    1         -0.7          0.0          0.0
-H    2    1          0.7          0.0          0.0
+H    1    1         -0.7         0.0         0.0
+H    2    1          0.7         0.0         0.0
 
 [GTO]
 1 0
@@ -20,26 +20,26 @@ S    3   1.0
 
 [MO]
 Sym=   A
-Ene=  -0.578
+Ene=  -0.58
 Spin=  Alpha
 Occup= 1
-   1         0.549
-   2         0.549
+   1         0.55
+   2         0.55
 Sym=   A
 Ene=   0.67
 Spin=  Alpha
 Occup= 0
-   1        -1.211
-   2         1.211
+   1        -1.21
+   2         1.21
 Sym=   A
-Ene=  -0.578
+Ene=  -0.58
 Spin=  Beta
 Occup= 1
-   1         0.549
-   2         0.549
+   1         0.55
+   2         0.55
 Sym=   A
 Ene=   0.67
 Spin=  Beta
 Occup= 0
-   1        -1.211
-   2         1.211
+   1        -1.21
+   2         1.21
