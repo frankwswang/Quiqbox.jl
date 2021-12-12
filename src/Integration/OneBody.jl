@@ -182,7 +182,8 @@ dropdims(elecKineticsCore(BSet), dims=3)
 
 """
 
-    coreHij(fb1::AbstractGTBasisFuncs, fb2::AbstractGTBasisFuncs) -> 
+    coreHij(fb1::AbstractGTBasisFuncs, fb2::AbstractGTBasisFuncs, nuc::Array{String, 1}, 
+            nucCoords::Array{<:AbstractArray, 1}) -> 
     Array{Float64, 2}
 
 Return a matrix element or block of the core Hamiltonian (an N×N `Matrix` where N is the 
@@ -199,7 +200,8 @@ dropdims(coreHijCore(bf1, bf2, nuc, nucCoords), dims=3)
 
 """
 
-    coreH(BSet::Array{<:AbstractGTBasisFuncs, 1}) -> Array{Float64, 2}
+    coreH(BSet::Array{<:AbstractGTBasisFuncs, 1}, nuc::Array{String, 1}, 
+          nucCoords::Array{<:AbstractArray, 1}) -> Array{Float64, 2}
 
 Return the core Hamiltonian matrix (an N×N `Matrix` where N is the number of spatial 
 orbitals) given a basis set in the form of an `Array`.

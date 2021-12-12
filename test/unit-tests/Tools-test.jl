@@ -1,6 +1,6 @@
 using Test
 using Quiqbox: tryIncluding, @compareLength, hasBoolRelation, markUnique, flatten, 
-               alignSignedNum, symbolReplace, splitTerm, groupedSort, mapPermute, Pf, itself
+               alignNumSign, symbolReplace, splitTerm, groupedSort, mapPermute, Pf, itself
 using Quiqbox
 using Symbolics
 using Suppressor: @capture_out
@@ -38,9 +38,9 @@ using Suppressor: @capture_out
     @test [(1,2), 3, [3,4]] |> flatten == [1,2,3,3,4]
 
 
-    # function alignSignedNum
-    @test alignSignedNum(-1) == "-1"
-    @test alignSignedNum( 1) == " 1"
+    # function alignNumSign
+    @test alignNumSign(-1) == "-1"
+    @test alignNumSign( 1) == " 1"
 
 
     # function symbolReplace
@@ -85,9 +85,10 @@ using Suppressor: @capture_out
         bs1 = genBasisFunc.([[rand(1:2), rand(1:3), rand(1:3)] for i=1:20], 
                                [(rand(0.5:0.5:2.5), rand(-0.1:0.2:0.5)) for i=1:20])
         bs2 = genBasisFunc.([[rand(1:2), rand(1:3), rand(1:3)] for i=1:20], 
-                            [GaussFunc(   Exponent(rand( 0.5:0.5:2.5), mapPool[rand(1:3)]), 
-                                       Contraction(rand(-0.1:0.2:0.5), mapPool[rand(1:3)])) 
-                             for i=1:20])
+                            [GaussFunc(   genExponent(rand( 0.5:0.5:2.5), 
+                                                      mapPool[rand(1:3)]), 
+                                       genContraction(rand(-0.1:0.2:0.5), 
+                                                      mapPool[rand(1:3)])) for i=1:20])
         bl1 *= (sortperm(arr) == mapPermute(arr, sort))
         bl2 *= hasIdentical(bs1[mapPermute(bs1, sortBasisFuncs)], sortBasisFuncs(bs1))
         bl3 *= hasIdentical(bs2[mapPermute(bs2, sortBasisFuncs)], sortBasisFuncs(bs2))

@@ -2,7 +2,7 @@ using Test
 using Quiqbox
 using Quiqbox: isFull, BasisFuncMix, unpackBasisFuncs, inSymbols, varVal, ElementNames, 
                sortBasisFuncs, ParamList, sumOf, expressionOfCore, mergeGaussFuncs, 
-               ijkOrbitalList
+               ijkOrbitalList, gaussProd, normOfGTOin
 using Symbolics
 using LinearAlgebra
 
@@ -35,6 +35,50 @@ x = [2.0, 1]
 for i=1:2 gf1.param[i][] = x[i] end
 @test gf1 === gf1_ref !== gf2
 @test hasEqual(gf1, gf2)
+
+
+# function genExponent genContraction
+m1 = x->x^2
+v1 = round(rand(), digits=6)
+e1 = genExponent(v1, m1)
+@test typeof(e1).parameters[2] == ParamList[:xpn]
+@test e1[] == v1
+@test e1() == m1(v1)
+
+c1 = genContraction(v1, m1)
+@test typeof(c1).parameters[2] == ParamList[:con]
+@test c1[] == v1
+@test e1() == m1(v1)
+
+e2 = genExponent(e1)
+e3 = genExponent(c1)
+@test hasIdentical(e1, e2)
+@test !hasEqual(e1, e3)
+@test e1[] == e3[]
+@test e1() == e3()
+@test e1.map !== e3.map
+v2 = rand()
+@test e1.map(v2) == e3.map(v2)
+
+c2 = genExponent(c1)
+c3 = genExponent(e1)
+@test hasIdentical(c1, c2)
+@test !hasEqual(c1, c3)
+@test c1[] == c3[]
+@test c1() == c3()
+@test c1.map !== c3.map
+@test c1.map(v2) == c3.map(v2)
+
+
+# function genSpatialPoint
+k = fill(1.0)
+v1 = genSpatialPoint([k,2,3  ])
+v2 = genSpatialPoint([k,2,3.0])
+@test v1 == v2
+@test hasEqual(v1, v2)
+@test !hasIdentical(v1, v2)
+@test hasIdentical(v1[1], v2[1])
+@test !hasIdentical(v1[2:3], v2[2:3])
 
 
 # struct BasisFunc and function genBasisFunc
@@ -129,6 +173,11 @@ bf5 = genBasisFunc([0,0,0], (2,1), [1,0,0])
 @test isFull(1) == false
 
 
+# function centerOf centerCoordOf
+@test centerOf(bf5) == bf5.center
+@test centerCoordOf(bf5) == [0,0,0]
+
+
 # struct BasisFuncMix
 bfm1 = BasisFuncMix(bf1)
 @test bfm1 == BasisFuncMix([bf1])
@@ -216,10 +265,21 @@ gf_merge3 = GaussFunc(1.5,1)
 @test hasIdentical(mergeGaussFuncs(gf_merge1, gf_merge3), [gf_merge1, gf_merge3])
 
 
-# , add, mul
+# function add, mul, gaussProd
 @test add(bs2[1]) === bs2[1]
 bf1s = BasisFuncs(bf1.center, bf1.gauss, [ijkOrbitalList[bf1.ijk[1]]], bf1.normalizeGTO)
 @test hasIdentical(add(bf1s), bf1)
+bfm_add1 = BasisFuncMix(bs2)
+@test add(bfm_add1) == sumOf(bs2)
+bf_add1 = genBasisFunc([1,2,1], (2,1.1))
+bf_add2 = genBasisFunc([1,1,1], (1,1.2))
+bf_add1_2 = BasisFuncMix(bf_add1)
+bf_add2_2 = BasisFuncMix(bf_add2)
+@test hasEqual(add(bf_add1, bf_add2), add(bf_add2, bf_add1))
+@test hasEqual(add(bf_add1_2, bf_add2_2), add(bf_add2_2, bf_add1_2))
+@test hasEqual(add(bf_add1_2, bf_add2), add(bf_add1, bf_add2))
+@test hasEqual(add(bf_add1, bf_add2_2), add(bf_add1, bf_add2))
+@test hasEqual(add(bf_add1_2, bf_add2_2), add(bf_add1, bf_add2))
 
 for bs in (bs2, bs2_2, bs2_3)
     X = overlaps(bs)^(-0.5)
@@ -227,6 +287,102 @@ for bs in (bs2, bs2_2, bs2_3)
     SNew = overlaps(bsNew)
     @test isapprox(SNew, LinearAlgebra.I, atol=1e-14)
 end
+@test hasEqual(mul(1.0, bf1), bf1)
+@test hasEqual(mul(1.1, bf1), mul(bf1, 1.1))
+
+α₁, α₂ = rand(1:0.01:10, 2)
+d₁, d₂ = rand(2)
+R₁ = rand(-2:0.01:2, 3)
+R₂ = rand(-2:0.01:2, 3)
+xr = -10:0.1:10
+yr = -10:0.1:10
+zr = -10:0.1:10
+gf_mul = mul(GaussFunc(α₁, d₁), GaussFunc(α₂, d₂))
+@test isapprox(gf_mul.xpn[], α₁ + α₂, atol=1e-14)
+@test isapprox(gf_mul.con[], d₁ * d₂, atol=1e-14)
+bl = true
+for x in xr, y in yr, z in zr
+    xv = [x, y, z]
+    α₃, d₃, R₃ = gaussProd((α₁, d₁, R₁), (α₂, d₂, R₂))
+    bl *= isapprox(d₁*exp(-α₁*sum(abs2, xv-R₁)) * d₂*exp(-α₂*sum(abs2, xv-R₂)), 
+                   d₃*exp(-α₃*sum(abs2, xv-R₃)), atol=1e-16) # limit: atol=1e-20
+end
+@test bl
+
+@test hasEqual(mul(bf1s, bf1s), [mul(bf1s[1], bf1s[1])])
+@test hasEqual(mul(bf1s, bf1s, normalizeGTO=true)[], 
+               mul(bf1s[1], bf1s[1], normalizeGTO=true))
+bf_mul1 = genBasisFunc([1,0,0], (2,3))
+bf_mul2 = genBasisFunc([1,0,0], (1.5,1))
+bf_mul2_2 = genBasisFunc([1,0,0], (1.5,1), normalizeGTO=true)
+@test hasEqual(mul(bf_mul1, bf_mul2),  mul(BasisFuncMix([bf_mul1]), BasisFuncMix([bf_mul2])))
+@test hasEqual(mul(bf_mul1, bf_mul2, normalizeGTO=true), 
+               mul(BasisFuncMix([bf_mul1]), BasisFuncMix([bf_mul2]), normalizeGTO=true))
+bf_mul3 = genBasisFunc([1,0,0], ([1.0, 1.5], [0.3, 0.4]))
+bf_mul4 = mul(bf_mul1, bf_mul2)
+bf_mul4_0 = genBasisFunc([1,0,0], (3.5,3))
+@test hasEqual(bf_mul4, bf_mul4_0)
+bf_mul5 = mul(bf_mul1, bf_mul2, normalizeGTO=true)
+bf_mul5_0 = genBasisFunc([1,0,0], (3.5,3), normalizeGTO=true)
+@test hasEqual(bf_mul5, bf_mul5_0)
+bf_mul6 = mul(bf_mul1, bf_mul2_2)
+bf_mul6_0 = genBasisFunc([1,0,0], (3.5,3*normOfGTOin(bf_mul2)[]))
+@test hasEqual(bf_mul6, bf_mul6_0)
+bf_mul7 = mul(bf_mul1, bf_mul2_2, normalizeGTO=true)
+bf_mul7_0 = genBasisFunc([1,0,0], (3.5,3*normOfGTOin(bf_mul2)[]), normalizeGTO=true)
+@test hasEqual(bf_mul7, bf_mul7_0)
+bf_mul8 = mul(bf_mul1, bf_mul3)
+bf_mul8_0 = genBasisFunc([1,0,0], ([3, 3.5], [0.9, 1.2]))
+@test hasEqual(bf_mul8, bf_mul8_0)
+bf_mul9 = mul(bf_mul1, bf_mul3, normalizeGTO=true)
+bf_mul9_0 = genBasisFunc([1,0,0], ([3, 3.5], [0.9, 1.2]), normalizeGTO=true)
+@test hasEqual(bf_mul9, bf_mul9_0)
+bf_mul10 = genBasisFunc([1,0,0], (1.2,0.3), [1,0,0])
+bf_mul11 = genBasisFunc([0,1,0], (1.5,1))
+bf_mul12 = genBasisFunc([0,1,0], (1.5,1), [1,0,0])
+bf_mul13 = genBasisFunc([1,1,1], ([1.2, 1.0], [0.2, 0.5]))
+bf_mul14 = genBasisFunc([1,0.2,1], ([1.2, 1.0], [0.2, 0.5]), [1,1,1])
+bf_mul15 = mul(bf_mul10, BasisFuncMix([bf_mul1, bf_mul2]))
+bf_mul15_0 = mul(bf_mul10, BasisFuncMix([bf_mul1, bf_mul2]), normalizeGTO=true)
+bf_mul16 = mul(bf_mul15, bf_mul15_0)
+bf_mul16_0 = mul(bf_mul15, bf_mul15_0, normalizeGTO=true)
+
+testNorm = function (bf1, bf2)
+    bf3 = mul(bf1, bf2)
+    n1 = Quiqbox.getOverlap(bf3, bf3)
+    n2 = Quiqbox.getOverlap(mul(bf1, bf1), mul(bf2, bf2))
+    @test isapprox(n1, n2, atol=1e-12)
+end
+
+testNorm(bf_mul1, bf_mul10)
+testNorm(bf_mul1, bf_mul11)
+testNorm(bf_mul1, bf_mul12)
+testNorm(bf_mul1, bf_mul13)
+testNorm(bf_mul1, bf_mul14)
+testNorm(bf_mul1, bf_mul15)
+testNorm(bf_mul1, bf_mul15_0)
+testNorm(bf_mul1, bf_mul16)
+testNorm(bf_mul1, bf_mul16_0)
+testNorm(bf_mul10, bf_mul11)
+testNorm(bf_mul11, bf_mul13)
+testNorm(bf_mul12, bf_mul13)
+testNorm(bf_mul12, bf_mul14)
+testNorm(bf_mul13, bf_mul14)
+testNorm(bf_mul12, bf_mul15)
+testNorm(bf_mul13, bf_mul15)
+testNorm(bf_mul14, bf_mul15)
+testNorm(bf_mul15, bf_mul15_0)
+testNorm(bf_mul12, bf_mul16)
+testNorm(bf_mul13, bf_mul16)
+testNorm(bf_mul14, bf_mul16)
+testNorm(bf_mul16, bf_mul16_0)
+
+
+# (dev) function getOverlap
+@test isapprox(Quiqbox.getOverlap(bf_mul2_2, bf_mul2_2), 1.0, atol=1e-10)
+@test isapprox(Quiqbox.getOverlap(bf_mul5_0, bf_mul5_0), 9.0, atol=1e-10)
+bf_mul18 = genBasisFunc(rand(3), "STO-3G")[]
+@test isapprox(Quiqbox.getOverlap(bf_mul18, bf_mul18), 1.0, atol=1e-10)
 
 
 # function shift
@@ -240,13 +396,32 @@ bf_os2S = genBasisFunc([0,0,0], (2,1), ijk+didjdk, normalizeGTO=true)
 @test hasEqual(shift(bf_os2, didjdk), bf_os2S)
 
 
-# func unpackBasisFuncs
+# function unpackBasisFuncs
 @test unpackBasisFuncs(bfm1)[1] == bf1
 @test unpackBasisFuncs(bf1) == [bf1]
 @test unpackBasisFuncs(0) == []
 
 
-# basisSize
+# function decompose
+bf_d_1 = genBasisFunc([1,0,0], (1, 0.5))
+bf_d_2 = genBasisFunc([1,0,0], ([2,1], [0.1, 0.5]))
+bf_d_3 = genBasisFunc([1,1,0], ([2,1], [0.1, 0.2]), "P")
+bm_d_1 = BasisFuncMix([bf_d_1, bf_d_2])
+dm1 = reshape([bf_d_1], 1, 1)
+@test hasEqual(decompose(bf_d_1), dm1)
+@test hasEqual(decompose(bf_d_1, splitGaussFunc=true), dm1)
+@test hasEqual(decompose(bf_d_2), reshape([bf_d_2], 1, 1))
+dm2 = reshape([genBasisFunc([1,0,0], (2, 0.1)), bf_d_1], 2, 1)
+@test hasEqual(decompose(bf_d_2, splitGaussFunc=true), dm2)
+@test hasEqual(decompose(bf_d_3), reshape(bf_d_3[:], 1, 3))
+@test hasEqual(decompose(bf_d_3, splitGaussFunc=true), 
+               hcat(decompose.(bf_d_3[:], splitGaussFunc=true)...))
+@test decompose(bm_d_1) === bm_d_1
+@test hasEqual(decompose(bm_d_1, splitGaussFunc=true), 
+              reshape(vcat(decompose.(bm_d_1.BasisFunc, splitGaussFunc=true)...), 3, 1))
+
+
+# function basisSize
 @test basisSize("P") == (3,)
 @test basisSize(["S", "P", "D"]) == (1, 3, 6)
 @test basisSize(bf1) == (1,)
@@ -261,14 +436,14 @@ bfCoeff = [[6.163845031, 1.097161308], [0.4301284983, 0.6789135305],
 bfCoeff2 = vcat([[bfCoeff[2i+1]'; bfCoeff[2i+2]']' for i=0:2]...)
 content = """
 S    2   1.0
-      6.163845031         0.4301284983
-      1.097161308         0.6789135305
+         6.163845031                   0.4301284983
+         1.097161308                   0.6789135305
 S    2   1.0
-      0.245916322         0.0494717692
-      0.06237087296       0.9637824081
+         0.245916322                   0.0494717692
+         0.06237087296                 0.9637824081
 P    2   1.0
-      0.245916322         0.5115407076
-      0.06237087296       0.6128198961
+         0.245916322                   0.5115407076
+         0.06237087296                 0.6128198961
 """
 lines = (content |> IOBuffer |> readlines)
 @test map(i->Quiqbox.genGaussFuncText(bfCoeff2[i,:]...), 1:size(bfCoeff2)[1] |> collect) == 
@@ -324,7 +499,7 @@ bf_pbTest1 = genBasisFunc([1,0,0], [gf_pbTest1, gf_pbTest2])
 @test getParams(bf_pbTest1) == [bf_pbTest1.center..., 
                                 gf_pbTest1.param..., gf_pbTest2.param...]
 
-alpha = Quiqbox.ParamList[:xpn]
+alpha = ParamList[:xpn]
 @test getParams(bf_pbTest1, alpha) == 
       vcat(getParams(gf_pbTest1, alpha), getParams(gf_pbTest2, alpha)) == 
       [gf_pbTest1.param[1], gf_pbTest2.param[1]]
@@ -339,25 +514,137 @@ ss = [:X, :Y, :Z]
 
 
 # function copyBasis
-e = Exponent(3.0, x -> x^2 + 1)
-c = Contraction(2.0)
-gf_dc1 = GaussFunc(e, c)
-gf_dc2 = copyBasis(gf_dc1)
-@test hasEqual(gf_dc1.con, gf_dc2.con)
-@test gf_dc1.xpn() == gf_dc2.xpn() == gf_dc2.xpn[]
+e = genExponent(3.0, x -> x^2 + 1)
+c = genContraction(2.0)
+gf_cb1 = GaussFunc(e, c)
+gf_cb2 = copyBasis(gf_cb1)
+@test !hasEqual(gf_cb1, gf_cb2)
+@test hasEqual(gf_cb1.con, gf_cb2.con)
+@test gf_cb1.xpn() == gf_cb2.xpn() == gf_cb2.xpn[] != gf_cb1.xpn[]
+gf_cb3 = copyBasis(gf_cb1, false)
+@test !hasEqual(gf_cb1, gf_cb3)
+@test gf_cb1.xpn() != gf_cb3.xpn() == gf_cb3.xpn[] == gf_cb1.xpn[]
+cen_cb1 = rand(3)
+
+bf_cb1 = genBasisFunc(cen_cb1, [gf_cb1, gf_cb3])
+bf_cb2 = copyBasis(bf_cb1)
+bf_cb3 = copyBasis(bf_cb1, false)
+testbf_cb = function (bf1, bf2)
+    @test bf1.center == bf2.center
+    @test bf1.ijk == bf2.ijk
+    @test bf1.normalizeGTO == bf2.normalizeGTO
+end
+testbf_cb(bf_cb1, bf_cb2)
+testbf_cb(bf_cb1, bf_cb3)
+@test hasEqual(bf_cb2.gauss, (gf_cb2, gf_cb3))
+@test hasEqual(bf_cb3.gauss, (gf_cb3, gf_cb3))
+
+bfm_cb1 = BasisFuncMix([bf_cb1, bf_cb3])
+bfm_cb2 = copyBasis(bfm_cb1)
+bfm_cb3 = copyBasis(bfm_cb1, false)
+testbf_cb.(bfm_cb1.BasisFunc, bfm_cb2.BasisFunc)
+testbf_cb.(bfm_cb1.BasisFunc, bfm_cb3.BasisFunc)
+@test hasEqual(bfm_cb2.BasisFunc |> collect, [bf_cb2, bf_cb3])
+@test hasEqual(bfm_cb3.BasisFunc |> collect, [bf_cb3, bf_cb3])
 
 
-# function getVar & getVarDict
-# @test getVar(pb1)[][1].val.name == :p
-# @test getVar(pb1)[][2] == 2.0
-# @test getVar(pb1)[] isa Pair{Num, Float64}
+# function uniqueParams! getVar getVarDict
+e_gv1 = genExponent(2.0)
+c_gv1 = genContraction(1.0)
+gf_gv1 = GaussFunc(e_gv1, c_gv1)
+e_gv2 = genExponent(2.5)
+c_gv2 = genContraction(0.5)
+gf_gv2 = GaussFunc(e_gv2, c_gv2)
+e_gv3 = genExponent(1.05, x->x^2)
+c_gv3 = genContraction(1.5)
+gf_gv3 = GaussFunc(e_gv3, c_gv3)
+gf_gv12 = GaussFunc(e_gv1, c_gv2)
+gf_gv23 = GaussFunc(e_gv2, c_gv3)
+gf_gv31 = GaussFunc(e_gv3, c_gv1)
+x_gv1 = fill(1.0)
+y_gv1 = fill(5.0)
+cen_gv1 = genSpatialPoint([x_gv1, 2, 3])
+cen_gv2 = genSpatialPoint([4, y_gv1, 6])
+cen_gv3 = genSpatialPoint([x_gv1, y_gv1, 6])
 
-gf11 = GaussFunc(3,1)
-gf12 = GaussFunc(3,0.5)
-# @test getVarDict([bf1]) == getVarDict(bf1)
-# @test getVarDict.([gf11, gf12]) == merge(getVarDict(gf11), getVarDict(gf12))
-# @test getVarDict(gf1.param |> collect) == Dict(getVar(ParamBox(1, :d))[], 
-#                                             getVar(ParamBox(2, :α))[])
+bf_gv1 = genBasisFunc(cen_gv1, gf_gv1)
+bf_gv2 = genBasisFunc(cen_gv2, gf_gv2)
+bf_gv3 = genBasisFunc(cen_gv2, [gf_gv1, gf_gv2])
+bf_gv4 = genBasisFunc(cen_gv1, gf_gv3)
+bf_gv5 = genBasisFunc(cen_gv3, gf_gv1)
+bf_gv6 = genBasisFunc(cen_gv3, [gf_gv12, gf_gv23, gf_gv31])
+bfm_gv = BasisFuncMix([bf_gv2, bf_gv4, bf_gv6])
+
+@test uniqueParams!(bf_gv4) == [cen_gv1..., e_gv3, c_gv3]
+
+pbs_gv1 = uniqueParams!([bf_gv1, bf_gv2])
+pbs_gv1_0 = [cen_gv1[1], cen_gv2[1], 
+             cen_gv1[2], cen_gv2[2], 
+             cen_gv1[3], cen_gv2[3], 
+                  e_gv1,      e_gv2, 
+                  c_gv1,      c_gv2]
+@test pbs_gv1 == pbs_gv1_0
+@test hasIdentical(pbs_gv1, pbs_gv1_0)
+
+pbs_gv2 = uniqueParams!([bf_gv2, bf_gv1, bf_gv3])
+
+pbs_gv2_0 = [cen_gv2[1], cen_gv1[1], cen_gv2[1], 
+             cen_gv2[2], cen_gv1[2], cen_gv2[2], 
+             cen_gv2[3], cen_gv1[3], cen_gv2[3], 
+             e_gv2, e_gv1, e_gv1, e_gv2,
+             c_gv2, c_gv1, c_gv1, c_gv2]
+@test pbs_gv2 == pbs_gv2_0
+@test hasIdentical(pbs_gv2, pbs_gv2_0)
+
+bfs_gv = sortBasisFuncs([bf_gv1, bf_gv2, bf_gv3, bf_gv4, bf_gv5, bf_gv6])
+pbs_gv3 = uniqueParams!(bfs_gv, filterMapping=true)
+pbs_gv4 = uniqueParams!(vcat(bfs_gv, bfm_gv), filterMapping=true)
+@test pbs_gv3 == pbs_gv4
+@test hasIdentical(pbs_gv3, pbs_gv4)
+
+pbs_gv0 = [cen_gv1[1], cen_gv2[1], 
+           cen_gv1[2], cen_gv2[2], 
+           cen_gv1[3], cen_gv2[3], cen_gv3[3], 
+           e_gv1, e_gv2, e_gv3, 
+           c_gv1, c_gv2, c_gv3]
+pbs_gv0_2 = sort(pbs_gv0, by=x->(typeof(x).parameters[2], x.index[]))
+pbs_gv3_2 = sort(pbs_gv3, by=x->(typeof(x).parameters[2], x.index[]))
+@test pbs_gv3_2 == pbs_gv0_2
+@test hasEqual(pbs_gv3_2, pbs_gv0_2)
+@test hasIdentical(pbs_gv3_2, pbs_gv0_2)
+
+@test getVar(e_gv1).val.name == :α₁
+@test getfield.(getfield.(getVar(bf_gv6), :val), :name) == 
+      [:X₁, :Y₂, :Z₂, :α₁, :d₃, :α₃, :d₂, :x_α₂, :d₁]
+@test getfield.(getfield.(getVar(bfm_gv), :val), :name) == 
+      [:X₂, :Y₂, :Z₃, :α₃, :d₃, :X₁, :Y₁, :Z₁, :x_α₂, 
+       :d₂, :X₁, :Y₂, :Z₂, :α₁, :d₃, :α₃, :d₂, :x_α₂, :d₁]
+
+@test getVarDict(e_gv1) == Dict(Symbolics.variable(:α, 1)=>2.0)
+
+pairs_gv1 = sort(getVarDict(e_gv3, includeMapping=true) |> collect, by=x->string(x[1]))
+strs_gv1 = getindex.(pairs_gv1, 1) .|> string
+strs_gv2 = getindex.(pairs_gv1, 2) .|> string
+
+@test strs_gv1[1][1:3] == "f_α" && strs_gv1[1][end-8:end] == "(x_α₂)"
+@test strs_gv1[2:end] == ["x_α₂", "x_α₂^2"]
+@test strs_gv2 == ["x_α₂^2", "1.05", "1.1025"]
+
+@test getVarDict(gf_gv1) == Dict( Pair.(Symbolics.variable.([:α, :d], fill(1, 2)), 
+                                        [2.0, 1.0]) )
+
+@test getVarDict(bf_gv1) == Dict( Pair.(Symbolics.variable.([:X, :Y, :Z, :α, :d], 
+                                                            fill(1, 5)), 
+                                        [1.0, 2.0, 3.0, 2.0, 1.0]) )
+
+@test getVarDict(bf_gv1) == getVarDict([bf_gv1, gf_gv1])
+@test getVarDict([bf_gv1, bf_gv2]) == 
+      merge(getVarDict(bf_gv1), getVarDict(bf_gv2)) ==
+      getVarDict([cen_gv1..., cen_gv2..., gf_gv1, gf_gv2]) == 
+      getVarDict(vcat(bf_gv1.param|>collect, bf_gv2.param|>collect))
+@test getVarDict(bfm_gv) == 
+      getVarDict([bf_gv2, bf_gv4, bf_gv6]) == 
+      getVarDict(pbs_gv0)
 
 
 # function expressionOf, expressionOfCore
