@@ -5,6 +5,7 @@ export GaussFunc, genExponent, genContraction, genSpatialPoint, BasisFunc, Basis
 
 using Symbolics
 using SymbolicUtils
+using LinearAlgebra: diag
 
 """
 
@@ -23,9 +24,7 @@ function.
 
 ≡≡≡ Initialization Method(s) ≡≡≡
 
-    GaussFunc(xpn::ParamBox{Float64, :$(ParamList[:xpn])}, 
-              con::ParamBox{Float64, :$(ParamList[:con])}) -> 
-    GaussFunc
+    GaussFunc(xpn::ParamBox, con::ParamBox) -> GaussFunc
 
     GaussFunc(xpn::Real, con::Real) -> GaussFunc
 
@@ -47,6 +46,8 @@ function GaussFunc(e::Real, c::Real)
     GaussFunc(xpn, con)
 end
 
+GaussFunc(xpn::ParamBox, con::ParamBox) = GaussFunc(genExponent(xpn), genContraction(con))
+
 
 """
 
@@ -58,7 +59,7 @@ Construct a `ParamBox` for an exponent coefficient given a value. Keywords `mapF
 and `canDiff` work the same way as in a general constructor of a `ParamBox`. If 
 `roundDigits < 0` or the input `e` is a 0-d `Array`, there won't be rounding for input data.
 """
-function genExponent(e::Union{Real, Array{Float64, 0}},mapFunction::F=itself; 
+function genExponent(e::Union{Real, Array{Float64, 0}}, mapFunction::F=itself; 
                      canDiff::Bool=true, roundDigits::Int=15, 
                      dataName::Symbol=:undef) where {F<:Function}
     n = (e isa Array) ? e : (roundDigits < 0 ? Float64(e) : round(e[], digits=roundDigits))
@@ -541,16 +542,15 @@ end
 
 """
 
-    sortBasisFuncs(bs::Array{<:FloatingGTBasisFuncs, 1}; groupCenters::Bool=false) ->
-    Array
+    sortBasisFuncs(bs::Array{<:FloatingGTBasisFuncs}; groupCenters::Bool=false) -> Array
 
 Sort basis functions. If `groupCenters = true`, Then the function will return an 
 `Array{<:Array{<:FloatingGTBasisFuncs, 1}, 1}` in which the arrays are grouped basis 
 functions with same center coordinates.
 """
-function sortBasisFuncs(bs::Vector{<:FloatingGTBasisFuncs}; groupCenters::Bool=false)
+function sortBasisFuncs(bs::Array{<:FloatingGTBasisFuncs}; groupCenters::Bool=false)
     bfBlocks = Vector{<:FloatingGTBasisFuncs}[]
-    sortedBasis = groupedSort(bs, centerCoordOf)
+    sortedBasis = groupedSort(bs[:], centerCoordOf)
     for subbs in sortedBasis
         ijkn = [(i.ijk[1], typeof(i).parameters[2]) for i in subbs]
 
@@ -913,8 +913,7 @@ BasisFunc{0, 3}(gauss, subshell, center)[X⁰Y⁰Z⁰][1.0, 1.0, 1.0]
 ```
 """
 function mul(sgf1::BasisFunc{𝑙1, 1}, sgf2::BasisFunc{𝑙2, 1}; 
-             normalizeGTO::Union{Bool, Missing}=missing)::BasisFunc{𝑙1+𝑙2, 1} where {𝑙1, 𝑙2}
-    ijk = ijkOrbitalList[sgf1.ijk[1]] + ijkOrbitalList[sgf2.ijk[1]]
+             normalizeGTO::Union{Bool, Missing}=missing) where {𝑙1, 𝑙2}
     α₁ = sgf1.gauss[1].xpn()
     α₂ = sgf2.gauss[1].xpn()
     d₁ = sgf1.gauss[1].con()
@@ -925,14 +924,54 @@ function mul(sgf1::BasisFunc{𝑙1, 1}, sgf2::BasisFunc{𝑙2, 1};
     n₂ && (d₂ *= normOfGTOin(sgf2)[1])
     R₁ = centerCoordOf(sgf1)
     R₂ = centerCoordOf(sgf2)
-    xpn, con, cen = gaussProd((α₁, d₁, R₁), (α₂, d₂, R₂))
+    normalizeGTO isa Missing && (normalizeGTO = n₁*n₂)
+    if R₁ == R₂
+        xpn = α₁ + α₂
+        con = d₁ * d₂
+        BasisFunc(makeCenter(R₁), GaussFunc(genExponent(xpn), genContraction(con)), 
+                  ijkOrbitalList[sgf1.ijk[1]]+ijkOrbitalList[sgf2.ijk[1]], normalizeGTO)
+    else
+        ijk1 = ijkOrbitalList[sgf1.ijk[1]]
+        ijk2 = ijkOrbitalList[sgf2.ijk[1]]
+        xpn, con, cen = gaussProd((α₁, d₁, R₁), (α₂, d₂, R₂))
+        coeffs = [Float64[] for _=1:3]
+        shiftPolyFunc = @inline (n, c1, c2) -> [(c2 - c1)^k*binomial(n,k) for k = n:-1:0]
+        for i = 1:3
+            c1 = shiftPolyFunc(ijk1[i], R₁[i], cen[i])
+            c2 = shiftPolyFunc(ijk2[i], R₂[i], cen[i])
+            m = reverse(c1 * transpose(c2), dims=2)
+            siz = size(m)
+            s, e = siz[2]-1, 1-siz[1]
+            step = (-1)^(s > e)
+            coeffs[i] = [diag(m, k)|>sum for k = s:step:e]
+        end
+        XYZcs = cat(Ref(coeffs[1] * transpose(coeffs[2])) .* coeffs[3]..., dims=3)
+        pbR = makeCenter(cen)
+        pbα = genExponent(xpn)
+        BasisFuncMix([BasisFunc(pbR, GaussFunc(pbα, genContraction(con*XYZcs[i])), 
+                                Int[i[m]-1 for m=1:3], normalizeGTO) 
+                    for i in CartesianIndices(XYZcs)] |> sortBasisFuncs)
+    end
+end
+
+function mul(sgf1::BasisFunc{0, 1}, sgf2::BasisFunc{0, 1}; 
+             normalizeGTO::Union{Bool, Missing}=missing)::BasisFunc{0, 1}
+    d₁ = sgf1.gauss[1].con()
+    d₂ = sgf2.gauss[1].con()
+    n₁ = sgf1.normalizeGTO
+    n₂ = sgf2.normalizeGTO
+    n₁ && (d₁ *= normOfGTOin(sgf1)[1])
+    n₂ && (d₂ *= normOfGTOin(sgf2)[1])
+    R₁ = centerCoordOf(sgf1)
+    R₂ = centerCoordOf(sgf2)
+    xpn, con, cen = gaussProd((sgf1.gauss[1].xpn(), d₁, R₁), (sgf2.gauss[1].xpn(), d₂, R₂))
     normalizeGTO isa Missing && (normalizeGTO = n₁*n₂)
     BasisFunc(makeCenter(cen), GaussFunc(genExponent(xpn), genContraction(con)), 
-              ijk, normalizeGTO)
+              [0,0,0], normalizeGTO)
 end
 
 function gaussProd((α₁, d₁, R₁)::T, (α₂, d₂, R₂)::T) where 
-                     {T<:Tuple{Number, Number, Array{<:Number}}}
+                  {T<:Tuple{Number, Number, Array{<:Number}}}
     α = α₁ + α₂
     d = d₁ * d₂ * exp(-α₁ * α₂ / α * sum(abs2, R₁-R₂))
     R = (α₁*R₁ + α₂*R₂) / α
@@ -973,13 +1012,15 @@ function mul(bf1::BasisFunc{<:Any, GN1}, bf2::BasisFunc{<:Any, GN2};
     ijk1 = ijkOrbitalList[bf1.ijk[1]]
     cen2 = bf2.center
     ijk2 = ijkOrbitalList[bf2.ijk[1]]
-    normalizeGTO isa Missing && (normalizeGTO = bf1.normalizeGTO * bf2.normalizeGTO)
-    bfs = BasisFunc[]
+    bf1n = bf1.normalizeGTO
+    bf2n = bf2.normalizeGTO
+    normalizeGTO isa Missing && (normalizeGTO = bf1n * bf2n)
+    bs = CompositeGTBasisFuncs{<:Any, 1}[]
     for gf1 in bf1.gauss, gf2 in bf2.gauss
-        push!(bfs, mul(BasisFunc(cen1, gf1, ijk1, normalizeGTO), 
-                       BasisFunc(cen2, gf2, ijk2, normalizeGTO)))
+        push!(bs, mul(BasisFunc(cen1, gf1, ijk1, bf1n), BasisFunc(cen2, gf2, ijk2, bf2n); 
+                      normalizeGTO))
     end
-    sumOf(bfs)
+    sumOf(bs)
 end
 
 mul(bf1::BasisFuncMix{1, GN1}, bf2::BasisFunc{<:Any, GN2}; 
@@ -1504,7 +1545,8 @@ variables.
 getVarDict(pb::ParamBox; includeMapping::Bool=false) = 
 includeMapping ? getVarDictCore(pb, true) : (getVarCore(pb, false)[end] |> Dict)
 
-function getVarDict(containers::Array; includeMapping::Bool=false)
+function getVarDict(containers::Union{Array, StructSpatialBasis}; 
+                    includeMapping::Bool=false)
     if includeMapping
         getVarDictCore(containers, true)
     else

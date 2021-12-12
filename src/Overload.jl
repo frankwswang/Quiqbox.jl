@@ -170,8 +170,7 @@ getindex(bf::BasisFunc, ::Val{:last}) = getindex(bf)
 firstindex(::BasisFunc) = Val(:first)
 lastindex(::BasisFunc) = Val(:last)
 
-getindex(bfm::BasisFuncMix) = 
-(getUnique! ∘ collect ∘ flatten)( getfield.(bfm.BasisFunc, :gauss) )
+getindex(bfm::BasisFuncMix) = (collect ∘ flatten)( getfield.(bfm.BasisFunc, :gauss) )
 getindex(bfm::BasisFuncMix, ::Val{:first}) = getindex(bfm)
 getindex(bfm::BasisFuncMix, ::Val{:last}) = getindex(bfm)
 firstindex(::BasisFuncMix) = Val(:first)
@@ -183,6 +182,7 @@ getindex(bfs::BasisFuncs{<:Any, <:Any, N}, ::Colon) where {N} = [getindex(bfs, i
 firstindex(bfs::BasisFuncs) = 1
 lastindex(::BasisFuncs{<:Any, <:Any, N}) where {N} = N
 eachindex(bfs::BasisFuncs{<:Any, <:Any, N}) where {N} = Base.OneTo(lastindex(bfs))
+getindex(bfs::BasisFuncs) = getfield.(bfs[:], :gauss) |> flatten
 
 
 # Broadcasting Interface

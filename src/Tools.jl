@@ -682,7 +682,7 @@ function splitTerm(term::Symbolics.Num)
 end
 
 
-function groupedSort(v::Array, sortFunction::F=itself) where {F<:Function}
+function groupedSort(v::Vector, sortFunction::F=itself) where {F<:Function}
     sortedArr = sort(v, by=x->sortFunction(x))
     state1 = 1
     groups = typeof(v)[]

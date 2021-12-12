@@ -98,6 +98,8 @@ using Suppressor: @capture_out
 
 
     # function *
+    @test hasEqual(gf1 * GaussFunc(0.2, 1.5), GaussFunc(2.2, 1.5))
+    @test hasEqual(gf1 * π, GaussFunc(2, π))
     boolFunc(x, y) = (==)(x,y)
     boolFunc(x::Array{<:Real, 0}, y::Array{<:Real, 0}) = isapprox(x, y, atol=1e-12)
     boolFunc(x::Real, y::Real) = isapprox(x, y, atol=1e-12)
@@ -203,6 +205,7 @@ using Suppressor: @capture_out
     @test ndims(pb1) == 0
 
     @test iterate(bfm1) == (bfm1, nothing)
+    @test iterate(bfm1, rand()) === nothing
     @test hasEqual(iterate(bfs1), (bfs1[1], 2))
     @test hasEqual(iterate(bfs1, 1), (bfs1[1], 2))
     @test hasEqual(iterate(bfs1, length(bfs1.ijk)+1), nothing)
@@ -224,14 +227,16 @@ using Suppressor: @capture_out
     @test getindex(gf1) == gf1[] == gf1[begin] == gf1[end] == (gf1.param |> collect)
     @test getindex(bf1) == bf1[] == bf1[begin] == bf1[end] == (bf1.gauss |> collect)
     bfm11 = Quiqbox.BasisFuncMix([bf1, bf2, bf1])
-    @test getindex(bfm11) == bfm11[] == bfm11[begin] == bfm11[end] == 
-          [bf1.gauss[1], bf2.gauss...]
+    gs = getindex(bfm11)
+    @test gs == bfm11[] == bfm11[begin] == bfm11[end]
+    @test getUnique!(gs) == [bf1.gauss[1], bf2.gauss...]
     bfs1_alter = genBasisFunc.(Ref([0,0,0]), Ref((2,1)), [[1,0,0], [0,1,0], [0,0,1]])
     for i in eachindex(bfs1)
         @test hasEqual(getindex(bfs1, i), bfs1[i], bfs1_alter[i])
     end
     @test hasEqual(bfs1[begin], bfs1[1])
     @test hasEqual(bfs1[end], bfs1[3])
+    @test getindex(bfs1) == fill(bfs1.gauss[1], 3)
 
 
     # function broadcastable
