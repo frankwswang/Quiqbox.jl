@@ -187,9 +187,9 @@ using Suppressor: @capture_out
 
     @test testMul2.([bf1, bf3, bf4, bf5, 
                      bfm2.BasisFunc |> sum, bfm3.BasisFunc |> sum, bfm4.BasisFunc |> sum], 
-                     c1, c2) |> prod
+                     c1, c2) |> all
 
-    @test .!testMul2.([bfm2, bfm3, bfm4], c1, c2) |> prod
+    @test .!testMul2.([bfm2, bfm3, bfm4], c1, c2) |> all
 
 
     # function iterate, size, length, ndims
@@ -198,10 +198,10 @@ using Suppressor: @capture_out
     @test iterate(bf1) == (bf1, nothing)
 
     cs = [pb1, gf1, bf1]
-    @test (iterate.(cs, 1) .=== nothing) |> prod
-    @test (size.(cs) .== Ref(())) |> prod
-    @test (size.(cs, 1) .== 1) |> prod
-    @test (length.(cs) .== 1) |> prod
+    @test (iterate.(cs, 1) .=== nothing) |> all
+    @test (size.(cs) .== Ref(())) |> all
+    @test (size.(cs, 1) .== 1) |> all
+    @test (length.(cs) .== 1) |> all
     @test ndims(pb1) == 0
 
     @test iterate(bfm1) == (bfm1, nothing)

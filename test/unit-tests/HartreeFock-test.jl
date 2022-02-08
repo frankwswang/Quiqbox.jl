@@ -132,7 +132,7 @@ using Suppressor: @suppress_out
        0.0        -0.0         1.09402044  0.0  0.0  0.0         2.77867255; 
        0.0         0.0         0.0         1.0  0.0  0.0         0.0; 
        0.0         0.0         0.0         0.0  1.0  0.0         0.0][1:5, [1,2,3,6,7]]), 
-    atol=errorThreshold2) |> prod
+    atol=errorThreshold2) |> all
 
     @test  isapprox(vcat(res2.C[1][6:7,:][:], res2.C[1][1:5, 4:5][:]) |> sort, 
                     vcat(fill(0,22), fill(1,2)), atol=errorThreshold1)
@@ -157,14 +157,14 @@ using Suppressor: @suppress_out
        0.48360381 -0.48360381  -0.0         0.0        -1.28092705  0.0  0.0; 
        0.0         0.0          0.0         0.0         0.0 -0.66130760  0.0; 
        0.0         0.0          0.0         0.0         0.0  0.0 -0.66130760]), 
-    atol=errorThreshold2) |> prod
+    atol=errorThreshold2) |> all
 
     @test isapprox.(res2.Emo, 
     ([-20.930384503, -1.616675737, -1.284466209, -0.661307611, 
        -0.661307611,  1.060815275,  1.847804069],
      [-20.930384496, -1.616675722, -1.284466197, -0.661307600, 
        -0.661307600,  1.060815276,  1.847804076]), 
-    atol=errorThreshold2) |> prod
+    atol=errorThreshold2) |> all
 
     @test ( res2.occu .== ([1, 1, 1, 1, 1, 0, 0], [1, 1, 1, 1, 1, 0, 0]) ) |> prod
 
@@ -244,6 +244,6 @@ using Suppressor: @suppress_out
             -0.992397272036, -0.992397272036, -0.992397272036, -0.992397272036, 
             -0.992397272036]
 
-    @test isapprox.(Erhf .+ Enuc, rhfs, atol=errorThreshold2) |> prod
-    @test isapprox.(Euhf .+ Enuc, uhfs, atol=errorThreshold2) |> prod
+    @test isapprox.(Erhf .+ Enuc, rhfs, atol=errorThreshold2) |> all
+    @test isapprox.(Euhf .+ Enuc, uhfs, atol=errorThreshold2) |> all
 end

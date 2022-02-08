@@ -124,8 +124,8 @@ bf4_3 = genBasisFunc([0,0,0], "STO-3G", nucleus = "He")[]
 bf4s1 = genBasisFunc([0,0,0], ["STO-3G", "STO-3G"])
 bf4s2 = genBasisFunc([0,0,0], ["STO-3G", "STO-3G"], nucleus = "He")
 bf4s3 = genBasisFunc([0,0,0], [("STO-3G", "H"), ("STO-3G", "He")])
-@test hasEqual.(Ref(bf4_1), bf4s1, Ref(bf4s3[1])) |> prod
-@test hasEqual.(Ref(bf4_2), Ref(bf4_3), bf4s2, Ref(bf4s3[2])) |> prod
+@test hasEqual.(Ref(bf4_1), bf4s1, Ref(bf4s3[1])) |> all
+@test hasEqual.(Ref(bf4_2), Ref(bf4_3), bf4s2, Ref(bf4s3[2])) |> all
 @test isapprox(1, overlap(bf4_1, bf4_1)[], atol=1e-8)
 @test isapprox(1, overlap(bf4_2, bf4_2)[], atol=1e-8)
 
@@ -348,9 +348,10 @@ bf_mul16 = mul(bf_mul15, bf_mul15_0)
 bf_mul16_0 = mul(bf_mul15, bf_mul15_0, normalizeGTO=true)
 
 testNorm = function (bf1, bf2)
-    bf3 = mul(bf1, bf2)
+    bf3 = mul(bf1, bf2, normalizeGTO=false)
     n1 = Quiqbox.getOverlap(bf3, bf3)
-    n2 = Quiqbox.getOverlap(mul(bf1, bf1), mul(bf2, bf2))
+    n2 = Quiqbox.getOverlap(mul(bf1, bf1, normalizeGTO=false), 
+                            mul(bf2, bf2, normalizeGTO=false))
     @test isapprox(n1, n2, atol=1e-12)
 end
 
@@ -376,6 +377,7 @@ testNorm(bf_mul12, bf_mul16)
 testNorm(bf_mul13, bf_mul16)
 testNorm(bf_mul14, bf_mul16)
 testNorm(bf_mul16, bf_mul16_0)
+testNorm(bf_mul15_0, bf_mul16_0)
 
 
 # (dev) function getOverlap
@@ -465,10 +467,10 @@ txt3 = genBasisFuncText(bs1) |> join
 bs2_3 = genBFuncsFromText(txt3)
 @test hasEqual(bs1, bs2_1, ignoreContainer=true)
 @test hasEqual(bs1, bs2_2, ignoreContainer=true)
-@test hasEqual.(sortBasisFuncs(bs1), bs2_3, ignoreFunction=true) |> prod
-@test hasEqual.(bs1, bs2_1, ignoreFunction=true) |> prod
-@test hasEqual.(bs1, bs2_2, ignoreFunction=true) |> prod
-@test hasEqual.(sortBasisFuncs(bs1), bs2_3, ignoreFunction=true) |> prod
+@test hasEqual.(sortBasisFuncs(bs1), bs2_3, ignoreFunction=true) |> all
+@test hasEqual.(bs1, bs2_1, ignoreFunction=true) |> all
+@test hasEqual.(bs1, bs2_2, ignoreFunction=true) |> all
+@test hasEqual.(sortBasisFuncs(bs1), bs2_3, ignoreFunction=true) |> all
 
 
 # function assignCenter!
