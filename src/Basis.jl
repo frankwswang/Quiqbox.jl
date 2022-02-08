@@ -295,10 +295,10 @@ struct BasisFuncs{𝑙, GN, ON} <: FloatingGTBasisFuncs{𝑙, GN, ON}
 
     function BasisFuncs(cen::Tuple{Vararg{<:ParamBox}}, gs::NTuple{GN, GaussFunc}, 
                         ijks::Vector{Vector{Int}}, normalizeGTO::Bool=false) where {GN}
-        @assert prod(length.(ijks) .== 3) "The length of each `ijk` should be 3."
+        @assert all(length.(ijks) .== 3) "The length of each `ijk` should be 3."
         ls = sum.(ijks)
         𝑙 = ls[1]
-        @assert prod(ls .== 𝑙) "The total angular momentums (of each ijk) should be "*
+        @assert all(ls .== 𝑙) "The total angular momentums (of each ijk) should be "*
                                    "the same."
         subshell = SubshellNames[𝑙+1]
         ss = SubshellDimList[subshell]
@@ -1558,12 +1558,11 @@ end
 
 function Nlα(l, α)
     if l < 2
-        ( ( 2^(2l+3) * factorial(l+1) * 2^(l+1.5) / 
-        (factorial(2l+2) * √π) ) |> sqrt) * α^(0.5l + 0.75)
+        ( 2^(2l+3) * factorial(l+1) * 2^(l+1.5) / 
+        (factorial(2l+2) * √π) )^0.5 * α^(0.5l + 0.75)
     else
         # for higher angular momentum make the upper bound of norms be 1.
-        ( ( 2^(3l+1.5) * factorial(l) / 
-        (factorial(2l) * π^1.5) ) |> sqrt ) * α^(0.5l + 0.75)
+        ( 2^(3l+1.5) * factorial(l) / (factorial(2l) * π^1.5) )^0.5 * α^(0.5l + 0.75)
     end
 end
 
@@ -1577,8 +1576,8 @@ Nijk(i, j, k) = (2/π)^0.75 * ( 2^(3*(i+j+k)) * factorial(i) * factorial(j) * fa
 function Nijkα(i, j, k, α)
     l = i + j + k
     if l < 2
-        ( ( 2^(2l+3) * factorial(l+1) * 2^(l+1.5) / 
-        (factorial(2l+2) * √π) ) |> sqrt ) * α^(0.5l + 0.75)
+        ( 2^(2l+3) * factorial(l+1) * 2^(l+1.5) / 
+        (factorial(2l+2) * √π) )^0.5 * α^(0.5l + 0.75)
     else
         # for higher angular momentum make the upper bound of norms be 1.
         Nijk(i, j, k) * α^(0.5l + 0.75)

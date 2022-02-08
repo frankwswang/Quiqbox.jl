@@ -112,7 +112,7 @@ struct ParamBox{T, V, F} <: DifferentiableParameter{ParamBox, T}
     end
 end
 
-(pb::ParamBox)() = Base.invokelatest(pb.map, pb.data[])
+(pb::ParamBox)() = Base.invokelatest(pb.map, pb.data[])::Float64
 
 function ParamBox(data::Array{T, 0}, name::Symbol=:undef, mapFunction::F=itself, 
                   dataName::Symbol=:undef; canDiff::Bool=true, 

@@ -547,12 +547,12 @@ end
 ([1, 1, 2, 1], S[S(1, 2.0), S(1, 2.1)])
 ```
 """
-function markUnique(arr::AbstractArray, args...; 
-                    compareFunction::F=hasEqual, kws...) where {F<:Function}
+function markUnique(arr::AbstractArray{T}, args...; 
+                    compareFunction::F=hasEqual, kws...) where {T<:Any, F<:Function}
     @assert length(arr) >= 1 "The length of input array should be not less than 1."
     f = (b...)->compareFunction((b..., args...)...; kws...)
     res = Int[1]
-    cmprList = eltype(arr)[arr[1]]
+    cmprList = T[arr[1]]
     for i = 2:length(arr)
         local j
         isNew = true
@@ -597,11 +597,11 @@ julia> arr
   "s"
 ```
 """
-function getUnique!(arr::Array, args...; 
-                    compareFunction::F = hasEqual, kws...) where {F<:Function}
+function getUnique!(arr::AbstractArray{T}, args...; 
+                    compareFunction::F = hasEqual, kws...) where {T<:Any, F<:Function}
     @assert length(arr) > 1 "The length of input array should be larger than 1."
     f = (b...)->compareFunction((b..., args...)...; kws...)
-    cmprList = eltype(arr)[arr[1]]
+    cmprList = T[arr[1]]
     delList = Bool[false]
     for i = 2:length(arr)
         isNew = true
