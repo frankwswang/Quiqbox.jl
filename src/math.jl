@@ -767,9 +767,6 @@ function ∫eeInteractionCore(R₁::NTuple{3, Float64}, ijk₁::NTuple{3, Int}, 
     β = η * sum(abs2, ΔRc)
     res = π^2.5 / (αl * αr * (αl + αr)^0.5) * 
           exp(-ηl * sum(abs2, ΔRl)) * exp(-ηr * sum(abs2, ΔRr))
-    res *= (@. (-1.0)^(ijk₁ + ijk₂) * 
-              factorial(ijk₁) * factorial(ijk₂) * factorial(ijk₃) * factorial(ijk₄) / 
-              αl^(ijk₁+ijk₂) / αr^(ijk₃+ijk₄)) |> prod
 
     if α₁ == α₂ && ijk₁ == ijk₂
         if α₃ == α₄ && ijk₃ == ijk₄
