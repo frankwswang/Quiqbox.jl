@@ -36,9 +36,7 @@ end
 
 F₀toFγ(γ::Int, u::Float64) = F₀toFγ(γ, u, Fγ(γ, u))
 
-@inline function genIntOverlapCore(Δx::Float64, 
-                                   i₁::Int, 
-                                   α₁::Float64)
+@inline function genIntOverlapCore(Δx::Float64, i₁::Int, α₁::Float64)
     res = 0.0
     for l₁ in 0:(i₁÷2), l₂ in 0:l₁
         Ω = 2*(i₁ - l₁ - l₂)
@@ -59,8 +57,8 @@ F₀toFγ(γ::Int, u::Float64) = F₀toFγ(γ, u, Fγ(γ, u))
 end
 
 @inline function genIntOverlapCore(Δx::Float64, 
-                                   i₁::Int, i₂::Int, 
-                                   α₁::Float64, α₂::Float64)
+                                   i₁::Int, α₁::Float64, 
+                                   i₂::Int, α₂::Float64)
     res = 0.0
     for l₁ in 0:(i₁÷2), l₂ in 0:(i₂÷2)
         Ω = i₁ + i₂ - 2*(l₁ + l₂)
@@ -84,14 +82,19 @@ end
     res
 end
 
-function ∫overlapCore(R₁::NTuple{3, Float64}, ijk₁::NTuple{3, Int}, α₁::Float64, 
-                      R₂::NTuple{3, Float64}, ijk₂::NTuple{3, Int}, α₂::Float64)
+∫overlapCore(R₁::NTuple{3, Float64}, R₂::NTuple{3, Float64}, 
+             ijk₁::NTuple{3, Int}, α₁::Float64, ijk₂::NTuple{3, Int}, α₂::Float64) = 
+∫overlapCore(R₁.-R₂, ijk₁, α₁, ijk₂, α₂)
+
+
+function ∫overlapCore(ΔR::NTuple{3, Float64}, 
+                      ijk₁::NTuple{3, Int}, α₁::Float64, 
+                      ijk₂::NTuple{3, Int}, α₂::Float64)
     for n in (ijk₁..., ijk₂...)
         n < 0 && return 0.0
     end
 
     α = α₁ + α₂
-    ΔR = R₁ .- R₂
     res = (π/α)^1.5 * exp(-α₁ * α₂ / α * sum(abs2, ΔR))
 
     if α₁ == α₂ && ijk₁ == ijk₂
@@ -102,26 +105,29 @@ function ∫overlapCore(R₁::NTuple{3, Float64}, ijk₁::NTuple{3, Int}, α₁:
     else
         for (i₁, i₂, ΔRᵢ) in zip(ijk₁, ijk₂, ΔR)
             res *= (-1.0)^(i₁) * factorial(i₁) * factorial(i₂) / α^(i₁+i₂) * 
-                   genIntOverlapCore(ΔRᵢ, i₁, i₂, α₁, α₂)
+                   genIntOverlapCore(ΔRᵢ, i₁, α₁, i₂, α₂)
         end
     end
+
     res
 end
 
-function ∫elecKineticCore(R₁::NTuple{3, Float64}, ijk₁::NTuple{3, Int}, α₁::Float64,
-                          R₂::NTuple{3, Float64}, ijk₂::NTuple{3, Int}, α₂::Float64)
+function ∫elecKineticCore(R₁::NTuple{3, Float64}, R₂::NTuple{3, Float64}, 
+                          ijk₁::NTuple{3, Int}, α₁::Float64,
+                          ijk₂::NTuple{3, Int}, α₂::Float64)
+    ΔR = R₁ .- R₂
     shifts = ((2,0,0), (0,2,0), (0,0,2))
-    0.5 * (α₂ * (4*sum(ijk₂) + 6) * ∫overlapCore(R₁, ijk₁, α₁, R₂, ijk₂, α₂) - 4.0 * α₂^2 * 
-           sum(∫overlapCore.(Ref(R₁), Ref(ijk₁), α₁, Ref(R₂), map.(+, Ref(ijk₂), shifts), α₂)) - 
+    0.5 * (α₂ * (4*sum(ijk₂) + 6) * ∫overlapCore(ΔR, ijk₁, α₁, ijk₂, α₂) - 4.0 * α₂^2 * 
+           sum(∫overlapCore.(Ref(ΔR), Ref(ijk₁), α₁, map.(+, Ref(ijk₂), shifts), α₂)) - 
            sum(ijk₁ .* (ijk₁.-1) .* 
-               ∫overlapCore.(Ref(R₁), Ref(ijk₁), α₁, Ref(R₂), map.(-, Ref(ijk₂), shifts), α₂)))
+               ∫overlapCore.(Ref(ΔR), Ref(ijk₁), α₁, map.(-, Ref(ijk₂), shifts), α₂)))
 end
 
 @inline function genIntTerm1(Δx::Float64, 
-                             i₁::Int, i₂::Int, 
-                             α₁::Float64, α₂::Float64, 
-                             l₁::Int, l₂::Int, 
-                             o₁::Int, o₂::Int)
+                             l₁::Int, o₁::Int, 
+                             l₂::Int, o₂::Int, 
+                             i₁::Int, α₁::Float64, 
+                             i₂::Int, α₂::Float64)
     @inline (r) -> 
         (-1)^(o₂+r) * factorial(o₁+o₂) * α₁^(o₂-l₁-r) * α₂^(o₁-l₂-r) * Δx^(o₁+o₂-2r) / 
         (
@@ -133,10 +139,9 @@ end
 end
 
 @inline function genIntTerm1(Δx::Float64, 
-                             i₁::Int, 
-                             α₁::Float64, 
-                             l₁::Int, l₂::Int, 
-                             o₁::Int, o₂::Int)
+                             l₁::Int, o₁::Int, 
+                             l₂::Int, o₂::Int, 
+                             i₁::Int, α₁::Float64)
     @inline (r) -> 
         (-1)^(o₂+r) * factorial(o₁+o₂) * α₁^(o₁+o₂-l₁-l₂-2r) * Δx^(o₁+o₂-2r) / 
         (
@@ -158,11 +163,9 @@ end
         (4^u * factorial(u) * factorial(μ-2u) * α^(o₁+o₂-r+u))
 end
 
-@inline function genIntNucAttCore2(ΔRR₀::NTuple{3, Float64}, 
-                                   ΔR₁R₂::NTuple{3, Float64}, 
-                                   ijk₁::NTuple{3, Int}, 
-                                   α₁::Float64, 
-                                   β::Float64)
+@inline function genIntNucAttCore2(ΔRR₀::NTuple{3, Float64}, ΔR₁R₂::NTuple{3, Float64}, 
+                                   β::Float64, 
+                                   ijk₁::NTuple{3, Int}, α₁::Float64)
     A = 0.0
     i₁, j₁, k₁ = ijk₁
     for l₁ in 0:(i₁÷2), m₁ in 0:(j₁÷2), n₁ in 0:(k₁÷2), 
@@ -192,7 +195,7 @@ end
             μˣ, μʸ, μᶻ = μv = @. 2*ijk₁ - 2*(lmn₁ + lmn₂) - (opq₁ + opq₂)
             μsum = sum(μv)
             Fγs = F₀toFγ(μsum, β)
-            core1s = genIntTerm1.(ΔR₁R₂, ijk₁, α₁, lmn₁, lmn₂, opq₁, opq₂)
+            core1s = genIntTerm1.(ΔR₁R₂, lmn₁, opq₁, lmn₂, opq₂, ijk₁, α₁)
 
             for r in 0:((o₁+o₂)÷2), s in 0:((p₁+p₂)÷2), t in 0:((q₁+q₂)÷2)
 
@@ -216,12 +219,10 @@ end
     A
 end
 
-@inline function genIntNucAttCore1(ΔRR₀::NTuple{3, Float64}, 
-                                   ΔR₁R₂::NTuple{3, Float64}, 
-                                   ijk₁::NTuple{3, Int}, 
-                                   ijk₂::NTuple{3, Int}, 
-                                   α₁::Float64, α₂::Float64, 
-                                   β::Float64)
+@inline function genIntNucAttCore1(ΔRR₀::NTuple{3, Float64}, ΔR₁R₂::NTuple{3, Float64}, 
+                                   β::Float64, 
+                                   ijk₁::NTuple{3, Int}, α₁::Float64, 
+                                   ijk₂::NTuple{3, Int}, α₂::Float64)
     A = 0.0
     i₁, j₁, k₁ = ijk₁
     i₂, j₂, k₂ = ijk₂
@@ -240,18 +241,17 @@ end
             μˣ, μʸ, μᶻ = μv = @. ijk₁ + ijk₂ - 2*(lmn₁ + lmn₂) - (opq₁ + opq₂)
             μsum = sum(μv)
             Fγs = F₀toFγ(μsum, β)
-            core1s = genIntTerm1.(ΔR₁R₂, 
-                                  ijk₁, ijk₂, α₁, α₂, lmn₁, lmn₂, opq₁, opq₂)
+            core1s = genIntTerm1.(ΔR₁R₂, lmn₁, opq₁, lmn₂, opq₂, ijk₁, α₁, ijk₂, α₂)
 
             for r in 0:((o₁+o₂)÷2), s in 0:((p₁+p₂)÷2), t in 0:((q₁+q₂)÷2)
 
                 rst = (r, s, t)
                 tmp = 0.0
-                cores2 = genIntTerm2.(ΔRR₀, α₁+α₂, opq₁, opq₂, μv, rst)
+                core2s = genIntTerm2.(ΔRR₀, α₁+α₂, opq₁, opq₂, μv, rst)
 
                 for u in 0:(μˣ÷2), v in 0:(μʸ÷2), w in 0:(μᶻ÷2)
                     γ = μsum - u - v - w
-                    tmp += (((u, v, w) .|> cores2)::NTuple{3, Float64} |> prod) * 2Fγs[γ+1]
+                    tmp += (((u, v, w) .|> core2s)::NTuple{3, Float64} |> prod) * 2Fγs[γ+1]
                 end
 
                 A += ((rst .|> core1s)::NTuple{3, Float64} |> prod) * tmp
@@ -264,8 +264,9 @@ end
 end
 
 function ∫nucAttractionCore(Z₀::Int, R₀::NTuple{3, Float64}, 
-                            R₁::NTuple{3, Float64}, ijk₁::NTuple{3, Int}, α₁::Float64,
-                            R₂::NTuple{3, Float64}, ijk₂::NTuple{3, Int}, α₂::Float64)
+                            R₁::NTuple{3, Float64}, R₂::NTuple{3, Float64}, 
+                            ijk₁::NTuple{3, Int}, α₁::Float64,
+                            ijk₂::NTuple{3, Int}, α₂::Float64)
     if α₁ == α₂
         α = 2α₁
         R = @. 0.5 * (R₁ + R₂)
@@ -278,18 +279,18 @@ function ∫nucAttractionCore(Z₀::Int, R₀::NTuple{3, Float64},
     ΔRR₀ = R .- R₀
     ΔR₁R₂ = R₁ .- R₂
     β = α * sum(abs2, ΔRR₀)
-    res = -Z₀ * π / α * exp(-α₁ * α₂ / α * sum(abs2, R₁.-R₂))
+    res = -Z₀ * π / α * exp(-α₁ * α₂ / α * sum(abs2, ΔR₁R₂))
     if flag && ijk₁ == ijk₂
         res *= (-1)^sum(2 .* ijk₁) * (factorial.(ijk₁) |> prod)^2 * 
-               genIntNucAttCore2(ΔRR₀, ΔR₁R₂, ijk₁, α₁, β)
+               genIntNucAttCore2(ΔRR₀, ΔR₁R₂, β, ijk₁, α₁)
     else
         res *= (-1)^sum(ijk₁ .+ ijk₂) * (factorial.((ijk₁..., ijk₂...)) |> prod) * 
-               genIntNucAttCore1(ΔRR₀, ΔR₁R₂, ijk₁, ijk₂, α₁, α₂, β)
+               genIntNucAttCore1(ΔRR₀, ΔR₁R₂, β, ijk₁, α₁, ijk₂, α₂)
     end
     res
 end
 
-@inline function genIntTerm3(Δx, i₁, i₂, α₁, α₂, l₁, l₂, o₁, o₂)
+@inline function genIntTerm3(Δx, l₁, o₁, l₂, o₂, i₁, α₁, i₂, α₂)
     @inline (r) -> 
         (-1)^(o₂+r) * factorial(o₁+o₂) * α₁^(o₂-l₁-r) * α₂^(o₁-l₂-r) * 
         (α₁+α₂)^(2*(l₁+l₂) + r) * Δx^(o₁+o₂-2r) / 
@@ -301,7 +302,7 @@ end
         )
 end
 
-@inline function genIntTerm3(Δx, i₁, α₁, l₁, l₂, o₁, o₂)
+@inline function genIntTerm3(Δx, l₁, o₁, l₂, o₂, i₁, α₁)
     @inline (r) -> 
         (-1)^(o₂+r) * factorial(o₁+o₂) * α₁^(o₁+o₂+l₁+l₂-r) * Δx^(o₁+o₂-2r) / 
         (
@@ -320,9 +321,9 @@ end
 
 # number indicate mark for unique (ijk, α)
 function ∫eeInteractionCore1122(ΔRl::NTuple{3, Float64}, ΔRr::NTuple{3, Float64}, 
-                                ΔRc::NTuple{3, Float64}, 
+                                ΔRc::NTuple{3, Float64}, β::Float64, η::Float64, 
                                 ijk₁::NTuple{3, Int}, α₁::Float64, 
-                                ijk₂::NTuple{3, Int}, α₂::Float64, β, η)
+                                ijk₂::NTuple{3, Int}, α₂::Float64)
     A = 0.0
     (i₁, j₁, k₁), (i₂, j₂, k₂) = ijk₁, ijk₂
 
@@ -376,8 +377,8 @@ function ∫eeInteractionCore1122(ΔRl::NTuple{3, Float64}, ΔRr::NTuple{3, Floa
             μsum = sum(μv)
             Fγs = F₀toFγ(μsum, β)
 
-            core1s = genIntTerm3.(ΔRl, ijk₁, α₁, lmn₁, lmn₂, opq₁, opq₂)
-            core2s = genIntTerm3.(ΔRr, ijk₂, α₂, lmn₃, lmn₄, opq₃, opq₄)
+            core1s = genIntTerm3.(ΔRl, lmn₁, opq₁, lmn₂, opq₂, ijk₁, α₁)
+            core2s = genIntTerm3.(ΔRr, lmn₃, opq₃, lmn₄, opq₄, ijk₂, α₂)
             core3s = genIntTerm4.(ΔRc, η, μv)
 
             for r₁ in 0:((o₁+o₂)÷2), s₁ in 0:((p₁+p₂)÷2), t₁ in 0:((q₁+q₂)÷2), 
@@ -405,8 +406,8 @@ end
 
 
 function ∫eeInteractionCore1111(ΔRl::NTuple{3, Float64}, ΔRr::NTuple{3, Float64}, 
-                                ΔRc::NTuple{3, Float64}, 
-                                ijk₁::NTuple{3, Int}, α₁::Float64, β, η)
+                                ΔRc::NTuple{3, Float64}, β::Float64, η::Float64, 
+                                ijk₁::NTuple{3, Int}, α₁::Float64)
     A = 0.0
     (i₁, j₁, k₁) = ijk₁
 
@@ -480,8 +481,8 @@ function ∫eeInteractionCore1111(ΔRl::NTuple{3, Float64}, ΔRr::NTuple{3, Floa
             μsum = sum(μv)
             Fγs = F₀toFγ(μsum, β)
 
-            core1s = genIntTerm3.(ΔRl, ijk₁, α₁, lmn₁, lmn₂, opq₁, opq₂)
-            core2s = genIntTerm3.(ΔRr, ijk₁, α₁, lmn₃, lmn₄, opq₃, opq₄)
+            core1s = genIntTerm3.(ΔRl, lmn₁, opq₁, lmn₂, opq₂, ijk₁, α₁)
+            core2s = genIntTerm3.(ΔRr, lmn₃, opq₃, lmn₄, opq₄, ijk₁, α₁)
             core3s = genIntTerm4.(ΔRc, η, μv)
 
             for r₁ in 0:((o₁+o₂)÷2), s₁ in 0:((p₁+p₂)÷2), t₁ in 0:((q₁+q₂)÷2), 
@@ -508,10 +509,10 @@ function ∫eeInteractionCore1111(ΔRl::NTuple{3, Float64}, ΔRr::NTuple{3, Floa
 end
 
 function ∫eeInteractionCore1123(ΔRl::NTuple{3, Float64}, ΔRr::NTuple{3, Float64}, 
-                                ΔRc::NTuple{3, Float64},
+                                ΔRc::NTuple{3, Float64}, β::Float64, η::Float64, 
                                 ijk₁::NTuple{3, Int}, α₁::Float64, 
                                 ijk₂::NTuple{3, Int}, α₂::Float64, 
-                                ijk₃::NTuple{3, Int}, α₃::Float64, β, η)
+                                ijk₃::NTuple{3, Int}, α₃::Float64)
     A = 0.0
     (i₁, j₁, k₁), (i₂, j₂, k₂), (i₃, j₃, k₃) = ijk₁, ijk₂, ijk₃
 
@@ -556,8 +557,8 @@ function ∫eeInteractionCore1123(ΔRl::NTuple{3, Float64}, ΔRr::NTuple{3, Floa
             μsum = sum(μv)
             Fγs = F₀toFγ(μsum, β)
 
-            core1s = genIntTerm3.(ΔRl, ijk₁, α₁, lmn₁, lmn₂, opq₁, opq₂)
-            core2s = genIntTerm3.(ΔRr, ijk₂, ijk₃, α₂, α₃, lmn₃, lmn₄, opq₃, opq₄)
+            core1s = genIntTerm3.(ΔRl, lmn₁, opq₁, lmn₂, opq₂, ijk₁, α₁)
+            core2s = genIntTerm3.(ΔRr, lmn₃, opq₃, lmn₄, opq₄, ijk₂, α₂, ijk₃, α₃)
             core3s = genIntTerm4.(ΔRc, η, μv)
 
             for r₁ in 0:((o₁+o₂)÷2), s₁ in 0:((p₁+p₂)÷2), t₁ in 0:((q₁+q₂)÷2), 
@@ -584,18 +585,18 @@ function ∫eeInteractionCore1123(ΔRl::NTuple{3, Float64}, ΔRr::NTuple{3, Floa
 end
 
 ∫eeInteractionCore1233(ΔRl::NTuple{3, Float64}, ΔRr::NTuple{3, Float64}, 
-                       ΔRc::NTuple{3, Float64}, 
+                       ΔRc::NTuple{3, Float64}, β::Float64, η::Float64, 
                        ijk₁::NTuple{3, Int}, α₁::Float64, 
                        ijk₂::NTuple{3, Int}, α₂::Float64, 
-                       ijk₃::NTuple{3, Int}, α₃::Float64, β, η) = 
-∫eeInteractionCore1123(ΔRl, ΔRr, ΔRc, ijk₃, α₃, ijk₁, α₁, ijk₂, α₂, β, η)
+                       ijk₃::NTuple{3, Int}, α₃::Float64) = 
+∫eeInteractionCore1123(ΔRl, ΔRr, ΔRc, β, η, ijk₃, α₃, ijk₁, α₁, ijk₂, α₂)
 
 function ∫eeInteractionCore1234(ΔRl::NTuple{3, Float64}, ΔRr::NTuple{3, Float64}, 
-                                ΔRc::NTuple{3, Float64}, 
+                                ΔRc::NTuple{3, Float64}, β::Float64, η::Float64, 
                                 ijk₁::NTuple{3, Int}, α₁::Float64, 
                                 ijk₂::NTuple{3, Int}, α₂::Float64, 
                                 ijk₃::NTuple{3, Int}, α₃::Float64, 
-                                ijk₄::NTuple{3, Int}, α₄::Float64, β, η)
+                                ijk₄::NTuple{3, Int}, α₄::Float64)
     A = 0.0
     (i₁, j₁, k₁), (i₂, j₂, k₂), (i₃, j₃, k₃), (i₄, j₄, k₄) = ijk₁, ijk₂, ijk₃, ijk₄
 
@@ -628,8 +629,8 @@ function ∫eeInteractionCore1234(ΔRl::NTuple{3, Float64}, ΔRr::NTuple{3, Floa
             μsum = sum(μv)
             Fγs = F₀toFγ(μsum, β)
 
-            core1s = genIntTerm3.(ΔRl, ijk₁, ijk₂, α₁, α₂, lmn₁, lmn₂, opq₁, opq₂)
-            core2s = genIntTerm3.(ΔRr, ijk₃, ijk₄, α₃, α₄, lmn₃, lmn₄, opq₃, opq₄)
+            core1s = genIntTerm3.(ΔRl, lmn₁, opq₁, lmn₂, opq₂, ijk₁, α₁, ijk₂, α₂)
+            core2s = genIntTerm3.(ΔRr, lmn₃, opq₃, lmn₄, opq₄, ijk₃, α₃, ijk₄, α₄)
             core3s = genIntTerm4.(ΔRc, η, μv)
 
             for r₁ in 0:((o₁+o₂)÷2), s₁ in 0:((p₁+p₂)÷2), t₁ in 0:((q₁+q₂)÷2), 
@@ -657,9 +658,9 @@ end
 
 # R1-R2 == R3-R4
 function ∫eeInteractionCore1212(ΔRl::NTuple{3, Float64}, ΔRr::NTuple{3, Float64}, 
-                                ΔRc::NTuple{3, Float64},
+                                ΔRc::NTuple{3, Float64}, β::Float64, η::Float64, 
                                 ijk₁::NTuple{3, Int}, α₁::Float64, 
-                                ijk₂::NTuple{3, Int}, α₂::Float64, β, η)
+                                ijk₂::NTuple{3, Int}, α₂::Float64)
     A = 0.0
     (i₁, j₁, k₁), (i₂, j₂, k₂) = ijk₁, ijk₂
 
@@ -724,8 +725,8 @@ function ∫eeInteractionCore1212(ΔRl::NTuple{3, Float64}, ΔRr::NTuple{3, Floa
             μsum = sum(μv)
             Fγs = F₀toFγ(μsum, β)
 
-            core1s = genIntTerm3.(ΔRl, ijk₁, ijk₂, α₁, α₂, lmn₁, lmn₂, opq₁, opq₂)
-            core2s = genIntTerm3.(ΔRr, ijk₁, ijk₂, α₁, α₂, lmn₃, lmn₄, opq₃, opq₄)
+            core1s = genIntTerm3.(ΔRl, lmn₁, opq₁, lmn₂, opq₂, ijk₁, α₁, ijk₂, α₂)
+            core2s = genIntTerm3.(ΔRr, lmn₃, opq₃, lmn₄, opq₄, ijk₁, α₁, ijk₂, α₂)
             core3s = genIntTerm4.(ΔRc, η, μv)
 
             for r₁ in 0:((o₁+o₂)÷2), s₁ in 0:((p₁+p₂)÷2), t₁ in 0:((q₁+q₂)÷2), 
@@ -774,33 +775,33 @@ function ∫eeInteractionCore(R₁::NTuple{3, Float64}, ijk₁::NTuple{3, Int}, 
         if α₃ == α₄ && ijk₃ == ijk₄
             if α₃ == α₁ && ijk₃ == ijk₁
                 res *= (@. factorial(ijk₁)^4 / αl^(4ijk₁)) |> prod
-                J = ∫eeInteractionCore1111(ΔRl, ΔRr, ΔRc, ijk₁, α₁, β, η)
+                J = ∫eeInteractionCore1111(ΔRl, ΔRr, ΔRc, β, η, ijk₁, α₁)
             else
                 res *= (@. factorial(ijk₁)^2 * factorial(ijk₃)^2 / 
                            αl^(2ijk₁) / αr^(2ijk₃)) |> prod
-                J = ∫eeInteractionCore1122(ΔRl, ΔRr, ΔRc, ijk₁, α₁, ijk₃, α₃, β, η)
+                J = ∫eeInteractionCore1122(ΔRl, ΔRr, ΔRc, β, η, ijk₁, α₁, ijk₃, α₃)
             end
         else
             res *= (@. factorial(ijk₁)^2 * factorial(ijk₃) * factorial(ijk₄) / 
                        αl^(2ijk₁) / αr^(ijk₃+ijk₄)) |> prod
-            J = ∫eeInteractionCore1123(ΔRl, ΔRr, ΔRc, ijk₁, α₁, ijk₃, α₃, ijk₄, α₄, β, η)
+            J = ∫eeInteractionCore1123(ΔRl, ΔRr, ΔRc, β, η, ijk₁, α₁, ijk₃, α₃, ijk₄, α₄)
         end
     elseif α₃ == α₄ && ijk₃ == ijk₄
         res *= (@. (-1.0)^(ijk₁ + ijk₂) * 
                    factorial(ijk₁) * factorial(ijk₂) * factorial(ijk₃)^2 / 
                    αl^(ijk₁+ijk₂) / αr^(2ijk₃)) |> prod
-        J = ∫eeInteractionCore1233(ΔRl, ΔRr, ΔRc, ijk₁, α₁, ijk₂, α₂, ijk₃, α₃, β, η)
+        J = ∫eeInteractionCore1233(ΔRl, ΔRr, ΔRc, β, η, ijk₁, α₁, ijk₂, α₂, ijk₃, α₃)
     elseif ((α₃ == α₁ && ijk₃ == ijk₁) || (α₃ == α₂ && ijk₃ == ijk₂)) && 
            ((α₄ == α₁ && ijk₄ == ijk₁) || (α₄ == α₂ && ijk₄ == ijk₂))
         res *= (@. (-1.0)^(ijk₁ + ijk₂) * factorial(ijk₁)^2 * factorial(ijk₂)^2 / 
                    αl^(2*(ijk₁+ijk₂))) |> prod
-        J = ∫eeInteractionCore1212(ΔRl, ΔRr, ΔRc, ijk₁, α₁, ijk₂, α₂, β, η)
+        J = ∫eeInteractionCore1212(ΔRl, ΔRr, ΔRc, β, η, ijk₁, α₁, ijk₂, α₂)
     else
         res *= (@. (-1.0)^(ijk₁ + ijk₂) * 
                    factorial(ijk₁) * factorial(ijk₂) * factorial(ijk₃) * factorial(ijk₄) / 
                    αl^(ijk₁+ijk₂) / αr^(ijk₃+ijk₄)) |> prod
-        J = ∫eeInteractionCore1234(ΔRl, ΔRr, ΔRc, 
-                                   ijk₁, α₁, ijk₂, α₂, ijk₃, α₃, ijk₄, α₄, β, η)
+        J = ∫eeInteractionCore1234(ΔRl, ΔRr, ΔRc, β, η, 
+                                   ijk₁, α₁, ijk₂, α₂, ijk₃, α₃, ijk₄, α₄)
     end
     res * J
 end
@@ -853,7 +854,7 @@ function getOneBodyInt(func::Symbol,
         end
     end
     map(uniquePairs, uPairCoeffs) do x, y
-        getfield(Quiqbox, func)(optArgs..., R₁, ijk₁, x[1], R₂, ijk₂, x[2])::Float64 * y
+        getfield(Quiqbox, func)(optArgs..., R₁, R₂, ijk₁, x[1], ijk₂, x[2])::Float64 * y
     end |> sum
 end
 
