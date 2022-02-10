@@ -36,25 +36,6 @@ end
 
 F₀toFγ(γ::Int, u::Float64) = F₀toFγ(γ, u, Fγ(γ, u))
 
-@inline function genIntOverlapCore(Δx::Float64, i₁::Int, α₁::Float64)
-    res = 0.0
-    for l₁ in 0:(i₁÷2), l₂ in 0:l₁
-        Ω = 2*(i₁ - l₁ - l₂)
-        oRange = (Δx == 0.0) ? Ω÷2 : (0:(Ω÷2))
-        for o in oRange
-            res += (l₁ == l₂ ? 1.0 : 2.0) * (-1)^o * factorial(Ω) * 2^(2 * (l₁ + l₂) + o) * 
-                    α₁^(2i₁ - l₂ - l₁ - o) * Δx^(Ω - 2o) / 
-                    ( 4^(l₁ + l₂ + o) * 
-                        factorial(l₁) * 
-                        factorial(l₂) * 
-                        factorial(o ) * 
-                        factorial(i₁ - 2l₁) * 
-                        factorial(i₁ - 2l₂) * 
-                        factorial(Ω  - 2o ) )
-        end
-    end
-    res
-end
 
 @inline function genIntOverlapCore(Δx::Float64, 
                                    i₁::Int, α₁::Float64, 
@@ -97,17 +78,10 @@ function ∫overlapCore(ΔR::NTuple{3, Float64},
     α = α₁ + α₂
     res = (π/α)^1.5 * exp(-α₁ * α₂ / α * sum(abs2, ΔR))
 
-    if α₁ == α₂ && ijk₁ == ijk₂
-        for (i₁, ΔRᵢ) in zip(ijk₁, ΔR)
-            res *= (-1.0)^(i₁) * factorial(i₁)^2 / α^(2i₁) * 
-                   genIntOverlapCore(ΔRᵢ, i₁, α₁)
-        end
-    else
         for (i₁, i₂, ΔRᵢ) in zip(ijk₁, ijk₂, ΔR)
             res *= (-1.0)^(i₁) * factorial(i₁) * factorial(i₂) / α^(i₁+i₂) * 
                    genIntOverlapCore(ΔRᵢ, i₁, α₁, i₂, α₂)
         end
-    end
 
     res
 end
@@ -138,20 +112,6 @@ end
         )
 end
 
-@inline function genIntTerm1(Δx::Float64, 
-                             l₁::Int, o₁::Int, 
-                             l₂::Int, o₂::Int, 
-                             i₁::Int, α₁::Float64)
-    @inline (r) -> 
-        (-1)^(o₂+r) * factorial(o₁+o₂) * α₁^(o₁+o₂-l₁-l₂-2r) * Δx^(o₁+o₂-2r) / 
-        (
-            4^(l₁+l₂+r) * 
-            factorial(l₁) * factorial(l₂) * factorial(o₁) * factorial(o₂) * 
-            factorial(r) * factorial(i₁-2l₁-o₁) * factorial(i₁-2l₂-o₂) * 
-            factorial(o₁+o₂-2r)
-        )
-end
-
 @inline function genIntTerm2(Δx::Float64, 
                              α::Float64, 
                              o₁::Int, 
@@ -161,62 +121,6 @@ end
     @inline (u) ->
         (-1)^u * factorial(μ) * Δx^(μ-2u) / 
         (4^u * factorial(u) * factorial(μ-2u) * α^(o₁+o₂-r+u))
-end
-
-@inline function genIntNucAttCore2(ΔRR₀::NTuple{3, Float64}, ΔR₁R₂::NTuple{3, Float64}, 
-                                   β::Float64, 
-                                   ijk₁::NTuple{3, Int}, α₁::Float64)
-    A = 0.0
-    i₁, j₁, k₁ = ijk₁
-    for l₁ in 0:(i₁÷2), m₁ in 0:(j₁÷2), n₁ in 0:(k₁÷2), 
-        l₂ in 0:l₁,     m₂ in 0:m₁,     n₂ in 0:n₁
-
-        lmn₁ = (l₁, m₁, n₁)
-        lmn₂ = (l₂, m₂, n₂)
-
-        B = 0.0
-        C = 0
-        if l₁ != l₂
-            C += 1
-        end
-        if m₁ != m₂
-            C += 1
-        end
-        if n₁ != n₂
-            C += 1
-        end
-
-        for o₁ in 0:(i₁-2l₁), p₁ in 0:(j₁-2m₁), q₁ in 0:(k₁-2n₁), 
-            o₂ in 0:(i₁-2l₂), p₂ in 0:(j₁-2m₂), q₂ in 0:(k₁-2n₂)
-
-            opq₁ = (o₁, p₁, q₁)
-            opq₂ = (o₂, p₂, q₂)
-
-            μˣ, μʸ, μᶻ = μv = @. 2*ijk₁ - 2*(lmn₁ + lmn₂) - (opq₁ + opq₂)
-            μsum = sum(μv)
-            Fγs = F₀toFγ(μsum, β)
-            core1s = genIntTerm1.(ΔR₁R₂, lmn₁, opq₁, lmn₂, opq₂, ijk₁, α₁)
-
-            for r in 0:((o₁+o₂)÷2), s in 0:((p₁+p₂)÷2), t in 0:((q₁+q₂)÷2)
-
-                rst = (r, s, t)
-                tmp = 0.0
-                core2s = genIntTerm2.(ΔRR₀, 2α₁, opq₁, opq₂, μv, rst)
-
-                for u in 0:(μˣ÷2), v in 0:(μʸ÷2), w in 0:(μᶻ÷2)
-                    γ = μsum - u - v - w
-                    tmp += (((u, v, w) .|> core2s)::NTuple{3, Float64} |> prod) * 2Fγs[γ+1]
-                end
-
-                B += ((rst .|> core1s)::NTuple{3, Float64} |> prod) * tmp
-
-            end
-        end
-
-        A += B * 2^C
-
-    end
-    A
 end
 
 @inline function genIntNucAttCore1(ΔRR₀::NTuple{3, Float64}, ΔR₁R₂::NTuple{3, Float64}, 
@@ -280,13 +184,8 @@ function ∫nucAttractionCore(Z₀::Int, R₀::NTuple{3, Float64},
     ΔR₁R₂ = R₁ .- R₂
     β = α * sum(abs2, ΔRR₀)
     res = -Z₀ * π / α * exp(-α₁ * α₂ / α * sum(abs2, ΔR₁R₂))
-    if flag && ijk₁ == ijk₂
-        res *= (-1)^sum(2 .* ijk₁) * (factorial.(ijk₁) |> prod)^2 * 
-               genIntNucAttCore2(ΔRR₀, ΔR₁R₂, β, ijk₁, α₁)
-    else
         res *= (-1)^sum(ijk₁ .+ ijk₂) * (factorial.((ijk₁..., ijk₂...)) |> prod) * 
                genIntNucAttCore1(ΔRR₀, ΔR₁R₂, β, ijk₁, α₁, ijk₂, α₂)
-    end
     res
 end
 
@@ -302,294 +201,11 @@ end
         )
 end
 
-@inline function genIntTerm3(Δx, l₁, o₁, l₂, o₂, i₁, α₁)
-    @inline (r) -> 
-        (-1)^(o₂+r) * factorial(o₁+o₂) * α₁^(o₁+o₂+l₁+l₂-r) * Δx^(o₁+o₂-2r) / 
-        (
-            2^r * 
-            factorial(l₁) * factorial(l₂) * factorial(o₁) * factorial(o₂) * 
-            factorial(r) * factorial(i₁-2l₁-o₁) * factorial(i₁-2l₂-o₂) * 
-            factorial(o₁+o₂-2r)
-        )
-end
-
 @inline function genIntTerm4(Δx, η, μ)
     @inline (u) ->
         (-1)^u * factorial(μ) * η^(μ-u) * Δx^(μ-2u) / 
         (4^u * factorial(u) * factorial(μ-2u))
 end
-
-# number indicate mark for unique (ijk, α)
-function ∫eeInteractionCore1122(ΔRl::NTuple{3, Float64}, ΔRr::NTuple{3, Float64}, 
-                                ΔRc::NTuple{3, Float64}, β::Float64, η::Float64, 
-                                ijk₁::NTuple{3, Int}, α₁::Float64, 
-                                ijk₂::NTuple{3, Int}, α₂::Float64)
-    A = 0.0
-    (i₁, j₁, k₁), (i₂, j₂, k₂) = ijk₁, ijk₂
-
-    IJK = @. 2 * (ijk₁ + ijk₂)
-
-    for l₁ in 0:(i₁÷2), m₁ in 0:(j₁÷2), n₁ in 0:(k₁÷2), 
-        l₂ in 0:l₁,     m₂ in 0:m₁,     n₂ in 0:n₁, 
-        l₃ in 0:(i₂÷2), m₃ in 0:(j₂÷2), n₃ in 0:(k₂÷2), 
-        l₄ in 0:l₃,     m₄ in 0:m₃,     n₄ in 0:n₃
-
-        lmn₁ = (l₁, m₁, n₁)
-        lmn₂ = (l₂, m₂, n₂)
-        lmn₃ = (l₃, m₃, n₃)
-        lmn₄ = (l₄, m₄, n₄)
-
-        B = 0.0
-        C = 0
-        if l₁ != l₂
-            C += 1
-        end
-        if m₁ != m₂
-            C += 1
-        end
-        if n₁ != n₂
-            C += 1
-        end
-        if l₃ != l₄
-            C += 1
-        end
-        if m₃ != m₄
-            C += 1
-        end
-        if n₃ != n₄
-            C += 1
-        end
-
-        for o₁ in 0:(i₁-2l₁), p₁ in 0:(j₁-2m₁), q₁ in 0:(k₁-2n₁), 
-            o₂ in 0:(i₁-2l₂), p₂ in 0:(j₁-2m₂), q₂ in 0:(k₁-2n₂), 
-            o₃ in 0:(i₂-2l₃), p₃ in 0:(j₂-2m₃), q₃ in 0:(k₂-2n₃), 
-            o₄ in 0:(i₂-2l₄), p₄ in 0:(j₂-2m₄), q₄ in 0:(k₂-2n₄)
-
-            opq₁ = (o₁, p₁, q₁)
-            opq₂ = (o₂, p₂, q₂)
-            opq₃ = (o₃, p₃, q₃)
-            opq₄ = (o₄, p₄, q₄)
-
-            μˣ, μʸ, μᶻ = μv = begin
-                @. IJK - (lmn₁ + lmn₂ + lmn₃ + lmn₄) * 2 - (opq₁ + opq₂ + opq₃ + opq₄)
-            end
-
-            μsum = sum(μv)
-            Fγs = F₀toFγ(μsum, β)
-
-            core1s = genIntTerm3.(ΔRl, lmn₁, opq₁, lmn₂, opq₂, ijk₁, α₁)
-            core2s = genIntTerm3.(ΔRr, lmn₃, opq₃, lmn₄, opq₄, ijk₂, α₂)
-            core3s = genIntTerm4.(ΔRc, η, μv)
-
-            for r₁ in 0:((o₁+o₂)÷2), s₁ in 0:((p₁+p₂)÷2), t₁ in 0:((q₁+q₂)÷2), 
-                r₂ in 0:((o₃+o₄)÷2), s₂ in 0:((p₃+p₄)÷2), t₂ in 0:((q₃+q₄)÷2)
-
-                rst₁ = (r₁, s₁, t₁)
-                rst₂ = (r₂, s₂, t₂)
-                tmp = 0.0
-
-                for u in 0:(μˣ÷2), v in 0:(μʸ÷2), w in 0:(μᶻ÷2)
-                    γ = μsum - u - v - w
-                    tmp += prod((u, v, w) .|> core3s) * 2Fγs[γ+1]
-                end
-
-                B += (rst₁ .|> core1s |> prod) * (rst₂ .|> core2s |> prod) * tmp
-
-            end
-        end
-
-        A += B * 2^C
-
-    end
-    A
-end
-
-
-function ∫eeInteractionCore1111(ΔRl::NTuple{3, Float64}, ΔRr::NTuple{3, Float64}, 
-                                ΔRc::NTuple{3, Float64}, β::Float64, η::Float64, 
-                                ijk₁::NTuple{3, Int}, α₁::Float64)
-    A = 0.0
-    (i₁, j₁, k₁) = ijk₁
-
-    IJK = 4 .* ijk₁
-
-    flags = fill(false, 3)
-    for i=1:3
-        if ΔRl[i] == ΔRr[i]
-            flags[i] = true
-        end
-    end
-
-    for l₁ in 0:(i₁÷2), m₁ in 0:(j₁÷2), n₁ in 0:(k₁÷2), 
-        l₂ in 0:l₁,     m₂ in 0:m₁,     n₂ in 0:n₁, 
-        l₃ in 0:(flags[1] ? l₁ : (i₁÷2)), 
-        m₃ in 0:(flags[2] ? m₁ : (j₁÷2)), 
-        n₃ in 0:(flags[3] ? n₁ : (k₁÷2)), 
-        l₄ in 0:((flags[1] && l₃==l₁) ? l₂ : l₃), 
-        m₄ in 0:((flags[2] && m₃==m₁) ? m₂ : m₃), 
-        n₄ in 0:((flags[3] && n₃==n₁) ? n₂ : n₃)
-
-        lmn₁ = (l₁, m₁, n₁)
-        lmn₂ = (l₂, m₂, n₂)
-        lmn₃ = (l₃, m₃, n₃)
-        lmn₄ = (l₄, m₄, n₄)
-
-        B = 0.0
-        C = 0
-        if l₁ != l₂
-            C += 1
-        end
-        if m₁ != m₂
-            C += 1
-        end
-        if n₁ != n₂
-            C += 1
-        end
-        if l₃ != l₄
-            C += 1
-        end
-        if m₃ != m₄
-            C += 1
-        end
-        if n₃ != n₄
-            C += 1
-        end
-        if flags[1] && (l₁ != l₃ || l₂ != l₄)
-            C += 1
-        end
-        if flags[2] && (m₁ != m₃ || m₂ != m₄)
-            C += 1
-        end
-        if flags[3] && (n₁ != n₃ || n₂ != n₄)
-            C += 1
-        end
-
-        for o₁ in 0:(i₁-2l₁), p₁ in 0:(j₁-2m₁), q₁ in 0:(k₁-2n₁), 
-            o₂ in 0:(i₁-2l₂), p₂ in 0:(j₁-2m₂), q₂ in 0:(k₁-2n₂), 
-            o₃ in 0:(i₁-2l₃), p₃ in 0:(j₁-2m₃), q₃ in 0:(k₁-2n₃), 
-            o₄ in 0:(i₁-2l₄), p₄ in 0:(j₁-2m₄), q₄ in 0:(k₁-2n₄)
-
-            opq₁ = (o₁, p₁, q₁)
-            opq₂ = (o₂, p₂, q₂)
-            opq₃ = (o₃, p₃, q₃)
-            opq₄ = (o₄, p₄, q₄)
-
-            μˣ, μʸ, μᶻ = μv = begin
-                @. IJK - (lmn₁ + lmn₂ + lmn₃ + lmn₄) * 2 - (opq₁ + opq₂ + opq₃ + opq₄)
-            end
-
-            μsum = sum(μv)
-            Fγs = F₀toFγ(μsum, β)
-
-            core1s = genIntTerm3.(ΔRl, lmn₁, opq₁, lmn₂, opq₂, ijk₁, α₁)
-            core2s = genIntTerm3.(ΔRr, lmn₃, opq₃, lmn₄, opq₄, ijk₁, α₁)
-            core3s = genIntTerm4.(ΔRc, η, μv)
-
-            for r₁ in 0:((o₁+o₂)÷2), s₁ in 0:((p₁+p₂)÷2), t₁ in 0:((q₁+q₂)÷2), 
-                r₂ in 0:((o₃+o₄)÷2), s₂ in 0:((p₃+p₄)÷2), t₂ in 0:((q₃+q₄)÷2)
-
-                rst₁ = (r₁, s₁, t₁)
-                rst₂ = (r₂, s₂, t₂)
-                tmp = 0.0
-
-                for u in 0:(μˣ÷2), v in 0:(μʸ÷2), w in 0:(μᶻ÷2)
-                    γ = μsum - u - v - w
-                    tmp += prod((u, v, w) .|> core3s) * 2Fγs[γ+1]
-                end
-
-                B += (rst₁ .|> core1s |> prod) * (rst₂ .|> core2s |> prod) * tmp
-
-            end
-        end
-
-        A += B * 2^C
-
-    end
-    A
-end
-
-function ∫eeInteractionCore1123(ΔRl::NTuple{3, Float64}, ΔRr::NTuple{3, Float64}, 
-                                ΔRc::NTuple{3, Float64}, β::Float64, η::Float64, 
-                                ijk₁::NTuple{3, Int}, α₁::Float64, 
-                                ijk₂::NTuple{3, Int}, α₂::Float64, 
-                                ijk₃::NTuple{3, Int}, α₃::Float64)
-    A = 0.0
-    (i₁, j₁, k₁), (i₂, j₂, k₂), (i₃, j₃, k₃) = ijk₁, ijk₂, ijk₃
-
-    IJK = @. 2ijk₁ + ijk₂ + ijk₃
-
-    for l₁ in 0:(i₁÷2), m₁ in 0:(j₁÷2), n₁ in 0:(k₁÷2), 
-        l₂ in 0:l₁,     m₂ in 0:m₁,     n₂ in 0:n₁, 
-        l₃ in 0:(i₂÷2), m₃ in 0:(j₂÷2), n₃ in 0:(k₂÷2), 
-        l₄ in 0:(i₃÷2), m₄ in 0:(j₃÷2), n₄ in 0:(k₃÷2)
-
-        lmn₁ = (l₁, m₁, n₁)
-        lmn₂ = (l₂, m₂, n₂)
-        lmn₃ = (l₃, m₃, n₃)
-        lmn₄ = (l₄, m₄, n₄)
-
-        B = 0.0
-        C = 0
-        if l₁ != l₂
-            C += 1
-        end
-        if m₁ != m₂
-            C += 1
-        end
-        if n₁ != n₂
-            C += 1
-        end
-
-        for o₁ in 0:(i₁-2l₁), p₁ in 0:(j₁-2m₁), q₁ in 0:(k₁-2n₁), 
-            o₂ in 0:(i₁-2l₂), p₂ in 0:(j₁-2m₂), q₂ in 0:(k₁-2n₂), 
-            o₃ in 0:(i₂-2l₃), p₃ in 0:(j₂-2m₃), q₃ in 0:(k₂-2n₃), 
-            o₄ in 0:(i₃-2l₄), p₄ in 0:(j₃-2m₄), q₄ in 0:(k₃-2n₄)
-
-            opq₁ = (o₁, p₁, q₁)
-            opq₂ = (o₂, p₂, q₂)
-            opq₃ = (o₃, p₃, q₃)
-            opq₄ = (o₄, p₄, q₄)
-
-            μˣ, μʸ, μᶻ = μv = begin
-                @. IJK - (lmn₁ + lmn₂ + lmn₃ + lmn₄) * 2 - (opq₁ + opq₂ + opq₃ + opq₄)
-            end
-
-            μsum = sum(μv)
-            Fγs = F₀toFγ(μsum, β)
-
-            core1s = genIntTerm3.(ΔRl, lmn₁, opq₁, lmn₂, opq₂, ijk₁, α₁)
-            core2s = genIntTerm3.(ΔRr, lmn₃, opq₃, lmn₄, opq₄, ijk₂, α₂, ijk₃, α₃)
-            core3s = genIntTerm4.(ΔRc, η, μv)
-
-            for r₁ in 0:((o₁+o₂)÷2), s₁ in 0:((p₁+p₂)÷2), t₁ in 0:((q₁+q₂)÷2), 
-                r₂ in 0:((o₃+o₄)÷2), s₂ in 0:((p₃+p₄)÷2), t₂ in 0:((q₃+q₄)÷2)
-
-                rst₁ = (r₁, s₁, t₁)
-                rst₂ = (r₂, s₂, t₂)
-                tmp = 0.0
-
-                for u in 0:(μˣ÷2), v in 0:(μʸ÷2), w in 0:(μᶻ÷2)
-                    γ = μsum - u - v - w
-                    tmp += prod((u, v, w) .|> core3s) * 2Fγs[γ+1]
-                end
-
-                B += (rst₁ .|> core1s |> prod) * (rst₂ .|> core2s |> prod) * tmp
-
-            end
-        end
-
-        A += B * 2^C
-
-    end
-    A
-end
-
-∫eeInteractionCore1233(ΔRl::NTuple{3, Float64}, ΔRr::NTuple{3, Float64}, 
-                       ΔRc::NTuple{3, Float64}, β::Float64, η::Float64, 
-                       ijk₁::NTuple{3, Int}, α₁::Float64, 
-                       ijk₂::NTuple{3, Int}, α₂::Float64, 
-                       ijk₃::NTuple{3, Int}, α₃::Float64) = 
-∫eeInteractionCore1123(ΔRl, ΔRr, ΔRc, β, η, ijk₃, α₃, ijk₁, α₁, ijk₂, α₂)
 
 function ∫eeInteractionCore1234(ΔRl::NTuple{3, Float64}, ΔRr::NTuple{3, Float64}, 
                                 ΔRc::NTuple{3, Float64}, β::Float64, η::Float64, 
@@ -654,104 +270,6 @@ function ∫eeInteractionCore1234(ΔRl::NTuple{3, Float64}, ΔRr::NTuple{3, Floa
     A
 end
 
-
-
-# R1-R2 == R3-R4
-function ∫eeInteractionCore1212(ΔRl::NTuple{3, Float64}, ΔRr::NTuple{3, Float64}, 
-                                ΔRc::NTuple{3, Float64}, β::Float64, η::Float64, 
-                                ijk₁::NTuple{3, Int}, α₁::Float64, 
-                                ijk₂::NTuple{3, Int}, α₂::Float64)
-    A = 0.0
-    (i₁, j₁, k₁), (i₂, j₂, k₂) = ijk₁, ijk₂
-
-    IJK = @. 2 * (ijk₁ + ijk₂)
-
-    flags = fill(false, 3)
-    for i=1:3
-        if ΔRl[i] == ΔRr[i]
-            flags[i] = true
-        end
-    end
-
-    for l₁ in 0:(i₁÷2), m₁ in 0:(j₁÷2), n₁ in 0:(k₁÷2), 
-        l₂ in 0:(i₂÷2), m₂ in 0:(j₂÷2), n₂ in 0:(k₂÷2), 
-        l₃ in 0:(flags[1] ? l₁ : (i₁÷2)), 
-        m₃ in 0:(flags[2] ? m₁ : (j₁÷2)), 
-        n₃ in 0:(flags[3] ? n₁ : (k₁÷2)), 
-        l₄ in 0:(flags[1] ? l₂ : (i₂÷2)),
-        m₄ in 0:(flags[2] ? m₂ : (j₂÷2)),
-        n₄ in 0:(flags[3] ? n₂ : (k₂÷2))
-
-        lmn₁ = (l₁, m₁, n₁)
-        lmn₂ = (l₂, m₂, n₂)
-        lmn₃ = (l₃, m₃, n₃)
-        lmn₄ = (l₄, m₄, n₄)
-
-        B = 0.0
-        C = 0
-        if flags[1] && l₁ != l₃
-            C += 1
-        end
-        if flags[2] && m₁ != m₃
-            C += 1
-        end
-        if flags[3] && n₁ != n₃
-            C += 1
-        end
-        if flags[1] && l₂ != l₄
-            C += 1
-        end
-        if flags[2] && m₂ != m₄
-            C += 1
-        end
-        if flags[3] && n₂ != n₄
-            C += 1
-        end
-
-        for o₁ in 0:(i₁-2l₁), p₁ in 0:(j₁-2m₁), q₁ in 0:(k₁-2n₁), 
-            o₂ in 0:(i₂-2l₂), p₂ in 0:(j₂-2m₂), q₂ in 0:(k₂-2n₂), 
-            o₃ in 0:(i₁-2l₃), p₃ in 0:(j₁-2m₃), q₃ in 0:(k₁-2n₃), 
-            o₄ in 0:(i₂-2l₄), p₄ in 0:(j₂-2m₄), q₄ in 0:(k₂-2n₄)
-
-            opq₁ = (o₁, p₁, q₁)
-            opq₂ = (o₂, p₂, q₂)
-            opq₃ = (o₃, p₃, q₃)
-            opq₄ = (o₄, p₄, q₄)
-
-            μˣ, μʸ, μᶻ = μv = begin
-                @. IJK - (lmn₁ + lmn₂ + lmn₃ + lmn₄) * 2 - (opq₁ + opq₂ + opq₃ + opq₄)
-            end
-
-            μsum = sum(μv)
-            Fγs = F₀toFγ(μsum, β)
-
-            core1s = genIntTerm3.(ΔRl, lmn₁, opq₁, lmn₂, opq₂, ijk₁, α₁, ijk₂, α₂)
-            core2s = genIntTerm3.(ΔRr, lmn₃, opq₃, lmn₄, opq₄, ijk₁, α₁, ijk₂, α₂)
-            core3s = genIntTerm4.(ΔRc, η, μv)
-
-            for r₁ in 0:((o₁+o₂)÷2), s₁ in 0:((p₁+p₂)÷2), t₁ in 0:((q₁+q₂)÷2), 
-                r₂ in 0:((o₃+o₄)÷2), s₂ in 0:((p₃+p₄)÷2), t₂ in 0:((q₃+q₄)÷2)
-
-                rst₁ = (r₁, s₁, t₁)
-                rst₂ = (r₂, s₂, t₂)
-                tmp = 0.0
-
-                for u in 0:(μˣ÷2), v in 0:(μʸ÷2), w in 0:(μᶻ÷2)
-                    γ = μsum - u - v - w
-                    tmp += prod((u, v, w) .|> core3s) * 2Fγs[γ+1]
-                end
-
-                B += (rst₁ .|> core1s |> prod) * (rst₂ .|> core2s |> prod) * tmp
-
-            end
-        end
-
-        A += B * 2^C
-
-    end
-    A
-end
-
 function ∫eeInteractionCore(R₁::NTuple{3, Float64}, ijk₁::NTuple{3, Int}, α₁::Float64, 
                             R₂::NTuple{3, Float64}, ijk₂::NTuple{3, Int}, α₂::Float64,
                             R₃::NTuple{3, Float64}, ijk₃::NTuple{3, Int}, α₃::Float64, 
@@ -767,39 +285,11 @@ function ∫eeInteractionCore(R₁::NTuple{3, Float64}, ijk₁::NTuple{3, Int}, 
     β = η * sum(abs2, ΔRc)
     res = π^2.5 / (αl * αr * (αl + αr)^0.5) * 
           exp(-ηl * sum(abs2, ΔRl)) * exp(-ηr * sum(abs2, ΔRr))
-
-    if α₁ == α₂ && ijk₁ == ijk₂
-        if α₃ == α₄ && ijk₃ == ijk₄
-            if α₃ == α₁ && ijk₃ == ijk₁
-                res *= (@. factorial(ijk₁)^4 / αl^(4ijk₁)) |> prod
-                J = ∫eeInteractionCore1111(ΔRl, ΔRr, ΔRc, β, η, ijk₁, α₁)
-            else
-                res *= (@. factorial(ijk₁)^2 * factorial(ijk₃)^2 / 
-                           αl^(2ijk₁) / αr^(2ijk₃)) |> prod
-                J = ∫eeInteractionCore1122(ΔRl, ΔRr, ΔRc, β, η, ijk₁, α₁, ijk₃, α₃)
-            end
-        else
-            res *= (@. factorial(ijk₁)^2 * factorial(ijk₃) * factorial(ijk₄) / 
-                       αl^(2ijk₁) / αr^(ijk₃+ijk₄)) |> prod
-            J = ∫eeInteractionCore1123(ΔRl, ΔRr, ΔRc, β, η, ijk₁, α₁, ijk₃, α₃, ijk₄, α₄)
-        end
-    elseif α₃ == α₄ && ijk₃ == ijk₄
-        res *= (@. (-1.0)^(ijk₁ + ijk₂) * 
-                   factorial(ijk₁) * factorial(ijk₂) * factorial(ijk₃)^2 / 
-                   αl^(ijk₁+ijk₂) / αr^(2ijk₃)) |> prod
-        J = ∫eeInteractionCore1233(ΔRl, ΔRr, ΔRc, β, η, ijk₁, α₁, ijk₂, α₂, ijk₃, α₃)
-    elseif ((α₃ == α₁ && ijk₃ == ijk₁) || (α₃ == α₂ && ijk₃ == ijk₂)) && 
-           ((α₄ == α₁ && ijk₄ == ijk₁) || (α₄ == α₂ && ijk₄ == ijk₂))
-        res *= (@. (-1.0)^(ijk₁ + ijk₂) * factorial(ijk₁)^2 * factorial(ijk₂)^2 / 
-                   αl^(2*(ijk₁+ijk₂))) |> prod
-        J = ∫eeInteractionCore1212(ΔRl, ΔRr, ΔRc, β, η, ijk₁, α₁, ijk₂, α₂)
-    else
         res *= (@. (-1.0)^(ijk₁ + ijk₂) * 
                    factorial(ijk₁) * factorial(ijk₂) * factorial(ijk₃) * factorial(ijk₄) / 
                    αl^(ijk₁+ijk₂) / αr^(ijk₃+ijk₄)) |> prod
         J = ∫eeInteractionCore1234(ΔRl, ΔRr, ΔRc, β, η, 
                                    ijk₁, α₁, ijk₂, α₂, ijk₃, α₃, ijk₄, α₄)
-    end
     res * J
 end
 
@@ -832,27 +322,154 @@ function getOneBodyInt(func::Symbol,
                        bf2::FloatingGTBasisFuncs{<:Any, GN2, 1}, 
                        optArgs...) where {GN1, GN2}
     (R₁, ijk₁, ps₁), (R₂, ijk₂, ps₂) = reformatIntData1.((bf1, bf2))
+    # uniquePairs = NTuple{2, Float64}[]
+    # sizehint!(uniquePairs, GN1*GN2)
+    # uPairCoeffs = Array{Float64}(undef, GN1*GN2)
+    # i = 0
+
+    # for p₁ in ps₁::NTuple{GN1, NTuple{2, Float64}}, 
+    #     p₂ in ps₂::NTuple{GN2, NTuple{2, Float64}}
+    #     pair = reformatIntData2(p₁[1], p₂[1], R₁==R₂ && ijk₁==ijk₂)
+    #     idx = findfirst(x->x==pair, uniquePairs)
+    #     con = p₁[2] * p₂[2]
+    #     if idx === nothing
+    #         i += 1
+    #         push!(uniquePairs, pair)
+    #         uPairCoeffs[i] = con
+    #     else
+    #         uPairCoeffs[idx] += con
+    #     end
+    # end
+
+    uniquePairs, uPairCoeffs = getOneBodyIntCore(Val(GN1), Val(GN2), 
+                                                 R₁==R₂ && ijk₁==ijk₂, ps₁, ps₂)
+
+    map(uniquePairs, uPairCoeffs) do x, y
+        getfield(Quiqbox, func)(optArgs..., R₁, R₂, ijk₁, x[1], ijk₂, x[2])::Float64 * y
+    end |> sum
+end
+
+# @inline function getOneBodyIntCore(::Val{GN1}, ::Val{GN2}, flag, ps₁, ps₂) where {GN1, GN2}
+#     uniquePairs = NTuple{2, Float64}[]
+#     sizehint!(uniquePairs, GN1*GN2)
+#     uPairCoeffs = Array{Float64}(undef, GN1*GN2)
+#     i = 0
+#     flag2 = (GN1 == GN2 && ps₁ == ps₂)
+#     for (n, p₁) in zip( 1:GN1, ps₁::NTuple{GN1, NTuple{2, Float64}} ), 
+#         (m, p₂) in zip( (flag2 ? (1:n) : (1:GN2)), ps₂::NTuple{GN2, NTuple{2, Float64}} )
+#         pair = reformatIntData2(p₁[1], p₂[1], flag)
+#         idx = findfirst(x->x==pair, uniquePairs)
+#         con = p₁[2] * p₂[2] * ((flag2 && m != n) ? 2.0 : 1.0)
+#         if idx === nothing
+#             i += 1
+#             push!(uniquePairs, pair)
+#             uPairCoeffs[i] = con
+#         else
+#             uPairCoeffs[idx] += con
+#         end
+#     end
+
+#     uniquePairs, uPairCoeffs
+# end
+
+# function tupleDiff(t1::NTuple{N1, T}, t2::NTuple{N2, T}) where {N1, N2, T}
+#     flag = N1 > N2
+#     flag && ((t1, t2) = (t2, t1))
+#     t3 = t2 |> collect
+#     idx = filter(x->x!==nothing, findfirst.(isequal.(t1), Ref(t2)))
+#     int = t2[idx|>collect]
+#     t1l = t1[begin:end .∉ (idx,)]
+#     t2l = t2[begin:end .∉ (idx,)]
+#     flag && ((t1l, t2l) = (t2l, t1l))
+#     int, t1l, t2l
+# end
+
+function arrayDiff!(v1::Array{T}, v2::Array{T}) where {T}
+    a1, a2 = (length(v1) > length(v2)) ? (v2, v1) : (v1, v2)
+    coms = T[]
+    l = length(a1)
+    sizehint!(coms, l)
+    i = 0
+    while i < l
+        i += 1
+        j = findfirst(isequal(a1[i]), a2)
+        if j !== nothing
+            popat!(a1, i)
+            push!(coms, popat!(a2, j))
+            i -= 1
+            l -= 1
+        end
+    end
+    coms, v1, v2
+end
+
+tupleDiff(t1::NTuple{N1, T}, t2::NTuple{N2, T}) where {N1, N2, T} = 
+arrayDiff!(t1|>collect, t2|>collect)
+
+@inline function getOneBodyIntCore(::Val{GN1}, ::Val{GN2}, flag, ps₁, ps₂) where {GN1, GN2}
     uniquePairs = NTuple{2, Float64}[]
     sizehint!(uniquePairs, GN1*GN2)
     uPairCoeffs = Array{Float64}(undef, GN1*GN2)
     i = 0
+    flag2 = (GN1 == GN2 && ps₁ == ps₂)
 
-    for p₁ in ps₁::NTuple{GN1, NTuple{2, Float64}}, 
-        p₂ in ps₂::NTuple{GN2, NTuple{2, Float64}}
-        pair = reformatIntData2(p₁[1], p₂[1], R₁==R₂ && ijk₁==ijk₂)
-        idx = findfirst(x->x==pair, uniquePairs)
-        con = p₁[2] * p₂[2]
-        if idx === nothing
-            i += 1
-            push!(uniquePairs, pair)
-            uPairCoeffs[i] = con
-        else
-            uPairCoeffs[idx] += con
+    if flag2
+        for (n, p₁) in zip( 1:GN1, ps₁::NTuple{GN1, NTuple{2, Float64}} ), 
+            (m, p₂) in zip( 1:n,   ps₂::NTuple{GN2, NTuple{2, Float64}} )
+            pair = reformatIntData2(p₁[1], p₂[1], flag)
+            idx = findfirst(x->x==pair, uniquePairs)
+            con = p₁[2] * p₂[2] * (m != n ? 2.0 : 1.0)
+            if idx === nothing
+                i += 1
+                push!(uniquePairs, pair)
+                uPairCoeffs[i] = con
+            else
+                uPairCoeffs[idx] += con
+            end
+        end
+    else
+        commonPairs, ps1, ps2 = tupleDiff(ps₁, ps₂)
+        for (i₁, p₁) in enumerate(commonPairs), (i₂, p₂) in zip(1:i₁, commonPairs)
+            pair = reformatIntData2(p₁[1], p₂[1], flag)
+            idx = findfirst(x->x==pair, uniquePairs)
+            con = p₁[2] * p₂[2] * (i₁ == i₂ ? 1.0 : 2.0)
+            if idx === nothing
+                i += 1
+                push!(uniquePairs, pair)
+                uPairCoeffs[i] = con
+            else
+                uPairCoeffs[idx] += con
+            end
+        end
+
+        for p₁ in ps1, p₂ in ps₂
+            pair = reformatIntData2(p₁[1], p₂[1], flag)
+            idx = findfirst(x->x==pair, uniquePairs)
+            con = p₁[2] * p₂[2]
+            if idx === nothing
+                i += 1
+                push!(uniquePairs, pair)
+                uPairCoeffs[i] = con
+            else
+                uPairCoeffs[idx] += con
+            end
+        end
+
+        for p₁ in commonPairs, p₂ in ps2
+            pair = reformatIntData2(p₁[1], p₂[1], flag)
+            idx = findfirst(x->x==pair, uniquePairs)
+            con = p₁[2] * p₂[2]
+            if idx === nothing
+                i += 1
+                push!(uniquePairs, pair)
+                uPairCoeffs[i] = con
+            else
+                uPairCoeffs[idx] += con
+            end
         end
     end
-    map(uniquePairs, uPairCoeffs) do x, y
-        getfield(Quiqbox, func)(optArgs..., R₁, R₂, ijk₁, x[1], ijk₂, x[2])::Float64 * y
-    end |> sum
+
+    uniquePairs, uPairCoeffs
 end
 
 function getTwoBodyInt(func::Symbol, 
