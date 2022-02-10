@@ -322,154 +322,75 @@ function getOneBodyInt(func::Symbol,
                        bf2::FloatingGTBasisFuncs{<:Any, GN2, 1}, 
                        optArgs...) where {GN1, GN2}
     (R₁, ijk₁, ps₁), (R₂, ijk₂, ps₂) = reformatIntData1.((bf1, bf2))
-    # uniquePairs = NTuple{2, Float64}[]
-    # sizehint!(uniquePairs, GN1*GN2)
-    # uPairCoeffs = Array{Float64}(undef, GN1*GN2)
-    # i = 0
-
-    # for p₁ in ps₁::NTuple{GN1, NTuple{2, Float64}}, 
-    #     p₂ in ps₂::NTuple{GN2, NTuple{2, Float64}}
-    #     pair = reformatIntData2(p₁[1], p₂[1], R₁==R₂ && ijk₁==ijk₂)
-    #     idx = findfirst(x->x==pair, uniquePairs)
-    #     con = p₁[2] * p₂[2]
-    #     if idx === nothing
-    #         i += 1
-    #         push!(uniquePairs, pair)
-    #         uPairCoeffs[i] = con
-    #     else
-    #         uPairCoeffs[idx] += con
-    #     end
-    # end
-
     uniquePairs, uPairCoeffs = getOneBodyIntCore(Val(GN1), Val(GN2), 
                                                  R₁==R₂ && ijk₁==ijk₂, ps₁, ps₂)
-
     map(uniquePairs, uPairCoeffs) do x, y
         getfield(Quiqbox, func)(optArgs..., R₁, R₂, ijk₁, x[1], ijk₂, x[2])::Float64 * y
     end |> sum
 end
 
-# @inline function getOneBodyIntCore(::Val{GN1}, ::Val{GN2}, flag, ps₁, ps₂) where {GN1, GN2}
-#     uniquePairs = NTuple{2, Float64}[]
-#     sizehint!(uniquePairs, GN1*GN2)
-#     uPairCoeffs = Array{Float64}(undef, GN1*GN2)
-#     i = 0
-#     flag2 = (GN1 == GN2 && ps₁ == ps₂)
-#     for (n, p₁) in zip( 1:GN1, ps₁::NTuple{GN1, NTuple{2, Float64}} ), 
-#         (m, p₂) in zip( (flag2 ? (1:n) : (1:GN2)), ps₂::NTuple{GN2, NTuple{2, Float64}} )
-#         pair = reformatIntData2(p₁[1], p₂[1], flag)
-#         idx = findfirst(x->x==pair, uniquePairs)
-#         con = p₁[2] * p₂[2] * ((flag2 && m != n) ? 2.0 : 1.0)
-#         if idx === nothing
-#             i += 1
-#             push!(uniquePairs, pair)
-#             uPairCoeffs[i] = con
-#         else
-#             uPairCoeffs[idx] += con
-#         end
-#     end
-
-#     uniquePairs, uPairCoeffs
-# end
-
-# function tupleDiff(t1::NTuple{N1, T}, t2::NTuple{N2, T}) where {N1, N2, T}
-#     flag = N1 > N2
-#     flag && ((t1, t2) = (t2, t1))
-#     t3 = t2 |> collect
-#     idx = filter(x->x!==nothing, findfirst.(isequal.(t1), Ref(t2)))
-#     int = t2[idx|>collect]
-#     t1l = t1[begin:end .∉ (idx,)]
-#     t2l = t2[begin:end .∉ (idx,)]
-#     flag && ((t1l, t2l) = (t2l, t1l))
-#     int, t1l, t2l
-# end
-
-function arrayDiff!(v1::Array{T}, v2::Array{T}) where {T}
-    a1, a2 = (length(v1) > length(v2)) ? (v2, v1) : (v1, v2)
-    coms = T[]
-    l = length(a1)
-    sizehint!(coms, l)
-    i = 0
-    while i < l
-        i += 1
-        j = findfirst(isequal(a1[i]), a2)
-        if j !== nothing
-            popat!(a1, i)
-            push!(coms, popat!(a2, j))
-            i -= 1
-            l -= 1
-        end
-    end
-    coms, v1, v2
-end
-
-tupleDiff(t1::NTuple{N1, T}, t2::NTuple{N2, T}) where {N1, N2, T} = 
-arrayDiff!(t1|>collect, t2|>collect)
-
-@inline function getOneBodyIntCore(::Val{GN1}, ::Val{GN2}, flag, ps₁, ps₂) where {GN1, GN2}
+@inline function getOneBodyIntCore(::Val{GN1}, ::Val{GN2}, flag::Bool, 
+                                   ps₁::NTuple{GN1, NTuple{2, Float64}}, 
+                                   ps₂::NTuple{GN2, NTuple{2, Float64}}) where {GN1, GN2}
     uniquePairs = NTuple{2, Float64}[]
     sizehint!(uniquePairs, GN1*GN2)
     uPairCoeffs = Array{Float64}(undef, GN1*GN2)
     i = 0
-    flag2 = (GN1 == GN2 && ps₁ == ps₂)
+    # flag2 = (GN1 == GN2 && ps₁ == ps₂)
 
-    if flag2
-        for (n, p₁) in zip( 1:GN1, ps₁::NTuple{GN1, NTuple{2, Float64}} ), 
-            (m, p₂) in zip( 1:n,   ps₂::NTuple{GN2, NTuple{2, Float64}} )
-            pair = reformatIntData2(p₁[1], p₂[1], flag)
-            idx = findfirst(x->x==pair, uniquePairs)
-            con = p₁[2] * p₂[2] * (m != n ? 2.0 : 1.0)
-            if idx === nothing
-                i += 1
-                push!(uniquePairs, pair)
-                uPairCoeffs[i] = con
-            else
-                uPairCoeffs[idx] += con
-            end
+    if GN1 == GN2 && ps₁ == ps₂
+        for (i₁, p₁) in enumerate(ps₁), (i₂, p₂) in zip(1:i₁, ps₁)
+            i = getOneBodyIntCoreCore!(i, uniquePairs, uPairCoeffs, flag, p₁, p₂, 
+                                       (i₁ == i₂ ? 1.0 : 2.0))
         end
     else
         commonPairs, ps1, ps2 = tupleDiff(ps₁, ps₂)
         for (i₁, p₁) in enumerate(commonPairs), (i₂, p₂) in zip(1:i₁, commonPairs)
-            pair = reformatIntData2(p₁[1], p₂[1], flag)
-            idx = findfirst(x->x==pair, uniquePairs)
-            con = p₁[2] * p₂[2] * (i₁ == i₂ ? 1.0 : 2.0)
-            if idx === nothing
-                i += 1
-                push!(uniquePairs, pair)
-                uPairCoeffs[i] = con
-            else
-                uPairCoeffs[idx] += con
-            end
+            i = getOneBodyIntCoreCore!(i, uniquePairs, uPairCoeffs, flag, p₁, p₂, 
+                                       (i₁ == i₂ ? 1.0 : 2.0))
         end
-
         for p₁ in ps1, p₂ in ps₂
-            pair = reformatIntData2(p₁[1], p₂[1], flag)
-            idx = findfirst(x->x==pair, uniquePairs)
-            con = p₁[2] * p₂[2]
-            if idx === nothing
-                i += 1
-                push!(uniquePairs, pair)
-                uPairCoeffs[i] = con
-            else
-                uPairCoeffs[idx] += con
-            end
+            i = getOneBodyIntCoreCore!(i, uniquePairs, uPairCoeffs, flag, p₁, p₂)
         end
-
         for p₁ in commonPairs, p₂ in ps2
-            pair = reformatIntData2(p₁[1], p₂[1], flag)
-            idx = findfirst(x->x==pair, uniquePairs)
-            con = p₁[2] * p₂[2]
-            if idx === nothing
-                i += 1
-                push!(uniquePairs, pair)
-                uPairCoeffs[i] = con
-            else
-                uPairCoeffs[idx] += con
-            end
+            i = getOneBodyIntCoreCore!(i, uniquePairs, uPairCoeffs, flag, p₁, p₂)
         end
     end
 
+    # if flag2
+    #     commonPairs = ps₁
+    # else
+    #     commonPairs, ps1, ps2 = tupleDiff(ps₁, ps₂)
+    # end
+    # for (i₁, p₁) in enumerate(commonPairs), (i₂, p₂) in zip(1:i₁, commonPairs)
+    #     i = getOneBodyIntCoreCore!(i, uniquePairs, uPairCoeffs, flag, p₁, p₂, 
+    #                                 (i₁ == i₂ ? 1.0 : 2.0))
+    # end
+    # if !flag2
+    #     for p₁ in ps1, p₂ in ps₂
+    #         i = getOneBodyIntCoreCore!(i, uniquePairs, uPairCoeffs, flag, p₁, p₂)
+    #     end
+    #     for p₁ in commonPairs, p₂ in ps2
+    #         i = getOneBodyIntCoreCore!(i, uniquePairs, uPairCoeffs, flag, p₁, p₂)
+    #     end
+    # end
+
     uniquePairs, uPairCoeffs
+end
+
+@inline function getOneBodyIntCoreCore!(i, uniquePairs, uPairCoeffs, 
+                                        flag, p₁, p₂, coeff=1.0)
+    pair = reformatIntData2(p₁[1], p₂[1], flag)
+    idx = findfirst(x->x==pair, uniquePairs)
+    con = p₁[2] * p₂[2] * coeff
+    if idx === nothing
+        i += 1
+        push!(uniquePairs, pair)
+        uPairCoeffs[i] = con
+    else
+        uPairCoeffs[idx] += con
+    end
+    i
 end
 
 function getTwoBodyInt(func::Symbol, 

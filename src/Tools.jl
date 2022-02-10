@@ -753,3 +753,26 @@ Pf(c::Float64, ::Val{Pf{C, :itself}}) where {C} = Pf{c*C, :itself}(itself)
 nameOf(f::ParameterizedFunction) = typeof(f)
 
 nameOf(f) = nameof(f)
+
+
+function arrayDiff!(v1::Array{T}, v2::Array{T}) where {T}
+    a1, a2 = (length(v1) > length(v2)) ? (v2, v1) : (v1, v2)
+    coms = T[]
+    l = length(a1)
+    sizehint!(coms, l)
+    i = 0
+    while i < l
+        i += 1
+        j = findfirst(isequal(a1[i]), a2)
+        if j !== nothing
+            popat!(a1, i)
+            push!(coms, popat!(a2, j))
+            i -= 1
+            l -= 1
+        end
+    end
+    coms, v1, v2
+end
+
+tupleDiff(t1::NTuple{N1, T}, t2::NTuple{N2, T}) where {N1, N2, T} = 
+arrayDiff!(t1|>collect, t2|>collect)
