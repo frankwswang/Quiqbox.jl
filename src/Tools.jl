@@ -755,7 +755,33 @@ nameOf(f::ParameterizedFunction) = typeof(f)
 nameOf(f) = nameof(f)
 
 
-function arrayDiff!(v1::Array{T}, v2::Array{T}) where {T}
+function arrayDiffCore!(vs::NTuple{N, Array{T}}) where {N, T}
+    head = vs[argmin(length.(vs))]
+    coms = T[]
+    sizehint!(coms, l)
+    l = length(head)
+    i = 0
+    while i < l
+        i += 1
+        ele = head[i]
+        ids = zeros(Int, N)
+        flag = false
+        for (j, v) in enumerate(vs)
+            k = findfirst(isequal(ele), v)
+            k === nothing ? (flag=true; break) : (ids[j] = k)
+        end
+        flag && continue
+        for (v, id) in zip(vs, ids)
+            popat!(v, id)
+        end
+        push!(coms, ele)
+        i -= 1
+        l -= 1
+    end
+    (coms, vs...)
+end
+
+function arrayDiffCore!(v1::Array{T}, v2::Array{T}) where {T}
     a1, a2 = (length(v1) > length(v2)) ? (v2, v1) : (v1, v2)
     coms = T[]
     l = length(a1)
@@ -774,5 +800,8 @@ function arrayDiff!(v1::Array{T}, v2::Array{T}) where {T}
     coms, v1, v2
 end
 
-tupleDiff(t1::NTuple{N1, T}, t2::NTuple{N2, T}) where {N1, N2, T} = 
-arrayDiff!(t1|>collect, t2|>collect)
+arrayDiff!(v1::Array{T}, v2::Array{T}) where {T} = arrayDiffCore!(v1, v2)
+
+arrayDiff!(vs::Vararg{Array{T}, N}) where {T, N} = arrayDiffCore!(vs)
+
+tupleDiff(ts::Vararg{NTuple{<:Any, T}, N}) where {T, N} = arrayDiff!((ts .|> collect)...)
