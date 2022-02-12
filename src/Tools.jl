@@ -758,8 +758,8 @@ nameOf(f) = nameof(f)
 function arrayDiffCore!(vs::NTuple{N, Array{T}}) where {N, T}
     head = vs[argmin(length.(vs))]
     coms = T[]
-    sizehint!(coms, l)
     l = length(head)
+    sizehint!(coms, l)
     i = 0
     while i < l
         i += 1

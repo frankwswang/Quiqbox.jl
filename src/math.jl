@@ -374,44 +374,6 @@ end
     i
 end
 
-# function getTwoBodyInt(func::Symbol, 
-#                        bf1::FloatingGTBasisFuncs{<:Any, GN1, 1}, 
-#                        bf2::FloatingGTBasisFuncs{<:Any, GN2, 1}, 
-#                        bf3::FloatingGTBasisFuncs{<:Any, GN3, 1}, 
-#                        bf4::FloatingGTBasisFuncs{<:Any, GN4, 1}, 
-#                        optArgs...) where {GN1, GN2, GN3, GN4}
-#     (R₁, ijk₁, ps₁), (R₂, ijk₂, ps₂), (R₃, ijk₃, ps₃), (R₄, ijk₄, ps₄) = 
-#     reformatIntData1.((bf1, bf2, bf3, bf4))
-
-#     f1 = (R₁ == R₂ && ijk₁ == ijk₂)
-#     f2 = (R₃ == R₄ && ijk₃ == ijk₄)
-#     f3 = (R₁ == R₃ && ijk₁ == ijk₃ && R₂ == R₄ && ijk₂ == ijk₄)
-
-#     uniquePairs = NTuple{4, Float64}[]
-#     sizehint!(uniquePairs, GN1*GN2*GN3*GN4)
-#     uPairCoeffs = Array{Float64}(undef, GN1*GN2*GN3*GN4)
-#     i = 0
-#     for p₁ in ps₁::NTuple{GN1, NTuple{2, Float64}}, 
-#         p₂ in ps₂::NTuple{GN2, NTuple{2, Float64}}, 
-#         p₃ in ps₃::NTuple{GN3, NTuple{2, Float64}}, 
-#         p₄ in ps₄::NTuple{GN4, NTuple{2, Float64}}
-#         pair = reformatIntData2((p₁[1], p₂[1], p₃[1], p₄[1]), (f1, f2, f3))
-#         idx = findfirst(x->x==pair, uniquePairs)
-#         con = p₁[2] * p₂[2] * p₃[2] * p₄[2]
-#         if idx === nothing
-#             i += 1
-#             push!(uniquePairs, pair)
-#             uPairCoeffs[i] = con
-#         else
-#             uPairCoeffs[idx] += con
-#         end
-#     end
-#     map(uniquePairs, uPairCoeffs) do x, y
-#         getfield(Quiqbox, func)(optArgs..., R₁, ijk₁, x[1], R₂, ijk₂, x[2], 
-#                                             R₃, ijk₃, x[3], R₄, ijk₄, x[4])::Float64 * y
-#     end |> sum
-# end
-
 function getTwoBodyInt(func::Symbol, 
                        bf1::FloatingGTBasisFuncs{<:Any, GN1, 1}, 
                        bf2::FloatingGTBasisFuncs{<:Any, GN2, 1}, 
@@ -454,7 +416,6 @@ end
     sizehint!(uniquePairs, GN1*GN2*GN3*GN4)
     uPairCoeffs = Array{Float64}(undef, GN1*GN2*GN3*GN4)
     i = 0
-
     if GN1 == GN2 && ps₁ == ps₂
         if GN3 == GN4 && ps₃ == ps₄
             if GN3 == GN1 && ps₃ == ps₁
@@ -482,19 +443,6 @@ end
         g1111 = ((A,),)
         g1122 = (((A, C),), ((B, A),), ((B, C),))
         g1212 = ()
-
-        # g1123 = flags[2] ? (((A, A, C), 2),  ((B, A, C), 2)) : 
-        #                    (((A, A, C),), ((A, C, A),), ((B, A, C),), ((B, C, A),))
-        # g1233 = flags[1] ? (((A, B, A), 2),  ((A, B, C), 2)) :
-        #                    (((A, B, A),), ((B, A, A),), ((A, B, C),), ((B, A, C),))
-        # if flags[1] && flags[2]
-        #     g1234 = (((A, B, A, C), 4),)
-        # else
-        #     g1234a = flags[2] ? (((A, B, A, C), 2),) : (((A, B, A, C),), ((A, B, C, A),))
-        #     g1234b = flags[1] ? (((A, B, C, A), 2),) : (((A, B, C, A),), ((B, A, C, A),))
-        #     g1234 = (g1234a..., g1234b...)
-        # end
-
         g1123 = (((A, A, C),), ((A, C, A),), ((B, A, C),), ((B, C, A),))
         g1233 = (((A, B, A),), ((B, A, A),), ((A, B, C),), ((B, A, C),))
         g1234 = (((A, B, A, C),), ((A, B, C, A),), ((A, B, C, A),), ((B, A, C, A),))
