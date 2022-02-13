@@ -2,7 +2,7 @@ using Test
 using Quiqbox
 using Quiqbox: isFull, BasisFuncMix, unpackBasisFuncs, inSymbols, varVal, ElementNames, 
                sortBasisFuncs, ParamList, sumOf, expressionOfCore, mergeGaussFuncs, 
-               ijkOrbitalList, gaussProd, normOfGTOin
+               gaussProd, normOfGTOin
 using Symbolics
 using LinearAlgebra
 
@@ -267,7 +267,7 @@ gf_merge3 = GaussFunc(1.5,1)
 
 # function add, mul, gaussProd
 @test add(bs2[1]) === bs2[1]
-bf1s = BasisFuncs(bf1.center, bf1.gauss, [ijkOrbitalList[bf1.ijk[1]]], bf1.normalizeGTO)
+bf1s = BasisFuncs(bf1.center, bf1.gauss, (bf1.ijk[1],), bf1.normalizeGTO)
 @test hasIdentical(add(bf1s), bf1)
 bfm_add1 = BasisFuncMix(bs2)
 @test add(bfm_add1) == sumOf(bs2)
@@ -454,7 +454,7 @@ lines = (content |> IOBuffer |> readlines)
 
 # function genBasisFuncText & genBFuncsFromText
 randElement = ElementNames[rand(1:length(ElementNames))]
-bs1 = genBasisFunc(missing, ("6-31G", "H"))
+bs1 = genBasisFunc(missing, ("6-31G", "H"), unlinkCenter=true)
 cens = [rand(3) for _=1:length(bs1)]
 txt1 = genBasisFuncText(bs1, printCenter=false, groupCenters=false) |> join
 txt2 = genBasisFuncText(bs1, printCenter=false) |> join

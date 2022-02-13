@@ -227,8 +227,8 @@ A (floating) basis function with the center attached to it instead of any nucleu
 
 `subshell::String`: The subshell (angular momentum symbol).
 
-`ijk::Tuple{String}`: Cartesian representation (pseudo-quantum number) of the angular 
-momentum orientation. E.g., s would be ("X⁰Y⁰Z⁰")
+`ijk::Tuple{NTuple{3, Int}}`: Cartesian representation (pseudo-quantum number) of the 
+angular momentum orientation. E.g., s (X⁰Y⁰Z⁰) would be `(0, 0, 0)`.
 
 `normalizeGTO::Bool`: Whether the GTO`::GaussFunc` will be normalized in calculations.
 
@@ -251,13 +251,14 @@ struct BasisFunc{𝑙, GN} <: FloatingGTBasisFuncs{𝑙, GN, 1}
                   ParamBox{Float64, ParamList[:Z]}}
     gauss::NTuple{GN, GaussFunc}
     subshell::String
-    ijk::Tuple{String}
+    ijk::Tuple{NTuple{3, Int}}
     normalizeGTO::Bool
     param::Tuple{Vararg{<:ParamBox}}
 
     function BasisFunc(cen::Tuple{Vararg{<:ParamBox}}, gs::NTuple{GN, GaussFunc}, 
-                       ijk::Vector{Int}, normalizeGTO::Bool) where {GN}
+                       ijk::NTuple{3, Int}, normalizeGTO::Bool) where {GN}
         @assert length(ijk) == 3 "The length of `ijk` should be 3."
+        @assert all(ijk .>= 0) "Each element of `ijk` must be non-negative."
         𝑙 = sum(ijk)
         subshell = SubshellNames[𝑙+1]
         pars = ParamBox[]
@@ -265,11 +266,11 @@ struct BasisFunc{𝑙, GN} <: FloatingGTBasisFuncs{𝑙, GN, 1}
         for g in gs
             append!(pars, g.param)
         end
-        new{𝑙, GN}(cen, gs, subshell, (ijkStringList[ijk],), normalizeGTO, pars |> Tuple)
+        new{𝑙, GN}(cen, gs, subshell, (ijk,), normalizeGTO, pars|>Tuple)
     end
 end
 
-BasisFunc(cen::Tuple{Vararg{<:ParamBox}}, g::GaussFunc, ijk::Vector{Int}, 
+BasisFunc(cen::Tuple{Vararg{<:ParamBox}}, g::GaussFunc, ijk::NTuple{3, Int}, 
           normalizeGTO::Bool) = 
 BasisFunc(cen, (g,), ijk, normalizeGTO)
 
@@ -280,8 +281,8 @@ BasisFunc(cen, (g,), ijk, normalizeGTO)
 
 A group of basis functions with identical parameters except they have different subshell 
 under the specified angular momentum. It has the same fields as `BasisFunc` and 
-specifically, for `ijk`, instead of being a 1-element `Tuple`, the size of the `Tuple` is 
-the size of the corresponding subshell.
+specifically, for `ijk`, the size of the it (`ON`) can be larger than 1 (no larger than the 
+size of the corresponding subshell).
 """
 struct BasisFuncs{𝑙, GN, ON} <: FloatingGTBasisFuncs{𝑙, GN, ON}
     center::Tuple{ParamBox{Float64, ParamList[:X]}, 
@@ -289,34 +290,34 @@ struct BasisFuncs{𝑙, GN, ON} <: FloatingGTBasisFuncs{𝑙, GN, ON}
                   ParamBox{Float64, ParamList[:Z]}}
     gauss::NTuple{GN, GaussFunc}
     subshell::String
-    ijk::Tuple{Vararg{String}}
+    ijk::NTuple{ON, NTuple{3, Int}}
     normalizeGTO::Bool
     param::Tuple{Vararg{<:ParamBox}}
 
     function BasisFuncs(cen::Tuple{Vararg{<:ParamBox}}, gs::NTuple{GN, GaussFunc}, 
-                        ijks::Vector{Vector{Int}}, normalizeGTO::Bool=false) where {GN}
-        @assert all(length.(ijks) .== 3) "The length of each `ijk` should be 3."
+                        ijks::NTuple{ON, NTuple{3, Int}}, normalizeGTO::Bool=false) where 
+                       {GN, ON}
         ls = sum.(ijks)
         𝑙 = ls[1]
-        @assert all(ls .== 𝑙) "The total angular momentums (of each ijk) should be "*
-                                   "the same."
+        @assert all([all(ijk .>= 0) for ijk in ijks]) "Each element of `ijk` must be " * 
+                                                      "non-negative."
+        @assert all(ls.==𝑙) "Total angular momentums (for each `ijk`) should be the same."
         subshell = SubshellNames[𝑙+1]
         ss = SubshellDimList[subshell]
         @assert length(ijks) <= ss "The total number of `ijk` should be no more than "*
                                    "$(ss) as they are in $(subshell) subshell."
-        ijks = sort(ijks, rev=true)
-        ijkStrs = [ijkStringList[i] for i in ijks] |> Tuple
+        ijks = sort(ijks|>collect, rev=true) |> Tuple
         pars = ParamBox[]
         append!(pars, cen)
         for g in gs
             append!(pars, g.param)
         end
-        new{𝑙, GN, length(ijks)}(cen, gs, subshell, ijkStrs, normalizeGTO, pars|>Tuple)
+        new{𝑙, GN, ON}(cen, gs, subshell, ijks, normalizeGTO, pars|>Tuple)
     end
 end
 
-BasisFuncs(cen::Tuple{Vararg{<:ParamBox}}, g::GaussFunc, ijks::Vector{Vector{Int}}, 
-          normalizeGTO::Bool=false) = 
+BasisFuncs(cen::Tuple{Vararg{<:ParamBox}}, g::GaussFunc, ijks::NTuple{ON, NTuple{3, Int}}, 
+          normalizeGTO::Bool=false) where {ON} = 
 BasisFuncs(cen, (g,), ijks, normalizeGTO)
 
 
@@ -328,14 +329,14 @@ BasisFuncs(cen, (g,), ijks, normalizeGTO)
 
 Constructor of `BasisFunc` and `BasisFuncs`, but it also returns different kinds of 
 collections of them based on the applied methods. The first argument `center` can be a 3-D 
-coordinate (e.g. `Vector{FLoat64}`), a `NTuple{3}` of spatial points (e.g. generated by 
+coordinate (e.g. `Array{Float64, 1}`), a `NTuple{3}` of spatial points (e.g. generated by 
 `genSpatialPoint`), or simply set to `missing` for later assignment.
 
 ≡≡≡ Method 1 ≡≡≡
 
     genBasisFunc(center, gs::Array{GaussFunc, 1}, 
-                 ijkOrijks::Union{Array{Int, 1}, Array{Array{Int, 1}, 1}}; 
-                 normalizeGTO::Bool=false)
+                 ijkOrijks::Union{T, Array{<:T, 1}, NTuple{<:Any, T}}; 
+                 normalizeGTO::Bool=false) where {T <: Union{Array{Int, 1}, NTuple{3, Int}}}
 
 `ijkOrijks` is the Array of the pseudo-quantum number(s) to specify the angular 
 momentum(s). E.g., s is [0,0,0] and p is [[1,0,0], [0,1,0], [0,0,1]].
@@ -348,22 +349,6 @@ BasisFunc{1, 1}(gauss, subshell, center)[X⁰Y¹Z⁰][0.0, 0.0, 0.0]
 ```
 
 ≡≡≡ Method 2 ≡≡≡
-
-    genBasisFunc(center, gs::Union{GaussFunc, Array{GaussFunc, 1}}, subshell::String="S"; 
-                 ijkFilter::Array{Bool, 1}=fill(true, SubshellDimList[subshell]), 
-                 normalizeGTO::Bool=false)
-
-≡≡≡ Example(s) ≡≡≡
-
-```jldoctest; setup = :(push!(LOAD_PATH, "../../src/"); using Quiqbox)
-julia> genBasisFunc([0,0,0], GaussFunc(2,1), "S")
-BasisFunc{0, 1}(gauss, subshell, center)[X⁰Y⁰Z⁰][0.0, 0.0, 0.0]
-
-julia> genBasisFunc([0,0,0], GaussFunc(2,1), "P")
-BasisFuncs{1, 1, 3}(gauss, subshell, center)[3/3][0.0, 0.0, 0.0]
-```
-
-≡≡≡ Method 3 ≡≡≡
 
     genBasisFunc(center, gExpsANDgCons::NTuple{2, Array{<:Real, 1}}, subshell="S"; kw...)
 
@@ -378,6 +363,22 @@ BasisFuncs{1, 1, 3}(gauss, subshell, center)[3/3][0.0, 0.0, 0.0]
 
 julia> genBasisFunc([0,0,0], ([2, 1.5], [1, 0.5]), "P")
 BasisFuncs{1, 2, 3}(gauss, subshell, center)[3/3][0.0, 0.0, 0.0]
+```
+
+≡≡≡ Method 3 ≡≡≡
+
+    genBasisFunc(center, gs::Union{GaussFunc, Array{GaussFunc, 1}}, subshell::String="S"; 
+                 ijkFilter::NTuple{N, Bool}=fill(true, SubshellDimList[subshell])|>Tuple, 
+                 normalizeGTO::Bool=false) where {N}
+
+≡≡≡ Example(s) ≡≡≡
+
+```jldoctest; setup = :(push!(LOAD_PATH, "../../src/"); using Quiqbox)
+julia> genBasisFunc([0,0,0], GaussFunc(2,1), "S")
+BasisFunc{0, 1}(gauss, subshell, center)[X⁰Y⁰Z⁰][0.0, 0.0, 0.0]
+
+julia> genBasisFunc([0,0,0], GaussFunc(2,1), "P")
+BasisFuncs{1, 1, 3}(gauss, subshell, center)[3/3][0.0, 0.0, 0.0]
 ```
 
 ≡≡≡ Method 4 ≡≡≡
@@ -414,74 +415,99 @@ julia> genBasisFunc([0,0,0], [("STO-2G", "He"), ("STO-3G", "O")])
  BasisFuncs{1, 3, 3}(gauss, subshell, center)[3/3][0.0, 0.0, 0.0]
 ```
 """
-genBasisFunc(cen::NTuple{3, ParamBox}, gs::Vector{GaussFunc}, 
-          ijk::Vector{Int}; normalizeGTO::Bool=false) = 
-BasisFunc(cen, gs|>Tuple, ijk, normalizeGTO)
+genBasisFunc(cen::NTuple{3, ParamBox}, gs::NTuple{GN, GaussFunc}, 
+             ijk::Vector{Int}=[0,0,0]; normalizeGTO::Bool=false) where {GN} = 
+BasisFunc(cen, gs, ijk|>Tuple, normalizeGTO)
 
-genBasisFunc(cen::NTuple{3, ParamBox}, gs::Vector{GaussFunc}, 
-          ijks::Vector{Vector{Int}}; normalizeGTO::Bool=false) = 
-BasisFuncs(cen, gs|>Tuple, ijks, normalizeGTO)
+genBasisFunc(cen::NTuple{3, ParamBox}, gs::NTuple{GN, GaussFunc}, 
+             ijk::NTuple{3, Int}; normalizeGTO::Bool=false) where {GN} = 
+BasisFunc(cen, gs, ijk, normalizeGTO)
 
-# ijkOrijks::Union{Vector{Int}, Vector{Vector{Int}}}
-function genBasisFunc(coord::AbstractArray, gs::Vector{GaussFunc}, ijkOrijks::Array; 
-                      normalizeGTO::Bool=false)
-    @assert length(coord) == 3 "The dimension of the center should be 3."
-    x = ParamBox(coord[1], ParamList[:X])
-    y = ParamBox(coord[2], ParamList[:Y])
-    z = ParamBox(coord[3], ParamList[:Z])
-    genBasisFunc((x,y,z), gs, ijkOrijks; normalizeGTO)
-end
+genBasisFunc(cen::NTuple{3, ParamBox}, gs::NTuple{GN, GaussFunc}, 
+             ijks::Vector{Vector{Int}}; normalizeGTO::Bool=false) where {GN} = 
+genBasisFunc(cen, gs, ijks.|>Tuple; normalizeGTO)
 
-genBasisFunc(::Missing, gs::Vector{GaussFunc}, ijkOrijks::Array; 
-             normalizeGTO::Bool=false) = 
-genBasisFunc([NaN, NaN, NaN], gs, ijkOrijks; normalizeGTO)
+genBasisFunc(cen::NTuple{3, ParamBox}, gs::NTuple{GN, GaussFunc}, 
+             ijks::Vector{NTuple{3, Int}}; normalizeGTO::Bool=false) where {GN} = 
+BasisFuncs(cen, gs, ijks|>Tuple, normalizeGTO)
 
-# center::Union{AbstractArray, NTuple{3, ParamBox}, Missing}
-function genBasisFunc(center, gs::Vector{GaussFunc}, subshell::String="S"; 
-                      ijkFilter::Vector{Bool}=fill(true, SubshellDimList[subshell]), 
-                      normalizeGTO::Bool=false)
-    ijkLen = length(ijkFilter)
+genBasisFunc(cen::NTuple{3, ParamBox}, gs::NTuple{GN, GaussFunc}, 
+             ijks::NTuple{ON, Vector{Int}}; normalizeGTO::Bool=false) where {GN, ON} = 
+BasisFuncs(cen, gs, ijks.|>Tuple, normalizeGTO)
+
+genBasisFunc(cen::NTuple{3, ParamBox}, gs::NTuple{GN, GaussFunc}, 
+             ijks::NTuple{ON, NTuple{3, Int}}; normalizeGTO::Bool=false) where {GN, ON} = 
+BasisFuncs(cen, gs, ijks, normalizeGTO)
+
+function genBasisFunc(cen::NTuple{3, ParamBox}, gs::NTuple{GN, GaussFunc}, subshell::String; 
+                      ijkFilter::NTuple{N, Bool}=fill(true, 
+                                                      SubshellDimList[subshell])|>Tuple, 
+                      normalizeGTO::Bool=false) where {GN, N}
     subshellSize = SubshellDimList[subshell]
-    @assert ijkLen == subshellSize "The length of `ijkFilter` should be $(subshellSize) "*
-                                   "to match the subshell's size."
-    ijks = [SubshellSuborderList[subshell][i] for i in findall(x->x==true, ijkFilter)]
-    length(ijks) == 1 && (ijks = ijks[])
-    genBasisFunc(center, gs, ijks; normalizeGTO)
+    @assert N == subshellSize "The length of `ijkFilter` should be $(subshellSize) "*
+                              "to match the subshell's size."
+    BasisFuncs(cen, gs, 
+               SubshellSuborderList[subshell][1:end .∈ [findall(x->x==true, ijkFilter)]], 
+               normalizeGTO)
 end
 
-# ijkOrSubshell::Union{Array, String}
-function genBasisFunc(center, gExpsANDgCons::NTuple{2, Vector{<:Real}}, ijkOrSubshell="S"; 
-                      kw...)
-    @compareLength gExpsANDgCons[1] gExpsANDgCons[2] "exponents" "contraction coefficients"
-    gs = GaussFunc.(gExpsANDgCons[1], gExpsANDgCons[2])
-    genBasisFunc(center, gs, ijkOrSubshell; kw...)
+function genBasisFunc(cen::NTuple{3, ParamBox}, xpnsANDcons::NTuple{2, Vector{<:Real}}, 
+                      ijkOrSubshell=[0,0,0]; normalizeGTO::Bool=false)
+    @compareLength xpnsANDcons[1] xpnsANDcons[2] "exponents" "contraction coefficients"
+    genBasisFunc(cen, GaussFunc.(xpnsANDcons[1], xpnsANDcons[2]), ijkOrSubshell; 
+                 normalizeGTO)
 end
 
-genBasisFunc(center, gExpANDgCon::NTuple{2, Real}, ijkOrSubshell ="S"; kw...) = 
-genBasisFunc(center, ([gExpANDgCon[1]], [gExpANDgCon[2]]), ijkOrSubshell; kw...)
+genBasisFunc(cen::NTuple{3, ParamBox}, xpnANDcon::NTuple{2, Real}, ijkOrSubshell=[0,0,0]; 
+             normalizeGTO::Bool=false) = 
+genBasisFunc(cen, (GaussFunc(xpnANDcon[1], xpnANDcon[2]),), ijkOrSubshell; normalizeGTO)
 
-function genBasisFunc(center, BSKeyANDnuc::Vector{Tuple{String, String}})
+# genBasisFunc(cen::NTuple{3, ParamBox}, xpnANDconOrGauss, ijkOrSubshell=(0,0,0); 
+#              normalizeGTO::Bool=false) = 
+# genBasisFunc(cen, xpnANDconOrGauss, ijkOrSubshell; normalizeGTO)
+
+function genBasisFunc(center::NTuple{3, ParamBox}, BSKeyANDnuc::Vector{NTuple{2, String}}; 
+                      unlinkCenter::Bool=false)
     bases = FloatingGTBasisFuncs[]
     for k in BSKeyANDnuc
         BFMcontent = BasisSetList[k[1]][AtomicNumberList[k[2]]]
         append!(bases, genBFuncsFromText(BFMcontent; adjustContent=true, 
-                excludeLastNlines=1, center))
+                excludeLastNlines=1, center, unlinkCenter))
     end
     bases
 end
 
-genBasisFunc(center, BSKeyANDnuc::Tuple{String, String}) = 
-genBasisFunc(center, [BSKeyANDnuc])
+genBasisFunc(cen::NTuple{3, ParamBox}, BSKeyANDnuc::NTuple{2, String}; 
+             unlinkCenter::Bool=false) = 
+genBasisFunc(cen, [BSKeyANDnuc]; unlinkCenter)
 
-genBasisFunc(center, BSkey::Vector{String}; nucleus::String="H") = 
-genBasisFunc(center, [(i, nucleus) for i in BSkey])
+genBasisFunc(cen::NTuple{3, ParamBox}, BSkey::Vector{String}; nucleus::String="H", 
+             unlinkCenter::Bool=false) = 
+genBasisFunc(cen, [(i, nucleus) for i in BSkey]; unlinkCenter)
 
-genBasisFunc(center, BSkey::String; nucleus::String="H") = 
-genBasisFunc(center, [BSkey]; nucleus)
+genBasisFunc(cen::NTuple{3, ParamBox}, BSkey::String; nucleus::String="H", 
+             unlinkCenter::Bool=false) = 
+genBasisFunc(cen, [BSkey]; nucleus, unlinkCenter)
 
 # A few methods for convenient arguments omissions and mutations.
-genBasisFunc(arg1, g::GaussFunc, args...; kws...) = genBasisFunc(arg1, [g], args...; kws...)
+genBasisFunc(cen::NTuple{3, ParamBox}, gs::Vector{GaussFunc}, args...; kws...) = 
+genBasisFunc(cen, gs|>Tuple, args...; kws...)
+
+genBasisFunc(cen::NTuple{3, ParamBox}, g::GaussFunc, args...; kws...) = 
+genBasisFunc(cen, (g,), args...; kws...)
+
+function genBasisFunc(coord::AbstractArray, args...; kws...)
+    @assert length(coord) == 3 "The dimension of the center should be 3."
+    x = ParamBox(coord[1], ParamList[:X])
+    y = ParamBox(coord[2], ParamList[:Y])
+    z = ParamBox(coord[3], ParamList[:Z])
+    genBasisFunc((x,y,z), args...; kws...)
+end
+
+genBasisFunc(::Missing, args...; kws...) = genBasisFunc([NaN, NaN, NaN], args...; kws...)
+
 genBasisFunc(bf::FloatingGTBasisFuncs) = itself(bf)
+
 genBasisFunc(bs::Vector{<:FloatingGTBasisFuncs}) = sortBasisFuncs(bs)
 
 
@@ -556,7 +582,7 @@ function sortBasisFuncs(bs::Array{<:FloatingGTBasisFuncs}; groupCenters::Bool=fa
 
         # Reversed order within same subshell but ordinary order among different subshells.
         sortVec = sortperm(map(ijkn) do x
-                               val = ijkOrbitalList[x[1]]
+                               val = x[1]
                                [-sum(val); val; x[2]]
                            end, 
                            rev=true)
@@ -614,7 +640,7 @@ Function in the integral calculation.
 
 ≡≡≡ Initialization Method(s) ≡≡≡
 
-    BasisFuncMix(bfs::Vector{<:FloatingGTBasisFuncs{𝑙, GN, 1} where {𝑙, GN}}) ->
+    BasisFuncMix(bfs::Array{<:FloatingGTBasisFuncs{𝑙, GN, 1} where {𝑙, GN}, 1}) ->
     BasisFuncMix{BN, GN}
 
 """
@@ -751,7 +777,7 @@ julia> bf3.gauss[1].con[]
 ```
 """
 function add(b::BasisFuncs{𝑙, GN, 1})::BasisFunc{𝑙, GN} where {𝑙, GN}
-    BasisFunc(b.center, b.gauss, ijkOrbitalList[b.ijk[1]], b.normalizeGTO)
+    BasisFunc(b.center, b.gauss, b.ijk[1], b.normalizeGTO)
 end
 
 add(b::BasisFunc) = itself(b)
@@ -773,7 +799,7 @@ function add(bf1::BasisFunc{𝑙, GN1},
         end
         gfs = vcat(bf1.gauss |> collect, bf2.gauss |> collect)
         gfsN = mergeGaussFuncs(gfs...) |> Tuple
-        BasisFunc(cen, gfsN, ijkOrbitalList[bf1.ijk[1]], bf1.normalizeGTO)
+        BasisFunc(cen, gfsN, bf1.ijk[1], bf1.normalizeGTO)
     else
         BasisFuncMix([bf1, bf2] |> sortBasisFuncs)
     end
@@ -929,10 +955,10 @@ function mul(sgf1::BasisFunc{𝑙1, 1}, sgf2::BasisFunc{𝑙2, 1};
         xpn = α₁ + α₂
         con = d₁ * d₂
         BasisFunc(makeCenter(R₁), GaussFunc(genExponent(xpn), genContraction(con)), 
-                  ijkOrbitalList[sgf1.ijk[1]]+ijkOrbitalList[sgf2.ijk[1]], normalizeGTO)
+                  sgf1.ijk[1].+sgf2.ijk[1], normalizeGTO)
     else
-        ijk1 = ijkOrbitalList[sgf1.ijk[1]]
-        ijk2 = ijkOrbitalList[sgf2.ijk[1]]
+        ijk1 = sgf1.ijk[1]
+        ijk2 = sgf2.ijk[1]
         xpn, con, cen = gaussProd((α₁, d₁, R₁), (α₂, d₂, R₂))
         coeffs = [Float64[] for _=1:3]
         shiftPolyFunc = @inline (n, c1, c2) -> [(c2 - c1)^k*binomial(n,k) for k = n:-1:0]
@@ -949,8 +975,8 @@ function mul(sgf1::BasisFunc{𝑙1, 1}, sgf2::BasisFunc{𝑙2, 1};
         pbR = makeCenter(cen)
         pbα = genExponent(xpn)
         BasisFuncMix([BasisFunc(pbR, GaussFunc(pbα, genContraction(con*XYZcs[i])), 
-                                Int[i[m]-1 for m=1:3], normalizeGTO) 
-                    for i in CartesianIndices(XYZcs)] |> sortBasisFuncs)
+                                Tuple(i).-1, normalizeGTO) 
+                      for i in CartesianIndices(XYZcs)] |> sortBasisFuncs)
     end
 end
 
@@ -967,7 +993,7 @@ function mul(sgf1::BasisFunc{0, 1}, sgf2::BasisFunc{0, 1};
     xpn, con, cen = gaussProd((sgf1.gauss[1].xpn(), d₁, R₁), (sgf2.gauss[1].xpn(), d₂, R₂))
     normalizeGTO isa Missing && (normalizeGTO = n₁*n₂)
     BasisFunc(makeCenter(cen), GaussFunc(genExponent(xpn), genContraction(con)), 
-              [0,0,0], normalizeGTO)
+              (0,0,0), normalizeGTO)
 end
 
 function gaussProd((α₁, d₁, R₁)::T, (α₂, d₂, R₂)::T) where 
@@ -984,7 +1010,7 @@ function mul(bf::BasisFunc{𝑙, GN}, coeff::Real;
     normalizeGTO isa Missing && (normalizeGTO = n)
     c = (n && !normalizeGTO) ? (coeff .* (normOfGTOin(bf) |> Tuple)) : coeff
     gfs = mul.(bf.gauss, c)
-    BasisFunc(bf.center, gfs, ijkOrbitalList[bf.ijk[1]], normalizeGTO)
+    BasisFunc(bf.center, gfs, bf.ijk[1], normalizeGTO)
 end
 
 function mul(coeff::Real, bf::BasisFunc{𝑙, GN}; 
@@ -1009,9 +1035,9 @@ function mul(bf1::BasisFunc{<:Any, GN1}, bf2::BasisFunc{<:Any, GN2};
                                  Missing}=missing)::CompositeGTBasisFuncs{<:Any, 1} where 
             {GN1, GN2}
     cen1 = bf1.center
-    ijk1 = ijkOrbitalList[bf1.ijk[1]]
+    ijk1 = bf1.ijk[1]
     cen2 = bf2.center
-    ijk2 = ijkOrbitalList[bf2.ijk[1]]
+    ijk2 = bf2.ijk[1]
     bf1n = bf1.normalizeGTO
     bf2n = bf2.normalizeGTO
     normalizeGTO isa Missing && (normalizeGTO = bf1n * bf2n)
@@ -1073,14 +1099,11 @@ mul(bf1::BasisFuncs{𝑙1, GN1, 1}, bf2::BasisFuncs{𝑙2, GN2, 1};
 Shift (add) the angular momentum (Cartesian representation) given the a vector that 
 specifies the change of each pseudo-quantum number 𝑑i, 𝑑j, 𝑑k.
 """
-function shift(bf::FloatingGTBasisFuncs{𝑙, GN, 1}, didjdk::Vector{Int}) where {𝑙, GN}
-    @assert didjdk |> length == 3 "The length of `didjdk` should be 3."
-    shiftCore(bf, didjdk)
-end
+shift(bf::FloatingGTBasisFuncs{𝑙, GN, 1}, didjdk::Vector{<:Real}) where {𝑙, GN} = 
+shiftCore(bf, (didjdk[1], didjdk[2], didjdk[3]).|>Int)
 
-shiftCore(bf::FloatingGTBasisFuncs{𝑙, GN, 1}, didjdk::Vector{<:Real}) where {𝑙, GN} = 
-BasisFunc(bf.center, bf.gauss, 
-          ijkOrbitalList[bf.ijk[1]] + convert(Vector{Int}, didjdk), bf.normalizeGTO)
+shiftCore(bf::FloatingGTBasisFuncs{𝑙, GN, 1}, didjdk::NTuple{3, Int}) where {𝑙, GN} = 
+BasisFunc(bf.center, bf.gauss, bf.ijk[1].+didjdk, bf.normalizeGTO)
 
 
 """
@@ -1105,7 +1128,7 @@ function decompose(bf::FloatingGTBasisFuncs{𝑙, GN, ON};
     end
     res = Array{BasisFunc{𝑙, nG}, 2}(undef, nRow, ON)
     for (c, ijk) in zip(eachcol(res), bf.ijk)
-        c .= BasisFunc.(Ref(bf.center), gs, Ref(ijkOrbitalList[ijk]), bf.normalizeGTO)
+        c .= BasisFunc.(Ref(bf.center), gs, Ref(ijk), bf.normalizeGTO)
     end
     res
 end
@@ -1212,7 +1235,8 @@ const Doc_genBFuncsFromText_strs = split(genBasisFuncText(genBasisFunc([1.0, 0.0
                       excludeFirstNlines::Int=0, excludeLastNlines::Int=0, 
                       center::Union{AbstractArray, 
                                     Tuple{N, ParamBox}, 
-                                    Missing}=missing) where {N, F<:Function} -> 
+                                    Missing}=missing, 
+                      unlinkCenter::Bool=false) where {N, F<:Function} -> 
     Array{<:FloatingGTBasisFuncs, 1}
 
 Generate the basis set from a `String` of basis set in Gaussian format or the String output 
@@ -1225,8 +1249,9 @@ the `String` if intent. `center` is used to assign a coordinate for all the basi
 from the String; it can be a `Vector`, a `Tuple` of the positional `ParamBox`s; when it's 
 set to `missing`, it will try to read the center information from the input string, and 
 leave the center as `[NaN, NaN, Nan]` if it can't find one for the corresponding 
-`BasisFunc`. The coordinate information, if included, should be right above the subshell 
-information for the `BasisFunc`. E.g.:
+`BasisFunc`. If `unlinkCenter = true`, the center of each basis function is a `deepcopy` of 
+the input `center`. The coordinate information, if included, should be right above the 
+subshell information for the `BasisFunc`. E.g.:
 ```
     \"\"\"
     $(Doc_genBFuncsFromText_strs[1])
@@ -1241,7 +1266,8 @@ function genBFuncsFromText(content::String;
                            excludeFirstNlines::Int=0, excludeLastNlines::Int=0, 
                            center::Union{AbstractArray, 
                                          NTuple{N, ParamBox}, 
-                                         Missing}=missing) where {N, F<:Function}
+                                         Missing}=missing, 
+                           unlinkCenter::Bool=false) where {N, F<:Function}
     adjustContent && (content = adjustFunction(content))
     lines = split.(content |> IOBuffer |> readlines)
     lines = lines[1+excludeFirstNlines : end-excludeLastNlines]
@@ -1261,13 +1287,14 @@ function genBFuncsFromText(content::String;
                 push!(gs1, GaussFunc(data[j][1], data[j][2]))
                 push!(gs2, GaussFunc(data[j][1], data[j][3]))
             end
-            append!(bfs, genBasisFunc.(Ref(center), [gs1, gs2], ["S", "P"], 
-                                       normalizeGTO=true))
+            append!(bfs, genBasisFunc.(Ref(unlinkCenter ? deepcopy(center) : center), 
+                                       [gs1, gs2], ["S", "P"], normalizeGTO=true))
         else
             for j = i+1 : i+ng
                 push!(gs1, GaussFunc(data[j]...))
             end
-            push!(bfs, genBasisFunc(center, gs1, (data[i][1] |> string), normalizeGTO=true))
+            push!(bfs, genBasisFunc((unlinkCenter ? deepcopy(center) : center), 
+                                    gs1, (data[i][1] |> string), normalizeGTO=true))
         end
         center = centerOld
     end
@@ -1402,16 +1429,10 @@ end
 
 function copyBasis(bfs::FloatingGTBasisFuncs{𝑙, GN, ON}, 
                    copyOutVal::Bool=true)::FloatingGTBasisFuncs{𝑙, GN, ON} where {𝑙, GN, ON}
-    if ON == 1
-        c = BasisFunc
-        ijk = ijkOrbitalList[bfs.ijk[1]]
-    else
-        c = BasisFuncs
-        ijk = [ijkOrbitalList[i] for i in bfs.ijk]
-    end
+    ijk = (ON == 1) ? bfs.ijk[1] : bfs.ijk
     cen = bfs.center .|> (copyOutVal ? outValCopy : inVarCopy)
     gs = copyBasis.(bfs.gauss, copyOutVal)
-    c(cen, gs, ijk, bfs.normalizeGTO)
+    genBasisFunc(cen, gs, ijk; normalizeGTO=bfs.normalizeGTO)
 end
 
 function copyBasis(bfm::BasisFuncMix{BN, GN}, 
@@ -1597,7 +1618,7 @@ cgo2(r, α, d, i, j, k, N=Nijkα(i,j,k,α)) = cgo0(r[1], r[2], r[3], α, d, i, j
 
 
 normOfGTOin(b::FloatingGTBasisFuncs{𝑙, GN, 1})  where {𝑙, GN} = 
-Nijkα.(ijkOrbitalList[b.ijk[1]]..., [g.xpn() for g in b.gauss])
+Nijkα.(b.ijk[1]..., [g.xpn() for g in b.gauss])
 
 normOfGTOin(b::FloatingGTBasisFuncs{𝑙, GN, ON}) where {𝑙, GN, ON} = 
 Nlα.(b.subshell, [g.xpn() for g in b.gauss])
@@ -1617,7 +1638,7 @@ function expressionOfCore(bf::FloatingGTBasisFuncs{𝑙, GN, ON}, substituteValu
                for i in (bf.center, getindex.(pars, 1), getindex.(pars, 2))]
     x = onlyParameter ? -R : Symbolics.variable.(:r, [1:3;]) - R
     res = map(bf.ijk) do ijk
-        i, j, k = ijkOrbitalList[ijk]
+        i, j, k = ijk
         exprs = cgo2.(Ref(x), α, d, i, j, k, N.(i,j,k,α))
         splitGaussFunc ? exprs : sum(exprs)
     end
@@ -1809,13 +1830,13 @@ end
 function diffInfoToBasisFunc(bf::FloatingGTBasisFuncs, info::Matrix{<:Any})
     bs = decompose(bf, splitGaussFunc=true)
     mat = map(bs, info) do x, y
-        xs = [copyBasis(x) for i = 1:length(y)]
+        xs = [copyBasis(x) for _ = 1:length(y)]
 
         for (i,j) in zip(y, xs)
             j.gauss[1].con[] *= getindex(i, 1)
         end
 
-        shiftCore.(xs, getindex.(y, Ref(2:4))) |> BasisFuncMix
+        shift.(xs, getindex.(y, Ref(2:4))) |> BasisFuncMix
     end
     eachcol(mat) .|> sum
 end
