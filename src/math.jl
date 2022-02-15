@@ -610,9 +610,6 @@ end
     n
 end
 
-# @inline getIntCore1233!(n, uniquePairs, uPairCoeffs, flags, pss, nFold=1) = 
-#         getIntCore1123!(n, uniquePairs, uPairCoeffs, flags, pss, nFold)
-
 @inline function getIntCore1234!(n, uniquePairs, uPairCoeffs, flags, (ps₁, ps₂, ps₃, ps₄), 
                                  nFold=1)
     for p₁ in ps₁, p₂ in ps₂, p₃ in ps₃, p₄ in ps₄

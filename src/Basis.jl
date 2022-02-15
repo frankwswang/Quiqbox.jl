@@ -255,24 +255,27 @@ struct BasisFunc{𝑙, GN} <: FloatingGTBasisFuncs{𝑙, GN, 1}
     normalizeGTO::Bool
     param::Tuple{Vararg{<:ParamBox}}
 
-    function BasisFunc(cen::Tuple{Vararg{<:ParamBox}}, gs::NTuple{GN, GaussFunc}, 
-                       ijk::NTuple{3, Int}, normalizeGTO::Bool) where {GN}
-        @assert length(ijk) == 3 "The length of `ijk` should be 3."
+    function BasisFunc{𝑙}(cen::Tuple{Vararg{<:ParamBox}}, gs::NTuple{GN, GaussFunc}, 
+                          ijk::NTuple{3, Int}, normalizeGTO::Bool) where {𝑙, GN}
+        @assert 𝑙 == sum(ijk)
         @assert all(ijk .>= 0) "Each element of `ijk` must be non-negative."
-        𝑙 = sum(ijk)
         subshell = SubshellNames[𝑙+1]
-        pars = ParamBox[]
-        append!(pars, cen)
-        for g in gs
-            append!(pars, g.param)
+        len = 3 + GN*2
+        pars = Array{ParamBox}(undef, len)
+        pars[1], pars[2], pars[3] = cen
+        for (g, k) in zip(gs, 4:2:(len-1))
+            pars[k], pars[k+1] = g.param
         end
         new{𝑙, GN}(cen, gs, subshell, (ijk,), normalizeGTO, pars|>Tuple)
     end
 end
 
-BasisFunc(cen::Tuple{Vararg{<:ParamBox}}, g::GaussFunc, ijk::NTuple{3, Int}, 
-          normalizeGTO::Bool) = 
-BasisFunc(cen, (g,), ijk, normalizeGTO)
+BasisFunc{𝑙}(cen::Tuple{Vararg{<:ParamBox}}, g::GaussFunc, ijk::NTuple{3, Int}, 
+             normalizeGTO::Bool) where {𝑙} = 
+BasisFunc{𝑙}(cen, (g,), ijk, normalizeGTO)
+
+BasisFunc(cen, gs, ijk::NTuple{3, Int}, normalizeGTO) = 
+BasisFunc{sum(ijk)}(cen, gs, ijk, normalizeGTO)
 
 
 """
@@ -294,31 +297,35 @@ struct BasisFuncs{𝑙, GN, ON} <: FloatingGTBasisFuncs{𝑙, GN, ON}
     normalizeGTO::Bool
     param::Tuple{Vararg{<:ParamBox}}
 
-    function BasisFuncs(cen::Tuple{Vararg{<:ParamBox}}, gs::NTuple{GN, GaussFunc}, 
+    function BasisFuncs{𝑙}(cen::Tuple{Vararg{<:ParamBox}}, gs::NTuple{GN, GaussFunc}, 
                         ijks::NTuple{ON, NTuple{3, Int}}, normalizeGTO::Bool=false) where 
-                       {GN, ON}
-        ls = sum.(ijks)
-        𝑙 = ls[1]
+                       {𝑙, GN, ON}
+        @assert all(sum.(ijks).==𝑙) "Magnitudes of Total angular momentums (for each " * 
+                                    "`ijk`) should all be the same."
         @assert all([all(ijk .>= 0) for ijk in ijks]) "Each element of `ijk` must be " * 
                                                       "non-negative."
-        @assert all(ls.==𝑙) "Total angular momentums (for each `ijk`) should be the same."
         subshell = SubshellNames[𝑙+1]
         ss = SubshellDimList[subshell]
         @assert length(ijks) <= ss "The total number of `ijk` should be no more than "*
                                    "$(ss) as they are in $(subshell) subshell."
         ijks = sort(ijks|>collect, rev=true) |> Tuple
         pars = ParamBox[]
-        append!(pars, cen)
-        for g in gs
-            append!(pars, g.param)
+        len = 3 + GN*2
+        pars = Array{ParamBox}(undef, len)
+        pars[1], pars[2], pars[3] = cen
+        for (g, k) in zip(gs, 4:2:(len-1))
+            pars[k], pars[k+1] = g.param
         end
         new{𝑙, GN, ON}(cen, gs, subshell, ijks, normalizeGTO, pars|>Tuple)
     end
 end
 
-BasisFuncs(cen::Tuple{Vararg{<:ParamBox}}, g::GaussFunc, ijks::NTuple{ON, NTuple{3, Int}}, 
-          normalizeGTO::Bool=false) where {ON} = 
-BasisFuncs(cen, (g,), ijks, normalizeGTO)
+BasisFuncs{𝑙}(cen::Tuple{Vararg{<:ParamBox}}, g::GaussFunc, 
+              ijks::NTuple{ON, NTuple{3, Int}}, normalizeGTO::Bool=false) where {𝑙, ON} = 
+BasisFuncs{𝑙}(cen, (g,), ijks, normalizeGTO)
+
+BasisFuncs(cen, gs, ijks::NTuple{ON, NTuple{3, Int}}, normalizeGTO) where {ON} = 
+BasisFuncs{sum(ijks[1])}(cen, gs, ijks, normalizeGTO)
 
 
 """
@@ -777,7 +784,7 @@ julia> bf3.gauss[1].con[]
 ```
 """
 function add(b::BasisFuncs{𝑙, GN, 1})::BasisFunc{𝑙, GN} where {𝑙, GN}
-    BasisFunc(b.center, b.gauss, b.ijk[1], b.normalizeGTO)
+    BasisFunc{𝑙}(b.center, b.gauss, b.ijk[1], b.normalizeGTO)
 end
 
 add(b::BasisFunc) = itself(b)
@@ -799,7 +806,7 @@ function add(bf1::BasisFunc{𝑙, GN1},
         end
         gfs = vcat(bf1.gauss |> collect, bf2.gauss |> collect)
         gfsN = mergeGaussFuncs(gfs...) |> Tuple
-        BasisFunc(cen, gfsN, bf1.ijk[1], bf1.normalizeGTO)
+        BasisFunc{𝑙}(cen, gfsN, bf1.ijk[1], bf1.normalizeGTO)
     else
         BasisFuncMix([bf1, bf2] |> sortBasisFuncs)
     end
@@ -954,8 +961,8 @@ function mul(sgf1::BasisFunc{𝑙1, 1}, sgf2::BasisFunc{𝑙2, 1};
     if R₁ == R₂
         xpn = α₁ + α₂
         con = d₁ * d₂
-        BasisFunc(makeCenter(R₁), GaussFunc(genExponent(xpn), genContraction(con)), 
-                  sgf1.ijk[1].+sgf2.ijk[1], normalizeGTO)
+        BasisFunc{𝑙1+𝑙2}(makeCenter(R₁), GaussFunc(genExponent(xpn), genContraction(con)), 
+                        sgf1.ijk[1].+sgf2.ijk[1], normalizeGTO)
     else
         ijk1 = sgf1.ijk[1]
         ijk2 = sgf2.ijk[1]
@@ -992,8 +999,8 @@ function mul(sgf1::BasisFunc{0, 1}, sgf2::BasisFunc{0, 1};
     R₂ = centerCoordOf(sgf2)
     xpn, con, cen = gaussProd((sgf1.gauss[1].xpn(), d₁, R₁), (sgf2.gauss[1].xpn(), d₂, R₂))
     normalizeGTO isa Missing && (normalizeGTO = n₁*n₂)
-    BasisFunc(makeCenter(cen), GaussFunc(genExponent(xpn), genContraction(con)), 
-              (0,0,0), normalizeGTO)
+    BasisFunc{0}(makeCenter(cen), GaussFunc(genExponent(xpn), genContraction(con)), 
+                 (0,0,0), normalizeGTO)
 end
 
 function gaussProd((α₁, d₁, R₁)::T, (α₂, d₂, R₂)::T) where 
@@ -1010,7 +1017,7 @@ function mul(bf::BasisFunc{𝑙, GN}, coeff::Real;
     normalizeGTO isa Missing && (normalizeGTO = n)
     c = (n && !normalizeGTO) ? (coeff .* (normOfGTOin(bf) |> Tuple)) : coeff
     gfs = mul.(bf.gauss, c)
-    BasisFunc(bf.center, gfs, bf.ijk[1], normalizeGTO)
+    BasisFunc{𝑙}(bf.center, gfs, bf.ijk[1], normalizeGTO)
 end
 
 function mul(coeff::Real, bf::BasisFunc{𝑙, GN}; 
@@ -1030,10 +1037,10 @@ function mul(coeff::Real, bfm::BasisFuncMix{BN, GN};
     mul(bfm, coeff; normalizeGTO)
 end
 
-function mul(bf1::BasisFunc{<:Any, GN1}, bf2::BasisFunc{<:Any, GN2}; 
+function mul(bf1::BasisFunc{𝑙1, GN1}, bf2::BasisFunc{𝑙2, GN2}; 
              normalizeGTO::Union{Bool, 
                                  Missing}=missing)::CompositeGTBasisFuncs{<:Any, 1} where 
-            {GN1, GN2}
+            {𝑙1, 𝑙2, GN1, GN2}
     cen1 = bf1.center
     ijk1 = bf1.ijk[1]
     cen2 = bf2.center
@@ -1043,7 +1050,8 @@ function mul(bf1::BasisFunc{<:Any, GN1}, bf2::BasisFunc{<:Any, GN2};
     normalizeGTO isa Missing && (normalizeGTO = bf1n * bf2n)
     bs = CompositeGTBasisFuncs{<:Any, 1}[]
     for gf1 in bf1.gauss, gf2 in bf2.gauss
-        push!(bs, mul(BasisFunc(cen1, gf1, ijk1, bf1n), BasisFunc(cen2, gf2, ijk2, bf2n); 
+        push!(bs, mul(BasisFunc{𝑙1}(cen1, (gf1,), ijk1, bf1n), 
+                      BasisFunc{𝑙2}(cen2, (gf2,), ijk2, bf2n); 
                       normalizeGTO))
     end
     sumOf(bs)
@@ -1128,7 +1136,7 @@ function decompose(bf::FloatingGTBasisFuncs{𝑙, GN, ON};
     end
     res = Array{BasisFunc{𝑙, nG}, 2}(undef, nRow, ON)
     for (c, ijk) in zip(eachcol(res), bf.ijk)
-        c .= BasisFunc.(Ref(bf.center), gs, Ref(ijk), bf.normalizeGTO)
+        c .= BasisFunc{𝑙}.(Ref(bf.center), gs, Ref(ijk), bf.normalizeGTO)
     end
     res
 end
