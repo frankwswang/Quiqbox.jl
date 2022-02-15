@@ -335,13 +335,17 @@ end
     sizehint!(uniquePairs, GN1*GN2)
     uPairCoeffs = Array{Float64}(undef, GN1*GN2)
     i = 0
-    if GN1 == GN2 && ps₁ == ps₂
-        i = getIntCore11!(i, uniquePairs, uPairCoeffs, flag, ps₁)
+    if flag
+        if ps₁ == ps₂
+            i = getIntCore11!(i, uniquePairs, uPairCoeffs, flag, ps₁)
+        else
+            psC, ps1, ps2 = tupleDiff(ps₁, ps₂)
+            i = getIntCore11!(i, uniquePairs, uPairCoeffs, flag, psC)
+            i = getIntCore12!(i, uniquePairs, uPairCoeffs, flag, (ps1, ps₂))
+            i = getIntCore12!(i, uniquePairs, uPairCoeffs, flag, (psC, ps2))
+        end
     else
-        psC, ps1, ps2 = tupleDiff(ps₁, ps₂)
-        i = getIntCore11!(i, uniquePairs, uPairCoeffs, flag, psC)
-        i = getIntCore12!(i, uniquePairs, uPairCoeffs, flag, (ps1, ps₂))
-        i = getIntCore12!(i, uniquePairs, uPairCoeffs, flag, (psC, ps2))
+        i = getIntCore12!(i, uniquePairs, uPairCoeffs, flag, (ps₁, ps₂))
     end
     uniquePairs, uPairCoeffs
 end
@@ -386,8 +390,9 @@ function getTwoBodyInt(func::Symbol,
     f1 = (R₁ == R₂ && ijk₁ == ijk₂)
     f2 = (R₃ == R₄ && ijk₃ == ijk₄)
     f3 = (R₁ == R₃ && ijk₁ == ijk₃ && R₂ == R₄ && ijk₂ == ijk₄)
+    f4 = (R₁ == R₄ && ijk₁ == ijk₄ && R₂ == R₃ && ijk₂ == ijk₃)
 
-    uniquePairs, uPairCoeffs = getTwoBodyIntCore((f1, f2, f3), ps₁, ps₂, ps₃, ps₄)
+    uniquePairs, uPairCoeffs = getTwoBodyIntCore((f1, f2, f3, f4), ps₁, ps₂, ps₃, ps₄)
     map(uniquePairs, uPairCoeffs) do x, y
         getfield(Quiqbox, func)(optArgs..., R₁, ijk₁, x[1], R₂, ijk₂, x[2], 
                                             R₃, ijk₃, x[3], R₄, ijk₄, x[4])::Float64 * y
@@ -406,7 +411,7 @@ end
     2^m
 end
 
-@inline function getTwoBodyIntCore(flags::NTuple{3, Bool}, 
+@inline function getTwoBodyIntCore(flags::NTuple{4, Bool}, 
                                    ps₁::NTuple{GN1, NTuple{2, Float64}},
                                    ps₂::NTuple{GN2, NTuple{2, Float64}},
                                    ps₃::NTuple{GN3, NTuple{2, Float64}},
@@ -415,31 +420,33 @@ end
     uniquePairs = NTuple{4, Float64}[]
     sizehint!(uniquePairs, GN1*GN2*GN3*GN4)
     uPairCoeffs = Array{Float64}(undef, GN1*GN2*GN3*GN4)
+    flagRijk = flags[1:3]
     i = 0
-    if GN1 == GN2 && ps₁ == ps₂
-        if GN3 == GN4 && ps₃ == ps₄
-            if GN3 == GN1 && ps₃ == ps₁
-                i = getIntCore1111!(i, uniquePairs, uPairCoeffs, flags, ps₁)
+    if ps₁ == ps₂ && flags[1]
+        if ps₃ == ps₄ && flags[2]
+            if ps₃ == ps₁ && flags[3]
+                i = getIntCore1111!(i, uniquePairs, uPairCoeffs, flagRijk, ps₁)
             else
-                i = getIntX1X1X2X2!(i, uniquePairs, uPairCoeffs, flags, ps₁, ps₃)
+                i = getIntX1X1X2X2!(i, uniquePairs, uPairCoeffs, flagRijk, ps₁, ps₃)
             end
         else
-            i = getIntX1X1X2X3!(i, uniquePairs, uPairCoeffs, flags, ps₁, ps₃, ps₄)
+            i = getIntX1X1X2X3!(i, uniquePairs, uPairCoeffs, flagRijk, ps₁, ps₃, ps₄)
         end
-    elseif GN3 == GN4 && ps₃ == ps₄
-        i = getIntX1X2X3X3!(i, uniquePairs, uPairCoeffs, flags, ps₁, ps₂, ps₃)
-    elseif ((GN3 == GN1 && ps₃ == ps₁) || (GN3 == GN2 && ps₃ == ps₂)) && 
-           ((GN4 == GN1 && ps₄ == ps₁) || (GN4 == GN2 && ps₄ == ps₂))
-        i = getIntX1X2X1X2!(i, uniquePairs, uPairCoeffs, flags, ps₁, ps₂)
+    elseif ps₃ == ps₄ && flags[2]
+        i = getIntX1X2X3X3!(i, uniquePairs, uPairCoeffs, flagRijk, ps₁, ps₂, ps₃)
+    elseif ps₁ == ps₃ && ps₂ == ps₄ && flags[3]
+        i = getIntX1X2X1X2!(i, uniquePairs, uPairCoeffs, flagRijk, ps₁, ps₂)
+    elseif ps₁ == ps₄ && ps₂ == ps₃ && flags[4]
+        i = getIntX1X2X2X1!(i, uniquePairs, uPairCoeffs, flagRijk, ps₁, ps₂)
     else
-        i = getIntX1X2X3X4!(i, uniquePairs, uPairCoeffs, flags, ps₁, ps₂, ps₃, ps₄)
+        i = getIntX1X2X3X4!(i, uniquePairs, uPairCoeffs, flagRijk, ps₁, ps₂, ps₃, ps₄)
     end
     uniquePairs, uPairCoeffs
 end
 
 @inline function getIntX1X1X2X2!(n, uniquePairs, uPairCoeffs, flags, ps₁, ps₂)
     A, B, C = tupleDiff(ps₁, ps₂)
-    if length(A) > 0
+    if length(A) > 0 && flags[3]
         g1111 = ((A,),)
         g1122 = (((A, C),), ((B, A),), ((B, C),))
         g1212 = ()
@@ -457,7 +464,7 @@ end
 
 @inline function getIntX1X2X1X2!(n, uniquePairs, uPairCoeffs, flags, ps₁, ps₂)
     A, B, C = tupleDiff(ps₁, ps₂)
-    if length(A) > 0
+    if length(A) > 0 && all(flags)
         g1111 = ((A,),)
         g1122 = ()
         g1212 = (((A, C),), ((B, A),), ((B, C),))
@@ -473,9 +480,12 @@ end
     n
 end
 
+@inline getIntX1X2X2X1!(n, uniquePairs, uPairCoeffs, flags, ps₁, ps₂) = 
+        getIntX1X2X1X2!(n, uniquePairs, uPairCoeffs, flags, ps₁, ps₂)
+
 @inline function getIntX1X1X2X3!(n, uniquePairs, uPairCoeffs, flags, ps₁, ps₂, ps₃)
     A, B, C, D = tupleDiff(ps₁, ps₂, ps₃)
-    if length(A) > 0
+    if length(A) > 0 && flags[2] && flags[3]
         g1111 = ((A,),)
         g1122 = (((B, A),),)
         g1212 = ()
@@ -494,7 +504,7 @@ end
 
 @inline function getIntX1X2X3X3!(n, uniquePairs, uPairCoeffs, flags, ps₁, ps₂, ps₃)
     A, B, C, D = tupleDiff(ps₁, ps₂, ps₃)
-    if length(A) > 0
+    if length(A) > 0 && flags[1] && flags[3]
         g1111 = ((A,),)
         g1122 = (((A, D),),)
         g1212 = ()
@@ -513,7 +523,7 @@ end
 
 @inline function getIntX1X2X3X4!(n, uniquePairs, uPairCoeffs, flags, ps₁, ps₂, ps₃, ps₄)
     A, B, C, D, E = tupleDiff(ps₁, ps₂, ps₃, ps₄)
-    if length(A) > 0
+    if length(A) > 0 && all(flags)
         g1111 = ((A,),)
         g1122 = ()
         g1212 = ()
@@ -571,12 +581,13 @@ end
     n
 end
 
-@inline function getIntCore1212!(n, uniquePairs, uPairCoeffs, flags, (ps₁, ps₂), 
-                                 nFold=1)
-    for (i₁, p₁) in enumerate(ps₁), (i₂, p₂) in enumerate(ps₂), 
-        (i₃, p₃) in zip(1:i₁, ps₁), (i₄, p₄) in zip(1:i₂, ps₂)
-        n = getUniquePair!(n, uniquePairs, uPairCoeffs, flags, (p₁, p₂, p₃, p₄), 
-                           diFoldCount(i₁, i₃)*diFoldCount(i₂, i₄)*nFold)
+@inline function getIntCore1212!(n, uniquePairs, uPairCoeffs, flags, 
+                                 (ps₁, ps₂)::Tuple{NTuple{N1}, NTuple{N2}}, 
+                                 nFold=1) where {N1, N2}
+    oneSidePairs = Iterators.product(1:N1, 1:N1)
+    for (x, (i₁,i₂)) in enumerate(oneSidePairs), (_, (i₃,i₄)) in zip(1:x, oneSidePairs)
+        n = getUniquePair!(n, uniquePairs, uPairCoeffs, flags, 
+                           (ps₁[i₁], ps₂[i₂], ps₁[i₃], ps₂[i₄]), 2^(i₁!=i₃ || i₂!=i₄)*nFold)
     end
     n
 end
