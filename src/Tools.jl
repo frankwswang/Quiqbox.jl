@@ -805,3 +805,8 @@ arrayDiff!(v1::Array{T}, v2::Array{T}) where {T} = arrayDiffCore!(v1, v2)
 arrayDiff!(vs::Vararg{Array{T}, N}) where {T, N} = arrayDiffCore!(vs)
 
 tupleDiff(ts::Vararg{NTuple{<:Any, T}, N}) where {T, N} = arrayDiff!((ts .|> collect)...)
+
+struct FunctionType{F}
+    f::Symbol
+    FunctionType{F}() where {F} = new{F}(F)
+end

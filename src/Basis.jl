@@ -431,6 +431,10 @@ genBasisFunc(cen::NTuple{3, ParamBox}, gs::NTuple{GN, GaussFunc},
 BasisFunc(cen, gs, ijk, normalizeGTO)
 
 genBasisFunc(cen::NTuple{3, ParamBox}, gs::NTuple{GN, GaussFunc}, 
+             ijk::Tuple{NTuple{3, Int}}; normalizeGTO::Bool=false) where {GN} = 
+BasisFunc(cen, gs, ijk[1], normalizeGTO)
+
+genBasisFunc(cen::NTuple{3, ParamBox}, gs::NTuple{GN, GaussFunc}, 
              ijks::Vector{Vector{Int}}; normalizeGTO::Bool=false) where {GN} = 
 genBasisFunc(cen, gs, ijks.|>Tuple; normalizeGTO)
 
@@ -453,9 +457,9 @@ function genBasisFunc(cen::NTuple{3, ParamBox}, gs::NTuple{GN, GaussFunc}, subsh
     subshellSize = SubshellDimList[subshell]
     @assert N == subshellSize "The length of `ijkFilter` should be $(subshellSize) "*
                               "to match the subshell's size."
-    BasisFuncs(cen, gs, 
-               SubshellSuborderList[subshell][1:end .∈ [findall(x->x==true, ijkFilter)]], 
-               normalizeGTO)
+    genBasisFunc(cen, gs, 
+                 SubshellSuborderList[subshell][1:end .∈ [findall(x->x==true, ijkFilter)]]; 
+                 normalizeGTO)
 end
 
 function genBasisFunc(cen::NTuple{3, ParamBox}, xpnsANDcons::NTuple{2, Vector{<:Real}}, 
@@ -468,10 +472,6 @@ end
 genBasisFunc(cen::NTuple{3, ParamBox}, xpnANDcon::NTuple{2, Real}, ijkOrSubshell=[0,0,0]; 
              normalizeGTO::Bool=false) = 
 genBasisFunc(cen, (GaussFunc(xpnANDcon[1], xpnANDcon[2]),), ijkOrSubshell; normalizeGTO)
-
-# genBasisFunc(cen::NTuple{3, ParamBox}, xpnANDconOrGauss, ijkOrSubshell=(0,0,0); 
-#              normalizeGTO::Bool=false) = 
-# genBasisFunc(cen, xpnANDconOrGauss, ijkOrSubshell; normalizeGTO)
 
 function genBasisFunc(center::NTuple{3, ParamBox}, BSKeyANDnuc::Vector{NTuple{2, String}}; 
                       unlinkCenter::Bool=false)
@@ -671,6 +671,7 @@ unpackBasisFuncs(bfm::BasisFuncMix{BN, GN}) where {BN, GN} = bfm.BasisFunc |> co
 unpackBasisFuncs(bf::FloatingGTBasisFuncs) = typeof(bf)[bf]
 unpackBasisFuncs(::Any) = FloatingGTBasisFuncs[]
 
+unpackBasis(bfm::BasisFuncMix{BN, GN}) where {BN, GN} = bfm.BasisFunc |> collect
 
 function sumOf(bfs::Array{<:BasisFunc})::CompositeGTBasisFuncs{<:Any, 1}
     arr1 = convert(Vector{BasisFunc}, sortBasisFuncs(bfs[:]))
