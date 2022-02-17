@@ -111,7 +111,7 @@ eeInteraction(bf1::AbstractGTBasisFuncs,
               bf3::AbstractGTBasisFuncs, 
               bf4::AbstractGTBasisFuncs) = 
 dropdims(eeInteractionCore(bf1, bf2, bf3, bf4), dims=5)
-
+# cat(get2eInteraction(bf1, bf2, bf3, bf4), dims=4)
 """
 
     eeInteractionsCore(BSet::Array{<:AbstractGTBasisFuncs, 1}; 
@@ -136,3 +136,4 @@ of spatial orbitals) given a basis set in the form of an `Array`.
 """
 eeInteractions(BSet::Vector{<:AbstractGTBasisFuncs}) = 
 dropdims(eeInteractionsCore(BSet), dims=5)
+# get2eInteractions(BSet)

@@ -1,17 +1,6 @@
 using SpecialFunctions: erf
 using LinearAlgebra: dot
 
-getNijk(i, j, k) = (2/π)^0.75 * ( 2^(3*(i+j+k)) * 
-                   factorial(i) * factorial(j) * factorial(k) / 
-                   (factorial(2i) * factorial(2j) * factorial(2k)) )^0.5
-
-getNα(i, j, k, α) = α^(0.5*(i + j + k) + 0.75)
-
-getNijkα(i, j, k, α) = getNijk(i, j, k) * getNα(i, j, k, α)
-
-getNijkα(ijk::NTuple{3, T}, α) where {T} = getNijkα(ijk[1], ijk[2], ijk[3], α)
-
-
 # Reference: DOI: 10.1088/0143-0807/31/1/004
 function Fγ(γ::Int, u::Float64)
     u == 0.0 && (return 1 / (2γ + 1))
@@ -29,7 +18,7 @@ function F₀toFγ(γ::Int, u::Float64, Fγu::Float64)
     res = Array{Float64}(undef, γ+1)
     res[end] = Fγu
     for i in γ:-1:1
-        res[i] = (2u*res[i+1] + exp(-u)) / (2γ + 1)
+        res[i] = (2u*res[i+1] + exp(-u)) / (2(i-1) + 1)
     end
     res
 end
@@ -167,7 +156,7 @@ end
     A
 end
 
-function ∫nucAttractionCore(Z₀::Int, R₀::NTuple{3, Float64}, 
+function ∫nucAttractionCore(Z₀::Int, R₀::NTuple{3, Real}, 
                             R₁::NTuple{3, Float64}, R₂::NTuple{3, Float64}, 
                             ijk₁::NTuple{3, Int}, α₁::Float64,
                             ijk₂::NTuple{3, Int}, α₂::Float64)
@@ -184,8 +173,8 @@ function ∫nucAttractionCore(Z₀::Int, R₀::NTuple{3, Float64},
     ΔR₁R₂ = R₁ .- R₂
     β = α * sum(abs2, ΔRR₀)
     res = -Z₀ * π / α * exp(-α₁ * α₂ / α * sum(abs2, ΔR₁R₂))
-        res *= (-1)^sum(ijk₁ .+ ijk₂) * (factorial.((ijk₁..., ijk₂...)) |> prod) * 
-               genIntNucAttCore1(ΔRR₀, ΔR₁R₂, β, ijk₁, α₁, ijk₂, α₂)
+    res *= (-1)^sum(ijk₁ .+ ijk₂) * (factorial.((ijk₁..., ijk₂...)) |> prod) * 
+            genIntNucAttCore1(ΔRR₀, ΔR₁R₂, β, ijk₁, α₁, ijk₂, α₂)
     res
 end
 
@@ -246,7 +235,7 @@ function ∫eeInteractionCore1234(ΔRl::NTuple{3, Float64}, ΔRr::NTuple{3, Floa
             Fγs = F₀toFγ(μsum, β)
 
             core1s = genIntTerm3.(ΔRl, lmn₁, opq₁, lmn₂, opq₂, ijk₁, α₁, ijk₂, α₂)
-            core2s = genIntTerm3.(ΔRr, lmn₃, opq₃, lmn₄, opq₄, ijk₃, α₃, ijk₄, α₄)
+            core2s = genIntTerm3.(ΔRr, lmn₄, opq₄, lmn₃, opq₃, ijk₄, α₄, ijk₃, α₃)
             core3s = genIntTerm4.(ΔRc, η, μv)
 
             for r₁ in 0:((o₁+o₂)÷2), s₁ in 0:((p₁+p₂)÷2), t₁ in 0:((q₁+q₂)÷2), 
@@ -623,7 +612,7 @@ getOneBodyInt(FunctionType{:∫elecKineticCore}(), bf1, bf2)
 
 function getNucAttraction(bf1::BasisFunc{<:Any, GN1}, bf2::BasisFunc{<:Any, GN2}, 
                           nuc::AbstractArray{String}, 
-                          nucCoords::AbstractArray{<:AbstractArray{Float64}}) where 
+                          nucCoords::AbstractArray{<:AbstractArray{<:Real}}) where 
                          {GN1, GN2}
     res = 0.0
     for (ele, coord) in zip(nuc, nucCoords)
@@ -639,16 +628,16 @@ function get2eInteraction(bf1::BasisFunc{<:Any, GN1}, bf2::BasisFunc{<:Any, GN2}
     getTwoBodyInt(FunctionType{:∫eeInteractionCore}(), bf1, bf2, bf3, bf4)
 end
 
-@inline function getCompositeInt(::FunctionType{F}, bs::NTuple{N, BasisFuncs}, 
+@inline function getCompositeInt(::FunctionType{F}, bs::NTuple{N, FloatingGTBasisFuncs}, 
                                  optArgs...) where {F, N}
     range = Iterators.product(bs...)
-    map(x->getfield(Quiqbox, F)(x..., optArgs...)::Float64, range)::Float64
+    map(x->getfield(Quiqbox, F)(x..., optArgs...)::Float64, range)::Array{Float64, N}
 end
 
 @inline function getCompositeInt(::FunctionType{F}, 
                                  bs::NTuple{N, CompositeGTBasisFuncs{<:Any, 1}}, 
                                  optArgs...) where {F, N}
-    range = Iterators.product(unpackBasis.(bs)...)
+    range = Iterators.product(unpackBasisFuncs.(bs)...)
     ( map(x->getfield(Quiqbox, F)(x..., optArgs...)::Float64, range) |> sum )::Float64
 end
 
@@ -660,12 +649,12 @@ getCompositeInt(FunctionType{:getElecKinetic}(), (b1, b2))
 
 getNucAttraction(b1::AbstractGTBasisFuncs, b2::AbstractGTBasisFuncs, 
                  nuc::AbstractArray{String}, 
-                 nucCoords::AbstractArray{<:AbstractArray{Float64}}) = 
+                 nucCoords::AbstractArray{<:AbstractArray{<:Real}}) = 
 getCompositeInt(FunctionType{:getNucAttraction}(), (b1, b2), nuc, nucCoords)
 
 getCoreHij(b1::AbstractGTBasisFuncs, b2::AbstractGTBasisFuncs, 
            nuc::AbstractArray{String}, 
-           nucCoords::AbstractArray{<:AbstractArray{Float64}}) = 
+           nucCoords::AbstractArray{<:AbstractArray{<:Real}}) = 
 getElecKinetic(b1, b2) + getNucAttraction(b1, b2, nuc, nucCoords)
 
 get2eInteraction(b1::AbstractGTBasisFuncs, b2::AbstractGTBasisFuncs, 
@@ -698,11 +687,11 @@ getOneBodyInts(FunctionType{:getElecKinetic}(), BSet)
 
 getNucAttractions(BSet::AbstractArray{<:AbstractGTBasisFuncs}, 
                   nuc::AbstractArray{String}, 
-                  nucCoords::AbstractArray{<:AbstractArray{Float64}}) = 
+                  nucCoords::AbstractArray{<:AbstractArray{<:Real}}) = 
 getOneBodyInts(FunctionType{:getNucAttraction}(), BSet, nuc, nucCoords)
 
 getCoreH(BSet::AbstractArray{<:AbstractGTBasisFuncs}, 
-         nuc::AbstractArray{String}, nucCoords::AbstractArray{<:AbstractArray{Float64}}) = 
+         nuc::AbstractArray{String}, nucCoords::AbstractArray{<:AbstractArray{<:Real}}) = 
 getOneBodyInts(FunctionType{:getCoreHij}(), BSet, nuc, nucCoords)
 
 
@@ -736,3 +725,14 @@ end
 
 get2eInteractions(BSet::AbstractArray{<:AbstractGTBasisFuncs}) = 
 getTwoBodyInts(FunctionType{:get2eInteraction}(), BSet)
+
+function genUniqueIndices(basisSet::AbstractArray{<:AbstractGTBasisFuncs})
+    s = basisSize(basisSet) |> sum
+    uniqueIdx = fill(Int[0,0,0,0], (3*binomial(s, 4)+6*binomial(s, 3)+4*binomial(s, 2)+s))
+    index = 1
+    for i = 1:s, j = 1:i, k = 1:i, l = 1:(k==i ? j : k)
+        uniqueIdx[index] = [i, j, k, l]
+        index += 1
+    end
+    uniqueIdx
+end

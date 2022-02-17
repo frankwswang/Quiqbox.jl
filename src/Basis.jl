@@ -954,8 +954,8 @@ function mul(sgf1::BasisFunc{𝑙1, 1}, sgf2::BasisFunc{𝑙2, 1};
     d₂ = sgf2.gauss[1].con()
     n₁ = sgf1.normalizeGTO
     n₂ = sgf2.normalizeGTO
-    n₁ && (d₁ *= normOfGTOin(sgf1)[1])
-    n₂ && (d₂ *= normOfGTOin(sgf2)[1])
+    n₁ && (d₁ *= getNorms(sgf1)[])
+    n₂ && (d₂ *= getNorms(sgf2)[])
     R₁ = centerCoordOf(sgf1)
     R₂ = centerCoordOf(sgf2)
     normalizeGTO isa Missing && (normalizeGTO = n₁*n₂)
@@ -994,8 +994,8 @@ function mul(sgf1::BasisFunc{0, 1}, sgf2::BasisFunc{0, 1};
     d₂ = sgf2.gauss[1].con()
     n₁ = sgf1.normalizeGTO
     n₂ = sgf2.normalizeGTO
-    n₁ && (d₁ *= normOfGTOin(sgf1)[1])
-    n₂ && (d₂ *= normOfGTOin(sgf2)[1])
+    n₁ && (d₁ *= getNorms(sgf1)[])
+    n₂ && (d₂ *= getNorms(sgf2)[])
     R₁ = centerCoordOf(sgf1)
     R₂ = centerCoordOf(sgf2)
     xpn, con, cen = gaussProd((sgf1.gauss[1].xpn(), d₁, R₁), (sgf2.gauss[1].xpn(), d₂, R₂))
@@ -1016,7 +1016,7 @@ function mul(bf::BasisFunc{𝑙, GN}, coeff::Real;
              normalizeGTO::Union{Bool, Missing}=missing)::BasisFunc{𝑙, GN} where {𝑙, GN}
     n = bf.normalizeGTO
     normalizeGTO isa Missing && (normalizeGTO = n)
-    c = (n && !normalizeGTO) ? (coeff .* (normOfGTOin(bf) |> Tuple)) : coeff
+    c = (n && !normalizeGTO) ? (coeff .* getNorms(bf)) : coeff
     gfs = mul.(bf.gauss, c)
     BasisFunc{𝑙}(bf.center, gfs, bf.ijk[1], normalizeGTO)
 end
@@ -1159,7 +1159,7 @@ end
 Return the size (number of orbitals) of each subshell.
 """
 basisSize(subshell::String) = (SubshellDimList[subshell],)
-basisSize(subshells::Vector{String}) = basisSize.(subshells) |> flatten |> Tuple
+basisSize(subshells::AbstractArray{String}) = basisSize.(subshells) |> flatten |> Tuple
 
 """
 
@@ -1169,7 +1169,7 @@ Return the numbers of orbitals of the input basis function(s).
 """
 basisSize(basis::FloatingGTBasisFuncs) = (basis.ijk |> length,)
 basisSize(::BasisFuncMix) = (1,)
-basisSize(basisSet::Vector{<:Any}) = basisSize.(basisSet) |> flatten |> Tuple
+basisSize(basisSet::AbstractArray{<:Any}) = basisSize.(basisSet) |> flatten |> Tuple
 
 
 # Core function to generate a customized X-Gaussian (X>1) basis function.
@@ -1586,6 +1586,8 @@ function getVarDict(containers::Union{Array, StructSpatialBasis};
 end
 
 
+#########################################################################
+
 function Nlα(l, α)
     if l < 2
         ( 2^(2l+3) * factorial(l+1) * 2^(l+1.5) / 
@@ -1614,6 +1616,30 @@ function Nijkα(i, j, k, α)
     end
 end
 
+normOfGTOin(b::FloatingGTBasisFuncs{𝑙, GN, 1})  where {𝑙, GN} = 
+Nijkα.(b.ijk[1]..., [g.xpn() for g in b.gauss])
+
+normOfGTOin(b::FloatingGTBasisFuncs{𝑙, GN, ON}) where {𝑙, GN, ON} = 
+Nlα.(b.subshell, [g.xpn() for g in b.gauss])
+
+#########################################################################
+
+
+getNijk(i, j, k) = (2/π)^0.75 * 
+                   ( 2^(3*(i+j+k)) * factorial(i) * factorial(j) * factorial(k) / 
+                     (factorial(2i) * factorial(2j) * factorial(2k)) )^0.5
+
+getNα(i, j, k, α) = α^(0.5*(i + j + k) + 0.75)
+
+getNijkα(args...) = Nijkα(args...)
+getNorms(b) = normOfGTOin(b)
+
+# getNijkα(i, j, k, α) = getNijk(i, j, k) * getNα(i, j, k, α)
+
+# getNijkα(ijk::NTuple{3, T}, α) where {T} = getNijkα(ijk[1], ijk[2], ijk[3], α)
+
+# getNorms(b::FloatingGTBasisFuncs{𝑙, GN, 1})  where {𝑙, GN} = 
+# getNijkα.(b.ijk[1]..., [g.xpn() for g in b.gauss])
 
 pgf0(x, y, z, α) = exp( -α * (x^2 + y^2 + z^2) )
 cgf0(x, y, z, α, d) = d * pgf0(x, y, z, α)
@@ -1622,15 +1648,8 @@ cgo0(x, y, z, α, d, i, j, k, N=1.0) = N * x^i * y^j * z^k * cgf0(x, y, z, α, d
 
 pgf(r, α) = pgf0(r[1], r[2], r[3], α)
 cgf(r, α, d) = cgf0(r[1], r[2], r[3], α, d)
-cgo(r, α, d, l, N=Nijkα(i,j,k,α)) = cgo0(r[1], r[2], r[3], α, d, l[1], l[2], l[3], N)
-cgo2(r, α, d, i, j, k, N=Nijkα(i,j,k,α)) = cgo0(r[1], r[2], r[3], α, d, i, j, k, N)
-
-
-normOfGTOin(b::FloatingGTBasisFuncs{𝑙, GN, 1})  where {𝑙, GN} = 
-Nijkα.(b.ijk[1]..., [g.xpn() for g in b.gauss])
-
-normOfGTOin(b::FloatingGTBasisFuncs{𝑙, GN, ON}) where {𝑙, GN, ON} = 
-Nlα.(b.subshell, [g.xpn() for g in b.gauss])
+cgo(r, α, d, l, N=getNijkα(i,j,k,α)) = cgo0(r[1], r[2], r[3], α, d, l[1], l[2], l[3], N)
+cgo2(r, α, d, i, j, k, N=getNijkα(i,j,k,α)) = cgo0(r[1], r[2], r[3], α, d, i, j, k, N)
 
 
 function expressionOfCore(pb::ParamBox, substituteValue::Bool=false)
@@ -1641,7 +1660,8 @@ end
 function expressionOfCore(bf::FloatingGTBasisFuncs{𝑙, GN, ON}, substituteValue::Bool=false, 
                           onlyParameter::Bool=false, splitGaussFunc::Bool=false) where 
                          {𝑙, GN, ON}
-    N = bf.normalizeGTO  ?  (ON == 1 ? Nijkα : (i,j,k,α)->Nlα(i+j+k, α))  :  (_...) -> 1
+    # N = bf.normalizeGTO  ?  (ON == 1 ? Nijkα : (i,j,k,α)->Nlα(i+j+k, α))  :  (_...) -> 1
+    N = bf.normalizeGTO  ?  getNijkα  :  (_...) -> 1
     pars = getfield.(bf.gauss, :param)
     R, α, d = [expressionOfCore.(i|>collect, substituteValue) 
                for i in (bf.center, getindex.(pars, 1), getindex.(pars, 2))]

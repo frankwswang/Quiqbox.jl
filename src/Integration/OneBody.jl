@@ -92,6 +92,7 @@ orbitals) given 2 basis functions.
 """
 overlap(bf1::AbstractGTBasisFuncs, bf2::AbstractGTBasisFuncs) = 
 dropdims(overlapCore(bf1, bf2), dims=3)
+# cat(getOverlap(bf1, bf2), dims=2)
 
 
 @inline overlapsCore(BSet::Vector{<:AbstractGTBasisFuncs}) = 
@@ -104,7 +105,9 @@ dropdims(overlapCore(bf1, bf2), dims=3)
 Return the orbital overlap matrix (an N×N `Matrix` where N is the number of spatial 
 orbitals) given a basis set in the form of an `Array`.
 """
-overlaps(BSet::Vector{<:AbstractGTBasisFuncs}) = dropdims(overlapsCore(BSet), dims=3)
+overlaps(BSet::Vector{<:AbstractGTBasisFuncs}) = 
+dropdims(overlapsCore(BSet), dims=3)
+# getOverlaps(BSet)
 
 
 @inline nucAttractionCore(bf1::AbstractGTBasisFuncs, 
@@ -124,6 +127,7 @@ orbitals) given 2 basis functions, and the nuclei with their coordinates (in ato
 nucAttraction(bf1::AbstractGTBasisFuncs, bf2::AbstractGTBasisFuncs, 
               nuc::Vector{String}, nucCoords::Vector{<:AbstractArray}) = 
 dropdims(nucAttractionCore(bf1, bf2, nuc, nucCoords), dims=3)
+# cat(getNucAttraction(bf1, bf2, nuc, nucCoords), dims=2)
 
 
 @inline nucAttractionsCore(BSet::Vector{<:AbstractGTBasisFuncs}, 
@@ -144,6 +148,7 @@ coordinates (in atomic unit).
 nucAttractions(BSet::Vector{<:AbstractGTBasisFuncs}, 
                nuc::Vector{String}, nucCoords::Vector{<:AbstractArray}) = 
 dropdims(nucAttractionsCore(BSet, nuc, nucCoords), dims=3)
+# getNucAttractions(BSet, nuc, nucCoords)
 
 
 @inline elecKineticCore(bf1::AbstractGTBasisFuncs, 
@@ -160,6 +165,7 @@ orbitals) given 2 basis functions.
 """
 elecKinetic(bf1::AbstractGTBasisFuncs, bf2::AbstractGTBasisFuncs) = 
 dropdims(elecKineticCore(bf1, bf2), dims=3)
+# cat(getElecKinetic(bf1, bf2), dims=2)
 
 
 @inline elecKineticsCore(BSet::Vector{<:AbstractGTBasisFuncs}) = 
@@ -174,6 +180,7 @@ orbitals) given a basis set in the form of an `Array`.
 """
 elecKinetics(BSet::Vector{<:AbstractGTBasisFuncs}) = 
 dropdims(elecKineticsCore(BSet), dims=3)
+# getElecKinetics(BSet)
 
 
 @inline coreHijCore(bf1::AbstractGTBasisFuncs, bf2::AbstractGTBasisFuncs, 
@@ -192,7 +199,7 @@ number of spatial orbitals) given 2 basis functions.
 coreHij(bf1::AbstractGTBasisFuncs, bf2::AbstractGTBasisFuncs, 
         nuc::Vector{String}, nucCoords::Vector{<:AbstractArray}) = 
 dropdims(coreHijCore(bf1, bf2, nuc, nucCoords), dims=3)
-
+# cat(getCoreHij(bf1, bf2, nuc, nucCoords), dims=2)
 
 @inline coreHCore(BSet::Vector{<:AbstractGTBasisFuncs}, 
                   nuc::Vector{String}, nucCoords::Vector{<:AbstractArray}) = 
@@ -209,3 +216,4 @@ orbitals) given a basis set in the form of an `Array`.
 coreH(BSet::Vector{<:AbstractGTBasisFuncs}, 
       nuc::Vector{String}, nucCoords::Vector{<:AbstractArray}) = 
 dropdims(coreHCore(BSet, nuc, nucCoords), dims=3)
+# getCoreH(BSet, nuc, nucCoords)

@@ -386,8 +386,8 @@ function ∂HFenergy(bs::Vector{<:CompositeGTBasisFuncs}, par::ParamBox,
     Xinv = S^(0.5)
     Cₓ = (C isa Tuple) ? (Ref(Xinv) .* C) : (Xinv * C)
     ∂hij, ∂hijkl = derivativeCore(bs, par, S, 
-                                  oneBodyFunc=(i,j)->coreHijCore(i,j,mol,nucCoords), 
-                                  twoBodyFunc=eeInteractionCore)
+                                  oneBodyFunc=(i,j)->cat(coreHij(i,j,mol,nucCoords), dims=3), 
+                                  twoBodyFunc=(i,j,k,l)->cat(eeInteraction(i,j,k,l), dims=5))
     getEᵀ(dropdims(∂hij, dims=3), dropdims(∂hijkl, dims=5), Cₓ, nElectron)
 end
 

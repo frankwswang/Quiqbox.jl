@@ -2,7 +2,7 @@ using Test
 using Quiqbox
 using Quiqbox: isFull, BasisFuncMix, unpackBasisFuncs, inSymbols, varVal, ElementNames, 
                sortBasisFuncs, ParamList, sumOf, expressionOfCore, mergeGaussFuncs, 
-               gaussProd, normOfGTOin
+               gaussProd, getNorms
 using Symbolics
 using LinearAlgebra
 
@@ -129,14 +129,17 @@ bf4s3 = genBasisFunc([0,0,0], [("STO-3G", "H"), ("STO-3G", "He")])
 @test isapprox(1, overlap(bf4_1, bf4_1)[], atol=1e-8)
 @test isapprox(1, overlap(bf4_2, bf4_2)[], atol=1e-8)
 
-errorThreshold1 = 1e-11
+errorThreshold1 = 1e-11; errorThreshold3 = 1e-9
 bf3_2_2 = genBasisFunc([1,0,0], (2,1), normalizeGTO=true)
 @test isapprox(1, overlap(bf3_2_2, bf3_2_2)[], atol=errorThreshold1)
 @test isapprox(0.0553891828418, overlap(bf3_2, bf3_2)[], atol=errorThreshold1)
+# @test isapprox(0.6960409996039634, overlap(bf3_2, bf3_2)[], atol=errorThreshold1)
 bf3_3_2 = genBasisFunc([0,0,0], (2,1), "P", normalizeGTO=true)
 @test isapprox(LinearAlgebra.I, overlap(bf3_3_2, bf3_3_2), atol=errorThreshold1)
 @test isapprox(0.0207709435653*LinearAlgebra.I, overlap(bf3_3, bf3_3), atol=errorThreshold1)
+# @test isapprox(0.0870051249504954*LinearAlgebra.I, overlap(bf3_3, bf3_3), atol=errorThreshold1)
 bf3_4_2 = genBasisFunc([0,0,0], (1,1), "D", normalizeGTO=true)
+@test isapprox(LinearAlgebra.I, overlap(bf4_2, bf4_2), atol=errorThreshold3)
 @test isapprox([1.0 0.0 0.0 1/3 0.0 1/3; 
                 0.0 1/3 0.0 0.0 0.0 0.0; 
                 0.0 0.0 1/3 0.0 0.0 0.0; 
@@ -326,10 +329,10 @@ bf_mul5 = mul(bf_mul1, bf_mul2, normalizeGTO=true)
 bf_mul5_0 = genBasisFunc([1,0,0], (3.5,3), normalizeGTO=true)
 @test hasEqual(bf_mul5, bf_mul5_0)
 bf_mul6 = mul(bf_mul1, bf_mul2_2)
-bf_mul6_0 = genBasisFunc([1,0,0], (3.5,3*normOfGTOin(bf_mul2)[]))
+bf_mul6_0 = genBasisFunc([1,0,0], (3.5,3*getNorms(bf_mul2)[]))
 @test hasEqual(bf_mul6, bf_mul6_0)
 bf_mul7 = mul(bf_mul1, bf_mul2_2, normalizeGTO=true)
-bf_mul7_0 = genBasisFunc([1,0,0], (3.5,3*normOfGTOin(bf_mul2)[]), normalizeGTO=true)
+bf_mul7_0 = genBasisFunc([1,0,0], (3.5,3*getNorms(bf_mul2)[]), normalizeGTO=true)
 @test hasEqual(bf_mul7, bf_mul7_0)
 bf_mul8 = mul(bf_mul1, bf_mul3)
 bf_mul8_0 = genBasisFunc([1,0,0], ([3, 3.5], [0.9, 1.2]))
@@ -663,6 +666,7 @@ expr2 = expressionOf(bf1)[]|>string
 expStr = expressionOfCore(bf6)[] |> string
 idx = findfirst('d', expStr)
 @test isapprox(parse(Float64, expStr[1:idx-1]), 7.579425332952777, atol=1e-12)
+# @test isapprox(parse(Float64, expStr[1:idx-1]), 2.1381164110649706, atol=1e-12)
 @test expStr[idx:end] == "d*exp(-α*((r₁ - X)^2 + (r₂ - Y)^2 + (r₃ - Z)^2))*(α^0.75)" || 
       expStr[idx:end] == "d*(α^0.75)*exp(-α*((r₁ - X)^2 + (r₂ - Y)^2 + (r₃ - Z)^2))"
 
