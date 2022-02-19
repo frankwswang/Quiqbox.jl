@@ -109,7 +109,7 @@ to nuclei charge.
 `Etarget::Float64`: The target Hartree-Hock energy intent to achieve.
 
 `threshold::Float64`: The threshold for the convergence when evaluating difference between 
-the latest two energies.
+the latest few energies. When set to `NaN`, there will be no convergence detection.
 
 `maxSteps::Int`: Maximum allowed iteration steps regardless of whether the optimization 
 iteration converges.
@@ -131,6 +131,7 @@ function optimizeParams!(bs::Vector{<:FloatingGTBasisFuncs}, pbs::Vector{<:Param
         pars = zeros(0, length(pbs))
         grads = zeros(0, length(pbs))
         gap = max(5, maxSteps ÷ 200 * 5)
+        detectConverge = isnan(threshold) ? false : true
 
         if Etarget === NaN
             isConverged = (Es) -> isOscillateConverged(Es, threshold, leastCycles=3)
@@ -165,7 +166,7 @@ function optimizeParams!(bs::Vector{<:FloatingGTBasisFuncs}, pbs::Vector{<:Param
 
             parsL = updateParams!(pbs, grad, method=GDmethod)
 
-            !isConverged(Es) && i < maxSteps || break
+            !(detectConverge && isConverged(Es)) && i < maxSteps || break
 
             i += 1
         end
@@ -182,7 +183,9 @@ function optimizeParams!(bs::Vector{<:FloatingGTBasisFuncs}, pbs::Vector{<:Param
         print(rpad("", 12), "grad = ")
         println(IOContext(stdout, :limit => true), grads[end, :])
         println("Optimization duration: ", tAll/60, " minutes.")
-        !isConverged(Es) && println("The result has not converged.")
+        if detectConverge
+            println("The result has" * (isConverged(Es) ? "" : " not") *" converged.")
+        end
     end
 
     Es, pars, grads
