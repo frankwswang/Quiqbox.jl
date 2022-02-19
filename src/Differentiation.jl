@@ -316,6 +316,9 @@ function twoBodyDerivativeCore(∂bfs::Vector{<:CompositeGTBasisFuncs},
     ∂ʃ = ones(bsSize, bsSize, bsSize, bsSize, dimOfʃ)
     ʃabcd = ones(bsSize, bsSize, bsSize, bsSize, dimOfʃ)
     ʃ∂abcd = ones(bsSize, bsSize, bsSize, bsSize, dimOfʃ)
+    # ʃa∂bcd = similar(ʃabcd)
+    # ʃab∂cd = similar(ʃabcd)
+    # ʃabc∂d = similar(ʃabcd)
     for i = 1:bsSize, j = 1:i, k = 1:i, l = 1:(k==i ? j : k)
         ʃabcd[i,j,k,l,:] = ʃabcd[j,i,k,l,:] = ʃabcd[j,i,l,k,:] = ʃabcd[i,j,l,k,:] = 
         ʃabcd[l,k,i,j,:] = ʃabcd[k,l,i,j,:] = ʃabcd[k,l,j,i,:] = ʃabcd[l,k,j,i,:] = 
@@ -324,6 +327,16 @@ function twoBodyDerivativeCore(∂bfs::Vector{<:CompositeGTBasisFuncs},
     for i = 1:bsSize, j=1:bsSize, k=1:bsSize, l=1:k
         ʃ∂abcd[i,j,k,l,:] = ʃ∂abcd[i,j,l,k,:] = ʃ(∂bfs[i], bfs[j],  bfs[k],  bfs[l])
     end
+    # Following tensor elements can be provided from above on case.
+    # for i = 1:bsSize, j=1:bsSize, k=1:bsSize, l=1:k
+    #     ʃa∂bcd[i,j,k,l,:] = ʃa∂bcd[i,j,l,k,:] = ʃ( bfs[i], ∂bfs[j],   bfs[k],  bfs[l])
+    # end
+    # for i = 1:bsSize, j=1:i, k=1:bsSize, l=1:bsSize
+    #     ʃab∂cd[i,j,k,l,:] = ʃab∂cd[j,i,k,l,:] = ʃ( bfs[i],  bfs[j],  ∂bfs[k],  bfs[l])
+    # end
+    # for i = 1:bsSize, j=1:i, k=1:bsSize, l=1:bsSize
+    #     ʃabc∂d[i,j,k,l,:] = ʃabc∂d[j,i,k,l,:] = ʃ( bfs[i],  bfs[j],   bfs[k], ∂bfs[l])
+    # end
     for e=1:dimOfʃ
         # [∂ʃ4[i,j,k,l] == ∂ʃ4[j,i,l,k] == ∂ʃ4[j,i,k,l] != ∂ʃ4[l,j,k,i]
         for i = 1:bsSize, j = 1:i, k = 1:i, l = 1:(k==i ? j : k)
@@ -331,11 +344,19 @@ function twoBodyDerivativeCore(∂bfs::Vector{<:CompositeGTBasisFuncs},
             # ʃ∂abcd[i,j,k,l,:] == ʃ∂abcd[i,j,l,k,:] == 
             # ʃab∂cd[l,k,i,j,:] == ʃab∂cd[k,l,i,j,:]
             for a = 1:bsSize, b = 1:bsSize, c = 1:bsSize, d = 1:bsSize
-                val += (  X[a,i]*X[b,j]* X[c,k]*X[d,l] +  X[a,j]*X[b,i]* X[c,k]*X[d,l] + 
-                          X[c,i]*X[d,j]* X[a,k]*X[b,l] +  X[c,i]*X[d,j]* X[a,l]*X[b,k]  ) * 
+                # Old version: Still correct.
+                # val += (  X[a,i]*X[b,j]* X[c,k]*X[d,l] +  X[a,j]*X[b,i]* X[c,k]*X[d,l] + 
+                #           X[c,i]*X[d,j]* X[a,k]*X[b,l] +  X[c,i]*X[d,j]* X[a,l]*X[b,k]  ) * 
+                #        ʃ∂abcd[a,b,c,d,e] + 
+                #        ( ∂X[a,i]*X[b,j]* X[c,k]*X[d,l] + ∂X[a,j]*X[b,i]* X[c,k]*X[d,l] + 
+                #           X[a,i]*X[b,j]*∂X[c,k]*X[d,l] +  X[a,i]*X[b,j]*∂X[c,l]*X[d,k]  ) * 
+                #        ʃabcd[a,b,c,d,e]
+                # New version: Better readability.
+                val += (  X[a,i]*X[b,j]*X[c,k]*X[d,l] + X[a,j]*X[b,i]*X[c,k]*X[d,l] + 
+                          X[c,i]*X[d,j]*X[a,k]*X[b,l] + X[c,i]*X[d,j]*X[a,l]*X[b,k]  ) * 
                        ʃ∂abcd[a,b,c,d,e] + 
-                       ( ∂X[a,i]*X[b,j]* X[c,k]*X[d,l] + ∂X[a,j]*X[b,i]* X[c,k]*X[d,l] + 
-                          X[a,i]*X[b,j]*∂X[c,k]*X[d,l] +  X[a,i]*X[b,j]*∂X[c,l]*X[d,k]  ) * 
+                       ( ∂X[a,i]*X[b,j]* X[c,k]*X[d,l] + X[a,i]*∂X[b,j]*X[c,k]* X[d,l] + 
+                          X[a,i]*X[b,j]*∂X[c,k]*X[d,l] + X[a,i]* X[b,j]*X[c,k]*∂X[d,l] ) * 
                        ʃabcd[a,b,c,d,e]
             end
             ∂ʃ[i,j,k,l,e] = ∂ʃ[j,i,k,l,e] = ∂ʃ[j,i,l,k,e] = ∂ʃ[i,j,l,k,e] = 
