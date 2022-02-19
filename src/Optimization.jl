@@ -1,32 +1,42 @@
 export gradDescent!, updateParams!, optimizeParams!
 
+using LinearAlgebra: norm
 
 """
 
-    gradDescent!(pars::Vector{<:Real}, grads::Vector{<:Real}, η=0.001) -> 
+    gradDescent!(pars::Vector{<:Real}, grads::Vector{<:Real}, 
+                 η=0.001, clipThreshold=0.08*sqrt(length(grad))/norm(η)) -> 
     pars::Vector{<:Real}
 
 Default gradient descent method in used in Quiqbox.
 """
-function gradDescent!(pars::Vector{<:Real}, grads::Vector{<:Real}, η=0.001)
-    @assert length(pars) == length(grads) "The length of gradients and corresponding "*
-                                          "parameters should be the same."
-    pars .-= η*grads
+function gradDescent!(pars::Vector{<:Real}, grad::Vector{<:Real}, η=0.001, 
+                      clipThreshold::Real=0.08*sqrt(length(grad))/norm(η))
+    @assert length(pars) == length(grad) "The length of gradients and corresponding "*
+                                         "parameters should be the same."
+    gNorm = norm(grad)
+    gradNew = if gNorm > clipThreshold
+        clipThreshold / gNorm * grad
+    else
+        grad
+    end
+
+    pars .-= η.*gradNew
 end
 
 
 """
 
-    updateParams!(pbs::Array{<:ParamBox, 1}, grads::Array{<:Real, 1}; 
+    updateParams!(pbs::Array{<:ParamBox, 1}, grads::Array{<:Real, 1}, 
                   method::F=gradDescent!) where {F<:Function} -> Array{<:ParamBox, 1}
 
 Given a `Vector` of parameters::`ParamBox` and its gradients with respect to each 
 parameter, update the `ParamBox`s and return the updated values.
 """
-function updateParams!(pbs::Vector{<:ParamBox}, grads::Vector{<:Real}; 
-                       method::F=gradDescent!) where {F<:Function}
+function updateParams!(pbs::Vector{<:ParamBox}, grads::Vector{<:Real}, 
+                       method!::F=gradDescent!) where {F<:Function}
     parVals = [i[] for i in pbs]
-    method(parVals, grads)
+    method!(parVals, grads)
     for (m,n) in zip(pbs, parVals)
         m[] = n
     end
@@ -116,7 +126,8 @@ iteration converges.
 
 `printInfo::Bool`: Whether print out the information of each iteration step.
 
-`GDmethod::F1`: Applied gradient descent `Function`.
+`GDmethod::F1`: Applied gradient descent `Function`. Default method is 
+`Quiqbox.gradDescent!`.
 """
 function optimizeParams!(bs::Vector{<:FloatingGTBasisFuncs}, pbs::Vector{<:ParamBox},
                          nuc::Vector{String}, nucCoords::Vector{<:AbstractArray}, 
@@ -164,7 +175,7 @@ function optimizeParams!(bs::Vector{<:FloatingGTBasisFuncs}, pbs::Vector{<:Param
                 println("Step duration: ", t, " seconds.\n")
             end
 
-            parsL = updateParams!(pbs, grad, method=GDmethod)
+            parsL = updateParams!(pbs, grad, GDmethod)
 
             !(detectConverge && isConverged(Es)) && i < maxSteps || break
 
