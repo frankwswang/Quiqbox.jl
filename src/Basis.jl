@@ -1587,7 +1587,7 @@ end
 
 
 #########################################################################
-
+# Old normalization functions for libcint integral functions.
 function Nlα(l, α)
     if l < 2
         ( 2^(2l+3) * factorial(l+1) * 2^(l+1.5) / 
@@ -1631,15 +1631,12 @@ getNijk(i, j, k) = (2/π)^0.75 *
 
 getNα(i, j, k, α) = α^(0.5*(i + j + k) + 0.75)
 
-getNijkα(args...) = Nijkα(args...)
-getNorms(b) = normOfGTOin(b)
+getNijkα(i, j, k, α) = getNijk(i, j, k) * getNα(i, j, k, α)
 
-# getNijkα(i, j, k, α) = getNijk(i, j, k) * getNα(i, j, k, α)
+getNijkα(ijk::NTuple{3, T}, α) where {T} = getNijkα(ijk[1], ijk[2], ijk[3], α)
 
-# getNijkα(ijk::NTuple{3, T}, α) where {T} = getNijkα(ijk[1], ijk[2], ijk[3], α)
-
-# getNorms(b::FloatingGTBasisFuncs{𝑙, GN, 1})  where {𝑙, GN} = 
-# getNijkα.(b.ijk[1]..., [g.xpn() for g in b.gauss])
+getNorms(b::FloatingGTBasisFuncs{𝑙, GN, 1})  where {𝑙, GN} = 
+getNijkα.(b.ijk[1]..., [g.xpn() for g in b.gauss])
 
 pgf0(x, y, z, α) = exp( -α * (x^2 + y^2 + z^2) )
 cgf0(x, y, z, α, d) = d * pgf0(x, y, z, α)

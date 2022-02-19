@@ -159,7 +159,7 @@ function optimizeParams!(bs::Vector{<:FloatingGTBasisFuncs}, pbs::Vector{<:Param
             E, C = ECmethod(Hcore, HeeI, bs, S)
 
             t = @elapsed begin
-                grad = gradHFenegy(bs, pbs, C, S, nuc, nucCoords)
+                grad = gradHFenergy(bs, pbs, C, S, nuc, nucCoords)
             end
 
             push!(Es, E)

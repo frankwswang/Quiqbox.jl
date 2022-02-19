@@ -1,5 +1,5 @@
 export ParamBox, inValOf, outValOf, inSymOf, outSymOf, dataOf, mapOf, outValCopy, 
-       inVarCopy, enableDiff!, disableDiff!, isDiffParam, toggleDiff!, gradHFenegy
+       inVarCopy, enableDiff!, disableDiff!, isDiffParam, toggleDiff!, gradHFenergy
 
 using LinearAlgebra: eigen
 using Symbolics: Num
@@ -413,7 +413,7 @@ function ∂HFenergy(bs::Vector{<:CompositeGTBasisFuncs}, par::ParamBox,
 end
 
 
-function gradHFenegy(bs::Vector{<:CompositeGTBasisFuncs}, par::Vector{<:ParamBox}, 
+function gradHFenergy(bs::Vector{<:CompositeGTBasisFuncs}, par::Vector{<:ParamBox}, 
                      C::Union{Matrix{Float64}, NTuple{2, Matrix{Float64}}}, 
                      S::Matrix{Float64}, mol::Vector{String}, 
                      nucCoords::Vector{<:AbstractArray}; 
@@ -424,8 +424,8 @@ function gradHFenegy(bs::Vector{<:CompositeGTBasisFuncs}, par::Vector{<:ParamBox
     ∂HFenergy.(Ref(bs), par, Ref(C), Ref(S), Ref(mol), Ref(nucCoords), Ref(nElectron))
 end
 
-gradHFenegy(bs::Vector{<:CompositeGTBasisFuncs}, par::ParamBox, 
+gradHFenergy(bs::Vector{<:CompositeGTBasisFuncs}, par::ParamBox, 
             C::Union{Matrix{Float64}, NTuple{2, Matrix{Float64}}}, S::Matrix{Float64}, 
             mol::Vector{String}, nucCoords::Vector{<:AbstractArray}; 
             nElectron::Union{Int, NTuple{2, Int}}=getCharge(mol)) = 
-gradHFenegy(bs, [par], C, S, mol, nucCoords; nElectron)
+gradHFenergy(bs, [par], C, S, mol, nucCoords; nElectron)
