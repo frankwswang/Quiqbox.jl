@@ -82,7 +82,7 @@ function ∫elecKineticCore(R₁::NTuple{3, Float64}, R₂::NTuple{3, Float64},
     shifts = ((2,0,0), (0,2,0), (0,0,2))
     0.5 * (α₂ * (4*sum(ijk₂) + 6) * ∫overlapCore(ΔR, ijk₁, α₁, ijk₂, α₂) - 4.0 * α₂^2 * 
            sum(∫overlapCore.(Ref(ΔR), Ref(ijk₁), α₁, map.(+, Ref(ijk₂), shifts), α₂)) - 
-           sum(ijk₁ .* (ijk₁.-1) .* 
+           sum(ijk₂ .* (ijk₂.-1) .* 
                ∫overlapCore.(Ref(ΔR), Ref(ijk₁), α₁, map.(-, Ref(ijk₂), shifts), α₂)))
 end
 
