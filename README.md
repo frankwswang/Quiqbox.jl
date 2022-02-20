@@ -16,7 +16,7 @@
 
 * Floating and fixed-basis Gaussian-type orbital (GTO) configurations.
 * Symbolic representation and analysis of basis function parameters.
-* Standalone 1-electron and 2-electron integral functions (powered by [libcint_jll](https://github.com/JuliaBinaryWrappers/libcint_jll.jl)).
+* Standalone 1-electron and 2-electron integral functions.
 * Restricted (closed-shell) and unrestricted (open-shell) Hartree–Fock methods (RHF & UHF).
 * Molecular orbital data output in [Molden](https://www3.cmbi.umcn.nl/molden/) file format.
 * Variational optimization of orbital geometry based on automatic differentiation (AD).
@@ -29,7 +29,7 @@
 * [Windows Subsystem for Linux](https://docs.microsoft.com/en-us/windows/wsl/about)
 
 ## Julia Environment
-* [1.5+](https://github.com/frankwswang/Quiqbox.jl/actions/workflows/CI.yml)
+* [1.6+](https://github.com/frankwswang/Quiqbox.jl/actions/workflows/CI.yml)
 
 ## Installation in Julia [REPL](https://docs.julialang.org/en/v1/manual/getting-started/)
 
@@ -100,7 +100,7 @@ To learn more about the basic usage of the programming language behind Quiqbox, 
 [Doc-latest]:  https://frankwswang.github.io/Quiqbox.jl/dev
 [Doc-s-img]:   https://img.shields.io/github/v/release/frankwswang/Quiqbox.jl?label=Latest%20release
 [Doc-l-img]:   https://img.shields.io/badge/docs-latest-blue.svg
-[GA-CI-img]:   https://img.shields.io/github/workflow/status/frankwswang/Quiqbox.jl/CI?label=Julia%201.5%2B
+[GA-CI-img]:   https://img.shields.io/github/workflow/status/frankwswang/Quiqbox.jl/CI?label=Julia%201.6%2B
 [GA-CI-url]:   https://github.com/frankwswang/Quiqbox.jl/actions/workflows/CI.yml
 [GA-CI-JN-img]:https://img.shields.io/github/workflow/status/frankwswang/Quiqbox.jl/CI-JN?label=Julia%20nightly
 [GA-CI-JN-url]:https://github.com/frankwswang/Quiqbox.jl/actions/workflows/CI-JN.yml

@@ -2,7 +2,29 @@ using Test
 using Quiqbox
 
 @testset "TwoBody.jl tests" begin
-    errT = 1e-10
+    errT1 = 1e-10
+    errT2 = 1e-14
+
+    b1 = genBasisFunc([0,1,0], (3,2), [1,0,0], normalizeGTO=true)
+    b2 = genBasisFunc([1,2,3], (1,2), [0,1,0], normalizeGTO=true)
+    b3 = genBasisFunc([1,2,3], (1,2), [1,0,0], normalizeGTO=true)
+    b4 = genBasisFunc([1,1,2], (0.8,0.4))
+    eeI1 = eeInteraction(b1, b2, b3, b4)
+    eeI2 = eeInteraction(b2, b1, b3, b4)
+    eeI3 = eeInteraction(b1, b2, b4, b3)
+    eeI4 = eeInteraction(b2, b1, b4, b3)
+    eeI5 = eeInteraction(b3, b4, b1, b2)
+    eeI6 = eeInteraction(b4, b3, b1, b2)
+    eeI7 = eeInteraction(b3, b4, b2, b1)
+    eeI8 = eeInteraction(b4, b3, b2, b1)
+    @test isapprox(eeI1[], eeI2[], atol=errT2)
+    @test isapprox(eeI2[], eeI3[], atol=errT2)
+    @test isapprox(eeI3[], eeI4[], atol=errT2)
+    @test isapprox(eeI4[], eeI5[], atol=errT2)
+    @test isapprox(eeI5[], eeI6[], atol=errT2)
+    @test isapprox(eeI6[], eeI7[], atol=errT2)
+    @test isapprox(eeI7[], eeI8[], atol=errT2)
+
     nucs = ["H", "H"]
     cens = [[-0.7, 0.0, 0.0], [ 0.7, 0.0, 0.0]]
     bs = genBasisFunc.(cens, fill("6-31G", 2)) |> flatten
@@ -71,24 +93,33 @@ using Quiqbox
             0.3221534573785314 0.43088268760281656 0.281114895451527 0.3918319845719349;
             0.2385821756420249 0.281114895451527 0.626369765524018 0.3803285686123761;
             0.25160103976844717 0.3918319845719349 0.3803285686123761 0.4829562753692258]]
-    eeI = reshape(vec |> flatten, 4,4,4,4,1)
+    eeIs = reshape(vec |> flatten, 4,4,4,4,1)
 
     randIdx = rand(1:4, 4)
-    randVal = eeI[randIdx...,1] * ones(1,1,1,1,1)
-    @test isapprox(eeInteraction(bs[randIdx]...), randVal, atol=errT)
+    randVal = eeIs[randIdx...,1] * ones(1,1,1,1,1)
+    @test isapprox(eeInteraction(bs[randIdx]...), randVal, atol=errT1)
 
-    eeI1, uniqueIdx1 = Quiqbox.eeInteractionsCore(bs, outputUniqueIndices=true)
-    isapprox(eeInteractions(bs), eeI1[:,:,:,:,1], atol=1e-15)
-    @test isapprox(eeI1, eeI, atol=errT)
-    uniqueInts1 = [eeI1[i...] for i in uniqueIdx1]
-    @test unique(eeI1) ⊆ uniqueInts1
-    @test isapprox(sort([eeI[i,j,k,l,1] for i = 1:size(eeI,1) 
-                                        for j = 1:i 
-                                        for k = 1:i 
-                                        for l = 1:(k==i ? j : k)]), 
-                   sort(uniqueInts1), atol=errT)
+    eeIs1 = eeInteractions(bs)
+    eeIs2 = eeInteractions(bs[[1,3,2,4]])
+    uniqueIdx = Quiqbox.genUniqueIndices(bs)
+    uniqueInts1 = [eeIs1[i...] for i in uniqueIdx]
+    uniqueInts2 = [eeIs2[i...] for i in uniqueIdx]
+    @test unique(eeIs1) ⊆ uniqueInts1
+    @test uniqueInts1  ⊆ unique(eeIs1)
+    @test isapprox(sort(uniqueInts1), sort(uniqueInts2), atol=errT1)
+
+    # eeI1, uniqueIdx1 = Quiqbox.eeInteractionsCore(bs, outputUniqueIndices=true)
+    # isapprox(eeInteractions(bs), eeI1[:,:,:,:,1], atol=1e-15)
+    # @test isapprox(eeI1, eeI, atol=errT1)
+    # uniqueInts1 = [eeI1[i...] for i in uniqueIdx1]
+    # @test unique(eeI1) ⊆ uniqueInts1
+    # @test isapprox(sort([eeI[i,j,k,l,1] for i = 1:size(eeI,1) 
+    #                                     for j = 1:i 
+    #                                     for k = 1:i 
+    #                                     for l = 1:(k==i ? j : k)]), 
+    #                sort(uniqueInts1), atol=errT1)
     
-    eeI2, uniqueIdx2 = Quiqbox.eeInteractionsCore(bs[[1,3,2,4]], outputUniqueIndices=true)
-    uniqueInts2 = [eeI2[i...] for i in uniqueIdx2]
-    @test isapprox(sort(uniqueInts1), sort(uniqueInts2), atol=errT)
+    # eeI2, uniqueIdx2 = Quiqbox.eeInteractionsCore(bs[[1,3,2,4]], outputUniqueIndices=true)
+    # uniqueInts2 = [eeI2[i...] for i in uniqueIdx2]
+    # @test isapprox(sort(uniqueInts1), sort(uniqueInts2), atol=errT1)
 end

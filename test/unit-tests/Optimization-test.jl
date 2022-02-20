@@ -15,41 +15,29 @@ nuc = ["H", "H"]
 ecMethods = [Quiqbox.defaultECmethod(:RHF, nuc, nucCoords), 
              Quiqbox.defaultECmethod(:UHF, nuc, nucCoords)]
 
-E_t1s = [-1.775682556228, -1.775682514824]
-# X₁, X₂, Y₁, Y₂, Z₁, Z₂, α₁, α₂, d₁, d₂
-par_t1s = [[-0.686629461207,  0.686629461207,  0.0,             0.0, 
-             0.0,             0.0,             1.331636672728,  0.311858635704, 
-             0.454798446619,  0.662643931788], 
-           [-0.686629463257,  0.686629463257,  0.0,             0.0, 
-             0.0,             0.0,             1.331636672181,  0.311858633503, 
-             0.454798445732,  0.662643932396]]
+Eend = Float64[]
+Ebegin = Float64[]
 
-grad_t1s = [[-0.056475936092,  0.056475936092,  0.0,             0.0, 
-              0.0,             0.0,            -0.125188275118,  0.017527948867, 
-             -0.107797228786,  0.073985454102], 
-            [-0.056475926135,  0.056475926135,  0.0,             0.0, 
-              0.0,             0.0,            -0.125188271319,  0.017527947101, 
-             -0.107797224221,  0.073985450757]]
-
-for (ecMethod, E_t1, par_t1, grad_t1) in zip(ecMethods, E_t1s, par_t1s, grad_t1s)
-
-    bfSource1 = genBasisFunc(missing, ("STO-2G", "H"))[]
-    gfs1 = bfSource1.gauss |> collect
+for ecMethod in ecMethods, (i,j) in zip((1,2,7,8,9,10), (2,2,7,9,9,10)) 
+    # 1->X₁, 2->X₂, 7->α₁, 8->α₂, 9->d₁, 10->d₂
+    gf1 = GaussFunc(1.7, 0.8)
+    gf2 = GaussFunc(0.45, 0.25)
     cens = makeCenter.(nucCoords)
-    bs1 = genBasisFunc.(cens, Ref(gfs1))
+    bs1 = genBasisFunc.(cens, Ref((gf1, gf2)), normalizeGTO=true)
     pars1 = uniqueParams!(bs1, filterMapping=true)
 
     local Es1L, pars1L, grads1L
     @suppress_out begin
-        Es1L, pars1L, grads1L = optimizeParams!(bs1, pars1, nuc, nucCoords, ecMethod, 
-                                                maxSteps = 200)
+        Es1L, _, _ = optimizeParams!(bs1, pars1[i:j], nuc, nucCoords, ecMethods[1], 
+                                     maxSteps=200, threshold=NaN, printInfo=false)
+        push!(Ebegin, Es1L[1])
+        push!(Eend, Es1L[end])
     end
-
-    @test isapprox(Es1L[end], E_t1, atol=errorThreshold1)
-    @test isapprox(pars1L[end, :], par_t1, atol=errorThreshold1)
-    @test isapprox(grads1L[end, :], grad_t1, atol=errorThreshold1)
-
 end
+
+@test all(Ebegin .> Eend)
+@test all(isapprox.(Eend[1:6], Eend[7:end], atol=errorThreshold1))
+
 
 # Grid-based basis set
 grid = GridBox(1, 3.0)
@@ -60,13 +48,13 @@ pars2 = uniqueParams!(bs2, filterMapping=true)[[1,4]]
 
 local Es2L, pars2L, grads2L
 @suppress_out begin
-    Es2L, pars2L, grads2L = optimizeParams!(bs2, pars2, nuc, nucCoords, maxSteps = 100)
+    Es2L, pars2L, grads2L = optimizeParams!(bs2, pars2, nuc, nucCoords, maxSteps = 200)
 end
 
-E_t2 = -1.16666630
+E_t2 = -1.1665258292058682
 # L, α
-par_t2  = [2.90239973, 0.17642659]
-grad_t2 = [0.48936670, 0.10233850]
+par_t2  = [2.8465051231251404, 0.2255010453287884]
+grad_t2 = [0.3752225248706008, 0.6830952135402155]
 
 @test isapprox(Es2L[end], E_t2, atol=errorThreshold2)
 @test isapprox(pars2L[end, :], par_t2, atol=errorThreshold2)

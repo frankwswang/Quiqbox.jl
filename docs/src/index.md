@@ -6,7 +6,7 @@
 
 * Floating and fixed-basis Gaussian-type orbital (GTO) configurations.
 * Symbolic representation and analysis of basis function parameters.
-* Standalone 1-electron and 2-electron integral functions (powered by [libcint_jll](https://github.com/JuliaBinaryWrappers/libcint_jll.jl)).
+* Standalone 1-electron and 2-electron integral functions.
 * Restricted (closed-shell) and unrestricted (open-shell) Hartree–Fock methods (RHF & UHF).
 * Molecular orbital data output in [Molden](https://www3.cmbi.umcn.nl/molden/) file format.
 * Variational optimization of orbital geometry based on automatic differentiation (AD).

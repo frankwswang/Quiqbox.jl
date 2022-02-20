@@ -1,32 +1,42 @@
 export gradDescent!, updateParams!, optimizeParams!
 
+using LinearAlgebra: norm
 
 """
 
-    gradDescent!(pars::Vector{<:Real}, grads::Vector{<:Real}, η=0.001) -> 
+    gradDescent!(pars::Vector{<:Real}, grads::Vector{<:Real}, 
+                 η=0.001, clipThreshold=0.08*sqrt(length(grad))/norm(η)) -> 
     pars::Vector{<:Real}
 
 Default gradient descent method in used in Quiqbox.
 """
-function gradDescent!(pars::Vector{<:Real}, grads::Vector{<:Real}, η=0.001)
-    @assert length(pars) == length(grads) "The length of gradients and corresponding "*
-                                          "parameters should be the same."
-    pars .-= η*grads
+function gradDescent!(pars::Vector{<:Real}, grad::Vector{<:Real}, η=0.001, 
+                      clipThreshold::Real=0.08*sqrt(length(grad))/norm(η))
+    @assert length(pars) == length(grad) "The length of gradients and corresponding "*
+                                         "parameters should be the same."
+    gNorm = norm(grad)
+    gradNew = if gNorm > clipThreshold
+        clipThreshold / gNorm * grad
+    else
+        grad
+    end
+
+    pars .-= η.*gradNew
 end
 
 
 """
 
-    updateParams!(pbs::Array{<:ParamBox, 1}, grads::Array{<:Real, 1}; 
+    updateParams!(pbs::Array{<:ParamBox, 1}, grads::Array{<:Real, 1}, 
                   method::F=gradDescent!) where {F<:Function} -> Array{<:ParamBox, 1}
 
 Given a `Vector` of parameters::`ParamBox` and its gradients with respect to each 
 parameter, update the `ParamBox`s and return the updated values.
 """
-function updateParams!(pbs::Vector{<:ParamBox}, grads::Vector{<:Real}; 
-                       method::F=gradDescent!) where {F<:Function}
+function updateParams!(pbs::Vector{<:ParamBox}, grads::Vector{<:Real}, 
+                       method!::F=gradDescent!) where {F<:Function}
     parVals = [i[] for i in pbs]
-    method(parVals, grads)
+    method!(parVals, grads)
     for (m,n) in zip(pbs, parVals)
         m[] = n
     end
@@ -109,14 +119,15 @@ to nuclei charge.
 `Etarget::Float64`: The target Hartree-Hock energy intent to achieve.
 
 `threshold::Float64`: The threshold for the convergence when evaluating difference between 
-the latest two energies.
+the latest few energies. When set to `NaN`, there will be no convergence detection.
 
 `maxSteps::Int`: Maximum allowed iteration steps regardless of whether the optimization 
 iteration converges.
 
 `printInfo::Bool`: Whether print out the information of each iteration step.
 
-`GDmethod::F1`: Applied gradient descent `Function`.
+`GDmethod::F1`: Applied gradient descent `Function`. Default method is 
+`Quiqbox.gradDescent!`.
 """
 function optimizeParams!(bs::Vector{<:FloatingGTBasisFuncs}, pbs::Vector{<:ParamBox},
                          nuc::Vector{String}, nucCoords::Vector{<:AbstractArray}, 
@@ -131,6 +142,7 @@ function optimizeParams!(bs::Vector{<:FloatingGTBasisFuncs}, pbs::Vector{<:Param
         pars = zeros(0, length(pbs))
         grads = zeros(0, length(pbs))
         gap = max(5, maxSteps ÷ 200 * 5)
+        detectConverge = isnan(threshold) ? false : true
 
         if Etarget === NaN
             isConverged = (Es) -> isOscillateConverged(Es, threshold, leastCycles=3)
@@ -147,7 +159,7 @@ function optimizeParams!(bs::Vector{<:FloatingGTBasisFuncs}, pbs::Vector{<:Param
             E, C = ECmethod(Hcore, HeeI, bs, S)
 
             t = @elapsed begin
-                grad = gradHFenegy(bs, pbs, C, S, nuc, nucCoords)
+                grad = gradHFenergy(bs, pbs, C, S, nuc, nucCoords)
             end
 
             push!(Es, E)
@@ -163,9 +175,9 @@ function optimizeParams!(bs::Vector{<:FloatingGTBasisFuncs}, pbs::Vector{<:Param
                 println("Step duration: ", t, " seconds.\n")
             end
 
-            parsL = updateParams!(pbs, grad, method=GDmethod)
+            parsL = updateParams!(pbs, grad, GDmethod)
 
-            !isConverged(Es) && i < maxSteps || break
+            !(detectConverge && isConverged(Es)) && i < maxSteps || break
 
             i += 1
         end
@@ -182,7 +194,9 @@ function optimizeParams!(bs::Vector{<:FloatingGTBasisFuncs}, pbs::Vector{<:Param
         print(rpad("", 12), "grad = ")
         println(IOContext(stdout, :limit => true), grads[end, :])
         println("Optimization duration: ", tAll/60, " minutes.")
-        !isConverged(Es) && println("The result has not converged.")
+        if detectConverge
+            println("The result has" * (isConverged(Es) ? "" : " not") *" converged.")
+        end
     end
 
     Es, pars, grads

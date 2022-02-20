@@ -34,6 +34,8 @@ Core function for one-electron integrals.
 `libcinFunc::Symbol` specifies the backend [libcint](https://github.com/sunqm/libcint) 
 function name, e.g. `"cint2e_cart"` should be converted to `:cint2e_cart` as the input 
 argument.
+
+**WARNING: This function might be completely removed in the future release.**
 """
 @inline function twoBodyBFTensor(libcinFunc::Symbol, 
                                  b1::AbstractGTBasisFuncs, 
@@ -110,8 +112,7 @@ eeInteraction(bf1::AbstractGTBasisFuncs,
               bf2::AbstractGTBasisFuncs, 
               bf3::AbstractGTBasisFuncs, 
               bf4::AbstractGTBasisFuncs) = 
-dropdims(eeInteractionCore(bf1, bf2, bf3, bf4), dims=5)
-
+cat(get2eInteraction(bf1, bf2, bf3, bf4), dims=4)
 """
 
     eeInteractionsCore(BSet::Array{<:AbstractGTBasisFuncs, 1}; 
@@ -135,4 +136,4 @@ Return the electron-electron interaction tensor (an N×N×N×N Tensor where N is
 of spatial orbitals) given a basis set in the form of an `Array`. 
 """
 eeInteractions(BSet::Vector{<:AbstractGTBasisFuncs}) = 
-dropdims(eeInteractionsCore(BSet), dims=5)
+get2eInteractions(BSet)

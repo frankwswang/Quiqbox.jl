@@ -4,6 +4,7 @@ using Quiqbox
 @testset "OneBody.jl tests" begin
     errT1 = 1e-10
     errT2 = 1e-10
+    errT3 = 1e-10
     nucs = fill("H", 2)
     cens = [[-0.7, 0.0, 0.0], [ 0.7, 0.0, 0.0]]
     bf1 = genBasisFunc(cens[1], ("STO-3G", "H"))[]
@@ -30,4 +31,25 @@ using Quiqbox
                    coreHij(bf1, bf2, nucs, cens)[], atol=errT2)
     @test isapprox(coreHij(bf2, bf1, nucs, cens)[], Hc[3], atol=errT2)
     @test isapprox(coreHij(bf2, bf2, nucs, cens)[], Hc[4], atol=errT2)
+
+    bfs = genBasisFunc([0,1,0], (3,2), "D")
+    S = [0.05500737317448707; 0.00788990951420727; 
+        -0.0;                 0.06075573582055236; 
+        -0.0;                 0.04948443651454198]
+    @test isapprox(overlap(bfs, bf1), S, atol=errT3)
+
+    T = [0.031092263857623516; 0.0244106493741589; 
+         0.0;                  0.0488771655445106; 
+         0.0;                  0.0140048092957122] |> transpose
+    @test isapprox(elecKinetic(bf1, bfs), T, atol=errT3)
+
+    V = [
+     -0.05113501486 0.0           0.0          -0.01876634304 0.0          -0.01616252693; 
+      0.0          -0.01876634304 0.0           0.0           0.0           0.0; 
+      0.0           0.0          -0.01616252693 0.0           0.0           0.0; 
+     -0.01876634304 0.0           0.0          -0.05728524140 0.0          -0.01687630012; 
+      0.0           0.0           0.0           0.0          -0.01687630012 0.0; 
+     -0.01616252693 0.0           0.0          -0.01687630012 0.0          -0.04643023450
+        ]
+    @test isapprox(nucAttraction(bfs, bfs, nucs, cens), V, atol=errT3)
 end

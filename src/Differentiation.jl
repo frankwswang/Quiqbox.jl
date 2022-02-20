@@ -1,5 +1,5 @@
 export ParamBox, inValOf, outValOf, inSymOf, outSymOf, dataOf, mapOf, outValCopy, 
-       inVarCopy, enableDiff!, disableDiff!, isDiffParam, toggleDiff!, gradHFenegy
+       inVarCopy, enableDiff!, disableDiff!, isDiffParam, toggleDiff!, gradHFenergy
 
 using LinearAlgebra: eigen
 using Symbolics: Num
@@ -112,7 +112,7 @@ struct ParamBox{T, V, F} <: DifferentiableParameter{ParamBox, T}
     end
 end
 
-(pb::ParamBox)() = Base.invokelatest(pb.map, pb.data[])
+(pb::ParamBox)() = Base.invokelatest(pb.map, pb.data[])::Float64
 
 function ParamBox(data::Array{T, 0}, name::Symbol=:undef, mapFunction::F=itself, 
                   dataName::Symbol=:undef; canDiff::Bool=true, 
@@ -316,6 +316,9 @@ function twoBodyDerivativeCore(∂bfs::Vector{<:CompositeGTBasisFuncs},
     ∂ʃ = ones(bsSize, bsSize, bsSize, bsSize, dimOfʃ)
     ʃabcd = ones(bsSize, bsSize, bsSize, bsSize, dimOfʃ)
     ʃ∂abcd = ones(bsSize, bsSize, bsSize, bsSize, dimOfʃ)
+    # ʃa∂bcd = similar(ʃabcd)
+    # ʃab∂cd = similar(ʃabcd)
+    # ʃabc∂d = similar(ʃabcd)
     for i = 1:bsSize, j = 1:i, k = 1:i, l = 1:(k==i ? j : k)
         ʃabcd[i,j,k,l,:] = ʃabcd[j,i,k,l,:] = ʃabcd[j,i,l,k,:] = ʃabcd[i,j,l,k,:] = 
         ʃabcd[l,k,i,j,:] = ʃabcd[k,l,i,j,:] = ʃabcd[k,l,j,i,:] = ʃabcd[l,k,j,i,:] = 
@@ -324,6 +327,16 @@ function twoBodyDerivativeCore(∂bfs::Vector{<:CompositeGTBasisFuncs},
     for i = 1:bsSize, j=1:bsSize, k=1:bsSize, l=1:k
         ʃ∂abcd[i,j,k,l,:] = ʃ∂abcd[i,j,l,k,:] = ʃ(∂bfs[i], bfs[j],  bfs[k],  bfs[l])
     end
+    # Following tensor elements can be provided from above on case.
+    # for i = 1:bsSize, j=1:bsSize, k=1:bsSize, l=1:k
+    #     ʃa∂bcd[i,j,k,l,:] = ʃa∂bcd[i,j,l,k,:] = ʃ( bfs[i], ∂bfs[j],   bfs[k],  bfs[l])
+    # end
+    # for i = 1:bsSize, j=1:i, k=1:bsSize, l=1:bsSize
+    #     ʃab∂cd[i,j,k,l,:] = ʃab∂cd[j,i,k,l,:] = ʃ( bfs[i],  bfs[j],  ∂bfs[k],  bfs[l])
+    # end
+    # for i = 1:bsSize, j=1:i, k=1:bsSize, l=1:bsSize
+    #     ʃabc∂d[i,j,k,l,:] = ʃabc∂d[j,i,k,l,:] = ʃ( bfs[i],  bfs[j],   bfs[k], ∂bfs[l])
+    # end
     for e=1:dimOfʃ
         # [∂ʃ4[i,j,k,l] == ∂ʃ4[j,i,l,k] == ∂ʃ4[j,i,k,l] != ∂ʃ4[l,j,k,i]
         for i = 1:bsSize, j = 1:i, k = 1:i, l = 1:(k==i ? j : k)
@@ -331,11 +344,19 @@ function twoBodyDerivativeCore(∂bfs::Vector{<:CompositeGTBasisFuncs},
             # ʃ∂abcd[i,j,k,l,:] == ʃ∂abcd[i,j,l,k,:] == 
             # ʃab∂cd[l,k,i,j,:] == ʃab∂cd[k,l,i,j,:]
             for a = 1:bsSize, b = 1:bsSize, c = 1:bsSize, d = 1:bsSize
-                val += (  X[a,i]*X[b,j]* X[c,k]*X[d,l] +  X[a,j]*X[b,i]* X[c,k]*X[d,l] + 
-                          X[c,i]*X[d,j]* X[a,k]*X[b,l] +  X[c,i]*X[d,j]* X[a,l]*X[b,k]  ) * 
+                # Old version: Still correct.
+                # val += (  X[a,i]*X[b,j]* X[c,k]*X[d,l] +  X[a,j]*X[b,i]* X[c,k]*X[d,l] + 
+                #           X[c,i]*X[d,j]* X[a,k]*X[b,l] +  X[c,i]*X[d,j]* X[a,l]*X[b,k]  ) * 
+                #        ʃ∂abcd[a,b,c,d,e] + 
+                #        ( ∂X[a,i]*X[b,j]* X[c,k]*X[d,l] + ∂X[a,j]*X[b,i]* X[c,k]*X[d,l] + 
+                #           X[a,i]*X[b,j]*∂X[c,k]*X[d,l] +  X[a,i]*X[b,j]*∂X[c,l]*X[d,k]  ) * 
+                #        ʃabcd[a,b,c,d,e]
+                # New version: Better readability.
+                val += (  X[a,i]*X[b,j]*X[c,k]*X[d,l] + X[a,j]*X[b,i]*X[c,k]*X[d,l] + 
+                          X[c,i]*X[d,j]*X[a,k]*X[b,l] + X[c,i]*X[d,j]*X[a,l]*X[b,k]  ) * 
                        ʃ∂abcd[a,b,c,d,e] + 
-                       ( ∂X[a,i]*X[b,j]* X[c,k]*X[d,l] + ∂X[a,j]*X[b,i]* X[c,k]*X[d,l] + 
-                          X[a,i]*X[b,j]*∂X[c,k]*X[d,l] +  X[a,i]*X[b,j]*∂X[c,l]*X[d,k]  ) * 
+                       ( ∂X[a,i]*X[b,j]* X[c,k]*X[d,l] + X[a,i]*∂X[b,j]*X[c,k]* X[d,l] + 
+                          X[a,i]*X[b,j]*∂X[c,k]*X[d,l] + X[a,i]* X[b,j]*X[c,k]*∂X[d,l] ) * 
                        ʃabcd[a,b,c,d,e]
             end
             ∂ʃ[i,j,k,l,e] = ∂ʃ[j,i,k,l,e] = ∂ʃ[j,i,l,k,e] = ∂ʃ[i,j,l,k,e] = 
@@ -380,31 +401,33 @@ end
 
 function ∂HFenergy(bs::Vector{<:CompositeGTBasisFuncs}, par::ParamBox, 
                    C::Union{Matrix{Float64}, NTuple{2, Matrix{Float64}}}, 
-                   S::Matrix{Float64}, mol::Vector{String}, 
+                   S::Matrix{Float64}, nuc::Vector{String}, 
                    nucCoords::Vector{<:AbstractArray}, 
                    nElectron::Union{Int, NTuple{2, Int}})
     Xinv = S^(0.5)
     Cₓ = (C isa Tuple) ? (Ref(Xinv) .* C) : (Xinv * C)
     ∂hij, ∂hijkl = derivativeCore(bs, par, S, 
-                                  oneBodyFunc=(i,j)->coreHijCore(i,j,mol,nucCoords), 
-                                  twoBodyFunc=eeInteractionCore)
+                                  oneBodyFunc=(i, j)->cat(coreHij(i, j, nuc, nucCoords), 
+                                                          dims=3), 
+                                  twoBodyFunc=(i, j, k, l)->cat(eeInteraction(i, j, k, l), 
+                                                                dims=5))
     getEᵀ(dropdims(∂hij, dims=3), dropdims(∂hijkl, dims=5), Cₓ, nElectron)
 end
 
 
-function gradHFenegy(bs::Vector{<:CompositeGTBasisFuncs}, par::Vector{<:ParamBox}, 
+function gradHFenergy(bs::Vector{<:CompositeGTBasisFuncs}, par::Vector{<:ParamBox}, 
                      C::Union{Matrix{Float64}, NTuple{2, Matrix{Float64}}}, 
-                     S::Matrix{Float64}, mol::Vector{String}, 
+                     S::Matrix{Float64}, nuc::Vector{String}, 
                      nucCoords::Vector{<:AbstractArray}; 
-                     nElectron::Union{Int, NTuple{2, Int}}=getCharge(mol))
+                     nElectron::Union{Int, NTuple{2, Int}}=getCharge(nuc))
     if length(C) == 2 && nElectron isa Int
         nElectron = (nElectron÷2, nElectron-nElectron÷2)
     end
-    ∂HFenergy.(Ref(bs), par, Ref(C), Ref(S), Ref(mol), Ref(nucCoords), Ref(nElectron))
+    ∂HFenergy.(Ref(bs), par, Ref(C), Ref(S), Ref(nuc), Ref(nucCoords), Ref(nElectron))
 end
 
-gradHFenegy(bs::Vector{<:CompositeGTBasisFuncs}, par::ParamBox, 
+gradHFenergy(bs::Vector{<:CompositeGTBasisFuncs}, par::ParamBox, 
             C::Union{Matrix{Float64}, NTuple{2, Matrix{Float64}}}, S::Matrix{Float64}, 
-            mol::Vector{String}, nucCoords::Vector{<:AbstractArray}; 
-            nElectron::Union{Int, NTuple{2, Int}}=getCharge(mol)) = 
-gradHFenegy(bs, [par], C, S, mol, nucCoords; nElectron)
+            nuc::Vector{String}, nucCoords::Vector{<:AbstractArray}; 
+            nElectron::Union{Int, NTuple{2, Int}}=getCharge(nuc)) = 
+gradHFenergy(bs, [par], C, S, nuc, nucCoords; nElectron)

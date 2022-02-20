@@ -43,7 +43,7 @@ allows user to customize the HF methods:
 
 ## Standalone Integral Functions
 
-Quiqbox also provides several integral functions that can be used independently of any SCF functions if intended.Those functions are wrappers of binary Julia library package ([JLL](https://docs.binarybuilder.org/stable/jll/)) [**libcint_jll**](https://github.com/JuliaBinaryWrappers/libcint_jll.jl), with more simplistic signature and versatile functionality.
+Quiqbox also provides several integral functions that can be used independently of any SCF functions if intended.
 
 [`overlap`](@ref)
 
@@ -59,12 +59,8 @@ Quiqbox also provides several integral functions that can be used independently 
 
 [`elecKinetics`](@ref)
 
-[`Quiqbox.oneBodyBFTensor`](@ref)
-
 ### Two-electron functions
 
 [`eeInteraction`](@ref)
 
 [`eeInteractions`](@ref)
-
-[`Quiqbox.twoBodyBFTensor`](@ref)

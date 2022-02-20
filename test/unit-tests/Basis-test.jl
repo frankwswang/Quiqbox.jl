@@ -2,7 +2,7 @@ using Test
 using Quiqbox
 using Quiqbox: isFull, BasisFuncMix, unpackBasisFuncs, inSymbols, varVal, ElementNames, 
                sortBasisFuncs, ParamList, sumOf, expressionOfCore, mergeGaussFuncs, 
-               ijkOrbitalList, gaussProd, normOfGTOin
+               gaussProd, getNorms
 using Symbolics
 using LinearAlgebra
 
@@ -124,26 +124,20 @@ bf4_3 = genBasisFunc([0,0,0], "STO-3G", nucleus = "He")[]
 bf4s1 = genBasisFunc([0,0,0], ["STO-3G", "STO-3G"])
 bf4s2 = genBasisFunc([0,0,0], ["STO-3G", "STO-3G"], nucleus = "He")
 bf4s3 = genBasisFunc([0,0,0], [("STO-3G", "H"), ("STO-3G", "He")])
-@test hasEqual.(Ref(bf4_1), bf4s1, Ref(bf4s3[1])) |> prod
-@test hasEqual.(Ref(bf4_2), Ref(bf4_3), bf4s2, Ref(bf4s3[2])) |> prod
+@test hasEqual.(Ref(bf4_1), bf4s1, Ref(bf4s3[1])) |> all
+@test hasEqual.(Ref(bf4_2), Ref(bf4_3), bf4s2, Ref(bf4s3[2])) |> all
 @test isapprox(1, overlap(bf4_1, bf4_1)[], atol=1e-8)
 @test isapprox(1, overlap(bf4_2, bf4_2)[], atol=1e-8)
 
-errorThreshold1 = 1e-11
+errorThreshold1 = 1e-11; errorThreshold3 = 1e-9
 bf3_2_2 = genBasisFunc([1,0,0], (2,1), normalizeGTO=true)
 @test isapprox(1, overlap(bf3_2_2, bf3_2_2)[], atol=errorThreshold1)
-@test isapprox(0.0553891828418, overlap(bf3_2, bf3_2)[], atol=errorThreshold1)
+@test isapprox(0.6960409996039634, overlap(bf3_2, bf3_2)[], atol=errorThreshold1)
 bf3_3_2 = genBasisFunc([0,0,0], (2,1), "P", normalizeGTO=true)
 @test isapprox(LinearAlgebra.I, overlap(bf3_3_2, bf3_3_2), atol=errorThreshold1)
-@test isapprox(0.0207709435653*LinearAlgebra.I, overlap(bf3_3, bf3_3), atol=errorThreshold1)
+@test isapprox(0.0870051249505*LinearAlgebra.I, overlap(bf3_3, bf3_3), atol=errorThreshold1)
 bf3_4_2 = genBasisFunc([0,0,0], (1,1), "D", normalizeGTO=true)
-@test isapprox([1.0 0.0 0.0 1/3 0.0 1/3; 
-                0.0 1/3 0.0 0.0 0.0 0.0; 
-                0.0 0.0 1/3 0.0 0.0 0.0; 
-                1/3 0.0 0.0 1.0 0.0 1/3; 
-                0.0 0.0 0.0 0.0 1/3 0.0; 
-                1/3 0.0 0.0 1/3 0.0 1.0], 
-                overlap(bf3_4_2, bf3_4_2), atol=errorThreshold1)
+@test isapprox(LinearAlgebra.I, overlap(bf4_2, bf4_2), atol=errorThreshold3)
 @test isapprox([0.3691314831028692 0.0 0.0 0.1230438277009564 0.0 0.1230438277009564; 
                 0.0 0.1230438277009564 0.0 0.0 0.0 0.0; 
                 0.0 0.0 0.1230438277009564 0.0 0.0 0.0; 
@@ -267,7 +261,7 @@ gf_merge3 = GaussFunc(1.5,1)
 
 # function add, mul, gaussProd
 @test add(bs2[1]) === bs2[1]
-bf1s = BasisFuncs(bf1.center, bf1.gauss, [ijkOrbitalList[bf1.ijk[1]]], bf1.normalizeGTO)
+bf1s = BasisFuncs(bf1.center, bf1.gauss, (bf1.ijk[1],), bf1.normalizeGTO)
 @test hasIdentical(add(bf1s), bf1)
 bfm_add1 = BasisFuncMix(bs2)
 @test add(bfm_add1) == sumOf(bs2)
@@ -315,7 +309,7 @@ end
 bf_mul1 = genBasisFunc([1,0,0], (2,3))
 bf_mul2 = genBasisFunc([1,0,0], (1.5,1))
 bf_mul2_2 = genBasisFunc([1,0,0], (1.5,1), normalizeGTO=true)
-@test hasEqual(mul(bf_mul1, bf_mul2),  mul(BasisFuncMix([bf_mul1]), BasisFuncMix([bf_mul2])))
+@test hasEqual(mul(bf_mul1, bf_mul2), mul(BasisFuncMix([bf_mul1]), BasisFuncMix([bf_mul2])))
 @test hasEqual(mul(bf_mul1, bf_mul2, normalizeGTO=true), 
                mul(BasisFuncMix([bf_mul1]), BasisFuncMix([bf_mul2]), normalizeGTO=true))
 bf_mul3 = genBasisFunc([1,0,0], ([1.0, 1.5], [0.3, 0.4]))
@@ -326,10 +320,11 @@ bf_mul5 = mul(bf_mul1, bf_mul2, normalizeGTO=true)
 bf_mul5_0 = genBasisFunc([1,0,0], (3.5,3), normalizeGTO=true)
 @test hasEqual(bf_mul5, bf_mul5_0)
 bf_mul6 = mul(bf_mul1, bf_mul2_2)
-bf_mul6_0 = genBasisFunc([1,0,0], (3.5,3*normOfGTOin(bf_mul2)[]))
+bf_mul6_0 = genBasisFunc([1,0,0], (3.5,round( 3*getNorms(bf_mul2)[], digits=15 )))
 @test hasEqual(bf_mul6, bf_mul6_0)
 bf_mul7 = mul(bf_mul1, bf_mul2_2, normalizeGTO=true)
-bf_mul7_0 = genBasisFunc([1,0,0], (3.5,3*normOfGTOin(bf_mul2)[]), normalizeGTO=true)
+bf_mul7_0 = genBasisFunc([1,0,0], (3.5,round( 3*getNorms(bf_mul2)[], digits=15 )), 
+                         normalizeGTO=true)
 @test hasEqual(bf_mul7, bf_mul7_0)
 bf_mul8 = mul(bf_mul1, bf_mul3)
 bf_mul8_0 = genBasisFunc([1,0,0], ([3, 3.5], [0.9, 1.2]))
@@ -348,9 +343,10 @@ bf_mul16 = mul(bf_mul15, bf_mul15_0)
 bf_mul16_0 = mul(bf_mul15, bf_mul15_0, normalizeGTO=true)
 
 testNorm = function (bf1, bf2)
-    bf3 = mul(bf1, bf2)
+    bf3 = mul(bf1, bf2, normalizeGTO=false)
     n1 = Quiqbox.getOverlap(bf3, bf3)
-    n2 = Quiqbox.getOverlap(mul(bf1, bf1), mul(bf2, bf2))
+    n2 = Quiqbox.getOverlap(mul(bf1, bf1, normalizeGTO=false), 
+                            mul(bf2, bf2, normalizeGTO=false))
     @test isapprox(n1, n2, atol=1e-12)
 end
 
@@ -376,6 +372,7 @@ testNorm(bf_mul12, bf_mul16)
 testNorm(bf_mul13, bf_mul16)
 testNorm(bf_mul14, bf_mul16)
 testNorm(bf_mul16, bf_mul16_0)
+testNorm(bf_mul15_0, bf_mul16_0)
 
 
 # (dev) function getOverlap
@@ -447,12 +444,12 @@ P    2   1.0
 """
 lines = (content |> IOBuffer |> readlines)
 @test map(i->Quiqbox.genGaussFuncText(bfCoeff2[i,:]...), 1:size(bfCoeff2)[1] |> collect) == 
-      [lines[2], lines[3], lines[5], lines[6], lines[8], lines[9]].*"\n"
+         [lines[2], lines[3], lines[5], lines[6], lines[8], lines[9]].*"\n"
 
 
 # function genBasisFuncText & genBFuncsFromText
 randElement = ElementNames[rand(1:length(ElementNames))]
-bs1 = genBasisFunc(missing, ("6-31G", "H"))
+bs1 = genBasisFunc(missing, ("6-31G", "H"), unlinkCenter=true)
 cens = [rand(3) for _=1:length(bs1)]
 txt1 = genBasisFuncText(bs1, printCenter=false, groupCenters=false) |> join
 txt2 = genBasisFuncText(bs1, printCenter=false) |> join
@@ -465,10 +462,10 @@ txt3 = genBasisFuncText(bs1) |> join
 bs2_3 = genBFuncsFromText(txt3)
 @test hasEqual(bs1, bs2_1, ignoreContainer=true)
 @test hasEqual(bs1, bs2_2, ignoreContainer=true)
-@test hasEqual.(sortBasisFuncs(bs1), bs2_3, ignoreFunction=true) |> prod
-@test hasEqual.(bs1, bs2_1, ignoreFunction=true) |> prod
-@test hasEqual.(bs1, bs2_2, ignoreFunction=true) |> prod
-@test hasEqual.(sortBasisFuncs(bs1), bs2_3, ignoreFunction=true) |> prod
+@test hasEqual.(sortBasisFuncs(bs1), bs2_3, ignoreFunction=true) |> all
+@test hasEqual.(bs1, bs2_1, ignoreFunction=true) |> all
+@test hasEqual.(bs1, bs2_2, ignoreFunction=true) |> all
+@test hasEqual.(sortBasisFuncs(bs1), bs2_3, ignoreFunction=true) |> all
 
 
 # function assignCenter!
@@ -660,7 +657,7 @@ expr2 = expressionOf(bf1)[]|>string
 
 expStr = expressionOfCore(bf6)[] |> string
 idx = findfirst('d', expStr)
-@test isapprox(parse(Float64, expStr[1:idx-1]), 7.579425332952777, atol=1e-12)
+@test isapprox(parse(Float64, expStr[1:idx-1]), 2.1381164110649706, atol=1e-12)
 @test expStr[idx:end] == "d*exp(-α*((r₁ - X)^2 + (r₂ - Y)^2 + (r₃ - Z)^2))*(α^0.75)" || 
       expStr[idx:end] == "d*(α^0.75)*exp(-α*((r₁ - X)^2 + (r₂ - Y)^2 + (r₃ - Z)^2))"
 

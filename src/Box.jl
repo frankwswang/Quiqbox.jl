@@ -49,7 +49,7 @@ struct GridBox{NX, NY, NZ} <: SemiMutableParameter{GridBox, Float64}
     function GridBox(nGrids::NTuple{3, Int}, spacing::Real=10, 
                      centerCoord::Vector{<:Real}=[0.0,0.0,0.0];
                      canDiff::Bool=true, index::Int=0)
-        @assert prod(nGrids .> 0) "The number of gird of each edge should be larger than 0."
+        @assert all(nGrids .> 0) "The number of gird of each edge should be larger than 0."
         sym = ParamList[:spacing]
         spc = spacing |> Float64
         pbRef = ParamBox(spc; canDiff, index)

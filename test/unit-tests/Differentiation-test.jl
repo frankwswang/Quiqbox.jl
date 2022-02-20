@@ -1,5 +1,6 @@
 using Test
 using Quiqbox
+using Quiqbox: gradHFenergy
 
 @testset "Differentiation.jl" begin
 
@@ -35,4 +36,44 @@ pb4 = ParamBox(1.2, :c, x->x^2, :x)
 pb5 = outValCopy(pb4)
 @test pb5() == pb5[] == pb4()
 @test pb5.map == Quiqbox.itself
+
+
+nuc = ["H", "H"]
+nucCoords = [[-0.7,0.0,0.0], [0.7,0.0,0.0]]
+
+grid = GridBox(1, 3.0)
+gf1 = GaussFunc(0.7,1)
+bs1 = genBasisFunc.(grid.box, Ref([gf1]))
+pars1 = uniqueParams!(bs1, filterMapping=true)[[1, 3, 4]]
+S1 = overlaps(bs1)
+HFres1 = runHF(bs1, nuc, nucCoords, printInfo=false)
+grad1 = gradHFenergy(bs1, pars1, HFres1.C, S1, nuc, nucCoords)
+
+grad1_t = [1.2560795050648697, 1.2560795050648697, 4.050658424754289]
+t1 = 1e-14
+t2 = 1e-10
+@test isapprox(grad1[1], grad1[2], atol=t1)
+@test isapprox.(grad1, grad1_t, atol=t2) |> all
+
+HFres1_2 = runHF(bs1, nuc, nucCoords, HFtype=:UHF, printInfo=false)
+grad1_2 = gradHFenergy(bs1, pars1, HFres1.C, overlaps(bs1), nuc, nucCoords)
+@test isapprox(grad1_2[1], grad1_2[2], atol=t1)
+@test isapprox.(grad1_2, grad1_t, atol=t2) |> all
+
+bfSource = genBasisFunc(missing, ("STO-2G", "H"))[]
+gfs = bfSource.gauss |> collect
+cens = makeCenter.(nucCoords)
+bs2 = genBasisFunc.(cens, Ref(gfs), normalizeGTO=true)
+pars2 = uniqueParams!(bs2, filterMapping=true)
+S2 = overlaps(bs2)
+HFres2 = runHF(bs2, nuc, nucCoords, printInfo=false)
+grad2 = gradHFenergy(bs2, pars2, HFres2.C, S2, nuc, nucCoords)
+
+@test isapprox(grad2[1], -grad2[2], atol=t2)
+@test isapprox(grad2[1], -0.23796869082562833, atol=t2)
+@test all(grad2[3:6] .== 0)
+grad2_tp = [-0.5950090665179929, 0.8280810295826272, 
+             0.09464147744656098, -0.05996050268876785]
+@test isapprox.(grad2[7:end], grad2_tp, atol=t2) |> all
+
 end

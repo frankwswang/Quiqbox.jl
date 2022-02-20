@@ -486,6 +486,8 @@ To avoid memory leaking, the user should use `free(x.ptr)` after the usage of
 
 If `showReminder=true`, the constructor will pop up a message to remind the user of 
 such operation.
+
+**WARNING: This function might be completely removed in the future release.**
 """
 struct ArrayPointer{T, N} <: Any
     ptr::Ptr{T}
@@ -547,12 +549,12 @@ end
 ([1, 1, 2, 1], S[S(1, 2.0), S(1, 2.1)])
 ```
 """
-function markUnique(arr::AbstractArray, args...; 
-                    compareFunction::F=hasEqual, kws...) where {F<:Function}
+function markUnique(arr::AbstractArray{T}, args...; 
+                    compareFunction::F=hasEqual, kws...) where {T<:Any, F<:Function}
     @assert length(arr) >= 1 "The length of input array should be not less than 1."
     f = (b...)->compareFunction((b..., args...)...; kws...)
     res = Int[1]
-    cmprList = eltype(arr)[arr[1]]
+    cmprList = T[arr[1]]
     for i = 2:length(arr)
         local j
         isNew = true
@@ -597,11 +599,11 @@ julia> arr
   "s"
 ```
 """
-function getUnique!(arr::Array, args...; 
-                    compareFunction::F = hasEqual, kws...) where {F<:Function}
+function getUnique!(arr::AbstractArray{T}, args...; 
+                    compareFunction::F = hasEqual, kws...) where {T<:Any, F<:Function}
     @assert length(arr) > 1 "The length of input array should be larger than 1."
     f = (b...)->compareFunction((b..., args...)...; kws...)
-    cmprList = eltype(arr)[arr[1]]
+    cmprList = T[arr[1]]
     delList = Bool[false]
     for i = 2:length(arr)
         isNew = true
@@ -666,20 +668,68 @@ function isOscillateConverged(sequence::Vector{<:Real},
 end
 
 
-function splitTerm(term::Symbolics.Num)
-    r1 = Symbolics.@rule +(~(~xs)) => [i for i in ~(~xs)]
-    r2 = Symbolics.@rule *(~(~xs)) => [[i for i in ~(~xs)] |> prod]
-    for r in [r1, r2]
-        term = Symbolics.simplify(term, rewriter = r)
-    end
-    # Converting Symbolics.Arr to Base.Array
-    if term isa Symbolics.Arr
-        terms = term |> collect
-    else
-        terms = [term]
-    end
-    terms
+# function splitTerm(term::Symbolics.Num)
+#     r1 = Symbolics.@rule +(~(~xs)) => [i for i in ~(~xs)]
+#     r2 = Symbolics.@rule *(~(~xs)) => [[i for i in ~(~xs)] |> prod]
+#     for r in [r1, r2]
+#         term = Symbolics.simplify(term, rewriter = r)
+#     end
+#     # Converting Symbolics.Arr to Base.Array
+#     if term isa Symbolics.Arr
+#         terms = term |> collect
+#     else
+#         terms = [term]
+#     end
+#     terms
+# end
+
+splitTerm(term::Symbolics.Num) = splitTermCore(term.val)
+
+function rewriteCore(term, r)
+    res = r(term)
+    res === nothing ? term : res
 end
+
+function splitTermCore(term::SymbolicUtils.Add)
+    r1 = SymbolicUtils.@rule +(~(~xs)) => [i for i in ~(~xs)]
+    r1(term) .|> rewriteTerm
+end
+
+rewriteTerm(term::SymbolicUtils.Add) = splitTermCore(term)
+
+rewriteTerm(term::SymbolicUtils.Pow) = itself(term)
+
+function rewriteTerm(term::SymbolicUtils.Div)
+    r = @rule (~x) / (~y) => (~x) * (~y)^(-1)
+    rewriteCore(term, r)
+end
+
+function rewriteTerm(term::SymbolicUtils.Mul)
+    r = SymbolicUtils.@rule *(~(~xs)) => sort([i for i in ~(~xs)], 
+                              by=x->(x isa SymbolicUtils.Symbolic)) |> prod
+    rewriteCore(term, r) |> SymbolicUtils.simplify
+end
+
+function splitTermCore(term::SymbolicUtils.Mul)
+    r1 = SymbolicUtils.@rule *(~(~xs)) => [i for i in ~(~xs)]
+    r2 = SymbolicUtils.@rule +(~(~xs)) => [i for i in ~(~xs)]
+    r3 = @acrule ~~vs * exp((~a)*((~x)^2+(~y)^2+(~z)^2)) * 
+                        exp(-1*(~a)*((~x)^2+(~y)^2+(~z)^2)) => prod(~~vs)
+    terms = rewriteCore(term, r1)
+    idx = findfirst(x-> x isa SymbolicUtils.Add, terms)
+    if idx !== nothing
+        sumTerm = popat!(terms, idx)
+        var = SymbolicUtils.simplify(sort(terms, 
+                                          by=x->(x isa SymbolicUtils.Symbolic)) |> prod)
+        rewriteCore.((r2(sumTerm) .* var), Ref(r3)) .|> rewriteTerm |> flatten
+    else
+        [terms |> prod]
+    end
+end
+
+splitTermCore(term::SymbolicUtils.Div) = term |> rewriteTerm |> splitTermCore
+
+splitTermCore(term) = [term]
 
 
 function groupedSort(v::Vector, sortFunction::F=itself) where {F<:Function}
@@ -753,3 +803,60 @@ Pf(c::Float64, ::Val{Pf{C, :itself}}) where {C} = Pf{c*C, :itself}(itself)
 nameOf(f::ParameterizedFunction) = typeof(f)
 
 nameOf(f) = nameof(f)
+
+
+function arrayDiffCore!(vs::NTuple{N, Array{T}}) where {N, T}
+    head = vs[argmin(length.(vs))]
+    coms = T[]
+    l = length(head)
+    sizehint!(coms, l)
+    i = 0
+    while i < l
+        i += 1
+        ele = head[i]
+        ids = zeros(Int, N)
+        flag = false
+        for (j, v) in enumerate(vs)
+            k = findfirst(isequal(ele), v)
+            k === nothing ? (flag=true; break) : (ids[j] = k)
+        end
+        flag && continue
+        for (v, id) in zip(vs, ids)
+            popat!(v, id)
+        end
+        push!(coms, ele)
+        i -= 1
+        l -= 1
+    end
+    (coms, vs...)
+end
+
+function arrayDiffCore!(v1::Array{T}, v2::Array{T}) where {T}
+    a1, a2 = (length(v1) > length(v2)) ? (v2, v1) : (v1, v2)
+    coms = T[]
+    l = length(a1)
+    sizehint!(coms, l)
+    i = 0
+    while i < l
+        i += 1
+        j = findfirst(isequal(a1[i]), a2)
+        if j !== nothing
+            popat!(a1, i)
+            push!(coms, popat!(a2, j))
+            i -= 1
+            l -= 1
+        end
+    end
+    coms, v1, v2
+end
+
+arrayDiff!(v1::Array{T}, v2::Array{T}) where {T} = arrayDiffCore!(v1, v2)
+
+arrayDiff!(vs::Vararg{Array{T}, N}) where {T, N} = arrayDiffCore!(vs)
+
+tupleDiff(ts::Vararg{NTuple{<:Any, T}, N}) where {T, N} = arrayDiff!((ts .|> collect)...)
+
+struct FunctionType{F}
+    f::Symbol
+    FunctionType{F}() where {F} = new{F}(F)
+end

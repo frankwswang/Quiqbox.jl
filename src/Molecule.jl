@@ -124,7 +124,7 @@ struct Molecule{Nc, Ne, Nb} <:MolecularHartreeFockCoefficient{Nc, Ne}
         coeff = spins |> unique |> length
         @assert (coeff*Nb .== 
                  length.([Emos, occus, C[1,:], spins, symms]) .== 
-                 coeff*length(C[:,1])) |> prod
+                 coeff*length(C[:,1])) |> all
         EnnR = nnRepulsions(nuc, nucCoords)
         iSorted = mapPermute(basis, sortBasisFuncs)
         basis = basis[iSorted]

@@ -28,12 +28,9 @@ function show(io::IO, gf::GaussFunc)
 end
 
 function show(io::IO, bf::BasisFunc)
-    xyz1 = bf.ijk[1]
-    xyz2 = ""
     print(io, typeof(bf))
     print(io, "(gauss, subshell, center)[")
-    printstyled(io, xyz1, color=:cyan)
-    print(io, xyz2)
+    printstyled(io, bf.ijk[1]|>ijkToStr, color=:cyan)
     print(io, "][", round(bf.center[1](), sigdigits=nSigShown), ", ",
                     round(bf.center[2](), sigdigits=nSigShown), ", ",
                     round(bf.center[3](), sigdigits=nSigShown), "]")
@@ -43,7 +40,7 @@ function show(io::IO, bf::BasisFuncs)
     OON = typeof(bf).parameters[3]
     SON = SubshellDimList[bf.subshell]
     if OON == 1
-        xyz1 = bf.ijk[1]
+        xyz1 = bf.ijk[1] |> ijkToStr
         xyz2 = ""
     else
         xyz1 = "$(bf.ijk |> length)"
@@ -135,12 +132,12 @@ length(::BasisFuncMix) = 1
 
 function iterate(bfs::CompositeGTBasisFuncs{<:Any, N}) where {N}
     item, state = iterate(bfs.ijk)
-    (BasisFunc(bfs.center, bfs.gauss, ijkOrbitalList[item], bfs.normalizeGTO), state)
+    (BasisFunc(bfs.center, bfs.gauss, item, bfs.normalizeGTO), state)
 end
 function iterate(bfs::CompositeGTBasisFuncs{<:Any, N}, state) where {N}
     iter = iterate(bfs.ijk, state)
-    iter !== nothing ? (BasisFunc(bfs.center, bfs.gauss, ijkOrbitalList[iter[1]], 
-                                  bfs.normalizeGTO), iter[2]) : nothing
+    iter !== nothing ? (BasisFunc(bfs.center, bfs.gauss, iter[1], bfs.normalizeGTO), 
+                        iter[2]) : nothing
 end
 size(::CompositeGTBasisFuncs{<:Any, N}) where {N} = (N,)
 length(::CompositeGTBasisFuncs{<:Any, N}) where {N} = N
@@ -177,7 +174,7 @@ firstindex(::BasisFuncMix) = Val(:first)
 lastindex(::BasisFuncMix) = Val(:last)
 
 getindex(bfs::BasisFuncs, i) = 
-BasisFunc(bfs.center, bfs.gauss, ijkOrbitalList[bfs.ijk[i]], bfs.normalizeGTO)
+BasisFunc(bfs.center, bfs.gauss, bfs.ijk[i], bfs.normalizeGTO)
 getindex(bfs::BasisFuncs{<:Any, <:Any, N}, ::Colon) where {N} = [getindex(bfs, i) for i=1:N]
 firstindex(bfs::BasisFuncs) = 1
 lastindex(::BasisFuncs{<:Any, <:Any, N}) where {N} = N

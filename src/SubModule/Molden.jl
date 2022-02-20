@@ -40,7 +40,7 @@ function makeMoldenFile(mol::Molecule;
     for cen in centers
         iNucPoint += 1
         coord = parse.(Float64, split(cen[5:end]))
-        if (i = findfirst(x->prod(isapprox.(x, coord, atol=1e-15)), nucCoords); 
+        if (i = findfirst(x->all(isapprox.(x, coord, atol=1e-15)), nucCoords); 
             i !== nothing)
             n = popat!(nuc, i)
             atmName = rpad("$(n)", 5)

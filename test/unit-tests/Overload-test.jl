@@ -47,12 +47,13 @@ using Suppressor: @capture_out
 
     fVar1 = runHF(GTb1, ["H", "H"], [[0, 0, 0], [1,2,1]], printInfo=false, initialC=:Hcore)
 
-    @test (@capture_out show(fVar1.temp)) == string(typeof(fVar1.temp))*"(shared.Etots="*
-                                             "[2.263712269, … , 2.262890932], shared.Dtots"*
-                                             ", Cs, Es, Ds, Fs)"
+    info1 = (@capture_out show(fVar1.temp))
+    @test info1[1:42] == string(typeof(fVar1.temp))*"(shared.Etots=["
+    @test info1[73:end] == "], shared.Dtots, Cs, Es, Ds, Fs)"
 
-    @test (@capture_out show(fVar1)) == string(typeof(fVar1))*"(E0HF=2.262890932, C, F, D,"*
-                                        " Emo, occu, temp, isConverged)"
+    info2 = (@capture_out show(fVar1))
+    @test info2[1:37] == string(typeof(fVar1))*"(E0HF="
+    @test info2[49:end] == ", C, F, D, Emo, occu, temp, isConverged)"
 
 
     # function hasBoolRelation
@@ -187,9 +188,9 @@ using Suppressor: @capture_out
 
     @test testMul2.([bf1, bf3, bf4, bf5, 
                      bfm2.BasisFunc |> sum, bfm3.BasisFunc |> sum, bfm4.BasisFunc |> sum], 
-                     c1, c2) |> prod
+                     c1, c2) |> all
 
-    @test .!testMul2.([bfm2, bfm3, bfm4], c1, c2) |> prod
+    @test .!testMul2.([bfm2, bfm3, bfm4], c1, c2) |> all
 
 
     # function iterate, size, length, ndims
@@ -198,10 +199,10 @@ using Suppressor: @capture_out
     @test iterate(bf1) == (bf1, nothing)
 
     cs = [pb1, gf1, bf1]
-    @test (iterate.(cs, 1) .=== nothing) |> prod
-    @test (size.(cs) .== Ref(())) |> prod
-    @test (size.(cs, 1) .== 1) |> prod
-    @test (length.(cs) .== 1) |> prod
+    @test (iterate.(cs, 1) .=== nothing) |> all
+    @test (size.(cs) .== Ref(())) |> all
+    @test (size.(cs, 1) .== 1) |> all
+    @test (length.(cs) .== 1) |> all
     @test ndims(pb1) == 0
 
     @test iterate(bfm1) == (bfm1, nothing)
