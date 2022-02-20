@@ -9,11 +9,11 @@ GaussFunc
 ```
 
 ```@docs
-BasisFunc{S, GN}
+BasisFunc{𝑙, GN}
 ```
 
 ```@docs
-BasisFuncs{S, GN, ON}
+BasisFuncs{𝑙, GN, ON}
 ```
 
 ```@docs
