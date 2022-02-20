@@ -215,15 +215,3 @@ eeInteraction
 ```@docs
 eeInteractions
 ```
-
-```@docs
-Quiqbox.eeInteractionsCore
-```
-
-```@docs
-Quiqbox.oneBodyBFTensor
-```
-
-```@docs
-Quiqbox.twoBodyBFTensor
-```
