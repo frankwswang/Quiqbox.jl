@@ -196,7 +196,7 @@ V = nucAttractions([bfm], nuc, nucCoords)[]
 @test isapprox(V, nucAttractions(bs1, nuc, nucCoords) |> sum, atol=errorThreshold2)
 eeI = eeInteractions([bfm])[]
 @test eeI == eeInteraction(bfm, bfm, bfm, bfm)[]
-@test isapprox(eeI, eeInteractions(bs1) |> sum, atol=errorThreshold2)
+@test isapprox(eeI, eeInteractions(bs1) |> sum, atol=errorThreshold2*10)
 
 
 # function sumOf
@@ -299,7 +299,7 @@ for x in xr, y in yr, z in zr
     xv = [x, y, z]
     α₃, d₃, R₃ = gaussProd((α₁, d₁, R₁), (α₂, d₂, R₂))
     bl *= isapprox(d₁*exp(-α₁*sum(abs2, xv-R₁)) * d₂*exp(-α₂*sum(abs2, xv-R₂)), 
-                   d₃*exp(-α₃*sum(abs2, xv-R₃)), atol=1e-16) # limit: atol=1e-20
+                   d₃*exp(-α₃*sum(abs2, xv-R₃)), atol=1e-15) # limit: atol=1e-20
 end
 @test bl
 

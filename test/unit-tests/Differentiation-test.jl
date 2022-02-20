@@ -66,7 +66,7 @@ cens = makeCenter.(nucCoords)
 bs2 = genBasisFunc.(cens, Ref(gfs), normalizeGTO=true)
 pars2 = uniqueParams!(bs2, filterMapping=true)
 S2 = overlaps(bs2)
-HFres2 = runHF(bs2, nuc, nucCoords, printInfo=false)
+HFres2 = runHF(bs2, nuc, nucCoords)
 grad2 = gradHFenergy(bs2, pars2, HFres2.C, S2, nuc, nucCoords)
 
 @test isapprox(grad2[1], -grad2[2], atol=t2)
