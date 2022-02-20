@@ -401,31 +401,33 @@ end
 
 function ∂HFenergy(bs::Vector{<:CompositeGTBasisFuncs}, par::ParamBox, 
                    C::Union{Matrix{Float64}, NTuple{2, Matrix{Float64}}}, 
-                   S::Matrix{Float64}, mol::Vector{String}, 
+                   S::Matrix{Float64}, nuc::Vector{String}, 
                    nucCoords::Vector{<:AbstractArray}, 
                    nElectron::Union{Int, NTuple{2, Int}})
     Xinv = S^(0.5)
     Cₓ = (C isa Tuple) ? (Ref(Xinv) .* C) : (Xinv * C)
     ∂hij, ∂hijkl = derivativeCore(bs, par, S, 
-                                  oneBodyFunc=(i,j)->cat(coreHij(i,j,mol,nucCoords), dims=3), 
-                                  twoBodyFunc=(i,j,k,l)->cat(eeInteraction(i,j,k,l), dims=5))
+                                  oneBodyFunc=(i, j)->cat(coreHij(i, j, nuc, nucCoords), 
+                                                          dims=3), 
+                                  twoBodyFunc=(i, j, k, l)->cat(eeInteraction(i, j, k, l), 
+                                                                dims=5))
     getEᵀ(dropdims(∂hij, dims=3), dropdims(∂hijkl, dims=5), Cₓ, nElectron)
 end
 
 
 function gradHFenergy(bs::Vector{<:CompositeGTBasisFuncs}, par::Vector{<:ParamBox}, 
                      C::Union{Matrix{Float64}, NTuple{2, Matrix{Float64}}}, 
-                     S::Matrix{Float64}, mol::Vector{String}, 
+                     S::Matrix{Float64}, nuc::Vector{String}, 
                      nucCoords::Vector{<:AbstractArray}; 
-                     nElectron::Union{Int, NTuple{2, Int}}=getCharge(mol))
+                     nElectron::Union{Int, NTuple{2, Int}}=getCharge(nuc))
     if length(C) == 2 && nElectron isa Int
         nElectron = (nElectron÷2, nElectron-nElectron÷2)
     end
-    ∂HFenergy.(Ref(bs), par, Ref(C), Ref(S), Ref(mol), Ref(nucCoords), Ref(nElectron))
+    ∂HFenergy.(Ref(bs), par, Ref(C), Ref(S), Ref(nuc), Ref(nucCoords), Ref(nElectron))
 end
 
 gradHFenergy(bs::Vector{<:CompositeGTBasisFuncs}, par::ParamBox, 
             C::Union{Matrix{Float64}, NTuple{2, Matrix{Float64}}}, S::Matrix{Float64}, 
-            mol::Vector{String}, nucCoords::Vector{<:AbstractArray}; 
-            nElectron::Union{Int, NTuple{2, Int}}=getCharge(mol)) = 
-gradHFenergy(bs, [par], C, S, mol, nucCoords; nElectron)
+            nuc::Vector{String}, nucCoords::Vector{<:AbstractArray}; 
+            nElectron::Union{Int, NTuple{2, Int}}=getCharge(nuc)) = 
+gradHFenergy(bs, [par], C, S, nuc, nucCoords; nElectron)

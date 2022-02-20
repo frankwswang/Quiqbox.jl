@@ -1840,15 +1840,28 @@ diffTransferCore(term::Symbolics.Num, args...) = diffTransferCore(term.val, args
 diffTransferCore(term::Real, _...) = Real[Float64(term), 0,0,0]
 
 
-function diffTransfer(term::Num, varDict::Dict{Num, <:Real})
-    terms = splitTerm(term)
+function diffTransfer(terms::Vector{Num}, varDict::Dict{Num, <:Real})
+    # terms = splitTerm(term)
     diffTransferCore.(terms, Ref(varDict))
+end
+
+
+# function diffInfo(bf::CompositeGTBasisFuncs, vr, varDict)
+#     exprs = expressionOfCore(bf, false, true, true)
+#     relDiffs = Symbolics.simplify.(Symbolics.derivative.(log.(exprs), vr), expand=true)
+#     diffTransfer.(relDiffs, Ref(varDict))
+# end
+
+function getRelDiff(expr::Num, vr::Num)
+    Diff = Symbolics.derivative(expr, vr)
+    relDiffs = Symbolics.simplify.(splitTerm(Diff) ./ expr, expand=true)
+    splitTerm.(relDiffs) |> flatten
 end
 
 
 function diffInfo(bf::CompositeGTBasisFuncs, vr, varDict)
     exprs = expressionOfCore(bf, false, true, true)
-    relDiffs = Symbolics.simplify.(Symbolics.derivative.(log.(exprs), vr), expand=true)
+    relDiffs = getRelDiff.(exprs, Ref(vr))
     diffTransfer.(relDiffs, Ref(varDict))
 end
 
