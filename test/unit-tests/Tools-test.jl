@@ -48,19 +48,23 @@ using Suppressor: @capture_out
 
 
     # function splitTerm
-    Symbolics.@variables X Y Z
-    vec0 = splitTerm(Num(1))
+    Symbolics.@variables α X Y Z
+    vec0 = splitTerm( Num(1) )
     @test ( string.(vec0) .== string.([Num(1)]) ) |> all
-    vec1 = splitTerm(X)
+    vec1 = splitTerm( X )
     @test ( string.(vec1) .== string.([X]) ) |> all
-    vec2 = splitTerm(X^2)
+    vec2 = splitTerm( X^2 )
     @test ( string.(vec2) .== string.([X^2]) ) |> all
-    vec3 = splitTerm(X*Y*Z)
+    vec3 = splitTerm( X*Y*Z )
     @test ( string.(vec3) .== string.([X*Y*Z]) ) |> all
-    vec4 = splitTerm(X^2 - X*Y - Z^2)
+    vec4 = splitTerm( X^2 - X*Y - Z^2 )
     @test ( string.(vec4) .== string.([X^2, -(Z^2), -X*Y]) ) |> all
+    vec5 = splitTerm( α^0.6*(X + exp(-α*(X^2+Y^2+Z^2))*α^(-0.1)*exp(α*(X^2+Y^2+Z^2))) )
+    @test ( string.(vec5) .== string.([X*(α^0.6), α^0.5]) ) |> all
     @test ([vec0, vec1, vec2, vec3, vec4] .|> length) == [1,1,1,1,3]
-    @test ([vec0, vec1, vec2, vec3, vec4] |> eltype) ==  Vector{Num}
+    for t in vcat(vec0, vec1, vec2, vec3, vec4, vec5)
+        @test t isa Union{Real, supertype(typeof(X.val))}
+    end
 
 
     # function groupedSort
