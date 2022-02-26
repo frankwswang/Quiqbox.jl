@@ -1,17 +1,30 @@
+using QuadGK: quadgk
 using SpecialFunctions: erf
 using LinearAlgebra: dot
 
 # Reference: DOI: 10.1088/0143-0807/31/1/004
+FγCore1(γ::Int, u::Float64, rtol=1e-8) = quadgk(t -> t^(2γ)*exp(-u*t^2), 0, 1; rtol)[1]
+
+myFactorial(a) = (a > 20 ? big(a) : a) |> factorial
+
+function FγCore2(γ::Int, u::Float64)
+    t = exp(-u) * sum(myFactorial(γ-k)/(4^k * myFactorial(2*(γ-k)) * u^(k+1)) for k=0:(γ-1))
+    myFactorial(2γ) / (2 * myFactorial(γ)) * (√π * erf(√u) / (4^γ * u^(γ + 0.5)) - t)
+end
+
+const FγSolverThreshold =  [ 1.0e-6,  0.0021,  0.0051,  0.0221,  0.0603,  0.1280,  0.2143, 
+                             0.3389,  0.4755,  0.6445, 15.9803, 17.5235, 17.2490, 18.6754, 
+                            20.6822, 20.4641, 21.5754, 21.6161, 22.5990, 23.2793, 24.9931, 
+                            24.9213, 27.1843, 27.0873]
+
 function Fγ(γ::Int, u::Float64)
-    u == 0.0 && (return 1 / (2γ + 1))
-    if γ > 0
-        t = exp(-u) * sum(factorial(γ-k)/(4^k * factorial(2*(γ-k)) * u^(k+1)) for k=0:(γ-1))
+    if u < 1e-8
+        1.0 / (2γ + 1)
     elseif γ == 0
-        t = 0
+        factorial(2γ) / (2 * factorial(γ)) * (√π * erf(√u) / (4^γ * u^(γ + 0.5)))
     else
-        error("γ must be non-negative.")
+        u < FγSolverThreshold[γ] ? FγCore1(γ, u) : FγCore2(γ, u)
     end
-    factorial(2γ) / (2 * factorial(γ)) * (√π * erf(√u) / (4^γ * u^(γ + 0.5)) - t)
 end
 
 function F₀toFγ(γ::Int, u::Float64, Fγu::Float64)

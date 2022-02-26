@@ -18,6 +18,7 @@ using Test
         t2_1 = @elapsed @testset "$(unit2_1)" begin
             include("unit-tests/Integration/OneBody-test.jl")
             include("unit-tests/Integration/TwoBody-test.jl")
+            include("unit-tests/Integration/math-test.jl")
             include("unit-tests/Basis-test.jl")
             include("unit-tests/Differentiation-test.jl")
         end
