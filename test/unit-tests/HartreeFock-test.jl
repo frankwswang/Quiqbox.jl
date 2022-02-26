@@ -39,7 +39,7 @@ using Suppressor: @suppress_out
                                              4=>[:solver=>:LCM])))
     end
 
-    @test isapprox(res2.E0HF, res2_2.E0HF, atol=1e-6)
+    @test isapprox(res2.E0HF, res2_2.E0HF, atol=1e-5)
     @test isapprox(res1.E0HF, res1_2.E0HF, atol=1e-6)
 
     @test begin
@@ -86,8 +86,8 @@ using Suppressor: @suppress_out
     atol=errorThreshold2)
 
     @test isapprox(res1.Emo, 
-    [-20.930374644, -1.616672450, -1.284464364, -0.661303892, 
-      -0.661303892,  1.060817046,  1.847805126], 
+    [-20.930371651088734, -1.6166714662844843, -1.2844637689430092, -0.6613027570108698, 
+     -0.661302757010868, 1.0608175741517432, 1.8478054667733597], 
     atol=errorThreshold1)
 
     @test res1.occu == [2, 2, 2, 2, 2, 0, 0]

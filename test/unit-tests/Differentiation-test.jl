@@ -49,7 +49,7 @@ S1 = overlaps(bs1)
 HFres1 = runHF(bs1, nuc, nucCoords, printInfo=false)
 grad1 = gradHFenergy(bs1, pars1, HFres1.C, S1, nuc, nucCoords)
 
-grad1_t = [1.2560795050648697, 1.2560795050648697, 4.050658424754289]
+grad1_t = [1.2560794975855811, 1.2560794975855811, 4.050658417242262]
 t1 = 1e-14
 t2 = 1e-10
 @test isapprox(grad1[1], grad1[2], atol=t1)
@@ -70,10 +70,10 @@ HFres2 = runHF(bs2, nuc, nucCoords, printInfo=false)
 grad2 = gradHFenergy(bs2, pars2, HFres2.C, S2, nuc, nucCoords)
 
 @test isapprox(grad2[1], -grad2[2], atol=t2)
-@test isapprox(grad2[1], -0.23796869082562833, atol=t2)
+@test isapprox(grad2[1], -0.1457888774124827, atol=t2)
 @test all(grad2[3:6] .== 0)
-grad2_tp = [-0.5950090665179929, 0.8280810295826272, 
-             0.09464147744656098, -0.05996050268876785]
+grad2_tp = [-0.027665907127075395, 0.032956566685641786, 
+             0.09464147744656182, -0.05996050268876785]
 @test isapprox.(grad2[7:end], grad2_tp, atol=t2) |> all
 
 end
