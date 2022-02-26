@@ -132,7 +132,7 @@ iteration converges.
 function optimizeParams!(bs::Vector{<:FloatingGTBasisFuncs}, pbs::Vector{<:ParamBox},
                          nuc::Vector{String}, nucCoords::Vector{<:AbstractArray}, 
                          ECmethod::F2=defaultECmethod(:RHF, nuc, nucCoords);
-                         Etarget::Float64=NaN, threshold::Float64=1e-4, maxSteps::Int=2000, 
+                         Etarget::Float64=NaN, threshold::Float64=1e-4, maxSteps::Int=500, 
                          printInfo::Bool=true, GDmethod::F1=gradDescent!) where 
                         {F1<:Function, F2<:Function}
     tAll = @elapsed begin
@@ -141,7 +141,7 @@ function optimizeParams!(bs::Vector{<:FloatingGTBasisFuncs}, pbs::Vector{<:Param
         Es = Float64[]
         pars = zeros(0, length(pbs))
         grads = zeros(0, length(pbs))
-        gap = max(5, maxSteps ÷ 200 * 5)
+        gap = min(100, max(maxSteps ÷ 200 * 5, 1))
         detectConverge = isnan(threshold) ? false : true
 
         if Etarget === NaN

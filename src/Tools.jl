@@ -656,14 +656,16 @@ end
 
 function isOscillateConverged(sequence::Vector{<:Real}, 
                               threshold1::Real, threshold2::Real=threshold1; 
-                              leastCycles::Int=1, nPartition::Int=5, returnStd::Bool=false)
+                              leastCycles::Int=1, nPartition::Int=5, returnStd::Bool=false, 
+                              convergeToMax::Bool=false)
     @assert leastCycles>0 && nPartition>1
     len = length(sequence)
     len < leastCycles && (return false)
     slice = len ÷ nPartition
     lastPortion = sequence[max(end-slice, 1) : end]
-    remained = sort(lastPortion)[end÷2+1 : end]
-    b = std(remained) < threshold1 && abs(sequence[end] - mean(remained)) < threshold2
+    remain = sort(lastPortion)[convergeToMax ? (end÷2+1 : end) : (1 : end÷2+1)]
+    b = std(remain) < threshold1 && 
+        abs(sequence[end] - (convergeToMax ? max(remain...) : min(remain...))) < threshold2
     returnStd ? (b, std(lastPortion)) : b
 end
 
