@@ -623,7 +623,7 @@ end
 """
 A dummy function that only returns its argument.
 """
-itself(x) = x
+itself(x::T) where {T} = x::T
 
 
 """
@@ -669,21 +669,6 @@ function isOscillateConverged(sequence::Vector{<:Real},
     returnStd ? (b, std(lastPortion)) : b
 end
 
-
-# function splitTerm(term::Symbolics.Num)
-#     r1 = Symbolics.@rule +(~(~xs)) => [i for i in ~(~xs)]
-#     r2 = Symbolics.@rule *(~(~xs)) => [[i for i in ~(~xs)] |> prod]
-#     for r in [r1, r2]
-#         term = Symbolics.simplify(term, rewriter = r)
-#     end
-#     # Converting Symbolics.Arr to Base.Array
-#     if term isa Symbolics.Arr
-#         terms = term |> collect
-#     else
-#         terms = [term]
-#     end
-#     terms
-# end
 
 splitTerm(term::Symbolics.Num) = splitTermCore(term.val)
 

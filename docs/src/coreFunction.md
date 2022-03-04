@@ -17,6 +17,10 @@ inValOf
 ```
 
 ```@docs
+inVarValOf
+```
+
+```@docs
 outValOf
 ```
 

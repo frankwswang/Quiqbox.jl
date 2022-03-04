@@ -1523,22 +1523,22 @@ function getVarCore(pb::ParamBox, expandNonDifferentiable::Bool=false)
     vNum = hasIdx ? Symbolics.variable(vSym, idx) : Symbolics.variable(vSym)
     f = pb.map
 
-    if f == itself
-        res = Pair[vNum => pb.data[]]
-    elseif pb.canDiff[] || expandNonDifferentiable
+    if pb.canDiff[] || expandNonDifferentiable
         ivSym = inSymOf(pb)
         ivNum = hasIdx ? Symbolics.variable(ivSym, idx) : Symbolics.variable(ivSym)
-        res = Pair[ivNum => pb.data[]]
+        res = Pair{Symbolics.Num, Real}[ivNum => pb.data[]]
         expr = f(ivNum)
         fNum = Symbolics.variable(f|>nameOf, T=Symbolics.FnType{Tuple{Any}, Real})(ivNum)
         pushfirst!(res, fNum=>expr, expr=>pb())
         !(pb.canDiff[]) && pushfirst(res, vNum=>fNum)
         res |> unique!
     else
-        res = Pair[vNum => pb()]
+        res = Pair{Symbolics.Num, Real}[vNum => pb()]
     end
     res
 end
+
+getVarCore(pb::ParamBox{T, V, :itself}, _::Bool=false) where {T, V} = [inVarValOf(pb)]
 
 """
 

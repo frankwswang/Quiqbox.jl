@@ -112,7 +112,9 @@ struct ParamBox{T, V, F} <: DifferentiableParameter{ParamBox, T}
     end
 end
 
-(pb::ParamBox)() = Base.invokelatest(pb.map, pb.data[])::Float64
+# (pb::ParamBox)() = Base.invokelatest(pb.map, pb.data[])::Float64
+(pb::ParamBox{T})() where {T} = pb.map(pb.data[]::T)
+(pb::ParamBox{T, <:Any, :itself})() where {T} = inValOf(pb)
 
 function ParamBox(data::Array{T, 0}, name::Symbol=:undef, mapFunction::F=itself, 
                   dataName::Symbol=:undef; canDiff::Bool=true, 
@@ -135,7 +137,23 @@ ParamBox(fill(data |> paramType), name, mapFunction, dataName; canDiff, index)
 Return the value of stored data (independent variable) of the input `ParamBox`. Equivalent 
 to `pb[]`.
 """
-inValOf(pb::ParamBox) = pb.data[]
+inValOf(pb::ParamBox{T}) where {T} = pb.data[]::T
+
+
+"""
+
+    inVarValOf(pb::ParamBox{T}) where {T} -> ::Pair{Symbolics.Num, T}
+
+Return a `Pair` of the stored independent variable of the input `ParamBox` and 
+its corresponding value.
+"""
+function inVarValOf(pb::ParamBox{T}) where {T}
+    idx = pb.index[]
+    hasIdx = idx isa Int
+    ivSym = inSymOf(pb)
+    ivNum = hasIdx ? Symbolics.variable(ivSym, idx) : Symbolics.variable(ivSym)
+    (ivNum => pb.data[])::Pair{Symbolics.Num, T}
+end
 
 
 """
@@ -145,7 +163,9 @@ inValOf(pb::ParamBox) = pb.data[]
 Return the value of mapped data (dependent variable) of the input `ParamBox`. Equivalent to 
 `pb()`.
 """
-outValOf(pb::ParamBox) = pb()
+outValOf(pb::ParamBox{T, <:Any, itself}) where {T} = 
+(pb::ParamBox{T2, <:Any, :itself} where T<:T2<:T)()
+outValOf(pb::ParamBox{T, <:Any, <:Any}) where {T} = (pb::ParamBox{T2} where T<:T2<:T)()
 
 
 """
@@ -270,7 +290,8 @@ toggleDiff!(pb::ParamBox) = begin pb.canDiff[] = !pb.canDiff[] end
 
 
 function deriveBasisFunc(bf::CompositeGTBasisFuncs, par::ParamBox) where {N}
-    varDict = getVarDictCore(bf)
+    # varDict = getVarDictCore(bf)
+    varDict = inVarValOf.(bf |> getParams) |> Dict
     vr = getVar(par)
     info = diffInfo(bf, vr, varDict)
     diffInfoToBasisFunc(bf, info)
