@@ -1,6 +1,5 @@
 using Test
 using Quiqbox
-using Quiqbox: gradHFenergy
 
 @testset "Differentiation.jl" begin
 

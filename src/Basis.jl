@@ -6,6 +6,7 @@ export GaussFunc, genExponent, genContraction, genSpatialPoint, BasisFunc, Basis
 using Symbolics
 using SymbolicUtils
 using LinearAlgebra: diag
+using ForwardDiff: derivative as ForwardDerivative
 
 """
 
@@ -1767,22 +1768,26 @@ end
 function varVal(vr::SymbolicUtils.Term, varDict::Dict{Num, <:Real})
     getFsym = (t) -> t isa SymbolicUtils.Sym ? Symbolics.tosymbol(t) : Symbol(t)
     if vr.f isa Symbolics.Differential
-        dvr = vr.arguments[]
-        vr = vr.f.x
-        if dvr isa SymbolicUtils.Term
-            f = getFunc(dvr.f |> getFsym, 0)
-            expr = f(dvr.arguments[]) # assuming AD propagates only through 1 var: f(g(x)).
+        fv = vr.arguments[]
+        if fv isa SymbolicUtils.Term
+            v = fv.arguments[]
+            f = getFunc(fv.f |> getFsym, 0)
+            ForwardDerivative(f, varVal(v, varDict))
         else
-            expr = dvr
+            v = vr.f.x
+            if v === fv
+                1.0
+            else
+                varVal(Symbolics.derivative(fv, vr), varDict)
+            end
         end
-        return varVal(Symbolics.derivative(expr, vr), varDict)
     elseif vr.f isa Union{SymbolicUtils.Sym, Function}
         fSymbol = vr.f |> getFsym
         f = getFunc(fSymbol, 0)
         v = varVal(vr.arguments[], varDict)
-        return f(v)
+        f(v)
     else
-        return NaN
+        NaN
     end
 end
 
@@ -1851,20 +1856,6 @@ function diffInfo(bf::CompositeGTBasisFuncs, vr, varDict)
     relDiffs = Symbolics.derivative.(log.(exprs), vr)
     diffTransfer.(relDiffs, Ref(varDict))
 end
-
-# function getRelDiff(expr::Num, vr::Num)
-#     Diff = Symbolics.derivative(log(expr), vr)
-#     D = Symbolics.simplify(Diff, rewriter = r)
-#     relDiffs = Symbolics.simplify.(splitTerm(Diff) ./ expr, expand=true)
-#     splitTerm.(relDiffs) |> flatten
-# end
-
-
-# function diffInfo(bf::CompositeGTBasisFuncs, vr, varDict)
-#     exprs = expressionOfCore(bf, false, true, true)
-#     relDiffs = getRelDiff.(exprs, Ref(vr))
-#     diffTransfer.(relDiffs, Ref(varDict))
-# end
 
 
 function diffInfoToBasisFunc(bf::FloatingGTBasisFuncs, info::Matrix{<:Any})

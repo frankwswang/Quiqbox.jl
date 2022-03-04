@@ -686,8 +686,8 @@ sym3 = Symbolics.variable(:a)
 vars = @variables X, Y, Z, F(X)
 F = vars[end]
 vars = vars[1:end-1]
-f1(X,Y,Z) = log(X+0.5Y*Z)
-expr = f1(X,Y,Z)
+func1(X,Y,Z) = log(X+0.5Y*Z)
+expr = func1(X,Y,Z)
 vals = [1, 3.334, -0.2]
 d1 = Dict(vars .=> vals)
 errT = 1e-10
@@ -695,7 +695,7 @@ errT = 1e-10
 @test isapprox(varVal(sum(vars), d1), sum(vals), atol=errT)
 @test isapprox(varVal(prod(vars), d1), prod(vals), atol=errT)
 @test isapprox(varVal(vars[1]^vars[2], d1), vals[1]^vals[2], atol=errT)
-@test isapprox(varVal(expr, d1), f1(vals...), atol=errT)
+@test isapprox(varVal(expr, d1), func1(vals...), atol=errT)
 
 f1 = Symbolics.variable(abs, T=Symbolics.FnType{Tuple{Any}, Real})(Z)
 f2 = Symbolics.variable(:abs, T=Symbolics.FnType{Tuple{Any}, Real})(Z)
