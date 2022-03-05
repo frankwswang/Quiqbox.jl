@@ -902,8 +902,7 @@ end
 function mulCore(c::Float64, con::ParamBox{<:Any, <:Any, F}) where {F}
     conNew = con.data
     mapFunction = Pf(c, Val(F))
-    dataName = inSymOf(con)
-    conNew, mapFunction, dataName
+    conNew, mapFunction, con.dataName
 end
 
 mul(coeff::Real, gf::GaussFunc) = mul(gf, coeff)
@@ -1393,7 +1392,7 @@ end
 
 function paramFilter(pb::ParamBox, outSym::Union{Symbol, Nothing}=nothing, 
                      canDiff::Bool=false)
-    (outSym === nothing || outSymOf(pb) == outSym) && 
+    (outSym === nothing || outSymOfCore(pb) == outSym) && 
     (!canDiff || pb.canDiff[])
 end
 
@@ -1477,7 +1476,7 @@ end
 function markParams!(parArray::Array{<:ParamBox}; 
                      filterMapping::Bool=false)
     pars = eltype(parArray)[]
-    syms = getUnique!(outSymOf.(parArray))
+    syms = getUnique!(outSymOfCore.(parArray))
     arr = parArray |> copy
     for sym in syms
         typ = ParamBox{<:Any, sym}
@@ -1517,18 +1516,14 @@ container. `expandNonDifferentiable` determines whether expanding the mapping re
 non-differentiable variable (parameters).
 """
 function getVarCore(pb::ParamBox, expandNonDifferentiable::Bool=false)
-    idx = pb.index[]
-    vSym = outSymOf(pb)
-    hasIdx = idx isa Int
-    vNum = hasIdx ? Symbolics.variable(vSym, idx) : Symbolics.variable(vSym)
+    vNum = outSymOf(pb)
     f = pb.map
-
     if pb.canDiff[] || expandNonDifferentiable
-        ivSym = inSymOf(pb)
-        ivNum = hasIdx ? Symbolics.variable(ivSym, idx) : Symbolics.variable(ivSym)
-        res = Pair{Symbolics.Num, Real}[ivNum => pb.data[]]
+        ivNum = inSymOf(pb)
         expr = f(ivNum)
-        fNum = Symbolics.variable(f|>nameOf, T=Symbolics.FnType{Tuple{Any}, Real})(ivNum)
+        res = Pair{Symbolics.Num, Real}[ivNum => pb.data[]]
+        fNum = getFuncNum(f, ivNum)
+        # fNum = Symbolics.variable(f|>nameOf, T=Symbolics.FnType{Tuple{Any}, Real})(ivNum)
         pushfirst!(res, fNum=>expr, expr=>pb())
         !(pb.canDiff[]) && pushfirst(res, vNum=>fNum)
         res |> unique!
@@ -1538,7 +1533,7 @@ function getVarCore(pb::ParamBox, expandNonDifferentiable::Bool=false)
     res
 end
 
-getVarCore(pb::ParamBox{T, V, :itself}, _::Bool=false) where {T, V} = [inVarValOf(pb)]
+getVarCore(pb::ParamBox{T, V, :itself}, _::Bool=false) where {T, V} = [inSymValOf(pb)]
 
 """
 
@@ -1651,8 +1646,12 @@ cgo2(r, α, d, i, j, k, N=getNijkα(i,j,k,α)) = cgo0(r[1], r[2], r[3], α, d, i
 
 
 function expressionOfCore(pb::ParamBox, substituteValue::Bool=false)
-    vrs = getVarCore(pb, false)
-    substituteValue ? recursivelyGet(vrs |> Dict, vrs[1][1]) : vrs[1][1]
+    if substituteValue
+        vrs = getVarCore(pb, false)
+        recursivelyGet(vrs |> Dict, vrs[1][1])
+    else
+        getFuncNum(pb.map, inSymOf(pb))
+    end
 end
 
 function expressionOfCore(bf::FloatingGTBasisFuncs{𝑙, GN, ON}, substituteValue::Bool=false, 

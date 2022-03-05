@@ -847,3 +847,13 @@ struct FunctionType{F}
     f::Symbol
     FunctionType{F}() where {F} = new{F}(F)
 end
+
+function getFuncNum(f::Function, vNum::Symbolics.Num)::Symbolics.Num
+    Symbolics.variable(f|>nameOf, T=Symbolics.FnType{Tuple{Any}, Real})(vNum)
+end
+
+function getFuncNum(::Pf{C, F}, vNum::Symbolics.Num) where {C, F}
+    (C * Symbolics.variable(F, T=Symbolics.FnType{Tuple{Any}, Real})(vNum))::Symbolics.Num
+end
+
+getFuncNum(::typeof(itself), vNum::Symbolics.Num) = vNum

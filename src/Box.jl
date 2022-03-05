@@ -46,25 +46,30 @@ struct GridBox{NX, NY, NZ} <: SemiMutableParameter{GridBox, Float64}
     spacing::Float64
     box::Vector{NTuple{3, ParamBox}}
 
-    function GridBox(nGrids::NTuple{3, Int}, spacing::Real=10, 
+    function GridBox((nGx, nGy, nGz)::NTuple{3, Int}, spacing::Real=10, 
                      centerCoord::Vector{<:Real}=[0.0,0.0,0.0];
                      canDiff::Bool=true, index::Int=0)
+        nGrids = (nGx, nGy, nGz)
         @assert all(nGrids .> 0) "The number of gird of each edge should be larger than 0."
         sym = ParamList[:spacing]
         spc = spacing |> Float64
         pbRef = ParamBox(spc; canDiff, index)
         boxes = NTuple{3, ParamBox{Float64}}[]
         n = 0
-        supIndex = "ᴳ"*numToSups(nGrids[1])*superscriptSym['-']*numToSups(nGrids[2])*
-                   superscriptSym['-']*numToSups(nGrids[3])
-        for i=0:nGrids[1], j=0:nGrids[2], k=0:nGrids[3]
+        # supIndex = "ᴳ"*numToSups(nGx)*superscriptSym['-']*numToSups(nGy)*
+        #            superscriptSym['-']*numToSups(nGz)
+        prefix = "G" * "_" * "$(nGx)" * "_" * "$(nGy)" * "_" * "$(nGz)" * "_"
+        for i=0:nGx, j=0:nGy, k=0:nGz
             n += 1
-            fX0 = L -> centerCoord[1] + (i - 0.5*nGrids[1]) * L
-            fY0 = L -> centerCoord[2] + (j - 0.5*nGrids[2]) * L
-            fZ0 = L -> centerCoord[3] + (k - 0.5*nGrids[3]) * L
-            fXname = (ParamList[:X] |> string) * supIndex * numToSubs(n)
-            fYname = (ParamList[:Y] |> string) * supIndex * numToSubs(n)
-            fZname = (ParamList[:Z] |> string) * supIndex * numToSubs(n)
+            fX0 = L -> centerCoord[1] + (i - 0.5*nGx) * L
+            fY0 = L -> centerCoord[2] + (j - 0.5*nGy) * L
+            fZ0 = L -> centerCoord[3] + (k - 0.5*nGz) * L
+            # fXname = (ParamList[:X] |> string) * supIndex * numToSubs(n)
+            # fYname = (ParamList[:Y] |> string) * supIndex * numToSubs(n)
+            # fZname = (ParamList[:Z] |> string) * supIndex * numToSubs(n)
+            fXname = prefix * (ParamList[:X] |> string) * numToSubs(n)
+            fYname = prefix * (ParamList[:Y] |> string) * numToSubs(n)
+            fZname = prefix * (ParamList[:Z] |> string) * numToSubs(n)
             fX = renameFunc(fXname, fX0)
             fY = renameFunc(fYname, fY0)
             fZ = renameFunc(fZname, fZ0)
@@ -73,7 +78,7 @@ struct GridBox{NX, NY, NZ} <: SemiMutableParameter{GridBox, Float64}
             Z = ParamBox(pbRef.data, ParamList[:Z], fZ, sym; canDiff, index)
             push!(boxes, (X, Y, Z))
         end
-        new{nGrids[1], nGrids[2], nGrids[3]}(prod(nGrids .+ 1), spc, boxes)
+        new{nGx, nGy, nGz}(prod(nGrids .+ 1), spc, boxes)
     end
 end
 

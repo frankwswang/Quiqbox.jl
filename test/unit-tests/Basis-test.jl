@@ -9,14 +9,14 @@ using LinearAlgebra
 @testset "Basis.jl" begin
 
 # struct GaussFunc
-exp1, con1 = (2, 1.0)
-gf1 = GaussFunc(exp1, con1)
-gf2 = GaussFunc(exp1, con1)
+xpn1, con1 = (2, 1.0)
+gf1 = GaussFunc(xpn1, con1)
+gf2 = GaussFunc(xpn1, con1)
 @test typeof(gf1) == typeof(gf2)
 @test (gf1, gf2) isa Tuple{GaussFunc, GaussFunc}
 @test (gf1, gf2) isa NTuple{2, GaussFunc}
 gf1_ref = gf1
-@test gf1.xpn == ParamBox(exp1, :xpn)
+@test gf1.xpn == ParamBox(xpn1, :xpn)
 @test gf1.con == ParamBox(con1, :con)
 @test gf1.param == (gf1.xpn, gf1.con)
 @test hasEqual(gf1, gf2)
@@ -102,10 +102,10 @@ bf2 = genBasisFunc(cen, [gf2])
 @test bf1 isa BasisFunc
 
 bf11 = genBasisFunc(cen, [gf1, gf1])
-bf1_3 = genBasisFunc(cen, (exp1, con1))
+bf1_3 = genBasisFunc(cen, (xpn1, con1))
 @test hasEqual(bf1, bf1_3)
 @test !hasIdentical(bf1, bf1_3)
-bf11_2 = genBasisFunc(cen, ([exp1, exp1], [con1, con1]))
+bf11_2 = genBasisFunc(cen, ([xpn1, xpn1], [con1, con1]))
 @test hasEqual(bf11, bf11_2)
 @test !hasIdentical(bf11, bf11_2)
 bf2_P_norm2 = genBasisFunc(cen, [gf2], "P")
@@ -283,6 +283,13 @@ for bs in (bs2, bs2_2, bs2_3)
 end
 @test hasEqual(mul(1.0, bf1), bf1)
 @test hasEqual(mul(1.1, bf1), mul(bf1, 1.1))
+xpn2 = genExponent(1.2)
+con2 = genContraction(1.2, x->x^2)
+bf_pf = genBasisFunc([1,2,3], GaussFunc(xpn2, con2))
+bf_pf2 = (bf_pf*0.4)*5
+@test bf_pf2.gauss[1].con.map isa Quiqbox.Pf{2.0}
+@test hasEqual(bf_pf2, mul(bf_pf, 2.0))
+
 
 α₁, α₂ = rand(1:0.01:10, 2)
 d₁, d₂ = rand(2)

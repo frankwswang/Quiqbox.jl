@@ -17,18 +17,18 @@ inValOf
 ```
 
 ```@docs
-inVarValOf
+inSymOf
+```
+
+```@docs
+inSymValOf
 ```
 
 ```@docs
 outValOf
 ```
 
-```@docs
-inSymOf
-```
-
-```@docs
+```@doc
 outSymOf
 ```
 

@@ -1,5 +1,6 @@
-export ParamBox, inValOf, outValOf, inSymOf, outSymOf, dataOf, mapOf, outValCopy, 
-       inVarCopy, enableDiff!, disableDiff!, isDiffParam, toggleDiff!, gradHFenergy
+export ParamBox, inValOf, inSymOf, inSymValOf, outValOf, outSymOf, dataOf, mapOf, 
+       outValCopy, inVarCopy, enableDiff!, disableDiff!, isDiffParam, toggleDiff!, 
+       gradHFenergy
 
 using LinearAlgebra: eigen
 using Symbolics: Num
@@ -142,18 +143,27 @@ inValOf(pb::ParamBox{T}) where {T} = pb.data[]::T
 
 """
 
-    inVarValOf(pb::ParamBox{T}) where {T} -> ::Pair{Symbolics.Num, T}
+    inSymOf(pb::ParamBox) -> Symbolics.Num
 
-Return a `Pair` of the stored independent variable of the input `ParamBox` and 
-its corresponding value.
+Return the variable`::Symbolics.Num` of stored data (independent variable) of the input 
+`ParamBox`.
 """
-function inVarValOf(pb::ParamBox{T}) where {T}
+function inSymOf(pb::ParamBox{T}) where {T}
     idx = pb.index[]
     hasIdx = idx isa Int
-    ivSym = inSymOf(pb)
-    ivNum = hasIdx ? Symbolics.variable(ivSym, idx) : Symbolics.variable(ivSym)
-    (ivNum => pb.data[])::Pair{Symbolics.Num, T}
+    ivSym = inSymOfCore(pb)
+    hasIdx ? Symbolics.variable(ivSym, idx) : Symbolics.variable(ivSym)
 end
+
+
+"""
+
+    inSymValOf(pb::ParamBox{T}) where {T} -> ::Pair{Symbolics.Num, T}
+
+Return a `Pair` of the stored independent variable of the input `ParamBox` and its 
+corresponding value.
+"""
+inSymValOf(pb::ParamBox{T}) where {T} = (inSymOf(pb) => pb.data[])::Pair{Symbolics.Num, T}
 
 
 """
@@ -170,20 +180,36 @@ outValOf(pb::ParamBox{T, <:Any, <:Any}) where {T} = (pb::ParamBox{T2} where T<:T
 
 """
 
-    inSymOf(pb::ParamBox) -> Symbol
+    outSymOf(pb::ParamBox) -> Symbolics.Num
+
+Return the variable`::Symbolics.Num` of mapped data (dependent variable) of the input 
+`ParamBox`.
+"""
+outSymOf(pb::ParamBox{T, <:Any, itself}) where {T} = inSymOf(pb)
+function outSymOf(pb::ParamBox)
+    idx = pb.index[]
+    hasIdx = idx isa Int
+    vSym = outSymOfCore(pb)
+    hasIdx ? Symbolics.variable(vSym, idx) : Symbolics.variable(vSym)
+end
+
+
+"""
+
+    inSymOfCore(pb::ParamBox) -> Symbol
 
 Return the `Symbol` of the stored data (independent variable) of the input `ParamBox`.
 """
-inSymOf(pb::ParamBox) = pb.dataName
+inSymOfCore(pb::ParamBox) = pb.dataName
 
 
 """
 
-    outSymOf(pb::ParamBox) -> Symbol
+    outSymOfCore(pb::ParamBox) -> Symbol
 
 Return the `Symbol` of the mapped data (dependent variable) of the input `ParamBox`.
 """
-outSymOf(::ParamBox{<:Any, V}) where {V} = V
+outSymOfCore(::ParamBox{<:Any, V}) where {V} = V
 
 
 """
@@ -211,7 +237,7 @@ mapOf(pb::ParamBox) = pb.map
 Return a new `ParamBox` of which the stored data is a **deep copy** of the mapped data from 
 the input `ParamBox`.
 """
-outValCopy(pb::ParamBox) = ParamBox(pb(), outSymOf(pb), canDiff=pb.canDiff[])
+outValCopy(pb::ParamBox) = ParamBox(pb(), outSymOfCore(pb), canDiff=pb.canDiff[])
 
 
 """
@@ -240,7 +266,7 @@ julia> pb2[]
 1.1
 ```
 """
-inVarCopy(pb::ParamBox) = ParamBox(pb.data, inSymOf(pb), canDiff=pb.canDiff[])
+inVarCopy(pb::ParamBox) = ParamBox(pb.data, inSymOfCore(pb), canDiff=pb.canDiff[])
 
 
 const NoDiffMark = superscriptSym['!']
@@ -291,7 +317,7 @@ toggleDiff!(pb::ParamBox) = begin pb.canDiff[] = !pb.canDiff[] end
 
 function deriveBasisFunc(bf::CompositeGTBasisFuncs, par::ParamBox) where {N}
     # varDict = getVarDictCore(bf)
-    varDict = inVarValOf.(bf |> getParams) |> Dict
+    varDict = inSymValOf.(bf |> getParams) |> Dict
     vr = getVar(par)
     info = diffInfo(bf, vr, varDict)
     diffInfoToBasisFunc(bf, info)
