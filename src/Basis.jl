@@ -660,11 +660,13 @@ centerOf(bf::FloatingGTBasisFuncs) = bf.center
 
 """
 
-    centerCoordOf(bf::FloatingGTBasisFuncs) -> Array{<:Real, 1}
+    centerCoordOf(bf::FloatingGTBasisFuncs) -> Vector{Float64}
 
 Return the center coordinate of the input `FloatingGTBasisFuncs`.
 """
 centerCoordOf(bf::FloatingGTBasisFuncs) = Float64[i() for i in bf.center]
+
+centerCoordOfCore(bf::FloatingGTBasisFuncs) = outValOf.(bf.center)
 
 
 """

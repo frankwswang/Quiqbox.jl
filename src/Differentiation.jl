@@ -104,10 +104,6 @@ struct ParamBox{T, V, F} <: DifferentiableParameter{ParamBox, T}
     new{T, V, :itself}(data, V, itself, fill(false), index)
 end
 
-# (pb::ParamBox)() = Base.invokelatest(pb.map, pb.data[])::Float64
-(pb::ParamBox{T})() where {T} = pb.map(pb.data[]::T)
-(pb::ParamBox{T, <:Any, :itself})() where {T} = inValOf(pb)
-
 function ParamBox{V}(mapFunction::F, 
                      data::Array{T, 0}, index, canDiff, dataName=:undef) where 
                     {V, F<:Function, T}
@@ -155,7 +151,7 @@ ParamBox{name}(mapFunction, data, genIndex(index), fill(canDiff), dataName)
 Return the value of stored data (independent variable) of the input `ParamBox`. Equivalent 
 to `pb[]`.
 """
-inValOf(pb::ParamBox{T}) where {T} = pb.data[]::T
+@inline inValOf(pb::ParamBox{T}) where {T} = pb.data[]::T
 
 
 """
@@ -165,7 +161,7 @@ inValOf(pb::ParamBox{T}) where {T} = pb.data[]::T
 Return the variable`::Symbolics.Num` of stored data (independent variable) of the input 
 `ParamBox`.
 """
-function inSymOf(pb::ParamBox{T}) where {T}
+@inline function inSymOf(pb::ParamBox{T}) where {T}
     idx = pb.index[]
     hasIdx = idx isa Int
     ivSym = inSymOfCore(pb)
@@ -180,7 +176,7 @@ end
 Return a `Pair` of the stored independent variable of the input `ParamBox` and its 
 corresponding value.
 """
-inSymValOf(pb::ParamBox{T}) where {T} = (inSymOf(pb) => pb.data[])::Pair{Symbolics.Num, T}
+@inline inSymValOf(pb::ParamBox{T}) where {T} = (inSymOf(pb) => pb.data[])::Pair{Symbolics.Num, T}
 
 
 """
@@ -190,9 +186,12 @@ inSymValOf(pb::ParamBox{T}) where {T} = (inSymOf(pb) => pb.data[])::Pair{Symboli
 Return the value of mapped data (dependent variable) of the input `ParamBox`. Equivalent to 
 `pb()`.
 """
-outValOf(pb::ParamBox{T, <:Any, itself}) where {T} = 
-(pb::ParamBox{T2, <:Any, :itself} where T<:T2<:T)()
-outValOf(pb::ParamBox{T, <:Any, <:Any}) where {T} = (pb::ParamBox{T2} where T<:T2<:T)()
+@inline outValOf(pb::ParamBox{T}) where {T} = pb.map(pb.data[]::T)
+
+@inline outValOf(pb::ParamBox{T, <:Any, :itself}) where {T} = inValOf(pb)
+
+(pb::ParamBox)() = outValOf(pb)
+# (pb::ParamBox)() = Base.invokelatest(pb.map, pb.data[])::Float64
 
 
 """
@@ -202,8 +201,9 @@ outValOf(pb::ParamBox{T, <:Any, <:Any}) where {T} = (pb::ParamBox{T2} where T<:T
 Return the variable`::Symbolics.Num` of mapped data (dependent variable) of the input 
 `ParamBox`.
 """
-outSymOf(pb::ParamBox{T, <:Any, itself}) where {T} = inSymOf(pb)
-function outSymOf(pb::ParamBox)
+@inline outSymOf(pb::ParamBox{T, <:Any, itself}) where {T} = inSymOf(pb)
+
+@inline function outSymOf(pb::ParamBox)
     idx = pb.index[]
     hasIdx = idx isa Int
     vSym = outSymOfCore(pb)
@@ -217,7 +217,7 @@ end
 
 Return the `Symbol` of the stored data (independent variable) of the input `ParamBox`.
 """
-inSymOfCore(pb::ParamBox) = pb.dataName
+@inline inSymOfCore(pb::ParamBox) = pb.dataName
 
 
 """
@@ -226,7 +226,7 @@ inSymOfCore(pb::ParamBox) = pb.dataName
 
 Return the `Symbol` of the mapped data (dependent variable) of the input `ParamBox`.
 """
-outSymOfCore(::ParamBox{<:Any, V}) where {V} = V
+@inline outSymOfCore(::ParamBox{<:Any, V}) where {V} = V
 
 
 """
@@ -235,7 +235,7 @@ outSymOfCore(::ParamBox{<:Any, V}) where {V} = V
 
 Return the 0-D `Array` of the data stored in the input `ParamBox`.
 """
-dataOf(pb::ParamBox) = pb.data
+@inline dataOf(pb::ParamBox) = pb.data
 
 
 """
@@ -244,7 +244,7 @@ dataOf(pb::ParamBox) = pb.data
 
 Return the mapping function of the input `ParamBox`.
 """
-mapOf(pb::ParamBox) = pb.map
+@inline mapOf(pb::ParamBox) = pb.map
 
 
 """
