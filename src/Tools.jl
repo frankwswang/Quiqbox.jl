@@ -634,9 +634,11 @@ function symbolReplace(sym::Symbol, pair::Pair{String, String}; count::Int=typem
 end
 
 
-function renameFunc(fName::String, f::F) where {F<:Function}
-    @eval ($(Symbol(fName)))(a...; b...) = $f(a...; b...)
+function renameFunc(fName::Symbol, f::F) where {F<:Function}
+    @eval ($(fName))(a...; b...) = $f(a...; b...)
 end
+
+renameFunc(fName::String, f) = renameFunc(Symbol(fName), f)
 
 
 """
@@ -749,23 +751,6 @@ function mapPermute(arr, permFunction)
 end
 
 
-function getFunc(fSym::Symbol, failedResult=missing)
-    try
-        getfield(Quiqbox, fSym)
-    catch
-        try
-            getfield(Main, fSym)
-        catch
-            try
-                fSym |> string |> Meta.parse |> eval
-            catch
-                (_) -> failedResult
-            end
-        end
-    end
-end
-
-
 struct Pf{C, F} <: ParameterizedFunction
     f::Function
 end
@@ -785,6 +770,29 @@ Pf(c::Float64, ::Val{Pf{C, :itself}}) where {C} = Pf{c*C, :itself}(itself)
 
 (f::Pf{C, :itself})(x::Real) where {C} = C * x
 (::Type{Pf{C, :itself}})(x::Real) where {C} = C * x
+
+
+function getFunc(fSym::Symbol, failedResult=missing)
+    try
+        getfield(Quiqbox, fSym)
+    catch
+        try
+            getfield(Main, fSym)
+        catch
+            try
+                fSym |> string |> Meta.parse |> eval
+            catch
+                (_) -> failedResult
+            end
+        end
+    end
+end
+
+getFunc(::Type{Pf{C, F}}, _=missing) where {C, F} = Pf{C, F}(getFunc(Val(F)))
+
+getFunc(::Val{F}, failedResult=missing) where {F} = getFunc(F, failedResult)
+
+getFunc(::Val{:itself}, _=missing) = itself
 
 
 nameOf(f::ParameterizedFunction) = typeof(f)
@@ -843,10 +851,12 @@ arrayDiff!(vs::Vararg{Array{T}, N}) where {T, N} = arrayDiffCore!(vs)
 
 tupleDiff(ts::Vararg{NTuple{<:Any, T}, N}) where {T, N} = arrayDiff!((ts .|> collect)...)
 
+
 struct FunctionType{F}
-    f::Symbol
+    f::Union{Symbol, Type{<:ParameterizedFunction}}
     FunctionType{F}() where {F} = new{F}(F)
 end
+
 
 function getFuncNum(f::Function, vNum::Symbolics.Num)::Symbolics.Num
     Symbolics.variable(f|>nameOf, T=Symbolics.FnType{Tuple{Any}, Real})(vNum)
@@ -857,3 +867,17 @@ function getFuncNum(::Pf{C, F}, vNum::Symbolics.Num) where {C, F}
 end
 
 getFuncNum(::typeof(itself), vNum::Symbolics.Num) = vNum
+
+function genIndex(index::Int)
+    @assert index >= 0
+    genIndexCore(index)
+end
+
+genIndex(index::Nothing) = genIndexCore(index)
+
+function genIndexCore(index)
+    res = reshape(Union{Int, Nothing}[0], ()) |> collect
+    res[] = index
+    res
+end
+

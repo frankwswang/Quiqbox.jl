@@ -6,7 +6,7 @@ using Suppressor: @capture_out
 @testset "Overload.jl" begin
 
     # function show
-    pb1 = ParamBox(-1, canDiff=false)
+    pb1 = ParamBox(-1)
     @test (@capture_out show(pb1)) == string(typeof(pb1))*"(-1.0)[∂][undef]"
 
     pb2 = ParamBox(-1, :a, index=1)
@@ -31,9 +31,12 @@ using Suppressor: @capture_out
     @test (@capture_out show(bfs1)) == string(typeof(bfs1))*"(gauss, subshell, center)"*
                                        "[3/3]"*"[0.0, 0.0, 0.0]"
 
-    bfs2 = genBasisFunc([0,0,0], (2,1), [[2,0,0]])
+    bfs2 = genBasisFunc([0,0,0], (2,1), [(2,0,0)])
     @test (@capture_out show(bfs2)) == string(typeof(bfs2))*"(gauss, subshell, center)"*
                                        "[X²Y⁰Z⁰]"*"[0.0, 0.0, 0.0]"
+    bfs3 = genBasisFunc([0,0,0], (2,1), [(2,0,0), (1,1,0)])
+    @test (@capture_out show(bfs3)) == string(typeof(bfs3))*"(gauss, subshell, center)"*
+                                       "[2/6]"*"[0.0, 0.0, 0.0]"
 
     bfm1 = BasisFuncMix([bf1, bf2])
     @test (@capture_out show(bfm1)) == string(typeof(bfm1))*"(BasisFunc, param)"
@@ -45,7 +48,7 @@ using Suppressor: @capture_out
     box1 = GridBox(2, 1.5)
     @test (@capture_out show(box1)) == string(typeof(box1))*"(num, len, coord)"
 
-    fVar1 = runHF(GTb1, ["H", "H"], [[0, 0, 0], [1,2,1]], printInfo=false, initialC=:Hcore)
+    fVar1 = runHF(GTb1, ["H", "H"], [[0,0,0], [1,2,1]], printInfo=false, initialC=:Hcore)
 
     info1 = (@capture_out show(fVar1.temp))
     @test info1[1:42] == string(typeof(fVar1.temp))*"(shared.Etots=["
@@ -56,14 +59,21 @@ using Suppressor: @capture_out
     @test info2[49:end] == ", C, F, D, Emo, occu, temp, isConverged)"
 
 
-    # function hasBoolRelation
+    # function ==, hasBoolRelation
     pb4 = deepcopy(pb1)
+    pb5 = ParamBox(-1, :fa, abs)
+    pb6 = ParamBox(-1, :x, abs)
+    @test false == (pb3 == pb5)
+    @test true  == (pb3 == pb6)
+    @test true  == hasBoolRelation(==, pb1, pb2)
+    toggleDiff!(pb1)
+    @test true  == (hasBoolRelation(==, pb1, pb2) && pb1.canDiff != pb2.canDiff)
+    @test true  == hasBoolRelation(==, pb1, pb2, ignoreContainer=true)
     @test true  == hasBoolRelation(==, pb1, pb4)
     @test false == hasBoolRelation(===, pb1, pb4)
+    @test true  == hasBoolRelation(===, pb1, pb4, ignoreContainer=true)
     @test false == hasBoolRelation(==, pb2, pb3)
     @test true  == hasBoolRelation(==, pb2, pb3, ignoreFunction = true)
-    @test false == hasBoolRelation(==, pb1, pb2)
-    @test true  == hasBoolRelation(==, pb1, pb2, ignoreContainer=true)
 
 
     # function +
@@ -231,7 +241,7 @@ using Suppressor: @capture_out
     gs = getindex(bfm11)
     @test gs == bfm11[] == bfm11[begin] == bfm11[end]
     @test getUnique!(gs) == [bf1.gauss[1], bf2.gauss...]
-    bfs1_alter = genBasisFunc.(Ref([0,0,0]), Ref((2,1)), [[1,0,0], [0,1,0], [0,0,1]])
+    bfs1_alter = genBasisFunc.(Ref([0,0,0]), Ref((2,1)), [(1,0,0), (0,1,0), (0,0,1)])
     for i in eachindex(bfs1)
         @test hasEqual(getindex(bfs1, i), bfs1[i], bfs1_alter[i])
     end

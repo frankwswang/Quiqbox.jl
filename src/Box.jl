@@ -53,7 +53,7 @@ struct GridBox{NX, NY, NZ} <: SemiMutableParameter{GridBox, Float64}
         @assert all(nGrids .> 0) "The number of gird of each edge should be larger than 0."
         sym = ParamList[:spacing]
         spc = spacing |> Float64
-        pbRef = ParamBox(spc; canDiff, index)
+        pbRef = ParamBox(spc; index)
         boxes = NTuple{3, ParamBox{Float64}}[]
         n = 0
         # supIndex = "ᴳ"*numToSups(nGx)*superscriptSym['-']*numToSups(nGy)*

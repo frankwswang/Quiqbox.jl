@@ -5,9 +5,9 @@ using Quiqbox
     errT1 = 1e-10
     errT2 = 1e-14
 
-    b1 = genBasisFunc([0,1,0], (3,2), [1,0,0], normalizeGTO=true)
-    b2 = genBasisFunc([1,2,3], (1,2), [0,1,0], normalizeGTO=true)
-    b3 = genBasisFunc([1,2,3], (1,2), [1,0,0], normalizeGTO=true)
+    b1 = genBasisFunc([0,1,0], (3,2), (1,0,0), normalizeGTO=true)
+    b2 = genBasisFunc([1,2,3], (1,2), (0,1,0), normalizeGTO=true)
+    b3 = genBasisFunc([1,2,3], (1,2), (1,0,0), normalizeGTO=true)
     b4 = genBasisFunc([1,1,2], (0.8,0.4))
     eeI1 = eeInteraction(b1, b2, b3, b4)
     eeI2 = eeInteraction(b2, b1, b3, b4)

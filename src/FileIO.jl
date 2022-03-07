@@ -87,12 +87,3 @@ function alignNumSign(c::Real; roundDigits::Int=-1)
         " "*alignNum(c, 0, 0; roundDigits)
     end
 end
-
-function ijkToStr(ijk::NTuple{3, Int})
-    res = ""
-    xyz = ("X", "Y", "Z")
-    for (i, j) in zip(xyz, ijk)
-        res *= i * superscriptNum[j + '0']
-    end
-    res
-end

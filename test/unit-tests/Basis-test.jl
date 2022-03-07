@@ -16,8 +16,8 @@ gf2 = GaussFunc(xpn1, con1)
 @test (gf1, gf2) isa Tuple{GaussFunc, GaussFunc}
 @test (gf1, gf2) isa NTuple{2, GaussFunc}
 gf1_ref = gf1
-@test gf1.xpn == ParamBox(xpn1, :xpn)
-@test gf1.con == ParamBox(con1, :con)
+@test gf1.xpn == ParamBox(xpn1, ParamList[:xpn])
+@test gf1.con == ParamBox(con1, ParamList[:con])
 @test gf1.param == (gf1.xpn, gf1.con)
 @test hasEqual(gf1, gf2)
 @test hasIdentical(gf1, gf1)
@@ -148,10 +148,10 @@ bf3_4_2 = genBasisFunc([0,0,0], (1,1), "D", normalizeGTO=true)
 
 
 # function sortBasisFuncs
-bfs1 = [genBasisFunc([1,1,1], (2,1), [1,0,0]), genBasisFunc([1,1,1], (3,1), [2,0,0]), 
-        genBasisFunc([1,1,2], (3,1), [0,0,0]), genBasisFunc([1,1,1], (3,1), "P")]
-bfs2 = [genBasisFunc([1,1,1], (2,1), [1,0,0]), genBasisFunc([1,1,1], (3,1), "P"), 
-        genBasisFunc([1,1,1], (3,1), [2,0,0]), genBasisFunc([1,1,2], (3,1), [0,0,0])]
+bfs1 = [genBasisFunc([1,1,1], (2,1), (1,0,0)), genBasisFunc([1,1,1], (3,1), (2,0,0)), 
+        genBasisFunc([1,1,2], (3,1), (0,0,0)), genBasisFunc([1,1,1], (3,1), "P")]
+bfs2 = [genBasisFunc([1,1,1], (2,1), (1,0,0)), genBasisFunc([1,1,1], (3,1), "P"), 
+        genBasisFunc([1,1,1], (3,1), (2,0,0)), genBasisFunc([1,1,2], (3,1), (0,0,0))]
 bfs3 = sortBasisFuncs(bfs1, groupCenters=true)
 @test length.(bfs3) == [3,1]
 bfs3 = bfs3 |> flatten
@@ -162,7 +162,7 @@ bfs3 = bfs3 |> flatten
 # function isFull
 @test isFull(bf3_1) == true
 @test isFull(bf3_3) == true
-bf5 = genBasisFunc([0,0,0], (2,1), [1,0,0])
+bf5 = genBasisFunc([0,0,0], (2,1), (1,0,0))
 @test isFull(bf5) == false
 @test isFull(1) == false
 
@@ -176,9 +176,9 @@ bf5 = genBasisFunc([0,0,0], (2,1), [1,0,0])
 bfm1 = BasisFuncMix(bf1)
 @test bfm1 == BasisFuncMix([bf1])
 @test BasisFuncMix(BasisFuncMix(bf3_1)) == BasisFuncMix(bf3_1)
-bf5_2 = genBasisFunc([0,0,0], (2,1), [[1,0,0]])
+bf5_2 = genBasisFunc([0,0,0], (2,1), [(1,0,0)])
 bfm2 = BasisFuncMix(bf5)
-@test hasEqual(bfm2, BasisFuncMix(bf5_2)[])
+@test hasEqual(bfm2, BasisFuncMix(bf5_2))
 
 errorThreshold2 = 1e-15
 bs1 = genBasisFunc.(gridCoords(GridBox(1,1.5)), Ref(GaussFunc(1.0, 0.5)))
@@ -200,26 +200,26 @@ eeI = eeInteractions([bfm])[]
 
 
 # function sumOf
-bs2 = [genBasisFunc([1,1,1], (2,1), [1,0,0], normalizeGTO=true), 
-       genBasisFunc([1,1,1], (3,1), [2,0,0], normalizeGTO=true), 
-       genBasisFunc([1,1,2], (3,1), [0,0,0], normalizeGTO=true), 
-       genBasisFunc([1,1,1], (3,1), [0,1,0], normalizeGTO=true)]
-bs2_2 = [genBasisFunc([1,1,1], (2,1), [1,0,0]), 
-         genBasisFunc([1,1,1], (3,1), [2,0,0]), 
-         genBasisFunc([1,1,2], (3,1), [0,0,0]), 
-         genBasisFunc([1,1,1], (3,1), [0,1,0])]
-bs2_3 = [genBasisFunc([1,1,1], (2,1), [1,0,0]), 
-         genBasisFunc([1,1,1], (3,1), [2,0,0], normalizeGTO=true), 
-         genBasisFunc([1,1,2], (3,1), [0,0,0]), 
-         genBasisFunc([1,1,1], (3,1), [0,1,0], normalizeGTO=true)]
-bs3 = [genBasisFunc([1,1,1], (2,1), [1,0,0], normalizeGTO=true), 
-       genBasisFunc([1,1,1], (3,1), [0,1,0], normalizeGTO=true), 
-       genBasisFunc([1,1,1], (3,1), [2,0,0], normalizeGTO=true), 
-       genBasisFunc([1,1,2], (3,1), [0,0,0], normalizeGTO=true)]
-bs3_2 = [genBasisFunc([1,1,1], (2,1), [1,0,0]), 
-       genBasisFunc([1,1,1], (3,1), [0,1,0]), 
-       genBasisFunc([1,1,1], (3,1), [2,0,0]), 
-       genBasisFunc([1,1,2], (3,1), [0,0,0])]
+bs2 =   [genBasisFunc([1,1,1], (2,1), (1,0,0), normalizeGTO=true), 
+         genBasisFunc([1,1,1], (3,1), (2,0,0), normalizeGTO=true), 
+         genBasisFunc([1,1,2], (3,1), (0,0,0), normalizeGTO=true), 
+         genBasisFunc([1,1,1], (3,1), (0,1,0), normalizeGTO=true)]
+bs2_2 = [genBasisFunc([1,1,1], (2,1), (1,0,0)), 
+         genBasisFunc([1,1,1], (3,1), (2,0,0)), 
+         genBasisFunc([1,1,2], (3,1), (0,0,0)), 
+         genBasisFunc([1,1,1], (3,1), (0,1,0))]
+bs2_3 = [genBasisFunc([1,1,1], (2,1), (1,0,0)), 
+         genBasisFunc([1,1,1], (3,1), (2,0,0), normalizeGTO=true), 
+         genBasisFunc([1,1,2], (3,1), (0,0,0)), 
+         genBasisFunc([1,1,1], (3,1), (0,1,0), normalizeGTO=true)]
+bs3 =   [genBasisFunc([1,1,1], (2,1), (1,0,0), normalizeGTO=true), 
+         genBasisFunc([1,1,1], (3,1), (0,1,0), normalizeGTO=true), 
+         genBasisFunc([1,1,1], (3,1), (2,0,0), normalizeGTO=true), 
+         genBasisFunc([1,1,2], (3,1), (0,0,0), normalizeGTO=true)]
+bs3_2 = [genBasisFunc([1,1,1], (2,1), (1,0,0)), 
+         genBasisFunc([1,1,1], (3,1), (0,1,0)), 
+         genBasisFunc([1,1,1], (3,1), (2,0,0)), 
+         genBasisFunc([1,1,2], (3,1), (0,0,0))]
 
 bfm_1 = +(bs2...,)
 bfm_2 = sumOf(bs2)
@@ -339,11 +339,11 @@ bf_mul8_0 = genBasisFunc([1,0,0], ([3, 3.5], [0.9, 1.2]))
 bf_mul9 = mul(bf_mul1, bf_mul3, normalizeGTO=true)
 bf_mul9_0 = genBasisFunc([1,0,0], ([3, 3.5], [0.9, 1.2]), normalizeGTO=true)
 @test hasEqual(bf_mul9, bf_mul9_0)
-bf_mul10 = genBasisFunc([1,0,0], (1.2,0.3), [1,0,0])
+bf_mul10 = genBasisFunc([1,0,0], (1.2,0.3), (1,0,0))
 bf_mul11 = genBasisFunc([0,1,0], (1.5,1))
-bf_mul12 = genBasisFunc([0,1,0], (1.5,1), [1,0,0])
+bf_mul12 = genBasisFunc([0,1,0], (1.5,1), (1,0,0))
 bf_mul13 = genBasisFunc([1,1,1], ([1.2, 1.0], [0.2, 0.5]))
-bf_mul14 = genBasisFunc([1,0.2,1], ([1.2, 1.0], [0.2, 0.5]), [1,1,1])
+bf_mul14 = genBasisFunc([1,0.2,1], ([1.2, 1.0], [0.2, 0.5]), (1,1,1))
 bf_mul15 = mul(bf_mul10, BasisFuncMix([bf_mul1, bf_mul2]))
 bf_mul15_0 = mul(bf_mul10, BasisFuncMix([bf_mul1, bf_mul2]), normalizeGTO=true)
 bf_mul16 = mul(bf_mul15, bf_mul15_0)
@@ -382,7 +382,7 @@ testNorm(bf_mul16, bf_mul16_0)
 testNorm(bf_mul15_0, bf_mul16_0)
 
 
-# (dev) function getOverlap
+# function getOverlap
 @test isapprox(Quiqbox.getOverlap(bf_mul2_2, bf_mul2_2), 1.0, atol=1e-10)
 @test isapprox(Quiqbox.getOverlap(bf_mul5_0, bf_mul5_0), 9.0, atol=1e-10)
 bf_mul18 = genBasisFunc(rand(3), "STO-3G")[]
@@ -390,12 +390,12 @@ bf_mul18 = genBasisFunc(rand(3), "STO-3G")[]
 
 
 # function shift
-ijk = [1,0,0]
-didjdk = [0,1,1]
+ijk = (1,0,0)
+didjdk = (0,1,1)
 bf_os1 = genBasisFunc([0,0,0], (2,1), ijk)
 bf_os2 = genBasisFunc([0,0,0], (2,1), ijk, normalizeGTO=true)
-bf_os1S = genBasisFunc([0,0,0], (2,1), ijk+didjdk)
-bf_os2S = genBasisFunc([0,0,0], (2,1), ijk+didjdk, normalizeGTO=true)
+bf_os1S = genBasisFunc([0,0,0], (2,1), ijk.+didjdk)
+bf_os2S = genBasisFunc([0,0,0], (2,1), ijk.+didjdk, normalizeGTO=true)
 @test hasEqual(shift(bf_os1, didjdk), bf_os1S)
 @test hasEqual(shift(bf_os2, didjdk), bf_os2S)
 
@@ -485,7 +485,7 @@ assignCenter!(coord, bf6)
 
 
 # function getParams
-pb1 = ParamBox(2, :p, canDiff=false)
+pb1 = ParamBox(2, :p)
 @test getParams(pb1) == pb1
 @test getParams(pb1, :p) == pb1
 @test getParams(pb1, :P) === nothing

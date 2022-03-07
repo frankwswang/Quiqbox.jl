@@ -307,7 +307,7 @@ end
 
 function reformatIntData1(bf::FloatingGTBasisFuncs{<:Any, GN, 1}) where {GN}
     R = (centerCoordOf(bf) |> Tuple)::NTuple{3, Float64}
-    ijk = bf.ijk[1]
+    ijk = bf.ijk[1].tuple
     αds = if bf.normalizeGTO
         N = getNijk(ijk...)
         map(x->(x.xpn()::Float64, x.con() * N * getNα(ijk..., x.xpn())::Float64), 

@@ -9,9 +9,9 @@ pb1 = ParamBox(1, :a)
 @test dataOf(pb1)[] == pb1[] == inValOf(pb1)
 @test pb1[] == pb1() == 1 == outValOf(pb1)
 @test pb1.map == Quiqbox.itself == mapOf(pb1)
-@test pb1.canDiff[] == true == isDiffParam(pb1)
+@test pb1.canDiff[] == false == isDiffParam(pb1)
 toggleDiff!(pb1)
-@test pb1.canDiff[] == false
+@test pb1.canDiff[] == true
 disableDiff!(pb1)
 @test pb1.canDiff[] == false
 enableDiff!(pb1)

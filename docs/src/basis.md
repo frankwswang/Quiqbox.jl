@@ -132,16 +132,16 @@ Unlike `BasisFunc` there's no proprietary function for it, you simply input the 
 bf2 = genBasisFunc([1.0,0,0], [gf1, gf2], "P")
 ```
 
-You can even choose one or a few orbitals to keep by indicting them using a 3-element `Array` of the Cartesian representation:
+You can even choose one or a few orbitals to keep by indicting them using a `NTuple{3, Int}` in the Cartesian representation:
 ```@repl 2
-bf3 = genBasisFunc([1.0,0,0], [gf1, gf2], [1,0,0])
+bf3 = genBasisFunc([1.0,0,0], [gf1, gf2], (1,0,0))
 
-bf4 = genBasisFunc([1.0,0,0], [gf1, gf2], [[1,0,0], [0,0,1]])
+bf4 = genBasisFunc([1.0,0,0], [gf1, gf2], [(1,0,0), (0,0,1)])
 ```
 
 Again, if you want a faster solution, you can also directly define the 2 `GaussFunc` parameter(s) in a 2-element `Tuple` as the 2nd argument for `genBasisFunc`:
 ```@repl 2
-bf5 = genBasisFunc([1.0,0,0], ([2.0, 2.5], [1.0, 0.75]), [[1,0,0], [0,0,1]])
+bf5 = genBasisFunc([1.0,0,0], ([2.0, 2.5], [1.0, 0.75]), [(1,0,0), (0,0,1)])
 
 hasEqual(bf4, bf5)
 ```
