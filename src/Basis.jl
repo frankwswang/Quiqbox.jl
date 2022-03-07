@@ -664,9 +664,7 @@ centerOf(bf::FloatingGTBasisFuncs) = bf.center
 
 Return the center coordinate of the input `FloatingGTBasisFuncs`.
 """
-centerCoordOf(bf::FloatingGTBasisFuncs) = Float64[i() for i in bf.center]
-
-centerCoordOfCore(bf::FloatingGTBasisFuncs) = outValOf.(bf.center)
+centerCoordOf(bf::FloatingGTBasisFuncs) = Float64[outValOf(i) for i in bf.center]
 
 
 """
