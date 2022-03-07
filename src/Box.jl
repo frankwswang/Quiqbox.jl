@@ -56,26 +56,21 @@ struct GridBox{NX, NY, NZ} <: SemiMutableParameter{GridBox, Float64}
         pbRef = ParamBox(spc; index)
         boxes = NTuple{3, ParamBox{Float64}}[]
         n = 0
-        # supIndex = "ᴳ"*numToSups(nGx)*superscriptSym['-']*numToSups(nGy)*
-        #            superscriptSym['-']*numToSups(nGz)
         prefix = "G" * "_" * "$(nGx)" * "_" * "$(nGy)" * "_" * "$(nGz)" * "_"
         for i=0:nGx, j=0:nGy, k=0:nGz
             n += 1
             fX0 = L -> centerCoord[1] + (i - 0.5*nGx) * L
             fY0 = L -> centerCoord[2] + (j - 0.5*nGy) * L
             fZ0 = L -> centerCoord[3] + (k - 0.5*nGz) * L
-            # fXname = (ParamList[:X] |> string) * supIndex * numToSubs(n)
-            # fYname = (ParamList[:Y] |> string) * supIndex * numToSubs(n)
-            # fZname = (ParamList[:Z] |> string) * supIndex * numToSubs(n)
-            fXname = prefix * (ParamList[:X] |> string) * numToSubs(n)
-            fYname = prefix * (ParamList[:Y] |> string) * numToSubs(n)
-            fZname = prefix * (ParamList[:Z] |> string) * numToSubs(n)
+            fXname = prefix * (XParamSym |> string) * numToSubs(n)
+            fYname = prefix * (YParamSym |> string) * numToSubs(n)
+            fZname = prefix * (ZParamSym |> string) * numToSubs(n)
             fX = renameFunc(fXname, fX0)
             fY = renameFunc(fYname, fY0)
             fZ = renameFunc(fZname, fZ0)
-            X = ParamBox(pbRef.data, ParamList[:X], fX, sym; canDiff, index)
-            Y = ParamBox(pbRef.data, ParamList[:Y], fY, sym; canDiff, index)
-            Z = ParamBox(pbRef.data, ParamList[:Z], fZ, sym; canDiff, index)
+            X = ParamBox(pbRef.data, XParamSym, fX, sym; canDiff, index)
+            Y = ParamBox(pbRef.data, YParamSym, fY, sym; canDiff, index)
+            Z = ParamBox(pbRef.data, ZParamSym, fZ, sym; canDiff, index)
             push!(boxes, (X, Y, Z))
         end
         new{nGx, nGy, nGz}(prod(nGrids .+ 1), spc, boxes)

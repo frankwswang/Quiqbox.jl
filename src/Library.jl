@@ -124,6 +124,12 @@ const ParamNames = [:X, :Y, :Z, :d, :α, :L]
 const ParamSymbols = [:X, :Y, :Z, :con, :xpn, :spacing]
 const ParamList = Dict(ParamSymbols .=> ParamNames)
 
+const αParamSym = ParamList[:xpn]
+const dParamSym = ParamList[:con]
+const XParamSym = ParamList[:X]
+const YParamSym = ParamList[:Y]
+const ZParamSym = ParamList[:Z]
+
 getCharge(nucs::Vector{String}) = getCharge.(nucs) |> sum
 
 getCharge(nucStr::String) = AtomicNumberList[nucStr]

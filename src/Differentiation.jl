@@ -94,24 +94,6 @@ struct ParamBox{T, V, F} <: DifferentiableParameter{ParamBox, T}
     canDiff::Array{Bool, 0}
     index::Array{<:Union{Int, Nothing}, 0}
 
-    # function ParamBox(data::Array{T, 0}, mapFunction::F, canDiff, index, 
-    #                   name::Symbol=:undef, dataName::Symbol=:undef) where 
-    #                  {T<:Number, F<:Function}
-    #     flag = (dataName == :undef)
-    #     if typeof(mapFunction) === typeof(itself)
-    #         dName = flag ? name : dataName
-    #     else
-    #         mapFuncStr = mapFunction |> nameOf |> string
-    #         if startswith(mapFuncStr, '#')
-    #             idx = parse(Int, mapFuncStr[2:end])
-    #             fStr = "f_" * string(name) * numToSubs(idx)
-    #             mapFunction = renameFunc(fStr, mapFunction)
-    #         end
-    #         dName = flag  ?  "x_" * string(name) |> Symbol  :  dataName
-    #     end
-    #     f = mapFunction
-    #     new{T, name, nameOf(f)}(data, dName, f, canDiff, index)
-    # end
     function ParamBox{V, F}(data::Array{T, 0}, index, canDiff, dataName=:undef) where 
                            {V, F, T}
         dName = (dataName == :undef) ? Symbol("x_" * string(V)) : dataName
@@ -149,33 +131,21 @@ ParamBox{V, :itself}(data, index)
 ParamBox{V}(pb::ParamBox{<:Any, <:Any, F}) where {V, F} = 
 ParamBox{V}(FunctionType{F}(), pb.data, pb.index, pb.canDiff, pb.dataName)
 
-ParamBox(data::Array{T, 0}, dataName::Symbol=:undef; 
-         index::Union{Int, Nothing}=nothing) where {T} = 
-ParamBox{dataName, :itself}(data, genIndex(index))
-
-ParamBox(data::Array{T, 0}, name::Symbol, mapFunction::F, dataName::Symbol=:undef; 
-         canDiff::Bool=true, index::Union{Int, Nothing}=nothing) where {T, F<:Function} = 
-ParamBox{name}(mapFunction, data, genIndex(index), fill(canDiff), dataName)
-
-function ParamBox(data::Number, args...; 
-                  paramType::Type{<:Number}=Float64, roundDigits::Int=-1, kws...)
+function ParamBox{V}(arg, data::Number, args...; 
+                     paramType::Type{<:Number}=Float64, roundDigits::Int=-1) where {V}
     num = (roundDigits < 0 ? data : round(data, digits=roundDigits)) |> paramType
-    ParamBox(fill(num), args...; kws...)
+    ParamBox{V}(arg, fill(num), args...)
 end
 
+ParamBox(data::T; index::Union{Int, Nothing}=nothing) where {T} = 
+ParamBox{:undef}(FunctionType{:itself}(), data, genIndex(index))
 
-# function ParamBox(data::Array{T, 0}, name::Symbol=:undef, mapFunction::F=itself, 
-#                   dataName::Symbol=:undef; canDiff::Bool=true, 
-#                   index::Union{Int, Nothing}=nothing) where {T<:Number, F<:Function}
-#     idx = reshape(Union{Int, Nothing}[0], ()) |> collect
-#     idx[] = index
-#     ParamBox(data, mapFunction, fill(canDiff), idx, name, dataName)
-# end
+ParamBox(data::T, dataName::Symbol; index::Union{Int, Nothing}=nothing) where {T} = 
+ParamBox{dataName}(FunctionType{:itself}(), data, genIndex(index))
 
-# ParamBox(data::Number, name::Symbol=:undef, mapFunction::F=itself, dataName::Symbol=:undef; 
-#          canDiff::Bool=true, index::Union{Int, Nothing}=nothing, 
-#          paramType::Type{<:Number}=Float64) where {F<:Function} = 
-# ParamBox(fill(data |> paramType), name, mapFunction, dataName; canDiff, index)
+ParamBox(data::T, name::Symbol, mapFunction::F, dataName::Symbol=:undef; 
+         canDiff::Bool=true, index::Union{Int, Nothing}=nothing) where {T, F<:Function} = 
+ParamBox{name}(mapFunction, data, genIndex(index), fill(canDiff), dataName)
 
 
 """
