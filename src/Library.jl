@@ -1,4 +1,4 @@
-export getCharge, ParamList
+export XYZTuple, getCharge, ParamList
 
 const ElementNames = 
 [
@@ -48,31 +48,49 @@ const SubshellNames =
 # ("X⁶Y⁰Z⁰", "X⁵Y¹Z⁰", "X⁵Y⁰Z¹", "X⁴Y²Z⁰", "X⁴Y¹Z¹", "X⁴Y⁰Z²", "X³Y³Z⁰", "X³Y²Z¹", "X³Y¹Z²", "X³Y⁰Z³", "X²Y⁴Z⁰", "X²Y³Z¹", "X²Y²Z²", "X²Y¹Z³", "X²Y⁰Z⁴", "X¹Y⁵Z⁰", "X¹Y⁴Z¹", "X¹Y³Z²", "X¹Y²Z³", "X¹Y¹Z⁴", "X¹Y⁰Z⁵", "X⁰Y⁶Z⁰", "X⁰Y⁵Z¹", "X⁰Y⁴Z²", "X⁰Y³Z³", "X⁰Y²Z⁴", "X⁰Y¹Z⁵", "X⁰Y⁰Z⁶")
 # ]
 
-struct XYZTuple{S}
+struct XYZTuple{L}
     tuple::NTuple{3, Int}
 
-    function XYZTuple{S}(t::NTuple{3, Int}) where {S}
+    function XYZTuple{L}(t::NTuple{3, Int}) where {L}
         @assert all(t .>= 0)
         new{sum(t)}(t)
     end
 
-    function XYZTuple(xyz1::XYZTuple{S1}, xyz2::XYZTuple{S2}) where {S1, S2}
-        new{S1+S2}(xyz1.tuple .+ xyz2.tuple)
-    end
+    XYZTuple(xyz::XYZTuple{L}) where {L} = new{L}(xyz.tuple)
+
+    XYZTuple(xyz1::XYZTuple{L1}, xyz2::XYZTuple{L2}) where {L1, L2} = 
+    new{L1+L2}(xyz1.tuple .+ xyz2.tuple)
+
+    # XYZTuple(::Val{1}, xyz1::XYZTuple{L1}, xyz2::XYZTuple{L2}) where {L1, L2} = 
+    # new{L1-L2}(xyz1.tuple .- xyz2.tuple)
 end
 
+# function XYZTuple(t::NTuple{3, Int})
+#     @assert all(t .>= 0)
+#     XYZTuple{sum(t)}(t)
+# end
 XYZTuple(t::NTuple{3, Int}) = XYZTuple{sum(t)}(t)
 XYZTuple(args::Vararg{Int, 3}) = XYZTuple(args)
 XYZTuple(a::Vector{Int}) = XYZTuple(a...)
 
-import Base: iterate, size, length, ndims, +, isless, Tuple
+import Base: iterate, size, length, ndims, +, -, isless, Tuple, sum, map, broadcastable
 iterate(snt::XYZTuple, args...) = iterate(snt.tuple, args...)
 size(snt::XYZTuple, args...) = size(snt.tuple, args...)
 length(snt::XYZTuple) = length(snt.tuple)
 ndims(snt::XYZTuple) = ndims(snt.tuple)
-+(xyz1::XYZTuple{S1}, xyz2::XYZTuple{S2}) where {S1, S2} = XYZTuple(xyz1, xyz2)
-isless(xyz1::XYZTuple, xyz2::XYZTuple) = isless(xyz1.tuple, xyz2.tuple)
-Tuple(xyz::XYZTuple) = xyz.tuple
++(xyz1::XYZTuple{L1}, xyz2::XYZTuple{L2}) where {L1, L2} = XYZTuple(xyz1, xyz2)
++(xyz::XYZTuple{L}, t::NTuple{3, Int}) where {L} = xyz + XYZTuple{sum(t)}(t)
++(t::NTuple{3, Int}, xyz::XYZTuple{L}) where {L} = +(xyz, t)
+# -(xyz1::XYZTuple{L1}, xyz2::XYZTuple{L2}) where {L1, L2} = XYZTuple(Val(1), xyz1, xyz2)
+# -(xyz::XYZTuple{L}, t::NTuple{3, Int}) where {L} = xyz - XYZTuple{sum(t)}(t)
+# -(t::NTuple{3, Int}, xyz::XYZTuple{L}) where {L} = -(xyz, t)
+@inline isless(xyz1::XYZTuple, xyz2::XYZTuple) = isless(xyz1.tuple, xyz2.tuple)
+@inline Tuple(xyz::XYZTuple) = xyz.tuple
+@inline sum(::XYZTuple{L}) where {L} = L
+@inline sum(f, xyz::XYZTuple) = sum(f, xyz.tuple)
+@inline map(f, x::XYZTuple{L1}, y::XYZTuple{L2}) where {L1, L2} = map(f, x.tuple, y.tuple)
+@inline map(f, xyzs::Vararg{XYZTuple, N}) where {N} = map(f, getfield.(xyzs, :tuple)...)
+Base.broadcastable(xyz::XYZTuple) = Base.broadcastable(xyz.tuple)
 
 const SubshellXYZs = 
 [ # Every XYZs must start with (l, 0, 0)

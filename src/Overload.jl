@@ -184,7 +184,6 @@ getindex(bfs::BasisFuncs) = getfield.(bfs[:], :gauss) |> flatten
 
 getindex(xyz::XYZTuple, args...) = getindex(xyz.tuple, args...)
 getindex(xyz::XYZTuple) = xyz.tuple
-setindex!(xyz::XYZTuple, args...) = setindex!(xyz.tuple, args...)
 firstindex(xyz::XYZTuple) = firstindex(xyz.tuple)
 lastindex(xyz::XYZTuple) = lastindex(xyz.tuple)
 eachindex(xyz::XYZTuple) = eachindex(xyz.tuple)
