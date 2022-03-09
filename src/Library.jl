@@ -37,17 +37,6 @@ const SubshellNames =
 ]
 
 
-# const SubshellAngularMomentums = 
-# [
-# ("X⁰Y⁰Z⁰",),
-# ("X¹Y⁰Z⁰", "X⁰Y¹Z⁰", "X⁰Y⁰Z¹"),
-# ("X²Y⁰Z⁰", "X¹Y¹Z⁰", "X¹Y⁰Z¹", "X⁰Y²Z⁰", "X⁰Y¹Z¹", "X⁰Y⁰Z²"),
-# ("X³Y⁰Z⁰", "X²Y¹Z⁰", "X²Y⁰Z¹", "X¹Y²Z⁰", "X¹Y¹Z¹", "X¹Y⁰Z²", "X⁰Y³Z⁰", "X⁰Y²Z¹", "X⁰Y¹Z²", "X⁰Y⁰Z³"),
-# ("X⁴Y⁰Z⁰", "X³Y¹Z⁰", "X³Y⁰Z¹", "X²Y²Z⁰", "X²Y¹Z¹", "X²Y⁰Z²", "X¹Y³Z⁰", "X¹Y²Z¹", "X¹Y¹Z²", "X¹Y⁰Z³", "X⁰Y⁴Z⁰", "X⁰Y³Z¹", "X⁰Y²Z²", "X⁰Y¹Z³", "X⁰Y⁰Z⁴"),
-# ("X⁵Y⁰Z⁰", "X⁴Y¹Z⁰", "X⁴Y⁰Z¹", "X³Y²Z⁰", "X³Y¹Z¹", "X³Y⁰Z²", "X²Y³Z⁰", "X²Y²Z¹", "X²Y¹Z²", "X²Y⁰Z³", "X¹Y⁴Z⁰", "X¹Y³Z¹", "X¹Y²Z²", "X¹Y¹Z³", "X¹Y⁰Z⁴", "X⁰Y⁵Z⁰", "X⁰Y⁴Z¹", "X⁰Y³Z²", "X⁰Y²Z³", "X⁰Y¹Z⁴", "X⁰Y⁰Z⁵"),
-# ("X⁶Y⁰Z⁰", "X⁵Y¹Z⁰", "X⁵Y⁰Z¹", "X⁴Y²Z⁰", "X⁴Y¹Z¹", "X⁴Y⁰Z²", "X³Y³Z⁰", "X³Y²Z¹", "X³Y¹Z²", "X³Y⁰Z³", "X²Y⁴Z⁰", "X²Y³Z¹", "X²Y²Z²", "X²Y¹Z³", "X²Y⁰Z⁴", "X¹Y⁵Z⁰", "X¹Y⁴Z¹", "X¹Y³Z²", "X¹Y²Z³", "X¹Y¹Z⁴", "X¹Y⁰Z⁵", "X⁰Y⁶Z⁰", "X⁰Y⁵Z¹", "X⁰Y⁴Z²", "X⁰Y³Z³", "X⁰Y²Z⁴", "X⁰Y¹Z⁵", "X⁰Y⁰Z⁶")
-# ]
-
 struct XYZTuple{L}
     tuple::NTuple{3, Int}
 
@@ -61,29 +50,25 @@ struct XYZTuple{L}
     XYZTuple(xyz1::XYZTuple{L1}, xyz2::XYZTuple{L2}) where {L1, L2} = 
     new{L1+L2}(xyz1.tuple .+ xyz2.tuple)
 
-    # XYZTuple(::Val{1}, xyz1::XYZTuple{L1}, xyz2::XYZTuple{L2}) where {L1, L2} = 
-    # new{L1-L2}(xyz1.tuple .- xyz2.tuple)
+    XYZTuple(xyz::XYZTuple{L}, ::XYZTuple{0}) where {L} = new{L}(xyz.tuple)
+
+    XYZTuple(::XYZTuple{0}, xyz::XYZTuple{L}) where {L} = new{L}(xyz.tuple)
+
+    XYZTuple(::XYZTuple{0}, ::XYZTuple{0}) = new{0}((0, 0, 0))
 end
 
-# function XYZTuple(t::NTuple{3, Int})
-#     @assert all(t .>= 0)
-#     XYZTuple{sum(t)}(t)
-# end
 XYZTuple(t::NTuple{3, Int}) = XYZTuple{sum(t)}(t)
 XYZTuple(args::Vararg{Int, 3}) = XYZTuple(args)
 XYZTuple(a::Vector{Int}) = XYZTuple(a...)
 
-import Base: iterate, size, length, ndims, +, -, isless, Tuple, sum, map, broadcastable
+import Base: iterate, size, length, ndims, +, isless, Tuple, sum, map, broadcastable
 iterate(snt::XYZTuple, args...) = iterate(snt.tuple, args...)
 size(snt::XYZTuple, args...) = size(snt.tuple, args...)
 length(snt::XYZTuple) = length(snt.tuple)
 ndims(snt::XYZTuple) = ndims(snt.tuple)
-+(xyz1::XYZTuple{L1}, xyz2::XYZTuple{L2}) where {L1, L2} = XYZTuple(xyz1, xyz2)
-+(xyz::XYZTuple{L}, t::NTuple{3, Int}) where {L} = xyz + XYZTuple{sum(t)}(t)
-+(t::NTuple{3, Int}, xyz::XYZTuple{L}) where {L} = +(xyz, t)
-# -(xyz1::XYZTuple{L1}, xyz2::XYZTuple{L2}) where {L1, L2} = XYZTuple(Val(1), xyz1, xyz2)
-# -(xyz::XYZTuple{L}, t::NTuple{3, Int}) where {L} = xyz - XYZTuple{sum(t)}(t)
-# -(t::NTuple{3, Int}, xyz::XYZTuple{L}) where {L} = -(xyz, t)
++(xyz1::XYZTuple{L1},  xyz2::XYZTuple{L2}  ) where {L1, L2} = XYZTuple(xyz1, xyz2)
++( xyz::XYZTuple{L},      t::NTuple{3, Int}) where {L} = xyz + XYZTuple{sum(t)}(t)
++(   t::NTuple{3, Int}, xyz::XYZTuple{L}   ) where {L} = +(xyz, t)
 @inline isless(xyz1::XYZTuple, xyz2::XYZTuple) = isless(xyz1.tuple, xyz2.tuple)
 @inline Tuple(xyz::XYZTuple) = xyz.tuple
 @inline sum(::XYZTuple{L}) where {L} = L
@@ -133,10 +118,7 @@ const AtomicNumberList = Dict(ElementNames .=> collect(1 : length(ElementNames))
 const AngularMomentumList = Dict(SubshellNames .=> collect(0 : length(SubshellNames)-1))
 const SubshellSuborderList = Dict(SubshellNames .=> SubshellXYZs)
 const SubshellDimList = Dict(SubshellNames .=> length.(SubshellXYZs))
-# const ijkOrderList = Dict(SubshellNames .=> SubshellAngularMomentums)
 const ijkIndexList = Dict(flatten(SubshellXYZs) .=> flatten([collect(1:length(i)) for i in SubshellXYZs]))
-# const ijkOrbitalList = Dict(flatten(SubshellAngularMomentums)  .=> flatten(SubshellXYZs))
-# const ijkStringList = Dict(flatten(SubshellXYZs) .=> flatten(SubshellAngularMomentums))
 # const ParamNames = [:𝑋, :𝑌, :𝑍, :𝑑, :𝛼, :𝐿]
 const ParamNames = [:X, :Y, :Z, :d, :α, :L]
 const ParamSymbols = [:X, :Y, :Z, :con, :xpn, :spacing]

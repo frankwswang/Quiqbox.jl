@@ -790,6 +790,8 @@ end
 
 getFunc(::Type{Pf{C, F}}, _=missing) where {C, F} = Pf{C, F}(getFunc(Val(F)))
 
+getFunc(f::Function, _=missing) = itself(f)
+
 getFunc(::Val{F}, failedResult=missing) where {F} = getFunc(F, failedResult)
 
 getFunc(::Val{:itself}, _=missing) = itself
@@ -853,10 +855,13 @@ tupleDiff(ts::Vararg{NTuple{<:Any, T}, N}) where {T, N} = arrayDiff!((ts .|> col
 
 
 struct FunctionType{F}
-    f::Union{Symbol, Type{<:ParameterizedFunction}}
+    f::Union{Symbol, Type{<:ParameterizedFunction}, Function}
+
     FunctionType{F}() where {F} = new{F}(F)
+    FunctionType(f::F) where {F<:Function} = new{F}(f)
 end
 
+getFunc(ft::FunctionType{F}) where {F} = ft.f
 
 function getFuncNum(f::Function, vNum::Symbolics.Num)::Symbolics.Num
     Symbolics.variable(f|>nameOf, T=Symbolics.FnType{Tuple{Any}, Real})(vNum)

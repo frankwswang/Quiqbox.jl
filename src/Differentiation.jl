@@ -2,7 +2,7 @@ export ParamBox, inValOf, inSymOf, inSymValOf, outValOf, outSymOf, dataOf, mapOf
        outValCopy, inVarCopy, enableDiff!, disableDiff!, isDiffParam, toggleDiff!, 
        gradHFenergy
 
-using LinearAlgebra: eigen
+using LinearAlgebra: eigen, Symmetric
 using Symbolics: Num
 
 """
@@ -343,100 +343,146 @@ function deriveBasisFunc(bf::CompositeGTBasisFuncs, par::ParamBox) where {N}
 end
 
 
-function oneBodyDerivativeCore(∂bfs::Vector{<:CompositeGTBasisFuncs}, 
+function oneBodyDerivativeCore(::Val{false}, ∂bfs::Vector{<:CompositeGTBasisFuncs}, 
                                bfs::Vector{<:CompositeGTBasisFuncs}, 
                                X::Matrix{Float64}, ∂X::Matrix{Float64}, 
-                               ʃ::F, isGradient::Bool = false) where {F<:Function}
-    dimOfʃ = 1+isGradient*2
+                               ft::FunctionType{F}) where {F}
+    ʃ = getFunc(ft.f)
     bsSize = ∂bfs |> length
-    ∂ʃ = ones(bsSize, bsSize, dimOfʃ)
-    ʃab = ones(bsSize, bsSize, dimOfʃ)
-    ∂ʃab = ones(bsSize, bsSize, dimOfʃ)
+    ∂ʃ = ones(bsSize, bsSize)
+    ʃab = ones(bsSize, bsSize)
+    ∂ʃab = ones(bsSize, bsSize)
     for i = 1:bsSize, j = 1:i
-       ʃab[i,j,:] = ʃab[j,i,:] = ʃ(bfs[i], bfs[j])
+       ʃab[i,j] = ʃab[j,i] = ʃ(bfs[i], bfs[j])
     end
     for i = 1:bsSize, j = 1:i
-        ∂ʃab[i,j,:] = ∂ʃab[j,i,:] = ʃ(∂bfs[i], bfs[j]) + ʃ(bfs[i], ∂bfs[j])
+        ∂ʃab[i,j] = ∂ʃab[j,i] = ʃ(∂bfs[i], bfs[j]) + ʃ(bfs[i], ∂bfs[j])
     end
     @views begin
-        for e = 1:dimOfʃ
-            for i=1:bsSize, j=1:i
-                # X[i,j] == X[j,i]
-                ∂ʃ[i,j,e] = ∂ʃ[j,i,e] = 
-                transpose( X[:,i]) * ∂ʃab[:,:,e] *  X[:,j] +
-                transpose(∂X[:,i]) *  ʃab[:,:,e] *  X[:,j] +
-                transpose( X[:,i]) *  ʃab[:,:,e] * ∂X[:,j]
-            end
+        for i=1:bsSize, j=1:i
+            # X[i,j] == X[j,i]
+            ∂ʃ[i,j] = ∂ʃ[j,i] = 
+            transpose( X[:,i]) * ∂ʃab[:,:] *  X[:,j] +
+            transpose(∂X[:,i]) *  ʃab[:,:] *  X[:,j] +
+            transpose( X[:,i]) *  ʃab[:,:] * ∂X[:,j]
         end
     end
     ∂ʃ
 end
 
+# function oneBodyDerivativeCore(::Val{true}, ∂bfs::Vector{<:CompositeGTBasisFuncs}, 
+#                                bfs::Vector{<:CompositeGTBasisFuncs}, 
+#                                X::Matrix{Float64}, ∂X::Matrix{Float64}, 
+#                                ft::FunctionType{F}, dimOfʃ::Int=3) where {F}
+#     ʃ = getFunc(ft.f)
+#     bsSize = ∂bfs |> length
+#     ∂ʃ = ones(bsSize, bsSize, dimOfʃ)
+#     ʃab = ones(bsSize, bsSize, dimOfʃ)
+#     ∂ʃab = ones(bsSize, bsSize, dimOfʃ)
+#     for i = 1:bsSize, j = 1:i
+#        ʃab[i,j,:] = ʃab[j,i,:] = ʃ(bfs[i], bfs[j])
+#     end
+#     for i = 1:bsSize, j = 1:i
+#         ∂ʃab[i,j,:] = ∂ʃab[j,i,:] = ʃ(∂bfs[i], bfs[j]) + ʃ(bfs[i], ∂bfs[j])
+#     end
+#     @views begin
+#         for e = 1:dimOfʃ
+#             for i=1:bsSize, j=1:i
+#                 ∂ʃ[i,j,e] = ∂ʃ[j,i,e] = 
+#                 transpose( X[:,i]) * ∂ʃab[:,:,e] *  X[:,j] +
+#                 transpose(∂X[:,i]) *  ʃab[:,:,e] *  X[:,j] +
+#                 transpose( X[:,i]) *  ʃab[:,:,e] * ∂X[:,j]
+#             end
+#         end
+#     end
+#     ∂ʃ
+# end
 
-function twoBodyDerivativeCore(∂bfs::Vector{<:CompositeGTBasisFuncs}, 
+
+function twoBodyDerivativeCore(::Val{false}, ∂bfs::Vector{<:CompositeGTBasisFuncs}, 
                                bfs::Vector{<:CompositeGTBasisFuncs}, 
                                X::Matrix{Float64}, ∂X::Matrix{Float64}, 
-                               ʃ::F, isGradient::Bool = false) where {F<:Function}
-    dimOfʃ = 1+isGradient*2
+                               ft::FunctionType{F}) where {F}
+    ʃ = getFunc(ft.f)
     bsSize = ∂bfs |> length
-    ∂ʃ = ones(bsSize, bsSize, bsSize, bsSize, dimOfʃ)
-    ʃabcd = ones(bsSize, bsSize, bsSize, bsSize, dimOfʃ)
-    ʃ∂abcd = ones(bsSize, bsSize, bsSize, bsSize, dimOfʃ)
-    # ʃa∂bcd = similar(ʃabcd)
-    # ʃab∂cd = similar(ʃabcd)
-    # ʃabc∂d = similar(ʃabcd)
+    ∂ʃ = ones(bsSize, bsSize, bsSize, bsSize)
+    ʃabcd = ones(bsSize, bsSize, bsSize, bsSize)
+    ʃ∂abcd = ones(bsSize, bsSize, bsSize, bsSize)
     for i = 1:bsSize, j = 1:i, k = 1:i, l = 1:(k==i ? j : k)
-        ʃabcd[i,j,k,l,:] = ʃabcd[j,i,k,l,:] = ʃabcd[j,i,l,k,:] = ʃabcd[i,j,l,k,:] = 
-        ʃabcd[l,k,i,j,:] = ʃabcd[k,l,i,j,:] = ʃabcd[k,l,j,i,:] = ʃabcd[l,k,j,i,:] = 
+        ʃabcd[i,j,k,l] = ʃabcd[j,i,k,l] = ʃabcd[j,i,l,k] = ʃabcd[i,j,l,k] = 
+        ʃabcd[l,k,i,j] = ʃabcd[k,l,i,j] = ʃabcd[k,l,j,i] = ʃabcd[l,k,j,i] = 
         ʃ(bfs[i],  bfs[j],  bfs[k],  bfs[l])
     end
     for i = 1:bsSize, j=1:bsSize, k=1:bsSize, l=1:k
-        ʃ∂abcd[i,j,k,l,:] = ʃ∂abcd[i,j,l,k,:] = ʃ(∂bfs[i], bfs[j],  bfs[k],  bfs[l])
+        ʃ∂abcd[i,j,k,l] = ʃ∂abcd[i,j,l,k] = ʃ(∂bfs[i], bfs[j],  bfs[k],  bfs[l])
     end
-    # Following tensor elements can be provided from above on case.
-    # for i = 1:bsSize, j=1:bsSize, k=1:bsSize, l=1:k
-    #     ʃa∂bcd[i,j,k,l,:] = ʃa∂bcd[i,j,l,k,:] = ʃ( bfs[i], ∂bfs[j],   bfs[k],  bfs[l])
-    # end
-    # for i = 1:bsSize, j=1:i, k=1:bsSize, l=1:bsSize
-    #     ʃab∂cd[i,j,k,l,:] = ʃab∂cd[j,i,k,l,:] = ʃ( bfs[i],  bfs[j],  ∂bfs[k],  bfs[l])
-    # end
-    # for i = 1:bsSize, j=1:i, k=1:bsSize, l=1:bsSize
-    #     ʃabc∂d[i,j,k,l,:] = ʃabc∂d[j,i,k,l,:] = ʃ( bfs[i],  bfs[j],   bfs[k], ∂bfs[l])
-    # end
-    for e=1:dimOfʃ
-        # [∂ʃ4[i,j,k,l] == ∂ʃ4[j,i,l,k] == ∂ʃ4[j,i,k,l] != ∂ʃ4[l,j,k,i]
-        for i = 1:bsSize, j = 1:i, k = 1:i, l = 1:(k==i ? j : k)
-            val = 0
-            # ʃ∂abcd[i,j,k,l,:] == ʃ∂abcd[i,j,l,k,:] == 
-            # ʃab∂cd[l,k,i,j,:] == ʃab∂cd[k,l,i,j,:]
-            for a = 1:bsSize, b = 1:bsSize, c = 1:bsSize, d = 1:bsSize
-                # Old version: Still correct.
-                # val += (  X[a,i]*X[b,j]* X[c,k]*X[d,l] +  X[a,j]*X[b,i]* X[c,k]*X[d,l] + 
-                #           X[c,i]*X[d,j]* X[a,k]*X[b,l] +  X[c,i]*X[d,j]* X[a,l]*X[b,k]  ) * 
-                #        ʃ∂abcd[a,b,c,d,e] + 
-                #        ( ∂X[a,i]*X[b,j]* X[c,k]*X[d,l] + ∂X[a,j]*X[b,i]* X[c,k]*X[d,l] + 
-                #           X[a,i]*X[b,j]*∂X[c,k]*X[d,l] +  X[a,i]*X[b,j]*∂X[c,l]*X[d,k]  ) * 
-                #        ʃabcd[a,b,c,d,e]
-                # New version: Better readability.
-                val += (  X[a,i]*X[b,j]*X[c,k]*X[d,l] + X[a,j]*X[b,i]*X[c,k]*X[d,l] + 
-                          X[c,i]*X[d,j]*X[a,k]*X[b,l] + X[c,i]*X[d,j]*X[a,l]*X[b,k]  ) * 
-                       ʃ∂abcd[a,b,c,d,e] + 
-                       ( ∂X[a,i]*X[b,j]* X[c,k]*X[d,l] + X[a,i]*∂X[b,j]*X[c,k]* X[d,l] + 
-                          X[a,i]*X[b,j]*∂X[c,k]*X[d,l] + X[a,i]* X[b,j]*X[c,k]*∂X[d,l] ) * 
-                       ʃabcd[a,b,c,d,e]
-            end
-            ∂ʃ[i,j,k,l,e] = ∂ʃ[j,i,k,l,e] = ∂ʃ[j,i,l,k,e] = ∂ʃ[i,j,l,k,e] = 
-            ∂ʃ[l,k,i,j,e] = ∂ʃ[k,l,i,j,e] = ∂ʃ[k,l,j,i,e] = ∂ʃ[l,k,j,i,e] = val
+    # [∂ʃ4[i,j,k,l] == ∂ʃ4[j,i,l,k] == ∂ʃ4[j,i,k,l] != ∂ʃ4[l,j,k,i]
+    for i = 1:bsSize, j = 1:i, k = 1:i, l = 1:(k==i ? j : k)
+        val = 0
+        # ʃ∂abcd[i,j,k,l] == ʃ∂abcd[i,j,l,k] == ʃab∂cd[l,k,i,j] == ʃab∂cd[k,l,i,j]
+        for a = 1:bsSize, b = 1:bsSize, c = 1:bsSize, d = 1:bsSize
+            # Old version: Still correct.
+            # val += (  X[a,i]*X[b,j]* X[c,k]*X[d,l] +  X[a,j]*X[b,i]* X[c,k]*X[d,l] + 
+            #           X[c,i]*X[d,j]* X[a,k]*X[b,l] +  X[c,i]*X[d,j]* X[a,l]*X[b,k]  ) * 
+            #        ʃ∂abcd[a,b,c,d] + 
+            #        ( ∂X[a,i]*X[b,j]* X[c,k]*X[d,l] + ∂X[a,j]*X[b,i]* X[c,k]*X[d,l] + 
+            #           X[a,i]*X[b,j]*∂X[c,k]*X[d,l] +  X[a,i]*X[b,j]*∂X[c,l]*X[d,k]  ) * 
+            #        ʃabcd[a,b,c,d]
+            # New version: Better readability.
+            val += (  X[a,i]*X[b,j]*X[c,k]*X[d,l] + X[a,j]*X[b,i]*X[c,k]*X[d,l] + 
+                      X[c,i]*X[d,j]*X[a,k]*X[b,l] + X[c,i]*X[d,j]*X[a,l]*X[b,k]  ) * 
+                   ʃ∂abcd[a,b,c,d] + 
+                   ( ∂X[a,i]*X[b,j]* X[c,k]*X[d,l] + X[a,i]*∂X[b,j]*X[c,k]* X[d,l] + 
+                      X[a,i]*X[b,j]*∂X[c,k]*X[d,l] + X[a,i]* X[b,j]*X[c,k]*∂X[d,l] ) * 
+                   ʃabcd[a,b,c,d]
         end
+        ∂ʃ[i,j,k,l] = ∂ʃ[j,i,k,l] = ∂ʃ[j,i,l,k] = ∂ʃ[i,j,l,k] = 
+        ∂ʃ[l,k,i,j] = ∂ʃ[k,l,i,j] = ∂ʃ[k,l,j,i] = ∂ʃ[l,k,j,i] = val
     end
     ∂ʃ
 end
 
+# function twoBodyDerivativeCore(::Val{true}, ∂bfs::Vector{<:CompositeGTBasisFuncs}, 
+#                                bfs::Vector{<:CompositeGTBasisFuncs}, 
+#                                X::Matrix{Float64}, ∂X::Matrix{Float64}, 
+#                                ft::FunctionType{F}, dimOfʃ::Int=3) where {F}
+#     ʃ = getFunc(ft.f)
+#     bsSize = ∂bfs |> length
+#     ∂ʃ = ones(bsSize, bsSize, bsSize, bsSize, dimOfʃ)
+#     ʃabcd = ones(bsSize, bsSize, bsSize, bsSize, dimOfʃ)
+#     ʃ∂abcd = ones(bsSize, bsSize, bsSize, bsSize, dimOfʃ)
+#     for i = 1:bsSize, j = 1:i, k = 1:i, l = 1:(k==i ? j : k)
+#         ʃabcd[i,j,k,l,:] = ʃabcd[j,i,k,l,:] = ʃabcd[j,i,l,k,:] = ʃabcd[i,j,l,k,:] = 
+#         ʃabcd[l,k,i,j,:] = ʃabcd[k,l,i,j,:] = ʃabcd[k,l,j,i,:] = ʃabcd[l,k,j,i,:] = 
+#         ʃ(bfs[i],  bfs[j],  bfs[k],  bfs[l])
+#     end
+#     for i = 1:bsSize, j=1:bsSize, k=1:bsSize, l=1:k
+#         ʃ∂abcd[i,j,k,l,:] = ʃ∂abcd[i,j,l,k,:] = ʃ(∂bfs[i], bfs[j],  bfs[k],  bfs[l])
+#     end
+#     for e=1:dimOfʃ
+#         for i = 1:bsSize, j = 1:i, k = 1:i, l = 1:(k==i ? j : k)
+#             val = 0
+#             for a = 1:bsSize, b = 1:bsSize, c = 1:bsSize, d = 1:bsSize
+#                 val += (  X[a,i]*X[b,j]*X[c,k]*X[d,l] + X[a,j]*X[b,i]*X[c,k]*X[d,l] + 
+#                           X[c,i]*X[d,j]*X[a,k]*X[b,l] + X[c,i]*X[d,j]*X[a,l]*X[b,k]  ) * 
+#                        ʃ∂abcd[a,b,c,d,e] + 
+#                        ( ∂X[a,i]*X[b,j]* X[c,k]*X[d,l] + X[a,i]*∂X[b,j]*X[c,k]* X[d,l] + 
+#                           X[a,i]*X[b,j]*∂X[c,k]*X[d,l] + X[a,i]* X[b,j]*X[c,k]*∂X[d,l] ) * 
+#                        ʃabcd[a,b,c,d,e]
+#             end
+#             ∂ʃ[i,j,k,l,e] = ∂ʃ[j,i,k,l,e] = ∂ʃ[j,i,l,k,e] = ∂ʃ[i,j,l,k,e] = 
+#             ∂ʃ[l,k,i,j,e] = ∂ʃ[k,l,i,j,e] = ∂ʃ[k,l,j,i,e] = ∂ʃ[l,k,j,i,e] = val
+#         end
+#     end
+#     ∂ʃ
+# end
 
-function derivativeCore(bs::Vector{<:CompositeGTBasisFuncs}, par::ParamBox, 
-                        S::Matrix{Float64}; oneBodyFunc::F1, twoBodyFunc::F2, 
-                        oneBodyGrad::Bool=false, 
-                        twoBodyGrad::Bool=false) where {F1<:Function, F2<:Function}
+
+function derivativeCore(isVector::Val{B}, 
+                        bs::Vector{<:CompositeGTBasisFuncs}, par::ParamBox, 
+                        S::Matrix{Float64}, 
+                        oneBodyF::FunctionType{F1}, twoBodyF::FunctionType{F2}) where 
+                       {B, F1, F2}
     # ijkl in chemists' notation of spatial bases (ij|kl).
     ∂bfs = deriveBasisFunc.(bs, Ref(par)) |> flatten
     bfs = decompose.(bs) |> flatten
@@ -449,7 +495,7 @@ function derivativeCore(bs::Vector{<:CompositeGTBasisFuncs}, par::ParamBox,
         Si∂j = overlap(bfs[i], ∂bfs[j])
         ∂S[i,j] = ∂S[j,i] = S∂ij[] + Si∂j[]
     end
-    X = S^(-0.5) |> Array
+    X = (S^(-0.5))::Symmetric{Float64, Matrix{Float64}} |> Array
     λ, 𝑣 = eigen(S)
     ∂S2 = transpose(𝑣)*∂S*𝑣
     for i=1:bsSize, j=1:i
@@ -459,8 +505,8 @@ function derivativeCore(bs::Vector{<:CompositeGTBasisFuncs}, par::ParamBox,
     for i=1:bsSize, j=1:bsSize
         ∂X[j,i] = [𝑣[j,k]*∂X₀[k,l]*𝑣[i,l] for k=1:bsSize, l=1:bsSize] |> sum
     end
-    ∂ʃ2 = oneBodyDerivativeCore(∂bfs, bfs, X, ∂X, oneBodyFunc, oneBodyGrad)
-    ∂ʃ4 = twoBodyDerivativeCore(∂bfs, bfs, X, ∂X, twoBodyFunc, twoBodyGrad)
+    ∂ʃ2 = oneBodyDerivativeCore(isVector, ∂bfs, bfs, X, ∂X, oneBodyF)
+    ∂ʃ4 = twoBodyDerivativeCore(isVector, ∂bfs, bfs, X, ∂X, twoBodyF)
     ∂ʃ2, ∂ʃ4
 end
 
@@ -470,22 +516,20 @@ function ∂HFenergy(bs::Vector{<:CompositeGTBasisFuncs}, par::ParamBox,
                    S::Matrix{Float64}, nuc::Vector{String}, 
                    nucCoords::Vector{<:AbstractArray}, 
                    nElectron::Union{Int, NTuple{2, Int}})
-    Xinv = S^(0.5)
+    Xinv = sqrt(S)::Matrix{Float64}
     Cₓ = (C isa Tuple) ? (Ref(Xinv) .* C) : (Xinv * C)
-    ∂hij, ∂hijkl = derivativeCore(bs, par, S, 
-                                  oneBodyFunc=(i, j)->cat(coreHij(i, j, nuc, nucCoords), 
-                                                          dims=3), 
-                                  twoBodyFunc=(i, j, k, l)->cat(eeInteraction(i, j, k, l), 
-                                                                dims=5))
-    getEᵀ(dropdims(∂hij, dims=3), dropdims(∂hijkl, dims=5), Cₓ, nElectron)
+    cH = (i, j)->getCoreHij(i, j, nuc, nucCoords)
+    ∂hij, ∂hijkl = derivativeCore(Val(false), bs, par, S, 
+                                  FunctionType(cH), FunctionType{:get2eInteraction}())
+    getEᵀ(∂hij, ∂hijkl, Cₓ, nElectron)
 end
 
 
 function gradHFenergy(bs::Vector{<:CompositeGTBasisFuncs}, par::Vector{<:ParamBox}, 
-                     C::Union{Matrix{Float64}, NTuple{2, Matrix{Float64}}}, 
-                     S::Matrix{Float64}, nuc::Vector{String}, 
-                     nucCoords::Vector{<:AbstractArray}; 
-                     nElectron::Union{Int, NTuple{2, Int}}=getCharge(nuc))
+                      C::Union{Matrix{Float64}, NTuple{2, Matrix{Float64}}}, 
+                      S::Matrix{Float64}, nuc::Vector{String}, 
+                      nucCoords::Vector{<:AbstractArray}; 
+                      nElectron::Union{Int, NTuple{2, Int}}=getCharge(nuc))
     if length(C) == 2 && nElectron isa Int
         nElectron = (nElectron÷2, nElectron-nElectron÷2)
     end
