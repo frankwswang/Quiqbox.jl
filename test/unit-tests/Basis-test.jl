@@ -426,11 +426,11 @@ dm2 = reshape([genBasisFunc([1,0,0], (2, 0.1)), bf_d_1], 2, 1)
 
 
 # function basisSize
-@test basisSize("P") == (3,)
-@test basisSize(["S", "P", "D"]) == (1, 3, 6)
-@test basisSize(bf1) == (1,)
-@test basisSize(bfm1) == (1,) == basisSize(bfm2)
-@test basisSize([bf1, bf2, bf3_3, bf5]) == (1,1,3,1)
+@test basisSize("P") == 3
+@test basisSize.(["S", "P", "D"]) == [1, 3, 6]
+@test basisSize(bf1) == 1
+@test basisSize(bfm1) == 1 == basisSize(bfm2)
+@test basisSize.((bf1, bf2, bf3_3, bf5)) == (1,1,3,1)
 
 
 # function genGaussFuncText

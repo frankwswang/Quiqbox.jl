@@ -597,7 +597,7 @@ struct GTBasis{N, BT} <: BasisSetData{N}
 
     function GTBasis(basis::Vector{<:AbstractGTBasisFuncs},
                      S::Matrix{<:Number}, Te::Matrix{<:Number}, eeI::Array{<:Number, 4})
-        new{basisSize(basis) |> sum, typeof(basis)}(basis, S, Te, eeI, 
+        new{basisSize.(basis) |> sum, typeof(basis)}(basis, S, Te, eeI, 
             (mol, nucCoords) -> nucAttractions(basis, mol, nucCoords),
             (mol, nucCoords) -> nucAttractions(basis, mol, nucCoords) + Te)
     end
@@ -1192,22 +1192,20 @@ end
 
 """
 
-    basisSize(subshell::Union{String, Array{String, 1}}) -> Tuple 
+    basisSize(subshell::Union{String, Array{String, 1}}) -> Int
 
 Return the size (number of orbitals) of each subshell.
 """
-basisSize(subshell::String) = (SubshellDimList[subshell],)
-basisSize(subshells::AbstractArray{String}) = basisSize.(subshells) |> flatten |> Tuple
+@inline basisSize(subshell::String) = SubshellDimList[subshell]
 
 """
 
-    basisSize(basisFunctions) -> Tuple
+    basisSize(b::CompositeGTBasisFuncs) -> Int
 
 Return the numbers of orbitals of the input basis function(s).
 """
-basisSize(basis::FloatingGTBasisFuncs) = (basis.ijk |> length,)
-basisSize(::BasisFuncMix) = (1,)
-basisSize(basisSet::AbstractArray{<:Any}) = basisSize.(basisSet) |> flatten |> Tuple
+@inline basisSize(::FloatingGTBasisFuncs{<:Any, <:Any, ON}) where {ON} = ON
+@inline basisSize(::BasisFuncMix) = 1
 
 
 # Core function to generate a customized X-Gaussian (X>1) basis function.

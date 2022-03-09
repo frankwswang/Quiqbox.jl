@@ -120,7 +120,7 @@ struct Molecule{Nc, Ne, Nb} <:MolecularHartreeFockCoefficient{Nc, Ne}
                       spins::Vector{String}, 
                       symms::Vector{String}=repeat(["A"], length(occus)))
         @assert length(nuc) == length(nucCoords)
-        Nb = basisSize(basis) |> sum
+        Nb = basisSize.(basis) |> sum
         coeff = spins |> unique |> length
         @assert (coeff*Nb .== 
                  length.([Emos, occus, C[1,:], spins, symms]) .== 
@@ -128,7 +128,7 @@ struct Molecule{Nc, Ne, Nb} <:MolecularHartreeFockCoefficient{Nc, Ne}
         EnnR = nnRepulsions(nuc, nucCoords)
         iSorted = mapPermute(basis, sortBasisFuncs)
         basis = basis[iSorted]
-        offset = pushfirst!(accumulate(+, collect(basisSize(basis)) .- 1), 0)
+        offset = pushfirst!(accumulate(+, collect(basisSize.(basis)) .- 1), 0)
         iSortedExtended = Union{Int, Vector{Int}}[]
         append!(iSortedExtended, iSorted)
         for (i, idx) in zip(iSorted, 1:length(iSorted))

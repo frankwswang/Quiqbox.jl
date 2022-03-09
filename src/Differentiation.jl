@@ -414,7 +414,7 @@ function derivativeCore(FoutputIsVector::Val{B},
     # ijkl in chemists' notation of spatial bases (ij|kl).
     ∂bfs = deriveBasisFunc.(bs, Ref(par)) |> flatten
     bfs = decompose.(bs) |> flatten
-    bsSize = basisSize(bs) |> sum
+    bsSize = basisSize.(bs) |> sum
     ∂S = ones(bsSize, bsSize)
     ∂X = ones(bsSize, bsSize) # ∂X corresponds to the derivative of X = S^(-0.5)
     ∂X₀ = ones(bsSize, bsSize) # ∂X in its eigen basis
