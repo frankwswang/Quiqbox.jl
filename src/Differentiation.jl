@@ -419,12 +419,10 @@ function derivativeCore(FoutputIsVector::Val{B},
     ∂X = ones(bsSize, bsSize) # ∂X corresponds to the derivative of X = S^(-0.5)
     ∂X₀ = ones(bsSize, bsSize) # ∂X in its eigen basis
     for i=1:bsSize, j=1:i
-        S∂ij = overlap(∂bfs[i], bfs[j])
-        Si∂j = overlap(bfs[i], ∂bfs[j])
-        ∂S[i,j] = ∂S[j,i] = S∂ij[] + Si∂j[]
+        ∂S[i,j] = ∂S[j,i] = getOverlap(∂bfs[i], bfs[j]) + getOverlap(bfs[i], ∂bfs[j])
     end
     X = (S^(-0.5))::Symmetric{Float64, Matrix{Float64}} |> Array
-    λ, 𝑣 = eigen(S)
+    λ, 𝑣 = eigen(S|>Symmetric)
     ∂S2 = transpose(𝑣)*∂S*𝑣
     for i=1:bsSize, j=1:i
         ∂X₀[i,j] = ∂X₀[j,i] = (- ∂S2[i,j] * λ[i]^(-0.5) * λ[j]^(-0.5) * 

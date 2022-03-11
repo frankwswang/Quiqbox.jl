@@ -431,7 +431,7 @@ julia> flatten([:one, 2, [3, 4.0], ([5], "six"), "7"])
   "7"
 ```
 """
-function flatten(c::Array)
+function flatten(c::Array{T}) where {T}
     c2 = map( x->(x isa Union{Array, Tuple} ? x : (x,)), c )
     [(c2...)...]
 end
