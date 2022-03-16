@@ -221,7 +221,7 @@ bs3_2 = [genBasisFunc([1,1,1], (2,1), (1,0,0)),
          genBasisFunc([1,1,1], (3,1), (2,0,0)), 
          genBasisFunc([1,1,2], (3,1), (0,0,0))]
 
-bfm_1 = +(bs2...,)
+bfm_1 = +(bs2...,) # 1.7+ bug
 bfm_2 = sumOf(bs2)
 bfm_3 = BasisFuncMix(bs3)
 bfm_4 = +(bs2_2...,)

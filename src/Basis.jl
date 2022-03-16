@@ -1604,7 +1604,7 @@ also include the mapping relations between the mapped variables and the independ
 variables.
 """
 getVarDict(pb::ParamBox; includeMapping::Bool=false) = 
-includeMapping ? getVarDictCore(pb, true) : (getVarCore(pb, false)[end] |> Dict)
+includeMapping ? getVarDictCore(pb, true) : (inSymValOf(pb) |> Dict)
 
 function getVarDict(containers::Union{Array, StructSpatialBasis}; 
                     includeMapping::Bool=false)
@@ -1612,7 +1612,7 @@ function getVarDict(containers::Union{Array, StructSpatialBasis};
         getVarDictCore(containers, true)
     else
         pbs = getParams(containers)
-        [i[end] for i in getVarCore.(pbs, false)] |> Dict
+        inSymValOf.(pbs) |> Dict
     end
 end
 
@@ -1669,45 +1669,48 @@ getNijkα(ijk, α) = getNijkα(ijk[1], ijk[2], ijk[3], α)
 getNorms(b::FloatingGTBasisFuncs{𝑙, GN, 1})  where {𝑙, GN} = 
 getNijkα.(b.ijk[1]..., [g.xpn() for g in b.gauss])
 
-pgf0(x, y, z, α) = exp( -α * (x^2 + y^2 + z^2) )
-cgf0(x, y, z, α, d) = d * pgf0(x, y, z, α)
-cgo0(x, y, z, α, d, i, j, k, N=1.0) = N * x^i * y^j * z^k * cgf0(x, y, z, α, d)
+pgf0(x::T, y, z, α) where {T} = exp( -α * (x^2 + y^2 + z^2) )::T
+cgf0(x::T, y, z, α, d) where {T} = (d * pgf0(x, y, z, α))::T
+cgo0(x::T, y, z, α, d, i, j, k, N=1.0) where {T} = 
+(N * x^i * y^j * z^k * cgf0(x, y, z, α, d))::T
 
 
-pgf(r, α) = pgf0(r[1], r[2], r[3], α)
-cgf(r, α, d) = cgf0(r[1], r[2], r[3], α, d)
-cgo(r, α, d, l, N=getNijkα(i,j,k,α)) = cgo0(r[1], r[2], r[3], α, d, l[1], l[2], l[3], N)
-cgo2(r, α, d, i, j, k, N=getNijkα(i,j,k,α)) = cgo0(r[1], r[2], r[3], α, d, i, j, k, N)
+@inline pgf(r, α) = pgf0(r[1], r[2], r[3], α)
+@inline cgf(r, α, d) = cgf0(r[1], r[2], r[3], α, d)
+@inline cgo(r, α, d, l, N=getNijkα(i,j,k,α)) = 
+cgo0(r[1], r[2], r[3], α, d, l[1], l[2], l[3], N)
+@inline cgo2(r, α, d, i, j, k, N=getNijkα(i,j,k,α)) = 
+cgo0(r[1], r[2], r[3], α, d, i, j, k, N)
 
 
-function expressionOfCore(pb::ParamBox, substituteValue::Bool=false)
+function expressionOfCore(pb::ParamBox{<:Any, <:Any, F}, substituteValue::Bool=false) where 
+                         {F}
     if substituteValue
         vrs = getVarCore(pb, false)
         recursivelyGet(vrs |> Dict, vrs[1][1])
     else
-        getFuncNum(pb.map, inSymOf(pb))
+        getFuncNum(FunctionType{F}(), inSymOf(pb))
     end
 end
 
 function expressionOfCore(bf::FloatingGTBasisFuncs{𝑙, GN, ON}, substituteValue::Bool=false, 
                           onlyParameter::Bool=false, splitGaussFunc::Bool=false) where 
                          {𝑙, GN, ON}
-    # N = bf.normalizeGTO  ?  (ON == 1 ? Nijkα : (i,j,k,α)->Nlα(i+j+k, α))  :  (_...) -> 1
     N = bf.normalizeGTO  ?  getNijkα  :  (_...) -> 1
-    pars = getfield.(bf.gauss, :param)
-    R, α, d = [expressionOfCore.(i|>collect, substituteValue) 
-               for i in (bf.center, getindex.(pars, 1), getindex.(pars, 2))]
-    x = onlyParameter ? -R : Symbolics.variable.(:r, [1:3;]) - R
+    R = expressionOfCore.(bf.center, substituteValue)
+    α = expressionOfCore.(getfield.(bf.gauss, :xpn), substituteValue)
+    d = expressionOfCore.(getfield.(bf.gauss, :con), substituteValue)
+    x = onlyParameter ? (-1 .* R) : (Symbolics.variable.(:r, (1,2,3)) .- R)
     res = map(bf.ijk) do ijk
         i, j, k = ijk
         exprs = cgo2.(Ref(x), α, d, i, j, k, N.(i,j,k,α))
-        splitGaussFunc ? exprs : sum(exprs)
+        splitGaussFunc ? collect(exprs) : sum(exprs)
     end
     hcat(res...)
 end
 
-function expressionOfCore(bfm::BasisFuncMix, substituteValue::Bool=false, 
-                          onlyParameter::Bool=false, splitGaussFunc::Bool=false)
+function expressionOfCore(bfm::BasisFuncMix{BN}, substituteValue::Bool=false, 
+                          onlyParameter::Bool=false, splitGaussFunc::Bool=false) where {BN}
     exprs = Matrix{Symbolics.Num}[expressionOfCore(bf, substituteValue, 
                                                    onlyParameter, splitGaussFunc)
                                   for bf in bfm.BasisFunc]
@@ -1716,8 +1719,8 @@ end
 
 function expressionOfCore(gf::GaussFunc, substituteValue::Bool=false)
     r = Symbolics.variable.(:r, [1:3;])
-    α, d = expressionOfCore.(gf.param, substituteValue)
-    cgf(r, α, d)
+    cgf(r, expressionOfCore(gf.xpn, substituteValue), 
+           expressionOfCore(gf.con, substituteValue))
 end
 
 """
@@ -1763,20 +1766,20 @@ inSymbols(vr::Num, pool::Vector{Symbol}=ParamNames) = inSymbols(vr.val, pool)
 
 function varVal(vr::SymbolicUtils.Sym, varDict::Dict{Num, <:Real})
     res = recursivelyGet(varDict, vr |> Num)
-    if res === nothing
+    if isnan(res)
         res = recursivelyGet(varDict, 
                              symbolReplace(Symbolics.tosymbol(vr), 
                                            NoDiffMark=>"") |> Symbolics.variable)
     end
-    if res === nothing
+    if isnan(res)
         str = Symbolics.tosymbol(vr) |> string
         pos = findfirst(r"[₁₂₃₄₅₆₇₈₉₀]", str)[1]
         front = split(str,str[pos])[1]
         var = front*NoDiffMark*str[pos:end] |> Symbol
         recursivelyGet(varDict, var |> Symbolics.variable)
     end
-    @assert res !== nothing "Can NOT find the value of $(vr)::$(typeof(vr)) in the given "*
-                            "Dict $(varDict)."
+    @assert !isnan(res) "Can NOT find the value of $(vr)::$(typeof(vr)) in the given "*
+                        "Dict $(varDict)."
     res
 end
 
@@ -1886,6 +1889,7 @@ end
 
 
 function diffInfo(bf::CompositeGTBasisFuncs, vr, varDict)
+# function diffInfo(bf::CompositeGTBasisFuncs{BN, 1}, vr, varDict) where {BN}
     exprs = expressionOfCore(bf, false, true, true)
     relDiffs = Symbolics.derivative.(log.(exprs), vr)
     diffTransfer.(relDiffs, Ref(varDict))
@@ -1905,3 +1909,18 @@ function diffInfoToBasisFunc(bf::FloatingGTBasisFuncs, info::Matrix{<:Any})
     end
     eachcol(mat) .|> sum
 end
+
+# function diffInfoToBasisFunc(bf::FloatingGTBasisFuncs, info::Matrix{<:Any})
+#     mat = map(info) do y
+#         xs = [copyBasis(x) for _ = 1:length(y)]
+#         d = genContraction
+#         alpha
+#         genBasisFunc(bf.center, ())
+#         for (i,j) in zip(y, xs)
+#             j.gauss[1].con[] *= getindex(i, 1)
+#         end
+
+#         shift.(xs, getindex.(y, Ref(2:4))) |> BasisFuncMix
+#     end
+#     eachcol(mat) .|> sum
+# end

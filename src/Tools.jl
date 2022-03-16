@@ -645,8 +645,9 @@ renameFunc(fName::String, f) = renameFunc(Symbol(fName), f)
 Recursively find the final value using the value of each iteration as the key for the 
 next search.
 """
-function recursivelyGet(dict::Dict, startKey::Any)
-    res = nothing
+function recursivelyGet(dict::Dict{K, V}, startKey::K, default=Vector{V}(undef, 1)[]) where 
+                       {K, V}
+    res = default
     val = get(dict, startKey, missing)
     while !(val isa Missing)
         res = val
@@ -654,6 +655,9 @@ function recursivelyGet(dict::Dict, startKey::Any)
     end
     res
 end
+
+recursivelyGet(dict::Dict{K, <:Real}, startKey::K) where {K} = 
+recursivelyGet(dict, startKey, NaN)
 
 
 function isOscillateConverged(sequence::Vector{<:Real}, 
@@ -870,6 +874,12 @@ end
 function getFuncNum(::Pf{C, F}, vNum::Symbolics.Num) where {C, F}
     (C * Symbolics.variable(F, T=Symbolics.FnType{Tuple{Any}, Real})(vNum))::Symbolics.Num
 end
+
+function getFuncNum(::FunctionType{F}, vNum::Symbolics.Num) where {F}
+    Symbolics.variable(F, T=Symbolics.FnType{Tuple{Any}, Real})(vNum)::Symbolics.Num
+end
+
+getFuncNum(::FunctionType{:itself}, vNum::Symbolics.Num) = vNum
 
 getFuncNum(::typeof(itself), vNum::Symbolics.Num) = vNum
 

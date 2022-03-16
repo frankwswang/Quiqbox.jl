@@ -334,14 +334,6 @@ altered result.
 toggleDiff!(pb::ParamBox) = begin pb.canDiff[] = !pb.canDiff[] end
 
 
-function deriveBasisFunc(bf::CompositeGTBasisFuncs, par::ParamBox) where {N}
-    varDict = inSymValOf.(bf |> getParams) |> Dict
-    vr = getVar(par)
-    info = diffInfo(bf, vr, varDict)
-    diffInfoToBasisFunc(bf, info)
-end
-
-
 function oneBodyDerivativeCore(::Val{false}, ∂bfs::Vector{<:CompositeGTBasisFuncs}, 
                                bfs::Vector{<:CompositeGTBasisFuncs}, 
                                X::Matrix{Float64}, ∂X::Matrix{Float64}, 
@@ -404,6 +396,21 @@ function twoBodyDerivativeCore(::Val{false}, ∂bfs::Vector{<:CompositeGTBasisFu
     end
     ∂ʃ
 end
+
+function deriveBasisFunc(bf::CompositeGTBasisFuncs, par::ParamBox) where {N}
+    varDict = getVarDict(bf)
+    vr = getVar(par)
+    info = diffInfo(bf, vr, varDict)
+    diffInfoToBasisFunc(bf, info)
+end
+
+
+# function deriveBasisFunc(bf::CompositeGTBasisFuncs{BN, 1}, par::ParamBox) where {BN}
+#     varDict = getVarDict(bf)
+#     vr = getVar(par)
+#     info = diffInfo(bf, vr, varDict)
+#     diffInfoToBasisFunc(bf, info)
+# end
 
 
 function derivativeCore(FoutputIsVector::Val{B}, 
