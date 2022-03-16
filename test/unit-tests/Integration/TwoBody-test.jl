@@ -93,10 +93,10 @@ using Quiqbox
             0.3221534573785314 0.43088268760281656 0.281114895451527 0.3918319845719349;
             0.2385821756420249 0.281114895451527 0.626369765524018 0.3803285686123761;
             0.25160103976844717 0.3918319845719349 0.3803285686123761 0.4829562753692258]]
-    eeIs = reshape(vec |> flatten, 4,4,4,4,1)
+    eeIs = reshape(vec |> flatten, 4,4,4,4)
 
     randIdx = rand(1:4, 4)
-    randVal = eeIs[randIdx...,1] * ones(1,1,1,1,1)
+    randVal = eeIs[randIdx...] * ones(1,1,1,1)
     @test isapprox(eeInteraction(bs[randIdx]...), randVal, atol=errT1)
 
     eeIs1 = eeInteractions(bs)
@@ -107,19 +107,4 @@ using Quiqbox
     @test unique(eeIs1) ⊆ uniqueInts1
     @test uniqueInts1  ⊆ unique(eeIs1)
     @test isapprox(sort(uniqueInts1), sort(uniqueInts2), atol=errT1)
-
-    # eeI1, uniqueIdx1 = Quiqbox.eeInteractionsCore(bs, outputUniqueIndices=true)
-    # isapprox(eeInteractions(bs), eeI1[:,:,:,:,1], atol=1e-15)
-    # @test isapprox(eeI1, eeI, atol=errT1)
-    # uniqueInts1 = [eeI1[i...] for i in uniqueIdx1]
-    # @test unique(eeI1) ⊆ uniqueInts1
-    # @test isapprox(sort([eeI[i,j,k,l,1] for i = 1:size(eeI,1) 
-    #                                     for j = 1:i 
-    #                                     for k = 1:i 
-    #                                     for l = 1:(k==i ? j : k)]), 
-    #                sort(uniqueInts1), atol=errT1)
-    
-    # eeI2, uniqueIdx2 = Quiqbox.eeInteractionsCore(bs[[1,3,2,4]], outputUniqueIndices=true)
-    # uniqueInts2 = [eeI2[i...] for i in uniqueIdx2]
-    # @test isapprox(sort(uniqueInts1), sort(uniqueInts2), atol=errT1)
 end
