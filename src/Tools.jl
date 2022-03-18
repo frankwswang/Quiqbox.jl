@@ -676,53 +676,54 @@ function isOscillateConverged(sequence::Vector{<:Real},
 end
 
 
-splitTerm(term::Symbolics.Num) = splitTermCore(term.val)
+splitTerm(trm::Symbolics.Num) = 
+splitTermCore(trm.val)::Vector{<:Union{Real, SymbolicUtils.Symbolic}}
 
-function rewriteCore(term, r)
-    res = r(term)
-    res === nothing ? term : res
+@inline function rewriteCore(trm, r)
+    res = r(trm)
+    res === nothing ? trm : res
 end
 
-function splitTermCore(term::SymbolicUtils.Add)
+function splitTermCore(trm::SymbolicUtils.Add)
     r1 = SymbolicUtils.@rule +(~(~xs)) => [i for i in ~(~xs)]
-    r1(term) .|> rewriteTerm
+    r1(trm) .|> rewriteTerm
 end
 
-rewriteTerm(term::SymbolicUtils.Add) = splitTermCore(term)
+rewriteTerm(trm::SymbolicUtils.Add) = splitTermCore(trm)
 
-rewriteTerm(term::SymbolicUtils.Pow) = itself(term)
+rewriteTerm(trm::SymbolicUtils.Pow) = itself(trm)
 
-function rewriteTerm(term::SymbolicUtils.Div)
+function rewriteTerm(trm::SymbolicUtils.Div)
     r = @rule (~x) / (~y) => (~x) * (~y)^(-1)
-    rewriteCore(term, r)
+    rewriteCore(trm, r)
 end
 
-function rewriteTerm(term::SymbolicUtils.Mul)
+function rewriteTerm(trm::SymbolicUtils.Mul)
     r = SymbolicUtils.@rule *(~(~xs)) => sort([i for i in ~(~xs)], 
                               by=x->(x isa SymbolicUtils.Symbolic)) |> prod
-    rewriteCore(term, r) |> SymbolicUtils.simplify
+    rewriteCore(trm, r) |> SymbolicUtils.simplify
 end
 
-function splitTermCore(term::SymbolicUtils.Mul)
+function splitTermCore(trm::SymbolicUtils.Mul)
     r1 = SymbolicUtils.@rule *(~(~xs)) => [i for i in ~(~xs)]
     r2 = SymbolicUtils.@rule +(~(~xs)) => [i for i in ~(~xs)]
     r3 = @acrule ~~vs * exp((~a)*((~x)^2+(~y)^2+(~z)^2)) * 
                         exp(-1*(~a)*((~x)^2+(~y)^2+(~z)^2)) => prod(~~vs)
-    terms = rewriteCore(term, r1)
-    idx = findfirst(x-> x isa SymbolicUtils.Add, terms)
+    trms = rewriteCore(trm, r1)
+    idx = findfirst(x-> x isa SymbolicUtils.Add, trms)
     if idx !== nothing
-        sumTerm = popat!(terms, idx)
-        var = SymbolicUtils.simplify(sort(terms, 
+        sumTerm = popat!(trms, idx)
+        var = SymbolicUtils.simplify(sort(trms, 
                                           by=x->(x isa SymbolicUtils.Symbolic)) |> prod)
         rewriteCore.((r2(sumTerm) .* var), Ref(r3)) .|> rewriteTerm |> flatten
     else
-        [terms |> prod]
+        [trms |> prod]
     end
 end
 
-splitTermCore(term::SymbolicUtils.Div) = term |> rewriteTerm |> splitTermCore
+splitTermCore(trm::SymbolicUtils.Div) = trm |> rewriteTerm |> splitTermCore
 
-splitTermCore(term) = [term]
+splitTermCore(trm) = [trm]
 
 
 function groupedSort(v::Vector, sortFunction::F=itself) where {F<:Function}

@@ -708,8 +708,8 @@ unpackBasisFuncs(::Any) = FloatingGTBasisFuncs[]
 
 unpackBasis(bfm::BasisFuncMix{BN, GN}) where {BN, GN} = bfm.BasisFunc |> collect
 
-function sumOf(bfs::Array{<:BasisFunc})::CompositeGTBasisFuncs{<:Any, 1}
-    arr1 = convert(Vector{BasisFunc}, sortBasisFuncs(bfs[:]))
+function sumOfCore(bfs::Array{<:BasisFunc})::CompositeGTBasisFuncs{<:Any, 1}
+    arr1 = convert(Vector{BasisFunc}, sortBasisFuncs(bfs))
     arr2 = BasisFunc[]
     while length(arr1) > 1
         temp = add(arr1[1], arr1[2])
@@ -727,9 +727,13 @@ function sumOf(bfs::Array{<:BasisFunc})::CompositeGTBasisFuncs{<:Any, 1}
     end
 end
 
-sumOf(bfms::Array{<:CompositeGTBasisFuncs{<:Any, 1}}) = 
-vcat((bfms .|> unpackBasisFuncs)...) |> sumOf
+sumOfCore(bfms::Array{<:CompositeGTBasisFuncs{<:Any, 1}}) = 
+vcat((bfms .|> unpackBasisFuncs)...) |> sumOfCore
 
+function sumOf(bs::Array)
+    length(bs) == 1 && (return bs[])
+    sumOfCore(bs)
+end
 
 mergeGaussFuncs(gf::GaussFunc) = itself(gf)
 
@@ -1143,7 +1147,7 @@ mul(bf1::BasisFuncs{𝑙1, GN1, 1}, bf2::BasisFuncs{𝑙2, GN2, 1};
 Shift (add) the angular momentum (Cartesian representation) given the a vector that 
 specifies the change of each pseudo-quantum number 𝑑i, 𝑑j, 𝑑k.
 """
-shift(bf::FloatingGTBasisFuncs{𝑙, GN, 1}, didjdk::Vector{<:Real}) where {𝑙, GN} = 
+shift(bf::FloatingGTBasisFuncs{𝑙, GN, 1}, didjdk::AbstractArray{<:Real}) where {𝑙, GN} = 
 shiftCore(bf, XYZTuple(didjdk.|>Int))
 
 shift(bf::FloatingGTBasisFuncs{𝑙, GN, 1}, didjdk::NTuple{3, Int}) where {𝑙, GN} = 
@@ -1155,8 +1159,7 @@ BasisFunc(bf.center, bf.gauss, bf.ijk[1]+didjdk, bf.normalizeGTO)
 
 """
 
-    decompose(bf::CompositeGTBasisFuncs; splitGaussFunc::Bool=false) -> 
-    Array{<:FloatingGTBasisFuncs, 2}
+    decompose(bf::CompositeGTBasisFuncs; splitGaussFunc::Bool=false) -> Matrix{<:BasisFunc}
 
 Decompose a `FloatingGTBasisFuncs` into an `Array` of `BasisFunc`s. Each column represents 
 one orbital of the input basis function(s). If `splitGaussFunc` is `true`, then each column 
@@ -1180,12 +1183,21 @@ function decompose(bf::FloatingGTBasisFuncs{𝑙, GN, ON};
     res
 end
 
+function decompose(bf::FloatingGTBasisFuncs{𝑙, GN, 1}; 
+                   splitGaussFunc::Bool=false) where {𝑙, GN}
+    if splitGaussFunc
+        BasisFunc.(Ref(bf.center), collect(bf.gauss), Ref(bf.ijk), bf.normalizeGTO)
+    else
+        [bf]
+    end
+end
+
 function decompose(bfm::BasisFuncMix; splitGaussFunc::Bool=false)
     if splitGaussFunc
         bfs = decompose.(bfm.BasisFunc; splitGaussFunc)
         vcat(bfs...)
     else
-        bfm
+        [bfm]
     end
 end
 
@@ -1404,22 +1416,20 @@ function getParams(pb::ParamBox, symbol::Union{Symbol, Nothing}=nothing;
 end
 
 function getParams(ssb::StructSpatialBasis, symbol::Union{Symbol, Nothing}=nothing; 
-          onlyDifferentiable::Bool=false)
+          onlyDifferentiable::Bool=false)::Vector{<:ParamBox}
     filter(x->paramFilter(x, symbol, onlyDifferentiable), ssb.param) |> collect
 end
 
-function getParams(cs::Array{<:ParamBox}, symbol::Union{Symbol, Nothing}=nothing; 
-          onlyDifferentiable::Bool=false)
-    idx = findall(x->paramFilter(x, symbol, onlyDifferentiable), cs)
-    [cs[i] for i in idx]
-end
+getParams(cs::Array{<:ParamBox}, symbol::Union{Symbol, Nothing}=nothing; 
+          onlyDifferentiable::Bool=false) = 
+cs[findall(x->paramFilter(x, symbol, onlyDifferentiable), cs)]
 
 getParams(cs::Array{<:StructSpatialBasis}, symbol::Union{Symbol, Nothing}=nothing; 
-          onlyDifferentiable::Bool=false) = 
+          onlyDifferentiable::Bool=false)::Vector{<:ParamBox} = 
 vcat(getParams.(cs, symbol; onlyDifferentiable)...)
 
 function getParams(cs::Array, symbol::Union{Symbol, Nothing}=nothing; 
-                   onlyDifferentiable::Bool=false)
+                   onlyDifferentiable::Bool=false)::Vector{<:ParamBox}
     pbIdx = findall(x->x isa ParamBox, cs)
     vcat(getParams(convert(Vector{ParamBox}, cs[pbIdx]), symbol; onlyDifferentiable), 
          getParams(convert(Vector{StructSpatialBasis}, cs[1:end .∉ [pbIdx]]), symbol; 
@@ -1580,7 +1590,7 @@ Return the independent variable(s) of the input parameter container.
 """
 getVar(pb::ParamBox) = getVarCore(pb, false)[end][1]
 
-function getVar(container::CompositeGTBasisFuncs)
+function getVar(container::CompositeGTBasisFuncs)::Vector{Symbolics.Num}
     vrs = getVarCore.(container |> getParams, false)
     getindex.(getindex.(vrs, lastindex.(vrs)), 1)
 end
@@ -1678,9 +1688,9 @@ cgo0(x::T, y, z, α, d, i, j, k, N=1.0) where {T} =
 @inline pgf(r, α) = pgf0(r[1], r[2], r[3], α)
 @inline cgf(r, α, d) = cgf0(r[1], r[2], r[3], α, d)
 @inline cgo(r, α, d, l, N=getNijkα(i,j,k,α)) = 
-cgo0(r[1], r[2], r[3], α, d, l[1], l[2], l[3], N)
+        cgo0(r[1], r[2], r[3], α, d, l[1], l[2], l[3], N)
 @inline cgo2(r, α, d, i, j, k, N=getNijkα(i,j,k,α)) = 
-cgo0(r[1], r[2], r[3], α, d, i, j, k, N)
+        cgo0(r[1], r[2], r[3], α, d, i, j, k, N)
 
 
 function expressionOfCore(pb::ParamBox{<:Any, <:Any, F}, substituteValue::Bool=false) where 
@@ -1701,17 +1711,17 @@ function expressionOfCore(bf::FloatingGTBasisFuncs{𝑙, GN, ON}, substituteValu
     α = expressionOfCore.(getfield.(bf.gauss, :xpn), substituteValue)
     d = expressionOfCore.(getfield.(bf.gauss, :con), substituteValue)
     x = onlyParameter ? (-1 .* R) : (Symbolics.variable.(:r, (1,2,3)) .- R)
-    res = map(bf.ijk) do ijk
+    res = map(bf.ijk::NTuple{ON, XYZTuple{𝑙}}) do ijk
         i, j, k = ijk
         exprs = cgo2.(Ref(x), α, d, i, j, k, N.(i,j,k,α))
         splitGaussFunc ? collect(exprs) : sum(exprs)
     end
-    hcat(res...)
+    ON==1 ? (vcat(res...)::Vector{Symbolics.Num}) : (hcat(res...)::Matrix{Symbolics.Num})
 end
 
 function expressionOfCore(bfm::BasisFuncMix{BN}, substituteValue::Bool=false, 
                           onlyParameter::Bool=false, splitGaussFunc::Bool=false) where {BN}
-    exprs = Matrix{Symbolics.Num}[expressionOfCore(bf, substituteValue, 
+    exprs = Vector{Symbolics.Num}[expressionOfCore(bf, substituteValue, 
                                                    onlyParameter, splitGaussFunc)
                                   for bf in bfm.BasisFunc]
     splitGaussFunc ? vcat(exprs...) : sum(exprs)
@@ -1801,7 +1811,6 @@ function varVal(vr::SymbolicUtils.Pow, varDict::Dict{Num, <:Real})
     varVal(vrs[1], varDict)^varVal(vrs[2], varDict)
 end
 
-
 function varVal(vr::SymbolicUtils.Term, varDict::Dict{Num, <:Real})
     getFsym = (t) -> t isa SymbolicUtils.Sym ? Symbolics.tosymbol(t) : Symbol(t)
     if vr.f isa Symbolics.Differential
@@ -1835,92 +1844,70 @@ varVal(vr::Real, args...) = itself(vr)
 varVal(vr::Rational, args...) = round(vr |> Float64, digits=14)
 
 
-function detectXYZ(i::SymbolicUtils.Symbolic)
-    vec = zeros(3)
+function detectXYZ(i::SymbolicUtils.Symbolic, varDict::Dict{Num, <:Real})
+    xyz = zeros(Int, 3)
     if i isa SymbolicUtils.Pow
         for j = 1:3
             if inSymbols(i.base, [ParamNames[j]]) != false
-                vec[j] = i.exp
-                sign = iseven(i.exp) ? 1 : -1
-                return (true, sign, vec) # (-X)^k -> (true, (-1)^k, [0, 0, 0])
+                xyz[j] = i.exp
+                return ((-1)^(i.exp), xyz) # (-X)^k -> (true, (-1)^k, [0, 0, 0])
             end
         end
     else
         for j = 1:3
             if inSymbols(i, [ParamNames[j]]) != false
-                vec[j] = 1
-                return (true, -1, vec)
+                xyz[j] = 1
+                return (-1, xyz)
             end
         end
     end
-    (false, 1, nothing)
+    (varVal(i, varDict), xyz)
 end
 
-detectXYZ(::Real) = (false, 1, nothing)
+detectXYZ(vr::Real, _) = (vr, [0,0,0])
 
 
 # res = [d_ratio, Δi, Δj, Δk]
-function diffTransferCore(term::SymbolicUtils.Symbolic, varDict::Dict{Num, <:Real})
-    res = Real[1,0,0,0]
+function diffTransferCore(trm::SymbolicUtils.Symbolic, varDict::Dict{Num, <:Real})
+    d = 1.0
+    xyz = zeros(Int, 3)
     r = Symbolics.@rule *(~~xs) => ~~xs
-    terms = SymbolicUtils.simplify(term, rewriter=r)
-    !(terms isa SubArray) && (terms = [terms])
-    for vr in terms
-        isXYZ, sign, xpns = detectXYZ(vr)
-        if isXYZ
-            res[2:end] += xpns
-            res[1] *= sign
-        else
-            res[1] *= varVal(vr, varDict)
-        end
+    trms = SymbolicUtils.simplify(trm, rewriter=r)
+    !(trms isa SubArray) && (trms = [trms])
+    for vr in trms
+        coeff, ijks = detectXYZ(vr, varDict)
+        xyz += ijks
+        d *= coeff
     end
-    res
+    (d, xyz)
 end
 
-# diffTransferCore(term::Symbolics.Num, args...) = diffTransferCore(term.val, args...)
-
-diffTransferCore(term::Real, _...) = Real[Float64(term), 0,0,0]
+diffTransferCore(trm::Real, _...) = (Float64(trm), [0,0,0])
 
 
-function diffTransfer(term::Num, varDict::Dict{Num, <:Real})
-    terms = splitTerm(term)
-    diffTransferCore.(terms, Ref(varDict))
+function diffTransfer(trm::Num, varDict::Dict{Num, <:Real})
+    trms = splitTerm(trm)
+    diffTransferCore.(trms, Ref(varDict))
 end
 
 
-function diffInfo(bf::CompositeGTBasisFuncs, vr, varDict)
-# function diffInfo(bf::CompositeGTBasisFuncs{BN, 1}, vr, varDict) where {BN}
+function diffInfo(bf::CompositeGTBasisFuncs{BN, 1}, vr, varDict) where {BN}
     exprs = expressionOfCore(bf, false, true, true)
     relDiffs = Symbolics.derivative.(log.(exprs), vr)
     diffTransfer.(relDiffs, Ref(varDict))
 end
 
 
-function diffInfoToBasisFunc(bf::FloatingGTBasisFuncs, info::Matrix{<:Any})
+function diffInfoToBasisFunc(bf::CompositeGTBasisFuncs{BN, 1}, 
+                             info::Vector{Vector{Tuple{Float64, Vector{Int}}}}) where {BN}
     bs = decompose(bf, splitGaussFunc=true)
-    mat = map(bs, info) do x, y
-        xs = [copyBasis(x) for _ = 1:length(y)]
-
-        for (i,j) in zip(y, xs)
-            j.gauss[1].con[] *= getindex(i, 1)
-        end
-
-        shift.(xs, getindex.(y, Ref(2:4))) |> BasisFuncMix
+    bss = map(info, bs) do gInfo, bf
+        map(gInfo) do dxyz
+           sgf = copyBasis(bf)
+           sgf.gauss[1].con[] *= dxyz[1]
+           xyz = dxyz[2]
+           xyz == [0,0,0] ? sgf : shift(sgf, xyz)
+        end::Vector{<:BasisFunc{<:Any, 1}}
     end
-    eachcol(mat) .|> sum
+    vcat(bss...)::Vector{<:BasisFunc{<:Any, 1}} |> sumOf
 end
-
-# function diffInfoToBasisFunc(bf::FloatingGTBasisFuncs, info::Matrix{<:Any})
-#     mat = map(info) do y
-#         xs = [copyBasis(x) for _ = 1:length(y)]
-#         d = genContraction
-#         alpha
-#         genBasisFunc(bf.center, ())
-#         for (i,j) in zip(y, xs)
-#             j.gauss[1].con[] *= getindex(i, 1)
-#         end
-
-#         shift.(xs, getindex.(y, Ref(2:4))) |> BasisFuncMix
-#     end
-#     eachcol(mat) .|> sum
-# end

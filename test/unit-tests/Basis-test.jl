@@ -411,18 +411,18 @@ bf_d_1 = genBasisFunc([1,0,0], (1, 0.5))
 bf_d_2 = genBasisFunc([1,0,0], ([2,1], [0.1, 0.5]))
 bf_d_3 = genBasisFunc([1,1,0], ([2,1], [0.1, 0.2]), "P")
 bm_d_1 = BasisFuncMix([bf_d_1, bf_d_2])
-dm1 = reshape([bf_d_1], 1, 1)
-@test hasEqual(decompose(bf_d_1), dm1)
+dm1 = [bf_d_1]
+@test hasIdentical(decompose(bf_d_1), dm1)
 @test hasEqual(decompose(bf_d_1, splitGaussFunc=true), dm1)
-@test hasEqual(decompose(bf_d_2), reshape([bf_d_2], 1, 1))
-dm2 = reshape([genBasisFunc([1,0,0], (2, 0.1)), bf_d_1], 2, 1)
+@test hasEqual(decompose(bf_d_2), [bf_d_2])
+dm2 = [genBasisFunc([1,0,0], (2, 0.1)), bf_d_1]
 @test hasEqual(decompose(bf_d_2, splitGaussFunc=true), dm2)
 @test hasEqual(decompose(bf_d_3), reshape(bf_d_3[:], 1, 3))
 @test hasEqual(decompose(bf_d_3, splitGaussFunc=true), 
                hcat(decompose.(bf_d_3[:], splitGaussFunc=true)...))
-@test decompose(bm_d_1) === bm_d_1
+@test hasIdentical(decompose(bm_d_1), [bm_d_1])
 @test hasEqual(decompose(bm_d_1, splitGaussFunc=true), 
-              reshape(vcat(decompose.(bm_d_1.BasisFunc, splitGaussFunc=true)...), 3, 1))
+               vcat(decompose.(bm_d_1.BasisFunc, splitGaussFunc=true)...))
 
 
 # function basisSize

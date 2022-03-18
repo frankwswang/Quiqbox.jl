@@ -397,20 +397,13 @@ function twoBodyDerivativeCore(::Val{false}, ∂bfs::Vector{<:CompositeGTBasisFu
     ∂ʃ
 end
 
-function deriveBasisFunc(bf::CompositeGTBasisFuncs, par::ParamBox) where {N}
+
+function deriveBasisFunc(bf::CompositeGTBasisFuncs{BN, 1}, par::ParamBox) where {BN}
     varDict = getVarDict(bf)
     vr = getVar(par)
     info = diffInfo(bf, vr, varDict)
     diffInfoToBasisFunc(bf, info)
 end
-
-
-# function deriveBasisFunc(bf::CompositeGTBasisFuncs{BN, 1}, par::ParamBox) where {BN}
-#     varDict = getVarDict(bf)
-#     vr = getVar(par)
-#     info = diffInfo(bf, vr, varDict)
-#     diffInfoToBasisFunc(bf, info)
-# end
 
 
 function derivativeCore(FoutputIsVector::Val{B}, 
@@ -419,8 +412,8 @@ function derivativeCore(FoutputIsVector::Val{B},
                         oneBodyF::FunctionType{F1}, twoBodyF::FunctionType{F2}) where 
                        {B, F1, F2}
     # ijkl in chemists' notation of spatial bases (ij|kl).
-    ∂bfs = deriveBasisFunc.(bs, Ref(par)) |> flatten
-    bfs = decompose.(bs) |> flatten
+    bfs = reshape(hcat(decompose.(bs)...), :)
+    ∂bfs = deriveBasisFunc.(bfs, par)
     bsSize = basisSize.(bs) |> sum
     ∂S = ones(bsSize, bsSize)
     ∂X = ones(bsSize, bsSize) # ∂X corresponds to the derivative of X = S^(-0.5)
