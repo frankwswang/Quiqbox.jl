@@ -166,7 +166,7 @@ cat(getElecKinetic(bf1, bf2), dims=2)
 
 
 @inline elecKineticsCore(BSet::Vector{<:AbstractGTBasisFuncs}) = 
-                     oneBodyBSTensor(BSet, elecKineticCore)
+        oneBodyBSTensor(BSet, elecKineticCore)
 
 """
 

@@ -95,7 +95,7 @@ end
                           bf2::AbstractGTBasisFuncs, 
                           bf3::AbstractGTBasisFuncs, 
                           bf4::AbstractGTBasisFuncs) = 
-twoBodyBFTensor(:cint2e_cart, bf1, bf2, bf3, bf4)
+        twoBodyBFTensor(:cint2e_cart, bf1, bf2, bf3, bf4)
 
 """
 
