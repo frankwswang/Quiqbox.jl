@@ -1,17 +1,17 @@
 using Test
 using Quiqbox
-using Quiqbox: gradHFenergy
+using Quiqbox: inSymOfCore, outSymOfCore
 
 @testset "Differentiation.jl" begin
 
 pb1 = ParamBox(1, :a)
-@test inSymOf(pb1) == :a == outSymOf(pb1)
+@test inSymOfCore(pb1) == :a == outSymOfCore(pb1)
 @test dataOf(pb1)[] == pb1[] == inValOf(pb1)
 @test pb1[] == pb1() == 1 == outValOf(pb1)
 @test pb1.map == Quiqbox.itself == mapOf(pb1)
-@test pb1.canDiff[] == true == isDiffParam(pb1)
+@test pb1.canDiff[] == false == isDiffParam(pb1)
 toggleDiff!(pb1)
-@test pb1.canDiff[] == false
+@test pb1.canDiff[] == true
 disableDiff!(pb1)
 @test pb1.canDiff[] == false
 enableDiff!(pb1)
@@ -23,13 +23,13 @@ pb2_2 = outValCopy(pb1)
 @test dataOf(pb1) !== dataOf(pb2_2)
 
 pb3 = ParamBox(1, :b, abs)
-@test inSymOf(pb3) == :x_b
-@test outSymOf(pb3) == :b
+@test inSymOfCore(pb3) == :x_b
+@test outSymOfCore(pb3) == :b
 @test mapOf(pb3) == abs
 
 pb4 = ParamBox(1.2, :c, x->x^2, :x)
-@test inSymOf(pb4) == :x
-@test outSymOf(pb4) == :c
+@test inSymOfCore(pb4) == :x
+@test outSymOfCore(pb4) == :c
 @test startswith(nameof(pb4.map) |> string, "f_c")
 
 
@@ -76,4 +76,17 @@ grad2_tp = [-0.027665907127075395, 0.032956566685641786,
              0.09464147744656182, -0.05996050268876785]
 @test isapprox.(grad2[7:end], grad2_tp, atol=t2) |> all
 
+bs3 = bs1[1:2] .* bs2
+pars3 = uniqueParams!(bs3, filterMapping=true)
+S3 = overlaps(bs3)
+HFres3 = runHF(bs3, nuc, nucCoords, printInfo=false)
+grad3 = gradHFenergy(bs3, pars3, HFres3.C, S3, nuc, nucCoords)
+grad3_t = [-0.16063989312344312,   -0.24141235049869234,  -0.1479195119283126, 
+            0.0047742716937190545, -0.0840383523693305,   -0.332511763883946, 
+           -0.4152462021714788,    -0.057372708045806686, -0.30571032966705025, 
+           -0.41924981152181917,    0.6566150755123951,    0.10168825403898338, 
+            1.2107395732278206,     0.13560218633869411,   1.6047571206290643, 
+            0.058802315807757986,   0.7173672535981447,   -1.2816915203875543, 
+            2.7680860344127267,   -16.526956760529522]
+@test isapprox.(grad3, grad3_t, atol=t2) |> all
 end

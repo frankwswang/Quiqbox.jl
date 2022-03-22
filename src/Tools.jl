@@ -431,7 +431,7 @@ julia> flatten([:one, 2, [3, 4.0], ([5], "six"), "7"])
   "7"
 ```
 """
-function flatten(c::Array)
+function flatten(c::Array{T}) where {T}
     c2 = map( x->(x isa Union{Array, Tuple} ? x : (x,)), c )
     [(c2...)...]
 end
@@ -623,7 +623,7 @@ end
 """
 A dummy function that only returns its argument.
 """
-itself(x) = x
+itself(x::T) where {T} = x::T
 
 
 """
@@ -634,17 +634,20 @@ function symbolReplace(sym::Symbol, pair::Pair{String, String}; count::Int=typem
 end
 
 
-function renameFunc(fName::String, f::F) where {F<:Function}
-    @eval ($(Symbol(fName)))(a...; b...) = $f(a...; b...)
+function renameFunc(fName::Symbol, f::F) where {F<:Function}
+    @eval ($(fName))(a...; b...) = $f(a...; b...)
 end
+
+renameFunc(fName::String, f) = renameFunc(Symbol(fName), f)
 
 
 """
 Recursively find the final value using the value of each iteration as the key for the 
 next search.
 """
-function recursivelyGet(dict::Dict, startKey::Any)
-    res = nothing
+function recursivelyGet(dict::Dict{K, V}, startKey::K, default=Vector{V}(undef, 1)[]) where 
+                       {K, V}
+    res = default
     val = get(dict, startKey, missing)
     while !(val isa Missing)
         res = val
@@ -652,6 +655,9 @@ function recursivelyGet(dict::Dict, startKey::Any)
     end
     res
 end
+
+recursivelyGet(dict::Dict{K, <:Real}, startKey::K) where {K} = 
+recursivelyGet(dict, startKey, NaN)
 
 
 function isOscillateConverged(sequence::Vector{<:Real}, 
@@ -670,68 +676,54 @@ function isOscillateConverged(sequence::Vector{<:Real},
 end
 
 
-# function splitTerm(term::Symbolics.Num)
-#     r1 = Symbolics.@rule +(~(~xs)) => [i for i in ~(~xs)]
-#     r2 = Symbolics.@rule *(~(~xs)) => [[i for i in ~(~xs)] |> prod]
-#     for r in [r1, r2]
-#         term = Symbolics.simplify(term, rewriter = r)
-#     end
-#     # Converting Symbolics.Arr to Base.Array
-#     if term isa Symbolics.Arr
-#         terms = term |> collect
-#     else
-#         terms = [term]
-#     end
-#     terms
-# end
+splitTerm(trm::Symbolics.Num) = 
+splitTermCore(trm.val)::Vector{<:Union{Real, SymbolicUtils.Symbolic}}
 
-splitTerm(term::Symbolics.Num) = splitTermCore(term.val)
-
-function rewriteCore(term, r)
-    res = r(term)
-    res === nothing ? term : res
+@inline function rewriteCore(trm, r)
+    res = r(trm)
+    res === nothing ? trm : res
 end
 
-function splitTermCore(term::SymbolicUtils.Add)
+function splitTermCore(trm::SymbolicUtils.Add)
     r1 = SymbolicUtils.@rule +(~(~xs)) => [i for i in ~(~xs)]
-    r1(term) .|> rewriteTerm
+    r1(trm) .|> rewriteTerm
 end
 
-rewriteTerm(term::SymbolicUtils.Add) = splitTermCore(term)
+rewriteTerm(trm::SymbolicUtils.Add) = splitTermCore(trm)
 
-rewriteTerm(term::SymbolicUtils.Pow) = itself(term)
+rewriteTerm(trm::SymbolicUtils.Pow) = itself(trm)
 
-function rewriteTerm(term::SymbolicUtils.Div)
+function rewriteTerm(trm::SymbolicUtils.Div)
     r = @rule (~x) / (~y) => (~x) * (~y)^(-1)
-    rewriteCore(term, r)
+    rewriteCore(trm, r)
 end
 
-function rewriteTerm(term::SymbolicUtils.Mul)
+function rewriteTerm(trm::SymbolicUtils.Mul)
     r = SymbolicUtils.@rule *(~(~xs)) => sort([i for i in ~(~xs)], 
                               by=x->(x isa SymbolicUtils.Symbolic)) |> prod
-    rewriteCore(term, r) |> SymbolicUtils.simplify
+    rewriteCore(trm, r) |> SymbolicUtils.simplify
 end
 
-function splitTermCore(term::SymbolicUtils.Mul)
+function splitTermCore(trm::SymbolicUtils.Mul)
     r1 = SymbolicUtils.@rule *(~(~xs)) => [i for i in ~(~xs)]
     r2 = SymbolicUtils.@rule +(~(~xs)) => [i for i in ~(~xs)]
     r3 = @acrule ~~vs * exp((~a)*((~x)^2+(~y)^2+(~z)^2)) * 
                         exp(-1*(~a)*((~x)^2+(~y)^2+(~z)^2)) => prod(~~vs)
-    terms = rewriteCore(term, r1)
-    idx = findfirst(x-> x isa SymbolicUtils.Add, terms)
+    trms = rewriteCore(trm, r1)
+    idx = findfirst(x-> x isa SymbolicUtils.Add, trms)
     if idx !== nothing
-        sumTerm = popat!(terms, idx)
-        var = SymbolicUtils.simplify(sort(terms, 
+        sumTerm = popat!(trms, idx)
+        var = SymbolicUtils.simplify(sort(trms, 
                                           by=x->(x isa SymbolicUtils.Symbolic)) |> prod)
         rewriteCore.((r2(sumTerm) .* var), Ref(r3)) .|> rewriteTerm |> flatten
     else
-        [terms |> prod]
+        [trms |> prod]
     end
 end
 
-splitTermCore(term::SymbolicUtils.Div) = term |> rewriteTerm |> splitTermCore
+splitTermCore(trm::SymbolicUtils.Div) = trm |> rewriteTerm |> splitTermCore
 
-splitTermCore(term) = [term]
+splitTermCore(trm) = [trm]
 
 
 function groupedSort(v::Vector, sortFunction::F=itself) where {F<:Function}
@@ -764,23 +756,6 @@ function mapPermute(arr, permFunction)
 end
 
 
-function getFunc(fSym::Symbol, failedResult=missing)
-    try
-        getfield(Quiqbox, fSym)
-    catch
-        try
-            getfield(Main, fSym)
-        catch
-            try
-                fSym |> string |> Meta.parse |> eval
-            catch
-                (_) -> failedResult
-            end
-        end
-    end
-end
-
-
 struct Pf{C, F} <: ParameterizedFunction
     f::Function
 end
@@ -800,6 +775,31 @@ Pf(c::Float64, ::Val{Pf{C, :itself}}) where {C} = Pf{c*C, :itself}(itself)
 
 (f::Pf{C, :itself})(x::Real) where {C} = C * x
 (::Type{Pf{C, :itself}})(x::Real) where {C} = C * x
+
+
+function getFunc(fSym::Symbol, failedResult=missing)
+    try
+        getfield(Quiqbox, fSym)
+    catch
+        try
+            getfield(Main, fSym)
+        catch
+            try
+                fSym |> string |> Meta.parse |> eval
+            catch
+                (_) -> failedResult
+            end
+        end
+    end
+end
+
+getFunc(::Type{Pf{C, F}}, _=missing) where {C, F} = Pf{C, F}(getFunc(Val(F)))
+
+getFunc(f::Function, _=missing) = itself(f)
+
+getFunc(::Val{F}, failedResult=missing) where {F} = getFunc(F, failedResult)
+
+getFunc(::Val{:itself}, _=missing) = itself
 
 
 nameOf(f::ParameterizedFunction) = typeof(f)
@@ -858,7 +858,42 @@ arrayDiff!(vs::Vararg{Array{T}, N}) where {T, N} = arrayDiffCore!(vs)
 
 tupleDiff(ts::Vararg{NTuple{<:Any, T}, N}) where {T, N} = arrayDiff!((ts .|> collect)...)
 
+
 struct FunctionType{F}
-    f::Symbol
+    f::Union{Symbol, Type{<:ParameterizedFunction}, Function}
+
     FunctionType{F}() where {F} = new{F}(F)
+    FunctionType(f::F) where {F<:Function} = new{F}(f)
 end
+
+getFunc(ft::FunctionType{F}) where {F} = ft.f
+
+function getFuncNum(f::Function, vNum::Symbolics.Num)::Symbolics.Num
+    Symbolics.variable(f|>nameOf, T=Symbolics.FnType{Tuple{Any}, Real})(vNum)
+end
+
+function getFuncNum(::Pf{C, F}, vNum::Symbolics.Num) where {C, F}
+    (C * Symbolics.variable(F, T=Symbolics.FnType{Tuple{Any}, Real})(vNum))::Symbolics.Num
+end
+
+function getFuncNum(::FunctionType{F}, vNum::Symbolics.Num) where {F}
+    Symbolics.variable(F, T=Symbolics.FnType{Tuple{Any}, Real})(vNum)::Symbolics.Num
+end
+
+getFuncNum(::FunctionType{:itself}, vNum::Symbolics.Num) = vNum
+
+getFuncNum(::typeof(itself), vNum::Symbolics.Num) = vNum
+
+function genIndex(index::Int)
+    @assert index >= 0
+    genIndexCore(index)
+end
+
+genIndex(index::Nothing) = genIndexCore(index)
+
+function genIndexCore(index)
+    res = reshape(Union{Int, Nothing}[0], ()) |> collect
+    res[] = index
+    res
+end
+

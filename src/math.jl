@@ -307,7 +307,7 @@ end
 
 function reformatIntData1(bf::FloatingGTBasisFuncs{<:Any, GN, 1}) where {GN}
     R = (centerCoordOf(bf) |> Tuple)::NTuple{3, Float64}
-    ijk = bf.ijk[1]
+    ijk = bf.ijk[1].tuple
     αds = if bf.normalizeGTO
         N = getNijk(ijk...)
         map(x->(x.xpn()::Float64, x.con() * N * getNα(ijk..., x.xpn())::Float64), 
@@ -678,7 +678,7 @@ getCompositeInt(FunctionType{:get2eInteraction}(), (b1, b2, b3, b4))
 @inline function getOneBodyInts(::FunctionType{F}, 
                                 basisSet::AbstractArray{<:AbstractGTBasisFuncs}, 
                                 optArgs...) where {F}
-    subSize = basisSize(basisSet) |> collect
+    subSize = basisSize.(basisSet) |> collect
     accuSize = vcat(0, accumulate(+, subSize))
     len = subSize |> sum
     buf = Array{Float64}(undef, len, len)
@@ -714,7 +714,7 @@ permuteArray(arr::Number, _) = itself(arr)
 
 @inline function getTwoBodyInts(::FunctionType{F}, 
                                 basisSet::AbstractArray{<:AbstractGTBasisFuncs}) where {F}
-    subSize = basisSize(basisSet) |> collect
+    subSize = basisSize.(basisSet)
     accuSize = vcat(0, accumulate(+, subSize))
     totalSize = subSize |> sum
     buf = Array{Float64}(undef, totalSize, totalSize, totalSize, totalSize)
@@ -740,7 +740,7 @@ get2eInteractions(BSet::AbstractArray{<:AbstractGTBasisFuncs}) =
 getTwoBodyInts(FunctionType{:get2eInteraction}(), BSet)
 
 function genUniqueIndices(basisSet::AbstractArray{<:AbstractGTBasisFuncs})
-    s = basisSize(basisSet) |> sum
+    s = basisSize.(basisSet) |> sum
     uniqueIdx = fill(Int[0,0,0,0], (3*binomial(s, 4)+6*binomial(s, 3)+4*binomial(s, 2)+s))
     index = 1
     for i = 1:s, j = 1:i, k = 1:i, l = 1:(k==i ? j : k)

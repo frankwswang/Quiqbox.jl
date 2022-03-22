@@ -23,7 +23,7 @@ export overlap, overlaps, nucAttraction, nucAttractions, elecKinetic, elecKineti
     addToDataChain!(env, atm, bas, bf2)
 
     cintFunc!(Val(libcinFunc), 
-              zeros(basisSize([bf1.subshell, bf2.subshell])..., 1+isGradient*2), 
+              zeros(basisSize(bf1.subshell), basisSize(bf2.subshell), 1+isGradient*2), 
               [0,1], atm, length(nuclei), bas, 2, env)
 end
 
@@ -62,7 +62,7 @@ end
 
 @inline function oneBodyBSTensor(BasisSet::Vector{<:AbstractGTBasisFuncs}, 
                                  intFunc::F) where {F<:Function}
-    subSize = basisSize(BasisSet) |> collect
+    subSize = basisSize.(BasisSet)
     accuSize = vcat(0, accumulate(+, subSize))
     len = subSize |> sum
     nPage = (intFunc(BasisSet[1], BasisSet[1]) |> size)[3]
@@ -166,7 +166,7 @@ cat(getElecKinetic(bf1, bf2), dims=2)
 
 
 @inline elecKineticsCore(BSet::Vector{<:AbstractGTBasisFuncs}) = 
-                     oneBodyBSTensor(BSet, elecKineticCore)
+        oneBodyBSTensor(BSet, elecKineticCore)
 
 """
 

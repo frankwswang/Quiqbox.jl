@@ -1,6 +1,7 @@
 # Julia internal methods overload.
 import Base: ==
 ==(pb1::ParamBox, pb2::ParamBox) = (pb1[] == pb2[] && 
+                                    pb1.dataName == pb2.dataName && 
                                     pb1.canDiff[] == pb2.canDiff[] && 
                                     pb1.index[] == pb2.index[] && 
                                     typeof(pb1.map) === typeof(pb2.map))
@@ -181,6 +182,13 @@ lastindex(::BasisFuncs{<:Any, <:Any, N}) where {N} = N
 eachindex(bfs::BasisFuncs{<:Any, <:Any, N}) where {N} = Base.OneTo(lastindex(bfs))
 getindex(bfs::BasisFuncs) = getfield.(bfs[:], :gauss) |> flatten
 
+getindex(xyz::XYZTuple, args...) = getindex(xyz.tuple, args...)
+getindex(xyz::XYZTuple) = xyz.tuple
+firstindex(xyz::XYZTuple) = firstindex(xyz.tuple)
+lastindex(xyz::XYZTuple) = lastindex(xyz.tuple)
+eachindex(xyz::XYZTuple) = eachindex(xyz.tuple)
+axes(xyz::XYZTuple) = axes(xyz.tuple)
+
 
 # Broadcasting Interface
 import Base: broadcastable
@@ -192,20 +200,28 @@ broadcastable(bfs::BasisFuncs) = getindex(bfs, :)
 
 # Quiqbox methods overload.
 ## Method overload of `hasBoolRelation` from Tools.jl.
-function hasBoolRelation(boolFunc::F, pb1::ParamBox, pb2::ParamBox; 
-                         ignoreFunction::Bool=false, 
-                         ignoreContainer::Bool=false,
-                         decomposeNumberCollection::Bool=false) where {F<:Function}
+function hasBoolRelation(boolFunc::F, 
+                         pb1::ParamBox{<:Any, <:Any, F1}, pb2::ParamBox{<:Any, <:Any, F2}; 
+                         ignoreFunction::Bool=false, ignoreContainer::Bool=false,
+                         kws...) where {F<:Function, F1, F2}
+    # if ignoreContainer
+    #     boolFunc(pb1(), pb2())
+    # elseif boolFunc(pb1.canDiff[], pb2.canDiff[])
+    #     if ignoreFunction
+    #         return boolFunc(pb1.data, pb2.data)
+    #     else
+    #         return (boolFunc(pb1.map, pb2.map) && boolFunc(pb1.data, pb2.data))
+    #     end
+    # else
+    #     false
+    # end
+
     if ignoreContainer
-        # boolFunc(pb1.data, pb2.data) && 
         boolFunc(pb1(), pb2())
-    elseif boolFunc(pb1.canDiff[], pb2.canDiff[])
-        if ignoreFunction
-            return boolFunc(pb1.data, pb2.data)
-        else
-            return (boolFunc(pb1.map, pb2.map) && boolFunc(pb1.data, pb2.data))
-        end
+    elseif ignoreFunction || F1 == F2 == :itself
+        boolFunc(pb1.data, pb2.data)
     else
-        false
+        boolFunc(pb1.canDiff[], pb2.canDiff[]) && boolFunc(pb1.map, pb2.map) && 
+        boolFunc(pb1.data, pb2.data)
     end
 end

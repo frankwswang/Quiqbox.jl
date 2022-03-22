@@ -9,15 +9,15 @@ using LinearAlgebra
 @testset "Basis.jl" begin
 
 # struct GaussFunc
-exp1, con1 = (2, 1.0)
-gf1 = GaussFunc(exp1, con1)
-gf2 = GaussFunc(exp1, con1)
+xpn1, con1 = (2, 1.0)
+gf1 = GaussFunc(xpn1, con1)
+gf2 = GaussFunc(xpn1, con1)
 @test typeof(gf1) == typeof(gf2)
 @test (gf1, gf2) isa Tuple{GaussFunc, GaussFunc}
 @test (gf1, gf2) isa NTuple{2, GaussFunc}
 gf1_ref = gf1
-@test gf1.xpn == ParamBox(exp1, :xpn)
-@test gf1.con == ParamBox(con1, :con)
+@test gf1.xpn == ParamBox(xpn1, ParamList[:xpn])
+@test gf1.con == ParamBox(con1, ParamList[:con])
 @test gf1.param == (gf1.xpn, gf1.con)
 @test hasEqual(gf1, gf2)
 @test hasIdentical(gf1, gf1)
@@ -102,10 +102,10 @@ bf2 = genBasisFunc(cen, [gf2])
 @test bf1 isa BasisFunc
 
 bf11 = genBasisFunc(cen, [gf1, gf1])
-bf1_3 = genBasisFunc(cen, (exp1, con1))
+bf1_3 = genBasisFunc(cen, (xpn1, con1))
 @test hasEqual(bf1, bf1_3)
 @test !hasIdentical(bf1, bf1_3)
-bf11_2 = genBasisFunc(cen, ([exp1, exp1], [con1, con1]))
+bf11_2 = genBasisFunc(cen, ([xpn1, xpn1], [con1, con1]))
 @test hasEqual(bf11, bf11_2)
 @test !hasIdentical(bf11, bf11_2)
 bf2_P_norm2 = genBasisFunc(cen, [gf2], "P")
@@ -148,10 +148,10 @@ bf3_4_2 = genBasisFunc([0,0,0], (1,1), "D", normalizeGTO=true)
 
 
 # function sortBasisFuncs
-bfs1 = [genBasisFunc([1,1,1], (2,1), [1,0,0]), genBasisFunc([1,1,1], (3,1), [2,0,0]), 
-        genBasisFunc([1,1,2], (3,1), [0,0,0]), genBasisFunc([1,1,1], (3,1), "P")]
-bfs2 = [genBasisFunc([1,1,1], (2,1), [1,0,0]), genBasisFunc([1,1,1], (3,1), "P"), 
-        genBasisFunc([1,1,1], (3,1), [2,0,0]), genBasisFunc([1,1,2], (3,1), [0,0,0])]
+bfs1 = [genBasisFunc([1,1,1], (2,1), (1,0,0)), genBasisFunc([1,1,1], (3,1), (2,0,0)), 
+        genBasisFunc([1,1,2], (3,1), (0,0,0)), genBasisFunc([1,1,1], (3,1), "P")]
+bfs2 = [genBasisFunc([1,1,1], (2,1), (1,0,0)), genBasisFunc([1,1,1], (3,1), "P"), 
+        genBasisFunc([1,1,1], (3,1), (2,0,0)), genBasisFunc([1,1,2], (3,1), (0,0,0))]
 bfs3 = sortBasisFuncs(bfs1, groupCenters=true)
 @test length.(bfs3) == [3,1]
 bfs3 = bfs3 |> flatten
@@ -162,7 +162,7 @@ bfs3 = bfs3 |> flatten
 # function isFull
 @test isFull(bf3_1) == true
 @test isFull(bf3_3) == true
-bf5 = genBasisFunc([0,0,0], (2,1), [1,0,0])
+bf5 = genBasisFunc([0,0,0], (2,1), (1,0,0))
 @test isFull(bf5) == false
 @test isFull(1) == false
 
@@ -176,9 +176,9 @@ bf5 = genBasisFunc([0,0,0], (2,1), [1,0,0])
 bfm1 = BasisFuncMix(bf1)
 @test bfm1 == BasisFuncMix([bf1])
 @test BasisFuncMix(BasisFuncMix(bf3_1)) == BasisFuncMix(bf3_1)
-bf5_2 = genBasisFunc([0,0,0], (2,1), [[1,0,0]])
+bf5_2 = genBasisFunc([0,0,0], (2,1), [(1,0,0)])
 bfm2 = BasisFuncMix(bf5)
-@test hasEqual(bfm2, BasisFuncMix(bf5_2)[])
+@test hasEqual(bfm2, BasisFuncMix(bf5_2))
 
 errorThreshold2 = 1e-15
 bs1 = genBasisFunc.(gridCoords(GridBox(1,1.5)), Ref(GaussFunc(1.0, 0.5)))
@@ -200,28 +200,28 @@ eeI = eeInteractions([bfm])[]
 
 
 # function sumOf
-bs2 = [genBasisFunc([1,1,1], (2,1), [1,0,0], normalizeGTO=true), 
-       genBasisFunc([1,1,1], (3,1), [2,0,0], normalizeGTO=true), 
-       genBasisFunc([1,1,2], (3,1), [0,0,0], normalizeGTO=true), 
-       genBasisFunc([1,1,1], (3,1), [0,1,0], normalizeGTO=true)]
-bs2_2 = [genBasisFunc([1,1,1], (2,1), [1,0,0]), 
-         genBasisFunc([1,1,1], (3,1), [2,0,0]), 
-         genBasisFunc([1,1,2], (3,1), [0,0,0]), 
-         genBasisFunc([1,1,1], (3,1), [0,1,0])]
-bs2_3 = [genBasisFunc([1,1,1], (2,1), [1,0,0]), 
-         genBasisFunc([1,1,1], (3,1), [2,0,0], normalizeGTO=true), 
-         genBasisFunc([1,1,2], (3,1), [0,0,0]), 
-         genBasisFunc([1,1,1], (3,1), [0,1,0], normalizeGTO=true)]
-bs3 = [genBasisFunc([1,1,1], (2,1), [1,0,0], normalizeGTO=true), 
-       genBasisFunc([1,1,1], (3,1), [0,1,0], normalizeGTO=true), 
-       genBasisFunc([1,1,1], (3,1), [2,0,0], normalizeGTO=true), 
-       genBasisFunc([1,1,2], (3,1), [0,0,0], normalizeGTO=true)]
-bs3_2 = [genBasisFunc([1,1,1], (2,1), [1,0,0]), 
-       genBasisFunc([1,1,1], (3,1), [0,1,0]), 
-       genBasisFunc([1,1,1], (3,1), [2,0,0]), 
-       genBasisFunc([1,1,2], (3,1), [0,0,0])]
+bs2 =   [genBasisFunc([1,1,1], (2,1), (1,0,0), normalizeGTO=true), 
+         genBasisFunc([1,1,1], (3,1), (2,0,0), normalizeGTO=true), 
+         genBasisFunc([1,1,2], (3,1), (0,0,0), normalizeGTO=true), 
+         genBasisFunc([1,1,1], (3,1), (0,1,0), normalizeGTO=true)]
+bs2_2 = [genBasisFunc([1,1,1], (2,1), (1,0,0)), 
+         genBasisFunc([1,1,1], (3,1), (2,0,0)), 
+         genBasisFunc([1,1,2], (3,1), (0,0,0)), 
+         genBasisFunc([1,1,1], (3,1), (0,1,0))]
+bs2_3 = [genBasisFunc([1,1,1], (2,1), (1,0,0)), 
+         genBasisFunc([1,1,1], (3,1), (2,0,0), normalizeGTO=true), 
+         genBasisFunc([1,1,2], (3,1), (0,0,0)), 
+         genBasisFunc([1,1,1], (3,1), (0,1,0), normalizeGTO=true)]
+bs3 =   [genBasisFunc([1,1,1], (2,1), (1,0,0), normalizeGTO=true), 
+         genBasisFunc([1,1,1], (3,1), (0,1,0), normalizeGTO=true), 
+         genBasisFunc([1,1,1], (3,1), (2,0,0), normalizeGTO=true), 
+         genBasisFunc([1,1,2], (3,1), (0,0,0), normalizeGTO=true)]
+bs3_2 = [genBasisFunc([1,1,1], (2,1), (1,0,0)), 
+         genBasisFunc([1,1,1], (3,1), (0,1,0)), 
+         genBasisFunc([1,1,1], (3,1), (2,0,0)), 
+         genBasisFunc([1,1,2], (3,1), (0,0,0))]
 
-bfm_1 = +(bs2...,)
+bfm_1 = +(bs2...,) # 1.7+ bug
 bfm_2 = sumOf(bs2)
 bfm_3 = BasisFuncMix(bs3)
 bfm_4 = +(bs2_2...,)
@@ -283,6 +283,13 @@ for bs in (bs2, bs2_2, bs2_3)
 end
 @test hasEqual(mul(1.0, bf1), bf1)
 @test hasEqual(mul(1.1, bf1), mul(bf1, 1.1))
+xpn2 = genExponent(1.2)
+con2 = genContraction(1.2, x->x^2)
+bf_pf = genBasisFunc([1,2,3], GaussFunc(xpn2, con2))
+bf_pf2 = (bf_pf*0.4)*5
+@test bf_pf2.gauss[1].con.map isa Quiqbox.Pf{2.0}
+@test hasEqual(bf_pf2, mul(bf_pf, 2.0))
+
 
 α₁, α₂ = rand(1:0.01:10, 2)
 d₁, d₂ = rand(2)
@@ -332,11 +339,11 @@ bf_mul8_0 = genBasisFunc([1,0,0], ([3, 3.5], [0.9, 1.2]))
 bf_mul9 = mul(bf_mul1, bf_mul3, normalizeGTO=true)
 bf_mul9_0 = genBasisFunc([1,0,0], ([3, 3.5], [0.9, 1.2]), normalizeGTO=true)
 @test hasEqual(bf_mul9, bf_mul9_0)
-bf_mul10 = genBasisFunc([1,0,0], (1.2,0.3), [1,0,0])
+bf_mul10 = genBasisFunc([1,0,0], (1.2,0.3), (1,0,0))
 bf_mul11 = genBasisFunc([0,1,0], (1.5,1))
-bf_mul12 = genBasisFunc([0,1,0], (1.5,1), [1,0,0])
+bf_mul12 = genBasisFunc([0,1,0], (1.5,1), (1,0,0))
 bf_mul13 = genBasisFunc([1,1,1], ([1.2, 1.0], [0.2, 0.5]))
-bf_mul14 = genBasisFunc([1,0.2,1], ([1.2, 1.0], [0.2, 0.5]), [1,1,1])
+bf_mul14 = genBasisFunc([1,0.2,1], ([1.2, 1.0], [0.2, 0.5]), (1,1,1))
 bf_mul15 = mul(bf_mul10, BasisFuncMix([bf_mul1, bf_mul2]))
 bf_mul15_0 = mul(bf_mul10, BasisFuncMix([bf_mul1, bf_mul2]), normalizeGTO=true)
 bf_mul16 = mul(bf_mul15, bf_mul15_0)
@@ -375,7 +382,7 @@ testNorm(bf_mul16, bf_mul16_0)
 testNorm(bf_mul15_0, bf_mul16_0)
 
 
-# (dev) function getOverlap
+# function getOverlap
 @test isapprox(Quiqbox.getOverlap(bf_mul2_2, bf_mul2_2), 1.0, atol=1e-10)
 @test isapprox(Quiqbox.getOverlap(bf_mul5_0, bf_mul5_0), 9.0, atol=1e-10)
 bf_mul18 = genBasisFunc(rand(3), "STO-3G")[]
@@ -383,12 +390,12 @@ bf_mul18 = genBasisFunc(rand(3), "STO-3G")[]
 
 
 # function shift
-ijk = [1,0,0]
-didjdk = [0,1,1]
+ijk = (1,0,0)
+didjdk = (0,1,1)
 bf_os1 = genBasisFunc([0,0,0], (2,1), ijk)
 bf_os2 = genBasisFunc([0,0,0], (2,1), ijk, normalizeGTO=true)
-bf_os1S = genBasisFunc([0,0,0], (2,1), ijk+didjdk)
-bf_os2S = genBasisFunc([0,0,0], (2,1), ijk+didjdk, normalizeGTO=true)
+bf_os1S = genBasisFunc([0,0,0], (2,1), ijk.+didjdk)
+bf_os2S = genBasisFunc([0,0,0], (2,1), ijk.+didjdk, normalizeGTO=true)
 @test hasEqual(shift(bf_os1, didjdk), bf_os1S)
 @test hasEqual(shift(bf_os2, didjdk), bf_os2S)
 
@@ -404,26 +411,26 @@ bf_d_1 = genBasisFunc([1,0,0], (1, 0.5))
 bf_d_2 = genBasisFunc([1,0,0], ([2,1], [0.1, 0.5]))
 bf_d_3 = genBasisFunc([1,1,0], ([2,1], [0.1, 0.2]), "P")
 bm_d_1 = BasisFuncMix([bf_d_1, bf_d_2])
-dm1 = reshape([bf_d_1], 1, 1)
-@test hasEqual(decompose(bf_d_1), dm1)
+dm1 = [bf_d_1]
+@test hasIdentical(decompose(bf_d_1), dm1)
 @test hasEqual(decompose(bf_d_1, splitGaussFunc=true), dm1)
-@test hasEqual(decompose(bf_d_2), reshape([bf_d_2], 1, 1))
-dm2 = reshape([genBasisFunc([1,0,0], (2, 0.1)), bf_d_1], 2, 1)
+@test hasEqual(decompose(bf_d_2), [bf_d_2])
+dm2 = [genBasisFunc([1,0,0], (2, 0.1)), bf_d_1]
 @test hasEqual(decompose(bf_d_2, splitGaussFunc=true), dm2)
 @test hasEqual(decompose(bf_d_3), reshape(bf_d_3[:], 1, 3))
 @test hasEqual(decompose(bf_d_3, splitGaussFunc=true), 
                hcat(decompose.(bf_d_3[:], splitGaussFunc=true)...))
-@test decompose(bm_d_1) === bm_d_1
+@test hasIdentical(decompose(bm_d_1), [bm_d_1])
 @test hasEqual(decompose(bm_d_1, splitGaussFunc=true), 
-              reshape(vcat(decompose.(bm_d_1.BasisFunc, splitGaussFunc=true)...), 3, 1))
+               vcat(decompose.(bm_d_1.BasisFunc, splitGaussFunc=true)...))
 
 
 # function basisSize
-@test basisSize("P") == (3,)
-@test basisSize(["S", "P", "D"]) == (1, 3, 6)
-@test basisSize(bf1) == (1,)
-@test basisSize(bfm1) == (1,) == basisSize(bfm2)
-@test basisSize([bf1, bf2, bf3_3, bf5]) == (1,1,3,1)
+@test basisSize("P") == 3
+@test basisSize.(["S", "P", "D"]) == [1, 3, 6]
+@test basisSize(bf1) == 1
+@test basisSize(bfm1) == 1 == basisSize(bfm2)
+@test basisSize.((bf1, bf2, bf3_3, bf5)) == (1,1,3,1)
 
 
 # function genGaussFuncText
@@ -478,7 +485,7 @@ assignCenter!(coord, bf6)
 
 
 # function getParams
-pb1 = ParamBox(2, :p, canDiff=false)
+pb1 = ParamBox(2, :p)
 @test getParams(pb1) == pb1
 @test getParams(pb1, :p) == pb1
 @test getParams(pb1, :P) === nothing
@@ -686,8 +693,8 @@ sym3 = Symbolics.variable(:a)
 vars = @variables X, Y, Z, F(X)
 F = vars[end]
 vars = vars[1:end-1]
-f1(X,Y,Z) = log(X+0.5Y*Z)
-expr = f1(X,Y,Z)
+func1(X,Y,Z) = log(X+0.5Y*Z)
+expr = func1(X,Y,Z)
 vals = [1, 3.334, -0.2]
 d1 = Dict(vars .=> vals)
 errT = 1e-10
@@ -695,7 +702,7 @@ errT = 1e-10
 @test isapprox(varVal(sum(vars), d1), sum(vals), atol=errT)
 @test isapprox(varVal(prod(vars), d1), prod(vals), atol=errT)
 @test isapprox(varVal(vars[1]^vars[2], d1), vals[1]^vals[2], atol=errT)
-@test isapprox(varVal(expr, d1), f1(vals...), atol=errT)
+@test isapprox(varVal(expr, d1), func1(vals...), atol=errT)
 
 f1 = Symbolics.variable(abs, T=Symbolics.FnType{Tuple{Any}, Real})(Z)
 f2 = Symbolics.variable(:abs, T=Symbolics.FnType{Tuple{Any}, Real})(Z)

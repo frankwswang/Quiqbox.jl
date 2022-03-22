@@ -8,7 +8,7 @@ export eeInteraction, eeInteractions
     env = Float64[]
     atm = Int32[]
     bas = Int32[]
-    subSize = basisSize([bf1.subshell, bf2.subshell, bf3.subshell, bf4.subshell])
+    subSize = basisSize.((bf1.subshell, bf2.subshell, bf3.subshell, bf4.subshell))
 
     id, uniqueBFs = markUnique([bf1, bf2, bf3, bf4])
 
@@ -55,7 +55,7 @@ end
 @inline function twoBodyBSTensor(BasisSet::Vector{<:AbstractGTBasisFuncs}, 
                                  intFunc::F; outputUniqueIndices::Bool=false) where 
                                 {F<:Function}
-    subSize = basisSize(BasisSet) |> collect
+    subSize = basisSize.(BasisSet) |> collect
     accuSize = vcat(0, accumulate(+, subSize))
     totalSize = subSize |> sum
     nPage = (intFunc(BasisSet[1], BasisSet[1], BasisSet[1], BasisSet[1]) |> size)[5]
@@ -95,7 +95,7 @@ end
                           bf2::AbstractGTBasisFuncs, 
                           bf3::AbstractGTBasisFuncs, 
                           bf4::AbstractGTBasisFuncs) = 
-twoBodyBFTensor(:cint2e_cart, bf1, bf2, bf3, bf4)
+        twoBodyBFTensor(:cint2e_cart, bf1, bf2, bf3, bf4)
 
 """
 
