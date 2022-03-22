@@ -12,140 +12,140 @@
  BasisFunc{0, 1}(gauss, subshell, center)[X⁰Y⁰Z⁰][1.5, -1.5, 1.5]
  BasisFunc{0, 1}(gauss, subshell, center)[X⁰Y⁰Z⁰][1.5, 1.5, -1.5]
  BasisFunc{0, 1}(gauss, subshell, center)[X⁰Y⁰Z⁰][1.5, 1.5, 1.5]</code></pre><p>After constructing the basis set, we need to use <a href="../coreFunction/#Quiqbox.uniqueParams!"><code>uniqueParams!</code></a> to mark all the  unique parameters that can also be optimized later:</p><pre><code class="language-julia-repl hljs" style="display:block;">julia&gt; pars = uniqueParams!(bs, filterMapping=true)</code><code class="nohighlight hljs ansi" style="display:block;">5-element Vector{ParamBox{Float64, V, F} where {V, F}}:
- ParamBox{Float64, :X, :Xᴳ¹⁻¹⁻¹₁}(3.0)[∂][L₁]
- ParamBox{Float64, :Y, :Yᴳ¹⁻¹⁻¹₁}(3.0)[∂][L₁]
- ParamBox{Float64, :Z, :Zᴳ¹⁻¹⁻¹₁}(3.0)[∂][L₁]
+ ParamBox{Float64, :X, :G_1_1_1_X₁}(3.0)[∂][L₁]
+ ParamBox{Float64, :Y, :G_1_1_1_Y₁}(3.0)[∂][L₁]
+ ParamBox{Float64, :Z, :G_1_1_1_Z₁}(3.0)[∂][L₁]
  ParamBox{Float64, :α, :itself}(0.7)[∂][α₁]
  ParamBox{Float64, :d, :itself}(1.0)[∂][d₁]</code></pre><p>As expected, there are indeed only 3 unique tunable independent parameters despite the basis set has 8 basis functions. However, if we take a step further, we can remove <span>$d$</span> since each basis function here is just one same Gaussian function. Thus, input the intent parameters (along with other necessary arguments) into the <a href="../coreFunction/#Quiqbox.optimizeParams!"><code>optimizeParams!</code></a> and we can sit and wait for the optimization iterations to complete.</p><pre><code class="language-julia-repl hljs" style="display:block;">julia&gt; parsPartial = [pars[1], pars[4]]</code><code class="nohighlight hljs ansi" style="display:block;">2-element Vector{ParamBox{Float64, V, F} where {V, F}}:
- ParamBox{Float64, :X, :Xᴳ¹⁻¹⁻¹₁}(3.0)[∂][L₁]
+ ParamBox{Float64, :X, :G_1_1_1_X₁}(3.0)[∂][L₁]
  ParamBox{Float64, :α, :itself}(0.7)[∂][α₁]</code><br/><code class="language-julia-repl hljs" style="display:block;">julia&gt; Es, pars, grads = optimizeParams!(bs, parsPartial, nuc, nucCoords, maxSteps=20);</code><code class="nohighlight hljs ansi" style="display:block;">Step 0:        E = 0.3326883608603233    
           params = [3.0, 0.7]
             grad = [1.256079497585581, 4.050658417242263]
-Step duration: 47.042461556 seconds.
+Step duration: 41.569843968 seconds.
 
 Step 1:        E = 0.3147108208702074    
           params = [2.9987439205024145, 0.6959493415827577]
             grad = [1.2552913669576549, 4.046875067062491]
-Step duration: 0.435933281 seconds.
+Step duration: 0.331712593 seconds.
 
 Step 2:        E = 0.29676666005291275   
           params = [2.9974886291354568, 0.6919024665156952]
             grad = [1.2543502475445407, 4.042756996645102]
-Step duration: 0.396655607 seconds.
+Step duration: 0.270558107 seconds.
 
 Step 3:        E = 0.2788589454611806    
           params = [2.996234278887912, 0.6878597095190501]
             grad = [1.2532554989490081, 4.038300081786559]
-Step duration: 0.396389188 seconds.
+Step duration: 0.264978308 seconds.
 
 Step 4:        E = 0.2609907692099124    
           params = [2.9949810233889633, 0.6838214094372635]
             grad = [1.2520066027366323, 4.033500397675597]
-Step duration: 0.39191904 seconds.
+Step duration: 0.321576014 seconds.
 
 Step 5:        E = 0.24316524555946972   
           params = [2.9937290167862267, 0.679787909039588]
             grad = [1.2506031650368141, 4.028354228396755]
-Step duration: 0.388507796 seconds.
+Step duration: 0.322042522 seconds.
 
 Step 6:        E = 0.22538550789908762   
           params = [2.99247841362119, 0.6757595548111912]
             grad = [1.2490449189294053, 4.022858076226912]
-Step duration: 0.391018675 seconds.
+Step duration: 0.267069045 seconds.
 
 Step 7:        E = 0.2076547056356825    
           params = [2.9912293687022604, 0.6717366967349643]
             grad = [1.2473317266046338, 4.017008670691505]
-Step duration: 0.38925585 seconds.
+Step duration: 0.32816173 seconds.
 
 Step 8:        E = 0.18997600099386772   
           params = [2.989982036975656, 0.6677196880642727]
             grad = [1.2454635812843557, 4.010802977345859]
-Step duration: 0.387127898 seconds.
+Step duration: 0.323244543 seconds.
 
 Step 9:        E = 0.17235256573346103   
           params = [2.9887365733943714, 0.6637088850869268]
             grad = [1.2434406088936623, 4.004238206248227]
-Step duration: 0.388587702 seconds.
+Step duration: 0.26903988 seconds.
 
 Step 10:       E = 0.15478757779125335   
           params = [2.987493132785478, 0.6597046468806786]
             grad = [1.241263069472292, 3.997311820090694]
-Step duration: 0.39050854 seconds.
+Step duration: 0.43003304 seconds.
 
 Step 11:       E = 0.13728421785420708   
           params = [2.9862518697160056, 0.655707335060588]
             grad = [1.2389313583162547, 3.9900215419544534]
-Step duration: 0.391583616 seconds.
+Step duration: 0.330232068 seconds.
 
 Step 12:       E = 0.11984566587173627   
           params = [2.9850129383576895, 0.6517173135186335]
             grad = [1.2364460068410077, 3.982365362657089]
-Step duration: 0.386989989 seconds.
+Step duration: 0.276595514 seconds.
 
 Step 13:       E = 0.10247509751507816   
           params = [2.9837764923508487, 0.6477349481559764]
             grad = [1.2338076831583062, 3.9743415476596518]
-Step duration: 0.389280852 seconds.
+Step duration: 0.262903572 seconds.
 
 Step 14:       E = 0.08517568059215709   
           params = [2.9825426846676906, 0.6437606066083168]
             grad = [1.2310171923600601, 3.9659486435027556]
-Step duration: 0.387119898 seconds.
+Step duration: 0.324780571 seconds.
 
 Step 15:       E = 0.06795057142669017   
           params = [2.9813116674753304, 0.639794657964814]
             grad = [1.2280754765034654, 3.9571854837417524]
-Step duration: 0.389847392 seconds.
+Step duration: 0.33711399 seconds.
 
 Step 16:       E = 0.05080291121056943   
           params = [2.980083591998827, 0.6358374724810723]
             grad = [1.2249836142929273, 3.9480511943526997]
-Step duration: 0.389803189 seconds.
+Step duration: 0.278452648 seconds.
 
 Step 17:       E = 0.033735822338859356  
           params = [2.978858608384534, 0.6318894212867195]
             grad = [1.2217428204554, 3.9385451985821884]
-Step duration: 0.388288281 seconds.
+Step duration: 0.313916578 seconds.
 
 Step 18:       E = 0.016752404736941562  
           params = [2.9776368655640786, 0.6279508760881374]
             grad = [1.2183544448070487, 3.928667221215859]
-Step duration: 0.389278452 seconds.
+Step duration: 0.32246603 seconds.
 
 Step 19:       E = -0.000144267810422552 
           params = [2.9764185111192716, 0.6240222088669215]
             grad = [1.2148199710103917, 3.9184172922423555]
-Step duration: 0.386412748 seconds.
+Step duration: 0.267783359 seconds.
 
 Step 20:       E = -0.016951151318253505 
           params = [2.9752036911482613, 0.6201037915746791]
             grad = [1.2111410150223643, 3.9077957498916707]
-Step duration: 0.388969329 seconds.
+Step duration: 0.265977326 seconds.
 
 The iteration just ended at
 Step 20:       E = -0.016951151318253505 
           params = [2.9752036911482613, 0.6201037915746791]
             grad = [1.2111410150223643, 3.9077957498916707]
-Optimization duration: 0.93507520695 minutes.
+Optimization duration: 0.8135495742166667 minutes.
 The result has not converged.</code></pre><p>After the optimization, you can check the basis set and we can see the parameters inside of it is also changed. This is because the <code>!</code> in the function names indicates that <code>optimizeParams!</code> is <a href="https://docs.julialang.org/en/v1/manual/style-guide/#bang-convention">a function that modifies its arguments</a>.</p><pre><code class="language-julia-repl hljs" style="display:block;">julia&gt; getParams(bs)</code><code class="nohighlight hljs ansi" style="display:block;">40-element Vector{ParamBox{Float64, V, F} where {V, F}}:
- ParamBox{Float64, :X, :Xᴳ¹⁻¹⁻¹₁}(2.97399255)[∂][L₁]
- ParamBox{Float64, :Y, :Yᴳ¹⁻¹⁻¹₁}(2.97399255)[∂][L₁]
- ParamBox{Float64, :Z, :Zᴳ¹⁻¹⁻¹₁}(2.97399255)[∂][L₁]
+ ParamBox{Float64, :X, :G_1_1_1_X₁}(2.97399255)[∂][L₁]
+ ParamBox{Float64, :Y, :G_1_1_1_Y₁}(2.97399255)[∂][L₁]
+ ParamBox{Float64, :Z, :G_1_1_1_Z₁}(2.97399255)[∂][L₁]
  ParamBox{Float64, :α, :itself}(0.6161959958)[∂][α₁]
  ParamBox{Float64, :d, :itself}(1.0)[∂][d₁]
- ParamBox{Float64, :X, :Xᴳ¹⁻¹⁻¹₂}(2.97399255)[∂][L₁]
- ParamBox{Float64, :Y, :Yᴳ¹⁻¹⁻¹₂}(2.97399255)[∂][L₁]
- ParamBox{Float64, :Z, :Zᴳ¹⁻¹⁻¹₂}(2.97399255)[∂][L₁]
+ ParamBox{Float64, :X, :G_1_1_1_X₂}(2.97399255)[∂][L₁]
+ ParamBox{Float64, :Y, :G_1_1_1_Y₂}(2.97399255)[∂][L₁]
+ ParamBox{Float64, :Z, :G_1_1_1_Z₂}(2.97399255)[∂][L₁]
  ParamBox{Float64, :α, :itself}(0.6161959958)[∂][α₁]
  ParamBox{Float64, :d, :itself}(1.0)[∂][d₁]
  ⋮
- ParamBox{Float64, :Y, :Yᴳ¹⁻¹⁻¹₇}(2.97399255)[∂][L₁]
- ParamBox{Float64, :Z, :Zᴳ¹⁻¹⁻¹₇}(2.97399255)[∂][L₁]
+ ParamBox{Float64, :Y, :G_1_1_1_Y₇}(2.97399255)[∂][L₁]
+ ParamBox{Float64, :Z, :G_1_1_1_Z₇}(2.97399255)[∂][L₁]
  ParamBox{Float64, :α, :itself}(0.6161959958)[∂][α₁]
  ParamBox{Float64, :d, :itself}(1.0)[∂][d₁]
- ParamBox{Float64, :X, :Xᴳ¹⁻¹⁻¹₈}(2.97399255)[∂][L₁]
- ParamBox{Float64, :Y, :Yᴳ¹⁻¹⁻¹₈}(2.97399255)[∂][L₁]
- ParamBox{Float64, :Z, :Zᴳ¹⁻¹⁻¹₈}(2.97399255)[∂][L₁]
+ ParamBox{Float64, :X, :G_1_1_1_X₈}(2.97399255)[∂][L₁]
+ ParamBox{Float64, :Y, :G_1_1_1_Y₈}(2.97399255)[∂][L₁]
+ ParamBox{Float64, :Z, :G_1_1_1_Z₈}(2.97399255)[∂][L₁]
  ParamBox{Float64, :α, :itself}(0.6161959958)[∂][α₁]
- ParamBox{Float64, :d, :itself}(1.0)[∂][d₁]</code></pre><p>It you want to go through the above example by yourself, you can also find the script <a href="https://github.com/frankwswang/Quiqbox.jl/blob/main/examples/OptimizeParams.jl">here</a>.</p><h2 id="Store-Customized-Basis-Set"><a class="docs-heading-anchor" href="#Store-Customized-Basis-Set">Store Customized Basis Set</a><a id="Store-Customized-Basis-Set-1"></a><a class="docs-heading-anchor-permalink" href="#Store-Customized-Basis-Set" title="Permalink"></a></h2><p>Now, if you want, you can also store the information of the basis set in an container called <a href="../coreType/#Quiqbox.GTBasis"><code>GTBasis</code></a> that not only includes the basis set, but also the related 1-electron and 2-electron integral values (nuclear attraction is not stored). <code>GTBasis</code> can also be accepted as an argument for <a href="../coreFunction/#Quiqbox.runHF"><code>runHF</code></a> to save the time of recalculating the integrals of the basis set.</p><pre><code class="language-julia-repl hljs" style="display:block;">julia&gt; GTBasis(bs)</code><code class="nohighlight hljs ansi" style="display:block;">GTBasis{8, Vector{BasisFunc{0, 1}}}(basis, S, Te, eeI, getVne, getHcore)</code></pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../SCF/">« Self-Consistent Field Methods</a><a class="docs-footer-nextpage" href="../coreFunction/">Core Functions »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 0.27.13 on <span class="colophon-date" title="Saturday 26 February 2022 23:31">Saturday 26 February 2022</span>. Using Julia version 1.6.5.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+ ParamBox{Float64, :d, :itself}(1.0)[∂][d₁]</code></pre><p>It you want to go through the above example by yourself, you can also find the script <a href="https://github.com/frankwswang/Quiqbox.jl/blob/main/examples/OptimizeParams.jl">here</a>.</p><h2 id="Store-Customized-Basis-Set"><a class="docs-heading-anchor" href="#Store-Customized-Basis-Set">Store Customized Basis Set</a><a id="Store-Customized-Basis-Set-1"></a><a class="docs-heading-anchor-permalink" href="#Store-Customized-Basis-Set" title="Permalink"></a></h2><p>Now, if you want, you can also store the information of the basis set in an container called <a href="../coreType/#Quiqbox.GTBasis"><code>GTBasis</code></a> that not only includes the basis set, but also the related 1-electron and 2-electron integral values (nuclear attraction is not stored). <code>GTBasis</code> can also be accepted as an argument for <a href="../coreFunction/#Quiqbox.runHF"><code>runHF</code></a> to save the time of recalculating the integrals of the basis set.</p><pre><code class="language-julia-repl hljs" style="display:block;">julia&gt; GTBasis(bs)</code><code class="nohighlight hljs ansi" style="display:block;">GTBasis{8, Vector{BasisFunc{0, 1}}}(basis, S, Te, eeI, getVne, getHcore)</code></pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../SCF/">« Self-Consistent Field Methods</a><a class="docs-footer-nextpage" href="../coreFunction/">Core Functions »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 0.27.15 on <span class="colophon-date" title="Tuesday 22 March 2022 05:55">Tuesday 22 March 2022</span>. Using Julia version 1.6.5.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
