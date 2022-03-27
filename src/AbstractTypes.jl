@@ -53,4 +53,4 @@ abstract type GTBasisFuncs{OrbitalN}  <: AbstractGTBasisFuncs end
 
 abstract type CompositeGTBasisFuncs{NofLinearlyCombinedBasis, NofOrbital}  <: GTBasisFuncs{NofOrbital} end
 
-abstract type FloatingGTBasisFuncs{Subshell, GaussFuncN, OrbitalN} <: CompositeGTBasisFuncs{1, OrbitalN} end
+abstract type FloatingGTBasisFuncs{𝑙, GaussFuncN, OrbitalN} <: CompositeGTBasisFuncs{1, OrbitalN} end

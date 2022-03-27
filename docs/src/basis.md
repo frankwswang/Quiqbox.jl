@@ -202,7 +202,7 @@ uniqueParams!(bs7)
 
 Another control the user can have on the parameters in Quiqbox is to not only directly store each parameter in a `ParamBox`, but also make it output a dependent variable that is defined by the mapping function of the parameter.
 
-Such a mapping function is stored in the `map` field of a `ParamBox` ( which normally is a ``R \to R`` mapping). The mapped value can be access through 
+Such a mapping function is stored in the `map` field of a `ParamBox` ( which normally is an ``R \to R`` mapping). The mapped value can be access through 
 syntax `()`. In default the variable is mapped to itself:
 ```@repl 2
 pb1 = gf4.xpn

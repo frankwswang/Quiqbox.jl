@@ -30,16 +30,16 @@ end
 
 function show(io::IO, bf::BasisFunc)
     print(io, typeof(bf))
-    print(io, "(gauss, subshell, center)[")
+    print(io, "(center, gauss)[")
     printstyled(io, bf.ijk[1]|>ijkToStr, color=:cyan)
     print(io, "][", round(bf.center[1](), sigdigits=nSigShown), ", ",
                     round(bf.center[2](), sigdigits=nSigShown), ", ",
                     round(bf.center[3](), sigdigits=nSigShown), "]")
 end
 
-function show(io::IO, bf::BasisFuncs)
+function show(io::IO, bf::BasisFuncs{𝑙}) where {𝑙}
     OON = typeof(bf).parameters[3]
-    SON = SubshellDimList[bf.subshell]
+    SON = SubshellXYZsizes[𝑙+1]
     if OON == 1
         xyz1 = bf.ijk[1] |> ijkToStr
         xyz2 = ""
@@ -48,7 +48,7 @@ function show(io::IO, bf::BasisFuncs)
         xyz2 = "/$(SON)"
     end
     print(io, typeof(bf))
-    print(io, "(gauss, subshell, center)[")
+    print(io, "(center, gauss)[")
     printstyled(io, xyz1, color=:cyan)
     print(io, xyz2)
     print(io, "][", round(bf.center[1](), sigdigits=nSigShown), ", ",

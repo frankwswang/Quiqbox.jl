@@ -2,13 +2,15 @@ export eeInteraction, eeInteractions
 
 
 @inline function twoBodyBFTensorCore(libcinFunc::Symbol, 
-                                     bf1::FloatingGTBasisFuncs, bf2::FloatingGTBasisFuncs, 
-                                     bf3::FloatingGTBasisFuncs, bf4::FloatingGTBasisFuncs; 
-                                     isGradient::Bool=false)
+                                     bf1::FloatingGTBasisFuncs{<:Any, <:Any, ON1}, 
+                                     bf2::FloatingGTBasisFuncs{<:Any, <:Any, ON2}, 
+                                     bf3::FloatingGTBasisFuncs{<:Any, <:Any, ON3}, 
+                                     bf4::FloatingGTBasisFuncs{<:Any, <:Any, ON4}; 
+                                     isGradient::Bool=false) where {ON1, ON2, ON3, ON4}
     env = Float64[]
     atm = Int32[]
     bas = Int32[]
-    subSize = basisSize.((bf1.subshell, bf2.subshell, bf3.subshell, bf4.subshell))
+    subSize = basisSize.((bf1, bf2, bf3, bf4))
 
     id, uniqueBFs = markUnique([bf1, bf2, bf3, bf4])
 

@@ -81,12 +81,28 @@ const SubshellXYZs =
 [ # Every XYZs must start with (l, 0, 0)
 (XYZTuple(0,0,0),),
 (XYZTuple(1,0,0), XYZTuple(0,1,0), XYZTuple(0,0,1)),
-(XYZTuple(2,0,0), XYZTuple(1,1,0), XYZTuple(1,0,1), XYZTuple(0,2,0), XYZTuple(0,1,1), XYZTuple(0,0,2)),
-(XYZTuple(3,0,0), XYZTuple(2,1,0), XYZTuple(2,0,1), XYZTuple(1,2,0), XYZTuple(1,1,1), XYZTuple(1,0,2), XYZTuple(0,3,0), XYZTuple(0,2,1), XYZTuple(0,1,2), XYZTuple(0,0,3)),
-(XYZTuple(4,0,0), XYZTuple(3,1,0), XYZTuple(3,0,1), XYZTuple(2,2,0), XYZTuple(2,1,1), XYZTuple(2,0,2), XYZTuple(1,3,0), XYZTuple(1,2,1), XYZTuple(1,1,2), XYZTuple(1,0,3), XYZTuple(0,4,0), XYZTuple(0,3,1), XYZTuple(0,2,2), XYZTuple(0,1,3), XYZTuple(0,0,4)),
-(XYZTuple(5,0,0), XYZTuple(4,1,0), XYZTuple(4,0,1), XYZTuple(3,2,0), XYZTuple(3,1,1), XYZTuple(3,0,2), XYZTuple(2,3,0), XYZTuple(2,2,1), XYZTuple(2,1,2), XYZTuple(2,0,3), XYZTuple(1,4,0), XYZTuple(1,3,1), XYZTuple(1,2,2), XYZTuple(1,1,3), XYZTuple(1,0,4), XYZTuple(0,5,0), XYZTuple(0,4,1), XYZTuple(0,3,2), XYZTuple(0,2,3), XYZTuple(0,1,4), XYZTuple(0,0,5)),
-(XYZTuple(6,0,0), XYZTuple(5,1,0), XYZTuple(5,0,1), XYZTuple(4,2,0), XYZTuple(4,1,1), XYZTuple(4,0,2), XYZTuple(3,3,0), XYZTuple(3,2,1), XYZTuple(3,1,2), XYZTuple(3,0,3), XYZTuple(2,4,0), XYZTuple(2,3,1), XYZTuple(2,2,2), XYZTuple(2,1,3), XYZTuple(2,0,4), XYZTuple(1,5,0), XYZTuple(1,4,1), XYZTuple(1,3,2), XYZTuple(1,2,3), XYZTuple(1,1,4), XYZTuple(1,0,5), XYZTuple(0,6,0), XYZTuple(0,5,1), XYZTuple(0,4,2), XYZTuple(0,3,3), XYZTuple(0,2,4), XYZTuple(0,1,5), XYZTuple(0,0,6))
+(XYZTuple(2,0,0), XYZTuple(1,1,0), XYZTuple(1,0,1), XYZTuple(0,2,0), XYZTuple(0,1,1), 
+ XYZTuple(0,0,2)),
+(XYZTuple(3,0,0), XYZTuple(2,1,0), XYZTuple(2,0,1), XYZTuple(1,2,0), XYZTuple(1,1,1), 
+ XYZTuple(1,0,2), XYZTuple(0,3,0), XYZTuple(0,2,1), XYZTuple(0,1,2), XYZTuple(0,0,3)),
+(XYZTuple(4,0,0), XYZTuple(3,1,0), XYZTuple(3,0,1), XYZTuple(2,2,0), XYZTuple(2,1,1), 
+ XYZTuple(2,0,2), XYZTuple(1,3,0), XYZTuple(1,2,1), XYZTuple(1,1,2), XYZTuple(1,0,3), 
+ XYZTuple(0,4,0), XYZTuple(0,3,1), XYZTuple(0,2,2), XYZTuple(0,1,3), XYZTuple(0,0,4)),
+(XYZTuple(5,0,0), XYZTuple(4,1,0), XYZTuple(4,0,1), XYZTuple(3,2,0), XYZTuple(3,1,1), 
+ XYZTuple(3,0,2), XYZTuple(2,3,0), XYZTuple(2,2,1), XYZTuple(2,1,2), XYZTuple(2,0,3), 
+ XYZTuple(1,4,0), XYZTuple(1,3,1), XYZTuple(1,2,2), XYZTuple(1,1,3), XYZTuple(1,0,4), 
+ XYZTuple(0,5,0), XYZTuple(0,4,1), XYZTuple(0,3,2), XYZTuple(0,2,3), XYZTuple(0,1,4), 
+ XYZTuple(0,0,5)),
+(XYZTuple(6,0,0), XYZTuple(5,1,0), XYZTuple(5,0,1), XYZTuple(4,2,0), XYZTuple(4,1,1), 
+ XYZTuple(4,0,2), XYZTuple(3,3,0), XYZTuple(3,2,1), XYZTuple(3,1,2), XYZTuple(3,0,3), 
+ XYZTuple(2,4,0), XYZTuple(2,3,1), XYZTuple(2,2,2), XYZTuple(2,1,3), XYZTuple(2,0,4), 
+ XYZTuple(1,5,0), XYZTuple(1,4,1), XYZTuple(1,3,2), XYZTuple(1,2,3), XYZTuple(1,1,4), 
+ XYZTuple(1,0,5), XYZTuple(0,6,0), XYZTuple(0,5,1), XYZTuple(0,4,2), XYZTuple(0,3,3), 
+ XYZTuple(0,2,4), XYZTuple(0,1,5), XYZTuple(0,0,6))
 ]
+
+const SubshellXYZsizes = length.(SubshellXYZs)
+
 
 function ijkToStr(ijk::XYZTuple)
     res = ""
@@ -96,6 +112,7 @@ function ijkToStr(ijk::XYZTuple)
     end
     res
 end
+
 
 const BasisFuncNames = 
 [
@@ -116,9 +133,10 @@ const BStextEndingMarker = "****"
 const BasisSetList = Dict(BasisFuncNames .=> BasisFuncTexts)
 const AtomicNumberList = Dict(ElementNames .=> collect(1 : length(ElementNames)))
 const AngularMomentumList = Dict(SubshellNames .=> collect(0 : length(SubshellNames)-1))
-const SubshellSuborderList = Dict(SubshellNames .=> SubshellXYZs)
-const SubshellDimList = Dict(SubshellNames .=> length.(SubshellXYZs))
-const ijkIndexList = Dict(flatten(SubshellXYZs) .=> flatten([collect(1:length(i)) for i in SubshellXYZs]))
+const SubshellOrientationList = Dict(SubshellNames .=> SubshellXYZs)
+const SubshellSizeList = Dict(SubshellNames .=> SubshellXYZsizes)
+const ijkIndexList = Dict(flatten(SubshellXYZs) .=> 
+                     flatten([collect(1:length(i)) for i in SubshellXYZs]))
 # const ParamNames = [:𝑋, :𝑌, :𝑍, :𝑑, :𝛼, :𝐿]
 const ParamNames = [:X, :Y, :Z, :d, :α, :L]
 const ParamSymbols = [:X, :Y, :Z, :con, :xpn, :spacing]
@@ -129,6 +147,7 @@ const dParamSym = ParamList[:con]
 const XParamSym = ParamList[:X]
 const YParamSym = ParamList[:Y]
 const ZParamSym = ParamList[:Z]
+
 
 getCharge(nucs::Vector{String}) = getCharge.(nucs) |> sum
 

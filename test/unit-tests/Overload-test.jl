@@ -20,22 +20,22 @@ using Suppressor: @capture_out
     @test (@capture_out show(gf1)) == string(typeof(gf1))*"(xpn="*
                                       string(typeof(gf1.param[1]))*"(2.0)[∂][α], con="*
                                       string(typeof(gf1.param[2]))*"(1.0)[∂][d])"
-    @test (@capture_out show(bf1)) == string(typeof(bf1))*"(gauss, subshell, center)"*
+    @test (@capture_out show(bf1)) == string(typeof(bf1))*"(center, gauss)"*
                                       "[X⁰Y⁰Z⁰][1.0, 2.0, 1.0]"
 
     bf2 = genBasisFunc(missing, "STO-3G")[]
-    @test (@capture_out show(bf2)) == string(typeof(bf2))*"(gauss, subshell, center)"*
+    @test (@capture_out show(bf2)) == string(typeof(bf2))*"(center, gauss)"*
                                       "[X⁰Y⁰Z⁰]"*"[NaN, NaN, NaN]"
 
     bfs1 = genBasisFunc([0,0,0], (2,1), "P")
-    @test (@capture_out show(bfs1)) == string(typeof(bfs1))*"(gauss, subshell, center)"*
+    @test (@capture_out show(bfs1)) == string(typeof(bfs1))*"(center, gauss)"*
                                        "[3/3]"*"[0.0, 0.0, 0.0]"
 
     bfs2 = genBasisFunc([0,0,0], (2,1), [(2,0,0)])
-    @test (@capture_out show(bfs2)) == string(typeof(bfs2))*"(gauss, subshell, center)"*
+    @test (@capture_out show(bfs2)) == string(typeof(bfs2))*"(center, gauss)"*
                                        "[X²Y⁰Z⁰]"*"[0.0, 0.0, 0.0]"
     bfs3 = genBasisFunc([0,0,0], (2,1), [(2,0,0), (1,1,0)])
-    @test (@capture_out show(bfs3)) == string(typeof(bfs3))*"(gauss, subshell, center)"*
+    @test (@capture_out show(bfs3)) == string(typeof(bfs3))*"(center, gauss)"*
                                        "[2/6]"*"[0.0, 0.0, 0.0]"
 
     bfm1 = BasisFuncMix([bf1, bf2])
