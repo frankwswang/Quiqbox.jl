@@ -463,7 +463,7 @@ end
 
 @inline function getIntX1X2X1X2!(n, uniquePairs, uPairCoeffs, flags, ps₁, ps₂)
     A, B, C = tupleDiff(ps₁, ps₂)
-    if length(A) > 0 && all(flags)
+    if length(A) > 0 && flags[1] && flags[2]
         g1111 = ((A,),)
         g1122 = ()
         g1212 = (((A, C),), ((B, A),), ((B, C),))
@@ -479,8 +479,28 @@ end
     n
 end
 
-@inline getIntX1X2X2X1!(n, uniquePairs, uPairCoeffs, flags, ps₁, ps₂) = 
-        getIntX1X2X1X2!(n, uniquePairs, uPairCoeffs, flags, ps₁, ps₂)
+@inline function getIntX1X2X2X1!(n, uniquePairs, uPairCoeffs, flags, ps₁, ps₂)
+    A, B, C = tupleDiff(ps₁, ps₂)
+    if length(A) > 0 && all(flags)
+        g1111 = ((A,),)
+        g1122 = ()
+        g1212 = ()
+        g1123 = (((A, A, C),), ((A, C, A),), ((A, C, B),))
+        g1233 = (((A, C, A),), ((B, A, A),), ((B, C, A),))
+        g1234 = (((A, C, A, B),), ((A, C, C, B),), ((B, A, C, A),),
+                 ((B, A, C, B),), ((B, C, A, B),), ((B, C, C, A),))
+        n = getIntXAXBXCXDcore!(n, uniquePairs, uPairCoeffs, flags, 
+                                (g1111, g1122, g1212, g1123, g1233, g1234))
+
+        g1221 = ((A, C), (B, A), (B, C))
+        for i in g1221
+            n = getIntCore1221!(n, uniquePairs, uPairCoeffs, flags, i)
+        end
+    else
+        n = getIntCore1221!(n, uniquePairs, uPairCoeffs, flags, (ps₁, ps₂))
+    end
+    n
+end
 
 @inline function getIntX1X1X2X3!(n, uniquePairs, uPairCoeffs, flags, ps₁, ps₂, ps₃)
     A, B, C, D = tupleDiff(ps₁, ps₂, ps₃)
@@ -587,6 +607,17 @@ end
     for (x, (i₁,i₂)) in enumerate(oneSidePairs), (_, (i₃,i₄)) in zip(1:x, oneSidePairs)
         n = getUniquePair!(n, uniquePairs, uPairCoeffs, flags, 
                            (ps₁[i₁], ps₂[i₂], ps₁[i₃], ps₂[i₄]), 2^(i₁!=i₃ || i₂!=i₄)*nFold)
+    end
+    n
+end
+
+@inline function getIntCore1221!(n, uniquePairs, uPairCoeffs, flags, 
+                                 (ps₁, ps₂)::Tuple{NTuple{N1}, NTuple{N2}}, 
+                                 nFold=1) where {N1, N2}
+    oneSidePairs = Iterators.product(1:N1, 1:N2)
+    for (x, (i₁,i₂)) in enumerate(oneSidePairs), (_, (i₃,i₄)) in zip(1:x, oneSidePairs)
+        n = getUniquePair!(n, uniquePairs, uPairCoeffs, flags, 
+                           (ps₁[i₁], ps₂[i₂], ps₂[i₄], ps₁[i₃]), 2^(i₁!=i₃ || i₂!=i₄)*nFold)
     end
     n
 end
