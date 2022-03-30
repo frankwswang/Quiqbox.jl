@@ -16,9 +16,14 @@ getX(S::Matrix{T}, method::Symbol=:m1) where {TelLB<:T<:TelUB} =
 getfield(getXmethods, method)(S)
 
 
-function getC(X::Matrix{T1}, F::Matrix{T2}; 
-              outputCx::Bool=false, outputEmo::Bool=false, stabilizeSign::Bool=true) where 
-             {TelLB<:T1<:TelUB, TelLB<:T2<:TelUB}
+getC(X::Matrix{T1}, F::Matrix{T2}; 
+     outputEmo::Bool=false, outputCx::Bool=false, stabilizeSign::Bool=true)  where 
+    {TelLB<:T1<:TelUB, TelLB<:T2<:TelUB} = 
+getCcore(X, F, outputEmo, outputCx, stabilizeSign)
+
+function getCcore(X::Matrix{T1}, F::Matrix{T2}, outputEmo::Bool=false, 
+                  outputCx::Bool=false, stabilizeSign::Bool=true) where 
+                 {TelLB<:T1<:TelUB, TelLB<:T2<:TelUB}
     ϵ, Cₓ = eigen(X'*F*X |> Hermitian, sortby=x->x)
     outC = outputCx ? Cₓ : X*Cₓ
     # Stabilize the sign factor of each column.
@@ -38,32 +43,31 @@ function breakSymOfC(C::Matrix{T}) where {TelLB<:T<:TelUB}
 end
 
 
-function getCfromGWH(S::Matrix{T1}, Hcore::Matrix{T2}, K::Float64=1.75; X=getX(S),
-                     forUHF::Bool=false) where 
-                    {TelLB<:T1<:TelUB, TelLB<:T2<:TelUB}
+function getCfromGWH(::Val{forUHF}, S::Matrix{T1}, Hcore::Matrix{T2}, X=getX(S)) where 
+                    {forUHF, TelLB<:T1<:TelUB, TelLB<:T2<:TelUB}
     l = size(Hcore)[1]
     H = zero(Hcore)
     for i in 1:l, j in 1:l
-        H[i,j] = K * S[i,j] * (Hcore[i,i] + Hcore[j,j]) * 0.5
+        H[i,j] = 1.75 * S[i,j] * (Hcore[i,i] + Hcore[j,j]) * 0.5
     end
-    C = getC(X, H)
+    C = getCcore(X, H)
     forUHF ? breakSymOfC(C) : C
 end
 
 
-function getCfromHcore(X::Matrix{T1}, Hcore::Matrix{T2}; forUHF::Bool=false) where 
-                      {TelLB<:T1<:TelUB, TelLB<:T2<:TelUB}
-    C = getC(X, Hcore)
+function getCfromHcore(::Val{forUHF}, 
+                       X::Matrix{T1}, Hcore::Matrix{T2}) where 
+                      {forUHF, TelLB<:T1<:TelUB, TelLB<:T2<:TelUB}
+    C = getCcore(X, Hcore)
     forUHF ? breakSymOfC(C) : C
 end
 
 
-function getCfromSAD(S::Matrix{T1}, Hcore::Matrix{T2}, HeeI::Array{T3, 4},
+function getCfromSAD(::Val{forUHF}, S::Matrix{T1}, Hcore::Matrix{T2}, HeeI::Array{T3, 4},
                      bs::Vector{<:AbstractGTBasisFuncs}, 
-                     nuc::Vector{String}, nucCoords::Vector{<:AbstractArray}; 
-                     X=getX(S), forUHF::Bool=false, 
+                     nuc::Vector{String}, nucCoords::Vector{<:AbstractArray}, X=getX(S); 
                      scfConfig=SCFconfig((:ADIIS,), (1e-10,))) where 
-                    {TelLB<:T1<:TelUB, TelLB<:T2<:TelUB, TelLB<:T3<:TelUB}
+                    {forUHF, TelLB<:T1<:TelUB, TelLB<:T2<:TelUB, TelLB<:T3<:TelUB}
     D₁ = zero(Hcore)
     D₂ = zero(Hcore)
     N₁tot = 0
@@ -80,7 +84,7 @@ function getCfromSAD(S::Matrix{T1}, Hcore::Matrix{T2}, HeeI::Array{T3, 4},
         end
         h1 = coreH(bs, [atm], [coord])
         res = runHFcore(scfConfig, 
-                        (N₁, N₂), h1, HeeI, S, X, getCfromHcore(X, h1, forUHF=true))
+                        (N₁, N₂), h1, HeeI, S, X, getCfromHcore(Val(true), X, h1))
         D₁ += res.D[1]
         D₂ += res.D[2]
         N₁tot += N₁
@@ -88,24 +92,24 @@ function getCfromSAD(S::Matrix{T1}, Hcore::Matrix{T2}, HeeI::Array{T3, 4},
     end
     Dᵀ = D₁ + D₂
     if forUHF
-        getC.(Ref(X), getF.(Ref(Hcore), Ref(HeeI), (D₁, D₂), Ref(Dᵀ)))
+        getCcore.(Ref(X), getF.(Ref(Hcore), Ref(HeeI), (D₁, D₂), Ref(Dᵀ)))
     else
-        getC(X, getF(Hcore, HeeI, Dᵀ.*0.5, Dᵀ))
+        getCcore(X, getF(Hcore, HeeI, Dᵀ.*0.5, Dᵀ))
     end
 end
 
 
 const guessCmethods = 
-    (  GWH = (forUHF, S, X, Hcore, _...)->getCfromGWH(S, Hcore; X, forUHF),
-     Hcore = (forUHF, S, X, Hcore, _...)->getCfromHcore(X, Hcore; forUHF), 
+    (  GWH = (forUHF, S, X, Hcore, _...)->getCfromGWH(forUHF, S, Hcore, X),
+     Hcore = (forUHF, S, X, Hcore, _...)->getCfromHcore(forUHF, X, Hcore), 
        SAD = (forUHF, S, X, Hcore, HeeI, bs, nuc, nucCoords)->
-             getCfromSAD(S, Hcore, HeeI, bs, nuc, nucCoords; X, forUHF))
+             getCfromSAD(forUHF, S, Hcore, HeeI, bs, nuc, nucCoords, X))
 
 
-guessC(::Val{M}, forUHF::Bool, S::Matrix{T1}, X::Matrix{T1}, Hcore::Matrix{T2}, 
+guessC(::Val{M}, forUHF::Val{B}, S::Matrix{T1}, X::Matrix{T1}, Hcore::Matrix{T2}, 
        HeeI::Array{T3, 4}, bs::Vector{<:AbstractGTBasisFuncs}, 
        nuc::Vector{String}, nucCoords::Vector{<:AbstractArray}) where 
-      {M, TelLB<:T1<:TelUB, TelLB<:T2<:TelUB, TelLB<:T3<:TelUB} = 
+      {M, B, TelLB<:T1<:TelUB, TelLB<:T2<:TelUB, TelLB<:T3<:TelUB} = 
 getfield(guessCmethods, M)(forUHF, S, X, Hcore, HeeI, bs, nuc, nucCoords)
 
 
@@ -114,7 +118,7 @@ getD(C::Matrix{T}, Nˢ::Int) where {TelLB<:T<:TelUB} =
 # Nˢ: number of electrons with the same spin.
 
 getD(X::Matrix{T1}, F::Matrix{T2}, Nˢ::Int) where {TelLB<:T1<:TelUB, TelLB<:T2<:TelUB} = 
-getD(getC(X, F), Nˢ)
+getD(getCcore(X, F), Nˢ)
 
 
 function getGcore(HeeI::Array{T1, 4}, DJ::Matrix{T2}, DK::Matrix{T3}) where 
@@ -200,7 +204,7 @@ function getCFDE(Hcore::Matrix{T1}, HeeI::Array{T2, 4}, X::Matrix{T3},
                 {TelLB<:T1<:TelUB, TelLB<:T2<:TelUB, TelLB<:T3<:TelUB, TelLB<:T4<:TelUB, N}
     Fnew = getF(Hcore, HeeI, Ds)
     Enew = getE(Hcore, Fnew, Ds[1])
-    Cnew = getC(X, Fnew)
+    Cnew = getCcore(X, Fnew)
     [Cnew, Fnew, Ds[1], Enew] # Fnew is based on latest variables.
 end
 
@@ -399,7 +403,7 @@ struct HFfinalVars{HFtype, N} <: HartreeFockFinalValue{HFtype}
         F = vars.Fs[end]
         D = vars.Ds[end]
         E0HF = vars.shared.Etots[end]
-        _, Emo = getC(X, F, outputEmo=true)
+        _, Emo = getCcore(X, F, true)
         occu = vcat(2*ones(Int, N), zeros(Int, size(X, 1) - N))
         new{:RHF, 2N}(E0HF, C, F, D, Emo, occu, vars, isConverged)
     end
@@ -411,7 +415,7 @@ struct HFfinalVars{HFtype, N} <: HartreeFockFinalValue{HFtype}
         F = (αVars.Fs[end], βVars.Fs[end])
         D = (αVars.Ds[end], βVars.Ds[end])
         E0HF = αVars.shared.Etots[end]
-        res = getC.(Ref(X), F, outputEmo=true)
+        res = getCcore.(Ref(X), F, true)
         Emo = getindex.(res, 2)
         occu = vcat.(ones.(Int, (N1, N2)), zeros.(Int, size(X, 1) .- (N1, N2)))
         new{:UHF, N1+N2}(E0HF, C, F, D, Emo, occu, (αVars, βVars), isConverged)
@@ -491,7 +495,7 @@ function runHF(gtb::BasisSetData{NB},
     Hcore = gtb.getHcore(nuc, nucCoords)
     X = getX(gtb.S)
     if initialC isa Symbol
-        initialC = guessC(Val(initialC), (HFtype==:UHF), 
+        initialC = guessC(Val(initialC), Val(HFtype==:UHF), 
                           gtb.S, X, Hcore, gtb.eeI, gtb.basis, nuc, nucCoords)
     end
     runHFcore(scfConfig, N, Hcore, gtb.eeI, gtb.S, X, initialC; 
@@ -508,14 +512,12 @@ end
               S::Array{T3, 2}, 
               X::Array{T4, 2}=getX(S), 
               C::Union{Array{T, 2}, NTuple{2, Array{T, 2}}}=
-              getCfromGWH(S, Hcore; X, forUHF=(length(N)==2));
-              earlyTermination::Bool=true, 
+              getCfromGWH(Val(length(N)==2), S, Hcore, X); 
               printInfo::Bool=false, 
-              maxSteps::Int=1000) where {$(TelLB)<:T1<:$(TelUB), 
-                                         $(TelLB)<:T2<:$(TelUB), 
-                                         $(TelLB)<:T3<:$(TelUB), 
-                                         $(TelLB)<:T4<:$(TelUB), 
-                                         $(TelLB)<:T5<:$(TelUB), L}
+              maxSteps::Int=1000, 
+              earlyTermination::Bool=true) where 
+             {$(TelLB)<:T1<:$(TelUB), $(TelLB)<:T2<:$(TelUB), $(TelLB)<:T3<:$(TelUB), 
+              $(TelLB)<:T4<:$(TelUB), $(TelLB)<:T5<:$(TelUB), L}
 
 The core function of `runHF`.
 
@@ -554,12 +556,12 @@ function runHFcore(scfConfig::SCFconfig{L},
                    S::Matrix{T3}, 
                    X::Matrix{T4}=getX(S), 
                    C::Union{Matrix{T5}, NTuple{2, Matrix{T5}}}=
-                   getCfromGWH(S, Hcore; X, forUHF=(length(N)==2));
-                   earlyTermination::Bool=true, 
+                   getCfromGWH(Val(length(N)==2), S, Hcore, X); 
                    printInfo::Bool=false, 
-                   maxSteps::Int=1000) where {TelLB<:T1<:TelUB, TelLB<:T2<:TelUB, 
-                                              TelLB<:T3<:TelUB, TelLB<:T4<:TelUB, 
-                                              TelLB<:T5<:TelUB, L}
+                   maxSteps::Int=1000, 
+                   earlyTermination::Bool=true) where 
+                  {TelLB<:T1<:TelUB, TelLB<:T2<:TelUB, TelLB<:T3<:TelUB, 
+                   TelLB<:T4<:TelUB, TelLB<:T5<:TelUB, L}
     @assert maxSteps > 0
     vars = initializeSCF(Hcore, HeeI, C, N)
     Etots = (vars isa Tuple) ? vars[1].shared.Etots : vars.shared.Etots
@@ -755,7 +757,7 @@ function ADMMSolver(vec::Vector{Float64}, B::Matrix{Float64}; convexConstraint::
     b = Float64[1.0]
     g = convexConstraint ? fill(indicator(0, 1), len) : fill(indicator(-Inf, Inf), len)
     params = SeparableOptimization.AdmmParams(B, vec, A, b, g)
-    settings = SeparableOptimization.Settings(; ρ=ones(1), σ=ones(len), compute_stats=true)
+    settings = SeparableOptimization.Settings(; ρ=ones(1), σ=ones(len))
     vars, _ = SeparableOptimization.optimize(params, settings)
     vars.x
 end

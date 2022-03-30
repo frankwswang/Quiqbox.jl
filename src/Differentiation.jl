@@ -454,7 +454,7 @@ end
 function gradHFenergy(bs::Vector{<:CompositeGTBasisFuncs}, par::Vector{<:ParamBox}, 
                       C::Union{Matrix{Float64}, NTuple{2, Matrix{Float64}}}, 
                       S::Matrix{Float64}, nuc::Vector{String}, 
-                      nucCoords::Vector{<:AbstractArray}; 
+                      nucCoords::Vector{<:AbstractArray}, 
                       nElectron::Union{Int, NTuple{2, Int}}=getCharge(nuc))
     if length(C) == 2 && nElectron isa Int
         nElectron = (nElectron÷2, nElectron-nElectron÷2)
@@ -464,6 +464,6 @@ end
 
 gradHFenergy(bs::Vector{<:CompositeGTBasisFuncs}, par::ParamBox, 
             C::Union{Matrix{Float64}, NTuple{2, Matrix{Float64}}}, S::Matrix{Float64}, 
-            nuc::Vector{String}, nucCoords::Vector{<:AbstractArray}; 
+            nuc::Vector{String}, nucCoords::Vector{<:AbstractArray}, 
             nElectron::Union{Int, NTuple{2, Int}}=getCharge(nuc)) = 
-gradHFenergy(bs, [par], C, S, nuc, nucCoords; nElectron)
+gradHFenergy(bs, [par], C, S, nuc, nucCoords, nElectron)

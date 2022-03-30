@@ -74,13 +74,13 @@ defaultECmethod(Nes::NTuple{2, Int},
                 nuc::Vector{String}, nucCoords::Vector{<:AbstractArray}) = 
 defaultECmethodCore(Nes, nuc, nucCoords)
 
-function defaultECmethodCore(Ne, nuc::Vector{String}, nucCoords::Vector{<:AbstractArray})
+function defaultECmethodCore(Ne::T, nuc::Vector{String}, 
+                             nucCoords::Vector{<:AbstractArray}) where {T}
     function (Hcore, HeeI, bs, S)
         X = getX(S)
         res = runHFcore(defaultSCFconfig, Ne, Hcore, HeeI, S, X, 
-                        guessC(Val(:SAD), (length(Ne)==2), S, X, 
-                               Hcore, HeeI, bs, nuc, nucCoords); 
-                        printInfo=false)
+                        guessC(Val(:SAD), Val(T<:NTuple{2}), S, X, 
+                               Hcore, HeeI, bs, nuc, nucCoords), printInfo=false)
         res.E0HF, res.C
     end
 end
