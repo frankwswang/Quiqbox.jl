@@ -33,11 +33,11 @@ SCFconfig{N}
 ```
 
 ```@docs
-Quiqbox.HFtempVars{HFtype, N}
+Quiqbox.HFtempVars{HFtype}
 ```
 
 ```@docs
-Quiqbox.HFfinalVars{T, N, Nb}
+Quiqbox.HFfinalVars{HFtype}
 ```
 
 ```@docs

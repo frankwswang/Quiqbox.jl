@@ -5,25 +5,19 @@ using PiecewiseQuadratics: indicator
 using SeparableOptimization
 using Combinatorics: powerset
 
-const TelLB = Float64 # Union{} to loose constraint
-const TelUB = Float64 # Any to loose constraint
-
-getXcore1(S::Matrix{T}) where {TelLB<:T<:TelUB} = S^(-0.5) |> Array
+getXcore1(S::Matrix{Float64}) = S^(-0.5) |> Array
 
 const getXmethods = (m1=getXcore1,)
 
-getX(S::Matrix{T}, method::Symbol=:m1) where {TelLB<:T<:TelUB} = 
-getfield(getXmethods, method)(S)
+getX(S::Matrix{Float64}, method::Symbol=:m1) = getfield(getXmethods, method)(S)
 
 
-getC(X::Matrix{T1}, F::Matrix{T2}; 
-     outputEmo::Bool=false, outputCx::Bool=false, stabilizeSign::Bool=true)  where 
-    {TelLB<:T1<:TelUB, TelLB<:T2<:TelUB} = 
+getC(X::Matrix{Float64}, F::Matrix{Float64}; 
+     outputEmo::Bool=false, outputCx::Bool=false, stabilizeSign::Bool=true) = 
 getCcore(X, F, outputEmo, outputCx, stabilizeSign)
 
-function getCcore(X::Matrix{T1}, F::Matrix{T2}, outputEmo::Bool=false, 
-                  outputCx::Bool=false, stabilizeSign::Bool=true) where 
-                 {TelLB<:T1<:TelUB, TelLB<:T2<:TelUB}
+function getCcore(X::Matrix{Float64}, F::Matrix{Float64}, outputEmo::Bool=false, 
+                  outputCx::Bool=false, stabilizeSign::Bool=true)
     ϵ, Cₓ = eigen(X'*F*X |> Hermitian, sortby=x->x)
     outC = outputCx ? Cₓ : X*Cₓ
     # Stabilize the sign factor of each column.
@@ -34,7 +28,7 @@ function getCcore(X::Matrix{T1}, F::Matrix{T2}, outputEmo::Bool=false,
 end
 
 
-function breakSymOfC(C::Matrix{T}) where {TelLB<:T<:TelUB}
+function breakSymOfC(C::Matrix{Float64})
     C2 = copy(C)
     l = min(size(C2)[1], 2)
     C2[1:l, 1:l] .= 0 # Breaking spin symmetry.
@@ -43,31 +37,30 @@ function breakSymOfC(C::Matrix{T}) where {TelLB<:T<:TelUB}
 end
 
 
-function getCfromGWH(::Val{forUHF}, S::Matrix{T1}, Hcore::Matrix{T2}, X=getX(S)) where 
-                    {forUHF, TelLB<:T1<:TelUB, TelLB<:T2<:TelUB}
+function getCfromGWH(::Val{ForUHF}, 
+                     S::Matrix{Float64}, Hcore::Matrix{Float64}, X=getX(S)) where {ForUHF}
     l = size(Hcore)[1]
     H = zero(Hcore)
     for i in 1:l, j in 1:l
         H[i,j] = 1.75 * S[i,j] * (Hcore[i,i] + Hcore[j,j]) * 0.5
     end
     C = getCcore(X, H)
-    forUHF ? breakSymOfC(C) : C
+    ForUHF ? breakSymOfC(C) : C
 end
 
 
-function getCfromHcore(::Val{forUHF}, 
-                       X::Matrix{T1}, Hcore::Matrix{T2}) where 
-                      {forUHF, TelLB<:T1<:TelUB, TelLB<:T2<:TelUB}
+function getCfromHcore(::Val{ForUHF}, 
+                       X::Matrix{Float64}, Hcore::Matrix{Float64}) where {ForUHF}
     C = getCcore(X, Hcore)
-    forUHF ? breakSymOfC(C) : C
+    ForUHF ? breakSymOfC(C) : C
 end
 
 
-function getCfromSAD(::Val{forUHF}, S::Matrix{T1}, Hcore::Matrix{T2}, HeeI::Array{T3, 4},
+function getCfromSAD(::Val{ForUHF}, 
+                     S::Matrix{Float64}, Hcore::Matrix{Float64}, HeeI::Array{Float64, 4},
                      bs::Vector{<:AbstractGTBasisFuncs}, 
                      nuc::Vector{String}, nucCoords::Vector{<:AbstractArray}, X=getX(S); 
-                     scfConfig=SCFconfig((:ADIIS,), (1e-10,))) where 
-                    {forUHF, TelLB<:T1<:TelUB, TelLB<:T2<:TelUB, TelLB<:T3<:TelUB}
+                     scfConfig=SCFconfig((:ADIIS,), (1e-10,))) where {ForUHF}
     D₁ = zero(Hcore)
     D₂ = zero(Hcore)
     N₁tot = 0
@@ -91,7 +84,7 @@ function getCfromSAD(::Val{forUHF}, S::Matrix{T1}, Hcore::Matrix{T2}, HeeI::Arra
         N₂tot += N₂
     end
     Dᵀ = D₁ + D₂
-    if forUHF
+    if ForUHF
         getCcore.(Ref(X), getF.(Ref(Hcore), Ref(HeeI), (D₁, D₂), Ref(Dᵀ)))
     else
         getCcore(X, getF(Hcore, HeeI, Dᵀ.*0.5, Dᵀ))
@@ -100,29 +93,26 @@ end
 
 
 const guessCmethods = 
-    (  GWH = (forUHF, S, X, Hcore, _...)->getCfromGWH(forUHF, S, Hcore, X),
-     Hcore = (forUHF, S, X, Hcore, _...)->getCfromHcore(forUHF, X, Hcore), 
-       SAD = (forUHF, S, X, Hcore, HeeI, bs, nuc, nucCoords)->
-             getCfromSAD(forUHF, S, Hcore, HeeI, bs, nuc, nucCoords, X))
+    (  GWH = (ForUHF, S, X, Hcore, _...)->getCfromGWH(ForUHF, S, Hcore, X),
+     Hcore = (ForUHF, S, X, Hcore, _...)->getCfromHcore(ForUHF, X, Hcore), 
+       SAD = (ForUHF, S, X, Hcore, HeeI, bs, nuc, nucCoords)->
+             getCfromSAD(ForUHF, S, Hcore, HeeI, bs, nuc, nucCoords, X))
 
 
-guessC(::Val{M}, forUHF::Val{B}, S::Matrix{T1}, X::Matrix{T1}, Hcore::Matrix{T2}, 
-       HeeI::Array{T3, 4}, bs::Vector{<:AbstractGTBasisFuncs}, 
-       nuc::Vector{String}, nucCoords::Vector{<:AbstractArray}) where 
-      {M, B, TelLB<:T1<:TelUB, TelLB<:T2<:TelUB, TelLB<:T3<:TelUB} = 
-getfield(guessCmethods, M)(forUHF, S, X, Hcore, HeeI, bs, nuc, nucCoords)
+@inline guessC(::Val{M}, ForUHF::Val{B}, 
+               S::Matrix{Float64}, X::Matrix{Float64}, Hcore::Matrix{Float64}, 
+               HeeI::Array{Float64, 4}, bs::Vector{<:AbstractGTBasisFuncs}, 
+               nuc::Vector{String}, nucCoords::Vector{<:AbstractArray}) where {M, B} = 
+getfield(guessCmethods, M)(ForUHF, S, X, Hcore, HeeI, bs, nuc, nucCoords)
 
 
-getD(C::Matrix{T}, Nˢ::Int) where {TelLB<:T<:TelUB} = 
-@views (C[:,1:Nˢ]*C[:,1:Nˢ]') |> Hermitian |> Array
+getD(C::Matrix{Float64}, Nˢ::Int) = @views (C[:,1:Nˢ]*C[:,1:Nˢ]') |> Hermitian |> Array
 # Nˢ: number of electrons with the same spin.
 
-getD(X::Matrix{T1}, F::Matrix{T2}, Nˢ::Int) where {TelLB<:T1<:TelUB, TelLB<:T2<:TelUB} = 
-getD(getCcore(X, F), Nˢ)
+@inline getD(X::Matrix{Float64}, F::Matrix{Float64}, Nˢ::Int) = getD(getCcore(X, F), Nˢ)
 
 
-function getGcore(HeeI::Array{T1, 4}, DJ::Matrix{T2}, DK::Matrix{T3}) where 
-    {TelLB<:T1<:TelUB, TelLB<:T2<:TelUB, TelLB<:T3<:TelUB}
+function getGcore(HeeI::Array{Float64, 4}, DJ::Matrix{Float64}, DK::Matrix{Float64})
     G = zero(DJ)
     l = size(G)[1]
     for μ = 1:l, ν = 1:l # fastest
@@ -132,64 +122,52 @@ function getGcore(HeeI::Array{T1, 4}, DJ::Matrix{T2}, DK::Matrix{T3}) where
 end
 
 # RHF
-getG(HeeI::Array{T1, 4}, D::Matrix{T2}) where 
-    {TelLB<:T1<:TelUB, TelLB<:T2<:TelUB} = 
-getGcore(HeeI, 2D, D)
+@inline getG(HeeI::Array{Float64, 4}, D::Matrix{Float64}) = getGcore(HeeI, 2D, D)
 
 # UHF
-getG(HeeI::Array{T1, 4}, D::Matrix{T2}, Dᵀ::Matrix{T3}) where 
-    {TelLB<:T1<:TelUB, TelLB<:T2<:TelUB, TelLB<:T3<:TelUB} = 
-getGcore(HeeI, Dᵀ, D)
+@inline getG(HeeI::Array{Float64, 4}, D::Matrix{Float64}, Dᵀ::Matrix{Float64}) = 
+        getGcore(HeeI, Dᵀ, D)
 
 
-getF(Hcore::Matrix{T1}, G::Matrix{T2}) where 
-            {TelLB<:T1<:TelUB, TelLB<:T2<:TelUB} = 
-        Hcore + G
+@inline getF(Hcore::Matrix{Float64}, G::Matrix{Float64}) = Hcore + G
 
 # RHF
-getF(Hcore::Matrix{T1}, HeeI::Array{T2, 4}, D::Matrix{T3}) where 
-    {TelLB<:T1<:TelUB, TelLB<:T2<:TelUB, TelLB<:T3<:TelUB} = 
-getF(Hcore, getG(HeeI, D))
+@inline getF(Hcore::Matrix{Float64}, HeeI::Array{Float64, 4}, D::Matrix{Float64}) = 
+        getF(Hcore, getG(HeeI, D))
 
 # UHF
-getF(Hcore::Matrix{T1}, HeeI::Array{T2, 4}, D::Matrix{T3}, Dᵀ::Matrix{T4}) where 
-    {TelLB<:T1<:TelUB, TelLB<:T2<:TelUB, TelLB<:T3<:TelUB, TelLB<:T4<:TelUB} = 
-getF(Hcore, getG(HeeI, D, Dᵀ))
+@inline getF(Hcore::Matrix{Float64}, HeeI::Array{Float64, 4}, 
+             D::Matrix{Float64}, Dᵀ::Matrix{Float64}) = 
+        getF(Hcore, getG(HeeI, D, Dᵀ))
 
 # RHF or UHF
-getF(Hcore::Matrix{T1}, HeeI::Array{T2, 4}, Ds::NTuple{N, Matrix{T3}}) where 
-    {TelLB<:T1<:TelUB, TelLB<:T2<:TelUB, TelLB<:T3<:TelUB, N} = 
-getF(Hcore, getG(HeeI, Ds...))
+@inline getF(Hcore::Matrix{Float64}, HeeI::Array{Float64, 4}, 
+             Ds::NTuple{N, Matrix{Float64}}) where {N} = 
+        getF(Hcore, getG(HeeI, Ds...))
 
-getE(Hcore::Matrix{T1}, F::Matrix{T2}, D::Matrix{T3}) where 
-    {TelLB<:T1<:TelUB, TelLB<:T2<:TelUB, TelLB<:T3<:TelUB} = 
-dot(transpose(D), 0.5*(Hcore + F))
+@inline getE(Hcore::Matrix{Float64}, F::Matrix{Float64}, D::Matrix{Float64}) = 
+        dot(transpose(D), 0.5*(Hcore + F))
 
 
 # RHF
-getEᵀcore(Hcore::Matrix{T1}, F::Matrix{T2}, D::Matrix{T3}) where 
-         {TelLB<:T1<:TelUB, TelLB<:T2<:TelUB, TelLB<:T3<:TelUB} = 
-2*getE(Hcore, F, D)
+@inline getEᵀcore(Hcore::Matrix{Float64}, F::Matrix{Float64}, D::Matrix{Float64}) = 
+        2*getE(Hcore, F, D)
 
 # UHF
-getEᵀcore(Hcore::Matrix{T1}, Fᵅ::Matrix{T2},   Dᵅ::Matrix{T3}, 
-          Fᵝ::Matrix{T4},    Dᵝ::Matrix{T5}) where 
-         {TelLB<:T1<:TelUB,  TelLB<:T2<:TelUB, TelLB<:T3<:TelUB, 
-          TelLB<:T4<:TelUB,  TelLB<:T5<:TelUB} = 
-getE(Hcore, Fᵅ, Dᵅ) + getE(Hcore, Fᵝ, Dᵝ)
+@inline getEᵀcore(Hcore::Matrix{Float64}, Fᵅ::Matrix{Float64},   Dᵅ::Matrix{Float64}, 
+                  Fᵝ::Matrix{Float64},    Dᵝ::Matrix{Float64}) = 
+        getE(Hcore, Fᵅ, Dᵅ) + getE(Hcore, Fᵝ, Dᵝ)
 
 # RHF
-function getEᵀ(Hcore::Matrix{T1}, HeeI::Array{T2, 4}, C::Matrix{T3}, N::Int) where 
-              {TelLB<:T1<:TelUB, TelLB<:T2<:TelUB, TelLB<:T3<:TelUB}
+function getEᵀ(Hcore::Matrix{Float64}, HeeI::Array{Float64, 4}, C::Matrix{Float64}, N::Int)
     D = getD(C, N÷2)
     F = getF(Hcore, HeeI, D)
     getEᵀcore(Hcore, F, D)
 end
 
 # UHF
-function getEᵀ(Hcore::Matrix{T1}, HeeI::Array{T2, 4}, (Cᵅ,Cᵝ)::NTuple{2, Matrix{T3}}, 
-               (Nᵅ,Nᵝ)::NTuple{2, Int}) where 
-              {TelLB<:T1<:TelUB, TelLB<:T2<:TelUB, TelLB<:T3<:TelUB}
+function getEᵀ(Hcore::Matrix{Float64}, HeeI::Array{Float64, 4}, 
+               (Cᵅ,Cᵝ)::NTuple{2, Matrix{Float64}}, (Nᵅ,Nᵝ)::NTuple{2, Int})
     Dᵅ = getD(Cᵅ, Nᵅ)
     Dᵝ = getD(Cᵝ, Nᵝ)
     Dᵀ = Dᵅ + Dᵝ
@@ -199,37 +177,34 @@ function getEᵀ(Hcore::Matrix{T1}, HeeI::Array{T2, 4}, (Cᵅ,Cᵝ)::NTuple{2, M
 end
 
 
-function getCFDE(Hcore::Matrix{T1}, HeeI::Array{T2, 4}, X::Matrix{T3}, 
-                 Ds::Vararg{Matrix{T4}, N}) where 
-                {TelLB<:T1<:TelUB, TelLB<:T2<:TelUB, TelLB<:T3<:TelUB, TelLB<:T4<:TelUB, N}
+@inline function getCFDE(Hcore::Matrix{Float64}, HeeI::Array{Float64, 4}, 
+                         X::Matrix{Float64}, Ds::Vararg{Matrix{Float64}, N}) where {N}
     Fnew = getF(Hcore, HeeI, Ds)
     Enew = getE(Hcore, Fnew, Ds[1])
     Cnew = getCcore(X, Fnew)
-    [Cnew, Fnew, Ds[1], Enew] # Fnew is based on latest variables.
+    (Cnew, Fnew, Ds[1], Enew) # Fnew is based on latest variables.
 end
 
 
 # RHF
-function initializeSCF(Hcore::Matrix{T1}, HeeI::Array{T2, 4}, C::Matrix{T3}, N::Int) where 
-                      {TelLB<:T1<:TelUB, TelLB<:T2<:TelUB, TelLB<:T3<:TelUB}
+function initializeSCF(Hcore::Matrix{Float64}, HeeI::Array{Float64, 4}, C::Matrix{Float64}, 
+                       N::Int)
     Nˢ = N÷2
     D = getD(C, Nˢ)
     F = getF(Hcore, HeeI, D)
     E = getE(Hcore, F, D)
-    HFtempVars(:RHF, Nˢ, C, F, D, E, 2D, 2E)
+    HFtempVars(FunctionType{:RHF}(), Nˢ, C, F, D, E, 2D, 2E)
 end
 
 # UHF
-function initializeSCF(Hcore::Matrix{T1}, HeeI::Array{T2, 4}, 
-                       Cs::NTuple{2, Matrix{T3}}, 
-                       Ns::NTuple{2, Int}) where 
-                       {TelLB<:T1<:TelUB, TelLB<:T2<:TelUB, TelLB<:T3<:TelUB}
+function initializeSCF(Hcore::Matrix{Float64}, HeeI::Array{Float64, 4}, 
+                       Cs::NTuple{2, Matrix{Float64}}, Ns::NTuple{2, Int})
     Ds = getD.(Cs, Ns)
     Dᵀs = [Ds |> sum]
     Fs = getF.(Ref(Hcore), Ref(HeeI), Ds, Ref(Dᵀs[]))
     Es = getE.(Ref(Hcore), Fs, Ds)
     Eᵀs = [Es |> sum]
-    res = HFtempVars.(:UHF, Ns, Cs, Fs, Ds, Es)
+    res = HFtempVars.(Ref(FunctionType{:UHF}()), Ns, Cs, Fs, Ds, Es)
     res[1].shared.Dtots = res[2].shared.Dtots = Dᵀs
     res[1].shared.Etots = res[2].shared.Etots = Eᵀs
     res |> Tuple
@@ -305,7 +280,7 @@ const defaultSCFconfig = SCFconfig((:ADIIS, :DIIS, :ADIIS), (1e-4, 1e-6, 1e-15))
 
 
 mutable struct HFinterrelatedVars <: HartreeFockintermediateData
-    Dtots::Vector{Matrix{T}} where {TelLB<:T<:TelUB}
+    Dtots::Vector{Matrix{Float64}}
     Etots::Vector{Float64}
 
     HFinterrelatedVars() = new()
@@ -314,24 +289,26 @@ end
 
 
 """
-    HFtempVars{HFtype, N} <: HartreeFockintermediateData
+    HFtempVars{HFtype} <: HartreeFockintermediateData
 
 The container to store the intermediate values (only of the same spin configuration) for 
 each iteration during the Hartree-Fock SCF procedure. 
 
 ≡≡≡ Field(s) ≡≡≡
 
-`Cs::Array{Array{T1, 2}, 1} where {$(TelLB)<:T1<:$(TelUB)}`: Coefficient matrices.
+`N::Int`: The number of electrons with the same spin function.
 
-`Fs::Array{Array{T2, 2}, 1} where {$(TelLB)<:T2<:$(TelUB)}`: Fock matrices
+`Cs::Array{Array{Float64, 2}, 1}`: Coefficient matrices.
 
-`Ds::Array{Array{T3, 2}, 1} where {$(TelLB)<:T3<:$(TelUB)}`: Density matrices corresponding 
+`Fs::Array{Array{Float64, 2}, 1}`: Fock matrices
+
+`Ds::Array{Array{Float64, 2}, 1}`: Density matrices corresponding 
 to only spin configuration. For RHF each elements means (unconverged) 0.5*Dᵀ.
 
 `Es::Array{Float64, 1}`: Part of Hartree-Fock energy corresponding to only spin 
 configuration. For RHF each element means (unconverged) 0.5*E0HF.
 
-`shared.Dtots::Array{Array{T, 2}, 1} where {$(TelLB)<:T<:$(TelUB)}`: The total density 
+`shared.Dtots::Array{Array{Float64, 2}, 1}`: The total density 
 matrices.
 
 `shared.Etots::Array{Float64, 1}`: The total Hartree-Fock energy.
@@ -340,27 +317,36 @@ matrices.
 change the field `shared.Dtots` or `shared.Etots` of one container will affect the other 
 one's.**
 """
-struct HFtempVars{HFtype, N} <: HartreeFockintermediateData
-    Cs::Vector{Matrix{T1}} where {TelLB<:T1<:TelUB}
-    Fs::Vector{Matrix{T2}} where {TelLB<:T2<:TelUB}
-    Ds::Vector{Matrix{T3}} where {TelLB<:T3<:TelUB}
+struct HFtempVars{HFtype} <: HartreeFockintermediateData
+    N::Int
+    Cs::Vector{Matrix{Float64}}
+    Fs::Vector{Matrix{Float64}}
+    Ds::Vector{Matrix{Float64}}
     Es::Vector{Float64}
     shared::HFinterrelatedVars
-
-    HFtempVars(HFtype::Symbol, N, C, F, D, E, vars...) = 
-    new{HFtype, N}([C], [F], [D], [E], HFinterrelatedVars([[x] for x in vars]...))
-
-    HFtempVars(HFtype::Symbol, Nˢ::Int, Cs::Vector{Matrix{T1}}, Fs::Vector{Matrix{T2}}, 
-               Ds::Vector{Matrix{T3}}, Es::Vector{<:Real}, Dtots::Vector{Matrix{T4}}, 
-               Etots::Vector{<:Real}) where 
-              {TelLB<:T1<:TelUB, TelLB<:T2<:TelUB, TelLB<:T3<:TelUB, TelLB<:T4<:TelUB} = 
-    new{HFtype, Nˢ}(Cs, Fs, Ds, Es, HFinterrelatedVars(Dtots, Etots))
 end
+
+HFtempVars(::FunctionType{HFtype}, 
+           N::Int, C::Matrix{Float64}, F::Matrix{Float64}, 
+           D::Matrix{Float64}, E::Real) where {HFtype} = 
+HFtempVars{HFtype}(N, [C], [F], [D], [E], HFinterrelatedVars())
+
+HFtempVars(::FunctionType{HFtype}, 
+           N::Int, C::Matrix{Float64}, F::Matrix{Float64}, 
+           D::Matrix{Float64}, E::Real, 
+           Dtot::Matrix{Float64}, Etot::Real) where {HFtype} = 
+HFtempVars{HFtype}(N, [C], [F], [D], [E], HFinterrelatedVars([Dtot], [Etot]))
+
+HFtempVars(::FunctionType{HFtype}, 
+           Nˢ::Int, Cs::Vector{Matrix{Float64}}, Fs::Vector{Matrix{Float64}}, 
+           Ds::Vector{Matrix{Float64}}, Es::Vector{<:Real}, 
+           Dtots::Vector{Matrix{Float64}}, Etots::Vector{<:Real}) where {HFtype} = 
+HFtempVars{HFtype}(Nˢ, Cs, Fs, Ds, Es, HFinterrelatedVars(Dtots, Etots))
 
 
 """
 
-    HFfinalVars{HFtype, N} <: HartreeFockFinalValue{HFtype}
+    HFfinalVars{HFtype} <: HartreeFockFinalValue{HFtype}
 
 The container of the final values after a Hartree-Fock SCF procedure.
 
@@ -368,13 +354,15 @@ The container of the final values after a Hartree-Fock SCF procedure.
 
 `E0HF::Float64`: Hartree-Fock energy of the electronic Hamiltonian. 
 
-`C::Union{Array{T1, 2}, NTuple{2, Array{T1, 2}}} where {$(TelLB)<:T1<:$(TelUB)}`: 
+`N::Int`: The total number of electrons.
+
+`C::Union{Array{Float64, 2}, NTuple{2, Array{Float64, 2}}}`: 
 Coefficient matrix(s) for one spin configuration.
 
-`F::Union{Array{T2, 2}, NTuple{2, Array{T2, 2}}} where {$(TelLB)<:T2<:$(TelUB)}`: Fock 
+`F::Union{Array{Float64, 2}, NTuple{2, Array{Float64, 2}}}`: Fock 
 matrix(s) for one spin configuration.
 
-`D::Union{Array{T3, 2}, NTuple{2, Array{T3, 2}}} where {$(TelLB)<:T3<:$(TelUB)}`: Density 
+`D::Union{Array{Float64, 2}, NTuple{2, Array{Float64, 2}}}`: Density 
 matrix(s) for one spin configuration.
 
 `Emo::Union{Array{Float64, 1}, NTuple{2, Array{Float64, 1}}}`: Energies of molecular 
@@ -387,38 +375,38 @@ orbitals.
 
 `isConverged::Bool`: Whether the SCF procedure is converged in the end.
 """
-struct HFfinalVars{HFtype, N} <: HartreeFockFinalValue{HFtype}
+struct HFfinalVars{HFtype} <: HartreeFockFinalValue{HFtype}
     E0HF::Float64
-    C::Union{Matrix{T1}, NTuple{2, Matrix{T1}}} where {TelLB<:T1<:TelUB}
-    F::Union{Matrix{T2}, NTuple{2, Matrix{T2}}} where {TelLB<:T2<:TelUB}
-    D::Union{Matrix{T3}, NTuple{2, Matrix{T3}}} where {TelLB<:T3<:TelUB}
+    N::Int
+    C::Union{Matrix{Float64}, NTuple{2, Matrix{Float64}}}
+    F::Union{Matrix{Float64}, NTuple{2, Matrix{Float64}}}
+    D::Union{Matrix{Float64}, NTuple{2, Matrix{Float64}}}
     Emo::Union{Vector{Float64}, NTuple{2, Vector{Float64}}}
     occu::Union{Vector{Int}, NTuple{2, Vector{Int}}}
     temp::Union{HFtempVars{HFtype}, NTuple{2, HFtempVars{HFtype}}}
     isConverged::Bool
 
-    function HFfinalVars(X::Matrix{T}, vars::HFtempVars{:RHF, N}, isConverged::Bool) where 
-                        {N, TelLB<:T<:TelUB}
+    function HFfinalVars(X::Matrix{Float64}, vars::HFtempVars{:RHF}, isConverged::Bool)
         C = vars.Cs[end]
         F = vars.Fs[end]
         D = vars.Ds[end]
         E0HF = vars.shared.Etots[end]
         _, Emo = getCcore(X, F, true)
+        N = vars.N
         occu = vcat(2*ones(Int, N), zeros(Int, size(X, 1) - N))
-        new{:RHF, 2N}(E0HF, C, F, D, Emo, occu, vars, isConverged)
+        new{:RHF}(E0HF, 2, C, F, D, Emo, occu, vars, isConverged)
     end
 
-    function HFfinalVars(X::Matrix{T}, 
-                         (αVars, βVars)::Tuple{HFtempVars{:UHF, N1}, HFtempVars{:UHF, N2}}, 
-                         isConverged::Bool) where {N1, N2, TelLB<:T<:TelUB}
-        C = (αVars.Cs[end], βVars.Cs[end])
-        F = (αVars.Fs[end], βVars.Fs[end])
-        D = (αVars.Ds[end], βVars.Ds[end])
-        E0HF = αVars.shared.Etots[end]
-        res = getCcore.(Ref(X), F, true)
-        Emo = getindex.(res, 2)
-        occu = vcat.(ones.(Int, (N1, N2)), zeros.(Int, size(X, 1) .- (N1, N2)))
-        new{:UHF, N1+N2}(E0HF, C, F, D, Emo, occu, (αVars, βVars), isConverged)
+    function HFfinalVars(X::Matrix{Float64}, αβVars::NTuple{2, HFtempVars{:UHF}}, 
+                         isConverged::Bool)
+        C = last.(getfield.(αβVars, :Cs))
+        F = last.(getfield.(αβVars, :Fs))
+        D = last.(getfield.(αβVars, :Ds))
+        E0HF = αβVars[1].shared.Etots[end]
+        Emo = getindex.(getCcore.(Ref(X), F, true), 2)
+        Ns = getfield.(αβVars, :N)
+        occu = vcat.(ones.(Int, Ns), zeros.(Int, size(X, 1) .- Ns))
+        new{:UHF}(E0HF, sum(Ns), C, F, D, Emo, occu, αβVars, isConverged)
     end
 end
 
@@ -428,12 +416,12 @@ end
           nuc::Array{String, 1}, 
           nucCoords::Array{<:AbstractArray, 1}, 
           N::Int=getCharge(nuc); 
-          initialC::Union{Array{T, 2}, NTuple{2, Array{T, 2}}, Symbol}=:SAD, 
+          initialC::Union{Array{Float64, 2}, NTuple{2, Array{Float64, 2}}, Symbol}=:SAD, 
           HFtype::Symbol=:RHF, 
           scfConfig::SCFconfig=defaultSCFconfig, 
           earlyTermination::Bool=true, 
           printInfo::Bool=true, 
-          maxSteps::Int=1000) where {$(TelLB)<:T<:$(TelUB)} -> HFfinalVars
+          maxSteps::Int=1000) -> HFfinalVars
 
 Main function to run Hartree-Fock in Quiqbox.
 
@@ -449,8 +437,8 @@ Main function to run Hartree-Fock in Quiqbox.
 
 === Keyword argument(s) ===
 
-`initialC::Union{Array{T, 2}, NTuple{2, Array{T, 2}}, Symbol}`: Initial guess of the 
-coefficient matrix(s) C of the molecular orbitals.
+`initialC::Union{Array{Float64, 2}, NTuple{2, Array{Float64, 2}}, Symbol}`: Initial guess 
+of the coefficient matrix(s) C of the molecular orbitals.
 
 `HFtype::Symbol`: Hartree-Fock type. Available values are `:RHF` and `:UHF`.
 
@@ -467,12 +455,12 @@ function runHF(bs::Vector{<:AbstractGTBasisFuncs},
                nuc::Vector{String}, 
                nucCoords::Vector{<:AbstractArray}, 
                N::Int=getCharge(nuc); 
-               initialC::Union{Matrix{T}, NTuple{2, Matrix{T}}, Symbol}=:SAD, 
+               initialC::Union{Matrix{Float64}, NTuple{2, Matrix{Float64}}, Symbol}=:SAD, 
                HFtype::Symbol=:RHF, 
                scfConfig::SCFconfig=defaultSCFconfig, 
                earlyTermination::Bool=true, 
                printInfo::Bool=true, 
-               maxSteps::Int=1000) where {TelLB<:T<:TelUB}
+               maxSteps::Int=1000)
     gtb = GTBasis(bs, false)
     runHF(gtb, nuc, nucCoords, N; initialC, HFtype, scfConfig, 
           earlyTermination, printInfo, maxSteps)
@@ -482,15 +470,15 @@ function runHF(gtb::BasisSetData{NB},
                nuc::Vector{String}, 
                nucCoords::Vector{<:AbstractArray}, 
                N::Int=getCharge(nuc); 
-               initialC::Union{Matrix{T}, NTuple{2, Matrix{T}}, Symbol}=:SAD, 
+               initialC::Union{Matrix{Float64}, NTuple{2, Matrix{Float64}}, Symbol}=:SAD, 
                HFtype::Symbol=:RHF, 
                scfConfig::SCFconfig=defaultSCFconfig, 
                earlyTermination::Bool=true, 
                printInfo::Bool=true, 
-               maxSteps::Int=1000) where {NB, TelLB<:T<:TelUB}
+               maxSteps::Int=1000) where {NB}
     @assert length(nuc) == length(nucCoords)
     @assert NB >= ceil(N/2)
-    @assert N > (HFtype == :RHF) "$(HFtype) requires more than $(LBofN) electron to run."
+    @assert N > (HFtype==:RHF) "$(HFtype) requires more than $(HFtype==:RHF) electrons."
     HFtype == :UHF && (N = (N÷2, N-N÷2))
     Hcore = gtb.getHcore(nuc, nucCoords)
     X = getX(gtb.S)
@@ -507,17 +495,15 @@ end
 
     runHFcore(scfConfig::SCFconfig{L}, 
               N::Union{NTuple{2, Int}, Int}, 
-              Hcore::Array{T1, 2}, 
-              HeeI::Array{T2, 4}, 
-              S::Array{T3, 2}, 
-              X::Array{T4, 2}=getX(S), 
-              C::Union{Array{T, 2}, NTuple{2, Array{T, 2}}}=
+              Hcore::Array{Float64, 2}, 
+              HeeI::Array{Float64, 4}, 
+              S::Array{Float64, 2}, 
+              X::Array{Float64, 2}=getX(S), 
+              C::Union{Array{Float64, 2}, NTuple{2, Array{Float64, 2}}}=
               getCfromGWH(Val(length(N)==2), S, Hcore, X); 
               printInfo::Bool=false, 
               maxSteps::Int=1000, 
-              earlyTermination::Bool=true) where 
-             {$(TelLB)<:T1<:$(TelUB), $(TelLB)<:T2<:$(TelUB), $(TelLB)<:T3<:$(TelUB), 
-              $(TelLB)<:T4<:$(TelUB), $(TelLB)<:T5<:$(TelUB), L}
+              earlyTermination::Bool=true) where {L}
 
 The core function of `runHF`.
 
@@ -528,17 +514,17 @@ The core function of `runHF`.
 `N::Union{NTuple{2, Int}, Int}`: The total number of electrons or the numbers of electrons 
 with different spins respectively. When the latter is input, an UHF is performed.
 
-`Hcore::Array{T1, 2}`: Core Hamiltonian of electronic Hamiltonian.
+`Hcore::Array{Float64, 2}`: Core Hamiltonian of electronic Hamiltonian.
 
-`HeeI::Array{T2, 4}`: The electron-electron interaction Hamiltonian which includes both the 
+`HeeI::Array{Float64, 4}`: The electron-electron interaction Hamiltonian which includes both the 
 Coulomb interactions and the Exchange Correlations.
 
-`S::Array{T3, 2}`: Overlap matrix of the corresponding basis set.
+`S::Array{Float64, 2}`: Overlap matrix of the corresponding basis set.
 
-`X::Array{T4, 2}`: Orthogonal transformation matrix of S. Default value is S^(-0.5).
+`X::Array{Float64, 2}`: Orthogonal transformation matrix of S. Default value is S^(-0.5).
 
-`C::Union{Array{T, 2}, NTuple{2, Array{T, 2}}}`: Initial guess of the coefficient matrix(s) 
-C of the molecular orbitals.
+`C::Union{Array{Float64, 2}, NTuple{2, Array{Float64, 2}}}`: Initial guess of the 
+coefficient matrix(s) C of the molecular orbitals.
 
 === Keyword argument(s) ===
 
@@ -551,18 +537,15 @@ when its performance becomes unstable or poor.
 """
 function runHFcore(scfConfig::SCFconfig{L}, 
                    N::Union{NTuple{2, Int}, Int}, 
-                   Hcore::Matrix{T1}, 
-                   HeeI::Array{T2, 4}, 
-                   S::Matrix{T3}, 
-                   X::Matrix{T4}=getX(S), 
-                   C::Union{Matrix{T5}, NTuple{2, Matrix{T5}}}=
+                   Hcore::Matrix{Float64}, 
+                   HeeI::Array{Float64, 4}, 
+                   S::Matrix{Float64}, 
+                   X::Matrix{Float64}=getX(S), 
+                   C::Union{Matrix{Float64}, NTuple{2, Matrix{Float64}}}=
                    getCfromGWH(Val(length(N)==2), S, Hcore, X); 
                    printInfo::Bool=false, 
                    maxSteps::Int=1000, 
-                   earlyTermination::Bool=true) where 
-                  {TelLB<:T1<:TelUB, TelLB<:T2<:TelUB, TelLB<:T3<:TelUB, 
-                   TelLB<:T4<:TelUB, TelLB<:T5<:TelUB, L}
-    @assert maxSteps > 0
+                   earlyTermination::Bool=true) where {L}
     vars = initializeSCF(Hcore, HeeI, C, N)
     Etots = (vars isa Tuple) ? vars[1].shared.Etots : vars.shared.Etots
     HFtypeStr =  length(N) == 1 ? "RHF" : "UHF"
@@ -598,23 +581,20 @@ function runHFcore(scfConfig::SCFconfig{L},
 end
 
 
-function SDcore(Nˢ::Int, Hcore::Matrix{T1}, HeeI::Array{T2, 4}, X::Matrix{T3}, 
-                F::Matrix{T4}, D::Matrix{T5}; dampingStrength::Float64=0.0, _kws...) where 
-               {TelLB<:T1<:TelUB, TelLB<:T2<:TelUB, TelLB<:T3<:TelUB, TelLB<:T4<:TelUB, 
-                TelLB<:T5<:TelUB}
+function SDcore(Nˢ::Int, Hcore::Matrix{Float64}, HeeI::Array{Float64, 4}, 
+                X::Matrix{Float64}, F::Matrix{Float64}, D::Matrix{Float64}; 
+                dampingStrength::Float64=0.0, _kws...)
     @assert 0 <= dampingStrength <= 1 "The range of `dampingStrength`::Float64 is [0,1]."
     Dnew = getD(X, F, Nˢ)
     (1-dampingStrength)*Dnew + dampingStrength*D
 end
 
 
-function xDIIScore(::Val{M}, Nˢ::Int, Hcore::Matrix{T1}, HeeI::Array{T2, 4}, 
-                   S::Matrix{T3}, X::Matrix{T4}, Fs::Vector{Matrix{T5}}, 
-                   Ds::Vector{Matrix{T6}},Es::Vector{Float64}; 
+function xDIIScore(::Val{M}, Nˢ::Int, Hcore::Matrix{Float64}, HeeI::Array{Float64, 4}, 
+                   S::Matrix{Float64}, X::Matrix{Float64}, Fs::Vector{Matrix{Float64}}, 
+                   Ds::Vector{Matrix{Float64}},Es::Vector{Float64}; 
                    DIISsize::Int=15, solver::Symbol=:ADMM, 
-                   _kws...) where 
-                  {M, TelLB<:T1<:TelUB, TelLB<:T2<:TelUB, TelLB<:T3<:TelUB, 
-                      TelLB<:T4<:TelUB, TelLB<:T5<:TelUB, TelLB<:T6<:TelUB}
+                   _kws...) where {M}
     DIISmethod, convexConstraint, permuteData = getfield(DIISmethods, M)
     is = permuteData ? sortperm(Es) : (:)
     ∇s = (@view Fs[is])[1:end .> end-DIISsize]
@@ -631,8 +611,8 @@ const DIISmethods = ( DIIS = ((∇s, Ds,  _, S)->DIIScore(∇s, Ds, S),   false,
                      ADIIS = ((∇s, Ds,  _, _)->ADIIScore(∇s, Ds),     true, false))
 
 
-function EDIIScore(∇s::Vector{Matrix{T1}}, Ds::Vector{Matrix{T2}}, 
-                   Es::Vector{Float64}) where {TelLB<:T1<:TelUB, TelLB<:T2<:TelUB}
+function EDIIScore(∇s::Vector{Matrix{Float64}}, Ds::Vector{Matrix{Float64}}, 
+                   Es::Vector{Float64})
     len = length(Ds)
     B = ones(len, len)
     for i=1:len, j=1:len
@@ -642,8 +622,7 @@ function EDIIScore(∇s::Vector{Matrix{T1}}, Ds::Vector{Matrix{T2}},
 end
 
 
-function ADIIScore(∇s::Vector{Matrix{T1}}, Ds::Vector{Matrix{T2}}) where 
-                  {TelLB<:T1<:TelUB, TelLB<:T2<:TelUB}
+function ADIIScore(∇s::Vector{Matrix{Float64}}, Ds::Vector{Matrix{Float64}})
     len = length(Ds)
     B = ones(len, len)
     vec = [dot(D - Ds[end], ∇s[end]) for D in Ds]
@@ -654,8 +633,8 @@ function ADIIScore(∇s::Vector{Matrix{T1}}, Ds::Vector{Matrix{T2}}) where
 end
 
 
-function DIIScore(∇s::Vector{Matrix{T1}}, Ds::Vector{Matrix{T2}}, S::Matrix{T3}) where 
-                 {TelLB<:T1<:TelUB, TelLB<:T2<:TelUB, TelLB<:T3<:TelUB}
+function DIIScore(∇s::Vector{Matrix{Float64}}, Ds::Vector{Matrix{Float64}}, 
+                  S::Matrix{Float64})
     len = length(Ds)
     B = ones(len, len)
     vec = zeros(len)
@@ -679,28 +658,27 @@ const SCFmethodSelector =
 
 
 function HF!(::FunctionType{F}, N::Union{NTuple{2, Int}, Int}, 
-             Hcore::Matrix{T1}, HeeI::Array{T2, 4}, S::Matrix{T3}, X::Matrix{T4}, 
-             tVars::Union{HFtempVars{:RHF}, NTuple{2, HFtempVars{:UHF}}}; kws...) where 
-            {F, TelLB<:T1<:TelUB, TelLB<:T2<:TelUB, TelLB<:T3<:TelUB, TelLB<:T4<:TelUB}
+             Hcore::Matrix{Float64}, HeeI::Array{Float64, 4}, 
+             S::Matrix{Float64}, X::Matrix{Float64}, 
+             tVars::Union{HFtempVars{:RHF}, NTuple{2, HFtempVars{:UHF}}}; kws...) where {F}
     res = HFcore(Val(F), N, Hcore, HeeI, S, X, tVars; kws...)
     pushHFtempVars!(tVars, res)
 end
 
 # RHF
-function HFcore(::Val{M}, N::Int, 
-                Hcore::Matrix{T1}, HeeI::Array{T2, 4}, S::Matrix{T3}, X::Matrix{T4}, 
-                rVars::HFtempVars{:RHF}; kws...) where 
-               {M, TelLB<:T1<:TelUB, TelLB<:T2<:TelUB, TelLB<:T3<:TelUB, TelLB<:T4<:TelUB}
+@inline function HFcore(::Val{M}, N::Int, 
+                Hcore::Matrix{Float64}, HeeI::Array{Float64, 4}, 
+                S::Matrix{Float64}, X::Matrix{Float64}, 
+                rVars::HFtempVars{:RHF}; kws...) where {M}
     D = getfield(SCFmethodSelector, M)(N÷2, Hcore, HeeI, S, X, rVars; kws...)
     partRes = getCFDE(Hcore, HeeI, X, D)
     partRes..., 2D, 2partRes[end]
 end
 
-function pushHFtempVars!(rVars::HFtempVars, 
-                         res::Tuple{Matrix{T1}, Matrix{T2}, Matrix{T3}, Float64, 
-                                    Matrix{T4}, Float64}) where 
-                        {TelLB<:T1<:TelUB, TelLB<:T2<:TelUB, TelLB<:T3<:TelUB, 
-                         TelLB<:T4<:TelUB}
+@inline function pushHFtempVars!(rVars::HFtempVars, 
+                                 res::Tuple{Matrix{Float64}, Matrix{Float64}, 
+                                            Matrix{Float64}, Float64, 
+                                            Matrix{Float64}, Float64})
     push!(rVars.Cs, res[1])
     push!(rVars.Fs, res[2])
     push!(rVars.Ds, res[3])
@@ -710,10 +688,10 @@ function pushHFtempVars!(rVars::HFtempVars,
 end
 
 # UHF
-function HFcore(::Val{M}, Ns::NTuple{2, Int}, 
-                Hcore::Matrix{T1}, HeeI::Array{T2, 4}, S::Matrix{T3}, X::Matrix{T4}, 
-                uVars::NTuple{2, HFtempVars{:UHF}}; kws...) where 
-               {M, TelLB<:T1<:TelUB, TelLB<:T2<:TelUB, TelLB<:T3<:TelUB, TelLB<:T4<:TelUB}
+@inline function HFcore(::Val{M}, Ns::NTuple{2, Int}, 
+                        Hcore::Matrix{Float64}, HeeI::Array{Float64, 4}, 
+                        S::Matrix{Float64}, X::Matrix{Float64}, 
+                        uVars::NTuple{2, HFtempVars{:UHF}}; kws...) where {M}
     Ds = getfield(SCFmethodSelector, M).(Ns, Ref(Hcore), Ref(HeeI), 
                                                  Ref(S), Ref(X), uVars; kws...)
     Dᵀnew = Ds |> sum
@@ -722,18 +700,17 @@ function HFcore(::Val{M}, Ns::NTuple{2, Int},
     (partRes[1]..., Dᵀnew, Eᵀnew), (partRes[2]..., Dᵀnew, Eᵀnew)
 end
 
-function pushHFtempVars!(uVars::NTuple{2, HFtempVars{:UHF}}, 
-                         res::NTuple{2, Tuple{Matrix{T1}, Matrix{T2}, Matrix{T3}, Float64, 
-                              Matrix{T4}, Float64}}) where 
-                        {TelLB<:T1<:TelUB, TelLB<:T2<:TelUB, TelLB<:T3<:TelUB, 
-                         TelLB<:T4<:TelUB}
+@inline function pushHFtempVars!(uVars::NTuple{2, HFtempVars{:UHF}}, 
+                                 res::NTuple{2, Tuple{Matrix{Float64}, Matrix{Float64}, 
+                                                      Matrix{Float64}, Float64, 
+                                                      Matrix{Float64}, Float64}})
     pushHFtempVars!.(uVars, res)
     pop!(uVars[1].shared.Dtots)
     pop!(uVars[1].shared.Etots)
 end
 
 
-function popHFtempVars!(rVars::HFtempVars)
+@inline function popHFtempVars!(rVars::HFtempVars)
     pop!(rVars.Cs)
     pop!(rVars.Fs)
     pop!(rVars.Ds)
@@ -742,9 +719,8 @@ function popHFtempVars!(rVars::HFtempVars)
     pop!(rVars.shared.Etots)
 end
 
-function popHFtempVars!(uVars::NTuple{2, HFtempVars{:UHF}})
-    fields = [:Cs, :Fs, :Ds, :Es]
-    for field in fields pop!.(getfield.(uVars, field)) end
+@inline function popHFtempVars!(uVars::NTuple{2, HFtempVars{:UHF}})
+    for field in [:Cs, :Fs, :Ds, :Es] pop!.(getfield.(uVars, field)) end
     pop!(uVars[1].shared.Dtots)
     pop!(uVars[1].shared.Etots)
 end
@@ -800,7 +776,6 @@ end
 
 const ConstraintSolvers = (ADMM=ADMMSolver, LCM=CMSolver)
 
-constraintSolver(vec::Vector{T1}, B::Matrix{T2}, 
-                 solver::Symbol=:ADMM; convexConstraint::Bool=true) where 
-                {TelLB<:T1<:TelUB, TelLB<:T2<:TelUB} = 
+constraintSolver(vec::Vector{Float64}, B::Matrix{Float64}, solver::Symbol=:ADMM; 
+                 convexConstraint::Bool=true) = 
 getfield(ConstraintSolvers, solver)(vec, B; convexConstraint)

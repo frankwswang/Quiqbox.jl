@@ -150,23 +150,23 @@ struct Molecule{Nc, Ne, Nb} <:MolecularHartreeFockCoefficient{Nc, Ne}
 end
 
 function Molecule(basis::Vector{<:FloatingGTBasisFuncs}, nuc::Vector{String}, 
-                  nucCoords::Vector{<:AbstractArray}, fVars::HFfinalVars{:UHF, N}) where {N}
+                  nucCoords::Vector{<:AbstractArray}, fVars::HFfinalVars{:UHF})
     len = length(fVars.Emo[1])
     Emos = vcat(fVars.Emo[1], fVars.Emo[2])
     occus = vcat(fVars.occu[1], fVars.occu[2])
     C = hcat(fVars.C...)
     spins = vcat(fill("Alpha", len), fill("Beta", len))
-    Molecule(basis, nuc, nucCoords, N, fVars.E0HF, Emos, occus, C, spins, 
+    Molecule(basis, nuc, nucCoords, fVars.N, fVars.E0HF, Emos, occus, C, spins, 
              fill("A", length(spins)))
 end
 
 function Molecule(basis::Vector{<:FloatingGTBasisFuncs}, nuc::Vector{String}, 
-                  nucCoords::Vector{<:AbstractArray}, fVars::HFfinalVars{:RHF, N}) where {N}
+                  nucCoords::Vector{<:AbstractArray}, fVars::HFfinalVars{:RHF})
     Emos = fVars.Emo
     occus = fVars.occu
     C = fVars.C
     spins = fill("Alpha", length(fVars.Emo))
-    Molecule(basis, nuc, nucCoords, N, fVars.E0HF, Emos, occus, C, spins, 
+    Molecule(basis, nuc, nucCoords, fVars.N, fVars.E0HF, Emos, occus, C, spins, 
              fill("A", length(spins)))
 end
 

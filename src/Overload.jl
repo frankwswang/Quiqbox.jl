@@ -74,13 +74,13 @@ function show(io::IO, vars::HFtempVars)
     print(io, typeof(vars))
     print(io, "(shared.Etots=[", round(vars.shared.Etots[1], sigdigits=nSigShown),", … , ", 
                                  round(vars.shared.Etots[end], sigdigits=nSigShown), "], "*
-              "shared.Dtots, Cs, Es, Ds, Fs)")
+              "shared.Dtots, N, Cs, Fs, Ds, Es)")
 end
 
 function show(io::IO, vars::HFfinalVars)
     print(io, typeof(vars))
-    print(io, "(E0HF=", round(vars.E0HF, sigdigits=nSigShown), ", C, F, D, Emo, occu, temp"*
-              ", isConverged)")
+    print(io, "(E0HF=", round(vars.E0HF, sigdigits=nSigShown), ", N, C, F, D, Emo, occu, "*
+              "temp, isConverged)")
 end
 
 
