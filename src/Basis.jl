@@ -625,7 +625,7 @@ function sortBasisFuncs(bs::Array{<:FloatingGTBasisFuncs}; groupCenters::Bool=fa
     bfBlocks = Vector{<:FloatingGTBasisFuncs}[]
     sortedBasis = groupedSort(bs[:], centerCoordOf)
     for subbs in sortedBasis
-        ijkn = [(i.ijk[1].tuple, typeof(i).parameters[2]) for i in subbs]
+        ijkn = [(i.ijk[1].tuple, length(i.gauss)) for i in subbs]
 
         # Reversed order within same subshell but ordinary order among different subshells.
         sortVec = sortperm(map(ijkn) do x

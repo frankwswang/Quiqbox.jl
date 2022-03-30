@@ -356,7 +356,7 @@ end
 
 """
 
-    HFfinalVars{T, N, Nb} <: HartreeFockFinalValue{T}
+    HFfinalVars{HFtype, N} <: HartreeFockFinalValue{HFtype}
 
 The container of the final values after a Hartree-Fock SCF procedure.
 
@@ -379,45 +379,42 @@ orbitals.
 `occu::Union{Array{Int, 1}, NTuple{2, Array{Int, 1}}}`: occupation numbers of molecular 
 orbitals.
 
-`temp::Union{HFtempVars{T}, NTuple{2, HFtempVars{T}}}` the intermediate values.
+`temp::Union{HFtempVars{HFtype}, NTuple{2, HFtempVars{HFtype}}}` the intermediate values.
 
 `isConverged::Bool`: Whether the SCF procedure is converged in the end.
 """
-struct HFfinalVars{T, N, Nb} <: HartreeFockFinalValue{T}
+struct HFfinalVars{HFtype, N} <: HartreeFockFinalValue{HFtype}
     E0HF::Float64
     C::Union{Matrix{T1}, NTuple{2, Matrix{T1}}} where {TelLB<:T1<:TelUB}
     F::Union{Matrix{T2}, NTuple{2, Matrix{T2}}} where {TelLB<:T2<:TelUB}
     D::Union{Matrix{T3}, NTuple{2, Matrix{T3}}} where {TelLB<:T3<:TelUB}
     Emo::Union{Vector{Float64}, NTuple{2, Vector{Float64}}}
     occu::Union{Vector{Int}, NTuple{2, Vector{Int}}}
-    temp::Union{HFtempVars{T}, NTuple{2, HFtempVars{T}}}
+    temp::Union{HFtempVars{HFtype}, NTuple{2, HFtempVars{HFtype}}}
     isConverged::Bool
 
-    function HFfinalVars(X::Matrix{T}, vars::HFtempVars{:RHF}, isConverged::Bool) where 
-             {TelLB<:T<:TelUB}
+    function HFfinalVars(X::Matrix{T}, vars::HFtempVars{:RHF, N}, isConverged::Bool) where 
+                        {N, TelLB<:T<:TelUB}
         C = vars.Cs[end]
         F = vars.Fs[end]
         D = vars.Ds[end]
         E0HF = vars.shared.Etots[end]
         _, Emo = getC(X, F, outputEmo=true)
-        Nˢ = typeof(vars).parameters[2]
-        occu = vcat(2*ones(Int, Nˢ), zeros(Int, size(X, 1) - Nˢ))
-        temp = vars
-        new{:RHF, 2Nˢ, length(Emo)}(E0HF, C, F, D, Emo, occu, temp, isConverged)
+        occu = vcat(2*ones(Int, N), zeros(Int, size(X, 1) - N))
+        new{:RHF, 2N}(E0HF, C, F, D, Emo, occu, vars, isConverged)
     end
 
-    function HFfinalVars(X::Matrix{T}, (αVars, βVars)::NTuple{2, HFtempVars{:UHF}}, 
-                         isConverged::Bool) where {TelLB<:T<:TelUB}
+    function HFfinalVars(X::Matrix{T}, 
+                         (αVars, βVars)::Tuple{HFtempVars{:UHF, N1}, HFtempVars{:UHF, N2}}, 
+                         isConverged::Bool) where {N1, N2, TelLB<:T<:TelUB}
         C = (αVars.Cs[end], βVars.Cs[end])
         F = (αVars.Fs[end], βVars.Fs[end])
         D = (αVars.Ds[end], βVars.Ds[end])
         E0HF = αVars.shared.Etots[end]
         res = getC.(Ref(X), F, outputEmo=true)
         Emo = getindex.(res, 2)
-        Nˢs = (typeof(αVars).parameters[2], typeof(βVars).parameters[2]) 
-        occu = vcat.(ones.(Int, Nˢs), zeros.(Int, size(X, 1) .- Nˢs))
-        temp = (αVars, βVars)
-        new{:UHF, Nˢs |> sum, length(Emo[1])}(E0HF, C, F, D, Emo, occu, temp, isConverged)
+        occu = vcat.(ones.(Int, (N1, N2)), zeros.(Int, size(X, 1) .- (N1, N2)))
+        new{:UHF, N1+N2}(E0HF, C, F, D, Emo, occu, (αVars, βVars), isConverged)
     end
 end
 
@@ -477,7 +474,7 @@ function runHF(bs::Vector{<:AbstractGTBasisFuncs},
           earlyTermination, printInfo, maxSteps)
 end
 
-function runHF(gtb::BasisSetData, 
+function runHF(gtb::BasisSetData{NB}, 
                nuc::Vector{String}, 
                nucCoords::Vector{<:AbstractArray}, 
                N::Int=getCharge(nuc); 
@@ -486,9 +483,9 @@ function runHF(gtb::BasisSetData,
                scfConfig::SCFconfig=defaultSCFconfig, 
                earlyTermination::Bool=true, 
                printInfo::Bool=true, 
-               maxSteps::Int=1000) where {TelLB<:T<:TelUB}
+               maxSteps::Int=1000) where {NB, TelLB<:T<:TelUB}
     @assert length(nuc) == length(nucCoords)
-    @assert typeof(gtb).parameters[1] >= ceil(sum(N)/2)
+    @assert NB >= ceil(N/2)
     @assert N > (HFtype == :RHF) "$(HFtype) requires more than $(LBofN) electron to run."
     HFtype == :UHF && (N = (N÷2, N-N÷2))
     Hcore = gtb.getHcore(nuc, nucCoords)

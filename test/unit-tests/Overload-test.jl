@@ -55,8 +55,8 @@ using Suppressor: @capture_out
     @test info1[73:end] == "], shared.Dtots, Cs, Es, Ds, Fs)"
 
     info2 = (@capture_out show(fVar1))
-    @test info2[1:37] == string(typeof(fVar1))*"(E0HF="
-    @test info2[49:end] == ", C, F, D, Emo, occu, temp, isConverged)"
+    @test info2[1:34] == string(typeof(fVar1))*"(E0HF="
+    @test info2[46:end] == ", C, F, D, Emo, occu, temp, isConverged)"
 
 
     # function ==, hasBoolRelation

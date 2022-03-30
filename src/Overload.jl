@@ -37,10 +37,9 @@ function show(io::IO, bf::BasisFunc)
                     round(bf.center[3](), sigdigits=nSigShown), "]")
 end
 
-function show(io::IO, bf::BasisFuncs{𝑙}) where {𝑙}
-    OON = typeof(bf).parameters[3]
+function show(io::IO, bf::BasisFuncs{𝑙, <:Any, ON}) where {𝑙, ON}
     SON = SubshellXYZsizes[𝑙+1]
-    if OON == 1
+    if ON == 1
         xyz1 = bf.ijk[1] |> ijkToStr
         xyz2 = ""
     else
