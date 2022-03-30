@@ -866,6 +866,8 @@ struct FunctionType{F}
     FunctionType(f::F) where {F<:Function} = new{F}(f)
 end
 
+FunctionType(s::Symbol) = FunctionType{s}()
+
 getFunc(ft::FunctionType{F}) where {F} = ft.f
 
 function getFuncNum(f::Function, vNum::Symbolics.Num)::Symbolics.Num

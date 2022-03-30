@@ -10,9 +10,10 @@ const TelUB = Float64 # Any to loose constraint
 
 getXcore1(S::Matrix{T}) where {TelLB<:T<:TelUB} = S^(-0.5) |> Array
 
-const getXmethods = Dict{Int, Function}(1=>getXcore1)
+const getXmethods = (m1=getXcore1,)
 
-getX(S::Matrix{T}; method::Int=1) where {TelLB<:T<:TelUB} = getXmethods[method](S)
+getX(S::Matrix{T}, method::Symbol=:m1) where {TelLB<:T<:TelUB} = 
+getfield(getXmethods, method)(S)
 
 
 function getC(X::Matrix{T1}, F::Matrix{T2}; 
@@ -61,7 +62,7 @@ function getCfromSAD(S::Matrix{T1}, Hcore::Matrix{T2}, HeeI::Array{T3, 4},
                      bs::Vector{<:AbstractGTBasisFuncs}, 
                      nuc::Vector{String}, nucCoords::Vector{<:AbstractArray}; 
                      X=getX(S), forUHF::Bool=false, 
-                     scfConfig=SCFconfig([:ADIIS], [1e-10])) where 
+                     scfConfig=SCFconfig((:ADIIS,), (1e-10,))) where 
                     {TelLB<:T1<:TelUB, TelLB<:T2<:TelUB, TelLB<:T3<:TelUB}
     D₁ = zero(Hcore)
     D₂ = zero(Hcore)
@@ -95,17 +96,17 @@ end
 
 
 const guessCmethods = 
-    Dict(  :GWH => (forUHF, S, X, Hcore, _...) -> getCfromGWH(S, Hcore; X, forUHF),
-         :Hcore => (forUHF, S, X, Hcore, _...) -> getCfromHcore(X, Hcore; forUHF), 
-           :SAD => (forUHF, S, X, Hcore, HeeI, bs, nuc, nucCoords) -> 
-                   getCfromSAD(S, Hcore, HeeI, bs, nuc, nucCoords; X, forUHF))
+    (  GWH = (forUHF, S, X, Hcore, _...)->getCfromGWH(S, Hcore; X, forUHF),
+     Hcore = (forUHF, S, X, Hcore, _...)->getCfromHcore(X, Hcore; forUHF), 
+       SAD = (forUHF, S, X, Hcore, HeeI, bs, nuc, nucCoords)->
+             getCfromSAD(S, Hcore, HeeI, bs, nuc, nucCoords; X, forUHF))
 
 
-guessC(method::Symbol, forUHF::Bool, S::Matrix{T1}, X::Matrix{T1}, Hcore::Matrix{T2}, 
+guessC(::Val{M}, forUHF::Bool, S::Matrix{T1}, X::Matrix{T1}, Hcore::Matrix{T2}, 
        HeeI::Array{T3, 4}, bs::Vector{<:AbstractGTBasisFuncs}, 
        nuc::Vector{String}, nucCoords::Vector{<:AbstractArray}) where 
-      {TelLB<:T1<:TelUB, TelLB<:T2<:TelUB, TelLB<:T3<:TelUB} = 
-guessCmethods[method](forUHF, S, X, Hcore, HeeI, bs, nuc, nucCoords)
+      {M, TelLB<:T1<:TelUB, TelLB<:T2<:TelUB, TelLB<:T3<:TelUB} = 
+getfield(guessCmethods, M)(forUHF, S, X, Hcore, HeeI, bs, nuc, nucCoords)
 
 
 getD(C::Matrix{T}, Nˢ::Int) where {TelLB<:T<:TelUB} = 
@@ -244,7 +245,7 @@ The `struct` for SCF iteration configurations.
 
 ≡≡≡ Field(s) ≡≡≡
 
-`methods::NTuple{N, Symbol}`: The applied methods. The available methods are their 
+`methods::NTuple{N, Symbol}`: The applied methods. The available methods and their 
 configurations (in terms of keyword arguments):
 
 | Methods | Configuration(s) | keyword argument(s) | Default value(s) |
@@ -261,9 +262,9 @@ $(Quiqbox.Doc_SCFconfig_OneRowTable)
 
 ≡≡≡ Initialization Method(s) ≡≡≡
 
-    SCFconfig(methods::Vector{Symbol}, intervals::Vector{Float64}, 
+    SCFconfig(methods::NTuple{N, Symbol}, intervals::NTuple{N, Float64}, 
               configs::Dict{Int, <:Vector{<:Pair}}=Dict(1=>Pair[]);
-              oscillateThreshold::Float64=1e-5) -> 
+              oscillateThreshold::Float64=1e-5) where {N} -> 
     SCFconfig{N}
 
 `methods` and `intervals` are the methods to be applied and their stopping (skipping) 
@@ -274,32 +275,29 @@ arguments and their values respectively.
 
 ≡≡≡ Example(s) ≡≡≡
 
-julia> SCFconfig([:SD, :ADIIS, :DIIS], [1e-4, 1e-12, 1e-13], 
-                 Dict(2=>[:solver=>:LCM])
+julia> SCFconfig((:SD, :ADIIS, :DIIS), (1e-4, 1e-12, 1e-13), Dict(2=>[:solver=>:LCM])
 SCFconfig{3}((:SD, :ADIIS, :DIIS), (0.0001, 1.0e-12, 1.0e-13), ((), (:solver => :LCM,), 
 ()), 1.0e-5)
 """
 struct SCFconfig{N} <: ImmutableParameter{SCFconfig, Any}
-    methods::NTuple{N, Symbol}
+    methods::NTuple{N, FunctionType}
     intervals::NTuple{N, Float64}
-    methodConfigs::NTuple{N, Tuple{Vararg{Pair}}}
+    methodConfigs::NTuple{N, Vector{<:Pair}}
     oscillateThreshold::Float64
 
-    function SCFconfig(methods::Vector{Symbol}, intervals::Vector{Float64}, 
+    function SCFconfig(methods::NTuple{N, Symbol}, intervals::NTuple{N, Float64}, 
                        configs::Dict{Int, <:Vector{<:Pair}}=Dict(1=>Pair[]);
-                       oscillateThreshold::Float64=1e-5)
-        l = length(methods)
-        kwPairs = [Pair[] for _=1:l]
+                       oscillateThreshold::Float64=1e-5) where {N}
+        kwPairs = [Pair[] for _=1:N]
         for i in keys(configs)
             kwPairs[i] = configs[i]
         end
-        new{length(methods)}(Tuple(methods), Tuple(intervals), Tuple(kwPairs .|> Tuple), 
-                             oscillateThreshold)
+        new{N}(FunctionType.(methods), intervals, Tuple(kwPairs), oscillateThreshold)
     end
 end
 
 
-const defaultSCFconfig = SCFconfig([:ADIIS, :DIIS, :ADIIS], [1e-4, 1e-6, 1e-15])
+const defaultSCFconfig = SCFconfig((:ADIIS, :DIIS, :ADIIS), (1e-4, 1e-6, 1e-15))
 
 
 mutable struct HFinterrelatedVars <: HartreeFockintermediateData
@@ -495,8 +493,10 @@ function runHF(gtb::BasisSetData,
     HFtype == :UHF && (N = (N÷2, N-N÷2))
     Hcore = gtb.getHcore(nuc, nucCoords)
     X = getX(gtb.S)
-    initialC isa Symbol && (initialC = guessC(initialC, (HFtype == :UHF), gtb.S, X, Hcore, 
-                                              gtb.eeI, gtb.basis, nuc, nucCoords))
+    if initialC isa Symbol
+        initialC = guessC(Val(initialC), (HFtype==:UHF), 
+                          gtb.S, X, Hcore, gtb.eeI, gtb.basis, nuc, nucCoords)
+    end
     runHFcore(scfConfig, N, Hcore, gtb.eeI, gtb.S, X, initialC; 
               printInfo, maxSteps, earlyTermination)
 end
@@ -579,7 +579,7 @@ function runHFcore(scfConfig::SCFconfig{L},
             HF!(method, N, Hcore, HeeI, S, X, vars; kws...)
             printInfo && (iStep % floor(log(4, iStep) + 1) == 0 || iStep == maxSteps) && 
             println(rpad("Step $(iStep)", 10), 
-                    rpad("#$(i) ($(method))", 12), 
+                    rpad("#$(i) ($(method.f))", 12), 
                     "E = $(Etots[end])")
             abs(Etots[end]-Etots[end-1]) > breakPoint || (isConverged = true) && break
             flag, Std = isOscillateConverged(Etots, 
@@ -609,14 +609,14 @@ function SDcore(Nˢ::Int, Hcore::Matrix{T1}, HeeI::Array{T2, 4}, X::Matrix{T3},
 end
 
 
-function xDIIScore(method::Symbol, Nˢ::Int, Hcore::Matrix{T1}, HeeI::Array{T2, 4}, 
+function xDIIScore(::Val{M}, Nˢ::Int, Hcore::Matrix{T1}, HeeI::Array{T2, 4}, 
                    S::Matrix{T3}, X::Matrix{T4}, Fs::Vector{Matrix{T5}}, 
                    Ds::Vector{Matrix{T6}},Es::Vector{Float64}; 
                    DIISsize::Int=15, solver::Symbol=:ADMM, 
                    _kws...) where 
-                  {TelLB<:T1<:TelUB, TelLB<:T2<:TelUB, TelLB<:T3<:TelUB, TelLB<:T4<:TelUB, 
-                   TelLB<:T5<:TelUB, TelLB<:T6<:TelUB}
-    DIISmethod, convexConstraint, permuteData = DIISmethods[method]
+                  {M, TelLB<:T1<:TelUB, TelLB<:T2<:TelUB, TelLB<:T3<:TelUB, 
+                      TelLB<:T4<:TelUB, TelLB<:T5<:TelUB, TelLB<:T6<:TelUB}
+    DIISmethod, convexConstraint, permuteData = getfield(DIISmethods, M)
     is = permuteData ? sortperm(Es) : (:)
     ∇s = (@view Fs[is])[1:end .> end-DIISsize]
     Ds = (@view Ds[is])[1:end .> end-DIISsize]
@@ -627,9 +627,9 @@ function xDIIScore(method::Symbol, Nˢ::Int, Hcore::Matrix{T1}, HeeI::Array{T2, 
     getD(X, grad |> Hermitian |> Array, Nˢ) # grad == F.
 end
 
-const DIISmethods = Dict( :DIIS => ((∇s, Ds,  _, S)->DIIScore(∇s, Ds, S),   false, true),
-                         :EDIIS => ((∇s, Ds, Es, _)->EDIIScore(∇s, Ds, Es), true, false),
-                         :ADIIS => ((∇s, Ds,  _, _)->ADIIScore(∇s, Ds),     true, false))
+const DIISmethods = ( DIIS = ((∇s, Ds,  _, S)->DIIScore(∇s, Ds, S),   false, true),
+                     EDIIS = ((∇s, Ds, Es, _)->EDIIScore(∇s, Ds, Es), true, false),
+                     ADIIS = ((∇s, Ds,  _, _)->ADIIScore(∇s, Ds),     true, false))
 
 
 function EDIIScore(∇s::Vector{Matrix{T1}}, Ds::Vector{Matrix{T2}}, 
@@ -667,39 +667,32 @@ function DIIScore(∇s::Vector{Matrix{T1}}, Ds::Vector{Matrix{T2}}, S::Matrix{T3
 end
 
 
-const SD = ((Nˢ::Int, Hcore::Matrix{T1}, HeeI::Array{T2, 4}, _dm::Any, X::Matrix{T3}, 
-             tVars::HFtempVars; kws...) where 
-            {TelLB<:T1<:TelUB, TelLB<:T2<:TelUB, TelLB<:T3<:TelUB}) -> 
-      SDcore(Nˢ, Hcore, HeeI, X, tVars.Fs[end], tVars.Ds[end]; kws...)
+@inline SD(Nˢ, Hcore, HeeI, _dm::Any, X, tVars; kws...) = 
+        SDcore(Nˢ, Hcore, HeeI, X, tVars.Fs[end], tVars.Ds[end]; kws...)
 
-const xDIIS = (method::Symbol) -> 
-              ((Nˢ::Int, Hcore::Matrix{T1}, HeeI::Array{T2, 4}, S::Matrix{T3}, 
-                X::Matrix{T4}, tVars::HFtempVars; kws...) where 
-               {TelLB<:T1<:TelUB, TelLB<:T2<:TelUB, 
-                TelLB<:T3<:TelUB, TelLB<:T4<:TelUB}) ->
-              xDIIScore(method, Nˢ, Hcore, HeeI, S, X, tVars.Fs, tVars.Ds, tVars.Es; kws...)
+@inline function xDIIS(::Val{M}) where {M}
+    @inline (Nˢ, Hcore, HeeI, S, X, tVars; kws...) ->
+            xDIIScore(Val(M), Nˢ, Hcore, HeeI, S, X, tVars.Fs, tVars.Ds, tVars.Es; kws...)
+end
 
-
-const SCFmethods = [:SD, :DIIS, :ADIIS, :EDIIS]
-
-const SCFmethodSelector = Dict(SCFmethods .=> 
-                               [SD, xDIIS(:DIIS), xDIIS(:ADIIS), xDIIS(:EDIIS)])
+const SCFmethodSelector = 
+      (SD=SD, DIIS=xDIIS(Val(:DIIS)), ADIIS=xDIIS(Val(:ADIIS)), EDIIS=xDIIS(Val(:EDIIS)))
 
 
-function HF!(SCFmethod::Symbol, N::Union{NTuple{2, Int}, Int}, 
+function HF!(::FunctionType{F}, N::Union{NTuple{2, Int}, Int}, 
              Hcore::Matrix{T1}, HeeI::Array{T2, 4}, S::Matrix{T3}, X::Matrix{T4}, 
              tVars::Union{HFtempVars{:RHF}, NTuple{2, HFtempVars{:UHF}}}; kws...) where 
-            {TelLB<:T1<:TelUB, TelLB<:T2<:TelUB, TelLB<:T3<:TelUB, TelLB<:T4<:TelUB}
-    res = HFcore(SCFmethod, N, Hcore, HeeI, S, X, tVars; kws...)
+            {F, TelLB<:T1<:TelUB, TelLB<:T2<:TelUB, TelLB<:T3<:TelUB, TelLB<:T4<:TelUB}
+    res = HFcore(Val(F), N, Hcore, HeeI, S, X, tVars; kws...)
     pushHFtempVars!(tVars, res)
 end
 
 # RHF
-function HFcore(SCFmethod::Symbol, N::Int, 
+function HFcore(::Val{M}, N::Int, 
                 Hcore::Matrix{T1}, HeeI::Array{T2, 4}, S::Matrix{T3}, X::Matrix{T4}, 
                 rVars::HFtempVars{:RHF}; kws...) where 
-               {TelLB<:T1<:TelUB, TelLB<:T2<:TelUB, TelLB<:T3<:TelUB, TelLB<:T4<:TelUB}
-    D = SCFmethodSelector[SCFmethod](N÷2, Hcore, HeeI, S, X, rVars; kws...)
+               {M, TelLB<:T1<:TelUB, TelLB<:T2<:TelUB, TelLB<:T3<:TelUB, TelLB<:T4<:TelUB}
+    D = getfield(SCFmethodSelector, M)(N÷2, Hcore, HeeI, S, X, rVars; kws...)
     partRes = getCFDE(Hcore, HeeI, X, D)
     partRes..., 2D, 2partRes[end]
 end
@@ -718,12 +711,12 @@ function pushHFtempVars!(rVars::HFtempVars,
 end
 
 # UHF
-function HFcore(SCFmethod::Symbol, Ns::NTuple{2, Int}, 
+function HFcore(::Val{M}, Ns::NTuple{2, Int}, 
                 Hcore::Matrix{T1}, HeeI::Array{T2, 4}, S::Matrix{T3}, X::Matrix{T4}, 
                 uVars::NTuple{2, HFtempVars{:UHF}}; kws...) where 
-               {TelLB<:T1<:TelUB, TelLB<:T2<:TelUB, TelLB<:T3<:TelUB, TelLB<:T4<:TelUB}
-    Ds = SCFmethodSelector[SCFmethod].(Ns, Ref(Hcore), Ref(HeeI), 
-                                Ref(S), Ref(X), uVars; kws...)
+               {M, TelLB<:T1<:TelUB, TelLB<:T2<:TelUB, TelLB<:T3<:TelUB, TelLB<:T4<:TelUB}
+    Ds = getfield(SCFmethodSelector, M).(Ns, Ref(Hcore), Ref(HeeI), 
+                                                 Ref(S), Ref(X), uVars; kws...)
     Dᵀnew = Ds |> sum
     partRes = getCFDE.(Ref(Hcore), Ref(HeeI), Ref(X), Ds, Ref(Dᵀnew))
     Eᵀnew = partRes[1][end] + partRes[2][end]
@@ -806,9 +799,9 @@ function CMSolver(vec::Vector, B::Matrix; convexConstraint=true, ϵ::Float64=1e-
 end
 
 
-const ConstraintSolvers = Dict(:ADMM=>ADMMSolver, :LCM=>CMSolver)
+const ConstraintSolvers = (ADMM=ADMMSolver, LCM=CMSolver)
 
 constraintSolver(vec::Vector{T1}, B::Matrix{T2}, 
                  solver::Symbol=:ADMM; convexConstraint::Bool=true) where 
                 {TelLB<:T1<:TelUB, TelLB<:T2<:TelUB} = 
-ConstraintSolvers[solver](vec, B; convexConstraint)
+getfield(ConstraintSolvers, solver)(vec, B; convexConstraint)

@@ -14,29 +14,21 @@ using Suppressor: @suppress_out
     Hcore = coreH(bs, nuc, nucCoords)
     HeeI = eeInteractions(bs)
     Ne = getCharge(nuc)
+    scfMethods = (:ADIIS, :DIIS, :EDIIS, :SD)
+    thresholds = (1e-4, 1e-8, 1e-10, 1e-12)
+    solvers = Dict(1=>[:solver=>:LCM], 2=>[:solver=>:LCM], 
+                   3=>[:solver=>:LCM], 4=>[:solver=>:LCM])
 
     local res1, res2, res1_2, res2_2
     @suppress_out begin
-        res1 = runHF(bs, nuc, nucCoords; HFtype=:RHF, initialC=:Hcore,
-                    scfConfig=SCFconfig([:ADIIS, :DIIS, :EDIIS, :SD], 
-                                        [1e-4, 1e-8, 1e-10, 1e-12]))
-        res1_2 = runHF(bs, nuc, nucCoords; HFtype=:RHF, 
-                       scfConfig=SCFconfig([:ADIIS, :DIIS, :EDIIS, :SD], 
-                                        [1e-4, 1e-8, 1e-10, 1e-12]))
-        res2 = runHF(bs, nuc, nucCoords; HFtype=:UHF, initialC=:GWH, 
-                    scfConfig=SCFconfig([:ADIIS, :DIIS, :EDIIS, :SD], 
-                                        [1e-4, 1e-8, 1e-10, 1e-12],
-                                        Dict(1=>[:solver=>:LCM],
-                                             2=>[:solver=>:LCM],
-                                             3=>[:solver=>:LCM],
-                                             4=>[:solver=>:LCM])))
-        res2_2 = runHF(bs, nuc, nucCoords; HFtype=:UHF, 
-                    scfConfig=SCFconfig([:ADIIS, :DIIS, :EDIIS, :SD], 
-                                        [1e-4, 1e-8, 1e-10, 1e-12],
-                                        Dict(1=>[:solver=>:LCM],
-                                             2=>[:solver=>:LCM],
-                                             3=>[:solver=>:LCM],
-                                             4=>[:solver=>:LCM])))
+        res1   = runHF(bs, nuc, nucCoords, HFtype=:RHF, initialC=:Hcore, 
+                       scfConfig=SCFconfig(scfMethods, thresholds))
+        res1_2 = runHF(bs, nuc, nucCoords, HFtype=:RHF, 
+                       scfConfig=SCFconfig(scfMethods, thresholds))
+        res2   = runHF(bs, nuc, nucCoords, HFtype=:UHF, initialC=:GWH, 
+                       scfConfig=SCFconfig(scfMethods, thresholds, solvers))
+        res2_2 = runHF(bs, nuc, nucCoords, HFtype=:UHF, 
+                       scfConfig=SCFconfig(scfMethods, thresholds, solvers))
     end
 
     @test isapprox(res2.E0HF, res2_2.E0HF, atol=1e-5)
