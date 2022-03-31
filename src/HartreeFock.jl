@@ -18,7 +18,7 @@ getCcore(X, F, outputEmo, outputCx, stabilizeSign)
 
 function getCcore(X::Matrix{Float64}, F::Matrix{Float64}, outputEmo::Bool=false, 
                   outputCx::Bool=false, stabilizeSign::Bool=true)
-    ϵ, Cₓ = eigen(X'*F*X |> Hermitian, sortby=x->x)
+    ϵ, Cₓ = eigen(X'*F*X |> Hermitian)
     outC = outputCx ? Cₓ : X*Cₓ
     # Stabilize the sign factor of each column.
     stabilizeSign && for j = 1:size(outC, 2)
@@ -41,7 +41,7 @@ function getCfromGWH(::Val{ForUHF},
                      S::Matrix{Float64}, Hcore::Matrix{Float64}, X=getX(S)) where {ForUHF}
     l = size(Hcore)[1]
     H = zero(Hcore)
-    for i in 1:l, j in 1:l
+    for j in 1:l, i in 1:l
         H[i,j] = 1.75 * S[i,j] * (Hcore[i,i] + Hcore[j,j]) * 0.5
     end
     C = getCcore(X, H)
@@ -115,7 +115,7 @@ getD(C::Matrix{Float64}, Nˢ::Int) = @views (C[:,1:Nˢ]*C[:,1:Nˢ]') |> Hermitia
 function getGcore(HeeI::Array{Float64, 4}, DJ::Matrix{Float64}, DK::Matrix{Float64})
     G = zero(DJ)
     l = size(G)[1]
-    for μ = 1:l, ν = 1:l # fastest
+    for ν = 1:l, μ = 1:l # fastest
         G[μ, ν] = dot(transpose(DJ), @view HeeI[μ,ν,:,:]) - dot(DK, @view HeeI[μ,:,:,ν]) 
     end
     G |> Hermitian |> Array
@@ -615,7 +615,7 @@ function EDIIScore(∇s::Vector{Matrix{Float64}}, Ds::Vector{Matrix{Float64}},
                    Es::Vector{Float64})
     len = length(Ds)
     B = ones(len, len)
-    for i=1:len, j=1:len
+    for j=1:len, i=1:len
         B[i,j] = -dot(Ds[i]-Ds[j], ∇s[i]-∇s[j])
     end
     Es, B
@@ -626,7 +626,7 @@ function ADIIScore(∇s::Vector{Matrix{Float64}}, Ds::Vector{Matrix{Float64}})
     len = length(Ds)
     B = ones(len, len)
     vec = [dot(D - Ds[end], ∇s[end]) for D in Ds]
-    for i=1:len, j=1:len
+    for j=1:len, i=1:len
         B[i,j] = dot(Ds[i]-Ds[len], ∇s[j]-∇s[len])
     end
     vec, B
@@ -638,7 +638,7 @@ function DIIScore(∇s::Vector{Matrix{Float64}}, Ds::Vector{Matrix{Float64}},
     len = length(Ds)
     B = ones(len, len)
     vec = zeros(len)
-    for i=1:len, j=1:len
+    for j=1:len, i=1:len
         B[i,j] = dot(∇s[i]*Ds[i]*S - Ds[i]*S*∇s[i], ∇s[j]*Ds[j]*S - Ds[j]*S*∇s[j])
     end
     vec, B

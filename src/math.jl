@@ -789,12 +789,12 @@ permuteArray(arr::Number, _) = itself(arr)
 
 
 function getTwoBodyInts(::FunctionType{F}, 
-                                basisSet::AbstractArray{<:AbstractGTBasisFuncs}) where {F}
+                        basisSet::AbstractArray{<:AbstractGTBasisFuncs}) where {F}
     subSize = basisSize.(basisSet)
     accuSize = vcat(0, accumulate(+, subSize))
     totalSize = subSize |> sum
     buf = Array{Float64}(undef, totalSize, totalSize, totalSize, totalSize)
-    for i = 1:length(basisSet), j = 1:i, k = 1:i, l = 1:(k==i ? j : k)
+    for l = 1:length(basisSet), k = 1:l, j = 1:l, i = 1:(j==l ? k : j)
         I = accuSize[i]+1 : accuSize[i+1]
         J = accuSize[j]+1 : accuSize[j+1]
         K = accuSize[k]+1 : accuSize[k+1]

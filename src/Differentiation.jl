@@ -376,7 +376,7 @@ function twoBodyDerivativeCore(::Val{false}, ∂bfs::Vector{<:CompositeGTBasisFu
         ʃabcd[l,k,i,j] = ʃabcd[k,l,i,j] = ʃabcd[k,l,j,i] = ʃabcd[l,k,j,i] = 
         ʃ(bfs[i],  bfs[j],  bfs[k],  bfs[l])
     end
-    for i = 1:bsSize, j=1:bsSize, k=1:bsSize, l=1:k
+    for l = 1:bsSize, k=1:l, j=1:bsSize, i=1:bsSize
         ʃ∂abcd[i,j,k,l] = ʃ∂abcd[i,j,l,k] = ʃ(∂bfs[i], bfs[j],  bfs[k],  bfs[l])
     end
     # [∂ʃ4[i,j,k,l] == ∂ʃ4[j,i,l,k] == ∂ʃ4[j,i,k,l] != ∂ʃ4[l,j,k,i]
