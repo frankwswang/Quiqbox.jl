@@ -66,11 +66,11 @@ and `canDiff` work the same way as in a general constructor of a `ParamBox`. If
 `roundDigits < 0`, there won't be rounding for input data.
 """
 genExponent(e::Real, mapFunction::F; canDiff::Bool=true, 
-               roundDigits::Int=15, dataName::Symbol=:undef) where {F<:Function} = 
+            roundDigits::Int=15, dataName::Symbol=:undef) where {F<:Function} = 
 ParamBox{αParamSym}(mapFunction, e, genIndex(nothing), fill(canDiff), dataName; roundDigits)
 
 genExponent(e::Array{T, 0}, mapFunction::F; canDiff::Bool=true, 
-               dataName::Symbol=:undef) where {T<:Real, F<:Function} = 
+            dataName::Symbol=:undef) where {T<:Real, F<:Function} = 
 ParamBox{αParamSym}(mapFunction, e, genIndex(nothing), fill(canDiff), dataName)
 
 

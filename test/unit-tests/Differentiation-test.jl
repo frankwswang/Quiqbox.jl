@@ -55,7 +55,7 @@ t2 = 1e-10
 @test isapprox(grad1[1], grad1[2], atol=t1)
 @test isapprox.(grad1, grad1_t, atol=t2) |> all
 
-HFres1_2 = runHF(bs1, nuc, nucCoords, HFtype=:UHF, printInfo=false)
+HFres1_2 = runHF(bs1, nuc, nucCoords, :UHF, printInfo=false)
 grad1_2 = gradHFenergy(bs1, pars1, HFres1.C, overlaps(bs1), nuc, nucCoords)
 @test isapprox(grad1_2[1], grad1_2[2], atol=t1)
 @test isapprox.(grad1_2, grad1_t, atol=t2) |> all

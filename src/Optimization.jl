@@ -145,7 +145,7 @@ function optimizeParams!(bs::Vector{<:FloatingGTBasisFuncs}, pbs::Vector{<:Param
         detectConverge = isnan(threshold) ? false : true
 
         if Etarget === NaN
-            isConverged = (Es) -> isOscillateConverged(Es, threshold, leastCycles=3)
+            isConverged = (Es) -> isOscillateConverged(Es, threshold, leastCycles=3)[1]
         else
             isConverged = Es -> (abs(Es[end] - Etarget) < threshold)
         end

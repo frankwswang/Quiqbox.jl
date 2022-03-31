@@ -662,7 +662,7 @@ recursivelyGet(dict, startKey, NaN)
 
 function isOscillateConverged(sequence::Vector{<:Real}, 
                               threshold1::Real, threshold2::Real=threshold1; 
-                              leastCycles::Int=1, nPartition::Int=5, returnStd::Bool=false, 
+                              leastCycles::Int=1, nPartition::Int=5, 
                               convergeToMax::Bool=false)
     @assert leastCycles>0 && nPartition>1
     len = length(sequence)
@@ -672,7 +672,7 @@ function isOscillateConverged(sequence::Vector{<:Real},
     remain = sort(lastPortion)[convergeToMax ? (end÷2+1 : end) : (1 : end÷2+1)]
     b = std(remain) < threshold1 && 
         abs(sequence[end] - (convergeToMax ? max(remain...) : min(remain...))) < threshold2
-    returnStd ? (b, std(lastPortion)) : b
+    b, std(lastPortion)
 end
 
 

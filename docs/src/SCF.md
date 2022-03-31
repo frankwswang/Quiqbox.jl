@@ -23,7 +23,7 @@ nucCoords = [[-0.7, 0.0, 0.0], [0.7, 0.0, 0.0]];
 
 bs = genBasisFunc.(nucCoords, ("STO-3G", "H") |> Ref) |> flatten
 
-resRHF = runHF(bs, nuc, nucCoords, HFtype=:RHF)
+resRHF = runHF(bs, nuc, nucCoords, :RHF)
 
 @show resRHF.E0HF resRHF.C resRHF.Emo resRHF.occu
 ```

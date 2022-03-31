@@ -21,13 +21,13 @@ using Suppressor: @suppress_out
 
     local res1, res2, res1_2, res2_2
     @suppress_out begin
-        res1   = runHF(bs, nuc, nucCoords, HFtype=:RHF, initialC=:Hcore, 
+        res1   = runHF(bs, nuc, nucCoords, :RHF, initialC=:Hcore, 
                        scfConfig=SCFconfig(scfMethods, thresholds))
-        res1_2 = runHF(bs, nuc, nucCoords, HFtype=:RHF, 
+        res1_2 = runHF(bs, nuc, nucCoords, :RHF, 
                        scfConfig=SCFconfig(scfMethods, thresholds))
-        res2   = runHF(bs, nuc, nucCoords, HFtype=:UHF, initialC=:GWH, 
+        res2   = runHF(bs, nuc, nucCoords, :UHF, initialC=:GWH, 
                        scfConfig=SCFconfig(scfMethods, thresholds, solvers))
-        res2_2 = runHF(bs, nuc, nucCoords, HFtype=:UHF, 
+        res2_2 = runHF(bs, nuc, nucCoords, :UHF, 
                        scfConfig=SCFconfig(scfMethods, thresholds, solvers))
     end
 
@@ -178,7 +178,7 @@ using Suppressor: @suppress_out
         bs = genBasisFunc.(nucCoords2, "3-21G") |> flatten
 
         push!(Erhf, runHF(bs, nuc2, nucCoords2, printInfo=false).E0HF)
-        push!(Euhf, runHF(bs, nuc2, nucCoords2, printInfo=false, HFtype=:UHF).E0HF)
+        push!(Euhf, runHF(bs, nuc2, nucCoords2, :UHF, printInfo=false).E0HF)
         push!(Enuc, nnRepulsions(nuc2, nucCoords2))
     end
 
