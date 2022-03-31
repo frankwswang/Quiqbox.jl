@@ -560,13 +560,13 @@ Return the subshell name of the input `$(FloatingGTBasisFuncs)`.
 
 """
 
-    GTBasis{N, BT} <: BasisSetData{N}
+    GTBasis{BT, T} <: BasisSetData{BT}
 
 The container to store basis set information.
 
 ≡≡≡ Field(s) ≡≡≡
 
-`basis::Array{<:AbstractGTBasisFuncs, 1}`: Basis set.
+`basis::Vector{<:CompositeGTBasisFuncs{<:Any, 1}}`: Basis set.
 
 `S::Array{<:Number, 2}`: Overlap matrix.
 
@@ -586,32 +586,31 @@ when nuclei and their coordinates of same `DataType` are input.
             Te::Matrix{<:Number}, eeI::Array{<:Number, 4}) -> 
     GTBasis
 
-    GTBasis(basis::Array{<:AbstractGTBasisFuncs, 1}, sortBasis::Bool=true) -> GTBasis
+    GTBasis(basis::Array{<:AbstractGTBasisFuncs, 1}) -> GTBasis
 
-Directly construct a `GTBasis` given a basis set. Argument `sortBasis` determines whether 
-the constructor will sort the input basis functions using `sortBasisFuncs` before build 
-a `GTBasis`.
+Directly construct a `GTBasis` given a basis set.
 """
-struct GTBasis{N, BT} <: BasisSetData{N}
-    basis::Vector{<:AbstractGTBasisFuncs}
-    S::Matrix{<:Number}
-    Te::Matrix{<:Number}
-    eeI::Array{<:Number, 4}
+struct GTBasis{BT, T} <: BasisSetData{BT}
+    basis::Vector{BT}
+    S::Matrix{T}
+    Te::Matrix{T}
+    eeI::Array{T, 4}
     getVne::Function
     getHcore::Function
 
-    function GTBasis(basis::Vector{<:AbstractGTBasisFuncs},
-                     S::Matrix{<:Number}, Te::Matrix{<:Number}, eeI::Array{<:Number, 4})
-        new{basisSize.(basis) |> sum, typeof(basis)}(basis, S, Te, eeI, 
-            (mol, nucCoords) -> nucAttractions(basis, mol, nucCoords),
-            (mol, nucCoords) -> nucAttractions(basis, mol, nucCoords) + Te)
+    function GTBasis(b::Vector{BT}, S::Matrix{T}, Te::Matrix{T}, eeI::Array{T, 4}) where 
+                    {BT<:CompositeGTBasisFuncs{<:Any, 1}, T}
+        new{BT, T}(b, S, Te, eeI, 
+                   (mol, nucCoords) -> nucAttractions(b, mol, nucCoords),
+                   (mol, nucCoords) -> nucAttractions(b, mol, nucCoords) + Te)
     end
 end
 
-function GTBasis(basis::Vector{<:AbstractGTBasisFuncs}, sortBasis::Bool=true)
-    bs = sortBasis ? sortBasisFuncs(basis) : basis
-    GTBasis(bs, overlaps(bs), elecKinetics(bs), eeInteractions(bs))
-end
+GTBasis(bs::Vector{<:CompositeGTBasisFuncs{<:Any, 1}}) = 
+GTBasis(bs, overlaps(bs), elecKinetics(bs), eeInteractions(bs))
+
+GTBasis(bs::Vector{<:AbstractGTBasisFuncs}) = GTBasis(hcat(decompose.(bs)...) |> vec)
+
 
 """
 

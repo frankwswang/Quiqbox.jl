@@ -26,7 +26,7 @@ abstract type DifferentiableParameter{ContainerT, DataT} <: MutableParameter{Con
 
 abstract type HartreeFockFinalValue{T} <: AbstractHartreeFockFinalValue end
 
-abstract type BasisSetData{N} <: AbstractBasisSetData end
+abstract type BasisSetData{BT} <: AbstractBasisSetData end
 
 abstract type MolecularCoefficients <: MolecularDataBox end
 

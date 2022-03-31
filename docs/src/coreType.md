@@ -21,7 +21,7 @@ Quiqbox.BasisFuncMix{BN, GN}
 ```
 
 ```@docs
-GTBasis{N, BT}
+GTBasis{BT, T}
 ```
 
 ```@docs

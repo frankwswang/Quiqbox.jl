@@ -12,19 +12,15 @@ const getXmethods = (m1=getXcore1,)
 getX(S::Matrix{Float64}, method::Symbol=:m1) = getfield(getXmethods, method)(S)
 
 
-getC(X::Matrix{Float64}, F::Matrix{Float64}; 
-     outputEmo::Bool=false, outputCx::Bool=false, stabilizeSign::Bool=true) = 
-getCcore(X, F, outputEmo, outputCx, stabilizeSign)
-
-function getCcore(X::Matrix{Float64}, F::Matrix{Float64}, outputEmo::Bool=false, 
-                  outputCx::Bool=false, stabilizeSign::Bool=true)
+function getC(X::Matrix{Float64}, F::Matrix{Float64}, includeEmo::Bool=false; 
+              outputCx::Bool=false, stabilizeSign::Bool=true)
     ϵ, Cₓ = eigen(X'*F*X |> Hermitian)
     outC = outputCx ? Cₓ : X*Cₓ
     # Stabilize the sign factor of each column.
     stabilizeSign && for j = 1:size(outC, 2)
        outC[:, j] *= (outC[1,j] < 0 ? -1 : 1)
     end
-    outputEmo ? (outC, ϵ) : outC
+    includeEmo ? (outC, ϵ) : outC
 end
 
 
@@ -44,14 +40,14 @@ function getCfromGWH(::Val{ForUHF},
     for j in 1:l, i in 1:l
         H[i,j] = 1.75 * S[i,j] * (Hcore[i,i] + Hcore[j,j]) * 0.5
     end
-    C = getCcore(X, H)
+    C = getC(X, H)
     ForUHF ? breakSymOfC(C) : C
 end
 
 
 function getCfromHcore(::Val{ForUHF}, 
                        X::Matrix{Float64}, Hcore::Matrix{Float64}) where {ForUHF}
-    C = getCcore(X, Hcore)
+    C = getC(X, Hcore)
     ForUHF ? breakSymOfC(C) : C
 end
 
@@ -85,9 +81,9 @@ function getCfromSAD(::Val{ForUHF},
     end
     Dᵀ = D₁ + D₂
     if ForUHF
-        getCcore.(Ref(X), getF.(Ref(Hcore), Ref(HeeI), (D₁, D₂), Ref(Dᵀ)))
+        getC.(Ref(X), getF.(Ref(Hcore), Ref(HeeI), (D₁, D₂), Ref(Dᵀ)))
     else
-        getCcore(X, getF(Hcore, HeeI, Dᵀ.*0.5, Dᵀ))
+        getC(X, getF(Hcore, HeeI, Dᵀ.*0.5, Dᵀ))
     end
 end
 
@@ -109,7 +105,7 @@ getfield(guessCmethods, M)(ForUHF, S, X, Hcore, HeeI, bs, nuc, nucCoords)
 getD(C::Matrix{Float64}, Nˢ::Int) = @views (C[:,1:Nˢ]*C[:,1:Nˢ]') |> Hermitian |> Array
 # Nˢ: number of electrons with the same spin.
 
-@inline getD(X::Matrix{Float64}, F::Matrix{Float64}, Nˢ::Int) = getD(getCcore(X, F), Nˢ)
+@inline getD(X::Matrix{Float64}, F::Matrix{Float64}, Nˢ::Int) = getD(getC(X, F), Nˢ)
 
 
 function getGcore(HeeI::Array{Float64, 4}, DJ::Matrix{Float64}, DK::Matrix{Float64})
@@ -181,7 +177,7 @@ end
                          X::Matrix{Float64}, Ds::Vararg{Matrix{Float64}, N}) where {N}
     Fnew = getF(Hcore, HeeI, Ds)
     Enew = getE(Hcore, Fnew, Ds[1])
-    Cnew = getCcore(X, Fnew)
+    Cnew = getC(X, Fnew)
     (Cnew, Fnew, Ds[1], Enew) # Fnew is based on latest variables.
 end
 
@@ -391,7 +387,7 @@ struct HFfinalVars{HFtype} <: HartreeFockFinalValue{HFtype}
         F = vars.Fs[end]
         D = vars.Ds[end]
         E0HF = vars.shared.Etots[end]
-        _, Emo = getCcore(X, F, true)
+        _, Emo = getC(X, F, true)
         N = vars.N
         occu = vcat(2*ones(Int, N), zeros(Int, size(X, 1) - N))
         new{:RHF}(E0HF, 2, C, F, D, Emo, occu, vars, isConverged)
@@ -403,7 +399,7 @@ struct HFfinalVars{HFtype} <: HartreeFockFinalValue{HFtype}
         F = last.(getfield.(αβVars, :Fs))
         D = last.(getfield.(αβVars, :Ds))
         E0HF = αβVars[1].shared.Etots[end]
-        Emo = getindex.(getCcore.(Ref(X), F, true), 2)
+        Emo = getindex.(getC.(Ref(X), F, true), 2)
         Ns = getfield.(αβVars, :N)
         occu = vcat.(ones.(Int, Ns), zeros.(Int, size(X, 1) .- Ns))
         new{:UHF}(E0HF, sum(Ns), C, F, D, Emo, occu, αβVars, isConverged)
