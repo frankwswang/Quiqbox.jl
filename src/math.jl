@@ -758,7 +758,7 @@ function getOneBodyInts(::FunctionType{F},
     accuSize = vcat(0, accumulate(+, subSize))
     len = subSize |> sum
     buf = Array{Float64}(undef, len, len)
-    for i = 1:length(basisSet), j = 1:i
+    for j = 1:length(basisSet), i = 1:j
         int = getfield(Quiqbox, F)(basisSet[i], basisSet[j], optArgs...)
         rowRange = accuSize[i]+1 : accuSize[i+1]
         colRange = accuSize[j]+1 : accuSize[j+1]

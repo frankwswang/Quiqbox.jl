@@ -417,7 +417,7 @@ end
           nucCoords::Array{<:AbstractArray, 1}, 
           HFtype::Symbol=:RHF; 
           N::Int=getCharge(nuc), 
-          initialC::Union{Array{Float64, 2}, NTuple{2, Array{Float64, 2}}, Symbol}=:SAD, 
+          initialC::Symbol=:SAD, 
           scfConfig::SCFconfig=defaultSCFconfig, 
           earlyTermination::Bool=true, 
           printInfo::Bool=true, 
@@ -439,8 +439,7 @@ Main function to run Hartree-Fock in Quiqbox.
 
 `N::Int`: The total number of electrons.
 
-`initialC::Union{Array{Float64, 2}, NTuple{2, Array{Float64, 2}}, Symbol}`: Initial guess 
-of the coefficient matrix(s) C of the molecular orbitals.
+`initialC::Symbol`: Initial guess of the coefficient matrix(s) C of the molecular orbitals.
 
 `scfConfig::SCFconfig`: SCF iteration configuration.
 
@@ -451,44 +450,32 @@ when its performance becomes unstable or poor.
 
 `maxSteps::Int`: Maximum allowed iteration steps regardless of whether the SCF converges.
 """
-function runHF(bs::Vector{<:AbstractGTBasisFuncs}, 
+function runHF(gtb::BasisSetData{BT}, 
                nuc::Vector{String}, 
-               nucCoords::Vector{<:AbstractArray}, 
-               HFtype::Symbol=:RHF; 
+               nucCoords::Vector{<:AbstractArray{<:Real}}, 
+               ::Val{HFtype}=Val(:RHF); 
                N::Int=getCharge(nuc), 
-               initialC::Union{Matrix{Float64}, NTuple{2, Matrix{Float64}}, Symbol}=:SAD, 
+               initialC::Symbol=:SAD, 
                scfConfig::SCFconfig=defaultSCFconfig, 
                earlyTermination::Bool=true, 
                printInfo::Bool=true, 
-               maxSteps::Int=1000)
-    gtb = GTBasis(bs, false)
-    runHF(gtb, nuc, nucCoords, HFtype; N, initialC, scfConfig, 
-          earlyTermination, printInfo, maxSteps)
-end
-
-function runHF(gtb::BasisSetData{NB}, 
-               nuc::Vector{String}, 
-               nucCoords::Vector{<:AbstractArray}, 
-               HFtype::Symbol=:RHF; 
-               N::Int=getCharge(nuc), 
-               initialC::Union{Matrix{Float64}, NTuple{2, Matrix{Float64}}, Symbol}=:SAD, 
-               scfConfig::SCFconfig=defaultSCFconfig, 
-               earlyTermination::Bool=true, 
-               printInfo::Bool=true, 
-               maxSteps::Int=1000) where {NB}
+               maxSteps::Int=1000) where {HFtype, BT}
     @assert length(nuc) == length(nucCoords)
-    @assert NB >= ceil(N/2)
+    @assert length(gtb.basis) >= ceil(N/2)
     @assert N > (HFtype==:RHF) "$(HFtype) requires more than $(HFtype==:RHF) electrons."
     HFtype == :UHF && (N = (N÷2, N-N÷2))
     Hcore = gtb.getHcore(nuc, nucCoords)
     X = getX(gtb.S)
-    if initialC isa Symbol
-        initialC = guessC(Val(initialC), Val(HFtype==:UHF), 
-                          gtb.S, X, Hcore, gtb.eeI, gtb.basis, nuc, nucCoords)
-    end
+    initialC = guessC(Val(initialC), Val(HFtype==:UHF), gtb.S, X, Hcore, gtb.eeI, gtb.basis, nuc, nucCoords)
     runHFcore(scfConfig, N, Hcore, gtb.eeI, gtb.S, X, initialC; 
               printInfo, maxSteps, earlyTermination)
 end
+
+runHF(a1::Vector{<:AbstractGTBasisFuncs}, a2, a3, HFtype::Symbol; kws...) = 
+runHF(a1, a2, a3, Val(HFtype); kws...)
+
+runHF(bs::Vector{<:AbstractGTBasisFuncs}, args...; kws...) = 
+runHF(GTBasis(bs), args...; kws...)
 
 
 """
