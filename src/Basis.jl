@@ -599,7 +599,7 @@ struct GTBasis{BT, T} <: BasisSetData{BT}
     getHcore::Function
 
     function GTBasis(b::Vector{BT}, S::Matrix{T}, Te::Matrix{T}, eeI::Array{T, 4}) where 
-                    {BT<:CompositeGTBasisFuncs{<:Any, 1}, T}
+                    {BT<:CompositeGTBasisFuncs{<:Any, 1}, T<:Real}
         new{BT, T}(b, S, Te, eeI, 
                    (mol, nucCoords) -> nucAttractions(b, mol, nucCoords),
                    (mol, nucCoords) -> nucAttractions(b, mol, nucCoords) + Te)
