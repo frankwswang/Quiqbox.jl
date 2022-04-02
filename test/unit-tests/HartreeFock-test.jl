@@ -20,15 +20,18 @@ using Suppressor: @suppress_out
                    3=>[:solver=>:LCM], 4=>[:solver=>:LCM])
 
     local res1, res2, res1_2, res2_2
+    SCFc1 = SCFconfig(scfMethods, thresholds)
+    SCFc2 = SCFconfig(scfMethods, thresholds, solvers)
+    HFc1 = HFconfig((C0=:Hcore, SCF=SCFc1))
+    HFc2 = HFconfig((SCF=SCFc1,))
+    HFc3 = HFconfig((HF=:UHF, C0=:GWH, SCF=SCFc2))
+    HFc4 = HFconfig((HF=:UHF, SCF=SCFc2))
+
     @suppress_out begin
-        res1   = runHF(bs, nuc, nucCoords, :RHF, initialC=:Hcore, 
-                       scfConfig=SCFconfig(scfMethods, thresholds))
-        res1_2 = runHF(bs, nuc, nucCoords, :RHF, 
-                       scfConfig=SCFconfig(scfMethods, thresholds))
-        res2   = runHF(bs, nuc, nucCoords, :UHF, initialC=:GWH, 
-                       scfConfig=SCFconfig(scfMethods, thresholds, solvers))
-        res2_2 = runHF(bs, nuc, nucCoords, :UHF, 
-                       scfConfig=SCFconfig(scfMethods, thresholds, solvers))
+        res1   = runHF(bs, nuc, nucCoords, HFc1)
+        res1_2 = runHF(bs, nuc, nucCoords, HFc2)
+        res2   = runHF(bs, nuc, nucCoords, HFc3)
+        res2_2 = runHF(bs, nuc, nucCoords, HFc4)
     end
 
     @test isapprox(res2.E0HF, res2_2.E0HF, atol=1e-5)
@@ -177,8 +180,8 @@ using Suppressor: @suppress_out
 
         bs = genBasisFunc.(nucCoords2, "3-21G") |> flatten
 
-        push!(Erhf, runHF(bs, nuc2, nucCoords2, printInfo=false).E0HF)
-        push!(Euhf, runHF(bs, nuc2, nucCoords2, :UHF, printInfo=false).E0HF)
+        push!(Erhf, runHF(bs, nuc2, nucCoords2, HFconfig((printInfo=false,))).E0HF)
+        push!(Euhf, runHF(bs, nuc2, nucCoords2, HFconfig((HF=:UHF, printInfo=false,))).E0HF)
         push!(Enuc, nnRepulsions(nuc2, nucCoords2))
     end
 

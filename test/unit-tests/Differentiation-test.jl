@@ -46,7 +46,7 @@ gf1 = GaussFunc(0.7,1)
 bs1 = genBasisFunc.(grid.box, Ref([gf1]))
 pars1 = uniqueParams!(bs1, filterMapping=true)[[1, 3, 4]]
 S1 = overlaps(bs1)
-HFres1 = runHF(bs1, nuc, nucCoords, printInfo=false)
+HFres1 = runHF(bs1, nuc, nucCoords, HFconfig((printInfo=false,)))
 grad1 = gradHFenergy(bs1, pars1, HFres1.C, S1, nuc, nucCoords)
 
 grad1_t = [1.2560794975855811, 1.2560794975855811, 4.050658417242262]
@@ -55,7 +55,7 @@ t2 = 1e-10
 @test isapprox(grad1[1], grad1[2], atol=t1)
 @test isapprox.(grad1, grad1_t, atol=t2) |> all
 
-HFres1_2 = runHF(bs1, nuc, nucCoords, :UHF, printInfo=false)
+HFres1_2 = runHF(bs1, nuc, nucCoords, HFconfig((HF=:UHF, printInfo=false,)))
 grad1_2 = gradHFenergy(bs1, pars1, HFres1.C, overlaps(bs1), nuc, nucCoords)
 @test isapprox(grad1_2[1], grad1_2[2], atol=t1)
 @test isapprox.(grad1_2, grad1_t, atol=t2) |> all
@@ -66,7 +66,7 @@ cens = makeCenter.(nucCoords)
 bs2 = genBasisFunc.(cens, Ref(gfs), normalizeGTO=true)
 pars2 = uniqueParams!(bs2, filterMapping=true)
 S2 = overlaps(bs2)
-HFres2 = runHF(bs2, nuc, nucCoords, printInfo=false)
+HFres2 = runHF(bs2, nuc, nucCoords, HFconfig((printInfo=false,)))
 grad2 = gradHFenergy(bs2, pars2, HFres2.C, S2, nuc, nucCoords)
 
 @test isapprox(grad2[1], -grad2[2], atol=t2)
@@ -79,7 +79,7 @@ grad2_tp = [-0.027665907127075284, 0.032956566685641786,
 bs3 = bs1[1:2] .* bs2
 pars3 = uniqueParams!(bs3, filterMapping=true)
 S3 = overlaps(bs3)
-HFres3 = runHF(bs3, nuc, nucCoords, printInfo=false)
+HFres3 = runHF(bs3, nuc, nucCoords, HFconfig((printInfo=false,)))
 grad3 = gradHFenergy(bs3, pars3, HFres3.C, S3, nuc, nucCoords)
 grad3_t = [-0.16065844917972594,   -0.2412318831261559,  -0.14800104892200816, 
             0.0047758208191306765, -0.08411348495227357, -0.3321910941342715, 

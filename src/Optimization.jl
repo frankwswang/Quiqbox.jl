@@ -79,8 +79,8 @@ function defaultECmethodCore(Ne::T, nuc::Vector{String},
     function (Hcore, HeeI, bs, S)
         X = getX(S)
         res = runHFcore(defaultSCFconfig, Ne, Hcore, HeeI, S, X, 
-                        guessC(Val(:SAD), Val(T<:NTuple{2}), S, X, 
-                               Hcore, HeeI, bs, nuc, nucCoords), printInfo=false)
+                        guessC(Val(:SAD), Val(T<:NTuple{2} ? :UHF : :RHF), S, X, 
+                               Hcore, HeeI, bs, nuc, nucCoords))
         res.E0HF, res.C
     end
 end
@@ -90,7 +90,7 @@ end
 
     optimizeParams!(bs::Array{<:FloatingGTBasisFuncs, 1}, pbs::Array{<:ParamBox, 1},
                     nuc::Array{String, 1}, nucCoords::Array{<:AbstractArray, 1};
-                    Etarget::Float64=NaN, threshold::Float64=1e-4, maxSteps::Int=2000, 
+                    Etarget::Float64=NaN, threshold::Float64=1e-4, maxStep::Int=2000, 
                     printInfo::Bool=true, GDmethod::F1=gradDescent!, 
                     ECmethod::F2=Quiqbox.defaultECmethod(:RHF, nuc, nucCoords)) where 
                    {F1<:Function, F2<:Function} -> 
@@ -121,7 +121,7 @@ to nuclei charge.
 `threshold::Float64`: The threshold for the convergence when evaluating difference between 
 the latest few energies. When set to `NaN`, there will be no convergence detection.
 
-`maxSteps::Int`: Maximum allowed iteration steps regardless of whether the optimization 
+`maxStep::Int`: Maximum allowed iteration steps regardless of whether the optimization 
 iteration converges.
 
 `printInfo::Bool`: Whether print out the information of each iteration step.
@@ -132,7 +132,7 @@ iteration converges.
 function optimizeParams!(bs::Vector{<:FloatingGTBasisFuncs}, pbs::Vector{<:ParamBox},
                          nuc::Vector{String}, nucCoords::Vector{<:AbstractArray}, 
                          ECmethod::F2=defaultECmethod(:RHF, nuc, nucCoords);
-                         Etarget::Float64=NaN, threshold::Float64=1e-4, maxSteps::Int=500, 
+                         Etarget::Float64=NaN, threshold::Float64=1e-4, maxStep::Int=500, 
                          printInfo::Bool=true, GDmethod::F1=gradDescent!) where 
                         {F1<:Function, F2<:Function}
     tAll = @elapsed begin
@@ -141,7 +141,7 @@ function optimizeParams!(bs::Vector{<:FloatingGTBasisFuncs}, pbs::Vector{<:Param
         Es = Float64[]
         pars = zeros(0, length(pbs))
         grads = zeros(0, length(pbs))
-        gap = min(100, max(maxSteps ÷ 200 * 5, 1))
+        gap = min(100, max(maxStep ÷ 200 * 5, 1))
         detectConverge = isnan(threshold) ? false : true
 
         if Etarget === NaN
@@ -177,7 +177,7 @@ function optimizeParams!(bs::Vector{<:FloatingGTBasisFuncs}, pbs::Vector{<:Param
 
             parsL = updateParams!(pbs, grad, GDmethod)
 
-            !(detectConverge && isConverged(Es)) && i < maxSteps || break
+            !(detectConverge && isConverged(Es)) && i < maxStep || break
 
             i += 1
         end

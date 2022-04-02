@@ -1,4 +1,4 @@
-export SCFconfig, runHF, runHFcore
+export SCFconfig, HFconfig, runHF, runHFcore
 
 using LinearAlgebra: dot, Hermitian, \, det, I
 using PiecewiseQuadratics: indicator
@@ -6,6 +6,8 @@ using SeparableOptimization
 using Combinatorics: powerset
 
 getXcore1(S::Matrix{Float64}) = S^(-0.5) |> Array
+
+precompile(getXcore1, (Matrix{Float64},))
 
 const getXmethods = (m1=getXcore1,)
 
@@ -33,30 +35,29 @@ function breakSymOfC(C::Matrix{Float64})
 end
 
 
-function getCfromGWH(::Val{ForUHF}, 
-                     S::Matrix{Float64}, Hcore::Matrix{Float64}, X=getX(S)) where {ForUHF}
+function getCfromGWH(::Val{HFT}, S::Matrix{Float64}, Hcore::Matrix{Float64}, 
+                     X::Matrix{Float64}) where {HFT}
     l = size(Hcore)[1]
     H = zero(Hcore)
     for j in 1:l, i in 1:l
         H[i,j] = 1.75 * S[i,j] * (Hcore[i,i] + Hcore[j,j]) * 0.5
     end
     C = getC(X, H)
-    ForUHF ? breakSymOfC(C) : C
+    (HFT == :UHF) ? breakSymOfC(C) : C
 end
 
 
-function getCfromHcore(::Val{ForUHF}, 
-                       X::Matrix{Float64}, Hcore::Matrix{Float64}) where {ForUHF}
+function getCfromHcore(::Val{HFT}, X::Matrix{Float64}, Hcore::Matrix{Float64}) where {HFT}
     C = getC(X, Hcore)
-    ForUHF ? breakSymOfC(C) : C
+    (HFT == :UHF) ? breakSymOfC(C) : C
 end
 
 
-function getCfromSAD(::Val{ForUHF}, 
+function getCfromSAD(::Val{HFT}, 
                      S::Matrix{Float64}, Hcore::Matrix{Float64}, HeeI::Array{Float64, 4},
-                     bs::Vector{<:AbstractGTBasisFuncs}, 
-                     nuc::Vector{String}, nucCoords::Vector{<:AbstractArray}, X=getX(S); 
-                     scfConfig=SCFconfig((:ADIIS,), (1e-10,))) where {ForUHF}
+                     bs::Vector{<:AbstractGTBasisFuncs}, nuc::Vector{String}, 
+                     nucCoords::Vector{<:AbstractArray}, X::Matrix{Float64}, 
+                     config=SCFconfig((:ADIIS,), (1e-10,))) where {HFT}
     D₁ = zero(Hcore)
     D₂ = zero(Hcore)
     N₁tot = 0
@@ -72,15 +73,14 @@ function getCfromSAD(::Val{ForUHF},
             N₂ = temp
         end
         h1 = coreH(bs, [atm], [coord])
-        res = runHFcore(scfConfig, 
-                        (N₁, N₂), h1, HeeI, S, X, getCfromHcore(Val(true), X, h1))
+        res = runHFcore(config, (N₁, N₂), h1, HeeI, S, X, getCfromHcore(Val(:UHF), X, h1))
         D₁ += res.D[1]
         D₂ += res.D[2]
         N₁tot += N₁
         N₂tot += N₂
     end
     Dᵀ = D₁ + D₂
-    if ForUHF
+    if HFT == :UHF
         getC.(Ref(X), getF.(Ref(Hcore), Ref(HeeI), (D₁, D₂), Ref(Dᵀ)))
     else
         getC(X, getF(Hcore, HeeI, Dᵀ.*0.5, Dᵀ))
@@ -89,17 +89,17 @@ end
 
 
 const guessCmethods = 
-    (  GWH = (ForUHF, S, X, Hcore, _...)->getCfromGWH(ForUHF, S, Hcore, X),
-     Hcore = (ForUHF, S, X, Hcore, _...)->getCfromHcore(ForUHF, X, Hcore), 
-       SAD = (ForUHF, S, X, Hcore, HeeI, bs, nuc, nucCoords)->
-             getCfromSAD(ForUHF, S, Hcore, HeeI, bs, nuc, nucCoords, X))
+    (  GWH = (HFT, S, X, Hcore, _...)->getCfromGWH(HFT, S, Hcore, X), 
+     Hcore = (HFT, S, X, Hcore, _...)->getCfromHcore(HFT, X, Hcore), 
+       SAD = (HFT, S, X, Hcore, HeeI, bs, nuc, nucCoords)->
+             getCfromSAD(HFT, S, Hcore, HeeI, bs, nuc, nucCoords, X))
 
 
-@inline guessC(::Val{M}, ForUHF::Val{B}, 
+@inline guessC(::Val{M}, ::Val{HFT}, 
                S::Matrix{Float64}, X::Matrix{Float64}, Hcore::Matrix{Float64}, 
                HeeI::Array{Float64, 4}, bs::Vector{<:AbstractGTBasisFuncs}, 
-               nuc::Vector{String}, nucCoords::Vector{<:AbstractArray}) where {M, B} = 
-getfield(guessCmethods, M)(ForUHF, S, X, Hcore, HeeI, bs, nuc, nucCoords)
+               nuc::Vector{String}, nucCoords::Vector{<:AbstractArray}) where {M, HFT} = 
+getfield(guessCmethods, M)(Val(HFT), S, X, Hcore, HeeI, bs, nuc, nucCoords)
 
 
 getD(C::Matrix{Float64}, Nˢ::Int) = @views (C[:,1:Nˢ]*C[:,1:Nˢ]') |> Hermitian |> Array
@@ -212,6 +212,10 @@ const Doc_SCFconfig_OneRowTable = "| `:DIIS`, `:EDIIS`, `:ADIIS` | Subspace size
                                   " `:LCM` -> Lagrange solver) | "*
                                   "`DIISsize::Int`; `solver::Symbol` | `15`; `:ADMM` |"
 
+const Doc_SCFconfig_Eg1 = "SCFconfig{3}(interval=(0.0001, 1.0e-12, 1.0e-13), "*
+                          "oscillateThreshold=1.0e-5, method, methodConfig)"*
+                          "[:SD, :ADIIS, :DIIS]"
+
 """
 
     SCFconfig{N} <: ImmutableParameter{SCFconfig, Any}
@@ -220,20 +224,20 @@ The `struct` for SCF iteration configurations.
 
 ≡≡≡ Field(s) ≡≡≡
 
-`methods::NTuple{N, Symbol}`: The applied methods. The available methods and their 
+`method::NTuple{N, $(FunctionType)}`: The applied methods. The available methods and their 
 configurations (in terms of keyword arguments):
 
 | Methods | Configuration(s) | keyword argument(s) | Default value(s) |
 | :----   | :---:            | :---:               | ----:            |
 | `:DS` | Damping strength: [0,1] | `dampingStrength::Float64` | `0.0` |
-$(Quiqbox.Doc_SCFconfig_OneRowTable)
+$(Doc_SCFconfig_OneRowTable)
 
-`intervals`: The stopping (skipping) thresholds for the required methods.
+`interval::NTuple{N, Float64}`: The stopping (skipping) thresholds for required methods.
 
-`methodConfigs`: The additional keywords arguments for each method stored as `Tuple`s of 
-`Pair`s.
+`methodConfig::NTuple{N, Vector{<:Pair}}`: The additional keywords arguments for each 
+method stored as `Tuple`s of `Pair`s.
 
-`oscillateThreshold`: The threshold for oscillating convergence.
+`oscillateThreshold::Float64`: The threshold for oscillating convergence.
 
 ≡≡≡ Initialization Method(s) ≡≡≡
 
@@ -250,14 +254,15 @@ arguments and their values respectively.
 
 ≡≡≡ Example(s) ≡≡≡
 
-julia> SCFconfig((:SD, :ADIIS, :DIIS), (1e-4, 1e-12, 1e-13), Dict(2=>[:solver=>:LCM])
-SCFconfig{3}((:SD, :ADIIS, :DIIS), (0.0001, 1.0e-12, 1.0e-13), ((), (:solver => :LCM,), 
-()), 1.0e-5)
+```jldoctest; setup = :(push!(LOAD_PATH, "../../src/"); using Quiqbox)
+julia> SCFconfig((:SD, :ADIIS, :DIIS), (1e-4, 1e-12, 1e-13), Dict(2=>[:solver=>:LCM]))
+$(Doc_SCFconfig_Eg1)
+```
 """
 struct SCFconfig{N} <: ImmutableParameter{SCFconfig, Any}
-    methods::NTuple{N, FunctionType}
-    intervals::NTuple{N, Float64}
-    methodConfigs::NTuple{N, Vector{<:Pair}}
+    method::NTuple{N, FunctionType}
+    interval::NTuple{N, Float64}
+    methodConfig::NTuple{N, Vector{<:Pair}}
     oscillateThreshold::Float64
 
     function SCFconfig(methods::NTuple{N, Symbol}, intervals::NTuple{N, Float64}, 
@@ -285,7 +290,7 @@ end
 
 
 """
-    HFtempVars{HFtype} <: HartreeFockintermediateData
+    HFtempVars{HFT} <: HartreeFockintermediateData
 
 The container to store the intermediate values (only of the same spin configuration) for 
 each iteration during the Hartree-Fock SCF procedure. 
@@ -313,7 +318,7 @@ matrices.
 change the field `shared.Dtots` or `shared.Etots` of one container will affect the other 
 one's.**
 """
-struct HFtempVars{HFtype} <: HartreeFockintermediateData
+struct HFtempVars{HFT} <: HartreeFockintermediateData
     N::Int
     Cs::Vector{Matrix{Float64}}
     Fs::Vector{Matrix{Float64}}
@@ -322,27 +327,27 @@ struct HFtempVars{HFtype} <: HartreeFockintermediateData
     shared::HFinterrelatedVars
 end
 
-HFtempVars(::FunctionType{HFtype}, 
+HFtempVars(::FunctionType{HFT}, 
            N::Int, C::Matrix{Float64}, F::Matrix{Float64}, 
-           D::Matrix{Float64}, E::Real) where {HFtype} = 
-HFtempVars{HFtype}(N, [C], [F], [D], [E], HFinterrelatedVars())
+           D::Matrix{Float64}, E::Real) where {HFT} = 
+HFtempVars{HFT}(N, [C], [F], [D], [E], HFinterrelatedVars())
 
-HFtempVars(::FunctionType{HFtype}, 
+HFtempVars(::FunctionType{HFT}, 
            N::Int, C::Matrix{Float64}, F::Matrix{Float64}, 
            D::Matrix{Float64}, E::Real, 
-           Dtot::Matrix{Float64}, Etot::Real) where {HFtype} = 
-HFtempVars{HFtype}(N, [C], [F], [D], [E], HFinterrelatedVars([Dtot], [Etot]))
+           Dtot::Matrix{Float64}, Etot::Real) where {HFT} = 
+HFtempVars{HFT}(N, [C], [F], [D], [E], HFinterrelatedVars([Dtot], [Etot]))
 
-HFtempVars(::FunctionType{HFtype}, 
+HFtempVars(::FunctionType{HFT}, 
            Nˢ::Int, Cs::Vector{Matrix{Float64}}, Fs::Vector{Matrix{Float64}}, 
            Ds::Vector{Matrix{Float64}}, Es::Vector{<:Real}, 
-           Dtots::Vector{Matrix{Float64}}, Etots::Vector{<:Real}) where {HFtype} = 
-HFtempVars{HFtype}(Nˢ, Cs, Fs, Ds, Es, HFinterrelatedVars(Dtots, Etots))
+           Dtots::Vector{Matrix{Float64}}, Etots::Vector{<:Real}) where {HFT} = 
+HFtempVars{HFT}(Nˢ, Cs, Fs, Ds, Es, HFinterrelatedVars(Dtots, Etots))
 
 
 """
 
-    HFfinalVars{HFtype} <: HartreeFockFinalValue{HFtype}
+    HFfinalVars{HFT} <: HartreeFockFinalValue{HFT}
 
 The container of the final values after a Hartree-Fock SCF procedure.
 
@@ -367,11 +372,11 @@ orbitals.
 `occu::Union{Array{Int, 1}, NTuple{2, Array{Int, 1}}}`: occupation numbers of molecular 
 orbitals.
 
-`temp::Union{HFtempVars{HFtype}, NTuple{2, HFtempVars{HFtype}}}` the intermediate values.
+`temp::Union{HFtempVars{HFT}, NTuple{2, HFtempVars{HFT}}}` the intermediate values.
 
 `isConverged::Bool`: Whether the SCF procedure is converged in the end.
 """
-struct HFfinalVars{HFtype} <: HartreeFockFinalValue{HFtype}
+struct HFfinalVars{HFT} <: HartreeFockFinalValue{HFT}
     E0HF::Float64
     N::Int
     C::Union{Matrix{Float64}, NTuple{2, Matrix{Float64}}}
@@ -379,7 +384,7 @@ struct HFfinalVars{HFtype} <: HartreeFockFinalValue{HFtype}
     D::Union{Matrix{Float64}, NTuple{2, Matrix{Float64}}}
     Emo::Union{Vector{Float64}, NTuple{2, Vector{Float64}}}
     occu::Union{Vector{Int}, NTuple{2, Vector{Int}}}
-    temp::Union{HFtempVars{HFtype}, NTuple{2, HFtempVars{HFtype}}}
+    temp::Union{HFtempVars{HFT}, NTuple{2, HFtempVars{HFT}}}
     isConverged::Bool
 
     function HFfinalVars(X::Matrix{Float64}, vars::HFtempVars{:RHF}, isConverged::Bool)
@@ -407,17 +412,101 @@ struct HFfinalVars{HFtype} <: HartreeFockFinalValue{HFtype}
 end
 
 
+const Doc_HFconfig_Eg1 = "HFconfig{:RHF, :SAD, 3}(Val{:UHF}(), Val{:SAD}(), "*
+                         "SCFconfig{3}(interval=(0.0001, 1.0e-6, 1.0e-15), "*
+                         "oscillateThreshold=1.0e-5, method, methodConfig)"*
+                         "[:ADIIS, :DIIS, :ADIIS], true, true, 1000)"
+
+const Doc_HFconfig_Eg2 = "HFconfig{:UHF, :SAD, 3}(Val{:UHF}(), Val{:SAD}(), "*
+                         "SCFconfig{3}(interval=(0.0001, 1.0e-6, 1.0e-15), "*
+                         "oscillateThreshold=1.0e-5, method, methodConfig)"*
+                         "[:ADIIS, :DIIS, :ADIIS], true, true, 1000)"
+
 """
-    runHF(bs::Union{BasisSetData, Array{<:AbstractGTBasisFuncs, 1}}, 
-          nuc::Array{String, 1}, 
-          nucCoords::Array{<:AbstractArray, 1}, 
-          HFtype::Symbol=:RHF; 
+
+    HFconfig{HFT, CT}
+
+The mutable container of Hartree-Fock method configuration.
+
+≡≡≡ Field(s) ≡≡≡
+
+`HF::Val`: Hartree-Fock method type. Available values are `Val(:RHF)` and `Val(:UHF)`.
+
+`C0::Union{Matrix{Float64}, NTuple{2, Matrix{Float64}}, Val}`: Initial guess of the 
+coefficient matrix(s) C of the molecular orbitals. When `C0` is a `Val{T}`, the `Tuple` of 
+available `T`s is `$(guessCmethods|>typeof|>fieldnames)`.
+
+`SCF::SCFconfig`: SCF iteration configuration. For more information please refer to 
+`SCFconfig`.
+
+`earlyTermination::Bool`: Whether automatically early terminate (skip) a convergence method 
+when its performance becomes unstable or poor.
+
+`printInfo::Bool`: Whether print out the information of each iteration step.
+
+`maxStep::Int`: Maximum allowed iteration steps regardless of whether the SCF converges.
+
+≡≡≡ Initialization Method(s) ≡≡≡
+
+    HFconfig() -> $(HFconfig |> typeof)
+
+    HFconfig(t::NamedTuple) -> HFconfig
+
+≡≡≡ Example(s) ≡≡≡
+
+```jldoctest; setup = :(push!(LOAD_PATH, "../../src/"); using Quiqbox)
+julia> HFconfig()
+$(Doc_HFconfig_Eg1)
+
+julia> HFconfig((HF=:UHF,))
+$(Doc_HFconfig_Eg2)
+```
+"""
+mutable struct HFconfig{HFT, CT, L}
+    HF::Val{HFT}
+    C0::Union{Matrix{Float64}, NTuple{2, Matrix{Float64}}, Val}
+    SCF::SCFconfig{L}
+    earlyTermination::Bool
+    printInfo::Bool
+    maxStep::Int
+
+    HFconfig(::Val{:UHF}, 
+             a2::NTuple{2, Matrix{Float64}}, a3::SCFconfig{L}, a4, a5, a6) where {L} = 
+    new{:UHF, NTuple{2, Matrix{Float64}}, L}(Val(:UHF), a2, a3, a4, a5, a6)
+
+    HFconfig(::Val{:RHF}, a2::Matrix{Float64}, a3::SCFconfig{L}, a4, a5, a6) where {L} = 
+    new{:RHF, Matrix{Float64}, L}(Val(:RHF), a2, a3, a4, a5, a6)
+
+    HFconfig(::Val{HFT}, a2::Val{CT}, a3::SCFconfig{L}, a4, a5, a6) where {HFT, CT, L} = 
+    new{HFT, CT, L}(Val(HFT), a2, a3, a4, a5, a6)
+end
+
+HFconfig(a1::Symbol, a2, args...) = HFconfig(Val(a1), a2, args...)
+
+HFconfig(a1, a2::Symbol, args...) = HFconfig(a1, Val(a2), args...)
+
+HFconfig(a1::Symbol, a2::Symbol, args...) = HFconfig(Val(a1), Val(a2), args...)
+
+HFconfig() = HFconfig(Val(:RHF), Val(:SAD), defaultSCFconfig, true, true, 1000)
+
+function HFconfig(t::T) where {T<:NamedTuple}
+    res = Any[Val(:RHF), Val(:SAD), defaultSCFconfig, true, true, 1000]
+    keys = fieldnames(HFconfig)
+    d = Dict(keys .=> collect(1:6))
+    for (val, fd) in zip(t, fieldnames(T))
+        res[d[fd]] = val
+    end
+    HFconfig(res...)
+end
+
+
+"""
+    runHF(gtb::Union{BasisSetData, Vector{<:AbstractGTBasisFuncs}}, 
+          nuc::Vector{String}, 
+          nucCoords::Vector{<:AbstractArray{<:Real}}, 
           N::Int=getCharge(nuc), 
-          initialC::Symbol=:SAD, 
-          scfConfig::SCFconfig=defaultSCFconfig, 
-          earlyTermination::Bool=true, 
-          printInfo::Bool=true, 
-          maxSteps::Int=1000) -> HFfinalVars
+          config::HFconfig{HFT}=HFconfig()) where {HFT} -> 
+    HFfinalVars{HFT}
 
 Main function to run Hartree-Fock in Quiqbox.
 
@@ -429,64 +518,60 @@ Main function to run Hartree-Fock in Quiqbox.
 
 `nucCoords::Array{<:AbstractArray, 1}`: The coordinates of the nuclei.
 
-`HFtype::Symbol`: Hartree-Fock type. Available values are `:RHF` and `:UHF`.
-
-=== Keyword argument(s) ===
-
 `N::Int`: The total number of electrons.
 
-`initialC::Symbol`: Initial guess of the coefficient matrix(s) C of the molecular orbitals.
-
-`scfConfig::SCFconfig`: SCF iteration configuration.
-
-`earlyTermination::Bool`: Whether automatically early terminate (skip) a convergence method 
-when its performance becomes unstable or poor.
-
-`printInfo::Bool`: Whether print out the information of each iteration step.
-
-`maxSteps::Int`: Maximum allowed iteration steps regardless of whether the SCF converges.
+`config::HFconfig`: The Configuration of selected Hartree-Fock method. For more information 
+please refer to `HFconfig`.
 """
 function runHF(gtb::BasisSetData{BT}, 
                nuc::Vector{String}, 
                nucCoords::Vector{<:AbstractArray{<:Real}}, 
-               ::Val{HFtype}=Val(:RHF); 
                N::Int=getCharge(nuc), 
-               initialC::Symbol=:SAD, 
-               scfConfig::SCFconfig=defaultSCFconfig, 
-               earlyTermination::Bool=true, 
-               printInfo::Bool=true, 
-               maxSteps::Int=1000) where {HFtype, BT}
+               config::HFconfig{HFT, CT, L}=HFconfig()) where {BT, HFT, CT, L}
     @assert length(nuc) == length(nucCoords)
     @assert length(gtb.basis) >= ceil(N/2)
-    @assert N > (HFtype==:RHF) "$(HFtype) requires more than $(HFtype==:RHF) electrons."
-    HFtype == :UHF && (N = (N÷2, N-N÷2))
+    @assert N > (HFT==:RHF) "$(HFT) requires more than $(HFT==:RHF) electrons."
+    HFT == :UHF && (N = (N÷2, N-N÷2))
     Hcore = gtb.getHcore(nuc, nucCoords)
     X = getX(gtb.S)
-    initialC = guessC(Val(initialC), Val(HFtype==:UHF), gtb.S, X, Hcore, gtb.eeI, gtb.basis, nuc, nucCoords)
-    runHFcore(scfConfig, N, Hcore, gtb.eeI, gtb.S, X, initialC; 
-              printInfo, maxSteps, earlyTermination)
+    initialC = if CT isa Symbol
+        guessC(Val(CT), Val(HFT), gtb.S, X, Hcore, gtb.eeI, gtb.basis, nuc, nucCoords)
+    else
+        config.C0
+    end
+    runHFcore(config.SCF, N, Hcore, gtb.eeI, gtb.S, X, initialC, 
+              config.printInfo, config.maxStep, config.earlyTermination)
 end
 
-runHF(a1::Vector{<:AbstractGTBasisFuncs}, a2, a3, HFtype::Symbol; kws...) = 
-runHF(a1, a2, a3, Val(HFtype); kws...)
+"""
 
-runHF(bs::Vector{<:AbstractGTBasisFuncs}, args...; kws...) = 
-runHF(GTBasis(bs), args...; kws...)
+    runHF(gtb::Union{BasisSetData, Vector{<:AbstractGTBasisFuncs}}, 
+          nuc::Vector{String}, 
+          nucCoords::Vector{<:AbstractArray{<:Real}}, 
+          config::HFconfig{HFT}=HFconfig(), 
+          N::Int=getCharge(nuc)) where {HFT} -> 
+    HFfinalVars{HFT}
+
+"""
+runHF(gtb::BasisSetData, nuc, nucCoords, config::HFconfig=HFconfig(), N=getCharge(nuc)) = 
+runHF(gtb::BasisSetData, nuc, nucCoords, N, config)
+
+runHF(bs::Vector{<:AbstractGTBasisFuncs}, args...) = runHF(GTBasis(bs), args...)
 
 
 """
 
-    runHFcore(scfConfig::SCFconfig{L}, 
+    runHFcore(scfConfig::SCFconfig, 
               N::Union{NTuple{2, Int}, Int}, 
               Hcore::Array{Float64, 2}, 
               HeeI::Array{Float64, 4}, 
               S::Array{Float64, 2}, 
-              X::Array{Float64, 2}=getX(S), 
-              C::Union{Array{Float64, 2}, NTuple{2, Array{Float64, 2}}}=
-              getCfromGWH(Val(length(N)==2), S, Hcore, X); 
+              X::Array{Float64, 2}, 
+              C0::Union{Array{Float64, 2}, NTuple{2, Array{Float64, 2}}}, 
               printInfo::Bool=false, 
-              maxSteps::Int=1000, 
-              earlyTermination::Bool=true) where {L}
+              maxStep::Int=1000, 
+              earlyTermination::Bool=true) -> 
+    HFfinalVars
 
 The core function of `runHF`.
 
@@ -506,30 +591,27 @@ Coulomb interactions and the Exchange Correlations.
 
 `X::Array{Float64, 2}`: Orthogonal transformation matrix of S. Default value is S^(-0.5).
 
-`C::Union{Array{Float64, 2}, NTuple{2, Array{Float64, 2}}}`: Initial guess of the 
+`C0::Union{Array{Float64, 2}, NTuple{2, Array{Float64, 2}}}`: Initial guess of the 
 coefficient matrix(s) C of the molecular orbitals.
-
-=== Keyword argument(s) ===
-
-`earlyTermination::Bool`: Whether automatically early terminate (skip) a convergence method 
-when its performance becomes unstable or poor.
 
 `printInfo::Bool`: Whether print out the information of each iteration step.
 
-`maxSteps::Int`: Maximum allowed iteration steps regardless of whether the SCF converges.
+`maxStep::Int`: Maximum allowed iteration steps regardless of whether the SCF converges.
+
+`earlyTermination::Bool`: Whether automatically early terminate (skip) a convergence method 
+when its performance becomes unstable or poor.
 """
 function runHFcore(scfConfig::SCFconfig{L}, 
-                   N::Union{NTuple{2, Int}, Int}, 
+                   N::Union{Int, NTuple{2, Int}}, 
                    Hcore::Matrix{Float64}, 
                    HeeI::Array{Float64, 4}, 
                    S::Matrix{Float64}, 
-                   X::Matrix{Float64}=getX(S), 
-                   C::T=getCfromGWH(Val(length(N)==2), S, Hcore, X); 
+                   X::Matrix{Float64}, 
+                   C0::Union{Matrix{Float64}, NTuple{2, Matrix{Float64}}}, 
                    printInfo::Bool=false, 
-                   maxSteps::Int=1000, 
-                   earlyTermination::Bool=true) where 
-                  {L, T<:Union{Matrix{Float64}, NTuple{2, Matrix{Float64}}}}
-    vars = initializeSCF(Hcore, HeeI, C, N)
+                   maxStep::Int=1000, 
+                   earlyTermination::Bool=true) where {L}
+    vars = initializeSCF(Hcore, HeeI, C0, N)
     Etots = (vars isa Tuple) ? vars[1].shared.Etots : vars.shared.Etots
     HFtypeStr =  N isa Int ? "RHF" : "UHF"
     printInfo && println(rpad(HFtypeStr*" | Initial Gauss", 22), "E = $(Etots[end])")
@@ -537,16 +619,16 @@ function runHFcore(scfConfig::SCFconfig{L},
     EtotMin = Etots[]
     i = 0
     for (m, kws, breakPoint, l) in 
-        zip(scfConfig.methods, scfConfig.methodConfigs, scfConfig.intervals, 1:L)
+        zip(scfConfig.method, scfConfig.methodConfig, scfConfig.interval, 1:L)
 
         while true
             i += 1
-            i <= maxSteps || (isConverged = false) || break
+            i <= maxStep || (isConverged = false) || break
 
             res = HFcore(m, N, Hcore, HeeI, S, X, vars; kws...)
             pushHFtempVars!(vars, res)
 
-            printInfo && (i % floor(log(4, i) + 1) == 0 || i == maxSteps) && 
+            printInfo && (i % floor(log(4, i) + 1) == 0 || i == maxStep) && 
             println(rpad("Step $i", 10), rpad("#$l ($(m.f))", 12), "E = $(Etots[end])")
 
             abs(Etots[end]-Etots[end-1]) > breakPoint || (isConverged = true) && break

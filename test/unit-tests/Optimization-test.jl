@@ -29,7 +29,7 @@ for ecMethod in ecMethods, (i,j) in zip((1,2,7,8,9,10), (2,2,7,9,9,10))
     local Es1L, pars1L, grads1L
     @suppress_out begin
         Es1L, _, _ = optimizeParams!(bs1, pars1[i:j], nuc, nucCoords, ecMethods[1], 
-                                     maxSteps=200, threshold=NaN, printInfo=false)
+                                     maxStep=200, threshold=NaN, printInfo=false)
         push!(Ebegin, Es1L[1])
         push!(Eend, Es1L[end])
     end
@@ -48,7 +48,7 @@ pars2 = uniqueParams!(bs2, filterMapping=true)[[1,4]]
 
 local Es2L, pars2L, grads2L
 @suppress_out begin
-    Es2L, pars2L, grads2L = optimizeParams!(bs2, pars2, nuc, nucCoords, maxSteps = 200)
+    Es2L, pars2L, grads2L = optimizeParams!(bs2, pars2, nuc, nucCoords, maxStep=200)
 end
 
 E_t2 = -1.1665258292058682

@@ -46,7 +46,11 @@ for (nuc, nucCoords, molName, iMol) in zip(mols, molCoords, molNames, 1:length(m
     end
 
     # Number of spin-orbitals must not be smaller than numbers of electrons.
-    fVars = try runHF(bs, nuc, nucCoords, HFtype; printInfo=false) catch; continue end
+    fVars = try
+        runHF(bs, nuc, nucCoords, HFconfig((HF=HFtype, printInfo=false,)))
+    catch
+        continue
+    end
 
     mol = Molecule(bs, nuc, nucCoords, fVars)
     fn = "Test_"*molName*"_"*bf*bsName*"_"*string(HFtype)

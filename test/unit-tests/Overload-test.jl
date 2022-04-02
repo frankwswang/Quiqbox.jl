@@ -1,6 +1,6 @@
 using Test
 using Quiqbox
-using Quiqbox: BasisFuncMix, hasBoolRelation
+using Quiqbox: BasisFuncMix, hasBoolRelation, Doc_SCFconfig_Eg1
 using Suppressor: @capture_out
 
 @testset "Overload.jl" begin
@@ -48,7 +48,7 @@ using Suppressor: @capture_out
     box1 = GridBox(2, 1.5)
     @test (@capture_out show(box1)) == string(typeof(box1))*"(num, len, coord)"
 
-    fVar1 = runHF(GTb1, ["H", "H"], [[0,0,0], [1,2,1]], printInfo=false, initialC=:Hcore)
+    fVar1 = runHF(GTb1, ["H","H"], [[0,0,0],[1,2,1]], HFconfig((C0=:Hcore,printInfo=false)))
 
     info1 = (@capture_out show(fVar1.temp))
     @test info1[1:39] == string(typeof(fVar1.temp))*"(shared.Etots=["
@@ -57,6 +57,10 @@ using Suppressor: @capture_out
     info2 = (@capture_out show(fVar1))
     @test info2[1:31] == string(typeof(fVar1))*"(E0HF="
     @test info2[end-42:end] == ", N, C, F, D, Emo, occu, temp, isConverged)"
+
+    info3 = (@capture_out show(SCFconfig((:SD, :ADIIS, :DIIS), 
+                                         (1e-4, 1e-12, 1e-13), Dict(2=>[:solver=>:LCM]))))
+    @test info3 == Doc_SCFconfig_Eg1
 
 
     # function ==, hasBoolRelation

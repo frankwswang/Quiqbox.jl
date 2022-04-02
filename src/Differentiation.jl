@@ -89,7 +89,7 @@ function derivativeCore(FoutputIsVector::Val{B},
     for i=1:bsSize, j=1:i
         ∂S[i,j] = ∂S[j,i] = getOverlap(∂bfs[i], bfs[j]) + getOverlap(bfs[i], ∂bfs[j])
     end
-    X = (S^(-0.5))::Symmetric{Float64, Matrix{Float64}} |> Array
+    X = getXcore1(S)
     λ, 𝑣 = eigen(S|>Symmetric)
     ∂S2 = transpose(𝑣)*∂S*𝑣
     for i=1:bsSize, j=1:i

@@ -70,6 +70,13 @@ function show(io::IO, box::GridBox)
     print(io, "(num, len, coord)")
 end
 
+function show(io::IO, config::SCFconfig)
+    print(io, typeof(config))
+    print(io, "(interval=", config.interval, ",", 
+              " oscillateThreshold=", config.oscillateThreshold, ",", 
+              " method, methodConfig)", getfield.(config.method, :f)|>collect)
+end
+
 function show(io::IO, vars::HFtempVars)
     print(io, typeof(vars))
     print(io, "(shared.Etots=[", round(vars.shared.Etots[1], sigdigits=nSigShown),", … , ", 
