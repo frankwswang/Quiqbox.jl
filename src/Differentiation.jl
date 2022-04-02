@@ -93,8 +93,8 @@ function derivativeCore(FoutputIsVector::Val{B},
     λ, 𝑣 = eigen(S|>Symmetric)
     ∂S2 = transpose(𝑣)*∂S*𝑣
     for i=1:bsSize, j=1:i
-        ∂X₀[i,j] = ∂X₀[j,i] = (- ∂S2[i,j] * λ[i]^(-0.5) * λ[j]^(-0.5) * 
-                               (λ[i]^0.5 + λ[j]^0.5)^(-1))
+        ∂X₀[i,j] = ∂X₀[j,i] = (- ∂S2[i,j] * inv(sqrt(λ[i])) * inv(sqrt(λ[j])) * 
+                               inv(sqrt(λ[i]) + sqrt(λ[j])))
     end
     for i=1:bsSize, j=1:bsSize
         ∂X[j,i] = [𝑣[j,k]*∂X₀[k,l]*𝑣[i,l] for k=1:bsSize, l=1:bsSize] |> sum

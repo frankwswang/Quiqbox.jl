@@ -284,11 +284,10 @@ function ∫eeInteractionCore(R₁::NTuple{3, Float64}, ijk₁::NTuple{3, Int}, 
     ΔRc = @. (α₁*R₁ + α₂*R₂)/αl - (α₃*R₃ + α₄*R₄)/αr
     η = αl * αr / (α₁ + α₂ + α₃ + α₄)
     β = η * sum(abs2, ΔRc)
-    res = π^2.5 / (αl * αr * (αl + αr)^0.5) * 
-          exp(-ηl * sum(abs2, ΔRl)) * exp(-ηr * sum(abs2, ΔRr))
-        res *= (@. (-1.0)^(ijk₁ + ijk₂) * 
-                   factorial(ijk₁) * factorial(ijk₂) * factorial(ijk₃) * factorial(ijk₄) / 
-                   αl^(ijk₁+ijk₂) / αr^(ijk₃+ijk₄)) |> prod
+    res = π^2.5 / (αl * αr * sqrt(αl + αr)) * exp(-ηl * sum(abs2, ΔRl)) * 
+                                              exp(-ηr * sum(abs2, ΔRr))
+    res *= (@. (-1.0)^(ijk₁ + ijk₂) * factorial(ijk₁) * factorial(ijk₂) * factorial(ijk₃) * 
+               factorial(ijk₄) / αl^(ijk₁+ijk₂) / αr^(ijk₃+ijk₄)) |> prod
         J = ∫eeInteractionCore1234(ΔRl, ΔRr, ΔRc, β, η, 
                                    ijk₁, α₁, ijk₂, α₂, ijk₃, α₃, ijk₄, α₄)
     res * J
@@ -752,8 +751,8 @@ getCompositeInt(FunctionType{:get2eInteraction}(), (b1, b2, b3, b4))
 
 
 function getOneBodyInts(::FunctionType{F}, 
-                          basisSet::AbstractArray{<:AbstractGTBasisFuncs}, 
-                          optArgs...) where {F}
+                        basisSet::AbstractArray{<:AbstractGTBasisFuncs}, 
+                        optArgs...) where {F}
     subSize = basisSize.(basisSet) |> collect
     accuSize = vcat(0, accumulate(+, subSize))
     len = subSize |> sum
