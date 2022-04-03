@@ -179,6 +179,10 @@ updateParams!
 gradDescent!
 ```
 
+```@docs
+Quiqbox.genOFmethod
+```
+
 
 ```@docs
 overlap

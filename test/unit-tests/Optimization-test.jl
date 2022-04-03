@@ -6,19 +6,19 @@ using Suppressor: @suppress_out
 @testset "Optimization.jl" begin
 
 errorThreshold1 = 1e-10
-errorThreshold2 = 1e-4
+errorThreshold2 = 1e-6
 
 # Floating basis set
 nucCoords = [[-0.7,0.0,0.0], [0.7,0.0,0.0]]
 nuc = ["H", "H"]
 
-ecMethods = [Quiqbox.defaultECmethod(:RHF, nuc, nucCoords), 
-             Quiqbox.defaultECmethod(:UHF, nuc, nucCoords)]
+configs = [POconfig((maxStep=200, error=NaN)), 
+           POconfig((maxStep=200, error=NaN, config=HFconfig((HF=:UHF,))))]
 
 Eend = Float64[]
 Ebegin = Float64[]
 
-for ecMethod in ecMethods, (i,j) in zip((1,2,7,8,9,10), (2,2,7,9,9,10)) 
+for c in configs, (i,j) in zip((1,2,7,8,9,10), (2,2,7,9,9,10))
     # 1->X₁, 2->X₂, 7->α₁, 8->α₂, 9->d₁, 10->d₂
     gf1 = GaussFunc(1.7, 0.8)
     gf2 = GaussFunc(0.45, 0.25)
@@ -28,15 +28,15 @@ for ecMethod in ecMethods, (i,j) in zip((1,2,7,8,9,10), (2,2,7,9,9,10))
 
     local Es1L, pars1L, grads1L
     @suppress_out begin
-        Es1L, _, _ = optimizeParams!(bs1, pars1[i:j], nuc, nucCoords, ecMethods[1], 
-                                     maxSteps=200, threshold=NaN, printInfo=false)
+        Es1L, _, _ = optimizeParams!(pars1[i:j], bs1, nuc, nucCoords, c, printInfo=false)
         push!(Ebegin, Es1L[1])
         push!(Eend, Es1L[end])
     end
 end
 
 @test all(Ebegin .> Eend)
-@test all(isapprox.(Eend[1:6], Eend[7:end], atol=errorThreshold1))
+@test all(Eend[1:6] .<= Eend[7:end])
+@test all(isapprox.(Eend[1:6], Eend[7:end], atol=errorThreshold2))
 
 
 # Grid-based basis set
@@ -48,7 +48,8 @@ pars2 = uniqueParams!(bs2, filterMapping=true)[[1,4]]
 
 local Es2L, pars2L, grads2L
 @suppress_out begin
-    Es2L, pars2L, grads2L = optimizeParams!(bs2, pars2, nuc, nucCoords, maxSteps = 200)
+    Es2L, pars2L, grads2L = optimizeParams!(pars2, bs2, nuc, nucCoords, 
+                                            POconfig((maxStep=200,)))
 end
 
 E_t2 = -1.1665258292058682

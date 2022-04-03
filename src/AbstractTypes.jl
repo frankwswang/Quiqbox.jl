@@ -23,10 +23,11 @@ abstract type MolecularDataBox <: ImmutableDataBox end
 abstract type HartreeFockintermediateData <: MutableDataBox end
 
 abstract type DifferentiableParameter{ContainerT, DataT} <: MutableParameter{ContainerT, DataT} end
+abstract type ConfigBox{ContainerT, MethodT} <: MutableParameter{ContainerT, Any} end
 
 abstract type HartreeFockFinalValue{T} <: AbstractHartreeFockFinalValue end
 
-abstract type BasisSetData{N} <: AbstractBasisSetData end
+abstract type BasisSetData{BT} <: AbstractBasisSetData end
 
 abstract type MolecularCoefficients <: MolecularDataBox end
 
@@ -53,4 +54,4 @@ abstract type GTBasisFuncs{OrbitalN}  <: AbstractGTBasisFuncs end
 
 abstract type CompositeGTBasisFuncs{NofLinearlyCombinedBasis, NofOrbital}  <: GTBasisFuncs{NofOrbital} end
 
-abstract type FloatingGTBasisFuncs{Subshell, GaussFuncN, OrbitalN} <: CompositeGTBasisFuncs{1, OrbitalN} end
+abstract type FloatingGTBasisFuncs{𝑙, GaussFuncN, OrbitalN} <: CompositeGTBasisFuncs{1, OrbitalN} end

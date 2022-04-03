@@ -30,7 +30,7 @@ As expected, there are indeed only 3 unique tunable independent parameters despi
 ```@repl 4
 parsPartial = [pars[1], pars[4]]
 
-Es, pars, grads = optimizeParams!(bs, parsPartial, nuc, nucCoords, maxSteps=20);
+Es, pars, grads = optimizeParams!(parsPartial, bs, nuc, nucCoords, POconfig((maxStep=20,)));
 ```
 
 After the optimization, you can check the basis set and we can see the parameters inside of it is also changed. This is because the `!` in the function names indicates that `optimizeParams!` is [a function that modifies its arguments](https://docs.julialang.org/en/v1/manual/style-guide/#bang-convention).

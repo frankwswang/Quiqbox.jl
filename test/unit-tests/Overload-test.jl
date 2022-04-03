@@ -1,6 +1,6 @@
 using Test
 using Quiqbox
-using Quiqbox: BasisFuncMix, hasBoolRelation
+using Quiqbox: BasisFuncMix, hasBoolRelation, Doc_SCFconfig_Eg1
 using Suppressor: @capture_out
 
 @testset "Overload.jl" begin
@@ -20,22 +20,22 @@ using Suppressor: @capture_out
     @test (@capture_out show(gf1)) == string(typeof(gf1))*"(xpn="*
                                       string(typeof(gf1.param[1]))*"(2.0)[∂][α], con="*
                                       string(typeof(gf1.param[2]))*"(1.0)[∂][d])"
-    @test (@capture_out show(bf1)) == string(typeof(bf1))*"(gauss, subshell, center)"*
+    @test (@capture_out show(bf1)) == string(typeof(bf1))*"(center, gauss)"*
                                       "[X⁰Y⁰Z⁰][1.0, 2.0, 1.0]"
 
     bf2 = genBasisFunc(missing, "STO-3G")[]
-    @test (@capture_out show(bf2)) == string(typeof(bf2))*"(gauss, subshell, center)"*
+    @test (@capture_out show(bf2)) == string(typeof(bf2))*"(center, gauss)"*
                                       "[X⁰Y⁰Z⁰]"*"[NaN, NaN, NaN]"
 
     bfs1 = genBasisFunc([0,0,0], (2,1), "P")
-    @test (@capture_out show(bfs1)) == string(typeof(bfs1))*"(gauss, subshell, center)"*
+    @test (@capture_out show(bfs1)) == string(typeof(bfs1))*"(center, gauss)"*
                                        "[3/3]"*"[0.0, 0.0, 0.0]"
 
     bfs2 = genBasisFunc([0,0,0], (2,1), [(2,0,0)])
-    @test (@capture_out show(bfs2)) == string(typeof(bfs2))*"(gauss, subshell, center)"*
+    @test (@capture_out show(bfs2)) == string(typeof(bfs2))*"(center, gauss)"*
                                        "[X²Y⁰Z⁰]"*"[0.0, 0.0, 0.0]"
     bfs3 = genBasisFunc([0,0,0], (2,1), [(2,0,0), (1,1,0)])
-    @test (@capture_out show(bfs3)) == string(typeof(bfs3))*"(gauss, subshell, center)"*
+    @test (@capture_out show(bfs3)) == string(typeof(bfs3))*"(center, gauss)"*
                                        "[2/6]"*"[0.0, 0.0, 0.0]"
 
     bfm1 = BasisFuncMix([bf1, bf2])
@@ -48,15 +48,20 @@ using Suppressor: @capture_out
     box1 = GridBox(2, 1.5)
     @test (@capture_out show(box1)) == string(typeof(box1))*"(num, len, coord)"
 
-    fVar1 = runHF(GTb1, ["H", "H"], [[0,0,0], [1,2,1]], printInfo=false, initialC=:Hcore)
+    fVar1 = runHF(GTb1, ["H", "H"], [[0,0,0], [1,2,1]], HFconfig((C0=:Hcore,)), 
+                  printInfo=false)
 
     info1 = (@capture_out show(fVar1.temp))
-    @test info1[1:42] == string(typeof(fVar1.temp))*"(shared.Etots=["
-    @test info1[73:end] == "], shared.Dtots, Cs, Es, Ds, Fs)"
+    @test info1[1:39] == string(typeof(fVar1.temp))*"(shared.Etots=["
+    @test info1[end-34:end] == "], shared.Dtots, N, Cs, Fs, Ds, Es)"
 
     info2 = (@capture_out show(fVar1))
-    @test info2[1:37] == string(typeof(fVar1))*"(E0HF="
-    @test info2[49:end] == ", C, F, D, Emo, occu, temp, isConverged)"
+    @test info2[1:31] == string(typeof(fVar1))*"(E0HF="
+    @test info2[end-42:end] == ", N, C, F, D, Emo, occu, temp, isConverged)"
+
+    info3 = (@capture_out show(SCFconfig((:SD, :ADIIS, :DIIS), 
+                                         (1e-4, 1e-12, 1e-13), Dict(2=>[:solver=>:LCM]))))
+    @test info3 == Doc_SCFconfig_Eg1
 
 
     # function ==, hasBoolRelation

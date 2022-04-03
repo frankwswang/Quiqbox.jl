@@ -3,10 +3,11 @@ export overlap, overlaps, nucAttraction, nucAttractions, elecKinetic, elecKineti
 
 
 @inline function oneBodyBFTensorCore(libcinFunc::Symbol, 
-                                     bf1::FloatingGTBasisFuncs, bf2::FloatingGTBasisFuncs, 
+                                     bf1::FloatingGTBasisFuncs{<:Any, <:Any, ON1}, 
+                                     bf2::FloatingGTBasisFuncs{<:Any, <:Any, ON2}, 
                                      nuclei::Vector{String}, 
                                      nucleiCoords::Vector{<:AbstractArray};
-                                     isGradient::Bool=false)
+                                     isGradient::Bool=false) where {ON1, ON2}
     env = Float64[]
     atm = Int32[]
     bas = Int32[]
@@ -23,7 +24,7 @@ export overlap, overlaps, nucAttraction, nucAttractions, elecKinetic, elecKineti
     addToDataChain!(env, atm, bas, bf2)
 
     cintFunc!(Val(libcinFunc), 
-              zeros(basisSize(bf1.subshell), basisSize(bf2.subshell), 1+isGradient*2), 
+              zeros(basisSize(bf1), basisSize(bf2), 1+isGradient*2), 
               [0,1], atm, length(nuclei), bas, 2, env)
 end
 

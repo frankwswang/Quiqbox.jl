@@ -1,5 +1,5 @@
 function addToDataChain!(env::Vector{Float64}, atm::Vector{Int32}, bas::Vector{Int32}, 
-                         bf::FloatingGTBasisFuncs)
+                         bf::FloatingGTBasisFuncs{𝑙}) where {𝑙}
     center = [bf.center[1](), bf.center[2](), bf.center[3]()]
     xpns = Float64[]
     cons = Float64[]
@@ -18,8 +18,7 @@ function addToDataChain!(env::Vector{Float64}, atm::Vector{Int32}, bas::Vector{I
     append!(env, xpns)
     norm = bf.normalizeGTO ? normOfGTOin(bf) : 1.0
     append!(env, cons.*norm)
-    append!(bas, Int32[gAtmIndex, AngularMomentumList[bf.subshell], nGauss, 1, 0, 
-                       envEndIndex, envEndIndex+nGauss, 0])
+    append!(bas, Int32[gAtmIndex, 𝑙, nGauss, 1, 0, envEndIndex, envEndIndex+nGauss, 0])
     envEndIndex += nGauss*2
     (env, atm, bas)
 end

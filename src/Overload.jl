@@ -30,17 +30,16 @@ end
 
 function show(io::IO, bf::BasisFunc)
     print(io, typeof(bf))
-    print(io, "(gauss, subshell, center)[")
+    print(io, "(center, gauss)[")
     printstyled(io, bf.ijk[1]|>ijkToStr, color=:cyan)
     print(io, "][", round(bf.center[1](), sigdigits=nSigShown), ", ",
                     round(bf.center[2](), sigdigits=nSigShown), ", ",
                     round(bf.center[3](), sigdigits=nSigShown), "]")
 end
 
-function show(io::IO, bf::BasisFuncs)
-    OON = typeof(bf).parameters[3]
-    SON = SubshellDimList[bf.subshell]
-    if OON == 1
+function show(io::IO, bf::BasisFuncs{𝑙, <:Any, ON}) where {𝑙, ON}
+    SON = SubshellXYZsizes[𝑙+1]
+    if ON == 1
         xyz1 = bf.ijk[1] |> ijkToStr
         xyz2 = ""
     else
@@ -48,7 +47,7 @@ function show(io::IO, bf::BasisFuncs)
         xyz2 = "/$(SON)"
     end
     print(io, typeof(bf))
-    print(io, "(gauss, subshell, center)[")
+    print(io, "(center, gauss)[")
     printstyled(io, xyz1, color=:cyan)
     print(io, xyz2)
     print(io, "][", round(bf.center[1](), sigdigits=nSigShown), ", ",
@@ -71,17 +70,24 @@ function show(io::IO, box::GridBox)
     print(io, "(num, len, coord)")
 end
 
+function show(io::IO, config::SCFconfig)
+    print(io, typeof(config))
+    print(io, "(interval=", config.interval, ",", 
+              " oscillateThreshold=", config.oscillateThreshold, ",", 
+              " method, methodConfig)", getfield.(config.method, :f)|>collect)
+end
+
 function show(io::IO, vars::HFtempVars)
     print(io, typeof(vars))
     print(io, "(shared.Etots=[", round(vars.shared.Etots[1], sigdigits=nSigShown),", … , ", 
                                  round(vars.shared.Etots[end], sigdigits=nSigShown), "], "*
-              "shared.Dtots, Cs, Es, Ds, Fs)")
+              "shared.Dtots, N, Cs, Fs, Ds, Es)")
 end
 
 function show(io::IO, vars::HFfinalVars)
     print(io, typeof(vars))
-    print(io, "(E0HF=", round(vars.E0HF, sigdigits=nSigShown), ", C, F, D, Emo, occu, temp"*
-              ", isConverged)")
+    print(io, "(E0HF=", round(vars.E0HF, sigdigits=nSigShown), ", N, C, F, D, Emo, occu, "*
+              "temp, isConverged)")
 end
 
 

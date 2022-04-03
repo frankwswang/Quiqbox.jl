@@ -27,13 +27,12 @@ molCoords = [
 bfCoords = [molCoords..., GridBox(1, 1.2) |> gridCoords]
 bfs = ["STO-3G", "STO-2G"]
 bsNames = push!(("-" .*molNames), "-Grid")
-HFtypes = [:RHF, :UHF]
 dir = @__DIR__
 prefix1 = dir*"/"
 prefix2 = dir*"/Moldens/"
 for (nuc, nucCoords, molName, iMol) in zip(mols, molCoords, molNames, 1:length(mols)), 
     (bfCoord, bsName) in zip(bfCoords[iMol:end], bsNames[iMol:end]), 
-    HFtype in HFtypes,
+    HFtype in Quiqbox.HFtypes,
     bf in bfs
 
     flag = (bfCoord == nucCoords)
@@ -46,7 +45,11 @@ for (nuc, nucCoords, molName, iMol) in zip(mols, molCoords, molNames, 1:length(m
     end
 
     # Number of spin-orbitals must not be smaller than numbers of electrons.
-    fVars = try runHF(bs, nuc, nucCoords; HFtype, printInfo=false) catch; continue end
+    fVars = try
+        runHF(bs, nuc, nucCoords, HFconfig((HF=HFtype,)), printInfo=false)
+    catch
+        continue
+    end
 
     mol = Molecule(bs, nuc, nucCoords, fVars)
     fn = "Test_"*molName*"_"*bf*bsName*"_"*string(HFtype)

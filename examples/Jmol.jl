@@ -34,7 +34,11 @@ for (nuc, nucCoords, molName, iMol) in zip(mols, molCoords, molNames, 1:length(m
     end
 
     # Number of spin-orbitals must not be smaller than numbers of electrons.
-    fVars = try runHF(bs, nuc, nucCoords; printInfo=false) catch; continue end
+    fVars = try
+        runHF(bs, nuc, nucCoords, printInfo=false)
+    catch
+        continue
+    end
 
     mol = Molecule(bs, nuc, nucCoords, fVars)
     fn = makeMoldenFile(mol; recordUMO=true, fileName=prefix*"_"*molName*"_"*bf*bsName)

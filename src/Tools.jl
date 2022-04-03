@@ -662,7 +662,7 @@ recursivelyGet(dict, startKey, NaN)
 
 function isOscillateConverged(sequence::Vector{<:Real}, 
                               threshold1::Real, threshold2::Real=threshold1; 
-                              leastCycles::Int=1, nPartition::Int=5, returnStd::Bool=false, 
+                              leastCycles::Int=1, nPartition::Int=5, 
                               convergeToMax::Bool=false)
     @assert leastCycles>0 && nPartition>1
     len = length(sequence)
@@ -672,7 +672,7 @@ function isOscillateConverged(sequence::Vector{<:Real},
     remain = sort(lastPortion)[convergeToMax ? (end÷2+1 : end) : (1 : end÷2+1)]
     b = std(remain) < threshold1 && 
         abs(sequence[end] - (convergeToMax ? max(remain...) : min(remain...))) < threshold2
-    returnStd ? (b, std(lastPortion)) : b
+    b, std(lastPortion)
 end
 
 
@@ -866,6 +866,8 @@ struct FunctionType{F}
     FunctionType(f::F) where {F<:Function} = new{F}(f)
 end
 
+FunctionType(s::Symbol) = FunctionType{s}()
+
 getFunc(ft::FunctionType{F}) where {F} = ft.f
 
 function getFuncNum(f::Function, vNum::Symbolics.Num)::Symbolics.Num
@@ -895,5 +897,18 @@ function genIndexCore(index)
     res = reshape(Union{Int, Nothing}[0], ()) |> collect
     res[] = index
     res
+end
+
+function genNamedTupleC(name::Symbol, defaultVars::AbstractArray)
+    @inline function (t::T) where {T<:NamedTuple}
+        container = getfield(Quiqbox, name)
+        res = deepcopy(defaultVars)
+        keys = fieldnames(container)
+        d = Dict(keys .=> collect(1:length(defaultVars)))
+        for (val, fd) in zip(t, fieldnames(T))
+            res[d[fd]] = val
+        end
+        container(res...)
+    end
 end
 

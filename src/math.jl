@@ -39,9 +39,9 @@ end
 F₀toFγ(γ::Int, u::Float64) = F₀toFγ(γ, u, Fγ(γ, u))
 
 
-@inline function genIntOverlapCore(Δx::Float64, 
-                                   i₁::Int, α₁::Float64, 
-                                   i₂::Int, α₂::Float64)
+function genIntOverlapCore(Δx::Float64, 
+                           i₁::Int, α₁::Float64, 
+                           i₂::Int, α₂::Float64)
     res = 0.0
     for l₁ in 0:(i₁÷2), l₂ in 0:(i₂÷2)
         Ω = i₁ + i₂ - 2*(l₁ + l₂)
@@ -125,10 +125,9 @@ end
         (4^u * factorial(u) * factorial(μ-2u) * α^(o₁+o₂-r+u))
 end
 
-@inline function genIntNucAttCore1(ΔRR₀::NTuple{3, Float64}, ΔR₁R₂::NTuple{3, Float64}, 
-                                   β::Float64, 
-                                   ijk₁::NTuple{3, Int}, α₁::Float64, 
-                                   ijk₂::NTuple{3, Int}, α₂::Float64)
+function genIntNucAttCore1(ΔRR₀::NTuple{3, Float64}, ΔR₁R₂::NTuple{3, Float64}, β::Float64, 
+                           ijk₁::NTuple{3, Int}, α₁::Float64, 
+                           ijk₂::NTuple{3, Int}, α₂::Float64)
     A = 0.0
     i₁, j₁, k₁ = ijk₁
     i₂, j₂, k₂ = ijk₂
@@ -285,11 +284,10 @@ function ∫eeInteractionCore(R₁::NTuple{3, Float64}, ijk₁::NTuple{3, Int}, 
     ΔRc = @. (α₁*R₁ + α₂*R₂)/αl - (α₃*R₃ + α₄*R₄)/αr
     η = αl * αr / (α₁ + α₂ + α₃ + α₄)
     β = η * sum(abs2, ΔRc)
-    res = π^2.5 / (αl * αr * (αl + αr)^0.5) * 
-          exp(-ηl * sum(abs2, ΔRl)) * exp(-ηr * sum(abs2, ΔRr))
-        res *= (@. (-1.0)^(ijk₁ + ijk₂) * 
-                   factorial(ijk₁) * factorial(ijk₂) * factorial(ijk₃) * factorial(ijk₄) / 
-                   αl^(ijk₁+ijk₂) / αr^(ijk₃+ijk₄)) |> prod
+    res = π^2.5 / (αl * αr * sqrt(αl + αr)) * exp(-ηl * sum(abs2, ΔRl)) * 
+                                              exp(-ηr * sum(abs2, ΔRr))
+    res *= (@. (-1.0)^(ijk₁ + ijk₂) * factorial(ijk₁) * factorial(ijk₂) * factorial(ijk₃) * 
+               factorial(ijk₄) / αl^(ijk₁+ijk₂) / αr^(ijk₃+ijk₄)) |> prod
         J = ∫eeInteractionCore1234(ΔRl, ΔRr, ΔRc, β, η, 
                                    ijk₁, α₁, ijk₂, α₂, ijk₃, α₃, ijk₄, α₄)
     res * J
@@ -329,9 +327,9 @@ function getOneBodyInt(::FunctionType{F},
     end |> sum
 end
 
-@inline function getOneBodyIntCore(flag::Bool, 
-                                   ps₁::NTuple{GN1, NTuple{2, Float64}}, 
-                                   ps₂::NTuple{GN2, NTuple{2, Float64}}) where {GN1, GN2}
+function getOneBodyIntCore(flag::Bool, 
+                           ps₁::NTuple{GN1, NTuple{2, Float64}}, 
+                           ps₂::NTuple{GN2, NTuple{2, Float64}}) where {GN1, GN2}
     uniquePairs = NTuple{2, Float64}[]
     sizehint!(uniquePairs, GN1*GN2)
     uPairCoeffs = Array{Float64}(undef, GN1*GN2)
@@ -389,9 +387,10 @@ function getTwoBodyInt(::FunctionType{F},
     f1 = (R₁ == R₂ && ijk₁ == ijk₂)
     f2 = (R₃ == R₄ && ijk₃ == ijk₄)
     f3 = (R₁ == R₃ && ijk₁ == ijk₃ && R₂ == R₄ && ijk₂ == ijk₄)
-    f4 = (R₁ == R₄ && ijk₁ == ijk₄ && R₂ == R₃ && ijk₂ == ijk₃)
+    f4 = (R₁ == R₄ && ijk₁ == ijk₄)
+    f5 = (R₂ == R₃ && ijk₂ == ijk₃)
 
-    uniquePairs, uPairCoeffs = getTwoBodyIntCore((f1, f2, f3, f4), ps₁, ps₂, ps₃, ps₄)
+    uniquePairs, uPairCoeffs = getTwoBodyIntCore((f1, f2, f3, f4, f5), ps₁, ps₂, ps₃, ps₄)
     map(uniquePairs, uPairCoeffs) do x, y
         getfield(Quiqbox, F)(optArgs..., R₁, ijk₁, x[1], R₂, ijk₂, x[2], 
                                          R₃, ijk₃, x[3], R₄, ijk₄, x[4])::Float64 * y
@@ -410,12 +409,11 @@ end
     2^m
 end
 
-@inline function getTwoBodyIntCore(flags::NTuple{4, Bool}, 
-                                   ps₁::NTuple{GN1, NTuple{2, Float64}},
-                                   ps₂::NTuple{GN2, NTuple{2, Float64}},
-                                   ps₃::NTuple{GN3, NTuple{2, Float64}},
-                                   ps₄::NTuple{GN4, NTuple{2, Float64}}) where 
-                                  {GN1, GN2, GN3, GN4}
+function getTwoBodyIntCore(flags::NTuple{5, Bool}, 
+                           ps₁::NTuple{GN1, NTuple{2, Float64}},
+                           ps₂::NTuple{GN2, NTuple{2, Float64}},
+                           ps₃::NTuple{GN3, NTuple{2, Float64}},
+                           ps₄::NTuple{GN4, NTuple{2, Float64}}) where {GN1, GN2, GN3, GN4}
     uniquePairs = NTuple{4, Float64}[]
     sizehint!(uniquePairs, GN1*GN2*GN3*GN4)
     uPairCoeffs = Array{Float64}(undef, GN1*GN2*GN3*GN4)
@@ -435,15 +433,21 @@ end
         i = getIntX1X2X3X3!(i, uniquePairs, uPairCoeffs, flagRijk, ps₁, ps₂, ps₃)
     elseif ps₁ == ps₃ && ps₂ == ps₄ && flags[3]
         i = getIntX1X2X1X2!(i, uniquePairs, uPairCoeffs, flagRijk, ps₁, ps₂)
-    elseif ps₁ == ps₄ && ps₂ == ps₃ && flags[4]
-        i = getIntX1X2X2X1!(i, uniquePairs, uPairCoeffs, flagRijk, ps₁, ps₂)
+    elseif ps₁ == ps₄ && flags[4]
+        if ps₂ == ps₃ && flags[5]
+            i = getIntX1X2X2X1!(i, uniquePairs, uPairCoeffs, flagRijk, ps₁, ps₂)
+        else
+            i = getIntX1X2X3X1!(i, uniquePairs, uPairCoeffs, flagRijk, ps₁, ps₂, ps₃)
+        end
+    elseif ps₂ == ps₃ && flags[5]
+        i = getIntX1X2X2X3!(i, uniquePairs, uPairCoeffs, flagRijk, ps₁, ps₂, ps₄)
     else
         i = getIntX1X2X3X4!(i, uniquePairs, uPairCoeffs, flagRijk, ps₁, ps₂, ps₃, ps₄)
     end
     uniquePairs, uPairCoeffs
 end
 
-@inline function getIntX1X1X2X2!(n, uniquePairs, uPairCoeffs, flags, ps₁, ps₂)
+function getIntX1X1X2X2!(n, uniquePairs, uPairCoeffs, flags, ps₁, ps₂)
     A, B, C = tupleDiff(ps₁, ps₂)
     if length(A) > 0 && flags[3]
         g1111 = ((A,),)
@@ -461,9 +465,9 @@ end
     n
 end
 
-@inline function getIntX1X2X1X2!(n, uniquePairs, uPairCoeffs, flags, ps₁, ps₂)
+function getIntX1X2X1X2!(n, uniquePairs, uPairCoeffs, flags, ps₁, ps₂)
     A, B, C = tupleDiff(ps₁, ps₂)
-    if length(A) > 0 && all(flags)
+    if length(A) > 0 && flags[1] && flags[2]
         g1111 = ((A,),)
         g1122 = ()
         g1212 = (((A, C),), ((B, A),), ((B, C),))
@@ -479,10 +483,30 @@ end
     n
 end
 
-@inline getIntX1X2X2X1!(n, uniquePairs, uPairCoeffs, flags, ps₁, ps₂) = 
-        getIntX1X2X1X2!(n, uniquePairs, uPairCoeffs, flags, ps₁, ps₂)
+function getIntX1X2X2X1!(n, uniquePairs, uPairCoeffs, flags, ps₁, ps₂)
+    A, B, C = tupleDiff(ps₁, ps₂)
+    if length(A) > 0 && all(flags)
+        g1111 = ((A,),)
+        g1122 = ()
+        g1212 = ()
+        g1123 = (((A, A, C),), ((A, C, A),), ((A, C, B),))
+        g1233 = (((A, C, A),), ((B, A, A),), ((B, C, A),))
+        g1234 = (((A, C, A, B),), ((A, C, C, B),), ((B, A, C, A),),
+                 ((B, A, C, B),), ((B, C, A, B),), ((B, C, C, A),))
+        n = getIntXAXBXCXDcore!(n, uniquePairs, uPairCoeffs, flags, 
+                                (g1111, g1122, g1212, g1123, g1233, g1234))
 
-@inline function getIntX1X1X2X3!(n, uniquePairs, uPairCoeffs, flags, ps₁, ps₂, ps₃)
+        g1221 = ((A, C), (B, A), (B, C))
+        for i in g1221
+            n = getIntCore1221!(n, uniquePairs, uPairCoeffs, flags, i)
+        end
+    else
+        n = getIntCore1221!(n, uniquePairs, uPairCoeffs, flags, (ps₁, ps₂))
+    end
+    n
+end
+
+function getIntX1X1X2X3!(n, uniquePairs, uPairCoeffs, flags, ps₁, ps₂, ps₃)
     A, B, C, D = tupleDiff(ps₁, ps₂, ps₃)
     if length(A) > 0 && flags[2] && flags[3]
         g1111 = ((A,),)
@@ -501,7 +525,7 @@ end
     n
 end
 
-@inline function getIntX1X2X3X3!(n, uniquePairs, uPairCoeffs, flags, ps₁, ps₂, ps₃)
+function getIntX1X2X3X3!(n, uniquePairs, uPairCoeffs, flags, ps₁, ps₂, ps₃)
     A, B, C, D = tupleDiff(ps₁, ps₂, ps₃)
     if length(A) > 0 && flags[1] && flags[3]
         g1111 = ((A,),)
@@ -520,7 +544,47 @@ end
     n
 end
 
-@inline function getIntX1X2X3X4!(n, uniquePairs, uPairCoeffs, flags, ps₁, ps₂, ps₃, ps₄)
+function getIntX1X2X3X1!(n, uniquePairs, uPairCoeffs, flags, ps₁, ps₂, ps₃)
+    A, B, C, D = tupleDiff(ps₁, ps₂, ps₃)
+    if length(A) > 0 && all(flags)
+        g1111 = ((A,),)
+        g1122 = ()
+        g1212 = ()
+        g1123 = (((A, A, B),), ((A, D, A),), ((A, D, B),))
+        g1233 = (((A, C, A),), ((B, A, A),), ((B, C, A),))
+        g1234 = (((A, C, A, B),), ((A, C, D, A),), ((A, C, D, B),), 
+                 ((B, A, D, A),), ((B, A, D, B),), 
+                 ((B, C, A, B),), ((B, C, D, A),), ((B, C, D, B),))
+        n = getIntXAXBXCXDcore!(n, uniquePairs, uPairCoeffs, flags, 
+                                (g1111, g1122, g1212, g1123, g1233, g1234))
+        n = getIntCore1221!(n, uniquePairs, uPairCoeffs, flags, (B,A))
+    else
+        n = getIntCore1234!(n, uniquePairs, uPairCoeffs, flags, (ps₁, ps₂, ps₃, ps₁))
+    end
+    n
+end
+
+function getIntX1X2X2X3!(n, uniquePairs, uPairCoeffs, flags, ps₁, ps₂, ps₃)
+    A, B, C, D = tupleDiff(ps₁, ps₂, ps₃)
+    if length(A) > 0 && all(flags)
+        g1111 = ((A,),)
+        g1122 = ()
+        g1212 = ()
+        g1123 = (((A, A, D),), ((A, C, A),), ((A, C, D),))
+        g1233 = (((A, C, A),), ((B, A, A),), ((B, C, A),))
+        g1234 = (((A, C, A, D),), ((A, C, C, D),), 
+                 ((B, A, A, D),), ((B, A, C, A),), ((B, A, C, D),), 
+                 ((B, C, A, D),), ((B, C, C, A),), ((B, C, C, D),))
+        n = getIntXAXBXCXDcore!(n, uniquePairs, uPairCoeffs, flags, 
+                                (g1111, g1122, g1212, g1123, g1233, g1234))
+        n = getIntCore1221!(n, uniquePairs, uPairCoeffs, flags, (A,C))
+    else
+        n = getIntCore1234!(n, uniquePairs, uPairCoeffs, flags, (ps₁, ps₂, ps₂, ps₃))
+    end
+    n
+end
+
+function getIntX1X2X3X4!(n, uniquePairs, uPairCoeffs, flags, ps₁, ps₂, ps₃, ps₄)
     A, B, C, D, E = tupleDiff(ps₁, ps₂, ps₃, ps₄)
     if length(A) > 0 && all(flags)
         g1111 = ((A,),)
@@ -539,7 +603,7 @@ end
     n
 end
 
-@inline function getIntXAXBXCXDcore!(n, uniquePairs, uPairCoeffs, flags, groups)
+function getIntXAXBXCXDcore!(n, uniquePairs, uPairCoeffs, flags, groups)
     for i in groups[1]
         n = getIntCore1111!(n, uniquePairs, uPairCoeffs, flags, i...)
     end
@@ -587,6 +651,17 @@ end
     for (x, (i₁,i₂)) in enumerate(oneSidePairs), (_, (i₃,i₄)) in zip(1:x, oneSidePairs)
         n = getUniquePair!(n, uniquePairs, uPairCoeffs, flags, 
                            (ps₁[i₁], ps₂[i₂], ps₁[i₃], ps₂[i₄]), 2^(i₁!=i₃ || i₂!=i₄)*nFold)
+    end
+    n
+end
+
+@inline function getIntCore1221!(n, uniquePairs, uPairCoeffs, flags, 
+                                 (ps₁, ps₂)::Tuple{NTuple{N1}, NTuple{N2}}, 
+                                 nFold=1) where {N1, N2}
+    oneSidePairs = Iterators.product(1:N1, 1:N2)
+    for (x, (i₁,i₂)) in enumerate(oneSidePairs), (_, (i₃,i₄)) in zip(1:x, oneSidePairs)
+        n = getUniquePair!(n, uniquePairs, uPairCoeffs, flags, 
+                           (ps₁[i₁], ps₂[i₂], ps₂[i₄], ps₁[i₃]), 2^(i₁!=i₃ || i₂!=i₄)*nFold)
     end
     n
 end
@@ -675,14 +750,14 @@ get2eInteraction(b1::AbstractGTBasisFuncs, b2::AbstractGTBasisFuncs,
 getCompositeInt(FunctionType{:get2eInteraction}(), (b1, b2, b3, b4))
 
 
-@inline function getOneBodyInts(::FunctionType{F}, 
-                                basisSet::AbstractArray{<:AbstractGTBasisFuncs}, 
-                                optArgs...) where {F}
+function getOneBodyInts(::FunctionType{F}, 
+                        basisSet::AbstractArray{<:AbstractGTBasisFuncs}, 
+                        optArgs...) where {F}
     subSize = basisSize.(basisSet) |> collect
     accuSize = vcat(0, accumulate(+, subSize))
     len = subSize |> sum
     buf = Array{Float64}(undef, len, len)
-    for i = 1:length(basisSet), j = 1:i
+    for j = 1:length(basisSet), i = 1:j
         int = getfield(Quiqbox, F)(basisSet[i], basisSet[j], optArgs...)
         rowRange = accuSize[i]+1 : accuSize[i+1]
         colRange = accuSize[j]+1 : accuSize[j+1]
@@ -712,13 +787,13 @@ permuteArray(arr::AbstractArray{T, N}, order) where {T, N} = PermutedDimsArray(a
 permuteArray(arr::Number, _) = itself(arr)
 
 
-@inline function getTwoBodyInts(::FunctionType{F}, 
-                                basisSet::AbstractArray{<:AbstractGTBasisFuncs}) where {F}
+function getTwoBodyInts(::FunctionType{F}, 
+                        basisSet::AbstractArray{<:AbstractGTBasisFuncs}) where {F}
     subSize = basisSize.(basisSet)
     accuSize = vcat(0, accumulate(+, subSize))
     totalSize = subSize |> sum
     buf = Array{Float64}(undef, totalSize, totalSize, totalSize, totalSize)
-    for i = 1:length(basisSet), j = 1:i, k = 1:i, l = 1:(k==i ? j : k)
+    for l = 1:length(basisSet), k = 1:l, j = 1:l, i = 1:(j==l ? k : j)
         I = accuSize[i]+1 : accuSize[i+1]
         J = accuSize[j]+1 : accuSize[j+1]
         K = accuSize[k]+1 : accuSize[k+1]

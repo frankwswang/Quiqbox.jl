@@ -21,7 +21,7 @@ Quiqbox.BasisFuncMix{BN, GN}
 ```
 
 ```@docs
-GTBasis{N, BT}
+GTBasis{BT, T}
 ```
 
 ```@docs
@@ -29,15 +29,19 @@ GridBox{NX, NY, NZ}
 ```
 
 ```@docs
+HFconfig{HFT, CT}
+```
+
+```@docs
 SCFconfig{N}
 ```
 
 ```@docs
-Quiqbox.HFtempVars{HFtype, N}
+Quiqbox.HFtempVars{HFtype}
 ```
 
 ```@docs
-Quiqbox.HFfinalVars{T, N, Nb}
+Quiqbox.HFfinalVars{HFtype}
 ```
 
 ```@docs
@@ -46,4 +50,8 @@ Molecule{Nc, Ne, Nb}
 
 ```@docs
 MolOrbital{N}
+```
+
+```@docs
+POconfig{M, T, F}
 ```

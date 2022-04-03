@@ -14,11 +14,11 @@ pars = uniqueParams!(bs, filterMapping=true)
 
 parsPartial = [pars[1], pars[4]]
 
-Es, pars, grads = optimizeParams!(bs, parsPartial, nuc, nucCoords, maxSteps=20)
+Es, pars, grads = optimizeParams!(parsPartial, bs, nuc, nucCoords, POconfig((maxStep=20,)))
 
 # # You can also use more advanced optimizers from other packages.
 # using Flux # First do `Pkg.add("Flux")` if you haven't installed the package.
 # using Flux.Optimise: update!
 # optimizer = AMSGrad(0.001)
 # GDm = (prs, grad) -> update!(optimizer, prs, grad)
-# optimizeParams!(bs, parsPartial, nuc, nucCoords; GDmethod=GDm)
+# optimizeParams!(bs, parsPartial, nuc, nucCoords; GD=GDm)
