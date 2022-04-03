@@ -179,6 +179,10 @@ updateParams!
 gradDescent!
 ```
 
+```@docs
+Quiqbox.genOFmethod
+```
+
 
 ```@docs
 overlap
@@ -218,8 +222,4 @@ eeInteraction
 
 ```@docs
 eeInteractions
-```
-
-```@docs
-genOFmethod
 ```
