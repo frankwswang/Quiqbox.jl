@@ -219,3 +219,7 @@ eeInteraction
 ```@docs
 eeInteractions
 ```
+
+```@docs
+genOFmethod
+```

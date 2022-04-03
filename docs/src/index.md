@@ -21,7 +21,7 @@
 
 ### Julia Environment
 
-* [1.5+](https://github.com/frankwswang/Quiqbox.jl/actions/workflows/CI.yml)
+* [1.6+](https://github.com/frankwswang/Quiqbox.jl/actions/workflows/CI.yml)
 
 ### Installation in Julia [REPL](https://docs.julialang.org/en/v1/manual/getting-started/)
 
