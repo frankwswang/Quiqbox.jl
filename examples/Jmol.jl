@@ -35,7 +35,7 @@ for (nuc, nucCoords, molName, iMol) in zip(mols, molCoords, molNames, 1:length(m
 
     # Number of spin-orbitals must not be smaller than numbers of electrons.
     fVars = try
-        runHF(bs, nuc, nucCoords, HFconfig((printInfo=false,)))
+        runHF(bs, nuc, nucCoords, printInfo=false)
     catch
         continue
     end

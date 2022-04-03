@@ -29,6 +29,10 @@ GridBox{NX, NY, NZ}
 ```
 
 ```@docs
+HFconfig{HFT, CT}
+```
+
+```@docs
 SCFconfig{N}
 ```
 
@@ -46,4 +50,8 @@ Molecule{Nc, Ne, Nb}
 
 ```@docs
 MolOrbital{N}
+```
+
+```@docs
+POconfig{M, T, F}
 ```

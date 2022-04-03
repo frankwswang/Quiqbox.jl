@@ -412,29 +412,30 @@ struct HFfinalVars{HFT} <: HartreeFockFinalValue{HFT}
 end
 
 
-const Doc_HFconfig_Eg1 = "HFconfig{:RHF, :SAD, 3}(Val{:UHF}(), Val{:SAD}(), "*
+const Doc_HFconfig_Eg1 = "HFconfig{:RHF, :SAD, 3}(Val{:RHF}(), Val{:SAD}(), "*
                          "SCFconfig{3}(interval=(0.0001, 1.0e-6, 1.0e-15), "*
                          "oscillateThreshold=1.0e-5, method, methodConfig)"*
-                         "[:ADIIS, :DIIS, :ADIIS], true, true, 1000)"
+                         "[:ADIIS, :DIIS, :ADIIS], 1000, true)"
 
-const Doc_HFconfig_Eg2 = "HFconfig{:UHF, :SAD, 3}(Val{:UHF}(), Val{:SAD}(), "*
-                         "SCFconfig{3}(interval=(0.0001, 1.0e-6, 1.0e-15), "*
-                         "oscillateThreshold=1.0e-5, method, methodConfig)"*
-                         "[:ADIIS, :DIIS, :ADIIS], true, true, 1000)"
+const Doc_HFconfig_Eg2 = Doc_HFconfig_Eg1[1:10] * "U" * Doc_HFconfig_Eg1[12:29] * "U" * 
+                         Doc_HFconfig_Eg1[31:end]
+
+const HFtypes = (:RHF, :UHF)
 
 """
 
-    HFconfig{HFT, CT}
+    HFconfig{HFT, CT} <: ConfigBox{HFconfig, HFT}
 
 The mutable container of Hartree-Fock method configuration.
 
 ≡≡≡ Field(s) ≡≡≡
 
-`HF::Val`: Hartree-Fock method type. Available values are `Val(:RHF)` and `Val(:UHF)`.
+`HF::Val{HFT}`: Hartree-Fock method type. Available values of `HFT` are 
+$(string(HFtypes)[2:end-1]).
 
 `C0::Union{Matrix{Float64}, NTuple{2, Matrix{Float64}}, Val}`: Initial guess of the 
-coefficient matrix(s) C of the molecular orbitals. When `C0` is a `Val{T}`, the `Tuple` of 
-available `T`s is `$(guessCmethods|>typeof|>fieldnames)`.
+coefficient matrix(s) C of the molecular orbitals. When `C0` is a `Val{T}`, the available 
+values of `T` are `$((guessCmethods|>typeof|>fieldnames|>string)[2:end-1])`.
 
 `SCF::SCFconfig`: SCF iteration configuration. For more information please refer to 
 `SCFconfig`.
@@ -442,13 +443,11 @@ available `T`s is `$(guessCmethods|>typeof|>fieldnames)`.
 `earlyTermination::Bool`: Whether automatically early terminate (skip) a convergence method 
 when its performance becomes unstable or poor.
 
-`printInfo::Bool`: Whether print out the information of each iteration step.
-
 `maxStep::Int`: Maximum allowed iteration steps regardless of whether the SCF converges.
 
 ≡≡≡ Initialization Method(s) ≡≡≡
 
-    HFconfig() -> $(HFconfig |> typeof)
+    HFconfig() -> HFconfig
 
     HFconfig(t::NamedTuple) -> HFconfig
 
@@ -462,23 +461,22 @@ julia> HFconfig((HF=:UHF,))
 $(Doc_HFconfig_Eg2)
 ```
 """
-mutable struct HFconfig{HFT, CT, L}
+mutable struct HFconfig{HFT, CT, L} <: ConfigBox{HFconfig, HFT}
     HF::Val{HFT}
     C0::Union{Matrix{Float64}, NTuple{2, Matrix{Float64}}, Val}
     SCF::SCFconfig{L}
-    earlyTermination::Bool
-    printInfo::Bool
     maxStep::Int
+    earlyTermination::Bool
 
-    HFconfig(::Val{:UHF}, 
-             a2::NTuple{2, Matrix{Float64}}, a3::SCFconfig{L}, a4, a5, a6) where {L} = 
-    new{:UHF, NTuple{2, Matrix{Float64}}, L}(Val(:UHF), a2, a3, a4, a5, a6)
+    HFconfig(::Val{:UHF}, a2::NTuple{2, Matrix{Float64}}, a3::SCFconfig{L}, a4, a5) where 
+            {L} = 
+    new{:UHF, NTuple{2, Matrix{Float64}}, L}(Val(:UHF), a2, a3, a4, a5)
 
-    HFconfig(::Val{:RHF}, a2::Matrix{Float64}, a3::SCFconfig{L}, a4, a5, a6) where {L} = 
-    new{:RHF, Matrix{Float64}, L}(Val(:RHF), a2, a3, a4, a5, a6)
+    HFconfig(::Val{:RHF}, a2::Matrix{Float64}, a3::SCFconfig{L}, a4, a5) where {L} = 
+    new{:RHF, Matrix{Float64}, L}(Val(:RHF), a2, a3, a4, a5)
 
-    HFconfig(::Val{HFT}, a2::Val{CT}, a3::SCFconfig{L}, a4, a5, a6) where {HFT, CT, L} = 
-    new{HFT, CT, L}(Val(HFT), a2, a3, a4, a5, a6)
+    HFconfig(::Val{HFT}, a2::Val{CT}, a3::SCFconfig{L}, a4, a5) where {HFT, CT, L} = 
+    new{HFT, CT, L}(Val(HFT), a2, a3, a4, a5)
 end
 
 HFconfig(a1::Symbol, a2, args...) = HFconfig(Val(a1), a2, args...)
@@ -487,17 +485,11 @@ HFconfig(a1, a2::Symbol, args...) = HFconfig(a1, Val(a2), args...)
 
 HFconfig(a1::Symbol, a2::Symbol, args...) = HFconfig(Val(a1), Val(a2), args...)
 
-HFconfig() = HFconfig(Val(:RHF), Val(:SAD), defaultSCFconfig, true, true, 1000)
+const defaultHFconfigPars = Any[Val(:RHF), Val(:SAD), defaultSCFconfig, 1000, true]
 
-function HFconfig(t::T) where {T<:NamedTuple}
-    res = Any[Val(:RHF), Val(:SAD), defaultSCFconfig, true, true, 1000]
-    keys = fieldnames(HFconfig)
-    d = Dict(keys .=> collect(1:6))
-    for (val, fd) in zip(t, fieldnames(T))
-        res[d[fd]] = val
-    end
-    HFconfig(res...)
-end
+HFconfig() = HFconfig(defaultHFconfigPars...)
+
+HFconfig(t::NamedTuple) = genNamedTupleC(:HFconfig, defaultHFconfigPars)(t)
 
 
 """
@@ -505,7 +497,8 @@ end
           nuc::Vector{String}, 
           nucCoords::Vector{<:AbstractArray{<:Real}}, 
           N::Int=getCharge(nuc), 
-          config::HFconfig{HFT}=HFconfig()) where {HFT} -> 
+          config::HFconfig{HFT}=HFconfig();
+          printInfo::Bool=true) where {HFT} -> 
     HFfinalVars{HFT}
 
 Main function to run Hartree-Fock in Quiqbox.
@@ -516,18 +509,23 @@ Main function to run Hartree-Fock in Quiqbox.
 
 `nuc::Array{String, 1}`: The element symbols of the nuclei for the Molecule.
 
-`nucCoords::Array{<:AbstractArray, 1}`: The coordinates of the nuclei.
+`nucCoords::Array{<:AbstractArray, 1}`: Nuclei coordinates.
 
-`N::Int`: The total number of electrons.
+`N::Int`: Total number of electrons.
 
 `config::HFconfig`: The Configuration of selected Hartree-Fock method. For more information 
 please refer to `HFconfig`.
+
+=== Keyword argument(s) ===
+
+`printInfo::Bool`: Whether print out the information of iteration steps.
 """
 function runHF(gtb::BasisSetData{BT}, 
                nuc::Vector{String}, 
                nucCoords::Vector{<:AbstractArray{<:Real}}, 
                N::Int=getCharge(nuc), 
-               config::HFconfig{HFT, CT, L}=HFconfig()) where {BT, HFT, CT, L}
+               config::HFconfig{HFT, CT, L}=HFconfig(); 
+               printInfo::Bool=true) where {BT, HFT, CT, L}
     @assert length(nuc) == length(nucCoords)
     @assert length(gtb.basis) >= ceil(N/2)
     @assert N > (HFT==:RHF) "$(HFT) requires more than $(HFT==:RHF) electrons."
@@ -540,7 +538,7 @@ function runHF(gtb::BasisSetData{BT},
         config.C0
     end
     runHFcore(config.SCF, N, Hcore, gtb.eeI, gtb.S, X, initialC, 
-              config.printInfo, config.maxStep, config.earlyTermination)
+              printInfo, config.maxStep, config.earlyTermination)
 end
 
 """
@@ -549,14 +547,18 @@ end
           nuc::Vector{String}, 
           nucCoords::Vector{<:AbstractArray{<:Real}}, 
           config::HFconfig{HFT}=HFconfig(), 
-          N::Int=getCharge(nuc)) where {HFT} -> 
+          N::Int=getCharge(nuc);
+          printInfo::Bool=true) where {HFT} -> 
     HFfinalVars{HFT}
 
+Another method of `runHF`.
 """
-runHF(gtb::BasisSetData, nuc, nucCoords, config::HFconfig=HFconfig(), N=getCharge(nuc)) = 
-runHF(gtb::BasisSetData, nuc, nucCoords, N, config)
+runHF(gtb::BasisSetData, nuc, nucCoords, config::HFconfig=HFconfig(), N=getCharge(nuc); 
+      printInfo=true) = 
+runHF(gtb::BasisSetData, nuc, nucCoords, N, config; printInfo)
 
-runHF(bs::Vector{<:AbstractGTBasisFuncs}, args...) = runHF(GTBasis(bs), args...)
+runHF(bs::Vector{<:AbstractGTBasisFuncs}, args...; printInfo=true) = 
+runHF(GTBasis(bs), args...; printInfo)
 
 
 """
@@ -594,7 +596,7 @@ Coulomb interactions and the Exchange Correlations.
 `C0::Union{Array{Float64, 2}, NTuple{2, Array{Float64, 2}}}`: Initial guess of the 
 coefficient matrix(s) C of the molecular orbitals.
 
-`printInfo::Bool`: Whether print out the information of each iteration step.
+`printInfo::Bool`: Whether print out the information of iteration steps.
 
 `maxStep::Int`: Maximum allowed iteration steps regardless of whether the SCF converges.
 

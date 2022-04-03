@@ -23,6 +23,7 @@ abstract type MolecularDataBox <: ImmutableDataBox end
 abstract type HartreeFockintermediateData <: MutableDataBox end
 
 abstract type DifferentiableParameter{ContainerT, DataT} <: MutableParameter{ContainerT, DataT} end
+abstract type ConfigBox{ContainerT, MethodT} <: MutableParameter{ContainerT, Any} end
 
 abstract type HartreeFockFinalValue{T} <: AbstractHartreeFockFinalValue end
 

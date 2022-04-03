@@ -180,8 +180,8 @@ using Suppressor: @suppress_out
 
         bs = genBasisFunc.(nucCoords2, "3-21G") |> flatten
 
-        push!(Erhf, runHF(bs, nuc2, nucCoords2, HFconfig((printInfo=false,))).E0HF)
-        push!(Euhf, runHF(bs, nuc2, nucCoords2, HFconfig((HF=:UHF, printInfo=false,))).E0HF)
+        push!(Erhf, runHF(bs, nuc2, nucCoords2, printInfo=false).E0HF)
+        push!(Euhf, runHF(bs, nuc2, nucCoords2, HFconfig((HF=:UHF,)), printInfo=false).E0HF)
         push!(Enuc, nnRepulsions(nuc2, nucCoords2))
     end
 

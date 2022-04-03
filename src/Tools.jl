@@ -899,3 +899,16 @@ function genIndexCore(index)
     res
 end
 
+function genNamedTupleC(name::Symbol, defaultVars::AbstractArray)
+    @inline function (t::T) where {T<:NamedTuple}
+        container = getfield(Quiqbox, name)
+        res = deepcopy(defaultVars)
+        keys = fieldnames(container)
+        d = Dict(keys .=> collect(1:length(defaultVars)))
+        for (val, fd) in zip(t, fieldnames(T))
+            res[d[fd]] = val
+        end
+        container(res...)
+    end
+end
+

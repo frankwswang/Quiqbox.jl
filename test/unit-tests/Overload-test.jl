@@ -48,7 +48,8 @@ using Suppressor: @capture_out
     box1 = GridBox(2, 1.5)
     @test (@capture_out show(box1)) == string(typeof(box1))*"(num, len, coord)"
 
-    fVar1 = runHF(GTb1, ["H","H"], [[0,0,0],[1,2,1]], HFconfig((C0=:Hcore,printInfo=false)))
+    fVar1 = runHF(GTb1, ["H", "H"], [[0,0,0], [1,2,1]], HFconfig((C0=:Hcore,)), 
+                  printInfo=false)
 
     info1 = (@capture_out show(fVar1.temp))
     @test info1[1:39] == string(typeof(fVar1.temp))*"(shared.Etots=["
