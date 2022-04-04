@@ -756,7 +756,8 @@ function mapPermute(arr, permFunction)
 end
 
 
-struct Pf{C, F} <: ParameterizedFunction
+# Product Function
+struct Pf{C, F} <: ParameterizedFunction{Pf, F}
     f::Function
 end
 
@@ -912,3 +913,11 @@ function genNamedTupleC(name::Symbol, defaultVars::AbstractArray)
     end
 end
 
+
+convertNumber(num::Number, roundDigits::Int=-1, type::Type{<:Number}=Float64) = 
+(roundDigits < 0  ?  num  :  round(num, digits=roundDigits)) |> type
+
+
+fillNumber(num::Number) = fill(num)
+
+fillNumber(num::Array{<:Any, 0}) = itself(num)

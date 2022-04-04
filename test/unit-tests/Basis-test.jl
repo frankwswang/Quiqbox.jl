@@ -82,7 +82,7 @@ v2 = genSpatialPoint([k,2,3.0])
 
 
 # struct BasisFunc and function genBasisFunc
-cen = [1,2,3]
+cen = [1.0, 2.0, 3.0]
 cenParNames = [ParamList[:X], ParamList[:Y], ParamList[:Z]]
 cenPar = ParamBox.(cen, cenParNames) |> Tuple
 bf1 = genBasisFunc(cen, [gf1])
