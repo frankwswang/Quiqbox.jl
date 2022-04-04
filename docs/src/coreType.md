@@ -1,7 +1,7 @@
 # Core Types
 
 ```@docs
-ParamBox{V, VI, T}
+ParamBox{T, V, FL}
 ```
 
 ```@docs

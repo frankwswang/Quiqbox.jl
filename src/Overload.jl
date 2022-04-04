@@ -224,7 +224,7 @@ function hasBoolRelation(boolFunc::F,
 
     if ignoreContainer
         boolFunc(pb1(), pb2())
-    elseif ignoreFunction || F1 == F2 == :itself
+    elseif ignoreFunction || F1 == F2 == FLevel{1, 0}
         boolFunc(pb1.data, pb2.data)
     else
         boolFunc(pb1.canDiff[], pb2.canDiff[]) && boolFunc(pb1.map, pb2.map) && 
