@@ -16,10 +16,13 @@ using Test
         unit2_1 = "Main Functions"
         println("Testing $(unit2_1)...")
         t2_1 = @elapsed @testset "$(unit2_1)" begin
-            include("unit-tests/Integration/OneBody-test.jl")
-            include("unit-tests/Integration/TwoBody-test.jl")
-            include("unit-tests/Integration/math-test.jl")
             include("unit-tests/Basis-test.jl")
+            include("unit-tests/Integrals/Core-test.jl")
+            include("unit-tests/Integrals/OneBody-test.jl")
+            include("unit-tests/Integrals/TwoBody-test.jl")
+            if Sys.islinux()
+                include("unit-tests/Integrals/Libcint-compare-tests.jl")
+            end
             include("unit-tests/Differentiation-test.jl")
         end
         println("$(unit2_1) test finished in $t2_1 seconds.\n")

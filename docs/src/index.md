@@ -17,7 +17,7 @@
 
 * Linux
 * Mac OS
-* [Windows Subsystem for Linux](https://docs.microsoft.com/en-us/windows/wsl/about)
+* Windows
 
 ### Julia Environment
 

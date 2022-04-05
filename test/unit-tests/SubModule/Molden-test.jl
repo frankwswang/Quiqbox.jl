@@ -4,7 +4,6 @@ using Quiqbox.Molden
 
 @testset "Molden.jl test" begin
 
-
 mols = [
         ["H", "H"],
         ["H", "F"],
@@ -57,9 +56,9 @@ for (nuc, nucCoords, molName, iMol) in zip(mols, molCoords, molNames, 1:length(m
     str1, str2 = replace.(read.((fd, prefix2*fn*".molden"), String), 
                           r"[0-9]+\.[0-9]{5}(?![0-9])"=>"X.XXXXX")
     str1, str2 = replace.((str1, str2), "-X.XXXXX"=>" X.XXXXX")
+    str1, str2 = replace.((str1, str2), "\r\n"=>"\n")
     @test str1 == str2
     rm(fd)
 end
-
 
 end

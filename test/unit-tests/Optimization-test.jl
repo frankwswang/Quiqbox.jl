@@ -1,4 +1,3 @@
-using Quiqbox
 using Test
 using Quiqbox
 using Suppressor: @suppress_out

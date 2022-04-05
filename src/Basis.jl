@@ -501,8 +501,9 @@ function genBasisFunc(center::NTuple{3, ParamBox}, BSKeyANDnuc::Vector{NTuple{2,
                       unlinkCenter::Bool=false)
     bases = FloatingGTBasisFuncs[]
     for k in BSKeyANDnuc
-        BFMcontent = BasisSetList[k[1]][AtomicNumberList[k[2]]]
-        append!(bases, genBFuncsFromText(BFMcontent; adjustContent=true, 
+        content = BasisSetList[k[1]][AtomicNumberList[k[2]]]
+        @assert content!==nothing "Quiqbox DOES NOT have basis set "*k[1]*" for "*k[2]*"."
+        append!(bases, genBFuncsFromText(content; adjustContent=true, 
                 excludeLastNlines=1, center, unlinkCenter))
     end
     bases
@@ -637,12 +638,6 @@ isFull(::Any) = false
 isFull(::FloatingGTBasisFuncs{0}) = true
 
 isFull(::FloatingGTBasisFuncs{𝑙, <:Any, ON}) where {𝑙, ON} = (ON == SubshellXYZsizes[𝑙+1])
-
-
-function ijkIndex(b::FloatingGTBasisFuncs)
-    isFull(b) && (return :)
-    [ijkIndexList[ijk] for ijk in b.ijk]
-end
 
 
 """
@@ -1624,46 +1619,6 @@ function getVarDict(containers::Union{Array, StructSpatialBasis};
         inSymValOf.(pbs) |> Dict
     end
 end
-
-
-#########################################################################
-# Old normalization functions for libcint integral functions.
-function Nlα(l, α)
-    if l < 2
-        sqrt( 2^(2l+3) * factorial(l+1) * 2^(l+1.5) / 
-              (factorial(2l+2) * √π) ) * α^(0.5l + 0.75)
-    else
-        # for higher angular momentum make the upper bound of norms be 1.
-        sqrt( 2^(3l+1.5) * factorial(l) / (factorial(2l) * π^1.5) ) * α^(0.5l + 0.75)
-    end
-end
-
-Nlα(subshell::String, α) = Nlα(AngularMomentumList[subshell], α)
-
-
-Nijk(i, j, k) = (2/π)^0.75 * sqrt( 2^(3*(i+j+k)) * factorial(i) * factorial(j) * 
-                                   factorial(k) / (factorial(2i) * factorial(2j) * 
-                                                   factorial(2k)) )
-
-
-function Nijkα(i, j, k, α)
-    l = i + j + k
-    if l < 2
-        sqrt( 2^(2l+3) * factorial(l+1) * 2^(l+1.5) / (factorial(2l+2) * √π) ) * 
-        α^(0.5l + 0.75)
-    else
-        # for higher angular momentum make the upper bound of norms be 1.
-        Nijk(i, j, k) * α^(0.5l + 0.75)
-    end
-end
-
-normOfGTOin(b::FloatingGTBasisFuncs{𝑙, GN, 1})  where {𝑙, GN} = 
-Nijkα.(b.ijk[1]..., [g.xpn() for g in b.gauss])
-
-normOfGTOin(b::FloatingGTBasisFuncs{𝑙, GN, ON}) where {𝑙, GN, ON} = 
-Nlα.(b|>getSubshell, [g.xpn() for g in b.gauss])
-
-#########################################################################
 
 
 getNijk(i, j, k) = (2/π)^0.75 * 

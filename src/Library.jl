@@ -114,7 +114,7 @@ function ijkToStr(ijk::XYZTuple)
 end
 
 
-const BasisFuncNames = 
+const BasisSetNames = 
 [
 "STO-2G", 
 "STO-3G", 
@@ -130,7 +130,7 @@ const BasisFuncNames =
 const SciNotMarker = r"D(?=[\+\-])"
 const sciNotReplace = (txt)->replace(txt, SciNotMarker => "e")
 const BStextEndingMarker = "****"
-const BasisSetList = Dict(BasisFuncNames .=> BasisFuncTexts)
+const BasisSetList = Dict(BasisSetNames .=> BasisFuncTexts)
 const AtomicNumberList = Dict(ElementNames .=> collect(1 : length(ElementNames)))
 const AngularMomentumList = Dict(SubshellNames .=> collect(0 : length(SubshellNames)-1))
 const SubshellOrientationList = Dict(SubshellNames .=> SubshellXYZs)

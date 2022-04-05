@@ -26,10 +26,10 @@
 ## Supported system platforms (64-bit)
 * Linux
 * Mac OS
-* [Windows Subsystem for Linux](https://docs.microsoft.com/en-us/windows/wsl/about)
+* Windows
 
 ## Julia Environment
-* [1.6+](https://github.com/frankwswang/Quiqbox.jl/actions/workflows/CI.yml)
+* [1.6+](https://github.com/frankwswang/Quiqbox.jl/actions/workflows/CI-JS-older.yml)
 
 ## Installation in Julia [REPL](https://docs.julialang.org/en/v1/manual/getting-started/)
 
@@ -100,8 +100,8 @@ To learn more about the basic usage of the programming language behind Quiqbox, 
 [Doc-latest]:  https://frankwswang.github.io/Quiqbox.jl/dev
 [Doc-s-img]:   https://img.shields.io/github/v/release/frankwswang/Quiqbox.jl?label=Latest%20release
 [Doc-l-img]:   https://img.shields.io/badge/docs-latest-blue.svg
-[GA-CI-img]:   https://img.shields.io/github/workflow/status/frankwswang/Quiqbox.jl/CI?label=Julia%201.6%2B
-[GA-CI-url]:   https://github.com/frankwswang/Quiqbox.jl/actions/workflows/CI.yml
+[GA-CI-img]:   https://img.shields.io/github/workflow/status/frankwswang/Quiqbox.jl/CI?label=Julia%20latest
+[GA-CI-url]:   https://github.com/frankwswang/Quiqbox.jl/actions/workflows/CI-JS-latest.yml
 [GA-CI-JN-img]:https://img.shields.io/github/workflow/status/frankwswang/Quiqbox.jl/CI-JN?label=Julia%20nightly
 [GA-CI-JN-url]:https://github.com/frankwswang/Quiqbox.jl/actions/workflows/CI-JN.yml
 [codecov-img]: https://img.shields.io/codecov/c/github/frankwswang/Quiqbox.jl/main?label=Coverage&token=Z1XOA39DV2

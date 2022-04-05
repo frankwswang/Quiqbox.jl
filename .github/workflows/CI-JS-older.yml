@@ -1,4 +1,4 @@
-name: CI-JN
+name: CI-JS-older
 on: 
   pull_request:
     branches:
@@ -15,7 +15,8 @@ jobs:
       fail-fast: false
       matrix:
         version:
-          - 'nightly'
+          - '1.6'
+          - '1.7'
         os:
           - ubuntu-latest
           - macOS-latest
