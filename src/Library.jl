@@ -1,6 +1,5 @@
 export XYZTuple, getCharge, ParamList
 
-
 const ElementNames = 
 [
 "H",

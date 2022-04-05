@@ -1,24 +1,11 @@
 using Test
 using Quiqbox
 
+include("../../../test/test-functions/Shared.jl")
+
 @testset "TwoBody.jl tests" begin
     errT1 = 1e-10
     errT2 = 1e-14
-
-    function compr2eIs(eeIs1, eeIs2, errT=errT1)
-        is = isapprox.(eeIs1, eeIs2, atol=errT)
-        ids = findall(isequal(0), is)
-        if length(ids) == 0
-            true
-        else
-            println()
-            for idx in ids
-                @show idx eeIs1[idx] eeIs2[idx]
-            end
-            println()
-            false
-        end
-    end
 
     b1 = genBasisFunc([0,1,0], (3,2), (1,0,0), normalizeGTO=true)
     b2 = genBasisFunc([1,2,3], (1,2), (0,1,0), normalizeGTO=true)
@@ -112,8 +99,8 @@ using Quiqbox
     eeIs1 = eeInteractions(bs)
     eeIs2 = [eeInteraction(i...)[] for i in Iterators.product(bs, bs, bs, bs)]
 
-    @test compr2eIs(eeIs1, eeIs)
-    @test compr2eIs(eeIs1, eeIs2)
+    @test compr2Arrays(eeIs1, eeIs, errT1)
+    @test compr2Arrays(eeIs1, eeIs2, errT1)
 
     eeIs3 = eeInteractions(bs[[1,3,2,4]])
     uniqueIdx = Quiqbox.genUniqueIndices(bs)

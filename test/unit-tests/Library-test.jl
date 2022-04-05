@@ -1,3 +1,4 @@
+using Test
 using Quiqbox: checkBSList
 
 @testset "Library.jl tests" begin
