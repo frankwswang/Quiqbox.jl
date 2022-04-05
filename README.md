@@ -26,7 +26,7 @@
 ## Supported system platforms (64-bit)
 * Linux
 * Mac OS
-* [Windows Subsystem for Linux](https://docs.microsoft.com/en-us/windows/wsl/about)
+* Windows
 
 ## Julia Environment
 * [1.6+](https://github.com/frankwswang/Quiqbox.jl/actions/workflows/CI.yml)
