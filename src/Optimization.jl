@@ -107,7 +107,7 @@ end
 
 POconfig(a1::Symbol, args...) = POconfig(Val(a1), args...)
 
-const defaultPOconfigPars = Any[Val(:HF), HFconfig(), NaN, 1e-4, 500, gradDescent!]
+const defaultPOconfigPars = Any[Val(:HF), HFconfig(), NaN, 1e-5, 500, gradDescent!]
 
 POconfig() = POconfig(defaultPOconfigPars...)
 
