@@ -1735,7 +1735,7 @@ function varVal(vr::SymbolicUtils.Sym, varDict::Dict{Num, <:Real})
     res = recursivelyGet(varDict, vr |> Num)
     if isnan(res)
         res = recursivelyGet(varDict, 
-                             symbolReplace(Symbolics.tosymbol(vr), 
+                             replaceSymbol(Symbolics.tosymbol(vr), 
                                            NoDiffMark=>"") |> Symbolics.variable)
     end
     if isnan(res)

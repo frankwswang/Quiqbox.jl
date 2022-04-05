@@ -562,7 +562,7 @@ itself(x::T) where {T} = x::T
 """
 Similar as `replace` but for Symbols.
 """
-function symbolReplace(sym::Symbol, pair::Pair{String, String}; count::Int=typemax(Int))
+function replaceSymbol(sym::Symbol, pair::Pair{String, String}; count::Int=typemax(Int))
     replace(sym |> string, pair; count) |> Symbol
 end
 
