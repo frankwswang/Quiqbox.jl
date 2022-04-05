@@ -1,5 +1,5 @@
 export ParamBox, inValOf, inSymOf, inSymValOf, outValOf, outSymOf, dataOf, mapOf, 
-       outValCopy, inVarCopy, enableDiff!, disableDiff!, isDiffParam, toggleDiff!
+       outValCopy, inVarCopy, enableDiff!, disableDiff!, isDiffParam, toggleDiff!, changeMap
 
 using Symbolics: Num
 
@@ -33,8 +33,8 @@ Parameter container that can enable parameter differentiations.
 
 ≡≡≡ Field(s) ≡≡≡
 
-`data::Array{T<:Number, 0}`: The data (parameter) stored in a 0-D `Array` that can be 
-accessed by syntax `[]`.
+`data::Array{T, 0}`: The data (parameter) stored in a 0-D `Array` that can be accessed by 
+syntax `[]`.
 
 `dataName::Symbol`: The name assigned to the stored data.
 
@@ -50,12 +50,12 @@ marked as "differentiable".
 
     ParamBox(data::Union{Array{T, 0}, T}, dataName::Symbol=:undef; 
              index::Union{Int, Nothing}=nothing) where {T<:Number} -> 
-    ParamBox{T, dataName, $(FLevel{1,0})}
+    ParamBox{T, dataName, $(FLevel(itself))}
 
     ParamBox(data::Union{Array{T, 0}, T}, name::Symbol, mapFunction::Function, 
              dataName::Symbol=:undef; index::Union{Int, Nothing}=nothing, 
              canDiff::Bool=true) where {T<:Number} ->
-    ParamBox{T, name, $(nameOf)(mapFunction)}
+    ParamBox{T, name, $(FLevel)(mapFunction)}
 
 `name` specifies the name of the (mapped) variable the `ParamBox` represents, which helps 
 with symbolic representation and automatic differentiation.
@@ -73,19 +73,17 @@ words, it determines whether the mapped variable `ParamBox` generated during the
 differentiation procedure is treated as a dependent variable or an independent variable 
 regardless of the mapping relation.
 
-`paramType` specifies the type of the stored parameter to avoid data type mutation.
-
 ≡≡≡ Example(s) ≡≡≡
 
 ```jldoctest; setup = :(push!(LOAD_PATH, "../../src/"); using Quiqbox)
 julia> ParamBox(1.0)
-ParamBox{Float64, :undef, $(FLevel{1,0})}(1.0)[∂][undef]
+ParamBox{Float64, :undef, $(FLevel(itself))}(1.0)[∂][undef]
 
 julia> ParamBox(1.0, :a)
-ParamBox{Float64, :a, $(FLevel{1,0})}(1.0)[∂][a]
+ParamBox{Float64, :a, $(FLevel(itself))}(1.0)[∂][a]
 
 julia> ParamBox(1.0, :a, abs)
-ParamBox{Float64, :a, $(FLevel{2,0})}(1.0)[∂][x_a]
+ParamBox{Float64, :a, $(FLevel(abs))}(1.0)[∂][x_a]
 ```
 
 **NOTE 1:** The rightmost "`[∂][IV]`" in the printing info indicates the differentiability 
@@ -105,18 +103,18 @@ struct ParamBox{T, V, FL<:FLevel} <: DifferentiableParameter{ParamBox, T}
     canDiff::Array{Bool, 0}
     index::Array{<:Union{Int, Nothing}, 0}
 
-    function ParamBox{V, F}(f::F, data::Array{T, 0}, index, canDiff, dataName=:undef) where 
-                           {V, F<:Function, T}
+    function ParamBox{T, V}(f::F, data::Array{T, 0}, index, canDiff, 
+                            dataName=:undef) where {T, V, F<:Function}
         dName = (dataName == :undef) ? Symbol("x_" * string(V)) : dataName
         new{T, V, FLevel(F)}(data, dName, f, canDiff, index)
     end
 
-    ParamBox{V, typeof(itself)}(data::Array{T, 0}, index) where {V, T} = 
+    ParamBox{T, V}(data::Array{T, 0}, index) where {T, V} = 
     new{T, V, FLevel(itself)}(data, V, itself, fill(false), index)
 end
 
-function ParamBox{V}(mapFunction::F, data, index, canDiff, dataName=:undef) where 
-                    {V, F<:Function}
+function ParamBox(::Val{V}, mapFunction::F, data::Array{T, 0}, index, canDiff, 
+                  dataName=:undef) where {V, F<:Function, T}
     L1, _ = getFLevel(F)
     Ftype = F
     if L1 == 2
@@ -126,27 +124,28 @@ function ParamBox{V}(mapFunction::F, data, index, canDiff, dataName=:undef) wher
             idx = parse(Int, fStr[2:end])
             fSym = "f_" * string(V) * numToSubs(idx) |> Symbol
             mapFunction = renameFunc(fSym, mapFunction)
-            Ftype = typeof(mapFunction)
         end
     end
-    ParamBox{V, Ftype}(mapFunction, data, index, canDiff, dataName)
+    ParamBox{T, V}(mapFunction, data, index, canDiff, dataName)
 end
 
-ParamBox{V}(::typeof(itself), data, index, _...) where {V} = 
-ParamBox{V, typeof(itself)}(data, index)
+ParamBox(::Val{V}, data::Array{T, 0}, index) where {V, T} = ParamBox{T, V}(data, index)
 
-ParamBox{V}(pb::ParamBox{<:Any, <:Any, FLevel{1,0}}) where {V} = 
-ParamBox{V, typeof(itself)}(pb.data, pb.index)
+ParamBox(::Val{V}, ::typeof(itself), data::Array{T, 0}, index, _...) where {V, T} = 
+ParamBox{T, V}(data, index)
 
-ParamBox{V}(pb::ParamBox) where {V} = 
-ParamBox{V}(pb.map, pb.data, pb.index, pb.canDiff, pb.dataName)
+ParamBox(::Val{V}, pb::ParamBox{T, <:Any, FLevel(itself)}) where {V, T} = 
+ParamBox{T, V}(pb.data, pb.index)
+
+ParamBox(::Val{V}, pb::ParamBox) where {V} = 
+ParamBox(Val(V), pb.map, pb.data, pb.index, pb.canDiff, pb.dataName)
 
 ParamBox(data::T, dataName::Symbol=:undef; index::Union{Int, Nothing}=nothing) where {T} = 
-ParamBox{dataName, typeof(itself)}(fillNumber(data), genIndex(index))
+ParamBox(Val(dataName), fillNumber(data), genIndex(index))
 
 ParamBox(data::T, name::Symbol, mapFunction::F, dataName::Symbol=:undef; 
          index::Union{Int, Nothing}=nothing, canDiff::Bool=true) where {T, F<:Function} = 
-ParamBox{name}(mapFunction, fillNumber(data), genIndex(index), fill(canDiff), dataName)
+ParamBox(Val(name), mapFunction, fillNumber(data), genIndex(index), fill(canDiff), dataName)
 
 
 """
@@ -181,7 +180,8 @@ end
 Return a `Pair` of the stored independent variable of the input `ParamBox` and its 
 corresponding value.
 """
-@inline inSymValOf(pb::ParamBox{T}) where {T} = (inSymOf(pb) => pb.data[])::Pair{Symbolics.Num, T}
+@inline inSymValOf(pb::ParamBox{T}) where {T} = 
+        (inSymOf(pb) => pb.data[])::Pair{Symbolics.Num, T}
 
 
 """
@@ -193,7 +193,7 @@ Return the value of mapped data (dependent variable) of the input `ParamBox`. Eq
 """
 @inline outValOf(pb::ParamBox{T}) where {T} = pb.map(pb.data[]::T)
 
-@inline outValOf(pb::ParamBox{T, <:Any, FLevel{1,0}}) where {T} = inValOf(pb)
+@inline outValOf(pb::ParamBox{T, <:Any, FLevel(itself)}) where {T} = inValOf(pb)
 
 (pb::ParamBox)() = outValOf(pb)
 # (pb::ParamBox)() = Base.invokelatest(pb.map, pb.data[])::Float64
@@ -206,7 +206,7 @@ Return the value of mapped data (dependent variable) of the input `ParamBox`. Eq
 Return the variable`::Symbolics.Num` of mapped data (dependent variable) of the input 
 `ParamBox`.
 """
-@inline outSymOf(pb::ParamBox{T, <:Any, FLevel{1,0}}) where {T} = inSymOf(pb)
+@inline outSymOf(pb::ParamBox{T, <:Any, FLevel(itself)}) where {T} = inSymOf(pb)
 
 @inline function outSymOf(pb::ParamBox)
     idx = pb.index[]
@@ -236,7 +236,7 @@ Return the `Symbol` of the mapped data (dependent variable) of the input `ParamB
 
 """
 
-    dataOf(pb::ParamBox{T}) where {T<:Number} -> Array{T, 0}
+    dataOf(pb::ParamBox{T}) where {T} -> Array{T, 0}
 
 Return the 0-D `Array` of the data stored in the input `ParamBox`.
 """
@@ -245,7 +245,7 @@ Return the 0-D `Array` of the data stored in the input `ParamBox`.
 
 """
 
-    mapOf(pb::ParamBox{<:Number, F}) where {F<:Function} -> F
+    mapOf(pb::ParamBox) -> Function
 
 Return the mapping function of the input `ParamBox`.
 """
@@ -254,18 +254,18 @@ Return the mapping function of the input `ParamBox`.
 
 """
 
-    outValCopy(pb::ParamBox{<:Number, V}) -> ParamBox{<:Number, V, $(FLevel{1,0})}
+    outValCopy(pb::ParamBox{T, V}) where {T} -> ParamBox{T, V, $(FLevel(itself))}
 
 Return a new `ParamBox` of which the stored data is a **deep copy** of the mapped data from 
 the input `ParamBox`.
 """
-outValCopy(pb::ParamBox{T, V}) where {T, V} = 
-ParamBox{V, typeof(itself)}(fill(pb()), genIndex(nothing))
+outValCopy(pb::ParamBox{<:Any, V}) where {V} = 
+ParamBox(Val(V), fill(pb()), genIndex(nothing))
 
 
 """
 
-    inVarCopy(pb::ParamBox) -> ParamBox{<:Number, <:Any, $(FLevel{1,0})}
+    inVarCopy(pb::ParamBox) -> ParamBox{<:Number, <:Any, $(FLevel(itself))}
 
 Return a new `ParamBox` of which the stored data is a **shallow copy** of the stored data 
 from the input `ParamBox`.
@@ -274,10 +274,10 @@ from the input `ParamBox`.
 
 ```jldoctest; setup = :(push!(LOAD_PATH, "../../src/"); using Quiqbox)
 julia> pb1 = ParamBox(-2.0, :a, abs)
-ParamBox{Float64, :a, $(FLevel{2,0})}(-2.0)[∂][x_a]
+ParamBox{Float64, :a, $(FLevel(abs))}(-2.0)[∂][x_a]
 
 julia> pb2 = inVarCopy(pb1)
-ParamBox{Float64, :x_a, $(FLevel{1,0})}(-2.0)[∂][x_a]
+ParamBox{Float64, :x_a, $(FLevel(itself))}(-2.0)[∂][x_a]
 
 julia> pb1[] == pb2[] == -2.0
 true
@@ -290,7 +290,7 @@ julia> pb2[]
 ```
 """
 inVarCopy(pb::ParamBox{T}) where {T} = 
-ParamBox{inSymOfCore(pb), typeof(itself)}(pb.data, genIndex(nothing))
+ParamBox{T, inSymOfCore(pb)}(pb.data, genIndex(nothing))
 
 
 const NoDiffMark = superscriptSym['!']

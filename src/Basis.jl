@@ -67,12 +67,12 @@ and `canDiff` work the same way as in a general constructor of a `ParamBox`. If
 """
 genExponent(e::Real, mapFunction::F; canDiff::Bool=true, 
             roundDigits::Int=15, dataName::Symbol=:undef) where {F<:Function} = 
-ParamBox{αParamSym}(mapFunction, fill(convertNumber(e, roundDigits)), genIndex(nothing), 
-                    fill(canDiff), dataName)
+ParamBox(Val(αParamSym), mapFunction, fill(convertNumber(e, roundDigits)), 
+         genIndex(nothing), fill(canDiff), dataName)
 
 genExponent(e::Array{T, 0}, mapFunction::F; canDiff::Bool=true, 
             dataName::Symbol=:undef) where {T<:Real, F<:Function} = 
-ParamBox{αParamSym}(mapFunction, e, genIndex(nothing), fill(canDiff), dataName)
+ParamBox(Val(αParamSym), mapFunction, e, genIndex(nothing), fill(canDiff), dataName)
 
 
 
@@ -84,9 +84,9 @@ ParamBox{αParamSym}(mapFunction, e, genIndex(nothing), fill(canDiff), dataName)
 
 """
 genExponent(e::Real; roundDigits::Int=15) = 
-ParamBox{αParamSym}(itself, fill(convertNumber(e, roundDigits)), genIndex(nothing))
+ParamBox(Val(αParamSym), itself, fill(convertNumber(e, roundDigits)), genIndex(nothing))
 
-genExponent(e::Array{Float64, 0}) = ParamBox{αParamSym}(itself, e, genIndex(nothing))
+genExponent(e::Array{Float64, 0}) = ParamBox(Val(αParamSym), itself, e, genIndex(nothing))
 
 
 """
@@ -95,7 +95,7 @@ genExponent(e::Array{Float64, 0}) = ParamBox{αParamSym}(itself, e, genIndex(not
 
 Convert a `$(ParamBox)` to an exponent coefficient parameter.
 """
-genExponent(pb::ParamBox{Float64, V, F}) where {V, F} = ParamBox{αParamSym}(pb)
+genExponent(pb::ParamBox{Float64, V, F}) where {V, F} = ParamBox(Val(αParamSym), pb)
 
 
 """
@@ -114,12 +114,12 @@ and `canDiff` work the same way as in a general constructor of a `ParamBox`. If
 """
 genContraction(c::Real, mapFunction::F; canDiff::Bool=true, 
                roundDigits::Int=15, dataName::Symbol=:undef) where {F<:Function} = 
-ParamBox{dParamSym}(mapFunction, fill(convertNumber(c, roundDigits)), genIndex(nothing), 
-                    fill(canDiff), dataName)
+ParamBox(Val(dParamSym), mapFunction, fill(convertNumber(c, roundDigits)), 
+         genIndex(nothing), fill(canDiff), dataName)
 
 genContraction(c::Array{T, 0}, mapFunction::F; canDiff::Bool=true, 
                dataName::Symbol=:undef) where {T<:Real, F<:Function} = 
-ParamBox{dParamSym}(mapFunction, c, genIndex(nothing), fill(canDiff), dataName)
+ParamBox(Val(dParamSym), mapFunction, c, genIndex(nothing), fill(canDiff), dataName)
 
 """
 
@@ -129,9 +129,10 @@ ParamBox{dParamSym}(mapFunction, c, genIndex(nothing), fill(canDiff), dataName)
 
 """
 genContraction(c::Real; roundDigits::Int=15) = 
-ParamBox{dParamSym}(itself, fill(convertNumber(c, roundDigits)), genIndex(nothing))
+ParamBox(Val(dParamSym), itself, fill(convertNumber(c, roundDigits)), genIndex(nothing))
 
-genContraction(c::Array{Float64, 0}) = ParamBox{dParamSym}(itself, c, genIndex(nothing))
+genContraction(c::Array{Float64, 0}) = ParamBox(Val(dParamSym), itself, c, 
+               genIndex(nothing))
 
 """
 
@@ -139,12 +140,12 @@ genContraction(c::Array{Float64, 0}) = ParamBox{dParamSym}(itself, c, genIndex(n
 
 Convert a `$(ParamBox)` to an exponent coefficient parameter.
 """
-genContraction(pb::ParamBox{Float64, V, F}) where {V, F} = ParamBox{dParamSym}(pb)
+genContraction(pb::ParamBox{Float64, V, F}) where {V, F} = ParamBox(Val(dParamSym), pb)
 
 
-const Doc_genSpatialPoint_Eg1 = "(ParamBox{Float64, :X, $(FLevel{1,0})}(1.0)[∂][X], " * 
-                                 "ParamBox{Float64, :Y, $(FLevel{1,0})}(2.0)[∂][Y], " * 
-                                 "ParamBox{Float64, :Z, $(FLevel{1,0})}(3.0)[∂][Z])"
+const Doc_genSpatialPoint_Eg1 = "(ParamBox{Float64, :X, $(FLevel(itself))}(1.0)[∂][X], " * 
+                                 "ParamBox{Float64, :Y, $(FLevel(itself))}(2.0)[∂][Y], " * 
+                                 "ParamBox{Float64, :Z, $(FLevel(itself))}(3.0)[∂][Z])"
 
 """
 
@@ -186,13 +187,13 @@ julia> v2 = [fill(1.0), 2, 3]
  3
 
 julia> p2 = genSpatialPoint(v2); p2[1]
-ParamBox{Float64, :X, $(FLevel{1,0})}(1.0)[∂][X]
+ParamBox{Float64, :X, $(FLevel(itself))}(1.0)[∂][X]
 
 julia> v2[1][] = 1.2
 1.2
 
 julia> p2[1]
-ParamBox{Float64, :X, $(FLevel{1,0})}(1.2)[∂][X]
+ParamBox{Float64, :X, $(FLevel(itself))}(1.2)[∂][X]
 ```
 
 ≡≡≡ Method 2 ≡≡≡
@@ -208,20 +209,20 @@ Return the component of a spatial point given its value (or 0-D container) and i
 
 ```jldoctest; setup = :(push!(LOAD_PATH, "../../src/"); using Quiqbox)
 julia> genSpatialPoint((1.2, 1))
-ParamBox{Float64, :X, $(FLevel{1,0})}(1.2)[∂][X]
+ParamBox{Float64, :X, $(FLevel(itself))}(1.2)[∂][X]
 
 julia> pointY1 = fill(2.0)
 0-dimensional Array{Float64, 0}:
 2.0
 
 julia> Y1 = genSpatialPoint((pointY1, 2))
-ParamBox{Float64, :Y, $(FLevel{1,0})}(2.0)[∂][Y]
+ParamBox{Float64, :Y, $(FLevel(itself))}(2.0)[∂][Y]
 
 julia> pointY1[] = 1.5
 1.5
 
 julia> Y1
-ParamBox{Float64, :Y, $(FLevel{1,0})}(1.5)[∂][Y]
+ParamBox{Float64, :Y, $(FLevel(itself))}(1.5)[∂][Y]
 ```
 """
 genSpatialPoint(point::Union{Tuple, Vector}, mapFunction::F=itself; 
@@ -878,17 +879,17 @@ add(bf1::BasisFuncs{𝑙1, GN1, 1}, bf2::BasisFuncs{𝑙2, GN2, 1}) where {𝑙1
 [[bf1, bf2] .|> add |> sumOf]
 
 
-const Doc_mul_Eg1 = "GaussFunc(xpn=ParamBox{Float64, :α, $(FLevel{1,0})}(3.0)[∂][α], " * 
-                              "con=ParamBox{Float64, :d, $(FLevel{1,0})}(1.0)[∂][d])"
+const Doc_mul_Eg1 = "GaussFunc(xpn=ParamBox{Float64, :α, $(FLevel(itself))}(3.0)[∂][α], " * 
+                              "con=ParamBox{Float64, :d, $(FLevel(itself))}(1.0)[∂][d])"
 
-const Doc_mul_Eg2 = "GaussFunc(xpn=ParamBox{Float64, :α, $(FLevel{1,0})}(3.0)[∂][α], " * 
-                              "con=ParamBox{Float64, :d, $(FLevel{1,0})}(2.0)[∂][d])"
+const Doc_mul_Eg2 = "GaussFunc(xpn=ParamBox{Float64, :α, $(FLevel(itself))}(3.0)[∂][α], " * 
+                              "con=ParamBox{Float64, :d, $(FLevel(itself))}(2.0)[∂][d])"
 
-const Doc_mul_Eg3 = "GaussFunc(xpn=ParamBox{Float64, :α, $(FLevel{1,0})}(6.0)[∂][α], " * 
-                              "con=ParamBox{Float64, :d, $(FLevel{1,0})}(1.0)[∂][d])"
+const Doc_mul_Eg3 = "GaussFunc(xpn=ParamBox{Float64, :α, $(FLevel(itself))}(6.0)[∂][α], " * 
+                              "con=ParamBox{Float64, :d, $(FLevel(itself))}(1.0)[∂][d])"
 
-const Doc_mul_Eg4 = "GaussFunc(xpn=ParamBox{Float64, :α, $(FLevel{1,0})}(6.0)[∂][α], " * 
-                              "con=ParamBox{Float64, :d, $(FLevel{1,0})}(2.0)[∂][d])"
+const Doc_mul_Eg4 = "GaussFunc(xpn=ParamBox{Float64, :α, $(FLevel(itself))}(6.0)[∂][α], " * 
+                              "con=ParamBox{Float64, :d, $(FLevel(itself))}(2.0)[∂][d])"
 
 """
 
@@ -924,7 +925,7 @@ function mul(gf::GaussFunc, coeff::Real)::GaussFunc
     GaussFunc(gf.xpn, conNew)
 end
 
-function mulCore(c::Float64, con::ParamBox{<:Any, <:Any, FLevel{1, 0}})
+function mulCore(c::Float64, con::ParamBox{<:Any, <:Any, FLevel(itself)})
     conNew = fill(con.data[] * c)
     mapFunction = itself
     dataName = :undef
@@ -1437,8 +1438,8 @@ function paramFilter(pb::ParamBox, outSym::Union{Symbol, Nothing}=nothing,
 end
 
 
-const Doc_copyBasis_Eg1 = "GaussFunc(xpn=ParamBox{Float64, :α, $(FLevel{1,0})}(9.0)[∂][α], " * 
-                                    "con=ParamBox{Float64, :d, $(FLevel{1,0})}(2.0)[∂][d])"
+const Doc_copyBasis_Eg1 = "GaussFunc(xpn=ParamBox{Float64, :α, $(FLevel(itself))}(9.0)[∂][α], " * 
+                                    "con=ParamBox{Float64, :d, $(FLevel(itself))}(2.0)[∂][d])"
 
 """
 
@@ -1454,10 +1455,10 @@ otherwise `inVarCopy` is used.
 
 ```jldoctest; setup = :(push!(LOAD_PATH, "../../src/"); using Quiqbox)
 julia> e = genExponent(3.0, x->x^2)
-ParamBox{Float64, :α, $(FLevel{2,0})}(3.0)[∂][x_α]
+ParamBox{Float64, :α, $(FLevel(x->x^2))}(3.0)[∂][x_α]
 
 julia> c = genContraction(2.0)
-ParamBox{Float64, :d, $(FLevel{1,0})}(2.0)[∂][d]
+ParamBox{Float64, :d, $(FLevel(itself))}(2.0)[∂][d]
 
 julia> gf1 = GaussFunc(e, c);
 
@@ -1572,7 +1573,8 @@ function getVarCore(pb::ParamBox, expandNonDifferentiable::Bool=false)
     res
 end
 
-getVarCore(pb::ParamBox{T, V, FLevel{1,0}}, _::Bool=false) where {T, V} = [inSymValOf(pb)]
+getVarCore(pb::ParamBox{T, V, FLevel(itself)}, _::Bool=false) where {T, V} = 
+[inSymValOf(pb)]
 
 """
 
