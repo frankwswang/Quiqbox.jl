@@ -16,6 +16,7 @@ using Test
         unit2_1 = "Main Functions"
         println("Testing $(unit2_1)...")
         t2_1 = @elapsed @testset "$(unit2_1)" begin
+            include("unit-tests/Parameters-test.jl")
             include("unit-tests/Basis-test.jl")
             include("unit-tests/Integrals/Core-test.jl")
             include("unit-tests/Integrals/OneBody-test.jl")
