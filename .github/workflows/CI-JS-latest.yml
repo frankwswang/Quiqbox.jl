@@ -1,4 +1,4 @@
-name: CI
+name: CI-JS-latest
 on: 
   pull_request:
     branches:
@@ -15,8 +15,6 @@ jobs:
       fail-fast: false
       matrix:
         version:
-          - '1.6'
-          - '1.7'
           - '1'
         os:
           - ubuntu-latest
