@@ -21,4 +21,4 @@ Es, pars, grads = optimizeParams!(parsPartial, bs, nuc, nucCoords, POconfig((max
 # using Flux.Optimise: update!
 # optimizer = AMSGrad(0.001)
 # GDm = (prs, grad) -> update!(optimizer, prs, grad)
-# optimizeParams!(bs, parsPartial, nuc, nucCoords; GD=GDm)
+# optimizeParams!(bs, parsPartial, nuc, nucCoords, POconfig((GD=GDm)))

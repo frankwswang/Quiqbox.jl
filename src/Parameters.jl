@@ -48,23 +48,14 @@ marked as "differentiable".
 
 ≡≡≡ Initialization Method(s) ≡≡≡
 
-    ParamBox(data::Array{T, 0}, dataName::Symbol=:undef; 
+    ParamBox(data::Union{Array{T, 0}, T}, dataName::Symbol=:undef; 
              index::Union{Int, Nothing}=nothing) where {T<:Number} -> 
     ParamBox{T, dataName, $(FLevel{1,0})}
 
-    ParamBox(data::Array{T, 0}, name::Symbol, mapFunction::Function, 
-             dataName::Symbol=:undef; canDiff::Bool=true, 
-             index::Union{Int, Nothing}=nothing) where {T<:Number} ->
+    ParamBox(data::Union{Array{T, 0}, T}, name::Symbol, mapFunction::Function, 
+             dataName::Symbol=:undef; index::Union{Int, Nothing}=nothing, 
+             canDiff::Bool=true) where {T<:Number} ->
     ParamBox{T, name, $(nameOf)(mapFunction)}
-
-    ParamBox(data::Number, dataName::Symbol=:undef; index::Union{Int, Nothing}=nothing, 
-             paramType::Type{<:Number}=Float64) where {T<:Number} -> 
-    ParamBox{paramType, dataName, $(FLevel{1,0})}
-
-    ParamBox(data::Number, name::Symbol, mapFunction::Function, dataName::Symbol=:undef; 
-             canDiff::Bool=true, index::Union{Int, Nothing}=nothing, 
-             paramType::Type{<:Number}=Float64) where {T<:Number} ->
-    ParamBox{paramType, name, $(nameOf)(mapFunction)}
 
 `name` specifies the name of the (mapped) variable the `ParamBox` represents, which helps 
 with symbolic representation and automatic differentiation.
@@ -124,20 +115,21 @@ struct ParamBox{T, V, FL<:FLevel} <: DifferentiableParameter{ParamBox, T}
     new{T, V, FLevel(itself)}(data, V, itself, fill(false), index)
 end
 
-function ParamBox{V}(mapF::F, data, index, canDiff, dataName=:undef) where {V, F<:Function}
+function ParamBox{V}(mapFunction::F, data, index, canDiff, dataName=:undef) where 
+                    {V, F<:Function}
     L1, _ = getFLevel(F)
     Ftype = F
     if L1 == 2
-        fSym = mapF |> nameOf
+        fSym = mapFunction |> nameOf
         fStr = fSym |> string
         if startswith(fStr, '#')
             idx = parse(Int, fStr[2:end])
             fSym = "f_" * string(V) * numToSubs(idx) |> Symbol
-            mapF = renameFunc(fSym, mapF)
-            Ftype = typeof(mapF)
+            mapFunction = renameFunc(fSym, mapFunction)
+            Ftype = typeof(mapFunction)
         end
     end
-    ParamBox{V, Ftype}(mapF, data, index, canDiff, dataName)
+    ParamBox{V, Ftype}(mapFunction, data, index, canDiff, dataName)
 end
 
 ParamBox{V}(::typeof(itself), data, index, _...) where {V} = 
@@ -152,9 +144,9 @@ ParamBox{V}(pb.map, pb.data, pb.index, pb.canDiff, pb.dataName)
 ParamBox(data::T, dataName::Symbol=:undef; index::Union{Int, Nothing}=nothing) where {T} = 
 ParamBox{dataName, typeof(itself)}(fillNumber(data), genIndex(index))
 
-ParamBox(data::T, name::Symbol, mapF::F, dataName::Symbol=:undef; 
+ParamBox(data::T, name::Symbol, mapFunction::F, dataName::Symbol=:undef; 
          index::Union{Int, Nothing}=nothing, canDiff::Bool=true) where {T, F<:Function} = 
-ParamBox{name}(mapF, fillNumber(data), genIndex(index), fill(canDiff), dataName)
+ParamBox{name}(mapFunction, fillNumber(data), genIndex(index), fill(canDiff), dataName)
 
 
 """
