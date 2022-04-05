@@ -20,7 +20,7 @@ using Test
             include("unit-tests/Integrals/Core-test.jl")
             include("unit-tests/Integrals/OneBody-test.jl")
             include("unit-tests/Integrals/TwoBody-test.jl")
-            if Sys.isapple() || Sys.islinux()
+            if Sys.islinux()
                 include("unit-tests/Integrals/Libcint-compare-tests.jl")
             end
             include("unit-tests/Differentiation-test.jl")
