@@ -65,6 +65,10 @@ toggleDiff!
 ```
 
 ```@docs
+changeMapping
+```
+
+```@docs
 genBasisFunc
 ```
 

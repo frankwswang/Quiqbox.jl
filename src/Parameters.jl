@@ -1,5 +1,6 @@
 export ParamBox, inValOf, inSymOf, inSymValOf, outValOf, outSymOf, dataOf, mapOf, 
-       outValCopy, inVarCopy, enableDiff!, disableDiff!, isDiffParam, toggleDiff!, changeMap
+       outValCopy, inVarCopy, enableDiff!, disableDiff!, isDiffParam, toggleDiff!, 
+       changeMapping
 
 using Symbolics: Num
 
@@ -337,3 +338,19 @@ Toggle the differentiability (`pb.canDiff[]`) of the input `ParamBox` and return
 altered result.
 """
 toggleDiff!(pb::ParamBox) = begin pb.canDiff[] = !pb.canDiff[] end
+
+
+"""
+
+    changeMapping(pb::ParamBox{T, V}, mapFunction::F, dataName::Symbol=:undef; 
+              index::Union{Int, Nothing}=nothing, canDiff::Bool=true) where 
+             {T, V, F<:Function} -> 
+    ParamBox{T, V}
+
+Return a `ParamBox` that contains the input `ParamBox`'s `data::Array{T, 0}` with the 
+newly assigned mapping function.
+"""
+changeMapping(pb::ParamBox{T, V}, mapFunction::F, dataName::Symbol=:undef; 
+          index::Union{Int, Nothing}=nothing, canDiff::Bool=true) where 
+         {T, V, F<:Function} = 
+ParamBox(Val(V), mapFunction, pb.data, genIndex(index), fill(canDiff), dataName)
