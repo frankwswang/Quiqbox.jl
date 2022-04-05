@@ -4,7 +4,6 @@ using Quiqbox.Molden
 
 @testset "Molden.jl test" begin
 
-
 mols = [
         ["H", "H"],
         ["H", "F"],
@@ -60,6 +59,5 @@ for (nuc, nucCoords, molName, iMol) in zip(mols, molCoords, molNames, 1:length(m
     @test str1 == str2
     rm(fd)
 end
-
 
 end

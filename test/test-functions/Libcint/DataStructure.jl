@@ -27,6 +27,7 @@ function Nijkα(i, j, k, α)
     end
 end
 
+
 normOfGTOin(b::Quiqbox.FloatingGTBasisFuncs{𝑙, GN, 1})  where {𝑙, GN} = 
 Nijkα.(b.ijk[1]..., [g.xpn() for g in b.gauss])
 
