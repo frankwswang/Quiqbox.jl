@@ -1,6 +1,6 @@
 using Test
 using Quiqbox: tryIncluding, @compareLength, hasBoolRelation, markUnique, flatten, 
-               alignNumSign, symbolReplace, splitTerm, groupedSort, mapPermute, Pf, itself
+               alignNumSign, replaceSymbol, splitTerm, groupedSort, mapPermute, Pf, itself
 using Quiqbox
 using Symbolics
 using Suppressor: @capture_out
@@ -43,8 +43,8 @@ pkgDir = @__DIR__
 @test alignNumSign( 1) == " 1"
 
 
-# function symbolReplace
-@test symbolReplace(:sombol, "o"=>"y", count=1) == :symbol
+# function replaceSymbol
+@test replaceSymbol(:sombol, "o"=>"y", count=1) == :symbol
 
 
 # function splitTerm

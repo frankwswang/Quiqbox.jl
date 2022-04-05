@@ -49,7 +49,7 @@ const Doc_POconfig_Eg1 = "POconfig{:HF, HFconfig{:RHF, :SAD, 3}, "*
                          "(Val{:RHF}(), Val{:SAD}(), SCFconfig{3}(interval=(0.0001, "*
                          "1.0e-6, 1.0e-15), oscillateThreshold=1.0e-5, method, "*
                          "methodConfig)[:ADIIS, :DIIS, :ADIIS], 1000, true), NaN, "*
-                         "0.0001, 500, Quiqbox.gradDescent!)"
+                         "1.0e-5, 500, Quiqbox.gradDescent!)"
 
 const Doc_POconfig_Eg2 = Doc_POconfig_Eg1[1:end-26] * "1" * Doc_POconfig_Eg1[end-24:end]
 
@@ -107,7 +107,7 @@ end
 
 POconfig(a1::Symbol, args...) = POconfig(Val(a1), args...)
 
-const defaultPOconfigPars = Any[Val(:HF), HFconfig(), NaN, 1e-4, 500, gradDescent!]
+const defaultPOconfigPars = Any[Val(:HF), HFconfig(), NaN, 1e-5, 500, gradDescent!]
 
 POconfig() = POconfig(defaultPOconfigPars...)
 
