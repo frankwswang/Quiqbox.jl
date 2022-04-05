@@ -1,14 +1,16 @@
 using Test
 using Quiqbox
-using Quiqbox: ElementNames, BasisSetNames
+using Quiqbox: BasisFuncTexts, ElementNames, BasisSetNames
 
 include("../../../test/test-functions/Shared.jl")
 include("../../../test/test-functions/Libcint/Libcint.jl")
 
 @testset "Integral engine Quiqbox VS Libcint tests" begin
 
-ns = rand(1:20, 8)
-atms = ElementNames[ns]
+atms = map(1:8) do i
+    list = findall(x->x!==nothing, BasisFuncTexts[i])
+    ElementNames[list[rand(1:end)]]
+end
 nuc = ["H", "H"]
 nucCoords = [[-0.7, 0.0, 0.0], [0.7, 0.0, 0.0]]
 center = [0, rand(0:0.2:1), 0]

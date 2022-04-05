@@ -501,8 +501,9 @@ function genBasisFunc(center::NTuple{3, ParamBox}, BSKeyANDnuc::Vector{NTuple{2,
                       unlinkCenter::Bool=false)
     bases = FloatingGTBasisFuncs[]
     for k in BSKeyANDnuc
-        BFMcontent = BasisSetList[k[1]][AtomicNumberList[k[2]]]
-        append!(bases, genBFuncsFromText(BFMcontent; adjustContent=true, 
+        content = BasisSetList[k[1]][AtomicNumberList[k[2]]]
+        @assert content!==nothing "Quiqbox DOES NOT have basis set "*k[1]*" for "*k[2]*"."
+        append!(bases, genBFuncsFromText(content; adjustContent=true, 
                 excludeLastNlines=1, center, unlinkCenter))
     end
     bases
