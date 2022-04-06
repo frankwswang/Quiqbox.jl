@@ -129,7 +129,7 @@ Filter = t -> nameof(t) == :copyBasis
 ```
 
 ```@docs
-uniqueParams!
+markParams!
 ```
 
 ```@docs
