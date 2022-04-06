@@ -1,6 +1,6 @@
-export ParamBox, inValOf, inSymOf, inSymValOf, outValOf, outSymOf, dataOf, mapOf, 
-       outValCopy, inVarCopy, enableDiff!, disableDiff!, isDiffParam, toggleDiff!, 
-       changeMapping
+export ParamBox, inValOf, inSymOf, inSymOfCore, inSymValOf, outValOf, outSymOf, 
+       outSymOfCore, outSymValOf, dataOf, mapOf, outValCopy, inVarCopy, enableDiff!, 
+       disableDiff!, isDiffParam, toggleDiff!, changeMapping
 
 using Symbolics: Num
 
@@ -219,6 +219,16 @@ end
 
 """
 
+    outSymValOf(pb::ParamBox) -> ::Pair{Symbolics.Num, T}
+
+Return a `Pair` of the dependent variable represented by the input `ParamBox` and the 
+corresponding value (mapped value).
+"""
+@inline outSymValOf(pb::ParamBox{T}) where {T} = (inSymOf(pb) => outValOf(pb))
+
+
+"""
+
     inSymOfCore(pb::ParamBox) -> Symbol
 
 Return the `Symbol` of the stored data (independent variable) of the input `ParamBox`.
@@ -342,15 +352,28 @@ toggleDiff!(pb::ParamBox) = begin pb.canDiff[] = !pb.canDiff[] end
 
 """
 
-    changeMapping(pb::ParamBox{T, V}, mapFunction::F, dataName::Symbol=:undef; 
-              index::Union{Int, Nothing}=nothing, canDiff::Bool=true) where 
-             {T, V, F<:Function} -> 
+    changeMapping(pb::ParamBox{T, V}, mapFunction::F; 
+                  index::Union{Int, Nothing}=nothing, canDiff::Bool=true) where 
+                 {T, V, F<:Function} -> 
     ParamBox{T, V}
 
 Return a `ParamBox` that contains the input `ParamBox`'s `data::Array{T, 0}` with the 
 newly assigned mapping function.
 """
-changeMapping(pb::ParamBox{T, V}, mapFunction::F, dataName::Symbol=:undef; 
-          index::Union{Int, Nothing}=nothing, canDiff::Bool=true) where 
-         {T, V, F<:Function} = 
-ParamBox(Val(V), mapFunction, pb.data, genIndex(index), fill(canDiff), dataName)
+changeMapping(pb::ParamBox{T, V}, mapFunction::F; 
+              index::Union{Int, Nothing}=nothing, canDiff::Bool=true) where 
+             {T, V, F<:Function} = 
+ParamBox(Val(V), mapFunction, pb.data, genIndex(index), fill(canDiff), pb.dataName)
+
+"""
+
+    changeMapping(pb::ParamBox{T}, name::Symbol, mapFunction::F; 
+                  index::Union{Int, Nothing}=nothing, canDiff::Bool=true) where 
+                 {T, F<:Function} -> 
+    ParamBox{T, name}
+
+"""
+changeMapping(pb::ParamBox{T}, name::Symbol, mapFunction::F; 
+              index::Union{Int, Nothing}=nothing, canDiff::Bool=true) where 
+             {T, F<:Function} = 
+ParamBox(Val(name), mapFunction, pb.data, genIndex(index), fill(canDiff), pb.dataName)
