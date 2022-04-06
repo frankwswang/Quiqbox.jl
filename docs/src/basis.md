@@ -1,26 +1,26 @@
 # Basis Sets
 
-The procedure to construct a basis set can be fundamentally broken down into several basic steps: first, choose a set of (tunable) parameters, and build the Gaussian functions around those parameters, then the basis functions around the Gaussian functions, finally the basis set.
+The procedure to construct a basis set can fundamentally break down into several basic steps: first, choose a set of (tunable) parameters, and build the Gaussian functions around those parameters, then the basis functions around the Gaussian functions, finally the basis set.
 
 The data structure formularized by Quiqbox in each step, namely the level of data complexity, can be summarized in the following table.
 
-| level  | objective  |  product examples | abstract type  | type instances |
+| level  | objective  |  data structure | container type  | example of type instances |
 | :---: | :---:   | :---:           | :---: | :---:          |
-| 4 | basis set | Array of basis functions (with reusable integrals) | `Array`, `GTBasis` | `Array{<:BasisFunc, 1}`...|
-| 3 | basis functions | single or linear combination of Gaussian functions | `CompositeGTBasisFuncs` | `BasisFunc{0, 1}`, `BasisFuncs{1, 3, 3}`...|
+| 4 | basis set | `Array` or `struct` as the container of basis functions | `Array`, `GTBasis` | `Vector{<:BasisFunc}`, `GTBasis{BasisFunc, Float64}`...|
+| 3 | basis functions | linear combination of Gaussian functions | `CompositeGTBasisFuncs` | `BasisFunc{0, 1}`, `BasisFuncs{1, 3, 3}`, `BasisFuncMix{2, 6}`...|
 | 2 | Gaussian functions | (primitive) Gaussian functions | `AbstractGaussFunc` | `GaussFunc`|
-| 1 |  a pool of parameters | center coordinates, function coefficients | `ParamBox` | `ParamBox{Float64, :α, :itself}`... |
+| 1 |  pool of parameters | center coordinates, exponents of Gaussian functions | `ParamBox` | `ParamBox{Float64, :α, FLevel{1, 0}}`... |
 
 
-Depending on how much control the user wants to have over each step, Quiqbox provides several [methods](https://docs.julialang.org/en/v1/manual/methods/) of related functions to leave the user with the freedom to balance between efficiency and customizability.
+Depending on how much control the user wants to have over each step, Quiqbox provides several [methods](https://docs.julialang.org/en/v1/manual/methods/) of related functions to give users the freedom to balance between efficiency and customizability.
 
-Below are some examples from the simplest way to relatively more flexible ways to construct a basis set in Quiqbox. Hopefully these use cases can also work as inspirations for more creative ways to manipulate basis sets.
+Below are some examples from the simplest way to relatively more flexible ways to construct a basis set in Quiqbox. Hopefully, these use cases can also work as inspirations for more creative ways to manipulate basis sets.
 
 ## Basis Set Construction
 
-### Constructing basis sets from existed basis sets
+### Constructing basis sets from existing basis sets
 
-First, you can create a basis set at one coordinate by input the `Vector` of its center coordinate and a `Tuple` of its name and corresponding atom in `String`.
+First, you can create a basis set at one coordinate by inputting the `Vector` of its center coordinate and a `Tuple` of its name and corresponding atom in `String`.
 ```@repl 1
 push!(LOAD_PATH,"../../src/") # hide
 using Quiqbox # hide
@@ -33,7 +33,7 @@ Notice that in the above result there are 2 types of `struct`s in the returned `
 !!! info "Unit System"
     Hartree atomic units are the unit system used in Quiqbox.
 
-If you want to postpone the specification of the center, you can replace the 1st argument with `missing`, and then use function `assignCenter!` to assign the coordinates later.
+If you want to postpone the specification of the center, you can replace the 1st argument with `missing`, and then use the function `assignCenter!` to assign the coordinates later.
 ```@repl 1
 bsO = genBasisFunc(missing, ("STO-3G", "O"))
 
@@ -44,14 +44,14 @@ bsO
 assignCenter!.(Ref([0,0,0]), bsO[2:end])
 ```
 
-If you omit the atom in the arguments, H will be set in default. Notice that even there's only 1 single basis function in H's STO-3G basis set, the returned value is still in `Array` type.
+If you omit the atom in the arguments, "H" will be set in default. Notice that even though there's only 1 single basis function in H's STO-3G basis set, the returned value is still an `Array`.
 ```@repl 1
 bsH_1 = genBasisFunc([-0.5, 0, 0], "STO-3G")
 
 bsH_2 = genBasisFunc([ 0.5, 0, 0], "STO-3G")
 ```
 
-Finally, you can use Quiqbox's included tool function `flatten` to merge the three atomic basis set into one molecular basis set:
+Finally, you can use Quiqbox's included tool function `flatten` to merge the three atomic basis sets into one molecular basis set:
 ```@repl 1
 bsH20 = [bsO, bsH_1, bsH_2] |> flatten
 ```
@@ -63,12 +63,12 @@ cens = [[0,0,0], [-0.5,0,0], [0.5,0,0]]
 bsH20_2 = genBasisFunc.(cens, [("STO-3G", "O"), fill("STO-3G", 2)...]) |> flatten
 ```
 
-In quiqbox, the user can often deal with several multi-layer containers (mainly `struct`s), it might be easy to get lost or uncertain that whether we are creating the objects intended. Quiqbox provides another tool function `hasEqual` that lets you compare if two objects hold the same data and structure. For example, if we want to see whether `bsH20_2` created in the faster way is same (not identical) as `bsH20`, we can verify it as follows:
+In quiqbox, the user can often deal with several multi-layer containers (mainly `struct`s), it might be easy to get lost or uncertain about whether we are creating the objects intended. Quiqbox provides another tool function `hasEqual` that lets you compare if two objects hold the same data and structure. For example, if we want to see whether `bsH20_2` created in the faster way is the same (not identical) as `bsH20`, we can verify it as follows:
 ```@repl 1
 hasEqual(bsH20, bsH20_2)
 ```
 
-If the basis set you want to use doesn't exist in Quiqbox's library, you can use `Function` `genBFuncsFromText` to generate the basis set from a **Gaussian** formatted `String`:
+If the basis set you want to use is not pre-stored in Quiqbox, you can use `Function` `genBFuncsFromText` to generate the basis set from a **Gaussian** formatted `String`:
 ```@repl 1
 genBasisFunc(missing, ("6-31G", "Kr"))
 
@@ -127,12 +127,12 @@ gf2 = GaussFunc(2.5, 0.75)
 bf1 = genBasisFunc([1.0,0,0], [gf1, gf2])
 ```
 
-Unlike `BasisFunc` there's no proprietary function for it, you simply input the exponent coefficient and the contraction coefficient as the 1st and 2nd arguments respectively to its default constructor. As for the method of `genBasisFunc` in this case, the default subshell is set to be "S" as the optional 3rd argument, but you can construct a `BasisFuncs` which contains all the orbitals within a specified one:
+Unlike `BasisFunc` there's no proprietary function for it, you simply input the exponent coefficient and the contraction coefficient as the 1st and 2nd arguments respectively to its constructor. As for the method of `genBasisFunc` in this case, the default subshell is set to be "S" as the optional 3rd argument, but you can construct a `BasisFuncs` which contains all the orbitals within one specified subshell:
 ```@repl 2
 bf2 = genBasisFunc([1.0,0,0], [gf1, gf2], "P")
 ```
 
-You can even choose one or a few orbitals to keep by indicting them using a `NTuple{3, Int}` in the Cartesian representation:
+You can even choose one or a few orbitals to keep by indicting them using an `NTuple{3, Int}` in the Cartesian representation:
 ```@repl 2
 bf3 = genBasisFunc([1.0,0,0], [gf1, gf2], (1,0,0))
 
@@ -147,11 +147,11 @@ hasEqual(bf4, bf5)
 ```
 
 ### Constructing basis sets based on `ParamBox`
-Sometimes you may want the parameters of basis functions (or `GaussFunc`) to be under some constrains (which can be crucial for the later basis set optimization), this is when you need a deeper level of control over the parameters, through its direct container: `ParamBox`. In fact, in the above example we have already had an glimpse on it through the printed info in the REPL:
+Sometimes you may want the parameters of basis functions (or `GaussFunc`) to be under some constraints (which can be crucial for the later basis set optimization), this is when you need a deeper level of control over the parameters, through its direct container: `ParamBox`. In fact, in the above example, we have already had a glimpse of it through the printed info in the REPL:
 ```@repl 2
 gf1
 ```
-the 2 fields of a `GaussFunc`, `.xpn` and `.con` are in fact `ParamBox`, and the actual value of them can be accessed through syntax `[]`:
+The 2 fields of a `GaussFunc`, `.xpn`, and `.con` are `ParamBox`, and their actual value can be accessed through syntax `[]`:
 ```@repl 2
 gf1.xpn
 
@@ -162,7 +162,7 @@ gf1.xpn[]
 gf1.con[]
 ```
 
-Since the data are not directly stored as `primitive type`s but rather inside `struct` `ParamBox`, this allows the direct assignment or shallow copy of them to not create new data with same values, but bindings to the original objects:
+Since the data are not directly stored as `primitive type`s but rather inside `struct` `ParamBox`, this allows the direct assignment or shallow copy of them without reconstructing new data, but bindings to the original objects:
 ```@repl 2
 gf3 = GaussFunc(1.1, 1)
 
@@ -186,24 +186,24 @@ gf3_2.xpn[] == gf3.xpn[] == bf6.gauss[2].xpn[] == 1.1
 
 ```
 
-Based on such trait in Julia, you can, for instance, create a basis set that enforces all the `GaussFunc`s have the **identical** parameters:
+Based on such trait in Julia, you can, for instance, create a basis set that enforces all the `GaussFunc`s have the **identical** gaussian function parameters:
 ```@repl 2
 gf4 = GaussFunc(2.5, 0.5)
 
 bs7 = genBasisFunc.([rand(3) for _=1:2], Ref(gf4))
 
-uniqueParams!(bs7)
+markParams!(bs7)
 ```
 
-`uniqueParams!` marks all the parameters of the given basis set and return the unique parameters. As you can see, even though `bs7` has 2 `GaussFunc`s as basis functions, but over all it only has 1 unique coefficient exponent ``\alpha_1`` and 1 unique contraction coefficient ``d_1``.
+`markParams!` marks all the parameters of the given basis set. As you can see, even though `bs7` has 2 `GaussFunc`s as basis functions, overall it only has 1 unique coefficient exponent ``\alpha_1`` and 1 unique contraction coefficient ``d_1`` if we ignore the center coordinates.
 
 
 ## Dependent Variable as a parameter
 
-Another control the user can have on the parameters in Quiqbox is to not only directly store each parameter in a `ParamBox`, but also make it output a dependent variable that is defined by the mapping function of the parameter.
+Another control the user can have on the parameters in Quiqbox is to make ParamBox represent a dependent variable defined by the mapping function of another independent parameter.
 
-Such a mapping function is stored in the `map` field of a `ParamBox` ( which normally is an ``R \to R`` mapping). The mapped value can be access through 
-syntax `()`. In default the variable is mapped to itself:
+Such a mapping function is stored in the `map` field of a `ParamBox` (which normally is an ``R \to R`` mapping). The mapped value can be accessed through 
+syntax `()`. In default, the variable is mapped to itself:
 ```@repl 2
 pb1 = gf4.xpn
 
@@ -217,4 +217,4 @@ You can get a clearer view of the mapping relations in a `ParamBox` using `getVa
 getVarDict(pb1)
 ```
 !!! info "Parameter represented by `ParamBox`"
-    The mapped variable (value) of a `ParamBox` is always used as the parameter (parameter value) it represents in the construction of any basis function component. If instead, you want to optimize the variable before the mapping, the `ParamBox` needs to be marked as "differentiable". For more information parameter optimization, please see the docstring of [`ParamBox`](@ref) and section [Parameter Optimization](@ref).
+    The mapped variable (value) of a `ParamBox` is always used as the parameter (parameter value) it represents in the construction of any basis function component. If you want to optimize the variable that is mapped from, the `ParamBox` needs to be marked as "differentiable". For more information on parameter optimization, please see the docstring of [`ParamBox`](@ref) and section [Parameter Optimization](@ref).

@@ -1,6 +1,6 @@
 name = "Quiqbox"
 uuid = "7cb8c394-fae1-4ab9-92f2-30189d7746cd"
-version = "0.2.3"
+version = "0.3.0"
 
 [deps]
 Combinatorics = "861a8166-3701-5b0c-9a16-15d98fcdc6aa"

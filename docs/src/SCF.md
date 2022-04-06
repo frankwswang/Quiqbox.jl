@@ -7,12 +7,12 @@ Quiqbox supports basic Hartree-Fock methods with various configurations:
 | Items | Options |
 | :---  |  ---:   |
 | HF Types | Restricted Closed-Shell (RHF), Unrestricted Open-Shell (UHF) |
-| Initial Guesses | Core Hamiltonian, Generalized Wolfsberg-Helmholtz, User-defined Coefficient Matrix |
+| Initial Guesses | Core Hamiltonian, Generalized Wolfsberg-Helmholtz, Superposition of Atomic Densities (SAD), User-defined Coefficient Matrix |
 | Converging Methods | Direct Diagonalization, [DIIS](https://onlinelibrary.wiley.com/doi/10.1002/jcc.540030413), [EDIIS](https://aip.scitation.org/doi/abs/10.1063/1.1470195), [ADIIS](https://aip.scitation.org/doi/10.1063/1.3304922), Combinations of Multi-methods |
 | DIIS-type Method Solvers | Lagrange Multiplier Solver, [ADMM](https://github.com/JuliaFirstOrder/SeparableOptimization.jl) Solver |
 
 ### Basic Hartree-Fock
-To run a Hartree-Fock method, the lines of code required in Quiqbox is as simple as below:
+To run a Hartree-Fock method, the lines of code required in Quiqbox are as simple as below:
 ```@repl 3
 push!(LOAD_PATH,"../../src/") # hide
 using Quiqbox # hide
@@ -34,8 +34,8 @@ mol = Molecule(bs, nuc, nucCoords, resRHF);
 ```
 
 ### Flexible core functions
-If the user want to fine-tune part of the SCF iteration steps to achieve better performance, Quiqbox also has provided various more flexible core functions that 
-allows user to customize the HF methods:
+If the user wants to fine-tune part of the SCF iteration steps to achieve better performance, Quiqbox also has provided various more flexible core functions that 
+allow the user to customize the HF methods:
 
 [`SCFconfig`](@ref)
 

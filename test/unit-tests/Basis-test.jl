@@ -552,7 +552,7 @@ testbf_cb.(bfm_cb1.BasisFunc, bfm_cb3.BasisFunc)
 @test hasEqual(bfm_cb3.BasisFunc |> collect, [bf_cb3, bf_cb3])
 
 
-# function uniqueParams! getVar getVarDict
+# function markParams! getVar getVarDict
 e_gv1 = genExponent(2.0)
 c_gv1 = genContraction(1.0)
 gf_gv1 = GaussFunc(e_gv1, c_gv1)
@@ -579,9 +579,9 @@ bf_gv5 = genBasisFunc(cen_gv3, gf_gv1)
 bf_gv6 = genBasisFunc(cen_gv3, [gf_gv12, gf_gv23, gf_gv31])
 bfm_gv = BasisFuncMix([bf_gv2, bf_gv4, bf_gv6])
 
-@test uniqueParams!(bf_gv4) == [cen_gv1..., e_gv3, c_gv3]
+@test markParams!(bf_gv4) == [cen_gv1..., e_gv3, c_gv3]
 
-pbs_gv1 = uniqueParams!([bf_gv1, bf_gv2])
+pbs_gv1 = markParams!([bf_gv1, bf_gv2])
 pbs_gv1_0 = [cen_gv1[1], cen_gv2[1], 
              cen_gv1[2], cen_gv2[2], 
              cen_gv1[3], cen_gv2[3], 
@@ -590,7 +590,7 @@ pbs_gv1_0 = [cen_gv1[1], cen_gv2[1],
 @test pbs_gv1 == pbs_gv1_0
 @test hasIdentical(pbs_gv1, pbs_gv1_0)
 
-pbs_gv2 = uniqueParams!([bf_gv2, bf_gv1, bf_gv3])
+pbs_gv2 = markParams!([bf_gv2, bf_gv1, bf_gv3])
 
 pbs_gv2_0 = [cen_gv2[1], cen_gv1[1], cen_gv2[1], 
              cen_gv2[2], cen_gv1[2], cen_gv2[2], 
@@ -601,8 +601,9 @@ pbs_gv2_0 = [cen_gv2[1], cen_gv1[1], cen_gv2[1],
 @test hasIdentical(pbs_gv2, pbs_gv2_0)
 
 bfs_gv = sortBasisFuncs([bf_gv1, bf_gv2, bf_gv3, bf_gv4, bf_gv5, bf_gv6])
-pbs_gv3 = uniqueParams!(bfs_gv, filterMapping=true)
-pbs_gv4 = uniqueParams!(vcat(bfs_gv, bfm_gv), filterMapping=true)
+pbs_gv3 = markParams!(bfs_gv, true)
+pbs_gv4 = markParams!(vcat(bfs_gv, bfm_gv), true)
+@test length(pbs_gv3) == 13
 @test pbs_gv3 == pbs_gv4
 @test hasIdentical(pbs_gv3, pbs_gv4)
 

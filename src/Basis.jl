@@ -1,7 +1,7 @@
 export GaussFunc, genExponent, genContraction, genSpatialPoint, BasisFunc, BasisFuncs, 
        genBasisFunc, getSubshell, centerOf, centerCoordOf, GTBasis, sortBasisFuncs, 
        add, mul, shift, decompose, basisSize, genBasisFuncText, genBFuncsFromText, 
-       assignCenter!, makeCenter, getParams, copyBasis, uniqueParams!, getVar, getVarDict, 
+       assignCenter!, makeCenter, getParams, copyBasis, markParams!, getVar, getVarDict, 
        expressionOf
 
 using Symbolics
@@ -1390,7 +1390,7 @@ end
               onlyDifferentiable::Bool=false) -> 
     Union{ParamBox, Nothing}
 
-    getParams(pbc::StructSpatialBasis, symbol::Union{Symbol, Nothing}=nothing; 
+    getParams(pbc::$(StructSpatialBasis), symbol::Union{Symbol, Nothing}=nothing; 
               onlyDifferentiable::Bool=false) -> 
     Array{<:ParamBox, 1}
 
@@ -1406,12 +1406,12 @@ whether ignore non-differentiable parameters. If the 1st argument is an `Array`,
 entries must be `ParamBox` containers.
 """
 function getParams(pb::ParamBox, symbol::Union{Symbol, Nothing}=nothing; 
-          onlyDifferentiable::Bool=false)
+                   onlyDifferentiable::Bool=false)
     paramFilter(pb, symbol, onlyDifferentiable) ? pb : nothing
 end
 
 function getParams(ssb::StructSpatialBasis, symbol::Union{Symbol, Nothing}=nothing; 
-          onlyDifferentiable::Bool=false)::Vector{<:ParamBox}
+                   onlyDifferentiable::Bool=false)::Vector{<:ParamBox}
     filter(x->paramFilter(x, symbol, onlyDifferentiable), ssb.param) |> collect
 end
 
@@ -1504,17 +1504,22 @@ function compareParamBox(pb1::ParamBox, pb2::ParamBox)
 end
 
 
-function markParams!(parArray::Array{<:ParamBox{<:Any, V}}; 
-                     filterMapping::Bool=false) where {V} # ignoreMapping
-    res, _ = markUnique(parArray, compareFunction=compareParamBox)
-    for (idx, i) in zip(parArray, res)
-        idx.index[] = i
-    end
-    filterMapping ? unique(x->x.index[], parArray) : parArray
-end
+"""
 
-function markParams!(parArray::Array{<:ParamBox}; 
-                     filterMapping::Bool=false)
+    markParams!(b::Union{Array{T}, T}, filterMapping::Bool=false)  where 
+               {T<:$(StructSpatialBasis)} -> 
+    Array{<:ParamBox, 1}
+
+Mark the parameters (`ParamBox`) in input bs which can a `Vector` of `GaussFunc` or 
+`FloatingGTBasisFuncs`. The identical parameters will be marked with same index. 
+`filterMapping`determines weather filter out (i.e. not return) `ParamBox`s that have same 
+independent variables despite they may have different mapping functions.
+"""
+markParams!(b::Union{Array{T}, T}, filterMapping::Bool=false) where 
+           {T<:StructSpatialBasis} = 
+markParams!(getParams(b), filterMapping)
+
+function markParams!(parArray::Array{<:ParamBox}, filterMapping::Bool=false)
     pars = eltype(parArray)[]
     syms = getUnique!(outSymOfCore.(parArray))
     arr = parArray |> copy
@@ -1529,22 +1534,18 @@ function markParams!(parArray::Array{<:ParamBox};
             end
         end
         deleteat!(arr, ids)
-        append!(pars, markParams!(subArr; filterMapping))
+        append!(pars, markParamsCore!(subArr))
     end
-    pars
+    filterMapping ? unique(x->(x.dataName, x.index[]), pars) : pars
 end
 
-
-"""
-
-    uniqueParams!(bs; filterMapping::Bool=false) -> Array{<:ParamBox, 1}
-
-Mark the parameters (`ParamBox`) in input bs which can a `Vector` of `GaussFunc` or 
-`FloatingGTBasisFuncs`. The identical parameters will be marked with same index. 
-`filterMapping`determines weather filter out (i.e. not return) `ParamBox`s that have same 
-independent variables despite they may have same mapping functions.
-"""
-uniqueParams!(bs; filterMapping::Bool=false) = markParams!(getParams(bs); filterMapping)
+function markParamsCore!(parArray::Array{<:ParamBox{<:Any, V}}) where {V}
+    res, _ = markUnique(parArray, compareFunction=compareParamBox)
+    for (idx, i) in zip(parArray, res)
+        idx.index[] = i
+    end
+    parArray
+end
 
 
 """
@@ -1580,7 +1581,7 @@ getVarCore(pb::ParamBox{T, V, FLevel(itself)}, _::Bool=false) where {T, V} =
 
     getVar(pb::ParamBox) -> Symbolics.Num
 
-    getVar(container::StructSpatialBasis) -> Array{Symbolics.Num, 1}
+    getVar(container::$(StructSpatialBasis)) -> Array{Symbolics.Num, 1}
 
 Return the independent variable(s) of the input parameter container.
 """
@@ -1600,7 +1601,7 @@ vcat(getVarCore.(containers|>getParams, expandNonDifferentiable)...) |> Dict
 
 """
 
-    getVarDict(obj::Union{ParamBox, StructSpatialBasis, Array}; 
+    getVarDict(obj::Union{ParamBox, $(StructSpatialBasis), Array}; 
                includeMapping::Bool=false) -> 
     Dict{Symbolics.Num, <:Number}
 

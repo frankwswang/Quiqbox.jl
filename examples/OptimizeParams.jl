@@ -10,15 +10,15 @@ gf1 = GaussFunc(0.7,1)
 
 bs = genBasisFunc.(grid.box, Ref([gf1]))
 
-pars = uniqueParams!(bs, filterMapping=true)
+pars = markParams!(bs, true)
 
-parsPartial = [pars[1], pars[4]]
+parsPartial = pars[1:2]
 
-Es, pars, grads = optimizeParams!(parsPartial, bs, nuc, nucCoords, POconfig((maxStep=20,)))
+Es, ps, grads = optimizeParams!(parsPartial, bs, nuc, nucCoords, POconfig((maxStep=20,)))
 
 # # You can also use more advanced optimizers from other packages.
 # using Flux # First do `Pkg.add("Flux")` if you haven't installed the package.
 # using Flux.Optimise: update!
 # optimizer = AMSGrad(0.001)
 # GDm = (prs, grad) -> update!(optimizer, prs, grad)
-# optimizeParams!(bs, parsPartial, nuc, nucCoords, POconfig((GD=GDm)))
+# optimizeParams!(bs, parsPartial, nuc, nucCoords, POconfig((GD=GDm, maxStep=20)))
