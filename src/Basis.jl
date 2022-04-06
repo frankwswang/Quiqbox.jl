@@ -1503,6 +1503,20 @@ function compareParamBox(pb1::ParamBox, pb2::ParamBox)
     end
 end
 
+compareParamBox(pb1::ParamBox{<:Any, <:Any, FLevel(itself)}, 
+                pb2::ParamBox{<:Any, <:Any, FLevel(itself)}) = (pb1.data === pb2.data)
+
+function compareParamBox(pb1::ParamBox{<:Any, <:Any, FLevel(itself)}, pb2::ParamBox)
+    if pb2.canDiff[] == true
+        pb1.data === pb2.data
+    else
+        false
+    end
+end
+
+compareParamBox(pb1::ParamBox, pb2::ParamBox{<:Any, <:Any, FLevel(itself)}) = 
+compareParamBox(pb2, pb1)
+
 
 """
 
