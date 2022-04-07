@@ -32,7 +32,7 @@ normOfGTOin(b::Quiqbox.FloatingGTBasisFuncs{𝑙, GN, 1})  where {𝑙, GN} =
 Nijkα.(b.ijk[1]..., [g.xpn() for g in b.gauss])
 
 normOfGTOin(b::Quiqbox.FloatingGTBasisFuncs{𝑙, GN, ON}) where {𝑙, GN, ON} = 
-Nlα.(b|>Quiqbox.getSubshell, [g.xpn() for g in b.gauss])
+Nlα.(b|>Quiqbox.subshellOf, [g.xpn() for g in b.gauss])
 
 
 function ijkIndex(b::Quiqbox.FloatingGTBasisFuncs)

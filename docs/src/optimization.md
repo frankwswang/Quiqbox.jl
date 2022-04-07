@@ -8,7 +8,6 @@ Here is an example of using [`GaussFunc`](@ref) and [`GridBox`](@ref) to quickly
 ```@repl 4
 push!(LOAD_PATH,"../../src/") # hide
 using Quiqbox # hide
-
 nuc = ["H", "H"]
 
 nucCoords = [[-0.7,0.0,0.0], [0.7,0.0,0.0]]

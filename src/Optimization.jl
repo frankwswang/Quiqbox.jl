@@ -141,7 +141,7 @@ end
                     N::Int=getCharge(nuc), 
                     config::POconfig{M, T, F}=POconfig(); 
                     printInfo::Bool=true
-    Es::Array{Float64, 1}, pars::Array{Float64, 2}, grads::Array{Float64, 2}
+    Es::Vector{Float64}, pars::Matrix{Float64}, grads::Matrix{Float64}
 
 The main function to optimize the parameters of a given basis set.
 
@@ -173,12 +173,12 @@ function optimizeParams!(pbs::Vector{<:ParamBox}, bs::Vector{<:AbstractGTBasisFu
 
         i = 0
         Es = Float64[]
-        pars = zeros(0, length(pbs))
-        grads = zeros(0, length(pbs))
+        pars = zeros(length(pbs), 0)
+        grads = zeros(length(pbs), 0)
         error = config.error
         target = config.target
         maxStep = config.maxStep
-        gap = min(100, max(maxStep ÷ 200 * 5, 1))
+        gap = min(100, max(maxStep ÷ 200 * 10, 1))
         detectConverge = isnan(error) ? false : true
 
         if target === NaN
@@ -200,8 +200,8 @@ function optimizeParams!(pbs::Vector{<:ParamBox}, bs::Vector{<:AbstractGTBasisFu
             end
 
             push!(Es, E)
-            pars = vcat(pars, parsL |> transpose)
-            grads = vcat(grads, grad |> transpose)
+            pars = hcat(pars, parsL)
+            grads = hcat(grads, grad)
 
             if i%gap == 0 && printInfo
                 println(rpad("Step $i: ", 15), rpad("E = $(E)", 26))
@@ -212,14 +212,12 @@ function optimizeParams!(pbs::Vector{<:ParamBox}, bs::Vector{<:AbstractGTBasisFu
                 println("Step duration: ", t, " seconds.\n")
             end
 
-            parsL = updateParams!(pbs, grad, config.GD)
-
             !(detectConverge && isConverged(Es)) && i < maxStep || break
+
+            parsL = updateParams!(pbs, grad, config.GD)
 
             i += 1
         end
-
-        popfirst!(Es)
 
     end
 
@@ -248,7 +246,7 @@ end
                     config::POconfig{M, T, F}=POconfig(), 
                     N::Int=getCharge(nuc); 
                     printInfo::Bool=true
-    Es::Array{Float64, 1}, pars::Array{Float64, 2}, grads::Array{Float64, 2}
+    Es::Matrix{Float64}, pars::Matrix{Float64}, grads::Matrix{Float64}
 
 Another method of `optimizeParams!`.
 """

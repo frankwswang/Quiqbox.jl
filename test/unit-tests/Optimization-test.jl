@@ -51,13 +51,41 @@ local Es2L, ps2L, grads2L
                                             POconfig((maxStep=200,)))
 end
 
-E_t2 = -1.1665258292058682
+E_t2 = -1.1665258278624209
 # L, α
-par_t2  = [2.8465051231251404, 0.2255010453287884]
-grad_t2 = [0.3752225248706008, 0.6830952135402155]
+par_t2  = [2.8465051232815264, 0.22550104533479082]
+grad_t2 = [0.3752225248883099, 0.6830952140061448]
 
+@test Es2L[1] > Es2L[end]
 @test isapprox(Es2L[end], E_t2, atol=errorThreshold2)
-@test isapprox(ps2L[end, :], par_t2, atol=errorThreshold2)
-@test isapprox(grads2L[end, :], grad_t2, atol=errorThreshold2)
+@test isapprox(ps2L[:, end], par_t2, atol=errorThreshold2)
+@test isapprox(grads2L[:, end], grad_t2, atol=errorThreshold2)
+
+
+# BasisFuncMix basis set
+gf2_2 = GaussFunc(0.7,1)
+grid2 = GridBox(1, 3.0)
+bs2_2 = genBasisFunc.(grid2.box, Ref([gf2_2]))
+gf3 = GaussFunc(0.5,1)
+bs3 = bs2_2 .+ genBasisFunc([0,0,0], gf3)
+pars3 = markParams!(bs3, true)[[1,5:end...]]
+local Es3L, ps3L, grads3L
+
+@suppress_out begin
+    Es3L, ps3L, grads3L = optimizeParams!(pars3, bs3, nuc, nucCoords, 
+                                          POconfig((maxStep=50,)))
+end
+
+E_t3 = -1.6538597833434006
+# L, α₁, α₂, d₁, d₂
+par_t3  = [2.9966466869974293, 0.6913223149659601, 0.4835057214805189, 0.9966863578341086, 
+           1.0033029163222076]
+grad_t3 = [0.05956359217705473, 0.16518443158936472, 0.28539984391180534, 
+           0.06666031150461275, -0.0662207016492597]
+
+@test Es3L[1] > Es3L[end]
+@test isapprox(Es3L[end], E_t3, atol=errorThreshold2)
+@test isapprox(ps3L[:, end], par_t3, atol=errorThreshold2)
+@test isapprox(grads3L[:, end], grad_t3, atol=errorThreshold2)
 
 end

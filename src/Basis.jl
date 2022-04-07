@@ -1,5 +1,5 @@
 export GaussFunc, genExponent, genContraction, genSpatialPoint, BasisFunc, BasisFuncs, 
-       genBasisFunc, getSubshell, centerOf, centerCoordOf, GTBasis, sortBasisFuncs, 
+       genBasisFunc, subshellOf, centerOf, centerCoordOf, GTBasis, sortBasisFuncs, 
        add, mul, shift, decompose, basisSize, genBasisFuncText, genBFuncsFromText, 
        assignCenter!, makeCenter, getParams, copyBasis, markParams!, getVar, getVarDict, 
        expressionOf
@@ -472,18 +472,19 @@ genBasisFunc(cen::NTuple{3, ParamBox}, gs::NTuple{GN, GaussFunc},
              ijk::Tuple{NTuple{3, Int}}; normalizeGTO::Bool=false) where {GN} = 
 genBasisFunc(cen, gs, ijk[1]; normalizeGTO)
 
-function genBasisFunc(cen::NTuple{3, ParamBox}, gs::NTuple{GN, GaussFunc}, subshell::String; 
-                      normalizeGTO::Bool=false) where {GN}
+function genBasisFunc(cen::NTuple{3, ParamBox}, gs::NTuple{GN, GaussFunc}, 
+                      subshell::String; normalizeGTO::Bool=false) where {GN}
     genBasisFunc(cen, gs, SubshellOrientationList[subshell]; normalizeGTO)
 end
 
-function genBasisFunc(cen::NTuple{3, ParamBox}, gs::NTuple{GN, GaussFunc}, subshell::String, 
-                      ijkFilter::NTuple{N, Bool}; normalizeGTO::Bool=false) where {GN, N}
+function genBasisFunc(cen::NTuple{3, ParamBox}, gs::NTuple{GN, GaussFunc}, 
+                      subshell::String, ijkFilter::NTuple{N, Bool}; 
+                      normalizeGTO::Bool=false) where {GN, N}
     subshellSize = SubshellSizeList[subshell]
     @assert N == subshellSize "The length of `ijkFilter` should be $(subshellSize) "*
                               "to match the subshell's size."
     genBasisFunc(cen, gs, 
-                 SubshellOrientationList[subshell][1:end .∈ [findall(x->x==true, ijkFilter)]]; 
+                 SubshellOrientationList[subshell][1:end.∈[findall(x->x==true,ijkFilter)]]; 
                  normalizeGTO)
 end
 
@@ -547,11 +548,11 @@ genBasisFunc(bs::Vector{<:FloatingGTBasisFuncs}) = sortBasisFuncs(bs)
 
 """
 
-    getSubshell(::FloatingGTBasisFuncs) -> String
+    subshellOf(::FloatingGTBasisFuncs) -> String
 
 Return the subshell name of the input `$(FloatingGTBasisFuncs)`.
 """
-@inline getSubshell(::FloatingGTBasisFuncs{𝑙}) where {𝑙} = SubshellNames[𝑙+1]
+@inline subshellOf(::FloatingGTBasisFuncs{𝑙}) where {𝑙} = SubshellNames[𝑙+1]
 
 
 """
@@ -1238,7 +1239,7 @@ function genBasisFuncText(bf::FloatingGTBasisFuncs{𝑙};
     GFs = map(x -> genGaussFuncText(x.xpn(), x.con()), gauss)
     cen = centerCoordOf(bf)
     firstLine = printCenter ? "X "*(alignNum.(cen) |> join)*"\n" : ""
-    firstLine * "$(bf|>getSubshell)    $(bf.gauss |> length)   $(norm)\n" * (GFs |> join)
+    firstLine * "$(bf|>subshellOf)    $(bf.gauss |> length)   $(norm)\n" * (GFs |> join)
 end
 
 """
@@ -1399,11 +1400,11 @@ end
     Array{<:ParamBox, 1}
 
 Return the parameter(s) stored in the input container. If keyword argument `symbol` is set 
-to `nothing`, then return all the different parameters; if it's set to the `Symbol` of a 
-parameter (e.g. the symbol of `ParamBox{T, V}` would be `V`), return only that type of 
-parameters (which might still have different indices). `onlyDifferentiable` determines 
-whether ignore non-differentiable parameters. If the 1st argument is an `Array`, the 
-entries must be `ParamBox` containers.
+to `nothing`, then return the parameter(s); if it's set to the `Symbol` of a parameter 
+(e.g. the symbol of `ParamBox{T, V}` would be `V`), return only that type of parameters 
+(which might still have different indices). `onlyDifferentiable` determines whether 
+ignore non-differentiable parameters. If the 1st argument is an `Array`, the entries must 
+be `ParamBox` containers.
 """
 function getParams(pb::ParamBox, symbol::Union{Symbol, Nothing}=nothing; 
                    onlyDifferentiable::Bool=false)
@@ -1432,14 +1433,16 @@ function getParams(cs::Array, symbol::Union{Symbol, Nothing}=nothing;
 end
 
 function paramFilter(pb::ParamBox, outSym::Union{Symbol, Nothing}=nothing, 
-                     canDiff::Bool=false)
+                     onlyDifferentiable::Bool=false)
     (outSym === nothing || outSymOfCore(pb) == outSym) && 
-    (!canDiff || pb.canDiff[])
+    (!onlyDifferentiable || pb.canDiff[])
 end
 
 
-const Doc_copyBasis_Eg1 = "GaussFunc(xpn=ParamBox{Float64, :α, $(FLevel(itself))}(9.0)[∂][α], " * 
-                                    "con=ParamBox{Float64, :d, $(FLevel(itself))}(2.0)[∂][d])"
+const Doc_copyBasis_Eg1 = "GaussFunc(xpn=ParamBox{Float64, :α, "*
+                                    "$(FLevel(itself))}(9.0)[∂][α], "*
+                                    "con=ParamBox{Float64, :d, "*
+                                    "$(FLevel(itself))}(2.0)[∂][d])"
 
 """
 
@@ -1502,6 +1505,20 @@ function compareParamBox(pb1::ParamBox, pb2::ParamBox)
         false
     end
 end
+
+compareParamBox(pb1::ParamBox{<:Any, <:Any, FLevel(itself)}, 
+                pb2::ParamBox{<:Any, <:Any, FLevel(itself)}) = (pb1.data === pb2.data)
+
+function compareParamBox(pb1::ParamBox{<:Any, <:Any, FLevel(itself)}, pb2::ParamBox)
+    if pb2.canDiff[] == true
+        pb1.data === pb2.data
+    else
+        false
+    end
+end
+
+compareParamBox(pb1::ParamBox, pb2::ParamBox{<:Any, <:Any, FLevel(itself)}) = 
+compareParamBox(pb2, pb1)
 
 
 """

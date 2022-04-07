@@ -440,8 +440,8 @@ values of `T` are `$((guessCmethods|>typeof|>fieldnames|>string)[2:end-1])`.
 `SCF::SCFconfig`: SCF iteration configuration. For more information please refer to 
 `SCFconfig`.
 
-`earlyTermination::Bool`: Whether automatically early terminate (skip) a convergence method 
-when its performance becomes unstable or poor.
+`earlyStop::Bool`: Whether automatically terminate (skip) a convergence method early when 
+its performance becomes unstable or poor.
 
 `maxStep::Int`: Maximum allowed iteration steps regardless of whether the SCF converges.
 
@@ -466,7 +466,7 @@ mutable struct HFconfig{HFT, CT, L} <: ConfigBox{HFconfig, HFT}
     C0::Union{Matrix{Float64}, NTuple{2, Matrix{Float64}}, Val}
     SCF::SCFconfig{L}
     maxStep::Int
-    earlyTermination::Bool
+    earlyStop::Bool
 
     HFconfig(::Val{:UHF}, a2::NTuple{2, Matrix{Float64}}, a3::SCFconfig{L}, a4, a5) where 
             {L} = 
@@ -538,7 +538,7 @@ function runHF(gtb::BasisSetData{BT},
         config.C0
     end
     runHFcore(config.SCF, N, Hcore, gtb.eeI, gtb.S, X, initialC, 
-              printInfo, config.maxStep, config.earlyTermination)
+              printInfo, config.maxStep, config.earlyStop)
 end
 
 """
@@ -572,7 +572,7 @@ runHF(GTBasis(bs), args...; printInfo)
               C0::Union{Array{Float64, 2}, NTuple{2, Array{Float64, 2}}}, 
               printInfo::Bool=false, 
               maxStep::Int=1000, 
-              earlyTermination::Bool=true) -> 
+              earlyStop::Bool=true) -> 
     HFfinalVars
 
 The core function of `runHF`.
@@ -600,7 +600,7 @@ coefficient matrix(s) C of the molecular orbitals.
 
 `maxStep::Int`: Maximum allowed iteration steps regardless of whether the SCF converges.
 
-`earlyTermination::Bool`: Whether automatically early terminate (skip) a convergence method 
+`earlyStop::Bool`: Whether automatically early terminate (skip) a convergence method 
 when its performance becomes unstable or poor.
 """
 function runHFcore(scfConfig::SCFconfig{L}, 
@@ -612,7 +612,7 @@ function runHFcore(scfConfig::SCFconfig{L},
                    C0::Union{Matrix{Float64}, NTuple{2, Matrix{Float64}}}, 
                    printInfo::Bool=false, 
                    maxStep::Int=1000, 
-                   earlyTermination::Bool=true) where {L}
+                   earlyStop::Bool=true) where {L}
     vars = initializeSCF(Hcore, HeeI, C0, N)
     Etots = (vars isa Tuple) ? vars[1].shared.Etots : vars.shared.Etots
     HFtypeStr =  N isa Int ? "RHF" : "UHF"
@@ -639,7 +639,7 @@ function runHFcore(scfConfig::SCFconfig{L},
 
             flag && (isConverged = Std > scfConfig.oscillateThreshold ? false : true; break)
 
-            if earlyTermination && (Etots[end] - EtotMin) / abs(EtotMin) > 0.2
+            if earlyStop && (Etots[end] - EtotMin) / abs(EtotMin) > 0.2
                 printInfo && println("Early termination of ", m, 
                                      " due to the poor performance.")
                 isConverged = false

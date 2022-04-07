@@ -21,6 +21,10 @@ inSymOf
 ```
 
 ```@docs
+inSymOfCore
+```
+
+```@docs
 inSymValOf
 ```
 
@@ -30,6 +34,14 @@ outValOf
 
 ```@doc
 outSymOf
+```
+
+```@docs
+outSymOfCore
+```
+
+```@docs
+outSymValOf
 ```
 
 ```@docs
@@ -74,6 +86,10 @@ genBasisFunc
 
 ```@docs
 sortBasisFuncs
+```
+
+```@docs
+subshellOf
 ```
 
 ```@docs
