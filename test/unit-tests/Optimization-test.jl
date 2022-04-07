@@ -56,8 +56,35 @@ E_t2 = -1.1665258292058682
 par_t2  = [2.8465051231251404, 0.2255010453287884]
 grad_t2 = [0.3752225248706008, 0.6830952135402155]
 
+@test Es2L[end] < Es2L[1]
 @test isapprox(Es2L[end], E_t2, atol=errorThreshold2)
 @test isapprox(ps2L[end, :], par_t2, atol=errorThreshold2)
 @test isapprox(grads2L[end, :], grad_t2, atol=errorThreshold2)
+
+
+# BasisFuncMix basis set
+gf2_2 = GaussFunc(0.7,1)
+bs2_2 = genBasisFunc.(grid.box, Ref([gf2_2]))
+gf3 = GaussFunc(0.5,1)
+bs3 = bs2_2 .+ genBasisFunc([0,0,0], gf3)
+pars3 = markParams!(bs3, true)[[1,5:end...]]
+local Es3L, ps3L, grads3L
+
+@suppress_out begin
+    Es3L, ps3L, grads3L = optimizeParams!(pars3, bs3, nuc, nucCoords, 
+                                          POconfig((maxStep=50,)))
+end
+
+E_t3 = -1.660135125602929
+# L, α₁, α₂, d₁, d₂
+par_t3  = [2.8438717380095864, 0.6912590580923045, 0.48913645109117465, 
+           0.9974149356990022, 1.0025785319279148]
+grad_t3 = [0.040670718930460946, 0.16979735243389227, 0.18942366614583084, 
+           0.05227968716424935, -0.052010430256302635]
+
+@test Es3L[end] < Es3L[1]
+@test isapprox(Es3L[end], E_t3, atol=errorThreshold2)
+@test isapprox(ps3L[end, :], par_t3, atol=errorThreshold2)
+@test isapprox(grads3L[end, :], grad_t3, atol=errorThreshold2)
 
 end
