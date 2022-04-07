@@ -56,10 +56,10 @@ E_t2 = -1.1665258292058682
 par_t2  = [2.8465051231251404, 0.2255010453287884]
 grad_t2 = [0.3752225248706008, 0.6830952135402155]
 
-@test Es2L[end] < Es2L[1]
+@test Es2L[1] > Es2L[end]
 @test isapprox(Es2L[end], E_t2, atol=errorThreshold2)
-@test isapprox(ps2L[end, :], par_t2, atol=errorThreshold2)
-@test isapprox(grads2L[end, :], grad_t2, atol=errorThreshold2)
+@test isapprox(ps2L[:, end], par_t2, atol=errorThreshold2)
+@test isapprox(grads2L[:, end], grad_t2, atol=errorThreshold2)
 
 
 # BasisFuncMix basis set
@@ -82,9 +82,9 @@ par_t3  = [2.8438717380095864, 0.6912590580923045, 0.48913645109117465,
 grad_t3 = [0.040670718930460946, 0.16979735243389227, 0.18942366614583084, 
            0.05227968716424935, -0.052010430256302635]
 
-@test Es3L[end] < Es3L[1]
+@test Es3L[1] > Es3L[end]
 @test isapprox(Es3L[end], E_t3, atol=errorThreshold2)
-@test isapprox(ps3L[end, :], par_t3, atol=errorThreshold2)
-@test isapprox(grads3L[end, :], grad_t3, atol=errorThreshold2)
+@test isapprox(ps3L[:, end], par_t3, atol=errorThreshold2)
+@test isapprox(grads3L[:, end], grad_t3, atol=errorThreshold2)
 
 end
