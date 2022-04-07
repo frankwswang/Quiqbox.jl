@@ -472,18 +472,19 @@ genBasisFunc(cen::NTuple{3, ParamBox}, gs::NTuple{GN, GaussFunc},
              ijk::Tuple{NTuple{3, Int}}; normalizeGTO::Bool=false) where {GN} = 
 genBasisFunc(cen, gs, ijk[1]; normalizeGTO)
 
-function genBasisFunc(cen::NTuple{3, ParamBox}, gs::NTuple{GN, GaussFunc}, subshell::String; 
-                      normalizeGTO::Bool=false) where {GN}
+function genBasisFunc(cen::NTuple{3, ParamBox}, gs::NTuple{GN, GaussFunc}, 
+                      subshell::String; normalizeGTO::Bool=false) where {GN}
     genBasisFunc(cen, gs, SubshellOrientationList[subshell]; normalizeGTO)
 end
 
-function genBasisFunc(cen::NTuple{3, ParamBox}, gs::NTuple{GN, GaussFunc}, subshell::String, 
-                      ijkFilter::NTuple{N, Bool}; normalizeGTO::Bool=false) where {GN, N}
+function genBasisFunc(cen::NTuple{3, ParamBox}, gs::NTuple{GN, GaussFunc}, 
+                      subshell::String, ijkFilter::NTuple{N, Bool}; 
+                      normalizeGTO::Bool=false) where {GN, N}
     subshellSize = SubshellSizeList[subshell]
     @assert N == subshellSize "The length of `ijkFilter` should be $(subshellSize) "*
                               "to match the subshell's size."
     genBasisFunc(cen, gs, 
-                 SubshellOrientationList[subshell][1:end .∈ [findall(x->x==true, ijkFilter)]]; 
+                 SubshellOrientationList[subshell][1:end.∈[findall(x->x==true,ijkFilter)]]; 
                  normalizeGTO)
 end
 
@@ -1399,11 +1400,11 @@ end
     Array{<:ParamBox, 1}
 
 Return the parameter(s) stored in the input container. If keyword argument `symbol` is set 
-to `nothing`, then return all the different parameters; if it's set to the `Symbol` of a 
-parameter (e.g. the symbol of `ParamBox{T, V}` would be `V`), return only that type of 
-parameters (which might still have different indices). `onlyDifferentiable` determines 
-whether ignore non-differentiable parameters. If the 1st argument is an `Array`, the 
-entries must be `ParamBox` containers.
+to `nothing`, then return the parameter(s); if it's set to the `Symbol` of a parameter 
+(e.g. the symbol of `ParamBox{T, V}` would be `V`), return only that type of parameters 
+(which might still have different indices). `onlyDifferentiable` determines whether 
+ignore non-differentiable parameters. If the 1st argument is an `Array`, the entries must 
+be `ParamBox` containers.
 """
 function getParams(pb::ParamBox, symbol::Union{Symbol, Nothing}=nothing; 
                    onlyDifferentiable::Bool=false)
@@ -1432,14 +1433,16 @@ function getParams(cs::Array, symbol::Union{Symbol, Nothing}=nothing;
 end
 
 function paramFilter(pb::ParamBox, outSym::Union{Symbol, Nothing}=nothing, 
-                     canDiff::Bool=false)
+                     onlyDifferentiable::Bool=false)
     (outSym === nothing || outSymOfCore(pb) == outSym) && 
-    (!canDiff || pb.canDiff[])
+    (!onlyDifferentiable || pb.canDiff[])
 end
 
 
-const Doc_copyBasis_Eg1 = "GaussFunc(xpn=ParamBox{Float64, :α, $(FLevel(itself))}(9.0)[∂][α], " * 
-                                    "con=ParamBox{Float64, :d, $(FLevel(itself))}(2.0)[∂][d])"
+const Doc_copyBasis_Eg1 = "GaussFunc(xpn=ParamBox{Float64, :α, "*
+                                    "$(FLevel(itself))}(9.0)[∂][α], "*
+                                    "con=ParamBox{Float64, :d, "*
+                                    "$(FLevel(itself))}(2.0)[∂][d])"
 
 """
 

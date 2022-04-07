@@ -211,18 +211,6 @@ function hasBoolRelation(boolFunc::F,
                          pb1::ParamBox{<:Any, <:Any, F1}, pb2::ParamBox{<:Any, <:Any, F2}; 
                          ignoreFunction::Bool=false, ignoreContainer::Bool=false,
                          kws...) where {F<:Function, F1, F2}
-    # if ignoreContainer
-    #     boolFunc(pb1(), pb2())
-    # elseif boolFunc(pb1.canDiff[], pb2.canDiff[])
-    #     if ignoreFunction
-    #         return boolFunc(pb1.data, pb2.data)
-    #     else
-    #         return (boolFunc(pb1.map, pb2.map) && boolFunc(pb1.data, pb2.data))
-    #     end
-    # else
-    #     false
-    # end
-
     if ignoreContainer
         boolFunc(pb1(), pb2())
     elseif ignoreFunction || F1 == F2 == FLevel(itself)

@@ -42,7 +42,7 @@ grad2_tp = [-0.027665907127075284, 0.032956566685641786,
              0.09464147744656182, -0.05996050268876785]
 @test isapprox.(grad2[7:end], grad2_tp, atol=t2) |> all
 
-bs3 = bs1[1:2] .* bs2
+bs3 = bs1[1:2] .* bs2 # basis set of BasisFuncMix
 pars3 = markParams!(bs3, true)
 S3 = overlaps(bs3)
 HFres3 = runHF(bs3, nuc, nucCoords, printInfo=false)
