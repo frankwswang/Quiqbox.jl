@@ -89,6 +89,10 @@ sortBasisFuncs
 ```
 
 ```@docs
+subshellOf
+```
+
+```@docs
 centerOf
 ```
 

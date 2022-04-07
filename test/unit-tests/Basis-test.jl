@@ -98,7 +98,7 @@ bf2 = genBasisFunc(cen, [gf2])
 @test !hasIdentical(bf1, bf2)
 @test !hasIdentical(bf1, bf1_3)
 @test hasIdentical(bf1_3, bf1_4)
-@test getSubshell(bf1) == "S"
+@test subshellOf(bf1) == "S"
 @test bf1 isa BasisFunc
 
 bf11 = genBasisFunc(cen, [gf1, gf1])
@@ -109,7 +109,7 @@ bf11_2 = genBasisFunc(cen, ([xpn1, xpn1], [con1, con1]))
 @test hasEqual(bf11, bf11_2)
 @test !hasIdentical(bf11, bf11_2)
 bf2_P_norm2 = genBasisFunc(cen, [gf2], "P")
-@test getSubshell(bf2_P_norm2) == "P"
+@test subshellOf(bf2_P_norm2) == "P"
 @test bf2_P_norm2 isa BasisFuncs
 
 bf3_1 = genBasisFunc([0,0,0], (3,1))

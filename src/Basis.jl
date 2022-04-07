@@ -1,5 +1,5 @@
 export GaussFunc, genExponent, genContraction, genSpatialPoint, BasisFunc, BasisFuncs, 
-       genBasisFunc, getSubshell, centerOf, centerCoordOf, GTBasis, sortBasisFuncs, 
+       genBasisFunc, subshellOf, centerOf, centerCoordOf, GTBasis, sortBasisFuncs, 
        add, mul, shift, decompose, basisSize, genBasisFuncText, genBFuncsFromText, 
        assignCenter!, makeCenter, getParams, copyBasis, markParams!, getVar, getVarDict, 
        expressionOf
@@ -548,11 +548,11 @@ genBasisFunc(bs::Vector{<:FloatingGTBasisFuncs}) = sortBasisFuncs(bs)
 
 """
 
-    getSubshell(::FloatingGTBasisFuncs) -> String
+    subshellOf(::FloatingGTBasisFuncs) -> String
 
 Return the subshell name of the input `$(FloatingGTBasisFuncs)`.
 """
-@inline getSubshell(::FloatingGTBasisFuncs{𝑙}) where {𝑙} = SubshellNames[𝑙+1]
+@inline subshellOf(::FloatingGTBasisFuncs{𝑙}) where {𝑙} = SubshellNames[𝑙+1]
 
 
 """
@@ -1239,7 +1239,7 @@ function genBasisFuncText(bf::FloatingGTBasisFuncs{𝑙};
     GFs = map(x -> genGaussFuncText(x.xpn(), x.con()), gauss)
     cen = centerCoordOf(bf)
     firstLine = printCenter ? "X "*(alignNum.(cen) |> join)*"\n" : ""
-    firstLine * "$(bf|>getSubshell)    $(bf.gauss |> length)   $(norm)\n" * (GFs |> join)
+    firstLine * "$(bf|>subshellOf)    $(bf.gauss |> length)   $(norm)\n" * (GFs |> join)
 end
 
 """
