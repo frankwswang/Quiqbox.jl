@@ -24,7 +24,6 @@ First, you can create a basis set at one coordinate by inputting the `Vector` of
 ```@repl 1
 push!(LOAD_PATH,"../../src/") # hide
 using Quiqbox # hide
-
 bsO = Quiqbox.genBasisFunc([0,0,0], ("STO-3G", "O"))
 ```
 
@@ -113,13 +112,11 @@ D    1   1.00
 genBFuncsFromText(txt_Kr_631G, adjustContent=true)
 ```
 
-
 ### Constructing basis sets from `GaussFunc`
 
 If you want to specify the parameters of each Gaussian function when constructing a basis set, you can first construct the container for Gaussian functions: `GaussFunc`, and then build the basis function upon them:
 ```@repl 2
 using Quiqbox # hide
-
 gf1 = GaussFunc(2.0, 1.0)
 
 gf2 = GaussFunc(2.5, 0.75)
@@ -147,6 +144,7 @@ hasEqual(bf4, bf5)
 ```
 
 ### Constructing basis sets based on `ParamBox`
+
 Sometimes you may want the parameters of basis functions (or `GaussFunc`) to be under some constraints (which can be crucial for the later basis set optimization), this is when you need a deeper level of control over the parameters, through its direct container: `ParamBox`. In fact, in the above example, we have already had a glimpse of it through the printed info in the REPL:
 ```@repl 2
 gf1
@@ -197,7 +195,6 @@ markParams!(bs7)
 
 `markParams!` marks all the parameters of the given basis set. As you can see, even though `bs7` has 2 `GaussFunc`s as basis functions, overall it only has 1 unique coefficient exponent ``\alpha_1`` and 1 unique contraction coefficient ``d_1`` if we ignore the center coordinates.
 
-
 ## Dependent Variable as a parameter
 
 Another control the user can have on the parameters in Quiqbox is to make ParamBox represent a dependent variable defined by the mapping function of another independent parameter.
@@ -218,3 +215,37 @@ getVarDict(pb1)
 ```
 !!! info "Parameter represented by `ParamBox`"
     The mapped variable (value) of a `ParamBox` is always used as the parameter (parameter value) it represents in the construction of any basis function component. If you want to optimize the variable that is mapped from, the `ParamBox` needs to be marked as "differentiable". For more information on parameter optimization, please see the docstring of [`ParamBox`](@ref) and section [Parameter Optimization](@ref).
+
+## Basis function from the linear combinations of other basis functions
+
+Apart from the flexible control of basis function parameters, a major feature of Quiqbox is the ability to construct a basis function from the linear combination of existing basis functions. Specifically, additional methods of `+` and `*` (operator syntax for [`add`](@ref) and [`mul`](@ref)) are implemented for `CompositeGTBasisFuncs` so the user can combine basis functions as if they are `Number`:
+```@repl 3
+using Quiqbox # hide
+bf7 = genBasisFunc([1,0,1], (1.5,3))
+
+bf8 = genBasisFunc([1,0,1], (2,4))
+
+bf9 = bf7*0.5 + bf8
+
+bf9.gauss[1].con() == 3 * 0.5
+```
+
+As you can see, the type of `bf9` is still `BasisFunc` since `bf7` and `bf8` have the same center coordinates, hence all the Gaussian functions inside `bf9`also have the same center coordinates. What if the combined basis functions are multi-center?
+```@repl 3
+bf10 = genBasisFunc([1,1,1], (1.2,3))
+
+bf11 = bf8 + bf10
+```
+The type of `bf11` is called `BasisFuncMix`, which means we can't express it as a contracted Gaussian-type orbital (CGTO), but as a "mixture" of multi-center CGTOs.
+
+There are other cases that can result in a `BasisFuncMix` as a returned basis function. For example:
+```@repl 3
+bf12 = genBasisFunc([1,1,1], (1.2,3), (1,1,0))
+
+bf10 + bf12
+```
+
+Despite the cause of generating a `BasisFuncMix`, it's still a valid basis function in Quiqbox and you can use it to call functions that accept `CompositeGTBasisFuncs` as input arguments:
+```@repl 3
+overlap(bf11, bf11)
+```
