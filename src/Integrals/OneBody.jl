@@ -25,6 +25,28 @@ overlaps(BSet::Vector{<:AbstractGTBasisFuncs}) = getOverlaps(BSet)
 
 """
 
+    elecKinetic(fb1::AbstractGTBasisFuncs, fb2::AbstractGTBasisFuncs) -> 
+    Array{Float64, 2}
+
+Return the electron kinetic energy matrix (an N×N `Matrix` where N is the number of spatial 
+orbitals) given 2 basis functions.
+"""
+elecKinetic(bf1::AbstractGTBasisFuncs, bf2::AbstractGTBasisFuncs) = 
+cat(getElecKinetic(bf1, bf2), dims=2)
+
+
+"""
+
+    elecKinetics(BSet::Array{<:AbstractGTBasisFuncs, 1}) -> Array{Float64, 2}
+
+Return the electron kinetic energy matrix (an N×N `Matrix` where N is the number of spatial 
+orbitals) given a basis set in the form of an `Array`.
+"""
+elecKinetics(BSet::Vector{<:AbstractGTBasisFuncs}) = getElecKinetics(BSet)
+
+
+"""
+
     nucAttraction(fb1::AbstractGTBasisFuncs, fb2::AbstractGTBasisFuncs, 
                   nuc::Array{String, 1}, nucCoords::Array{<:AbstractArray, 1}) -> 
     Array{Float64, 2}
@@ -50,28 +72,6 @@ coordinates (in atomic unit).
 nucAttractions(BSet::Vector{<:AbstractGTBasisFuncs}, 
                nuc::Vector{String}, nucCoords::Vector{<:AbstractArray}) = 
 getNucAttractions(BSet, nuc, nucCoords)
-
-
-"""
-
-    elecKinetic(fb1::AbstractGTBasisFuncs, fb2::AbstractGTBasisFuncs) -> 
-    Array{Float64, 2}
-
-Return the electron kinetic energy matrix (an N×N `Matrix` where N is the number of spatial 
-orbitals) given 2 basis functions.
-"""
-elecKinetic(bf1::AbstractGTBasisFuncs, bf2::AbstractGTBasisFuncs) = 
-cat(getElecKinetic(bf1, bf2), dims=2)
-
-
-"""
-
-    elecKinetics(BSet::Array{<:AbstractGTBasisFuncs, 1}) -> Array{Float64, 2}
-
-Return the electron kinetic energy matrix (an N×N `Matrix` where N is the number of spatial 
-orbitals) given a basis set in the form of an `Array`.
-"""
-elecKinetics(BSet::Vector{<:AbstractGTBasisFuncs}) = getElecKinetics(BSet)
 
 
 @inline coreHijCore(bf1::AbstractGTBasisFuncs, bf2::AbstractGTBasisFuncs, 

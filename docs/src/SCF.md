@@ -38,6 +38,8 @@ mol = Molecule(bs, nuc, nucCoords, resRHF);
 If the user wants to fine-tune part of the SCF iteration steps to achieve better performance, Quiqbox also has provided various more flexible core functions that 
 allow the user to customize the HF methods:
 
+[`HFconfig`](@ref)
+
 [`SCFconfig`](@ref)
 
 [`runHFcore`](@ref)
@@ -46,19 +48,23 @@ allow the user to customize the HF methods:
 
 Quiqbox also provides several integral functions that can be used independently of any SCF functions if intended.
 
+### One-electron functions
+
 [`overlap`](@ref)
 
 [`overlaps`](@ref)
 
-### One-electron functions
+[`elecKinetic`](@ref)
+
+[`elecKinetics`](@ref)
 
 [`nucAttraction`](@ref)
 
 [`nucAttractions`](@ref)
 
-[`elecKinetic`](@ref)
+[`coreHij`](@ref)
 
-[`elecKinetics`](@ref)
+[`coreH`](@ref)
 
 ### Two-electron functions
 
