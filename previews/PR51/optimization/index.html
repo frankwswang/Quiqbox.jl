@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Parameter Optimization · Quiqbox.jl</title><script data-outdated-warner src="../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.039/juliamono-regular.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.13.11/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL=".."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../assets/documenter.js"></script><script src="../siteinfo.js"></script><script src="../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><a class="docs-logo" href="../"><img src="../assets/logo.png" alt="Quiqbox.jl logo"/></a><div class="docs-package-name"><span class="docs-autofit"><a href="../">Quiqbox.jl</a></span></div><form class="docs-search" action="../search/"><input class="docs-search-query" id="documenter-search-query" name="q" type="text" placeholder="Search docs"/></form><ul class="docs-menu"><li><a class="tocitem" href="../">Home</a></li><li><span class="tocitem">Manual</span><ul><li><a class="tocitem" href="../basis/">Basis Sets</a></li><li><a class="tocitem" href="../SCF/">Self-Consistent Field Methods</a></li><li class="is-active"><a class="tocitem" href>Parameter Optimization</a><ul class="internal"><li><a class="tocitem" href="#Selectively-Optimizing-Parameters"><span>Selectively Optimizing Parameters</span></a></li><li><a class="tocitem" href="#Store-Customized-Basis-Set"><span>Store Customized Basis Set</span></a></li></ul></li></ul></li><li><span class="tocitem">Base</span><ul><li><a class="tocitem" href="../coreFunction/">Core Functions</a></li><li><a class="tocitem" href="../coreType/">Core Types</a></li><li><a class="tocitem" href="../toolFunction/">Tool Functions</a></li></ul></li><li><span class="tocitem">Submodule</span><ul><li><a class="tocitem" href="../molden/">Molden</a></li></ul></li><li><a class="tocitem" href="../list/">Index</a></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Manual</a></li><li class="is-active"><a href>Parameter Optimization</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Parameter Optimization</a></li></ul></nav><div class="docs-right"><a class="docs-edit-link" href="https://github.com/frankwswang/Quiqbox.jl/blob/master/docs/src/optimization.md" title="Edit on GitHub"><span class="docs-icon fab"></span><span class="docs-label is-hidden-touch">Edit on GitHub</span></a><a class="docs-settings-button fas fa-cog" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-sidebar-button fa fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a></div></header><article class="content" id="documenter-page"><h1 id="Parameter-Optimization"><a class="docs-heading-anchor" href="#Parameter-Optimization">Parameter Optimization</a><a id="Parameter-Optimization-1"></a><a class="docs-heading-anchor-permalink" href="#Parameter-Optimization" title="Permalink"></a></h1><h2 id="Selectively-Optimizing-Parameters"><a class="docs-heading-anchor" href="#Selectively-Optimizing-Parameters">Selectively Optimizing Parameters</a><a id="Selectively-Optimizing-Parameters-1"></a><a class="docs-heading-anchor-permalink" href="#Selectively-Optimizing-Parameters" title="Permalink"></a></h2><p>In the <a href="../basis/#Basis-Sets">Basis Sets</a> section, we have briefly introduced the parameters in terms of <a href="../coreType/#Quiqbox.ParamBox"><code>ParamBox</code></a> that are embedded in containers such as <a href="../coreType/#Quiqbox.BasisFunc"><code>BasisFunc</code></a> and <a href="../coreType/#Quiqbox.BasisFuncs"><code>BasisFuncs</code></a> directly used to form a basis set. This means how we construct the basis set using the parameters will determine the parameter space for the basis set optimization. For more information please refer to <a href="../basis/#Constructing-basis-sets-based-on-ParamBox">Constructing basis sets based on ParamBox</a>.</p><p>Here is an example of using <a href="../coreType/#Quiqbox.GaussFunc"><code>GaussFunc</code></a> and <a href="../coreType/#Quiqbox.GridBox"><code>GridBox</code></a> to quickly generate a grid-based basis set with only 3 independent parameters. One is the spacing <span>$L$</span> of the grid points that indirectly determines all the center coordinates of the basis function through a series of mapping functions; the other two are one exponent coefficient <span>$\alpha$</span> and one contraction coefficient <span>$d$</span>.</p><pre><code class="nohighlight hljs ansi" style="display:block;"></code><code class="nohighlight hljs ansi" style="display:block;"></code><br/><code class="language-julia-repl hljs" style="display:block;">julia&gt; nuc = [&quot;H&quot;, &quot;H&quot;]</code><code class="nohighlight hljs ansi" style="display:block;">2-element Vector{String}:
+ &quot;H&quot;
+ &quot;H&quot;</code><br/><code class="language-julia-repl hljs" style="display:block;">julia&gt; nucCoords = [[-0.7,0.0,0.0], [0.7,0.0,0.0]]</code><code class="nohighlight hljs ansi" style="display:block;">2-element Vector{Vector{Float64}}:
+ [-0.7, 0.0, 0.0]
+ [0.7, 0.0, 0.0]</code><br/><code class="language-julia-repl hljs" style="display:block;">julia&gt; grid = GridBox(1, 3.0)</code><code class="nohighlight hljs ansi" style="display:block;">GridBox{1, 1, 1}(num, len, coord)</code><br/><code class="language-julia-repl hljs" style="display:block;">julia&gt; gf1 = GaussFunc(0.7,1)</code><code class="nohighlight hljs ansi" style="display:block;">GaussFunc(xpn=ParamBox{Float64, :α, Quiqbox.FLevel{1, 0}}(0.7)[∂][α], con=ParamBox{Float64, :d, Quiqbox.FLevel{1, 0}}(1.0)[∂][d])</code><br/><code class="language-julia-repl hljs" style="display:block;">julia&gt; bs = genBasisFunc.(grid.box, Ref([gf1]))</code><code class="nohighlight hljs ansi" style="display:block;">8-element Vector{BasisFunc{0, 1}}:
+ BasisFunc{0, 1}(center, gauss)[X⁰Y⁰Z⁰][-1.5, -1.5, -1.5]
+ BasisFunc{0, 1}(center, gauss)[X⁰Y⁰Z⁰][-1.5, -1.5, 1.5]
+ BasisFunc{0, 1}(center, gauss)[X⁰Y⁰Z⁰][-1.5, 1.5, -1.5]
+ BasisFunc{0, 1}(center, gauss)[X⁰Y⁰Z⁰][-1.5, 1.5, 1.5]
+ BasisFunc{0, 1}(center, gauss)[X⁰Y⁰Z⁰][1.5, -1.5, -1.5]
+ BasisFunc{0, 1}(center, gauss)[X⁰Y⁰Z⁰][1.5, -1.5, 1.5]
+ BasisFunc{0, 1}(center, gauss)[X⁰Y⁰Z⁰][1.5, 1.5, -1.5]
+ BasisFunc{0, 1}(center, gauss)[X⁰Y⁰Z⁰][1.5, 1.5, 1.5]</code></pre><p>After constructing the basis set, we need to use <a href="../coreFunction/#Quiqbox.markParams!"><code>markParams!</code></a> to mark all the unique parameters that can also be optimized later:</p><pre><code class="language-julia-repl hljs" style="display:block;">julia&gt; pars = markParams!(bs, true)</code><code class="nohighlight hljs ansi" style="display:block;">3-element Vector{ParamBox{Float64, V, FL} where {V, FL&lt;:Quiqbox.FLevel}}:
+ ParamBox{Float64, :X, Quiqbox.FLevel{2, 0}}(3.0)[∂][L₁]
+ ParamBox{Float64, :α, Quiqbox.FLevel{1, 0}}(0.7)[∂][α₁]
+ ParamBox{Float64, :d, Quiqbox.FLevel{1, 0}}(1.0)[∂][d₁]</code></pre><p>As expected, there are only 3 unique tunable independent parameters despite the basis set having 8 basis functions with a total of 40 parameters. However, if we take a step further, we can remove <span>$d$</span> since each basis function here is just one same Gaussian function. Thus, input the left parameters (along with other necessary arguments) into the <a href="../coreFunction/#Quiqbox.optimizeParams!"><code>optimizeParams!</code></a> and we can sit and wait for the optimization iterations to complete.</p><pre><code class="language-julia-repl hljs" style="display:block;">julia&gt; parsPartial = pars[1:2]</code><code class="nohighlight hljs ansi" style="display:block;">2-element Vector{ParamBox{Float64, V, FL} where {V, FL&lt;:Quiqbox.FLevel}}:
+ ParamBox{Float64, :X, Quiqbox.FLevel{2, 0}}(3.0)[∂][L₁]
+ ParamBox{Float64, :α, Quiqbox.FLevel{1, 0}}(0.7)[∂][α₁]</code><br/><code class="language-julia-repl hljs" style="display:block;">julia&gt; Es, ps, grads = optimizeParams!(parsPartial, bs, nuc, nucCoords, POconfig((maxStep=20,)));</code><code class="nohighlight hljs ansi" style="display:block;">Step 0:        E = 0.3326883608603231    
+          params = [3.0, 0.7]
+            grad = [1.2560794975855796, 4.050658417242255]
+Step duration: 31.769934604 seconds.
+
+Step 1:        E = 0.31471082087020796   
+          params = [2.9987439205024145, 0.6959493415827577]
+            grad = [1.255291366957658, 4.0468750670624996]
+Step duration: 0.252835818 seconds.
+
+Step 2:        E = 0.2967666600529124    
+          params = [2.9974886291354568, 0.6919024665156952]
+            grad = [1.2543502475445372, 4.042756996645089]
+Step duration: 0.252065624 seconds.
+
+Step 3:        E = 0.2788589454611798    
+          params = [2.996234278887912, 0.6878597095190501]
+            grad = [1.2532554989490041, 4.038300081786543]
+Step duration: 0.249634443 seconds.
+
+Step 4:        E = 0.2609907692099122    
+          params = [2.9949810233889633, 0.6838214094372635]
+            grad = [1.2520066027366314, 4.033500397675592]
+Step duration: 0.248728351 seconds.
+
+Step 5:        E = 0.24316524555946872   
+          params = [2.9937290167862267, 0.679787909039588]
+            grad = [1.2506031650368092, 4.028354228396743]
+Step duration: 0.248584852 seconds.
+
+Step 6:        E = 0.22538550789908784   
+          params = [2.99247841362119, 0.6757595548111912]
+            grad = [1.2490449189294068, 4.022858076226915]
+Step duration: 0.246811067 seconds.
+
+Step 7:        E = 0.20765470563568292   
+          params = [2.9912293687022604, 0.6717366967349643]
+            grad = [1.247331726604636, 4.017008670691514]
+Step duration: 0.24768806 seconds.
+
+Step 8:        E = 0.18997600099386758   
+          params = [2.989982036975656, 0.6677196880642727]
+            grad = [1.2454635812843542, 4.010802977345854]
+Step duration: 0.24648017 seconds.
+
+Step 9:        E = 0.17235256573346125   
+          params = [2.9887365733943714, 0.6637088850869268]
+            grad = [1.2434406088936651, 4.004238206248238]
+Step duration: 0.246669169 seconds.
+
+Step 10:       E = 0.15478757779125327   
+          params = [2.987493132785478, 0.6597046468806785]
+            grad = [1.241263069472292, 3.99731182009069]
+Step duration: 0.247495167 seconds.
+
+Step 11:       E = 0.13728421785420583   
+          params = [2.9862518697160056, 0.6557073350605879]
+            grad = [1.2389313583162556, 3.9900215419544507]
+Step duration: 0.253776416 seconds.
+
+Step 12:       E = 0.11984566587173548   
+          params = [2.9850129383576895, 0.6517173135186334]
+            grad = [1.2364460068410057, 3.9823653626570756]
+Step duration: 0.249786349 seconds.
+
+Step 13:       E = 0.10247509751507658   
+          params = [2.9837764923508487, 0.6477349481559763]
+            grad = [1.2338076831583038, 3.9743415476596367]
+Step duration: 0.246020379 seconds.
+
+Step 14:       E = 0.08517568059215706   
+          params = [2.9825426846676906, 0.6437606066083167]
+            grad = [1.2310171923600564, 3.9659486435027462]
+Step duration: 0.246890173 seconds.
+
+Step 15:       E = 0.06795057142668978   
+          params = [2.9813116674753304, 0.6397946579648139]
+            grad = [1.228075476503465, 3.9571854837417453]
+Step duration: 0.246655374 seconds.
+
+Step 16:       E = 0.05080291121056944   
+          params = [2.980083591998827, 0.6358374724810721]
+            grad = [1.2249836142929253, 3.9480511943526975]
+Step duration: 0.246422076 seconds.
+
+Step 17:       E = 0.033735822338857815  
+          params = [2.978858608384534, 0.6318894212867194]
+            grad = [1.2217428204553997, 3.938545198582185]
+Step duration: 0.247808165 seconds.
+
+Step 18:       E = 0.01675240473694116   
+          params = [2.9776368655640786, 0.6279508760881373]
+            grad = [1.2183544448070487, 3.9286672212158544]
+Step duration: 0.247651466 seconds.
+
+Step 19:       E = -0.0001442678104227879
+          params = [2.9764185111192716, 0.6240222088669214]
+            grad = [1.2148199710103926, 3.918417292242359]
+Step duration: 0.246459176 seconds.
+
+Step 20:       E = -0.01695115131825449  
+          params = [2.9752036911482613, 0.620103791574679]
+            grad = [1.2111410150223683, 3.9077957498916827]
+Step duration: 0.246412877 seconds.
+
+The iteration just ended at
+Step 20:       E = -0.01695115131825449  
+          params = [0.7, 0.6959493415827577, 0.6919024665156952, 0.6878597095190501, 0.6838214094372635, 0.679787909039588, 0.6757595548111912, 0.6717366967349643, 0.6677196880642727, 0.6637088850869268  …  0.6557073350605879, 0.6517173135186334, 0.6477349481559763, 0.6437606066083167, 0.6397946579648139, 0.6358374724810721, 0.6318894212867194, 0.6279508760881373, 0.6240222088669214, 0.620103791574679]
+            grad = [4.050658417242255, 4.0468750670624996, 4.042756996645089, 4.038300081786543, 4.033500397675592, 4.028354228396743, 4.022858076226915, 4.017008670691514, 4.010802977345854, 4.004238206248238  …  3.9900215419544507, 3.9823653626570756, 3.9743415476596367, 3.9659486435027462, 3.9571854837417453, 3.9480511943526975, 3.938545198582185, 3.9286672212158544, 3.918417292242359, 3.9077957498916827]
+Optimization duration: 0.6246188544166666 minutes.
+The result has not converged.</code></pre><p>After the optimization, you can check the basis set and we can see the parameters inside of it are also changed. This is because the <code>!</code> in the function names indicates that <code>optimizeParams!</code> is <a href="https://docs.julialang.org/en/v1/manual/style-guide/#bang-convention">a function that modifies its arguments</a>.</p><pre><code class="language-julia-repl hljs" style="display:block;">julia&gt; getParams(bs)</code><code class="nohighlight hljs ansi" style="display:block;">40-element Vector{ParamBox{Float64, V, FL} where {V, FL&lt;:Quiqbox.FLevel}}:
+ ParamBox{Float64, :X, Quiqbox.FLevel{2, 0}}(2.975203691)[∂][L₁]
+ ParamBox{Float64, :Y, Quiqbox.FLevel{2, 0}}(2.975203691)[∂][L₁]
+ ParamBox{Float64, :Z, Quiqbox.FLevel{2, 0}}(2.975203691)[∂][L₁]
+ ParamBox{Float64, :α, Quiqbox.FLevel{1, 0}}(0.6201037916)[∂][α₁]
+ ParamBox{Float64, :d, Quiqbox.FLevel{1, 0}}(1.0)[∂][d₁]
+ ParamBox{Float64, :X, Quiqbox.FLevel{2, 0}}(2.975203691)[∂][L₁]
+ ParamBox{Float64, :Y, Quiqbox.FLevel{2, 0}}(2.975203691)[∂][L₁]
+ ParamBox{Float64, :Z, Quiqbox.FLevel{2, 0}}(2.975203691)[∂][L₁]
+ ParamBox{Float64, :α, Quiqbox.FLevel{1, 0}}(0.6201037916)[∂][α₁]
+ ParamBox{Float64, :d, Quiqbox.FLevel{1, 0}}(1.0)[∂][d₁]
+ ⋮
+ ParamBox{Float64, :Y, Quiqbox.FLevel{2, 0}}(2.975203691)[∂][L₁]
+ ParamBox{Float64, :Z, Quiqbox.FLevel{2, 0}}(2.975203691)[∂][L₁]
+ ParamBox{Float64, :α, Quiqbox.FLevel{1, 0}}(0.6201037916)[∂][α₁]
+ ParamBox{Float64, :d, Quiqbox.FLevel{1, 0}}(1.0)[∂][d₁]
+ ParamBox{Float64, :X, Quiqbox.FLevel{2, 0}}(2.975203691)[∂][L₁]
+ ParamBox{Float64, :Y, Quiqbox.FLevel{2, 0}}(2.975203691)[∂][L₁]
+ ParamBox{Float64, :Z, Quiqbox.FLevel{2, 0}}(2.975203691)[∂][L₁]
+ ParamBox{Float64, :α, Quiqbox.FLevel{1, 0}}(0.6201037916)[∂][α₁]
+ ParamBox{Float64, :d, Quiqbox.FLevel{1, 0}}(1.0)[∂][d₁]</code></pre><p>If you want to go through the above example by yourself, you can also find the script <a href="https://github.com/frankwswang/Quiqbox.jl/blob/main/examples/OptimizeParams.jl">here</a>.</p><h2 id="Store-Customized-Basis-Set"><a class="docs-heading-anchor" href="#Store-Customized-Basis-Set">Store Customized Basis Set</a><a id="Store-Customized-Basis-Set-1"></a><a class="docs-heading-anchor-permalink" href="#Store-Customized-Basis-Set" title="Permalink"></a></h2><p>You can also store the information of the basis set in <a href="../coreType/#Quiqbox.GTBasis"><code>GTBasis</code></a> which contains not only the basis set but also the related 1-electron and 2-electron integral values. GTBasis can also be an input argument for <a href="../coreFunction/#Quiqbox.runHF"><code>runHF</code></a> to save the time of recalculating the integrals of basis sets.</p><pre><code class="language-julia-repl hljs" style="display:block;">julia&gt; GTBasis(bs)</code><code class="nohighlight hljs ansi" style="display:block;">GTBasis{BasisFunc{0, 1}, Float64}(basis, S, Te, eeI, getVne, getHcore)</code></pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../SCF/">« Self-Consistent Field Methods</a><a class="docs-footer-nextpage" href="../coreFunction/">Core Functions »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 0.27.15 on <span class="colophon-date" title="Friday 8 April 2022 03:01">Friday 8 April 2022</span>. Using Julia version 1.6.6.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
