@@ -4,7 +4,7 @@
     </a>
 </p>
 
-**Quiqbox** is a quantum chemistry and quantum physics software package that starts off around Gaussian basis set optimization for electronic structure problems. Quiqbox is written in pure [Julia](https://julialang.org/). This work is supported by the U.S. Department of Energy under Award No. DESC0019374.
+**Quiqbox** is a quantum chemistry and quantum physics software package that starts around Gaussian basis set optimization for electronic structure problems. Quiqbox is written in pure [Julia](https://julialang.org/). This work is supported by the U.S. Department of Energy under Award No. DESC0019374.
 
 | Documentation | Code Status | License |
 | :---: | :---: | :---: |
@@ -54,7 +54,7 @@ julia> using Quiqbox
 
 # Showcase
 
-## Apply existed basis set
+## Combine atomic orbitals
 ```julia
 coords = [[-0.7,0,0], [0.7,0,0]]
 
@@ -66,7 +66,7 @@ bsH₂ = genBasisFunc.(coords, "STO-3G") |> flatten
 bs = genBasisFunc.(coords, fill(GaussFunc(1, 0.75), 2))
 ```
 
-## Run Hartree-Fock method
+## Run the Hartree-Fock method
 ```julia
 nuc = ["H", "H"]
 
@@ -82,9 +82,9 @@ optimizeParams!(pars[end-1:end], bs, nuc, coords)
 
 # Documentation
 
-For more information on how to use the package, please read the [documentation of released versions][Doc-stable]. For unreleased/experimental features, please refer to the [latest documentation][Doc-latest].
+For more information on the package, please read the [documentation of released versions][Doc-stable]. For unreleased/experimental features, please refer to the [latest documentation][Doc-latest].
 
-To learn more about the basic usage of the programming language behind Quiqbox, **Julia**, [the official documentation](https://docs.julialang.org/) or [this official tutorial](https://juliaacademy.com/p/intro-to-julia) is recommended.
+To learn more about the programming language behind Quiqbox, **Julia**, [the official documentation](https://docs.julialang.org/), or [this tutorial](https://juliaacademy.com/p/intro-to-julia) is recommended.
 
 <br />
 <br />
