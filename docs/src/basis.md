@@ -20,14 +20,14 @@ Below are some examples from the simplest way to relatively more flexible ways t
 
 ### Constructing basis sets from existing basis sets
 
-First, you can create a basis set at one coordinate by inputting the `Vector` of its center coordinate and a `Tuple` of its name and corresponding atom in `String`.
+First, you can construct an atomic basis set at one coordinate by inputting its center coordinate and a `Tuple` of its name and corresponding atom in `String`.
 ```@repl 1
 push!(LOAD_PATH,"../../src/") # hide
 using Quiqbox # hide
 bsO = Quiqbox.genBasisFunc([0,0,0], ("STO-3G", "O"))
 ```
 
-Notice that in the above result there are 2 types of `struct`s in the returned `Vector`: `BasisFunc` and `BasisFuncs`. `BasisFunc` is the most basic `type` to hold the data of a basis function; `BasisFuncs` is very similar except it may hold multiple orbitals with only the spherical harmonics ``Y_{ml}`` being different when the orbital angular momentum ``l>0``.
+Notice that in the above result there are 2 types of `struct`s in the returned `Vector`: `BasisFunc` and `BasisFuncs`. `BasisFunc` is the most basic `DataType` to hold the data of a basis function; `BasisFuncs` is very similar except it may hold multiple orbitals with only the spherical harmonics ``Y_{ml}`` being different when the orbital angular momentum ``l>0``.
 
 !!! info "Unit System"
     Hartree atomic units are the unit system used in Quiqbox.
@@ -67,7 +67,7 @@ In quiqbox, the user can often deal with several multi-layer containers (mainly 
 hasEqual(bsH20, bsH20_2)
 ```
 
-If the basis set you want to use is not pre-stored in Quiqbox, you can use `Function` `genBFuncsFromText` to generate the basis set from a **Gaussian** formatted `String`:
+If the basis set you want to use is not pre-stored in Quiqbox, you can use `genBFuncsFromText` to generate the basis set from a **Gaussian** format `String`:
 ```@repl 1
 genBasisFunc(missing, ("6-31G", "Kr"))
 
@@ -216,9 +216,9 @@ getVarDict(pb1)
 !!! info "Parameter represented by `ParamBox`"
     The mapped variable (value) of a `ParamBox` is always used as the parameter (parameter value) it represents in the construction of any basis function component. If you want to optimize the variable that is mapped from, the `ParamBox` needs to be marked as "differentiable". For more information on parameter optimization, please see the docstring of [`ParamBox`](@ref) and section [Parameter Optimization](@ref).
 
-## Basis function from the linear combinations of other basis functions
+## Linear combinations of basis functions
 
-Apart from the flexible control of basis function parameters, a major feature of Quiqbox is the ability to construct a basis function from the linear combination of existing basis functions. Specifically, additional methods of `+` and `*` (operator syntax for [`add`](@ref) and [`mul`](@ref)) are implemented for `CompositeGTBasisFuncs` so the user can combine basis functions as if they are `Number`:
+Apart from the flexible control of basis function parameters, a major feature of Quiqbox is the ability to construct a basis function from the linear combination of other basis functions. Specifically, additional methods of `+` and `*` (operator syntax for [`add`](@ref) and [`mul`](@ref)) are implemented for `CompositeGTBasisFuncs` so the user can combine basis functions as if they are `Number`:
 ```@repl 3
 using Quiqbox # hide
 bf7 = genBasisFunc([1,0,1], (1.5,3))
