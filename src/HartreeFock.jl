@@ -447,7 +447,7 @@ its performance becomes unstable or poor.
 
 ≡≡≡ Initialization Method(s) ≡≡≡
 
-    HFconfig() -> HFconfig
+    HFconfig(;kws...) -> HFconfig
 
     HFconfig(t::NamedTuple) -> HFconfig
 
@@ -457,7 +457,7 @@ its performance becomes unstable or poor.
 julia> HFconfig()
 $(Doc_HFconfig_Eg1)
 
-julia> HFconfig((HF=:UHF,))
+julia> HFconfig(HF=:UHF)
 $(Doc_HFconfig_Eg2)
 ```
 """
@@ -487,9 +487,10 @@ HFconfig(a1::Symbol, a2::Symbol, args...) = HFconfig(Val(a1), Val(a2), args...)
 
 const defaultHFconfigPars = Any[Val(:RHF), Val(:SAD), defaultSCFconfig, 1000, true]
 
-HFconfig() = HFconfig(defaultHFconfigPars...)
-
 HFconfig(t::NamedTuple) = genNamedTupleC(:HFconfig, defaultHFconfigPars)(t)
+
+HFconfig(;kws...) = 
+length(kws) == 0 ? HFconfig(defaultHFconfigPars...) : HFconfig(kws|>NamedTuple)
 
 
 """

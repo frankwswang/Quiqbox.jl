@@ -82,7 +82,7 @@ iteration converges.
 
 ≡≡≡ Initialization Method(s) ≡≡≡
 
-    POconfig() -> POconfig
+    POconfig(;kws...) -> POconfig
 
     POconfig(t::NamedTuple) -> POconfig
 
@@ -92,7 +92,7 @@ iteration converges.
 julia> POconfig()
 $(Doc_POconfig_Eg1)
 
-julia> POconfig((maxStep=100,))
+julia> POconfig(maxStep=100)
 $(Doc_POconfig_Eg2)
 ```
 """
@@ -109,9 +109,10 @@ POconfig(a1::Symbol, args...) = POconfig(Val(a1), args...)
 
 const defaultPOconfigPars = Any[Val(:HF), HFconfig(), NaN, 1e-5, 500, gradDescent!]
 
-POconfig() = POconfig(defaultPOconfigPars...)
-
 POconfig(t::NamedTuple) = genNamedTupleC(:POconfig, defaultPOconfigPars)(t)
+
+POconfig(;kws...) = 
+length(kws) == 0 ? POconfig(defaultPOconfigPars...) : POconfig(kws|>NamedTuple)
 
 
 """
