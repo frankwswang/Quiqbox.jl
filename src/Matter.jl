@@ -64,11 +64,11 @@ end
 
     Molecule{Nc, Ne, Nb} <:MolecularHartreeFockCoefficient{Nc, Ne}
 
-Container for the information of a molecule.
+Container for the electronic structure information of a system.
 
 ≡≡≡ Field(s) ≡≡≡
 
-`nuc::Tuple{Vararg{String}}`: Nuclei of the molecule.
+`nuc::Tuple{Vararg{String}}`: Nuclei of the system.
 
 `nucCoords::Tuple{Vararg{NTuple{3, Real}}}`: The coordinates of the nuclei.
 
@@ -78,14 +78,14 @@ Container for the information of a molecule.
 
 `basis::Tuple{Vararg{FloatingGTBasisFuncs}}`: The basis set for the molecular orbitals.
 
-`E0HF::Float64`: Hartree-Fock energy of the electronic Hamiltonian from the basis set.
+`E0::Float64`: Hartree-Fock energy of the electronic Hamiltonian from the basis set.
 
 `EnnR::Float64`: The nuclear-nuclear repulsion energy.
 
 ≡≡≡ Initialization Method(s) ≡≡≡
 
     Molecule(basis::Array{FloatingGTBasisFuncs, 1}, nuc::Array{String, 1}, 
-             nucCoords::Array{<:AbstractArray, 1}, Ne::Int, E0HF::Float64, 
+             nucCoords::Array{<:AbstractArray, 1}, Ne::Int, E0::Float64, 
              Emos::Array{Float64, 1}, occus::Array{<:Real, 1}, C::Array{Float64, 2}, 
              spins::Array{String, 1}, 
              symms::Array{String, 1}=repeat(["A"], length(occus))) -> 
@@ -111,11 +111,11 @@ struct Molecule{Nc, Ne, Nb} <:MolecularHartreeFockCoefficient{Nc, Ne}
     Ne::Int
     orbital::Tuple{Vararg{MolOrbital}}
     basis::Tuple{Vararg{FloatingGTBasisFuncs}}
-    E0HF::Float64
+    E0::Float64
     EnnR::Float64
 
     function Molecule(basis::Vector{<:FloatingGTBasisFuncs}, nuc::Vector{String}, 
-                      nucCoords::Vector{<:AbstractArray}, Ne::Int, E0HF::Float64, 
+                      nucCoords::Vector{<:AbstractArray}, Ne::Int, E0::Float64, 
                       Emos::Vector{Float64}, occus::Vector{<:Real}, C::Matrix{Float64}, 
                       spins::Vector{String}, 
                       symms::Vector{String}=repeat(["A"], length(occus)))
@@ -144,7 +144,7 @@ struct Molecule{Nc, Ne, Nb} <:MolecularHartreeFockCoefficient{Nc, Ne}
                                     Ne, 
                                     getMolOrbitals(Emos, occus, C, spins, symms), 
                                     deepcopy(basis) |> Tuple,
-                                    E0HF, 
+                                    E0, 
                                     EnnR)
     end
 end
@@ -175,8 +175,7 @@ end
 
     nnRepulsions(nuc::Array{String, 1}, nucCoords::Array{<:AbstractArray, 1}) -> Float64
 
-Calculate the nuclear-nuclear repulsion energy given the nuclei and their coordinates of a 
-molecule.
+Calculate the nuclear-nuclear repulsion energy given the nuclei and their coordinates.
 """
 function nnRepulsions(nuc::Vector{String}, nucCoords::Vector{<:AbstractArray})
     E = 0.0

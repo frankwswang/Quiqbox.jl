@@ -2,7 +2,7 @@ using Test
 using Quiqbox
 using LinearAlgebra: norm
 
-@testset "Molecule.jl tests" begin
+@testset "Matter.jl tests" begin
 
 nuc1 = ["H", "H"]
 nucCoords1 = [[-0.7, 0.0, 0.0], [0.7, 0.0, 0.0]]

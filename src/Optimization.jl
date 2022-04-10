@@ -153,7 +153,7 @@ basis set.
 
 `bs::Array{<:AbstractGTBasisFuncs, 1}`: Basis set.
 
-`nuc::Array{String, 1}`: The element symbols of the nuclei for the Molecule.
+`nuc::Array{String, 1}`: The element symbols of the nuclei for the studied system.
 
 `nucCoords::Array{<:AbstractArray, 1}`: Nuclei coordinates.
 
