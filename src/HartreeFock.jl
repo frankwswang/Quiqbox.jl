@@ -207,14 +207,20 @@ function initializeSCF(Hcore::Matrix{Float64}, HeeI::Array{Float64, 4},
 end
 
 
-const Doc_SCFconfig_OneRowTable = "| `:DIIS`, `:EDIIS`, `:ADIIS` | Subspace size (>1); "*
-                                  "Coefficient solver(`:ADMM`-> ADMM solver,"*
-                                  " `:LCM` -> Lagrange solver) | "*
-                                  "`DIISsize::Int`; `solver::Symbol` | `15`; `:ADMM` |"
+const Doc_SCFconfig_OneRowTable = "|`:DIIS`, `:EDIIS`, `:ADIIS`|subspace size; "*
+                                  "coefficient solver|`DIISsize`; `solver`|`1`,`2`...; "*
+                                  "`:LCM`, `:ADMM`|`15`; `:ADMM`|"
+
+const Doc_SCFconfig_DIIS = "[Direct inversion in the iterative subspace]"*
+                           "(https://onlinelibrary.wiley.com/doi/10.1002/jcc.540030413)."
+const Doc_SCFconfig_ADIIS = "[DIIS based on the augmented Roothaan–Hall (ARH) energy "*
+                            "function](https://aip.scitation.org/doi/10.1063/1.3304922)."
+const Doc_SCFconfig_ADMM = "[Alternating direction method of multipliers]"*
+                           "(https://github.com/JuliaFirstOrder/SeparableOptimization.jl)."
 
 const Doc_SCFconfig_Eg1 = "SCFconfig{3}(interval=(0.0001, 1.0e-12, 1.0e-13), "*
                           "oscillateThreshold=1.0e-5, method, methodConfig)"*
-                          "[:SD, :ADIIS, :DIIS]"
+                          "[:DD, :ADIIS, :DIIS]"
 
 """
 
@@ -227,10 +233,20 @@ The `struct` for SCF iteration configurations.
 `method::NTuple{N, $(FunctionType)}`: The applied methods. The available methods and their 
 configurations (in terms of keyword arguments):
 
-| Methods | Configuration(s) | keyword argument(s) | Default value(s) |
-| :----   | :---:            | :---:               | ----:            |
-| `:DS` | Damping strength: [0,1] | `dampingStrength::Float64` | `0.0` |
+| Convergence Method(s) | Configuration(s) | Keyword(s) | Range(s)/Option(s) | Default(s) |
+| :----                 | :---:            | :---:      | :---:              |      ----: |
+| `:DD`                 | damping strength |`dampStrength`|    [`0`, `1`]    |      `0.0` |
 $(Doc_SCFconfig_OneRowTable)
+
+### Convergence Methods
+* DD: Direct diagonalization of the Fock matrix.
+* DIIS: $(Doc_SCFconfig_DIIS)
+* EDIIS: [Energy-DIIS](https://aip.scitation.org/doi/abs/10.1063/1.1470195).
+* ADIIS: $(Doc_SCFconfig_ADIIS)
+
+### DIIS-type Method Solvers
+* LCM: Lagrange multiplier solver.
+* ADMM: $(Doc_SCFconfig_ADMM)
 
 `interval::NTuple{N, Float64}`: The stopping (skipping) thresholds for required methods.
 
@@ -255,7 +271,7 @@ arguments and their values respectively.
 ≡≡≡ Example(s) ≡≡≡
 
 ```jldoctest; setup = :(push!(LOAD_PATH, "../../src/"); using Quiqbox)
-julia> SCFconfig((:SD, :ADIIS, :DIIS), (1e-4, 1e-12, 1e-13), Dict(2=>[:solver=>:LCM]))
+julia> SCFconfig((:DD, :ADIIS, :DIIS), (1e-4, 1e-12, 1e-13), Dict(2=>[:solver=>:LCM]))
 $(Doc_SCFconfig_Eg1)
 ```
 """
@@ -655,12 +671,12 @@ function runHFcore(scfConfig::SCFconfig{L},
 end
 
 
-function SDcore(Nˢ::Int, Hcore::Matrix{Float64}, HeeI::Array{Float64, 4}, 
+function DDcore(Nˢ::Int, Hcore::Matrix{Float64}, HeeI::Array{Float64, 4}, 
                 X::Matrix{Float64}, F::Matrix{Float64}, D::Matrix{Float64}; 
-                dampingStrength::Float64=0.0, _kws...)
-    @assert 0 <= dampingStrength <= 1 "The range of `dampingStrength`::Float64 is [0,1]."
+                dampStrength::Float64=0.0, _kws...)
+    @assert 0 <= dampStrength <= 1 "The range of `dampStrength`::Float64 is [0,1]."
     Dnew = getD(X, F, Nˢ)
-    (1-dampingStrength)*Dnew + dampingStrength*D
+    (1-dampStrength)*Dnew + dampStrength*D
 end
 
 
@@ -719,8 +735,8 @@ function DIIScore(∇s::Vector{Matrix{Float64}}, Ds::Vector{Matrix{Float64}},
 end
 
 
-@inline SD(Nˢ, Hcore, HeeI, _dm::Any, X, tVars; kws...) = 
-        SDcore(Nˢ, Hcore, HeeI, X, tVars.Fs[end], tVars.Ds[end]; kws...)
+@inline DD(Nˢ, Hcore, HeeI, _dm::Any, X, tVars; kws...) = 
+        DDcore(Nˢ, Hcore, HeeI, X, tVars.Fs[end], tVars.Ds[end]; kws...)
 
 @inline function xDIIS(::Val{M}) where {M}
     @inline (Nˢ, Hcore, HeeI, S, X, tVars; kws...) ->
@@ -728,7 +744,7 @@ end
 end
 
 const SCFmethodSelector = 
-      (SD=SD, DIIS=xDIIS(Val(:DIIS)), ADIIS=xDIIS(Val(:ADIIS)), EDIIS=xDIIS(Val(:EDIIS)))
+      (DD=DD, DIIS=xDIIS(Val(:DIIS)), ADIIS=xDIIS(Val(:ADIIS)), EDIIS=xDIIS(Val(:EDIIS)))
 
 
 # RHF

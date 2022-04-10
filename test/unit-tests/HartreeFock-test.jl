@@ -14,7 +14,7 @@ S = overlaps(bs)
 Hcore = coreH(bs, nuc, nucCoords)
 HeeI = eeInteractions(bs)
 Ne = getCharge(nuc)
-scfMethods = (:ADIIS, :DIIS, :EDIIS, :SD)
+scfMethods = (:ADIIS, :DIIS, :EDIIS, :DD)
 thresholds = (1e-4, 1e-8, 1e-10, 1e-12)
 solvers = Dict(1=>[:solver=>:LCM], 2=>[:solver=>:LCM], 
                 3=>[:solver=>:LCM], 4=>[:solver=>:LCM])
