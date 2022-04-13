@@ -40,6 +40,6 @@ for (nuc, nucCoords, molName, iMol) in zip(mols, molCoords, molNames, 1:length(m
         continue
     end
 
-    mol = Molecule(bs, nuc, nucCoords, fVars)
+    mol = Molecule(bs, fVars)
     fn = makeMoldenFile(mol; recordUMO=true, fileName=prefix*"_"*molName*"_"*bf*bsName)
 end

@@ -2,8 +2,10 @@ module Molden
 
 export makeMoldenFile
 
-import ..Quiqbox: Molecule, checkFname, AtomicNumberList, centerCoordOf, flatten, groupedSort, 
-                  joinConcentricBFuncStr, alignNumSign, alignNum
+import ..Quiqbox: Molecule, spinStr, checkFname, AtomicNumberList, centerCoordOf, flatten, 
+                  groupedSort, joinConcentricBFuncStr, alignNumSign, alignNum
+
+const spinStrMolden = Dict(spinStr .=> ("Alpha", "Beta", "Alpha"))
 
 """
 
@@ -80,7 +82,7 @@ function makeMoldenFile(mol::Molecule;
             MOcoeffs = round.(MOcoeffs, digits=roundDigits)
         end
         text *= "Ene=  "*alignNumSign(moe; roundDigits)*"\n"
-        text *= "Spin=  $(MOs[i].spin)\n"
+        text *= "Spin=  $(spinStrMolden[MOs[i].spin])\n"
         text *= "Occup= $(MOs[i].occupancy)\n"
         text *= join([rpad("   $j", 6)*alignNum(c, lpadN, 0; roundDigits)*
                       "\n" for (j,c) in zip(1:length(MOcoeffs), MOcoeffs)])
