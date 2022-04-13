@@ -168,7 +168,7 @@ function genIntNucAttCore1(ΔRR₀::NTuple{3, Float64}, ΔR₁R₂::NTuple{3, Fl
     A
 end
 
-function ∫nucAttractionCore(Z₀::Int, R₀::NTuple{3, Real}, 
+function ∫nucAttractionCore(Z₀::Int, R₀::NTuple{3, Float64}, 
                             R₁::NTuple{3, Float64}, R₂::NTuple{3, Float64}, 
                             ijk₁::NTuple{3, Int}, α₁::Float64,
                             ijk₂::NTuple{3, Int}, α₂::Float64)
@@ -699,9 +699,8 @@ getElecKinetic(bf1::BasisFunc{<:Any, GN1}, bf2::BasisFunc{<:Any, GN2}) where {GN
 getOneBodyInt(FunctionType{:∫elecKineticCore}(), bf1, bf2)
 
 function getNucAttraction(bf1::BasisFunc{<:Any, GN1}, bf2::BasisFunc{<:Any, GN2}, 
-                          nuc::AbstractArray{String}, 
-                          nucCoords::AbstractArray{<:AbstractArray{<:Real}}) where 
-                         {GN1, GN2}
+                          nuc::NTuple{NN, String}, 
+                          nucCoords::NTuple{NN, NTuple{3,Float64}}) where {GN1, GN2, NN}
     res = 0.0
     for (ele, coord) in zip(nuc, nucCoords)
         res += getOneBodyInt(FunctionType{:∫nucAttractionCore}(), 
@@ -736,13 +735,13 @@ getElecKinetic(b1::AbstractGTBasisFuncs, b2::AbstractGTBasisFuncs) =
 getCompositeInt(FunctionType{:getElecKinetic}(), (b1, b2))
 
 getNucAttraction(b1::AbstractGTBasisFuncs, b2::AbstractGTBasisFuncs, 
-                 nuc::AbstractArray{String}, 
-                 nucCoords::AbstractArray{<:AbstractArray{<:Real}}) = 
+                 nuc::NTuple{NN, String}, 
+                 nucCoords::NTuple{NN, NTuple{3,Float64}}) where {NN} = 
 getCompositeInt(FunctionType{:getNucAttraction}(), (b1, b2), nuc, nucCoords)
 
 getCoreHij(b1::AbstractGTBasisFuncs, b2::AbstractGTBasisFuncs, 
-           nuc::AbstractArray{String}, 
-           nucCoords::AbstractArray{<:AbstractArray{<:Real}}) = 
+           nuc::NTuple{NN, String}, 
+           nucCoords::NTuple{NN, NTuple{3,Float64}}) where {NN} = 
 getElecKinetic(b1, b2) + getNucAttraction(b1, b2, nuc, nucCoords)
 
 get2eInteraction(b1::AbstractGTBasisFuncs, b2::AbstractGTBasisFuncs, 
@@ -774,12 +773,13 @@ getElecKinetics(BSet::AbstractArray{<:AbstractGTBasisFuncs}) =
 getOneBodyInts(FunctionType{:getElecKinetic}(), BSet)
 
 getNucAttractions(BSet::AbstractArray{<:AbstractGTBasisFuncs}, 
-                  nuc::AbstractArray{String}, 
-                  nucCoords::AbstractArray{<:AbstractArray{<:Real}}) = 
+                  nuc::NTuple{NN, String}, 
+                  nucCoords::NTuple{NN, NTuple{3,Float64}}) where {NN} = 
 getOneBodyInts(FunctionType{:getNucAttraction}(), BSet, nuc, nucCoords)
 
 getCoreH(BSet::AbstractArray{<:AbstractGTBasisFuncs}, 
-         nuc::AbstractArray{String}, nucCoords::AbstractArray{<:AbstractArray{<:Real}}) = 
+         nuc::NTuple{NN, String}, 
+         nucCoords::NTuple{NN, NTuple{3,Float64}}) where {NN} = 
 getOneBodyInts(FunctionType{:getCoreHij}(), BSet, nuc, nucCoords)
 
 

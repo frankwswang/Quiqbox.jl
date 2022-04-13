@@ -127,7 +127,7 @@ which should have the same value with the field `method` in the corresponding `P
 function genOFmethod(::Val{:HF}, config::HFconfig{HFT}=HFconfig()) where {HFT}
     fVal = @inline function (gtb, nuc, nucCoords, N)
         res = runHF(gtb, nuc, nucCoords, N, config, printInfo=false)
-        res.E0HF, res.C
+        res.Ehf, res.C
     end
     fVal, gradHFenergy
 end
@@ -137,8 +137,8 @@ end
 
     optimizeParams!(pbs::Array{<:ParamBox, 1}, 
                     bs::Array{<:AbstractGTBasisFuncs, 1}, 
-                    nuc::Array{String, 1}, 
-                    nucCoords::Array{<:AbstractArray, 1}, 
+                    nuc::Vector{String}, 
+                    nucCoords::Vector{<:AbstractArray{<:Real}}, 
                     N::Int=getCharge(nuc), 
                     config::POconfig{M, T, F}=POconfig(); 
                     printInfo::Bool=true
@@ -153,9 +153,9 @@ basis set.
 
 `bs::Array{<:AbstractGTBasisFuncs, 1}`: Basis set.
 
-`nuc::Array{String, 1}`: The element symbols of the nuclei for the studied system.
+`nuc::Vector{String}`: The element symbols of the nuclei for the studied system.
 
-`nucCoords::Array{<:AbstractArray, 1}`: Nuclei coordinates.
+`nucCoords::Vector{<:AbstractArray{<:Real}}`: Nuclei coordinates.
 
 `N::Int`: Total number of electrons.
 
@@ -167,7 +167,7 @@ information please refer to `POconfig`.
 `printInfo::Bool`: Whether print out the information of iteration steps.
 """
 function optimizeParams!(pbs::Vector{<:ParamBox}, bs::Vector{<:AbstractGTBasisFuncs}, 
-                         nuc::Vector{String}, nucCoords::Vector{<:AbstractArray{Float64}}, 
+                         nuc::Vector{String}, nucCoords::Vector{<:AbstractArray{<:Real}}, 
                          N::Int=getCharge(nuc), config::POconfig{M, T, F}=POconfig(); 
                          printInfo::Bool=true) where {M, T, F}
     tAll = @elapsed begin
@@ -242,8 +242,8 @@ end
 
     optimizeParams!(pbs::Array{<:ParamBox, 1}, 
                     bs::Array{<:AbstractGTBasisFuncs, 1}, 
-                    nuc::Array{String, 1}, 
-                    nucCoords::Array{<:AbstractArray, 1}, 
+                    nuc::Vector{String}, 
+                    nucCoords::Vector{<:AbstractArray{<:Real}}, 
                     config::POconfig{M, T, F}=POconfig(), 
                     N::Int=getCharge(nuc); 
                     printInfo::Bool=true

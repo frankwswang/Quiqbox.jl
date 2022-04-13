@@ -25,7 +25,7 @@ bs = genBasisFunc.(nucCoords, ("STO-3G", "H") |> Ref) |> flatten
 
 resRHF = runHF(bs, nuc, nucCoords)
 
-@show resRHF.E0HF resRHF.C resRHF.Emo resRHF.occu
+@show resRHF.Ehf resRHF.C resRHF.Emo resRHF.occu
 ```
 
 After the SCF procedure, one can also easily store the result in a `Molecule` for further data processing such as generating [Molden](@ref) files.

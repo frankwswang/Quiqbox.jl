@@ -29,7 +29,7 @@ GridBox{NX, NY, NZ}
 ```
 
 ```@docs
-HFconfig{HFT, CT}
+HFconfig{HFT, CT, L}
 ```
 
 ```@docs
@@ -41,7 +41,7 @@ Quiqbox.HFtempVars{HFtype}
 ```
 
 ```@docs
-Quiqbox.HFfinalVars{HFtype}
+Quiqbox.HFfinalVars{HFT, NN, HFTS}
 ```
 
 ```@docs

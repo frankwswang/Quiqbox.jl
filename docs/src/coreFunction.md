@@ -1,6 +1,10 @@
 # Core Functions
 
 ```@docs
+getCharge
+```
+
+```@docs
 genExponent
 ```
 

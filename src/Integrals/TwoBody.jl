@@ -19,9 +19,9 @@ eeInteraction(bf1::AbstractGTBasisFuncs,
 
 """
 
-    eeInteractions(BSet::Array{<:AbstractGTBasisFuncs, 1}) -> Array{Float64, 4}
+    eeInteractions(BSet::Vector{<:AbstractGTBasisFuncs}) -> Array{Float64, 4}
 
 Return the electron-electron interaction tensor (an N×N×N×N Tensor where N is the number 
-of spatial orbitals) given a basis set in the form of an `Array`. 
+of spatial orbitals) given a basis set in the form of an `Vector`.
 """
 eeInteractions(BSet::Vector{<:AbstractGTBasisFuncs}) = get2eInteractions(BSet)
