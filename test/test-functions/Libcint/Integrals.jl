@@ -4,7 +4,7 @@
                                      bf1::Quiqbox.FloatingGTBasisFuncs{<:Any, <:Any, ON1}, 
                                      bf2::Quiqbox.FloatingGTBasisFuncs{<:Any, <:Any, ON2}, 
                                      nuclei::Vector{String}, 
-                                     nucleiCoords::Vector{<:AbstractArray};
+                                     nucleiCoords::Vector{<:AbstractArray{<:Real}};
                                      isGradient::Bool=false) where {ON1, ON2}
     env = Float64[]
     atm = Int32[]
@@ -30,8 +30,8 @@ end
 """
 
     oneBodyBFTensor(libcinFunc::Symbol, b1::Quiqbox.AbstractGTBasisFuncs, 
-                    b2::Quiqbox.AbstractGTBasisFuncs, nuclei::Array{String, 1}=String[], 
-                    nucleiCoords::Array{<:AbstractArray, 1}=Array[]; 
+                    b2::Quiqbox.AbstractGTBasisFuncs, nuclei::Vector{String}=String[], 
+                    nucleiCoords::Vector{<:AbstractArray{<:Real}}=Vector{Float64}[]; 
                     isGradient::Bool=false) -> 
     Array{Float64, 3}
 
@@ -47,7 +47,8 @@ coordinates, those 2 arguments can be omitted. If the integral is a spacial grad
                                  b1::Quiqbox.AbstractGTBasisFuncs, 
                                  b2::Quiqbox.AbstractGTBasisFuncs, 
                                  nuclei::Vector{String}=String[], 
-                                 nucleiCoords::Vector{<:AbstractArray}=Array[];
+                                 nucleiCoords::Vector{<:AbstractArray{<:Real}}=
+                                             Vector{Float64}[];
                                  isGradient::Bool=false)
     f = @inline function (i,j)
         ints = oneBodyBFTensorCore(libcinFunc, i, j, nuclei, nucleiCoords; isGradient)
@@ -96,23 +97,24 @@ dropdims(overlapsCoreLibcint(BSet), dims=3)
 
 @inline nucAttractionCoreLibcint(bf1::Quiqbox.AbstractGTBasisFuncs, 
                                  bf2::Quiqbox.AbstractGTBasisFuncs, 
-                                 nuc::Vector{String}, nucCoords::Vector{<:AbstractArray}) = 
+                                 nuc::Vector{String}, 
+                                 nucCoords::Vector{<:AbstractArray{<:Real}}) = 
         oneBodyBFTensor(:cint1e_nuc_cart, bf1, bf2, nuc, nucCoords)
 
 nucAttractionLibcint(bf1::Quiqbox.AbstractGTBasisFuncs, 
                      bf2::Quiqbox.AbstractGTBasisFuncs, 
-                     nuc::Vector{String}, nucCoords::Vector{<:AbstractArray}) = 
+                     nuc::Vector{String}, nucCoords::Vector{<:AbstractArray{<:Real}}) = 
 dropdims(nucAttractionCoreLibcint(bf1, bf2, nuc, nucCoords), dims=3)
 
 
 @inline nucAttractionsCoreLibcint(BSet::Vector{<:Quiqbox.AbstractGTBasisFuncs}, 
                                   nuc::Vector{String}, 
-                                  nucCoords::Vector{<:AbstractArray}) = 
+                                  nucCoords::Vector{<:AbstractArray{<:Real}}) = 
         oneBodyBSTensor(BSet, @inline (bf1, bf2)->oneBodyBFTensor(:cint1e_nuc_cart, 
                                                                   bf1, bf2, nuc, nucCoords))
 
 nucAttractionsLibcint(BSet::Vector{<:Quiqbox.AbstractGTBasisFuncs}, 
-                      nuc::Vector{String}, nucCoords::Vector{<:AbstractArray}) = 
+                      nuc::Vector{String}, nucCoords::Vector{<:AbstractArray{<:Real}}) = 
 dropdims(nucAttractionsCoreLibcint(BSet, nuc, nucCoords), dims=3)
 
 

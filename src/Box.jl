@@ -15,7 +15,7 @@ A `struct` that stores coordinates of grid points in terms of both `Vector`s and
 
 `box::Vector{NTuple{3, ParamBox}}`: The coordinates of grid points in terms of `ParamBox`s.
 
-`coord::Array{Array{Float64, 1}, 1}`: The coordinates of grid points in terms of `Vector`s.
+`coord::Array{Vector{Float64}, 1}`: The coordinates of grid points in terms of `Vector`s.
 
 ≡≡≡ Initialization Method(s) ≡≡≡
 
@@ -84,7 +84,7 @@ GridBox(fill(nGridPerEdge, 3) |> Tuple, spacing, centerCoord; canDiff, index)
 
 """
 
-    gridCoords(gb::GridBox) -> Array{Array{Float64, 1}, 1}
+    gridCoords(gb::GridBox) -> Array{Vector{Float64}, 1}
 
 Return the grid-point coordinates in `Vector`s given the `GriBox`.
 """
