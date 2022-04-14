@@ -4,7 +4,7 @@
     </a>
 </p>
 
-**Quiqbox** is a quantum chemistry and quantum computing software package that starts off around Gaussian basis set optimization of molecular electronic-structure problems. Quiqbox is written in pure [Julia](https://julialang.org/).
+**Quiqbox** is a quantum chemistry and quantum physics software package that starts around Gaussian basis set optimization for electronic structure problems. Quiqbox is written in pure [Julia](https://julialang.org/). This work is supported by the U.S. Department of Energy under Award No. DESC0019374.
 
 | Documentation | Code Status | License |
 | :---: | :---: | :---: |
@@ -14,22 +14,23 @@
 
 # Features
 
-* Floating and fixed-basis Gaussian-type orbital (GTO) configurations.
-* Symbolic representation and analysis of basis function parameters.
-* Standalone 1-electron and 2-electron integral functions (powered by [libcint_jll](https://github.com/JuliaBinaryWrappers/libcint_jll.jl)).
+* Floating and fixed-position Gaussian-type orbital (GTO).
+* Linear combination of GTOs with different centers as a basis function.
+* Symbolic representation of basis function expression.
+* Standalone 1-electron and 2-electron integral functions.
 * Restricted (closed-shell) and unrestricted (open-shell) Hartree–Fock methods (RHF & UHF).
 * Molecular orbital data output in [Molden](https://www3.cmbi.umcn.nl/molden/) file format.
-* Variational optimization of orbital geometry based on automatic differentiation (AD).
+* Variational optimization of orbital parameters based on automatic differentiation (AD).
 
 # Setup
 
 ## Supported system platforms (64-bit)
 * Linux
 * Mac OS
-* [Windows Subsystem for Linux](https://docs.microsoft.com/en-us/windows/wsl/about)
+* Windows
 
 ## Julia Environment
-* [1.5+](https://github.com/frankwswang/Quiqbox.jl/actions/workflows/CI.yml)
+* [1.6+](https://github.com/frankwswang/Quiqbox.jl/actions/workflows/CI-JS-older.yml)
 
 ## Installation in Julia [REPL](https://docs.julialang.org/en/v1/manual/getting-started/)
 
@@ -53,7 +54,7 @@ julia> using Quiqbox
 
 # Showcase
 
-## Apply existed basis set
+## Combine atomic orbitals
 ```julia
 coords = [[-0.7,0,0], [0.7,0,0]]
 
@@ -65,7 +66,7 @@ bsH₂ = genBasisFunc.(coords, "STO-3G") |> flatten
 bs = genBasisFunc.(coords, fill(GaussFunc(1, 0.75), 2))
 ```
 
-## Run Hartree-Fock method
+## Run the Hartree-Fock method
 ```julia
 nuc = ["H", "H"]
 
@@ -74,18 +75,17 @@ runHF(bs, nuc, coords)
 
 ## Optimize a basis set
 ```julia
-pars = uniqueParams!(bs, filterMapping=true)
+pars = markParams!(bs, true)
 
-optimizeParams!(bs, pars[1:4], nuc, coords)
+optimizeParams!(pars[end-1:end], bs, nuc, coords)
 ```
 
 # Documentation
 
-For more information on how to use the package, please read the [documentation of released versions][Doc-stable]. For unreleased/experimental features, please refer to the [latest documentation][Doc-latest].
+For more information on the package, please read the [documentation of released versions][Doc-stable]. For unreleased/experimental features, please refer to the [latest documentation][Doc-latest].
 
-To learn more about the basic usage of the programming language behind Quiqbox, **Julia**, [the official documentation](https://docs.julialang.org/) or [this official tutorial](https://juliaacademy.com/p/intro-to-julia) is recommended.
+To learn more about the programming language behind Quiqbox, **Julia**, [the official documentation](https://docs.julialang.org/), or [this tutorial](https://juliaacademy.com/p/intro-to-julia) is recommended.
 
-<br />
 <br />
 <br />
 
@@ -96,14 +96,13 @@ To learn more about the basic usage of the programming language behind Quiqbox, 
 </p>
 
 <br />
-<br />
 
 [Doc-stable]:  https://frankwswang.github.io/Quiqbox.jl/stable
 [Doc-latest]:  https://frankwswang.github.io/Quiqbox.jl/dev
 [Doc-s-img]:   https://img.shields.io/github/v/release/frankwswang/Quiqbox.jl?label=Latest%20release
 [Doc-l-img]:   https://img.shields.io/badge/docs-latest-blue.svg
-[GA-CI-img]:   https://img.shields.io/github/workflow/status/frankwswang/Quiqbox.jl/CI?label=Julia%201.5%2B
-[GA-CI-url]:   https://github.com/frankwswang/Quiqbox.jl/actions/workflows/CI.yml
+[GA-CI-img]:   https://img.shields.io/github/workflow/status/frankwswang/Quiqbox.jl/CI?label=Julia%20latest
+[GA-CI-url]:   https://github.com/frankwswang/Quiqbox.jl/actions/workflows/CI-JS-latest.yml
 [GA-CI-JN-img]:https://img.shields.io/github/workflow/status/frankwswang/Quiqbox.jl/CI-JN?label=Julia%20nightly
 [GA-CI-JN-url]:https://github.com/frankwswang/Quiqbox.jl/actions/workflows/CI-JN.yml
 [codecov-img]: https://img.shields.io/codecov/c/github/frankwswang/Quiqbox.jl/main?label=Coverage&token=Z1XOA39DV2

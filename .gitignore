@@ -5,3 +5,5 @@ Manifest.toml
 .VSCodeCounter/
 __test__*
 Example_*
+plot_*
+*_draft*

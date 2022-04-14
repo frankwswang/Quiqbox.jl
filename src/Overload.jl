@@ -1,29 +1,24 @@
 # Julia internal methods overload.
+
 import Base: ==
 ==(pb1::ParamBox, pb2::ParamBox) = (pb1[] == pb2[] && 
+                                    pb1.dataName == pb2.dataName && 
                                     pb1.canDiff[] == pb2.canDiff[] && 
-                                    pb1.index == pb2.index && 
-                                    pb1.map[] == pb2.map[])
+                                    pb1.index[] == pb2.index[] && 
+                                    typeof(pb1.map) === typeof(pb2.map))
 
 
 import Base: show
 const nSigShown = 10
 function show(io::IO, pb::ParamBox)
-    v = typeof(pb).parameters[1]
-    if pb.index === nothing 
-        i = v
-    else
-        i = string(v)*numToSubs(pb.index)
-    end
     c = pb.canDiff[] ? :green : :light_black
-    if typeof(pb.map[]) == typeof(itself)
-        j = ""
-    else
-        j = " -> $(Symbol(pb.map[]))($i)"
-    end
     print(io, typeof(pb))
-    print(io, "(", round(pb.data[], sigdigits=nSigShown), ")[", i, j, "]")
-    printstyled(io, "[∂]", color=c)
+    print(io, "(", round(pb.data[], sigdigits=nSigShown), ")")
+    print(io, "[")
+    printstyled(io, "∂", color=c)
+    print(io, "][")
+    printstyled(io, "$(pb|>getVar)", color=:cyan)
+    print(io, "]")
 end
 
 function show(io::IO, gf::GaussFunc)
@@ -35,29 +30,25 @@ function show(io::IO, gf::GaussFunc)
 end
 
 function show(io::IO, bf::BasisFunc)
-    xyz1 = bf.ijk[1]
-    xyz2 = ""
     print(io, typeof(bf))
-    print(io, "(gauss, subshell, center)[")
-    printstyled(io, xyz1, color=:cyan)
-    print(io, xyz2)
+    print(io, "(center, gauss)[")
+    printstyled(io, bf.ijk[1]|>ijkToStr, color=:cyan)
     print(io, "][", round(bf.center[1](), sigdigits=nSigShown), ", ",
                     round(bf.center[2](), sigdigits=nSigShown), ", ",
                     round(bf.center[3](), sigdigits=nSigShown), "]")
 end
 
-function show(io::IO, bf::BasisFuncs)
-    OON = typeof(bf).parameters[3]
-    SON = SubshellDimList[bf.subshell]
-    if OON == 1
-        xyz1 = bf.ijk[1]
+function show(io::IO, bf::BasisFuncs{𝑙, <:Any, ON}) where {𝑙, ON}
+    SON = SubshellXYZsizes[𝑙+1]
+    if ON == 1
+        xyz1 = bf.ijk[1] |> ijkToStr
         xyz2 = ""
     else
         xyz1 = "$(bf.ijk |> length)"
         xyz2 = "/$(SON)"
     end
     print(io, typeof(bf))
-    print(io, "(gauss, subshell, center)[")
+    print(io, "(center, gauss)[")
     printstyled(io, xyz1, color=:cyan)
     print(io, xyz2)
     print(io, "][", round(bf.center[1](), sigdigits=nSigShown), ", ",
@@ -80,17 +71,24 @@ function show(io::IO, box::GridBox)
     print(io, "(num, len, coord)")
 end
 
+function show(io::IO, config::SCFconfig)
+    print(io, typeof(config))
+    print(io, "(interval=", config.interval, ",", 
+              " oscillateThreshold=", config.oscillateThreshold, ",", 
+              " method, methodConfig)", getfield.(config.method, :f)|>collect)
+end
+
 function show(io::IO, vars::HFtempVars)
     print(io, typeof(vars))
-    print(io, "(shared.Etot=[", round(vars.shared.Etots[1], sigdigits=nSigShown),", … , ", 
-                                round(vars.shared.Etots[end], sigdigits=nSigShown), "], "*
-                            "shared.Dtots, Cs, Es, Ds, Fs)")
+    print(io, "(shared.Etots=[", round(vars.shared.Etots[1], sigdigits=nSigShown),", … , ", 
+                                 round(vars.shared.Etots[end], sigdigits=nSigShown), "], "*
+              "shared.Dtots, N, Cs, Fs, Ds, Es)")
 end
 
 function show(io::IO, vars::HFfinalVars)
     print(io, typeof(vars))
-    print(io, "(E0HF=", round(vars.E0HF, sigdigits=nSigShown), ", C, F, D, Emo, occu, temp"*
-              ", isConverged)")
+    print(io, "(Ehf=", round(vars.Ehf, sigdigits=nSigShown), ", Enn, N, nuc, nucCoords, " * 
+              "C, F, D, Emo, occu, temp, isConverged)")
 end
 
 
@@ -123,6 +121,7 @@ iterate(::ParamBox, _) = nothing
 size(::ParamBox) = ()
 length(::ParamBox) = 1
 ndims(::ParamBox) = 0
+size(::ParamBox, d::Integer) = d == 1 ? 1 : throw(BoundsError())
 
 iterate(gf::GaussFunc) = (gf, nothing)
 iterate(::GaussFunc, _) = nothing
@@ -141,15 +140,18 @@ length(::BasisFuncMix) = 1
 
 function iterate(bfs::CompositeGTBasisFuncs{<:Any, N}) where {N}
     item, state = iterate(bfs.ijk)
-    (BasisFunc(bfs.center, bfs.gauss, ijkOrbitalList[item], bfs.normalizeGTO), state)
+    (BasisFunc(bfs.center, bfs.gauss, item, bfs.normalizeGTO), state)
 end
 function iterate(bfs::CompositeGTBasisFuncs{<:Any, N}, state) where {N}
     iter = iterate(bfs.ijk, state)
-    iter !== nothing ? (BasisFunc(bfs.center, bfs.gauss, ijkOrbitalList[iter[1]], 
-                                  bfs.normalizeGTO), iter[2]) : nothing
+    iter !== nothing ? (BasisFunc(bfs.center, bfs.gauss, iter[1], bfs.normalizeGTO), 
+                        iter[2]) : nothing
 end
 size(::CompositeGTBasisFuncs{<:Any, N}) where {N} = (N,)
 length(::CompositeGTBasisFuncs{<:Any, N}) where {N} = N
+
+size(x::SpatialOrbital, d::Integer) = d == 1 ? length(x) : throw(BoundsError())
+
 
 # Indexing Interface
 import Base: getindex, setindex!, firstindex, lastindex, eachindex, axes
@@ -173,18 +175,26 @@ getindex(bf::BasisFunc, ::Val{:last}) = getindex(bf)
 firstindex(::BasisFunc) = Val(:first)
 lastindex(::BasisFunc) = Val(:last)
 
-getindex(bfm::BasisFuncMix) = 
-(getUnique! ∘ collect ∘ flatten)( getfield.(bfm.BasisFunc, :gauss) )
+getindex(bfm::BasisFuncMix) = (collect ∘ flatten)( getfield.(bfm.BasisFunc, :gauss) )
 getindex(bfm::BasisFuncMix, ::Val{:first}) = getindex(bfm)
 getindex(bfm::BasisFuncMix, ::Val{:last}) = getindex(bfm)
 firstindex(::BasisFuncMix) = Val(:first)
 lastindex(::BasisFuncMix) = Val(:last)
 
 getindex(bfs::BasisFuncs, i) = 
-BasisFunc(bfs.center, bfs.gauss, ijkOrbitalList[bfs.ijk[i]], bfs.normalizeGTO)
+BasisFunc(bfs.center, bfs.gauss, bfs.ijk[i], bfs.normalizeGTO)
 getindex(bfs::BasisFuncs{<:Any, <:Any, N}, ::Colon) where {N} = [getindex(bfs, i) for i=1:N]
 firstindex(bfs::BasisFuncs) = 1
 lastindex(::BasisFuncs{<:Any, <:Any, N}) where {N} = N
+eachindex(bfs::BasisFuncs{<:Any, <:Any, N}) where {N} = Base.OneTo(lastindex(bfs))
+getindex(bfs::BasisFuncs) = getfield.(bfs[:], :gauss) |> flatten
+
+getindex(xyz::XYZTuple, args...) = getindex(xyz.tuple, args...)
+getindex(xyz::XYZTuple) = xyz.tuple
+firstindex(xyz::XYZTuple) = firstindex(xyz.tuple)
+lastindex(xyz::XYZTuple) = lastindex(xyz.tuple)
+eachindex(xyz::XYZTuple) = eachindex(xyz.tuple)
+axes(xyz::XYZTuple) = axes(xyz.tuple)
 
 
 # Broadcasting Interface
@@ -197,21 +207,16 @@ broadcastable(bfs::BasisFuncs) = getindex(bfs, :)
 
 # Quiqbox methods overload.
 ## Method overload of `hasBoolRelation` from Tools.jl.
-## If `ignoreContainer = true`, then `ignoreFunction` is automatically set to be `true` 
-## as the `map` function for `ParamBox` is considered as a type of container for the actual 
-## stored data.
-function hasBoolRelation(boolFunc::F, pb1::ParamBox, pb2::ParamBox; 
-                         ignoreFunction::Bool=false, 
-                         ignoreContainer::Bool=false,
-                         decomposeNumberCollection::Bool=false) where {F<:Function}
+function hasBoolRelation(boolFunc::F, 
+                         pb1::ParamBox{<:Any, <:Any, F1}, pb2::ParamBox{<:Any, <:Any, F2}; 
+                         ignoreFunction::Bool=false, ignoreContainer::Bool=false,
+                         kws...) where {F<:Function, F1, F2}
     if ignoreContainer
+        boolFunc(pb1(), pb2())
+    elseif ignoreFunction || F1 == F2 == FLevel(itself)
         boolFunc(pb1.data, pb2.data)
-    elseif ignoreFunction
-        boolFunc(pb1.data, pb2.data) && 
-        boolFunc(pb1.canDiff[],pb2.canDiff[])
     else
-        boolFunc(pb1.map[], pb2.map[]) && 
-        boolFunc(pb1.data, pb2.data) && 
-        boolFunc(pb1.canDiff[],pb2.canDiff[])
+        boolFunc(pb1.canDiff[], pb2.canDiff[]) && boolFunc(pb1.map, pb2.map) && 
+        boolFunc(pb1.data, pb2.data)
     end
 end

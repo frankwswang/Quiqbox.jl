@@ -1,7 +1,7 @@
 # Core Types
 
 ```@docs
-ParamBox{V, T}
+ParamBox{T, V, FL}
 ```
 
 ```@docs
@@ -9,19 +9,27 @@ GaussFunc
 ```
 
 ```@docs
-BasisFunc{S, GN}
+BasisFunc{𝑙, GN}
 ```
 
 ```@docs
-BasisFuncs{S, GN, ON}
+BasisFuncs{𝑙, GN, ON}
 ```
 
 ```@docs
-GTBasis{N, BT}
+Quiqbox.BasisFuncMix{BN, GN}
 ```
 
 ```@docs
-GridBox{NX, NY, NZ}
+GTBasis
+```
+
+```@docs
+GridBox
+```
+
+```@docs
+HFconfig{HFT, CT, L}
 ```
 
 ```@docs
@@ -29,11 +37,11 @@ SCFconfig{N}
 ```
 
 ```@docs
-Quiqbox.HFtempVars{HFtype, N}
+Quiqbox.HFtempVars{HFtype}
 ```
 
 ```@docs
-Quiqbox.HFfinalVars{T, N, Nb}
+Quiqbox.HFfinalVars{HFT, NN, HFTS}
 ```
 
 ```@docs
@@ -42,4 +50,8 @@ Molecule{Nc, Ne, Nb}
 
 ```@docs
 MolOrbital{N}
+```
+
+```@docs
+POconfig{M, T, F}
 ```

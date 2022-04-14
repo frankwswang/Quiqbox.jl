@@ -4,7 +4,6 @@ using Statistics: std, mean
 using Symbolics
 using LinearAlgebra: eigvals, svdvals, eigen
 
-
 # Function for submodule loading and integrity checking.
 function tryIncluding(subModuleName::String; subModulePath=(@__DIR__)[:]*"/SubModule")
     try
@@ -175,6 +174,8 @@ function hasBoolRelation(boolOp::F, obj1, obj2;
                                    decomposeNumberCollection)
             !res && (return false)
         end
+    elseif obj1 isa Type || obj2 isa Type
+        return boolOp(obj1, obj2)
     else
         fs1 = fieldnames(t1)
         fs2 = fieldnames(t2)
@@ -261,8 +262,8 @@ end
 
 Compare if two objects are the equal.
 
-If `ignoreFunction = true` then the function will pop up a warning message when a field is 
-a function.
+If `ignoreFunction = true`, the function will ignore comparisons between Function-type 
+fields.
 
 If `ignoreContainer = true`, the function will ignore the difference of the container(s) 
 and only compare the field(s)/entry(s) from two objects respectively.
@@ -310,8 +311,8 @@ hasBoolRelation(==, obj1, obj2, obj3...; ignoreFunction, ignoreContainer,
 
 Compare if two objects are the Identical. An instantiation of `hasBoolRelation`.
 
-If `ignoreFunction = true` then the function will pop up a warning message when a field is 
-a function.
+If `ignoreFunction = true`, the function will ignore comparisons between Function-type 
+fields.
 
 If `ignoreContainer = true`, the function will ignore the difference of the container(s) 
 and only compare the field(s)/entry(s) from two objects respectively.
@@ -327,7 +328,7 @@ This is an instantiation of `Quiqbox.hasBoolRelation`.
 begin
     struct S
         a::Int
-        b::Array{Float64, 1}
+        b::Vector{Float64}
     end
 
     a = S(1, [1.0, 1.1])
@@ -429,78 +430,14 @@ julia> flatten([:one, 2, [3, 4.0], ([5], "six"), "7"])
   "7"
 ```
 """
-function flatten(c::Array)
-    c2 = map( x->(x isa Union{Array, Tuple} ? x : [x]), c )
+function flatten(c::Array{T}) where {T}
+    c2 = map( x->(x isa Union{Array, Tuple} ? x : (x,)), c )
     [(c2...)...]
 end
 
 function flatten(c::Tuple)
-    c2 = map( x->(x isa Union{Array, Tuple} ? x : [x]), c )
+    c2 = map( x->(x isa Union{Array, Tuple} ? x : (x,)), c )
     ((c2...)...,)
-end
-
-
-"""
-
-    arrayAlloc(arrayLength::Int, 
-               anExampleOrType::Union{T, Type{T}}) where {T<:Real} -> 
-    Ptr{T}
-
-Allocate the memory for an array of specified length and element type, then return the 
-pointer `Ptr` to it.
-"""
-function arrayAlloc(arrayLength::Int, elementType::Type{T}) where {T<:Real}
-    memoryLen = arrayLength*sizeof(elementType) |> Cint
-    ccall(:malloc, Ptr{T}, (Cint,), memoryLen)
-end
-
-arrayAlloc(arrayLength::Int, NumberExample::T) where {T<:Real} = 
-arrayAlloc(arrayLength, typeof(NumberExample))
-
-
-"""
-
-    ArrayPointer{T, N} <: Any
-
-Stores a pointer to the actual address of an array.
-
-≡≡≡ Field(s) ≡≡≡
-
-`ptr::Ptr{T}`: Pointer pointing to the memory address of the first element of the array.
-
-`arr::Array{T, N}`: The mutable array linked to the pointer. As long as the pointer 
-                    (memory) is not freed, the array is safely preserved.
-
-≡≡≡ Initialization Method(s) ≡≡≡
-
-    ArrayPointer(arr::Array{<:Real, N}; 
-                 showReminder::Bool=true) where {N} -> ArrayPointer{T, N}
-
-Create a `ArrayPointer` that contains a `Ptr` pointing to the actual memory address of the 
-(1st element of the) `Array`.
-
-To avoid memory leaking, the user should use `free(x.ptr)` after the usage of 
-`x::ArrayPointer` to free the occupied memory.
-
-If `showReminder=true`, the constructor will pop up a message to remind the user of 
-such operation.
-"""
-struct ArrayPointer{T, N} <: Any
-    ptr::Ptr{T}
-    arr::Array{T, N}
-
-    function ArrayPointer(arr::Array{<:Real, N}; showReminder::Bool=true) where {N}
-        len = length(arr)
-        elt =  eltype(arr)
-        ptr = arrayAlloc(len, elt)
-        unsafe_copyto!(ptr, pointer(arr |> copy), len)
-        arr2 = unsafe_wrap(Array, ptr, size(arr))
-        showReminder && printStyledInfo("""
-            Generating a C-array pointer-like object x`::ArrayPointer{$(elt)}`...
-            Remember to use free(x.ptr) afterwards to prevent potential memory leaking.
-            """)
-        new{elt, N}(ptr, arr2)
-    end
 end
 
 
@@ -545,12 +482,12 @@ end
 ([1, 1, 2, 1], S[S(1, 2.0), S(1, 2.1)])
 ```
 """
-function markUnique(arr::AbstractArray, args...; 
-                    compareFunction::F=hasEqual, kws...) where {F<:Function}
+function markUnique(arr::AbstractArray{T}, args...; 
+                    compareFunction::F=hasEqual, kws...) where {T<:Any, F<:Function}
     @assert length(arr) >= 1 "The length of input array should be not less than 1."
     f = (b...)->compareFunction((b..., args...)...; kws...)
     res = Int[1]
-    cmprList = eltype(arr)[arr[1]]
+    cmprList = T[arr[1]]
     for i = 2:length(arr)
         local j
         isNew = true
@@ -595,11 +532,11 @@ julia> arr
   "s"
 ```
 """
-function getUnique!(arr::Array, args...; 
-                    compareFunction::F = hasEqual, kws...) where {F<:Function}
+function getUnique!(arr::AbstractArray{T}, args...; 
+                    compareFunction::F = hasEqual, kws...) where {T<:Any, F<:Function}
     @assert length(arr) > 1 "The length of input array should be larger than 1."
     f = (b...)->compareFunction((b..., args...)...; kws...)
-    cmprList = eltype(arr)[arr[1]]
+    cmprList = T[arr[1]]
     delList = Bool[false]
     for i = 2:length(arr)
         isNew = true
@@ -617,64 +554,314 @@ end
 
 
 """
-A function that only returns its argument.
+A dummy function that only returns its argument.
 """
-itself(x) = x
+itself(x::T) where {T} = x::T
 
 
 """
 Similar as `replace` but for Symbols.
 """
-function symbolReplace(sym::Symbol, pair::Pair{String, String}; count::Int=typemax(Int))
+function replaceSymbol(sym::Symbol, pair::Pair{String, String}; count::Int=typemax(Int))
     replace(sym |> string, pair; count) |> Symbol
 end
 
 
-function renameFunc(fName::String, f::F) where {F<:Function}
-    @eval ($(Symbol(fName)))(a...; b...) = $f(a...; b...)
+function renameFunc(fName::Symbol, f::F) where {F<:Function}
+    @eval ($(fName))(a...; b...) = $f(a...; b...)
 end
+
+renameFunc(fName::String, f) = renameFunc(Symbol(fName), f)
 
 
 """
 Recursively find the final value using the value of each iteration as the key for the 
 next search.
 """
-function recursivelyGet(dict::Dict, startKey::Any)
-    res = nothing
-    val = get(dict, startKey, false)
-    while val != false
+function recursivelyGet(dict::Dict{K, V}, startKey::K, default=Vector{V}(undef, 1)[]) where 
+                       {K, V}
+    res = default
+    val = get(dict, startKey, missing)
+    while !(val isa Missing)
         res = val
-        val = get(dict, val, false)
+        val = get(dict, val, missing)
     end
     res
 end
 
+recursivelyGet(dict::Dict{K, <:Real}, startKey::K) where {K} = 
+recursivelyGet(dict, startKey, NaN)
+
 
 function isOscillateConverged(sequence::Vector{<:Real}, 
                               threshold1::Real, threshold2::Real=threshold1; 
-                              leastCycles::Int=1, nPartition::Int=5, returnStd::Bool=false)
+                              leastCycles::Int=1, nPartition::Int=5, 
+                              convergeToMax::Bool=false)
     @assert leastCycles>0 && nPartition>1
     len = length(sequence)
     len < leastCycles && (return false)
     slice = len ÷ nPartition
     lastPortion = sequence[max(end-slice, 1) : end]
-    remained = sort(lastPortion)[end÷2+1 : end]
-    b = std(remained) < threshold1 && abs(sequence[end] - mean(remained)) < threshold2
-    returnStd ? (b, std(lastPortion)) : b
+    remain = sort(lastPortion)[convergeToMax ? (end÷2+1 : end) : (1 : end÷2+1)]
+    b = std(remain) < threshold1 && 
+        abs(sequence[end] - (convergeToMax ? max(remain...) : min(remain...))) < threshold2
+    b, std(lastPortion)
 end
 
 
-function splitTerm(term::Symbolics.Num)
-    r1 = Symbolics.@rule +(~(~xs)) => [i for i in ~(~xs)]
-    r2 = Symbolics.@rule *(~(~xs)) => [[i for i in ~(~xs)] |> prod]
-    for r in [r1, r2]
-        term = Symbolics.simplify(term, rewriter = r)
-    end
-    # Converting Symbolics.Arr to Base.Array
-    if term isa Symbolics.Arr
-        terms = term |> collect
+splitTerm(trm::Symbolics.Num) = 
+splitTermCore(trm.val)::Vector{<:Union{Real, SymbolicUtils.Symbolic}}
+
+@inline function rewriteCore(trm, r)
+    res = r(trm)
+    res === nothing ? trm : res
+end
+
+function splitTermCore(trm::SymbolicUtils.Add)
+    r1 = SymbolicUtils.@rule +(~(~xs)) => [i for i in ~(~xs)]
+    r1(trm) .|> rewriteTerm
+end
+
+rewriteTerm(trm::SymbolicUtils.Add) = splitTermCore(trm)
+
+rewriteTerm(trm::SymbolicUtils.Pow) = itself(trm)
+
+function rewriteTerm(trm::SymbolicUtils.Div)
+    r = @rule (~x) / (~y) => (~x) * (~y)^(-1)
+    rewriteCore(trm, r)
+end
+
+function rewriteTerm(trm::SymbolicUtils.Mul)
+    r = SymbolicUtils.@rule *(~(~xs)) => sort([i for i in ~(~xs)], 
+                              by=x->(x isa SymbolicUtils.Symbolic)) |> prod
+    rewriteCore(trm, r) |> SymbolicUtils.simplify
+end
+
+function splitTermCore(trm::SymbolicUtils.Mul)
+    r1 = SymbolicUtils.@rule *(~(~xs)) => [i for i in ~(~xs)]
+    r2 = SymbolicUtils.@rule +(~(~xs)) => [i for i in ~(~xs)]
+    r3 = @acrule ~~vs * exp((~a)*((~x)^2+(~y)^2+(~z)^2)) * 
+                        exp(-1*(~a)*((~x)^2+(~y)^2+(~z)^2)) => prod(~~vs)
+    trms = rewriteCore(trm, r1)
+    idx = findfirst(x-> x isa SymbolicUtils.Add, trms)
+    if idx !== nothing
+        sumTerm = popat!(trms, idx)
+        var = SymbolicUtils.simplify(sort(trms, 
+                                          by=x->(x isa SymbolicUtils.Symbolic)) |> prod)
+        rewriteCore.((r2(sumTerm) .* var), Ref(r3)) .|> rewriteTerm |> flatten
     else
-        terms = [term]
+        [trms |> prod]
     end
-    terms
 end
+
+splitTermCore(trm::SymbolicUtils.Div) = trm |> rewriteTerm |> splitTermCore
+
+splitTermCore(trm) = [trm]
+
+
+function groupedSort(v::Vector, sortFunction::F=itself) where {F<:Function}
+    sortedArr = sort(v, by=x->sortFunction(x))
+    state1 = 1
+    groups = typeof(v)[]
+    next = iterate(sortedArr)
+    while next !== nothing
+        item, state = next
+        next = iterate(sortedArr, state)
+        if next === nothing || sortFunction(next[1]) != sortFunction(item)
+            push!(groups, sortedArr[state1:state-1])
+            state1 = state
+        end
+    end
+    groups
+end
+
+
+function mapPermute(arr, permFunction)
+    ks = [[true, x, i] for (x, i) in zip(arr, eachindex(arr))]
+    arrNew = permFunction(arr)
+    idx = Int[]
+    for ele in arrNew
+        i = findfirst(x -> x[1] == true && hasIdentical(x[2], ele), ks)
+        push!(idx, i)
+        ks[i][1] = false
+    end
+    idx
+end
+
+
+# Product Function
+struct Pf{C, F} <: ParameterizedFunction{Pf, F}
+    f::Function
+end
+
+Pf(c::Float64, f::Function) = Pf{c, nameOf(f)}(f)
+Pf(c::Float64, f::Pf{C, F}) where {C, F} = Pf{c*C, F}(f.f)
+Pf(c::Float64, ::Val{T}) where {T} = Pf{c, T}(getFunc(T, NaN))
+Pf(c::Float64, ::Val{Pf{C, F}}) where {C, F} = Pf{c*C, F}(getFunc(F, NaN))
+
+
+(f::Pf{C})(x::Real) where {C} = C * f.f(x)
+(::Type{Pf{C, F}})(x::Real) where {C, F} = C * getFunc(F, NaN)(x)
+
+Pf(c::Float64, ::Pf{C, :itself}) where {C} = Pf{c*C, :itself}(itself)
+Pf(c::Float64, ::Val{:itself}) = Pf{c, :itself}(itself)
+Pf(c::Float64, ::Val{Pf{C, :itself}}) where {C} = Pf{c*C, :itself}(itself)
+
+(f::Pf{C, :itself})(x::Real) where {C} = C * x
+(::Type{Pf{C, :itself}})(x::Real) where {C} = C * x
+
+
+function getFunc(fSym::Symbol, failedResult=missing)
+    try
+        getfield(Quiqbox, fSym)
+    catch
+        try
+            getfield(Main, fSym)
+        catch
+            try
+                fSym |> string |> Meta.parse |> eval
+            catch
+                (_) -> failedResult
+            end
+        end
+    end
+end
+
+getFunc(::Type{Pf{C, F}}, _=missing) where {C, F} = Pf{C, F}(getFunc(Val(F)))
+
+getFunc(f::Function, _=missing) = itself(f)
+
+getFunc(::Val{F}, failedResult=missing) where {F} = getFunc(F, failedResult)
+
+getFunc(::Val{:itself}, _=missing) = itself
+
+
+nameOf(f::ParameterizedFunction) = typeof(f)
+
+nameOf(f) = nameof(f)
+
+
+function arrayDiffCore!(vs::NTuple{N, Array{T}}) where {N, T}
+    head = vs[argmin(length.(vs))]
+    coms = T[]
+    l = length(head)
+    sizehint!(coms, l)
+    i = 0
+    while i < l
+        i += 1
+        ele = head[i]
+        ids = zeros(Int, N)
+        flag = false
+        for (j, v) in enumerate(vs)
+            k = findfirst(isequal(ele), v)
+            k === nothing ? (flag=true; break) : (ids[j] = k)
+        end
+        flag && continue
+        for (v, id) in zip(vs, ids)
+            popat!(v, id)
+        end
+        push!(coms, ele)
+        i -= 1
+        l -= 1
+    end
+    (coms, vs...)
+end
+
+function arrayDiffCore!(v1::Array{T}, v2::Array{T}) where {T}
+    a1, a2 = (length(v1) > length(v2)) ? (v2, v1) : (v1, v2)
+    coms = T[]
+    l = length(a1)
+    sizehint!(coms, l)
+    i = 0
+    while i < l
+        i += 1
+        j = findfirst(isequal(a1[i]), a2)
+        if j !== nothing
+            popat!(a1, i)
+            push!(coms, popat!(a2, j))
+            i -= 1
+            l -= 1
+        end
+    end
+    coms, v1, v2
+end
+
+arrayDiff!(v1::Array{T}, v2::Array{T}) where {T} = arrayDiffCore!(v1, v2)
+
+arrayDiff!(vs::Vararg{Array{T}, N}) where {T, N} = arrayDiffCore!(vs)
+
+tupleDiff(ts::Vararg{NTuple{<:Any, T}, N}) where {T, N} = arrayDiff!((ts .|> collect)...)
+
+
+struct FunctionType{F}
+    f::Union{Symbol, Type{<:ParameterizedFunction}, Function}
+
+    FunctionType{F}() where {F} = new{F}(F)
+    FunctionType(f::F) where {F<:Function} = new{F}(f)
+end
+
+FunctionType(s::Symbol) = FunctionType{s}()
+
+getFunc(ft::FunctionType{F}) where {F} = ft.f
+
+function getFuncNum(f::Function, vNum::Symbolics.Num)::Symbolics.Num
+    Symbolics.variable(f|>nameOf, T=Symbolics.FnType{Tuple{Any}, Real})(vNum)
+end
+
+function getFuncNum(::Pf{C, F}, vNum::Symbolics.Num) where {C, F}
+    (C * Symbolics.variable(F, T=Symbolics.FnType{Tuple{Any}, Real})(vNum))::Symbolics.Num
+end
+
+function getFuncNum(::FunctionType{F}, vNum::Symbolics.Num) where {F}
+    Symbolics.variable(F, T=Symbolics.FnType{Tuple{Any}, Real})(vNum)::Symbolics.Num
+end
+
+getFuncNum(::FunctionType{:itself}, vNum::Symbolics.Num) = vNum
+
+getFuncNum(::typeof(itself), vNum::Symbolics.Num) = vNum
+
+function genIndex(index::Int)
+    @assert index >= 0
+    genIndexCore(index)
+end
+
+genIndex(index::Nothing) = genIndexCore(index)
+
+function genIndexCore(index)
+    res = reshape(Union{Int, Nothing}[0], ()) |> collect
+    res[] = index
+    res
+end
+
+function genNamedTupleC(name::Symbol, defaultVars::AbstractArray)
+    @inline function (t::T) where {T<:NamedTuple}
+        container = getfield(Quiqbox, name)
+        res = deepcopy(defaultVars)
+        keys = fieldnames(container)
+        d = Dict(keys .=> collect(1:length(defaultVars)))
+        for (val, fd) in zip(t, fieldnames(T))
+            res[d[fd]] = val
+        end
+        container(res...)
+    end
+end
+
+
+convertNumber(num::Number, roundDigits::Int=-1, type::Type{<:Number}=Float64) = 
+(roundDigits < 0  ?  num  :  round(num, digits=roundDigits)) |> type
+
+
+fillNumber(num::Number) = fill(num)
+
+fillNumber(num::Array{<:Any, 0}) = itself(num)
+
+
+@inline genTupleCoords(coords::Vector{<:AbstractArray{<:Real}}) = 
+        Tuple((Float64(i[1]), Float64(i[2]), Float64(i[3])) for i in coords)
+
+@inline genTupleCoords(coords::Tuple{Vararg{NTuple{3,Float64}}}) = itself(coords)
+
+
+@inline arrayToTuple(arr::Array) = Tuple(arr)
+
+@inline arrayToTuple(tpl::Tuple) = itself(tpl)

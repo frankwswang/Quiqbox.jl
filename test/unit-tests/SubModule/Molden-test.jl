@@ -4,7 +4,6 @@ using Quiqbox.Molden
 
 @testset "Molden.jl test" begin
 
-
 mols = [
         ["H", "H"],
         ["H", "F"],
@@ -27,11 +26,12 @@ molCoords = [
 bfCoords = [molCoords..., GridBox(1, 1.2) |> gridCoords]
 bfs = ["STO-3G", "STO-2G"]
 bsNames = push!(("-" .*molNames), "-Grid")
-HFtypes = [:RHF, :UHF]
-prefix = "Example"
+dir = @__DIR__
+prefix1 = dir*"/"
+prefix2 = dir*"/Moldens/"
 for (nuc, nucCoords, molName, iMol) in zip(mols, molCoords, molNames, 1:length(mols)), 
     (bfCoord, bsName) in zip(bfCoords[iMol:end], bsNames[iMol:end]), 
-    HFtype in HFtypes,
+    HFtype in Quiqbox.HFtypes,
     bf in bfs
 
     flag = (bfCoord == nucCoords)
@@ -44,14 +44,21 @@ for (nuc, nucCoords, molName, iMol) in zip(mols, molCoords, molNames, 1:length(m
     end
 
     # Number of spin-orbitals must not be smaller than numbers of electrons.
-    fVars = try runHF(bs, nuc, nucCoords; HFtype, printInfo=false) catch; continue end
+    fVars = try
+        runHF(bs, nuc, nucCoords, HFconfig((HF=HFtype,)), printInfo=false)
+    catch
+        continue
+    end
 
-    mol = Molecule(bs, nuc, nucCoords, fVars)
-    fn = makeMoldenFile(mol; recordUMO=true, fileName=prefix*"_"*molName*"_"*bf*bsName*
-                                                      "_"*string(HFtype))
-    rm(fn)
+    mol = Molecule(bs, fVars)
+    fn = "Test_"*molName*"_"*bf*bsName*"_"*string(HFtype)
+    fd = makeMoldenFile(mol; roundDigits=5, recordUMO=true, fileName=prefix1*fn)
+    str1, str2 = replace.(read.((fd, prefix2*fn*".molden"), String), 
+                          r"[0-9]+\.[0-9]{5}(?![0-9])"=>"X.XXXXX")
+    str1, str2 = replace.((str1, str2), "-X.XXXXX"=>" X.XXXXX")
+    str1, str2 = replace.((str1, str2), "\r\n"=>"\n")
+    @test str1 == str2
+    rm(fd)
 end
-
-@test true
 
 end

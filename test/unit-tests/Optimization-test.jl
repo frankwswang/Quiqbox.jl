@@ -5,33 +5,37 @@ using Suppressor: @suppress_out
 @testset "Optimization.jl" begin
 
 errorThreshold1 = 1e-10
-errorThreshold2 = 1e-4
+errorThreshold2 = 1e-6
 
 # Floating basis set
 nucCoords = [[-0.7,0.0,0.0], [0.7,0.0,0.0]]
-mol = ["H", "H"]
-bfSource1 = genBasisFunc(missing, ("STO-2G", "H"))[]
-gfs1 = bfSource1.gauss |> collect
-cens = makeCenter.(nucCoords)
-bs1 = genBasisFunc.(cens, Ref(gfs1))
-pars1 = uniqueParams!(bs1, filterMapping=true)
+nuc = ["H", "H"]
 
-local Es1L, pars1L, grads1L
-@suppress_out begin
-    Es1L, pars1L, grads1L = optimizeParams!(bs1, pars1, mol, nucCoords, maxSteps = 200)
+configs = [POconfig((maxStep=200, error=NaN)), 
+           POconfig((maxStep=200, error=NaN, config=HFconfig((HF=:UHF,))))]
+
+Eend = Float64[]
+Ebegin = Float64[]
+
+for c in configs, (i,j) in zip((1,2,7,8,9,10), (2,2,7,9,9,10))
+    # 1->X₁, 2->X₂, 7->α₁, 8->α₂, 9->d₁, 10->d₂
+    gf1 = GaussFunc(1.7, 0.8)
+    gf2 = GaussFunc(0.45, 0.25)
+    cens = makeCenter.(nucCoords)
+    bs1 = genBasisFunc.(cens, Ref((gf1, gf2)), normalizeGTO=true)
+    pars1 = markParams!(bs1, true)
+
+    local Es1L
+    @suppress_out begin
+        Es1L, _, _ = optimizeParams!(pars1[i:j], bs1, nuc, nucCoords, c, printInfo=false)
+        push!(Ebegin, Es1L[1])
+        push!(Eend, Es1L[end])
+    end
 end
 
-E_t1 = -1.775682554420
-par_t1 =  [ 1.331636672727,  0.311858635697,  0.454798446617, 
-            0.662643931789, -0.686629455293,  0.686629467121, 
-            0.0, 0.0, 0.0, 0.0]
-grad_t1 = [-0.125188275109,  0.017527948869, -0.107797228779, 
-            0.073985454098, -0.056469017810,  0.056482854380, 
-            0.0, 0.0, 0.0, 0.0]
-
-@test isapprox(Es1L[end], E_t1, atol=errorThreshold1)
-@test isapprox(pars1L[end, :], par_t1, atol=errorThreshold1)
-@test isapprox(grads1L[end, :], grad_t1, atol=errorThreshold1)
+@test all(Ebegin .> Eend)
+@test all(Eend[1:6] .<= Eend[7:end])
+@test all(isapprox.(Eend[1:6], Eend[7:end], atol=errorThreshold2))
 
 
 # Grid-based basis set
@@ -39,19 +43,49 @@ grid = GridBox(1, 3.0)
 gf2 = GaussFunc(0.7,1)
 bs2 = genBasisFunc.(grid.box, Ref([gf2]))
 
-pars2 = uniqueParams!(bs2, filterMapping=true)[[1,3]]
+pars2 = markParams!(bs2, true)[1:2]
 
-local Es2L, pars2L, grads2L
+local Es2L, ps2L, grads2L
 @suppress_out begin
-    Es2L, pars2L, grads2L = optimizeParams!(bs2, pars2, mol, nucCoords, maxSteps = 100)
+    Es2L, ps2L, grads2L = optimizeParams!(pars2, bs2, nuc, nucCoords, 
+                                            POconfig((maxStep=200,)))
 end
 
-E_t2 = -1.16666630
-par_t2  = [0.17642659, 2.90239973]
-grad_t2 = [0.10233850, 0.48936670]
+E_t2 = -1.1665258278624209
+# L, α
+par_t2  = [2.8465051232815264, 0.22550104533479082]
+grad_t2 = [0.3752225248883099, 0.6830952140061448]
 
+@test Es2L[1] > Es2L[end]
 @test isapprox(Es2L[end], E_t2, atol=errorThreshold2)
-@test isapprox(pars2L[end, :], par_t2, atol=errorThreshold2)
-@test isapprox(grads2L[end, :], grad_t2, atol=errorThreshold2)
+@test isapprox(ps2L[:, end], par_t2, atol=errorThreshold2)
+@test isapprox(grads2L[:, end], grad_t2, atol=errorThreshold2)
+
+
+# BasisFuncMix basis set
+gf2_2 = GaussFunc(0.7,1)
+grid2 = GridBox(1, 3.0)
+bs2_2 = genBasisFunc.(grid2.box, Ref([gf2_2]))
+gf3 = GaussFunc(0.5,1)
+bs3 = bs2_2 .+ genBasisFunc([0,0,0], gf3)
+pars3 = markParams!(bs3, true)[[1,5:end...]]
+local Es3L, ps3L, grads3L
+
+@suppress_out begin
+    Es3L, ps3L, grads3L = optimizeParams!(pars3, bs3, nuc, nucCoords, 
+                                          POconfig((maxStep=50,)))
+end
+
+E_t3 = -1.6538597833434006
+# L, α₁, α₂, d₁, d₂
+par_t3  = [2.9966466869974293, 0.6913223149659601, 0.4835057214805189, 0.9966863578341086, 
+           1.0033029163222076]
+grad_t3 = [0.05956359217705473, 0.16518443158936472, 0.28539984391180534, 
+           0.06666031150461275, -0.0662207016492597]
+
+@test Es3L[1] > Es3L[end]
+@test isapprox(Es3L[end], E_t3, atol=errorThreshold2)
+@test isapprox(ps3L[:, end], par_t3, atol=errorThreshold2)
+@test isapprox(grads3L[:, end], grad_t3, atol=errorThreshold2)
 
 end

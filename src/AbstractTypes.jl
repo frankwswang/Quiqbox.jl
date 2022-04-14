@@ -1,7 +1,14 @@
 abstract type QuiqboxContainer <: Any end
 
+abstract type MetaParameter <: Any end
+
+
+abstract type ParameterizedFunction{P, F} <: Function end
+
 
 abstract type QuiqboxVariableBox <: QuiqboxContainer end
+
+abstract type MetaParam{T} <: MetaParameter end
 
 abstract type QuiqboxParameter{ParameterT, ContainerT} <: QuiqboxVariableBox end
 abstract type QuiqboxDataBox <: QuiqboxVariableBox end
@@ -20,10 +27,11 @@ abstract type MolecularDataBox <: ImmutableDataBox end
 abstract type HartreeFockintermediateData <: MutableDataBox end
 
 abstract type DifferentiableParameter{ContainerT, DataT} <: MutableParameter{ContainerT, DataT} end
+abstract type ConfigBox{ContainerT, MethodT} <: MutableParameter{ContainerT, Any} end
 
 abstract type HartreeFockFinalValue{T} <: AbstractHartreeFockFinalValue end
 
-abstract type BasisSetData{N} <: AbstractBasisSetData end
+abstract type BasisSetData{BT} <: AbstractBasisSetData end
 
 abstract type MolecularCoefficients <: MolecularDataBox end
 
@@ -44,10 +52,10 @@ abstract type AbstractGaussFunc <: NucleusCenteredBasis end
 
 abstract type AbstractGTBasisFuncs <: FloatingBasis end
 
-abstract type MolecularHartreeFockCoefficient{NucleiC, ElectronC} <: MolecularCoefficients end
+abstract type MolecularHartreeFockCoefficient{NN, N} <: MolecularCoefficients end
 
 abstract type GTBasisFuncs{OrbitalN}  <: AbstractGTBasisFuncs end
 
 abstract type CompositeGTBasisFuncs{NofLinearlyCombinedBasis, NofOrbital}  <: GTBasisFuncs{NofOrbital} end
 
-abstract type FloatingGTBasisFuncs{Subshell, GaussFuncN, OrbitalN} <: CompositeGTBasisFuncs{1, OrbitalN} end
+abstract type FloatingGTBasisFuncs{𝑙, GaussFuncN, OrbitalN} <: CompositeGTBasisFuncs{1, OrbitalN} end

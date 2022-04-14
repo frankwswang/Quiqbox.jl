@@ -16,9 +16,13 @@ using Test
         unit2_1 = "Main Functions"
         println("Testing $(unit2_1)...")
         t2_1 = @elapsed @testset "$(unit2_1)" begin
-            include("unit-tests/Integration/OneBody-test.jl")
-            include("unit-tests/Integration/TwoBody-test.jl")
+            include("unit-tests/Parameters-test.jl")
             include("unit-tests/Basis-test.jl")
+            include("unit-tests/Integrals/Core-test.jl")
+            include("unit-tests/Integrals/OneBody-test.jl")
+            include("unit-tests/Integrals/TwoBody-test.jl")
+            Sys.islinux() && include("unit-tests/Integrals/Libcint-compare-tests.jl")
+            include("unit-tests/Differentiation-test.jl")
         end
         println("$(unit2_1) test finished in $t2_1 seconds.\n")
 
@@ -27,7 +31,7 @@ using Test
         t2_2 = @elapsed @testset "$(unit2_2)" begin
             include("unit-tests/Box-test.jl")
             include("unit-tests/Library-test.jl")
-            include("unit-tests/Molecule-test.jl")
+            include("unit-tests/Matter-test.jl")
         end
         println("$(unit2_2) test finished in $t2_2 seconds.\n")
 
@@ -38,7 +42,7 @@ using Test
             include("unit-tests/Optimization-test.jl")
         end
         println("$(unit2_3) test finished in $t2_3 seconds.\n")
-    
+
     end
 
     @testset "Submodule Functions" begin

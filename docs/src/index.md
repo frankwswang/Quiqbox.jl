@@ -1,15 +1,16 @@
 # Quiqbox.jl
 
-**Quiqbox** is a quantum chemistry and quantum computing software package that starts off around Gaussian basis set optimization of molecular electronic-structure problems. Quiqbox is written in pure [Julia](https://julialang.org/).
+**Quiqbox** is a quantum chemistry and quantum physics software package that starts off around Gaussian basis set optimization for electronic structure problems. Quiqbox is written in pure [Julia](https://julialang.org/).
 
 ## Features
 
-* Floating and fixed-basis Gaussian-type orbital (GTO) configurations.
-* Symbolic representation and analysis of basis function parameters.
-* Standalone 1-electron and 2-electron integral functions (powered by [libcint_jll](https://github.com/JuliaBinaryWrappers/libcint_jll.jl)).
+* Floating and fixed-position Gaussian-type orbital (GTO).
+* Linear combination of GTOs with different centers as a basis function.
+* Symbolic representation of basis function expression.
+* Standalone 1-electron and 2-electron integral functions.
 * Restricted (closed-shell) and unrestricted (open-shell) Hartree–Fock methods (RHF & UHF).
 * Molecular orbital data output in [Molden](https://www3.cmbi.umcn.nl/molden/) file format.
-* Variational optimization of orbital geometry based on automatic differentiation (AD).
+* Variational optimization of orbital parameters based on automatic differentiation (AD).
 
 ## Setup
 
@@ -17,11 +18,11 @@
 
 * Linux
 * Mac OS
-* [Windows Subsystem for Linux](https://docs.microsoft.com/en-us/windows/wsl/about)
+* Windows
 
 ### Julia Environment
 
-* [1.5+](https://github.com/frankwswang/Quiqbox.jl/actions/workflows/CI.yml)
+* [1.6+](https://github.com/frankwswang/Quiqbox.jl/actions/workflows/CI.yml)
 
 ### Installation in Julia [REPL](https://docs.julialang.org/en/v1/manual/getting-started/)
 
