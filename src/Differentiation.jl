@@ -2,23 +2,25 @@ export gradHFenergy
 
 using LinearAlgebra: eigen, Symmetric
 
-function oneBodyDerivativeCore(::Val{false}, ∂bfs::Vector{<:CompositeGTBasisFuncs}, 
-                               bfs::Vector{<:CompositeGTBasisFuncs}, 
+function oneBodyDerivativeCore(::Val{false}, 
+                               ∂bfs::Union{NTuple{BN,BT1},NTuple{BN,AbstractGTBasisFuncs}}, 
+                               bfs::Union{NTuple{BN,BT2}, NTuple{BN,AbstractGTBasisFuncs}}, 
                                X::Matrix{Float64}, ∂X::Matrix{Float64}, 
-                               ft::FunctionType{F}) where {F}
+                               ft::FunctionType{F}) where 
+                              {BN, BT1<:CompositeGTBasisFuncs{<:Any, 1}, 
+                                   BT2<:CompositeGTBasisFuncs{<:Any, 1}, F}
     ʃ = getFunc(ft.f)
-    bsSize = ∂bfs |> length
-    ∂ʃ = ones(bsSize, bsSize)
-    ʃab = ones(bsSize, bsSize)
-    ∂ʃab = ones(bsSize, bsSize)
-    for i = 1:bsSize, j = 1:i
+    ∂ʃ = ones(BN, BN)
+    ʃab = ones(BN, BN)
+    ∂ʃab = ones(BN, BN)
+    for i = 1:BN, j = 1:i
        ʃab[i,j] = ʃab[j,i] = ʃ(bfs[i], bfs[j])
     end
-    for i = 1:bsSize, j = 1:i
+    for i = 1:BN, j = 1:i
         ∂ʃab[i,j] = ∂ʃab[j,i] = ʃ(∂bfs[i], bfs[j]) + ʃ(bfs[i], ∂bfs[j])
     end
     @views begin
-        for i=1:bsSize, j=1:i
+        for i=1:BN, j=1:i
             # X[i,j] == X[j,i]
             ∂ʃ[i,j] = ∂ʃ[j,i] = 
             transpose( X[:,i]) * ∂ʃab[:,:] *  X[:,j] +
@@ -30,10 +32,13 @@ function oneBodyDerivativeCore(::Val{false}, ∂bfs::Vector{<:CompositeGTBasisFu
 end
 
 
-function twoBodyDerivativeCore(::Val{false}, ∂bfs::Vector{<:CompositeGTBasisFuncs}, 
-                               bfs::Vector{<:CompositeGTBasisFuncs}, 
+function twoBodyDerivativeCore(::Val{false}, 
+                               ∂bfs::Union{NTuple{BN,BT1},NTuple{BN,AbstractGTBasisFuncs}}, 
+                               bfs::Union{NTuple{BN,BT2}, NTuple{BN,AbstractGTBasisFuncs}},
                                X::Matrix{Float64}, ∂X::Matrix{Float64}, 
-                               ft::FunctionType{F}) where {F}
+                               ft::FunctionType{F}) where 
+                              {BN, BT1<:CompositeGTBasisFuncs{<:Any, 1}, 
+                                   BT2<:CompositeGTBasisFuncs{<:Any, 1}, F}
     ʃ = getFunc(ft.f)
     bsSize = ∂bfs |> length
     ∂ʃ = ones(bsSize, bsSize, bsSize, bsSize)
@@ -75,12 +80,12 @@ end
 
 
 function derivativeCore(FoutputIsVector::Val{B}, 
-                        bs::Vector{<:CompositeGTBasisFuncs}, par::ParamBox, 
-                        S::Matrix{Float64}, 
+                        bs::Union{NTuple{BN, BT}, NTuple{BN, AbstractGTBasisFuncs}}, 
+                        par::ParamBox, S::Matrix{Float64}, 
                         oneBodyF::FunctionType{F1}, twoBodyF::FunctionType{F2}) where 
-                       {B, F1, F2}
+                       {B, BN, BT<:AbstractGTBasisFuncs, F1, F2}
     # ijkl in chemists' notation of spatial bases (ij|kl).
-    bfs = reshape(hcat(decompose.(bs)...), :)
+    bfs = Tuple(hcat(decompose.(bs)...))
     ∂bfs = deriveBasisFunc.(bfs, par)
     bsSize = basisSize.(bs) |> sum
     ∂S = ones(bsSize, bsSize)
@@ -105,11 +110,12 @@ function derivativeCore(FoutputIsVector::Val{B},
 end
 
 
-function ∂HFenergy(bs::Vector{<:CompositeGTBasisFuncs}, par::ParamBox, 
-                   C::NTuple{HFTS, Matrix{Float64}}, 
+function ∂HFenergy(bs::Union{NTuple{BN, BT}, NTuple{BN, AbstractGTBasisFuncs}}, 
+                   par::ParamBox, C::NTuple{HFTS, Matrix{Float64}}, 
                    S::Matrix{Float64}, nuc::NTuple{NN, String}, 
                    nucCoords::NTuple{NN, NTuple{3,Float64}}, 
-                   nElectron::Union{Int, NTuple{2, Int}}) where {HFTS, NN}
+                   nElectron::Union{Int, NTuple{2, Int}}) where 
+                  {BN, BT<:AbstractGTBasisFuncs, HFTS, NN}
     Xinv = sqrt(S)::Matrix{Float64}
     cH = (i, j)->getCoreHij(i, j, nuc, nucCoords)
     ∂hij, ∂hijkl = derivativeCore(Val(false), bs, par, S, 
@@ -118,21 +124,21 @@ function ∂HFenergy(bs::Vector{<:CompositeGTBasisFuncs}, par::ParamBox,
 end
 
 
-function gradHFenergy(bs::Vector{<:CompositeGTBasisFuncs}, par::Vector{<:ParamBox}, 
+function gradHFenergy(bs::Union{NTuple{BN, BT}, NTuple{BN, AbstractGTBasisFuncs}, 
+                                Vector{<:AbstractGTBasisFuncs}}, 
+                      par::Vector{<:ParamBox}, 
                       C::NTuple{HFTS, Matrix{Float64}}, 
-                      S::Matrix{Float64}, nuc::NTuple{NN, String}, 
-                      nucCoords::NTuple{NN, NTuple{3,Float64}}, 
-                      nElectron::Union{Int, NTuple{2, Int}}=getCharge(nuc)) where {HFTS, NN}
+                      S::Matrix{Float64}, 
+                      nuc::Union{NTuple{NN, String}, Vector{String}}, 
+                      nucCoords::Union{NTuple{NN, NTuple{3,Float64}}, 
+                                       Vector{<:AbstractArray{<:Real}}}, 
+                      nElectron::Union{Int, NTuple{2, Int}}=getCharge(nuc)) where 
+                     {BN, BT<:AbstractGTBasisFuncs, HFTS, NN}
+    bs = arrayToTuple(bs)
+    nuc = arrayToTuple(nuc)
+    nucCoords = genTupleCoords(nucCoords)
     if length(C) == 2 && nElectron isa Int
         nElectron = (nElectron÷2, nElectron-nElectron÷2)
     end
     ∂HFenergy.(Ref(bs), par, Ref(C), Ref(S), Ref(nuc), Ref(nucCoords), Ref(nElectron))
 end
-
-gradHFenergy(bs, par::Vector{<:ParamBox}, C, S, 
-             nuc::Vector{String}, nucCoords::Vector{<:AbstractArray{<:Real}}, 
-             nElectron=getCharge(nuc)) = 
-gradHFenergy(bs, par, C, S, Tuple(nuc), genTupleCoords(nucCoords), nElectron)
-
-gradHFenergy(bs, par::ParamBox, C, S, nuc, nucCoords, nElectron=getCharge(nuc)) = 
-gradHFenergy(bs, [par], C, S, nuc, nucCoords, nElectron)

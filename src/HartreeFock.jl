@@ -55,10 +55,11 @@ end
 
 function getCfromSAD(::Val{HFT}, S::Matrix{Float64}, 
                      Hcore::Matrix{Float64}, HeeI::Array{Float64, 4},
-                     bs::Vector{<:AbstractGTBasisFuncs}, 
+                     bs::Union{NTuple{BN, BT}, NTuple{BN, AbstractGTBasisFuncs}}, 
                      nuc::NTuple{NN, String}, nucCoords::NTuple{NN, NTuple{3,Float64}}, 
                      X::Matrix{Float64}, 
-                     config=SCFconfig((:ADIIS,), (1e-10,))) where {HFT, NN}
+                     config=SCFconfig((:ADIIS,), (1e-10,))) where 
+                    {HFT, BN, BT<:AbstractGTBasisFuncs, NN}
     D₁ = zero(Hcore)
     D₂ = zero(Hcore)
     N₁tot = 0
@@ -96,11 +97,11 @@ const guessCmethods =
              getCfromSAD(HFT, S, Hcore, HeeI, bs, nuc, nucCoords, X))
 
 
-@inline guessC(::Type{Val{M}}, ::Val{HFT}, 
-               S::Matrix{Float64}, X::Matrix{Float64}, Hcore::Matrix{Float64}, 
-               HeeI::Array{Float64, 4}, bs::Vector{<:AbstractGTBasisFuncs}, 
+@inline guessC(::Type{Val{M}}, ::Val{HFT}, S::Matrix{Float64}, X::Matrix{Float64}, 
+               Hcore::Matrix{Float64}, HeeI::Array{Float64, 4}, 
+               bs::Union{NTuple{BN, BT}, NTuple{BN, AbstractGTBasisFuncs}}, 
                nuc::NTuple{NN, String}, nucCoords::NTuple{NN, NTuple{3,Float64}}) where 
-              {M, HFT, NN} = 
+              {M, HFT, BN, BT<:AbstractGTBasisFuncs, NN} = 
 getfield(guessCmethods, M)(Val(HFT), S, X, Hcore, HeeI, bs, nuc, nucCoords)
 
 
@@ -443,13 +444,13 @@ struct HFfinalVars{HFT, NN, HFTS} <: HartreeFockFinalValue{HFT}
 end
 
 
-const Doc_HFconfig_Eg1 = "HFconfig{:RHF, :SAD, 3}(Val{:RHF}(), Val{:SAD}(), "*
+const Doc_HFconfig_Eg1 = "HFconfig{:RHF, Val{:SAD}, 3}(Val{:RHF}(), Val{:SAD}(), "*
                          "SCFconfig{3}(interval=(0.0001, 1.0e-6, 1.0e-15), "*
                          "oscillateThreshold=1.0e-5, method, methodConfig)"*
                          "[:ADIIS, :DIIS, :ADIIS], 1000, true)"
 
-const Doc_HFconfig_Eg2 = Doc_HFconfig_Eg1[1:10] * "U" * Doc_HFconfig_Eg1[12:29] * "U" * 
-                         Doc_HFconfig_Eg1[31:end]
+const Doc_HFconfig_Eg2 = Doc_HFconfig_Eg1[1:10] * "U" * Doc_HFconfig_Eg1[12:34] * "U" * 
+                         Doc_HFconfig_Eg1[36:end]
 
 const HFtypes = (:RHF, :UHF)
 
@@ -525,11 +526,13 @@ length(kws) == 0 ? HFconfig(defaultHFconfigPars...) : HFconfig(kws|>NamedTuple)
 
 
 """
-    runHF(gtb::Union{BasisSetData, Vector{<:AbstractGTBasisFuncs}}, 
-          nuc::Vector{String}, 
-          nucCoords::Vector{<:AbstractArray{<:Real}}, 
-          N::Int=getCharge(nuc), 
-          config::HFconfig{HFT}=HFconfig();
+    runHF(bs::Union{BasisSetData, Vector{<:AbstractGTBasisFuncs}, 
+                    Tuple{Vararg{<:AbstractGTBasisFuncs}}}, 
+          nuc::Union{NTuple{NN, String}, Vector{String}}, 
+          nucCoords::Union{NTuple{NN, NTuple{3,Float64}}, 
+                           Vector{<:AbstractArray{<:Real}}}, 
+          config::HFconfig{HFT, CT, L}=HFconfig(), 
+          N::Int=getCharge(nuc); 
           printInfo::Bool=true) where {HFT} -> 
     HFfinalVars{HFT}
 
@@ -537,53 +540,45 @@ Main function to run Hartree-Fock in Quiqbox.
 
 === Positional argument(s) ===
 
-`bs::Union{BasisSetData, Array{<:AbstractGTBasisFuncs, 1}}`: Basis set.
+`bs::Union{BasisSetData, Vector{<:AbstractGTBasisFuncs}, 
+           Tuple{Vararg{<:AbstractGTBasisFuncs}}}`: Basis set.
 
-`nuc::Vector{String}`: The element symbols of the nuclei for the studied system.
+`nuc::Union{NTuple{NN, String}, Vector{String}}`: The element symbols of the nuclei for the 
+studied system.
 
-`nucCoords::Vector{<:AbstractArray{<:Real}}`: Nuclei coordinates.
-
-`N::Int`: Total number of electrons.
+`nucCoords::Union{NTuple{NN, NTuple{3,Float64}}, Vector{<:AbstractArray{<:Real}}}`: Nuclei 
+coordinates.
 
 `config::HFconfig`: The Configuration of selected Hartree-Fock method. For more information 
 please refer to `HFconfig`.
+
+`N::Int`: Total number of electrons.
 
 === Keyword argument(s) ===
 
 `printInfo::Bool`: Whether print out the information of iteration steps.
 """
-runHF(gtb::BasisSetData, nuc::Vector{String}, nucCoords::Vector{<:AbstractArray{<:Real}}, 
-      N::Int, config; printInfo=true) = 
-runHF(gtb, Tuple(nuc), genTupleCoords(nucCoords), N, config; printInfo)
-
-"""
-
-    runHF(gtb::Union{BasisSetData, Vector{<:AbstractGTBasisFuncs}}, 
-          nuc::NTuple{NN, String}, 
-          nucCoords::NTuple{NN, NTuple{3,Float64}}, 
-          N::Int=getCharge(nuc), 
-          config::HFconfig{HFT}=HFconfig(); 
-          printInfo::Bool=true) where {NN, HFT} -> 
-    HFfinalVars{HFT, NN}
-
-"""
-function runHF(gtb::BasisSetData{BT}, 
-               nuc::NTuple{NN, String}, 
-               nucCoords::NTuple{NN, NTuple{3,Float64}}, 
-               N::Int=getCharge(nuc), 
-               config::HFconfig{HFT, CT, L}=HFconfig(); 
-               printInfo::Bool=true) where {BT, NN, HFT, CT, L}
-    @assert length(gtb.basis) >= ceil(N/2)
+function runHF(bs::GTBasis{BN, BT}, 
+               nuc::Union{NTuple{NN, String}, Vector{String}}, 
+               nucCoords::Union{NTuple{NN, NTuple{3,Float64}}, 
+                                Vector{<:AbstractArray{<:Real}}}, 
+               config::HFconfig{HFT, CT, L}=HFconfig(), 
+               N::Int=getCharge(nuc); 
+               printInfo::Bool=true) where {BN, BT, NN, HFT, CT, L}
+    nuc = arrayToTuple(nuc)
+    nucCoords = genTupleCoords(nucCoords)
+    leastNb = ceil(N/2)
+    @assert BN >= leastNb "The number of basis functions should be no less than $(leastNb)."
     @assert N > (HFT==:RHF) "$(HFT) requires more than $(HFT==:RHF) electrons."
-    N = (HFT == :RHF) ? (N,) : (N÷2, N-N÷2)
-    Hcore = gtb.getHcore(nuc, nucCoords)
-    X = getX(gtb.S)
+    Ns = (HFT == :RHF) ? (N,) : (N÷2, N-N÷2)
+    Hcore = bs.getHcore(nuc, nucCoords)
+    X = getX(bs.S)
     initialC = if CT <: Val
-        guessC(CT, Val(HFT), gtb.S, X, Hcore, gtb.eeI, gtb.basis, nuc, nucCoords)
+        guessC(CT, Val(HFT), bs.S, X, Hcore, bs.eeI, bs.basis, nuc, nucCoords)
     else
         config.C0
     end
-    vars, isConverged = runHFcore(config.SCF, N, Hcore, gtb.eeI, gtb.S, X, initialC, 
+    vars, isConverged = runHFcore(config.SCF, Ns, Hcore, bs.eeI, bs.S, X, initialC, 
                                   printInfo, config.maxStep, config.earlyStop)
     res = HFfinalVars(nuc, nucCoords, X, vars, isConverged)
     if printInfo
@@ -599,21 +594,21 @@ end
 
 """
 
-    runHF(gtb::Union{BasisSetData, Vector{<:AbstractGTBasisFuncs}}, 
-          nuc::Vector{String}, 
-          nucCoords::Vector{<:AbstractArray{<:Real}}, 
-          config::HFconfig{HFT}=HFconfig(), 
-          N::Int=getCharge(nuc);
+    runHF(bs::Union{BasisSetData, Vector{<:AbstractGTBasisFuncs}, 
+                    Tuple{Vararg{<:AbstractGTBasisFuncs}}}, 
+          nuc::Union{NTuple{NN, String}, Vector{String}}, 
+          nucCoords::Union{NTuple{NN, NTuple{3,Float64}}, 
+                           Vector{<:AbstractArray{<:Real}}}, 
+          N::Int=getCharge(nuc), 
+          config::HFconfig{HFT, CT, L}=HFconfig(); 
           printInfo::Bool=true) where {HFT} -> 
     HFfinalVars{HFT}
-
-Another method of `runHF`.
 """
-runHF(gtb::BasisSetData, nuc, nucCoords, config::HFconfig=HFconfig(), N=getCharge(nuc); 
-      printInfo=true) = 
-runHF(gtb::BasisSetData, nuc, nucCoords, N, config; printInfo)
+runHF(bs::BasisSetData, nuc, nucCoords, N::Int, config=HFconfig(); printInfo=true) = 
+runHF(bs::BasisSetData, nuc, nucCoords, config, N; printInfo)
 
-runHF(bs::Vector{<:AbstractGTBasisFuncs}, args...; printInfo=true) = 
+runHF(bs::Union{Tuple{Vararg{<:AbstractGTBasisFuncs}}, Vector{<:AbstractGTBasisFuncs}}, 
+      args...; printInfo=true) = 
 runHF(GTBasis(bs), args...; printInfo)
 
 

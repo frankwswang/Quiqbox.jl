@@ -21,11 +21,11 @@ Quiqbox.BasisFuncMix{BN, GN}
 ```
 
 ```@docs
-GTBasis{BT, T}
+GTBasis
 ```
 
 ```@docs
-GridBox{NX, NY, NZ}
+GridBox
 ```
 
 ```@docs

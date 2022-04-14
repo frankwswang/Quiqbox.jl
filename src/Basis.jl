@@ -557,13 +557,13 @@ Return the subshell name of the input `$(FloatingGTBasisFuncs)`.
 
 """
 
-    GTBasis{BT, T} <: BasisSetData{BT}
+    GTBasis{BN, BT<:CompositeGTBasisFuncs{<:Any, 1}, T} <: BasisSetData{BT}
 
 The container to store basis set information.
 
 ≡≡≡ Field(s) ≡≡≡
 
-`basis::Vector{<:CompositeGTBasisFuncs{<:Any, 1}}`: Basis set.
+`basis::NTuple{BN, BT}`: Basis set.
 
 `S::Array{<:Number, 2}`: Overlap matrix.
 
@@ -583,30 +583,43 @@ when nuclei and their coordinates of same `DataType` are input.
             Te::Matrix{<:Number}, eeI::Array{<:Number, 4}) -> 
     GTBasis
 
-    GTBasis(basis::Array{<:AbstractGTBasisFuncs, 1}) -> GTBasis
+    GTBasis(basis::Union{Tuple{Vararg{<:AbstractGTBasisFuncs}}, 
+                         Vector{<:AbstractGTBasisFuncs}}) -> 
+    GTBasis
 
 Directly construct a `GTBasis` given a basis set.
 """
-struct GTBasis{BT, T} <: BasisSetData{BT}
-    basis::Vector{BT}
+struct GTBasis{BN, BT, T} <: BasisSetData{BT}
+    basis::NTuple{BN, BT}
     S::Matrix{T}
     Te::Matrix{T}
     eeI::Array{T, 4}
     getVne::Function
     getHcore::Function
 
-    function GTBasis(b::Vector{BT}, S::Matrix{T}, Te::Matrix{T}, eeI::Array{T, 4}) where 
-                    {BT<:CompositeGTBasisFuncs{<:Any, 1}, T<:Real}
-        new{BT, T}(b, S, Te, eeI, 
-                   (mol, nucCoords) -> nucAttractions(b, mol, nucCoords),
-                   (mol, nucCoords) -> nucAttractions(b, mol, nucCoords) + Te)
+    function GTBasis(b::NTuple{BN, BT}, 
+                     S::Matrix{T}, Te::Matrix{T}, eeI::Array{T, 4}) where 
+                    {BN, BT<:CompositeGTBasisFuncs{<:Any, 1}, T<:Real}
+        new{BN, BT, T}(b, S, Te, eeI, 
+                       (mol, nucCoords) -> nucAttractions(b, mol, nucCoords),
+                       (mol, nucCoords) -> nucAttractions(b, mol, nucCoords) + Te)
+    end
+
+    function GTBasis(b::NTuple{BN, CompositeGTBasisFuncs{<:Any, 1}}, 
+                     S::Matrix{T}, Te::Matrix{T}, eeI::Array{T, 4}) where 
+                    {BN, T<:Real}
+        BT = typejoin(typeof.(b)...)
+        new{BN, BT, T}(b, S, Te, eeI, 
+                       (mol, nucCoords) -> nucAttractions(b, mol, nucCoords),
+                       (mol, nucCoords) -> nucAttractions(b, mol, nucCoords) + Te)
     end
 end
 
 GTBasis(bs::Vector{<:CompositeGTBasisFuncs{<:Any, 1}}) = 
-GTBasis(bs, overlaps(bs), elecKinetics(bs), eeInteractions(bs))
+GTBasis(Tuple(bs), overlaps(bs), elecKinetics(bs), eeInteractions(bs))
 
-GTBasis(bs::Vector{<:AbstractGTBasisFuncs}) = GTBasis(hcat(decompose.(bs)...) |> vec)
+GTBasis(bs::Union{Tuple{Vararg{<:AbstractGTBasisFuncs}}, Vector{<:AbstractGTBasisFuncs}}) = 
+GTBasis(hcat(decompose.(bs)...)|>Tuple, overlaps(bs), elecKinetics(bs), eeInteractions(bs))
 
 
 """
@@ -1395,7 +1408,7 @@ end
               onlyDifferentiable::Bool=false) -> 
     Array{<:ParamBox, 1}
 
-    getParams(pbc::Array, symbol::Union{Symbol, Nothing}=nothing; 
+    getParams(pbc::Union{Array, Tuple}, symbol::Union{Symbol, Nothing}=nothing; 
               onlyDifferentiable::Bool=false) -> 
     Array{<:ParamBox, 1}
 
@@ -1431,6 +1444,9 @@ function getParams(cs::Array, symbol::Union{Symbol, Nothing}=nothing;
          getParams(convert(Vector{StructSpatialBasis}, cs[1:end .∉ [pbIdx]]), symbol; 
                    onlyDifferentiable))
 end
+
+getParams(cs::Tuple, symbol=nothing; onlyDifferentiable=false) = 
+getParams(collect(cs), symbol; onlyDifferentiable)
 
 function paramFilter(pb::ParamBox, outSym::Union{Symbol, Nothing}=nothing, 
                      onlyDifferentiable::Bool=false)
@@ -1523,8 +1539,8 @@ compareParamBox(pb2, pb1)
 
 """
 
-    markParams!(b::Union{Array{T}, T}, filterMapping::Bool=false)  where 
-               {T<:$(StructSpatialBasis)} -> 
+    markParams!(b::Union{Array{T}, T, Tuple{Vararg{StructSpatialBasis}}}, 
+                filterMapping::Bool=false)  where {T<:$(StructSpatialBasis)} -> 
     Array{<:ParamBox, 1}
 
 Mark the parameters (`ParamBox`) in input bs which can a `Vector` of `GaussFunc` or 
@@ -1532,8 +1548,8 @@ Mark the parameters (`ParamBox`) in input bs which can a `Vector` of `GaussFunc`
 `filterMapping`determines weather filter out (i.e. not return) `ParamBox`s that have same 
 independent variables despite they may have different mapping functions.
 """
-markParams!(b::Union{Array{T}, T}, filterMapping::Bool=false) where 
-           {T<:StructSpatialBasis} = 
+markParams!(b::Union{Array{T}, T, Tuple{Vararg{StructSpatialBasis}}}, 
+            filterMapping::Bool=false) where {T<:StructSpatialBasis} = 
 markParams!(getParams(b), filterMapping)
 
 function markParams!(parArray::Array{<:ParamBox}, filterMapping::Bool=false)
@@ -1618,7 +1634,7 @@ vcat(getVarCore.(containers|>getParams, expandNonDifferentiable)...) |> Dict
 
 """
 
-    getVarDict(obj::Union{ParamBox, $(StructSpatialBasis), Array}; 
+    getVarDict(obj::Union{ParamBox, $(StructSpatialBasis), Array, Tuple}; 
                includeMapping::Bool=false) -> 
     Dict{Symbolics.Num, <:Number}
 
@@ -1630,7 +1646,7 @@ variables.
 getVarDict(pb::ParamBox; includeMapping::Bool=false) = 
 includeMapping ? getVarDictCore(pb, true) : (inSymValOf(pb) |> Dict)
 
-function getVarDict(containers::Union{Array, StructSpatialBasis}; 
+function getVarDict(containers::Union{Tuple, Array, StructSpatialBasis}; 
                     includeMapping::Bool=false)
     if includeMapping
         getVarDictCore(containers, true)

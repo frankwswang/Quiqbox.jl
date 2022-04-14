@@ -167,22 +167,18 @@ end
 
 """
 
-    nnRepulsions(nuc::Vector{String}, nucCoords::Vector{<:AbstractArray{<:Real}}) -> Float64
+    nnRepulsions(nuc::Union{NTuple{NN, String}, Vector{String}}, 
+                 nucCoords::Union{NTuple{NN, NTuple{3, Float64}}, 
+                                  Vector{<:AbstractArray{<:Real}}}) where {NN} -> 
+    Float64
 
 Calculate the nuclear repulsion energy given the nuclei and their coordinates.
 """
-nnRepulsions(nuc::Vector{String}, nucCoords::Vector{<:AbstractArray{<:Real}}) = 
-nnRepulsions(Tuple(nuc), genTupleCoords(nucCoords))
-
-"""
-
-    nnRepulsions(nuc::NTuple{N, String}, 
-                 nucCoords::NTuple{N, NTuple{3, Float64}}) where {N} -> 
-    Float64
-
-"""
-function nnRepulsions(nuc::NTuple{N, String}, 
-                      nucCoords::NTuple{N, NTuple{3, Float64}}) where {N}
+function nnRepulsions(nuc::Union{NTuple{NN, String}, Vector{String}}, 
+                      nucCoords::Union{NTuple{NN, NTuple{3, Float64}}, 
+                                       Vector{<:AbstractArray{<:Real}}}) where {NN}
+    nuc = arrayToTuple(nuc)
+    nucCoords = genTupleCoords(nucCoords)
     E = 0.0
     len = length(nuc)
     for i = 1:len, j=i+1:len

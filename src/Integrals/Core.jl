@@ -750,13 +750,13 @@ getCompositeInt(FunctionType{:get2eInteraction}(), (b1, b2, b3, b4))
 
 
 function getOneBodyInts(::FunctionType{F}, 
-                        basisSet::AbstractArray{<:AbstractGTBasisFuncs}, 
-                        optArgs...) where {F}
+                        basisSet::Union{NTuple{BN, BT}, NTuple{BN, AbstractGTBasisFuncs}}, 
+                        optArgs...) where {F, BN, BT<:AbstractGTBasisFuncs}
     subSize = basisSize.(basisSet) |> collect
     accuSize = vcat(0, accumulate(+, subSize))
     len = subSize |> sum
     buf = Array{Float64}(undef, len, len)
-    for j = 1:length(basisSet), i = 1:j
+    for j = 1:BN, i = 1:j
         int = getfield(Quiqbox, F)(basisSet[i], basisSet[j], optArgs...)
         rowRange = accuSize[i]+1 : accuSize[i+1]
         colRange = accuSize[j]+1 : accuSize[j+1]
@@ -766,20 +766,22 @@ function getOneBodyInts(::FunctionType{F},
     buf
 end
 
-getOverlaps(BSet::AbstractArray{<:AbstractGTBasisFuncs}) = 
+getOverlaps(BSet::Union{NTuple{BN, BT}, NTuple{BN, AbstractGTBasisFuncs}}) where 
+           {BN, BT<:AbstractGTBasisFuncs} = 
 getOneBodyInts(FunctionType{:getOverlap}(), BSet)
 
-getElecKinetics(BSet::AbstractArray{<:AbstractGTBasisFuncs}) = 
+getElecKinetics(BSet::Union{NTuple{BN, BT}, NTuple{BN, AbstractGTBasisFuncs}}) where 
+               {BN, BT<:AbstractGTBasisFuncs} = 
 getOneBodyInts(FunctionType{:getElecKinetic}(), BSet)
 
-getNucAttractions(BSet::AbstractArray{<:AbstractGTBasisFuncs}, 
-                  nuc::NTuple{NN, String}, 
-                  nucCoords::NTuple{NN, NTuple{3,Float64}}) where {NN} = 
+getNucAttractions(BSet::Union{NTuple{BN, BT}, NTuple{BN, AbstractGTBasisFuncs}}, 
+                  nuc::NTuple{NN, String}, nucCoords::NTuple{NN, NTuple{3,Float64}}) where 
+                 {BN, BT<:AbstractGTBasisFuncs, NN} = 
 getOneBodyInts(FunctionType{:getNucAttraction}(), BSet, nuc, nucCoords)
 
-getCoreH(BSet::AbstractArray{<:AbstractGTBasisFuncs}, 
-         nuc::NTuple{NN, String}, 
-         nucCoords::NTuple{NN, NTuple{3,Float64}}) where {NN} = 
+getCoreH(BSet::Union{NTuple{BN, BT}, NTuple{BN, AbstractGTBasisFuncs}}, 
+         nuc::NTuple{NN, String}, nucCoords::NTuple{NN, NTuple{3,Float64}}) where 
+        {BN, BT<:AbstractGTBasisFuncs, NN} = 
 getOneBodyInts(FunctionType{:getCoreHij}(), BSet, nuc, nucCoords)
 
 
@@ -788,12 +790,14 @@ permuteArray(arr::Number, _) = itself(arr)
 
 
 function getTwoBodyInts(::FunctionType{F}, 
-                        basisSet::AbstractArray{<:AbstractGTBasisFuncs}) where {F}
-    subSize = basisSize.(basisSet)
+                        basisSet::Union{NTuple{BN, BT}, 
+                                        NTuple{BN, AbstractGTBasisFuncs}}) where 
+                       {F, BN, BT<:AbstractGTBasisFuncs}
+    subSize = basisSize.(basisSet) |> collect
     accuSize = vcat(0, accumulate(+, subSize))
     totalSize = subSize |> sum
     buf = Array{Float64}(undef, totalSize, totalSize, totalSize, totalSize)
-    for l = 1:length(basisSet), k = 1:l, j = 1:l, i = 1:(j==l ? k : j)
+    for l = 1:BN, k = 1:l, j = 1:l, i = 1:(j==l ? k : j)
         I = accuSize[i]+1 : accuSize[i+1]
         J = accuSize[j]+1 : accuSize[j+1]
         K = accuSize[k]+1 : accuSize[k+1]
@@ -811,14 +815,17 @@ function getTwoBodyInts(::FunctionType{F},
     buf
 end
 
-get2eInteractions(BSet::AbstractArray{<:AbstractGTBasisFuncs}) = 
+get2eInteractions(BSet::Union{NTuple{BN, BT}, NTuple{BN, AbstractGTBasisFuncs}}) where 
+                 {BN, BT<:AbstractGTBasisFuncs} = 
 getTwoBodyInts(FunctionType{:get2eInteraction}(), BSet)
 
-function genUniqueIndices(basisSet::AbstractArray{<:AbstractGTBasisFuncs})
-    s = basisSize.(basisSet) |> sum
-    uniqueIdx = fill(Int[0,0,0,0], (3*binomial(s, 4)+6*binomial(s, 3)+4*binomial(s, 2)+s))
+
+function genUniqueIndices(basisSetSize::Int)
+    uniqueIdx = fill(Int[0,0,0,0], (3*binomial(basisSetSize, 4) + 
+                                    6*binomial(basisSetSize, 3) + 
+                                    4*binomial(basisSetSize, 2) + basisSetSize))
     index = 1
-    for i = 1:s, j = 1:i, k = 1:i, l = 1:(k==i ? j : k)
+    for i = 1:basisSetSize, j = 1:i, k = 1:i, l = 1:(k==i ? j : k)
         uniqueIdx[index] = [i, j, k, l]
         index += 1
     end

@@ -855,5 +855,13 @@ fillNumber(num::Number) = fill(num)
 
 fillNumber(num::Array{<:Any, 0}) = itself(num)
 
-genTupleCoords(coords::Vector{<:AbstractArray{<:Real}}) = 
-Tuple((Float64(i[1]), Float64(i[2]), Float64(i[3])) for i in coords)
+
+@inline genTupleCoords(coords::Vector{<:AbstractArray{<:Real}}) = 
+        Tuple((Float64(i[1]), Float64(i[2]), Float64(i[3])) for i in coords)
+
+@inline genTupleCoords(coords::Tuple{Vararg{NTuple{3,Float64}}}) = itself(coords)
+
+
+@inline arrayToTuple(arr::Array) = Tuple(arr)
+
+@inline arrayToTuple(tpl::Tuple) = itself(tpl)
