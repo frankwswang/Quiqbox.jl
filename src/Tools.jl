@@ -328,7 +328,7 @@ This is an instantiation of `Quiqbox.hasBoolRelation`.
 begin
     struct S
         a::Int
-        b::Array{Float64, 1}
+        b::Vector{Float64}
     end
 
     a = S(1, [1.0, 1.1])
@@ -854,3 +854,14 @@ convertNumber(num::Number, roundDigits::Int=-1, type::Type{<:Number}=Float64) =
 fillNumber(num::Number) = fill(num)
 
 fillNumber(num::Array{<:Any, 0}) = itself(num)
+
+
+@inline genTupleCoords(coords::Vector{<:AbstractArray{<:Real}}) = 
+        Tuple((Float64(i[1]), Float64(i[2]), Float64(i[3])) for i in coords)
+
+@inline genTupleCoords(coords::Tuple{Vararg{NTuple{3,Float64}}}) = itself(coords)
+
+
+@inline arrayToTuple(arr::Array) = Tuple(arr)
+
+@inline arrayToTuple(tpl::Tuple) = itself(tpl)

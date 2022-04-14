@@ -87,8 +87,8 @@ end
 
 function show(io::IO, vars::HFfinalVars)
     print(io, typeof(vars))
-    print(io, "(E0HF=", round(vars.E0HF, sigdigits=nSigShown), ", N, C, F, D, Emo, occu, "*
-              "temp, isConverged)")
+    print(io, "(Ehf=", round(vars.Ehf, sigdigits=nSigShown), ", Enn, N, nuc, nucCoords, " * 
+              "C, F, D, Emo, occu, temp, isConverged)")
 end
 
 

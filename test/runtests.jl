@@ -21,9 +21,7 @@ using Test
             include("unit-tests/Integrals/Core-test.jl")
             include("unit-tests/Integrals/OneBody-test.jl")
             include("unit-tests/Integrals/TwoBody-test.jl")
-            if Sys.islinux()
-                include("unit-tests/Integrals/Libcint-compare-tests.jl")
-            end
+            Sys.islinux() && include("unit-tests/Integrals/Libcint-compare-tests.jl")
             include("unit-tests/Differentiation-test.jl")
         end
         println("$(unit2_1) test finished in $t2_1 seconds.\n")
@@ -33,7 +31,7 @@ using Test
         t2_2 = @elapsed @testset "$(unit2_2)" begin
             include("unit-tests/Box-test.jl")
             include("unit-tests/Library-test.jl")
-            include("unit-tests/Molecule-test.jl")
+            include("unit-tests/Matter-test.jl")
         end
         println("$(unit2_2) test finished in $t2_2 seconds.\n")
 

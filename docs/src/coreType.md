@@ -21,15 +21,15 @@ Quiqbox.BasisFuncMix{BN, GN}
 ```
 
 ```@docs
-GTBasis{BT, T}
+GTBasis
 ```
 
 ```@docs
-GridBox{NX, NY, NZ}
+GridBox
 ```
 
 ```@docs
-HFconfig{HFT, CT}
+HFconfig{HFT, CT, L}
 ```
 
 ```@docs
@@ -41,7 +41,7 @@ Quiqbox.HFtempVars{HFtype}
 ```
 
 ```@docs
-Quiqbox.HFfinalVars{HFtype}
+Quiqbox.HFfinalVars{HFT, NN, HFTS}
 ```
 
 ```@docs

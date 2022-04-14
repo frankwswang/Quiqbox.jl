@@ -2,7 +2,7 @@ export gridBoxCoords, GridBox, gridCoords
 
 """
 
-    GridBox{NX, NY, NZ} <: SemiMutableParameter{GridBox, Float64}
+    GridBox{NP} <: SemiMutableParameter{GridBox, Float64}
 
 A `struct` that stores coordinates of grid points in terms of both `Vector`s and 
 `ParamBox`s.
@@ -13,9 +13,9 @@ A `struct` that stores coordinates of grid points in terms of both `Vector`s and
 
 `spacing::Float64`: The length between adjacent grid points.
 
-`box::Vector{NTuple{3, ParamBox}}`: The coordinates of grid points in terms of `ParamBox`s.
+`box::NTuple{NP, NTuple{3, ParamBox}}`: The coordinates of grid points.
 
-`coord::Array{Array{Float64, 1}, 1}`: The coordinates of grid points in terms of `Vector`s.
+`coord::Array{Vector{Float64}, 1}`: The coordinates of grid points in terms of `Vector`s.
 
 ≡≡≡ Initialization Method(s) ≡≡≡
 
@@ -41,10 +41,13 @@ adjacent grid points. `centerCoord` specifies the geometry center coordinate of 
 defines the index number for the actual parameter: spacing `L`, with the default value 0 
 it would be `L₀`.
 """
-struct GridBox{NX, NY, NZ} <: SemiMutableParameter{GridBox, Float64}
+struct GridBox{NP} <: SemiMutableParameter{GridBox, Float64}
     num::Int
     spacing::Float64
-    box::Vector{NTuple{3, ParamBox}}
+    box::NTuple{NP, 
+                Tuple{ParamBox{Float64, :X, FLevel{2, 0}}, 
+                      ParamBox{Float64, :Y, FLevel{2, 0}}, 
+                      ParamBox{Float64, :Z, FLevel{2, 0}}}}
 
     function GridBox((nGx, nGy, nGz)::NTuple{3, Int}, spacing::Real=10, 
                      centerCoord::Vector{<:Real}=[0.0,0.0,0.0];
@@ -73,7 +76,7 @@ struct GridBox{NX, NY, NZ} <: SemiMutableParameter{GridBox, Float64}
             Z = ParamBox(pbRef.data, ZParamSym, fZ, sym; canDiff, index)
             push!(boxes, (X, Y, Z))
         end
-        new{nGx, nGy, nGz}(prod(nGrids .+ 1), spc, boxes)
+        new{(nGx+1)*(nGy+1)*(nGz+1)}(prod(nGrids .+ 1), spc, Tuple(boxes))
     end
 end
 
@@ -84,7 +87,7 @@ GridBox(fill(nGridPerEdge, 3) |> Tuple, spacing, centerCoord; canDiff, index)
 
 """
 
-    gridCoords(gb::GridBox) -> Array{Array{Float64, 1}, 1}
+    gridCoords(gb::GridBox) -> Array{Vector{Float64}, 1}
 
 Return the grid-point coordinates in `Vector`s given the `GriBox`.
 """

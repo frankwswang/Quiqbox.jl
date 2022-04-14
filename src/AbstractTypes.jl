@@ -52,7 +52,7 @@ abstract type AbstractGaussFunc <: NucleusCenteredBasis end
 
 abstract type AbstractGTBasisFuncs <: FloatingBasis end
 
-abstract type MolecularHartreeFockCoefficient{NucleiC, ElectronC} <: MolecularCoefficients end
+abstract type MolecularHartreeFockCoefficient{NN, N} <: MolecularCoefficients end
 
 abstract type GTBasisFuncs{OrbitalN}  <: AbstractGTBasisFuncs end
 

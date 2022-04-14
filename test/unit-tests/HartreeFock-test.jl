@@ -14,7 +14,7 @@ S = overlaps(bs)
 Hcore = coreH(bs, nuc, nucCoords)
 HeeI = eeInteractions(bs)
 Ne = getCharge(nuc)
-scfMethods = (:ADIIS, :DIIS, :EDIIS, :SD)
+scfMethods = (:ADIIS, :DIIS, :EDIIS, :DD)
 thresholds = (1e-4, 1e-8, 1e-10, 1e-12)
 solvers = Dict(1=>[:solver=>:LCM], 2=>[:solver=>:LCM], 
                 3=>[:solver=>:LCM], 4=>[:solver=>:LCM])
@@ -34,29 +34,29 @@ HFc4 = HFconfig((HF=:UHF, SCF=SCFc2))
     res2_2 = runHF(bs, nuc, nucCoords, HFc4)
 end
 
-@test isapprox(res2.E0HF, res2_2.E0HF, atol=1e-5)
-@test isapprox(res1.E0HF, res1_2.E0HF, atol=1e-6)
+@test isapprox(res2.Ehf, res2_2.Ehf, atol=1e-5)
+@test isapprox(res1.Ehf, res1_2.Ehf, atol=1e-6)
 
 @test begin
-    tVars1 = deepcopy(res1.temp)
+    tVars1 = deepcopy(res1.temp[1])
     Quiqbox.popHFtempVars!(tVars1)
-    push!(tVars1.Cs, res1.temp.Cs[end])
-    push!(tVars1.Fs, res1.temp.Fs[end])
-    push!(tVars1.Ds, res1.temp.Ds[end])
-    push!(tVars1.Es, res1.temp.Es[end])
-    push!(tVars1.shared.Dtots, res1.temp.shared.Dtots[end])
-    push!(tVars1.shared.Etots, res1.temp.shared.Etots[end])
-    hasEqual(tVars1, res1.temp)
+    push!(tVars1.Cs, res1.temp[1].Cs[end])
+    push!(tVars1.Fs, res1.temp[1].Fs[end])
+    push!(tVars1.Ds, res1.temp[1].Ds[end])
+    push!(tVars1.Es, res1.temp[1].Es[end])
+    push!(tVars1.shared.Dtots, res1.temp[1].shared.Dtots[end])
+    push!(tVars1.shared.Etots, res1.temp[1].shared.Etots[end])
+    hasEqual(tVars1, res1.temp[1])
 end
 
-@test isapprox(res1.E0HF, Quiqbox.getEᵀ(Hcore, HeeI, res1.C, Ne), atol=errorThreshold1)
+@test isapprox(res1.Ehf, Quiqbox.getEᵀ(Hcore, HeeI, res1.C, Ne), atol=errorThreshold1)
 
-@test isapprox(res1.E0HF, -93.7878386326277, atol=errorThreshold1)
+@test isapprox(res1.Ehf, -93.7878386326277, atol=errorThreshold1)
 
 # Note: the molecular energies of 4th and 5th columns are so close that based on the 
 # numerical error of each machine the position of them might switch.
 
-@test isapprox(res1.C[1:5, [1,2,3,6,7]], 
+@test isapprox(res1.C[1][1:5, [1,2,3,6,7]], 
 [ 0.010895948  0.088981718  0.121610580  0.0  0.0  1.914545170  3.615733228; 
     0.010895948  0.088981718 -0.121610580  0.0  0.0  1.914545170 -3.615733228; 
     -0.994229856 -0.263439202  0.0          0.0  0.0  0.049696590 -0.0; 
@@ -66,11 +66,11 @@ end
     0.0          0.0          0.0          0.0  1.0  0.0          0.0][1:5, [1,2,3,6,7]], 
 atol=errorThreshold2)
 
-@test  isapprox(vcat(res1.C[6:7,:][:], res1.C[1:5, 4:5][:]) |> sort, 
+@test  isapprox(vcat(res1.C[1][6:7,:][:], res1.C[1][1:5, 4:5][:]) |> sort, 
                 vcat(fill(0,22), fill(1,2)), atol=errorThreshold1)
-@test  isapprox(res1.C[6:7, 4:5][:] |> sort, [0,0,1,1], atol=errorThreshold1)
+@test  isapprox(res1.C[1][6:7, 4:5][:] |> sort, [0,0,1,1], atol=errorThreshold1)
 
-@test isapprox(res1.F, 
+@test isapprox(res1.F[1], 
 [-2.255355742 -1.960980213  -4.484367700 -2.511687004  0.483602713  0.0  0.0; 
     -1.960980213 -2.255355742  -4.484367700 -2.511687004 -0.483602713  0.0  0.0; 
     -4.484367700 -4.484367700 -20.920373317 -5.363455107  0.0          0.0  0.0; 
@@ -80,14 +80,14 @@ atol=errorThreshold2)
     0.0          0.0           0.0          0.0          0.0  0.0 -0.661303892], 
 atol=errorThreshold2)
 
-@test isapprox(res1.Emo, 
+@test isapprox(res1.Emo[1], 
 [-20.930371651088734, -1.6166714662844843, -1.2844637689430092, -0.6613027570108698, 
     -0.661302757010868, 1.0608175741517432, 1.8478054667733597], 
 atol=errorThreshold1)
 
-@test res1.occu == [2, 2, 2, 2, 2, 0, 0]
+@test res1.occu[1] == [2, 2, 2, 2, 2, 0, 0]
 
-D1 = res1.D
+D1 = res1.D[1]
 @test isapprox(D1*S*D1, D1, atol=errorThreshold1)
 
 
@@ -107,10 +107,10 @@ D1 = res1.D
     hasEqual(tVars2, res2.temp)
 end
 
-@test isapprox(res2.E0HF, Quiqbox.getEᵀ(Hcore, HeeI, res2.C, (Ne÷2, Ne-Ne÷2)), 
+@test isapprox(res2.Ehf, Quiqbox.getEᵀ(Hcore, HeeI, res2.C, (Ne÷2, Ne-Ne÷2)), 
                 atol=errorThreshold1)
 
-@test isapprox(res2.E0HF, -93.7878386328625, atol=errorThreshold1)
+@test isapprox(res2.Ehf, -93.7878386328625, atol=errorThreshold1)
 
 @test isapprox.((res2.C[1][1:5, [1,2,3,6,7]], res2.C[2][1:5, [1,2,3,6,7]]), 
 ([ 0.01089592  0.08898109  0.12160791  0.0  0.0  1.91454520  3.61573332; 
@@ -180,8 +180,8 @@ for i in range
 
     bs = genBasisFunc.(nucCoords2, "3-21G") |> flatten
 
-    push!(Erhf, runHF(bs, nuc2, nucCoords2, printInfo=false).E0HF)
-    push!(Euhf, runHF(bs, nuc2, nucCoords2, HFconfig((HF=:UHF,)), printInfo=false).E0HF)
+    push!(Erhf, runHF(bs, nuc2, nucCoords2, printInfo=false).Ehf)
+    push!(Euhf, runHF(bs, nuc2, nucCoords2, HFconfig((HF=:UHF,)), printInfo=false).Ehf)
     push!(Enuc, nnRepulsions(nuc2, nucCoords2))
 end
 

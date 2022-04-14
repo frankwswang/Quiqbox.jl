@@ -149,7 +149,14 @@ const YParamSym = ParamList[:Y]
 const ZParamSym = ParamList[:Z]
 
 
-getCharge(nucs::Vector{String}) = getCharge.(nucs) |> sum
+
+"""
+
+    getCharge(nucs::Union{Vector{String}, Tuple{Vararg{String}}}) -> Int
+
+Return the total electric charge (in 𝑒) of the input nuclei.
+"""
+getCharge(nucs::Union{Vector, Tuple}) = getCharge.(nucs) |> sum
 
 getCharge(nucStr::String) = AtomicNumberList[nucStr]
 

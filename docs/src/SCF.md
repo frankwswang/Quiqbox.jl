@@ -8,7 +8,7 @@ Quiqbox supports basic Hartree-Fock methods with various configurations:
 | :---  |  ---:   |
 | HF Types | Restricted Closed-Shell (RHF), Unrestricted Open-Shell (UHF) |
 | Initial Guesses | Core Hamiltonian, Generalized Wolfsberg-Helmholtz, Superposition of Atomic Densities (SAD), User-defined Coefficient Matrix |
-| Converging Methods | Direct Diagonalization, [DIIS](https://onlinelibrary.wiley.com/doi/10.1002/jcc.540030413), [EDIIS](https://aip.scitation.org/doi/abs/10.1063/1.1470195), [ADIIS](https://aip.scitation.org/doi/10.1063/1.3304922), Combinations of Multi-methods |
+| Converging Methods | Direct Diagonalization, [DIIS](https://onlinelibrary.wiley.com/doi/10.1002/jcc.540030413), [EDIIS](https://aip.scitation.org/doi/abs/10.1063/1.1470195), [ADIIS](https://aip.scitation.org/doi/10.1063/1.3304922), Combinations of Multiple Methods |
 | DIIS-type Method Solvers | Lagrange Multiplier Solver, [ADMM](https://github.com/JuliaFirstOrder/SeparableOptimization.jl) Solver |
 
 ### Basic Hartree-Fock
@@ -25,7 +25,7 @@ bs = genBasisFunc.(nucCoords, ("STO-3G", "H") |> Ref) |> flatten
 
 resRHF = runHF(bs, nuc, nucCoords)
 
-@show resRHF.E0HF resRHF.C resRHF.Emo resRHF.occu
+@show resRHF.Ehf resRHF.C resRHF.Emo resRHF.occu
 ```
 
 After the SCF procedure, one can also easily store the result in a `Molecule` for further data processing such as generating [Molden](@ref) files.

@@ -44,8 +44,8 @@ function updateParams!(pbs::Vector{<:ParamBox}, grads::Vector{<:Real},
 end
 
 
-const Doc_POconfig_Eg1 = "POconfig{:HF, HFconfig{:RHF, :SAD, 3}, "*
-                         "typeof(gradDescent!)}(Val{:HF}(), HFconfig{:RHF, :SAD, 3}"*
+const Doc_POconfig_Eg1 = "POconfig{:HF, HFconfig{:RHF, Val{:SAD}, 3}, "*
+                         "typeof(gradDescent!)}(Val{:HF}(), HFconfig{:RHF, Val{:SAD}, 3}"*
                          "(Val{:RHF}(), Val{:SAD}(), SCFconfig{3}(interval=(0.0001, "*
                          "1.0e-6, 1.0e-15), oscillateThreshold=1.0e-5, method, "*
                          "methodConfig)[:ADIIS, :DIIS, :ADIIS], 1000, true), NaN, "*
@@ -82,7 +82,7 @@ iteration converges.
 
 ≡≡≡ Initialization Method(s) ≡≡≡
 
-    POconfig() -> POconfig
+    POconfig(;kws...) -> POconfig
 
     POconfig(t::NamedTuple) -> POconfig
 
@@ -92,7 +92,7 @@ iteration converges.
 julia> POconfig()
 $(Doc_POconfig_Eg1)
 
-julia> POconfig((maxStep=100,))
+julia> POconfig(maxStep=100)
 $(Doc_POconfig_Eg2)
 ```
 """
@@ -109,9 +109,10 @@ POconfig(a1::Symbol, args...) = POconfig(Val(a1), args...)
 
 const defaultPOconfigPars = Any[Val(:HF), HFconfig(), NaN, 1e-5, 500, gradDescent!]
 
-POconfig() = POconfig(defaultPOconfigPars...)
-
 POconfig(t::NamedTuple) = genNamedTupleC(:POconfig, defaultPOconfigPars)(t)
+
+POconfig(;kws...) = 
+length(kws) == 0 ? POconfig(defaultPOconfigPars...) : POconfig(kws|>NamedTuple)
 
 
 """
@@ -126,7 +127,7 @@ which should have the same value with the field `method` in the corresponding `P
 function genOFmethod(::Val{:HF}, config::HFconfig{HFT}=HFconfig()) where {HFT}
     fVal = @inline function (gtb, nuc, nucCoords, N)
         res = runHF(gtb, nuc, nucCoords, N, config, printInfo=false)
-        res.E0HF, res.C
+        res.Ehf, res.C
     end
     fVal, gradHFenergy
 end
@@ -134,13 +135,14 @@ end
 
 """
 
-    optimizeParams!(pbs::Array{<:ParamBox, 1}, 
-                    bs::Array{<:AbstractGTBasisFuncs, 1}, 
-                    nuc::Array{String, 1}, 
-                    nucCoords::Array{<:AbstractArray, 1}, 
-                    N::Int=getCharge(nuc), 
-                    config::POconfig{M, T, F}=POconfig(); 
-                    printInfo::Bool=true
+    optimizeParams!(pbs::Vector{<:ParamBox}, 
+                    bs::Union{Tuple{Vararg{<:AbstractGTBasisFuncs}}, 
+                              Vector{<:AbstractGTBasisFuncs}}, 
+                    nuc::Union{NTuple{NN, String}, Vector{String}}, 
+                    nucCoords::Union{NTuple{NN, NTuple{3, Float64}}, 
+                                     Vector{<:AbstractArray{<:Real}}}, 
+                    config::POconfig{M, T, F}=POconfig(), N::Int=getCharge(nuc); 
+                    printInfo::Bool=true) where {NN, M, T, F} -> 
     Es::Vector{Float64}, pars::Matrix{Float64}, grads::Matrix{Float64}
 
 The main function to optimize the parameters of a given basis set.
@@ -150,25 +152,33 @@ The main function to optimize the parameters of a given basis set.
 `pbs::Array{<:ParamBox, 1}`: The parameters to be optimized that are extracted from the 
 basis set.
 
-`bs::Array{<:AbstractGTBasisFuncs, 1}`: Basis set.
+`bs::Union{Tuple{Vararg{<:AbstractGTBasisFuncs}}, Vector{<:AbstractGTBasisFuncs}}`: Basis 
+set.
 
-`nuc::Array{String, 1}`: The element symbols of the nuclei for the Molecule.
+`nuc::Union{NTuple{NN, String}, Vector{String}}`: The element symbols of the nuclei for the 
+studied system.
 
-`nucCoords::Array{<:AbstractArray, 1}`: Nuclei coordinates.
-
-`N::Int`: Total number of electrons.
+`nucCoords::Union{NTuple{NN, NTuple{3, Float64}}, Vector{<:AbstractArray{<:Real}}}`: Nuclei 
+coordinates.
 
 `config::POconfig`: The Configuration of selected parameter optimization method. For more 
 information please refer to `POconfig`.
+
+`N::Int`: Total number of electrons.
 
 === Keyword argument(s) ===
 
 `printInfo::Bool`: Whether print out the information of iteration steps.
 """
-function optimizeParams!(pbs::Vector{<:ParamBox}, bs::Vector{<:AbstractGTBasisFuncs}, 
-                         nuc::Vector{String}, nucCoords::Vector{<:AbstractArray{Float64}}, 
-                         N::Int=getCharge(nuc), config::POconfig{M, T, F}=POconfig(); 
-                         printInfo::Bool=true) where {M, T, F}
+function optimizeParams!(pbs::Vector{<:ParamBox}, 
+                         bs::Union{Tuple{Vararg{<:AbstractGTBasisFuncs}}, 
+                                   Vector{<:AbstractGTBasisFuncs}}, 
+                         nuc::Union{NTuple{NN, String}, Vector{String}}, 
+                         nucCoords::Union{NTuple{NN, NTuple{3, Float64}}, 
+                                          Vector{<:AbstractArray{<:Real}}}, 
+                         config::POconfig{M, T, F}=POconfig(), N::Int=getCharge(nuc); 
+                         printInfo::Bool=true) where 
+                        {NN, M, T, F}
     tAll = @elapsed begin
 
         i = 0
@@ -239,17 +249,15 @@ end
 
 """
 
-    optimizeParams!(pbs::Array{<:ParamBox, 1}, 
-                    bs::Array{<:AbstractGTBasisFuncs, 1}, 
-                    nuc::Array{String, 1}, 
-                    nucCoords::Array{<:AbstractArray, 1}, 
-                    config::POconfig{M, T, F}=POconfig(), 
-                    N::Int=getCharge(nuc); 
-                    printInfo::Bool=true
-    Es::Matrix{Float64}, pars::Matrix{Float64}, grads::Matrix{Float64}
-
-Another method of `optimizeParams!`.
+    optimizeParams!(pbs::Vector{<:ParamBox}, 
+                    bs::Union{Tuple{Vararg{<:AbstractGTBasisFuncs}}, 
+                              Vector{<:AbstractGTBasisFuncs}}, 
+                    nuc::Union{NTuple{NN, String}, Vector{String}}, 
+                    nucCoords::Union{NTuple{NN, NTuple{3, Float64}}, 
+                                     Vector{<:AbstractArray{<:Real}}}, 
+                    N::Int=getCharge(nuc), config::POconfig{M, T, F}=POconfig(); 
+                    printInfo::Bool=true) where {NN, M, T, F} -> 
+    Es::Vector{Float64}, pars::Matrix{Float64}, grads::Matrix{Float64}
 """
-optimizeParams!(pbs, bs, nuc, nucCoords, config::POconfig=POconfig(), 
-                N::Int=getCharge(nuc); printInfo=true) = 
-optimizeParams!(pbs, bs, nuc, nucCoords, N, config; printInfo)
+optimizeParams!(pbs, bs, nuc, nucCoords, N::Int, config=POconfig(); printInfo=true) = 
+optimizeParams!(pbs, bs, nuc, nucCoords, config, N; printInfo)
