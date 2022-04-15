@@ -348,7 +348,8 @@ BasisFuncs(cen, (g,), ijks, normalizeGTO)
 
 """
 
-    genBasisFunc(center::Union{AbstractArray, NTuple{3, ParamBox}, Missing}, 
+    genBasisFunc(center::Union{AbstractArray{<:Real}, NTuple{3, ParamBox}, NTuple{3, Real}, 
+                               Missing}, 
                  args..., kws...) -> 
     B where {B<:Union{FloatingGTBasisFuncs, Array{<:FloatingGTBasisFuncs}}}
 
@@ -530,7 +531,7 @@ genBasisFunc(cen, gs|>Tuple, args...; kws...)
 genBasisFunc(cen::NTuple{3, ParamBox}, g::GaussFunc, args...; kws...) = 
 genBasisFunc(cen, (g,), args...; kws...)
 
-function genBasisFunc(coord::AbstractArray, args...; kws...)
+function genBasisFunc(coord::Union{AbstractArray{<:Real}, NTuple{3, Real}}, args...; kws...)
     @assert length(coord) == 3 "The dimension of the center should be 3."
     x = ParamBox(convertNumber(coord[1]), XParamSym)
     y = ParamBox(convertNumber(coord[2]), YParamSym)
@@ -1327,13 +1328,14 @@ subshell information for the `BasisFunc`. E.g.:
 ```
 """
 function genBFuncsFromText(content::String;
-                           adjustContent::Bool=false,
+                           adjustContent::Bool=false, 
                            adjustFunction::F=sciNotReplace, 
                            excludeFirstNlines::Int=0, excludeLastNlines::Int=0, 
-                           center::Union{AbstractArray, 
-                                         NTuple{N, ParamBox}, 
+                           center::Union{AbstractArray{<:Real}, 
+                                         NTuple{3, Real}, 
+                                         NTuple{3, ParamBox}, 
                                          Missing}=missing, 
-                           unlinkCenter::Bool=false) where {N, F<:Function}
+                           unlinkCenter::Bool=false) where {F<:Function}
     adjustContent && (content = adjustFunction(content))
     lines = split.(content |> IOBuffer |> readlines)
     lines = lines[1+excludeFirstNlines : end-excludeLastNlines]
@@ -1345,7 +1347,7 @@ function genBFuncsFromText(content::String;
         ng = data[i][2] |> Int
         centerOld = center
         if center isa Missing && i != 1 && data[i-1][1] == "X"
-            center = data[i-1][2:end]
+            center = convert(Vector{Float64}, data[i-1][2:end])
         end
         if data[i][1] == "SP"
             gs2 = GaussFunc[]
