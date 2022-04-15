@@ -114,7 +114,7 @@ function ∂HFenergy(bs::Union{NTuple{BN, BT}, NTuple{BN, AbstractGTBasisFuncs}}
                    par::ParamBox, C::NTuple{HFTS, Matrix{Float64}}, 
                    S::Matrix{Float64}, nuc::NTuple{NN, String}, 
                    nucCoords::NTuple{NN, NTuple{3,Float64}}, 
-                   nElectron::Union{Int, NTuple{2, Int}}) where 
+                   nElectron::NTuple{HFTS, Int}) where 
                   {BN, BT<:AbstractGTBasisFuncs, HFTS, NN}
     Xinv = sqrt(S)::Matrix{Float64}
     cH = (i, j)->getCoreHij(i, j, nuc, nucCoords)
@@ -137,8 +137,6 @@ function gradHFenergy(bs::Union{NTuple{BN, BT}, NTuple{BN, AbstractGTBasisFuncs}
     bs = arrayToTuple(bs)
     nuc = arrayToTuple(nuc)
     nucCoords = genTupleCoords(nucCoords)
-    if length(C) == 2 && nElectron isa Int
-        nElectron = (nElectron÷2, nElectron-nElectron÷2)
-    end
-    ∂HFenergy.(Ref(bs), par, Ref(C), Ref(S), Ref(nuc), Ref(nucCoords), Ref(nElectron))
+    Ns = splitSpins(Val(HFTS), nElectron)
+    ∂HFenergy.(Ref(bs), par, Ref(C), Ref(S), Ref(nuc), Ref(nucCoords), Ref(Ns))
 end

@@ -107,24 +107,29 @@ end
 
 POconfig(a1::Symbol, args...) = POconfig(Val(a1), args...)
 
-const defaultPOconfigPars = Any[Val(:HF), HFconfig(), NaN, 1e-5, 500, gradDescent!]
+const defaultPOconfigPars = Any[Val(:HF), defaultHFconfig, NaN, 1e-5, 500, gradDescent!]
 
 POconfig(t::NamedTuple) = genNamedTupleC(:POconfig, defaultPOconfigPars)(t)
 
 POconfig(;kws...) = 
 length(kws) == 0 ? POconfig(defaultPOconfigPars...) : POconfig(kws|>NamedTuple)
 
+const defaultPOconfig = POconfig()
+
+const defaultPOconfigStr = "POconfig()"
+
 
 """
 
-    genOFmethod(POmethod::Val{:HF}, config::HFconfig=HFconfig()) -> NTuple{2, Function}
+    genOFmethod(POmethod::Val{:HF}, config::HFconfig=$(defaultHFconfigStr)) -> 
+    NTuple{2, Function}
 
 Generate the functions to calculate the value and gradient respectively of the desired 
 objective function. Default method is HF energy. To implement your own method for parameter 
 optimization, you can import `genOFmethod` and add new methods with different `POmethod` 
 which should have the same value with the field `method` in the corresponding `POconfig`.
 """
-function genOFmethod(::Val{:HF}, config::HFconfig{HFT}=HFconfig()) where {HFT}
+function genOFmethod(::Val{:HF}, config::HFconfig{HFT}=defaultHFconfig) where {HFT}
     fVal = @inline function (gtb, nuc, nucCoords, N)
         res = runHF(gtb, nuc, nucCoords, N, config, printInfo=false)
         res.Ehf, res.C
@@ -141,7 +146,7 @@ end
                     nuc::Union{NTuple{NN, String}, Vector{String}}, 
                     nucCoords::Union{NTuple{NN, NTuple{3, Float64}}, 
                                      Vector{<:AbstractArray{<:Real}}}, 
-                    config::POconfig{M, T, F}=POconfig(), N::Int=getCharge(nuc); 
+                    config::POconfig{M, T, F}=$(defaultPOconfigStr), N::Int=getCharge(nuc); 
                     printInfo::Bool=true) where {NN, M, T, F} -> 
     Es::Vector{Float64}, pars::Matrix{Float64}, grads::Matrix{Float64}
 
@@ -176,7 +181,7 @@ function optimizeParams!(pbs::Vector{<:ParamBox},
                          nuc::Union{NTuple{NN, String}, Vector{String}}, 
                          nucCoords::Union{NTuple{NN, NTuple{3, Float64}}, 
                                           Vector{<:AbstractArray{<:Real}}}, 
-                         config::POconfig{M, T, F}=POconfig(), N::Int=getCharge(nuc); 
+                         config::POconfig{M, T, F}=defaultPOconfig, N::Int=getCharge(nuc); 
                          printInfo::Bool=true) where 
                         {NN, M, T, F}
     tAll = @elapsed begin
@@ -255,9 +260,9 @@ end
                     nuc::Union{NTuple{NN, String}, Vector{String}}, 
                     nucCoords::Union{NTuple{NN, NTuple{3, Float64}}, 
                                      Vector{<:AbstractArray{<:Real}}}, 
-                    N::Int=getCharge(nuc), config::POconfig{M, T, F}=POconfig(); 
+                    N::Int=getCharge(nuc), config::POconfig{M, T, F}=$(defaultPOconfigStr); 
                     printInfo::Bool=true) where {NN, M, T, F} -> 
     Es::Vector{Float64}, pars::Matrix{Float64}, grads::Matrix{Float64}
 """
-optimizeParams!(pbs, bs, nuc, nucCoords, N::Int, config=POconfig(); printInfo=true) = 
+optimizeParams!(pbs, bs, nuc, nucCoords, N::Int, config=defaultPOconfig; printInfo=true) = 
 optimizeParams!(pbs, bs, nuc, nucCoords, config, N; printInfo)
