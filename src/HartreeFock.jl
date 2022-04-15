@@ -5,7 +5,7 @@ using PiecewiseQuadratics: indicator
 using SeparableOptimization
 using Combinatorics: powerset
 
-getXcore1(S::Matrix{Float64}) = S^(-0.5) |> Array
+getXcore1(S::Matrix{Float64}) = Hermitian(S)^(-0.5) |> Array
 
 precompile(getXcore1, (Matrix{Float64},))
 
@@ -122,7 +122,7 @@ const guessCmethods =
 @inline guessC(Cs::Tuple{Vararg{Matrix}}, _...) = itself(Cs)
 
 
-getD(C::Matrix{Float64}, Nˢ::Int) = @views (C[:,1:Nˢ]*C[:,1:Nˢ]') |> Hermitian |> Array
+getD(C::Matrix{Float64}, Nˢ::Int) = @views (C[:,1:Nˢ]*C[:,1:Nˢ]')
 # Nˢ: number of electrons with the same spin.
 
 @inline getD(X::Matrix{Float64}, F::Matrix{Float64}, Nˢ::Int) = getD(getC(X, F), Nˢ)
