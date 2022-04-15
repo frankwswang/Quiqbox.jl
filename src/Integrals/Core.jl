@@ -724,7 +724,7 @@ end
 @inline function getCompositeInt(::FunctionType{F}, 
                                  bs::NTuple{N, CompositeGTBasisFuncs{<:Any, 1}}, 
                                  optArgs...) where {F, N}
-    range = Iterators.product(unpackBasisFuncs.(bs)...)
+    range = Iterators.product(unpackBasis.(bs)...)
     ( map(x->getfield(Quiqbox, F)(x..., optArgs...)::Float64, range) |> sum )::Float64
 end
 

@@ -578,7 +578,7 @@ renameFunc(fName::String, f) = renameFunc(Symbol(fName), f)
 Recursively find the final value using the value of each iteration as the key for the 
 next search.
 """
-function recursivelyGet(dict::Dict{K, V}, startKey::K, default=Vector{V}(undef, 1)[]) where 
+function recursivelyGet(dict::Dict{K, V}, startKey::K, default=Array{V}(undef, 1)[]) where 
                        {K, V}
     res = default
     val = get(dict, startKey, missing)

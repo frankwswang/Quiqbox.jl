@@ -306,6 +306,8 @@ BasisFunc(cen, gs, (ijk,), normalizeGTO)
 BasisFunc(cen, g::GaussFunc, ijk, normalizeGTO=false) = 
 BasisFunc(cen, (g,), ijk, normalizeGTO)
 
+BasisFunc(bf::BasisFunc) = itself(bf)
+
 
 """
 
@@ -345,6 +347,12 @@ end
 
 BasisFuncs(cen, g::GaussFunc, ijks, normalizeGTO=false) = 
 BasisFuncs(cen, (g,), ijks, normalizeGTO)
+
+BasisFuncs(bfs::BasisFuncs) = itself(bfs)
+
+BasisFunc(bfs::BasisFuncs{<:Any, <:Any, 1}) = 
+BasisFunc(bfs.center, bfs.gauss, bfs.ijk, bfs.normalizeGTO)
+
 
 """
 
@@ -620,7 +628,8 @@ GTBasis(bs::Vector{<:CompositeGTBasisFuncs{<:Any, 1}}) =
 GTBasis(Tuple(bs), overlaps(bs), elecKinetics(bs), eeInteractions(bs))
 
 GTBasis(bs::Union{Tuple{Vararg{<:AbstractGTBasisFuncs}}, Vector{<:AbstractGTBasisFuncs}}) = 
-GTBasis(hcat(decompose.(bs)...)|>Tuple, overlaps(bs), elecKinetics(bs), eeInteractions(bs))
+GTBasis(hcat(decomposeCore.(Val(false), bs)...)|>Tuple, 
+        overlaps(bs), elecKinetics(bs), eeInteractions(bs))
 
 
 """
@@ -679,44 +688,45 @@ centerCoordOf(bf::FloatingGTBasisFuncs) = Float64[outValOf(i) for i in bf.center
 
 """
 
-    BasisFuncMix{BN, GN} <: CompositeGTBasisFuncs{BN, 1}
+    BasisFuncMix{BN, BT, GN} <: CompositeGTBasisFuncs{BN, 1}
 
 Sum of multiple `FloatingGTBasisFuncs` without any reformulation, treated as one basis 
 Function in the integral calculation.
 
 ≡≡≡ Field(s) ≡≡≡
 
-`BasisFunc::NTuple{BN, FloatingGTBasisFuncs{<:Any, <:Any, 1}}`: Inside basis functions
+`BasisFunc::NTuple{BN, BT}`: Inside basis functions.
 
 `param::Tuple{Vararg{<:ParamBox}}`: Inside parameters.
 
 ≡≡≡ Initialization Method(s) ≡≡≡
 
-    BasisFuncMix(bfs::Array{<:FloatingGTBasisFuncs{𝑙, GN, 1} where {𝑙, GN}, 1}) ->
-    BasisFuncMix{BN, GN}
+    BasisFuncMix(bfs::Vector{T}) where {T<:FloatingGTBasisFuncs{<:Any, <:Any, 1}} ->
+    BasisFuncMix{<:Any, BT}
 
 """
-struct BasisFuncMix{BN, GN} <: CompositeGTBasisFuncs{BN, 1}
-    BasisFunc::NTuple{BN, FloatingGTBasisFuncs{<:Any, <:Any, 1}}
-    param::Tuple{Vararg{<:ParamBox}}
-    function BasisFuncMix(bfs::Vector{<:FloatingGTBasisFuncs{𝑙, GN, 1} where {𝑙, GN}})
+struct BasisFuncMix{BN, BT, GN} <: CompositeGTBasisFuncs{BN, 1}
+    BasisFunc::NTuple{BN, BT}
+    param::Tuple{Vararg{ParamBox}}
+    function BasisFuncMix(bfs::Vector{T}) where {T<:BasisFunc}
         pars = ParamBox[]
         for bf in bfs
             append!(pars, bf.param)
         end
-        new{length(bfs), [length(bf.gauss) for bf in bfs]|>sum}(bfs |> Tuple, pars |> Tuple)
+        new{length(bfs), T, [length(bf.gauss) for bf in bfs]|>sum}(bfs|>Tuple, pars|>Tuple)
     end
 end
+
+BasisFuncMix(bfs::Vector{T}) where {T<:FloatingGTBasisFuncs{<:Any, <:Any, 1}} = 
+BasisFuncMix(BasisFunc.(bfs))
 BasisFuncMix(bf::BasisFunc) = BasisFuncMix([bf])
 BasisFuncMix(bfs::BasisFuncs) = BasisFuncMix.(decompose(bfs))
 BasisFuncMix(bfm::BasisFuncMix) = itself(bfm)
 
 
-unpackBasisFuncs(bfm::BasisFuncMix{BN, GN}) where {BN, GN} = bfm.BasisFunc |> collect
-unpackBasisFuncs(bf::FloatingGTBasisFuncs) = typeof(bf)[bf]
-unpackBasisFuncs(::Any) = FloatingGTBasisFuncs[]
-
-unpackBasis(bfm::BasisFuncMix{BN, GN}) where {BN, GN} = bfm.BasisFunc |> collect
+unpackBasis(bfm::BasisFuncMix{BN, BT, GN}) where {BN, BT, GN} = bfm.BasisFunc |> collect
+unpackBasis(bf::FloatingGTBasisFuncs) = typeof(bf)[bf]
+unpackBasis(::Any) = FloatingGTBasisFuncs[]
 
 function sumOfCore(bfs::Array{<:BasisFunc})::CompositeGTBasisFuncs{<:Any, 1}
     arr1 = convert(Vector{BasisFunc}, sortBasisFuncs(bfs))
@@ -733,12 +743,12 @@ function sumOfCore(bfs::Array{<:BasisFunc})::CompositeGTBasisFuncs{<:Any, 1}
     if length(arr2) == 0
         arr1[]
     else
-        vcat((vcat(arr2, arr1) .|> unpackBasisFuncs)...) |> BasisFuncMix
+        vcat((vcat(arr2, arr1) .|> unpackBasis)...) |> BasisFuncMix
     end
 end
 
 sumOfCore(bfms::Array{<:CompositeGTBasisFuncs{<:Any, 1}}) = 
-vcat((bfms .|> unpackBasisFuncs)...) |> sumOfCore
+vcat((bfms .|> unpackBasis)...) |> sumOfCore
 
 function sumOf(bs::Array)
     length(bs) == 1 && (return bs[])
@@ -862,26 +872,22 @@ function add(bf1::BasisFunc{𝑙, GN1},
     end
 end
 
-function add(bf1::BasisFunc{<:Any, GN1}, 
-             bf2::BasisFunc{<:Any, GN2})::BasisFuncMix{2, GN1+GN2} where {GN1, GN2}
+function add(bf1::BasisFunc{<:Any, GN1}, bf2::BasisFunc{<:Any, GN2}) where {GN1, GN2}
     BasisFuncMix([bf1, bf2] |> sortBasisFuncs)
 end
 
-add(bfm::BasisFuncMix{BN, GN}) where {BN, GN} = unpackBasisFuncs(bfm) |> sumOf
+add(bfm::BasisFuncMix{BN}) where {BN} = unpackBasis(bfm) |> sumOf
 
-add(bf1::BasisFuncMix{1, GN1}, bf2::BasisFunc{𝑙, GN2}) where {𝑙, GN1, GN2} = 
-add(bf1.BasisFunc[1], bf2)
+add(bf1::BasisFuncMix{1}, bf2::BasisFunc{𝑙}) where {𝑙} = add(bf1.BasisFunc[1], bf2)
 
-add(bf1::BasisFunc{𝑙, GN1}, bf2::BasisFuncMix{1, GN2}) where {𝑙, GN1, GN2} = 
-add(bf2, bf1)
+add(bf1::BasisFunc{𝑙}, bf2::BasisFuncMix{1}) where {𝑙} = add(bf2, bf1)
 
 add(bf::BasisFunc, bfm::BasisFuncMix{BN}) where {BN} = 
 vcat(bf, bfm.BasisFunc |> collect) |> sumOf
 
 add(bfm::BasisFuncMix{BN}, bf::BasisFunc) where {BN} = add(bf, bfm)
 
-add(bf1::BasisFuncMix{1, GN1}, bf2::BasisFuncMix{1, GN2}) where {GN1, GN2} = 
-add(bf1.BasisFunc[1], bf2.BasisFunc[1])
+add(bf1::BasisFuncMix{1}, bf2::BasisFuncMix{1}) = add(bf1.BasisFunc[1], bf2.BasisFunc[1])
 
 add(bf::BasisFuncMix{1}, bfm::BasisFuncMix{BN}) where {BN} = add(bf.BasisFunc[1], bfm)
 
@@ -1074,15 +1080,12 @@ function mul(coeff::Real, bf::BasisFunc{𝑙, GN};
     mul(bf, coeff; normalizeGTO)
 end
 
-function mul(bfm::BasisFuncMix{BN, GN}, coeff::Real; 
-             normalizeGTO::Union{Bool, Missing}=missing)::BasisFuncMix{BN, GN} where 
-            {BN, GN}
-    BasisFuncMix(mul.(bfm.BasisFunc, coeff; normalizeGTO) |> collect)
+function mul(bfm::T, coeff::Real; normalizeGTO::Union{Bool, Missing}=missing) where 
+            {T<:BasisFuncMix}
+    BasisFuncMix(mul.(bfm.BasisFunc, coeff; normalizeGTO) |> collect)::T
 end
 
-function mul(coeff::Real, bfm::BasisFuncMix{BN, GN}; 
-             normalizeGTO::Union{Bool, Missing}=missing)::BasisFuncMix{BN, GN} where 
-            {BN, GN}
+function mul(coeff::Real, bfm::BasisFuncMix; normalizeGTO::Union{Bool, Missing}=missing)
     mul(bfm, coeff; normalizeGTO)
 end
 
@@ -1106,36 +1109,34 @@ function mul(bf1::BasisFunc{𝑙1, GN1}, bf2::BasisFunc{𝑙2, GN2};
     sumOf(bs)
 end
 
-mul(bf1::BasisFuncMix{1, GN1}, bf2::BasisFunc{<:Any, GN2}; 
-    normalizeGTO::Union{Bool, Missing}=missing) where {GN1, GN2} = 
+mul(bf1::BasisFuncMix{1}, bf2::BasisFunc; normalizeGTO::Union{Bool, Missing}=missing) = 
 mul(bf1.BasisFunc[1], bf2; normalizeGTO)
 
-mul(bf1::BasisFunc{<:Any, GN1}, bf2::BasisFuncMix{1, GN2}; 
-normalizeGTO::Union{Bool, Missing}=missing) where {GN1, GN2} = 
+mul(bf1::BasisFunc, bf2::BasisFuncMix{1}; normalizeGTO::Union{Bool, Missing}=missing) = 
 mul(bf2, bf1; normalizeGTO)
 
-mul(bf::BasisFunc{<:Any, GN1}, bfm::BasisFuncMix{BN, GN2}; 
-    normalizeGTO::Union{Bool, Missing}=missing) where {BN, GN1, GN2} = 
+mul(bf::BasisFunc, bfm::BasisFuncMix{BN}; 
+    normalizeGTO::Union{Bool, Missing}=missing) where {BN} = 
 mul.(Ref(bf), bfm.BasisFunc; normalizeGTO) |> collect |> sumOf
 
-mul(bfm::BasisFuncMix{BN, GN1}, bf::BasisFunc{<:Any, GN2}; 
-    normalizeGTO::Union{Bool, Missing}=missing) where {BN, GN1, GN2} = 
+mul(bfm::BasisFuncMix{BN}, bf::BasisFunc; 
+    normalizeGTO::Union{Bool, Missing}=missing) where {BN} = 
 mul(bf, bfm; normalizeGTO)
 
-mul(bf1::BasisFuncMix{1, GN1}, bf2::BasisFuncMix{1, GN2}; 
-    normalizeGTO::Union{Bool, Missing}=missing) where {GN1, GN2} = 
+mul(bf1::BasisFuncMix{1}, bf2::BasisFuncMix{1}; 
+    normalizeGTO::Union{Bool, Missing}=missing) = 
 mul(bf1.BasisFunc[1], bf2.BasisFunc[1]; normalizeGTO)
 
-mul(bf::BasisFuncMix{1, GN1}, bfm::BasisFuncMix{BN, GN2}; 
-    normalizeGTO::Union{Bool, Missing}=missing) where {BN, GN1, GN2} = 
+mul(bf::BasisFuncMix{1}, bfm::BasisFuncMix{BN}; 
+    normalizeGTO::Union{Bool, Missing}=missing) where {BN} = 
 mul(bf.BasisFunc[1], bfm; normalizeGTO)
 
-mul(bfm::BasisFuncMix{BN, GN1}, bf::BasisFuncMix{1, GN2}; 
-    normalizeGTO::Union{Bool, Missing}=missing) where {BN, GN1, GN2} = 
+mul(bfm::BasisFuncMix{BN}, bf::BasisFuncMix{1}; 
+    normalizeGTO::Union{Bool, Missing}=missing) where {BN} = 
 mul(bf, bfm; normalizeGTO)
 
-function mul(bfm1::BasisFuncMix{BN1, GN1}, bfm2::BasisFuncMix{BN2, GN2}; 
-             normalizeGTO::Union{Bool, Missing}=missing) where {BN1, BN2, GN1, GN2}
+function mul(bfm1::BasisFuncMix{BN1}, bfm2::BasisFuncMix{BN2}; 
+             normalizeGTO::Union{Bool, Missing}=missing) where {BN1, BN2}
     bfms = CompositeGTBasisFuncs{<:Any, 1}[]
     for bf1 in bfm1.BasisFunc, bf2 in bfm2.BasisFunc
         push!(bfms, mul(bf1, bf2; normalizeGTO))
@@ -1169,46 +1170,46 @@ BasisFunc(bf.center, bf.gauss, bf.ijk[1]+didjdk, bf.normalizeGTO)
 
 """
 
-    decompose(bf::CompositeGTBasisFuncs; splitGaussFunc::Bool=false) -> Matrix{<:BasisFunc}
+    decompose(bf::CompositeGTBasisFuncs, splitGaussFunc::Bool=false) -> Matrix{<:BasisFunc}
 
 Decompose a `FloatingGTBasisFuncs` into an `Array` of `BasisFunc`s. Each column represents 
 one orbital of the input basis function(s). If `splitGaussFunc` is `true`, then each column 
 consists of the `BasisFunc`s each with only 1 `GaussFunc`.
 """
-function decompose(bf::FloatingGTBasisFuncs{𝑙, GN, ON}; 
-                   splitGaussFunc::Bool=false) where {𝑙, GN, ON}
-    if splitGaussFunc
-        nRow = GN
-        nG = 1
-        gs = bf.gauss
-    else
-        nRow = 1
-        nG = GN
-        gs = Ref(bf.gauss)
-    end
-    res = Array{BasisFunc{𝑙, nG}, 2}(undef, nRow, ON)
-    for (c, ijk) in zip(eachcol(res), bf.ijk)
-        c .= BasisFunc.(Ref(bf.center), gs, Ref(ijk), bf.normalizeGTO)
+decompose(bf::CompositeGTBasisFuncs, splitGaussFunc::Bool=false) = 
+decomposeCore(Val(splitGaussFunc), bf)
+
+function decomposeCore(::Val{false}, bf::FloatingGTBasisFuncs{𝑙, GN, ON}) where {𝑙, GN, ON}
+    res = Array{BasisFunc{𝑙, GN}}(undef, 1, ON)
+    for i in eachindex(res)
+        res[i] = BasisFunc(bf.center, bf.gauss, bf.ijk[i], bf.normalizeGTO)
     end
     res
 end
 
-function decompose(bf::FloatingGTBasisFuncs{𝑙, GN, 1}; 
-                   splitGaussFunc::Bool=false) where {𝑙, GN}
-    if splitGaussFunc
-        BasisFunc.(Ref(bf.center), collect(bf.gauss), Ref(bf.ijk), bf.normalizeGTO)
-    else
-        [bf]
+function decomposeCore(::Val{true}, bf::FloatingGTBasisFuncs{𝑙, GN, ON}) where {𝑙, GN, ON}
+    res = Array{BasisFunc{𝑙, 1}}(undef, GN, ON)
+    for (c, ijk) in zip(eachcol(res), bf.ijk)
+        c .= BasisFunc.(Ref(bf.center), bf.gauss, Ref(ijk), bf.normalizeGTO)
     end
+    res
 end
 
-function decompose(bfm::BasisFuncMix; splitGaussFunc::Bool=false)
-    if splitGaussFunc
-        bfs = decompose.(bfm.BasisFunc; splitGaussFunc)
-        vcat(bfs...)
-    else
-        [bfm]
+decomposeCore(::Val{false}, bfm::BasisFuncMix) = reshape([bfm], 1, 1)
+
+getSGFtype(::Type{<:BasisFunc}) = BasisFunc{<:Any, 1}
+getSGFtype(::Type{BasisFunc{𝑙}}) where {𝑙} = BasisFunc{𝑙, 1}
+
+function decomposeCore(::Val{true}, bfm::BasisFuncMix{BN, BT, GN}) where {BN, BT, GN}
+    res = Array{getSGFtype(BT)}(undef, GN, 1)
+    i = 1
+    for j = 1:BN
+        bf = bfm.BasisFunc[j]
+        iNew = i + length(bf.gauss)
+        res[i:iNew-1] = decomposeCore(Val(true), bf)
+        i = iNew
     end
+    res
 end
 
 
@@ -1498,17 +1499,15 @@ function copyBasis(g::GaussFunc, copyOutVal::Bool=true)::GaussFunc
     GaussFunc(pbs...)
 end
 
-function copyBasis(bfs::FloatingGTBasisFuncs{𝑙, GN, ON}, 
-                   copyOutVal::Bool=true)::FloatingGTBasisFuncs{𝑙, GN, ON} where {𝑙, GN, ON}
+function copyBasis(bfs::T, copyOutVal::Bool=true) where {T<:FloatingGTBasisFuncs}
     cen = bfs.center .|> (copyOutVal ? outValCopy : inVarCopy)
     gs = copyBasis.(bfs.gauss, copyOutVal)
-    genBasisFunc(cen, gs, bfs.ijk; normalizeGTO=bfs.normalizeGTO)
+    genBasisFunc(cen, gs, bfs.ijk; normalizeGTO=bfs.normalizeGTO)::T
 end
 
-function copyBasis(bfm::BasisFuncMix{BN, GN}, 
-                   copyOutVal::Bool=true)::BasisFuncMix{BN, GN} where {BN, GN}
+function copyBasis(bfm::T, copyOutVal::Bool=true) where {T<:BasisFuncMix}
     bfs = copyBasis.(bfm.BasisFunc, copyOutVal)
-    BasisFuncMix(bfs |> collect)
+    BasisFuncMix(bfs |> collect)::T
 end
 
 
@@ -1728,7 +1727,7 @@ end
 
 """
 
-    expressionOf(bf::CompositeGTBasisFuncs; splitGaussFunc::Bool=false) -> 
+    expressionOf(bf::CompositeGTBasisFuncs, splitGaussFunc::Bool=false) -> 
     Array{<:Symbolics.Num, 2}
 
 Return the expression(s) of a given `CompositeGTBasisFuncs` (e.g. `BasisFuncMix` or 
@@ -1736,7 +1735,7 @@ Return the expression(s) of a given `CompositeGTBasisFuncs` (e.g. `BasisFuncMix`
 different orbitals. If `splitGaussFunc` is `true`, the column(s) will be expanded 
 vertically such that the entries are `GaussFunc` inside the corresponding orbital.
 """
-expressionOf(bf::CompositeGTBasisFuncs; splitGaussFunc::Bool=false) = 
+expressionOf(bf::CompositeGTBasisFuncs, splitGaussFunc::Bool=false) = 
 expressionOfCore(bf, true, false, splitGaussFunc)
 
 """
@@ -1893,7 +1892,7 @@ end
 
 function diffInfoToBasisFunc(bf::CompositeGTBasisFuncs{BN, 1}, 
                              info::Vector{Vector{Tuple{Float64, Vector{Int}}}}) where {BN}
-    bs = decompose(bf, splitGaussFunc=true)
+    bs = decomposeCore(Val(true), bf)
     bss = map(info, bs) do gInfo, bf
         map(gInfo) do dxyz
            sgf = copyBasis(bf)

@@ -85,7 +85,7 @@ function derivativeCore(FoutputIsVector::Val{B},
                         oneBodyF::FunctionType{F1}, twoBodyF::FunctionType{F2}) where 
                        {B, BN, BT<:AbstractGTBasisFuncs, F1, F2}
     # ijkl in chemists' notation of spatial bases (ij|kl).
-    bfs = Tuple(hcat(decompose.(bs)...))
+    bfs = Tuple(hcat(decomposeCore.(Val(false), bs)...))
     ∂bfs = deriveBasisFunc.(bfs, par)
     bsSize = basisSize.(bs) |> sum
     ∂S = ones(bsSize, bsSize)

@@ -1,6 +1,6 @@
 using Test
 using Quiqbox
-using Quiqbox: isFull, BasisFuncMix, unpackBasisFuncs, inSymbols, varVal, ElementNames, 
+using Quiqbox: isFull, BasisFuncMix, unpackBasis, inSymbols, varVal, ElementNames, 
                sortBasisFuncs, ParamList, sumOf, expressionOfCore, mergeGaussFuncs, 
                gaussProd, getNorms
 using Symbolics
@@ -400,10 +400,10 @@ bf_os2S = genBasisFunc([0,0,0], (2,1), ijk.+didjdk, normalizeGTO=true)
 @test hasEqual(shift(bf_os2, didjdk), bf_os2S)
 
 
-# function unpackBasisFuncs
-@test unpackBasisFuncs(bfm1)[1] == bf1
-@test unpackBasisFuncs(bf1) == [bf1]
-@test unpackBasisFuncs(0) == []
+# function unpackBasis
+@test unpackBasis(bfm1)[1] == bf1
+@test unpackBasis(bf1) == [bf1]
+@test unpackBasis(0) == []
 
 
 # function decompose
@@ -411,18 +411,18 @@ bf_d_1 = genBasisFunc([1,0,0], (1, 0.5))
 bf_d_2 = genBasisFunc([1,0,0], ([2,1], [0.1, 0.5]))
 bf_d_3 = genBasisFunc([1,1,0], ([2,1], [0.1, 0.2]), "P")
 bm_d_1 = BasisFuncMix([bf_d_1, bf_d_2])
-dm1 = [bf_d_1]
+dm1 = reshape([bf_d_1], 1, 1)
 @test hasIdentical(decompose(bf_d_1), dm1)
-@test hasEqual(decompose(bf_d_1, splitGaussFunc=true), dm1)
-@test hasEqual(decompose(bf_d_2), [bf_d_2])
-dm2 = [genBasisFunc([1,0,0], (2, 0.1)), bf_d_1]
-@test hasEqual(decompose(bf_d_2, splitGaussFunc=true), dm2)
+@test hasEqual(decompose(bf_d_1, true), dm1)
+@test hasEqual(decompose(bf_d_2), reshape([bf_d_2], 1, 1))
+dm2 = reshape([genBasisFunc([1,0,0], (2, 0.1)), bf_d_1], 2, 1)
+@test hasEqual(decompose(bf_d_2, true), dm2)
 @test hasEqual(decompose(bf_d_3), reshape(bf_d_3[:], 1, 3))
-@test hasEqual(decompose(bf_d_3, splitGaussFunc=true), 
-               hcat(decompose.(bf_d_3[:], splitGaussFunc=true)...))
-@test hasIdentical(decompose(bm_d_1), [bm_d_1])
-@test hasEqual(decompose(bm_d_1, splitGaussFunc=true), 
-               vcat(decompose.(bm_d_1.BasisFunc, splitGaussFunc=true)...))
+@test hasEqual(decompose(bf_d_3, true), 
+               hcat(decompose.(bf_d_3[:], true)...))
+@test hasIdentical(decompose(bm_d_1), reshape([bm_d_1], 1, 1))
+@test hasEqual(decompose(bm_d_1, true), 
+               vcat(decompose.(bm_d_1.BasisFunc, true)...))
 
 
 # function basisSize
