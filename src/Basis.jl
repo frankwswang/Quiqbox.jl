@@ -1584,32 +1584,23 @@ end
 
 """
 
-    getVarCore(pb::ParamBox, expandNonDifferentiable::Bool=false) -> Array{Pair, 1}
+    getVarCore(pb::ParamBox{T}, expandNonDifferentiable::Bool=false) -> 
+    Vector{Pair{Symbolics.Num, T}}
 
 Core function of `getVar`, which returns the mapping relations inside the parameter 
 container. `expandNonDifferentiable` determines whether expanding the mapping relations of 
 non-differentiable variable (parameters).
 """
 function getVarCore(pb::ParamBox, expandNonDifferentiable::Bool=false)
-    vNum = outSymOf(pb)
-    f = pb.map
     if pb.canDiff[] || expandNonDifferentiable
         ivNum = inSymOf(pb)
-        expr = f(ivNum)
-        res = Pair{Symbolics.Num, Real}[ivNum => pb.data[]]
-        fNum = getFuncNum(f, ivNum)
-        # fNum = Symbolics.variable(f|>nameOf, T=Symbolics.FnType{Tuple{Any}, Real})(ivNum)
-        pushfirst!(res, fNum=>expr, expr=>pb())
-        !(pb.canDiff[]) && pushfirst(res, vNum=>fNum)
-        res |> unique!
+        fNum = getFuncNum(pb.map, ivNum)
+        res = Pair{Symbolics.Num, Real}[fNum=>pb(), ivNum => pb.data[]]
     else
+        vNum = outSymOf(pb)
         res = Pair{Symbolics.Num, Real}[vNum => pb()]
     end
-    res
 end
-
-getVarCore(pb::ParamBox{T, V, FLevel(itself)}, _::Bool=false) where {T, V} = 
-[inSymValOf(pb)]
 
 """
 
