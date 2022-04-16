@@ -632,8 +632,8 @@ strs_gv1 = getindex.(pairs_gv1, 1) .|> string
 strs_gv2 = getindex.(pairs_gv1, 2) .|> string
 
 @test strs_gv1[1][1:3] == "f_α" && strs_gv1[1][end-8:end] == "(x_α₂)"
-@test strs_gv1[2:end] == ["x_α₂", "x_α₂^2"]
-@test strs_gv2 == ["x_α₂^2", "1.05", "1.1025"]
+@test strs_gv1[2:end] == ["x_α₂"]
+@test strs_gv2 == ["1.1025", "1.05"]
 
 @test getVarDict(gf_gv1) == Dict( Pair.(Symbolics.variable.([:α, :d], fill(1, 2)), 
                                         [2.0, 1.0]) )
