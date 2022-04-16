@@ -567,11 +567,16 @@ function replaceSymbol(sym::Symbol, pair::Pair{String, String}; count::Int=typem
 end
 
 
-function renameFunc(fName::Symbol, f::F) where {F<:Function}
-    @eval ($(fName))(a...; b...) = $f(a...; b...)
+function renameFunc(fName::Symbol, f::F, returnType::Type{T}, N::Int=1) where 
+                   {F<:Function, T}
+    @eval ($(fName))(a::Vararg{$T, $N}) = $f(a...)::$T
 end
 
-renameFunc(fName::String, f) = renameFunc(Symbol(fName), f)
+function renameFunc(fName::Symbol, f::F, N::Int=1) where {F<:Function}
+    @eval ($(fName))(a::Vararg{<:Any, $N}) where {T} = $f(a...)
+end
+
+renameFunc(fName::String, args...) = renameFunc(Symbol(fName), args...)
 
 
 """
@@ -691,24 +696,24 @@ end
 
 # Product Function
 struct Pf{C, F} <: ParameterizedFunction{Pf, F}
-    f::Function
+    f::F
 end
 
-Pf(c::Float64, f::Function) = Pf{c, nameOf(f)}(f)
+Pf(c::Float64, f::F) where {F<:Function} = Pf{c, F}(f)
 Pf(c::Float64, f::Pf{C, F}) where {C, F} = Pf{c*C, F}(f.f)
 Pf(c::Float64, ::Val{T}) where {T} = Pf{c, T}(getFunc(T, NaN))
 Pf(c::Float64, ::Val{Pf{C, F}}) where {C, F} = Pf{c*C, F}(getFunc(F, NaN))
 
 
-(f::Pf{C})(x::Real) where {C} = C * f.f(x)
-(::Type{Pf{C, F}})(x::Real) where {C, F} = C * getFunc(F, NaN)(x)
+(f::Pf{C, F})(x::Real) where {C, F} = Float64(C) * f.f(x)
+(::Type{Pf{C, F}})(x::Real) where {C, F} = Float64(C) * getFunc(F, NaN)(x)
 
-Pf(c::Float64, ::Pf{C, :itself}) where {C} = Pf{c*C, :itself}(itself)
-Pf(c::Float64, ::Val{:itself}) = Pf{c, :itself}(itself)
-Pf(c::Float64, ::Val{Pf{C, :itself}}) where {C} = Pf{c*C, :itself}(itself)
+Pf(c::Float64, ::Pf{C, typeof(itself)}) where {C} = Pf{c*C, typeof(itself)}(itself)
+Pf(c::Float64, ::Val{typeof(itself)}) = Pf{c, typeof(itself)}(itself)
+Pf(c::Float64, ::Val{Pf{C, typeof(itself)}}) where {C} = Pf{c*C, typeof(itself)}(itself)
 
-(f::Pf{C, :itself})(x::Real) where {C} = C * x
-(::Type{Pf{C, :itself}})(x::Real) where {C} = C * x
+(f::Pf{C, typeof(itself)})(x::Real) where {C} = Float64(C) * x
+(::Type{Pf{C, typeof(itself)}})(x::Real) where {C} = Float64(C) * x
 
 
 function getFunc(fSym::Symbol, failedResult=missing)
@@ -734,6 +739,8 @@ getFunc(f::Function, _=missing) = itself(f)
 getFunc(::Val{F}, failedResult=missing) where {F} = getFunc(F, failedResult)
 
 getFunc(::Val{:itself}, _=missing) = itself
+
+getFunc(::Type{F}, _=missing) where {F}= F.instance
 
 
 nameOf(f::ParameterizedFunction) = typeof(f)

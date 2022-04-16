@@ -65,7 +65,7 @@ with symbolic representation and automatic differentiation.
 `map`. It is for the case where the variable represented by the `ParamBox` is dependent on 
 another independent variable of which the value is the stored data in the container. After 
 initializing a `ParamBox`, e.g `pb1 = ParamBox(x, mapFunction=f)`, `pb[]` returns `x`, and 
-`pb()` returns `f(x)`. `mapFunction` is set to `$(itself)` in default, which is a dummy 
+`pb()` returns `f(x)::T`. `mapFunction` is set to `$(itself)` in default, which is a dummy 
 function that maps the data to itself.
 
 `canDiff` determines whether the mapped math variable is "marked" as differentiable (i.e., 
@@ -106,6 +106,7 @@ struct ParamBox{T, V, FL<:FLevel} <: DifferentiableParameter{ParamBox, T}
 
     function ParamBox{T, V}(f::F, data::Array{T, 0}, index, canDiff, 
                             dataName=:undef) where {T, V, F<:Function}
+        @assert Base.return_types(f, (T,))[1] == T
         dName = (dataName == :undef) ? Symbol("x_" * string(V)) : dataName
         new{T, V, FLevel(F)}(data, dName, f, canDiff, index)
     end
