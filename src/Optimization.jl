@@ -141,7 +141,7 @@ end
 """
 
     optimizeParams!(pbs::Vector{<:ParamBox}, 
-                    bs::Union{Tuple{Vararg{<:AbstractGTBasisFuncs}}, 
+                    bs::Union{Tuple{Vararg{AbstractGTBasisFuncs}}, 
                               Vector{<:AbstractGTBasisFuncs}}, 
                     nuc::Union{NTuple{NN, String}, Vector{String}}, 
                     nucCoords::Union{NTuple{NN, NTuple{3, Float64}}, 
@@ -157,7 +157,7 @@ The main function to optimize the parameters of a given basis set.
 `pbs::Array{<:ParamBox, 1}`: The parameters to be optimized that are extracted from the 
 basis set.
 
-`bs::Union{Tuple{Vararg{<:AbstractGTBasisFuncs}}, Vector{<:AbstractGTBasisFuncs}}`: Basis 
+`bs::Union{Tuple{Vararg{AbstractGTBasisFuncs}}, Vector{<:AbstractGTBasisFuncs}}`: Basis 
 set.
 
 `nuc::Union{NTuple{NN, String}, Vector{String}}`: The element symbols of the nuclei for the 
@@ -176,7 +176,7 @@ information please refer to `POconfig`.
 `printInfo::Bool`: Whether print out the information of iteration steps.
 """
 function optimizeParams!(pbs::Vector{<:ParamBox}, 
-                         bs::Union{Tuple{Vararg{<:AbstractGTBasisFuncs}}, 
+                         bs::Union{Tuple{Vararg{AbstractGTBasisFuncs}}, 
                                    Vector{<:AbstractGTBasisFuncs}}, 
                          nuc::Union{NTuple{NN, String}, Vector{String}}, 
                          nucCoords::Union{NTuple{NN, NTuple{3, Float64}}, 
@@ -255,7 +255,7 @@ end
 """
 
     optimizeParams!(pbs::Vector{<:ParamBox}, 
-                    bs::Union{Tuple{Vararg{<:AbstractGTBasisFuncs}}, 
+                    bs::Union{Tuple{Vararg{AbstractGTBasisFuncs}}, 
                               Vector{<:AbstractGTBasisFuncs}}, 
                     nuc::Union{NTuple{NN, String}, Vector{String}}, 
                     nucCoords::Union{NTuple{NN, NTuple{3, Float64}}, 

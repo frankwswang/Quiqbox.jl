@@ -265,16 +265,16 @@ convenient syntax, `.ijk[]` converts it to a `NTuple{3, Int}`.
 
 `normalizeGTO::Bool`: Whether the GTO`::GaussFunc` will be normalized in calculations.
 
-`param::Tuple{Vararg{<:ParamBox}}`： All the tunable parameters`::ParamBox` stored in the 
+`param::Tuple{Vararg{ParamBox}}`： All the tunable parameters`::ParamBox` stored in the 
 `BasisFunc`.
 
 ≡≡≡ Initialization Method(s) ≡≡≡
 
-    BasisFunc(center::Tuple{Vararg{<:ParamBox}}, gauss::NTuple{GN, GaussFunc}, 
+    BasisFunc(center::Tuple{Vararg{ParamBox}}, gauss::NTuple{GN, GaussFunc}, 
               ijk::NTuple{3, Int}, normalizeGTO::Bool) where {GN} -> 
     BasisFunc{𝑙, GN} where {𝑙}
 
-    BasisFunc(cen::Tuple{Vararg{<:ParamBox}}, gauss::GaussFunc, ijk::NTuple{3, Int}, 
+    BasisFunc(cen::Tuple{Vararg{ParamBox}}, gauss::GaussFunc, ijk::NTuple{3, Int}, 
               normalizeGTO::Bool) ->
     BasisFunc{𝑙, 1} where {𝑙}
 """
@@ -285,9 +285,9 @@ struct BasisFunc{𝑙, GN} <: FloatingGTBasisFuncs{𝑙, GN, 1}
     gauss::NTuple{GN, GaussFunc}
     ijk::Tuple{XYZTuple{𝑙}}
     normalizeGTO::Bool
-    param::Tuple{Vararg{<:ParamBox}}
+    param::Tuple{Vararg{ParamBox}}
 
-    function BasisFunc(cen::Tuple{Vararg{<:ParamBox}}, gs::NTuple{GN, GaussFunc}, 
+    function BasisFunc(cen::Tuple{Vararg{ParamBox}}, gs::NTuple{GN, GaussFunc}, 
                        ijk::Tuple{XYZTuple{𝑙}}, normalizeGTO::Bool) where {𝑙, GN}
         len = 3 + GN*2
         pars = Array{ParamBox}(undef, len)
@@ -325,9 +325,9 @@ struct BasisFuncs{𝑙, GN, ON} <: FloatingGTBasisFuncs{𝑙, GN, ON}
     gauss::NTuple{GN, GaussFunc}
     ijk::NTuple{ON, XYZTuple{𝑙}}
     normalizeGTO::Bool
-    param::Tuple{Vararg{<:ParamBox}}
+    param::Tuple{Vararg{ParamBox}}
 
-    function BasisFuncs(cen::Tuple{Vararg{<:ParamBox}}, gs::NTuple{GN, GaussFunc}, 
+    function BasisFuncs(cen::Tuple{Vararg{ParamBox}}, gs::NTuple{GN, GaussFunc}, 
                         ijks::NTuple{ON, XYZTuple{𝑙}}, normalizeGTO::Bool=false) where 
                        {𝑙, GN, ON}
         ss = SubshellXYZsizes[𝑙+1]
@@ -597,7 +597,7 @@ when nuclei and their coordinates of same `DataType` are input.
             Te::Matrix{<:Number}, eeI::Array{<:Number, 4}) -> 
     GTBasis
 
-    GTBasis(basis::Union{Tuple{Vararg{<:AbstractGTBasisFuncs}}, 
+    GTBasis(basis::Union{Tuple{Vararg{AbstractGTBasisFuncs}}, 
                          Vector{<:AbstractGTBasisFuncs}}) -> 
     GTBasis
 
@@ -632,7 +632,7 @@ end
 GTBasis(bs::Vector{<:CompositeGTBasisFuncs{<:Any, 1}}) = 
 GTBasis(Tuple(bs), overlaps(bs), elecKinetics(bs), eeInteractions(bs))
 
-GTBasis(bs::Union{Tuple{Vararg{<:AbstractGTBasisFuncs}}, Vector{<:AbstractGTBasisFuncs}}) = 
+GTBasis(bs::Union{Tuple{Vararg{AbstractGTBasisFuncs}}, Vector{<:AbstractGTBasisFuncs}}) = 
 GTBasis(hcat(decomposeCore.(Val(false), bs)...)|>Tuple, 
         overlaps(bs), elecKinetics(bs), eeInteractions(bs))
 
@@ -702,7 +702,7 @@ Function in the integral calculation.
 
 `BasisFunc::NTuple{BN, BT}`: Inside basis functions.
 
-`param::Tuple{Vararg{<:ParamBox}}`: Inside parameters.
+`param::Tuple{Vararg{ParamBox}}`: Inside parameters.
 
 ≡≡≡ Initialization Method(s) ≡≡≡
 

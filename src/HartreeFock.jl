@@ -548,7 +548,7 @@ const defaultHFconfigStr = "HFconfig()"
 
 """
     runHF(bs::Union{BasisSetData, Vector{<:AbstractGTBasisFuncs}, 
-                    Tuple{Vararg{<:AbstractGTBasisFuncs}}}, 
+                    Tuple{Vararg{AbstractGTBasisFuncs}}}, 
           nuc::Union{NTuple{NN, String}, Vector{String}}, 
           nucCoords::Union{NTuple{NN, NTuple{3,Float64}}, 
                            Vector{<:AbstractArray{<:Real}}}, 
@@ -562,7 +562,7 @@ Main function to run Hartree-Fock in Quiqbox.
 === Positional argument(s) ===
 
 `bs::Union{BasisSetData, Vector{<:AbstractGTBasisFuncs}, 
-           Tuple{Vararg{<:AbstractGTBasisFuncs}}}`: Basis set.
+           Tuple{Vararg{AbstractGTBasisFuncs}}}`: Basis set.
 
 `nuc::Union{NTuple{NN, String}, Vector{String}}`: The element symbols of the nuclei for the 
 studied system.
@@ -612,7 +612,7 @@ end
 """
 
     runHF(bs::Union{BasisSetData, Vector{<:AbstractGTBasisFuncs}, 
-                    Tuple{Vararg{<:AbstractGTBasisFuncs}}}, 
+                    Tuple{Vararg{AbstractGTBasisFuncs}}}, 
           nuc::Union{NTuple{NN, String}, Vector{String}}, 
           nucCoords::Union{NTuple{NN, NTuple{3,Float64}}, 
                            Vector{<:AbstractArray{<:Real}}},
@@ -624,7 +624,7 @@ end
 runHF(bs::BasisSetData, nuc, nucCoords, N::Int, config=defaultHFconfig; printInfo=true) = 
 runHF(bs::BasisSetData, nuc, nucCoords, config, N; printInfo)
 
-runHF(bs::Union{Tuple{Vararg{<:AbstractGTBasisFuncs}}, Vector{<:AbstractGTBasisFuncs}}, 
+runHF(bs::Union{Tuple{Vararg{AbstractGTBasisFuncs}}, Vector{<:AbstractGTBasisFuncs}}, 
       args...; printInfo=true) = 
 runHF(GTBasis(bs), args...; printInfo)
 
