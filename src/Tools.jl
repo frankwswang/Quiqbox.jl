@@ -573,7 +573,7 @@ function renameFunc(fName::Symbol, f::F, returnType::Type{T}, N::Int=1) where
 end
 
 function renameFunc(fName::Symbol, f::F, N::Int=1) where {F<:Function}
-    @eval ($(fName))(a::Vararg{<:Any, $N}) where {T} = $f(a...)
+    @eval ($(fName))(a::Vararg{Any, $N}) where {T} = $f(a...)
 end
 
 renameFunc(fName::String, args...) = renameFunc(Symbol(fName), args...)
