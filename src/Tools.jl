@@ -808,9 +808,9 @@ function getFuncNum(tf::TypedFunction{F}, vNum::Symbolics.Num) where {F}
     Symbolics.variable(tf.n, T=Symbolics.FnType)(vNum)::Symbolics.Num
 end
 
-getFuncNum(::TypedFunction{typeof(itself)}, vNum::Symbolics.Num) = vNum
+getFuncNum(::TypedFunction{typeof(itself)}, vNum::Symbolics.Num) = itself(vNum)
 
-getFuncNum(::typeof(itself), vNum::Symbolics.Num) = vNum
+getFuncNum(::typeof(itself), vNum::Symbolics.Num) = itself(vNum)
 
 function genIndex(index::Int)
     @assert index >= 0

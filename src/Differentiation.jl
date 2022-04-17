@@ -72,7 +72,7 @@ end
 
 
 function deriveBasisFunc(bf::CompositeGTBasisFuncs{BN, 1}, par::ParamBox) where {BN}
-    varDict = getVarDict(bf)
+    varDict = getVarDict(bf.param)
     vr = getVar(par)
     info = diffInfo(bf, vr, varDict)
     diffInfoToBasisFunc(bf, info)

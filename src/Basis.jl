@@ -1591,14 +1591,14 @@ Core function of `getVar`, which returns the mapping relations inside the parame
 container. `expandNonDifferentiable` determines whether expanding the mapping relations of 
 non-differentiable variable (parameters).
 """
-function getVarCore(pb::ParamBox, expandNonDifferentiable::Bool=false)
+function getVarCore(pb::ParamBox{T}, expandNonDifferentiable::Bool=false) where {T}
     if pb.canDiff[] || expandNonDifferentiable
         ivNum = inSymOf(pb)
         fNum = getFuncNum(pb.map, ivNum)
-        res = Pair{Symbolics.Num, Real}[fNum=>pb(), ivNum => pb.data[]]
+        res = Pair{Symbolics.Num, T}[fNum=>pb(), ivNum=>pb.data[]]
     else
         vNum = outSymOf(pb)
-        res = Pair{Symbolics.Num, Real}[vNum => pb()]
+        res = Pair{Symbolics.Num, T}[vNum => pb()]
     end
 end
 
