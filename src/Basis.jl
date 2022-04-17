@@ -354,6 +354,11 @@ BasisFunc(bfs::BasisFuncs{<:Any, <:Any, 1}) =
 BasisFunc(bfs.center, bfs.gauss, bfs.ijk, bfs.normalizeGTO)
 
 
+struct EmptyBasisFunc <: CompositeGTBasisFuncs{0, 1} end
+
+const BasisFunc0 = EmptyBasisFunc()
+
+
 """
 
     genBasisFunc(center::Union{AbstractArray{<:Real}, NTuple{3, ParamBox}, NTuple{3, Real}, 
@@ -899,6 +904,12 @@ vcat(bfm1.BasisFunc |> collect, bfm2.BasisFunc |> collect) |> sumOf
 add(bf1::BasisFuncs{𝑙1, GN1, 1}, bf2::BasisFuncs{𝑙2, GN2, 1}) where {𝑙1, 𝑙2, GN1, GN2} = 
 [[bf1, bf2] .|> add |> sumOf]
 
+add(::EmptyBasisFunc, b::CompositeGTBasisFuncs) = itself(b)
+
+add(b::CompositeGTBasisFuncs, ::EmptyBasisFunc) = itself(b)
+
+add(::EmptyBasisFunc, ::EmptyBasisFunc) = EmptyBasisFunc()
+
 
 const Doc_mul_Eg1 = "GaussFunc(xpn=ParamBox{Float64, :α, $(FLevel(itself))}(3.0)[∂][α], " * 
                               "con=ParamBox{Float64, :d, $(FLevel(itself))}(1.0)[∂][d])"
@@ -1066,8 +1077,8 @@ function gaussProd((α₁, d₁, R₁)::T, (α₂, d₂, R₂)::T) where
     (α, d, R)
 end
 
-function mul(bf::BasisFunc{𝑙, GN}, coeff::Real; 
-             normalizeGTO::Union{Bool, Missing}=missing)::BasisFunc{𝑙, GN} where {𝑙, GN}
+function mulCore(bf::BasisFunc{𝑙, GN}, coeff::Real; 
+                 normalizeGTO::Union{Bool, Missing}=missing)::BasisFunc{𝑙, GN} where {𝑙, GN}
     n = bf.normalizeGTO
     normalizeGTO isa Missing && (normalizeGTO = n)
     c = (n && !normalizeGTO) ? (coeff .* getNorms(bf)) : coeff
@@ -1075,19 +1086,19 @@ function mul(bf::BasisFunc{𝑙, GN}, coeff::Real;
     BasisFunc(bf.center, gfs, bf.ijk, normalizeGTO)
 end
 
-function mul(coeff::Real, bf::BasisFunc{𝑙, GN}; 
-             normalizeGTO::Union{Bool, Missing}=missing)::BasisFunc{𝑙, GN} where {𝑙, GN}
-    mul(bf, coeff; normalizeGTO)
-end
+# function mulCore(coeff::Real, bf::BasisFunc{𝑙, GN}; 
+#                  normalizeGTO::Union{Bool, Missing}=missing)::BasisFunc{𝑙, GN} where {𝑙, GN}
+#     mul(bf, coeff; normalizeGTO)
+# end
 
-function mul(bfm::T, coeff::Real; normalizeGTO::Union{Bool, Missing}=missing) where 
-            {T<:BasisFuncMix}
+function mulCore(bfm::T, coeff::Real; normalizeGTO::Union{Bool, Missing}=missing) where 
+                {T<:BasisFuncMix}
     BasisFuncMix(mul.(bfm.BasisFunc, coeff; normalizeGTO) |> collect)::T
 end
 
-function mul(coeff::Real, bfm::BasisFuncMix; normalizeGTO::Union{Bool, Missing}=missing)
-    mul(bfm, coeff; normalizeGTO)
-end
+# function mulCore(coeff::Real, bfm::BasisFuncMix; normalizeGTO::Union{Bool, Missing}=missing)
+#     mul(bfm, coeff; normalizeGTO)
+# end
 
 function mul(bf1::BasisFunc{𝑙1, GN1}, bf2::BasisFunc{𝑙2, GN2}; 
              normalizeGTO::Union{Bool, 
@@ -1144,6 +1155,25 @@ function mul(bfm1::BasisFuncMix{BN1}, bfm2::BasisFuncMix{BN2};
     sumOf(bfms)
 end
 
+mul(::EmptyBasisFunc, ::Real; normalizeGTO=nothing) = EmptyBasisFunc()
+
+mul(::Real, ::EmptyBasisFunc; normalizeGTO=nothing) = EmptyBasisFunc()
+
+function mul(b::CompositeGTBasisFuncs{BN, 1}, coeff::Real; 
+             normalizeGTO::Union{Bool, Missing}=missing) where {BN}
+    iszero(coeff) ? EmptyBasisFunc() : mulCore(b, coeff; normalizeGTO)
+end
+
+mul(coeff::Real, b::CompositeGTBasisFuncs{<:Any, 1}; 
+    normalizeGTO::Union{Bool, Missing}=missing) = 
+mul(b, coeff; normalizeGTO)
+
+mul(::EmptyBasisFunc, ::CompositeGTBasisFuncs; normalizeGTO=nothing) = EmptyBasisFunc()
+
+mul(::CompositeGTBasisFuncs, ::EmptyBasisFunc; normalizeGTO=nothing) = EmptyBasisFunc()
+
+mul(::EmptyBasisFunc, ::EmptyBasisFunc; normalizeGTO=nothing) = EmptyBasisFunc()
+
 mul(bf1::BasisFuncs{𝑙1, GN1, 1}, bf2::BasisFuncs{𝑙2, GN2, 1}; 
     normalizeGTO::Union{Bool, Missing}=missing) where {𝑙1, 𝑙2, GN1, GN2} = 
 [mul(add(bf1), add(bf2); normalizeGTO)]
@@ -1164,9 +1194,12 @@ shiftCore(bf, XYZTuple(didjdk.|>Int))
 shift(bf::FloatingGTBasisFuncs{𝑙, GN, 1}, didjdk::NTuple{3, Int}) where {𝑙, GN} = 
 shiftCore(bf, XYZTuple(didjdk))
 
+shift(::EmptyBasisFunc, _) = EmptyBasisFunc()
+
 shiftCore(bf::FloatingGTBasisFuncs{𝑙1, GN, 1}, didjdk::XYZTuple{𝑙2}) where {𝑙1, 𝑙2, GN} = 
 BasisFunc(bf.center, bf.gauss, bf.ijk[1]+didjdk, bf.normalizeGTO)
 
+shiftCore(::EmptyBasisFunc, _) = EmptyBasisFunc()
 
 """
 

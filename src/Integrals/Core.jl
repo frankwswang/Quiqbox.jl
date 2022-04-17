@@ -327,6 +327,12 @@ function getOneBodyInt(∫1e::F,
     end |> sum
 end
 
+function getOneBodyInt(::F, 
+                       ::CompositeGTBasisFuncs{BN1, 1}, ::CompositeGTBasisFuncs{BN2, 1}, 
+                       optArgs...) where {F<:Function, BN1, BN2}
+    min(BN1, BN2) == 0 ? 0.0 : error("The input basis type is NOT supported.")
+end
+
 function getOneBodyIntCore(flag::Bool, 
                            ps₁::NTuple{GN1, NTuple{2, Float64}}, 
                            ps₂::NTuple{GN2, NTuple{2, Float64}}) where {GN1, GN2}
@@ -394,6 +400,13 @@ function getTwoBodyInt(∫2e::F,
     map(uniquePairs, uPairCoeffs) do x, y
         ∫2e(optArgs..., R₁,ijk₁,x[1], R₂,ijk₂,x[2], R₃,ijk₃,x[3], R₄,ijk₄,x[4])::Float64 * y
     end |> sum
+end
+
+function getTwoBodyInt(::F, 
+                       ::CompositeGTBasisFuncs{BN1, 1}, ::CompositeGTBasisFuncs{BN2, 1}, 
+                       ::CompositeGTBasisFuncs{BN3, 1}, ::CompositeGTBasisFuncs{BN4, 1}, 
+                       optArgs...) where {F<:Function, BN1, BN2, BN3, BN4}
+    min(BN1, BN2, BN3, BN4) == 0 ? 0.0 : error("The input basis type is NOT supported.")
 end
 
 @inline function diFoldCount(i::T, j::T) where {T<:Real}
