@@ -75,7 +75,7 @@ function show(io::IO, config::SCFconfig)
     print(io, typeof(config))
     print(io, "(interval=", config.interval, ",", 
               " oscillateThreshold=", config.oscillateThreshold, ",", 
-              " method, methodConfig)", getfield.(config.method, :f)|>collect)
+              " method, methodConfig)", config.method|>collect)
 end
 
 function show(io::IO, vars::HFtempVars)

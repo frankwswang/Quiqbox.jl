@@ -6,10 +6,10 @@ function oneBodyDerivativeCore(::Val{false},
                                ∂bfs::Union{NTuple{BN,BT1},NTuple{BN,AbstractGTBasisFuncs}}, 
                                bfs::Union{NTuple{BN,BT2}, NTuple{BN,AbstractGTBasisFuncs}}, 
                                X::Matrix{Float64}, ∂X::Matrix{Float64}, 
-                               ft::FunctionType{F}) where 
+                               tf::TypedFunction{F}) where 
                               {BN, BT1<:CompositeGTBasisFuncs{<:Any, 1}, 
                                    BT2<:CompositeGTBasisFuncs{<:Any, 1}, F}
-    ʃ = getFunc(ft.f)
+    ʃ = getFunc(tf)
     ∂ʃ = ones(BN, BN)
     ʃab = ones(BN, BN)
     ∂ʃab = ones(BN, BN)
@@ -36,10 +36,10 @@ function twoBodyDerivativeCore(::Val{false},
                                ∂bfs::Union{NTuple{BN,BT1},NTuple{BN,AbstractGTBasisFuncs}}, 
                                bfs::Union{NTuple{BN,BT2}, NTuple{BN,AbstractGTBasisFuncs}},
                                X::Matrix{Float64}, ∂X::Matrix{Float64}, 
-                               ft::FunctionType{F}) where 
+                               tf::TypedFunction{F}) where 
                               {BN, BT1<:CompositeGTBasisFuncs{<:Any, 1}, 
                                    BT2<:CompositeGTBasisFuncs{<:Any, 1}, F}
-    ʃ = getFunc(ft.f)
+    ʃ = getFunc(tf)
     bsSize = ∂bfs |> length
     ∂ʃ = ones(bsSize, bsSize, bsSize, bsSize)
     ʃabcd = ones(bsSize, bsSize, bsSize, bsSize)
@@ -82,7 +82,7 @@ end
 function derivativeCore(FoutputIsVector::Val{B}, 
                         bs::Union{NTuple{BN, BT}, NTuple{BN, AbstractGTBasisFuncs}}, 
                         par::ParamBox, S::Matrix{Float64}, 
-                        oneBodyF::FunctionType{F1}, twoBodyF::FunctionType{F2}) where 
+                        oneBodyF::TypedFunction{F1}, twoBodyF::TypedFunction{F2}) where 
                        {B, BN, BT<:AbstractGTBasisFuncs, F1, F2}
     # ijkl in chemists' notation of spatial bases (ij|kl).
     bfs = Tuple(hcat(decomposeCore.(Val(false), bs)...))
@@ -119,7 +119,7 @@ function ∂HFenergy(bs::Union{NTuple{BN, BT}, NTuple{BN, AbstractGTBasisFuncs}}
     Xinv = sqrt(S)::Matrix{Float64}
     cH = (i, j)->getCoreHij(i, j, nuc, nucCoords)
     ∂hij, ∂hijkl = derivativeCore(Val(false), bs, par, S, 
-                                  FunctionType(cH), FunctionType{:get2eInteraction}())
+                                  TypedFunction(cH), TypedFunction(get2eInteraction))
     getEᵀ(∂hij, ∂hijkl, Ref(Xinv).*C, nElectron)
 end
 

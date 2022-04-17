@@ -251,7 +251,7 @@ The `struct` for SCF iteration configurations.
 
 ≡≡≡ Field(s) ≡≡≡
 
-`method::NTuple{N, $(FunctionType)}`: The applied methods. The available methods and their 
+`method::NTuple{N, Symbol}`: The applied methods. The available methods and their 
 configurations (in terms of keyword arguments):
 
 | Convergence Method(s) | Configuration(s) | Keyword(s) | Range(s)/Option(s) | Default(s) |
@@ -297,7 +297,7 @@ $(Doc_SCFconfig_Eg1)
 ```
 """
 struct SCFconfig{N} <: ImmutableParameter{SCFconfig, Any}
-    method::NTuple{N, FunctionType}
+    method::NTuple{N, Symbol}
     interval::NTuple{N, Float64}
     methodConfig::NTuple{N, Vector{<:Pair}}
     oscillateThreshold::Float64
@@ -309,7 +309,7 @@ struct SCFconfig{N} <: ImmutableParameter{SCFconfig, Any}
         for i in keys(configs)
             kwPairs[i] = configs[i]
         end
-        new{N}(FunctionType.(methods), intervals, Tuple(kwPairs), oscillateThreshold)
+        new{N}(methods, intervals, Tuple(kwPairs), oscillateThreshold)
     end
 end
 
@@ -704,7 +704,7 @@ function runHFcore(::Val{HFT},
             pushHFtempVars!(vars, res)
 
             printInfo && (i % floor(log(4, i) + 1) == 0 || i == maxStep) && 
-            println(rpad("Step $i", 10), rpad("#$l ($(m.f))", 12), "E = $(Etots[end])")
+            println(rpad("Step $i", 10), rpad("#$l ($(m))", 12), "E = $(Etots[end])")
 
             abs(Etots[end]-Etots[end-1]) > breakPoint || (isConverged = true) && break
 
@@ -804,11 +804,11 @@ const SCFmethodSelector =
 
 
 # RHF
-@inline function HFcore(::FunctionType{M}, (N,)::Tuple{Int}, 
+@inline function HFcore(m::Symbol, (N,)::Tuple{Int}, 
                         Hcore::Matrix{Float64}, HeeI::Array{Float64, 4}, 
                         S::Matrix{Float64}, X::Matrix{Float64}, 
-                        (rVars,)::Tuple{HFtempVars{:RHF}}; kws...) where {M}
-    D = getfield(SCFmethodSelector, M)(N÷2, Hcore, HeeI, S, X, rVars; kws...)
+                        (rVars,)::Tuple{HFtempVars{:RHF}}; kws...)
+    D = getfield(SCFmethodSelector, m)(N÷2, Hcore, HeeI, S, X, rVars; kws...)
     partRes = getCFDE(Hcore, HeeI, X, D)
     partRes..., 2D, 2partRes[end]
 end
@@ -826,12 +826,12 @@ end
 end
 
 # UHF
-@inline function HFcore(::FunctionType{M}, Ns::NTuple{2, Int}, 
+@inline function HFcore(m::Symbol, Ns::NTuple{2, Int}, 
                         Hcore::Matrix{Float64}, HeeI::Array{Float64, 4}, 
                         S::Matrix{Float64}, X::Matrix{Float64}, 
-                        uVars::NTuple{2, HFtempVars{:UHF}}; kws...) where {M}
-    Ds = getfield(SCFmethodSelector, M).(Ns, Ref(Hcore), Ref(HeeI), 
-                                                 Ref(S), Ref(X), uVars; kws...)
+                        uVars::NTuple{2, HFtempVars{:UHF}}; kws...)
+    Ds = getfield(SCFmethodSelector, m).(Ns, Ref(Hcore), Ref(HeeI), Ref(S), Ref(X), uVars; 
+                                         kws...)
     Dᵀnew = Ds |> sum
     partRes = getCFDE.(Ref(Hcore), Ref(HeeI), Ref(X), Ds, Ref(Dᵀnew))
     Eᵀnew = partRes[1][end] + partRes[2][end]

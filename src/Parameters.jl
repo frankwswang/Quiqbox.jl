@@ -17,12 +17,12 @@ FLevel(::Type{<:ParameterizedFunction{<:Any, <:ParameterizedFunction}}) = FLevel
 FLevel(::F) where {F<:Function} = FLevel(F)
 
 FLevel(sym::Symbol) = FLevel(getFunc(sym))
-FLevel(::FunctionType{F}) where {F} = FLevel(F)
-FLevel(::Type{FunctionType{F}}) where {F} = FLevel(F)
+FLevel(::TypedFunction{F}) where {F} = FLevel(F)
+FLevel(::Type{TypedFunction{F}}) where {F} = FLevel(F)
 
 getFLevel(::Type{FLevel{L1, L2}}) where {L1, L2} = (L1, L2)
 getFLevel(f::Function) = getFLevel(f |> FLevel)
-getFLevel(::FunctionType{F}) where {F} = getFLevel(F |> FLevel)
+getFLevel(::TypedFunction{F}) where {F} = getFLevel(F |> FLevel)
 getFLevel(::Type{T}) where {T} = getFLevel(T |> FLevel)
 
 
