@@ -396,8 +396,11 @@ bf_os1 = genBasisFunc([0,0,0], (2,1), ijk)
 bf_os2 = genBasisFunc([0,0,0], (2,1), ijk, normalizeGTO=true)
 bf_os1S = genBasisFunc([0,0,0], (2,1), ijk.+didjdk)
 bf_os2S = genBasisFunc([0,0,0], (2,1), ijk.+didjdk, normalizeGTO=true)
+bf_os3 = genBasisFunc([0,0,0], (2,1), (2,0,0))
 @test hasEqual(shift(bf_os1, didjdk), bf_os1S)
 @test hasEqual(shift(bf_os2, didjdk), bf_os2S)
+@test shift(bf_os2, didjdk, -) == Quiqbox.EmptyBasisFunc()
+@test hasEqual(shift(bf_os3, ijk, -), bf_os1)
 
 
 # function unpackBasis

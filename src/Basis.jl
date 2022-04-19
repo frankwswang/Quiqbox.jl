@@ -1173,19 +1173,20 @@ mul(bf1::BasisFuncs{𝑙1, GN1, 1}, bf2::BasisFuncs{𝑙2, GN2, 1};
 """
 
     shift(bf::FloatingGTBasisFuncs{𝑙, GN, 1}, 
-          didjdk::Union{Vector{<:Real}, NTuple{3, Int}}) where {𝑙, GN} -> 
+          didjdk::Union{Vector{<:Real}, NTuple{3, Int}}, op::Function=+) where {𝑙, GN} -> 
     BasisFunc
 
-Shift (add) the angular momentum (Cartesian representation) given the a vector that 
-specifies the change of each pseudo-quantum number 𝑑i, 𝑑j, 𝑑k.
+Shift (`+` as the "add" operator in default) the angular momentum (Cartesian 
+representation) given the a vector that specifies the change of each pseudo-quantum number 
+𝑑i, 𝑑j, 𝑑k.
 """
-shift(bf::FloatingGTBasisFuncs{𝑙, GN, 1}, didjdk::AbstractArray{<:Real}) where {𝑙, GN} = 
-shiftCore(+, bf, XYZTuple(didjdk.|>Int))
+shift(bf::FloatingGTBasisFuncs{𝑙, GN, 1}, didjdk::AbstractArray{<:Real}, op::F=+) where 
+     {𝑙, GN, F<:Function} = 
+shiftCore(op, bf, XYZTuple(didjdk.|>Int))
 
-shift(bf::FloatingGTBasisFuncs{𝑙, GN, 1}, didjdk::NTuple{3, Int}) where {𝑙, GN} = 
-shiftCore(+, bf, XYZTuple(didjdk))
-
-shift(::EmptyBasisFunc, _) = EmptyBasisFunc()
+shift(bf::FloatingGTBasisFuncs{𝑙, GN, 1}, didjdk::NTuple{3, Int}, op::F=+) where 
+     {𝑙, GN, F<:Function} = 
+shiftCore(op, bf, XYZTuple(didjdk))
 
 shiftCore(::typeof(+), bf::FloatingGTBasisFuncs{𝑙1, GN, 1}, didjdk::XYZTuple{𝑙2}) where 
          {𝑙1, 𝑙2, GN} = 
@@ -1195,7 +1196,7 @@ shiftCore(::typeof(-), bf::FloatingGTBasisFuncs{0, GN, 1}, ::XYZTuple{0}) where 
 BasisFunc(bf.center, bf.gauss, bf.ijk[1], bf.normalizeGTO)
 
 shiftCore(::typeof(-), bf::FloatingGTBasisFuncs{0, GN, 1}, didjdk::XYZTuple{𝑙}) where 
-          {𝑙, GN} = EmptyBasisFunc()
+         {𝑙, GN} = EmptyBasisFunc()
 
 function shiftCore(::typeof(-), bf::FloatingGTBasisFuncs{𝑙1, GN, 1}, 
                    didjdk::XYZTuple{𝑙2}) where {𝑙1, 𝑙2, GN}
@@ -1206,7 +1207,7 @@ function shiftCore(::typeof(-), bf::FloatingGTBasisFuncs{𝑙1, GN, 1},
     BasisFunc(bf.center, bf.gauss, XYZTuple(xyz), bf.normalizeGTO)
 end
 
-shiftCore(::EmptyBasisFunc, _) = EmptyBasisFunc()
+shiftCore(::Function, ::EmptyBasisFunc, ::XYZTuple) = EmptyBasisFunc()
 
 """
 
@@ -1235,7 +1236,11 @@ function decomposeCore(::Val{true}, bf::FloatingGTBasisFuncs{𝑙, GN, ON}) wher
     res
 end
 
-decomposeCore(::Val{false}, bfm::BasisFuncMix) = reshape([bfm], 1, 1)
+decomposeCore(::Val{false}, b::CompositeGTBasisFuncs{<:Any, 1}) = hcat(b)
+
+decomposeCore(::Val{true}, b::FloatingGTBasisFuncs{<:Any, 1, 1}) = hcat(BasisFunc(b))
+
+decomposeCore(::Val{false}, b::FloatingGTBasisFuncs{<:Any, <:Any, 1}) = hcat(BasisFunc(b))
 
 getSGFtype(::Type{<:BasisFunc}) = BasisFunc{<:Any, 1}
 getSGFtype(::Type{BasisFunc{𝑙}}) where {𝑙} = BasisFunc{𝑙, 1}
