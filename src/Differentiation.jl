@@ -1,6 +1,7 @@
 export gradHFenergy
 
 using LinearAlgebra: eigen, Symmetric
+using ForwardDiff: derivative as ForwardDerivative
 
 function oneBodyDerivativeCore(::Val{false}, 
                                ∂bfs::Union{NTuple{BN,BT1},NTuple{BN,AbstractGTBasisFuncs}}, 
@@ -86,7 +87,8 @@ function derivativeCore(FoutputIsVector::Val{B},
                        {B, BN, BT<:AbstractGTBasisFuncs, F1, F2}
     # ijkl in chemists' notation of spatial bases (ij|kl).
     bfs = Tuple(hcat(decomposeCore.(Val(false), bs)...))
-    ∂bfs = deriveBasisFunc.(bfs, par)
+    # ∂bfs = deriveBasisFunc.(bfs, par)
+    ∂bfs = ∂Basis.(par, bfs)
     bsSize = basisSize.(bs) |> sum
     ∂S = ones(bsSize, bsSize)
     ∂X = ones(bsSize, bsSize) # ∂X corresponds to the derivative of X = S^(-0.5)
@@ -140,3 +142,70 @@ function gradHFenergy(bs::Union{NTuple{BN, BT}, NTuple{BN, AbstractGTBasisFuncs}
     Ns = splitSpins(Val(HFTS), nElectron)
     ∂HFenergy.(Ref(bs), par, Ref(C), Ref(S), Ref(nuc), Ref(nucCoords), Ref(Ns))
 end
+
+
+𝑑f(::Type{FL}, f::F, x::T) where {FL<:FLevel, F<:Function, T} = ForwardDerivative(f, x)
+
+𝑑f(::Type{FLevel(itself)}, f::Function, x::T) where {T} = 1.0
+
+function ∂SGFcore(::Val{xpnSym}, sgf::FloatingGTBasisFuncs{𝑙, 1, 1}, c::T=1) where {T, 𝑙}
+    res = ( shiftCore(+, sgf, XYZTuple(2,0,0)) + shiftCore(+, sgf, XYZTuple(0,2,0)) + 
+            shiftCore(+, sgf, XYZTuple(0,0,2)) ) * (-c)
+    if sgf.normalizeGTO
+        res += sgf * ((0.5𝑙 + 0.75) / sgf.gauss[1].xpn() * c)
+    end
+    res
+end
+
+function ∂SGFcore(::Val{conSym}, sgf::FloatingGTBasisFuncs{𝑙, 1, 1}, c::T=1) where {T, 𝑙}
+    BasisFunc(sgf.center, GaussFunc(sgf.gauss[1].xpn, c), sgf.ijk, sgf.normalizeGTO)
+end
+
+function ∂SGFcore(::Val{cxSym}, sgf::FloatingGTBasisFuncs{𝑙, 1, 1}, c::T=1) where {T, 𝑙}
+    shiftCore(-, sgf, XYZTuple(1,0,0)) * (-c*sgf.ijk[1][1]) + 
+    shiftCore(+, sgf, XYZTuple(1,0,0)) * (2c*sgf.gauss[1].xpn())
+end
+
+function ∂SGFcore(::Val{cySym}, sgf::FloatingGTBasisFuncs{𝑙, 1, 1}, c::T=1) where {T, 𝑙}
+    shiftCore(-, sgf, XYZTuple(0,1,0)) * (-c*sgf.ijk[1][2]) + 
+    shiftCore(+, sgf, XYZTuple(0,1,0)) * (2c*sgf.gauss[1].xpn())
+end
+
+function ∂SGFcore(::Val{czSym}, sgf::FloatingGTBasisFuncs{𝑙, 1, 1}, c::T=1) where {T, 𝑙}
+    shiftCore(-, sgf, XYZTuple(0,0,1)) * (-c*sgf.ijk[1][3]) + 
+    shiftCore(+, sgf, XYZTuple(0,0,1)) * (2c*sgf.gauss[1].xpn())
+end
+
+
+function ∂Basis(par::ParamBox{T, V}, sgf::FloatingGTBasisFuncs{<:Any, 1, 1}) where {T, V}
+    params = sgf.param
+    if par.canDiff[]
+        is = findall(x->x.dataName==par.dataName && x.index==par.index, params)
+        if length(is) > 0
+            map(is) do i
+                fPar = params[i]
+                _, V2, FL2 = getTypeParams(fPar)
+                c = 𝑑f(FL2, fPar.map, fPar[])
+                if c == 0.0
+                    EmptyBasisFunc()
+                else
+                    ∂SGFcore(Val(V2), sgf, c)
+                end
+            end |> sum
+        else
+            EmptyBasisFunc()
+        end
+    else
+        if par.index == params[findfirst(x->typeof(x)<:ParamBox{<:Any, V}, params)].index
+            ∂SGFcore(Val(V), sgf)
+        else
+            EmptyBasisFunc()
+        end
+    end
+end
+
+∂Basis(par::ParamBox, b::FloatingGTBasisFuncs{𝑙, GN, 1}) where {𝑙, GN} = 
+∂Basis.(par, decomposeCore(Val(true), b)[:]) |> sum
+
+∂Basis(par::ParamBox, b::BasisFuncMix{BN, BT}) where {BN, BT} = 
+∂Basis.(par, b.BasisFunc) |> sum

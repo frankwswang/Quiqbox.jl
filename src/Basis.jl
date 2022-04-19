@@ -25,9 +25,7 @@ A single contracted gaussian function `struct` from package Quiqbox.
 
 ≡≡≡ Initialization Method(s) ≡≡≡
 
-    GaussFunc(xpn::ParamBox, con::ParamBox) -> GaussFunc
-
-    GaussFunc(xpn::Real, con::Real) -> GaussFunc
+    GaussFunc(xpn::Union{Real, ParamBox}, con::Union{Real, ParamBox}) -> GaussFunc
 
 """
 struct GaussFunc <: AbstractGaussFunc
@@ -41,13 +39,8 @@ struct GaussFunc <: AbstractGaussFunc
     new(xpn, con, (xpn, con))
 end
 
-function GaussFunc(e::Real, c::Real)
-    xpn = ParamBox(convertNumber(e), xpnSym)
-    con = ParamBox(convertNumber(c), conSym)
-    GaussFunc(xpn, con)
-end
-
-GaussFunc(xpn::ParamBox, con::ParamBox) = GaussFunc(genExponent(xpn), genContraction(con))
+GaussFunc(e::T1, d::T2) where {T1<:Union{Real, ParamBox}, T2<:Union{Real, ParamBox}} = 
+GaussFunc(genExponent(e), genContraction(d))
 
 
 """
@@ -1187,15 +1180,31 @@ Shift (add) the angular momentum (Cartesian representation) given the a vector t
 specifies the change of each pseudo-quantum number 𝑑i, 𝑑j, 𝑑k.
 """
 shift(bf::FloatingGTBasisFuncs{𝑙, GN, 1}, didjdk::AbstractArray{<:Real}) where {𝑙, GN} = 
-shiftCore(bf, XYZTuple(didjdk.|>Int))
+shiftCore(+, bf, XYZTuple(didjdk.|>Int))
 
 shift(bf::FloatingGTBasisFuncs{𝑙, GN, 1}, didjdk::NTuple{3, Int}) where {𝑙, GN} = 
-shiftCore(bf, XYZTuple(didjdk))
+shiftCore(+, bf, XYZTuple(didjdk))
 
 shift(::EmptyBasisFunc, _) = EmptyBasisFunc()
 
-shiftCore(bf::FloatingGTBasisFuncs{𝑙1, GN, 1}, didjdk::XYZTuple{𝑙2}) where {𝑙1, 𝑙2, GN} = 
+shiftCore(::typeof(+), bf::FloatingGTBasisFuncs{𝑙1, GN, 1}, didjdk::XYZTuple{𝑙2}) where 
+         {𝑙1, 𝑙2, GN} = 
 BasisFunc(bf.center, bf.gauss, bf.ijk[1]+didjdk, bf.normalizeGTO)
+
+shiftCore(::typeof(-), bf::FloatingGTBasisFuncs{0, GN, 1}, ::XYZTuple{0}) where {GN} = 
+BasisFunc(bf.center, bf.gauss, bf.ijk[1], bf.normalizeGTO)
+
+shiftCore(::typeof(-), bf::FloatingGTBasisFuncs{0, GN, 1}, didjdk::XYZTuple{𝑙}) where 
+          {𝑙, GN} = EmptyBasisFunc()
+
+function shiftCore(::typeof(-), bf::FloatingGTBasisFuncs{𝑙1, GN, 1}, 
+                   didjdk::XYZTuple{𝑙2}) where {𝑙1, 𝑙2, GN}
+    xyz = bf.ijk[1].tuple .- didjdk.tuple
+    for i in xyz
+        i < 0 && (return EmptyBasisFunc())
+    end
+    BasisFunc(bf.center, bf.gauss, XYZTuple(xyz), bf.normalizeGTO)
+end
 
 shiftCore(::EmptyBasisFunc, _) = EmptyBasisFunc()
 
