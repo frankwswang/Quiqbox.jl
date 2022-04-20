@@ -317,14 +317,20 @@ function reformatIntData1(bf::FloatingGTBasisFuncs{<:Any, GN, 1}) where {GN}
 end
 
 
-function getOneBodyInt(::FunctionType{F}, 
+function getOneBodyInt(∫1e::F, 
                        bf1::BasisFunc{<:Any, GN1}, bf2::BasisFunc{<:Any, GN2}, 
-                       optArgs...) where {F, GN1, GN2}
+                       optArgs...) where {F<:Function, GN1, GN2}
     (R₁, ijk₁, ps₁), (R₂, ijk₂, ps₂) = reformatIntData1.((bf1, bf2))
     uniquePairs, uPairCoeffs = getOneBodyIntCore(R₁==R₂ && ijk₁==ijk₂, ps₁, ps₂)
     map(uniquePairs, uPairCoeffs) do x, y
-        getfield(Quiqbox, F)(optArgs..., R₁, R₂, ijk₁, x[1], ijk₂, x[2])::Float64 * y
+        ∫1e(optArgs..., R₁, R₂, ijk₁, x[1], ijk₂, x[2])::Float64 * y
     end |> sum
+end
+
+function getOneBodyInt(::F, 
+                       ::CompositeGTBasisFuncs{BN1, 1}, ::CompositeGTBasisFuncs{BN2, 1}, 
+                       optArgs...) where {F<:Function, BN1, BN2}
+    min(BN1, BN2) == 0 ? 0.0 : error("The input basis type is NOT supported.")
 end
 
 function getOneBodyIntCore(flag::Bool, 
@@ -377,10 +383,10 @@ end
     i
 end
 
-function getTwoBodyInt(::FunctionType{F}, 
+function getTwoBodyInt(∫2e::F, 
                        bf1::BasisFunc{<:Any, GN1}, bf2::BasisFunc{<:Any, GN2}, 
                        bf3::BasisFunc{<:Any, GN3}, bf4::BasisFunc{<:Any, GN4}, 
-                       optArgs...) where {F, GN1, GN2, GN3, GN4}
+                       optArgs...) where {F<:Function, GN1, GN2, GN3, GN4}
     (R₁, ijk₁, ps₁), (R₂, ijk₂, ps₂), (R₃, ijk₃, ps₃), (R₄, ijk₄, ps₄) = 
     reformatIntData1.((bf1, bf2, bf3, bf4))
 
@@ -392,9 +398,15 @@ function getTwoBodyInt(::FunctionType{F},
 
     uniquePairs, uPairCoeffs = getTwoBodyIntCore((f1, f2, f3, f4, f5), ps₁, ps₂, ps₃, ps₄)
     map(uniquePairs, uPairCoeffs) do x, y
-        getfield(Quiqbox, F)(optArgs..., R₁, ijk₁, x[1], R₂, ijk₂, x[2], 
-                                         R₃, ijk₃, x[3], R₄, ijk₄, x[4])::Float64 * y
+        ∫2e(optArgs..., R₁,ijk₁,x[1], R₂,ijk₂,x[2], R₃,ijk₃,x[3], R₄,ijk₄,x[4])::Float64 * y
     end |> sum
+end
+
+function getTwoBodyInt(::F, 
+                       ::CompositeGTBasisFuncs{BN1, 1}, ::CompositeGTBasisFuncs{BN2, 1}, 
+                       ::CompositeGTBasisFuncs{BN3, 1}, ::CompositeGTBasisFuncs{BN4, 1}, 
+                       optArgs...) where {F<:Function, BN1, BN2, BN3, BN4}
+    min(BN1, BN2, BN3, BN4) == 0 ? 0.0 : error("The input basis type is NOT supported.")
 end
 
 @inline function diFoldCount(i::T, j::T) where {T<:Real}
@@ -693,18 +705,17 @@ end
 end
 
 getOverlap(bf1::BasisFunc{<:Any, GN1}, bf2::BasisFunc{<:Any, GN2}) where {GN1, GN2} = 
-getOneBodyInt(FunctionType{:∫overlapCore}(), bf1, bf2)
+getOneBodyInt(∫overlapCore, bf1, bf2)
 
 getElecKinetic(bf1::BasisFunc{<:Any, GN1}, bf2::BasisFunc{<:Any, GN2}) where {GN1, GN2} = 
-getOneBodyInt(FunctionType{:∫elecKineticCore}(), bf1, bf2)
+getOneBodyInt(∫elecKineticCore, bf1, bf2)
 
 function getNucAttraction(bf1::BasisFunc{<:Any, GN1}, bf2::BasisFunc{<:Any, GN2}, 
                           nuc::NTuple{NN, String}, 
                           nucCoords::NTuple{NN, NTuple{3,Float64}}) where {GN1, GN2, NN}
     res = 0.0
     for (ele, coord) in zip(nuc, nucCoords)
-        res += getOneBodyInt(FunctionType{:∫nucAttractionCore}(), 
-                             bf1, bf2, getCharge(ele), coord|>Tuple)
+        res += getOneBodyInt(∫nucAttractionCore, bf1, bf2, getCharge(ele), coord|>Tuple)
     end
     res
 end
@@ -712,32 +723,33 @@ end
 function get2eInteraction(bf1::BasisFunc{<:Any, GN1}, bf2::BasisFunc{<:Any, GN2}, 
                           bf3::BasisFunc{<:Any, GN3}, bf4::BasisFunc{<:Any, GN4}) where 
                          {GN1, GN2, GN3, GN4}
-    getTwoBodyInt(FunctionType{:∫eeInteractionCore}(), bf1, bf2, bf3, bf4)
+    getTwoBodyInt(∫eeInteractionCore, bf1, bf2, bf3, bf4)
 end
 
-@inline function getCompositeInt(::FunctionType{F}, bs::NTuple{N, FloatingGTBasisFuncs}, 
-                                 optArgs...) where {F, N}
+@inline function getCompositeInt(∫::F, 
+                                 bs::NTuple{N, FloatingGTBasisFuncs}, optArgs...) where 
+                                {F<:Function, N}
     range = Iterators.product(bs...)
-    map(x->getfield(Quiqbox, F)(x..., optArgs...)::Float64, range)::Array{Float64, N}
+    map(x->∫(x..., optArgs...)::Float64, range)::Array{Float64, N}
 end
 
-@inline function getCompositeInt(::FunctionType{F}, 
+@inline function getCompositeInt(∫::F, 
                                  bs::NTuple{N, CompositeGTBasisFuncs{<:Any, 1}}, 
-                                 optArgs...) where {F, N}
-    range = Iterators.product(unpackBasisFuncs.(bs)...)
-    ( map(x->getfield(Quiqbox, F)(x..., optArgs...)::Float64, range) |> sum )::Float64
+                                 optArgs...) where {F<:Function, N}
+    range = Iterators.product(unpackBasis.(bs)...)
+    ( map(x->∫(x..., optArgs...)::Float64, range) |> sum )::Float64
 end
 
 getOverlap(b1::AbstractGTBasisFuncs, b2::AbstractGTBasisFuncs) = 
-getCompositeInt(FunctionType{:getOverlap}(), (b1, b2))
+getCompositeInt(getOverlap, (b1, b2))
 
 getElecKinetic(b1::AbstractGTBasisFuncs, b2::AbstractGTBasisFuncs) = 
-getCompositeInt(FunctionType{:getElecKinetic}(), (b1, b2))
+getCompositeInt(getElecKinetic, (b1, b2))
 
 getNucAttraction(b1::AbstractGTBasisFuncs, b2::AbstractGTBasisFuncs, 
                  nuc::NTuple{NN, String}, 
                  nucCoords::NTuple{NN, NTuple{3,Float64}}) where {NN} = 
-getCompositeInt(FunctionType{:getNucAttraction}(), (b1, b2), nuc, nucCoords)
+getCompositeInt(getNucAttraction, (b1, b2), nuc, nucCoords)
 
 getCoreHij(b1::AbstractGTBasisFuncs, b2::AbstractGTBasisFuncs, 
            nuc::NTuple{NN, String}, 
@@ -746,18 +758,18 @@ getElecKinetic(b1, b2) + getNucAttraction(b1, b2, nuc, nucCoords)
 
 get2eInteraction(b1::AbstractGTBasisFuncs, b2::AbstractGTBasisFuncs, 
                  b3::AbstractGTBasisFuncs, b4::AbstractGTBasisFuncs) = 
-getCompositeInt(FunctionType{:get2eInteraction}(), (b1, b2, b3, b4))
+getCompositeInt(get2eInteraction, (b1, b2, b3, b4))
 
 
-function getOneBodyInts(::FunctionType{F}, 
+function getOneBodyInts(∫1e::F, 
                         basisSet::Union{NTuple{BN, BT}, NTuple{BN, AbstractGTBasisFuncs}}, 
-                        optArgs...) where {F, BN, BT<:AbstractGTBasisFuncs}
+                        optArgs...) where {F<:Function, BN, BT<:AbstractGTBasisFuncs}
     subSize = basisSize.(basisSet) |> collect
     accuSize = vcat(0, accumulate(+, subSize))
     len = subSize |> sum
     buf = Array{Float64}(undef, len, len)
     for j = 1:BN, i = 1:j
-        int = getfield(Quiqbox, F)(basisSet[i], basisSet[j], optArgs...)
+        int = ∫1e(basisSet[i], basisSet[j], optArgs...)
         rowRange = accuSize[i]+1 : accuSize[i+1]
         colRange = accuSize[j]+1 : accuSize[j+1]
         buf[rowRange, colRange] .= int
@@ -768,31 +780,31 @@ end
 
 getOverlaps(BSet::Union{NTuple{BN, BT}, NTuple{BN, AbstractGTBasisFuncs}}) where 
            {BN, BT<:AbstractGTBasisFuncs} = 
-getOneBodyInts(FunctionType{:getOverlap}(), BSet)
+getOneBodyInts(getOverlap, BSet)
 
 getElecKinetics(BSet::Union{NTuple{BN, BT}, NTuple{BN, AbstractGTBasisFuncs}}) where 
                {BN, BT<:AbstractGTBasisFuncs} = 
-getOneBodyInts(FunctionType{:getElecKinetic}(), BSet)
+getOneBodyInts(getElecKinetic, BSet)
 
 getNucAttractions(BSet::Union{NTuple{BN, BT}, NTuple{BN, AbstractGTBasisFuncs}}, 
                   nuc::NTuple{NN, String}, nucCoords::NTuple{NN, NTuple{3,Float64}}) where 
                  {BN, BT<:AbstractGTBasisFuncs, NN} = 
-getOneBodyInts(FunctionType{:getNucAttraction}(), BSet, nuc, nucCoords)
+getOneBodyInts(getNucAttraction, BSet, nuc, nucCoords)
 
 getCoreH(BSet::Union{NTuple{BN, BT}, NTuple{BN, AbstractGTBasisFuncs}}, 
          nuc::NTuple{NN, String}, nucCoords::NTuple{NN, NTuple{3,Float64}}) where 
         {BN, BT<:AbstractGTBasisFuncs, NN} = 
-getOneBodyInts(FunctionType{:getCoreHij}(), BSet, nuc, nucCoords)
+getOneBodyInts(getCoreHij, BSet, nuc, nucCoords)
 
 
 permuteArray(arr::AbstractArray{T, N}, order) where {T, N} = PermutedDimsArray(arr, order)
 permuteArray(arr::Number, _) = itself(arr)
 
 
-function getTwoBodyInts(::FunctionType{F}, 
+function getTwoBodyInts(∫2e::F, 
                         basisSet::Union{NTuple{BN, BT}, 
                                         NTuple{BN, AbstractGTBasisFuncs}}) where 
-                       {F, BN, BT<:AbstractGTBasisFuncs}
+                       {F<:Function, BN, BT<:AbstractGTBasisFuncs}
     subSize = basisSize.(basisSet) |> collect
     accuSize = vcat(0, accumulate(+, subSize))
     totalSize = subSize |> sum
@@ -802,7 +814,7 @@ function getTwoBodyInts(::FunctionType{F},
         J = accuSize[j]+1 : accuSize[j+1]
         K = accuSize[k]+1 : accuSize[k+1]
         L = accuSize[l]+1 : accuSize[l+1]
-        subBuf = getfield(Quiqbox, F)(basisSet[i], basisSet[j], basisSet[k], basisSet[l])
+        subBuf = ∫2e(basisSet[i], basisSet[j], basisSet[k], basisSet[l])
         buf[I,J,K,L] .= subBuf
         buf[J,I,K,L] .= permuteArray(subBuf, [2,1,3,4])
         buf[J,I,L,K] .= permuteArray(subBuf, [2,1,4,3])
@@ -817,7 +829,7 @@ end
 
 get2eInteractions(BSet::Union{NTuple{BN, BT}, NTuple{BN, AbstractGTBasisFuncs}}) where 
                  {BN, BT<:AbstractGTBasisFuncs} = 
-getTwoBodyInts(FunctionType{:get2eInteraction}(), BSet)
+getTwoBodyInts(get2eInteraction, BSet)
 
 
 function genUniqueIndices(basisSetSize::Int)

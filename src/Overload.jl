@@ -61,6 +61,10 @@ function show(io::IO, bfm::BasisFuncMix)
     print(io, "(BasisFunc, param)")
 end
 
+function show(io::IO, ::EmptyBasisFunc)
+    print(io, EmptyBasisFunc)
+end
+
 function show(io::IO, gtb::GTBasis)
     print(io, typeof(gtb))
     print(io, "(basis, S, Te, eeI, getVne, getHcore)")
@@ -75,7 +79,7 @@ function show(io::IO, config::SCFconfig)
     print(io, typeof(config))
     print(io, "(interval=", config.interval, ",", 
               " oscillateThreshold=", config.oscillateThreshold, ",", 
-              " method, methodConfig)", getfield.(config.method, :f)|>collect)
+              " method, methodConfig)", config.method|>collect)
 end
 
 function show(io::IO, vars::HFtempVars)
@@ -137,6 +141,8 @@ iterate(bfm::BasisFuncMix) = (bfm, nothing)
 iterate(::BasisFuncMix, _) = nothing
 size(::BasisFuncMix) = ()
 length(::BasisFuncMix) = 1
+
+iterate(bfZero::EmptyBasisFunc) = (bfZero, nothing)
 
 function iterate(bfs::CompositeGTBasisFuncs{<:Any, N}) where {N}
     item, state = iterate(bfs.ijk)

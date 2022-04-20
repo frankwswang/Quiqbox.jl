@@ -54,7 +54,7 @@ coordinates, those 2 arguments can be omitted. If the integral is a spacial grad
         ints = oneBodyBFTensorCore(libcinFunc, i, j, nuclei, nucleiCoords; isGradient)
         ints[ijkIndex(i), ijkIndex(j), :]
     end
-    sum([f(i,j) for i in Quiqbox.unpackBasisFuncs(b1), j in Quiqbox.unpackBasisFuncs(b2)])
+    sum([f(i,j) for i in Quiqbox.unpackBasis(b1), j in Quiqbox.unpackBasis(b2)])
 end
 
 
@@ -182,10 +182,10 @@ argument.
         ints = twoBodyBFTensorCore(libcinFunc, i, j, k, l; isGradient)
         ints[ijkIndex(i), ijkIndex(j), ijkIndex(k), ijkIndex(l),:]
     end
-    sum([f(i,j,k,l) for i in Quiqbox.unpackBasisFuncs(b1), 
-                        j in Quiqbox.unpackBasisFuncs(b2), 
-                        k in Quiqbox.unpackBasisFuncs(b3), 
-                        l in Quiqbox.unpackBasisFuncs(b4)])
+    sum([f(i,j,k,l) for i in Quiqbox.unpackBasis(b1), 
+                        j in Quiqbox.unpackBasis(b2), 
+                        k in Quiqbox.unpackBasis(b3), 
+                        l in Quiqbox.unpackBasis(b4)])
 end
 
 

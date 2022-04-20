@@ -567,18 +567,23 @@ function replaceSymbol(sym::Symbol, pair::Pair{String, String}; count::Int=typem
 end
 
 
-function renameFunc(fName::Symbol, f::F) where {F<:Function}
-    @eval ($(fName))(a...; b...) = $f(a...; b...)
+function renameFunc(fName::Symbol, f::F, returnType::Type{T}, N::Int=1) where 
+                   {F<:Function, T}
+    @eval ($(fName))(a::Vararg{$T, $N}) = $f(a...)::$T
 end
 
-renameFunc(fName::String, f) = renameFunc(Symbol(fName), f)
+function renameFunc(fName::Symbol, f::F, N::Int=1) where {F<:Function}
+    @eval ($(fName))(a::Vararg{Any, $N}) where {T} = $f(a...)
+end
+
+renameFunc(fName::String, args...) = renameFunc(Symbol(fName), args...)
 
 
 """
 Recursively find the final value using the value of each iteration as the key for the 
 next search.
 """
-function recursivelyGet(dict::Dict{K, V}, startKey::K, default=Vector{V}(undef, 1)[]) where 
+function recursivelyGet(dict::Dict{K, V}, startKey::K, default=Array{V}(undef, 1)[]) where 
                        {K, V}
     res = default
     val = get(dict, startKey, missing)
@@ -689,26 +694,26 @@ function mapPermute(arr, permFunction)
 end
 
 
-# Product Function
-struct Pf{C, F} <: ParameterizedFunction{Pf, F}
-    f::Function
+struct TypedFunction{F<:Function} <: Function
+    f::F
+    n::Symbol
+
+    TypedFunction(f::F) where {F<:Function} = new{F}(f, nameOf(f))
 end
 
-Pf(c::Float64, f::Function) = Pf{c, nameOf(f)}(f)
-Pf(c::Float64, f::Pf{C, F}) where {C, F} = Pf{c*C, F}(f.f)
-Pf(c::Float64, ::Val{T}) where {T} = Pf{c, T}(getFunc(T, NaN))
-Pf(c::Float64, ::Val{Pf{C, F}}) where {C, F} = Pf{c*C, F}(getFunc(F, NaN))
+(tf::TypedFunction{F})(x...) where {F} = tf.f(x...)
 
 
-(f::Pf{C})(x::Real) where {C} = C * f.f(x)
-(::Type{Pf{C, F}})(x::Real) where {C, F} = C * getFunc(F, NaN)(x)
+# Product Function
+struct Pf{C, FN} <: ParameterizedFunction{Pf, FN}
+    f::TypedFunction{FN}
+end
 
-Pf(c::Float64, ::Pf{C, :itself}) where {C} = Pf{c*C, :itself}(itself)
-Pf(c::Float64, ::Val{:itself}) = Pf{c, :itself}(itself)
-Pf(c::Float64, ::Val{Pf{C, :itself}}) where {C} = Pf{c*C, :itself}(itself)
+Pf(c::Float64, f::TypedFunction{FN}) where {FN} = Pf{c, FN}(f)
+Pf(c::Float64, f::Pf{C, FN}) where {C, FN} = Pf{c*C, FN}(f.f)
+Pf(c::Float64, f::F) where {F<:Function} = Pf(c, TypedFunction(f))
 
-(f::Pf{C, :itself})(x::Real) where {C} = C * x
-(::Type{Pf{C, :itself}})(x::Real) where {C} = C * x
+(f::Pf{C, FN})(x::T) where {C, FN, T} = Float64(C) * f.f.f(x)
 
 
 function getFunc(fSym::Symbol, failedResult=missing)
@@ -727,16 +732,14 @@ function getFunc(fSym::Symbol, failedResult=missing)
     end
 end
 
-getFunc(::Type{Pf{C, F}}, _=missing) where {C, F} = Pf{C, F}(getFunc(Val(F)))
+getFunc(tf::TypedFunction) = tf.f
 
 getFunc(f::Function, _=missing) = itself(f)
 
-getFunc(::Val{F}, failedResult=missing) where {F} = getFunc(F, failedResult)
-
-getFunc(::Val{:itself}, _=missing) = itself
-
 
 nameOf(f::ParameterizedFunction) = typeof(f)
+
+nameOf(f::TypedFunction) = f.n
 
 nameOf(f) = nameof(f)
 
@@ -793,32 +796,21 @@ arrayDiff!(vs::Vararg{Array{T}, N}) where {T, N} = arrayDiffCore!(vs)
 tupleDiff(ts::Vararg{NTuple{<:Any, T}, N}) where {T, N} = arrayDiff!((ts .|> collect)...)
 
 
-struct FunctionType{F}
-    f::Union{Symbol, Type{<:ParameterizedFunction}, Function}
-
-    FunctionType{F}() where {F} = new{F}(F)
-    FunctionType(f::F) where {F<:Function} = new{F}(f)
-end
-
-FunctionType(s::Symbol) = FunctionType{s}()
-
-getFunc(ft::FunctionType{F}) where {F} = ft.f
-
 function getFuncNum(f::Function, vNum::Symbolics.Num)::Symbolics.Num
-    Symbolics.variable(f|>nameOf, T=Symbolics.FnType{Tuple{Any}, Real})(vNum)
+    Symbolics.variable(f|>nameOf, T=Symbolics.FnType)(vNum)
 end
 
-function getFuncNum(::Pf{C, F}, vNum::Symbolics.Num) where {C, F}
-    (C * Symbolics.variable(F, T=Symbolics.FnType{Tuple{Any}, Real})(vNum))::Symbolics.Num
+function getFuncNum(pf::Pf{C, F}, vNum::Symbolics.Num) where {C, F}
+    (C * Symbolics.variable(pf.f.n, T=Symbolics.FnType)(vNum))::Symbolics.Num
 end
 
-function getFuncNum(::FunctionType{F}, vNum::Symbolics.Num) where {F}
-    Symbolics.variable(F, T=Symbolics.FnType{Tuple{Any}, Real})(vNum)::Symbolics.Num
+function getFuncNum(tf::TypedFunction{F}, vNum::Symbolics.Num) where {F}
+    Symbolics.variable(tf.n, T=Symbolics.FnType)(vNum)::Symbolics.Num
 end
 
-getFuncNum(::FunctionType{:itself}, vNum::Symbolics.Num) = vNum
+getFuncNum(::TypedFunction{typeof(itself)}, vNum::Symbolics.Num) = itself(vNum)
 
-getFuncNum(::typeof(itself), vNum::Symbolics.Num) = vNum
+getFuncNum(::typeof(itself), vNum::Symbolics.Num) = itself(vNum)
 
 function genIndex(index::Int)
     @assert index >= 0

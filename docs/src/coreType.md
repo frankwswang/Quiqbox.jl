@@ -17,7 +17,7 @@ BasisFuncs{𝑙, GN, ON}
 ```
 
 ```@docs
-Quiqbox.BasisFuncMix{BN, GN}
+Quiqbox.BasisFuncMix
 ```
 
 ```@docs

@@ -49,7 +49,7 @@ end
     hasEqual(tVars1, res1.temp[1])
 end
 
-@test isapprox(res1.Ehf, Quiqbox.getEᵀ(Hcore, HeeI, res1.C, Ne), atol=errorThreshold1)
+@test isapprox(res1.Ehf, Quiqbox.getEᵀ(Hcore, HeeI, res1.C, (Ne,)), atol=errorThreshold1)
 
 @test isapprox(res1.Ehf, -93.7878386326277, atol=errorThreshold1)
 

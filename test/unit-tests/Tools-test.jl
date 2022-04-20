@@ -1,6 +1,8 @@
 using Test
 using Quiqbox: tryIncluding, @compareLength, hasBoolRelation, markUnique, flatten, 
-               alignNumSign, replaceSymbol, splitTerm, groupedSort, mapPermute, Pf, itself
+               alignNumSign, replaceSymbol, renameFunc, splitTerm, groupedSort, mapPermute, 
+               nameOf, TypedFunction, Pf, itself, getFunc
+
 using Quiqbox
 using Symbolics
 using Suppressor: @capture_out
@@ -45,6 +47,15 @@ pkgDir = @__DIR__
 
 # function replaceSymbol
 @test replaceSymbol(:sombol, "o"=>"y", count=1) == :symbol
+
+
+# function renameFunc
+f1 = renameFunc(:f1, x->abs(x))
+@test f1(-0.1) === 0.1
+@test f1(-1) === 1
+f2 = renameFunc(:f2, x->abs(x), Float64)
+@test f2(-0.1) === 0.1
+@test try f2(-1) catch; true end
 
 
 # function splitTerm
@@ -101,16 +112,29 @@ end
 @test bl2
 @test bl3
 
-# struct Pf
-@test Pf(-1.5, abs)(-2) == -3.0
-@test Pf(-1.0, Pf(-1.5, abs))(-2) == 3.0
-@test Pf(1.5, Val(:abs))(-2) == 3.0
-@test Pf(-1.0, Val(Pf{-1.5, :abs}))(-2) == 3.0
-@test typeof(Pf(-1.5, abs))(-2) == -3.0
 
+# struct TypedFunction
+tf1 = TypedFunction(abs)
+@test nameOf(tf1) == nameOf(abs) == nameof(abs)
+v = -abs(rand())
+@test tf1(v) === abs(v)
+
+
+# struct Pf
+pf1 = Pf(-1.5, abs)
+@test pf1(-2) == -3.0
+@test nameOf(pf1) == typeof(pf1)
+pf2 = Pf(-1.5, abs)
+@test pf2(-2) == Pf(-1.5, tf1)(-2) == -3.0
+@test Pf(-1.0, pf2)(-2) == 3.0
 @test Pf(-1.0, Pf(-1.5, itself))(-2) == -3.0
-@test Pf(1.5, Val(:itself))(-2) == -3.0
-@test Pf(-1.0, Val(Pf{-1.5, :itself}))(-2) == -3.0
-@test typeof(Pf(-1.5, itself))(-2) == 3.0
+
+
+# function getFunc
+@test getFunc(abs) == abs
+tff = nameOf(tf1) |> getFunc
+@test tff == tf1.f == getFunc(tf1) == abs
+@test getFunc(:abs) == abs
+@test getFunc(:getOverlap) == Quiqbox.getOverlap
 
 end
