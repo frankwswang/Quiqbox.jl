@@ -1,8 +1,5 @@
 name: CI-JS-older
 on: 
-  pull_request:
-    branches:
-      - main
   push:
     branches:
       - main
