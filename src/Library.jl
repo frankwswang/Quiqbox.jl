@@ -142,11 +142,11 @@ const ParamNames = [:X, :Y, :Z, :d, :α, :L]
 const ParamSymbols = [:X, :Y, :Z, :con, :xpn, :spacing]
 const ParamList = Dict(ParamSymbols .=> ParamNames)
 
-const αParamSym = ParamList[:xpn]
-const dParamSym = ParamList[:con]
-const XParamSym = ParamList[:X]
-const YParamSym = ParamList[:Y]
-const ZParamSym = ParamList[:Z]
+const xpnSym = ParamList[:xpn]
+const conSym = ParamList[:con]
+const cxSym = ParamList[:X]
+const cySym = ParamList[:Y]
+const czSym = ParamList[:Z]
 
 
 

@@ -118,7 +118,6 @@ end
 function ParamBox(::Val{V}, mapFunction::F, data::Array{T, 0}, index, canDiff, 
                   dataName=:undef) where {V, F<:Function, T}
     L1, _ = getFLevel(F)
-    Ftype = F
     if L1 == 2
         fSym = mapFunction |> nameOf
         fStr = fSym |> string
@@ -139,8 +138,8 @@ ParamBox{T, V}(data, index)
 ParamBox(::Val{V}, pb::ParamBox{T, <:Any, FLevel(itself)}) where {V, T} = 
 ParamBox{T, V}(pb.data, pb.index)
 
-ParamBox(::Val{V}, pb::ParamBox) where {V} = 
-ParamBox(Val(V), pb.map, pb.data, pb.index, pb.canDiff, pb.dataName)
+ParamBox(::Val{V}, pb::ParamBox{T}) where {T, V} = 
+ParamBox{T, V}(pb.map, pb.data, pb.index, pb.canDiff, pb.dataName)
 
 ParamBox(data::T, dataName::Symbol=:undef; index::Union{Int, Nothing}=nothing) where {T} = 
 ParamBox(Val(dataName), fillNumber(data), genIndex(index))
@@ -193,7 +192,7 @@ corresponding value.
 Return the value of mapped data (dependent variable) of the input `ParamBox`. Equivalent to 
 `pb()`.
 """
-@inline outValOf(pb::ParamBox{T}) where {T} = pb.map(pb.data[]::T)
+@inline outValOf(pb::ParamBox) = pb.map(pb.data[])
 
 @inline outValOf(pb::ParamBox{T, <:Any, FLevel(itself)}) where {T} = inValOf(pb)
 
@@ -244,6 +243,9 @@ Return the `Symbol` of the stored data (independent variable) of the input `Para
 Return the `Symbol` of the mapped data (dependent variable) of the input `ParamBox`.
 """
 @inline outSymOfCore(::ParamBox{<:Any, V}) where {V} = V
+
+
+getTypeParams(::ParamBox{T, V, FL}) where {T, V, FL} = (T, V, FL)
 
 
 """

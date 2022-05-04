@@ -694,7 +694,7 @@ function mapPermute(arr, permFunction)
 end
 
 
-struct TypedFunction{F<:Function} <: Function
+struct TypedFunction{F<:Function} <: StructFunction{TypedFunction}
     f::F
     n::Symbol
 
@@ -705,15 +705,15 @@ end
 
 
 # Product Function
-struct Pf{C, FN} <: ParameterizedFunction{Pf, FN}
-    f::TypedFunction{FN}
+struct Pf{C, F} <: ParameterizedFunction{Pf, F}
+    f::TypedFunction{F}
 end
 
-Pf(c::Float64, f::TypedFunction{FN}) where {FN} = Pf{c, FN}(f)
-Pf(c::Float64, f::Pf{C, FN}) where {C, FN} = Pf{c*C, FN}(f.f)
+Pf(c::Float64, f::TypedFunction{F}) where {F} = Pf{c, F}(f)
+Pf(c::Float64, f::Pf{C, F}) where {C, F} = Pf{c*C, F}(f.f)
 Pf(c::Float64, f::F) where {F<:Function} = Pf(c, TypedFunction(f))
 
-(f::Pf{C, FN})(x::T) where {C, FN, T} = Float64(C) * f.f.f(x)
+(f::Pf{C, F})(x::T) where {C, F, T} = Float64(C) * f.f.f(x)
 
 
 function getFunc(fSym::Symbol, failedResult=missing)

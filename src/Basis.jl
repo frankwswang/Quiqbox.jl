@@ -17,49 +17,41 @@ A single contracted gaussian function `struct` from package Quiqbox.
 
 ≡≡≡ Field(s) ≡≡≡
 
-`xpn::ParamBox{Float64, :$(αParamSym)}`：Exponent of the gaussian function.
+`xpn::ParamBox{Float64, :$(xpnSym)}`：Exponent of the gaussian function.
 
-`con::ParamBox{Float64, :$(dParamSym)}`: Contraction coefficient of the gaussian 
-function.
+`con::ParamBox{Float64, :$(conSym)}`: Contraction coefficient of the gaussian function.
 
 `param::NTuple{2, ParamBox}`: A Tuple that stores the `ParamBox`s of `xpn` and `con`.
 
 ≡≡≡ Initialization Method(s) ≡≡≡
 
-    GaussFunc(xpn::ParamBox, con::ParamBox) -> GaussFunc
-
-    GaussFunc(xpn::Real, con::Real) -> GaussFunc
+    GaussFunc(xpn::Union{Real, ParamBox}, con::Union{Real, ParamBox}) -> GaussFunc
 
 """
 struct GaussFunc <: AbstractGaussFunc
-    xpn::ParamBox{Float64, αParamSym}
-    con::ParamBox{Float64, dParamSym}
-    param::Tuple{ParamBox{Float64, αParamSym}, 
-                 ParamBox{Float64, dParamSym}}
+    xpn::ParamBox{Float64, xpnSym}
+    con::ParamBox{Float64, conSym}
+    param::Tuple{ParamBox{Float64, xpnSym}, 
+                 ParamBox{Float64, conSym}}
 
-    GaussFunc(xpn::ParamBox{Float64, αParamSym}, 
-              con::ParamBox{Float64, dParamSym}) = 
+    GaussFunc(xpn::ParamBox{Float64, xpnSym}, 
+              con::ParamBox{Float64, conSym}) = 
     new(xpn, con, (xpn, con))
 end
 
-function GaussFunc(e::Real, c::Real)
-    xpn = ParamBox(convertNumber(e), αParamSym)
-    con = ParamBox(convertNumber(c), dParamSym)
-    GaussFunc(xpn, con)
-end
-
-GaussFunc(xpn::ParamBox, con::ParamBox) = GaussFunc(genExponent(xpn), genContraction(con))
+GaussFunc(e::T1, d::T2) where {T1<:Union{Real, ParamBox}, T2<:Union{Real, ParamBox}} = 
+GaussFunc(genExponent(e), genContraction(d))
 
 
 """
 
     genExponent(e::Real, mapFunction::Function; canDiff::Bool=true, 
                 roundDigits::Int=15, dataName::Symbol=:undef) -> 
-    ParamBox{Float64, :$(αParamSym)}
+    ParamBox{Float64, :$(xpnSym)}
 
     genExponent(e::Array{T, 0}, mapFunction::Function; canDiff::Bool=true, 
                 dataName::Symbol=:undef) where {T<:Real} -> 
-    ParamBox{Float64, :$(αParamSym)}
+    ParamBox{Float64, :$(xpnSym)}
 
 Construct a `ParamBox` for an exponent coefficient given a value. Keywords `mapFunction` 
 and `canDiff` work the same way as in a general constructor of a `ParamBox`. If 
@@ -67,46 +59,46 @@ and `canDiff` work the same way as in a general constructor of a `ParamBox`. If
 """
 genExponent(e::Real, mapFunction::F; canDiff::Bool=true, 
             roundDigits::Int=15, dataName::Symbol=:undef) where {F<:Function} = 
-ParamBox(Val(αParamSym), mapFunction, fill(convertNumber(e, roundDigits)), 
+ParamBox(Val(xpnSym), mapFunction, fill(convertNumber(e, roundDigits)), 
          genIndex(nothing), fill(canDiff), dataName)
 
 genExponent(e::Array{T, 0}, mapFunction::F; canDiff::Bool=true, 
             dataName::Symbol=:undef) where {T<:Real, F<:Function} = 
-ParamBox(Val(αParamSym), mapFunction, e, genIndex(nothing), fill(canDiff), dataName)
+ParamBox(Val(xpnSym), mapFunction, e, genIndex(nothing), fill(canDiff), dataName)
 
 
 
 """
 
-    genExponent(e::Real; roundDigits::Int=15) -> ParamBox{Float64, :$(αParamSym)}
+    genExponent(e::Real; roundDigits::Int=15) -> ParamBox{Float64, :$(xpnSym)}
 
-    genExponent(e::Array{Float64, 0}) -> ParamBox{Float64, :$(αParamSym)}
+    genExponent(e::Array{Float64, 0}) -> ParamBox{Float64, :$(xpnSym)}
 
 """
 genExponent(e::Real; roundDigits::Int=15) = 
-ParamBox(Val(αParamSym), itself, fill(convertNumber(e, roundDigits)), genIndex(nothing))
+ParamBox(Val(xpnSym), itself, fill(convertNumber(e, roundDigits)), genIndex(nothing))
 
-genExponent(e::Array{Float64, 0}) = ParamBox(Val(αParamSym), itself, e, genIndex(nothing))
+genExponent(e::Array{Float64, 0}) = ParamBox(Val(xpnSym), itself, e, genIndex(nothing))
 
 
 """
 
-    genExponent(pb::ParamBox{Float64}) -> ParamBox{Float64, :$(αParamSym)}
+    genExponent(pb::ParamBox{Float64}) -> ParamBox{Float64, :$(xpnSym)}
 
 Convert a `$(ParamBox)` to an exponent coefficient parameter.
 """
-genExponent(pb::ParamBox{Float64, V, F}) where {V, F} = ParamBox(Val(αParamSym), pb)
+genExponent(pb::ParamBox{Float64, V, F}) where {V, F} = ParamBox(Val(xpnSym), pb)
 
 
 """
 
     genContraction(c::Real, mapFunction::Function; canDiff::Bool=true, 
                 roundDigits::Int=15, dataName::Symbol=:undef) -> 
-    ParamBox{Float64, :$(dParamSym)}
+    ParamBox{Float64, :$(conSym)}
 
     genContraction(c::Array{T, 0}, mapFunction::Function; canDiff::Bool=true, 
                 dataName::Symbol=:undef) where {T<:Real} -> 
-    ParamBox{Float64, :$(dParamSym)}
+    ParamBox{Float64, :$(conSym)}
 
 Construct a `ParamBox` for an contraction coefficient given a value. Keywords `mapFunction` 
 and `canDiff` work the same way as in a general constructor of a `ParamBox`. If 
@@ -114,33 +106,32 @@ and `canDiff` work the same way as in a general constructor of a `ParamBox`. If
 """
 genContraction(c::Real, mapFunction::F; canDiff::Bool=true, 
                roundDigits::Int=15, dataName::Symbol=:undef) where {F<:Function} = 
-ParamBox(Val(dParamSym), mapFunction, fill(convertNumber(c, roundDigits)), 
+ParamBox(Val(conSym), mapFunction, fill(convertNumber(c, roundDigits)), 
          genIndex(nothing), fill(canDiff), dataName)
 
 genContraction(c::Array{T, 0}, mapFunction::F; canDiff::Bool=true, 
                dataName::Symbol=:undef) where {T<:Real, F<:Function} = 
-ParamBox(Val(dParamSym), mapFunction, c, genIndex(nothing), fill(canDiff), dataName)
+ParamBox(Val(conSym), mapFunction, c, genIndex(nothing), fill(canDiff), dataName)
 
 """
 
-    genContraction(c::Real; roundDigits::Int=15) -> ParamBox{Float64, :$(dParamSym)}
+    genContraction(c::Real; roundDigits::Int=15) -> ParamBox{Float64, :$(conSym)}
 
-    genContraction(c::Array{Float64, 0}) -> ParamBox{Float64, :$(dParamSym)}
+    genContraction(c::Array{Float64, 0}) -> ParamBox{Float64, :$(conSym)}
 
 """
 genContraction(c::Real; roundDigits::Int=15) = 
-ParamBox(Val(dParamSym), itself, fill(convertNumber(c, roundDigits)), genIndex(nothing))
+ParamBox(Val(conSym), itself, fill(convertNumber(c, roundDigits)), genIndex(nothing))
 
-genContraction(c::Array{Float64, 0}) = ParamBox(Val(dParamSym), itself, c, 
-               genIndex(nothing))
+genContraction(c::Array{Float64, 0}) = ParamBox(Val(conSym), itself, c, genIndex(nothing))
 
 """
 
-    genContraction(pb::ParamBox{Float64}) -> ParamBox{Float64, :$(dParamSym)}
+    genContraction(pb::ParamBox{Float64}) -> ParamBox{Float64, :$(conSym)}
 
 Convert a `$(ParamBox)` to an exponent coefficient parameter.
 """
-genContraction(pb::ParamBox{Float64, V, F}) where {V, F} = ParamBox(Val(dParamSym), pb)
+genContraction(pb::ParamBox{Float64, V, F}) where {V, F} = ParamBox(Val(conSym), pb)
 
 
 const Doc_genSpatialPoint_Eg1 = "(ParamBox{Float64, :X, $(FLevel(itself))}(1.0)[∂][X], " * 
@@ -279,9 +270,9 @@ convenient syntax, `.ijk[]` converts it to a `NTuple{3, Int}`.
     BasisFunc{𝑙, 1} where {𝑙}
 """
 struct BasisFunc{𝑙, GN} <: FloatingGTBasisFuncs{𝑙, GN, 1}
-    center::Tuple{ParamBox{Float64, XParamSym}, 
-                  ParamBox{Float64, YParamSym}, 
-                  ParamBox{Float64, ZParamSym}}
+    center::Tuple{ParamBox{Float64, cxSym}, 
+                  ParamBox{Float64, cySym}, 
+                  ParamBox{Float64, czSym}}
     gauss::NTuple{GN, GaussFunc}
     ijk::Tuple{XYZTuple{𝑙}}
     normalizeGTO::Bool
@@ -319,9 +310,9 @@ specifically, for `ijk`, the size of the it (`ON`) can be no less than 1 (and no
 than the size of the corresponding subshell).
 """
 struct BasisFuncs{𝑙, GN, ON} <: FloatingGTBasisFuncs{𝑙, GN, ON}
-    center::Tuple{ParamBox{Float64, XParamSym}, 
-                  ParamBox{Float64, YParamSym}, 
-                  ParamBox{Float64, ZParamSym}}
+    center::Tuple{ParamBox{Float64, cxSym}, 
+                  ParamBox{Float64, cySym}, 
+                  ParamBox{Float64, czSym}}
     gauss::NTuple{GN, GaussFunc}
     ijk::NTuple{ON, XYZTuple{𝑙}}
     normalizeGTO::Bool
@@ -546,9 +537,9 @@ genBasisFunc(cen, (g,), args...; kws...)
 
 function genBasisFunc(coord::Union{AbstractArray{<:Real}, NTuple{3, Real}}, args...; kws...)
     @assert length(coord) == 3 "The dimension of the center should be 3."
-    x = ParamBox(convertNumber(coord[1]), XParamSym)
-    y = ParamBox(convertNumber(coord[2]), YParamSym)
-    z = ParamBox(convertNumber(coord[3]), ZParamSym)
+    x = ParamBox(convertNumber(coord[1]), cxSym)
+    y = ParamBox(convertNumber(coord[2]), cySym)
+    z = ParamBox(convertNumber(coord[3]), czSym)
     genBasisFunc((x,y,z), args...; kws...)
 end
 
@@ -673,9 +664,9 @@ isFull(::FloatingGTBasisFuncs{𝑙, <:Any, ON}) where {𝑙, ON} = (ON == Subshe
 """
 
     centerOf(bf::FloatingGTBasisFuncs) -> 
-    Tuple{ParamBox{Float64, $(XParamSym)}, 
-          ParamBox{Float64, $(YParamSym)}, 
-          ParamBox{Float64, $(ZParamSym)}}
+    Tuple{ParamBox{Float64, $(cxSym)}, 
+          ParamBox{Float64, $(cySym)}, 
+          ParamBox{Float64, $(czSym)}}
 
 Return the center of the input `FloatingGTBasisFuncs`.
 """
@@ -1182,24 +1173,41 @@ mul(bf1::BasisFuncs{𝑙1, GN1, 1}, bf2::BasisFuncs{𝑙2, GN2, 1};
 """
 
     shift(bf::FloatingGTBasisFuncs{𝑙, GN, 1}, 
-          didjdk::Union{Vector{<:Real}, NTuple{3, Int}}) where {𝑙, GN} -> 
+          didjdk::Union{Vector{<:Real}, NTuple{3, Int}}, op::Function=+) where {𝑙, GN} -> 
     BasisFunc
 
-Shift (add) the angular momentum (Cartesian representation) given the a vector that 
-specifies the change of each pseudo-quantum number 𝑑i, 𝑑j, 𝑑k.
+Shift (`+` as the "add" operator in default) the angular momentum (Cartesian 
+representation) given the a vector that specifies the change of each pseudo-quantum number 
+𝑑i, 𝑑j, 𝑑k.
 """
-shift(bf::FloatingGTBasisFuncs{𝑙, GN, 1}, didjdk::AbstractArray{<:Real}) where {𝑙, GN} = 
-shiftCore(bf, XYZTuple(didjdk.|>Int))
+shift(bf::FloatingGTBasisFuncs{𝑙, GN, 1}, didjdk::AbstractArray{<:Real}, op::F=+) where 
+     {𝑙, GN, F<:Function} = 
+shiftCore(op, bf, XYZTuple(didjdk.|>Int))
 
-shift(bf::FloatingGTBasisFuncs{𝑙, GN, 1}, didjdk::NTuple{3, Int}) where {𝑙, GN} = 
-shiftCore(bf, XYZTuple(didjdk))
+shift(bf::FloatingGTBasisFuncs{𝑙, GN, 1}, didjdk::NTuple{3, Int}, op::F=+) where 
+     {𝑙, GN, F<:Function} = 
+shiftCore(op, bf, XYZTuple(didjdk))
 
-shift(::EmptyBasisFunc, _) = EmptyBasisFunc()
-
-shiftCore(bf::FloatingGTBasisFuncs{𝑙1, GN, 1}, didjdk::XYZTuple{𝑙2}) where {𝑙1, 𝑙2, GN} = 
+shiftCore(::typeof(+), bf::FloatingGTBasisFuncs{𝑙1, GN, 1}, didjdk::XYZTuple{𝑙2}) where 
+         {𝑙1, 𝑙2, GN} = 
 BasisFunc(bf.center, bf.gauss, bf.ijk[1]+didjdk, bf.normalizeGTO)
 
-shiftCore(::EmptyBasisFunc, _) = EmptyBasisFunc()
+shiftCore(::typeof(-), bf::FloatingGTBasisFuncs{0, GN, 1}, ::XYZTuple{0}) where {GN} = 
+BasisFunc(bf.center, bf.gauss, bf.ijk[1], bf.normalizeGTO)
+
+shiftCore(::typeof(-), bf::FloatingGTBasisFuncs{0, GN, 1}, didjdk::XYZTuple{𝑙}) where 
+         {𝑙, GN} = EmptyBasisFunc()
+
+function shiftCore(::typeof(-), bf::FloatingGTBasisFuncs{𝑙1, GN, 1}, 
+                   didjdk::XYZTuple{𝑙2}) where {𝑙1, 𝑙2, GN}
+    xyz = bf.ijk[1].tuple .- didjdk.tuple
+    for i in xyz
+        i < 0 && (return EmptyBasisFunc())
+    end
+    BasisFunc(bf.center, bf.gauss, XYZTuple(xyz), bf.normalizeGTO)
+end
+
+shiftCore(::Function, ::EmptyBasisFunc, ::XYZTuple) = EmptyBasisFunc()
 
 """
 
@@ -1228,7 +1236,11 @@ function decomposeCore(::Val{true}, bf::FloatingGTBasisFuncs{𝑙, GN, ON}) wher
     res
 end
 
-decomposeCore(::Val{false}, bfm::BasisFuncMix) = reshape([bfm], 1, 1)
+decomposeCore(::Val{false}, b::CompositeGTBasisFuncs{<:Any, 1}) = hcat(b)
+
+decomposeCore(::Val{true}, b::FloatingGTBasisFuncs{<:Any, 1, 1}) = hcat(BasisFunc(b))
+
+decomposeCore(::Val{false}, b::FloatingGTBasisFuncs{<:Any, <:Any, 1}) = hcat(BasisFunc(b))
 
 getSGFtype(::Type{<:BasisFunc}) = BasisFunc{<:Any, 1}
 getSGFtype(::Type{BasisFunc{𝑙}}) where {𝑙} = BasisFunc{𝑙, 1}
@@ -1427,9 +1439,9 @@ Generate a `Tuple` of coordinate `ParamBox`s for a basis function center coordin
 """
 function makeCenter(coord::Vector{<:Real}; roundDigits::Int=-1)
     c = roundDigits<0 ? convert(Vector{Float64}, coord) : round.(coord, digits=roundDigits)
-    x = ParamBox(c[1], XParamSym)
-    y = ParamBox(c[2], YParamSym)
-    z = ParamBox(c[3], ZParamSym)
+    x = ParamBox(c[1], cxSym)
+    y = ParamBox(c[2], cySym)
+    z = ParamBox(c[3], czSym)
     (x,y,z)
 end
 

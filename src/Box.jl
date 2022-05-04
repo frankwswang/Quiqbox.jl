@@ -65,15 +65,15 @@ struct GridBox{NP} <: SemiMutableParameter{GridBox, Float64}
             fX0 = L -> centerCoord[1] + (i - 0.5*nGx) * L
             fY0 = L -> centerCoord[2] + (j - 0.5*nGy) * L
             fZ0 = L -> centerCoord[3] + (k - 0.5*nGz) * L
-            fXname = prefix * (XParamSym |> string) * numToSubs(n)
-            fYname = prefix * (YParamSym |> string) * numToSubs(n)
-            fZname = prefix * (ZParamSym |> string) * numToSubs(n)
+            fXname = prefix * (cxSym |> string) * numToSubs(n)
+            fYname = prefix * (cySym |> string) * numToSubs(n)
+            fZname = prefix * (czSym |> string) * numToSubs(n)
             fX = renameFunc(fXname, fX0)
             fY = renameFunc(fYname, fY0)
             fZ = renameFunc(fZname, fZ0)
-            X = ParamBox(pbRef.data, XParamSym, fX, sym; canDiff, index)
-            Y = ParamBox(pbRef.data, YParamSym, fY, sym; canDiff, index)
-            Z = ParamBox(pbRef.data, ZParamSym, fZ, sym; canDiff, index)
+            X = ParamBox(pbRef.data, cxSym, fX, sym; canDiff, index)
+            Y = ParamBox(pbRef.data, cySym, fY, sym; canDiff, index)
+            Z = ParamBox(pbRef.data, czSym, fZ, sym; canDiff, index)
             push!(boxes, (X, Y, Z))
         end
         new{(nGx+1)*(nGy+1)*(nGz+1)}(prod(nGrids .+ 1), spc, Tuple(boxes))
