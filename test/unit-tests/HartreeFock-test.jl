@@ -6,7 +6,7 @@ using Suppressor: @suppress_out
 
 errorThreshold1 = 1e-8
 errorThreshold2 = 5e-5
-errorThreshold3 = 1e-4
+errorThreshold3 = 2e-4
 
 nucCoords = [[-0.7,0.0,0.0], [0.7,0.0,0.0], [0.0, 0.0, 0.0]]
 nuc = ["H", "H", "O"]
@@ -108,7 +108,7 @@ D1 = res1.D[1]
 end
 
 @test isapprox(res2.Ehf, Quiqbox.getEᵀ(Hcore, HeeI, res2.C, (Ne÷2, Ne-Ne÷2)), 
-                atol=errorThreshold2)
+                atol=errorThreshold3)
 
 @test isapprox(res2.Ehf, -93.78783862153227, atol=errorThreshold2)
 
@@ -127,7 +127,7 @@ end
   0.0 -0.0 1.09399263 0.0 0.0 0.0 2.7786835; 
   -0.0 0.0 0.0 1.0 0.0 0.0 -0.0; 
   -0.0 0.0 0.0 0.0 1.0 0.0 -0.0][1:5, [1,2,3,6,7]]), 
-atol=errorThreshold2) |> all
+atol=errorThreshold3) |> all
 
 @test  isapprox(vcat(res2.C[1][6:7,:][:], res2.C[1][1:5, 4:5][:]) |> sort, 
                 vcat(fill(0,22), fill(1,2)), atol=errorThreshold1)
