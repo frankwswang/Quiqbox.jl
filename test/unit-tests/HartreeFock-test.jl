@@ -6,6 +6,7 @@ using Suppressor: @suppress_out
 
 errorThreshold1 = 1e-8
 errorThreshold2 = 5e-5
+errorThreshold3 = 1e-4
 
 nucCoords = [[-0.7,0.0,0.0], [0.7,0.0,0.0], [0.0, 0.0, 0.0]]
 nuc = ["H", "H", "O"]
@@ -109,7 +110,7 @@ end
 @test isapprox(res2.Ehf, Quiqbox.getEᵀ(Hcore, HeeI, res2.C, (Ne÷2, Ne-Ne÷2)), 
                 atol=errorThreshold2)
 
-@test isapprox(res2.Ehf, -93.78783862153227, atol=errorThreshold1)
+@test isapprox(res2.Ehf, -93.78783862153227, atol=errorThreshold2)
 
 @test isapprox.((res2.C[1][1:5, [1,2,3,6,7]], res2.C[2][1:5, [1,2,3,6,7]]), 
 ([0.01089599 0.08896693 0.12165132 0.0 0.0 1.91454586 3.61573186; 
@@ -151,12 +152,12 @@ atol=errorThreshold2) |> all
   0.48360346 -0.48360346 0.0 -0.0 -1.28091496 0.0 0.0; 
   0.0 0.0 0.0 0.0 0.0 -0.6612953 0.0; 
   0.0 0.0 0.0 0.0 0.0 0.0 -0.6612953]), 
-atol=errorThreshold2) |> all
+atol=errorThreshold3) |> all
 
 @test isapprox.(res2.Emo, 
 ([-20.93037089, -1.61667659, -1.28447204, -0.66130603, -0.66130603, 1.06081929, 1.84780051],
  [-20.93036224, -1.6166635, -1.28445199, -0.6612953, -0.6612953, 1.06081725, 1.8478124]), 
-atol=errorThreshold2) |> all
+atol=errorThreshold3) |> all
 
 @test ( res2.occu .== ([1, 1, 1, 1, 1, 0, 0], [1, 1, 1, 1, 1, 0, 0]) ) |> prod
 
