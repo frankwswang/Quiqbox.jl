@@ -127,7 +127,7 @@ end
   0.0 -0.0 1.09399263 0.0 0.0 0.0 2.7786835; 
   -0.0 0.0 0.0 1.0 0.0 0.0 -0.0; 
   -0.0 0.0 0.0 0.0 1.0 0.0 -0.0][1:5, [1,2,3,6,7]]), 
-atol=errorThreshold3) |> all
+atol=errorThreshold3*2) |> all
 
 @test  isapprox(vcat(res2.C[1][6:7,:][:], res2.C[1][1:5, 4:5][:]) |> sort, 
                 vcat(fill(0,22), fill(1,2)), atol=errorThreshold1)
