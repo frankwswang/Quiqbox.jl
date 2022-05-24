@@ -6,7 +6,7 @@ using Suppressor: @suppress_out
 
 errorThreshold1 = 1e-8
 errorThreshold2 = 5e-5
-errorThreshold3 = 2e-4
+errorThreshold3 = 5e-4
 
 nucCoords = [[-0.7,0.0,0.0], [0.7,0.0,0.0], [0.0, 0.0, 0.0]]
 nuc = ["H", "H", "O"]
