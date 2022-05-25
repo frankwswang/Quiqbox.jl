@@ -4,6 +4,7 @@ using LinearAlgebra: dot, Hermitian, \, det, I
 using PiecewiseQuadratics: indicator
 using SeparableOptimization
 using Combinatorics: powerset
+using LBFGSB: lbfgsb
 
 getXcore1(S::Matrix{Float64}) = Hermitian(S)^(-0.5) |> Array
 
@@ -739,22 +740,22 @@ end
 function xDIIScore(::Val{M}, Nˢ::Int, Hcore::Matrix{Float64}, HeeI::Array{Float64, 4}, 
                    S::Matrix{Float64}, X::Matrix{Float64}, Fs::Vector{Matrix{Float64}}, 
                    Ds::Vector{Matrix{Float64}},Es::Vector{Float64}; 
-                   DIISsize::Int=15, solver::Symbol=:ADMM, 
+                   DIISsize::Int=15, solver::Symbol=:LBFGS, 
                    _kws...) where {M}
     DIISmethod, convexConstraint, permuteData = getfield(DIISmethods, M)
     is = permuteData ? sortperm(Es) : (:)
     ∇s = (@view Fs[is])[1:end .> end-DIISsize]
     Ds = (@view Ds[is])[1:end .> end-DIISsize]
     Es = (@view Es[is])[1:end .> end-DIISsize]
-    vec, B = DIISmethod(∇s, Ds, Es, S)
-    c = constraintSolver(vec, B, solver; convexConstraint)
+    v, B, scl = DIISmethod(∇s, Ds, Es, S)
+    c = constraintSolver(v, B, convexConstraint, solver)
     grad = c.*∇s |> sum
     getD(X, grad |> Hermitian |> Array, Nˢ) # grad == F.
 end
 
 const DIISmethods = ( DIIS = ((∇s, Ds,  _, S)->DIIScore(∇s, Ds, S),   false, true),
                      EDIIS = ((∇s, Ds, Es, _)->EDIIScore(∇s, Ds, Es), true, false),
-                     ADIIS = ((∇s, Ds,  _, _)->ADIIScore(∇s, Ds),     true, false))
+                     ADIIS = ((∇s, Ds, Es, _)->ADIIScore(∇s, Ds, Es), true, false))
 
 
 function EDIIScore(∇s::Vector{Matrix{Float64}}, Ds::Vector{Matrix{Float64}}, 
@@ -764,18 +765,19 @@ function EDIIScore(∇s::Vector{Matrix{Float64}}, Ds::Vector{Matrix{Float64}},
     for j=1:len, i=1:len
         B[i,j] = -dot(Ds[i]-Ds[j], ∇s[i]-∇s[j])
     end
-    Es, B
+    Es, B, 0
 end
 
 
-function ADIIScore(∇s::Vector{Matrix{Float64}}, Ds::Vector{Matrix{Float64}})
+function ADIIScore(∇s::Vector{Matrix{Float64}}, Ds::Vector{Matrix{Float64}}, 
+                   Es::Vector{Float64})
     len = length(Ds)
     B = ones(len, len)
-    vec = [dot(D - Ds[end], ∇s[end]) for D in Ds]
+    v = [dot(D - Ds[end], ∇s[end]) for D in Ds]
     for j=1:len, i=1:len
         B[i,j] = dot(Ds[i]-Ds[len], ∇s[j]-∇s[len])
     end
-    vec, B
+    v, B, Es[end]
 end
 
 
@@ -783,11 +785,11 @@ function DIIScore(∇s::Vector{Matrix{Float64}}, Ds::Vector{Matrix{Float64}},
                   S::Matrix{Float64})
     len = length(Ds)
     B = ones(len, len)
-    vec = zeros(len)
+    v = zeros(len)
     for j=1:len, i=1:len
         B[i,j] = dot(∇s[i]*Ds[i]*S - S*Ds[i]*∇s[i], ∇s[j]*Ds[j]*S - S*Ds[j]*∇s[j])
     end
-    vec, B
+    v, B, 0
 end
 
 
@@ -868,22 +870,50 @@ end
 
 
 # Default
-function ADMMSolver(vec::Vector{Float64}, B::Matrix{Float64}; convexConstraint::Bool=true)
-    len = length(vec)
+function ADMMsolver(v::Vector{Float64}, B::Matrix{Float64}, convexConstraint::Bool)
+    len = length(v)
     A = ones(len) |> transpose |> Array
     b = Float64[1.0]
     g = convexConstraint ? fill(indicator(0, 1), len) : fill(indicator(-Inf, Inf), len)
-    params = SeparableOptimization.AdmmParams(B, vec, A, b, g)
+    params = SeparableOptimization.AdmmParams(B, v, A, b, g)
     settings = SeparableOptimization.Settings(; ρ=ones(1), σ=ones(len))
     vars, _ = SeparableOptimization.optimize(params, settings)
     vars.x
 end
 
+xDIISf(v, B, c, scl) = xDIISfCore(v, B, c) + scl
 
-function CMSolver(vec::Vector, B::Matrix; convexConstraint=true, ϵ::Float64=1e-5)
-    len = length(vec)
+# Included normalization condition, but not non-negative condition.
+@inline function xDIISfCore(v, B, c)
+    s = sum(c)
+    dot(v, c) / s + 0.5 * transpose(c) * B * c / s^2
+end
+
+@inline function genxDIISfCore(v, B)
+    c -> xDIISfCore(v, B, c)
+end
+
+@inline function genxDIIS∇f(v, B)
+    function (g, c)
+        s = sum(c)
+        g.= v./c + (B + transpose(B))*c ./ (2*s^2) .- (dot(v, c)/s^2 + transpose(c)*B*c/s^3)
+    end
+end
+
+function LBFGSBsolver(v::Vector{Float64}, B::Matrix{Float64}, convexConstraint::Bool)
+    f = genxDIISfCore(v, B)
+    g! = genxDIIS∇f(v, B)
+    len = length(v)
+    lb = convexConstraint ? 0.0 : -Inf
+    _, c = lbfgsb(f, g!, fill(1e-2, len); lb, 
+                  m=15, factr=1e8, pgtol=1e-6, iprint=-1, maxfun=15000, maxiter=15000)
+    c ./ sum(c)
+end
+
+function CMsolver(v::Vector, B::Matrix, convexConstraint::Bool, ϵ::Float64=1e-5)
+    len = length(v)
     getA = (B)->[B  ones(len); ones(1, len) 0]
-    b = vcat(-vec, 1)
+    b = vcat(-v, 1)
     local c
     while true
         A = getA(B)
@@ -915,8 +945,8 @@ function CMSolver(vec::Vector, B::Matrix; convexConstraint=true, ϵ::Float64=1e-
 end
 
 
-const ConstraintSolvers = (ADMM=ADMMSolver, LCM=CMSolver)
+const ConstraintSolvers = (ADMM=ADMMsolver, LCM=CMsolver, LBFGS=LBFGSBsolver)
 
-constraintSolver(vec::Vector{Float64}, B::Matrix{Float64}, solver::Symbol=:ADMM; 
-                 convexConstraint::Bool=true) = 
-getfield(ConstraintSolvers, solver)(vec, B; convexConstraint)
+constraintSolver(v::Vector{Float64}, B::Matrix{Float64}, 
+                 convexConstraint::Bool, solver::Symbol=:LBFGS) = 
+getfield(ConstraintSolvers, solver)(v, B, convexConstraint)
