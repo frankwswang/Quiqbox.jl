@@ -192,7 +192,8 @@ corresponding value.
 Return the value of mapped data (dependent variable) of the input `ParamBox`. Equivalent to 
 `pb()`.
 """
-@inline outValOf(pb::ParamBox) = pb.map(pb.data[])
+# @inline outValOf(pb::ParamBox) = pb.map(pb.data[])
+@inline outValOf(pb::ParamBox) = Base.invokelatest(pb.map, pb.data[])
 
 @inline outValOf(pb::ParamBox{T, <:Any, FLevel(itself)}) where {T} = inValOf(pb)
 

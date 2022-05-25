@@ -567,13 +567,19 @@ function replaceSymbol(sym::Symbol, pair::Pair{String, String}; count::Int=typem
 end
 
 
-function renameFunc(fName::Symbol, f::F, returnType::Type{T}, N::Int=1) where 
-                   {F<:Function, T}
-    @eval ($(fName))(a::Vararg{$T, $N}) = $f(a...)::$T
-end
+# function renameFunc(fName::Symbol, f::F, ::Type{T}, N::Int=1) where 
+#                    {F<:Function, T}
+#     @eval ($(fName))(a::Vararg{$T, $N}) = $f(a...)::$T
+# end
+
+# function renameFunc(fName::Symbol, f::F, ::Type{T}, N::Int=1) where {F<:Function, T}
+#     newF = @eval ($(fName))(a::Vararg{Any, $N}) = $f(a...)
+#     Base.invokelatest(newF, rand(T, N)...)
+#     newF
+# end
 
 function renameFunc(fName::Symbol, f::F, N::Int=1) where {F<:Function}
-    @eval ($(fName))(a::Vararg{Any, $N}) where {T} = $f(a...)
+    @eval ($(fName))(a::Vararg{Any, $N}) = $f(a...)
 end
 
 renameFunc(fName::String, args...) = renameFunc(Symbol(fName), args...)
