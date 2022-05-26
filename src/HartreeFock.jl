@@ -314,7 +314,7 @@ struct SCFconfig{N} <: ImmutableParameter{SCFconfig, Any}
 end
 
 
-const defaultSCFconfig = SCFconfig((:ADIIS, :DIIS), (1e-2, 1e-15))
+const defaultSCFconfig = SCFconfig((:ADIIS, :DIIS), (5e-3, 1e-16))
 
 
 mutable struct HFinterrelatedVars <: HartreeFockintermediateData
@@ -746,15 +746,15 @@ function xDIIScore(::Val{M}, Nˢ::Int, Hcore::Matrix{Float64}, HeeI::Array{Float
     ∇s = (@view Fs[is])[1:end .> end-DIISsize]
     Ds = (@view Ds[is])[1:end .> end-DIISsize]
     Es = (@view Es[is])[1:end .> end-DIISsize]
-    v, B, scl = DIISmethod(∇s, Ds, Es, S)
+    v, B = DIISmethod(∇s, Ds, Es, S)
     c = constraintSolver(v, B, convexConstraint, solver)
     grad = c.*∇s |> sum
     getD(X, grad |> Hermitian |> Array, Nˢ) # grad == F.
 end
 
-const DIISmethods = ( DIIS = ((∇s, Ds,  _, S)->DIIScore(∇s, Ds, S),   false, true),
-                     EDIIS = ((∇s, Ds, Es, _)->EDIIScore(∇s, Ds, Es), true, false),
-                     ADIIS = ((∇s, Ds, Es, _)->ADIIScore(∇s, Ds, Es), true, false))
+const DIISmethods = ( DIIS = ((∇s, Ds, _ , S)-> DIIScore(∇s, Ds, S ), false, true ),
+                     EDIIS = ((∇s, Ds, Es, _)->EDIIScore(∇s, Ds, Es), true , false),
+                     ADIIS = ((∇s, Ds, _ , _)->ADIIScore(∇s, Ds    ), true , false))
 
 
 function EDIIScore(∇s::Vector{Matrix{Float64}}, Ds::Vector{Matrix{Float64}}, 
@@ -764,19 +764,18 @@ function EDIIScore(∇s::Vector{Matrix{Float64}}, Ds::Vector{Matrix{Float64}},
     for j=1:len, i=1:len
         B[i,j] = -dot(Ds[i]-Ds[j], ∇s[i]-∇s[j])
     end
-    Es, B, 0
+    Es, B
 end
 
 
-function ADIIScore(∇s::Vector{Matrix{Float64}}, Ds::Vector{Matrix{Float64}}, 
-                   Es::Vector{Float64})
+function ADIIScore(∇s::Vector{Matrix{Float64}}, Ds::Vector{Matrix{Float64}})
     len = length(Ds)
     B = ones(len, len)
     v = [dot(D - Ds[end], ∇s[end]) for D in Ds]
     for j=1:len, i=1:len
         B[i,j] = dot(Ds[i]-Ds[len], ∇s[j]-∇s[len])
     end
-    v, B, Es[end]
+    v, B
 end
 
 
@@ -788,7 +787,7 @@ function DIIScore(∇s::Vector{Matrix{Float64}}, Ds::Vector{Matrix{Float64}},
     for j=1:len, i=1:len
         B[i,j] = dot(∇s[i]*Ds[i]*S - S*Ds[i]*∇s[i], ∇s[j]*Ds[j]*S - S*Ds[j]*∇s[j])
     end
-    v, B, 0
+    v, B
 end
 
 
@@ -868,16 +867,12 @@ end
 end
 
 
-xDIISf(v, B, c, scl) = xDIISfCore(v, B, c) + scl
-
 # Included normalization condition, but not non-negative condition.
-@inline function xDIISfCore(v, B, c)
-    s = sum(c)
-    dot(v, c) / s + 0.5 * transpose(c) * B * c / s^2
-end
-
-@inline function genxDIISfCore(v, B)
-    c -> xDIISfCore(v, B, c)
+@inline function genxDIISf(v, B)
+    function (c)
+        s = sum(c)
+        dot(v, c) / s + 0.5 * transpose(c) * B * c / s^2
+    end
 end
 
 @inline function genxDIIS∇f(v, B)
@@ -890,12 +885,12 @@ end
 
 # Default
 function LBFGSBsolver(v::Vector{Float64}, B::Matrix{Float64}, convexConstraint::Bool)
-    f = genxDIISfCore(v, B)
+    f = genxDIISf(v, B)
     g! = genxDIIS∇f(v, B)
     len = length(v)
     lb = convexConstraint ? 0.0 : -Inf
-    _, c = lbfgsb(f, g!, fill(1e-2, len); lb, 
-                  m=15, factr=1e8, pgtol=1e-6, iprint=-1, maxfun=15000, maxiter=15000)
+    _, c = lbfgsb(f, g!, fill(1e-2, len); lb)
+                  # m=10, factr=1e7, pgtol=1e-5, iprint=-1, maxfun=15000, maxiter=15000
     c ./ sum(c)
 end
 
@@ -937,6 +932,6 @@ end
 
 const ConstraintSolvers = (LCM=CMsolver, BFGS=LBFGSBsolver)
 
-constraintSolver(v::Vector{Float64}, B::Matrix{Float64}, 
-                 convexConstraint::Bool, solver::Symbol=:BFGS) = 
+constraintSolver(v::Vector{Float64}, B::Matrix{Float64}, convexConstraint::Bool, 
+                 solver::Symbol) = 
 getfield(ConstraintSolvers, solver)(v, B, convexConstraint)
