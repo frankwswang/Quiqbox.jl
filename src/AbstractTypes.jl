@@ -2,14 +2,14 @@ abstract type QuiqboxContainer <: Any end
 
 abstract type MetaParameter <: Any end
 
-abstract type StructFunction{T} <:Function end
+abstract type StructFunction{F} <:Function end
 
 
 abstract type QuiqboxVariableBox <: QuiqboxContainer end
 
 abstract type MetaParam{T} <: MetaParameter end
 
-abstract type ParameterizedFunction{P, F} <: StructFunction{ParameterizedFunction} end
+abstract type ParameterizedFunction{P, F} <: StructFunction{F} end
 
 
 abstract type QuiqboxParameter{ParameterT, ContainerT} <: QuiqboxVariableBox end

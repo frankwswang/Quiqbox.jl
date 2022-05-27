@@ -700,7 +700,7 @@ function mapPermute(arr, permFunction)
 end
 
 
-struct TypedFunction{F<:Function} <: StructFunction{TypedFunction}
+struct TypedFunction{F<:Function} <: StructFunction{F}
     f::F
     n::Symbol
 
@@ -724,10 +724,10 @@ Pf(c::Float64, f::F) where {F<:Function} = Pf(c, TypedFunction(f))
 
 function getFunc(fSym::Symbol, failedResult=missing)
     try
-        getfield(Quiqbox, fSym)
+        getproperty(Quiqbox, fSym)
     catch
         try
-            getfield(Main, fSym)
+            getproperty(Main, fSym)
         catch
             try
                 fSym |> string |> Meta.parse |> eval
