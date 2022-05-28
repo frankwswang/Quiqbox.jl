@@ -222,7 +222,7 @@ uhfs = [ 7.275712839,  0.721327346, -0.450914119, -0.86029418,  -1.029212126, -1
         -0.992397272, -0.992397272, -0.992397272, -0.992397272, -0.992397272, -0.992397272, 
         -0.992397272, -0.992397272, -0.992397272, -0.992397272, -0.992397272]
 
-@test isapprox.(Erhf .+ Enuc, rhfs, atol=errorThreshold3) |> all
+@test isapprox.(Erhf .+ Enuc, rhfs, atol=2*errorThreshold3) |> all
 @test isapprox.(Euhf .+ Enuc, uhfs, atol=errorThreshold3) |> all
 
 end
