@@ -889,8 +889,8 @@ function LBFGSBsolver(v::Vector{Float64}, B::Matrix{Float64}, convexConstraint::
     g! = genxDIIS∇f(v, B)
     len = length(v)
     lb = convexConstraint ? 0.0 : -Inf
-    _, c = lbfgsb(f, g!, fill(1e-2, len); lb)
-                  # m=10, factr=1e7, pgtol=1e-5, iprint=-1, maxfun=15000, maxiter=15000
+    _, c = lbfgsb(f, g!, fill(1e-2, len); lb, 
+                  m=15, factr=1, pgtol=1e-8, maxfun=20000, maxiter=20000)
     c ./ sum(c)
 end
 
