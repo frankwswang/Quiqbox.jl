@@ -8,116 +8,116 @@
  ParamBox{Float64, :α, Quiqbox.FLevel{1, 0}}(0.7)[∂][α₁]
  ParamBox{Float64, :d, Quiqbox.FLevel{1, 0}}(1.0)[∂][d₁]</code></pre><p>As expected, there are only 3 unique tunable independent parameters despite the basis set having 8 basis functions with a total of 40 parameters. However, if we take a step further, we can remove <span>$d$</span> since each basis function here is just one same Gaussian function. Thus, input the left parameters (along with other necessary arguments) into the <a href="../coreFunction/#Quiqbox.optimizeParams!"><code>optimizeParams!</code></a> and we can sit and wait for the optimization iterations to complete.</p><pre><code class="language-julia-repl hljs" style="display:block;">julia&gt; parsPartial = pars[1:2]</code><code class="nohighlight hljs ansi" style="display:block;">2-element Vector{ParamBox{Float64, V, FL} where {V, FL&lt;:Quiqbox.FLevel}}:
  ParamBox{Float64, :X, Quiqbox.FLevel{2, 0}}(3.0)[∂][L₁]
- ParamBox{Float64, :α, Quiqbox.FLevel{1, 0}}(0.7)[∂][α₁]</code><br/><code class="language-julia-repl hljs" style="display:block;">julia&gt; Es, ps, grads = optimizeParams!(parsPartial, bs, nuc, nucCoords, POconfig((maxStep=20,)));</code><code class="nohighlight hljs ansi" style="display:block;">Step 0:        E = 0.33268815858683076   
+ ParamBox{Float64, :α, Quiqbox.FLevel{1, 0}}(0.7)[∂][α₁]</code><br/><code class="language-julia-repl hljs" style="display:block;">julia&gt; Es, ps, grads = optimizeParams!(parsPartial, bs, nuc, nucCoords, POconfig((maxStep=20,)));</code><code class="nohighlight hljs ansi" style="display:block;">Step 0:        E = 0.33268815858648615   
           params = [3.0, 0.7]
-            grad = [1.2560795063144978, 4.050658426012186]
-Step duration: 11.74876052 seconds.
+            grad = [1.2560795063145096, 4.050658426012198]
+Step duration: 11.463669309 seconds.
 
-Step 1:        E = 0.3147106172499805    
+Step 1:        E = 0.3147106172496218    
           params = [2.9987439204936854, 0.6959493415739878]
-            grad = [1.2552913756833337, 4.046875075801594]
-Step duration: 0.286077662 seconds.
+            grad = [1.2552913756833448, 4.046875075801601]
+Step duration: 0.202115313 seconds.
 
-Step 2:        E = 0.2967664552294357    
+Step 2:        E = 0.29676645522906253   
           params = [2.9974886291180023, 0.6919024664981862]
-            grad = [1.2543502562585471, 4.042757005342648]
-Step duration: 0.243098972 seconds.
+            grad = [1.2543502562585593, 4.042757005342661]
+Step duration: 0.233781978 seconds.
 
-Step 3:        E = 0.27885873956833906   
+Step 3:        E = 0.278858739567952     
           params = [2.9962342788617438, 0.6878597094928436]
-            grad = [1.2532555076434888, 4.038300090432431]
-Step duration: 0.302706535 seconds.
+            grad = [1.253255507643499, 4.0383000904324415]
+Step duration: 0.227798465 seconds.
 
-Step 4:        E = 0.2609905623723538    
-          params = [2.9949810233541, 0.6838214094024112]
-            grad = [1.2520066114042785, 4.03350040626021]
-Step duration: 0.278822029 seconds.
+Step 4:        E = 0.26099056237195      
+          params = [2.9949810233541, 0.6838214094024111]
+            grad = [1.25200661140429, 4.033500406260219]
+Step duration: 0.238241886 seconds.
 
-Step 5:        E = 0.2431650378930026    
-          params = [2.9937290167426958, 0.679787908996151]
-            grad = [1.2506031736708385, 4.028354236911047]
-Step duration: 0.298891618 seconds.
+Step 5:        E = 0.24316503789258354   
+          params = [2.9937290167426958, 0.6797879089961508]
+            grad = [1.2506031736708545, 4.028354236911078]
+Step duration: 0.22518686 seconds.
 
-Step 6:        E = 0.2253852995110756    
-          params = [2.992478413569025, 0.67575955475924]
-            grad = [1.249044927523546, 4.022858084662403]
-Step duration: 0.272419402 seconds.
+Step 6:        E = 0.22538529951064057   
+          params = [2.992478413569025, 0.6757595547592398]
+            grad = [1.2490449275235558, 4.022858084662415]
+Step duration: 0.22997807 seconds.
 
-Step 7:        E = 0.2076544966254421    
-          params = [2.9912293686415015, 0.6717366966745776]
-            grad = [1.247331735153098, 4.017008679040187]
-Step duration: 0.285937561 seconds.
+Step 7:        E = 0.20765449662499288   
+          params = [2.9912293686415015, 0.6717366966745774]
+            grad = [1.2473317351531081, 4.017008679040198]
+Step duration: 0.234127778 seconds.
 
-Step 8:        E = 0.1899757914530722    
-          params = [2.9899820369063486, 0.6677196879955374]
-            grad = [1.2454635897818214, 4.010802985600186]
-Step duration: 0.277678824 seconds.
+Step 8:        E = 0.18997579145295312   
+          params = [2.9899820369063486, 0.6677196879955372]
+            grad = [1.2454635897818305, 4.010802985600202]
+Step duration: 0.232754175 seconds.
 
-Step 9:        E = 0.17235235574653995   
-          params = [2.988736573316567, 0.6637088850099372]
-            grad = [1.243440617335257, 4.004238214401178]
-Step duration: 0.277044422 seconds.
+Step 9:        E = 0.17235235574642535   
+          params = [2.988736573316567, 0.663708885009937]
+            grad = [1.2434406173352663, 4.004238214401195]
+Step duration: 0.23012837 seconds.
 
-Step 10:       E = 0.1547873674357788    
-          params = [2.987493132699232, 0.659704646795536]
-            grad = [1.241263077853555, 3.9973118281356532]
-Step duration: 0.30841476 seconds.
+Step 10:       E = 0.15478736743566832   
+          params = [2.987493132699232, 0.6597046467955358]
+            grad = [1.2412630778535585, 3.997311828135646]
+Step duration: 0.22060165 seconds.
 
-Step 11:       E = 0.13728400720128348   
-          params = [2.9862518696213782, 0.6557073349674003]
-            grad = [1.2389313666331307, 3.990021549885248]
-Step duration: 0.277488824 seconds.
+Step 11:       E = 0.13728400720117795   
+          params = [2.9862518696213782, 0.6557073349674001]
+            grad = [1.238931366633134, 3.990021549885245]
+Step duration: 0.237770285 seconds.
 
-Step 12:       E = 0.11984545498637411   
-          params = [2.9850129382547452, 0.651717313417515]
-            grad = [1.2364460150898198, 3.98236537046795]
-Step duration: 0.288376371 seconds.
+Step 12:       E = 0.11984545498627423   
+          params = [2.9850129382547452, 0.6517173134175148]
+            grad = [1.2364460150898267, 3.982365370467962]
+Step duration: 0.232099874 seconds.
 
-Step 13:       E = 0.10247488645655574   
-          params = [2.9837764922396555, 0.6477349480470471]
-            grad = [1.233807691335748, 3.974341555345256]
-Step duration: 0.248001293 seconds.
+Step 13:       E = 0.10247488645645875   
+          params = [2.9837764922396555, 0.6477349480470469]
+            grad = [1.23380769133575, 3.974341555345246]
+Step duration: 0.228336767 seconds.
 
-Step 14:       E = 0.08517546941436764   
-          params = [2.98254268454832, 0.6437606064917019]
-            grad = [1.231017200463155, 3.9659486510581035]
-Step duration: 0.24729319 seconds.
+Step 14:       E = 0.08517546941427623   
+          params = [2.98254268454832, 0.6437606064917016]
+            grad = [1.2310172004631634, 3.965948651058121]
+Step duration: 0.231188772 seconds.
 
-Step 15:       E = 0.06795036017848068   
-          params = [2.981311667347857, 0.6397946578406437]
-            grad = [1.2280754845295714, 3.957185491162243]
-Step duration: 0.275661215 seconds.
+Step 15:       E = 0.06795036017839308   
+          params = [2.981311667347857, 0.6397946578406435]
+            grad = [1.228075484529575, 3.957185491162241]
+Step duration: 0.202059613 seconds.
 
-Step 16:       E = 0.050802699936060625  
-          params = [2.9800835918633273, 0.6358374723494815]
-            grad = [1.2249836222396964, 3.9480512016340468]
-Step duration: 0.279602233 seconds.
+Step 16:       E = 0.05080269993597714   
+          params = [2.9800835918633273, 0.6358374723494813]
+            grad = [1.224983622239701, 3.9480512016340468]
+Step duration: 0.195504799 seconds.
 
-Step 17:       E = 0.033735611077752914  
-          params = [2.9788586082410875, 0.6318894211478475]
-            grad = [1.221742828320783, 3.938545205720469]
-Step duration: 0.273421906 seconds.
+Step 17:       E = 0.03373561107767088   
+          params = [2.9788586082410875, 0.6318894211478473]
+            grad = [1.2217428283207836, 3.938545205720455]
+Step duration: 0.221405052 seconds.
 
-Step 18:       E = 0.016752193524809902  
-          params = [2.9776368654127667, 0.6279508759421271]
-            grad = [1.2183544525892631, 3.9286672282074377]
-Step duration: 0.278736328 seconds.
+Step 18:       E = 0.01675219352473406   
+          params = [2.9776368654127667, 0.6279508759421268]
+            grad = [1.2183544525892638, 3.9286672282074377]
+Step duration: 0.237398884 seconds.
 
-Step 19:       E = -0.00014447894185520838
-          params = [2.9764185109601775, 0.6240222087139197]
-            grad = [1.2148199787078997, 3.9184172990838912]
-Step duration: 0.286451361 seconds.
+Step 19:       E = -0.00014447894192952393
+          params = [2.9764185109601775, 0.6240222087139194]
+            grad = [1.2148199787079044, 3.9184172990838935]
+Step duration: 0.224750459 seconds.
 
-Step 20:       E = -0.016951362340856937 
-          params = [2.9752036909814694, 0.6201037914148357]
-            grad = [1.2111410226338906, 3.9077957565801396]
-Step duration: 0.289473274 seconds.
+Step 20:       E = -0.016951362340925938 
+          params = [2.9752036909814694, 0.6201037914148355]
+            grad = [1.2111410226338917, 3.9077957565801396]
+Step duration: 0.229238236 seconds.
 
 The iteration just ended at
-Step 20:       E = -0.016951362340856937 
-          params = [2.9752036909814694, 0.6201037914148357]
-            grad = [1.2111410226338906, 3.9077957565801396]
-Optimization duration: 0.31151005415 minutes.
+Step 20:       E = -0.016951362340925938 
+          params = [2.9752036909814694, 0.6201037914148355]
+            grad = [1.2111410226338917, 3.9077957565801396]
+Optimization duration: 0.28803722810000004 minutes.
 The result has not converged.</code></pre><p>After the optimization, you can check the basis set and we can see the parameters inside of it are also changed. This is because the <code>!</code> in the function names indicates that <code>optimizeParams!</code> is <a href="https://docs.julialang.org/en/v1/manual/style-guide/#bang-convention">a function that modifies its arguments</a>.</p><pre><code class="language-julia-repl hljs" style="display:block;">julia&gt; getParams(bs)</code><code class="nohighlight hljs ansi" style="display:block;">40-element Vector{ParamBox{Float64, V, FL} where {V, FL&lt;:Quiqbox.FLevel}}:
  ParamBox{Float64, :X, Quiqbox.FLevel{2, 0}}(2.975203691)[∂][L₁]
  ParamBox{Float64, :Y, Quiqbox.FLevel{2, 0}}(2.975203691)[∂][L₁]
@@ -138,4 +138,4 @@ The result has not converged.</code></pre><p>After the optimization, you can che
  ParamBox{Float64, :Y, Quiqbox.FLevel{2, 0}}(2.975203691)[∂][L₁]
  ParamBox{Float64, :Z, Quiqbox.FLevel{2, 0}}(2.975203691)[∂][L₁]
  ParamBox{Float64, :α, Quiqbox.FLevel{1, 0}}(0.6201037914)[∂][α₁]
- ParamBox{Float64, :d, Quiqbox.FLevel{1, 0}}(1.0)[∂][d₁]</code></pre><p>If you want to go through the above example by yourself, you can also find the script <a href="https://github.com/frankwswang/Quiqbox.jl/blob/main/examples/OptimizeParams.jl">here</a>.</p><h2 id="Store-Customized-Basis-Set"><a class="docs-heading-anchor" href="#Store-Customized-Basis-Set">Store Customized Basis Set</a><a id="Store-Customized-Basis-Set-1"></a><a class="docs-heading-anchor-permalink" href="#Store-Customized-Basis-Set" title="Permalink"></a></h2><p>You can also store the information of the basis set in <a href="../coreType/#Quiqbox.GTBasis"><code>GTBasis</code></a> which contains not only the basis set but also the related 1-electron and 2-electron integral values. GTBasis can also be an input argument for <a href="../coreFunction/#Quiqbox.runHF"><code>runHF</code></a> to save the time of recalculating the integrals of basis sets.</p><pre><code class="language-julia-repl hljs" style="display:block;">julia&gt; GTBasis(bs)</code><code class="nohighlight hljs ansi" style="display:block;">GTBasis{8, BasisFunc{0, 1}, Float64}(basis, S, Te, eeI, getVne, getHcore)</code></pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../SCF/">« Self-Consistent Field Methods</a><a class="docs-footer-nextpage" href="../coreFunction/">Core Functions »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 0.27.18 on <span class="colophon-date" title="Saturday 28 May 2022 15:51">Saturday 28 May 2022</span>. Using Julia version 1.6.6.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+ ParamBox{Float64, :d, Quiqbox.FLevel{1, 0}}(1.0)[∂][d₁]</code></pre><p>If you want to go through the above example by yourself, you can also find the script <a href="https://github.com/frankwswang/Quiqbox.jl/blob/main/examples/OptimizeParams.jl">here</a>.</p><h2 id="Store-Customized-Basis-Set"><a class="docs-heading-anchor" href="#Store-Customized-Basis-Set">Store Customized Basis Set</a><a id="Store-Customized-Basis-Set-1"></a><a class="docs-heading-anchor-permalink" href="#Store-Customized-Basis-Set" title="Permalink"></a></h2><p>You can also store the information of the basis set in <a href="../coreType/#Quiqbox.GTBasis"><code>GTBasis</code></a> which contains not only the basis set but also the related 1-electron and 2-electron integral values. GTBasis can also be an input argument for <a href="../coreFunction/#Quiqbox.runHF"><code>runHF</code></a> to save the time of recalculating the integrals of basis sets.</p><pre><code class="language-julia-repl hljs" style="display:block;">julia&gt; GTBasis(bs)</code><code class="nohighlight hljs ansi" style="display:block;">GTBasis{8, BasisFunc{0, 1}, Float64}(basis, S, Te, eeI, getVne, getHcore)</code></pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../SCF/">« Self-Consistent Field Methods</a><a class="docs-footer-nextpage" href="../coreFunction/">Core Functions »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 0.27.18 on <span class="colophon-date" title="Saturday 28 May 2022 17:37">Saturday 28 May 2022</span>. Using Julia version 1.6.6.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
