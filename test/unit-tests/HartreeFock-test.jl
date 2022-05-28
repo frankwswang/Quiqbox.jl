@@ -5,7 +5,7 @@ using Suppressor: @suppress_out
 @testset "HartreeFock.jl" begin
 
 errorThreshold1 = 1e-8
-errorThreshold2 = 1e-4
+errorThreshold2 = 5e-5
 errorThreshold3 = 5e-4
 
 nucCoords = [[-0.7,0.0,0.0], [0.7,0.0,0.0], [0.0, 0.0, 0.0]]
@@ -222,7 +222,7 @@ uhfs = [ 7.275712839,  0.721327346, -0.450914119, -0.86029418,  -1.029212126, -1
         -0.992397272, -0.992397272, -0.992397272, -0.992397272, -0.992397272, -0.992397272, 
         -0.992397272, -0.992397272, -0.992397272, -0.992397272, -0.992397272]
 
-@test isapprox.(Erhf .+ Enuc, rhfs, atol=errorThreshold2) |> all
-@test isapprox.(Euhf .+ Enuc, uhfs, atol=errorThreshold2) |> all
+@test isapprox.(Erhf .+ Enuc, rhfs, atol=errorThreshold3) |> all
+@test isapprox.(Euhf .+ Enuc, uhfs, atol=errorThreshold3) |> all
 
 end
