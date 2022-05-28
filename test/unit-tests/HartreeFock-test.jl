@@ -222,7 +222,16 @@ uhfs = [ 7.275712839,  0.721327346, -0.450914119, -0.86029418,  -1.029212126, -1
         -0.992397272, -0.992397272, -0.992397272, -0.992397272, -0.992397272, -0.992397272, 
         -0.992397272, -0.992397272, -0.992397272, -0.992397272, -0.992397272]
 
-@test isapprox.(Erhf .+ Enuc, rhfs, atol=2*errorThreshold3) |> all
-@test isapprox.(Euhf .+ Enuc, uhfs, atol=errorThreshold3) |> all
+Et1 = Erhf + Enuc
+Et2 = Euhf + Enuc
+bools1 = isapprox.(Et1, rhfs, atol=2*errorThreshold3)
+bools2 = isapprox.(Et2, uhfs, atol=errorThreshold3)
+ids1 = findall(isequal(false), bools1)
+ids2 = findall(isequal(false), bools2)
+length(ids1) > 0 && (@show Et1[ids1] rhfs[ids1])
+length(ids2) > 0 && (@show Et2[ids2] uhfs[ids2])
+
+@test all(length(ids1) == 0)
+@test all(length(ids2) == 0)
 
 end
