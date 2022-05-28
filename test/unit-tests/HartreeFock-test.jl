@@ -2,7 +2,7 @@ using Test
 using Quiqbox
 using Suppressor: @suppress_out
 
-@testset "HartreeFock.jl" begin
+# @testset "HartreeFock.jl" begin
 
 errorThreshold1 = 1e-8
 errorThreshold2 = 5e-5
@@ -28,12 +28,12 @@ HFc2 = HFconfig((SCF=SCFc1,))
 HFc3 = HFconfig((HF=:UHF, C0=:GWH, SCF=SCFc2))
 HFc4 = HFconfig((HF=:UHF, SCF=SCFc2))
 
-@suppress_out begin
+# @suppress_out begin
     res1   = runHF(bs, nuc, nucCoords, HFc1)
     res1_2 = runHF(bs, nuc, nucCoords, HFc2)
     res2   = runHF(bs, nuc, nucCoords, HFc3)
     res2_2 = runHF(bs, nuc, nucCoords, HFc4)
-end
+# end
 
 @test isapprox(res2.Ehf, res2_2.Ehf, atol=errorThreshold2)
 @test isapprox(res1.Ehf, res1_2.Ehf, atol=errorThreshold1)
@@ -224,14 +224,9 @@ uhfs = [ 7.275712839,  0.721327346, -0.450914119, -0.86029418,  -1.029212126, -1
 
 Et1 = Erhf + Enuc
 Et2 = Euhf + Enuc
-bools1 = isapprox.(Et1, rhfs, atol=2*errorThreshold3)
-bools2 = isapprox.(Et2, uhfs, atol=errorThreshold3)
-ids1 = findall(isequal(false), bools1)
-ids2 = findall(isequal(false), bools2)
-length(ids1) > 0 && (@show Et1[ids1] rhfs[ids1])
-length(ids2) > 0 && (@show Et2[ids2] uhfs[ids2])
+cutoffIdx = Int(length(range) ÷ 1.5)
 
-@test all(length(ids1) == 0)
-@test all(length(ids2) == 0)
+compr2Arrays2((Et1=Erhf + Enuc, rhfs=rhfs), cutoffIdx, errorThreshold3, 0.02)
+compr2Arrays2((Et2=Euhf + Enuc, uhfs=uhfs), cutoffIdx, errorThreshold3, 0.001)
 
 end

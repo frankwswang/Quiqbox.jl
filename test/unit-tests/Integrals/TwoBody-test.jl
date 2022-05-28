@@ -100,8 +100,8 @@ eeIs = reshape(cat(v1..., dims=(3,)), (4,4,4,4))
 eeIs1 = eeInteractions(bs)
 eeIs2 = [eeInteraction(i...)[] for i in Iterators.product(bs, bs, bs, bs)]
 
-@test compr2Arrays(eeIs1, eeIs, errT1)
-@test compr2Arrays(eeIs1, eeIs2, errT1)
+@test compr2Arrays1(eeIs1, eeIs, errT1)
+@test compr2Arrays1(eeIs1, eeIs2, errT1)
 
 eeIs3 = eeInteractions(bs[[1,3,2,4]])
 uniqueIdx = Quiqbox.genUniqueIndices(basisSize.(bs) |> sum)
