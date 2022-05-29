@@ -35,7 +35,7 @@ end
 
 @test all(Ebegin .> Eend)
 @test all(Eend[1:6] .<= Eend[7:end])
-@test all(isapprox.(Eend[1:6], Eend[7:end], atol=errorThreshold2))
+@test all(isapprox.(Eend[1:6], Eend[7:end], atol=100*errorThreshold2))
 
 
 # Grid-based basis set
@@ -48,13 +48,13 @@ pars2 = markParams!(bs2, true)[1:2]
 local Es2L, ps2L, grads2L
 @suppress_out begin
     Es2L, ps2L, grads2L = optimizeParams!(pars2, bs2, nuc, nucCoords, 
-                                            POconfig((maxStep=200,)))
+                                          POconfig((maxStep=200,)))
 end
 
-E_t2 = -1.1665258278624209
+E_t2 = -1.1665258293062977
 # L, α
-par_t2  = [2.8465051232815264, 0.22550104533479082]
-grad_t2 = [0.3752225248883099, 0.6830952140061448]
+par_t2  = [2.8465051230989435, 0.22550104532759083]
+grad_t2 = [0.37522252486564855, 0.683095213465126]
 
 @test Es2L[1] > Es2L[end]
 @test isapprox(Es2L[end], E_t2, atol=errorThreshold2)
@@ -76,12 +76,12 @@ local Es3L, ps3L, grads3L
                                           POconfig((maxStep=50,)))
 end
 
-E_t3 = -1.6538597833434006
+E_t3 = -1.653859783670078
 # L, α₁, α₂, d₁, d₂
-par_t3  = [2.9966466869974293, 0.6913223149659601, 0.4835057214805189, 0.9966863578341086, 
-           1.0033029163222076]
-grad_t3 = [0.05956359217705473, 0.16518443158936472, 0.28539984391180534, 
-           0.06666031150461275, -0.0662207016492597]
+par_t3  = [2.996646686997478, 0.6913223149667996, 0.4835057214802305, 0.996686357834139, 
+           1.0033029163221774]
+grad_t3 = [0.0595635921759659, 0.16518443157274584, 0.2853998439170006, 0.0666603115041208, 
+           -0.0662207016487781]
 
 @test Es3L[1] > Es3L[end]
 @test isapprox(Es3L[end], E_t3, atol=errorThreshold2)

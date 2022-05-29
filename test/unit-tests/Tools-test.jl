@@ -53,9 +53,9 @@ pkgDir = @__DIR__
 f1 = renameFunc(:f1, x->abs(x))
 @test f1(-0.1) === 0.1
 @test f1(-1) === 1
-f2 = renameFunc(:f2, x->abs(x), Float64)
-@test f2(-0.1) === 0.1
-@test try f2(-1) catch; true end
+# f2 = renameFunc(:f2, x->abs(x), Float64)
+# @test f2(-0.1) === 0.1
+# @test try f2(-1) catch; true end
 
 
 # function splitTerm

@@ -114,19 +114,6 @@ function ijkToStr(ijk::XYZTuple)
 end
 
 
-const BasisSetNames = 
-[
-"STO-2G", 
-"STO-3G", 
-"STO-6G", 
-"3-21G", 
-"6-31G", 
-"cc-pVDZ", 
-"cc-pVTZ", 
-"cc-pVQZ"
-]
-
-
 const SciNotMarker = r"D(?=[\+\-])"
 const sciNotReplace = (txt)->replace(txt, SciNotMarker => "e")
 const BStextEndingMarker = "****"

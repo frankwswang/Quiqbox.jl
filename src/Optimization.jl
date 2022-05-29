@@ -240,9 +240,9 @@ function optimizeParams!(pbs::Vector{<:ParamBox},
         println("The iteration just ended at")
         println(rpad("Step $(i): ", 15), rpad("E = $(Es[end])", 26))
         print(rpad("", 10), "params = ")
-        println(IOContext(stdout, :limit => true), pars[end, :])
+        println(IOContext(stdout, :limit => true), pars[:, end])
         print(rpad("", 12), "grad = ")
-        println(IOContext(stdout, :limit => true), grads[end, :])
+        println(IOContext(stdout, :limit => true), grads[:, end])
         println("Optimization duration: ", tAll/60, " minutes.")
         if detectConverge
             println("The result has" * (isConverged(Es) ? "" : " not") *" converged.")

@@ -675,11 +675,15 @@ centerOf(bf::FloatingGTBasisFuncs) = bf.center
 
 """
 
-    centerCoordOf(bf::FloatingGTBasisFuncs) -> Vector{Float64}
+    centerCoordOf(bf::FloatingGTBasisFuncs) -> Vector
 
 Return the center coordinate of the input `FloatingGTBasisFuncs`.
 """
-centerCoordOf(bf::FloatingGTBasisFuncs) = Float64[outValOf(i) for i in bf.center]
+centerCoordOf(bf::FloatingGTBasisFuncs) = centerCoordOf(bf.center)
+centerCoordOf(cen::Tuple{ParamBox{T, cxSym, FL1}, 
+                         ParamBox{T, cySym, FL2}, 
+                         ParamBox{T, czSym, FL3}}) where {T, FL1, FL2, FL3} = 
+T[outValOf(i) for i in cen]
 
 
 """

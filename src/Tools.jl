@@ -567,13 +567,12 @@ function replaceSymbol(sym::Symbol, pair::Pair{String, String}; count::Int=typem
 end
 
 
-function renameFunc(fName::Symbol, f::F, returnType::Type{T}, N::Int=1) where 
-                   {F<:Function, T}
-    @eval ($(fName))(a::Vararg{$T, $N}) = $f(a...)::$T
-end
+# function renameFunc(fName::Symbol, f::F, ::Type{T}, N::Int=1) where {F<:Function, T}
+#     @eval ($(fName))(a::Vararg{$T, $N}) = $f(a...)::$T
+# end
 
 function renameFunc(fName::Symbol, f::F, N::Int=1) where {F<:Function}
-    @eval ($(fName))(a::Vararg{Any, $N}) where {T} = $f(a...)
+    @eval ($(fName))(a::Vararg{Any, $N}) = $f(a...)
 end
 
 renameFunc(fName::String, args...) = renameFunc(Symbol(fName), args...)
@@ -694,7 +693,7 @@ function mapPermute(arr, permFunction)
 end
 
 
-struct TypedFunction{F<:Function} <: StructFunction{TypedFunction}
+struct TypedFunction{F<:Function} <: StructFunction{F}
     f::F
     n::Symbol
 
@@ -718,10 +717,10 @@ Pf(c::Float64, f::F) where {F<:Function} = Pf(c, TypedFunction(f))
 
 function getFunc(fSym::Symbol, failedResult=missing)
     try
-        getfield(Quiqbox, fSym)
+        getproperty(Quiqbox, fSym)
     catch
         try
-            getfield(Main, fSym)
+            getproperty(Main, fSym)
         catch
             try
                 fSym |> string |> Meta.parse |> eval
@@ -857,3 +856,15 @@ fillNumber(num::Array{<:Any, 0}) = itself(num)
 @inline arrayToTuple(arr::Array) = Tuple(arr)
 
 @inline arrayToTuple(tpl::Tuple) = itself(tpl)
+
+
+function callGenFunc(f::F, x::T) where {F<:Function, T}
+    if worldAgeSafe(F) || applicable(f, zero(T))
+        !worldAgeSafe(F) && (@eval worldAgeSafe(::Type{$F}) = true)
+        f(x)
+    else
+        Base.invokelatest(f, x)
+    end
+end
+
+worldAgeSafe(::Type{<:Function}) = false
