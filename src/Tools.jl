@@ -1,4 +1,4 @@
-export hasEqual, hasIdentical, flatten, markUnique, getUnique!
+export hasEqual, hasIdentical, hasApprox, flatten, markUnique, getUnique!
 
 using Statistics: std, mean
 using Symbolics
@@ -149,18 +149,19 @@ end
 true
 ```
 """
-function hasBoolRelation(boolOp::F, obj1, obj2;
+function hasBoolRelation(boolOp::F, obj1::T1, obj2::T2;
                          ignoreFunction::Bool=false, 
                          ignoreContainer::Bool=false,
-                         decomposeNumberCollection::Bool=false) where {F<:Function}
+                         decomposeNumberCollection::Bool=false) where {T1, T2, F<:Function}
     res = true
-    t1 = typeof(obj1)
-    t2 = typeof(obj2)
-    if (t1 <: Function) && (t2 <: Function)
+    if (T1 <: Function) && (T2 <: Function)
         ignoreFunction ? (return true) : (return boolOp(obj1, obj2))
-    elseif (t1 <: Number) && (t2 <: Number)
+    elseif (T1 <: Number) && (T2 <: Number)
         return boolOp(obj1, obj2)
-    elseif t1 != t2 && !ignoreContainer
+    elseif T1 != T2 && !ignoreContainer && 
+          ( !ignoreFunction || typejoin(T1, T2) == Any || 
+            !(isa.([T1.parameters...], Type{<:FLevel}) |> any) || 
+            !(isa.([T2.parameters...], Type{<:FLevel}) |> any) )
         return false
     elseif obj1 isa Union{Array, Tuple}
         if !decomposeNumberCollection && 
@@ -177,8 +178,8 @@ function hasBoolRelation(boolOp::F, obj1, obj2;
     elseif obj1 isa Type || obj2 isa Type
         return boolOp(obj1, obj2)
     else
-        fs1 = fieldnames(t1)
-        fs2 = fieldnames(t2)
+        fs1 = fieldnames(T1)
+        fs2 = fieldnames(T2)
         if fs1 == fs2
             if length(fs1) == 0
                 res = boolOp(obj1, obj2)
@@ -260,7 +261,7 @@ end
              decomposeNumberCollection::Bool=false) -> 
     Bool
 
-Compare if two objects are the equal.
+Compare if two containers (e.g. `struct`) are the equal.
 
 If `ignoreFunction = true`, the function will ignore comparisons between Function-type 
 fields.
@@ -309,7 +310,7 @@ hasBoolRelation(==, obj1, obj2, obj3...; ignoreFunction, ignoreContainer,
                  decomposeNumberCollection::Bool=false) -> 
     Bool
 
-Compare if two objects are the Identical. An instantiation of `hasBoolRelation`.
+Compare if two containers (e.g. `struct`) are the Identical.
 
 If `ignoreFunction = true`, the function will ignore comparisons between Function-type 
 fields.
@@ -349,6 +350,40 @@ hasIdentical(obj1, obj2, obj3...; ignoreFunction::Bool=false, ignoreContainer::B
              decomposeNumberCollection::Bool=false) = 
 hasBoolRelation(===, obj1, obj2, obj3...; ignoreFunction, ignoreContainer,
                 decomposeNumberCollection)
+
+
+"""
+
+    hasApprox(obj1, obj2, obj3...; ignoreFunction::Bool=false, ignoreContainer::Bool=false,
+              decomposeNumberCollection::Bool=false, atol=1e-15) -> 
+    Bool
+
+Similar to `hasEqual`, except it does not require the `Number`-typed fields 
+(e.g. `Float64`) of the compared containers to have the exact same values, but rather the 
+approximate values within an error threshold determined by `atol`, like in `isapprox`.
+"""
+hasApprox(obj1, obj2, obj3...; ignoreFunction::Bool=false, ignoreContainer::Bool=false,
+          decomposeNumberCollection::Bool=false, atol=1e-15) = 
+hasBoolRelation((x, y)->hasApproxCore(x, y, atol), obj1, obj2, obj3...; ignoreFunction, 
+                ignoreContainer, decomposeNumberCollection)
+
+hasApproxCore(obj1::T1, obj2::T2, atol::Real=1e-15) where {T1<:Number, T2<:Number} = 
+isapprox(obj1, obj2; atol)
+
+function hasApproxCore(obj1::AbstractArray{<:Number}, obj2::AbstractArray{<:Number}, 
+                       atol::Real=1e-15)
+    if length(obj1) != length(obj2)
+        false
+    else
+        isapprox.(obj1, obj2; atol) |> all
+    end
+end
+
+hasApproxCore(obj1::NTuple{N, Number}, obj2::NTuple{N, Number}, 
+              atol::Real=1e-15) where {N} = 
+isapprox.(obj1, obj2; atol) |> all
+
+hasApproxCore(obj1, obj2, atol::Real=1e-15) = (obj1 == obj2)
 
 
 """
