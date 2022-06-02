@@ -698,7 +698,7 @@ splitTermCore(trm::SymbolicUtils.Div) = trm |> rewriteTerm |> splitTermCore
 splitTermCore(trm) = [trm]
 
 
-function groupedSort(v::Vector, sortFunction::F=itself) where {F<:Function}
+function groupedSort(v::AbstractVector, sortFunction::F=itself) where {F<:Function}
     sortedArr = sort(v, by=x->sortFunction(x))
     state1 = 1
     groups = typeof(v)[]

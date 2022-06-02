@@ -74,10 +74,18 @@ c3 = genExponent(e1)
 k = fill(1.0)
 v1 = genSpatialPoint([k,2,3  ])
 v2 = genSpatialPoint([k,2,3.0])
+v3 = genSpatialPoint([1.0,2,3.0])
+v1_2 = genSpatialPoint((k,2,3  ))
+v2_2 = genSpatialPoint((k,2,3.0))
+v3_2 = genSpatialPoint((1.0,2,3.0))
 @test v1 == v2
+@test v1_2 == v2_2
 @test hasEqual(v1, v2)
+@test hasEqual(v1_2, v2_2)
+@test hasEqual(v3, v3_2, ignoreContainer=true)
+@test hasEqual(v3, collect(v3_2))
 @test !hasIdentical(v1, v2)
-@test hasIdentical(v1[1], v2[1])
+@test hasIdentical(v1[1], v2[1], v1_2[1], v2_2[1])
 @test !hasIdentical(v1[2:3], v2[2:3])
 
 
@@ -327,18 +335,17 @@ bf_mul5 = mul(bf_mul1, bf_mul2, normalizeGTO=true)
 bf_mul5_0 = genBasisFunc([1,0,0], (3.5,3), normalizeGTO=true)
 @test hasEqual(bf_mul5, bf_mul5_0)
 bf_mul6 = mul(bf_mul1, bf_mul2_2)
-bf_mul6_0 = genBasisFunc([1,0,0], (3.5,round( 3*getNorms(bf_mul2)[], digits=15 )))
+bf_mul6_0 = genBasisFunc([1,0,0], (3.5,3*getNorms(bf_mul2)[]))
 @test hasEqual(bf_mul6, bf_mul6_0)
 bf_mul7 = mul(bf_mul1, bf_mul2_2, normalizeGTO=true)
-bf_mul7_0 = genBasisFunc([1,0,0], (3.5,round( 3*getNorms(bf_mul2)[], digits=15 )), 
-                         normalizeGTO=true)
+bf_mul7_0 = genBasisFunc([1,0,0], (3.5,3*getNorms(bf_mul2)[]), normalizeGTO=true)
 @test hasEqual(bf_mul7, bf_mul7_0)
 bf_mul8 = mul(bf_mul1, bf_mul3)
 bf_mul8_0 = genBasisFunc([1,0,0], ([3, 3.5], [0.9, 1.2]))
-@test hasEqual(bf_mul8, bf_mul8_0)
+@test hasApprox(bf_mul8, bf_mul8_0)
 bf_mul9 = mul(bf_mul1, bf_mul3, normalizeGTO=true)
 bf_mul9_0 = genBasisFunc([1,0,0], ([3, 3.5], [0.9, 1.2]), normalizeGTO=true)
-@test hasEqual(bf_mul9, bf_mul9_0)
+@test hasApprox(bf_mul9, bf_mul9_0)
 bf_mul10 = genBasisFunc([1,0,0], (1.2,0.3), (1,0,0))
 bf_mul11 = genBasisFunc([0,1,0], (1.5,1))
 bf_mul12 = genBasisFunc([0,1,0], (1.5,1), (1,0,0))
@@ -470,9 +477,6 @@ assignCenter!.(cens, bs2_1)
 assignCenter!.(cens, bs2_2)
 txt3 = genBasisFuncText(bs1) |> join
 bs2_3 = genBFuncsFromText(txt3)
-@test hasEqual(bs1, bs2_1, ignoreContainer=true)
-@test hasEqual(bs1, bs2_2, ignoreContainer=true)
-@test hasEqual.(sortBasisFuncs(bs1), bs2_3, ignoreFunction=true) |> all
 @test hasEqual.(bs1, bs2_1, ignoreFunction=true) |> all
 @test hasEqual.(bs1, bs2_2, ignoreFunction=true) |> all
 @test hasEqual.(sortBasisFuncs(bs1), bs2_3, ignoreFunction=true) |> all
@@ -625,8 +629,8 @@ pbs_gv3_2 = sort(pbs_gv3, by=x->(typeof(x).parameters[2], x.index[]))
 @test getfield.(getfield.(getVar(bf_gv6), :val), :name) == 
       [:X₁, :Y₂, :Z₂, :α₁, :d₃, :α₃, :d₂, :x_α₂, :d₁]
 @test getfield.(getfield.(getVar(bfm_gv), :val), :name) == 
-      [:X₂, :Y₂, :Z₃, :α₃, :d₃, :X₁, :Y₁, :Z₁, :x_α₂, 
-       :d₂, :X₁, :Y₂, :Z₂, :α₁, :d₃, :α₃, :d₂, :x_α₂, :d₁]
+      [:X₁, :Y₁, :Z₁, :x_α₂, :d₂, :X₁, :Y₂, :Z₂, :α₁, 
+       :d₃, :α₃, :d₂, :x_α₂, :d₁, :X₂, :Y₂, :Z₃, :α₃, :d₃]
 
 @test getVarDict(e_gv1) == Dict(Symbolics.variable(:α, 1)=>2.0)
 

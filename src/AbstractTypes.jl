@@ -47,12 +47,8 @@ abstract type StructSpatialBasis <: SpatialOrbital end
 
 abstract type AbstractMolOrbital <: SpinOrbital end
 
-abstract type NucleusCenteredBasis <: StructSpatialBasis end
-abstract type FloatingBasis <: StructSpatialBasis end
-
-abstract type AbstractGaussFunc <: NucleusCenteredBasis end
-
-abstract type AbstractGTBasisFuncs <: FloatingBasis end
+abstract type AbstractGaussFunc{T} <: StructSpatialBasis end
+abstract type AbstractGTBasisFuncs <: StructSpatialBasis end
 
 abstract type MolecularHartreeFockCoefficient{NN, N} <: MolecularCoefficients end
 

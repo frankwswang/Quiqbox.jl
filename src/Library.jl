@@ -124,16 +124,18 @@ const SubshellOrientationList = Dict(SubshellNames .=> SubshellXYZs)
 const SubshellSizeList = Dict(SubshellNames .=> SubshellXYZsizes)
 const ijkIndexList = Dict(flatten(SubshellXYZs) .=> 
                      flatten([collect(1:length(i)) for i in SubshellXYZs]))
-# const ParamNames = [:𝑋, :𝑌, :𝑍, :𝑑, :𝛼, :𝐿]
-const ParamNames = [:X, :Y, :Z, :d, :α, :L]
-const ParamSymbols = [:X, :Y, :Z, :con, :xpn, :spacing]
-const ParamList = Dict(ParamSymbols .=> ParamNames)
+# const ParamSyms = [:𝑋, :𝑌, :𝑍, :𝑑, :𝛼, :𝐿]
+const SpatialParams = [:X, :Y, :Z]
+const SpatialParamSyms = [:X, :Y, :Z]
+const ParamSyms = vcat(SpatialParamSyms, [:d, :α, :L])
+const ParamAcrs = vcat(SpatialParams, [:con, :xpn, :spacing])
+const ParamList = Dict(ParamAcrs .=> ParamSyms)
 
 const xpnSym = ParamList[:xpn]
 const conSym = ParamList[:con]
-const cxSym = ParamList[:X]
-const cySym = ParamList[:Y]
-const czSym = ParamList[:Z]
+const cxSym = SpatialParamSyms[1]
+const cySym = SpatialParamSyms[2]
+const czSym = SpatialParamSyms[3]
 
 
 
