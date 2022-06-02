@@ -136,7 +136,7 @@ genBFuncsFromText
 ```
 
 ```@docs
-assignCenter!
+assignCenInVal!
 ```
 
 ```@docs
@@ -164,10 +164,6 @@ getVarDict
 expressionOf
 ```
 
-
-```@docs
-makeCenter
-```
 
 ```@docs
 gridCoords

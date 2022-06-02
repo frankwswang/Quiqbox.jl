@@ -4,16 +4,20 @@
 ParamBox{T, V, FL}
 ```
 
+```@doc
+SpatialPoint{D, T, PT}
+```
+
 ```@docs
 GaussFunc
 ```
 
 ```@docs
-BasisFunc{𝑙, GN}
+BasisFunc{𝑙, GN, PT, D, T}
 ```
 
 ```@docs
-BasisFuncs{𝑙, GN, ON}
+BasisFuncs{𝑙, GN, ON, PT, D, T}
 ```
 
 ```@docs

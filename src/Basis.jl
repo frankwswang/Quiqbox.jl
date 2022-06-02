@@ -1,8 +1,7 @@
 export GaussFunc, genExponent, genContraction, genSpatialPoint, BasisFunc, BasisFuncs, 
        genBasisFunc, subshellOf, centerOf, centerCoordOf, GTBasis, sortBasisFuncs, 
        add, mul, shift, decompose, basisSize, genBasisFuncText, genBFuncsFromText, 
-       assignCenter!, makeCenter, getParams, copyBasis, markParams!, getVar, getVarDict, 
-       expressionOf
+       assignCenInVal!, getParams, copyBasis, markParams!, getVar, getVarDict, expressionOf
 
 using Symbolics
 using SymbolicUtils
@@ -17,9 +16,9 @@ A single contracted gaussian function `struct` from package Quiqbox.
 
 ≡≡≡ Field(s) ≡≡≡
 
-`xpn::ParamBox{Float64, :$(xpnSym), FL1}`：Exponent of the gaussian function.
+`xpn::ParamBox{T, :$(xpnSym), FL1}`：Exponent of the gaussian function.
 
-`con::ParamBox{Float64, :$(conSym), FL2}`: Contraction coefficient of the gaussian function.
+`con::ParamBox{T, :$(conSym), FL2}`: Contraction coefficient of the gaussian function.
 
 `param::NTuple{2, ParamBox}`: A Tuple that stores the `ParamBox`s of `xpn` and `con`.
 
@@ -31,8 +30,7 @@ A single contracted gaussian function `struct` from package Quiqbox.
 struct GaussFunc{T, FLxpn, FLcon} <: AbstractGaussFunc{T}
     xpn::ParamBox{T, xpnSym, FLxpn}
     con::ParamBox{T, conSym, FLcon}
-    param::Tuple{ParamBox{Float64, xpnSym}, 
-                 ParamBox{Float64, conSym}}
+    param::Tuple{ParamBox{T, xpnSym, FLxpn}, ParamBox{T, conSym, FLcon}}
 
     GaussFunc(xpn::ParamBox{T, xpnSym, FL1}, con::ParamBox{T, conSym, FL2}) where 
              {T, FL1, FL2} = 
@@ -46,20 +44,22 @@ GaussFunc(genExponent(e), genContraction(d))
 """
 
     genExponent(e::Real, mapFunction::Function; canDiff::Bool=true, 
-                roundDigits::Int=-1, dataName::Symbol=:undef) -> 
-    ParamBox{Float64, :$(xpnSym)}
+                dataName::Symbol=:undef, roundDigits::Int=-1, 
+                numberType::Type{<:Real}=Float64) -> 
+    ParamBox{numberType, :$(xpnSym)}
 
     genExponent(e::Array{T, 0}, mapFunction::Function; canDiff::Bool=true, 
                 dataName::Symbol=:undef) where {T<:Real} -> 
-    ParamBox{Float64, :$(xpnSym)}
+    ParamBox{T, :$(xpnSym)}
 
 Construct a `ParamBox` for an exponent coefficient given a value. Keywords `mapFunction` 
 and `canDiff` work the same way as in a general constructor of a `ParamBox`. If 
 `roundDigits < 0`, there won't be rounding for input data.
 """
-genExponent(e::Real, mapFunction::F; canDiff::Bool=true, 
-            roundDigits::Int=-1, dataName::Symbol=:undef) where {F<:Function} = 
-ParamBox(Val(xpnSym), mapFunction, fill(convertNumber(e, roundDigits)), 
+genExponent(e::Real, mapFunction::F; canDiff::Bool=true, dataName::Symbol=:undef, 
+            roundDigits::Int=-1, numberType::Type{<:Real}=Float64) where 
+           {F<:Function} = 
+ParamBox(Val(xpnSym), mapFunction, fill(convertNumber(e, roundDigits, numberType)), 
          genIndex(nothing), fill(canDiff), dataName)
 
 genExponent(e::Array{T, 0}, mapFunction::F; canDiff::Bool=true, 
@@ -70,47 +70,48 @@ ParamBox(Val(xpnSym), mapFunction, e, genIndex(nothing), fill(canDiff), dataName
 
 """
 
-    genExponent(e::Real; roundDigits::Int=-1) -> ParamBox{Float64, :$(xpnSym)}
+    genExponent(e::Real; roundDigits::Int=-1, numberType::Type{<:Real}=Float64) -> 
+    ParamBox{numberType, :$(xpnSym)}
 
-    genExponent(e::Array{Float64, 0}) -> ParamBox{Float64, :$(xpnSym)}
-
-"""
-genExponent(e::Real; roundDigits::Int=-1) = 
-ParamBox(Val(xpnSym), itself, fill(convertNumber(e, roundDigits)), genIndex(nothing))
-
-genExponent(e::Array{Float64, 0}) = ParamBox(Val(xpnSym), itself, e, genIndex(nothing))
-
+    genExponent(e::Array{T, 0}) where {T<:Real} -> ParamBox{T, :$(xpnSym)}
 
 """
+genExponent(e::Real; roundDigits::Int=-1, numberType::Type{<:Real}=Float64) = 
+ParamBox(Val(xpnSym), itself, fill(convertNumber(e, roundDigits, numberType)), 
+         genIndex(nothing))
 
-    genExponent(pb::ParamBox{Float64}) -> ParamBox{Float64, :$(xpnSym)}
+genExponent(e::Array{T, 0}) where {T<:Real} = 
+ParamBox(Val(xpnSym), itself, e, genIndex(nothing))
+
+
+"""
+
+    genExponent(pb::ParamBox{T}) where {T<:Real} -> ParamBox{T, :$(xpnSym)}
 
 Convert a `$(ParamBox)` to an exponent coefficient parameter.
 """
-genExponent(pb::ParamBox{Float64, V, F}) where {V, F} = ParamBox(Val(xpnSym), pb)
+genExponent(pb::ParamBox{T, <:Any, F}) where {T<:Real, F} = ParamBox(Val(xpnSym), pb)
 
 
 """
 
     genContraction(c::Real, mapFunction::Function; canDiff::Bool=true, 
-                   roundDigits::Int=-1, dataName::Symbol=:undef) -> 
-                roundDigits::Int=-1, dataName::Symbol=:undef) -> 
-                   roundDigits::Int=-1, dataName::Symbol=:undef) -> 
-    ParamBox{Float64, :$(conSym)}
+                   dataName::Symbol=:undef, roundDigits::Int=-1, 
+                   numberType::Type{<:Real}=Float64) -> 
+    ParamBox{numberType, :$(conSym)}
 
     genContraction(c::Array{T, 0}, mapFunction::Function; canDiff::Bool=true, 
                    dataName::Symbol=:undef) where {T<:Real} -> 
-                dataName::Symbol=:undef) where {T<:Real} -> 
-                   dataName::Symbol=:undef) where {T<:Real} -> 
-    ParamBox{Float64, :$(conSym)}
+    ParamBox{T, :$(conSym)}
 
 Construct a `ParamBox` for an contraction coefficient given a value. Keywords `mapFunction` 
 and `canDiff` work the same way as in a general constructor of a `ParamBox`. If 
 `roundDigits < 0`, there won't be rounding for input data.
 """
-genContraction(c::Real, mapFunction::F; canDiff::Bool=true, 
-               roundDigits::Int=-1, dataName::Symbol=:undef) where {F<:Function} = 
-ParamBox(Val(conSym), mapFunction, fill(convertNumber(c, roundDigits)), 
+genContraction(c::Real, mapFunction::F; canDiff::Bool=true, dataName::Symbol=:undef, 
+               roundDigits::Int=-1, numberType::Type{<:Real}=Float64) where 
+              {F<:Function} = 
+ParamBox(Val(conSym), mapFunction, fill(convertNumber(c, roundDigits, numberType)), 
          genIndex(nothing), fill(canDiff), dataName)
 
 genContraction(c::Array{T, 0}, mapFunction::F; canDiff::Bool=true, 
@@ -119,46 +120,55 @@ ParamBox(Val(conSym), mapFunction, c, genIndex(nothing), fill(canDiff), dataName
 
 """
 
-    genContraction(c::Real; roundDigits::Int=-1) -> ParamBox{Float64, :$(conSym)}
+    genContraction(c::Real; roundDigits::Int=-1, numberType::Type{<:Real}=Float64) -> 
+    ParamBox{numberType, :$(conSym)}
 
-    genContraction(c::Array{Float64, 0}) -> ParamBox{Float64, :$(conSym)}
-
-"""
-genContraction(c::Real; roundDigits::Int=-1) = 
-ParamBox(Val(conSym), itself, fill(convertNumber(c, roundDigits)), genIndex(nothing))
-
-genContraction(c::Array{Float64, 0}) = ParamBox(Val(conSym), itself, c, genIndex(nothing))
+    genContraction(c::Array{T, 0}) where {T<:Real} -> ParamBox{T, :$(conSym)}
 
 """
+genContraction(c::Real; roundDigits::Int=-1, numberType::Type{<:Real}=Float64) = 
+ParamBox(Val(conSym), itself, fill(convertNumber(c, roundDigits, numberType)), 
+         genIndex(nothing))
 
-    genContraction(pb::ParamBox{Float64}) -> ParamBox{Float64, :$(conSym)}
+genContraction(c::Array{T, 0}) where {T<:Real} = 
+ParamBox(Val(conSym), itself, c, genIndex(nothing))
+
+"""
+
+    genContraction(pb::ParamBox{T}) where {T<:Real} -> ParamBox{T, :$(conSym)}
 
 Convert a `$(ParamBox)` to an exponent coefficient parameter.
 """
-genContraction(pb::ParamBox{Float64, V, F}) where {V, F} = ParamBox(Val(conSym), pb)
+genContraction(pb::ParamBox{T, <:Any, F}) where {T<:Real, F} = ParamBox(Val(conSym), pb)
 
 
-const Doc_genSpatialPoint_Eg1 = "(ParamBox{Float64, :X, $(FLevel(itself))}(1.0)[∂][X], " * 
-                                 "ParamBox{Float64, :Y, $(FLevel(itself))}(2.0)[∂][Y], " * 
-                                 "ParamBox{Float64, :Z, $(FLevel(itself))}(3.0)[∂][Z])"
+const Doc_genSpatialPoint_Eg1 = "SpatialPoint{3, Float64, "*
+                                "Tuple{FLevel{1, 0}, FLevel{1, 0}, FLevel{1, 0}}}"*
+                                "(param)[1.0, 2.0, 3.0][∂][∂][∂]"
 
+struct Point1D{T, FLx} <: SpatialPoint{1, T, Tuple{FLx}}
+    param::Tuple{ParamBox{T, cxSym, FLx}}
+end
 
-# struct SpatialPoint{D, T}
-#     NTuple{D, }
-# end
+struct Point2D{T, FLx, FLy} <: SpatialPoint{2, T, Tuple{FLx, FLy}}
+    param::Tuple{ParamBox{T, cxSym, FLx}, ParamBox{T, cySym, FLy}}
+end
 
+struct Point3D{T, FLx, FLy, FLz} <: SpatialPoint{3, T, Tuple{FLx, FLy, FLz}}
+    param::Tuple{ParamBox{T, cxSym, FLx}, ParamBox{T, cySym, FLy}, ParamBox{T, czSym, FLz}}
+end
 
 """
 
     genSpatialPoint(point::Union{Tuple{Vararg{Real}}, AbstractArray{<:Real}}, 
                     mapFunction::F=itself; canDiff::Bool=true, dataName::Symbol=:undef, 
                     roundDigits::Int=-1) -> 
-    pbs::Union{Tuple{Vararg{ParamBox}}, Vector{<:ParamBox}}
+    SpatialPoint
 
     genSpatialPoint(point::Union{Tuple{Vararg{Array{Float64, 0}}}, 
                                  AbstractArray{Array{Float64, 0}}}, 
                     mapFunction::F=itself; canDiff::Bool=true, dataName::Symbol=:undef) -> 
-    pbs::Union{Tuple{Vararg{ParamBox}}, Vector{<:ParamBox}}
+    SpatialPoint
 
 Return the parameter(s) of a spatial coordinate in terms of `ParamBox`. Keywords 
 `mapFunction` and `canDiff` work the same way as in a general constructor of a `ParamBox`. 
@@ -192,20 +202,30 @@ julia> p2[1]
 ParamBox{Float64, :X, $(FLevel(itself))}(1.2)[∂][X]
 ```
 """
-genSpatialPoint(v::Union{AbstractArray, Tuple}, optArgs...) = 
-genSpatialPoint.(v, Tuple([1:length(v);]), optArgs...)
+genSpatialPoint(v::AbstractArray, optArgs...) = genSpatialPoint(Tuple(v), optArgs...)
+genSpatialPoint(v::NTuple{N, Any}, optArgs...) where {N} = 
+genSpatialPoint.(v, Tuple([1:N;]), optArgs...) |> genSpatialPointCore
 
 """
 
-    genSpatialPoint(comp::Real, index::Int, mapFunction::F=itself; canDiff::Bool=true, 
-                    dataName::Symbol=:undef, roundDigits::Int=-1) -> 
-    ParamBox{Float64}
+    genSpatialPoint(comp::Real, index::Int, mapFunction::F; canDiff::Bool=true, 
+                    dataName::Symbol=:undef, roundDigits::Int=-1, 
+                    numberType::Type{<:Real}=Float64) -> 
+    ParamBox{numberType}
 
-    genSpatialPoint(comp::Array{Float64, 0}, index::Int,mapFunction::F=itself; 
-                    canDiff::Bool=true, dataName::Symbol=:undef) -> 
-    ParamBox{Float64}
+    genSpatialPoint(comp::Array{T, 0}, index::Int,mapFunction::F; canDiff::Bool=true, 
+                    dataName::Symbol=:undef) -> 
+    ParamBox{T}
 
-Return the component of a spatial point given its value (or 0-D container) and index.
+    genSpatialPoint(comp::Real, index::Int; roundDigits::Int=-1, 
+                    numberType::Type{<:Real}=Float64) -> 
+    ParamBox{numberType}
+
+    genSpatialPoint(comp::Array{T, 0}, index::Int) -> ParamBox{T}
+
+    genSpatialPoint(comp::ParamBox{T}, index::Int) -> ParamBox{T}
+
+Return the component of a `SpatialPoint` given its value (or 0-D container) and index.
 
 ≡≡≡ Example(s) ≡≡≡
 
@@ -227,47 +247,60 @@ julia> Y1
 ParamBox{Float64, :Y, $(FLevel(itself))}(1.5)[∂][Y]
 ```
 """
-genSpatialPoint(comp::Real, index::Int, mapFunction::F=itself; canDiff::Bool=true, 
-                dataName::Symbol=:undef, roundDigits::Int=-1) where {F<:Function} = 
-ParamBox(fill(convertNumber(comp, roundDigits)), SpatialParamSyms[index], mapFunction, 
-         dataName; canDiff)
+genSpatialPoint(comp::Real, index::Int, mapFunction::F; canDiff::Bool=true, 
+                dataName::Symbol=:undef, roundDigits::Int=-1, 
+                numberType::Type{<:Real}=Float64) where {F<:Function} = 
+ParamBox(Val(SpatialParamSyms[index]), mapFunction, 
+         fill(convertNumber(comp, roundDigits, numberType)), 
+         genIndex(nothing), fill(canDiff), dataName)
 
-genSpatialPoint(comp::Array{Float64, 0}, index::Int, mapFunction::F=itself; 
-                canDiff::Bool=true, dataName::Symbol=:undef) where {F<:Function} = 
-ParamBox(comp, SpatialParamSyms[index], mapFunction, dataName; canDiff)
+genSpatialPoint(comp::Array{T, 0}, index::Int, mapFunction::F; 
+                canDiff::Bool=true, dataName::Symbol=:undef) where {T<:Real, F<:Function} = 
+ParamBox(Val(SpatialParamSyms[index]), mapFunction, comp, 
+         genIndex(nothing), fill(canDiff), dataName)
+
+genSpatialPoint(comp::Real, index::Int; roundDigits::Int=-1, 
+                numberType::Type{<:Real}=Float64) = 
+ParamBox(Val(SpatialParamSyms[index]), itself, 
+         fill(convertNumber(comp, roundDigits, numberType)), genIndex(nothing))
+
+genSpatialPoint(comp::Array{T, 0}, index::Int) where {T<:Real} = 
+ParamBox(Val(SpatialParamSyms[index]), itself, comp, genIndex(nothing))
+
+genSpatialPoint(point::ParamBox, index::Int) = ParamBox(Val(SpatialParamSyms[index]), point)
 
 """
 
     genSpatialPoint(point::Union{Tuple{Vararg{ParamBox}}, AbstractArray{<:ParamBox}}) -> 
-    pbs::Union{Tuple{Vararg{ParamBox}}, Vector{<:ParamBox}}
+    SpatialPoint
 
 Convert a collection of `$(ParamBox)`s to a spatial point.
 """
 genSpatialPoint(point::NTuple{N, ParamBox}) where {N} = 
-ParamBox.(Val.(SpatialParamSyms[1:N]|>Tuple), point)
+ParamBox.(Val.(SpatialParamSyms[1:N]|>Tuple), point) |> genSpatialPointCore
 
-genSpatialPoint(point::AbstractArray{<:ParamBox}) = 
-ParamBox.(Val.(SpatialParamSyms[1:length(point)]), point)
+genSpatialPointCore(point::Tuple{ParamBox{T, cxSym, FLx}}) where {T, FLx} = 
+Point1D{T, FLx}(point)
 
-genSpatialPoint(point::Tuple{ParamBox{Float64, cxSym}}) = itself(point)
+genSpatialPointCore(point::Tuple{ParamBox{T, cxSym, FLx}, 
+                                 ParamBox{T, cySym, FLy}}) where {T, FLx, FLy} = 
+Point2D{T, FLx, FLy}(point)
 
-genSpatialPoint(point::Tuple{ParamBox{Float64, cxSym}, 
-                             ParamBox{Float64, cySym}}) = itself(point)
-genSpatialPoint(point::Tuple{ParamBox{Float64, cxSym}, 
-                             ParamBox{Float64, cySym}, 
-                             ParamBox{Float64, czSym}}) = itself(point)
+genSpatialPointCore(point::Tuple{ParamBox{T, cxSym, FLx}, 
+                                 ParamBox{T, cySym, FLy}, 
+                                 ParamBox{T, czSym, FLz}}) where {T, FLx, FLy, FLz} = 
+Point3D{T, FLx, FLy, FLz}(point)
 
 
 """
 
-    BasisFunc{𝑙, GN} <: FloatingGTBasisFuncs{𝑙, GN, 1}
+    BasisFunc{𝑙, GN, PT, D, T} <: FloatingGTBasisFuncs{𝑙, GN, 1, PT, D, T}
 
 A (floating) basis function with the center attached to it instead of any nucleus.
 
 ≡≡≡ Field(s) ≡≡≡
 
-`center::NTuple{3, ParamBox}`: The center coordinate in form of a 3-element `ParamBox`-type 
-`Tuple`.
+`center::SpatialPoint{D, T, PT}`: The `D`-dimensional center coordinate.
 
 `gauss::NTuple{N, GaussFunc}`: Gaussian functions within the basis function.
 
@@ -277,37 +310,37 @@ convenient syntax, `.ijk[]` converts it to a `NTuple{3, Int}`.
 
 `normalizeGTO::Bool`: Whether the GTO`::GaussFunc` will be normalized in calculations.
 
-`param::NTuple{3+GN*2, ParamBox}`： All the tunable parameters`::ParamBox` stored in the 
+`param::NTuple{D+GN*2, ParamBox}`： All the tunable parameters`::ParamBox` stored in the 
 `BasisFunc`.
 
 ≡≡≡ Initialization Method(s) ≡≡≡
 
-    BasisFunc(center::NTuple{3, ParamBox}, gauss::NTuple{GN, GaussFunc}, 
-              ijk::NTuple{3, Int}, normalizeGTO::Bool) where {GN} -> 
-    BasisFunc{𝑙, GN} where {𝑙}
+    BasisFunc(cen::SpatialPoint{D, T, PT}, gs::NTuple{GN, AbstractGaussFunc{T}}, 
+              ijk::Union{Tuple{XYZTuple{𝑙}}, XYZTuple{𝑙}}, normalizeGTO::Bool) where 
+             {D, T, PT, 𝑙, GN} -> 
+    BasisFunc{𝑙, GN, PT, D, T}
 
-    BasisFunc(cen::NTuple{3, ParamBox}, gauss::GaussFunc, ijk::NTuple{3, Int}, 
-              normalizeGTO::Bool) ->
-    BasisFunc{𝑙, 1} where {𝑙}
+    BasisFunc(cen::SpatialPoint{D, T, PT}, gs::AbstractGaussFunc{T}, 
+              ijk::Union{Tuple{XYZTuple{𝑙}}, XYZTuple{𝑙}}, normalizeGTO::Bool) where 
+             {D, T, PT, 𝑙, GN} -> 
+    BasisFunc{𝑙, 1, PT, D, T}
 """
-struct BasisFunc{𝑙, GN} <: FloatingGTBasisFuncs{𝑙, GN, 1}
-    center::Tuple{ParamBox{Float64, cxSym}, 
-                  ParamBox{Float64, cySym}, 
-                  ParamBox{Float64, czSym}}
-    gauss::NTuple{GN, AbstractGaussFunc{Float64}}
+struct BasisFunc{𝑙, GN, PT, D, T} <: FloatingGTBasisFuncs{𝑙, GN, 1, PT, D, T}
+    center::SpatialPoint{D, T, PT}
+    gauss::NTuple{GN, AbstractGaussFunc{T}}
     ijk::Tuple{XYZTuple{𝑙}}
     normalizeGTO::Bool
     param::Tuple{Vararg{ParamBox}}
 
-    function BasisFunc(cen::NTuple{D, ParamBox}, gs::NTuple{GN, AbstractGaussFunc{Float64}}, 
-                       ijk::Tuple{XYZTuple{𝑙}}, normalizeGTO::Bool) where {D, 𝑙, GN}
-        len = 3 + GN*2
+    function BasisFunc(cen::SpatialPoint{D, T, PT}, gs::NTuple{GN, AbstractGaussFunc{T}}, 
+                       ijk::Tuple{XYZTuple{𝑙}}, normalizeGTO::Bool) where {D, T, PT, 𝑙, GN}
+        len = D + GN*2
         pars = Array{ParamBox}(undef, len)
-        pars[1], pars[2], pars[3] = cen
+        pars[1], pars[2], pars[3] = cen.param
         for (g, k) in zip(gs, 4:2:(len-1))
             pars[k], pars[k+1] = g.param
         end
-        new{𝑙, GN}(genSpatialPoint(cen), gs, ijk, normalizeGTO, pars|>Tuple)
+        new{𝑙, GN, PT, D, T}(cen, gs, ijk, normalizeGTO, pars|>Tuple)
     end
 end
 
@@ -323,37 +356,35 @@ BasisFunc(bf::BasisFunc) = itself(bf)
 
 """
 
-    BasisFuncs{𝑙, GN, ON} <: FloatingGTBasisFuncs{𝑙, GN, ON}
+    BasisFuncs{𝑙, GN, ON, PT, D, T} <: FloatingGTBasisFuncs{𝑙, GN, ON, PT, D, T}
 
 A group of basis functions with identical parameters except they have different 
 orientations in the specified subshell. It has the same fields as `BasisFunc` and 
 specifically, for `ijk`, the size of the it (`ON`) can be no less than 1 (and no larger 
 than the size of the corresponding subshell).
 """
-struct BasisFuncs{𝑙, GN, ON} <: FloatingGTBasisFuncs{𝑙, GN, ON}
-    center::Tuple{ParamBox{Float64, cxSym}, 
-                  ParamBox{Float64, cySym}, 
-                  ParamBox{Float64, czSym}}
+struct BasisFuncs{𝑙, GN, ON, PT, D, T} <: FloatingGTBasisFuncs{𝑙, GN, ON, PT, D, T}
+    center::SpatialPoint{D, T, PT}
     gauss::NTuple{GN, AbstractGaussFunc{Float64}}
     ijk::NTuple{ON, XYZTuple{𝑙}}
     normalizeGTO::Bool
     param::Tuple{Vararg{ParamBox}}
 
-    function BasisFuncs(cen::NTuple{D, ParamBox}, gs::NTuple{GN, AbstractGaussFunc{Float64}}, 
+    function BasisFuncs(cen::SpatialPoint{D, T, PT}, gs::NTuple{GN, AbstractGaussFunc{T}}, 
                         ijks::NTuple{ON, XYZTuple{𝑙}}, normalizeGTO::Bool=false) where 
-                       {D, 𝑙, GN, ON}
+                       {D, T, PT, 𝑙, GN, ON}
         ss = SubshellXYZsizes[𝑙+1]
         @assert ON <= ss "The total number of `ijk` should be no more than $(ss) as " * 
                          "they are in $(subshell) subshell."
         ijks = sort(ijks|>collect, rev=true) |> Tuple
         pars = ParamBox[]
-        len = 3 + GN*2
+        len = D + GN*2
         pars = Array{ParamBox}(undef, len)
-        pars[1], pars[2], pars[3] = cen
+        pars[1], pars[2], pars[3] = cen.param
         for (g, k) in zip(gs, 4:2:(len-1))
             pars[k], pars[k+1] = g.param
         end
-        new{𝑙, GN, ON}(genSpatialPoint(cen), gs, ijks, normalizeGTO, pars|>Tuple)
+        new{𝑙, GN, ON, PT, D, T}(cen, gs, ijks, normalizeGTO, pars|>Tuple)
     end
 end
 
@@ -373,7 +404,7 @@ const BasisFunc0 = EmptyBasisFunc()
 
 """
 
-    genBasisFunc(center::Union{AbstractArray{T}, Tuple{Vararg{T}}, Missing}, 
+    genBasisFunc(center::Union{AbstractArray{T}, Tuple{Vararg{T}, SpatialPoint}, Missing}, 
                  args..., kws...) where {T<:Union{Real, ParamBox}} -> 
     B where {B<:Union{FloatingGTBasisFuncs, Array{<:FloatingGTBasisFuncs}}}
 
@@ -465,44 +496,44 @@ julia> genBasisFunc([0,0,0], [("STO-2G", "He"), ("STO-3G", "O")])
  BasisFuncs{1, 3, 3}(center, gauss)[3/3][0.0, 0.0, 0.0]
 ```
 """
-genBasisFunc(cen::NTuple{3, ParamBox}, gs::NTuple{GN, AbstractGaussFunc{Float64}}, 
+genBasisFunc(cen::SpatialPoint, gs::NTuple{GN, AbstractGaussFunc{Float64}}, 
              ijk::XYZTuple{𝑙}=XYZTuple(0,0,0); normalizeGTO::Bool=false) where {GN, 𝑙} = 
 BasisFunc(cen, gs, ijk, normalizeGTO)
 
-genBasisFunc(cen::NTuple{3, ParamBox}, gs::NTuple{GN, AbstractGaussFunc{Float64}}, 
+genBasisFunc(cen::SpatialPoint, gs::NTuple{GN, AbstractGaussFunc{Float64}}, 
              ijk::NTuple{3, Int}; normalizeGTO::Bool=false) where {GN} = 
 BasisFunc(cen, gs, ijk|>XYZTuple, normalizeGTO)
 
-genBasisFunc(cen::NTuple{3, ParamBox}, gs::NTuple{GN, AbstractGaussFunc{Float64}}, 
+genBasisFunc(cen::SpatialPoint, gs::NTuple{GN, AbstractGaussFunc{Float64}}, 
              ijks::NTuple{ON, XYZTuple{𝑙}}; normalizeGTO::Bool=false) where {GN, ON, 𝑙} = 
 BasisFuncs(cen, gs, ijks, normalizeGTO)
 
-genBasisFunc(cen::NTuple{3, ParamBox}, gs::NTuple{GN, AbstractGaussFunc{Float64}}, 
+genBasisFunc(cen::SpatialPoint, gs::NTuple{GN, AbstractGaussFunc{Float64}}, 
              ijks::NTuple{ON, NTuple{3, Int}}; normalizeGTO::Bool=false) where {GN, ON} = 
 BasisFuncs(cen, gs, ijks.|>XYZTuple, normalizeGTO)
 
-genBasisFunc(cen::NTuple{3, ParamBox}, gs::NTuple{GN, AbstractGaussFunc{Float64}}, 
+genBasisFunc(cen::SpatialPoint, gs::NTuple{GN, AbstractGaussFunc{Float64}}, 
              ijks::Vector{XYZTuple{𝑙}}; normalizeGTO::Bool=false) where {GN, 𝑙} = 
 genBasisFunc(cen, gs, ijks|>Tuple; normalizeGTO)
 
-genBasisFunc(cen::NTuple{3, ParamBox}, gs::NTuple{GN, AbstractGaussFunc{Float64}}, 
+genBasisFunc(cen::SpatialPoint, gs::NTuple{GN, AbstractGaussFunc{Float64}}, 
              ijks::Vector{NTuple{3, Int}}; normalizeGTO::Bool=false) where {GN} = 
 genBasisFunc(cen, gs, ijks|>Tuple; normalizeGTO)
 
-genBasisFunc(cen::NTuple{3, ParamBox}, gs::NTuple{GN, AbstractGaussFunc{Float64}}, 
+genBasisFunc(cen::SpatialPoint, gs::NTuple{GN, AbstractGaussFunc{Float64}}, 
              ijk::Tuple{XYZTuple{𝑙}}; normalizeGTO::Bool=false) where {GN, 𝑙} = 
 genBasisFunc(cen, gs, ijk[1]; normalizeGTO)
 
-genBasisFunc(cen::NTuple{3, ParamBox}, gs::NTuple{GN, AbstractGaussFunc{Float64}}, 
+genBasisFunc(cen::SpatialPoint, gs::NTuple{GN, AbstractGaussFunc{Float64}}, 
              ijk::Tuple{NTuple{3, Int}}; normalizeGTO::Bool=false) where {GN} = 
 genBasisFunc(cen, gs, ijk[1]; normalizeGTO)
 
-function genBasisFunc(cen::NTuple{3, ParamBox}, gs::NTuple{GN, AbstractGaussFunc{Float64}}, 
+function genBasisFunc(cen::SpatialPoint, gs::NTuple{GN, AbstractGaussFunc{Float64}}, 
                       subshell::String; normalizeGTO::Bool=false) where {GN}
     genBasisFunc(cen, gs, SubshellOrientationList[subshell]; normalizeGTO)
 end
 
-function genBasisFunc(cen::NTuple{3, ParamBox}, gs::NTuple{GN, AbstractGaussFunc{Float64}}, 
+function genBasisFunc(cen::SpatialPoint, gs::NTuple{GN, AbstractGaussFunc{Float64}}, 
                       subshell::String, ijkFilter::NTuple{N, Bool}; 
                       normalizeGTO::Bool=false) where {GN, N}
     subshellSize = SubshellSizeList[subshell]
@@ -513,18 +544,18 @@ function genBasisFunc(cen::NTuple{3, ParamBox}, gs::NTuple{GN, AbstractGaussFunc
                  normalizeGTO)
 end
 
-function genBasisFunc(cen::NTuple{3, ParamBox}, xpnsANDcons::NTuple{2, Vector{<:Real}}, 
+function genBasisFunc(cen::SpatialPoint, xpnsANDcons::NTuple{2, Vector{<:Real}}, 
                       ijkOrSubshell=XYZTuple(0,0,0); normalizeGTO::Bool=false)
     @compareLength xpnsANDcons[1] xpnsANDcons[2] "exponents" "contraction coefficients"
     genBasisFunc(cen, GaussFunc.(xpnsANDcons[1], xpnsANDcons[2]), ijkOrSubshell; 
                  normalizeGTO)
 end
 
-genBasisFunc(cen::NTuple{3, ParamBox}, xpnANDcon::NTuple{2, Real}, 
+genBasisFunc(cen::SpatialPoint, xpnANDcon::NTuple{2, Real}, 
              ijkOrSubshell=XYZTuple(0,0,0); normalizeGTO::Bool=false) = 
 genBasisFunc(cen, (GaussFunc(xpnANDcon[1], xpnANDcon[2]),), ijkOrSubshell; normalizeGTO)
 
-function genBasisFunc(center::NTuple{3, ParamBox}, BSKeyANDnuc::Vector{NTuple{2, String}}; 
+function genBasisFunc(center::SpatialPoint, BSKeyANDnuc::Vector{NTuple{2, String}}; 
                       unlinkCenter::Bool=false)
     bases = FloatingGTBasisFuncs[]
     for k in BSKeyANDnuc
@@ -536,32 +567,30 @@ function genBasisFunc(center::NTuple{3, ParamBox}, BSKeyANDnuc::Vector{NTuple{2,
     bases
 end
 
-genBasisFunc(cen::NTuple{3, ParamBox}, BSKeyANDnuc::NTuple{2, String}; 
+genBasisFunc(cen::SpatialPoint, BSKeyANDnuc::NTuple{2, String}; 
              unlinkCenter::Bool=false) = 
 genBasisFunc(cen, [BSKeyANDnuc]; unlinkCenter)
 
-genBasisFunc(cen::NTuple{3, ParamBox}, BSkey::Vector{String}; nucleus::String="H", 
+genBasisFunc(cen::SpatialPoint, BSkey::Vector{String}; nucleus::String="H", 
              unlinkCenter::Bool=false) = 
 genBasisFunc(cen, [(i, nucleus) for i in BSkey]; unlinkCenter)
 
-genBasisFunc(cen::NTuple{3, ParamBox}, BSkey::String; nucleus::String="H", 
+genBasisFunc(cen::SpatialPoint, BSkey::String; nucleus::String="H", 
              unlinkCenter::Bool=false) = 
 genBasisFunc(cen, [BSkey]; nucleus, unlinkCenter)
 
 # A few methods for convenient arguments omissions and mutations.
-genBasisFunc(cen::NTuple{3, ParamBox}, gs::AbstractArray{<:AbstractGaussFunc{Float64}}, args...; kws...) = 
+genBasisFunc(cen::SpatialPoint, gs::AbstractArray{<:AbstractGaussFunc{Float64}}, 
+             args...; kws...) = 
 genBasisFunc(cen, gs|>Tuple, args...; kws...)
 
-genBasisFunc(cen::NTuple{3, ParamBox}, g::GaussFunc, args...; kws...) = 
+genBasisFunc(cen::SpatialPoint, g::GaussFunc, args...; kws...) = 
 genBasisFunc(cen, (g,), args...; kws...)
 
-genBasisFunc(coord::NTuple{D, Real}, args...; kws...) where {D} = 
+genBasisFunc(coord::Union{Tuple, AbstractArray}, args...; kws...) = 
 genBasisFunc(genSpatialPoint(coord), args...; kws...)
 
-genBasisFunc(coord::AbstractArray, args...; kws...) = 
-genBasisFunc(Tuple(coord), args...; kws...)
-
-genBasisFunc(::Missing, args...; kws...) = genBasisFunc([NaN, NaN, NaN], args...; kws...)
+genBasisFunc(::Missing, args...; kws...) = genBasisFunc((NaN, NaN, NaN), args...; kws...)
 
 genBasisFunc(bf::FloatingGTBasisFuncs) = itself(bf)
 
@@ -693,7 +722,7 @@ centerOf(bf::FloatingGTBasisFuncs) = bf.center
 
 Return the center coordinate of the input `FloatingGTBasisFuncs`.
 """
-centerCoordOf(bf::FloatingGTBasisFuncs) = [outValOf(i) for i in bf.center]
+centerCoordOf(bf::FloatingGTBasisFuncs) = [outValOf(i) for i in bf.center.param]
 
 
 """
@@ -875,7 +904,7 @@ function add(bf1::BasisFunc{𝑙1, GN1},
         elseif hasEqual(bf1, bf2)
             cen = deepcopy(bf1.center)
         else
-            cen = makeCenter(c)
+            cen = genSpatialPoint(c)
         end
         gfsN = mergeGaussFuncs(bf1.gauss..., bf2.gauss...; roundDigits) |> Tuple
         BasisFunc(cen, gfsN, bf1.ijk, bf1.normalizeGTO)
@@ -1038,7 +1067,7 @@ function mul(sgf1::BasisFunc{𝑙1, 1}, sgf2::BasisFunc{𝑙2, 1};
     if R₁ == R₂
         xpn = α₁ + α₂
         con = d₁ * d₂
-        BasisFunc(makeCenter(R₁), GaussFunc(genExponent(xpn), genContraction(con)), 
+        BasisFunc(genSpatialPoint(R₁), GaussFunc(genExponent(xpn), genContraction(con)), 
                   sgf1.ijk.+sgf2.ijk, normalizeGTO)
     else
         ijk1 = sgf1.ijk[1]
@@ -1056,9 +1085,9 @@ function mul(sgf1::BasisFunc{𝑙1, 1}, sgf2::BasisFunc{𝑙2, 1};
             coeffs[i] = [diag(m, k)|>sum for k = s:step:e]
         end
         XYZcs = cat(Ref(coeffs[1] * transpose(coeffs[2])) .* coeffs[3]..., dims=3)
-        pbR = makeCenter(cen)
+        R = genSpatialPoint(cen)
         pbα = genExponent(xpn)
-        BasisFuncMix([BasisFunc(pbR, GaussFunc(pbα, genContraction(con*XYZcs[i])), 
+        BasisFuncMix([BasisFunc(R, GaussFunc(pbα, genContraction(con*XYZcs[i])), 
                                 XYZTuple(i.I .- 1), normalizeGTO) 
                       for i in CartesianIndices(XYZcs)])
     end
@@ -1076,7 +1105,7 @@ function mul(sgf1::BasisFunc{0, 1}, sgf2::BasisFunc{0, 1};
     R₂ = centerCoordOf(sgf2)
     xpn, con, cen = gaussProd((sgf1.gauss[1].xpn(), d₁, R₁), (sgf2.gauss[1].xpn(), d₂, R₂))
     normalizeGTO isa Missing && (normalizeGTO = n₁*n₂)
-    BasisFunc(makeCenter(cen), GaussFunc(genExponent(xpn), genContraction(con)), 
+    BasisFunc(genSpatialPoint(cen), GaussFunc(genExponent(xpn), genContraction(con)), 
               (XYZTuple(0,0,0),), normalizeGTO)
 end
 
@@ -1097,19 +1126,10 @@ function mulCore(bf::BasisFunc{𝑙, GN}, coeff::Real;
     BasisFunc(bf.center, gfs, bf.ijk, normalizeGTO)
 end
 
-# function mulCore(coeff::Real, bf::BasisFunc{𝑙, GN}; 
-#                  normalizeGTO::Union{Bool, Missing}=missing)::BasisFunc{𝑙, GN} where {𝑙, GN}
-#     mul(bf, coeff; normalizeGTO)
-# end
-
 function mulCore(bfm::T, coeff::Real; normalizeGTO::Union{Bool, Missing}=missing) where 
                 {T<:BasisFuncMix}
     BasisFuncMix(mul.(bfm.BasisFunc, coeff; normalizeGTO) |> collect)::T
 end
-
-# function mulCore(coeff::Real, bfm::BasisFuncMix; normalizeGTO::Union{Bool, Missing}=missing)
-#     mul(bfm, coeff; normalizeGTO)
-# end
 
 function mul(bf1::BasisFunc{𝑙1, GN1}, bf2::BasisFunc{𝑙2, GN2}; 
              normalizeGTO::Union{Bool, 
@@ -1240,16 +1260,18 @@ consists of the `BasisFunc`s each with only 1 `GaussFunc`.
 decompose(bf::CompositeGTBasisFuncs, splitGaussFunc::Bool=false) = 
 decomposeCore(Val(splitGaussFunc), bf)
 
-function decomposeCore(::Val{false}, bf::FloatingGTBasisFuncs{𝑙, GN, ON}) where {𝑙, GN, ON}
-    res = Array{BasisFunc{𝑙, GN}}(undef, 1, ON)
+function decomposeCore(::Val{false}, bf::FloatingGTBasisFuncs{𝑙, GN, ON, PT, D, T}) where 
+                      {𝑙, GN, ON, PT, D, T}
+    res = Array{BasisFunc{𝑙, GN, PT, D, T}}(undef, 1, ON)
     for i in eachindex(res)
         res[i] = BasisFunc(bf.center, bf.gauss, bf.ijk[i], bf.normalizeGTO)
     end
     res
 end
 
-function decomposeCore(::Val{true}, bf::FloatingGTBasisFuncs{𝑙, GN, ON}) where {𝑙, GN, ON}
-    res = Array{BasisFunc{𝑙, 1}}(undef, GN, ON)
+function decomposeCore(::Val{true}, bf::FloatingGTBasisFuncs{𝑙, GN, ON, PT, D, T}) where 
+                      {𝑙, GN, ON, PT, D, T}
+    res = Array{BasisFunc{𝑙, 1, PT, D, T}}(undef, GN, ON)
     for (c, ijk) in zip(eachcol(res), bf.ijk)
         c .= BasisFunc.(Ref(bf.center), bf.gauss, Ref(ijk), bf.normalizeGTO)
     end
@@ -1266,15 +1288,10 @@ getSGFtype(::Type{<:BasisFunc}) = BasisFunc{<:Any, 1}
 getSGFtype(::Type{BasisFunc{𝑙}}) where {𝑙} = BasisFunc{𝑙, 1}
 
 function decomposeCore(::Val{true}, bfm::BasisFuncMix{BN, BT, GN}) where {BN, BT, GN}
-    res = Array{getSGFtype(BT)}(undef, GN, 1)
-    i = 1
-    for j = 1:BN
-        bf = bfm.BasisFunc[j]
-        iNew = i + GNof(bf)
-        res[i:iNew-1] = decomposeCore(Val(true), bf)
-        i = iNew
+    bfss = map(bfm.BasisFunc) do bf
+        decomposeCore(Val(true), bf)
     end
-    res
+    reshape(vcat(bfss...), GN, 1)
 end
 
 
@@ -1393,13 +1410,14 @@ subshell information for the `BasisFunc`. E.g.:
     \"\"\"
 ```
 """
-function genBFuncsFromText(content::String;
+function genBFuncsFromText(content::String; 
                            adjustContent::Bool=false, 
                            adjustFunction::F=sciNotReplace, 
                            excludeFirstNlines::Int=0, excludeLastNlines::Int=0, 
                            center::Union{AbstractArray{<:Real}, 
-                                         NTuple{3, Real}, 
-                                         NTuple{3, ParamBox}, 
+                                         NTuple{<:Any, Real}, 
+                                         NTuple{<:Any, ParamBox}, 
+                                         SpatialPoint, 
                                          Missing}=missing, 
                            unlinkCenter::Bool=false) where {F<:Function}
     adjustContent && (content = adjustFunction(content))
@@ -1437,32 +1455,17 @@ end
 
 """
 
-    assignCenter!(center::AbstractArray, b::FloatingGTBasisFuncs) -> NTuple{3, ParamBox}
+    assignCenInVal!(center::AbstractArray, b::FloatingGTBasisFuncs) -> NTuple{3, ParamBox}
 
-Assign a new coordinate to the center of the input `FloatingGTBasisFuncs`. Also return the 
-altered center.
+Assign a new value to the data stored in `b.center` (meaning the output value will also 
+change according to the mapping function) given a `FloatingGTBasisFuncs`. Also, return 
+the altered center.
 """
-function assignCenter!(center::AbstractArray, b::FloatingGTBasisFuncs)
+function assignCenInVal!(center::AbstractArray, b::FloatingGTBasisFuncs)
     for (i,j) in zip(b.center, center)
         i[] = j
     end
     b.center
-end
-
-
-"""
-
-    makeCenter(coord::Array{<:Real, 1}; roundDigits::Int=-1) -> NTuple{3, ParamBox}
-
-Generate a `Tuple` of coordinate `ParamBox`s for a basis function center coordinate given a 
-`Vector`. If `roundDigits < 0` then there won't be rounding for input data.
-"""
-function makeCenter(coord::Vector{<:Real}; roundDigits::Int=-1)
-    c = roundDigits<0 ? convert(Vector{Float64}, coord) : round.(coord, digits=roundDigits)
-    x = ParamBox(c[1], cxSym)
-    y = ParamBox(c[2], cySym)
-    z = ParamBox(c[3], czSym)
-    (x,y,z)
 end
 
 

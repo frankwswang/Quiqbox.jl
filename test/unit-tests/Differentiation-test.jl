@@ -28,7 +28,7 @@ grad1_2 = gradHFenergy(bs1, pars1, HFres1.C, overlaps(bs1), nuc, nucCoords)
 
 bfSource = genBasisFunc(missing, ("STO-2G", "H"))[]
 gfs = bfSource.gauss |> collect
-cens = makeCenter.(nucCoords)
+cens = genSpatialPoint.(nucCoords)
 bs2 = genBasisFunc.(cens, Ref(gfs), normalizeGTO=true)
 pars2 = markParams!(bs2, true)
 S2 = overlaps(bs2)

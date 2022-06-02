@@ -1,3 +1,6 @@
+export FloatingGTBasisFuncs, CompositeGTBasisFuncs, SpatialPoint, AbstractGaussFunc, 
+       GTBasisFuncs, AbstractGTBasisFuncs
+
 abstract type QuiqboxContainer <: Any end
 
 abstract type MetaParameter <: Any end
@@ -31,6 +34,8 @@ abstract type HartreeFockintermediateData <: MutableDataBox end
 abstract type DifferentiableParameter{ContainerT, DataT} <: MutableParameter{ContainerT, DataT} end
 abstract type ConfigBox{ContainerT, MethodT} <: MutableParameter{ContainerT, Any} end
 
+abstract type SpatialPoint{D, T, FLS} <: DifferentiableParameter{SpatialPoint, T} end
+
 abstract type HartreeFockFinalValue{T} <: AbstractHartreeFockFinalValue end
 
 abstract type BasisSetData{BT} <: AbstractBasisSetData end
@@ -56,4 +61,4 @@ abstract type GTBasisFuncs{OrbitalN}  <: AbstractGTBasisFuncs end
 
 abstract type CompositeGTBasisFuncs{NofLinearlyCombinedBasis, NofOrbital}  <: GTBasisFuncs{NofOrbital} end
 
-abstract type FloatingGTBasisFuncs{𝑙, GaussFuncN, OrbitalN} <: CompositeGTBasisFuncs{1, OrbitalN} end
+abstract type FloatingGTBasisFuncs{𝑙, GaussFuncN, OrbitalN, PointT, D, NumberT} <: CompositeGTBasisFuncs{1, OrbitalN} end

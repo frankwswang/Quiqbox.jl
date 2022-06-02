@@ -82,8 +82,7 @@ v3_2 = genSpatialPoint((1.0,2,3.0))
 @test v1_2 == v2_2
 @test hasEqual(v1, v2)
 @test hasEqual(v1_2, v2_2)
-@test hasEqual(v3, v3_2, ignoreContainer=true)
-@test hasEqual(v3, collect(v3_2))
+@test hasEqual(v3, v3_2)
 @test !hasIdentical(v1, v2)
 @test hasIdentical(v1[1], v2[1], v1_2[1], v2_2[1])
 @test !hasIdentical(v1[2:3], v2[2:3])
@@ -472,9 +471,9 @@ txt1 = genBasisFuncText(bs1, printCenter=false, groupCenters=false) |> join
 txt2 = genBasisFuncText(bs1, printCenter=false) |> join
 bs2_1 = genBFuncsFromText(txt1)
 bs2_2 = genBFuncsFromText(txt2)
-assignCenter!.(cens, bs1)
-assignCenter!.(cens, bs2_1)
-assignCenter!.(cens, bs2_2)
+assignCenInVal!.(cens, bs1)
+assignCenInVal!.(cens, bs2_1)
+assignCenInVal!.(cens, bs2_2)
 txt3 = genBasisFuncText(bs1) |> join
 bs2_3 = genBFuncsFromText(txt3)
 @test hasEqual.(bs1, bs2_1, ignoreFunction=true) |> all
@@ -482,12 +481,12 @@ bs2_3 = genBFuncsFromText(txt3)
 @test hasEqual.(sortBasisFuncs(bs1), bs2_3, ignoreFunction=true) |> all
 
 
-# function assignCenter!
+# function assignCenInVal!
 bf6 = genBasisFunc(missing, "STO-3G")[]
 coord = [1,0,0]
 bf6_1 = genBasisFunc(coord, "STO-3G")[]
 @test !hasEqual(bf6, bf6_1)
-assignCenter!(coord, bf6)
+assignCenInVal!(coord, bf6)
 @test hasEqual(bf6, bf6_1)
 
 

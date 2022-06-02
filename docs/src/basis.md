@@ -7,7 +7,7 @@ The data structure formularized by Quiqbox in each step, namely the level of dat
 | level  | objective  |  data structure | container type  | example of type instances |
 | :---: | :---:   | :---:           | :---: | :---:          |
 | 4 | basis set | `Array` or `struct` as the container of basis functions | `Array`, `GTBasis` | `Vector{<:BasisFunc}`, `GTBasis{BasisFunc, Float64}`...|
-| 3 | basis functions | linear combination of Gaussian functions | `CompositeGTBasisFuncs` | `BasisFunc{0, 1}`, `BasisFuncs{1, 3, 3}`, `BasisFuncMix{2, BasisFunc{0, 1}, 6}`...|
+| 3 | basis functions | linear combination of Gaussian functions | `CompositeGTBasisFuncs` | `BasisFunc{0, 1, Tuple{FLevel{1, 0}, FLevel{1, 0}, FLevel{1, 0}}, 3, Float64}`, `BasisFuncMix{3, BasisFunc{0, GN, PT, 3, Float64} where {GN, PT}, 4}`...|
 | 2 | Gaussian functions | (primitive) Gaussian functions | `AbstractGaussFunc{Float64}` | `GaussFunc{Float64, Tuple{FLevel{1, 0}, FLevel{1, 0}}}`|
 | 1 |  pool of parameters | center coordinates, exponents of Gaussian functions | `ParamBox` | `ParamBox{Float64, :α, FLevel{1, 0}}`... |
 
@@ -32,15 +32,15 @@ Notice that in the above result there are 2 types of `struct`s in the returned `
 !!! info "Unit System"
     Hartree atomic units are the unit system used in Quiqbox.
 
-If you want to postpone the specification of the center, you can replace the 1st argument with `missing`, and then use the function `assignCenter!` to assign the coordinates later.
+If you want to postpone the specification of the center, you can replace the 1st argument with `missing`, and then use the function `assignCenInVal!` to assign the coordinates later.
 ```@repl 1
 bsO = genBasisFunc(missing, ("STO-3G", "O"))
 
-assignCenter!([0,0,0], bsO[1]);
+assignCenInVal!([0,0,0], bsO[1]);
 
 bsO
 
-assignCenter!.(Ref([0,0,0]), bsO[2:end])
+assignCenInVal!.(Ref([0,0,0]), bsO[2:end])
 ```
 
 If you omit the atom in the arguments, "H" will be set in default. Notice that even though there's only 1 single basis function in H's STO-3G basis set, the returned value is still an `Array`.

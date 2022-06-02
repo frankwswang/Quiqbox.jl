@@ -7,18 +7,33 @@ import Base: ==
                                     pb1.index[] == pb2.index[] && 
                                     typeof(pb1.map) === typeof(pb2.map))
 
+==(cp1::SpatialPoint, cp2::SpatialPoint) = (cp1.param == cp2.param)
+==(t1::XYZTuple, t2::XYZTuple) = (t1.tuple == t2.tuple)
+
+
+diffColorSym(pb::ParamBox) = isDiffParam(pb) ? :green : :light_black
 
 import Base: show
 const nSigShown = 10
 function show(io::IO, pb::ParamBox)
-    c = pb.canDiff[] ? :green : :light_black
     print(io, typeof(pb))
     print(io, "(", round(pb.data[], sigdigits=nSigShown), ")")
     print(io, "[")
-    printstyled(io, "∂", color=c)
+    printstyled(io, "∂", color=diffColorSym(pb))
     print(io, "][")
     printstyled(io, "$(pb|>getVar)", color=:cyan)
     print(io, "]")
+end
+
+function show(io::IO, sp::SpatialPoint)
+    pbs = sp.param
+    print(io, typeof(sp)|>supertype, "(param)")
+    print(io, [i() for i in pbs])
+    for pb in pbs
+        print(io, "[")
+        printstyled(io, "∂", color=diffColorSym(pb))
+        print(io, "]")
+    end
 end
 
 function show(io::IO, gf::GaussFunc)
@@ -33,9 +48,8 @@ function show(io::IO, bf::BasisFunc)
     print(io, typeof(bf))
     print(io, "(center, gauss)[")
     printstyled(io, bf.ijk[1]|>ijkToStr, color=:cyan)
-    print(io, "][", round(bf.center[1](), sigdigits=nSigShown), ", ",
-                    round(bf.center[2](), sigdigits=nSigShown), ", ",
-                    round(bf.center[3](), sigdigits=nSigShown), "]")
+    cen = round.([i() for i in bf.center], sigdigits=nSigShown)
+    print(io, "]", cen)
 end
 
 function show(io::IO, bf::BasisFuncs{𝑙, <:Any, ON}) where {𝑙, ON}
@@ -51,9 +65,8 @@ function show(io::IO, bf::BasisFuncs{𝑙, <:Any, ON}) where {𝑙, ON}
     print(io, "(center, gauss)[")
     printstyled(io, xyz1, color=:cyan)
     print(io, xyz2)
-    print(io, "][", round(bf.center[1](), sigdigits=nSigShown), ", ",
-                    round(bf.center[2](), sigdigits=nSigShown), ", ",
-                    round(bf.center[3](), sigdigits=nSigShown), "]")
+    cen = round.([i() for i in bf.center], sigdigits=nSigShown)
+    print(io, "]", cen)
 end
 
 function show(io::IO, bfm::BasisFuncMix)
@@ -132,6 +145,11 @@ iterate(::GaussFunc, _) = nothing
 size(::GaussFunc) = ()
 length(::GaussFunc) = 1
 
+iterate(sp::SpatialPoint) = iterate(sp.param)
+iterate(sp::SpatialPoint, state) = iterate(sp.param, state)
+size(::SpatialPoint{D}) where {D} = (D,)
+length(::SpatialPoint{D}) where {D} = D
+
 iterate(bf::BasisFunc) = (bf, nothing)
 iterate(::BasisFunc, _) = nothing
 size(::BasisFunc) = ()
@@ -168,6 +186,14 @@ setindex!(pb::ParamBox, d) = begin pb.data[] = d end
 firstindex(::ParamBox) = Val(:first)
 lastindex(::ParamBox) = Val(:last)
 axes(::ParamBox) = ()
+
+getindex(sp::SpatialPoint, args...) = getindex(sp.param, args...)
+getindex(sp::SpatialPoint) = sp.param
+firstindex(sp::SpatialPoint) = firstindex(sp.param)
+lastindex(sp::SpatialPoint) = lastindex(sp.param)
+eachindex(sp::SpatialPoint) = eachindex(sp.param)
+axes(sp::SpatialPoint) = axes(sp.param)
+ndims(sp::SpatialPoint) = ndims(sp.param)
 
 getindex(gf::GaussFunc) = gf.param |> collect
 getindex(gf::GaussFunc, ::Val{:first}) = getindex(gf)
@@ -209,6 +235,7 @@ broadcastable(pb::ParamBox) = Ref(pb)
 broadcastable(gf::GaussFunc) = Ref(gf)
 broadcastable(bf::CompositeGTBasisFuncs{<:Any, 1}) = Ref(bf)
 broadcastable(bfs::BasisFuncs) = getindex(bfs, :)
+Base.broadcastable(sp::SpatialPoint) = Base.broadcastable(sp.param)
 
 
 # Quiqbox methods overload.

@@ -21,7 +21,7 @@ for c in configs, (i,j) in zip((1,2,7,8,9,10), (2,2,7,9,9,10))
     # 1->X₁, 2->X₂, 7->α₁, 8->α₂, 9->d₁, 10->d₂
     gf1 = GaussFunc(1.7, 0.8)
     gf2 = GaussFunc(0.45, 0.25)
-    cens = makeCenter.(nucCoords)
+    cens = genSpatialPoint.(nucCoords)
     bs1 = genBasisFunc.(cens, Ref((gf1, gf2)), normalizeGTO=true)
     pars1 = markParams!(bs1, true)
 
