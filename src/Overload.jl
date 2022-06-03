@@ -7,7 +7,7 @@ import Base: ==
                                     pb1.index[] == pb2.index[] && 
                                     typeof(pb1.map) === typeof(pb2.map))
 
-==(cp1::SpatialPoint, cp2::SpatialPoint) = (cp1.param == cp2.param)
+==(cp1::SpatialPoint, cp2::SpatialPoint) = (cp1.point.param == cp2.point.param)
 ==(t1::XYZTuple, t2::XYZTuple) = (t1.tuple == t2.tuple)
 
 
@@ -26,8 +26,8 @@ function show(io::IO, pb::ParamBox)
 end
 
 function show(io::IO, sp::SpatialPoint)
-    pbs = sp.param
-    print(io, typeof(sp)|>supertype, "(param)")
+    pbs = sp.point.param
+    print(io, typeof(sp), "(point.param)")
     print(io, [i() for i in pbs])
     for pb in pbs
         print(io, "[")
@@ -145,8 +145,8 @@ iterate(::GaussFunc, _) = nothing
 size(::GaussFunc) = ()
 length(::GaussFunc) = 1
 
-iterate(sp::SpatialPoint) = iterate(sp.param)
-iterate(sp::SpatialPoint, state) = iterate(sp.param, state)
+iterate(sp::SpatialPoint) = iterate(sp.point.param)
+iterate(sp::SpatialPoint, state) = iterate(sp.point.param, state)
 size(::SpatialPoint{D}) where {D} = (D,)
 length(::SpatialPoint{D}) where {D} = D
 
@@ -187,13 +187,13 @@ firstindex(::ParamBox) = Val(:first)
 lastindex(::ParamBox) = Val(:last)
 axes(::ParamBox) = ()
 
-getindex(sp::SpatialPoint, args...) = getindex(sp.param, args...)
-getindex(sp::SpatialPoint) = sp.param
-firstindex(sp::SpatialPoint) = firstindex(sp.param)
-lastindex(sp::SpatialPoint) = lastindex(sp.param)
-eachindex(sp::SpatialPoint) = eachindex(sp.param)
-axes(sp::SpatialPoint) = axes(sp.param)
-ndims(sp::SpatialPoint) = ndims(sp.param)
+getindex(sp::SpatialPoint, args...) = getindex(sp.point.param, args...)
+getindex(sp::SpatialPoint) = sp.point.param
+firstindex(sp::SpatialPoint) = firstindex(sp.point.param)
+lastindex(sp::SpatialPoint) = lastindex(sp.point.param)
+eachindex(sp::SpatialPoint) = eachindex(sp.point.param)
+axes(sp::SpatialPoint) = axes(sp.point.param)
+ndims(sp::SpatialPoint) = ndims(sp.point.param)
 
 getindex(gf::GaussFunc) = gf.param |> collect
 getindex(gf::GaussFunc, ::Val{:first}) = getindex(gf)
@@ -235,7 +235,7 @@ broadcastable(pb::ParamBox) = Ref(pb)
 broadcastable(gf::GaussFunc) = Ref(gf)
 broadcastable(bf::CompositeGTBasisFuncs{<:Any, 1}) = Ref(bf)
 broadcastable(bfs::BasisFuncs) = getindex(bfs, :)
-Base.broadcastable(sp::SpatialPoint) = Base.broadcastable(sp.param)
+Base.broadcastable(sp::SpatialPoint) = Base.broadcastable(sp.point.param)
 
 
 # Quiqbox methods overload.
@@ -246,7 +246,7 @@ function hasBoolRelation(boolFunc::F,
                          kws...) where {F<:Function, F1, F2}
     if ignoreContainer
         boolFunc(pb1(), pb2())
-    elseif ignoreFunction || F1 == F2 == FLevel(itself)
+    elseif ignoreFunction || F1 == F2 == FLi
         boolFunc(pb1.data, pb2.data)
     else
         boolFunc(pb1.canDiff[], pb2.canDiff[]) && boolFunc(pb1.map, pb2.map) && 

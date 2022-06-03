@@ -22,7 +22,7 @@ grid = GridBox(2, 3.0)
 @test gridCoords(grid) == points
 @test map(i-> [j() for j in i], grid.box) == Tuple(points)
 
-gPoints = getfield.(genSpatialPoint.(points), :param) |> flatten
+gPoints = getfield.(getfield.(genSpatialPoint.(points), :point), :param) |> flatten
 @test [i[] for i in gPoints] == [i() for i in gPoints] == (points |> flatten)
 
 end

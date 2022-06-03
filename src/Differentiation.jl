@@ -146,7 +146,7 @@ end
 
 𝑑f(::Type{FL}, f::F, x::T) where {FL<:FLevel, F<:Function, T} = ForwardDerivative(f, x)
 
-𝑑f(::Type{FLevel(itself)}, f::Function, x::T) where {T} = 1.0
+𝑑f(::Type{FLi}, f::Function, x::T) where {T} = 1.0
 
 function ∂SGFcore(::Val{xpnSym}, sgf::FloatingGTBasisFuncs{𝑙, 1, 1}, c::T=1) where {T, 𝑙}
     res = ( shiftCore(+, sgf, XYZTuple(2,0,0)) + shiftCore(+, sgf, XYZTuple(0,2,0)) + 

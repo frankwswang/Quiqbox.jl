@@ -1,7 +1,10 @@
-export GaussFunc, genExponent, genContraction, genSpatialPoint, BasisFunc, BasisFuncs, 
-       genBasisFunc, subshellOf, centerOf, centerCoordOf, GTBasis, sortBasisFuncs, 
-       add, mul, shift, decompose, basisSize, genBasisFuncText, genBFuncsFromText, 
-       assignCenInVal!, getParams, copyBasis, markParams!, getVar, getVarDict, expressionOf
+export GaussFunc, genExponent, genContraction, SpatialPoint, genSpatialPoint, BasisFunc, 
+       BasisFuncs, genBasisFunc, subshellOf, centerOf, centerCoordOf, GTBasis, 
+       sortBasisFuncs, add, mul, shift, decompose, basisSize, genBasisFuncText, 
+       genBFuncsFromText, assignCenInVal!, getParams, copyBasis, markParams!, getVar, 
+       getVarDict, expressionOf
+
+export SP1D, SP2D, SP3D
 
 using Symbolics
 using SymbolicUtils
@@ -146,16 +149,32 @@ const Doc_genSpatialPoint_Eg1 = "SpatialPoint{3, Float64, "*
                                 "Tuple{FLevel{1, 0}, FLevel{1, 0}, FLevel{1, 0}}}"*
                                 "(param)[1.0, 2.0, 3.0][∂][∂][∂]"
 
-struct Point1D{T, FLx} <: SpatialPoint{1, T, Tuple{FLx}}
-    param::Tuple{ParamBox{T, cxSym, FLx}}
+const PT1D{FLx, T} = Tuple{ParamBox{T, cxSym, FLx}}
+const PT2D{FLx, FLy, T} = Tuple{ParamBox{T, cxSym, FLx}, ParamBox{T, cySym, FLy}}
+const PT3D{FLx, FLy, FLz, T} = Tuple{ParamBox{T, cxSym, FLx}, ParamBox{T, cySym, FLy}, 
+                                     ParamBox{T, czSym, FLz}}
+
+const SPointPTL = Union{Tuple{ParamBox{T, cxSym}} where T, 
+                        Tuple{ParamBox{T, cxSym}, ParamBox{T, cySym}} where T, 
+                        Tuple{ParamBox{T, cxSym}, ParamBox{T, cySym}, 
+                              ParamBox{T, czSym}} where T}
+
+const SPointPTU{D, T} = Tuple{Vararg{ParamBox{T, V, FL} where {V, FL<:FLevel}, D}}
+
+struct SPoint{TT<:SPointPTL}
+    param::TT
 end
 
-struct Point2D{T, FLx, FLy} <: SpatialPoint{2, T, Tuple{FLx, FLy}}
-    param::Tuple{ParamBox{T, cxSym, FLx}, ParamBox{T, cySym, FLy}}
-end
+const SP1D{FLx, T} = SPoint{PT1D{FLx, T}}
+const SP2D{FLx, FLy, T} = SPoint{PT2D{FLx, FLy, T}}
+const SP3D{FLx, FLy, FLz, T} = SPoint{PT3D{FLx, FLy, FLz, T}}
 
-struct Point3D{T, FLx, FLy, FLz} <: SpatialPoint{3, T, Tuple{FLx, FLy, FLz}}
-    param::Tuple{ParamBox{T, cxSym, FLx}, ParamBox{T, cySym, FLy}, ParamBox{T, czSym, FLz}}
+struct SpatialPoint{D, T, PT} <: AbstractSpatialPoint{D, T}
+    point::PT
+    function SpatialPoint(pbs::SPointPTU{D, T}) where {D, T}
+        sp = SPoint{typeof(pbs)}(pbs)
+        new{D, T, typeof(sp)}(sp)
+    end
 end
 
 """
@@ -193,13 +212,13 @@ julia> v2 = [fill(1.0), 2, 3]
  3
 
 julia> p2 = genSpatialPoint(v2); p2[1]
-ParamBox{Float64, :X, $(FLevel(itself))}(1.0)[∂][X]
+ParamBox{Float64, :X, $(FLi)}(1.0)[∂][X]
 
 julia> v2[1][] = 1.2
 1.2
 
 julia> p2[1]
-ParamBox{Float64, :X, $(FLevel(itself))}(1.2)[∂][X]
+ParamBox{Float64, :X, $(FLi)}(1.2)[∂][X]
 ```
 """
 genSpatialPoint(v::AbstractArray, optArgs...) = genSpatialPoint(Tuple(v), optArgs...)
@@ -231,20 +250,20 @@ Return the component of a `SpatialPoint` given its value (or 0-D container) and 
 
 ```jldoctest; setup = :(push!(LOAD_PATH, "../../src/"); using Quiqbox)
 julia> genSpatialPoint(1.2, 1)
-ParamBox{Float64, :X, $(FLevel(itself))}(1.2)[∂][X]
+ParamBox{Float64, :X, $(FLi)}(1.2)[∂][X]
 
 julia> pointY1 = fill(2.0)
 0-dimensional Array{Float64, 0}:
 2.0
 
 julia> Y1 = genSpatialPoint(pointY1, 2)
-ParamBox{Float64, :Y, $(FLevel(itself))}(2.0)[∂][Y]
+ParamBox{Float64, :Y, $(FLi)}(2.0)[∂][Y]
 
 julia> pointY1[] = 1.5
 1.5
 
 julia> Y1
-ParamBox{Float64, :Y, $(FLevel(itself))}(1.5)[∂][Y]
+ParamBox{Float64, :Y, $(FLi)}(1.5)[∂][Y]
 ```
 """
 genSpatialPoint(comp::Real, index::Int, mapFunction::F; canDiff::Bool=true, 
@@ -279,17 +298,14 @@ Convert a collection of `$(ParamBox)`s to a spatial point.
 genSpatialPoint(point::NTuple{N, ParamBox}) where {N} = 
 ParamBox.(Val.(SpatialParamSyms[1:N]|>Tuple), point) |> genSpatialPointCore
 
-genSpatialPointCore(point::Tuple{ParamBox{T, cxSym, FLx}}) where {T, FLx} = 
-Point1D{T, FLx}(point)
+genSpatialPointCore(point::PT1D{FLx, T}) where {T, FLx} = 
+SpatialPoint(point)
 
-genSpatialPointCore(point::Tuple{ParamBox{T, cxSym, FLx}, 
-                                 ParamBox{T, cySym, FLy}}) where {T, FLx, FLy} = 
-Point2D{T, FLx, FLy}(point)
+genSpatialPointCore(point::PT2D{FLx, FLy, T}) where {T, FLx, FLy} = 
+SpatialPoint(point)
 
-genSpatialPointCore(point::Tuple{ParamBox{T, cxSym, FLx}, 
-                                 ParamBox{T, cySym, FLy}, 
-                                 ParamBox{T, czSym, FLz}}) where {T, FLx, FLy, FLz} = 
-Point3D{T, FLx, FLy, FLz}(point)
+genSpatialPointCore(point::PT3D{FLx, FLy, FLz, T}) where {T, FLx, FLy, FLz} = 
+SpatialPoint(point)
 
 
 """
@@ -336,7 +352,7 @@ struct BasisFunc{𝑙, GN, PT, D, T} <: FloatingGTBasisFuncs{𝑙, GN, 1, PT, D,
                        ijk::Tuple{XYZTuple{𝑙}}, normalizeGTO::Bool) where {D, T, PT, 𝑙, GN}
         len = D + GN*2
         pars = Array{ParamBox}(undef, len)
-        pars[1], pars[2], pars[3] = cen.param
+        pars[1], pars[2], pars[3] = cen.point.param
         for (g, k) in zip(gs, 4:2:(len-1))
             pars[k], pars[k+1] = g.param
         end
@@ -380,7 +396,7 @@ struct BasisFuncs{𝑙, GN, ON, PT, D, T} <: FloatingGTBasisFuncs{𝑙, GN, ON, 
         pars = ParamBox[]
         len = D + GN*2
         pars = Array{ParamBox}(undef, len)
-        pars[1], pars[2], pars[3] = cen.param
+        pars[1], pars[2], pars[3] = cen.point.param
         for (g, k) in zip(gs, 4:2:(len-1))
             pars[k], pars[k+1] = g.param
         end
@@ -722,7 +738,7 @@ centerOf(bf::FloatingGTBasisFuncs) = bf.center
 
 Return the center coordinate of the input `FloatingGTBasisFuncs`.
 """
-centerCoordOf(bf::FloatingGTBasisFuncs) = [outValOf(i) for i in bf.center.param]
+centerCoordOf(bf::FloatingGTBasisFuncs) = [outValOf(i) for i in bf.center.point.param]
 
 
 """
@@ -951,17 +967,17 @@ add(b::CompositeGTBasisFuncs, ::EmptyBasisFunc) = itself(b)
 add(::EmptyBasisFunc, ::EmptyBasisFunc) = EmptyBasisFunc()
 
 
-const Doc_mul_Eg1 = "GaussFunc(xpn=ParamBox{Float64, :α, $(FLevel(itself))}(3.0)[∂][α], " * 
-                              "con=ParamBox{Float64, :d, $(FLevel(itself))}(1.0)[∂][d])"
+const Doc_mul_Eg1 = "GaussFunc(xpn=ParamBox{Float64, :α, $(FLi)}(3.0)[∂][α], " * 
+                              "con=ParamBox{Float64, :d, $(FLi)}(1.0)[∂][d])"
 
-const Doc_mul_Eg2 = "GaussFunc(xpn=ParamBox{Float64, :α, $(FLevel(itself))}(3.0)[∂][α], " * 
-                              "con=ParamBox{Float64, :d, $(FLevel(itself))}(2.0)[∂][d])"
+const Doc_mul_Eg2 = "GaussFunc(xpn=ParamBox{Float64, :α, $(FLi)}(3.0)[∂][α], " * 
+                              "con=ParamBox{Float64, :d, $(FLi)}(2.0)[∂][d])"
 
-const Doc_mul_Eg3 = "GaussFunc(xpn=ParamBox{Float64, :α, $(FLevel(itself))}(6.0)[∂][α], " * 
-                              "con=ParamBox{Float64, :d, $(FLevel(itself))}(1.0)[∂][d])"
+const Doc_mul_Eg3 = "GaussFunc(xpn=ParamBox{Float64, :α, $(FLi)}(6.0)[∂][α], " * 
+                              "con=ParamBox{Float64, :d, $(FLi)}(1.0)[∂][d])"
 
-const Doc_mul_Eg4 = "GaussFunc(xpn=ParamBox{Float64, :α, $(FLevel(itself))}(6.0)[∂][α], " * 
-                              "con=ParamBox{Float64, :d, $(FLevel(itself))}(2.0)[∂][d])"
+const Doc_mul_Eg4 = "GaussFunc(xpn=ParamBox{Float64, :α, $(FLi)}(6.0)[∂][α], " * 
+                              "con=ParamBox{Float64, :d, $(FLi)}(2.0)[∂][d])"
 
 """
 
@@ -997,7 +1013,7 @@ function mul(gf::GaussFunc, coeff::Real)::GaussFunc
     GaussFunc(gf.xpn, conNew)
 end
 
-function mulCore(c::Float64, con::ParamBox{<:Any, <:Any, FLevel(itself)})
+function mulCore(c::Float64, con::ParamBox{<:Any, <:Any, FLi})
     conNew = fill(con.data[] * c)
     mapFunction = itself
     dataName = :undef
@@ -1527,9 +1543,9 @@ end
 
 
 const Doc_copyBasis_Eg1 = "GaussFunc(xpn=ParamBox{Float64, :α, "*
-                                    "$(FLevel(itself))}(9.0)[∂][α], "*
+                                    "$(FLi)}(9.0)[∂][α], "*
                                     "con=ParamBox{Float64, :d, "*
-                                    "$(FLevel(itself))}(2.0)[∂][d])"
+                                    "$(FLi)}(2.0)[∂][d])"
 
 """
 
@@ -1548,7 +1564,7 @@ julia> e = genExponent(3.0, x->x^2)
 ParamBox{Float64, :α, $(FLevel(x->x^2))}(3.0)[∂][x_α]
 
 julia> c = genContraction(2.0)
-ParamBox{Float64, :d, $(FLevel(itself))}(2.0)[∂][d]
+ParamBox{Float64, :d, $(FLi)}(2.0)[∂][d]
 
 julia> gf1 = GaussFunc(e, c);
 
@@ -1591,10 +1607,10 @@ function compareParamBox(pb1::ParamBox, pb2::ParamBox)
     end
 end
 
-compareParamBox(pb1::ParamBox{<:Any, <:Any, FLevel(itself)}, 
-                pb2::ParamBox{<:Any, <:Any, FLevel(itself)}) = (pb1.data === pb2.data)
+compareParamBox(pb1::ParamBox{<:Any, <:Any, FLi}, 
+                pb2::ParamBox{<:Any, <:Any, FLi}) = (pb1.data === pb2.data)
 
-function compareParamBox(pb1::ParamBox{<:Any, <:Any, FLevel(itself)}, pb2::ParamBox)
+function compareParamBox(pb1::ParamBox{<:Any, <:Any, FLi}, pb2::ParamBox)
     if pb2.canDiff[] == true
         pb1.data === pb2.data
     else
@@ -1602,7 +1618,7 @@ function compareParamBox(pb1::ParamBox{<:Any, <:Any, FLevel(itself)}, pb2::Param
     end
 end
 
-compareParamBox(pb1::ParamBox, pb2::ParamBox{<:Any, <:Any, FLevel(itself)}) = 
+compareParamBox(pb1::ParamBox, pb2::ParamBox{<:Any, <:Any, FLi}) = 
 compareParamBox(pb2, pb1)
 
 
