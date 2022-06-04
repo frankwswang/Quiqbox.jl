@@ -110,7 +110,8 @@ end
 
 
 import Base: +
-+(bfm1::CompositeGTBasisFuncs{<:Any, 1}, bfm2::CompositeGTBasisFuncs{<:Any, 1}) = 
++(bfm1::CompositeGTBasisFuncs{<:Any, 1, D}, 
+  bfm2::CompositeGTBasisFuncs{<:Any, 1, D}) where {D} = 
 add(bfm1, bfm2)
 
 
@@ -121,7 +122,8 @@ import Base: *
 
 *(coeff::Real, bfm::GaussFunc) = mul(coeff, bfm)
 
-*(bfm1::CompositeGTBasisFuncs{<:Any, 1}, bfm2::CompositeGTBasisFuncs{<:Any, 1}) = 
+*(bfm1::CompositeGTBasisFuncs{<:Any, 1, D}, 
+  bfm2::CompositeGTBasisFuncs{<:Any, 1, D}) where {D} = 
 mul(bfm1, bfm2)
 
 *(bfm::CompositeGTBasisFuncs{<:Any, 1}, coeff::Real) = 

@@ -59,6 +59,6 @@ abstract type MolecularHartreeFockCoefficient{NN, N} <: MolecularCoefficients en
 
 abstract type GTBasisFuncs{OrbitalN}  <: AbstractGTBasisFuncs end
 
-abstract type CompositeGTBasisFuncs{NofLinearlyCombinedBasis, NofOrbital}  <: GTBasisFuncs{NofOrbital} end
+abstract type CompositeGTBasisFuncs{NofLinearlyCombinedBasis, NofOrbital, D, NumberT}  <: GTBasisFuncs{NofOrbital} end
 
-abstract type FloatingGTBasisFuncs{𝑙, GaussFuncN, OrbitalN, PointT, D, NumberT} <: CompositeGTBasisFuncs{1, OrbitalN} end
+abstract type FloatingGTBasisFuncs{𝑙, GaussFuncN, OrbitalN, PointT, D, NumberT} <: CompositeGTBasisFuncs{1, OrbitalN, D, NumberT} end

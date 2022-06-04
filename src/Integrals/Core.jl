@@ -328,8 +328,9 @@ function getOneBodyInt(∫1e::F,
 end
 
 function getOneBodyInt(::F, 
-                       ::CompositeGTBasisFuncs{BN1, 1}, ::CompositeGTBasisFuncs{BN2, 1}, 
-                       optArgs...) where {F<:Function, BN1, BN2}
+                       ::CompositeGTBasisFuncs{BN1, 1, D}, 
+                       ::CompositeGTBasisFuncs{BN2, 1, D}, 
+                       optArgs...) where {F<:Function, BN1, BN2, D}
     min(BN1, BN2) == 0 ? 0.0 : error("The input basis type is NOT supported.")
 end
 
@@ -403,9 +404,11 @@ function getTwoBodyInt(∫2e::F,
 end
 
 function getTwoBodyInt(::F, 
-                       ::CompositeGTBasisFuncs{BN1, 1}, ::CompositeGTBasisFuncs{BN2, 1}, 
-                       ::CompositeGTBasisFuncs{BN3, 1}, ::CompositeGTBasisFuncs{BN4, 1}, 
-                       optArgs...) where {F<:Function, BN1, BN2, BN3, BN4}
+                       ::CompositeGTBasisFuncs{BN1, 1, D}, 
+                       ::CompositeGTBasisFuncs{BN2, 1, D}, 
+                       ::CompositeGTBasisFuncs{BN3, 1, D}, 
+                       ::CompositeGTBasisFuncs{BN4, 1, D}, 
+                       optArgs...) where {F<:Function, BN1, BN2, BN3, BN4, D}
     min(BN1, BN2, BN3, BN4) == 0 ? 0.0 : error("The input basis type is NOT supported.")
 end
 
@@ -727,18 +730,23 @@ function get2eInteraction(bf1::BasisFunc{<:Any, GN1}, bf2::BasisFunc{<:Any, GN2}
 end
 
 @inline function getCompositeInt(∫::F, 
-                                 bs::NTuple{N, FloatingGTBasisFuncs}, optArgs...) where 
-                                {F<:Function, N}
+                         bs::NTuple{N, FloatingGTBasisFuncs{<:Any,<:Any,<:Any,<:Any, D,T}}, 
+                         optArgs...) where {F<:Function, N, D, T}
     range = Iterators.product(bs...)
-    map(x->∫(x..., optArgs...)::Float64, range)::Array{Float64, N}
+    map(x->∫(x..., optArgs...)::T, range)::Array{T, N}
 end
 
 @inline function getCompositeInt(∫::F, 
-                                 bs::NTuple{N, CompositeGTBasisFuncs{<:Any, 1}}, 
-                                 optArgs...) where {F<:Function, N}
-    range = Iterators.product(unpackBasis.(bs)...)
-    ( map(x->∫(x..., optArgs...)::Float64, range) |> sum )::Float64
+                                 bs::NTuple{N, CompositeGTBasisFuncs{<:Any, 1, D, T}}, 
+                                 optArgs...) where {F<:Function, N, D, T}
+    if any(fieldtypes(typeof(bs)) .<: EmptyBasisFunc)
+        zero(T)
+    else
+        range = Iterators.product(unpackBasis.(bs)...)
+        ( map(x->∫(x..., optArgs...)::T, range) |> sum )
+    end
 end
+
 
 getOverlap(b1::AbstractGTBasisFuncs, b2::AbstractGTBasisFuncs) = 
 getCompositeInt(getOverlap, (b1, b2))

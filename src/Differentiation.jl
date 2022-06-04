@@ -176,10 +176,16 @@ function ∂SGFcore(::Val{czSym}, sgf::FloatingGTBasisFuncs{𝑙, 1, 1}, c::T=1)
     shiftCore(+, sgf, XYZTuple(0,0,1)) * (2c*sgf.gauss[1].xpn())
 end
 
-
-function ∂Basis(par::ParamBox{T, V}, sgf::FloatingGTBasisFuncs{<:Any, 1, 1}) where {T, V}
+function ∂Basis(par::ParamBox{T, V, FL}, 
+                sgf::FloatingGTBasisFuncs{<:Any, 1, 1, <:Any, D, T}) where {T, V, FL, D}
     params = sgf.param
-    if par.canDiff[]
+    if FL == FLi || !par.canDiff[]
+        if par.index == params[findfirst(x->typeof(x)<:ParamBox{<:Any, V}, params)].index
+            ∂SGFcore(Val(V), sgf)
+        else
+            EmptyBasisFunc{D, T}()
+        end
+    else
         is = findall(x->x.dataName==par.dataName && x.index==par.index, params)
         if length(is) > 0
             map(is) do i
@@ -187,25 +193,22 @@ function ∂Basis(par::ParamBox{T, V}, sgf::FloatingGTBasisFuncs{<:Any, 1, 1}) w
                 _, V2, FL2 = getTypeParams(fPar)
                 c = 𝑑f(FL2, fPar.map, fPar[])
                 if c == 0.0
-                    EmptyBasisFunc()
+                    EmptyBasisFunc{D, T}()
                 else
                     ∂SGFcore(Val(V2), sgf, c)
                 end
             end |> sum
         else
-            EmptyBasisFunc()
-        end
-    else
-        if par.index == params[findfirst(x->typeof(x)<:ParamBox{<:Any, V}, params)].index
-            ∂SGFcore(Val(V), sgf)
-        else
-            EmptyBasisFunc()
+            EmptyBasisFunc{D, T}()
         end
     end
 end
 
-∂Basis(par::ParamBox, b::FloatingGTBasisFuncs{𝑙, GN, 1}) where {𝑙, GN} = 
+∂Basis(par::ParamBox{T, V, FL}, 
+       b::FloatingGTBasisFuncs{<:Any, <:Any, 1, <:Any, <:Any, T}) where {T, V, FL} = 
 ∂Basis.(par, reshape(decomposeCore(Val(true), b), :)) |> sum
 
-∂Basis(par::ParamBox, b::BasisFuncMix{BN, BT}) where {BN, BT} = 
+∂Basis(par::ParamBox{T}, b::BasisFuncMix{<:Any, <:Any, <:Any, T}) where {T} = 
 ∂Basis.(par, b.BasisFunc) |> sum
+
+∂Basis(par::ParamBox{T}, b::EmptyBasisFunc{D, T}) where {D, T} = EmptyBasisFunc{D, T}()

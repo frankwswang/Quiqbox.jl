@@ -465,16 +465,17 @@ julia> flatten([:one, 2, [3, 4.0], ([5], "six"), "7"])
   "7"
 ```
 """
-function flatten(c::Array{T}) where {T}
-    c2 = map( x->(x isa Union{Array, Tuple} ? x : (x,)), c )
+function flatten(c::AbstractArray{T}) where {T}
+    c2 = map( x->(x isa Union{AbstractArray, Tuple} ? x : (x,)), c )
     [(c2...)...]
 end
 
 function flatten(c::Tuple)
-    c2 = map( x->(x isa Union{Array, Tuple} ? x : (x,)), c )
+    c2 = map( x->(x isa Union{AbstractArray, Tuple} ? x : (x,)), c )
     ((c2...)...,)
 end
 
+flatten(c::AbstractArray{<:Tuple}) = joinTuple(c...) |> collect
 
 joinTuple(t1::Tuple, t2::Tuple, t3::Tuple...) = (t1..., joinTuple(t2, t3...)...)
 

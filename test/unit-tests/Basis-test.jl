@@ -1,8 +1,7 @@
 using Test
 using Quiqbox
-using Quiqbox: isFull, BasisFuncMix, unpackBasis, inSymbols, varVal, ElementNames, 
-               sortBasisFuncs, ParamList, sumOf, expressionOfCore, mergeGaussFuncs, 
-               gaussProd, getNorms
+using Quiqbox: BasisFuncMix, unpackBasis, inSymbols, varVal, ElementNames, sortBasisFuncs, 
+               ParamList, sumOf, expressionOfCore, mergeGaussFuncs, gaussProd, getNorms
 using Symbolics
 using LinearAlgebra
 
@@ -166,15 +165,8 @@ bfs3 = bfs3 |> flatten
 @test  hasEqual(bfs3, bfs2)
 
 
-# function isFull
-@test isFull(bf3_1) == true
-@test isFull(bf3_3) == true
-bf5 = genBasisFunc([0,0,0], (2,1), (1,0,0))
-@test isFull(bf5) == false
-@test isFull(1) == false
-
-
 # function centerOf centerCoordOf
+bf5 = genBasisFunc([0,0,0], (2,1), (1,0,0))
 @test centerOf(bf5) == bf5.center
 @test centerCoordOf(bf5) == [0,0,0]
 
@@ -405,14 +397,14 @@ bf_os2S = genBasisFunc([0,0,0], (2,1), ijk.+didjdk, normalizeGTO=true)
 bf_os3 = genBasisFunc([0,0,0], (2,1), (2,0,0))
 @test hasEqual(shift(bf_os1, didjdk), bf_os1S)
 @test hasEqual(shift(bf_os2, didjdk), bf_os2S)
-@test shift(bf_os2, didjdk, -) == Quiqbox.EmptyBasisFunc()
+@test shift(bf_os2, didjdk, -) == Quiqbox.EmptyBasisFunc{3, Float64}()
 @test hasEqual(shift(bf_os3, ijk, -), bf_os1)
 
 
 # function unpackBasis
 @test unpackBasis(bfm1)[1] == bf1
-@test unpackBasis(bf1) == [bf1]
-@test unpackBasis(0) == []
+@test unpackBasis(bf1) == (bf1,)
+@test unpackBasis(Quiqbox.EmptyBasisFunc{1, Float64}()) == ()
 
 
 # function decompose

@@ -413,9 +413,7 @@ BasisFunc(bfs::BasisFuncs{<:Any, <:Any, 1}) =
 BasisFunc(bfs.center, bfs.gauss, bfs.ijk, bfs.normalizeGTO)
 
 
-struct EmptyBasisFunc <: CompositeGTBasisFuncs{0, 1} end
-
-const BasisFunc0 = EmptyBasisFunc()
+struct EmptyBasisFunc{D, T} <: CompositeGTBasisFuncs{0, 1, D, T} end
 
 
 """
@@ -673,14 +671,11 @@ struct GTBasis{BN, BT, T} <: BasisSetData{BT}
                        (mol, nucCoords) -> nucAttractions(b, mol, nucCoords) + Te)
     end
 
-    function GTBasis(b::NTuple{BN, CompositeGTBasisFuncs{<:Any, 1}}, 
-                     S::Matrix{T}, Te::Matrix{T}, eeI::Array{T, 4}) where 
-                    {BN, T<:Real}
-        BT = typejoin(typeof.(b)...)
-        new{BN, BT, T}(b, S, Te, eeI, 
-                       (mol, nucCoords) -> nucAttractions(b, mol, nucCoords),
-                       (mol, nucCoords) -> nucAttractions(b, mol, nucCoords) + Te)
-    end
+    GTBasis(b::Tuple{Vararg{CompositeGTBasisFuncs{<:Any, 1}, BN}}, 
+            S::Matrix{T}, Te::Matrix{T}, eeI::Array{T, 4}) where {BN, T<:Real} = 
+    new{BN, eltype(b), T}(b, S, Te, eeI, 
+                          (mol, nucCoords) -> nucAttractions(b, mol, nucCoords),
+                          (mol, nucCoords) -> nucAttractions(b, mol, nucCoords) + Te)
 end
 
 GTBasis(bs::Vector{<:CompositeGTBasisFuncs{<:Any, 1}}) = 
@@ -719,12 +714,6 @@ sortBasisFuncs(bs::Tuple{Vararg{FloatingGTBasisFuncs, N}},
                groupCenters::Bool=false) where {N} = 
 sortBasisFuncs(FloatingGTBasisFuncs[bs...], groupCenters) |> Tuple
 
-isFull(::Any) = false
-
-isFull(::FloatingGTBasisFuncs{0}) = true
-
-isFull(::FloatingGTBasisFuncs{𝑙, <:Any, ON}) where {𝑙, ON} = (ON == SubshellXYZsizes[𝑙+1])
-
 
 """
 
@@ -749,7 +738,7 @@ centerCoordOf(bf::FloatingGTBasisFuncs) = [outValOf(i) for i in bf.center.point.
 
 """
 
-    BasisFuncMix{BN, BT, GN} <: CompositeGTBasisFuncs{BN, 1}
+    BasisFuncMix{BN, BT, D, T} <: CompositeGTBasisFuncs{BN, 1, D, T}
 
 Sum of multiple `FloatingGTBasisFuncs` without any reformulation, treated as one basis 
 Function in the integral calculation.
@@ -766,28 +755,29 @@ Function in the integral calculation.
     BasisFuncMix{<:Any, BT}
 
 """
-struct BasisFuncMix{BN, BT, GN} <: CompositeGTBasisFuncs{BN, 1}
+struct BasisFuncMix{BN, BT, D, T} <: CompositeGTBasisFuncs{BN, 1, D, T}
     BasisFunc::NTuple{BN, BT}
     param::Tuple{Vararg{ParamBox}}
 
-    @inline function BasisFuncMix(bfs::Tuple{Vararg{BasisFunc, BN}}) where {BN}
+    function BasisFuncMix(bfs::Tuple{Vararg{BasisFunc{<:Any,<:Any,<:Any, D,T}, BN}}) where 
+                         {D, T, BN}
         bs = sortBasisFuncs(bfs)
-        pars = joinTuple(getfield.(bs, :param)...)
-        new{BN, eltype(bfs), sum(GNof.(bfs))}(bs, pars)
+        new{BN, eltype(bfs), D, T}(bs, joinTuple(getfield.(bs, :param)...))
     end
 end
 
 BasisFuncMix(bfs::AbstractArray{<:BasisFunc}) = BasisFuncMix(bfs|>Tuple)
 BasisFuncMix(bfs::AbstractArray{T}) where {T<:FloatingGTBasisFuncs{<:Any, <:Any, 1}} = 
 BasisFuncMix(BasisFunc.(bfs))
-BasisFuncMix(bf::BasisFunc) = BasisFuncMix([bf])
+BasisFuncMix(bf::BasisFunc) = BasisFuncMix((bf,))
 BasisFuncMix(bfs::BasisFuncs) = BasisFuncMix.(decompose(bfs))
 BasisFuncMix(bfm::BasisFuncMix) = itself(bfm)
 
 
-unpackBasis(bfm::BasisFuncMix{BN, BT, GN}) where {BN, BT, GN} = bfm.BasisFunc |> collect
-unpackBasis(bf::FloatingGTBasisFuncs) = [bf]
-unpackBasis(::Any) = FloatingGTBasisFuncs[]
+unpackBasis(::EmptyBasisFunc) = ()
+unpackBasis(b::BasisFunc)  = (b,)
+unpackBasis(b::BasisFuncMix)  = b.BasisFunc
+unpackBasis(b::BasisFuncs{<:Any, <:Any, 1})  = (BasisFunc(b),)
 
 
 GNof(::FloatingGTBasisFuncs{<:Any, GN}) where {GN} = GN
@@ -814,11 +804,14 @@ function sumOfCore(bfs::AbstractVector{<:BasisFunc{<:Any, <:Any, <:Any, D, T}},
     end
 end
 
-sumOfCore(bfms::AbstractVector{<:CompositeGTBasisFuncs{<:Any, 1}}, roundDigits::Int=15) = 
-sumOfCore(vcat((bfms .|> unpackBasis)...), roundDigits)
+sumOfCore(bs::Union{Tuple{Vararg{CompositeGTBasisFuncs{<:Any, 1, D, T}}}, 
+          AbstractVector{<:CompositeGTBasisFuncs{<:Any, 1, D, T}}}, 
+          roundDigits::Int=15) where {D, T} = 
+sumOfCore(BasisFunc{<:Any, <:Any, <:Any, D, T}[joinTuple(unpackBasis.(bs)...)...], 
+          roundDigits)
 
-function sumOf(bs::AbstractVector; roundDigits::Int=-1)
-    length(bs) == 1 && (return bs[])
+function sumOf(bs::Union{Tuple, AbstractVector}; roundDigits::Int=-1)
+    length(bs) == 1 && (return bs[1])
     sumOfCore(bs, roundDigits)
 end
 
@@ -879,12 +872,13 @@ end
 
 """
 
-    add(b::CompositeGTBasisFuncs{<:Any, 1}) -> CompositeGTBasisFuncs{<:Any, 1}
+    add(b::CompositeGTBasisFuncs{<:Any, 1, D, T}) -> CompositeGTBasisFuncs{<:Any, 1, D, T}
 
-    add(b1::CompositeGTBasisFuncs{<:Any, 1}, b2::CompositeGTBasisFuncs{<:Any, 1}) ->
-    CompositeGTBasisFuncs{<:Any, 1}
+    add(b1::CompositeGTBasisFuncs{<:Any, 1, D, T}, 
+        b2::CompositeGTBasisFuncs{<:Any, 1, D, T}) ->
+    CompositeGTBasisFuncs{<:Any, 1, D, T}
 
-Addition between `CompositeGTBasisFuncs{<:Any, 1}` such as `BasisFunc` and 
+Addition between `CompositeGTBasisFuncs{<:Any, 1, D, T}` such as `BasisFunc` and 
 `Quiqbox.BasisFuncMix`. It can be called using `+` syntax.
 
 ≡≡≡ Example(s) ≡≡≡
@@ -931,9 +925,7 @@ function add(bf1::BasisFunc{𝑙1, GN1, PT1, D, T}, bf2::BasisFunc{𝑙2, GN2, P
     end
 end
 
-add(bfm::BasisFuncMix{BN, <:BasisFunc{<:Any, <:Any, <:Any, D, T}}; 
-    roundDigits::Int=15) where {BN, D, T} = 
-sumOf(BasisFunc{<:Any, <:Any, <:Any, D, T}[bfm.BasisFunc...]; roundDigits)
+add(bfm::BasisFuncMix; roundDigits::Int=15) = sumOf(bfm.BasisFunc; roundDigits)
 
 add(bf1::BasisFuncMix{1}, bf2::BasisFunc{𝑙}; roundDigits::Int=15) where {𝑙} = 
 add(bf1.BasisFunc[1], bf2; roundDigits)
@@ -941,9 +933,8 @@ add(bf1.BasisFunc[1], bf2; roundDigits)
 add(bf1::BasisFunc{𝑙}, bf2::BasisFuncMix{1}; roundDigits::Int=15) where {𝑙} = 
 add(bf2, bf1; roundDigits)
 
-add(bf::BasisFunc{<:Any, <:Any, <:Any, D, T}, bfm::BasisFuncMix{BN}; 
-    roundDigits::Int=15) where {D, T, BN} = 
-sumOf(BasisFunc{<:Any, <:Any, <:Any, D, T}[bf, bfm.BasisFunc...]; roundDigits)
+add(bf::BasisFunc, bfm::BasisFuncMix{BN}; roundDigits::Int=15) where {BN} = 
+sumOf((bf, bfm.BasisFunc...); roundDigits)
 
 add(bfm::BasisFuncMix{BN}, bf::BasisFunc; roundDigits::Int=15) where {BN} = 
 add(bf, bfm; roundDigits)
@@ -960,18 +951,18 @@ add(bf, bfm; roundDigits)
 add(bfm1::BasisFuncMix{BN1, <:BasisFunc{<:Any, <:Any, <:Any, D, T}}, 
     bfm2::BasisFuncMix{BN2, <:BasisFunc{<:Any, <:Any, <:Any, D, T}}; 
     roundDigits::Int=15) where {BN1, BN2, D, T} = 
-sumOf(BasisFunc{<:Any, <:Any, <:Any, D, T}[bfm1.BasisFunc..., bfm2.BasisFunc...]; 
-      roundDigits)
+sumOf((bfm1.BasisFunc..., bfm2.BasisFunc...); roundDigits)
 
-add(bf1::BasisFuncs{𝑙1, GN1, 1, PT1, D, T}, bf2::BasisFuncs{𝑙2, GN2, 1, PT2, D, T}; 
-    roundDigits::Int=15) where {𝑙1, 𝑙2, GN1, GN2, PT1, PT2, D, T} = 
-[sumOf(BasisFunc{<:Any, <:Any, <:Any, D, T}[add(bf1), add(bf2)]; roundDigits)]
+add(bf1::BasisFuncs{<:Any, <:Any, 1, <:Any, D, T}, 
+    bf2::BasisFuncs{<:Any, <:Any, 1, <:Any, D, T}; roundDigits::Int=15) where {D, T} = 
+[sumOf((add(bf1), add(bf2)); roundDigits)]
 
-add(::EmptyBasisFunc, b::CompositeGTBasisFuncs) = itself(b)
+add(::EmptyBasisFunc{D}, b::CompositeGTBasisFuncs{<:Any, <:Any, D}) where {D} = itself(b)
 
-add(b::CompositeGTBasisFuncs, ::EmptyBasisFunc) = itself(b)
+add(b::CompositeGTBasisFuncs{<:Any, <:Any, D}, ::EmptyBasisFunc{D}) where {D} = itself(b)
 
-add(::EmptyBasisFunc, ::EmptyBasisFunc) = EmptyBasisFunc()
+add(::EmptyBasisFunc{D, T1}, ::EmptyBasisFunc{D, T2}) where {D, T1, T2} = 
+EmptyBasisFunc{D, promote_type(T1, T2)}()
 
 
 const Doc_mul_Eg1 = "GaussFunc(xpn=ParamBox{Float64, :α, $(FLi)}(3.0)[∂][α], " * 
@@ -1045,17 +1036,18 @@ end
         normalizeGTO::Union{Bool, Missing}=missing) ->
     BasisFunc{𝑙1+𝑙2, 1}
 
-    mul(a1::Real, a2::CompositeGTBasisFuncs{<:Any, 1}; 
+    mul(a1::Real, a2::CompositeGTBasisFuncs{<:Any, 1, D, T}; 
         normalizeGTO::Union{Bool, Missing}=missing) -> 
-    CompositeGTBasisFuncs{<:Any, 1}
+    CompositeGTBasisFuncs{<:Any, 1, D, T}
 
-    mul(a1::CompositeGTBasisFuncs{<:Any, 1}, a2::CompositeGTBasisFuncs{<:Any, 1}; 
+    mul(a1::CompositeGTBasisFuncs{<:Any, 1, D, T}, 
+        a2::CompositeGTBasisFuncs{<:Any, 1, D, T}; 
         normalizeGTO::Union{Bool, Missing}=missing) -> 
-    CompositeGTBasisFuncs{<:Any, 1}
+    CompositeGTBasisFuncs{<:Any, 1, D, T}
 
-Multiplication between `CompositeGTBasisFuncs{<:Any, 1}`s such as `BasisFunc` and 
+Multiplication between `CompositeGTBasisFuncs{<:Any, 1, D, T}`s such as `BasisFunc` and 
 `$(BasisFuncMix)`, or contraction coefficient multiplication between a `Real` number 
-and a `CompositeGTBasisFuncs{<:Any, 1}`. If `normalizeGTO` is set to `missing` (in 
+and a `CompositeGTBasisFuncs{<:Any, 1, D, T}`. If `normalizeGTO` is set to `missing` (in 
 default), The `GaussFunc` in the output result will be normalized only if all the input 
 bases have `normalizeGTO = true`. The function can be called using `*` syntax.
 
@@ -1165,7 +1157,7 @@ function mul(bf1::BasisFunc{𝑙1, GN1, PT1, D, T}, bf2::BasisFunc{𝑙2, GN2, P
     bf1n = bf1.normalizeGTO
     bf2n = bf2.normalizeGTO
     normalizeGTO isa Missing && (normalizeGTO = bf1n * bf2n)
-    bs = CompositeGTBasisFuncs{<:Any, 1}[]
+    bs = CompositeGTBasisFuncs{<:Any, 1, D, T}[]
     for gf1 in bf1.gauss, gf2 in bf2.gauss
         push!(bs, mul(BasisFunc(cen1, (gf1,), ijk1, bf1n), 
                       BasisFunc(cen2, (gf2,), ijk2, bf2n); 
@@ -1182,7 +1174,7 @@ mul(bf2, bf1; normalizeGTO)
 
 mul(bf::BasisFunc, bfm::BasisFuncMix{BN}; 
     normalizeGTO::Union{Bool, Missing}=missing) where {BN} = 
-mul.(Ref(bf), collect(bfm.BasisFunc); normalizeGTO) |> sumOf
+mul.(Ref(bf), bfm.BasisFunc; normalizeGTO) |> sumOf
 
 mul(bfm::BasisFuncMix{BN}, bf::BasisFunc; 
     normalizeGTO::Union{Bool, Missing}=missing) where {BN} = 
@@ -1200,33 +1192,41 @@ mul(bfm::BasisFuncMix{BN}, bf::BasisFuncMix{1};
     normalizeGTO::Union{Bool, Missing}=missing) where {BN} = 
 mul(bf, bfm; normalizeGTO)
 
-function mul(bfm1::BasisFuncMix{BN1}, bfm2::BasisFuncMix{BN2}; 
-             normalizeGTO::Union{Bool, Missing}=missing) where {BN1, BN2}
-    bfms = CompositeGTBasisFuncs{<:Any, 1}[]
+function mul(bfm1::BasisFuncMix{BN1, <:Any, D, T}, bfm2::BasisFuncMix{BN2, <:Any, D, T}; 
+             normalizeGTO::Union{Bool, Missing}=missing) where {BN1, BN2, D, T}
+    bfms = CompositeGTBasisFuncs{<:Any, 1, D, T}[]
     for bf1 in bfm1.BasisFunc, bf2 in bfm2.BasisFunc
         push!(bfms, mul(bf1, bf2; normalizeGTO))
     end
     sumOf(bfms)
 end
 
-mul(::EmptyBasisFunc, ::Real; normalizeGTO=nothing) = EmptyBasisFunc()
+mul(::EmptyBasisFunc{D, T}, ::Real; normalizeGTO=nothing) where {D, T} = 
+EmptyBasisFunc{D, T}()
 
-mul(::Real, ::EmptyBasisFunc; normalizeGTO=nothing) = EmptyBasisFunc()
+mul(::Real, ::EmptyBasisFunc{D, T}; normalizeGTO=nothing) where {D, T} = 
+EmptyBasisFunc{D, T}()
 
-function mul(b::CompositeGTBasisFuncs{BN, 1}, coeff::Real; 
-             normalizeGTO::Union{Bool, Missing}=missing) where {BN}
-    iszero(coeff) ? EmptyBasisFunc() : mulCore(b, coeff; normalizeGTO)
+function mul(b::CompositeGTBasisFuncs{BN, 1, D, T}, coeff::Real; 
+             normalizeGTO::Union{Bool, Missing}=missing) where {BN, D, T}
+    iszero(coeff) ? EmptyBasisFunc{D, T}() : mulCore(b, coeff; normalizeGTO)
 end
 
 mul(coeff::Real, b::CompositeGTBasisFuncs{<:Any, 1}; 
     normalizeGTO::Union{Bool, Missing}=missing) = 
 mul(b, coeff; normalizeGTO)
 
-mul(::EmptyBasisFunc, ::CompositeGTBasisFuncs; normalizeGTO=nothing) = EmptyBasisFunc()
+mul(::EmptyBasisFunc{D}, ::CompositeGTBasisFuncs{<:Any, <:Any, D, T}; 
+    normalizeGTO=nothing) where {D, T} = 
+EmptyBasisFunc{D, T}()
 
-mul(::CompositeGTBasisFuncs, ::EmptyBasisFunc; normalizeGTO=nothing) = EmptyBasisFunc()
+mul(::CompositeGTBasisFuncs{<:Any, <:Any, D, T}, ::EmptyBasisFunc{D}; 
+    normalizeGTO=nothing) where {D, T} = 
+EmptyBasisFunc{D, T}()
 
-mul(::EmptyBasisFunc, ::EmptyBasisFunc; normalizeGTO=nothing) = EmptyBasisFunc()
+mul(::EmptyBasisFunc{D, T1}, ::EmptyBasisFunc{D, T2}; 
+    normalizeGTO=nothing) where {D, T1, T2} = 
+EmptyBasisFunc{D, promote_type(T1, T2)}()
 
 mul(bf1::BasisFuncs{𝑙1, GN1, 1, PT1, D, T}, bf2::BasisFuncs{𝑙2, GN2, 1, PT2, D, T}; 
     normalizeGTO::Union{Bool, Missing}=missing) where {𝑙1, 𝑙2, GN1, GN2, PT1, PT2, D, T} = 
@@ -1258,19 +1258,21 @@ BasisFunc(bf.center, bf.gauss, bf.ijk[1]+didjdk, bf.normalizeGTO)
 shiftCore(::typeof(-), bf::FloatingGTBasisFuncs{0, GN, 1}, ::XYZTuple{0}) where {GN} = 
 BasisFunc(bf.center, bf.gauss, bf.ijk[1], bf.normalizeGTO)
 
-shiftCore(::typeof(-), bf::FloatingGTBasisFuncs{0, GN, 1}, didjdk::XYZTuple{𝑙}) where 
-         {𝑙, GN} = EmptyBasisFunc()
+shiftCore(::typeof(-), bf::FloatingGTBasisFuncs{0, <:Any, 1, <:Any, D, T}, 
+          didjdk::XYZTuple) where {D, T} = 
+EmptyBasisFunc{D, T}()
 
-function shiftCore(::typeof(-), bf::FloatingGTBasisFuncs{𝑙1, GN, 1}, 
-                   didjdk::XYZTuple{𝑙2}) where {𝑙1, 𝑙2, GN}
+function shiftCore(::typeof(-), bf::FloatingGTBasisFuncs{𝑙1, <:Any, 1, <:Any, D, T}, 
+                   didjdk::XYZTuple{𝑙2}) where {𝑙1, 𝑙2, D, T}
     xyz = bf.ijk[1].tuple .- didjdk.tuple
     for i in xyz
-        i < 0 && (return EmptyBasisFunc())
+        i < 0 && (return EmptyBasisFunc{D, T}())
     end
     BasisFunc(bf.center, bf.gauss, XYZTuple(xyz), bf.normalizeGTO)
 end
 
-shiftCore(::Function, ::EmptyBasisFunc, ::XYZTuple) = EmptyBasisFunc()
+shiftCore(::Function, ::EmptyBasisFunc{D, T}, ::XYZTuple) where {D, T} = 
+EmptyBasisFunc{D, T}()
 
 """
 
