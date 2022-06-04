@@ -303,15 +303,15 @@ function reformatIntData2((o1, o2, o3, o4)::NTuple{4, T}, flag::NTuple{3, Bool})
     ((flag[3] && isless(p2, p1)) ? (p2..., p1...) : (p1..., p2...) )::NTuple{4, T}
 end
 
-function reformatIntData1(bf::FloatingGTBasisFuncs{<:Any, GN, 1}) where {GN}
-    R = (centerCoordOf(bf) |> Tuple)::NTuple{3, Float64}
+function reformatIntData1(bf::FloatingGTBasisFuncs{𝑙, GN, 1, <:Any, D, T}) where 
+                         {𝑙, GN, D, T}
+    R = (centerCoordOf(bf) |> Tuple)::NTuple{D, T}
     ijk = bf.ijk[1].tuple
     αds = if bf.normalizeGTO
         N = getNijk(ijk...)
-        map(x->(x.xpn()::Float64, x.con() * N * getNα(ijk..., x.xpn())::Float64), 
-            bf.gauss::NTuple{GN, GaussFunc})
+        map(x->(x.xpn(), x.con() * N * getNα(ijk..., x.xpn())), bf.gauss)
     else
-        map(x->(x.xpn()::Float64, x.con()::Float64), bf.gauss::NTuple{GN, GaussFunc})
+        map(x->(x.xpn(), x.con()), bf.gauss)
     end
     R, ijk, αds
 end
