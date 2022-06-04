@@ -187,8 +187,7 @@ end
 Return a `Pair` of the stored independent variable of the input `ParamBox` and its 
 corresponding value.
 """
-@inline inSymValOf(pb::ParamBox{T}) where {T} = 
-        (inSymOf(pb) => pb.data[])::Pair{Symbolics.Num, T}
+@inline inSymValOf(pb::ParamBox{T}) where {T} = (inSymOf(pb) => pb.data[])
 
 
 """

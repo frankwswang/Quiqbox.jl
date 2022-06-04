@@ -205,7 +205,7 @@ function ∂Basis(par::ParamBox{T, V}, sgf::FloatingGTBasisFuncs{<:Any, 1, 1}) w
 end
 
 ∂Basis(par::ParamBox, b::FloatingGTBasisFuncs{𝑙, GN, 1}) where {𝑙, GN} = 
-∂Basis.(par, decomposeCore(Val(true), b)[:]) |> sum
+∂Basis.(par, reshape(decomposeCore(Val(true), b), :)) |> sum
 
 ∂Basis(par::ParamBox, b::BasisFuncMix{BN, BT}) where {BN, BT} = 
 ∂Basis.(par, b.BasisFunc) |> sum

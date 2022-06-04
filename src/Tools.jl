@@ -476,6 +476,11 @@ function flatten(c::Tuple)
 end
 
 
+joinTuple(t1::Tuple, t2::Tuple, t3::Tuple...) = (t1..., joinTuple(t2, t3...)...)
+
+joinTuple(t::Tuple) = itself(t)
+
+
 """
 
     markUnique(arr::AbstractArray, args...; 
@@ -591,7 +596,7 @@ end
 """
 A dummy function that only returns its argument.
 """
-itself(x::T) where {T} = x::T
+@inline itself(x) = x
 
 
 """
@@ -698,10 +703,10 @@ splitTermCore(trm::SymbolicUtils.Div) = trm |> rewriteTerm |> splitTermCore
 splitTermCore(trm) = [trm]
 
 
-function groupedSort(v::AbstractVector, sortFunction::F=itself) where {F<:Function}
+function groupedSort(v::T, sortFunction::F=itself) where {T<:AbstractVector, F<:Function}
     sortedArr = sort(v, by=x->sortFunction(x))
     state1 = 1
-    groups = typeof(v)[]
+    groups = T[]
     next = iterate(sortedArr)
     while next !== nothing
         item, state = next

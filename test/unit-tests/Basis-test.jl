@@ -159,7 +159,7 @@ bfs1 = [genBasisFunc([1,1,1], (2,1), (1,0,0)), genBasisFunc([1,1,1], (3,1), (2,0
         genBasisFunc([1,1,2], (3,1), (0,0,0)), genBasisFunc([1,1,1], (3,1), "P")]
 bfs2 = [genBasisFunc([1,1,1], (2,1), (1,0,0)), genBasisFunc([1,1,1], (3,1), "P"), 
         genBasisFunc([1,1,1], (3,1), (2,0,0)), genBasisFunc([1,1,2], (3,1), (0,0,0))]
-bfs3 = sortBasisFuncs(bfs1, groupCenters=true)
+bfs3 = sortBasisFuncs(bfs1, true)
 @test length.(bfs3) == [3,1]
 bfs3 = bfs3 |> flatten
 @test !hasEqual(bfs1, bfs2)
