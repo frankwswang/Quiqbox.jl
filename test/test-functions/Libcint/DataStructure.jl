@@ -56,7 +56,7 @@ function addToDataChain!(env::Vector{Float64}, atm::Vector{Int32}, bas::Vector{I
         push!(xpns, i.xpn())
         push!(cons, i.con())
     end
-    nGauss = GNof(bf)
+    nGauss = Quiqbox.getTypeParams(bf)[2]
     envEndIndex = length(env)
     gAtmIndex = length(atm) / 6 |> Int32
 

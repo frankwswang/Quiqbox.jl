@@ -691,7 +691,7 @@ functions with same center coordinates.
                         groupCenters::Bool=false)
     bfBlocks = map( groupedSort(bs, centerCoordOf) ) do subbs
         # Reversed order within same subshell.
-        sort!(subbs, by=x->[-Lof(x), x.ijk[1].tuple, GNof(x)], rev=true)
+        sort!(subbs, by=x->[-getTypeParams(x)[1], x.ijk[1].tuple, getTypeParams(x)[2]], rev=true)
     end
     groupCenters ? bfBlocks : vcat(bfBlocks...)
 end
@@ -763,15 +763,16 @@ BasisFuncMix(bfs::BasisFuncs) = BasisFuncMix.(decompose(bfs))
 BasisFuncMix(bfm::BasisFuncMix) = itself(bfm)
 
 
+getTypeParams(::FloatingGTBasisFuncs{𝑙, GN, ON, PT, D, T}) where {𝑙, GN, ON, PT, D, T} = 
+(𝑙, GN, ON, PT, D, T)
+getTypeParams(::BasisFuncMix{BN, BT, D, T}) where {BN, BT, D, T} = (BN, BT, D, T)
+
+
 unpackBasis(::EmptyBasisFunc) = ()
 unpackBasis(b::BasisFunc)  = (b,)
 unpackBasis(b::BasisFuncMix)  = b.BasisFunc
 unpackBasis(b::BasisFuncs{<:Any, <:Any, 1})  = (BasisFunc(b),)
 
-
-GNof(::FloatingGTBasisFuncs{<:Any, GN}) where {GN} = GN
-GNof(::BasisFuncMix{<:Any, <:Any, GN}) where {GN} = GN
-Lof(::FloatingGTBasisFuncs{𝑙}) where {𝑙} = 𝑙
 
 function sumOfCore(bfs::AbstractVector{<:BasisFunc{<:Any, <:Any, <:Any, D, T}}, 
                    roundDigits::Int=-1) where {D, T}
@@ -1346,7 +1347,7 @@ function genBasisFuncText(bf::FloatingGTBasisFuncs{𝑙};
     GFs = map(x -> genGaussFuncText(x.xpn(), x.con()), bf.gauss)
     cen = centerCoordOf(bf)
     firstLine = printCenter ? "X "*(alignNum.(cen) |> join)*"\n" : ""
-    firstLine * "$(bf|>subshellOf)    $(GNof(bf))   $(norm)\n" * (GFs |> join)
+    firstLine * "$(bf|>subshellOf)    $(getTypeParams(bf)[2])   $(norm)\n" * (GFs |> join)
 end
 
 """
