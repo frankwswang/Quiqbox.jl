@@ -39,7 +39,7 @@ isFull(::Any) = false
 isFull(::Quiqbox.FloatingGTBasisFuncs{0}) = true
 
 isFull(::Quiqbox.FloatingGTBasisFuncs{𝑙, <:Any, ON}) where {𝑙, ON} = 
-(ON == SubshellXYZsizes[𝑙+1])
+(ON == Quiqbox.SubshellXYZsizes[𝑙+1])
 
 function ijkIndex(b::Quiqbox.FloatingGTBasisFuncs)
     isFull(b) && (return :)
