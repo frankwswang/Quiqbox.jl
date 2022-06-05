@@ -350,13 +350,15 @@ struct BasisFunc{𝑙, GN, PT, D, T} <: FloatingGTBasisFuncs{𝑙, GN, 1, PT, D,
 
     function BasisFunc(cen::SpatialPoint{D, T, PT}, gs::NTuple{GN, AbstractGaussFunc{T}}, 
                        ijk::Tuple{XYZTuple{𝑙}}, normalizeGTO::Bool) where {D, T, PT, 𝑙, GN}
-        len = D + GN*2
-        pars = Array{ParamBox}(undef, len)
-        pars[1], pars[2], pars[3] = cen.point.param
-        for (g, k) in zip(gs, 4:2:(len-1))
-            pars[k], pars[k+1] = g.param
-        end
-        new{𝑙, GN, PT, D, T}(cen, gs, ijk, normalizeGTO, pars|>Tuple)
+        # len = D + GN*2
+        # pars = Array{ParamBox}(undef, len)
+        # pars[1], pars[2], pars[3] = cen.point.param
+        # for (g, k) in zip(gs, 4:2:(len-1))
+        #     pars[k], pars[k+1] = g.param
+        # end
+        pars = joinTuple(cen.point.param, getfield.(gs, :param)...)
+        new{𝑙, GN, PT, D, T}(cen, gs, ijk, normalizeGTO, pars)
+        # new{𝑙, GN, PT, D, T}(cen, gs, ijk, normalizeGTO, pars|>Tuple)
     end
 end
 
@@ -392,15 +394,18 @@ struct BasisFuncs{𝑙, GN, ON, PT, D, T} <: FloatingGTBasisFuncs{𝑙, GN, ON, 
         ss = SubshellXYZsizes[𝑙+1]
         @assert ON <= ss "The total number of `ijk` should be no more than $(ss) as " * 
                          "they are in $(subshell) subshell."
-        ijks = sort(Any[ijks...], rev=true) |> Tuple
-        pars = ParamBox[]
-        len = D + GN*2
-        pars = Array{ParamBox}(undef, len)
-        pars[1], pars[2], pars[3] = cen.point.param
-        for (g, k) in zip(gs, 4:2:(len-1))
-            pars[k], pars[k+1] = g.param
-        end
-        new{𝑙, GN, ON, PT, D, T}(cen, gs, ijks, normalizeGTO, pars|>Tuple)
+        # ijks = sort(Any[ijks...], rev=true) |> Tuple
+        ijks = sort(collect(ijks), rev=true) |> Tuple
+        # pars = ParamBox[]
+        # len = D + GN*2
+        # pars = Array{ParamBox}(undef, len)
+        # pars[1], pars[2], pars[3] = cen.point.param
+        # for (g, k) in zip(gs, 4:2:(len-1))
+        #     pars[k], pars[k+1] = g.param
+        # end
+        pars = joinTuple(cen.point.param, getfield.(gs, :param)...)
+        new{𝑙, GN, ON, PT, D, T}(cen, gs, ijks, normalizeGTO, pars)
+        # new{𝑙, GN, ON, PT, D, T}(cen, gs, ijks, normalizeGTO, pars|>Tuple)
     end
 end
 
@@ -764,9 +769,20 @@ struct BasisFuncMix{BN, BT, D, T} <: CompositeGTBasisFuncs{BN, 1, D, T}
         bs = sortBasisFuncs(bfs)
         new{BN, eltype(bfs), D, T}(bs, joinTuple(getfield.(bs, :param)...))
     end
+
+    ## Very slow
+    # function BasisFuncMix(bfs::AbstractArray{<:BasisFunc{<:Any,<:Any,<:Any, D,T}}) where 
+    #                      {D, T}
+    #     BN = length(bfs)
+    #     bs = sortBasisFuncs(bfs) |> Tuple
+    #     new{BN, typejoin(typeof.(bfs)...), D, T}(bs, joinTuple(getfield.(bs, :param)...))
+    # end
 end
 
 BasisFuncMix(bfs::AbstractArray{<:BasisFunc}) = BasisFuncMix(bfs|>Tuple)
+# BasisFuncMix(bfs::Tuple{Vararg{FloatingGTBasisFuncs{<:Any, <:Any, 1, <:Any, D, T}}}) where 
+#             {D, T} = 
+# BasisFuncMix(FloatingGTBasisFuncs{<:Any, <:Any, 1, <:Any, D, T}[bfs...])
 BasisFuncMix(bfs::AbstractArray{T}) where {T<:FloatingGTBasisFuncs{<:Any, <:Any, 1}} = 
 BasisFuncMix(BasisFunc.(bfs))
 BasisFuncMix(bf::BasisFunc) = BasisFuncMix((bf,))
