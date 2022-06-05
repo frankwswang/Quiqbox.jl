@@ -125,10 +125,14 @@ const SubshellSizeList = Dict(SubshellNames .=> SubshellXYZsizes)
 const ijkIndexList = Dict(flatten(SubshellXYZs) .=> 
                      flatten([collect(1:length(i)) for i in SubshellXYZs]))
 # const ParamSyms = [:𝑋, :𝑌, :𝑍, :𝑑, :𝛼, :𝐿]
-const SpatialParams = [:X, :Y, :Z]
-const SpatialParamSyms = [:X, :Y, :Z]
-const ParamSyms = vcat(SpatialParamSyms, [:d, :α, :L])
-const ParamAcrs = vcat(SpatialParams, [:con, :xpn, :spacing])
+const SpatialParams = (:X, :Y, :Z)
+const SpatialParamSyms = (:X, :Y, :Z)
+const GaussFuncParams = (:xpn, :con)
+const GaussFuncParamSyms = (:α, :d)
+const OtherParams = [:spacing]
+const OtherParamSyms = [:L]
+const ParamSyms = vcat(SpatialParamSyms..., GaussFuncParamSyms..., OtherParamSyms)
+const ParamAcrs = vcat(SpatialParams..., GaussFuncParams..., OtherParams)
 const ParamList = Dict(ParamAcrs .=> ParamSyms)
 
 const xpnSym = ParamList[:xpn]

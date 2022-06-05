@@ -176,11 +176,25 @@ function ∂SGFcore(::Val{czSym}, sgf::FloatingGTBasisFuncs{𝑙, 1, 1}, c::T=1)
     shiftCore(+, sgf, XYZTuple(0,0,1)) * (2c*sgf.gauss[1].xpn())
 end
 
+const sgfSample = genBasisFunc([0,0,0], (2,1))
+
+const cxIndex = findfirst(x->getTypeParams(x)[2]==cxSym, sgfSample.param)
+const cyIndex = findfirst(x->getTypeParams(x)[2]==cySym, sgfSample.param)
+const czIndex = findfirst(x->getTypeParams(x)[2]==czSym, sgfSample.param)
+const xpnIndex = findfirst(x->getTypeParams(x)[2]==xpnSym, sgfSample.param)
+const conIndex = findfirst(x->getTypeParams(x)[2]==conSym, sgfSample.param)
+
+paramIndex(::Val{cxSym}, ::Val) = cxIndex
+paramIndex(::Val{cySym}, ::Val) = cyIndex
+paramIndex(::Val{czSym}, ::Val) = czIndex
+paramIndex(::Val{xpnSym}, ::Val{D}) where {D} = xpnIndex - 3 + D
+paramIndex(::Val{conSym}, ::Val{D}) where {D} = conIndex - 3 + D
+
 function ∂Basis(par::ParamBox{T, V, FL}, 
                 sgf::FloatingGTBasisFuncs{<:Any, 1, 1, <:Any, D, T}) where {T, V, FL, D}
     params = sgf.param
     if FL == FLi || !par.canDiff[]
-        if par.index == params[findfirst(x->typeof(x)<:ParamBox{<:Any, V}, params)].index
+        if par.index == params[paramIndex(Val(V), Val(D))].index
             ∂SGFcore(Val(V), sgf)
         else
             EmptyBasisFunc{D, T}()
@@ -197,7 +211,7 @@ function ∂Basis(par::ParamBox{T, V, FL},
                 else
                     ∂SGFcore(Val(V2), sgf, c)
                 end
-            end |> sum
+            end |> sumOf
         else
             EmptyBasisFunc{D, T}()
         end
