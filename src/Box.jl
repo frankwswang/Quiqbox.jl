@@ -53,7 +53,7 @@ struct GridBox{NP} <: SemiMutableParameter{GridBox, Float64}
                      centerCoord::Vector{<:Real}=[0.0,0.0,0.0];
                      canDiff::Bool=true, index::Int=0)
         nGrids = (nGx, nGy, nGz)
-        @assert all(nGrids .> 0) "The number of gird of each edge should be larger than 0."
+        @assert all(nGrids.>=0) "The number of gird of each edge should be no less than 0."
         sym = ParamList[:spacing]
         spc = spacing |> Float64
         pbRef = ParamBox(spc; index)
@@ -62,9 +62,9 @@ struct GridBox{NP} <: SemiMutableParameter{GridBox, Float64}
         prefix = "G" * "_" * "$(nGx)" * "_" * "$(nGy)" * "_" * "$(nGz)" * "_"
         for i=0:nGx, j=0:nGy, k=0:nGz
             n += 1
-            fX0 = L -> centerCoord[1] + (i - 0.5*nGx) * L
-            fY0 = L -> centerCoord[2] + (j - 0.5*nGy) * L
-            fZ0 = L -> centerCoord[3] + (k - 0.5*nGz) * L
+            fX0 = nGx==0  ?  itself  :  L -> centerCoord[1] + (i - 0.5*nGx) * L
+            fY0 = nGy==0  ?  itself  :  L -> centerCoord[2] + (j - 0.5*nGy) * L
+            fZ0 = nGz==0  ?  itself  :  L -> centerCoord[3] + (k - 0.5*nGz) * L
             fXname = prefix * (cxSym |> string) * numToSubs(n)
             fYname = prefix * (cySym |> string) * numToSubs(n)
             fZname = prefix * (czSym |> string) * numToSubs(n)
