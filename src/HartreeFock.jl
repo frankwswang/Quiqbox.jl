@@ -592,7 +592,7 @@ function runHF(bs::GTBasis{BN, BT},
     @assert BN >= leastNb "The number of basis functions should be no less than $(leastNb)."
     @assert N > (HFT==:RHF) "$(HFT) requires more than $(HFT==:RHF) electrons."
     Ns = splitSpins(Val(HFT), N)
-    Hcore = bs.getHcore(nuc, nucCoords)
+    Hcore = coreH(bs, nuc, nucCoords)
     X = getX(bs.S)
     C0s = guessC(CT, Val(HFT), bs.S, X, Hcore, bs.eeI, bs.basis, nuc, nucCoords)
     vars, isConverged = runHFcore(Val(HFT), config.SCF, Ns, Hcore, bs.eeI, bs.S, X, 

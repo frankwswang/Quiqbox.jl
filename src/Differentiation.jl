@@ -222,7 +222,7 @@ end
        b::FloatingGTBasisFuncs{<:Any, <:Any, 1, <:Any, <:Any, T}) where {T, V, FL} = 
 ∂Basis.(par, reshape(decomposeCore(Val(true), b), :)) |> sum
 
-∂Basis(par::ParamBox{T}, b::BasisFuncMix{<:Any, <:Any, <:Any, T}) where {T} = 
+∂Basis(par::ParamBox{T}, b::BasisFuncMix{<:Any, <:Any, T}) where {T} = 
 ∂Basis.(par, b.BasisFunc) |> sum
 
 ∂Basis(par::ParamBox{T}, b::EmptyBasisFunc{D, T}) where {D, T} = EmptyBasisFunc{D, T}()

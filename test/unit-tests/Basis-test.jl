@@ -508,7 +508,7 @@ alpha = ParamList[:xpn]
 
 cs = [pb1, bf_pbTest1]
 ss = [:X, :Y, :Z]
-@test [getParams(i, j) for i in cs, j in ss] |> flatten == 
+@test reshape([getParams(i, j) for i in cs, j in ss], :) |> flatten == 
       [nothing, bf_pbTest1.center[1], nothing, bf_pbTest1.center[2], 
        nothing, bf_pbTest1.center[3]]
 @test getParams(cs) == vcat(getParams(pb1), getParams(bf_pbTest1))

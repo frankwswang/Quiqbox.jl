@@ -364,6 +364,8 @@ BasisFunc(cen, (g,), ijk, normalizeGTO)
 
 BasisFunc(bf::BasisFunc) = itself(bf)
 
+const BFunc{D, T} = BasisFunc{<:Any, <:Any, <:Any, D, T}
+
 
 """
 
@@ -600,7 +602,6 @@ genBasisFunc(bf::FloatingGTBasisFuncs) = itself(bf)
 genBasisFunc(bs::Vector{<:FloatingGTBasisFuncs}) = sortBasisFuncs(bs)
 
 
-
 """
 
     subshellOf(::FloatingGTBasisFuncs) -> String
@@ -608,71 +609,6 @@ genBasisFunc(bs::Vector{<:FloatingGTBasisFuncs}) = sortBasisFuncs(bs)
 Return the subshell name of the input `$(FloatingGTBasisFuncs)`.
 """
 @inline subshellOf(::FloatingGTBasisFuncs{𝑙}) where {𝑙} = SubshellNames[𝑙+1]
-
-
-"""
-
-    GTBasis{BN, BT<:CompositeGTBasisFuncs{<:Any, 1}, T} <: BasisSetData{BT}
-
-The container to store basis set information.
-
-≡≡≡ Field(s) ≡≡≡
-
-`basis::NTuple{BN, BT}`: Basis set.
-
-`S::Array{<:Number, 2}`: Overlap matrix.
-
-`Te::Array{<:Number, 2}`: Kinetic energy part of the electronic core Hamiltonian.
-
-`eeI::Array{<:Number, 4}`: Electron-electron interaction.
-
-`getVne::Function`: A `Function` that returns the nuclear attraction Hamiltonian when 
-nuclei`::Vector{String}` and their coordinates`::Vector{<:AbstractArray{<:Real}}` are input.
-
-getHcore::Function: Similar as `getVne`, a `Function` that returns the core Hamiltonian 
-when nuclei and their coordinates of same `DataType` are input.
-
-≡≡≡ Initialization Method(s) ≡≡≡
-
-    GTBasis(basis::Array{<:AbstractGTBasisFuncs, 1}, S::Matrix{<:Number}, 
-            Te::Matrix{<:Number}, eeI::Array{<:Number, 4}) -> 
-    GTBasis
-
-    GTBasis(basis::Union{Tuple{Vararg{AbstractGTBasisFuncs}}, 
-                         Vector{<:AbstractGTBasisFuncs}}) -> 
-    GTBasis
-
-Directly construct a `GTBasis` given a basis set.
-"""
-struct GTBasis{BN, BT, T} <: BasisSetData{BT}
-    basis::NTuple{BN, BT}
-    S::Matrix{T}
-    Te::Matrix{T}
-    eeI::Array{T, 4}
-    getVne::Function
-    getHcore::Function
-
-    function GTBasis(b::NTuple{BN, BT}, 
-                     S::Matrix{T}, Te::Matrix{T}, eeI::Array{T, 4}) where 
-                    {BN, BT<:CompositeGTBasisFuncs{<:Any, 1}, T<:Real}
-        new{BN, BT, T}(b, S, Te, eeI, 
-                       (mol, nucCoords) -> nucAttractions(b, mol, nucCoords),
-                       (mol, nucCoords) -> nucAttractions(b, mol, nucCoords) + Te)
-    end
-
-    GTBasis(b::Tuple{Vararg{CompositeGTBasisFuncs{<:Any, 1}, BN}}, 
-            S::Matrix{T}, Te::Matrix{T}, eeI::Array{T, 4}) where {BN, T<:Real} = 
-    new{BN, eltype(b), T}(b, S, Te, eeI, 
-                          (mol, nucCoords) -> nucAttractions(b, mol, nucCoords),
-                          (mol, nucCoords) -> nucAttractions(b, mol, nucCoords) + Te)
-end
-
-GTBasis(bs::Vector{<:CompositeGTBasisFuncs{<:Any, 1}}) = 
-GTBasis(Tuple(bs), overlaps(bs), elecKinetics(bs), eeInteractions(bs))
-
-GTBasis(bs::Union{Tuple{Vararg{AbstractGTBasisFuncs}}, Vector{<:AbstractGTBasisFuncs}}) = 
-GTBasis(hcat(decomposeCore.(Val(false), bs)...)|>Tuple, 
-        overlaps(bs), elecKinetics(bs), eeInteractions(bs))
 
 
 """
@@ -727,7 +663,7 @@ centerCoordOf(bf::FloatingGTBasisFuncs) = [outValOf(i) for i in bf.center.point.
 
 """
 
-    BasisFuncMix{BN, BT, D, T} <: CompositeGTBasisFuncs{BN, 1, D, T}
+    BasisFuncMix{BN, D, T, BT<:BFunc{D, T}} <: CompositeGTBasisFuncs{BN, 1, D, T}
 
 Sum of multiple `FloatingGTBasisFuncs` without any reformulation, treated as one basis 
 Function in the integral calculation.
@@ -744,14 +680,13 @@ Function in the integral calculation.
     BasisFuncMix{<:Any, BT}
 
 """
-struct BasisFuncMix{BN, BT, D, T} <: CompositeGTBasisFuncs{BN, 1, D, T}
+struct BasisFuncMix{BN, D, T, BT<:BFunc{D, T}} <: CompositeGTBasisFuncs{BN, 1, D, T}
     BasisFunc::NTuple{BN, BT}
     param::Tuple{Vararg{ParamBox}}
 
-    function BasisFuncMix(bfs::Tuple{Vararg{BasisFunc{<:Any,<:Any,<:Any, D,T}, BN}}) where 
-                         {D, T, BN}
+    function BasisFuncMix(bfs::Tuple{Vararg{BFunc{D, T}, BN}}) where {D, T, BN}
         bs = sortBasisFuncs(bfs)
-        new{BN, eltype(bfs), D, T}(bs, joinTuple(getfield.(bs, :param)...))
+        new{BN, D, T, eltype(bfs)}(bs, joinTuple(getfield.(bs, :param)...))
     end
 end
 
@@ -765,13 +700,57 @@ BasisFuncMix(bfm::BasisFuncMix) = itself(bfm)
 
 getTypeParams(::FloatingGTBasisFuncs{𝑙, GN, ON, PT, D, T}) where {𝑙, GN, ON, PT, D, T} = 
 (𝑙, GN, ON, PT, D, T)
-getTypeParams(::BasisFuncMix{BN, BT, D, T}) where {BN, BT, D, T} = (BN, BT, D, T)
+getTypeParams(::BasisFuncMix{BN, D, T, BT}) where {BN, D, T, BT} = (BN, D, T, BT)
 
 
 unpackBasis(::EmptyBasisFunc) = ()
 unpackBasis(b::BasisFunc)  = (b,)
 unpackBasis(b::BasisFuncMix)  = b.BasisFunc
 unpackBasis(b::BasisFuncs{<:Any, <:Any, 1})  = (BasisFunc(b),)
+
+
+"""
+
+    GTBasis{BN, D, T, BT<:GTBasisFuncs{1, D, T}} <: BasisSetData{BT}
+
+The container to store basis set information.
+
+≡≡≡ Field(s) ≡≡≡
+
+`basis::NTuple{BN, BT}`: Basis set.
+
+`S::Array{<:Number, 2}`: Overlap matrix.
+
+`Te::Array{<:Number, 2}`: Kinetic energy part of the electronic core Hamiltonian.
+
+`eeI::Array{<:Number, 4}`: Electron-electron interaction.
+
+≡≡≡ Initialization Method(s) ≡≡≡
+
+    GTBasis(basis::Array{<:AbstractGTBasisFuncs, 1}, S::Matrix{<:Number}, 
+            Te::Matrix{<:Number}, eeI::Array{<:Number, 4}) -> 
+    GTBasis
+
+    GTBasis(basis::Union{Tuple{Vararg{AbstractGTBasisFuncs}}, 
+                         AbstractVector{<:AbstractGTBasisFuncs}}) -> 
+    GTBasis
+
+Directly construct a `GTBasis` given a basis set.
+"""
+struct GTBasis{BN, D, T, BT<:GTBasisFuncs{1, D, T}} <: BasisSetData{BT}
+    basis::NTuple{BN, BT}
+    S::Matrix{T}
+    Te::Matrix{T}
+    eeI::Array{T, 4}
+
+    GTBasis(bfs::Tuple{Vararg{GTBasisFuncs{1, D, T}, BN}}) where 
+           {BN, D, T<:Real} = 
+    new{BN, D, T, eltype(bfs)}(bfs, overlaps(bfs), elecKinetics(bfs), eeInteractions(bfs))
+end
+
+GTBasis(bs::Tuple{Vararg{GTBasisFuncs{<:Any, D, T}}}) where {D, T} = GTBasis(bs |> flatten)
+
+GTBasis(bs::AbstractVector{<:GTBasisFuncs{<:Any, D, T}}) where {D, T} = GTBasis(bs |> Tuple)
 
 
 function sumOfCore(bfs::AbstractVector{<:BasisFunc{<:Any, <:Any, <:Any, D, T}}, 
@@ -938,8 +917,7 @@ add(bf.BasisFunc[1], bfm; roundDigits)
 add(bfm::BasisFuncMix{BN}, bf::BasisFuncMix{1}; roundDigits::Int=15) where {BN} = 
 add(bf, bfm; roundDigits)
 
-add(bfm1::BasisFuncMix{BN1, <:BasisFunc{<:Any, <:Any, <:Any, D, T}}, 
-    bfm2::BasisFuncMix{BN2, <:BasisFunc{<:Any, <:Any, <:Any, D, T}}; 
+add(bfm1::BasisFuncMix{BN1, D, T}, bfm2::BasisFuncMix{BN2, D, T}; 
     roundDigits::Int=15) where {BN1, BN2, D, T} = 
 sumOf((bfm1.BasisFunc..., bfm2.BasisFunc...); roundDigits)
 
@@ -1182,7 +1160,7 @@ mul(bfm::BasisFuncMix{BN}, bf::BasisFuncMix{1};
     normalizeGTO::Union{Bool, Missing}=missing) where {BN} = 
 mul(bf, bfm; normalizeGTO)
 
-function mul(bfm1::BasisFuncMix{BN1, <:Any, D, T}, bfm2::BasisFuncMix{BN2, <:Any, D, T}; 
+function mul(bfm1::BasisFuncMix{BN1, D, T}, bfm2::BasisFuncMix{BN2, D, T}; 
              normalizeGTO::Union{Bool, Missing}=missing) where {BN1, BN2, D, T}
     bfms = CompositeGTBasisFuncs{<:Any, 1, D, T}[]
     for bf1 in bfm1.BasisFunc, bf2 in bfm2.BasisFunc
@@ -1299,11 +1277,11 @@ decomposeCore(::Val{true}, b::FloatingGTBasisFuncs{<:Any, 1, 1}) = hcat(BasisFun
 
 decomposeCore(::Val{false}, b::FloatingGTBasisFuncs{<:Any, <:Any, 1}) = hcat(BasisFunc(b))
 
-function decomposeCore(::Val{true}, bfm::BasisFuncMix{BN, BT, GN}) where {BN, BT, GN}
+function decomposeCore(::Val{true}, bfm::BasisFuncMix)
     bfss = map(bfm.BasisFunc) do bf
         decomposeCore(Val(true), bf)
     end
-    reshape(vcat(bfss...), GN, 1)
+    reshape(vcat(bfss...), :, 1)
 end
 
 

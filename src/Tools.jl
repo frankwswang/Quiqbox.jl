@@ -443,10 +443,10 @@ end
 """
     flatten(a::Tuple) -> Tuple
 
-    flatten(a::Array) -> Array
+    flatten(a::AbstractVector) -> AbstractVector
 
-Flatten `a::Union{Array, Tuple}` that contains `Array`s and/or `Tuple`s. Only operate on 
-the outermost layer.
+Flatten `a::Union{AbstractVector, Tuple}` that contains `AbstractArray`s and/or `Tuple`s. 
+Only operate on the outermost container.
 
 ≡≡≡ Example(s) ≡≡≡
 
@@ -465,7 +465,7 @@ julia> flatten([:one, 2, [3, 4.0], ([5], "six"), "7"])
   "7"
 ```
 """
-function flatten(c::AbstractArray{T}) where {T}
+function flatten(c::AbstractVector{T}) where {T}
     c2 = map( x->(x isa Union{AbstractArray, Tuple} ? x : (x,)), c )
     [(c2...)...]
 end
@@ -475,7 +475,7 @@ function flatten(c::Tuple)
     ((c2...)...,)
 end
 
-flatten(c::AbstractArray{<:Tuple}) = joinTuple(c...) |> collect
+flatten(c::AbstractVector{<:Tuple}) = joinTuple(c...) |> collect
 
 joinTuple(t1::Tuple, t2::Tuple, t3::Tuple...) = (t1..., joinTuple(t2, t3...)...)
 

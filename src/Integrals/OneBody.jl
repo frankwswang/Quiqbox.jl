@@ -109,7 +109,7 @@ cat(getCoreHij(bf1, bf2, arrayToTuple(nuc), genTupleCoords(nucCoords)), dims=2)
 
 """
 
-    coreH(bs::Union{Tuple{Vararg{AbstractGTBasisFuncs}}, 
+    coreH(bs::Union{GTBasis, Tuple{Vararg{AbstractGTBasisFuncs}}, 
                     Vector{<:AbstractGTBasisFuncs}}, 
           nuc::Union{NTuple{NN, String}, Vector{String}}, 
           nucCoords::Union{NTuple{NN, NTuple{3, Float64}}, 
@@ -124,3 +124,8 @@ coreH(bs::Union{Tuple{Vararg{AbstractGTBasisFuncs}}, Vector{<:AbstractGTBasisFun
       nucCoords::Union{NTuple{NN, NTuple{3, Float64}}, 
                        Vector{<:AbstractArray{<:Real}}}) where {NN} = 
 getCoreH(bs|>arrayToTuple, arrayToTuple(nuc), genTupleCoords(nucCoords))
+
+coreH(b::GTBasis, nuc::Union{NTuple{NN, String}, Vector{String}}, 
+      nucCoords::Union{NTuple{NN, NTuple{3, Float64}}, 
+                       Vector{<:AbstractArray{<:Real}}}) where {NN} = 
+nucAttractions(b.basis, nuc, nucCoords) + b.Te

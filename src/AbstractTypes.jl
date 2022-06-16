@@ -43,22 +43,22 @@ abstract type BasisSetData{BT} <: AbstractBasisSetData end
 abstract type MolecularCoefficients <: MolecularDataBox end
 
 
-abstract type QuiqboxBasis <: QuiqboxContainer end
+abstract type QuiqboxBasis{T} <: QuiqboxContainer end
 
-abstract type SpatialOrbital <: QuiqboxBasis end
-abstract type SpinOrbital <: QuiqboxBasis end
+abstract type SpatialOrbital{T} <: QuiqboxBasis{T} end
+abstract type SpinOrbital{T} <: QuiqboxBasis{T} end
 
-abstract type StructSpatialBasis <: SpatialOrbital end
+abstract type StructSpatialBasis{T} <: SpatialOrbital{T} end
 
-abstract type AbstractMolOrbital <: SpinOrbital end
+abstract type AbstractMolOrbital{T} <: SpinOrbital{T} end
 
-abstract type AbstractGaussFunc{T} <: StructSpatialBasis end
-abstract type AbstractGTBasisFuncs <: StructSpatialBasis end
+abstract type AbstractGaussFunc{T} <: StructSpatialBasis{T} end
+abstract type AbstractGTBasisFuncs{D, T} <: StructSpatialBasis{T} end
 
 abstract type MolecularHartreeFockCoefficient{NN, N} <: MolecularCoefficients end
 
-abstract type GTBasisFuncs{OrbitalN}  <: AbstractGTBasisFuncs end
+abstract type GTBasisFuncs{OrbitalN, D, NumberT}  <: AbstractGTBasisFuncs{D, NumberT} end
 
-abstract type CompositeGTBasisFuncs{NofLinearlyCombinedBasis, NofOrbital, D, NumberT}  <: GTBasisFuncs{NofOrbital} end
+abstract type CompositeGTBasisFuncs{NofLinearlyCombinedBasis, NofOrbital, D, NumberT}  <: GTBasisFuncs{NofOrbital, D, NumberT} end
 
 abstract type FloatingGTBasisFuncs{𝑙, GaussFuncN, OrbitalN, PointT, D, NumberT} <: CompositeGTBasisFuncs{1, OrbitalN, D, NumberT} end

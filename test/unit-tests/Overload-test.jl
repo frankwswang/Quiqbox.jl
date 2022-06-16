@@ -42,8 +42,7 @@ bfm1 = BasisFuncMix([bf1, bf2])
 @test (@capture_out show(bfm1)) == string(typeof(bfm1))*"(BasisFunc, param)"
 
 GTb1 = GTBasis([bf1, bfs2])
-@test (@capture_out show(GTb1)) == string(typeof(GTb1))*"(basis, S, Te, eeI, getVne, "*
-                                    "getHcore)"
+@test (@capture_out show(GTb1)) == string(typeof(GTb1))*"(basis, S, Te, eeI)"
 
 box1 = GridBox(2, 1.5)
 @test (@capture_out show(box1)) == string(typeof(box1))*"(num, len, coord)"
@@ -264,5 +263,15 @@ bfm12 = bf1 + genBasisFunc([1,2,2], (2,3))
 @test hasEqual(bfm12 .* [1.0, 3.0], [bfm12*1.0, bfm12*3.0])
 bfs11 = genBasisFunc([1,1,1], (2,3), "P")
 @test hasEqual(bfs11 .* [1.0, 2.0, 3.0], [i*j for (i,j) in zip(bfs11, 1:3)])
+
+
+# function flatten
+bfTf1 = genBasisFunc([1,2,1], (2,1))
+bfTfs = genBasisFunc([1,2,1], (3,2), "P")
+bs1 = [bfTf1, bfTfs]
+bs2 = (bfTf1, bfTfs)
+bfs = decompose(bfTfs)
+@test flatten(bs1) == [bfTf1, bfs...]
+@test flatten(bs2) == (bfTf1, bfs...)
 
 end

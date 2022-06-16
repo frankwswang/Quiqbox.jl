@@ -80,7 +80,7 @@ end
 
 function show(io::IO, gtb::GTBasis)
     print(io, typeof(gtb))
-    print(io, "(basis, S, Te, eeI, getVne, getHcore)")
+    print(io, "(basis, S, Te, eeI)")
 end
 
 function show(io::IO, box::GridBox)
@@ -255,3 +255,26 @@ function hasBoolRelation(boolFunc::F,
         boolFunc(pb1.data, pb2.data)
     end
 end
+
+
+"""
+
+    flatten(b::AbstractVector{<:GTBasisFuncs{<:Any, D, T}}) where {D, T} -> 
+    AbstractVector{<:CompositeGTBasisFuncs{<:Any, 1, D, T}}
+
+    flatten(b::Tuple{Vararg{GTBasisFuncs{<:Any, D, T}}}) where {D, T} -> 
+    Tuple{Vararg{CompositeGTBasisFuncs{<:Any, 1, D, T}}}
+
+Flatten a collection of `CompositeGTBasisFuncs` by decomposing every 
+`CompositeGTBasisFuncs{<:Any, ON, D, T}` where `ON > 1` into multiple 
+`CompositeGTBasisFuncs{<:Any, 1, D, T}`.
+"""
+flatten(bs::AbstractVector{<:GTBasisFuncs{<:Any, D, T}}) where {D, T} = 
+reshape(hcat(decomposeCore.(Val(false), bs)...), :)
+
+flatten(bs::Tuple{Vararg{GTBasisFuncs{<:Any, D, T}}}) where {D, T} = 
+hcat(decomposeCore.(Val(false), bs)...) |> Tuple
+
+flatten(bs::Union{AbstractVector{<:GTBasisFuncs{1, D, T}}, 
+                  Tuple{Vararg{CompositeGTBasisFuncs{<:Any, 1, D, T}}}}) where {D, T} = 
+itself(bs)
