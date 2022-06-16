@@ -38,7 +38,7 @@ abstract type AbstractSpatialPoint{D, T} <: DifferentiableParameter{AbstractSpat
 
 abstract type HartreeFockFinalValue{T} <: AbstractHartreeFockFinalValue end
 
-abstract type BasisSetData{BT} <: AbstractBasisSetData end
+abstract type BasisSetData{D, T, BT} <: AbstractBasisSetData end
 
 abstract type MolecularCoefficients <: MolecularDataBox end
 

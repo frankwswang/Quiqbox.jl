@@ -712,7 +712,7 @@ unpackBasis(b::BasisFuncs{<:Any, <:Any, 1})  = (BasisFunc(b),)
 
 """
 
-    GTBasis{BN, D, T, BT<:GTBasisFuncs{1, D, T}} <: BasisSetData{BT}
+    GTBasis{BN, D, T, BT<:GTBasisFuncs{1, D, T}} <: BasisSetData{D, T, BT}
 
 The container to store basis set information.
 
@@ -734,7 +734,7 @@ The container to store basis set information.
 
 Construct a `GTBasis` given a basis set.
 """
-struct GTBasis{BN, D, T, BT<:GTBasisFuncs{1, D, T}} <: BasisSetData{BT}
+struct GTBasis{BN, D, T, BT<:GTBasisFuncs{1, D, T}} <: BasisSetData{D, T, BT}
     basis::NTuple{BN, BT}
     S::Matrix{T}
     Te::Matrix{T}
@@ -742,7 +742,7 @@ struct GTBasis{BN, D, T, BT<:GTBasisFuncs{1, D, T}} <: BasisSetData{BT}
 
     GTBasis(bfs::Tuple{Vararg{GTBasisFuncs{1, D, T}, BN}}) where 
            {BN, D, T<:Real} = 
-    new{BN, D, T, eltype(bfs)}(bfs, overlaps(bfs), elecKinetics(bfs), eeInteractions(bfs))
+    new{BN, D, T, eltype(bfs)}(bfs, overlaps(bfs), eKinetics(bfs), eeInteractions(bfs))
 end
 
 GTBasis(bs::Tuple{Vararg{GTBasisFuncs{<:Any, D, T}}}) where {D, T} = GTBasis(bs |> flatten)
