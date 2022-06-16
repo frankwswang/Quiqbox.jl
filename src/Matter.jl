@@ -6,7 +6,7 @@ const spinStr = ("α", "β", "α&β")
 
 """
 
-    MolOrbital{N} <: AbstractMolOrbital
+    MolOrbital{N, T} <: AbstractMolOrbital{T}
 
 `Struct` of molecular orbitals.
 
@@ -15,51 +15,52 @@ const spinStr = ("α", "β", "α&β")
 `symmetry::String`: The symmetry of the orbital. The default value is "A" for being 
 antisymmetric.
 
-`energy::Float64`: Molecular energy.
+`energy::T`: Molecular energy.
 
 `spin::String`: Spin function of the orbital. Available values: `"$(spinStr[1])"`, 
 `"$(spinStr[2])"`, or `"$(spinStr[3])"` for being double-occupied.
 
 `occupancy::Real`: Occupation number.
 
-`orbitalCoeffs::NTuple{N, Float64}`: coefficients of the basis functions to form the 
+`orbitalCoeffs::NTuple{N, T}`: coefficients of the basis functions to form the 
 molecular orbital.
 
 ≡≡≡ Initialization Method(s) ≡≡≡
 
-    MolOrbital(energy::Float64, occupancy::Real, orbitalCoeffs::Vector{Float64}, 
-               spin::String="$(spinStr[1])", symmetry::String="A") -> MolOrbital{N}
+    MolOrbital(energy::T, occupancy::Real, orbitalCoeffs::NTuple{N, T}, 
+               spin::String="$(spinStr[1])", symmetry::String="A") where {N, T<:Real} -> 
+    MolOrbital{N}
 
 """
-struct MolOrbital{N} <: AbstractMolOrbital
+struct MolOrbital{N, T} <: AbstractMolOrbital{T}
     symmetry::String
-    energy::Float64
+    energy::T
     spin::String
     occupancy::Real
-    orbitalCoeffs::NTuple{N, Float64}
+    orbitalCoeffs::NTuple{N, T}
 
-    function MolOrbital(energy::Float64, occupancy::Real, 
-                        orbitalCoeffs::NTuple{N, Float64}, spin::String=spinStr[1], 
-                        symmetry::String="A") where {N}
+    function MolOrbital(energy::T, occupancy::Real, 
+                        orbitalCoeffs::NTuple{N, T}, spin::String=spinStr[1], 
+                        symmetry::String="A") where {N, T<:Real}
         @assert spin in spinStr "The input spin configuration "*
         "is NOT supported."
-        new{N}(symmetry, energy, spin, occupancy, orbitalCoeffs)
+        new{N, T}(symmetry, energy, spin, occupancy, orbitalCoeffs)
     end
 end
 
 
 """
 
-    getMolOrbitals(ens::Vector{Float64}, occus::Vector{<:Real}, C::Matrix{Float64}, 
+    getMolOrbitals(ens::Vector{T}, occus::Vector{<:Real}, C::Matrix{T}, 
                    spins::Vector{String}, 
-                   symms::Vector{String}=repeat(["A"], length(occus))) -> 
-    Tuple{Vararg{getMolOrbitals}}
+                   symms::Vector{String}=repeat(["A"], length(occus))) where {T<:Real} -> 
+    Tuple{Vararg{getMolOrbitals{<:Any, T}}}
 
 A function that returns the molecular orbitals.
 """
-function getMolOrbitals(ens::Vector{Float64}, occus::Vector{<:Real}, C::Matrix{Float64}, 
+function getMolOrbitals(ens::Vector{T}, occus::Vector{<:Real}, C::Matrix{T}, 
                         spins::Vector{String}, 
-                        symms::Vector{String}=repeat(["A"], length(occus)))
+                        symms::Vector{String}=repeat(["A"], length(occus))) where {T<:Real}
     MolOrbital.(ens, occus, [ Tuple(C[:,i]) for i = 1:size(C, 2) ], spins, symms) |> Tuple
 end
 
