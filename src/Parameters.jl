@@ -12,6 +12,7 @@ struct FLevel{L1, L2} <: MetaParam{FLevel} end
 # FLevel(::Any) = FLevel{0, 0}
 const FLX0{L1} = FLevel{L1, 0}
 FLevel(::Type{typeof(itself)}) = FLevel{1, 0}
+FLevel(::Type{typeof(Base.identity)}) = FLevel{1, 0}
 FLevel(::Type{<:Function}) = FLevel{2, 0}
 FLevel(::Type{<:ParameterizedFunction{<:Any, <:Any}}) = FLevel{3, 0}
 FLevel(::Type{<:ParameterizedFunction{<:Any, itself}}) = FLevel{3, 1}
