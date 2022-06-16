@@ -54,13 +54,13 @@ Quiqbox also provides several integral functions that can be used independently 
 
 [`overlaps`](@ref)
 
-[`elecKinetic`](@ref)
+[`eKinetic`](@ref)
 
-[`elecKinetics`](@ref)
+[`eKinetics`](@ref)
 
-[`nucAttraction`](@ref)
+[`neAttraction`](@ref)
 
-[`nucAttractions`](@ref)
+[`neAttractions`](@ref)
 
 [`coreHij`](@ref)
 

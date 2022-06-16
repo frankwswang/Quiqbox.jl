@@ -187,12 +187,12 @@ bfm = BasisFuncMix(bs1)
 S = overlaps([bfm])[]
 @test S == overlap(bfm, bfm)[]
 @test isapprox(S, overlaps(bs1) |> sum, atol=errorThreshold2)
-T = elecKinetics([bfm])[]
-@test T == elecKinetic(bfm, bfm)[]
-@test isapprox(T, elecKinetics(bs1) |> sum, atol=errorThreshold2)
-V = nucAttractions([bfm], nuc, nucCoords)[]
-@test V == nucAttraction(bfm, bfm, nuc, nucCoords)[]
-@test isapprox(V, nucAttractions(bs1, nuc, nucCoords) |> sum, atol=errorThreshold2)
+T = eKinetics([bfm])[]
+@test T == eKinetic(bfm, bfm)[]
+@test isapprox(T, eKinetics(bs1) |> sum, atol=errorThreshold2)
+V = neAttractions([bfm], nuc, nucCoords)[]
+@test V == neAttraction(bfm, bfm, nuc, nucCoords)[]
+@test isapprox(V, neAttractions(bs1, nuc, nucCoords) |> sum, atol=errorThreshold2)
 eeI = eeInteractions([bfm])[]
 @test eeI == eeInteraction(bfm, bfm, bfm, bfm)[]
 @test isapprox(eeI, eeInteractions(bs1) |> sum, atol=errorThreshold2*10)

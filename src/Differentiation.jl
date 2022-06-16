@@ -121,7 +121,7 @@ function ∂HFenergy(bs::Union{NTuple{BN, BT}, NTuple{BN, AbstractGTBasisFuncs}}
     Xinv = sqrt(S)::Matrix{Float64}
     cH = (i, j)->getCoreHij(i, j, nuc, nucCoords)
     ∂hij, ∂hijkl = derivativeCore(Val(false), bs, par, S, 
-                                  TypedFunction(cH), TypedFunction(get2eInteraction))
+                                  TypedFunction(cH), TypedFunction(getEleEleInteraction))
     getEᵀ(∂hij, ∂hijkl, Ref(Xinv).*C, nElectron)
 end
 

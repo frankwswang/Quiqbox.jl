@@ -19,14 +19,14 @@ errT = 1e-12
 oFilter(f) = bs-> f(filter(i->typeof(i).parameters[1]<2, bs))
 
 fs1 = (oFilter(overlaps), 
-       oFilter(elecKinetics), 
-       oFilter(x->nucAttractions(x, nuc, nucCoords)), 
+       oFilter(eKinetics), 
+       oFilter(x->neAttractions(x, nuc, nucCoords)), 
        oFilter(eeInteractions))
 fs2 = (oFilter(overlapsLibcint), 
        oFilter(elecKineticsLibcint), 
        oFilter(x->nucAttractionsLibcint(x, nuc, nucCoords)), 
        oFilter(eeInteractionsLibcint))
-fns = (:overlaps, :elecKinetics, :nucAttractions, :eeInteractions)
+fns = (:overlaps, :eKinetics, :neAttractions, :eeInteractions)
 
 for (f1, f2, fn) in zip(fs1, fs2, fns), pair in zip(BasisSetNames, atms)
     bs = genBasisFunc(center, pair)

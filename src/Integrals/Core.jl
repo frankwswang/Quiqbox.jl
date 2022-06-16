@@ -710,10 +710,10 @@ end
 getOverlap(bf1::BasisFunc{<:Any, GN1}, bf2::BasisFunc{<:Any, GN2}) where {GN1, GN2} = 
 getOneBodyInt(∫overlapCore, bf1, bf2)
 
-getElecKinetic(bf1::BasisFunc{<:Any, GN1}, bf2::BasisFunc{<:Any, GN2}) where {GN1, GN2} = 
+getEleKinetic(bf1::BasisFunc{<:Any, GN1}, bf2::BasisFunc{<:Any, GN2}) where {GN1, GN2} = 
 getOneBodyInt(∫elecKineticCore, bf1, bf2)
 
-function getNucAttraction(bf1::BasisFunc{<:Any, GN1}, bf2::BasisFunc{<:Any, GN2}, 
+function getNucEleAttraction(bf1::BasisFunc{<:Any, GN1}, bf2::BasisFunc{<:Any, GN2}, 
                           nuc::NTuple{NN, String}, 
                           nucCoords::NTuple{NN, NTuple{3,Float64}}) where {GN1, GN2, NN}
     res = 0.0
@@ -723,7 +723,7 @@ function getNucAttraction(bf1::BasisFunc{<:Any, GN1}, bf2::BasisFunc{<:Any, GN2}
     res
 end
 
-function get2eInteraction(bf1::BasisFunc{<:Any, GN1}, bf2::BasisFunc{<:Any, GN2}, 
+function getEleEleInteraction(bf1::BasisFunc{<:Any, GN1}, bf2::BasisFunc{<:Any, GN2}, 
                           bf3::BasisFunc{<:Any, GN3}, bf4::BasisFunc{<:Any, GN4}) where 
                          {GN1, GN2, GN3, GN4}
     getTwoBodyInt(∫eeInteractionCore, bf1, bf2, bf3, bf4)
@@ -751,22 +751,22 @@ end
 getOverlap(b1::AbstractGTBasisFuncs, b2::AbstractGTBasisFuncs) = 
 getCompositeInt(getOverlap, (b1, b2))
 
-getElecKinetic(b1::AbstractGTBasisFuncs, b2::AbstractGTBasisFuncs) = 
-getCompositeInt(getElecKinetic, (b1, b2))
+getEleKinetic(b1::AbstractGTBasisFuncs, b2::AbstractGTBasisFuncs) = 
+getCompositeInt(getEleKinetic, (b1, b2))
 
-getNucAttraction(b1::AbstractGTBasisFuncs, b2::AbstractGTBasisFuncs, 
+getNucEleAttraction(b1::AbstractGTBasisFuncs, b2::AbstractGTBasisFuncs, 
                  nuc::NTuple{NN, String}, 
                  nucCoords::NTuple{NN, NTuple{3,Float64}}) where {NN} = 
-getCompositeInt(getNucAttraction, (b1, b2), nuc, nucCoords)
+getCompositeInt(getNucEleAttraction, (b1, b2), nuc, nucCoords)
 
 getCoreHij(b1::AbstractGTBasisFuncs, b2::AbstractGTBasisFuncs, 
            nuc::NTuple{NN, String}, 
            nucCoords::NTuple{NN, NTuple{3,Float64}}) where {NN} = 
-getElecKinetic(b1, b2) + getNucAttraction(b1, b2, nuc, nucCoords)
+getEleKinetic(b1, b2) + getNucEleAttraction(b1, b2, nuc, nucCoords)
 
-get2eInteraction(b1::AbstractGTBasisFuncs, b2::AbstractGTBasisFuncs, 
+getEleEleInteraction(b1::AbstractGTBasisFuncs, b2::AbstractGTBasisFuncs, 
                  b3::AbstractGTBasisFuncs, b4::AbstractGTBasisFuncs) = 
-getCompositeInt(get2eInteraction, (b1, b2, b3, b4))
+getCompositeInt(getEleEleInteraction, (b1, b2, b3, b4))
 
 
 function getOneBodyInts(∫1e::F, 
@@ -790,14 +790,14 @@ getOverlaps(BSet::Union{NTuple{BN, BT}, NTuple{BN, AbstractGTBasisFuncs}}) where
            {BN, BT<:AbstractGTBasisFuncs} = 
 getOneBodyInts(getOverlap, BSet)
 
-getElecKinetics(BSet::Union{NTuple{BN, BT}, NTuple{BN, AbstractGTBasisFuncs}}) where 
+getEleKinetics(BSet::Union{NTuple{BN, BT}, NTuple{BN, AbstractGTBasisFuncs}}) where 
                {BN, BT<:AbstractGTBasisFuncs} = 
-getOneBodyInts(getElecKinetic, BSet)
+getOneBodyInts(getEleKinetic, BSet)
 
-getNucAttractions(BSet::Union{NTuple{BN, BT}, NTuple{BN, AbstractGTBasisFuncs}}, 
+getNucEleAttractions(BSet::Union{NTuple{BN, BT}, NTuple{BN, AbstractGTBasisFuncs}}, 
                   nuc::NTuple{NN, String}, nucCoords::NTuple{NN, NTuple{3,Float64}}) where 
                  {BN, BT<:AbstractGTBasisFuncs, NN} = 
-getOneBodyInts(getNucAttraction, BSet, nuc, nucCoords)
+getOneBodyInts(getNucEleAttraction, BSet, nuc, nucCoords)
 
 getCoreH(BSet::Union{NTuple{BN, BT}, NTuple{BN, AbstractGTBasisFuncs}}, 
          nuc::NTuple{NN, String}, nucCoords::NTuple{NN, NTuple{3,Float64}}) where 
@@ -835,9 +835,9 @@ function getTwoBodyInts(∫2e::F,
     buf
 end
 
-get2eInteractions(BSet::Union{NTuple{BN, BT}, NTuple{BN, AbstractGTBasisFuncs}}) where 
+getEleEleInteractions(BSet::Union{NTuple{BN, BT}, NTuple{BN, AbstractGTBasisFuncs}}) where 
                  {BN, BT<:AbstractGTBasisFuncs} = 
-getTwoBodyInts(get2eInteraction, BSet)
+getTwoBodyInts(getEleEleInteraction, BSet)
 
 
 function genUniqueIndices(basisSetSize::Int)

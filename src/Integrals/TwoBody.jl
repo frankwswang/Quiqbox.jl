@@ -11,7 +11,7 @@ spatial orbitals) given 4 basis functions.
 """
 eeInteraction(bf1::AbstractGTBasisFuncs, bf2::AbstractGTBasisFuncs, 
               bf3::AbstractGTBasisFuncs, bf4::AbstractGTBasisFuncs) = 
-cat(get2eInteraction(bf1, bf2, bf3, bf4), dims=4)
+cat(getEleEleInteraction(bf1, bf2, bf3, bf4), dims=4)
 
 
 """
@@ -25,4 +25,4 @@ of spatial orbitals) given a basis set in the form of an `Vector`.
 """
 eeInteractions(bs::Union{Tuple{Vararg{AbstractGTBasisFuncs}}, 
                          Vector{<:AbstractGTBasisFuncs}}) = 
-get2eInteractions(bs |> arrayToTuple)
+getEleEleInteractions(bs |> arrayToTuple)

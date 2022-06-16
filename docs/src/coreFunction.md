@@ -213,19 +213,19 @@ overlaps
 ```
 
 ```@docs
-elecKinetic
+eKinetic
 ```
 
 ```@docs
-elecKinetics
+eKinetics
 ```
 
 ```@docs
-nucAttraction
+neAttraction
 ```
 
 ```@docs
-nucAttractions
+neAttractions
 ```
 
 ```@docs

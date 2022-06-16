@@ -18,12 +18,12 @@ S = [1.0 0.6593182058508896; 0.6593182058508896 1.0]
 @test isapprox(overlaps(bs), S)
 
 V = [-1.8804408905227634 -1.1948346220535715; -1.1948346220535715 -1.8804408905227632]
-@test isapprox(nucAttraction(bf1, bf2, nucs, cens), V[2]*ones(1,1), atol=errT1)
-@test isapprox(nucAttractions(bs, nucs, cens), V, atol=errT1)
+@test isapprox(neAttraction(bf1, bf2, nucs, cens), V[2]*ones(1,1), atol=errT1)
+@test isapprox(neAttractions(bs, nucs, cens), V, atol=errT1)
 
 T = [0.7600318799755844 0.23645465829079276; 0.23645465829079276 0.7600318799755844]
-@test isapprox(elecKinetic(bf1, bf2), T[2]*ones(1,1,1), atol=errT1)
-@test isapprox(elecKinetics(bs), T)
+@test isapprox(eKinetic(bf1, bf2), T[2]*ones(1,1,1), atol=errT1)
+@test isapprox(eKinetics(bs), T)
 
 Hc = coreH(bs, nucs, cens)
 @test isapprox(Hc, T+V, atol=errT1)
@@ -42,7 +42,7 @@ S = [0.05500737317448707; 0.00788990951420727;
 T = [0.031092263857623516; 0.0244106493741589; 
         0.0;                  0.0488771655445106; 
         0.0;                  0.0140048092957122] |> transpose
-@test isapprox(elecKinetic(bf1, bfs), T, atol=errT3)
+@test isapprox(eKinetic(bf1, bfs), T, atol=errT3)
 
 V = [
     -0.05113501486 0.0           0.0          -0.01876634304 0.0          -0.01616252693; 
@@ -52,6 +52,6 @@ V = [
     0.0           0.0           0.0           0.0          -0.01687630012 0.0; 
     -0.01616252693 0.0           0.0          -0.01687630012 0.0          -0.04643023450
     ]
-@test isapprox(nucAttraction(bfs, bfs, nucs, cens), V, atol=errT3)
+@test isapprox(neAttraction(bfs, bfs, nucs, cens), V, atol=errT3)
 
 end
