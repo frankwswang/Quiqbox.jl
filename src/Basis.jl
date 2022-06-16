@@ -665,19 +665,20 @@ centerCoordOf(bf::FloatingGTBasisFuncs) = [outValOf(i) for i in bf.center.point.
 
     BasisFuncMix{BN, D, T, BT<:BFunc{D, T}} <: CompositeGTBasisFuncs{BN, 1, D, T}
 
-Sum of multiple `FloatingGTBasisFuncs` without any reformulation, treated as one basis 
-Function in the integral calculation.
+Sum of multiple `FloatingGTBasisFuncs{<:Any, <:Any, 1}` without any reformulation, treated 
+as one basis function in the integral calculation.
 
 ≡≡≡ Field(s) ≡≡≡
 
 `BasisFunc::NTuple{BN, BT}`: Inside basis functions.
 
-`param::Tuple{Vararg{ParamBox}}`: Inside parameters.
+`param::Tuple{Vararg{ParamBox}}`: Contained parameters.
 
 ≡≡≡ Initialization Method(s) ≡≡≡
 
-    BasisFuncMix(bfs::Vector{T}) where {T<:FloatingGTBasisFuncs{<:Any, <:Any, 1}} ->
-    BasisFuncMix{<:Any, BT}
+    BasisFuncMix(bfs::Union{Tuple{Vararg{T}}, Vector{T}}) where 
+                {T<:FloatingGTBasisFuncs{<:Any, <:Any, 1}} ->
+    BasisFuncMix
 
 """
 struct BasisFuncMix{BN, D, T, BT<:BFunc{D, T}} <: CompositeGTBasisFuncs{BN, 1, D, T}
@@ -719,23 +720,19 @@ The container to store basis set information.
 
 `basis::NTuple{BN, BT}`: Basis set.
 
-`S::Array{<:Number, 2}`: Overlap matrix.
+`S::Matrix{T}`: Overlap matrix.
 
-`Te::Array{<:Number, 2}`: Kinetic energy part of the electronic core Hamiltonian.
+`Te::Matrix{T}`: Kinetic energy part of the electronic core Hamiltonian.
 
-`eeI::Array{<:Number, 4}`: Electron-electron interaction.
+`eeI::Array{T, 4}`: Electron-electron interaction.
 
 ≡≡≡ Initialization Method(s) ≡≡≡
 
-    GTBasis(basis::Array{<:AbstractGTBasisFuncs, 1}, S::Matrix{<:Number}, 
-            Te::Matrix{<:Number}, eeI::Array{<:Number, 4}) -> 
+    GTBasis(basis::Union{Tuple{Vararg{GTBasisFuncs{<:Any, D, T}}}, 
+                         AbstractVector{<:GTBasisFuncs{<:Any, D, T}}}) where {D, T} -> 
     GTBasis
 
-    GTBasis(basis::Union{Tuple{Vararg{AbstractGTBasisFuncs}}, 
-                         AbstractVector{<:AbstractGTBasisFuncs}}) -> 
-    GTBasis
-
-Directly construct a `GTBasis` given a basis set.
+Construct a `GTBasis` given a basis set.
 """
 struct GTBasis{BN, D, T, BT<:GTBasisFuncs{1, D, T}} <: BasisSetData{BT}
     basis::NTuple{BN, BT}
