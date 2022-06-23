@@ -774,15 +774,15 @@ getCompositeInt(getEleEleInteraction, (b1, b2, b3, b4))
 
 function update2DarrBlock!(arr::Matrix{T1}, block::T1, I::T2, J::T2) where 
                           {T1, T2<:UnitRange{Int}}
-    arr[I,J] .= block
-    arr[J,I] .= block
+    arr[I, J] .= block
+    arr[J, I] .= block
     nothing
 end
 
 function update2DarrBlock!(arr::Matrix{T1}, block::Matrix{T1}, I::T2, J::T2) where 
                           {T1, T2<:UnitRange{Int}}
-    arr[I,J] = block
-    arr[J,I] = block |> transpose
+    arr[I, J] = block
+    arr[J, I] = block |> transpose
     nothing
 end
 
@@ -800,6 +800,17 @@ function getOneBodyInts(∫1e::F, basisSet::NTuple{BN, GTBasisFuncs{T, D}}, optA
     end
     buf
 end
+
+function getOneBodyInts(∫1e::F, basisSet::NTuple{BN, GTBasisFuncs{T, D, 1}}, 
+                        optArgs...) where {F<:Function, BN, T, D}
+    buf = Array{Float64}(undef, BN, BN)
+    for j = 1:BN, i = 1:j
+        int = ∫1e(basisSet[i], basisSet[j], optArgs...)
+        buf[i, j] = buf[j, i] = int
+    end
+    buf
+end
+
 
 getOverlap(BSet::NTuple{BN, GTBasisFuncs{T, D}}) where {BN, T, D} = 
 getOneBodyInts(getOverlap, BSet)
@@ -823,27 +834,27 @@ permuteArray(arr::Number, _) = itself(arr)
 
 function update4DarrBlock!(arr::Array{T1, 4}, block::T1, I::T2, J::T2, K::T2, L::T2) where 
                           {T1, T2<:UnitRange{Int}}
-    arr[I,J,K,L] .= block
-    arr[J,I,K,L] .= block
-    arr[J,I,L,K] .= block
-    arr[I,J,L,K] .= block
-    arr[L,K,I,J] .= block
-    arr[K,L,I,J] .= block
-    arr[K,L,J,I] .= block
-    arr[L,K,J,I] .= block
+    arr[I, J, K, L] .= block
+    arr[J, I, K, L] .= block
+    arr[J, I, L, K] .= block
+    arr[I, J, L, K] .= block
+    arr[L, K, I, J] .= block
+    arr[K, L, I, J] .= block
+    arr[K, L, J, I] .= block
+    arr[L, K, J, I] .= block
     nothing
 end
 
 function update4DarrBlock!(arr::Array{T1, 4}, block::Array{T1, 4}, 
                            I::T2, J::T2, K::T2, L::T2) where {T1, T2<:UnitRange{Int}}
-    arr[I,J,K,L] .= block
-    arr[J,I,K,L] = permuteArray(block, (2,1,3,4))
-    arr[J,I,L,K] = permuteArray(block, (2,1,4,3))
-    arr[I,J,L,K] = permuteArray(block, (1,2,4,3))
-    arr[L,K,I,J] = permuteArray(block, (4,3,1,2))
-    arr[K,L,I,J] = permuteArray(block, (3,4,1,2))
-    arr[K,L,J,I] = permuteArray(block, (3,4,2,1))
-    arr[L,K,J,I] = permuteArray(block, (4,3,2,1))
+    arr[I, J, K, L] .= block
+    arr[J, I, K, L] = permuteArray(block, (2,1,3,4))
+    arr[J, I, L, K] = permuteArray(block, (2,1,4,3))
+    arr[I, J, L, K] = permuteArray(block, (1,2,4,3))
+    arr[L, K, I, J] = permuteArray(block, (4,3,1,2))
+    arr[K, L, I, J] = permuteArray(block, (3,4,1,2))
+    arr[K, L, J, I] = permuteArray(block, (3,4,2,1))
+    arr[L, K, J, I] = permuteArray(block, (4,3,2,1))
     nothing
 end
 
@@ -858,11 +869,23 @@ function getTwoBodyInts(∫2e::F, basisSet::NTuple{BN, GTBasisFuncs{T, D}}) wher
         J = accuSize[j]+1 : accuSize[j+1]
         K = accuSize[k]+1 : accuSize[k+1]
         L = accuSize[l]+1 : accuSize[l+1]
-        subBuf = ∫2e(basisSet[i], basisSet[j], basisSet[k], basisSet[l])
-        update4DarrBlock!(buf, subBuf, I, J, K, L)
+        int = ∫2e(basisSet[i], basisSet[j], basisSet[k], basisSet[l])
+        update4DarrBlock!(buf, int, I, J, K, L)
     end
     buf
 end
+
+function getTwoBodyInts(∫2e::F, basisSet::NTuple{BN, GTBasisFuncs{T, D, 1}}) where 
+                       {F<:Function, BN, T, D}
+    buf = Array{Float64}(undef, BN, BN, BN, BN)
+    for l = 1:BN, k = 1:l, j = 1:l, i = 1:(j==l ? k : j)
+        int = ∫2e(basisSet[i], basisSet[j], basisSet[k], basisSet[l])
+        buf[i, j, k, l] = buf[j, i, k, l] = buf[j, i, l, k] = buf[i, j, l, k] = 
+        buf[l, k, i, j] = buf[k, l, i, j] = buf[k, l, j, i] = buf[l, k, j, i] = int
+    end
+    buf
+end
+
 
 getEleEleInteraction(BSet::NTuple{BN, GTBasisFuncs{T, D}}) where {BN, T, D} = 
 getTwoBodyInts(getEleEleInteraction, BSet)
