@@ -4,12 +4,10 @@ using LinearAlgebra: eigen, Symmetric
 using ForwardDiff: derivative as ForwardDerivative
 
 function oneBodyDerivativeCore(::Val{false}, 
-                               ∂bfs::Union{NTuple{BN,BT1},NTuple{BN,AbstractGTBasisFuncs}}, 
-                               bfs::Union{NTuple{BN,BT2}, NTuple{BN,AbstractGTBasisFuncs}}, 
-                               X::Matrix{Float64}, ∂X::Matrix{Float64}, 
-                               tf::TypedFunction{F}) where 
-                              {BN, BT1<:CompositeGTBasisFuncs{<:Any, 1}, 
-                                   BT2<:CompositeGTBasisFuncs{<:Any, 1}, F}
+                               ∂bfs::Union{NTuple{BN, GTBasisFuncs{T, D, 1}}}, 
+                               bfs::Union{NTuple{BN, GTBasisFuncs{T, D, 1}}}, 
+                               X::Matrix{T}, ∂X::Matrix{T}, 
+                               tf::TypedFunction{F}) where {BN, T, D, F}
     ʃ = getFunc(tf)
     ∂ʃ = ones(BN, BN)
     ʃab = ones(BN, BN)
@@ -34,12 +32,10 @@ end
 
 
 function twoBodyDerivativeCore(::Val{false}, 
-                               ∂bfs::Union{NTuple{BN,BT1},NTuple{BN,AbstractGTBasisFuncs}}, 
-                               bfs::Union{NTuple{BN,BT2}, NTuple{BN,AbstractGTBasisFuncs}},
-                               X::Matrix{Float64}, ∂X::Matrix{Float64}, 
-                               tf::TypedFunction{F}) where 
-                              {BN, BT1<:CompositeGTBasisFuncs{<:Any, 1}, 
-                                   BT2<:CompositeGTBasisFuncs{<:Any, 1}, F}
+                               ∂bfs::Union{NTuple{BN, GTBasisFuncs{T, D, 1}}}, 
+                               bfs::Union{NTuple{BN, GTBasisFuncs{T, D, 1}}}, 
+                               X::Matrix{T}, ∂X::Matrix{T}, 
+                               tf::TypedFunction{F}) where {BN, T, D, F}
     ʃ = getFunc(tf)
     bsSize = ∂bfs |> length
     ∂ʃ = ones(bsSize, bsSize, bsSize, bsSize)
@@ -72,7 +68,7 @@ function twoBodyDerivativeCore(::Val{false},
 end
 
 
-function deriveBasisFunc(bf::CompositeGTBasisFuncs{BN, 1}, par::ParamBox) where {BN}
+function deriveBasisFunc(bf::CGTBasisFuncs1O{<:Any, <:Any, BN}, par::ParamBox) where {BN}
     varDict = getVarDict(bf.param)
     vr = getVar(par)
     info = diffInfo(bf, vr, varDict)
@@ -81,10 +77,10 @@ end
 
 
 function derivativeCore(FoutputIsVector::Val{B}, 
-                        bs::Union{NTuple{BN, BT}, NTuple{BN, AbstractGTBasisFuncs}}, 
-                        par::ParamBox, S::Matrix{Float64}, 
+                        bs::NTuple{BN, GTBasisFuncs{T, D, 1}}, 
+                        par::ParamBox, S::Matrix{T}, 
                         oneBodyF::TypedFunction{F1}, twoBodyF::TypedFunction{F2}) where 
-                       {B, BN, BT<:AbstractGTBasisFuncs, F1, F2}
+                       {B, BN, T, D, F1, F2}
     # ijkl in chemists' notation of spatial bases (ij|kl).
     bfs = Tuple(hcat(decomposeCore.(Val(false), bs)...))
     # ∂bfs = deriveBasisFunc.(bfs, par)
@@ -112,30 +108,29 @@ function derivativeCore(FoutputIsVector::Val{B},
 end
 
 
-function ∂HFenergy(bs::Union{NTuple{BN, BT}, NTuple{BN, AbstractGTBasisFuncs}}, 
-                   par::ParamBox, C::NTuple{HFTS, Matrix{Float64}}, 
-                   S::Matrix{Float64}, nuc::NTuple{NN, String}, 
-                   nucCoords::NTuple{NN, NTuple{3,Float64}}, 
-                   nElectron::NTuple{HFTS, Int}) where 
-                  {BN, BT<:AbstractGTBasisFuncs, HFTS, NN}
-    Xinv = sqrt(S)::Matrix{Float64}
-    cH = (i, j)->getCoreHij(i, j, nuc, nucCoords)
+function ∂HFenergy(bs::NTuple{BN, GTBasisFuncs{T, D, 1}}, 
+                   par::ParamBox, C::NTuple{HFTS, Matrix{T}}, 
+                   S::Matrix{T}, nuc::NTuple{NN, String}, 
+                   nucCoords::NTuple{NN, NTuple{3, T}}, 
+                   nElectron::NTuple{HFTS, Int}) where {BN, T, D, HFTS, NN}
+    Xinv = sqrt(S)::Matrix{T}
+    cH = (i, j)->getCoreH(i, j, nuc, nucCoords)
     ∂hij, ∂hijkl = derivativeCore(Val(false), bs, par, S, 
                                   TypedFunction(cH), TypedFunction(getEleEleInteraction))
     getEᵀ(∂hij, ∂hijkl, Ref(Xinv).*C, nElectron)
 end
 
 
-function gradHFenergy(bs::Union{NTuple{BN, BT}, NTuple{BN, AbstractGTBasisFuncs}, 
-                                Vector{<:AbstractGTBasisFuncs}}, 
+function gradHFenergy(bs::Union{NTuple{BN, GTBasisFuncs{T, D, 1}}, 
+                                AbstractVector{<:GTBasisFuncs{T, D, 1}}}, 
                       par::Vector{<:ParamBox}, 
-                      C::NTuple{HFTS, Matrix{Float64}}, 
-                      S::Matrix{Float64}, 
+                      C::NTuple{HFTS, Matrix{T}}, 
+                      S::Matrix{T}, 
                       nuc::Union{NTuple{NN, String}, Vector{String}}, 
-                      nucCoords::Union{NTuple{NN, NTuple{3,Float64}}, 
+                      nucCoords::Union{NTuple{NN, NTuple{3, T}}, 
                                        Vector{<:AbstractArray{<:Real}}}, 
                       nElectron::Union{Int, NTuple{2, Int}}=getCharge(nuc)) where 
-                     {BN, BT<:AbstractGTBasisFuncs, HFTS, NN}
+                     {BN, T, D, HFTS, NN}
     bs = arrayToTuple(bs)
     nuc = arrayToTuple(nuc)
     nucCoords = genTupleCoords(nucCoords)
@@ -148,35 +143,35 @@ end
 
 𝑑f(::Type{FLi}, f::Function, x::T) where {T} = 1.0
 
-function ∂SGFcore(::Val{xpnSym}, sgf::FloatingGTBasisFuncs{𝑙, 1, 1}, c::T=1) where {T, 𝑙}
+function ∂SGFcore(::Val{xpnSym}, sgf::FGTBasisFuncs1O{T, D, 𝑙, 1}, c::T=T(1)) where {T, D, 𝑙}
     res = ( shiftCore(+, sgf, XYZTuple(2,0,0)) + shiftCore(+, sgf, XYZTuple(0,2,0)) + 
             shiftCore(+, sgf, XYZTuple(0,0,2)) ) * (-c)
     if sgf.normalizeGTO
-        res += sgf * ((0.5𝑙 + 0.75) / sgf.gauss[1].xpn() * c)
+        res += sgf * (T(0.5𝑙 + 0.75) / sgf.gauss[1].xpn() * c)
     end
     res
 end
 
-function ∂SGFcore(::Val{conSym}, sgf::FloatingGTBasisFuncs{𝑙, 1, 1}, c::T=1) where {T, 𝑙}
+function ∂SGFcore(::Val{conSym}, sgf::FGTBasisFuncs1O{T, D, 𝑙, 1}, c::T=T(1)) where {T, D, 𝑙}
     BasisFunc(sgf.center, GaussFunc(sgf.gauss[1].xpn, c), sgf.ijk, sgf.normalizeGTO)
 end
 
-function ∂SGFcore(::Val{cxSym}, sgf::FloatingGTBasisFuncs{𝑙, 1, 1}, c::T=1) where {T, 𝑙}
+function ∂SGFcore(::Val{cxSym}, sgf::FGTBasisFuncs1O{T, D, 𝑙, 1}, c::T=T(1)) where {T, D, 𝑙}
     shiftCore(-, sgf, XYZTuple(1,0,0)) * (-c*sgf.ijk[1][1]) + 
     shiftCore(+, sgf, XYZTuple(1,0,0)) * (2c*sgf.gauss[1].xpn())
 end
 
-function ∂SGFcore(::Val{cySym}, sgf::FloatingGTBasisFuncs{𝑙, 1, 1}, c::T=1) where {T, 𝑙}
+function ∂SGFcore(::Val{cySym}, sgf::FGTBasisFuncs1O{T, D, 𝑙, 1}, c::T=T(1)) where {T, D, 𝑙}
     shiftCore(-, sgf, XYZTuple(0,1,0)) * (-c*sgf.ijk[1][2]) + 
     shiftCore(+, sgf, XYZTuple(0,1,0)) * (2c*sgf.gauss[1].xpn())
 end
 
-function ∂SGFcore(::Val{czSym}, sgf::FloatingGTBasisFuncs{𝑙, 1, 1}, c::T=1) where {T, 𝑙}
+function ∂SGFcore(::Val{czSym}, sgf::FGTBasisFuncs1O{T, D, 𝑙, 1}, c::T=T(1)) where {T, D, 𝑙}
     shiftCore(-, sgf, XYZTuple(0,0,1)) * (-c*sgf.ijk[1][3]) + 
     shiftCore(+, sgf, XYZTuple(0,0,1)) * (2c*sgf.gauss[1].xpn())
 end
 
-const sgfSample = genBasisFunc([0,0,0], (2,1))
+const sgfSample = genBasisFunc([0.0, 0.0, 0.0], (2.0, 1.0))
 
 const cxIndex = findfirst(x->getTypeParams(x)[2]==cxSym, sgfSample.param)
 const cyIndex = findfirst(x->getTypeParams(x)[2]==cySym, sgfSample.param)
@@ -190,14 +185,14 @@ paramIndex(::Val{czSym}, ::Val) = czIndex
 paramIndex(::Val{xpnSym}, ::Val{D}) where {D} = xpnIndex - 3 + D
 paramIndex(::Val{conSym}, ::Val{D}) where {D} = conIndex - 3 + D
 
-function ∂Basis(par::ParamBox{T, V, FL}, 
-                sgf::FloatingGTBasisFuncs{<:Any, 1, 1, <:Any, D, T}) where {T, V, FL, D}
+function ∂Basis(par::ParamBox{T, V, FL}, sgf::FGTBasisFuncs1O{T, D, <:Any, 1}) where 
+               {T, V, FL, D}
     params = sgf.param
     if FL == FLi || !par.canDiff[]
         if par.index == params[paramIndex(Val(V), Val(D))].index
             ∂SGFcore(Val(V), sgf)
         else
-            EmptyBasisFunc{D, T}()
+            EmptyBasisFunc{T, D}()
         end
     else
         is = findall(x->x.dataName==par.dataName && x.index==par.index, params)
@@ -207,22 +202,21 @@ function ∂Basis(par::ParamBox{T, V, FL},
                 _, V2, FL2 = getTypeParams(fPar)
                 c = 𝑑f(FL2, fPar.map, fPar[])
                 if c == 0.0
-                    EmptyBasisFunc{D, T}()
+                    EmptyBasisFunc{T, D}()
                 else
                     ∂SGFcore(Val(V2), sgf, c)
                 end
             end |> sumOf
         else
-            EmptyBasisFunc{D, T}()
+            EmptyBasisFunc{T, D}()
         end
     end
 end
 
-∂Basis(par::ParamBox{T, V, FL}, 
-       b::FloatingGTBasisFuncs{<:Any, <:Any, 1, <:Any, <:Any, T}) where {T, V, FL} = 
+∂Basis(par::ParamBox{T, V, FL}, b::FGTBasisFuncs1O{T}) where {T, V, FL} = 
 ∂Basis.(par, reshape(decomposeCore(Val(true), b), :)) |> sum
 
-∂Basis(par::ParamBox{T}, b::BasisFuncMix{<:Any, <:Any, T}) where {T} = 
+∂Basis(par::ParamBox{T}, b::BasisFuncMix{T}) where {T} = 
 ∂Basis.(par, b.BasisFunc) |> sum
 
-∂Basis(par::ParamBox{T}, b::EmptyBasisFunc{D, T}) where {D, T} = EmptyBasisFunc{D, T}()
+∂Basis(par::ParamBox{T}, b::EmptyBasisFunc{T, D}) where {T, D} = EmptyBasisFunc{T, D}()

@@ -5,7 +5,7 @@ ParamBox{T, V, FL}
 ```
 
 ```@doc
-SpatialPoint{D, T, PT}
+SpatialPoint{T, D, PT}
 ```
 
 ```@docs
@@ -13,11 +13,11 @@ GaussFunc
 ```
 
 ```@docs
-BasisFunc{𝑙, GN, PT, D, T}
+BasisFunc{T, D, 𝑙, GN, PT}
 ```
 
 ```@docs
-BasisFuncs{𝑙, GN, ON, PT, D, T}
+BasisFuncs{T, D, 𝑙, GN, PT, ON}
 ```
 
 ```@docs
@@ -33,29 +33,29 @@ GridBox
 ```
 
 ```@docs
-HFconfig{HFT, CT, L}
+HFconfig{T1, HFT, F, T2, L}
 ```
 
 ```@docs
-SCFconfig{N}
+SCFconfig{T, N}
 ```
 
 ```@docs
-Quiqbox.HFtempVars{HFtype}
+Quiqbox.HFtempVars{T, HFtype}
 ```
 
 ```@docs
-Quiqbox.HFfinalVars{HFT, NN, HFTS}
+Quiqbox.HFfinalVars{T, HFT, NN, HFTS}
 ```
 
 ```@docs
-Molecule{Nc, Ne, Nb}
+Molecule{T, Nc, Ne, Nb}
 ```
 
 ```@docs
-MolOrbital{N}
+MolOrbital{T, N}
 ```
 
 ```@docs
-POconfig{M, T, F}
+POconfig{T, M, T, F}
 ```

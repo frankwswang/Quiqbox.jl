@@ -3,22 +3,23 @@ module Molden
 export makeMoldenFile
 
 import ..Quiqbox: Molecule, spinStr, checkFname, AtomicNumberList, centerCoordOf, flatten, 
-                  groupedSort, joinConcentricBFuncStr, alignNumSign, alignNum
+                  groupedSort, joinConcentricBFuncStr, alignNumSign, alignNum, getAtolVal
 
 const spinStrMolden = Dict(spinStr .=> ("Alpha", "Beta", "Alpha"))
 
 """
 
-    makeMoldenFile(mol::Molecule; roundDigits::Int=15, 
-                   recordUMO::Bool=false, fileName::String = "MO") -> String
+    makeMoldenFile(mol::Molecule{T}; roundDigits::Int=getAtolDigits(T), 
+                   recordUMO::Bool=false, fileName::String = "MO") where {T} -> 
+    String
 
 Write the information of input `Molecule` into a **Molden** file. `recordUMO` determines 
 whether to include the unoccupied molecular orbitals. `fileName` specifies the name of the 
 file, which is also the returned value. If `roundDigits < 0`, there won't be rounding for 
 recorded data.
 """
-function makeMoldenFile(mol::Molecule; 
-                        roundDigits::Int=15, recordUMO::Bool=false, fileName::String = "MO")
+function makeMoldenFile(mol::Molecule{T}; roundDigits::Int=getAtolDigits(T), 
+                        recordUMO::Bool=false, fileName::String = "MO") where {T}
     nucCoords = mol.nucCoords |> collect
     nuc = mol.nuc |> collect
     basis = mol.basis |> collect
@@ -42,7 +43,7 @@ function makeMoldenFile(mol::Molecule;
     for cen in centers
         iNucPoint += 1
         coord = parse.(Float64, split(cen[5:end]))
-        if (i = findfirst(x->all(isapprox.(x, coord, atol=1e-15)), nucCoords); 
+        if (i = findfirst(x->all(isapprox.(x, coord, atol=getAtolVal(T))), nucCoords); 
             i !== nothing)
             n = popat!(nuc, i)
             atmName = rpad("$(n)", 5)

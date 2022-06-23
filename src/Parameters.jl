@@ -11,7 +11,7 @@ struct FLevel{L1, L2} <: MetaParam{FLevel} end
 
 # FLevel(::Any) = FLevel{0, 0}
 const FLX0{L1} = FLevel{L1, 0}
-FLevel(::Type{typeof(itself)}) = FLevel{1, 0}
+FLevel(::Type{itselfT}) = FLevel{1, 0}
 FLevel(::Type{typeof(Base.identity)}) = FLevel{1, 0}
 FLevel(::Type{<:Function}) = FLevel{2, 0}
 FLevel(::Type{<:ParameterizedFunction{<:Any, <:Any}}) = FLevel{3, 0}
@@ -32,7 +32,7 @@ getFLevel(::Type{T}) where {T} = getFLevel(T |> FLevel)
 
 """
 
-    ParamBox{T, V, FL} <: DifferentiableParameter{ParamBox, T}
+    ParamBox{T, V, FL} <: DifferentiableParameter{T, ParamBox}
 
 Parameter container that can enable parameter differentiations.
 
@@ -101,7 +101,7 @@ differentiate the basis (in other words, only when `mapFunction = $(itself)` or
 `canDiff = false` is the independent variable same as the output variable / represented 
 parameter).
 """
-struct ParamBox{T, V, FL<:FLevel} <: DifferentiableParameter{ParamBox, T}
+struct ParamBox{T, V, FL<:FLevel} <: DifferentiableParameter{T, ParamBox}
     data::Array{T, 0}
     dataName::Symbol
     map::Function
@@ -136,7 +136,7 @@ end
 
 ParamBox(::Val{V}, data::Array{T, 0}, index) where {V, T} = ParamBox{T, V}(data, index)
 
-ParamBox(::Val{V}, ::typeof(itself), data::Array{T, 0}, index, _...) where {V, T} = 
+ParamBox(::Val{V}, ::itselfT, data::Array{T, 0}, index, _...) where {V, T} = 
 ParamBox{T, V}(data, index)
 
 ParamBox(::Val{V}, pb::ParamBox{T, <:Any, FLi}) where {V, T} = 

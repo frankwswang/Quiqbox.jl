@@ -4,14 +4,14 @@ using LinearAlgebra: norm
 
 """
 
-    gradDescent!(pars::Vector{<:Real}, grads::Vector{<:Real}, 
-                 η=0.001, clipThreshold=0.08*sqrt(length(grad))/norm(η)) -> 
-    pars::Vector{<:Real}
+    gradDescent!(pars::AbstractVector{T}, grads::AbstractVector{T}, η::T=T(0.001), 
+                 clipThreshold::T=2sqrt(length(grad))/(25norm(η))) where {T} -> 
+    pars::AbstractVector{T}
 
 Default gradient descent method in used in Quiqbox.
 """
-function gradDescent!(pars::Vector{<:Real}, grad::Vector{<:Real}, η=0.001, 
-                      clipThreshold::Real=0.08*sqrt(length(grad))/norm(η))
+function gradDescent!(pars::AbstractVector{T}, grad::AbstractVector{T}, η::T=T(0.001), 
+                      clipThreshold::T=2sqrt(length(grad))/(25norm(η))) where {T}
     @assert length(pars) == length(grad) "The length of gradients and corresponding "*
                                          "parameters should be the same."
     gNorm = norm(grad)
@@ -27,14 +27,15 @@ end
 
 """
 
-    updateParams!(pbs::Array{<:ParamBox, 1}, grads::Array{<:Real, 1}, 
-                  method::F=gradDescent!) where {F<:Function} -> Array{<:ParamBox, 1}
+    updateParams!(pbs::AbstractVector{<:ParamBox{T}}, grads::AbstractVector{T}, 
+                  method::F=gradDescent!) where {T, F<:Function} -> 
+                  AbstractVector{<:ParamBox{T}}
 
-Given a `Vector` of parameters::`ParamBox` and its gradients with respect to each 
-parameter, update the `ParamBox`s and return the updated values.
+Given a `AbstractVector` of parameters::`ParamBox{T}` and its gradients with respect to 
+each parameter, update the `ParamBox`s and return the updated values.
 """
-function updateParams!(pbs::Vector{<:ParamBox}, grads::Vector{<:Real}, 
-                       method!::F=gradDescent!) where {F<:Function}
+function updateParams!(pbs::AbstractVector{<:ParamBox{T}}, grads::AbstractVector{T}, 
+                       method!::F=gradDescent!) where {T, F<:Function}
     parVals = [i[] for i in pbs]
     method!(parVals, grads)
     for (m,n) in zip(pbs, parVals)
@@ -44,10 +45,10 @@ function updateParams!(pbs::Vector{<:ParamBox}, grads::Vector{<:Real},
 end
 
 
-const Doc_POconfig_Eg1 = "POconfig{:HF, HFconfig{:RHF, Val{:SAD}, 3}, "*
+const Doc_POconfig_Eg1 = "POconfig{Float64, :HF, HFconfig{:RHF, Val{:SAD}, 3}, "*
                          "typeof(gradDescent!)}(Val{:HF}(), HFconfig{:RHF, Val{:SAD}, 3}"*
-                         "(Val{:RHF}(), Val{:SAD}(), SCFconfig{3}(interval=(0.0001, "*
-                         "1.0e-6, 1.0e-15), oscillateThreshold=1.0e-5, method, "*
+                         "(Val{:RHF}(), Val{:SAD}(), SCFconfig{Float64, 3}(interval=("*
+                         "0.0001, 1.0e-6, 1.0e-15), oscillateThreshold=1.0e-5, method, "*
                          "methodConfig)[:ADIIS, :DIIS, :ADIIS], 1000, true), NaN, "*
                          "1.0e-5, 500, Quiqbox.gradDescent!)"
 
@@ -58,7 +59,7 @@ const OFtypes = (:HF,)
 
 """
 
-    POconfig{M, T, F} <: ConfigBox{POconfig, M}
+    POconfig{T, M, CBT, F} <: ConfigBox{T, POconfig, M}
 
 ≡≡≡ Field(s) ≡≡≡
 
@@ -67,12 +68,12 @@ The mutable container of parameter optimization configuration.
 `method::Val{M}`: The method to calculate objective function (e.g., HF energy) for 
 optimization. Available values of `M` from Quiqbox are $(string(OFtypes)[2:end-1]).
 
-`config::ConfigBox{<:Any, T}`: The configuration `struct` for the selected `method`. E.g., 
+`config::ConfigBox`: The configuration `struct` for the selected `method`. E.g., 
 for `:HF` it's `$(HFconfig)`.
 
-`target::Float64`: The value of target function aimed to achieve.
+`target::T`: The value of target function aimed to achieve.
 
-`error::Float64`: The error for the convergence when evaluating difference between 
+`error::T`: The error for the convergence when evaluating difference between 
 the latest few energies. When set to `NaN`, there will be no convergence detection.
 
 `maxStep::Int`: Maximum allowed iteration steps regardless of whether the optimization 
@@ -96,18 +97,18 @@ julia> POconfig(maxStep=100)
 $(Doc_POconfig_Eg2)
 ```
 """
-mutable struct POconfig{M, T, F<:Function} <: ConfigBox{POconfig, M}
+mutable struct POconfig{T<:Real, M, CBT<:ConfigBox, F<:Function} <: ConfigBox{T,POconfig,M}
     method::Val{M}
-    config::T
-    target::Float64
-    error::Float64
+    config::CBT
+    target::T
+    error::T
     maxStep::Int
     GD::F
 end
 
 POconfig(a1::Symbol, args...) = POconfig(Val(a1), args...)
 
-const defaultPOconfigPars = Any[Val(:HF), defaultHFconfig, NaN, 1e-5, 500, gradDescent!]
+const defaultPOconfigPars = Any[Val(:HF), defaultHFC, NaN, 1e-5, 500, gradDescent!]
 
 POconfig(t::NamedTuple) = genNamedTupleC(:POconfig, defaultPOconfigPars)(t)
 
@@ -121,7 +122,7 @@ const defaultPOconfigStr = "POconfig()"
 
 """
 
-    genOFmethod(POmethod::Val{:HF}, config::HFconfig=$(defaultHFconfigStr)) -> 
+    genOFmethod(POmethod::Val{:HF}, config::HFconfig=$(defaultHFCStr)) -> 
     NTuple{2, Function}
 
 Generate the functions to calculate the value and gradient respectively of the desired 
@@ -129,7 +130,7 @@ objective function. Default method is HF energy. To implement your own method fo
 optimization, you can import `genOFmethod` and add new methods with different `POmethod` 
 which should have the same value with the field `method` in the corresponding `POconfig`.
 """
-function genOFmethod(::Val{:HF}, config::HFconfig{HFT}=defaultHFconfig) where {HFT}
+function genOFmethod(::Val{:HF}, config::HFconfig{<:Any, HFT}=defaultHFC) where {HFT}
     fVal = @inline function (gtb, nuc, nucCoords, N)
         res = runHF(gtb, nuc, nucCoords, N, config, printInfo=false)
         res.Ehf, res.C
@@ -140,34 +141,35 @@ end
 
 """
 
-    optimizeParams!(pbs::Vector{<:ParamBox}, 
-                    bs::Union{Tuple{Vararg{AbstractGTBasisFuncs}}, 
-                              Vector{<:AbstractGTBasisFuncs}}, 
-                    nuc::Union{NTuple{NN, String}, Vector{String}}, 
-                    nucCoords::Union{NTuple{NN, NTuple{3, Float64}}, 
-                                     Vector{<:AbstractArray{<:Real}}}, 
-                    config::POconfig{M, T, F}=$(defaultPOconfigStr), N::Int=getCharge(nuc); 
-                    printInfo::Bool=true) where {NN, M, T, F} -> 
-    Es::Vector{Float64}, pars::Matrix{Float64}, grads::Matrix{Float64}
+    optimizeParams!(pbs::AbstractVector{<:ParamBox{T1}}, 
+                    bs::Union{Tuple{Vararg{AbstractGTBasisFuncs{T1, D}}}, 
+                              AbstractVector{<:AbstractGTBasisFuncs{T1, D}}}, 
+                    nuc::Union{NTuple{NN, String}, AbstractVector{String}}, 
+                    nucCoords::Union{NTuple{NN, NTuple{3, T1}}, 
+                                     AbstractVector{<:AbstractVector{T1}}}, 
+                    config::POconfig{T2, M, CBT, F}=$(defaultPOconfigStr), 
+                    N::Int=getCharge(nuc); 
+                    printInfo::Bool=true) where {T1, T2, D, NN, M, CBT, F} -> 
+    Es::Vector{T1}, pars::Matrix{T1}, grads::Matrix{T1}
 
 The main function to optimize the parameters of a given basis set.
 
 === Positional argument(s) ===
 
-`pbs::Array{<:ParamBox, 1}`: The parameters to be optimized that are extracted from the 
-basis set.
+`pbs::AbstractVector{<:ParamBox{T}}`: The parameters to be optimized that are extracted 
+from the basis set.
 
-`bs::Union{Tuple{Vararg{AbstractGTBasisFuncs}}, Vector{<:AbstractGTBasisFuncs}}`: Basis 
-set.
+`bs::Union{Tuple{Vararg{AbstractGTBasisFuncs{T, D}}}, 
+AbstractVector{<:AbstractGTBasisFuncs{T, D}}}`: Basis set.
 
-`nuc::Union{NTuple{NN, String}, Vector{String}}`: The element symbols of the nuclei for the 
-studied system.
+`nuc::Union{NTuple{NN, String}, AbstractVector{String}}`: The element symbols of the nuclei 
+for the studied system.
 
-`nucCoords::Union{NTuple{NN, NTuple{3, Float64}}, Vector{<:AbstractArray{<:Real}}}`: Nuclei 
+`nucCoords::Union{NTuple{NN, NTuple{3, T}}, AbstractVector{<:AbstractVector{T}}}`: Nuclei 
 coordinates.
 
-`config::POconfig`: The Configuration of selected parameter optimization method. For more 
-information please refer to `POconfig`.
+`config::POconfig{T, M, CBT, F}`: The Configuration of selected parameter optimization 
+method. For more information please refer to `POconfig`.
 
 `N::Int`: Total number of electrons.
 
@@ -175,19 +177,19 @@ information please refer to `POconfig`.
 
 `printInfo::Bool`: Whether print out the information of iteration steps.
 """
-function optimizeParams!(pbs::Vector{<:ParamBox}, 
-                         bs::Union{Tuple{Vararg{AbstractGTBasisFuncs}}, 
-                                   Vector{<:AbstractGTBasisFuncs}}, 
-                         nuc::Union{NTuple{NN, String}, Vector{String}}, 
-                         nucCoords::Union{NTuple{NN, NTuple{3, Float64}}, 
-                                          Vector{<:AbstractArray{<:Real}}}, 
-                         config::POconfig{M, T, F}=defaultPOconfig, N::Int=getCharge(nuc); 
-                         printInfo::Bool=true) where 
-                        {NN, M, T, F}
+function optimizeParams!(pbs::AbstractVector{<:ParamBox{T1}}, 
+                         bs::Union{Tuple{Vararg{AbstractGTBasisFuncs{T1, D}}}, 
+                                   AbstractVector{<:AbstractGTBasisFuncs{T1, D}}}, 
+                         nuc::Union{NTuple{NN, String}, AbstractVector{String}}, 
+                         nucCoords::Union{NTuple{NN, NTuple{3, T1}}, 
+                                          AbstractVector{<:AbstractVector{T1}}}, 
+                         config::POconfig{T2, M, CBT, F}=defaultPOconfig, 
+                         N::Int=getCharge(nuc); printInfo::Bool=true) where 
+                        {T1, T2, D, NN, M, CBT, F}
     tAll = @elapsed begin
 
         i = 0
-        Es = Float64[]
+        Es = T1[]
         pars = zeros(length(pbs), 0)
         grads = zeros(length(pbs), 0)
         error = config.error
@@ -196,7 +198,7 @@ function optimizeParams!(pbs::Vector{<:ParamBox},
         gap = min(100, max(maxStep ÷ 200 * 10, 1))
         detectConverge = isnan(error) ? false : true
 
-        if target === NaN
+        if isnan(target)
             isConverged = (Es) -> isOscillateConverged(Es, error, leastCycles=3)[1]
         else
             isConverged = Es -> (abs(Es[end] - target) < error)
@@ -254,15 +256,16 @@ end
 
 """
 
-    optimizeParams!(pbs::Vector{<:ParamBox}, 
-                    bs::Union{Tuple{Vararg{AbstractGTBasisFuncs}}, 
-                              Vector{<:AbstractGTBasisFuncs}}, 
-                    nuc::Union{NTuple{NN, String}, Vector{String}}, 
-                    nucCoords::Union{NTuple{NN, NTuple{3, Float64}}, 
-                                     Vector{<:AbstractArray{<:Real}}}, 
-                    N::Int=getCharge(nuc), config::POconfig{M, T, F}=$(defaultPOconfigStr); 
-                    printInfo::Bool=true) where {NN, M, T, F} -> 
-    Es::Vector{Float64}, pars::Matrix{Float64}, grads::Matrix{Float64}
+    optimizeParams!(pbs::AbstractVector{<:ParamBox{T1}}, 
+                    bs::Union{Tuple{Vararg{AbstractGTBasisFuncs{T1, D}}}, 
+                              AbstractVector{<:AbstractGTBasisFuncs{T1, D}}}, 
+                    nuc::Union{NTuple{NN, String}, AbstractVector{String}}, 
+                    nucCoords::Union{NTuple{NN, NTuple{3, T1}}, 
+                                     AbstractVector{<:AbstractVector{T1}}}, 
+                    N::Int=getCharge(nuc), 
+                    config::POconfig{T2, M, CBT, F}=$(defaultPOconfigStr); 
+                    printInfo::Bool=true) where {T1, T2, D, NN, M, CBT, F} -> 
+    Es::Vector{T1}, pars::Matrix{T1}, grads::Matrix{T1}
 """
 optimizeParams!(pbs, bs, nuc, nucCoords, N::Int, config=defaultPOconfig; printInfo=true) = 
 optimizeParams!(pbs, bs, nuc, nucCoords, config, N; printInfo)

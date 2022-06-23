@@ -15,7 +15,7 @@ pb2 = ParamBox(-1, :a, index=1)
 pb3 = ParamBox(-1, :x, abs)
 @test (@capture_out show(pb3)) == string(typeof(pb3))*"(-1.0)[∂][x_x]"
 
-bf1 = genBasisFunc([1,2,1], (2,1))
+bf1 = genBasisFunc([1.0, 2.0, 1.0], (2.0, 1.0))
 gf1 = bf1.gauss[1]
 @test (@capture_out show(gf1)) == string(typeof(gf1))*"(xpn="*
                                     string(typeof(gf1.param[1]))*"(2.0)[∂][α], con="*
@@ -27,14 +27,14 @@ bf2 = genBasisFunc(missing, "STO-3G")[]
 @test (@capture_out show(bf2)) == string(typeof(bf2))*"(center, gauss)"*
                                     "[X⁰Y⁰Z⁰]"*"[NaN, NaN, NaN]"
 
-bfs1 = genBasisFunc([0,0,0], (2,1), "P")
+bfs1 = genBasisFunc([0.0, 0.0, 0.0], (2.0, 1.0), "P")
 @test (@capture_out show(bfs1)) == string(typeof(bfs1))*"(center, gauss)"*
                                     "[3/3]"*"[0.0, 0.0, 0.0]"
 
-bfs2 = genBasisFunc([0,0,0], (2,1), [(2,0,0)])
+bfs2 = genBasisFunc([0.0 ,0.0 , 0.0], (2.0, 1.0), [(2,0,0)])
 @test (@capture_out show(bfs2)) == string(typeof(bfs2))*"(center, gauss)"*
                                     "[X²Y⁰Z⁰]"*"[0.0, 0.0, 0.0]"
-bfs3 = genBasisFunc([0,0,0], (2,1), [(2,0,0), (1,1,0)])
+bfs3 = genBasisFunc([0.0, 0.0, 0.0], (2.0, 1.0), [(2,0,0), (1,1,0)])
 @test (@capture_out show(bfs3)) == string(typeof(bfs3))*"(center, gauss)"*
                                     "[2/6]"*"[0.0, 0.0, 0.0]"
 
@@ -47,20 +47,20 @@ GTb1 = GTBasis([bf1, bfs2])
 box1 = GridBox(2, 1.5)
 @test (@capture_out show(box1)) == string(typeof(box1))*"(num, len, coord)"
 
-fVar1 = runHF(GTb1, ["H", "H"], [[0,0,0], [1,2,1]], HFconfig((C0=:Hcore,)), 
+fVar1 = runHF(GTb1, ["H", "H"], [[0.0, 0.0, 0.0], [1.0, 2.0, 1.0]], HFconfig((C0=:Hcore,)), 
               printInfo=false)
 
 info1 = (@capture_out show(fVar1.temp[1]))
-@test info1[1:39] == string(typeof(fVar1.temp[1]))*"(shared.Etots=["
+@test info1[1:48] == string(typeof(fVar1.temp[1]))*"(shared.Etots=["
 @test info1[end-34:end] == "], shared.Dtots, N, Cs, Fs, Ds, Es)"
 
 info2 = (@capture_out show(fVar1))
-@test info2[1:36] == string(typeof(fVar1))*"(Ehf="
+@test info2[1:45] == string(typeof(fVar1))*"(Ehf="
 @test info2[end-63] == ','
 @test info2[end-62:end] == " Enn, N, nuc, nucCoords, C, F, D, Emo, occu, temp, isConverged)"
 
 info3 = (@capture_out show(SCFconfig((:DD, :ADIIS, :DIIS), 
-                                        (1e-4, 1e-12, 1e-13), Dict(2=>[:solver=>:LCM]))))
+                                     (1e-4, 1e-12, 1e-13), Dict(2=>[:solver=>:LCM]))))
 @test info3 == Doc_SCFconfig_Eg1
 
 
@@ -84,15 +84,15 @@ toggleDiff!(pb1)
 # function +
 testAdd = function (a1, a2)
     hasEqual(a2 +  a1 + a1, 
-                a1 +  a2 + a1, 
-                a1 +  a1 + a2, 
-                a1 + (a1 + a2), 
-                add(add(a1, a2), a1), 
-                add(a1, add(a2, a1)))
+             a1 +  a2 + a1, 
+             a1 +  a1 + a2, 
+             a1 + (a1 + a2), 
+             add(add(a1, a2), a1), 
+             add(a1, add(a2, a1)))
 end
 
-bf3 = genBasisFunc([1,2,1], ([2,1], [0.2, 0.4]))
-bf4 = genBasisFunc([1,1,1], (3,0.5))
+bf3 = genBasisFunc([1.0, 2.0, 1.0], ([2.0, 1.0], [0.2, 0.4]))
+bf4 = genBasisFunc([1.0, 1.0, 1.0], (3.0, 0.5))
 bfm2 = BasisFuncMix([bf1, bf4, bf1])
 bfm3 = BasisFuncMix([bf4, bf4, bf3])
 
@@ -115,7 +115,7 @@ bfm3 = BasisFuncMix([bf4, bf4, bf3])
 
 # function *
 @test hasEqual(gf1 * GaussFunc(0.2, 1.5), GaussFunc(2.2, 1.5))
-@test hasEqual(gf1 * π, GaussFunc(2, π))
+@test hasEqual(gf1 * π, GaussFunc(2.0, 1π))
 boolFunc(x, y) = (==)(x,y)
 boolFunc(x::Array{<:Real, 0}, y::Array{<:Real, 0}) = isapprox(x, y, atol=1e-12)
 boolFunc(x::Real, y::Real) = isapprox(x, y, atol=1e-12)
@@ -135,7 +135,7 @@ testMul = function (a1, a2, ignoreContainer=false)
     r1 * r2
 end
 
-bf5 = genBasisFunc([1,1,1], GaussFunc(genExponent(3), genContraction(0.2, x->5x)))
+bf5 = genBasisFunc([1.0, 1.0, 1.0], GaussFunc(genExponent(3.0), genContraction(0.2, x->5x)))
 bfm4 = BasisFuncMix([bf4, bf5, bf4])
 
 @test testMul(bf1,  bf3)
@@ -246,7 +246,7 @@ bfm11 = Quiqbox.BasisFuncMix([bf1, bf2, bf1])
 gs = getindex(bfm11)
 @test gs == bfm11[] == bfm11[begin] == bfm11[end]
 @test getUnique!(gs) == [bf1.gauss[1], bf2.gauss...]
-bfs1_alter = genBasisFunc.(Ref([0,0,0]), Ref((2,1)), [(1,0,0), (0,1,0), (0,0,1)])
+bfs1_alter = genBasisFunc.(Ref(fill(0.0, 3)), Ref((2.0,1.0)), [(1,0,0), (0,1,0), (0,0,1)])
 for i in eachindex(bfs1)
     @test hasEqual(getindex(bfs1, i), bfs1[i], bfs1_alter[i])
 end
@@ -259,15 +259,15 @@ end
 @test getfield.(pb1, [:data, :map]) == [pb1.data, pb1.map]
 @test getfield.(gf1, [:xpn, :con]) == [gf1.xpn, gf1.con]
 @test hasEqual(bf1 .* [1.0, 3.0], [bf1*1.0, bf1*3.0])
-bfm12 = bf1 + genBasisFunc([1,2,2], (2,3))
+bfm12 = bf1 + genBasisFunc([1.0, 2.0, 2.0], (2.0, 3.0))
 @test hasEqual(bfm12 .* [1.0, 3.0], [bfm12*1.0, bfm12*3.0])
-bfs11 = genBasisFunc([1,1,1], (2,3), "P")
+bfs11 = genBasisFunc([1.0, 1.0, 1.0], (2.0, 3.0), "P")
 @test hasEqual(bfs11 .* [1.0, 2.0, 3.0], [i*j for (i,j) in zip(bfs11, 1:3)])
 
 
 # function flatten
-bfTf1 = genBasisFunc([1,2,1], (2,1))
-bfTfs = genBasisFunc([1,2,1], (3,2), "P")
+bfTf1 = genBasisFunc([1.0, 2.0, 1.0], (2.0, 1.0))
+bfTfs = genBasisFunc([1.0, 2.0, 1.0], (3.0, 2.0), "P")
 bs1 = [bfTf1, bfTfs]
 bs2 = (bfTf1, bfTfs)
 bfs = decompose(bfTfs)

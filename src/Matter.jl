@@ -6,7 +6,7 @@ const spinStr = ("α", "β", "α&β")
 
 """
 
-    MolOrbital{N, T} <: AbstractMolOrbital{T}
+    MolOrbital{T, N} <: AbstractMolOrbital{T}
 
 `Struct` of molecular orbitals.
 
@@ -29,10 +29,10 @@ molecular orbital.
 
     MolOrbital(energy::T, occupancy::Real, orbitalCoeffs::NTuple{N, T}, 
                spin::String="$(spinStr[1])", symmetry::String="A") where {N, T<:Real} -> 
-    MolOrbital{N}
+    MolOrbital{T, N}
 
 """
-struct MolOrbital{N, T} <: AbstractMolOrbital{T}
+struct MolOrbital{T, N} <: AbstractMolOrbital{T}
     symmetry::String
     energy::T
     spin::String
@@ -44,7 +44,7 @@ struct MolOrbital{N, T} <: AbstractMolOrbital{T}
                         symmetry::String="A") where {N, T<:Real}
         @assert spin in spinStr "The input spin configuration "*
         "is NOT supported."
-        new{N, T}(symmetry, energy, spin, occupancy, orbitalCoeffs)
+        new{T, N}(symmetry, energy, spin, occupancy, orbitalCoeffs)
     end
 end
 
@@ -67,7 +67,7 @@ end
 
 """
 
-    Molecule{NN, N, NB} <:MolecularHartreeFockCoefficient{NN, N}
+    Molecule{T, D, NN, N, NB} <:MatterHFData{T, NN, N}
 
 Container for the electronic structure information of a system.
 
@@ -81,7 +81,8 @@ Container for the electronic structure information of a system.
 
 `orbital::Tuple{Vararg{MolOrbital}}`: Molecular orbitals.
 
-`basis::Tuple{Vararg{FloatingGTBasisFuncs}}`: The basis set for the molecular orbitals.
+`basis::Tuple{Vararg{CompositeGTBasisFuncs{T, D}}`: The basis set for the molecular 
+orbitals.
 
 `Ehf::Float64`: Hartree-Fock energy of the electronic Hamiltonian from the basis set.
 
@@ -111,22 +112,22 @@ of the orbitals where the default entry value is "A" for being antisymmetric.
 Construct a `Molecule` from a basis set, and the result from the corresponding 
 Hartree-Fock method.
 """
-struct Molecule{NN, N, NB} <:MolecularHartreeFockCoefficient{NN, N}
+struct Molecule{T, D, NN, N, NB} <:MatterHFData{T, NN, N}
     nuc::NTuple{NN, String}
-    nucCoords::NTuple{NN, NTuple{3,Float64}}
+    nucCoords::NTuple{NN, NTuple{3, T}}
     N::Int
-    orbital::Tuple{Vararg{MolOrbital}}
-    basis::Tuple{Vararg{FloatingGTBasisFuncs}}
-    Ehf::Float64
-    Enn::Float64
+    orbital::Tuple{Vararg{MolOrbital{T}}}
+    basis::Tuple{Vararg{CompositeGTBasisFuncs{T, D}}}
+    Ehf::T
+    Enn::T
 
-    function Molecule(basis::Vector{<:FloatingGTBasisFuncs}, 
+    function Molecule(basis::Vector{<:CompositeGTBasisFuncs{T, D}}, 
                       nuc::NTuple{NN, String}, 
-                      nucCoords::NTuple{NN, NTuple{3,Float64}}, 
-                      N::Int, Ehf::Float64, Enn::Float64, 
-                      Emos::Vector{Float64}, occus::Vector{<:Real}, C::Matrix{Float64}, 
+                      nucCoords::NTuple{NN, NTuple{3, T}}, 
+                      N::Int, Ehf::T, Enn::T, 
+                      Emos::Vector{T}, occus::Vector{<:Real}, C::Matrix{T}, 
                       spins::Vector{String}, 
-                      symms::Vector{String}=repeat(["A"], length(occus))) where {NN}
+                      symms::Vector{String}=repeat(["A"], length(occus))) where {T, D, NN}
         NB = basisSize.(basis) |> sum
         coeff = spins |> unique |> length
         @assert (coeff*NB .== 
@@ -145,13 +146,14 @@ struct Molecule{NN, N, NB} <:MolecularHartreeFockCoefficient{NN, N}
             end
         end
         C = C[vcat(iSortedExtended...), :]
-        new{NN, N, NB}(nuc, nucCoords, N, getMolOrbitals(Emos, occus, C, spins, symms), 
-                       deepcopy(basis) |> Tuple, Ehf, Enn)
+        new{T, D, NN, N, NB}(nuc, nucCoords, N, 
+                             getMolOrbitals(Emos, occus, C, spins, symms), 
+                             deepcopy(basis) |> Tuple, Ehf, Enn)
     end
 end
 
-function Molecule(basis::Vector{<:FloatingGTBasisFuncs}, 
-                  fVars::HFfinalVars{<:Any, <:Any, HFTS}) where {HFTS}
+function Molecule(basis::Vector{<:CompositeGTBasisFuncs{T, D}}, 
+                  fVars::HFfinalVars{T, <:Any, <:Any, HFTS}) where {T, D, HFTS}
     l1 = length(fVars.Emo[1])
     Emos, occus, C, spins = if HFTS == 1
         l2 = l1

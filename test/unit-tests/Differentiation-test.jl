@@ -8,7 +8,7 @@ nuc = ["H", "H"]
 nucCoords = [[-0.7,0.0,0.0], [0.7,0.0,0.0]]
 
 grid = GridBox(1, 3.0)
-gf1 = GaussFunc(0.7,1)
+gf1 = GaussFunc(0.7, 1.0)
 bs1 = genBasisFunc.(grid.box, Ref([gf1]))
 pars1 = markParams!(bs1)[[1, 9, 25, 33]]
 S1 = overlaps(bs1)

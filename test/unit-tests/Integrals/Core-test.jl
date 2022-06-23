@@ -2,7 +2,7 @@ using Test
 using Quiqbox: Fγ
 using QuadGK: quadgk
 
-@testset "OneBody.jl tests" begin
+@testset "Core.jl tests" begin
 
 tolerance1 = 1e-8
 tolerance2 = 5e-8

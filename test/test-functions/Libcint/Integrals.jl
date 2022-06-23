@@ -1,8 +1,8 @@
 # One-body functions
 
 @inline function oneBodyBFTensorCore(libcinFunc::Symbol, 
-                                     bf1::Quiqbox.FloatingGTBasisFuncs{<:Any, <:Any, ON1}, 
-                                     bf2::Quiqbox.FloatingGTBasisFuncs{<:Any, <:Any, ON2}, 
+                                     bf1::Quiqbox.FGTBasisFuncsON{ON1}, 
+                                     bf2::Quiqbox.FGTBasisFuncsON{ON2}, 
                                      nuclei::Vector{String}, 
                                      nucleiCoords::Vector{<:AbstractArray{<:Real}};
                                      isGradient::Bool=false) where {ON1, ON2}
@@ -14,7 +14,7 @@
         natm = length(nuclei) 
     to save calculating overhead.
     Otherwise set 
-        natm = length(nuclei) + length(BasisSet) 
+        natm = length(nuclei) + length(BSet) 
     to include ghost atoms.
     =#
     addToDataChain!(env, atm, nuclei, nucleiCoords)
@@ -33,8 +33,9 @@ unpack(::Any) = Quiqbox.FloatingGTBasisFuncs[]
 
 """
 
-    oneBodyBFTensor(libcinFunc::Symbol, b1::Quiqbox.AbstractGTBasisFuncs, 
-                    b2::Quiqbox.AbstractGTBasisFuncs, nuclei::Vector{String}=String[], 
+    oneBodyBFTensor(libcinFunc::Symbol, b1::Quiqbox.AbstractGTBasisFuncs{Float64, 3}, 
+                    b2::Quiqbox.AbstractGTBasisFuncs{Float64, 3}, 
+                    nuclei::Vector{String}=String[], 
                     nucleiCoords::Vector{<:AbstractArray{<:Real}}=Vector{Float64}[]; 
                     isGradient::Bool=false) -> 
     Array{Float64, 3}
@@ -48,8 +49,8 @@ coordinates, those 2 arguments can be omitted. If the integral is a spacial grad
 `isGradient` should be set to `true`.
 """
 @inline function oneBodyBFTensor(libcinFunc::Symbol, 
-                                 b1::Quiqbox.AbstractGTBasisFuncs, 
-                                 b2::Quiqbox.AbstractGTBasisFuncs, 
+                                 b1::Quiqbox.AbstractGTBasisFuncs{Float64, 3}, 
+                                 b2::Quiqbox.AbstractGTBasisFuncs{Float64, 3}, 
                                  nuclei::Vector{String}=String[], 
                                  nucleiCoords::Vector{<:AbstractArray{<:Real}}=
                                              Vector{Float64}[];
@@ -62,15 +63,15 @@ coordinates, those 2 arguments can be omitted. If the integral is a spacial grad
 end
 
 
-@inline function oneBodyBSTensor(BasisSet::Vector{<:Quiqbox.AbstractGTBasisFuncs}, 
+@inline function oneBodyBSTensor(BSet::Vector{<:Quiqbox.AbstractGTBasisFuncs{Float64, 3}}, 
                                  intFunc::F) where {F<:Function}
-    subSize = Quiqbox.basisSize.(BasisSet)
+    subSize = Quiqbox.basisSize.(BSet)
     accuSize = vcat(0, accumulate(+, subSize))
     len = subSize |> sum
-    nPage = (intFunc(BasisSet[1], BasisSet[1]) |> size)[3]
+    nPage = (intFunc(BSet[1], BSet[1]) |> size)[3]
     tensor = cat(fill(-2*ones(len, len), nPage)..., dims=3)
-    for i = 1:length(BasisSet), j = 1:i
-        intTensor =  intFunc(BasisSet[i], BasisSet[j])
+    for i = 1:length(BSet), j = 1:i
+        intTensor =  intFunc(BSet[i], BSet[j])
         for page = 1:nPage
             rowRange = accuSize[i]+1 : accuSize[i+1]
             colRange = accuSize[j]+1 : accuSize[j+1]
@@ -83,68 +84,68 @@ end
 end
 
 
-@inline overlapCoreLibcint(bf1::Quiqbox.AbstractGTBasisFuncs, 
-                           bf2::Quiqbox.AbstractGTBasisFuncs) = 
+@inline overlapCoreLibcint(bf1::Quiqbox.AbstractGTBasisFuncs{Float64, 3}, 
+                           bf2::Quiqbox.AbstractGTBasisFuncs{Float64, 3}) = 
         oneBodyBFTensor(:cint1e_ovlp_cart, bf1, bf2)
 
-overlapLibcint(bf1::Quiqbox.AbstractGTBasisFuncs, 
-               bf2::Quiqbox.AbstractGTBasisFuncs) = 
+overlapLibcint(bf1::Quiqbox.AbstractGTBasisFuncs{Float64, 3}, 
+               bf2::Quiqbox.AbstractGTBasisFuncs{Float64, 3}) = 
 dropdims(overlapCoreLibcint(bf1, bf2), dims=3)
 
 
-@inline overlapsCoreLibcint(BSet::Vector{<:Quiqbox.AbstractGTBasisFuncs}) = 
+@inline overlapsCoreLibcint(BSet::Vector{<:Quiqbox.AbstractGTBasisFuncs{Float64, 3}}) = 
         oneBodyBSTensor(BSet, overlapCoreLibcint)
 
-overlapsLibcint(BSet::Vector{<:Quiqbox.AbstractGTBasisFuncs}) = 
+overlapsLibcint(BSet::Vector{<:Quiqbox.AbstractGTBasisFuncs{Float64, 3}}) = 
 dropdims(overlapsCoreLibcint(BSet), dims=3)
 
 
-@inline nucAttractionCoreLibcint(bf1::Quiqbox.AbstractGTBasisFuncs, 
-                                 bf2::Quiqbox.AbstractGTBasisFuncs, 
+@inline nucAttractionCoreLibcint(bf1::Quiqbox.AbstractGTBasisFuncs{Float64, 3}, 
+                                 bf2::Quiqbox.AbstractGTBasisFuncs{Float64, 3}, 
                                  nuc::Vector{String}, 
                                  nucCoords::Vector{<:AbstractArray{<:Real}}) = 
         oneBodyBFTensor(:cint1e_nuc_cart, bf1, bf2, nuc, nucCoords)
 
-nucAttractionLibcint(bf1::Quiqbox.AbstractGTBasisFuncs, 
-                     bf2::Quiqbox.AbstractGTBasisFuncs, 
+nucAttractionLibcint(bf1::Quiqbox.AbstractGTBasisFuncs{Float64, 3}, 
+                     bf2::Quiqbox.AbstractGTBasisFuncs{Float64, 3}, 
                      nuc::Vector{String}, nucCoords::Vector{<:AbstractArray{<:Real}}) = 
 dropdims(nucAttractionCoreLibcint(bf1, bf2, nuc, nucCoords), dims=3)
 
 
-@inline nucAttractionsCoreLibcint(BSet::Vector{<:Quiqbox.AbstractGTBasisFuncs}, 
+@inline nucAttractionsCoreLibcint(BSet::Vector{<:Quiqbox.AbstractGTBasisFuncs{Float64, 3}}, 
                                   nuc::Vector{String}, 
                                   nucCoords::Vector{<:AbstractArray{<:Real}}) = 
         oneBodyBSTensor(BSet, @inline (bf1, bf2)->oneBodyBFTensor(:cint1e_nuc_cart, 
                                                                   bf1, bf2, nuc, nucCoords))
 
-nucAttractionsLibcint(BSet::Vector{<:Quiqbox.AbstractGTBasisFuncs}, 
+nucAttractionsLibcint(BSet::Vector{<:Quiqbox.AbstractGTBasisFuncs{Float64, 3}}, 
                       nuc::Vector{String}, nucCoords::Vector{<:AbstractArray{<:Real}}) = 
 dropdims(nucAttractionsCoreLibcint(BSet, nuc, nucCoords), dims=3)
 
 
-@inline elecKineticCoreLibcint(bf1::Quiqbox.AbstractGTBasisFuncs, 
-                               bf2::Quiqbox.AbstractGTBasisFuncs) = 
+@inline elecKineticCoreLibcint(bf1::Quiqbox.AbstractGTBasisFuncs{Float64, 3}, 
+                               bf2::Quiqbox.AbstractGTBasisFuncs{Float64, 3}) = 
         oneBodyBFTensor(:cint1e_kin_cart, bf1, bf2)
 
-elecKineticLibcint(bf1::Quiqbox.AbstractGTBasisFuncs, 
-                   bf2::Quiqbox.AbstractGTBasisFuncs) = 
+elecKineticLibcint(bf1::Quiqbox.AbstractGTBasisFuncs{Float64, 3}, 
+                   bf2::Quiqbox.AbstractGTBasisFuncs{Float64, 3}) = 
 dropdims(elecKineticCoreLibcint(bf1, bf2), dims=3)
 
 
-@inline elecKineticsCoreLibcint(BSet::Vector{<:Quiqbox.AbstractGTBasisFuncs}) = 
+@inline elecKineticsCoreLibcint(BSet::Vector{<:Quiqbox.AbstractGTBasisFuncs{Float64, 3}}) = 
         oneBodyBSTensor(BSet, elecKineticCoreLibcint)
 
-elecKineticsLibcint(BSet::Vector{<:Quiqbox.AbstractGTBasisFuncs}) = 
+elecKineticsLibcint(BSet::Vector{<:Quiqbox.AbstractGTBasisFuncs{Float64, 3}}) = 
 dropdims(elecKineticsCoreLibcint(BSet), dims=3)
 
 
 # Two-body functions
 
 @inline function twoBodyBFTensorCore(libcinFunc::Symbol, 
-                                     bf1::Quiqbox.FloatingGTBasisFuncs{<:Any, <:Any, ON1}, 
-                                     bf2::Quiqbox.FloatingGTBasisFuncs{<:Any, <:Any, ON2}, 
-                                     bf3::Quiqbox.FloatingGTBasisFuncs{<:Any, <:Any, ON3}, 
-                                     bf4::Quiqbox.FloatingGTBasisFuncs{<:Any, <:Any, ON4}; 
+                                     bf1::Quiqbox.FGTBasisFuncsON{ON1}, 
+                                     bf2::Quiqbox.FGTBasisFuncsON{ON2}, 
+                                     bf3::Quiqbox.FGTBasisFuncsON{ON3}, 
+                                     bf4::Quiqbox.FGTBasisFuncsON{ON4}; 
                                      isGradient::Bool=false) where {ON1, ON2, ON3, ON4}
     env = Float64[]
     atm = Int32[]
@@ -165,8 +166,10 @@ end
 """
 
     twoBodyBFTensor(libcinFunc::Symbol, 
-                    b1::Quiqbox.AbstractGTBasisFuncs, b2::Quiqbox.AbstractGTBasisFuncs, 
-                    b3::Quiqbox.AbstractGTBasisFuncs, b4::Quiqbox.AbstractGTBasisFuncs; 
+                    b1::Quiqbox.AbstractGTBasisFuncs{Float64, 3}, 
+                    b2::Quiqbox.AbstractGTBasisFuncs{Float64, 3}, 
+                    b3::Quiqbox.AbstractGTBasisFuncs{Float64, 3}, 
+                    b4::Quiqbox.AbstractGTBasisFuncs{Float64, 3}; 
                     isGradient::Bool=false) -> 
     Array{Float64, 5}
 
@@ -177,10 +180,10 @@ function name, e.g. `"cint2e_cart"` should be converted to `:cint2e_cart` as the
 argument.
 """
 @inline function twoBodyBFTensor(libcinFunc::Symbol, 
-                                 b1::Quiqbox.AbstractGTBasisFuncs, 
-                                 b2::Quiqbox.AbstractGTBasisFuncs, 
-                                 b3::Quiqbox.AbstractGTBasisFuncs, 
-                                 b4::Quiqbox.AbstractGTBasisFuncs; 
+                                 b1::Quiqbox.AbstractGTBasisFuncs{Float64, 3}, 
+                                 b2::Quiqbox.AbstractGTBasisFuncs{Float64, 3}, 
+                                 b3::Quiqbox.AbstractGTBasisFuncs{Float64, 3}, 
+                                 b4::Quiqbox.AbstractGTBasisFuncs{Float64, 3}; 
                                  isGradient::Bool=false)
     f = @inline function (i,j,k,l)
         ints = twoBodyBFTensorCore(libcinFunc, i, j, k, l; isGradient)
@@ -191,20 +194,20 @@ argument.
 end
 
 
-@inline function twoBodyBSTensor(BasisSet::Vector{<:Quiqbox.AbstractGTBasisFuncs}, 
+@inline function twoBodyBSTensor(BSet::Vector{<:Quiqbox.AbstractGTBasisFuncs{Float64, 3}}, 
                                  intFunc::F; outputUniqueIndices::Bool=false) where 
                                 {F<:Function}
-    subSize = Quiqbox.basisSize.(BasisSet) |> collect
+    subSize = Quiqbox.basisSize.(BSet) |> collect
     accuSize = vcat(0, accumulate(+, subSize))
     totalSize = subSize |> sum
-    nPage = (intFunc(BasisSet[1], BasisSet[1], BasisSet[1], BasisSet[1]) |> size)[5]
+    nPage = (intFunc(BSet[1], BSet[1], BSet[1], BSet[1]) |> size)[5]
     buf = ones(totalSize, totalSize, totalSize, totalSize, nPage)
-    for i = 1:length(BasisSet), j = 1:i, k = 1:i, l = 1:(k==i ? j : k)
+    for i = 1:length(BSet), j = 1:i, k = 1:i, l = 1:(k==i ? j : k)
         I = accuSize[i]+1 : accuSize[i+1]
         J = accuSize[j]+1 : accuSize[j+1]
         K = accuSize[k]+1 : accuSize[k+1]
         L = accuSize[l]+1 : accuSize[l+1]
-        subBuf = intFunc(BasisSet[i], BasisSet[j], BasisSet[k], BasisSet[l])
+        subBuf = intFunc(BSet[i], BSet[j], BSet[k], BSet[l])
         for page = 1:nPage
             buf[I,J,K,L,page:page] .= subBuf
             buf[J,I,K,L,page:page] .= PermutedDimsArray(subBuf, [2,1,3,4,5])
@@ -230,22 +233,22 @@ end
 end
 
 
-@inline eeInteractionCoreLibcint(bf1::Quiqbox.AbstractGTBasisFuncs, 
-                                 bf2::Quiqbox.AbstractGTBasisFuncs, 
-                                 bf3::Quiqbox.AbstractGTBasisFuncs, 
-                                 bf4::Quiqbox.AbstractGTBasisFuncs) = 
+@inline eeInteractionCoreLibcint(bf1::Quiqbox.AbstractGTBasisFuncs{Float64, 3}, 
+                                 bf2::Quiqbox.AbstractGTBasisFuncs{Float64, 3}, 
+                                 bf3::Quiqbox.AbstractGTBasisFuncs{Float64, 3}, 
+                                 bf4::Quiqbox.AbstractGTBasisFuncs{Float64, 3}) = 
         twoBodyBFTensor(:cint2e_cart, bf1, bf2, bf3, bf4)
 
-eeInteractionLibcint(bf1::Quiqbox.AbstractGTBasisFuncs, 
-                     bf2::Quiqbox.AbstractGTBasisFuncs, 
-                     bf3::Quiqbox.AbstractGTBasisFuncs, 
-                     bf4::Quiqbox.AbstractGTBasisFuncs) = 
+eeInteractionLibcint(bf1::Quiqbox.AbstractGTBasisFuncs{Float64, 3}, 
+                     bf2::Quiqbox.AbstractGTBasisFuncs{Float64, 3}, 
+                     bf3::Quiqbox.AbstractGTBasisFuncs{Float64, 3}, 
+                     bf4::Quiqbox.AbstractGTBasisFuncs{Float64, 3}) = 
 dropdims(eeInteractionCoreLibcint(bf1, bf2, bf3, bf4), dims=5)
 
 
 """
 
-    eeInteractionsCoreLibcint(BSet::Array{<:Quiqbox.AbstractGTBasisFuncs, 1}; 
+    eeInteractionsCoreLibcint(BSet::Array{<:Quiqbox.AbstractGTBasisFuncs{Float64, 3}, 1}; 
                        outputUniqueIndices::Bool=false) -> 
     Array{Float64, 5}, [Array{<:Array{Int, 1}, 1}]
 
@@ -254,9 +257,9 @@ of spatial orbitals) given a basis set in the form of an `Array`.
 
 If `outputUniqueIndices=true`, additionally return the indices for all the unique integrals.
 """
-@inline eeInteractionsCoreLibcint(BSet::Vector{<:Quiqbox.AbstractGTBasisFuncs}; 
+@inline eeInteractionsCoreLibcint(BSet::Vector{<:Quiqbox.AbstractGTBasisFuncs{Float64, 3}}; 
                                   outputUniqueIndices::Bool=false) = 
         twoBodyBSTensor(BSet, eeInteractionCoreLibcint; outputUniqueIndices)
 
-eeInteractionsLibcint(BSet::Vector{<:Quiqbox.AbstractGTBasisFuncs}) = 
+eeInteractionsLibcint(BSet::Vector{<:Quiqbox.AbstractGTBasisFuncs{Float64, 3}}) = 
 dropdims(eeInteractionsCoreLibcint(BSet), dims=5)

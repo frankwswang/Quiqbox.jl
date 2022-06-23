@@ -52,7 +52,7 @@ function show(io::IO, bf::BasisFunc)
     print(io, "]", cen)
 end
 
-function show(io::IO, bf::BasisFuncs{𝑙, <:Any, ON}) where {𝑙, ON}
+function show(io::IO, bf::BasisFuncs{<:Any, <:Any, 𝑙, <:Any, <:Any, ON}) where {𝑙, ON}
     SON = SubshellXYZsizes[𝑙+1]
     if ON == 1
         xyz1 = bf.ijk[1] |> ijkToStr
@@ -110,9 +110,7 @@ end
 
 
 import Base: +
-+(bfm1::CompositeGTBasisFuncs{<:Any, 1, D}, 
-  bfm2::CompositeGTBasisFuncs{<:Any, 1, D}) where {D} = 
-add(bfm1, bfm2)
++(bfm1::CGTBasisFuncs1O{T, D}, bfm2::CGTBasisFuncs1O{T, D}) where {T, D} = add(bfm1, bfm2)
 
 
 import Base: *
@@ -122,15 +120,11 @@ import Base: *
 
 *(coeff::Real, bfm::GaussFunc) = mul(coeff, bfm)
 
-*(bfm1::CompositeGTBasisFuncs{<:Any, 1, D}, 
-  bfm2::CompositeGTBasisFuncs{<:Any, 1, D}) where {D} = 
-mul(bfm1, bfm2)
+*(bfm1::CGTBasisFuncs1O{T, D}, bfm2::CGTBasisFuncs1O{T, D}) where {T, D} = mul(bfm1, bfm2)
 
-*(bfm::CompositeGTBasisFuncs{<:Any, 1}, coeff::Real) = 
-mul(bfm, coeff)
+*(bfm::CGTBasisFuncs1O, coeff::Real) = mul(bfm, coeff)
 
-*(coeff::Real, bfm::CompositeGTBasisFuncs{<:Any, 1}) = 
-mul(coeff, bfm)
+*(coeff::Real, bfm::CGTBasisFuncs1O) = mul(coeff, bfm)
 
 
 # Iteration Interface
@@ -149,8 +143,8 @@ length(::GaussFunc) = 1
 
 iterate(sp::SpatialPoint) = iterate(sp.point.param)
 iterate(sp::SpatialPoint, state) = iterate(sp.point.param, state)
-size(::SpatialPoint{D}) where {D} = (D,)
-length(::SpatialPoint{D}) where {D} = D
+size(::SpatialPoint{<:Any, D}) where {D} = (D,)
+length(::SpatialPoint{<:Any, D}) where {D} = D
 
 iterate(bf::BasisFunc) = (bf, nothing)
 iterate(::BasisFunc, _) = nothing
@@ -164,17 +158,17 @@ length(::BasisFuncMix) = 1
 
 iterate(bfZero::EmptyBasisFunc) = (bfZero, nothing)
 
-function iterate(bfs::CompositeGTBasisFuncs{<:Any, N}) where {N}
+function iterate(bfs::CompositeGTBasisFuncs)
     item, state = iterate(bfs.ijk)
     (BasisFunc(bfs.center, bfs.gauss, item, bfs.normalizeGTO), state)
 end
-function iterate(bfs::CompositeGTBasisFuncs{<:Any, N}, state) where {N}
+function iterate(bfs::CompositeGTBasisFuncs, state)
     iter = iterate(bfs.ijk, state)
     iter !== nothing ? (BasisFunc(bfs.center, bfs.gauss, iter[1], bfs.normalizeGTO), 
                         iter[2]) : nothing
 end
-size(::CompositeGTBasisFuncs{<:Any, N}) where {N} = (N,)
-length(::CompositeGTBasisFuncs{<:Any, N}) where {N} = N
+size(::CGTBasisFuncsON{ON}) where {ON} = (ON,)
+length(::CGTBasisFuncsON{ON}) where {ON} = ON
 
 size(x::SpatialOrbital, d::Integer) = d == 1 ? length(x) : throw(BoundsError())
 
@@ -217,10 +211,10 @@ lastindex(::BasisFuncMix) = Val(:last)
 
 getindex(bfs::BasisFuncs, i) = 
 BasisFunc(bfs.center, bfs.gauss, bfs.ijk[i], bfs.normalizeGTO)
-getindex(bfs::BasisFuncs{<:Any, <:Any, N}, ::Colon) where {N} = [getindex(bfs, i) for i=1:N]
+getindex(bfs::BFuncsON{ON}, ::Colon) where {ON} = [getindex(bfs, i) for i=1:ON]
 firstindex(bfs::BasisFuncs) = 1
-lastindex(::BasisFuncs{<:Any, <:Any, N}) where {N} = N
-eachindex(bfs::BasisFuncs{<:Any, <:Any, N}) where {N} = Base.OneTo(lastindex(bfs))
+lastindex(::BFuncsON{ON}) where {ON} = ON
+eachindex(bfs::BFuncsON) = Base.OneTo(lastindex(bfs))
 getindex(bfs::BasisFuncs) = getfield.(bfs[:], :gauss) |> flatten
 
 getindex(xyz::XYZTuple, args...) = getindex(xyz.tuple, args...)
@@ -235,7 +229,7 @@ axes(xyz::XYZTuple) = axes(xyz.tuple)
 import Base: broadcastable
 broadcastable(pb::ParamBox) = Ref(pb)
 broadcastable(gf::GaussFunc) = Ref(gf)
-broadcastable(bf::CompositeGTBasisFuncs{<:Any, 1}) = Ref(bf)
+broadcastable(bf::CGTBasisFuncs1O) = Ref(bf)
 broadcastable(bfs::BasisFuncs) = getindex(bfs, :)
 Base.broadcastable(sp::SpatialPoint) = Base.broadcastable(sp.point.param)
 
@@ -259,22 +253,22 @@ end
 
 """
 
-    flatten(b::AbstractVector{<:GTBasisFuncs{<:Any, D, T}}) where {D, T} -> 
-    AbstractVector{<:CompositeGTBasisFuncs{<:Any, 1, D, T}}
+    flatten(b::AbstractVector{<:GTBasisFuncs{T, D}}) where {T, D} -> 
+    AbstractVector{<:CompositeGTBasisFuncs{T, D, <:Any, 1}}
 
-    flatten(b::Tuple{Vararg{GTBasisFuncs{<:Any, D, T}}}) where {D, T} -> 
-    Tuple{Vararg{CompositeGTBasisFuncs{<:Any, 1, D, T}}}
+    flatten(b::Tuple{Vararg{GTBasisFuncs{T, D}}}) where {T, D} -> 
+    Tuple{Vararg{CompositeGTBasisFuncs{T, D, <:Any, 1}}}
 
 Flatten a collection of `CompositeGTBasisFuncs` by decomposing every 
-`CompositeGTBasisFuncs{<:Any, ON, D, T}` where `ON > 1` into multiple 
-`CompositeGTBasisFuncs{<:Any, 1, D, T}`.
+`CompositeGTBasisFuncs{T, D, <:Any, ON}` where `ON > 1` into multiple 
+`CompositeGTBasisFuncs{T, D, <:Any, 1}`.
 """
-flatten(bs::AbstractVector{<:GTBasisFuncs{<:Any, D, T}}) where {D, T} = 
+flatten(bs::AbstractVector{<:GTBasisFuncs{T, D}}) where {T, D} = 
 reshape(hcat(decomposeCore.(Val(false), bs)...), :)
 
-flatten(bs::Tuple{Vararg{GTBasisFuncs{<:Any, D, T}}}) where {D, T} = 
+flatten(bs::Tuple{Vararg{GTBasisFuncs{T, D}}}) where {T, D} = 
 hcat(decomposeCore.(Val(false), bs)...) |> Tuple
 
-flatten(bs::Union{AbstractVector{<:GTBasisFuncs{1, D, T}}, 
-                  Tuple{Vararg{CompositeGTBasisFuncs{<:Any, 1, D, T}}}}) where {D, T} = 
+flatten(bs::Union{AbstractVector{<:GTBasisFuncs{T, D, 1}}, 
+                  Tuple{Vararg{FGTBasisFuncs1O{T, D}}}}) where {T, D} = 
 itself(bs)

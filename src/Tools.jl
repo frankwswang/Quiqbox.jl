@@ -4,6 +4,17 @@ using Statistics: std, mean
 using Symbolics
 using LinearAlgebra: eigvals, svdvals, eigen
 
+getAtolCore(::Type{T}) where {T<:Real} = log(10, T|>eps)|>ceil
+getAtolVal(::Type{T}) where {T<:Real} = 10^(T |> getAtolCore)
+"""
+
+    getAtolDigits(::Type{T}) where {T<:Real} -> Int
+
+Set the maximal number of digits kept for rounding given a real number `DataType`.
+"""
+getAtolDigits(::Type{T}) where {T<:Real} = Int(-getAtolCore(T))
+
+
 # Function for submodule loading and integrity checking.
 function tryIncluding(subModuleName::String; subModulePath=(@__DIR__)[:]*"/SubModule")
     try
@@ -383,7 +394,7 @@ hasApproxCore(obj1::NTuple{N, Number}, obj2::NTuple{N, Number},
               atol::Real=1e-15) where {N} = 
 isapprox.(obj1, obj2; atol) |> all
 
-hasApproxCore(obj1, obj2, atol::Real=1e-15) = (obj1 == obj2)
+hasApproxCore(obj1, obj2, _=1e-15) = (obj1 == obj2)
 
 
 """
@@ -598,6 +609,8 @@ end
 A dummy function that only returns its argument.
 """
 @inline itself(x) = x
+
+const itselfT = typeof(itself)
 
 
 """
@@ -848,9 +861,9 @@ function getFuncNum(tf::TypedFunction{F}, vNum::Symbolics.Num) where {F}
     Symbolics.variable(tf.n, T=Symbolics.FnType)(vNum)::Symbolics.Num
 end
 
-getFuncNum(::TypedFunction{typeof(itself)}, vNum::Symbolics.Num) = itself(vNum)
+getFuncNum(::TypedFunction{itselfT}, vNum::Symbolics.Num) = itself(vNum)
 
-getFuncNum(::typeof(itself), vNum::Symbolics.Num) = itself(vNum)
+getFuncNum(::itselfT, vNum::Symbolics.Num) = itself(vNum)
 
 function genIndex(index::Int)
     @assert index >= 0
@@ -879,8 +892,8 @@ function genNamedTupleC(name::Symbol, defaultVars::AbstractArray)
 end
 
 
-convertNumber(num::Number, roundDigits::Int=-1, type::Type{<:Number}=Float64) = 
-(roundDigits < 0  ?  num  :  round(num, digits=roundDigits)) |> type
+@inline roundNum(num::Number, roundDigits::Int=-1) = 
+        (roundDigits < 0  ?  num  :  round(num, digits=roundDigits))
 
 
 fillNumber(num::Number) = fill(num)
@@ -894,7 +907,7 @@ fillNumber(num::Array{<:Any, 0}) = itself(num)
 @inline genTupleCoords(coords::Tuple{Vararg{NTuple{3,Float64}}}) = itself(coords)
 
 
-@inline arrayToTuple(arr::Array) = Tuple(arr)
+@inline arrayToTuple(arr::AbstractArray) = Tuple(arr)
 
 @inline arrayToTuple(tpl::Tuple) = itself(tpl)
 
@@ -909,3 +922,7 @@ function callGenFunc(f::F, x::T) where {F<:Function, T}
 end
 
 worldAgeSafe(::Type{<:Function}) = false
+
+
+uniCallFunc(f::F, argsOrder::NTuple{N, Int}, args...) where {F<:Function, N} = 
+f(getindex.(Ref(args), argsOrder)...)

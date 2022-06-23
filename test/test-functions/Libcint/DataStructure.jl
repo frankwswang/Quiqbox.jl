@@ -28,17 +28,17 @@ function Nijkα(i, j, k, α)
 end
 
 
-normOfGTOin(b::Quiqbox.FloatingGTBasisFuncs{𝑙, GN, 1})  where {𝑙, GN} = 
+normOfGTOin(b::Quiqbox.FGTBasisFuncs1O) = 
 Nijkα.(b.ijk[1]..., [g.xpn() for g in b.gauss])
 
-normOfGTOin(b::Quiqbox.FloatingGTBasisFuncs{𝑙, GN, ON}) where {𝑙, GN, ON} = 
+normOfGTOin(b::Quiqbox.FloatingGTBasisFuncs) = 
 Nlα.(b|>Quiqbox.subshellOf, [g.xpn() for g in b.gauss])
 
 isFull(::Any) = false
 
-isFull(::Quiqbox.FloatingGTBasisFuncs{0}) = true
+isFull(::Quiqbox.FloatingGTBasisFuncs{<:Any, <:Any, 0}) = true
 
-isFull(::Quiqbox.FloatingGTBasisFuncs{𝑙, <:Any, ON}) where {𝑙, ON} = 
+isFull(::Quiqbox.FloatingGTBasisFuncs{<:Any, <:Any, 𝑙, <:Any, <:Any, ON}) where {𝑙, ON} = 
 (ON == Quiqbox.SubshellXYZsizes[𝑙+1])
 
 function ijkIndex(b::Quiqbox.FloatingGTBasisFuncs)
@@ -48,7 +48,7 @@ end
 
 
 function addToDataChain!(env::Vector{Float64}, atm::Vector{Int32}, bas::Vector{Int32}, 
-                         bf::Quiqbox.FloatingGTBasisFuncs{𝑙}) where {𝑙}
+                         bf::Quiqbox.FloatingGTBasisFuncs{<:Any, <:Any, 𝑙}) where {𝑙}
     center = [bf.center[1](), bf.center[2](), bf.center[3]()]
     xpns = Float64[]
     cons = Float64[]

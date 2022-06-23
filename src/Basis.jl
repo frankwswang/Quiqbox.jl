@@ -27,7 +27,8 @@ A single contracted gaussian function `struct` from package Quiqbox.
 
 ≡≡≡ Initialization Method(s) ≡≡≡
 
-    GaussFunc(xpn::Union{Real, ParamBox}, con::Union{Real, ParamBox}) -> GaussFunc
+    GaussFunc(xpn::Union{AbstractFloat, ParamBox}, con::Union{AbstractFloat, ParamBox}) -> 
+    GaussFunc
 
 """
 struct GaussFunc{T, FLxpn, FLcon} <: AbstractGaussFunc{T}
@@ -36,122 +37,107 @@ struct GaussFunc{T, FLxpn, FLcon} <: AbstractGaussFunc{T}
     param::Tuple{ParamBox{T, xpnSym, FLxpn}, ParamBox{T, conSym, FLcon}}
 
     GaussFunc(xpn::ParamBox{T, xpnSym, FL1}, con::ParamBox{T, conSym, FL2}) where 
-             {T, FL1, FL2} = 
+             {T<:AbstractFloat, FL1, FL2} = 
     new{T, FL1, FL2}(xpn, con, (xpn, con))
 end
 
-GaussFunc(e::T1, d::T2) where {T1<:Union{Real, ParamBox}, T2<:Union{Real, ParamBox}} = 
+GaussFunc(e::Union{AbstractFloat, ParamBox}, d::Union{AbstractFloat, ParamBox}) = 
 GaussFunc(genExponent(e), genContraction(d))
 
 
 """
 
-    genExponent(e::Real, mapFunction::Function; canDiff::Bool=true, 
-                dataName::Symbol=:undef, roundDigits::Int=-1, 
-                numberType::Type{<:Real}=Float64) -> 
-    ParamBox{numberType, :$(xpnSym)}
+    genExponent(e::T, mapFunction::Function; canDiff::Bool=true, 
+                dataName::Symbol=:undef) where {T<:AbstractFloat} -> 
+    ParamBox{T, :$(xpnSym)}
 
     genExponent(e::Array{T, 0}, mapFunction::Function; canDiff::Bool=true, 
-                dataName::Symbol=:undef) where {T<:Real} -> 
+                dataName::Symbol=:undef) where {T<:AbstractFloat} -> 
     ParamBox{T, :$(xpnSym)}
 
 Construct a `ParamBox` for an exponent coefficient given a value. Keywords `mapFunction` 
-and `canDiff` work the same way as in a general constructor of a `ParamBox`. If 
-`roundDigits < 0`, there won't be rounding for input data.
+and `canDiff` work the same way as in a general constructor of a `ParamBox`.
 """
-genExponent(e::Real, mapFunction::F; canDiff::Bool=true, dataName::Symbol=:undef, 
-            roundDigits::Int=-1, numberType::Type{<:Real}=Float64) where 
-           {F<:Function} = 
-ParamBox(Val(xpnSym), mapFunction, fill(convertNumber(e, roundDigits, numberType)), 
-         genIndex(nothing), fill(canDiff), dataName)
+genExponent(e::AbstractFloat, mapFunction::F; 
+            canDiff::Bool=true, dataName::Symbol=:undef) where {F<:Function} = 
+ParamBox(Val(xpnSym), mapFunction, fill(e), genIndex(nothing), fill(canDiff), dataName)
 
 genExponent(e::Array{T, 0}, mapFunction::F; canDiff::Bool=true, 
-            dataName::Symbol=:undef) where {T<:Real, F<:Function} = 
+            dataName::Symbol=:undef) where {T<:AbstractFloat, F<:Function} = 
 ParamBox(Val(xpnSym), mapFunction, e, genIndex(nothing), fill(canDiff), dataName)
-
-
 
 """
 
-    genExponent(e::Real; roundDigits::Int=-1, numberType::Type{<:Real}=Float64) -> 
-    ParamBox{numberType, :$(xpnSym)}
+    genExponent(e::T) where {T<:AbstractFloat} -> ParamBox{T, :$(xpnSym)}
 
     genExponent(e::Array{T, 0}) where {T<:Real} -> ParamBox{T, :$(xpnSym)}
 
 """
-genExponent(e::Real; roundDigits::Int=-1, numberType::Type{<:Real}=Float64) = 
-ParamBox(Val(xpnSym), itself, fill(convertNumber(e, roundDigits, numberType)), 
-         genIndex(nothing))
+genExponent(e::AbstractFloat) = ParamBox(Val(xpnSym), itself, fill(e), genIndex(nothing))
 
-genExponent(e::Array{T, 0}) where {T<:Real} = 
+genExponent(e::Array{T, 0}) where {T<:AbstractFloat} = 
 ParamBox(Val(xpnSym), itself, e, genIndex(nothing))
-
 
 """
 
-    genExponent(pb::ParamBox{T}) where {T<:Real} -> ParamBox{T, :$(xpnSym)}
+    genExponent(pb::ParamBox{T}) where {T<:AbstractFloat} -> ParamBox{T, :$(xpnSym)}
 
 Convert a `$(ParamBox)` to an exponent coefficient parameter.
 """
-genExponent(pb::ParamBox{T, <:Any, F}) where {T<:Real, F} = ParamBox(Val(xpnSym), pb)
+genExponent(pb::ParamBox{T, <:Any, F}) where {T<:AbstractFloat, F} = 
+ParamBox(Val(xpnSym), pb)
 
 
 """
 
-    genContraction(c::Real, mapFunction::Function; canDiff::Bool=true, 
-                   dataName::Symbol=:undef, roundDigits::Int=-1, 
-                   numberType::Type{<:Real}=Float64) -> 
-    ParamBox{numberType, :$(conSym)}
+    genContraction(c::T, mapFunction::Function; canDiff::Bool=true, 
+                   dataName::Symbol=:undef) where {T<:AbstractFloat} -> 
+    ParamBox{T, :$(conSym)}
 
     genContraction(c::Array{T, 0}, mapFunction::Function; canDiff::Bool=true, 
-                   dataName::Symbol=:undef) where {T<:Real} -> 
+                   dataName::Symbol=:undef) where {T<:AbstractFloat} -> 
     ParamBox{T, :$(conSym)}
 
 Construct a `ParamBox` for an contraction coefficient given a value. Keywords `mapFunction` 
-and `canDiff` work the same way as in a general constructor of a `ParamBox`. If 
-`roundDigits < 0`, there won't be rounding for input data.
+and `canDiff` work the same way as in a general constructor of a `ParamBox`.
 """
-genContraction(c::Real, mapFunction::F; canDiff::Bool=true, dataName::Symbol=:undef, 
-               roundDigits::Int=-1, numberType::Type{<:Real}=Float64) where 
-              {F<:Function} = 
-ParamBox(Val(conSym), mapFunction, fill(convertNumber(c, roundDigits, numberType)), 
-         genIndex(nothing), fill(canDiff), dataName)
+genContraction(c::AbstractFloat, mapFunction::F; 
+               canDiff::Bool=true, dataName::Symbol=:undef) where {F<:Function} = 
+ParamBox(Val(conSym), mapFunction, fill(c), genIndex(nothing), fill(canDiff), dataName)
 
 genContraction(c::Array{T, 0}, mapFunction::F; canDiff::Bool=true, 
-               dataName::Symbol=:undef) where {T<:Real, F<:Function} = 
+               dataName::Symbol=:undef) where {T<:AbstractFloat, F<:Function} = 
 ParamBox(Val(conSym), mapFunction, c, genIndex(nothing), fill(canDiff), dataName)
 
 """
 
-    genContraction(c::Real; roundDigits::Int=-1, numberType::Type{<:Real}=Float64) -> 
-    ParamBox{numberType, :$(conSym)}
+    genContraction(c::T) where {T<:AbstractFloat} -> ParamBox{T, :$(conSym)}
 
-    genContraction(c::Array{T, 0}) where {T<:Real} -> ParamBox{T, :$(conSym)}
+    genContraction(c::Array{T, 0}) where {T<:AbstractFloat} -> ParamBox{T, :$(conSym)}
 
 """
-genContraction(c::Real; roundDigits::Int=-1, numberType::Type{<:Real}=Float64) = 
-ParamBox(Val(conSym), itself, fill(convertNumber(c, roundDigits, numberType)), 
-         genIndex(nothing))
+genContraction(c::AbstractFloat) = ParamBox(Val(conSym), itself, fill(c), genIndex(nothing))
 
-genContraction(c::Array{T, 0}) where {T<:Real} = 
+genContraction(c::Array{T, 0}) where {T<:AbstractFloat} = 
 ParamBox(Val(conSym), itself, c, genIndex(nothing))
 
 """
 
-    genContraction(pb::ParamBox{T}) where {T<:Real} -> ParamBox{T, :$(conSym)}
+    genContraction(pb::ParamBox{T}) where {T<:AbstractFloat} -> ParamBox{T, :$(conSym)}
 
 Convert a `$(ParamBox)` to an exponent coefficient parameter.
 """
-genContraction(pb::ParamBox{T, <:Any, F}) where {T<:Real, F} = ParamBox(Val(conSym), pb)
+genContraction(pb::ParamBox{T, <:Any, F}) where {T<:AbstractFloat, F} = 
+ParamBox(Val(conSym), pb)
 
 
 const Doc_genSpatialPoint_Eg1 = "SpatialPoint{3, Float64, "*
                                 "Tuple{FLevel{1, 0}, FLevel{1, 0}, FLevel{1, 0}}}"*
                                 "(param)[1.0, 2.0, 3.0][∂][∂][∂]"
 
-const PT1D{FLx, T} = Tuple{ParamBox{T, cxSym, FLx}}
-const PT2D{FLx, FLy, T} = Tuple{ParamBox{T, cxSym, FLx}, ParamBox{T, cySym, FLy}}
-const PT3D{FLx, FLy, FLz, T} = Tuple{ParamBox{T, cxSym, FLx}, ParamBox{T, cySym, FLy}, 
+const PT1D{T, FLx} = Tuple{ParamBox{T, cxSym, FLx}}
+const PT2D{T, FLx, FLy} = Tuple{ParamBox{T, cxSym, FLx}, ParamBox{T, cySym, FLy}}
+const PT3D{T, FLx, FLy, FLz} = Tuple{ParamBox{T, cxSym, FLx}, ParamBox{T, cySym, FLy}, 
                                      ParamBox{T, czSym, FLz}}
 
 const SPointPTL = Union{Tuple{ParamBox{T, cxSym}} where T, 
@@ -159,33 +145,33 @@ const SPointPTL = Union{Tuple{ParamBox{T, cxSym}} where T,
                         Tuple{ParamBox{T, cxSym}, ParamBox{T, cySym}, 
                               ParamBox{T, czSym}} where T}
 
-const SPointPTU{D, T} = Tuple{Vararg{ParamBox{T, V, FL} where {V, FL<:FLevel}, D}}
+const SPointPTU{T, D} = Tuple{Vararg{ParamBox{T, V, FL} where {V, FL<:FLevel}, D}}
 
 struct SPoint{TT<:SPointPTL}
     param::TT
 end
 
-const SP1D{FLx, T} = SPoint{PT1D{FLx, T}}
-const SP2D{FLx, FLy, T} = SPoint{PT2D{FLx, FLy, T}}
-const SP3D{FLx, FLy, FLz, T} = SPoint{PT3D{FLx, FLy, FLz, T}}
+const SP1D{T, FLx} = SPoint{PT1D{T, FLx}}
+const SP2D{T, FLx, FLy} = SPoint{PT2D{T, FLx, FLy}}
+const SP3D{T, FLx, FLy, FLz} = SPoint{PT3D{T, FLx, FLy, FLz}}
 
-struct SpatialPoint{D, T, PT} <: AbstractSpatialPoint{D, T}
+struct SpatialPoint{T, D, PT} <: AbstractSpatialPoint{T, D}
     point::PT
-    function SpatialPoint(pbs::SPointPTU{D, T}) where {D, T}
+    function SpatialPoint(pbs::SPointPTU{T, D}) where {T, D}
         sp = SPoint{typeof(pbs)}(pbs)
-        new{D, T, typeof(sp)}(sp)
+        new{T, D, typeof(sp)}(sp)
     end
 end
 
 """
 
-    genSpatialPoint(point::Union{Tuple{Vararg{Real}}, AbstractArray{<:Real}}, 
-                    mapFunction::F=itself; canDiff::Bool=true, dataName::Symbol=:undef, 
-                    roundDigits::Int=-1) -> 
+    genSpatialPoint(point::Union{Tuple{Vararg{AbstractFloat}}, 
+                                       AbstractArray{<:AbstractFloat}}, 
+                    mapFunction::F=itself; canDiff::Bool=true, dataName::Symbol=:undef) -> 
     SpatialPoint
 
-    genSpatialPoint(point::Union{Tuple{Vararg{Array{Float64, 0}}}, 
-                                 AbstractArray{Array{Float64, 0}}}, 
+    genSpatialPoint(point::Union{Tuple{Vararg{Array{<:AbstractFloat, 0}}}, 
+                                 AbstractArray{<:Array{<:AbstractFloat, 0}}}, 
                     mapFunction::F=itself; canDiff::Bool=true, dataName::Symbol=:undef) -> 
     SpatialPoint
 
@@ -196,20 +182,20 @@ If `roundDigits < 0` or `point` is a 0-d `Array`, there won't be rounding for in
 ≡≡≡ Example(s) ≡≡≡
 
 ```jldoctest; setup = :(push!(LOAD_PATH, "../../src/"); using Quiqbox)
-julia> v1 = [1,2,3]
-3-element Vector{Int64}:
- 1
- 2
- 3
+julia> v1 = [1.0,2,3]
+3-element Vector{Float64}:
+ 1.0
+ 2.0
+ 3.0
 
 julia> genSpatialPoint(v1)
 $(Doc_genSpatialPoint_Eg1)
 
-julia> v2 = [fill(1.0), 2, 3]
+julia> v2 = [fill(1.0), 2.0, 3.0]
 3-element Vector{Any}:
   fill(1.0)
- 2
- 3
+ 2.0
+ 3.0
 
 julia> p2 = genSpatialPoint(v2); p2[1]
 ParamBox{Float64, :X, $(FLi)}(1.0)[∂][X]
@@ -227,18 +213,15 @@ genSpatialPoint.(v, Tuple([1:N;]), optArgs...) |> genSpatialPointCore
 
 """
 
-    genSpatialPoint(comp::Real, index::Int, mapFunction::F; canDiff::Bool=true, 
-                    dataName::Symbol=:undef, roundDigits::Int=-1, 
-                    numberType::Type{<:Real}=Float64) -> 
-    ParamBox{numberType}
-
-    genSpatialPoint(comp::Array{T, 0}, index::Int,mapFunction::F; canDiff::Bool=true, 
-                    dataName::Symbol=:undef) -> 
+    genSpatialPoint(comp::T, index::Int, mapFunction::F; canDiff::Bool=true, 
+                    dataName::Symbol=:undef) where {T<:AbstractFloat} -> 
     ParamBox{T}
 
-    genSpatialPoint(comp::Real, index::Int; roundDigits::Int=-1, 
-                    numberType::Type{<:Real}=Float64) -> 
-    ParamBox{numberType}
+    genSpatialPoint(comp::Array{T, 0}, index::Int,mapFunction::F; canDiff::Bool=true, 
+                    dataName::Symbol=:undef) where {T<:AbstractFloat} -> 
+    ParamBox{T}
+
+    genSpatialPoint(comp::T, index::Int) where {T<:AbstractFloat} -> ParamBox{T}
 
     genSpatialPoint(comp::Array{T, 0}, index::Int) -> ParamBox{T}
 
@@ -266,24 +249,21 @@ julia> Y1
 ParamBox{Float64, :Y, $(FLi)}(1.5)[∂][Y]
 ```
 """
-genSpatialPoint(comp::Real, index::Int, mapFunction::F; canDiff::Bool=true, 
-                dataName::Symbol=:undef, roundDigits::Int=-1, 
-                numberType::Type{<:Real}=Float64) where {F<:Function} = 
-ParamBox(Val(SpatialParamSyms[index]), mapFunction, 
-         fill(convertNumber(comp, roundDigits, numberType)), 
+genSpatialPoint(comp::AbstractFloat, index::Int, mapFunction::F; 
+                canDiff::Bool=true, dataName::Symbol=:undef) where {F<:Function} = 
+ParamBox(Val(SpatialParamSyms[index]), mapFunction, fill(comp), 
          genIndex(nothing), fill(canDiff), dataName)
 
 genSpatialPoint(comp::Array{T, 0}, index::Int, mapFunction::F; 
-                canDiff::Bool=true, dataName::Symbol=:undef) where {T<:Real, F<:Function} = 
-ParamBox(Val(SpatialParamSyms[index]), mapFunction, comp, 
-         genIndex(nothing), fill(canDiff), dataName)
+                canDiff::Bool=true, dataName::Symbol=:undef) where 
+               {T<:AbstractFloat, F<:Function} = 
+ParamBox(Val(SpatialParamSyms[index]), mapFunction, comp, genIndex(nothing), fill(canDiff), 
+         dataName)
 
-genSpatialPoint(comp::Real, index::Int; roundDigits::Int=-1, 
-                numberType::Type{<:Real}=Float64) = 
-ParamBox(Val(SpatialParamSyms[index]), itself, 
-         fill(convertNumber(comp, roundDigits, numberType)), genIndex(nothing))
+genSpatialPoint(comp::AbstractFloat, index::Int) = 
+ParamBox(Val(SpatialParamSyms[index]), itself, fill(comp), genIndex(nothing))
 
-genSpatialPoint(comp::Array{T, 0}, index::Int) where {T<:Real} = 
+genSpatialPoint(comp::Array{T, 0}, index::Int) where {T<:AbstractFloat} = 
 ParamBox(Val(SpatialParamSyms[index]), itself, comp, genIndex(nothing))
 
 genSpatialPoint(point::ParamBox, index::Int) = ParamBox(Val(SpatialParamSyms[index]), point)
@@ -308,17 +288,20 @@ genSpatialPointCore(point::PT3D{FLx, FLy, FLz, T}) where {T, FLx, FLy, FLz} =
 SpatialPoint(point)
 
 
+coordOf(sp::SpatialPoint) = [outValOf(i) for i in sp.point.param]
+
+
 """
 
-    BasisFunc{𝑙, GN, PT, D, T} <: FloatingGTBasisFuncs{𝑙, GN, 1, PT, D, T}
+    BasisFunc{T, D, 𝑙, GN, PT} <: FloatingGTBasisFuncs{T, D, 𝑙, GN, PT, 1}
 
 A (floating) basis function with the center attached to it instead of any nucleus.
 
 ≡≡≡ Field(s) ≡≡≡
 
-`center::SpatialPoint{D, T, PT}`: The `D`-dimensional center coordinate.
+`center::SpatialPoint{T, D, PT}`: The `D`-dimensional center coordinate.
 
-`gauss::NTuple{N, GaussFunc}`: Gaussian functions within the basis function.
+`gauss::NTuple{N, GaussFunc{T, <:Any}}`: Gaussian functions within the basis function.
 
 `ijk::Tuple{$(XYZTuple){𝑙}}`: Cartesian representation (pseudo-quantum number) of the 
 angular momentum orientation. E.g., s (X⁰Y⁰Z⁰) would be `$(XYZTuple(0, 0, 0))`. For 
@@ -331,27 +314,27 @@ convenient syntax, `.ijk[]` converts it to a `NTuple{3, Int}`.
 
 ≡≡≡ Initialization Method(s) ≡≡≡
 
-    BasisFunc(cen::SpatialPoint{D, T, PT}, gs::NTuple{GN, AbstractGaussFunc{T}}, 
+    BasisFunc(cen::SpatialPoint{T, D, PT}, gs::NTuple{GN, AbstractGaussFunc{T}}, 
               ijk::Union{Tuple{XYZTuple{𝑙}}, XYZTuple{𝑙}}, normalizeGTO::Bool) where 
-             {D, T, PT, 𝑙, GN} -> 
-    BasisFunc{𝑙, GN, PT, D, T}
+             {T, D, PT, 𝑙, GN} -> 
+    BasisFunc{T, D, 𝑙, GN, PT}
 
-    BasisFunc(cen::SpatialPoint{D, T, PT}, gs::AbstractGaussFunc{T}, 
+    BasisFunc(cen::SpatialPoint{T, D, PT}, gs::AbstractGaussFunc{T}, 
               ijk::Union{Tuple{XYZTuple{𝑙}}, XYZTuple{𝑙}}, normalizeGTO::Bool) where 
-             {D, T, PT, 𝑙, GN} -> 
-    BasisFunc{𝑙, 1, PT, D, T}
+             {T, D, PT, 𝑙, GN} -> 
+    BasisFunc{T, D, 𝑙, 1, PT}
 """
-struct BasisFunc{𝑙, GN, PT, D, T} <: FloatingGTBasisFuncs{𝑙, GN, 1, PT, D, T}
-    center::SpatialPoint{D, T, PT}
+struct BasisFunc{T, D, 𝑙, GN, PT} <: FGTBasisFuncs1O{T, D, 𝑙, GN, PT}
+    center::SpatialPoint{T, D, PT}
     gauss::NTuple{GN, AbstractGaussFunc{T}}
     ijk::Tuple{XYZTuple{𝑙}}
     normalizeGTO::Bool
     param::Tuple{Vararg{ParamBox}}
 
-    function BasisFunc(cen::SpatialPoint{D, T, PT}, gs::NTuple{GN, AbstractGaussFunc{T}}, 
-                       ijk::Tuple{XYZTuple{𝑙}}, normalizeGTO::Bool) where {D, T, PT, 𝑙, GN}
+    function BasisFunc(cen::SpatialPoint{T, D, PT}, gs::NTuple{GN, AbstractGaussFunc{T}}, 
+                       ijk::Tuple{XYZTuple{𝑙}}, normalizeGTO::Bool) where {T, D, PT, 𝑙, GN}
         pars = joinTuple(cen.point.param, getfield.(gs, :param)...)
-        new{𝑙, GN, PT, D, T}(cen, gs, ijk, normalizeGTO, pars)
+        new{T, D, 𝑙, GN, PT}(cen, gs, ijk, normalizeGTO, pars)
     end
 end
 
@@ -364,47 +347,47 @@ BasisFunc(cen, (g,), ijk, normalizeGTO)
 
 BasisFunc(bf::BasisFunc) = itself(bf)
 
-const BFunc{D, T} = BasisFunc{<:Any, <:Any, <:Any, D, T}
-
 
 """
 
-    BasisFuncs{𝑙, GN, ON, PT, D, T} <: FloatingGTBasisFuncs{𝑙, GN, ON, PT, D, T}
+    BasisFuncs{T, D, 𝑙, GN, PT, ON} <: FloatingGTBasisFuncs{T, D, 𝑙, GN, PT, ON}
 
 A group of basis functions with identical parameters except they have different 
 orientations in the specified subshell. It has the same fields as `BasisFunc` and 
 specifically, for `ijk`, the size of the it (`ON`) can be no less than 1 (and no larger 
 than the size of the corresponding subshell).
 """
-struct BasisFuncs{𝑙, GN, ON, PT, D, T} <: FloatingGTBasisFuncs{𝑙, GN, ON, PT, D, T}
-    center::SpatialPoint{D, T, PT}
+struct BasisFuncs{T, D, 𝑙, GN, PT, ON} <: FloatingGTBasisFuncs{T, D, 𝑙, GN, PT, ON}
+    center::SpatialPoint{T, D, PT}
     gauss::NTuple{GN, AbstractGaussFunc{Float64}}
     ijk::NTuple{ON, XYZTuple{𝑙}}
     normalizeGTO::Bool
     param::Tuple{Vararg{ParamBox}}
 
-    function BasisFuncs(cen::SpatialPoint{D, T, PT}, gs::NTuple{GN, AbstractGaussFunc{T}}, 
+    function BasisFuncs(cen::SpatialPoint{T, D, PT}, gs::NTuple{GN, AbstractGaussFunc{T}}, 
                         ijks::NTuple{ON, XYZTuple{𝑙}}, normalizeGTO::Bool=false) where 
-                       {D, T, PT, 𝑙, GN, ON}
+                       {T, D, PT, 𝑙, GN, ON}
         ss = SubshellXYZsizes[𝑙+1]
         @assert ON <= ss "The total number of `ijk` should be no more than $(ss) as " * 
                          "they are in $(subshell) subshell."
         ijks = sort(collect(ijks), rev=true) |> Tuple
         pars = joinTuple(cen.point.param, getfield.(gs, :param)...)
-        new{𝑙, GN, ON, PT, D, T}(cen, gs, ijks, normalizeGTO, pars)
+        new{T, D, 𝑙, GN, PT, ON}(cen, gs, ijks, normalizeGTO, pars)
     end
 end
+
+const BFuncs1O{T, D, 𝑙, GN, PT} = BasisFuncs{T, D, 𝑙, GN, PT, 1}
+const BFuncsON{ON} = BasisFuncs{<:Any, <:Any, <:Any, <:Any, <:Any, ON}
 
 BasisFuncs(cen, g::GaussFunc, ijks, normalizeGTO=false) = 
 BasisFuncs(cen, (g,), ijks, normalizeGTO)
 
 BasisFuncs(bfs::BasisFuncs) = itself(bfs)
 
-BasisFunc(bfs::BasisFuncs{<:Any, <:Any, 1}) = 
-BasisFunc(bfs.center, bfs.gauss, bfs.ijk, bfs.normalizeGTO)
+BasisFunc(bfs::BFuncs1O) = BasisFunc(bfs.center, bfs.gauss, bfs.ijk, bfs.normalizeGTO)
 
 
-struct EmptyBasisFunc{D, T} <: CompositeGTBasisFuncs{0, 1, D, T} end
+struct EmptyBasisFunc{T<:Real, D} <: CGTBasisFuncs1O{T, D, 0} end
 
 
 """
@@ -608,7 +591,7 @@ genBasisFunc(bs::Vector{<:FloatingGTBasisFuncs}) = sortBasisFuncs(bs)
 
 Return the subshell name of the input `$(FloatingGTBasisFuncs)`.
 """
-@inline subshellOf(::FloatingGTBasisFuncs{𝑙}) where {𝑙} = SubshellNames[𝑙+1]
+subshellOf(::FloatingGTBasisFuncs{<:Any, <:Any, 𝑙}) where {𝑙} = SubshellNames[𝑙+1]
 
 
 """
@@ -624,10 +607,10 @@ Sort basis functions. If `groupCenters = true`, Then the function will return an
 functions with same center coordinates.
 """
 @inline function sortBasisFuncs(bs::AbstractVector{<:FloatingGTBasisFuncs}, 
-                        groupCenters::Bool=false)
+                                groupCenters::Bool=false)
     bfBlocks = map( groupedSort(bs, centerCoordOf) ) do subbs
         # Reversed order within same subshell.
-        sort!(subbs, by=x->[-getTypeParams(x)[1], x.ijk[1].tuple, getTypeParams(x)[2]], rev=true)
+        sort!(subbs, by=x->[-getTypeParams(x)[3], x.ijk[1].tuple, getTypeParams(x)[4]], rev=true)
     end
     groupCenters ? bfBlocks : vcat(bfBlocks...)
 end
@@ -658,15 +641,14 @@ centerOf(bf::FloatingGTBasisFuncs) = bf.center
 
 Return the center coordinate of the input `FloatingGTBasisFuncs`.
 """
-centerCoordOf(bf::FloatingGTBasisFuncs) = [outValOf(i) for i in bf.center.point.param]
-
+centerCoordOf(bf::FloatingGTBasisFuncs) = coordOf(bf.center)
 
 """
 
-    BasisFuncMix{BN, D, T, BT<:BFunc{D, T}} <: CompositeGTBasisFuncs{BN, 1, D, T}
+    BasisFuncMix{T, D, BN, BT<:BasisFunc{T, D}} <: CGTBasisFuncs1O{T, D, BN}
 
-Sum of multiple `FloatingGTBasisFuncs{<:Any, <:Any, 1}` without any reformulation, treated 
-as one basis function in the integral calculation.
+Sum of multiple `FloatingGTBasisFuncs{<:Any, <:Any, <:Any, <:Any, <:Any, 1}` without any 
+reformulation, treated as one basis function in the integral calculation.
 
 ≡≡≡ Field(s) ≡≡≡
 
@@ -677,42 +659,42 @@ as one basis function in the integral calculation.
 ≡≡≡ Initialization Method(s) ≡≡≡
 
     BasisFuncMix(bfs::Union{Tuple{Vararg{T}}, Vector{T}}) where 
-                {T<:FloatingGTBasisFuncs{<:Any, <:Any, 1}} ->
+                {T<:FloatingGTBasisFuncs{<:Any, <:Any, <:Any, <:Any, <:Any, 1}} ->
     BasisFuncMix
 
 """
-struct BasisFuncMix{BN, D, T, BT<:BFunc{D, T}} <: CompositeGTBasisFuncs{BN, 1, D, T}
+struct BasisFuncMix{T, D, BN, BT<:BasisFunc{T, D}} <: CGTBasisFuncs1O{T, D, BN}
     BasisFunc::NTuple{BN, BT}
     param::Tuple{Vararg{ParamBox}}
 
-    function BasisFuncMix(bfs::Tuple{Vararg{BFunc{D, T}, BN}}) where {D, T, BN}
+    function BasisFuncMix(bfs::Tuple{Vararg{BasisFunc{T, D}, BN}}) where {T, D, BN}
         bs = sortBasisFuncs(bfs)
-        new{BN, D, T, eltype(bfs)}(bs, joinTuple(getfield.(bs, :param)...))
+        new{T, D, BN, eltype(bfs)}(bs, joinTuple(getfield.(bs, :param)...))
     end
 end
 
 BasisFuncMix(bfs::AbstractArray{<:BasisFunc}) = BasisFuncMix(bfs|>Tuple)
-BasisFuncMix(bfs::AbstractArray{T}) where {T<:FloatingGTBasisFuncs{<:Any, <:Any, 1}} = 
+BasisFuncMix(bfs::AbstractArray{T}) where {T<:FGTBasisFuncsON{1}} = 
 BasisFuncMix(BasisFunc.(bfs))
 BasisFuncMix(bf::BasisFunc) = BasisFuncMix((bf,))
 BasisFuncMix(bfs::BasisFuncs) = BasisFuncMix.(decompose(bfs))
 BasisFuncMix(bfm::BasisFuncMix) = itself(bfm)
 
 
-getTypeParams(::FloatingGTBasisFuncs{𝑙, GN, ON, PT, D, T}) where {𝑙, GN, ON, PT, D, T} = 
-(𝑙, GN, ON, PT, D, T)
-getTypeParams(::BasisFuncMix{BN, D, T, BT}) where {BN, D, T, BT} = (BN, D, T, BT)
+getTypeParams(::FloatingGTBasisFuncs{T, D, 𝑙, GN, PT, ON}) where {T, D, 𝑙, GN, PT, ON} = 
+(T, D, 𝑙, GN, PT, ON)
+getTypeParams(::BasisFuncMix{T, D, BN, BT}) where {T, D, BN, BT} = (T, D, BN, BT)
 
 
 unpackBasis(::EmptyBasisFunc) = ()
 unpackBasis(b::BasisFunc)  = (b,)
 unpackBasis(b::BasisFuncMix)  = b.BasisFunc
-unpackBasis(b::BasisFuncs{<:Any, <:Any, 1})  = (BasisFunc(b),)
+unpackBasis(b::BFuncs1O)  = (BasisFunc(b),)
 
 
 """
 
-    GTBasis{BN, D, T, BT<:GTBasisFuncs{1, D, T}} <: BasisSetData{D, T, BT}
+    GTBasis{T, D, BN, BT<:GTBasisFuncs{1, T, D}} <: BasisSetData{T, D, BT}
 
 The container to store basis set information.
 
@@ -728,31 +710,30 @@ The container to store basis set information.
 
 ≡≡≡ Initialization Method(s) ≡≡≡
 
-    GTBasis(basis::Union{Tuple{Vararg{GTBasisFuncs{<:Any, D, T}}}, 
-                         AbstractVector{<:GTBasisFuncs{<:Any, D, T}}}) where {D, T} -> 
+    GTBasis(basis::Union{Tuple{Vararg{GTBasisFuncs{T, D}}}, 
+                         AbstractVector{<:GTBasisFuncs{T, D}}}) where {T, D} -> 
     GTBasis
 
 Construct a `GTBasis` given a basis set.
 """
-struct GTBasis{BN, D, T, BT<:GTBasisFuncs{1, D, T}} <: BasisSetData{D, T, BT}
+struct GTBasis{T, D, BN, BT<:GTBasisFuncs{T, D, 1}} <: BasisSetData{T, D, BT}
     basis::NTuple{BN, BT}
     S::Matrix{T}
     Te::Matrix{T}
     eeI::Array{T, 4}
 
-    GTBasis(bfs::Tuple{Vararg{GTBasisFuncs{1, D, T}, BN}}) where 
-           {BN, D, T<:Real} = 
-    new{BN, D, T, eltype(bfs)}(bfs, overlaps(bfs), eKinetics(bfs), eeInteractions(bfs))
+    GTBasis(bfs::Tuple{Vararg{GTBasisFuncs{T, D, 1}, BN}}) where {T<:Real, D, BN} = 
+    new{T, D, BN, eltype(bfs)}(bfs, overlaps(bfs), eKinetics(bfs), eeInteractions(bfs))
 end
 
-GTBasis(bs::Tuple{Vararg{GTBasisFuncs{<:Any, D, T}}}) where {D, T} = GTBasis(bs |> flatten)
+GTBasis(bs::Tuple{Vararg{GTBasisFuncs{T, D}}}) where {T, D} = GTBasis(bs |> flatten)
 
-GTBasis(bs::AbstractVector{<:GTBasisFuncs{<:Any, D, T}}) where {D, T} = GTBasis(bs |> Tuple)
+GTBasis(bs::AbstractVector{<:GTBasisFuncs{T, D}}) where {T, D} = GTBasis(bs |> Tuple)
 
 
-function sumOfCore(bfs::AbstractVector{<:BasisFunc{<:Any, <:Any, <:Any, D, T}}, 
-                   roundDigits::Int=-1) where {D, T}
-    arr1 = convert(Vector{BasisFunc{<:Any, <:Any, <:Any, D, T}}, sortBasisFuncs(bfs))
+function sumOfCore(bfs::AbstractVector{<:BasisFunc{T, D}}, 
+                   roundDigits::Int=getAtolDigits(T)) where {T, D}
+    arr1 = convert(Vector{BasisFunc{T, D}}, sortBasisFuncs(bfs))
     arr2 = BasisFunc[]
     while length(arr1) > 1
         temp = add(arr1[1], arr1[2]; roundDigits)
@@ -770,52 +751,78 @@ function sumOfCore(bfs::AbstractVector{<:BasisFunc{<:Any, <:Any, <:Any, D, T}},
     end
 end
 
-sumOfCore(bs::Union{Tuple{Vararg{CompositeGTBasisFuncs{<:Any, 1, D, T}}}, 
-          AbstractVector{<:CompositeGTBasisFuncs{<:Any, 1, D, T}}}, 
-          roundDigits::Int=15) where {D, T} = 
-sumOfCore(BasisFunc{<:Any, <:Any, <:Any, D, T}[joinTuple(unpackBasis.(bs)...)...], 
-          roundDigits)
+sumOfCore(bs::Union{Tuple{Vararg{GTBasisFuncs{T, D, 1}}}, 
+                    AbstractVector{<:GTBasisFuncs{T, D, 1}}}, 
+          roundDigits::Int=getAtolDigits(T)) where {T, D} = 
+sumOfCore(BasisFunc{T, D}[joinTuple(unpackBasis.(bs)...)...], roundDigits)
 
-function sumOf(bs::Union{Tuple, AbstractVector}; roundDigits::Int=-1)
+function sumOf(bs::Union{Tuple{Vararg{GTBasisFuncs{T, D, 1}}}, 
+                         AbstractVector{<:GTBasisFuncs{T, D, 1}}}; 
+               roundDigits::Int=getAtolDigits(T)) where {T, D}
     length(bs) == 1 && (return bs[1])
     sumOfCore(bs, roundDigits)
 end
 
 mergeGaussFuncs(gf::GaussFunc) = itself(gf)
 
-function mergeGaussFuncs(gf1::GaussFunc, gf2::GaussFunc; roundDigits::Int=-1)
-    xpn1 = gf1.xpn
-    xpn2 = gf2.xpn
-    con1 = gf1.con
-    con2 = gf2.con
-    xpn1v = xpn1()
-    rBool = roundDigits < 0
-    rBool || (atol = 0.1^roundDigits)
-    if rBool ? xpn1v===xpn2() : isapprox(xpn1v, xpn2(); atol)
-        if xpn1 === xpn2 || hasIdentical(xpn1, xpn2)
-            xpn = xpn1
-        elseif rBool ? hasEqual(xpn1, xpn2) : hasApprox(xpn1, xpn2; atol)
-            xpn = deepcopy(xpn1)
-        else
-            xpn = genExponent(xpn1v; roundDigits)
-        end
+# function mergeGaussFuncs(gf1::GaussFunc, gf2::GaussFunc; roundDigits::Int=-1)
+#     xpn1 = gf1.xpn
+#     xpn2 = gf2.xpn
+#     con1 = gf1.con
+#     con2 = gf2.con
+#     xpn1v = xpn1()
+#     rBool = roundDigits < 0
+#     rBool || (atol = 0.1^roundDigits)
+#     if rBool ? xpn1v===xpn2() : isapprox(xpn1v, xpn2(); atol)
+#         if xpn1 === xpn2 || hasIdentical(xpn1, xpn2)
+#             xpn = xpn1
+#         elseif rBool ? hasEqual(xpn1, xpn2) : hasApprox(xpn1, xpn2; atol)
+#             xpn = deepcopy(xpn1)
+#         else
+#             xpn = genExponent(xpn1v; roundDigits)
+#         end
 
-        if con1 === con2 || hasIdentical(con1, con2)
-            res = GaussFunc(xpn, con1) * 2.0
-        elseif rBool ? hasEqual(con1, con2) : hasApprox(con1, con2; atol)
-            res = GaussFunc(xpn, deepcopy(con1)) * 2.0
-        else
-            res = GaussFunc(xpn, genContraction(con1()+con2(); roundDigits))
-        end
+#         if con1 === con2 || hasIdentical(con1, con2)
+#             res = GaussFunc(xpn, con1) * 2.0
+#         elseif rBool ? hasEqual(con1, con2) : hasApprox(con1, con2; atol)
+#             res = GaussFunc(xpn, deepcopy(con1)) * 2.0
+#         else
+#             res = GaussFunc(xpn, genContraction(con1()+con2(); roundDigits))
+#         end
 
-        return [res]
+#         return [res]
+#     else
+#         return [gf1, gf2]
+#     end
+# end
+
+function mergeGaussFuncs(gf1::GaussFunc{T}, gf2::GaussFunc{T}; 
+                         roundDigits::Int=getAtolDigits(T)) where {T}
+    xpn = if (xpn1 = gf1.xpn) === (xpn2 = gf2.xpn) || hasIdentical(xpn1, xpn2)
+        xpn1
+    elseif hasEqual(xpn1, xpn2)
+        deepcopy(xpn1)
+    elseif (xpn1R=roundNum(xpn1(), roundDigits)) == (xpn2R=roundNum(xpn2(), roundDigits))
+        genExponent(xpn1R)
     else
         return [gf1, gf2]
     end
+
+    res = if (con1 = gf1.con) === (con2 = gf2.con) || hasIdentical(con1, con2)
+        mul(GaussFunc(xpn, con1), 2; roundDigits)
+    elseif hasEqual(con1, con2)
+        mul(GaussFunc(xpn, deepcopy(con1)), 2; roundDigits)
+    elseif (con1R=roundNum(con1(), roundDigits)) == (con2R=roundNum(con2(), roundDigits))
+        GaussFunc(xpn, genContraction(roundNum(2con1R, roundDigits)))
+    else
+        GaussFunc(xpn, genContraction(roundNum(con1R + con2R, roundDigits)))
+    end
+
+    [res]
 end
 
 function mergeGaussFuncs(gf1::GaussFunc{T}, gf2::GaussFunc{T}, 
-                         gf3::GaussFunc{T}...; roundDigits::Int=-1) where {T}
+                         gf3::GaussFunc{T}...; roundDigits::Int=getAtolDigits(T)) where {T}
     arr1 = GaussFunc[gf1, gf2, gf3...]
     arr2 = GaussFunc[]
     while length(arr1) >= 1
@@ -838,14 +845,19 @@ end
 
 """
 
-    add(b::CompositeGTBasisFuncs{<:Any, 1, D, T}) -> CompositeGTBasisFuncs{<:Any, 1, D, T}
+    add(b::CompositeGTBasisFuncs{T, D, <:Any, 1}; roundDigits::Int=getAtolDigits(T)) where 
+       {T, D} -> 
+    CompositeGTBasisFuncs{T, D, <:Any, 1}
 
-    add(b1::CompositeGTBasisFuncs{<:Any, 1, D, T}, 
-        b2::CompositeGTBasisFuncs{<:Any, 1, D, T}) ->
-    CompositeGTBasisFuncs{<:Any, 1, D, T}
+    add(b1::CompositeGTBasisFuncs{T, D, <:Any, 1}, 
+        b2::CompositeGTBasisFuncs{T, D, <:Any, 1}; roundDigits::Int=getAtolDigits(T)) where 
+       {T, D} -> 
+    CompositeGTBasisFuncs{T, D, <:Any, 1}
 
-Addition between `CompositeGTBasisFuncs{<:Any, 1, D, T}` such as `BasisFunc` and 
-`Quiqbox.BasisFuncMix`. It can be called using `+` syntax.
+Addition between `CompositeGTBasisFuncs{T, D, <:Any, 1}` such as `BasisFunc` and 
+`Quiqbox.BasisFuncMix`. `roundDigits` specifies the maximal number of digits after the 
+radix point of the calculated values. The function can be called using `+` syntax with 
+the keyword argument set to it default value.
 
 ≡≡≡ Example(s) ≡≡≡
 
@@ -863,26 +875,24 @@ julia> bf3.gauss[1].con[]
 3.0
 ```
 """
-function add(b::BasisFuncs{𝑙, GN, 1}) where {𝑙, GN}
+function add(b::BFuncs1O)
     BasisFunc(b.center, b.gauss, b.ijk, b.normalizeGTO)
 end
 
 add(b::BasisFunc) = itself(b)
 
-function add(bf1::BasisFunc{𝑙1, GN1, PT1, D, T}, bf2::BasisFunc{𝑙2, GN2, PT2, D, T}; 
-             roundDigits::Int=15) where {𝑙1, 𝑙2, GN1, GN2, PT1, PT2, D, T}
-    if 𝑙1 == 𝑙2 && bf1.ijk == bf2.ijk && 
-       bf1.normalizeGTO == bf2.normalizeGTO && 
-       (c = centerCoordOf(bf1)) == centerCoordOf(bf2)
-
-        cen1 = bf1.center
-        cen2 = bf2.center
-        if cen1 === cen2 || hasIdentical(cen1, cen2)
-            cen = bf1.center
-        elseif hasEqual(bf1, bf2)
-            cen = deepcopy(bf1.center)
+function add(bf1::BasisFunc{T, D, 𝑙1, GN1, PT1}, bf2::BasisFunc{T, D, 𝑙2, GN2, PT2}; 
+             roundDigits::Int=getAtolDigits(T)) where {T, D, 𝑙1, 𝑙2, GN1, GN2, PT1, PT2}
+    if 𝑙1 == 𝑙2 && bf1.ijk == bf2.ijk && bf1.normalizeGTO == bf2.normalizeGTO
+        cen = if (cen1 = bf1.center) === (cen2 = bf2.center) || hasIdentical(cen1, cen2)
+            cen1
+        elseif hasEqual(cen1, cen2)
+            deepcopy(cen1)
+        elseif (c1 = roundNum.(coordOf(cen1), roundDigits)) == 
+               (c2 = roundNum.(coordOf(cen2), roundDigits))
+            genSpatialPoint(c1)
         else
-            cen = genSpatialPoint(c)
+            return BasisFuncMix([bf1, bf2])
         end
         gfsN = mergeGaussFuncs(bf1.gauss..., bf2.gauss...; roundDigits) |> Tuple
         BasisFunc(cen, gfsN, bf1.ijk, bf1.normalizeGTO)
@@ -891,43 +901,73 @@ function add(bf1::BasisFunc{𝑙1, GN1, PT1, D, T}, bf2::BasisFunc{𝑙2, GN2, P
     end
 end
 
-add(bfm::BasisFuncMix; roundDigits::Int=15) = sumOf(bfm.BasisFunc; roundDigits)
+# function add(bf1::BasisFunc{𝑙1, GN1, PT1, D, T}, bf2::BasisFunc{𝑙2, GN2, PT2, D, T}; 
+#              roundDigits::Int=15) where {𝑙1, 𝑙2, GN1, GN2, PT1, PT2, D, T}
+#     if 𝑙1 == 𝑙2 && bf1.ijk == bf2.ijk && 
+#        bf1.normalizeGTO == bf2.normalizeGTO && 
+#        (c = centerCoordOf(bf1)) == centerCoordOf(bf2)
 
-add(bf1::BasisFuncMix{1}, bf2::BasisFunc{𝑙}; roundDigits::Int=15) where {𝑙} = 
+#         cen1 = bf1.center
+#         cen2 = bf2.center
+#         if cen1 === cen2 || hasIdentical(cen1, cen2)
+#             cen = bf1.center
+#         elseif hasEqual(bf1, bf2)
+#             cen = deepcopy(bf1.center)
+#         else
+#             cen = genSpatialPoint(c)
+#         end
+#         gfsN = mergeGaussFuncs(bf1.gauss..., bf2.gauss...; roundDigits) |> Tuple
+#         BasisFunc(cen, gfsN, bf1.ijk, bf1.normalizeGTO)
+#     else
+#         BasisFuncMix([bf1, bf2])
+#     end
+# end
+
+add(bfm::BasisFuncMix{T}; roundDigits::Int=getAtolDigits(T)) where {T} = 
+sumOf(bfm.BasisFunc; roundDigits)
+
+add(bf1::BasisFuncMix{T, D, 1}, bf2::BasisFunc{T, D, 𝑙}; 
+    roundDigits::Int=getAtolDigits(T)) where {T, D, 𝑙} = 
 add(bf1.BasisFunc[1], bf2; roundDigits)
 
-add(bf1::BasisFunc{𝑙}, bf2::BasisFuncMix{1}; roundDigits::Int=15) where {𝑙} = 
+add(bf1::BasisFunc{T, D, 𝑙}, bf2::BasisFuncMix{T, D, 1}; 
+    roundDigits::Int=getAtolDigits(T)) where {T, D, 𝑙} = 
 add(bf2, bf1; roundDigits)
 
-add(bf::BasisFunc, bfm::BasisFuncMix{BN}; roundDigits::Int=15) where {BN} = 
+add(bf::BasisFunc{T, D}, bfm::BasisFuncMix{T, D, BN}; 
+    roundDigits::Int=getAtolDigits(T)) where {T, D, BN} = 
 sumOf((bf, bfm.BasisFunc...); roundDigits)
 
-add(bfm::BasisFuncMix{BN}, bf::BasisFunc; roundDigits::Int=15) where {BN} = 
+add(bfm::BasisFuncMix{T, D, BN}, bf::BasisFunc{T, D}; 
+    roundDigits::Int=getAtolDigits(T)) where {T, D, BN} = 
 add(bf, bfm; roundDigits)
 
-add(bf1::BasisFuncMix{1}, bf2::BasisFuncMix{1}; roundDigits::Int=15) = 
+add(bf1::BasisFuncMix{T, D, 1}, bf2::BasisFuncMix{T, D, 1}; 
+    roundDigits::Int=getAtolDigits(T)) where {T, D} = 
 add(bf1.BasisFunc[1], bf2.BasisFunc[1]; roundDigits)
 
-add(bf::BasisFuncMix{1}, bfm::BasisFuncMix{BN}; roundDigits::Int=15) where {BN} = 
+add(bf::BasisFuncMix{T, D, 1}, bfm::BasisFuncMix{T, D, BN}; 
+    roundDigits::Int=getAtolDigits(T)) where {T, D, BN} = 
 add(bf.BasisFunc[1], bfm; roundDigits)
 
-add(bfm::BasisFuncMix{BN}, bf::BasisFuncMix{1}; roundDigits::Int=15) where {BN} = 
+add(bfm::BasisFuncMix{T, D, BN}, bf::BasisFuncMix{T, D, 1}; 
+    roundDigits::Int=getAtolDigits(T)) where {T, D, BN} = 
 add(bf, bfm; roundDigits)
 
-add(bfm1::BasisFuncMix{BN1, D, T}, bfm2::BasisFuncMix{BN2, D, T}; 
-    roundDigits::Int=15) where {BN1, BN2, D, T} = 
+add(bfm1::BasisFuncMix{T, D, BN1}, bfm2::BasisFuncMix{T, D, BN2}; 
+    roundDigits::Int=getAtolDigits(T)) where {T, D, BN1, BN2} = 
 sumOf((bfm1.BasisFunc..., bfm2.BasisFunc...); roundDigits)
 
-add(bf1::BasisFuncs{<:Any, <:Any, 1, <:Any, D, T}, 
-    bf2::BasisFuncs{<:Any, <:Any, 1, <:Any, D, T}; roundDigits::Int=15) where {D, T} = 
+add(bf1::BFuncs1O{T, D}, bf2::BFuncs1O{T, D}; roundDigits::Int=getAtolDigits(T)) where 
+   {T, D} = 
 [sumOf((add(bf1), add(bf2)); roundDigits)]
 
-add(::EmptyBasisFunc{D}, b::CompositeGTBasisFuncs{<:Any, <:Any, D}) where {D} = itself(b)
+add(::EmptyBasisFunc{<:Any, D}, b::CGTBasisFuncs1O{<:Any, D}) where {D} = itself(b)
 
-add(b::CompositeGTBasisFuncs{<:Any, <:Any, D}, ::EmptyBasisFunc{D}) where {D} = itself(b)
+add(b::CGTBasisFuncs1O{<:Any, D}, ::EmptyBasisFunc{<:Any, D}) where {D} = itself(b)
 
-add(::EmptyBasisFunc{D, T1}, ::EmptyBasisFunc{D, T2}) where {D, T1, T2} = 
-EmptyBasisFunc{D, promote_type(T1, T2)}()
+add(::EmptyBasisFunc{T1, D}, ::EmptyBasisFunc{T2, D}) where {D, T1, T2} = 
+EmptyBasisFunc{promote_type(T1, T2), D}()
 
 
 const Doc_mul_Eg1 = "GaussFunc(xpn=ParamBox{Float64, :α, $(FLi)}(3.0)[∂][α], " * 
@@ -944,14 +984,20 @@ const Doc_mul_Eg4 = "GaussFunc(xpn=ParamBox{Float64, :α, $(FLi)}(6.0)[∂][α],
 
 """
 
-    mul(gf::GaussFunc, coeff::Real) -> GaussFunc
+    mul(gf::GaussFunc{T}, coeff::Real; roundDigits::Int=getAtolDigits(T)) where {T} -> 
+    GaussFunc
 
-    mul(coeff::Real, gf::GaussFunc) -> GaussFunc
+    mul(coeff::Real, gf::GaussFunc{T}; roundDigits::Int=getAtolDigits(T)) where {T} -> 
+    GaussFunc
 
-    mul(gf1::GaussFunc, gf2::GaussFunc) -> GaussFunc
+    mul(gf1::GaussFunc{T}, gf2::GaussFunc{T}; 
+        roundDigits::Int=getAtolDigits(T)) where {T} -> 
+    GaussFunc
 
 Multiplication between `GaussFunc`s or contraction coefficient multiplication between a 
-`Real` number and a `GaussFunc`. It can be called using `*` syntax.
+`Real` number and a `GaussFunc`. `roundDigits` specifies the maximal number of digits after 
+the radix point of the calculated values. The function can be called using `*` syntax with 
+the keyword argument set to it default value.
 
 ≡≡≡ Example(s) ≡≡≡
 
@@ -969,53 +1015,62 @@ julia> gf1 * 2 * gf1
 $(Doc_mul_Eg4)
 ```
 """
-function mul(gf::GaussFunc, coeff::Real)
+function mul(gf::GaussFunc{T}, coeff::Real; roundDigits::Int=getAtolDigits(T)) where {T}
     c = convert(Float64, coeff)
-    con, mapFunction, dataName = mulCore(c, gf.con)
+    con, mapFunction, dataName = mulCore(c, gf.con; roundDigits)
     conNew = genContraction(con, mapFunction; dataName, canDiff=gf.con.canDiff[])
     GaussFunc(gf.xpn, conNew)
 end
 
-function mulCore(c::Float64, con::ParamBox{<:Any, <:Any, FLi})
-    conNew = fill(con.data[] * c)
+function mulCore(c::T, con::ParamBox{T, <:Any, FLi}; 
+                 roundDigits::Int=getAtolDigits(T)) where {T}
+    conNew = fill(roundNum(con.data[] * c, roundDigits))
     mapFunction = itself
     dataName = :undef
     conNew, mapFunction, dataName
 end
 
-function mulCore(c::Float64, con::ParamBox{<:Any, <:Any, F}) where {F}
+function mulCore(c::T, con::ParamBox{T}; roundDigits::Int=getAtolDigits(T)) where {T}
     conNew = con.data
-    mapFunction = Pf(c, con.map)
+    mapFunction = Pf(roundNum(c, roundDigits), con.map)
     conNew, mapFunction, con.dataName
 end
 
-mul(coeff::Real, gf::GaussFunc) = mul(gf, coeff)
+mulCore(c::T1, con::ParamBox{T2}; roundDigits::Int=getAtolDigits(T2)) where {T1, T2} = 
+mulCore(T2(c), con; roundDigits)
 
-function mul(gf1::GaussFunc, gf2::GaussFunc)
-    GaussFunc(genExponent(gf1.xpn()+gf2.xpn()), genContraction(gf1.con()*gf2.con()))
-end
+mul(coeff::Real, gf::GaussFunc{T}; roundDigits::Int=getAtolDigits(T)) where {T} = 
+mul(gf, coeff; roundDigits)
+
+mul(gf1::GaussFunc{T}, gf2::GaussFunc{T}; roundDigits::Int=getAtolDigits(T)) where {T} = 
+GaussFunc(    genExponent(roundNum(gf1.xpn()+gf2.xpn(), roundDigits)), 
+           genContraction(roundNum(gf1.con()*gf2.con(), roundDigits)) )
 
 """
 
-    mul(sgf1::BasisFunc{𝑙1, 1}, sgf2::BasisFunc{𝑙2, 1}; 
-        normalizeGTO::Union{Bool, Missing}=missing) ->
-    BasisFunc{𝑙1+𝑙2, 1}
+    mul(sgf1::BasisFunc{T, D, 𝑙1, 1}, sgf2::BasisFunc{T, D, 𝑙2, 1}; 
+        normalizeGTO::Union{Bool, Missing}=missing, 
+        roundDigits::Int=getAtolDigits(T)) where {T, D, 𝑙1, 𝑙2} -> 
+    BasisFunc{T, D, 𝑙1+𝑙2, 1}
 
-    mul(a1::Real, a2::CompositeGTBasisFuncs{<:Any, 1, D, T}; 
-        normalizeGTO::Union{Bool, Missing}=missing) -> 
-    CompositeGTBasisFuncs{<:Any, 1, D, T}
+    mul(a1::Real, a2::CompositeGTBasisFuncs{T, D, <:Any, 1}; 
+        normalizeGTO::Union{Bool, Missing}=missing, 
+        roundDigits::Int=getAtolDigits(T)) where {T, D} -> 
+    CompositeGTBasisFuncs{T, D, <:Any, 1}
 
-    mul(a1::CompositeGTBasisFuncs{<:Any, 1, D, T}, 
-        a2::CompositeGTBasisFuncs{<:Any, 1, D, T}; 
-        normalizeGTO::Union{Bool, Missing}=missing) -> 
-    CompositeGTBasisFuncs{<:Any, 1, D, T}
+    mul(a1::CompositeGTBasisFuncs{T, D, <:Any, 1}, 
+        a2::CompositeGTBasisFuncs{T, D, <:Any, 1}; 
+        normalizeGTO::Union{Bool, Missing}=missing, 
+        roundDigits::Int=getAtolDigits(T)) where {T, D} -> 
+    CompositeGTBasisFuncs{T, D, <:Any, 1}
 
-Multiplication between `CompositeGTBasisFuncs{<:Any, 1, D, T}`s such as `BasisFunc` and 
+Multiplication between `CompositeGTBasisFuncs{T, D, <:Any, 1}`s such as `BasisFunc` and 
 `$(BasisFuncMix)`, or contraction coefficient multiplication between a `Real` number 
-and a `CompositeGTBasisFuncs{<:Any, 1, D, T}`. If `normalizeGTO` is set to `missing` (in 
+and a `CompositeGTBasisFuncs{T, D, <:Any, 1}`. If `normalizeGTO` is set to `missing` (in 
 default), The `GaussFunc` in the output result will be normalized only if all the input 
-bases have `normalizeGTO = true`. The function can be called using `*` syntax.
-
+bases have `normalizeGTO = true`. `roundDigits` specifies the maximal number of digits 
+after the radix point of the calculated values. The function can be called using `*` syntax 
+with the keyword arguments set to their default values.
 ≡≡≡ Example(s) ≡≡≡
 
 ```jldoctest; setup = :(push!(LOAD_PATH, "../../src/"); using Quiqbox)
@@ -1032,8 +1087,9 @@ julia> bf3 = bf1 * bf2
 BasisFunc{0, 3}(center, gauss)[X⁰Y⁰Z⁰][1.0, 1.0, 1.0]
 ```
 """
-function mul(sgf1::BasisFunc{𝑙1, 1, PT1, D, T}, sgf2::BasisFunc{𝑙2, 1, PT2, D, T}; 
-             normalizeGTO::Union{Bool, Missing}=missing) where {𝑙1, 𝑙2, PT1, PT2, D, T}
+function mul(sgf1::BasisFunc{T, D, 𝑙1, 1, PT1}, sgf2::BasisFunc{T, D, 𝑙2, 1, PT2}; 
+             normalizeGTO::Union{Bool, Missing}=missing, 
+             roundDigits::Int=getAtolDigits(T)) where {T, D, 𝑙1, 𝑙2, PT1, PT2}
     α₁ = sgf1.gauss[1].xpn()
     α₂ = sgf2.gauss[1].xpn()
     d₁ = sgf1.gauss[1].con()
@@ -1042,40 +1098,48 @@ function mul(sgf1::BasisFunc{𝑙1, 1, PT1, D, T}, sgf2::BasisFunc{𝑙2, 1, PT2
     n₂ = sgf2.normalizeGTO
     n₁ && (d₁ *= getNorms(sgf1)[])
     n₂ && (d₂ *= getNorms(sgf2)[])
-    R₁ = centerCoordOf(sgf1)
-    R₂ = centerCoordOf(sgf2)
     normalizeGTO isa Missing && (normalizeGTO = n₁*n₂)
-    if R₁ == R₂
-        xpn = α₁ + α₂
-        con = d₁ * d₂
-        BasisFunc(genSpatialPoint(R₁), GaussFunc(genExponent(xpn), genContraction(con)), 
-                  sgf1.ijk.+sgf2.ijk, normalizeGTO)
+
+    R = if (cen1 = sgf1.center) === (cen2 = sgf2.center) || hasIdentical(cen1, cen2)
+        cen1
+    elseif hasEqual(cen1, cen2)
+        deepcopy(cen1)
+    elseif (R₁ = roundNum.(coordOf(cen1), roundDigits)) == 
+           (R₂ = roundNum.(coordOf(cen2), roundDigits))
+        genSpatialPoint(R₁)
     else
         ijk1 = sgf1.ijk[1]
         ijk2 = sgf2.ijk[1]
         xpn, con, cen = gaussProd((α₁, d₁, R₁), (α₂, d₂, R₂))
-        coeffs = [Float64[] for _=1:3]
         shiftPolyFunc = @inline (n, c1, c2) -> [(c2 - c1)^k*binomial(n,k) for k = n:-1:0]
-        for i = 1:3
-            c1 = shiftPolyFunc(ijk1[i], R₁[i], cen[i])
-            c2 = shiftPolyFunc(ijk2[i], R₂[i], cen[i])
-            m = reverse(c1 * transpose(c2), dims=2)
-            siz = size(m)
-            s, e = siz[2]-1, 1-siz[1]
-            step = (-1)^(s > e)
-            coeffs[i] = [diag(m, k)|>sum for k = s:step:e]
+        coeffs = map(1:3) do i
+            n1 = ijk1[i]
+            n2 = ijk2[i]
+            c1N = shiftPolyFunc(n1, R₁[i], cen[i])
+            c2N = shiftPolyFunc(n2, R₂[i], cen[i])
+            m = c1N * transpose(c2N |> reverse)
+            [diag(m, k)|>sum for k = n2 : (-1)^(-n1 < n2) : -n1]
         end
-        XYZcs = cat(Ref(coeffs[1] * transpose(coeffs[2])) .* coeffs[3]..., dims=3)
-        R = genSpatialPoint(cen)
-        pbα = genExponent(xpn)
-        BasisFuncMix([BasisFunc(R, GaussFunc(pbα, genContraction(con*XYZcs[i])), 
-                                XYZTuple(i.I .- 1), normalizeGTO) 
-                      for i in CartesianIndices(XYZcs)])
+        lCs = cat(Ref(coeffs[1] * transpose(coeffs[2])) .* coeffs[3]..., dims=3) # TC
+        cen = genSpatialPoint(roundNum.(cen, roundDigits))
+        pbα = genExponent(roundNum(xpn, roundDigits))
+        return BasisFuncMix(
+            [BasisFunc(cen, 
+                       GaussFunc(pbα, genContraction(roundNum(con*lCs[i], roundDigits))), 
+                                 XYZTuple(i.I .- 1), 
+                       normalizeGTO) 
+             for i in CartesianIndices(lCs)])
     end
+
+    xpn = roundNum(α₁ + α₂, roundDigits)
+    con = roundNum(d₁ * d₂, roundDigits)
+    BasisFunc(R, GaussFunc(genExponent(xpn), genContraction(con)), (sgf1.ijk .+ sgf2.ijk), 
+              normalizeGTO)
 end
 
-function mul(sgf1::BasisFunc{0, 1, PT1, D, T}, sgf2::BasisFunc{0, 1, PT2, D, T}; 
-             normalizeGTO::Union{Bool, Missing}=missing) where {PT1, PT2, D, T}
+function mul(sgf1::BasisFunc{T, D, 0, 1, PT1}, sgf2::BasisFunc{T, D, 0, 1, PT2}; 
+             normalizeGTO::Union{Bool, Missing}=missing, 
+             roundDigits::Int=getAtolDigits(T)) where {T, D, PT1, PT2}
     d₁ = sgf1.gauss[1].con()
     d₂ = sgf2.gauss[1].con()
     n₁ = sgf1.normalizeGTO
@@ -1086,158 +1150,169 @@ function mul(sgf1::BasisFunc{0, 1, PT1, D, T}, sgf2::BasisFunc{0, 1, PT2, D, T};
     R₂ = centerCoordOf(sgf2)
     xpn, con, cen = gaussProd((sgf1.gauss[1].xpn(), d₁, R₁), (sgf2.gauss[1].xpn(), d₂, R₂))
     normalizeGTO isa Missing && (normalizeGTO = n₁*n₂)
-    BasisFunc(genSpatialPoint(cen), GaussFunc(genExponent(xpn), genContraction(con)), 
+    BasisFunc(genSpatialPoint( roundNum.(cen, roundDigits) ), 
+              GaussFunc( genExponent(roundNum(xpn, roundDigits)), 
+                         genContraction(roundNum(con, roundDigits)) ), 
               (XYZTuple(0,0,0),), normalizeGTO)
 end
 
 function gaussProd((α₁, d₁, R₁)::T, (α₂, d₂, R₂)::T) where 
-                  {T<:Tuple{Number, Number, Array{<:Number}}}
+                  {T<:Tuple{Number, Number, AbstractArray{<:Number}}}
     α = α₁ + α₂
     d = d₁ * d₂ * exp(-α₁ * α₂ / α * sum(abs2, R₁-R₂))
     R = (α₁*R₁ + α₂*R₂) / α
     (α, d, R)
 end
 
-function mulCore(bf::BasisFunc{𝑙, GN}, coeff::Real; 
-                 normalizeGTO::Union{Bool, Missing}=missing) where {𝑙, GN}
+function mul(bf::BasisFunc{T, D, 𝑙, GN}, coeff::Real; 
+             normalizeGTO::Union{Bool, Missing}=missing, 
+             roundDigits::Int=getAtolDigits(T)) where {T, D, 𝑙, GN}
     n = bf.normalizeGTO
     normalizeGTO isa Missing && (normalizeGTO = n)
     c = (n && !normalizeGTO) ? (coeff .* getNorms(bf)) : coeff
-    gfs = mul.(bf.gauss, c)
+    gfs = mul.(bf.gauss, c; roundDigits)
     BasisFunc(bf.center, gfs, bf.ijk, normalizeGTO)
 end
 
-function mulCore(bfm::T, coeff::Real; normalizeGTO::Union{Bool, Missing}=missing) where 
-                {T<:BasisFuncMix}
-    BasisFuncMix(mul.(bfm.BasisFunc, coeff; normalizeGTO))::T
-end
+mul(bfm::BasisFuncMix{T, D, BN}, coeff::Real; normalizeGTO::Union{Bool, Missing}=missing, 
+    roundDigits::Int=getAtolDigits(T)) where {T, D, BN} = 
+BasisFuncMix(mul.(bfm.BasisFunc, coeff; normalizeGTO, roundDigits))
 
-function mul(bf1::BasisFunc{𝑙1, GN1, PT1, D, T}, bf2::BasisFunc{𝑙2, GN2, PT2, D, T}; 
-             normalizeGTO::Union{Bool, Missing}=missing) where 
-            {𝑙1, 𝑙2, GN1, GN2, PT1, PT2, D, T}
-    cen1 = bf1.center
-    ijk1 = bf1.ijk
-    cen2 = bf2.center
-    ijk2 = bf2.ijk
+function mul(bf1::BasisFunc{T, D, 𝑙1, GN1, PT1}, bf2::BasisFunc{T, D, 𝑙2, GN2, PT2}; 
+             normalizeGTO::Union{Bool, Missing}=missing, 
+             roundDigits::Int=getAtolDigits(T)) where {T, D, 𝑙1, 𝑙2, GN1, GN2, PT1, PT2}
     bf1n = bf1.normalizeGTO
     bf2n = bf2.normalizeGTO
     normalizeGTO isa Missing && (normalizeGTO = bf1n * bf2n)
-    bs = CompositeGTBasisFuncs{<:Any, 1, D, T}[]
+    bs = CGTBasisFuncs1O{T, D}[]
     for gf1 in bf1.gauss, gf2 in bf2.gauss
-        push!(bs, mul(BasisFunc(cen1, (gf1,), ijk1, bf1n), 
-                      BasisFunc(cen2, (gf2,), ijk2, bf2n); 
-                      normalizeGTO))
+        push!(bs, mul(BasisFunc(bf1.center, (gf1,), bf1.ijk, bf1n), 
+                      BasisFunc(bf2.center, (gf2,), bf2.ijk, bf2n); 
+                      normalizeGTO, roundDigits))
     end
-    sumOf(bs)
+    sumOf(bs; roundDigits)
 end
 
-mul(bf1::BasisFuncMix{1}, bf2::BasisFunc; normalizeGTO::Union{Bool, Missing}=missing) = 
-mul(bf1.BasisFunc[1], bf2; normalizeGTO)
+mul(bf1::BasisFuncMix{T, D, 1}, bf2::BasisFunc{T, D}; 
+    normalizeGTO::Union{Bool, Missing}=missing, roundDigits::Int=getAtolDigits(T)) where 
+   {T, D} = 
+mul(bf1.BasisFunc[1], bf2; normalizeGTO, roundDigits)
 
-mul(bf1::BasisFunc, bf2::BasisFuncMix{1}; normalizeGTO::Union{Bool, Missing}=missing) = 
-mul(bf2, bf1; normalizeGTO)
+mul(bf1::BasisFunc{T, D}, bf2::BasisFuncMix{T, D, 1}; 
+    normalizeGTO::Union{Bool, Missing}=missing, roundDigits::Int=getAtolDigits(T)) where 
+   {T, D} = 
+mul(bf2, bf1; normalizeGTO, roundDigits)
 
-mul(bf::BasisFunc, bfm::BasisFuncMix{BN}; 
-    normalizeGTO::Union{Bool, Missing}=missing) where {BN} = 
-mul.(Ref(bf), bfm.BasisFunc; normalizeGTO) |> sumOf
+mul(bf::BasisFunc{T, D}, bfm::BasisFuncMix{T, D, BN}; 
+    normalizeGTO::Union{Bool, Missing}=missing, roundDigits::Int=getAtolDigits(T)) where 
+   {T, D, BN} = 
+sumOf(mul.(Ref(bf), bfm.BasisFunc; normalizeGTO, roundDigits); roundDigits)
 
-mul(bfm::BasisFuncMix{BN}, bf::BasisFunc; 
-    normalizeGTO::Union{Bool, Missing}=missing) where {BN} = 
-mul(bf, bfm; normalizeGTO)
+mul(bfm::BasisFuncMix{T, D, BN}, bf::BasisFunc{T, D}; 
+    normalizeGTO::Union{Bool, Missing}=missing, roundDigits::Int=getAtolDigits(T)) where 
+   {T, D, BN} = 
+mul(bf, bfm; normalizeGTO, roundDigits)
 
-mul(bf1::BasisFuncMix{1}, bf2::BasisFuncMix{1}; 
-    normalizeGTO::Union{Bool, Missing}=missing) = 
-mul(bf1.BasisFunc[1], bf2.BasisFunc[1]; normalizeGTO)
+mul(bf1::BasisFuncMix{T, D, 1}, bf2::BasisFuncMix{T, D, 1}; 
+    normalizeGTO::Union{Bool, Missing}=missing, roundDigits::Int=getAtolDigits(T)) where 
+   {T, D} = 
+mul(bf1.BasisFunc[1], bf2.BasisFunc[1]; normalizeGTO, roundDigits)
 
-mul(bf::BasisFuncMix{1}, bfm::BasisFuncMix{BN}; 
-    normalizeGTO::Union{Bool, Missing}=missing) where {BN} = 
-mul(bf.BasisFunc[1], bfm; normalizeGTO)
+mul(bf::BasisFuncMix{T, D, 1}, bfm::BasisFuncMix{T, D, BN}; 
+    normalizeGTO::Union{Bool, Missing}=missing, roundDigits::Int=getAtolDigits(T)) where 
+   {T, D, BN} = 
+mul(bf.BasisFunc[1], bfm; normalizeGTO, roundDigits)
 
-mul(bfm::BasisFuncMix{BN}, bf::BasisFuncMix{1}; 
-    normalizeGTO::Union{Bool, Missing}=missing) where {BN} = 
-mul(bf, bfm; normalizeGTO)
+mul(bfm::BasisFuncMix{T, D, BN}, bf::BasisFuncMix{T, D, 1}; 
+    normalizeGTO::Union{Bool, Missing}=missing, roundDigits::Int=getAtolDigits(T)) where 
+   {T, D, BN} = 
+mul(bf, bfm; normalizeGTO, roundDigits)
 
-function mul(bfm1::BasisFuncMix{BN1, D, T}, bfm2::BasisFuncMix{BN2, D, T}; 
-             normalizeGTO::Union{Bool, Missing}=missing) where {BN1, BN2, D, T}
-    bfms = CompositeGTBasisFuncs{<:Any, 1, D, T}[]
+function mul(bfm1::BasisFuncMix{T, D, BN1}, bfm2::BasisFuncMix{T, D, BN2}; 
+             normalizeGTO::Union{Bool, Missing}=missing, 
+             roundDigits::Int=getAtolDigits(T)) where {T, D, BN1, BN2}
+    bfms = CGTBasisFuncs1O{T, D}[]
     for bf1 in bfm1.BasisFunc, bf2 in bfm2.BasisFunc
-        push!(bfms, mul(bf1, bf2; normalizeGTO))
+        push!(bfms, mul(bf1, bf2; normalizeGTO, roundDigits))
     end
-    sumOf(bfms)
+    sumOf(bfms; roundDigits)
 end
 
-mul(::EmptyBasisFunc{D, T}, ::Real; normalizeGTO=nothing) where {D, T} = 
-EmptyBasisFunc{D, T}()
+mul(::EmptyBasisFunc{<:Any, D}, ::T; 
+    normalizeGTO=missing, roundDigits::Int=getAtolDigits(T)) where {D, T<:Real} = 
+EmptyBasisFunc{T, D}()
 
-mul(::Real, ::EmptyBasisFunc{D, T}; normalizeGTO=nothing) where {D, T} = 
-EmptyBasisFunc{D, T}()
+mul(::T, ::EmptyBasisFunc{<:Any, D}; 
+    normalizeGTO=missing, roundDigits::Int=getAtolDigits(T)) where {T<:Real, D} = 
+EmptyBasisFunc{T, D}()
 
-function mul(b::CompositeGTBasisFuncs{BN, 1, D, T}, coeff::Real; 
-             normalizeGTO::Union{Bool, Missing}=missing) where {BN, D, T}
-    iszero(coeff) ? EmptyBasisFunc{D, T}() : mulCore(b, coeff; normalizeGTO)
+function mul(b::CGTBasisFuncs1O{T, D}, coeff::Real; 
+             normalizeGTO::Union{Bool, Missing}=missing, 
+             roundDigits::Int=getAtolDigits(T)) where {T, D}
+    iszero(coeff) ? EmptyBasisFunc{T, D}() : mul(b, coeff; normalizeGTO, roundDigits)
 end
 
-mul(coeff::Real, b::CompositeGTBasisFuncs{<:Any, 1}; 
-    normalizeGTO::Union{Bool, Missing}=missing) = 
-mul(b, coeff; normalizeGTO)
+mul(coeff::Real, b::CGTBasisFuncs1O{T}; normalizeGTO::Union{Bool, Missing}=missing, 
+    roundDigits::Int=getAtolDigits(T)) where {T} = 
+mul(b, coeff; normalizeGTO, roundDigits)
 
-mul(::EmptyBasisFunc{D}, ::CompositeGTBasisFuncs{<:Any, <:Any, D, T}; 
-    normalizeGTO=nothing) where {D, T} = 
-EmptyBasisFunc{D, T}()
+mul(::EmptyBasisFunc{<:Any, D}, ::CGTBasisFuncs1O{T, D}; 
+    normalizeGTO=missing, roundDigits::Int=getAtolDigits(T)) where {D, T} = 
+EmptyBasisFunc{T, D}()
 
-mul(::CompositeGTBasisFuncs{<:Any, <:Any, D, T}, ::EmptyBasisFunc{D}; 
-    normalizeGTO=nothing) where {D, T} = 
-EmptyBasisFunc{D, T}()
+mul(::CGTBasisFuncs1O{T, D}, ::EmptyBasisFunc{<:Any, D}; 
+    normalizeGTO=missing, roundDigits::Int=getAtolDigits(T)) where {T, D} = 
+EmptyBasisFunc{T, D}()
 
-mul(::EmptyBasisFunc{D, T1}, ::EmptyBasisFunc{D, T2}; 
-    normalizeGTO=nothing) where {D, T1, T2} = 
-EmptyBasisFunc{D, promote_type(T1, T2)}()
+mul(::EmptyBasisFunc{T1, D}, ::EmptyBasisFunc{T2, D}; normalizeGTO=missing, 
+    roundDigits::Int=getAtolDigits(promote_type(T1, T2))) where {T1, T2, D} = 
+EmptyBasisFunc{promote_type(T1, T2), D}()
 
-mul(bf1::BasisFuncs{𝑙1, GN1, 1, PT1, D, T}, bf2::BasisFuncs{𝑙2, GN2, 1, PT2, D, T}; 
-    normalizeGTO::Union{Bool, Missing}=missing) where {𝑙1, 𝑙2, GN1, GN2, PT1, PT2, D, T} = 
-[mul(add(bf1), add(bf2); normalizeGTO)]
+mul(bf1::BFuncs1O{T, D, 𝑙1, GN1, PT1}, bf2::BFuncs1O{T, D, 𝑙2, GN2, PT2}; 
+    normalizeGTO::Union{Bool, Missing}=missing, roundDigits::Int=getAtolDigits(T)) where 
+   {T, D, 𝑙1, 𝑙2, GN1, GN2, PT1, PT2} = 
+[mul(add(bf1), add(bf2); normalizeGTO, roundDigits)]
 
 
 """
 
-    shift(bf::FloatingGTBasisFuncs{𝑙, GN, 1}, 
-          didjdk::Union{Vector{<:Real}, NTuple{3, Int}}, op::Function=+) where {𝑙, GN} -> 
+    shift(bf::FloatingGTBasisFuncs{<:Any, D, 𝑙, GN, <:Any, 1}, 
+          didjdk::Union{Vector{Int}, NTuple{3, Int}}, op::Function=+) where {D, 𝑙, GN} -> 
     BasisFunc
 
 Shift (`+` as the "add" operator in default) the angular momentum (Cartesian 
 representation) given the a vector that specifies the change of each pseudo-quantum number 
 𝑑i, 𝑑j, 𝑑k.
 """
-shift(bf::FloatingGTBasisFuncs{𝑙, GN, 1}, didjdk::AbstractArray{<:Real}, op::F=+) where 
-     {𝑙, GN, F<:Function} = 
-shiftCore(op, bf, XYZTuple(didjdk.|>Int))
-
-shift(bf::FloatingGTBasisFuncs{𝑙, GN, 1}, didjdk::NTuple{3, Int}, op::F=+) where 
-     {𝑙, GN, F<:Function} = 
+shift(bf::FGTBasisFuncs1O{<:Any, D, 𝑙, GN}, didjdk::AbstractArray{Int}, op::F=+) where 
+     {D, 𝑙, GN, F<:Function} = 
 shiftCore(op, bf, XYZTuple(didjdk))
 
-shiftCore(::typeof(+), bf::FloatingGTBasisFuncs{𝑙1, GN, 1}, didjdk::XYZTuple{𝑙2}) where 
-         {𝑙1, 𝑙2, GN} = 
+shift(bf::FGTBasisFuncs1O{<:Any, D, 𝑙, GN}, didjdk::NTuple{3, Int}, op::F=+) where 
+     {D, 𝑙, GN, F<:Function} = 
+shiftCore(op, bf, XYZTuple(didjdk))
+
+shiftCore(::typeof(+), bf::FGTBasisFuncs1O{<:Any, D, 𝑙1, GN}, didjdk::XYZTuple{𝑙2}) where 
+         {D, 𝑙1, 𝑙2, GN} = 
 BasisFunc(bf.center, bf.gauss, bf.ijk[1]+didjdk, bf.normalizeGTO)
 
-shiftCore(::typeof(-), bf::FloatingGTBasisFuncs{0, GN, 1}, ::XYZTuple{0}) where {GN} = 
+shiftCore(::typeof(-), bf::FGTBasisFuncs1O{<:Any, D, 0, GN}, ::XYZTuple{0}) where {D, GN} = 
 BasisFunc(bf.center, bf.gauss, bf.ijk[1], bf.normalizeGTO)
 
-shiftCore(::typeof(-), bf::FloatingGTBasisFuncs{0, <:Any, 1, <:Any, D, T}, 
-          didjdk::XYZTuple) where {D, T} = 
-EmptyBasisFunc{D, T}()
+shiftCore(::typeof(-), bf::FGTBasisFuncs1O{T, D, 0}, didjdk::XYZTuple) where {T, D} = 
+EmptyBasisFunc{T, D}()
 
-function shiftCore(::typeof(-), bf::FloatingGTBasisFuncs{𝑙1, <:Any, 1, <:Any, D, T}, 
-                   didjdk::XYZTuple{𝑙2}) where {𝑙1, 𝑙2, D, T}
+function shiftCore(::typeof(-), bf::FGTBasisFuncs1O{T, D, 𝑙1}, didjdk::XYZTuple{𝑙2}) where 
+                  {T, D, 𝑙1, 𝑙2}
     xyz = bf.ijk[1].tuple .- didjdk.tuple
     for i in xyz
-        i < 0 && (return EmptyBasisFunc{D, T}())
+        i < 0 && (return EmptyBasisFunc{T, D}())
     end
     BasisFunc(bf.center, bf.gauss, XYZTuple(xyz), bf.normalizeGTO)
 end
 
-shiftCore(::Function, ::EmptyBasisFunc{D, T}, ::XYZTuple) where {D, T} = 
-EmptyBasisFunc{D, T}()
+shiftCore(::Function, ::EmptyBasisFunc{T, D}, ::XYZTuple) where {T, D} = 
+EmptyBasisFunc{T, D}()
 
 """
 
@@ -1250,29 +1325,29 @@ consists of the `BasisFunc`s each with only 1 `GaussFunc`.
 decompose(bf::CompositeGTBasisFuncs, splitGaussFunc::Bool=false) = 
 decomposeCore(Val(splitGaussFunc), bf)
 
-function decomposeCore(::Val{false}, bf::FloatingGTBasisFuncs{𝑙, GN, ON, PT, D, T}) where 
-                      {𝑙, GN, ON, PT, D, T}
-    res = Array{BasisFunc{𝑙, GN, PT, D, T}}(undef, 1, ON)
+function decomposeCore(::Val{false}, bf::FloatingGTBasisFuncs{T, D, 𝑙, GN, PT, ON}) where 
+                      {T, D, 𝑙, GN, PT, ON}
+    res = Array{BasisFunc{T, D, 𝑙, GN, PT}}(undef, 1, ON)
     for i in eachindex(res)
         res[i] = BasisFunc(bf.center, bf.gauss, bf.ijk[i], bf.normalizeGTO)
     end
     res
 end
 
-function decomposeCore(::Val{true}, bf::FloatingGTBasisFuncs{𝑙, GN, ON, PT, D, T}) where 
-                      {𝑙, GN, ON, PT, D, T}
-    res = Array{BasisFunc{𝑙, 1, PT, D, T}}(undef, GN, ON)
+function decomposeCore(::Val{true}, bf::FloatingGTBasisFuncs{T, D, 𝑙, GN, PT, ON}) where 
+                      {T, D, 𝑙, GN, PT, ON}
+    res = Array{BasisFunc{T, D, 𝑙, 1, PT}}(undef, GN, ON)
     for (c, ijk) in zip(eachcol(res), bf.ijk)
         c .= BasisFunc.(Ref(bf.center), bf.gauss, Ref(ijk), bf.normalizeGTO)
     end
     res
 end
 
-decomposeCore(::Val{false}, b::CompositeGTBasisFuncs{<:Any, 1}) = hcat(b)
+decomposeCore(::Val{false}, b::CGTBasisFuncsON{1}) = hcat(b)
 
-decomposeCore(::Val{true}, b::FloatingGTBasisFuncs{<:Any, 1, 1}) = hcat(BasisFunc(b))
+decomposeCore(::Val{true}, b::FGTBasisFuncs1O{<:Any, <:Any, <:Any, 1}) = hcat(BasisFunc(b))
 
-decomposeCore(::Val{false}, b::FloatingGTBasisFuncs{<:Any, <:Any, 1}) = hcat(BasisFunc(b))
+decomposeCore(::Val{false}, b::FGTBasisFuncsON{1}) = hcat(BasisFunc(b))
 
 function decomposeCore(::Val{true}, bfm::BasisFuncMix)
     bfss = map(bfm.BasisFunc) do bf
@@ -1296,7 +1371,7 @@ Return the size (number of orbitals) of each subshell.
 
 Return the numbers of orbitals of the input basis function(s).
 """
-@inline basisSize(::FloatingGTBasisFuncs{<:Any, <:Any, ON}) where {ON} = ON
+@inline basisSize(::CGTBasisFuncsON{ON}) where {ON} = ON
 @inline basisSize(::BasisFuncMix) = 1
 
 
@@ -1317,12 +1392,12 @@ Generate a `String` of the text of the input `FloatingGTBasisFuncs`. `norm` is t
 additional normalization factor. If `printCenter` is `true`, the center coordinate 
 will be added on the first line of the `String`.
 """
-function genBasisFuncText(bf::FloatingGTBasisFuncs{𝑙}; 
-                          norm::Float64=1.0, printCenter::Bool=true) where {𝑙}
+function genBasisFuncText(bf::FloatingGTBasisFuncs{T, <:Any, 𝑙}; 
+                          norm::Real=1.0, printCenter::Bool=true) where {T, 𝑙}
     GFs = map(x -> genGaussFuncText(x.xpn(), x.con()), bf.gauss)
     cen = centerCoordOf(bf)
     firstLine = printCenter ? "X "*(alignNum.(cen) |> join)*"\n" : ""
-    firstLine * "$(bf|>subshellOf)    $(getTypeParams(bf)[2])   $(norm)\n" * (GFs |> join)
+    firstLine * "$(bf|>subshellOf)    $(getTypeParams(bf)[4])   $(T(norm))\n" * (GFs|>join)
 end
 
 """
@@ -1713,7 +1788,7 @@ getNijkα(i, j, k, α) = getNijk(i, j, k) * getNα(i, j, k, α)
 
 getNijkα(ijk, α) = getNijkα(ijk[1], ijk[2], ijk[3], α)
 
-getNorms(b::FloatingGTBasisFuncs{𝑙, GN, 1})  where {𝑙, GN} = 
+getNorms(b::FGTBasisFuncs1O{<:Any, <:Any, 𝑙, GN})  where {𝑙, GN} = 
 getNijkα.(b.ijk[1]..., [g.xpn() for g in b.gauss])
 
 pgf0(x, y, z, α) = exp( -α * (x^2 + y^2 + z^2) )
@@ -1739,9 +1814,9 @@ function expressionOfCore(pb::ParamBox{<:Any, <:Any, F}, substituteValue::Bool=f
     end
 end
 
-function expressionOfCore(bf::FloatingGTBasisFuncs{𝑙, GN, ON}, substituteValue::Bool=false, 
-                          onlyParameter::Bool=false, splitGaussFunc::Bool=false) where 
-                         {𝑙, GN, ON}
+function expressionOfCore(bf::FloatingGTBasisFuncs{<:Any, <:Any, 𝑙, GN, <:Any, ON}, 
+                          substituteValue::Bool=false, onlyParameter::Bool=false, 
+                          splitGaussFunc::Bool=false) where {𝑙, GN, ON}
     N = bf.normalizeGTO  ?  getNijkα  :  (_...) -> 1
     R = expressionOfCore.(bf.center, substituteValue)
     α = expressionOfCore.(getfield.(bf.gauss, :xpn), substituteValue)
@@ -1927,23 +2002,23 @@ function diffTransfer(trm::Num, varDict::Dict{Num, <:Real})
 end
 
 
-function diffInfo(bf::CompositeGTBasisFuncs{BN, 1}, vr, varDict) where {BN}
-    exprs = expressionOfCore(bf, false, true, true)
-    relDiffs = Symbolics.derivative.(log.(exprs), vr)
-    diffTransfer.(relDiffs, Ref(varDict))
-end
+# function diffInfo(bf::CompositeGTBasisFuncs{BN, 1}, vr, varDict) where {BN}
+#     exprs = expressionOfCore(bf, false, true, true)
+#     relDiffs = Symbolics.derivative.(log.(exprs), vr)
+#     diffTransfer.(relDiffs, Ref(varDict))
+# end
 
 
-function diffInfoToBasisFunc(bf::CompositeGTBasisFuncs{BN, 1}, 
-                             info::Vector{Vector{Tuple{Float64, Vector{Int}}}}) where {BN}
-    bs = decomposeCore(Val(true), bf)
-    bss = map(info, bs) do gInfo, bf
-        map(gInfo) do dxyz
-           sgf = copyBasis(bf)
-           sgf.gauss[1].con[] *= dxyz[1]
-           xyz = dxyz[2]
-           xyz == [0,0,0] ? sgf : shift(sgf, xyz)
-        end::Vector{<:BasisFunc{<:Any, 1}}
-    end
-    vcat(bss...)::Vector{<:BasisFunc{<:Any, 1}} |> sumOf
-end
+# function diffInfoToBasisFunc(bf::CompositeGTBasisFuncs{BN, 1}, 
+#                              info::Vector{Vector{Tuple{Float64, Vector{Int}}}}) where {BN}
+#     bs = decomposeCore(Val(true), bf)
+#     bss = map(info, bs) do gInfo, bf
+#         map(gInfo) do dxyz
+#            sgf = copyBasis(bf)
+#            sgf.gauss[1].con[] *= dxyz[1]
+#            xyz = dxyz[2]
+#            xyz == [0,0,0] ? sgf : shift(sgf, xyz)
+#         end::Vector{<:BasisFunc{<:Any, 1}}
+#     end
+#     vcat(bss...)::Vector{<:BasisFunc{<:Any, 1}} |> sumOf
+# end
