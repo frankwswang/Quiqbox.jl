@@ -2,6 +2,8 @@ using Test
 using Quiqbox
 using Suppressor: @suppress_out
 
+include("../../test/test-functions/Shared.jl")
+
 @testset "HartreeFock.jl" begin
 
 errorThreshold1 = 1e-8

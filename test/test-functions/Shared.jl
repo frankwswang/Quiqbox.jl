@@ -27,7 +27,7 @@ function compr2Arrays2(cprTuple::NamedTuple{<:Any, <:NTuple{2, T}},
         for i=1:2
             println(ks[i], "[$(ids)] = ", cprTuple[i][ids])
         end
-        @test all(ids .> cutoffIdx) && all(abs.(Et1[ids] - rhfs[ids]) .< atol2)
+        @test all(ids .> cutoffIdx) && all(abs.(cprTuple[1][ids]-cprTuple[2][ids]) .< atol2)
     else
         @test true
     end
