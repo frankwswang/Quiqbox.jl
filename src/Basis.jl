@@ -359,7 +359,7 @@ than the size of the corresponding subshell).
 """
 struct BasisFuncs{T, D, 𝑙, GN, PT, ON} <: FloatingGTBasisFuncs{T, D, 𝑙, GN, PT, ON}
     center::SpatialPoint{T, D, PT}
-    gauss::NTuple{GN, AbstractGaussFunc{Float64}}
+    gauss::NTuple{GN, AbstractGaussFunc{T}}
     ijk::NTuple{ON, XYZTuple{𝑙}}
     normalizeGTO::Bool
     param::Tuple{Vararg{ParamBox}}
@@ -484,46 +484,46 @@ julia> genBasisFunc([0,0,0], [("STO-2G", "He"), ("STO-3G", "O")])
  BasisFuncs{1, 3, 3}(center, gauss)[3/3][0.0, 0.0, 0.0]
 ```
 """
-genBasisFunc(cen::SpatialPoint, gs::NTuple{GN, AbstractGaussFunc{Float64}}, 
-             ijk::XYZTuple{𝑙}=XYZTuple(0,0,0); normalizeGTO::Bool=false) where {GN, 𝑙} = 
+genBasisFunc(cen::SpatialPoint, gs::NTuple{GN, AbstractGaussFunc{T}}, 
+             ijk::XYZTuple{𝑙}=XYZTuple(0,0,0); normalizeGTO::Bool=false) where {T, GN, 𝑙} = 
 BasisFunc(cen, gs, ijk, normalizeGTO)
 
-genBasisFunc(cen::SpatialPoint, gs::NTuple{GN, AbstractGaussFunc{Float64}}, 
-             ijk::NTuple{3, Int}; normalizeGTO::Bool=false) where {GN} = 
+genBasisFunc(cen::SpatialPoint, gs::NTuple{GN, AbstractGaussFunc{T}}, 
+             ijk::NTuple{3, Int}; normalizeGTO::Bool=false) where {T, GN} = 
 BasisFunc(cen, gs, ijk|>XYZTuple, normalizeGTO)
 
-genBasisFunc(cen::SpatialPoint, gs::NTuple{GN, AbstractGaussFunc{Float64}}, 
-             ijks::NTuple{ON, XYZTuple{𝑙}}; normalizeGTO::Bool=false) where {GN, ON, 𝑙} = 
+genBasisFunc(cen::SpatialPoint, gs::NTuple{GN, AbstractGaussFunc{T}}, 
+             ijks::NTuple{ON, XYZTuple{𝑙}}; normalizeGTO::Bool=false) where {T, GN, ON, 𝑙} = 
 BasisFuncs(cen, gs, ijks, normalizeGTO)
 
-genBasisFunc(cen::SpatialPoint, gs::NTuple{GN, AbstractGaussFunc{Float64}}, 
-             ijks::NTuple{ON, NTuple{3, Int}}; normalizeGTO::Bool=false) where {GN, ON} = 
+genBasisFunc(cen::SpatialPoint, gs::NTuple{GN, AbstractGaussFunc{T}}, 
+             ijks::NTuple{ON, NTuple{3, Int}}; normalizeGTO::Bool=false) where {T, GN, ON} = 
 BasisFuncs(cen, gs, ijks.|>XYZTuple, normalizeGTO)
 
-genBasisFunc(cen::SpatialPoint, gs::NTuple{GN, AbstractGaussFunc{Float64}}, 
-             ijks::Vector{XYZTuple{𝑙}}; normalizeGTO::Bool=false) where {GN, 𝑙} = 
+genBasisFunc(cen::SpatialPoint, gs::NTuple{GN, AbstractGaussFunc{T}}, 
+             ijks::Vector{XYZTuple{𝑙}}; normalizeGTO::Bool=false) where {T, GN, 𝑙} = 
 genBasisFunc(cen, gs, ijks|>Tuple; normalizeGTO)
 
-genBasisFunc(cen::SpatialPoint, gs::NTuple{GN, AbstractGaussFunc{Float64}}, 
-             ijks::Vector{NTuple{3, Int}}; normalizeGTO::Bool=false) where {GN} = 
+genBasisFunc(cen::SpatialPoint, gs::NTuple{GN, AbstractGaussFunc{T}}, 
+             ijks::Vector{NTuple{3, Int}}; normalizeGTO::Bool=false) where {T, GN} = 
 genBasisFunc(cen, gs, ijks|>Tuple; normalizeGTO)
 
-genBasisFunc(cen::SpatialPoint, gs::NTuple{GN, AbstractGaussFunc{Float64}}, 
-             ijk::Tuple{XYZTuple{𝑙}}; normalizeGTO::Bool=false) where {GN, 𝑙} = 
+genBasisFunc(cen::SpatialPoint, gs::NTuple{GN, AbstractGaussFunc{T}}, 
+             ijk::Tuple{XYZTuple{𝑙}}; normalizeGTO::Bool=false) where {T, GN, 𝑙} = 
 genBasisFunc(cen, gs, ijk[1]; normalizeGTO)
 
-genBasisFunc(cen::SpatialPoint, gs::NTuple{GN, AbstractGaussFunc{Float64}}, 
-             ijk::Tuple{NTuple{3, Int}}; normalizeGTO::Bool=false) where {GN} = 
+genBasisFunc(cen::SpatialPoint, gs::NTuple{GN, AbstractGaussFunc{T}}, 
+             ijk::Tuple{NTuple{3, Int}}; normalizeGTO::Bool=false) where {T, GN} = 
 genBasisFunc(cen, gs, ijk[1]; normalizeGTO)
 
-function genBasisFunc(cen::SpatialPoint, gs::NTuple{GN, AbstractGaussFunc{Float64}}, 
-                      subshell::String; normalizeGTO::Bool=false) where {GN}
+function genBasisFunc(cen::SpatialPoint, gs::NTuple{GN, AbstractGaussFunc{T}}, 
+                      subshell::String; normalizeGTO::Bool=false) where {T, GN}
     genBasisFunc(cen, gs, SubshellOrientationList[subshell]; normalizeGTO)
 end
 
-function genBasisFunc(cen::SpatialPoint, gs::NTuple{GN, AbstractGaussFunc{Float64}}, 
+function genBasisFunc(cen::SpatialPoint, gs::NTuple{GN, AbstractGaussFunc{T}}, 
                       subshell::String, ijkFilter::NTuple{N, Bool}; 
-                      normalizeGTO::Bool=false) where {GN, N}
+                      normalizeGTO::Bool=false) where {T, GN, N}
     subshellSize = SubshellSizeList[subshell]
     @assert N == subshellSize "The length of `ijkFilter` should be $(subshellSize) "*
                               "to match the subshell's size."
@@ -568,8 +568,8 @@ genBasisFunc(cen::SpatialPoint, BSkey::String; nucleus::String="H",
 genBasisFunc(cen, [BSkey]; nucleus, unlinkCenter)
 
 # A few methods for convenient arguments omissions and mutations.
-genBasisFunc(cen::SpatialPoint, gs::AbstractArray{<:AbstractGaussFunc{Float64}}, 
-             args...; kws...) = 
+genBasisFunc(cen::SpatialPoint, gs::AbstractArray{<:AbstractGaussFunc{T}}, 
+             args...; kws...) where {T} = 
 genBasisFunc(cen, gs|>Tuple, args...; kws...)
 
 genBasisFunc(cen::SpatialPoint, g::GaussFunc, args...; kws...) = 
@@ -1016,7 +1016,7 @@ $(Doc_mul_Eg4)
 ```
 """
 function mul(gf::GaussFunc{T}, coeff::Real; roundDigits::Int=getAtolDigits(T)) where {T}
-    c = convert(Float64, coeff)
+    c = convert(T, coeff)
     con, mapFunction, dataName = mulCore(c, gf.con; roundDigits)
     conNew = genContraction(con, mapFunction; dataName, canDiff=gf.con.canDiff[])
     GaussFunc(gf.xpn, conNew)
@@ -1412,7 +1412,7 @@ on the first line of the `String`. `groupCenters` determines whether the functio
 group the basis functions with same center together.
 """
 function genBasisFuncText(bs::Vector{<:FloatingGTBasisFuncs}; 
-                          norm::Float64=1.0, printCenter::Bool=true, 
+                          norm::Real=1.0, printCenter::Bool=true, 
                           groupCenters::Bool=true)
     strs = String[]
     bfBlocks = sortBasisFuncs(bs, groupCenters)
@@ -1430,7 +1430,7 @@ end
 
 
 function joinConcentricBFuncStr(bs::Vector{<:FloatingGTBasisFuncs},
-                                norm::Float64=1.0, printFirstBFcenter::Bool=true)
+                                norm::Real=1.0, printFirstBFcenter::Bool=true)
     str = genBasisFuncText(bs[1]; norm, printCenter=printFirstBFcenter)
     str *= genBasisFuncText.(bs[2:end]; norm, printCenter=false) |> join
 end
@@ -1778,18 +1778,20 @@ function getVarDict(containers::Union{Tuple, Array, StructSpatialBasis};
 end
 
 
-getNijk(i, j, k) = (2/π)^0.75 * 
-                    sqrt( 2^(3*(i+j+k)) * factorial(i) * factorial(j) * factorial(k) / 
-                          (factorial(2i) * factorial(2j) * factorial(2k)) )
+getNijk(::Type{T}, i::Integer, j::Integer, k::Integer) where {T} = 
+    (T(2)/π)^T(0.75) * sqrt( 2^(3*(i+j+k)) * factorial(i) * factorial(j) * factorial(k) / 
+    (factorial(2i) * factorial(2j) * factorial(2k)) )
 
-getNα(i, j, k, α) = α^(0.5*(i + j + k) + 0.75)
+getNα(i::Integer, j::Integer, k::Integer, α::T) where {T} = 
+α^T(0.5*(i + j + k) + 0.75)
 
-getNijkα(i, j, k, α) = getNijk(i, j, k) * getNα(i, j, k, α)
+getNijkα(i::Integer, j::Integer, k::Integer, α::T) where {T} = 
+getNijk(T, i, j, k) * getNα(i, j, k, α)
 
 getNijkα(ijk, α) = getNijkα(ijk[1], ijk[2], ijk[3], α)
 
-getNorms(b::FGTBasisFuncs1O{<:Any, <:Any, 𝑙, GN})  where {𝑙, GN} = 
-getNijkα.(b.ijk[1]..., [g.xpn() for g in b.gauss])
+getNorms(b::FGTBasisFuncs1O{T, <:Any, 𝑙, GN})  where {T, 𝑙, GN} = 
+getNijkα.(b.ijk[1]..., T[g.xpn() for g in b.gauss])
 
 pgf0(x, y, z, α) = exp( -α * (x^2 + y^2 + z^2) )
 cgf0(x, y, z, α, d) = (d * pgf0(x, y, z, α))

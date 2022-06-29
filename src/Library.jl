@@ -103,6 +103,7 @@ const SubshellXYZs =
 
 const SubshellXYZsizes = length.(SubshellXYZs)
 
+const FactorialsLs = Integer[0, factorial.(1:20)..., factorial.(big.(21:48))...]
 
 function ijkToStr(ijk::XYZTuple)
     res = ""

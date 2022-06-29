@@ -3,48 +3,72 @@ using SpecialFunctions: erf
 using LinearAlgebra: dot
 
 # Reference: DOI: 10.1088/0143-0807/31/1/004
-function FγCore1(γ::Int, u::T, rTol::Real=NaN) where {T<:Real}
-    atol = isnan(rTol) ? getAtolVal(T) : rTol
-    quadgk(t -> t^(2γ)*exp(-u*t^2), 0, T(1); atol)[1]
+# factorialL(l::Integer) = (l > 20 ? big(l) : l) |> factorial
+factorialL(l::Integer) = FactorialsLs[l+1]
+
+getGKQorder(T::Type{<:Real}) = 
+ifelse(getAtolVal(T) >= getAtolVal(Float64), 13, 26)
+
+πroot(::Type{T}) where {T} = sqrt(π*T(1))
+## Has compatibility issue with BigFloat that may cause bad precision for LBFGS-B solver: 
+# πroot(::Type{T}) where {T} = sqrt(π |> BigFloat) |> T
+# πroot(::Type{T}, c::Number=T(1)) where {T} = 
+# ifelse(getAtolDigits(BigFloat) > getAtolDigits(T), (π|>BigFloat|>sqrt|>T), sqrt(π*T(1)))
+
+function F0Core(u::T) where {T}
+    ur = sqrt(u)
+    πroot(T) * erf(ur) / (2ur)
 end
 
-myFactorial(a) = (a > 20 ? big(a) : a) |> factorial
-
-function FγCore2(γ::Int, u::T) where {T<:Real}
-    t = exp(-u) * sum(myFactorial(γ-k)/(4^k * myFactorial(2*(γ-k)) * u^(k+1)) for k=0:(γ-1))
-    myFactorial(2γ) / (2 * myFactorial(γ)) * (√π * erf(√u) / (4^γ * u^(γ + 0.5)) - t)
+function FγCore1(γ::Int, u::T, rtol=0.5getAtolVal(T), order=getGKQorder(T)) where {T}
+    quadgk(t -> t^(2γ)*exp(-u*t^2), 0, T(1); order, rtol)[1]
 end
 
-const FγSolverThreshold =  [ 1.0e-6,  0.0021,  0.0051,  0.0221,  0.0603,  0.1280,  0.2143, 
-                             0.3389,  0.4755,  0.6445, 15.9803, 17.5235, 17.2490, 18.6754, 
-                            20.6822, 20.4641, 21.5754, 21.6161, 22.5990, 23.2793, 24.9931, 
-                            24.9213, 27.1843, 27.0873]
+function FγCore2(γ::Int, u::T) where {T}
+    t = exp(-u) * sum(factorialL(γ-k)/(4^k * factorialL(2*(γ-k)) * u^(k+1)) for k=0:(γ-1))
+    T(factorialL(2γ) / (2factorialL(γ)) * (πroot(T)*erf(√u) / (4^γ * u^(γ + T(0.5))) - t))
+end
 
-function Fγ(γ::Int, u::T, atol::Real=1e-8) where {T}
-    if u < atol
-        1 / (2γ + 1)
+const FγSolverThreshold =  [ 6.6701,  6.6645,  6.6658,  8.0597,  6.8447,  7.6676,  9.3999, 
+                             9.3547, 11.3685,  9.1267, 60.9556, 62.7040, 62.7022, 65.9929, 
+                            68.3654, 68.3522, 71.1386, 70.8620, 73.3747, 73.8483, 77.8355, 
+                            76.9363, 82.0030, 81.9330]
+
+function Fγ(γ::Int, u::T, uEps::Real=getAtolVal(T)) where {T}
+    if u < uEps
+        T(1 / (2γ + 1))
     elseif γ == 0
-        factorial(2γ) / (2 * factorial(γ)) * (√π * erf(√u) / (4^γ * u^(γ + 0.5)))
+        F0Core(u)
     else
         u < FγSolverThreshold[γ] ? FγCore1(γ, u) : FγCore2(γ, u)
     end
 end
 
-function F₀toFγ(γ::Int, u::Float64, Fγu::Float64)
-    res = Array{Float64}(undef, γ+1)
+function F₀toFγCore(γ::Int, u::T, Fγu::T) where {T}
+    res = Array{T}(undef, γ+1)
     res[end] = Fγu
-    for i in γ:-1:1
-        res[i] = (2u*res[i+1] + exp(-u)) / (2(i-1) + 1)
+    for i in γ:-1:3
+        res[i] = (2u*res[i+1] + exp(-u)) / (2i - 1)
+    end
+    if γ > 0
+        res[1] = F0Core(u)
+        res[2] = FγCore1(1, u)
     end
     res
 end
 
-F₀toFγ(γ::Int, u::Float64) = F₀toFγ(γ, u, Fγ(γ, u))
+function F₀toFγ(γ::Int, u::T, uEps::Real=getAtolVal(T)) where {T}
+    if uEps >= getAtolVal(Float64)
+        F₀toFγCore(γ, u, Fγ(γ, u)) # max(err) < getAtolVal(Float64)
+    else
+        vcat(F0Core(u), [FγCore1(i, u) for i=1:γ])
+    end
+end
 
 
-function genIntOverlapCore(Δx::Float64, 
-                           i₁::Int, α₁::Float64, 
-                           i₂::Int, α₂::Float64)
+function genIntOverlapCore(Δx::T, 
+                           i₁::Int, α₁::T, 
+                           i₂::Int, α₂::T) where {T}
     res = 0.0
     for l₁ in 0:(i₁÷2), l₂ in 0:(i₂÷2)
         Ω = i₁ + i₂ - 2*(l₁ + l₂)
@@ -68,45 +92,46 @@ function genIntOverlapCore(Δx::Float64,
     res
 end
 
-∫overlapCore(R₁::NTuple{3, Float64}, R₂::NTuple{3, Float64}, 
-             ijk₁::NTuple{3, Int}, α₁::Float64, ijk₂::NTuple{3, Int}, α₂::Float64) = 
+∫overlapCore(R₁::NTuple{3, T}, R₂::NTuple{3, T}, 
+             ijk₁::NTuple{3, Int}, α₁::T, 
+             ijk₂::NTuple{3, Int}, α₂::T) where {T} = 
 ∫overlapCore(R₁.-R₂, ijk₁, α₁, ijk₂, α₂)
 
 
-function ∫overlapCore(ΔR::NTuple{3, Float64}, 
-                      ijk₁::NTuple{3, Int}, α₁::Float64, 
-                      ijk₂::NTuple{3, Int}, α₂::Float64)
+function ∫overlapCore(ΔR::NTuple{3, T}, 
+                      ijk₁::NTuple{3, Int}, α₁::T, 
+                      ijk₂::NTuple{3, Int}, α₂::T) where {T}
     for n in (ijk₁..., ijk₂...)
-        n < 0 && return 0.0
+        n < 0 && return T(0)
     end
 
     α = α₁ + α₂
-    res = (π/α)^1.5 * exp(-α₁ * α₂ / α * sum(abs2, ΔR))
+    res = (π/α)^T(1.5) * exp(-α₁ * α₂ / α * sum(abs2, ΔR))
 
         for (i₁, i₂, ΔRᵢ) in zip(ijk₁, ijk₂, ΔR)
-            res *= (-1.0)^(i₁) * factorial(i₁) * factorial(i₂) / α^(i₁+i₂) * 
+            res *= (-1)^(i₁) * factorial(i₁) * factorial(i₂) / α^(i₁+i₂) * 
                    genIntOverlapCore(ΔRᵢ, i₁, α₁, i₂, α₂)
         end
 
     res
 end
 
-function ∫elecKineticCore(R₁::NTuple{3, Float64}, R₂::NTuple{3, Float64}, 
-                          ijk₁::NTuple{3, Int}, α₁::Float64,
-                          ijk₂::NTuple{3, Int}, α₂::Float64)
+function ∫elecKineticCore(R₁::NTuple{3, T}, R₂::NTuple{3, T}, 
+                          ijk₁::NTuple{3, Int}, α₁::T,
+                          ijk₂::NTuple{3, Int}, α₂::T) where {T}
     ΔR = R₁ .- R₂
     shifts = ((2,0,0), (0,2,0), (0,0,2))
-    0.5 * (α₂ * (4*sum(ijk₂) + 6) * ∫overlapCore(ΔR, ijk₁, α₁, ijk₂, α₂) - 4.0 * α₂^2 * 
-           sum(∫overlapCore.(Ref(ΔR), Ref(ijk₁), α₁, map.(+, Ref(ijk₂), shifts), α₂)) - 
-           sum(ijk₂ .* (ijk₂.-1) .* 
-               ∫overlapCore.(Ref(ΔR), Ref(ijk₁), α₁, map.(-, Ref(ijk₂), shifts), α₂)))
+    ( α₂ * (4*sum(ijk₂) + 6) * ∫overlapCore(ΔR, ijk₁, α₁, ijk₂, α₂) - 4 * α₂^2 * 
+      sum(∫overlapCore.(Ref(ΔR), Ref(ijk₁), α₁, map.(+, Ref(ijk₂), shifts), α₂)) - 
+      sum(ijk₂ .* (ijk₂.-1) .* 
+          ∫overlapCore.(Ref(ΔR), Ref(ijk₁), α₁, map.(-, Ref(ijk₂), shifts), α₂)) ) / 2
 end
 
-@inline function genIntTerm1(Δx::Float64, 
+@inline function genIntTerm1(Δx::T, 
                              l₁::Int, o₁::Int, 
                              l₂::Int, o₂::Int, 
-                             i₁::Int, α₁::Float64, 
-                             i₂::Int, α₂::Float64)
+                             i₁::Int, α₁::T, 
+                             i₂::Int, α₂::T) where {T}
     @inline (r) -> 
         (-1)^(o₂+r) * factorial(o₁+o₂) * α₁^(o₂-l₁-r) * α₂^(o₁-l₂-r) * Δx^(o₁+o₂-2r) / 
         (
@@ -117,21 +142,21 @@ end
         )
 end
 
-@inline function genIntTerm2(Δx::Float64, 
-                             α::Float64, 
+@inline function genIntTerm2(Δx::T, 
+                             α::T, 
                              o₁::Int, 
                              o₂::Int, 
                              μ::Int, 
-                             r::Int)
+                             r::Int) where {T}
     @inline (u) ->
         (-1)^u * factorial(μ) * Δx^(μ-2u) / 
         (4^u * factorial(u) * factorial(μ-2u) * α^(o₁+o₂-r+u))
 end
 
-function genIntNucAttCore1(ΔRR₀::NTuple{3, Float64}, ΔR₁R₂::NTuple{3, Float64}, β::Float64, 
-                           ijk₁::NTuple{3, Int}, α₁::Float64, 
-                           ijk₂::NTuple{3, Int}, α₂::Float64)
-    A = 0.0
+function genIntNucAttCore1(ΔRR₀::NTuple{3, T}, ΔR₁R₂::NTuple{3, T}, β::T, 
+                           ijk₁::NTuple{3, Int}, α₁::T, 
+                           ijk₂::NTuple{3, Int}, α₂::T) where {T}
+    A = T(0)
     i₁, j₁, k₁ = ijk₁
     i₂, j₂, k₂ = ijk₂
     for l₁ in 0:(i₁÷2), m₁ in 0:(j₁÷2), n₁ in 0:(k₁÷2), 
@@ -159,10 +184,10 @@ function genIntNucAttCore1(ΔRR₀::NTuple{3, Float64}, ΔR₁R₂::NTuple{3, Fl
 
                 for u in 0:(μˣ÷2), v in 0:(μʸ÷2), w in 0:(μᶻ÷2)
                     γ = μsum - u - v - w
-                    tmp += (((u, v, w) .|> core2s)::NTuple{3, Float64} |> prod) * 2Fγs[γ+1]
+                    tmp += (((u, v, w) .|> core2s)::NTuple{3, T} |> prod) * 2Fγs[γ+1]
                 end
 
-                A += ((rst .|> core1s)::NTuple{3, Float64} |> prod) * tmp
+                A += ((rst .|> core1s)::NTuple{3, T} |> prod) * tmp
 
             end
         end
@@ -171,13 +196,13 @@ function genIntNucAttCore1(ΔRR₀::NTuple{3, Float64}, ΔR₁R₂::NTuple{3, Fl
     A
 end
 
-function ∫nucAttractionCore(Z₀::Int, R₀::NTuple{3, Float64}, 
-                            R₁::NTuple{3, Float64}, R₂::NTuple{3, Float64}, 
-                            ijk₁::NTuple{3, Int}, α₁::Float64,
-                            ijk₂::NTuple{3, Int}, α₂::Float64)
+function ∫nucAttractionCore(Z₀::Int, R₀::NTuple{3, T}, 
+                            R₁::NTuple{3, T}, R₂::NTuple{3, T}, 
+                            ijk₁::NTuple{3, Int}, α₁::T,
+                            ijk₂::NTuple{3, Int}, α₂::T) where {T}
     if α₁ == α₂
         α = 2α₁
-        R = @. 0.5 * (R₁ + R₂)
+        R = @. (R₁ + R₂) / 2
         flag = true
     else
         α = α₁ + α₂
@@ -211,12 +236,12 @@ end
         (4^u * factorial(u) * factorial(μ-2u))
 end
 
-function ∫eeInteractionCore1234(ΔRl::NTuple{3, Float64}, ΔRr::NTuple{3, Float64}, 
-                                ΔRc::NTuple{3, Float64}, β::Float64, η::Float64, 
-                                ijk₁::NTuple{3, Int}, α₁::Float64, 
-                                ijk₂::NTuple{3, Int}, α₂::Float64, 
-                                ijk₃::NTuple{3, Int}, α₃::Float64, 
-                                ijk₄::NTuple{3, Int}, α₄::Float64)
+function ∫eeInteractionCore1234(ΔRl::NTuple{3, T}, ΔRr::NTuple{3, T}, 
+                                ΔRc::NTuple{3, T}, β::T, η::T, 
+                                ijk₁::NTuple{3, Int}, α₁::T, 
+                                ijk₂::NTuple{3, Int}, α₂::T, 
+                                ijk₃::NTuple{3, Int}, α₃::T, 
+                                ijk₄::NTuple{3, Int}, α₄::T) where {T}
     A = 0.0
     (i₁, j₁, k₁), (i₂, j₂, k₂), (i₃, j₃, k₃), (i₄, j₄, k₄) = ijk₁, ijk₂, ijk₃, ijk₄
 
@@ -274,10 +299,10 @@ function ∫eeInteractionCore1234(ΔRl::NTuple{3, Float64}, ΔRr::NTuple{3, Floa
     A
 end
 
-function ∫eeInteractionCore(R₁::NTuple{3, Float64}, ijk₁::NTuple{3, Int}, α₁::Float64, 
-                            R₂::NTuple{3, Float64}, ijk₂::NTuple{3, Int}, α₂::Float64,
-                            R₃::NTuple{3, Float64}, ijk₃::NTuple{3, Int}, α₃::Float64, 
-                            R₄::NTuple{3, Float64}, ijk₄::NTuple{3, Int}, α₄::Float64)
+function ∫eeInteractionCore(R₁::NTuple{3, T}, ijk₁::NTuple{3, Int}, α₁::T, 
+                            R₂::NTuple{3, T}, ijk₂::NTuple{3, Int}, α₂::T,
+                            R₃::NTuple{3, T}, ijk₃::NTuple{3, Int}, α₃::T, 
+                            R₄::NTuple{3, T}, ijk₄::NTuple{3, Int}, α₄::T) where {T}
     ΔRl = R₁ .- R₂
     ΔRr = R₃ .- R₄
     αl = α₁ + α₂
@@ -287,10 +312,11 @@ function ∫eeInteractionCore(R₁::NTuple{3, Float64}, ijk₁::NTuple{3, Int}, 
     ΔRc = @. (α₁*R₁ + α₂*R₂)/αl - (α₃*R₃ + α₄*R₄)/αr
     η = αl * αr / (α₁ + α₂ + α₃ + α₄)
     β = η * sum(abs2, ΔRc)
-    res = π^2.5 / (αl * αr * sqrt(αl + αr)) * exp(-ηl * sum(abs2, ΔRl)) * 
-                                              exp(-ηr * sum(abs2, ΔRr))
-    res *= (@. (-1.0)^(ijk₁ + ijk₂) * factorial(ijk₁) * factorial(ijk₂) * factorial(ijk₃) * 
-               factorial(ijk₄) / αl^(ijk₁+ijk₂) / αr^(ijk₃+ijk₄)) |> prod
+    res = π^T(2.5) / (αl * αr * sqrt(αl + αr)) * exp(-ηl * sum(abs2, ΔRl)) * 
+                                                 exp(-ηr * sum(abs2, ΔRr))
+    res *= ( @. (-1)^(ijk₁ + ijk₂) * factorial(ijk₁) * factorial(ijk₂) * 
+                factorial(ijk₃) * factorial(ijk₄) / 
+                αl^(ijk₁+ijk₂) / αr^(ijk₃+ijk₄) ) |> prod
         J = ∫eeInteractionCore1234(ΔRl, ΔRr, ΔRc, β, η, 
                                    ijk₁, α₁, ijk₂, α₂, ijk₃, α₃, ijk₄, α₄)
     res * J
@@ -310,7 +336,7 @@ function reformatIntData1(bf::FGTBasisFuncs1O{T, D, 𝑙, GN}) where {T, D, 𝑙
     R = (centerCoordOf(bf) |> Tuple)::NTuple{D, T}
     ijk = bf.ijk[1].tuple
     αds = if bf.normalizeGTO
-        N = getNijk(ijk...)
+        N = getNijk(T, ijk...)
         map(x->(x.xpn(), x.con() * N * getNα(ijk..., x.xpn())), bf.gauss)
     else
         map(x->(x.xpn(), x.con()), bf.gauss)
@@ -325,7 +351,7 @@ function getOneBodyInt(∫1e::F,
     (R₁, ijk₁, ps₁), (R₂, ijk₂, ps₂) = reformatIntData1.((bf1, bf2))
     uniquePairs, uPairCoeffs = getOneBodyIntCore(R₁==R₂ && ijk₁==ijk₂, ps₁, ps₂)
     map(uniquePairs, uPairCoeffs) do x, y
-        ∫1e(optArgs..., R₁, R₂, ijk₁, x[1], ijk₂, x[2])::Float64 * y
+        ∫1e(optArgs..., R₁, R₂, ijk₁, x[1], ijk₂, x[2])::T * y
     end |> sum
 end
 
@@ -336,10 +362,10 @@ function getOneBodyInt(::F,
 end
 
 function getOneBodyIntCore(flag::Bool, 
-                           ps₁::NTuple{GN1, NTuple{2, Float64}}, 
-                           ps₂::NTuple{GN2, NTuple{2, Float64}}) where {GN1, GN2}
-    uniquePairs = NTuple{2, Float64}[]
-    uPairCoeffs = Array{Float64}(undef, GN1*GN2)
+                           ps₁::NTuple{GN1, NTuple{2, T}}, 
+                           ps₂::NTuple{GN2, NTuple{2, T}}) where {T, GN1, GN2}
+    uniquePairs = NTuple{2, T}[]
+    uPairCoeffs = Array{T}(undef, GN1*GN2)
     i = 0
     if flag
         if ps₁ == ps₂
@@ -399,7 +425,7 @@ function getTwoBodyInt(∫2e::F,
 
     uniquePairs, uPairCoeffs = getTwoBodyIntCore((f1, f2, f3, f4, f5), ps₁, ps₂, ps₃, ps₄)
     map(uniquePairs, uPairCoeffs) do x, y
-        ∫2e(optArgs..., R₁,ijk₁,x[1], R₂,ijk₂,x[2], R₃,ijk₃,x[3], R₄,ijk₄,x[4])::Float64 * y
+        ∫2e(optArgs..., R₁,ijk₁,x[1], R₂,ijk₂,x[2], R₃,ijk₃,x[3], R₄,ijk₄,x[4])::T * y
     end |> sum
 end
 
@@ -412,11 +438,11 @@ function getTwoBodyInt(::F,
     min(BN1, BN2, BN3, BN4) == 0 ? 0.0 : error("The input basis type is NOT supported.")
 end
 
-@inline function diFoldCount(i::T, j::T) where {T<:Real}
+@inline function diFoldCount(i::T, j::T) where {T}
     i==j ? 1 : 2
 end
 
-@inline function octaFoldCount(i::T, j::T, k::T, l::T) where {T<:Real}
+@inline function octaFoldCount(i::T, j::T, k::T, l::T) where {T}
     m = 0
     i != j && (m += 1)
     k != l && (m += 1)
@@ -425,12 +451,12 @@ end
 end
 
 function getTwoBodyIntCore(flags::NTuple{5, Bool}, 
-                           ps₁::NTuple{GN1, NTuple{2, Float64}},
-                           ps₂::NTuple{GN2, NTuple{2, Float64}},
-                           ps₃::NTuple{GN3, NTuple{2, Float64}},
-                           ps₄::NTuple{GN4, NTuple{2, Float64}}) where {GN1, GN2, GN3, GN4}
-    uniquePairs = NTuple{4, Float64}[]
-    uPairCoeffs = Array{Float64}(undef, GN1*GN2*GN3*GN4)
+                           ps₁::NTuple{GN1, NTuple{2, T}},
+                           ps₂::NTuple{GN2, NTuple{2, T}},
+                           ps₃::NTuple{GN3, NTuple{2, T}},
+                           ps₄::NTuple{GN4, NTuple{2, T}}) where {GN1, GN2, GN3, GN4, T}
+    uniquePairs = NTuple{4, T}[]
+    uPairCoeffs = Array{T}(undef, GN1*GN2*GN3*GN4)
     flagRijk = flags[1:3]
     i = 0
     if ps₁ == ps₂ && flags[1]
@@ -659,8 +685,8 @@ end
 end
 
 @inline function getIntCore1212!(n, uniquePairs, uPairCoeffs, flags, 
-                                 (ps₁, ps₂)::Tuple{NTuple{N1}, NTuple{N2}}, 
-                                 nFold=1) where {N1, N2}
+                                 (ps₁, ps₂)::Tuple{NTuple{N1, T}, NTuple{N2, T}}, 
+                                 nFold=1) where {N1, N2, T}
     oneSidePairs = Iterators.product(1:N1, 1:N2)
     for (x, (i₁,i₂)) in enumerate(oneSidePairs), (_, (i₃,i₄)) in zip(1:x, oneSidePairs)
         n = getUniquePair!(n, uniquePairs, uPairCoeffs, flags, 
@@ -670,8 +696,8 @@ end
 end
 
 @inline function getIntCore1221!(n, uniquePairs, uPairCoeffs, flags, 
-                                 (ps₁, ps₂)::Tuple{NTuple{N1}, NTuple{N2}}, 
-                                 nFold=1) where {N1, N2}
+                                 (ps₁, ps₂)::Tuple{NTuple{N1, T}, NTuple{N2, T}}, 
+                                 nFold=1) where {N1, N2, T}
     oneSidePairs = Iterators.product(1:N1, 1:N2)
     for (x, (i₁,i₂)) in enumerate(oneSidePairs), (_, (i₃,i₄)) in zip(1:x, oneSidePairs)
         n = getUniquePair!(n, uniquePairs, uPairCoeffs, flags, 
@@ -717,7 +743,7 @@ getOneBodyInt(∫elecKineticCore, bf1, bf2)
 function getNucEleAttraction(bf1::BasisFunc{T, D, <:Any, GN1}, 
                              bf2::BasisFunc{T, D, <:Any, GN2}, 
                              nuc::NTuple{NN, String}, 
-                             nucCoords::NTuple{NN, NTuple{3, T}}) where {T, D, GN1, GN2, NN}
+                             nucCoords::NTuple{NN, NTuple{D, T}}) where {T, D, GN1, GN2, NN}
     res = 0.0
     for (ele, coord) in zip(nuc, nucCoords)
         res += getOneBodyInt(∫nucAttractionCore, bf1, bf2, getCharge(ele), coord|>Tuple)
@@ -759,12 +785,12 @@ getCompositeInt(getEleKinetic, (b1, b2))
 
 getNucEleAttraction(b1::GTBasisFuncs{T, D}, b2::GTBasisFuncs{T, D}, 
                     nuc::NTuple{NN, String}, 
-                    nucCoords::NTuple{NN, NTuple{3, T}}) where {T, D, NN} = 
+                    nucCoords::NTuple{NN, NTuple{D, T}}) where {T, D, NN} = 
 getCompositeInt(getNucEleAttraction, (b1, b2), nuc, nucCoords)
 
 getCoreH(b1::GTBasisFuncs{T, D}, b2::GTBasisFuncs{T, D}, 
          nuc::NTuple{NN, String}, 
-         nucCoords::NTuple{NN, NTuple{3, T}}) where {T, D, NN} = 
+         nucCoords::NTuple{NN, NTuple{D, T}}) where {T, D, NN} = 
 getEleKinetic(b1, b2) + getNucEleAttraction(b1, b2, nuc, nucCoords)
 
 getEleEleInteraction(b1::GTBasisFuncs{T, D}, b2::GTBasisFuncs{T, D}, 
@@ -791,7 +817,7 @@ function getOneBodyInts(∫1e::F, basisSet::NTuple{BN, GTBasisFuncs{T, D}}, optA
     subSize = basisSize.(basisSet) |> collect
     accuSize = vcat(0, accumulate(+, subSize))
     len = subSize |> sum
-    buf = Array{Float64}(undef, len, len)
+    buf = Array{T}(undef, len, len)
     for j = 1:BN, i = 1:j
         int = ∫1e(basisSet[i], basisSet[j], optArgs...)
         rowRange = accuSize[i]+1 : accuSize[i+1]
@@ -803,7 +829,7 @@ end
 
 function getOneBodyInts(∫1e::F, basisSet::NTuple{BN, GTBasisFuncs{T, D, 1}}, 
                         optArgs...) where {F<:Function, BN, T, D}
-    buf = Array{Float64}(undef, BN, BN)
+    buf = Array{T}(undef, BN, BN)
     for j = 1:BN, i = 1:j
         int = ∫1e(basisSet[i], basisSet[j], optArgs...)
         buf[i, j] = buf[j, i] = int
@@ -819,12 +845,12 @@ getEleKinetic(BSet::NTuple{BN, GTBasisFuncs{T, D}}) where {BN, T, D} =
 getOneBodyInts(getEleKinetic, BSet)
 
 getNucEleAttraction(BSet::NTuple{BN, GTBasisFuncs{T, D}}, 
-                     nuc::NTuple{NN, String}, nucCoords::NTuple{NN, NTuple{3, T}}) where 
+                     nuc::NTuple{NN, String}, nucCoords::NTuple{NN, NTuple{D, T}}) where 
                     {BN, T, D, NN} = 
 getOneBodyInts(getNucEleAttraction, BSet, nuc, nucCoords)
 
 getCoreH(BSet::NTuple{BN, GTBasisFuncs{T, D}}, 
-         nuc::NTuple{NN, String}, nucCoords::NTuple{NN, NTuple{3, T}}) where 
+         nuc::NTuple{NN, String}, nucCoords::NTuple{NN, NTuple{D, T}}) where 
         {BN, T, D, NN} = 
 getOneBodyInts(getCoreH, BSet, nuc, nucCoords)
 
@@ -863,7 +889,7 @@ function getTwoBodyInts(∫2e::F, basisSet::NTuple{BN, GTBasisFuncs{T, D}}) wher
     subSize = basisSize.(basisSet) |> collect
     accuSize = vcat(0, accumulate(+, subSize))
     totalSize = subSize |> sum
-    buf = Array{Float64}(undef, totalSize, totalSize, totalSize, totalSize)
+    buf = Array{T}(undef, totalSize, totalSize, totalSize, totalSize)
     for l = 1:BN, k = 1:l, j = 1:l, i = 1:(j==l ? k : j)
         I = accuSize[i]+1 : accuSize[i+1]
         J = accuSize[j]+1 : accuSize[j+1]
@@ -877,7 +903,7 @@ end
 
 function getTwoBodyInts(∫2e::F, basisSet::NTuple{BN, GTBasisFuncs{T, D, 1}}) where 
                        {F<:Function, BN, T, D}
-    buf = Array{Float64}(undef, BN, BN, BN, BN)
+    buf = Array{T}(undef, BN, BN, BN, BN)
     for l = 1:BN, k = 1:l, j = 1:l, i = 1:(j==l ? k : j)
         int = ∫2e(basisSet[i], basisSet[j], basisSet[k], basisSet[l])
         buf[i, j, k, l] = buf[j, i, k, l] = buf[j, i, l, k] = buf[i, j, l, k] = 

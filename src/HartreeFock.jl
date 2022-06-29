@@ -902,7 +902,9 @@ function LBFGSBsolver(v::Vector{T}, B::Matrix{T}, cvxConstraint::Bool) where {T}
     g! = genxDIIS∇f(v, B)
     lb = cvxConstraint ? 0.0 : -Inf
     _, c = lbfgsb(f, g!, fill(1e-2, length(v)); lb, 
-                  m=15, factr=1, pgtol=1e-8, maxfun=20000, maxiter=20000)
+                  m=min(getAtolDigits(T), 50), factr=1, 
+                  pgtol=max(sqrt(getAtolVal(T)), getAtolVal(T)), 
+                  maxfun=20000, maxiter=20000)
     convert(Vector{T}, c ./ sum(c))
 end
 
