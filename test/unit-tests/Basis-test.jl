@@ -264,7 +264,7 @@ gf_merge3 = GaussFunc(1.5, 1.0)
 
 # function add, mul, gaussProd
 @test add(bs2[1]) === bs2[1]
-bf1s = BasisFuncs(bf1.center, bf1.gauss, (bf1.ijk[1],), bf1.normalizeGTO)
+bf1s = BasisFuncs(bf1.center, bf1.gauss, (bf1.l[1],), bf1.normalizeGTO)
 @test hasIdentical(add(bf1s), bf1)
 bfm_add1 = BasisFuncMix(bs2)
 @test add(bfm_add1) == sumOf(bs2)
@@ -290,7 +290,7 @@ xpn2 = genExponent(1.2)
 con2 = genContraction(1.2, x->x^2)
 bf_pf = genBasisFunc([1.0, 2.0, 3.0], GaussFunc(xpn2, con2))
 bf_pf2 = (bf_pf*0.4)*5
-@test bf_pf2.gauss[1].con.map isa Quiqbox.Pf{2.0}
+@test bf_pf2.gauss[1].con.map isa Quiqbox.Pf{Float64}
 @test hasEqual(bf_pf2, mul(bf_pf, 2.0))
 
 
@@ -433,6 +433,7 @@ dm2 = reshape([genBasisFunc([1.0, 0.0, 0.0], (2.0, 0.1)), bf_d_1], 2, 1)
 
 # function basisSize
 @test basisSize("P") == 3
+@test basisSize("P", 2) == 2
 @test basisSize.(["S", "P", "D"]) == [1, 3, 6]
 @test basisSize(bf1) == 1
 @test basisSize(bfm1) == 1 == basisSize(bfm2)
@@ -538,7 +539,7 @@ bf_cb2 = copyBasis(bf_cb1)
 bf_cb3 = copyBasis(bf_cb1, false)
 testbf_cb = function (bf1, bf2)
     @test bf1.center == bf2.center
-    @test bf1.ijk == bf2.ijk
+    @test bf1.l == bf2.l
     @test bf1.normalizeGTO == bf2.normalizeGTO
 end
 testbf_cb(bf_cb1, bf_cb2)

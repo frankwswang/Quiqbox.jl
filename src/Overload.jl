@@ -8,7 +8,9 @@ import Base: ==
                                     typeof(pb1.map) === typeof(pb2.map))
 
 ==(cp1::SpatialPoint, cp2::SpatialPoint) = (cp1.point.param == cp2.point.param)
-==(t1::XYZTuple, t2::XYZTuple) = (t1.tuple == t2.tuple)
+==(t1::LTuple, t2::LTuple) = (t1.tuple == t2.tuple)
+==(t1::LTuple{D, 0}, t2::LTuple{D, 0}) where {D} = true
+==(t1::LTuple{1, L}, t2::LTuple{1, L}) where {L} = true
 
 
 diffColorSym(pb::ParamBox) = isDiffParam(pb) ? :green : :light_black
@@ -47,7 +49,7 @@ end
 function show(io::IO, bf::BasisFunc)
     print(io, typeof(bf))
     print(io, "(center, gauss)[")
-    printstyled(io, bf.ijk[1]|>ijkToStr, color=:cyan)
+    printstyled(io, bf.l[1]|>LtoStr, color=:cyan)
     cen = round.([i() for i in bf.center], sigdigits=nSigShown)
     print(io, "]", cen)
 end
@@ -55,10 +57,10 @@ end
 function show(io::IO, bf::BasisFuncs{<:Any, <:Any, 𝑙, <:Any, <:Any, ON}) where {𝑙, ON}
     SON = SubshellXYZsizes[𝑙+1]
     if ON == 1
-        xyz1 = bf.ijk[1] |> ijkToStr
+        xyz1 = bf.l[1] |> LtoStr
         xyz2 = ""
     else
-        xyz1 = "$(bf.ijk |> length)"
+        xyz1 = "$(bf.l |> length)"
         xyz2 = "/$(SON)"
     end
     print(io, typeof(bf))
@@ -159,11 +161,11 @@ length(::BasisFuncMix) = 1
 iterate(bfZero::EmptyBasisFunc) = (bfZero, nothing)
 
 function iterate(bfs::CompositeGTBasisFuncs)
-    item, state = iterate(bfs.ijk)
+    item, state = iterate(bfs.l)
     (BasisFunc(bfs.center, bfs.gauss, item, bfs.normalizeGTO), state)
 end
 function iterate(bfs::CompositeGTBasisFuncs, state)
-    iter = iterate(bfs.ijk, state)
+    iter = iterate(bfs.l, state)
     iter !== nothing ? (BasisFunc(bfs.center, bfs.gauss, iter[1], bfs.normalizeGTO), 
                         iter[2]) : nothing
 end
@@ -210,19 +212,19 @@ firstindex(::BasisFuncMix) = Val(:first)
 lastindex(::BasisFuncMix) = Val(:last)
 
 getindex(bfs::BasisFuncs, i) = 
-BasisFunc(bfs.center, bfs.gauss, bfs.ijk[i], bfs.normalizeGTO)
+BasisFunc(bfs.center, bfs.gauss, bfs.l[i], bfs.normalizeGTO)
 getindex(bfs::BFuncsON{ON}, ::Colon) where {ON} = [getindex(bfs, i) for i=1:ON]
 firstindex(bfs::BasisFuncs) = 1
 lastindex(::BFuncsON{ON}) where {ON} = ON
 eachindex(bfs::BFuncsON) = Base.OneTo(lastindex(bfs))
 getindex(bfs::BasisFuncs) = getfield.(bfs[:], :gauss) |> flatten
 
-getindex(xyz::XYZTuple, args...) = getindex(xyz.tuple, args...)
-getindex(xyz::XYZTuple) = xyz.tuple
-firstindex(xyz::XYZTuple) = firstindex(xyz.tuple)
-lastindex(xyz::XYZTuple) = lastindex(xyz.tuple)
-eachindex(xyz::XYZTuple) = eachindex(xyz.tuple)
-axes(xyz::XYZTuple) = axes(xyz.tuple)
+getindex(xyz::LTuple, args...) = getindex(xyz.tuple, args...)
+getindex(xyz::LTuple) = xyz.tuple
+firstindex(xyz::LTuple) = firstindex(xyz.tuple)
+lastindex(xyz::LTuple) = lastindex(xyz.tuple)
+eachindex(xyz::LTuple) = eachindex(xyz.tuple)
+axes(xyz::LTuple) = axes(xyz.tuple)
 
 
 # Broadcasting Interface

@@ -29,7 +29,7 @@ end
 
 
 normOfGTOin(b::Quiqbox.FGTBasisFuncs1O) = 
-Nijkα.(b.ijk[1]..., [g.xpn() for g in b.gauss])
+Nijkα.(b.l[1]..., [g.xpn() for g in b.gauss])
 
 normOfGTOin(b::Quiqbox.FloatingGTBasisFuncs) = 
 Nlα.(b|>Quiqbox.subshellOf, [g.xpn() for g in b.gauss])
@@ -43,7 +43,7 @@ isFull(::Quiqbox.FloatingGTBasisFuncs{<:Any, <:Any, 𝑙, <:Any, <:Any, ON}) whe
 
 function ijkIndex(b::Quiqbox.FloatingGTBasisFuncs)
     isFull(b) && (return :)
-    [Quiqbox.ijkIndexList[ijk] for ijk in b.ijk]
+    [Quiqbox.AngMomIndexList[ijk] for ijk in b.l]
 end
 
 

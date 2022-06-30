@@ -121,11 +121,11 @@ v = -abs(rand())
 
 # struct Pf
 pf1 = Pf(-1.5, abs)
-@test pf1(-2) == -3.0
+@test pf1(-2.0) == -3.0
 @test nameOf(pf1) == typeof(pf1)
 pf2 = Pf(-1.5, abs)
 @test pf2(-2) == Pf(-1.5, tf1)(-2) == -3.0
-@test Pf(-1.0, pf2)(-2) == 3.0
+@test Pf(-1.0, pf2)(-2.0) == 3.0
 @test Pf(-1.0, Pf(-1.5, itself))(-2) == -3.0
 
 

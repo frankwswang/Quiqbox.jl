@@ -224,15 +224,15 @@ cs = [pb1, gf1, bf1]
 @test iterate(bfm1, rand()) === nothing
 @test hasEqual(iterate(bfs1), (bfs1[1], 2))
 @test hasEqual(iterate(bfs1, 1), (bfs1[1], 2))
-@test hasEqual(iterate(bfs1, length(bfs1.ijk)+1), nothing)
+@test hasEqual(iterate(bfs1, length(bfs1.l)+1), nothing)
 
 @test size(bfm1) == ()
 @test size(bfm1, 1) == 1
-@test size(bfs1) == (length(bfs1.ijk),)
-@test size(bfs1, 1) == length(bfs1.ijk)
+@test size(bfs1) == (length(bfs1.l),)
+@test size(bfs1, 1) == length(bfs1.l)
 
 @test length(bfm1) == 1
-@test length(bfs1) == length(bfs1.ijk)
+@test length(bfs1) == length(bfs1.l)
 
 
 # function getindex, setindex!, firstindex, lastindex, axes

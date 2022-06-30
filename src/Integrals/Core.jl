@@ -334,7 +334,7 @@ end
 
 function reformatIntData1(bf::FGTBasisFuncs1O{T, D, 𝑙, GN}) where {T, D, 𝑙, GN}
     R = (centerCoordOf(bf) |> Tuple)::NTuple{D, T}
-    ijk = bf.ijk[1].tuple
+    ijk = bf.l[1].tuple
     αds = if bf.normalizeGTO
         N = getNijk(T, ijk...)
         map(x->(x.xpn(), x.con() * N * getNα(ijk..., x.xpn())), bf.gauss)

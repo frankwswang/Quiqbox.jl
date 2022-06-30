@@ -143,9 +143,9 @@ end
 
 𝑑f(::Type{FLi}, f::Function, x::T) where {T} = 1.0
 
-function ∂SGFcore(::Val{xpnSym}, sgf::FGTBasisFuncs1O{T, D, 𝑙, 1}, c::T=T(1)) where {T, D, 𝑙}
-    res = ( shiftCore(+, sgf, XYZTuple(2,0,0)) + shiftCore(+, sgf, XYZTuple(0,2,0)) + 
-            shiftCore(+, sgf, XYZTuple(0,0,2)) ) * (-c)
+function ∂SGFcore(::Val{xpnSym}, sgf::FGTBasisFuncs1O{T, 3, 𝑙, 1}, c::T=T(1)) where {T, D, 𝑙}
+    res = ( shiftCore(+, sgf, LTuple(2,0,0)) + shiftCore(+, sgf, LTuple(0,2,0)) + 
+            shiftCore(+, sgf, LTuple(0,0,2)) ) * (-c)
     if sgf.normalizeGTO
         res += sgf * (T(0.5𝑙 + 0.75) / sgf.gauss[1].xpn() * c)
     end
@@ -153,22 +153,22 @@ function ∂SGFcore(::Val{xpnSym}, sgf::FGTBasisFuncs1O{T, D, 𝑙, 1}, c::T=T(1
 end
 
 function ∂SGFcore(::Val{conSym}, sgf::FGTBasisFuncs1O{T, D, 𝑙, 1}, c::T=T(1)) where {T, D, 𝑙}
-    BasisFunc(sgf.center, GaussFunc(sgf.gauss[1].xpn, c), sgf.ijk, sgf.normalizeGTO)
+    BasisFunc(sgf.center, GaussFunc(sgf.gauss[1].xpn, c), sgf.l, sgf.normalizeGTO)
 end
 
-function ∂SGFcore(::Val{cxSym}, sgf::FGTBasisFuncs1O{T, D, 𝑙, 1}, c::T=T(1)) where {T, D, 𝑙}
-    shiftCore(-, sgf, XYZTuple(1,0,0)) * (-c*sgf.ijk[1][1]) + 
-    shiftCore(+, sgf, XYZTuple(1,0,0)) * (2c*sgf.gauss[1].xpn())
+function ∂SGFcore(::Val{cxSym}, sgf::FGTBasisFuncs1O{T, 3, 𝑙, 1}, c::T=T(1)) where {T, D, 𝑙}
+    shiftCore(-, sgf, LTuple(1,0,0)) * (-c*sgf.l[1][1]) + 
+    shiftCore(+, sgf, LTuple(1,0,0)) * (2c*sgf.gauss[1].xpn())
 end
 
-function ∂SGFcore(::Val{cySym}, sgf::FGTBasisFuncs1O{T, D, 𝑙, 1}, c::T=T(1)) where {T, D, 𝑙}
-    shiftCore(-, sgf, XYZTuple(0,1,0)) * (-c*sgf.ijk[1][2]) + 
-    shiftCore(+, sgf, XYZTuple(0,1,0)) * (2c*sgf.gauss[1].xpn())
+function ∂SGFcore(::Val{cySym}, sgf::FGTBasisFuncs1O{T, 3, 𝑙, 1}, c::T=T(1)) where {T, D, 𝑙}
+    shiftCore(-, sgf, LTuple(0,1,0)) * (-c*sgf.l[1][2]) + 
+    shiftCore(+, sgf, LTuple(0,1,0)) * (2c*sgf.gauss[1].xpn())
 end
 
-function ∂SGFcore(::Val{czSym}, sgf::FGTBasisFuncs1O{T, D, 𝑙, 1}, c::T=T(1)) where {T, D, 𝑙}
-    shiftCore(-, sgf, XYZTuple(0,0,1)) * (-c*sgf.ijk[1][3]) + 
-    shiftCore(+, sgf, XYZTuple(0,0,1)) * (2c*sgf.gauss[1].xpn())
+function ∂SGFcore(::Val{czSym}, sgf::FGTBasisFuncs1O{T, 3, 𝑙, 1}, c::T=T(1)) where {T, D, 𝑙}
+    shiftCore(-, sgf, LTuple(0,0,1)) * (-c*sgf.l[1][3]) + 
+    shiftCore(+, sgf, LTuple(0,0,1)) * (2c*sgf.gauss[1].xpn())
 end
 
 const sgfSample = genBasisFunc([0.0, 0.0, 0.0], (2.0, 1.0))
