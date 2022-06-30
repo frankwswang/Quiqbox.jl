@@ -758,15 +758,17 @@ end
 
 
 # Product Function
-struct Pf{C, F} <: ParameterizedFunction{Pf, F}
+struct Pf{T<:Number, F<:Function} <: ParameterizedFunction{Pf, F}
     f::TypedFunction{F}
+    c::T
 end
 
-Pf(c::Float64, f::TypedFunction{F}) where {F} = Pf{c, F}(f)
-Pf(c::Float64, f::Pf{C, F}) where {C, F} = Pf{c*C, F}(f.f)
-Pf(c::Float64, f::F) where {F<:Function} = Pf(c, TypedFunction(f))
+Pf(c::T, f::TypedFunction{F}) where {T, F} = Pf{T, F}(f, c)
+Pf(c::T, f::Pf{T, F}) where {T, F} = Pf{T, F}(f.f, f.c*c)
+Pf(c::T, f::F) where {T, F<:Function} = Pf{T, F}(TypedFunction(f), c)
 
-(f::Pf{C, F})(x::T) where {C, F, T} = Float64(C) * f.f.f(x)
+(f::Pf{T, F})(x::T) where {T, F} = f.c * f.f.f(x)
+(f::Pf{T1, F})(x::T2) where {T1, T2, F} = f(T1(x))
 
 
 function getFunc(fSym::Symbol, failedResult=missing)
@@ -853,8 +855,8 @@ function getFuncNum(f::Function, vNum::Symbolics.Num)::Symbolics.Num
     Symbolics.variable(f|>nameOf, T=Symbolics.FnType)(vNum)
 end
 
-function getFuncNum(pf::Pf{C, F}, vNum::Symbolics.Num) where {C, F}
-    (C * Symbolics.variable(pf.f.n, T=Symbolics.FnType)(vNum))::Symbolics.Num
+function getFuncNum(pf::Pf{T, F}, vNum::Symbolics.Num) where {T, F}
+    (pf.c * Symbolics.variable(pf.f.n, T=Symbolics.FnType)(vNum))::Symbolics.Num
 end
 
 function getFuncNum(tf::TypedFunction{F}, vNum::Symbolics.Num) where {F}
@@ -904,7 +906,7 @@ fillNumber(num::Array{<:Any, 0}) = itself(num)
 @inline genTupleCoords(coords::Vector{<:AbstractArray{<:Real}}) = 
         Tuple((Float64(i[1]), Float64(i[2]), Float64(i[3])) for i in coords)
 
-@inline genTupleCoords(coords::Tuple{Vararg{NTuple{3,Float64}}}) = itself(coords)
+@inline genTupleCoords(coords::Tuple{Vararg{NTuple{3, Float64}}}) = itself(coords)
 
 
 @inline arrayToTuple(arr::AbstractArray) = Tuple(arr)
