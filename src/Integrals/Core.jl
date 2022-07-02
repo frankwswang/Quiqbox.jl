@@ -3,11 +3,9 @@ using SpecialFunctions: erf
 using LinearAlgebra: dot
 
 # Reference: DOI: 10.1088/0143-0807/31/1/004
-# factorialL(l::Integer) = (l > 20 ? big(l) : l) |> factorial
 factorialL(l::Integer) = FactorialsLs[l+1]
 
-getGKQorder(T::Type{<:Real}) = 
-ifelse(getAtolVal(T) >= getAtolVal(Float64), 13, 26)
+getGKQorder(T::Type{<:Real}) = ifelse(getAtolVal(T) >= getAtolVal(Float64), 13, 26)
 
 πroot(::Type{T}) where {T} = sqrt(π*T(1))
 ## Has compatibility issue with BigFloat that may cause bad precision for LBFGS-B solver: 
@@ -322,14 +320,13 @@ function ∫eeInteractionCore(R₁::NTuple{3, T}, ijk₁::NTuple{3, Int}, α₁:
     res * J
 end
 
-function reformatIntData2((o1, o2)::NTuple{2, T}, flag::Bool) where {T}
-    ( (flag && isless(o2, o1)) ? (o2, o1) : (o1, o2) )::NTuple{2, T}
-end
+reformatIntData2((o1, o2)::NTuple{2, T}, flag::Bool) where {T} = 
+( (flag && isless(o2, o1)) ? (o2, o1) : (o1, o2) )
 
-function reformatIntData2((o1, o2, o3, o4)::NTuple{4, T}, flag::NTuple{3, Bool}) where {T}
-    p1 = (flag[1] && isless(o2, o1)) ? (o2, o1) : (o1, o2)
-    p2 = (flag[2] && isless(o4, o3)) ? (o4, o3) : (o3, o4)
-    ((flag[3] && isless(p2, p1)) ? (p2..., p1...) : (p1..., p2...) )::NTuple{4, T}
+function reformatIntData2((o1, o2, o3, o4)::NTuple{4, T}, flags::NTuple{3, Bool}) where {T}
+    l = reformatIntData2((o1, o2), flags[1])
+    r = reformatIntData2((o3, o4), flags[2])
+    ifelse((flags[3] && isless(r, l)), (r[1], r[2], l[1], l[2]), (l[1], l[2], r[1], r[2]))
 end
 
 function reformatIntData1(bf::FGTBasisFuncs1O{T, D, 𝑙, GN}) where {T, D, 𝑙, GN}
@@ -438,9 +435,7 @@ function getTwoBodyInt(::F,
     min(BN1, BN2, BN3, BN4) == 0 ? 0.0 : error("The input basis type is NOT supported.")
 end
 
-@inline function diFoldCount(i::T, j::T) where {T}
-    i==j ? 1 : 2
-end
+diFoldCount(i::T, j::T) where {T} = ifelse(i==j, 1, 2)
 
 @inline function octaFoldCount(i::T, j::T, k::T, l::T) where {T}
     m = 0
@@ -459,31 +454,34 @@ function getTwoBodyIntCore(flags::NTuple{5, Bool},
     uPairCoeffs = Array{T}(undef, GN1*GN2*GN3*GN4)
     flagRijk = flags[1:3]
     i = 0
-    if ps₁ == ps₂ && flags[1]
-        if ps₃ == ps₄ && flags[2]
-            if ps₃ == ps₁ && flags[3]
-                i = getIntCore1111!(i, uniquePairs, uPairCoeffs, flagRijk, ps₁)
-            else
-                i = getIntX1X1X2X2!(i, uniquePairs, uPairCoeffs, flagRijk, ps₁, ps₃)
-            end
-        else
-            i = getIntX1X1X2X3!(i, uniquePairs, uPairCoeffs, flagRijk, ps₁, ps₃, ps₄)
-        end
-    elseif ps₃ == ps₄ && flags[2]
-        i = getIntX1X2X3X3!(i, uniquePairs, uPairCoeffs, flagRijk, ps₁, ps₂, ps₃)
-    elseif ps₁ == ps₃ && ps₂ == ps₄ && flags[3]
-        i = getIntX1X2X1X2!(i, uniquePairs, uPairCoeffs, flagRijk, ps₁, ps₂)
-    elseif ps₁ == ps₄ && flags[4]
-        if ps₂ == ps₃ && flags[5]
-            i = getIntX1X2X2X1!(i, uniquePairs, uPairCoeffs, flagRijk, ps₁, ps₂)
-        else
-            i = getIntX1X2X3X1!(i, uniquePairs, uPairCoeffs, flagRijk, ps₁, ps₂, ps₃)
-        end
-    elseif ps₂ == ps₃ && flags[5]
-        i = getIntX1X2X2X3!(i, uniquePairs, uPairCoeffs, flagRijk, ps₁, ps₂, ps₄)
+
+    if (ps₁ == ps₂ && ps₂ == ps₃ && ps₃ == ps₄ && flags[1] && flags[2] && flags[3])
+        getIntCore1111!(i, uniquePairs, uPairCoeffs, flagRijk, ps₁)
+
+    elseif (ps₁ == ps₂ && ps₃ == ps₄ && flags[1] && flags[2])
+            getIntX1X1X2X2!(i, uniquePairs, uPairCoeffs, flagRijk, ps₁, ps₃)
+
+    elseif (ps₁ == ps₄ && ps₂ == ps₃ && flags[4] && flags[5])
+        getIntX1X2X2X1!(i, uniquePairs, uPairCoeffs, flagRijk, ps₁, ps₂)
+
+    elseif (ps₁ == ps₃ && ps₂ == ps₄ && flags[3])
+        getIntX1X2X1X2!(i, uniquePairs, uPairCoeffs, flagRijk, ps₁, ps₂)
+
+    elseif (ps₁ == ps₂ && flags[1])
+        getIntX1X1X2X3!(i, uniquePairs, uPairCoeffs, flagRijk, ps₁, ps₃, ps₄)
+
+    elseif (ps₃ == ps₄ && flags[2])
+        getIntX1X2X3X3!(i, uniquePairs, uPairCoeffs, flagRijk, ps₁, ps₂, ps₃)
+
+    elseif (ps₁ == ps₄ && flags[4])
+        getIntX1X2X3X1!(i, uniquePairs, uPairCoeffs, flagRijk, ps₁, ps₂, ps₃)
+
+    elseif (ps₂ == ps₃ && flags[5])
+        getIntX1X2X2X3!(i, uniquePairs, uPairCoeffs, flagRijk, ps₁, ps₂, ps₄)
     else
-        i = getIntX1X2X3X4!(i, uniquePairs, uPairCoeffs, flagRijk, ps₁, ps₂, ps₃, ps₄)
+        getIntX1X2X3X4!(i, uniquePairs, uPairCoeffs, flagRijk, ps₁, ps₂, ps₃, ps₄)
     end
+
     uniquePairs, uPairCoeffs
 end
 
@@ -667,7 +665,7 @@ end
 
 @inline function getIntCore1111!(n, uniquePairs, uPairCoeffs, flags, ps₁, nFold=1)
     for (i₁, p₁) in enumerate(ps₁), (i₂, p₂) in zip(1:i₁, ps₁), 
-        (i₃, p₃) in zip(1:i₁, ps₁), (i₄, p₄) in zip(1:(i₃==i₁ ? i₂ : i₃), ps₁)
+        (i₃, p₃) in zip(1:i₁, ps₁), (i₄, p₄) in zip(1:ifelse(i₃==i₁, i₂, i₃), ps₁)
         n = getUniquePair!(n, uniquePairs, uPairCoeffs, flags, (p₁,p₂,p₃,p₄), 
                            octaFoldCount(i₁,i₂,i₃,i₄)*nFold)
     end
@@ -684,10 +682,8 @@ end
     n
 end
 
-@inline function getIntCore1212!(n, uniquePairs, uPairCoeffs, flags, 
-                                 (ps₁, ps₂)::Tuple{NTuple{N1, T}, NTuple{N2, T}}, 
-                                 nFold=1) where {N1, N2, T}
-    oneSidePairs = Iterators.product(1:N1, 1:N2)
+@inline function getIntCore1212!(n, uniquePairs, uPairCoeffs, flags, (ps₁, ps₂), nFold=1)
+    oneSidePairs = Iterators.product(eachindex(ps₁), eachindex(ps₂))
     for (x, (i₁,i₂)) in enumerate(oneSidePairs), (_, (i₃,i₄)) in zip(1:x, oneSidePairs)
         n = getUniquePair!(n, uniquePairs, uPairCoeffs, flags, 
                            (ps₁[i₁], ps₂[i₂], ps₁[i₃], ps₂[i₄]), 2^(i₁!=i₃ || i₂!=i₄)*nFold)
@@ -695,10 +691,8 @@ end
     n
 end
 
-@inline function getIntCore1221!(n, uniquePairs, uPairCoeffs, flags, 
-                                 (ps₁, ps₂)::Tuple{NTuple{N1, T}, NTuple{N2, T}}, 
-                                 nFold=1) where {N1, N2, T}
-    oneSidePairs = Iterators.product(1:N1, 1:N2)
+@inline function getIntCore1221!(n, uniquePairs, uPairCoeffs, flags, (ps₁, ps₂), nFold=1)
+    oneSidePairs = Iterators.product(eachindex(ps₁), eachindex(ps₂))
     for (x, (i₁,i₂)) in enumerate(oneSidePairs), (_, (i₃,i₄)) in zip(1:x, oneSidePairs)
         n = getUniquePair!(n, uniquePairs, uPairCoeffs, flags, 
                            (ps₁[i₁], ps₂[i₂], ps₂[i₄], ps₁[i₃]), 2^(i₁!=i₃ || i₂!=i₄)*nFold)
@@ -890,7 +884,7 @@ function getTwoBodyInts(∫2e::F, basisSet::NTuple{BN, GTBasisFuncs{T, D}}) wher
     accuSize = vcat(0, accumulate(+, subSize))
     totalSize = subSize |> sum
     buf = Array{T}(undef, totalSize, totalSize, totalSize, totalSize)
-    for l = 1:BN, k = 1:l, j = 1:l, i = 1:(j==l ? k : j)
+    for l = 1:BN, k = 1:l, j = 1:l, i = 1:ifelse(j==l, k, j)
         I = accuSize[i]+1 : accuSize[i+1]
         J = accuSize[j]+1 : accuSize[j+1]
         K = accuSize[k]+1 : accuSize[k+1]
@@ -904,7 +898,7 @@ end
 function getTwoBodyInts(∫2e::F, basisSet::NTuple{BN, GTBasisFuncs{T, D, 1}}) where 
                        {F<:Function, BN, T, D}
     buf = Array{T}(undef, BN, BN, BN, BN)
-    for l = 1:BN, k = 1:l, j = 1:l, i = 1:(j==l ? k : j)
+    for l = 1:BN, k = 1:l, j = 1:l, i = 1:ifelse(j==l, k, j)
         int = ∫2e(basisSet[i], basisSet[j], basisSet[k], basisSet[l])
         buf[i, j, k, l] = buf[j, i, k, l] = buf[j, i, l, k] = buf[i, j, l, k] = 
         buf[l, k, i, j] = buf[k, l, i, j] = buf[k, l, j, i] = buf[l, k, j, i] = int
@@ -922,7 +916,7 @@ function genUniqueIndices(basisSetSize::Int)
                                     6*binomial(basisSetSize, 3) + 
                                     4*binomial(basisSetSize, 2) + basisSetSize))
     index = 1
-    for i = 1:basisSetSize, j = 1:i, k = 1:i, l = 1:(k==i ? j : k)
+    for i = 1:basisSetSize, j = 1:i, k = 1:i, l = 1:ifelse(k==i, j, k)
         uniqueIdx[index] = [i, j, k, l]
         index += 1
     end

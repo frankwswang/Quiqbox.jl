@@ -12,15 +12,8 @@ Default gradient descent method in used in Quiqbox.
 """
 function gradDescent!(pars::AbstractVector{T}, grad::AbstractVector{T}, η::T=T(0.001), 
                       clipThreshold::T=2sqrt(length(grad))/(25norm(η))) where {T}
-    @assert length(pars) == length(grad) "The length of gradients and corresponding "*
-                                         "parameters should be the same."
     gNorm = norm(grad)
-    gradNew = if gNorm > clipThreshold
-        clipThreshold / gNorm * grad
-    else
-        grad
-    end
-
+    gradNew = ifelse(gNorm > clipThreshold, (clipThreshold / gNorm * grad), grad)
     pars .-= η.*gradNew
 end
 
@@ -196,7 +189,7 @@ function optimizeParams!(pbs::AbstractVector{<:ParamBox{T1}},
         target = config.target
         maxStep = config.maxStep
         gap = min(100, max(maxStep ÷ 200 * 10, 1))
-        detectConverge = isnan(error) ? false : true
+        detectConverge = ifelse(isnan(error), false, true)
 
         if isnan(target)
             isConverged = (Es) -> isOscillateConverged(Es, error, leastCycles=3)[1]
@@ -247,7 +240,7 @@ function optimizeParams!(pbs::AbstractVector{<:ParamBox{T1}},
         println(IOContext(stdout, :limit => true), grads[:, end])
         println("Optimization duration: ", tAll/60, " minutes.")
         if detectConverge
-            println("The result has" * (isConverged(Es) ? "" : " not") *" converged.")
+            println("The result has" * ifelse(isConverged(Es), "", " not") *" converged.")
         end
     end
 

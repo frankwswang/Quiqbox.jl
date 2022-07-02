@@ -13,7 +13,7 @@ import Base: ==
 ==(t1::LTuple{1, L}, t2::LTuple{1, L}) where {L} = true
 
 
-diffColorSym(pb::ParamBox) = isDiffParam(pb) ? :green : :light_black
+diffColorSym(pb::ParamBox) = ifelse(isDiffParam(pb), :green, :light_black)
 
 import Base: show
 const nSigShown = 10
@@ -137,7 +137,7 @@ iterate(::ParamBox, _) = nothing
 size(::ParamBox) = ()
 length(::ParamBox) = 1
 ndims(::ParamBox) = 0
-size(::ParamBox, d::Integer) = d == 1 ? 1 : throw(BoundsError())
+size(::ParamBox, d::Integer) = (d == 1) ? 1 : throw(BoundsError())
 
 iterate(gf::GaussFunc) = (gf, nothing)
 iterate(::GaussFunc, _) = nothing
@@ -173,7 +173,7 @@ end
 size(::CGTBasisFuncsON{ON}) where {ON} = (ON,)
 length(::CGTBasisFuncsON{ON}) where {ON} = ON
 
-size(x::SpatialOrbital, d::Integer) = d == 1 ? length(x) : throw(BoundsError())
+size(x::SpatialOrbital, d::Integer) = (d == 1) ? length(x) : throw(BoundsError())
 
 
 # Indexing Interface
@@ -243,21 +243,51 @@ function hasBoolRelation(boolFunc::F,
                          pb1::ParamBox{<:Any, V1, F1}, pb2::ParamBox{<:Any, V2, F2}; 
                          ignoreFunction::Bool=false, ignoreContainer::Bool=false, 
                          kws...) where {F<:Function, V1, V2, F1, F2}
-    ifelse(ignoreContainer, 
-        boolFunc(pb1(), pb2()), 
+    # ifelse(ignoreContainer, 
+    #     boolFunc(pb1(), pb2()), 
 
+    #     ifelse(V1 == V2, 
+    #         ifelse((ignoreFunction || F1 == F2 == FLi), 
+    #             boolFunc(pb1.data, pb2.data), 
+
+    #             ( boolFunc(pb1.canDiff[], pb2.canDiff[]) && 
+    #               boolFunc(pb1.map, pb2.map) && 
+    #               boolFunc(pb1.data, pb2.data) )
+    #         ), 
+
+    #         false
+    #     )
+    # )
+
+    if ignoreContainer
+        boolFunc(pb1(), pb2())
+    else
         ifelse(V1 == V2, 
-            ifelse(ignoreFunction || F1 == F2 == FLi, 
+            ifelse((ignoreFunction || F1 == F2 == FLi), 
                 boolFunc(pb1.data, pb2.data), 
 
-                boolFunc(pb1.canDiff[], pb2.canDiff[]) && 
-                boolFunc(pb1.map, pb2.map) && 
-                boolFunc(pb1.data, pb2.data)
+                ( boolFunc(pb1.canDiff[], pb2.canDiff[]) && 
+                  boolFunc(pb1.map, pb2.map) && 
+                  boolFunc(pb1.data, pb2.data) )
             ), 
 
             false
         )
-    )
+    end
+
+    # if ignoreContainer
+    #     boolFunc(pb1(), pb2())
+    # elseif V1 == V2
+    #     ifelse( (ignoreFunction || F1 == F2 == FLi), 
+    #         boolFunc(pb1.data, pb2.data), 
+
+    #         ( boolFunc(pb1.canDiff[], pb2.canDiff[]) && 
+    #           boolFunc(pb1.map, pb2.map) && 
+    #           boolFunc(pb1.data, pb2.data) )
+    #     )
+    # else
+    #     false
+    # end
 end
 
 

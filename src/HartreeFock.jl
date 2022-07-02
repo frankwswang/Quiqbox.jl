@@ -19,7 +19,7 @@ function getCϵ(X::Matrix{T}, F::Matrix{T}, stabilizeSign::Bool=true) where {T<:
     outC = X*Cₓ
     # Stabilize the sign factor of each column.
     stabilizeSign && for j = 1:size(outC, 2)
-       outC[:, j] *= (outC[1,j] < 0 ? -1 : 1)
+       outC[:, j] *= ifelse(outC[1,j] < 0, -1, 1)
     end
     outC, ϵ
 end
@@ -731,7 +731,8 @@ function runHFcore(::Val{HFT},
 
             flag, Std = isOscillateConverged(Etots, 10^(log(10, breakPoint)÷2))
 
-            flag && (isConverged = Std > scfConfig.oscillateThreshold ? false : true; break)
+            flag && (isConverged = ifelse(Std > scfConfig.oscillateThreshold, false, true); 
+                     break)
 
             if earlyStop && (Etots[end] - EtotMin) / abs(EtotMin) > 0.2
                 printInfo && println("Early termination of ", m, 
@@ -742,7 +743,7 @@ function runHFcore(::Val{HFT},
         end
 
     end
-    negStr = isConverged ? "is " : "has not "
+    negStr = ifelse(isConverged, "is ", "has not ")
     printInfo && println("The SCF procedure ", negStr, "converged.\n")
     vars, isConverged
 end
@@ -900,7 +901,7 @@ end
 function LBFGSBsolver(v::Vector{T}, B::Matrix{T}, cvxConstraint::Bool) where {T}
     f = genxDIISf(v, B)
     g! = genxDIIS∇f(v, B)
-    lb = cvxConstraint ? 0.0 : -Inf
+    lb = ifelse(cvxConstraint, 0.0, -Inf)
     _, c = lbfgsb(f, g!, fill(1e-2, length(v)); lb, 
                   m=min(getAtolDigits(T), 50), factr=1, 
                   pgtol=max(sqrt(getAtolVal(T)), getAtolVal(T)), 

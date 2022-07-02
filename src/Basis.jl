@@ -1425,7 +1425,7 @@ function genBFuncsFromText(content::String;
                                          SpatialPoint{T, D}, 
                                          Missing}=missing, 
                            unlinkCenter::Bool=false) where {D, T<:Real, F<:Function}
-    typ = ((center isa Missing) ? Float64 : T)
+    typ = ifelse((center isa Missing), Float64, T)
     adjustContent && (content = adjustFunction(content))
     lines = split.(content |> IOBuffer |> readlines)
     lines = lines[1+excludeFirstNlines : end-excludeLastNlines]
@@ -1497,10 +1497,9 @@ searching through the `Symbol`(s) of the independent variable(s) represented by 
 during the differentiation process. If the 1st argument is a collection, its entries must 
 be `ParamBox` containers.
 """
-function getParams(pb::ParamBox, symbol::Union{Symbol, Missing}=missing; 
-                   forDifferentiation::Bool=false)
-    paramFilter(pb, symbol, forDifferentiation) ? pb : nothing
-end
+getParams(pb::ParamBox, symbol::Union{Symbol, Missing}=missing; 
+          forDifferentiation::Bool=false) = 
+ifelse(paramFilter(pb, symbol, forDifferentiation), pb, nothing)
 
 getParams(cs::AbstractArray{<:ParamBox}, symbol::Union{Symbol, Missing}=missing; 
           forDifferentiation::Bool=false) = 
@@ -1566,12 +1565,12 @@ true
 ```
 """
 function copyBasis(g::GaussFunc, copyOutVal::Bool=true)
-    pbs = g.param .|> (copyOutVal ? outValCopy : inVarCopy)
+    pbs = g.param .|> ifelse(copyOutVal, outValCopy, inVarCopy)
     GaussFunc(pbs...)
 end
 
 function copyBasis(bfs::T, copyOutVal::Bool=true) where {T<:FloatingGTBasisFuncs}
-    cen = bfs.center .|> (copyOutVal ? outValCopy : inVarCopy)
+    cen = bfs.center .|> ifelse(copyOutVal, outValCopy, inVarCopy)
     gs = copyBasis.(bfs.gauss, copyOutVal)
     genBasisFunc(cen, gs, bfs.l; normalizeGTO=bfs.normalizeGTO)::T
 end
@@ -1583,27 +1582,22 @@ end
 
 
 function compareParamBox(pb1::ParamBox, pb2::ParamBox)
-    if pb1.canDiff[] == pb2.canDiff[]
-        if pb1.canDiff[] == true
-            pb1.data === pb2.data
-        else
-            (pb1.data === pb2.data) && (typeof(pb1.map) === typeof(pb2.map))
-        end
-    else
+    ifelse((pb1.canDiff[] == pb2.canDiff[]),
+        ifelse( pb1.canDiff[],
+            (pb1.data === pb2.data), 
+
+            ( (pb1.data === pb2.data) && (typeof(pb1.map) === typeof(pb2.map)) )
+        ),
+
         false
-    end
+    )
 end
 
 compareParamBox(pb1::ParamBox{<:Any, <:Any, FLi}, 
                 pb2::ParamBox{<:Any, <:Any, FLi}) = (pb1.data === pb2.data)
 
-function compareParamBox(pb1::ParamBox{<:Any, <:Any, FLi}, pb2::ParamBox)
-    if pb2.canDiff[] == true
-        pb1.data === pb2.data
-    else
-        false
-    end
-end
+compareParamBox(pb1::ParamBox{<:Any, <:Any, FLi}, pb2::ParamBox) = 
+ifelse(pb2.canDiff[], (pb1.data === pb2.data), false)
 
 compareParamBox(pb1::ParamBox, pb2::ParamBox{<:Any, <:Any, FLi}) = 
 compareParamBox(pb2, pb1)

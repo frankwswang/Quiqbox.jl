@@ -202,7 +202,7 @@ end
     totalSize = subSize |> sum
     nPage = (intFunc(BSet[1], BSet[1], BSet[1], BSet[1]) |> size)[5]
     buf = ones(totalSize, totalSize, totalSize, totalSize, nPage)
-    for i = 1:length(BSet), j = 1:i, k = 1:i, l = 1:(k==i ? j : k)
+    for i = 1:length(BSet), j = 1:i, k = 1:i, l = 1:ifelse(k==i, j, k)
         I = accuSize[i]+1 : accuSize[i+1]
         J = accuSize[j]+1 : accuSize[j+1]
         K = accuSize[k]+1 : accuSize[k+1]
@@ -224,7 +224,7 @@ end
         uniqueInts = fill(Int[0,0,0,0,0], 
                           (3*binomial(s, 4)+6*binomial(s, 3)+4*binomial(s, 2)+s)*nPage)
         index = 1
-        for i = 1:s, j = 1:i, k = 1:i, l = 1:(k==i ? j : k), p=1:nPage
+        for i = 1:s, j = 1:i, k = 1:i, l = 1:ifelse(k==i, j, k), p=1:nPage
             uniqueInts[index] = [i, j, k, l, p]
             index += 1
         end

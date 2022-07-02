@@ -29,7 +29,7 @@ function makeMoldenFile(mol::Molecule{T}; roundDigits::Int=getAtolDigits(T),
     strs = joinConcentricBFuncStr.(groups)
     strs = split.(strs, "\n", limit=2)
     gCoeffs = getindex.(strs, 2)
-    rpadN = roundDigits < 0 ? 21 : (roundDigits+1)
+    rpadN = ifelse(roundDigits < 0, 21, roundDigits+1)
     lpadN = 8
 
     text = """
@@ -72,8 +72,7 @@ function makeMoldenFile(mol::Molecule{T}; roundDigits::Int=getAtolDigits(T),
         text *= "\n$i 0\n" * gs
     end
     text *= "\n[MO]\n"
-    recordUMO ? (l = length(MOs)) : (l = findfirst(isequal(0), 
-                                                   [x.occupancy for x in MOs]) - 1)
+    l = recordUMO ? length(MOs) : (findfirst(isequal(0), [x.occupancy for x in MOs]) - 1)
     for i = 1:l
         text *= "Sym=   $(MOs[i].symmetry)\n"
         moe = MOs[i].energy

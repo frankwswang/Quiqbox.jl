@@ -109,7 +109,7 @@ struct ParamBox{T, V, FL<:FLevel} <: DifferentiableParameter{T, ParamBox}
     function ParamBox{T, V}(f::F, data::Array{T, 0}, index, canDiff, 
                             dataName=:undef) where {T, V, F<:Function}
         @assert Base.return_types(f, (T,))[1] == T
-        dName = (dataName == :undef) ? Symbol("x_" * string(V)) : dataName
+        dName = ifelse(dataName == :undef, Symbol("x_" * string(V)), dataName)
         new{T, V, FLevel(F)}(data, dName, f, canDiff, index)
     end
 

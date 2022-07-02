@@ -41,7 +41,7 @@ function twoBodyDerivativeCore(::Val{false},
     ∂ʃ = ones(bsSize, bsSize, bsSize, bsSize)
     ʃabcd = ones(bsSize, bsSize, bsSize, bsSize)
     ʃ∂abcd = ones(bsSize, bsSize, bsSize, bsSize)
-    for i = 1:bsSize, j = 1:i, k = 1:i, l = 1:(k==i ? j : k)
+    for i = 1:bsSize, j = 1:i, k = 1:i, l = 1:ifelse(k==i, j, k)
         ʃabcd[i,j,k,l] = ʃabcd[j,i,k,l] = ʃabcd[j,i,l,k] = ʃabcd[i,j,l,k] = 
         ʃabcd[l,k,i,j] = ʃabcd[k,l,i,j] = ʃabcd[k,l,j,i] = ʃabcd[l,k,j,i] = 
         ʃ(bfs[i],  bfs[j],  bfs[k],  bfs[l])
@@ -50,7 +50,7 @@ function twoBodyDerivativeCore(::Val{false},
         ʃ∂abcd[i,j,k,l] = ʃ∂abcd[i,j,l,k] = ʃ(∂bfs[i], bfs[j],  bfs[k],  bfs[l])
     end
     # [∂ʃ4[i,j,k,l] == ∂ʃ4[j,i,l,k] == ∂ʃ4[j,i,k,l] != ∂ʃ4[l,j,k,i]
-    for i = 1:bsSize, j = 1:i, k = 1:i, l = 1:(k==i ? j : k)
+    for i = 1:bsSize, j = 1:i, k = 1:i, l = 1:ifelse(k==i, j, k)
         val = 0
         # ʃ∂abcd[i,j,k,l] == ʃ∂abcd[i,j,l,k] == ʃab∂cd[l,k,i,j] == ʃab∂cd[k,l,i,j]
         for a = 1:bsSize, b = 1:bsSize, c = 1:bsSize, d = 1:bsSize

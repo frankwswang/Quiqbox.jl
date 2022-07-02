@@ -200,7 +200,7 @@ end
 hasBoolRelation(boolOp::Function, obj1::Function, obj2::Function; 
                 ignoreFunction::Bool=false, ignoreContainer::Bool=false, 
                 decomposeNumberCollection::Bool=false) = 
-ignoreFunction ? true : boolOp(obj1, obj2)
+ifelse(ignoreFunction, true, boolOp(obj1, obj2))
 
 hasBoolRelation(boolOp::Function, obj1::Number, obj2::Number; 
                 ignoreFunction::Bool=false, ignoreContainer::Bool=false, 
@@ -682,7 +682,7 @@ function isOscillateConverged(sequence::Vector{<:Real},
     len < leastCycles && (return false)
     slice = len ÷ nPartition
     lastPortion = sequence[max(end-slice, 1) : end]
-    remain = sort(lastPortion)[convergeToMax ? (end÷2+1 : end) : (1 : end÷2+1)]
+    remain = sort(lastPortion)[ifelse(convergeToMax, (end÷2+1 : end), (1 : end÷2+1))]
     b = std(remain) < threshold1 && 
         abs(sequence[end] - (convergeToMax ? max(remain...) : min(remain...))) < threshold2
     b, std(lastPortion)
@@ -798,7 +798,7 @@ function arrayDiffCore!(vs::NTuple{N, Array{T}}) where {N, T}
 end
 
 function arrayDiffCore!(v1::Array{T}, v2::Array{T}) where {T}
-    a1, a2 = (length(v1) > length(v2)) ? (v2, v1) : (v1, v2)
+    a1, a2 = ifelse((length(v1) > length(v2)), (v2, v1), (v1, v2))
     coms = T[]
     l = length(a1)
     sizehint!(coms, l)
