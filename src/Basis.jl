@@ -762,37 +762,6 @@ end
 
 mergeGaussFuncs(gf::GaussFunc) = itself(gf)
 
-# function mergeGaussFuncs(gf1::GaussFunc, gf2::GaussFunc; roundDigits::Int=-1)
-#     xpn1 = gf1.xpn
-#     xpn2 = gf2.xpn
-#     con1 = gf1.con
-#     con2 = gf2.con
-#     xpn1v = xpn1()
-#     rBool = roundDigits < 0
-#     rBool || (atol = 0.1^roundDigits)
-#     if rBool ? xpn1v===xpn2() : isapprox(xpn1v, xpn2(); atol)
-#         if xpn1 === xpn2 || hasIdentical(xpn1, xpn2)
-#             xpn = xpn1
-#         elseif rBool ? hasEqual(xpn1, xpn2) : hasApprox(xpn1, xpn2; atol)
-#             xpn = deepcopy(xpn1)
-#         else
-#             xpn = genExponent(xpn1v; roundDigits)
-#         end
-
-#         if con1 === con2 || hasIdentical(con1, con2)
-#             res = GaussFunc(xpn, con1) * 2.0
-#         elseif rBool ? hasEqual(con1, con2) : hasApprox(con1, con2; atol)
-#             res = GaussFunc(xpn, deepcopy(con1)) * 2.0
-#         else
-#             res = GaussFunc(xpn, genContraction(con1()+con2(); roundDigits))
-#         end
-
-#         return [res]
-#     else
-#         return [gf1, gf2]
-#     end
-# end
-
 function mergeGaussFuncs(gf1::GaussFunc{T}, gf2::GaussFunc{T}; 
                          roundDigits::Int=getAtolDigits(T)) where {T}
     xpn = if (xpn1 = gf1.xpn) === (xpn2 = gf2.xpn) || hasIdentical(xpn1, xpn2)

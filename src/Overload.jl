@@ -241,20 +241,23 @@ Base.broadcastable(sp::SpatialPoint) = Base.broadcastable(sp.point.param)
 ## Method overload of `hasBoolRelation` from Tools.jl.
 function hasBoolRelation(boolFunc::F, 
                          pb1::ParamBox{<:Any, V1, F1}, pb2::ParamBox{<:Any, V2, F2}; 
-                         ignoreFunction::Bool=false, ignoreContainer::Bool=false,
+                         ignoreFunction::Bool=false, ignoreContainer::Bool=false, 
                          kws...) where {F<:Function, V1, V2, F1, F2}
-    if ignoreContainer
-        boolFunc(pb1(), pb2())
-    elseif V1 == V2
-        if ignoreFunction || F1 == F2 == FLi
-            boolFunc(pb1.data, pb2.data)
-        else
-            boolFunc(pb1.canDiff[], pb2.canDiff[]) && boolFunc(pb1.map, pb2.map) && 
-            boolFunc(pb1.data, pb2.data)
-        end
-    else
-        false
-    end
+    ifelse(ignoreContainer, 
+        boolFunc(pb1(), pb2()), 
+
+        ifelse(V1 == V2, 
+            ifelse(ignoreFunction || F1 == F2 == FLi, 
+                boolFunc(pb1.data, pb2.data), 
+
+                boolFunc(pb1.canDiff[], pb2.canDiff[]) && 
+                boolFunc(pb1.map, pb2.map) && 
+                boolFunc(pb1.data, pb2.data)
+            ), 
+
+            false
+        )
+    )
 end
 
 

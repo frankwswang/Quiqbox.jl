@@ -164,22 +164,16 @@ end
 true
 ```
 """
-function hasBoolRelation(boolOp::F, obj1::T1, obj2::T2;
+function hasBoolRelation(boolOp::F, obj1::T1, obj2::T2; 
                          ignoreFunction::Bool=false, 
-                         ignoreContainer::Bool=false,
+                         ignoreContainer::Bool=false, 
                          decomposeNumberCollection::Bool=false) where {T1, T2, F<:Function}
     res = true
-    if (T1 <: Function) && (T2 <: Function)
-        ignoreFunction ? (return true) : (return boolOp(obj1, obj2))
-    elseif (T1 <: Number) && (T2 <: Number)
-        return boolOp(obj1, obj2)
-    elseif T1 != T2 && !ignoreContainer && 
+    if T1 != T2 && !ignoreContainer && 
           ( !ignoreFunction || typejoin(T1, T2) == Any || 
             !(isa.([T1.parameters...], Type{<:FLevel}) |> any) || 
             !(isa.([T2.parameters...], Type{<:FLevel}) |> any) )
         return false
-    elseif obj1 isa Type || obj2 isa Type
-        return boolOp(obj1, obj2)
     else
         fs1 = fieldnames(T1)
         fs2 = fieldnames(T2)
@@ -203,10 +197,25 @@ function hasBoolRelation(boolOp::F, obj1::T1, obj2::T2;
     res
 end
 
+hasBoolRelation(boolOp::Function, obj1::Function, obj2::Function; 
+                ignoreFunction::Bool=false, ignoreContainer::Bool=false, 
+                decomposeNumberCollection::Bool=false) = 
+ignoreFunction ? true : boolOp(obj1, obj2)
+
+hasBoolRelation(boolOp::Function, obj1::Number, obj2::Number; 
+                ignoreFunction::Bool=false, ignoreContainer::Bool=false, 
+                decomposeNumberCollection::Bool=false) = 
+boolOp(obj1, obj2)
+
+hasBoolRelation(boolOp::Function, obj1::Type{T1}, obj2::Type{T2}; 
+                ignoreFunction::Bool=false, ignoreContainer::Bool=false, 
+                decomposeNumberCollection::Bool=false) where {T1, T2} = 
+boolOp(obj1, obj2)
+
 function hasBoolRelation(boolOp::F, 
                          obj1::Union{AbstractArray, Tuple}, 
-                         obj2::Union{AbstractArray, Tuple};
-                         ignoreFunction::Bool=false, ignoreContainer::Bool=false,
+                         obj2::Union{AbstractArray, Tuple}; 
+                         ignoreFunction::Bool=false, ignoreContainer::Bool=false, 
                          decomposeNumberCollection::Bool=false) where {F<:Function}
     if !decomposeNumberCollection && (eltype(obj1) <: Number) && (eltype(obj2) <: Number)
         return boolOp(obj1, obj2)
@@ -680,56 +689,6 @@ function isOscillateConverged(sequence::Vector{<:Real},
 end
 
 
-# splitTerm(trm::Symbolics.Num) = 
-# splitTermCore(trm.val)::Vector{<:Union{Real, SymbolicUtils.Symbolic}}
-
-# @inline function rewriteCore(trm, r)
-#     res = r(trm)
-#     res === nothing ? trm : res
-# end
-
-# function splitTermCore(trm::SymbolicUtils.Add)
-#     r1 = SymbolicUtils.@rule +(~(~xs)) => [i for i in ~(~xs)]
-#     r1(trm) .|> rewriteTerm
-# end
-
-# rewriteTerm(trm::SymbolicUtils.Add) = splitTermCore(trm)
-
-# rewriteTerm(trm::SymbolicUtils.Pow) = itself(trm)
-
-# function rewriteTerm(trm::SymbolicUtils.Div)
-#     r = @rule (~x) / (~y) => (~x) * (~y)^(-1)
-#     rewriteCore(trm, r)
-# end
-
-# function rewriteTerm(trm::SymbolicUtils.Mul)
-#     r = SymbolicUtils.@rule *(~(~xs)) => sort([i for i in ~(~xs)], 
-#                               by=x->(x isa SymbolicUtils.Symbolic)) |> prod
-#     rewriteCore(trm, r) |> SymbolicUtils.simplify
-# end
-
-# function splitTermCore(trm::SymbolicUtils.Mul)
-#     r1 = SymbolicUtils.@rule *(~(~xs)) => [i for i in ~(~xs)]
-#     r2 = SymbolicUtils.@rule +(~(~xs)) => [i for i in ~(~xs)]
-#     r3 = @acrule ~~vs * exp((~a)*((~x)^2+(~y)^2+(~z)^2)) * 
-#                         exp(-1*(~a)*((~x)^2+(~y)^2+(~z)^2)) => prod(~~vs)
-#     trms = rewriteCore(trm, r1)
-#     idx = findfirst(x-> x isa SymbolicUtils.Add, trms)
-#     if idx !== nothing
-#         sumTerm = popat!(trms, idx)
-#         var = SymbolicUtils.simplify(sort(trms, 
-#                                           by=x->(x isa SymbolicUtils.Symbolic)) |> prod)
-#         rewriteCore.((r2(sumTerm) .* var), Ref(r3)) .|> rewriteTerm |> flatten
-#     else
-#         [trms |> prod]
-#     end
-# end
-
-# splitTermCore(trm::SymbolicUtils.Div) = trm |> rewriteTerm |> splitTermCore
-
-# splitTermCore(trm) = [trm]
-
-
 function groupedSort(v::T, sortFunction::F=itself) where {T<:AbstractVector, F<:Function}
     sortedArr = sort(v, by=x->sortFunction(x))
     state1 = 1
@@ -863,22 +822,6 @@ arrayDiff!(vs::Vararg{Array{T}, N}) where {T, N} = arrayDiffCore!(vs)
 
 tupleDiff(ts::Vararg{NTuple{<:Any, T}, N}) where {T, N} = arrayDiff!((ts .|> collect)...)
 
-
-# function getFuncNum(f::Function, vNum::Symbolics.Num)::Symbolics.Num
-#     Symbolics.variable(f|>nameOf, T=Symbolics.FnType)(vNum)
-# end
-
-# function getFuncNum(pf::Pf{T, F}, vNum::Symbolics.Num) where {T, F}
-#     (pf.c * Symbolics.variable(pf.f.n, T=Symbolics.FnType)(vNum))::Symbolics.Num
-# end
-
-# function getFuncNum(tf::TypedFunction{F}, vNum::Symbolics.Num) where {F}
-#     Symbolics.variable(tf.n, T=Symbolics.FnType)(vNum)::Symbolics.Num
-# end
-
-# getFuncNum(::TypedFunction{itselfT}, vNum::Symbolics.Num) = itself(vNum)
-
-# getFuncNum(::itselfT, vNum::Symbolics.Num) = itself(vNum)
 
 function genIndex(index::Int)
     @assert index >= 0
