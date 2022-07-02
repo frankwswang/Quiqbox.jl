@@ -1,13 +1,10 @@
 export GaussFunc, genExponent, genContraction, SpatialPoint, genSpatialPoint, BasisFunc, 
        BasisFuncs, genBasisFunc, subshellOf, centerOf, centerCoordOf, GTBasis, 
        sortBasisFuncs, add, mul, shift, decompose, basisSize, genBasisFuncText, 
-       genBFuncsFromText, assignCenInVal!, getParams, copyBasis, markParams!, getVar, 
-       getVarDict, expressionOf
+       genBFuncsFromText, assignCenInVal!, getParams, copyBasis, markParams!
 
 export SP1D, SP2D, SP3D
 
-using Symbolics
-using SymbolicUtils
 using LinearAlgebra: diag
 using ForwardDiff: derivative as ForwardDerivative
 
@@ -901,28 +898,6 @@ function add(bf1::BasisFunc{T, D, 𝑙1, GN1, PT1}, bf2::BasisFunc{T, D, 𝑙2, 
     end
 end
 
-# function add(bf1::BasisFunc{𝑙1, GN1, PT1, D, T}, bf2::BasisFunc{𝑙2, GN2, PT2, D, T}; 
-#              roundDigits::Int=15) where {𝑙1, 𝑙2, GN1, GN2, PT1, PT2, D, T}
-#     if 𝑙1 == 𝑙2 && bf1.l == bf2.l && 
-#        bf1.normalizeGTO == bf2.normalizeGTO && 
-#        (c = centerCoordOf(bf1)) == centerCoordOf(bf2)
-
-#         cen1 = bf1.center
-#         cen2 = bf2.center
-#         if cen1 === cen2 || hasIdentical(cen1, cen2)
-#             cen = bf1.center
-#         elseif hasEqual(bf1, bf2)
-#             cen = deepcopy(bf1.center)
-#         else
-#             cen = genSpatialPoint(c)
-#         end
-#         gfsN = mergeGaussFuncs(bf1.gauss..., bf2.gauss...; roundDigits) |> Tuple
-#         BasisFunc(cen, gfsN, bf1.l, bf1.normalizeGTO)
-#     else
-#         BasisFuncMix([bf1, bf2])
-#     end
-# end
-
 add(bfm::BasisFuncMix{T}; roundDigits::Int=getAtolDigits(T)) where {T} = 
 sumOf(bfm.BasisFunc; roundDigits)
 
@@ -1485,7 +1460,7 @@ function genBFuncsFromText(content::String;
     adjustContent && (content = adjustFunction(content))
     lines = split.(content |> IOBuffer |> readlines)
     lines = lines[1+excludeFirstNlines : end-excludeLastNlines]
-    data = [advancedParse.(i) for i in lines]
+    data = [advancedParse.(typ, i) for i in lines]
     index = findall(x -> typeof(x) != Vector{typ} && length(x)==3, data)
     bfs = []
     for i in index
@@ -1533,59 +1508,56 @@ end
 
 """
 
-    getParams(pbc::ParamBox, symbol::Union{Symbol, Nothing}=nothing; 
-              onlyDifferentiable::Bool=false) -> 
+    getParams(pbc::ParamBox, symbol::Union{Symbol, Missing}=missing; 
+              forDifferentiation::Bool=false) -> 
     Union{ParamBox, Nothing}
 
-    getParams(pbc::$(StructSpatialBasis), symbol::Union{Symbol, Nothing}=nothing; 
-              onlyDifferentiable::Bool=false) -> 
-    Array{<:ParamBox, 1}
+    getParams(pbc::$(StructSpatialBasis), symbol::Union{Symbol, Missing}=missing; 
+              forDifferentiation::Bool=false) -> 
+    AbstractVector{<:ParamBox}
 
-    getParams(pbc::Union{Array, Tuple}, symbol::Union{Symbol, Nothing}=nothing; 
-              onlyDifferentiable::Bool=false) -> 
-    Array{<:ParamBox, 1}
+    getParams(pbc::Union{AbstractArray, Tuple}, symbol::Union{Symbol, Missing}=missing; 
+              forDifferentiation::Bool=false) -> 
+    AbstractVector{<:ParamBox}
 
-Return the parameter(s) stored in the input container. If keyword argument `symbol` is set 
-to `nothing`, then return the parameter(s); if it's set to the `Symbol` of a parameter 
-(e.g. the symbol of `ParamBox{T, V}` would be `V`), return only that type of parameters 
-(which might still have different indices). `onlyDifferentiable` determines whether 
-ignore non-differentiable parameters. If the 1st argument is an `Array`, the entries must 
+Return the parameter(s) stored in the input container. If the keyword argument `symbol` is 
+set to `missing`, then return all parameter(s); if it's set to the `Symbol` of a parameter 
+(e.g., `:α₁` will match any `pb` such that `getVar(forDifferentiation) == :α₁`; `:α` will 
+match all the `pb`s that are `ParamBox{<:Any, α}`. `forDifferentiation` determines whether 
+searching through the `Symbol`(s) of the independent variable(s) represented by `pbc` 
+during the differentiation process. If the 1st argument is a collection, its entries must 
 be `ParamBox` containers.
 """
-function getParams(pb::ParamBox, symbol::Union{Symbol, Nothing}=nothing; 
-                   onlyDifferentiable::Bool=false)
-    paramFilter(pb, symbol, onlyDifferentiable) ? pb : nothing
+function getParams(pb::ParamBox, symbol::Union{Symbol, Missing}=missing; 
+                   forDifferentiation::Bool=false)
+    paramFilter(pb, symbol, forDifferentiation) ? pb : nothing
 end
 
-function getParams(ssb::StructSpatialBasis, symbol::Union{Symbol, Nothing}=nothing; 
-                   onlyDifferentiable::Bool=false)::Vector{<:ParamBox}
-    filter(x->paramFilter(x, symbol, onlyDifferentiable), ssb.param) |> collect
-end
+getParams(cs::AbstractArray{<:ParamBox}, symbol::Union{Symbol, Missing}=missing; 
+          forDifferentiation::Bool=false) = 
+cs[findall(x->paramFilter(x, symbol, forDifferentiation), cs)]
 
-getParams(cs::Array{<:ParamBox}, symbol::Union{Symbol, Nothing}=nothing; 
-          onlyDifferentiable::Bool=false) = 
-cs[findall(x->paramFilter(x, symbol, onlyDifferentiable), cs)]
+getParams(ssb::StructSpatialBasis, symbol::Union{Symbol, Missing}=missing; 
+          forDifferentiation::Bool=false) = 
+filter(x->paramFilter(x, symbol, forDifferentiation), ssb.param) |> collect
 
-getParams(cs::Array{<:StructSpatialBasis}, symbol::Union{Symbol, Nothing}=nothing; 
-          onlyDifferentiable::Bool=false)::Vector{<:ParamBox} = 
-vcat(getParams.(cs, symbol; onlyDifferentiable)...)
+getParams(cs::AbstractArray{<:StructSpatialBasis}, symbol::Union{Symbol, Missing}=missing; 
+          forDifferentiation::Bool=false) = 
+vcat(getParams.(cs, symbol; forDifferentiation)...)
 
-function getParams(cs::Array, symbol::Union{Symbol, Nothing}=nothing; 
-                   onlyDifferentiable::Bool=false)::Vector{<:ParamBox}
+function getParams(cs::AbstractArray, symbol::Union{Symbol, Missing}=missing; 
+                   forDifferentiation::Bool=false)
     pbIdx = findall(x->x isa ParamBox, cs)
-    vcat(getParams(convert(Vector{ParamBox}, cs[pbIdx]), symbol; onlyDifferentiable), 
+    vcat(getParams(convert(Vector{ParamBox}, cs[pbIdx]), symbol; forDifferentiation), 
          getParams(convert(Vector{StructSpatialBasis}, cs[1:end .∉ [pbIdx]]), symbol; 
-                   onlyDifferentiable))
+                   forDifferentiation))
 end
 
-getParams(cs::Tuple, symbol=nothing; onlyDifferentiable=false) = 
-getParams(collect(cs), symbol; onlyDifferentiable)
+getParams(cs::Tuple, symbol=missing; forDifferentiation::Bool=false) = 
+getParams(collect(cs), symbol; forDifferentiation)
 
-function paramFilter(pb::ParamBox, outSym::Union{Symbol, Nothing}=nothing, 
-                     onlyDifferentiable::Bool=false)
-    (outSym === nothing || outSymOfCore(pb) == outSym) && 
-    (!onlyDifferentiable || pb.canDiff[])
-end
+paramFilter(pb::ParamBox, sym::Union{Symbol, Missing}, forDifferentiation::Bool) = 
+sym isa Missing || inSymbol(sym, getVar(pb, forDifferentiation))
 
 
 const Doc_copyBasis_Eg1 = "GaussFunc(xpn=ParamBox{Float64, :α, "*
@@ -1676,8 +1648,8 @@ compareParamBox(pb2, pb1)
 
 Mark the parameters (`ParamBox`) in input bs which can a `Vector` of `GaussFunc` or 
 `FloatingGTBasisFuncs`. The identical parameters will be marked with same index. 
-`filterMapping`determines weather filter out (i.e. not return) `ParamBox`s that have same 
-independent variables despite they may have different mapping functions.
+`filterMapping`determines whether filtering out (i.e. not return) extra `ParamBox`s that 
+have same independent variables despite may having different mapping functions.
 """
 markParams!(b::Union{Array{T}, T, Tuple{Vararg{StructSpatialBasis}}}, 
             filterMapping::Bool=false) where {T<:StructSpatialBasis} = 
@@ -1712,73 +1684,6 @@ function markParamsCore!(parArray::Array{<:ParamBox{<:Any, V}}) where {V}
 end
 
 
-"""
-
-    getVarCore(pb::ParamBox{T}, expandNonDifferentiable::Bool=false) -> 
-    Vector{Pair{Symbolics.Num, T}}
-
-Core function of `getVar`, which returns the mapping relations inside the parameter 
-container. `expandNonDifferentiable` determines whether expanding the mapping relations of 
-non-differentiable variable (parameters).
-"""
-function getVarCore(pb::ParamBox{T}, expandNonDifferentiable::Bool=false) where {T}
-    if pb.canDiff[] || expandNonDifferentiable
-        ivNum = inSymOf(pb)
-        fNum = getFuncNum(pb.map, ivNum)
-        res = Pair{Symbolics.Num, T}[fNum=>pb(), ivNum=>pb.data[]]
-    else
-        vNum = outSymOf(pb)
-        res = Pair{Symbolics.Num, T}[vNum => pb()]
-    end
-end
-
-"""
-
-    getVar(pb::ParamBox) -> Symbolics.Num
-
-    getVar(container::$(StructSpatialBasis)) -> Array{Symbolics.Num, 1}
-
-Return the independent variable(s) of the input parameter container.
-"""
-getVar(pb::ParamBox) = getVarCore(pb, false)[end][1]
-
-function getVar(container::CompositeGTBasisFuncs)::Vector{Symbolics.Num}
-    vrs = getVarCore.(container |> getParams, false)
-    getindex.(getindex.(vrs, lastindex.(vrs)), 1)
-end
-
-
-getVarDictCore(pb::ParamBox, expandNonDifferentiable::Bool=false) = 
-getVarCore(pb, expandNonDifferentiable) |> Dict
-
-getVarDictCore(containers, expandNonDifferentiable::Bool=false) = 
-vcat(getVarCore.(containers|>getParams, expandNonDifferentiable)...) |> Dict
-
-"""
-
-    getVarDict(obj::Union{ParamBox, $(StructSpatialBasis), Array, Tuple}; 
-               includeMapping::Bool=false) -> 
-    Dict{Symbolics.Num, <:Number}
-
-Return a `Dict` that stores the independent variable(s) of the parameter container(s) and 
-its(their) corresponding value(s). If `includeMapping = true`, then the dictionary will 
-also include the mapping relations between the mapped variables and the independent 
-variables.
-"""
-getVarDict(pb::ParamBox; includeMapping::Bool=false) = 
-includeMapping ? getVarDictCore(pb, true) : (inSymValOf(pb) |> Dict)
-
-function getVarDict(containers::Union{Tuple, Array, StructSpatialBasis}; 
-                    includeMapping::Bool=false)
-    if includeMapping
-        getVarDictCore(containers, true)
-    else
-        pbs = getParams(containers)
-        inSymValOf.(pbs) |> Dict
-    end
-end
-
-
 getNijk(::Type{T}, i::Integer, j::Integer, k::Integer) where {T} = 
     (T(2)/π)^T(0.75) * sqrt( 2^(3*(i+j+k)) * factorial(i) * factorial(j) * factorial(k) / 
     (factorial(2i) * factorial(2j) * factorial(2k)) )
@@ -1793,235 +1698,3 @@ getNijkα(ijk, α) = getNijkα(ijk[1], ijk[2], ijk[3], α)
 
 getNorms(b::FGTBasisFuncs1O{T, 3, 𝑙, GN})  where {T, 𝑙, GN} = 
 getNijkα.(b.l[1]..., T[g.xpn() for g in b.gauss])
-
-pgf0(x, y, z, α) = exp( -α * (x^2 + y^2 + z^2) )
-cgf0(x, y, z, α, d) = (d * pgf0(x, y, z, α))
-cgo0(x, y, z, α, d, i, j, k, N=1.0) = (N * x^i * y^j * z^k * cgf0(x, y, z, α, d))
-
-
-@inline pgf(r, α) = pgf0(r[1], r[2], r[3], α)
-@inline cgf(r, α, d) = cgf0(r[1], r[2], r[3], α, d)
-@inline cgo(r, α, d, l, N=getNijkα(i,j,k,α)) = 
-        cgo0(r[1], r[2], r[3], α, d, l[1], l[2], l[3], N)
-@inline cgo2(r, α, d, i, j, k, N=getNijkα(i,j,k,α)) = 
-        cgo0(r[1], r[2], r[3], α, d, i, j, k, N)
-
-
-function expressionOfCore(pb::ParamBox{<:Any, <:Any, F}, substituteValue::Bool=false) where 
-                         {F}
-    if substituteValue
-        vrs = getVarCore(pb, false)
-        recursivelyGet(vrs |> Dict, vrs[1][1])
-    else
-        getFuncNum(pb.map, inSymOf(pb))
-    end
-end
-
-function expressionOfCore(bf::FloatingGTBasisFuncs{<:Any, D, 𝑙, GN, <:Any, ON}, 
-                          substituteValue::Bool=false, onlyParameter::Bool=false, 
-                          splitGaussFunc::Bool=false) where {D, 𝑙, GN, ON}
-    N = bf.normalizeGTO  ?  getNijkα  :  (_...) -> 1
-    R = expressionOfCore.(bf.center, substituteValue)
-    α = expressionOfCore.(getfield.(bf.gauss, :xpn), substituteValue)
-    d = expressionOfCore.(getfield.(bf.gauss, :con), substituteValue)
-    x = onlyParameter ? (-1 .* R) : (Symbolics.variable.(:r, (1,2,3)) .- R)
-    res = map(bf.l::NTuple{ON, LTuple{D, 𝑙}}) do l
-        i, j, k = l
-        exprs = cgo2.(Ref(x), α, d, i, j, k, N.(i,j,k,α))
-        splitGaussFunc ? collect(exprs) : sum(exprs)
-    end
-    ON==1 ? (vcat(res...)::Vector{Symbolics.Num}) : (hcat(res...)::Matrix{Symbolics.Num})
-end
-
-function expressionOfCore(bfm::BasisFuncMix{BN}, substituteValue::Bool=false, 
-                          onlyParameter::Bool=false, splitGaussFunc::Bool=false) where {BN}
-    exprs = Vector{Symbolics.Num}[expressionOfCore(bf, substituteValue, 
-                                                   onlyParameter, splitGaussFunc)
-                                  for bf in bfm.BasisFunc]
-    splitGaussFunc ? vcat(exprs...) : sum(exprs)
-end
-
-function expressionOfCore(gf::GaussFunc, substituteValue::Bool=false)
-    r = Symbolics.variable.(:r, [1:3;])
-    cgf(r, expressionOfCore(gf.xpn, substituteValue), 
-           expressionOfCore(gf.con, substituteValue))
-end
-
-"""
-
-    expressionOf(bf::CompositeGTBasisFuncs, splitGaussFunc::Bool=false) -> 
-    Array{<:Symbolics.Num, 2}
-
-Return the expression(s) of a given `CompositeGTBasisFuncs` (e.g. `BasisFuncMix` or 
-`FloatingGTBasisFuncs`) as a `Matrix{<:Symbolics.Num}`of which the column(s) corresponds to 
-different orbitals. If `splitGaussFunc` is `true`, the column(s) will be expanded 
-vertically such that the entries are `GaussFunc` inside the corresponding orbital.
-"""
-expressionOf(bf::CompositeGTBasisFuncs, splitGaussFunc::Bool=false) = 
-expressionOfCore(bf, true, false, splitGaussFunc)
-
-"""
-
-    expressionOf(gf::GaussFunc) -> Symbolics.Num
-
-Return the expression of a given `GaussFunc`.
-"""
-expressionOf(gf::GaussFunc) = expressionOfCore(gf, true)
-
-
-function inSymbols(sym::Symbol, pool::Vector{Symbol}=ParamSyms)
-    symString = sym |> string
-    for i in pool
-         occursin(i |> string, symString) && (return i)
-    end
-    return false
-end
-
-inSymbols(vr::SymbolicUtils.Sym, pool::Vector{Symbol}=ParamSyms) = 
-inSymbols(Symbolics.tosymbol(vr), pool)
-
-inSymbols(vr::SymbolicUtils.Term, pool::Vector{Symbol}=ParamSyms) = 
-inSymbols(Symbolics.tosymbol(vr.f), pool)
-
-inSymbols(::Function, args...) = false
-
-inSymbols(vr::Num, pool::Vector{Symbol}=ParamSyms) = inSymbols(vr.val, pool)
-
-
-function varVal(vr::SymbolicUtils.Sym, varDict::Dict{Num, <:Real})
-    res = recursivelyGet(varDict, vr |> Num)
-    if isnan(res)
-        res = recursivelyGet(varDict, 
-                             replaceSymbol(Symbolics.tosymbol(vr), 
-                                           NoDiffMark=>"") |> Symbolics.variable)
-    end
-    if isnan(res)
-        str = Symbolics.tosymbol(vr) |> string
-        pos = findfirst(r"[₁₂₃₄₅₆₇₈₉₀]", str)[1]
-        front = split(str,str[pos])[1]
-        var = front*NoDiffMark*str[pos:end] |> Symbol
-        recursivelyGet(varDict, var |> Symbolics.variable)
-    end
-    @assert !isnan(res) "Can NOT find the value of $(vr)::$(typeof(vr)) in the given "*
-                        "Dict $(varDict)."
-    res
-end
-
-function varVal(vr::SymbolicUtils.Add, varDict::Dict{Num, <:Real})
-    r = Symbolics.@rule +(~(~xs)) => [i for i in ~(~xs)]
-    vrs = r(vr)
-    varVal.(vrs, Ref(varDict)) |> sum
-end
-
-function varVal(vr::SymbolicUtils.Mul, varDict::Dict{Num, <:Real})
-    r = Symbolics.@rule *(~(~xs)) => [i for i in ~(~xs)]
-    vrs = r(vr)
-    varVal.(vrs, Ref(varDict)) |> prod
-end
-
-function varVal(vr::SymbolicUtils.Pow, varDict::Dict{Num, <:Real})
-    r = Symbolics.@rule (~x)^(~k) => [~x, ~k]
-    vrs = r(vr)
-    varVal(vrs[1], varDict)^varVal(vrs[2], varDict)
-end
-
-function varVal(vr::SymbolicUtils.Term, varDict::Dict{Num, <:Real})
-    getFsym = (t) -> t isa SymbolicUtils.Sym ? Symbolics.tosymbol(t) : Symbol(t)
-    if vr.f isa Symbolics.Differential
-        fv = vr.arguments[]
-        if fv isa SymbolicUtils.Term
-            v = fv.arguments[]
-            f = getFunc(fv.f |> getFsym, 0)
-            ForwardDerivative(f, varVal(v, varDict))
-        else
-            v = vr.f.x
-            if v === fv
-                1.0
-            else
-                varVal(Symbolics.derivative(fv, vr), varDict)
-            end
-        end
-    elseif vr.f isa Union{SymbolicUtils.Sym, Function}
-        fSymbol = vr.f |> getFsym
-        f = getFunc(fSymbol, 0)
-        v = varVal(vr.arguments[], varDict)
-        f(v)
-    else
-        NaN
-    end
-end
-
-varVal(vr::Num, varDict::Dict{Num, <:Real}) = varVal(vr.val, varDict)
-
-varVal(vr::Real, args...) = itself(vr)
-
-varVal(vr::Rational, args...) = round(vr |> Float64, digits=14)
-
-
-function detectXYZ(i::SymbolicUtils.Symbolic, varDict::Dict{Num, <:Real})
-    xyz = zeros(Int, 3)
-    if i isa SymbolicUtils.Pow
-        for j = 1:3
-            if inSymbols(i.base, [ParamSyms[j]]) != false
-                xyz[j] = i.exp
-                return ((-1)^(i.exp), xyz) # (-X)^k -> (true, (-1)^k, [0, 0, 0])
-            end
-        end
-    else
-        for j = 1:3
-            if inSymbols(i, [ParamSyms[j]]) != false
-                xyz[j] = 1
-                return (-1, xyz)
-            end
-        end
-    end
-    (varVal(i, varDict), xyz)
-end
-
-detectXYZ(vr::Real, _) = (vr, [0,0,0])
-
-
-# res = [d_ratio, Δi, Δj, Δk]
-function diffTransferCore(trm::SymbolicUtils.Symbolic, varDict::Dict{Num, <:Real})
-    d = 1.0
-    xyz = zeros(Int, 3)
-    r = Symbolics.@rule *(~~xs) => ~~xs
-    trms = SymbolicUtils.simplify(trm, rewriter=r)
-    !(trms isa SubArray) && (trms = [trms])
-    for vr in trms
-        coeff, ijks = detectXYZ(vr, varDict)
-        xyz += ijks
-        d *= coeff
-    end
-    (d, xyz)
-end
-
-diffTransferCore(trm::Real, _...) = (Float64(trm), [0,0,0])
-
-
-function diffTransfer(trm::Num, varDict::Dict{Num, <:Real})
-    trms = splitTerm(trm)
-    diffTransferCore.(trms, Ref(varDict))
-end
-
-
-# function diffInfo(bf::CompositeGTBasisFuncs{BN, 1}, vr, varDict) where {BN}
-#     exprs = expressionOfCore(bf, false, true, true)
-#     relDiffs = Symbolics.derivative.(log.(exprs), vr)
-#     diffTransfer.(relDiffs, Ref(varDict))
-# end
-
-
-# function diffInfoToBasisFunc(bf::CompositeGTBasisFuncs{BN, 1}, 
-#                              info::Vector{Vector{Tuple{Float64, Vector{Int}}}}) where {BN}
-#     bs = decomposeCore(Val(true), bf)
-#     bss = map(info, bs) do gInfo, bf
-#         map(gInfo) do dxyz
-#            sgf = copyBasis(bf)
-#            sgf.gauss[1].con[] *= dxyz[1]
-#            xyz = dxyz[2]
-#            xyz == [0,0,0] ? sgf : shift(sgf, xyz)
-#         end::Vector{<:BasisFunc{<:Any, 1}}
-#     end
-#     vcat(bss...)::Vector{<:BasisFunc{<:Any, 1}} |> sumOf
-# end

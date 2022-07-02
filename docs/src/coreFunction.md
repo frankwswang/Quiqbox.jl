@@ -160,10 +160,6 @@ getVar
 getVarDict
 ```
 
-```@docs
-expressionOf
-```
-
 
 ```@docs
 gridCoords

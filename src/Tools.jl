@@ -1,7 +1,6 @@
 export hasEqual, hasIdentical, hasApprox, flatten, markUnique, getUnique!
 
 using Statistics: std, mean
-using Symbolics
 using LinearAlgebra: eigvals, svdvals, eigen
 
 getAtolCore(::Type{T}) where {T<:Real} = log(10, T|>eps)|>ceil
@@ -96,6 +95,11 @@ macro compareLength(inputArg1, inputArg2, argNames::String...)
 end
 
 
+sizeOf(arr::AbstractArray) = size(arr)
+
+sizeOf(tpl::Tuple) = (length(tpl),)
+
+
 """
 
     hasBoolRelation(boolOp::Function, obj1, obj2; ignoreFunction::Bool=false, 
@@ -174,18 +178,6 @@ function hasBoolRelation(boolOp::F, obj1::T1, obj2::T2;
             !(isa.([T1.parameters...], Type{<:FLevel}) |> any) || 
             !(isa.([T2.parameters...], Type{<:FLevel}) |> any) )
         return false
-    elseif obj1 isa Union{Array, Tuple}
-        if !decomposeNumberCollection && 
-           (eltype(obj1) <: Number) && (eltype(obj2) <: Number)
-            return boolOp(obj1, obj2)
-        end
-        length(obj1) != length(obj2) && (return false)
-        !ignoreContainer && obj1 isa Matrix && (size(obj1) != size(obj2)) && (return false)
-        for (i,j) in zip(obj1, obj2)
-            res *= hasBoolRelation(boolOp, i, j; ignoreFunction, ignoreContainer, 
-                                   decomposeNumberCollection)
-            !res && (return false)
-        end
     elseif obj1 isa Type || obj2 isa Type
         return boolOp(obj1, obj2)
     else
@@ -207,6 +199,27 @@ function hasBoolRelation(boolOp::F, obj1::T1, obj2::T2;
         else
             return false
         end
+    end
+    res
+end
+
+function hasBoolRelation(boolOp::F, 
+                         obj1::Union{AbstractArray, Tuple}, 
+                         obj2::Union{AbstractArray, Tuple};
+                         ignoreFunction::Bool=false, ignoreContainer::Bool=false,
+                         decomposeNumberCollection::Bool=false) where {F<:Function}
+    if !decomposeNumberCollection && (eltype(obj1) <: Number) && (eltype(obj2) <: Number)
+        return boolOp(obj1, obj2)
+    end
+    !ignoreContainer && 
+    (typejoin(typeof(obj1), typeof(obj2))==Any || sizeOf(obj1)!=sizeOf(obj2)) && 
+    (return false)
+    length(obj1) != length(obj2) && (return false)
+    res = true
+    for (i,j) in zip(obj1, obj2)
+        res *= hasBoolRelation(boolOp, i, j; ignoreFunction, ignoreContainer, 
+                                decomposeNumberCollection)
+        !res && (return false)
     end
     res
 end
@@ -621,9 +634,9 @@ function replaceSymbol(sym::Symbol, pair::Pair{String, String}; count::Int=typem
 end
 
 
-# function renameFunc(fName::Symbol, f::F, ::Type{T}, N::Int=1) where {F<:Function, T}
-#     @eval ($(fName))(a::Vararg{$T, $N}) = $f(a...)::$T
-# end
+function renameFunc(fName::Symbol, f::F, ::Type{T}, N::Int=1) where {F<:Function, T}
+    @eval ($(fName))(a::Vararg{$T, $N}) = $f(a...)::$T
+end
 
 function renameFunc(fName::Symbol, f::F, N::Int=1) where {F<:Function}
     @eval ($(fName))(a::Vararg{Any, $N}) = $f(a...)
@@ -667,54 +680,54 @@ function isOscillateConverged(sequence::Vector{<:Real},
 end
 
 
-splitTerm(trm::Symbolics.Num) = 
-splitTermCore(trm.val)::Vector{<:Union{Real, SymbolicUtils.Symbolic}}
+# splitTerm(trm::Symbolics.Num) = 
+# splitTermCore(trm.val)::Vector{<:Union{Real, SymbolicUtils.Symbolic}}
 
-@inline function rewriteCore(trm, r)
-    res = r(trm)
-    res === nothing ? trm : res
-end
+# @inline function rewriteCore(trm, r)
+#     res = r(trm)
+#     res === nothing ? trm : res
+# end
 
-function splitTermCore(trm::SymbolicUtils.Add)
-    r1 = SymbolicUtils.@rule +(~(~xs)) => [i for i in ~(~xs)]
-    r1(trm) .|> rewriteTerm
-end
+# function splitTermCore(trm::SymbolicUtils.Add)
+#     r1 = SymbolicUtils.@rule +(~(~xs)) => [i for i in ~(~xs)]
+#     r1(trm) .|> rewriteTerm
+# end
 
-rewriteTerm(trm::SymbolicUtils.Add) = splitTermCore(trm)
+# rewriteTerm(trm::SymbolicUtils.Add) = splitTermCore(trm)
 
-rewriteTerm(trm::SymbolicUtils.Pow) = itself(trm)
+# rewriteTerm(trm::SymbolicUtils.Pow) = itself(trm)
 
-function rewriteTerm(trm::SymbolicUtils.Div)
-    r = @rule (~x) / (~y) => (~x) * (~y)^(-1)
-    rewriteCore(trm, r)
-end
+# function rewriteTerm(trm::SymbolicUtils.Div)
+#     r = @rule (~x) / (~y) => (~x) * (~y)^(-1)
+#     rewriteCore(trm, r)
+# end
 
-function rewriteTerm(trm::SymbolicUtils.Mul)
-    r = SymbolicUtils.@rule *(~(~xs)) => sort([i for i in ~(~xs)], 
-                              by=x->(x isa SymbolicUtils.Symbolic)) |> prod
-    rewriteCore(trm, r) |> SymbolicUtils.simplify
-end
+# function rewriteTerm(trm::SymbolicUtils.Mul)
+#     r = SymbolicUtils.@rule *(~(~xs)) => sort([i for i in ~(~xs)], 
+#                               by=x->(x isa SymbolicUtils.Symbolic)) |> prod
+#     rewriteCore(trm, r) |> SymbolicUtils.simplify
+# end
 
-function splitTermCore(trm::SymbolicUtils.Mul)
-    r1 = SymbolicUtils.@rule *(~(~xs)) => [i for i in ~(~xs)]
-    r2 = SymbolicUtils.@rule +(~(~xs)) => [i for i in ~(~xs)]
-    r3 = @acrule ~~vs * exp((~a)*((~x)^2+(~y)^2+(~z)^2)) * 
-                        exp(-1*(~a)*((~x)^2+(~y)^2+(~z)^2)) => prod(~~vs)
-    trms = rewriteCore(trm, r1)
-    idx = findfirst(x-> x isa SymbolicUtils.Add, trms)
-    if idx !== nothing
-        sumTerm = popat!(trms, idx)
-        var = SymbolicUtils.simplify(sort(trms, 
-                                          by=x->(x isa SymbolicUtils.Symbolic)) |> prod)
-        rewriteCore.((r2(sumTerm) .* var), Ref(r3)) .|> rewriteTerm |> flatten
-    else
-        [trms |> prod]
-    end
-end
+# function splitTermCore(trm::SymbolicUtils.Mul)
+#     r1 = SymbolicUtils.@rule *(~(~xs)) => [i for i in ~(~xs)]
+#     r2 = SymbolicUtils.@rule +(~(~xs)) => [i for i in ~(~xs)]
+#     r3 = @acrule ~~vs * exp((~a)*((~x)^2+(~y)^2+(~z)^2)) * 
+#                         exp(-1*(~a)*((~x)^2+(~y)^2+(~z)^2)) => prod(~~vs)
+#     trms = rewriteCore(trm, r1)
+#     idx = findfirst(x-> x isa SymbolicUtils.Add, trms)
+#     if idx !== nothing
+#         sumTerm = popat!(trms, idx)
+#         var = SymbolicUtils.simplify(sort(trms, 
+#                                           by=x->(x isa SymbolicUtils.Symbolic)) |> prod)
+#         rewriteCore.((r2(sumTerm) .* var), Ref(r3)) .|> rewriteTerm |> flatten
+#     else
+#         [trms |> prod]
+#     end
+# end
 
-splitTermCore(trm::SymbolicUtils.Div) = trm |> rewriteTerm |> splitTermCore
+# splitTermCore(trm::SymbolicUtils.Div) = trm |> rewriteTerm |> splitTermCore
 
-splitTermCore(trm) = [trm]
+# splitTermCore(trm) = [trm]
 
 
 function groupedSort(v::T, sortFunction::F=itself) where {T<:AbstractVector, F<:Function}
@@ -851,21 +864,21 @@ arrayDiff!(vs::Vararg{Array{T}, N}) where {T, N} = arrayDiffCore!(vs)
 tupleDiff(ts::Vararg{NTuple{<:Any, T}, N}) where {T, N} = arrayDiff!((ts .|> collect)...)
 
 
-function getFuncNum(f::Function, vNum::Symbolics.Num)::Symbolics.Num
-    Symbolics.variable(f|>nameOf, T=Symbolics.FnType)(vNum)
-end
+# function getFuncNum(f::Function, vNum::Symbolics.Num)::Symbolics.Num
+#     Symbolics.variable(f|>nameOf, T=Symbolics.FnType)(vNum)
+# end
 
-function getFuncNum(pf::Pf{T, F}, vNum::Symbolics.Num) where {T, F}
-    (pf.c * Symbolics.variable(pf.f.n, T=Symbolics.FnType)(vNum))::Symbolics.Num
-end
+# function getFuncNum(pf::Pf{T, F}, vNum::Symbolics.Num) where {T, F}
+#     (pf.c * Symbolics.variable(pf.f.n, T=Symbolics.FnType)(vNum))::Symbolics.Num
+# end
 
-function getFuncNum(tf::TypedFunction{F}, vNum::Symbolics.Num) where {F}
-    Symbolics.variable(tf.n, T=Symbolics.FnType)(vNum)::Symbolics.Num
-end
+# function getFuncNum(tf::TypedFunction{F}, vNum::Symbolics.Num) where {F}
+#     Symbolics.variable(tf.n, T=Symbolics.FnType)(vNum)::Symbolics.Num
+# end
 
-getFuncNum(::TypedFunction{itselfT}, vNum::Symbolics.Num) = itself(vNum)
+# getFuncNum(::TypedFunction{itselfT}, vNum::Symbolics.Num) = itself(vNum)
 
-getFuncNum(::itselfT, vNum::Symbolics.Num) = itself(vNum)
+# getFuncNum(::itselfT, vNum::Symbolics.Num) = itself(vNum)
 
 function genIndex(index::Int)
     @assert index >= 0

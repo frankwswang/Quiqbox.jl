@@ -1,8 +1,7 @@
 using Test
 using Quiqbox
-using Quiqbox: BasisFuncMix, unpackBasis, inSymbols, varVal, ElementNames, sortBasisFuncs, 
-               ParamList, sumOf, expressionOfCore, mergeGaussFuncs, gaussProd, getNorms
-using Symbolics
+using Quiqbox: BasisFuncMix, unpackBasis, ElementNames, sortBasisFuncs, ParamList, sumOf, 
+               mergeGaussFuncs, gaussProd, getNorms
 using LinearAlgebra
 
 @testset "Basis.jl" begin
@@ -61,7 +60,7 @@ v2 = rand()
 
 c2 = genExponent(c1)
 c3 = genExponent(e1)
-@test hasIdentical(c1, c2)
+@test hasIdentical(c1, c2, ignoreContainer=true) && c1.map == c2.map
 @test !hasEqual(c1, c3)
 @test c1[] == c3[]
 @test c1() == c3()
@@ -493,11 +492,29 @@ pb1 = ParamBox(2, :p)
 @test getParams(pb1) == pb1
 @test getParams(pb1, :p) == pb1
 @test getParams(pb1, :P) === nothing
-@test getParams(pb1, onlyDifferentiable=true) === nothing
+@test getParams(pb1, :p₁) === nothing
+@test getParams(pb1, forDifferentiation=true) === pb1
+pb1.index[] = 1
+@test getParams(pb1, :p) === getParams(pb1, :p₁) === pb1
 
 pb2 = ParamBox(2, :q)
 @test getParams([pb1, pb2]) == [pb1, pb2]
 @test getParams([pb1, pb2], :p) == [pb1]
+
+pb3 = ParamBox(2.1, :l, x->x^2)
+@test getParams(pb3, :l) === pb3
+@test getParams(pb3, :l₂) === nothing
+@test getParams(pb3, :x_l) === nothing
+@test getParams(pb3, :x_l, forDifferentiation=true) === pb3
+@test getParams(pb3, :x_l₂, forDifferentiation=true) === nothing
+pb3.index[] = 2
+@test getParams(pb3, :l) === pb3
+@test getParams(pb3, :l₁) === nothing
+@test getParams(pb3, :l₂) === pb3
+@test getParams(pb3, :l, forDifferentiation=true) === nothing
+@test getParams(pb3, :x_l, forDifferentiation=true) === pb3
+@test getParams(pb3, :x_l₁, forDifferentiation=true) === nothing
+@test getParams(pb3, :x_l₂, forDifferentiation=true) === pb3
 
 gf_pbTest1 = GaussFunc(2.0, 1.0)
 @test getParams(gf_pbTest1) == gf_pbTest1.param |> collect
@@ -556,7 +573,7 @@ testbf_cb.(bfm_cb1.BasisFunc, bfm_cb3.BasisFunc)
 @test hasEqual(bfm_cb3.BasisFunc |> collect, [bf_cb3, bf_cb3])
 
 
-# function markParams! getVar getVarDict
+# function markParams!
 e_gv1 = genExponent(2.0)
 c_gv1 = genContraction(1.0)
 gf_gv1 = GaussFunc(e_gv1, c_gv1)
@@ -622,114 +639,31 @@ pbs_gv3_2 = sort(pbs_gv3, by=x->(typeof(x).parameters[2], x.index[]))
 @test hasEqual(pbs_gv3_2, pbs_gv0_2)
 @test hasIdentical(pbs_gv3_2, pbs_gv0_2)
 
-@test getVar(e_gv1).val.name == :α₁
-@test getfield.(getfield.(getVar(bf_gv6), :val), :name) == 
-      [:X₁, :Y₂, :Z₂, :α₁, :d₃, :α₃, :d₂, :x_α₂, :d₁]
-@test getfield.(getfield.(getVar(bfm_gv), :val), :name) == 
-      [:X₁, :Y₁, :Z₁, :x_α₂, :d₂, :X₁, :Y₂, :Z₂, :α₁, 
-       :d₃, :α₃, :d₂, :x_α₂, :d₁, :X₂, :Y₂, :Z₃, :α₃, :d₃]
 
-@test getVarDict(e_gv1) == Dict(Symbolics.variable(:α, 1)=>2.0)
-
-pairs_gv1 = sort(getVarDict(e_gv3, includeMapping=true) |> collect, by=x->string(x[1]))
-strs_gv1 = getindex.(pairs_gv1, 1) .|> string
-strs_gv2 = getindex.(pairs_gv1, 2) .|> string
-
-@test strs_gv1[1][1:3] == "f_α" && strs_gv1[1][end-8:end] == "(x_α₂)"
-@test strs_gv1[2:end] == ["x_α₂"]
-@test strs_gv2 == ["1.1025", "1.05"]
-
-@test getVarDict(gf_gv1) == Dict( Pair.(Symbolics.variable.([:α, :d], fill(1, 2)), 
-                                        [2.0, 1.0]) )
-
-@test getVarDict(bf_gv1) == Dict( Pair.(Symbolics.variable.([:X, :Y, :Z, :α, :d], 
-                                                            fill(1, 5)), 
-                                        [1.0, 2.0, 3.0, 2.0, 1.0]) )
-
-@test getVarDict(bf_gv1) == getVarDict([bf_gv1, gf_gv1])
-@test getVarDict([bf_gv1, bf_gv2]) == 
-      merge(getVarDict(bf_gv1), getVarDict(bf_gv2)) ==
-      getVarDict([cen_gv1..., cen_gv2..., gf_gv1, gf_gv2]) == 
-      getVarDict(vcat(bf_gv1.param|>collect, bf_gv2.param|>collect))
-@test getVarDict(bfm_gv) == 
-      getVarDict([bf_gv2, bf_gv4, bf_gv6]) == 
-      getVarDict(pbs_gv0)
+# function getVar getVarDict
+@test getVar(e_gv1) == :α₁
+@test getVar.(bf_gv6.param) == (:X₁, :Y₂, :Z₂, :α₁, :d₃, :α₃, :d₂, :α₂, :d₁)
+@test getVar.(bf_gv6.param, true) == (:X₁, :Y₂, :Z₂, :α₁, :d₃, :α₃, :d₂, :x_α₂, :d₁)
+@test getVar.(bfm_gv.param) == (:X₁, :Y₁, :Z₁, :α₂, :d₂, :X₁, :Y₂, :Z₂, :α₁, :d₃, :α₃, :d₂, 
+                                :α₂, :d₁, :X₂, :Y₂, :Z₃, :α₃, :d₃)
+@test getVar.(bfm_gv.param, true) == (:X₁, :Y₁, :Z₁, :x_α₂, :d₂, :X₁, :Y₂, :Z₂, :α₁, :d₃, 
+                                      :α₃, :d₂, :x_α₂, :d₁, :X₂, :Y₂, :Z₃, :α₃, :d₃)
 
 
-# function expressionOf, expressionOfCore
-expr1 = expressionOf(gf1) |> string
-@test expr1 == "exp(-2.0(r₁^2) - 2.0(r₂^2) - 2.0(r₃^2))" || 
-      expr1 == "exp(-2.0(r₁^2) - (2.0(r₂^2)) - (2.0(r₃^2)))"
-
-expr2 = expressionOf(bf1)[]|>string
-@test expr2 == "exp(-2.0((r₁ - 1.0)^2) - 2.0((r₂ - 2.0)^2) - 2.0((r₃ - 3.0)^2))" || 
-      expr2 == "exp(-2.0((r₁ - 1.0)^2) - (2.0((r₂ - 2.0)^2)) - (2.0((r₃ - 3.0)^2)))"
-@test expressionOfCore(gf1) |> string == "d*exp(-α*(r₁^2 + r₂^2 + r₃^2))"
-@test expressionOfCore(bf1)[]|>string == "d*exp(-α*((r₁ - X)^2 + (r₂ - Y)^2 + (r₃ - Z)^2))"
-
-expStr = expressionOfCore(bf6)[] |> string
-idx = findfirst('d', expStr)
-@test isapprox(parse(Float64, expStr[1:idx-1]), 2.1381164110649706, atol=1e-12)
-@test expStr[idx:end] == "d*exp(-α*((r₁ - X)^2 + (r₂ - Y)^2 + (r₃ - Z)^2))*(α^0.75)" || 
-      expStr[idx:end] == "d*(α^0.75)*exp(-α*((r₁ - X)^2 + (r₂ - Y)^2 + (r₃ - Z)^2))"
-
-@test expressionOfCore(bfm1)[]|>string == "d*exp(-α*((r₁ - X)^2 + (r₂ - Y)^2 + (r₃ - Z)^2))"
-expr_bfm2 =  expressionOfCore(bfm2)[] |> string
-@test expr_bfm2 == "d*exp(-α*((r₁ - X)^2 + (r₂ - Y)^2 + (r₃ - Z)^2))*(r₁ - X)" || 
-      expr_bfm2 == "d*(r₁ - X)*exp(-α*((r₁ - X)^2 + (r₂ - Y)^2 + (r₃ - Z)^2))"
-
-
-# function inSymbols
-sym1 = :a1
-sym2 = :d
-syms = [:a, :b, :c]
-@test inSymbols(sym1, syms) == :a
-@test !inSymbols(sym2, syms)
-
-sym3 = Symbolics.variable(:a)
-@test inSymbols(sym3, syms) == :a
-@test inSymbols(sym3.val, syms) == :a
-@test inSymbols(log(sym3).val, syms) == false
-
-@test inSymbols(abs, syms) == false
-
-
-# function varVal
-vars = @variables X, Y, Z, F(X)
-F = vars[end]
-vars = vars[1:end-1]
-func1(X,Y,Z) = log(X+0.5Y*Z)
-expr = func1(X,Y,Z)
-vals = [1, 3.334, -0.2]
-d1 = Dict(vars .=> vals)
-errT = 1e-10
-@test varVal.(vars, Ref(d1)) == vals
-@test isapprox(varVal(sum(vars), d1), sum(vals), atol=errT)
-@test isapprox(varVal(prod(vars), d1), prod(vals), atol=errT)
-@test isapprox(varVal(vars[1]^vars[2], d1), vals[1]^vals[2], atol=errT)
-@test isapprox(varVal(expr, d1), func1(vals...), atol=errT)
-
-f1 = Symbolics.variable(abs, T=Symbolics.FnType{Tuple{Any}, Real})(Z)
-f2 = Symbolics.variable(:abs, T=Symbolics.FnType{Tuple{Any}, Real})(Z)
-f1sym = f1.val
-f2sym = f2.val
-@test varVal(f1sym, d1) == abs(d1[Z])
-@test varVal(f2sym, d1) == abs(d1[Z])
-
-sp = 1.5
-gb1 = GridBox(1,sp)
-d2 = getVarDict(gb1.box |> flatten)
-l = Symbolics.variable(:L,0)
-vars2 = [i.val for i in keys(d2)]
-diffs2 = Differential(l).(vars2)
-exprs2 = map(x -> (x isa SymbolicUtils.Term) ? d2[x] : x, vars2)
-diffExprs2 = Symbolics.derivative.(exprs2, Ref(l))
-excs2 = Symbolics.build_function.(exprs2, l) .|> eval
-vals2 = [f(sp) for f in excs2]
-excdiffs2 = Symbolics.build_function.(diffExprs2, l) .|> eval
-diffvals2 = [f(sp) for f in excdiffs2]
-
-@test varVal.(vars2, Ref(d2)) == vals2
-@test varVal.(diffs2, Ref(d2)) == diffvals2
+@test getVarDict(e_gv1) == Dict(:α₁=>2.0)
+@test getVarDict(pb2) == Dict(:q=>2)
+@test getVarDict(pb3) == Dict([:x_l₂=>2.1, :l₂=>4.41])
+@test getVarDict(bf_gv6.param) == Dict( ( (  getVar.(bf_gv6.param) .=> 
+                                           outValOf.(bf_gv6.param))..., 
+                                          ( inSymOf.(bf_gv6.param) .=> 
+                                           getindex.(bf_gv6.param))... ) )
+@test getVarDict(bfm_gv.param) == Dict( ( (  getVar.(bfm_gv.param) .=> 
+                                           outValOf.(bfm_gv.param))..., 
+                                         (  inSymOf.(bfm_gv.param) .=> 
+                                           getindex.(bfm_gv.param))... ) )
+@test getVarDict(bfm_gv.param) == getVarDict(unique(bfm_gv.param))
+@test getVarDict(bfm_gv.param) != getVarDict(getUnique!(bfm_gv.param|>collect))
+@test getVarDict(bfm_gv.param) == getVarDict(getUnique!(bfm_gv.param|>collect, 
+                                                        compareFunction=hasIdentical))
 
 end

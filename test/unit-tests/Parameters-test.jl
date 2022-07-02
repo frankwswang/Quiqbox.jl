@@ -1,6 +1,5 @@
 using Test
 using Quiqbox
-using Symbolics
 
 @testset "Parameters.jl" begin
 
@@ -32,9 +31,11 @@ pb4 = ParamBox(1.2, :c, x->x^2, :x)
 @test outSymOfCore(pb4) == :c
 @test startswith(nameof(pb4.map) |> string, "f_c")
 pair1 = inSymValOf(pb4)
-@test Tuple(pair1) == (inSymOf(pb4), 1.2) == ((@variables x)[], 1.2)
+@test Tuple(pair1) == (inSymOf(pb4), 1.2) == (:x, 1.2)
 pair2 = outSymValOf(pb4)
-@test Tuple(pair2) == (outSymOf(pb4), pb4()) == ((@variables x)[], pb4.map(1.2))
+@test Tuple(pair2) == (outSymOf(pb4), pb4()) == (:c, pb4.map(1.2))
+pb4_2 = ParamBox(1.2, :c)
+@test inSymOf(pb4_2) == outSymOf(pb4_2) == :c
 
 
 pb5 = outValCopy(pb4)

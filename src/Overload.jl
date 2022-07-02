@@ -18,12 +18,13 @@ diffColorSym(pb::ParamBox) = isDiffParam(pb) ? :green : :light_black
 import Base: show
 const nSigShown = 10
 function show(io::IO, pb::ParamBox)
+    v = pb.data[]
     print(io, typeof(pb))
-    print(io, "(", round(pb.data[], sigdigits=nSigShown), ")")
+    print(io, "(", v isa Integer ? v : round(v, sigdigits=nSigShown), ")")
     print(io, "[")
     printstyled(io, "∂", color=diffColorSym(pb))
     print(io, "][")
-    printstyled(io, "$(pb|>getVar)", color=:cyan)
+    printstyled(io, "$(getVar(pb, true))", color=:cyan)
     print(io, "]")
 end
 
@@ -239,16 +240,20 @@ Base.broadcastable(sp::SpatialPoint) = Base.broadcastable(sp.point.param)
 # Quiqbox methods overload.
 ## Method overload of `hasBoolRelation` from Tools.jl.
 function hasBoolRelation(boolFunc::F, 
-                         pb1::ParamBox{<:Any, <:Any, F1}, pb2::ParamBox{<:Any, <:Any, F2}; 
+                         pb1::ParamBox{<:Any, V1, F1}, pb2::ParamBox{<:Any, V2, F2}; 
                          ignoreFunction::Bool=false, ignoreContainer::Bool=false,
-                         kws...) where {F<:Function, F1, F2}
+                         kws...) where {F<:Function, V1, V2, F1, F2}
     if ignoreContainer
         boolFunc(pb1(), pb2())
-    elseif ignoreFunction || F1 == F2 == FLi
-        boolFunc(pb1.data, pb2.data)
+    elseif V1 == V2
+        if ignoreFunction || F1 == F2 == FLi
+            boolFunc(pb1.data, pb2.data)
+        else
+            boolFunc(pb1.canDiff[], pb2.canDiff[]) && boolFunc(pb1.map, pb2.map) && 
+            boolFunc(pb1.data, pb2.data)
+        end
     else
-        boolFunc(pb1.canDiff[], pb2.canDiff[]) && boolFunc(pb1.map, pb2.map) && 
-        boolFunc(pb1.data, pb2.data)
+        false
     end
 end
 

@@ -6,7 +6,7 @@ const subscriptNum   = Dict(['0'=>'₀', '1'=>'₁', '2'=>'₂', '3'=>'₃', '4'
                              '6'=>'₆', '7'=>'₇', '8'=>'₈', '9'=>'₉'])
 const superscriptSym = Dict(['+'=>'⁺', '-'=>'⁻', '('=>'⁽', ')'=>'⁾', '!'=>'ꜝ'])
 
-
+const subscripts = ['₀', '₁', '₂', '₃', '₄', '₅', '₆', '₇', '₈', '₉']
 """
 
     checkFname(Fname::String; showWarning::Bool=true) -> String
@@ -33,18 +33,17 @@ function checkFname(Fname::String; showWarning::Bool=true)
 end
 
 
-function advancedParse(content::AbstractString, 
-                       ParseFunc::F=adaptiveParse) where {F<:Function}
-    res = ParseFunc(content)
+function advancedParse(::Type{T}, content::AbstractString, 
+                       ParseFunc::F=adaptiveParse) where {T, F<:Function}
+    res = ParseFunc(T, content)
     res === nothing && (res = content)
     res
 end
 
 
-function adaptiveParse(content::AbstractString)
-    res = tryparse(Int, content)
-    res === nothing && (res = tryparse(Float64, content))
-    res === nothing && (res = tryparse(Complex{Float64}, content))
+function adaptiveParse(::Type{T}, content::AbstractString) where {T<:AbstractFloat}
+    res = tryparse(T, content)
+    res === nothing && (res = tryparse(Complex{T}, content))
     res
 end
 
@@ -54,11 +53,14 @@ function numToSups(num::Int)
     [superscriptNum[i] for i in str] |> prod
 end
 
+numToSups(::Nothing) = ""
 
 function numToSubs(num::Int)
     str = string(num)
     [subscriptNum[i] for i in str] |> prod
 end
+
+numToSubs(::Nothing) = ""
 
 
 function alignNum(x::Number, lpadN::Int=8, rpadN::Int=21; roundDigits::Int=-1)
@@ -86,4 +88,16 @@ function alignNumSign(c::Real; roundDigits::Int=-1)
     else
         " "*alignNum(c, 0, 0; roundDigits)
     end
+end
+
+
+function inSymbol(sym::Symbol, src::Symbol)
+    symStr, srcStr = (sym, src) .|> string
+    bl = false
+    for i in subscripts
+        i == symStr[end] && (bl = true; break)
+    end
+    l1 = length(symStr)
+    l2 = length(srcStr)
+    bl ? (l1 == l2 && symStr == srcStr) : (l1 <= l2 && symStr == srcStr[1:l1])
 end

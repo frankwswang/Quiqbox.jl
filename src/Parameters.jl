@@ -1,10 +1,8 @@
 export FLevel, ParamBox, inValOf, inSymOf, inSymOfCore, inSymValOf, outValOf, outSymOf, 
-       outSymOfCore, outSymValOf, dataOf, mapOf, outValCopy, inVarCopy, enableDiff!, 
-       disableDiff!, isDiffParam, toggleDiff!, changeMapping
+       outSymOfCore, outSymValOf, dataOf, mapOf, getVar, getVarDict, outValCopy, inVarCopy, 
+       enableDiff!, disableDiff!, isDiffParam, toggleDiff!, changeMapping
 
 export FLX0
-
-using Symbolics: Num
 
 # Function Level
 struct FLevel{L1, L2} <: MetaParam{FLevel} end
@@ -168,22 +166,16 @@ to `pb[]`.
 
 """
 
-    inSymOf(pb::ParamBox) -> Symbolics.Num
+    inSymOf(pb::ParamBox) -> Symbol
 
-Return the variable`::Symbolics.Num` of stored data (independent variable) of the input 
-`ParamBox`.
+Return the `Symbol` of stored data (independent variable) of the input `ParamBox`.
 """
-@inline function inSymOf(pb::ParamBox)
-    idx = pb.index[]
-    hasIdx = idx isa Int
-    ivSym = inSymOfCore(pb)
-    hasIdx ? Symbolics.variable(ivSym, idx) : Symbolics.variable(ivSym)
-end
+inSymOf(pb::ParamBox) = ( string(inSymOfCore(pb)) * numToSubs(pb.index[]) ) |> Symbol
 
 
 """
 
-    inSymValOf(pb::ParamBox{T}) where {T} -> ::Pair{Symbolics.Num, T}
+    inSymValOf(pb::ParamBox{T}) where {T} -> ::Pair{Symbol, T}
 
 Return a `Pair` of the stored independent variable of the input `ParamBox` and its 
 corresponding value.
@@ -208,29 +200,21 @@ Equivalent to `pb()`.
 
 """
 
-    outSymOf(pb::ParamBox) -> Symbolics.Num
+    outSymOf(pb::ParamBox) -> Symbol
 
-Return the variable`::Symbolics.Num` of the output data (dependent variable) of the input 
-`ParamBox`.
+Return the `Symbol` of the output data (dependent variable) of the input `ParamBox`.
 """
-@inline outSymOf(pb::ParamBox{<:Any, <:Any, FLi}) = inSymOf(pb)
-
-@inline function outSymOf(pb::ParamBox)
-    idx = pb.index[]
-    hasIdx = idx isa Int
-    vSym = outSymOfCore(pb)
-    hasIdx ? Symbolics.variable(vSym, idx) : Symbolics.variable(vSym)
-end
+outSymOf(pb::ParamBox) = ( string(outSymOfCore(pb)) * numToSubs(pb.index[]) ) |> Symbol
 
 
 """
 
-    outSymValOf(pb::ParamBox) -> ::Pair{Symbolics.Num, T}
+    outSymValOf(pb::ParamBox) -> ::Pair{Symbol, T}
 
 Return a `Pair` of the dependent variable represented by the input `ParamBox` and the 
 corresponding output value.
 """
-@inline outSymValOf(pb::ParamBox{T}) where {T} = (inSymOf(pb) => outValOf(pb))
+@inline outSymValOf(pb::ParamBox{T}) where {T} = (outSymOf(pb) => outValOf(pb))
 
 
 """
@@ -240,6 +224,7 @@ corresponding output value.
 Return the `Symbol` of the stored data (independent variable) of the input `ParamBox`.
 """
 @inline inSymOfCore(pb::ParamBox) = pb.dataName
+@inline inSymOfCore(pb::ParamBox{<:Any, <:Any, FLi}) = outSymOfCore(pb)
 
 
 """
@@ -270,6 +255,47 @@ Return the 0-D `Array` of the data stored in the input `ParamBox`.
 Return the mapping function of the input `ParamBox`.
 """
 @inline mapOf(pb::ParamBox) = pb.map
+
+
+"""
+
+    getVar(pb::ParamBox{T}, forDifferentiation::Bool=false) -> Symbol
+
+Return the `Symbol` of a parameter. If `forDifferentiation` is set to `true`, then 
+the `Symbol` of the independent variable represented by the input `ParamBox` during the 
+differentiation process is returned.
+"""
+function getVar(pb::ParamBox, forDifferentiation::Bool=false)
+    if forDifferentiation
+        getVarCore(pb)[end][1]
+    else
+        outSymOf(pb)
+    end
+end
+
+function getVarCore(pb::ParamBox{T, <:Any, FL}) where {T, FL}
+    dvSym = outSymOf(pb)
+    ivVal = pb.data[]
+    if FL == FLi || !pb.canDiff[]
+        Pair{Symbol, T}[dvSym => ivVal]
+    else
+        Pair{Symbol, T}[dvSym => pb(), inSymOf(pb) => ivVal]
+    end
+end
+
+
+"""
+
+    getVarDict(obj::Union{ParamBox, Tuple{Vararg{ParamBox}}, AbstractArray{<:ParamBox}}) -> 
+    Dict{Symbol}
+
+Return a `Dict` that stores the independent variable(s) of the parameter container(s) and 
+its(their) corresponding value(s). **NOTE: Once the input `ParamBox` is mutated, the 
+generated `Dict` may no longer be up to date.**
+"""
+getVarDict(pbs::AbstractArray{<:ParamBox}) = vcat(getVarCore.(pbs)...) |> Dict
+getVarDict(pbs::Tuple{Vararg{ParamBox}}) = getVarDict(pbs |> collect)
+getVarDict(pbs::ParamBox) = getVarCore(pbs) |> Dict
 
 
 """

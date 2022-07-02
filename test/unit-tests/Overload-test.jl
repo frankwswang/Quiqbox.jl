@@ -7,13 +7,13 @@ using Suppressor: @capture_out
 
 # function show
 pb1 = ParamBox(-1)
-@test (@capture_out show(pb1)) == string(typeof(pb1))*"(-1.0)[∂][undef]"
+@test (@capture_out show(pb1)) == string(typeof(pb1))*"(-1)[∂][undef]"
 
 pb2 = ParamBox(-1, :a, index=1)
-@test (@capture_out show(pb2)) == string(typeof(pb2))*"(-1.0)[∂][a₁]"
+@test (@capture_out show(pb2)) == string(typeof(pb2))*"(-1)[∂][a₁]"
 
 pb3 = ParamBox(-1, :x, abs)
-@test (@capture_out show(pb3)) == string(typeof(pb3))*"(-1.0)[∂][x_x]"
+@test (@capture_out show(pb3)) == string(typeof(pb3))*"(-1)[∂][x_x]"
 
 bf1 = genBasisFunc([1.0, 2.0, 1.0], (2.0, 1.0))
 gf1 = bf1.gauss[1]
@@ -68,17 +68,22 @@ info3 = (@capture_out show(SCFconfig((:DD, :ADIIS, :DIIS),
 pb4 = deepcopy(pb1)
 pb5 = ParamBox(-1, :fa, abs)
 pb6 = ParamBox(-1, :x, abs)
+pb7 = ParamBox(-1.0, :undef, identity, index=1)
+pb8 = ParamBox(-1, :a, abs, index=2)
 @test false == (pb3 == pb5)
 @test true  == (pb3 == pb6)
-@test true  == hasBoolRelation(==, pb1, pb2)
+@test false  == hasBoolRelation(==, pb1, pb2)
+@test true  == hasBoolRelation(==, pb1, pb7)
+@test false  == hasBoolRelation(===, pb1, pb7)
 toggleDiff!(pb1)
-@test true  == (hasBoolRelation(==, pb1, pb2) && pb1.canDiff != pb2.canDiff)
+@test true  == (hasBoolRelation(==, pb1, pb7) && pb1.canDiff == pb7.canDiff)
 @test true  == hasBoolRelation(==, pb1, pb2, ignoreContainer=true)
+@test true  == hasBoolRelation(==, pb1, pb7, ignoreContainer=true)
 @test true  == hasBoolRelation(==, pb1, pb4)
 @test false == hasBoolRelation(===, pb1, pb4)
 @test true  == hasBoolRelation(===, pb1, pb4, ignoreContainer=true)
-@test false == hasBoolRelation(==, pb2, pb3)
-@test true  == hasBoolRelation(==, pb2, pb3, ignoreFunction = true)
+@test false == hasBoolRelation(==, pb2, pb8)
+@test true  == hasBoolRelation(==, pb2, pb8, ignoreFunction = true)
 
 
 # function +

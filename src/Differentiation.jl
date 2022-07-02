@@ -68,14 +68,6 @@ function twoBodyDerivativeCore(::Val{false},
 end
 
 
-function deriveBasisFunc(bf::CGTBasisFuncs1O{<:Any, <:Any, BN}, par::ParamBox) where {BN}
-    varDict = getVarDict(bf.param)
-    vr = getVar(par)
-    info = diffInfo(bf, vr, varDict)
-    diffInfoToBasisFunc(bf, info)
-end
-
-
 function derivativeCore(FoutputIsVector::Val{B}, 
                         bs::NTuple{BN, GTBasisFuncs{T, D, 1}}, 
                         par::ParamBox, S::Matrix{T}, 
