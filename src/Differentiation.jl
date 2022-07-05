@@ -177,33 +177,41 @@ paramIndex(::Val{czSym}, ::Val) = czIndex
 paramIndex(::Val{xpnSym}, ::Val{D}) where {D} = xpnIndex - 3 + D
 paramIndex(::Val{conSym}, ::Val{D}) where {D} = conIndex - 3 + D
 
-function ∂Basis(par::ParamBox{T, V, FL}, sgf::FGTBasisFuncs1O{T, D, <:Any, 1}) where 
-               {T, V, FL, D}
+function ∂BasisCore1(par::ParamBox{T, V, FL}, sgf::FGTBasisFuncs1O{T, D, <:Any, 1}) where 
+                    {T, FL, V, D}
     params = sgf.param
-    if FL == FLi || !par.canDiff[]
-        if par.index == params[paramIndex(Val(V), Val(D))].index
-            ∂SGFcore(Val(V), sgf)
-        else
-            EmptyBasisFunc{T, D}()
-        end
+    is = findall(x->x.data===par.data, params)
+    if length(is) > 0
+        map(is) do i
+            fPar = params[i]
+            _, V2, FL2 = getTypeParams(fPar)
+            c = 𝑑f(FL2, fPar.map, fPar[])
+            if c == 0.0
+                EmptyBasisFunc{T, D}()
+            else
+                ∂SGFcore(Val(V2), sgf, c)
+            end
+        end |> sumOf
     else
-        is = findall(x->x.dataName==par.dataName && x.index==par.index, params)
-        if length(is) > 0
-            map(is) do i
-                fPar = params[i]
-                _, V2, FL2 = getTypeParams(fPar)
-                c = 𝑑f(FL2, fPar.map, fPar[])
-                if c == 0.0
-                    EmptyBasisFunc{T, D}()
-                else
-                    ∂SGFcore(Val(V2), sgf, c)
-                end
-            end |> sumOf
-        else
-            EmptyBasisFunc{T, D}()
-        end
+        EmptyBasisFunc{T, D}()
     end
 end
+
+function ∂BasisCore2(par::ParamBox{T, V, FL}, sgf::FGTBasisFuncs1O{T, D, <:Any, 1}) where 
+                    {T, V, FL, D}
+    dividend = sgf.param[paramIndex(Val(V), Val(D))]
+    if !(divident.canDiff[]) && par.data === dividend.data && par.map === dividend.map
+        ∂SGFcore(Val(V), sgf)
+    else
+        EmptyBasisFunc{T, D}()
+    end
+end
+
+∂Basis(par::ParamBox{T, V, FLi}, sgf::FGTBasisFuncs1O{T, D, <:Any, 1}) where {T, V, D} = 
+∂BasisCore1(par, sgf)
+
+∂Basis(par::ParamBox{T, V, FL}, sgf::FGTBasisFuncs1O{T, D, <:Any, 1}) where {T, V, FL, D} = 
+par.canDiff[] ? ∂BasisCore1(par, sgf) : ∂BasisCore2(par, sgf)
 
 ∂Basis(par::ParamBox{T, V, FL}, b::FGTBasisFuncs1O{T}) where {T, V, FL} = 
 ∂Basis.(par, reshape(decomposeCore(Val(true), b), :)) |> sum
