@@ -55,9 +55,10 @@ info1 = (@capture_out show(fVar1.temp[1]))
 @test info1[end-34:end] == "], shared.Dtots, N, Cs, Fs, Ds, Es)"
 
 info2 = (@capture_out show(fVar1))
-@test info2[1:45] == string(typeof(fVar1))*"(Ehf="
-@test info2[end-63] == ','
-@test info2[end-62:end] == " Enn, N, nuc, nucCoords, C, F, D, Emo, occu, temp, isConverged)"
+@test info2[1:51] == string(typeof(fVar1))*"(Ehf="
+@test info2[end-69] == ','
+@test info2[end-68:end] == 
+      " Enn, N, nuc, nucCoords, C, F, D, Eo, occu, temp, isConverged, basis)"
 
 info3 = (@capture_out show(SCFconfig((:DD, :ADIIS, :DIIS), 
                                      (1e-4, 1e-12, 1e-13), Dict(2=>[:solver=>:LCM]))))

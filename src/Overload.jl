@@ -7,7 +7,7 @@ import Base: ==
                                     pb1.index[] == pb2.index[] && 
                                     typeof(pb1.map) === typeof(pb2.map))
 
-==(cp1::SpatialPoint, cp2::SpatialPoint) = (cp1.point.param == cp2.point.param)
+==(cp1::SpatialPoint, cp2::SpatialPoint) = (cp1.param == cp2.param)
 ==(t1::LTuple, t2::LTuple) = (t1.tuple == t2.tuple)
 ==(t1::LTuple{D, 0}, t2::LTuple{D, 0}) where {D} = true
 ==(t1::LTuple{1, L}, t2::LTuple{1, L}) where {L} = true
@@ -29,7 +29,7 @@ function show(io::IO, pb::ParamBox)
 end
 
 function show(io::IO, sp::SpatialPoint)
-    pbs = sp.point.param
+    pbs = sp.param
     print(io, typeof(sp), "(point.param)")
     print(io, [i() for i in pbs])
     for pb in pbs
@@ -108,7 +108,7 @@ end
 function show(io::IO, vars::HFfinalVars)
     print(io, typeof(vars))
     print(io, "(Ehf=", round(vars.Ehf, sigdigits=nSigShown), ", Enn, N, nuc, nucCoords, " * 
-              "C, F, D, Emo, occu, temp, isConverged)")
+              "C, F, D, Eo, occu, temp, isConverged, basis)")
 end
 
 
@@ -143,9 +143,10 @@ iterate(gf::GaussFunc) = (gf, nothing)
 iterate(::GaussFunc, _) = nothing
 size(::GaussFunc) = ()
 length(::GaussFunc) = 1
+size(::GaussFunc, d::Integer) = (d == 1) ? 1 : throw(BoundsError())
 
-iterate(sp::SpatialPoint) = iterate(sp.point.param)
-iterate(sp::SpatialPoint, state) = iterate(sp.point.param, state)
+iterate(sp::SpatialPoint) = iterate(sp.param)
+iterate(sp::SpatialPoint, state) = iterate(sp.param, state)
 size(::SpatialPoint{<:Any, D}) where {D} = (D,)
 length(::SpatialPoint{<:Any, D}) where {D} = D
 
@@ -186,13 +187,13 @@ firstindex(::ParamBox) = Val(:first)
 lastindex(::ParamBox) = Val(:last)
 axes(::ParamBox) = ()
 
-getindex(sp::SpatialPoint, args...) = getindex(sp.point.param, args...)
-getindex(sp::SpatialPoint) = sp.point.param
-firstindex(sp::SpatialPoint) = firstindex(sp.point.param)
-lastindex(sp::SpatialPoint) = lastindex(sp.point.param)
-eachindex(sp::SpatialPoint) = eachindex(sp.point.param)
-axes(sp::SpatialPoint) = axes(sp.point.param)
-ndims(sp::SpatialPoint) = ndims(sp.point.param)
+getindex(sp::SpatialPoint, args...) = getindex(sp.param, args...)
+getindex(sp::SpatialPoint) = sp.param
+firstindex(sp::SpatialPoint) = firstindex(sp.param)
+lastindex(sp::SpatialPoint) = lastindex(sp.param)
+eachindex(sp::SpatialPoint) = eachindex(sp.param)
+axes(sp::SpatialPoint) = axes(sp.param)
+ndims(sp::SpatialPoint) = ndims(sp.param)
 
 getindex(gf::GaussFunc) = gf.param |> collect
 getindex(gf::GaussFunc, ::Val{:first}) = getindex(gf)
@@ -234,7 +235,7 @@ broadcastable(pb::ParamBox) = Ref(pb)
 broadcastable(gf::GaussFunc) = Ref(gf)
 broadcastable(bf::CGTBasisFuncs1O) = Ref(bf)
 broadcastable(bfs::BasisFuncs) = getindex(bfs, :)
-Base.broadcastable(sp::SpatialPoint) = Base.broadcastable(sp.point.param)
+Base.broadcastable(sp::SpatialPoint) = Base.broadcastable(sp.param)
 
 
 # Quiqbox methods overload.

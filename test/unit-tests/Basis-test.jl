@@ -117,42 +117,44 @@ bf2_P_norm2 = genBasisFunc(cen, [gf2], "P")
 @test subshellOf(bf2_P_norm2) == "P"
 @test bf2_P_norm2 isa BasisFuncs
 
-bf3_1 = genBasisFunc([0.0, 0.0, 0.0], (3.0, 1.0))
-bf3_2 = genBasisFunc([1.0, 0.0, 0.0], (2.0, 1.0))
-bf3_3 = genBasisFunc([0.0, 0.0, 0.0], (2.0, 1.0), "P")
-bf3_4 = genBasisFunc([0.0, 0.0, 0.0], (1.0, 1.0), "D")
-@test genBasisFunc([bf3_1, bf3_4, bf3_3, bf3_2]) == [bf3_1, bf3_3, bf3_4, bf3_2]
+bf3_1 = genBasisFunc(fill(0.0, 3), "STO-3G")[]
+bf3_2 = genBasisFunc(fill(0.0, 3), ("STO-3G", "He"))[]
+bf3_3 = genBasisFunc(fill(0.0, 3), "STO-3G", nucleus = "He")[]
+bf3s1 = genBasisFunc(fill(0.0, 3), ["STO-3G", "STO-3G"])
+bf3s2 = genBasisFunc(fill(0.0, 3), ["STO-3G", "STO-3G"], nucleus = "He")
+bf3s3 = genBasisFunc(fill(0.0, 3), [("STO-3G", "H"), ("STO-3G", "He")])
+@test hasEqual.(Ref(bf3_1), bf3s1, Ref(bf3s3[1])) |> all
+@test hasEqual.(Ref(bf3_2), Ref(bf3_3), bf3s2, Ref(bf3s3[2])) |> all
+@test isapprox(1, overlap(bf3_1, bf3_1)[], atol=1e-8)
+@test isapprox(1, overlap(bf3_2, bf3_2)[], atol=1e-8)
 
-bf4_1 = genBasisFunc(fill(0.0, 3), "STO-3G")[]
-bf4_2 = genBasisFunc(fill(0.0, 3), ("STO-3G", "He"))[]
-bf4_3 = genBasisFunc(fill(0.0, 3), "STO-3G", nucleus = "He")[]
-bf4s1 = genBasisFunc(fill(0.0, 3), ["STO-3G", "STO-3G"])
-bf4s2 = genBasisFunc(fill(0.0, 3), ["STO-3G", "STO-3G"], nucleus = "He")
-bf4s3 = genBasisFunc(fill(0.0, 3), [("STO-3G", "H"), ("STO-3G", "He")])
-@test hasEqual.(Ref(bf4_1), bf4s1, Ref(bf4s3[1])) |> all
-@test hasEqual.(Ref(bf4_2), Ref(bf4_3), bf4s2, Ref(bf4s3[2])) |> all
-@test isapprox(1, overlap(bf4_1, bf4_1)[], atol=1e-8)
-@test isapprox(1, overlap(bf4_2, bf4_2)[], atol=1e-8)
-
+bf4_1 = genBasisFunc([0.0, 0.0, 0.0], (3.0, 1.0))
+bf4_2 = genBasisFunc([1.0, 0.0, 0.0], (2.0, 1.0))
+bf4_3 = genBasisFunc([0.0, 0.0, 0.0], (2.0, 1.0), "P")
+bf4_4 = genBasisFunc([0.0, 0.0, 0.0], (1.0, 1.0), "D")
 errorThreshold1 = 1e-11; errorThreshold3 = 1e-9
 bf3_2_2 = genBasisFunc([1.0, 0.0, 0.0], (2.0, 1.0), normalizeGTO=true)
 @test isapprox(1, overlap(bf3_2_2, bf3_2_2)[], atol=errorThreshold1)
-@test isapprox(0.6960409996039634, overlap(bf3_2, bf3_2)[], atol=errorThreshold1)
+@test isapprox(0.6960409996039634, overlap(bf4_2, bf4_2)[], atol=errorThreshold1)
 bf3_3_2 = genBasisFunc([0.0, 0.0, 0.0], (2.0, 1.0), "P", normalizeGTO=true)
 @test isapprox(LinearAlgebra.I, overlaps((bf3_3_2,)), atol=errorThreshold1)
-@test isapprox(0.0870051249505*LinearAlgebra.I, overlaps((bf3_3,)), atol=errorThreshold1)
+@test isapprox(0.0870051249505*LinearAlgebra.I, overlaps((bf4_3,)), atol=errorThreshold1)
 bf3_4_2 = genBasisFunc([0.0, 0.0, 0.0], (1.0, 1.0), "D", normalizeGTO=true)
-@test isapprox(LinearAlgebra.I, overlaps((bf4_2,)), atol=errorThreshold3)
+@test isapprox(LinearAlgebra.I, overlaps((bf3_2,)), atol=errorThreshold3)
 @test isapprox([0.3691314831028692 0.0 0.0 0.1230438277009564 0.0 0.1230438277009564; 
                 0.0 0.1230438277009564 0.0 0.0 0.0 0.0; 
                 0.0 0.0 0.1230438277009564 0.0 0.0 0.0; 
                 0.1230438277009564 0.0 0.0 0.3691314831028692 0.0 0.1230438277009564; 
                 0.0 0.0 0.0 0.0 0.1230438277009564 0.0; 
                 0.1230438277009564 0.0 0.0 0.1230438277009564 0.0 0.3691314831028692], 
-                overlaps((bf3_4,)), atol=errorThreshold1)
+                overlaps((bf4_4,)), atol=errorThreshold1)
 
 
-# function sortBasisFuncs
+# function sortBasisFuncs sortPermBasisFuncs
+unsortedbfs = [bf4_1, bf4_4, bf4_3, bf4_2]
+sortedbfs = [bf4_1, bf4_3, bf4_4, bf4_2]
+@test sortBasisFuncs(unsortedbfs) == sortedbfs
+@test unsortedbfs[sortPermBasisFuncs(unsortedbfs)] == sortedbfs
 bfs1 = [genBasisFunc(fill(1.0, 3), (2.0, 1.0), (1,0,0)), 
         genBasisFunc(fill(1.0, 3), (3.0, 1.0), (2,0,0)), 
         genBasisFunc([1.0, 1.0, 2.0], (3.0, 1.0), (0,0,0)), 
@@ -162,10 +164,13 @@ bfs2 = [genBasisFunc(fill(1.0, 3), (2.0, 1.0), (1,0,0)),
         genBasisFunc(fill(1.0, 3), (3.0, 1.0), (2,0,0)), 
         genBasisFunc([1.0, 1.0, 2.0], (3.0, 1.0), (0,0,0))]
 bfs3 = sortBasisFuncs(bfs1, true)
+@test vcat(bfs3...) == bfs1[sortPermBasisFuncs(bfs1)]
 @test length.(bfs3) == [3,1]
 bfs3 = bfs3 |> flatten
 @test !hasEqual(bfs1, bfs2)
 @test  hasEqual(bfs3, bfs2)
+@test vcat(sortBasisFuncs(bfs1, true, roundDigits=12)...) == 
+      bfs1[sortPermBasisFuncs(bfs1, roundDigits=12)]
 
 
 # function centerOf centerCoordOf
@@ -177,7 +182,7 @@ bf5 = genBasisFunc(fill(0.0, 3), (2.0, 1.0), (1,0,0))
 # struct BasisFuncMix
 bfm1 = BasisFuncMix(bf1)
 @test bfm1 == BasisFuncMix([bf1])
-@test BasisFuncMix(BasisFuncMix(bf3_1)) == BasisFuncMix(bf3_1)
+@test BasisFuncMix(BasisFuncMix(bf4_1)) == BasisFuncMix(bf4_1)
 bf5_2 = genBasisFunc(fill(0.0, 3), (2.0, 1.0), [(1,0,0)])
 bfm2 = BasisFuncMix(bf5)
 @test hasEqual(bfm2, BasisFuncMix(bf5_2))
@@ -199,6 +204,13 @@ V = neAttractions([bfm], nuc, nucCoords)[]
 eeI = eeInteractions([bfm])[]
 @test eeI == eeInteraction(bfm, bfm, bfm, bfm)[]
 @test isapprox(eeI, eeInteractions(bs1) |> sum, atol=errorThreshold2*10)
+
+
+# function dimOf
+@test dimOf(v1) == 3
+@test dimOf(bf11) == 3
+@test dimOf(bfm1) == 3
+@test dimOf(bf4_3) == 3
 
 
 # function sumOf
@@ -436,7 +448,7 @@ dm2 = reshape([genBasisFunc([1.0, 0.0, 0.0], (2.0, 0.1)), bf_d_1], 2, 1)
 @test basisSize.(["S", "P", "D"]) == [1, 3, 6]
 @test basisSize(bf1) == 1
 @test basisSize(bfm1) == 1 == basisSize(bfm2)
-@test basisSize.((bf1, bf2, bf3_3, bf5)) == (1, 1, 3, 1)
+@test basisSize.((bf1, bf2, bf4_3, bf5)) == (1, 1, 3, 1)
 
 
 # function genGaussFuncText
@@ -476,6 +488,7 @@ bs2_3 = genBFuncsFromText(txt3)
 @test hasEqual.(bs1, bs2_1, ignoreFunction=true) |> all
 @test hasEqual.(bs1, bs2_2, ignoreFunction=true) |> all
 @test hasEqual.(sortBasisFuncs(bs1), bs2_3, ignoreFunction=true) |> all
+@test hasEqual.(bs1[sortPermBasisFuncs(bs1)], bs2_3, ignoreFunction=true) |> all
 
 
 # function assignCenInVal!

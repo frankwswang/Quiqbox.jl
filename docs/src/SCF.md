@@ -25,12 +25,12 @@ bs = genBasisFunc.(nucCoords, ("STO-3G", "H") |> Ref) |> flatten
 
 resRHF = runHF(bs, nuc, nucCoords)
 
-@show resRHF.Ehf resRHF.C resRHF.Emo resRHF.occu
+@show resRHF.Ehf resRHF.C resRHF.Eo resRHF.occu
 ```
 
-After the SCF procedure, one can also easily store the result in a `Molecule` for further data processing such as generating [Molden](@ref) files.
+After the SCF procedure, one can also easily store the result in a `MatterByHF` for further data processing such as generating [Molden](@ref) files.
 ```@repl 3
-mol = Molecule(bs, nuc, nucCoords, resRHF);
+mol = MatterByHF(resRHF); 
 ```
 
 ### Flexible core functions

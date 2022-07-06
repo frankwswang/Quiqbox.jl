@@ -2,13 +2,13 @@ using Test
 using Quiqbox
 using LinearAlgebra: norm
 
-@testset "Matter.jl tests" begin
+@testset "MatterByHF.jl tests" begin
 
 nuc1 = ["H", "H"]
 nucCoords1 = [[-0.7, 0.0, 0.0], [0.7, 0.0, 0.0]]
 bs = genBasisFunc.(nucCoords1, ("STO-3G", "H") |> Ref) |> flatten
 resRHF = runHF(bs, nuc1, nucCoords1, printInfo=false)
-Molecule(bs, resRHF)
+MatterByHF(resRHF)
 
 # function nnRepulsions
 nuc2 = ["H", "H", "O"]

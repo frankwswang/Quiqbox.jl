@@ -174,9 +174,6 @@ runHF
 runHFcore
 ```
 
-```@docs
-getMolOrbitals
-```
 
 ```@docs
 nnRepulsions

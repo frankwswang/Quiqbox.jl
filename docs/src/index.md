@@ -6,10 +6,8 @@
 
 * Floating and fixed-position Gaussian-type orbital (GTO).
 * Linear combination of GTOs with different centers as a basis function.
-* Symbolic representation of basis function expression.
 * Standalone 1-electron and 2-electron integral functions.
 * Restricted (closed-shell) and unrestricted (open-shell) Hartree–Fock methods (RHF & UHF).
-* Molecular orbital data output in [Molden](https://www3.cmbi.umcn.nl/molden/) file format.
 * Variational optimization of orbital parameters based on automatic differentiation (AD).
 
 ## Setup

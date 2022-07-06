@@ -385,30 +385,42 @@ altered result.
 toggleDiff!(pb::ParamBox) = begin pb.canDiff[] = !pb.canDiff[] end
 
 
+# """
+
+#     changeMapping(pb::ParamBox{T, V}, mapFunction::F, canDiff::Bool=true) where 
+#                  {T, V, F<:Function} -> 
+#     ParamBox{T, V}
+
+# Return a `ParamBox` that contains the input `ParamBox`'s `data::Array{T, 0}` with the 
+# newly assigned mapping function.
+# """
+# function changeMapping(pb::ParamBox{T, V, FL}, mapFunction::F, canDiff::Bool=true) where 
+#              {T, V, FL, F<:Function}
+#     dn = pb.dataName
+#     if (FL==FLi && FLevel(F)!=FLi) 
+#         dnStr = string(dn)
+#         dn = Symbol(dnStr * "_" * dnStr)
+#     end
+#     ParamBox(Val(V), mapFunction, pb.data, 
+#              genIndex( ifelse(canDiff, pb.index[], nothing) ), fill(canDiff), dn)
+# end
+
+
+
 """
 
-    changeMapping(pb::ParamBox{T, V}, mapFunction::F; 
-                  index::Union{Int, Nothing}=nothing, canDiff::Bool=true) where 
-                 {T, V, F<:Function} -> 
-    ParamBox{T, V}
-
-Return a `ParamBox` that contains the input `ParamBox`'s `data::Array{T, 0}` with the 
-newly assigned mapping function.
-"""
-changeMapping(pb::ParamBox{T, V}, mapFunction::F; 
-              index::Union{Int, Nothing}=nothing, canDiff::Bool=true) where 
-             {T, V, F<:Function} = 
-ParamBox(Val(V), mapFunction, pb.data, genIndex(index), fill(canDiff), pb.dataName)
+    changeMapping(pb::ParamBox{T, V, FL}, mapFunction::F, outputName::Symbol=V; 
+                  canDiff::Bool=true) where {T, V, FL, F<:Function} -> 
+    ParamBox{T, outputName}
 
 """
-
-    changeMapping(pb::ParamBox{T}, name::Symbol, mapFunction::F; 
-                  index::Union{Int, Nothing}=nothing, canDiff::Bool=true) where 
-                 {T, F<:Function} -> 
-    ParamBox{T, name}
-
-"""
-changeMapping(pb::ParamBox{T}, name::Symbol, mapFunction::F; 
-              index::Union{Int, Nothing}=nothing, canDiff::Bool=true) where 
-             {T, F<:Function} = 
-ParamBox(Val(name), mapFunction, pb.data, genIndex(index), fill(canDiff), pb.dataName)
+function changeMapping(pb::ParamBox{T, V, FL}, mapFunction::F, outputName::Symbol=V; 
+                       canDiff::Bool=true) where {T, V, FL, F<:Function}
+    dn = pb.dataName
+    if (FL==FLi && FLevel(F)!=FLi) 
+        dnStr = string(dn)
+        dn = Symbol(dnStr * "_" * dnStr)
+    end
+    ParamBox(Val(outputName), mapFunction, pb.data, 
+             genIndex( ifelse(canDiff, pb.index[], nothing) ), fill(canDiff), dn)
+end

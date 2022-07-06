@@ -62,7 +62,9 @@ end
 numToSubs(::Nothing) = ""
 
 
-function alignNum(x::Number, lpadN::Int=8, rpadN::Int=21; roundDigits::Int=-1)
+function alignNum(x::T, lpadN::Int=8, rpadN::Int=getAtolDigits(T)+6; 
+                  roundDigits::Int=-1) where {T<:Real}
+    roundDigits > 0 && ( rpadN = min(rpadN, roundDigits+5) )
     if roundDigits < 0
         str = x |> string
     else

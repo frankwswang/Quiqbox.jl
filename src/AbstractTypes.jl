@@ -27,33 +27,34 @@ abstract type MutableDataBox{T} <: QuiqboxDataBox{T} end
 
 abstract type AbstractHartreeFockFinalValue{T} <: ImmutableDataBox{T} end
 abstract type AbstractBasisSetData{T} <: ImmutableDataBox{T} end
-abstract type ManyFermionDataBox{T, N} <: ImmutableDataBox{T} end
+abstract type ManyFermionDataBox{T, D, N} <: ImmutableDataBox{T} end
 
 abstract type HartreeFockintermediateData{T} <: MutableDataBox{T} end
 
 abstract type DifferentiableParameter{DataT, ContainerT} <: SemiMutableParameter{DataT, ContainerT} end
 abstract type ConfigBox{T, ContainerT, MethodT} <: MutableParameter{ContainerT, T} end
 
-abstract type AbstractSpatialPoint{T, D} <: DifferentiableParameter{T, AbstractSpatialPoint} end
-
 abstract type HartreeFockFinalValue{T, HFT} <: AbstractHartreeFockFinalValue{T} end
 
 abstract type BasisSetData{T, D, BT} <: AbstractBasisSetData{T} end
 
-abstract type MatterHFData{T, NN, N} <: ManyFermionDataBox{T, N} end
+abstract type MatterData{T, D, N} <: ManyFermionDataBox{T, D, N} end
 
+abstract type ParameterizedContainer{T} <: QuiqboxContainer end
 
-abstract type QuiqboxBasis{T} <: QuiqboxContainer end
+abstract type QuiqboxBasis{T, D} <: ParameterizedContainer{T} end
+abstract type PrimitiveBasisFunc{T} <: ParameterizedContainer{T} end
+abstract type AbstractSpatialPoint{T, D} <: ParameterizedContainer{T} end
 
-abstract type SpatialOrbital{T} <: QuiqboxBasis{T} end
-abstract type SpinOrbital{T} <: QuiqboxBasis{T} end
+abstract type SpatialOrbital{T, D, N} <: QuiqboxBasis{T, D} end
+abstract type FermionState{T, D, MaxOccupation} <: QuiqboxBasis{T, D} end
 
-abstract type StructSpatialBasis{T} <: SpatialOrbital{T} end
+abstract type AbstractSpinOrbital{T, D} <: FermionState{T, D, 2} end
 
-abstract type AbstractMolOrbital{T} <: SpinOrbital{T} end
+abstract type SpatialBasis{T, D, ON} <: SpatialOrbital{T, D, ON} end
 
-abstract type AbstractGaussFunc{T} <: StructSpatialBasis{T} end
-abstract type AbstractGTBasisFuncs{T, D, OrbitalN} <: StructSpatialBasis{T} end
+abstract type AbstractGaussFunc{T} <: PrimitiveBasisFunc{T} end
+abstract type AbstractGTBasisFuncs{T, D, OrbitalN} <: SpatialBasis{T, D, OrbitalN} end
 
 abstract type GTBasisFuncs{NumberT, D, OrbitalN}  <: AbstractGTBasisFuncs{NumberT, D, OrbitalN} end
 

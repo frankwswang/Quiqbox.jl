@@ -45,15 +45,15 @@ Quiqbox.HFtempVars{T, HFtype}
 ```
 
 ```@docs
-Quiqbox.HFfinalVars{T, HFT, NN, HFTS}
+Quiqbox.HFfinalVars{T, D, HFT, NN, BN, HFTS}
 ```
 
 ```@docs
-Molecule{T, Nc, Ne, Nb}
+MatterByHF{T, Nc, Ne, Nb}
 ```
 
 ```@docs
-MolOrbital{T, N}
+CanOrbital{T, N}
 ```
 
 ```@docs

@@ -56,7 +56,7 @@ end
 
 @test isapprox(res1.Ehf, -93.78783862904237, atol=errorThreshold1)
 
-# Note: the molecular energies of 4th and 5th columns are so close that based on the 
+# Note: the orbital coefficients of 4th and 5th columns are so close that based on the 
 # numerical error of each machine the position of them might switch.
 
 @test isapprox(res1.C[1][1:5, [1,2,3,6,7]], 
@@ -83,12 +83,12 @@ atol=errorThreshold2)
       0.0          0.0           0.0          0.0          0.0          0.0 -0.661290136], 
 atol=errorThreshold2)
 
-@test isapprox(res1.Emo[1], 
+@test isapprox(res1.Eo[1], 
     [-20.930339345, -1.616661422, -1.284455637, -0.661290136, 
       -0.661290136, 1.060822806, 1.847810083], 
 atol=errorThreshold1)
 
-@test res1.occu[1] == [2, 2, 2, 2, 2, 0, 0]
+@test res1.occu[1] == ("↿⇂", "↿⇂", "↿⇂", "↿⇂", "↿⇂", "0", "0")
 
 D1 = res1.D[1]
 @test isapprox(D1*S*D1, D1, atol=errorThreshold1)
@@ -157,15 +157,15 @@ atol=errorThreshold3*2) |> all
    0.0          0.0          0.0           0.0          0.0          0.0 -0.661295305]), 
 atol=errorThreshold3) |> all
 
-@test isapprox.(res2.Emo, 
+@test isapprox.(res2.Eo, 
 ([-20.930370891, -1.616676585, -1.284472038, -0.661306034, 
    -0.661306034, 1.060819291, 1.847800507],
  [-20.930362238, -1.616663502, -1.284451995, -0.661295305, 
    -0.661295305, 1.060817247, 1.8478124]), 
 atol=errorThreshold3) |> all
 
-@test ( res2.occu .== ([1, 1, 1, 1, 1, 0, 0], [1, 1, 1, 1, 1, 0, 0]) ) |> prod
-
+@test all( res2.occu .== ( ("↿", "↿", "↿", "↿", "↿", "0", "0"), 
+                           ("⇂", "⇂", "⇂", "⇂", "⇂", "0", "0") ) )
 D2s = res2.D
 for D in D2s
     @test isapprox(D*S*D, D, atol=errorThreshold1)

@@ -690,7 +690,7 @@ end
 
 
 function groupedSort(v::T, sortFunction::F=itself) where {T<:AbstractVector, F<:Function}
-    sortedArr = sort(v, by=x->sortFunction(x))
+    sortedArr = sort(v, by=sortFunction)
     state1 = 1
     groups = T[]
     next = iterate(sortedArr)

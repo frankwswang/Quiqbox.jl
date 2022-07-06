@@ -81,7 +81,7 @@ end
 function getCfromSAD(::Val{HFT}, S::Matrix{T}, 
                      Hcore::Matrix{T}, HeeI::Array{T, 4},
                      bs::NTuple{BN, AbstractGTBasisFuncs{T, D}}, 
-                     nuc::NTuple{NN, String}, nucCoords::NTuple{NN, NTuple{3, T}}, 
+                     nuc::NTuple{NN, String}, nucCoords::NTuple{NN, NTuple{D, T}}, 
                      X::Matrix{T}, 
                      config=SCFconfig((:ADIIS,), (1e4*getAtolDigits(T),))) where 
                     {HFT, T, D, BN, NN}
@@ -382,7 +382,7 @@ HFtempVars{T, HFT}(Nˢ, Cs, Fs, Ds, Es, HFinterrelatedVars(Dtots, Etots))
 
 """
 
-    HFfinalVars{T, HFT, NN, HFTS} <: HartreeFockFinalValue{T, HFT}
+    HFfinalVars{T, D, HFT, NN, BN, HFTS} <: HartreeFockFinalValue{T, HFT}
 
 The container of the final values after a Hartree-Fock SCF procedure.
 
@@ -392,11 +392,11 @@ The container of the final values after a Hartree-Fock SCF procedure.
 
 `Enn::T`: The nuclear repulsion energy.
 
-`N::Int`: The total number of electrons.
+`spin::NTuple{2, Int}`: The numbers of two different spins respectively.
 
 `nuc::Tuple{NTuple{NN, String}}`: Nuclei of the system.
 
-`nucCoords::Tuple{NTuple{NN, NTuple{3, T}}}`: Nuclei coordinates.
+`nucCoords::Tuple{NTuple{NN, NTuple{D, T}}}`: Nuclei coordinates.
 
 `C::NTuple{HFTS, Matrix{T}}`: Coefficient matrix(s) for one spin configuration.
 
@@ -404,57 +404,60 @@ The container of the final values after a Hartree-Fock SCF procedure.
 
 `D::NTuple{HFTS, Matrix{T}}`: Density matrix(s) for one spin configuration.
 
-`Emo::NTuple{HFTS, Vector{T}}`: Energies of molecular orbitals.
+`Eo::NTuple{HFTS, Vector{T}}`: Energies of canonical orbitals.
 
-`occu::NTuple{HFTS, Vector{Int}}`: occupation numbers of molecular orbitals.
+`occu::NTuple{HFTS, NTuple{BN, String}}`: Spin occupations of canonical orbitals.
 
 `temp::NTuple{HFTS, HFtempVars{T, HFT}}`: the intermediate values.
 
 `isConverged::Bool`: Whether the SCF procedure is converged in the end.
 """
-struct HFfinalVars{T, HFT, NN, HFTS} <: HartreeFockFinalValue{T, HFT}
+struct HFfinalVars{T, D, HFT, NN, BN, HFTS} <: HartreeFockFinalValue{T, HFT}
     Ehf::T
     Enn::T
-    N::Int
+    spin::NTuple{2, Int}
     nuc::NTuple{NN, String}
-    nucCoords::NTuple{NN, NTuple{3, T}}
+    nucCoord::NTuple{NN, NTuple{D, T}}
     C::NTuple{HFTS, Matrix{T}}
     F::NTuple{HFTS, Matrix{T}}
     D::NTuple{HFTS, Matrix{T}}
-    Emo::NTuple{HFTS, Vector{T}}
-    occu::NTuple{HFTS, Vector{Int}}
+    Eo::NTuple{HFTS, Vector{T}}
+    occu::NTuple{HFTS, NTuple{BN, String}}
     temp::NTuple{HFTS, HFtempVars{T, HFT}}
     isConverged::Bool
+    basis::GTBasis{T, D, BN}
 
-    function HFfinalVars(nuc::NTuple{NN, String}, nucCoords::NTuple{NN, NTuple{3, T}}, 
+    function HFfinalVars(basis::GTBasis{T, 𝐷, BN}, 
+                         nuc::NTuple{NN, String}, nucCoords::NTuple{NN, NTuple{𝐷, T}}, 
                          X::Matrix{T}, (vars,)::Tuple{HFtempVars{T, :RHF}}, 
-                         isConverged::Bool) where {NN, T}
+                         isConverged::Bool) where {T, 𝐷, BN, NN}
         C = (vars.Cs[end],)
         F = vars.Fs[end]
-        D = (vars.Ds[end],)
+        D = (vars.Ds[end],) 
         Ehf = vars.shared.Etots[end]
-        Emo = (getCϵ(X, F)[2],)
+        Eo = (getCϵ(X, F)[2],)
         N = vars.N
-        occu = (vcat(2*ones(Int, N), zeros(Int, size(X, 1) - N)),)
+        occu = ((fill(spinOccupations[4], N)..., fill(spinOccupations[1], BN-N)...),)
         Enn = nnRepulsions(nuc, nucCoords)
-        new{T, :RHF, NN, 1}(Ehf, Enn, 2N, nuc, nucCoords, C, (F,), D, Emo, occu, (vars,), 
-                            isConverged)
+        new{T, 𝐷, :RHF, NN, BN, 1}(Ehf, Enn, (N, N), nuc, nucCoords, C, (F,), D, Eo, occu, 
+                                   (vars,), isConverged, basis)
     end
 
-    function HFfinalVars(nuc::NTuple{NN, String}, nucCoords::NTuple{NN, NTuple{3, T}}, 
+    function HFfinalVars(basis::GTBasis{T, 𝐷, BN}, 
+                         nuc::NTuple{NN, String}, nucCoords::NTuple{NN, NTuple{𝐷, T}}, 
                          X::Matrix{T}, αβVars::NTuple{2, HFtempVars{T, :UHF}}, 
-                         isConverged::Bool) where {NN, T}
+                         isConverged::Bool) where {T, 𝐷, BN, NN}
         C = last.(getfield.(αβVars, :Cs))
         F = last.(getfield.(αβVars, :Fs))
         D = last.(getfield.(αβVars, :Ds))
         Ehf = αβVars[1].shared.Etots[end]
-        Emo = getindex.(getCϵ.(Ref(X), F), 2)
-        Ns = getfield.(αβVars, :N)
-        occu = vcat.(ones.(Int, Ns), zeros.(Int, size(X, 1) .- Ns))
+        Eo = getindex.(getCϵ.(Ref(X), F), 2)
+        Nα, Nβ = Ns = getfield.(αβVars, :N)
+        occu = ( (fill(spinOccupations[2], Nα)..., fill(spinOccupations[1], BN-Nα)...), 
+                 (fill(spinOccupations[3], Nβ)..., fill(spinOccupations[1], BN-Nβ)...) )
         Enn = nnRepulsions(nuc, nucCoords)
-        N = sum(Ns)
-        new{T, :UHF, NN, 2}(Ehf, Enn, N, nuc, nucCoords, C, F, D, Emo, occu, αβVars, 
-                            isConverged)
+        new{T, 𝐷, :UHF, NN, BN, 2}(Ehf, Enn, Ns, nuc, nucCoords, C, F, D, Eo, occu, 
+                                   αβVars, isConverged, basis)
     end
 end
 
@@ -492,7 +495,7 @@ The container of Hartree-Fock method configuration.
 `HF::Val{HFT}`: Hartree-Fock method type. Available values of `HFT` are 
 $(string(HFtypes)[2:end-1]).
 
-`C0::ICT`: Initial guess of the coefficient matrix(s) C of the molecular orbitals. When `C0` 
+`C0::ICT`: Initial guess of the coefficient matrix(s) C of the canonical orbitals. When `C0` 
 is a `Val{T}`, the available values of `T` are 
 `$((guessCmethods|>typeof|>fieldnames|>string)[2:end-1])`.
 
@@ -568,12 +571,12 @@ const C0methodArgOrders = (itself=(1,),
     runHF(bs::Union{BasisSetData, AbstractVector{<:AbstractGTBasisFuncs{T1, D}}, 
                     Tuple{Vararg{AbstractGTBasisFuncs{T1, D}}}}, 
           nuc::Union{NTuple{NN, String}, AbstractVector{String}}, 
-          nucCoords::Union{NTuple{NN, NTuple{3, T1}}, 
+          nucCoords::Union{NTuple{NN, NTuple{D, T1}}, 
                            AbstractVector{<:AbstractArray{<:Real}}}, 
           config::Union{HFconfig{T1, HFT, itselfT}, HFconfig{T2, HFT}}=$(defaultHFCStr), 
           N::Int=getCharge(nuc); 
           printInfo::Bool=true) where {T1, D, NN, HFT, T2} -> 
-    HFfinalVars{T1, HFT}
+    HFfinalVars{T1, D, HFT, NN}
 
 Main function to run Hartree-Fock in Quiqbox.
 
@@ -585,7 +588,7 @@ Main function to run Hartree-Fock in Quiqbox.
 `nuc::Union{NTuple{NN, String}, AbstractVector{String}}`: The element symbols of the nuclei 
 for the studied system.
 
-`nucCoords::Union{NTuple{NN, NTuple{3, T1}}, 
+`nucCoords::Union{NTuple{NN, NTuple{D, T1}}, 
 AbstractVector{<:AbstractVector{<:Real}}}`: Nuclei coordinates.
 
 `config::HFconfig`: The Configuration of selected Hartree-Fock method. For more information 
@@ -606,18 +609,22 @@ function runHF(bs::GTBasis{T1, D, BN, BT},
                printInfo::Bool=true) where {T1, D, BN, BT, NN, HFT, T2}
     nuc = arrayToTuple(nuc)
     nucCoords = genTupleCoords(nucCoords)
-    leastNb = ceil(N/2)
+    leastNb = ceil(N/2) |> Int
     @assert BN >= leastNb "The number of basis functions should be no less than $(leastNb)."
     @assert N > (HFT==:RHF) "$(HFT) requires more than $(HFT==:RHF) electrons."
     Ns = splitSpins(Val(HFT), N)
     Hcore = coreH(bs, nuc, nucCoords)
     X = getX(bs.S)
+    if X isa Matrix{ComplexF64}
+        @show X
+        @show bs.S
+    end
     getC0f = config.C0.f
     C0 = uniCallFunc(getC0f, getfield(C0methodArgOrders, nameOf(getC0f)), config.C0.mat, 
                      Val(HFT), bs.S, X, Hcore, bs.eeI, bs.basis, nuc, nucCoords)
     vars, isConverged = runHFcore(Val(HFT), config.SCF, Ns, Hcore, bs.eeI, bs.S, X, 
                                   C0, printInfo, config.maxStep, config.earlyStop)
-    res = HFfinalVars(nuc, nucCoords, X, vars, isConverged)
+    res = HFfinalVars(bs, nuc, nucCoords, X, vars, isConverged)
     if printInfo
         Etot = round(res.Ehf + res.Enn, digits=10)
         Ehf = round(res.Ehf, digits=10)
@@ -634,12 +641,12 @@ end
     runHF(bs::Union{BasisSetData{T1, D}, AbstractVector{<:AbstractGTBasisFuncs{T1, D}}, 
                     Tuple{Vararg{AbstractGTBasisFuncs{T1, D}}}}, 
           nuc::Union{NTuple{NN, String}, AbstractVector{String}}, 
-          nucCoords::Union{NTuple{NN, NTuple{3, T1}}, 
+          nucCoords::Union{NTuple{NN, NTuple{D, T1}}, 
                            AbstractVector{<:AbstractArray{<:Real}}},
           N::Int=getCharge(nuc), 
           config::Union{HFconfig{T1, HFT, itselfT}, HFconfig{T2, HFT}}=$(defaultHFCStr); 
           printInfo::Bool=true) where {T1, D, NN, HFT, T2} -> 
-    HFfinalVars{T1, HFT}
+    HFfinalVars{T1, D, HFT, NN}
 """
 runHF(bs::BasisSetData, nuc, nucCoords, N::Int, config=defaultHFC; printInfo=true) = 
 runHF(bs::BasisSetData, nuc, nucCoords, config, N; printInfo)
@@ -688,7 +695,7 @@ Coulomb interactions and the Exchange Correlations.
 `X::Matrix{T}`: Orthogonal transformation matrix of S. Default value is S^(-0.5).
 
 `C0::Union{Matrix{T}, NTuple{2, Matrix{T}}}`: Initial guess of the 
-coefficient matrix(s) C of the molecular orbitals.
+coefficient matrix(s) C of the canonical orbitals.
 
 `printInfo::Bool`: Whether print out the information of iteration steps.
 

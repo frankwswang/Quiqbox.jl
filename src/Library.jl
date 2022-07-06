@@ -117,6 +117,7 @@ const SubshellXYZs =
 const SubshellXsizes = length.(SubshellXs)
 const SubshellXYsizes = length.(SubshellXYs)
 const SubshellXYZsizes = length.(SubshellXYZs)
+const SubshellSizes =(SubshellXsizes, SubshellXYsizes, SubshellXYZsizes)
 
 const FactorialsLs = Integer[0, factorial.(1:20)..., factorial.(big.(21:48))...]
 
@@ -165,6 +166,10 @@ const cxSym = SpatialParamSyms[1]
 const cySym = SpatialParamSyms[2]
 const czSym = SpatialParamSyms[3]
 
+const spinOccupations = ("0", "↿", "⇂", "↿⇂")
+const OrbitalOccupation = ((false, false), (true, false), (false, true), (true, true))
+const SpinOrbitalOccupation = Dict(spinOccupations .=> OrbitalOccupation)
+const SpinOrbitalSpinConfig = Dict(OrbitalOccupation .=> spinOccupations)
 
 
 """

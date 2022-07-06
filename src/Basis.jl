@@ -1,7 +1,8 @@
 export GaussFunc, genExponent, genContraction, SpatialPoint, genSpatialPoint, BasisFunc, 
-       BasisFuncs, genBasisFunc, subshellOf, centerOf, centerCoordOf, GTBasis, 
-       sortBasisFuncs, add, mul, shift, decompose, basisSize, genBasisFuncText, 
-       genBFuncsFromText, assignCenInVal!, getParams, copyBasis, markParams!
+       BasisFuncs, genBasisFunc, subshellOf, centerOf, centerCoordOf, dimOf, GTBasis, 
+       sortBasisFuncs, sortPermBasisFuncs, add, mul, shift, decompose, basisSize, 
+       genBasisFuncText, genBFuncsFromText, assignCenInVal!, getParams, copyBasis, 
+       markParams!
 
 export SP1D, SP2D, SP3D
 
@@ -160,6 +161,10 @@ struct SpatialPoint{T, D, PT} <: AbstractSpatialPoint{T, D}
     end
 end
 
+import Base: getproperty
+getproperty(sp::SpatialPoint, sym::Symbol) = 
+sym === :param ? getproperty(getfield(sp, :point), :param) : getfield(sp, sym)
+
 """
 
     genSpatialPoint(point::Union{Tuple{Vararg{AbstractFloat}}, 
@@ -285,7 +290,7 @@ genSpatialPointCore(point::PT3D{FLx, FLy, FLz, T}) where {T, FLx, FLy, FLz} =
 SpatialPoint(point)
 
 
-coordOf(sp::SpatialPoint) = [outValOf(i) for i in sp.point.param]
+coordOf(sp::SpatialPoint) = [outValOf(i) for i in sp.param]
 
 
 """
@@ -330,7 +335,7 @@ struct BasisFunc{T, D, 𝑙, GN, PT} <: FGTBasisFuncs1O{T, D, 𝑙, GN, PT}
 
     function BasisFunc(cen::SpatialPoint{T, D, PT}, gs::NTuple{GN, AbstractGaussFunc{T}}, 
                        l::Tuple{LTuple{D, 𝑙}}, normalizeGTO::Bool) where {T, D, PT, 𝑙, GN}
-        pars = joinTuple(cen.point.param, getfield.(gs, :param)...)
+        pars = joinTuple(cen.param, getfield.(gs, :param)...)
         new{T, D, 𝑙, GN, PT}(cen, gs, l, normalizeGTO, pars)
     end
 end
@@ -367,7 +372,7 @@ struct BasisFuncs{T, D, 𝑙, GN, PT, ON} <: FloatingGTBasisFuncs{T, D, 𝑙, GN
         @assert ON <= ss "The total number of `l` should be no more than $(ss) as " * 
                          "they are in $(subshell) subshell."
         ls = sort(collect(ls), rev=true) |> Tuple
-        pars = joinTuple(cen.point.param, getfield.(gs, :param)...)
+        pars = joinTuple(cen.param, getfield.(gs, :param)...)
         new{T, D, 𝑙, GN, PT, ON}(cen, gs, ls, normalizeGTO, pars)
     end
 end
@@ -381,6 +386,20 @@ BasisFuncs(cen, (g,), ls, normalizeGTO)
 BasisFuncs(bfs::BasisFuncs) = itself(bfs)
 
 BasisFunc(bfs::BFuncs1O) = BasisFunc(bfs.center, bfs.gauss, bfs.l, bfs.normalizeGTO)
+
+
+# for i in 0:length(SubshellNames)-1
+#     eval
+# end
+
+const FullSubShellBasisFuncs{T, D, 0, GN, PT} = FloatingGTBasisFuncs{T, D, 0, GN, PT, SubshellSizes[D][1]}
+const FullSubShellBasisFuncs{T, D, 1, GN, PT} = FloatingGTBasisFuncs{T, D, 0, GN, PT, SubshellSizes[D][2]}
+const FullSubShellBasisFuncs{T, D, 2, GN, PT} = FloatingGTBasisFuncs{T, D, 0, GN, PT, SubshellSizes[D][3]}
+const FullSubShellBasisFuncs{T, D, 3, GN, PT} = FloatingGTBasisFuncs{T, D, 0, GN, PT, SubshellSizes[D][4]}
+const FullSubShellBasisFuncs{T, D, 4, GN, PT} = FloatingGTBasisFuncs{T, D, 0, GN, PT, SubshellSizes[D][5]}
+const FullSubShellBasisFuncs{T, D, 5, GN, PT} = FloatingGTBasisFuncs{T, D, 0, GN, PT, SubshellSizes[D][6]}
+const FullSubShellBasisFuncs{T, D, 6, GN, PT} = FloatingGTBasisFuncs{T, D, 0, GN, PT, SubshellSizes[D][7]}
+
 
 
 struct EmptyBasisFunc{T<:Real, D} <: CGTBasisFuncs1O{T, D, 0} end
@@ -540,9 +559,9 @@ genBasisFunc(cen::SpatialPoint{T, D}, xpnANDcon::NTuple{2, T},
              lOrSubshell=LTuple(fill(0, D)); normalizeGTO::Bool=false) where {T, D} = 
 genBasisFunc(cen, (GaussFunc(xpnANDcon[1], xpnANDcon[2]),), lOrSubshell; normalizeGTO)
 
-function genBasisFunc(center::SpatialPoint, BSKeyANDnuc::Vector{NTuple{2, String}}; 
-                      unlinkCenter::Bool=false)
-    bases = FloatingGTBasisFuncs[]
+function genBasisFunc(center::SpatialPoint{T, D}, BSKeyANDnuc::Vector{NTuple{2, String}}; 
+                      unlinkCenter::Bool=false) where {T, D}
+    bases = FloatingGTBasisFuncs{T, D}[]
     for k in BSKeyANDnuc
         content = BasisSetList[k[1]][AtomicNumberList[k[2]]]
         @assert content!==nothing "Quiqbox DOES NOT have basis set "*k[1]*" for "*k[2]*"."
@@ -579,7 +598,19 @@ genBasisFunc(::Missing, args...; kws...) = genBasisFunc((NaN, NaN, NaN), args...
 
 genBasisFunc(bf::FloatingGTBasisFuncs) = itself(bf)
 
-genBasisFunc(bs::Vector{<:FloatingGTBasisFuncs}) = sortBasisFuncs(bs)
+genBasisFunc(bf::FloatingGTBasisFuncs{T, D}, cen::SpatialPoint{T, D}) where {T, D} = 
+genBasisFunc(cen, bf.gauss, bf.l, normalizeGTO=bf.normalizeGTO)
+
+genBasisFunc(bf::FloatingGTBasisFuncs{T, D}, gs::Tuple{Vararg{AbstractGaussFunc{T}}}) where 
+            {T, D} = 
+genBasisFunc(bf.center, gs, bf.l, normalizeGTO=bf.normalizeGTO)
+
+genBasisFunc(bf::FloatingGTBasisFuncs{T, D}, ls::Tuple{Vararg{LTuple{D, 𝑙}}}) where 
+            {T, D, 𝑙} = 
+genBasisFunc(bf.center, bf.gauss, ls, normalizeGTO=bf.normalizeGTO)
+
+genBasisFunc(bf::FloatingGTBasisFuncs{T, D}, normalizeGTO::Bool) where {T, D} = 
+genBasisFunc(bf.center, bf.gauss, bf.l; normalizeGTO)
 
 
 """
@@ -593,31 +624,55 @@ subshellOf(::FloatingGTBasisFuncs{<:Any, <:Any, 𝑙}) where {𝑙} = SubshellNa
 
 """
 
-    sortBasisFuncs(bs::AbstractArray{<:FloatingGTBasisFuncs}, groupCenters::Bool=false) -> 
+    sortBasisFuncs(bs::AbstractArray{<:FloatingGTBasisFuncs{T, D}}, 
+                   groupCenters::Bool=false; roundDigits::Int=getAtolDigits(T)) where 
+                  {T, D} -> 
     Vector
 
-    sortBasisFuncs(bs::Tuple{Vararg{FloatingGTBasisFuncs}}, groupCenters::Bool=false) -> 
-    Tuple
-
-Sort basis functions. If `groupCenters = true`, Then the function will return an 
+Sort `FloatingGTBasisFuncs`. If `groupCenters = true`, Then the function will return an 
 `Array{<:Array{<:FloatingGTBasisFuncs, 1}, 1}` in which the arrays are grouped basis 
 functions with same center coordinates.
 """
-@inline function sortBasisFuncs(bs::AbstractVector{<:FloatingGTBasisFuncs}, 
-                                groupCenters::Bool=false)
-    bfBlocks = map( groupedSort(bs, centerCoordOf) ) do subbs
+@inline function sortBasisFuncs(bs::AbstractArray{<:FloatingGTBasisFuncs{T, D}}, 
+                                groupCenters::Bool=false; 
+                                roundDigits::Int=getAtolDigits(T)) where {T, D}
+    bfBlocks = map( groupedSort(reshape(bs, :), 
+                    x->roundNum.(centerCoordOf(x), roundDigits)) ) do subbs
         # Reversed order within same subshell.
-        sort!(subbs, by=x->[-getTypeParams(x)[3], x.l[1].tuple, getTypeParams(x)[4]], rev=true)
+        sort!(subbs, by=x->[-getTypeParams(x)[3], x.l[1].tuple, getTypeParams(x)[4]], 
+              rev=true)
     end
     groupCenters ? bfBlocks : vcat(bfBlocks...)
 end
 
-sortBasisFuncs(bs::AbstractArray{<:FloatingGTBasisFuncs}, groupCenters::Bool=false) = 
-sortBasisFuncs(reshape(bs, :), groupCenters)
+"""
 
-sortBasisFuncs(bs::Tuple{Vararg{FloatingGTBasisFuncs, N}}, 
-               groupCenters::Bool=false) where {N} = 
-sortBasisFuncs(FloatingGTBasisFuncs[bs...], groupCenters) |> Tuple
+    sortBasisFuncs(bs::Tuple{Vararg{FloatingGTBasisFuncs{T, D}}}, groupCenters::Bool=false; 
+                   roundDigits::Int=getAtolDigits(T)) where {T, D} -> 
+    Tuple
+
+"""
+sortBasisFuncs(bs::Tuple{Vararg{FloatingGTBasisFuncs{T, D}}}, groupCenters::Bool=false; 
+               roundDigits::Int=getAtolDigits(T)) where {T, D} = 
+sortBasisFuncs(FloatingGTBasisFuncs{T, D}[bs...], groupCenters; roundDigits) |> Tuple
+
+
+"""
+
+    sortPermBasisFuncs(Union{AbstractArray{<:FloatingGTBasisFuncs{T, D}}, 
+                             Tuple{Vararg{FloatingGTBasisFuncs{T, D}}}}) where {T, D} -> 
+    Vector{Int}
+
+"""
+sortPermBasisFuncs(bs::AbstractArray{<:FloatingGTBasisFuncs{T, D}}; 
+                   roundDigits::Int=getAtolDigits(T)) where {T, D} = 
+sortperm(reshape(bs, :), 
+         by=x->[-1*roundNum.(centerCoordOf(x), roundDigits), 
+                -getTypeParams(x)[3], x.l[1].tuple, getTypeParams(x)[4]], rev=true)
+
+sortPermBasisFuncs(bs::Tuple{Vararg{FloatingGTBasisFuncs{T, D}}}; 
+                   roundDigits::Int=getAtolDigits(T)) where {T, D} = 
+sortPermBasisFuncs(FloatingGTBasisFuncs{T, D}[bs...]; roundDigits)
 
 
 """
@@ -642,7 +697,7 @@ centerCoordOf(bf::FloatingGTBasisFuncs) = coordOf(bf.center)
 
 """
 
-    BasisFuncMix{T, D, BN, BT<:BasisFunc{T, D}} <: CGTBasisFuncs1O{T, D, BN}
+    BasisFuncMix{T, D, BN, BT<:BasisFunc{T, D}} <: CompositeGTBasisFuncs{T, D, BN, 1}
 
 Sum of multiple `FloatingGTBasisFuncs{<:Any, <:Any, <:Any, <:Any, <:Any, 1}` without any 
 reformulation, treated as one basis function in the integral calculation.
@@ -665,7 +720,7 @@ struct BasisFuncMix{T, D, BN, BT<:BasisFunc{T, D}} <: CGTBasisFuncs1O{T, D, BN}
     param::Tuple{Vararg{ParamBox}}
 
     function BasisFuncMix(bfs::Tuple{Vararg{BasisFunc{T, D}, BN}}) where {T, D, BN}
-        bs = sortBasisFuncs(bfs)
+        bs = sortBasisFuncs(bfs, roundDigits=-1)
         new{T, D, BN, eltype(bfs)}(bs, joinTuple(getfield.(bs, :param)...))
     end
 end
@@ -687,6 +742,23 @@ unpackBasis(::EmptyBasisFunc) = ()
 unpackBasis(b::BasisFunc)  = (b,)
 unpackBasis(b::BasisFuncMix)  = b.BasisFunc
 unpackBasis(b::BFuncs1O)  = (BasisFunc(b),)
+
+
+"""
+
+    dimOf(::AbstractSpatialPoint) -> Int
+
+Return the spatial dimension of the input `AbstractSpatialPoint`.
+"""
+dimOf(::AbstractSpatialPoint{<:Any, D}) where {D} = D
+
+"""
+
+    dimOf(::QuiqboxBasis) -> Int
+
+Return the spatial dimension of the input basis.
+"""
+dimOf(::QuiqboxBasis{<:Any, D}) where {D} = D
 
 
 """
@@ -713,6 +785,28 @@ The container to store basis set information.
 
 Construct a `GTBasis` given a basis set.
 """
+# struct GTBasis{T, D, BN, BT<:GTBasisFuncs{T, D, 1}} <: BasisSetData{T, D, BT}
+#     basis::NTuple{BN, BT}
+#     S::Matrix{T}
+#     Te::Matrix{T}
+#     eeI::Array{T, 4}
+
+#     function GTBasis(bfs::AbstractVector{<:GTBasisFuncs{T, D, 1}}, 
+#                      sortGTBasis::Bool=true) where {T, D}
+#         bfs = (sortGTBasis ? sortBasis(bfs) : bfs) |> Tuple
+#         # bfs = bfs |> Tuple
+#         new{T, D, length(bfs), eltype(bfs)}(bfs, overlaps(bfs), eKinetics(bfs), 
+#                                             eeInteractions(bfs))    
+#     end
+# end
+
+# GTBasis(bs::Tuple{Vararg{GTBasisFuncs{T, D, 1}}}, sortGTBasis::Bool=true) where {T, D} = 
+# GTBasis(bs |> collect, sortGTBasis)
+
+# GTBasis(bs::Union{AbstractVector{<:GTBasisFuncs{T, D}}, Tuple{Vararg{GTBasisFuncs{T, D}}}}, 
+#         sortGTBasis::Bool=true) where {T, D} = 
+# GTBasis(bs |> flatten, sortGTBasis)
+
 struct GTBasis{T, D, BN, BT<:GTBasisFuncs{T, D, 1}} <: BasisSetData{T, D, BT}
     basis::NTuple{BN, BT}
     S::Matrix{T}
@@ -728,10 +822,59 @@ GTBasis(bs::Tuple{Vararg{GTBasisFuncs{T, D}}}) where {T, D} = GTBasis(bs |> flat
 GTBasis(bs::AbstractVector{<:GTBasisFuncs{T, D}}) where {T, D} = GTBasis(bs |> Tuple)
 
 
+"""
+
+    sortBasis(bs::Union{AbstractArray{<:CompositeGTBasisFuncs{T, D}}, 
+                        Tuple{Vararg{CompositeGTBasisFuncs{T, D}}}}; 
+              roundDigits::Int=getAtolDigits(T)) where {T, D} -> 
+    Vector{<:CompositeGTBasisFuncs{T, D}}
+
+Sort basis functions.
+"""
+function sortBasis(bs::AbstractArray{<:CompositeGTBasisFuncs{T, D}}; 
+                   roundDigits::Int=getAtolDigits(T)) where {T, D}
+    bs = reshape(bs, :)
+    ids = findall(x->isa(x, FloatingGTBasisFuncs), bs)
+    bfs = splice!(bs, ids)
+    vcat( sortBasisFuncs(convert(AbstractVector{FloatingGTBasisFuncs{T, D}}, bfs); 
+                         roundDigits), 
+          sortBasis(convert(AbstractVector{BasisFuncMix{T, D}}, bs); roundDigits) )
+end
+
+sortBasis(bs::AbstractArray{<:BasisFuncMix{T, D}}; 
+          roundDigits::Int=getAtolDigits(T)) where {T, D} = 
+bs[sortPermBasisFuncs(getindex.(getproperty.(bs, :BasisFunc), 1); roundDigits)]
+
+sortBasis(bs::AbstractArray{<:FloatingGTBasisFuncs{T, D}}; 
+          roundDigits::Int=getAtolDigits(T)) where {T, D} = 
+sortBasisFuncs(bs; roundDigits)
+
+"""
+
+    sortBasis(bs::Tuple{Vararg{CompositeGTBasisFuncs{T, D}}}; 
+              roundDigits::Int=getAtolDigits(T)) where {T, D} -> 
+    Tuple{Vararg{CompositeGTBasisFuncs{T, D}}}
+
+"""
+sortBasis(bs::Tuple{Vararg{CompositeGTBasisFuncs{T, D}}}; 
+          roundDigits::Int=getAtolDigits(T)) where {T, D} = 
+sortBasis(collect(bs); roundDigits) |> Tuple
+
+"""
+
+    sortBasis(b::GTBasis{T, D}; roundDigits::Int=getAtolDigits(T)) where {T, D} -> 
+    GTBasis{T, D}
+
+Reconstruct a `GTBasis` by sorting the `GTBasisFuncs` stored in the input one.
+"""
+sortBasis(b::GTBasis; roundDigits::Int=getAtolDigits(T)) = 
+          GTBasis(sortBasis(b.basis; roundDigits))
+
+
 function sumOfCore(bfs::AbstractVector{<:BasisFunc{T, D}}, 
                    roundDigits::Int=getAtolDigits(T)) where {T, D}
-    arr1 = convert(Vector{BasisFunc{T, D}}, sortBasisFuncs(bfs))
-    arr2 = BasisFunc[]
+    arr1 = convert(Vector{BasisFunc{T, D}}, sortBasisFuncs(bfs; roundDigits))
+    arr2 = BasisFunc{T, D}[]
     while length(arr1) > 1
         temp = add(arr1[1], arr1[2]; roundDigits)
         if temp isa BasisFunc
@@ -864,6 +1007,84 @@ function add(bf1::BasisFunc{T, D, 𝑙1, GN1, PT1}, bf2::BasisFunc{T, D, 𝑙2, 
         BasisFunc(cen, gfsN, bf1.l, bf1.normalizeGTO)
     else
         BasisFuncMix([bf1, bf2])
+    end
+end
+
+function mergeBasisFuncs(bs::AbstractVector{<:FloatingGTBasisFuncs{T, D}}; 
+                         roundDigits::Int=getAtolDigits(T)) where {T, D}
+    bfGroups = sortBasisFuncs(bs, true; roundDigits)
+    map(bfGroups) do arr1
+        arr2 = FloatingGTBasisFuncs{T, D}[]
+        while length(arr1) > 1
+            temp = mergeBasisFuncs(arr1[1], arr1[2]; roundDigits)
+            if temp isa FloatingGTBasisFuncs
+                arr1[1] = temp
+                popat!(arr1, 2)
+            else
+                push!(arr2, popfirst!(arr1))
+            end
+        end
+        if length(arr2) == 0
+            arr1[]
+        else
+            vcat(arr1, arr2)
+        end
+    end
+    vcat(bfGroups...)
+end
+
+
+mergeBasisFuncs(args::Vararg{GTBasisFuncs, 2}) = itself(args)
+
+function mergeBasisFuncs(bf1::FloatingGTBasisFuncs{T, D, 𝑙, GN, PT1, ON1}, 
+                         bf2::FloatingGTBasisFuncs{T, D, 𝑙, GN, PT2, ON2}; 
+                         roundDigits::Int=getAtolDigits(T)) where 
+                        {T, D, 𝑙, GN, PT1, PT2, ON1, ON2}
+    ss = SubshellXYZsizes[𝑙+1]
+    (ON1 == ss || ON2 == ss) && ( return (bf1, bf2) )
+    if bf1.normalizeGTO == bf2.normalizeGTO
+        cen = if (cen1 = bf1.center) === (cen2 = bf2.center) || hasIdentical(cen1, cen2)
+            cen1
+        elseif hasEqual(cen1, cen2)
+            deepcopy(cen1)
+        elseif (c1 = roundNum.(coordOf(cen1), roundDigits)) == 
+               (c2 = roundNum.(coordOf(cen2), roundDigits))
+            genSpatialPoint(c1)
+        else
+            return (bf1, bf2)
+        end
+
+        if bf1.l == bf2.l
+            gfs = mergeGaussFuncs(bf1.gauss..., bf2.gauss...; roundDigits) |> Tuple
+            return BasisFunc(cen, gfs, bf1.l, bf1.normalizeGTO)
+        else
+            gfPairs1 = [roundNum.((x.xpn(), x.con()), roundDigits) for x in bf1.gauss]
+            gfPairs2 = [roundNum.((x.xpn(), x.con()), roundDigits) for x in bf2.gauss]
+            gfs1 = bf1.gauss[sortperm(gfPairs1)]
+            gfs2 = bf2.gauss[sortperm(gfPairs2)]
+
+            gfs = Array{GaussFunc{T}}(undef, GN)
+            for ((i, gf1), gf2) in zip(enumerate(gfs1), gfs2)
+                res = if gf1 === gf2 || hasIndentical(gf1, gf2)
+                    gf1
+                elseif hasEuqal(gf1, gf2)
+                    deepcopy(gf1)
+                elseif gfPairs1[i] == gfPairs2[i]
+                    GaussFunc(gfPairs1[i]...)
+                else
+                    false
+                end
+                if res == false 
+                    return (bf1, bf2)
+                else
+                    gfs[i] = res
+                end
+            end
+        end
+
+        BasisFuncs(cen, gfs, (bf1.l, bf2.l), bf1.normalizeGTO)
+    else
+        (bf1, bf2)
     end
 end
 
@@ -1320,33 +1541,35 @@ Return the numbers of orbitals of the input basis function(s).
 
 
 # Core function to generate a customized X-Gaussian (X>1) basis function.
-function genGaussFuncText(xpn::Real, con::Real, roundDigits::Int=-1)
+function genGaussFuncText(xpn::Real, con::Real; roundDigits::Int=-1)
     if roundDigits >= 0
         xpn = round(xpn, digits=roundDigits)
         con = round(con, digits=roundDigits)
     end
-    "  " * alignNum(xpn) * (alignNum(con) |> rstrip) * "\n"
+    "  " * alignNum(xpn; roundDigits) * (alignNum(con; roundDigits) |> rstrip) * "\n"
 end
 
 """
 
-    genBasisFuncText(bf::FloatingGTBasisFuncs; norm=1.0, printCenter=true) -> String
+    genBasisFuncText(bf::FloatingGTBasisFuncs; 
+                     norm=1.0, printCenter=true, roundDigits::Int=-1) -> String
 
 Generate a `String` of the text of the input `FloatingGTBasisFuncs`. `norm` is the 
 additional normalization factor. If `printCenter` is `true`, the center coordinate 
 will be added on the first line of the `String`.
 """
-function genBasisFuncText(bf::FloatingGTBasisFuncs{T, <:Any, 𝑙}; 
-                          norm::Real=1.0, printCenter::Bool=true) where {T, 𝑙}
-    GFs = map(x -> genGaussFuncText(x.xpn(), x.con()), bf.gauss)
+function genBasisFuncText(bf::FloatingGTBasisFuncs{T}; norm::Real=1.0, 
+                          printCenter::Bool=true, roundDigits::Int=-1) where {T}
+    GFs = map(x -> genGaussFuncText(x.xpn(), x.con(); roundDigits), bf.gauss)
     cen = centerCoordOf(bf)
-    firstLine = printCenter ? "X "*(alignNum.(cen) |> join)*"\n" : ""
+    firstLine = printCenter ? "X "*(alignNum.(cen; roundDigits) |> join)*"\n" : ""
     firstLine * "$(bf|>subshellOf)    $(getTypeParams(bf)[4])   $(T(norm))\n" * (GFs|>join)
 end
 
 """
 
-    genBasisFuncText(bs::Array{<:FloatingGTBasisFuncs, 1}; 
+    genBasisFuncText(bs::Union{AbstractVector{<:FloatingGTBasisFuncs}, 
+                               Tuple{Vararg{FloatingGTBasisFuncs}}; 
                      norm=1.0, printCenter=true, groupCenters::Bool=true) -> 
     String
 
@@ -1355,28 +1578,31 @@ normalization factor. If `printCenter` is `true`, the center coordinate will be 
 on the first line of the `String`. `groupCenters` determines whether the function will 
 group the basis functions with same center together.
 """
-function genBasisFuncText(bs::Vector{<:FloatingGTBasisFuncs}; 
+function genBasisFuncText(bs::Union{AbstractVector{<:FloatingGTBasisFuncs{T, D}}, 
+                                    Tuple{Vararg{FloatingGTBasisFuncs{T, D}}}}; 
                           norm::Real=1.0, printCenter::Bool=true, 
-                          groupCenters::Bool=true)
+                          groupCenters::Bool=true, roundDigits::Int=-1) where {T, D}
     strs = String[]
-    bfBlocks = sortBasisFuncs(bs, groupCenters)
+    bfBlocks = sortBasisFuncs(bs, groupCenters; roundDigits)
     if groupCenters
         for b in bfBlocks
-            push!(strs, joinConcentricBFuncStr(b, norm, printCenter))
+            push!(strs, joinConcentricBFuncStr(b; norm, printCenter, roundDigits))
         end
     else
         for b in bfBlocks
-            push!(strs, genBasisFuncText(b; norm, printCenter))
+            push!(strs, genBasisFuncText(b; norm, printCenter, roundDigits))
         end
     end
     strs
 end
 
 
-function joinConcentricBFuncStr(bs::Vector{<:FloatingGTBasisFuncs},
-                                norm::Real=1.0, printFirstBFcenter::Bool=true)
-    str = genBasisFuncText(bs[1]; norm, printCenter=printFirstBFcenter)
-    str *= genBasisFuncText.(bs[2:end]; norm, printCenter=false) |> join
+function joinConcentricBFuncStr(bs::Union{AbstractVector{<:FloatingGTBasisFuncs{T, D}}, 
+                                          Tuple{Vararg{FloatingGTBasisFuncs{T, D}}}}; 
+                                norm::Real=1.0, printCenter::Bool=true, 
+                                roundDigits::Int=-1) where {T, D}
+    str = genBasisFuncText(bs[1]; norm, printCenter, roundDigits)
+    str *= genBasisFuncText.(bs[2:end]; norm, printCenter=false, roundDigits) |> join
 end
 
 
@@ -1481,7 +1707,7 @@ end
               forDifferentiation::Bool=false) -> 
     Union{ParamBox, Nothing}
 
-    getParams(pbc::$(StructSpatialBasis), symbol::Union{Symbol, Missing}=missing; 
+    getParams(pbc::$(ParameterizedContainer), symbol::Union{Symbol, Missing}=missing; 
               forDifferentiation::Bool=false) -> 
     AbstractVector{<:ParamBox}
 
@@ -1505,19 +1731,19 @@ getParams(cs::AbstractArray{<:ParamBox}, symbol::Union{Symbol, Missing}=missing;
           forDifferentiation::Bool=false) = 
 cs[findall(x->paramFilter(x, symbol, forDifferentiation), cs)]
 
-getParams(ssb::StructSpatialBasis, symbol::Union{Symbol, Missing}=missing; 
+getParams(ssb::ParameterizedContainer, symbol::Union{Symbol, Missing}=missing; 
           forDifferentiation::Bool=false) = 
 filter(x->paramFilter(x, symbol, forDifferentiation), ssb.param) |> collect
 
-getParams(cs::AbstractArray{<:StructSpatialBasis}, symbol::Union{Symbol, Missing}=missing; 
-          forDifferentiation::Bool=false) = 
+getParams(cs::AbstractArray{<:ParameterizedContainer}, 
+          symbol::Union{Symbol, Missing}=missing; forDifferentiation::Bool=false) = 
 vcat(getParams.(cs, symbol; forDifferentiation)...)
 
 function getParams(cs::AbstractArray, symbol::Union{Symbol, Missing}=missing; 
                    forDifferentiation::Bool=false)
     pbIdx = findall(x->x isa ParamBox, cs)
     vcat(getParams(convert(Vector{ParamBox}, cs[pbIdx]), symbol; forDifferentiation), 
-         getParams(convert(Vector{StructSpatialBasis}, cs[1:end .∉ [pbIdx]]), symbol; 
+         getParams(convert(Vector{ParameterizedContainer}, cs[1:end .∉ [pbIdx]]), symbol; 
                    forDifferentiation))
 end
 
@@ -1605,8 +1831,8 @@ compareParamBox(pb2, pb1)
 
 """
 
-    markParams!(b::Union{Array{T}, T, Tuple{Vararg{StructSpatialBasis}}}, 
-                filterMapping::Bool=false)  where {T<:$(StructSpatialBasis)} -> 
+    markParams!(b::Union{Array{T}, T, Tuple{Vararg{T}}}, 
+                filterMapping::Bool=false)  where {T<:$(ParameterizedContainer)} -> 
     Array{<:ParamBox, 1}
 
 Mark the parameters (`ParamBox`) in input bs which can a `Vector` of `GaussFunc` or 
@@ -1614,8 +1840,8 @@ Mark the parameters (`ParamBox`) in input bs which can a `Vector` of `GaussFunc`
 `filterMapping`determines whether filtering out (i.e. not return) extra `ParamBox`s that 
 have same independent variables despite may having different mapping functions.
 """
-markParams!(b::Union{Array{T}, T, Tuple{Vararg{StructSpatialBasis}}}, 
-            filterMapping::Bool=false) where {T<:StructSpatialBasis} = 
+markParams!(b::Union{Array{T}, T, Tuple{Vararg{T}}}, 
+            filterMapping::Bool=false) where {T<:ParameterizedContainer} = 
 markParams!(getParams(b), filterMapping)
 
 function markParams!(parArray::Array{<:ParamBox}, filterMapping::Bool=false)
@@ -1635,7 +1861,7 @@ function markParams!(parArray::Array{<:ParamBox}, filterMapping::Bool=false)
         deleteat!(arr, ids)
         append!(pars, markParamsCore!(subArr))
     end
-    filterMapping ? unique(x->(x.dataName, x.index[]), pars) : pars
+    filterMapping ? unique(x->(objectid(x.data), x.index[]), pars) : pars
 end
 
 function markParamsCore!(parArray::Array{<:ParamBox{<:Any, V}}) where {V}
