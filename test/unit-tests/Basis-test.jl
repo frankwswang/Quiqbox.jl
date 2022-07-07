@@ -149,6 +149,12 @@ bf3_4_2 = genBasisFunc([0.0, 0.0, 0.0], (1.0, 1.0), "D", normalizeGTO=true)
                 0.1230438277009564 0.0 0.0 0.1230438277009564 0.0 0.3691314831028692], 
                 overlaps((bf4_4,)), atol=errorThreshold1)
 
+@test markUnique( [genBasisFunc(cen, (2.0, 1.0), (2,0,0)), 
+                   genBasisFunc(cen, (2.0, 1.0), [(2,0,0)]),
+                   genBasisFunc(cen, (2.0, 1.0), "D", (true,)),
+                   genBasisFunc(bf1.center, (2.0, 1.0), "D", (true,)),
+                   genBasisFunc(cen, GaussFunc(2.0, 1.0), "D", (true,))] )[1] == fill(1, 5)
+      
 
 # function sortBasisFuncs sortPermBasisFuncs
 unsortedbfs = [bf4_1, bf4_4, bf4_3, bf4_2]
@@ -471,6 +477,13 @@ lines = (content |> IOBuffer |> readlines)
 @test map(i->Quiqbox.genGaussFuncText(bfCoeff2[i,:]...), 1:size(bfCoeff2)[1] |> collect) == 
          [lines[2], lines[3], lines[5], lines[6], lines[8], lines[9]].*"\n"
 
+@test (genBasisFunc(missing, (2.0, 1.1), "D")[[1,3,5]] |> genBasisFuncText) == 
+"""
+X      NaN                          NaN                          NaN                     
+D    1   1.0  1 3 5
+         2.0                           1.1
+"""
+
 
 # function genBasisFuncText & genBFuncsFromText
 randElement = ElementNames[rand(1:length(ElementNames))]
@@ -489,6 +502,9 @@ bs2_3 = genBFuncsFromText(txt3)
 @test hasEqual.(bs1, bs2_2, ignoreFunction=true) |> all
 @test hasEqual.(sortBasisFuncs(bs1), bs2_3, ignoreFunction=true) |> all
 @test hasEqual.(bs1[sortPermBasisFuncs(bs1)], bs2_3, ignoreFunction=true) |> all
+bsO_STO3G = genBasisFunc(fill(0.0, 3), ("STO-3G", "O"))
+@test basisSize.(bsO_STO3G ) == [1, 1, 3]
+@test hasEqual(bsO_STO3G, genBasisFuncText.(bsO_STO3G) |> join |> genBFuncsFromText)
 
 
 # function assignCenInVal!

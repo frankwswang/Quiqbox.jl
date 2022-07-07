@@ -387,23 +387,16 @@ BasisFuncs(bfs::BasisFuncs) = itself(bfs)
 
 BasisFunc(bfs::BFuncs1O) = BasisFunc(bfs.center, bfs.gauss, bfs.l, bfs.normalizeGTO)
 
-
-# for i in 0:length(SubshellNames)-1
-#     eval
-# end
-
-const FullSubShellBasisFuncs{T, D, 0, GN, PT} = FloatingGTBasisFuncs{T, D, 0, GN, PT, SubshellSizes[D][1]}
-const FullSubShellBasisFuncs{T, D, 1, GN, PT} = FloatingGTBasisFuncs{T, D, 0, GN, PT, SubshellSizes[D][2]}
-const FullSubShellBasisFuncs{T, D, 2, GN, PT} = FloatingGTBasisFuncs{T, D, 0, GN, PT, SubshellSizes[D][3]}
-const FullSubShellBasisFuncs{T, D, 3, GN, PT} = FloatingGTBasisFuncs{T, D, 0, GN, PT, SubshellSizes[D][4]}
-const FullSubShellBasisFuncs{T, D, 4, GN, PT} = FloatingGTBasisFuncs{T, D, 0, GN, PT, SubshellSizes[D][5]}
-const FullSubShellBasisFuncs{T, D, 5, GN, PT} = FloatingGTBasisFuncs{T, D, 0, GN, PT, SubshellSizes[D][6]}
-const FullSubShellBasisFuncs{T, D, 6, GN, PT} = FloatingGTBasisFuncs{T, D, 0, GN, PT, SubshellSizes[D][7]}
-
-
-
 struct EmptyBasisFunc{T<:Real, D} <: CGTBasisFuncs1O{T, D, 0} end
 
+
+isaFullShellBasisFuncs(::Any) = false
+
+isaFullShellBasisFuncs(::FloatingGTBasisFuncs{<:Any, <:Any, 𝑙, <:Any, <:Any, ON}) where 
+                      {𝑙, ON} = 
+(ON == SubshellXYZsizes[𝑙+1])
+
+isaFullShellBasisFuncs(::FloatingGTBasisFuncs{<:Any, <:Any, 0}) = true
 
 """
 
@@ -539,15 +532,7 @@ function genBasisFunc(cen::SpatialPoint{T, D}, gs::NTuple{GN, AbstractGaussFunc{
     genBasisFunc(cen, gs, SubshellOrientationList[D][subshell]; normalizeGTO)
 end
 
-function genBasisFunc(cen::SpatialPoint{T, D}, gs::NTuple{GN, AbstractGaussFunc{T}}, 
-                      subshell::String, lFilter::Tuple{Vararg{Bool}}; 
-                      normalizeGTO::Bool=false) where {T, D, GN}
-    genBasisFunc(cen, gs, 
-                 SubshellOrientationList[D][subshell][1:end .∈ [findall(lFilter)]]; 
-                 normalizeGTO)
-end
-
-function genBasisFunc(cen::SpatialPoint{T, D}, xpnsANDcons::NTuple{2, Vector{T}}, 
+function genBasisFunc(cen::SpatialPoint{T, D}, xpnsANDcons::NTuple{2, AbstractVector{T}}, 
                       lOrSubshell=LTuple(fill(0, D)); normalizeGTO::Bool=false) where 
                      {T, D}
     @compareLength xpnsANDcons[1] xpnsANDcons[2] "exponents" "contraction coefficients"
@@ -559,7 +544,7 @@ genBasisFunc(cen::SpatialPoint{T, D}, xpnANDcon::NTuple{2, T},
              lOrSubshell=LTuple(fill(0, D)); normalizeGTO::Bool=false) where {T, D} = 
 genBasisFunc(cen, (GaussFunc(xpnANDcon[1], xpnANDcon[2]),), lOrSubshell; normalizeGTO)
 
-function genBasisFunc(center::SpatialPoint{T, D}, BSKeyANDnuc::Vector{NTuple{2, String}}; 
+function genBasisFunc(center::SpatialPoint{T, D}, BSKeyANDnuc::AbstractVector{NTuple{2, String}}; 
                       unlinkCenter::Bool=false) where {T, D}
     bases = FloatingGTBasisFuncs{T, D}[]
     for k in BSKeyANDnuc
@@ -571,11 +556,16 @@ function genBasisFunc(center::SpatialPoint{T, D}, BSKeyANDnuc::Vector{NTuple{2, 
     bases
 end
 
+genBasisFunc(cen::SpatialPoint{T, D}, gs::Tuple, subshell::String, lFilter::Tuple{Vararg{Bool}}; 
+             normalizeGTO::Bool=false) where {T, D} = 
+genBasisFunc(cen, gs, SubshellOrientationList[D][subshell][1:end .∈ [findall(lFilter)]]; 
+             normalizeGTO)
+
 genBasisFunc(cen::SpatialPoint, BSKeyANDnuc::NTuple{2, String}; 
              unlinkCenter::Bool=false) = 
 genBasisFunc(cen, [BSKeyANDnuc]; unlinkCenter)
 
-genBasisFunc(cen::SpatialPoint, BSkey::Vector{String}; nucleus::String="H", 
+genBasisFunc(cen::SpatialPoint, BSkey::AbstractVector{String}; nucleus::String="H", 
              unlinkCenter::Bool=false) = 
 genBasisFunc(cen, [(i, nucleus) for i in BSkey]; unlinkCenter)
 
@@ -659,10 +649,12 @@ sortBasisFuncs(FloatingGTBasisFuncs{T, D}[bs...], groupCenters; roundDigits) |> 
 
 """
 
-    sortPermBasisFuncs(Union{AbstractArray{<:FloatingGTBasisFuncs{T, D}}, 
-                             Tuple{Vararg{FloatingGTBasisFuncs{T, D}}}}) where {T, D} -> 
+    sortPermBasisFuncs(bs::Union{AbstractArray{<:FloatingGTBasisFuncs{T, D}}, 
+                                 Tuple{Vararg{FloatingGTBasisFuncs{T, D}}}}) where 
+                      {T, D} -> 
     Vector{Int}
 
+Return a `Vector` of indices `I` such that `bs[I] == sortBasisFuncs(bs; roundDigits)`.
 """
 sortPermBasisFuncs(bs::AbstractArray{<:FloatingGTBasisFuncs{T, D}}; 
                    roundDigits::Int=getAtolDigits(T)) where {T, D} = 
@@ -843,7 +835,7 @@ end
 
 sortBasis(bs::AbstractArray{<:BasisFuncMix{T, D}}; 
           roundDigits::Int=getAtolDigits(T)) where {T, D} = 
-bs[sortPermBasisFuncs(getindex.(getproperty.(bs, :BasisFunc), 1); roundDigits)]
+bs[sortPermBasis(bs; roundDigits)]
 
 sortBasis(bs::AbstractArray{<:FloatingGTBasisFuncs{T, D}}; 
           roundDigits::Int=getAtolDigits(T)) where {T, D} = 
@@ -869,6 +861,38 @@ Reconstruct a `GTBasis` by sorting the `GTBasisFuncs` stored in the input one.
 """
 sortBasis(b::GTBasis; roundDigits::Int=getAtolDigits(T)) = 
           GTBasis(sortBasis(b.basis; roundDigits))
+
+
+"""
+
+    sortPermBasis(bs::AbstractArray{<:CompositeGTBasisFuncs{T, D}}; 
+                  roundDigits::Int=getAtolDigits(T)) where {T, D} -> 
+    Vector{Int}
+
+Return a `Vector` of indices `I` such that `bs[I] == sortBasis(bs; roundDigits)`.
+"""
+function sortPermBasis(bs::AbstractArray{<:CompositeGTBasisFuncs{T, D}}; 
+                       roundDigits::Int=getAtolDigits(T)) where {T, D}
+    bs = reshape(bs, :)
+    idbfs = findall(x->isa(x, FloatingGTBasisFuncs), bs)
+    bfs = splice!(bs, idbfs)
+    ids1 = sortPermBasisFuncs(convert(AbstractVector{FloatingGTBasisFuncs{T, D}}, bfs); 
+                              roundDigits)
+    ids2 = sortPermBasis(convert(AbstractVector{BasisFuncMix{T, D}}, bs); roundDigits)
+    [ids1..., (ids2 .+ length(idbfs))...]
+end
+
+sortPermBasis(bs::AbstractArray{<:BasisFuncMix{T, D}}; 
+              roundDigits::Int=getAtolDigits(T)) where {T, D} = 
+sortPermBasisFuncs(getindex.(getproperty.(bs, :BasisFunc), 1); roundDigits)
+
+sortPermBasis(bs::AbstractArray{<:FloatingGTBasisFuncs{T, D}}; 
+              roundDigits::Int=getAtolDigits(T)) where {T, D} = 
+sortPermBasisFuncs(bs; roundDigits)
+
+sortPermBasis(bs::Tuple{Vararg{CompositeGTBasisFuncs{T, D}}}; 
+              roundDigits::Int=getAtolDigits(T)) where {T, D} = 
+sortPermBasis(collect(bs); roundDigits)
 
 
 function sumOfCore(bfs::AbstractVector{<:BasisFunc{T, D}}, 
@@ -1558,12 +1582,15 @@ Generate a `String` of the text of the input `FloatingGTBasisFuncs`. `norm` is t
 additional normalization factor. If `printCenter` is `true`, the center coordinate 
 will be added on the first line of the `String`.
 """
-function genBasisFuncText(bf::FloatingGTBasisFuncs{T}; norm::Real=1.0, 
-                          printCenter::Bool=true, roundDigits::Int=-1) where {T}
+function genBasisFuncText(bf::FloatingGTBasisFuncs{T, D}; norm::Real=1.0, 
+                          printCenter::Bool=true, roundDigits::Int=-1) where {T, D}
     GFs = map(x -> genGaussFuncText(x.xpn(), x.con(); roundDigits), bf.gauss)
     cen = centerCoordOf(bf)
     firstLine = printCenter ? "X "*(alignNum.(cen; roundDigits) |> join)*"\n" : ""
-    firstLine * "$(bf|>subshellOf)    $(getTypeParams(bf)[4])   $(T(norm))\n" * (GFs|>join)
+    firstLine * "$(bf|>subshellOf)    $(getTypeParams(bf)[4])   $(T(norm))" * 
+    ( isaFullShellBasisFuncs(bf) ? "" : " " * 
+      join( [" $i" for i in get.(Ref(AngMomIndexList[D]), bf.l, "")] |> join ) ) * "\n" * 
+    (GFs|>join)
 end
 
 """
@@ -1651,21 +1678,30 @@ function genBFuncsFromText(content::String;
                                          SpatialPoint{T, D}, 
                                          Missing}=missing, 
                            unlinkCenter::Bool=false) where {D, T<:Real, F<:Function}
-    typ = ifelse((center isa Missing), Float64, T)
+    centerIsMissing = (center isa Missing)
+    typ = ifelse(centerIsMissing, Float64, T)
     adjustContent && (content = adjustFunction(content))
     lines = split.(content |> IOBuffer |> readlines)
     lines = lines[1+excludeFirstNlines : end-excludeLastNlines]
     data = [advancedParse.(typ, i) for i in lines]
-    index = findall(x -> typeof(x) != Vector{typ} && length(x)==3, data)
-    bfs = []
+    index = findall( x -> (eltype(x) != typ) && (length(x) > 2) && 
+                    (x[1] == "SP" || x[1] in SubshellNames), data )
+    bfs = FloatingGTBasisFuncs[]
+    if !centerIsMissing
+        d = (center isa AbstractArray) ? length(center) : D
+    end
     for i in index
+        oInfo = data[i]
+        # @show oInfo
         gs1 = GaussFunc{typ}[]
-        ng = data[i][2] |> Int
+        ng = oInfo[2] |> Int
         centerOld = center
         if center isa Missing && i != 1 && data[i-1][1] == "X"
-            center = convert(Vector{typ}, data[i-1][2:end])
+            cenStr = data[i-1][2:end]
+            center = convert(Vector{typ}, cenStr)
+            d = length(cenStr)
         end
-        if data[i][1] == "SP"
+        if oInfo[1] == "SP"
             gs2 = GaussFunc{typ}[]
             for j = i+1 : i+ng
                 push!(gs1, GaussFunc(data[j][1], data[j][2]))
@@ -1677,8 +1713,15 @@ function genBFuncsFromText(content::String;
             for j = i+1 : i+ng
                 push!(gs1, GaussFunc(data[j]...))
             end
+            subshellInfo = oInfo[1] |> string
+            # @show subshellInfo
+            if length(oInfo) > 3
+                # @show 1
+                subshellInfo = SubshellOrientationList[d][subshellInfo][oInfo[2:end]]
+                # @show subshellInfo
+            end
             push!(bfs, genBasisFunc((unlinkCenter ? deepcopy(center) : center), 
-                                    gs1, (data[i][1] |> string), normalizeGTO=true))
+                                    gs1, subshellInfo, normalizeGTO=true))
         end
         center = centerOld
     end

@@ -213,7 +213,9 @@ getindex(bfm::BasisFuncMix, ::Val{:last}) = getindex(bfm)
 firstindex(::BasisFuncMix) = Val(:first)
 lastindex(::BasisFuncMix) = Val(:last)
 
-getindex(bfs::BasisFuncs, i) = 
+getindex(bfs::BasisFuncs, is::AbstractVector{Int}) = 
+BasisFuncs(bfs.center, bfs.gauss, bfs.l[is], bfs.normalizeGTO)
+getindex(bfs::BasisFuncs, i::Int) = 
 BasisFunc(bfs.center, bfs.gauss, bfs.l[i], bfs.normalizeGTO)
 getindex(bfs::BFuncsON{ON}, ::Colon) where {ON} = [getindex(bfs, i) for i=1:ON]
 firstindex(bfs::BasisFuncs) = 1
