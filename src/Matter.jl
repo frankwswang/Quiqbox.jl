@@ -226,7 +226,7 @@ struct MatterByHF{T, D, NN, N, BN, HFTS} <:MatterData{T, D, N}
         (osO, osU), (CO, CU) = getCanOrbitalsCore(fVars)
         ints = changeHbasis.(Ref(basis), Ref(nuc), Ref(nucCoords), fVars.C)
         new{T, D, NN, sum(spin), BN, HFTS}(fVars.Ehf, nuc, nucCoords, fVars.Enn, spin, 
-                                           Tuple.(osO), Tuple.(osU), CU, CO, 
+                                           Tuple.(osO), Tuple.(osU), CO, CU, 
                                            getindex.(ints, 1), getindex.(ints, 2), basis)
     end
 end

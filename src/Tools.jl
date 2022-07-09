@@ -884,3 +884,25 @@ worldAgeSafe(::Type{<:Function}) = false
 
 uniCallFunc(f::F, argsOrder::NTuple{N, Int}, args...) where {F<:Function, N} = 
 f(getindex.(Ref(args), argsOrder)...)
+
+
+function mergeMultiObjs(::Type{T}, merge2Ofunc::F, o1::T, o2::T, o3::T, o4::T...; 
+                        roundDigits::Int) where {T, F}
+    arr1 = T[o1, o2, o3, o4...]
+    arr2 = T[]
+    while length(arr1) >= 1
+        i = 1
+        while i < length(arr1)
+            temp = merge2Ofunc(arr1[i], arr1[i+1]; roundDigits)
+            if eltype(temp) <: T && length(temp) == 1
+                arr1[i] = temp[]
+                popat!(arr1, i+1)
+            else
+                reverse!(arr1, i, i+1)
+                i += 1
+            end
+        end
+        push!(arr2, popat!(arr1, i))
+    end
+    arr2
+end

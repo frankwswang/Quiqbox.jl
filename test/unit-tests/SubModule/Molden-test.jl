@@ -29,8 +29,8 @@ bsNames = push!(("-" .*molNames), "-Grid")
 dir = @__DIR__
 prefix1 = dir*"/"
 prefix2 = dir*"/Moldens/"
-for (nuc, nucCoords, molName, iMol) in zip(mols, molCoords, molNames, 1:length(mols)), 
-    (bfCoord, bsName) in zip(bfCoords[iMol:end], bsNames[iMol:end]), 
+for ((iNuc, nuc), nucCoords, molName) in zip(enumerate(mols), molCoords, molNames), 
+    (bfCoord, bsName) in zip(bfCoords[iNuc:end], bsNames[iNuc:end]), 
     HFtype in Quiqbox.HFtypes,
     bf in bfs
 
@@ -50,7 +50,7 @@ for (nuc, nucCoords, molName, iMol) in zip(mols, molCoords, molNames, 1:length(m
         continue
     end
 
-    mol = Molecule(bs, fVars)
+    mol = MatterByHF(fVars)
     fn = "Test_"*molName*"_"*bf*bsName*"_"*string(HFtype)
     fd = makeMoldenFile(mol; roundDigits=5, recordUMO=true, fileName=prefix1*fn)
     str1, str2 = replace.(read.((fd, prefix2*fn*".molden"), String), 
@@ -61,4 +61,13 @@ for (nuc, nucCoords, molName, iMol) in zip(mols, molCoords, molNames, 1:length(m
     rm(fd)
 end
 
+bf1 = genBasisFunc(fill(0.0, 3), (0.3, 0.5))
+bs1 = (genBasisFunc.(molCoords[1], "STO-3G") |> flatten) .+ bf1
+mol1 = runHF(bs1, mols[1], molCoords[1], printInfo=false) |> MatterByHF
+@test try makeMoldenFile(mol1) catch; true end
+
+bf2 = genBasisFunc(fill(0.0, 3), ("STO-3G", "O"))[3][[1,3]]
+bs2 = [bf1, bf2]
+mol2 = runHF(bs2, mols[1], molCoords[1], printInfo=false) |> MatterByHF
+@test try makeMoldenFile(mol2) catch; true end
 end

@@ -14,8 +14,8 @@ const getXmethods = (m1=getXcore1,)
 getX(S::Matrix{T}, method::Symbol=:m1) where {T<:Real} = getfield(getXmethods, method)(S)
 
 
-function getCϵ(X::Matrix{T}, F::Matrix{T}, stabilizeSign::Bool=true) where {T<:Real}
-    ϵ, Cₓ = eigen(X'*F*X |> Hermitian)
+function getCϵ(X::Matrix{T}, Fˢ::Matrix{T}, stabilizeSign::Bool=true) where {T<:Real}
+    ϵ, Cₓ = eigen(X'*Fˢ*X |> Hermitian)
     outC = X*Cₓ
     # Stabilize the sign factor of each column.
     stabilizeSign && for j = 1:size(outC, 2)
@@ -24,11 +24,11 @@ function getCϵ(X::Matrix{T}, F::Matrix{T}, stabilizeSign::Bool=true) where {T<:
     outC, ϵ
 end
 
-@inline getC(X::Matrix{T}, F::Matrix{T}, stabilizeSign::Bool=true) where {T<:Real} = 
-        getCϵ(X, F, stabilizeSign)[1]
+@inline getC(X::Matrix{T}, Fˢ::Matrix{T}, stabilizeSign::Bool=true) where {T<:Real} = 
+        getCϵ(X, Fˢ, stabilizeSign)[1]
 
 
-splitSpins(::Val{1}, N::Int) = (N,)
+splitSpins(::Val{1}, N::Int) = (N÷2,)
 
 splitSpins(::Val{2}, N::Int) = (N÷2, N-N÷2)
 
@@ -49,15 +49,11 @@ end
 
 breakSymOfC(::Val{:RHF}, C::Matrix{T}) where {T<:Real} = (C,)
 
-function breakSymOfC(::Val{:RHF}, X, D₁, D₂, Hcore, HeeI)
-    Dᵀ = D₁ + D₂
-    (getC(X, getF(Hcore, HeeI, Dᵀ./ 2, Dᵀ)),)
-end
+breakSymOfC(::Val{:RHF}, X, Dᵅ, Dᵝ, Hcore, HeeI) = 
+( getC(X, getF(Hcore, HeeI, (Dᵅ + Dᵝ)./2)), )
 
-function breakSymOfC(::Val{:UHF}, X, D₁, D₂, Hcore, HeeI)
-    Dᵀ = D₁ + D₂
-    getC.(Ref(X), getF.(Ref(Hcore), Ref(HeeI), (D₁, D₂), Ref(Dᵀ)))
-end
+breakSymOfC(::Val{:UHF}, X, Dᵅ, Dᵝ, Hcore, HeeI) =
+getC.( Ref(X), getF.(Ref(Hcore), Ref(HeeI), (Dᵅ, Dᵝ), (Dᵝ, Dᵅ)) )
 
 
 function getCfromGWH(::Val{HFT}, S::Matrix{T}, Hcore::Matrix{T}, X::Matrix{T}) where 
@@ -67,14 +63,14 @@ function getCfromGWH(::Val{HFT}, S::Matrix{T}, Hcore::Matrix{T}, X::Matrix{T}) w
     for j in 1:l, i in 1:l
         H[i,j] = 3 * S[i,j] * (Hcore[i,i] + Hcore[j,j]) / 8
     end
-    C = getC(X, H)
-    breakSymOfC(Val(HFT), C)
+    Cˢ = getC(X, H)
+    breakSymOfC(Val(HFT), Cˢ)
 end
 
 
 function getCfromHcore(::Val{HFT}, X::Matrix{T}, Hcore::Matrix{T}) where {HFT, T}
-    C = getC(X, Hcore)
-    breakSymOfC(Val(HFT), C)
+    Cˢ = getC(X, Hcore)
+    breakSymOfC(Val(HFT), Cˢ)
 end
 
 
@@ -85,8 +81,8 @@ function getCfromSAD(::Val{HFT}, S::Matrix{T},
                      X::Matrix{T}, 
                      config=SCFconfig((:ADIIS,), (1e4*getAtolDigits(T),))) where 
                     {HFT, T, D, BN, NN}
-    D₁ = zero(Hcore)
-    D₂ = zero(Hcore)
+    Dᵅ = zero(Hcore)
+    Dᵝ = zero(Hcore)
     N₁tot = 0
     N₂tot = 0
     order = sortperm(collect(nuc), by=x->AtomicNumberList[x])
@@ -99,12 +95,12 @@ function getCfromSAD(::Val{HFT}, S::Matrix{T},
         h1 = coreH(bs, (atm,), (coord,))
         r, _ = runHFcore(Val(:UHF), 
                          config, (N₁, N₂), h1, HeeI, S, X, getCfromHcore(Val(:UHF), X, h1))
-        D₁ += r[1].Ds[end]
-        D₂ += r[2].Ds[end]
+        Dᵅ += r[1].Ds[end]
+        Dᵝ += r[2].Ds[end]
         N₁tot += N₁
         N₂tot += N₂
     end
-    breakSymOfC(Val(HFT), X, D₁, D₂, Hcore, HeeI)
+    breakSymOfC(Val(HFT), X, Dᵅ, Dᵝ, Hcore, HeeI)
 end
 
 
@@ -124,10 +120,10 @@ const guessCmethods = (GWH=getCfromGWH, Hcore=getCfromHcore, SAD=getCfromSAD)
 # @inline guessC(Cs::Tuple{Vararg{Matrix}}, _...) = itself(Cs)
 
 
-getD(C::Matrix{T}, Nˢ::Int) where {T} = @views (C[:,1:Nˢ]*C[:,1:Nˢ]')
+getD(Cˢ::Matrix{T}, Nˢ::Int) where {T} = @views (Cˢ[:,1:Nˢ]*Cˢ[:,1:Nˢ]')
 # Nˢ: number of electrons with the same spin.
 
-@inline getD(X::Matrix{T}, F::Matrix{T}, Nˢ::Int) where {T<:Real} = getD(getC(X, F), Nˢ)
+@inline getD(X::Matrix{T}, Fˢ::Matrix{T}, Nˢ::Int) where {T<:Real} = getD(getC(X, Fˢ), Nˢ)
 
 
 function getGcore(HeeI::Array{T, 4}, DJ::Matrix{T}, DK::Matrix{T}) where {T<:Real}
@@ -140,36 +136,33 @@ function getGcore(HeeI::Array{T, 4}, DJ::Matrix{T}, DK::Matrix{T}) where {T<:Rea
 end
 
 # RHF
-@inline getG(HeeI::Array{T, 4}, D::Matrix{T}) where {T<:Real} = getGcore(HeeI, 2D, D)
+@inline getG(HeeI::Array{T, 4}, Dˢ::Matrix{T}) where {T<:Real} = getGcore(HeeI, 2Dˢ, Dˢ)
 
 # UHF
-@inline getG(HeeI::Array{T, 4}, D::Matrix{T}, Dᵀ::Matrix{T}) where {T<:Real} = 
-        getGcore(HeeI, Dᵀ, D)
+@inline getG(HeeI::Array{T, 4}, Dᵅ::Matrix{T}, Dᵝ::Matrix{T}) where {T<:Real} = 
+        getGcore(HeeI, Dᵅ+Dᵝ, Dᵅ)
 
 
 @inline getF(Hcore::Matrix{T}, G::Matrix{T}) where {T<:Real} = Hcore + G
 
 # RHF
-@inline getF(Hcore::Matrix{T}, HeeI::Array{T, 4}, D::Matrix{T}) where {T<:Real} = 
-        getF(Hcore, getG(HeeI, D))
+@inline getF(Hcore::Matrix{T}, HeeI::Array{T, 4}, Dˢ::Matrix{T}) where {T<:Real} = 
+        getF(Hcore, getG(HeeI, Dˢ))
 
 # UHF
-@inline getF(Hcore::Matrix{T}, HeeI::Array{T, 4}, D::Matrix{T}, Dᵀ::Matrix{T}) where 
+@inline getF(Hcore::Matrix{T}, HeeI::Array{T, 4}, Dᵅ::Matrix{T}, Dᵝ::Matrix{T}) where 
             {T<:Real} = 
-        getF(Hcore, getG(HeeI, D, Dᵀ))
+        getF(Hcore, getG(HeeI, Dᵅ, Dᵝ))
+
 
 # RHF or UHF
-@inline getF(Hcore::Matrix{T}, HeeI::Array{T, 4}, Ds::NTuple{N, Matrix{T}}) where 
-            {N, T<:Real} = 
-        getF(Hcore, getG(HeeI, Ds...))
-
-@inline getE(Hcore::Matrix{T}, F::Matrix{T}, D::Matrix{T}) where {T<:Real} = 
-        dot(transpose(D), (Hcore + F)/2)
+@inline getE(Hcore::Matrix{T}, Fˢ::Matrix{T}, Dˢ::Matrix{T}) where {T<:Real} = 
+        dot(transpose(Dˢ), (Hcore + Fˢ)/2)
 
 
 # RHF
-@inline getEᵀcore(Hcore::Matrix{T}, F::Matrix{T}, D::Matrix{T}) where {T<:Real} = 
-        2*getE(Hcore, F, D)
+@inline getEᵀcore(Hcore::Matrix{T}, Fˢ::Matrix{T}, Dˢ::Matrix{T}) where {T<:Real} = 
+        2*getE(Hcore, Fˢ, Dˢ)
 
 # UHF
 @inline getEᵀcore(Hcore::Matrix{T}, Fᵅ::Matrix{T}, Dᵅ::Matrix{T}, 
@@ -178,10 +171,10 @@ end
 
 # RHF
 function getEᵀ(Hcore::Matrix{T}, HeeI::Array{T, 4}, 
-               (C,)::Tuple{Matrix{T}}, (N,)::Tuple{Int}) where {T<:Real}
-    D = getD(C, N÷2)
-    F = getF(Hcore, HeeI, D)
-    getEᵀcore(Hcore, F, D)
+               (Cˢ,)::Tuple{Matrix{T}}, (Nˢ,)::Tuple{Int}) where {T<:Real}
+    Dˢ = getD(Cˢ, Nˢ)
+    Fˢ = getF(Hcore, HeeI, Dˢ)
+    getEᵀcore(Hcore, Fˢ, Dˢ)
 end
 
 # UHF
@@ -189,26 +182,57 @@ function getEᵀ(Hcore::Matrix{T}, HeeI::Array{T, 4},
                (Cᵅ,Cᵝ)::NTuple{2, Matrix{T}}, (Nᵅ,Nᵝ)::NTuple{2, Int}) where {T<:Real}
     Dᵅ = getD(Cᵅ, Nᵅ)
     Dᵝ = getD(Cᵝ, Nᵝ)
-    Dᵀ = Dᵅ + Dᵝ
-    Fᵅ = getF(Hcore, HeeI, Dᵅ, Dᵀ)
-    Fᵝ = getF(Hcore, HeeI, Dᵝ, Dᵀ)
+    Fᵅ = getF(Hcore, HeeI, Dᵅ, Dᵝ)
+    Fᵝ = getF(Hcore, HeeI, Dᵝ, Dᵅ)
     getEᵀcore(Hcore, Fᵅ, Dᵅ, Fᵝ, Dᵝ)
 end
 
 
-@inline function getCFDE(Hcore::Matrix{T}, HeeI::Array{T, 4}, 
-                         X::Matrix{T}, Ds::Vararg{Matrix{T}, N}) where {N, T<:Real}
-    Fnew = getF(Hcore, HeeI, Ds)
-    Enew = getE(Hcore, Fnew, Ds[1])
-    Cnew = getC(X, Fnew)
-    (Cnew, Fnew, Ds[1], Enew) # Fnew is based on latest variables.
+# @inline function getCFDE(Hcore::Matrix{T}, HeeI::Array{T, 4}, 
+#                          X::Matrix{T}, Ds::Vararg{Matrix{T}, 1}) where {N, T<:Real}
+#     Fnew = getF(Hcore, HeeI, Ds[1])
+#     Enew = getE(Hcore, Fnew, Ds[1])
+#     Cnew = getC(X, Fnew)
+#     (Cnew, Fnew, Ds[1], Enew) # Fnew is based on latest variables.
+# end
+
+# @inline function getCFDE(Hcore::Matrix{T}, HeeI::Array{T, 4}, 
+#                          X::Matrix{T}, Ds::Vararg{Matrix{T}, 2}) where {N, T<:Real}
+#     Fnew = getF(Hcore, HeeI, Ds...)
+#     Enew = getE(Hcore, Fnew, Ds[1])
+#     Cnew = getC(X, Fnew)
+#     (Cnew, Fnew, Ds[1], Enew) # Fnew is based on latest variables.
+# end
+
+function getCFDE(Hcore::Matrix{T}, HeeI::Array{T, 4}, X::Matrix{T}, 
+                 N::NTuple{2, Int}, Dnew::NTuple{2, Matrix{T}}) where {T}
+    # Dtmp = (Dᵅᵝ, reverse(Dᵅᵝ))
+    # Ftmp = getF.(Ref(Hcore), Ref(HeeI), Dtmp...)
+    # Ctmp = getC.(Ref(X), Fᵅᵝ)
+    # Dnew = getD.(Ctmp, N)
+    Fnew = [getF(Hcore, HeeI, i...) for i in (Dnew, reverse(Dnew))]
+    Cnew = getC.(Ref(X), Fnew)
+    Enew = getE.(Ref(Hcore), Fnew, Dnew)
+    Dᵀnew = sum(Dnew)
+    Eᵀnew = sum(Enew)
+    ( (Cnew[1], Fnew[1], Dnew[1], Enew[1], Dᵀnew, Eᵀnew), 
+      (Cnew[2], Fnew[2], Dnew[2], Enew[2], Dᵀnew, Eᵀnew) )
 end
 
+function getCFDE(Hcore::Matrix{T}, HeeI::Array{T, 4}, X::Matrix{T}, 
+                 Nˢ::Int, Dnew::Matrix{T}) where {T}
+    # Ftmp = getF(Hcore, HeeI, Dˢ)
+    # Ct = getC(X, F)
+    # Dnew = getD(Ct, Nˢ)
+    Fnew = getF(Hcore, HeeI, Dnew)
+    Cnew = getC(X, Fnew)
+    Enew = getE(Hcore, Fnew, Dnew)
+    Cnew, Fnew, Dnew, Enew, 2Dnew, 2Enew
+end
 
 # RHF
 function initializeSCF(::Val{:RHF}, Hcore::Matrix{T}, HeeI::Array{T, 4}, 
-                       (C,)::Tuple{Matrix{T}}, (N,)::Tuple{Int}) where {T<:Real}
-    Nˢ = N÷2
+                       (C,)::Tuple{Matrix{T}}, (Nˢ,)::Tuple{Int}) where {T<:Real}
     D = getD(C, Nˢ)
     F = getF(Hcore, HeeI, D)
     E = getE(Hcore, F, D)
@@ -220,7 +244,7 @@ function initializeSCF(::Val{:UHF}, Hcore::Matrix{T}, HeeI::Array{T, 4},
                        Cs::NTuple{2, Matrix{T}}, Ns::NTuple{2, Int}) where {T<:Real}
     Ds = getD.(Cs, Ns)
     Dᵀs = [Ds |> sum]
-    Fs = getF.(Ref(Hcore), Ref(HeeI), Ds, Ref(Dᵀs[]))
+    Fs = getF.(Ref(Hcore), Ref(HeeI), Ds, reverse(Ds))
     Es = getE.(Ref(Hcore), Fs, Ds)
     Eᵀs = [Es |> sum]
     res = HFtempVars.(Val(:UHF), Ns, Cs, Fs, Ds, Es)
@@ -760,7 +784,7 @@ function DDcore(Nˢ::Int, Hcore::Matrix{T}, HeeI::Array{T, 4}, X::Matrix{T}, F::
                 D::Matrix{T}; dampStrength::T=T(0.0), _kws...) where {T}
     @assert 0 <= dampStrength <= 1 "The range of `dampStrength`::$(T) is [0,1]."
     Dnew = getD(X, F, Nˢ)
-    (1 - dampStrength)*Dnew + dampStrength*D
+    (1 - dampStrength)*Dnew + dampStrength*D, F
 end
 
 
@@ -775,8 +799,8 @@ function xDIIScore(::Val{M}, Nˢ::Int, Hcore::Matrix{T}, HeeI::Array{T, 4},
     Es = (@view Es[is])[1:end .> end-DIISsize]
     v, B = DIISmethod(∇s, Ds, Es, S)
     c = constraintSolver(v, B, cvxConstraint, solver)
-    grad = c.*∇s |> sum
-    getD(X, grad |> Hermitian |> Array, Nˢ) # grad == F.
+    grad = c.*∇s |> sum |> Hermitian |> Array
+    getD(X, grad, Nˢ), grad # grad == F.
 end
 
 const DIISmethods = ( DIIS = ((∇s, Ds, _ , S)-> DIIScore(∇s, Ds, S ), false, true ),
@@ -829,12 +853,11 @@ const SCFmethodSelector =
 
 
 # RHF
-@inline function HFcore(m::Symbol, (N,)::Tuple{Int}, Hcore::Matrix{T}, HeeI::Array{T, 4}, 
+@inline function HFcore(m::Symbol, (Nˢ,)::Tuple{Int}, Hcore::Matrix{T}, HeeI::Array{T, 4}, 
                         S::Matrix{T}, X::Matrix{T}, (rVars,)::Tuple{HFtempVars{T, :RHF}}; 
                         kws...) where {T}
-    D = getfield(SCFmethodSelector, m)(N÷2, Hcore, HeeI, S, X, rVars; kws...)
-    partRes = getCFDE(Hcore, HeeI, X, D)
-    partRes..., 2D, 2partRes[end]
+    D, F = getfield(SCFmethodSelector, m)(Nˢ, Hcore, HeeI, S, X, rVars; kws...)
+    getCFDE(Hcore, HeeI, X, Nˢ, D)
 end
 
 @inline function pushHFtempVars!((rVars,)::Tuple{HFtempVars}, 
@@ -852,12 +875,9 @@ end
 @inline function HFcore(m::Symbol, Ns::NTuple{2, Int}, Hcore::Matrix{T}, HeeI::Array{T, 4}, 
                         S::Matrix{T}, X::Matrix{T}, uVars::NTuple{2, HFtempVars{T, :UHF}}; 
                         kws...) where {T}
-    Ds = getfield(SCFmethodSelector, m).(Ns, Ref(Hcore), Ref(HeeI), Ref(S), Ref(X), uVars; 
+    (Dᵅ, Fᵅ), (Dᵝ, Fᵝ) = getfield(SCFmethodSelector, m).(Ns, Ref(Hcore), Ref(HeeI), Ref(S), Ref(X), uVars; 
                                          kws...)
-    Dᵀnew = Ds |> sum
-    partRes = getCFDE.(Ref(Hcore), Ref(HeeI), Ref(X), Ds, Ref(Dᵀnew))
-    Eᵀnew = partRes[1][end] + partRes[2][end]
-    (partRes[1]..., Dᵀnew, Eᵀnew), (partRes[2]..., Dᵀnew, Eᵀnew)
+    getCFDE(Hcore, HeeI, X, Ns, (Dᵅ, Dᵝ))
 end
 
 @inline function pushHFtempVars!((αVars, βVars)::NTuple{2, HFtempVars{T, :UHF}}, 

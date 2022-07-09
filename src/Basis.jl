@@ -392,9 +392,9 @@ struct EmptyBasisFunc{T<:Real, D} <: CGTBasisFuncs1O{T, D, 0} end
 
 isaFullShellBasisFuncs(::Any) = false
 
-isaFullShellBasisFuncs(::FloatingGTBasisFuncs{<:Any, <:Any, 𝑙, <:Any, <:Any, ON}) where 
-                      {𝑙, ON} = 
-(ON == SubshellXYZsizes[𝑙+1])
+isaFullShellBasisFuncs(::FloatingGTBasisFuncs{<:Any, D, 𝑙, <:Any, <:Any, ON}) where 
+                      {D, 𝑙, ON} = 
+(ON == SubshellSizes[D][𝑙+1])
 
 isaFullShellBasisFuncs(::FloatingGTBasisFuncs{<:Any, <:Any, 0}) = true
 
@@ -927,8 +927,6 @@ function sumOf(bs::Union{Tuple{Vararg{GTBasisFuncs{T, D, 1}}},
     sumOfCore(bs, roundDigits)
 end
 
-mergeGaussFuncs(gf::GaussFunc) = itself(gf)
-
 function mergeGaussFuncs(gf1::GaussFunc{T}, gf2::GaussFunc{T}; 
                          roundDigits::Int=getAtolDigits(T)) where {T}
     xpn = if (xpn1 = gf1.xpn) === (xpn2 = gf2.xpn) || hasIdentical(xpn1, xpn2)
@@ -954,26 +952,30 @@ function mergeGaussFuncs(gf1::GaussFunc{T}, gf2::GaussFunc{T};
     [res]
 end
 
-function mergeGaussFuncs(gf1::GaussFunc{T}, gf2::GaussFunc{T}, 
-                         gf3::GaussFunc{T}...; roundDigits::Int=getAtolDigits(T)) where {T}
-    arr1 = GaussFunc[gf1, gf2, gf3...]
-    arr2 = GaussFunc[]
-    while length(arr1) >= 1
-        i = 1
-        while i < length(arr1)
-            temp = mergeGaussFuncs(arr1[i], arr1[i+1]; roundDigits)
-            if length(temp) == 1
-                arr1[i] = temp[]
-                popat!(arr1, i+1)
-            else
-                reverse!(arr1, i, i+1)
-                i += 1
-            end
-        end
-        push!(arr2, popat!(arr1, i))
-    end
-    arr2
-end
+# function mergeGaussFuncs(gf1::GaussFunc{T}, gf2::GaussFunc{T}, 
+#                          gf3::GaussFunc{T}...; roundDigits::Int=getAtolDigits(T)) where {T}
+#     arr1 = GaussFunc[gf1, gf2, gf3...]
+#     arr2 = GaussFunc[]
+#     while length(arr1) >= 1
+#         i = 1
+#         while i < length(arr1)
+#             temp = mergeGaussFuncs(arr1[i], arr1[i+1]; roundDigits)
+#             if length(temp) == 1
+#                 arr1[i] = temp[]
+#                 popat!(arr1, i+1)
+#             else
+#                 reverse!(arr1, i, i+1)
+#                 i += 1
+#             end
+#         end
+#         push!(arr2, popat!(arr1, i))
+#     end
+#     arr2
+# end
+
+mergeGaussFuncs(gf1::GaussFunc{T}, gf2::GaussFunc{T}, gf3::GaussFunc{T}, 
+                gf4::GaussFunc{T}...; roundDigits::Int=getAtolDigits(T)) where {T} = 
+mergeMultiObjs(GaussFunc{T}, mergeGaussFuncs, gf1, gf2, gf3, gf4...; roundDigits)
 
 
 """
@@ -1034,38 +1036,45 @@ function add(bf1::BasisFunc{T, D, 𝑙1, GN1, PT1}, bf2::BasisFunc{T, D, 𝑙2, 
     end
 end
 
-function mergeBasisFuncs(bs::AbstractVector{<:FloatingGTBasisFuncs{T, D}}; 
-                         roundDigits::Int=getAtolDigits(T)) where {T, D}
-    bfGroups = sortBasisFuncs(bs, true; roundDigits)
-    map(bfGroups) do arr1
-        arr2 = FloatingGTBasisFuncs{T, D}[]
-        while length(arr1) > 1
-            temp = mergeBasisFuncs(arr1[1], arr1[2]; roundDigits)
-            if temp isa FloatingGTBasisFuncs
-                arr1[1] = temp
-                popat!(arr1, 2)
-            else
-                push!(arr2, popfirst!(arr1))
-            end
-        end
-        if length(arr2) == 0
-            arr1[]
-        else
-            vcat(arr1, arr2)
-        end
-    end
-    vcat(bfGroups...)
-end
+# function mergeBasisFuncs(bf1::FloatingGTBasisFuncs{T, D}, 
+#                          bf2::FloatingGTBasisFuncs{T, D}, 
+#                          bf3::FloatingGTBasisFuncs{T, D}; 
+#                          roundDigits::Int=getAtolDigits(T)) where {T, D}
+#     bfGroups = sortBasisFuncs(bs, true; roundDigits)
+#     arr1 = GaussFunc[gf1, gf2, gf3...]
+#     arr2 = GaussFunc[]
+#     while length(arr1) >= 1
+#         i = 1
+#         while i < length(arr1)
+#             temp = mergeGaussFuncs(arr1[i], arr1[i+1]; roundDigits)
+#             if length(temp) == 1
+#                 arr1[i] = temp[]
+#                 popat!(arr1, i+1)
+#             else
+#                 reverse!(arr1, i, i+1)
+#                 i += 1
+#             end
+#         end
+#         push!(arr2, popat!(arr1, i))
+#     end
+#     arr2
+# end
 
+mergeBasisFuncs(bf1::FloatingGTBasisFuncs{T, D}, bf2::FloatingGTBasisFuncs{T, D}, 
+                bf3::FloatingGTBasisFuncs{T, D}, bf4::FloatingGTBasisFuncs{T, D}...; 
+                roundDigits::Int=getAtolDigits(T)) where {T, D} = 
+mergeMultiObjs(FloatingGTBasisFuncs{T, D}, mergeBasisFuncs, bf1, bf2, bf3, bf4...; 
+               roundDigits)
 
-mergeBasisFuncs(args::Vararg{GTBasisFuncs, 2}) = itself(args)
+mergeBasisFuncs(bs::Vararg{GTBasisFuncs{T, D}, 2}; roundDigits::Int=-1) where {T, D} = 
+collect(bs)
 
 function mergeBasisFuncs(bf1::FloatingGTBasisFuncs{T, D, 𝑙, GN, PT1, ON1}, 
                          bf2::FloatingGTBasisFuncs{T, D, 𝑙, GN, PT2, ON2}; 
                          roundDigits::Int=getAtolDigits(T)) where 
                         {T, D, 𝑙, GN, PT1, PT2, ON1, ON2}
     ss = SubshellXYZsizes[𝑙+1]
-    (ON1 == ss || ON2 == ss) && ( return (bf1, bf2) )
+    (ON1 == ss || ON2 == ss) && ( return [bf1, bf2] )
     if bf1.normalizeGTO == bf2.normalizeGTO
         cen = if (cen1 = bf1.center) === (cen2 = bf2.center) || hasIdentical(cen1, cen2)
             cen1
@@ -1075,20 +1084,21 @@ function mergeBasisFuncs(bf1::FloatingGTBasisFuncs{T, D, 𝑙, GN, PT1, ON1},
                (c2 = roundNum.(coordOf(cen2), roundDigits))
             genSpatialPoint(c1)
         else
-            return (bf1, bf2)
+            return [bf1, bf2]
         end
 
         if bf1.l == bf2.l
             gfs = mergeGaussFuncs(bf1.gauss..., bf2.gauss...; roundDigits) |> Tuple
-            return BasisFunc(cen, gfs, bf1.l, bf1.normalizeGTO)
+            return [BasisFunc(cen, gfs, bf1.l, bf1.normalizeGTO)]
         else
             gfPairs1 = [roundNum.((x.xpn(), x.con()), roundDigits) for x in bf1.gauss]
             gfPairs2 = [roundNum.((x.xpn(), x.con()), roundDigits) for x in bf2.gauss]
-            gfs1 = bf1.gauss[sortperm(gfPairs1)]
+            ids = sortperm(gfPairs1)
+            gfs1 = bf1.gauss[ids]
             gfs2 = bf2.gauss[sortperm(gfPairs2)]
 
             gfs = Array{GaussFunc{T}}(undef, GN)
-            for ((i, gf1), gf2) in zip(enumerate(gfs1), gfs2)
+            for (id, (i, gf1), gf2) in zip(ids, enumerate(gfs1), gfs2)
                 res = if gf1 === gf2 || hasIndentical(gf1, gf2)
                     gf1
                 elseif hasEuqal(gf1, gf2)
@@ -1098,17 +1108,14 @@ function mergeBasisFuncs(bf1::FloatingGTBasisFuncs{T, D, 𝑙, GN, PT1, ON1},
                 else
                     false
                 end
-                if res == false 
-                    return (bf1, bf2)
-                else
-                    gfs[i] = res
-                end
+                (res == false) ? (return [bf1, bf2]) : (gfs[id] = res)
             end
+            gfs = Tuple(gfs)
         end
 
-        BasisFuncs(cen, gfs, (bf1.l, bf2.l), bf1.normalizeGTO)
+        [BasisFuncs(cen, gfs, (bf1.l..., bf2.l...), bf1.normalizeGTO)]
     else
-        (bf1, bf2)
+        [bf1, bf2]
     end
 end
 

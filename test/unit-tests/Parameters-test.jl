@@ -44,7 +44,7 @@ pb5 = outValCopy(pb4)
 
 pb6 = ParamBox(1.1, :p1, abs, :x)
 pb7 = changeMapping(pb6, x->x^1.5)
-pb8 = changeMapping(pb6, :p2, x->x^1.5)
+pb8 = changeMapping(pb6, x->x^1.5, :p2)
 @test pb8() == pb7() == 1.1^1.5
 @test pb8.data === pb7.data === pb6.data
 @test pb8.dataName == pb7.dataName == :x
