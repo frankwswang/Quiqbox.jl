@@ -347,9 +347,9 @@ function getOneBodyInt(∫1e::F,
                        optArgs...) where {F<:Function, T, D, GN1, GN2}
     (R₁, ijk₁, ps₁), (R₂, ijk₂, ps₂) = reformatIntData1.((bf1, bf2))
     uniquePairs, uPairCoeffs = getOneBodyIntCore(R₁==R₂ && ijk₁==ijk₂, ps₁, ps₂)
-    mapreduce(+, uniquePairs, uPairCoeffs) do x, y
+    map(uniquePairs, uPairCoeffs) do x, y
         ∫1e(optArgs..., R₁, R₂, ijk₁, x[1], ijk₂, x[2])::T * y
-    end
+    end |> sum
 end
 
 function getOneBodyInt(::F, 
@@ -753,7 +753,14 @@ function getEleEleInteraction(bf1::BasisFunc{T, D, <:Any, GN1},
     getTwoBodyInt(∫eeInteractionCore, bf1, bf2, bf3, bf4)
 end
 
-@inline function getCompositeInt(∫::F, bs::NTuple{N, FloatingGTBasisFuncs{T, D}}, 
+
+@inline getCompositeInt(∫::F, 
+                        bs::NTuple{N, BasisFunc{T, D}}, optArgs...) where 
+                       {F<:Function, N, T, D} = 
+        ∫(bs..., optArgs...)
+
+@inline function getCompositeInt(∫::F, 
+                                 bs::NTuple{N, CompositeGTBasisFuncs{T, D}}, 
                                  optArgs...) where {F<:Function, N, T, D}
     range = Iterators.product(bs...)
     map(x->∫(x..., optArgs...)::T, range)::Array{T, N}
@@ -765,7 +772,7 @@ end
     if any(fieldtypes(typeof(bs)) .<: EmptyBasisFunc)
         zero(T)
     else
-        mapreduce(x->∫(x..., optArgs...)::T, +, Iterators.product(unpackBasis.(bs)...))
+        map(x->∫(x..., optArgs...)::T, Iterators.product(unpackBasis.(bs)...)) |> sum
     end
 end
 
