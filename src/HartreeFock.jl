@@ -50,10 +50,10 @@ end
 breakSymOfC(::Val{:RHF}, C::Matrix{T}) where {T<:Real} = (C,)
 
 breakSymOfC(::Val{:RHF}, X, Dᵅ, Dᵝ, Hcore, HeeI) = 
-( getC(X, getF(Hcore, HeeI, (Dᵅ + Dᵝ)./2)), )
+getC.( Ref(X), getF(Hcore, HeeI, ((Dᵅ + Dᵝ)./2,)) )
 
 breakSymOfC(::Val{:UHF}, X, Dᵅ, Dᵝ, Hcore, HeeI) =
-getC.( Ref(X), getF.(Ref(Hcore), Ref(HeeI), (Dᵅ, Dᵝ), (Dᵝ, Dᵅ)) )
+getC.( Ref(X), getF(Hcore, HeeI, (Dᵅ, Dᵝ)) )
 
 
 function getCfromGWH(::Val{HFT}, S::Matrix{T}, Hcore::Matrix{T}, X::Matrix{T}) where 
@@ -136,23 +136,20 @@ function getGcore(HeeI::Array{T, 4}, DJ::Matrix{T}, DK::Matrix{T}) where {T<:Rea
 end
 
 # RHF
-@inline getG(HeeI::Array{T, 4}, Dˢ::Matrix{T}) where {T<:Real} = getGcore(HeeI, 2Dˢ, Dˢ)
+@inline getG(HeeI::Array{T, 4}, (Dˢ,)::Tuple{Matrix{T}}) where {T<:Real} = 
+        ( getGcore(HeeI, 2Dˢ, Dˢ), )
 
 # UHF
-@inline getG(HeeI::Array{T, 4}, Dᵅ::Matrix{T}, Dᵝ::Matrix{T}) where {T<:Real} = 
-        getGcore(HeeI, Dᵅ+Dᵝ, Dᵅ)
+@inline getG(HeeI::Array{T, 4}, (Dᵅ, Dᵝ)::NTuple{2, Matrix{T}}) where {T<:Real} = 
+        ( getGcore(HeeI, Dᵅ+Dᵝ, Dᵅ), getGcore(HeeI, Dᵅ+Dᵝ, Dᵝ) )
 
 
-@inline getF(Hcore::Matrix{T}, G::Matrix{T}) where {T<:Real} = Hcore + G
+@inline getF(Hcore::Matrix{T}, G::NTuple{HFTS, Matrix{T}}) where {T<:Real, HFTS} = 
+        Ref(Hcore) .+ G
 
-# RHF
-@inline getF(Hcore::Matrix{T}, HeeI::Array{T, 4}, Dˢ::Matrix{T}) where {T<:Real} = 
-        getF(Hcore, getG(HeeI, Dˢ))
-
-# UHF
-@inline getF(Hcore::Matrix{T}, HeeI::Array{T, 4}, Dᵅ::Matrix{T}, Dᵝ::Matrix{T}) where 
-            {T<:Real} = 
-        getF(Hcore, getG(HeeI, Dᵅ, Dᵝ))
+@inline getF(Hcore::Matrix{T}, HeeI::Array{T, 4}, D::NTuple{HFTS, Matrix{T}}) where 
+            {T<:Real, HFTS} = 
+        getF(Hcore, getG(HeeI, D))
 
 
 # RHF or UHF
@@ -160,32 +157,37 @@ end
         dot(transpose(Dˢ), (Hcore + Fˢ)/2)
 
 
-# RHF
-@inline getEᵀcore(Hcore::Matrix{T}, Fˢ::Matrix{T}, Dˢ::Matrix{T}) where {T<:Real} = 
-        2*getE(Hcore, Fˢ, Dˢ)
+get2SpinQuantity(O::NTuple{HFTS, T}) where {HFTS, T} = abs(3-HFTS) * sum(O)
+get2SpinQuantities(O, nRepeat::Int) = fill(get2SpinQuantity(O), nRepeat) |> Tuple
 
-# UHF
-@inline getEᵀcore(Hcore::Matrix{T}, Fᵅ::Matrix{T}, Dᵅ::Matrix{T}, 
-                                    Fᵝ::Matrix{T}, Dᵝ::Matrix{T}) where {T<:Real} = 
-        getE(Hcore, Fᵅ, Dᵅ) + getE(Hcore, Fᵝ, Dᵝ)
+# RHF or UHF
+getEᵀcore(Hcore::Matrix{T}, Fˢ::NTuple{HFTS, Matrix{T}}, Dˢ::NTuple{HFTS, Matrix{T}}) where 
+         {T<:Real, HFTS} = 
+get2SpinQuantity(getE.(Ref(Hcore), Fˢ, Dˢ))
 
-# RHF
+# # UHF
+# @inline getEᵀcore(Hcore::Matrix{T}, Fᵅ::Matrix{T}, Dᵅ::Matrix{T}, 
+#                                     Fᵝ::Matrix{T}, Dᵝ::Matrix{T}) where {T<:Real} = 
+#         getE(Hcore, Fᵅ, Dᵅ) + getE(Hcore, Fᵝ, Dᵝ)
+
+# RHF or UHF
 function getEᵀ(Hcore::Matrix{T}, HeeI::Array{T, 4}, 
-               (Cˢ,)::Tuple{Matrix{T}}, (Nˢ,)::Tuple{Int}) where {T<:Real}
-    Dˢ = getD(Cˢ, Nˢ)
-    Fˢ = getF(Hcore, HeeI, Dˢ)
-    getEᵀcore(Hcore, Fˢ, Dˢ)
+               C::NTuple{HFTS, Matrix{T}}, N::NTuple{HFTS, Int}) where {T<:Real, HFTS}
+    D = getD.(C, N)
+    F = getF(Hcore, HeeI, D)
+    getEᵀcore(Hcore, F, D)
 end
 
-# UHF
-function getEᵀ(Hcore::Matrix{T}, HeeI::Array{T, 4}, 
-               (Cᵅ,Cᵝ)::NTuple{2, Matrix{T}}, (Nᵅ,Nᵝ)::NTuple{2, Int}) where {T<:Real}
-    Dᵅ = getD(Cᵅ, Nᵅ)
-    Dᵝ = getD(Cᵝ, Nᵝ)
-    Fᵅ = getF(Hcore, HeeI, Dᵅ, Dᵝ)
-    Fᵝ = getF(Hcore, HeeI, Dᵝ, Dᵅ)
-    getEᵀcore(Hcore, Fᵅ, Dᵅ, Fᵝ, Dᵝ)
-end
+
+
+# # UHF
+# function getEᵀ(Hcore::Matrix{T}, HeeI::Array{T, 4}, 
+#                C::NTuple{2, Matrix{T}}, N::NTuple{2, Int}) where {T<:Real}
+#     Dᵅ, Dᵝ = getD.(C, N)
+#     Fᵅ = getF(Hcore, HeeI, (Dᵅ, Dᵝ))
+#     Fᵝ = getF(Hcore, HeeI, (Dᵝ, Dᵅ))
+#     getEᵀcore(Hcore, Fᵅ, Dᵅ, Fᵝ, Dᵝ)
+# end
 
 
 # @inline function getCFDE(Hcore::Matrix{T}, HeeI::Array{T, 4}, 
@@ -204,78 +206,79 @@ end
 #     (Cnew, Fnew, Ds[1], Enew) # Fnew is based on latest variables.
 # end
 
+# function getCFDE(Hcore::Matrix{T}, HeeI::Array{T, 4}, X::Matrix{T}, 
+#                  N::NTuple{2, Int}, F::NTuple{2, Matrix{T}}) where {T}
+#     # Dtmp = (Dᵅᵝ, reverse(Dᵅᵝ))
+#     # Ftmp = getF.(Ref(Hcore), Ref(HeeI), Dtmp...)
+#     Ctmp = getC.(Ref(X), F)
+#     Dnew = getD.(Ctmp, N)
+#     Fnew = getF(Hcore, HeeI, Dnew)
+#     Cnew = getC.(Ref(X), Fnew)
+#     Enew = getE.(Ref(Hcore), Fnew, Dnew)
+#     Dᵀnew = sum(Dnew)
+#     Eᵀnew = sum(Enew)
+#     ( (Cnew[1], Fnew[1], Dnew[1], Enew[1], Dᵀnew, Eᵀnew), 
+#       (Cnew[2], Fnew[2], Dnew[2], Enew[2], Dᵀnew, Eᵀnew) )
+# end
+
 function getCFDE(Hcore::Matrix{T}, HeeI::Array{T, 4}, X::Matrix{T}, 
-                 N::NTuple{2, Int}, Fᵅᵝ::NTuple{2, Matrix{T}}) where {T}
-    # Dtmp = (Dᵅᵝ, reverse(Dᵅᵝ))
-    # Ftmp = getF.(Ref(Hcore), Ref(HeeI), Dtmp...)
-    Ctmp = getC.(Ref(X), Fᵅᵝ)
+                 N::NTuple{HFTS, Int}, F::NTuple{HFTS, Matrix{T}}) where {T, HFTS}
+    # Ftmp = getF(Hcore, HeeI, Dˢ)
+    Ctmp = getC.(Ref(X), F)
     Dnew = getD.(Ctmp, N)
-    Fnew = [getF(Hcore, HeeI, i...) for i in (Dnew, reverse(Dnew))]
-    Cnew = getC.(Ref(X), Fnew)
-    Enew = getE.(Ref(Hcore), Fnew, Dnew)
-    Dᵀnew = sum(Dnew)
-    Eᵀnew = sum(Enew)
-    ( (Cnew[1], Fnew[1], Dnew[1], Enew[1], Dᵀnew, Eᵀnew), 
-      (Cnew[2], Fnew[2], Dnew[2], Enew[2], Dᵀnew, Eᵀnew) )
-end
-
-function getCFDE(Hcore::Matrix{T}, HeeI::Array{T, 4}, X::Matrix{T}, 
-                 Nˢ::Tuple{Int}, (F,)::Tuple{Matrix{T}}) where {T}
-    # Ftmp = getF(Hcore, HeeI, Dˢ)
-    Ct = getC(X, F)
-    Dnew = getD(Ct, Nˢ[1])
     Fnew = getF(Hcore, HeeI, Dnew)
-    Cnew = getC(X, Fnew)
-    Enew = getE(Hcore, Fnew, Dnew)
-    Cnew, Fnew, Dnew, Enew, 2Dnew, 2Enew
-end
-
-function getCFDEold(Hcore::Matrix{T}, HeeI::Array{T, 4}, X::Matrix{T}, 
-                 N::NTuple{2, Int}, Fnew::NTuple{2, Matrix{T}}) where {T}
-    # Dtmp = (Dᵅᵝ, reverse(Dᵅᵝ))
-    # Ftmp = getF.(Ref(Hcore), Ref(HeeI), Dtmp...)
-    # Ctmp = getC.(Ref(X), Fᵅᵝ)
-    # Dnew = getD.(Ctmp, N)
-    # Fnew = [getF(Hcore, HeeI, i...) for i in (Dnew, reverse(Dnew))]
     Cnew = getC.(Ref(X), Fnew)
     Enew = getE.(Ref(Hcore), Fnew, Dnew)
-    Dᵀnew = sum(Dnew)
-    Eᵀnew = sum(Enew)
-    ( (Cnew[1], Fnew[1], Dnew[1], Enew[1], Dᵀnew, Eᵀnew), 
-      (Cnew[2], Fnew[2], Dnew[2], Enew[2], Dᵀnew, Eᵀnew) )
+    Dᵀnew = get2SpinQuantities(Dnew, HFTS)
+    Eᵀnew = get2SpinQuantities(Enew, HFTS)
+    # @show length.((Cnew, Fnew, Dnew, Enew, Dᵀnew, Eᵀnew))
+    map(themselves, Cnew, Fnew, Dnew, Enew, Dᵀnew, Eᵀnew)
 end
 
-function getCFDEold(Hcore::Matrix{T}, HeeI::Array{T, 4}, X::Matrix{T}, 
-                 Nˢ::Tuple{Int}, (Fnew,)::Tuple{Matrix{T}}) where {T}
-    # Ftmp = getF(Hcore, HeeI, Dˢ)
-    # Ct = getC(X, F)
-    # Dnew = getD(Ct, Nˢ)
-    # Fnew = getF(Hcore, HeeI, Dnew)
-    Cnew = getC(X, Fnew)
-    Enew = getE(Hcore, Fnew, Dnew)
-    Cnew, Fnew, Dnew, Enew, 2Dnew, 2Enew
-end
+# function getCFDEold(Hcore::Matrix{T}, HeeI::Array{T, 4}, X::Matrix{T}, 
+#                  N::NTuple{2, Int}, Fnew::NTuple{2, Matrix{T}}) where {T}
+#     # Dtmp = (Dᵅᵝ, reverse(Dᵅᵝ))
+#     # Ftmp = getF.(Ref(Hcore), Ref(HeeI), Dtmp...)
+#     # Ctmp = getC.(Ref(X), Fᵅᵝ)
+#     # Dnew = getD.(Ctmp, N)
+#     # Fnew = [getF(Hcore, HeeI, i...) for i in (Dnew, reverse(Dnew))]
+#     Cnew = getC.(Ref(X), Fnew)
+#     Enew = getE.(Ref(Hcore), Fnew, Dnew)
+#     Dᵀnew = sum(Dnew)
+#     Eᵀnew = sum(Enew)
+#     ( (Cnew[1], Fnew[1], Dnew[1], Enew[1], Dᵀnew, Eᵀnew), 
+#       (Cnew[2], Fnew[2], Dnew[2], Enew[2], Dᵀnew, Eᵀnew) )
+# end
+
+# function getCFDEold(Hcore::Matrix{T}, HeeI::Array{T, 4}, X::Matrix{T}, 
+#                  Nˢ::Tuple{Int}, (Fnew,)::Tuple{Matrix{T}}) where {T}
+#     # Ftmp = getF(Hcore, HeeI, Dˢ)
+#     # Ct = getC(X, F)
+#     # Dnew = getD(Ct, Nˢ)
+#     # Fnew = getF(Hcore, HeeI, Dnew)
+#     Cnew = getC(X, Fnew)
+#     Enew = getE(Hcore, Fnew, Dnew)
+#     Cnew, Fnew, Dnew, Enew, 2Dnew, 2Enew
+# end
 
 # RHF
 function initializeSCF(::Val{:RHF}, Hcore::Matrix{T}, HeeI::Array{T, 4}, 
-                       (C,)::Tuple{Matrix{T}}, (Nˢ,)::Tuple{Int}) where {T<:Real}
-    D = getD(C, Nˢ)
+                       C::Tuple{Matrix{T}}, N::Tuple{Int}) where {T<:Real}
+    D = getD.(C, N)
     F = getF(Hcore, HeeI, D)
-    E = getE(Hcore, F, D)
-    (HFtempVars(Val(:RHF), Nˢ, C, F, D, E, 2D, 2E),)
+    E = getE.(Ref(Hcore), F, D)
+    HFtempVars.(Val(:RHF), N, C, F, D, E, 2 .* D, 2 .* E)
 end
 
 # UHF
 function initializeSCF(::Val{:UHF}, Hcore::Matrix{T}, HeeI::Array{T, 4}, 
                        Cs::NTuple{2, Matrix{T}}, Ns::NTuple{2, Int}) where {T<:Real}
     Ds = getD.(Cs, Ns)
-    Dᵀs = [Ds |> sum]
-    Fs = getF.(Ref(Hcore), Ref(HeeI), Ds, reverse(Ds))
+    Fs = getF(Hcore, HeeI, Ds)
     Es = getE.(Ref(Hcore), Fs, Ds)
-    Eᵀs = [Es |> sum]
     res = HFtempVars.(Val(:UHF), Ns, Cs, Fs, Ds, Es)
-    res[1].shared.Dtots = res[2].shared.Dtots = Dᵀs
-    res[1].shared.Etots = res[2].shared.Etots = Eᵀs
+    res[1].shared.Dtots = res[2].shared.Dtots = [Ds |> sum]
+    res[1].shared.Etots = res[2].shared.Etots = [Es |> sum]
     res
 end
 
@@ -865,17 +868,17 @@ function DIIScore(∇s::Vector{Matrix{T}}, Ds::Vector{Matrix{T}}, S::Matrix{T}) 
 end
 
 
-function DD(Nˢ::Tuple{Int}, Hcore, HeeI, _S, X, tVars::Tuple{HFtempVars{T}}; kws...) where {T}
-    Dnew = DDcore(Nˢ[1], X, tVars[1].Fs[end], tVars[1].Ds[end], get(kws, :dampStrength, T(0)))
-    (getF(Hcore, HeeI, Dnew),)
-end
+# function DD(Nˢ::Tuple{Int}, Hcore, HeeI, _S, X, tVars::Tuple{HFtempVars{T}}; kws...) where {T}
+#     Dnew = DDcore(Nˢ[1], X, tVars[1].Fs[end], tVars[1].Ds[end], get(kws, :dampStrength, T(0)))
+#     getF(Ref(Hcore), Ref(HeeI), Dnew)
+# end
 
-function DD(Nˢ::NTuple{2, Int}, Hcore, HeeI, _S, X, 
-            tVars::NTuple{2, HFtempVars{T, HFT}}; kws...) where {T, HFT}
+function DD(Nˢ::NTuple{HFTS, Int}, Hcore, HeeI, _S, X, 
+            tVars::NTuple{HFTS, HFtempVars{T, HFT}}; kws...) where {HFTS, T, HFT}
     Fs = last.(getproperty.(tVars, :Fs))
     Ds = last.(getproperty.(tVars, :Ds))
     Dnew = DDcore.( Nˢ, Ref(X), Fs, Ds, get(kws, :dampStrength, T(0)) )
-    getF.(Ref(Hcore), Ref(HeeI), (Dnew, reverse(Dnew))...)
+    getF(Hcore, HeeI, Dnew)
 end
 
 # @inline function xDIIS(::Val{M}) where {M}
@@ -902,20 +905,32 @@ const SCFmethodSelector =
                         S::Matrix{T}, X::Matrix{T}, rVars::NTuple{HFTS, HFtempVars{T, HFT}}; 
                         kws...) where {HFTS, T, HFT}
     F = getfield(SCFmethodSelector, m)(N, Hcore, HeeI, S, X, rVars; kws...)
-    if m == :DD
-        getCFDEold(Hcore, HeeI, X, N, F)
-    else
+    # if m == :DD
+    #     getCFDEold(Hcore, HeeI, X, N, F)
+    # else
         getCFDE(Hcore, HeeI, X, N, F)
-    end
+    # end
 end
 
 @inline function pushHFtempVars!((rVars,)::Tuple{HFtempVars}, 
-                                 res::Tuple{Matrix{T}, Matrix{T}, 
-                                            Matrix{T}, T, Matrix{T}, T}) where {T}
+                                 (res,)::Tuple{Tuple{Matrix{T}, Matrix{T}, 
+                                               Matrix{T}, T, Matrix{T}, T}}) where {T}
+    pushHFtempVarsCore1!(rVars, res)
+    pushHFtempVarsCore2!(rVars, res)
+end
+
+@inline function pushHFtempVarsCore1!(rVars::HFtempVars, 
+                                      res::Tuple{Matrix{T}, Matrix{T}, 
+                                                 Matrix{T}, T, Matrix{T}, T}) where {T}
     push!(rVars.Cs, res[1])
     push!(rVars.Fs, res[2])
     push!(rVars.Ds, res[3])
     push!(rVars.Es, res[4])
+end
+
+@inline function pushHFtempVarsCore2!(rVars::HFtempVars, 
+                                      res::Tuple{Matrix{T}, Matrix{T}, 
+                                                 Matrix{T}, T, Matrix{T}, T}) where {T}
     push!(rVars.shared.Dtots, res[5])
     push!(rVars.shared.Etots, res[6])
 end
@@ -929,13 +944,11 @@ end
 #     getCFDE(Hcore, HeeI, X, Ns, F)
 # end
 
-@inline function pushHFtempVars!((αVars, βVars)::NTuple{2, HFtempVars{T, :UHF}}, 
+@inline function pushHFtempVars!(αβVars::NTuple{2, HFtempVars{T, :UHF}}, 
                                  res::NTuple{2, Tuple{Matrix{T}, Matrix{T}, Matrix{T}, T, 
                                                       Matrix{T}, T}}) where {T}
-    pushHFtempVars!((αVars,), res[1])
-    pushHFtempVars!((βVars,), res[2])
-    pop!(αVars.shared.Dtots)
-    pop!(αVars.shared.Etots)
+    pushHFtempVarsCore1!.(αβVars, res)
+    pushHFtempVarsCore2!(αβVars[1], res[1])
 end
 
 

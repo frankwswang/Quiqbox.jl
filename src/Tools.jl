@@ -634,6 +634,8 @@ A dummy function that only returns its argument.
 
 const itselfT = typeof(itself)
 
+@inline themselves(xs::Vararg) = xs
+
 
 """
 Similar as `replace` but for Symbols.
