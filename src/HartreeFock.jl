@@ -1,6 +1,6 @@
 export SCFconfig, HFconfig, runHF, runHFcore
 
-using LinearAlgebra: dot, Hermitian, \, det, I
+using LinearAlgebra: dot, Hermitian, \, det, I, ishermitian
 using PiecewiseQuadratics: indicator
 using Combinatorics: powerset
 using LBFGSB: lbfgsb
@@ -104,20 +104,7 @@ function getCfromSAD(::Val{HFT}, S::Matrix{T},
 end
 
 
-# const guessCmethods = 
-#     (  GWH = (HFT, S, X, Hcore, _...)->getCfromGWH(HFT, S, Hcore, X), 
-#      Hcore = (HFT, S, X, Hcore, _...)->getCfromHcore(HFT, X, Hcore), 
-#        SAD = (HFT, S, X, Hcore, HeeI, bs, nuc, nucCoords)->
-#              getCfromSAD(HFT, S, Hcore, HeeI, bs, nuc, nucCoords, X))
-
 const guessCmethods = (GWH=getCfromGWH, Hcore=getCfromHcore, SAD=getCfromSAD)
-
-
-# @inline guessC(::Type{Val{M}}, ::Val{HFT}, S, X, Hcore, HeeI, bs, nuc, nucCoords) where 
-#        {M, HFT} = 
-#         getfield(guessCmethods, M)(Val(HFT), S, X, Hcore, HeeI, bs, nuc, nucCoords)
-
-# @inline guessC(Cs::Tuple{Vararg{Matrix}}, _...) = itself(Cs)
 
 
 getD(Cˢ::Matrix{T}, Nˢ::Int) where {T} = @views (Cˢ[:,1:Nˢ]*Cˢ[:,1:Nˢ]')
@@ -156,7 +143,6 @@ end
 @inline getE(Hcore::Matrix{T}, Fˢ::Matrix{T}, Dˢ::Matrix{T}) where {T<:Real} = 
         dot(transpose(Dˢ), (Hcore + Fˢ)/2)
 
-
 get2SpinQuantity(O::NTuple{HFTS, T}) where {HFTS, T} = abs(3-HFTS) * sum(O)
 get2SpinQuantities(O, nRepeat::Int) = fill(get2SpinQuantity(O), nRepeat) |> Tuple
 
@@ -173,6 +159,7 @@ function getEᵀ(Hcore::Matrix{T}, HeeI::Array{T, 4},
     getEᵀcore(Hcore, F, D)
 end
 
+
 function getCFDE(Hcore::Matrix{T}, HeeI::Array{T, 4}, X::Matrix{T}, 
                  N::NTuple{HFTS, Int}, F::NTuple{HFTS, Matrix{T}}) where {T, HFTS}
     Cnew = getC.(Ref(X), F)
@@ -184,24 +171,18 @@ function getCFDE(Hcore::Matrix{T}, HeeI::Array{T, 4}, X::Matrix{T},
     map(themselves, Cnew, Fnew, Dnew, Enew, Dᵀnew, Eᵀnew)
 end
 
-# RHF
-function initializeSCF(::Val{:RHF}, Hcore::Matrix{T}, HeeI::Array{T, 4}, 
-                       C::Tuple{Matrix{T}}, N::Tuple{Int}) where {T<:Real}
+
+function initializeSCF(::Val{HFT}, Hcore::Matrix{T}, HeeI::Array{T, 4}, 
+                       C::NTuple{HFTS, Matrix{T}}, N::NTuple{HFTS, Int}) where 
+                      {HFT, T<:Real, HFTS}
     D = getD.(C, N)
     F = getF(Hcore, HeeI, D)
     E = getE.(Ref(Hcore), F, D)
-    HFtempVars.(Val(:RHF), N, C, F, D, E, 2 .* D, 2 .* E)
-end
-
-# UHF
-function initializeSCF(::Val{:UHF}, Hcore::Matrix{T}, HeeI::Array{T, 4}, 
-                       Cs::NTuple{2, Matrix{T}}, Ns::NTuple{2, Int}) where {T<:Real}
-    Ds = getD.(Cs, Ns)
-    Fs = getF(Hcore, HeeI, Ds)
-    Es = getE.(Ref(Hcore), Fs, Ds)
-    res = HFtempVars.(Val(:UHF), Ns, Cs, Fs, Ds, Es)
-    res[1].shared.Dtots = res[2].shared.Dtots = [Ds |> sum]
-    res[1].shared.Etots = res[2].shared.Etots = [Es |> sum]
+    res = HFtempVars.(Val(HFT), N, C, F, D, E)
+    sharedFields = getproperty.(res, :shared)
+    for (field, val) in zip( (:Dtots, :Etots), fill.(get2SpinQuantity.((D, E)), 1)  )
+        setproperty!.(sharedFields, field, Ref(val))
+    end
     res
 end
 
@@ -262,10 +243,10 @@ method stored as `Tuple`s of `Pair`s.
     SCFconfig{T, L}
 
 `methods` and `intervals` are the methods to be applied and their stopping (skipping) 
-thresholds respectively; the length of those two `AbstractVector`s should be the same. `configs` 
-specifies the additional keyword arguments for each methods by a `Pair` of which the `Int` 
-key `i` is for `i`th method and the pointed `AbstractVector{<:Pair}` is the pairs of keyword 
-arguments and their values respectively.
+thresholds respectively; the length of those two `AbstractVector`s should be the same. 
+`configs` specifies the additional keyword arguments for each methods by a `Pair` of which 
+the `Int` key `i` is for `i`th method and the pointed `AbstractVector{<:Pair}` is the pairs 
+of keyword arguments and their values respectively.
 
 ≡≡≡ Example(s) ≡≡≡
 
@@ -740,25 +721,6 @@ function DDcore(Nˢ::Int, X::Matrix{T}, F::Matrix{T}, D::Matrix{T},
 end
 
 
-function xDIIScore(::Val{M}, S::Matrix{T}, 
-                   Fs::Vector{Matrix{T}}, Ds::Vector{Matrix{T}}, Es::Vector{T}, 
-                   DIISsize::Int=10, solver::Symbol=:BFGS) where {M, T}
-    DIISmethod, cvxConstraint, permuteData = getfield(DIISmethods, M)
-    is = permuteData ? sortperm(Es) : (:)
-    ∇s = (@view Fs[is])[1:end .> end-DIISsize]
-    Ds = (@view Ds[is])[1:end .> end-DIISsize]
-    Es = (@view Es[is])[1:end .> end-DIISsize]
-    v, B = DIISmethod(∇s, Ds, Es, S)
-    c = constraintSolver(v, B, cvxConstraint, solver)
-    grad = c.*∇s |> sum |> Hermitian |> Array
-    # getD(X, grad, Nˢ), grad # grad == F.
-end
-
-const DIISmethods = ( DIIS = ((∇s, Ds, _ , S)-> DIIScore(∇s, Ds, S ), false, true ),
-                     EDIIS = ((∇s, Ds, Es, _)->EDIIScore(∇s, Ds, Es), true , false),
-                     ADIIS = ((∇s, Ds, _ , _)->ADIIScore(∇s, Ds    ), true , false))
-
-
 function EDIIScore(∇s::Vector{Matrix{T}}, Ds::Vector{Matrix{T}}, Es::Vector{T}) where {T}
     len = length(Ds)
     B = ones(len, len)
@@ -791,11 +753,6 @@ function DIIScore(∇s::Vector{Matrix{T}}, Ds::Vector{Matrix{T}}, S::Matrix{T}) 
 end
 
 
-# function DD(Nˢ::Tuple{Int}, Hcore, HeeI, _S, X, tVars::Tuple{HFtempVars{T}}; kws...) where {T}
-#     Dnew = DDcore(Nˢ[1], X, tVars[1].Fs[end], tVars[1].Ds[end], get(kws, :dampStrength, T(0)))
-#     getF(Ref(Hcore), Ref(HeeI), Dnew)
-# end
-
 function DD(Nˢ::NTuple{HFTS, Int}, Hcore, HeeI, _S, X, 
             tVars::NTuple{HFTS, HFtempVars{T, HFT}}; kws...) where {HFTS, T, HFT}
     Fs = last.(getproperty.(tVars, :Fs))
@@ -804,10 +761,6 @@ function DD(Nˢ::NTuple{HFTS, Int}, Hcore, HeeI, _S, X,
     getF(Hcore, HeeI, Dnew)
 end
 
-# @inline function xDIIS(::Val{M}) where {M}
-#     @inline (Nˢ, Hcore, HeeI, S, X, tVars; kws...) ->
-#             xDIIScore(Val(M), Nˢ, Hcore, HeeI, S, X, tVars.Fs, tVars.Ds, tVars.Es; kws...)
-# end
 
 function xDIIS(::Val{M}) where {M}
     @inline function (_Nˢ, _Hcore, _HeeI, S, _X, tVars; kws...)
@@ -819,77 +772,79 @@ function xDIIS(::Val{M}) where {M}
     end
 end
 
+
+const DIIScoreMethods = (DIIS=DIIScore, EDIIS=EDIIScore, ADIIS=ADIIScore)
+
+const DIISmethodArgOrders = (DIIScore=(1,2,4), EDIIScore=(1,2,3), ADIIScore=(1,2))
+
+const DIISadditionalConfigs = (DIIS=(false, true), EDIIS=(true, false), ADIIS=(true, false))
+
+function xDIIScore(::Val{M}, S::Matrix{T}, 
+                   Fs::Vector{Matrix{T}}, Ds::Vector{Matrix{T}}, Es::Vector{T}, 
+                   DIISsize::Int=10, solver::Symbol=:BFGS) where {M, T}
+    cvxConstraint, permuteData = getproperty(DIISadditionalConfigs, M)
+    is = permuteData ? sortperm(Es) : (:)
+    ∇s = (@view Fs[is])[1:end .> end-DIISsize]
+    Ds = (@view Ds[is])[1:end .> end-DIISsize]
+    Es = (@view Es[is])[1:end .> end-DIISsize]
+    DIIS = getproperty(DIIScoreMethods, M)
+    v, B = uniCallFunc(DIIS, getproperty(DIISmethodArgOrders, nameOf(DIIS)), ∇s, Ds, Es, S)
+    c = constraintSolver(v, B, cvxConstraint, solver)
+    sum(c.*∇s) # Fnew
+end
+
+
 const SCFmethodSelector = 
       (DD=DD, DIIS=xDIIS(Val(:DIIS)), ADIIS=xDIIS(Val(:ADIIS)), EDIIS=xDIIS(Val(:EDIIS)))
 
 
-# RHF
-@inline function HFcore(m::Symbol, N::NTuple{HFTS, Int}, Hcore::Matrix{T}, HeeI::Array{T, 4}, 
-                        S::Matrix{T}, X::Matrix{T}, rVars::NTuple{HFTS, HFtempVars{T, HFT}}; 
-                        kws...) where {HFTS, T, HFT}
+function HFcore(m::Symbol, N::NTuple{HFTS, Int}, Hcore::Matrix{T}, HeeI::Array{T, 4}, 
+                S::Matrix{T}, X::Matrix{T}, rVars::NTuple{HFTS, HFtempVars{T, HFT}}; 
+                kws...) where {HFTS, T, HFT}
     F = getfield(SCFmethodSelector, m)(N, Hcore, HeeI, S, X, rVars; kws...)
-    # if m == :DD
-    #     getCFDEold(Hcore, HeeI, X, N, F)
-    # else
         getCFDE(Hcore, HeeI, X, N, F)
-    # end
 end
 
-@inline function pushHFtempVars!((rVars,)::Tuple{HFtempVars}, 
-                                 (res,)::Tuple{Tuple{Matrix{T}, Matrix{T}, 
-                                               Matrix{T}, T, Matrix{T}, T}}) where {T}
-    pushHFtempVarsCore1!(rVars, res)
-    pushHFtempVarsCore2!(rVars, res)
-end
 
-@inline function pushHFtempVarsCore1!(rVars::HFtempVars, 
-                                      res::Tuple{Matrix{T}, Matrix{T}, 
-                                                 Matrix{T}, T, Matrix{T}, T}) where {T}
+function pushHFtempVarsCore1!(rVars::HFtempVars, 
+                              res::Tuple{Matrix{T}, Matrix{T}, 
+                                         Matrix{T}, T, Matrix{T}, T}) where {T}
     push!(rVars.Cs, res[1])
     push!(rVars.Fs, res[2])
     push!(rVars.Ds, res[3])
     push!(rVars.Es, res[4])
 end
 
-@inline function pushHFtempVarsCore2!(rVars::HFtempVars, 
-                                      res::Tuple{Matrix{T}, Matrix{T}, 
-                                                 Matrix{T}, T, Matrix{T}, T}) where {T}
+function pushHFtempVarsCore2!(rVars::HFtempVars, 
+                              res::Tuple{Matrix{T}, Matrix{T}, 
+                                         Matrix{T}, T, Matrix{T}, T}) where {T}
     push!(rVars.shared.Dtots, res[5])
     push!(rVars.shared.Etots, res[6])
 end
 
-# # UHF
-# @inline function HFcore(m::Symbol, Ns::NTuple{2, Int}, Hcore::Matrix{T}, HeeI::Array{T, 4}, 
-#                         S::Matrix{T}, X::Matrix{T}, uVars::NTuple{2, HFtempVars{T, :UHF}}; 
-#                         kws...) where {T}
-#     F = getfield(SCFmethodSelector, m).(Ns, Ref(Hcore), Ref(HeeI), Ref(S), Ref(X), uVars; 
-#                                          kws...)
-#     getCFDE(Hcore, HeeI, X, Ns, F)
-# end
-
-@inline function pushHFtempVars!(αβVars::NTuple{2, HFtempVars{T, :UHF}}, 
-                                 res::NTuple{2, Tuple{Matrix{T}, Matrix{T}, Matrix{T}, T, 
-                                                      Matrix{T}, T}}) where {T}
+function pushHFtempVars!(αβVars::NTuple{HFTS, HFtempVars{T, HFT}}, 
+                         res::NTuple{HFTS, Tuple{Matrix{T}, Matrix{T}, Matrix{T}, T, 
+                                                 Matrix{T}, T}}) where {HFTS, T, HFT}
     pushHFtempVarsCore1!.(αβVars, res)
     pushHFtempVarsCore2!(αβVars[1], res[1])
 end
 
 
-@inline function popHFtempVars!(rVars::HFtempVars)
+function popHFtempVarsCore1!(rVars::HFtempVars)
     pop!(rVars.Cs)
     pop!(rVars.Fs)
     pop!(rVars.Ds)
     pop!(rVars.Es)
+end
+
+function popHFtempVarsCore2!(rVars::HFtempVars)
     pop!(rVars.shared.Dtots)
     pop!(rVars.shared.Etots)
 end
 
-@inline popHFtempVars!((rVars,)::Tuple{HFtempVars}) = popHFtempVars!(rVars)
-
-@inline function popHFtempVars!(uVars::NTuple{2, HFtempVars{T, :UHF}}) where {T}
-    for field in [:Cs, :Fs, :Ds, :Es] pop!.(getfield.(uVars, field)) end
-    pop!(uVars[1].shared.Dtots)
-    pop!(uVars[1].shared.Etots)
+function popHFtempVars!(αβVars::NTuple{HFTS, HFtempVars{T, HFT}}) where {HFTS, T, HFT}
+    popHFtempVarsCore1!.(αβVars)
+    popHFtempVarsCore2!(αβVars[1])
 end
 
 

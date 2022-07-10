@@ -210,7 +210,7 @@ V = neAttractions([bfm], nuc, nucCoords)[]
 @test isapprox(V, neAttractions(bs1, nuc, nucCoords) |> sum, atol=errorThreshold2)
 eeI = eeInteractions([bfm])[]
 @test eeI == eeInteraction(bfm, bfm, bfm, bfm)[]
-@test isapprox(eeI, eeInteractions(bs1) |> sum, atol=errorThreshold2*10)
+@test isapprox(eeI, eeInteractions(bs1) |> sum, atol=errorThreshold2*5e3)
 
 
 # function dimOf

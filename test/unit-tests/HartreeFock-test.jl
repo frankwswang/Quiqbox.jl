@@ -42,7 +42,7 @@ end
 
 @test begin
     tVars1 = deepcopy(res1.temp[1])
-    Quiqbox.popHFtempVars!(tVars1)
+    Quiqbox.popHFtempVars!((tVars1,))
     push!(tVars1.Cs, res1.temp[1].Cs[end])
     push!(tVars1.Fs, res1.temp[1].Fs[end])
     push!(tVars1.Ds, res1.temp[1].Ds[end])

@@ -347,9 +347,9 @@ function getOneBodyInt(∫1e::F,
                        optArgs...) where {F<:Function, T, D, GN1, GN2}
     (R₁, ijk₁, ps₁), (R₂, ijk₂, ps₂) = reformatIntData1.((bf1, bf2))
     uniquePairs, uPairCoeffs = getOneBodyIntCore(R₁==R₂ && ijk₁==ijk₂, ps₁, ps₂)
-    map(uniquePairs, uPairCoeffs) do x, y
+    mapreduce(+, uniquePairs, uPairCoeffs) do x, y
         ∫1e(optArgs..., R₁, R₂, ijk₁, x[1], ijk₂, x[2])::T * y
-    end |> sum
+    end
 end
 
 function getOneBodyInt(::F, 
@@ -765,8 +765,7 @@ end
     if any(fieldtypes(typeof(bs)) .<: EmptyBasisFunc)
         zero(T)
     else
-        range = Iterators.product(unpackBasis.(bs)...)
-        ( map(x->∫(x..., optArgs...)::T, range) |> sum )
+        mapreduce(x->∫(x..., optArgs...)::T, +, Iterators.product(unpackBasis.(bs)...))
     end
 end
 
