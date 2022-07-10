@@ -48,8 +48,7 @@ H2O = MatterByHF(HFres2)
 nα, nβ = H2O.spin
 C_UHF1, C_UHF2 = HFres2.C
 
-Ehf_H2O = Quiqbox.getEᵀ(Hc2, basis2.eeI, H2O.occuC, H2O.spin)
-@test isapprox(H2O.Ehf, Ehf_H2O, atol=1e-9)
+@test H2O.Ehf == Quiqbox.getEᵀ(Hc2, basis2.eeI, H2O.occuC, H2O.spin)
 @test H2O.Hcore == changeHbasis.(Ref(Hc2), HFres2.C)
 @test isapprox.(H2O.Hcore[1], get1spinHcore(C_UHF1, Hc2), atol=1e-12) |> all
 @test isapprox.(H2O.Hcore[2], get1spinHcore(C_UHF2, Hc2), atol=1e-12) |> all
@@ -57,12 +56,12 @@ Ehf_H2O = Quiqbox.getEᵀ(Hc2, basis2.eeI, H2O.occuC, H2O.spin)
 @test isapprox.(H2O.eeI[1], get1spin2eI(C_UHF1, basis2.eeI)) |> all
 @test isapprox.(H2O.eeI[2], get1spin2eI(C_UHF2, basis2.eeI)) |> all
 
-Jαβ = [eeInteraction(i.func, i.func, j.func, j.func) for (i,j) in Iterators.product(H2O.occuOrbital...)]
+Jαβ = [ eeInteraction(i.func, i.func, j.func, j.func) 
+        for (i,j) in Iterators.product(H2O.occuOrbital...) ]
 EαandEβ = map(H2O.spin, H2O.Hcore, H2O.eeI) do n, Hc, eeI
     sum(diag(Hc)[1:n]) + 0.5*sum([(eeI[i,i,j,j] - eeI[i,j,j,i]) for j in 1:n, i in 1:n])
 end |> sum
-@test isapprox(H2O.Ehf, EαandEβ + sum([Jαβ[i,j] for i=1:nα, j=1:nβ]), atol=1e-9)
-@test isapprox(Ehf_H2O, EαandEβ + sum([Jαβ[i,j] for i=1:nα, j=1:nβ]), atol=1e-12)
+@test isapprox(H2O.Ehf, EαandEβ + sum([Jαβ[i,j] for i=1:nα, j=1:nβ]), atol=1e-12)
 
 
 # function nnRepulsions
