@@ -130,7 +130,7 @@ ParamBox(Val(conSym), pb)
 
 
 const Doc_genSpatialPoint_Eg1 = "SpatialPoint{3, Float64, "*
-                                "Tuple{FLevel{1, 0}, FLevel{1, 0}, FLevel{1, 0}}}"*
+                                "Tuple{FI, FI, FI}}"*
                                 "(param)[1.0, 2.0, 3.0][∂][∂][∂]"
 
 const PT1D{T, FLx} = Tuple{ParamBox{T, cxSym, FLx}}
@@ -145,8 +145,9 @@ const SPointPTL = Union{Tuple{ParamBox{T, cxSym}} where T,
 
 const SPointPTU{T, D} = Tuple{Vararg{ParamBox{T, V, FL} where {V, FL<:FLevel}, D}}
 
-struct SPoint{TT<:SPointPTL}
+struct SPoint{TT}
     param::TT
+    SPoint(param::TT) where {TT<:SPointPTL} = new{TT}(param)
 end
 
 const SP1D{T, FLx} = SPoint{PT1D{T, FLx}}
@@ -156,7 +157,7 @@ const SP3D{T, FLx, FLy, FLz} = SPoint{PT3D{T, FLx, FLy, FLz}}
 struct SpatialPoint{T, D, PT} <: AbstractSpatialPoint{T, D}
     point::PT
     function SpatialPoint(pbs::SPointPTU{T, D}) where {T, D}
-        sp = SPoint{typeof(pbs)}(pbs)
+        sp = SPoint(pbs)
         new{T, D, typeof(sp)}(sp)
     end
 end
@@ -200,13 +201,13 @@ julia> v2 = [fill(1.0), 2.0, 3.0]
  3.0
 
 julia> p2 = genSpatialPoint(v2); p2[1]
-ParamBox{Float64, :X, $(FLi)}(1.0)[∂][X]
+ParamBox{Float64, :X, $(FI)}(1.0)[∂][X]
 
 julia> v2[1][] = 1.2
 1.2
 
 julia> p2[1]
-ParamBox{Float64, :X, $(FLi)}(1.2)[∂][X]
+ParamBox{Float64, :X, $(FI)}(1.2)[∂][X]
 ```
 """
 genSpatialPoint(v::AbstractArray, optArgs...) = genSpatialPoint(Tuple(v), optArgs...)
@@ -235,20 +236,20 @@ Return the component of a `SpatialPoint` given its value (or 0-D container) and 
 
 ```jldoctest; setup = :(push!(LOAD_PATH, "../../src/"); using Quiqbox)
 julia> genSpatialPoint(1.2, 1)
-ParamBox{Float64, :X, $(FLi)}(1.2)[∂][X]
+ParamBox{Float64, :X, $(FI)}(1.2)[∂][X]
 
 julia> pointY1 = fill(2.0)
 0-dimensional Array{Float64, 0}:
 2.0
 
 julia> Y1 = genSpatialPoint(pointY1, 2)
-ParamBox{Float64, :Y, $(FLi)}(2.0)[∂][Y]
+ParamBox{Float64, :Y, $(FI)}(2.0)[∂][Y]
 
 julia> pointY1[] = 1.5
 1.5
 
 julia> Y1
-ParamBox{Float64, :Y, $(FLi)}(1.5)[∂][Y]
+ParamBox{Float64, :Y, $(FI)}(1.5)[∂][Y]
 ```
 """
 genSpatialPoint(comp::AbstractFloat, index::Int, mapFunction::F; 
@@ -331,7 +332,7 @@ struct BasisFunc{T, D, 𝑙, GN, PT} <: FGTBasisFuncs1O{T, D, 𝑙, GN, PT}
     gauss::NTuple{GN, AbstractGaussFunc{T}}
     l::Tuple{LTuple{D, 𝑙}}
     normalizeGTO::Bool
-    param::Tuple{Vararg{ParamBox}}
+    param::Tuple{Vararg{ParamBox{T}}}
 
     function BasisFunc(cen::SpatialPoint{T, D, PT}, gs::NTuple{GN, AbstractGaussFunc{T}}, 
                        l::Tuple{LTuple{D, 𝑙}}, normalizeGTO::Bool) where {T, D, PT, 𝑙, GN}
@@ -363,7 +364,7 @@ struct BasisFuncs{T, D, 𝑙, GN, PT, ON} <: FloatingGTBasisFuncs{T, D, 𝑙, GN
     gauss::NTuple{GN, AbstractGaussFunc{T}}
     l::NTuple{ON, LTuple{D, 𝑙}}
     normalizeGTO::Bool
-    param::Tuple{Vararg{ParamBox}}
+    param::Tuple{Vararg{ParamBox{T}}}
 
     function BasisFuncs(cen::SpatialPoint{T, D, PT}, gs::NTuple{GN, AbstractGaussFunc{T}}, 
                         ls::NTuple{ON, LTuple{D, 𝑙}}, normalizeGTO::Bool=false) where 
@@ -709,7 +710,7 @@ reformulation, treated as one basis function in the integral calculation.
 """
 struct BasisFuncMix{T, D, BN, BT<:BasisFunc{T, D}} <: CGTBasisFuncs1O{T, D, BN}
     BasisFunc::NTuple{BN, BT}
-    param::Tuple{Vararg{ParamBox}}
+    param::Tuple{Vararg{ParamBox{T}}}
 
     function BasisFuncMix(bfs::Tuple{Vararg{BasisFunc{T, D}, BN}}) where {T, D, BN}
         bs = sortBasisFuncs(bfs, roundDigits=-1)
@@ -1166,17 +1167,17 @@ add(::EmptyBasisFunc{T1, D}, ::EmptyBasisFunc{T2, D}) where {D, T1, T2} =
 EmptyBasisFunc{promote_type(T1, T2), D}()
 
 
-const Doc_mul_Eg1 = "GaussFunc(xpn=ParamBox{Float64, :α, $(FLi)}(3.0)[∂][α], " * 
-                              "con=ParamBox{Float64, :d, $(FLi)}(1.0)[∂][d])"
+const Doc_mul_Eg1 = "GaussFunc(xpn=ParamBox{Float64, :α, $(FI)}(3.0)[∂][α], " * 
+                              "con=ParamBox{Float64, :d, $(FI)}(1.0)[∂][d])"
 
-const Doc_mul_Eg2 = "GaussFunc(xpn=ParamBox{Float64, :α, $(FLi)}(3.0)[∂][α], " * 
-                              "con=ParamBox{Float64, :d, $(FLi)}(2.0)[∂][d])"
+const Doc_mul_Eg2 = "GaussFunc(xpn=ParamBox{Float64, :α, $(FI)}(3.0)[∂][α], " * 
+                              "con=ParamBox{Float64, :d, $(FI)}(2.0)[∂][d])"
 
-const Doc_mul_Eg3 = "GaussFunc(xpn=ParamBox{Float64, :α, $(FLi)}(6.0)[∂][α], " * 
-                              "con=ParamBox{Float64, :d, $(FLi)}(1.0)[∂][d])"
+const Doc_mul_Eg3 = "GaussFunc(xpn=ParamBox{Float64, :α, $(FI)}(6.0)[∂][α], " * 
+                              "con=ParamBox{Float64, :d, $(FI)}(1.0)[∂][d])"
 
-const Doc_mul_Eg4 = "GaussFunc(xpn=ParamBox{Float64, :α, $(FLi)}(6.0)[∂][α], " * 
-                              "con=ParamBox{Float64, :d, $(FLi)}(2.0)[∂][d])"
+const Doc_mul_Eg4 = "GaussFunc(xpn=ParamBox{Float64, :α, $(FI)}(6.0)[∂][α], " * 
+                              "con=ParamBox{Float64, :d, $(FI)}(2.0)[∂][d])"
 
 """
 
@@ -1218,7 +1219,7 @@ function mul(gf::GaussFunc{T}, coeff::Real; roundDigits::Int=getAtolDigits(T)) w
     GaussFunc(gf.xpn, conNew)
 end
 
-function mulCore(c::T, con::ParamBox{T, <:Any, FLi}; 
+function mulCore(c::T, con::ParamBox{T, <:Any, FI}; 
                  roundDigits::Int=getAtolDigits(T)) where {T}
     conNew = fill(roundNum(con.data[] * c, roundDigits))
     mapFunction = itself
@@ -1805,9 +1806,9 @@ sym isa Missing || inSymbol(sym, getVar(pb, forDifferentiation))
 
 
 const Doc_copyBasis_Eg1 = "GaussFunc(xpn=ParamBox{Float64, :α, "*
-                                    "$(FLi)}(9.0)[∂][α], "*
+                                    "$(FI)}(9.0)[∂][α], "*
                                     "con=ParamBox{Float64, :d, "*
-                                    "$(FLi)}(2.0)[∂][d])"
+                                    "$(FI)}(2.0)[∂][d])"
 
 """
 
@@ -1826,7 +1827,7 @@ julia> e = genExponent(3.0, x->x^2)
 ParamBox{Float64, :α, $(FLevel(x->x^2))}(3.0)[∂][x_α]
 
 julia> c = genContraction(2.0)
-ParamBox{Float64, :d, $(FLi)}(2.0)[∂][d]
+ParamBox{Float64, :d, $(FI)}(2.0)[∂][d]
 
 julia> gf1 = GaussFunc(e, c);
 
@@ -1869,13 +1870,13 @@ function compareParamBox(pb1::ParamBox, pb2::ParamBox)
     )
 end
 
-compareParamBox(pb1::ParamBox{<:Any, <:Any, FLi}, 
-                pb2::ParamBox{<:Any, <:Any, FLi}) = (pb1.data === pb2.data)
+compareParamBox(pb1::ParamBox{<:Any, <:Any, FI}, 
+                pb2::ParamBox{<:Any, <:Any, FI}) = (pb1.data === pb2.data)
 
-compareParamBox(pb1::ParamBox{<:Any, <:Any, FLi}, pb2::ParamBox) = 
+compareParamBox(pb1::ParamBox{<:Any, <:Any, FI}, pb2::ParamBox) = 
 ifelse(pb2.canDiff[], (pb1.data === pb2.data), false)
 
-compareParamBox(pb1::ParamBox, pb2::ParamBox{<:Any, <:Any, FLi}) = 
+compareParamBox(pb1::ParamBox, pb2::ParamBox{<:Any, <:Any, FI}) = 
 compareParamBox(pb2, pb1)
 
 

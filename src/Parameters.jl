@@ -1,29 +1,25 @@
-export FLevel, ParamBox, inValOf, inSymOf, inSymOfCore, inSymValOf, outValOf, outSymOf, 
+export ParamBox, inValOf, inSymOf, inSymOfCore, inSymValOf, outValOf, outSymOf, 
        outSymOfCore, outSymValOf, dataOf, mapOf, getVar, getVarDict, outValCopy, inVarCopy, 
        enableDiff!, disableDiff!, isDiffParam, toggleDiff!, changeMapping
 
-export FLX0
+export FLevel
 
 # Function Level
-struct FLevel{L1, L2} <: MetaParam{FLevel} end
+struct FLevel{L} <: MetaParam{FLevel} end
 
-# FLevel(::Any) = FLevel{0, 0}
-const FLX0{L1} = FLevel{L1, 0}
-FLevel(::Type{itselfT}) = FLevel{1, 0}
-FLevel(::Type{typeof(Base.identity)}) = FLevel{1, 0}
-FLevel(::Type{<:Function}) = FLevel{2, 0}
-FLevel(::Type{<:ParameterizedFunction{<:Any, <:Any}}) = FLevel{3, 0}
-FLevel(::Type{<:ParameterizedFunction{<:Any, itself}}) = FLevel{3, 1}
-FLevel(::Type{<:ParameterizedFunction{<:Any, <:Function}}) = FLevel{3, 2}
-FLevel(::Type{<:ParameterizedFunction{<:Any, <:ParameterizedFunction}}) = FLevel{3, 3}
+FLevel(::Type{itselfT}) = FLevel{0}
+FLevel(::Type{typeof(Base.identity)}) = FLevel{0}
+FLevel(::Type{<:Function}) = FLevel{1}
+FLevel(::Type{<:ParameterizedFunction{T1, T2}}) where {T1, T2} = 
+      FLevel{getFLevel(T1) + getFLevel(T2)}
 FLevel(::F) where {F<:Function} = FLevel(F)
-const FLi = FLevel(itself)
+const FI = FLevel(itself)
 
 FLevel(sym::Symbol) = FLevel(getFunc(sym))
 FLevel(::TypedFunction{F}) where {F} = FLevel(F)
 FLevel(::Type{TypedFunction{F}}) where {F} = FLevel(F)
 
-getFLevel(::Type{FLevel{L1, L2}}) where {L1, L2} = (L1, L2)
+getFLevel(::Type{FLevel{L}}) where {L} = L
 getFLevel(f::Function) = getFLevel(f |> FLevel)
 getFLevel(::TypedFunction{F}) where {F} = getFLevel(F |> FLevel)
 getFLevel(::Type{T}) where {T} = getFLevel(T |> FLevel)
@@ -53,7 +49,7 @@ value is mapped to, i.e. the output variable) is marked as "differentiable".
 
     ParamBox(data::Union{Array{T, 0}, T}, dataName::Symbol=:undef; 
              index::Union{Int, Nothing}=nothing) where {T<:Number} -> 
-    ParamBox{T, dataName, $(FLi)}
+    ParamBox{T, dataName, $(FI)}
 
     ParamBox(data::Union{Array{T, 0}, T}, name::Symbol, mapFunction::Function, 
              dataName::Symbol=:undef; index::Union{Int, Nothing}=nothing, 
@@ -80,10 +76,10 @@ regardless of the mapping relation.
 
 ```jldoctest; setup = :(push!(LOAD_PATH, "../../src/"); using Quiqbox)
 julia> ParamBox(1.0)
-ParamBox{Float64, :undef, $(FLi)}(1.0)[∂][undef]
+ParamBox{Float64, :undef, $(FI)}(1.0)[∂][undef]
 
 julia> ParamBox(1.0, :a)
-ParamBox{Float64, :a, $(FLi)}(1.0)[∂][a]
+ParamBox{Float64, :a, $(FI)}(1.0)[∂][a]
 
 julia> ParamBox(1.0, :a, abs)
 ParamBox{Float64, :a, $(FLevel(abs))}(1.0)[∂][x_a]
@@ -114,13 +110,12 @@ struct ParamBox{T, V, FL<:FLevel} <: DifferentiableParameter{T, ParamBox}
     end
 
     ParamBox{T, V}(data::Array{T, 0}, index) where {T, V} = 
-    new{T, V, FLi}(data, V, itself, fill(false), index)
+    new{T, V, FI}(data, V, itself, fill(false), index)
 end
 
 function ParamBox(::Val{V}, mapFunction::F, data::Array{T, 0}, index, canDiff, 
                   dataName=:undef) where {V, F<:Function, T}
-    L1, _ = getFLevel(F)
-    if L1 == 2
+    if getFLevel(F) > 0
         fSym = mapFunction |> nameOf
         fStr = fSym |> string
         if startswith(fStr, '#')
@@ -137,7 +132,7 @@ ParamBox(::Val{V}, data::Array{T, 0}, index) where {V, T} = ParamBox{T, V}(data,
 ParamBox(::Val{V}, ::itselfT, data::Array{T, 0}, index, _...) where {V, T} = 
 ParamBox{T, V}(data, index)
 
-ParamBox(::Val{V}, pb::ParamBox{T, <:Any, FLi}) where {V, T} = 
+ParamBox(::Val{V}, pb::ParamBox{T, <:Any, FI}) where {V, T} = 
 ParamBox{T, V}(pb.data, pb.index)
 
 ParamBox(::Val{V}, pb::ParamBox{T}) where {T, V} = 
@@ -192,7 +187,7 @@ Equivalent to `pb()`.
 """
 @inline outValOf(pb::ParamBox) = callGenFunc(pb.map, pb.data[])
 
-@inline outValOf(pb::ParamBox{<:Any, <:Any, FLi}) = inValOf(pb)
+@inline outValOf(pb::ParamBox{<:Any, <:Any, FI}) = inValOf(pb)
 
 (pb::ParamBox)() = outValOf(pb)
 # (pb::ParamBox)() = Base.invokelatest(pb.map, pb.data[])::Float64
@@ -224,7 +219,7 @@ corresponding output value.
 Return the `Symbol` of the stored data (independent variable) of the input `ParamBox`.
 """
 @inline inSymOfCore(pb::ParamBox) = pb.dataName
-@inline inSymOfCore(pb::ParamBox{<:Any, <:Any, FLi}) = outSymOfCore(pb)
+@inline inSymOfCore(pb::ParamBox{<:Any, <:Any, FI}) = outSymOfCore(pb)
 
 
 """
@@ -276,7 +271,7 @@ end
 function getVarCore(pb::ParamBox{T, <:Any, FL}) where {T, FL}
     dvSym = outSymOf(pb)
     ivVal = pb.data[]
-    if FL == FLi || !pb.canDiff[]
+    if FL == FI || !pb.canDiff[]
         Pair{Symbol, T}[dvSym => ivVal]
     else
         Pair{Symbol, T}[dvSym => pb(), inSymOf(pb) => ivVal]
@@ -300,7 +295,7 @@ getVarDict(pbs::ParamBox) = getVarCore(pbs) |> Dict
 
 """
 
-    outValCopy(pb::ParamBox{T, V}) where {T} -> ParamBox{T, V, $(FLi)}
+    outValCopy(pb::ParamBox{T, V}) where {T} -> ParamBox{T, V, $(FI)}
 
 Return a new `ParamBox` of which the stored data is a **deep copy** of the data mapped from 
 the input `ParamBox`.
@@ -311,7 +306,7 @@ ParamBox(Val(V), fill(pb()), genIndex(nothing))
 
 """
 
-    inVarCopy(pb::ParamBox) -> ParamBox{<:Number, <:Any, $(FLi)}
+    inVarCopy(pb::ParamBox) -> ParamBox{<:Number, <:Any, $(FI)}
 
 Return a new `ParamBox` of which the stored data is a **shallow copy** of the stored data 
 from the input `ParamBox`.
@@ -323,7 +318,7 @@ julia> pb1 = ParamBox(-2.0, :a, abs)
 ParamBox{Float64, :a, $(FLevel(abs))}(-2.0)[∂][x_a]
 
 julia> pb2 = inVarCopy(pb1)
-ParamBox{Float64, :x_a, $(FLi)}(-2.0)[∂][x_a]
+ParamBox{Float64, :x_a, $(FI)}(-2.0)[∂][x_a]
 
 julia> pb1[] == pb2[] == -2.0
 true
@@ -397,7 +392,7 @@ toggleDiff!(pb::ParamBox) = begin pb.canDiff[] = !pb.canDiff[] end
 # function changeMapping(pb::ParamBox{T, V, FL}, mapFunction::F, canDiff::Bool=true) where 
 #              {T, V, FL, F<:Function}
 #     dn = pb.dataName
-#     if (FL==FLi && FLevel(F)!=FLi) 
+#     if (FL==FI && FLevel(F)!=FI) 
 #         dnStr = string(dn)
 #         dn = Symbol(dnStr * "_" * dnStr)
 #     end
@@ -417,7 +412,7 @@ toggleDiff!(pb::ParamBox) = begin pb.canDiff[] = !pb.canDiff[] end
 function changeMapping(pb::ParamBox{T, V, FL}, mapFunction::F, outputName::Symbol=V; 
                        canDiff::Bool=true) where {T, V, FL, F<:Function}
     dn = pb.dataName
-    if (FL==FLi && FLevel(F)!=FLi) 
+    if (FL==FI && FLevel(F)!=FI) 
         dnStr = string(dn)
         dn = Symbol(dnStr * "_" * dnStr)
     end

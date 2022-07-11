@@ -741,8 +741,19 @@ Pf(c::T, f::TypedFunction{F}) where {T, F} = Pf{T, F}(f, c)
 Pf(c::T, f::Pf{T, F}) where {T, F} = Pf{T, F}(f.f, f.c*c)
 Pf(c::T, f::F) where {T, F<:Function} = Pf{T, F}(TypedFunction(f), c)
 
-(f::Pf{T, F})(x::T) where {T, F} = f.c * f.f.f(x)
-(f::Pf{T1, F})(x::T2) where {T1, T2, F} = f(T1(x))
+(f::Pf)(x::T) where {T<:Number} = f.c * f.f.f(x)
+
+
+# Sum Function
+struct Sf{T<:Number, F<:Function} <: ParameterizedFunction{Sf, F}
+    f::TypedFunction{F}
+    c::T
+end
+Sf(c::T, f::TypedFunction{F}) where {T, F} = Sf{T, F}(f, c)
+Sf(c::T, f::Sf{T, F}) where {T, F} = Sf{T, F}(f.f, f.c+c)
+Sf(c::T, f::F) where {T, F<:Function} = Sf{T, F}(TypedFunction(f), c)
+
+(f::Sf)(x::T) where {T<:Number} = f.c + f.f.f(x)
 
 
 function getFunc(fSym::Symbol, failedResult=missing)

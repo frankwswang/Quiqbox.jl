@@ -250,7 +250,7 @@ function hasBoolRelation(boolFunc::F,
     #     boolFunc(pb1(), pb2()), 
 
     #     ifelse(V1 == V2, 
-    #         ifelse((ignoreFunction || F1 == F2 == FLi), 
+    #         ifelse((ignoreFunction || F1 == F2 == FI), 
     #             boolFunc(pb1.data, pb2.data), 
 
     #             ( boolFunc(pb1.canDiff[], pb2.canDiff[]) && 
@@ -266,7 +266,7 @@ function hasBoolRelation(boolFunc::F,
         boolFunc(pb1(), pb2())
     else
         ifelse(V1 == V2, 
-            ifelse((ignoreFunction || F1 == F2 == FLi), 
+            ifelse((ignoreFunction || F1 == F2 == FI), 
                 boolFunc(pb1.data, pb2.data), 
 
                 ( boolFunc(pb1.canDiff[], pb2.canDiff[]) && 
@@ -281,7 +281,7 @@ function hasBoolRelation(boolFunc::F,
     # if ignoreContainer
     #     boolFunc(pb1(), pb2())
     # elseif V1 == V2
-    #     ifelse( (ignoreFunction || F1 == F2 == FLi), 
+    #     ifelse( (ignoreFunction || F1 == F2 == FI), 
     #         boolFunc(pb1.data, pb2.data), 
 
     #         ( boolFunc(pb1.canDiff[], pb2.canDiff[]) && 

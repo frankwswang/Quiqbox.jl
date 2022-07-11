@@ -220,8 +220,8 @@ struct MatterByHF{T, D, NN, 𝑁, BN, HFTS} <:MatterData{T, D, 𝑁}
             error("The input data format is not supported: HFTS = $(HFTS).")
         end
         new{T, D, NN, sum(Ns), BN, HFTS}(fVars.Ehf, nuc, nucCoords, fVars.Enn, Ns, 
-                                           Tuple.(osO), Tuple.(osU), CO, CU, 
-                                           cH, eeI, Jᵅᵝ, basis)
+                                         Tuple.(osO), Tuple.(osU), CO, CU, 
+                                         cH, eeI, Jᵅᵝ, basis)
     end
 end
 

@@ -7,9 +7,9 @@ The data structure formularized by Quiqbox in each step, namely the level of dat
 | level  | objective  |  data structure | container type  | example of type instances |
 | :---: | :---:   | :---:           | :---: | :---:          |
 | 4 | basis set | `Array` or `struct` as the container of basis functions | `Array`, `GTBasis` | `Vector{<:BasisFunc}`, `GTBasis{3, 3, Float64, GTBasisFuncs{1, 3, Float64}}`...|
-| 3 | basis functions | linear combination of Gaussian functions | `CompositeGTBasisFuncs` | `BasisFunc{0, 1, Tuple{FLevel{1, 0}, FLevel{1, 0}, FLevel{1, 0}}, 3, Float64}`, `BasisFuncMix{2, 3, Float64, BasisFunc{0, 1, SP3D{FLX0{1}, FLX0{1}, FLX0{1}, Float64}, 3, Float64}}`...|
-| 2 | Gaussian functions | (primitive) Gaussian functions | `AbstractGaussFunc{Float64}` | `GaussFunc{Float64, Tuple{FLevel{1, 0}, FLevel{1, 0}}}`|
-| 1 |  pool of parameters | center coordinates, exponents of Gaussian functions | `ParamBox` | `ParamBox{Float64, :α, FLevel{1, 0}}`... |
+| 3 | basis functions | linear combination of Gaussian functions | `CompositeGTBasisFuncs` | `BasisFunc{0, 1, Tuple{FI, FI, FI}, 3, Float64}`, `BasisFuncMix{2, 3, Float64, BasisFunc{0, 1, SP3D{FLevel{1}, FLevel{1}, FLevel{1}, Float64}, 3, Float64}}`...|
+| 2 | Gaussian functions | (primitive) Gaussian functions | `AbstractGaussFunc{Float64}` | `GaussFunc{Float64, Tuple{FI, FI}}`|
+| 1 |  pool of parameters | center coordinates, exponents of Gaussian functions | `ParamBox` | `ParamBox{Float64, :α, FI}`... |
 
 
 Depending on how much control the user wants to have over each step, Quiqbox provides several [methods](https://docs.julialang.org/en/v1/manual/methods/) of related functions to give users the freedom to balance between efficiency and customizability.

@@ -133,7 +133,7 @@ end
 
 𝑑f(::Type{FL}, f::F, x::T) where {FL<:FLevel, F<:Function, T} = ForwardDerivative(f, x)
 
-𝑑f(::Type{FLi}, f::Function, x::T) where {T} = 1.0
+𝑑f(::Type{FI}, f::Function, x::T) where {T} = 1.0
 
 function ∂SGFcore(::Val{xpnSym}, sgf::FGTBasisFuncs1O{T, 3, 𝑙, 1}, c::T=T(1)) where {T, D, 𝑙}
     res = ( shiftCore(+, sgf, LTuple(2,0,0)) + shiftCore(+, sgf, LTuple(0,2,0)) + 
@@ -207,7 +207,7 @@ function ∂BasisCore2(par::ParamBox{T, V, FL}, sgf::FGTBasisFuncs1O{T, D, <:Any
     end
 end
 
-∂Basis(par::ParamBox{T, V, FLi}, sgf::FGTBasisFuncs1O{T, D, <:Any, 1}) where {T, V, D} = 
+∂Basis(par::ParamBox{T, V, FI}, sgf::FGTBasisFuncs1O{T, D, <:Any, 1}) where {T, V, D} = 
 ∂BasisCore1(par, sgf)
 
 ∂Basis(par::ParamBox{T, V, FL}, sgf::FGTBasisFuncs1O{T, D, <:Any, 1}) where {T, V, FL, D} = 
