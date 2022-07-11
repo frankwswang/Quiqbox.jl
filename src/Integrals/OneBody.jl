@@ -72,7 +72,7 @@ neAttraction(bf1::AbstractGTBasisFuncs{T, D, 1}, bf2::AbstractGTBasisFuncs{T, D,
               nuc::Union{NTuple{NN, String}, AbstractVector{String}}, 
               nucCoords::Union{NTuple{NN, NTuple{D, T}}, 
                                AbstractVector{<:AbstractVector{T}}}) where {T, D, NN} = 
-getNucEleAttraction(bf1, bf2, arrayToTuple(nuc), genTupleCoords(nucCoords))
+getNucEleAttraction(bf1, bf2, arrayToTuple(nuc), genTupleCoords(T, nucCoords))
 
 
 """
@@ -94,7 +94,7 @@ neAttractions(bs::Union{Tuple{Vararg{AbstractGTBasisFuncs{T, D}}},
               nuc::Union{NTuple{NN, String}, AbstractVector{String}}, 
               nucCoords::Union{NTuple{NN, NTuple{D, T}}, 
                                AbstractVector{<:AbstractVector{T}}}) where {T, D, NN} = 
-getNucEleAttraction(bs|>arrayToTuple, arrayToTuple(nuc), genTupleCoords(nucCoords))
+getNucEleAttraction(bs|>arrayToTuple, arrayToTuple(nuc), genTupleCoords(T, nucCoords))
 
 
 """
@@ -112,7 +112,7 @@ coreHij(bf1::AbstractGTBasisFuncs{T, D, 1}, bf2::AbstractGTBasisFuncs{T, D, 1},
         nuc::Union{NTuple{NN, String}, AbstractVector{String}}, 
         nucCoords::Union{NTuple{NN, NTuple{D, T}}, 
                          AbstractVector{<:AbstractVector{T}}}) where {T, D, NN} = 
-getCoreH(bf1, bf2, arrayToTuple(nuc), genTupleCoords(nucCoords))
+getCoreH(bf1, bf2, arrayToTuple(nuc), genTupleCoords(T, nucCoords))
 
 
 """
@@ -132,7 +132,7 @@ coreH(bs::Union{Tuple{Vararg{AbstractGTBasisFuncs{T, D}}},
       nuc::Union{NTuple{NN, String}, AbstractVector{String}}, 
       nucCoords::Union{NTuple{NN, NTuple{D, T}}, 
                        AbstractVector{<:AbstractVector{T}}}) where {T, D, NN} = 
-getCoreH(bs|>arrayToTuple, arrayToTuple(nuc), genTupleCoords(nucCoords))
+getCoreH(bs|>arrayToTuple, arrayToTuple(nuc), genTupleCoords(T, nucCoords))
 
 coreH(b::GTBasis{T, D}, nuc::Union{NTuple{NN, String}, AbstractVector{String}}, 
       nucCoords::Union{NTuple{NN, NTuple{D, T}}, 

@@ -125,7 +125,7 @@ function gradHFenergy(bs::Union{NTuple{BN, GTBasisFuncs{T, D, 1}},
                      {BN, T, D, HFTS, NN}
     bs = arrayToTuple(bs)
     nuc = arrayToTuple(nuc)
-    nucCoords = genTupleCoords(nucCoords)
+    nucCoords = genTupleCoords(T, nucCoords)
     Ns = splitSpins(Val(HFTS), nElectron)
     ∂HFenergy.(Ref(bs), par, Ref(C), Ref(S), Ref(nuc), Ref(nucCoords), Ref(Ns))
 end

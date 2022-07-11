@@ -861,10 +861,12 @@ fillNumber(num::Number) = fill(num)
 fillNumber(num::Array{<:Any, 0}) = itself(num)
 
 
-@inline genTupleCoords(coords::Vector{<:AbstractArray{<:Real}}) = 
-        Tuple((Float64(i[1]), Float64(i[2]), Float64(i[3])) for i in coords)
+@inline genTupleCoords(::Type{T1}, coords::Vector{<:AbstractArray{<:T2}}) where {T1, T2} = 
+        Tuple(Tuple(i.|>T1) for i in coords)
+        
 
-@inline genTupleCoords(coords::Tuple{Vararg{NTuple{3, Float64}}}) = itself(coords)
+@inline genTupleCoords(::Type{T}, coords::Tuple{Vararg{NTuple{3, T}}}) where {T} = 
+        itself(coords)
 
 
 @inline arrayToTuple(arr::AbstractArray) = Tuple(arr)

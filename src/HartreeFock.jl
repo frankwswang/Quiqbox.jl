@@ -349,7 +349,7 @@ The container of the final values after a Hartree-Fock SCF procedure.
 
 `Enn::T`: The nuclear repulsion energy.
 
-`spin::NTuple{2, Int}`: The numbers of two different spins respectively.
+`N::NTuple{2, Int}`: The numbers of two different spins respectively.
 
 `nuc::Tuple{NTuple{NN, String}}`: Nuclei of the system.
 
@@ -372,7 +372,7 @@ The container of the final values after a Hartree-Fock SCF procedure.
 struct HFfinalVars{T, D, HFT, NN, BN, HFTS} <: HartreeFockFinalValue{T, HFT}
     Ehf::T
     Enn::T
-    spin::NTuple{2, Int}
+    N::NTuple{2, Int}
     nuc::NTuple{NN, String}
     nucCoord::NTuple{NN, NTuple{D, T}}
     C::NTuple{HFTS, Matrix{T}}
@@ -565,7 +565,7 @@ function runHF(bs::GTBasis{T1, D, BN, BT},
                N::Int=getCharge(nuc); 
                printInfo::Bool=true) where {T1, D, BN, BT, NN, HFT, T2}
     nuc = arrayToTuple(nuc)
-    nucCoords = genTupleCoords(nucCoords)
+    nucCoords = genTupleCoords(T1, nucCoords)
     leastNb = ceil(N/2) |> Int
     @assert BN >= leastNb "The number of basis functions should be no less than $(leastNb)."
     @assert N > (HFT==:RHF) "$(HFT) requires more than $(HFT==:RHF) electrons."
