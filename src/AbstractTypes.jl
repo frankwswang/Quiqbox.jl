@@ -44,6 +44,7 @@ abstract type ParameterizedContainer{T} <: QuiqboxContainer end
 
 abstract type QuiqboxBasis{T, D} <: ParameterizedContainer{T} end
 abstract type PrimitiveBasisFunc{T} <: ParameterizedContainer{T} end
+abstract type SpatialStructure{T, D} <: ParameterizedContainer{T} end
 abstract type AbstractSpatialPoint{T, D} <: ParameterizedContainer{T} end
 
 abstract type SpatialOrbital{T, D, N} <: QuiqboxBasis{T, D} end

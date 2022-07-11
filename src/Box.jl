@@ -1,10 +1,52 @@
 export gridBoxCoords, GridBox, gridCoords
 
+export GP1D, GP2D, GP3D
+
+# const SPSpatialPoint{T, 1, SPoint{Tuple{ParamBox{T, :X, FLevel{2}}}}}
+
+# SpatialPoint{T, 2, SPoint{Tuple{ParamBox{T, :X, FLevel{2}}, 
+#                                 ParamBox{T, :Y, FLevel{2}}}}}
+
+# SpatialPoint{T, 3, SPoint{Tuple{ParamBox{T, :X, FLevel{2}}, 
+#                                 ParamBox{T, :Y, FLevel{2}}, 
+#                                 ParamBox{T, :Z, FLevel{2}}}}}
+
+const GP1D{T, L} = SP1D{T, FLevel{L}}
+const GP2D{T, L} = SP2D{T, FLevel{L}, FLevel{L}}
+const GP3D{T, L} = SP3D{T, FLevel{L}, FLevel{L}, FLevel{L}}
+
+getGPT(::Type{T}, ::Val{1}, ::Val{L}) where {T, L} = GP1D{T, L}
+getGPT(::Type{T}, ::Val{2}, ::Val{L}) where {T, L} = GP2D{T, L}
+getGPT(::Type{T}, ::Val{3}, ::Val{L}) where {T, L} = GP3D{T, L}
+
+# const SPoints{T, D, FL} = Tuple{Vararg{ParamBox{T, V, FL} where {V}, D}}
+
+function makeGridFuncsCore(nG::Int, prefix::String)
+    res = Array{Function}(undef, nG+1)
+    if nG == 0
+        res[] = itself
+    else
+        for i = 0:nG
+            funcName = prefix * "_$(nG)" * numToSubs(i)
+            funcSym = Symbol(funcName)
+            res[i+1] = if isdefined(Quiqbox, funcSym)
+                getfield(Quiqbox, funcSym)
+            else
+                renameFunc(funcName, L -> (i - 0.5nG)*L)
+            end
+        end
+    end
+    res
+end
+
+makeGridFuncs(c, f::F) where {F<:Function} = ifelse(c == 0, f, Sf(c, f))
+makeGridFuncs(_, f::itselfT) = itself
+
 """
 
-    GridBox{NP} <: SemiMutableParameter{GridBox, Float64}
+    GridBox{T, D, NP}
 
-A `struct` that stores coordinates of grid points in terms of both `Vector`s and 
+A `struct` that stores coordinates of grid points in terms of both `AbstractVector`s and 
 `ParamBox`s.
 
 ≡≡≡ Field(s) ≡≡≡
@@ -15,80 +57,79 @@ A `struct` that stores coordinates of grid points in terms of both `Vector`s and
 
 `box::NTuple{NP, NTuple{3, ParamBox}}`: The coordinates of grid points.
 
-`coord::Array{Vector{Float64}, 1}`: The coordinates of grid points in terms of `Vector`s.
+`coord::Array{AbstractVector{Float64}, 1}`: The coordinates of grid points in terms of `AbstractVector`s.
 
 ≡≡≡ Initialization Method(s) ≡≡≡
 
     GridBox(nGrids::NTuple{3, Int}, spacing::Real=10, 
-            centerCoord::Array{<:Real, 1}=[0.0,0.0,0.0];
+            center::Array{<:Real, 1}=[0.0,0.0,0.0];
             canDiff::Bool=true, index::Int=0) -> GridBox
 
 Construct a general `GridBox` that doesn't have to shape as a cube. `nGrid` is a 3-element 
 `Tuple` that specifies the number of grids (number of grid points - 1) along 3 dimensions. 
-`spacing` specifies the length between adjacent grid points. `centerCoord` specifies the 
+`spacing` specifies the length between adjacent grid points. `center` specifies the 
 geometry center coordinate of the box. `canDiff` determines whether the `ParamBox` should 
 be marked as differentiable. `index` defines the index number for the actual parameter: 
 spacing `L`, with the default value 0 it would be `L₀`.
 
     GridBox(nGridPerEdge::Int, spacing::Real=10, 
-            centerCoord::Array{<:Real, 1}=[0.0,0.0,0.0]; 
+            center::Array{<:Real, 1}=[0.0,0.0,0.0]; 
             canDiff::Bool=true, index::Int=0) -> GridBox
 
 Method of generating a cubic `GridBox`. `nGridPerEdge` specifies the number of grids 
 (number of grid points - 1) along each dimension.`spacing` specifies the length between 
-adjacent grid points. `centerCoord` specifies the geometry center coordinate of the box. 
+adjacent grid points. `center` specifies the geometry center coordinate of the box. 
 `canDiff` determines whether the `ParamBox` should be marked as differentiable. `index` 
 defines the index number for the actual parameter: spacing `L`, with the default value 0 
 it would be `L₀`.
 """
-struct GridBox{NP} <: SemiMutableParameter{GridBox, Float64}
-    num::Int
-    spacing::Float64
-    box::NTuple{NP, 
-                Tuple{ParamBox{Float64, :X, FLevel{2, 0}}, 
-                      ParamBox{Float64, :Y, FLevel{2, 0}}, 
-                      ParamBox{Float64, :Z, FLevel{2, 0}}}}
+struct GridBox{T, D, NP, GPT} <: SpatialStructure{T, D}
+    nPoint::Int
+    spacing::T
+    box::NTuple{NP, SpatialPoint{T, D, GPT}}
+    param::Tuple{Vararg{ParamBox{T}}}
 
-    function GridBox((nGx, nGy, nGz)::NTuple{3, Int}, spacing::Real=10, 
-                     centerCoord::Vector{<:Real}=[0.0,0.0,0.0];
-                     canDiff::Bool=true, index::Int=0)
-        nGrids = (nGx, nGy, nGz)
-        @assert all(nGrids.>=0) "The number of gird of each edge should be no less than 0."
+    function GridBox(nGrids::NTuple{D, Int}, spacing::Union{T, Array{T, 0}}, 
+                     center::AbstractVector{T}=fill(T(0), D); 
+                     canDiff::Bool=true, index::Int=0) where {T<:AbstractFloat, D}
+        @assert all(nGrids.>=0) "The number of gird of each edge must be no less than 0."
+        @assert length(center)==D "The dimension of center coordinate must be equal to $D."
+        NP = prod(nGrids .+ 1)
         sym = ParamList[:spacing]
-        spc = spacing |> Float64
-        pbRef = ParamBox(spc; index)
-        boxes = NTuple{3, ParamBox{Float64}}[]
-        n = 0
+        data = ifelse(spacing isa AbstractFloat, fill(spacing), spacing)
+        GPT = getGPT(T, Val(D), Val(2))
+        box = Array{SpatialPoint{T, D}}(undef, NP)
+        param = Array{ParamBox{T}}(undef, 3NP)
+        nGx, nGy, nGz = nGrids
+        # prefix = "G"*numToSups(nGx)*superscriptSym['-']*numToSups(nGy)*superscriptSym['-']*numToSups(nGz)*"_"
         prefix = "G" * "_" * "$(nGx)" * "_" * "$(nGy)" * "_" * "$(nGz)" * "_"
+        funcs = makeGridFuncsCore.(nGrids, prefix)
+        n = 0
         for i=0:nGx, j=0:nGy, k=0:nGz
             n += 1
-            fX0 = nGx==0  ?  itself  :  L -> centerCoord[1] + (i - 0.5*nGx) * L
-            fY0 = nGy==0  ?  itself  :  L -> centerCoord[2] + (j - 0.5*nGy) * L
-            fZ0 = nGz==0  ?  itself  :  L -> centerCoord[3] + (k - 0.5*nGz) * L
-            fXname = prefix * (cxSym |> string) * numToSubs(n)
-            fYname = prefix * (cySym |> string) * numToSubs(n)
-            fZname = prefix * (czSym |> string) * numToSubs(n)
-            fX = renameFunc(fXname, fX0)
-            fY = renameFunc(fYname, fY0)
-            fZ = renameFunc(fZname, fZ0)
-            X = ParamBox(pbRef.data, cxSym, fX, sym; canDiff, index)
-            Y = ParamBox(pbRef.data, cySym, fY, sym; canDiff, index)
-            Z = ParamBox(pbRef.data, czSym, fZ, sym; canDiff, index)
-            push!(boxes, (X, Y, Z))
+            fX = makeGridFuncs(center[1], funcs[1][i+1])
+            fY = makeGridFuncs(center[2], funcs[2][j+1])
+            fZ = makeGridFuncs(center[3], funcs[3][k+1])
+            X = ParamBox(data, cxSym, fX, sym; canDiff, index)
+            Y = ParamBox(data, cySym, fY, sym; canDiff, index)
+            Z = ParamBox(data, czSym, fZ, sym; canDiff, index)
+            p = (X, Y, Z)
+            box[n] = SpatialPoint(p)
+            param[3n-2:3n] .= p
         end
-        new{(nGx+1)*(nGy+1)*(nGz+1)}(prod(nGrids .+ 1), spc, Tuple(boxes))
+        new{T, D, NP, GPT}(NP, spacing, Tuple(box), Tuple(param))
     end
 end
 
-GridBox(nGridPerEdge::Int, spacing::Real=10, centerCoord::Vector{<:Real}=[0.0,0.0,0.0];
-        canDiff::Bool=true, index::Int=0) = 
-GridBox(fill(nGridPerEdge, 3) |> Tuple, spacing, centerCoord; canDiff, index)
+GridBox(nGridPerEdge::Int, spacing::T=T(1), center::AbstractVector{T}= T[0,0,0];
+        canDiff::Bool=true, index::Int=0) where {T} = 
+GridBox(fill(nGridPerEdge, 3) |> Tuple, spacing, center; canDiff, index)
 
 
 """
 
-    gridCoords(gb::GridBox) -> Array{Vector{Float64}, 1}
+    gridCoords(gb::GridBox) -> Array{AbstractVector{Float64}, 1}
 
-Return the grid-point coordinates in `Vector`s given the `GriBox`.
+Return the grid-point coordinates in `AbstractVector`s given the `GriBox`.
 """
 gridCoords(gb::GridBox) = [outValOf.(i) |> collect for i in gb.box]

@@ -17,7 +17,7 @@ grid = GridBox(2, 3.0)
 
 @test hasEqual(grid, GridBox((2,2,2), 3.0))
 
-@test grid.num == num
+@test grid.nPoint == num
 @test grid.spacing == 3.0
 @test gridCoords(grid) == points
 @test map(i-> [j() for j in i], grid.box) == Tuple(points)
