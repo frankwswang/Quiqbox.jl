@@ -15,28 +15,39 @@ pb2 = ParamBox(-1, :a, index=1)
 pb3 = ParamBox(-1, :x, abs)
 @test (@capture_out show(pb3)) == string(typeof(pb3))*"(-1)[∂][x_x]"
 
+p1 = genSpatialPoint((1.,))
+@test (@capture_out show(p1)) == "SpatialPoint{Float64, 1, SP1D{Float64, 0}}(param)[1.0][∂]"
+
+p2 = genSpatialPoint((1.,2.))
+@test (@capture_out show(p2)) == "SpatialPoint{Float64, 2, SP2D{Float64, 0, 0}}(param)"*
+                                 "[1.0, 2.0][∂][∂]"
+
+p3 = genSpatialPoint((1.,2.,3.))
+@test (@capture_out show(p3)) == "SpatialPoint{Float64, 3, SP3D{Float64, 0, 0, 0}}(param)"* 
+                                 "[1.0, 2.0, 3.0][∂][∂][∂]"
+
 bf1 = genBasisFunc([1.0, 2.0, 1.0], (2.0, 1.0))
 gf1 = bf1.gauss[1]
-@test (@capture_out show(gf1)) == string(typeof(gf1))*"(xpn="*
-                                    string(typeof(gf1.param[1]))*"(2.0)[∂][α], con="*
-                                    string(typeof(gf1.param[2]))*"(1.0)[∂][d])"
+@test (@capture_out show(gf1)) == string(typeof(gf1))*"(xpn="*string(typeof(gf1.param[1]))*
+                                  "(2.0)[∂][α], con="*string(typeof(gf1.param[2]))*
+                                  "(1.0)[∂][d])"
 @test (@capture_out show(bf1)) == string(typeof(bf1))*"(center, gauss)"*
-                                    "[X⁰Y⁰Z⁰][1.0, 2.0, 1.0]"
+                                  "[X⁰Y⁰Z⁰][1.0, 2.0, 1.0]"
 
 bf2 = genBasisFunc(missing, "STO-3G")[]
 @test (@capture_out show(bf2)) == string(typeof(bf2))*"(center, gauss)"*
-                                    "[X⁰Y⁰Z⁰]"*"[NaN, NaN, NaN]"
+                                  "[X⁰Y⁰Z⁰]"*"[NaN, NaN, NaN]"
 
 bfs1 = genBasisFunc([0.0, 0.0, 0.0], (2.0, 1.0), "P")
 @test (@capture_out show(bfs1)) == string(typeof(bfs1))*"(center, gauss)"*
-                                    "[3/3]"*"[0.0, 0.0, 0.0]"
+                                   "[3/3]"*"[0.0, 0.0, 0.0]"
 
 bfs2 = genBasisFunc([0.0 ,0.0 , 0.0], (2.0, 1.0), [(2,0,0)])
 @test (@capture_out show(bfs2)) == string(typeof(bfs2))*"(center, gauss)"*
-                                    "[X²Y⁰Z⁰]"*"[0.0, 0.0, 0.0]"
+                                   "[X²Y⁰Z⁰]"*"[0.0, 0.0, 0.0]"
 bfs3 = genBasisFunc([0.0, 0.0, 0.0], (2.0, 1.0), [(2,0,0), (1,1,0)])
 @test (@capture_out show(bfs3)) == string(typeof(bfs3))*"(center, gauss)"*
-                                    "[2/6]"*"[0.0, 0.0, 0.0]"
+                                   "[2/6]"*"[0.0, 0.0, 0.0]"
 
 bfm1 = BasisFuncMix([bf1, bf2])
 @test (@capture_out show(bfm1)) == string(typeof(bfm1))*"(BasisFunc, param)"
@@ -127,17 +138,17 @@ boolFunc(x::Array{<:Real, 0}, y::Array{<:Real, 0}) = isapprox(x, y, atol=1e-12)
 boolFunc(x::Real, y::Real) = isapprox(x, y, atol=1e-12)
 testMul = function (a1, a2, ignoreContainer=false)
     r1 = hasBoolRelation(boolFunc, 
-                            a1*(a1 + a2), 
-                            (a1 + a2)*a1, 
-                            a1*a1 + a1*a2, 
-                            a1*a1 + a2*a1, 
-                            mul(a1, add(a1, a2)), 
-                            mul(add(a1, a2), a1); ignoreContainer)
+                         a1*(a1 + a2), 
+                         (a1 + a2)*a1, 
+                         a1*a1 + a1*a2, 
+                         a1*a1 + a2*a1, 
+                         mul(a1, add(a1, a2)), 
+                         mul(add(a1, a2), a1); ignoreContainer)
 
     r2 = hasBoolRelation(boolFunc, a1 *  a2 * a1, 
-                            a1 * (a2 * a1), 
-                            mul(mul(a1, a2), a1),
-                            mul(a1, mul(a2, a1)); ignoreContainer)
+                         a1 * (a2 * a1), 
+                         mul(mul(a1, a2), a1),
+                         mul(a1, mul(a2, a1)); ignoreContainer)
     r1 * r2
 end
 
@@ -165,21 +176,21 @@ bfm4 = BasisFuncMix([bf4, bf5, bf4])
 
 testMul2 = function (a, a1, a2)
     r1 = hasBoolRelation(boolFunc, 
-                            a*(a1 + a2), 
-                            (a1 + a2)*a, 
-                            a*a1 + a*a2, 
-                            a1*a + a2*a, ignoreContainer=true)
+                         a*(a1 + a2), 
+                         (a1 + a2)*a, 
+                         a*a1 + a*a2, 
+                         a1*a + a2*a, ignoreContainer=true)
 
     r2 = hasBoolRelation(boolFunc, 
-                            a  * a1 * a2, 
-                            a  * a2 * a1,
-                            a1 * a  * a2,
-                            a1 * a2 * a ,
-                            a2 * a1 * a ,
-                            a2 * a  * a1,
-                            a  * (a1* a2), 
-                            a1 * (a2* a ),
-                            a2 * (a * a1), ignoreContainer=true)
+                         a  * a1 * a2, 
+                         a  * a2 * a1,
+                         a1 * a  * a2,
+                         a1 * a2 * a ,
+                         a2 * a1 * a ,
+                         a2 * a  * a1,
+                         a  * (a1* a2), 
+                         a1 * (a2* a ),
+                         a2 * (a * a1), ignoreContainer=true)
     r1 * r2
 end
 
@@ -208,8 +219,8 @@ c1 = 1.5
 c2 = 2.5
 
 @test testMul2.([bf1, bf3, bf4, bf5, 
-                    bfm2.BasisFunc |> sum, bfm3.BasisFunc |> sum, bfm4.BasisFunc |> sum], 
-                    c1, c2) |> all
+                 bfm2.BasisFunc |> sum, bfm3.BasisFunc |> sum, bfm4.BasisFunc |> sum], 
+                c1, c2) |> all
 
 @test .!testMul2.([bfm2, bfm3, bfm4], c1, c2) |> all
 

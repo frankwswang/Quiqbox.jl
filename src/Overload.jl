@@ -28,9 +28,21 @@ function show(io::IO, pb::ParamBox)
     print(io, "]")
 end
 
+getSPNDstring(t::Type{SP1D{T, Lx}}) where {T, Lx} = 
+(string(t), "SP1D{$T, $(Lx)}")
+
+getSPNDstring(t::Type{SP2D{T, Lx, Ly}}) where {T, Lx, Ly} = 
+(string(t), "SP2D{$T, $(Lx), $(Ly)}")
+
+getSPNDstring(t::Type{SP3D{T, Lx, Ly, Lz}}) where {T, Lx, Ly, Lz} = 
+(string(t), "SP3D{$T, $(Lx), $(Ly), $(Lz)}")
+
 function show(io::IO, sp::SpatialPoint)
     pbs = sp.param
-    print(io, typeof(sp), "(point.param)")
+    spTstrO = typeof(sp) |> string
+    pbsTstrO, pbsTstrN = typeof(sp.param) |> getSPNDstring
+    spTstrN = replace(spTstrO, pbsTstrO=>pbsTstrN, count=1)
+    print(io, spTstrN, "(param)")
     print(io, [i() for i in pbs])
     for pb in pbs
         print(io, "[")

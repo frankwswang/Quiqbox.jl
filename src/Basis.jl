@@ -133,38 +133,25 @@ const Doc_genSpatialPoint_Eg1 = "SpatialPoint{3, Float64, "*
                                 "Tuple{FI, FI, FI}}"*
                                 "(param)[1.0, 2.0, 3.0][∂][∂][∂]"
 
-const PT1D{T, FLx} = Tuple{ParamBox{T, cxSym, FLx}}
-const PT2D{T, FLx, FLy} = Tuple{ParamBox{T, cxSym, FLx}, ParamBox{T, cySym, FLy}}
-const PT3D{T, FLx, FLy, FLz} = Tuple{ParamBox{T, cxSym, FLx}, ParamBox{T, cySym, FLy}, 
-                                     ParamBox{T, czSym, FLz}}
+const SP1D{T, Lx} = Tuple{ParamBox{T, cxSym, FLevel{Lx}}}
+const SP2D{T, Lx, Ly} = Tuple{ParamBox{T, cxSym, FLevel{Lx}}, 
+                              ParamBox{T, cySym, FLevel{Ly}}}
+const SP3D{T, Lx, Ly, Lz} = Tuple{ParamBox{T, cxSym, FLevel{Lx}}, 
+                                  ParamBox{T, cySym, FLevel{Ly}}, 
+                                  ParamBox{T, czSym, FLevel{Lz}}}
 
-const SPointPTL = Union{Tuple{ParamBox{T, cxSym}} where T, 
-                        Tuple{ParamBox{T, cxSym}, ParamBox{T, cySym}} where T, 
-                        Tuple{ParamBox{T, cxSym}, ParamBox{T, cySym}, 
-                              ParamBox{T, czSym}} where T}
+const SPointTL{T} = Union{SP1D{T}, SP2D{T}, SP3D{T}}
 
-const SPointPTU{T, D} = Tuple{Vararg{ParamBox{T, V, FL} where {V, FL<:FLevel}, D}}
-
-struct SPoint{TT}
-    param::TT
-    SPoint(param::TT) where {TT<:SPointPTL} = new{TT}(param)
-end
-
-const SP1D{T, Lx} = SPoint{PT1D{T, FLevel{Lx}}}
-const SP2D{T, Lx, Ly} = SPoint{PT2D{T, FLevel{Lx}, FLevel{Ly}}}
-const SP3D{T, Lx, Ly, Lz} = SPoint{PT3D{T, FLevel{Lx}, FLevel{Ly}, FLevel{Lz}}}
+const SPointTU{T, D} = Tuple{Vararg{ParamBox{T, V, FL} where {V, FL<:FLevel}, D}}
 
 struct SpatialPoint{T, D, PT} <: AbstractSpatialPoint{T, D}
-    point::PT
-    function SpatialPoint(pbs::SPointPTU{T, D}) where {T, D}
-        sp = SPoint(pbs)
-        new{T, D, typeof(sp)}(sp)
+    param::PT
+    function SpatialPoint(pbs::SPointTU{T, D}) where {T, D}
+        pbsT = typeof(pbs)
+        @assert  pbsT <: SPointTL{T}
+        new{T, D, pbsT}(pbs)
     end
 end
-
-import Base: getproperty
-getproperty(sp::SpatialPoint, sym::Symbol) = 
-sym === :param ? getproperty(getproperty(sp, :point), :param) : getfield(sp, sym)
 
 """
 
@@ -281,14 +268,7 @@ Convert a collection of `$(ParamBox)`s to a spatial point.
 genSpatialPoint(point::NTuple{N, ParamBox}) where {N} = 
 ParamBox.(Val.(SpatialParamSyms[1:N]), point) |> genSpatialPointCore
 
-genSpatialPointCore(point::PT1D{FLx, T}) where {T, FLx} = 
-SpatialPoint(point)
-
-genSpatialPointCore(point::PT2D{FLx, FLy, T}) where {T, FLx, FLy} = 
-SpatialPoint(point)
-
-genSpatialPointCore(point::PT3D{FLx, FLy, FLz, T}) where {T, FLx, FLy, FLz} = 
-SpatialPoint(point)
+genSpatialPointCore(point::Union{SP1D, SP2D, SP3D}) = SpatialPoint(point)
 
 
 coordOf(sp::SpatialPoint) = [outValOf(i) for i in sp.param]
