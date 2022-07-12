@@ -180,7 +180,7 @@ paramIndex(::Val{conSym}, ::Val{D}) where {D} = conIndex - 3 + D
 function ∂BasisCore1(par::ParamBox{T, V, FL}, sgf::FGTBasisFuncs1O{T, D, <:Any, 1}) where 
                     {T, FL, V, D}
     params = sgf.param
-    is = findall(x->x.data===par.data, params)
+    is = findall(x->compareParamBoxCore1(x, par), params)
     if length(is) > 0
         map(is) do i
             fPar = params[i]
@@ -200,7 +200,7 @@ end
 function ∂BasisCore2(par::ParamBox{T, V, FL}, sgf::FGTBasisFuncs1O{T, D, <:Any, 1}) where 
                     {T, V, FL, D}
     dividend = sgf.param[paramIndex(Val(V), Val(D))]
-    if !(divident.canDiff[]) && par.data === dividend.data && par.map === dividend.map
+    if !(divident.canDiff[]) && compareParamBoxCore2(par, dividend)
         ∂SGFcore(Val(V), sgf)
     else
         EmptyBasisFunc{T, D}()

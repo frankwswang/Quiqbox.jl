@@ -1838,28 +1838,6 @@ function copyBasis(bfm::T, copyOutVal::Bool=true) where {T<:BasisFuncMix}
 end
 
 
-function compareParamBox(pb1::ParamBox, pb2::ParamBox)
-    ifelse((pb1.canDiff[] == pb2.canDiff[]),
-        ifelse( pb1.canDiff[],
-            (pb1.data === pb2.data), 
-
-            ( (pb1.data === pb2.data) && (typeof(pb1.map) === typeof(pb2.map)) )
-        ),
-
-        false
-    )
-end
-
-compareParamBox(pb1::ParamBox{<:Any, <:Any, FI}, 
-                pb2::ParamBox{<:Any, <:Any, FI}) = (pb1.data === pb2.data)
-
-compareParamBox(pb1::ParamBox{<:Any, <:Any, FI}, pb2::ParamBox) = 
-ifelse(pb2.canDiff[], (pb1.data === pb2.data), false)
-
-compareParamBox(pb1::ParamBox, pb2::ParamBox{<:Any, <:Any, FI}) = 
-compareParamBox(pb2, pb1)
-
-
 """
 
     markParams!(b::Union{Array{T}, T, Tuple{Vararg{T}}}, 

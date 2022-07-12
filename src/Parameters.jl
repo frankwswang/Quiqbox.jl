@@ -419,3 +419,30 @@ function changeMapping(pb::ParamBox{T, V, FL}, mapFunction::F, outputName::Symbo
     ParamBox(Val(outputName), mapFunction, pb.data, 
              genIndex( ifelse(canDiff, pb.index[], nothing) ), fill(canDiff), dn)
 end
+
+
+compareParamBoxCore1(pb1::ParamBox, pb2::ParamBox) = (pb1.data === pb2.data)
+
+compareParamBoxCore2(pb1::ParamBox, pb2::ParamBox) = 
+compareParamBoxCore1(pb1, pb2) && (typeof(pb1.map) === typeof(pb2.map))
+
+function compareParamBox(pb1::ParamBox, pb2::ParamBox)
+    ifelse((pb1.canDiff[] == pb2.canDiff[]),
+        ifelse( pb1.canDiff[],
+            compareParamBoxCore1(pb1, pb2), 
+
+            compareParamBoxCore2(pb1, pb2)
+        ),
+
+        false
+    )
+end
+
+compareParamBox(pb1::ParamBox{<:Any, <:Any, FI}, pb2::ParamBox{<:Any, <:Any, FI}) = 
+compareParamBoxCore1(pb1, pb2)
+
+compareParamBox(pb1::ParamBox{<:Any, <:Any, FI}, pb2::ParamBox) = 
+ifelse(pb2.canDiff[], compareParamBoxCore1(pb1, pb2), false)
+
+compareParamBox(pb1::ParamBox, pb2::ParamBox{<:Any, <:Any, FI}) = 
+compareParamBox(pb2, pb1)
