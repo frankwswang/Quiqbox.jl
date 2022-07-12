@@ -143,24 +143,32 @@ import Base: *
 
 
 # Iteration Interface
-import Base: iterate, size, length, ndims
+import Base: iterate, size, length, eltype
 iterate(pb::ParamBox) = (pb.data[], nothing)
 iterate(::ParamBox, _) = nothing
 size(::ParamBox) = ()
 length(::ParamBox) = 1
-ndims(::ParamBox) = 0
-size(::ParamBox, d::Integer) = (d == 1) ? 1 : throw(BoundsError())
-
-iterate(gf::GaussFunc) = (gf, nothing)
-iterate(::GaussFunc, _) = nothing
-size(::GaussFunc) = ()
-length(::GaussFunc) = 1
-size(::GaussFunc, d::Integer) = (d == 1) ? 1 : throw(BoundsError())
+eltype(::ParamBox{T}) where {T} = T
+size(pb::ParamBox, d::Integer) = size(pb.data[], d)
 
 iterate(sp::SpatialPoint) = iterate(sp.param)
 iterate(sp::SpatialPoint, state) = iterate(sp.param, state)
 size(::SpatialPoint{<:Any, D}) where {D} = (D,)
 length(::SpatialPoint{<:Any, D}) where {D} = D
+eltype(::SpatialPoint{T}) where {T} = ParamBox{T}
+function size(::SpatialPoint{<:Any, D}, d::Integer) where {D}
+    if d > 0
+        ifelse(d==1, D, 1)
+    else
+        throw(BoundsError())
+    end
+end
+
+iterate(gf::GaussFunc) = (gf, nothing)
+iterate(::GaussFunc, _) = nothing
+size(::GaussFunc) = ()
+length(::GaussFunc) = 1
+size(::GaussFunc, d::Integer) = (d > 0) ? 1 : throw(BoundsError())
 
 iterate(bf::BasisFunc) = (bf, nothing)
 iterate(::BasisFunc, _) = nothing
@@ -173,6 +181,9 @@ size(::BasisFuncMix) = ()
 length(::BasisFuncMix) = 1
 
 iterate(bfZero::EmptyBasisFunc) = (bfZero, nothing)
+iterate(::EmptyBasisFunc, _) = nothing
+size(::EmptyBasisFunc) = ()
+length(::EmptyBasisFunc) = 1
 
 function iterate(bfs::CompositeGTBasisFuncs)
     item, state = iterate(bfs.l)
@@ -185,9 +196,15 @@ function iterate(bfs::CompositeGTBasisFuncs, state)
 end
 size(::CGTBasisFuncsON{ON}) where {ON} = (ON,)
 length(::CGTBasisFuncsON{ON}) where {ON} = ON
+eltype(::BasisFuncs{T, D, 𝑙, GN, PT}) where {T, D, 𝑙, GN, PT} = BasisFunc{T, D, 𝑙, GN, PT}
 
-size(x::SpatialOrbital, d::Integer) = (d == 1) ? length(x) : throw(BoundsError())
-
+function size(x::SpatialOrbital, d::Integer)
+    if d > 0
+        ifelse(d==1, length(x), 1)
+    else
+        throw(BoundsError())
+    end
+end
 
 # Indexing Interface
 import Base: getindex, setindex!, firstindex, lastindex, eachindex, axes
@@ -199,44 +216,26 @@ firstindex(::ParamBox) = Val(:first)
 lastindex(::ParamBox) = Val(:last)
 axes(::ParamBox) = ()
 
+getindex(container::ParameterizedContainer) = container.param
+
 getindex(sp::SpatialPoint, args...) = getindex(sp.param, args...)
-getindex(sp::SpatialPoint) = sp.param
 firstindex(sp::SpatialPoint) = firstindex(sp.param)
 lastindex(sp::SpatialPoint) = lastindex(sp.param)
 eachindex(sp::SpatialPoint) = eachindex(sp.param)
 axes(sp::SpatialPoint) = axes(sp.param)
-ndims(sp::SpatialPoint) = ndims(sp.param)
-
-getindex(gf::GaussFunc) = gf.param |> collect
-getindex(gf::GaussFunc, ::Val{:first}) = getindex(gf)
-getindex(gf::GaussFunc, ::Val{:last}) = getindex(gf)
-firstindex(::GaussFunc) = Val(:first)
-lastindex(::GaussFunc) = Val(:last)
-
-getindex(bf::BasisFunc) = bf.gauss |> collect
-getindex(bf::BasisFunc, ::Val{:first}) = getindex(bf)
-getindex(bf::BasisFunc, ::Val{:last}) = getindex(bf)
-firstindex(::BasisFunc) = Val(:first)
-lastindex(::BasisFunc) = Val(:last)
-
-getindex(bfm::BasisFuncMix) = (collect ∘ flatten)( getproperty.(bfm.BasisFunc, :gauss) )
-getindex(bfm::BasisFuncMix, ::Val{:first}) = getindex(bfm)
-getindex(bfm::BasisFuncMix, ::Val{:last}) = getindex(bfm)
-firstindex(::BasisFuncMix) = Val(:first)
-lastindex(::BasisFuncMix) = Val(:last)
 
 getindex(bfs::BasisFuncs, is::AbstractVector{Int}) = 
 BasisFuncs(bfs.center, bfs.gauss, bfs.l[is], bfs.normalizeGTO)
 getindex(bfs::BasisFuncs, i::Int) = 
 BasisFunc(bfs.center, bfs.gauss, bfs.l[i], bfs.normalizeGTO)
-getindex(bfs::BFuncsON{ON}, ::Colon) where {ON} = [getindex(bfs, i) for i=1:ON]
+getindex(bfs::BasisFuncs{T, D, 𝑙, GN, PT, ON}, ::Colon) where {T, D, 𝑙, GN, PT, ON} = 
+BasisFunc{T, D, 𝑙, GN, PT}[getindex(bfs, i) for i=1:ON]
 firstindex(bfs::BasisFuncs) = 1
 lastindex(::BFuncsON{ON}) where {ON} = ON
 eachindex(bfs::BFuncsON) = Base.OneTo(lastindex(bfs))
-getindex(bfs::BasisFuncs) = getproperty.(bfs[:], :gauss) |> flatten
 
-getindex(xyz::LTuple, args...) = getindex(xyz.tuple, args...)
 getindex(xyz::LTuple) = xyz.tuple
+getindex(xyz::LTuple, args...) = getindex(xyz.tuple, args...)
 firstindex(xyz::LTuple) = firstindex(xyz.tuple)
 lastindex(xyz::LTuple) = lastindex(xyz.tuple)
 eachindex(xyz::LTuple) = eachindex(xyz.tuple)
@@ -258,22 +257,6 @@ function hasBoolRelation(boolFunc::F,
                          pb1::ParamBox{<:Any, V1, F1}, pb2::ParamBox{<:Any, V2, F2}; 
                          ignoreFunction::Bool=false, ignoreContainer::Bool=false, 
                          kws...) where {F<:Function, V1, V2, F1, F2}
-    # ifelse(ignoreContainer, 
-    #     boolFunc(pb1(), pb2()), 
-
-    #     ifelse(V1 == V2, 
-    #         ifelse((ignoreFunction || F1 == F2 == FI), 
-    #             boolFunc(pb1.data, pb2.data), 
-
-    #             ( boolFunc(pb1.canDiff[], pb2.canDiff[]) && 
-    #               boolFunc(pb1.map, pb2.map) && 
-    #               boolFunc(pb1.data, pb2.data) )
-    #         ), 
-
-    #         false
-    #     )
-    # )
-
     if ignoreContainer
         boolFunc(pb1(), pb2())
     else
@@ -289,20 +272,6 @@ function hasBoolRelation(boolFunc::F,
             false
         )
     end
-
-    # if ignoreContainer
-    #     boolFunc(pb1(), pb2())
-    # elseif V1 == V2
-    #     ifelse( (ignoreFunction || F1 == F2 == FI), 
-    #         boolFunc(pb1.data, pb2.data), 
-
-    #         ( boolFunc(pb1.canDiff[], pb2.canDiff[]) && 
-    #           boolFunc(pb1.map, pb2.map) && 
-    #           boolFunc(pb1.data, pb2.data) )
-    #     )
-    # else
-    #     false
-    # end
 end
 
 

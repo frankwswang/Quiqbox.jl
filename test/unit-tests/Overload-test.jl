@@ -235,7 +235,6 @@ cs = [pb1, gf1, bf1]
 @test (size.(cs) .== Ref(())) |> all
 @test (size.(cs, 1) .== 1) |> all
 @test (length.(cs) .== 1) |> all
-@test ndims(pb1) == 0
 
 @test iterate(bfm1) == (bfm1, nothing)
 @test iterate(bfm1, rand()) === nothing
@@ -257,19 +256,19 @@ cs = [pb1, gf1, bf1]
 @test (pb1[] = -2; res = (pb1[] == -2); pb1[] = -1; res)
 @test axes(pb1) == ()
 
-@test getindex(gf1) == gf1[] == gf1[begin] == gf1[end] == (gf1.param |> collect)
-@test getindex(bf1) == bf1[] == bf1[begin] == bf1[end] == (bf1.gauss |> collect)
+@test getindex(gf1) == gf1[] == gf1.param
+@test getindex(bf1) == bf1[] == bf1.param
 bfm11 = Quiqbox.BasisFuncMix([bf1, bf2, bf1])
-gs = getindex(bfm11)
-@test gs == bfm11[] == bfm11[begin] == bfm11[end]
-@test getUnique!(gs) == [bf1.gauss[1], bf2.gauss...]
+for i in bfm11.param[end-8:end-6]
+    i[] = rand()
+end
+@test getindex(bfm11) == bfm11[] == bfm11.param
 bfs1_alter = genBasisFunc.(Ref(fill(0.0, 3)), Ref((2.0,1.0)), [(1,0,0), (0,1,0), (0,0,1)])
 for i in eachindex(bfs1)
     @test hasEqual(getindex(bfs1, i), bfs1[i], bfs1_alter[i])
 end
 @test hasEqual(bfs1[begin], bfs1[1])
 @test hasEqual(bfs1[end], bfs1[3])
-@test getindex(bfs1) == fill(bfs1.gauss[1], 3)
 
 
 # function broadcastable
