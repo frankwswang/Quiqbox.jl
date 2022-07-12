@@ -150,9 +150,9 @@ struct SPoint{TT}
     SPoint(param::TT) where {TT<:SPointPTL} = new{TT}(param)
 end
 
-const SP1D{T, FLx} = SPoint{PT1D{T, FLx}}
-const SP2D{T, FLx, FLy} = SPoint{PT2D{T, FLx, FLy}}
-const SP3D{T, FLx, FLy, FLz} = SPoint{PT3D{T, FLx, FLy, FLz}}
+const SP1D{T, Lx} = SPoint{PT1D{T, FLevel{Lx}}}
+const SP2D{T, Lx, Ly} = SPoint{PT2D{T, FLevel{Lx}, FLevel{Ly}}}
+const SP3D{T, Lx, Ly, Lz} = SPoint{PT3D{T, FLevel{Lx}, FLevel{Ly}, FLevel{Lz}}}
 
 struct SpatialPoint{T, D, PT} <: AbstractSpatialPoint{T, D}
     point::PT

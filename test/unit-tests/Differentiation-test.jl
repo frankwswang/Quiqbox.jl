@@ -15,7 +15,7 @@ S1 = overlaps(bs1)
 HFres1 = runHF(bs1, nuc, nucCoords, printInfo=false)
 grad1 = gradHFenergy(bs1, pars1, HFres1.C, S1, nuc, nucCoords)
 
-grad1_t = [1.256079506314511, 1.256079506314511, 4.050658426012203, 0]
+grad1_t = [1.2560795063134957, 1.2560795063134957, 4.05065842601134, 0]
 t1 = 1e-14
 t2 = 1e-10
 @test isapprox(grad1[1], grad1[2], atol=t1)
@@ -36,13 +36,13 @@ HFres2 = runHF(bs2, nuc, nucCoords, printInfo=false)
 grad2 = gradHFenergy(bs2, pars2, HFres2.C, S2, nuc, nucCoords)
 
 @test isapprox(grad2[1], -grad2[2], atol=t2)
-@test isapprox(grad2[1], -0.14578887741248492, atol=t2)
+@test isapprox(grad2[1], -0.14578887741248214, atol=t2)
 @test all(grad2[3:6] .== 0)
-grad2_tp = [-0.027665907127074563, 0.03295656668564936, 
-             0.0946414774465647, -0.059960502688767015]
+grad2_tp = [-0.02766590712707717,  0.03295656668565583, 
+             0.09464147744656481, -0.059960502688767015]
 @test isapprox.(grad2[7:end], grad2_tp, atol=t2) |> all
 
-bs3 = bs1[1:2] .* bs2 # basis set of BasisFuncMix
+bs3 = bs1[[1,5]] .* bs2 # basis set of BasisFuncMix
 pars3 = markParams!(bs3, true)
 S3 = overlaps(bs3)
 HFres3 = runHF(bs3, nuc, nucCoords, printInfo=false)
@@ -52,7 +52,7 @@ grad3_t = [-0.16062864424199147,  -0.2411735493547453,  -0.14804711194047948,
            -0.415532056832117,    -0.05740760658222217, -0.3058527627387774, 
            -0.4188960659822835,    0.6570036772359016,   0.10173083205927101, 
             1.2104779162193346,    0.13562783299744025,  1.6063572261633068, 
-            0.058847447233214285,  0.7019079596644315,  -1.2886938155694367, 
+            0.05884744723321426,   0.7019079596644315,  -1.2886938155694367, 
             2.7630302660205586,  -16.539056820811133]
 @test isapprox.(grad3, grad3_t, atol=t2) |> all
 

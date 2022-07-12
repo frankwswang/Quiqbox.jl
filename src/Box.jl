@@ -1,26 +1,5 @@
 export gridBoxCoords, GridBox, gridCoords
 
-export GP1D, GP2D, GP3D
-
-# const SPSpatialPoint{T, 1, SPoint{Tuple{ParamBox{T, :X, FLevel{2}}}}}
-
-# SpatialPoint{T, 2, SPoint{Tuple{ParamBox{T, :X, FLevel{2}}, 
-#                                 ParamBox{T, :Y, FLevel{2}}}}}
-
-# SpatialPoint{T, 3, SPoint{Tuple{ParamBox{T, :X, FLevel{2}}, 
-#                                 ParamBox{T, :Y, FLevel{2}}, 
-#                                 ParamBox{T, :Z, FLevel{2}}}}}
-
-const GP1D{T, L} = SP1D{T, FLevel{L}}
-const GP2D{T, L} = SP2D{T, FLevel{L}, FLevel{L}}
-const GP3D{T, L} = SP3D{T, FLevel{L}, FLevel{L}, FLevel{L}}
-
-getGPT(::Type{T}, ::Val{1}, ::Val{L}) where {T, L} = GP1D{T, L}
-getGPT(::Type{T}, ::Val{2}, ::Val{L}) where {T, L} = GP2D{T, L}
-getGPT(::Type{T}, ::Val{3}, ::Val{L}) where {T, L} = GP3D{T, L}
-
-# const SPoints{T, D, FL} = Tuple{Vararg{ParamBox{T, V, FL} where {V}, D}}
-
 function makeGridFuncsCore(nG::Int)
     res = Array{Function}(undef, nG+1)
     if nG == 0
@@ -100,10 +79,9 @@ struct GridBox{T, D, NP, GPT<:SpatialPoint{T, D}} <: SpatialStructure{T, D}
         data = ifelse(spacing isa AbstractFloat, fill(spacing), spacing)
         box = Array{SpatialPoint{T, D}}(undef, NP)
         param = Array{ParamBox{T}}(undef, D*NP)
-        # prefix = "G" * "_" * "$(nGx)" * "_" * "$(nGy)" * "_" * "$(nGz)" * "_"
         funcs = makeGridFuncsCore.(nGrids)
-        for (n, i) in enumerate( CartesianIndices(reverse(nGrids) .+ 1) )
-            fs = makeGridFuncs.(center, [funcs[j][k] for (j, k) in enumerate(i|>Tuple|>reverse)])
+        for (n, i) in enumerate( CartesianIndices(nGrids .+ 1) )
+            fs = makeGridFuncs.(center, [funcs[j][k] for (j, k) in enumerate(i|>Tuple)])
             p = ParamBox.(Ref(data), oVsym, fs, iVsym; canDiff, index) |> Tuple
             box[n] = SpatialPoint(p)
             param[D*(n-1)+1 : D*n] .= p
