@@ -164,7 +164,7 @@ end
 
 import Base: getproperty
 getproperty(sp::SpatialPoint, sym::Symbol) = 
-sym === :param ? getproperty(getfield(sp, :point), :param) : getfield(sp, sym)
+sym === :param ? getproperty(getproperty(sp, :point), :param) : getfield(sp, sym)
 
 """
 
@@ -336,7 +336,7 @@ struct BasisFunc{T, D, 𝑙, GN, PT} <: FGTBasisFuncs1O{T, D, 𝑙, GN, PT}
 
     function BasisFunc(cen::SpatialPoint{T, D, PT}, gs::NTuple{GN, AbstractGaussFunc{T}}, 
                        l::Tuple{LTuple{D, 𝑙}}, normalizeGTO::Bool) where {T, D, PT, 𝑙, GN}
-        pars = joinTuple(cen.param, getfield.(gs, :param)...)
+        pars = joinTuple(cen.param, getproperty.(gs, :param)...)
         new{T, D, 𝑙, GN, PT}(cen, gs, l, normalizeGTO, pars)
     end
 end
@@ -373,7 +373,7 @@ struct BasisFuncs{T, D, 𝑙, GN, PT, ON} <: FloatingGTBasisFuncs{T, D, 𝑙, GN
         @assert ON <= ss "The total number of `l` should be no more than $(ss) as " * 
                          "they are in $(subshell) subshell."
         ls = sort(collect(ls), rev=true) |> Tuple
-        pars = joinTuple(cen.param, getfield.(gs, :param)...)
+        pars = joinTuple(cen.param, getproperty.(gs, :param)...)
         new{T, D, 𝑙, GN, PT, ON}(cen, gs, ls, normalizeGTO, pars)
     end
 end
@@ -714,7 +714,7 @@ struct BasisFuncMix{T, D, BN, BT<:BasisFunc{T, D}} <: CGTBasisFuncs1O{T, D, BN}
 
     function BasisFuncMix(bfs::Tuple{Vararg{BasisFunc{T, D}, BN}}) where {T, D, BN}
         bs = sortBasisFuncs(bfs, roundDigits=-1)
-        new{T, D, BN, eltype(bfs)}(bs, joinTuple(getfield.(bs, :param)...))
+        new{T, D, BN, eltype(bfs)}(bs, joinTuple(getproperty.(bs, :param)...))
     end
 end
 
@@ -1277,7 +1277,7 @@ BasisFunc{0, 2}(center, gauss)[X⁰Y⁰Z⁰][1.0, 1.0, 1.0]
 julia> bf2 = bf1 * 2
 BasisFunc{0, 2}(center, gauss)[X⁰Y⁰Z⁰][1.0, 1.0, 1.0]
 
-julia> getindex.(getfield.(bf2.gauss, :con))
+julia> getindex.(getproperty.(bf2.gauss, :con))
 (0.2, 0.4)
 
 julia> bf3 = bf1 * bf2

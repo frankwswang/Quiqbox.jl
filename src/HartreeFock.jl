@@ -11,7 +11,7 @@ precompile(getXcore1, (Matrix{Float64},))
 
 const getXmethods = (m1=getXcore1,)
 
-getX(S::Matrix{T}, method::Symbol=:m1) where {T<:Real} = getfield(getXmethods, method)(S)
+getX(S::Matrix{T}, method::Symbol=:m1) where {T<:Real} = getproperty(getXmethods, method)(S)
 
 
 function getCϵ(X::Matrix{T}, Fˢ::Matrix{T}, stabilizeSign::Bool=true) where {T<:Real}
@@ -404,12 +404,12 @@ struct HFfinalVars{T, D, HFT, NN, BN, HFTS} <: HartreeFockFinalValue{T, HFT}
                          nuc::NTuple{NN, String}, nucCoords::NTuple{NN, NTuple{𝐷, T}}, 
                          X::Matrix{T}, αβVars::NTuple{2, HFtempVars{T, :UHF}}, 
                          isConverged::Bool) where {T, 𝐷, BN, NN}
-        C = last.(getfield.(αβVars, :Cs))
-        F = last.(getfield.(αβVars, :Fs))
-        D = last.(getfield.(αβVars, :Ds))
+        C = last.(getproperty.(αβVars, :Cs))
+        F = last.(getproperty.(αβVars, :Fs))
+        D = last.(getproperty.(αβVars, :Ds))
         Ehf = αβVars[1].shared.Etots[end]
         Eo = getindex.(getCϵ.(Ref(X), F), 2)
-        Nα, Nβ = Ns = getfield.(αβVars, :N)
+        Nα, Nβ = Ns = getproperty.(αβVars, :N)
         occu = ( (fill(spinOccupations[2], Nα)..., fill(spinOccupations[1], BN-Nα)...), 
                  (fill(spinOccupations[3], Nβ)..., fill(spinOccupations[1], BN-Nβ)...) )
         Enn = nnRepulsions(nuc, nucCoords)
@@ -496,7 +496,7 @@ mutable struct HFconfig{T1, HFT, F, T2, L} <: ConfigBox{T1, HFconfig, HFT}
 
     function HFconfig(::Val{HFT}, a2::Val{CF}, a3::SCFconfig{T, L}, a4, a5) where 
                      {T, HFT, CF, L}
-        f = getfield(guessCmethods, CF)
+        f = getproperty(guessCmethods, CF)
         new{T, HFT, typeof(f), T, L}(Val(HFT), InitialC(Val(HFT), f, T), a3, a4, a5)
     end
 end
@@ -577,7 +577,7 @@ function runHF(bs::GTBasis{T1, D, BN, BT},
         @show bs.S
     end
     getC0f = config.C0.f
-    C0 = uniCallFunc(getC0f, getfield(C0methodArgOrders, nameOf(getC0f)), config.C0.mat, 
+    C0 = uniCallFunc(getC0f, getproperty(C0methodArgOrders, nameOf(getC0f)), config.C0.mat, 
                      Val(HFT), bs.S, X, Hcore, bs.eeI, bs.basis, nuc, nucCoords)
     vars, isConverged = runHFcore(Val(HFT), config.SCF, Ns, Hcore, bs.eeI, bs.S, X, 
                                   C0, printInfo, config.maxStep, config.earlyStop)
@@ -801,7 +801,7 @@ const SCFmethodSelector =
 function HFcore(m::Symbol, N::NTuple{HFTS, Int}, Hcore::Matrix{T}, HeeI::Array{T, 4}, 
                 S::Matrix{T}, X::Matrix{T}, rVars::NTuple{HFTS, HFtempVars{T, HFT}}; 
                 kws...) where {HFTS, T, HFT}
-    F = getfield(SCFmethodSelector, m)(N, Hcore, HeeI, S, X, rVars; kws...)
+    F = getproperty(SCFmethodSelector, m)(N, Hcore, HeeI, S, X, rVars; kws...)
         getCFDE(Hcore, HeeI, X, N, F)
 end
 
@@ -915,4 +915,4 @@ const ConstraintSolvers = (LCM=CMsolver, BFGS=LBFGSBsolver)
 
 constraintSolver(v::Vector{T}, B::Matrix{T}, 
                  cvxConstraint::Bool, solver::Symbol) where {T} = 
-getfield(ConstraintSolvers, solver)(v, B, cvxConstraint)
+getproperty(ConstraintSolvers, solver)(v, B, cvxConstraint)

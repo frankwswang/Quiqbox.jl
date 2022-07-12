@@ -9,7 +9,7 @@ function makeGridFuncsCore(nG::Int)
             funcName = "G$(nG)" * numToSups(i)
             funcSym = Symbol(funcName)
             res[i+1] = if isdefined(Quiqbox, funcSym)
-                getfield(Quiqbox, funcSym)
+                getproperty(Quiqbox, funcSym)
             else
                 renameFunc(funcName, L -> (i - 0.5nG)*L)
             end

@@ -853,7 +853,7 @@ end
 
 function genNamedTupleC(name::Symbol, defaultVars::AbstractArray)
     @inline function (t::T) where {T<:NamedTuple}
-        container = getfield(Quiqbox, name)
+        container = getproperty(Quiqbox, name)
         res = deepcopy(defaultVars)
         keys = fieldnames(container)
         d = Dict(keys .=> collect(1:length(defaultVars)))

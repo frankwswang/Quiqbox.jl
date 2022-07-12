@@ -262,8 +262,8 @@ end
 
 
 # function broadcastable
-@test getfield.(pb1, [:data, :map]) == [pb1.data, pb1.map]
-@test getfield.(gf1, [:xpn, :con]) == [gf1.xpn, gf1.con]
+@test getproperty.(pb1, [:data, :map]) == [pb1.data, pb1.map]
+@test getproperty.(gf1, [:xpn, :con]) == [gf1.xpn, gf1.con]
 @test hasEqual(bf1 .* [1.0, 3.0], [bf1*1.0, bf1*3.0])
 bfm12 = bf1 + genBasisFunc([1.0, 2.0, 2.0], (2.0, 3.0))
 @test hasEqual(bfm12 .* [1.0, 3.0], [bfm12*1.0, bfm12*3.0])

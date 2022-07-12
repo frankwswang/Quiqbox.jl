@@ -207,7 +207,7 @@ getindex(bf::BasisFunc, ::Val{:last}) = getindex(bf)
 firstindex(::BasisFunc) = Val(:first)
 lastindex(::BasisFunc) = Val(:last)
 
-getindex(bfm::BasisFuncMix) = (collect ∘ flatten)( getfield.(bfm.BasisFunc, :gauss) )
+getindex(bfm::BasisFuncMix) = (collect ∘ flatten)( getproperty.(bfm.BasisFunc, :gauss) )
 getindex(bfm::BasisFuncMix, ::Val{:first}) = getindex(bfm)
 getindex(bfm::BasisFuncMix, ::Val{:last}) = getindex(bfm)
 firstindex(::BasisFuncMix) = Val(:first)
@@ -221,7 +221,7 @@ getindex(bfs::BFuncsON{ON}, ::Colon) where {ON} = [getindex(bfs, i) for i=1:ON]
 firstindex(bfs::BasisFuncs) = 1
 lastindex(::BFuncsON{ON}) where {ON} = ON
 eachindex(bfs::BFuncsON) = Base.OneTo(lastindex(bfs))
-getindex(bfs::BasisFuncs) = getfield.(bfs[:], :gauss) |> flatten
+getindex(bfs::BasisFuncs) = getproperty.(bfs[:], :gauss) |> flatten
 
 getindex(xyz::LTuple, args...) = getindex(xyz.tuple, args...)
 getindex(xyz::LTuple) = xyz.tuple

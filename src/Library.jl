@@ -75,7 +75,8 @@ ndims(snt::LTuple) = ndims(snt.tuple)
 @inline sum(f, xyz::LTuple) = sum(f, xyz.tuple)
 @inline map(f, x::LTuple{D, L1}, y::LTuple{D, L2}) where {D, L1, L2} = 
         map(f, x.tuple, y.tuple)
-@inline map(f, xyzs::Vararg{LTuple{D}, N}) where {D, N} = map(f, getfield.(xyzs, :tuple)...)
+@inline map(f, xyzs::Vararg{LTuple{D}, N}) where {D, N} = 
+        map(f, getproperty.(xyzs, :tuple)...)
 Base.broadcastable(xyz::LTuple) = Base.broadcastable(xyz.tuple)
 
 const SubshellXs = 
