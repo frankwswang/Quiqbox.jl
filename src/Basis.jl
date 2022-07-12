@@ -758,28 +758,6 @@ The container to store basis set information.
 
 Construct a `GTBasis` given a basis set.
 """
-# struct GTBasis{T, D, BN, BT<:GTBasisFuncs{T, D, 1}} <: BasisSetData{T, D, BT}
-#     basis::NTuple{BN, BT}
-#     S::Matrix{T}
-#     Te::Matrix{T}
-#     eeI::Array{T, 4}
-
-#     function GTBasis(bfs::AbstractVector{<:GTBasisFuncs{T, D, 1}}, 
-#                      sortGTBasis::Bool=true) where {T, D}
-#         bfs = (sortGTBasis ? sortBasis(bfs) : bfs) |> Tuple
-#         # bfs = bfs |> Tuple
-#         new{T, D, length(bfs), eltype(bfs)}(bfs, overlaps(bfs), eKinetics(bfs), 
-#                                             eeInteractions(bfs))    
-#     end
-# end
-
-# GTBasis(bs::Tuple{Vararg{GTBasisFuncs{T, D, 1}}}, sortGTBasis::Bool=true) where {T, D} = 
-# GTBasis(bs |> collect, sortGTBasis)
-
-# GTBasis(bs::Union{AbstractVector{<:GTBasisFuncs{T, D}}, Tuple{Vararg{GTBasisFuncs{T, D}}}}, 
-#         sortGTBasis::Bool=true) where {T, D} = 
-# GTBasis(bs |> flatten, sortGTBasis)
-
 struct GTBasis{T, D, BN, BT<:GTBasisFuncs{T, D, 1}} <: BasisSetData{T, D, BT}
     basis::NTuple{BN, BT}
     S::Matrix{T}
@@ -933,27 +911,6 @@ function mergeGaussFuncs(gf1::GaussFunc{T}, gf2::GaussFunc{T};
     [res]
 end
 
-# function mergeGaussFuncs(gf1::GaussFunc{T}, gf2::GaussFunc{T}, 
-#                          gf3::GaussFunc{T}...; roundDigits::Int=getAtolDigits(T)) where {T}
-#     arr1 = GaussFunc[gf1, gf2, gf3...]
-#     arr2 = GaussFunc[]
-#     while length(arr1) >= 1
-#         i = 1
-#         while i < length(arr1)
-#             temp = mergeGaussFuncs(arr1[i], arr1[i+1]; roundDigits)
-#             if length(temp) == 1
-#                 arr1[i] = temp[]
-#                 popat!(arr1, i+1)
-#             else
-#                 reverse!(arr1, i, i+1)
-#                 i += 1
-#             end
-#         end
-#         push!(arr2, popat!(arr1, i))
-#     end
-#     arr2
-# end
-
 mergeGaussFuncs(gf1::GaussFunc{T}, gf2::GaussFunc{T}, gf3::GaussFunc{T}, 
                 gf4::GaussFunc{T}...; roundDigits::Int=getAtolDigits(T)) where {T} = 
 mergeMultiObjs(GaussFunc{T}, mergeGaussFuncs, gf1, gf2, gf3, gf4...; roundDigits)
@@ -997,49 +954,30 @@ end
 
 add(b::BasisFunc) = itself(b)
 
+function margeBasisFuncCenters(cen1, cen2, roundDigits)
+    if cen1 === cen2 || hasIdentical(cen1, cen2)
+        cen1
+    elseif hasEqual(cen1, cen2)
+        deepcopy(cen1)
+    elseif (c1 = roundNum.(coordOf(cen1), roundDigits)) == 
+                 roundNum.(coordOf(cen2), roundDigits)
+        genSpatialPoint(c1)
+    else
+        nothing
+    end
+end
+
 function add(bf1::BasisFunc{T, D, 𝑙1, GN1, PT1}, bf2::BasisFunc{T, D, 𝑙2, GN2, PT2}; 
              roundDigits::Int=getAtolDigits(T)) where {T, D, 𝑙1, 𝑙2, GN1, GN2, PT1, PT2}
     if 𝑙1 == 𝑙2 && bf1.l == bf2.l && bf1.normalizeGTO == bf2.normalizeGTO
-        cen = if (cen1 = bf1.center) === (cen2 = bf2.center) || hasIdentical(cen1, cen2)
-            cen1
-        elseif hasEqual(cen1, cen2)
-            deepcopy(cen1)
-        elseif (c1 = roundNum.(coordOf(cen1), roundDigits)) == 
-               (c2 = roundNum.(coordOf(cen2), roundDigits))
-            genSpatialPoint(c1)
-        else
-            return BasisFuncMix([bf1, bf2])
-        end
+        cen = margeBasisFuncCenters(bf1.center, bf2.center, roundDigits)
+        cen === nothing && (return BasisFuncMix([bf1, bf2]))
         gfsN = mergeGaussFuncs(bf1.gauss..., bf2.gauss...; roundDigits) |> Tuple
         BasisFunc(cen, gfsN, bf1.l, bf1.normalizeGTO)
     else
         BasisFuncMix([bf1, bf2])
     end
 end
-
-# function mergeBasisFuncs(bf1::FloatingGTBasisFuncs{T, D}, 
-#                          bf2::FloatingGTBasisFuncs{T, D}, 
-#                          bf3::FloatingGTBasisFuncs{T, D}; 
-#                          roundDigits::Int=getAtolDigits(T)) where {T, D}
-#     bfGroups = sortBasisFuncs(bs, true; roundDigits)
-#     arr1 = GaussFunc[gf1, gf2, gf3...]
-#     arr2 = GaussFunc[]
-#     while length(arr1) >= 1
-#         i = 1
-#         while i < length(arr1)
-#             temp = mergeGaussFuncs(arr1[i], arr1[i+1]; roundDigits)
-#             if length(temp) == 1
-#                 arr1[i] = temp[]
-#                 popat!(arr1, i+1)
-#             else
-#                 reverse!(arr1, i, i+1)
-#                 i += 1
-#             end
-#         end
-#         push!(arr2, popat!(arr1, i))
-#     end
-#     arr2
-# end
 
 mergeBasisFuncs(bf1::FloatingGTBasisFuncs{T, D}, bf2::FloatingGTBasisFuncs{T, D}, 
                 bf3::FloatingGTBasisFuncs{T, D}, bf4::FloatingGTBasisFuncs{T, D}...; 
@@ -1057,17 +995,8 @@ function mergeBasisFuncs(bf1::FloatingGTBasisFuncs{T, D, 𝑙, GN, PT1, ON1},
     ss = SubshellXYZsizes[𝑙+1]
     (ON1 == ss || ON2 == ss) && ( return [bf1, bf2] )
     if bf1.normalizeGTO == bf2.normalizeGTO
-        cen = if (cen1 = bf1.center) === (cen2 = bf2.center) || hasIdentical(cen1, cen2)
-            cen1
-        elseif hasEqual(cen1, cen2)
-            deepcopy(cen1)
-        elseif (c1 = roundNum.(coordOf(cen1), roundDigits)) == 
-               (c2 = roundNum.(coordOf(cen2), roundDigits))
-            genSpatialPoint(c1)
-        else
-            return [bf1, bf2]
-        end
-
+        cen = margeBasisFuncCenters(bf1.center, bf2.center, roundDigits)
+        cen === nothing && (return [bf1, bf2])
         if bf1.l == bf2.l
             gfs = mergeGaussFuncs(bf1.gauss..., bf2.gauss...; roundDigits) |> Tuple
             return [BasisFunc(cen, gfs, bf1.l, bf1.normalizeGTO)]
@@ -1077,7 +1006,6 @@ function mergeBasisFuncs(bf1::FloatingGTBasisFuncs{T, D, 𝑙, GN, PT1, ON1},
             ids = sortperm(gfPairs1)
             gfs1 = bf1.gauss[ids]
             gfs2 = bf2.gauss[sortperm(gfPairs2)]
-
             gfs = Array{GaussFunc{T}}(undef, GN)
             for (id, (i, gf1), gf2) in zip(ids, enumerate(gfs1), gfs2)
                 res = if gf1 === gf2 || hasIndentical(gf1, gf2)
@@ -1093,7 +1021,6 @@ function mergeBasisFuncs(bf1::FloatingGTBasisFuncs{T, D, 𝑙, GN, PT1, ON1},
             end
             gfs = Tuple(gfs)
         end
-
         [BasisFuncs(cen, gfs, (bf1.l..., bf2.l...), bf1.normalizeGTO)]
     else
         [bf1, bf2]
@@ -1680,7 +1607,6 @@ function genBFuncsFromText(content::String;
     end
     for i in index
         oInfo = data[i]
-        # @show oInfo
         gs1 = GaussFunc{typ}[]
         ng = oInfo[2] |> Int
         centerOld = center
@@ -1702,11 +1628,8 @@ function genBFuncsFromText(content::String;
                 push!(gs1, GaussFunc(data[j]...))
             end
             subshellInfo = oInfo[1] |> string
-            # @show subshellInfo
             if length(oInfo) > 3
-                # @show 1
                 subshellInfo = SubshellOrientationList[d][subshellInfo][oInfo[2:end]]
-                # @show subshellInfo
             end
             push!(bfs, genBasisFunc((unlinkCenter ? deepcopy(center) : center), 
                                     gs1, subshellInfo, normalizeGTO=true))

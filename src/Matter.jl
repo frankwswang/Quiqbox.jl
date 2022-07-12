@@ -74,17 +74,17 @@ coefficient matrix.
 """
 function changeHbasis(oneBoadyInt::Matrix{T}, C::Matrix{T}) where {T}
     ij = Array{T}(undef, size(C, 2), size(C, 2))
-    @tullio ij[i,j] = oneBoadyInt[a,b] * C[a,i] * C[b,j]
+    @tullio ij[i,j] := oneBoadyInt[a,b] * C[a,i] * C[b,j]
 end
 
 function changeHbasis(twoBoadyInt::Array{T, 4}, C::Matrix{T}) where {T}
     ijkl = Array{T}(undef, size(C, 2), size(C, 2), size(C, 2), size(C, 2))
-    @tullio ijkl[i,j,k,l] = twoBoadyInt[a,b,c,d] * C[a,i] * C[b,j] * C[c,k] * C[d,l]
+    @tullio ijkl[i,j,k,l] := twoBoadyInt[a,b,c,d] * C[a,i] * C[b,j] * C[c,k] * C[d,l]
 end
 
 function getJᵅᵝ(twoBoadyInt::Array{T, 4}, (C1, C2)::NTuple{2, Matrix{T}}) where {T}
     iijj = Array{T}(undef, size(C1, 2), size(C2, 2))
-    @tullio iijj[i,j] = twoBoadyInt[a,b,c,d] * C1[a,i] * C1[b,i] * C2[c,j] * C2[d,j]
+    @tullio iijj[i,j] := twoBoadyInt[a,b,c,d] * C1[a,i] * C1[b,i] * C2[c,j] * C2[d,j]
 end
 
 """
