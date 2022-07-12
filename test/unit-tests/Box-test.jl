@@ -25,4 +25,6 @@ grid = GridBox(2, 3.0)
 gPoints = getfield.(getfield.(genSpatialPoint.(points), :point), :param) |> flatten
 @test [i[] for i in gPoints] == [i() for i in gPoints] == (points |> flatten)
 
+gb = GridBox((1,1), 2.0, [1.0, 1.0])
+
 end

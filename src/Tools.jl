@@ -728,30 +728,32 @@ struct TypedFunction{F<:Function} <: StructFunction{F}
     TypedFunction(f::F) where {F<:Function} = new{F}(f, nameOf(f))
 end
 
+TypedFunction(f::TypedFunction) = itself(f)
+
 (tf::TypedFunction{F})(x...) where {F} = tf.f(x...)
 
 
 # Product Function
 struct Pf{T<:Number, F<:Function} <: ParameterizedFunction{Pf, F}
-    f::TypedFunction{F}
     c::T
+    f::TypedFunction{F}
 end
 
-Pf(c::T, f::TypedFunction{F}) where {T, F} = Pf{T, F}(f, c)
-Pf(c::T, f::Pf{T, F}) where {T, F} = Pf{T, F}(f.f, f.c*c)
-Pf(c::T, f::F) where {T, F<:Function} = Pf{T, F}(TypedFunction(f), c)
+PfCore(c::T, f::Pf{T, F}) where {T, F} = Pf{T, F}(f.c*c, f.f)
+PfCore(c::T, f::F) where {T, F<:Function} = Pf{T, F}(c, TypedFunction(f))
+Pf(c::T, f::F) where {T, F<:Function} = ifelse(c == T(1), f, PfCore(c, f))
 
 (f::Pf)(x::T) where {T<:Number} = f.c * f.f.f(x)
 
 
 # Sum Function
 struct Sf{T<:Number, F<:Function} <: ParameterizedFunction{Sf, F}
-    f::TypedFunction{F}
     c::T
+    f::TypedFunction{F}
 end
-Sf(c::T, f::TypedFunction{F}) where {T, F} = Sf{T, F}(f, c)
-Sf(c::T, f::Sf{T, F}) where {T, F} = Sf{T, F}(f.f, f.c+c)
-Sf(c::T, f::F) where {T, F<:Function} = Sf{T, F}(TypedFunction(f), c)
+SfCore(c::T, f::Sf{T, F}) where {T, F} = Sf{T, F}(f.c+c, f.f)
+SfCore(c::T, f::F) where {T, F<:Function} = Sf{T, F}(c, TypedFunction(f))
+Sf(c::T, f::F) where {T, F<:Function} = ifelse(c == T(0), f, SfCore(c, f))
 
 (f::Sf)(x::T) where {T<:Number} = f.c + f.f.f(x)
 
