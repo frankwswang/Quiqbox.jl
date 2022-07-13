@@ -170,7 +170,7 @@ bfs2 = [genBasisFunc(fill(1.0, 3), (2.0, 1.0), (1,0,0)),
         genBasisFunc(fill(1.0, 3), (3.0, 1.0), (2,0,0)), 
         genBasisFunc([1.0, 1.0, 2.0], (3.0, 1.0), (0,0,0))]
 bfs3 = sortBasisFuncs(bfs1, true)
-@test bfs3 == groupedSort(sortBasisFuncs(bfs1), centerCoordOf)
+@test bfs3 == Quiqbox.groupedSort(sortBasisFuncs(bfs1), centerCoordOf)
 @test vcat(bfs3...) == bfs1[sortPermBasisFuncs(bfs1)]
 @test length.(bfs3) == [3,1]
 bfs3 = bfs3 |> flatten
@@ -242,7 +242,7 @@ bs3_2 = [genBasisFunc([1.0, 1.0, 1.0], (2.0, 1.0), (1,0,0)),
          genBasisFunc([1.0, 1.0, 1.0], (3.0, 1.0), (2,0,0)), 
          genBasisFunc([1.0, 1.0, 2.0], (3.0, 1.0), (0,0,0))]
 
-bfm_1 = +(bs2...,) # 1.7+ bug
+bfm_1 = +(bs2...,)
 bfm_2 = sumOf(bs2)
 bfm_3 = BasisFuncMix(bs3)
 bfm_4 = +(bs2_2...,)

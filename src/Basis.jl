@@ -1602,8 +1602,9 @@ function genBFuncsFromText(content::String;
                                          SpatialPoint{T, D}, 
                                          Missing}=(NaN, NaN, NaN), 
                            unlinkCenter::Bool=false) where {D, T<:AbstractFloat}
-    centerIsMissing = (center isa Missing || all(center .|> isNaN))
-    typ = ifelse(centerIsMissing, Float64, T)
+    
+    cenIsMissing = ( (all(center.|>isNaN) && (center=missing; true)) || center isa Missing )
+    typ = ifelse(cenIsMissing, Float64, T)
     adjustContent && (content = adjustFunction(content))
     lines = split.(content |> IOBuffer |> readlines)
     lines = lines[1+excludeFirstNlines : end-excludeLastNlines]
@@ -1611,7 +1612,7 @@ function genBFuncsFromText(content::String;
     index = findall( x -> (eltype(x) != typ) && (length(x) > 2) && 
                     (x[1] == "SP" || x[1] in SubshellNames), data )
     bfs = FloatingGTBasisFuncs[]
-    if !centerIsMissing
+    if !cenIsMissing
         d = (center isa AbstractArray) ? length(center) : D
     end
     for i in index
