@@ -44,9 +44,9 @@ for ((iNuc, nuc), nucCoords, molName) in zip(enumerate(mols), molCoords, molName
     end
 
     # Number of spin-orbitals must not be smaller than numbers of electrons.
-    fVars = try
-        runHF(bs, nuc, nucCoords, HFconfig((HF=HFtype,)), printInfo=false)
-    catch
+    if getCharge(nuc) <= sum( basisSize.(bs) )
+        fVars = runHF(bs, nuc, nucCoords, HFconfig((HF=HFtype,)), printInfo=false)
+    else
         continue
     end
 

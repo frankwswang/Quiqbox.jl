@@ -35,10 +35,10 @@ bFieldStr = getFieldNameStr(bf1)
 @test (@capture_out show(bf1)) == string(typeStrOf(bf1))*bFieldStr*"[X⁰Y⁰Z⁰][1.0, 2.0, 1.0]"
 
 bf2 = genBasisFunc(missing, "STO-3G")[]
-@test (@capture_out show(bf2)) == string(typeStrOf(bf2))*bFieldStr*"[X⁰Y⁰Z⁰]"*"[NaN, NaN, NaN]"
+@test (@capture_out show(bf2)) == string(typeStrOf(bf2))*bFieldStr*"[X⁰Y⁰Z⁰][NaN, NaN, NaN]"
 
 bfs1 = genBasisFunc([0.0, 0.0, 0.0], (2.0, 1.0), "P")
-@test (@capture_out show(bfs1)) == string(typeStrOf(bfs1))*bFieldStr*"[3/3]"*"[0.0, 0.0, 0.0]"
+@test (@capture_out show(bfs1)) == string(typeStrOf(bfs1))*bFieldStr*"[3/3][0.0, 0.0, 0.0]"
 
 bfs2 = genBasisFunc([0.0 ,0.0 , 0.0], (2.0, 1.0), [(2,0,0)])
 @test (@capture_out show(bfs2)) == string(typeStrOf(bfs2))*bFieldStr*
