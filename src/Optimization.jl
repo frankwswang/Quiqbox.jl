@@ -90,7 +90,7 @@ julia> POconfig(maxStep=100)
 $(Doc_POconfig_Eg2)
 ```
 """
-mutable struct POconfig{T<:Real, M, CBT<:ConfigBox, F<:Function} <: ConfigBox{T,POconfig,M}
+mutable struct POconfig{T, M, CBT<:ConfigBox, F<:Function} <: ConfigBox{T, POconfig, M}
     method::Val{M}
     config::CBT
     target::T

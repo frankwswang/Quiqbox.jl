@@ -3,7 +3,7 @@ export hasEqual, hasIdentical, hasApprox, flatten, markUnique, getUnique!
 using Statistics: std, mean
 using LinearAlgebra: eigvals, svdvals, eigen
 
-getAtolCore(::Type{T}) where {T<:Real} = log(10, T|>eps)|>ceil
+getAtolCore(::Type{T}) where {T<:Real} = log(10, T|>eps) |> ceil |> float
 getAtolVal(::Type{T}) where {T<:Real} = 10^(T |> getAtolCore)
 """
 

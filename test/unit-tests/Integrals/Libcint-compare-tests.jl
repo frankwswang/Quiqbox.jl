@@ -16,7 +16,7 @@ nucCoords = [[-0.7, 0.0, 0.0], [0.7, 0.0, 0.0]]
 center = [0, rand(0:0.2:1), 0]
 errT = 1e-12
 
-oFilter(f) = bs-> f(filter(i->typeof(i).parameters[1]<2, bs))
+oFilter(f) = bs-> f(filter(i->lOf(i)<2, bs))
 
 fs1 = (oFilter(overlaps), 
        oFilter(eKinetics), 

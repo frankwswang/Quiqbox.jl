@@ -1,5 +1,5 @@
 export GaussFunc, genExponent, genContraction, SpatialPoint, genSpatialPoint, BasisFunc, 
-       BasisFuncs, genBasisFunc, subshellOf, centerOf, centerCoordOf, dimOf, GTBasis, 
+       BasisFuncs, genBasisFunc, lOf, subshellOf, centerOf, centerCoordOf, dimOf, GTBasis, 
        sortBasisFuncs, sortPermBasisFuncs, add, mul, shift, decompose, basisSize, 
        genBasisFuncText, genBFuncsFromText, assignCenInVal!, getParams, copyBasis, 
        markParams!
@@ -586,11 +586,20 @@ genBasisFunc(bf.center, bf.gauss, bf.l; normalizeGTO)
 
 """
 
+    lOf(::FloatingGTBasisFuncs) -> Int
+
+Return the total angular momentum (in Cartesian coordinate system).
+"""
+lOf(::FloatingGTBasisFuncs{<:Any, <:Any, 𝑙}) where {𝑙} = 𝑙
+
+
+"""
+
     subshellOf(::FloatingGTBasisFuncs) -> String
 
-Return the subshell name of the input `$(FloatingGTBasisFuncs)`.
+Return the subshell name.
 """
-subshellOf(::FloatingGTBasisFuncs{<:Any, <:Any, 𝑙}) where {𝑙} = SubshellNames[𝑙+1]
+subshellOf(b::FloatingGTBasisFuncs) = SubshellNames[lOf(b)+1]
 
 
 """
@@ -1585,14 +1594,14 @@ subshell information for the `BasisFunc`. E.g.:
 """
 function genBFuncsFromText(content::String; 
                            adjustContent::Bool=false, 
-                           adjustFunction::F=sciNotReplace, 
+                           adjustFunction::Function=sciNotReplace, 
                            excludeFirstNlines::Int=0, excludeLastNlines::Int=0, 
-                           center::Union{AbstractArray{<:Real}, 
+                           center::Union{AbstractArray{T}, 
                                          NTuple{D, T}, 
                                          NTuple{D, ParamBox{T}}, 
                                          SpatialPoint{T, D}, 
                                          Missing}=missing, 
-                           unlinkCenter::Bool=false) where {D, T<:Real, F<:Function}
+                           unlinkCenter::Bool=false) where {D, T<:AbstractFloat}
     centerIsMissing = (center isa Missing)
     typ = ifelse(centerIsMissing, Float64, T)
     adjustContent && (content = adjustFunction(content))
