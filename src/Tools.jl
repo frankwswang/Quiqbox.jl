@@ -923,3 +923,7 @@ function mergeMultiObjs(::Type{T}, merge2Ofunc::F, o1::T, o2::T, o3::T, o4::T...
     end
     arr2
 end
+
+
+isNaN(::Any) = false
+isNaN(n::Number) = isnan(n)

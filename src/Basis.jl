@@ -1602,7 +1602,7 @@ function genBFuncsFromText(content::String;
                                          SpatialPoint{T, D}, 
                                          Missing}=(NaN, NaN, NaN), 
                            unlinkCenter::Bool=false) where {D, T<:AbstractFloat}
-    centerIsMissing = (center isa Missing || all(center .|> isnan))
+    centerIsMissing = (center isa Missing || all(center .|> isNaN))
     typ = ifelse(centerIsMissing, Float64, T)
     adjustContent && (content = adjustFunction(content))
     lines = split.(content |> IOBuffer |> readlines)
