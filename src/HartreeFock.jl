@@ -198,9 +198,9 @@ const Doc_SCFconfig_ADIIS = "[DIIS based on the augmented Roothaan–Hall (ARH) 
 const Doc_SCFconfig_LBFGSB = "[Limited-memory BFGS with box constraints]"*
                              "(https://github.com/Gnimuc/LBFGSB.jl)."
 
-const Doc_SCFconfig_Eg1 = "SCFconfig{Float64, 3}(interval=(0.0001, 1.0e-12, 1.0e-13), "*
-                          "oscillateThreshold=1.0e-5, method, methodConfig)"*
-                          "[:DD, :ADIIS, :DIIS]"
+const Doc_SCFconfig_Eg1 = "SCFconfig{Float64, 3}(method=(:DD, :ADIIS, :DIIS), "*
+                          "interval=(0.0001, 1.0e-12, 1.0e-13), methodConfig, "*
+                          "oscillateThreshold)"
 
 """
 

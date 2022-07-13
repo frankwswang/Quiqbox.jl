@@ -4,7 +4,7 @@ export GaussFunc, genExponent, genContraction, SpatialPoint, genSpatialPoint, Ba
        genBasisFuncText, genBFuncsFromText, assignCenInVal!, getParams, copyBasis, 
        markParams!
 
-export SP1D, SP2D, SP3D
+export P1D, P2D, P3D
 
 using LinearAlgebra: diag
 using ForwardDiff: derivative as ForwardDerivative
@@ -133,14 +133,14 @@ const Doc_genSpatialPoint_Eg1 = "SpatialPoint{3, Float64, "*
                                 "Tuple{FI, FI, FI}}"*
                                 "(param)[1.0, 2.0, 3.0][∂][∂][∂]"
 
-const SP1D{T, Lx} = Tuple{ParamBox{T, cxSym, FLevel{Lx}}}
-const SP2D{T, Lx, Ly} = Tuple{ParamBox{T, cxSym, FLevel{Lx}}, 
-                              ParamBox{T, cySym, FLevel{Ly}}}
-const SP3D{T, Lx, Ly, Lz} = Tuple{ParamBox{T, cxSym, FLevel{Lx}}, 
-                                  ParamBox{T, cySym, FLevel{Ly}}, 
-                                  ParamBox{T, czSym, FLevel{Lz}}}
+const P1D{T, Lx} = Tuple{ParamBox{T, cxSym, FLevel{Lx}}}
+const P2D{T, Lx, Ly} = Tuple{ParamBox{T, cxSym, FLevel{Lx}}, 
+                             ParamBox{T, cySym, FLevel{Ly}}}
+const P3D{T, Lx, Ly, Lz} = Tuple{ParamBox{T, cxSym, FLevel{Lx}}, 
+                                 ParamBox{T, cySym, FLevel{Ly}}, 
+                                 ParamBox{T, czSym, FLevel{Lz}}}
 
-const SPointTL{T} = Union{SP1D{T}, SP2D{T}, SP3D{T}}
+const SPointTL{T} = Union{P1D{T}, P2D{T}, P3D{T}}
 
 const SPointTU{T, D} = Tuple{Vararg{ParamBox{T, V, FL} where {V, FL<:FLevel}, D}}
 
@@ -268,7 +268,7 @@ Convert a collection of `$(ParamBox)`s to a spatial point.
 genSpatialPoint(point::NTuple{N, ParamBox}) where {N} = 
 ParamBox.(Val.(SpatialParamSyms[1:N]), point) |> genSpatialPointCore
 
-genSpatialPointCore(point::Union{SP1D, SP2D, SP3D}) = SpatialPoint(point)
+genSpatialPointCore(point::Union{P1D, P2D, P3D}) = SpatialPoint(point)
 
 
 coordOf(sp::SpatialPoint) = [outValOf(i) for i in sp.param]

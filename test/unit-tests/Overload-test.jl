@@ -1,6 +1,6 @@
 using Test
 using Quiqbox
-using Quiqbox: BasisFuncMix, hasBoolRelation, Doc_SCFconfig_Eg1
+using Quiqbox: BasisFuncMix, hasBoolRelation, Doc_SCFconfig_Eg1, typeStrOf, getFieldNameStr
 using Suppressor: @capture_out
 
 @testset "Overload.jl" begin
@@ -16,64 +16,73 @@ pb3 = ParamBox(-1, :x, abs)
 @test (@capture_out show(pb3)) == string(typeof(pb3))*"(-1)[∂][x_x]"
 
 p1 = genSpatialPoint((1.,))
-@test (@capture_out show(p1)) == "SpatialPoint{Float64, 1, SP1D{Float64, 0}}(param)[1.0][∂]"
+@test (@capture_out show(p1)) == "SpatialPoint{Float64, 1, P1D{Float64, 0}}(param)[1.0][∂]"
 
 p2 = genSpatialPoint((1.,2.))
-@test (@capture_out show(p2)) == "SpatialPoint{Float64, 2, SP2D{Float64, 0, 0}}(param)"*
+@test (@capture_out show(p2)) == "SpatialPoint{Float64, 2, P2D{Float64, 0, 0}}(param)"*
                                  "[1.0, 2.0][∂][∂]"
 
 p3 = genSpatialPoint((1.,2.,3.))
-@test (@capture_out show(p3)) == "SpatialPoint{Float64, 3, SP3D{Float64, 0, 0, 0}}(param)"* 
+@test (@capture_out show(p3)) == "SpatialPoint{Float64, 3, P3D{Float64, 0, 0, 0}}(param)"* 
                                  "[1.0, 2.0, 3.0][∂][∂][∂]"
 
 bf1 = genBasisFunc([1.0, 2.0, 1.0], (2.0, 1.0))
 gf1 = bf1.gauss[1]
-@test (@capture_out show(gf1)) == string(typeof(gf1))*"(xpn="*string(typeof(gf1.param[1]))*
-                                  "(2.0)[∂][α], con="*string(typeof(gf1.param[2]))*
-                                  "(1.0)[∂][d])"
-@test (@capture_out show(bf1)) == string(typeof(bf1))*"(center, gauss)"*
-                                  "[X⁰Y⁰Z⁰][1.0, 2.0, 1.0]"
+@test (@capture_out show(gf1)) == string(typeof(gf1))*"(xpn()=$(gf1.xpn()), "*
+                                                       "con()=$(gf1.con()), param)"
+
+bFieldStr = getFieldNameStr(bf1)
+@test (@capture_out show(bf1)) == string(typeStrOf(bf1))*bFieldStr*"[X⁰Y⁰Z⁰][1.0, 2.0, 1.0]"
 
 bf2 = genBasisFunc(missing, "STO-3G")[]
-@test (@capture_out show(bf2)) == string(typeof(bf2))*"(center, gauss)"*
-                                  "[X⁰Y⁰Z⁰]"*"[NaN, NaN, NaN]"
+@test (@capture_out show(bf2)) == string(typeStrOf(bf2))*bFieldStr*"[X⁰Y⁰Z⁰]"*"[NaN, NaN, NaN]"
 
 bfs1 = genBasisFunc([0.0, 0.0, 0.0], (2.0, 1.0), "P")
-@test (@capture_out show(bfs1)) == string(typeof(bfs1))*"(center, gauss)"*
-                                   "[3/3]"*"[0.0, 0.0, 0.0]"
+@test (@capture_out show(bfs1)) == string(typeStrOf(bfs1))*bFieldStr*"[3/3]"*"[0.0, 0.0, 0.0]"
 
 bfs2 = genBasisFunc([0.0 ,0.0 , 0.0], (2.0, 1.0), [(2,0,0)])
-@test (@capture_out show(bfs2)) == string(typeof(bfs2))*"(center, gauss)"*
+@test (@capture_out show(bfs2)) == string(typeStrOf(bfs2))*bFieldStr*
                                    "[X²Y⁰Z⁰]"*"[0.0, 0.0, 0.0]"
 bfs3 = genBasisFunc([0.0, 0.0, 0.0], (2.0, 1.0), [(2,0,0), (1,1,0)])
-@test (@capture_out show(bfs3)) == string(typeof(bfs3))*"(center, gauss)"*
+@test (@capture_out show(bfs3)) == string(typeStrOf(bfs3))*bFieldStr*
                                    "[2/6]"*"[0.0, 0.0, 0.0]"
 
 bfm1 = BasisFuncMix([bf1, bf2])
-@test (@capture_out show(bfm1)) == string(typeof(bfm1))*"(BasisFunc, param)"
+@test (@capture_out show(bfm1)) == string(typeof(bfm1))*getFieldNameStr(bfm1)
 
 GTb1 = GTBasis([bf1, bfs2])
-@test (@capture_out show(GTb1)) == string(typeof(GTb1))*"(basis, S, Te, eeI)"
+@test (@capture_out show(GTb1)) == string(typeof(GTb1))*getFieldNameStr(GTb1)
 
 box1 = GridBox(2, 1.5)
-@test (@capture_out show(box1)) == string(typeof(box1))*"(num, len, coord)"
+@test (@capture_out show(box1)) == string(typeStrOf(box1))*getFieldNameStr(box1)
 
 fVar1 = runHF(GTb1, ["H", "H"], [[0.0, 0.0, 0.0], [1.0, 2.0, 1.0]], HFconfig((C0=:Hcore,)), 
               printInfo=false)
 
 info1 = (@capture_out show(fVar1.temp[1]))
-@test info1[1:48] == string(typeof(fVar1.temp[1]))*"(shared.Etots=["
-@test info1[end-34:end] == "], shared.Dtots, N, Cs, Fs, Ds, Es)"
+tVarStrP1 = string(typeof(fVar1.temp[1]))
+l1 = length(tVarStrP1)
+@test info1[1:l1] == tVarStrP1
+tVarStrP2 = getFieldNameStr(fVar1.temp[1])
+l2 = length(tVarStrP2)
+@test info1[l1+1:l1+l2-1] == tVarStrP2[1:end-1]
+@test info1[l1+l2:l1+l2+7] == ".Etots=["
+@test info1[end-1:end] == "])"
 
 info2 = (@capture_out show(fVar1))
-@test info2[1:51] == string(typeof(fVar1))*"(Ehf="
-@test info2[end-69] == ','
-@test info2[end-68:end] == 
-      " Enn, N, nuc, nucCoords, C, F, D, Eo, occu, temp, isConverged, basis)"
+fVarStrP1 = string(typeof(fVar1))
+fVarStrP2 = getFieldNameStr(fVar1)
+l3 = length(fVarStrP1)
+@test info2[1:l3] == fVarStrP1
+@test info2[l3+1:l3+4] * info2[l3+17:end] == fVarStrP2
 
 info3 = (@capture_out show(SCFconfig((:DD, :ADIIS, :DIIS), 
                                      (1e-4, 1e-12, 1e-13), Dict(2=>[:solver=>:LCM]))))
 @test info3 == Doc_SCFconfig_Eg1
+
+H2 = MatterByHF(fVar1)
+info4 = (@capture_out show(H2))
+@test info4 == string(H2|>typeof) * getFieldNameStr(H2)
 
 
 # function ==, hasBoolRelation

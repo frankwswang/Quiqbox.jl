@@ -61,22 +61,26 @@ LTuple(t::NTuple{D, Int}) where {D} = LTuple{D, sum(t)}(t)
 LTuple(args::Vararg{Int}) = LTuple(args)
 LTuple(a::Vector{Int}) = LTuple(a...)
 
-import Base: iterate, size, length, ndims, +, isless, Tuple, sum, map, broadcastable
+import Base: iterate, size, length, eltype
 iterate(snt::LTuple, args...) = iterate(snt.tuple, args...)
 size(snt::LTuple, args...) = size(snt.tuple, args...)
-length(snt::LTuple) = length(snt.tuple)
-ndims(snt::LTuple) = ndims(snt.tuple)
+length(::LTuple{D}) where {D} = D
+eltype(::LTuple) = Int
+
+import Base: +
 +(xyz1::LTuple{D, L1},  xyz2::LTuple{D, L2} ) where {D, L1, L2} = LTuple(xyz1, xyz2)
 +( xyz::LTuple{D, L},      t::NTuple{D, Int}) where {D, L} = xyz + LTuple{sum(t)}(t)
 +(   t::NTuple{D, Int},  xyz::LTuple{L, D}  ) where {D, L} = +(xyz, t)
-@inline isless(xyz1::LTuple{D}, xyz2::LTuple{D}) where {D} = isless(xyz1.tuple, xyz2.tuple)
-@inline Tuple(xyz::LTuple) = xyz.tuple
-@inline sum(::LTuple{<:Any, L}) where {L} = L
-@inline sum(f, xyz::LTuple) = sum(f, xyz.tuple)
-@inline map(f, x::LTuple{D, L1}, y::LTuple{D, L2}) where {D, L1, L2} = 
-        map(f, x.tuple, y.tuple)
-@inline map(f, xyzs::Vararg{LTuple{D}, N}) where {D, N} = 
-        map(f, getproperty.(xyzs, :tuple)...)
+
+import Base: Tuple, sum, map, isless
+Tuple(xyz::LTuple) = xyz.tuple
+sum(::LTuple{<:Any, L}) where {L} = L
+sum(f, xyz::LTuple) = sum(f, xyz.tuple)
+map(f, x::LTuple{D, L1}, y::LTuple{D, L2}) where {D, L1, L2} = map(f, x.tuple, y.tuple)
+map(f, xyzs::Vararg{LTuple{D}, N}) where {D, N} = map(f, getproperty.(xyzs, :tuple)...)
+isless(xyz1::LTuple{D}, xyz2::LTuple{D}) where {D} = isless(xyz1.tuple, xyz2.tuple)
+
+import Base: broadcastable
 Base.broadcastable(xyz::LTuple) = Base.broadcastable(xyz.tuple)
 
 const SubshellXs = 

@@ -28,21 +28,45 @@ function show(io::IO, pb::ParamBox)
     print(io, "]")
 end
 
-getSPNDstring(t::Type{SP1D{T, Lx}}) where {T, Lx} = 
-(string(t), "SP1D{$T, $(Lx)}")
+getSPNDstring(t::Type{P1D{T, Lx}}) where {T, Lx} = 
+(string(t), "P1D{$T, $(Lx)}")
 
-getSPNDstring(t::Type{SP2D{T, Lx, Ly}}) where {T, Lx, Ly} = 
-(string(t), "SP2D{$T, $(Lx), $(Ly)}")
+getSPNDstring(t::Type{P2D{T, Lx, Ly}}) where {T, Lx, Ly} = 
+(string(t), "P2D{$T, $(Lx), $(Ly)}")
 
-getSPNDstring(t::Type{SP3D{T, Lx, Ly, Lz}}) where {T, Lx, Ly, Lz} = 
-(string(t), "SP3D{$T, $(Lx), $(Ly), $(Lz)}")
+getSPNDstring(t::Type{P3D{T, Lx, Ly, Lz}}) where {T, Lx, Ly, Lz} = 
+(string(t), "P3D{$T, $(Lx), $(Ly), $(Lz)}")
+
+function typeStrOf(sp::Type{SpatialPoint{T, D, PDT}}) where {T, D, PDT}
+    spTstrO = sp |> string
+    pbsTstrO, pbsTstrN = PDT |> getSPNDstring
+    replace(spTstrO, pbsTstrO=>pbsTstrN, count=1)
+end
+
+typeStrOf(::T) where {T<:SpatialPoint} = typeStrOf(T)
+
+function typeStrOf(b::FloatingGTBasisFuncs{<:Any, <:Any, <:Any, <:Any, PDT}) where {PDT}
+    bTstrO = typeof(b) |> string
+    pbsTstrO, pbsTstrN = PDT |> getSPNDstring
+    replace(bTstrO, pbsTstrO=>pbsTstrN, count=1)
+end
+
+function typeStrOf(gb::GridBox{<:Any, <:Any, <:Any, SPT}) where {SPT}
+    gbTstrO = typeof(gb) |> string
+    pbsTstrN = SPT |> typeStrOf
+    replace(gbTstrO, string(SPT)=>pbsTstrN, count=1)
+end
+
+function getFieldNameStr(::T) where {T} 
+    fields = fieldnames(T)
+    str = fields |> string
+    length(fields) == 1 && (str = str[1:end-2]*")")
+    replace(str, ':'=>"")
+end
 
 function show(io::IO, sp::SpatialPoint)
     pbs = sp.param
-    spTstrO = typeof(sp) |> string
-    pbsTstrO, pbsTstrN = typeof(sp.param) |> getSPNDstring
-    spTstrN = replace(spTstrO, pbsTstrO=>pbsTstrN, count=1)
-    print(io, spTstrN, "(param)")
+    print(io, typeStrOf(sp), getFieldNameStr(sp))
     print(io, [i() for i in pbs])
     for pb in pbs
         print(io, "[")
@@ -52,76 +76,71 @@ function show(io::IO, sp::SpatialPoint)
 end
 
 function show(io::IO, gf::GaussFunc)
-    print(io, typeof(gf), "(xpn=")
-    show(io, gf.xpn)
-    print(io, ", con=")
-    show(io, gf.con)
-    print(io, ")")
+    str = getFieldNameStr(gf)
+    str = replace(str, "xpn"=>"xpn()=$(round(gf.xpn(), sigdigits=nSigShown))")
+    str = replace(str, "con"=>"con()=$(round(gf.con(), sigdigits=nSigShown))")
+    print(io, typeof(gf), str)
 end
 
 function show(io::IO, bf::BasisFunc)
-    print(io, typeof(bf))
-    print(io, "(center, gauss)[")
+    print(io, typeStrOf(bf))
+    print(io, getFieldNameStr(bf), "[")
     printstyled(io, bf.l[1]|>LtoStr, color=:cyan)
     cen = round.([i() for i in bf.center], sigdigits=nSigShown)
     print(io, "]", cen)
 end
 
-function show(io::IO, bf::BasisFuncs{<:Any, <:Any, 𝑙, <:Any, <:Any, ON}) where {𝑙, ON}
+function show(io::IO, bfs::BasisFuncs{<:Any, <:Any, 𝑙, <:Any, <:Any, ON}) where {𝑙, ON}
     SON = SubshellXYZsizes[𝑙+1]
     if ON == 1
-        xyz1 = bf.l[1] |> LtoStr
+        xyz1 = bfs.l[1] |> LtoStr
         xyz2 = ""
     else
-        xyz1 = "$(bf.l |> length)"
+        xyz1 = "$(bfs.l |> length)"
         xyz2 = "/$(SON)"
     end
-    print(io, typeof(bf))
-    print(io, "(center, gauss)[")
+    print(io, typeStrOf(bfs))
+    print(io, getFieldNameStr(bfs), "[")
     printstyled(io, xyz1, color=:cyan)
     print(io, xyz2)
-    cen = round.([i() for i in bf.center], sigdigits=nSigShown)
+    cen = round.([i() for i in bfs.center], sigdigits=nSigShown)
     print(io, "]", cen)
 end
 
-function show(io::IO, bfm::BasisFuncMix)
-    print(io, typeof(bfm))
-    print(io, "(BasisFunc, param)")
-end
+show(io::IO, bfm::BasisFuncMix) = print(io, typeof(bfm), getFieldNameStr(bfm))
 
-function show(io::IO, ::EmptyBasisFunc)
-    print(io, EmptyBasisFunc)
-end
+show(io::IO, ::T) where {T<:EmptyBasisFunc} = print(io, T)
 
-function show(io::IO, gtb::GTBasis)
-    print(io, typeof(gtb))
-    print(io, "(basis, S, Te, eeI)")
-end
+show(io::IO, gtb::GTBasis) = print(io, typeof(gtb), getFieldNameStr(gtb))
 
-function show(io::IO, box::GridBox)
-    print(io, typeof(box))
-    print(io, "(num, len, coord)")
-end
+show(io::IO, box::GridBox) = print(io, typeStrOf(box), getFieldNameStr(box))
 
 function show(io::IO, config::SCFconfig)
     print(io, typeof(config))
-    print(io, "(interval=", config.interval, ",", 
-              " oscillateThreshold=", config.oscillateThreshold, ",", 
-              " method, methodConfig)", config.method|>collect)
+    str = getFieldNameStr(config)
+    str = replace(str, "method,"=>"method=$(config.method),")
+    str = replace(str, "interval"=>"interval=$(config.interval)")
+    print(io, str)
 end
 
 function show(io::IO, vars::HFtempVars)
     print(io, typeof(vars))
-    print(io, "(shared.Etots=[", round(vars.shared.Etots[1], sigdigits=nSigShown),", … , ", 
-                                 round(vars.shared.Etots[end], sigdigits=nSigShown), "], "*
-              "shared.Dtots, N, Cs, Fs, Ds, Es)")
+    str = getFieldNameStr(vars)
+    Etot0 = round(vars.shared.Etots[1], sigdigits=nSigShown)
+    EtotL = round(vars.shared.Etots[end], sigdigits=nSigShown)
+    str = replace(str, "shared"=>"shared.Etots=[$(Etot0), … , $(EtotL)]")
+    print(io, str)
 end
 
 function show(io::IO, vars::HFfinalVars)
     print(io, typeof(vars))
-    print(io, "(Ehf=", round(vars.Ehf, sigdigits=nSigShown), ", Enn, N, nuc, nucCoords, " * 
-              "C, F, D, Eo, occu, temp, isConverged, basis)")
+    str = getFieldNameStr(vars)
+    Ehf = round(vars.Ehf, sigdigits=nSigShown)
+    str = replace(str, "Ehf"=>"Ehf=$(Ehf)")
+    print(io, str)
 end
+
+show(io::IO, matter::MatterByHF) = print(io, typeof(matter), getFieldNameStr(matter))
 
 
 import Base: +
@@ -142,7 +161,7 @@ import Base: *
 *(coeff::Real, bfm::CGTBasisFuncs1O) = mul(coeff, bfm)
 
 
-# Iteration Interface
+## Iteration Interface
 import Base: iterate, size, length, eltype
 iterate(pb::ParamBox) = (pb.data[], nothing)
 iterate(::ParamBox, _) = nothing
@@ -206,7 +225,7 @@ function size(x::SpatialOrbital, d::Integer)
     end
 end
 
-# Indexing Interface
+## Indexing Interface
 import Base: getindex, setindex!, firstindex, lastindex, eachindex, axes
 getindex(pb::ParamBox) = pb.data[]
 getindex(pb::ParamBox, ::Val{:first}) = getindex(pb)
@@ -242,7 +261,7 @@ eachindex(xyz::LTuple) = eachindex(xyz.tuple)
 axes(xyz::LTuple) = axes(xyz.tuple)
 
 
-# Broadcasting Interface
+## Broadcasting Interface
 import Base: broadcastable
 broadcastable(pb::ParamBox) = Ref(pb)
 broadcastable(gf::GaussFunc) = Ref(gf)
@@ -296,3 +315,13 @@ hcat(decomposeCore.(Val(false), bs)...) |> Tuple
 flatten(bs::Union{AbstractVector{<:GTBasisFuncs{T, D, 1}}, 
                   Tuple{Vararg{FGTBasisFuncs1O{T, D}}}}) where {T, D} = 
 itself(bs)
+
+
+# The overload of following functions (or methods for specific types) are defined in 
+# separate files to ensure precompilation capability.
+
+## Methods for type __ : 
+### LTuple
+
+## Function __ : 
+### getTypeParams
