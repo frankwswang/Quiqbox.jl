@@ -48,7 +48,7 @@ end
 
 
 function addToDataChain!(env::Vector{Float64}, atm::Vector{Int32}, bas::Vector{Int32}, 
-                         bf::Quiqbox.FloatingGTBasisFuncs{<:Any, <:Any, 𝑙}) where {𝑙}
+                         bf::Quiqbox.FloatingGTBasisFuncs{<:Any, <:Any, 𝑙, GN}) where {𝑙, GN}
     center = [bf.center[1](), bf.center[2](), bf.center[3]()]
     xpns = Float64[]
     cons = Float64[]
@@ -56,7 +56,6 @@ function addToDataChain!(env::Vector{Float64}, atm::Vector{Int32}, bas::Vector{I
         push!(xpns, i.xpn())
         push!(cons, i.con())
     end
-    nGauss = Quiqbox.getTypeParams(bf)[2]
     envEndIndex = length(env)
     gAtmIndex = length(atm) / 6 |> Int32
 
@@ -67,8 +66,8 @@ function addToDataChain!(env::Vector{Float64}, atm::Vector{Int32}, bas::Vector{I
     append!(env, xpns)
     norm = bf.normalizeGTO ? normOfGTOin(bf) : 1.0
     append!(env, cons.*norm)
-    append!(bas, Int32[gAtmIndex, 𝑙, nGauss, 1, 0, envEndIndex, envEndIndex+nGauss, 0])
-    envEndIndex += nGauss*2
+    append!(bas, Int32[gAtmIndex, 𝑙, GN, 1, 0, envEndIndex, envEndIndex+GN, 0])
+    envEndIndex += GN*2
     (env, atm, bas)
 end
 
