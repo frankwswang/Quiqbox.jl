@@ -9,8 +9,9 @@ import Base: ==
 
 ==(cp1::SpatialPoint, cp2::SpatialPoint) = (cp1.param == cp2.param)
 ==(t1::LTuple, t2::LTuple) = (t1.tuple == t2.tuple)
-==(t1::LTuple{D, 0}, t2::LTuple{D, 0}) where {D} = true
-==(t1::LTuple{1, L}, t2::LTuple{1, L}) where {L} = true
+==(::LTuple{D, 0}, ::LTuple{D, 0}) where {D} = true
+==(::LTuple{1, L1}, ::LTuple{1, L2}) where {L1, L2} = (L1 == L2)
+==(::LTuple{1, 0}, ::LTuple{1, 0}) = true
 
 
 diffColorSym(pb::ParamBox) = ifelse(isDiffParam(pb), :green, :light_black)
