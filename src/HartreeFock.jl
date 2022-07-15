@@ -3,9 +3,9 @@ export SCFconfig, HFconfig, runHF, runHFcore
 using LinearAlgebra: dot, Hermitian, \, det, I, ishermitian
 using PiecewiseQuadratics: indicator
 using Combinatorics: powerset
-# using LBFGSB: lbfgsb
-using Optim: LBFGS, Fminbox, optimize, minimizer, Options
 using LineSearches: BackTracking
+using Optim: LBFGS, Fminbox, optimize as OptimOptimize, minimizer as OptimMinimizer, 
+             Options as OptimOptions
 
 getXcore1(S::Matrix{T}) where {T<:Real} = Hermitian(S)^(-T(0.5)) |> Array
 
@@ -574,10 +574,6 @@ function runHF(bs::GTBasis{T1, D, BN, BT},
     Ns = splitSpins(Val(HFT), N)
     Hcore = coreH(bs, nuc, nucCoords)
     X = getX(bs.S)
-    if X isa Matrix{ComplexF64}
-        @show X
-        @show bs.S
-    end
     getC0f = config.C0.f
     C0 = uniCallFunc(getC0f, getproperty(C0methodArgOrders, nameOf(getC0f)), config.C0.mat, 
                      Val(HFT), bs.S, X, Hcore, bs.eeI, bs.basis, nuc, nucCoords)
@@ -866,28 +862,17 @@ end
 end
 
 
-# Default method: Support up to Float64.
-# function LBFGSBsolver(v::Vector{T}, B::Matrix{T}, cvxConstraint::Bool) where {T}
-#     f = genxDIISf(v, B)
-#     g! = genxDIIS∇f(v, B)
-#     lb = ifelse(cvxConstraint, 0.0, -Inf)
-#     _, c = lbfgsb(f, g!, fill(1e-2, length(v)); lb, 
-#                   m=min(getAtolDigits(T), 50), factr=1, 
-#                   pgtol=max(sqrt(getAtolVal(T)), getAtolVal(T)), 
-#                   maxfun=20000, maxiter=20000)
-#     convert(Vector{T}, c ./ sum(c))
-# end
-
-function LBFGSBsolver(v::Vector{T}, B::Matrix{T}, cvxConstraint::Bool) where {T}
+# Default method
+function LBFGSBsolver(v::Vector{T}, B::Matrix{T}, cvxConstraint::Bool) where {T<:Real}
     f = genxDIISf(v, B)
     g! = genxDIIS∇f(v, B)
     lb = ifelse(cvxConstraint, T(0), T(-Inf))
     vL = length(v)
     c0 = fill(T(1)/vL, vL)
-    innerOptimizer = LBFGS(m=min(getAtolDigits(T), 50), linesearch=BackTracking(c_1=1e-5))
-    res = optimize( f, g!, fill(lb, vL), fill(T(Inf), vL), c0, Fminbox(innerOptimizer), 
-                    Options(g_tol=sqrt(getAtolVal(T)), iterations=20000) )
-    c = minimizer(res)
+    innerOptimizer = LBFGS(m=min(getAtolDigits(T), 50), linesearch=BackTracking(c_1=1e-6))
+    res = OptimOptimize(f, g!, fill(lb, vL), fill(T(Inf), vL), c0, Fminbox(innerOptimizer), 
+                        OptimOptions(g_tol=getAtolVal(T), iterations=20000))
+    c = OptimMinimizer(res)
     c ./ sum(c)
 end
 

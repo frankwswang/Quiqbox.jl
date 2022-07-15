@@ -4,8 +4,7 @@ using Suppressor: @suppress_out
 
 @testset "Optimization.jl" begin
 
-errorThreshold1 = 1e-10
-errorThreshold2 = 1e-6
+errorThreshold = 1e-10
 
 # Floating basis set
 nucCoords = [[-0.7,0.0,0.0], [0.7,0.0,0.0]]
@@ -35,7 +34,7 @@ end
 
 @test all(Ebegin .> Eend)
 @test all(Eend[1:6] .<= Eend[7:end])
-@test all(isapprox.(Eend[1:6], Eend[7:end], atol=100*errorThreshold2))
+@test all(isapprox.(Eend[1:6], Eend[7:end], atol=1e-4))
 
 
 # Grid-based basis set
@@ -51,15 +50,14 @@ local Es2L, ps2L, grads2L
                                           POconfig((maxStep=200,)))
 end
 
-E_t2 = -1.1665258293062977
+E_t2 = -1.16652582930629
 # L, α
-par_t2  = [2.8465051230989435, 0.22550104532759083]
-grad_t2 = [0.37522252486564855, 0.683095213465126]
-
+par_t2  = [2.846505123098946, 0.225501045327590]
+grad_t2 = [0.375222524865646, 0.683095213465143]
 @test Es2L[1] > Es2L[end]
-@test isapprox(Es2L[end], E_t2, atol=errorThreshold2)
-@test isapprox(ps2L[:, end], par_t2, atol=errorThreshold2)
-@test isapprox(grads2L[:, end], grad_t2, atol=errorThreshold2)
+@test isapprox(Es2L[end], E_t2, atol=errorThreshold)
+@test isapprox(ps2L[:, end], par_t2, atol=errorThreshold)
+@test isapprox(grads2L[:, end], grad_t2, atol=errorThreshold)
 
 
 # BasisFuncMix basis set
@@ -76,16 +74,15 @@ local Es3L, ps3L, grads3L
                                           POconfig((maxStep=50,)))
 end
 
-E_t3 = -1.653859783670078
+E_t3 = -1.653859783670083
 # L, α₁, α₂, d₁, d₂
-par_t3  = [2.996646686997478, 0.6913223149667996, 0.4835057214802305, 0.996686357834139, 
-           1.0033029163221774]
-grad_t3 = [0.0595635921759659, 0.16518443157274584, 0.2853998439170006, 0.0666603115041208, 
-           -0.0662207016487781]
-
+par_t3  = [ 2.996646686997478,  0.691322314966799,  0.483505721480230,  0.996686357834139, 
+            1.003302916322178]
+grad_t3 = [ 0.059563592175966,  0.165184431572722,  0.285399843917006,  0.066660311504127, 
+           -0.066220701648778]
 @test Es3L[1] > Es3L[end]
-@test isapprox(Es3L[end], E_t3, atol=errorThreshold2)
-@test isapprox(ps3L[:, end], par_t3, atol=errorThreshold2)
-@test isapprox(grads3L[:, end], grad_t3, atol=errorThreshold2)
+@test isapprox(Es3L[end], E_t3, atol=errorThreshold)
+@test isapprox(ps3L[:, end], par_t3, atol=errorThreshold)
+@test isapprox(grads3L[:, end], grad_t3, atol=errorThreshold)
 
 end
