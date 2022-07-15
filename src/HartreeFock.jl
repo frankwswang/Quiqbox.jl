@@ -3,7 +3,9 @@ export SCFconfig, HFconfig, runHF, runHFcore
 using LinearAlgebra: dot, Hermitian, \, det, I, ishermitian
 using PiecewiseQuadratics: indicator
 using Combinatorics: powerset
-using LBFGSB: lbfgsb
+# using LBFGSB: lbfgsb
+using Optim: LBFGS, Fminbox, optimize, minimizer, Options
+using LineSearches: BackTracking
 
 getXcore1(S::Matrix{T}) where {T<:Real} = Hermitian(S)^(-T(0.5)) |> Array
 
@@ -865,15 +867,28 @@ end
 
 
 # Default method: Support up to Float64.
+# function LBFGSBsolver(v::Vector{T}, B::Matrix{T}, cvxConstraint::Bool) where {T}
+#     f = genxDIISf(v, B)
+#     g! = genxDIIS∇f(v, B)
+#     lb = ifelse(cvxConstraint, 0.0, -Inf)
+#     _, c = lbfgsb(f, g!, fill(1e-2, length(v)); lb, 
+#                   m=min(getAtolDigits(T), 50), factr=1, 
+#                   pgtol=max(sqrt(getAtolVal(T)), getAtolVal(T)), 
+#                   maxfun=20000, maxiter=20000)
+#     convert(Vector{T}, c ./ sum(c))
+# end
+
 function LBFGSBsolver(v::Vector{T}, B::Matrix{T}, cvxConstraint::Bool) where {T}
     f = genxDIISf(v, B)
     g! = genxDIIS∇f(v, B)
-    lb = ifelse(cvxConstraint, 0.0, -Inf)
-    _, c = lbfgsb(f, g!, fill(1e-2, length(v)); lb, 
-                  m=min(getAtolDigits(T), 50), factr=1, 
-                  pgtol=max(sqrt(getAtolVal(T)), getAtolVal(T)), 
-                  maxfun=20000, maxiter=20000)
-    convert(Vector{T}, c ./ sum(c))
+    lb = ifelse(cvxConstraint, T(0), T(-Inf))
+    vL = length(v)
+    c0 = fill(T(1)/vL, vL)
+    innerOptimizer = LBFGS(m=min(getAtolDigits(T), 50), linesearch=BackTracking(c_1=1e-5))
+    res = optimize( f, g!, fill(lb, vL), fill(T(Inf), vL), c0, Fminbox(innerOptimizer), 
+                    Options(g_tol=sqrt(getAtolVal(T)), iterations=20000) )
+    c = minimizer(res)
+    c ./ sum(c)
 end
 
 function CMsolver(v::Vector{T}, B::Matrix{T}, cvxConstraint::Bool, ϵ::T=T(1e-5)) where {T}
