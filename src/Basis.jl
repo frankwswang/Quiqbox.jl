@@ -1,8 +1,8 @@
 export GaussFunc, genExponent, genContraction, SpatialPoint, genSpatialPoint, BasisFunc, 
        BasisFuncs, genBasisFunc, lOf, subshellOf, centerOf, centerCoordOf, dimOf, GTBasis, 
-       sortBasisFuncs, sortPermBasisFuncs, add, mul, shift, decompose, basisSize, 
-       genBasisFuncText, genBFuncsFromText, assignCenInVal!, getParams, copyBasis, 
-       markParams!
+       sortBasisFuncs, sortPermBasisFuncs, sortBasis, sortPermBasis, add, mul, shift, 
+       decompose, basisSize, genBasisFuncText, genBFuncsFromText, assignCenInVal!, 
+       getParams, copyBasis, markParams!
 
 export P1D, P2D, P3D
 
@@ -793,7 +793,7 @@ Sort basis functions.
 """
 function sortBasis(bs::AbstractArray{<:CompositeGTBasisFuncs{T, D}}; 
                    roundDigits::Int=getAtolDigits(T)) where {T, D}
-    bs = reshape(bs, :)
+    bs = reshape(copy(bs), :)
     ids = findall(x->isa(x, FloatingGTBasisFuncs), bs)
     bfs = splice!(bs, ids)
     vcat( sortBasisFuncs(convert(AbstractVector{FloatingGTBasisFuncs{T, D}}, bfs); 
@@ -841,13 +841,10 @@ Return a `Vector` of indices `I` such that `bs[I] == sortBasis(bs; roundDigits)`
 """
 function sortPermBasis(bs::AbstractArray{<:CompositeGTBasisFuncs{T, D}}; 
                        roundDigits::Int=getAtolDigits(T)) where {T, D}
-    bs = reshape(bs, :)
-    idbfs = findall(x->isa(x, FloatingGTBasisFuncs), bs)
-    bfs = splice!(bs, idbfs)
-    ids1 = sortPermBasisFuncs(convert(AbstractVector{FloatingGTBasisFuncs{T, D}}, bfs); 
-                              roundDigits)
-    ids2 = sortPermBasis(convert(AbstractVector{BasisFuncMix{T, D}}, bs); roundDigits)
-    [ids1..., (ids2 .+ length(idbfs))...]
+    ids = objectid.(bs)
+    bsN = sortBasis(bs; roundDigits)
+    idsN = objectid.(bsN)
+    indexin(idsN, ids)
 end
 
 sortPermBasis(bs::AbstractArray{<:BasisFuncMix{T, D}}; 

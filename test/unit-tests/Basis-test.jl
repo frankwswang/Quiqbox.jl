@@ -3,6 +3,7 @@ using Quiqbox
 using Quiqbox: BasisFuncMix, unpackBasis, ElementNames, sortBasisFuncs, ParamList, sumOf, 
                mergeGaussFuncs, gaussProd, getNorms
 using LinearAlgebra
+using Random
 
 @testset "Basis.jl" begin
 
@@ -211,6 +212,23 @@ V = neAttractions([bfm], nuc, nucCoords)[]
 eeI = eeInteractions([bfm])[]
 @test eeI == eeInteraction(bfm, bfm, bfm, bfm)[]
 @test isapprox(eeI, eeInteractions(bs1) |> sum, atol=errorThreshold2)
+
+
+# function sortBasis sortPermBasis
+@test sortBasis(unsortedbfs) == sortedbfs
+@test unsortedbfs[sortPermBasis(unsortedbfs)] == sortedbfs
+bfm3 = BasisFuncMix(genBasisFunc([-1.0, 0.0, -1.2], (2.0, 0.5)))
+unsortedbfms = [bfm, bfm1, bfm2, bfm3]
+sortedbfms = [bfm3, bfm, bfm2, bfm1]
+@test sortBasis(unsortedbfms) == sortedbfms
+@test unsortedbfms[sortPermBasis(unsortedbfms)] == sortedbfms
+unsortedbs1 = vcat(unsortedbfs, unsortedbfms)
+unsortedbs2 = shuffle(unsortedbs1)
+sortedbs = vcat(sortedbfs, sortedbfms)
+@test sortBasis(unsortedbs1) == sortedbs
+@test unsortedbs1[sortPermBasis(unsortedbs1)] == sortedbs
+@test sortBasis(unsortedbs2) == sortedbs
+@test unsortedbs2[sortPermBasis(unsortedbs2)] == sortedbs
 
 
 # function dimOf
