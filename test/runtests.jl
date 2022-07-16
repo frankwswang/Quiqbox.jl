@@ -1,6 +1,9 @@
 using Test
+using Random
 
 @testset "Quiqbox tests" begin
+
+    Random.seed!(1234)
 
     unit1 = "Support Functions"
     println("Testing $(unit1)...")
