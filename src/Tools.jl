@@ -13,6 +13,8 @@ Set the maximal number of digits kept for rounding given a real number `DataType
 """
 getAtolDigits(::Type{T}) where {T<:Real} = Int(-getAtolCore(T))
 
+sqrtAtolVal(::Type{T}) where {T<:Real} = floor(T|>eps|>sqrt, sigdigits=1)
+
 
 # Function for submodule loading and integrity checking.
 function tryIncluding(subModuleName::String; subModulePath=(@__DIR__)[:]*"/SubModule")
