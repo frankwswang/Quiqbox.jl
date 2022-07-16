@@ -783,7 +783,7 @@ function xDIIScore(::Val{M}, S::Matrix{T},
                    DIISsize::Int=defaultDIISconfig[1], 
                    solver::Symbol=defaultDIISconfig[2]) where {M, T}
     cvxConstraint, permuteData = getproperty(DIISadditionalConfigs, M)
-    is = permuteData ? sortperm(Es) : (:)
+    is = (:)
     ∇s = (@view Fs[is])[1:end .> end-DIISsize]
     Ds = (@view Ds[is])[1:end .> end-DIISsize]
     Es = (@view Es[is])[1:end .> end-DIISsize]
