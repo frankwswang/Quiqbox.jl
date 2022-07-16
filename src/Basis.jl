@@ -1014,9 +1014,9 @@ function mergeBasisFuncs(bf1::FloatingGTBasisFuncs{T, D, 𝑙, GN, PT1, ON1},
             gfs2 = bf2.gauss[sortperm(gfPairs2)]
             gfs = Array{GaussFunc{T}}(undef, GN)
             for (id, (i, gf1), gf2) in zip(ids, enumerate(gfs1), gfs2)
-                res = if gf1 === gf2 || hasIndentical(gf1, gf2)
+                res = if gf1 === gf2 || hasIdentical(gf1, gf2)
                     gf1
-                elseif hasEuqal(gf1, gf2)
+                elseif hasEqual(gf1, gf2)
                     deepcopy(gf1)
                 elseif gfPairs1[i] == gfPairs2[i]
                     GaussFunc(gfPairs1[i]...)

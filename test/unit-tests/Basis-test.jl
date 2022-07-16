@@ -1,7 +1,7 @@
 using Test
 using Quiqbox
 using Quiqbox: BasisFuncMix, unpackBasis, ElementNames, sortBasisFuncs, ParamList, sumOf, 
-               mergeGaussFuncs, gaussProd, getNorms
+               mergeGaussFuncs, gaussProd, getNorms, mergeBasisFuncs, getTypeParams
 using LinearAlgebra
 using Random
 
@@ -294,6 +294,18 @@ mgf1_3 = mergeGaussFuncs(gf_merge1, gf_merge1_3)[]
 
 gf_merge3 = GaussFunc(1.5, 1.0)
 @test hasIdentical(mergeGaussFuncs(gf_merge1, gf_merge3), [gf_merge1, gf_merge3])
+
+
+# mergeBasisFuncs
+@test mergeBasisFuncs(bf4_3[:]...) == [bf4_3]
+@test mergeBasisFuncs(shuffle(bf4_4[:])...) == [bf4_4]
+bfsComps = vcat(bf4_3[:], bf4_4[:])
+mySort = xs->sort(xs, by=x->getTypeParams(x)[2:4])
+@test mySort(mergeBasisFuncs(shuffle(bfsComps)...)) == [bf4_3, bf4_4]
+mergedbfs = [bf3_1, bf4_3, bf4_4]
+@test hasEqual(mySort(mergeBasisFuncs(shuffle(vcat(bfsComps, bf3_1))...)), mergedbfs)
+@test hasEqual(mySort(mergeBasisFuncs(shuffle(vcat(bfsComps, bf3_1).|>deepcopy)...)), 
+               mergedbfs)
 
 
 # function add, mul, gaussProd
