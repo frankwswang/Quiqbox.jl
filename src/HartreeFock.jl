@@ -865,7 +865,7 @@ end
 
 
 # Default method
-function LBFGSBsolver(v::Vector{T}, B::Matrix{T}, cvxConstraint::Bool) where {T<:Real}
+function LBFGSBsolver(v::AbstractVector{T}, B::AbstractMatrix{T}, cvxConstraint::Bool) where {T<:Real}
     f = genxDIISf(v, B)
     g! = genxDIIS∇f(v, B)
     lb = ifelse(cvxConstraint, T(0), T(-Inf))
@@ -880,7 +880,7 @@ function LBFGSBsolver(v::Vector{T}, B::Matrix{T}, cvxConstraint::Bool) where {T<
     c ./ sum(c)
 end
 
-function CMsolver(v::Vector{T}, B::Matrix{T}, cvxConstraint::Bool, ϵ::T=T(1e-5)) where {T}
+function CMsolver(v::AbstractVector{T}, B::AbstractMatrix{T}, cvxConstraint::Bool, ϵ::T=T(1e-5)) where {T}
     len = length(v)
     getA = (B)->[B  ones(len); ones(1, len) 0]
     b = vcat(-v, 1)
@@ -917,6 +917,6 @@ end
 
 const ConstraintSolvers = (LCM=CMsolver, BFGS=LBFGSBsolver)
 
-constraintSolver(v::Vector{T}, B::Matrix{T}, 
+constraintSolver(v::AbstractVector{T}, B::AbstractMatrix{T}, 
                  cvxConstraint::Bool, solver::Symbol) where {T} = 
 getproperty(ConstraintSolvers, solver)(v, B, cvxConstraint)
