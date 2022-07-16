@@ -3,7 +3,7 @@ export SCFconfig, HFconfig, runHF, runHFcore
 using LinearAlgebra: dot, Hermitian, \, det, I, ishermitian
 using PiecewiseQuadratics: indicator
 using Combinatorics: powerset
-using LineSearches: BackTracking
+using LineSearches
 using Optim: LBFGS, Fminbox, optimize as OptimOptimize, minimizer as OptimMinimizer, 
              Options as OptimOptions
 
@@ -869,7 +869,9 @@ function LBFGSBsolver(v::Vector{T}, B::Matrix{T}, cvxConstraint::Bool) where {T<
     lb = ifelse(cvxConstraint, T(0), T(-Inf))
     vL = length(v)
     c0 = fill(T(1)/vL, vL)
-    innerOptimizer = LBFGS(m=min(getAtolDigits(T), 50), linesearch=BackTracking(c_1=1e-6))
+    innerOptimizer = LBFGS(m=min(getAtolDigits(T), 50), 
+                                 linesearch=HagerZhang(linesearchmax=100), 
+                                 alphaguess=InitialHagerZhang())
     res = OptimOptimize(f, g!, fill(lb, vL), fill(T(Inf), vL), c0, Fminbox(innerOptimizer), 
                         OptimOptions(g_tol=getAtolVal(T), iterations=20000))
     c = OptimMinimizer(res)
