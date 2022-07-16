@@ -765,11 +765,12 @@ function xDIIS(::Val{M}) where {M}
         Fs = getproperty.(tVars, :Fs)
         Ds = getproperty.(tVars, :Ds)
         Es = getproperty.(tVars, :Es)
-        oArg1, oArg2 = get.(Ref(kws), (:DIISsize, :solver), (10, :BFGS))
+        oArg1, oArg2 = get.(Ref(kws), (:DIISsize, :solver), defaultDIISconfig)
         xDIIScore.(Val(M), Ref(S), Fs, Ds, Es, oArg1, oArg2)
     end
 end
 
+const defaultDIISconfig = (15, :BFGS)
 
 const DIIScoreMethods = (DIIS=DIIScore, EDIIS=EDIIScore, ADIIS=ADIIScore)
 
@@ -779,7 +780,8 @@ const DIISadditionalConfigs = (DIIS=(false, true), EDIIS=(true, false), ADIIS=(t
 
 function xDIIScore(::Val{M}, S::Matrix{T}, 
                    Fs::Vector{Matrix{T}}, Ds::Vector{Matrix{T}}, Es::Vector{T}, 
-                   DIISsize::Int=10, solver::Symbol=:BFGS) where {M, T}
+                   DIISsize::Int=defaultDIISconfig[1], 
+                   solver::Symbol=defaultDIISconfig[2]) where {M, T}
     cvxConstraint, permuteData = getproperty(DIISadditionalConfigs, M)
     is = permuteData ? sortperm(Es) : (:)
     ∇s = (@view Fs[is])[1:end .> end-DIISsize]
