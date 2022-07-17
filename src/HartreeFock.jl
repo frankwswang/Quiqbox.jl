@@ -687,7 +687,7 @@ function runHFcore(::Val{HFT},
 
             if earlyStop && i > 1 && (Etots[end] - Etots[end-1]) / abs(Etots[end-1]) > 0.05
                 isConverged = false
-                i = terminateSCF(i, vars, method, printInfo)
+                i = terminateSCF(i, vars, m, printInfo)
                 break
             end
 
@@ -696,7 +696,7 @@ function runHFcore(::Val{HFT},
             if flag 
                 isConverged = ifelse(Std > scfConfig.oscillateThreshold, false, true)
                 if !isConverged
-                    i = terminateSCF(i, vars, method, printInfo)
+                    i = terminateSCF(i, vars, m, printInfo)
                 end
                 break
             end
@@ -797,9 +797,9 @@ function xDIIScore(::Val{M}, S::Matrix{T},
                    solver::Symbol=defaultDIISconfig[2]) where {M, T}
     cvxConstraint, permuteData = getproperty(DIISadditionalConfigs, M)
     is = permuteData ? sortperm(Es, rev=true) : (:)
-    ∇s = (@view Fs[is])[1:end .> end-DIISsize]
-    Ds = (@view Ds[is])[1:end .> end-DIISsize]
-    Es = (@view Es[is])[1:end .> end-DIISsize]
+    ∇s = @view Fs[is][1:end .> end-DIISsize]
+    Ds = @view Ds[is][1:end .> end-DIISsize]
+    Es = @view Es[is][1:end .> end-DIISsize]
     DIIS = getproperty(DIIScoreMethods, M)
     v, B = uniCallFunc(DIIS, getproperty(DIISmethodArgOrders, nameOf(DIIS)), ∇s, Ds, Es, S)
     c = constraintSolver(v, B, cvxConstraint, solver)
