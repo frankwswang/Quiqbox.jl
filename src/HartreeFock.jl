@@ -674,7 +674,6 @@ function runHFcore(::Val{HFT},
     Etots = vars[1].shared.Etots
     printInfo && println(rpad(HFT, 4)*rpad(" | Initial Gauss", 18), "E = $(Etots[end])")
     isConverged = true
-    EtotMin = Etots[]
     i = 0
     for (m, kws, breakPoint, l) in 
         zip(scfConfig.method, scfConfig.methodConfig, scfConfig.interval, 1:L)
@@ -686,22 +685,30 @@ function runHFcore(::Val{HFT},
             res = HFcore(m, N, Hcore, HeeI, S, X, vars; kws...)
             pushHFtempVars!(vars, res)
 
+            if earlyStop && i > 1 && (Etots[end] - Etots[end-1]) / abs(Etots[end-1]) > 0.05
+                isConverged = false
+                popHFtempVars!(vars)
+                i -= 1
+                printInfo && TerminateSCFinfo(m)
+                break
+            end
+
+            flag, Std = isOscillateConverged(Etots, 10^(log(10, breakPoint)÷2))
+
+            if flag 
+                isConverged = ifelse(Std > scfConfig.oscillateThreshold, false, true)
+                if !isConverged
+                    popHFtempVars!(vars)
+                    i -= 1
+                    printInfo && TerminateSCFinfo(m)
+                end
+                break
+            end
+
             printInfo && (i % floor(log(4, i) + 1) == 0 || i == maxStep) && 
             println(rpad("Step $i", 10), rpad("#$l ($(m))", 12), "E = $(Etots[end])")
 
             abs(Etots[end]-Etots[end-1]) > breakPoint || (isConverged = true) && break
-
-            flag, Std = isOscillateConverged(Etots, 10^(log(10, breakPoint)÷2))
-
-            flag && (isConverged = ifelse(Std > scfConfig.oscillateThreshold, false, true); 
-                     break)
-
-            if earlyStop && (Etots[end] - EtotMin) / abs(EtotMin) > 0.2
-                printInfo && println("Early termination of ", m, 
-                                     " due to the poor performance.")
-                isConverged = false
-                break
-            end
         end
 
     end
@@ -709,6 +716,8 @@ function runHFcore(::Val{HFT},
     printInfo && println("The SCF procedure ", negStr, "converged.\n")
     vars, isConverged
 end
+
+TerminateSCFinfo(m) = println("Early termination of ", m, " due to the poor performance.")
 
 const defaultDampStrength = 0.5
 
@@ -873,7 +882,7 @@ function LBFGSBsolver(v::AbstractVector{T}, B::AbstractMatrix{T}, cvxConstraint:
     vL = length(v)
     c0 = fill(T(1)/vL, vL)
     innerOptimizer = LBFGS(m=min(getAtolDigits(T), 50), 
-                                 linesearch=HagerZhang(linesearchmax=200), 
+                                 linesearch=HagerZhang(linesearchmax=200, epsilon=5e-8), 
                                  alphaguess=InitialHagerZhang())
     res = OptimOptimize(f, g!, fill(lb, vL), fill(T(Inf), vL), c0, Fminbox(innerOptimizer), 
                         OptimOptions(g_tol=getAtolVal(T), iterations=20000))
