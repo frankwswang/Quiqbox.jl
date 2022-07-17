@@ -122,7 +122,7 @@ end
   -0.0          0.0          1.09402024   0.0  0.0 -0.0          2.778672635; 
   -0.0          0.0          0.0          1.0  0.0 -0.0          0.0; 
   -0.0          0.0          0.0          0.0  1.0 -0.0          0.0][1:5, [1,2,3,6,7]]), 
-atol=20errorThreshold) |> all
+atol=100errorThreshold) |> all
 
 @test  isapprox(vcat(res2.C[1][6:7,:][:], res2.C[1][1:5, 4:5][:]) |> sort, 
                 vcat(fill(0,22), fill(1,2)), atol=errorThreshold)
@@ -146,7 +146,7 @@ atol=20errorThreshold) |> all
    0.483603812 -0.483603812  -0.0         -0.0         -1.280927041  0.0  0.0; 
    0.0          0.0           0.0          0.0          0.0 -0.661307591  0.0; 
    0.0          0.0           0.0          0.0          0.0  0.0 -0.661307591]), 
-atol=20errorThreshold) |> all
+atol=100errorThreshold) |> all
 @test isapprox.(res2.Eo, 
 ([-20.93038451, -1.616675748, -1.28446622,  -0.66130762, 
    -0.66130762,  1.060815274,  1.847804062], 
@@ -173,9 +173,10 @@ for i in range
     nucCoords2 = [[0, 0.0, 0.0], [i, 0.0, 0.0]]
 
     bs = genBasisFunc.(nucCoords2, "3-21G") |> flatten
-    res1 = runHF(bs, nuc2, nucCoords2, printInfo=(n%14==1 || n>95))
+    res1 = runHF(bs, nuc2, nucCoords2, printInfo=(n%14==1 || n>95 && (@show i; true)))
     push!(Erhf, res1.Ehf)
-    res2 = runHF(bs, nuc2, nucCoords2, HFconfig((HF=:UHF,)), printInfo=(n%14==1))
+    res2 = runHF(bs, nuc2, nucCoords2, HFconfig((HF=:UHF,)), 
+                                       printInfo=(n%14==1 && (@show i; true)))
     push!(Euhf, res2.Ehf)
     push!(Enuc, res1.Enn)
 end

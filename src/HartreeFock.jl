@@ -509,7 +509,7 @@ HFconfig(a1, a2::Symbol, args...) = HFconfig(a1, Val(a2), args...)
 
 HFconfig(a1::Symbol, a2::Symbol, args...) = HFconfig(Val(a1), Val(a2), args...)
 
-const defaultHFconfigPars = Any[Val(:RHF), Val(:SAD), defaultSCFconfig, 1000, true]
+const defaultHFconfigPars = Any[Val(:RHF), Val(:SAD), defaultSCFconfig, 100, true]
 
 HFconfig(t::NamedTuple) = genNamedTupleC(:HFconfig, defaultHFconfigPars)(t)
 
@@ -687,20 +687,16 @@ function runHFcore(::Val{HFT},
 
             if earlyStop && i > 1 && (Etots[end] - Etots[end-1]) / abs(Etots[end-1]) > 0.05
                 isConverged = false
-                popHFtempVars!(vars)
-                i -= 1
-                printInfo && TerminateSCFinfo(m)
+                i = terminateSCF(i, vars, method, printInfo)
                 break
             end
 
-            flag, Std = isOscillateConverged(Etots, 10^(log(10, breakPoint)/2))
+            flag, Std = isOscillateConverged(Etots, sqrt(breakPoint))
 
             if flag 
                 isConverged = ifelse(Std > scfConfig.oscillateThreshold, false, true)
                 if !isConverged
-                    popHFtempVars!(vars)
-                    i -= 1
-                    printInfo && TerminateSCFinfo(m)
+                    i = terminateSCF(i, vars, method, printInfo)
                 end
                 break
             end
@@ -717,7 +713,11 @@ function runHFcore(::Val{HFT},
     vars, isConverged
 end
 
-TerminateSCFinfo(m) = println("Early termination of ", m, " due to the poor performance.")
+function terminateSCF(i, vars, method, printInfo)
+    popHFtempVars!(vars)
+    printInfo && println("Early termination of ", method, " due to the poor performance.")
+    i-1
+end
 
 const defaultDampStrength = 0.5
 
@@ -729,7 +729,8 @@ function DDcore(Nˢ::Int, X::AbstractMatrix{T}, F::AbstractMatrix{T}, D::Abstrac
 end
 
 
-function EDIIScore(∇s::AbstractVector{<:AbstractMatrix{T}}, Ds::AbstractVector{<:AbstractMatrix{T}}, Es::AbstractVector{T}) where {T}
+function EDIIScore(∇s::AbstractVector{<:AbstractMatrix{T}}, 
+                   Ds::AbstractVector{<:AbstractMatrix{T}}, Es::AbstractVector{T}) where {T}
     len = length(Ds)
     B = ones(len, len)
     for j=1:len, i=1:len
@@ -739,7 +740,8 @@ function EDIIScore(∇s::AbstractVector{<:AbstractMatrix{T}}, Ds::AbstractVector
 end
 
 
-function ADIIScore(∇s::AbstractVector{<:AbstractMatrix{T}}, Ds::AbstractVector{<:AbstractMatrix{T}}) where {T}
+function ADIIScore(∇s::AbstractVector{<:AbstractMatrix{T}}, 
+                   Ds::AbstractVector{<:AbstractMatrix{T}}) where {T}
     len = length(Ds)
     B = ones(len, len)
     v = [dot(D - Ds[end], ∇s[end]) for D in Ds]
@@ -750,7 +752,8 @@ function ADIIScore(∇s::AbstractVector{<:AbstractMatrix{T}}, Ds::AbstractVector
 end
 
 
-function DIIScore(∇s::AbstractVector{<:AbstractMatrix{T}}, Ds::AbstractVector{<:AbstractMatrix{T}}, S::AbstractMatrix{T}) where {T}
+function DIIScore(∇s::AbstractVector{<:AbstractMatrix{T}}, 
+                  Ds::AbstractVector{<:AbstractMatrix{T}}, S::AbstractMatrix{T}) where {T}
     len = length(Ds)
     B = ones(len, len)
     v = zeros(len)
@@ -794,9 +797,9 @@ function xDIIScore(::Val{M}, S::Matrix{T},
                    solver::Symbol=defaultDIISconfig[2]) where {M, T}
     cvxConstraint, permuteData = getproperty(DIISadditionalConfigs, M)
     is = permuteData ? sortperm(Es, rev=true) : (:)
-    ∇s = @view Fs[is][1:end .> end-DIISsize]
-    Ds = @view Ds[is][1:end .> end-DIISsize]
-    Es = @view Es[is][1:end .> end-DIISsize]
+    ∇s = (@view Fs[is])[1:end .> end-DIISsize]
+    Ds = (@view Ds[is])[1:end .> end-DIISsize]
+    Es = (@view Es[is])[1:end .> end-DIISsize]
     DIIS = getproperty(DIIScoreMethods, M)
     v, B = uniCallFunc(DIIS, getproperty(DIISmethodArgOrders, nameOf(DIIS)), ∇s, Ds, Es, S)
     c = constraintSolver(v, B, cvxConstraint, solver)
