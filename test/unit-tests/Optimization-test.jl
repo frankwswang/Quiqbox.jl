@@ -33,8 +33,9 @@ for c in configs, (i,j) in zip((1,2,7,8,9,10), (2,2,7,9,9,10))
 end
 
 @test all(Ebegin .> Eend)
-@test all(Eend[1:6] .<= Eend[7:end])
-@test all(isapprox.(Eend[1:6], Eend[7:end], atol=1e-4))
+@test all(Eend[2] >= Eend[8])
+@test all(Eend[[1, 3:6...]] .<= Eend[7, 9:end...])
+@test all(isapprox.(Eend[1:6], Eend[7:end], atol=1e-5))
 
 
 # Grid-based basis set

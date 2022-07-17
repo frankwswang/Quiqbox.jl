@@ -167,16 +167,15 @@ range = 0.1:0.2:19.9
 Erhf = Float64[]
 Euhf = Float64[]
 Enuc = Float64[]
-
+n = 0
 for i in range
+    n += 1
     nucCoords2 = [[0, 0.0, 0.0], [i, 0.0, 0.0]]
 
     bs = genBasisFunc.(nucCoords2, "3-21G") |> flatten
-    res1 = runHF(bs, nuc2, nucCoords2, printInfo=false)
-    # @show length(res1.temp[1].Cs)
+    res1 = runHF(bs, nuc2, nucCoords2, printInfo=(n%14==1))
     push!(Erhf, res1.Ehf)
-    res2 = runHF(bs, nuc2, nucCoords2, HFconfig((HF=:UHF,)), printInfo=false)
-    # @show length(res2.temp[1].Cs)
+    res2 = runHF(bs, nuc2, nucCoords2, HFconfig((HF=:UHF,)), printInfo=(n%14==1))
     push!(Euhf, res2.Ehf)
     push!(Enuc, res1.Enn)
 end

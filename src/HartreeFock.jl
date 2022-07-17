@@ -51,10 +51,10 @@ end
 
 breakSymOfC(::Val{:RHF}, C::Matrix{T}) where {T<:Real} = (C,)
 
-breakSymOfC(::Val{:RHF}, X, Dᵅ, Dᵝ, Hcore, HeeI) = 
-getC.( Ref(X), getF(Hcore, HeeI, ((Dᵅ + Dᵝ)./2,)) )
+breakSymOfC(::Val{:RHF}, Hcore, HeeI, X, Dᵅ, Dᵝ, Nᵅ, Nᵝ) = 
+getC.( Ref(X), getF(Hcore, HeeI, ((Nᵅ*Dᵅ + Nᵝ*Dᵝ)./(Nᵅ+Nᵝ),)) )
 
-breakSymOfC(::Val{:UHF}, X, Dᵅ, Dᵝ, Hcore, HeeI) =
+breakSymOfC(::Val{:UHF}, Hcore, HeeI, X, Dᵅ, Dᵝ, _, _) =
 getC.( Ref(X), getF(Hcore, HeeI, (Dᵅ, Dᵝ)) )
 
 
@@ -102,7 +102,7 @@ function getCfromSAD(::Val{HFT}, S::Matrix{T},
         N₁tot += N₁
         N₂tot += N₂
     end
-    breakSymOfC(Val(HFT), X, Dᵅ, Dᵝ, Hcore, HeeI)
+    breakSymOfC(Val(HFT), Hcore, HeeI, X, Dᵅ, Dᵝ, N₁tot, N₂tot)
 end
 
 
@@ -143,7 +143,7 @@ end
 
 # RHF or UHF
 @inline getE(Hcore::Matrix{T}, Fˢ::Matrix{T}, Dˢ::Matrix{T}) where {T<:Real} = 
-        dot(transpose(Dˢ), (Hcore + Fˢ)/2)
+        dot(transpose(Dˢ), Hcore+Fˢ) / 2
 
 get2SpinQuantity(O::NTuple{HFTS, T}) where {HFTS, T} = abs(3-HFTS) * sum(O)
 get2SpinQuantities(O, nRepeat::Int) = fill(get2SpinQuantity(O), nRepeat) |> Tuple
@@ -710,9 +710,10 @@ function runHFcore(::Val{HFT},
     vars, isConverged
 end
 
+const defaultDampStrength = 0.5
 
 function DDcore(Nˢ::Int, X::AbstractMatrix{T}, F::AbstractMatrix{T}, D::AbstractMatrix{T}, 
-                dampStrength::T=T(0)) where {T}
+                dampStrength::T=T(defaultDampStrength)) where {T}
     @assert 0 <= dampStrength <= 1 "The range of `dampStrength`::$(T) is [0,1]."
     Dnew = getD(X, F, Nˢ)
     (1 - dampStrength)*Dnew + dampStrength*D
@@ -755,7 +756,7 @@ function DD(Nˢ::NTuple{HFTS, Int}, Hcore, HeeI, _S, X,
             tVars::NTuple{HFTS, HFtempVars{T, HFT}}; kws...) where {HFTS, T, HFT}
     Fs = last.(getproperty.(tVars, :Fs))
     Ds = last.(getproperty.(tVars, :Ds))
-    Dnew = DDcore.( Nˢ, Ref(X), Fs, Ds, get(kws, :dampStrength, T(0)) )
+    Dnew = DDcore.( Nˢ, Ref(X), Fs, Ds, get(kws, :dampStrength, T(defaultDampStrength)) )
     getF(Hcore, HeeI, Dnew)
 end
 
@@ -802,7 +803,7 @@ function HFcore(m::Symbol, N::NTuple{HFTS, Int}, Hcore::Matrix{T}, HeeI::Array{T
                 S::Matrix{T}, X::Matrix{T}, rVars::NTuple{HFTS, HFtempVars{T, HFT}}; 
                 kws...) where {HFTS, T, HFT}
     F = getproperty(SCFmethodSelector, m)(N, Hcore, HeeI, S, X, rVars; kws...)
-        getCFDE(Hcore, HeeI, X, N, F)
+    getCFDE(Hcore, HeeI, X, N, F)
 end
 
 
