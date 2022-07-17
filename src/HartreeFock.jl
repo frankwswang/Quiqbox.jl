@@ -882,7 +882,7 @@ function LBFGSBsolver(v::AbstractVector{T}, B::AbstractMatrix{T}, cvxConstraint:
     vL = length(v)
     c0 = fill(T(1)/vL, vL)
     innerOptimizer = LBFGS(m=min(getAtolDigits(T), 50), 
-                                 linesearch=HagerZhang(linesearchmax=200, epsilon=5e-8), 
+                                 linesearch=HagerZhang(linesearchmax=100, epsilon=1e-7), 
                                  alphaguess=InitialHagerZhang())
     res = OptimOptimize(f, g!, fill(lb, vL), fill(T(Inf), vL), c0, Fminbox(innerOptimizer), 
                         OptimOptions(g_tol=getAtolVal(T), iterations=20000))
