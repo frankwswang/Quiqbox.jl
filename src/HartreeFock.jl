@@ -275,7 +275,7 @@ struct SCFconfig{T, L} <: ImmutableParameter{T, SCFconfig}
 end
 
 
-const defaultSCFconfig = SCFconfig((:ADIIS, :DIIS), (5e-3, 1e-16))
+const defaultSCFconfig = SCFconfig((:ADIIS, :DIIS), (5e-3, 2e-16))
 
 
 mutable struct HFinterrelatedVars{T} <: HartreeFockintermediateData{T}
