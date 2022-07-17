@@ -275,7 +275,7 @@ struct SCFconfig{T, L} <: ImmutableParameter{T, SCFconfig}
 end
 
 
-const defaultSCFconfig = SCFconfig((:ADIIS, :DIIS), (5e-3, 1e-16))
+const defaultSCFconfig = SCFconfig((:ADIIS, :EDIIS, :DIIS), (5e-3, 5e-6, 1e-16))
 
 
 mutable struct HFinterrelatedVars{T} <: HartreeFockintermediateData{T}
@@ -693,7 +693,7 @@ function runHFcore(::Val{HFT},
                 break
             end
 
-            flag, Std = isOscillateConverged(Etots, 10^(log(10, breakPoint)÷2))
+            flag, Std = isOscillateConverged(Etots, 10^(log(10, breakPoint)/2))
 
             if flag 
                 isConverged = ifelse(Std > scfConfig.oscillateThreshold, false, true)
