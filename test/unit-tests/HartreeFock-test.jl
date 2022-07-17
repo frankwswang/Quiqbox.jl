@@ -218,9 +218,8 @@ uhfs = [ 7.275712508,  0.721327344, -0.450914129, -0.860294199, -1.029212153, -1
 
 Et1 = Erhf + Enuc
 Et2 = Euhf + Enuc
-cutoffIdx = Int(length(range) ÷ 1.5)
 
-compr2Arrays2((Et1=Et1, rhfs=rhfs), cutoffIdx, errorThreshold, 1e-5)
-compr2Arrays2((Et2=Et2, uhfs=uhfs), cutoffIdx, errorThreshold, 1e-5)
+compr2Arrays2((Et1=Et1, rhfs=rhfs), 95, errorThreshold, 0.6)
+compr2Arrays2((Et2=Et2, uhfs=uhfs), 16, errorThreshold, 5e-5, <)
 
 end

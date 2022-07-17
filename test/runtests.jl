@@ -5,38 +5,38 @@ using Random
 
     Random.seed!(1234)
 
-    unit1 = "Support Functions"
-    println("Testing $(unit1)...")
-    t1 = @elapsed @testset "$(unit1)" begin
-        include("unit-tests/Tools-test.jl")
-        include("unit-tests/FileIO-test.jl")
-        include("unit-tests/Overload-test.jl")
-    end
-    println("$(unit1) test finished in $t1 seconds.\n")
+    # unit1 = "Support Functions"
+    # println("Testing $(unit1)...")
+    # t1 = @elapsed @testset "$(unit1)" begin
+    #     include("unit-tests/Tools-test.jl")
+    #     include("unit-tests/FileIO-test.jl")
+    #     include("unit-tests/Overload-test.jl")
+    # end
+    # println("$(unit1) test finished in $t1 seconds.\n")
 
     @testset "Module Functions" begin
 
-        unit2_1 = "Main Functions"
-        println("Testing $(unit2_1)...")
-        t2_1 = @elapsed @testset "$(unit2_1)" begin
-            include("unit-tests/Parameters-test.jl")
-            include("unit-tests/Basis-test.jl")
-            include("unit-tests/Integrals/Core-test.jl")
-            include("unit-tests/Integrals/OneBody-test.jl")
-            include("unit-tests/Integrals/TwoBody-test.jl")
-            # Sys.islinux() && include("unit-tests/Integrals/Libcint-compare-tests.jl")
-            include("unit-tests/Differentiation-test.jl")
-        end
-        println("$(unit2_1) test finished in $t2_1 seconds.\n")
+        # unit2_1 = "Main Functions"
+        # println("Testing $(unit2_1)...")
+        # t2_1 = @elapsed @testset "$(unit2_1)" begin
+        #     include("unit-tests/Parameters-test.jl")
+        #     include("unit-tests/Basis-test.jl")
+        #     include("unit-tests/Integrals/Core-test.jl")
+        #     include("unit-tests/Integrals/OneBody-test.jl")
+        #     include("unit-tests/Integrals/TwoBody-test.jl")
+        #     # Sys.islinux() && include("unit-tests/Integrals/Libcint-compare-tests.jl")
+        #     include("unit-tests/Differentiation-test.jl")
+        # end
+        # println("$(unit2_1) test finished in $t2_1 seconds.\n")
 
-        unit2_2 = "Data Structure"
-        println("Testing $(unit2_2)...")
-        t2_2 = @elapsed @testset "$(unit2_2)" begin
-            include("unit-tests/Box-test.jl")
-            include("unit-tests/Library-test.jl")
-            include("unit-tests/Matter-test.jl")
-        end
-        println("$(unit2_2) test finished in $t2_2 seconds.\n")
+        # unit2_2 = "Data Structure"
+        # println("Testing $(unit2_2)...")
+        # t2_2 = @elapsed @testset "$(unit2_2)" begin
+        #     include("unit-tests/Box-test.jl")
+        #     include("unit-tests/Library-test.jl")
+        #     include("unit-tests/Matter-test.jl")
+        # end
+        # println("$(unit2_2) test finished in $t2_2 seconds.\n")
 
         unit2_3 = "Applications"
         println("Testing $(unit2_3)...")
