@@ -162,25 +162,6 @@ for D in D2s
 end
 
 # Potential energy curve tests.
-nuc2 = ["H", "H"]
-range = 0.1:0.2:19.9
-Erhf = Float64[]
-Euhf = Float64[]
-Enuc = Float64[]
-n = 0
-for i in range
-    n += 1
-    nucCoords2 = [[0, 0.0, 0.0], [i, 0.0, 0.0]]
-
-    bs = genBasisFunc.(nucCoords2, "3-21G") |> flatten
-    res1 = runHF(bs, nuc2, nucCoords2, printInfo=(n%14==1 || n>95 && (@show i; true)))
-    push!(Erhf, res1.Ehf)
-    res2 = runHF(bs, nuc2, nucCoords2, HFconfig((HF=:UHF,)), 
-                                       printInfo=(n%14==1 && (@show i; true)))
-    push!(Euhf, res2.Ehf)
-    push!(Enuc, res1.Enn)
-end
-
 rhfs = [ 7.275712508,  0.721327344, -0.450914129, -0.860294199, -1.029212153, -1.098483134, 
         -1.12116316,  -1.12068526,  -1.108423332, -1.090377472, -1.06979209,  -1.048358444, 
         -1.026929524, -1.005949751, -0.985675141, -0.966266831, -0.947825531, -0.93040561, 
@@ -217,8 +198,30 @@ uhfs = [ 7.275712508,  0.721327344, -0.450914129, -0.860294199, -1.029212153, -1
         -0.992397272, -0.992397272, -0.992397272, -0.992397272, -0.992397272, -0.992397272, 
         -0.992397272, -0.992397272, -0.992397272, -0.992397272]
 
-Et1 = Erhf + Enuc
-Et2 = Euhf + Enuc
+nuc2 = ["H", "H"]
+range = 0.1:0.2:19.9
+Et1 = Float64[]
+Et2 = Float64[]
+n = 0
+for i in range
+    n += 1
+    nucCoords2 = [[0, 0.0, 0.0], [i, 0.0, 0.0]]
+
+    bs = genBasisFunc.(nucCoords2, "3-21G") |> flatten
+    local res1, res2
+    info1 = @suppress_out begin
+        @show i
+        res1 = runHF(bs, nuc2, nucCoords2, printInfo=true)
+    end
+    info2 = @suppress_out begin
+        @show i
+        res2 = runHF(bs, nuc2, nucCoords2, HFconfig((HF=:UHF,)), printInfo=true)
+    end
+    push!(Et1, res1.Ehf+res1.Enn)
+    push!(Et2, res2.Ehf+res1.Enn)
+    !isapprox(Et1[n], rhfs[n], atol=errorThreshold) && println(info1)
+    !isapprox(Et2[n], uhfs[n], atol=errorThreshold) && println(info2)
+end
 
 compr2Arrays2((Et1=Et1, rhfs=rhfs), 95, errorThreshold, 0.6)
 compr2Arrays2((Et2=Et2, uhfs=uhfs), 16, errorThreshold, 5e-5, <)
