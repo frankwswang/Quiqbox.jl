@@ -48,7 +48,7 @@ bfs3 = genBasisFunc([0.0, 0.0, 0.0], (2.0, 1.0), [(2,0,0), (1,1,0)])
                                    "[2/6]"*"[0.0, 0.0, 0.0]"
 
 bfm1 = BasisFuncMix([bf1, bf2])
-@test (@capture_out show(bfm1)) == string(typeof(bfm1))*getFieldNameStr(bfm1)
+@test (@capture_out show(bfm1)) == string(typeStrOf(bfm1))*getFieldNameStr(bfm1)
 
 GTb1 = GTBasis([bf1, bfs2])
 @test (@capture_out show(GTb1)) == string(typeof(GTb1))*getFieldNameStr(GTb1)

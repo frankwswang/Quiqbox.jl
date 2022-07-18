@@ -46,17 +46,27 @@ end
 
 typeStrOf(::T) where {T<:SpatialPoint} = typeStrOf(T)
 
-function typeStrOf(b::FloatingGTBasisFuncs{<:Any, <:Any, <:Any, <:Any, PDT}) where {PDT}
-    bTstrO = typeof(b) |> string
+function typeStrOf(bT::Type{<:FloatingGTBasisFuncs{<:Any, <:Any, <:Any, <:Any, PDT}}) where 
+                  {PDT}
+    bTstrO = bT |> string
     pbsTstrO, pbsTstrN = PDT |> getSPNDstring
     replace(bTstrO, pbsTstrO=>pbsTstrN, count=1)
 end
 
-function typeStrOf(gb::GridBox{<:Any, <:Any, <:Any, SPT}) where {SPT}
-    gbTstrO = typeof(gb) |> string
+typeStrOf(::T) where {T<:FloatingGTBasisFuncs} = typeStrOf(T)
+
+function typeStrOf(gbT::Type{<:GridBox{<:Any, <:Any, <:Any, SPT}}) where {SPT}
+    gbTstrO = gbT |> string
     pbsTstrN = SPT |> typeStrOf
     replace(gbTstrO, string(SPT)=>pbsTstrN, count=1)
 end
+
+typeStrOf(::T) where {T<:GridBox} = typeStrOf(T)
+
+typeStrOf(bfmT::Type{<:BasisFuncMix{<:Any, <:Any, <:Any, BT}}) where {BT} = 
+replace(string(bfmT), string(BT)=>typeStrOf(BT), count=1)
+
+typeStrOf(::T) where {T<:BasisFuncMix} = typeStrOf(T)
 
 function getFieldNameStr(::T) where {T} 
     fields = fieldnames(T)
@@ -108,7 +118,7 @@ function show(io::IO, bfs::BasisFuncs{<:Any, <:Any, 𝑙, <:Any, <:Any, ON}) whe
     print(io, "]", cen)
 end
 
-show(io::IO, bfm::BasisFuncMix) = print(io, typeof(bfm), getFieldNameStr(bfm))
+show(io::IO, bfm::BasisFuncMix) = print(io, typeStrOf(bfm), getFieldNameStr(bfm))
 
 show(io::IO, ::T) where {T<:EmptyBasisFunc} = print(io, T)
 
