@@ -567,18 +567,17 @@ end
 function genBasisFunc(cen::SpatialPoint{T, D}, xpnsANDcons::NTuple{2, AbstractVector{T}}, 
                       lOrSubshell=LTuple(fill(0, D)); normalizeGTO::Bool=false) where 
                      {T, D}
-    @assert length(xpnsANDcons[1]) == length(xpnsANDcons[2]) "The length of exponent " * 
-            "coefficients and contraction coefficients are NOT equal."
-    genBasisFunc(cen, GaussFunc.(xpnsANDcons[1], xpnsANDcons[2]), lOrSubshell; 
-                 normalizeGTO)
+    @assert ==(length.(xpnsANDcons)...) "The length of exponent coefficients and " * 
+                                        "contraction coefficients are NOT equal."
+    genBasisFunc(cen, GaussFunc.(xpnsANDcons[1], xpnsANDcons[2]), lOrSubshell; normalizeGTO)
 end
 
 genBasisFunc(cen::SpatialPoint{T, D}, xpnANDcon::NTuple{2, T}, 
              lOrSubshell=LTuple(fill(0, D)); normalizeGTO::Bool=false) where {T, D} = 
 genBasisFunc(cen, (GaussFunc(xpnANDcon[1], xpnANDcon[2]),), lOrSubshell; normalizeGTO)
 
-genBasisFunc(cen::SpatialPoint{T, D}, gs::Tuple, subshell::String, lFilter::Tuple{Vararg{Bool}}; 
-             normalizeGTO::Bool=false) where {T, D} = 
+genBasisFunc(cen::SpatialPoint{T, D}, gs::Tuple, subshell::String, 
+             lFilter::Tuple{Vararg{Bool}}; normalizeGTO::Bool=false) where {T, D} = 
 genBasisFunc(cen, gs, SubshellOrientationList[D][subshell][1:end .∈ [findall(lFilter)]]; 
              normalizeGTO)
 
@@ -1211,6 +1210,7 @@ all the input bases hold `.normalizeGTO == true`. `roundDigits` specifies the ma
 number of digits after the radix point of the calculated values. When set to negative, no 
 rounding will be performed. The function can be called using `*` syntax with the keyword 
 arguments set to their default values.
+
 ≡≡≡ Example(s) ≡≡≡
 
 ```jldoctest; setup = :(push!(LOAD_PATH, "../../src/"); using Quiqbox)
@@ -1811,9 +1811,9 @@ end
     Vector{<:ParamBox}
 
 Mark the parameters ([`ParamBox`](@ref)) in `b`. The parameters that will be considered 
-identical in the automatic differentiation procedure will be marked with same index. 
-`filterMapping` determines whether filtering out (i.e. not return) the extra `ParamBox`s 
-that have the same indices despite may having different mapping functions.
+identical in the differentiation procedure will be marked with same index. `filterMapping` 
+determines whether filtering out (i.e. not return) the extra `ParamBox`s that have the same 
+indices despite may having different mapping functions.
 """
 markParams!(b::Union{AbstractVector{T}, T, Tuple{Vararg{T}}}, 
             filterMapping::Bool=false) where {T<:ParameterizedContainer} = 

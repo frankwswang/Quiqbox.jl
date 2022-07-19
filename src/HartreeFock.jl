@@ -191,14 +191,14 @@ end
 
 const Doc_SCFconfig_OneRowTable = "|`:DIIS`, `:EDIIS`, `:ADIIS`|subspace size; "*
                                   "coefficient solver|`DIISsize`; `solver`|`1`,`2`...; "*
-                                  "`:LCM`, `:BFGS`|`15`; `:BFGS`|"
+                                  "`:LCM`, `:LBFGS`|`15`; `:LBFGS`|"
 
 const Doc_SCFconfig_DIIS = "[Direct inversion in the iterative subspace]"*
                            "(https://onlinelibrary.wiley.com/doi/10.1002/jcc.540030413)."
 const Doc_SCFconfig_ADIIS = "[DIIS based on the augmented Roothaan–Hall (ARH) energy "*
                             "function](https://aip.scitation.org/doi/10.1063/1.3304922)."
 const Doc_SCFconfig_LBFGSB = "[Limited-memory BFGS with box constraints]"*
-                             "(https://github.com/Gnimuc/LBFGSB.jl)."
+                             "(https://github.com/JuliaNLSolvers/Optim.jl)."
 
 const Doc_SCFconfig_Eg1 = "SCFconfig{Float64, 3}(method=(:DD, :ADIIS, :DIIS), "*
                           "interval=(0.0001, 1.0e-12, 1.0e-13), methodConfig, "*
@@ -228,7 +228,7 @@ $(Doc_SCFconfig_OneRowTable)
 
 ### DIIS-type Method Solvers
 * LCM: Lagrange multiplier solver.
-* BFGS: $(Doc_SCFconfig_LBFGSB)
+* LBFGS: $(Doc_SCFconfig_LBFGSB)
 
 `interval::NTuple{L, T}`: The stopping (skipping) thresholds for required methods.
 
@@ -783,7 +783,7 @@ function xDIIS(::Val{M}) where {M}
     end
 end
 
-const defaultDIISconfig = (12, :BFGS)
+const defaultDIISconfig = (12, :LBFGS)
 
 const DIIScoreMethods = (DIIS=DIIScore, EDIIS=EDIIScore, ADIIS=ADIIScore)
 
@@ -928,7 +928,7 @@ function CMsolver(v::AbstractVector{T}, B::AbstractMatrix{T}, cvxConstraint::Boo
 end
 
 
-const ConstraintSolvers = (LCM=CMsolver, BFGS=LBFGSBsolver)
+const ConstraintSolvers = (LCM=CMsolver, LBFGS=LBFGSBsolver)
 
 constraintSolver(v::AbstractVector{T}, B::AbstractMatrix{T}, 
                  cvxConstraint::Bool, solver::Symbol) where {T} = 

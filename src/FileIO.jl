@@ -7,13 +7,15 @@ const subscriptNum   = Dict(['0'=>'₀', '1'=>'₁', '2'=>'₂', '3'=>'₃', '4'
 const superscriptSym = Dict(['+'=>'⁺', '-'=>'⁻', '('=>'⁽', ')'=>'⁾', '!'=>'ꜝ'])
 
 const subscripts = ['₀', '₁', '₂', '₃', '₄', '₅', '₆', '₇', '₈', '₉']
+
+
 """
 
     checkFname(Fname::String; showWarning::Bool=true) -> String
 
-Check if there is a file with the same name in the current directory. If so, will add an 
-`"_N"` at the end of the file name `String`. `showWarning` determines whether prints out 
-the WARNING info when there is a file with the same name.
+Check if there is a file with the same name in the current directory. If so, add a `"_N"` 
+at the end of `Fname`. `showWarning` determines whether to print out the WARNING info when 
+there is a file with the same name.
 """
 function checkFname(Fname::String; showWarning::Bool=true)
     FnameN = Fname

@@ -774,9 +774,9 @@ end
         (roundDigits < 0  ?  num  :  round(num, digits=roundDigits))
 
 
-fillNumber(num::Number) = fill(num)
+fillObj(num::Any) = fill(num)
 
-fillNumber(num::Array{<:Any, 0}) = itself(num)
+fillObj(num::Array{<:Any, 0}) = itself(num)
 
 
 @inline genTupleCoords(::Type{T1}, coords::Vector{<:AbstractArray{<:T2}}) where {T1, T2} = 

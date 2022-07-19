@@ -81,7 +81,7 @@ function show(io::IO, sp::SpatialPoint)
     print(io, [i() for i in pbs])
     for pb in pbs
         print(io, "[")
-        printstyled(io, "∂", color=diffColorSym(pb))
+        printstyled(io, ifelse(isDiffParam(pb), "𝛛", "∂"), color=diffColorSym(pb))
         print(io, "]")
     end
 end

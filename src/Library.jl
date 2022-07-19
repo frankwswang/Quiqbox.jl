@@ -128,6 +128,7 @@ const SubshellSizes =(SubshellXsizes, SubshellXYsizes, SubshellXYZsizes)
 
 const FactorialsLs = Integer[0, factorial.(1:20)..., factorial.(big.(21:48))...]
 
+
 function LtoStr(lt::LTuple{D}) where {D}
     res = ""
     ls = ["X", "Y", "Z"][1:D]

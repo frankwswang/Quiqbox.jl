@@ -26,51 +26,63 @@ getFLevel(::Type{T}) where {T} = getFLevel(T |> FLevel)
 
 """
 
-    ParamBox{T, V, FL} <: DifferentiableParameter{T, ParamBox}
-
-Parameter container that can enable parameter differentiations.
+    ParamBox{T, V, FL<:FLevel} <: DifferentiableParameter{T, ParamBox}
+ 
+Parameter container that can enable differentiation.
 
 ≡≡≡ Field(s) ≡≡≡
 
-`data::Array{T, 0}`: The data (parameter) stored in a 0-D `Array` whose value (i.e. input 
-value) can be accessed by syntax `[]`.
+`data::Array{T, 0}`: The container of the data (i.e. the value of the input variable) 
+stored in the `ParamBox` that can be accessed by syntax `[]`.
 
-`dataName::Symbol`: The name assigned to the stored data.
+`dataName::Symbol`: The name of the input variable.
 
-`map::Function`: The mathematical mapping of the data. The result (i.e., output value) can 
-be accessed by syntax `()`.
+`map::Function`: The mapping of the data within the same domain (`.map(::T)->T`). The 
+result (i.e., the value of the output variable) can be accessed by syntax `()`.
 
-`canDiff::Array{Bool, 0}`: Indicator that whether this container (the variable the stored 
-value is mapped to, i.e. the output variable) is marked as "differentiable".
+`canDiff::Array{Bool, 0}`: Indicator of whether the output variable is "marked" as 
+differentiable with respect to the input variable in the differentiation process. In other 
+words, it determines whether the output variable represented by the `ParamBox` is treated 
+as a dependent variable or an independent variable.
 
-`index::Array{<:Union{Int, Nothing}, 0}`: Additional index assigned to the parameter.
+`index::Array{<:Union{Int, Nothing}, 0}`: Additional index assigned to the `ParamBox`.
 
 ≡≡≡ Initialization Method(s) ≡≡≡
 
     ParamBox(data::Union{Array{T, 0}, T}, dataName::Symbol=:undef; 
-             index::Union{Int, Nothing}=nothing) where {T<:Number} -> 
+             index::Union{Int, Nothing}=nothing) where {T} -> 
     ParamBox{T, dataName, $(FI)}
 
     ParamBox(data::Union{Array{T, 0}, T}, name::Symbol, mapFunction::Function, 
              dataName::Symbol=:undef; index::Union{Int, Nothing}=nothing, 
-             canDiff::Bool=true) where {T<:Number} ->
+             canDiff::Bool=true) where {T} ->
     ParamBox{T, name, $(FLevel)(mapFunction)}
 
-`name` specifies the name of the output variable the `ParamBox` represents, which helps 
-with symbolic representation and automatic differentiation.
+=== Positional argument(s) ===
 
-`mapFunction`: The (mathematical) mapping of the data, which will be stored in the field 
-`map`. It is for the case where the variable represented by the `ParamBox` is dependent on 
-another independent variable of which the value is the stored data in the container. After 
-initializing a `ParamBox`, e.g `pb1 = ParamBox(x, mapFunction=f)`, `pb[]` returns `x`, and 
-`pb()` returns `f(x)::T`. `mapFunction` is set to `$(itself)` in default, which is a dummy 
-function that maps the data to itself.
+`data::Union{Array{T, 0}, T}`: The input value to be stored or the container of it. If the 
+latter is the first argument, then it will directly be assigned to `.data`.
 
-`canDiff` determines whether the output math variable is "marked" as differentiable (i.e., 
-the mapping is a differentiable function) with respect to the stored data. In other 
-words, it determines whether the output variable `ParamBox` generated during the automatic 
-differentiation procedure is treated as a dependent variable or an independent variable 
-regardless of the mapping relation.
+`name::Symbol`: Specify the name of the output variable represented by the constructed 
+`ParamBox`. It's not required when `mapFunction` is not provided because then the output 
+variable is considered the same as the input variable. It's equal to the type parameter `V` 
+of the constructed `ParamBox`.
+
+`mapFunction::Function`: The mapping of the stored data (`mapFunction(::T)->T`), which will 
+be assigned to the field `.map`. After constructing a `ParamBox`, e.g 
+`pb = ParamBox(x, yName, f)`, `pb[]` returns the value of `x`, and `pb()` returns the value 
+of `f(x)::T`. When `mapFunction` is not provided, `.map` is set to [`itself`](@ref) that 
+maps the stored data to itself.
+
+`dataName::Symbol`: The name of the stored data, i.e, the name of the input variable.
+
+=== Keyword argument(s) ===
+
+`index::Union{Int, Nothing}`: The index of the constructed `ParamBox`. It's should be left 
+with its default value unless the user plans to utilize the index of a `ParamBox` for 
+specific application other than differentiation.
+
+`canDiff::Bool`: Determine whether the output variable is marked as "differentiable".
 
 ≡≡≡ Example(s) ≡≡≡
 
@@ -85,15 +97,15 @@ julia> ParamBox(1.0, :a, abs)
 ParamBox{Float64, :a, $(FLevel(abs))}(1.0)[∂][x_a]
 ```
 
-**NOTE 1:** The rightmost "`[∂][IV]`" in the printing info indicates the differentiability 
-and the name of the represented independent variable `:IV`. When the `ParamBox` is marked 
-as a "differentiable function", "`[∂]`" is in color green (otherwise it's in grey).
+**NOTE 1:** The rightmost "`[∂][IV]`" in the printed info indicates the differentiability 
+and the name (with an assigned index) of the independent variable held by the `ParamBox`. 
+When the `ParamBox` is marked as a "differentiable parameter", "`[∂]`" is bold and green 
+instead of just being grey, and `IV` is the name of the input variable.
 
-**NOTE 2:** It's always the output variable `V` generated by a `ParamBox{<:Any, V}` that 
-is used to construct a basis, whereas the underlying independent variable is used to 
-differentiate the basis (in other words, only when `mapFunction = $(itself)` or 
-`canDiff = false` is the independent variable same as the output variable / represented 
-parameter).
+**NOTE 2:** The output variable of a `ParamBox` is normally used to differentiate a 
+parameter functional (e.g., the Hartree-Fock energy). However, the derivative with respect 
+to the corresponding input variable can also be computed to when the `ParamBox` is marked 
+as differentiable.
 """
 struct ParamBox{T, V, FL<:FLevel} <: DifferentiableParameter{T, ParamBox}
     data::Array{T, 0}
@@ -139,11 +151,11 @@ ParamBox(::Val{V}, pb::ParamBox{T}) where {T, V} =
 ParamBox{T, V}(pb.map, pb.data, pb.index, pb.canDiff, pb.dataName)
 
 ParamBox(data::T, dataName::Symbol=:undef; index::Union{Int, Nothing}=nothing) where {T} = 
-ParamBox(Val(dataName), fillNumber(data), genIndex(index))
+ParamBox(Val(dataName), fillObj(data), genIndex(index))
 
 ParamBox(data::T, name::Symbol, mapFunction::F, dataName::Symbol=:undef; 
          index::Union{Int, Nothing}=nothing, canDiff::Bool=true) where {T, F<:Function} = 
-ParamBox(Val(name), mapFunction, fillNumber(data), genIndex(index), fill(canDiff), dataName)
+ParamBox(Val(name), mapFunction, fillObj(data), genIndex(index), fill(canDiff), dataName)
 
 
 mapTypeOf(::ParamBox{<:Any, <:Any, FL}) where {FL} = FL
@@ -151,9 +163,9 @@ mapTypeOf(::ParamBox{<:Any, <:Any, FL}) where {FL} = FL
 
 """
 
-    inValOf(pb::ParamBox) -> Number
+    inValOf(pb::ParamBox{T}) where {T} -> T
 
-Return the input value (independent variable) of `pb`. Equivalent to `pb[]`.
+Return the value of the input variable of `pb`. Equivalent to `pb[]`.
 """
 @inline inValOf(pb::ParamBox) = pb.data[]
 
@@ -162,7 +174,7 @@ Return the input value (independent variable) of `pb`. Equivalent to `pb[]`.
 
     inSymOf(pb::ParamBox) -> Symbol
 
-Return the `Symbol` of stored data (independent variable) of the input `ParamBox`.
+Return the name (with the index if available) of the input variable of `pb`.
 """
 inSymOf(pb::ParamBox) = ( string(inSymOfCore(pb)) * numToSubs(pb.index[]) ) |> Symbol
 
@@ -171,8 +183,8 @@ inSymOf(pb::ParamBox) = ( string(inSymOfCore(pb)) * numToSubs(pb.index[]) ) |> S
 
     inSymValOf(pb::ParamBox{T}) where {T} -> ::Pair{Symbol, T}
 
-Return a `Pair` of the stored independent variable of the input `ParamBox` and its 
-corresponding value.
+Return a `Pair` of the name (with the index if available) and the value of the input 
+variable of `pb`.
 """
 @inline inSymValOf(pb::ParamBox{T}) where {T} = (inSymOf(pb) => pb.data[])
 
@@ -181,8 +193,7 @@ corresponding value.
 
     outValOf(pb::ParamBox) -> Number
 
-Return the output value of (dependent variable) of `pb`. 
-Equivalent to `pb()`.
+Return the value of the output variable of `pb`. Equivalent to `pb()`.
 """
 @inline outValOf(pb::ParamBox) = callGenFunc(pb.map, pb.data[])
 
@@ -196,7 +207,7 @@ Equivalent to `pb()`.
 
     outSymOf(pb::ParamBox) -> Symbol
 
-Return the `Symbol` of the output data (dependent variable) of the input `ParamBox`.
+Return the name (with the index if available) of the output variable of `pb`.
 """
 outSymOf(pb::ParamBox) = ( string(outSymOfCore(pb)) * numToSubs(pb.index[]) ) |> Symbol
 
@@ -205,8 +216,8 @@ outSymOf(pb::ParamBox) = ( string(outSymOfCore(pb)) * numToSubs(pb.index[]) ) |>
 
     outSymValOf(pb::ParamBox) -> ::Pair{Symbol, T}
 
-Return a `Pair` of the dependent variable represented by the input `ParamBox` and the 
-corresponding output value.
+Return a `Pair` of the name (with the index if available) and the value of the output 
+variable of `pb`.
 """
 @inline outSymValOf(pb::ParamBox{T}) where {T} = (outSymOf(pb) => outValOf(pb))
 
@@ -215,7 +226,7 @@ corresponding output value.
 
     inSymOfCore(pb::ParamBox) -> Symbol
 
-Return the `Symbol` of the stored data (independent variable) of the input `ParamBox`.
+Return the `Symbol` of the input variable of `pb`.
 """
 @inline inSymOfCore(pb::ParamBox) = pb.dataName
 @inline inSymOfCore(pb::ParamBox{<:Any, <:Any, FI}) = outSymOfCore(pb)
@@ -225,7 +236,7 @@ Return the `Symbol` of the stored data (independent variable) of the input `Para
 
     outSymOfCore(pb::ParamBox) -> Symbol
 
-Return the `Symbol` of the output data (dependent variable) of the input `ParamBox`.
+Return the `Symbol` of the output variable of `pb`.
 """
 @inline outSymOfCore(::ParamBox{<:Any, V}) where {V} = V
 
@@ -237,7 +248,7 @@ getTypeParams(::ParamBox{T, V, FL}) where {T, V, FL} = (T, V, FL)
 
     dataOf(pb::ParamBox{T}) where {T} -> Array{T, 0}
 
-Return the 0-D `Array` of the data stored in the input `ParamBox`.
+Return the 0-D `Array` containing data stored in `pb`.
 """
 @inline dataOf(pb::ParamBox) = pb.data
 
@@ -246,7 +257,7 @@ Return the 0-D `Array` of the data stored in the input `ParamBox`.
 
     mapOf(pb::ParamBox) -> Function
 
-Return the mapping function of the input `ParamBox`.
+Return the mapping function of `pb`.
 """
 @inline mapOf(pb::ParamBox) = pb.map
 
@@ -255,9 +266,8 @@ Return the mapping function of the input `ParamBox`.
 
     getVar(pb::ParamBox{T}, forDifferentiation::Bool=false) -> Symbol
 
-Return the `Symbol` of a parameter. If `forDifferentiation` is set to `true`, then 
-the `Symbol` of the independent variable represented by the input `ParamBox` during the 
-differentiation process is returned.
+Return the name of (the output variable of) `pb`. If `forDifferentiation` is set to `true`, 
+the name of the independent variable held by `pb` is returned.
 """
 function getVar(pb::ParamBox, forDifferentiation::Bool=false)
     if forDifferentiation
@@ -284,8 +294,9 @@ end
     Dict{Symbol}
 
 Return a `Dict` that stores the independent variable(s) of the parameter container(s) and 
-its(their) corresponding value(s). **NOTE: Once the input `ParamBox` is mutated, the 
-generated `Dict` may no longer be up to date.**
+its(their) corresponding value(s). 
+
+**NOTE: Once `obj` is mutated, the generated `Dict` may no longer be up to date.**
 """
 getVarDict(pbs::AbstractArray{<:ParamBox}) = vcat(getVarCore.(pbs)...) |> Dict
 getVarDict(pbs::Tuple{Vararg{ParamBox}}) = getVarDict(pbs |> collect)
@@ -296,8 +307,8 @@ getVarDict(pbs::ParamBox) = getVarCore(pbs) |> Dict
 
     outValCopy(pb::ParamBox{T, V}) where {T} -> ParamBox{T, V, $(FI)}
 
-Return a new `ParamBox` of which the stored data is a **deep copy** of the data mapped from 
-the input `ParamBox`.
+Return a new `ParamBox` of which the input variable is a **deep copy** of the output 
+variable of `pb`.
 """
 outValCopy(pb::ParamBox{<:Any, V}) where {V} = 
 ParamBox(Val(V), fill(pb()), genIndex(nothing))
@@ -307,8 +318,8 @@ ParamBox(Val(V), fill(pb()), genIndex(nothing))
 
     inVarCopy(pb::ParamBox) -> ParamBox{<:Number, <:Any, $(FI)}
 
-Return a new `ParamBox` of which the stored data is a **shallow copy** of the stored data 
-from the input `ParamBox`.
+Return a new `ParamBox` of which the input variable is a **shallow copy** of the input 
+variable of `pb`.
 
 ≡≡≡ Example(s) ≡≡≡
 
@@ -340,7 +351,7 @@ const NoDiffMark = superscriptSym['!']
 
     enableDiff!(pb::ParamBox) -> ParamBox
 
-Mark the input `ParamBox` as "differentiable" and return the marked `ParamBox`.
+Mark the input `pb` as "differentiable" and then return it.
 """
 function enableDiff!(pb::ParamBox)
     pb.canDiff[] = true
@@ -352,7 +363,7 @@ end
 
     disableDiff!(pb::ParamBox) -> ParamBox
 
-Mark the input `ParamBox` as "non-differentiable" and return the marked `ParamBox`.
+Mark the `pb` as "non-differentiable" and then return it.
 """
 function disableDiff!(pb::ParamBox)
     pb.canDiff[] = false
@@ -364,7 +375,7 @@ end
 
     isDiffParam(pb::ParamBox) -> Bool
 
-Return the Boolean value of if the input `ParamBox` is "differentiable".
+Return the Boolean value of if `pb` is differentiable.
 """
 isDiffParam(pb::ParamBox) = pb.canDiff[]
 
@@ -373,18 +384,20 @@ isDiffParam(pb::ParamBox) = pb.canDiff[]
 
     toggleDiff!(pb::ParamBox) -> Bool
 
-Toggle the differentiability (`pb.canDiff[]`) of the input `ParamBox` and return the 
-altered result.
+Toggle the differentiability of the input `pb` and then return it.
 """
 toggleDiff!(pb::ParamBox) = begin pb.canDiff[] = !pb.canDiff[] end
 
 
 """
 
-    changeMapping(pb::ParamBox{T, V, FL}, mapFunction::F, outputName::Symbol=V; 
-                  canDiff::Bool=true) where {T, V, FL, F<:Function} -> 
+    changeMapping(pb::ParamBox, mapFunction::Function, outputName::Symbol=V; 
+                  canDiff::Bool=true) -> 
     ParamBox{T, outputName}
 
+Change the mapping function of `pb`. The name of the output variable of the returned 
+`ParamBox` can be specified by `outputName`, and its differentiability is determined by 
+`canDiff`.
 """
 function changeMapping(pb::ParamBox{T, V, FL}, mapFunction::F, outputName::Symbol=V; 
                        canDiff::Bool=true) where {T, V, FL, F<:Function}
