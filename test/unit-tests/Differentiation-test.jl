@@ -25,7 +25,7 @@ grad1_2 = gradHFenergy(bs1, pars1, HFres1.C, overlaps(bs1), nuc, nucCoords)
 @test isapprox(grad1_2[1], grad1_2[2], atol=t1)
 @test isapprox.(grad1_2, grad1_t, atol=t2) |> all
 
-bfSource = genBasisFunc(missing, ("STO-2G", "H"))[]
+bfSource = genBasisFunc(missing, "STO-2G", "H")[]
 gfs = bfSource.gauss |> collect
 cens = genSpatialPoint.(nucCoords)
 bs2 = genBasisFunc.(cens, Ref(gfs), normalizeGTO=true)

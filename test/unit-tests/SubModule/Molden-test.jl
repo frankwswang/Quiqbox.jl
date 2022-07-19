@@ -36,15 +36,14 @@ for ((iNuc, nuc), nucCoords, molName) in zip(enumerate(mols), molCoords, molName
 
     flag = (bfCoord == nucCoords)
     if flag
-        nucConfig = [(bf, i) for i in nuc]
-        bs = genBasisFunc.(bfCoord, nucConfig) |> flatten
+        bs = genBasisFunc.(bfCoord, bf, nuc) |> flatten
     else
         bs = genBasisFunc.(bfCoord, bf) |> flatten
         bsName = "-Float"*bsName
     end
 
     # Number of spin-orbitals must not be smaller than numbers of electrons.
-    if getCharge(nuc) <= sum( basisSize.(bs) )
+    if getCharge(nuc) <= sum( orbitalNumOf.(bs) )
         fVars = runHF(bs, nuc, nucCoords, HFconfig((HF=HFtype,)), printInfo=false)
     else
         continue
@@ -66,7 +65,7 @@ bs1 = (genBasisFunc.(molCoords[1], "STO-3G") |> flatten) .+ bf1
 mol1 = runHF(bs1, mols[1], molCoords[1], printInfo=false) |> MatterByHF
 @test try makeMoldenFile(mol1) catch; true end
 
-bf2 = genBasisFunc(fill(0.0, 3), ("STO-3G", "O"))[3][[1,3]]
+bf2 = genBasisFunc(fill(0.0, 3), "STO-3G", "O")[3][[1,3]]
 bs2 = [bf1, bf2]
 mol2 = runHF(bs2, mols[1], molCoords[1], printInfo=false) |> MatterByHF
 @test try makeMoldenFile(mol2) catch; true end

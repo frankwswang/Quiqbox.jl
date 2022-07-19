@@ -814,7 +814,7 @@ end
 
 function getOneBodyInts(∫1e::F, basisSet::NTuple{BN, GTBasisFuncs{T, D}}, optArgs...) where 
                        {F<:Function, BN, T, D}
-    subSize = basisSize.(basisSet) |> collect
+    subSize = orbitalNumOf.(basisSet) |> collect
     accuSize = vcat(0, accumulate(+, subSize))
     len = subSize |> sum
     buf = Array{T}(undef, len, len)
@@ -886,7 +886,7 @@ end
 
 function getTwoBodyInts(∫2e::F, basisSet::NTuple{BN, GTBasisFuncs{T, D}}) where 
                        {F<:Function, BN, T, D}
-    subSize = basisSize.(basisSet) |> collect
+    subSize = orbitalNumOf.(basisSet) |> collect
     accuSize = vcat(0, accumulate(+, subSize))
     totalSize = subSize |> sum
     buf = Array{T}(undef, totalSize, totalSize, totalSize, totalSize)

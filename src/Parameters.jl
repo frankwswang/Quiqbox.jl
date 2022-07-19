@@ -32,13 +32,13 @@ Parameter container that can enable parameter differentiations.
 
 ≡≡≡ Field(s) ≡≡≡
 
-`data::Array{T, 0}`: The data (parameter) stored in a 0-D `Array` that can be accessed by 
-syntax `[]`.
+`data::Array{T, 0}`: The data (parameter) stored in a 0-D `Array` whose value (i.e. input 
+value) can be accessed by syntax `[]`.
 
 `dataName::Symbol`: The name assigned to the stored data.
 
-`map::Function`: The mathematical mapping of the data. The result can be accessed by 
-syntax `()`.
+`map::Function`: The mathematical mapping of the data. The result (i.e., output value) can 
+be accessed by syntax `()`.
 
 `canDiff::Array{Bool, 0}`: Indicator that whether this container (the variable the stored 
 value is mapped to, i.e. the output variable) is marked as "differentiable".
@@ -153,8 +153,7 @@ mapTypeOf(::ParamBox{<:Any, <:Any, FL}) where {FL} = FL
 
     inValOf(pb::ParamBox) -> Number
 
-Return the value of stored data (independent variable) of the input `ParamBox`. Equivalent 
-to `pb[]`.
+Return the input value (independent variable) of `pb`. Equivalent to `pb[]`.
 """
 @inline inValOf(pb::ParamBox) = pb.data[]
 
@@ -182,7 +181,7 @@ corresponding value.
 
     outValOf(pb::ParamBox) -> Number
 
-Return the value of the output data (dependent variable) of the input `ParamBox`. 
+Return the output value of (dependent variable) of `pb`. 
 Equivalent to `pb()`.
 """
 @inline outValOf(pb::ParamBox) = callGenFunc(pb.map, pb.data[])

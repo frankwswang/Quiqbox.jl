@@ -1,7 +1,8 @@
 using Test
 using Quiqbox
-using Quiqbox: BasisFuncMix, unpackBasis, ElementNames, sortBasisFuncs, ParamList, sumOf, 
-               mergeGaussFuncs, gaussProd, getNorms, mergeBasisFuncs, getTypeParams
+using Quiqbox: BasisFuncMix, isaFullShellBasisFuncs, unpackBasis, ElementNames, 
+               sortBasisFuncs, ParamList, sumOf, mergeGaussFuncs, gaussProd, getNorms, 
+               mergeBasisFuncs, getTypeParams
 using LinearAlgebra
 using Random
 
@@ -69,7 +70,7 @@ c3 = genExponent(e1)
 @test c1.map(v2) == c3.map(v2)
 
 
-# function genSpatialPoint
+# function genSpatialPoint coordOf
 k = fill(1.0)
 v1 = genSpatialPoint([k, 2.0, 3.0])
 v2 = genSpatialPoint([k, 2.0, 3.0])
@@ -85,6 +86,7 @@ v3_2 = genSpatialPoint((1.0, 2.0, 3.0))
 @test !hasIdentical(v1, v2)
 @test hasIdentical(v1[1], v2[1], v1_2[1], v2_2[1])
 @test !hasIdentical(v1[2:3], v2[2:3])
+@test coordOf(v1) == [k[], 2.0, 3.0]
 
 
 # struct BasisFunc and function genBasisFunc
@@ -119,13 +121,12 @@ bf2_P_norm2 = genBasisFunc(cen, [gf2], "P")
 @test bf2_P_norm2 isa BasisFuncs
 
 bf3_1 = genBasisFunc(fill(0.0, 3), "STO-3G")[]
-bf3_2 = genBasisFunc(fill(0.0, 3), ("STO-3G", "He"))[]
-bf3_3 = genBasisFunc(fill(0.0, 3), "STO-3G", nucleus = "He")[]
-bf3s1 = genBasisFunc(fill(0.0, 3), ["STO-3G", "STO-3G"])
-bf3s2 = genBasisFunc(fill(0.0, 3), ["STO-3G", "STO-3G"], nucleus = "He")
-bf3s3 = genBasisFunc(fill(0.0, 3), [("STO-3G", "H"), ("STO-3G", "He")])
+bf3_2 = genBasisFunc(fill(0.0, 3), "STO-3G", "He")[]
+bf3s1 = genBasisFunc.(Ref(fill(0.0, 3)), fill("STO-3G", 2)) |> flatten
+bf3s2 = genBasisFunc.(Ref(fill(0.0, 3)), fill("STO-3G", 2), "He") |> flatten
+bf3s3 = genBasisFunc.(Ref(fill(0.0, 3)), "STO-3G", ["H", "He"]) |> flatten
 @test hasEqual.(Ref(bf3_1), bf3s1, Ref(bf3s3[1])) |> all
-@test hasEqual.(Ref(bf3_2), Ref(bf3_3), bf3s2, Ref(bf3s3[2])) |> all
+@test hasEqual.(Ref(bf3_2), bf3s2, Ref(bf3s3[2])) |> all
 @test isapprox(1, overlap(bf3_1, bf3_1)[], atol=1e-8)
 @test isapprox(1, overlap(bf3_2, bf3_2)[], atol=1e-8)
 
@@ -155,7 +156,7 @@ bf3_4_2 = genBasisFunc([0.0, 0.0, 0.0], (1.0, 1.0), "D", normalizeGTO=true)
                    genBasisFunc(cen, (2.0, 1.0), "D", (true,)),
                    genBasisFunc(bf1.center, (2.0, 1.0), "D", (true,)),
                    genBasisFunc(cen, GaussFunc(2.0, 1.0), "D", (true,))] )[1] == fill(1, 5)
-      
+
 
 # function sortBasisFuncs sortPermBasisFuncs
 unsortedbfs = [bf4_1, bf4_4, bf4_3, bf4_2]
@@ -212,6 +213,14 @@ V = neAttractions([bfm], nuc, nucCoords)[]
 eeI = eeInteractions([bfm])[]
 @test eeI == eeInteraction(bfm, bfm, bfm, bfm)[]
 @test isapprox(eeI, eeInteractions(bs1) |> sum, atol=errorThreshold2)
+
+
+# function isaFullShellBasisFuncs
+@test isaFullShellBasisFuncs(bf1)
+@test isaFullShellBasisFuncs(bf3_1)
+@test isaFullShellBasisFuncs(bf4_4)
+@test !isaFullShellBasisFuncs(bfm1)
+@test !isaFullShellBasisFuncs(Quiqbox.EmptyBasisFunc{Float64, 3}())
 
 
 # function sortBasis sortPermBasis
@@ -477,13 +486,13 @@ dm2 = reshape([genBasisFunc([1.0, 0.0, 0.0], (2.0, 0.1)), bf_d_1], 2, 1)
                vcat(decompose.(bm_d_1.BasisFunc, true)...))
 
 
-# function basisSize
-@test basisSize("P") == 3
-@test basisSize("P", 2) == 2
-@test basisSize.(["S", "P", "D"]) == [1, 3, 6]
-@test basisSize(bf1) == 1
-@test basisSize(bfm1) == 1 == basisSize(bfm2)
-@test basisSize.((bf1, bf2, bf4_3, bf5)) == (1, 1, 3, 1)
+# function orbitalNumOf
+@test orbitalNumOf("P") == 3
+@test orbitalNumOf("P", 2) == 2
+@test orbitalNumOf.(["S", "P", "D"]) == [1, 3, 6]
+@test orbitalNumOf(bf1) == 1
+@test orbitalNumOf(bfm1) == 1 == orbitalNumOf(bfm2)
+@test orbitalNumOf.((bf1, bf2, bf4_3, bf5)) == (1, 1, 3, 1)
 
 
 # function genGaussFuncText
@@ -509,7 +518,7 @@ lines = (content |> IOBuffer |> readlines)
 
 # function genBasisFuncText & genBFuncsFromText
 randElement = ElementNames[rand(1:length(ElementNames))]
-bs1 = genBasisFunc(missing, ("6-31G", "H"), unlinkCenter=true)
+bs1 = genBasisFunc(missing, "6-31G", unlinkCenter=true)
 cens = [rand(3) for _=1:length(bs1)]
 txt1 = genBasisFuncText(bs1, printCenter=false, groupCenters=false) |> join
 txt2 = genBasisFuncText(bs1, printCenter=false) |> join
@@ -524,8 +533,8 @@ bs2_3 = genBFuncsFromText(txt3)
 @test hasEqual.(bs1, bs2_2, ignoreFunction=true) |> all
 @test hasEqual.(sortBasisFuncs(bs1), bs2_3, ignoreFunction=true) |> all
 @test hasEqual.(bs1[sortPermBasisFuncs(bs1)], bs2_3, ignoreFunction=true) |> all
-bsO_STO3G = genBasisFunc(fill(0.0, 3), ("STO-3G", "O"))
-@test basisSize.(bsO_STO3G ) == [1, 1, 3]
+bsO_STO3G = genBasisFunc(fill(0.0, 3), "STO-3G", "O")
+@test orbitalNumOf.(bsO_STO3G ) == [1, 1, 3]
 @test hasEqual(bsO_STO3G, genBasisFuncText.(bsO_STO3G) |> join |> genBFuncsFromText)
 @test (genBasisFunc(missing, (2.0, 1.1), "D")[[1,3,5]] |> genBasisFuncText) == 
 """

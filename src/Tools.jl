@@ -5,15 +5,14 @@ using LinearAlgebra: eigvals, svdvals, eigen
 
 getAtolCore(::Type{T}) where {T<:Real} = log(10, T|>eps) |> ceil
 getAtolVal(::Type{T}) where {T<:Real} = round(10^(T |> getAtolCore), sigdigits=1)
+
 """
 
     getAtolDigits(::Type{T}) where {T<:Real} -> Int
 
-Set the maximal number of digits kept for rounding given a real number `DataType`.
+Set the maximal number of digits kept after rounding given a real number `DataType`.
 """
 getAtolDigits(::Type{T}) where {T<:Real} = Int(-getAtolCore(T))
-
-sqrtAtolVal(::Type{T}) where {T<:Real} = floor(T|>eps|>sqrt, sigdigits=1)
 
 
 # Function for submodule loading and integrity checking.
@@ -35,68 +34,6 @@ function tryIncluding(subModuleName::String; subModulePath=(@__DIR__)[:]*"/SubMo
 end
 
 
-"""
-
-    @compareLength inputArg1 inputArg2 argNames::String... -> length(inputArg1)
-
-A macro that checks whether the lengths of 2 `Arrays`/`Tuples` are equal. It returns the 
-lengths of the compared objects are the same; it throws a detailed ERROR message when they 
-are not equal.
-
-You can specify the name for the compared variables in arguments for better ERROR 
-information.
-
-≡≡≡ Example(s) ≡≡≡
-
-```jldoctest; setup = :(push!(LOAD_PATH, "../../src/"); using Quiqbox)
-julia> Quiqbox.@compareLength [1,2] [3,4]
-2
-
-julia> let a = [1,2], b = [3]
-           Quiqbox.@compareLength a b
-       end
-ERROR: The lengths of a and b are NOT equal.
-       a::Vector{Int64}   length: 2
-       b::Vector{Int64}   length: 1
-
-julia> Quiqbox.@compareLength [1,2] [3] "a"
-ERROR: The lengths of a ([1, 2]) and [3] are NOT equal.
-       a ([1, 2])::Vector{Int64}   length: 2
-       [3]::Vector{Int64}   length: 1
-
-julia> Quiqbox.@compareLength [1,2] [3] "a" "b"
-ERROR: The lengths of a ([1, 2]) and b ([3]) are NOT equal.
-       a ([1, 2])::Vector{Int64}   length: 2
-       b ([3])::Vector{Int64}   length: 1
-```
-"""
-macro compareLength(inputArg1, inputArg2, argNames::String...)
-    # In a macro you must escape all the user inputs once and exactly once.
-    ns0 = [string(inputArg1), string(inputArg2)]
-    ns = ns0
-    quote
-        local arg1 = $(esc(inputArg1))
-        local arg2 = $(esc(inputArg2))
-        type = Union{AbstractArray, Tuple}
-        (!(arg1 isa type && arg2 isa type)) && error("The compared objects have to be ", 
-                                                     "Arrays or Tuples!\n")
-        if length(arg1) != length(arg2)
-            for i = 1:length($argNames)
-                # Replace the default type control ERROR message.
-                !($argNames[i] isa String) && error("The object's name has to be a "*
-                                                    "`String`!\n")
-                $ns[i] = $argNames[i]*" ($($ns0[i]))"
-            end
-            error("""The lengths of $($ns[1]) and $($ns[2]) are NOT equal.
-                           $($ns0[1])::$(typeof(arg1))   length: $(length(arg1))
-                           $($ns0[2])::$(typeof(arg2))   length: $(length(arg2))
-                    """)
-        end
-        length(arg1)
-    end
-end
-
-
 sizeOf(arr::AbstractArray) = size(arr)
 
 sizeOf(tpl::Tuple) = (length(tpl),)
@@ -108,20 +45,18 @@ sizeOf(tpl::Tuple) = (length(tpl),)
                     ignoreContainer::Bool=false, decomposeNumberCollection::Bool=false) -> 
     Bool
 
-Recursively apply the specified boolean operator to all the fields within 2 objects 
-(normally 2 `struct`s in the same type). It returns `true` only if all comparisons 
-performed return `true`. Note that the boolean operator should have method(s) defined for 
-all the possible elements inside the compared objects.
+Recursively apply the specified boolean operator `boolOp` to all the fields inside two 
+objects (e.g., two `struct`s of the same type). It returns `true` if and only if all 
+comparisons performed return `true`. Note that the boolean operator should have method(s) 
+defined for all the possible fields inside the compared objects.
 
-If `ignoreFunction = true`, the function will ignore comparisons between Function-type 
-fields.
+If `ignoreFunction = true`, comparisons between Function-type fields will be ignored.
 
-If `ignoreContainer = true`, the function will ignore the difference of the container(s) as 
-long as the boolean operator returns true for the field(s)/entry(s) from two objects 
-respectively.
+If `ignoreContainer = true`, the difference of the container(s) will be ignored as long as 
+the boolean operator returns true for the field(s)/entry(s) from two objects respectively.
 
-If `decomposeNumberCollection = true`, then `Tuple{Vararg{Number}}` and `Array{<:Number}` 
-will be treated as decomposable containers.
+If `decomposeNumberCollection = true`, `Tuple{Vararg{Number}}` and `Array{<:Number}` will 
+be treated as decomposable containers.
 
 ≡≡≡ Example(s) ≡≡≡
 
@@ -238,13 +173,15 @@ end
 
 """
 
-    hasBoolRelation(boolOp::F, obj1, obj2, obj3...; 
+    hasBoolRelation(boolOp::Function, obj1, obj2, obj3...; 
                     ignoreFunction::Bool=false, 
                     ignoreContainer::Bool=false,
-                    decomposeNumberCollection::Bool=false) where {F<:Function} -> 
+                    decomposeNumberCollection::Bool=false) -> 
     Bool
 
-Method for more than 2 objects. E.g.: `hasBoolRelation(>, a, b, c)` is equivalent to 
+Method for more than 2 objects. If returns true if and only if `hasBoolRelation` returns 
+true for every unique combination of two objects from the all the input objects under the 
+transitive relation. E.g.: `hasBoolRelation(>, a, b, c)` is equivalent to 
 `hasBoolRelation(>, a, b) && hasBoolRelation(>, b, c)`.
 
 ≡≡≡ Example(s) ≡≡≡
@@ -296,19 +233,8 @@ end
              decomposeNumberCollection::Bool=false) -> 
     Bool
 
-Compare if two containers (e.g. `struct`) are the equal.
-
-If `ignoreFunction = true`, the function will ignore comparisons between Function-type 
-fields.
-
-If `ignoreContainer = true`, the function will ignore the difference of the container(s) 
-and only compare the field(s)/entry(s) from two objects respectively.
-
-If `decomposeNumberCollection = true`, then `Tuple{Vararg{Number}}` and `Array{<:Number}` 
-will be treated as decomposable containers.
-
-This is an instantiation of `Quiqbox.hasBoolRelation`.
-
+Compare if two containers (e.g. `struct`) are equal. An instantiation of 
+[`hasBoolRelation`](@ref).
 ≡≡≡ Example(s) ≡≡≡
 
 ```jldoctest; setup = :(push!(LOAD_PATH, "../../src/"); using Quiqbox)
@@ -345,18 +271,8 @@ hasBoolRelation(==, obj1, obj2, obj3...; ignoreFunction, ignoreContainer,
                  decomposeNumberCollection::Bool=false) -> 
     Bool
 
-Compare if two containers (e.g. `struct`) are the Identical.
-
-If `ignoreFunction = true`, the function will ignore comparisons between Function-type 
-fields.
-
-If `ignoreContainer = true`, the function will ignore the difference of the container(s) 
-and only compare the field(s)/entry(s) from two objects respectively.
-
-If `decomposeNumberCollection = true`, then `Tuple{Vararg{Number}}` and `Array{<:Number}` 
-will be treated as decomposable containers.
-
-This is an instantiation of `Quiqbox.hasBoolRelation`.
+Compare if two containers (e.g. `struct`) are the Identical. An instantiation of 
+[`hasBoolRelation`](@ref).
 
 ≡≡≡ Example(s) ≡≡≡
 
@@ -390,15 +306,15 @@ hasBoolRelation(===, obj1, obj2, obj3...; ignoreFunction, ignoreContainer,
 """
 
     hasApprox(obj1, obj2, obj3...; ignoreFunction::Bool=false, ignoreContainer::Bool=false,
-              decomposeNumberCollection::Bool=false, atol=1e-15) -> 
+              decomposeNumberCollection::Bool=false, atol::Real=1e-15) -> 
     Bool
 
-Similar to `hasEqual`, except it does not require the `Number`-typed fields 
+Similar to [`hasEqual`](@ref), except it does not require the `Number`-typed fields 
 (e.g. `Float64`) of the compared containers to have the exact same values, but rather the 
 approximate values within an error threshold determined by `atol`, like in `isapprox`.
 """
 hasApprox(obj1, obj2, obj3...; ignoreFunction::Bool=false, ignoreContainer::Bool=false,
-          decomposeNumberCollection::Bool=false, atol=1e-15) = 
+          decomposeNumberCollection::Bool=false, atol::Real=1e-15) = 
 hasBoolRelation((x, y)->hasApproxCore(x, y, atol), obj1, obj2, obj3...; ignoreFunction, 
                 ignoreContainer, decomposeNumberCollection)
 
@@ -428,9 +344,9 @@ hasApproxCore(obj1, obj2, _=1e-15) = (obj1 == obj2)
 
 Print info with colorful title and automatically highlighted code blocks enclosed by ` `.
 
-If you want to highlight other contents in different colors, you can also put them inside 
-` ` and start it with "///theColorSymbolName///". The available color names follows the 
-values of `color` keyword argument in function `printstyled`.
+If you want to highlight other contents in different colors, you can also start it with 
+"///theColorSymbolName///" and then enclose it with ``. The available color names follows 
+the values of `color` keyword argument in function `Base.printstyled`.
 
 NOTE: There can only be one color in one ` ` quote.
 
@@ -519,16 +435,15 @@ joinTuple(t::Tuple) = itself(t)
 
 """
 
-    markUnique(arr::AbstractArray, args...; 
-               compareFunction::Function = hasEqual, kws...) -> 
-    markingList:: Array{Int, 1}, uniqueList::Array
+    markUnique(arr::AbstractArray{T}, args...; 
+               compareFunction::Function=hasEqual, kws...) where {T} -> 
+    Tuple{Vector{Int}, Vector{T}}
 
-Return a `markingList` using `Int` number to mark each different elements from (and inside) 
-the input argument(s) and a `uniqueList` to contain all the unique elements when 
-`compareFunction` is set to `hasEqual` (in default).
-
-`args` and `kws` are positional arguments and keywords arguments respectively as 
-parameters of the specified `compareFunction`.
+Return a `Vector{Int}` whose elements are indices to mark the elements inside `arr` such 
+that same element will be marked with same index, and a `Vector{T}` containing all the 
+unique elements. The definition of "unique" (or "same") is based on `compareFunction` 
+which is set to [`hasEqual`](@ref) in default. `args` and `kws` are placeholders for the 
+positional arguments and keyword arguments for `compareFunction` respectively.
 
 ≡≡≡ Example(s) ≡≡≡
 
@@ -582,12 +497,12 @@ end
 
 """
 
-    getUnique!(arr::Array, args...; compareFunction::F = hasEqual, kws...) where 
-              {F<:Function} -> 
-    arr::Array
+    getUnique!(arr::AbstractVector, args...; compareFunction::Function = hasEqual, 
+               kws...) -> 
+    AbstractVector
 
-Similar to [`markUnique`](@ref) but instead, just directly return the input `Array` with 
-repeated entries deleted.
+Similar to [`markUnique`](@ref) but instead, directly return the modified `arr` so that the 
+repeated entries are deleted.
 
 ≡≡≡ Example(s) ≡≡≡
 
@@ -608,7 +523,7 @@ julia> arr
   "s"
 ```
 """
-function getUnique!(arr::AbstractArray{T}, args...; 
+function getUnique!(arr::AbstractVector{T}, args...; 
                     compareFunction::F = hasEqual, kws...) where {T<:Any, F<:Function}
     @assert length(arr) > 1 "The length of input array should be larger than 1."
     f = (b...)->compareFunction((b..., args...)...; kws...)
@@ -630,7 +545,10 @@ end
 
 
 """
-A dummy function that only returns its argument.
+
+    itself(::T) -> T
+
+A dummy function that returns its argument.
 """
 @inline itself(x) = x
 
@@ -640,7 +558,11 @@ const itselfT = typeof(itself)
 
 
 """
-Similar as `replace` but for Symbols.
+
+    replaceSymbol(sym::Symbol, pair::Pair{String, String}; count::Int=typemax(Int)) -> 
+    Symbol
+
+Similar as `Base.replace` but for Symbols.
 """
 function replaceSymbol(sym::Symbol, pair::Pair{String, String}; count::Int=typemax(Int))
     replace(sym |> string, pair; count) |> Symbol
@@ -656,25 +578,6 @@ function renameFunc(fName::Symbol, f::F, N::Int=1) where {F<:Function}
 end
 
 renameFunc(fName::String, args...) = renameFunc(Symbol(fName), args...)
-
-
-"""
-Recursively find the final value using the value of each iteration as the key for the 
-next search.
-"""
-function recursivelyGet(dict::Dict{K, V}, startKey::K, default=Array{V}(undef, 1)[]) where 
-                       {K, V}
-    res = default
-    val = get(dict, startKey, missing)
-    while !(val isa Missing)
-        res = val
-        val = get(dict, val, missing)
-    end
-    res
-end
-
-recursivelyGet(dict::Dict{K, <:Real}, startKey::K) where {K} = 
-recursivelyGet(dict, startKey, NaN)
 
 
 function isOscillateConverged(sequence::Vector{<:Real}, 

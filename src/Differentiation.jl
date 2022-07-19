@@ -77,7 +77,7 @@ function derivativeCore(FoutputIsVector::Val{B},
     bfs = Tuple(hcat(decomposeCore.(Val(false), bs)...))
     # ∂bfs = deriveBasisFunc.(bfs, par)
     ∂bfs = ∂Basis.(par, bfs)
-    bsSize = basisSize.(bs) |> sum
+    bsSize = orbitalNumOf.(bs) |> sum
     ∂S = ones(bsSize, bsSize)
     ∂X = ones(bsSize, bsSize) # ∂X corresponds to the derivative of X = S^(-0.5)
     ∂X₀ = ones(bsSize, bsSize) # ∂X in its eigen basis

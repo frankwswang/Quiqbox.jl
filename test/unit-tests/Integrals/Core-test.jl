@@ -18,7 +18,7 @@ end
 nuc = ["H", "F"]
 nucCoords = [[-0.8664394281409157, 0.0, 0.0], [0.8664394281409157, 0.0, 0.0]]
 b1 = genBasisFunc(nucCoords[1], GaussFunc(2.0, 1.0), "D", (true,))
-b2 = genBasisFunc(nucCoords[2], ("STO-3G", "F"))
+b2 = genBasisFunc(nucCoords[2], "STO-3G", "F")
 bfm1, bfm2 = b1 .+ b2[1:2]
 bs_bf_bfs_bfm = [b1, bfm1, b2..., bfm2]
 

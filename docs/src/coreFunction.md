@@ -124,7 +124,7 @@ decompose
 ```
 
 ```@docs
-basisSize
+orbitalNumOf
 ```
 
 ```@docs

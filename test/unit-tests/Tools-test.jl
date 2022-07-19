@@ -1,7 +1,7 @@
 using Test
-using Quiqbox: tryIncluding, @compareLength, sizeOf, hasBoolRelation, markUnique, flatten, 
-               alignNumSign, replaceSymbol, renameFunc, groupedSort, mapPermute, 
-               nameOf, TypedFunction, Pf, itself, getFunc
+using Quiqbox: tryIncluding, sizeOf, hasBoolRelation, markUnique, flatten, alignNumSign, 
+               replaceSymbol, renameFunc, groupedSort, mapPermute, nameOf, TypedFunction, 
+               Pf, itself, getFunc
 
 using Quiqbox
 using Suppressor: @capture_out
@@ -14,10 +14,6 @@ errStr = @capture_out begin isIncluded = tryIncluding("someMod") end
 @test isIncluded == false
 pkgDir = @__DIR__
 @test length(errStr) > length(@capture_out tryIncluding("someMod", subModulePath=""))
-
-
-# macro @compareLength
-@test try @compareLength [1] [1,2] "a" "b"; catch; true end
 
 
 #function sizeOf

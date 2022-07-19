@@ -22,7 +22,7 @@
     addToDataChain!(env, atm, bas, bf2)
 
     cintFunc!(Val(libcinFunc), 
-              zeros(Quiqbox.basisSize(bf1), Quiqbox.basisSize(bf2), 1+isGradient*2), 
+              zeros(Quiqbox.orbitalNumOf(bf1), Quiqbox.orbitalNumOf(bf2), 1+isGradient*2), 
               [0,1], atm, length(nuclei), bas, 2, env)
 end
 
@@ -65,7 +65,7 @@ end
 
 @inline function oneBodyBSTensor(BSet::Vector{<:Quiqbox.AbstractGTBasisFuncs{Float64, 3}}, 
                                  intFunc::F) where {F<:Function}
-    subSize = Quiqbox.basisSize.(BSet)
+    subSize = Quiqbox.orbitalNumOf.(BSet)
     accuSize = vcat(0, accumulate(+, subSize))
     len = subSize |> sum
     nPage = (intFunc(BSet[1], BSet[1]) |> size)[3]
@@ -150,7 +150,7 @@ dropdims(elecKineticsCoreLibcint(BSet), dims=3)
     env = Float64[]
     atm = Int32[]
     bas = Int32[]
-    subSize = Quiqbox.basisSize.((bf1, bf2, bf3, bf4))
+    subSize = Quiqbox.orbitalNumOf.((bf1, bf2, bf3, bf4))
 
     id, uniqueBFs = Quiqbox.markUnique([bf1, bf2, bf3, bf4])
 
@@ -197,7 +197,7 @@ end
 @inline function twoBodyBSTensor(BSet::Vector{<:Quiqbox.AbstractGTBasisFuncs{Float64, 3}}, 
                                  intFunc::F; outputUniqueIndices::Bool=false) where 
                                 {F<:Function}
-    subSize = Quiqbox.basisSize.(BSet) |> collect
+    subSize = Quiqbox.orbitalNumOf.(BSet) |> collect
     accuSize = vcat(0, accumulate(+, subSize))
     totalSize = subSize |> sum
     nPage = (intFunc(BSet[1], BSet[1], BSet[1], BSet[1]) |> size)[5]

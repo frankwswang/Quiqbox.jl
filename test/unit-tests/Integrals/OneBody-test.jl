@@ -8,8 +8,8 @@ errT2 = 1e-10
 errT3 = 1e-10
 nucs = fill("H", 2)
 cens = [[-0.7, 0.0, 0.0], [ 0.7, 0.0, 0.0]]
-bf1 = genBasisFunc(cens[1], ("STO-3G", "H"))[]
-bf2 = genBasisFunc(cens[2], ("STO-3G", "H"))[]
+bf1 = genBasisFunc(cens[1], "STO-3G", "H")[]
+bf2 = genBasisFunc(cens[2], "STO-3G", "H")[]
 bs = [bf1, bf2]
 
 S = [1.0 0.6593182058508896; 0.6593182058508896 1.0]

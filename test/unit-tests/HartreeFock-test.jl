@@ -10,7 +10,7 @@ errorThreshold = 5e-8
 
 nucCoords = [[-0.7,0.0,0.0], [0.7,0.0,0.0], [0.0, 0.0, 0.0]]
 nuc = ["H", "H", "O"]
-bs = genBasisFunc.(nucCoords, ("STO-3G", "STO-3G", ("STO-3G", "O"))) |> flatten
+bs = genBasisFunc.(nucCoords, "STO-3G", ["H", "H", "O"]) |> flatten
 S = overlaps(bs)
 Hcore = coreH(bs, nuc, nucCoords)
 HeeI = eeInteractions(bs)

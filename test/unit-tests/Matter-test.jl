@@ -19,8 +19,8 @@ end
 nuc1 = ["H", "H"]
 nHalf = getCharge(nuc1) ÷ 2
 nucCoords1 = [[-0.7, 0.0, 0.0], [0.7, 0.0, 0.0]]
-bs1 = genBasisFunc.(nucCoords1, ("STO-3G", "H") |> Ref) |> flatten
-nbs1 = basisSize.(bs1) |> sum
+bs1 = genBasisFunc.(nucCoords1, "STO-3G", "H") |> flatten
+nbs1 = orbitalNumOf.(bs1) |> sum
 basis1 = GTBasis(bs1)
 Hc1 = coreH(basis1, nuc1, nucCoords1)
 HFres1 = runHF(basis1, nuc1, nucCoords1, printInfo=false)
@@ -43,8 +43,8 @@ C_H2 = hcat(H2.occuC[1], H2.unocC[1])
 
 nuc2 = ["H", "H", "O"]
 nucCoords2 = [[-0.7,0.0,0.0], [0.6,0.0,0.0], [0.0, 0.0, 0.0]]
-bs2 = genBasisFunc.(nucCoords2, [("STO-3G", i) for i in nuc2]) |> flatten
-nbs2 = basisSize.(bs2) |> sum
+bs2 = genBasisFunc.(nucCoords2, "STO-3G", nuc2) |> flatten
+nbs2 = orbitalNumOf.(bs2) |> sum
 basis2 = GTBasis(bs2)
 Hc2 = coreH(basis2, nuc2, nucCoords2)
 HFres2 = runHF(basis2, nuc2, nucCoords2, HFconfig((HF=:UHF,)), printInfo=false)

@@ -75,7 +75,8 @@ end
 function addToDataChain!(env::Vector{Float64}, atm::Vector{Int32}, 
                          nuclei::Vector{String}, 
                          nucleiCoords::Vector{<:AbstractArray{<:Real}})
-    Quiqbox.@compareLength nuclei nucleiCoords "nuclei" "their coordinates"
+    @assert length(nuclei) == length(nucleiCoords) "The length of nuclei and their " * 
+            "coordinates are NOT equal."
     envEndIndex = length(env)
     len = length(nuclei)
     atmsConfig = Int32[]

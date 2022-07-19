@@ -1,4 +1,4 @@
-export LTuple, getCharge, ParamList
+export LTuple, orbitalLin, getCharge, ParamList
 
 const ElementNames = 
 [
@@ -119,6 +119,8 @@ const SubshellXYZs =
  LTuple(0,3,3), LTuple(0,2,4), LTuple(0,1,5), LTuple(0,0,6))
 ]
 
+const SubshellLs = (SubshellXs, SubshellXYs, SubshellXYZs)
+
 const SubshellXsizes = length.(SubshellXs)
 const SubshellXYsizes = length.(SubshellXYs)
 const SubshellXYZsizes = length.(SubshellXYZs)
@@ -142,18 +144,18 @@ const BStextEndingMarker = "****"
 const BasisSetList = Dict(BasisSetNames .=> BasisFuncTexts)
 const AtomicNumberList = Dict(ElementNames .=> collect(1 : length(ElementNames)))
 const AngularMomentumList = Dict(SubshellNames .=> collect(0 : length(SubshellNames)-1))
-const SubshellOrientationList = [Dict(SubshellNames .=> SubshellXs), 
-                                 Dict(SubshellNames .=> SubshellXYs), 
-                                 Dict(SubshellNames .=> SubshellXYZs)]
+const SubshellOrientationList = [Dict(SubshellNames .=> SubshellLs[1]), 
+                                 Dict(SubshellNames .=> SubshellLs[2]), 
+                                 Dict(SubshellNames .=> SubshellLs[3])]
 const SubshellSizeList = [Dict(SubshellNames .=> SubshellXsizes),
                           Dict(SubshellNames .=> SubshellXYsizes),
                           Dict(SubshellNames .=> SubshellXYZsizes)]
-const AngMomIndexList = [Dict(flatten(SubshellXs) .=> 
-                              flatten([collect(1:length(i)) for i in SubshellXs])),
-                         Dict(flatten(SubshellXYs) .=> 
-                              flatten([collect(1:length(i)) for i in SubshellXYs])),
-                         Dict(flatten(SubshellXYZs) .=> 
-                              flatten([collect(1:length(i)) for i in SubshellXYZs]))]
+const AngMomIndexList = [Dict(flatten(SubshellLs[1]) .=> 
+                              flatten([collect(1:length(i)) for i in SubshellLs[1]])),
+                         Dict(flatten(SubshellLs[2]) .=> 
+                              flatten([collect(1:length(i)) for i in SubshellLs[2]])),
+                         Dict(flatten(SubshellLs[3]) .=> 
+                              flatten([collect(1:length(i)) for i in SubshellLs[3]]))]
 # const ParamSyms = [:𝑋, :𝑌, :𝑍, :𝑑, :𝛼, :𝐿]
 const SpatialParams = (:X, :Y, :Z)
 const SpatialParamSyms = (:X, :Y, :Z)
@@ -175,6 +177,17 @@ const spinOccupations = ("0", "↿", "⇂", "↿⇂")
 const OrbitalOccupation = ((false, false), (true, false), (false, true), (true, true))
 const SpinOrbitalOccupation = Dict(spinOccupations .=> OrbitalOccupation)
 const SpinOrbitalSpinConfig = Dict(OrbitalOccupation .=> spinOccupations)
+
+
+"""
+
+    orbitalLin(subshell::String, D::Int=3) -> Tuple{Vararg{NTuple{3, Int}}}
+
+Return all the possible angular momentum configuration(s) within the input `subshell` of 
+`D` dimension.
+"""
+orbitalLin(subshell::String, D::Int=3) = 
+getproperty.(SubshellLs[D][AngularMomentumList[subshell]+1], :tuple)
 
 
 """

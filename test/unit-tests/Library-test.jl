@@ -9,6 +9,8 @@ using Quiqbox: SubshellXs, SubshellXYs, SubshellXYZs, checkBSList
 @test sort(SubshellXYZs) == SubshellXYZs
 @test sort.(SubshellXYZs.|>collect, rev=true) .|> Tuple == SubshellXYZs
 
+@test orbitalLin("P") == ((1,0,0), (0,1,0), (0,0,1))
+
 @test try checkBSList(); true catch; false end
 
 end

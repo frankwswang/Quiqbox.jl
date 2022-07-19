@@ -31,7 +31,7 @@ eeI8 = eeInteraction(b4, b3, b2, b1)
 nucs = ["H", "H"]
 cens = [[-0.7, 0.0, 0.0], [ 0.7, 0.0, 0.0]]
 bs = genBasisFunc.(cens, fill("6-31G", 2)) |> flatten
-bsiz = basisSize.(bs) |> sum
+bsiz = orbitalNumOf.(bs) |> sum
 v1 = [[1.076566132309008 0.5784702970086923 0.4074124800025758 0.44048862738995587; 
        0.5784702970086923 0.5873958310618852 0.3462701643810019 0.48010659406093475; 
        0.4074124800025758 0.3462701643810019 0.6617232405843492 0.4074796629352414; 
@@ -104,7 +104,7 @@ eeIs2 = [eeInteraction(i...)[] for i in Iterators.product(bs, bs, bs, bs)]
 @test compr2Arrays1(eeIs1, eeIs2, errT1)
 
 eeIs3 = eeInteractions(bs[[1,3,2,4]])
-uniqueIdx = Quiqbox.genUniqueIndices(basisSize.(bs) |> sum)
+uniqueIdx = Quiqbox.genUniqueIndices(orbitalNumOf.(bs) |> sum)
 uniqueInts1 = [eeIs1[i...] for i in uniqueIdx]
 uniqueInts2 = [eeIs3[i...] for i in uniqueIdx]
 @test unique(eeIs1) ⊆ uniqueInts1
