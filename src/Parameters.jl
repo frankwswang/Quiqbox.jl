@@ -49,14 +49,10 @@ as a dependent variable or an independent variable.
 
 ≡≡≡ Initialization Method(s) ≡≡≡
 
-    ParamBox(data::Union{Array{T, 0}, T}, dataName::Symbol=:undef; 
-             index::Union{Int, Nothing}=nothing) where {T} -> 
-    ParamBox{T, dataName, $(FI)}
+    ParamBox(data, dataName=:undef; index=nothing) -> ParamBox{<:Any, dataName, $(FI)}
 
-    ParamBox(data::Union{Array{T, 0}, T}, name::Symbol, mapFunction::Function, 
-             dataName::Symbol=:undef; index::Union{Int, Nothing}=nothing, 
-             canDiff::Bool=true) where {T} ->
-    ParamBox{T, name, $(FLevel)(mapFunction)}
+    ParamBox(data, name, mapFunction, dataName=:undef; index=nothing, canDiff=true) ->
+    ParamBox{<:Any, name}
 
 === Positional argument(s) ===
 

@@ -7,16 +7,23 @@ using LineSearches
 using Optim: LBFGS, Fminbox, optimize as OptimOptimize, minimizer as OptimMinimizer, 
              Options as OptimOptions
 
-getXcore1(S::Matrix{T}) where {T<:Real} = Hermitian(S)^(-T(0.5)) |> Array
+const HFtypes = (:RHF, :UHF)
+const defaultDS = 0.5
+const defaultDIISconfig = (12, :LBFGS)
+
+
+getXcore1(S::AbstractMatrix{T}) where {T} = Hermitian(S)^(-T(0.5)) |> Array
 
 precompile(getXcore1, (Matrix{Float64},))
 
 const getXmethods = (m1=getXcore1,)
 
-getX(S::Matrix{T}, method::Symbol=:m1) where {T<:Real} = getproperty(getXmethods, method)(S)
+getX(S::AbstractMatrix{T}, method::Symbol=:m1) where {T} = 
+getproperty(getXmethods, method)(S)
 
 
-function getCϵ(X::Matrix{T}, Fˢ::Matrix{T}, stabilizeSign::Bool=true) where {T<:Real}
+function getCϵ(X::AbstractMatrix{T}, Fˢ::AbstractMatrix{T}, 
+               stabilizeSign::Bool=true) where {T}
     ϵ, Cₓ = eigen(X'*Fˢ*X |> Hermitian)
     outC = X*Cₓ
     # Stabilize the sign factor of each column.
@@ -26,7 +33,8 @@ function getCϵ(X::Matrix{T}, Fˢ::Matrix{T}, stabilizeSign::Bool=true) where {T
     outC, ϵ
 end
 
-@inline getC(X::Matrix{T}, Fˢ::Matrix{T}, stabilizeSign::Bool=true) where {T<:Real} = 
+@inline getC(X::AbstractMatrix{T}, Fˢ::AbstractMatrix{T}, 
+             stabilizeSign::Bool=true) where {T} = 
         getCϵ(X, Fˢ, stabilizeSign)[1]
 
 
@@ -40,8 +48,16 @@ splitSpins(::Val{:UHF}, N::Int) = splitSpins(Val(2), N)
 
 splitSpins(::Val, Ns::Tuple) = itself(Ns)
 
+groupSpins(::Val{1}, (Nˢ,)::Tuple{Int}) = (Nˢ, Nˢ)
 
-function breakSymOfC(::Val{:UHF}, C::Matrix{T}) where {T<:Real}
+groupSpins(::Val{2}, Ns::NTuple{2, Int}) = itself(Ns)
+
+groupSpins(::Val{:RHF}, Ns::Tuple{Vararg{Int}}) = groupSpins(Val(1), Ns)
+
+groupSpins(::Val{:UHF}, Ns::Tuple{Vararg{Int}}) = groupSpins(Val(2), Ns)
+
+
+function breakSymOfC(::Val{:UHF}, C::AbstractMatrix{T}) where {T}
     C2 = copy(C)
     l = min(size(C2)[1], 2)
     C2[1:l, 1:l] .= 0 # Breaking spin symmetry.
@@ -49,7 +65,7 @@ function breakSymOfC(::Val{:UHF}, C::Matrix{T}) where {T<:Real}
     (copy(C), C2)
 end
 
-breakSymOfC(::Val{:RHF}, C::Matrix{T}) where {T<:Real} = (C,)
+breakSymOfC(::Val{:RHF}, C::AbstractMatrix{T}) where {T} = (C,)
 
 breakSymOfC(::Val{:RHF}, Hcore, HeeI, X, Dᵅ, Dᵝ, Nᵅ, Nᵝ) = 
 getC.( Ref(X), getF(Hcore, HeeI, ((Nᵅ*Dᵅ + Nᵝ*Dᵝ)./(Nᵅ+Nᵝ),)) )
@@ -58,8 +74,8 @@ breakSymOfC(::Val{:UHF}, Hcore, HeeI, X, Dᵅ, Dᵝ, _, _) =
 getC.( Ref(X), getF(Hcore, HeeI, (Dᵅ, Dᵝ)) )
 
 
-function getCfromGWH(::Val{HFT}, S::Matrix{T}, Hcore::Matrix{T}, X::Matrix{T}) where 
-                    {HFT, T<:Real}
+function getCfromGWH(::Val{HFT}, S::AbstractMatrix{T}, Hcore::AbstractMatrix{T}, 
+                     X::AbstractMatrix{T}) where {HFT, T}
     l = size(Hcore)[1]
     H = zero(Hcore)
     for j in 1:l, i in 1:l
@@ -70,17 +86,18 @@ function getCfromGWH(::Val{HFT}, S::Matrix{T}, Hcore::Matrix{T}, X::Matrix{T}) w
 end
 
 
-function getCfromHcore(::Val{HFT}, X::Matrix{T}, Hcore::Matrix{T}) where {HFT, T}
+function getCfromHcore(::Val{HFT}, X::AbstractMatrix{T}, Hcore::AbstractMatrix{T}) where 
+                      {HFT, T}
     Cˢ = getC(X, Hcore)
     breakSymOfC(Val(HFT), Cˢ)
 end
 
 
-function getCfromSAD(::Val{HFT}, S::Matrix{T}, 
-                     Hcore::Matrix{T}, HeeI::Array{T, 4},
+function getCfromSAD(::Val{HFT}, S::AbstractMatrix{T}, 
+                     Hcore::AbstractMatrix{T}, HeeI::Array{T, 4},
                      bs::NTuple{BN, AbstractGTBasisFuncs{T, D}}, 
                      nuc::NTuple{NN, String}, nucCoords::NTuple{NN, NTuple{D, T}}, 
-                     X::Matrix{T}, 
+                     X::AbstractMatrix{T}, 
                      config=SCFconfig((:ADIIS,), (1e4*getAtolDigits(T),))) where 
                     {HFT, T, D, BN, NN}
     Dᵅ = zero(Hcore)
@@ -109,13 +126,14 @@ end
 const guessCmethods = (GWH=getCfromGWH, Hcore=getCfromHcore, SAD=getCfromSAD)
 
 
-getD(Cˢ::Matrix{T}, Nˢ::Int) where {T} = @views (Cˢ[:,1:Nˢ]*Cˢ[:,1:Nˢ]')
+getD(Cˢ::AbstractMatrix{T}, Nˢ::Int) where {T} = @views (Cˢ[:,1:Nˢ]*Cˢ[:,1:Nˢ]')
 # Nˢ: number of electrons with the same spin.
 
-@inline getD(X::Matrix{T}, Fˢ::Matrix{T}, Nˢ::Int) where {T<:Real} = getD(getC(X, Fˢ), Nˢ)
+@inline getD(X::AbstractMatrix{T}, Fˢ::AbstractMatrix{T}, Nˢ::Int) where {T} = 
+        getD(getC(X, Fˢ), Nˢ)
 
 
-function getGcore(HeeI::Array{T, 4}, DJ::Matrix{T}, DK::Matrix{T}) where {T<:Real}
+function getGcore(HeeI::Array{T, 4}, DJ::AbstractMatrix{T}, DK::AbstractMatrix{T}) where {T}
     G = zero(DJ)
     l = size(G)[1]
     for ν = 1:l, μ = 1:l # fastest
@@ -125,62 +143,65 @@ function getGcore(HeeI::Array{T, 4}, DJ::Matrix{T}, DK::Matrix{T}) where {T<:Rea
 end
 
 # RHF
-@inline getG(HeeI::Array{T, 4}, (Dˢ,)::Tuple{Matrix{T}}) where {T<:Real} = 
+@inline getG(HeeI::Array{T, 4}, (Dˢ,)::Tuple{AbstractMatrix{T}}) where {T} = 
         ( getGcore(HeeI, 2Dˢ, Dˢ), )
 
 # UHF
-@inline getG(HeeI::Array{T, 4}, (Dᵅ, Dᵝ)::NTuple{2, Matrix{T}}) where {T<:Real} = 
+@inline getG(HeeI::Array{T, 4}, (Dᵅ, Dᵝ)::NTuple{2, AbstractMatrix{T}}) where {T} = 
         ( getGcore(HeeI, Dᵅ+Dᵝ, Dᵅ), getGcore(HeeI, Dᵅ+Dᵝ, Dᵝ) )
 
 
-@inline getF(Hcore::Matrix{T}, G::NTuple{HFTS, Matrix{T}}) where {T<:Real, HFTS} = 
+@inline getF(Hcore::AbstractMatrix{T}, G::NTuple{HFTS, AbstractMatrix{T}}) where 
+            {T, HFTS} = 
         Ref(Hcore) .+ G
 
-@inline getF(Hcore::Matrix{T}, HeeI::Array{T, 4}, D::NTuple{HFTS, Matrix{T}}) where 
-            {T<:Real, HFTS} = 
+@inline getF(Hcore::AbstractMatrix{T}, HeeI::Array{T, 4}, 
+             D::NTuple{HFTS, AbstractMatrix{T}}) where {T, HFTS} = 
         getF(Hcore, getG(HeeI, D))
 
 
 # RHF or UHF
-@inline getE(Hcore::Matrix{T}, Fˢ::Matrix{T}, Dˢ::Matrix{T}) where {T<:Real} = 
+@inline getE(Hcore::AbstractMatrix{T}, 
+             Fˢ::AbstractMatrix{T}, Dˢ::AbstractMatrix{T}) where {T} = 
         dot(transpose(Dˢ), Hcore+Fˢ) / 2
 
 get2SpinQuantity(O::NTuple{HFTS, T}) where {HFTS, T} = abs(3-HFTS) * sum(O)
 get2SpinQuantities(O, nRepeat::Int) = fill(get2SpinQuantity(O), nRepeat) |> Tuple
 
 # RHF or UHF
-getEᵀcore(Hcore::Matrix{T}, Fˢ::NTuple{HFTS, Matrix{T}}, Dˢ::NTuple{HFTS, Matrix{T}}) where 
-         {T<:Real, HFTS} = 
+getEᵗcore(Hcore::AbstractMatrix{T}, 
+          Fˢ::NTuple{HFTS, AbstractMatrix{T}}, Dˢ::NTuple{HFTS, AbstractMatrix{T}}) where 
+         {T, HFTS} = 
 get2SpinQuantity(getE.(Ref(Hcore), Fˢ, Dˢ))
 
 # RHF or UHF
-function getEᵀ(Hcore::Matrix{T}, HeeI::Array{T, 4}, 
-               C::NTuple{HFTS, Matrix{T}}, N::NTuple{HFTS, Int}) where {T<:Real, HFTS}
+function getEᵗ(Hcore::AbstractMatrix{T}, HeeI::Array{T, 4}, 
+               C::NTuple{HFTS, AbstractMatrix{T}}, N::NTuple{HFTS, Int}) where {T, HFTS}
     D = getD.(C, N)
     F = getF(Hcore, HeeI, D)
-    getEᵀcore(Hcore, F, D)
+    getEᵗcore(Hcore, F, D)
 end
 
 
-function getCFDE(Hcore::Matrix{T}, HeeI::Array{T, 4}, X::Matrix{T}, 
-                 N::NTuple{HFTS, Int}, F::NTuple{HFTS, Matrix{T}}) where {T, HFTS}
+function getCDFE(Hcore::AbstractMatrix{T}, HeeI::Array{T, 4}, X::AbstractMatrix{T}, 
+                 N::NTuple{HFTS, Int}, F::NTuple{HFTS, AbstractMatrix{T}}) where {T, HFTS}
     Cnew = getC.(Ref(X), F)
     Dnew = getD.(Cnew, N)
     Fnew = getF(Hcore, HeeI, Dnew)
     Enew = getE.(Ref(Hcore), Fnew, Dnew)
-    Dᵀnew = get2SpinQuantities(Dnew, HFTS)
-    Eᵀnew = get2SpinQuantities(Enew, HFTS)
-    map(themselves, Cnew, Fnew, Dnew, Enew, Dᵀnew, Eᵀnew)
+    Dᵗnew = get2SpinQuantities(Dnew, HFTS)
+    Eᵗnew = get2SpinQuantities(Enew, HFTS)
+    map(themselves, Cnew, Dnew, Fnew, Enew, Dᵗnew, Eᵗnew)
 end
 
 
-function initializeSCF(::Val{HFT}, Hcore::Matrix{T}, HeeI::Array{T, 4}, 
-                       C::NTuple{HFTS, Matrix{T}}, N::NTuple{HFTS, Int}) where 
-                      {HFT, T<:Real, HFTS}
+function initializeSCF(::Val{HFT}, Hcore::AbstractMatrix{T}, HeeI::Array{T, 4}, 
+                       C::NTuple{HFTS, AbstractMatrix{T}}, N::NTuple{HFTS, Int}) where 
+                      {HFT, T, HFTS}
     D = getD.(C, N)
     F = getF(Hcore, HeeI, D)
     E = getE.(Ref(Hcore), F, D)
-    res = HFtempVars.(Val(HFT), N, C, F, D, E)
+    res = HFtempVars.(Val(HFT), N, C, D, F, E)
     sharedFields = getproperty.(res, :shared)
     for (field, val) in zip( (:Dtots, :Etots), fill.(get2SpinQuantity.((D, E)), 1)  )
         setproperty!.(sharedFields, field, Ref(val))
@@ -191,7 +212,8 @@ end
 
 const Doc_SCFconfig_OneRowTable = "|`:DIIS`, `:EDIIS`, `:ADIIS`|subspace size; "*
                                   "coefficient solver|`DIISsize`; `solver`|`1`,`2`...; "*
-                                  "`:LCM`, `:LBFGS`|`15`; `:LBFGS`|"
+                                  "`:LCM`, `:LBFGS`|`$(defaultDIISconfig[1])`; "*
+                                  "`:$(defaultDIISconfig[2])`|"
 
 const Doc_SCFconfig_DIIS = "[Direct inversion in the iterative subspace]"*
                            "(https://onlinelibrary.wiley.com/doi/10.1002/jcc.540030413)."
@@ -200,24 +222,20 @@ const Doc_SCFconfig_ADIIS = "[DIIS based on the augmented Roothaan–Hall (ARH) 
 const Doc_SCFconfig_LBFGSB = "[Limited-memory BFGS with box constraints]"*
                              "(https://github.com/JuliaNLSolvers/Optim.jl)."
 
-const Doc_SCFconfig_Eg1 = "SCFconfig{Float64, 3}(method=(:DD, :ADIIS, :DIIS), "*
-                          "interval=(0.0001, 1.0e-12, 1.0e-13), methodConfig, "*
-                          "oscillateThreshold)"
-
 """
 
     SCFconfig{T, L} <: ImmutableParameter{T, SCFconfig}
 
-The `struct` for SCF iteration configurations.
+The `struct` for self-consistent field (SCF) iteration configurations.
 
 ≡≡≡ Field(s) ≡≡≡
 
-`method::NTuple{L, Symbol}`: The applied methods. The available methods and their 
-configurations (in terms of keyword arguments):
+`method::NTuple{L, Symbol}`: The applied convergence methods. The available methods and 
+their configurations (in terms of keyword arguments):
 
 | Convergence Method(s) | Configuration(s) | Keyword(s) | Range(s)/Option(s) | Default(s) |
 | :----                 | :---:            | :---:      | :---:              |      ----: |
-| `:DD`                 | damping strength |`dampStrength`|    [`0`, `1`]    |      `0.0` |
+| `:DD`                 | damping strength |`dampStrength`|    [`0`, `1`]  |`$(defaultDS)`|
 $(Doc_SCFconfig_OneRowTable)
 
 ### Convergence Methods
@@ -230,7 +248,7 @@ $(Doc_SCFconfig_OneRowTable)
 * LCM: Lagrange multiplier solver.
 * LBFGS: $(Doc_SCFconfig_LBFGSB)
 
-`interval::NTuple{L, T}`: The stopping (skipping) thresholds for required methods.
+`interval::NTuple{L, T}`: The stopping (or skipping) thresholds for required methods.
 
 `methodConfig::NTuple{L, Vector{<:Pair}}`: The additional keywords arguments for each 
 method stored as `Tuple`s of `Pair`s.
@@ -240,21 +258,19 @@ method stored as `Tuple`s of `Pair`s.
 ≡≡≡ Initialization Method(s) ≡≡≡
 
     SCFconfig(methods::NTuple{L, Symbol}, intervals::NTuple{L, T}, 
-              configs::Dict{Int, <:AbstractVector{<:Pair}}=Dict(1=>Pair[]);
+              config::Dict{Int, <:AbstractVector{<:Pair}}=Dict(1=>Pair[]);
               oscillateThreshold::Real=1e-5) where {L, T} -> 
     SCFconfig{T, L}
 
-`methods` and `intervals` are the methods to be applied and their stopping (skipping) 
-thresholds respectively; the length of those two `AbstractVector`s should be the same. 
-`configs` specifies the additional keyword arguments for each methods by a `Pair` of which 
-the `Int` key `i` is for `i`th method and the pointed `AbstractVector{<:Pair}` is the pairs 
-of keyword arguments and their values respectively.
+`methods` and `intervals` are the convergence methods to be applied and their stopping 
+(or skipping) thresholds respectively. `config` specifies additional keyword argument(s) 
+for each methods by a `Pair` of which the key `i::Int` is for `i`th method and the pointed 
+`AbstractVector{<:Pair}` is the pairs of keyword arguments and their values respectively.
 
 ≡≡≡ Example(s) ≡≡≡
 
 ```jldoctest; setup = :(push!(LOAD_PATH, "../../src/"); using Quiqbox)
-julia> SCFconfig((:DD, :ADIIS, :DIIS), (1e-4, 1e-12, 1e-13), Dict(2=>[:solver=>:LCM]))
-$(Doc_SCFconfig_Eg1)
+julia> SCFconfig((:DD, :ADIIS, :DIIS), (1e-4, 1e-12, 1e-13), Dict(2=>[:solver=>:LCM]));
 ```
 """
 struct SCFconfig{T, L} <: ImmutableParameter{T, SCFconfig}
@@ -264,11 +280,11 @@ struct SCFconfig{T, L} <: ImmutableParameter{T, SCFconfig}
     oscillateThreshold::T
 
     function SCFconfig(methods::NTuple{L, Symbol}, intervals::NTuple{L, T}, 
-                       configs::Dict{Int, <:AbstractVector{<:Pair}}=Dict(1=>Pair[]);
+                       config::Dict{Int, <:AbstractVector{<:Pair}}=Dict(1=>Pair[]);
                        oscillateThreshold::Real=1e-5) where {L, T}
         kwPairs = [Pair[] for _=1:L]
-        for i in keys(configs)
-            kwPairs[i] = configs[i]
+        for i in keys(config)
+            kwPairs[i] = config[i]
         end
         new{T, L}(methods, intervals, Tuple(kwPairs), oscillateThreshold)
     end
@@ -283,60 +299,71 @@ mutable struct HFinterrelatedVars{T} <: HartreeFockintermediateData{T}
     Etots::Vector{T}
 
     HFinterrelatedVars{T}() where {T} = new{T}()
-    HFinterrelatedVars(Dts::Vector{Matrix{T}}, Ets::Vector{T}) where {T} = new{T}(Dts, Ets)
+    HFinterrelatedVars(Dts::AbstractVector{<:AbstractMatrix{T}}, 
+                       Ets::AbstractVector{T}) where {T} = 
+    new{T}(Dts, Ets)
 end
 
+getSpinOccupations(::Val{:RHF}, (Nˢ,)::Tuple{Int}, BN) = 
+((fill(spinOccupations[4], Nˢ)..., fill(spinOccupations[1], BN-Nˢ)...),)
+
+getSpinOccupations(::Val{:UHF}, (Nᵅ, Nᵝ)::NTuple{2, Int}, BN) = 
+( (fill(spinOccupations[2], Nᵅ)..., fill(spinOccupations[1], BN-Nᵅ)...), 
+  (fill(spinOccupations[3], Nᵝ)..., fill(spinOccupations[1], BN-Nᵝ)...) )
 
 """
     HFtempVars{T, HFT} <: HartreeFockintermediateData{T}
 
-The container to store the intermediate values (only of the same spin configuration) for 
+The container to store the intermediate values (only of the one spin configuration) for 
 each iteration during the Hartree-Fock SCF procedure. 
 
 ≡≡≡ Field(s) ≡≡≡
 
-`N::Int`: The number of electrons with the same spin function.
+`N::Int`: The number of electrons with the one spin function.
 
 `Cs::Vector{Matrix{T}}`: Coefficient matrices.
 
-`Fs::Vector{Matrix{T}}`: Fock matrices
+`Ds::Vector{Matrix{T}}`: Density matrices corresponding to only spin configuration.
 
-`Ds::Vector{Matrix{T}}`: Density matrices corresponding 
-to only spin configuration. For RHF each elements means (unconverged) 0.5*Dᵀ.
+`Fs::Vector{Matrix{T}}`: Fock matrices.
 
-`Es::Vector{T}`: Part of Hartree-Fock energy corresponding to only one spin 
-configuration. For RHF each element means (unconverged) 0.5*Ehf.
+`Es::Vector{T}`: Part of the Hartree-Fock energy corresponding to one spin configuration.
 
-`shared.Dtots::Vector{Matrix{T}}`: The total density 
-matrices.
+`shared.Dtots::Vector{Matrix{T}}`: The total density matrices.
 
 `shared.Etots::Vector{T}`: The total Hartree-Fock energy.
 
-**NOTE: For UHF, there are 2 `HFtempVars` being updated during the SCF iterations, and 
-change the field `shared.Dtots` or `shared.Etots` of one container will affect the other 
-one's.**
+**NOTE: For unrestricted Hartree-Fock, there are 2 `HFtempVars` being updated during the 
+iterations, and changing the field `shared.Dtots` or `shared.Etots` of one `HFtempVars` 
+will affect the other one's.**
 """
 struct HFtempVars{T, HFT} <: HartreeFockintermediateData{T}
     N::Int
     Cs::Vector{Matrix{T}}
-    Fs::Vector{Matrix{T}}
     Ds::Vector{Matrix{T}}
+    Fs::Vector{Matrix{T}}
     Es::Vector{T}
     shared::HFinterrelatedVars{T}
 end
 
-HFtempVars(::Val{HFT}, N::Int, C::Matrix{T}, F::Matrix{T}, D::Matrix{T}, E::T) where 
+HFtempVars(::Val{HFT}, N::Int, 
+           C::AbstractMatrix{T}, D::AbstractMatrix{T}, F::AbstractMatrix{T}, E::T) where 
           {HFT, T} = 
-HFtempVars{T, HFT}(N, [C], [F], [D], [E], HFinterrelatedVars{T}())
+HFtempVars{T, HFT}(N, [C], [D], [F], [E], HFinterrelatedVars{T}())
 
-HFtempVars(::Val{HFT}, N::Int, C::Matrix{T}, F::Matrix{T}, D::Matrix{T}, E::T, 
-           Dtot::Matrix{T}, Etot::T) where {HFT, T} = 
-HFtempVars{T, HFT}(N, [C], [F], [D], [E], HFinterrelatedVars([Dtot], [Etot]))
+HFtempVars(::Val{HFT}, N::Int, 
+           C::AbstractMatrix{T}, D::AbstractMatrix{T}, F::AbstractMatrix{T}, E::T, 
+           Dtot::AbstractMatrix{T}, Etot::T) where {HFT, T} = 
+HFtempVars{T, HFT}(N, [C], [D], [F], [E], HFinterrelatedVars([Dtot], [Etot]))
 
-HFtempVars(::Val{HFT}, Nˢ::Int, Cs::Vector{Matrix{T}}, Fs::Vector{Matrix{T}}, 
-           Ds::Vector{Matrix{T}}, Es::Vector{T}, Dtots::Vector{Matrix{T}}, 
-           Etots::Vector{T}) where {HFT, T} = 
-HFtempVars{T, HFT}(Nˢ, Cs, Fs, Ds, Es, HFinterrelatedVars(Dtots, Etots))
+HFtempVars(::Val{HFT}, Nˢ::Int, 
+           Cs::AbstractVector{<:AbstractMatrix{T}}, 
+           Ds::AbstractVector{<:AbstractMatrix{T}}, 
+           Fs::AbstractVector{<:AbstractMatrix{T}}, 
+           Es::AbstractVector{T}, 
+           Dtots::AbstractVector{<:AbstractMatrix{T}}, Etots::AbstractVector{T}) where 
+          {HFT, T} = 
+HFtempVars{T, HFT}(Nˢ, Cs, Ds, Fs, Es, HFinterrelatedVars(Dtots, Etots))
 
 
 """
@@ -359,9 +386,9 @@ The container of the final values after a Hartree-Fock SCF procedure.
 
 `C::NTuple{HFTS, Matrix{T}}`: Coefficient matrix(s) for one spin configuration.
 
-`F::NTuple{HFTS, Matrix{T}}`: Fock matrix(s) for one spin configuration.
-
 `D::NTuple{HFTS, Matrix{T}}`: Density matrix(s) for one spin configuration.
+
+`F::NTuple{HFTS, Matrix{T}}`: Fock matrix(s) for one spin configuration.
 
 `Eo::NTuple{HFTS, Vector{T}}`: Energies of canonical orbitals.
 
@@ -370,6 +397,8 @@ The container of the final values after a Hartree-Fock SCF procedure.
 `temp::NTuple{HFTS, HFtempVars{T, HFT}}`: the intermediate values.
 
 `isConverged::Bool`: Whether the SCF procedure is converged in the end.
+
+`basis::GTBasis{T, D, BN}`: The basis set used for the Hartree-Fock approximation.
 """
 struct HFfinalVars{T, D, HFT, NN, BN, HFTS} <: HartreeFockFinalValue{T, HFT}
     Ehf::T
@@ -378,8 +407,8 @@ struct HFfinalVars{T, D, HFT, NN, BN, HFTS} <: HartreeFockFinalValue{T, HFT}
     nuc::NTuple{NN, String}
     nucCoord::NTuple{NN, NTuple{D, T}}
     C::NTuple{HFTS, Matrix{T}}
-    F::NTuple{HFTS, Matrix{T}}
     D::NTuple{HFTS, Matrix{T}}
+    F::NTuple{HFTS, Matrix{T}}
     Eo::NTuple{HFTS, Vector{T}}
     occu::NTuple{HFTS, NTuple{BN, String}}
     temp::NTuple{HFTS, HFtempVars{T, HFT}}
@@ -388,35 +417,18 @@ struct HFfinalVars{T, D, HFT, NN, BN, HFTS} <: HartreeFockFinalValue{T, HFT}
 
     function HFfinalVars(basis::GTBasis{T, 𝐷, BN}, 
                          nuc::NTuple{NN, String}, nucCoords::NTuple{NN, NTuple{𝐷, T}}, 
-                         X::Matrix{T}, (vars,)::Tuple{HFtempVars{T, :RHF}}, 
-                         isConverged::Bool) where {T, 𝐷, BN, NN}
-        C = (vars.Cs[end],)
-        F = vars.Fs[end]
-        D = (vars.Ds[end],) 
-        Ehf = vars.shared.Etots[end]
-        Eo = (getCϵ(X, F)[2],)
-        N = vars.N
-        occu = ((fill(spinOccupations[4], N)..., fill(spinOccupations[1], BN-N)...),)
+                         X::AbstractMatrix{T}, vars::NTuple{HFTS, HFtempVars{T, HFT}}, 
+                         isConverged::Bool) where {T, 𝐷, BN, NN, HFTS, HFT}
+        Ehf = vars[1].shared.Etots[end]
         Enn = nnRepulsions(nuc, nucCoords)
-        new{T, 𝐷, :RHF, NN, BN, 1}(Ehf, Enn, (N, N), nuc, nucCoords, C, (F,), D, Eo, occu, 
-                                   (vars,), isConverged, basis)
-    end
-
-    function HFfinalVars(basis::GTBasis{T, 𝐷, BN}, 
-                         nuc::NTuple{NN, String}, nucCoords::NTuple{NN, NTuple{𝐷, T}}, 
-                         X::Matrix{T}, αβVars::NTuple{2, HFtempVars{T, :UHF}}, 
-                         isConverged::Bool) where {T, 𝐷, BN, NN}
-        C = last.(getproperty.(αβVars, :Cs))
-        F = last.(getproperty.(αβVars, :Fs))
-        D = last.(getproperty.(αβVars, :Ds))
-        Ehf = αβVars[1].shared.Etots[end]
+        Ns = getproperty.(vars, :N)
+        C = last.(getproperty.(vars, :Cs))
+        D = last.(getproperty.(vars, :Ds))
+        F = last.(getproperty.(vars, :Fs))
         Eo = getindex.(getCϵ.(Ref(X), F), 2)
-        Nα, Nβ = Ns = getproperty.(αβVars, :N)
-        occu = ( (fill(spinOccupations[2], Nα)..., fill(spinOccupations[1], BN-Nα)...), 
-                 (fill(spinOccupations[3], Nβ)..., fill(spinOccupations[1], BN-Nβ)...) )
-        Enn = nnRepulsions(nuc, nucCoords)
-        new{T, 𝐷, :UHF, NN, BN, 2}(Ehf, Enn, Ns, nuc, nucCoords, C, F, D, Eo, occu, 
-                                   αβVars, isConverged, basis)
+        occu = getSpinOccupations(Val(HFT), Ns, BN)
+        new{T, 𝐷, HFT, NN, BN, HFTS}(Ehf, Enn, groupSpins(Val(HFT), Ns), nuc, nucCoords, 
+                                     C, D, F, Eo, occu, vars, isConverged, basis)
     end
 end
 
@@ -426,22 +438,13 @@ struct InitialC{T<:Number, HFT, F<:Function}
 
     InitialC(::Val{HFT}, f::F, ::Type{T}) where {HFT, F, T} = new{T, HFT, F}((), f)
 
-    InitialC(::Val{:RHF}, C0::NTuple{1, Matrix{T}}) where {T} = 
+    InitialC(::Val{:RHF}, C0::NTuple{1, AbstractMatrix{T}}) where {T} = 
     new{T, :RHF, itselfT}(C0, itself)
 
-    InitialC(::Val{:UHF}, C0::NTuple{2, Matrix{T}}) where {T} = 
+    InitialC(::Val{:UHF}, C0::NTuple{2, AbstractMatrix{T}}) where {T} = 
     new{T, :UHF, itselfT}(C0, itself)
 end
 
-const Doc_HFconfig_Eg1 = "HFconfig{:RHF, Val{:SAD}, 3}(Val{:RHF}(), Val{:SAD}(), "*
-                         "SCFconfig{Float64, 3}(interval=(0.0001, 1.0e-6, 1.0e-15), "*
-                         "oscillateThreshold=1.0e-5, method, methodConfig)"*
-                         "[:ADIIS, :DIIS, :ADIIS], 1000, true)"
-
-const Doc_HFconfig_Eg2 = Doc_HFconfig_Eg1[1:10] * "U" * Doc_HFconfig_Eg1[12:34] * "U" * 
-                         Doc_HFconfig_Eg1[36:end]
-
-const HFtypes = (:RHF, :UHF)
 
 """
 
@@ -454,17 +457,17 @@ The container of Hartree-Fock method configuration.
 `HF::Val{HFT}`: Hartree-Fock method type. Available values of `HFT` are 
 $(string(HFtypes)[2:end-1]).
 
-`C0::ICT`: Initial guess of the coefficient matrix(s) C of the canonical orbitals. When `C0` 
-is a `Val{T}`, the available values of `T` are 
+`C0::InitialC{T1, HFT, F}`: Initial guess of the coefficient matrix(s) C of the canonical 
+orbitals. When `C0` is a `Val{T}`, the available values of `T` are 
 `$((guessCmethods|>typeof|>fieldnames|>string)[2:end-1])`.
 
-`SCF::SCFconfig`: SCF iteration configuration. For more information please refer to 
-`SCFconfig`.
+`SCF::SCFconfig{T2, L}`: SCF iteration configuration. For more information please refer to 
+[`SCFconfig`](@ref).
 
-`earlyStop::Bool`: Whether automatically terminate (skip) a convergence method early when 
-its performance becomes unstable or poor.
+`maxStep::Int`: Maximum iteration steps allowed regardless if the iteration converges.
 
-`maxStep::Int`: Maximum allowed iteration steps regardless of whether the SCF converges.
+`earlyStop::Bool`: Whether automatically terminate (or skip) a convergence method early 
+when its performance becomes unstable or poor.
 
 ≡≡≡ Initialization Method(s) ≡≡≡
 
@@ -475,11 +478,9 @@ its performance becomes unstable or poor.
 ≡≡≡ Example(s) ≡≡≡
 
 ```jldoctest; setup = :(push!(LOAD_PATH, "../../src/"); using Quiqbox)
-julia> HFconfig()
-$(Doc_HFconfig_Eg1)
+julia> HFconfig();
 
-julia> HFconfig(HF=:UHF)
-$(Doc_HFconfig_Eg2)
+julia> HFconfig(HF=:UHF);
 ```
 """
 mutable struct HFconfig{T1, HFT, F, T2, L} <: ConfigBox{T1, HFconfig, HFT}
@@ -489,11 +490,13 @@ mutable struct HFconfig{T1, HFT, F, T2, L} <: ConfigBox{T1, HFconfig, HFT}
     maxStep::Int
     earlyStop::Bool
 
-    HFconfig(::Val{:UHF}, a2::NTuple{2, Matrix{T1}}, a3::SCFconfig{T2, L}, a4, a5) where 
+    HFconfig(::Val{:UHF}, 
+             a2::NTuple{2, AbstractMatrix{T1}}, a3::SCFconfig{T2, L}, a4, a5) where 
             {T1, T2, L} = 
     new{T1, :UHF, itselfT, T2, L}(Val(:UHF), InitialC(Val(:UHF), a2), a3, a4, a5)
 
-    HFconfig(::Val{:RHF}, a2::Matrix{T1}, a3::SCFconfig{T2, L}, a4, a5) where {T1, T2, L} = 
+    HFconfig(::Val{:RHF}, 
+             a2::AbstractMatrix{T1}, a3::SCFconfig{T2, L}, a4, a5) where {T1, T2, L} = 
     new{T1, :RHF, itselfT, T2, L}(Val(:RHF), InitialC(Val(:RHF), (a2,)), a3, a4, a5)
 
     function HFconfig(::Val{HFT}, a2::Val{CF}, a3::SCFconfig{T, L}, a4, a5) where 
@@ -527,43 +530,46 @@ const C0methodArgOrders = (itself=(1,),
                            getCfromSAD=(2,3,5,6,7,8,9,4))
 
 """
-    runHF(bs::Union{BasisSetData, AbstractVector{<:AbstractGTBasisFuncs{T1, D}}, 
-                    Tuple{Vararg{AbstractGTBasisFuncs{T1, D}}}}, 
-          nuc::Union{NTuple{NN, String}, AbstractVector{String}}, 
-          nucCoords::Union{NTuple{NN, NTuple{D, T1}}, 
-                           AbstractVector{<:AbstractArray{<:Real}}}, 
-          config::Union{HFconfig{T1, HFT, itselfT}, HFconfig{T2, HFT}}=$(defaultHFCStr), 
-          N::Int=getCharge(nuc); 
-          printInfo::Bool=true) where {T1, D, NN, HFT, T2} -> 
-    HFfinalVars{T1, D, HFT, NN}
+    runHF(bs, nuc, nucCoords, config=$(defaultHFCStr), N=getCharge(nuc); printInfo=true) -> 
+    HFfinalVars
+
+    runHF(bs, nuc, nucCoords, N=getCharge(nuc), config=$(defaultHFCStr); printInfo=true) -> 
+    HFfinalVars
 
 Main function to run Hartree-Fock in Quiqbox.
 
-=== Positional argument(s) ===
+≡≡≡ Positional argument(s) ≡≡≡
 
-`bs::Union{BasisSetData, AbstractVector{<:AbstractGTBasisFuncs{T1, D}}, 
-           Tuple{Vararg{AbstractGTBasisFuncs{T1, D}}}}`: Basis set.
+`bs::Union{
+    BasisSetData{T, D}, 
+    AbstractVector{<:AbstractGTBasisFuncs{T, D}}, 
+    Tuple{Vararg{AbstractGTBasisFuncs{T, D}}}
+} where {T, D}`: The basis set used for the Hartree-Fock approximation.
 
-`nuc::Union{NTuple{NN, String}, AbstractVector{String}}`: The element symbols of the nuclei 
-for the studied system.
+`nuc::Union{
+    NTuple{<:Any, String}, 
+    AbstractVector{String}
+}`: The nuclei in the studied system.
 
-`nucCoords::Union{NTuple{NN, NTuple{D, T1}}, 
-AbstractVector{<:AbstractVector{<:Real}}}`: Nuclei coordinates.
+`nucCoords::Union{
+    NTuple{<:Any, NTuple{D, T1}}, 
+    AbstractVector{<:AbstractVector{T1}}
+}`: The coordinates of corresponding nuclei.
 
 `config::HFconfig`: The Configuration of selected Hartree-Fock method. For more information 
-please refer to `HFconfig`.
+please refer to [`HFconfig`](@ref).
 
 `N::Int`: Total number of electrons.
 
-=== Keyword argument(s) ===
+≡≡≡ Keyword argument(s) ≡≡≡
 
-`printInfo::Bool`: Whether print out the information of iteration steps.
+`printInfo::Bool`: Whether print out the information of iteration steps and result.
 """
 function runHF(bs::GTBasis{T1, D, BN, BT}, 
                nuc::Union{NTuple{NN, String}, AbstractVector{String}}, 
                nucCoords::Union{NTuple{NN, NTuple{D, T1}}, 
                                 AbstractVector{<:AbstractVector{T1}}}, 
-               config::Union{HFconfig{T1, HFT, itselfT}, HFconfig{T2, HFT}}=defaultHFC, 
+               config::HFconfig{T2, HFT}=defaultHFC, 
                N::Int=getCharge(nuc); 
                printInfo::Bool=true) where {T1, D, BN, BT, NN, HFT, T2}
     nuc = arrayToTuple(nuc)
@@ -591,18 +597,6 @@ function runHF(bs::GTBasis{T1, D, BN, BT},
     res
 end
 
-"""
-
-    runHF(bs::Union{BasisSetData{T1, D}, AbstractVector{<:AbstractGTBasisFuncs{T1, D}}, 
-                    Tuple{Vararg{AbstractGTBasisFuncs{T1, D}}}}, 
-          nuc::Union{NTuple{NN, String}, AbstractVector{String}}, 
-          nucCoords::Union{NTuple{NN, NTuple{D, T1}}, 
-                           AbstractVector{<:AbstractArray{<:Real}}},
-          N::Int=getCharge(nuc), 
-          config::Union{HFconfig{T1, HFT, itselfT}, HFconfig{T2, HFT}}=$(defaultHFCStr); 
-          printInfo::Bool=true) where {T1, D, NN, HFT, T2} -> 
-    HFfinalVars{T1, D, HFT, NN}
-"""
 runHF(bs::BasisSetData, nuc, nucCoords, N::Int, config=defaultHFC; printInfo=true) = 
 runHF(bs::BasisSetData, nuc, nucCoords, config, N; printInfo)
 
@@ -614,59 +608,49 @@ runHF(GTBasis(bs), args...; printInfo)
 
 """
 
-    runHFcore(::Val{HFT}, 
-              scfConfig::SCFconfig{T1, L}, 
-              N::NTuple{HFTS, Int}, 
-              Hcore::Matrix{T2}, 
-              HeeI::Array{T2, 4}, 
-              S::Matrix{T2}, 
-              X::Matrix{T2}, 
-              C0::NTuple{HFTS, Matrix{T2}}, 
-              printInfo::Bool=false, 
-              maxStep::Int=1000, 
-              earlyStop::Bool=true) where {HFT, T1, L, HFTS, T2} -> 
-    Tuple{Vararg{HFtempVars}}, Bool
+    runHFcore(HTtype, scfConfig, N, Hcore, HeeI, S, X, C0, 
+              printInfo=false, maxStep=1000, earlyStop=true) -> 
+    Tuple{Tuple{Vararg{HFtempVars}}, Bool}
 
 The core function of `runHF` which returns the data collected during the iteration and the 
 result of whether the SCF procedure is converged.
 
 === Positional argument(s) ===
 
-`HTtype::Val{HFT}`: Hartree-Fock method type. Available values of `HFT` are 
+`HTtype::Val{HFT} where HFT`: Hartree-Fock method type. Available values of `HFT` are 
 $(string(HFtypes)[2:end-1]).
 
-`scfConfig::SCFconfig`: SCF iteration configuration.
+`scfConfig::SCFconfig`: The SCF iteration configuration.
 
-`N::Union{NTuple{2, Int}, Int}`: The total number of electrons or the numbers of electrons 
-with different spins respectively. When the latter is input, an UHF is performed.
+`N::Union{NTuple{2, Int}, Int}`: The numbers of electrons with same spin configurations. 
 
-`Hcore::Matrix{T}`: Core Hamiltonian of electronic Hamiltonian.
+`Hcore::Matrix{T}`: The core Hamiltonian of the electronic Hamiltonian.
 
-`HeeI::Array{T, 4}`: The electron-electron interaction Hamiltonian which includes both the 
-Coulomb interactions and the Exchange Correlations.
+`HeeI::Array{T, 4}`: The electron-electron interaction tensor (in chemists' notation) which 
+includes both the Coulomb interactions and the Exchange Correlations.
 
-`S::Matrix{T}`: Overlap matrix of the corresponding basis set.
+`S::Matrix{T}`: The overlap matrix of the used basis set.
 
-`X::Matrix{T}`: Orthogonal transformation matrix of S. Default value is S^(-0.5).
+`X::Matrix{T}`: The transformation matrix of `S`. Default value is `S^(-0.5)`.
 
-`C0::Union{Matrix{T}, NTuple{2, Matrix{T}}}`: Initial guess of the 
-coefficient matrix(s) C of the canonical orbitals.
+`C0::Union{Matrix{T}, NTuple{2, Matrix{T}}}`: Initial guess of the coefficient matrix(s) of 
+the canonical spin-orbitals.
 
-`printInfo::Bool`: Whether print out the information of iteration steps.
+`printInfo::Bool`: Whether print out the information of iteration steps and result.
 
-`maxStep::Int`: Maximum allowed iteration steps regardless of whether the SCF converges.
+`maxStep::Int`: Maximum iteration steps allowed regardless if the iteration converges.
 
-`earlyStop::Bool`: Whether automatically early terminate (skip) a convergence method 
+`earlyStop::Bool`: Whether automatically terminate (or skip) a convergence method early 
 when its performance becomes unstable or poor.
 """
 function runHFcore(::Val{HFT}, 
                    scfConfig::SCFconfig{T1, L}, 
                    N::NTuple{HFTS, Int}, 
-                   Hcore::Matrix{T2}, 
+                   Hcore::AbstractMatrix{T2}, 
                    HeeI::Array{T2, 4}, 
-                   S::Matrix{T2}, 
-                   X::Matrix{T2}, 
-                   C0::NTuple{HFTS, Matrix{T2}}, 
+                   S::AbstractMatrix{T2}, 
+                   X::AbstractMatrix{T2}, 
+                   C0::NTuple{HFTS, AbstractMatrix{T2}}, 
                    printInfo::Bool=false, 
                    maxStep::Int=1000, 
                    earlyStop::Bool=true) where {HFT, T1, L, HFTS, T2}
@@ -695,10 +679,14 @@ function runHFcore(::Val{HFT},
 
             if flag 
                 isConverged = ifelse(Std > scfConfig.oscillateThreshold, false, true)
-                if !isConverged
-                    i = terminateSCF(i, vars, m, printInfo)
+                if isConverged
+                    break
+                else
+                    if earlyStop
+                        i = terminateSCF(i, vars, m, printInfo)
+                        break
+                    end
                 end
-                break
             end
 
             printInfo && (i % floor(log(4, i) + 1) == 0 || i == maxStep) && 
@@ -719,10 +707,9 @@ function terminateSCF(i, vars, method, printInfo)
     i-1
 end
 
-const defaultDampStrength = 0.5
 
 function DDcore(Nˢ::Int, X::AbstractMatrix{T}, F::AbstractMatrix{T}, D::AbstractMatrix{T}, 
-                dampStrength::T=T(defaultDampStrength)) where {T}
+                dampStrength::T=T(defaultDS)) where {T}
     @assert 0 <= dampStrength <= 1 "The range of `dampStrength`::$(T) is [0,1]."
     Dnew = getD(X, F, Nˢ)
     (1 - dampStrength)*Dnew + dampStrength*D
@@ -768,7 +755,7 @@ function DD(Nˢ::NTuple{HFTS, Int}, Hcore, HeeI, _S, X,
             tVars::NTuple{HFTS, HFtempVars{T, HFT}}; kws...) where {HFTS, T, HFT}
     Fs = last.(getproperty.(tVars, :Fs))
     Ds = last.(getproperty.(tVars, :Ds))
-    Dnew = DDcore.( Nˢ, Ref(X), Fs, Ds, get(kws, :dampStrength, T(defaultDampStrength)) )
+    Dnew = DDcore.( Nˢ, Ref(X), Fs, Ds, get(kws, :dampStrength, T(defaultDS)) )
     getF(Hcore, HeeI, Dnew)
 end
 
@@ -783,16 +770,16 @@ function xDIIS(::Val{M}) where {M}
     end
 end
 
-const defaultDIISconfig = (12, :LBFGS)
-
 const DIIScoreMethods = (DIIS=DIIScore, EDIIS=EDIIScore, ADIIS=ADIIScore)
 
 const DIISmethodArgOrders = (DIIScore=(1,2,4), EDIIScore=(1,2,3), ADIIScore=(1,2))
 
 const DIISadditionalConfigs = (DIIS=(false, true), EDIIS=(true, false), ADIIS=(true, false))
 
-function xDIIScore(::Val{M}, S::Matrix{T}, 
-                   Fs::Vector{Matrix{T}}, Ds::Vector{Matrix{T}}, Es::Vector{T}, 
+function xDIIScore(::Val{M}, S::AbstractMatrix{T}, 
+                   Fs::AbstractVector{<:AbstractMatrix{T}}, 
+                   Ds::AbstractVector{<:AbstractMatrix{T}}, 
+                   Es::AbstractVector{T}, 
                    DIISsize::Int=defaultDIISconfig[1], 
                    solver::Symbol=defaultDIISconfig[2]) where {M, T}
     cvxConstraint, permuteData = getproperty(DIISadditionalConfigs, M)
@@ -811,33 +798,39 @@ const SCFmethodSelector =
       (DD=DD, DIIS=xDIIS(Val(:DIIS)), ADIIS=xDIIS(Val(:ADIIS)), EDIIS=xDIIS(Val(:EDIIS)))
 
 
-function HFcore(m::Symbol, N::NTuple{HFTS, Int}, Hcore::Matrix{T}, HeeI::Array{T, 4}, 
-                S::Matrix{T}, X::Matrix{T}, rVars::NTuple{HFTS, HFtempVars{T, HFT}}; 
+function HFcore(m::Symbol, N::NTuple{HFTS, Int}, 
+                Hcore::AbstractMatrix{T}, HeeI::Array{T, 4}, 
+                S::AbstractMatrix{T}, X::AbstractMatrix{T}, 
+                rVars::NTuple{HFTS, HFtempVars{T, HFT}}; 
                 kws...) where {HFTS, T, HFT}
     F = getproperty(SCFmethodSelector, m)(N, Hcore, HeeI, S, X, rVars; kws...)
-    getCFDE(Hcore, HeeI, X, N, F)
+    getCDFE(Hcore, HeeI, X, N, F)
 end
 
 
 function pushHFtempVarsCore1!(rVars::HFtempVars, 
-                              res::Tuple{Matrix{T}, Matrix{T}, 
-                                         Matrix{T}, T, Matrix{T}, T}) where {T}
+                              res::Tuple{AbstractMatrix{T}, AbstractMatrix{T}, 
+                                         AbstractMatrix{T}, T, 
+                                         AbstractMatrix{T}, T}) where {T}
     push!(rVars.Cs, res[1])
-    push!(rVars.Fs, res[2])
-    push!(rVars.Ds, res[3])
+    push!(rVars.Ds, res[2])
+    push!(rVars.Fs, res[3])
     push!(rVars.Es, res[4])
 end
 
 function pushHFtempVarsCore2!(rVars::HFtempVars, 
-                              res::Tuple{Matrix{T}, Matrix{T}, 
-                                         Matrix{T}, T, Matrix{T}, T}) where {T}
+                              res::Tuple{AbstractMatrix{T}, AbstractMatrix{T}, 
+                                         AbstractMatrix{T}, T, 
+                                         AbstractMatrix{T}, T}) where {T}
     push!(rVars.shared.Dtots, res[5])
     push!(rVars.shared.Etots, res[6])
 end
 
 function pushHFtempVars!(αβVars::NTuple{HFTS, HFtempVars{T, HFT}}, 
-                         res::NTuple{HFTS, Tuple{Matrix{T}, Matrix{T}, Matrix{T}, T, 
-                                                 Matrix{T}, T}}) where {HFTS, T, HFT}
+                         res::NTuple{HFTS, 
+                                     Tuple{AbstractMatrix{T}, AbstractMatrix{T}, 
+                                           AbstractMatrix{T}, T, 
+                                           AbstractMatrix{T}, T}}) where {HFTS, T, HFT}
     pushHFtempVarsCore1!.(αβVars, res)
     pushHFtempVarsCore2!(αβVars[1], res[1])
 end
@@ -845,8 +838,8 @@ end
 
 function popHFtempVarsCore1!(rVars::HFtempVars)
     pop!(rVars.Cs)
-    pop!(rVars.Fs)
     pop!(rVars.Ds)
+    pop!(rVars.Fs)
     pop!(rVars.Es)
 end
 
@@ -878,7 +871,8 @@ end
 
 
 # Default method
-function LBFGSBsolver(v::AbstractVector{T}, B::AbstractMatrix{T}, cvxConstraint::Bool) where {T<:Real}
+function LBFGSBsolver(v::AbstractVector{T}, B::AbstractMatrix{T}, 
+                      cvxConstraint::Bool) where {T}
     f = genxDIISf(v, B)
     g! = genxDIIS∇f(v, B)
     lb = ifelse(cvxConstraint, T(0), T(-Inf))
@@ -893,7 +887,8 @@ function LBFGSBsolver(v::AbstractVector{T}, B::AbstractMatrix{T}, cvxConstraint:
     c ./ sum(c)
 end
 
-function CMsolver(v::AbstractVector{T}, B::AbstractMatrix{T}, cvxConstraint::Bool, ϵ::T=T(1e-5)) where {T}
+function CMsolver(v::AbstractVector{T}, B::AbstractMatrix{T}, 
+                  cvxConstraint::Bool, ϵ::T=T(1e-5)) where {T}
     len = length(v)
     getA = (B)->[B  ones(len); ones(1, len) 0]
     b = vcat(-v, 1)

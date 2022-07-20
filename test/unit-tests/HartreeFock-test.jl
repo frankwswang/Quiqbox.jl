@@ -50,7 +50,7 @@ end
     hasEqual(tVars1, res1.temp[1])
 end
 
-@test res1.Ehf == Quiqbox.getEᵀ(Hcore, HeeI, res1.C, (Ne÷2,))
+@test res1.Ehf == Quiqbox.getEᵗ(Hcore, HeeI, res1.C, (Ne÷2,))
 @test isapprox(res1.Ehf, -93.7878386328627, atol=errorThreshold)
                          
 # Note: the orbital coefficients of 4th and 5th columns are so close that based on the 
@@ -105,7 +105,7 @@ D1 = res1.D[1]
     hasEqual(tVars2, res2.temp)
 end
 
-@test res2.Ehf == Quiqbox.getEᵀ(Hcore, HeeI, res2.C, (Ne÷2, Ne-Ne÷2))
+@test res2.Ehf == Quiqbox.getEᵗ(Hcore, HeeI, res2.C, (Ne÷2, Ne-Ne÷2))
 @test isapprox(res2.Ehf, -93.78783863286264, atol=errorThreshold)
 @test isapprox.((res2.C[1][1:5, [1,2,3,6,7]], res2.C[2][1:5, [1,2,3,6,7]]), 
 ([ 0.01089592   0.088980957  0.121608177  0.0  0.0  1.914545206  3.615733309; 

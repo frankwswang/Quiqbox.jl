@@ -6,7 +6,7 @@ using ForwardDiff: derivative as ForwardDerivative
 function oneBodyDerivativeCore(::Val{false}, 
                                ∂bfs::Union{NTuple{BN, GTBasisFuncs{T, D, 1}}}, 
                                bfs::Union{NTuple{BN, GTBasisFuncs{T, D, 1}}}, 
-                               X::Matrix{T}, ∂X::Matrix{T}, 
+                               X::AbstractMatrix{T}, ∂X::AbstractMatrix{T}, 
                                tf::TypedFunction{F}) where {BN, T, D, F}
     ʃ = getFunc(tf)
     ∂ʃ = ones(BN, BN)
@@ -34,7 +34,7 @@ end
 function twoBodyDerivativeCore(::Val{false}, 
                                ∂bfs::Union{NTuple{BN, GTBasisFuncs{T, D, 1}}}, 
                                bfs::Union{NTuple{BN, GTBasisFuncs{T, D, 1}}}, 
-                               X::Matrix{T}, ∂X::Matrix{T}, 
+                               X::AbstractMatrix{T}, ∂X::AbstractMatrix{T}, 
                                tf::TypedFunction{F}) where {BN, T, D, F}
     ʃ = getFunc(tf)
     bsSize = ∂bfs |> length
@@ -70,7 +70,7 @@ end
 
 function derivativeCore(FoutputIsVector::Val{B}, 
                         bs::NTuple{BN, GTBasisFuncs{T, D, 1}}, 
-                        par::ParamBox, S::Matrix{T}, 
+                        par::ParamBox, S::AbstractMatrix{T}, 
                         oneBodyF::TypedFunction{F1}, twoBodyF::TypedFunction{F2}) where 
                        {B, BN, T, D, F1, F2}
     # ijkl in chemists' notation of spatial bases (ij|kl).
@@ -100,34 +100,36 @@ function derivativeCore(FoutputIsVector::Val{B},
 end
 
 
-function ∂HFenergy(bs::NTuple{BN, GTBasisFuncs{T, D, 1}}, 
-                   par::ParamBox, C::NTuple{HFTS, Matrix{T}}, 
-                   S::Matrix{T}, nuc::NTuple{NN, String}, 
+function ∂HFenergy(par::ParamBox, 
+                   bs::NTuple{BN, GTBasisFuncs{T, D, 1}}, 
+                   S::AbstractMatrix{T}, 
+                   C::NTuple{HFTS, AbstractMatrix{T}}, 
+                   nuc::NTuple{NN, String}, 
                    nucCoords::NTuple{NN, NTuple{3, T}}, 
                    nElectron::NTuple{HFTS, Int}) where {BN, T, D, HFTS, NN}
-    Xinv = sqrt(S)::Matrix{T}
+    Xinv = sqrt(S)
     cH = (i, j)->getCoreH(i, j, nuc, nucCoords)
     ∂hij, ∂hijkl = derivativeCore(Val(false), bs, par, S, 
                                   TypedFunction(cH), TypedFunction(getEleEleInteraction))
-    getEᵀ(∂hij, ∂hijkl, Ref(Xinv).*C, nElectron)
+    getEᵗ(∂hij, ∂hijkl, Ref(Xinv).*C, nElectron)
 end
 
 
-function gradHFenergy(bs::Union{NTuple{BN, GTBasisFuncs{T, D, 1}}, 
+function gradHFenergy(par::AbstractVector{<:ParamBox{T}}, 
+                      bs::Union{NTuple{BN, GTBasisFuncs{T, D, 1}}, 
                                 AbstractVector{<:GTBasisFuncs{T, D, 1}}}, 
-                      par::Vector{<:ParamBox}, 
-                      C::NTuple{HFTS, Matrix{T}}, 
-                      S::Matrix{T}, 
-                      nuc::Union{NTuple{NN, String}, Vector{String}}, 
+                      S::AbstractMatrix{T}, 
+                      C::NTuple{HFTS, AbstractMatrix{T}}, 
+                      nuc::Union{NTuple{NN, String}, AbstractVector{String}}, 
                       nucCoords::Union{NTuple{NN, NTuple{3, T}}, 
-                                       Vector{<:AbstractArray{<:Real}}}, 
+                                       AbstractVector{<:AbstractArray{T}}}, 
                       nElectron::Union{Int, NTuple{2, Int}}=getCharge(nuc)) where 
                      {BN, T, D, HFTS, NN}
     bs = arrayToTuple(bs)
     nuc = arrayToTuple(nuc)
     nucCoords = genTupleCoords(T, nucCoords)
     Ns = splitSpins(Val(HFTS), nElectron)
-    ∂HFenergy.(Ref(bs), par, Ref(C), Ref(S), Ref(nuc), Ref(nucCoords), Ref(Ns))
+    ∂HFenergy.(par, Ref(bs), Ref(S), Ref(C), Ref(nuc), Ref(nucCoords), Ref(Ns))
 end
 
 

@@ -1,6 +1,6 @@
 using Test
 using Quiqbox
-using Quiqbox: BasisFuncMix, hasBoolRelation, Doc_SCFconfig_Eg1, typeStrOf, getFieldNameStr
+using Quiqbox: BasisFuncMix, hasBoolRelation, typeStrOf, getFieldNameStr
 using Suppressor: @capture_out
 
 @testset "Overload.jl" begin
@@ -78,7 +78,8 @@ l3 = length(fVarStrP1)
 
 info3 = (@capture_out show(SCFconfig((:DD, :ADIIS, :DIIS), 
                                      (1e-4, 1e-12, 1e-13), Dict(2=>[:solver=>:LCM]))))
-@test info3 == Doc_SCFconfig_Eg1
+@test info3 == "SCFconfig{Float64, 3}(method=(:DD, :ADIIS, :DIIS), "*
+               "interval=(0.0001, 1.0e-12, 1.0e-13), methodConfig, oscillateThreshold)"
 
 H2 = MatterByHF(fVar1)
 info4 = (@capture_out show(H2))

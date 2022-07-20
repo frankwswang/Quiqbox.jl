@@ -206,7 +206,7 @@ function optimizeParams!(pbs::AbstractVector{<:ParamBox{T1}},
             E, C = ECmethod(gtb, nuc, nucCoords, N)
 
             t = @elapsed begin
-                grad = EGmethod(gtb.basis, pbs, C, gtb.S, nuc, nucCoords)
+                grad = EGmethod(pbs, gtb.basis, gtb.S, C, nuc, nucCoords)
             end
 
             push!(Es, E)

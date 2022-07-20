@@ -30,7 +30,7 @@ C_H2 = hcat(H2.occuC[1], H2.unocC[1])
 
 @test C_H2 == C_RHF
 @test all(nHalf .== H2.N)
-@test H2.Ehf == Quiqbox.getEᵀ(Hc1, basis1.eeI, H2.occuC, (H2.N[1],))
+@test H2.Ehf == Quiqbox.getEᵗ(Hc1, basis1.eeI, H2.occuC, (H2.N[1],))
 @test H2.coreHsameSpin[1] == changeHbasis(Hc1, C_RHF)
 @test isapprox.(H2.coreHsameSpin[1], get1spinHcore(C_RHF, Hc1), atol=1e-15) |> all
 @test H2.eeIsameSpin[1] == changeHbasis(basis1.eeI, C_RHF)
@@ -60,7 +60,7 @@ Jαβ = [ eeInteraction(i.orbital, i.orbital, j.orbital, j.orbital)
 
 @test C_UHF1 == Cα_H2O
 @test C_UHF2 == Cβ_H2O
-@test H2O.Ehf == Quiqbox.getEᵀ(Hc2, basis2.eeI, H2O.occuC, H2O.N)
+@test H2O.Ehf == Quiqbox.getEᵗ(Hc2, basis2.eeI, H2O.occuC, H2O.N)
 @test H2O.coreHsameSpin == changeHbasis.(Ref(Hc2), HFres2.C)
 @test isapprox.(H2O.coreHsameSpin[1], get1spinHcore(C_UHF1, Hc2), atol=1e-12) |> all
 @test isapprox.(H2O.coreHsameSpin[2], get1spinHcore(C_UHF2, Hc2), atol=1e-12) |> all
