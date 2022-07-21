@@ -779,18 +779,21 @@ fillObj(num::Any) = fill(num)
 fillObj(num::Array{<:Any, 0}) = itself(num)
 
 
-@inline genTupleCoords(::Type{T1}, coords::Vector{<:AbstractArray{<:T2}}) where {T1, T2} = 
-        Tuple(Tuple(i.|>T1) for i in coords)
-        
+arrayToTuple(arr::AbstractArray) = Tuple(arr)
 
-@inline genTupleCoords(::Type{T}, coords::Tuple{Vararg{NTuple{3, T}}}) where {T} = 
-        itself(coords)
+arrayToTuple(tpl::Tuple) = itself(tpl)
 
 
-@inline arrayToTuple(arr::AbstractArray) = Tuple(arr)
+genTupleCoords(::Type{T1}, coords::AbstractVector{<:AbstractVector{<:T2}}) where {T1, T2} = 
+Tuple(Tuple(i.|>T1) for i in coords)
 
-@inline arrayToTuple(tpl::Tuple) = itself(tpl)
+genTupleCoords(::Type{T1}, coords::Tuple{Vararg{AbstractVector{<:T2}}}) where {T1, T2} = 
+map(x->Tuple(x.|>T1), coords)
 
+genTupleCoords(::Type{T}, coords::Tuple{Vararg{NTuple{D, T}}}) where {D, T} = itself(coords)
+
+genTupleCoords(::Type{T}, coords::AbstractVector{NTuple{D, T}}) where {D, T} = 
+arrayToTuple(coord)
 
 function callGenFunc(f::F, x::T) where {F<:Function, T}
     if worldAgeSafe(F) || applicable(f, zero(T))

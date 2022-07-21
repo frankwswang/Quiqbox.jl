@@ -197,7 +197,7 @@ bfm2 = BasisFuncMix(bf5)
 @test hasEqual(bfm2, BasisFuncMix(bf5_2))
 
 errorThreshold2 = 5e-15
-bs1 = genBasisFunc.(gridCoords(GridBox(1,1.5)), Ref(GaussFunc(1.0, 0.5)))
+bs1 = genBasisFunc.(gridCoordOf(GridBox(1,1.5)), Ref(GaussFunc(1.0, 0.5)))
 nuc = ["H", "H"]
 nucCoords = [rand(3), rand(3)]
 bfm = BasisFuncMix(bs1)

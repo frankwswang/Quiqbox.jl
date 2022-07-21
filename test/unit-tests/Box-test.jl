@@ -17,7 +17,7 @@ grid = GridBox(2, 3.0)
 
 @test grid.nPoint == num
 @test grid.spacing == 3.0
-@test gridCoordOf(grid) coordOf.(grid.point) == points
+@test gridCoordOf(grid) == coordOf.(grid.point) == points
 @test map(i-> [j() for j in i], grid.point) == points
 
 gPoints = getproperty.(genSpatialPoint.(points), :param) |> flatten

@@ -14,9 +14,9 @@
 
 # Features
 
-* Floating and fixed-position Gaussian-type orbital (GTO).
-* Linear combination of GTOs with different centers as a basis function.
-* Standalone 1-electron and 2-electron integral functions.
+* Native 1-electron and 2-electron integral functions.
+* Floating and fixed-position contracted Gaussian-type orbital (CGTO).
+* Linear combination of multi-center GTOs (MCGTO) as a basis function.
 * Restricted (closed-shell) and unrestricted (open-shell) Hartree–Fock methods (RHF & UHF).
 * Variational optimization of orbital parameters based on automatic differentiation (AD).
 
@@ -54,35 +54,37 @@ julia> using Quiqbox
 
 ## Combine atomic orbitals
 ```julia
-coords = [[-0.7,0,0], [0.7,0,0]]
+points = GridBox((1,0,0), 1.4).point
 
-bsH₂ = genBasisFunc.(coords, "STO-3G") |> flatten
+bsH₂ = genBasisFunc.(points, "STO-3G") |> flatten
 ```
 
-## Build your own basis set
+## Construct a customized basis set
 ```julia
-bs = genBasisFunc.(coords, fill(GaussFunc(1, 0.75), 2))
+gf = GaussFunc(1.0, 0.75)
+
+bs = genBasisFunc.(points, Ref(gf)) .+ bsH₂
 ```
 
 ## Run the Hartree-Fock method
 ```julia
 nuc = ["H", "H"]
 
+coords = coordOf.(points)
+
 runHF(bs, nuc, coords)
 ```
 
-## Optimize a basis set
+## Optimize the basis set
 ```julia
 pars = markParams!(bs, true)
 
-optimizeParams!(pars[end-1:end], bs, nuc, coords)
+optimizeParams!(pars, bs, nuc, coords)
 ```
 
 # Documentation
 
 For more information on the package, please read the [documentation of released versions][Doc-stable]. For unreleased/experimental features, please refer to the [latest documentation][Doc-latest].
-
-To learn more about the programming language behind Quiqbox, **Julia**, [the official documentation](https://docs.julialang.org/), or [this tutorial](https://juliaacademy.com/p/intro-to-julia) is recommended.
 
 <br />
 <br />

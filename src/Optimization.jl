@@ -127,10 +127,7 @@ from the basis set.
     AbstractVector{String}
 }`: The nuclei in the studied system.
 
-`nucCoords::Union{
-    NTuple{NN, NTuple{D, T}} where {NN, D}, 
-    AbstractVector{<:AbstractVector{T}}
-} where T`: The coordinates of corresponding nuclei.
+`nucCoords::$(SpatialCoordType)`: The coordinates of corresponding nuclei.
 
 `config::POconfig`: The Configuration of selected parameter optimization method. For more 
 information please refer to [`POconfig`](@ref).
@@ -146,8 +143,7 @@ function optimizeParams!(pbs::AbstractVector{<:ParamBox{T}},
                          bs::Union{Tuple{Vararg{AbstractGTBasisFuncs{T, D}}}, 
                                    AbstractVector{<:AbstractGTBasisFuncs{T, D}}}, 
                          nuc::Union{NTuple{NN, String}, AbstractVector{String}}, 
-                         nucCoords::Union{NTuple{NN, NTuple{D, T}}, 
-                                          AbstractVector{<:AbstractVector{T}}}, 
+                         nucCoords::SpatialCoordType{T, D, NN}, 
                          config::POconfig{<:Any, M, CBT, F}=defaultPOconfig, 
                          N::Union{Int, Tuple{Int}, NTuple{2, Int}}=getCharge(nuc); 
                          printInfo::Bool=true) where {T, D, NN, M, CBT, F}

@@ -15,10 +15,6 @@ orbital) equals 2. Please refer to [`getCanOrbitals`](@ref) for the construction
 
 ≡≡≡ Field(s) ≡≡≡
 
-`energy::T`: 
-
-`occu::NTuple{2, Bool}`: Occupation number. 
-
 `energy::T`: The eigen energy corresponding to the orbital.
 
 `index::Int`: The index of the orbital within the same spin configuration.
@@ -248,16 +244,13 @@ end
 """
 
     nnRepulsions(nuc::Union{NTuple{NN, String}, AbstractVector{String}}, 
-                 nucCoords::Union{NTuple{NN, NTuple{D, T}}, 
-                                  AbstractVector{<:AbstractVector{T}}}) where {NN, D, T} -> 
+                 nucCoords::$(SpatialCoordType|>typeStrNotUnionAll)) where {NN, D, T} -> 
     T
 
 Return the nuclear repulsion energy given nuclei `nuc` and their coordinates `nucCoords`.
 """
 function nnRepulsions(nuc::Union{NTuple{NN, String}, AbstractVector{String}}, 
-                      nucCoords::Union{NTuple{NN, NTuple{D, T}}, 
-                                       AbstractVector{<:AbstractVector{T}}}) where 
-                     {NN, D, T}
+                      nucCoords::SpatialCoordType{T, D, NN}) where {NN, D, T}
     nuc = arrayToTuple(nuc)
     nucCoords = genTupleCoords(T, nucCoords)
     E = T(0)

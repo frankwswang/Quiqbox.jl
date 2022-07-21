@@ -109,3 +109,14 @@ function inSymbol(sym::Symbol, src::Symbol)
     l2 = length(srcStr)
     bl ? (l1 == l2 && symStr == srcStr) : (l1 <= l2 && symStr == srcStr[1:l1])
 end
+
+
+function typeStrNotUnionAll(::Type{T}) where {T}
+    strT = string(T)
+    rng = findlast("where", strT)
+    if rng === nothing
+        strT
+    else
+        strT[1:rng[1]-2]
+    end
+end

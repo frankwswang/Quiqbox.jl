@@ -1,6 +1,6 @@
 using Test
 using Quiqbox
-using Suppressor: @suppress_out
+using Suppressor: @suppress_out, @capture_out
 
 include("../../test/test-functions/Shared.jl")
 
@@ -209,11 +209,11 @@ for i in range
 
     bs = genBasisFunc.(nucCoords2, "3-21G") |> flatten
     local res1, res2
-    info1 = @suppress_out begin
+    info1 = @capture_out begin
         @show i
         res1 = runHF(bs, nuc2, nucCoords2, printInfo=true)
     end
-    info2 = @suppress_out begin
+    info2 = @capture_out begin
         @show i
         res2 = runHF(bs, nuc2, nucCoords2, HFconfig((HF=:UHF,)), printInfo=true)
     end

@@ -157,10 +157,7 @@ orbitals with respect to the selected basis set.
     AbstractVector{String}
 }`: The nuclei in the studied system.
 
-`nucCoords::Union{
-    NTuple{NN, NTuple{D, T}} where {NN, D}, 
-    AbstractVector{<:AbstractVector{T}}
-} where T`: The coordinates of corresponding nuclei.
+`nucCoords::$(SpatialCoordType)`: The coordinates of corresponding nuclei.
 
 `N::Union{Int, Tuple{Int}, NTuple{2, Int}}`: Total number of electrons, or the number(s) of 
 electrons with same spin configurations(s).
@@ -181,8 +178,7 @@ order of `bs` (`basis.basis`).
 gradOfHFenergy(par::AbstractVector{<:ParamBox}, b::GTBasis{T, D}, 
                C::NTuple{HFTS, AbstractMatrix{T}}, 
                nuc::Union{NTuple{NN, String}, AbstractVector{String}}, 
-               nucCoords::Union{NTuple{NN, NTuple{D, T}}, 
-                                AbstractVector{<:AbstractVector{T}}}, 
+               nucCoords::SpatialCoordType{T, D, NN}, 
                N::Union{Int, Tuple{Int}, NTuple{2, Int}}=getCharge(nuc)) where 
               {T, D, HFTS, NN} = 
 gradOfHFenergy(par, b.basis, b.S, C, nuc, nucCoords, N)
@@ -193,8 +189,7 @@ function gradOfHFenergy(par::AbstractVector{<:ParamBox{T}},
                         S::AbstractMatrix{T}, 
                         C::NTuple{HFTS, AbstractMatrix{T}}, 
                         nuc::Union{NTuple{NN, String}, AbstractVector{String}}, 
-                        nucCoords::Union{NTuple{NN, NTuple{D, T}}, 
-                                         AbstractVector{<:AbstractVector{T}}}, 
+                        nucCoords::SpatialCoordType{T, D, NN}, 
                         N::Union{Int, Tuple{Int}, NTuple{2, Int}}=getCharge(nuc)) where 
                        {BN, T, D, HFTS, NN}
     bs = arrayToTuple(bs)

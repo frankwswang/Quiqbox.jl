@@ -176,20 +176,12 @@ same way as in a general constructor of a `ParamBox`. If `roundDigits < 0` or `p
 ≡≡≡ Example(s) ≡≡≡
 
 ```jldoctest; setup = :(push!(LOAD_PATH, "../../src/"); using Quiqbox)
-julia> v1 = [1.0,2,3]
-3-element Vector{Float64}:
- 1.0
- 2.0
- 3.0
+julia> v1 = [1.0, 2.0, 3.0];
 
 julia> genSpatialPoint(v1)
 $( SpatialPoint(ParamBox.((1.0, 2.0, 3.0), SpatialParamSyms)) )
 
-julia> v2 = [fill(1.0), 2.0, 3.0]
-3-element Vector{Any}:
-  fill(1.0)
- 2.0
- 3.0
+julia> v2 = [fill(1.0), 2.0, 3.0];
 
 julia> p2 = genSpatialPoint(v2); p2[1]
 ParamBox{Float64, :X, $(FI)}(1.0)[∂][X]
@@ -210,7 +202,7 @@ genSpatialPoint.(v, Tuple([1:N;]), optArgs...) |> genSpatialPointCore
     genSpatialPoint(comp::T, index::Int) where {T<:AbstractFloat} -> ParamBox{T}
 
     genSpatialPoint(comp::Array{T, 0}, index::Int) where {T<:AbstractFloat} -> ParamBox{T}
-    
+
     genSpatialPoint(comp::T, index::Int, mapFunction::Function; canDiff::Bool=true, 
                     dataName::Symbol=:undef) where {T<:AbstractFloat} -> 
     ParamBox{T}
@@ -231,15 +223,12 @@ index.
 julia> genSpatialPoint(1.2, 1)
 ParamBox{Float64, :X, $(FI)}(1.2)[∂][X]
 
-julia> pointY1 = fill(2.0)
-0-dimensional Array{Float64, 0}:
-2.0
+julia> pointY1 = fill(2.0);
 
 julia> Y1 = genSpatialPoint(pointY1, 2)
 ParamBox{Float64, :Y, $(FI)}(2.0)[∂][Y]
 
-julia> pointY1[] = 1.5
-1.5
+julia> pointY1[] = 1.5;
 
 julia> Y1
 ParamBox{Float64, :Y, $(FI)}(1.5)[∂][Y]
@@ -481,11 +470,11 @@ BasisFuncs{Float64, 3, 1, 1, P3D{Float64, 0, 0, 0}, 2}(center, gauss, l, normali
 
 === Positional argument(s) ===
 
-`BSkey::String`: The name of an existed atomic basis set. The supported options can be 
-checked in `$(BasisSetNames)`.
+`BSkey::String`: The name of an existed atomic basis set. The supported options are in 
+`$(BasisSetNames)`.
 
 `atm::String`: The name of the atom corresponding to the chosen basis set. The supported 
-options can be checked in `$(ElementNames)`.
+options are in `$(ElementNames)`.
 
 === Keyword argument(s) ===
 
@@ -1128,7 +1117,7 @@ called using `*` syntax with the keyword argument set to it default value.
 ≡≡≡ Example(s) ≡≡≡
 
 ```jldoctest; setup = :(push!(LOAD_PATH, "../../src/"); using Quiqbox)
-julia> gf1 = GaussFunc(3,1)
+julia> gf1 = GaussFunc(3.0, 1.0)
 $( GaussFunc(3.0, 1.0) )
 
 julia> gf1 * 2
@@ -1199,17 +1188,17 @@ arguments set to their default values.
 ≡≡≡ Example(s) ≡≡≡
 
 ```jldoctest; setup = :(push!(LOAD_PATH, "../../src/"); using Quiqbox)
-julia> bf1 = genBasisFunc([1,1,1], ([2,1], [0.1, 0.2]))
-BasisFunc{0, 2}(center, gauss)[X⁰Y⁰Z⁰][1.0, 1.0, 1.0]
+julia> bf1 = genBasisFunc([1.0, 1.0, 1.0], ([2.0, 1.0], [0.1, 0.2]))
+$( genBasisFunc([1.0, 1.0, 1.0], ([2.0, 1.0], [0.1, 0.2])) )
 
 julia> bf2 = bf1 * 2
-BasisFunc{0, 2}(center, gauss)[X⁰Y⁰Z⁰][1.0, 1.0, 1.0]
+$( genBasisFunc([1.0, 1.0, 1.0], ([2.0, 1.0], [0.2, 0.4])) )
 
 julia> getindex.(getproperty.(bf2.gauss, :con))
-(0.2, 0.4)
+$( (0.2, 0.4) )
 
 julia> bf3 = bf1 * bf2
-BasisFunc{0, 3}(center, gauss)[X⁰Y⁰Z⁰][1.0, 1.0, 1.0]
+$( genBasisFunc([1.0, 1.0, 1.0], ([4.0, 3.0, 2.0], [0.02, 0.08, 0.08])) )
 ```
 """
 function mul(sgf1::BasisFunc{T, D, 𝑙1, 1, PT1}, sgf2::BasisFunc{T, D, 𝑙2, 1, PT2}; 
@@ -1599,9 +1588,8 @@ the same underlying data so changing the value of one will affect others. If the
 coordinate is included in `content`, it should be right above the subshell information for 
 the `FloatingGTBasisFuncs`. E.g.:
 ```
-    \"\"\"
-    $( genBasisFuncText(genBasisFunc([1.0, 0.0, 0.0], (2.0, 1.0))) )
-    \"\"\"
+\"\"\"
+$( genBasisFuncText(genBasisFunc([1.0, 0.0, 0.0], (2.0, 1.0))) )\"\"\"
 ```
 """
 function genBFuncsFromText(content::String; 
@@ -1614,7 +1602,6 @@ function genBFuncsFromText(content::String;
                                          SpatialPoint{T, D}, 
                                          Missing}=(NaN, NaN, NaN), 
                            unlinkCenter::Bool=false) where {D, T<:AbstractFloat}
-    
     cenIsMissing = ( (all(center.|>isNaN) && (center=missing; true)) || center isa Missing )
     typ = ifelse(cenIsMissing, Float64, T)
     adjustContent && (content = adjustFunction(content))

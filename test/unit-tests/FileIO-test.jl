@@ -1,6 +1,7 @@
 using Test
 using Quiqbox
-using Quiqbox: checkFname, advancedParse, numToSups, superscriptNum, numToSubs, subscriptNum
+using Quiqbox: checkFname, advancedParse, numToSups, superscriptNum, numToSubs, 
+               subscriptNum, SpatialCoordType, typeStrNotUnionAll
 
 @testset "FileIO.jl tests" begin
 
@@ -24,7 +25,7 @@ rm(testFname)
 @test advancedParse(BigFloat, "1.0") == BigFloat(1.0)
 
 
-# Function numToSups & numToSubs
+# function numToSups & numToSubs
 ds = [superscriptNum, subscriptNum]
 fs = [numToSups, numToSubs]
 for (d,f) in zip(ds, fs)
@@ -40,5 +41,10 @@ for (d,f) in zip(ds, fs)
     end
     @test str == f(num)
 end
+
+
+# function typeStrNotUnionAll
+strT = SpatialCoordType |> string
+@test typeStrNotUnionAll(SpatialCoordType) == strT[1:findlast('w', strT)-2]
 
 end

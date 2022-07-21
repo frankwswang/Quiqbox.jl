@@ -1,30 +1,13 @@
 # Tool Functions
 
-```@docs
-Quiqbox.checkFname
+```@autodocs
+Modules = [Quiqbox]
+Pages   = ["Tools.jl", "FileIO.jl"]
+Order   = [:function]
 ```
 
-```@docs
-hasEqual
-```
-
-```@docs
-hasIdentical
-```
-
-```@docs
-flatten
-```
-
-```@docs
-markUnique
-```
-
-```@docs
-getUnique!(arr::Array, args...; compareFunction::F = hasEqual, kws...) where
-          {F<:Function} 
-```
-
-```@docs
-Quiqbox.itself
+```@autodocs
+Modules = [Quiqbox]
+Pages   = ["Overload.jl"]
+Filter = f -> typeof(f) === typeof(Quiqbox.flatten)
 ```

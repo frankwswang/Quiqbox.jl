@@ -398,7 +398,7 @@ The container of the final values after a Hartree-Fock SCF procedure.
 
 `Eo::NTuple{HFTS, Vector{T}}`: Energies of canonical orbitals.
 
-`occu::NTuple{HFTS, NTuple{BN, String}}`: Spin occupations of canonical orbitals.
+`occu::NTuple{HFTS, NTuple{BN, String}}`: Occupations of canonical orbitals.
 
 `temp::NTuple{HFTS, HFtempVars{T, HFT}}`: the intermediate values.
 
@@ -559,10 +559,7 @@ Main function to run Hartree-Fock in Quiqbox.
     AbstractVector{String}
 }`: The nuclei in the studied system.
 
-`nucCoords::Union{
-    NTuple{NN, NTuple{D, T}} where {NN, D}, 
-    AbstractVector{<:AbstractVector{T}}
-} where T`: The coordinates of corresponding nuclei.
+`nucCoords::$(SpatialCoordType)`: The coordinates of corresponding nuclei.
 
 `config::HFconfig`: The Configuration of selected Hartree-Fock method. For more information 
 please refer to [`HFconfig`](@ref).
@@ -576,8 +573,7 @@ electrons with same spin configurations(s).
 """
 function runHF(bs::GTBasis{T1, D, BN, BT}, 
                nuc::Union{NTuple{NN, String}, AbstractVector{String}}, 
-               nucCoords::Union{NTuple{NN, NTuple{D, T1}}, 
-                                AbstractVector{<:AbstractVector{T1}}}, 
+               nucCoords::SpatialCoordType{T1, D, NN}, 
                config::HFconfig{T2, HFT}=defaultHFC, 
                N::Union{Int, Tuple{Int}, NTuple{2, Int}}=getCharge(nuc); 
                printInfo::Bool=true) where {T1, D, BN, BT, NN, HFT, T2}

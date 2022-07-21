@@ -69,3 +69,9 @@ const CGTBasisFuncs1O{T, D, BN} = CompositeGTBasisFuncs{T, D, BN, 1}
 
 const FGTBasisFuncsON{ON} = FloatingGTBasisFuncs{<:Any, <:Any, <:Any, <:Any, <:Any, ON}
 const FGTBasisFuncs1O{T, D, 𝑙, GN, PT} = FloatingGTBasisFuncs{T, D, 𝑙, GN, PT, 1}
+
+
+const SpatialCoordType{T, D, NN} = Union{ AbstractVector{NTuple{D, T}}, 
+                                          Tuple{Vararg{AbstractVector{T}}}, 
+                                          NTuple{NN, NTuple{D, T}}, 
+                                          AbstractVector{VT} where VT<:AbstractVector{T} }
