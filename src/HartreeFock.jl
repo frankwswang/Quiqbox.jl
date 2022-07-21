@@ -11,6 +11,9 @@ const HFtypes = (:RHF, :UHF)
 const defaultDS = 0.5
 const defaultDIISconfig = (12, :LBFGS)
 
+const defaultHFCStr = "HFconfig()"
+const defaultSCFconfigStr = "SCFconfig((:ADIIS, :DIIS), (5e-3, 2e-16))"
+
 
 getXcore1(S::AbstractMatrix{T}) where {T} = Hermitian(S)^(-T(0.5))
 
@@ -294,8 +297,7 @@ struct SCFconfig{T, L} <: ImmutableParameter{T, SCFconfig}
     end
 end
 
-
-const defaultSCFconfig = SCFconfig((:ADIIS, :DIIS), (5e-3, 2e-16))
+const defaultSCFconfig = Meta.parse(defaultSCFconfigStr) |> eval
 
 
 mutable struct HFinterrelatedVars{T} <: HartreeFockintermediateData{T}
@@ -527,9 +529,7 @@ HFconfig(t::NamedTuple) = genNamedTupleC(:HFconfig, defaultHFconfigPars)(t)
 HFconfig(;kws...) = 
 length(kws) == 0 ? HFconfig(defaultHFconfigPars...) : HFconfig(kws|>NamedTuple)
 
-const defaultHFC = HFconfig()
-
-const defaultHFCStr = "HFconfig()"
+const defaultHFC = Meta.parse(defaultHFCStr) |> eval
 
 
 const C0methodArgOrders = (itself=(1,), 

@@ -5,6 +5,8 @@ using LinearAlgebra: norm
 
 const OFtypes = (:HF,)
 
+const defaultPOconfigStr = "POconfig()"
+
 
 """
 
@@ -84,9 +86,7 @@ POconfig(t::NamedTuple) = genNamedTupleC(:POconfig, defaultPOconfigPars)(t)
 POconfig(;kws...) = 
 length(kws) == 0 ? POconfig(defaultPOconfigPars...) : POconfig(kws|>NamedTuple)
 
-const defaultPOconfig = POconfig()
-
-const defaultPOconfigStr = "POconfig()"
+const defaultPOconfig = Meta.parse(defaultPOconfigStr) |> eval
 
 
 function getGradE(config::POconfig{<:Any, :HF, <:ConfigBox{T, HFconfig}}, 

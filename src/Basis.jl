@@ -129,10 +129,6 @@ Convert a [`ParamBox`](@ref) to an exponent coefficient parameter.
 genContraction(pb) = ParamBox(Val(conSym), pb)
 
 
-const Doc_genSpatialPoint_Eg1 = "SpatialPoint{3, Float64, "*
-                                "Tuple{FI, FI, FI}}"*
-                                "(param)[1.0, 2.0, 3.0][∂][∂][∂]"
-
 const P1D{T, Lx} = Tuple{ParamBox{T, cxSym, FLevel{Lx}}}
 const P2D{T, Lx, Ly} = Tuple{ParamBox{T, cxSym, FLevel{Lx}}, 
                              ParamBox{T, cySym, FLevel{Ly}}}
@@ -187,7 +183,7 @@ julia> v1 = [1.0,2,3]
  3.0
 
 julia> genSpatialPoint(v1)
-$(Doc_genSpatialPoint_Eg1)
+$( SpatialPoint(ParamBox.((1.0, 2.0, 3.0), SpatialParamSyms)) )
 
 julia> v2 = [fill(1.0), 2.0, 3.0]
 3-element Vector{Any}:
@@ -1112,18 +1108,6 @@ add(::EmptyBasisFunc{T1, D}, ::EmptyBasisFunc{T2, D}) where {D, T1, T2} =
 EmptyBasisFunc{promote_type(T1, T2), D}()
 
 
-const Doc_mul_Eg1 = "GaussFunc(xpn=ParamBox{Float64, :α, $(FI)}(3.0)[∂][α], " * 
-                              "con=ParamBox{Float64, :d, $(FI)}(1.0)[∂][d])"
-
-const Doc_mul_Eg2 = "GaussFunc(xpn=ParamBox{Float64, :α, $(FI)}(3.0)[∂][α], " * 
-                              "con=ParamBox{Float64, :d, $(FI)}(2.0)[∂][d])"
-
-const Doc_mul_Eg3 = "GaussFunc(xpn=ParamBox{Float64, :α, $(FI)}(6.0)[∂][α], " * 
-                              "con=ParamBox{Float64, :d, $(FI)}(1.0)[∂][d])"
-
-const Doc_mul_Eg4 = "GaussFunc(xpn=ParamBox{Float64, :α, $(FI)}(6.0)[∂][α], " * 
-                              "con=ParamBox{Float64, :d, $(FI)}(2.0)[∂][d])"
-
 """
 
     mul(gf::GaussFunc{T}, coeff::Real; roundDigits::Int=getAtolDigits(T)) where {T} -> 
@@ -1145,16 +1129,16 @@ called using `*` syntax with the keyword argument set to it default value.
 
 ```jldoctest; setup = :(push!(LOAD_PATH, "../../src/"); using Quiqbox)
 julia> gf1 = GaussFunc(3,1)
-$(Doc_mul_Eg1)
+$( GaussFunc(3.0, 1.0) )
 
 julia> gf1 * 2
-$(Doc_mul_Eg2)
+$( GaussFunc(3.0, 2.0) )
 
 julia> gf1 * gf1
-$(Doc_mul_Eg3)
+$( GaussFunc(6.0, 1.0) )
 
 julia> gf1 * 2 * gf1
-$(Doc_mul_Eg4)
+$( GaussFunc(6.0, 2.0) )
 ```
 """
 function mul(gf::GaussFunc{T}, c::Real; roundDigits::Int=getAtolDigits(T)) where {T}
@@ -1589,9 +1573,6 @@ function joinConcentricBFuncStr(bs::Union{AbstractVector{<:FloatingGTBasisFuncs{
 end
 
 
-const Doc_genBFuncsFromText_strs = split(genBasisFuncText(genBasisFunc([1.0, 0.0, 0.0], 
-                                                                       (2.0, 1.0))), "\n")
-
 """
 
     genBFuncsFromText(content::String; adjustContent::Bool=false, 
@@ -1619,9 +1600,7 @@ coordinate is included in `content`, it should be right above the subshell infor
 the `FloatingGTBasisFuncs`. E.g.:
 ```
     \"\"\"
-    $(Doc_genBFuncsFromText_strs[1])
-    $(Doc_genBFuncsFromText_strs[2])
-    $(Doc_genBFuncsFromText_strs[3])
+    $( genBasisFuncText(genBasisFunc([1.0, 0.0, 0.0], (2.0, 1.0))) )
     \"\"\"
 ```
 """
@@ -1752,11 +1731,6 @@ paramFilter(pb::ParamBox, sym::Union{Symbol, Missing}, forDifferentiation::Bool)
 sym isa Missing || inSymbol(sym, getVar(pb, forDifferentiation))
 
 
-const Doc_copyBasis_Eg1 = "GaussFunc(xpn=ParamBox{Float64, :α, "*
-                                    "$(FI)}(9.0)[∂][α], "*
-                                    "con=ParamBox{Float64, :d, "*
-                                    "$(FI)}(2.0)[∂][d])"
-
 """
 
     copyBasis(b::GaussFunc, copyOutVal::Bool=true) -> GaussFunc
@@ -1771,15 +1745,15 @@ value(s) of the stored data will be copied, i.e., [`outValCopy`](@ref) is used t
 
 ```jldoctest; setup = :(push!(LOAD_PATH, "../../src/"); using Quiqbox)
 julia> e = genExponent(3.0, x->x^2)
-ParamBox{Float64, :α, $(FLevel(x->x^2))}(3.0)[∂][x_α]
+$( genExponent(3.0, x->x^2) )
 
 julia> c = genContraction(2.0)
-ParamBox{Float64, :d, $(FI)}(2.0)[∂][d]
+$( genContraction(2.0) )
 
 julia> gf1 = GaussFunc(e, c);
 
 julia> gf2 = copyBasis(gf1)
-$(Doc_copyBasis_Eg1)
+$( GaussFunc(9.0, 2.0) )
 
 julia> gf1.xpn() == gf2.xpn()
 true
