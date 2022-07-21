@@ -130,7 +130,7 @@ variable.
 """
 
 gradOfHFenergy(par::AbstractVector{<:ParamBox{T}}, HFres::HFfinalVars{T}) where {T} = 
-gradOfHFenergy(par, HFres.basis, HFres.C, HFres.nuc, HFres.nucCoord, HFres.N)
+gradOfHFenergy(par, HFres.basis, HFres.C, HFres.nuc, HFres.nucCoord, HFres.Ns)
 
 
 """

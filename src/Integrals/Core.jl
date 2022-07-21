@@ -798,15 +798,15 @@ getEleEleInteraction(b1::GTBasisFuncs{T, D}, b2::GTBasisFuncs{T, D},
 getCompositeInt(getEleEleInteraction, (b1, b2, b3, b4))
 
 
-function update2DarrBlock!(arr::Matrix{T1}, block::T1, I::T2, J::T2) where 
-                          {T1, T2<:UnitRange{Int}}
+function update2DarrBlock!(arr::AbstractMatrix{T1}, block::T1, 
+                           I::T2, J::T2) where {T1, T2<:UnitRange{Int}}
     arr[I, J] .= block
     arr[J, I] .= block
     nothing
 end
 
-function update2DarrBlock!(arr::Matrix{T1}, block::Matrix{T1}, I::T2, J::T2) where 
-                          {T1, T2<:UnitRange{Int}}
+function update2DarrBlock!(arr::AbstractMatrix{T1}, block::AbstractMatrix{T1}, 
+                           I::T2, J::T2) where {T1, T2<:UnitRange{Int}}
     arr[I, J] = block
     arr[J, I] = block |> transpose
     nothing

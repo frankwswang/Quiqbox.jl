@@ -3,13 +3,13 @@ using Quiqbox
 
 @testset "Tools.jl" begin
 
-points = [[-3.0, -3.0, -3.0], [ 0.0, -3.0, -3.0], [ 3.0, -3.0, -3.0], [-3.0,  0.0, -3.0], 
+points = ([-3.0, -3.0, -3.0], [ 0.0, -3.0, -3.0], [ 3.0, -3.0, -3.0], [-3.0,  0.0, -3.0], 
           [ 0.0,  0.0, -3.0], [ 3.0,  0.0, -3.0], [-3.0,  3.0, -3.0], [ 0.0,  3.0, -3.0], 
           [ 3.0,  3.0, -3.0], [-3.0, -3.0,  0.0], [ 0.0, -3.0,  0.0], [ 3.0, -3.0,  0.0], 
           [-3.0,  0.0,  0.0], [ 0.0,  0.0,  0.0], [ 3.0,  0.0,  0.0], [-3.0,  3.0,  0.0], 
           [ 0.0,  3.0,  0.0], [ 3.0,  3.0,  0.0], [-3.0, -3.0,  3.0], [ 0.0, -3.0,  3.0], 
           [ 3.0, -3.0,  3.0], [-3.0,  0.0,  3.0], [ 0.0,  0.0,  3.0], [ 3.0,  0.0,  3.0], 
-          [-3.0,  3.0,  3.0], [ 0.0,  3.0,  3.0], [ 3.0,  3.0,  3.0]]
+          [-3.0,  3.0,  3.0], [ 0.0,  3.0,  3.0], [ 3.0,  3.0,  3.0])
 num = length(points)
 grid = GridBox(2, 3.0)
 
@@ -18,13 +18,13 @@ grid = GridBox(2, 3.0)
 @test grid.nPoint == num
 @test grid.spacing == 3.0
 @test gridCoords(grid) == points
-@test map(i-> [j() for j in i], grid.box) == Tuple(points)
+@test map(i-> [j() for j in i], grid.point) == points
 
 gPoints = getproperty.(genSpatialPoint.(points), :param) |> flatten
-@test [i[] for i in gPoints] == [i() for i in gPoints] == (points |> flatten)
+@test [i[] for i in gPoints] == [i() for i in gPoints] == (points |> flatten |> collect)
 
 @test gridCoords( GridBox((1,2), 2.0, [1.0, 1.0]) ) == 
-      [[ 0.0, -1.0], [ 2.0, -1.0], [ 0.0,  1.0], [ 2.0,  1.0], [ 0.0,  3.0], [ 2.0,  3.0]]
+      ([ 0.0, -1.0], [ 2.0, -1.0], [ 0.0,  1.0], [ 2.0,  1.0], [ 0.0,  3.0], [ 2.0,  3.0])
 @test all( collect(getproperty.(GridBox((0,3), 1.0).param, :map))[isodd.(1:end)] .== 
            Quiqbox.itself )
 end

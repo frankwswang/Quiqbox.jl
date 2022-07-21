@@ -29,8 +29,8 @@ C_RHF = HFres1.C[1]
 C_H2 = hcat(H2.occuC[1], H2.unocC[1])
 
 @test C_H2 == C_RHF
-@test all(nHalf .== H2.N)
-@test H2.Ehf == Quiqbox.getEᵗ(Hc1, basis1.eeI, H2.occuC, (H2.N[1],))
+@test all(nHalf .== H2.Ns)
+@test H2.Ehf == Quiqbox.getEᵗ(Hc1, basis1.eeI, H2.occuC, (H2.Ns[1],))
 @test H2.coreHsameSpin[1] == changeHbasis(Hc1, C_RHF)
 @test isapprox.(H2.coreHsameSpin[1], get1spinHcore(C_RHF, Hc1), atol=1e-15) |> all
 @test H2.eeIsameSpin[1] == changeHbasis(basis1.eeI, C_RHF)
@@ -49,7 +49,7 @@ basis2 = GTBasis(bs2)
 Hc2 = coreH(basis2, nuc2, nucCoords2)
 HFres2 = runHF(basis2, nuc2, nucCoords2, HFconfig((HF=:UHF,)), printInfo=false)
 H2O = MatterByHF(HFres2)
-nα, nβ = H2O.N
+nα, nβ = H2O.Ns
 C_UHF1, C_UHF2 = HFres2.C
 Cα_H2O = hcat(H2O.occuC[1], H2O.unocC[1])
 Cβ_H2O = hcat(H2O.occuC[2], H2O.unocC[2])
@@ -60,7 +60,7 @@ Jαβ = [ eeInteraction(i.orbital, i.orbital, j.orbital, j.orbital)
 
 @test C_UHF1 == Cα_H2O
 @test C_UHF2 == Cβ_H2O
-@test H2O.Ehf == Quiqbox.getEᵗ(Hc2, basis2.eeI, H2O.occuC, H2O.N)
+@test H2O.Ehf == Quiqbox.getEᵗ(Hc2, basis2.eeI, H2O.occuC, H2O.Ns)
 @test H2O.coreHsameSpin == changeHbasis.(Ref(Hc2), HFres2.C)
 @test isapprox.(H2O.coreHsameSpin[1], get1spinHcore(C_UHF1, Hc2), atol=1e-12) |> all
 @test isapprox.(H2O.coreHsameSpin[2], get1spinHcore(C_UHF2, Hc2), atol=1e-12) |> all
@@ -71,7 +71,7 @@ Jαβ = [ eeInteraction(i.orbital, i.orbital, j.orbital, j.orbital)
 
 ids = 1:length(H2O.occuOrbital[1])
 Jαβ_occu = Jαβ[ids, ids]
-EαandEβ = map(H2O.N, H2O.coreHsameSpin, H2O.eeIsameSpin) do n, Hc, eeI
+EαandEβ = map(H2O.Ns, H2O.coreHsameSpin, H2O.eeIsameSpin) do n, Hc, eeI
     sum(diag(Hc)[1:n]) + 0.5*sum([(eeI[i,i,j,j] - eeI[i,j,j,i]) for j in 1:n, i in 1:n])
 end |> sum
 @test isapprox(H2O.Ehf, EαandEβ + sum([Jαβ_occu[i,j] for i=1:nα, j=1:nβ]), atol=1e-12)

@@ -12,14 +12,14 @@ getOrbitalType(::CanOrbital) = "A"
 
 """
 
-    makeMoldenFile(mol::MatterByHF{T}; roundDigits::Int=getAtolDigits(T), 
+    makeMoldenFile(mol::MatterByHF{T, 3}; roundDigits::Int=getAtolDigits(T), 
                    recordUMO::Bool=false, fileName::String = "MO") where {T} -> 
     String
 
-Write the information of input `MatterByHF` into a **Molden** file. `recordUMO` determines 
-whether to include the unoccupied canonical orbitals. `fileName` specifies the name of the 
-file, which is also the returned value. If `roundDigits < 0`, there won't be rounding for 
-recorded data.
+Write the information of `MatterByHF` into a newly created **Molden** file. `recordUMO` 
+determines whether to include the unoccupied canonical orbitals. `fileName` specifies the 
+name of the file, which is also the returned value. If `roundDigits < 0`, there won't be 
+rounding for recorded data.
 """
 function makeMoldenFile(mol::MatterByHF{T, 3}; 
                         roundDigits::Int=getAtolDigits(T), 

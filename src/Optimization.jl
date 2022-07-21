@@ -2,7 +2,6 @@ export gradDescent!, POconfig, optimizeParams!
 
 using LinearAlgebra: norm
 
-
 const OFtypes = (:HF,)
 
 const defaultPOconfigStr = "POconfig()"

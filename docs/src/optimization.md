@@ -16,7 +16,7 @@ grid = GridBox(1, 3.0)
 
 gf1 = GaussFunc(0.7,1)
 
-bs = genBasisFunc.(grid.box, Ref([gf1]))
+bs = genBasisFunc.(grid.point, Ref([gf1]))
 ```
 
 After constructing the basis set, we need to use [`markParams!`](@ref) to mark all the unique parameters that can also be optimized later:

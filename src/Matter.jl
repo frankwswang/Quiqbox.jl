@@ -1,26 +1,35 @@
-export CanOrbital, changeHbasis, MatterByHF, nnRepulsions
+export CanOrbital, getCanOrbitals, changeHbasis, MatterByHF, nnRepulsions
 
 using LinearAlgebra: norm
 using Tullio: @tullio
 
 """
 
-    CanOrbital{T, N} <: AbstractSpinOrbital{T, D}
+    CanOrbital{T, D, NN} <: AbstractSpinOrbital{T, D}
 
-`Struct` of one of a canonical (spin-)orbital set that diagonalizes the Fock matrix of the 
-Hartree-Fock state of a many-body system.
+The spatial part (orbital) of a canonical spin-orbital (the set of which diagonalizes the 
+Fock matrix of a Hartree-Fock state) with its occupation information. This means the 
+maximal occupation number for the mode corresponding to the orbital (namely a canonical 
+orbital) equals 2. Please refer to [`getCanOrbitals`](@ref) for the construction of a 
+`CanOrbital`.
 
 ≡≡≡ Field(s) ≡≡≡
 
-`energy::T`: eigen energy corresponding to the orbital.
+`energy::T`: 
 
 `occu::NTuple{2, Bool}`: Occupation number. 
 
-≡≡≡ Initialization Method(s) ≡≡≡
+`energy::T`: The eigen energy corresponding to the orbital.
 
-    CanOrbital(energy::T, occupancy::Real, orbitalCoeffs::NTuple{N, T}, 
-               spin::String="$(spinOccupations[1])", symmetry::String="A") where {N, T<:Real} -> 
-    CanOrbital{T, N}
+`index::Int`: The index of the orbital within the same spin configuration.
+
+`nuc::NTuple{NN, String}`: The nuclei in the studied system.
+
+`nucCoords::NTuple{NN, NTuple{D, T}}`: The coordinates of corresponding nuclei.
+
+`occu::NTuple{2, Array{Bool, 0}}`: The occupations of two spin configurations.
+
+`orbital::GTBasisFuncs{T, D, 1}`: The spatial orbital part.
 
 """
 struct CanOrbital{T, D, NN} <: AbstractSpinOrbital{T, D}
@@ -41,7 +50,7 @@ end
 function getCanOrbitalsCore(::Val{I}, 
                             fVars::HFfinalVars{<:Any, <:Any, <:Any, <:Any, BN}) where 
                            {I, BN}
-    OON = fVars.N[I]
+    OON = fVars.Ns[I]
     rngO = 1:OON
     rngU = (OON+1):BN
     (
@@ -60,67 +69,75 @@ function getCanOrbitalsCore(fVars::HFfinalVars{<:Any, <:Any, :UHF})
     ((a, e), (b, f)), ((c, g), (d, h))
 end
 
+"""
+
+    getCanOrbitals(fVars::HFfinalVars{T, D, <:Any, NN}) where {T, D, NN} -> 
+    CanOrbital{T, D, NN}
+
+Generate a set of canonical orbitals from the result of a Hartree-Fock approximation.
+"""
 getCanOrbitals(fVars::HFfinalVars) = getCanOrbitalsCore(fVars)[1]
 
 
 """
 
-    changeHbasis(NBodyInt::Matrix{T}, C::Matrix{T}) where {T} -> Matrix{T}
+    changeHbasis(DbodyInt::AbstractArray{T, D}, C::AbstractMatrix{T}) where {T} -> 
+    AbstractArray{T, D}
 
-    changeHbasis(NBodyInt::Array{T, D}, C::Matrix{T}) where {T} -> Array{T, 4}
-
-Change the basis of the input one-body / two-body integrals based on the orbital 
-coefficient matrix. 
+Change the basis of the input one-body / two-body integrals `DbodyInt` based on the orbital 
+coefficient matrix `C`.
 """
-function changeHbasis(oneBoadyInt::Matrix{T}, C::Matrix{T}) where {T}
-    ij = Array{T}(undef, size(C, 2), size(C, 2))
+function changeHbasis(oneBoadyInt::AbstractMatrix{T}, C::AbstractMatrix{T}) where {T}
+    ij = similar(oneBoadyInt, size(C, 2), size(C, 2))
     @tullio ij[i,j] := oneBoadyInt[a,b] * C[a,i] * C[b,j]
 end
 
-function changeHbasis(twoBoadyInt::Array{T, 4}, C::Matrix{T}) where {T}
-    ijkl = Array{T}(undef, size(C, 2), size(C, 2), size(C, 2), size(C, 2))
+function changeHbasis(twoBoadyInt::AbstractArray{T, 4}, C::AbstractMatrix{T}) where {T}
+    ijkl = similar(twoBoadyInt, size(C, 2), size(C, 2), size(C, 2), size(C, 2))
     @tullio ijkl[i,j,k,l] := twoBoadyInt[a,b,c,d] * C[a,i] * C[b,j] * C[c,k] * C[d,l]
 end
 
-function getJᵅᵝ(twoBoadyInt::Array{T, 4}, (C1, C2)::NTuple{2, Matrix{T}}) where {T}
-    iijj = Array{T}(undef, size(C1, 2), size(C2, 2))
+function getJᵅᵝ(twoBoadyInt::AbstractArray{T, 4}, 
+                (C1, C2)::NTuple{2, AbstractMatrix{T}}) where {T}
+    iijj = similar(twoBoadyInt, size(C1, 2), size(C2, 2))
     @tullio iijj[i,j] := twoBoadyInt[a,b,c,d] * C1[a,i] * C1[b,i] * C2[c,j] * C2[d,j]
 end
 
 """
 
-    changeHbasis(twoBoadyInt::Array{T, 4}, C1::Matrix{T}, C2::Matrix{T}) where {T} -> 
-    Array{T, 4}
+    changeHbasis(twoBoadyInt::AbstractArray{T, 4}, 
+                 C1::AbstractMatrix{T}, C2::AbstractMatrix{T}) where {T} -> 
+    AbstractArray{T, 4}
 
-Change the basis of the input two-body integrals based on 2 orbital coefficient 
-matrices for different spin configurations (i.e., the unrestricted case). The output is a 
-3-element `Tuple` of which the first 2 elements are the spatial integrals of each spin 
-configurations respectively, while the last element is the coulomb interaction between 
-orbitals with different spins.
+Change the basis of the input two-body integrals `twoBoadyInt` based on two orbital 
+coefficient matrices `C1` and `C2` for different spin configurations (e.g., the 
+unrestricted case). The output is a 3-element `Tuple` of which the first 2 elements are the 
+spatial integrals of each spin configurations respectively, while the last element is the 
+Coulomb interactions between orbitals with different spins.
 """
-changeHbasis(twoBoadyInt::Array{T, 4}, C::Vararg{Matrix{T}, 2}) where {T} = 
+changeHbasis(twoBoadyInt::AbstractArray{T, 4}, C::Vararg{AbstractMatrix{T}, 2}) where {T} = 
 (changeHbasis.(Ref(twoBoadyInt), C)..., getJᵅᵝ(twoBoadyInt, C))
 
 """
 
     changeHbasis(b::GTBasis{T, D}, 
                  nuc::NTuple{NN, String}, nucCoords::NTuple{NN, NTuple{D, T}}, 
-                 C::Union{Matrix{T}, NTuple{2, Matrix{T}}}) where 
+                 C::Union{AbstractMatrix{T}, NTuple{2, AbstractMatrix{T}}}) where 
                 {T, D, NN} -> 
     NTuple{2, Any}
 
-Return the one-body and two-body integrals after a change of basis based on the input `C`. 
-The type of each element in the returned `Tuple` is consistent with the case where the 
-first argument of `changeHbasis` is an `Array`.
+Return the one-body and two-body integrals after a change of basis based on the input `C`, 
+given the basis set information `b`. The type of each element in the returned `Tuple` is 
+consistent with the cases where the first argument of `changeHbasis` is an `AbstractArray`.
 """
 changeHbasis(b::GTBasis{T, D}, 
              nuc::NTuple{NN, String}, nucCoords::NTuple{NN, NTuple{D, T}}, 
-             C::Matrix{T}) where {T, D, NN} = 
+             C::AbstractMatrix{T}) where {T, D, NN} = 
 changeHbasis.((coreH(b, nuc, nucCoords), b.eeI), Ref(C))
 
 function changeHbasis(b::GTBasis{T, D}, 
                       nuc::NTuple{NN, String}, nucCoords::NTuple{NN, NTuple{D, T}}, 
-                      C::Vararg{Matrix{T}, 2}) where {T, D, NN}
+                      C::Vararg{AbstractMatrix{T}, 2}) where {T, D, NN}
     Hcs = changeHbasis.(Ref(coreH(b, nuc, nucCoords)), C)
     eeIs = changeHbasis(b.eeI, C...)
     Hcs, eeIs
@@ -128,65 +145,67 @@ end
 
 """
 
-    changeHbasis(fVars::HFfinalVars) -> NTuple{2, Any}
+    changeHbasis(HFres::HFfinalVars) -> NTuple{2, Any}
+
+Return the one-body and two-body integrals on the basis of the canonical orbitals 
+using the result of a Hartree-Fock method `HFres`.
+"""
+changeHbasis(HFres::HFfinalVars) = 
+changeHbasis(HFres.basis, HFres.nuc, HFres.nucCoord, HFres.C...)
+
 
 """
-changeHbasis(fVars::HFfinalVars) = 
-changeHbasis(fVars.basis, fVars.nuc, fVars.nucCoord, fVars.C...)
 
+    MatterByHF{T, D, NN, N, BN, HFTS} <:MatterData{T, D, N}
 
-"""
-
-    MatterByHF{T, D, NN, N, BN} <:MatterData{T, NN, N}
-
-Container for the electronic structure information of a system.
+Container of the electronic structure information of a quantum system.
 
 ≡≡≡ Field(s) ≡≡≡
 
-`nuc::NTuple{NN, String}`: Nuclei of the system.
+`Ehf::T`: Hartree-Fock energy of the electronic Hamiltonian.
 
-`nucCoord::NTuple{NN, NTuple{3,Float64}}`: Nuclei coordinates.
+`nuc::NTuple{NN, String}`: The nuclei in the studied system.
 
-`N::Int`: Total number of electrons.
+`nucCoord::NTuple{NN, NTuple{D, T}}`: The coordinates of corresponding nuclei.
 
-`orbital::Tuple{Vararg{CanOrbital}}`: canonical orbitals.
+`Enn::T`: The nuclear repulsion energy.
 
-`basis::Tuple{Vararg{CompositeGTBasisFuncs{T, D}}`: The basis set for canonical orbitals.
+`Ns::NTuple{2, Int}`: The numbers of two different spins respectively.
 
-`Ehf::Float64`: Hartree-Fock energy of the electronic Hamiltonian from the basis set.
+`occuOrbital::NTuple{HFTS, Tuple{Vararg{CanOrbital{T, D, NN}}}}`: The occupied canonical 
+orbitals.
 
-`Enn::Float64`: The nuclear repulsion energy.
+`unocOrbital::NTuple{HFTS, Tuple{Vararg{CanOrbital{T, D, NN}}}}` The unoccupied canonical 
+orbitals.
+
+`occuC::NTuple{HFTS, Matrix{T}}`: Coefficient matrix(s) of occupied canonical orbitals.
+
+`unocC::NTuple{HFTS, Matrix{T}}`: Coefficient matrix(s) of unoccupied canonical orbitals.
+
+`coreHsameSpin::NTuple{HFTS, Matrix{T}}`: Core Hamiltonian(s) (one-body integrals) of the 
+canonical orbitals with same spin configuration(s).
+
+`eeIsameSpin::NTuple{HFTS, Array{T, 4}}`: electron-electron interactions (two-body 
+integrals) of the canonical orbitals with same spin configuration(s).
+
+`eeIdiffSpin::Matrix{T}`: Coulomb interactions between canonical orbitals with different 
+spins.
+
+`basis::GTBasis{T, D, BN}`: The basis set used for the Hartree-Fock approximation.
 
 ≡≡≡ Initialization Method(s) ≡≡≡
 
-    MatterByHF(basis::Vector{<:FloatingGTBasisFuncs}, 
-             nuc::NTuple{NN, String}, 
-             nucCoords::NTuple{NN, NTuple{3,Float64}}, 
-             N::Int, Ehf::Float64, Enn::Float64, 
-             Eos::Vector{Float64}, occus::Vector{<:Real}, C::Matrix{Float64}, 
-             spins::Vector{String}, 
-             symms::Vector{String}=repeat(["A"], length(occus))) -> 
-    MatterByHF{NN, N}
+    MatterByHF(HFres::HFfinalVars{T, D, <:Any, NN, BN, HFTS}) where {T, D, NN, BN, HFTS} -> 
+    MatterByHF{T, D, NN, <:Any, BN, HFTS}
 
-`Eos` are the energies of corresponding orbital energies. `occus` are the occupation 
-numbers of the orbitals. `C` is the coefficient matrix, which does not need to be a square 
-matrix since the number of rows is the size of the (spatial) basis set whereas the number 
-of the columns represents the number of canonical orbitals. `spin` specifies the spin 
-functions of the orbitals, entries of which can be set to `"$(spinOccupations[1])"`, 
-`"$(spinOccupations[2])"`, or `"$(spinOccupations[3])"` for being double-occupied. `symms` are symmetries 
-of the orbitals where the default entry value is "A" for being antisymmetric.
-
-    MatterByHF(basis::Vector{<:FloatingGTBasisFuncs}, fVars::HFfinalVars) -> MatterByHF
-
-Construct a `MatterByHF` from a basis set, and the result from the corresponding 
-Hartree-Fock method.
+Construct a `MatterByHF` from the result of a Hartree-Fock method `HFres`.
 """
-struct MatterByHF{T, D, NN, 𝑁, BN, HFTS} <:MatterData{T, D, 𝑁}
+struct MatterByHF{T, D, NN, N, BN, HFTS} <:MatterData{T, D, N}
     Ehf::T
     nuc::NTuple{NN, String}
     nucCoord::NTuple{NN, NTuple{D, T}}
     Enn::T
-    N::NTuple{2, Int}
+    Ns::NTuple{2, Int}
     occuOrbital::NTuple{HFTS, Tuple{Vararg{CanOrbital{T, D, NN}}}}
     unocOrbital::NTuple{HFTS, Tuple{Vararg{CanOrbital{T, D, NN}}}}
     occuC::NTuple{HFTS, Matrix{T}}
@@ -200,7 +219,7 @@ struct MatterByHF{T, D, NN, 𝑁, BN, HFTS} <:MatterData{T, D, 𝑁}
                        {T, D, NN, BN, HFTS}
         nuc = fVars.nuc
         nucCoords = fVars.nucCoord
-        Ns = fVars.N
+        Ns = fVars.Ns
         basis = fVars.basis
         (osO, osU), (CO, CU) = getCanOrbitalsCore(fVars)
         ints = changeHbasis(fVars)
@@ -229,15 +248,15 @@ end
 """
 
     nnRepulsions(nuc::Union{NTuple{NN, String}, AbstractVector{String}}, 
-                 nucCoords::Union{NTuple{NN, NTuple{3, Float64}}, 
-                                  AbstractVector{<:AbstractVector{<:Real}}}) where {NN} -> 
-    Float64
+                 nucCoords::Union{NTuple{NN, NTuple{D, T}}, 
+                                  AbstractVector{<:AbstractVector{T}}}) where {NN, D, T} -> 
+    T
 
-Calculate the nuclear repulsion energy given the nuclei and their coordinates.
+Return the nuclear repulsion energy given nuclei `nuc` and their coordinates `nucCoords`.
 """
 function nnRepulsions(nuc::Union{NTuple{NN, String}, AbstractVector{String}}, 
                       nucCoords::Union{NTuple{NN, NTuple{D, T}}, 
-                                       AbstractVector{<:AbstractVector{<:T}}}) where 
+                                       AbstractVector{<:AbstractVector{T}}}) where 
                      {NN, D, T}
     nuc = arrayToTuple(nuc)
     nucCoords = genTupleCoords(T, nucCoords)

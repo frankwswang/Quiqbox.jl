@@ -384,11 +384,11 @@ The container of the final values after a Hartree-Fock SCF procedure.
 
 `Enn::T`: The nuclear repulsion energy.
 
-`N::NTuple{2, Int}`: The numbers of two different spins respectively.
+`Ns::NTuple{2, Int}`: The numbers of two different spins respectively.
 
-`nuc::Tuple{NTuple{NN, String}}`: Nuclei of the system.
+`nuc::NTuple{NN, String}`: The nuclei in the studied system.
 
-`nucCoords::Tuple{NTuple{NN, NTuple{D, T}}}`: Nuclei coordinates.
+`nucCoords::NTuple{NN, NTuple{D, T}}`: The coordinates of corresponding nuclei.
 
 `C::NTuple{HFTS, Matrix{T}}`: Coefficient matrix(s) for one spin configuration.
 
@@ -409,7 +409,7 @@ The container of the final values after a Hartree-Fock SCF procedure.
 struct HFfinalVars{T, D, HFT, NN, BN, HFTS} <: HartreeFockFinalValue{T, HFT}
     Ehf::T
     Enn::T
-    N::NTuple{2, Int}
+    Ns::NTuple{2, Int}
     nuc::NTuple{NN, String}
     nucCoord::NTuple{NN, NTuple{D, T}}
     C::NTuple{HFTS, Matrix{T}}

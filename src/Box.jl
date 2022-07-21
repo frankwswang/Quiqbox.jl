@@ -23,49 +23,50 @@ makeGridFuncs(_, f::itselfT) = itself
 
 """
 
-    GridBox{T, D, NP}
+    GridBox{T, D, NP, GPT<:SpatialPoint{T, D}} <: SpatialStructure{T, D}
 
-A `struct` that stores coordinates of grid points in terms of both `AbstractVector`s and 
-`ParamBox`s.
+A container of multiple `D`-dimensional grid points.
 
 ≡≡≡ Field(s) ≡≡≡
 
-`num::Int`: Total number of the grid points.
+`spacing::T`: The distance between adjacent grid points, a.k.a the edge length of each grid.
 
-`spacing::Float64`: The length between adjacent grid points.
+`nPoint::Int`: Total number of the grid points.
 
-`box::NTuple{NP, NTuple{3, ParamBox}}`: The coordinates of grid points.
+`point::NTuple{NP, GPT}`: The grid points represented by [`SpatialPoint`](@ref).
 
-`coord::Array{AbstractVector{Float64}, 1}`: The coordinates of grid points in terms of `AbstractVector`s.
+`param::Tuple{Vararg{ParamBox{T}}}`: All the parameters in the `GridBox`.
 
 ≡≡≡ Initialization Method(s) ≡≡≡
 
-    GridBox(nGrids::NTuple{3, Int}, spacing::Real=10, 
-            center::Array{<:Real, 1}=[0.0,0.0,0.0];
-            canDiff::Bool=true, index::Int=0) -> GridBox
+    GridBox(nGrids::NTuple{D, Int}, spacing::Union{T, Array{T, 0}}, 
+            center::Union{AbstractVector{T}, NTuple{D, T}}=ntuple(_->T(0),Val(D)); 
+            canDiff::Bool=true, index::Int=0) where {T<:AbstractFloat, D} -> 
+    GridBox{T, D}
 
-Construct a general `GridBox` that doesn't have to shape as a cube. `nGrid` is a 3-element 
-`Tuple` that specifies the number of grids (number of grid points - 1) along 3 dimensions. 
-`spacing` specifies the length between adjacent grid points. `center` specifies the 
-geometry center coordinate of the box. `canDiff` determines whether the `ParamBox` should 
-be marked as differentiable. `index` defines the index number for the actual parameter: 
-spacing `L`, with the default value 0 it would be `L₀`.
+Construct a general `D`-dimensional `GridBox`.
 
-    GridBox(nGridPerEdge::Int, spacing::Real=10, 
-            center::Array{<:Real, 1}=[0.0,0.0,0.0]; 
-            canDiff::Bool=true, index::Int=0) -> GridBox
+=== Positional argument(s) ===
 
-Method of generating a cubic `GridBox`. `nGridPerEdge` specifies the number of grids 
-(number of grid points - 1) along each dimension.`spacing` specifies the length between 
-adjacent grid points. `center` specifies the geometry center coordinate of the box. 
-`canDiff` determines whether the `ParamBox` should be marked as differentiable. `index` 
-defines the index number for the actual parameter: spacing `L`, with the default value 0 
-it would be `L₀`.
+`nGrids::NTuple{D, Int}`: The numbers of grids along each dimension.
+
+`spacing::Union{T, Array{T, 0}}`: The edge length of each grid.
+
+`center::Union{AbstractVector{T}, NTuple{D, T}}`: The coordinate of the geometric center of 
+the grid box.
+
+=== Keyword argument(s) ===
+
+`canDiff`: If all the `ParamBox`es stored in the constructed `GridBox` will be marked as 
+differentiable.
+
+`index`: The Index that will be assigned to the shared input variable 
+`$(ParamList[:spacing])` of all the stored `ParamBox`es.
 """
 struct GridBox{T, D, NP, GPT<:SpatialPoint{T, D}} <: SpatialStructure{T, D}
-    nPoint::Int
     spacing::T
-    box::NTuple{NP, GPT}
+    nPoint::Int
+    point::NTuple{NP, GPT}
     param::Tuple{Vararg{ParamBox{T}}}
 
     function GridBox(nGrids::NTuple{D, Int}, spacing::Union{T, Array{T, 0}}, 
@@ -77,21 +78,32 @@ struct GridBox{T, D, NP, GPT<:SpatialPoint{T, D}} <: SpatialStructure{T, D}
         iVsym = ParamList[:spacing]
         oVsym = SpatialParamSyms[1:D]
         data = ifelse(spacing isa AbstractFloat, fill(spacing), spacing)
-        box = Array{SpatialPoint{T, D}}(undef, NP)
+        point = Array{SpatialPoint{T, D}}(undef, NP)
         param = Array{ParamBox{T}}(undef, D*NP)
         funcs = makeGridFuncsCore.(nGrids)
         for (n, i) in enumerate( CartesianIndices(nGrids .+ 1) )
             fs = makeGridFuncs.(center, [funcs[j][k] for (j, k) in enumerate(i|>Tuple)])
             p = ParamBox.(Ref(data), oVsym, fs, iVsym; canDiff, index) |> Tuple
-            box[n] = SpatialPoint(p)
+            point[n] = SpatialPoint(p)
             param[D*(n-1)+1 : D*n] .= p
         end
-        box = Tuple(box)
-        new{T, D, NP, eltype(box)}(NP, spacing, box, Tuple(param))
+        point = Tuple(point)
+        new{T, D, NP, eltype(point)}(spacing, NP, point, Tuple(param))
     end
 end
 
-GridBox(nGridPerEdge::Int, spacing::T=T(1), 
+"""
+
+    GridBox(nGridPerEdge::Int, spacing::T, 
+            center::Union{AbstractVector{T}, NTuple{D, T}}=ntuple(_->T(0), 3); 
+            canDiff::Bool=true, index::Int=0) where {T<:AbstractFloat, D} -> 
+    GridBox{T, D}
+
+The method of generating a cubic `GridBox`. Aside from the common arguments, `nGridPerEdge` 
+specifies the number of grids for every dimension. The dimension of the grid box is 
+determined by the dimension of `center`.
+"""
+GridBox(nGridPerEdge::Int, spacing::T, 
         center::Union{AbstractVector{T}, NTuple{D, T}}=ntuple(_->T(0), 3); 
         canDiff::Bool=true, index::Int=0) where {T<:AbstractFloat, D} = 
 GridBox(ntuple(_->nGridPerEdge, length(center)), spacing, center; canDiff, index)
@@ -99,8 +111,8 @@ GridBox(ntuple(_->nGridPerEdge, length(center)), spacing, center; canDiff, index
 
 """
 
-    gridCoords(gb::GridBox) -> Array{AbstractVector{Float64}, 1}
+    gridCoords(gb::GridBox{T}) where {T} -> Tuple{Vararg{Vector{T}}}
 
-Return the grid-point coordinates in `AbstractVector`s given the `GriBox`.
+Return the coordinates of the grid points stored in `gb`.
 """
-gridCoords(gb::GridBox) = [outValOf.(i) |> collect for i in gb.box]
+gridCoords(gb::GridBox) = coordOf.(gb.point)

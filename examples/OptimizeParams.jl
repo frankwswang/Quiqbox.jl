@@ -8,7 +8,7 @@ grid = GridBox(1, 3.0)
 
 gf1 = GaussFunc(0.7,1)
 
-bs = genBasisFunc.(grid.box, Ref([gf1]))
+bs = genBasisFunc.(grid.point, Ref([gf1]))
 
 pars = markParams!(bs, true)
 
