@@ -1,4 +1,4 @@
-export gridBoxCoords, GridBox, gridCoords
+export gridBoxCoords, GridBox, gridCoordOf
 
 function makeGridFuncsCore(nG::Int)
     res = Array{Function}(undef, nG+1)
@@ -19,7 +19,10 @@ function makeGridFuncsCore(nG::Int)
 end
 
 makeGridFuncs(c, f::F) where {F<:Function} = Sf(c, f)
-makeGridFuncs(_, f::itselfT) = itself
+makeGridFuncs(_, ::itselfT) = itself
+
+makeGridPBoxData(cenCompData::Array{T, 0}, spacingData::Array{T, 0}, nG::Int) where {T} = 
+ifelse(nG>0, spacingData, cenCompData)
 
 """
 
@@ -77,13 +80,14 @@ struct GridBox{T, D, NP, GPT<:SpatialPoint{T, D}} <: SpatialStructure{T, D}
         NP = prod(nGrids .+ 1)
         iVsym = ParamList[:spacing]
         oVsym = SpatialParamSyms[1:D]
-        data = ifelse(spacing isa AbstractFloat, fill(spacing), spacing)
         point = Array{SpatialPoint{T, D}}(undef, NP)
         param = Array{ParamBox{T}}(undef, D*NP)
         funcs = makeGridFuncsCore.(nGrids)
+        spcData = ifelse(spacing isa AbstractFloat, fill(spacing), spacing)
+        data = makeGridPBoxData.(fill.(center), Ref(spcData), nGrids)
         for (n, i) in enumerate( CartesianIndices(nGrids .+ 1) )
             fs = makeGridFuncs.(center, [funcs[j][k] for (j, k) in enumerate(i|>Tuple)])
-            p = ParamBox.(Ref(data), oVsym, fs, iVsym; canDiff, index) |> Tuple
+            p = ParamBox.(data, oVsym, fs, iVsym; canDiff, index) |> Tuple
             point[n] = SpatialPoint(p)
             param[D*(n-1)+1 : D*n] .= p
         end
@@ -111,8 +115,8 @@ GridBox(ntuple(_->nGridPerEdge, length(center)), spacing, center; canDiff, index
 
 """
 
-    gridCoords(gb::GridBox{T}) where {T} -> Tuple{Vararg{Vector{T}}}
+    gridCoordOf(gb::GridBox{T}) where {T} -> Tuple{Vararg{Vector{T}}}
 
 Return the coordinates of the grid points stored in `gb`.
 """
-gridCoords(gb::GridBox) = coordOf.(gb.point)
+gridCoordOf(gb::GridBox) = coordOf.(gb.point)
