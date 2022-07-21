@@ -28,6 +28,8 @@ function gradDescent!(vars::AbstractVector{T}, grad::AbstractVector{T}, η::T=T(
 end
 
 
+const defaultPOconfigPars = Any[Val(:HF), defaultHFC, NaN, 1e-5, 500, gradDescent!]
+
 """
 
     POconfig{T, M, CBT<:ConfigBox, F<:Function} <: ConfigBox{T, POconfig, M}
@@ -55,9 +57,13 @@ detection.
 
 ≡≡≡ Initialization Method(s) ≡≡≡
 
-    POconfig(;kws...) -> POconfig
-
-The available `kws` and allowed data types are consistent with the fields of `POconfig`.
+    POconfig(;method=$(defaultPOconfigPars[1]), 
+              config=$(defaultHFCStr), 
+              target=$(defaultPOconfigPars[3]), 
+              error=$(defaultPOconfigPars[4]), 
+              maxStep=$(defaultPOconfigPars[5]), 
+              GD=$(defaultPOconfigPars[6])) -> 
+    POconfig
 
 ≡≡≡ Example(s) ≡≡≡
 
@@ -77,8 +83,6 @@ mutable struct POconfig{T, M, CBT<:ConfigBox, F<:Function} <: ConfigBox{T, POcon
 end
 
 POconfig(a1::Symbol, args...) = POconfig(Val(a1), args...)
-
-const defaultPOconfigPars = Any[Val(:HF), defaultHFC, NaN, 1e-5, 500, gradDescent!]
 
 POconfig(t::NamedTuple) = genNamedTupleC(:POconfig, defaultPOconfigPars)(t)
 

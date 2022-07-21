@@ -481,9 +481,9 @@ when its performance becomes unstable or poor.
     HFconfig(;HF::Symbol=:$(defaultHFconfigPars[1]), 
               C0::Union{Tuple{AbstractMatrix}, 
                         NTuple{2, AbstractMatrix}, Symbol}=:$(defaultHFconfigPars[2]), 
-              SCF::SCFconfig=:$(defaultHFconfigPars[3]), 
-              maxStep::Int=:$(defaultHFconfigPars[4]), 
-              earlyStop::Bool=:$(defaultHFconfigPars[5])) -> 
+              SCF::SCFconfig=$(defaultHFconfigPars[3]), 
+              maxStep::Int=$(defaultHFconfigPars[4]), 
+              earlyStop::Bool=$(defaultHFconfigPars[5])) -> 
     HFconfig
 
 ≡≡≡ Example(s) ≡≡≡
