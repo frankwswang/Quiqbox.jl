@@ -12,7 +12,7 @@ const defaultDS = 0.5
 const defaultDIISconfig = (12, :LBFGS)
 
 
-getXcore1(S::AbstractMatrix{T}) where {T} = Hermitian(S)^(-T(0.5)) |> Array
+getXcore1(S::AbstractMatrix{T}) where {T} = Hermitian(S)^(-T(0.5))
 
 precompile(getXcore1, (Matrix{Float64},))
 
@@ -42,11 +42,15 @@ splitSpins(::Val{1}, N::Int) = (N÷2,)
 
 splitSpins(::Val{2}, N::Int) = (N÷2, N-N÷2)
 
-splitSpins(::Val{:RHF}, N::Int) = splitSpins(Val(1), N)
+splitSpins(::Val{N}, Ns::NTuple{N, Int}) where {N} = itself(Ns)
 
-splitSpins(::Val{:UHF}, N::Int) = splitSpins(Val(2), N)
+splitSpins(::Val{2}, (Nˢ,)::Tuple{Int}) = (Nˢ, Nˢ)
 
-splitSpins(::Val, Ns::Tuple) = itself(Ns)
+splitSpins(::Val{1}, Ns::NTuple{2, Int}) = (sum(Ns)÷2,)
+
+splitSpins(::Val{:RHF}, N) = splitSpins(Val(1), N)
+
+splitSpins(::Val{:UHF}, N) = splitSpins(Val(2), N)
 
 groupSpins(::Val{1}, (Nˢ,)::Tuple{Int}) = (Nˢ, Nˢ)
 
@@ -94,7 +98,7 @@ end
 
 
 function getCfromSAD(::Val{HFT}, S::AbstractMatrix{T}, 
-                     Hcore::AbstractMatrix{T}, HeeI::Array{T, 4},
+                     Hcore::AbstractMatrix{T}, HeeI::AbstractArray{T, 4},
                      bs::NTuple{BN, AbstractGTBasisFuncs{T, D}}, 
                      nuc::NTuple{NN, String}, nucCoords::NTuple{NN, NTuple{D, T}}, 
                      X::AbstractMatrix{T}, 
@@ -133,21 +137,21 @@ getD(Cˢ::AbstractMatrix{T}, Nˢ::Int) where {T} = @views (Cˢ[:,1:Nˢ]*Cˢ[:,1:
         getD(getC(X, Fˢ), Nˢ)
 
 
-function getGcore(HeeI::Array{T, 4}, DJ::AbstractMatrix{T}, DK::AbstractMatrix{T}) where {T}
+function getGcore(HeeI::AbstractArray{T, 4}, DJ::AbstractMatrix{T}, DK::AbstractMatrix{T}) where {T}
     G = zero(DJ)
     l = size(G)[1]
     for ν = 1:l, μ = 1:l # fastest
         G[μ, ν] = dot(transpose(DJ), @view HeeI[μ,ν,:,:]) - dot(DK, @view HeeI[μ,:,:,ν]) 
     end
-    G |> Hermitian |> Array
+    G |> Hermitian
 end
 
 # RHF
-@inline getG(HeeI::Array{T, 4}, (Dˢ,)::Tuple{AbstractMatrix{T}}) where {T} = 
+@inline getG(HeeI::AbstractArray{T, 4}, (Dˢ,)::Tuple{AbstractMatrix{T}}) where {T} = 
         ( getGcore(HeeI, 2Dˢ, Dˢ), )
 
 # UHF
-@inline getG(HeeI::Array{T, 4}, (Dᵅ, Dᵝ)::NTuple{2, AbstractMatrix{T}}) where {T} = 
+@inline getG(HeeI::AbstractArray{T, 4}, (Dᵅ, Dᵝ)::NTuple{2, AbstractMatrix{T}}) where {T} = 
         ( getGcore(HeeI, Dᵅ+Dᵝ, Dᵅ), getGcore(HeeI, Dᵅ+Dᵝ, Dᵝ) )
 
 
@@ -155,7 +159,7 @@ end
             {T, HFTS} = 
         Ref(Hcore) .+ G
 
-@inline getF(Hcore::AbstractMatrix{T}, HeeI::Array{T, 4}, 
+@inline getF(Hcore::AbstractMatrix{T}, HeeI::AbstractArray{T, 4}, 
              D::NTuple{HFTS, AbstractMatrix{T}}) where {T, HFTS} = 
         getF(Hcore, getG(HeeI, D))
 
@@ -175,7 +179,7 @@ getEᵗcore(Hcore::AbstractMatrix{T},
 get2SpinQuantity(getE.(Ref(Hcore), Fˢ, Dˢ))
 
 # RHF or UHF
-function getEᵗ(Hcore::AbstractMatrix{T}, HeeI::Array{T, 4}, 
+function getEᵗ(Hcore::AbstractMatrix{T}, HeeI::AbstractArray{T, 4}, 
                C::NTuple{HFTS, AbstractMatrix{T}}, N::NTuple{HFTS, Int}) where {T, HFTS}
     D = getD.(C, N)
     F = getF(Hcore, HeeI, D)
@@ -183,7 +187,7 @@ function getEᵗ(Hcore::AbstractMatrix{T}, HeeI::Array{T, 4},
 end
 
 
-function getCDFE(Hcore::AbstractMatrix{T}, HeeI::Array{T, 4}, X::AbstractMatrix{T}, 
+function getCDFE(Hcore::AbstractMatrix{T}, HeeI::AbstractArray{T, 4}, X::AbstractMatrix{T}, 
                  N::NTuple{HFTS, Int}, F::NTuple{HFTS, AbstractMatrix{T}}) where {T, HFTS}
     Cnew = getC.(Ref(X), F)
     Dnew = getD.(Cnew, N)
@@ -195,7 +199,7 @@ function getCDFE(Hcore::AbstractMatrix{T}, HeeI::Array{T, 4}, X::AbstractMatrix{
 end
 
 
-function initializeSCF(::Val{HFT}, Hcore::AbstractMatrix{T}, HeeI::Array{T, 4}, 
+function initializeSCF(::Val{HFT}, Hcore::AbstractMatrix{T}, HeeI::AbstractArray{T, 4}, 
                        C::NTuple{HFTS, AbstractMatrix{T}}, N::NTuple{HFTS, Int}) where 
                       {HFT, T, HFTS}
     D = getD.(C, N)
@@ -445,6 +449,7 @@ struct InitialC{T<:Number, HFT, F<:Function}
     new{T, :UHF, itselfT}(C0, itself)
 end
 
+const defaultHFconfigPars = [:RHF, :SAD, defaultSCFconfig, 100, true]
 
 """
 
@@ -471,9 +476,13 @@ when its performance becomes unstable or poor.
 
 ≡≡≡ Initialization Method(s) ≡≡≡
 
-    HFconfig(;kws...) -> HFconfig
-
-    HFconfig(t::NamedTuple) -> HFconfig
+    HFconfig(;HF::Symbol=:$(defaultHFconfigPars[1]), 
+              C0::Union{Tuple{AbstractMatrix}, 
+                        NTuple{2, AbstractMatrix}, Symbol}=:$(defaultHFconfigPars[2]), 
+              SCF::SCFconfig=:$(defaultHFconfigPars[3]), 
+              maxStep::Int=:$(defaultHFconfigPars[4]), 
+              earlyStop::Bool=:$(defaultHFconfigPars[5])) -> 
+    HFconfig
 
 ≡≡≡ Example(s) ≡≡≡
 
@@ -496,8 +505,9 @@ mutable struct HFconfig{T1, HFT, F, T2, L} <: ConfigBox{T1, HFconfig, HFT}
     new{T1, :UHF, itselfT, T2, L}(Val(:UHF), InitialC(Val(:UHF), a2), a3, a4, a5)
 
     HFconfig(::Val{:RHF}, 
-             a2::AbstractMatrix{T1}, a3::SCFconfig{T2, L}, a4, a5) where {T1, T2, L} = 
-    new{T1, :RHF, itselfT, T2, L}(Val(:RHF), InitialC(Val(:RHF), (a2,)), a3, a4, a5)
+             a2::Tuple{AbstractMatrix{T1}}, a3::SCFconfig{T2, L}, a4, a5) where 
+            {T1, T2, L} = 
+    new{T1, :RHF, itselfT, T2, L}(Val(:RHF), InitialC(Val(:RHF), a2), a3, a4, a5)
 
     function HFconfig(::Val{HFT}, a2::Val{CF}, a3::SCFconfig{T, L}, a4, a5) where 
                      {T, HFT, CF, L}
@@ -511,8 +521,6 @@ HFconfig(a1::Symbol, a2, args...) = HFconfig(Val(a1), a2, args...)
 HFconfig(a1, a2::Symbol, args...) = HFconfig(a1, Val(a2), args...)
 
 HFconfig(a1::Symbol, a2::Symbol, args...) = HFconfig(Val(a1), Val(a2), args...)
-
-const defaultHFconfigPars = Any[Val(:RHF), Val(:SAD), defaultSCFconfig, 100, true]
 
 HFconfig(t::NamedTuple) = genNamedTupleC(:HFconfig, defaultHFconfigPars)(t)
 
@@ -547,19 +555,20 @@ Main function to run Hartree-Fock in Quiqbox.
 } where {T, D}`: The basis set used for the Hartree-Fock approximation.
 
 `nuc::Union{
-    NTuple{<:Any, String}, 
+    NTuple{NN, String} where NN, 
     AbstractVector{String}
 }`: The nuclei in the studied system.
 
 `nucCoords::Union{
-    NTuple{<:Any, NTuple{D, T1}}, 
-    AbstractVector{<:AbstractVector{T1}}
-}`: The coordinates of corresponding nuclei.
+    NTuple{NN, NTuple{D, T}} where {NN, D}, 
+    AbstractVector{<:AbstractVector{T}}
+} where T`: The coordinates of corresponding nuclei.
 
 `config::HFconfig`: The Configuration of selected Hartree-Fock method. For more information 
 please refer to [`HFconfig`](@ref).
 
-`N::Int`: Total number of electrons.
+`N::Union{Int, Tuple{Int}, NTuple{2, Int}}`: Total number of electrons, or the number(s) of 
+electrons with same spin configurations(s).
 
 ≡≡≡ Keyword argument(s) ≡≡≡
 
@@ -570,11 +579,11 @@ function runHF(bs::GTBasis{T1, D, BN, BT},
                nucCoords::Union{NTuple{NN, NTuple{D, T1}}, 
                                 AbstractVector{<:AbstractVector{T1}}}, 
                config::HFconfig{T2, HFT}=defaultHFC, 
-               N::Int=getCharge(nuc); 
+               N::Union{Int, Tuple{Int}, NTuple{2, Int}}=getCharge(nuc); 
                printInfo::Bool=true) where {T1, D, BN, BT, NN, HFT, T2}
     nuc = arrayToTuple(nuc)
     nucCoords = genTupleCoords(T1, nucCoords)
-    leastNb = ceil(N/2) |> Int
+    leastNb = ceil(sum(N)/2) |> Int
     @assert BN >= leastNb "The number of basis functions should be no less than $(leastNb)."
     @assert N > (HFT==:RHF) "$(HFT) requires more than $(HFT==:RHF) electrons."
     Ns = splitSpins(Val(HFT), N)
@@ -622,19 +631,19 @@ $(string(HFtypes)[2:end-1]).
 
 `scfConfig::SCFconfig`: The SCF iteration configuration.
 
-`N::Union{NTuple{2, Int}, Int}`: The numbers of electrons with same spin configurations. 
+`N::NTuple{HFTS, Int} where HFTS`: The numbers of electrons with same spin configurations. 
 
-`Hcore::Matrix{T}`: The core Hamiltonian of the electronic Hamiltonian.
+`Hcore::AbstractMatrix{T} where T`: The core Hamiltonian of the electronic Hamiltonian.
 
-`HeeI::Array{T, 4}`: The electron-electron interaction tensor (in chemists' notation) which 
-includes both the Coulomb interactions and the Exchange Correlations.
+`HeeI::AbstractArray{T, 4} where T`: The electron-electron interaction tensor (in chemists' 
+notation) which includes both the Coulomb interactions and the Exchange Correlations.
 
-`S::Matrix{T}`: The overlap matrix of the used basis set.
+`S::AbstractMatrix{T} where T`: The overlap matrix of the used basis set.
 
-`X::Matrix{T}`: The transformation matrix of `S`. Default value is `S^(-0.5)`.
+`X::AbstractMatrix{T} where T`: The transformation matrix of `S`.
 
-`C0::Union{Matrix{T}, NTuple{2, Matrix{T}}}`: Initial guess of the coefficient matrix(s) of 
-the canonical spin-orbitals.
+`C0::NTuple{HFTS, AbstractMatrix{T}} where {HFTS, T}`: Initial guess of the coefficient 
+matrix(s) of the canonical spin-orbitals.
 
 `printInfo::Bool`: Whether print out the information of iteration steps and result.
 
@@ -647,7 +656,7 @@ function runHFcore(::Val{HFT},
                    scfConfig::SCFconfig{T1, L}, 
                    N::NTuple{HFTS, Int}, 
                    Hcore::AbstractMatrix{T2}, 
-                   HeeI::Array{T2, 4}, 
+                   HeeI::AbstractArray{T2, 4}, 
                    S::AbstractMatrix{T2}, 
                    X::AbstractMatrix{T2}, 
                    C0::NTuple{HFTS, AbstractMatrix{T2}}, 
@@ -799,7 +808,7 @@ const SCFmethodSelector =
 
 
 function HFcore(m::Symbol, N::NTuple{HFTS, Int}, 
-                Hcore::AbstractMatrix{T}, HeeI::Array{T, 4}, 
+                Hcore::AbstractMatrix{T}, HeeI::AbstractArray{T, 4}, 
                 S::AbstractMatrix{T}, X::AbstractMatrix{T}, 
                 rVars::NTuple{HFTS, HFtempVars{T, HFT}}; 
                 kws...) where {HFTS, T, HFT}

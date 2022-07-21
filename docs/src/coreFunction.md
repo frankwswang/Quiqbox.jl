@@ -185,10 +185,6 @@ optimizeParams!
 ```
 
 ```@docs
-updateParams!
-```
-
-```@docs
 gradDescent!
 ```
 

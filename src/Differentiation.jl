@@ -1,4 +1,4 @@
-export gradHFenergy
+export gradOfHFenergy
 
 using LinearAlgebra: eigen, Symmetric
 using ForwardDiff: derivative as ForwardDerivative
@@ -100,35 +100,107 @@ function derivativeCore(FoutputIsVector::Val{B},
 end
 
 
-function ∂HFenergy(par::ParamBox, 
+function ∂HFenergy(par::ParamBox{T}, 
                    bs::NTuple{BN, GTBasisFuncs{T, D, 1}}, 
                    S::AbstractMatrix{T}, 
                    C::NTuple{HFTS, AbstractMatrix{T}}, 
                    nuc::NTuple{NN, String}, 
-                   nucCoords::NTuple{NN, NTuple{3, T}}, 
-                   nElectron::NTuple{HFTS, Int}) where {BN, T, D, HFTS, NN}
+                   nucCoords::NTuple{NN, NTuple{D, T}}, 
+                   N::NTuple{HFTS, Int}) where {BN, T, D, HFTS, NN}
     Xinv = sqrt(S)
     cH = (i, j)->getCoreH(i, j, nuc, nucCoords)
     ∂hij, ∂hijkl = derivativeCore(Val(false), bs, par, S, 
                                   TypedFunction(cH), TypedFunction(getEleEleInteraction))
-    getEᵗ(∂hij, ∂hijkl, Ref(Xinv).*C, nElectron)
+    getEᵗ(∂hij, ∂hijkl, Ref(Xinv).*C, N)
 end
 
 
-function gradHFenergy(par::AbstractVector{<:ParamBox{T}}, 
-                      bs::Union{NTuple{BN, GTBasisFuncs{T, D, 1}}, 
-                                AbstractVector{<:GTBasisFuncs{T, D, 1}}}, 
-                      S::AbstractMatrix{T}, 
-                      C::NTuple{HFTS, AbstractMatrix{T}}, 
-                      nuc::Union{NTuple{NN, String}, AbstractVector{String}}, 
-                      nucCoords::Union{NTuple{NN, NTuple{3, T}}, 
-                                       AbstractVector{<:AbstractArray{T}}}, 
-                      nElectron::Union{Int, NTuple{2, Int}}=getCharge(nuc)) where 
-                     {BN, T, D, HFTS, NN}
+"""
+
+    gradOfHFenergy(par::AbstractVector{<:ParamBox{T}}, HFres::HFfinalVars{T}) where {T} -> 
+    AbstractVector{T}
+
+Given a Hartree-Fock approximation result `HFres`, return the gradient of the Hartree-Fock 
+energy with respect to a collection of parameters `par`. Specifically, for any 
+[`ParamBox`](@ref) in `par`, unlike other cases where the it is always the output variable 
+that is represented by the `ParamBox`, here the corresponding independent variable is 
+represented by the `ParamBox`, so when the `ParamBox` is marked as differentiable (i.e., 
+[`isDiffParam`](@ref) returns `true`), the variable it represents switches to its input 
+variable.
+"""
+
+gradOfHFenergy(par::AbstractVector{<:ParamBox{T}}, HFres::HFfinalVars{T}) where {T} = 
+gradOfHFenergy(par, HFres.basis, HFres.C, HFres.nuc, HFres.nucCoord, HFres.N)
+
+
+"""
+
+    gradOfHFenergy(par, basis, C, nuc, nucCoords, N=getCharge(nuc)) ->
+    AbstractVector
+
+    gradOfHFenergy(par, bs, S, C, nuc, nucCoords, N=getCharge(nuc)) ->
+    AbstractVector
+
+Two methods of `gradOfHFenergy`.
+
+≡≡≡ Positional argument(s) ≡≡≡
+
+`par::AbstractVector{<:ParamBox}`: The parameters for differentiation.
+
+`basis::`[`GTBasis`](@ref)`{T, D} where {T, D}`: Basis set information.
+
+`C::NTuple{<:Any, AbstractMatrix{T}} where T`: The coefficient matrix(s) of the canonical 
+orbitals with respect to the selected basis set.
+
+`nuc::Union{
+    NTuple{NN, String} where NN, 
+    AbstractVector{String}
+}`: The nuclei in the studied system.
+
+`nucCoords::Union{
+    NTuple{NN, NTuple{D, T}} where {NN, D}, 
+    AbstractVector{<:AbstractVector{T}}
+} where T`: The coordinates of corresponding nuclei.
+
+`N::Union{Int, Tuple{Int}, NTuple{2, Int}}`: Total number of electrons, or the number(s) of 
+electrons with same spin configurations(s).
+
+`bs::Union{
+    NTuple{BN, GTBasisFuncs{T, D, 1}}, 
+    AbstractVector{<:GTBasisFuncs{T, D, 1}}
+} where {T, D}`: A collection of basis functions.
+
+`S::AbstractMatrix{T} where T`: The overlap lap of the basis set when `bs` is provided as 
+the second argument.
+
+**NOTE 1:** If any of these two methods is applied, the user needs to make sure the row 
+orders as well as the colum orders of `C` and (or) `S` are consistent with the element 
+order of `bs` (`basis.basis`).
+``
+"""
+gradOfHFenergy(par::AbstractVector{<:ParamBox}, b::GTBasis{T, D}, 
+               C::NTuple{HFTS, AbstractMatrix{T}}, 
+               nuc::Union{NTuple{NN, String}, AbstractVector{String}}, 
+               nucCoords::Union{NTuple{NN, NTuple{D, T}}, 
+                                AbstractVector{<:AbstractVector{T}}}, 
+               N::Union{Int, Tuple{Int}, NTuple{2, Int}}=getCharge(nuc)) where 
+              {T, D, HFTS, NN} = 
+gradOfHFenergy(par, b.basis, b.S, C, nuc, nucCoords, N)
+
+function gradOfHFenergy(par::AbstractVector{<:ParamBox{T}}, 
+                        bs::Union{NTuple{BN, GTBasisFuncs{T, D, 1}}, 
+                                  AbstractVector{<:GTBasisFuncs{T, D, 1}}}, 
+                        S::AbstractMatrix{T}, 
+                        C::NTuple{HFTS, AbstractMatrix{T}}, 
+                        nuc::Union{NTuple{NN, String}, AbstractVector{String}}, 
+                        nucCoords::Union{NTuple{NN, NTuple{D, T}}, 
+                                         AbstractVector{<:AbstractVector{T}}}, 
+                        N::Union{Int, Tuple{Int}, NTuple{2, Int}}=getCharge(nuc)) where 
+                       {BN, T, D, HFTS, NN}
     bs = arrayToTuple(bs)
     nuc = arrayToTuple(nuc)
     nucCoords = genTupleCoords(T, nucCoords)
-    Ns = splitSpins(Val(HFTS), nElectron)
+    Ns = splitSpins(Val(HFTS), N)
     ∂HFenergy.(par, Ref(bs), Ref(S), Ref(C), Ref(nuc), Ref(nucCoords), Ref(Ns))
 end
 

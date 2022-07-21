@@ -414,25 +414,25 @@ specifies the center coordinate of the generated `FloatingGTBasisFuncs`, and can
 === Positional argument(s) ===
 
 `GsOrCoeffs::Union{
-    AbstractGaussFunc{<:AbstractFloat}, 
-    AbstractVector{<:AbstractGaussFunc{T} where T<:AbstractFloat}, 
-    Tuple{Vararg{AbstractGaussFunc{T} where T<:AbstractFloat}}, 
-    NTuple{2, <:AbstractFloat}, 
-    NTuple{2, AbstractVector{<:AbstractFloat}}
-}`: A collection of concentric `GaussFunc` that will be used to construct 
-the basis function. To simplify the procedure, it can also be in the form of a `NTuple{2}` 
-of the exponent coefficient(s)`::Union{AbstractFloat, AbstractVector{<:AbstractFloat}}` and 
-contraction coefficients`::Union{AbstractFloat, AbstractVector{<:AbstractFloat}}` of the 
-[`GaussFunc`](@ref)(s) to be input.
+    AbstractGaussFunc{T1}, 
+    AbstractVector{<:AbstractGaussFunc{T1}}, 
+    Tuple{Vararg{AbstractGaussFunc{T1}}}, 
+    NTuple{2, T1}, 
+    NTuple{2, AbstractVector{T1}}
+} where {T1<:AbstractFloat}`: A collection of concentric `GaussFunc` that will be used to 
+construct the basis function. To simplify the procedure, it can also be in the form of a 
+`NTuple{2}` of the exponent coefficient(s)`::Union{AbstractFloat, 
+AbstractVector{<:AbstractFloat}}` and contraction coefficients`::Union{AbstractFloat, 
+AbstractVector{<:AbstractFloat}}` of the [`GaussFunc`](@ref)(s) to be input.
 
 `Ls::Union{
-    T, 
-    AbstractVector{T}, 
-    NTuple{<:Any, T}
-} where {T<:Union{Tuple{Vararg{Int}}, LTuple}}`: A collection of angular momentum(s) within 
-the same subshell, in the Cartesian coordinate representation. E.g., for p shell it can be 
-set to `((1,0,0), (0,1,0))`. This will determine the number of spatial orbitals and their 
-angular momentum respectively to be stored in the output `FloatingGTBasisFuncs`.
+    T2, 
+    AbstractVector{T2}, 
+    NTuple{<:Any, T2}
+} where {T2<:Union{Tuple{Vararg{Int}}, LTuple}}`: A collection of angular momentum(s) 
+within the same subshell, in the Cartesian coordinate representation. E.g., for p shell it 
+can be set to `((1,0,0), (0,1,0))`. This will determine the number of spatial orbitals and 
+their angular momentum respectively to be stored in the output `FloatingGTBasisFuncs`.
 
 === Keyword argument(s) ===
 
@@ -518,7 +518,8 @@ julia> genBasisFunc([0.,0.,0.], "STO-3G", "Li");
     Tuple{Vararg{AbstractGaussFunc{T}}}, 
     Tuple{Vararg{LTuple{D, 𝑙}}} where 𝑙, 
     Bool
-}`: Any one of the fields inside a `FloatingGTBasisFuncs` except `param`.
+} where {T<:AbstractFloat, D}`: Any one of the fields inside a `FloatingGTBasisFuncs` 
+except `param`.
 
 This method outputs a `FloatingGTBasisFuncs` that has identical fields as the input one 
 except the field that can be replaced by `newFieldVal` (and `param` if the replaced field 
