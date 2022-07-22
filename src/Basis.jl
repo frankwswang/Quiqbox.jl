@@ -955,8 +955,8 @@ mergeMultiObjs(GaussFunc{T}, mergeGaussFuncs, gf1, gf2, gf3, gf4...; roundDigits
 
 Addition between two `CompositeGTBasisFuncs{T, D, <:Any, 1}`s such as [`BasisFunc`](@ref) 
 and [`BasisFuncMix`](@ref). `roundDigits` specifies the maximal number of digits after the 
-radix point of the calculated values. The function can be called using `+` syntax with 
-the keyword argument set to it default value.
+radix point of the calculated values. The function can be called using `+` syntax with the 
+keyword argument set to it default value.
 
 ≡≡≡ Example(s) ≡≡≡
 

@@ -221,7 +221,7 @@ getVarDict(pb1)
 ```
 
 !!! info "Parameter represented by `ParamBox`"
-    The output variable of a `ParamBox` is always used in the construction of any basis function component. If you want to optimize the input variable when the mapping is nontrivial (i.e. not [`itself`](@ref)), the `ParamBox` needs to be marked as "differentiable". For more information on parameter optimization, please see the docstring of [`optimizeParams!`](@ref) and section [Parameter Optimization](@ref).
+    The output variable of a `ParamBox` is always used in the construction of any basis function component. If you want to optimize the input variable when the mapping is nontrivial (i.e. not [`Quiqbox.itself`](@ref)), the `ParamBox` needs to be marked as "differentiable". For more information on parameter optimization, please see the docstring of [`optimizeParams!`](@ref) and section [Parameter Optimization](@ref).
 
 ## Linear combinations of basis functions
 
@@ -243,7 +243,7 @@ bf10 = genBasisFunc([1,1,1], (1.2,3))
 
 bf11 = bf8 + bf10
 ```
-The type of `bf11` is called [`BasisFuncMix`](@ref), which means it cannot be expressed as a contracted Gaussian-type orbital (CGTO), but rather a "mixture" of multi-center GTOs (MCGTO).
+The type of `bf11` is called [`Quiqbox.BasisFuncMix`](@ref), which means it cannot be expressed as a contracted Gaussian-type orbital (CGTO), but rather a "mixture" of multi-center GTOs (MCGTO).
 
 There are other cases that can result in a `BasisFuncMix` as the returned object. For example:
 ```@repl 3
