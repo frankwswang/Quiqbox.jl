@@ -34,8 +34,7 @@ end
 
 @test all(Ebegin .> Eend)
 @test all(Eend[2] >= Eend[8])
-@show Eend[[1, 3:6...]] Eend[7, 9:end...]
-@test all(Eend[[1, 3:6...]] .<= Eend[7, 9:end...])
+@test all(Eend[[3:6...]] .<= Eend[[9:end...]])
 @test all(isapprox.(Eend[1:6], Eend[7:end], atol=1e-5))
 
 

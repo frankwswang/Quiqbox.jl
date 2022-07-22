@@ -73,10 +73,10 @@ end
 
 breakSymOfC(::Val{:RHF}, C::AbstractMatrix{T}) where {T} = (C,)
 
-breakSymOfC(::Val{:RHF}, Hcore, HeeI, X, Dᵅ, Dᵝ, Nᵅ, Nᵝ) = 
-getC.( Ref(X), getF(Hcore, HeeI, ((Nᵅ*Dᵅ + Nᵝ*Dᵝ)./(Nᵅ+Nᵝ),)) )
+breakSymOfC(::Val{:RHF}, Hcore, HeeI, X, Dᵅ, Dᵝ) = 
+getC.( Ref(X), getF(Hcore, HeeI, ((Dᵅ + Dᵝ)./2,)) )
 
-breakSymOfC(::Val{:UHF}, Hcore, HeeI, X, Dᵅ, Dᵝ, _, _) =
+breakSymOfC(::Val{:UHF}, Hcore, HeeI, X, Dᵅ, Dᵝ) =
 getC.( Ref(X), getF(Hcore, HeeI, (Dᵅ, Dᵝ)) )
 
 
@@ -125,7 +125,7 @@ function getCfromSAD(::Val{HFT}, S::AbstractMatrix{T},
         N₁tot += N₁
         N₂tot += N₂
     end
-    breakSymOfC(Val(HFT), Hcore, HeeI, X, Dᵅ, Dᵝ, N₁tot, N₂tot)
+    breakSymOfC(Val(HFT), Hcore, HeeI, X, Dᵅ, Dᵝ)
 end
 
 
@@ -674,12 +674,12 @@ function runHFcore(::Val{HFT},
 
             diff = Etots[end] - Etots[end-1]
             relDiff = diff / abs(Etots[end-1])
-            if i > 1 && relDiff > 0.025
+            if i > 1 && relDiff > 0.0005
                 flag, Std = isOscillateConverged(Etots, 10breakPoint)
                 if flag
                     isConverged = ifelse(Std > scfConfig.oscillateThreshold, false, true)
                 else
-                    earlyStop && relDiff > 0.05 && 
+                    earlyStop && relDiff > 0.005 && 
                     (i = terminateSCF(i, vars, m, printInfo); break)
                 end
             end
