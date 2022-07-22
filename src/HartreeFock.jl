@@ -673,13 +673,13 @@ function runHFcore(::Val{HFT},
             pushHFtempVars!(vars, res)
 
             diff = Etots[end] - Etots[end-1]
-            reDiff = diff / abs(Etots[end-1])
-            if i > 1 && reDiff > 0.025
+            relDiff = diff / abs(Etots[end-1])
+            if i > 1 && relDiff > 0.025
                 flag, Std = isOscillateConverged(Etots, 10breakPoint)
                 if flag
                     isConverged = ifelse(Std > scfConfig.oscillateThreshold, false, true)
                 else
-                    earlyStop && reDiff > 0.05 && 
+                    earlyStop && relDiff > 0.05 && 
                     (i = terminateSCF(i, vars, m, printInfo); break)
                 end
             end
@@ -687,7 +687,7 @@ function runHFcore(::Val{HFT},
             printInfo && (i % floor(log(4, i) + 1) == 0 || i == maxStep) && 
             println(rpad("Step $i", 10), rpad("#$l ($(m))", 12), "E = $(Etots[end])")
 
-            abs(diff) <= breakPoint && isConverged && break
+            abs(diff) > breakPoint || (isConverged = true) && break
         end
 
     end
