@@ -660,6 +660,7 @@ function runHFcore(::Val{HFT},
                    earlyStop::Bool=true) where {HFT, T1, L, HFTS, T2}
     vars = initializeSCF(Val(HFT), Hcore, HeeI, C0, N)
     Etots = vars[1].shared.Etots
+    oscThreshold = scfConfig.oscillateThreshold
     printInfo && println(rpad(HFT, 4)*rpad(" | Initial Gauss", 18), "E = $(Etots[end])")
     isConverged = true
     i = 0
@@ -677,9 +678,9 @@ function runHFcore(::Val{HFT},
             if i > 1 && relDiff > 0.005
                 flag, Std = isOscillateConverged(Etots, 15breakPoint)
                 if flag
-                    isConverged = ifelse(Std > scfConfig.oscillateThreshold, false, true)
+                    isConverged = ifelse(Std > max(breakPoint, oscThreshold), false, true)
                 else
-                    earlyStop && relDiff > 0.01 && 
+                    earlyStop && relDiff > 0.02 && 
                     (i = terminateSCF(i, vars, m, printInfo); break)
                 end
             end
@@ -687,7 +688,7 @@ function runHFcore(::Val{HFT},
             printInfo && (i % floor(log(4, i) + 1) == 0 || i == maxStep) && 
             println(rpad("Step $i", 10), rpad("#$l ($(m))", 12), "E = $(Etots[end])")
 
-            abs(diff) > breakPoint || (isConverged = true) && break
+            isConverged && abs(diff) <= breakPoint && break
         end
 
     end
@@ -714,9 +715,9 @@ end
 function EDIIScore(∇s::AbstractVector{<:AbstractMatrix{T}}, 
                    Ds::AbstractVector{<:AbstractMatrix{T}}, Es::AbstractVector{T}) where {T}
     len = length(Ds)
-    B = ones(len, len)
-    for j=1:len, i=1:len
-        B[i,j] = -dot(Ds[i]-Ds[j], ∇s[i]-∇s[j])
+    B = similar(∇s[begin], len, len)
+    for idx in CartesianIndices(B)
+        B[idx] = -dot(Ds[idx[1]]-Ds[idx[2]], ∇s[idx[1]]-∇s[idx[2]])
     end
     Es, B
 end
@@ -725,10 +726,10 @@ end
 function ADIIScore(∇s::AbstractVector{<:AbstractMatrix{T}}, 
                    Ds::AbstractVector{<:AbstractMatrix{T}}) where {T}
     len = length(Ds)
-    B = ones(len, len)
+    B = similar(∇s[begin], len, len)
     v = [dot(D - Ds[end], ∇s[end]) for D in Ds]
-    for j=1:len, i=1:len
-        B[i,j] = dot(Ds[i]-Ds[len], ∇s[j]-∇s[len])
+    for idx in CartesianIndices(B)
+        B[idx] = dot(Ds[idx[1]]-Ds[len], ∇s[idx[2]]-∇s[len])
     end
     v, B
 end
@@ -737,10 +738,11 @@ end
 function DIIScore(∇s::AbstractVector{<:AbstractMatrix{T}}, 
                   Ds::AbstractVector{<:AbstractMatrix{T}}, S::AbstractMatrix{T}) where {T}
     len = length(Ds)
-    B = ones(len, len)
+    B = similar(∇s[begin], len, len)
     v = zeros(len)
-    for j=1:len, i=1:len
-        B[i,j] = dot(∇s[i]*Ds[i]*S - S*Ds[i]*∇s[i], ∇s[j]*Ds[j]*S - S*Ds[j]*∇s[j])
+    for idx in CartesianIndices(B)
+        B[idx] = dot( ∇s[idx[1]]*Ds[idx[1]]*S - S*Ds[idx[1]]*∇s[idx[1]], 
+                      ∇s[idx[2]]*Ds[idx[2]]*S - S*Ds[idx[2]]*∇s[idx[2]] )
     end
     v, B
 end
