@@ -441,9 +441,9 @@ BasisFunc{Float64, 3, 1, 1, P3D{Float64, 0, 0, 0}}(center, gauss, l, normalizeGT
 
 === Positional argument(s) ===
 
-`subshell::String`: The 3rd argument of the constructor can also be the name of a subshell, 
-which will make sure the output is a `BasisFuncs` that contains the spatial orbitals that 
-fully occupy the subshell. 
+`subshell::String`: The third argument of the constructor can also be the name of a 
+subshell, which will make sure the output is a `BasisFuncs` that contains the spatial 
+orbitals that fully occupy the subshell. 
 
 `lFilter::Tuple{Vararg{Bool}}`: When this 4th argument is provided, it can determine the 
 orbital(s) to be included based on the given `subshell`. The order of the corresponding 
@@ -1579,7 +1579,7 @@ or the output from `genBasisFuncText`. For the former, `adjustContent` needs to 
 `function` used to detect and convert the format of the scientific notation in `content`.
 
 `excludeFirstNlines` and `excludeLastNlines` are used to exclude first or last few lines of 
-`content` if intent. `center` is used to assign a center coordinate for all the basis 
+`content` if intended. `center` is used to assign a center coordinate for all the basis 
 functions from `content`; when it's set to `missing`, it will try to read the center 
 information in `content`, and leave the center as `[NaN, NaN, Nan]` if one cannot be found 
 for each corresponding `FloatingGTBasisFuncs`. If `unlinkCenter = true`, the center of each 

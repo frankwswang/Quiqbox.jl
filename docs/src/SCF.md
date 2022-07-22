@@ -21,22 +21,21 @@ nuc = ["H", "H"];
 
 nucCoords = [[-0.7, 0.0, 0.0], [0.7, 0.0, 0.0]];
 
-bs = genBasisFunc.(nucCoords, "STO-3G", "H") |> flatten
+bs = genBasisFunc.(nucCoords, "STO-3G", nuc) |> flatten
 
 resRHF = runHF(bs, nuc, nucCoords)
 
 @show resRHF.Ehf resRHF.C resRHF.Eo resRHF.occu
 ```
 
-After the SCF procedure, one can also easily store the result in a `MatterByHF` for further data processing such as generating a [Molden](@ref) file.
+After the SCF procedure, one can also store the result in a `MatterByHF` for further data processing such as generating a [Molden](@ref) file.
 ```@repl 3
 mol = MatterByHF(resRHF); 
 ```
 
 ### Flexible core functions
 
-If the user wants to fine-tune the SCF iteration to achieve better performance, Quiqbox has provided various more flexible core functions that 
-allow the user to customize the HF methods:
+If the user wants to fine-tune the SCF iteration to achieve better performance, Quiqbox has provided various core types and functions that allow the user to customize the HF methods:
 
 [`HFconfig`](@ref)
 
@@ -46,7 +45,7 @@ allow the user to customize the HF methods:
 
 ## Standalone Integral Functions
 
-Quiqbox also provides stand-alone integral functions that can be used independently of any SCF functions if intended.
+Quiqbox also provides efficient stand-alone integral functions.
 
 ### One-electron functions
 
