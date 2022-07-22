@@ -582,8 +582,8 @@ renameFunc(fName::String, args...) = renameFunc(Symbol(fName), args...)
 
 function isOscillateConverged(seq::AbstractVector{T}, 
                               ValDiffThreshold::Real, 
-                              stdThreshold::Real=0.6ValDiffThreshold; 
-                              nPartition::Int=4, minimalCycles::Int=nPartition, 
+                              stdThreshold::Real=0.75ValDiffThreshold; 
+                              nPartition::Int=5, minimalCycles::Int=nPartition, 
                               convergeToMax::Bool=false) where {T}
     @assert minimalCycles>0 && nPartition>1
     len = length(seq)
