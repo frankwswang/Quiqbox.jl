@@ -675,7 +675,7 @@ function runHFcore(::Val{HFT},
             diff = Etots[end] - Etots[end-1]
             relDiff = diff / abs(Etots[end-1])
             if i > 1 && relDiff > 0.005
-                flag, Std = isOscillateConverged(Etots, 10breakPoint)
+                flag, Std = isOscillateConverged(Etots, 15breakPoint)
                 if flag
                     isConverged = ifelse(Std > scfConfig.oscillateThreshold, false, true)
                 else
