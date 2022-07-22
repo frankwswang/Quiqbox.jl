@@ -580,18 +580,19 @@ end
 renameFunc(fName::String, args...) = renameFunc(Symbol(fName), args...)
 
 
-function isOscillateConverged(sequence::Vector{<:Real}, 
-                              threshold1::Real, threshold2::Real=threshold1; 
-                              leastCycles::Int=1, nPartition::Int=5, 
-                              convergeToMax::Bool=false)
-    @assert leastCycles>0 && nPartition>1
-    len = length(sequence)
-    len < leastCycles && (return false)
+function isOscillateConverged(seq::AbstractVector{T}, 
+                              ValDiffThreshold::Real, 
+                              stdThreshold::Real=0.6ValDiffThreshold; 
+                              nPartition::Int=4, minimalCycles::Int=nPartition, 
+                              convergeToMax::Bool=false) where {T}
+    @assert minimalCycles>0 && nPartition>1
+    len = length(seq)
+    len < minimalCycles && (return (false, T(0)))
     slice = len ÷ nPartition
-    lastPortion = sequence[max(end-slice, 1) : end]
+    lastPortion = seq[max(end-slice, 1) : end]
     remain = sort(lastPortion)[ifelse(convergeToMax, (end÷2+1 : end), (1 : end÷2+1))]
-    b = std(remain) < threshold1 && 
-        abs(sequence[end] - (convergeToMax ? max(remain...) : min(remain...))) < threshold2
+    b = std(remain) < stdThreshold && 
+        abs(seq[end] - (convergeToMax ? max(remain...) : min(remain...))) < ValDiffThreshold
     b, std(lastPortion)
 end
 

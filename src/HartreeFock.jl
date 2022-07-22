@@ -265,7 +265,7 @@ method stored as `Tuple`s of `Pair`s.
 
     SCFconfig(methods::NTuple{L, Symbol}, intervals::NTuple{L, T}, 
               config::Dict{Int, <:AbstractVector{<:Pair}}=Dict(1=>Pair[]);
-              oscillateThreshold::Real=1e-5) where {L, T} -> 
+              oscillateThreshold::Real=1e-6) where {L, T} -> 
     SCFconfig{T, L}
 
 `methods` and `intervals` are the convergence methods to be applied and their stopping 
@@ -287,7 +287,7 @@ struct SCFconfig{T, L} <: ImmutableParameter{T, SCFconfig}
 
     function SCFconfig(methods::NTuple{L, Symbol}, intervals::NTuple{L, T}, 
                        config::Dict{Int, <:AbstractVector{<:Pair}}=Dict(1=>Pair[]);
-                       oscillateThreshold::Real=1e-5) where {L, T}
+                       oscillateThreshold::Real=1e-6) where {L, T}
         kwPairs = [Pair[] for _=1:L]
         for i in keys(config)
             kwPairs[i] = config[i]
@@ -665,7 +665,6 @@ function runHFcore(::Val{HFT},
     i = 0
     for (m, kws, breakPoint, l) in 
         zip(scfConfig.method, scfConfig.methodConfig, scfConfig.interval, 1:L)
-
         while true
             i += 1
             i <= maxStep || (isConverged = false) || break
@@ -673,30 +672,22 @@ function runHFcore(::Val{HFT},
             res = HFcore(m, N, Hcore, HeeI, S, X, vars; kws...)
             pushHFtempVars!(vars, res)
 
-            if earlyStop && i > 1 && (Etots[end] - Etots[end-1]) / abs(Etots[end-1]) > 0.05
-                isConverged = false
-                i = terminateSCF(i, vars, m, printInfo)
-                break
-            end
-
-            flag, Std = isOscillateConverged(Etots, sqrt(breakPoint))
-
-            if flag 
-                isConverged = ifelse(Std > scfConfig.oscillateThreshold, false, true)
-                if isConverged
-                    break
+            diff = Etots[end] - Etots[end-1]
+            reDiff = diff / abs(Etots[end-1])
+            if i > 1 && reDiff > 0.025
+                flag, Std = isOscillateConverged(Etots, 10breakPoint)
+                if flag
+                    isConverged = ifelse(Std > scfConfig.oscillateThreshold, false, true)
                 else
-                    if earlyStop
-                        i = terminateSCF(i, vars, m, printInfo)
-                        break
-                    end
+                    earlyStop && reDiff > 0.05 && 
+                    (i = terminateSCF(i, vars, m, printInfo); break)
                 end
             end
 
             printInfo && (i % floor(log(4, i) + 1) == 0 || i == maxStep) && 
             println(rpad("Step $i", 10), rpad("#$l ($(m))", 12), "E = $(Etots[end])")
 
-            abs(Etots[end]-Etots[end-1]) > breakPoint || (isConverged = true) && break
+            abs(diff) <= breakPoint && isConverged && break
         end
 
     end

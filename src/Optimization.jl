@@ -28,7 +28,7 @@ function gradDescent!(vars::AbstractVector{T}, grad::AbstractVector{T}, η::T=T(
 end
 
 
-const defaultPOconfigPars = Any[Val(:HF), defaultHFC, NaN, 1e-5, 500, gradDescent!]
+const defaultPOconfigPars = Any[Val(:HF), defaultHFC, NaN, 5e-7, 500, gradDescent!]
 
 """
 
@@ -167,7 +167,7 @@ function optimizeParams!(pbs::AbstractVector{<:ParamBox{T}},
         detectConverge = ifelse(isnan(error), false, true)
 
         if isnan(target)
-            isConverged = (Es) -> isOscillateConverged(Es, error, leastCycles=3)[1]
+            isConverged = (Es) -> isOscillateConverged(Es, error, minimalCycles=3)[1]
         else
             isConverged = Es -> (abs(Es[end] - target) < error)
         end
