@@ -22,7 +22,7 @@ b2 = genBasisFunc(nucCoords[2], "STO-3G", "F")
 bfm1, bfm2 = b1 .+ b2[1:2]
 bs_bf_bfs_bfm = [b1, bfm1, b2..., bfm2]
 
-@test try eeInteractions(bs_bf_bfs_bfm); true catch; end
-@test try coreH(bs_bf_bfs_bfm, nuc, nucCoords); true catch; end
+@test try eeInteractions(bs_bf_bfs_bfm); true catch; false end
+@test try coreH(bs_bf_bfs_bfm, nuc, nucCoords); true catch; false end
 
 end
