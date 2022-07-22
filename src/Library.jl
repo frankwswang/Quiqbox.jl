@@ -180,6 +180,11 @@ const SpinOrbitalOccupation = Dict(spinOccupations .=> OrbitalOccupation)
 const SpinOrbitalSpinConfig = Dict(OrbitalOccupation .=> spinOccupations)
 
 
+const HFtypes = (:RHF, :UHF)
+const HFsizes = (1, 2)
+const HFtypeSizeList = Dict(HFtypes .=> HFsizes)
+
+
 """
 
     orbitalLin(subshell::String, D::Int=3) -> Tuple{Vararg{NTuple{3, Int}}}

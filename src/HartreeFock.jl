@@ -7,7 +7,6 @@ using LineSearches
 using Optim: LBFGS, Fminbox, optimize as OptimOptimize, minimizer as OptimMinimizer, 
              Options as OptimOptions
 
-const HFtypes = (:RHF, :UHF)
 const defaultDS = 0.5
 const defaultDIISconfig = (12, :LBFGS)
 
@@ -51,17 +50,17 @@ splitSpins(::Val{2}, (Nˢ,)::Tuple{Int}) = (Nˢ, Nˢ)
 
 splitSpins(::Val{1}, Ns::NTuple{2, Int}) = (sum(Ns)÷2,)
 
-splitSpins(::Val{:RHF}, N) = splitSpins(Val(1), N)
+splitSpins(::Val{:RHF}, N) = splitSpins(Val(HFtypeSizeList[:RHF]), N)
 
-splitSpins(::Val{:UHF}, N) = splitSpins(Val(2), N)
+splitSpins(::Val{:UHF}, N) = splitSpins(Val(HFtypeSizeList[:UHF]), N)
 
 groupSpins(::Val{1}, (Nˢ,)::Tuple{Int}) = (Nˢ, Nˢ)
 
 groupSpins(::Val{2}, Ns::NTuple{2, Int}) = itself(Ns)
 
-groupSpins(::Val{:RHF}, Ns::Tuple{Vararg{Int}}) = groupSpins(Val(1), Ns)
+groupSpins(::Val{:RHF}, Ns::Tuple{Vararg{Int}}) = groupSpins(Val(HFtypeSizeList[:RHF]), Ns)
 
-groupSpins(::Val{:UHF}, Ns::Tuple{Vararg{Int}}) = groupSpins(Val(2), Ns)
+groupSpins(::Val{:UHF}, Ns::Tuple{Vararg{Int}}) = groupSpins(Val(HFtypeSizeList[:UHF]), Ns)
 
 
 function breakSymOfC(::Val{:UHF}, C::AbstractMatrix{T}) where {T}
@@ -577,12 +576,12 @@ function runHF(bs::GTBasis{T1, D, BN, BT},
                config::HFconfig{T2, HFT}=defaultHFC, 
                N::Union{Int, Tuple{Int}, NTuple{2, Int}}=getCharge(nuc); 
                printInfo::Bool=true) where {T1, D, BN, BT, NN, HFT, T2}
-    nuc = arrayToTuple(nuc)
-    nucCoords = genTupleCoords(T1, nucCoords)
-    leastNb = ceil(sum(N)/2) |> Int
-    @assert BN >= leastNb "The number of basis functions should be no less than $(leastNb)."
     @assert N > (HFT==:RHF) "$(HFT) requires more than $(HFT==:RHF) electrons."
     Ns = splitSpins(Val(HFT), N)
+    leastNb = max(Ns...)
+    @assert BN >= leastNb "The number of basis functions should be no less than $(leastNb)."
+    nuc = arrayToTuple(nuc)
+    nucCoords = genTupleCoords(T1, nucCoords)
     Hcore = coreH(bs, nuc, nucCoords)
     X = getX(bs.S)
     getC0f = config.C0.f
