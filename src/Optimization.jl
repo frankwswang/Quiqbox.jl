@@ -118,8 +118,9 @@ column is the result of each step.
 
 === Positional argument(s) ===
 
-`pbs::AbstractVector{<:ParamBox{T}}`: The parameters to be modified that are extracted 
-from the basis set.
+`pbs::AbstractVector{<:ParamBox{T}}`: The parameters to be optimized that are extracted 
+from the basis set. If the parameter is marked as "differentiable", the value of its input 
+variable will be optimized.
 
 `bs::Union{
     Tuple{Vararg{AbstractGTBasisFuncs{T, D}}}, 

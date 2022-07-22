@@ -59,7 +59,7 @@ points = GridBox((1,0,0), 1.4).point
 bsH₂ = genBasisFunc.(points, "STO-3G") |> flatten
 ```
 
-## Construct a customized basis set
+## Build a customized basis set
 ```julia
 gf = GaussFunc(1.0, 0.75)
 

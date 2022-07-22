@@ -35,7 +35,7 @@ Stores a pointer to the actual address of an array.
                  showReminder::Bool=true) where {N} -> ArrayPointer{T, N}
 
 Create a `ArrayPointer` that contains a `Ptr` pointing to the actual memory address of the 
-(1st element of the) `Array`.
+(first element of the) `Array`.
 
 To avoid memory leaking, the user should use `free(x.ptr)` after the usage of 
 `x::ArrayPointer` to free the occupied memory.

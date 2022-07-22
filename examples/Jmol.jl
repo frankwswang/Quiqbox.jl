@@ -1,20 +1,14 @@
 using Quiqbox
 using Quiqbox.Molden
 
-mols = [
-        ["H", "H"],
-        ["N", "H", "H", "H"]
-        ]
-molNames = [
-            "H2", 
-            "NH3"
-            ]
+mols = [ ["H", "H"], ["N", "H", "H", "H"] ]
+molNames = ["H2", "NH3"]
 br = 0.529177210903
 # Data from CCCBDB: https://cccbdb.nist.gov
-molCoords = [
-             [[0.3705,0.0,0.0], [-0.3705,0.0,0.0]],
-             [[0.0, 0.0, 0.1111], [0.0, 0.9316, -0.2592], [0.8068, -0.4658, -0.2592], [-0.8068, -0.4658, -0.2592]]
-             ] ./ br
+molCoords = [ [[0.3705,0.0,0.0], [-0.3705,0.0,0.0]],
+              [[0.0, 0.0, 0.1111], [0.0, 0.9316, -0.2592], 
+               [0.8068, -0.4658, -0.2592], [-0.8068, -0.4658, -0.2592]]
+            ] ./ br
 
 bfCoords = [molCoords..., GridBox(1, 1.2) |> gridCoordOf]
 bfs = ["STO-3G"]
@@ -26,20 +20,19 @@ for (nuc, nucCoords, molName, iMol) in zip(mols, molCoords, molNames, 1:length(m
 
     flag = (bfCoord == nucCoords)
     if flag
-        nucConfig = [(bf, i) for i in nuc]
-        bs = genBasisFunc.(bfCoord, nucConfig) |> flatten
+        bs = genBasisFunc.(bfCoord, bf, nuc) |> flatten
     else
         bs = genBasisFunc.(bfCoord, bf) |> flatten
         bsName = "-Float"*bsName
     end
 
     # Number of spin-orbitals must not be smaller than numbers of electrons.
-    fVars = try
-        runHF(bs, nuc, nucCoords, printInfo=false)
-    catch
+    if getCharge(nuc) <= 2sum( orbitalNumOf.(bs) )
+        HFres = runHF(bs, nuc, nucCoords, printInfo=false)
+    else
         continue
     end
 
-    mol = Molecule(bs, fVars)
+    mol = MatterByHF(HFres)
     fn = makeMoldenFile(mol; recordUMO=true, fileName=prefix*"_"*molName*"_"*bf*bsName)
 end

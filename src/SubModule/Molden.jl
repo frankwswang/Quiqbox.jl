@@ -2,7 +2,7 @@ module Molden
 
 export makeMoldenFile
 
-import ..Quiqbox: CanOrbital, MatterByHF, sortPermBasis, mergeBasisFuncs, 
+import ..Quiqbox: CanOrbital, MatterByHF, sortPermBasis, mergeBasisFuncs, getAtolDigits, 
                   isaFullShellBasisFuncs, checkFname, AtomicNumberList, centerCoordOf, 
                   groupedSort, joinConcentricBFuncStr, alignNumSign, alignNum, getAtolVal
 

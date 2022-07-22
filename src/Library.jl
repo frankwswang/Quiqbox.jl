@@ -210,7 +210,7 @@ function checkBSList(;printInfo::Bool=false)
             eBool = endswith(text, BStextEndingMarker*"\n")
             @assert (sBool && eBool) """\n
             The format of 'Basis functions' is NOT CORRECT!
-            "[A-Z][a-z]?     [0-9]\\n" (regex) should exit as the 1st line of the string!
+            "[A-Z][a-z]?     [0-9]\\n" (regex) should exit as the first line of the string!
             "$(BStextEndingMarker)\\n" should exit as the last line of the string!
             The incorrect text content is:\n$(text)
             """
