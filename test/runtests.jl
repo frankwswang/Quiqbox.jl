@@ -1,5 +1,6 @@
 using Test
 using Random
+using Documenter
 
 @testset "Quiqbox tests" begin
 
@@ -24,7 +25,7 @@ using Random
             include("unit-tests/Integrals/Core-test.jl")
             include("unit-tests/Integrals/OneBody-test.jl")
             include("unit-tests/Integrals/TwoBody-test.jl")
-            # Sys.islinux() && include("unit-tests/Integrals/Libcint-compare-tests.jl")
+            Sys.islinux() && include("unit-tests/Integrals/Libcint-compare-tests.jl")
             include("unit-tests/Differentiation-test.jl")
         end
         println("$(unit2_1) test finished in $t2_1 seconds.\n")
@@ -57,7 +58,7 @@ using Random
         println("$(unit3_1) test finished in $t3_1 seconds.\n")
     end
 
-    @testset "Docstrings" begin
+    @testset "Documentation" begin
         unit4_1 = "Docstrings"
         println("Testing $(unit4_1)...")
         t4_1 = @elapsed @testset "$(unit4_1)" begin
