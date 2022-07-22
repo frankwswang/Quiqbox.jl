@@ -219,6 +219,7 @@ You can get a clearer view of the variable value(s) in a `ParamBox` using `getVa
 ```@repl 2
 getVarDict(pb1)
 ```
+
 !!! info "Parameter represented by `ParamBox`"
     The output variable of a `ParamBox` is always used in the construction of any basis function component. If you want to optimize the input variable when the mapping is nontrivial (i.e. not [`itself`](@ref)), the `ParamBox` needs to be marked as "differentiable". For more information on parameter optimization, please see the docstring of [`optimizeParams!`](@ref) and section [Parameter Optimization](@ref).
 

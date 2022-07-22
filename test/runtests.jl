@@ -57,4 +57,13 @@ using Random
         println("$(unit3_1) test finished in $t3_1 seconds.\n")
     end
 
+    @testset "Docstrings" begin
+        unit4_1 = "Docstrings"
+        println("Testing $(unit4_1)...")
+        t4_1 = @elapsed @testset "$(unit4_1)" begin
+            doctest(Quiqbox)
+        end
+        println("$(unit4_1) test finished in $t4_1 seconds.\n")
+    end
+
 end
