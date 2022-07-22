@@ -29,7 +29,7 @@ fs2 = (oFilter(overlapsLibcint),
 fns = (:overlaps, :eKinetics, :neAttractions, :eeInteractions)
 
 for (f1, f2, fn) in zip(fs1, fs2, fns), pair in zip(BasisSetNames, atms)
-    bs = genBasisFunc(center, pair)
+    bs = genBasisFunc(center, pair...)
     bl = compr2Arrays1(f1(bs), f2(bs), errT)
     !bl && println("Failed Case:", (fn, pair...))
     @test bl
