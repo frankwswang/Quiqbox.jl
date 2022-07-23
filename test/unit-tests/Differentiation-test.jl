@@ -18,12 +18,12 @@ grad1_t = [1.2560795063144674, 1.2560795063144674, 4.050658426012163, 0]
 t1 = 1e-14
 t2 = 1e-10
 @test isapprox(grad1[1], grad1[2], atol=t1)
-@test isapprox.(grad1, grad1_t, atol=t2) |> all
+compr2Arrays3((grad1=grad1, grad1_t=grad1_t), t2)
 
 HFres1_2 = runHF(bs1, nuc, nucCoords, HFconfig((HF=:UHF,)), printInfo=false)
 grad1_2 = gradOfHFenergy(pars1, bs1, overlaps(bs1), HFres1.C, nuc, nucCoords)
 @test isapprox(grad1_2[1], grad1_2[2], atol=t1)
-@test isapprox.(grad1_2, grad1_t, atol=t2) |> all
+compr2Arrays3((grad1_2=grad1_2, grad1_t=grad1_t), t2)
 
 bfSource = genBasisFunc(missing, "STO-2G", "H")[]
 gfs = bfSource.gauss |> collect
@@ -38,7 +38,7 @@ grad2 = gradOfHFenergy(pars2, bs2, S2, HFres2.C, nuc, nucCoords)
 @test all(grad2[3:6] .== 0)
 grad2_tp = [-0.02766590712707717,  0.03295656668565583, 
              0.09464147744656481, -0.059960502688767015]
-@test isapprox.(grad2[7:end], grad2_tp, atol=t2) |> all
+compr2Arrays3((grad2_7toEnd=grad2[7:end], grad2_tp=grad2_tp), t2)
 
 bs3 = bs1[[1,5]] .* bs2 # basis set of BasisFuncMix
 pars3 = markParams!(bs3, true)
@@ -52,6 +52,6 @@ grad3_t = [-0.16065229026420086,  -0.24121982820608456, -0.14801056792457273,
             1.2107782085950103,    0.13565575853200829,  1.6060315090316117, 
             0.05883838103623499,   0.7017475944844322,  -1.28869660219716, 
             2.762948616280592,   -16.536548488030494]
-@test isapprox.(grad3, grad3_t, atol=1000t2) |> all
+compr2Arrays3((grad3=grad3, grad3_t=grad3_t), 5000t2)
 
 end

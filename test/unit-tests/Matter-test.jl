@@ -28,18 +28,18 @@ H2 = MatterByHF(HFres1)
 C_RHF = HFres1.C[1]
 C_H2 = hcat(H2.occuC[1], H2.unocC[1])
 
+t1 = 1e-15
 @test C_H2 == C_RHF
 @test all(nHalf .== H2.Ns)
 @test H2.Ehf == Quiqbox.getEᵗ(Hc1, basis1.eeI, H2.occuC, (H2.Ns[1],))
 @test H2.coreHsameSpin[1] == changeHbasis(Hc1, C_RHF)
-@test isapprox.(H2.coreHsameSpin[1], get1spinHcore(C_RHF, Hc1), atol=1e-15) |> all
+compr2Arrays3((H2_cH1=H2.coreHsameSpin[1], H2_cH2=get1spinHcore(C_RHF, Hc1)), t1)
 @test H2.eeIsameSpin[1] == changeHbasis(basis1.eeI, C_RHF)
-@test isapprox.(H2.eeIsameSpin[1], get1spin2eI(C_RHF, basis1.eeI), atol=1e-14) |> all
+compr2Arrays3((H2_eeI1=H2.eeIsameSpin[1], H2_eeI2=get1spin2eI(C_RHF, basis1.eeI)), 10t1)
 @test isapprox(H2.Ehf, 2(diag(H2.coreHsameSpin[1])[1:nHalf] |> sum) + 
                           sum( [(2H2.eeIsameSpin[1][i,i,j,j] - H2.eeIsameSpin[1][i,j,j,i]) 
-                               for j in 1:nHalf, i in 1:nHalf] ), atol=1e-15)
-@test isapprox.(H2.eeIdiffSpin, 
-                Quiqbox.getJᵅᵝ(H2.basis.eeI, (C_H2, C_H2)), atol=1e-15) |> all
+                               for j in 1:nHalf, i in 1:nHalf] ), atol=t1)
+compr2Arrays3((H2_eeIds=H2.eeIdiffSpin, Jαβ=Quiqbox.getJᵅᵝ(H2.basis.eeI, (C_H2, C_H2))), t1)
 
 nuc2 = ["H", "H", "O"]
 nucCoords2 = [[-0.7,0.0,0.0], [0.6,0.0,0.0], [0.0, 0.0, 0.0]]
@@ -58,16 +58,17 @@ MOβ_H2O = (H2O.occuOrbital[2]..., H2O.unocOrbital[2]...)
 Jαβ = [ eeInteraction(i.orbital, i.orbital, j.orbital, j.orbital) 
         for (i,j) in Iterators.product(MOα_H2O, MOβ_H2O) ]
 
+t2 = 1e-12
 @test C_UHF1 == Cα_H2O
 @test C_UHF2 == Cβ_H2O
 @test H2O.Ehf == Quiqbox.getEᵗ(Hc2, basis2.eeI, H2O.occuC, H2O.Ns)
 @test H2O.coreHsameSpin == changeHbasis.(Ref(Hc2), HFres2.C)
-@test isapprox.(H2O.coreHsameSpin[1], get1spinHcore(C_UHF1, Hc2), atol=1e-12) |> all
-@test isapprox.(H2O.coreHsameSpin[2], get1spinHcore(C_UHF2, Hc2), atol=1e-12) |> all
+compr2Arrays3((H2O_cHα1=H2O.coreHsameSpin[1], H2O_cHα2=get1spinHcore(C_UHF1, Hc2)), t2)
+compr2Arrays3((H2O_cHβ1=H2O.coreHsameSpin[2], H2O_cHβ2=get1spinHcore(C_UHF2, Hc2)), t2)
 @test H2O.eeIsameSpin == changeHbasis.(Ref(basis2.eeI), HFres2.C)
-@test isapprox.(H2O.eeIsameSpin[1], get1spin2eI(C_UHF1, basis2.eeI), atol=1e-12) |> all
-@test isapprox.(H2O.eeIsameSpin[2], get1spin2eI(C_UHF2, basis2.eeI), atol=1e-12) |> all
-@test isapprox.(H2O.eeIdiffSpin, Jαβ, atol=1e-12) |> all
+compr2Arrays3((H2O_eeIα1=H2O.eeIsameSpin[1], H2O_eeIα2=get1spin2eI(C_UHF1, basis2.eeI)), t2)
+compr2Arrays3((H2O_eeIβ1=H2O.eeIsameSpin[2], H2O_eeIβ2=get1spin2eI(C_UHF2, basis2.eeI)), t2)
+compr2Arrays3((H2O_eeIds=H2O.eeIdiffSpin, Jαβ=Jαβ), t2)
 
 ids = 1:length(H2O.occuOrbital[1])
 Jαβ_occu = Jαβ[ids, ids]
