@@ -11,7 +11,7 @@ const defaultDS = 0.5
 const defaultDIISconfig = (12, :LBFGS)
 
 const defaultHFCStr = "HFconfig()"
-const defaultSCFconfigStr = "SCFconfig((:ADIIS, :DIIS), (5e-3, 2e-16))"
+const defaultSCFconfigStr = "SCFconfig((:ADIIS, :DIIS), (5e-3, 5e-16))"
 
 
 getXcore1(S::AbstractMatrix{T}) where {T} = Hermitian(S)^(-T(0.5))
@@ -666,8 +666,10 @@ function runHFcore(::Val{HFT},
     i = 0
     for (m, kws, breakPoint, l) in 
         zip(scfConfig.method, scfConfig.methodConfig, scfConfig.interval, 1:L)
+        n = 0
         while true
             i += 1
+            n += 1
             i <= maxStep || (isConverged = false) || break
 
             res = HFcore(m, N, Hcore, HeeI, S, X, vars; kws...)
@@ -675,12 +677,12 @@ function runHFcore(::Val{HFT},
 
             diff = Etots[end] - Etots[end-1]
             relDiff = diff / abs(Etots[end-1])
-            if i > 1 && relDiff > 0.005
+            if n > 1 && relDiff > sqrt(breakPoint)
                 flag, Std = isOscillateConverged(Etots, 15breakPoint)
                 if flag
                     isConverged = ifelse(Std > max(breakPoint, oscThreshold), false, true)
                 else
-                    earlyStop && relDiff > 0.02 && 
+                    earlyStop && relDiff > cbrt(breakPoint) && 
                     (i = terminateSCF(i, vars, m, printInfo); break)
                 end
             end
