@@ -34,7 +34,7 @@ end
 
 @test all(Ebegin .> Eend)
 @test all(Eend[2] >= Eend[8])
-@test all(isapprox.(Eend[1:6], Eend[7:end], atol=1e-5))
+compr2Arrays3((Eend_1to6=Eend[1:6], Eend_7toEnd=Eend[7:end]), 1e-5)
 
 
 # Grid-based basis set
