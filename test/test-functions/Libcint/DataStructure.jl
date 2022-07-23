@@ -28,21 +28,27 @@ function Nijkα(i, j, k, α)
 end
 
 
-normOfGTOin(b::Quiqbox.FloatingGTBasisFuncs{𝑙, GN, 1})  where {𝑙, GN} = 
-Nijkα.(b.ijk[1]..., [g.xpn() for g in b.gauss])
+normOfGTOin(b::Quiqbox.FGTBasisFuncs1O) = 
+Nijkα.(b.l[1]..., [g.xpn() for g in b.gauss])
 
-normOfGTOin(b::Quiqbox.FloatingGTBasisFuncs{𝑙, GN, ON}) where {𝑙, GN, ON} = 
+normOfGTOin(b::Quiqbox.FloatingGTBasisFuncs) = 
 Nlα.(b|>Quiqbox.subshellOf, [g.xpn() for g in b.gauss])
 
+isFull(::Any) = false
+
+isFull(::Quiqbox.FloatingGTBasisFuncs{<:Any, <:Any, 0}) = true
+
+isFull(::Quiqbox.FloatingGTBasisFuncs{<:Any, <:Any, 𝑙, <:Any, <:Any, ON}) where {𝑙, ON} = 
+(ON == Quiqbox.SubshellXYZsizes[𝑙+1])
 
 function ijkIndex(b::Quiqbox.FloatingGTBasisFuncs)
-    Quiqbox.isFull(b) && (return :)
-    [Quiqbox.ijkIndexList[ijk] for ijk in b.ijk]
+    isFull(b) && (return :)
+    [Quiqbox.AngMomIndexList[ijk] for ijk in b.l]
 end
 
 
 function addToDataChain!(env::Vector{Float64}, atm::Vector{Int32}, bas::Vector{Int32}, 
-                         bf::Quiqbox.FloatingGTBasisFuncs{𝑙}) where {𝑙}
+                         bf::Quiqbox.FloatingGTBasisFuncs{<:Any, <:Any, 𝑙, GN}) where {𝑙, GN}
     center = [bf.center[1](), bf.center[2](), bf.center[3]()]
     xpns = Float64[]
     cons = Float64[]
@@ -50,7 +56,6 @@ function addToDataChain!(env::Vector{Float64}, atm::Vector{Int32}, bas::Vector{I
         push!(xpns, i.xpn())
         push!(cons, i.con())
     end
-    nGauss = bf.gauss |> length
     envEndIndex = length(env)
     gAtmIndex = length(atm) / 6 |> Int32
 
@@ -61,8 +66,8 @@ function addToDataChain!(env::Vector{Float64}, atm::Vector{Int32}, bas::Vector{I
     append!(env, xpns)
     norm = bf.normalizeGTO ? normOfGTOin(bf) : 1.0
     append!(env, cons.*norm)
-    append!(bas, Int32[gAtmIndex, 𝑙, nGauss, 1, 0, envEndIndex, envEndIndex+nGauss, 0])
-    envEndIndex += nGauss*2
+    append!(bas, Int32[gAtmIndex, 𝑙, GN, 1, 0, envEndIndex, envEndIndex+GN, 0])
+    envEndIndex += GN*2
     (env, atm, bas)
 end
 
@@ -70,7 +75,8 @@ end
 function addToDataChain!(env::Vector{Float64}, atm::Vector{Int32}, 
                          nuclei::Vector{String}, 
                          nucleiCoords::Vector{<:AbstractArray{<:Real}})
-    Quiqbox.@compareLength nuclei nucleiCoords "nuclei" "their coordinates"
+    @assert length(nuclei) == length(nucleiCoords) "The length of nuclei and their " * 
+            "coordinates are NOT equal."
     envEndIndex = length(env)
     len = length(nuclei)
     atmsConfig = Int32[]

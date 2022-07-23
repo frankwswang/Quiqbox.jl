@@ -1,126 +1,124 @@
-export overlap, overlaps, nucAttraction, nucAttractions, elecKinetic, elecKinetics, 
+export overlap, overlaps, neAttraction, neAttractions, eKinetic, eKinetics, 
        coreH, coreHij
 
 """
 
-    overlap(fb1::AbstractGTBasisFuncs, fb2::AbstractGTBasisFuncs) -> Matrix{Float64}
+    overlap(bf1::AbstractGTBasisFuncs{T, D, 1}, bf2::AbstractGTBasisFuncs{T, D, 1}) where 
+           {T, D, 1} -> 
+    T
 
-Return the orbital overlap matrix (an N×N `Matrix` where N is the number of spatial 
-orbitals) given 2 basis functions.
+Return the orbital overlap between two basis functions.
 """
-overlap(bf1::AbstractGTBasisFuncs, bf2::AbstractGTBasisFuncs) = 
-cat(getOverlap(bf1, bf2), dims=2)
-
-
-"""
-
-    overlaps(bs::Union{Tuple{Vararg{AbstractGTBasisFuncs}}, 
-                       Vector{<:AbstractGTBasisFuncs}}) -> 
-    Matrix{Float64}
-
-Return the orbital overlap matrix (an N×N `Matrix` where N is the number of spatial 
-orbitals) given a basis set in the form of an `Vector`.
-"""
-overlaps(bs::Union{Tuple{Vararg{AbstractGTBasisFuncs}}, Vector{<:AbstractGTBasisFuncs}}) = 
-getOverlaps(bs |> arrayToTuple)
+overlap(bf1::AbstractGTBasisFuncs{T, D, 1}, bf2::AbstractGTBasisFuncs{T, D, 1}) where 
+       {T, D} = 
+getOverlap(bf1, bf2)
 
 
 """
 
-    elecKinetic(fb1::AbstractGTBasisFuncs, fb2::AbstractGTBasisFuncs) -> Matrix{Float64}
+    overlaps(bs::Union{Tuple{Vararg{AbstractGTBasisFuncs{T, D}}}, 
+                       AbstractVector{<:AbstractGTBasisFuncs{T, D}}}) where {T, D} -> 
+    Matrix{T}
 
-Return the electron kinetic energy matrix (an N×N `Matrix` where N is the number of spatial 
-orbitals) given 2 basis functions.
+Return the orbital overlap matrix given a basis set.
 """
-elecKinetic(bf1::AbstractGTBasisFuncs, bf2::AbstractGTBasisFuncs) = 
-cat(getElecKinetic(bf1, bf2), dims=2)
-
-
-"""
-
-    elecKinetics(bs::Union{Tuple{Vararg{AbstractGTBasisFuncs}}, 
-                           Vector{<:AbstractGTBasisFuncs}}) -> 
-    Matrix{Float64}
-
-Return the electron kinetic energy matrix (an N×N `Matrix` where N is the number of spatial 
-orbitals) given a basis set in the form of an `Vector`.
-"""
-elecKinetics(bs::Union{Tuple{Vararg{AbstractGTBasisFuncs}}, 
-                       Vector{<:AbstractGTBasisFuncs}}) = 
-getElecKinetics(bs |> arrayToTuple)
+overlaps(bs::Union{Tuple{Vararg{AbstractGTBasisFuncs{T, D}}}, 
+                   AbstractVector{<:AbstractGTBasisFuncs{T, D}}}) where {T, D} = 
+getOverlap(bs |> arrayToTuple)
 
 
 """
 
-    nucAttraction(fb1::AbstractGTBasisFuncs, fb2::AbstractGTBasisFuncs, 
-                  nuc::Union{NTuple{NN, String}, Vector{String}}, 
-                  nucCoords::Union{NTuple{NN, NTuple{3, Float64}}, 
-                                   Vector{<:AbstractArray{<:Real}}}) where {NN} -> 
-    Matrix{Float64}
+    eKinetic(bf1::AbstractGTBasisFuncs{T, D, 1}, bf2::AbstractGTBasisFuncs{T, D, 1}) where 
+            {T, D} -> 
+    T
 
-Return the nuclear attraction matrix (an N×N `Matrix` where N is the number of spatial 
-orbitals) given 2 basis functions, and the nuclei with their coordinates (in atomic unit).
+Return the electron kinetic energy between two basis functions.
 """
-nucAttraction(bf1::AbstractGTBasisFuncs, bf2::AbstractGTBasisFuncs, 
-              nuc::Union{NTuple{NN, String}, Vector{String}}, 
-              nucCoords::Union{NTuple{NN, NTuple{3, Float64}}, 
-                               Vector{<:AbstractArray{<:Real}}}) where {NN} = 
-cat(getNucAttraction(bf1, bf2, arrayToTuple(nuc), genTupleCoords(nucCoords)), dims=2)
+eKinetic(bf1::AbstractGTBasisFuncs{T, D, 1}, bf2::AbstractGTBasisFuncs{T, D, 1}) where 
+        {D, T} = 
+getEleKinetic(bf1, bf2)
 
 
 """
 
-    nucAttractions(bs::Union{Tuple{Vararg{AbstractGTBasisFuncs}}, 
-                             Vector{<:AbstractGTBasisFuncs}}, 
-                   nuc::Union{NTuple{NN, String}, Vector{String}}, 
-                   nucCoords::Union{NTuple{NN, NTuple{3, Float64}}, 
-                                    Vector{<:AbstractArray{<:Real}}}) where {NN} -> 
-    Matrix{Float64}
+    eKinetics(bs::Union{Tuple{Vararg{AbstractGTBasisFuncs{T, D}}}, 
+                        AbstractVector{<:AbstractGTBasisFuncs{T, D}}}) where {T, D} -> 
+    Matrix{T}
 
-Return the nuclear attraction matrix (an N×N `Matrix` where N is the number of spatial 
-orbitals) given a basis set in the form of an `Vector`, and the nuclei with their 
-coordinates (in atomic unit).
+Return the electron kinetic energy matrix given a basis set.
 """
-nucAttractions(bs::Union{Tuple{Vararg{AbstractGTBasisFuncs}}, 
-                         Vector{<:AbstractGTBasisFuncs}}, 
-               nuc::Union{NTuple{NN, String}, Vector{String}}, 
-               nucCoords::Union{NTuple{NN, NTuple{3, Float64}}, 
-                                Vector{<:AbstractArray{<:Real}}}) where {NN} = 
-getNucAttractions(bs|>arrayToTuple, arrayToTuple(nuc), genTupleCoords(nucCoords))
+eKinetics(bs::Union{Tuple{Vararg{AbstractGTBasisFuncs{T, D}}}, 
+                    AbstractVector{<:AbstractGTBasisFuncs{T, D}}}) where {T, D} = 
+getEleKinetic(bs |> arrayToTuple)
 
 
 """
 
-    coreHij(fb1::AbstractGTBasisFuncs, fb2::AbstractGTBasisFuncs, 
-            nuc::Union{NTuple{NN, String}, Vector{String}}, 
-            nucCoords::Union{NTuple{NN, NTuple{3, Float64}}, 
-                             Vector{<:AbstractArray{<:Real}}}) where {NN} -> 
-    Matrix{Float64}
+    neAttraction(bf1::AbstractGTBasisFuncs{T, D, 1}, bf2::AbstractGTBasisFuncs{T, D, 1}, 
+                 nuc::Union{NTuple{NN, String}, AbstractVector{String}}, 
+                 nucCoords::$(SpatialCoordType|>typeStrNotUnionAll)) where {T, D, NN} -> 
+    T
 
-Return a block M×N matrix of the core Hamiltonian given 2 basis functions, where M and N 
-are the numbers of spatial orbitals within in the basis functions.
+Return the nuclear attraction between two basis functions, provided with the nuclei and 
+their coordinates (in the atomic units).
 """
-coreHij(bf1::AbstractGTBasisFuncs, bf2::AbstractGTBasisFuncs, 
-        nuc::Union{NTuple{NN, String}, Vector{String}}, 
-        nucCoords::Union{NTuple{NN, NTuple{3, Float64}}, 
-                         Vector{<:AbstractArray{<:Real}}}) where {NN} = 
-cat(getCoreHij(bf1, bf2, arrayToTuple(nuc), genTupleCoords(nucCoords)), dims=2)
+neAttraction(bf1::AbstractGTBasisFuncs{T, D, 1}, bf2::AbstractGTBasisFuncs{T, D, 1}, 
+              nuc::Union{NTuple{NN, String}, AbstractVector{String}}, 
+              nucCoords::SpatialCoordType{T, D, NN}) where {T, D, NN} = 
+getNucEleAttraction(bf1, bf2, arrayToTuple(nuc), genTupleCoords(T, nucCoords))
 
 
 """
 
-    coreH(bs::Union{Tuple{Vararg{AbstractGTBasisFuncs}}, 
-                    Vector{<:AbstractGTBasisFuncs}}, 
-          nuc::Union{NTuple{NN, String}, Vector{String}}, 
-          nucCoords::Union{NTuple{NN, NTuple{3, Float64}}, 
-                           Vector{<:AbstractArray{<:Real}}}) where {NN} -> 
-    Matrix{Float64}
+    neAttractions(bs::Union{Tuple{Vararg{AbstractGTBasisFuncs{T, D}}}, 
+                            AbstractVector{<:AbstractGTBasisFuncs{T, D}}}, 
+                  nuc::Union{NTuple{NN, String}, AbstractVector{String}}, 
+                  nucCoords::$(SpatialCoordType|>typeStrNotUnionAll)) where {T, D, NN} -> 
+    Matrix{T}
 
-Return the core Hamiltonian matrix (an N×N `Matrix` where N is the total number of spatial 
-orbitals) given a basis set in the form of an `Vector`.
+Return the nuclear attraction matrix given a basis set and the corresponding nuclei with 
+their coordinates (in atomic units).
 """
-coreH(bs::Union{Tuple{Vararg{AbstractGTBasisFuncs}}, Vector{<:AbstractGTBasisFuncs}}, 
-      nuc::Union{NTuple{NN, String}, Vector{String}}, 
-      nucCoords::Union{NTuple{NN, NTuple{3, Float64}}, 
-                       Vector{<:AbstractArray{<:Real}}}) where {NN} = 
-getCoreH(bs|>arrayToTuple, arrayToTuple(nuc), genTupleCoords(nucCoords))
+neAttractions(bs::Union{Tuple{Vararg{AbstractGTBasisFuncs{T, D}}}, 
+                        AbstractVector{<:AbstractGTBasisFuncs{T, D}}}, 
+              nuc::Union{NTuple{NN, String}, AbstractVector{String}}, 
+              nucCoords::SpatialCoordType{T, D, NN}) where {T, D, NN} = 
+getNucEleAttraction(bs|>arrayToTuple, arrayToTuple(nuc), genTupleCoords(T, nucCoords))
+
+
+"""
+
+    coreHij(bf1::AbstractGTBasisFuncs{T, D, 1}, bf2::AbstractGTBasisFuncs{T, D, 1}, 
+            nuc::Union{NTuple{NN, String}, AbstractVector{String}}, 
+            nucCoords::$(SpatialCoordType|>typeStrNotUnionAll)) where {T, D, NN} -> 
+    T
+
+Return a matrix element of the core Hamiltonian given two basis functions.
+"""
+coreHij(bf1::AbstractGTBasisFuncs{T, D, 1}, bf2::AbstractGTBasisFuncs{T, D, 1}, 
+        nuc::Union{NTuple{NN, String}, AbstractVector{String}}, 
+        nucCoords::SpatialCoordType{T, D, NN}) where {T, D, NN} = 
+getCoreH(bf1, bf2, arrayToTuple(nuc), genTupleCoords(T, nucCoords))
+
+
+"""
+
+    coreH(bs::Union{GTBasis, Tuple{Vararg{AbstractGTBasisFuncs{T, D}}}, 
+                    AbstractVector{<:AbstractGTBasisFuncs{T, D}}}, 
+          nuc::Union{NTuple{NN, String}, AbstractVector{String}}, 
+          nucCoords::$(SpatialCoordType|>typeStrNotUnionAll)) where {T, D, NN} -> 
+    Matrix{T}
+
+Return the core Hamiltonian given a basis set and the corresponding nuclei with their 
+coordinates (in atomic units).
+"""
+coreH(bs::Union{Tuple{Vararg{AbstractGTBasisFuncs{T, D}}}, 
+                AbstractVector{<:AbstractGTBasisFuncs{T, D}}}, 
+      nuc::Union{NTuple{NN, String}, AbstractVector{String}}, 
+      nucCoords::SpatialCoordType{T, D, NN}) where {T, D, NN} = 
+getCoreH(bs|>arrayToTuple, arrayToTuple(nuc), genTupleCoords(T, nucCoords))
+
+coreH(b::GTBasis{T, D}, nuc::Union{NTuple{NN, String}, AbstractVector{String}}, 
+      nucCoords::SpatialCoordType{T, D, NN}) where {T, D, NN} = 
+neAttractions(b.basis, nuc, nucCoords) + b.Te

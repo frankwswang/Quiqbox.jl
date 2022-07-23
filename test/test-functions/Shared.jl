@@ -18,7 +18,8 @@ function compr2Arrays1(arr1, arr2, errT=1e-12, factor=1)
 end
 
 function compr2Arrays2(cprTuple::NamedTuple{<:Any, <:NTuple{2, T}}, 
-                       cutoffIdx::Int, atol::Float64, atol2::Float64=10*atol1) where {T}
+                       cutoffIdx::Int, atol::Float64, atol2::Float64=10*atol1, 
+                       idxDirecFunc::Function=(>)) where {T}
     bools = isapprox.(cprTuple[1], cprTuple[2]; atol)
     ids = findall(isequal(false), bools)
     if length(ids) > 0
@@ -27,7 +28,8 @@ function compr2Arrays2(cprTuple::NamedTuple{<:Any, <:NTuple{2, T}},
         for i=1:2
             println(ks[i], "[$(ids)] = ", cprTuple[i][ids])
         end
-        @test all(ids .> cutoffIdx) && all(abs.(Et1[ids] - rhfs[ids]) .< atol2)
+        @test all(idxDirecFunc.(ids,cutoffIdx)) && 
+              all(abs.(cprTuple[1][ids]-cprTuple[2][ids]) .< atol2)
     else
         @test true
     end

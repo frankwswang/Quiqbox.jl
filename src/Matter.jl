@@ -1,185 +1,259 @@
-export MolOrbital, getMolOrbitals, Molecule, nnRepulsions
+export CanOrbital, getCanOrbitals, changeHbasis, MatterByHF, nnRepulsions
 
 using LinearAlgebra: norm
-
-const spinStr = ("α", "β", "α&β")
+using Tullio: @tullio
 
 """
 
-    MolOrbital{N} <: AbstractMolOrbital
+    CanOrbital{T, D, NN} <: AbstractSpinOrbital{T, D}
 
-`Struct` of molecular orbitals.
+The spatial part (orbital) of a canonical spin-orbital (the set of which diagonalizes the 
+Fock matrix of a Hartree-Fock state) with its occupation information. This means the 
+maximal occupation number for the mode corresponding to the orbital (namely a canonical 
+orbital) equals 2. Please refer to [`getCanOrbitals`](@ref) for the construction of a 
+`CanOrbital`.
 
 ≡≡≡ Field(s) ≡≡≡
 
-`symmetry::String`: The symmetry of the orbital. The default value is "A" for being 
-antisymmetric.
+`energy::T`: The eigen energy corresponding to the orbital.
 
-`energy::Float64`: Molecular energy.
+`index::Int`: The index of the orbital within the same spin configuration.
 
-`spin::String`: Spin function of the orbital. Available values: `"$(spinStr[1])"`, 
-`"$(spinStr[2])"`, or `"$(spinStr[3])"` for being double-occupied.
+`nuc::NTuple{NN, String}`: The nuclei in the studied system.
 
-`occupancy::Real`: Occupation number.
+`nucCoords::NTuple{NN, NTuple{D, T}}`: The coordinates of corresponding nuclei.
 
-`orbitalCoeffs::NTuple{N, Float64}`: coefficients of the basis functions to form the 
-molecular orbital.
+`occu::NTuple{2, Array{Bool, 0}}`: The occupations of two spin configurations.
 
-≡≡≡ Initialization Method(s) ≡≡≡
-
-    MolOrbital(energy::Float64, occupancy::Real, orbitalCoeffs::Vector{Float64}, 
-               spin::String="$(spinStr[1])", symmetry::String="A") -> MolOrbital{N}
+`orbital::GTBasisFuncs{T, D, 1}`: The spatial orbital part.
 
 """
-struct MolOrbital{N} <: AbstractMolOrbital
-    symmetry::String
-    energy::Float64
-    spin::String
-    occupancy::Real
-    orbitalCoeffs::NTuple{N, Float64}
-
-    function MolOrbital(energy::Float64, occupancy::Real, 
-                        orbitalCoeffs::NTuple{N, Float64}, spin::String=spinStr[1], 
-                        symmetry::String="A") where {N}
-        @assert spin in spinStr "The input spin configuration "*
-        "is NOT supported."
-        new{N}(symmetry, energy, spin, occupancy, orbitalCoeffs)
-    end
-end
-
-
-"""
-
-    getMolOrbitals(ens::Vector{Float64}, occus::Vector{<:Real}, C::Matrix{Float64}, 
-                   spins::Vector{String}, 
-                   symms::Vector{String}=repeat(["A"], length(occus))) -> 
-    Tuple{Vararg{getMolOrbitals}}
-
-A function that returns the molecular orbitals.
-"""
-function getMolOrbitals(ens::Vector{Float64}, occus::Vector{<:Real}, C::Matrix{Float64}, 
-                        spins::Vector{String}, 
-                        symms::Vector{String}=repeat(["A"], length(occus)))
-    MolOrbital.(ens, occus, [ Tuple(C[:,i]) for i = 1:size(C, 2) ], spins, symms) |> Tuple
-end
-
-
-"""
-
-    Molecule{NN, N, NB} <:MolecularHartreeFockCoefficient{NN, N}
-
-Container for the electronic structure information of a system.
-
-≡≡≡ Field(s) ≡≡≡
-
-`nuc::NTuple{NN, String}`: Nuclei of the system.
-
-`nucCoords::NTuple{NN, NTuple{3,Float64}}`: Nuclei coordinates.
-
-`N::Int`: Total number of electrons.
-
-`orbital::Tuple{Vararg{MolOrbital}}`: Molecular orbitals.
-
-`basis::Tuple{Vararg{FloatingGTBasisFuncs}}`: The basis set for the molecular orbitals.
-
-`Ehf::Float64`: Hartree-Fock energy of the electronic Hamiltonian from the basis set.
-
-`Enn::Float64`: The nuclear repulsion energy.
-
-≡≡≡ Initialization Method(s) ≡≡≡
-
-    Molecule(basis::Vector{<:FloatingGTBasisFuncs}, 
-             nuc::NTuple{NN, String}, 
-             nucCoords::NTuple{NN, NTuple{3,Float64}}, 
-             N::Int, Ehf::Float64, Enn::Float64, 
-             Emos::Vector{Float64}, occus::Vector{<:Real}, C::Matrix{Float64}, 
-             spins::Vector{String}, 
-             symms::Vector{String}=repeat(["A"], length(occus))) -> 
-    Molecule{NN, N}
-
-`Emos` are the energies of corresponding molecular energies. `occus` are the occupation 
-numbers of the orbitals. `C` is the coefficient matrix, which does not need to be a square 
-matrix since the number of rows is the size of the (spatial) basis set whereas the number 
-of the columns represents the number of molecular orbitals. `spin` specifies the spin 
-functions of the orbitals, entries of which can be set to `"$(spinStr[1])"`, 
-`"$(spinStr[2])"`, or `"$(spinStr[3])"` for being double-occupied. `symms` are symmetries 
-of the orbitals where the default entry value is "A" for being antisymmetric.
-
-    Molecule(basis::Vector{<:FloatingGTBasisFuncs}, fVars::HFfinalVars) -> Molecule
-
-Construct a `Molecule` from a basis set, and the result from the corresponding 
-Hartree-Fock method.
-"""
-struct Molecule{NN, N, NB} <:MolecularHartreeFockCoefficient{NN, N}
+struct CanOrbital{T, D, NN} <: AbstractSpinOrbital{T, D}
+    energy::T
+    index::Int
     nuc::NTuple{NN, String}
-    nucCoords::NTuple{NN, NTuple{3,Float64}}
-    N::Int
-    orbital::Tuple{Vararg{MolOrbital}}
-    basis::Tuple{Vararg{FloatingGTBasisFuncs}}
-    Ehf::Float64
-    Enn::Float64
+    nucCoord::NTuple{NN, NTuple{D, T}}
+    occu::NTuple{2, Array{Bool, 0}}
+    orbital::GTBasisFuncs{T, D, 1}
 
-    function Molecule(basis::Vector{<:FloatingGTBasisFuncs}, 
-                      nuc::NTuple{NN, String}, 
-                      nucCoords::NTuple{NN, NTuple{3,Float64}}, 
-                      N::Int, Ehf::Float64, Enn::Float64, 
-                      Emos::Vector{Float64}, occus::Vector{<:Real}, C::Matrix{Float64}, 
-                      spins::Vector{String}, 
-                      symms::Vector{String}=repeat(["A"], length(occus))) where {NN}
-        NB = basisSize.(basis) |> sum
-        coeff = spins |> unique |> length
-        @assert (coeff*NB .== 
-                 length.([Emos, occus, C[1,:], spins, symms]) .== 
-                 coeff*length(C[:,1])) |> all
-        iSorted = mapPermute(basis, sortBasisFuncs)
-        basis = basis[iSorted]
-        offset = pushfirst!(accumulate(+, collect(basisSize.(basis)) .- 1), 0)
-        iSortedExtended = Union{Int, Vector{Int}}[]
-        append!(iSortedExtended, iSorted)
-        for (i, idx) in zip(iSorted, 1:length(iSorted))
-            if basis[i] isa BasisFuncs
-                iSortedExtended[idx] = collect(i : i+length(basis[i])-1) .+ offset[i]
-            else
-                iSortedExtended[idx] += offset[i]
+    CanOrbital(::Val{S}, i::Int, fVars::HFfinalVars{T, D, <:Any, NN}) where {S, T, D, NN} = 
+    new{T, D, NN}(fVars.Eo[S][i], i, fVars.nuc, fVars.nucCoord, 
+                  fill.(SpinOrbitalOccupation[fVars.occu[S][i]]), 
+                  mul.(fVars.C[S][:, i], fVars.basis.basis)|>sumOf)
+end
+
+
+function getCanOrbitalsCore(::Val{I}, 
+                            fVars::HFfinalVars{<:Any, <:Any, <:Any, <:Any, BN}) where 
+                           {I, BN}
+    OON = fVars.Ns[I]
+    rngO = 1:OON
+    rngU = (OON+1):BN
+    (
+        ( CanOrbital.(Val(I), rngO, Ref(fVars)), CanOrbital.(Val(I), rngU, Ref(fVars)) ), 
+        ( fVars.C[I][:, 1:OON], fVars.C[I][:, OON+1:BN] )
+    )
+end
+
+function getCanOrbitalsCore(fVars::HFfinalVars{<:Any, <:Any, :RHF})
+    ((a, b), (c, d)) = getCanOrbitalsCore(Val(1), fVars)
+    ((a,), (b,)), ((c,), (d,))
+end
+
+function getCanOrbitalsCore(fVars::HFfinalVars{<:Any, <:Any, :UHF})
+    ((a, b), (c, d)), ((e, f), (g, h)) = getCanOrbitalsCore.((Val(1), Val(2)), Ref(fVars))
+    ((a, e), (b, f)), ((c, g), (d, h))
+end
+
+"""
+
+    getCanOrbitals(fVars::HFfinalVars{T, D, <:Any, NN}) where {T, D, NN} -> 
+    CanOrbital{T, D, NN}
+
+Generate a set of canonical orbitals from the result of a Hartree-Fock approximation.
+"""
+getCanOrbitals(fVars::HFfinalVars) = getCanOrbitalsCore(fVars)[1]
+
+
+"""
+
+    changeHbasis(DbodyInt::AbstractArray{T, D}, C::AbstractMatrix{T}) where {T} -> 
+    AbstractArray{T, D}
+
+Change the basis of the input one-body / two-body integrals `DbodyInt` based on the orbital 
+coefficient matrix `C`.
+"""
+function changeHbasis(oneBoadyInt::AbstractMatrix{T}, C::AbstractMatrix{T}) where {T}
+    ij = similar(oneBoadyInt, size(C, 2), size(C, 2))
+    @tullio ij[i,j] := oneBoadyInt[a,b] * C[a,i] * C[b,j]
+end
+
+function changeHbasis(twoBoadyInt::AbstractArray{T, 4}, C::AbstractMatrix{T}) where {T}
+    ijkl = similar(twoBoadyInt, size(C, 2), size(C, 2), size(C, 2), size(C, 2))
+    @tullio ijkl[i,j,k,l] := twoBoadyInt[a,b,c,d] * C[a,i] * C[b,j] * C[c,k] * C[d,l]
+end
+
+function getJᵅᵝ(twoBoadyInt::AbstractArray{T, 4}, 
+                (C1, C2)::NTuple{2, AbstractMatrix{T}}) where {T}
+    iijj = similar(twoBoadyInt, size(C1, 2), size(C2, 2))
+    @tullio iijj[i,j] := twoBoadyInt[a,b,c,d] * C1[a,i] * C1[b,i] * C2[c,j] * C2[d,j]
+end
+
+"""
+
+    changeHbasis(twoBoadyInt::AbstractArray{T, 4}, 
+                 C1::AbstractMatrix{T}, C2::AbstractMatrix{T}) where {T} -> 
+    AbstractArray{T, 4}
+
+Change the basis of the input two-body integrals `twoBoadyInt` based on two orbital 
+coefficient matrices `C1` and `C2` for different spin configurations (e.g., the 
+unrestricted case). The output is a 3-element `Tuple` of which the first 2 elements are the 
+spatial integrals of each spin configurations respectively, while the last element is the 
+Coulomb interactions between orbitals with different spins.
+"""
+changeHbasis(twoBoadyInt::AbstractArray{T, 4}, C::Vararg{AbstractMatrix{T}, 2}) where {T} = 
+(changeHbasis.(Ref(twoBoadyInt), C)..., getJᵅᵝ(twoBoadyInt, C))
+
+"""
+
+    changeHbasis(b::GTBasis{T, D}, 
+                 nuc::NTuple{NN, String}, nucCoords::NTuple{NN, NTuple{D, T}}, 
+                 C::Union{AbstractMatrix{T}, NTuple{2, AbstractMatrix{T}}}) where 
+                {T, D, NN} -> 
+    NTuple{2, Any}
+
+Return the one-body and two-body integrals after a change of basis based on the input `C`, 
+given the basis set information `b`. The type of each element in the returned `Tuple` is 
+consistent with the cases where the first argument of `changeHbasis` is an `AbstractArray`.
+"""
+changeHbasis(b::GTBasis{T, D}, 
+             nuc::NTuple{NN, String}, nucCoords::NTuple{NN, NTuple{D, T}}, 
+             C::AbstractMatrix{T}) where {T, D, NN} = 
+changeHbasis.((coreH(b, nuc, nucCoords), b.eeI), Ref(C))
+
+function changeHbasis(b::GTBasis{T, D}, 
+                      nuc::NTuple{NN, String}, nucCoords::NTuple{NN, NTuple{D, T}}, 
+                      C::Vararg{AbstractMatrix{T}, 2}) where {T, D, NN}
+    Hcs = changeHbasis.(Ref(coreH(b, nuc, nucCoords)), C)
+    eeIs = changeHbasis(b.eeI, C...)
+    Hcs, eeIs
+end
+
+"""
+
+    changeHbasis(HFres::HFfinalVars) -> NTuple{2, Any}
+
+Return the one-body and two-body integrals on the basis of the canonical orbitals 
+using the result of a Hartree-Fock method `HFres`.
+"""
+changeHbasis(HFres::HFfinalVars) = 
+changeHbasis(HFres.basis, HFres.nuc, HFres.nucCoord, HFres.C...)
+
+
+"""
+
+    MatterByHF{T, D, NN, N, BN, HFTS} <:MatterData{T, D, N}
+
+Container of the electronic structure information of a quantum system.
+
+≡≡≡ Field(s) ≡≡≡
+
+`Ehf::T`: Hartree-Fock energy of the electronic Hamiltonian.
+
+`nuc::NTuple{NN, String}`: The nuclei in the studied system.
+
+`nucCoord::NTuple{NN, NTuple{D, T}}`: The coordinates of corresponding nuclei.
+
+`Enn::T`: The nuclear repulsion energy.
+
+`Ns::NTuple{2, Int}`: The numbers of two different spins respectively.
+
+`occuOrbital::NTuple{HFTS, Tuple{Vararg{CanOrbital{T, D, NN}}}}`: The occupied canonical 
+orbitals.
+
+`unocOrbital::NTuple{HFTS, Tuple{Vararg{CanOrbital{T, D, NN}}}}` The unoccupied canonical 
+orbitals.
+
+`occuC::NTuple{HFTS, Matrix{T}}`: Coefficient matrix(s) of occupied canonical orbitals.
+
+`unocC::NTuple{HFTS, Matrix{T}}`: Coefficient matrix(s) of unoccupied canonical orbitals.
+
+`coreHsameSpin::NTuple{HFTS, Matrix{T}}`: Core Hamiltonian(s) (one-body integrals) of the 
+canonical orbitals with same spin configuration(s).
+
+`eeIsameSpin::NTuple{HFTS, Array{T, 4}}`: electron-electron interactions (two-body 
+integrals) of the canonical orbitals with same spin configuration(s).
+
+`eeIdiffSpin::Matrix{T}`: Coulomb interactions between canonical orbitals with different 
+spins.
+
+`basis::GTBasis{T, D, BN}`: The basis set used for the Hartree-Fock approximation.
+
+≡≡≡ Initialization Method(s) ≡≡≡
+
+    MatterByHF(HFres::HFfinalVars{T, D, <:Any, NN, BN, HFTS}) where {T, D, NN, BN, HFTS} -> 
+    MatterByHF{T, D, NN, <:Any, BN, HFTS}
+
+Construct a `MatterByHF` from the result of a Hartree-Fock method `HFres`.
+"""
+struct MatterByHF{T, D, NN, N, BN, HFTS} <:MatterData{T, D, N}
+    Ehf::T
+    nuc::NTuple{NN, String}
+    nucCoord::NTuple{NN, NTuple{D, T}}
+    Enn::T
+    Ns::NTuple{2, Int}
+    occuOrbital::NTuple{HFTS, Tuple{Vararg{CanOrbital{T, D, NN}}}}
+    unocOrbital::NTuple{HFTS, Tuple{Vararg{CanOrbital{T, D, NN}}}}
+    occuC::NTuple{HFTS, Matrix{T}}
+    unocC::NTuple{HFTS, Matrix{T}}
+    coreHsameSpin::NTuple{HFTS, Matrix{T}}
+    eeIsameSpin::NTuple{HFTS, Array{T, 4}}
+    eeIdiffSpin::Matrix{T}
+    basis::GTBasis{T, D, BN}
+
+    function MatterByHF(fVars::HFfinalVars{T, D, <:Any, NN, BN, HFTS}) where 
+                       {T, D, NN, BN, HFTS}
+        nuc = fVars.nuc
+        nucCoords = fVars.nucCoord
+        Ns = fVars.Ns
+        basis = fVars.basis
+        (osO, osU), (CO, CU) = getCanOrbitalsCore(fVars)
+        ints = changeHbasis(fVars)
+        if HFTS == 1
+            cH = (ints[1],)
+            eeI = ints[2]
+            Jᵅᵝ = Array{T}(undef, BN, BN)
+            for i=1:BN, j=i:BN
+               Jᵅᵝ[i,j] = Jᵅᵝ[j,i] = eeI[i,i,j,j]
             end
+            eeI = (eeI,)
+        elseif HFTS == 2
+            cH = ints[1]
+            eeI = ints[2][1:2]
+            Jᵅᵝ = ints[2][3]
+        else
+            error("The input data format is not supported: HFTS = $(HFTS).")
         end
-        C = C[vcat(iSortedExtended...), :]
-        new{NN, N, NB}(nuc, nucCoords, N, getMolOrbitals(Emos, occus, C, spins, symms), 
-                       deepcopy(basis) |> Tuple, Ehf, Enn)
+        new{T, D, NN, sum(Ns), BN, HFTS}(fVars.Ehf, nuc, nucCoords, fVars.Enn, Ns, 
+                                         Tuple.(osO), Tuple.(osU), CO, CU, 
+                                         cH, eeI, Jᵅᵝ, basis)
     end
-end
-
-function Molecule(basis::Vector{<:FloatingGTBasisFuncs}, 
-                  fVars::HFfinalVars{<:Any, <:Any, HFTS}) where {HFTS}
-    l1 = length(fVars.Emo[1])
-    Emos, occus, C, spins = if HFTS == 1
-        l2 = l1
-        ( fVars.Emo[1], fVars.occu[1], fVars.C[1], fill(spinStr[3], l1) )
-    else
-        l2 = 2l1
-        ( vcat(fVars.Emo[1], fVars.Emo[2]), vcat(fVars.occu[1], fVars.occu[2]), 
-          hcat(fVars.C[1], fVars.C[2]), vcat(fill(spinStr[1], l1), fill(spinStr[2], l1)) )
-    end
-    Molecule(basis, fVars.nuc, fVars.nucCoords, fVars.N, fVars.Ehf, fVars.Enn, Emos, occus, 
-             C, spins, fill("A", l2))
 end
 
 
 """
 
-    nnRepulsions(nuc::Union{NTuple{NN, String}, Vector{String}}, 
-                 nucCoords::Union{NTuple{NN, NTuple{3, Float64}}, 
-                                  Vector{<:AbstractArray{<:Real}}}) where {NN} -> 
-    Float64
+    nnRepulsions(nuc::Union{NTuple{NN, String}, AbstractVector{String}}, 
+                 nucCoords::$(SpatialCoordType|>typeStrNotUnionAll)) where {NN, D, T} -> 
+    T
 
-Calculate the nuclear repulsion energy given the nuclei and their coordinates.
+Return the nuclear repulsion energy given nuclei `nuc` and their coordinates `nucCoords`.
 """
-function nnRepulsions(nuc::Union{NTuple{NN, String}, Vector{String}}, 
-                      nucCoords::Union{NTuple{NN, NTuple{3, Float64}}, 
-                                       Vector{<:AbstractArray{<:Real}}}) where {NN}
+function nnRepulsions(nuc::Union{NTuple{NN, String}, AbstractVector{String}}, 
+                      nucCoords::SpatialCoordType{T, D, NN}) where {NN, D, T}
     nuc = arrayToTuple(nuc)
-    nucCoords = genTupleCoords(nucCoords)
-    E = 0.0
+    nucCoords = genTupleCoords(T, nucCoords)
+    E = T(0)
     len = length(nuc)
     for i = 1:len, j=i+1:len
         E += getCharge(nuc[i]) * getCharge(nuc[j]) / norm(nucCoords[i] .- nucCoords[j])

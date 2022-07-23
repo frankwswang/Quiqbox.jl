@@ -1,8 +1,19 @@
-export hasEqual, hasIdentical, flatten, markUnique, getUnique!
+export hasEqual, hasIdentical, hasApprox, flatten, markUnique, getUnique!
 
 using Statistics: std, mean
-using Symbolics
 using LinearAlgebra: eigvals, svdvals, eigen
+
+getAtolCore(::Type{T}) where {T<:Real} = log(10, T|>eps) |> ceil
+getAtolVal(::Type{T}) where {T<:Real} = round(10^(T |> getAtolCore), sigdigits=1)
+
+"""
+
+    getAtolDigits(::Type{T}) where {T<:Real} -> Int
+
+Set the maximal number of digits kept after rounding given a real number `DataType`.
+"""
+getAtolDigits(::Type{T}) where {T<:Real} = Int(-getAtolCore(T))
+
 
 # Function for submodule loading and integrity checking.
 function tryIncluding(subModuleName::String; subModulePath=(@__DIR__)[:]*"/SubModule")
@@ -23,66 +34,9 @@ function tryIncluding(subModuleName::String; subModulePath=(@__DIR__)[:]*"/SubMo
 end
 
 
-"""
+sizeOf(arr::AbstractArray) = size(arr)
 
-    @compareLength inputArg1 inputArg2 argNames::String... -> length(inputArg1)
-
-A macro that checks whether the lengths of 2 `Arrays`/`Tuples` are equal. It returns the 
-lengths of the compared objects are the same; it throws a detailed ERROR message when they 
-are not equal.
-
-You can specify the name for the compared variables in arguments for better ERROR 
-information.
-
-≡≡≡ Example(s) ≡≡≡
-
-```jldoctest; setup = :(push!(LOAD_PATH, "../../src/"); using Quiqbox)
-julia> Quiqbox.@compareLength [1,2] [3,4]
-2
-
-julia> let a = [1,2], b = [3]
-           Quiqbox.@compareLength a b
-       end
-ERROR: The lengths of a and b are NOT equal.
-       a::Vector{Int64}   length: 2
-       b::Vector{Int64}   length: 1
-
-julia> Quiqbox.@compareLength [1,2] [3] "a"
-ERROR: The lengths of a ([1, 2]) and [3] are NOT equal.
-       a ([1, 2])::Vector{Int64}   length: 2
-       [3]::Vector{Int64}   length: 1
-
-julia> Quiqbox.@compareLength [1,2] [3] "a" "b"
-ERROR: The lengths of a ([1, 2]) and b ([3]) are NOT equal.
-       a ([1, 2])::Vector{Int64}   length: 2
-       b ([3])::Vector{Int64}   length: 1
-```
-"""
-macro compareLength(inputArg1, inputArg2, argNames::String...)
-    # In a macro you must escape all the user inputs once and exactly once.
-    ns0 = [string(inputArg1), string(inputArg2)]
-    ns = ns0
-    quote
-        local arg1 = $(esc(inputArg1))
-        local arg2 = $(esc(inputArg2))
-        type = Union{AbstractArray, Tuple}
-        (!(arg1 isa type && arg2 isa type)) && error("The compared objects have to be ", 
-                                                     "Arrays or Tuples!\n")
-        if length(arg1) != length(arg2)
-            for i = 1:length($argNames)
-                # Replace the default type control ERROR message.
-                !($argNames[i] isa String) && error("The object's name has to be a "*
-                                                    "`String`!\n")
-                $ns[i] = $argNames[i]*" ($($ns0[i]))"
-            end
-            error("""The lengths of $($ns[1]) and $($ns[2]) are NOT equal.
-                           $($ns0[1])::$(typeof(arg1))   length: $(length(arg1))
-                           $($ns0[2])::$(typeof(arg2))   length: $(length(arg2))
-                    """)
-        end
-        length(arg1)
-    end
-end
+sizeOf(tpl::Tuple) = (length(tpl),)
 
 
 """
@@ -91,20 +45,18 @@ end
                     ignoreContainer::Bool=false, decomposeNumberCollection::Bool=false) -> 
     Bool
 
-Recursively apply the specified boolean operator to all the fields within 2 objects 
-(normally 2 `struct`s in the same type). It returns `true` only if all comparisons 
-performed return `true`. Note that the boolean operator should have method(s) defined for 
-all the possible elements inside the compared objects.
+Recursively apply the specified boolean operator `boolOp` to all the fields inside two 
+objects (e.g., two `struct`s of the same type). It returns `true` if and only if all 
+comparisons performed return `true`. Note that the boolean operator should have method(s) 
+defined for all the possible fields inside the compared objects.
 
-If `ignoreFunction = true`, the function will ignore comparisons between Function-type 
-fields.
+If `ignoreFunction = true`, comparisons between Function-type fields will be ignored.
 
-If `ignoreContainer = true`, the function will ignore the difference of the container(s) as 
-long as the boolean operator returns true for the field(s)/entry(s) from two objects 
-respectively.
+If `ignoreContainer = true`, the difference of the container(s) will be ignored as long as 
+the boolean operator returns true for the field(s)/entry(s) from two objects respectively.
 
-If `decomposeNumberCollection = true`, then `Tuple{Vararg{Number}}` and `Array{<:Number}` 
-will be treated as decomposable containers.
+If `decomposeNumberCollection = true`, `Tuple{Vararg{Number}}` and `Array{<:Number}` will 
+be treated as decomposable containers.
 
 ≡≡≡ Example(s) ≡≡≡
 
@@ -149,36 +101,19 @@ end
 true
 ```
 """
-function hasBoolRelation(boolOp::F, obj1, obj2;
+function hasBoolRelation(boolOp::F, obj1::T1, obj2::T2; 
                          ignoreFunction::Bool=false, 
-                         ignoreContainer::Bool=false,
-                         decomposeNumberCollection::Bool=false) where {F<:Function}
+                         ignoreContainer::Bool=false, 
+                         decomposeNumberCollection::Bool=false) where {T1, T2, F<:Function}
     res = true
-    t1 = typeof(obj1)
-    t2 = typeof(obj2)
-    if (t1 <: Function) && (t2 <: Function)
-        ignoreFunction ? (return true) : (return boolOp(obj1, obj2))
-    elseif (t1 <: Number) && (t2 <: Number)
-        return boolOp(obj1, obj2)
-    elseif t1 != t2 && !ignoreContainer
+    if T1 != T2 && !ignoreContainer && 
+          ( !ignoreFunction || typejoin(T1, T2) == Any || 
+            !(isa.([T1.parameters...], Type{<:FLevel}) |> any) || 
+            !(isa.([T2.parameters...], Type{<:FLevel}) |> any) )
         return false
-    elseif obj1 isa Union{Array, Tuple}
-        if !decomposeNumberCollection && 
-           (eltype(obj1) <: Number) && (eltype(obj2) <: Number)
-            return boolOp(obj1, obj2)
-        end
-        length(obj1) != length(obj2) && (return false)
-        !ignoreContainer && obj1 isa Matrix && (size(obj1) != size(obj2)) && (return false)
-        for (i,j) in zip(obj1, obj2)
-            res *= hasBoolRelation(boolOp, i, j; ignoreFunction, ignoreContainer, 
-                                   decomposeNumberCollection)
-            !res && (return false)
-        end
-    elseif obj1 isa Type || obj2 isa Type
-        return boolOp(obj1, obj2)
     else
-        fs1 = fieldnames(t1)
-        fs2 = fieldnames(t2)
+        fs1 = fieldnames(T1)
+        fs2 = fieldnames(T2)
         if fs1 == fs2
             if length(fs1) == 0
                 res = boolOp(obj1, obj2)
@@ -198,17 +133,55 @@ function hasBoolRelation(boolOp::F, obj1, obj2;
     end
     res
 end
+
+hasBoolRelation(boolOp::Function, obj1::Function, obj2::Function; 
+                ignoreFunction::Bool=false, ignoreContainer::Bool=false, 
+                decomposeNumberCollection::Bool=false) = 
+ifelse(ignoreFunction, true, boolOp(obj1, obj2))
+
+hasBoolRelation(boolOp::Function, obj1::Number, obj2::Number; 
+                ignoreFunction::Bool=false, ignoreContainer::Bool=false, 
+                decomposeNumberCollection::Bool=false) = 
+boolOp(obj1, obj2)
+
+hasBoolRelation(boolOp::Function, obj1::Type{T1}, obj2::Type{T2}; 
+                ignoreFunction::Bool=false, ignoreContainer::Bool=false, 
+                decomposeNumberCollection::Bool=false) where {T1, T2} = 
+boolOp(obj1, obj2)
+
+function hasBoolRelation(boolOp::F, 
+                         obj1::Union{AbstractArray, Tuple}, 
+                         obj2::Union{AbstractArray, Tuple}; 
+                         ignoreFunction::Bool=false, ignoreContainer::Bool=false, 
+                         decomposeNumberCollection::Bool=false) where {F<:Function}
+    if !decomposeNumberCollection && (eltype(obj1) <: Number) && (eltype(obj2) <: Number)
+        return boolOp(obj1, obj2)
+    end
+    !ignoreContainer && 
+    (typejoin(typeof(obj1), typeof(obj2))==Any || sizeOf(obj1)!=sizeOf(obj2)) && 
+    (return false)
+    length(obj1) != length(obj2) && (return false)
+    res = true
+    for (i,j) in zip(obj1, obj2)
+        res *= hasBoolRelation(boolOp, i, j; ignoreFunction, ignoreContainer, 
+                                decomposeNumberCollection)
+        !res && (return false)
+    end
+    res
+end
 ## Refer overload for `ParamBox` to Overload.jl.
 
 """
 
-    hasBoolRelation(boolOp::F, obj1, obj2, obj3...; 
+    hasBoolRelation(boolOp::Function, obj1, obj2, obj3...; 
                     ignoreFunction::Bool=false, 
                     ignoreContainer::Bool=false,
-                    decomposeNumberCollection::Bool=false) where {F<:Function} -> 
+                    decomposeNumberCollection::Bool=false) -> 
     Bool
 
-Method for more than 2 objects. E.g.: `hasBoolRelation(>, a, b, c)` is equivalent to 
+Method for more than 2 objects. If returns true if and only if `hasBoolRelation` returns 
+true for every unique combination of two objects from the all the input objects under the 
+transitive relation. E.g.: `hasBoolRelation(>, a, b, c)` is equivalent to 
 `hasBoolRelation(>, a, b) && hasBoolRelation(>, b, c)`.
 
 ≡≡≡ Example(s) ≡≡≡
@@ -260,19 +233,8 @@ end
              decomposeNumberCollection::Bool=false) -> 
     Bool
 
-Compare if two objects are the equal.
-
-If `ignoreFunction = true`, the function will ignore comparisons between Function-type 
-fields.
-
-If `ignoreContainer = true`, the function will ignore the difference of the container(s) 
-and only compare the field(s)/entry(s) from two objects respectively.
-
-If `decomposeNumberCollection = true`, then `Tuple{Vararg{Number}}` and `Array{<:Number}` 
-will be treated as decomposable containers.
-
-This is an instantiation of `Quiqbox.hasBoolRelation`.
-
+Compare if two containers (e.g. `struct`) are equal. An instantiation of 
+[`hasBoolRelation`](@ref).
 ≡≡≡ Example(s) ≡≡≡
 
 ```jldoctest; setup = :(push!(LOAD_PATH, "../../src/"); using Quiqbox)
@@ -309,18 +271,8 @@ hasBoolRelation(==, obj1, obj2, obj3...; ignoreFunction, ignoreContainer,
                  decomposeNumberCollection::Bool=false) -> 
     Bool
 
-Compare if two objects are the Identical. An instantiation of `hasBoolRelation`.
-
-If `ignoreFunction = true`, the function will ignore comparisons between Function-type 
-fields.
-
-If `ignoreContainer = true`, the function will ignore the difference of the container(s) 
-and only compare the field(s)/entry(s) from two objects respectively.
-
-If `decomposeNumberCollection = true`, then `Tuple{Vararg{Number}}` and `Array{<:Number}` 
-will be treated as decomposable containers.
-
-This is an instantiation of `Quiqbox.hasBoolRelation`.
+Compare if two containers (e.g. `struct`) are the Identical. An instantiation of 
+[`hasBoolRelation`](@ref).
 
 ≡≡≡ Example(s) ≡≡≡
 
@@ -353,14 +305,48 @@ hasBoolRelation(===, obj1, obj2, obj3...; ignoreFunction, ignoreContainer,
 
 """
 
+    hasApprox(obj1, obj2, obj3...; ignoreFunction::Bool=false, ignoreContainer::Bool=false,
+              decomposeNumberCollection::Bool=false, atol::Real=1e-15) -> 
+    Bool
+
+Similar to [`hasEqual`](@ref), except it does not require the `Number`-typed fields 
+(e.g. `Float64`) of the compared containers to have the exact same values, but rather the 
+approximate values within an error threshold determined by `atol`, like in `isapprox`.
+"""
+hasApprox(obj1, obj2, obj3...; ignoreFunction::Bool=false, ignoreContainer::Bool=false,
+          decomposeNumberCollection::Bool=false, atol::Real=1e-15) = 
+hasBoolRelation((x, y)->hasApproxCore(x, y, atol), obj1, obj2, obj3...; ignoreFunction, 
+                ignoreContainer, decomposeNumberCollection)
+
+hasApproxCore(obj1::T1, obj2::T2, atol::Real=1e-15) where {T1<:Number, T2<:Number} = 
+isapprox(obj1, obj2; atol)
+
+function hasApproxCore(obj1::AbstractArray{<:Number}, obj2::AbstractArray{<:Number}, 
+                       atol::Real=1e-15)
+    if length(obj1) != length(obj2)
+        false
+    else
+        isapprox.(obj1, obj2; atol) |> all
+    end
+end
+
+hasApproxCore(obj1::NTuple{N, Number}, obj2::NTuple{N, Number}, 
+              atol::Real=1e-15) where {N} = 
+isapprox.(obj1, obj2; atol) |> all
+
+hasApproxCore(obj1, obj2, _=1e-15) = (obj1 == obj2)
+
+
+"""
+
     printStyledInfo(str::String; title::String="", titleColor::Symbol=:light_blue) -> 
     Nothing
 
 Print info with colorful title and automatically highlighted code blocks enclosed by ` `.
 
-If you want to highlight other contents in different colors, you can also put them inside 
-` ` and start it with "///theColorSymbolName///". The available color names follows the 
-values of `color` keyword argument in function `printstyled`.
+If you want to highlight other contents in different colors, you can also start it with 
+"///theColorSymbolName///" and then enclose it with ``. The available color names follows 
+the values of `color` keyword argument in function `Base.printstyled`.
 
 NOTE: There can only be one color in one ` ` quote.
 
@@ -408,10 +394,10 @@ end
 """
     flatten(a::Tuple) -> Tuple
 
-    flatten(a::Array) -> Array
+    flatten(a::AbstractVector) -> AbstractVector
 
-Flatten `a::Union{Array, Tuple}` that contains `Array`s and/or `Tuple`s. Only operate on 
-the outermost layer.
+Flatten `a::Union{AbstractVector, Tuple}` that contains `AbstractArray`s and/or `Tuple`s. 
+Only operate on the outermost container.
 
 ≡≡≡ Example(s) ≡≡≡
 
@@ -430,29 +416,34 @@ julia> flatten([:one, 2, [3, 4.0], ([5], "six"), "7"])
   "7"
 ```
 """
-function flatten(c::Array{T}) where {T}
-    c2 = map( x->(x isa Union{Array, Tuple} ? x : (x,)), c )
+function flatten(c::AbstractVector{T}) where {T}
+    c2 = map( x->(x isa Union{AbstractArray, Tuple} ? x : (x,)), c )
     [(c2...)...]
 end
 
 function flatten(c::Tuple)
-    c2 = map( x->(x isa Union{Array, Tuple} ? x : (x,)), c )
+    c2 = map( x->(x isa Union{AbstractArray, Tuple} ? x : (x,)), c )
     ((c2...)...,)
 end
+
+flatten(c::AbstractVector{<:Tuple}) = joinTuple(c...) |> collect
+
+joinTuple(t1::Tuple, t2::Tuple, t3::Tuple...) = (t1..., joinTuple(t2, t3...)...)
+
+joinTuple(t::Tuple) = itself(t)
 
 
 """
 
-    markUnique(arr::AbstractArray, args...; 
-               compareFunction::Function = hasEqual, kws...) -> 
-    markingList:: Array{Int, 1}, uniqueList::Array
+    markUnique(arr::AbstractArray{T}, args...; 
+               compareFunction::Function=hasEqual, kws...) where {T} -> 
+    Tuple{Vector{Int}, Vector{T}}
 
-Return a `markingList` using `Int` number to mark each different elements from (and inside) 
-the input argument(s) and a `uniqueList` to contain all the unique elements when 
-`compareFunction` is set to `hasEqual` (in default).
-
-`args` and `kws` are positional arguments and keywords arguments respectively as 
-parameters of the specified `compareFunction`.
+Return a `Vector{Int}` whose elements are indices to mark the elements inside `arr` such 
+that same element will be marked with same index, and a `Vector{T}` containing all the 
+unique elements. The definition of "unique" (or "same") is based on `compareFunction` 
+which is set to [`hasEqual`](@ref) in default. `args` and `kws` are placeholders for the 
+positional arguments and keyword arguments for `compareFunction` respectively.
 
 ≡≡≡ Example(s) ≡≡≡
 
@@ -506,12 +497,12 @@ end
 
 """
 
-    getUnique!(arr::Array, args...; compareFunction::F = hasEqual, kws...) where 
-              {F<:Function} -> 
-    arr::Array
+    getUnique!(arr::AbstractVector, args...; compareFunction::Function = hasEqual, 
+               kws...) -> 
+    AbstractVector
 
-Similar to [`markUnique`](@ref) but instead, just directly return the input `Array` with 
-repeated entries deleted.
+Similar to [`markUnique`](@ref) but instead, directly return the modified `arr` so that the 
+repeated entries are deleted.
 
 ≡≡≡ Example(s) ≡≡≡
 
@@ -532,7 +523,7 @@ julia> arr
   "s"
 ```
 """
-function getUnique!(arr::AbstractArray{T}, args...; 
+function getUnique!(arr::AbstractVector{T}, args...; 
                     compareFunction::F = hasEqual, kws...) where {T<:Any, F<:Function}
     @assert length(arr) > 1 "The length of input array should be larger than 1."
     f = (b...)->compareFunction((b..., args...)...; kws...)
@@ -554,22 +545,33 @@ end
 
 
 """
-A dummy function that only returns its argument.
+
+    itself(::T) -> T
+
+A dummy function that returns its argument.
 """
-itself(x::T) where {T} = x::T
+@inline itself(x) = x
+
+const itselfT = typeof(itself)
+
+@inline themselves(xs::Vararg) = xs
 
 
 """
-Similar as `replace` but for Symbols.
+
+    replaceSymbol(sym::Symbol, pair::Pair{String, String}; count::Int=typemax(Int)) -> 
+    Symbol
+
+Similar as `Base.replace` but for Symbols.
 """
 function replaceSymbol(sym::Symbol, pair::Pair{String, String}; count::Int=typemax(Int))
     replace(sym |> string, pair; count) |> Symbol
 end
 
 
-# function renameFunc(fName::Symbol, f::F, ::Type{T}, N::Int=1) where {F<:Function, T}
-#     @eval ($(fName))(a::Vararg{$T, $N}) = $f(a...)::$T
-# end
+function renameFunc(fName::Symbol, f::F, ::Type{T}, N::Int=1) where {F<:Function, T}
+    @eval ($(fName))(a::Vararg{$T, $N}) = $f(a...)::$T
+end
 
 function renameFunc(fName::Symbol, f::F, N::Int=1) where {F<:Function}
     @eval ($(fName))(a::Vararg{Any, $N}) = $f(a...)
@@ -578,95 +580,27 @@ end
 renameFunc(fName::String, args...) = renameFunc(Symbol(fName), args...)
 
 
-"""
-Recursively find the final value using the value of each iteration as the key for the 
-next search.
-"""
-function recursivelyGet(dict::Dict{K, V}, startKey::K, default=Array{V}(undef, 1)[]) where 
-                       {K, V}
-    res = default
-    val = get(dict, startKey, missing)
-    while !(val isa Missing)
-        res = val
-        val = get(dict, val, missing)
-    end
-    res
-end
-
-recursivelyGet(dict::Dict{K, <:Real}, startKey::K) where {K} = 
-recursivelyGet(dict, startKey, NaN)
-
-
-function isOscillateConverged(sequence::Vector{<:Real}, 
-                              threshold1::Real, threshold2::Real=threshold1; 
-                              leastCycles::Int=1, nPartition::Int=5, 
-                              convergeToMax::Bool=false)
-    @assert leastCycles>0 && nPartition>1
-    len = length(sequence)
-    len < leastCycles && (return false)
+function isOscillateConverged(seq::AbstractVector{T}, 
+                              ValDiffThreshold::Real, 
+                              stdThreshold::Real=0.65ValDiffThreshold; 
+                              nPartition::Int=5, minimalCycles::Int=nPartition, 
+                              convergeToMax::Bool=false) where {T}
+    @assert minimalCycles>0 && nPartition>1
+    len = length(seq)
+    len < minimalCycles && (return (false, T(0)))
     slice = len ÷ nPartition
-    lastPortion = sequence[max(end-slice, 1) : end]
-    remain = sort(lastPortion)[convergeToMax ? (end÷2+1 : end) : (1 : end÷2+1)]
-    b = std(remain) < threshold1 && 
-        abs(sequence[end] - (convergeToMax ? max(remain...) : min(remain...))) < threshold2
+    lastPortion = seq[max(end-slice, 1) : end]
+    remain = sort(lastPortion)[ifelse(convergeToMax, (end÷2+1 : end), (1 : end÷2+1))]
+    b = std(remain) < stdThreshold && 
+        abs(seq[end] - (convergeToMax ? max(remain...) : min(remain...))) < ValDiffThreshold
     b, std(lastPortion)
 end
 
 
-splitTerm(trm::Symbolics.Num) = 
-splitTermCore(trm.val)::Vector{<:Union{Real, SymbolicUtils.Symbolic}}
-
-@inline function rewriteCore(trm, r)
-    res = r(trm)
-    res === nothing ? trm : res
-end
-
-function splitTermCore(trm::SymbolicUtils.Add)
-    r1 = SymbolicUtils.@rule +(~(~xs)) => [i for i in ~(~xs)]
-    r1(trm) .|> rewriteTerm
-end
-
-rewriteTerm(trm::SymbolicUtils.Add) = splitTermCore(trm)
-
-rewriteTerm(trm::SymbolicUtils.Pow) = itself(trm)
-
-function rewriteTerm(trm::SymbolicUtils.Div)
-    r = @rule (~x) / (~y) => (~x) * (~y)^(-1)
-    rewriteCore(trm, r)
-end
-
-function rewriteTerm(trm::SymbolicUtils.Mul)
-    r = SymbolicUtils.@rule *(~(~xs)) => sort([i for i in ~(~xs)], 
-                              by=x->(x isa SymbolicUtils.Symbolic)) |> prod
-    rewriteCore(trm, r) |> SymbolicUtils.simplify
-end
-
-function splitTermCore(trm::SymbolicUtils.Mul)
-    r1 = SymbolicUtils.@rule *(~(~xs)) => [i for i in ~(~xs)]
-    r2 = SymbolicUtils.@rule +(~(~xs)) => [i for i in ~(~xs)]
-    r3 = @acrule ~~vs * exp((~a)*((~x)^2+(~y)^2+(~z)^2)) * 
-                        exp(-1*(~a)*((~x)^2+(~y)^2+(~z)^2)) => prod(~~vs)
-    trms = rewriteCore(trm, r1)
-    idx = findfirst(x-> x isa SymbolicUtils.Add, trms)
-    if idx !== nothing
-        sumTerm = popat!(trms, idx)
-        var = SymbolicUtils.simplify(sort(trms, 
-                                          by=x->(x isa SymbolicUtils.Symbolic)) |> prod)
-        rewriteCore.((r2(sumTerm) .* var), Ref(r3)) .|> rewriteTerm |> flatten
-    else
-        [trms |> prod]
-    end
-end
-
-splitTermCore(trm::SymbolicUtils.Div) = trm |> rewriteTerm |> splitTermCore
-
-splitTermCore(trm) = [trm]
-
-
-function groupedSort(v::Vector, sortFunction::F=itself) where {F<:Function}
-    sortedArr = sort(v, by=x->sortFunction(x))
+function groupedSort(v::T, sortFunction::F=itself) where {T<:AbstractVector, F<:Function}
+    sortedArr = sort(v, by=sortFunction)
     state1 = 1
-    groups = typeof(v)[]
+    groups = T[]
     next = iterate(sortedArr)
     while next !== nothing
         item, state = next
@@ -700,19 +634,34 @@ struct TypedFunction{F<:Function} <: StructFunction{F}
     TypedFunction(f::F) where {F<:Function} = new{F}(f, nameOf(f))
 end
 
+TypedFunction(f::TypedFunction) = itself(f)
+
 (tf::TypedFunction{F})(x...) where {F} = tf.f(x...)
 
 
 # Product Function
-struct Pf{C, F} <: ParameterizedFunction{Pf, F}
+struct Pf{T<:Number, F<:Function} <: ParameterizedFunction{Pf, F}
+    c::T
     f::TypedFunction{F}
 end
 
-Pf(c::Float64, f::TypedFunction{F}) where {F} = Pf{c, F}(f)
-Pf(c::Float64, f::Pf{C, F}) where {C, F} = Pf{c*C, F}(f.f)
-Pf(c::Float64, f::F) where {F<:Function} = Pf(c, TypedFunction(f))
+PfCore(c::T, f::Pf{T, F}) where {T, F} = Pf{T, F}(f.c*c, f.f)
+PfCore(c::T, f::F) where {T, F<:Function} = Pf{T, F}(c, TypedFunction(f))
+Pf(c::T, f::F) where {T, F<:Function} = ifelse(c == T(1), f, PfCore(c, f))
 
-(f::Pf{C, F})(x::T) where {C, F, T} = Float64(C) * f.f.f(x)
+(f::Pf)(x::T) where {T<:Number} = f.c * f.f.f(x)
+
+
+# Sum Function
+struct Sf{T<:Number, F<:Function} <: ParameterizedFunction{Sf, F}
+    c::T
+    f::TypedFunction{F}
+end
+SfCore(c::T, f::Sf{T, F}) where {T, F} = Sf{T, F}(f.c+c, f.f)
+SfCore(c::T, f::F) where {T, F<:Function} = Sf{T, F}(c, TypedFunction(f))
+Sf(c::T, f::F) where {T, F<:Function} = ifelse(c == T(0), f, SfCore(c, f))
+
+(f::Sf)(x::T) where {T<:Number} = f.c + f.f.f(x)
 
 
 function getFunc(fSym::Symbol, failedResult=missing)
@@ -770,7 +719,7 @@ function arrayDiffCore!(vs::NTuple{N, Array{T}}) where {N, T}
 end
 
 function arrayDiffCore!(v1::Array{T}, v2::Array{T}) where {T}
-    a1, a2 = (length(v1) > length(v2)) ? (v2, v1) : (v1, v2)
+    a1, a2 = ifelse((length(v1) > length(v2)), (v2, v1), (v1, v2))
     coms = T[]
     l = length(a1)
     sizehint!(coms, l)
@@ -795,22 +744,6 @@ arrayDiff!(vs::Vararg{Array{T}, N}) where {T, N} = arrayDiffCore!(vs)
 tupleDiff(ts::Vararg{NTuple{<:Any, T}, N}) where {T, N} = arrayDiff!((ts .|> collect)...)
 
 
-function getFuncNum(f::Function, vNum::Symbolics.Num)::Symbolics.Num
-    Symbolics.variable(f|>nameOf, T=Symbolics.FnType)(vNum)
-end
-
-function getFuncNum(pf::Pf{C, F}, vNum::Symbolics.Num) where {C, F}
-    (C * Symbolics.variable(pf.f.n, T=Symbolics.FnType)(vNum))::Symbolics.Num
-end
-
-function getFuncNum(tf::TypedFunction{F}, vNum::Symbolics.Num) where {F}
-    Symbolics.variable(tf.n, T=Symbolics.FnType)(vNum)::Symbolics.Num
-end
-
-getFuncNum(::TypedFunction{typeof(itself)}, vNum::Symbolics.Num) = itself(vNum)
-
-getFuncNum(::typeof(itself), vNum::Symbolics.Num) = itself(vNum)
-
 function genIndex(index::Int)
     @assert index >= 0
     genIndexCore(index)
@@ -826,7 +759,7 @@ end
 
 function genNamedTupleC(name::Symbol, defaultVars::AbstractArray)
     @inline function (t::T) where {T<:NamedTuple}
-        container = getfield(Quiqbox, name)
+        container = getproperty(Quiqbox, name)
         res = deepcopy(defaultVars)
         keys = fieldnames(container)
         d = Dict(keys .=> collect(1:length(defaultVars)))
@@ -838,25 +771,30 @@ function genNamedTupleC(name::Symbol, defaultVars::AbstractArray)
 end
 
 
-convertNumber(num::Number, roundDigits::Int=-1, type::Type{<:Number}=Float64) = 
-(roundDigits < 0  ?  num  :  round(num, digits=roundDigits)) |> type
+@inline roundNum(num::Number, roundDigits::Int=-1) = 
+        (roundDigits < 0  ?  num  :  round(num, digits=roundDigits))
 
 
-fillNumber(num::Number) = fill(num)
+fillObj(num::Any) = fill(num)
 
-fillNumber(num::Array{<:Any, 0}) = itself(num)
-
-
-@inline genTupleCoords(coords::Vector{<:AbstractArray{<:Real}}) = 
-        Tuple((Float64(i[1]), Float64(i[2]), Float64(i[3])) for i in coords)
-
-@inline genTupleCoords(coords::Tuple{Vararg{NTuple{3,Float64}}}) = itself(coords)
+fillObj(num::Array{<:Any, 0}) = itself(num)
 
 
-@inline arrayToTuple(arr::Array) = Tuple(arr)
+arrayToTuple(arr::AbstractArray) = Tuple(arr)
 
-@inline arrayToTuple(tpl::Tuple) = itself(tpl)
+arrayToTuple(tpl::Tuple) = itself(tpl)
 
+
+genTupleCoords(::Type{T1}, coords::AbstractVector{<:AbstractVector{<:T2}}) where {T1, T2} = 
+Tuple(Tuple(i.|>T1) for i in coords)
+
+genTupleCoords(::Type{T1}, coords::Tuple{Vararg{AbstractVector{<:T2}}}) where {T1, T2} = 
+map(x->Tuple(x.|>T1), coords)
+
+genTupleCoords(::Type{T}, coords::Tuple{Vararg{NTuple{D, T}}}) where {D, T} = itself(coords)
+
+genTupleCoords(::Type{T}, coords::AbstractVector{NTuple{D, T}}) where {D, T} = 
+arrayToTuple(coord)
 
 function callGenFunc(f::F, x::T) where {F<:Function, T}
     if worldAgeSafe(F) || applicable(f, zero(T))
@@ -868,3 +806,33 @@ function callGenFunc(f::F, x::T) where {F<:Function, T}
 end
 
 worldAgeSafe(::Type{<:Function}) = false
+
+
+uniCallFunc(f::F, argsOrder::NTuple{N, Int}, args...) where {F<:Function, N} = 
+f(getindex.(Ref(args), argsOrder)...)
+
+
+function mergeMultiObjs(::Type{T}, merge2Ofunc::F, o1::T, o2::T, o3::T, o4::T...; 
+                        roundDigits::Int) where {T, F}
+    arr1 = T[o1, o2, o3, o4...]
+    arr2 = T[]
+    while length(arr1) >= 1
+        i = 1
+        while i < length(arr1)
+            temp = merge2Ofunc(arr1[i], arr1[i+1]; roundDigits)
+            if eltype(temp) <: T && length(temp) == 1
+                arr1[i] = temp[]
+                popat!(arr1, i+1)
+            else
+                reverse!(arr1, i, i+1)
+                i += 1
+            end
+        end
+        push!(arr2, popat!(arr1, i))
+    end
+    arr2
+end
+
+
+isNaN(::Any) = false
+isNaN(n::Number) = isnan(n)

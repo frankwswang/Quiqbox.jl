@@ -6,21 +6,22 @@ const subscriptNum   = Dict(['0'=>'₀', '1'=>'₁', '2'=>'₂', '3'=>'₃', '4'
                              '6'=>'₆', '7'=>'₇', '8'=>'₈', '9'=>'₉'])
 const superscriptSym = Dict(['+'=>'⁺', '-'=>'⁻', '('=>'⁽', ')'=>'⁾', '!'=>'ꜝ'])
 
+const subscripts = ['₀', '₁', '₂', '₃', '₄', '₅', '₆', '₇', '₈', '₉']
+
 
 """
 
     checkFname(Fname::String; showWarning::Bool=true) -> String
 
-Check if there is a file with the same name in the current directory. If so, will add an 
-`"_N"` at the end of the file name `String`. `showWarning` determines whether prints out 
-the WARNING info when there is a file with the same name.
+Check if there is a file with the same name in the current directory. If so, add a `"_N"` 
+at the end of `Fname`. `showWarning` determines whether to print out the WARNING info when 
+there is a file with the same name.
 """
 function checkFname(Fname::String; showWarning::Bool=true)
     FnameN = Fname
     while isfile(FnameN) == true
-        i=0
-        contains(FnameN, ".") ? i=findlast(".", FnameN)|>last : i=(FnameN|>length)+1
-        FnameN = FnameN[1:i-1]*"_N"*FnameN[i:end]
+        i = contains(FnameN, ".") ? ( findlast(".", FnameN)|>last ) : ( (FnameN|>length)+1 )
+        FnameN = FnameN[1:i-1] * "_N" * FnameN[i:end]
     end
     FnamePrint, FnameNPrint = map([Fname, FnameN]) do f
         contains(f, "/") ? f[(findlast("/", f) |> last)+1 : end] : f
@@ -33,18 +34,17 @@ function checkFname(Fname::String; showWarning::Bool=true)
 end
 
 
-function advancedParse(content::AbstractString, 
-                       ParseFunc::F=adaptiveParse) where {F<:Function}
-    res = ParseFunc(content)
+function advancedParse(::Type{T}, content::AbstractString, 
+                       ParseFunc::F=adaptiveParse) where {T, F<:Function}
+    res = ParseFunc(T, content)
     res === nothing && (res = content)
     res
 end
 
 
-function adaptiveParse(content::AbstractString)
-    res = tryparse(Int, content)
-    res === nothing && (res = tryparse(Float64, content))
-    res === nothing && (res = tryparse(Complex{Float64}, content))
+function adaptiveParse(::Type{T}, content::AbstractString) where {T<:AbstractFloat}
+    res = tryparse(T, content)
+    res === nothing && (res = tryparse(Complex{T}, content))
     res
 end
 
@@ -54,14 +54,24 @@ function numToSups(num::Int)
     [superscriptNum[i] for i in str] |> prod
 end
 
+numToSups(::Nothing) = ""
 
 function numToSubs(num::Int)
     str = string(num)
     [subscriptNum[i] for i in str] |> prod
 end
 
+numToSubs(::Nothing) = ""
 
-function alignNum(x::Number, lpadN::Int=8, rpadN::Int=21; roundDigits::Int=-1)
+
+function alignNum(x::T, lpadN::Int=8, rpadN::Union{Int, Missing}=missing; 
+                  roundDigits::Int=-1) where {T<:Real}
+    if rpadN isa Missing
+        rpadN = getAtolDigits(T)+2
+        if roundDigits >= 0
+            rpadN = min(rpadN, roundDigits+2)
+        end
+    end
     if roundDigits < 0
         str = x |> string
     else
@@ -85,5 +95,28 @@ function alignNumSign(c::Real; roundDigits::Int=-1)
         alignNum(c, 0, 0; roundDigits)
     else
         " "*alignNum(c, 0, 0; roundDigits)
+    end
+end
+
+
+function inSymbol(sym::Symbol, src::Symbol)
+    symStr, srcStr = (sym, src) .|> string
+    bl = false
+    for i in subscripts
+        i == symStr[end] && (bl = true; break)
+    end
+    l1 = length(symStr)
+    l2 = length(srcStr)
+    bl ? (l1 == l2 && symStr == srcStr) : (l1 <= l2 && symStr == srcStr[1:l1])
+end
+
+
+function typeStrNotUnionAll(::Type{T}) where {T}
+    strT = string(T)
+    rng = findlast("where", strT)
+    if rng === nothing
+        strT
+    else
+        strT[1:rng[1]-2]
     end
 end

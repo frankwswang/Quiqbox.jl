@@ -1,6 +1,10 @@
 using Test
+using Random
+using Documenter
 
 @testset "Quiqbox tests" begin
+
+    Random.seed!(1000)
 
     unit1 = "Support Functions"
     println("Testing $(unit1)...")
@@ -52,6 +56,15 @@ using Test
             include("unit-tests/SubModule/Molden-test.jl")
         end
         println("$(unit3_1) test finished in $t3_1 seconds.\n")
+    end
+
+    @testset "Documentation" begin
+        unit4_1 = "Docstrings"
+        println("Testing $(unit4_1)...")
+        t4_1 = @elapsed @testset "$(unit4_1)" begin
+            doctest(Quiqbox)
+        end
+        println("$(unit4_1) test finished in $t4_1 seconds.\n")
     end
 
 end

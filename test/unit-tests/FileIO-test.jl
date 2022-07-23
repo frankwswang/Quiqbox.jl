@@ -1,6 +1,7 @@
 using Test
 using Quiqbox
-using Quiqbox: checkFname, advancedParse, numToSups, superscriptNum, numToSubs, subscriptNum
+using Quiqbox: checkFname, advancedParse, numToSups, superscriptNum, numToSubs, 
+               subscriptNum, SpatialCoordType, typeStrNotUnionAll
 
 @testset "FileIO.jl tests" begin
 
@@ -15,14 +16,16 @@ rm(testFname)
 
 
 # function advancedParse (with adaptiveParse)
-@test advancedParse("1") === 1
-@test advancedParse("1.0") === 1.0
-@test advancedParse("1.0 + im") === "1.0 + im"
-@test advancedParse("1 + 1im") === 1.0 + 1.0im
-@test advancedParse("1.0 + 1.1im") === 1.0 + 1.1im
+@test advancedParse(Float64, "1") === 1.0
+@test advancedParse(Float64, "1.0") === 1.0
+@test advancedParse(Float64, "1.0 + im") === "1.0 + im"
+@test advancedParse(Float64, "1 + 1im") === 1.0 + 1.0im
+@test advancedParse(Float64, "1.0 + 1.1im") === 1.0 + 1.1im
+@test advancedParse(BigFloat, "1.0") isa BigFloat
+@test advancedParse(BigFloat, "1.0") == BigFloat(1.0)
 
 
-# Function numToSups & numToSubs
+# function numToSups & numToSubs
 ds = [superscriptNum, subscriptNum]
 fs = [numToSups, numToSubs]
 for (d,f) in zip(ds, fs)
@@ -38,5 +41,10 @@ for (d,f) in zip(ds, fs)
     end
     @test str == f(num)
 end
+
+
+# function typeStrNotUnionAll
+strT = SpatialCoordType |> string
+@test typeStrNotUnionAll(SpatialCoordType) == strT[1:findlast('w', strT)-2]
 
 end

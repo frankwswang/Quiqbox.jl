@@ -2,33 +2,53 @@ module Molden
 
 export makeMoldenFile
 
-import ..Quiqbox: Molecule, spinStr, checkFname, AtomicNumberList, centerCoordOf, flatten, 
-                  groupedSort, joinConcentricBFuncStr, alignNumSign, alignNum
+import ..Quiqbox: CanOrbital, MatterByHF, sortPermBasis, mergeBasisFuncs, getAtolDigits, 
+                  isaFullShellBasisFuncs, checkFname, AtomicNumberList, centerCoordOf, 
+                  groupedSort, joinConcentricBFuncStr, alignNumSign, alignNum, getAtolVal
 
-const spinStrMolden = Dict(spinStr .=> ("Alpha", "Beta", "Alpha"))
+const spinStrs = ["Alpha", "Beta"]
+
+getOrbitalType(::CanOrbital) = "A"
 
 """
 
-    makeMoldenFile(mol::Molecule; roundDigits::Int=15, 
-                   recordUMO::Bool=false, fileName::String = "MO") -> String
+    makeMoldenFile(mol::MatterByHF{T, 3}; roundDigits::Int=getAtolDigits(T), 
+                   recordUMO::Bool=false, fileName::String = "MO") where {T} -> 
+    String
 
-Write the information of input `Molecule` into a **Molden** file. `recordUMO` determines 
-whether to include the unoccupied molecular orbitals. `fileName` specifies the name of the 
-file, which is also the returned value. If `roundDigits < 0`, there won't be rounding for 
-recorded data.
+Write the information of `MatterByHF` into a newly created **Molden** file. `recordUMO` 
+determines whether to include the unoccupied canonical orbitals. `fileName` specifies the 
+name of the file, which is also the returned value. If `roundDigits < 0`, there won't be 
+rounding for recorded data.
 """
-function makeMoldenFile(mol::Molecule; 
-                        roundDigits::Int=15, recordUMO::Bool=false, fileName::String = "MO")
-    nucCoords = mol.nucCoords |> collect
+function makeMoldenFile(mol::MatterByHF{T, 3}; 
+                        roundDigits::Int=getAtolDigits(T), 
+                        recordUMO::Bool=false, fileName::String = "MO") where {T}
+    basis = mol.basis.basis |> collect
+    ids = sortPermBasis(basis; roundDigits)
+    basis = mergeBasisFuncs(basis[ids]...; roundDigits)
+    @assert all(basis .|> isaFullShellBasisFuncs) "The basis set stored in the input " * 
+                                                  "`MatterByHF` is not supported by " * 
+                                                  "the Molden format."
+    occuC = getindex.(mol.occuC, Ref(ids), :)
+    unocC = getindex.(mol.unocC, Ref(ids), :)
+    nucCoords = mol.nucCoord |> collect
     nuc = mol.nuc |> collect
-    basis = mol.basis |> collect
-    MOs = mol.orbital
+    if recordUMO
+        MOgroups = map(mol.occuOrbital, mol.unocOrbital) do osO, osU
+            (osO..., osU...)
+        end
+        Cgroups = map(occuC, unocC) do cO, cU
+            hcat(cO, cU)
+        end
+    else
+        MOgroups = mol.occuOrbital
+        Cgroups = occuC
+    end
     iNucPoint = 0
-    groups = groupedSort(basis, centerCoordOf)
-    strs = joinConcentricBFuncStr.(groups)
+    strs = joinConcentricBFuncStr.(groupedSort(basis, centerCoordOf))
     strs = split.(strs, "\n", limit=2)
     gCoeffs = getindex.(strs, 2)
-    rpadN = roundDigits < 0 ? 21 : (roundDigits+1)
     lpadN = 8
 
     text = """
@@ -41,8 +61,8 @@ function makeMoldenFile(mol::Molecule;
     centers = getindex.(strs, 1)
     for cen in centers
         iNucPoint += 1
-        coord = parse.(Float64, split(cen[5:end]))
-        if (i = findfirst(x->all(isapprox.(x, coord, atol=1e-15)), nucCoords); 
+        coord = parse.(T, split(cen[5:end]))
+        if (i = findfirst(x->all(isapprox.(x, coord, atol=getAtolVal(T))), nucCoords); 
             i !== nothing)
             n = popat!(nuc, i)
             atmName = rpad("$(n)", 5)
@@ -52,40 +72,38 @@ function makeMoldenFile(mol::Molecule;
             atmName = "X    "
             atmNumber = "X   "
         end
-        roundDigits > 0 && (coord = round.(coord, digits=roundDigits))
-        coordStr = alignNum(coord[1], lpadN, rpadN; roundDigits) * 
-                   alignNum(coord[2], lpadN, rpadN; roundDigits) * 
+        coordStr = alignNum(coord[1], lpadN; roundDigits) * 
+                   alignNum(coord[2], lpadN; roundDigits) * 
                    alignNum(coord[3], lpadN, 0; roundDigits)
         text *= atmName*rpad("$iNucPoint", 5)*atmNumber*coordStr*"\n"
     end
     for (n, coord) in zip(nuc, nucCoords)
-        roundDigits >= 0 && (cv = round.(coord, digits=roundDigits))
         iNucPoint += 1
         text *= rpad("$(n)", 5) * rpad(iNucPoint, 5) * rpad("$(AtomicNumberList[n])", 4)*
-                alignNum(cv[1], lpadN, rpadN; roundDigits) * 
-                alignNum(cv[2], lpadN, rpadN; roundDigits) * 
-                alignNum(cv[3], lpadN, 0; roundDigits) * "\n"
+                alignNum(coord[1], lpadN; roundDigits) * 
+                alignNum(coord[2], lpadN; roundDigits) * 
+                alignNum(coord[3], lpadN, 0; roundDigits) * "\n"
     end
     text *= "\n[GTO]"
-    for (i, gs) in zip(1:length(gCoeffs), gCoeffs)
+    for (i, gs) in enumerate(gCoeffs)
         text *= "\n$i 0\n" * gs
     end
     text *= "\n[MO]\n"
-    recordUMO ? (l = length(MOs)) : (l = findfirst(isequal(0), 
-                                                   [x.occupancy for x in MOs]) - 1)
-    for i = 1:l
-        text *= "Sym=   $(MOs[i].symmetry)\n"
-        moe = MOs[i].energy
-        MOcoeffs = MOs[i].orbitalCoeffs
-        if roundDigits > 0
-            moe = round(moe, digits=roundDigits)
-            MOcoeffs = round.(MOcoeffs, digits=roundDigits)
+    for (spinIdx, MOs) in enumerate(MOgroups)
+        for (i, mo) in enumerate(MOs)
+            text *= "Sym=   " * getOrbitalType(mo) * "\n"
+            moe = mo.energy
+            MOcoeffs = Cgroups[spinIdx][:, i]
+            if roundDigits > 0
+                moe = round(moe, digits=roundDigits)
+                MOcoeffs = round.(MOcoeffs, digits=roundDigits)
+            end
+            text *= "Ene=  "*alignNumSign(moe; roundDigits)*"\n"
+            text *= "Spin=  $(spinStrs[spinIdx])\n"
+            text *= "Occup= $(sum(mo.occu)[])\n"
+            text *= join([rpad("   $j", 6)*alignNum(c, lpadN, 0; roundDigits)*
+                        "\n" for (j,c) in enumerate(MOcoeffs)])
         end
-        text *= "Ene=  "*alignNumSign(moe; roundDigits)*"\n"
-        text *= "Spin=  $(spinStrMolden[MOs[i].spin])\n"
-        text *= "Occup= $(MOs[i].occupancy)\n"
-        text *= join([rpad("   $j", 6)*alignNum(c, lpadN, 0; roundDigits)*
-                      "\n" for (j,c) in zip(1:length(MOcoeffs), MOcoeffs)])
     end
 
     fn = fileName*".molden" |> checkFname
