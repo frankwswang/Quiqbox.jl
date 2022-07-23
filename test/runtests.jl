@@ -4,7 +4,7 @@ using Documenter
 
 @testset "Quiqbox tests" begin
 
-    Random.seed!(1234)
+    Random.seed!(1000)
 
     unit1 = "Support Functions"
     println("Testing $(unit1)...")
