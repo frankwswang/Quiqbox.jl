@@ -5,9 +5,11 @@
 In the [Basis Sets](@ref) section, we have briefly introduced [`ParamBox`](@ref) as the parameters embedded in containers such as [`BasisFunc`](@ref) and [`BasisFuncs`](@ref). This means how we construct the basis set using the parameters will determine the parameter space for the basis set optimization. (For more information please refer to [Constructing basis sets based on ParamBox](@ref).) Sometimes, we can select parameters for optimization to achieve higher efficiency.
 
 Here is an example of using [`GaussFunc`](@ref) and [`GridBox`](@ref) to quickly generate a grid-based basis set with only 3 independent parameters. One is the spacing ``L`` of the grid points that determines all the center coordinates of the basis functions; the other two are the exponent coefficient ``\alpha`` and the contraction coefficient ``d``.
+```@setup 3
+    push!(LOAD_PATH,"../../src/")
+    using Quiqbox
+```
 ```@repl 3
-push!(LOAD_PATH,"../../src/") # hide
-using Quiqbox # hide
 nuc = ["H", "H"];
 
 nucCoords = [[-0.7,0.0,0.0], [0.7,0.0,0.0]];
