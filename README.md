@@ -101,7 +101,7 @@ For more information on the package, please read the [documentation of released 
 [Doc-latest]:  https://frankwswang.github.io/Quiqbox.jl/dev
 [Doc-s-img]:   https://img.shields.io/github/v/release/frankwswang/Quiqbox.jl?label=Latest%20release
 [Doc-l-img]:   https://img.shields.io/badge/docs-latest-blue.svg
-[GA-CI-img]:   https://img.shields.io/github/workflow/status/frankwswang/Quiqbox.jl/CI?label=Julia%20latest
+[GA-CI-img]:   https://img.shields.io/github/workflow/status/frankwswang/Quiqbox.jl/CI-JS-latest?label=Julia%20latest
 [GA-CI-url]:   https://github.com/frankwswang/Quiqbox.jl/actions/workflows/CI-JS-latest.yml
 [GA-CI-JN-img]:https://img.shields.io/github/workflow/status/frankwswang/Quiqbox.jl/CI-JN?label=Julia%20nightly
 [GA-CI-JN-url]:https://github.com/frankwswang/Quiqbox.jl/actions/workflows/CI-JN.yml
