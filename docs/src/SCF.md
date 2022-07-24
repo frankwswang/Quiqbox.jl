@@ -14,14 +14,16 @@ Quiqbox supports basic Hartree-Fock methods with various configurations:
 ### Basic Hartree-Fock
 
 To run a Hartree-Fock method, the lines of code required in Quiqbox are as simple as below:
+```@setup 2
+    push!(LOAD_PATH,"../../src/")
+    using Quiqbox
+```
 ```@repl 2
-push!(LOAD_PATH,"../../src/") # hide
-using Quiqbox # hide
 nuc = ["H", "H"];
 
 nucCoords = [[-0.7, 0.0, 0.0], [0.7, 0.0, 0.0]];
 
-bs = genBasisFunc.(nucCoords, "STO-3G", nuc) |> flatten
+bs = genBasisFunc.(nucCoords, "STO-3G", nuc) |> flatten;
 
 resRHF = runHF(bs, nuc, nucCoords)
 
