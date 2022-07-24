@@ -1,6 +1,6 @@
 # Self-Consistent Field Methods
 
-## Hartree-Fock Methods
+## Hartree-Fock methods
 
 Quiqbox supports basic Hartree-Fock methods with various configurations: 
 
@@ -14,7 +14,7 @@ Quiqbox supports basic Hartree-Fock methods with various configurations:
 ### Basic Hartree-Fock
 
 To run a Hartree-Fock method, the lines of code required in Quiqbox are as simple as below:
-```@repl 3
+```@repl 2
 push!(LOAD_PATH,"../../src/") # hide
 using Quiqbox # hide
 nuc = ["H", "H"];
@@ -25,11 +25,11 @@ bs = genBasisFunc.(nucCoords, "STO-3G", nuc) |> flatten
 
 resRHF = runHF(bs, nuc, nucCoords)
 
-@show resRHF.Ehf resRHF.C resRHF.Eo resRHF.occu
+@show resRHF.Ehf resRHF.C resRHF.Eo resRHF.occu;
 ```
 
 After the SCF procedure, one can also store the result in a `MatterByHF` for further data processing such as generating a [Molden](@ref) file.
-```@repl 3
+```@repl 2
 mol = MatterByHF(resRHF); 
 ```
 
@@ -43,9 +43,9 @@ If the user wants to fine-tune the SCF iteration to achieve better performance, 
 
 [`runHFcore`](@ref)
 
-## Standalone Integral Functions
+## Stand-alone integral functions
 
-Quiqbox also provides efficient stand-alone integral functions.
+Quiqbox also provides efficient native functions for one-electron and two-electron integral calculations.
 
 ### One-electron functions
 
