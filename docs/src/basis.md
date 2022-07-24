@@ -30,7 +30,7 @@ julia> bsO = Quiqbox.genBasisFunc(fill(1.0, 3), "STO-3G", "O")
 
 Notice that in the above result there are two types of `struct`s in the returned `Vector`: `BasisFunc` and `BasisFuncs`. `BasisFunc` is the most basic `DataType` to hold the data of a basis function; `BasisFuncs` is very similar except it may hold multiple orbitals with only the spherical harmonics ``Y_{ml}`` being different when the orbital angular momentum ``l>0``.
 
-!!! info "Unit System"
+!!! info "Unit system"
     Hartree atomic units are the unit system used in Quiqbox.
 
 If you want to postpone the specification of the center, you can replace the first argument with `missing`, then use the function `assignCenInVal!` to assign the coordinates later.
