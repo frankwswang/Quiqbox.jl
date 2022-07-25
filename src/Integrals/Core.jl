@@ -337,39 +337,54 @@ function reformatIntData1(bf::FGTBasisFuncs1O{T, D, 𝑙, GN}) where {T, D, 𝑙
     R, ijk, αds
 end
 
-function isOneBodyInt0Core(::Val{1}, 
-                           R₁::NTuple{D, T}, R₂::NTuple{D, T}, 
-                           ijk₁::NTuple{D, Int}, ijk₂::NTuple{D, Int}) where {D, T}
+function isIntZeroCore(::Val{1}, 
+                       R₁::NTuple{D, T}, R₂::NTuple{D, T}, 
+                       ijk₁::NTuple{D, Int}, ijk₂::NTuple{D, Int}) where {D, T}
     for i in eachindex(R₁)
-        isodd(ijk₁[i] + ijk₂[i]) && R₁[i]==R₂[i] && (return true)
+        R₁[i]==R₂[i] && isodd(ijk₁[i] + ijk₂[i]) && (return true)
     end
     false
 end
 
-function isOneBodyInt0Core(::Val{:∫nucAttractionCore}, 
-                           R₁::NTuple{D, T}, R₂::NTuple{D, T}, 
-                           ijk₁::NTuple{D, Int}, ijk₂::NTuple{D, Int}, 
-                           R₀::NTuple{D, T}) where {D, T}
+function isIntZeroCore(::Val{2}, 
+                       R₁::NTuple{D, T}, R₂::NTuple{D, T}, 
+                       R₃::NTuple{D, T}, R₄::NTuple{D, T}, 
+                       ijk₁::NTuple{D, Int}, ijk₂::NTuple{D, Int}, 
+                       ijk₃::NTuple{D, Int}, ijk₄::NTuple{D, Int}) where {D, T}
     for i in eachindex(R₁)
-        isodd(ijk₁[i] + ijk₂[i]) && R₀[i]==R₁[i]==R₂[i] && (return true)
+        R₁[i]==R₂[i]==R₃[i]==R₄[i] && 
+        isodd(ijk₁[i] + ijk₂[i] + ijk₃[i] + ijk₄[i]) && (return true)
     end
     false
 end
 
-isOneBodyInt0(::Type{typeof(∫overlapCore)}, R₁, R₂, ijk₁, ijk₂, _) = 
-isOneBodyInt0Core(Val(1), R₁, R₂, ijk₁, ijk₂)
+function isIntZeroCore(::Val{:∫nucAttractionCore}, 
+                       R₁::NTuple{D, T}, R₂::NTuple{D, T}, 
+                       ijk₁::NTuple{D, Int}, ijk₂::NTuple{D, Int}, 
+                       R₀::NTuple{D, T}) where {D, T}
+    for i in eachindex(R₁)
+        R₀[i]==R₁[i]==R₂[i] && isodd(ijk₁[i] + ijk₂[i]) && (return true)
+    end
+    false
+end
 
-isOneBodyInt0(::Type{typeof(∫elecKineticCore)}, R₁, R₂, ijk₁, ijk₂, _) = 
-isOneBodyInt0Core(Val(1), R₁, R₂, ijk₁, ijk₂)
+isIntZero(::Type{typeof(∫overlapCore)}, R₁, R₂, ijk₁, ijk₂, _) = 
+isIntZeroCore(Val(1), R₁, R₂, ijk₁, ijk₂)
 
-isOneBodyInt0(::Type{typeof(∫nucAttractionCore)}, R₁, R₂, ijk₁, ijk₂, optArgs) = 
-isOneBodyInt0Core(Val(:∫nucAttractionCore), R₁, R₂, ijk₁, ijk₂, optArgs[end])
+isIntZero(::Type{typeof(∫elecKineticCore)}, R₁, R₂, ijk₁, ijk₂, _) = 
+isIntZeroCore(Val(1), R₁, R₂, ijk₁, ijk₂)
+
+isIntZero(::Type{typeof(∫nucAttractionCore)}, R₁, R₂, ijk₁, ijk₂, optArgs) = 
+isIntZeroCore(Val(:∫nucAttractionCore), R₁, R₂, ijk₁, ijk₂, optArgs[end])
+
+isIntZero(::Type{typeof(∫eeInteractionCore)}, R₁, R₂, R₃, R₄, ijk₁, ijk₂, ijk₃, ijk₄, _) = 
+isIntZeroCore(Val(2), R₁, R₂, R₃, R₄, ijk₁, ijk₂, ijk₃, ijk₄)
 
 function getOneBodyInt(∫1e::F, 
                        bf1::BasisFunc{T, D, 𝑙1, GN1}, bf2::BasisFunc{T, D, 𝑙2, GN2}, 
                        optArgs...) where {F<:Function, T, D, 𝑙1, 𝑙2, GN1, GN2}
     (R₁, ijk₁, ps₁), (R₂, ijk₂, ps₂) = reformatIntData1.((bf1, bf2))
-    !(𝑙1==𝑙2==0) && isOneBodyInt0(F, R₁, R₂, ijk₁, ijk₂, optArgs) && (return T(0.0))
+    !(𝑙1==𝑙2==0) && isIntZero(F, R₁, R₂, ijk₁, ijk₂, optArgs) && (return T(0.0))
     uniquePairs, uPairCoeffs = get1BodyUniquePairs(R₁==R₂ && ijk₁==ijk₂, ps₁, ps₂)
     map(uniquePairs, uPairCoeffs) do x, y
         ∫1e(optArgs..., R₁, R₂, ijk₁, x[1], ijk₂, x[2])::T * y
@@ -434,11 +449,15 @@ end
 end
 
 function getTwoBodyInt(∫2e::F, 
-                       bf1::BasisFunc{T, D, <:Any, GN1}, bf2::BasisFunc{T, D, <:Any, GN2}, 
-                       bf3::BasisFunc{T, D, <:Any, GN3}, bf4::BasisFunc{T, D, <:Any, GN4}, 
-                       optArgs...) where {F<:Function, T, D, GN1, GN2, GN3, GN4}
+                       bf1::BasisFunc{T, D, 𝑙1, GN1}, bf2::BasisFunc{T, D, 𝑙2, GN2}, 
+                       bf3::BasisFunc{T, D, 𝑙3, GN3}, bf4::BasisFunc{T, D, 𝑙4, GN4}, 
+                       optArgs...) where 
+                      {F<:Function, T, D, 𝑙1, 𝑙2, 𝑙3, 𝑙4, GN1, GN2, GN3, GN4}
     (R₁, ijk₁, ps₁), (R₂, ijk₂, ps₂), (R₃, ijk₃, ps₃), (R₄, ijk₄, ps₄) = 
     reformatIntData1.((bf1, bf2, bf3, bf4))
+
+    !(𝑙1==𝑙2==𝑙3==𝑙4==0) && isIntZero(F, R₁, R₂, R₃, R₄, ijk₁, ijk₂, ijk₃, ijk₄, optArgs) && 
+    (return T(0.0))
 
     f1 = (R₁ == R₂ && ijk₁ == ijk₂)
     f2 = (R₃ == R₄ && ijk₃ == ijk₄)
