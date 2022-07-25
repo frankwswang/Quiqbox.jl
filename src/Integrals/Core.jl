@@ -8,10 +8,6 @@ factorialL(l::Integer) = FactorialsLs[l+1]
 getGKQorder(T::Type{<:Real}) = ifelse(getAtolVal(T) >= getAtolVal(Float64), 13, 26)
 
 πroot(::Type{T}) where {T} = sqrt(π*T(1))
-## Has compatibility issue with BigFloat that may cause bad precision for LBFGS-B solver: 
-# πroot(::Type{T}) where {T} = sqrt(π |> BigFloat) |> T
-# πroot(::Type{T}, c::Number=T(1)) where {T} = 
-# ifelse(getAtolDigits(BigFloat) > getAtolDigits(T), (π|>BigFloat|>sqrt|>T), sqrt(π*T(1)))
 
 function F0Core(u::T) where {T}
     ur = sqrt(u)
@@ -370,10 +366,10 @@ isOneBodyInt0(::Type{typeof(∫nucAttractionCore)}, R₁, R₂, ijk₁, ijk₂, 
 isOneBodyInt0Core(Val(:∫nucAttractionCore), R₁, R₂, ijk₁, ijk₂, optArgs[end])
 
 function getOneBodyInt(∫1e::F, 
-                       bf1::BasisFunc{T, D, <:Any, GN1}, bf2::BasisFunc{T, D, <:Any, GN2}, 
-                       optArgs...) where {F<:Function, T, D, GN1, GN2}
+                       bf1::BasisFunc{T, D, 𝑙1, GN1}, bf2::BasisFunc{T, D, 𝑙2, GN2}, 
+                       optArgs...) where {F<:Function, T, D, 𝑙1, 𝑙2, GN1, GN2}
     (R₁, ijk₁, ps₁), (R₂, ijk₂, ps₂) = reformatIntData1.((bf1, bf2))
-    isOneBodyInt0(F, R₁, R₂, ijk₁, ijk₂, optArgs) && (return T(0.0))
+    !(𝑙1==𝑙2==0) && isOneBodyInt0(F, R₁, R₂, ijk₁, ijk₂, optArgs) && (return T(0.0))
     uniquePairs, uPairCoeffs = get1BodyUniquePairs(R₁==R₂ && ijk₁==ijk₂, ps₁, ps₂)
     map(uniquePairs, uPairCoeffs) do x, y
         ∫1e(optArgs..., R₁, R₂, ijk₁, x[1], ijk₂, x[2])::T * y
