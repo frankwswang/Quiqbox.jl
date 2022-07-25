@@ -371,6 +371,9 @@ BasisFunc(bfs::BFuncs1O) = BasisFunc(bfs.center, bfs.gauss, bfs.l, bfs.normalize
 
 struct EmptyBasisFunc{T<:Real, D} <: CGTBasisFuncs1O{T, D, 0} end
 
+isEmptyBasisFunc(::EmptyBasisFunc) = true
+isEmptyBasisFunc(::CompositeGTBasisFuncs) = false
+
 
 isaFullShellBasisFuncs(::Any) = false
 

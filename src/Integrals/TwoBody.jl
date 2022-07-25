@@ -14,7 +14,7 @@ eeInteraction(bf1::AbstractGTBasisFuncs{T, D, 1},
               bf2::AbstractGTBasisFuncs{T, D, 1}, 
               bf3::AbstractGTBasisFuncs{T, D, 1}, 
               bf4::AbstractGTBasisFuncs{T, D, 1}) where {T, D} = 
-getEleEleInteraction(bf1, bf2, bf3, bf4)
+getCompositeInt(∫eeInteractionCore, (bf1, bf2, bf3, bf4))
 
 
 """
@@ -27,4 +27,4 @@ Return the electron-electron interaction given a basis set.
 """
 eeInteractions(bs::Union{Tuple{Vararg{AbstractGTBasisFuncs{T, D}}}, 
                          AbstractVector{<:AbstractGTBasisFuncs{T, D}}}) where {T, D} = 
-getEleEleInteraction(bs |> arrayToTuple)
+getTwoBodyInts(∫eeInteractionCore, bs|>arrayToTuple)

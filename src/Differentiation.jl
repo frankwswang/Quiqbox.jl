@@ -82,7 +82,7 @@ function derivativeCore(FoutputIsVector::Val{B},
     ∂X = ones(bsSize, bsSize) # ∂X corresponds to the derivative of X = S^(-0.5)
     ∂X₀ = ones(bsSize, bsSize) # ∂X in its eigen basis
     for i=1:bsSize, j=1:i
-        ∂S[i,j] = ∂S[j,i] = getOverlap(∂bfs[i], bfs[j]) + getOverlap(bfs[i], ∂bfs[j])
+        ∂S[i,j] = ∂S[j,i] = overlap(∂bfs[i], bfs[j]) + overlap(bfs[i], ∂bfs[j])
     end
     X = getXcore1(S)
     λ, 𝑣 = eigen(S|>Symmetric)
@@ -108,9 +108,9 @@ function ∂HFenergy(par::ParamBox{T},
                    nucCoords::NTuple{NN, NTuple{D, T}}, 
                    N::NTuple{HFTS, Int}) where {BN, T, D, HFTS, NN}
     Xinv = sqrt(S)
-    cH = (i, j)->getCoreH(i, j, nuc, nucCoords)
+    cH = (i, j)->coreHij(i, j, nuc, nucCoords)
     ∂hij, ∂hijkl = derivativeCore(Val(false), bs, par, S, 
-                                  TypedFunction(cH), TypedFunction(getEleEleInteraction))
+                                  TypedFunction(cH), TypedFunction(eeInteraction))
     getEᵗ(∂hij, ∂hijkl, Ref(Xinv).*C, N)
 end
 

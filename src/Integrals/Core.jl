@@ -773,44 +773,28 @@ end
     n
 end
 
-getOverlap(bf1::BasisFunc{T, D, <:Any, GN1}, bf2::BasisFunc{T, D, <:Any, GN2}) where 
-          {T, D, GN1, GN2} = 
-getOneBodyInt(∫overlapCore, bf1, bf2)
 
-getEleKinetic(bf1::BasisFunc{T, D, <:Any, GN1}, bf2::BasisFunc{T, D, <:Any, GN2}) where 
-             {T, D, GN1, GN2} = 
-getOneBodyInt(∫elecKineticCore, bf1, bf2)
+getCompositeInt(∫::F, bfs::NTuple{2, BasisFunc{T, D}}, optArgs...) where {F<:Function, T, D} = 
+getOneBodyInt(∫, bfs..., optArgs...)
 
-function getNucEleAttraction(bf1::BasisFunc{T, D, <:Any, GN1}, 
-                             bf2::BasisFunc{T, D, <:Any, GN2}, 
-                             nuc::NTuple{NN, String}, 
-                             nucCoords::NTuple{NN, NTuple{D, T}}) where {T, D, GN1, GN2, NN}
-    res = 0.0
+getCompositeInt(∫::F, bfs::NTuple{4, BasisFunc{T, D}}, optArgs...) where {F<:Function, T, D} = 
+getTwoBodyInt(∫, bfs..., optArgs...)
+
+function getCompositeInt(∫::F, bfs::NTuple{2, BasisFunc{T, D}}, 
+                         nuc::NTuple{NN, String}, 
+                         nucCoords::NTuple{NN, NTuple{D, T}}) where {F<:Function, T, D, NN}
+    res = T(0.0)
     for (ele, coord) in zip(nuc, nucCoords)
-        res += getOneBodyInt(∫nucAttractionCore, bf1, bf2, getCharge(ele), coord|>Tuple)
+        res += getOneBodyInt(∫, bfs..., getCharge(ele), coord|>Tuple)
     end
     res
 end
 
-function getEleEleInteraction(bf1::BasisFunc{T, D, <:Any, GN1}, 
-                              bf2::BasisFunc{T, D, <:Any, GN2}, 
-                              bf3::BasisFunc{T, D, <:Any, GN3}, 
-                              bf4::BasisFunc{T, D, <:Any, GN4}) where 
-                             {T, D, GN1, GN2, GN3, GN4}
-    getTwoBodyInt(∫eeInteractionCore, bf1, bf2, bf3, bf4)
-end
-
-
-@inline getCompositeInt(∫::F, 
-                        bs::NTuple{N, BasisFunc{T, D}}, optArgs...) where 
-                       {F<:Function, N, T, D} = 
-        ∫(bs..., optArgs...)
-
 @inline function getCompositeInt(∫::F, 
                                  bs::NTuple{N, CompositeGTBasisFuncs{T, D}}, 
                                  optArgs...) where {F<:Function, N, T, D}
-    range = Iterators.product(bs...)
-    map(x->∫(x..., optArgs...)::T, range)::Array{T, N}
+    rng = Iterators.product(bs...)
+    map(x->getCompositeInt(∫, x, optArgs...)::T, rng)::Array{T, N}
 end
 
 @inline function getCompositeInt(∫::F, 
@@ -819,30 +803,10 @@ end
     if any(fieldtypes(typeof(bs)) .<: EmptyBasisFunc)
         zero(T)
     else
-        map(x->∫(x..., optArgs...)::T, Iterators.product(unpackBasis.(bs)...)) |> sum
+        rng = Iterators.product(unpackBasis.(bs)...)
+        map(x->getCompositeInt(∫, x, optArgs...)::T, rng) |> sum
     end
 end
-
-
-getOverlap(b1::GTBasisFuncs{T, D}, b2::GTBasisFuncs{T, D}) where {T, D} = 
-getCompositeInt(getOverlap, (b1, b2))
-
-getEleKinetic(b1::GTBasisFuncs{T, D}, b2::GTBasisFuncs{T, D}) where {T, D} = 
-getCompositeInt(getEleKinetic, (b1, b2))
-
-getNucEleAttraction(b1::GTBasisFuncs{T, D}, b2::GTBasisFuncs{T, D}, 
-                    nuc::NTuple{NN, String}, 
-                    nucCoords::NTuple{NN, NTuple{D, T}}) where {T, D, NN} = 
-getCompositeInt(getNucEleAttraction, (b1, b2), nuc, nucCoords)
-
-getCoreH(b1::GTBasisFuncs{T, D}, b2::GTBasisFuncs{T, D}, 
-         nuc::NTuple{NN, String}, 
-         nucCoords::NTuple{NN, NTuple{D, T}}) where {T, D, NN} = 
-getEleKinetic(b1, b2) + getNucEleAttraction(b1, b2, nuc, nucCoords)
-
-getEleEleInteraction(b1::GTBasisFuncs{T, D}, b2::GTBasisFuncs{T, D}, 
-                     b3::GTBasisFuncs{T, D}, b4::GTBasisFuncs{T, D}) where {T, D} = 
-getCompositeInt(getEleEleInteraction, (b1, b2, b3, b4))
 
 
 function update2DarrBlock!(arr::AbstractMatrix{T1}, block::T1, 
@@ -866,7 +830,7 @@ function getOneBodyInts(∫1e::F, basisSet::NTuple{BN, GTBasisFuncs{T, D}}, optA
     len = subSize |> sum
     buf = Array{T}(undef, len, len)
     for j = 1:BN, i = 1:j
-        int = ∫1e(basisSet[i], basisSet[j], optArgs...)
+        int = getCompositeInt(∫1e, (basisSet[i], basisSet[j]), optArgs...)
         rowRange = accuSize[i]+1 : accuSize[i+1]
         colRange = accuSize[j]+1 : accuSize[j+1]
         update2DarrBlock!(buf, int, rowRange, colRange)
@@ -878,28 +842,11 @@ function getOneBodyInts(∫1e::F, basisSet::NTuple{BN, GTBasisFuncs{T, D, 1}},
                         optArgs...) where {F<:Function, BN, T, D}
     buf = Array{T}(undef, BN, BN)
     for j = 1:BN, i = 1:j
-        int = ∫1e(basisSet[i], basisSet[j], optArgs...)
+        int = getCompositeInt(∫1e, (basisSet[i], basisSet[j]), optArgs...)
         buf[i, j] = buf[j, i] = int
     end
     buf
 end
-
-
-getOverlap(BSet::NTuple{BN, GTBasisFuncs{T, D}}) where {BN, T, D} = 
-getOneBodyInts(getOverlap, BSet)
-
-getEleKinetic(BSet::NTuple{BN, GTBasisFuncs{T, D}}) where {BN, T, D} = 
-getOneBodyInts(getEleKinetic, BSet)
-
-getNucEleAttraction(BSet::NTuple{BN, GTBasisFuncs{T, D}}, 
-                     nuc::NTuple{NN, String}, nucCoords::NTuple{NN, NTuple{D, T}}) where 
-                    {BN, T, D, NN} = 
-getOneBodyInts(getNucEleAttraction, BSet, nuc, nucCoords)
-
-getCoreH(BSet::NTuple{BN, GTBasisFuncs{T, D}}, 
-         nuc::NTuple{NN, String}, nucCoords::NTuple{NN, NTuple{D, T}}) where 
-        {BN, T, D, NN} = 
-getOneBodyInts(getCoreH, BSet, nuc, nucCoords)
 
 
 permuteArray(arr::AbstractArray{T, N}, order) where {T, N} = PermutedDimsArray(arr, order)
@@ -942,7 +889,7 @@ function getTwoBodyInts(∫2e::F, basisSet::NTuple{BN, GTBasisFuncs{T, D}}) wher
         J = accuSize[j]+1 : accuSize[j+1]
         K = accuSize[k]+1 : accuSize[k+1]
         L = accuSize[l]+1 : accuSize[l+1]
-        int = ∫2e(basisSet[i], basisSet[j], basisSet[k], basisSet[l])
+        int = getCompositeInt(∫2e, (basisSet[i], basisSet[j], basisSet[k], basisSet[l]))
         update4DarrBlock!(buf, int, I, J, K, L)
     end
     buf
@@ -952,16 +899,12 @@ function getTwoBodyInts(∫2e::F, basisSet::NTuple{BN, GTBasisFuncs{T, D, 1}}) w
                        {F<:Function, BN, T, D}
     buf = Array{T}(undef, BN, BN, BN, BN)
     for l = 1:BN, k = 1:l, j = 1:l, i = 1:ifelse(j==l, k, j)
-        int = ∫2e(basisSet[i], basisSet[j], basisSet[k], basisSet[l])
+        int = getCompositeInt(∫2e, (basisSet[i], basisSet[j], basisSet[k], basisSet[l]))
         buf[i, j, k, l] = buf[j, i, k, l] = buf[j, i, l, k] = buf[i, j, l, k] = 
         buf[l, k, i, j] = buf[k, l, i, j] = buf[k, l, j, i] = buf[l, k, j, i] = int
     end
     buf
 end
-
-
-getEleEleInteraction(BSet::NTuple{BN, GTBasisFuncs{T, D}}) where {BN, T, D} = 
-getTwoBodyInts(getEleEleInteraction, BSet)
 
 
 function genUniqueIndices(basisSetSize::Int)
