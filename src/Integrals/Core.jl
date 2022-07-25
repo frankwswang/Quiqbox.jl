@@ -337,6 +337,25 @@ function reformatIntData1(bf::FGTBasisFuncs1O{T, D, 𝑙, GN}) where {T, D, 𝑙
     R, ijk, αds
 end
 
+function reformatIntData1((ji,)::Tuple{Bool}, 
+                          bfs::NTuple{2, FGTBasisFuncs1O{T, D}}) where {T, D}
+    if ji
+        data1 = reformatIntData1(bfs[1])
+        (data1, data1)
+    else
+        reformatIntData1.(bfs)
+    end
+end
+
+function reformatIntData1((lk, lj, kj, kiOrji)::NTuple{4, Bool}, 
+                          bfs::NTuple{4, FGTBasisFuncs1O{T, D}}) where {T, D}
+    data4 = reformatIntData1(bfs[4])
+    data3 = lk ? data4 : reformatIntData1(bfs[3])
+    data2 = lj ? data4 : (kj ? data3 : reformatIntData1(bfs[2]))
+    data1 = kiOrji ? ifelse(lj, data3, data2) : reformatIntData1(bfs[1])
+    (data1, data2, data3, data4)
+end
+
 function isIntZeroCore(::Val{1}, 
                        R₁::NTuple{D, T}, R₂::NTuple{D, T}, 
                        ijk₁::NTuple{D, Int}, ijk₂::NTuple{D, Int}) where {D, T}
@@ -380,10 +399,10 @@ isIntZeroCore(Val(:∫nucAttractionCore), R₁, R₂, ijk₁, ijk₂, optArgs[en
 isIntZero(::Type{typeof(∫eeInteractionCore)}, R₁, R₂, R₃, R₄, ijk₁, ijk₂, ijk₃, ijk₄, _) = 
 isIntZeroCore(Val(2), R₁, R₂, R₃, R₄, ijk₁, ijk₂, ijk₃, ijk₄)
 
-function getOneBodyInt(∫1e::F, 
+function getOneBodyInt(∫1e::F, bls::Tuple{Bool}, 
                        bf1::BasisFunc{T, D, 𝑙1, GN1}, bf2::BasisFunc{T, D, 𝑙2, GN2}, 
                        optArgs...) where {F<:Function, T, D, 𝑙1, 𝑙2, GN1, GN2}
-    (R₁, ijk₁, ps₁), (R₂, ijk₂, ps₂) = reformatIntData1.((bf1, bf2))
+    (R₁, ijk₁, ps₁), (R₂, ijk₂, ps₂) = reformatIntData1(bls, (bf1, bf2))
     !(𝑙1==𝑙2==0) && isIntZero(F, R₁, R₂, ijk₁, ijk₂, optArgs) && (return T(0.0))
     uniquePairs, uPairCoeffs = get1BodyUniquePairs(R₁==R₂ && ijk₁==ijk₂, ps₁, ps₂)
     map(uniquePairs, uPairCoeffs) do x, y
@@ -391,9 +410,9 @@ function getOneBodyInt(∫1e::F,
     end |> sum
 end
 
-function getOneBodyInt(::F, 
-                       b1::FGTBasisFuncs1O{T, D, BN1}, b2::FGTBasisFuncs1O{T, D, BN2}, 
-                       optArgs...) where {F<:Function, T, D, BN1, BN2}
+function getOneBodyInt(::F, ::Tuple{Bool}, 
+                       ::FGTBasisFuncs1O{T, D, BN1}, ::FGTBasisFuncs1O{T, D, BN2}, 
+                       _...) where {F<:Function, T, D, BN1, BN2}
     min(BN1, BN2) == 0 ? T(0.0) : 
         error("The combination of such basis types are NOT supported: 
                \n$(b1|>typeof)\n$(b2|>typeof)")
@@ -448,13 +467,13 @@ end
     i
 end
 
-function getTwoBodyInt(∫2e::F, 
+function getTwoBodyInt(∫2e::F, bls::NTuple{4, Bool}, 
                        bf1::BasisFunc{T, D, 𝑙1, GN1}, bf2::BasisFunc{T, D, 𝑙2, GN2}, 
                        bf3::BasisFunc{T, D, 𝑙3, GN3}, bf4::BasisFunc{T, D, 𝑙4, GN4}, 
                        optArgs...) where 
                       {F<:Function, T, D, 𝑙1, 𝑙2, 𝑙3, 𝑙4, GN1, GN2, GN3, GN4}
     (R₁, ijk₁, ps₁), (R₂, ijk₂, ps₂), (R₃, ijk₃, ps₃), (R₄, ijk₄, ps₄) = 
-    reformatIntData1.((bf1, bf2, bf3, bf4))
+    reformatIntData1(bls, (bf1, bf2, bf3, bf4))
 
     !(𝑙1==𝑙2==𝑙3==𝑙4==0) && isIntZero(F, R₁, R₂, R₃, R₄, ijk₁, ijk₂, ijk₃, ijk₄, optArgs) && 
     (return T(0.0))
@@ -471,12 +490,12 @@ function getTwoBodyInt(∫2e::F,
     end |> sum
 end
 
-function getTwoBodyInt(::F, 
-                       b1::FGTBasisFuncs1O{T, D, BN1}, 
-                       b2::FGTBasisFuncs1O{T, D, BN2}, 
-                       b3::FGTBasisFuncs1O{T, D, BN3}, 
-                       b4::FGTBasisFuncs1O{T, D, BN4}, 
-                       optArgs...) where {F<:Function, T, D, BN1, BN2, BN3, BN4}
+function getTwoBodyInt(::F, ::NTuple{4, Bool}, 
+                       ::FGTBasisFuncs1O{T, D, BN1}, 
+                       ::FGTBasisFuncs1O{T, D, BN2}, 
+                       ::FGTBasisFuncs1O{T, D, BN3}, 
+                       ::FGTBasisFuncs1O{T, D, BN4}, 
+                       _...) where {F<:Function, T, D, BN1, BN2, BN3, BN4}
     min(BN1, BN2, BN3, BN4) == 0 ? T(0.0) : 
         error("The combination of the basis types are NOT supported: 
                \n$(b1|>typeof)\n$(b2|>typeof)\n$(b3|>typeof)\n$(b4|>typeof)")
@@ -774,37 +793,40 @@ end
 end
 
 
-getCompositeInt(∫::F, bfs::NTuple{2, BasisFunc{T, D}}, optArgs...) where 
+getCompositeInt(∫::F, bls::Tuple{Bool}, bfs::NTuple{2, BasisFunc{T, D}}, optArgs...) where 
                {F<:Function, T, D} = 
-getOneBodyInt(∫, bfs..., optArgs...)
+getOneBodyInt(∫, bls, bfs..., optArgs...)
 
-getCompositeInt(∫::F, bfs::NTuple{4, BasisFunc{T, D}}, optArgs...) where 
+getCompositeInt(∫::F, bls::NTuple{4, Bool}, bfs::NTuple{4, BasisFunc{T, D}}, optArgs...) where 
                {F<:Function, T, D} = 
-getTwoBodyInt(∫, bfs..., optArgs...)
+getTwoBodyInt(∫, bls, bfs..., optArgs...)
 
-function getCompositeInt(::typeof(∫nucAttractionCore), bfs::NTuple{2, BasisFunc{T, D}}, 
+function getCompositeInt(::typeof(∫nucAttractionCore), bls::Tuple{Bool}, bfs::NTuple{2, BasisFunc{T, D}}, 
                          nuc::NTuple{NN, String}, 
                          nucCoords::NTuple{NN, NTuple{D, T}}) where {T, D, NN}
     res = T(0.0)
     for (ele, coord) in zip(nuc, nucCoords)
-        res += getOneBodyInt(∫nucAttractionCore, bfs..., getCharge(ele), coord|>Tuple)
+        res += getOneBodyInt(∫nucAttractionCore, bls, bfs..., getCharge(ele), coord|>Tuple)
     end
     res
 end
 
-function getCompositeInt(∫::F, bs::NTuple{N, CompositeGTBasisFuncs{T, D}}, 
+getbls(::Val{2}) = (false,)
+getbls(::Val{4}) = (false,false,false,false)
+
+function getCompositeInt(∫::F, bls::Tuple{Vararg{Bool}}, bs::NTuple{N, CompositeGTBasisFuncs{T, D}}, 
                          optArgs...) where {F<:Function, N, T, D}
     rng = Iterators.product(bs...)
-    map(x->getCompositeInt(∫, x, optArgs...)::T, rng)::Array{T, N}
+    map(x->getCompositeInt(∫, getbls(Val(N)), x, optArgs...)::T, rng)::Array{T, N}
 end
 
-function getCompositeInt(∫::F, bs::NTuple{N, CGTBasisFuncs1O{T, D}}, optArgs...) where 
+function getCompositeInt(∫::F, bls::Tuple{Vararg{Bool}}, bs::NTuple{N, CGTBasisFuncs1O{T, D}}, optArgs...) where 
                          {F<:Function, N, T, D}
     if any(fieldtypes(typeof(bs)) .<: EmptyBasisFunc)
         zero(T)
     else
         rng = Iterators.product(unpackBasis.(bs)...)
-        map(x->getCompositeInt(∫, x, optArgs...)::T, rng) |> sum
+        map(x->getCompositeInt(∫, getbls(Val(N)), x, optArgs...)::T, rng) |> sum
     end
 end
 
@@ -830,7 +852,7 @@ function getOneBodyInts(∫1e::F, basisSet::NTuple{BN, GTBasisFuncs{T, D}}, optA
     len = subSize |> sum
     buf = Array{T}(undef, len, len)
     for j = 1:BN, i = 1:j
-        int = getCompositeInt(∫1e, (basisSet[i], basisSet[j]), optArgs...)
+        int = getCompositeInt(∫1e, (j==i,), (basisSet[i], basisSet[j]), optArgs...)
         rowRange = accuSize[i]+1 : accuSize[i+1]
         colRange = accuSize[j]+1 : accuSize[j+1]
         update2DarrBlock!(buf, int, rowRange, colRange)
@@ -842,7 +864,7 @@ function getOneBodyInts(∫1e::F, basisSet::NTuple{BN, GTBasisFuncs{T, D, 1}},
                         optArgs...) where {F<:Function, BN, T, D}
     buf = Array{T}(undef, BN, BN)
     for j = 1:BN, i = 1:j
-        int = getCompositeInt(∫1e, (basisSet[i], basisSet[j]), optArgs...)
+        int = getCompositeInt(∫1e, (j==i,), (basisSet[i], basisSet[j]), optArgs...)
         buf[i, j] = buf[j, i] = int
     end
     buf
@@ -889,7 +911,8 @@ function getTwoBodyInts(∫2e::F, basisSet::NTuple{BN, GTBasisFuncs{T, D}}) wher
         J = accuSize[j]+1 : accuSize[j+1]
         K = accuSize[k]+1 : accuSize[k+1]
         L = accuSize[l]+1 : accuSize[l+1]
-        int = getCompositeInt(∫2e, (basisSet[i], basisSet[j], basisSet[k], basisSet[l]))
+        bl = (l==k, l==j, k==j, ifelse(j==l, k, j)==i)
+        int = getCompositeInt(∫2e, bl, (basisSet[i], basisSet[j], basisSet[k], basisSet[l]))
         update4DarrBlock!(buf, int, I, J, K, L)
     end
     buf
@@ -899,7 +922,8 @@ function getTwoBodyInts(∫2e::F, basisSet::NTuple{BN, GTBasisFuncs{T, D, 1}}) w
                        {F<:Function, BN, T, D}
     buf = Array{T}(undef, BN, BN, BN, BN)
     for l = 1:BN, k = 1:l, j = 1:l, i = 1:ifelse(j==l, k, j)
-        int = getCompositeInt(∫2e, (basisSet[i], basisSet[j], basisSet[k], basisSet[l]))
+        bl = (l==k, l==j, k==j, ifelse(j==l, k, j)==i)
+        int = getCompositeInt(∫2e, bl, (basisSet[i], basisSet[j], basisSet[k], basisSet[l]))
         buf[i, j, k, l] = buf[j, i, k, l] = buf[j, i, l, k] = buf[i, j, l, k] = 
         buf[l, k, i, j] = buf[k, l, i, j] = buf[k, l, j, i] = buf[l, k, j, i] = int
     end
