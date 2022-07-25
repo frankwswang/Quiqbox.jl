@@ -435,7 +435,7 @@ BasisFunc{Float64, 3, 1, 1, P3D{Float64, 0, 0, 0}}(center, gauss, l, normalizeGT
 
     genBasisFunc(center, GsOrCoeffs, subshell="S"; normalizeGTO=false) -> 
     FloatingGTBasisFuncs
-    
+
     genBasisFunc(center, GsOrCoeffs, subshell, lFilter; normalizeGTO=false) -> 
     FloatingGTBasisFuncs
 
