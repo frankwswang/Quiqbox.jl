@@ -100,7 +100,7 @@ function ∫overlapCore(ΔR::NTuple{3, T},
                       ijk₁::NTuple{3, Int}, α₁::T, 
                       ijk₂::NTuple{3, Int}, α₂::T) where {T}
     for n in (ijk₁..., ijk₂...)
-        n < 0 && return T(0)
+        n < 0 && return T(0.0)
     end
 
     α = α₁ + α₂
@@ -154,7 +154,7 @@ end
 function genIntNucAttCore1(ΔRR₀::NTuple{3, T}, ΔR₁R₂::NTuple{3, T}, β::T, 
                            ijk₁::NTuple{3, Int}, α₁::T, 
                            ijk₂::NTuple{3, Int}, α₂::T) where {T}
-    A = T(0)
+    A = T(0.0)
     i₁, j₁, k₁ = ijk₁
     i₂, j₂, k₂ = ijk₂
     for l₁ in 0:(i₁÷2), m₁ in 0:(j₁÷2), n₁ in 0:(k₁÷2), 
@@ -341,26 +341,56 @@ function reformatIntData1(bf::FGTBasisFuncs1O{T, D, 𝑙, GN}) where {T, D, 𝑙
     R, ijk, αds
 end
 
+function isOneBodyInt0Core(::Val{1}, 
+                           R₁::NTuple{D, T}, R₂::NTuple{D, T}, 
+                           ijk₁::NTuple{D, Int}, ijk₂::NTuple{D, Int}) where {D, T}
+    for i in eachindex(R₁)
+        isodd(ijk₁[i] + ijk₂[i]) && R₁[i]==R₂[i] && (return true)
+    end
+    false
+end
+
+function isOneBodyInt0Core(::Val{:∫nucAttractionCore}, 
+                           R₁::NTuple{D, T}, R₂::NTuple{D, T}, 
+                           ijk₁::NTuple{D, Int}, ijk₂::NTuple{D, Int}, 
+                           R₀::NTuple{D, T}) where {D, T}
+    for i in eachindex(R₁)
+        isodd(ijk₁[i] + ijk₂[i]) && R₀[i]==R₁[i]==R₂[i] && (return true)
+    end
+    false
+end
+
+isOneBodyInt0(::Type{typeof(∫overlapCore)}, R₁, R₂, ijk₁, ijk₂, _) = 
+isOneBodyInt0Core(Val(1), R₁, R₂, ijk₁, ijk₂)
+
+isOneBodyInt0(::Type{typeof(∫elecKineticCore)}, R₁, R₂, ijk₁, ijk₂, _) = 
+isOneBodyInt0Core(Val(1), R₁, R₂, ijk₁, ijk₂)
+
+isOneBodyInt0(::Type{typeof(∫nucAttractionCore)}, R₁, R₂, ijk₁, ijk₂, optArgs) = 
+isOneBodyInt0Core(Val(:∫nucAttractionCore), R₁, R₂, ijk₁, ijk₂, optArgs[end])
 
 function getOneBodyInt(∫1e::F, 
                        bf1::BasisFunc{T, D, <:Any, GN1}, bf2::BasisFunc{T, D, <:Any, GN2}, 
                        optArgs...) where {F<:Function, T, D, GN1, GN2}
     (R₁, ijk₁, ps₁), (R₂, ijk₂, ps₂) = reformatIntData1.((bf1, bf2))
-    uniquePairs, uPairCoeffs = getOneBodyIntCore(R₁==R₂ && ijk₁==ijk₂, ps₁, ps₂)
+    isOneBodyInt0(F, R₁, R₂, ijk₁, ijk₂, optArgs) && (return T(0.0))
+    uniquePairs, uPairCoeffs = get1BodyUniquePairs(R₁==R₂ && ijk₁==ijk₂, ps₁, ps₂)
     map(uniquePairs, uPairCoeffs) do x, y
         ∫1e(optArgs..., R₁, R₂, ijk₁, x[1], ijk₂, x[2])::T * y
     end |> sum
 end
 
 function getOneBodyInt(::F, 
-                       ::FGTBasisFuncs1O{T, D, BN1}, ::FGTBasisFuncs1O{T, D, BN2}, 
+                       b1::FGTBasisFuncs1O{T, D, BN1}, b2::FGTBasisFuncs1O{T, D, BN2}, 
                        optArgs...) where {F<:Function, T, D, BN1, BN2}
-    min(BN1, BN2) == 0 ? 0.0 : error("The input basis type is NOT supported.")
+    min(BN1, BN2) == 0 ? T(0.0) : 
+        error("The combination of such basis types are NOT supported: 
+               \n$(b1|>typeof)\n$(b2|>typeof)")
 end
 
-function getOneBodyIntCore(flag::Bool, 
-                           ps₁::NTuple{GN1, NTuple{2, T}}, 
-                           ps₂::NTuple{GN2, NTuple{2, T}}) where {T, GN1, GN2}
+function get1BodyUniquePairs(flag::Bool, 
+                             ps₁::NTuple{GN1, NTuple{2, T}}, 
+                             ps₂::NTuple{GN2, NTuple{2, T}}) where {T, GN1, GN2}
     uniquePairs = NTuple{2, T}[]
     uPairCoeffs = Array{T}(undef, GN1*GN2)
     i = 0
@@ -420,19 +450,21 @@ function getTwoBodyInt(∫2e::F,
     f4 = (R₁ == R₄ && ijk₁ == ijk₄)
     f5 = (R₂ == R₃ && ijk₂ == ijk₃)
 
-    uniquePairs, uPairCoeffs = getTwoBodyIntCore((f1, f2, f3, f4, f5), ps₁, ps₂, ps₃, ps₄)
+    uniquePairs, uPairCoeffs = get2BodyUniquePairs((f1, f2, f3, f4, f5), ps₁, ps₂, ps₃, ps₄)
     map(uniquePairs, uPairCoeffs) do x, y
         ∫2e(optArgs..., R₁,ijk₁,x[1], R₂,ijk₂,x[2], R₃,ijk₃,x[3], R₄,ijk₄,x[4])::T * y
     end |> sum
 end
 
 function getTwoBodyInt(::F, 
-                       ::FGTBasisFuncs1O{T, D, BN1}, 
-                       ::FGTBasisFuncs1O{T, D, BN2}, 
-                       ::FGTBasisFuncs1O{T, D, BN3}, 
-                       ::FGTBasisFuncs1O{T, D, BN4}, 
+                       b1::FGTBasisFuncs1O{T, D, BN1}, 
+                       b2::FGTBasisFuncs1O{T, D, BN2}, 
+                       b3::FGTBasisFuncs1O{T, D, BN3}, 
+                       b4::FGTBasisFuncs1O{T, D, BN4}, 
                        optArgs...) where {F<:Function, T, D, BN1, BN2, BN3, BN4}
-    min(BN1, BN2, BN3, BN4) == 0 ? 0.0 : error("The input basis type is NOT supported.")
+    min(BN1, BN2, BN3, BN4) == 0 ? T(0.0) : 
+        error("The combination of the basis types are NOT supported: 
+               \n$(b1|>typeof)\n$(b2|>typeof)\n$(b3|>typeof)\n$(b4|>typeof)")
 end
 
 diFoldCount(i::T, j::T) where {T} = ifelse(i==j, 1, 2)
@@ -445,11 +477,11 @@ diFoldCount(i::T, j::T) where {T} = ifelse(i==j, 1, 2)
     2^m
 end
 
-function getTwoBodyIntCore(flags::NTuple{5, Bool}, 
-                           ps₁::NTuple{GN1, NTuple{2, T}},
-                           ps₂::NTuple{GN2, NTuple{2, T}},
-                           ps₃::NTuple{GN3, NTuple{2, T}},
-                           ps₄::NTuple{GN4, NTuple{2, T}}) where {GN1, GN2, GN3, GN4, T}
+function get2BodyUniquePairs(flags::NTuple{5, Bool}, 
+                             ps₁::NTuple{GN1, NTuple{2, T}},
+                             ps₂::NTuple{GN2, NTuple{2, T}},
+                             ps₃::NTuple{GN3, NTuple{2, T}},
+                             ps₄::NTuple{GN4, NTuple{2, T}}) where {GN1, GN2, GN3, GN4, T}
     uniquePairs = NTuple{4, T}[]
     uPairCoeffs = Array{T}(undef, GN1*GN2*GN3*GN4)
     flagRijk = flags[1:3]
