@@ -774,32 +774,32 @@ end
 end
 
 
-getCompositeInt(∫::F, bfs::NTuple{2, BasisFunc{T, D}}, optArgs...) where {F<:Function, T, D} = 
+getCompositeInt(∫::F, bfs::NTuple{2, BasisFunc{T, D}}, optArgs...) where 
+               {F<:Function, T, D} = 
 getOneBodyInt(∫, bfs..., optArgs...)
 
-getCompositeInt(∫::F, bfs::NTuple{4, BasisFunc{T, D}}, optArgs...) where {F<:Function, T, D} = 
+getCompositeInt(∫::F, bfs::NTuple{4, BasisFunc{T, D}}, optArgs...) where 
+               {F<:Function, T, D} = 
 getTwoBodyInt(∫, bfs..., optArgs...)
 
-function getCompositeInt(∫::F, bfs::NTuple{2, BasisFunc{T, D}}, 
+function getCompositeInt(::typeof(∫nucAttractionCore), bfs::NTuple{2, BasisFunc{T, D}}, 
                          nuc::NTuple{NN, String}, 
-                         nucCoords::NTuple{NN, NTuple{D, T}}) where {F<:Function, T, D, NN}
+                         nucCoords::NTuple{NN, NTuple{D, T}}) where {T, D, NN}
     res = T(0.0)
     for (ele, coord) in zip(nuc, nucCoords)
-        res += getOneBodyInt(∫, bfs..., getCharge(ele), coord|>Tuple)
+        res += getOneBodyInt(∫nucAttractionCore, bfs..., getCharge(ele), coord|>Tuple)
     end
     res
 end
 
-@inline function getCompositeInt(∫::F, 
-                                 bs::NTuple{N, CompositeGTBasisFuncs{T, D}}, 
-                                 optArgs...) where {F<:Function, N, T, D}
+function getCompositeInt(∫::F, bs::NTuple{N, CompositeGTBasisFuncs{T, D}}, 
+                         optArgs...) where {F<:Function, N, T, D}
     rng = Iterators.product(bs...)
     map(x->getCompositeInt(∫, x, optArgs...)::T, rng)::Array{T, N}
 end
 
-@inline function getCompositeInt(∫::F, 
-                                 bs::NTuple{N, CGTBasisFuncs1O{T, D}}, optArgs...) where 
-                                {F<:Function, N, T, D}
+function getCompositeInt(∫::F, bs::NTuple{N, CGTBasisFuncs1O{T, D}}, optArgs...) where 
+                         {F<:Function, N, T, D}
     if any(fieldtypes(typeof(bs)) .<: EmptyBasisFunc)
         zero(T)
     else
