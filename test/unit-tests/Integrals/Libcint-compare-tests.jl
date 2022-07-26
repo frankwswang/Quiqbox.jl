@@ -30,8 +30,15 @@ fns = (:overlaps, :eKinetics, :neAttractions, :eeInteractions)
 
 for (f1, f2, fn) in zip(fs1, fs2, fns), pair in zip(BasisSetNames, atms)
     bs = genBasisFunc(center, pair...)
+    if (orbitalNumOf.(bs) |> sum) < 12
+        bs2 = hcat(decompose.(bs)...) |> vec
+        # Test result consistency of libcint functions for BasisFuncs
+        res = compr2Arrays1(f2(bs), f2(bs2), 0.001errT)
+        !res && println("The above errors are from Libcint functions for: ", (fn, pair...))
+        @test res
+    end
     bl = compr2Arrays1(f1(bs), f2(bs), errT)
-    !bl && println("Failed Case:", (fn, pair...))
+    !bl && println("Failed Case for errors between Quiqbox and Libcint: ", (fn, pair...))
     @test bl
 end
 
