@@ -13,8 +13,7 @@ perturbStep = rand(-1e-1:2e-3:1e-1)
 fNumInt = (γ, u) -> quadgk(t -> t^(2γ)*exp(-u*t^2), 0, 1; rtol=tolerance1)[1]
 rng = -10:(0.2+perturbStep):2
 for γ in 0:24
-    @test all([isapprox(fNumInt(γ, 10.0^e), Fγ(γ, 10.0^e), atol=tolerance2) 
-                for e in rng])
+    @test all([isapprox(fNumInt(γ, 10.0^e), Fγ(γ, 10.0^e), atol=tolerance2) for e in rng])
 end
 
 nuc = ["H", "F"]
@@ -31,10 +30,9 @@ bs_bf_bfs_bfm = [b1, bfm1, b2..., bfm2]
 tolerance3 = 1e-15
 for i in Quiqbox.SubshellNames[2:4]
     bfs1 = genBasisFunc(rand(3), (rand(0.5:0.1:2.0, 2), rand(-0.5:0.1:0.5, 2)), "S")
-    bfs2 = genBasisFunc(rand(3), (rand(0.5:0.1:2.0, 2), rand(-0.5:0.1:0.5, 2)), "P")
-    bfs3 = genBasisFunc(rand(3), (rand(0.5:0.1:2.0, 2), rand(-0.5:0.1:0.5, 2)), i)
-    bs1 = [bfs1, bfs2, bfs3]
-    bs2 = [bfs1, bfs2[:]..., bfs3[:]...]
+    bfs2 = genBasisFunc(rand(3), (rand(0.5:0.1:2.0, 2), rand(-0.5:0.1:0.5, 2)), i)
+    bs1 = [bfs1, bfs2]
+    bs2 = [bfs1, bfs2[:]...]
     bss = (bs1, bs2)
 
     S1, S2 = overlaps.(bss)
