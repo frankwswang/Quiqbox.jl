@@ -40,7 +40,7 @@ abstract type ConfigBox{T, ContainerT, MethodT} <: MutableParameter{ContainerT, 
 
 abstract type HartreeFockFinalValue{T, HFT} <: AbstractHartreeFockFinalValue{T} end
 
-abstract type BasisSetData{T, D, BT} <: AbstractBasisSetData{T} end
+abstract type BasisSetData{T, D, BFT} <: AbstractBasisSetData{T} end
 
 abstract type MatterData{T, D, N} <: ManyFermionDataBox{T, D, N} end
 

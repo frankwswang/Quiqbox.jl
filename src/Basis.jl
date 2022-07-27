@@ -703,14 +703,14 @@ centerCoordOf(bf::FloatingGTBasisFuncs) = coordOf(bf.center)
 
 """
 
-    BasisFuncMix{T, D, BN, BT<:BasisFunc{T, D}} <: CompositeGTBasisFuncs{T, D, BN, 1}
+    BasisFuncMix{T, D, BN, BFT<:BasisFunc{T, D}} <: CompositeGTBasisFuncs{T, D, BN, 1}
 
 Sum of multiple `FloatingGTBasisFuncs{<:Any, <:Any, <:Any, <:Any, <:Any, 1}` without any 
 reformulation, treated as one basis function in the calculations.
 
 ≡≡≡ Field(s) ≡≡≡
 
-`BasisFunc::NTuple{BN, BT}`: Basis functions used to sum up.
+`BasisFunc::NTuple{BN, BFT}`: Basis functions used to sum up.
 
 `param::Tuple{Vararg{ParamBox}}`: Contained parameters.
 
@@ -721,8 +721,8 @@ reformulation, treated as one basis function in the calculations.
     BasisFuncMix
 
 """
-struct BasisFuncMix{T, D, BN, BT<:BasisFunc{T, D}} <: CGTBasisFuncs1O{T, D, BN}
-    BasisFunc::NTuple{BN, BT}
+struct BasisFuncMix{T, D, BN, BFT<:BasisFunc{T, D}} <: CGTBasisFuncs1O{T, D, BN}
+    BasisFunc::NTuple{BN, BFT}
     param::Tuple{Vararg{ParamBox{T}}}
 
     function BasisFuncMix(bfs::Tuple{Vararg{BasisFunc{T, D}, BN}}) where {T, D, BN}
@@ -741,7 +741,7 @@ BasisFuncMix(bfm::BasisFuncMix) = itself(bfm)
 
 getTypeParams(::FloatingGTBasisFuncs{T, D, 𝑙, GN, PT, ON}) where {T, D, 𝑙, GN, PT, ON} = 
 (T, D, 𝑙, GN, PT, ON)
-getTypeParams(::BasisFuncMix{T, D, BN, BT}) where {T, D, BN, BT} = (T, D, BN, BT)
+getTypeParams(::BasisFuncMix{T, D, BN, BFT}) where {T, D, BN, BFT} = (T, D, BN, BFT)
 
 
 unpackBasis(::EmptyBasisFunc) = ()
@@ -762,13 +762,13 @@ dimOf(::DimensionalParamContainer{<:Any, D}) where {D} = D
 
 """
 
-    GTBasis{T, D, BN, BT<:GTBasisFuncs{T, D, 1}} <: BasisSetData{T, D, BT}
+    GTBasis{T, D, BN, BFT<:GTBasisFuncs{T, D, 1}} <: BasisSetData{T, D, BFT}
 
 The container of basis set information.
 
 ≡≡≡ Field(s) ≡≡≡
 
-`basis::NTuple{BN, BT}`: Stored basis set.
+`basis::NTuple{BN, BFT}`: Stored basis set.
 
 `S::Matrix{T}`: Overlap matrix.
 
@@ -784,8 +784,8 @@ The container of basis set information.
 
 Construct a `GTBasis` given a basis set.
 """
-struct GTBasis{T, D, BN, BT<:GTBasisFuncs{T, D, 1}} <: BasisSetData{T, D, BT}
-    basis::NTuple{BN, BT}
+struct GTBasis{T, D, BN, BFT<:GTBasisFuncs{T, D, 1}} <: BasisSetData{T, D, BFT}
+    basis::NTuple{BN, BFT}
     S::Matrix{T}
     Te::Matrix{T}
     eeI::Array{T, 4}

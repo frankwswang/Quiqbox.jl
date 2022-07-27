@@ -63,8 +63,8 @@ end
 
 typeStrOf(::T) where {T<:GridBox} = typeStrOf(T)
 
-typeStrOf(bfmT::Type{<:BasisFuncMix{<:Any, <:Any, <:Any, BT}}) where {BT} = 
-replace(string(bfmT), string(BT)=>typeStrOf(BT), count=1)
+typeStrOf(bfmT::Type{<:BasisFuncMix{<:Any, <:Any, <:Any, BFT}}) where {BFT} = 
+replace(string(bfmT), string(BFT)=>typeStrOf(BFT), count=1)
 
 typeStrOf(::T) where {T<:BasisFuncMix} = typeStrOf(T)
 

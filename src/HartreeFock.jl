@@ -570,12 +570,12 @@ electrons with same spin configurations(s).
 
 `printInfo::Bool`: Whether print out the information of iteration steps and result.
 """
-function runHF(bs::GTBasis{T1, D, BN, BT}, 
+function runHF(bs::GTBasis{T1, D, BN, BFT}, 
                nuc::Union{NTuple{NN, String}, AbstractVector{String}}, 
                nucCoords::SpatialCoordType{T1, D, NN}, 
                config::HFconfig{T2, HFT}=defaultHFC, 
                N::Union{Int, Tuple{Int}, NTuple{2, Int}}=getCharge(nuc); 
-               printInfo::Bool=true) where {T1, D, BN, BT, NN, HFT, T2}
+               printInfo::Bool=true) where {T1, D, BN, BFT, NN, HFT, T2}
     @assert N > (HFT==:RHF) "$(HFT) requires more than $(HFT==:RHF) electrons."
     Ns = splitSpins(Val(HFT), N)
     leastNb = max(Ns...)
