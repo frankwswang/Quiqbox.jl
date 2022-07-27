@@ -352,7 +352,8 @@ function reformatIntData1((lk, lj, kj, kiOrji)::NTuple{4, Bool},
     data4 = reformatIntData1(bfs[4])
     data3 = lk ? data4 : reformatIntData1(bfs[3])
     data2 = lj ? data4 : (kj ? data3 : reformatIntData1(bfs[2]))
-    data1 = kiOrji ? ifelse(lj, data3, data2) : reformatIntData1(bfs[1])
+    data1 = lj ? (kiOrji ? data3 : reformatIntData1(bfs[1])) : 
+                 (kiOrji ? data2 : reformatIntData1(bfs[1]))
     (data1, data2, data3, data4)
 end
 
@@ -811,16 +812,169 @@ function getCompositeInt(::typeof(∫nucAttractionCore), bls::Tuple{Bool}, bfs::
     res
 end
 
+function getCompositeInt(∫::F, (ji,)::Tuple{Bool}, bs::NTuple{2, BasisFuncs{T, D}}, 
+                         optArgs...) where {F<:Function, N, T, D}
+    if ji
+        b = bs[1]
+        len = length(b)
+        res = Array{T, 2}(undef, len, len)
+        for j=1:len, i=1:j
+            res[i,j] = res[j,i] = getCompositeInt(∫, (j==i,), (b[i], b[j]), optArgs...)
+        end
+    else
+        rng = Iterators.product(bs...)
+        res = map(x->getCompositeInt(∫, (false,), x, optArgs...)::T, rng)
+    end
+    res
+end
+                            # a==b   lk,    lj,    kj, ki/ji    ijkl
+const BasisFuncsIntTypes = Dict([( true,  true,  true,  true), #1111
+                                 ( true, false, false,  true), #1122
+                                 (false,  true, false,  true), #1212
+                                 (false,  true, false, false), #1232
+                                 (false, false,  true, false), #122X
+                                 (false, false,  true,  true), #1112
+                                 (false, false, false,  true), #1123
+                                 ( true,  true,  true, false), #1222
+                                 ( true, false, false, false), #12XX
+                                 (false, false, false, false)  #123X
+                                ] .=> 
+                                [Val(:aaaa), Val(:aabb), Val(:abab), Val(:abcx), 
+                                 Val(:abbx), Val(:aabc), Val(:aabc), Val(:abxx), 
+                                 Val(:abxx), Val(:abcx)])
+
+function getCompositeIntCore(::Val{:aaaa}, ∫::F, 
+                             bs::NTuple{4, BasisFuncs{T, D, 𝑙, GN, PT, ON}}, 
+                             optArgs...) where {F<:Function, T, D, 𝑙, GN, PT, ON}
+    b = bs[1]
+    res = Array{T}(undef, ON, ON, ON, ON)
+    for l = 1:ON, k = 1:l, j = 1:l, i = 1:ifelse(l==j, k, j)
+        bl = (l==k, l==j, k==j, ifelse(l==j, k, j)==i)
+        res[i, j, k, l] = res[j, i, k, l] = res[j, i, l, k] = res[i, j, l, k] = 
+        res[l, k, i, j] = res[k, l, i, j] = res[k, l, j, i] = res[l, k, j, i] = 
+        getCompositeInt(∫, bl, (b[i], b[j], b[k], b[l]), optArgs...)
+    end
+    res
+end
+
+function getCompositeIntCore(::Val{:aabb}, ∫::F, 
+                             bs::Tuple{BasisFuncs{T, D, 𝑙1, GN1, PT1, ON1}, 
+                                       BasisFuncs{T, D, 𝑙1, GN1, PT1, ON1}, 
+                                       BasisFuncs{T, D, 𝑙2, GN2, PT2, ON2}, 
+                                       BasisFuncs{T, D, 𝑙2, GN2, PT2, ON2}}, 
+                             optArgs...) where 
+                            {F<:Function, T, D, 𝑙1, GN1, PT1, ON1, 𝑙2, GN2, PT2, ON2}
+    b1, b2 = bs[[1, 3]]
+    res = Array{T}(undef, ON1, ON1, ON2, ON2)
+    for l = 1:ON2, k = 1:l, j = 1:ON1, i = 1:j
+        bl = (l==k, false, false, j==i)
+        res[i, j, k, l] = res[j, i, k, l] = res[j, i, l, k] = res[i, j, l, k] = 
+        getCompositeInt(∫, bl, (b1[i], b1[j], b2[k], b2[l]), optArgs...)
+    end
+    res
+end
+function getCompositeIntCore(::Val{:abab}, ∫::F, 
+                             bs::Tuple{BasisFuncs{T, D, 𝑙1, GN1, PT1, ON1}, 
+                                       BasisFuncs{T, D, 𝑙2, GN2, PT2, ON2}, 
+                                       BasisFuncs{T, D, 𝑙1, GN1, PT1, ON1}, 
+                                       BasisFuncs{T, D, 𝑙2, GN2, PT2, ON2}}, 
+                            optArgs...) where 
+                            {F<:Function, T, D, 𝑙1, GN1, PT1, ON1, 𝑙2, GN2, PT2, ON2}
+    b1, b2 = bs[[1, 2]]
+    res = Array{T}(undef, ON1, ON2, ON1, ON2)
+    rng = Iterators.product(1:ON2, 1:ON1)
+    for (x, (l,k)) in enumerate(rng), (_, (j,i)) in zip(1:x, rng)
+        bl = (false, l==j, false, ifelse(l==j, k==i, false))
+        res[i, j, k, l] = res[k, l, i, j] = 
+        getCompositeInt(∫, bl, (b1[i], b2[j], b1[k], b2[l]), optArgs...)
+    end
+    res
+end
+
+function getCompositeIntCore(::Val{:abbx}, ∫::F, 
+                             bs::Tuple{BasisFuncs{T, D, 𝑙1, GN1, PT1, ON1}, 
+                                       BasisFuncs{T, D, 𝑙2, GN2, PT2, ON2}, 
+                                       BasisFuncs{T, D, 𝑙2, GN2, PT2, ON2}, 
+                                       BasisFuncs{T, D, 𝑙3, GN3, PT3, ON3}}, 
+                             optArgs...) where 
+                            {F<:Function, T, D, 𝑙1, GN1, PT1, ON1, 
+                                                𝑙2, GN2, PT2, ON2, 
+                                                𝑙3, GN3, PT3, ON3}
+    if bs[1] === bs[4]
+        b1, b2 = bs[[1, 2]]
+        res = Array{T}(undef, ON1, ON2, ON2, ON1)
+        rng = Iterators.product(1:ON1, 1:ON2)
+        for (x, (l,k)) in enumerate(rng), (_, (i,j)) in zip(1:x, rng)
+            bl = (false, false, k==j, false)
+            res[i, j, k, l] = res[k, l, i, j] = 
+            getCompositeInt(∫, bl, (b1[i], b2[j], b2[k], b1[l]), optArgs...)
+        end
+    else
+        res = getCompositeIntCore(Val(:abcx), ∫, bs, optArgs...)
+    end
+    res
+end
+
+function getCompositeIntCore(::Val{:aabc}, ∫::F, 
+                             bs::Tuple{BasisFuncs{T, D, 𝑙1, GN1, PT1, ON1}, 
+                                       BasisFuncs{T, D, 𝑙1, GN1, PT1, ON1}, 
+                                       BasisFuncs{T, D, 𝑙2, GN2, PT2, ON2}, 
+                                       BasisFuncs{T, D, 𝑙3, GN3, PT3, ON3}}, 
+                             optArgs...) where 
+                            {F<:Function, T, D, 𝑙1, GN1, PT1, ON1, 
+                                                𝑙2, GN2, PT2, ON2, 
+                                                𝑙3, GN3, PT3, ON3}
+    b1, b2, b3 = bs[[1, 3, 4]]
+    res = Array{T}(undef, ON1, ON1, ON2, ON3)
+    for l=1:ON3, k=1:ON2, j=1:ON1, i=1:j
+        bl = (false, false, false, j==i)
+        res[i, j, k, l] = res[j, i, k, l] = 
+        getCompositeInt(∫, bl, (b1[i], b1[j], b2[k], b3[l]), optArgs...)
+    end
+    res
+end
+
+function getCompositeIntCore(::Val{:abxx}, ∫::F, 
+                             bs::Tuple{BasisFuncs{T, D, 𝑙1, GN1, PT1, ON1}, 
+                                       BasisFuncs{T, D, 𝑙2, GN2, PT2, ON2}, 
+                                       BasisFuncs{T, D, 𝑙3, GN3, PT3, ON3}, 
+                                       BasisFuncs{T, D, 𝑙3, GN3, PT3, ON3}}, 
+                             optArgs...) where 
+                            {F<:Function, T, D, 𝑙1, GN1, PT1, ON1, 
+                                                𝑙2, GN2, PT2, ON2, 
+                                                𝑙3, GN3, PT3, ON3}
+    b1, b2, b3 = bs[[1, 2, 3]]
+    res = Array{T}(undef, ON1, ON2, ON3, ON3)
+    for l=1:ON3, k=1:l, j=1:ON2, i=1:ON1
+        bl = (l==k, false, false, false)
+        res[i, j, k, l] = res[i, j, l, k] = 
+        getCompositeInt(∫, bl, (b1[i], b2[j], b3[k], b3[l]), optArgs...)
+    end
+    res
+end
+
+function getCompositeIntCore(::Val{:abcx}, ∫::F, 
+                             bs::NTuple{4, BasisFuncs{T, D}}, optArgs...) where 
+                            {F<:Function, T, D}
+    rng = Iterators.product(bs...)
+    map(x->getCompositeInt(∫, (false,false,false,false), x, optArgs...)::T, rng)
+end
+
+getCompositeInt(∫::F, bls::NTuple{4, Bool}, bs::NTuple{4, BasisFuncs{T, D}}, 
+                optArgs...) where {F<:Function, T, D} = 
+getCompositeIntCore(BasisFuncsIntTypes[bls], ∫, bs, optArgs...)
+
+
 getbls(::Val{2}) = (false,)
 getbls(::Val{4}) = (false,false,false,false)
 
-function getCompositeInt(∫::F, bls::Tuple{Vararg{Bool}}, bs::NTuple{N, CompositeGTBasisFuncs{T, D}}, 
+function getCompositeInt(∫::F, ::Tuple{Vararg{Bool}}, bs::NTuple{N, CompositeGTBasisFuncs{T, D}}, 
                          optArgs...) where {F<:Function, N, T, D}
     rng = Iterators.product(bs...)
-    map(x->getCompositeInt(∫, getbls(Val(N)), x, optArgs...)::T, rng)::Array{T, N}
+    map(x->getCompositeInt(∫, getbls(Val(N)), x, optArgs...)::T, rng)
 end
 
-function getCompositeInt(∫::F, bls::Tuple{Vararg{Bool}}, bs::NTuple{N, CGTBasisFuncs1O{T, D}}, optArgs...) where 
+function getCompositeInt(∫::F, ::Tuple{Vararg{Bool}}, bs::NTuple{N, CGTBasisFuncs1O{T, D}}, optArgs...) where 
                          {F<:Function, N, T, D}
     if any(fieldtypes(typeof(bs)) .<: EmptyBasisFunc)
         zero(T)
@@ -906,12 +1060,12 @@ function getTwoBodyInts(∫2e::F, basisSet::NTuple{BN, GTBasisFuncs{T, D}}) wher
     accuSize = vcat(0, accumulate(+, subSize))
     totalSize = subSize |> sum
     buf = Array{T}(undef, totalSize, totalSize, totalSize, totalSize)
-    for l = 1:BN, k = 1:l, j = 1:l, i = 1:ifelse(j==l, k, j)
+    for l = 1:BN, k = 1:l, j = 1:l, i = 1:ifelse(l==j, k, j)
         I = accuSize[i]+1 : accuSize[i+1]
         J = accuSize[j]+1 : accuSize[j+1]
         K = accuSize[k]+1 : accuSize[k+1]
         L = accuSize[l]+1 : accuSize[l+1]
-        bl = (l==k, l==j, k==j, ifelse(j==l, k, j)==i)
+        bl = (l==k, l==j, k==j, ifelse(l==j, k, j)==i)
         int = getCompositeInt(∫2e, bl, (basisSet[i], basisSet[j], basisSet[k], basisSet[l]))
         update4DarrBlock!(buf, int, I, J, K, L)
     end
@@ -921,8 +1075,8 @@ end
 function getTwoBodyInts(∫2e::F, basisSet::NTuple{BN, GTBasisFuncs{T, D, 1}}) where 
                        {F<:Function, BN, T, D}
     buf = Array{T}(undef, BN, BN, BN, BN)
-    for l = 1:BN, k = 1:l, j = 1:l, i = 1:ifelse(j==l, k, j)
-        bl = (l==k, l==j, k==j, ifelse(j==l, k, j)==i)
+    for l = 1:BN, k = 1:l, j = 1:l, i = 1:ifelse(l==j, k, j)
+        bl = (l==k, l==j, k==j, ifelse(l==j, k, j)==i)
         int = getCompositeInt(∫2e, bl, (basisSet[i], basisSet[j], basisSet[k], basisSet[l]))
         buf[i, j, k, l] = buf[j, i, k, l] = buf[j, i, l, k] = buf[i, j, l, k] = 
         buf[l, k, i, j] = buf[k, l, i, j] = buf[k, l, j, i] = buf[l, k, j, i] = int
