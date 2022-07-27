@@ -799,24 +799,34 @@ end
                         #       j==i      j!=i
 const CGB1eIndexTypes = Dict([( true,), (false,)] .=> [Val(:aa), Val(:ab)])
 
+getON(::Val{:ContainBasisFuncs}, b::SpatialBasis) = orbitalNumOf(b)
+getON(::Val{:WithoutBasisFuncs}, ::CGTBasisFuncs1O{<:Any, <:Any, BN}) where {BN} = BN
+
+getBF(::Val, b::SpatialBasis, i) = getindex(b, i)
+getBF(::Val{:WithoutBasisFuncs}, b::BasisFuncMix, i) = getindex(b.BasisFunc, i)
+
+getBFs(::Val{:ContainBasisFuncs}, b::SpatialBasis) = itself(b)
+getBFs(::Val{:WithoutBasisFuncs}, b::CGTBasisFuncs1O) = unpackBasis(b)
+
 # 1e integrals for BasisFuncs-mixed bases
-function getCompositeIntCore(::Val{T}, ::Val{D}, ::Val{:aa}, ∫::F, 
-                             bs::NTuple{2, CGBT}, optArgs...) where 
-                            {T, D, F<:Function, CGBT<:SpatialBasis{T, D}}
-    b = bs[begin]
-    ON = orbitalNumOf(b)
+function getCompositeIntCore(::Val{T}, ::Val{D}, ::Val{BL}, ::Val{:aa}, ∫::F, 
+                             bs::NTuple{2, BT}, optArgs...) where 
+                            {T, D, BL, F<:Function, BT<:SpatialBasis{T, D}}
+    a = bs[begin]
+    ON = getON(Val(BL), a)
     res = Array{T, 2}(undef, ON, ON)
     for j=1:ON, i=1:j
-        res[i,j] = res[j,i] = getCompositeInt(∫, (j==i,), (b[i], b[j]), optArgs...)
+        res[i,j] = res[j,i] = getCompositeInt(∫, (j==i,), 
+                                              (getBF(Val(BL), a, i), 
+                                               getBF(Val(BL), a, j)), optArgs...)
     end
     res
 end
 
-function getCompositeIntCore(::Val{T}, ::Val{D}, ::Val{:ab}, ∫::F, 
-                             bs::Tuple{CGBT1, CGBT2}, optArgs...) where 
-                            {T, D, F<:Function, CGBT1<:SpatialBasis{T, D}, 
-                                                CGBT2<:SpatialBasis{T, D}}
-    rng = Iterators.product(bs...)
+function getCompositeIntCore(::Val{T}, ::Val{D}, ::Val{BL}, ::Val{:ab}, ∫::F, 
+                             bs::NTuple{2, SpatialBasis{T, D}}, optArgs...) where 
+                            {T, D, BL, F<:Function}
+    rng = Iterators.product(getBFs.(Val(BL), bs)...)
     map(x->getCompositeInt(∫, (false,), x, optArgs...)::T, rng)
 end
 
@@ -836,109 +846,115 @@ const CGB2eIndexTypes = Dict([( true,  true,  true,  true), #1111
                               Val(:aabc), Val(:aabc), Val(:abxx), Val(:abxx), Val(:abcx)])
 
 # 2e integrals for BasisFuncs-mixed bases
-function getCompositeIntCore(::Val{T}, ::Val{D}, ::Val{:aaaa}, ∫::F, 
-                             bs::NTuple{4, CGBT}, optArgs...) where 
-                            {T, D, F<:Function, CGBT<:SpatialBasis{T, D}}
+function getCompositeIntCore(::Val{T}, ::Val{D}, ::Val{BL}, ::Val{:aaaa}, ∫::F, 
+                             bs::NTuple{4, BT}, optArgs...) where 
+                            {T, D, BL, F<:Function, BT<:SpatialBasis{T, D}}
     a = bs[begin]
-    ON = orbitalNumOf(a)
+    ON = getON(Val(BL), a)
     res = Array{T}(undef, ON, ON, ON, ON)
     for l = 1:ON, k = 1:l, j = 1:l, i = 1:ifelse(l==j, k, j)
         bl = (l==k, l==j, k==j, ifelse(l==j, k, j)==i)
         res[i, j, k, l] = res[j, i, k, l] = res[j, i, l, k] = res[i, j, l, k] = 
         res[l, k, i, j] = res[k, l, i, j] = res[k, l, j, i] = res[l, k, j, i] = 
-        getCompositeInt(∫, bl, (a[i], a[j], a[k], a[l]), optArgs...)
+        getCompositeInt(∫, bl, (getBF(Val(BL), a, i), getBF(Val(BL), a, j), 
+                                getBF(Val(BL), a, k), getBF(Val(BL), a, l)), optArgs...)
     end
     res
 end
 
-function getCompositeIntCore(::Val{T}, ::Val{D}, ::Val{:aabb}, ∫::F, 
-                             bs::Tuple{CGBT1, CGBT1, CGBT2, CGBT2}, optArgs...) where 
-                            {T, D, F<:Function, CGBT1<:SpatialBasis{T, D}, 
-                                                CGBT2<:SpatialBasis{T, D}}
+function getCompositeIntCore(::Val{T}, ::Val{D}, ::Val{BL}, ::Val{:aabb}, ∫::F, 
+                             bs::Tuple{BT1, BT1, BT2, BT2}, optArgs...) where 
+                            {T, D, BL, F<:Function, BT1<:SpatialBasis{T, D}, 
+                                                    BT2<:SpatialBasis{T, D}}
     a, b = ab = bs[[1, 3]]
-    ON1, ON2 = orbitalNumOf.(ab)
+    ON1, ON2 = getON.(Val(BL), ab)
     res = Array{T}(undef, ON1, ON1, ON2, ON2)
     for l = 1:ON2, k = 1:l, j = 1:ON1, i = 1:j
         bl = (l==k, false, false, j==i)
         res[i, j, k, l] = res[j, i, k, l] = res[j, i, l, k] = res[i, j, l, k] = 
-        getCompositeInt(∫, bl, (a[i], a[j], b[k], b[l]), optArgs...)
+        getCompositeInt(∫, bl, (getBF(Val(BL), a, i), getBF(Val(BL), a, j), 
+                                getBF(Val(BL), b, k), getBF(Val(BL), b, l)), optArgs...)
     end
     res
 end
 
-function getCompositeIntCore(::Val{T}, ::Val{D}, ::Val{:abab}, ∫::F, 
-                             bs::Tuple{CGBT1, CGBT2, CGBT1, CGBT2}, optArgs...) where 
-                            {T, D, F<:Function, CGBT1<:SpatialBasis{T, D}, 
-                                                CGBT2<:SpatialBasis{T, D}}
+function getCompositeIntCore(::Val{T}, ::Val{D}, ::Val{BL}, ::Val{:abab}, ∫::F, 
+                             bs::Tuple{BT1, BT2, BT1, BT2}, optArgs...) where 
+                            {T, D, BL, F<:Function, BT1<:SpatialBasis{T, D}, 
+                                                    BT2<:SpatialBasis{T, D}}
     a, b = ab = bs[[1, 2]]
-    ON1, ON2 = orbitalNumOf.(ab)
+    ON1, ON2 = getON.(Val(BL), ab)
     res = Array{T}(undef, ON1, ON2, ON1, ON2)
     rng = Iterators.product(1:ON2, 1:ON1)
     for (x, (l,k)) in enumerate(rng), (_, (j,i)) in zip(1:x, rng)
         bl = (false, l==j, false, ifelse(l==j, k==i, false))
         res[i, j, k, l] = res[k, l, i, j] = 
-        getCompositeInt(∫, bl, (a[i], b[j], a[k], b[l]), optArgs...)
+        getCompositeInt(∫, bl, (getBF(Val(BL), a, i), getBF(Val(BL), b, j), 
+                                getBF(Val(BL), a, k), getBF(Val(BL), b, l)), optArgs...)
     end
     res
 end
 
-function getCompositeIntCore(::Val{T}, ::Val{D}, ::Val{:abbx}, ∫::F, 
-                             bs::Tuple{CGBT1, CGBT2, CGBT2, CGBT3}, optArgs...) where 
-                            {T, D, F<:Function, CGBT1<:SpatialBasis{T, D}, 
-                                                CGBT2<:SpatialBasis{T, D},
-                                                CGBT3<:SpatialBasis{T, D}}
+function getCompositeIntCore(::Val{T}, ::Val{D}, ::Val{BL}, ::Val{:abbx}, ∫::F, 
+                             bs::Tuple{BT1, BT2, BT2, BT3}, optArgs...) where 
+                            {T, D, BL, F<:Function, BT1<:SpatialBasis{T, D}, 
+                                                    BT2<:SpatialBasis{T, D}, 
+                                                    BT3<:SpatialBasis{T, D}}
     if bs[1] === bs[4]
         a, b = ab = bs[[1, 2]]
-        ON1, ON2 = orbitalNumOf.(ab)
+        ON1, ON2 = getON.(Val(BL), ab)
         res = Array{T}(undef, ON1, ON2, ON2, ON1)
         rng = Iterators.product(1:ON1, 1:ON2)
         for (x, (l,k)) in enumerate(rng), (_, (i,j)) in zip(1:x, rng)
             bl = (false, false, k==j, false)
             res[i, j, k, l] = res[k, l, i, j] = 
-            getCompositeInt(∫, bl, (a[i], b[j], b[k], a[l]), optArgs...)
+            getCompositeInt(∫, bl, (getBF(Val(BL), a, i), getBF(Val(BL), b, j), 
+                                    getBF(Val(BL), b, k), getBF(Val(BL), a, l)), optArgs...)
         end
     else
-        res = getCompositeIntCore(Val(T), Val(D), Val(:abcx), ∫, bs, optArgs...)
+        res = getCompositeIntCore(Val(T), Val(D), Val(BL), Val(:abcx), ∫, bs, optArgs...)
     end
     res
 end
 
-function getCompositeIntCore(::Val{T}, ::Val{D}, ::Val{:aabc}, ∫::F, 
-                             bs::Tuple{CGBT1, CGBT1, CGBT2, CGBT3}, optArgs...) where 
-                            {T, D, F<:Function, CGBT1<:SpatialBasis{T, D}, 
-                                                CGBT2<:SpatialBasis{T, D},
-                                                CGBT3<:SpatialBasis{T, D}}
+function getCompositeIntCore(::Val{T}, ::Val{D}, ::Val{BL}, ::Val{:aabc}, ∫::F, 
+                             bs::Tuple{BT1, BT1, BT2, BT3}, optArgs...) where 
+                            {T, D, BL, F<:Function, BT1<:SpatialBasis{T, D}, 
+                                                    BT2<:SpatialBasis{T, D}, 
+                                                    BT3<:SpatialBasis{T, D}}
     a, b, c = abc = bs[[1, 3, 4]]
-    ON1, ON2, ON3 = orbitalNumOf.(abc)
+    ON1, ON2, ON3 = getON.(Val(BL), abc)
     res = Array{T}(undef, ON1, ON1, ON2, ON3)
     for l=1:ON3, k=1:ON2, j=1:ON1, i=1:j
         bl = (false, false, false, j==i)
         res[i, j, k, l] = res[j, i, k, l] = 
-        getCompositeInt(∫, bl, (a[i], a[j], b[k], c[l]), optArgs...)
+        getCompositeInt(∫, bl, (getBF(Val(BL), a, i), getBF(Val(BL), a, j), 
+                                getBF(Val(BL), b, k), getBF(Val(BL), c, l)), optArgs...)
     end
     res
 end
 
-function getCompositeIntCore(::Val{T}, ::Val{D}, ::Val{:abxx}, ∫::F, 
-                             bs::Tuple{CGBT1, CGBT2, CGBT3, CGBT3}, optArgs...) where 
-                            {T, D, F<:Function, CGBT1<:SpatialBasis{T, D}, 
-                                                CGBT2<:SpatialBasis{T, D},
-                                                CGBT3<:SpatialBasis{T, D}}
+function getCompositeIntCore(::Val{T}, ::Val{D}, ::Val{BL}, ::Val{:abxx}, ∫::F, 
+                             bs::Tuple{BT1, BT2, BT3, BT3}, optArgs...) where 
+                            {T, D, BL, F<:Function, BT1<:SpatialBasis{T, D}, 
+                                                    BT2<:SpatialBasis{T, D}, 
+                                                    BT3<:SpatialBasis{T, D}}
     a, b, x = abx = bs[[1, 2, 3]]
-    ON1, ON2, ON3 = orbitalNumOf.(abx)
+    ON1, ON2, ON3 = getON.(Val(BL), abx)
     res = Array{T}(undef, ON1, ON2, ON3, ON3)
     for l=1:ON3, k=1:l, j=1:ON2, i=1:ON1
         bl = (l==k, false, false, false)
         res[i, j, k, l] = res[i, j, l, k] = 
-        getCompositeInt(∫, bl, (a[i], b[j], x[k], x[l]), optArgs...)
+        getCompositeInt(∫, bl, (getBF(Val(BL), a, i), getBF(Val(BL), b, j), 
+                                getBF(Val(BL), x, k), getBF(Val(BL), x, l)), optArgs...)
     end
     res
 end
 
-function getCompositeIntCore(::Val{T}, ::Val{D}, ::Val{:abcx}, ∫::F, 
+function getCompositeIntCore(::Val{T}, ::Val{D}, ::Val{BL}, ::Val{:abcx}, ∫::F, 
                              bs::NTuple{4, SpatialBasis{T, D}}, optArgs...) where 
-                            {F<:Function, T, D}
-    rng = Iterators.product(bs...)
+                            {T, D, BL, F<:Function}
+    rng = Iterators.product(getBFs.(Val(BL), bs)...)
     map(x->getCompositeInt(∫, (false,false,false,false), x, optArgs...)::T, rng)
 end
 
@@ -946,7 +962,8 @@ const CGBNeIndexTypes = Dict([2,4] .=> [CGB1eIndexTypes, CGB2eIndexTypes])
 
 getCompositeInt(∫::F, bls::Tuple{Vararg{Bool}}, bs::NTuple{BN, SpatialBasis{T, D}}, 
                 optArgs...) where {F<:Function, BN, T, D} = 
-getCompositeIntCore(Val(T), Val(D), CGBNeIndexTypes[BN][bls], ∫, bs, optArgs...)
+getCompositeIntCore(Val(T), Val(D), Val(:ContainBasisFuncs), CGBNeIndexTypes[BN][bls], ∫, 
+                    bs, optArgs...)
 
 getbls(::Val{2}) = (false,)
 getbls(::Val{4}) = (false,false,false,false)
