@@ -796,22 +796,6 @@ function getCompositeInt(::typeof(∫nucAttractionCore), bls::Tuple{Bool},
     end
     res
 end
-
-# function getCompositeInt(∫::F, (ji,)::Tuple{Bool}, bs::NTuple{2, BasisFuncs{T, D}}, 
-#                          optArgs...) where {F<:Function, N, T, D}
-#     if ji
-#         b = bs[1]
-#         len = length(b)
-#         res = Array{T, 2}(undef, len, len)
-#         for j=1:len, i=1:j
-#             res[i,j] = res[j,i] = getCompositeInt(∫, (j==i,), (b[i], b[j]), optArgs...)
-#         end
-#     else
-#         rng = Iterators.product(bs...)
-#         res = map(x->getCompositeInt(∫, (false,), x, optArgs...)::T, rng)
-#     end
-#     res
-# end
                         #       j==i      j!=i
 const CGB1eIndexTypes = Dict([( true,), (false,)] .=> [Val(:aa), Val(:ab)])
 
@@ -835,10 +819,6 @@ function getCompositeIntCore(::Val{T}, ::Val{D}, ::Val{:ab}, ∫::F,
     rng = Iterators.product(bs...)
     map(x->getCompositeInt(∫, (false,), x, optArgs...)::T, rng)
 end
-
-getCompositeInt(∫::F, bls::Tuple{Bool}, bs::NTuple{2, SpatialBasis{T, D}}, 
-                optArgs...) where {F<:Function, T, D} = 
-getCompositeIntCore(Val(T), Val(D), CGB1eIndexTypes[bls], ∫, bs, optArgs...)
 
                         # a==b    lk,    lj,    kj, ki/ji    ijkl
 const CGB2eIndexTypes = Dict([( true,  true,  true,  true), #1111
@@ -962,36 +942,22 @@ function getCompositeIntCore(::Val{T}, ::Val{D}, ::Val{:abcx}, ∫::F,
     map(x->getCompositeInt(∫, (false,false,false,false), x, optArgs...)::T, rng)
 end
 
-getCompositeInt(∫::F, bls::NTuple{4, Bool}, bs::NTuple{4, SpatialBasis{T, D}}, 
-                optArgs...) where {F<:Function, T, D} = 
-getCompositeIntCore(Val(T), Val(D), CGB2eIndexTypes[bls], ∫, bs, optArgs...)
+const CGBNeIndexTypes = Dict([2,4] .=> [CGB1eIndexTypes, CGB2eIndexTypes])
 
-# getbls(::Val{2}) = (false,)
-# getbls(::Val{4}) = (false,false,false,false)
+getCompositeInt(∫::F, bls::Tuple{Vararg{Bool}}, bs::NTuple{BN, SpatialBasis{T, D}}, 
+                optArgs...) where {F<:Function, BN, T, D} = 
+getCompositeIntCore(Val(T), Val(D), CGBNeIndexTypes[BN][bls], ∫, bs, optArgs...)
 
-# function getCompositeInt(∫::F, ::Tuple{Vararg{Bool}}, bs::NTuple{N, CompositeGTBasisFuncs{T, D}}, 
-#                          optArgs...) where {F<:Function, N, T, D}
-#     rng = Iterators.product(bs...)
-#     map(x->getCompositeInt(∫, getbls(Val(N)), x, optArgs...)::T, rng)
-# end
+getbls(::Val{2}) = (false,)
+getbls(::Val{4}) = (false,false,false,false)
 
-function getCompositeInt(∫::F, ::Tuple{Bool}, bs::NTuple{2, SpatialBasis{T, D, 1}}, 
-                         optArgs...) where {F<:Function, T, D}
+function getCompositeInt(∫::F, ::Tuple{Vararg{Bool}}, bs::NTuple{BN, SpatialBasis{T, D, 1}}, 
+                         optArgs...) where {F<:Function, BN, T, D}
     if any(fieldtypes(typeof(bs)) .<: EmptyBasisFunc)
         zero(T)
     else
         rng = Iterators.product(unpackBasis.(bs)...)
-        map(x->getCompositeInt(∫, (false,), x, optArgs...)::T, rng) |> sum
-    end
-end
-
-function getCompositeInt(∫::F, ::NTuple{4, Bool}, bs::NTuple{4, SpatialBasis{T, D, 1}}, 
-                         optArgs...) where {F<:Function, T, D}
-    if any(fieldtypes(typeof(bs)) .<: EmptyBasisFunc)
-        zero(T)
-    else
-        rng = Iterators.product(unpackBasis.(bs)...)
-        map(x->getCompositeInt(∫, (false,false,false,false), x, optArgs...)::T, rng) |> sum
+        map(x->getCompositeInt(∫, getbls(Val(BN)), x, optArgs...)::T, rng) |> sum
     end
 end
 
