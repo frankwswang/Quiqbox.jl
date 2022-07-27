@@ -965,16 +965,14 @@ getCompositeInt(∫::F, bls::Tuple{Vararg{Bool}}, bs::NTuple{BN, SpatialBasis{T,
 getCompositeIntCore(Val(T), Val(D), Val(:ContainBasisFuncs), CGBNeIndexTypes[BN][bls], ∫, 
                     bs, optArgs...)
 
-getbls(::Val{2}) = (false,)
-getbls(::Val{4}) = (false,false,false,false)
-
-function getCompositeInt(∫::F, ::Tuple{Vararg{Bool}}, bs::NTuple{BN, SpatialBasis{T, D, 1}}, 
+function getCompositeInt(∫::F, 
+                         bls::Tuple{Vararg{Bool}}, bs::NTuple{BN, SpatialBasis{T, D, 1}}, 
                          optArgs...) where {F<:Function, BN, T, D}
     if any(fieldtypes(typeof(bs)) .<: EmptyBasisFunc)
         zero(T)
     else
-        rng = Iterators.product(unpackBasis.(bs)...)
-        map(x->getCompositeInt(∫, getbls(Val(BN)), x, optArgs...)::T, rng) |> sum
+        getCompositeIntCore(Val(T), Val(D), Val(:WithoutBasisFuncs), 
+                            CGBNeIndexTypes[BN][bls], ∫, bs, optArgs...) |> sum
     end
 end
 
