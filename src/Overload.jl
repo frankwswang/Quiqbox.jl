@@ -200,35 +200,26 @@ size(::GaussFunc) = ()
 length(::GaussFunc) = 1
 size(::GaussFunc, d::Integer) = (d > 0) ? 1 : throw(BoundsError())
 
-iterate(bf::BasisFunc) = (bf, nothing)
-iterate(::BasisFunc, _) = nothing
-size(::BasisFunc) = ()
-length(::BasisFunc) = 1
+iterate(bf::CGTBasisFuncs1O) = (bf, nothing)
+iterate(::CGTBasisFuncs1O, _) = nothing
+size(::CGTBasisFuncs1O) = ()
+length(::CGTBasisFuncs1O) = 1
 
-iterate(bfm::BasisFuncMix) = (bfm, nothing)
-iterate(::BasisFuncMix, _) = nothing
-size(::BasisFuncMix) = ()
-length(::BasisFuncMix) = 1
-
-iterate(bfZero::EmptyBasisFunc) = (bfZero, nothing)
-iterate(::EmptyBasisFunc, _) = nothing
-size(::EmptyBasisFunc) = ()
-length(::EmptyBasisFunc) = 1
-
-function iterate(bfs::CompositeGTBasisFuncs)
+function iterate(bfs::BasisFuncs)
     item, state = iterate(bfs.l)
     (BasisFunc(bfs.center, bfs.gauss, item, bfs.normalizeGTO), state)
 end
-function iterate(bfs::CompositeGTBasisFuncs, state)
+function iterate(bfs::BasisFuncs, state)
     iter = iterate(bfs.l, state)
     iter !== nothing ? (BasisFunc(bfs.center, bfs.gauss, iter[1], bfs.normalizeGTO), 
                         iter[2]) : nothing
 end
+
 size(::CGTBasisFuncsON{ON}) where {ON} = (ON,)
 length(::CGTBasisFuncsON{ON}) where {ON} = ON
 eltype(::BasisFuncs{T, D, 𝑙, GN, PT}) where {T, D, 𝑙, GN, PT} = BasisFunc{T, D, 𝑙, GN, PT}
 
-function size(x::SpatialOrbital, d::Integer)
+function size(x::SpatialBasis, d::Integer)
     if d > 0
         ifelse(d==1, length(x), 1)
     else
@@ -253,6 +244,11 @@ firstindex(sp::SpatialPoint) = firstindex(sp.param)
 lastindex(sp::SpatialPoint) = lastindex(sp.param)
 eachindex(sp::SpatialPoint) = eachindex(sp.param)
 axes(sp::SpatialPoint) = axes(sp.param)
+
+function getindex(bf::CGTBasisFuncs1O, i::Int)
+    i == 1 || throw(BoundsError(bf, i))
+    bf
+end
 
 getindex(bfs::BasisFuncs, is::AbstractVector{Int}) = 
 BasisFuncs(bfs.center, bfs.gauss, bfs.l[is], bfs.normalizeGTO)

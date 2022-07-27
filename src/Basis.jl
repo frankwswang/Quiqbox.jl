@@ -752,19 +752,12 @@ unpackBasis(b::BFuncs1O)  = (BasisFunc(b),)
 
 """
 
-    dimOf(::AbstractSpatialPoint) -> Int
+    dimOf(::DimensionalParamContainer) -> Int
 
-Return the spatial dimension of the input `AbstractSpatialPoint`.
+Return the spatial dimension of the input parameterized container such as 
+`AbstractSpatialPoint` and `QuiqboxBasis`.
 """
-dimOf(::AbstractSpatialPoint{<:Any, D}) where {D} = D
-
-"""
-
-    dimOf(::QuiqboxBasis) -> Int
-
-Return the spatial dimension of the input basis.
-"""
-dimOf(::QuiqboxBasis{<:Any, D}) where {D} = D
+dimOf(::DimensionalParamContainer{<:Any, D}) where {D} = D
 
 
 """
@@ -1487,12 +1480,11 @@ Return the size (number of orbitals) of each subshell in `D` dimensional real sp
 
 """
 
-    orbitalNumOf(b::CompositeGTBasisFuncs) -> Int
+    orbitalNumOf(b::QuiqboxBasis) -> Int
 
-Return the numbers of orbitals of the input basis function(s).
+Return the numbers of orbitals of the input basis.
 """
-@inline orbitalNumOf(::CGTBasisFuncsON{ON}) where {ON} = ON
-@inline orbitalNumOf(::BasisFuncMix) = 1
+@inline orbitalNumOf(::QuiqboxBasis{<:Any, <:Any, ON}) where {ON} = ON
 
 
 # Core function to generate a customized X-Gaussian (X>1) basis function.
