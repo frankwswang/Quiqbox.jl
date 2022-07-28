@@ -331,9 +331,13 @@ function reformatIntData1(bf::FGTBasisFuncs1O{T, D, 𝑙, GN}) where {T, D, 𝑙
     ijk = bf.l[1].tuple
     αds = if bf.normalizeGTO
         N = getNijk(T, ijk...)
-        map(x->(x.xpn(), x.con() * N * getNα(ijk..., x.xpn())), bf.gauss)
+        map(bf.gauss) do x
+            xpn = x.xpn()::T
+            con = x.con()::T
+            (xpn, con * N * getNα(ijk..., xpn))
+        end
     else
-        map(x->(x.xpn(), x.con()), bf.gauss)
+        map(x->(x.xpn()::T, x.con()::T), bf.gauss)
     end
     R, ijk, αds
 end
