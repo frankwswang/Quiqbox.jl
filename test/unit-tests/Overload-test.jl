@@ -239,6 +239,8 @@ c2 = 2.5
 @test iterate(pb1) == (-1, nothing)
 @test iterate(gf1) == (gf1, nothing)
 @test iterate(bf1) == (bf1, nothing)
+bfe = Quiqbox.EmptyBasisFunc{Float64, 2}()
+@test iterate(bfe) == (bfe, nothing)
 
 cs = [pb1, gf1, bf1]
 @test (iterate.(cs, 1) .=== nothing) |> all
