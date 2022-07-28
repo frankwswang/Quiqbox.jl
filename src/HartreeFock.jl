@@ -201,7 +201,7 @@ function getCDFE(Hcore::AbstractMatrix{T}, HeeI::AbstractArray{T, 4}, X::Abstrac
 end
 
 
-function initializeSCF(::Val{HFT}, Hcore::AbstractMatrix{T}, HeeI::AbstractArray{T, 4}, 
+function initializeSCFcore(::Val{HFT}, Hcore::AbstractMatrix{T}, HeeI::AbstractArray{T, 4}, 
                        C::NTuple{HFTS, AbstractMatrix{T}}, N::NTuple{HFTS, Int}) where 
                       {HFT, T, HFTS}
     D = getD.(C, N)
@@ -209,11 +209,21 @@ function initializeSCF(::Val{HFT}, Hcore::AbstractMatrix{T}, HeeI::AbstractArray
     E = getE.(Ref(Hcore), F, D)
     res = HFtempVars.(Val(HFT), N, C, D, F, E)
     sharedFields = getproperty.(res, :shared)
-    for (field, val) in zip( (:Dtots, :Etots), fill.(get2SpinQuantity.((D, E)), 1)  )
+    fields = (:Dtots, :Etots)
+    for (field, val) in zip(fields, fill.(get2SpinQuantity.((D, E)), 1))
         setproperty!.(sharedFields, field, Ref(val))
     end
-    res
+    res::NTuple{HFTS, HFtempVars{T, HFT}} # A somehow necessary assertion for type stability
 end
+
+# Additional wrapper to correlate `HTF` and `HFTS` for type stability.
+initializeSCF(::Val{:RHF}, Hcore::AbstractMatrix{T}, HeeI::AbstractArray{T, 4}, 
+              C::Tuple{AbstractMatrix{T}}, N::Tuple{Int}) where {T} = 
+initializeSCFcore(Val(:RHF), Hcore, HeeI, C, N)
+
+initializeSCF(::Val{:UHF}, Hcore::AbstractMatrix{T}, HeeI::AbstractArray{T, 4}, 
+              C::NTuple{2, AbstractMatrix{T}}, N::NTuple{2, Int}) where {T} = 
+initializeSCFcore(Val(:UHF), Hcore, HeeI, C, N)
 
 
 const Doc_SCFconfig_OneRowTable = "|`:DIIS`, `:EDIIS`, `:ADIIS`|subspace size; "*
