@@ -316,6 +316,7 @@ function ∫eeInteractionCore(R₁::NTuple{3, T}, ijk₁::NTuple{3, Int}, α₁:
     res * J
 end
 
+
 reformatIntData2((o1, o2)::NTuple{2, T}, flag::Bool) where {T} = 
 ( (flag && isless(o2, o1)) ? (o2, o1) : (o1, o2) )
 
@@ -356,6 +357,10 @@ function reformatIntData1((lk, lj, kj, kiOrji)::NTuple{4, Bool},
                  (kiOrji ? data2 : reformatIntData1(bfs[1]))
     (data1, data2, data3, data4)
 end
+
+reformatIntData1(::Val{false}, bfs::Tuple{Vararg{FGTBasisFuncs1O{T, D}}}) where {T, D} = 
+reformatIntData1.(bfs)
+
 
 function isIntZeroCore(::Val{1}, 
                        R₁::NTuple{D, T}, R₂::NTuple{D, T}, 
@@ -400,7 +405,8 @@ isIntZeroCore(Val(:∫nucAttractionCore), R₁, R₂, ijk₁, ijk₂, optArgs[en
 isIntZero(::Type{typeof(∫eeInteractionCore)}, R₁, R₂, R₃, R₄, ijk₁, ijk₂, ijk₃, ijk₄, _) = 
 isIntZeroCore(Val(2), R₁, R₂, R₃, R₄, ijk₁, ijk₂, ijk₃, ijk₄)
 
-function getOneBodyInt(∫1e::F, bls::Tuple{Bool}, 
+
+function getOneBodyInt(∫1e::F, bls::Union{Tuple{Bool}, Val{false}}, 
                        bf1::FGTBasisFuncs1O{T, D, 𝑙1, GN1}, 
                        bf2::FGTBasisFuncs1O{T, D, 𝑙2, GN2}, 
                        optArgs...) where {F<:Function, T, D, 𝑙1, 𝑙2, GN1, GN2}
@@ -461,7 +467,8 @@ end
     i
 end
 
-function getTwoBodyInt(∫2e::F, bls::NTuple{4, Bool}, 
+
+function getTwoBodyInt(∫2e::F, bls::Union{NTuple{4, Bool}, Val{false}}, 
                        bf1::FGTBasisFuncs1O{T, D, 𝑙1, GN1}, 
                        bf2::FGTBasisFuncs1O{T, D, 𝑙2, GN2}, 
                        bf3::FGTBasisFuncs1O{T, D, 𝑙3, GN3}, 
@@ -778,15 +785,17 @@ end
 end
 
 
-getCompositeInt(∫::F, bls::Tuple{Bool}, bfs::NTuple{2, FGTBasisFuncs1O{T, D}}, 
+getCompositeInt(∫::F, bls::Union{Tuple{Bool}, Val{false}}, 
+                bfs::NTuple{2, FGTBasisFuncs1O{T, D}}, 
                 optArgs...) where {F<:Function, T, D} = 
 getOneBodyInt(∫, bls, bfs..., optArgs...)
 
-getCompositeInt(∫::F, bls::NTuple{4, Bool}, bfs::NTuple{4, FGTBasisFuncs1O{T, D}}, 
+getCompositeInt(∫::F, bls::Union{NTuple{4, Bool}, Val{false}}, 
+                bfs::NTuple{4, FGTBasisFuncs1O{T, D}}, 
                 optArgs...) where {F<:Function, T, D} = 
 getTwoBodyInt(∫, bls, bfs..., optArgs...)
 
-function getCompositeInt(::typeof(∫nucAttractionCore), bls::Tuple{Bool}, 
+function getCompositeInt(::typeof(∫nucAttractionCore), bls::Union{Tuple{Bool}, Val{false}}, 
                          bfs::NTuple{2, FGTBasisFuncs1O{T, D}}, 
                          nuc::NTuple{NN, String}, 
                          nucCoords::NTuple{NN, NTuple{D, T}}) where {T, D, NN}
@@ -796,8 +805,8 @@ function getCompositeInt(::typeof(∫nucAttractionCore), bls::Tuple{Bool},
     end
     res
 end
-                        #       j==i      j!=i
-const CGB1eIndexTypes = Dict([( true,), (false,)] .=> [Val(:aa), Val(:ab)])
+                          #       j==i      j!=i
+const Int1eBIndexLabels = Dict([( true,), (false,)] .=> [Val(:aa), Val(:ab)])
 
 getON(::Val{:ContainBasisFuncs}, b::SpatialBasis) = orbitalNumOf(b)
 getON(::Val{:WithoutBasisFuncs}, ::CGTBasisFuncs1O{<:Any, <:Any, BN}) where {BN} = BN
@@ -808,7 +817,7 @@ getBF(::Val{:WithoutBasisFuncs}, b::BasisFuncMix, i) = getindex(b.BasisFunc, i)
 getBFs(::Val{:ContainBasisFuncs}, b::SpatialBasis) = itself(b)
 getBFs(::Val{:WithoutBasisFuncs}, b::CGTBasisFuncs1O) = unpackBasis(b)
 
-# 1e integrals for BasisFuncs-mixed bases
+# 1e integrals for BasisFuncs/BasisFuncMix-mixed bases
 function getCompositeIntCore(::Val{T}, ::Val{D}, ::Val{BL}, ::Val{:aa}, ∫::F, 
                              bs::NTuple{2, BT}, optArgs...) where 
                             {T, D, BL, F<:Function, BT<:SpatialBasis{T, D}}
@@ -827,25 +836,25 @@ function getCompositeIntCore(::Val{T}, ::Val{D}, ::Val{BL}, ::Val{:ab}, ∫::F,
                              bs::NTuple{2, SpatialBasis{T, D}}, optArgs...) where 
                             {T, D, BL, F<:Function}
     rng = Iterators.product(getBFs.(Val(BL), bs)...)
-    map(x->getCompositeInt(∫, (false,), x, optArgs...)::T, rng)
+    map(x->getCompositeInt(∫, Val(false), x, optArgs...)::T, rng)
 end
 
-                        # a==b    lk,    lj,    kj, ki/ji    ijkl
-const CGB2eIndexTypes = Dict([( true,  true,  true,  true), #1111
-                              ( true, false, false,  true), #1122
-                              (false,  true, false,  true), #1212
-                              (false,  true, false, false), #1232
-                              (false, false,  true, false), #122X
-                              (false, false,  true,  true), #1112
-                              (false, false, false,  true), #1123
-                              ( true,  true,  true, false), #1222
-                              ( true, false, false, false), #12XX
-                              (false, false, false, false)  #123X
-                             ] .=> 
-                             [Val(:aaaa), Val(:aabb), Val(:abab), Val(:abcx), Val(:abbx), 
-                              Val(:aabc), Val(:aabc), Val(:abxx), Val(:abxx), Val(:abcx)])
+                          # a==b    lk,    lj,    kj, ki/ji    ijkl
+const Int2eBIndexLabels = Dict([( true,  true,  true,  true), #1111
+                                ( true, false, false,  true), #1122
+                                (false,  true, false,  true), #1212
+                                (false,  true, false, false), #1232
+                                (false, false,  true, false), #122X
+                                (false, false,  true,  true), #1112
+                                (false, false, false,  true), #1123
+                                ( true,  true,  true, false), #1222
+                                ( true, false, false, false), #12XX
+                                (false, false, false, false)  #123X
+                               ] .=> 
+                               [Val(:aaaa), Val(:aabb), Val(:abab), Val(:abcx), Val(:abbx), 
+                                Val(:aabc), Val(:aabc), Val(:abxx), Val(:abxx), Val(:abcx)])
 
-# 2e integrals for BasisFuncs-mixed bases
+# 2e integrals for BasisFuncs/BasisFuncMix-mixed bases
 function getCompositeIntCore(::Val{T}, ::Val{D}, ::Val{BL}, ::Val{:aaaa}, ∫::F, 
                              bs::NTuple{4, BT}, optArgs...) where 
                             {T, D, BL, F<:Function, BT<:SpatialBasis{T, D}}
@@ -955,24 +964,28 @@ function getCompositeIntCore(::Val{T}, ::Val{D}, ::Val{BL}, ::Val{:abcx}, ∫::F
                              bs::NTuple{4, SpatialBasis{T, D}}, optArgs...) where 
                             {T, D, BL, F<:Function}
     rng = Iterators.product(getBFs.(Val(BL), bs)...)
-    map(x->getCompositeInt(∫, (false,false,false,false), x, optArgs...)::T, rng)
+    map(x->getCompositeInt(∫, Val(false), x, optArgs...)::T, rng)
 end
 
-const CGBNeIndexTypes = Dict([2,4] .=> [CGB1eIndexTypes, CGB2eIndexTypes])
+getBasisIndexL(::Val{2}, bls::Tuple{Bool}) = Int1eBIndexLabels[bls]
+getBasisIndexL(::Val{4}, bls::NTuple{4, Bool}) = Int2eBIndexLabels[bls]
+getBasisIndexL(::Val{2}, ::Val{false}) = Int1eBIndexLabels[(false,)]
+getBasisIndexL(::Val{4}, ::Val{false}) = Int2eBIndexLabels[(false, false, false, false)]
 
-getCompositeInt(∫::F, bls::Tuple{Vararg{Bool}}, bs::NTuple{BN, SpatialBasis{T, D}}, 
+getCompositeInt(∫::F, bls::Union{Tuple{Vararg{Bool}}, Val{false}}, 
+                bs::NTuple{BN, SpatialBasis{T, D}}, 
                 optArgs...) where {F<:Function, BN, T, D} = 
-getCompositeIntCore(Val(T), Val(D), Val(:ContainBasisFuncs), CGBNeIndexTypes[BN][bls], ∫, 
-                    bs, optArgs...)
+getCompositeIntCore(Val(T), Val(D), Val(:ContainBasisFuncs), 
+                    getBasisIndexL(Val(BN), bls), ∫, bs, optArgs...)
 
-function getCompositeInt(∫::F, 
-                         bls::Tuple{Vararg{Bool}}, bs::NTuple{BN, SpatialBasis{T, D, 1}}, 
+function getCompositeInt(∫::F, bls::Union{Tuple{Vararg{Bool}}, Val{false}}, 
+                         bs::NTuple{BN, SpatialBasis{T, D, 1}}, 
                          optArgs...) where {F<:Function, BN, T, D}
     if any(fieldtypes(typeof(bs)) .<: EmptyBasisFunc)
         zero(T)
     else
         getCompositeIntCore(Val(T), Val(D), Val(:WithoutBasisFuncs), 
-                            CGBNeIndexTypes[BN][bls], ∫, bs, optArgs...) |> sum
+                            getBasisIndexL(Val(BN), bls), ∫, bs, optArgs...) |> sum
     end
 end
 
