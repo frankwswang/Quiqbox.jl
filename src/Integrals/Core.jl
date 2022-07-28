@@ -725,65 +725,61 @@ function getIntXAXBXCXDcore!(n, uniquePairs, uPairCoeffs, flags, groups)
     n
 end
 
-@inline function getIntCore1111!(n, uniquePairs, uPairCoeffs, flags, ps₁, nFold=1)
+@inline function getIntCore1111!(n, uniquePairs, uPairCoeffs, flags, ps₁)
     for (i₁, p₁) in enumerate(ps₁), (i₂, p₂) in zip(1:i₁, ps₁), 
         (i₃, p₃) in zip(1:i₁, ps₁), (i₄, p₄) in zip(1:ifelse(i₃==i₁, i₂, i₃), ps₁)
         n = getUniquePair!(n, uniquePairs, uPairCoeffs, flags, (p₁,p₂,p₃,p₄), 
-                           octaFoldCount(i₁,i₂,i₃,i₄)*nFold)
+                           octaFoldCount(i₁,i₂,i₃,i₄))
     end
     n
 end
 
-@inline function getIntCore1122!(n, uniquePairs, uPairCoeffs, flags, (ps₁, ps₂), 
-                                 nFold=1)
+@inline function getIntCore1122!(n, uniquePairs, uPairCoeffs, flags, (ps₁, ps₂))
     for (i₁, p₁) in enumerate(ps₁), (i₂, p₂) in zip(1:i₁, ps₁), 
         (i₃, p₃) in enumerate(ps₂), (i₄, p₄) in zip(1:i₃, ps₂)
         n = getUniquePair!(n, uniquePairs, uPairCoeffs, flags, (p₁, p₂, p₃, p₄), 
-                           diFoldCount(i₁, i₂)*diFoldCount(i₃, i₄)*nFold)
+                           diFoldCount(i₁, i₂)*diFoldCount(i₃, i₄))
     end
     n
 end
 
-@inline function getIntCore1212!(n, uniquePairs, uPairCoeffs, flags, (ps₁, ps₂), nFold=1)
+@inline function getIntCore1212!(n, uniquePairs, uPairCoeffs, flags, (ps₁, ps₂))
     oneSidePairs = Iterators.product(eachindex(ps₁), eachindex(ps₂))
     for (x, (i₁,i₂)) in enumerate(oneSidePairs), (_, (i₃,i₄)) in zip(1:x, oneSidePairs)
         n = getUniquePair!(n, uniquePairs, uPairCoeffs, flags, 
-                           (ps₁[i₁], ps₂[i₂], ps₁[i₃], ps₂[i₄]), 2^(i₁!=i₃ || i₂!=i₄)*nFold)
+                           (ps₁[i₁], ps₂[i₂], ps₁[i₃], ps₂[i₄]), 2^(i₁!=i₃ || i₂!=i₄))
     end
     n
 end
 
-@inline function getIntCore1221!(n, uniquePairs, uPairCoeffs, flags, (ps₁, ps₂), nFold=1)
+@inline function getIntCore1221!(n, uniquePairs, uPairCoeffs, flags, (ps₁, ps₂))
     oneSidePairs = Iterators.product(eachindex(ps₁), eachindex(ps₂))
     for (x, (i₁,i₂)) in enumerate(oneSidePairs), (_, (i₃,i₄)) in zip(1:x, oneSidePairs)
         n = getUniquePair!(n, uniquePairs, uPairCoeffs, flags, 
-                           (ps₁[i₁], ps₂[i₂], ps₂[i₄], ps₁[i₃]), 2^(i₁!=i₃ || i₂!=i₄)*nFold)
+                           (ps₁[i₁], ps₂[i₂], ps₂[i₄], ps₁[i₃]), 2^(i₁!=i₃ || i₂!=i₄))
     end
     n
 end
 
-@inline function getIntCore1123!(n, uniquePairs, uPairCoeffs, flags, (ps₁, ps₂, ps₃), 
-                                 nFold=1)
+@inline function getIntCore1123!(n, uniquePairs, uPairCoeffs, flags, (ps₁, ps₂, ps₃))
     for (i₁, p₁) in enumerate(ps₁), (i₂, p₂) in zip(1:i₁, ps₁), p₃ in ps₂, p₄ in ps₃
         n = getUniquePair!(n, uniquePairs, uPairCoeffs, flags, (p₁, p₂, p₃, p₄), 
-                           diFoldCount(i₁, i₂)*nFold)
+                           diFoldCount(i₁, i₂))
     end
     n
 end
 
-@inline function getIntCore1233!(n, uniquePairs, uPairCoeffs, flags, (ps₁, ps₂, ps₃), 
-                                 nFold=1)
+@inline function getIntCore1233!(n, uniquePairs, uPairCoeffs, flags, (ps₁, ps₂, ps₃))
     for p₁ in ps₁, p₂ in ps₂, (i₃, p₃) in enumerate(ps₃), (i₄, p₄) in zip(1:i₃, ps₃)
         n = getUniquePair!(n, uniquePairs, uPairCoeffs, flags, (p₁, p₂, p₃, p₄), 
-                           diFoldCount(i₃, i₄)*nFold)
+                           diFoldCount(i₃, i₄))
     end
     n
 end
 
-@inline function getIntCore1234!(n, uniquePairs, uPairCoeffs, flags, (ps₁, ps₂, ps₃, ps₄), 
-                                 nFold=1)
+@inline function getIntCore1234!(n, uniquePairs, uPairCoeffs, flags, (ps₁, ps₂, ps₃, ps₄))
     for p₁ in ps₁, p₂ in ps₂, p₃ in ps₃, p₄ in ps₄
-        n = getUniquePair!(n, uniquePairs, uPairCoeffs, flags, (p₁, p₂, p₃, p₄), nFold)
+        n = getUniquePair!(n, uniquePairs, uPairCoeffs, flags, (p₁, p₂, p₃, p₄))
     end
     n
 end
