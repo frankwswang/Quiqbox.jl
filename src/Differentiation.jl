@@ -1,6 +1,6 @@
 export gradOfHFenergy
 
-using LinearAlgebra: eigen, Symmetric
+using LinearAlgebra: eigen, Symmetric, Hermitian
 using ForwardDiff: derivative as ForwardDerivative
 
 function oneBodyDerivativeCore(::Val{false}, 
@@ -82,7 +82,7 @@ function derivativeCore(FoutputIsVector::Val{B},
         ∂S[i,j] = ∂S[j,i] = overlap(∂bfs[i], bfs[j]) + overlap(bfs[i], ∂bfs[j])
     end
     X = getXcore1(S)
-    λ, 𝑣 = eigen(S|>Symmetric)
+    λ, 𝑣 = eigen(S|>Hermitian)
     ∂S2 = transpose(𝑣)*∂S*𝑣
     for i=1:BN, j=1:i
         ∂X₀[i,j] = ∂X₀[j,i] = (- ∂S2[i,j] * inv(sqrt(λ[i])) * inv(sqrt(λ[j])) * 
@@ -104,7 +104,7 @@ function ∂HFenergy(par::ParamBox{T},
                    nuc::NTuple{NN, String}, 
                    nucCoords::NTuple{NN, NTuple{D, T}}, 
                    N::NTuple{HFTS, Int}) where {BN, T, D, HFTS, NN}
-    Xinv = sqrt(S)
+    Xinv = sqrt(S)::Matrix{T} # necessary assertion for type stability
     cH = (i, j)->coreHij(i, j, nuc, nucCoords)
     ∂hij, ∂hijkl = derivativeCore(Val(false), bs, par, S, 
                                   TypedFunction(cH), TypedFunction(eeInteraction))

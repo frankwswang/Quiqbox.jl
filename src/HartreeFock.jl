@@ -172,7 +172,7 @@ end
         dot(transpose(Dˢ), Hcore+Fˢ) / 2
 
 get2SpinQuantity(O::NTuple{HFTS, T}) where {HFTS, T} = abs(3-HFTS) * sum(O)
-get2SpinQuantities(O, nRepeat::Int) = fill(get2SpinQuantity(O), nRepeat) |> Tuple
+get2SpinQuantities(O, nRepeat::Int) = ntuple(_->get2SpinQuantity(O), nRepeat)
 
 # RHF or UHF
 getEᵗcore(Hcore::AbstractMatrix{T}, 
