@@ -4,14 +4,14 @@ using LinearAlgebra: eigen, Symmetric
 using ForwardDiff: derivative as ForwardDerivative
 
 function oneBodyDerivativeCore(::Val{false}, 
-                               ∂bfs::Union{NTuple{BN, GTBasisFuncs{T, D, 1}}}, 
-                               bfs::Union{NTuple{BN, GTBasisFuncs{T, D, 1}}}, 
+                               ∂bfs::NTuple{BN, GTBasisFuncs{T, D, 1}}, 
+                               bfs::NTuple{BN, GTBasisFuncs{T, D, 1}}, 
                                X::AbstractMatrix{T}, ∂X::AbstractMatrix{T}, 
                                tf::TypedFunction{F}) where {BN, T, D, F}
     ʃ = getFunc(tf)
-    ∂ʃ = ones(BN, BN)
-    ʃab = ones(BN, BN)
-    ∂ʃab = ones(BN, BN)
+    ∂ʃ = Array{T}(undef, BN, BN)
+    ʃab = Array{T}(undef, BN, BN)
+    ∂ʃab = Array{T}(undef, BN, BN)
     for i = 1:BN, j = 1:i
        ʃab[i,j] = ʃab[j,i] = ʃ(bfs[i], bfs[j])
     end
@@ -32,28 +32,29 @@ end
 
 
 function twoBodyDerivativeCore(::Val{false}, 
-                               ∂bfs::Union{NTuple{BN, GTBasisFuncs{T, D, 1}}}, 
-                               bfs::Union{NTuple{BN, GTBasisFuncs{T, D, 1}}}, 
+                               ∂bfs::NTuple{BN, GTBasisFuncs{T, D, 1}}, 
+                               bfs::NTuple{BN, GTBasisFuncs{T, D, 1}}, 
                                X::AbstractMatrix{T}, ∂X::AbstractMatrix{T}, 
                                tf::TypedFunction{F}) where {BN, T, D, F}
     ʃ = getFunc(tf)
-    bsSize = ∂bfs |> length
-    ∂ʃ = ones(bsSize, bsSize, bsSize, bsSize)
-    ʃabcd = ones(bsSize, bsSize, bsSize, bsSize)
-    ʃ∂abcd = ones(bsSize, bsSize, bsSize, bsSize)
-    for i = 1:bsSize, j = 1:i, k = 1:i, l = 1:ifelse(k==i, j, k)
+    ∂ʃ = Array{T}(undef, BN, BN, BN, BN)
+    ʃabcd = Array{T}(undef, BN, BN, BN, BN)
+    ʃ∂abcd = Array{T}(undef, BN, BN, BN, BN)
+
+    # ijkl in chemists' notation of spatial bases (ij|kl).
+    for i = 1:BN, j = 1:i, k = 1:i, l = 1:ifelse(k==i, j, k)
         ʃabcd[i,j,k,l] = ʃabcd[j,i,k,l] = ʃabcd[j,i,l,k] = ʃabcd[i,j,l,k] = 
         ʃabcd[l,k,i,j] = ʃabcd[k,l,i,j] = ʃabcd[k,l,j,i] = ʃabcd[l,k,j,i] = 
         ʃ(bfs[i],  bfs[j],  bfs[k],  bfs[l])
     end
-    for l = 1:bsSize, k=1:l, j=1:bsSize, i=1:bsSize
+    for l = 1:BN, k=1:l, j=1:BN, i=1:BN
         ʃ∂abcd[i,j,k,l] = ʃ∂abcd[i,j,l,k] = ʃ(∂bfs[i], bfs[j],  bfs[k],  bfs[l])
     end
     # [∂ʃ4[i,j,k,l] == ∂ʃ4[j,i,l,k] == ∂ʃ4[j,i,k,l] != ∂ʃ4[l,j,k,i]
-    for i = 1:bsSize, j = 1:i, k = 1:i, l = 1:ifelse(k==i, j, k)
-        val = 0
+    for i = 1:BN, j = 1:i, k = 1:i, l = 1:ifelse(k==i, j, k)
+        val = T(0.0)
         # ʃ∂abcd[i,j,k,l] == ʃ∂abcd[i,j,l,k] == ʃab∂cd[l,k,i,j] == ʃab∂cd[k,l,i,j]
-        for a = 1:bsSize, b = 1:bsSize, c = 1:bsSize, d = 1:bsSize
+        for a = 1:BN, b = 1:BN, c = 1:BN, d = 1:BN
             val += (  X[a,i]*X[b,j]*X[c,k]*X[d,l] + X[a,j]*X[b,i]*X[c,k]*X[d,l] + 
                       X[c,i]*X[d,j]*X[a,k]*X[b,l] + X[c,i]*X[d,j]*X[a,l]*X[b,k]  ) * 
                    ʃ∂abcd[a,b,c,d] + 
@@ -69,30 +70,26 @@ end
 
 
 function derivativeCore(FoutputIsVector::Val{B}, 
-                        bs::NTuple{BN, GTBasisFuncs{T, D, 1}}, 
+                        bfs::NTuple{BN, GTBasisFuncs{T, D, 1}}, 
                         par::ParamBox, S::AbstractMatrix{T}, 
                         oneBodyF::TypedFunction{F1}, twoBodyF::TypedFunction{F2}) where 
                        {B, BN, T, D, F1, F2}
-    # ijkl in chemists' notation of spatial bases (ij|kl).
-    bfs = Tuple(hcat(decomposeCore.(Val(false), bs)...))
-    # ∂bfs = deriveBasisFunc.(bfs, par)
     ∂bfs = ∂Basis.(par, bfs)
-    bsSize = orbitalNumOf.(bs) |> sum
-    ∂S = ones(bsSize, bsSize)
-    ∂X = ones(bsSize, bsSize) # ∂X corresponds to the derivative of X = S^(-0.5)
-    ∂X₀ = ones(bsSize, bsSize) # ∂X in its eigen basis
-    for i=1:bsSize, j=1:i
+    ∂S = Array{T}(undef, BN, BN)
+    ∂X = Array{T}(undef, BN, BN) # ∂X corresponds to the derivative of X = S^(-0.5)
+    ∂X₀ = Array{T}(undef, BN, BN) # ∂X in its eigen basis
+    for i=1:BN, j=1:i
         ∂S[i,j] = ∂S[j,i] = overlap(∂bfs[i], bfs[j]) + overlap(bfs[i], ∂bfs[j])
     end
     X = getXcore1(S)
     λ, 𝑣 = eigen(S|>Symmetric)
     ∂S2 = transpose(𝑣)*∂S*𝑣
-    for i=1:bsSize, j=1:i
+    for i=1:BN, j=1:i
         ∂X₀[i,j] = ∂X₀[j,i] = (- ∂S2[i,j] * inv(sqrt(λ[i])) * inv(sqrt(λ[j])) * 
                                inv(sqrt(λ[i]) + sqrt(λ[j])))
     end
-    for i=1:bsSize, j=1:bsSize
-        ∂X[j,i] = [𝑣[j,k]*∂X₀[k,l]*𝑣[i,l] for k=1:bsSize, l=1:bsSize] |> sum
+    for i=1:BN, j=1:BN
+        ∂X[j,i] = [𝑣[j,k]*∂X₀[k,l]*𝑣[i,l] for k=1:BN, l=1:BN] |> sum
     end
     ∂ʃ2 = oneBodyDerivativeCore(FoutputIsVector, ∂bfs, bfs, X, ∂X, oneBodyF)
     ∂ʃ4 = twoBodyDerivativeCore(FoutputIsVector, ∂bfs, bfs, X, ∂X, twoBodyF)
@@ -202,7 +199,7 @@ end
 
 𝑑f(::Type{FL}, f::F, x::T) where {FL<:FLevel, F<:Function, T} = ForwardDerivative(f, x)
 
-𝑑f(::Type{FI}, f::Function, x::T) where {T} = 1.0
+𝑑f(::Type{FI}, f::Function, x::T) where {T} = T(1.0)
 
 function ∂SGFcore(::Val{xpnSym}, sgf::FGTBasisFuncs1O{T, 3, 𝑙, 1}, c::T=T(1)) where {T, 𝑙}
     res = ( shiftCore(+, sgf, LTuple(2,0,0)) + shiftCore(+, sgf, LTuple(0,2,0)) + 
