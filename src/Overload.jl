@@ -245,8 +245,8 @@ lastindex(sp::SpatialPoint) = lastindex(sp.param)
 eachindex(sp::SpatialPoint) = eachindex(sp.param)
 axes(sp::SpatialPoint) = axes(sp.param)
 
-function getindex(bf::CGTBasisFuncs1O, i::Int)
-    i == 1 || throw(BoundsError(bf, i))
+@inline function getindex(bf::CGTBasisFuncs1O, i::Int)
+    @boundscheck ( i==1 || throw(BoundsError(bf, i)) )
     bf
 end
 
