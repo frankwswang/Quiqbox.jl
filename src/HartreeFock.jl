@@ -1,7 +1,6 @@
 export SCFconfig, HFconfig, runHF, runHFcore
 
 using LinearAlgebra: dot, Hermitian, \, det, I, ishermitian
-using PiecewiseQuadratics: indicator
 using Combinatorics: powerset
 using LineSearches
 using Optim: LBFGS, Fminbox, optimize as OptimOptimize, minimizer as OptimMinimizer, 
