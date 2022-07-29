@@ -90,8 +90,7 @@ changeHbasis(oneBodyInt::AbstractMatrix{T}, C::AbstractMatrix{T}) where {T} =
 changeHbasis(twoBodyInt::AbstractArray{T, 4}, C::AbstractMatrix{T}) where {T} = 
 @TOtensor ijkl[i,j,k,l] := twoBodyInt[a,b,c,d] * C[a,i] * C[b,j] * C[c,k] * C[d,l]
 
-getJᵅᵝ(twoBodyInt::AbstractArray{T, 4}, (C1, C2)::NTuple{2, AbstractMatrix{T}}) where 
-      {T} = 
+getJᵅᵝ(twoBodyInt::AbstractArray{T, 4}, (C1, C2)::NTuple{2, AbstractMatrix{T}}) where {T} = 
 @tullio iijj[i,j] := twoBodyInt[a,b,c,d] * C1[a,i] * C1[b,i] * C2[c,j] * C2[d,j]
 
 """

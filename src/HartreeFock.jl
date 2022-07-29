@@ -5,7 +5,7 @@ using Combinatorics: powerset
 using LineSearches
 using Optim: LBFGS, Fminbox, optimize as OptimOptimize, minimizer as OptimMinimizer, 
              Options as OptimOptions
-using Tullio 
+using Tullio: @tullio
 
 const defaultDS = 0.5
 const defaultDIISconfig = (12, :LBFGS)
@@ -82,8 +82,6 @@ getC.( Ref(X), getF(Hcore, HeeI, (Dᵅ, Dᵝ)) )
 
 function getCfromGWH(::Val{HFT}, S::AbstractMatrix{T}, Hcore::AbstractMatrix{T}, 
                      X::AbstractMatrix{T}) where {HFT, T}
-    l = size(Hcore)[1]
-    H = zero(Hcore)
     @tullio H[i,j] := 3 * S[i,j] * (Hcore[i,i] + Hcore[j,j]) / 8
     Cˢ = getC(X, H)
     breakSymOfC(Val(HFT), Cˢ)
@@ -733,8 +731,6 @@ end
 
 function ADIIScore(∇s::AbstractVector{<:AbstractMatrix{T}}, 
                    Ds::AbstractVector{<:AbstractMatrix{T}}) where {T}
-    len = length(Ds)
-    B = similar(∇s[begin], len, len)
     @tullio v[i] := dot(Ds[i] - Ds[end], ∇s[end])
     @tullio B[i,j] := dot((Ds[i]-Ds[end]), (∇s[j]-∇s[end]))
     v, B
