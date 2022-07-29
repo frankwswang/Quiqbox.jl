@@ -19,7 +19,7 @@ function oneBodyDerivativeCore(::Val{false},
         ∂ʃab[i,j] = ∂ʃab[j,i] = ʃ(∂bfs[i], bfs[j]) + ʃ(bfs[i], ∂bfs[j])
     end
     @views begin
-        for i=1:BN, j=1:i
+        @inbounds for i=1:BN, j=1:i
             # X[i,j] == X[j,i]
             ∂ʃ[i,j] = ∂ʃ[j,i] = 
             transpose( X[:,i]) * ∂ʃab[:,:] *  X[:,j] +
@@ -54,7 +54,7 @@ function twoBodyDerivativeCore(::Val{false},
     for i = 1:BN, j = 1:i, k = 1:i, l = 1:ifelse(k==i, j, k)
         val = T(0.0)
         # ʃ∂abcd[i,j,k,l] == ʃ∂abcd[i,j,l,k] == ʃab∂cd[l,k,i,j] == ʃab∂cd[k,l,i,j]
-        for a = 1:BN, b = 1:BN, c = 1:BN, d = 1:BN
+        @inbounds for a = 1:BN, b = 1:BN, c = 1:BN, d = 1:BN
             val += (  X[a,i]*X[b,j]*X[c,k]*X[d,l] + X[a,j]*X[b,i]*X[c,k]*X[d,l] + 
                       X[c,i]*X[d,j]*X[a,k]*X[b,l] + X[c,i]*X[d,j]*X[a,l]*X[b,k]  ) * 
                    ʃ∂abcd[a,b,c,d] + 
@@ -84,11 +84,11 @@ function derivativeCore(FoutputIsVector::Val{B},
     X = getXcore1(S)
     λ, 𝑣 = eigen(S|>Hermitian)
     ∂S2 = transpose(𝑣)*∂S*𝑣
-    for i=1:BN, j=1:i
+    @inbounds for i=1:BN, j=1:i
         ∂X₀[i,j] = ∂X₀[j,i] = (- ∂S2[i,j] * inv(sqrt(λ[i])) * inv(sqrt(λ[j])) * 
                                inv(sqrt(λ[i]) + sqrt(λ[j])))
     end
-    for i=1:BN, j=1:BN
+    @inbounds for i=1:BN, j=1:BN
         ∂X[j,i] = [𝑣[j,k]*∂X₀[k,l]*𝑣[i,l] for k=1:BN, l=1:BN] |> sum
     end
     ∂ʃ2 = oneBodyDerivativeCore(FoutputIsVector, ∂bfs, bfs, X, ∂X, oneBodyF)

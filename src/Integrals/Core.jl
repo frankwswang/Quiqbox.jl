@@ -63,11 +63,12 @@ end
 function genIntOverlapCore(Δx::T, 
                            i₁::Int, α₁::T, 
                            i₂::Int, α₂::T) where {T}
-    res = 0.0
+    res = T(0.0)
     for l₁ in 0:(i₁÷2), l₂ in 0:(i₂÷2)
         Ω = i₁ + i₂ - 2*(l₁ + l₂)
-        oRange = 0:(Ω÷2)
-        Δx == 0.0 && (iseven(Ω) ? (oRange = Ω÷2) : continue)
+        halfΩ = Ω÷2
+        oRange = 0:halfΩ
+        Δx == 0.0 && (iseven(Ω) ? (oRange = halfΩ:halfΩ) : continue)
         for o in oRange
             res += (-1)^o * factorial(Ω) * 
                     α₁^(i₂ - l₁ - 2l₂ - o) * 
@@ -173,7 +174,7 @@ function genIntNucAttCore1(ΔRR₀::NTuple{3, T}, ΔR₁R₂::NTuple{3, T}, β::
             for r in 0:((o₁+o₂)÷2), s in 0:((p₁+p₂)÷2), t in 0:((q₁+q₂)÷2)
 
                 rst = (r, s, t)
-                tmp = 0.0
+                tmp = T(0.0)
                 core2s = genIntTerm2.(ΔRR₀, α₁+α₂, opq₁, opq₂, μv, rst)
 
                 for u in 0:(μˣ÷2), v in 0:(μʸ÷2), w in 0:(μᶻ÷2)
@@ -236,7 +237,7 @@ function ∫eeInteractionCore1234(ΔRl::NTuple{3, T}, ΔRr::NTuple{3, T},
                                 ijk₂::NTuple{3, Int}, α₂::T, 
                                 ijk₃::NTuple{3, Int}, α₃::T, 
                                 ijk₄::NTuple{3, Int}, α₄::T) where {T}
-    A = 0.0
+    A = T(0.0)
     (i₁, j₁, k₁), (i₂, j₂, k₂), (i₃, j₃, k₃), (i₄, j₄, k₄) = ijk₁, ijk₂, ijk₃, ijk₄
 
     IJK = @. ijk₁ + ijk₂ + ijk₃ + ijk₄
@@ -277,7 +278,7 @@ function ∫eeInteractionCore1234(ΔRl::NTuple{3, T}, ΔRr::NTuple{3, T},
 
                 rst₁ = (r₁, s₁, t₁)
                 rst₂ = (r₂, s₂, t₂)
-                tmp = 0.0
+                tmp = T(0.0)
 
                 for u in 0:(μˣ÷2), v in 0:(μʸ÷2), w in 0:(μᶻ÷2)
                     γ = μsum - u - v - w
