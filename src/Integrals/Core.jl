@@ -181,10 +181,10 @@ function genIntNucAttCore1(ΔRR₀::NTuple{3, T}, ΔR₁R₂::NTuple{3, T}, β::
 
                 for u in 0:(μˣ÷2), v in 0:(μʸ÷2), w in 0:(μᶻ÷2)
                     γ = μsum - u - v - w
-                    tmp += (((u, v, w) .|> core2s)::NTuple{3, T} |> prod) * 2Fγs[γ+1]
+                    tmp += (((u, v, w) .|> core2s) |> prod) * 2Fγs[γ+1]
                 end
 
-                A += ((rst .|> core1s)::NTuple{3, T} |> prod) * tmp
+                A += ((rst .|> core1s) |> prod) * tmp
 
             end
         end
