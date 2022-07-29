@@ -636,8 +636,9 @@ $(string(HFtypes)[2:end-1]).
 
 `Hcore::AbstractMatrix{T} where T`: The core Hamiltonian of the electronic Hamiltonian.
 
-`HeeI::AbstractArray{T, 4} where T`: The electron-electron interaction tensor (in chemists' 
-notation) which includes both the Coulomb interactions and the Exchange Correlations.
+`HeeI::AbstractArray{T, 4} where T`: The electron-electron interaction tensor (in the 
+chemists' notation) which includes both the Coulomb interactions and the Exchange 
+Correlations.
 
 `S::AbstractMatrix{T} where T`: The overlap matrix of the used basis set.
 

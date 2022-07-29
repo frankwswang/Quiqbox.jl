@@ -27,13 +27,6 @@ function oneBodyDerivativeCore(::Val{false},
                                 X[:,i]' *  ʃab * ∂X[:,j]
         end
     end
-    # for i=1:BN, j=1:i
-    #     # X[i,j] == X[j,i]
-    #     @tullio temp1 := X[a,$i] * ∂ʃab[a,b] *  X[b,$j]
-    #     @tullio temp2 := ∂X[a,$i] *ʃab[a,b] *  X[b,$j]
-    #     @tullio temp3 := X[a,$i] *  ʃab[a,b] * ∂X[b,$j]
-    #     ∂ʃ[i,j] = ∂ʃ[j,i] = temp1 + temp2 + temp3
-    # end
     ∂ʃ
 end
 
@@ -48,7 +41,7 @@ function twoBodyDerivativeCore(::Val{false},
     ʃabcd = Array{T}(undef, BN, BN, BN, BN)
     ʃ∂abcd = Array{T}(undef, BN, BN, BN, BN)
 
-    # ijkl in chemists' notation of spatial bases (ij|kl).
+    # ijkl in the chemists' notation of spatial bases (ij|kl).
     for i = 1:BN, j = 1:i, k = 1:i, l = 1:ifelse(k==i, j, k)
         ʃabcd[i,j,k,l] = ʃabcd[j,i,k,l] = ʃabcd[j,i,l,k] = ʃabcd[i,j,l,k] = 
         ʃabcd[l,k,i,j] = ʃabcd[k,l,i,j] = ʃabcd[k,l,j,i] = ʃabcd[l,k,j,i] = 
@@ -59,17 +52,6 @@ function twoBodyDerivativeCore(::Val{false},
     end
     # [∂ʃ4[i,j,k,l] == ∂ʃ4[j,i,l,k] == ∂ʃ4[j,i,k,l] != ∂ʃ4[l,j,k,i]
     for i = 1:BN, j = 1:i, k = 1:i, l = 1:ifelse(k==i, j, k)
-        # val = T(0.0)
-        # # ʃ∂abcd[i,j,k,l] == ʃ∂abcd[i,j,l,k] == ʃab∂cd[l,k,i,j] == ʃab∂cd[k,l,i,j]
-        # @inbounds for a = 1:BN, b = 1:BN, c = 1:BN, d = 1:BN
-        #     val += (  X[a,i]*X[b,j]*X[c,k]*X[d,l] + X[a,j]*X[b,i]*X[c,k]*X[d,l] + 
-        #               X[c,i]*X[d,j]*X[a,k]*X[b,l] + X[c,i]*X[d,j]*X[a,l]*X[b,k]  ) * 
-        #            ʃ∂abcd[a,b,c,d] + 
-        #            ( ∂X[a,i]*X[b,j]* X[c,k]*X[d,l] + X[a,i]*∂X[b,j]*X[c,k]* X[d,l] + 
-        #               X[a,i]*X[b,j]*∂X[c,k]*X[d,l] + X[a,i]* X[b,j]*X[c,k]*∂X[d,l] ) * 
-        #            ʃabcd[a,b,c,d]
-        # end
-
         # ʃ∂abcd[i,j,k,l] == ʃ∂abcd[i,j,l,k] == ʃab∂cd[l,k,i,j] == ʃab∂cd[k,l,i,j]
         @tullio val := ( X[a,$i]* X[b,$j]* X[c,$k]* X[d,$l] + 
                          X[a,$j]* X[b,$i]* X[c,$k]* X[d,$l] + 
@@ -106,10 +88,7 @@ function derivativeCore(FoutputIsVector::Val{B},
         ∂X₀[i,j] = ∂X₀[j,i] = (- ∂S2[i,j] * inv(sqrt(λ[i])) * inv(sqrt(λ[j])) * 
                                inv(sqrt(λ[i]) + sqrt(λ[j])))
     end
-    # @tullio ∂X₀[i,j] := ( -∂S2[i,j] * inv(sqrt(λ[i])) * inv(sqrt(λ[j])) * 
-    #                       inv(sqrt(λ[i]) + sqrt(λ[j])) )
     ∂X = 𝑣*∂X₀*𝑣'
-    # @tullio ∂X[j,i] := 𝑣[j,k]*∂X₀[k,l]*𝑣[i,l]
     ∂ʃ2 = oneBodyDerivativeCore(FoutputIsVector, ∂bfs, bfs, X, ∂X, oneBodyF)
     ∂ʃ4 = twoBodyDerivativeCore(FoutputIsVector, ∂bfs, bfs, X, ∂X, twoBodyF)
     ∂ʃ2, ∂ʃ4

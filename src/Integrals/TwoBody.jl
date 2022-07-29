@@ -8,7 +8,8 @@ export eeInteraction, eeInteractions
                   bf4::AbstractGTBasisFuncs{T, D, 1}) where {T, D} -> 
     T
 
-Return a tensor element of the electron-electron interaction given four basis functions.
+Return an electron-electron interaction tensor element given four basis functions (ordered 
+in the chemists' notation).
 """
 eeInteraction(bf1::AbstractGTBasisFuncs{T, D, 1}, 
               bf2::AbstractGTBasisFuncs{T, D, 1}, 
@@ -25,7 +26,8 @@ getCompositeInt(∫eeInteractionCore, (false, false, false, false), (bf1, bf2, b
                              AbstractVector{<:AbstractGTBasisFuncs{T, D}}}) -> 
     Array{T, 4}
 
-Return the electron-electron interaction given a basis set.
+Return the tensor of electron-electron interactions (in the chemists' notation) given a 
+basis set.
 """
 eeInteractions(bs::Union{Tuple{Vararg{AbstractGTBasisFuncs{T, D}}}, 
                          AbstractVector{<:AbstractGTBasisFuncs{T, D}}}) where {T, D} = 

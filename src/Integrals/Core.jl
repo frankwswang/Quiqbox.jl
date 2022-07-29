@@ -1,3 +1,5 @@
+export eeIuniqueIndicesOf
+
 using QuadGK: quadgk
 using SpecialFunctions: erf
 using LinearAlgebra: dot
@@ -1102,7 +1104,14 @@ function getTwoBodyInts(∫2e::F, basisSet::NTuple{BN, GTBasisFuncs{T, D, 1}}) w
 end
 
 
-function genUniqueIndices(basisSetSize::Int)
+"""
+
+    eeIuniqueIndicesOf(basisSetSize::Int) -> Vector{Vector{Int}}
+
+Return the unique matrix element indices (in the chemists' notation) of electron-electron 
+interactions given the size of a basis set.
+"""
+function eeIuniqueIndicesOf(basisSetSize::Int)
     uniqueIdx = fill(Int[0,0,0,0], (3*binomial(basisSetSize, 4) + 
                                     6*binomial(basisSetSize, 3) + 
                                     4*binomial(basisSetSize, 2) + basisSetSize))
