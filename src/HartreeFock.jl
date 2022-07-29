@@ -666,11 +666,12 @@ function runHFcore(::Val{HFT},
     Etots = vars[1].shared.Etots
     oscThreshold = scfConfig.oscillateThreshold
     printInfo && println(rpad(HFT, 4)*rpad(" | Initial Gauss", 18), "E = $(Etots[end])")
-    isConverged = true
     i = 0
     for (m, kws, breakPoint, l) in 
         zip(scfConfig.method, scfConfig.methodConfig, scfConfig.interval, 1:L)
+        isConverged = true
         n = 0
+
         while true
             i += 1
             n += 1
@@ -687,7 +688,7 @@ function runHFcore(::Val{HFT},
                     isConverged = ifelse(Std > max(breakPoint, oscThreshold), false, true)
                 else
                     earlyStop && relDiff > cbrt(breakPoint) && 
-                    (i = terminateSCF(i, vars, m, printInfo); break)
+                    (i = terminateSCF(i, vars, m, printInfo); isConverged=false; break)
                 end
             end
 
@@ -696,7 +697,6 @@ function runHFcore(::Val{HFT},
 
             isConverged && abs(diff) <= breakPoint && break
         end
-
     end
     negStr = ifelse(isConverged, "is ", "has not ")
     printInfo && println("The SCF procedure ", negStr, "converged.\n")
