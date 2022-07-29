@@ -6,6 +6,7 @@ using Combinatorics: powerset
 using LineSearches
 using Optim: LBFGS, Fminbox, optimize as OptimOptimize, minimizer as OptimMinimizer, 
              Options as OptimOptions
+using Tullio 
 
 const defaultDS = 0.5
 const defaultDIISconfig = (12, :LBFGS)
@@ -84,9 +85,7 @@ function getCfromGWH(::Val{HFT}, S::AbstractMatrix{T}, Hcore::AbstractMatrix{T},
                      X::AbstractMatrix{T}) where {HFT, T}
     l = size(Hcore)[1]
     H = zero(Hcore)
-    for j in 1:l, i in 1:l
-        H[i,j] = 3 * S[i,j] * (Hcore[i,i] + Hcore[j,j]) / 8
-    end
+    @tullio H[i,j] := 3 * S[i,j] * (Hcore[i,i] + Hcore[j,j]) / 8
     Cˢ = getC(X, H)
     breakSymOfC(Val(HFT), Cˢ)
 end
@@ -139,12 +138,9 @@ getD(Cˢ::AbstractMatrix{T}, Nˢ::Int) where {T} = @views (Cˢ[:,1:Nˢ]*Cˢ[:,1:
         getD(getC(X, Fˢ), Nˢ)
 
 
-function getGcore(HeeI::AbstractArray{T, 4}, DJ::AbstractMatrix{T}, DK::AbstractMatrix{T}) where {T}
-    G = zero(DJ)
-    l = size(G)[1]
-    for ν = 1:l, μ = 1:l # fastest
-        G[μ, ν] = dot(transpose(DJ), @view HeeI[μ,ν,:,:]) - dot(DK, @view HeeI[μ,:,:,ν]) 
-    end
+function getGcore(HeeI::AbstractArray{T, 4}, 
+                  DJ::AbstractMatrix{T}, DK::AbstractMatrix{T}) where {T}
+    @tullio G[μ, ν] := DJ[b,a] * HeeI[μ,ν,a,b] - DK[a,b] * HeeI[μ,a,b,ν]
     G |> Hermitian
 end
 
@@ -728,8 +724,8 @@ function EDIIScore(∇s::AbstractVector{<:AbstractMatrix{T}},
                    Ds::AbstractVector{<:AbstractMatrix{T}}, Es::AbstractVector{T}) where {T}
     len = length(Ds)
     B = similar(∇s[begin], len, len)
-    for idx in CartesianIndices(B)
-        B[idx] = -dot(Ds[idx[1]]-Ds[idx[2]], ∇s[idx[1]]-∇s[idx[2]])
+    @inbounds for j=1:len, i=1:j
+        B[i,j] = B[j,i] = -dot(Ds[i]-Ds[j], ∇s[i]-∇s[j])
     end
     Es, B
 end
@@ -739,10 +735,8 @@ function ADIIScore(∇s::AbstractVector{<:AbstractMatrix{T}},
                    Ds::AbstractVector{<:AbstractMatrix{T}}) where {T}
     len = length(Ds)
     B = similar(∇s[begin], len, len)
-    v = [dot(D - Ds[end], ∇s[end]) for D in Ds]
-    for idx in CartesianIndices(B)
-        B[idx] = dot(Ds[idx[1]]-Ds[len], ∇s[idx[2]]-∇s[len])
-    end
+    @tullio v[i] := dot(Ds[i] - Ds[end], ∇s[end])
+    @tullio B[i,j] := dot((Ds[i]-Ds[end]), (∇s[j]-∇s[end]))
     v, B
 end
 
@@ -752,9 +746,9 @@ function DIIScore(∇s::AbstractVector{<:AbstractMatrix{T}},
     len = length(Ds)
     B = similar(∇s[begin], len, len)
     v = zeros(len)
-    for idx in CartesianIndices(B)
-        B[idx] = dot( ∇s[idx[1]]*Ds[idx[1]]*S - S*Ds[idx[1]]*∇s[idx[1]], 
-                      ∇s[idx[2]]*Ds[idx[2]]*S - S*Ds[idx[2]]*∇s[idx[2]] )
+    @inbounds for j in 1:len, i=1:j
+        B[i,j] = B[j,i] = dot( ∇s[i]*Ds[i]*S - S*Ds[i]*∇s[i], 
+                               ∇s[j]*Ds[j]*S - S*Ds[j]*∇s[j] )
     end
     v, B
 end
