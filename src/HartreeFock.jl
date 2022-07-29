@@ -666,6 +666,7 @@ function runHFcore(::Val{HFT},
     Etots = vars[1].shared.Etots
     oscThreshold = scfConfig.oscillateThreshold
     printInfo && println(rpad(HFT, 4)*rpad(" | Initial Gauss", 18), "E = $(Etots[end])")
+    isConverged = true
     i = 0
     for (m, kws, breakPoint, l) in 
         zip(scfConfig.method, scfConfig.methodConfig, scfConfig.interval, 1:L)
