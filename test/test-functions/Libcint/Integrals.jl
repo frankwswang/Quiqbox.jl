@@ -1,11 +1,11 @@
 # One-body functions
 
 @inline function oneBodyBFTensorCore(libcinFunc::Symbol, 
-                                     bf1::Quiqbox.FGTBasisFuncsON{ON1}, 
-                                     bf2::Quiqbox.FGTBasisFuncsON{ON2}, 
+                                     bf1::Quiqbox.FloatingGTBasisFuncs{Float64, 3, 𝑙1}, 
+                                     bf2::Quiqbox.FloatingGTBasisFuncs{Float64, 3, 𝑙2}, 
                                      nuclei::Vector{String}, 
                                      nucleiCoords::Vector{<:AbstractArray{<:Real}};
-                                     isGradient::Bool=false) where {ON1, ON2}
+                                     isGradient::Bool=false) where {𝑙1, 𝑙2}
     env = Float64[]
     atm = Int32[]
     bas = Int32[]
@@ -22,7 +22,8 @@
     addToDataChain!(env, atm, bas, bf2)
 
     cintFunc!(Val(libcinFunc), 
-              zeros(Quiqbox.orbitalNumOf(bf1), Quiqbox.orbitalNumOf(bf2), 1+isGradient*2), 
+              zeros(Quiqbox.SubshellXYZsizes[𝑙1+1], 
+                    Quiqbox.SubshellXYZsizes[𝑙2+1], 1+isGradient*2), 
               [0,1], atm, length(nuclei), bas, 2, env)
 end
 
@@ -142,15 +143,15 @@ dropdims(elecKineticsCoreLibcint(BSet), dims=3)
 # Two-body functions
 
 @inline function twoBodyBFTensorCore(libcinFunc::Symbol, 
-                                     bf1::Quiqbox.FGTBasisFuncsON{ON1}, 
-                                     bf2::Quiqbox.FGTBasisFuncsON{ON2}, 
-                                     bf3::Quiqbox.FGTBasisFuncsON{ON3}, 
-                                     bf4::Quiqbox.FGTBasisFuncsON{ON4}; 
-                                     isGradient::Bool=false) where {ON1, ON2, ON3, ON4}
+                                     bf1::Quiqbox.FloatingGTBasisFuncs{Float64, 3, 𝑙1}, 
+                                     bf2::Quiqbox.FloatingGTBasisFuncs{Float64, 3, 𝑙2}, 
+                                     bf3::Quiqbox.FloatingGTBasisFuncs{Float64, 3, 𝑙3}, 
+                                     bf4::Quiqbox.FloatingGTBasisFuncs{Float64, 3, 𝑙4}; 
+                                     isGradient::Bool=false) where {𝑙1, 𝑙2, 𝑙3, 𝑙4}
     env = Float64[]
     atm = Int32[]
     bas = Int32[]
-    subSize = Quiqbox.orbitalNumOf.((bf1, bf2, bf3, bf4))
+    subSize = getindex.(Ref(Quiqbox.SubshellXYZsizes), [𝑙1, 𝑙2, 𝑙3, 𝑙4].+1)
 
     id, uniqueBFs = Quiqbox.markUnique([bf1, bf2, bf3, bf4])
 

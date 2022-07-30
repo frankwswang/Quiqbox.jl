@@ -1,3 +1,5 @@
+export eeIuniqueIndicesOf
+
 using QuadGK: quadgk
 using SpecialFunctions: erf
 using LinearAlgebra: dot
@@ -8,10 +10,6 @@ factorialL(l::Integer) = FactorialsLs[l+1]
 getGKQorder(T::Type{<:Real}) = ifelse(getAtolVal(T) >= getAtolVal(Float64), 13, 26)
 
 πroot(::Type{T}) where {T} = sqrt(π*T(1))
-## Has compatibility issue with BigFloat that may cause bad precision for LBFGS-B solver: 
-# πroot(::Type{T}) where {T} = sqrt(π |> BigFloat) |> T
-# πroot(::Type{T}, c::Number=T(1)) where {T} = 
-# ifelse(getAtolDigits(BigFloat) > getAtolDigits(T), (π|>BigFloat|>sqrt|>T), sqrt(π*T(1)))
 
 function F0Core(u::T) where {T}
     ur = sqrt(u)
@@ -67,11 +65,12 @@ end
 function genIntOverlapCore(Δx::T, 
                            i₁::Int, α₁::T, 
                            i₂::Int, α₂::T) where {T}
-    res = 0.0
+    res = T(0.0)
     for l₁ in 0:(i₁÷2), l₂ in 0:(i₂÷2)
         Ω = i₁ + i₂ - 2*(l₁ + l₂)
-        oRange = 0:(Ω÷2)
-        Δx == 0.0 && (iseven(Ω) ? (oRange = Ω÷2) : continue)
+        halfΩ = Ω÷2
+        oRange = 0:halfΩ
+        Δx == 0.0 && (iseven(Ω) ? (oRange = halfΩ:halfΩ) : continue)
         for o in oRange
             res += (-1)^o * factorial(Ω) * 
                     α₁^(i₂ - l₁ - 2l₂ - o) * 
@@ -100,7 +99,7 @@ function ∫overlapCore(ΔR::NTuple{3, T},
                       ijk₁::NTuple{3, Int}, α₁::T, 
                       ijk₂::NTuple{3, Int}, α₂::T) where {T}
     for n in (ijk₁..., ijk₂...)
-        n < 0 && return T(0)
+        n < 0 && return T(0.0)
     end
 
     α = α₁ + α₂
@@ -154,7 +153,7 @@ end
 function genIntNucAttCore1(ΔRR₀::NTuple{3, T}, ΔR₁R₂::NTuple{3, T}, β::T, 
                            ijk₁::NTuple{3, Int}, α₁::T, 
                            ijk₂::NTuple{3, Int}, α₂::T) where {T}
-    A = T(0)
+    A = T(0.0)
     i₁, j₁, k₁ = ijk₁
     i₂, j₂, k₂ = ijk₂
     for l₁ in 0:(i₁÷2), m₁ in 0:(j₁÷2), n₁ in 0:(k₁÷2), 
@@ -177,15 +176,15 @@ function genIntNucAttCore1(ΔRR₀::NTuple{3, T}, ΔR₁R₂::NTuple{3, T}, β::
             for r in 0:((o₁+o₂)÷2), s in 0:((p₁+p₂)÷2), t in 0:((q₁+q₂)÷2)
 
                 rst = (r, s, t)
-                tmp = 0.0
+                tmp = T(0.0)
                 core2s = genIntTerm2.(ΔRR₀, α₁+α₂, opq₁, opq₂, μv, rst)
 
                 for u in 0:(μˣ÷2), v in 0:(μʸ÷2), w in 0:(μᶻ÷2)
                     γ = μsum - u - v - w
-                    tmp += (((u, v, w) .|> core2s)::NTuple{3, T} |> prod) * 2Fγs[γ+1]
+                    tmp += (((u, v, w) .|> core2s) |> prod) * 2Fγs[γ+1]
                 end
 
-                A += ((rst .|> core1s)::NTuple{3, T} |> prod) * tmp
+                A += ((rst .|> core1s) |> prod) * tmp
 
             end
         end
@@ -240,7 +239,7 @@ function ∫eeInteractionCore1234(ΔRl::NTuple{3, T}, ΔRr::NTuple{3, T},
                                 ijk₂::NTuple{3, Int}, α₂::T, 
                                 ijk₃::NTuple{3, Int}, α₃::T, 
                                 ijk₄::NTuple{3, Int}, α₄::T) where {T}
-    A = 0.0
+    A = T(0.0)
     (i₁, j₁, k₁), (i₂, j₂, k₂), (i₃, j₃, k₃), (i₄, j₄, k₄) = ijk₁, ijk₂, ijk₃, ijk₄
 
     IJK = @. ijk₁ + ijk₂ + ijk₃ + ijk₄
@@ -281,7 +280,7 @@ function ∫eeInteractionCore1234(ΔRl::NTuple{3, T}, ΔRr::NTuple{3, T},
 
                 rst₁ = (r₁, s₁, t₁)
                 rst₂ = (r₂, s₂, t₂)
-                tmp = 0.0
+                tmp = T(0.0)
 
                 for u in 0:(μˣ÷2), v in 0:(μʸ÷2), w in 0:(μᶻ÷2)
                     γ = μsum - u - v - w
@@ -320,6 +319,7 @@ function ∫eeInteractionCore(R₁::NTuple{3, T}, ijk₁::NTuple{3, Int}, α₁:
     res * J
 end
 
+
 reformatIntData2((o1, o2)::NTuple{2, T}, flag::Bool) where {T} = 
 ( (flag && isless(o2, o1)) ? (o2, o1) : (o1, o2) )
 
@@ -334,33 +334,100 @@ function reformatIntData1(bf::FGTBasisFuncs1O{T, D, 𝑙, GN}) where {T, D, 𝑙
     ijk = bf.l[1].tuple
     αds = if bf.normalizeGTO
         N = getNijk(T, ijk...)
-        map(x->(x.xpn(), x.con() * N * getNα(ijk..., x.xpn())), bf.gauss)
+        map(bf.gauss) do x
+            xpn = x.xpn()::T
+            con = x.con()::T
+            (xpn, con * N * getNα(ijk..., xpn))
+        end
     else
-        map(x->(x.xpn(), x.con()), bf.gauss)
+        map(x->(x.xpn()::T, x.con()::T), bf.gauss)
     end
     R, ijk, αds
 end
 
+function reformatIntData1((ji,)::Tuple{Bool}, 
+                          bfs::NTuple{2, FGTBasisFuncs1O{T, D}}) where {T, D}
+    if ji
+        data1 = reformatIntData1(bfs[1])
+        (data1, data1)
+    else
+        reformatIntData1.(bfs)
+    end
+end
 
-function getOneBodyInt(∫1e::F, 
-                       bf1::BasisFunc{T, D, <:Any, GN1}, bf2::BasisFunc{T, D, <:Any, GN2}, 
-                       optArgs...) where {F<:Function, T, D, GN1, GN2}
-    (R₁, ijk₁, ps₁), (R₂, ijk₂, ps₂) = reformatIntData1.((bf1, bf2))
-    uniquePairs, uPairCoeffs = getOneBodyIntCore(R₁==R₂ && ijk₁==ijk₂, ps₁, ps₂)
+function reformatIntData1((lk, lj, kj, kiOrji)::NTuple{4, Bool}, 
+                          bfs::NTuple{4, FGTBasisFuncs1O{T, D}}) where {T, D}
+    data4 = reformatIntData1(bfs[4])
+    data3 = lk ? data4 : reformatIntData1(bfs[3])
+    data2 = lj ? data4 : (kj ? data3 : reformatIntData1(bfs[2]))
+    data1 = lj ? (kiOrji ? data3 : reformatIntData1(bfs[1])) : 
+                 (kiOrji ? data2 : reformatIntData1(bfs[1]))
+    (data1, data2, data3, data4)
+end
+
+reformatIntData1(::Val{false}, bfs::Tuple{Vararg{FGTBasisFuncs1O{T, D}}}) where {T, D} = 
+reformatIntData1.(bfs)
+
+
+function isIntZeroCore(::Val{1}, 
+                       R₁::NTuple{D, T}, R₂::NTuple{D, T}, 
+                       ijk₁::NTuple{D, Int}, ijk₂::NTuple{D, Int}) where {D, T}
+    for i in eachindex(R₁)
+        R₁[i]==R₂[i] && isodd(ijk₁[i] + ijk₂[i]) && (return true)
+    end
+    false
+end
+
+function isIntZeroCore(::Val{2}, 
+                       R₁::NTuple{D, T}, R₂::NTuple{D, T}, 
+                       R₃::NTuple{D, T}, R₄::NTuple{D, T}, 
+                       ijk₁::NTuple{D, Int}, ijk₂::NTuple{D, Int}, 
+                       ijk₃::NTuple{D, Int}, ijk₄::NTuple{D, Int}) where {D, T}
+    for i in eachindex(R₁)
+        R₁[i]==R₂[i]==R₃[i]==R₄[i] && 
+        isodd(ijk₁[i] + ijk₂[i] + ijk₃[i] + ijk₄[i]) && (return true)
+    end
+    false
+end
+
+function isIntZeroCore(::Val{:∫nucAttractionCore}, 
+                       R₁::NTuple{D, T}, R₂::NTuple{D, T}, 
+                       ijk₁::NTuple{D, Int}, ijk₂::NTuple{D, Int}, 
+                       R₀::NTuple{D, T}) where {D, T}
+    for i in eachindex(R₁)
+        R₀[i]==R₁[i]==R₂[i] && isodd(ijk₁[i] + ijk₂[i]) && (return true)
+    end
+    false
+end
+
+isIntZero(::Type{typeof(∫overlapCore)}, R₁, R₂, ijk₁, ijk₂, _) = 
+isIntZeroCore(Val(1), R₁, R₂, ijk₁, ijk₂)
+
+isIntZero(::Type{typeof(∫elecKineticCore)}, R₁, R₂, ijk₁, ijk₂, _) = 
+isIntZeroCore(Val(1), R₁, R₂, ijk₁, ijk₂)
+
+isIntZero(::Type{typeof(∫nucAttractionCore)}, R₁, R₂, ijk₁, ijk₂, optArgs) = 
+isIntZeroCore(Val(:∫nucAttractionCore), R₁, R₂, ijk₁, ijk₂, optArgs[end])
+
+isIntZero(::Type{typeof(∫eeInteractionCore)}, R₁, R₂, R₃, R₄, ijk₁, ijk₂, ijk₃, ijk₄, _) = 
+isIntZeroCore(Val(2), R₁, R₂, R₃, R₄, ijk₁, ijk₂, ijk₃, ijk₄)
+
+
+function getOneBodyInt(∫1e::F, bls::Union{Tuple{Bool}, Val{false}}, 
+                       bf1::FGTBasisFuncs1O{T, D, 𝑙1, GN1}, 
+                       bf2::FGTBasisFuncs1O{T, D, 𝑙2, GN2}, 
+                       optArgs...) where {F<:Function, T, D, 𝑙1, 𝑙2, GN1, GN2}
+    (R₁, ijk₁, ps₁), (R₂, ijk₂, ps₂) = reformatIntData1(bls, (bf1, bf2))
+    !(𝑙1==𝑙2==0) && isIntZero(F, R₁, R₂, ijk₁, ijk₂, optArgs) && (return T(0.0))
+    uniquePairs, uPairCoeffs = get1BodyUniquePairs(R₁==R₂ && ijk₁==ijk₂, ps₁, ps₂)
     map(uniquePairs, uPairCoeffs) do x, y
         ∫1e(optArgs..., R₁, R₂, ijk₁, x[1], ijk₂, x[2])::T * y
     end |> sum
 end
 
-function getOneBodyInt(::F, 
-                       ::FGTBasisFuncs1O{T, D, BN1}, ::FGTBasisFuncs1O{T, D, BN2}, 
-                       optArgs...) where {F<:Function, T, D, BN1, BN2}
-    min(BN1, BN2) == 0 ? 0.0 : error("The input basis type is NOT supported.")
-end
-
-function getOneBodyIntCore(flag::Bool, 
-                           ps₁::NTuple{GN1, NTuple{2, T}}, 
-                           ps₂::NTuple{GN2, NTuple{2, T}}) where {T, GN1, GN2}
+function get1BodyUniquePairs(flag::Bool, 
+                             ps₁::NTuple{GN1, NTuple{2, T}}, 
+                             ps₂::NTuple{GN2, NTuple{2, T}}) where {T, GN1, GN2}
     uniquePairs = NTuple{2, T}[]
     uPairCoeffs = Array{T}(undef, GN1*GN2)
     i = 0
@@ -407,12 +474,19 @@ end
     i
 end
 
-function getTwoBodyInt(∫2e::F, 
-                       bf1::BasisFunc{T, D, <:Any, GN1}, bf2::BasisFunc{T, D, <:Any, GN2}, 
-                       bf3::BasisFunc{T, D, <:Any, GN3}, bf4::BasisFunc{T, D, <:Any, GN4}, 
-                       optArgs...) where {F<:Function, T, D, GN1, GN2, GN3, GN4}
+
+function getTwoBodyInt(∫2e::F, bls::Union{NTuple{4, Bool}, Val{false}}, 
+                       bf1::FGTBasisFuncs1O{T, D, 𝑙1, GN1}, 
+                       bf2::FGTBasisFuncs1O{T, D, 𝑙2, GN2}, 
+                       bf3::FGTBasisFuncs1O{T, D, 𝑙3, GN3}, 
+                       bf4::FGTBasisFuncs1O{T, D, 𝑙4, GN4}, 
+                       optArgs...) where 
+                      {F<:Function, T, D, 𝑙1, 𝑙2, 𝑙3, 𝑙4, GN1, GN2, GN3, GN4}
     (R₁, ijk₁, ps₁), (R₂, ijk₂, ps₂), (R₃, ijk₃, ps₃), (R₄, ijk₄, ps₄) = 
-    reformatIntData1.((bf1, bf2, bf3, bf4))
+    reformatIntData1(bls, (bf1, bf2, bf3, bf4))
+
+    !(𝑙1==𝑙2==𝑙3==𝑙4==0) && isIntZero(F, R₁, R₂, R₃, R₄, ijk₁, ijk₂, ijk₃, ijk₄, optArgs) && 
+    (return T(0.0))
 
     f1 = (R₁ == R₂ && ijk₁ == ijk₂)
     f2 = (R₃ == R₄ && ijk₃ == ijk₄)
@@ -420,19 +494,10 @@ function getTwoBodyInt(∫2e::F,
     f4 = (R₁ == R₄ && ijk₁ == ijk₄)
     f5 = (R₂ == R₃ && ijk₂ == ijk₃)
 
-    uniquePairs, uPairCoeffs = getTwoBodyIntCore((f1, f2, f3, f4, f5), ps₁, ps₂, ps₃, ps₄)
+    uniquePairs, uPairCoeffs = get2BodyUniquePairs((f1, f2, f3, f4, f5), ps₁, ps₂, ps₃, ps₄)
     map(uniquePairs, uPairCoeffs) do x, y
         ∫2e(optArgs..., R₁,ijk₁,x[1], R₂,ijk₂,x[2], R₃,ijk₃,x[3], R₄,ijk₄,x[4])::T * y
     end |> sum
-end
-
-function getTwoBodyInt(::F, 
-                       ::FGTBasisFuncs1O{T, D, BN1}, 
-                       ::FGTBasisFuncs1O{T, D, BN2}, 
-                       ::FGTBasisFuncs1O{T, D, BN3}, 
-                       ::FGTBasisFuncs1O{T, D, BN4}, 
-                       optArgs...) where {F<:Function, T, D, BN1, BN2, BN3, BN4}
-    min(BN1, BN2, BN3, BN4) == 0 ? 0.0 : error("The input basis type is NOT supported.")
 end
 
 diFoldCount(i::T, j::T) where {T} = ifelse(i==j, 1, 2)
@@ -445,11 +510,11 @@ diFoldCount(i::T, j::T) where {T} = ifelse(i==j, 1, 2)
     2^m
 end
 
-function getTwoBodyIntCore(flags::NTuple{5, Bool}, 
-                           ps₁::NTuple{GN1, NTuple{2, T}},
-                           ps₂::NTuple{GN2, NTuple{2, T}},
-                           ps₃::NTuple{GN3, NTuple{2, T}},
-                           ps₄::NTuple{GN4, NTuple{2, T}}) where {GN1, GN2, GN3, GN4, T}
+function get2BodyUniquePairs(flags::NTuple{5, Bool}, 
+                             ps₁::NTuple{GN1, NTuple{2, T}},
+                             ps₂::NTuple{GN2, NTuple{2, T}},
+                             ps₃::NTuple{GN3, NTuple{2, T}},
+                             ps₄::NTuple{GN4, NTuple{2, T}}) where {GN1, GN2, GN3, GN4, T}
     uniquePairs = NTuple{4, T}[]
     uPairCoeffs = Array{T}(undef, GN1*GN2*GN3*GN4)
     flagRijk = flags[1:3]
@@ -663,139 +728,280 @@ function getIntXAXBXCXDcore!(n, uniquePairs, uPairCoeffs, flags, groups)
     n
 end
 
-@inline function getIntCore1111!(n, uniquePairs, uPairCoeffs, flags, ps₁, nFold=1)
+@inline function getIntCore1111!(n, uniquePairs, uPairCoeffs, flags, ps₁)
     for (i₁, p₁) in enumerate(ps₁), (i₂, p₂) in zip(1:i₁, ps₁), 
         (i₃, p₃) in zip(1:i₁, ps₁), (i₄, p₄) in zip(1:ifelse(i₃==i₁, i₂, i₃), ps₁)
         n = getUniquePair!(n, uniquePairs, uPairCoeffs, flags, (p₁,p₂,p₃,p₄), 
-                           octaFoldCount(i₁,i₂,i₃,i₄)*nFold)
+                           octaFoldCount(i₁,i₂,i₃,i₄))
     end
     n
 end
 
-@inline function getIntCore1122!(n, uniquePairs, uPairCoeffs, flags, (ps₁, ps₂), 
-                                 nFold=1)
+@inline function getIntCore1122!(n, uniquePairs, uPairCoeffs, flags, (ps₁, ps₂))
     for (i₁, p₁) in enumerate(ps₁), (i₂, p₂) in zip(1:i₁, ps₁), 
         (i₃, p₃) in enumerate(ps₂), (i₄, p₄) in zip(1:i₃, ps₂)
         n = getUniquePair!(n, uniquePairs, uPairCoeffs, flags, (p₁, p₂, p₃, p₄), 
-                           diFoldCount(i₁, i₂)*diFoldCount(i₃, i₄)*nFold)
+                           diFoldCount(i₁, i₂)*diFoldCount(i₃, i₄))
     end
     n
 end
 
-@inline function getIntCore1212!(n, uniquePairs, uPairCoeffs, flags, (ps₁, ps₂), nFold=1)
+@inline function getIntCore1212!(n, uniquePairs, uPairCoeffs, flags, (ps₁, ps₂))
     oneSidePairs = Iterators.product(eachindex(ps₁), eachindex(ps₂))
     for (x, (i₁,i₂)) in enumerate(oneSidePairs), (_, (i₃,i₄)) in zip(1:x, oneSidePairs)
         n = getUniquePair!(n, uniquePairs, uPairCoeffs, flags, 
-                           (ps₁[i₁], ps₂[i₂], ps₁[i₃], ps₂[i₄]), 2^(i₁!=i₃ || i₂!=i₄)*nFold)
+                           (ps₁[i₁], ps₂[i₂], ps₁[i₃], ps₂[i₄]), 2^(i₁!=i₃ || i₂!=i₄))
     end
     n
 end
 
-@inline function getIntCore1221!(n, uniquePairs, uPairCoeffs, flags, (ps₁, ps₂), nFold=1)
+@inline function getIntCore1221!(n, uniquePairs, uPairCoeffs, flags, (ps₁, ps₂))
     oneSidePairs = Iterators.product(eachindex(ps₁), eachindex(ps₂))
     for (x, (i₁,i₂)) in enumerate(oneSidePairs), (_, (i₃,i₄)) in zip(1:x, oneSidePairs)
         n = getUniquePair!(n, uniquePairs, uPairCoeffs, flags, 
-                           (ps₁[i₁], ps₂[i₂], ps₂[i₄], ps₁[i₃]), 2^(i₁!=i₃ || i₂!=i₄)*nFold)
+                           (ps₁[i₁], ps₂[i₂], ps₂[i₄], ps₁[i₃]), 2^(i₁!=i₃ || i₂!=i₄))
     end
     n
 end
 
-@inline function getIntCore1123!(n, uniquePairs, uPairCoeffs, flags, (ps₁, ps₂, ps₃), 
-                                 nFold=1)
+@inline function getIntCore1123!(n, uniquePairs, uPairCoeffs, flags, (ps₁, ps₂, ps₃))
     for (i₁, p₁) in enumerate(ps₁), (i₂, p₂) in zip(1:i₁, ps₁), p₃ in ps₂, p₄ in ps₃
         n = getUniquePair!(n, uniquePairs, uPairCoeffs, flags, (p₁, p₂, p₃, p₄), 
-                           diFoldCount(i₁, i₂)*nFold)
+                           diFoldCount(i₁, i₂))
     end
     n
 end
 
-@inline function getIntCore1233!(n, uniquePairs, uPairCoeffs, flags, (ps₁, ps₂, ps₃), 
-                                 nFold=1)
+@inline function getIntCore1233!(n, uniquePairs, uPairCoeffs, flags, (ps₁, ps₂, ps₃))
     for p₁ in ps₁, p₂ in ps₂, (i₃, p₃) in enumerate(ps₃), (i₄, p₄) in zip(1:i₃, ps₃)
         n = getUniquePair!(n, uniquePairs, uPairCoeffs, flags, (p₁, p₂, p₃, p₄), 
-                           diFoldCount(i₃, i₄)*nFold)
+                           diFoldCount(i₃, i₄))
     end
     n
 end
 
-@inline function getIntCore1234!(n, uniquePairs, uPairCoeffs, flags, (ps₁, ps₂, ps₃, ps₄), 
-                                 nFold=1)
+@inline function getIntCore1234!(n, uniquePairs, uPairCoeffs, flags, (ps₁, ps₂, ps₃, ps₄))
     for p₁ in ps₁, p₂ in ps₂, p₃ in ps₃, p₄ in ps₄
-        n = getUniquePair!(n, uniquePairs, uPairCoeffs, flags, (p₁, p₂, p₃, p₄), nFold)
+        n = getUniquePair!(n, uniquePairs, uPairCoeffs, flags, (p₁, p₂, p₃, p₄))
     end
     n
 end
 
-getOverlap(bf1::BasisFunc{T, D, <:Any, GN1}, bf2::BasisFunc{T, D, <:Any, GN2}) where 
-          {T, D, GN1, GN2} = 
-getOneBodyInt(∫overlapCore, bf1, bf2)
 
-getEleKinetic(bf1::BasisFunc{T, D, <:Any, GN1}, bf2::BasisFunc{T, D, <:Any, GN2}) where 
-             {T, D, GN1, GN2} = 
-getOneBodyInt(∫elecKineticCore, bf1, bf2)
+getCompositeInt(∫::F, bls::Union{Tuple{Bool}, Val{false}}, 
+                bfs::NTuple{2, FGTBasisFuncs1O{T, D}}, 
+                optArgs...) where {F<:Function, T, D} = 
+getOneBodyInt(∫, bls, bfs..., optArgs...)
 
-function getNucEleAttraction(bf1::BasisFunc{T, D, <:Any, GN1}, 
-                             bf2::BasisFunc{T, D, <:Any, GN2}, 
-                             nuc::NTuple{NN, String}, 
-                             nucCoords::NTuple{NN, NTuple{D, T}}) where {T, D, GN1, GN2, NN}
-    res = 0.0
+getCompositeInt(∫::F, bls::Union{NTuple{4, Bool}, Val{false}}, 
+                bfs::NTuple{4, FGTBasisFuncs1O{T, D}}, 
+                optArgs...) where {F<:Function, T, D} = 
+getTwoBodyInt(∫, bls, bfs..., optArgs...)
+
+function getCompositeInt(::typeof(∫nucAttractionCore), bls::Union{Tuple{Bool}, Val{false}}, 
+                         bfs::NTuple{2, FGTBasisFuncs1O{T, D}}, 
+                         nuc::NTuple{NN, String}, 
+                         nucCoords::NTuple{NN, NTuple{D, T}}) where {T, D, NN}
+    res = T(0.0)
     for (ele, coord) in zip(nuc, nucCoords)
-        res += getOneBodyInt(∫nucAttractionCore, bf1, bf2, getCharge(ele), coord|>Tuple)
+        res += getOneBodyInt(∫nucAttractionCore, bls, bfs..., getCharge(ele), coord|>Tuple)
+    end
+    res
+end
+                          #       j==i      j!=i
+const Int1eBIndexLabels = Dict([( true,), (false,)] .=> [Val(:aa), Val(:ab)])
+
+getON(::Val{:ContainBasisFuncs}, b::SpatialBasis) = orbitalNumOf(b)
+getON(::Val{:WithoutBasisFuncs}, ::CGTBasisFuncs1O{<:Any, <:Any, BN}) where {BN} = BN
+
+getBF(::Val, b::SpatialBasis, i) = getindex(b, i)
+getBF(::Val{:WithoutBasisFuncs}, b::BasisFuncMix, i) = getindex(b.BasisFunc, i)
+
+getBFs(::Val{:ContainBasisFuncs}, b::SpatialBasis) = itself(b)
+getBFs(::Val{:WithoutBasisFuncs}, b::CGTBasisFuncs1O) = unpackBasis(b)
+
+# 1e integrals for BasisFuncs/BasisFuncMix-mixed bases
+function getCompositeIntCore(::Val{T}, ::Val{D}, ::Val{BL}, ::Val{:aa}, ∫::F, 
+                             bs::NTuple{2, BT}, optArgs...) where 
+                            {T, D, BL, F<:Function, BT<:SpatialBasis{T, D}}
+    a = bs[begin]
+    ON = getON(Val(BL), a)
+    res = zeros(T, ON, ON)
+    for j=1:ON, i=1:j
+        res[i,j] = res[j,i] = getCompositeInt(∫, (j==i,), 
+                                              (getBF(Val(BL), a, i), 
+                                               getBF(Val(BL), a, j)), optArgs...)
     end
     res
 end
 
-function getEleEleInteraction(bf1::BasisFunc{T, D, <:Any, GN1}, 
-                              bf2::BasisFunc{T, D, <:Any, GN2}, 
-                              bf3::BasisFunc{T, D, <:Any, GN3}, 
-                              bf4::BasisFunc{T, D, <:Any, GN4}) where 
-                             {T, D, GN1, GN2, GN3, GN4}
-    getTwoBodyInt(∫eeInteractionCore, bf1, bf2, bf3, bf4)
+function getCompositeIntCore(::Val{T}, ::Val{D}, ::Val{BL}, ::Val{:ab}, ∫::F, 
+                             bs::NTuple{2, SpatialBasis{T, D}}, optArgs...) where 
+                            {T, D, BL, F<:Function}
+    bfsI, bfsJ = bs = getBFs.(Val(BL), bs)
+    ON1, ON2 = length.(bs)
+    res = zeros(T, ON1, ON2)
+    for (j, bfj) in enumerate(bfsJ), (i, bfi) in enumerate(bfsI)
+        res[i,j] = getCompositeInt(∫, Val(false), (bfi, bfj), optArgs...)
+    end
+    res
 end
 
+                          # a==b    lk,    lj,    kj, ki/ji    ijkl
+const Int2eBIndexLabels = Dict([( true,  true,  true,  true), #1111
+                                ( true, false, false,  true), #1122
+                                (false,  true, false,  true), #1212
+                                (false,  true, false, false), #1232
+                                (false, false,  true, false), #122X
+                                (false, false,  true,  true), #1112
+                                (false, false, false,  true), #1123
+                                ( true,  true,  true, false), #1222
+                                ( true, false, false, false), #12XX
+                                (false, false, false, false)  #123X
+                               ] .=> 
+                               [Val(:aaaa), Val(:aabb), Val(:abab), Val(:abcx), Val(:abbx), 
+                                Val(:aabc), Val(:aabc), Val(:abxx), Val(:abxx), Val(:abcx)])
 
-@inline getCompositeInt(∫::F, 
-                        bs::NTuple{N, BasisFunc{T, D}}, optArgs...) where 
-                       {F<:Function, N, T, D} = 
-        ∫(bs..., optArgs...)
-
-@inline function getCompositeInt(∫::F, 
-                                 bs::NTuple{N, CompositeGTBasisFuncs{T, D}}, 
-                                 optArgs...) where {F<:Function, N, T, D}
-    range = Iterators.product(bs...)
-    map(x->∫(x..., optArgs...)::T, range)::Array{T, N}
+# 2e integrals for BasisFuncs/BasisFuncMix-mixed bases
+function getCompositeIntCore(::Val{T}, ::Val{D}, ::Val{BL}, ::Val{:aaaa}, ∫::F, 
+                             bs::NTuple{4, BT}, optArgs...) where 
+                            {T, D, BL, F<:Function, BT<:SpatialBasis{T, D}}
+    a = bs[begin]
+    ON = getON(Val(BL), a)
+    res = zeros(T, ON, ON, ON, ON)
+    for l = 1:ON, k = 1:l, j = 1:l, i = 1:ifelse(l==j, k, j)
+        bl = (l==k, l==j, k==j, ifelse(l==j, k, j)==i)
+        res[i, j, k, l] = res[j, i, k, l] = res[j, i, l, k] = res[i, j, l, k] = 
+        res[l, k, i, j] = res[k, l, i, j] = res[k, l, j, i] = res[l, k, j, i] = 
+        getCompositeInt(∫, bl, (getBF(Val(BL), a, i), getBF(Val(BL), a, j), 
+                                getBF(Val(BL), a, k), getBF(Val(BL), a, l)), optArgs...)
+    end
+    res
 end
 
-@inline function getCompositeInt(∫::F, 
-                                 bs::NTuple{N, CGTBasisFuncs1O{T, D}}, optArgs...) where 
-                                {F<:Function, N, T, D}
+function getCompositeIntCore(::Val{T}, ::Val{D}, ::Val{BL}, ::Val{:aabb}, ∫::F, 
+                             bs::Tuple{BT1, BT1, BT2, BT2}, optArgs...) where 
+                            {T, D, BL, F<:Function, BT1<:SpatialBasis{T, D}, 
+                                                    BT2<:SpatialBasis{T, D}}
+    a, b = ab = bs[[1, 3]]
+    ON1, ON2 = getON.(Val(BL), ab)
+    res = zeros(T, ON1, ON1, ON2, ON2)
+    for l = 1:ON2, k = 1:l, j = 1:ON1, i = 1:j
+        bl = (l==k, false, false, j==i)
+        res[i, j, k, l] = res[j, i, k, l] = res[j, i, l, k] = res[i, j, l, k] = 
+        getCompositeInt(∫, bl, (getBF(Val(BL), a, i), getBF(Val(BL), a, j), 
+                                getBF(Val(BL), b, k), getBF(Val(BL), b, l)), optArgs...)
+    end
+    res
+end
+
+function getCompositeIntCore(::Val{T}, ::Val{D}, ::Val{BL}, ::Val{:abab}, ∫::F, 
+                             bs::Tuple{BT1, BT2, BT1, BT2}, optArgs...) where 
+                            {T, D, BL, F<:Function, BT1<:SpatialBasis{T, D}, 
+                                                    BT2<:SpatialBasis{T, D}}
+    a, b = ab = bs[[1, 2]]
+    ON1, ON2 = getON.(Val(BL), ab)
+    res = zeros(T, ON1, ON2, ON1, ON2)
+    rng = Iterators.product(1:ON2, 1:ON1)
+    for (x, (l,k)) in enumerate(rng), (_, (j,i)) in zip(1:x, rng)
+        bl = (false, l==j, false, ifelse(l==j, k==i, false))
+        res[i, j, k, l] = res[k, l, i, j] = 
+        getCompositeInt(∫, bl, (getBF(Val(BL), a, i), getBF(Val(BL), b, j), 
+                                getBF(Val(BL), a, k), getBF(Val(BL), b, l)), optArgs...)
+    end
+    res
+end
+
+function getCompositeIntCore(::Val{T}, ::Val{D}, ::Val{BL}, ::Val{:abbx}, ∫::F, 
+                             bs::Tuple{BT1, BT2, BT2, BT3}, optArgs...) where 
+                            {T, D, BL, F<:Function, BT1<:SpatialBasis{T, D}, 
+                                                    BT2<:SpatialBasis{T, D}, 
+                                                    BT3<:SpatialBasis{T, D}}
+    if bs[1] === bs[4]
+        a, b = ab = bs[[1, 2]]
+        ON1, ON2 = getON.(Val(BL), ab)
+        res = zeros(T, ON1, ON2, ON2, ON1)
+        rng = Iterators.product(1:ON1, 1:ON2)
+        for (x, (l,k)) in enumerate(rng), (_, (i,j)) in zip(1:x, rng)
+            bl = (false, false, k==j, false)
+            res[i, j, k, l] = res[k, l, i, j] = 
+            getCompositeInt(∫, bl, (getBF(Val(BL), a, i), getBF(Val(BL), b, j), 
+                                    getBF(Val(BL), b, k), getBF(Val(BL), a, l)), optArgs...)
+        end
+    else
+        res = getCompositeIntCore(Val(T), Val(D), Val(BL), Val(:abcx), ∫, bs, optArgs...)
+    end
+    res
+end
+
+function getCompositeIntCore(::Val{T}, ::Val{D}, ::Val{BL}, ::Val{:aabc}, ∫::F, 
+                             bs::Tuple{BT1, BT1, BT2, BT3}, optArgs...) where 
+                            {T, D, BL, F<:Function, BT1<:SpatialBasis{T, D}, 
+                                                    BT2<:SpatialBasis{T, D}, 
+                                                    BT3<:SpatialBasis{T, D}}
+    a, b, c = abc = bs[[1, 3, 4]]
+    ON1, ON2, ON3 = getON.(Val(BL), abc)
+    res = zeros(T, ON1, ON1, ON2, ON3)
+    for l=1:ON3, k=1:ON2, j=1:ON1, i=1:j
+        bl = (false, false, false, j==i)
+        res[i, j, k, l] = res[j, i, k, l] = 
+        getCompositeInt(∫, bl, (getBF(Val(BL), a, i), getBF(Val(BL), a, j), 
+                                getBF(Val(BL), b, k), getBF(Val(BL), c, l)), optArgs...)
+    end
+    res
+end
+
+function getCompositeIntCore(::Val{T}, ::Val{D}, ::Val{BL}, ::Val{:abxx}, ∫::F, 
+                             bs::Tuple{BT1, BT2, BT3, BT3}, optArgs...) where 
+                            {T, D, BL, F<:Function, BT1<:SpatialBasis{T, D}, 
+                                                    BT2<:SpatialBasis{T, D}, 
+                                                    BT3<:SpatialBasis{T, D}}
+    a, b, x = abx = bs[[1, 2, 3]]
+    ON1, ON2, ON3 = getON.(Val(BL), abx)
+    res = zeros(T, ON1, ON2, ON3, ON3)
+    for l=1:ON3, k=1:l, j=1:ON2, i=1:ON1
+        bl = (l==k, false, false, false)
+        res[i, j, k, l] = res[i, j, l, k] = 
+        getCompositeInt(∫, bl, (getBF(Val(BL), a, i), getBF(Val(BL), b, j), 
+                                getBF(Val(BL), x, k), getBF(Val(BL), x, l)), optArgs...)
+    end
+    res
+end
+
+function getCompositeIntCore(::Val{T}, ::Val{D}, ::Val{BL}, ::Val{:abcx}, ∫::F, 
+                             bs::NTuple{4, SpatialBasis{T, D}}, optArgs...) where 
+                            {T, D, BL, F<:Function}
+    bfsI, bfsJ, bfsK, bfsL = bs = getBFs.(Val(BL), bs)
+    ON1, ON2, ON3, ON4 = length.(bs)
+    res = zeros(T, ON1, ON2, ON3, ON4)
+    for (l, bfl) in enumerate(bfsL), (k, bfk) in enumerate(bfsK), 
+        (j, bfj) in enumerate(bfsJ), (i, bfi) in enumerate(bfsI)
+        res[i,j,k,l] = getCompositeInt(∫, Val(false), (bfi, bfj, bfk, bfl), optArgs...)
+    end
+    res
+end
+
+getBasisIndexL(::Val{2}, bls::Tuple{Bool}) = Int1eBIndexLabels[bls]
+getBasisIndexL(::Val{4}, bls::NTuple{4, Bool}) = Int2eBIndexLabels[bls]
+getBasisIndexL(::Val{2}, ::Val{false}) = Int1eBIndexLabels[(false,)]
+getBasisIndexL(::Val{4}, ::Val{false}) = Int2eBIndexLabels[(false, false, false, false)]
+
+getCompositeInt(∫::F, bls::Union{Tuple{Vararg{Bool}}, Val{false}}, 
+                bs::NTuple{BN, SpatialBasis{T, D}}, 
+                optArgs...) where {F<:Function, BN, T, D} = 
+getCompositeIntCore(Val(T), Val(D), Val(:ContainBasisFuncs), 
+                    getBasisIndexL(Val(BN), bls), ∫, bs, optArgs...)
+
+function getCompositeInt(∫::F, bls::Union{Tuple{Vararg{Bool}}, Val{false}}, 
+                         bs::NTuple{BN, SpatialBasis{T, D, 1}}, 
+                         optArgs...) where {F<:Function, BN, T, D}
     if any(fieldtypes(typeof(bs)) .<: EmptyBasisFunc)
         zero(T)
     else
-        map(x->∫(x..., optArgs...)::T, Iterators.product(unpackBasis.(bs)...)) |> sum
+        getCompositeIntCore(Val(T), Val(D), Val(:WithoutBasisFuncs), 
+                            getBasisIndexL(Val(BN), bls), ∫, bs, optArgs...) |> sum
     end
 end
-
-
-getOverlap(b1::GTBasisFuncs{T, D}, b2::GTBasisFuncs{T, D}) where {T, D} = 
-getCompositeInt(getOverlap, (b1, b2))
-
-getEleKinetic(b1::GTBasisFuncs{T, D}, b2::GTBasisFuncs{T, D}) where {T, D} = 
-getCompositeInt(getEleKinetic, (b1, b2))
-
-getNucEleAttraction(b1::GTBasisFuncs{T, D}, b2::GTBasisFuncs{T, D}, 
-                    nuc::NTuple{NN, String}, 
-                    nucCoords::NTuple{NN, NTuple{D, T}}) where {T, D, NN} = 
-getCompositeInt(getNucEleAttraction, (b1, b2), nuc, nucCoords)
-
-getCoreH(b1::GTBasisFuncs{T, D}, b2::GTBasisFuncs{T, D}, 
-         nuc::NTuple{NN, String}, 
-         nucCoords::NTuple{NN, NTuple{D, T}}) where {T, D, NN} = 
-getEleKinetic(b1, b2) + getNucEleAttraction(b1, b2, nuc, nucCoords)
-
-getEleEleInteraction(b1::GTBasisFuncs{T, D}, b2::GTBasisFuncs{T, D}, 
-                     b3::GTBasisFuncs{T, D}, b4::GTBasisFuncs{T, D}) where {T, D} = 
-getCompositeInt(getEleEleInteraction, (b1, b2, b3, b4))
 
 
 function update2DarrBlock!(arr::AbstractMatrix{T1}, block::T1, 
@@ -819,7 +1025,7 @@ function getOneBodyInts(∫1e::F, basisSet::NTuple{BN, GTBasisFuncs{T, D}}, optA
     len = subSize |> sum
     buf = Array{T}(undef, len, len)
     for j = 1:BN, i = 1:j
-        int = ∫1e(basisSet[i], basisSet[j], optArgs...)
+        int = getCompositeInt(∫1e, (j==i,), (basisSet[i], basisSet[j]), optArgs...)
         rowRange = accuSize[i]+1 : accuSize[i+1]
         colRange = accuSize[j]+1 : accuSize[j+1]
         update2DarrBlock!(buf, int, rowRange, colRange)
@@ -831,28 +1037,11 @@ function getOneBodyInts(∫1e::F, basisSet::NTuple{BN, GTBasisFuncs{T, D, 1}},
                         optArgs...) where {F<:Function, BN, T, D}
     buf = Array{T}(undef, BN, BN)
     for j = 1:BN, i = 1:j
-        int = ∫1e(basisSet[i], basisSet[j], optArgs...)
+        int = getCompositeInt(∫1e, (j==i,), (basisSet[i], basisSet[j]), optArgs...)
         buf[i, j] = buf[j, i] = int
     end
     buf
 end
-
-
-getOverlap(BSet::NTuple{BN, GTBasisFuncs{T, D}}) where {BN, T, D} = 
-getOneBodyInts(getOverlap, BSet)
-
-getEleKinetic(BSet::NTuple{BN, GTBasisFuncs{T, D}}) where {BN, T, D} = 
-getOneBodyInts(getEleKinetic, BSet)
-
-getNucEleAttraction(BSet::NTuple{BN, GTBasisFuncs{T, D}}, 
-                     nuc::NTuple{NN, String}, nucCoords::NTuple{NN, NTuple{D, T}}) where 
-                    {BN, T, D, NN} = 
-getOneBodyInts(getNucEleAttraction, BSet, nuc, nucCoords)
-
-getCoreH(BSet::NTuple{BN, GTBasisFuncs{T, D}}, 
-         nuc::NTuple{NN, String}, nucCoords::NTuple{NN, NTuple{D, T}}) where 
-        {BN, T, D, NN} = 
-getOneBodyInts(getCoreH, BSet, nuc, nucCoords)
 
 
 permuteArray(arr::AbstractArray{T, N}, order) where {T, N} = PermutedDimsArray(arr, order)
@@ -890,12 +1079,13 @@ function getTwoBodyInts(∫2e::F, basisSet::NTuple{BN, GTBasisFuncs{T, D}}) wher
     accuSize = vcat(0, accumulate(+, subSize))
     totalSize = subSize |> sum
     buf = Array{T}(undef, totalSize, totalSize, totalSize, totalSize)
-    for l = 1:BN, k = 1:l, j = 1:l, i = 1:ifelse(j==l, k, j)
+    for l = 1:BN, k = 1:l, j = 1:l, i = 1:ifelse(l==j, k, j)
         I = accuSize[i]+1 : accuSize[i+1]
         J = accuSize[j]+1 : accuSize[j+1]
         K = accuSize[k]+1 : accuSize[k+1]
         L = accuSize[l]+1 : accuSize[l+1]
-        int = ∫2e(basisSet[i], basisSet[j], basisSet[k], basisSet[l])
+        bl = (l==k, l==j, k==j, ifelse(l==j, k, j)==i)
+        int = getCompositeInt(∫2e, bl, (basisSet[i], basisSet[j], basisSet[k], basisSet[l]))
         update4DarrBlock!(buf, int, I, J, K, L)
     end
     buf
@@ -904,8 +1094,9 @@ end
 function getTwoBodyInts(∫2e::F, basisSet::NTuple{BN, GTBasisFuncs{T, D, 1}}) where 
                        {F<:Function, BN, T, D}
     buf = Array{T}(undef, BN, BN, BN, BN)
-    for l = 1:BN, k = 1:l, j = 1:l, i = 1:ifelse(j==l, k, j)
-        int = ∫2e(basisSet[i], basisSet[j], basisSet[k], basisSet[l])
+    for l = 1:BN, k = 1:l, j = 1:l, i = 1:ifelse(l==j, k, j)
+        bl = (l==k, l==j, k==j, ifelse(l==j, k, j)==i)
+        int = getCompositeInt(∫2e, bl, (basisSet[i], basisSet[j], basisSet[k], basisSet[l]))
         buf[i, j, k, l] = buf[j, i, k, l] = buf[j, i, l, k] = buf[i, j, l, k] = 
         buf[l, k, i, j] = buf[k, l, i, j] = buf[k, l, j, i] = buf[l, k, j, i] = int
     end
@@ -913,11 +1104,14 @@ function getTwoBodyInts(∫2e::F, basisSet::NTuple{BN, GTBasisFuncs{T, D, 1}}) w
 end
 
 
-getEleEleInteraction(BSet::NTuple{BN, GTBasisFuncs{T, D}}) where {BN, T, D} = 
-getTwoBodyInts(getEleEleInteraction, BSet)
+"""
 
+    eeIuniqueIndicesOf(basisSetSize::Int) -> Vector{Vector{Int}}
 
-function genUniqueIndices(basisSetSize::Int)
+Return the unique matrix element indices (in the chemists' notation) of electron-electron 
+interactions given the size of a basis set.
+"""
+function eeIuniqueIndicesOf(basisSetSize::Int)
     uniqueIdx = fill(Int[0,0,0,0], (3*binomial(basisSetSize, 4) + 
                                     6*binomial(basisSetSize, 3) + 
                                     4*binomial(basisSetSize, 2) + basisSetSize))

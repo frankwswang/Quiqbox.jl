@@ -409,9 +409,8 @@ bf_mul16_0 = mul(bf_mul15, bf_mul15_0, normalizeGTO=true)
 
 testNorm = function (bf1, bf2)
     bf3 = mul(bf1, bf2, normalizeGTO=false)
-    n1 = Quiqbox.getOverlap(bf3, bf3)
-    n2 = Quiqbox.getOverlap(mul(bf1, bf1, normalizeGTO=false), 
-                            mul(bf2, bf2, normalizeGTO=false))
+    n1 = overlap(bf3, bf3)
+    n2 = overlap(mul(bf1, bf1, normalizeGTO=false), mul(bf2, bf2, normalizeGTO=false))
     @test isapprox(n1, n2, atol=1e-12)
 end
 
@@ -439,12 +438,10 @@ testNorm(bf_mul14, bf_mul16)
 testNorm(bf_mul16, bf_mul16_0)
 testNorm(bf_mul15_0, bf_mul16_0)
 
-
-# function getOverlap
-@test isapprox(Quiqbox.getOverlap(bf_mul2_2, bf_mul2_2), 1.0, atol=1e-10)
-@test isapprox(Quiqbox.getOverlap(bf_mul5_0, bf_mul5_0), 9.0, atol=1e-10)
+@test isapprox(overlap(bf_mul2_2, bf_mul2_2), 1.0, atol=1e-10)
+@test isapprox(overlap(bf_mul5_0, bf_mul5_0), 9.0, atol=1e-10)
 bf_mul18 = genBasisFunc(rand(3), "STO-3G")[]
-@test isapprox(Quiqbox.getOverlap(bf_mul18, bf_mul18), 1.0, atol=1e-10)
+@test isapprox(overlap(bf_mul18, bf_mul18), 1.0, atol=1e-10)
 
 
 # function shift

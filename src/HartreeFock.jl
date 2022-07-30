@@ -1,11 +1,11 @@
 export SCFconfig, HFconfig, runHF, runHFcore
 
 using LinearAlgebra: dot, Hermitian, \, det, I, ishermitian
-using PiecewiseQuadratics: indicator
 using Combinatorics: powerset
 using LineSearches
 using Optim: LBFGS, Fminbox, optimize as OptimOptimize, minimizer as OptimMinimizer, 
              Options as OptimOptions
+using Tullio: @tullio
 
 const defaultDS = 0.5
 const defaultDIISconfig = (12, :LBFGS)
@@ -82,11 +82,7 @@ getC.( Ref(X), getF(Hcore, HeeI, (Dᵅ, Dᵝ)) )
 
 function getCfromGWH(::Val{HFT}, S::AbstractMatrix{T}, Hcore::AbstractMatrix{T}, 
                      X::AbstractMatrix{T}) where {HFT, T}
-    l = size(Hcore)[1]
-    H = zero(Hcore)
-    for j in 1:l, i in 1:l
-        H[i,j] = 3 * S[i,j] * (Hcore[i,i] + Hcore[j,j]) / 8
-    end
+    @tullio H[i,j] := 3 * S[i,j] * (Hcore[i,i] + Hcore[j,j]) / 8
     Cˢ = getC(X, H)
     breakSymOfC(Val(HFT), Cˢ)
 end
@@ -139,12 +135,9 @@ getD(Cˢ::AbstractMatrix{T}, Nˢ::Int) where {T} = @views (Cˢ[:,1:Nˢ]*Cˢ[:,1:
         getD(getC(X, Fˢ), Nˢ)
 
 
-function getGcore(HeeI::AbstractArray{T, 4}, DJ::AbstractMatrix{T}, DK::AbstractMatrix{T}) where {T}
-    G = zero(DJ)
-    l = size(G)[1]
-    for ν = 1:l, μ = 1:l # fastest
-        G[μ, ν] = dot(transpose(DJ), @view HeeI[μ,ν,:,:]) - dot(DK, @view HeeI[μ,:,:,ν]) 
-    end
+function getGcore(HeeI::AbstractArray{T, 4}, 
+                  DJ::AbstractMatrix{T}, DK::AbstractMatrix{T}) where {T}
+    @tullio G[μ, ν] := DJ[b,a] * HeeI[μ,ν,a,b] - DK[a,b] * HeeI[μ,a,b,ν]
     G |> Hermitian
 end
 
@@ -172,7 +165,7 @@ end
         dot(transpose(Dˢ), Hcore+Fˢ) / 2
 
 get2SpinQuantity(O::NTuple{HFTS, T}) where {HFTS, T} = abs(3-HFTS) * sum(O)
-get2SpinQuantities(O, nRepeat::Int) = fill(get2SpinQuantity(O), nRepeat) |> Tuple
+get2SpinQuantities(O, nRepeat::Int) = ntuple(_->get2SpinQuantity(O), nRepeat)
 
 # RHF or UHF
 getEᵗcore(Hcore::AbstractMatrix{T}, 
@@ -201,7 +194,7 @@ function getCDFE(Hcore::AbstractMatrix{T}, HeeI::AbstractArray{T, 4}, X::Abstrac
 end
 
 
-function initializeSCF(::Val{HFT}, Hcore::AbstractMatrix{T}, HeeI::AbstractArray{T, 4}, 
+function initializeSCFcore(::Val{HFT}, Hcore::AbstractMatrix{T}, HeeI::AbstractArray{T, 4}, 
                        C::NTuple{HFTS, AbstractMatrix{T}}, N::NTuple{HFTS, Int}) where 
                       {HFT, T, HFTS}
     D = getD.(C, N)
@@ -209,11 +202,21 @@ function initializeSCF(::Val{HFT}, Hcore::AbstractMatrix{T}, HeeI::AbstractArray
     E = getE.(Ref(Hcore), F, D)
     res = HFtempVars.(Val(HFT), N, C, D, F, E)
     sharedFields = getproperty.(res, :shared)
-    for (field, val) in zip( (:Dtots, :Etots), fill.(get2SpinQuantity.((D, E)), 1)  )
+    fields = (:Dtots, :Etots)
+    for (field, val) in zip(fields, fill.(get2SpinQuantity.((D, E)), 1))
         setproperty!.(sharedFields, field, Ref(val))
     end
-    res
+    res::NTuple{HFTS, HFtempVars{T, HFT}} # A somehow necessary assertion for type stability
 end
+
+# Additional wrapper to correlate `HTF` and `HFTS` for type stability.
+initializeSCF(::Val{:RHF}, Hcore::AbstractMatrix{T}, HeeI::AbstractArray{T, 4}, 
+              C::Tuple{AbstractMatrix{T}}, N::Tuple{Int}) where {T} = 
+initializeSCFcore(Val(:RHF), Hcore, HeeI, C, N)
+
+initializeSCF(::Val{:UHF}, Hcore::AbstractMatrix{T}, HeeI::AbstractArray{T, 4}, 
+              C::NTuple{2, AbstractMatrix{T}}, N::NTuple{2, Int}) where {T} = 
+initializeSCFcore(Val(:UHF), Hcore, HeeI, C, N)
 
 
 const Doc_SCFconfig_OneRowTable = "|`:DIIS`, `:EDIIS`, `:ADIIS`|subspace size; "*
@@ -570,12 +573,12 @@ electrons with same spin configurations(s).
 
 `printInfo::Bool`: Whether print out the information of iteration steps and result.
 """
-function runHF(bs::GTBasis{T1, D, BN, BT}, 
+function runHF(bs::GTBasis{T1, D, BN, BFT}, 
                nuc::Union{NTuple{NN, String}, AbstractVector{String}}, 
                nucCoords::SpatialCoordType{T1, D, NN}, 
                config::HFconfig{T2, HFT}=defaultHFC, 
                N::Union{Int, Tuple{Int}, NTuple{2, Int}}=getCharge(nuc); 
-               printInfo::Bool=true) where {T1, D, BN, BT, NN, HFT, T2}
+               printInfo::Bool=true) where {T1, D, BN, BFT, NN, HFT, T2}
     @assert N > (HFT==:RHF) "$(HFT) requires more than $(HFT==:RHF) electrons."
     Ns = splitSpins(Val(HFT), N)
     leastNb = max(Ns...)
@@ -630,8 +633,9 @@ $(string(HFtypes)[2:end-1]).
 
 `Hcore::AbstractMatrix{T} where T`: The core Hamiltonian of the electronic Hamiltonian.
 
-`HeeI::AbstractArray{T, 4} where T`: The electron-electron interaction tensor (in chemists' 
-notation) which includes both the Coulomb interactions and the Exchange Correlations.
+`HeeI::AbstractArray{T, 4} where T`: The electron-electron interaction tensor (in the 
+chemists' notation) which includes both the Coulomb interactions and the Exchange 
+Correlations.
 
 `S::AbstractMatrix{T} where T`: The overlap matrix of the used basis set.
 
@@ -666,7 +670,9 @@ function runHFcore(::Val{HFT},
     i = 0
     for (m, kws, breakPoint, l) in 
         zip(scfConfig.method, scfConfig.methodConfig, scfConfig.interval, 1:L)
+        isConverged = true
         n = 0
+
         while true
             i += 1
             n += 1
@@ -683,7 +689,7 @@ function runHFcore(::Val{HFT},
                     isConverged = ifelse(Std > max(breakPoint, oscThreshold), false, true)
                 else
                     earlyStop && relDiff > cbrt(breakPoint) && 
-                    (i = terminateSCF(i, vars, m, printInfo); break)
+                    (i = terminateSCF(i, vars, m, printInfo); isConverged=false; break)
                 end
             end
 
@@ -692,7 +698,6 @@ function runHFcore(::Val{HFT},
 
             isConverged && abs(diff) <= breakPoint && break
         end
-
     end
     negStr = ifelse(isConverged, "is ", "has not ")
     printInfo && println("The SCF procedure ", negStr, "converged.\n")
@@ -718,8 +723,8 @@ function EDIIScore(∇s::AbstractVector{<:AbstractMatrix{T}},
                    Ds::AbstractVector{<:AbstractMatrix{T}}, Es::AbstractVector{T}) where {T}
     len = length(Ds)
     B = similar(∇s[begin], len, len)
-    for idx in CartesianIndices(B)
-        B[idx] = -dot(Ds[idx[1]]-Ds[idx[2]], ∇s[idx[1]]-∇s[idx[2]])
+    @inbounds for j=1:len, i=1:j
+        B[i,j] = B[j,i] = -dot(Ds[i]-Ds[j], ∇s[i]-∇s[j])
     end
     Es, B
 end
@@ -727,12 +732,8 @@ end
 
 function ADIIScore(∇s::AbstractVector{<:AbstractMatrix{T}}, 
                    Ds::AbstractVector{<:AbstractMatrix{T}}) where {T}
-    len = length(Ds)
-    B = similar(∇s[begin], len, len)
-    v = [dot(D - Ds[end], ∇s[end]) for D in Ds]
-    for idx in CartesianIndices(B)
-        B[idx] = dot(Ds[idx[1]]-Ds[len], ∇s[idx[2]]-∇s[len])
-    end
+    @tullio v[i] := dot(Ds[i] - Ds[end], ∇s[end])
+    @tullio B[i,j] := dot((Ds[i]-Ds[end]), (∇s[j]-∇s[end]))
     v, B
 end
 
@@ -742,9 +743,9 @@ function DIIScore(∇s::AbstractVector{<:AbstractMatrix{T}},
     len = length(Ds)
     B = similar(∇s[begin], len, len)
     v = zeros(len)
-    for idx in CartesianIndices(B)
-        B[idx] = dot( ∇s[idx[1]]*Ds[idx[1]]*S - S*Ds[idx[1]]*∇s[idx[1]], 
-                      ∇s[idx[2]]*Ds[idx[2]]*S - S*Ds[idx[2]]*∇s[idx[2]] )
+    @inbounds for j in 1:len, i=1:j
+        B[i,j] = B[j,i] = dot( ∇s[i]*Ds[i]*S - S*Ds[i]*∇s[i], 
+                               ∇s[j]*Ds[j]*S - S*Ds[j]*∇s[j] )
     end
     v, B
 end

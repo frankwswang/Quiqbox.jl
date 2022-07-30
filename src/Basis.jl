@@ -371,6 +371,9 @@ BasisFunc(bfs::BFuncs1O) = BasisFunc(bfs.center, bfs.gauss, bfs.l, bfs.normalize
 
 struct EmptyBasisFunc{T<:Real, D} <: CGTBasisFuncs1O{T, D, 0} end
 
+isEmptyBasisFunc(::EmptyBasisFunc) = true
+isEmptyBasisFunc(::CompositeGTBasisFuncs) = false
+
 
 isaFullShellBasisFuncs(::Any) = false
 
@@ -435,7 +438,7 @@ BasisFunc{Float64, 3, 1, 1, P3D{Float64, 0, 0, 0}}(center, gauss, l, normalizeGT
 
     genBasisFunc(center, GsOrCoeffs, subshell="S"; normalizeGTO=false) -> 
     FloatingGTBasisFuncs
-    
+
     genBasisFunc(center, GsOrCoeffs, subshell, lFilter; normalizeGTO=false) -> 
     FloatingGTBasisFuncs
 
@@ -700,14 +703,14 @@ centerCoordOf(bf::FloatingGTBasisFuncs) = coordOf(bf.center)
 
 """
 
-    BasisFuncMix{T, D, BN, BT<:BasisFunc{T, D}} <: CompositeGTBasisFuncs{T, D, BN, 1}
+    BasisFuncMix{T, D, BN, BFT<:BasisFunc{T, D}} <: CompositeGTBasisFuncs{T, D, BN, 1}
 
 Sum of multiple `FloatingGTBasisFuncs{<:Any, <:Any, <:Any, <:Any, <:Any, 1}` without any 
 reformulation, treated as one basis function in the calculations.
 
 ≡≡≡ Field(s) ≡≡≡
 
-`BasisFunc::NTuple{BN, BT}`: Basis functions used to sum up.
+`BasisFunc::NTuple{BN, BFT}`: Basis functions used to sum up.
 
 `param::Tuple{Vararg{ParamBox}}`: Contained parameters.
 
@@ -718,8 +721,8 @@ reformulation, treated as one basis function in the calculations.
     BasisFuncMix
 
 """
-struct BasisFuncMix{T, D, BN, BT<:BasisFunc{T, D}} <: CGTBasisFuncs1O{T, D, BN}
-    BasisFunc::NTuple{BN, BT}
+struct BasisFuncMix{T, D, BN, BFT<:BasisFunc{T, D}} <: CGTBasisFuncs1O{T, D, BN}
+    BasisFunc::NTuple{BN, BFT}
     param::Tuple{Vararg{ParamBox{T}}}
 
     function BasisFuncMix(bfs::Tuple{Vararg{BasisFunc{T, D}, BN}}) where {T, D, BN}
@@ -738,7 +741,7 @@ BasisFuncMix(bfm::BasisFuncMix) = itself(bfm)
 
 getTypeParams(::FloatingGTBasisFuncs{T, D, 𝑙, GN, PT, ON}) where {T, D, 𝑙, GN, PT, ON} = 
 (T, D, 𝑙, GN, PT, ON)
-getTypeParams(::BasisFuncMix{T, D, BN, BT}) where {T, D, BN, BT} = (T, D, BN, BT)
+getTypeParams(::BasisFuncMix{T, D, BN, BFT}) where {T, D, BN, BFT} = (T, D, BN, BFT)
 
 
 unpackBasis(::EmptyBasisFunc) = ()
@@ -749,30 +752,23 @@ unpackBasis(b::BFuncs1O)  = (BasisFunc(b),)
 
 """
 
-    dimOf(::AbstractSpatialPoint) -> Int
+    dimOf(::DimensionalParamContainer) -> Int
 
-Return the spatial dimension of the input `AbstractSpatialPoint`.
+Return the spatial dimension of the input parameterized container such as 
+`AbstractSpatialPoint` and `QuiqboxBasis`.
 """
-dimOf(::AbstractSpatialPoint{<:Any, D}) where {D} = D
-
-"""
-
-    dimOf(::QuiqboxBasis) -> Int
-
-Return the spatial dimension of the input basis.
-"""
-dimOf(::QuiqboxBasis{<:Any, D}) where {D} = D
+dimOf(::DimensionalParamContainer{<:Any, D}) where {D} = D
 
 
 """
 
-    GTBasis{T, D, BN, BT<:GTBasisFuncs{T, D, 1}} <: BasisSetData{T, D, BT}
+    GTBasis{T, D, BN, BFT<:GTBasisFuncs{T, D, 1}} <: BasisSetData{T, D, BFT}
 
 The container of basis set information.
 
 ≡≡≡ Field(s) ≡≡≡
 
-`basis::NTuple{BN, BT}`: Stored basis set.
+`basis::NTuple{BN, BFT}`: Stored basis set.
 
 `S::Matrix{T}`: Overlap matrix.
 
@@ -788,8 +784,8 @@ The container of basis set information.
 
 Construct a `GTBasis` given a basis set.
 """
-struct GTBasis{T, D, BN, BT<:GTBasisFuncs{T, D, 1}} <: BasisSetData{T, D, BT}
-    basis::NTuple{BN, BT}
+struct GTBasis{T, D, BN, BFT<:GTBasisFuncs{T, D, 1}} <: BasisSetData{T, D, BFT}
+    basis::NTuple{BN, BFT}
     S::Matrix{T}
     Te::Matrix{T}
     eeI::Array{T, 4}
@@ -1484,12 +1480,11 @@ Return the size (number of orbitals) of each subshell in `D` dimensional real sp
 
 """
 
-    orbitalNumOf(b::CompositeGTBasisFuncs) -> Int
+    orbitalNumOf(b::QuiqboxBasis) -> Int
 
-Return the numbers of orbitals of the input basis function(s).
+Return the numbers of orbitals of the input basis.
 """
-@inline orbitalNumOf(::CGTBasisFuncsON{ON}) where {ON} = ON
-@inline orbitalNumOf(::BasisFuncMix) = 1
+@inline orbitalNumOf(::QuiqboxBasis{<:Any, <:Any, ON}) where {ON} = ON
 
 
 # Core function to generate a customized X-Gaussian (X>1) basis function.

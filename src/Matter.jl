@@ -2,6 +2,7 @@ export CanOrbital, getCanOrbitals, changeHbasis, MatterByHF, nnRepulsions
 
 using LinearAlgebra: norm
 using Tullio: @tullio
+using TensorOperations: @tensor as @TOtensor
 
 """
 
@@ -83,36 +84,29 @@ getCanOrbitals(fVars::HFfinalVars) = getCanOrbitalsCore(fVars)[1]
 Change the basis of the input one-body / two-body integrals `DbodyInt` based on the orbital 
 coefficient matrix `C`.
 """
-function changeHbasis(oneBoadyInt::AbstractMatrix{T}, C::AbstractMatrix{T}) where {T}
-    ij = similar(oneBoadyInt, size(C, 2), size(C, 2))
-    @tullio ij[i,j] := oneBoadyInt[a,b] * C[a,i] * C[b,j]
-end
+changeHbasis(oneBodyInt::AbstractMatrix{T}, C::AbstractMatrix{T}) where {T} = 
+@TOtensor ij[i,j] := oneBodyInt[a,b] * C[a,i] * C[b,j]
 
-function changeHbasis(twoBoadyInt::AbstractArray{T, 4}, C::AbstractMatrix{T}) where {T}
-    ijkl = similar(twoBoadyInt, size(C, 2), size(C, 2), size(C, 2), size(C, 2))
-    @tullio ijkl[i,j,k,l] := twoBoadyInt[a,b,c,d] * C[a,i] * C[b,j] * C[c,k] * C[d,l]
-end
+changeHbasis(twoBodyInt::AbstractArray{T, 4}, C::AbstractMatrix{T}) where {T} = 
+@TOtensor ijkl[i,j,k,l] := twoBodyInt[a,b,c,d] * C[a,i] * C[b,j] * C[c,k] * C[d,l]
 
-function getJᵅᵝ(twoBoadyInt::AbstractArray{T, 4}, 
-                (C1, C2)::NTuple{2, AbstractMatrix{T}}) where {T}
-    iijj = similar(twoBoadyInt, size(C1, 2), size(C2, 2))
-    @tullio iijj[i,j] := twoBoadyInt[a,b,c,d] * C1[a,i] * C1[b,i] * C2[c,j] * C2[d,j]
-end
+getJᵅᵝ(twoBodyInt::AbstractArray{T, 4}, (C1, C2)::NTuple{2, AbstractMatrix{T}}) where {T} = 
+@tullio iijj[i,j] := twoBodyInt[a,b,c,d] * C1[a,i] * C1[b,i] * C2[c,j] * C2[d,j]
 
 """
 
-    changeHbasis(twoBoadyInt::AbstractArray{T, 4}, 
+    changeHbasis(twoBodyInt::AbstractArray{T, 4}, 
                  C1::AbstractMatrix{T}, C2::AbstractMatrix{T}) where {T} -> 
     AbstractArray{T, 4}
 
-Change the basis of the input two-body integrals `twoBoadyInt` based on two orbital 
+Change the basis of the input two-body integrals `twoBodyInt` based on two orbital 
 coefficient matrices `C1` and `C2` for different spin configurations (e.g., the 
 unrestricted case). The output is a 3-element `Tuple` of which the first 2 elements are the 
 spatial integrals of each spin configurations respectively, while the last element is the 
 Coulomb interactions between orbitals with different spins.
 """
-changeHbasis(twoBoadyInt::AbstractArray{T, 4}, C::Vararg{AbstractMatrix{T}, 2}) where {T} = 
-(changeHbasis.(Ref(twoBoadyInt), C)..., getJᵅᵝ(twoBoadyInt, C))
+changeHbasis(twoBodyInt::AbstractArray{T, 4}, C::Vararg{AbstractMatrix{T}, 2}) where {T} = 
+(changeHbasis.(Ref(twoBodyInt), C)..., getJᵅᵝ(twoBodyInt, C))
 
 """
 

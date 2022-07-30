@@ -2,6 +2,8 @@ using Test
 using Quiqbox
 using Quiqbox: inSymOfCore, outSymOfCore
 
+include("../../test/test-functions/Shared.jl")
+
 @testset "Differentiation.jl" begin
 
 nuc = ["H", "H"]

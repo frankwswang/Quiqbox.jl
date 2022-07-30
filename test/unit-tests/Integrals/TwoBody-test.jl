@@ -104,7 +104,7 @@ eeIs2 = [eeInteraction(i...)[] for i in Iterators.product(bs, bs, bs, bs)]
 @test compr2Arrays1(eeIs1, eeIs2, errT1)
 
 eeIs3 = eeInteractions(bs[[1,3,2,4]])
-uniqueIdx = Quiqbox.genUniqueIndices(orbitalNumOf.(bs) |> sum)
+uniqueIdx = Quiqbox.eeIuniqueIndicesOf(orbitalNumOf.(bs) |> sum)
 uniqueInts1 = [eeIs1[i...] for i in uniqueIdx]
 uniqueInts2 = [eeIs3[i...] for i in uniqueIdx]
 @test unique(eeIs1) ⊆ uniqueInts1

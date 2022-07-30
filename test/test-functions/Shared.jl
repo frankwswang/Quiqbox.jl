@@ -44,7 +44,7 @@ function compr2Arrays3(cprTuple::NamedTuple{<:Any, <:NTuple{2, T}}, atol::Real,
     res = isapprox.(arr1, arr2; atol) |> all
     if !res
         diff = arr1 - arr2
-        showAllDiff && println("$(name1) - $(name2) = ", diff)
+        showAllDiff && !res && println("$(name1) - $(name2) = ", diff)
         println("max(abs.($(name1) - $(name2))...) = ", max(abs.(diff)...))
     end
     @test res

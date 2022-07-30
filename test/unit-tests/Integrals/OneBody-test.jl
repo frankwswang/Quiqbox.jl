@@ -17,15 +17,18 @@ S = [1.0 0.6593182058508896; 0.6593182058508896 1.0]
 @test isapprox(overlap(bf1, bf2), S[2], atol=errT1)
 @test isapprox(overlaps(bs), S)
 
-V = [-1.8804408905227634 -1.1948346220535715; -1.1948346220535715 -1.8804408905227632]
-@test isapprox(neAttraction(bf1, bf2, nucs, cens), V[2], atol=errT1)
-@test isapprox(neAttractions(bs, nucs, cens), V, atol=errT1)
-
 T = [0.7600318799755844 0.23645465829079276; 0.23645465829079276 0.7600318799755844]
 @test isapprox(eKinetic(bf1, bf2), T[2], atol=errT1)
-@test isapprox(eKinetics(bs), T)
+T2 = eKinetics(bs)
+@test isapprox(T2, T)
+
+V = [-1.8804408905227634 -1.1948346220535715; -1.1948346220535715 -1.8804408905227632]
+@test isapprox(neAttraction(bf1, bf2, nucs, cens), V[2], atol=errT1)
+V2 = neAttractions(bs, nucs, cens)
+@test isapprox(V2, V, atol=errT1)
 
 Hc = coreH(bs, nucs, cens)
+@test Hc == T2 + V2
 @test isapprox(Hc, T+V, atol=errT1)
 @test isapprox(coreHij(bf1, bf1, nucs, cens)[], Hc[1], atol=errT2)
 @test isapprox(coreHij(bf2, bf1, nucs, cens)[], 

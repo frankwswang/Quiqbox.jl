@@ -41,9 +41,9 @@ isFull(::Quiqbox.FloatingGTBasisFuncs{<:Any, <:Any, 0}) = true
 isFull(::Quiqbox.FloatingGTBasisFuncs{<:Any, <:Any, 𝑙, <:Any, <:Any, ON}) where {𝑙, ON} = 
 (ON == Quiqbox.SubshellXYZsizes[𝑙+1])
 
-function ijkIndex(b::Quiqbox.FloatingGTBasisFuncs)
+function ijkIndex(b::Quiqbox.FloatingGTBasisFuncs{<:Any, D}) where {D}
     isFull(b) && (return :)
-    [Quiqbox.AngMomIndexList[ijk] for ijk in b.l]
+    [Quiqbox.AngMomIndexList[D][ijk] for ijk in b.l]
 end
 
 

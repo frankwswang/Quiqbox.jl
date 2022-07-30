@@ -26,7 +26,7 @@ for (nuc, nucCoords, molName, iMol) in zip(mols, molCoords, molNames, 1:length(m
         bsName = "-Float"*bsName
     end
 
-    # Number of spin-orbitals must not be smaller than numbers of electrons.
+    # The number of spin-orbitals must not be smaller than the number of electrons.
     if getCharge(nuc) <= 2sum( orbitalNumOf.(bs) )
         HFres = runHF(bs, nuc, nucCoords, printInfo=false)
     else

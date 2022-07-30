@@ -17,7 +17,7 @@ pkgDir = @__DIR__
 
 
 #function sizeOf
-nr = rand(1:4) 
+nr = rand(1:4)
 nc = rand(2:5)
 @test sizeOf(rand(nr, nc)) == (nr, nc)
 @test sizeOf((rand(nc, nr)...,)) == (nr*nc,)
@@ -131,7 +131,7 @@ pf2 = Pf(-1.5, abs)
 tff = nameOf(tf1) |> getFunc
 @test tff == tf1.f == getFunc(tf1) == abs
 @test getFunc(:abs) == abs
-@test getFunc(:getOverlap) == Quiqbox.getOverlap
+@test getFunc(:getTwoBodyInts) == Quiqbox.getTwoBodyInts
 
 
 # function getAtolVal
