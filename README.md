@@ -8,7 +8,7 @@
 
 | Documentation | Code Status | License |
 | :---: | :---: | :---: |
-| [![][Doc-s-img]][Doc-stable] | [![CI][GA-CI-img]][GA-CI-url] [![codecov][codecov-img]][codecov-url] [![CI-JN][GA-CI-JN-img]][GA-CI-JN-url] | [![License: MIT][License-img]][License-url] |
+| [![][Doc-s-img]][Doc-stable] | [![CI][GA-CI-img]][GA-CI-url] [![codecov][codecov-img]][codecov-url] [![CI-JN][GA-CI-JN-img]][GA-CI-JN-url] [![][New-commits-img]][New-commits-url] | [![License: MIT][License-img]][License-url] |
 
 <br />
 
@@ -99,13 +99,15 @@ For more information on the package, please read the [documentation of released 
 
 [Doc-stable]:  https://frankwswang.github.io/Quiqbox.jl/stable
 [Doc-latest]:  https://frankwswang.github.io/Quiqbox.jl/dev
-[Doc-s-img]:   https://img.shields.io/github/v/release/frankwswang/Quiqbox.jl?label=Latest%20release
+[Doc-s-img]:   https://img.shields.io/github/v/release/frankwswang/Quiqbox.jl?label=latest%20release
 [Doc-l-img]:   https://img.shields.io/badge/docs-latest-blue.svg
 [GA-CI-img]:   https://img.shields.io/github/workflow/status/frankwswang/Quiqbox.jl/CI-JS-latest?label=Julia%20latest
 [GA-CI-url]:   https://github.com/frankwswang/Quiqbox.jl/actions/workflows/CI-JS-latest.yml
 [GA-CI-JN-img]:https://img.shields.io/github/workflow/status/frankwswang/Quiqbox.jl/CI-JN?label=Julia%20nightly
 [GA-CI-JN-url]:https://github.com/frankwswang/Quiqbox.jl/actions/workflows/CI-JN.yml
-[codecov-img]: https://img.shields.io/codecov/c/github/frankwswang/Quiqbox.jl/main?label=Coverage&token=Z1XOA39DV2
+[codecov-img]: https://img.shields.io/codecov/c/github/frankwswang/Quiqbox.jl/main?label=coverage&token=Z1XOA39DV2
+[New-commits-img]: https://img.shields.io/github/commits-since/frankwswang/Quiqbox.jl/latest?color=teal&include_prereleases
+[New-commits-url]: https://github.com/frankwswang/Quiqbox.jl/commits/main
 [codecov-url]: https://codecov.io/gh/frankwswang/Quiqbox.jl
 [License-img]: https://img.shields.io/badge/License-MIT-blueviolet.svg
 [License-url]: https://github.com/frankwswang/Quiqbox.jl/blob/main/LICENSE
