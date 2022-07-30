@@ -8,7 +8,7 @@
 
 | Documentation | Code Status | License |
 | :---: | :---: | :---: |
-| [![][Doc-s-img]][Doc-stable] | [![CI][GA-CI-img]][GA-CI-url] [![codecov][codecov-img]][codecov-url] [![CI-JN][GA-CI-JN-img]][GA-CI-JN-url] [![][New-commits-img]][New-commits-url] | [![License: MIT][License-img]][License-url] |
+| [![][Doc-s-img]][Doc-stable] | [![codecov][codecov-img]][codecov-url] [![CI][GA-CI-img]][GA-CI-url] [![CI-JN][GA-CI-JN-img]][GA-CI-JN-url] [![][New-commits-img]][New-commits-url] | [![License: MIT][License-img]][License-url] |
 
 <br />
 
@@ -109,5 +109,5 @@ For more information on the package, please read the [documentation of released 
 [New-commits-img]: https://img.shields.io/github/commits-since/frankwswang/Quiqbox.jl/latest?color=teal&include_prereleases
 [New-commits-url]: https://github.com/frankwswang/Quiqbox.jl/commits/main
 [codecov-url]: https://codecov.io/gh/frankwswang/Quiqbox.jl
-[License-img]: https://img.shields.io/badge/License-MIT-blueviolet.svg
+[License-img]: https://img.shields.io/badge/MIT%20License-blueviolet.svg
 [License-url]: https://github.com/frankwswang/Quiqbox.jl/blob/main/LICENSE
