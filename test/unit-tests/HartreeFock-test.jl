@@ -20,23 +20,29 @@ thresholds = (1e-4, 1e-8, 1e-10, 1e-15)
 solvers = Dict(1=>[:solver=>:LCM], 2=>[:solver=>:LCM], 
                3=>[:solver=>:LCM], 4=>[:solver=>:LCM])
 
-local res1, res2, res1_2, res2_2
+local res1, res1_2, res1_3, res1_4, res2, res2_2
 SCFc1 = SCFconfig(scfMethods, thresholds)
 SCFc2 = SCFconfig(scfMethods, thresholds, solvers)
 HFc1 = HFconfig((C0=:Hcore, SCF=SCFc1))
 HFc2 = HFconfig((SCF=SCFc1,))
-HFc3 = HFconfig((HF=:UHF, C0=:GWH, SCF=SCFc2))
+HFc3 = HFconfig(HF=:UHF, C0=:GWH, SCF=SCFc2)
 HFc4 = HFconfig((HF=:UHF, SCF=SCFc2))
+HFc5 = HFconfig((C0=:Hcore, SCF=SCFconfig(threshold=1e-15)))
+HFc6 = HFconfig((C0=:Hcore, SCF=SCFconfig()))
 
 @suppress_out begin
     res1   = runHF(bs, nuc, nucCoords, HFc1)
     res1_2 = runHF(bs, nuc, nucCoords, HFc2)
+    res1_3 = runHF(bs, nuc, nucCoords, HFc5)
+    res1_4 = runHF(bs, nuc, nucCoords, HFc6)
     res2   = runHF(bs, nuc, nucCoords, HFc3)
     res2_2 = runHF(bs, nuc, nucCoords, HFc4)
 end
 
 @test isapprox(res2.Ehf, res2_2.Ehf, atol=100errorThreshold)
 @test isapprox(res1.Ehf, res1_2.Ehf, atol=errorThreshold)
+@test isapprox(res1.Ehf, res1_3.Ehf, atol=errorThreshold)
+@test isapprox(res1_3.Ehf, res1_4.Ehf, atol=2e-12)
 
 @test begin
     tVars1 = deepcopy(res1.temp[1])
@@ -191,7 +197,7 @@ rhfs = [ 7.275712508,  0.721327344, -0.450914129, -0.860294199, -1.029212153, -1
         -0.711896094, -0.711630384, -0.711370069, -0.711114987]
 
 uhfs = [ 7.275712508,  0.721327344, -0.450914129, -0.860294199, -1.029212153, -1.098483134, 
-        -1.12116316,  -1.12068526,  -1.108423332, -1.09037743,  -1.069781576, -1.048704435, 
+        -1.12116316,  -1.12068526,  -1.108423332, -1.09037743,  -1.069762577, -1.048704435, 
         -1.032357188, -1.020787228, -1.01259153,  -1.006780872, -1.002658864, -0.999733913, 
         -0.997657971, -0.996184131, -0.99513707,  -0.994392271, -0.993861306, -0.993481374, 
         -0.99320788,  -0.993009217, -0.992863103, -0.992753979, -0.992671126, -0.992607258, 

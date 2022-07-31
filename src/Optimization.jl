@@ -6,6 +6,10 @@ const OFtypes = (:HF,)
 
 const defaultPOconfigStr = "POconfig()"
 
+const defaultHFthresholdForHFgrad = getAtolVal(Float64) / 2
+
+const defaultHFforHFgrad = HFconfig(SCF=SCFconfig(threshold=defaultHFthresholdForHFgrad))
+
 
 """
 
@@ -28,7 +32,7 @@ function gradDescent!(vars::AbstractVector{T}, grad::AbstractVector{T}, η::T=T(
 end
 
 
-const defaultPOconfigPars = Any[Val(:HF), defaultHFC, NaN, 5e-7, 500, gradDescent!]
+const defaultPOconfigPars = Any[Val(:HF), defaultHFforHFgrad, NaN, 5e-7, 500, gradDescent!]
 
 """
 
@@ -45,10 +49,11 @@ optimization. Available values of `M` from Quiqbox are $(string(OFtypes)[2:end-1
 [`HFconfig`](@ref).
 
 `target::T`: The value of target function aimed to achieve. If it's set to `NaN`, the 
-convergence will be solely based on `error` between the latest updated function values 
+convergence will be solely based on `threshold` between the latest updated function values 
 rather then the latest value and `target`.
 
-`error::T`: The error for the convergence. When set to `NaN`, there will be no convergence 
+`threshold::T`: The error threshold (i.e. the absolute value of the function loss with 
+respect to `target`) for the convergence. When set to `NaN`, there will be no convergence 
 detection.
 
 `maxStep::Int`: Maximum iteration steps allowed regardless if the iteration converges.
@@ -60,7 +65,7 @@ detection.
     POconfig(;method=$(defaultPOconfigPars[1]), 
               config=$(defaultHFCStr), 
               target=$(defaultPOconfigPars[3]), 
-              error=$(defaultPOconfigPars[4]), 
+              threshold=$(defaultPOconfigPars[4]), 
               maxStep=$(defaultPOconfigPars[5]), 
               GD=$(defaultPOconfigPars[6])) -> 
     POconfig
@@ -77,7 +82,7 @@ mutable struct POconfig{T, M, CBT<:ConfigBox, F<:Function} <: ConfigBox{T, POcon
     method::Val{M}
     config::CBT
     target::T
-    error::T
+    threshold::T
     maxStep::Int
     GD::F
 end
@@ -160,16 +165,16 @@ function optimizeParams!(pbs::AbstractVector{<:ParamBox{T}},
         Es = T[]
         pvs = zeros(length(pbs), 0)
         grads = zeros(length(pbs), 0)
-        error = config.error
+        threshold = config.threshold
         target = config.target
         maxStep = config.maxStep
         gap = min(100, max(maxStep ÷ 200 * 10, 1))
-        detectConverge = ifelse(isnan(error), false, true)
+        detectConverge = ifelse(isnan(threshold), false, true)
 
         if isnan(target)
-            isConverged = (Es) -> isOscillateConverged(Es, error, minimalCycles=3)[1]
+            isConverged = (Es) -> isOscillateConverged(Es, threshold, minimalCycles=3)[1]
         else
-            isConverged = Es -> (abs(Es[end] - target) < error)
+            isConverged = Es -> (abs(Es[end] - target) < threshold)
         end
 
         pvsL = getindex.(pbs)

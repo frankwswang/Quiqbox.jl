@@ -11,7 +11,8 @@ const defaultDS = 0.5
 const defaultDIISconfig = (12, :LBFGS)
 
 const defaultHFCStr = "HFconfig()"
-const defaultSCFconfigStr = "SCFconfig((:ADIIS, :DIIS), (5e-3, 5e-16))"
+const defaultSCFconfigArgs = ( (:ADIIS, :DIIS), (5e-3, 1e-12) )
+const defultOscThreshold = 1e-6
 
 
 getXcore1(S::AbstractMatrix{T}) where {T} = Hermitian(S)^(-T(0.5))
@@ -231,6 +232,9 @@ const Doc_SCFconfig_ADIIS = "[DIIS based on the augmented Roothaan–Hall (ARH) 
 const Doc_SCFconfig_LBFGSB = "[Limited-memory BFGS with box constraints]"*
                              "(https://github.com/JuliaNLSolvers/Optim.jl)."
 
+const Doc_SCFconfig_eg1 = "SCFconfig{Float64, 2}(method=(:ADIIS, :DIIS), "*
+                          "interval=(0.005, 1.0e-8), methodConfig, oscillateThreshold)"
+
 """
 
     SCFconfig{T, L} <: ImmutableParameter{T, SCFconfig}
@@ -268,7 +272,7 @@ method stored as `Tuple`s of `Pair`s.
 
     SCFconfig(methods::NTuple{L, Symbol}, intervals::NTuple{L, T}, 
               config::Dict{Int, <:AbstractVector{<:Pair}}=Dict(1=>Pair[]);
-              oscillateThreshold::Real=1e-6) where {L, T} -> 
+              oscillateThreshold::Real=$(defultOscThreshold)) where {L, T} -> 
     SCFconfig{T, L}
 
 `methods` and `intervals` are the convergence methods to be applied and their stopping 
@@ -276,10 +280,20 @@ method stored as `Tuple`s of `Pair`s.
 for each methods by a `Pair` of which the key `i::Int` is for `i`th method and the pointed 
 `AbstractVector{<:Pair}` is the pairs of keyword arguments and their values respectively.
 
-≡≡≡ Example(s) ≡≡≡
+    SCFconfig(;threshold::AbstractFloat=$(defaultSCFconfigArgs[2][1:end]), 
+               oscillateThreshold::Real=defultOscThreshold) -> 
+    SCFconfig{$(defaultSCFconfigArgs[2] |> eltype), $(defaultSCFconfigArgs[1] |> length)}
 
+`threshold` will update the stopping threshold of the default SCF configuration used in 
+$(defaultHFCStr) with a new value. In other words, it updates the stopping threshold of 
+`:$(defaultSCFconfigArgs[2][end])`.
+
+≡≡≡ Example(s) ≡≡≡
 ```jldoctest; setup = :(push!(LOAD_PATH, "../../src/"); using Quiqbox)
 julia> SCFconfig((:DD, :ADIIS, :DIIS), (1e-4, 1e-12, 1e-13), Dict(2=>[:solver=>:LCM]));
+
+julia> SCFconfig(threshold=1e-8, oscillateThreshold=1e-5)
+$(Doc_SCFconfig_eg1)
 ```
 """
 struct SCFconfig{T, L} <: ImmutableParameter{T, SCFconfig}
@@ -290,7 +304,7 @@ struct SCFconfig{T, L} <: ImmutableParameter{T, SCFconfig}
 
     function SCFconfig(methods::NTuple{L, Symbol}, intervals::NTuple{L, T}, 
                        config::Dict{Int, <:AbstractVector{<:Pair}}=Dict(1=>Pair[]);
-                       oscillateThreshold::Real=1e-6) where {L, T}
+                       oscillateThreshold::Real=defultOscThreshold) where {L, T}
         kwPairs = [Pair[] for _=1:L]
         for i in keys(config)
             kwPairs[i] = config[i]
@@ -299,7 +313,13 @@ struct SCFconfig{T, L} <: ImmutableParameter{T, SCFconfig}
     end
 end
 
-const defaultSCFconfig = Meta.parse(defaultSCFconfigStr) |> eval
+const defaultSCFconfig = SCFconfig(defaultSCFconfigArgs...)
+
+SCFconfig(;threshold::AbstractFloat=defaultSCFconfigArgs[2][end], 
+          oscillateThreshold::Real=defultOscThreshold) = 
+SCFconfig( defaultSCFconfigArgs[1], 
+          (defaultSCFconfigArgs[2][1:end-1]..., Float64(threshold)); 
+           oscillateThreshold )
 
 
 mutable struct HFinterrelatedVars{T} <: HartreeFockintermediateData{T}

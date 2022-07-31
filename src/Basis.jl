@@ -352,7 +352,7 @@ struct BasisFuncs{T, D, 𝑙, GN, PT, ON} <: FloatingGTBasisFuncs{T, D, 𝑙, GN
         ss = SubshellXYZsizes[𝑙+1]
         @assert ON <= ss "The total number of `l` should be no more than $(ss) as " * 
                          "they are in $(subshell) subshell."
-        ls = sort(collect(ls), rev=true) |> Tuple
+        ls = sort!(collect(ls), rev=true) |> Tuple
         pars = joinTuple(cen.param, getproperty.(gs, :param)...)
         new{T, D, 𝑙, GN, PT, ON}(cen, gs, ls, normalizeGTO, pars)
     end

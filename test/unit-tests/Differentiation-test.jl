@@ -1,6 +1,7 @@
 using Test
 using Quiqbox
-using Quiqbox: inSymOfCore, outSymOfCore
+using Quiqbox: inSymOfCore, outSymOfCore, defaultHFforHFgrad as DHFO, 
+               defaultHFthresholdForHFgrad as DHFOthreshold
 
 include("../../test/test-functions/Shared.jl")
 
@@ -14,7 +15,7 @@ gf1 = GaussFunc(0.7, 1.0)
 bs1 = genBasisFunc.(grid.point, Ref([gf1]))
 pars1 = markParams!(bs1)[[1, 9, 25, 33]]
 S1 = overlaps(bs1)
-HFres1 = runHF(bs1, nuc, nucCoords, printInfo=false)
+HFres1 = runHF(bs1, nuc, nucCoords, DHFO, printInfo=false)
 grad1 = gradOfHFenergy(pars1, bs1, S1, HFres1.C, nuc, nucCoords)
 grad1_t = [1.2560795063144674, 1.2560795063144674, 4.050658426012163, 0]
 t1 = 1e-14
@@ -22,7 +23,9 @@ t2 = 1e-10
 @test isapprox(grad1[1], grad1[2], atol=t1)
 compr2Arrays3((grad1=grad1, grad1_t=grad1_t), t2)
 
-HFres1_2 = runHF(bs1, nuc, nucCoords, HFconfig((HF=:UHF,)), printInfo=false)
+HFres1_2 = runHF(bs1, nuc, nucCoords, 
+                 HFconfig(HF=:UHF, SCF=SCFconfig(threshold=DHFOthreshold)), 
+                 printInfo=false)
 grad1_2 = gradOfHFenergy(pars1, bs1, overlaps(bs1), HFres1.C, nuc, nucCoords)
 @test isapprox(grad1_2[1], grad1_2[2], atol=t1)
 compr2Arrays3((grad1_2=grad1_2, grad1_t=grad1_t), t2)
@@ -33,7 +36,7 @@ cens = genSpatialPoint.(nucCoords)
 bs2 = genBasisFunc.(cens, Ref(gfs), normalizeGTO=true)
 pars2 = markParams!(bs2, true)
 S2 = overlaps(bs2)
-HFres2 = runHF(bs2, nuc, nucCoords, printInfo=false)
+HFres2 = runHF(bs2, nuc, nucCoords, DHFO, printInfo=false)
 grad2 = gradOfHFenergy(pars2, bs2, S2, HFres2.C, nuc, nucCoords)
 @test isapprox(grad2[1], -grad2[2], atol=t2)
 @test isapprox(grad2[1], -0.14578887741248214, atol=t2)
@@ -45,7 +48,7 @@ compr2Arrays3((grad2_7toEnd=grad2[7:end], grad2_tp=grad2_tp), t2)
 bs3 = bs1[[1,5]] .* bs2 # basis set of BasisFuncMix
 pars3 = markParams!(bs3, true)
 S3 = overlaps(bs3)
-HFres3 = runHF(bs3, nuc, nucCoords, printInfo=false)
+HFres3 = runHF(bs3, nuc, nucCoords, DHFO, printInfo=false)
 grad3 = gradOfHFenergy(pars3, HFres3)
 grad3_t = [-0.16065229026420086,  -0.24121982820608456, -0.14801056792457273, 
             0.004774655346313956, -0.08411038921832216, -0.33217356284279526, 
