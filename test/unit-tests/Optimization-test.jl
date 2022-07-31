@@ -10,8 +10,8 @@ errorThreshold = 1e-10
 nucCoords = [[-0.7,0.0,0.0], [0.7,0.0,0.0]]
 nuc = ["H", "H"]
 
-configs = [POconfig((maxStep=200, error=NaN)), 
-           POconfig((maxStep=200, error=NaN, config=HFconfig((HF=:UHF,))))]
+configs = [POconfig((maxStep=200, threshold=NaN)), 
+           POconfig((maxStep=200, threshold=NaN, config=HFconfig((HF=:UHF,))))]
 
 Eend = Float64[]
 Ebegin = Float64[]
