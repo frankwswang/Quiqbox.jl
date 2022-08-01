@@ -66,7 +66,7 @@ groupSpins(::Val{:UHF}, Ns::Tuple{Vararg{Int}}) = groupSpins(Val(HFtypeSizeList[
 
 function breakSymOfC(::Val{:UHF}, C::AbstractMatrix{T}) where {T}
     C2 = copy(C)
-    l = min(size(C2)[1], 2)
+    l = min(size(C2, 1), 2)
     C2[1:l, 1:l] .= 0 # Breaking spin symmetry.
     # C2[l, :] .= 0 # Another way.
     (copy(C), C2)
@@ -83,7 +83,10 @@ getC.( Ref(X), getF(Hcore, HeeI, (Dᵅ, Dᵝ)) )
 
 function getCfromGWH(::Val{HFT}, S::AbstractMatrix{T}, Hcore::AbstractMatrix{T}, 
                      X::AbstractMatrix{T}) where {HFT, T}
-    @tullio H[i,j] := 3 * S[i,j] * (Hcore[i,i] + Hcore[j,j]) / 8
+    H = similar(Hcore)
+    for j in 1:size(H, 1), i in 1:j
+        H[j,i] = H[i,j] = 3 * S[i,j] * (Hcore[i,i] + Hcore[j,j]) / 8
+    end
     Cˢ = getC(X, H)
     breakSymOfC(Val(HFT), Cˢ)
 end
@@ -138,8 +141,12 @@ getD(Cˢ::AbstractMatrix{T}, Nˢ::Int) where {T} = @views (Cˢ[:,1:Nˢ]*Cˢ[:,1:
 
 function getGcore(HeeI::AbstractArray{T, 4}, 
                   DJ::AbstractMatrix{T}, DK::AbstractMatrix{T}) where {T}
-    @tullio G[μ, ν] := DJ[b,a] * HeeI[μ,ν,a,b] - DK[a,b] * HeeI[μ,a,b,ν]
-    G |> Hermitian
+    G = similar(DJ)
+    for ν = 1:size(G, 1), μ = 1:ν
+        G[ν, μ] = G[μ, ν] = 
+        dot(transpose(DJ), @view HeeI[μ,ν,:,:]) - dot(DK, @view HeeI[μ,:,:,ν])
+    end
+    G
 end
 
 # RHF
@@ -802,11 +809,12 @@ function xDIIScore(::Val{M}, S::AbstractMatrix{T},
                    Es::AbstractVector{T}, 
                    DIISsize::Int=defaultDIISconfig[1], 
                    solver::Symbol=defaultDIISconfig[2]) where {M, T}
-    cvxConstraint, permuteData = getproperty(DIISadditionalConfigs, M)
-    is = permuteData ? sortperm(Es, rev=true) : (:)
-    ∇s = @view Fs[is][1:end .> end-DIISsize]
-    Ds = @view Ds[is][1:end .> end-DIISsize]
-    Es = @view Es[is][1:end .> end-DIISsize]
+    cvxConstraint, permData = getproperty(DIISadditionalConfigs, M)
+    # is = length(Es)>DIISsize ? (permData ? sortperm(Es)[begin:DIISsize] : 1:DIISsize) : (:)
+    is = length(Es)>DIISsize ? sortperm(Es)[begin:DIISsize] : (:)
+    ∇s = view(Fs, is)
+    Ds = view(Ds, is)
+    Es = view(Es, is)
     DIIS = getproperty(DIIScoreMethods, M)
     v, B = uniCallFunc(DIIS, getproperty(DIISmethodArgOrders, nameOf(DIIS)), ∇s, Ds, Es, S)
     c = constraintSolver(v, B, cvxConstraint, solver)
