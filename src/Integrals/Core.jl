@@ -365,6 +365,24 @@ function reformatIntData1((lk, lj, kj, kiOrji)::NTuple{4, Bool},
     (data1, data2, data3, data4)
 end
 
+# function reformatIntData1((lk, lj, kj, ji)::Tuple{Bool, Val{false}, Val{false}, Bool}, 
+#                           bfs::NTuple{4, FGTBasisFuncs1O{T, D}}) where {T, D}
+#     data4 = reformatIntData1(bfs[4])
+#     data3 = lk ? data4 : reformatIntData1(bfs[3])
+#     data2 = reformatIntData1(bfs[2])
+#     data1 = ji ? data2 : reformatIntData1(bfs[1])
+#     (data1, data2, data3, data4)
+# end
+
+# function reformatIntData1((lk, lj, kj, kiOrji)::Tuple{Val{false}, Bool, Val{false}, Bool}, 
+#                           bfs::NTuple{4, FGTBasisFuncs1O{T, D}}) where {T, D}
+#     data4 = reformatIntData1(bfs[4])
+#     data3 = reformatIntData1(bfs[3])
+#     data2 = lj ? data4 : reformatIntData1(bfs[2])
+#     data1 = (lj && kiOrji) ? data3 : reformatIntData1(bfs[1])
+#     (data1, data2, data3, data4)
+# end
+
 reformatIntData1(::Val{false}, bfs::Tuple{Vararg{FGTBasisFuncs1O{T, D}}}) where {T, D} = 
 reformatIntData1.(bfs)
 
@@ -828,7 +846,7 @@ function getCompositeIntCore(::Val{T}, ::Val{D}, ::Val{BL}, ::Val{:aa}, ∫::F,
     ON = getON(Val(BL), a)
     res = zeros(T, ON, ON)
     for j=1:ON, i=1:j
-        res[i,j] = res[j,i] = getCompositeInt(∫, (j==i,), 
+        res[j,i] = res[i,j] = getCompositeInt(∫, (j==i,), 
                                               (getBF(Val(BL), a, i), 
                                                getBF(Val(BL), a, j)), optArgs...)
     end
@@ -871,8 +889,8 @@ function getCompositeIntCore(::Val{T}, ::Val{D}, ::Val{BL}, ::Val{:aaaa}, ∫::F
     res = zeros(T, ON, ON, ON, ON)
     for l = 1:ON, k = 1:l, j = 1:l, i = 1:ifelse(l==j, k, j)
         bl = (l==k, l==j, k==j, ifelse(l==j, k, j)==i)
-        res[i, j, k, l] = res[j, i, k, l] = res[j, i, l, k] = res[i, j, l, k] = 
-        res[l, k, i, j] = res[k, l, i, j] = res[k, l, j, i] = res[l, k, j, i] = 
+        res[l, k, j, i] = res[k, l, j, i] = res[k, l, i, j] = res[l, k, i, j] = 
+        res[i, j, l, k] = res[j, i, l, k] = res[j, i, k, l] = res[i, j, k, l] = 
         getCompositeInt(∫, bl, (getBF(Val(BL), a, i), getBF(Val(BL), a, j), 
                                 getBF(Val(BL), a, k), getBF(Val(BL), a, l)), optArgs...)
     end
@@ -888,7 +906,7 @@ function getCompositeIntCore(::Val{T}, ::Val{D}, ::Val{BL}, ::Val{:aabb}, ∫::F
     res = zeros(T, ON1, ON1, ON2, ON2)
     for l = 1:ON2, k = 1:l, j = 1:ON1, i = 1:j
         bl = (l==k, false, false, j==i)
-        res[i, j, k, l] = res[j, i, k, l] = res[j, i, l, k] = res[i, j, l, k] = 
+        res[i, j, l, k] = res[j, i, l, k] = res[j, i, k, l] = res[i, j, k, l] = 
         getCompositeInt(∫, bl, (getBF(Val(BL), a, i), getBF(Val(BL), a, j), 
                                 getBF(Val(BL), b, k), getBF(Val(BL), b, l)), optArgs...)
     end
@@ -905,7 +923,7 @@ function getCompositeIntCore(::Val{T}, ::Val{D}, ::Val{BL}, ::Val{:abab}, ∫::F
     rng = Iterators.product(1:ON2, 1:ON1)
     for (x, (l,k)) in enumerate(rng), (_, (j,i)) in zip(1:x, rng)
         bl = (false, l==j, false, ifelse(l==j, k==i, false))
-        res[i, j, k, l] = res[k, l, i, j] = 
+        res[k, l, i, j] = res[i, j, k, l] = 
         getCompositeInt(∫, bl, (getBF(Val(BL), a, i), getBF(Val(BL), b, j), 
                                 getBF(Val(BL), a, k), getBF(Val(BL), b, l)), optArgs...)
     end
@@ -924,7 +942,7 @@ function getCompositeIntCore(::Val{T}, ::Val{D}, ::Val{BL}, ::Val{:abbx}, ∫::F
         rng = Iterators.product(1:ON1, 1:ON2)
         for (x, (l,k)) in enumerate(rng), (_, (i,j)) in zip(1:x, rng)
             bl = (false, false, k==j, false)
-            res[i, j, k, l] = res[k, l, i, j] = 
+            res[k, l, i, j] = res[i, j, k, l] = 
             getCompositeInt(∫, bl, (getBF(Val(BL), a, i), getBF(Val(BL), b, j), 
                                     getBF(Val(BL), b, k), getBF(Val(BL), a, l)), optArgs...)
         end
@@ -944,7 +962,7 @@ function getCompositeIntCore(::Val{T}, ::Val{D}, ::Val{BL}, ::Val{:aabc}, ∫::F
     res = zeros(T, ON1, ON1, ON2, ON3)
     for l=1:ON3, k=1:ON2, j=1:ON1, i=1:j
         bl = (false, false, false, j==i)
-        res[i, j, k, l] = res[j, i, k, l] = 
+        res[j, i, k, l] = res[i, j, k, l] = 
         getCompositeInt(∫, bl, (getBF(Val(BL), a, i), getBF(Val(BL), a, j), 
                                 getBF(Val(BL), b, k), getBF(Val(BL), c, l)), optArgs...)
     end
@@ -961,7 +979,7 @@ function getCompositeIntCore(::Val{T}, ::Val{D}, ::Val{BL}, ::Val{:abxx}, ∫::F
     res = zeros(T, ON1, ON2, ON3, ON3)
     for l=1:ON3, k=1:l, j=1:ON2, i=1:ON1
         bl = (l==k, false, false, false)
-        res[i, j, k, l] = res[i, j, l, k] = 
+        res[i, j, l, k] = res[i, j, k, l] = 
         getCompositeInt(∫, bl, (getBF(Val(BL), a, i), getBF(Val(BL), b, j), 
                                 getBF(Val(BL), x, k), getBF(Val(BL), x, l)), optArgs...)
     end
@@ -1038,7 +1056,7 @@ function getOneBodyInts(∫1e::F, basisSet::NTuple{BN, GTBasisFuncs{T, D, 1}},
     buf = Array{T}(undef, BN, BN)
     for j = 1:BN, i = 1:j
         int = getCompositeInt(∫1e, (j==i,), (basisSet[i], basisSet[j]), optArgs...)
-        buf[i, j] = buf[j, i] = int
+        buf[j, i] = buf[i, j] = int
     end
     buf
 end
@@ -1097,8 +1115,8 @@ function getTwoBodyInts(∫2e::F, basisSet::NTuple{BN, GTBasisFuncs{T, D, 1}}) w
     for l = 1:BN, k = 1:l, j = 1:l, i = 1:ifelse(l==j, k, j)
         bl = (l==k, l==j, k==j, ifelse(l==j, k, j)==i)
         int = getCompositeInt(∫2e, bl, (basisSet[i], basisSet[j], basisSet[k], basisSet[l]))
-        buf[i, j, k, l] = buf[j, i, k, l] = buf[j, i, l, k] = buf[i, j, l, k] = 
-        buf[l, k, i, j] = buf[k, l, i, j] = buf[k, l, j, i] = buf[l, k, j, i] = int
+        buf[l, k, j, i] = buf[k, l, j, i] = buf[k, l, i, j] = buf[l, k, i, j] = 
+        buf[i, j, l, k] = buf[j, i, l, k] = buf[j, i, k, l] = buf[i, j, k, l] = int
     end
     buf
 end
