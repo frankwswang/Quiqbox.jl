@@ -801,7 +801,9 @@ const DIIScoreMethods = (DIIS=DIIScore, EDIIS=EDIIScore, ADIIS=ADIIScore)
 
 const DIISmethodArgOrders = (DIIScore=(1,2,4), EDIIScore=(1,2,3), ADIIScore=(1,2))
 
-const DIISadditionalConfigs = (DIIS=(false, true), EDIIS=(true, false), ADIIS=(true, false))
+const DIISadditionalConfigs = ( DIIS=(Val(false), true), 
+                               EDIIS=(Val(true), false), 
+                               ADIIS=(Val(true), false) )
 
 function xDIIScore(::Val{M}, S::AbstractMatrix{T}, 
                    Fs::AbstractVector{<:AbstractMatrix{T}}, 
@@ -810,8 +812,7 @@ function xDIIScore(::Val{M}, S::AbstractMatrix{T},
                    DIISsize::Int=defaultDIISconfig[1], 
                    solver::Symbol=defaultDIISconfig[2]) where {M, T}
     cvxConstraint, permData = getproperty(DIISadditionalConfigs, M)
-    # is = length(Es)>DIISsize ? (permData ? sortperm(Es)[begin:DIISsize] : 1:DIISsize) : (:)
-    is = length(Es)>DIISsize ? sortperm(Es)[begin:DIISsize] : (:)
+    is = length(Es)>DIISsize ? (permData ? sortperm(Es)[begin:DIISsize] : 1:DIISsize) : (:)
     ∇s = view(Fs, is)
     Ds = view(Ds, is)
     Es = view(Es, is)
@@ -899,11 +900,10 @@ end
 
 
 # Default method
-function LBFGSBsolver(v::AbstractVector{T}, B::AbstractMatrix{T}, 
-                      cvxConstraint::Bool) where {T}
+function LBFGSBsolver(::Val{CCB}, v::AbstractVector{T}, B::AbstractMatrix{T}) where {CCB, T}
     f = genxDIISf(v, B)
     g! = genxDIIS∇f(v, B)
-    lb = ifelse(cvxConstraint, T(0), T(-Inf))
+    lb = ifelse(CCB, T(0), T(-Inf))
     vL = length(v)
     c0 = fill(T(1)/vL, vL)
     innerOptimizer = LBFGS(m=min(getAtolDigits(T), 50), 
@@ -915,8 +915,8 @@ function LBFGSBsolver(v::AbstractVector{T}, B::AbstractMatrix{T},
     c ./ sum(c)
 end
 
-function CMsolver(v::AbstractVector{T}, B::AbstractMatrix{T}, 
-                  cvxConstraint::Bool, ϵ::T=T(1e-5)) where {T}
+function CMsolver(::Val{CCB}, v::AbstractVector{T}, B::AbstractMatrix{T}, 
+                  ϵ::T=T(1e-6)) where {CCB, T}
     len = length(v)
     getA = (B)->[B  ones(len); ones(1, len) 0]
     b = vcat(-v, 1)
@@ -929,7 +929,7 @@ function CMsolver(v::AbstractVector{T}, B::AbstractMatrix{T},
         end
         x = A \ b
         c = x[1:end-1]
-        (findfirst(x->x<0, c) !== nothing && cvxConstraint) || (return c)
+        (CCB && findfirst(x->x<0, c) !== nothing) || (return c)
         idx = (sortperm(abs.(c)) |> powerset |> collect)
         popfirst!(idx)
 
@@ -954,5 +954,6 @@ end
 const ConstraintSolvers = (LCM=CMsolver, LBFGS=LBFGSBsolver)
 
 constraintSolver(v::AbstractVector{T}, B::AbstractMatrix{T}, 
-                 cvxConstraint::Bool, solver::Symbol) where {T} = 
-getproperty(ConstraintSolvers, solver)(v, B, cvxConstraint)
+                 ::Val{CCB}, # cvxConstraint
+                 solver::Symbol) where {T, CCB} = 
+getproperty(ConstraintSolvers, solver)(Val(CCB), v, B)
