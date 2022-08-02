@@ -1,64 +1,48 @@
 export eeIuniqueIndicesOf
 
-using QuadGK: quadgk
 using SpecialFunctions: erf
+using FastGaussQuadrature: gausslegendre
 using LinearAlgebra: dot
 
 # Reference: DOI: 10.1088/0143-0807/31/1/004
-factorialL(l::Integer) = FactorialsLs[l+1]
-
-getGKQorder(T::Type{<:Real}) = ifelse(getAtolVal(T) >= getAtolVal(Float64), 13, 26)
-
-πroot(::Type{T}) where {T} = sqrt(π*T(1))
-
-function F0Core(u::T) where {T}
-    ur = sqrt(u)
-    πroot(T) * erf(ur) / (2ur)
-end
-
-function FγCore1(γ::Int, u::T, rtol=0.5getAtolVal(T), order=getGKQorder(T)) where {T}
-    quadgk(t -> t^(2γ)*exp(-u*t^2), 0, T(1); order, rtol)[begin]
-end
-
-function FγCore2(γ::Int, u::T) where {T}
-    t = exp(-u) * sum(factorialL(γ-k)/(4^k * factorialL(2*(γ-k)) * u^(k+1)) for k=0:(γ-1))
-    T(factorialL(2γ) / (2factorialL(γ)) * (πroot(T)*erf(√u) / (4^γ * u^(γ + T(0.5))) - t))
-end
-
-const FγSolverThreshold =  [ 6.6701,  6.6645,  6.6658,  8.0597,  6.8447,  7.6676,  9.3999, 
-                             9.3547, 11.3685,  9.1267, 60.9556, 62.7040, 62.7022, 65.9929, 
-                            68.3654, 68.3522, 71.1386, 70.8620, 73.3747, 73.8483, 77.8355, 
-                            76.9363, 82.0030, 81.9330]
-
-function Fγ(γ::Int, u::T, uEps::Real=getAtolVal(T)) where {T}
-    if u < uEps
-        T(1 / (2γ + 1))
-    elseif γ == 0
-        F0Core(u)
-    else
-        u < FγSolverThreshold[γ] ? FγCore1(γ, u) : FγCore2(γ, u)
+function genFγIntegrand(γ::Int, u::T) where {T}
+    function (x)
+        ( (x+1)/2 )^(2γ) * exp(-u * (x+1)^2 / 4) / 2
     end
 end
 
-function F₀toFγCore(γ::Int, u::T, Fγu::T) where {T}
+@generated function FγCore(γ::Int, u::T, ::Val{GQN}) where {T, GQN}
+    GQnodes, GQweights = gausslegendre(GQN)
+    return :(dot($GQweights, genFγIntegrand(γ, u).($GQnodes)))
+end
+
+function F0(u::T) where {T}
+    if u < getAtolVal(T)
+        T(1)
+    else
+        ur = sqrt(u)
+        sqrt(π*T(1)) * erf(ur) / (2ur)
+    end
+end
+
+function Fγ(γ::Int, u::T) where {T}
+    if u < getAtolVal(T)
+        T(1 / (2γ + 1))
+    else
+        FγCore(γ, u, getValI( getAtolDigits(T) + 4 + Int(0.25abs(u)|>round) ))
+    end
+end
+
+function F₀toFγ(γ::Int, u::T) where {T}
     res = Array{T}(undef, γ+1)
-    res[end] = Fγu
-    for i in γ:-1:3
+    res[begin] = F0(u)
+    γ > 0 || (return res)
+    res[end] = Fγ(γ, u)
+    for i in γ:-1:2
         res[i] = (2u*res[i+1] + exp(-u)) / (2i - 1)
     end
-    if γ > 0
-        res[begin] = F0Core(u)
-        res[begin+1] = FγCore1(1, u)
-    end
+    any(isnan.(res)) && (@show res)
     res
-end
-
-function F₀toFγ(γ::Int, u::T, uEps::Real=getAtolVal(T)) where {T}
-    if uEps >= getAtolVal(Float64)
-        F₀toFγCore(γ, u, Fγ(γ, u)) # max(err) < getAtolVal(Float64)
-    else
-        vcat(F0Core(u), [FγCore1(i, u) for i=1:γ])
-    end
 end
 
 

@@ -126,9 +126,6 @@ const SubshellXYsizes = length.(SubshellXYs)
 const SubshellXYZsizes = length.(SubshellXYZs)
 const SubshellSizes =(SubshellXsizes, SubshellXYsizes, SubshellXYZsizes)
 
-const FactorialsLs = Integer[0, factorial.(1:20)..., factorial.(big.(21:48))...]
-
-
 function LtoStr(lt::LTuple{D}) where {D}
     res = ""
     ls = ["X", "Y", "Z"][1:D]
@@ -222,4 +219,12 @@ function checkBSList(;printInfo::Bool=false)
         end
     end
     printInfo && println("Basis function list checked.")
+end
+
+
+const ValInts = Val.(collect(0:500))
+
+function getValI(i::Int)
+    @assert i>=0
+    (i+1) > length(ValInts) ? Val(i) : ValInts[i+1]
 end

@@ -7,11 +7,11 @@ include("../../../test/test-functions/Shared.jl")
 
 @testset "Core.jl tests" begin
 
-tolerance1 = 1e-8
-tolerance2 = 5e-8
+tolerance1 = 5e-16
+tolerance2 = 1e-15
 perturbStep = rand(-1e-1:2e-3:1e-1)
-fNumInt = (γ, u) -> quadgk(t -> t^(2γ)*exp(-u*t^2), 0, 1; rtol=tolerance1)[1]
-rng = -10:(0.2+perturbStep):2
+fNumInt = (γ, u) -> quadgk(t -> t^(2γ)*exp(-u*t^2), 0, 1; order=13, rtol=tolerance1)[1]
+rng = -15:(0.2+perturbStep):8
 for γ in 0:24
     @test all([isapprox(fNumInt(γ, 10.0^e), Fγ(γ, 10.0^e), atol=tolerance2) for e in rng])
 end
