@@ -27,7 +27,7 @@ end
 
 function getGQN(::Type{T}, u) where {T}
     u = abs(u) + getAtolVal(T)
-    getAtolDigits(T) + Int( round(0.4*(u + 10/sqrt(u))) )
+    getAtolDigits(T) + Int( round(0.25*(u + 10/sqrt(u))) ) + 1
 end
 
 function Fγ(γ::Int, u::T) where {T}

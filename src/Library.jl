@@ -222,10 +222,9 @@ function checkBSList(;printInfo::Bool=false)
 end
 
 
-const ValInts = Val.(collect(0:1000))
+const ValInts = Val.(collect(0:5000))
 
 function getValI(i::Int)
     i = abs(i)
-    l = length(ValInts)
-    i<l ? ValInts[i+1] : ifelse(i>5000, Val(5000), Val(i))
+    i<length(ValInts) ? ValInts[i+1] : ValInts[end]
 end
