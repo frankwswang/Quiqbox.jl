@@ -25,11 +25,16 @@ function F0(u::T) where {T}
     end
 end
 
+function getGQN(::Type{T}, u) where {T}
+    u = abs(u) + getAtolVal(T)
+    getAtolDigits(T) + Int( round(0.25*(u + 10/sqrt(u))) ) + 1
+end
+
 function Fγ(γ::Int, u::T) where {T}
     if u < getAtolVal(T)
         T(1 / (2γ + 1))
     else
-        FγCore(γ, u, getValI( getAtolDigits(T) + 4 + Int(0.25abs(u)|>round) ))
+        FγCore(γ, u, getValI( getGQN(T, u) ))
     end
 end
 

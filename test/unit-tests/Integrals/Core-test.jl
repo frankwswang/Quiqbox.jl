@@ -1,25 +1,23 @@
 using Test
 using Quiqbox
-using Quiqbox: Fγ
+using Quiqbox: Fγ, F0
 using QuadGK: quadgk
 
 include("../../../test/test-functions/Shared.jl")
 
-@testset "Core.jl tests" begin
+# @testset "Core.jl tests" begin
 
-tolerance1 = 1e-16
+tolerance1 = 5e-17
 tolerance2 = 1e-15
 perturbStep = rand(-1e-1:2e-3:1e-1)
-fNumInt = (γ, u) -> quadgk(t -> t^(2γ)*exp(-u*t^2), 0, 1; order=15, rtol=tolerance1)[1]
-rng = -15:(0.2+perturbStep):8
+fNumInt = (γ, u) -> quadgk(t -> t^(2γ)*exp(-u*t^2), 0, 1; order=25, rtol=tolerance1)[1]
+rng = -20:(0.2+perturbStep):9
 for γ in 0:24
-    ints1 = [Fγ(γ, 10.0^e) for e in rng]
+    f = ifelse(γ==0, (_, u)->F0(u), Fγ)
+    ints1 = [f(γ, 10.0^e) for e in rng]
     ints2 = [fNumInt(γ, 10.0^e) for e in rng]
-    try
-        compr2Arrays3((Fγ=ints1, FγTest=ints2), tolerance2)
-    catch
-        println("with γ = ", γ)
-    end
+    compr2Arrays3((Fγ=ints1, FγTest=ints2), tolerance2; 
+                  additionalInfo="γ=$γ step=$(0.2+perturbStep) rng=$(rng)")
 end
 
 nuc = ["H", "F"]

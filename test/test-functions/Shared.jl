@@ -37,7 +37,8 @@ function compr2Arrays2(cprTuple::NamedTuple{<:Any, <:NTuple{2, T}},
 end
 
 function compr2Arrays3(cprTuple::NamedTuple{<:Any, <:NTuple{2, T}}, atol::Real, 
-                       showAllDiff::Bool=false) where {T<:AbstractArray{<:Number}}
+                       showAllDiff::Bool=false; additionalInfo::String="") where 
+                      {T<:AbstractArray{<:Number}}
     name1, name2 = keys(cprTuple)
     arr1, arr2 = cprTuple
     @assert length(arr1) == length(arr2)
@@ -45,7 +46,9 @@ function compr2Arrays3(cprTuple::NamedTuple{<:Any, <:NTuple{2, T}}, atol::Real,
     if !res
         diff = arr1 - arr2
         showAllDiff && !res && println("$(name1) - $(name2) = ", diff)
-        println("max(abs.($(name1) - $(name2))...) = ", max(abs.(diff)...))
+        println(additionalInfo)
+        v, i  = findmax(abs, diff)
+        println("max(abs.($(name1) - $(name2))...) = ", v, "  index = ", i)
     end
     @test res
 end
