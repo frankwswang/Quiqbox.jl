@@ -5,7 +5,7 @@ using QuadGK: quadgk
 
 include("../../../test/test-functions/Shared.jl")
 
-# @testset "Core.jl tests" begin
+@testset "Core.jl tests" begin
 
 tolerance1 = 5e-17
 tolerance2 = 1e-15
