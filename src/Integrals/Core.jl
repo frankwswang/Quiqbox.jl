@@ -16,13 +16,18 @@ end
     return :(dot($GQweights, genFγIntegrand(γ, u).($GQnodes)))
 end
 
+for ValI in ValInts[begin:end .<= 1000]
+    precompile(FγCore, (Int, Float64, ValI))
+end
+
 function F0(u::T) where {T}
-    if u < getAtolVal(T)
-        T(1)
-    else
-        ur = sqrt(u)
-        sqrt(π*T(1)) * erf(ur) / (2ur)
-    end
+    ifelse(u < getAtolVal(T), 
+        T(1), 
+        begin
+            ur = sqrt(u)
+            sqrt(π*T(1)) * erf(ur) / (2ur)
+        end
+    )
 end
 
 function getGQN(::Type{T}, u) where {T}
@@ -46,7 +51,6 @@ function F₀toFγ(γ::Int, u::T) where {T}
     for i in γ:-1:2
         res[i] = (2u*res[i+1] + exp(-u)) / (2i - 1)
     end
-    any(isnan.(res)) && (@show res)
     res
 end
 
@@ -87,9 +91,7 @@ end
 function ∫overlapCore(ΔR::NTuple{3, T}, 
                       ijk₁::NTuple{3, Int}, α₁::T, 
                       ijk₂::NTuple{3, Int}, α₂::T) where {T}
-    for n in (ijk₁..., ijk₂...)
-        n < 0 && return T(0.0)
-    end
+    any(n -> n<0, (ijk₁..., ijk₂...)) && (return T(0.0))
 
     α = α₁ + α₂
     res = (π/α)^T(1.5) * exp(-α₁ * α₂ / α * sum(abs2, ΔR))
@@ -170,10 +172,10 @@ function genIntNucAttCore1(ΔRR₀::NTuple{3, T}, ΔR₁R₂::NTuple{3, T}, β::
 
                 for u in 0:(μˣ÷2), v in 0:(μʸ÷2), w in 0:(μᶻ÷2)
                     γ = μsum - u - v - w
-                    tmp += (((u, v, w) .|> core2s) |> prod) * 2Fγs[γ+1]
+                    tmp += prod((u, v, w) .|> core2s) * 2Fγs[γ+1]
                 end
 
-                A += ((rst .|> core1s) |> prod) * tmp
+                A += prod(rst .|> core1s) * tmp
 
             end
         end
@@ -276,7 +278,7 @@ function ∫eeInteractionCore1234(ΔRl::NTuple{3, T}, ΔRr::NTuple{3, T},
                     tmp += prod((u, v, w) .|> core3s) * 2Fγs[γ+1]
                 end
 
-                A += (rst₁ .|> core1s |> prod) * (rst₂ .|> core2s |> prod) * tmp
+                A += prod(rst₁ .|> core1s) * prod(rst₂ .|> core2s) * tmp
 
             end
         end
@@ -324,12 +326,11 @@ function reformatIntData1(bf::FGTBasisFuncs1O{T, D, 𝑙, GN}) where {T, D, 𝑙
     αds = if bf.normalizeGTO
         N = getNijk(T, ijk...)
         map(bf.gauss) do x
-            xpn = x.xpn()::T
-            con = x.con()::T
+            xpn, con = outValOf.(x.param)::NTuple{2, T}
             (xpn, con * N * getNα(ijk..., xpn))
         end
     else
-        map(x->(x.xpn()::T, x.con()::T), bf.gauss)
+        map(x->outValOf.(x.param)::NTuple{2, T}, bf.gauss)
     end
     R, ijk, αds
 end
@@ -406,10 +407,8 @@ reformatIntData1.(bfs)
 function isIntZeroCore(::Val{1}, 
                        R₁::NTuple{D, T}, R₂::NTuple{D, T}, 
                        ijk₁::NTuple{D, Int}, ijk₂::NTuple{D, Int}) where {D, T}
-    for i in eachindex(R₁)
-        R₁[i]==R₂[i] && isodd(ijk₁[i] + ijk₂[i]) && (return true)
-    end
     false
+    any(i -> (R₁[i]==R₂[i] && isodd(ijk₁[i] + ijk₂[i])), eachindex(R₁))
 end
 
 function isIntZeroCore(::Val{2}, 
@@ -417,21 +416,17 @@ function isIntZeroCore(::Val{2},
                        R₃::NTuple{D, T}, R₄::NTuple{D, T}, 
                        ijk₁::NTuple{D, Int}, ijk₂::NTuple{D, Int}, 
                        ijk₃::NTuple{D, Int}, ijk₄::NTuple{D, Int}) where {D, T}
-    for i in eachindex(R₁)
-        R₁[i]==R₂[i]==R₃[i]==R₄[i] && 
-        isodd(ijk₁[i] + ijk₂[i] + ijk₃[i] + ijk₄[i]) && (return true)
-    end
     false
+    any(i -> (R₁[i]==R₂[i]==R₃[i]==R₄[i] && isodd(ijk₁[i] + ijk₂[i] + ijk₃[i] + ijk₄[i])), 
+        eachindex(R₁))
 end
 
 function isIntZeroCore(::Val{:∫nucAttractionCore}, 
                        R₁::NTuple{D, T}, R₂::NTuple{D, T}, 
                        ijk₁::NTuple{D, Int}, ijk₂::NTuple{D, Int}, 
                        R₀::NTuple{D, T}) where {D, T}
-    for i in eachindex(R₁)
-        R₀[i]==R₁[i]==R₂[i] && isodd(ijk₁[i] + ijk₂[i]) && (return true)
-    end
     false
+    any(i -> (R₀[i]==R₁[i]==R₂[i] && isodd(ijk₁[i] + ijk₂[i])), eachindex(R₁))
 end
 
 isIntZero(::Type{typeof(∫overlapCore)}, R₁, R₂, ijk₁, ijk₂, _) = 
@@ -494,16 +489,16 @@ end
     n
 end
 
-@inline function getUniquePair!(i, uniquePairs, uPairCoeffs, flag, psc, nFold=1)
+function getUniquePair!(i, uniquePairs, uPairCoeffs, flag, psc, nFold=1)
     pair = reformatIntData2(getindex.(psc, 1), flag)
-    idx = findfirst(x->x==pair, uniquePairs)
+    idx = findfirst(isequal(pair), uniquePairs)
     con = (getindex.(psc, 2) |> prod) * nFold
     if idx === nothing
         i += 1
         push!(uniquePairs, pair)
-        uPairCoeffs[i] = con
+        @inbounds uPairCoeffs[i] = con
     else
-        uPairCoeffs[idx] += con
+        @inbounds uPairCoeffs[idx] += con
     end
     i
 end
@@ -587,12 +582,12 @@ end
 function getIntX1X1X2X2!(n, uniquePairs, uPairCoeffs, flags, ps₁, ps₂)
     A, B, C = tupleDiff(ps₁, ps₂)
     if length(A) > 0 && flags[3]
-        g1111 = ((A,),)
-        g1122 = (((A, C),), ((B, A),), ((B, C),))
+        g1111 = (A,)
+        g1122 = ((A, C), (B, A), (B, C))
         g1212 = ()
-        g1123 = (((A, A, C),), ((A, C, A),), ((B, A, C),), ((B, C, A),))
-        g1233 = (((A, B, A),), ((B, A, A),), ((A, B, C),), ((B, A, C),))
-        g1234 = (((A, B, A, C),), ((A, B, C, A),), ((A, B, C, A),), ((B, A, C, A),))
+        g1123 = ((A, A, C), (A, C, A), (B, A, C), (B, C, A))
+        g1233 = ((A, B, A), (B, A, A), (A, B, C), (B, A, C))
+        g1234 = ((A, B, A, C), (A, B, C, A), (A, B, C, A), (B, A, C, A))
 
         n = getIntXAXBXCXDcore!(n, uniquePairs, uPairCoeffs, flags, 
                                 (g1111, g1122, g1212, g1123, g1233, g1234))
@@ -605,13 +600,13 @@ end
 function getIntX1X2X1X2!(n, uniquePairs, uPairCoeffs, flags, ps₁, ps₂)
     A, B, C = tupleDiff(ps₁, ps₂)
     if length(A) > 0 && flags[1] && flags[2]
-        g1111 = ((A,),)
+        g1111 = (A,)
         g1122 = ()
-        g1212 = (((A, C),), ((B, A),), ((B, C),))
-        g1123 = (((A, A, C),), ((A, B, A),), ((A, B, C),))
-        g1233 = (((A, C, A),), ((B, A, A),), ((B, C, A),))
-        g1234 = (((A, C, B, A),), ((A, C, B, C),), ((B, A, B, C),),
-                 ((B, A, A, C),), ((B, C, A, C),), ((B, C, B, A),))
+        g1212 = ((A, C), (B, A), (B, C))
+        g1123 = ((A, A, C), (A, B, A), (A, B, C))
+        g1233 = ((A, C, A), (B, A, A), (B, C, A))
+        g1234 = ((A, C, B, A), (A, C, B, C), (B, A, B, C),
+                 (B, A, A, C), (B, C, A, C), (B, C, B, A))
         n = getIntXAXBXCXDcore!(n, uniquePairs, uPairCoeffs, flags, 
                                 (g1111, g1122, g1212, g1123, g1233, g1234))
     else
@@ -623,13 +618,13 @@ end
 function getIntX1X2X2X1!(n, uniquePairs, uPairCoeffs, flags, ps₁, ps₂)
     A, B, C = tupleDiff(ps₁, ps₂)
     if length(A) > 0 && all(flags)
-        g1111 = ((A,),)
+        g1111 = (A,)
         g1122 = ()
         g1212 = ()
-        g1123 = (((A, A, C),), ((A, C, A),), ((A, C, B),))
-        g1233 = (((A, C, A),), ((B, A, A),), ((B, C, A),))
-        g1234 = (((A, C, A, B),), ((A, C, C, B),), ((B, A, C, A),),
-                 ((B, A, C, B),), ((B, C, A, B),), ((B, C, C, A),))
+        g1123 = ((A, A, C), (A, C, A), (A, C, B))
+        g1233 = ((A, C, A), (B, A, A), (B, C, A))
+        g1234 = ((A, C, A, B), (A, C, C, B), (B, A, C, A),
+                 (B, A, C, B), (B, C, A, B), (B, C, C, A))
         n = getIntXAXBXCXDcore!(n, uniquePairs, uPairCoeffs, flags, 
                                 (g1111, g1122, g1212, g1123, g1233, g1234))
 
@@ -646,14 +641,14 @@ end
 function getIntX1X1X2X3!(n, uniquePairs, uPairCoeffs, flags, ps₁, ps₂, ps₃)
     A, B, C, D = tupleDiff(ps₁, ps₂, ps₃)
     if length(A) > 0 && flags[2] && flags[3]
-        g1111 = ((A,),)
-        g1122 = (((B, A),),)
+        g1111 = (A,)
+        g1122 = ((B, A),)
         g1212 = ()
-        g1123 = (((A, A, D),), ((A, C, A),), ((A, C, D),),
-                 ((B, A, D),), ((B, C, A),), ((B, C, D),))
-        g1233 = (((A, B, A),), ((B, A, A),))
-        g1234 = (((A, B, A, D),), ((A, B, C, A),), ((A, B, C, D),),
-                 ((B, A, A, D),), ((B, A, C, A),), ((B, A, C, D),))
+        g1123 = ((A, A, D), (A, C, A), (A, C, D),
+                 (B, A, D), (B, C, A), (B, C, D))
+        g1233 = ((A, B, A), (B, A, A))
+        g1234 = ((A, B, A, D), (A, B, C, A), (A, B, C, D),
+                 (B, A, A, D), (B, A, C, A), (B, A, C, D))
         n = getIntXAXBXCXDcore!(n, uniquePairs, uPairCoeffs, flags, 
                                 (g1111, g1122, g1212, g1123, g1233, g1234))
     else
@@ -665,14 +660,14 @@ end
 function getIntX1X2X3X3!(n, uniquePairs, uPairCoeffs, flags, ps₁, ps₂, ps₃)
     A, B, C, D = tupleDiff(ps₁, ps₂, ps₃)
     if length(A) > 0 && flags[1] && flags[3]
-        g1111 = ((A,),)
-        g1122 = (((A, D),),)
+        g1111 = (A,)
+        g1122 = ((A, D),)
         g1212 = ()
-        g1123 = (((A, A, D),), ((A, D, A),))
-        g1233 = (((A, C, A),), ((A, C, D),), ((B, A, A),), 
-                 ((B, A, D),), ((B, C, A),), ((B, C, D),))
-        g1234 = (((A, C, A, D),), ((A, C, D, A),), ((B, A, A, D),),
-                 ((B, A, D, A),), ((B, C, A, D),), ((B, C, D, A),))
+        g1123 = ((A, A, D), (A, D, A))
+        g1233 = ((A, C, A), (A, C, D), (B, A, A), 
+                 (B, A, D), (B, C, A), (B, C, D))
+        g1234 = ((A, C, A, D), (A, C, D, A), (B, A, A, D),
+                 (B, A, D, A), (B, C, A, D), (B, C, D, A))
         n = getIntXAXBXCXDcore!(n, uniquePairs, uPairCoeffs, flags, 
                                 (g1111, g1122, g1212, g1123, g1233, g1234))
     else
@@ -684,14 +679,14 @@ end
 function getIntX1X2X3X1!(n, uniquePairs, uPairCoeffs, flags, ps₁, ps₂, ps₃)
     A, B, C, D = tupleDiff(ps₁, ps₂, ps₃)
     if length(A) > 0 && all(flags)
-        g1111 = ((A,),)
+        g1111 = (A,)
         g1122 = ()
         g1212 = ()
-        g1123 = (((A, A, B),), ((A, D, A),), ((A, D, B),))
-        g1233 = (((A, C, A),), ((B, A, A),), ((B, C, A),))
-        g1234 = (((A, C, A, B),), ((A, C, D, A),), ((A, C, D, B),), 
-                 ((B, A, D, A),), ((B, A, D, B),), 
-                 ((B, C, A, B),), ((B, C, D, A),), ((B, C, D, B),))
+        g1123 = ((A, A, B), (A, D, A), (A, D, B))
+        g1233 = ((A, C, A), (B, A, A), (B, C, A))
+        g1234 = ((A, C, A, B), (A, C, D, A), (A, C, D, B), 
+                 (B, A, D, A), (B, A, D, B), 
+                 (B, C, A, B), (B, C, D, A), (B, C, D, B))
         n = getIntXAXBXCXDcore!(n, uniquePairs, uPairCoeffs, flags, 
                                 (g1111, g1122, g1212, g1123, g1233, g1234))
         n = getIntCore1221!(n, uniquePairs, uPairCoeffs, flags, (B,A))
@@ -704,14 +699,14 @@ end
 function getIntX1X2X2X3!(n, uniquePairs, uPairCoeffs, flags, ps₁, ps₂, ps₃)
     A, B, C, D = tupleDiff(ps₁, ps₂, ps₃)
     if length(A) > 0 && all(flags)
-        g1111 = ((A,),)
+        g1111 = (A,)
         g1122 = ()
         g1212 = ()
-        g1123 = (((A, A, D),), ((A, C, A),), ((A, C, D),))
-        g1233 = (((A, C, A),), ((B, A, A),), ((B, C, A),))
-        g1234 = (((A, C, A, D),), ((A, C, C, D),), 
-                 ((B, A, A, D),), ((B, A, C, A),), ((B, A, C, D),), 
-                 ((B, C, A, D),), ((B, C, C, A),), ((B, C, C, D),))
+        g1123 = ((A, A, D), (A, C, A), (A, C, D))
+        g1233 = ((A, C, A), (B, A, A), (B, C, A))
+        g1234 = ((A, C, A, D), (A, C, C, D), 
+                 (B, A, A, D), (B, A, C, A), (B, A, C, D), 
+                 (B, C, A, D), (B, C, C, A), (B, C, C, D))
         n = getIntXAXBXCXDcore!(n, uniquePairs, uPairCoeffs, flags, 
                                 (g1111, g1122, g1212, g1123, g1233, g1234))
         n = getIntCore1221!(n, uniquePairs, uPairCoeffs, flags, (A,C))
@@ -724,14 +719,14 @@ end
 function getIntX1X2X3X4!(n, uniquePairs, uPairCoeffs, flags, ps₁, ps₂, ps₃, ps₄)
     A, B, C, D, E = tupleDiff(ps₁, ps₂, ps₃, ps₄)
     if length(A) > 0 && all(flags)
-        g1111 = ((A,),)
+        g1111 = (A,)
         g1122 = ()
         g1212 = ()
-        g1123 = (((A, A, E),), ((A, D, A),), ((A, D, E),))
-        g1233 = (((A, C, A),), ((B, A, A),), ((B, C, A),))
-        g1234 = (((A, C, A, E),), ((A, C, D, A),), ((A, C, D, E),),
-                 ((B, A, A, E),), ((B, A, D, A),), ((B, A, D, E),), 
-                 ((B, C, A, E),), ((B, C, D, A),), ((B, C, D, E),))
+        g1123 = ((A, A, E), (A, D, A), (A, D, E))
+        g1233 = ((A, C, A), (B, A, A), (B, C, A))
+        g1234 = ((A, C, A, E), (A, C, D, A), (A, C, D, E),
+                 (B, A, A, E), (B, A, D, A), (B, A, D, E), 
+                 (B, C, A, E), (B, C, D, A), (B, C, D, E))
         n = getIntXAXBXCXDcore!(n, uniquePairs, uPairCoeffs, flags, 
                                 (g1111, g1122, g1212, g1123, g1233, g1234))
     else
@@ -742,22 +737,22 @@ end
 
 function getIntXAXBXCXDcore!(n, uniquePairs, uPairCoeffs, flags, groups)
     for i in groups[1]
-        n = getIntCore1111!(n, uniquePairs, uPairCoeffs, flags, i...)
+        n = getIntCore1111!(n, uniquePairs, uPairCoeffs, flags, i)
     end
     for i in groups[2]
-        n = getIntCore1122!(n, uniquePairs, uPairCoeffs, flags, i...)
+        n = getIntCore1122!(n, uniquePairs, uPairCoeffs, flags, i)
     end
     for i in groups[3]
-        n = getIntCore1212!(n, uniquePairs, uPairCoeffs, flags, i...)
+        n = getIntCore1212!(n, uniquePairs, uPairCoeffs, flags, i)
     end
     for i in groups[4]
-        n = getIntCore1123!(n, uniquePairs, uPairCoeffs, flags, i...)
+        n = getIntCore1123!(n, uniquePairs, uPairCoeffs, flags, i)
     end
     for i in groups[5]
-        n = getIntCore1233!(n, uniquePairs, uPairCoeffs, flags, i...)
+        n = getIntCore1233!(n, uniquePairs, uPairCoeffs, flags, i)
     end
     for i in groups[6]
-        n = getIntCore1234!(n, uniquePairs, uPairCoeffs, flags, i...)
+        n = getIntCore1234!(n, uniquePairs, uPairCoeffs, flags, i)
     end
     n
 end
