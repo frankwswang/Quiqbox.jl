@@ -836,3 +836,6 @@ end
 
 isNaN(::Any) = false
 isNaN(n::Number) = isnan(n)
+
+getBool(bl::Bool) = itself(bl)
+getBool(::Val{BL}) where {BL} = BL::Bool

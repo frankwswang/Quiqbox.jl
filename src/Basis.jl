@@ -792,9 +792,15 @@ struct GTBasis{T, D, BN, BFT<:GTBasisFuncs{T, D, 1}} <: BasisSetData{T, D, BFT}
 
     GTBasis(bfs::Tuple{Vararg{GTBasisFuncs{T, D, 1}, BN}}) where {T<:Real, D, BN} = 
     new{T, D, BN, eltype(bfs)}(bfs, overlaps(bfs), eKinetics(bfs), eeInteractions(bfs))
-end
 
-GTBasis(bs::Tuple{Vararg{GTBasisFuncs{T, D}}}) where {T, D} = GTBasis(bs |> flatten)
+    function GTBasis(bs::Tuple{Vararg{GTBasisFuncs{T, D}}}) where {T, D}
+        bfs = flatten(bs)
+        S = overlaps(bs)
+        Te = eKinetics(bs)
+        eeI = eeInteractions(bs)
+        new{T, D, length(bfs), eltype(bfs)}(bfs, S, Te, eeI)
+    end
+end
 
 GTBasis(bs::AbstractVector{<:GTBasisFuncs{T, D}}) where {T, D} = GTBasis(bs |> Tuple)
 

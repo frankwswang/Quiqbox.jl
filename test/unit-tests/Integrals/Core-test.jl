@@ -1,19 +1,23 @@
 using Test
 using Quiqbox
-using Quiqbox: Fγ
+using Quiqbox: Fγ, F0
 using QuadGK: quadgk
 
 include("../../../test/test-functions/Shared.jl")
 
 @testset "Core.jl tests" begin
 
-tolerance1 = 1e-8
-tolerance2 = 5e-8
+tolerance1 = 5e-17
+tolerance2 = ifelse(VERSION < v"1.7", 2, 1) * 1e-15
 perturbStep = rand(-1e-1:2e-3:1e-1)
-fNumInt = (γ, u) -> quadgk(t -> t^(2γ)*exp(-u*t^2), 0, 1; rtol=tolerance1)[1]
-rng = -10:(0.2+perturbStep):2
+fNumInt = (γ, u) -> quadgk(t -> t^(2γ)*exp(-u*t^2), 0, 1; order=25, rtol=tolerance1)[1]
+rng = -20:(0.2+perturbStep):9
 for γ in 0:24
-    @test all([isapprox(fNumInt(γ, 10.0^e), Fγ(γ, 10.0^e), atol=tolerance2) for e in rng])
+    f = ifelse(γ==0, (_, u)->F0(u), Fγ)
+    ints1 = [f(γ, 10.0^e) for e in rng]
+    ints2 = [fNumInt(γ, 10.0^e) for e in rng]
+    compr2Arrays3((Fγ=ints1, FγTest=ints2), tolerance2; 
+                  additionalInfo="γ=$γ step=$(0.2+perturbStep) rng=$(rng)")
 end
 
 nuc = ["H", "F"]
@@ -23,8 +27,11 @@ b2 = genBasisFunc(nucCoords[2], "STO-3G", "F")
 bfm1, bfm2 = b1 .+ b2[1:2]
 bs_bf_bfs_bfm = [b1, bfm1, b2..., bfm2]
 
-@test try eeInteractions(bs_bf_bfs_bfm); true catch; false end
-@test try coreH(bs_bf_bfs_bfm, nuc, nucCoords); true catch; false end
+eeI = eeInteractions(bs_bf_bfs_bfm)
+cH = coreH(bs_bf_bfs_bfm, nuc, nucCoords)
+
+@test @isdefined eeI
+@test @isdefined cH
 
 # function getCompositeIntCore
 tolerance3 = 1e-15
