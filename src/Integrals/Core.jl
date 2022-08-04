@@ -115,12 +115,12 @@ function ∫elecKineticCore(R₁::NTuple{3, T}, R₂::NTuple{3, T},
           ∫overlapCore.(Ref(ΔR), Ref(ijk₁), α₁, map.(-, Ref(ijk₂), shifts), α₂)) ) / 2
 end
 
-@inline function genIntTerm1(Δx::T, 
-                             l₁::Int, o₁::Int, 
-                             l₂::Int, o₂::Int, 
-                             i₁::Int, α₁::T, 
-                             i₂::Int, α₂::T) where {T}
-    @inline (r) -> 
+function genIntTerm1(Δx::T1, 
+                     l₁::T2, o₁::T2, 
+                     l₂::T2, o₂::T2, 
+                     i₁::T2, α₁::T1, 
+                     i₂::T2, α₂::T1) where {T1, T2}
+    (r::T2) -> 
         (-1)^(o₂+r) * factorial(o₁+o₂) * α₁^(o₂-l₁-r) * α₂^(o₁-l₂-r) * Δx^(o₁+o₂-2r) / 
         (
             4^(l₁+l₂+r) * 
@@ -130,13 +130,8 @@ end
         )
 end
 
-@inline function genIntTerm2(Δx::T, 
-                             α::T, 
-                             o₁::Int, 
-                             o₂::Int, 
-                             μ::Int, 
-                             r::Int) where {T}
-    @inline (u) ->
+function genIntTerm2(Δx::T1, α::T1, o₁::T2, o₂::T2, μ::T2, r::T2) where {T1, T2}
+    (u::T2) -> 
         (-1)^u * factorial(μ) * Δx^(μ-2u) / 
         (4^u * factorial(u) * factorial(μ-2u) * α^(o₁+o₂-r+u))
 end
@@ -206,8 +201,12 @@ function ∫nucAttractionCore(Z₀::Int, R₀::NTuple{3, T},
     res
 end
 
-@inline function genIntTerm3(Δx, l₁, o₁, l₂, o₂, i₁, α₁, i₂, α₂)
-    @inline (r) -> 
+function genIntTerm3(Δx::T1, 
+                     l₁::T2, o₁::T2, 
+                     l₂::T2, o₂::T2, 
+                     i₁::T2, α₁::T1, 
+                     i₂::T2, α₂::T1) where {T1, T2}
+    (r::T2) -> 
         (-1)^(o₂+r) * factorial(o₁+o₂) * α₁^(o₂-l₁-r) * α₂^(o₁-l₂-r) * 
         (α₁+α₂)^(2*(l₁+l₂) + r) * Δx^(o₁+o₂-2r) / 
         (
@@ -218,8 +217,8 @@ end
         )
 end
 
-@inline function genIntTerm4(Δx, η, μ)
-    @inline (u) ->
+function genIntTerm4(Δx::T1, η::T1, μ::T2) where {T1, T2}
+    (u::T2) -> 
         (-1)^u * factorial(μ) * η^(μ-u) * Δx^(μ-2u) / 
         (4^u * factorial(u) * factorial(μ-2u))
 end
