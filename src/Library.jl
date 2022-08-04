@@ -226,5 +226,5 @@ const ValInts = Val.(collect(0:5000))
 
 function getValI(i::Int)
     i = abs(i)
-    i<length(ValInts) ? ValInts[i+1] : ValInts[end]
+    i < length(ValInts) ? ValInts[i+1] : ValInts[end]
 end
