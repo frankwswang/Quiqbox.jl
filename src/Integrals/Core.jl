@@ -1096,8 +1096,8 @@ function getTwoBodyInts(∫2e::F, basisSet::AbstractVector{<:GTBasisFuncs{T, D}}
     accuSize = [0, accumulate(+, subSize)...]
     totalSize = subSize |> sum
     buf = Array{T}(undef, totalSize, totalSize, totalSize, totalSize)
-    for l = 1:length(basisSet), k = 1:l
-        @sync for j = 1:l
+    @sync for l = 1:length(basisSet), k = 1:l
+        for j = 1:l
             Threads.@spawn for i = 1:ifelse(l==j, k, j)
                 I = accuSize[i]+1 : accuSize[i+1]
                 J = accuSize[j]+1 : accuSize[j+1]
@@ -1117,8 +1117,8 @@ function getTwoBodyInts(∫2e::F, basisSet::AbstractVector{<:GTBasisFuncs{T, D, 
                        {F<:Function, T, D}
     BN = length(basisSet)
     buf = Array{T}(undef, BN, BN, BN, BN)
-    for l = 1:BN, k = 1:l
-        @sync for j = 1:l
+    @sync for l = 1:BN, k = 1:l
+        for j = 1:l
             Threads.@spawn for i = 1:ifelse(l==j, k, j)
                 bl = (l==k, l==j, k==j, ifelse(l==j, k, j)==i)
                 int = getCompositeInt(∫2e, bl, (basisSet[i], basisSet[j], 
