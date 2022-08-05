@@ -5,10 +5,11 @@ using ForwardDiff: derivative as ForwardDerivative
 using Tullio: @tullio
 
 function oneBodyDerivativeCore(::Val{false}, 
-                               ∂bfs::NTuple{BN, GTBasisFuncs{T, D, 1}}, 
-                               bfs::NTuple{BN, GTBasisFuncs{T, D, 1}}, 
+                               ∂bfs::AbstractVector{<:GTBasisFuncs{T, D, 1}}, 
+                               bfs::AbstractVector{<:GTBasisFuncs{T, D, 1}}, 
                                X::AbstractMatrix{T}, ∂X::AbstractMatrix{T}, 
-                               tf::TypedFunction{F}) where {BN, T, D, F}
+                               tf::TypedFunction{F}) where {T, D, F}
+    BN = length(bfs)
     ʃ = getFunc(tf)
     ∂ʃ = Array{T}(undef, BN, BN)
     ʃab = Array{T}(undef, BN, BN)
@@ -32,10 +33,11 @@ end
 
 
 function twoBodyDerivativeCore(::Val{false}, 
-                               ∂bfs::NTuple{BN, GTBasisFuncs{T, D, 1}}, 
-                               bfs::NTuple{BN, GTBasisFuncs{T, D, 1}}, 
+                               ∂bfs::AbstractVector{<:GTBasisFuncs{T, D, 1}}, 
+                               bfs::AbstractVector{<:GTBasisFuncs{T, D, 1}}, 
                                X::AbstractMatrix{T}, ∂X::AbstractMatrix{T}, 
-                               tf::TypedFunction{F}) where {BN, T, D, F}
+                               tf::TypedFunction{F}) where {T, D, F}
+    BN = length(bfs)
     ʃ = getFunc(tf)
     ∂ʃ = Array{T}(undef, BN, BN, BN, BN)
     ʃabcd = Array{T}(undef, BN, BN, BN, BN)
@@ -70,10 +72,11 @@ end
 
 
 function derivativeCore(FoutputIsVector::Val{B}, 
-                        bfs::NTuple{BN, GTBasisFuncs{T, D, 1}}, 
+                        bfs::AbstractVector{<:GTBasisFuncs{T, D, 1}}, 
                         par::ParamBox, S::AbstractMatrix{T}, 
                         oneBodyF::TypedFunction{F1}, twoBodyF::TypedFunction{F2}) where 
-                       {B, BN, T, D, F1, F2}
+                       {B, T, D, F1, F2}
+    BN = length(bfs)
     ∂bfs = ∂Basis.(par, bfs)
     ∂S = Array{T}(undef, BN, BN)
     ∂X = Array{T}(undef, BN, BN) # ∂X corresponds to the derivative of X = S^(-0.5)
@@ -96,12 +99,12 @@ end
 
 
 function ∂HFenergy(par::ParamBox{T}, 
-                   bs::NTuple{BN, GTBasisFuncs{T, D, 1}}, 
+                   bs::AbstractVector{<:GTBasisFuncs{T, D, 1}}, 
                    S::AbstractMatrix{T}, 
                    C::NTuple{HFTS, AbstractMatrix{T}}, 
                    nuc::NTuple{NN, String}, 
                    nucCoords::NTuple{NN, NTuple{D, T}}, 
-                   N::NTuple{HFTS, Int}) where {BN, T, D, HFTS, NN}
+                   N::NTuple{HFTS, Int}) where {T, D, HFTS, NN}
     Xinv = sqrt(S)::Matrix{T} # necessary assertion for type stability
     cH = (i, j)->coreHij(i, j, nuc, nucCoords)
     ∂hij, ∂hijkl = derivativeCore(Val(false), bs, par, S, 
