@@ -187,11 +187,10 @@ function gradOfHFenergy(par::AbstractVector{<:ParamBox{T}},
                         nucCoords::SpatialCoordType{T, D, NN}, 
                         N::Union{Int, Tuple{Int}, NTuple{2, Int}}=getCharge(nuc)) where 
                        {BN, T, D, HFTS, NN}
-    bs = arrayToTuple(bs)
     nuc = arrayToTuple(nuc)
     nucCoords = genTupleCoords(T, nucCoords)
     Ns = splitSpins(Val(HFTS), N)
-    ∂HFenergy.(par, Ref(bs), Ref(S), Ref(C), Ref(nuc), Ref(nucCoords), Ref(Ns))
+    ∂HFenergy.(par, Ref(bs|>collect), Ref(S), Ref(C), Ref(nuc), Ref(nucCoords), Ref(Ns))
 end
 
 

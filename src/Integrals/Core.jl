@@ -1041,13 +1041,13 @@ end
     nothing
 end
 
-function getOneBodyInts(∫1e::F, basisSet::NTuple{BN, GTBasisFuncs{T, D}}, optArgs...) where 
-                       {F<:Function, BN, T, D}
+function getOneBodyInts(∫1e::F, basisSet::AbstractVector{<:GTBasisFuncs{T, D}}, 
+                        optArgs...) where {F<:Function, T, D}
     subSize = orbitalNumOf.(basisSet)
     accuSize = [0, accumulate(+, subSize)...]
     totalSize = subSize |> sum
     buf = Array{T}(undef, totalSize, totalSize)
-    @sync for j = 1:BN
+    @sync for j = 1:length(basisSet)
         Threads.@spawn for i = 1:j
             int = getCompositeInt(∫1e, (j==i,), (basisSet[i], basisSet[j]), optArgs...)
             rowRange = accuSize[i]+1 : accuSize[i+1]
@@ -1058,8 +1058,9 @@ function getOneBodyInts(∫1e::F, basisSet::NTuple{BN, GTBasisFuncs{T, D}}, optA
     buf
 end
 
-function getOneBodyInts(∫1e::F, basisSet::NTuple{BN, GTBasisFuncs{T, D, 1}}, 
-                        optArgs...) where {F<:Function, BN, T, D}
+function getOneBodyInts(∫1e::F, basisSet::AbstractVector{<:GTBasisFuncs{T, D, 1}}, 
+                        optArgs...) where {F<:Function, T, D}
+    BN = length(basisSet)
     buf = Array{T}(undef, BN, BN)
     @sync for j = 1:BN
         Threads.@spawn for i = 1:j
@@ -1089,13 +1090,13 @@ permuteArray(arr::Number, _) = itself(arr)
     nothing
 end
 
-function getTwoBodyInts(∫2e::F, basisSet::NTuple{BN, GTBasisFuncs{T, D}}) where 
-                       {F<:Function, BN, T, D}
+function getTwoBodyInts(∫2e::F, basisSet::AbstractVector{<:GTBasisFuncs{T, D}}) where 
+                       {F<:Function, T, D}
     subSize = orbitalNumOf.(basisSet)
     accuSize = [0, accumulate(+, subSize)...]
     totalSize = subSize |> sum
     buf = Array{T}(undef, totalSize, totalSize, totalSize, totalSize)
-    for l = 1:BN, k = 1:l
+    for l = 1:length(basisSet), k = 1:l
         @sync for j = 1:l
             Threads.@spawn for i = 1:ifelse(l==j, k, j)
                 I = accuSize[i]+1 : accuSize[i+1]
@@ -1112,8 +1113,9 @@ function getTwoBodyInts(∫2e::F, basisSet::NTuple{BN, GTBasisFuncs{T, D}}) wher
     buf
 end
 
-function getTwoBodyInts(∫2e::F, basisSet::NTuple{BN, GTBasisFuncs{T, D, 1}}) where 
-                       {F<:Function, BN, T, D}
+function getTwoBodyInts(∫2e::F, basisSet::AbstractVector{<:GTBasisFuncs{T, D, 1}}) where 
+                       {F<:Function, T, D}
+    BN = length(basisSet)
     buf = Array{T}(undef, BN, BN, BN, BN)
     for l = 1:BN, k = 1:l
         @sync for j = 1:l
