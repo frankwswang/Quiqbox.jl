@@ -4,7 +4,7 @@ using Documenter
 
 @testset "Quiqbox tests" begin
 
-    println("Number of threads for tests: ", Threads.threads(), "\n")
+    println("Number of threads for tests: ", Threads.nthreads(), "\n")
 
     Random.seed!(1000)
 
