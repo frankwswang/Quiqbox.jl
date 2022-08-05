@@ -722,7 +722,7 @@ function runHFcore(::Val{HFT},
 
             diff = Etots[end] - Etots[end-1]
             relDiff = diff / abs(Etots[end-1])
-            if n > 1 && relDiff > sqrt(breakPoint)
+            if n > 1 && (!isConverged || relDiff > sqrt(breakPoint))
                 flag, Std = isOscillateConverged(Etots, 15breakPoint)
                 if flag
                     isConverged = ifelse(Std > max(breakPoint, oscThreshold), false, true)
