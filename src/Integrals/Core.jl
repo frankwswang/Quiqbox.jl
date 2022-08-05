@@ -842,8 +842,8 @@ const Int1eBIndexLabels = Dict([( true,), (false,)] .=> [Val(:aa), Val(:ab)])
 getON(::Val{:ContainBasisFuncs}, b::SpatialBasis) = orbitalNumOf(b)
 getON(::Val{:WithoutBasisFuncs}, ::CGTBasisFuncs1O{<:Any, <:Any, BN}) where {BN} = BN
 
-getBF(::Val, b::SpatialBasis, i) = getindex(b, i)
-getBF(::Val{:WithoutBasisFuncs}, b::BasisFuncMix, i) = getindex(b.BasisFunc, i)
+getBF(::Val, b::SpatialBasis, i) = @inbounds getindex(b, i)
+getBF(::Val{:WithoutBasisFuncs}, b::BasisFuncMix, i) = @inbounds getindex(b.BasisFunc, i)
 
 getBFs(::Val{:ContainBasisFuncs}, b::SpatialBasis) = itself(b)
 getBFs(::Val{:WithoutBasisFuncs}, b::CGTBasisFuncs1O) = unpackBasis(b)
@@ -1033,11 +1033,13 @@ function getCompositeInt(∫::F, bls::Union{Tuple{Bool}, NTuple{4, Any}, Val{fal
 end
 
 
-@inline function update2DarrBlock!(arr::AbstractMatrix{T1}, 
-                                   block::Union{T1, AbstractMatrix{T1}}, 
-                                   I::T2, J::T2) where {T1, T2<:UnitRange{Int}}
-    arr[I, J] .= block
-    arr[J, I] .= block |> transpose
+function update2DarrBlock!(arr::AbstractMatrix{T1}, 
+                           block::Union{T1, AbstractMatrix{T1}}, 
+                           I::T2, J::T2) where {T1, T2<:UnitRange{Int}}
+    @inbounds begin
+        arr[I, J] .= block
+        arr[J, I] .= (J!=I ? transpose(block) : block)
+    end
     nothing
 end
 
@@ -1072,21 +1074,24 @@ function getOneBodyInts(∫1e::F, basisSet::AbstractVector{<:GTBasisFuncs{T, D, 
 end
 
 
-permuteArray(arr::AbstractArray{T, N}, order) where {T, N} = PermutedDimsArray(arr, order)
-permuteArray(arr::Number, _) = itself(arr)
+permuteDims(arr::AbstractArray{T, N}, order) where {T, N} = permutedims(arr, order)
+permuteDims(arr::Number, _) = itself(arr)
 
-@inline function update4DarrBlock!(arr::AbstractArray{T1, 4}, 
-                                   block::Union{AbstractArray{T1, 4}, T1}, 
-                                   I::T2, J::T2, K::T2, L::T2) where 
-                                  {T1, T2<:UnitRange{Int}}
-    arr[I, J, K, L] .= block
-    arr[J, I, K, L] .= permuteArray(block, (2,1,3,4))
-    arr[J, I, L, K] .= permuteArray(block, (2,1,4,3))
-    arr[I, J, L, K] .= permuteArray(block, (1,2,4,3))
-    arr[L, K, I, J] .= permuteArray(block, (4,3,1,2))
-    arr[K, L, I, J] .= permuteArray(block, (3,4,1,2))
-    arr[K, L, J, I] .= permuteArray(block, (3,4,2,1))
-    arr[L, K, J, I] .= permuteArray(block, (4,3,2,1))
+function update4DarrBlock!(arr::AbstractArray{T1, 4}, 
+                           block::Union{AbstractArray{T1, 4}, T1}, 
+                           I::T2, J::T2, K::T2, L::T2) where {T1, T2<:UnitRange{Int}}
+    local blockTemp
+    @inbounds begin
+        arr[I, J, K, L] .= block
+        arr[J, I, K, L] .= (blockTemp = (J!=I ? permuteDims(block, (2,1,3,4)) : block))
+        arr[J, I, L, K] .= (blockTemp = (L!=K ? permuteDims(block, (2,1,4,3)) : blockTemp))
+        arr[I, J, L, K] .= (blockTemp = (I!=J ? permuteDims(block, (1,2,4,3)) : blockTemp))
+        arr[L, K, I, J] .= (blockTemp = ((L, K, I, J) != (I, J, L, K) ? 
+                                                permuteDims(block, (4,3,1,2)) : blockTemp))
+        arr[K, L, I, J] .= (blockTemp = (K!=L ? permuteDims(block, (3,4,1,2)) : blockTemp))
+        arr[K, L, J, I] .= (blockTemp = (J!=I ? permuteDims(block, (3,4,2,1)) : blockTemp))
+        arr[L, K, J, I] .= (L!=K ? permuteDims(block, (4,3,2,1)) : blockTemp)
+    end
     nothing
 end
 
