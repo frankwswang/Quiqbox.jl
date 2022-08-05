@@ -11,8 +11,7 @@ Return the orbital overlap between two basis functions.
 """
 overlap(bf1::AbstractGTBasisFuncs{T, D, 1}, bf2::AbstractGTBasisFuncs{T, D, 1}) where 
        {T, D} = 
-getCompositeInt(∫overlapCore, (false,), (bf1, bf2))
-# getCompositeInt(∫overlapCore, (bf2===bf1,), (bf1, bf2))
+getCompositeInt(∫overlapCore, (bf2===bf1,), (bf1, bf2))
 
 
 """
@@ -25,7 +24,7 @@ Return the orbital overlap matrix given a basis set.
 """
 overlaps(bs::Union{Tuple{Vararg{AbstractGTBasisFuncs{T, D}}}, 
                    AbstractVector{<:AbstractGTBasisFuncs{T, D}}}) where {T, D} = 
-getOneBodyInts(∫overlapCore, bs|>arrayToTuple)
+getOneBodyInts(∫overlapCore, collect(bs))
 
 
 """
@@ -38,8 +37,7 @@ Return the electron kinetic energy between two basis functions.
 """
 eKinetic(bf1::AbstractGTBasisFuncs{T, D, 1}, bf2::AbstractGTBasisFuncs{T, D, 1}) where 
         {D, T} = 
-getCompositeInt(∫elecKineticCore, (false,), (bf1, bf2))
-# getCompositeInt(∫elecKineticCore, (bf2===bf1,), (bf1, bf2))
+getCompositeInt(∫elecKineticCore, (bf2===bf1,), (bf1, bf2))
 
 
 """
@@ -52,7 +50,7 @@ Return the electron kinetic energy matrix given a basis set.
 """
 eKinetics(bs::Union{Tuple{Vararg{AbstractGTBasisFuncs{T, D}}}, 
                     AbstractVector{<:AbstractGTBasisFuncs{T, D}}}) where {T, D} = 
-getOneBodyInts(∫elecKineticCore, bs|>arrayToTuple)
+getOneBodyInts(∫elecKineticCore, collect(bs))
 
 
 """
@@ -68,10 +66,8 @@ their coordinates (in the atomic units).
 neAttraction(bf1::AbstractGTBasisFuncs{T, D, 1}, bf2::AbstractGTBasisFuncs{T, D, 1}, 
              nuc::Union{NTuple{NN, String}, AbstractVector{String}}, 
              nucCoords::SpatialCoordType{T, D, NN}) where {T, D, NN} = 
-getCompositeInt(∫nucAttractionCore, (false,), (bf1, bf2), 
+getCompositeInt(∫nucAttractionCore, (bf2===bf1,), (bf1, bf2), 
                 arrayToTuple(nuc), genTupleCoords(T, nucCoords))
-# getCompositeInt(∫nucAttractionCore, (bf2===bf1,), (bf1, bf2), 
-#                 arrayToTuple(nuc), genTupleCoords(T, nucCoords))
 
 
 """
@@ -89,7 +85,7 @@ neAttractions(bs::Union{Tuple{Vararg{AbstractGTBasisFuncs{T, D}}},
                         AbstractVector{<:AbstractGTBasisFuncs{T, D}}}, 
               nuc::Union{NTuple{NN, String}, AbstractVector{String}}, 
               nucCoords::SpatialCoordType{T, D, NN}) where {T, D, NN} = 
-getOneBodyInts(∫nucAttractionCore, bs|>arrayToTuple, 
+getOneBodyInts(∫nucAttractionCore, collect(bs), 
                arrayToTuple(nuc), genTupleCoords(T, nucCoords))
 
 

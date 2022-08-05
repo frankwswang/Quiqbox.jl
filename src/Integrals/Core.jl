@@ -115,12 +115,12 @@ function ∫elecKineticCore(R₁::NTuple{3, T}, R₂::NTuple{3, T},
           ∫overlapCore.(Ref(ΔR), Ref(ijk₁), α₁, map.(-, Ref(ijk₂), shifts), α₂)) ) / 2
 end
 
-@inline function genIntTerm1(Δx::T, 
-                             l₁::Int, o₁::Int, 
-                             l₂::Int, o₂::Int, 
-                             i₁::Int, α₁::T, 
-                             i₂::Int, α₂::T) where {T}
-    @inline (r) -> 
+function genIntTerm1(Δx::T1, 
+                     l₁::T2, o₁::T2, 
+                     l₂::T2, o₂::T2, 
+                     i₁::T2, α₁::T1, 
+                     i₂::T2, α₂::T1) where {T1, T2}
+    (r::T2) -> 
         (-1)^(o₂+r) * factorial(o₁+o₂) * α₁^(o₂-l₁-r) * α₂^(o₁-l₂-r) * Δx^(o₁+o₂-2r) / 
         (
             4^(l₁+l₂+r) * 
@@ -130,13 +130,8 @@ end
         )
 end
 
-@inline function genIntTerm2(Δx::T, 
-                             α::T, 
-                             o₁::Int, 
-                             o₂::Int, 
-                             μ::Int, 
-                             r::Int) where {T}
-    @inline (u) ->
+function genIntTerm2(Δx::T1, α::T1, o₁::T2, o₂::T2, μ::T2, r::T2) where {T1, T2}
+    (u::T2) -> 
         (-1)^u * factorial(μ) * Δx^(μ-2u) / 
         (4^u * factorial(u) * factorial(μ-2u) * α^(o₁+o₂-r+u))
 end
@@ -206,8 +201,12 @@ function ∫nucAttractionCore(Z₀::Int, R₀::NTuple{3, T},
     res
 end
 
-@inline function genIntTerm3(Δx, l₁, o₁, l₂, o₂, i₁, α₁, i₂, α₂)
-    @inline (r) -> 
+function genIntTerm3(Δx::T1, 
+                     l₁::T2, o₁::T2, 
+                     l₂::T2, o₂::T2, 
+                     i₁::T2, α₁::T1, 
+                     i₂::T2, α₂::T1) where {T1, T2}
+    (r::T2) -> 
         (-1)^(o₂+r) * factorial(o₁+o₂) * α₁^(o₂-l₁-r) * α₂^(o₁-l₂-r) * 
         (α₁+α₂)^(2*(l₁+l₂) + r) * Δx^(o₁+o₂-2r) / 
         (
@@ -218,8 +217,8 @@ end
         )
 end
 
-@inline function genIntTerm4(Δx, η, μ)
-    @inline (u) ->
+function genIntTerm4(Δx::T1, η::T1, μ::T2) where {T1, T2}
+    (u::T2) -> 
         (-1)^u * factorial(μ) * η^(μ-u) * Δx^(μ-2u) / 
         (4^u * factorial(u) * factorial(μ-2u))
 end
@@ -843,8 +842,8 @@ const Int1eBIndexLabels = Dict([( true,), (false,)] .=> [Val(:aa), Val(:ab)])
 getON(::Val{:ContainBasisFuncs}, b::SpatialBasis) = orbitalNumOf(b)
 getON(::Val{:WithoutBasisFuncs}, ::CGTBasisFuncs1O{<:Any, <:Any, BN}) where {BN} = BN
 
-getBF(::Val, b::SpatialBasis, i) = getindex(b, i)
-getBF(::Val{:WithoutBasisFuncs}, b::BasisFuncMix, i) = getindex(b.BasisFunc, i)
+getBF(::Val, b::SpatialBasis, i) = @inbounds getindex(b, i)
+getBF(::Val{:WithoutBasisFuncs}, b::BasisFuncMix, i) = @inbounds getindex(b.BasisFunc, i)
 
 getBFs(::Val{:ContainBasisFuncs}, b::SpatialBasis) = itself(b)
 getBFs(::Val{:WithoutBasisFuncs}, b::CGTBasisFuncs1O) = unpackBasis(b)
@@ -1034,84 +1033,105 @@ function getCompositeInt(∫::F, bls::Union{Tuple{Bool}, NTuple{4, Any}, Val{fal
 end
 
 
-@inline function update2DarrBlock!(arr::AbstractMatrix{T1}, 
-                                   block::Union{T1, AbstractMatrix{T1}}, 
-                                   I::T2, J::T2) where {T1, T2<:UnitRange{Int}}
-    arr[I, J] .= block
-    arr[J, I] .= block |> transpose
+function update2DarrBlock!(arr::AbstractMatrix{T1}, 
+                           block::Union{T1, AbstractMatrix{T1}}, 
+                           I::T2, J::T2) where {T1, T2<:UnitRange{Int}}
+    @inbounds begin
+        arr[I, J] .= block
+        arr[J, I] .= (J!=I ? transpose(block) : block)
+    end
     nothing
 end
 
-function getOneBodyInts(∫1e::F, basisSet::NTuple{BN, GTBasisFuncs{T, D}}, optArgs...) where 
-                       {F<:Function, BN, T, D}
+function getOneBodyInts(∫1e::F, basisSet::AbstractVector{<:GTBasisFuncs{T, D}}, 
+                        optArgs...) where {F<:Function, T, D}
     subSize = orbitalNumOf.(basisSet)
     accuSize = [0, accumulate(+, subSize)...]
     totalSize = subSize |> sum
     buf = Array{T}(undef, totalSize, totalSize)
-    for j = 1:BN, i = 1:j
-        int = getCompositeInt(∫1e, (j==i,), (basisSet[i], basisSet[j]), optArgs...)
-        rowRange = accuSize[i]+1 : accuSize[i+1]
-        colRange = accuSize[j]+1 : accuSize[j+1]
-        update2DarrBlock!(buf, int, rowRange, colRange)
+    @sync for j = 1:length(basisSet)
+        Threads.@spawn for i = 1:j
+            int = getCompositeInt(∫1e, (j==i,), (basisSet[i], basisSet[j]), optArgs...)
+            rowRange = accuSize[i]+1 : accuSize[i+1]
+            colRange = accuSize[j]+1 : accuSize[j+1]
+            update2DarrBlock!(buf, int, rowRange, colRange)
+        end
     end
     buf
 end
 
-function getOneBodyInts(∫1e::F, basisSet::NTuple{BN, GTBasisFuncs{T, D, 1}}, 
-                        optArgs...) where {F<:Function, BN, T, D}
+function getOneBodyInts(∫1e::F, basisSet::AbstractVector{<:GTBasisFuncs{T, D, 1}}, 
+                        optArgs...) where {F<:Function, T, D}
+    BN = length(basisSet)
     buf = Array{T}(undef, BN, BN)
-    for j = 1:BN, i = 1:j
-        int = getCompositeInt(∫1e, (j==i,), (basisSet[i], basisSet[j]), optArgs...)
-        buf[j, i] = buf[i, j] = int
+    @sync for j = 1:BN
+        Threads.@spawn for i = 1:j
+            int = getCompositeInt(∫1e, (j==i,), (basisSet[i], basisSet[j]), optArgs...)
+            buf[j, i] = buf[i, j] = int
+        end
     end
     buf
 end
 
 
-permuteArray(arr::AbstractArray{T, N}, order) where {T, N} = PermutedDimsArray(arr, order)
-permuteArray(arr::Number, _) = itself(arr)
+permuteDims(arr::AbstractArray{T, N}, order) where {T, N} = permutedims(arr, order)
+permuteDims(arr::Number, _) = itself(arr)
 
-@inline function update4DarrBlock!(arr::AbstractArray{T1, 4}, 
-                                   block::Union{AbstractArray{T1, 4}, T1}, 
-                                   I::T2, J::T2, K::T2, L::T2) where 
-                                  {T1, T2<:UnitRange{Int}}
-    arr[I, J, K, L] .= block
-    arr[J, I, K, L] .= permuteArray(block, (2,1,3,4))
-    arr[J, I, L, K] .= permuteArray(block, (2,1,4,3))
-    arr[I, J, L, K] .= permuteArray(block, (1,2,4,3))
-    arr[L, K, I, J] .= permuteArray(block, (4,3,1,2))
-    arr[K, L, I, J] .= permuteArray(block, (3,4,1,2))
-    arr[K, L, J, I] .= permuteArray(block, (3,4,2,1))
-    arr[L, K, J, I] .= permuteArray(block, (4,3,2,1))
+function update4DarrBlock!(arr::AbstractArray{T1, 4}, 
+                           block::Union{AbstractArray{T1, 4}, T1}, 
+                           I::T2, J::T2, K::T2, L::T2) where {T1, T2<:UnitRange{Int}}
+    local blockTemp
+    @inbounds begin
+        arr[I, J, K, L] .= block
+        arr[J, I, K, L] .= (blockTemp = (J!=I ? permuteDims(block, (2,1,3,4)) : block))
+        arr[J, I, L, K] .= (blockTemp = (L!=K ? permuteDims(block, (2,1,4,3)) : blockTemp))
+        arr[I, J, L, K] .= (blockTemp = (I!=J ? permuteDims(block, (1,2,4,3)) : blockTemp))
+        arr[L, K, I, J] .= (blockTemp = ((L, K, I, J) != (I, J, L, K) ? 
+                                                permuteDims(block, (4,3,1,2)) : blockTemp))
+        arr[K, L, I, J] .= (blockTemp = (K!=L ? permuteDims(block, (3,4,1,2)) : blockTemp))
+        arr[K, L, J, I] .= (blockTemp = (J!=I ? permuteDims(block, (3,4,2,1)) : blockTemp))
+        arr[L, K, J, I] .= (L!=K ? permuteDims(block, (4,3,2,1)) : blockTemp)
+    end
     nothing
 end
 
-function getTwoBodyInts(∫2e::F, basisSet::NTuple{BN, GTBasisFuncs{T, D}}) where 
-                       {F<:Function, BN, T, D}
+function getTwoBodyInts(∫2e::F, basisSet::AbstractVector{<:GTBasisFuncs{T, D}}) where 
+                       {F<:Function, T, D}
     subSize = orbitalNumOf.(basisSet)
     accuSize = [0, accumulate(+, subSize)...]
     totalSize = subSize |> sum
     buf = Array{T}(undef, totalSize, totalSize, totalSize, totalSize)
-    for l = 1:BN, k = 1:l, j = 1:l, i = 1:ifelse(l==j, k, j)
-        I = accuSize[i]+1 : accuSize[i+1]
-        J = accuSize[j]+1 : accuSize[j+1]
-        K = accuSize[k]+1 : accuSize[k+1]
-        L = accuSize[l]+1 : accuSize[l+1]
-        bl = (l==k, l==j, k==j, ifelse(l==j, k, j)==i)
-        int = getCompositeInt(∫2e, bl, (basisSet[i], basisSet[j], basisSet[k], basisSet[l]))
-        update4DarrBlock!(buf, int, I, J, K, L)
+    @sync for l = 1:length(basisSet), k = 1:l
+        for j = 1:l
+            Threads.@spawn for i = 1:ifelse(l==j, k, j)
+                I = accuSize[i]+1 : accuSize[i+1]
+                J = accuSize[j]+1 : accuSize[j+1]
+                K = accuSize[k]+1 : accuSize[k+1]
+                L = accuSize[l]+1 : accuSize[l+1]
+                bl = (l==k, l==j, k==j, ifelse(l==j, k, j)==i)
+                int = getCompositeInt(∫2e, bl, (basisSet[i], basisSet[j], 
+                                                basisSet[k], basisSet[l]))
+                update4DarrBlock!(buf, int, I, J, K, L)
+            end
+        end
     end
     buf
 end
 
-function getTwoBodyInts(∫2e::F, basisSet::NTuple{BN, GTBasisFuncs{T, D, 1}}) where 
-                       {F<:Function, BN, T, D}
+function getTwoBodyInts(∫2e::F, basisSet::AbstractVector{<:GTBasisFuncs{T, D, 1}}) where 
+                       {F<:Function, T, D}
+    BN = length(basisSet)
     buf = Array{T}(undef, BN, BN, BN, BN)
-    for l = 1:BN, k = 1:l, j = 1:l, i = 1:ifelse(l==j, k, j)
-        bl = (l==k, l==j, k==j, ifelse(l==j, k, j)==i)
-        int = getCompositeInt(∫2e, bl, (basisSet[i], basisSet[j], basisSet[k], basisSet[l]))
-        buf[l, k, j, i] = buf[k, l, j, i] = buf[k, l, i, j] = buf[l, k, i, j] = 
-        buf[i, j, l, k] = buf[j, i, l, k] = buf[j, i, k, l] = buf[i, j, k, l] = int
+    @sync for l = 1:BN, k = 1:l
+        for j = 1:l
+            Threads.@spawn for i = 1:ifelse(l==j, k, j)
+                bl = (l==k, l==j, k==j, ifelse(l==j, k, j)==i)
+                int = getCompositeInt(∫2e, bl, (basisSet[i], basisSet[j], 
+                                                basisSet[k], basisSet[l]))
+                buf[l, k, j, i] = buf[k, l, j, i] = buf[k, l, i, j] = buf[l, k, i, j] = 
+                buf[i, j, l, k] = buf[j, i, l, k] = buf[j, i, k, l] = buf[i, j, k, l] = int
+            end
+        end
     end
     buf
 end

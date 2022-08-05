@@ -5,26 +5,33 @@ using ForwardDiff: derivative as ForwardDerivative
 using Tullio: @tullio
 
 function oneBodyDerivativeCore(::Val{false}, 
-                               ∂bfs::NTuple{BN, GTBasisFuncs{T, D, 1}}, 
-                               bfs::NTuple{BN, GTBasisFuncs{T, D, 1}}, 
+                               ∂bfs::AbstractVector{<:GTBasisFuncs{T, D, 1}}, 
+                               bfs::AbstractVector{<:GTBasisFuncs{T, D, 1}}, 
                                X::AbstractMatrix{T}, ∂X::AbstractMatrix{T}, 
-                               tf::TypedFunction{F}) where {BN, T, D, F}
+                               tf::TypedFunction{F}) where {T, D, F}
+    BN = length(bfs)
     ʃ = getFunc(tf)
     ∂ʃ = Array{T}(undef, BN, BN)
     ʃab = Array{T}(undef, BN, BN)
     ∂ʃab = Array{T}(undef, BN, BN)
-    for i = 1:BN, j = 1:i
-       ʃab[i,j] = ʃab[j,i] = ʃ(bfs[i], bfs[j])
+    @sync for i = 1:BN
+        Threads.@spawn for j = 1:i
+            ʃab[i,j] = ʃab[j,i] = ʃ(bfs[i], bfs[j])
+        end
     end
-    for i = 1:BN, j = 1:i
-        ∂ʃab[i,j] = ∂ʃab[j,i] = ʃ(∂bfs[i], bfs[j]) + ʃ(bfs[i], ∂bfs[j])
+    @sync for i = 1:BN
+        Threads.@spawn for j = 1:i
+            ∂ʃab[i,j] = ∂ʃab[j,i] = ʃ(∂bfs[i], bfs[j]) + ʃ(bfs[i], ∂bfs[j])
+        end
     end
     @views begin
-        @inbounds for i=1:BN, j=1:i
-            # X[i,j] == X[j,i]
-            ∂ʃ[i,j] = ∂ʃ[j,i] = X[:,i]' * ∂ʃab *  X[:,j] +
-                               ∂X[:,i]' *  ʃab *  X[:,j] +
-                                X[:,i]' *  ʃab * ∂X[:,j]
+        @sync for i=1:BN
+            Threads.@spawn for j=1:i
+                # X[i,j] == X[j,i]
+                @inbounds ∂ʃ[i,j] = ∂ʃ[j,i] = X[:,i]' * ∂ʃab *  X[:,j] + 
+                                             ∂X[:,i]' *  ʃab *  X[:,j] + 
+                                              X[:,i]' *  ʃab * ∂X[:,j]
+            end
         end
     end
     ∂ʃ
@@ -32,35 +39,42 @@ end
 
 
 function twoBodyDerivativeCore(::Val{false}, 
-                               ∂bfs::NTuple{BN, GTBasisFuncs{T, D, 1}}, 
-                               bfs::NTuple{BN, GTBasisFuncs{T, D, 1}}, 
+                               ∂bfs::AbstractVector{<:GTBasisFuncs{T, D, 1}}, 
+                               bfs::AbstractVector{<:GTBasisFuncs{T, D, 1}}, 
                                X::AbstractMatrix{T}, ∂X::AbstractMatrix{T}, 
-                               tf::TypedFunction{F}) where {BN, T, D, F}
+                               tf::TypedFunction{F}) where {T, D, F}
+    BN = length(bfs)
     ʃ = getFunc(tf)
     ∂ʃ = Array{T}(undef, BN, BN, BN, BN)
     ʃabcd = Array{T}(undef, BN, BN, BN, BN)
     ʃ∂abcd = Array{T}(undef, BN, BN, BN, BN)
 
     # ijkl in the chemists' notation of spatial bases (ij|kl).
-    for i = 1:BN, j = 1:i, k = 1:i, l = 1:ifelse(k==i, j, k)
-        ʃabcd[i,j,k,l] = ʃabcd[j,i,k,l] = ʃabcd[j,i,l,k] = ʃabcd[i,j,l,k] = 
-        ʃabcd[l,k,i,j] = ʃabcd[k,l,i,j] = ʃabcd[k,l,j,i] = ʃabcd[l,k,j,i] = 
-        ʃ(bfs[i],  bfs[j],  bfs[k],  bfs[l])
+    @sync for i = 1:BN, j = 1:i, k = 1:i
+        Threads.@spawn for l = 1:ifelse(k==i, j, k)
+            ʃabcd[i,j,k,l] = ʃabcd[j,i,k,l] = ʃabcd[j,i,l,k] = ʃabcd[i,j,l,k] = 
+            ʃabcd[l,k,i,j] = ʃabcd[k,l,i,j] = ʃabcd[k,l,j,i] = ʃabcd[l,k,j,i] = 
+            ʃ(bfs[i],  bfs[j],  bfs[k],  bfs[l])
+        end
     end
-    for l = 1:BN, k=1:l, j=1:BN, i=1:BN
-        ʃ∂abcd[i,j,k,l] = ʃ∂abcd[i,j,l,k] = ʃ(∂bfs[i], bfs[j],  bfs[k],  bfs[l])
+    @sync for l = 1:BN, k=1:l, j=1:BN
+        Threads.@spawn for i=1:BN
+            ʃ∂abcd[i,j,l,k] = ʃ∂abcd[i,j,k,l] = ʃ(∂bfs[i], bfs[j],  bfs[k],  bfs[l])
+        end
     end
     # [∂ʃ4[i,j,k,l] == ∂ʃ4[j,i,l,k] == ∂ʃ4[j,i,k,l] != ∂ʃ4[l,j,k,i]
     for i = 1:BN, j = 1:i, k = 1:i, l = 1:ifelse(k==i, j, k)
         # ʃ∂abcd[i,j,k,l] == ʃ∂abcd[i,j,l,k] == ʃab∂cd[l,k,i,j] == ʃab∂cd[k,l,i,j]
-        @tullio val := ( X[a,$i]* X[b,$j]* X[c,$k]* X[d,$l] + 
-                         X[a,$j]* X[b,$i]* X[c,$k]* X[d,$l] + 
-                         X[c,$i]* X[d,$j]* X[a,$k]* X[b,$l] + 
-                         X[c,$i]* X[d,$j]* X[a,$l]* X[b,$k]  ) *ʃ∂abcd[a,b,c,d] + 
-                       (∂X[a,$i]* X[b,$j]* X[c,$k]* X[d,$l] + 
-                         X[a,$i]*∂X[b,$j]* X[c,$k]* X[d,$l] + 
-                         X[a,$i]* X[b,$j]*∂X[c,$k]* X[d,$l] + 
-                         X[a,$i]* X[b,$j]* X[c,$k]*∂X[d,$l]  ) * ʃabcd[a,b,c,d]
+        @tullio val := begin
+            @inbounds ( X[a,$i]* X[b,$j]* X[c,$k]* X[d,$l] + 
+                        X[a,$j]* X[b,$i]* X[c,$k]* X[d,$l] + 
+                        X[c,$i]* X[d,$j]* X[a,$k]* X[b,$l] + 
+                        X[c,$i]* X[d,$j]* X[a,$l]* X[b,$k]  ) *ʃ∂abcd[a,b,c,d] + 
+                      (∂X[a,$i]* X[b,$j]* X[c,$k]* X[d,$l] + 
+                        X[a,$i]*∂X[b,$j]* X[c,$k]* X[d,$l] + 
+                        X[a,$i]* X[b,$j]*∂X[c,$k]* X[d,$l] + 
+                        X[a,$i]* X[b,$j]* X[c,$k]*∂X[d,$l]  ) * ʃabcd[a,b,c,d]
+        end
 
         ∂ʃ[i,j,k,l] = ∂ʃ[j,i,k,l] = ∂ʃ[j,i,l,k] = ∂ʃ[i,j,l,k] = 
         ∂ʃ[l,k,i,j] = ∂ʃ[k,l,i,j] = ∂ʃ[k,l,j,i] = ∂ʃ[l,k,j,i] = val
@@ -70,23 +84,26 @@ end
 
 
 function derivativeCore(FoutputIsVector::Val{B}, 
-                        bfs::NTuple{BN, GTBasisFuncs{T, D, 1}}, 
+                        bfs::AbstractVector{<:GTBasisFuncs{T, D, 1}}, 
                         par::ParamBox, S::AbstractMatrix{T}, 
                         oneBodyF::TypedFunction{F1}, twoBodyF::TypedFunction{F2}) where 
-                       {B, BN, T, D, F1, F2}
+                       {B, T, D, F1, F2}
+    BN = length(bfs)
     ∂bfs = ∂Basis.(par, bfs)
     ∂S = Array{T}(undef, BN, BN)
     ∂X = Array{T}(undef, BN, BN) # ∂X corresponds to the derivative of X = S^(-0.5)
     ∂X₀ = Array{T}(undef, BN, BN) # ∂X in its eigen basis
-    for i=1:BN, j=1:i
-        ∂S[i,j] = ∂S[j,i] = overlap(∂bfs[i], bfs[j]) + overlap(bfs[i], ∂bfs[j])
+    @sync for i=1:BN
+        Threads.@spawn for j=1:i
+            ∂S[i,j] = ∂S[j,i] = overlap(∂bfs[i], bfs[j]) + overlap(bfs[i], ∂bfs[j])
+        end
     end
     X = getXcore1(S)
     λ, 𝑣 = eigen(S|>Hermitian)
     ∂S2 = 𝑣'*∂S*𝑣
-    @inbounds for i=1:BN, j=1:i
-        ∂X₀[i,j] = ∂X₀[j,i] = (- ∂S2[i,j] * inv(sqrt(λ[i])) * inv(sqrt(λ[j])) * 
-                               inv(sqrt(λ[i]) + sqrt(λ[j])))
+    for i=1:BN, j=1:i # Faster without multi-threading
+        @inbounds ∂X₀[i,j] = ∂X₀[j,i] = ( -∂S2[i,j] * inv(sqrt(λ[i])) * inv(sqrt(λ[j])) * 
+                                          inv(sqrt(λ[i]) + sqrt(λ[j])) )
     end
     ∂X = 𝑣*∂X₀*𝑣'
     ∂ʃ2 = oneBodyDerivativeCore(FoutputIsVector, ∂bfs, bfs, X, ∂X, oneBodyF)
@@ -96,12 +113,12 @@ end
 
 
 function ∂HFenergy(par::ParamBox{T}, 
-                   bs::NTuple{BN, GTBasisFuncs{T, D, 1}}, 
+                   bs::AbstractVector{<:GTBasisFuncs{T, D, 1}}, 
                    S::AbstractMatrix{T}, 
                    C::NTuple{HFTS, AbstractMatrix{T}}, 
                    nuc::NTuple{NN, String}, 
                    nucCoords::NTuple{NN, NTuple{D, T}}, 
-                   N::NTuple{HFTS, Int}) where {BN, T, D, HFTS, NN}
+                   N::NTuple{HFTS, Int}) where {T, D, HFTS, NN}
     Xinv = sqrt(S)::Matrix{T} # necessary assertion for type stability
     cH = (i, j)->coreHij(i, j, nuc, nucCoords)
     ∂hij, ∂hijkl = derivativeCore(Val(false), bs, par, S, 
@@ -187,11 +204,10 @@ function gradOfHFenergy(par::AbstractVector{<:ParamBox{T}},
                         nucCoords::SpatialCoordType{T, D, NN}, 
                         N::Union{Int, Tuple{Int}, NTuple{2, Int}}=getCharge(nuc)) where 
                        {BN, T, D, HFTS, NN}
-    bs = arrayToTuple(bs)
     nuc = arrayToTuple(nuc)
     nucCoords = genTupleCoords(T, nucCoords)
     Ns = splitSpins(Val(HFTS), N)
-    ∂HFenergy.(par, Ref(bs), Ref(S), Ref(C), Ref(nuc), Ref(nucCoords), Ref(Ns))
+    ∂HFenergy.(par, Ref(bs|>collect), Ref(S), Ref(C), Ref(nuc), Ref(nucCoords), Ref(Ns))
 end
 
 
