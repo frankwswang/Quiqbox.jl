@@ -153,7 +153,7 @@ function getGcore(HeeI::AbstractArray{T, 4},
                   DJ::AbstractMatrix{T}, DK::AbstractMatrix{T}) where {T}
     G = similar(DJ)
     @sync for ν = 1:size(G, 1)
-        Threads.@spawn for μ = 1:ν
+        Threads.@spawn for μ = 1:ν # Spawn here is faster than spawn inside the loop.
             G[ν, μ] = G[μ, ν] = 
             dot(transpose(DJ), @view HeeI[μ,ν,:,:]) - dot(DK, @view HeeI[μ,:,:,ν])
         end
@@ -762,10 +762,8 @@ function EDIIScore(∇s::AbstractVector{<:AbstractMatrix{T}},
                    Ds::AbstractVector{<:AbstractMatrix{T}}, Es::AbstractVector{T}) where {T}
     len = length(Ds)
     B = similar(∇s[begin], len, len)
-    @sync for j=1:len
-        Threads.@spawn for i=1:j
-            B[i,j] = B[j,i] = -dot(Ds[i]-Ds[j], ∇s[i]-∇s[j])
-        end
+    @sync for j=1:len, i=1:j
+        Threads.@spawn B[i,j] = B[j,i] = -dot(Ds[i]-Ds[j], ∇s[i]-∇s[j])
     end
     Es, B
 end
@@ -784,11 +782,9 @@ function DIIScore(∇s::AbstractVector{<:AbstractMatrix{T}},
     len = length(Ds)
     B = similar(∇s[begin], len, len)
     v = zeros(len)
-    @sync for j in 1:len
-        Threads.@spawn for i=1:j
-            B[i,j] = B[j,i] = dot( ∇s[i]*Ds[i]*S - S*Ds[i]*∇s[i], 
-                                   ∇s[j]*Ds[j]*S - S*Ds[j]*∇s[j] )
-        end
+    @sync for j in 1:len, i=1:j
+        Threads.@spawn B[i,j] = B[j,i] = dot( ∇s[i]*Ds[i]*S - S*Ds[i]*∇s[i], 
+                                              ∇s[j]*Ds[j]*S - S*Ds[j]*∇s[j] )
     end
     v, B
 end
