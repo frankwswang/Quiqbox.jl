@@ -1049,8 +1049,8 @@ function getOneBodyInts(∫1e::F, basisSet::AbstractVector{<:GTBasisFuncs{T, D}}
     accuSize = [0, accumulate(+, subSize)...]
     totalSize = subSize |> sum
     buf = Array{T}(undef, totalSize, totalSize)
-    @sync for j = 1:length(basisSet)
-        Threads.@spawn for i = 1:j
+    @sync for j = 1:length(basisSet), i = 1:j
+        Threads.@spawn begin
             int = getCompositeInt(∫1e, (j==i,), (basisSet[i], basisSet[j]), optArgs...)
             rowRange = accuSize[i]+1 : accuSize[i+1]
             colRange = accuSize[j]+1 : accuSize[j+1]
@@ -1064,8 +1064,8 @@ function getOneBodyInts(∫1e::F, basisSet::AbstractVector{<:GTBasisFuncs{T, D, 
                         optArgs...) where {F<:Function, T, D}
     BN = length(basisSet)
     buf = Array{T}(undef, BN, BN)
-    @sync for j = 1:BN
-        Threads.@spawn for i = 1:j
+    @sync for j = 1:BN, i = 1:j
+        Threads.@spawn begin
             int = getCompositeInt(∫1e, (j==i,), (basisSet[i], basisSet[j]), optArgs...)
             buf[j, i] = buf[i, j] = int
         end
@@ -1101,18 +1101,16 @@ function getTwoBodyInts(∫2e::F, basisSet::AbstractVector{<:GTBasisFuncs{T, D}}
     accuSize = [0, accumulate(+, subSize)...]
     totalSize = subSize |> sum
     buf = Array{T}(undef, totalSize, totalSize, totalSize, totalSize)
-    @sync for l = 1:length(basisSet), k = 1:l
-        for j = 1:l
-            Threads.@spawn for i = 1:ifelse(l==j, k, j)
-                I = accuSize[i]+1 : accuSize[i+1]
-                J = accuSize[j]+1 : accuSize[j+1]
-                K = accuSize[k]+1 : accuSize[k+1]
-                L = accuSize[l]+1 : accuSize[l+1]
-                bl = (l==k, l==j, k==j, ifelse(l==j, k, j)==i)
-                int = getCompositeInt(∫2e, bl, (basisSet[i], basisSet[j], 
-                                                basisSet[k], basisSet[l]))
-                update4DarrBlock!(buf, int, I, J, K, L)
-            end
+    @sync for l = 1:length(basisSet), k = 1:l, j = 1:l, i = 1:ifelse(l==j, k, j)
+        Threads.@spawn begin
+            I = accuSize[i]+1 : accuSize[i+1]
+            J = accuSize[j]+1 : accuSize[j+1]
+            K = accuSize[k]+1 : accuSize[k+1]
+            L = accuSize[l]+1 : accuSize[l+1]
+            bl = (l==k, l==j, k==j, ifelse(l==j, k, j)==i)
+            int = getCompositeInt(∫2e, bl, (basisSet[i], basisSet[j], 
+                                            basisSet[k], basisSet[l]))
+            update4DarrBlock!(buf, int, I, J, K, L)
         end
     end
     buf
@@ -1122,15 +1120,13 @@ function getTwoBodyInts(∫2e::F, basisSet::AbstractVector{<:GTBasisFuncs{T, D, 
                        {F<:Function, T, D}
     BN = length(basisSet)
     buf = Array{T}(undef, BN, BN, BN, BN)
-    @sync for l = 1:BN, k = 1:l
-        for j = 1:l
-            Threads.@spawn for i = 1:ifelse(l==j, k, j)
-                bl = (l==k, l==j, k==j, ifelse(l==j, k, j)==i)
-                int = getCompositeInt(∫2e, bl, (basisSet[i], basisSet[j], 
-                                                basisSet[k], basisSet[l]))
-                buf[l, k, j, i] = buf[k, l, j, i] = buf[k, l, i, j] = buf[l, k, i, j] = 
-                buf[i, j, l, k] = buf[j, i, l, k] = buf[j, i, k, l] = buf[i, j, k, l] = int
-            end
+    @sync for l = 1:BN, k = 1:l, j = 1:l, i = 1:ifelse(l==j, k, j)
+        Threads.@spawn begin
+            bl = (l==k, l==j, k==j, ifelse(l==j, k, j)==i)
+            int = getCompositeInt(∫2e, bl, (basisSet[i], basisSet[j], 
+                                            basisSet[k], basisSet[l]))
+            buf[l, k, j, i] = buf[k, l, j, i] = buf[k, l, i, j] = buf[l, k, i, j] = 
+            buf[i, j, l, k] = buf[j, i, l, k] = buf[j, i, k, l] = buf[i, j, k, l] = int
         end
     end
     buf

@@ -14,19 +14,15 @@ function oneBodyDerivativeCore(::Val{false},
     ∂ʃ = Array{T}(undef, BN, BN)
     ʃab = Array{T}(undef, BN, BN)
     ∂ʃab = Array{T}(undef, BN, BN)
-    @sync for i = 1:BN
-        Threads.@spawn for j = 1:i
-            ʃab[i,j] = ʃab[j,i] = ʃ(bfs[i], bfs[j])
-        end
+    @sync for i = 1:BN, j = 1:i
+        Threads.@spawn ʃab[i,j] = ʃab[j,i] = ʃ(bfs[i], bfs[j])
     end
-    @sync for i = 1:BN
-        Threads.@spawn for j = 1:i
-            ∂ʃab[i,j] = ∂ʃab[j,i] = ʃ(∂bfs[i], bfs[j]) + ʃ(bfs[i], ∂bfs[j])
-        end
+    @sync for i = 1:BN, j = 1:i
+        Threads.@spawn ∂ʃab[i,j] = ∂ʃab[j,i] = ʃ(∂bfs[i], bfs[j]) + ʃ(bfs[i], ∂bfs[j])
     end
     @views begin
         @sync for i=1:BN
-            Threads.@spawn for j=1:i
+            Threads.@spawn for j=1:i # Spawn here is faster than spawn inside the loop.
                 # X[i,j] == X[j,i]
                 @inbounds ∂ʃ[i,j] = ∂ʃ[j,i] = X[:,i]' * ∂ʃab *  X[:,j] + 
                                              ∂X[:,i]' *  ʃab *  X[:,j] + 
@@ -50,15 +46,15 @@ function twoBodyDerivativeCore(::Val{false},
     ʃ∂abcd = Array{T}(undef, BN, BN, BN, BN)
 
     # ijkl in the chemists' notation of spatial bases (ij|kl).
-    @sync for i = 1:BN, j = 1:i, k = 1:i
-        Threads.@spawn for l = 1:ifelse(k==i, j, k)
+    @sync for i = 1:BN, j = 1:i, k = 1:i, l = 1:ifelse(k==i, j, k)
+        Threads.@spawn begin
             ʃabcd[i,j,k,l] = ʃabcd[j,i,k,l] = ʃabcd[j,i,l,k] = ʃabcd[i,j,l,k] = 
             ʃabcd[l,k,i,j] = ʃabcd[k,l,i,j] = ʃabcd[k,l,j,i] = ʃabcd[l,k,j,i] = 
             ʃ(bfs[i],  bfs[j],  bfs[k],  bfs[l])
         end
     end
-    @sync for l = 1:BN, k=1:l, j=1:BN
-        Threads.@spawn for i=1:BN
+    @sync for l = 1:BN, k=1:l, j=1:BN, i=1:BN
+        Threads.@spawn begin
             ʃ∂abcd[i,j,l,k] = ʃ∂abcd[i,j,k,l] = ʃ(∂bfs[i], bfs[j],  bfs[k],  bfs[l])
         end
     end
@@ -93,8 +89,8 @@ function derivativeCore(FoutputIsVector::Val{B},
     ∂S = Array{T}(undef, BN, BN)
     ∂X = Array{T}(undef, BN, BN) # ∂X corresponds to the derivative of X = S^(-0.5)
     ∂X₀ = Array{T}(undef, BN, BN) # ∂X in its eigen basis
-    @sync for i=1:BN
-        Threads.@spawn for j=1:i
+    @sync for i=1:BN, j=1:i
+        Threads.@spawn begin
             ∂S[i,j] = ∂S[j,i] = overlap(∂bfs[i], bfs[j]) + overlap(bfs[i], ∂bfs[j])
         end
     end
