@@ -1,8 +1,8 @@
 export GaussFunc, genExponent, genContraction, SpatialPoint, genSpatialPoint, coordOf, 
        BasisFunc, BasisFuncs, genBasisFunc, lOf, subshellOf, centerOf, centerCoordOf, 
-       dimOf, GTBasis, sortBasisFuncs, sortPermBasisFuncs, sortBasis, sortPermBasis, add, 
-       mul, shift, decompose, orbitalNumOf, genBasisFuncText, genBFuncsFromText, 
-       assignCenInVal!, getParams, copyBasis, markParams!
+       gaussCoeffOf, dimOf, GTBasis, sortBasisFuncs, sortPermBasisFuncs, sortBasis, 
+       sortPermBasis, add, mul, shift, decompose, orbitalNumOf, genBasisFuncText, 
+       genBFuncsFromText, assignCenInVal!, getParams, copyBasis, markParams!, normOf
 
 export P1D, P2D, P3D
 
@@ -371,9 +371,6 @@ BasisFunc(bfs::BFuncs1O) = BasisFunc(bfs.center, bfs.gauss, bfs.l, bfs.normalize
 
 struct EmptyBasisFunc{T<:Real, D} <: CGTBasisFuncs1O{T, D, 0} end
 
-isEmptyBasisFunc(::EmptyBasisFunc) = true
-isEmptyBasisFunc(::CompositeGTBasisFuncs) = false
-
 
 isaFullShellBasisFuncs(::Any) = false
 
@@ -699,6 +696,24 @@ centerOf(bf::FloatingGTBasisFuncs) = bf.center
 Return the center coordinate of the input `FloatingGTBasisFuncs`.
 """
 centerCoordOf(bf::FloatingGTBasisFuncs) = coordOf(bf.center)
+
+
+"""
+
+    gaussCoeffOf(gf::GaussFunc{T}) -> Vector{T}
+
+Return the exponent and contraction coefficients of `gf`.
+"""
+gaussCoeffOf(gf::GaussFunc) = outValOf.(gf.param) |> collect
+
+"""
+
+    gaussCoeffOf(b::FloatingGTBasisFuncs{T}) -> Matrix{T}
+
+Return the exponent and contraction coefficients of each [`GaussFunc`](@ref) (in each 
+column of the returned `Matrix`) inside `b`.
+"""
+gaussCoeffOf(bf::FloatingGTBasisFuncs) = hcat(gaussCoeffOf.(bf.gauss)...)
 
 
 """
@@ -1212,8 +1227,8 @@ function mul(sgf1::BasisFunc{T, D, 𝑙1, 1, PT1}, sgf2::BasisFunc{T, D, 𝑙2, 
     d₂ = sgf2.gauss[1].con()
     n₁ = sgf1.normalizeGTO
     n₂ = sgf2.normalizeGTO
-    n₁ && (d₁ *= getNorms(sgf1)[])
-    n₂ && (d₂ *= getNorms(sgf2)[])
+    n₁ && (d₁ *= normOf(sgf1)[])
+    n₂ && (d₂ *= normOf(sgf2)[])
     normalizeGTO isa Missing && (normalizeGTO = n₁*n₂)
 
     R = if (cen1 = sgf1.center) === (cen2 = sgf2.center) || hasIdentical(cen1, cen2)
@@ -1260,8 +1275,8 @@ function mul(sgf1::BasisFunc{T, D, 0, 1, PT1}, sgf2::BasisFunc{T, D, 0, 1, PT2};
     d₂ = sgf2.gauss[1].con()
     n₁ = sgf1.normalizeGTO
     n₂ = sgf2.normalizeGTO
-    n₁ && (d₁ *= getNorms(sgf1)[])
-    n₂ && (d₂ *= getNorms(sgf2)[])
+    n₁ && (d₁ *= normOf(sgf1)[])
+    n₂ && (d₂ *= normOf(sgf2)[])
     R₁ = centerCoordOf(sgf1)
     R₂ = centerCoordOf(sgf2)
     xpn, con, cen = gaussProd((sgf1.gauss[1].xpn(), d₁, R₁), (sgf2.gauss[1].xpn(), d₂, R₂))
@@ -1285,7 +1300,7 @@ function mul(bf::BasisFunc{T, D, 𝑙, GN}, coeff::Real;
              roundDigits::Int=getAtolDigits(T)) where {T, D, 𝑙, GN}
     n = bf.normalizeGTO
     normalizeGTO isa Missing && (normalizeGTO = n)
-    c = (n && !normalizeGTO) ? (coeff .* getNorms(bf)) : coeff
+    c = (n && !normalizeGTO) ? (coeff .* normOf(bf)) : coeff
     gfs = mul.(bf.gauss, c; roundDigits)
     BasisFunc(bf.center, gfs, bf.l, normalizeGTO)
 end
@@ -1823,5 +1838,15 @@ getNijk(T, i, j, k) * getNα(i, j, k, α)
 
 getNijkα(ijk, α) = getNijkα(ijk[1], ijk[2], ijk[3], α)
 
-getNorms(b::FGTBasisFuncs1O{T, 3, 𝑙, GN})  where {T, 𝑙, GN} = 
+"""
+
+    normOf(b::FloatingGTBasisFuncs{T, 3}) where {T} -> Array{T}
+
+Return the normalization factors of the Gaussian-type orbitals (GTO) inside the input `b`. 
+Each column corresponds to one orbital.
+"""
+normOf(b::FGTBasisFuncs1O{T, 3, 𝑙, GN})  where {T, 𝑙, GN} = 
 getNijkα.(b.l[1]..., T[g.xpn() for g in b.gauss])
+
+normOf(b::FloatingGTBasisFuncs{<:Any, 3, <:Any, <:Any, <:Any, ON}) where {ON} = 
+hcat(normOf.(b)...)
