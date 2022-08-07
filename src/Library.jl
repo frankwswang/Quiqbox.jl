@@ -69,8 +69,8 @@ eltype(::LTuple) = Int
 
 import Base: +
 +(xyz1::LTuple{D, L1},  xyz2::LTuple{D, L2} ) where {D, L1, L2} = LTuple(xyz1, xyz2)
-+( xyz::LTuple{D, L},      t::NTuple{D, Int}) where {D, L} = xyz + LTuple{sum(t)}(t)
-+(   t::NTuple{D, Int},  xyz::LTuple{L, D}  ) where {D, L} = +(xyz, t)
++( xyz::LTuple{D, L},      t::NTuple{D, Int}) where {D, L} = xyz + LTuple{D, sum(t)}(t)
++(   t::NTuple{D, Int},  xyz::LTuple{D, L}  ) where {D, L} = +(xyz, t)
 
 import Base: Tuple, sum, map, isless
 Tuple(xyz::LTuple) = xyz.tuple
