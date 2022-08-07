@@ -1,7 +1,7 @@
 using Test
 using Quiqbox
 using Quiqbox: BasisFuncMix, isaFullShellBasisFuncs, unpackBasis, ElementNames, 
-               sortBasisFuncs, ParamList, sumOf, mergeGaussFuncs, gaussProd, getNorms, 
+               sortBasisFuncs, ParamList, sumOf, mergeGaussFuncs, gaussProd, normOf, 
                mergeBasisFuncs, getTypeParams
 using LinearAlgebra
 using Random
@@ -9,7 +9,7 @@ using Random
 @testset "Basis.jl" begin
 
 # struct GaussFunc
-xpn1, con1 = (2.0, 1.0)
+xpn1, con1 = ps1 = (2.0, 1.0)
 gf1 = GaussFunc(xpn1, con1)
 gf2 = GaussFunc(xpn1, con1)
 @test typeof(gf1) == typeof(gf2)
@@ -131,14 +131,14 @@ bf3s3 = genBasisFunc.(Ref(fill(0.0, 3)), "STO-3G", ["H", "He"]) |> flatten
 @test isapprox(1, overlap(bf3_2, bf3_2)[], atol=1e-8)
 
 bf4_1 = genBasisFunc([0.0, 0.0, 0.0], (3.0, 1.0))
-bf4_2 = genBasisFunc([1.0, 0.0, 0.0], (2.0, 1.0))
-bf4_3 = genBasisFunc([0.0, 0.0, 0.0], (2.0, 1.0), "P")
+bf4_2 = genBasisFunc([1.0, 0.0, 0.0], ps1)
+bf4_3 = genBasisFunc([0.0, 0.0, 0.0], ps1, "P")
 bf4_4 = genBasisFunc([0.0, 0.0, 0.0], (1.0, 1.0), "D")
 errorThreshold1 = 1e-11; errorThreshold3 = 1e-9
-bf3_2_2 = genBasisFunc([1.0, 0.0, 0.0], (2.0, 1.0), normalizeGTO=true)
+bf3_2_2 = genBasisFunc([1.0, 0.0, 0.0], ps1, normalizeGTO=true)
 @test isapprox(1, overlap(bf3_2_2, bf3_2_2)[], atol=errorThreshold1)
 @test isapprox(0.6960409996039634, overlap(bf4_2, bf4_2)[], atol=errorThreshold1)
-bf3_3_2 = genBasisFunc([0.0, 0.0, 0.0], (2.0, 1.0), "P", normalizeGTO=true)
+bf3_3_2 = genBasisFunc([0.0, 0.0, 0.0], ps1, "P", normalizeGTO=true)
 @test isapprox(LinearAlgebra.I, overlaps((bf3_3_2,)), atol=errorThreshold1)
 @test isapprox(0.0870051249505*LinearAlgebra.I, overlaps((bf4_3,)), atol=errorThreshold1)
 bf3_4_2 = genBasisFunc([0.0, 0.0, 0.0], (1.0, 1.0), "D", normalizeGTO=true)
@@ -151,10 +151,10 @@ bf3_4_2 = genBasisFunc([0.0, 0.0, 0.0], (1.0, 1.0), "D", normalizeGTO=true)
                 0.1230438277009564 0.0 0.0 0.1230438277009564 0.0 0.3691314831028692], 
                 overlaps((bf4_4,)), atol=errorThreshold1)
 
-@test markUnique( [genBasisFunc(cen, (2.0, 1.0), (2,0,0)), 
-                   genBasisFunc(cen, (2.0, 1.0), [(2,0,0)]),
-                   genBasisFunc(cen, (2.0, 1.0), "D", (true,)),
-                   genBasisFunc(bf1.center, (2.0, 1.0), "D", (true,)),
+@test markUnique( [genBasisFunc(cen, ps1, (2,0,0)), 
+                   genBasisFunc(cen, ps1, [(2,0,0)]),
+                   genBasisFunc(cen, ps1, "D", (true,)),
+                   genBasisFunc(bf1.center, ps1, "D", (true,)),
                    genBasisFunc(cen, GaussFunc(2.0, 1.0), "D", (true,))] )[1] == fill(1, 5)
 
 
@@ -186,6 +186,12 @@ bfs3 = bfs3 |> flatten
 bf5 = genBasisFunc(fill(0.0, 3), (2.0, 1.0), (1,0,0))
 @test centerOf(bf5) == bf5.center
 @test centerCoordOf(bf5) == fill(0.0, 3)
+
+# function gaussCoeffOf
+@test gaussCoeffOf(gf1) == Quiqbox.outValOf.(gf1.param) |> collect
+ps1v = ps1 |> collect
+@test gaussCoeffOf(bf11) == hcat(ps1v, ps1v)
+@test gaussCoeffOf(bf4_3) == hcat(ps1v)
 
 
 # struct BasisFuncMix
@@ -385,7 +391,7 @@ bf_mul5 = mul(bf_mul1, bf_mul2, normalizeGTO=true)
 bf_mul5_0 = genBasisFunc([1.0, 0.0, 0.0], (3.5, 3.0), normalizeGTO=true)
 @test hasEqual(bf_mul5, bf_mul5_0)
 bf_mul6 = mul(bf_mul1, bf_mul2_2)
-gfCoeffs = (3.5, round(3*getNorms(bf_mul2)[], digits=15))
+gfCoeffs = (3.5, round(3*normOf(bf_mul2)[], digits=15))
 bf_mul6_0 = genBasisFunc([1.0, 0.0, 0.0], gfCoeffs)
 @test hasEqual(bf_mul6, bf_mul6_0)
 bf_mul7 = mul(bf_mul1, bf_mul2_2, normalizeGTO=true)
@@ -703,30 +709,11 @@ pbs_gv3_2 = sort(pbs_gv3, by=x->(typeof(x).parameters[2], x.index[]))
 @test hasIdentical(pbs_gv3_2, pbs_gv0_2)
 
 
-# function getVar getVarDict
-@test getVar(e_gv1) == :α₁
-@test getVar.(bf_gv6.param) == (:X₁, :Y₂, :Z₂, :α₁, :d₃, :α₃, :d₂, :α₂, :d₁)
-@test getVar.(bf_gv6.param, true) == (:X₁, :Y₂, :Z₂, :α₁, :d₃, :α₃, :d₂, :x_α₂, :d₁)
-@test getVar.(bfm_gv.param) == (:X₁, :Y₁, :Z₁, :α₂, :d₂, :X₁, :Y₂, :Z₂, :α₁, :d₃, :α₃, :d₂, 
-                                :α₂, :d₁, :X₂, :Y₂, :Z₃, :α₃, :d₃)
-@test getVar.(bfm_gv.param, true) == (:X₁, :Y₁, :Z₁, :x_α₂, :d₂, :X₁, :Y₂, :Z₂, :α₁, :d₃, 
-                                      :α₃, :d₂, :x_α₂, :d₁, :X₂, :Y₂, :Z₃, :α₃, :d₃)
-
-
-@test getVarDict(e_gv1) == Dict(:α₁=>2.0)
-@test getVarDict(pb2) == Dict(:q=>2)
-@test getVarDict(pb3) == Dict([:x_l₂=>2.1, :l₂=>4.41])
-@test getVarDict(bf_gv6.param) == Dict( ( (  getVar.(bf_gv6.param) .=> 
-                                           outValOf.(bf_gv6.param))..., 
-                                          ( inSymOf.(bf_gv6.param) .=> 
-                                           getindex.(bf_gv6.param))... ) )
-@test getVarDict(bfm_gv.param) == Dict( ( (  getVar.(bfm_gv.param) .=> 
-                                           outValOf.(bfm_gv.param))..., 
-                                         (  inSymOf.(bfm_gv.param) .=> 
-                                           getindex.(bfm_gv.param))... ) )
-@test getVarDict(bfm_gv.param) == getVarDict(unique(bfm_gv.param))
-@test getVarDict(bfm_gv.param) != getVarDict(getUnique!(bfm_gv.param|>collect))
-@test getVarDict(bfm_gv.param) == getVarDict(getUnique!(bfm_gv.param|>collect, 
-                                                        compareFunction=hasIdentical))
+# function normOf
+bf_mul17 = genBasisFunc([1.0, 1.0, 1.0], "6-31G", "K")[end]
+ns = normOf(bf_mul17)
+sgfs = decompose(genBasisFunc(bf_mul17, false), true)
+bf_mul17s = [sum(i) for i in eachcol(sgfs .* ns)]
+@test isapprox.(1, map((x,y)->overlap(x,y), bf_mul17s, bf_mul17), atol=1e-12) |> all
 
 end
