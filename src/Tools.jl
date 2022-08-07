@@ -525,7 +525,7 @@ julia> arr
 """
 function getUnique!(arr::AbstractVector{T}, args...; 
                     compareFunction::F = hasEqual, kws...) where {T<:Any, F<:Function}
-    @assert length(arr) > 1 "The length of input array should be larger than 1."
+    @assert length(arr) > 0 "The length of input array should be larger than 0."
     f = (b...)->compareFunction((b..., args...)...; kws...)
     cmprList = T[arr[1]]
     delList = Bool[false]
