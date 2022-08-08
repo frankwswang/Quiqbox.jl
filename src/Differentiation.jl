@@ -211,13 +211,18 @@ end
 
 𝑑f(::Type{FI}, ::Function, ::T) where {T} = T(1.0)
 
-function ∂SGFcore(::Val{xpnSym}, sgf::FGTBasisFuncs1O{T, 3, 𝑙, 1}, c::T=T(1)) where {T, 𝑙}
-    res = ( shiftCore(+, sgf, LTuple(2,0,0)) + shiftCore(+, sgf, LTuple(0,2,0)) + 
-            shiftCore(+, sgf, LTuple(0,0,2)) ) * (-c)
-    if sgf.normalizeGTO
-        res += sgf * ((𝑙/T(2) + T(0.75)) / sgf.gauss[1].xpn() * c)
-    end
-    res
+∂SGFcore(::Val{xpnSym}, sgf::FGTBasisFuncs1O{T, 3, 𝑙, 1}, c::T=T(1)) where {T, 𝑙} = 
+sgf.normalizeGTO ? ∂SGF∂xpn2(sgf, c) : ∂SGF∂xpn1(sgf, c)
+
+function ∂SGF∂xpn1(sgf::FGTBasisFuncs1O{T, 3, 𝑙, 1}, c::T) where {T, 𝑙}
+    ( shiftCore(+, sgf, LTuple(2,0,0)) + shiftCore(+, sgf, LTuple(0,2,0)) + 
+      shiftCore(+, sgf, LTuple(0,0,2)) ) * (-c)
+end
+
+function ∂SGF∂xpn2(sgf::FGTBasisFuncs1O{T, 3, 𝑙, 1}, c::T) where {T, 𝑙}
+    α = sgf.gauss[1].xpn()
+    ugf = genBasisFunc(sgf, false)
+    ∂SGF∂xpn1(ugf, c) * getNijkα(sgf.l[1].tuple, α) + sgf * ( c * (𝑙/T(2) + T(0.75)) / α )
 end
 
 function ∂SGFcore(::Val{conSym}, sgf::FGTBasisFuncs1O{T, D, 𝑙, 1}, c::T=T(1)) where {T, D, 𝑙}
