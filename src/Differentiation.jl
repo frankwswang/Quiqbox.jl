@@ -209,13 +209,13 @@ end
 
 𝑑f(::Type{FL}, f::F, x::T) where {FL<:FLevel, F<:Function, T} = ForwardDerivative(f, x)
 
-𝑑f(::Type{FI}, f::Function, x::T) where {T} = T(1.0)
+𝑑f(::Type{FI}, ::Function, ::T) where {T} = T(1.0)
 
 function ∂SGFcore(::Val{xpnSym}, sgf::FGTBasisFuncs1O{T, 3, 𝑙, 1}, c::T=T(1)) where {T, 𝑙}
     res = ( shiftCore(+, sgf, LTuple(2,0,0)) + shiftCore(+, sgf, LTuple(0,2,0)) + 
             shiftCore(+, sgf, LTuple(0,0,2)) ) * (-c)
     if sgf.normalizeGTO
-        res += sgf * ((𝑙/T(2) + T(3)/4) / sgf.gauss[1].xpn() * c)
+        res += sgf * ((𝑙/T(2) + T(0.75)) / sgf.gauss[1].xpn() * c)
     end
     res
 end
@@ -256,7 +256,8 @@ paramIndex(::Val{conSym}, ::Val{D}) where {D} = conIndex - 3 + D
 function ∂BasisCore1(par::ParamBox{T, V, FL}, sgf::FGTBasisFuncs1O{T, D, <:Any, 1}) where 
                     {T, FL, V, D}
     params = sgf.param
-    is = findall(x->compareParamBoxCore1(x, par), params)
+    is = findall(x->compareParamBoxCore1(x, par) && 
+                    (getFLevel(x.map)==0 || isDiffParam(x)), params)
     if length(is) > 0
         map(is) do i
             fPar = params[i]
@@ -276,7 +277,7 @@ end
 function ∂BasisCore2(par::ParamBox{T, V, FL}, sgf::FGTBasisFuncs1O{T, D, <:Any, 1}) where 
                     {T, V, FL, D}
     dividend = sgf.param[paramIndex(Val(V), Val(D))]
-    if !(divident.canDiff[]) && compareParamBoxCore2(par, dividend)
+    if compareParamBoxCore2(par, dividend)
         ∂SGFcore(Val(V), sgf)
     else
         EmptyBasisFunc{T, D}()
@@ -287,7 +288,7 @@ end
 ∂BasisCore1(par, sgf)
 
 ∂Basis(par::ParamBox{T, V, FL}, sgf::FGTBasisFuncs1O{T, D, <:Any, 1}) where {T, V, FL, D} = 
-par.canDiff[] ? ∂BasisCore1(par, sgf) : ∂BasisCore2(par, sgf)
+isDiffParam(par) ? ∂BasisCore1(par, sgf) : ∂BasisCore2(par, sgf)
 
 ∂Basis(par::ParamBox{T, V, FL}, b::FGTBasisFuncs1O{T}) where {T, V, FL} = 
 ∂Basis.(par, reshape(decomposeCore(Val(true), b), :)) |> sum
