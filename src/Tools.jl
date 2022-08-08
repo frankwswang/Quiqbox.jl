@@ -482,7 +482,7 @@ function markUnique(arr::AbstractArray{T}, args...;
     for i = 2:length(arr)
         local j
         isNew = true
-        for outer j = 1:length(cmprList)
+        for outer j = eachindex(cmprList)
             if f(cmprList[j], arr[i])
                 isNew = false
                 break
@@ -794,7 +794,7 @@ map(x->Tuple(x.|>T1), coords)
 genTupleCoords(::Type{T}, coords::Tuple{Vararg{NTuple{D, T}}}) where {D, T} = itself(coords)
 
 genTupleCoords(::Type{T}, coords::AbstractVector{NTuple{D, T}}) where {D, T} = 
-arrayToTuple(coord)
+arrayToTuple(coords)
 
 function callGenFunc(f::F, x::T) where {F<:Function, T}
     if worldAgeSafe(F) || applicable(f, zero(T))
