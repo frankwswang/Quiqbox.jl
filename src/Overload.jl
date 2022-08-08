@@ -3,7 +3,7 @@
 import Base: ==
 ==(pb1::ParamBox, pb2::ParamBox) = (pb1[] == pb2[] && 
                                     pb1.dataName == pb2.dataName && 
-                                    pb1.canDiff[] == pb2.canDiff[] && 
+                                    isDiffParam(pb1) == isDiffParam(pb2) && 
                                     pb1.index[] == pb2.index[] && 
                                     typeof(pb1.map) === typeof(pb2.map))
 
@@ -279,7 +279,7 @@ function hasBoolRelation(boolFunc::F,
             ifelse((ignoreFunction || F1 == F2 == FI), 
                 boolFunc(pb1.data, pb2.data), 
 
-                ( boolFunc(pb1.canDiff[], pb2.canDiff[]) && 
+                ( boolFunc(isDiffParam(pb1), isDiffParam(pb2)) && 
                   boolFunc(pb1.map, pb2.map) && 
                   boolFunc(pb1.data, pb2.data) )
             ), 
