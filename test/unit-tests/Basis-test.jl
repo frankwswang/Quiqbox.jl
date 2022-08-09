@@ -801,6 +801,9 @@ bf_mul17s = [sum(i) for i in eachcol(sgfs .* ns)]
 
 
 # function absorbNormFactor
+@test absorbNormFactor(bf1) === bf1
+@test absorbNormFactor(bf_mul8_0) === bf_mul8_0
+@test absorbNormFactor(bf2_P_norm2) === bf2_P_norm2
 bfForabsorbNorm1 = genBasisFunc(bf5, true)
 @test bfForabsorbNorm1 isa BasisFunc
 @test isapprox(overlaps([bfForabsorbNorm1])[], overlaps([bf5*getNormFactor(bf5)[]])[], 

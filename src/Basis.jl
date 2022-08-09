@@ -1855,24 +1855,32 @@ hcat(getNormFactor.(b)...)
 
 """
 
-    absorbNormFactor(b::FloatingGTBasisFuncs{T, 3, 𝑙, GN, PT, 1}) where {T, 𝑙, GN, PT, 1} -> 
-    BasisFunc{{T, 3, 𝑙, GN, PT}
+    absorbNormFactor(b::FloatingGTBasisFuncs{T, 3, 𝑙, GN, PT, ON}) where 
+                    {T, 𝑙, GN, PT, ON} -> 
+    Union{FloatingGTBasisFuncs{T, 3, 𝑙, GN, PT}, 
+          Vector{<:FloatingGTBasisFuncs{T, 3, 𝑙, GN, PT}}}
 
-    absorbNormFactor(b::FloatingGTBasisFuncs{T, 3, 𝑙, <:Any, PT, ON}) where 
-                    {T, 3, 𝑙, PT, ON} -> 
-    Vector{<:FloatingGTBasisFuncs{T, 3, 𝑙, <:Any, PT}}
-
-Absorb the normalization factor of each Gaussian-type orbital inside `b` into the orbital's 
-corresponding contraction coefficient and then set `normalizeGTO` of `b` to `false`.
+If `hasNormFactor(`b`) == true`, absorb the normalization factor of each Gaussian-type 
+orbital inside `b` into the orbital's corresponding contraction coefficient and then set 
+`.normalizeGTO` of `b` to `false`. Otherwise, directly return `b`.
 """
-absorbNormFactor(b::FGTBasisFuncs1O{<:Any, 3}) = 
+function absorbNormFactor(b::FloatingGTBasisFuncs{<:Any, 3})
+    if hasNormFactor(b)
+        absorbNormFactorCore(b)
+    else
+        b
+    end
+end
+
+absorbNormFactorCore(b::FGTBasisFuncs1O{<:Any, 3, <:Any, 1}) = 
+(genBasisFunc(b, false) * getNormFactor(b)[begin])
+
+absorbNormFactorCore(b::FGTBasisFuncs1O{<:Any, 3}) = 
 sum( decomposeCore(Val(true), genBasisFunc(b, false)) .* getNormFactor(b) )
 
-absorbNormFactor(b::FloatingGTBasisFuncs{<:Any, 3, <:Any, <:Any, <:Any, ON}) where {ON} = 
-mergeBasisFuncs(absorbNormFactor.(b)...)
-
-absorbNormFactor(b::FGTBasisFuncs1O{<:Any, 3, <:Any, 1}) = 
-genBasisFunc(b, false) * getNormFactor(b)[begin]
+absorbNormFactorCore(b::FloatingGTBasisFuncs{<:Any, 3, <:Any, <:Any, <:Any, ON}) where 
+                    {ON} = 
+mergeBasisFuncs(absorbNormFactorCore.(b)...)
 
 """
 
