@@ -212,7 +212,7 @@ end
 𝑑f(::Type{FI}, ::Function, ::T) where {T} = T(1.0)
 
 ∂SGFcore(::Val{xpnSym}, sgf::FGTBasisFuncs1O{T, 3, 𝑙, 1}, c::T=T(1)) where {T, 𝑙} = 
-sgf.normalizeGTO ? ∂SGF∂xpn2(sgf, c) : ∂SGF∂xpn1(sgf, c)
+hasNormFactor(sgf) ? ∂SGF∂xpn2(sgf, c) : ∂SGF∂xpn1(sgf, c)
 
 function ∂SGF∂xpn1(sgf::FGTBasisFuncs1O{T, 3, 𝑙, 1}, c::T) where {T, 𝑙}
     ( shiftCore(+, sgf, LTuple(2,0,0)) + shiftCore(+, sgf, LTuple(0,2,0)) + 
@@ -230,16 +230,19 @@ function ∂SGFcore(::Val{conSym}, sgf::FGTBasisFuncs1O{T, D, 𝑙, 1}, c::T=T(1
 end
 
 function ∂SGFcore(::Val{cxSym}, sgf::FGTBasisFuncs1O{T, 3, 𝑙, 1}, c::T=T(1)) where {T, 𝑙}
+    sgf = hasNormFactor(sgf) ? absorbNormFactor(sgf) : sgf
     shiftCore(-, sgf, LTuple(1,0,0)) * (-c*sgf.l[1][1]) + 
     shiftCore(+, sgf, LTuple(1,0,0)) * (2c*sgf.gauss[1].xpn())
 end
 
 function ∂SGFcore(::Val{cySym}, sgf::FGTBasisFuncs1O{T, 3, 𝑙, 1}, c::T=T(1)) where {T, 𝑙}
+    sgf = hasNormFactor(sgf) ? absorbNormFactor(sgf) : sgf
     shiftCore(-, sgf, LTuple(0,1,0)) * (-c*sgf.l[1][2]) + 
     shiftCore(+, sgf, LTuple(0,1,0)) * (2c*sgf.gauss[1].xpn())
 end
 
 function ∂SGFcore(::Val{czSym}, sgf::FGTBasisFuncs1O{T, 3, 𝑙, 1}, c::T=T(1)) where {T, 𝑙}
+    sgf = hasNormFactor(sgf) ? absorbNormFactor(sgf) : sgf
     shiftCore(-, sgf, LTuple(0,0,1)) * (-c*sgf.l[1][3]) + 
     shiftCore(+, sgf, LTuple(0,0,1)) * (2c*sgf.gauss[1].xpn())
 end

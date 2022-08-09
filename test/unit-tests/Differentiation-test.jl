@@ -87,7 +87,7 @@ S2 = overlaps(bs2)
 HFres2 = runHF(bs2, nuc, nucCoords, DHFO, printInfo=false)
 grad2 = gradOfHFenergy(pars2, bs2, S2, HFres2.C, nuc, nucCoords)
 @test isapprox(grad2[1], -grad2[2], atol=t2)
-@test isapprox(grad2[1], -0.14578887741248214, atol=t2)
+@test isapprox(grad2[1], -0.06786383130892232, atol=t2)
 @test all(grad2[3:6] .== 0)
 grad2_tp = [0.006457377706861833, 0.17348694557592814, 
             0.09464147744656332, -0.059960502688769846]
