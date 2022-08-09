@@ -47,11 +47,20 @@ disableDiff!(con3)
 
 sgf3 = genBasisFunc(sgf1, true)
 ijk1 = sgf1.l[1].tuple
-grad1 = ∂Basis(xpn, sgf3)
-grad0 = Quiqbox.getNijkα(ijk1, xpn())*∂Basis(xpn, sgf1) + 
-       sgf1 * ForwardDerivative(x->Quiqbox.getNijkα(ijk1, x), xpn()) * gα(vα)
-@test hasApprox(overlap(grad0, grad1), overlap(grad0, grad0), overlap(grad1, grad1), 
+grad2 = ∂Basis(xpn, sgf3)
+grad1 = Quiqbox.getNijkα(ijk1, xpn())*∂Basis(xpn, sgf1) + 
+        sgf1 * ForwardDerivative(x->Quiqbox.getNijkα(ijk1, x), xpn()) * gα(vα)
+@test hasApprox(overlap(grad1, grad2), overlap(grad1, grad1), overlap(grad2, grad2), 
                 atol=1e-15)
+
+for P in (X,Y,Z)
+    @test hasApprox(∂Basis(P, sgf3), ∂Basis(P, sgf1) * Quiqbox.getNijkα(ijk1, xpn()), 
+                    atol=1e-15)
+end
+
+@test hasApprox(absorbNormFactor(∂Basis(con, sgf3)), 
+                                 ∂Basis(con, sgf1) * Quiqbox.getNijkα(ijk1, xpn()), 
+                                 atol=1e-15)
 
 
 # function gradOfHFenergy
@@ -87,7 +96,7 @@ S2 = overlaps(bs2)
 HFres2 = runHF(bs2, nuc, nucCoords, DHFO, printInfo=false)
 grad2 = gradOfHFenergy(pars2, bs2, S2, HFres2.C, nuc, nucCoords)
 @test isapprox(grad2[1], -grad2[2], atol=t2)
-@test isapprox(grad2[1], -0.14578887741248214, atol=t2)
+@test isapprox(grad2[1], -0.06786383130892232, atol=t2)
 @test all(grad2[3:6] .== 0)
 grad2_tp = [0.006457377706861833, 0.17348694557592814, 
             0.09464147744656332, -0.059960502688769846]

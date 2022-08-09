@@ -3,7 +3,7 @@ export GaussFunc, genExponent, genContraction, SpatialPoint, genSpatialPoint, co
        gaussCoeffOf, dimOf, GTBasis, sortBasisFuncs, sortPermBasisFuncs, sortBasis, 
        sortPermBasis, add, mul, shift, decompose, orbitalNumOf, genBasisFuncText, 
        genBFuncsFromText, assignCenInVal!, getParams, copyBasis, markParams!, 
-       getNormFactor, absorbNormFactor
+       hasNormFactor, getNormFactor, absorbNormFactor
 
 export P1D, P2D, P3D
 
@@ -1185,10 +1185,11 @@ Multiplication between two `CompositeGTBasisFuncs{T, D, <:Any, 1}`s (e.g.,
 [`BasisFunc`](@ref) and [`BasisFuncMix`](@ref)), or a `Real` number and a 
 `CompositeGTBasisFuncs{T, D, <:Any, 1}`. If `normalizeGTO` is set to `missing` (in 
 default), The [`GaussFunc`](@ref) inside the output containers will be normalized only if 
-all the input bases hold `.normalizeGTO == true`. `roundDigits` specifies the maximal 
-number of digits after the radix point of the calculated values. When set to negative, no 
-rounding will be performed. The function can be called using `*` syntax with the keyword 
-arguments set to their default values.
+every input `FloatingGTBasisFuncs` (or inside the input `CompositeGTBasisFuncs`) holds 
+`hasNormFactor(ai) == true`. `roundDigits` specifies the maximal number of digits after the 
+radix point of the calculated values. When set to negative, no rounding will be performed. 
+The function can be called using `*` syntax with the keyword arguments set to their default 
+values.
 
 ≡≡≡ Example(s) ≡≡≡
 
@@ -1816,6 +1817,16 @@ function markParamsCore!(parArray::AbstractVector{<:ParamBox{<:Any, V}}) where {
 end
 
 
+"""
+
+    hasNormFactor(b::FloatingGTBasisFuncs) -> Bool
+
+Indicate whether `b`' will be treated as having additional normalization factor(s) 
+multiplied to its Gaussian-type orbital(s) during any calculation.
+"""
+hasNormFactor(b::FloatingGTBasisFuncs) = b.normalizeGTO
+
+
 getNijk(::Type{T}, i::Integer, j::Integer, k::Integer) where {T} = 
     (T(2)/π)^T(0.75) * sqrt( 2^(3*(i+j+k)) * factorial(i) * factorial(j) * factorial(k) / 
     (factorial(2i) * factorial(2j) * factorial(2k)) )
@@ -1844,21 +1855,32 @@ hcat(getNormFactor.(b)...)
 
 """
 
-    absorbNormFactor(b::FloatingGTBasisFuncs{T, 3, 𝑙, GN, PT, 1}) where {T, 𝑙, GN, PT, 1} -> 
-    BasisFunc{{T, 3, 𝑙, GN, PT}
+    absorbNormFactor(b::FloatingGTBasisFuncs{T, 3, 𝑙, GN, PT, ON}) where 
+                    {T, 𝑙, GN, PT, ON} -> 
+    Union{FloatingGTBasisFuncs{T, 3, 𝑙, GN, PT}, 
+          Vector{<:FloatingGTBasisFuncs{T, 3, 𝑙, GN, PT}}}
 
-    absorbNormFactor(b::FloatingGTBasisFuncs{T, 3, 𝑙, <:Any, PT, ON}) where 
-                    {T, 3, 𝑙, PT, ON} -> 
-    Vector{<:FloatingGTBasisFuncs{T, 3, 𝑙, <:Any, PT}}
-
-Absorb the normalization factor of each Gaussian-type orbital inside `b` into the orbital's 
-corresponding contraction coefficient and then set `normalizeGTO` of `b` to `false`.
+If `hasNormFactor(`b`) == true`, absorb the normalization factor of each Gaussian-type 
+orbital inside `b` into the orbital's corresponding contraction coefficient and then set 
+`.normalizeGTO` of `b` to `false`. Otherwise, directly return `b`.
 """
-absorbNormFactor(b::FGTBasisFuncs1O{<:Any, 3}) = 
+function absorbNormFactor(b::FloatingGTBasisFuncs{<:Any, 3})
+    if hasNormFactor(b)
+        absorbNormFactorCore(b)
+    else
+        b
+    end
+end
+
+absorbNormFactorCore(b::FGTBasisFuncs1O{<:Any, 3, <:Any, 1}) = 
+(genBasisFunc(b, false) * getNormFactor(b)[begin])
+
+absorbNormFactorCore(b::FGTBasisFuncs1O{<:Any, 3}) = 
 sum( decomposeCore(Val(true), genBasisFunc(b, false)) .* getNormFactor(b) )
 
-absorbNormFactor(b::FloatingGTBasisFuncs{<:Any, 3, <:Any, <:Any, <:Any, ON}) where {ON} = 
-mergeBasisFuncs(absorbNormFactor.(b)...)
+absorbNormFactorCore(b::FloatingGTBasisFuncs{<:Any, 3, <:Any, <:Any, <:Any, ON}) where 
+                    {ON} = 
+mergeBasisFuncs(absorbNormFactorCore.(b)...)
 
 """
 

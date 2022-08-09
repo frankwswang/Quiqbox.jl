@@ -2,6 +2,8 @@ using Test
 using Quiqbox
 using Suppressor: @suppress_out
 
+include("../../test/test-functions/Shared.jl")
+
 @testset "Optimization.jl" begin
 
 errorThreshold = 1e-10
@@ -24,16 +26,12 @@ for c in configs, (i,j) in zip((1,2,7,8,9,10), (2,2,7,9,9,10))
     bs1 = genBasisFunc.(cens, Ref((gf1, gf2)), normalizeGTO=true)
     pars1 = markParams!(bs1, true)
 
-    local Es1L
-    @suppress_out begin
-        Es1L, _, _ = optimizeParams!(pars1[i:j], bs1, nuc, nucCoords, c, printInfo=false)
-        push!(Ebegin, Es1L[1])
-        push!(Eend, Es1L[end])
-    end
+    Es1L, _, _ = optimizeParams!(pars1[i:j], bs1, nuc, nucCoords, c, printInfo=false)
+    push!(Ebegin, Es1L[1])
+    push!(Eend, Es1L[end])
 end
 
 @test all(Ebegin .> Eend)
-@test all(Eend[2] >= Eend[8])
 compr2Arrays3((Eend_1to6=Eend[1:6], Eend_7toEnd=Eend[7:end]), 1e-5)
 
 
