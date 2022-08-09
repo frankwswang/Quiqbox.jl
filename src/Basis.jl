@@ -2,7 +2,8 @@ export GaussFunc, genExponent, genContraction, SpatialPoint, genSpatialPoint, co
        BasisFunc, BasisFuncs, genBasisFunc, lOf, subshellOf, centerOf, centerCoordOf, 
        gaussCoeffOf, dimOf, GTBasis, sortBasisFuncs, sortPermBasisFuncs, sortBasis, 
        sortPermBasis, add, mul, shift, decompose, orbitalNumOf, genBasisFuncText, 
-       genBFuncsFromText, assignCenInVal!, getParams, copyBasis, markParams!, normOf
+       genBFuncsFromText, assignCenInVal!, getParams, copyBasis, markParams!, 
+       getNormFactor, absorbNormFactor
 
 export P1D, P2D, P3D
 
@@ -1214,8 +1215,8 @@ function mul(sgf1::BasisFunc{T, D, 𝑙1, 1, PT1}, sgf2::BasisFunc{T, D, 𝑙2, 
     d₂ = sgf2.gauss[1].con()
     n₁ = sgf1.normalizeGTO
     n₂ = sgf2.normalizeGTO
-    n₁ && (d₁ *= normOf(sgf1)[])
-    n₂ && (d₂ *= normOf(sgf2)[])
+    n₁ && (d₁ *= getNormFactor(sgf1)[])
+    n₂ && (d₂ *= getNormFactor(sgf2)[])
     normalizeGTO isa Missing && (normalizeGTO = n₁*n₂)
 
     R = if (cen1 = sgf1.center) === (cen2 = sgf2.center) || hasIdentical(cen1, cen2)
@@ -1262,8 +1263,8 @@ function mul(sgf1::BasisFunc{T, D, 0, 1, PT1}, sgf2::BasisFunc{T, D, 0, 1, PT2};
     d₂ = sgf2.gauss[1].con()
     n₁ = sgf1.normalizeGTO
     n₂ = sgf2.normalizeGTO
-    n₁ && (d₁ *= normOf(sgf1)[])
-    n₂ && (d₂ *= normOf(sgf2)[])
+    n₁ && (d₁ *= getNormFactor(sgf1)[])
+    n₂ && (d₂ *= getNormFactor(sgf2)[])
     R₁ = centerCoordOf(sgf1)
     R₂ = centerCoordOf(sgf2)
     xpn, con, cen = gaussProd((sgf1.gauss[1].xpn(), d₁, R₁), (sgf2.gauss[1].xpn(), d₂, R₂))
@@ -1287,7 +1288,7 @@ function mulCore(bf::BasisFunc{T, D, 𝑙, GN}, coeff::Real;
                  roundDigits::Int=getAtolDigits(T)) where {T, D, 𝑙, GN}
     n = bf.normalizeGTO
     normalizeGTO isa Missing && (normalizeGTO = n)
-    c = (n && !normalizeGTO) ? (coeff .* normOf(bf)) : coeff
+    c = (n && !normalizeGTO) ? (coeff .* getNormFactor(bf)) : coeff
     gfs = mul.(bf.gauss, c; roundDigits)
     BasisFunc(bf.center, gfs, bf.l, normalizeGTO)
 end
@@ -1829,13 +1830,58 @@ getNijkα(ijk, α) = getNijkα(ijk[1], ijk[2], ijk[3], α)
 
 """
 
-    normOf(b::FloatingGTBasisFuncs{T, 3}) where {T} -> Array{T}
+    getNormFactor(b::FloatingGTBasisFuncs{T, 3}) where {T} -> Array{T}
 
 Return the normalization factors of the Gaussian-type orbitals (GTO) inside the input `b`. 
 Each column corresponds to one orbital.
 """
-normOf(b::FGTBasisFuncs1O{T, 3, 𝑙, GN})  where {T, 𝑙, GN} = 
+getNormFactor(b::FGTBasisFuncs1O{T, 3, 𝑙, GN})  where {T, 𝑙, GN} = 
 getNijkα.(b.l[1]..., T[g.xpn() for g in b.gauss])
 
-normOf(b::FloatingGTBasisFuncs{<:Any, 3, <:Any, <:Any, <:Any, ON}) where {ON} = 
-hcat(normOf.(b)...)
+getNormFactor(b::FloatingGTBasisFuncs{<:Any, 3, <:Any, <:Any, <:Any, ON}) where {ON} = 
+hcat(getNormFactor.(b)...)
+
+
+"""
+
+    absorbNormFactor(b::FloatingGTBasisFuncs{T, 3, 𝑙, GN, PT, 1}) where {T, 𝑙, GN, PT, 1} -> 
+    BasisFunc{{T, 3, 𝑙, GN, PT}
+
+    absorbNormFactor(b::FloatingGTBasisFuncs{T, 3, 𝑙, <:Any, PT, ON}) where 
+                    {T, 3, 𝑙, PT, ON} -> 
+    Vector{<:FloatingGTBasisFuncs{T, 3, 𝑙, <:Any, PT}}
+
+Absorb the normalization factor of each Gaussian-type orbital inside `b` into the orbital's 
+corresponding contraction coefficient and then set `normalizeGTO` of `b` to `false`.
+"""
+absorbNormFactor(b::FGTBasisFuncs1O{<:Any, 3}) = 
+sum( decomposeCore(Val(true), genBasisFunc(b, false)) .* getNormFactor(b) )
+
+absorbNormFactor(b::FloatingGTBasisFuncs{<:Any, 3, <:Any, <:Any, <:Any, ON}) where {ON} = 
+mergeBasisFuncs(absorbNormFactor.(b)...)
+
+"""
+
+    absorbNormFactor(bfm::BasisFuncMix{T, 3}) where {T} -> GTBasisFuncs{T, 3}
+
+Apply `absorbNormFactor` to every one of the `BasisFunc` inside `bfm` and them sum them 
+over.
+"""
+absorbNormFactor(bfm::BasisFuncMix{<:Any, 3}) = absorbNormFactor(bfm.BasisFunc) |> sumOf
+
+
+"""
+
+    absorbNormFactor(bs::AbstractVector{<:GTBasisFuncs{T, 3}}) where {T} -> 
+    AbstractVector{<:GTBasisFuncs{T, 3}}
+
+    absorbNormFactor(bs::Tuple{Vararg{GTBasisFuncs{T, 3}}}) where {T} -> 
+    Tuple{Vararg{GTBasisFuncs{T, 3}}}
+
+Apply `absorbNormFactor` to every element inside `bs`.
+"""
+absorbNormFactor(bs::AbstractVector{<:GTBasisFuncs{T, 3}}) where {T} = 
+vcat(absorbNormFactor.(bs)...)
+
+absorbNormFactor(bs::Tuple{Vararg{GTBasisFuncs{T, 3}}}) where {T} = 
+absorbNormFactor(bs |> collect) |> Tuple
