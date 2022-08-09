@@ -3,7 +3,7 @@
 import Base: ==
 ==(pb1::ParamBox, pb2::ParamBox) = (pb1[] == pb2[] && 
                                     pb1.dataName == pb2.dataName && 
-                                    pb1.canDiff[] == pb2.canDiff[] && 
+                                    isDiffParam(pb1) == isDiffParam(pb2) && 
                                     pb1.index[] == pb2.index[] && 
                                     typeof(pb1.map) === typeof(pb2.map))
 
@@ -103,13 +103,8 @@ end
 
 function show(io::IO, bfs::BasisFuncs{<:Any, <:Any, 𝑙, <:Any, <:Any, ON}) where {𝑙, ON}
     SON = SubshellXYZsizes[𝑙+1]
-    if ON == 1
-        xyz1 = bfs.l[1] |> LtoStr
-        xyz2 = ""
-    else
-        xyz1 = "$(bfs.l |> length)"
-        xyz2 = "/$(SON)"
-    end
+    xyz1 = "$(bfs.l |> length)"
+    xyz2 = "/$(SON)"
     print(io, typeStrOf(bfs))
     print(io, getFieldNameStr(bfs), "[")
     printstyled(io, xyz1, color=:cyan)
@@ -187,11 +182,8 @@ size(::SpatialPoint{<:Any, D}) where {D} = (D,)
 length(::SpatialPoint{<:Any, D}) where {D} = D
 eltype(::SpatialPoint{T}) where {T} = ParamBox{T}
 function size(::SpatialPoint{<:Any, D}, d::Integer) where {D}
-    if d > 0
-        ifelse(d==1, D, 1)
-    else
-        throw(BoundsError())
-    end
+    @boundscheck ( d > 0 || throw(BoundsError()) )
+    ifelse(d==1, D, 1)
 end
 
 iterate(gf::GaussFunc) = (gf, nothing)
@@ -220,11 +212,8 @@ length(::CGTBasisFuncsON{ON}) where {ON} = ON
 eltype(::BasisFuncs{T, D, 𝑙, GN, PT}) where {T, D, 𝑙, GN, PT} = BasisFunc{T, D, 𝑙, GN, PT}
 
 function size(x::SpatialBasis, d::Integer)
-    if d > 0
-        ifelse(d==1, length(x), 1)
-    else
-        throw(BoundsError())
-    end
+    @boundscheck ( d > 0 || throw(BoundsError(x, d)) )
+    ifelse(d==1, length(x), 1)
 end
 
 ## Indexing Interface
@@ -239,7 +228,7 @@ axes(::ParamBox) = ()
 
 getindex(container::ParameterizedContainer) = container.param
 
-getindex(sp::SpatialPoint, args...) = getindex(sp.param, args...)
+getindex(sp::SpatialPoint, is) = getindex(sp.param, is)
 firstindex(sp::SpatialPoint) = firstindex(sp.param)
 lastindex(sp::SpatialPoint) = lastindex(sp.param)
 eachindex(sp::SpatialPoint) = eachindex(sp.param)
@@ -290,7 +279,7 @@ function hasBoolRelation(boolFunc::F,
             ifelse((ignoreFunction || F1 == F2 == FI), 
                 boolFunc(pb1.data, pb2.data), 
 
-                ( boolFunc(pb1.canDiff[], pb2.canDiff[]) && 
+                ( boolFunc(isDiffParam(pb1), isDiffParam(pb2)) && 
                   boolFunc(pb1.map, pb2.map) && 
                   boolFunc(pb1.data, pb2.data) )
             ), 

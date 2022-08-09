@@ -1,7 +1,7 @@
 using Test
 using Quiqbox
-using Quiqbox: checkFname, advancedParse, numToSups, superscriptNum, numToSubs, 
-               subscriptNum, SpatialCoordType, typeStrNotUnionAll
+using Quiqbox: checkFname, advancedParse, alignNumSign, numToSups, superscriptNum, 
+               numToSubs, subscriptNum, SpatialCoordType, typeStrNotUnionAll
 
 @testset "FileIO.jl tests" begin
 
@@ -23,6 +23,11 @@ rm(testFname)
 @test advancedParse(Float64, "1.0 + 1.1im") === 1.0 + 1.1im
 @test advancedParse(BigFloat, "1.0") isa BigFloat
 @test advancedParse(BigFloat, "1.0") == BigFloat(1.0)
+
+
+# function alignNumSign
+@test alignNumSign(-1) == "-1"
+@test alignNumSign( 1) == " 1"
 
 
 # function numToSups & numToSubs

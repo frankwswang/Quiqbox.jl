@@ -482,7 +482,7 @@ function markUnique(arr::AbstractArray{T}, args...;
     for i = 2:length(arr)
         local j
         isNew = true
-        for outer j = 1:length(cmprList)
+        for outer j = eachindex(cmprList)
             if f(cmprList[j], arr[i])
                 isNew = false
                 break
@@ -525,7 +525,7 @@ julia> arr
 """
 function getUnique!(arr::AbstractVector{T}, args...; 
                     compareFunction::F = hasEqual, kws...) where {T<:Any, F<:Function}
-    @assert length(arr) > 1 "The length of input array should be larger than 1."
+    @assert length(arr) > 0 "The length of input array should be larger than 0."
     f = (b...)->compareFunction((b..., args...)...; kws...)
     cmprList = T[arr[1]]
     delList = Bool[false]
@@ -794,7 +794,7 @@ map(x->Tuple(x.|>T1), coords)
 genTupleCoords(::Type{T}, coords::Tuple{Vararg{NTuple{D, T}}}) where {D, T} = itself(coords)
 
 genTupleCoords(::Type{T}, coords::AbstractVector{NTuple{D, T}}) where {D, T} = 
-arrayToTuple(coord)
+arrayToTuple(coords)
 
 function callGenFunc(f::F, x::T) where {F<:Function, T}
     if worldAgeSafe(F) || applicable(f, zero(T))

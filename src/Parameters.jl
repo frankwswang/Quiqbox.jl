@@ -123,7 +123,7 @@ end
 
 function ParamBox(::Val{V}, mapFunction::F, data::Array{T, 0}, index, canDiff, 
                   dataName=:undef) where {V, F<:Function, T}
-    if getFLevel(F) > 0
+    if getFLevel(F) != 0
         fSym = mapFunction |> nameOf
         fStr = fSym |> string
         if startswith(fStr, '#')
@@ -143,8 +143,8 @@ ParamBox{T, V}(data, index)
 ParamBox(::Val{V}, pb::ParamBox{T, <:Any, FI}) where {V, T} = 
 ParamBox{T, V}(pb.data, pb.index)
 
-ParamBox(::Val{V}, pb::ParamBox{T}) where {T, V} = 
-ParamBox{T, V}(pb.map, pb.data, pb.index, pb.canDiff, pb.dataName)
+ParamBox(::Val{V}, pb::ParamBox{T}; canDiff::Array{Bool, 0}=pb.canDiff) where {T, V} = 
+ParamBox{T, V}(pb.map, pb.data, pb.index, canDiff, pb.dataName)
 
 ParamBox(data::T, dataName::Symbol=:undef; index::Union{Int, Nothing}=nothing) where {T} = 
 ParamBox(Val(dataName), fillObj(data), genIndex(index))
@@ -276,7 +276,7 @@ end
 function getVarCore(pb::ParamBox{T, <:Any, FL}) where {T, FL}
     dvSym = outSymOf(pb)
     ivVal = pb.data[]
-    if FL == FI || !pb.canDiff[]
+    if FL == FI || !isDiffParam(pb)
         Pair{Symbol, T}[dvSym => ivVal]
     else
         Pair{Symbol, T}[dvSym => pb(), inSymOf(pb) => ivVal]
@@ -382,7 +382,7 @@ isDiffParam(pb::ParamBox) = pb.canDiff[]
 
 Toggle the differentiability of the input `pb` and then return it.
 """
-toggleDiff!(pb::ParamBox) = begin pb.canDiff[] = !pb.canDiff[] end
+toggleDiff!(pb::ParamBox) = begin pb.canDiff[] = !isDiffParam(pb) end
 
 
 """
@@ -413,8 +413,8 @@ compareParamBoxCore2(pb1::ParamBox, pb2::ParamBox) =
 compareParamBoxCore1(pb1, pb2) && (typeof(pb1.map) === typeof(pb2.map))
 
 function compareParamBox(pb1::ParamBox, pb2::ParamBox)
-    ifelse((pb1.canDiff[] == pb2.canDiff[]),
-        ifelse( pb1.canDiff[],
+    ifelse(( (bl=isDiffParam(pb1)) == isDiffParam(pb2) ),
+        ifelse( bl, 
             compareParamBoxCore1(pb1, pb2), 
 
             compareParamBoxCore2(pb1, pb2)
@@ -428,7 +428,23 @@ compareParamBox(pb1::ParamBox{<:Any, <:Any, FI}, pb2::ParamBox{<:Any, <:Any, FI}
 compareParamBoxCore1(pb1, pb2)
 
 compareParamBox(pb1::ParamBox{<:Any, <:Any, FI}, pb2::ParamBox) = 
-ifelse(pb2.canDiff[], compareParamBoxCore1(pb1, pb2), false)
+ifelse(isDiffParam(pb2), compareParamBoxCore1(pb1, pb2), false)
 
 compareParamBox(pb1::ParamBox, pb2::ParamBox{<:Any, <:Any, FI}) = 
 compareParamBox(pb2, pb1)
+
+
+function mulParamBoxCore(c::T1, con::ParamBox{T2, <:Any, FI}; 
+                         roundDigits::Int=getAtolDigits(T2)) where {T1, T2}
+    conNew = fill(roundNum(convert(T2, con.data[]*c), roundDigits))
+    mapFunction = itself
+    dataName = :undef
+    conNew, mapFunction, dataName
+end
+
+function mulParamBoxCore(c::T1, con::ParamBox{T2}; 
+                         roundDigits::Int=getAtolDigits(T2)) where {T1, T2}
+    conNew = con.data
+    mapFunction = Pf(convert(T2, roundNum(c, roundDigits)), con.map)
+    conNew, mapFunction, con.dataName
+end

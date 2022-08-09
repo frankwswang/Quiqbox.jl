@@ -1,12 +1,60 @@
 using Test
 using Quiqbox
-using Quiqbox: inSymOfCore, outSymOfCore, defaultHFforHFgrad as DHFO, 
+using Quiqbox: ∂Basis, defaultHFforHFgrad as DHFO, 
                defaultHFthresholdForHFgrad as DHFOthreshold
+using ForwardDiff: derivative as ForwardDerivative
 
 include("../../test/test-functions/Shared.jl")
 
 @testset "Differentiation.jl" begin
 
+# function ∂Basis
+fα = x->sqrt(x); gα = x->1/2sqrt(x); vα = 1.2
+xpn = genExponent(vα, fα)
+fd = x->x^3; gd = x->3x^2; vd = 1.2
+con = genContraction(vd, fd, canDiff=false)
+gf = GaussFunc(xpn, con)
+sgf1 = genBasisFunc([1.0, 0.0, 0.0], gf, (1,0,0))
+X, Y, Z, xα, d = markParams!([sgf1])
+
+@test hasEqual(∂Basis(X, sgf1), -1*shift(sgf1, (1,0,0), -) + 2xpn()*shift(sgf1, (1,0,0)))
+@test hasEqual(∂Basis(Y, sgf1), 2xpn()*shift(sgf1, (0,1,0)))
+@test hasEqual(∂Basis(Z, sgf1), 2xpn()*shift(sgf1, (0,0,1)))
+@test hasEqual(∂Basis(xα, sgf1), -1*(shift(sgf1, (2,0,0)) + 
+                                     shift(sgf1, (0,2,0)) + 
+                                     shift(sgf1, (0,0,2)))*gα(vα))
+sgfN = genBasisFunc([1.0, 0.0, 0.0], GaussFunc(xpn, genContraction(1/con()*con())), (1,0,0))
+@test hasEqual(∂Basis(d, sgf1), sgfN)
+
+con2 = genContraction(con)
+enableDiff!(con)
+@test !isDiffParam(con2) == isDiffParam(con)
+@test con2.data === con.data
+@test hasEqual(∂Basis(con2, sgf1), sgfN)
+toggleDiff!.([con, con2])
+@test ∂Basis(con2, sgf1) == Quiqbox.EmptyBasisFunc{Float64, 3}()
+enableDiff!(con)
+sgfN2 = genBasisFunc([1.0, 0.0, 0.0], GaussFunc(xpn, genContraction(gd(vd))), (1,0,0))
+@test hasEqual(∂Basis(con2, sgf1), ∂Basis(con, sgf1), sgfN2)
+
+con3 = genContraction(xpn.data, fd)
+sgf2 = genBasisFunc([1.0, 0.0, 0.0], GaussFunc(xpn, con3), (1,0,0))
+@test hasEqual(∂Basis(con3, sgf1), ∂Basis(xpn, sgf1), ∂Basis(xα, sgf1))
+@test hasEqual(∂Basis(con3, sgf2), ∂Basis(xpn, sgf2), ∂Basis(xα, sgf2))
+@test hasEqual(∂Basis(con3, sgf2), ∂Basis(xα, sgf1)+sgfN2)
+disableDiff!(con3)
+@test hasEqual(∂Basis(con3, sgf2), sgfN)
+
+sgf3 = genBasisFunc(sgf1, true)
+ijk1 = sgf1.l[1].tuple
+grad1 = ∂Basis(xpn, sgf3)
+grad0 = Quiqbox.getNijkα(ijk1, xpn())*∂Basis(xpn, sgf1) + 
+       sgf1 * ForwardDerivative(x->Quiqbox.getNijkα(ijk1, x), xpn()) * gα(vα)
+@test hasApprox(overlap(grad0, grad1), overlap(grad0, grad0), overlap(grad1, grad1), 
+                atol=1e-15)
+
+
+# function gradOfHFenergy
 nuc = ["H", "H"]
 nucCoords = [[-0.7,0.0,0.0], [0.7,0.0,0.0]]
 
@@ -41,8 +89,8 @@ grad2 = gradOfHFenergy(pars2, bs2, S2, HFres2.C, nuc, nucCoords)
 @test isapprox(grad2[1], -grad2[2], atol=t2)
 @test isapprox(grad2[1], -0.14578887741248214, atol=t2)
 @test all(grad2[3:6] .== 0)
-grad2_tp = [-0.02766590712707717,  0.03295656668565583, 
-             0.09464147744656481, -0.059960502688767015]
+grad2_tp = [0.006457377706861833, 0.17348694557592814, 
+            0.09464147744656332, -0.059960502688769846]
 compr2Arrays3((grad2_7toEnd=grad2[7:end], grad2_tp=grad2_tp), t2)
 
 bs3 = bs1[[1,5]] .* bs2 # basis set of BasisFuncMix

@@ -1,12 +1,18 @@
 using Test
-using Quiqbox: tryIncluding, sizeOf, hasBoolRelation, markUnique, flatten, alignNumSign, 
-               replaceSymbol, renameFunc, groupedSort, mapPermute, nameOf, TypedFunction, 
-               Pf, itself, getFunc
-
 using Quiqbox
+using Quiqbox: getAtolVal, getAtolDigits, tryIncluding, sizeOf, hasBoolRelation, flatten, 
+               joinTuple, markUnique, getUnique!, itself, themselves, replaceSymbol, 
+               renameFunc, groupedSort, mapPermute, TypedFunction, Pf, Sf, getFunc, nameOf, 
+               arrayDiff!, tupleDiff, genIndex, roundNum, fillObj, arrayToTuple, 
+               genTupleCoords, callGenFunc, uniCallFunc, mergeMultiObjs, isNaN, getBool
 using Suppressor: @capture_out
 
 @testset "Tools.jl" begin
+
+# function getAtolVal getAtolDigits
+@test getAtolVal(Float64) == 1e-15
+@test getAtolDigits(Float64) == 15
+
 
 # function tryIncluding
 local isIncluded
@@ -32,21 +38,51 @@ nc = rand(2:5)
                        ignoreContainer=true)
 @test !hasBoolRelation(===, [1 x->x^2], [1 x->abs(x)])
 @test  hasBoolRelation(===, [1 x->x^2], [1 x->abs(x)], ignoreFunction=true)
+@test hasBoolRelation(==, Int, Int)
+@test hasBoolRelation(<:, Int, Integer)
 
 # function hasEqual
 @test hasEqual([1,2], [1.0, 2.0])
+
+# function hasEqual
+@test !hasIdentical([1,2], [1, 2])
+@test  hasIdentical([1,2], [1, 2], decomposeNumberCollection=true)
+@test !hasIdentical([1,2], [1.0, 2], decomposeNumberCollection=true)
+@test !hasIdentical([fill(1), :two], [fill(1), :two])
+v0 = fill(1)
+@test hasIdentical([v0, :two], [v0, :two])
+
+# function hasApprox
+@test  hasApprox(1, 1+5e-16)
+@test !hasApprox(1, 1+5e-15)
+@test !hasApprox([1,2], [3])
+
+
+# function flatten
+@test [(1,2), (3,3,4)] |> flatten == [1,2,3,3,4]
+@test [(1,2), 3, [3,4]] |> flatten == [1,2,3,3,4]
+
+
+# function joinTuple
+@test joinTuple((1,2), (3,4)) == (1,2,3,4)
+@test joinTuple((1,2,3,4)) == (1,2,3,4)
+
 
 # function markUnique
 @test markUnique([1,3,2,2,5]) == ([1,2,3,3,4], [1,3,2,5])
 
 
-# function flatten
-@test [(1,2), 3, [3,4]] |> flatten == [1,2,3,3,4]
+# function getUnique!
+arr = rand(1:3, 10)
+arr2 = unique(arr)
+getUnique!(arr)
+@test arr == arr2
 
 
-# function alignNumSign
-@test alignNumSign(-1) == "-1"
-@test alignNumSign( 1) == " 1"
+#function itself, themselves
+x1 = rand(10)
+@test itself(x1) === x1 === identity(x1)
+@test themselves(x1, x1) === (x1, x1)
 
 
 # function replaceSymbol
@@ -114,6 +150,7 @@ tf1 = TypedFunction(abs)
 @test nameOf(tf1) == nameOf(abs) == nameof(abs)
 v = -abs(rand())
 @test tf1(v) === abs(v)
+@test TypedFunction(tf1) === tf1
 
 
 # struct Pf
@@ -126,15 +163,90 @@ pf2 = Pf(-1.5, abs)
 @test Pf(-1.0, Pf(-1.5, itself))(-2) == -3.0
 
 
+# struct Sf
+sf1 = Sf(2, abs)
+@test sf1(-1) == 3
+sf2 = Sf(3, sf1)
+@test sf2(-1) == 6
+
+
 # function getFunc
 @test getFunc(abs) == abs
 tff = nameOf(tf1) |> getFunc
 @test tff == tf1.f == getFunc(tf1) == abs
 @test getFunc(:abs) == abs
 @test getFunc(:getTwoBodyInts) == Quiqbox.getTwoBodyInts
+@test getFunc(:f1_getFunc)(rand()) isa Missing
+@test getFunc(Symbol("x->x^2"))(3) == 3^2
 
 
-# function getAtolVal
-@test Quiqbox.getAtolVal(Float64) == 1e-15
+# function nameOf
+@test nameOf(abs) == :abs
+@test nameOf(tf1) == :abs
+@test nameOf(pf1) == Pf{Float64, typeof(abs)}
+
+
+# function arrayDiff! tupleDiff
+a = [1,1,2,2,3]
+b = [3,2,2,1,3]
+@test arrayDiff!(a,b) == ([1, 2, 2, 3], [1], [3])
+c = (1,1,2,2,3)
+d = (3,2,2,1,3)
+@test tupleDiff(c,d) == ([1, 2, 2, 3], a, b)
+
+
+# function genIndex
+@test genIndex(1) == fill(1)
+@test genIndex(nothing) == fill(nothing)
+
+
+# function roundNum
+@test roundNum(1e-15, -1) == 1e-15
+@test roundNum(1e-15, 14) == 0
+
+
+# function fillObj
+@test fillObj(v0) === v0
+@test fill(1) == v0
+
+
+# function arrayToTuple
+@test arrayToTuple(arr) == Tuple(arr) == arrayToTuple(arr|>Tuple)
+
+
+# function genTupleCoords
+c1 = [rand(3) for _=1:3]
+c2 = c1 |> Tuple
+c3 = c1 .|> Tuple
+c4 = c3 |> Tuple
+@test c4 == genTupleCoords(Float64, c1)
+@test c4 == genTupleCoords(Float64, c2)
+@test c4 == genTupleCoords(Float64, c3)
+@test c4 == genTupleCoords(Float64, c4)
+
+
+# function callGenFunc
+@test callGenFunc(f1, -1) == 1
+
+
+# function uniCallFunc
+@test uniCallFunc(abs, (1,), -4,2,3) == 4
+
+
+# function mergeMultiObjs
+mergeFunc1 = (x,y; kws...) -> ifelse(abs(x)==abs(y), abs(x), [x, y])
+@test mergeMultiObjs(Int, mergeFunc1, 1, 2, -2, 3, -2, -1, 4, -3, 
+                     roundDigits=10) == [1,2,3,4]
+
+
+# function isNaN
+@test !isNaN(42)
+@test  isNaN(NaN)
+@test !isNaN("NaN")
+
+
+# function getBool
+@test getBool(true)
+@test getBool(Val(true))
 
 end

@@ -47,6 +47,9 @@ bfs3 = genBasisFunc([0.0, 0.0, 0.0], (2.0, 1.0), [(2,0,0), (1,1,0)])
 @test (@capture_out show(bfs3)) == string(typeStrOf(bfs3))*bFieldStr*
                                    "[2/6]"*"[0.0, 0.0, 0.0]"
 
+bfe = Quiqbox.EmptyBasisFunc{Float64, 3}()
+@test (@capture_out show(bfe)) == string(typeof(bfe))
+
 bfm1 = BasisFuncMix([bf1, bf2])
 @test (@capture_out show(bfm1)) == string(typeStrOf(bfm1))*getFieldNameStr(bfm1)
 
@@ -143,6 +146,7 @@ bfm3 = BasisFuncMix([bf4, bf4, bf3])
 # function *
 @test hasEqual(gf1 * GaussFunc(0.2, 1.5), GaussFunc(2.2, 1.5))
 @test hasEqual(gf1 * π, GaussFunc(2.0, 1π))
+@test hasEqual(π * gf1, GaussFunc(2.0, 1π))
 boolFunc(x, y) = (==)(x,y)
 boolFunc(x::Array{<:Real, 0}, y::Array{<:Real, 0}) = isapprox(x, y, atol=1e-12)
 boolFunc(x::Real, y::Real) = isapprox(x, y, atol=1e-12)
@@ -235,6 +239,11 @@ c2 = 2.5
 @test .!testMul2.([bfm2, bfm3, bfm4], c1, c2) |> all
 
 
+# function eltype
+eltype(pb1) == typeof(pb1[])
+eltype(bfs1) == typeof(bfs1[begin])
+
+
 # function iterate, size, length, ndims
 @test iterate(pb1) == (-1, nothing)
 @test iterate(gf1) == (gf1, nothing)
@@ -256,8 +265,14 @@ cs = [pb1, gf1, bf1]
 
 @test size(bfm1) == ()
 @test size(bfm1, 1) == 1
+@test try size(bfm1, -1) catch; true end
 @test size(bfs1) == (length(bfs1.l),)
 @test size(bfs1, 1) == length(bfs1.l)
+D = dimOf(bf1)
+sp1 = bf1.center
+@test size(sp1) == (D,)
+@test [size(sp1, i) for i in 1:D] == [D, 1, 1]
+@test try size(sp1, -1) catch; true end
 
 @test length(bfm1) == 1
 @test length(bfs1) == length(bfs1.l)
@@ -267,13 +282,15 @@ cs = [pb1, gf1, bf1]
 @test getindex(pb1) == pb1[] == pb1[begin] == pb1[end] == -1
 @test (pb1[] = -2; res = (pb1[] == -2); pb1[] = -1; res)
 @test axes(pb1) == ()
-
-@test getindex(gf1) == gf1[] == gf1.param
-@test getindex(bf1) == bf1[] == bf1.param
+lt1 = bf1.l[1]
 bfm11 = Quiqbox.BasisFuncMix([bf1, bf2, bf1])
 for i in bfm11.param[end-8:end-6]
     i[] = rand()
 end
+@test getindex(gf1) == gf1[] == gf1.param
+@test getindex(sp1) == sp1[] == sp1.param
+@test getindex(bf1) == bf1[] == bf1.param
+@test getindex(lt1) == lt1[] == lt1.tuple
 @test getindex(bfm11) == bfm11[] == bfm11.param
 bfs1_alter = genBasisFunc.(Ref(fill(0.0, 3)), Ref((2.0,1.0)), [(1,0,0), (0,1,0), (0,0,1)])
 for i in eachindex(bfs1)
@@ -281,6 +298,13 @@ for i in eachindex(bfs1)
 end
 @test hasEqual(bfs1[begin], bfs1[1])
 @test hasEqual(bfs1[end], bfs1[3])
+
+@test firstindex(sp1) == 1
+@test lastindex(sp1) == D
+@test axes(sp1) == (eachindex(sp1),) == (Base.OneTo(D),)
+@test firstindex(lt1) == 1
+@test lastindex(lt1) == D
+@test axes(lt1) == (eachindex(lt1),) == (Base.OneTo(D),)
 
 
 # function broadcastable
@@ -301,5 +325,9 @@ bs2 = (bfTf1, bfTfs)
 bfs = decompose(bfTfs)
 @test flatten(bs1) == [bfTf1, bfs...]
 @test flatten(bs2) == (bfTf1, bfs...)
+bs1 = [bfTf1, bf1]
+bs2 = (bfTf1, bf1)
+@test flatten(bs1) === bs1
+@test flatten(bs2) === bs2
 
 end
