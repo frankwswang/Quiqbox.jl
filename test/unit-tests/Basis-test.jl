@@ -2,7 +2,7 @@ using Test
 using Quiqbox
 using Quiqbox: EmptyBasisFunc, BasisFuncMix, isaFullShellBasisFuncs, unpackBasis, 
                ElementNames, sortBasisFuncs, ParamList, sumOf, mergeGaussFuncs, gaussProd, 
-               normOf, mergeBasisFuncs, getTypeParams
+               getNormFactor, mergeBasisFuncs, getTypeParams
 using LinearAlgebra
 using Random
 
@@ -434,7 +434,7 @@ bf_mul5 = mul(bf_mul1, bf_mul2, normalizeGTO=true)
 bf_mul5_0 = genBasisFunc([1.0, 0.0, 0.0], (3.5, 3.0), normalizeGTO=true)
 @test hasEqual(bf_mul5, bf_mul5_0)
 bf_mul6 = mul(bf_mul1, bf_mul2_2)
-gfCoeffs = (3.5, round(3*normOf(bf_mul2)[], digits=15))
+gfCoeffs = (3.5, round(3*getNormFactor(bf_mul2)[], digits=15))
 bf_mul6_0 = genBasisFunc([1.0, 0.0, 0.0], gfCoeffs)
 @test hasEqual(bf_mul6, bf_mul6_0)
 bf_mul7 = mul(bf_mul1, bf_mul2_2, normalizeGTO=true)
@@ -790,11 +790,39 @@ pbs_gv3_2 = sort(pbs_gv3, by=x->(typeof(x).parameters[2], x.index[]))
 @test hasIdentical(pbs_gv3_2, pbs_gv0_2)
 
 
-# function normOf
+# function getNormFactor
 bf_mul17 = genBasisFunc([1.0, 1.0, 1.0], "6-31G", "K")[end]
-ns = normOf(bf_mul17)
+ns = getNormFactor(bf_mul17)
 sgfs = decompose(genBasisFunc(bf_mul17, false), true)
 bf_mul17s = [sum(i) for i in eachcol(sgfs .* ns)]
 @test isapprox.(1, map((x,y)->overlap(x,y), bf_mul17s, bf_mul17), atol=1e-12) |> all
+
+
+# function absorbNormFactor
+bfForabsorbNorm1 = genBasisFunc(bf5, true)
+@test bfForabsorbNorm1 isa BasisFunc
+@test isapprox(overlaps([bfForabsorbNorm1])[], overlaps([bf5*getNormFactor(bf5)[]])[], 
+               atol=1e-15)
+
+bfForabsorbNorm2 = genBasisFunc(bf2_P_norm2, true)
+@test isapprox(overlaps([bfForabsorbNorm2]), 
+               overlaps(bf2_P_norm2[:].*unique(getNormFactor(bf2_P_norm2))), atol=1e-15)
+
+bsForabsorbNorm1 = genBasisFunc(missing, "cc-pVTZ", "Ca") |> Tuple
+for b in bsForabsorbNorm1
+    assignCenInVal!(rand(3), b)
+end
+bsForabsorbNorm2 = absorbNormFactor(bsForabsorbNorm1)
+bsForabsorbNorm1_2 = bsForabsorbNorm1 |> flatten
+bsForabsorbNorm2_2 = bsForabsorbNorm2 |> flatten
+o1 = overlaps(bsForabsorbNorm1_2 |> sortBasisFuncs)
+o2 = overlaps(bsForabsorbNorm2_2  |> sortBasisFuncs)
+@test isapprox.(o1, o2 , atol=5e-13) |> all
+
+bfmForabsorbNorm1 = BasisFuncMix(bsForabsorbNorm1_2) |> absorbNormFactor
+bfmForabsorbNorm2 = BasisFuncMix(bsForabsorbNorm2_2)
+
+@test isapprox(overlap(bfmForabsorbNorm1, bfmForabsorbNorm2), 
+               overlaps(bsForabsorbNorm1) |> sum, atol=1e-12)
 
 end
