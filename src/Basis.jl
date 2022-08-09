@@ -1185,10 +1185,11 @@ Multiplication between two `CompositeGTBasisFuncs{T, D, <:Any, 1}`s (e.g.,
 [`BasisFunc`](@ref) and [`BasisFuncMix`](@ref)), or a `Real` number and a 
 `CompositeGTBasisFuncs{T, D, <:Any, 1}`. If `normalizeGTO` is set to `missing` (in 
 default), The [`GaussFunc`](@ref) inside the output containers will be normalized only if 
-all the input bases hold `.normalizeGTO == true`. `roundDigits` specifies the maximal 
-number of digits after the radix point of the calculated values. When set to negative, no 
-rounding will be performed. The function can be called using `*` syntax with the keyword 
-arguments set to their default values.
+every input `FloatingGTBasisFuncs` (or inside the input `CompositeGTBasisFuncs`) holds 
+`hasNormFactor(ai) == true`. `roundDigits` specifies the maximal number of digits after the 
+radix point of the calculated values. When set to negative, no rounding will be performed. 
+The function can be called using `*` syntax with the keyword arguments set to their default 
+values.
 
 ≡≡≡ Example(s) ≡≡≡
 
@@ -1869,6 +1870,9 @@ sum( decomposeCore(Val(true), genBasisFunc(b, false)) .* getNormFactor(b) )
 
 absorbNormFactor(b::FloatingGTBasisFuncs{<:Any, 3, <:Any, <:Any, <:Any, ON}) where {ON} = 
 mergeBasisFuncs(absorbNormFactor.(b)...)
+
+absorbNormFactor(b::FGTBasisFuncs1O{<:Any, 3, <:Any, 1}) = 
+genBasisFunc(b, false) * getNormFactor(b)[begin]
 
 """
 
