@@ -260,22 +260,18 @@ paramIndex(::Val{conSym}, ::Val{D}) where {D} = conIndex - 3 + D
 
 function ∂BasisCore1(par::ParamBox{T, V, FL}, sgf::FGTBasisFuncs1O{T, D, <:Any, 1}) where 
                     {T, FL, V, D}
-    params = sgf.param
-    is = findall(x->compareParamBoxCore1(x, par) && 
-                    (getFLevel(x.map)==0 || isDiffParam(x)), params)
-    if length(is) > 0
-        map(is) do i
-            fPar = params[i]
+    mapreduce(+, sgf.param) do fPar
+        c = if compareParamBoxCore1(fPar, par)
             _, V2, FL2 = getTypeParams(fPar)
-            c = 𝑑f(FL2, fPar.map, fPar[])
-            if c == 0.0
-                EmptyBasisFunc{T, D}()
+            if FL2 == FI || isDiffParam(fPar)
+                𝑑f(FL2, fPar.map, fPar[])
             else
-                ∂SGFcore(Val(V2), sgf, c)
+                0
             end
-        end |> sumOf
-    else
-        EmptyBasisFunc{T, D}()
+        else
+            0
+        end
+        iszero(c) ? EmptyBasisFunc{T, D}() : ∂SGFcore(Val(V2), sgf, c)
     end
 end
 
