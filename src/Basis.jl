@@ -3,7 +3,7 @@ export GaussFunc, genExponent, genContraction, SpatialPoint, genSpatialPoint, co
        gaussCoeffOf, dimOf, GTBasis, sortBasisFuncs, sortPermBasisFuncs, sortBasis, 
        sortPermBasis, add, mul, shift, decompose, orbitalNumOf, genBasisFuncText, 
        genBFuncsFromText, assignCenInVal!, getParams, copyBasis, markParams!, 
-       getNormFactor, absorbNormFactor
+       hasNormFactor, getNormFactor, absorbNormFactor
 
 export P1D, P2D, P3D
 
@@ -1814,6 +1814,16 @@ function markParamsCore!(parArray::AbstractVector{<:ParamBox{<:Any, V}}) where {
     end
     parArray
 end
+
+
+"""
+
+    hasNormFactor(b::FloatingGTBasisFuncs) -> Bool
+
+Indicate whether `b`' will be treated as having additional normalization factor(s) 
+multiplied to its Gaussian-type orbital(s) during any calculation.
+"""
+hasNormFactor(b::FloatingGTBasisFuncs) = b.normalizeGTO
 
 
 getNijk(::Type{T}, i::Integer, j::Integer, k::Integer) where {T} = 

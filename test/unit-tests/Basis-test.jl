@@ -790,8 +790,10 @@ pbs_gv3_2 = sort(pbs_gv3, by=x->(typeof(x).parameters[2], x.index[]))
 @test hasIdentical(pbs_gv3_2, pbs_gv0_2)
 
 
-# function getNormFactor
-bf_mul17 = genBasisFunc([1.0, 1.0, 1.0], "6-31G", "K")[end]
+# function hasNormFactor getNormFactor
+bf_mul17pool = genBasisFunc([1.0, 1.0, 1.0], "6-31G", "K")
+@test all(bf_mul17pool .|> hasNormFactor)
+bf_mul17 = bf_mul17pool[end]
 ns = getNormFactor(bf_mul17)
 sgfs = decompose(genBasisFunc(bf_mul17, false), true)
 bf_mul17s = [sum(i) for i in eachcol(sgfs .* ns)]
