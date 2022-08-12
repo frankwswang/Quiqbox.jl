@@ -218,10 +218,10 @@ bf5 = genBasisFunc(fill(0.0, 3), (2.0, 1.0), (1,0,0))
 @test centerCoordOf(bf5) == fill(0.0, 3)
 
 # function gaussCoeffOf
-@test gaussCoeffOf(gf1) == Quiqbox.outValOf.(gf1.param) |> collect
-ps1v = ps1 |> collect
-@test gaussCoeffOf(bf11) == hcat(ps1v, ps1v)
-@test gaussCoeffOf(bf4_3) == hcat(ps1v)
+@test gaussCoeffOf(gf1) == hcat(Quiqbox.outValOf.(gf1.param)...)
+ps1v = hcat(ps1...)
+@test gaussCoeffOf(bf11) == vcat(ps1v, ps1v)
+@test gaussCoeffOf(bf4_3) == ps1v
 
 
 # struct BasisFuncMix

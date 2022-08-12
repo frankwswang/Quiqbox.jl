@@ -702,20 +702,28 @@ centerCoordOf(bf::FloatingGTBasisFuncs) = coordOf(bf.center)
 
 """
 
-    gaussCoeffOf(gf::GaussFunc{T}) -> Vector{T}
+    gaussCoeffOf(gf::GaussFunc{T}) -> Matrix{T}
 
 Return the exponent and contraction coefficients of `gf`.
 """
-gaussCoeffOf(gf::GaussFunc) = outValOf.(gf.param) |> collect
+gaussCoeffOf(gf::GaussFunc{T}) where {T} = hcat(outValOf.(gf.param)::NTuple{2, T}...)
 
 """
 
     gaussCoeffOf(b::FloatingGTBasisFuncs{T}) -> Matrix{T}
 
-Return the exponent and contraction coefficients of each [`GaussFunc`](@ref) (in each 
-column of the returned `Matrix`) inside `b`.
+Return the exponent and contraction coefficients of each [`GaussFunc`](@ref) (in each row 
+of the returned `Matrix`) inside `b`.
 """
-gaussCoeffOf(bf::FloatingGTBasisFuncs) = hcat(gaussCoeffOf.(bf.gauss)...)
+function gaussCoeffOf(bf::FloatingGTBasisFuncs{T, <:Any, <:Any, GN}) where {T, GN}
+    xpns = Array{T}(undef, GN)
+    cons = Array{T}(undef, GN)
+    for (i, g) in enumerate(bf.gauss)
+        xpns[i] = outValOf(g.xpn)
+        cons[i] = outValOf(g.con)
+    end
+    hcat(xpns, cons)
+end
 
 
 """
