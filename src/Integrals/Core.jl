@@ -94,10 +94,10 @@ function ∫overlapCore(ΔR::NTuple{3, T},
     any(n -> n<0, (ijk₁..., ijk₂...)) && (return T(0.0))
 
     α = α₁ + α₂
-    res = (π / α)^T(1.5) * exp(-α₁ * α₂ / α * sum(abs2, ΔR))
+    res = (π/α)^T(1.5) * exp(-α₁ * α₂ / α * sum(abs2, ΔR))
 
         for (i₁, i₂, ΔRᵢ) in zip(ijk₁, ijk₂, ΔR)
-            res *= (-1)^(i₁) * factorial(i₁) * factorial(i₂) * α^(-i₁-i₂) * 
+            res *= (-1)^(i₁) * factorial(i₁) * factorial(i₂) / α^(i₁+i₂) * 
                    genIntOverlapCore(ΔRᵢ, i₁, α₁, i₂, α₂)
         end
 
@@ -296,14 +296,14 @@ function ∫eeInteractionCore(R₁::NTuple{3, T}, ijk₁::NTuple{3, Int}, α₁:
     αr = α₃ + α₄
     ηl = α₁ * α₂ / αl
     ηr = α₃ * α₄ / αr
-    ΔRc = @. (α₁*R₁ + α₂*R₂) / αl - (α₃*R₃ + α₄*R₄) / αr
+    ΔRc = @. (α₁*R₁ + α₂*R₂)/αl - (α₃*R₃ + α₄*R₄)/αr
     η = αl * αr / (α₁ + α₂ + α₃ + α₄)
     β = η * sum(abs2, ΔRc)
     res = T(πvals[2.5]) / (αl * αr * sqrt(αl + αr)) * exp(-ηl * sum(abs2, ΔRl)) * 
                                                       exp(-ηr * sum(abs2, ΔRr))
     res *= ( @. (-1)^(ijk₁ + ijk₂) * factorial(ijk₁) * factorial(ijk₂) * 
                 factorial(ijk₃) * factorial(ijk₄) * 
-                αl^(-ijk₁-ijk₂) * αr^(-ijk₃-ijk₄) ) |> prod
+                αl^(-ijk₁-ijk₂) / αr^(ijk₃+ijk₄) ) |> prod
         J = ∫eeInteractionCore1234(ΔRl, ΔRr, ΔRc, β, η, 
                                    ijk₁, α₁, ijk₂, α₂, ijk₃, α₃, ijk₄, α₄)
     res * J
