@@ -25,7 +25,7 @@ function F0(u::T) where {T}
         T(1), 
         begin
             ur = sqrt(u)
-            T(πvals[0.5]) * erf(ur) * inv(2ur)
+            T(πvals[0.5]) * erf(ur) / (2ur)
         end
     )
 end
@@ -69,14 +69,14 @@ function genIntOverlapCore(Δx::T,
                     α₁^(i₂ - l₁ - 2l₂ - o) * 
                     α₂^(i₁ - l₂ - 2l₁ - o) * 
                     (α₁ + α₂)^(2 * (l₁ + l₂) + o) * 
-                    Δx^(Ω-2o) * 
-                    inv( T( 4^(l₁ + l₂ + o) * 
-                            factorial(l₁) * 
-                            factorial(l₂) * 
-                            factorial(o ) * 
-                            factorial(i₁ - 2l₁) * 
-                            factorial(i₂ - 2l₂) * 
-                            factorial(Ω  - 2o ) ) )
+                    Δx^(Ω-2o) / 
+                    ( 4^(l₁ + l₂ + o) * 
+                        factorial(l₁) * 
+                        factorial(l₂) * 
+                        factorial(o ) * 
+                        factorial(i₁ - 2l₁) * 
+                        factorial(i₂ - 2l₂) * 
+                        factorial(Ω  - 2o ) )
         end
     end
     res
@@ -94,7 +94,7 @@ function ∫overlapCore(ΔR::NTuple{3, T},
     any(n -> n<0, (ijk₁..., ijk₂...)) && (return T(0.0))
 
     α = α₁ + α₂
-    res = (π * inv(α))^T(1.5) * exp(-α₁ * α₂ * inv(α) * sum(abs2, ΔR))
+    res = (π / α)^T(1.5) * exp(-α₁ * α₂ / α * sum(abs2, ΔR))
 
         for (i₁, i₂, ΔRᵢ) in zip(ijk₁, ijk₂, ΔR)
             res *= (-1)^(i₁) * factorial(i₁) * factorial(i₂) * α^(-i₁-i₂) * 
@@ -121,19 +121,19 @@ function genIntTerm1(Δx::T1,
                      i₁::T2, α₁::T1, 
                      i₂::T2, α₂::T1) where {T1, T2}
     (r::T2) -> 
-        (-1)^(o₂+r) * factorial(o₁+o₂) * α₁^(o₂-l₁-r) * α₂^(o₁-l₂-r) * Δx^(o₁+o₂-2r) * 
-        inv( T1(
+        (-1)^(o₂+r) * factorial(o₁+o₂) * α₁^(o₂-l₁-r) * α₂^(o₁-l₂-r) * Δx^(o₁+o₂-2r) / 
+        (
             4^(l₁+l₂+r) * 
             factorial(l₁) * factorial(l₂) * factorial(o₁) * factorial(o₂) * 
             factorial(r) * factorial(i₁-2l₁-o₁) * factorial(i₂-2l₂-o₂) * 
             factorial(o₁+o₂-2r)
-        ) )
+        )
 end
 
 function genIntTerm2(Δx::T1, α::T1, o₁::T2, o₂::T2, μ::T2, r::T2) where {T1, T2}
     (u::T2) -> 
-        (-1)^u * factorial(μ) * Δx^(μ-2u) * 
-        inv( T1(4^u * factorial(u) * factorial(μ-2u) * α^(o₁+o₂-r+u)) )
+        (-1)^u * factorial(μ) * Δx^(μ-2u) / 
+        ( 4^u * factorial(u) * factorial(μ-2u) * α^(o₁+o₂-r+u) )
 end
 
 function genIntNucAttCore1(ΔRR₀::NTuple{3, T}, ΔR₁R₂::NTuple{3, T}, β::T, 
@@ -189,13 +189,13 @@ function ∫nucAttractionCore(Z₀::Int, R₀::NTuple{3, T},
         flag = true
     else
         α = α₁ + α₂
-        R = @. (α₁*R₁ + α₂*R₂) * inv(α)
+        R = @. (α₁*R₁ + α₂*R₂) / α
         flag = false
     end
     ΔRR₀ = R .- R₀
     ΔR₁R₂ = R₁ .- R₂
     β = α * sum(abs2, ΔRR₀)
-    res = -Z₀ * (π * inv(α)) * exp(-α₁ * α₂ * inv(α) * sum(abs2, ΔR₁R₂))
+    res = -Z₀ * (π / α) * exp(-α₁ * α₂ / α * sum(abs2, ΔR₁R₂))
     res *= (-1)^sum(ijk₁ .+ ijk₂) * (factorial.((ijk₁..., ijk₂...)) |> prod) * 
             genIntNucAttCore1(ΔRR₀, ΔR₁R₂, β, ijk₁, α₁, ijk₂, α₂)
     res
@@ -208,19 +208,19 @@ function genIntTerm3(Δx::T1,
                      i₂::T2, α₂::T1) where {T1, T2}
     (r::T2) -> 
         (-1)^(o₂+r) * factorial(o₁+o₂) * α₁^(o₂-l₁-r) * α₂^(o₁-l₂-r) * 
-        (α₁+α₂)^(2*(l₁+l₂) + r) * Δx^(o₁+o₂-2r) * 
-        inv( T1(
+        (α₁+α₂)^(2*(l₁+l₂) + r) * Δx^(o₁+o₂-2r) / 
+        (
             4^(l₁+l₂+r) * 
             factorial(l₁) * factorial(l₂) * factorial(o₁) * factorial(o₂) * 
             factorial(r) * factorial(i₁-2l₁-o₁) * factorial(i₂-2l₂-o₂) * 
             factorial(o₁+o₂-2r)
-        ) )
+        )
 end
 
 function genIntTerm4(Δx::T1, η::T1, μ::T2) where {T1, T2}
     (u::T2) -> 
-        (-1)^u * factorial(μ) * η^(μ-u) * Δx^(μ-2u) * 
-        inv( T1(4^u * factorial(u) * factorial(μ-2u)) )
+        (-1)^u * factorial(μ) * η^(μ-u) * Δx^(μ-2u) / 
+        ( 4^u * factorial(u) * factorial(μ-2u) )
 end
 
 function ∫eeInteractionCore1234(ΔRl::NTuple{3, T}, ΔRr::NTuple{3, T}, 
@@ -294,16 +294,16 @@ function ∫eeInteractionCore(R₁::NTuple{3, T}, ijk₁::NTuple{3, Int}, α₁:
     ΔRr = R₃ .- R₄
     αl = α₁ + α₂
     αr = α₃ + α₄
-    ηl = α₁ * α₂ * inv(αl)
-    ηr = α₃ * α₄ * inv(αr)
-    ΔRc = @. (α₁*R₁ + α₂*R₂)*inv(αl) - (α₃*R₃ + α₄*R₄)*inv(αr)
-    η = αl * αr * inv(α₁ + α₂ + α₃ + α₄)
+    ηl = α₁ * α₂ / αl
+    ηr = α₃ * α₄ / αr
+    ΔRc = @. (α₁*R₁ + α₂*R₂) / αl - (α₃*R₃ + α₄*R₄) / αr
+    η = αl * αr / (α₁ + α₂ + α₃ + α₄)
     β = η * sum(abs2, ΔRc)
-    res = T(πvals[2.5]) * inv(αl * αr * sqrt(αl + αr)) * exp(-ηl * sum(abs2, ΔRl)) * 
-                                                         exp(-ηr * sum(abs2, ΔRr))
+    res = T(πvals[2.5]) / (αl * αr * sqrt(αl + αr)) * exp(-ηl * sum(abs2, ΔRl)) * 
+                                                      exp(-ηr * sum(abs2, ΔRr))
     res *= ( @. (-1)^(ijk₁ + ijk₂) * factorial(ijk₁) * factorial(ijk₂) * 
                 factorial(ijk₃) * factorial(ijk₄) * 
-                inv(αl^(ijk₁+ijk₂)) * inv(αr^(ijk₃+ijk₄)) ) |> prod
+                αl^(-ijk₁-ijk₂) * αr^(-ijk₃-ijk₄) ) |> prod
         J = ∫eeInteractionCore1234(ΔRl, ΔRr, ΔRc, β, η, 
                                    ijk₁, α₁, ijk₂, α₂, ijk₃, α₃, ijk₄, α₄)
     res * J

@@ -25,9 +25,9 @@ will be renormalized if it's larger then `threshold` to prevent gradient explodi
 more advanced GD function through customizing [`POconfig`](@ref).
 """
 function gradDescent!(vars::AbstractVector{T}, grad::AbstractVector{T}, η::T=T(0.001), 
-                      threshold::T=2sqrt(length(grad))*inv(25norm(η))) where {T}
+                      threshold::T=2sqrt(length(grad))/(25norm(η))) where {T}
     gNorm = norm(grad)
-    gradNew = ifelse(gNorm > threshold, (threshold * inv(gNorm) * grad), grad)
+    gradNew = ifelse(gNorm > threshold, (threshold / gNorm * grad), grad)
     vars .-= η*gradNew
 end
 

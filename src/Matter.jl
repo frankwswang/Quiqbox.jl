@@ -250,7 +250,7 @@ function nnRepulsions(nuc::Union{NTuple{NN, String}, AbstractVector{String}},
     E = T(0)
     len = length(nuc)
     for i = 1:len, j=i+1:len
-        E += getCharge(nuc[i]) * getCharge(nuc[j]) * inv(norm(nucCoords[i] .- nucCoords[j]))
+        E += getCharge(nuc[i]) * getCharge(nuc[j]) / norm(nucCoords[i] .- nucCoords[j])
     end
     E
 end

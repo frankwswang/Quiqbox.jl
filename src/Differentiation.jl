@@ -98,8 +98,8 @@ function derivativeCore(FoutputIsVector::Val{B},
     λ, 𝑣 = eigen(S|>Hermitian)
     ∂S2 = 𝑣'*∂S*𝑣
     for i=1:BN, j=1:i # Faster without multi-threading
-        @inbounds ∂X₀[i,j] = ∂X₀[j,i] = ( -∂S2[i,j] * inv(sqrt(λ[i])) * inv(sqrt(λ[j])) * 
-                                          inv(sqrt(λ[i]) + sqrt(λ[j])) )
+        @inbounds ∂X₀[i,j] = ∂X₀[j,i] = ( -∂S2[i,j] / ( sqrt(λ[i]) * sqrt(λ[j]) * 
+                                          (sqrt(λ[i]) + sqrt(λ[j])) ) )
     end
     ∂X = 𝑣*∂X₀*𝑣'
     ∂ʃ2 = oneBodyDerivativeCore(FoutputIsVector, ∂bfs, bfs, X, ∂X, oneBodyF)
@@ -223,7 +223,7 @@ function ∂SGF∂xpn2(sgf::FGTBasisFuncs1O{T, 3, 𝑙, 1}, c::T) where {T, 𝑙
     α = sgf.gauss[1].xpn()
     ugf = genBasisFunc(sgf, false)
     ∂SGF∂xpn1(ugf, c) * getNijkα(sgf.l[1].tuple, α) + 
-    sgf * ( c * (T(𝑙)/2 + T(0.75)) * inv(α) )
+    sgf * ( c * (𝑙/T(2) + T(0.75)) / α )
 end
 
 function ∂SGFcore(::Val{conSym}, sgf::FGTBasisFuncs1O{T, D, 𝑙, 1}, c::T=T(1)) where {T, D, 𝑙}

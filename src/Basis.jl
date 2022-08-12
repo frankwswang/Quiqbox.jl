@@ -1279,8 +1279,8 @@ end
 function gaussProd((α₁, d₁, R₁)::T, (α₂, d₂, R₂)::T) where 
                   {T<:Tuple{Number, Number, AbstractArray{<:Number}}}
     α = α₁ + α₂
-    d = d₁ * d₂ * exp(-α₁ * α₂ * inv(α) * sum(abs2, R₁-R₂))
-    R = (α₁*R₁ + α₂*R₂) * inv(α)
+    d = d₁ * d₂ * exp(-α₁ * α₂ / α * sum(abs2, R₁-R₂))
+    R = (α₁*R₁ + α₂*R₂) / α
     (α, d, R)
 end
 
@@ -1829,7 +1829,7 @@ hasNormFactor(b::FloatingGTBasisFuncs) = b.normalizeGTO
 
 getNijk(::Type{T}, i::Integer, j::Integer, k::Integer) where {T} = 
 T(πvals[-0.75]) * 2^(T(1.5)*(i+j+k) + T(0.75)) * sqrt( factorial(i) * factorial(j) * 
-factorial(k) * inv( T(factorial(2i) * factorial(2j) * factorial(2k)) ) )
+factorial(k) / (factorial(2i) * factorial(2j) * factorial(2k)) )
 
 getNα(i::Integer, j::Integer, k::Integer, α::T) where {T} = 
 α^( T(2i + 2j + 2k + 3)*T(0.25) )
