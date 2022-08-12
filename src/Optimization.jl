@@ -53,7 +53,7 @@ convergence will be solely based on `threshold` between the latest updated funct
 rather then the latest value and `target`.
 
 `threshold::T`: The error threshold (i.e. the absolute value of the function loss with 
-respect to `target`) for the convergence. When set to `NaN`, there will be no convergence 
+respect to `target`) for the convergence; when set to `NaN`, there will be no convergence 
 detection.
 
 `maxStep::Int`: Maximum iteration steps allowed regardless if the iteration converges.

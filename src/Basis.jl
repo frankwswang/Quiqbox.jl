@@ -635,7 +635,7 @@ subshellOf(b::FloatingGTBasisFuncs) = SubshellNames[lOf(b)+1]
 Sort `FloatingGTBasisFuncs`. If `groupCenters = true`, Then the function will return an 
 `Vector{<:Vector{<:FloatingGTBasisFuncs}}` in which the elements are grouped basis 
 functions with same center coordinates. `roundDigits` specifies the rounding digits for 
-center coordinates when comparing them. When set to negative, no rounding will be performed.
+center coordinates when comparing them; when set to negative, no rounding will be performed.
 """
 @inline function sortBasisFuncs(bs::AbstractArray{<:FloatingGTBasisFuncs{T, D}}, 
                                 groupCenters::Bool=false; 
@@ -829,7 +829,7 @@ GTBasis(bs::AbstractVector{<:GTBasisFuncs{T, D}}) where {T, D} = GTBasis(bs |> T
     Vector{<:CompositeGTBasisFuncs{T, D}}
 
 Sort basis functions. `roundDigits` specifies the rounding digits for the parameters stored
-in each `CompositeGTBasisFuncs` when comparing them. When set to negative, no rounding will 
+in each `CompositeGTBasisFuncs` when comparing them; when set to negative, no rounding will 
 be performed.
 """
 function sortBasis(bs::AbstractArray{<:CompositeGTBasisFuncs{T, D}}; 
@@ -1127,7 +1127,7 @@ EmptyBasisFunc{promote_type(T1, T2), D}()
 
 Multiplication between a `Real` number and a [`GaussFunc`](@ref) or two `GaussFunc`s. 
 `roundDigits` specifies the maximal number of digits after the radix point of the 
-calculated values. When set to negative, no rounding will be performed. The function can be 
+calculated values; when set to negative, no rounding will be performed. The function can be 
 called using `*` syntax with the keyword argument set to it default value.
 
 ≡≡≡ Example(s) ≡≡≡
@@ -1187,7 +1187,7 @@ Multiplication between two `CompositeGTBasisFuncs{T, D, <:Any, 1}`s (e.g.,
 default), The [`GaussFunc`](@ref) inside the output containers will be normalized only if 
 every input `FloatingGTBasisFuncs` (or inside the input `CompositeGTBasisFuncs`) holds 
 `hasNormFactor(ai) == true`. `roundDigits` specifies the maximal number of digits after the 
-radix point of the calculated values. When set to negative, no rounding will be performed. 
+radix point of the calculated values; when set to negative, no rounding will be performed. 
 The function can be called using `*` syntax with the keyword arguments set to their default 
 values.
 
@@ -1516,7 +1516,7 @@ end
 Generate the text of input `FloatingGTBasisFuncs`. `norm` is the additional normalization 
 factor. If `printCenter` is `true`, the center coordinate will be added to the first line 
 of the output `String`. `roundDigits` specifies the rounding digits for the parameters 
-inside `bf`. When set to negative, no rounding will be performed.
+inside `bf`; when set to negative, no rounding will be performed.
 """
 function genBasisFuncText(bf::FloatingGTBasisFuncs{T, D}; norm::Real=1.0, 
                           printCenter::Bool=true, roundDigits::Int=-1) where {T, D}
