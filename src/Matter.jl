@@ -37,43 +37,50 @@ struct CanOrbital{T, D, NN} <: AbstractSpinOrbital{T, D}
     occu::NTuple{2, Array{Bool, 0}}
     orbital::GTBasisFuncs{T, D, 1}
 
-    CanOrbital(::Val{S}, i::Int, fVars::HFfinalVars{T, D, <:Any, NN}) where {S, T, D, NN} = 
+    CanOrbital(::Val{S}, i::Int, fVars::HFfinalVars{T, D, <:Any, NN}; 
+               roundDigits::Int=-1) where {S, T, D, NN} = 
     new{T, D, NN}(fVars.Eo[S][i], i, fVars.nuc, fVars.nucCoord, 
                   fill.(SpinOrbitalOccupation[fVars.occu[S][i]]), 
-                  mul.(fVars.C[S][:, i], fVars.basis.basis)|>sumOf)
+                  mul.(fVars.C[S][:, i], fVars.basis.basis; roundDigits)|>sumOf)
 end
 
 
-function getCanOrbitalsCore(::Val{I}, 
-                            fVars::HFfinalVars{<:Any, <:Any, <:Any, <:Any, BN}) where 
-                           {I, BN}
+function getCanOrbitalsCore(::Val{I}, fVars::HFfinalVars{<:Any, <:Any, <:Any, <:Any, BN}; 
+                            roundDigits::Int=-1) where {I, BN}
     OON = fVars.Ns[I]
     rngO = 1:OON
     rngU = (OON+1):BN
     (
-        ( CanOrbital.(Val(I), rngO, Ref(fVars)), CanOrbital.(Val(I), rngU, Ref(fVars)) ), 
+        ( CanOrbital.(Val(I), rngO, Ref(fVars); roundDigits), 
+          CanOrbital.(Val(I), rngU, Ref(fVars); roundDigits) ), 
         ( fVars.C[I][:, 1:OON], fVars.C[I][:, OON+1:BN] )
     )
 end
 
-function getCanOrbitalsCore(fVars::HFfinalVars{<:Any, <:Any, :RHF})
-    ((a, b), (c, d)) = getCanOrbitalsCore(Val(1), fVars)
+function getCanOrbitalsCore(fVars::HFfinalVars{<:Any, <:Any, :RHF}; roundDigits::Int=-1)
+    ((a, b), (c, d)) = getCanOrbitalsCore(Val(1), fVars; roundDigits)
     ((a,), (b,)), ((c,), (d,))
 end
 
-function getCanOrbitalsCore(fVars::HFfinalVars{<:Any, <:Any, :UHF})
-    ((a, b), (c, d)), ((e, f), (g, h)) = getCanOrbitalsCore.((Val(1), Val(2)), Ref(fVars))
+function getCanOrbitalsCore(fVars::HFfinalVars{<:Any, <:Any, :UHF}; roundDigits::Int=-1)
+    ((a, b), (c, d)), ((e, f), (g, h)) = 
+    getCanOrbitalsCore.((Val(1), Val(2)), Ref(fVars); roundDigits)
     ((a, e), (b, f)), ((c, g), (d, h))
 end
 
 """
 
-    getCanOrbitals(fVars::HFfinalVars{T, D, <:Any, NN}) where {T, D, NN} -> 
+    getCanOrbitals(fVars::HFfinalVars{T, D, <:Any, NN}; 
+                   roundDigits::Int=-1) where {T, D, NN} -> 
     CanOrbital{T, D, NN}
 
-Generate a set of canonical orbitals from the result of a Hartree-Fock approximation.
+Generate a set of canonical orbitals from the result of a Hartree-Fock approximation. 
+`roundDigits` specifies the maximal number of digits after the radix point of the 
+calculated contraction coefficients of the Gaussian-type orbitals used to construct the 
+[`CanOrbital`](@ref) to be returned; when set to negative, no rounding will be performed.
 """
-getCanOrbitals(fVars::HFfinalVars) = getCanOrbitalsCore(fVars)[1]
+getCanOrbitals(fVars::HFfinalVars; roundDigits::Int=-1) = 
+getCanOrbitalsCore(fVars; roundDigits)[1]
 
 
 """
@@ -185,10 +192,14 @@ spins.
 
 ≡≡≡ Initialization Method(s) ≡≡≡
 
-    MatterByHF(HFres::HFfinalVars{T, D, <:Any, NN, BN, HFTS}) where {T, D, NN, BN, HFTS} -> 
+    MatterByHF(HFres::HFfinalVars{T, D, <:Any, NN, BN, HFTS}; roundDigits::Int=-1) where 
+              {T, D, NN, BN, HFTS} -> 
     MatterByHF{T, D, NN, <:Any, BN, HFTS}
 
-Construct a `MatterByHF` from the result of a Hartree-Fock method `HFres`.
+Construct a `MatterByHF` from the result of a Hartree-Fock method `HFres`. `roundDigits` 
+specifies the maximal number of digits after the radix point of the calculated contraction 
+coefficients of the Gaussian-type orbitals used to construct the [`CanOrbital`](@ref)s in 
+`.occuOrbital` and `.unocOrbital`; when set to negative, no rounding will be performed.
 """
 struct MatterByHF{T, D, NN, N, BN, HFTS} <:MatterData{T, D, N}
     Ehf::T
@@ -205,13 +216,13 @@ struct MatterByHF{T, D, NN, N, BN, HFTS} <:MatterData{T, D, N}
     eeIdiffSpin::Matrix{T}
     basis::GTBasis{T, D, BN}
 
-    function MatterByHF(fVars::HFfinalVars{T, D, <:Any, NN, BN, HFTS}) where 
-                       {T, D, NN, BN, HFTS}
+    function MatterByHF(fVars::HFfinalVars{T, D, <:Any, NN, BN, HFTS}; 
+                        roundDigits::Int=-1) where {T, D, NN, BN, HFTS}
         nuc = fVars.nuc
         nucCoords = fVars.nucCoord
         Ns = fVars.Ns
         basis = fVars.basis
-        (osO, osU), (CO, CU) = getCanOrbitalsCore(fVars)
+        (osO, osU), (CO, CU) = getCanOrbitalsCore(fVars; roundDigits)
         ints = changeHbasis(fVars)
         if HFTS == 1
             cH = (ints[1],)
