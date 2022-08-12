@@ -229,4 +229,4 @@ function getValI(i::Int)
     i < length(ValInts) ? ValInts[i+1] : ValInts[end]
 end
 
-const πvals = Dict([-0.75, 0.5, 1.5, 2.5] .=> big(π).^[-0.75, 0.5, 1.5, 2.5])
+const πvals = Dict([-0.75, 0.5, 2.5] .=> big(π).^[-0.75, 0.5, 2.5])

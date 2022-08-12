@@ -222,7 +222,8 @@ end
 function ∂SGF∂xpn2(sgf::FGTBasisFuncs1O{T, 3, 𝑙, 1}, c::T) where {T, 𝑙}
     α = sgf.gauss[1].xpn()
     ugf = genBasisFunc(sgf, false)
-    ∂SGF∂xpn1(ugf, c) * getNijkα(sgf.l[1].tuple, α) + sgf * ( c * (𝑙/T(2) + T(0.75)) / α )
+    ∂SGF∂xpn1(ugf, c) * getNijkα(sgf.l[1].tuple, α) + 
+    sgf * ( c * (T(𝑙)/2 + T(0.75)) * inv(α) )
 end
 
 function ∂SGFcore(::Val{conSym}, sgf::FGTBasisFuncs1O{T, D, 𝑙, 1}, c::T=T(1)) where {T, D, 𝑙}
