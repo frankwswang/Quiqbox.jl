@@ -6,7 +6,7 @@ using ForwardDiff: derivative as ForwardDerivative
 
 include("../../test/test-functions/Shared.jl")
 
-# @testset "Differentiation.jl" begin
+@testset "Differentiation.jl" begin
 
 # function ∂Basis
 fα = x->sqrt(x); gα = x->1/2sqrt(x); vα = 1.2
