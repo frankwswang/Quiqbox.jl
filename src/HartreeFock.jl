@@ -922,7 +922,7 @@ function LBFGSBsolver(::Val{CCB}, v::AbstractVector{T}, B::AbstractMatrix{T}) wh
                                  linesearch=HagerZhang(linesearchmax=100, epsilon=1e-7), 
                                  alphaguess=InitialHagerZhang())
     res = OptimOptimize(f, g!, fill(lb, vL), fill(T(Inf), vL), c0, Fminbox(innerOptimizer), 
-                        OptimOptions(g_tol=getAtolVal(T), iterations=20000))
+                        OptimOptions(g_tol=exp10(-getAtolDigits(T)), iterations=20000))
     c = OptimMinimizer(res)
     c ./ sum(c)
 end
