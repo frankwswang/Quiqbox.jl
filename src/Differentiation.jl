@@ -98,8 +98,8 @@ function derivativeCore(FoutputIsVector::Val{B},
     λ, 𝑣 = eigen(S|>Hermitian)
     ∂S2 = 𝑣'*∂S*𝑣
     for i=1:BN, j=1:i # Faster without multi-threading
-        @inbounds ∂X₀[i,j] = ∂X₀[j,i] = ( -∂S2[i,j] * inv(sqrt(λ[i])) * inv(sqrt(λ[j])) * 
-                                          inv(sqrt(λ[i]) + sqrt(λ[j])) )
+        @inbounds ∂X₀[i,j] = ∂X₀[j,i] = ( -∂S2[i,j] / ( sqrt(λ[i]) * sqrt(λ[j]) * 
+                                          (sqrt(λ[i]) + sqrt(λ[j])) ) )
     end
     ∂X = 𝑣*∂X₀*𝑣'
     ∂ʃ2 = oneBodyDerivativeCore(FoutputIsVector, ∂bfs, bfs, X, ∂X, oneBodyF)

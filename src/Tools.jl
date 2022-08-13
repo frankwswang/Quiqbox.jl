@@ -3,16 +3,52 @@ export hasEqual, hasIdentical, hasApprox, flatten, markUnique, getUnique!
 using Statistics: std, mean
 using LinearAlgebra: eigvals, svdvals, eigen
 
-getAtolCore(::Type{T}) where {T<:Real} = log(10, T|>eps) |> ceil
-getAtolVal(::Type{T}) where {T<:Real} = round(10^(T |> getAtolCore), sigdigits=1)
-
 """
 
     getAtolDigits(::Type{T}) where {T<:Real} -> Int
 
-Set the maximal number of digits kept after rounding given a real number `DataType`.
+Return the maximal number of digits kept after rounding of the input real number type `T`.
 """
-getAtolDigits(::Type{T}) where {T<:Real} = Int(-getAtolCore(T))
+function getAtolDigits(::Type{T}) where {T<:Real}
+    val = log10(T|>eps)
+    max(0, -val) |> floor |> Int
+end
+
+
+"""
+
+    getAtolVal(::Type{T}) where {T<:Real} -> Real
+
+Return the absolute precision tolerance of the input real number type `T`.
+"""
+getAtolVal(::Type{T}) where {T<:Real} = ceil(eps(T)*1.5, sigdigits=1)
+
+
+function roundToMultiOfStep(num::Number, step::Real)
+    if isnan(step)
+        num
+    else
+        invStep = inv(step)
+        round(num * invStep, RoundNearest) / invStep
+    end
+end
+
+
+nearestHalfOf(val::T) where {T<:Real} = 
+roundToMultiOfStep(val/2, floor(eps(T), sigdigits=1))
+
+
+getNearestMid(num1::T, num2::T, atol::Real) where {T} = 
+(isnan(atol) || num1==num2) ? num1 : roundToMultiOfStep((num1+num2)/2, atol)
+
+
+function isApprox(x::T, y::T; atol=0) where {T}
+    if isnan(atol)
+        x==y
+    else
+        isapprox(x, y; atol)
+    end
+end
 
 
 # Function for submodule loading and integrity checking.
@@ -771,10 +807,6 @@ function genNamedTupleC(name::Symbol, defaultVars::AbstractArray)
 end
 
 
-@inline roundNum(num::Number, roundDigits::Int=-1) = 
-        (roundDigits < 0  ?  num  :  round(num, digits=roundDigits))
-
-
 fillObj(num::Any) = fill(num)
 
 fillObj(num::Array{<:Any, 0}) = itself(num)
@@ -813,13 +845,13 @@ f(getindex.(Ref(args), argsOrder)...)
 
 
 function mergeMultiObjs(::Type{T}, merge2Ofunc::F, o1::T, o2::T, o3::T, o4::T...; 
-                        roundDigits::Int) where {T, F}
+                        roundAtol::Real=getAtolVal(T)) where {T, F}
     arr1 = T[o1, o2, o3, o4...]
     arr2 = T[]
     while length(arr1) >= 1
         i = 1
         while i < length(arr1)
-            temp = merge2Ofunc(arr1[i], arr1[i+1]; roundDigits)
+            temp = merge2Ofunc(arr1[i], arr1[i+1]; roundAtol)
             if eltype(temp) <: T && length(temp) == 1
                 arr1[i] = temp[]
                 popat!(arr1, i+1)

@@ -113,12 +113,12 @@ toggleDiff!(pb1)
 
 # function +
 testAdd = function (a1, a2)
-    hasEqual(a2 +  a1 + a1, 
-             a1 +  a2 + a1, 
-             a1 +  a1 + a2, 
-             a1 + (a1 + a2), 
-             add(add(a1, a2), a1), 
-             add(a1, add(a2, a1)))
+    hasApprox(a2 +  a1 + a1, 
+              a1 +  a2 + a1, 
+              a1 +  a1 + a2, 
+              a1 + (a1 + a2), 
+              add(add(a1, a2), a1), 
+              add(a1, add(a2, a1)), atol=5e-16)
 end
 
 bf3 = genBasisFunc([1.0, 2.0, 1.0], ([2.0, 1.0], [0.2, 0.4]))
@@ -126,11 +126,12 @@ bf4 = genBasisFunc([1.0, 1.0, 1.0], (3.0, 0.5))
 bfm2 = BasisFuncMix([bf1, bf4, bf1])
 bfm3 = BasisFuncMix([bf4, bf4, bf3])
 
+@test gaussCoeffOf.((bf1 + bf3 + bf4).BasisFunc) == ([3.0 0.5], [2.0 1.2; 1.0 0.4])
 @test hasEqual(bf1 + bf3 + bf4, 
-                bf1 + bf4 + bf3, 
-                bf3 + bf1 + bf4, 
-                bf3 + bf4 + bf1, 
-                bf4 + bf3 + bf1)
+               bf1 + bf4 + bf3, 
+               bf3 + bf1 + bf4, 
+               bf3 + bf4 + bf1, 
+               bf4 + bf3 + bf1)
 @test testAdd(bf1, bf3)
 @test testAdd(bf1, bf4)
 @test testAdd(bf3, bf4)
@@ -147,22 +148,19 @@ bfm3 = BasisFuncMix([bf4, bf4, bf3])
 @test hasEqual(gf1 * GaussFunc(0.2, 1.5), GaussFunc(2.2, 1.5))
 @test hasEqual(gf1 * π, GaussFunc(2.0, 1π))
 @test hasEqual(π * gf1, GaussFunc(2.0, 1π))
-boolFunc(x, y) = (==)(x,y)
-boolFunc(x::Array{<:Real, 0}, y::Array{<:Real, 0}) = isapprox(x, y, atol=1e-12)
-boolFunc(x::Real, y::Real) = isapprox(x, y, atol=1e-12)
-testMul = function (a1, a2, ignoreContainer=false)
-    r1 = hasBoolRelation(boolFunc, 
-                         a1*(a1 + a2), 
-                         (a1 + a2)*a1, 
-                         a1*a1 + a1*a2, 
-                         a1*a1 + a2*a1, 
-                         mul(a1, add(a1, a2)), 
-                         mul(add(a1, a2), a1); ignoreContainer)
 
-    r2 = hasBoolRelation(boolFunc, a1 *  a2 * a1, 
-                         a1 * (a2 * a1), 
-                         mul(mul(a1, a2), a1),
-                         mul(a1, mul(a2, a1)); ignoreContainer)
+testMul = function (a1, a2, ignoreContainer=false)
+    r1 = hasApprox( a1*(a1 + a2), 
+                    (a1 + a2)*a1, 
+                    a1*a1 + a1*a2, 
+                    a1*a1 + a2*a1, 
+                    mul(a1, add(a1, a2)), 
+                    mul(add(a1, a2), a1); ignoreContainer, atol=1e-15)
+
+    r2 = hasApprox( a1 *  a2 * a1, 
+                    a1 * (a2 * a1), 
+                    mul(mul(a1, a2), a1),
+                    mul(a1, mul(a2, a1)); ignoreContainer, atol=1e-15)
     r1 * r2
 end
 
@@ -189,22 +187,20 @@ bfm4 = BasisFuncMix([bf4, bf5, bf4])
 @test testMul(bfm3, bfm4)
 
 testMul2 = function (a, a1, a2)
-    r1 = hasBoolRelation(boolFunc, 
-                         a*(a1 + a2), 
-                         (a1 + a2)*a, 
-                         a*a1 + a*a2, 
-                         a1*a + a2*a, ignoreContainer=true)
+    r1 = hasApprox( a*(a1 + a2), 
+                    (a1 + a2)*a, 
+                    a*a1 + a*a2, 
+                    a1*a + a2*a, ignoreContainer=true, atol=1e-15)
 
-    r2 = hasBoolRelation(boolFunc, 
-                         a  * a1 * a2, 
-                         a  * a2 * a1,
-                         a1 * a  * a2,
-                         a1 * a2 * a ,
-                         a2 * a1 * a ,
-                         a2 * a  * a1,
-                         a  * (a1* a2), 
-                         a1 * (a2* a ),
-                         a2 * (a * a1), ignoreContainer=true)
+    r2 = hasApprox( a  * a1 * a2, 
+                    a  * a2 * a1,
+                    a1 * a  * a2,
+                    a1 * a2 * a ,
+                    a2 * a1 * a ,
+                    a2 * a  * a1,
+                    a  * (a1* a2), 
+                    a1 * (a2* a ),
+                    a2 * (a * a1), ignoreContainer=true, atol=1e-15)
     r1 * r2
 end
 

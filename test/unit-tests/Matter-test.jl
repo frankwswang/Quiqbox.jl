@@ -2,6 +2,8 @@ using Test
 using Quiqbox
 using LinearAlgebra: norm, diag
 
+include("../../test/test-functions/Shared.jl")
+
 @testset "MatterByHF.jl tests" begin
 
 # struct MatterByHF and function changeHbasis
@@ -28,14 +30,14 @@ H2 = MatterByHF(HFres1)
 C_RHF = HFres1.C[1]
 C_H2 = hcat(H2.occuC[1], H2.unocC[1])
 
-t1 = 1e-15
+t1 = 2e-15
 @test C_H2 == C_RHF
 @test all(nHalf .== H2.Ns)
 @test H2.Ehf == Quiqbox.getEᵗ(Hc1, basis1.eeI, H2.occuC, (H2.Ns[1],))
 @test H2.coreHsameSpin[1] == changeHbasis(Hc1, C_RHF)
 compr2Arrays3((H2_cH1=H2.coreHsameSpin[1], H2_cH2=get1spinHcore(C_RHF, Hc1)), t1)
 @test H2.eeIsameSpin[1] == changeHbasis(basis1.eeI, C_RHF)
-compr2Arrays3((H2_eeI1=H2.eeIsameSpin[1], H2_eeI2=get1spin2eI(C_RHF, basis1.eeI)), 10t1)
+compr2Arrays3((H2_eeI1=H2.eeIsameSpin[1], H2_eeI2=get1spin2eI(C_RHF, basis1.eeI)), t1)
 @test isapprox(H2.Ehf, 2(diag(H2.coreHsameSpin[1])[1:nHalf] |> sum) + 
                           sum( [(2H2.eeIsameSpin[1][i,i,j,j] - H2.eeIsameSpin[1][i,j,j,i]) 
                                for j in 1:nHalf, i in 1:nHalf] ), atol=t1)

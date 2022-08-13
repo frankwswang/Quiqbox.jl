@@ -25,8 +25,9 @@ function makeMoldenFile(mol::MatterByHF{T, 3};
                         roundDigits::Int=getAtolDigits(T), 
                         recordUMO::Bool=false, fileName::String = "MO") where {T}
     basis = mol.basis.basis |> collect
-    ids = sortPermBasis(basis; roundDigits)
-    basis = mergeBasisFuncs(basis[ids]...; roundDigits)
+    roundAtol = roundDigits<0 ? NaN : exp10(-roundDigits)
+    ids = sortPermBasis(basis; roundAtol)
+    basis = mergeBasisFuncs(basis[ids]...; roundAtol)
     @assert all(basis .|> isaFullShellBasisFuncs) "The basis set stored in the input " * 
                                                   "`MatterByHF` is not supported by " * 
                                                   "the Molden format."
@@ -95,8 +96,8 @@ function makeMoldenFile(mol::MatterByHF{T, 3};
             moe = mo.energy
             MOcoeffs = Cgroups[spinIdx][:, i]
             if roundDigits > 0
-                moe = round(moe, digits=roundDigits)
-                MOcoeffs = round.(MOcoeffs, digits=roundDigits)
+                moe = round(moe, sigdigits=roundDigits)
+                MOcoeffs = round.(MOcoeffs, sigdigits=roundDigits)
             end
             text *= "Ene=  "*alignNumSign(moe; roundDigits)*"\n"
             text *= "Spin=  $(spinStrs[spinIdx])\n"

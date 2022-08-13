@@ -25,19 +25,19 @@ function F0(u::T) where {T}
         T(1), 
         begin
             ur = sqrt(u)
-            sqrt(π*T(1)) * erf(ur) / (2ur)
+            T(πvals[0.5]) * erf(ur) / (2ur)
         end
     )
 end
 
 function getGQN(::Type{T}, u) where {T}
     u = abs(u) + getAtolVal(T)
-    getAtolDigits(T) + Int( round(0.4*(u + 5/sqrt(u))) ) + 1
+    getAtolDigits(T) + Int( round(0.4u + 2inv(sqrt(u))) ) + 1
 end
 
 function Fγ(γ::Int, u::T) where {T}
     if u < getAtolVal(T)
-        T(1 / (2γ + 1))
+        T(2γ + 1) |> inv
     else
         FγCore(γ, u, getValI( getGQN(T, u) ))
     end
@@ -133,7 +133,7 @@ end
 function genIntTerm2(Δx::T1, α::T1, o₁::T2, o₂::T2, μ::T2, r::T2) where {T1, T2}
     (u::T2) -> 
         (-1)^u * factorial(μ) * Δx^(μ-2u) / 
-        (4^u * factorial(u) * factorial(μ-2u) * α^(o₁+o₂-r+u))
+        ( 4^u * factorial(u) * factorial(μ-2u) * α^(o₁+o₂-r+u) )
 end
 
 function genIntNucAttCore1(ΔRR₀::NTuple{3, T}, ΔR₁R₂::NTuple{3, T}, β::T, 
@@ -195,7 +195,7 @@ function ∫nucAttractionCore(Z₀::Int, R₀::NTuple{3, T},
     ΔRR₀ = R .- R₀
     ΔR₁R₂ = R₁ .- R₂
     β = α * sum(abs2, ΔRR₀)
-    res = -Z₀ * π / α * exp(-α₁ * α₂ / α * sum(abs2, ΔR₁R₂))
+    res = -Z₀ * (π / α) * exp(-α₁ * α₂ / α * sum(abs2, ΔR₁R₂))
     res *= (-1)^sum(ijk₁ .+ ijk₂) * (factorial.((ijk₁..., ijk₂...)) |> prod) * 
             genIntNucAttCore1(ΔRR₀, ΔR₁R₂, β, ijk₁, α₁, ijk₂, α₂)
     res
@@ -220,7 +220,7 @@ end
 function genIntTerm4(Δx::T1, η::T1, μ::T2) where {T1, T2}
     (u::T2) -> 
         (-1)^u * factorial(μ) * η^(μ-u) * Δx^(μ-2u) / 
-        (4^u * factorial(u) * factorial(μ-2u))
+        ( 4^u * factorial(u) * factorial(μ-2u) )
 end
 
 function ∫eeInteractionCore1234(ΔRl::NTuple{3, T}, ΔRr::NTuple{3, T}, 
@@ -299,11 +299,11 @@ function ∫eeInteractionCore(R₁::NTuple{3, T}, ijk₁::NTuple{3, Int}, α₁:
     ΔRc = @. (α₁*R₁ + α₂*R₂)/αl - (α₃*R₃ + α₄*R₄)/αr
     η = αl * αr / (α₁ + α₂ + α₃ + α₄)
     β = η * sum(abs2, ΔRc)
-    res = π^T(2.5) / (αl * αr * sqrt(αl + αr)) * exp(-ηl * sum(abs2, ΔRl)) * 
-                                                 exp(-ηr * sum(abs2, ΔRr))
+    res = T(πvals[2.5]) / (αl * αr * sqrt(αl + αr)) * exp(-ηl * sum(abs2, ΔRl)) * 
+                                                      exp(-ηr * sum(abs2, ΔRr))
     res *= ( @. (-1)^(ijk₁ + ijk₂) * factorial(ijk₁) * factorial(ijk₂) * 
-                factorial(ijk₃) * factorial(ijk₄) / 
-                αl^(ijk₁+ijk₂) / αr^(ijk₃+ijk₄) ) |> prod
+                factorial(ijk₃) * factorial(ijk₄) * 
+                αl^(-ijk₁-ijk₂) / αr^(ijk₃+ijk₄) ) |> prod
         J = ∫eeInteractionCore1234(ΔRl, ΔRr, ΔRc, β, η, 
                                    ijk₁, α₁, ijk₂, α₂, ijk₃, α₃, ijk₄, α₄)
     res * J
