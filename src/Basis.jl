@@ -1,9 +1,9 @@
 export GaussFunc, genExponent, genContraction, SpatialPoint, genSpatialPoint, coordOf, 
        BasisFunc, BasisFuncs, genBasisFunc, lOf, subshellOf, centerOf, centerCoordOf, 
-       gaussCoeffOf, dimOf, GTBasis, sortBasisFuncs, sortPermBasisFuncs, sortBasis, 
-       sortPermBasis, add, mul, shift, decompose, orbitalNumOf, genBasisFuncText, 
-       genBFuncsFromText, assignCenInVal!, getParams, copyBasis, markParams!, 
-       hasNormFactor, getNormFactor, absorbNormFactor
+       unpackBasis, gaussCoeffOf, dimOf, GTBasis, sortBasisFuncs, sortPermBasisFuncs, 
+       sortBasis, sortPermBasis, add, mul, shift, decompose, orbitalNumOf, 
+       genBasisFuncText, genBFuncsFromText, assignCenInVal!, getParams, copyBasis, 
+       markParams!, hasNormFactor, getNormFactor, absorbNormFactor
 
 export P1D, P2D, P3D
 
@@ -777,6 +777,12 @@ getTypeParams(::FloatingGTBasisFuncs{T, D, 𝑙, GN, PT, ON}) where {T, D, 𝑙,
 getTypeParams(::BasisFuncMix{T, D, BN, BFT}) where {T, D, BN, BFT} = (T, D, BN, BFT)
 
 
+"""
+
+    unpackBasis(b::GTBasisFuncs) -> Tuple
+
+unpack `b` to return all the `FloatingGTBasisFuncs` inside it.
+"""
 unpackBasis(::EmptyBasisFunc) = ()
 unpackBasis(b::BasisFunc)  = (b,)
 unpackBasis(b::BasisFuncMix)  = b.BasisFunc

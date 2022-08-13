@@ -223,7 +223,6 @@ ps1v = hcat(ps1...)
 @test gaussCoeffOf(bf11) == vcat(ps1v, ps1v)
 @test gaussCoeffOf(bf4_3) == ps1v
 
-
 # struct BasisFuncMix
 bfm1 = BasisFuncMix(bf1)
 @test bfm1 == BasisFuncMix([bf1])
@@ -231,7 +230,9 @@ bfm1 = BasisFuncMix(bf1)
 bf5_2 = genBasisFunc(fill(0.0, 3), (2.0, 1.0), [(1,0,0)])
 bfm2 = BasisFuncMix(bf5)
 @test hasEqual(bfm2, BasisFuncMix(bf5_2))
-@test hasEqual(BasisFuncMix(bf2_P_norm3[:]), BasisFuncMix([bfsp, bf2_P_norm3[2:end]...]))
+bfm_bf2_P =  BasisFuncMix(bf2_P_norm3[:])
+@test hasEqual(bfm_bf2_P, BasisFuncMix([bfsp, bf2_P_norm3[2:end]...]))
+@test collect(gaussCoeffOf.(bfm_bf2_P.BasisFunc)) == fill(gaussCoeffOf(bf2_P_norm3), 3)
 @test getTypeParams(bfm1) == 
       (Float64, 3, 1, BasisFunc{Float64, 3, 0, 1, P3D{Float64, 0, 0, 0}})
 
