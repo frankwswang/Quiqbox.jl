@@ -104,7 +104,7 @@ function getCfromSAD(::Val{HFT}, S::AbstractMatrix{T},
                      bs::NTuple{BN, AbstractGTBasisFuncs{T, D}}, 
                      nuc::NTuple{NN, String}, nucCoords::NTuple{NN, NTuple{D, T}}, 
                      X::AbstractMatrix{T}, 
-                     config=SCFconfig((:ADIIS,), (1e4*getAtolDigits(T),))) where 
+                     config=SCFconfig((:ADIIS,), (max(1e-2, 10getAtolVal(T)),))) where 
                     {HFT, T, D, BN, NN}
     N₁tot = 0
     N₂tot = 0
