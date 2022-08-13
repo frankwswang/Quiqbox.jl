@@ -104,7 +104,7 @@ function getCfromSAD(::Val{HFT}, S::AbstractMatrix{T},
                      bs::NTuple{BN, AbstractGTBasisFuncs{T, D}}, 
                      nuc::NTuple{NN, String}, nucCoords::NTuple{NN, NTuple{D, T}}, 
                      X::AbstractMatrix{T}, 
-                     config=SCFconfig((:ADIIS,), (max(2e-2, 10getAtolVal(T)),))) where 
+                     config=SCFconfig((:ADIIS,), (max(1e-2, 10getAtolVal(T)),))) where 
                     {HFT, T, D, BN, NN}
     N₁tot = 0
     N₂tot = 0
@@ -722,12 +722,12 @@ function runHFcore(::Val{HFT},
 
             diff = Etots[end] - Etots[end-1]
             relDiff = diff / abs(Etots[end-1])
-            if n > 1 && (!isConverged || relDiff > sqrt(breakPoint))
-                flag, Std = isOscillateConverged(Etots, 15breakPoint)
+            if n > 1 && (!isConverged || (bl = relDiff > sqrt(breakPoint)))
+                flag, Std = isOscillateConverged(Etots, 10breakPoint)
                 if flag
                     isConverged = ifelse(Std > max(breakPoint, oscThreshold), false, true)
                 else
-                    earlyStop && relDiff > cbrt(breakPoint) && 
+                    earlyStop && bl && 
                     (i = terminateSCF(i, vars, m, printInfo); isConverged=false; break)
                 end
             end
