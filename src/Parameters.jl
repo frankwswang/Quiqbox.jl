@@ -434,17 +434,17 @@ compareParamBox(pb1::ParamBox, pb2::ParamBox{<:Any, <:Any, FI}) =
 compareParamBox(pb2, pb1)
 
 
-function mulParamBoxCore(c::T1, con::ParamBox{T2, <:Any, FI}; 
-                         roundDigits::Int=getAtolDigits(T2)) where {T1, T2}
-    conNew = fill(roundNum(convert(T2, con.data[]*c), roundDigits))
+function mulParamBoxCore(c::T1, con::ParamBox{T2, <:Any, FI}, 
+                         roundAtol::Real=nearestHalfOf(getAtolVal(T))) where {T1, T2}
+    conNew = fill(roundToMultiOfStep(convert(T2, con.data[]*c), roundAtol))
     mapFunction = itself
     dataName = :undef
     conNew, mapFunction, dataName
 end
 
-function mulParamBoxCore(c::T1, con::ParamBox{T2}; 
-                         roundDigits::Int=getAtolDigits(T2)) where {T1, T2}
+function mulParamBoxCore(c::T1, con::ParamBox{T2}, 
+                         roundAtol::Real=nearestHalfOf(getAtolVal(T))) where {T1, T2}
     conNew = con.data
-    mapFunction = Pf(convert(T2, roundNum(c, roundDigits)), con.map)
+    mapFunction = Pf(convert(T2, roundToMultiOfStep(c, roundAtol)), con.map)
     conNew, mapFunction, con.dataName
 end

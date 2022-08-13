@@ -6,7 +6,7 @@ const OFtypes = (:HF,)
 
 const defaultPOconfigStr = "POconfig()"
 
-const defaultHFthresholdForHFgrad = getAtolVal(Float64) / 2
+const defaultHFthresholdForHFgrad = getAtolVal(Float64)
 
 const defaultHFforHFgrad = HFconfig(SCF=SCFconfig(threshold=defaultHFthresholdForHFgrad))
 

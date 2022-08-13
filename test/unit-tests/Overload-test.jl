@@ -127,10 +127,10 @@ bfm2 = BasisFuncMix([bf1, bf4, bf1])
 bfm3 = BasisFuncMix([bf4, bf4, bf3])
 
 @test hasEqual(bf1 + bf3 + bf4, 
-                bf1 + bf4 + bf3, 
-                bf3 + bf1 + bf4, 
-                bf3 + bf4 + bf1, 
-                bf4 + bf3 + bf1)
+               bf1 + bf4 + bf3, 
+               bf3 + bf1 + bf4, 
+               bf3 + bf4 + bf1, 
+               bf4 + bf3 + bf1)
 @test testAdd(bf1, bf3)
 @test testAdd(bf1, bf4)
 @test testAdd(bf3, bf4)

@@ -208,8 +208,8 @@ bfs3 = sortBasisFuncs(bfs1, true)
 bfs3 = bfs3 |> flatten
 @test !hasEqual(bfs1, bfs2)
 @test  hasEqual(bfs3, bfs2)
-@test vcat(sortBasisFuncs(bfs1, true, roundDigits=12)...) == 
-      bfs1[sortPermBasisFuncs(bfs1, roundDigits=12)]
+@test vcat(sortBasisFuncs(bfs1, true, roundAtol=1e-12)...) == 
+      bfs1[sortPermBasisFuncs(bfs1, roundAtol=1e-12)]
 
 
 # function centerOf centerCoordOf
