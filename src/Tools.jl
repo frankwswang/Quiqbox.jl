@@ -42,7 +42,7 @@ getNearestMid(num1::T, num2::T, atol::Real) where {T} =
 (isnan(atol) || num1==num2) ? num1 : roundToMultiOfStep((num1+num2)/2, atol)
 
 
-function isApprox(x::T, y::T; atol) where {T}
+function isApprox(x::T, y::T; atol=0) where {T}
     if isnan(atol)
         x==y
     else

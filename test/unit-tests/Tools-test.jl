@@ -1,10 +1,11 @@
 using Test
 using Quiqbox
-using Quiqbox: getAtolVal, getAtolDigits, tryIncluding, sizeOf, hasBoolRelation, flatten, 
-               joinTuple, markUnique, getUnique!, itself, themselves, replaceSymbol, 
-               renameFunc, groupedSort, mapPermute, TypedFunction, Pf, Sf, getFunc, nameOf, 
-               arrayDiff!, tupleDiff, genIndex, fillObj, arrayToTuple, 
-               genTupleCoords, callGenFunc, uniCallFunc, mergeMultiObjs, isNaN, getBool
+using Quiqbox: getAtolVal, getAtolDigits, roundToMultiOfStep, nearestHalfOf, getNearestMid, 
+               isApprox, tryIncluding, sizeOf, hasBoolRelation, flatten, joinTuple, 
+               markUnique, getUnique!, itself, themselves, replaceSymbol, renameFunc, 
+               groupedSort, mapPermute, TypedFunction, Pf, Sf, getFunc, nameOf, arrayDiff!, 
+               tupleDiff, genIndex, fillObj, arrayToTuple, genTupleCoords, callGenFunc, 
+               uniCallFunc, mergeMultiObjs, isNaN, getBool
 using Suppressor: @capture_out
 
 @testset "Tools.jl" begin
@@ -12,6 +13,23 @@ using Suppressor: @capture_out
 # function getAtolVal getAtolDigits
 @test getAtolVal(Float64) == 4e-16
 @test getAtolDigits(Float64) == 15
+
+
+# function roundToMultiOfStep nearestHalfOf getNearestMid
+@test roundToMultiOfStep(3811.47123123, 0.01) == 3811.47
+@test roundToMultiOfStep(0.1+0.2, 1e-17) == 0.30000000000000004
+@test roundToMultiOfStep(0.1+0.2, 1e-16) == 0.3
+
+@test nearestHalfOf(0.1 + 0.2) == 0.15
+@test getNearestMid(0.1, 0.2, 1e-16) == 0.15
+@test getNearestMid(0.1, 0.2, 1e-17) == (0.1 + 0.2)/2
+
+
+# function isApprox
+v1 = 1/3 + 1e-16
+v2 = 1/3
+@test isApprox(v1, v2)
+@test !isApprox(v1, v2, atol=NaN)
 
 
 # function tryIncluding
