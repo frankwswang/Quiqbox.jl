@@ -396,6 +396,9 @@ bf_pf = genBasisFunc([1.0, 2.0, 3.0], GaussFunc(xpn2, con2))
 bf_pf2 = (bf_pf*0.4)*5
 @test bf_pf2.gauss[1].con.map isa Quiqbox.Pf{Float64}
 @test hasEqual(bf_pf2, mul(bf_pf, 2.0))
+@test hasEqual(add(bf_add1, bf_add1), 
+               add(bf_add1, deepcopy(bf_add1)), 
+               2bf_add1, genBasisFunc([1.0, 2.0, 1.0], (2.0, 2.2)))
 
 
 α₁, α₂ = rand(1:0.01:10, 2)
@@ -434,7 +437,7 @@ bf_mul5 = mul(bf_mul1, bf_mul2, normalizeGTO=true)
 bf_mul5_0 = genBasisFunc([1.0, 0.0, 0.0], (3.5, 3.0), normalizeGTO=true)
 @test hasEqual(bf_mul5, bf_mul5_0)
 bf_mul6 = mul(bf_mul1, bf_mul2_2)
-gfCoeffs = (3.5, round(3*getNormFactor(bf_mul2)[], digits=15))
+gfCoeffs = (3.5, 3*getNormFactor(bf_mul2)[])
 bf_mul6_0 = genBasisFunc([1.0, 0.0, 0.0], gfCoeffs)
 @test hasEqual(bf_mul6, bf_mul6_0)
 bf_mul7 = mul(bf_mul1, bf_mul2_2, normalizeGTO=true)

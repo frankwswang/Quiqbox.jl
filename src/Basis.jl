@@ -973,13 +973,7 @@ function mergeGaussFuncs(gf1::GaussFunc{T}, gf2::GaussFunc{T};
     elseif hasEqual(con1, con2)
         mul(GaussFunc(xpn, deepcopy(con1)), 2; roundAtol)
     else
-        con1R = con1()
-        con2R = con2()
-        if isApprox(con1R, con2R, atol=roundAtol)
-            GaussFunc(xpn, genContraction( getNearestMid(con1R, con2R, halfAtol) ))
-        else
-            GaussFunc(xpn, genContraction(con1R + con2R))
-        end
+        GaussFunc(xpn, genContraction(roundToMultiOfStep(con1() + con2(), roundAtol)))
     end
 
     [res]
@@ -1034,7 +1028,7 @@ function margeBasisFuncCenters(cen1, cen2, roundAtol)
         c1 = coordOf(cen1)
         c2 = coordOf(cen2)
         if all(isApprox.(c1, c2, atol=roundAtol))
-            genSpatialPoint( getNearestMid(c1, c2, nearestHalfOf(roundAtol)) )
+            genSpatialPoint( getNearestMid.(c1, c2, nearestHalfOf(roundAtol)) )
         else
             nothing
         end
@@ -1159,16 +1153,13 @@ EmptyBasisFunc{promote_type(T1, T2), D}()
 
 """
 
-    mul(gf::GaussFunc{T}, coeff::Real; 
-        roundAtol::Real=getAtolVal(T)) where {T} -> 
+    mul(gf::GaussFunc{T}, coeff::Real; roundAtol::Real=getAtolVal(T)) where {T} -> 
     GaussFunc
 
-    mul(coeff::Real, gf::GaussFunc{T}; 
-        roundAtol::Real=getAtolVal(T)) where {T} -> 
+    mul(coeff::Real, gf::GaussFunc{T}; roundAtol::Real=getAtolVal(T)) where {T} -> 
     GaussFunc
 
-    mul(gf1::GaussFunc{T}, gf2::GaussFunc{T}; 
-        roundAtol::Real=getAtolVal(T)) where {T} -> 
+    mul(gf1::GaussFunc{T}, gf2::GaussFunc{T}; roundAtol::Real=getAtolVal(T)) where {T} -> 
     GaussFunc
 
 Multiplication between a `Real` number and a [`GaussFunc`](@ref) or two `GaussFunc`s. 
@@ -1279,7 +1270,7 @@ function mul(sgf1::BasisFunc{T, D, 𝑙1, 1, PT1}, sgf2::BasisFunc{T, D, 𝑙2, 
         R₁ = coordOf(cen1)
         R₂ = coordOf(cen2)
         if all(isApprox.(R₁, R₂, atol=roundAtol))
-            genSpatialPoint( getNearestMid(R₁, R₂, halfAtol) )
+            genSpatialPoint( getNearestMid.(R₁, R₂, halfAtol) )
         else
             l1 = sgf1.l[1]
             l2 = sgf2.l[1]
