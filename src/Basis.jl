@@ -781,7 +781,7 @@ getTypeParams(::BasisFuncMix{T, D, BN, BFT}) where {T, D, BN, BFT} = (T, D, BN, 
 
     unpackBasis(b::GTBasisFuncs) -> Tuple
 
-unpack `b` to return all the `FloatingGTBasisFuncs` inside it.
+Unpack `b` to return all the `FloatingGTBasisFuncs` inside it.
 """
 unpackBasis(::EmptyBasisFunc) = ()
 unpackBasis(b::BasisFunc)  = (b,)

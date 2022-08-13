@@ -27,7 +27,7 @@
 * Mac OS
 * Windows
 
-## Julia Environment
+## Julia environment
 * [1.6+](https://github.com/frankwswang/Quiqbox.jl/actions/workflows/CI-JS-older.yml)
 
 ## Installation in Julia [REPL](https://docs.julialang.org/en/v1/manual/getting-started/)
