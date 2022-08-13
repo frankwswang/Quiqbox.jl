@@ -973,7 +973,7 @@ function mergeGaussFuncs(gf1::GaussFunc{T}, gf2::GaussFunc{T};
     elseif hasEqual(con1, con2)
         mul(GaussFunc(xpn, deepcopy(con1)), 2; roundAtol)
     else
-        GaussFunc(xpn, genContraction(roundToMultiOfStep(con1() + con2(), roundAtol)))
+        GaussFunc(xpn, genContraction(roundToMultiOfStep(con1() + con2(), halfAtol)))
     end
 
     [res]
