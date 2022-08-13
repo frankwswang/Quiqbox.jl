@@ -18,7 +18,7 @@
 * Mac OS
 * Windows
 
-### Julia Environment
+### Julia environment
 
 * [1.6+](https://github.com/frankwswang/Quiqbox.jl/actions/workflows/CI.yml)
 
@@ -43,3 +43,10 @@ julia> using Quiqbox
 ```
 
 For more basic usage of the programming language behind Quiqbox, **Julia**, please refer to [the official documentation](https://docs.julialang.org/).
+
+
+## Manual Contents
+```@contents
+Pages = ["basis.md", "SCF.md", "optimization.md"]
+Depth = 3
+```
