@@ -63,6 +63,22 @@ end
                                  atol=1e-15)
 
 
+fDiffOfHFenergyCore! = function (pars, bs, nuc, nucCoords, Δx, config)
+    map(pars) do par
+        @assert (isDiffParam(par) || Quiqbox.getFLevel(par.map) == 0)
+        par[] += Δx
+        E = runHF(bs, nuc, nucCoords, config, printInfo=false).Ehf
+        par[] -= Δx
+        E
+    end
+end
+
+fDiffOfHFenergy = function (pars, bs, nuc, nucCoords, Δx=1e-6; config=DHFO)
+    Eus = fDiffOfHFenergyCore!(pars, bs, nuc, nucCoords, Δx, config)
+    Eds = fDiffOfHFenergyCore!(pars, bs, nuc, nucCoords, -Δx, config)
+    (Eus - Eds) ./ (2Δx)
+end
+
 # function gradOfHFenergy
 nuc = ["H", "H"]
 nucCoords = [[-0.7,0.0,0.0], [0.7,0.0,0.0]]
@@ -74,18 +90,23 @@ pars1 = markParams!(bs1)[[1, 9, 25, 33]]
 S1 = overlaps(bs1)
 HFres1 = runHF(bs1, nuc, nucCoords, DHFO, printInfo=false)
 grad1 = gradOfHFenergy(pars1, bs1, S1, HFres1.C, nuc, nucCoords)
+grad1_fd = fDiffOfHFenergy(pars1, bs1, nuc, nucCoords, 5e-8)
 grad1_t = [1.2560795063145092, 1.2560795063145092, 4.050658426012205, 0]
 t1 = 1e-14
 t2 = 1e-10
+t3 = 1e-8
 @test isapprox(grad1[1], grad1[2], atol=t1)
-compr2Arrays3((grad1=grad1, grad1_t=grad1_t), t2)
+compr2Arrays3((grad1=grad1, grad1_t=grad1_t), t2, true)
+compr2Arrays3((grad1=grad1, grad1_fd=grad1_fd), t3, true)
 
-HFres1_2 = runHF(bs1, nuc, nucCoords, 
-                 HFconfig(HF=:UHF, SCF=SCFconfig(threshold=DHFOthreshold)), 
-                 printInfo=false)
+config = HFconfig(HF=:UHF, SCF=SCFconfig(threshold=DHFOthreshold))
+HFres1_2 = runHF(bs1, nuc, nucCoords, config, printInfo=false)
 grad1_2 = gradOfHFenergy(pars1, bs1, overlaps(bs1), HFres1.C, nuc, nucCoords)
+grad1_2_fd = fDiffOfHFenergy(pars1, bs1, nuc, nucCoords, 1e-9; config)
 @test isapprox(grad1_2[1], grad1_2[2], atol=t1)
-compr2Arrays3((grad1_2=grad1_2, grad1_t=grad1_t), t2)
+compr2Arrays3((grad1_2=grad1_2, grad1_t=grad1_t), t2, true)
+@test all(abs.(grad1_2_fd[1:3] - grad1_2[1:3]) ./ grad1_2[1:3] .< 0.05)
+@test abs(grad1_2_fd[end] - grad1_2[end]) < 1e-5
 
 bfSource = genBasisFunc(missing, "STO-2G", "H")[]
 gfs = bfSource.gauss |> collect
@@ -95,18 +116,23 @@ pars2 = markParams!(bs2, true)
 S2 = overlaps(bs2)
 HFres2 = runHF(bs2, nuc, nucCoords, DHFO, printInfo=false)
 grad2 = gradOfHFenergy(pars2, bs2, S2, HFres2.C, nuc, nucCoords)
+grad2_fd = fDiffOfHFenergy(pars2, bs2, nuc, nucCoords, 5e-8)
+compr2Arrays3((grad2=grad2, grad2_fd=grad2_fd), 5t3, true)
 @test isapprox(grad2[1], -grad2[2], atol=t2)
 @test isapprox(grad2[1], -0.0678638313089222, atol=t2)
 @test all(grad2[3:6] .== 0)
 grad2_tp = [0.006457377706861833, 0.1734869455759258, 
             0.09464147744656537, -0.059960502688765016]
-compr2Arrays3((grad2_7toEnd=grad2[7:end], grad2_tp=grad2_tp), t2)
+compr2Arrays3((grad2_7toEnd=grad2[7:end], grad2_tp=grad2_tp), t2, true)
 
 bs3 = bs1[[1,5]] .* bs2 # basis set of BasisFuncMix
 pars3 = markParams!(bs3, true)
 S3 = overlaps(bs3)
 HFres3 = runHF(bs3, nuc, nucCoords, DHFO, printInfo=false)
 grad3 = gradOfHFenergy(pars3, HFres3)
+grad3_fd = fDiffOfHFenergy(pars3, bs3, nuc, nucCoords, 1e-7)
+compr2Arrays3((grad3p=grad3[1:end-1], grad3_fdp=grad3_fd[1:end-1]), 10t3, true)
+@test isapprox(grad3[end], grad3_fd[end], atol=50t3)
 grad3_t = [-0.1606522922402765,    -0.24121983207381031, -0.1480105648704627, 
             0.0047746557202592195, -0.08411039021158562, -0.33217356846754603, 
            -0.4154684787642143,    -0.05739800488612984, -0.3058823967298582, 
