@@ -275,13 +275,14 @@ end
 
 function getVarCore(pb::ParamBox{T, <:Any, FL}) where {T, FL}
     dvSym = outSymOf(pb)
-    ivVal = pb.data[]
-    if FL == FI || !isDiffParam(pb)
-        Pair{Symbol, T}[dvSym => ivVal]
-    else
-        Pair{Symbol, T}[dvSym => pb(), inSymOf(pb) => ivVal]
-    end
+    ivVal = inValOf(pb)
+    ovVal = outValOf(pb)
+    ifelse(isDiffParam(pb), Pair{Symbol, T}[dvSym=>ovVal, inSymOf(pb)=>ivVal], 
+                            Pair{Symbol, T}[dvSym=>ovVal])
 end
+
+getVarCore(pb::ParamBox{T, <:Any, FI}) where {T} = 
+Pair{Symbol, T}[inSymOf(pb) => inValOf(pb)]
 
 
 """
