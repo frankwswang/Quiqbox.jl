@@ -33,7 +33,8 @@ Parameter container that can enable differentiation.
 ≡≡≡ Field(s) ≡≡≡
 
 `data::Array{T, 0}`: The container of the data (i.e. the value of the input variable) 
-stored in the `ParamBox` that can be accessed by syntax `[]`.
+stored in the `ParamBox` that can be accessed by syntax `[]`. The data value stored in an 
+arbitrary `ParamBox{T}` `pb` can be modified using the syntax `pb[] = aNewVal`.
 
 `dataName::Symbol`: The name of the input variable.
 
