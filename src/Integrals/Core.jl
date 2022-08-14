@@ -406,7 +406,6 @@ reformatIntData1.(bfs)
 function isIntZeroCore(::Val{1}, 
                        R₁::NTuple{D, T}, R₂::NTuple{D, T}, 
                        ijk₁::NTuple{D, Int}, ijk₂::NTuple{D, Int}) where {D, T}
-    false
     any(i -> (R₁[i]==R₂[i] && isodd(ijk₁[i] + ijk₂[i])), eachindex(R₁))
 end
 
@@ -415,7 +414,6 @@ function isIntZeroCore(::Val{2},
                        R₃::NTuple{D, T}, R₄::NTuple{D, T}, 
                        ijk₁::NTuple{D, Int}, ijk₂::NTuple{D, Int}, 
                        ijk₃::NTuple{D, Int}, ijk₄::NTuple{D, Int}) where {D, T}
-    false
     any(i -> (R₁[i]==R₂[i]==R₃[i]==R₄[i] && isodd(ijk₁[i] + ijk₂[i] + ijk₃[i] + ijk₄[i])), 
         eachindex(R₁))
 end
@@ -424,7 +422,6 @@ function isIntZeroCore(::Val{:∫nucAttractionCore},
                        R₁::NTuple{D, T}, R₂::NTuple{D, T}, 
                        ijk₁::NTuple{D, Int}, ijk₂::NTuple{D, Int}, 
                        R₀::NTuple{D, T}) where {D, T}
-    false
     any(i -> (R₀[i]==R₁[i]==R₂[i] && isodd(ijk₁[i] + ijk₂[i])), eachindex(R₁))
 end
 
