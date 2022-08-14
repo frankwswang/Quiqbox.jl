@@ -97,7 +97,7 @@ t2 = 1e-10
 t3 = 1e-8
 @test isapprox(grad1[1], grad1[2], atol=t1)
 compr2Arrays3((grad1=grad1, grad1_t=grad1_t), t2, true)
-compr2Arrays3((grad1=grad1, grad1_fd=grad1_fd), t3, true)
+compr2Arrays3((grad1=grad1, grad1_fd=grad1_fd), 2t3, true)
 
 config = HFconfig(HF=:UHF, SCF=SCFconfig(threshold=DHFOthreshold))
 HFres1_2 = runHF(bs1, nuc, nucCoords, config, printInfo=false)
@@ -105,8 +105,8 @@ grad1_2 = gradOfHFenergy(pars1, bs1, overlaps(bs1), HFres1.C, nuc, nucCoords)
 grad1_2_fd = fDiffOfHFenergy(pars1, bs1, nuc, nucCoords, 1e-9; config)
 @test isapprox(grad1_2[1], grad1_2[2], atol=t1)
 compr2Arrays3((grad1_2=grad1_2, grad1_t=grad1_t), t2, true)
-@test all(abs.(grad1_2_fd[1:3] - grad1_2[1:3]) ./ grad1_2[1:3] .< 0.05)
-@test abs(grad1_2_fd[end] - grad1_2[end]) < 1e-5
+@test all(abs.((grad1_2_fd[1:3] - grad1_2[1:3]) ./ grad1_2[1:3]) .< 0.05)
+@test abs(grad1_2_fd[end] - grad1_2[end]) < 5e-5
 
 bfSource = genBasisFunc(missing, "STO-2G", "H")[]
 gfs = bfSource.gauss |> collect
@@ -132,7 +132,7 @@ HFres3 = runHF(bs3, nuc, nucCoords, DHFO, printInfo=false)
 grad3 = gradOfHFenergy(pars3, HFres3)
 grad3_fd = fDiffOfHFenergy(pars3, bs3, nuc, nucCoords, 1e-7)
 compr2Arrays3((grad3p=grad3[1:end-1], grad3_fdp=grad3_fd[1:end-1]), 10t3, true)
-@test isapprox(grad3[end], grad3_fd[end], atol=50t3)
+@test isapprox(grad3[end], grad3_fd[end], atol=100t3)
 grad3_t = [-0.1606522922402765,    -0.24121983207381031, -0.1480105648704627, 
             0.0047746557202592195, -0.08411039021158562, -0.33217356846754603, 
            -0.4154684787642143,    -0.05739800488612984, -0.3058823967298582, 
