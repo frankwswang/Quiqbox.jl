@@ -1,9 +1,10 @@
 export GaussFunc, genExponent, genContraction, SpatialPoint, genSpatialPoint, coordOf, 
        BasisFunc, BasisFuncs, genBasisFunc, lOf, subshellOf, centerOf, centerCoordOf, 
        unpackBasis, gaussCoeffOf, dimOf, GTBasis, sortBasisFuncs, sortPermBasisFuncs, 
-       sortBasis, sortPermBasis, add, mul, shift, decompose, orbitalNumOf, 
-       genBasisFuncText, genBFuncsFromText, assignCenInVal!, getParams, copyBasis, 
-       markParams!, hasNormFactor, getNormFactor, absorbNormFactor
+       sortBasis, sortPermBasis, add, mergeBasisFuncsIn, mul, shift, decompose, 
+       orbitalNumOf, genBasisFuncText, genBFuncsFromText, assignCenInVal!, getParams, 
+       copyBasis, markParams!, hasNormFactor, getNormFactor, absorbNormFactor, 
+       normalizeBasis
 
 export P1D, P2D, P3D
 
@@ -784,9 +785,8 @@ getTypeParams(::BasisFuncMix{T, D, BN, BFT}) where {T, D, BN, BFT} = (T, D, BN, 
 Unpack `b` to return all the `FloatingGTBasisFuncs` inside it.
 """
 unpackBasis(::EmptyBasisFunc) = ()
-unpackBasis(b::BasisFunc)  = (b,)
 unpackBasis(b::BasisFuncMix)  = b.BasisFunc
-unpackBasis(b::BFuncs1O)  = (BasisFunc(b),)
+unpackBasis(b::FGTBasisFuncs1O)  = (BasisFunc(b),)
 
 
 """
@@ -925,7 +925,7 @@ sortPermBasis(bs::Tuple{Vararg{CompositeGTBasisFuncs{T, D}}};
 sortPermBasis(collect(bs); roundAtol)
 
 
-function sumOfCore(bfs::AbstractVector{<:BasisFunc{T, D}}; 
+function sumOfCore(bfs::AbstractArray{<:BasisFunc{T, D}}; 
                    roundAtol::Real=getAtolVal(T)) where {T, D}
     arr1 = convert(Vector{BasisFunc{T, D}}, sortBasisFuncs(bfs; roundAtol))
     arr2 = BasisFunc{T, D}[]
@@ -946,12 +946,12 @@ function sumOfCore(bfs::AbstractVector{<:BasisFunc{T, D}};
 end
 
 sumOfCore(bs::Union{Tuple{Vararg{GTBasisFuncs{T, D, 1}}}, 
-                    AbstractVector{<:GTBasisFuncs{T, D, 1}}}; 
+                    AbstractArray{<:GTBasisFuncs{T, D, 1}}}; 
           roundAtol::Real=getAtolVal(T)) where {T, D} = 
 sumOfCore(BasisFunc{T, D}[joinTuple(unpackBasis.(bs)...)...]; roundAtol)
 
 function sumOf(bs::Union{Tuple{Vararg{GTBasisFuncs{T, D, 1}}}, 
-                         AbstractVector{<:GTBasisFuncs{T, D, 1}}}; 
+                         AbstractArray{<:GTBasisFuncs{T, D, 1}}}; 
                roundAtol::Real=getAtolVal(T)) where {T, D}
     length(bs) == 1 && (return bs[1])
     sumOfCore(bs; roundAtol)
@@ -1054,13 +1054,58 @@ function add(bf1::BasisFunc{T, D, 𝑙1, GN1, PT1}, bf2::BasisFunc{T, D, 𝑙2, 
     end
 end
 
-mergeBasisFuncs(bf1::FloatingGTBasisFuncs{T, D}, bf2::FloatingGTBasisFuncs{T, D}, 
-                bf3::FloatingGTBasisFuncs{T, D}, bf4::FloatingGTBasisFuncs{T, D}...; 
-                roundAtol::Real=getAtolVal(T)) where {T, D} = 
-mergeMultiObjs(FloatingGTBasisFuncs{T, D}, mergeBasisFuncs, bf1, bf2, bf3, bf4...; 
-               roundAtol)
+add(bfm::BasisFuncMix{T}; roundAtol::Real=getAtolVal(T)) where {T} = 
+sumOf(bfm.BasisFunc; roundAtol)
 
-mergeBasisFuncs(bs::Vararg{GTBasisFuncs{T, D}, 2}; roundAtol::Real=NaN) where {T, D} = 
+add(bf1::BasisFuncMix{T, D, 1}, bf2::BasisFunc{T, D, 𝑙}; 
+    roundAtol::Real=getAtolVal(T)) where {T, D, 𝑙} = 
+add(bf1.BasisFunc[1], bf2; roundAtol)
+
+add(bf1::BasisFunc{T, D, 𝑙}, bf2::BasisFuncMix{T, D, 1}; 
+    roundAtol::Real=getAtolVal(T)) where {T, D, 𝑙} = 
+add(bf2, bf1; roundAtol)
+
+add(bf::BasisFunc{T, D}, bfm::BasisFuncMix{T, D, BN}; 
+    roundAtol::Real=getAtolVal(T)) where {T, D, BN} = 
+sumOf((bf, bfm.BasisFunc...); roundAtol)
+
+add(bfm::BasisFuncMix{T, D, BN}, bf::BasisFunc{T, D}; 
+    roundAtol::Real=getAtolVal(T)) where {T, D, BN} = 
+add(bf, bfm; roundAtol)
+
+add(bf1::BasisFuncMix{T, D, 1}, bf2::BasisFuncMix{T, D, 1}; 
+    roundAtol::Real=getAtolVal(T)) where {T, D} = 
+add(bf1.BasisFunc[1], bf2.BasisFunc[1]; roundAtol)
+
+add(bf::BasisFuncMix{T, D, 1}, bfm::BasisFuncMix{T, D, BN}; 
+    roundAtol::Real=getAtolVal(T)) where {T, D, BN} = 
+add(bf.BasisFunc[1], bfm; roundAtol)
+
+add(bfm::BasisFuncMix{T, D, BN}, bf::BasisFuncMix{T, D, 1}; 
+    roundAtol::Real=getAtolVal(T)) where {T, D, BN} = 
+add(bf, bfm; roundAtol)
+
+add(bfm1::BasisFuncMix{T, D, BN1}, bfm2::BasisFuncMix{T, D, BN2}; 
+    roundAtol::Real=getAtolVal(T)) where {T, D, BN1, BN2} = 
+sumOf((bfm1.BasisFunc..., bfm2.BasisFunc...); roundAtol)
+
+add(::EmptyBasisFunc{<:Any, D}, b::CGTBasisFuncs1O{<:Any, D}; 
+    roundAtol::Real=NaN) where {D} = 
+itself(b)
+
+add(b::CGTBasisFuncs1O{<:Any, D}, ::EmptyBasisFunc{<:Any, D}; 
+    roundAtol::Real=NaN) where {D} = 
+itself(b)
+
+add(::EmptyBasisFunc{T1, D}, ::EmptyBasisFunc{T2, D}; 
+    roundAtol::Real=NaN) where {D, T1, T2} = 
+EmptyBasisFunc{promote_type(T1, T2), D}()
+
+
+mergeBasisFuncs(bf::FloatingGTBasisFuncs{T, D}; roundAtol::Real=NaN) where {T, D} = [bf]
+
+mergeBasisFuncs(bs::Vararg{FloatingGTBasisFuncs{T, D}, 2}; 
+                roundAtol::Real=NaN) where {T, D} = 
 collect(bs)
 
 function mergeBasisFuncs(bf1::FloatingGTBasisFuncs{T, D, 𝑙, GN, PT1, ON1}, 
@@ -1109,52 +1154,35 @@ function mergeBasisFuncs(bf1::FloatingGTBasisFuncs{T, D, 𝑙, GN, PT1, ON1},
     end
 end
 
-add(bfm::BasisFuncMix{T}; roundAtol::Real=getAtolVal(T)) where {T} = 
-sumOf(bfm.BasisFunc; roundAtol)
+mergeBasisFuncs(bf1::FloatingGTBasisFuncs{T, D}, bf2::FloatingGTBasisFuncs{T, D}, 
+                bf3::FloatingGTBasisFuncs{T, D}, bf4::FloatingGTBasisFuncs{T, D}...; 
+                roundAtol::Real=getAtolVal(T)) where {T, D} = 
+mergeMultiObjs(FloatingGTBasisFuncs{T, D}, mergeBasisFuncs, bf1, bf2, bf3, bf4...; 
+               roundAtol)
 
-add(bf1::BasisFuncMix{T, D, 1}, bf2::BasisFunc{T, D, 𝑙}; 
-    roundAtol::Real=getAtolVal(T)) where {T, D, 𝑙} = 
-add(bf1.BasisFunc[1], bf2; roundAtol)
 
-add(bf1::BasisFunc{T, D, 𝑙}, bf2::BasisFuncMix{T, D, 1}; 
-    roundAtol::Real=getAtolVal(T)) where {T, D, 𝑙} = 
-add(bf2, bf1; roundAtol)
+"""
 
-add(bf::BasisFunc{T, D}, bfm::BasisFuncMix{T, D, BN}; 
-    roundAtol::Real=getAtolVal(T)) where {T, D, BN} = 
-sumOf((bf, bfm.BasisFunc...); roundAtol)
+    mergeBasisFuncsIn(bs::Union{AbstractVector{<:GTBasisFuncs{T, D}}, 
+                                Tuple{Vararg{GTBasisFuncs{T, D}}}}; 
+                      roundAtol::Real=NaN) where {T, D} -> 
+    Vector{<:GTBasisFuncs{T, D}}
 
-add(bfm::BasisFuncMix{T, D, BN}, bf::BasisFunc{T, D}; 
-    roundAtol::Real=getAtolVal(T)) where {T, D, BN} = 
-add(bf, bfm; roundAtol)
-
-add(bf1::BasisFuncMix{T, D, 1}, bf2::BasisFuncMix{T, D, 1}; 
-    roundAtol::Real=getAtolVal(T)) where {T, D} = 
-add(bf1.BasisFunc[1], bf2.BasisFunc[1]; roundAtol)
-
-add(bf::BasisFuncMix{T, D, 1}, bfm::BasisFuncMix{T, D, BN}; 
-    roundAtol::Real=getAtolVal(T)) where {T, D, BN} = 
-add(bf.BasisFunc[1], bfm; roundAtol)
-
-add(bfm::BasisFuncMix{T, D, BN}, bf::BasisFuncMix{T, D, 1}; 
-    roundAtol::Real=getAtolVal(T)) where {T, D, BN} = 
-add(bf, bfm; roundAtol)
-
-add(bfm1::BasisFuncMix{T, D, BN1}, bfm2::BasisFuncMix{T, D, BN2}; 
-    roundAtol::Real=getAtolVal(T)) where {T, D, BN1, BN2} = 
-sumOf((bfm1.BasisFunc..., bfm2.BasisFunc...); roundAtol)
-
-add(::EmptyBasisFunc{<:Any, D}, b::CGTBasisFuncs1O{<:Any, D}; 
-    roundAtol::Real=NaN) where {D} = 
-itself(b)
-
-add(b::CGTBasisFuncs1O{<:Any, D}, ::EmptyBasisFunc{<:Any, D}; 
-    roundAtol::Real=NaN) where {D} = 
-itself(b)
-
-add(::EmptyBasisFunc{T1, D}, ::EmptyBasisFunc{T2, D}; 
-    roundAtol::Real=NaN) where {D, T1, T2} = 
-EmptyBasisFunc{promote_type(T1, T2), D}()
+Try merging multiple `FloatingGTBasisFuncs` (if there's any) in `bs` into 
+`FloatingGTBasisFuncs{T, D, <:Any, <:Any, <:Any, ON}` where `ON > 1` if possible and then 
+return the resulted basis collection. If no merging is performed, then the returned 
+collection is same as (but not necessarily identical to) `bs`.
+"""
+function mergeBasisFuncsIn(bs::Union{AbstractVector{<:GTBasisFuncs{T, D}}, 
+                                     Tuple{Vararg{GTBasisFuncs{T, D}}}}; 
+                           roundAtol::Real=NaN) where {T, D}
+    ids = findall(x->isa(x, FGTBasisFuncs1O), bs)
+    if isempty(ids)
+        collect(bs)
+    else
+        vcat(mergeBasisFuncs(bs[ids]...; roundAtol), collect(bs[1:end .∉ [ids]]))
+    end
+end
 
 
 """
@@ -1714,13 +1742,13 @@ end
 
 """
 
-    assignCenInVal!(center::AbstractVector{<:Real}, b::FloatingGTBasisFuncs{T, D}) -> 
+    assignCenInVal!(b::FloatingGTBasisFuncs{T, D}, center::AbstractVector{<:Real}) -> 
     SpatialPoint{T, D}
 
 Change the input value of data stored in `b.center` (meaning the output value will also 
 change according to the mapping function). Then, return the altered center.
 """
-function assignCenInVal!(center::AbstractVector{<:Real}, b::FloatingGTBasisFuncs)
+function assignCenInVal!(b::FloatingGTBasisFuncs, center::AbstractVector{<:Real})
     for (i,j) in zip(b.center, center)
         i[] = j
     end
@@ -1760,7 +1788,7 @@ cs[findall(x->paramFilter(x, symbol, forDifferentiation), cs)]
 
 getParams(pbc::ParameterizedContainer, symbol::Union{Symbol, Missing}=missing; 
           forDifferentiation::Bool=false) = 
-filter(x->paramFilter(x, symbol, forDifferentiation), pbc.param) |> collect
+[x for x in pbc.param if paramFilter(x, symbol, forDifferentiation)]
 
 getParams(cs::AbstractArray{<:ParameterizedContainer}, 
           symbol::Union{Symbol, Missing}=missing; forDifferentiation::Bool=false) = 
@@ -1877,8 +1905,8 @@ end
 
     hasNormFactor(b::FloatingGTBasisFuncs) -> Bool
 
-Indicate whether `b`' will be treated as having additional normalization factor(s) 
-multiplied to its Gaussian-type orbital(s) during any calculation.
+Indicate whether `b`' is be treated as having additional normalization factor(s) which its 
+Gaussian-type orbital(s) will be multiplied by during any calculation.
 """
 hasNormFactor(b::FloatingGTBasisFuncs) = b.normalizeGTO
 
@@ -1911,16 +1939,18 @@ hcat(getNormFactor.(b)...)
 
 """
 
-    absorbNormFactor(b::FloatingGTBasisFuncs{T, 3, 𝑙, GN, PT, ON}) where 
-                    {T, 𝑙, GN, PT, ON} -> 
-    Union{FloatingGTBasisFuncs{T, 3, 𝑙, GN, PT}, 
-          Vector{<:FloatingGTBasisFuncs{T, 3, 𝑙, GN, PT}}}
+    absorbNormFactor(b::BasisFunc{T, 3, 𝑙, GN, PT}) where {T, 𝑙, GN, PT} -> 
+    FloatingGTBasisFuncs{T, 3, 𝑙, GN, PT}
+
+    absorbNormFactor(b::BasisFuncs{T, 3, 𝑙, GN, PT}) where {T, 𝑙, GN, PT} -> 
+    Vector{<:FloatingGTBasisFuncs{T, 3, 𝑙, GN, PT}}
 
 If `hasNormFactor(`b`) == true`, absorb the normalization factor of each Gaussian-type 
 orbital inside `b` into the orbital's corresponding contraction coefficient and then set 
-`.normalizeGTO` of `b` to `false`. Otherwise, directly return `b`.
+`.normalizeGTO` of `b` to `false`. Otherwise, directly return `b` when it's a `BasisFunc`, 
+or `[b]` when it's a `BasisFuncs`.
 """
-function absorbNormFactor(b::FloatingGTBasisFuncs{<:Any, 3})
+function absorbNormFactor(b::BasisFunc{<:Any, 3})
     if hasNormFactor(b)
         absorbNormFactorCore(b)
     else
@@ -1928,15 +1958,16 @@ function absorbNormFactor(b::FloatingGTBasisFuncs{<:Any, 3})
     end
 end
 
-absorbNormFactorCore(b::FGTBasisFuncs1O{<:Any, 3, <:Any, 1}) = 
-(genBasisFunc(b, false) * getNormFactor(b)[begin])
+absorbNormFactorCore(b::BasisFunc{<:Any, 3, <:Any, 1}) = 
+mul(genBasisFunc(b, false), getNormFactor(b)[begin], roundAtol=NaN)
 
-absorbNormFactorCore(b::FGTBasisFuncs1O{<:Any, 3}) = 
-sum( decomposeCore(Val(true), genBasisFunc(b, false)) .* getNormFactor(b) )
+absorbNormFactorCore(b::BasisFunc{<:Any, 3}) = 
+sumOf( mul.(decomposeCore(Val(true), genBasisFunc(b, false)), 
+          getNormFactor(b), roundAtol=NaN), 
+     roundAtol=NaN)
 
-absorbNormFactorCore(b::FloatingGTBasisFuncs{<:Any, 3, <:Any, <:Any, <:Any, ON}) where 
-                    {ON} = 
-mergeBasisFuncs(absorbNormFactorCore.(b)...)
+absorbNormFactor(b::BasisFuncs{<:Any, 3, <:Any, <:Any, <:Any, ON}) where {ON} = 
+mergeBasisFuncs(absorbNormFactor.(b)...)
 
 """
 
@@ -1963,3 +1994,26 @@ vcat(absorbNormFactor.(bs)...)
 
 absorbNormFactor(bs::Tuple{Vararg{GTBasisFuncs{T, 3}}}) where {T} = 
 absorbNormFactor(bs |> collect) |> Tuple
+
+
+"""
+
+    normalizeBasis(b::GTBasisFuncs{T, D, 1}) where {T, D} -> GTBasisFuncs{T, D, 1}
+
+Multiply the contraction coefficient(s) inside `b` by constant coefficient(s) to normalizeBasis 
+the `b`, and then return the normalized basis.
+"""
+function normalizeBasis(b::GTBasisFuncs{T}) where {T}
+    nrm = roundToMultiOfStep(overlap(b,b), exp10(-getAtolDigits(T)-1))
+    mul(b, inv(nrm|>sqrt), roundAtol=NaN)
+end
+
+"""
+
+    normalizeBasis(b::BasisFuncs{T, D}) where {T, D} -> Vector{<:FloatingGTBasisFuncs{T, D}}
+
+Normalize each [`BasisFunc`](@ref) inside `b` and try to merge them back to one 
+[`BasisFuncs`](@ref). If the merge is performed, the returned result is a 1-element 
+`Vector`.
+"""
+normalizeBasis(bfs::BasisFuncs) = mergeBasisFuncs(normalizeBasis.(bfs)...)

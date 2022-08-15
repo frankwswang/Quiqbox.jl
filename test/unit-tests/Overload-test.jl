@@ -292,8 +292,12 @@ bfs1_alter = genBasisFunc.(Ref(fill(0.0, 3)), Ref((2.0,1.0)), [(1,0,0), (0,1,0),
 for i in eachindex(bfs1)
     @test hasEqual(getindex(bfs1, i), bfs1[i], bfs1_alter[i])
 end
+@test sp1[begin] === sp1[1]
+@test sp1[end] === sp1[dimOf(sp1)]
+@test bf1[begin] === bf1 === bf1[end]
+@test bfm11[begin] === bfm11 === bfm11[end]
 @test hasEqual(bfs1[begin], bfs1[1])
-@test hasEqual(bfs1[end], bfs1[3])
+@test hasEqual(bfs1[end], bfs1[orbitalNumOf("P")])
 
 @test firstindex(sp1) == 1
 @test lastindex(sp1) == D
@@ -301,6 +305,26 @@ end
 @test firstindex(lt1) == 1
 @test lastindex(lt1) == D
 @test axes(lt1) == (eachindex(lt1),) == (Base.OneTo(D),)
+
+@test p3[:] == (p3[1], p3[2], p3[3])
+@test bfs1[:] === bfs1[begin:end] === bfs1[[1,2,3]] === bfs1
+
+collection1 = collect(pb1); collection1t = [pb1[]]
+@test collection1 == collection1t
+collection2 = collect(p3); collection2t = collect(p3[:])
+@test collection2 == collection2t
+collection3 = collect(bf1); collection3t = [bf1]
+@test collection3 == collection3t == [i for i in bf1]
+collection4 = collect(bfm1); collection4t = [bfm1]
+@test collection4 == collection4t == [i for i in bfm1]
+collection5 = collect(bfs1); collection5t = [bfs1[1], bfs1[2], bfs1[3]]
+@test collection5 == collection5t == [i for i in bfs1]
+
+@test typeof(collection1) == typeof(collection1t)
+@test typeof(collection2) == typeof(collection2t)
+@test typeof(collection3) == typeof(collection3t)
+@test typeof(collection4) == typeof(collection4t)
+@test typeof(collection5) == typeof(collection5t)
 
 
 # function broadcastable

@@ -33,7 +33,8 @@ Parameter container that can enable differentiation.
 ≡≡≡ Field(s) ≡≡≡
 
 `data::Array{T, 0}`: The container of the data (i.e. the value of the input variable) 
-stored in the `ParamBox` that can be accessed by syntax `[]`.
+stored in the `ParamBox` that can be accessed by syntax `[]`. The data value stored in an 
+arbitrary `ParamBox{T}` `pb` can be modified using the syntax `pb[] = aNewVal`.
 
 `dataName::Symbol`: The name of the input variable.
 
@@ -275,13 +276,14 @@ end
 
 function getVarCore(pb::ParamBox{T, <:Any, FL}) where {T, FL}
     dvSym = outSymOf(pb)
-    ivVal = pb.data[]
-    if FL == FI || !isDiffParam(pb)
-        Pair{Symbol, T}[dvSym => ivVal]
-    else
-        Pair{Symbol, T}[dvSym => pb(), inSymOf(pb) => ivVal]
-    end
+    ivVal = inValOf(pb)
+    ovVal = outValOf(pb)
+    ifelse(isDiffParam(pb), Pair{Symbol, T}[dvSym=>ovVal, inSymOf(pb)=>ivVal], 
+                            Pair{Symbol, T}[dvSym=>ovVal])
 end
+
+getVarCore(pb::ParamBox{T, <:Any, FI}) where {T} = 
+Pair{Symbol, T}[inSymOf(pb) => inValOf(pb)]
 
 
 """

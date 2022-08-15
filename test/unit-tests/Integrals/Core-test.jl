@@ -39,7 +39,7 @@ for i in Quiqbox.SubshellNames[2:4]
     bfs1 = genBasisFunc(rand(3), (rand(0.5:0.1:2.0, 2), rand(-0.5:0.1:0.5, 2)), "S")
     bfs2 = genBasisFunc(rand(3), (rand(0.5:0.1:2.0, 2), rand(-0.5:0.1:0.5, 2)), i)
     bs1 = [bfs1, bfs2]
-    bs2 = [bfs1, bfs2[:]...]
+    bs2 = [bfs1, bfs2...]
     bss = (bs1, bs2)
 
     S1, S2 = overlaps.(bss)

@@ -1,5 +1,6 @@
 using Test
 using Quiqbox
+using Quiqbox: getVarCore
 
 @testset "Parameters.jl" begin
 
@@ -21,7 +22,7 @@ pb2_2 = outValCopy(pb1)
 @test dataOf(pb1) == dataOf(pb2_2)
 @test dataOf(pb1) !== dataOf(pb2_2)
 
-pb3 = ParamBox(1, :b, abs)
+pb3 = ParamBox(-1, :b, abs)
 @test inSymOfCore(pb3) == :x_b
 @test outSymOfCore(pb3) == :b
 @test mapOf(pb3) == abs
@@ -52,7 +53,12 @@ pb8 = changeMapping(pb6, x->x^1.5, :p2)
 @test typeof(pb8).parameters[2] == :p2
 
 
-# function getVar getVarDict
+# function getVarCore getVar getVarDict
+@test getVarCore(pb1) == [:a=>1]
+@test getVarCore(pb4) == [:c=>1.44, :x=>1.2]
+pb9 = ParamBox(pb4[], getVar(pb4), pb4.map, pb4.dataName, canDiff=false)
+@test getVarCore(pb9) == [:c=>1.44]
+
 e_gv1 = genExponent(2.0)
 c_gv1 = genContraction(1.0)
 gf_gv1 = GaussFunc(e_gv1, c_gv1)
@@ -95,8 +101,9 @@ markParams!(vcat(bfs_gv, bfm_gv), true)
 @test getVarDict(pb4) == Dict([:x=>1.2, :c=>1.44])
 pb1_2 = changeMapping(pb1, x->x+2)
 @test getVarDict(pb1_2) == Dict(:a_a=>1, :a=>3)
-pb4_2 = ParamBox(1.2, :X, x->x^2)
-@test getVarDict(pb4_2) == Dict([:x_X=>1.2, :X=>1.44])
+@test getVarDict(pb3) == Dict(:x_b=>-1, :b=>1)
+pb4_3 = changeMapping(pb4, x->x+2)
+@test getVarDict(pb4_3) == Dict(:c=>3.2, :x=>1.2)
 @test getVarDict(bf_gv6.param) == Dict( ( (  getVar.(bf_gv6.param) .=> 
                                            outValOf.(bf_gv6.param))..., 
                                           ( inSymOf.(bf_gv6.param) .=> 

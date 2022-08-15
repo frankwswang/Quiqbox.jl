@@ -247,10 +247,8 @@ c4 = c3 |> Tuple
 
 
 # function mergeMultiObjs
-mergeFunc1 = (x,y; roundAtol) -> ifelse(isapprox(abs(x), abs(y); atol=roundAtol), 
-                                        abs(x), [x, y])
-@test mergeMultiObjs(Int, mergeFunc1, 1, 2, -2, 3, -2, -1, 4, -3, 
-                     roundAtol=1e-10) == [1,2,3,4]
+mergeFunc1 = (x,y; atol) -> ifelse(isapprox(abs(x), abs(y); atol), [abs(x)], abs.([x, y]))
+@test mergeMultiObjs(Int, mergeFunc1, -1, -2, 2, 3, -2, -1, 4, -3, atol=1e-10) == [1,2,3,4]
 
 
 # function isNaN

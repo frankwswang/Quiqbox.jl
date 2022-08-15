@@ -135,7 +135,7 @@ bf2_P_norm3 = genBasisFunc(cen, gf2, "P")
 @test hasEqual(bf2_P_norm2, bf2_P_norm3)
 @test BasisFuncs(bf2_P_norm3) === bf2_P_norm3
 bfsp = BasisFuncs(genSpatialPoint(cen), gf2, (Quiqbox.LTuple(1,0,0),))
-@test hasEqual(bfsp[:][], BasisFunc(bfsp), bf2_P_norm3[1])
+@test hasEqual(collect(bfsp)[], BasisFunc(bfsp), bf2_P_norm3[1])
 @test getTypeParams(bf2_P_norm3) == (Float64, 3, 1, 1, Quiqbox.P3D{Float64, 0,0,0}, 3)
 
 bf3_1 = genBasisFunc(fill(0.0, 3), "STO-3G")[]
@@ -230,7 +230,7 @@ bfm1 = BasisFuncMix(bf1)
 bf5_2 = genBasisFunc(fill(0.0, 3), (2.0, 1.0), [(1,0,0)])
 bfm2 = BasisFuncMix(bf5)
 @test hasEqual(bfm2, BasisFuncMix(bf5_2))
-bfm_bf2_P =  BasisFuncMix(bf2_P_norm3[:])
+bfm_bf2_P =  BasisFuncMix(bf2_P_norm3|>collect)
 @test hasEqual(bfm_bf2_P, BasisFuncMix([bfsp, bf2_P_norm3[2:end]...]))
 @test collect(gaussCoeffOf.(bfm_bf2_P.BasisFunc)) == fill(gaussCoeffOf(bf2_P_norm3), 3)
 @test getTypeParams(bfm1) == 
@@ -249,7 +249,7 @@ T = eKinetics([bfm])[]
 @test isapprox(T, eKinetics(bs1) |> sum, atol=errorThreshold2)
 V = neAttractions([bfm], nuc, nucCoords)[]
 @test V == neAttraction(bfm, bfm, nuc, nucCoords)[]
-@test isapprox(V, neAttractions(bs1, nuc, nucCoords) |> sum, atol=errorThreshold2)
+@test isapprox(V, neAttractions(bs1, nuc, nucCoords) |> sum, atol=1.5errorThreshold2)
 eeI = eeInteractions([bfm])[]
 @test eeI == eeInteraction(bfm, bfm, bfm, bfm)[]
 @test isapprox(eeI, eeInteractions(bs1) |> sum, atol=errorThreshold2)
@@ -349,10 +349,13 @@ gf_merge3 = GaussFunc(1.5, 1.0)
 @test hasIdentical(mergeGaussFuncs(gf_merge1, gf_merge3), [gf_merge1, gf_merge3])
 
 
-# mergeBasisFuncs
-@test mergeBasisFuncs(bf4_3[:]...) == [bf4_3]
-@test mergeBasisFuncs(shuffle(bf4_4[:])...) == [bf4_4]
-bfsComps = vcat(bf4_3[:], bf4_4[:])
+# function mergeBasisFuncs
+@test mergeBasisFuncs(bf1)[] === bf1
+@test mergeBasisFuncs(bf1, bf2) == [bf1, bf2]
+@test mergeBasisFuncs(bf4_3)[] === bf4_3
+@test mergeBasisFuncs(bf4_3...) == [bf4_3]
+@test mergeBasisFuncs(shuffle(bf4_4|>collect)...) == [bf4_4]
+bfsComps = vcat(collect(bf4_3), bf4_4...)
 mySort = xs->sort(xs, by=x->getTypeParams(x)[2:4])
 @test mySort(mergeBasisFuncs(shuffle(bfsComps)...)) == [bf4_3, bf4_4]
 mergedbfs = [bf3_1, bf4_3, bf4_4]
@@ -362,6 +365,16 @@ mergedbfs = [bf3_1, bf4_3, bf4_4]
 bfMerge1 = genBasisFunc(cen, gf1, (1,0,0))
 bfMerge2 = genBasisFunc(cen, gf2, [(0,0,1), (0,1,0)])
 @test hasEqual(mergeBasisFuncs(bfMerge1, bfMerge2)[], genBasisFunc(cen, gf1, "P"))
+
+
+# function mergeBasisFuncsIn
+@test mergeBasisFuncsIn([bf1]) == mergeBasisFuncsIn((bf1,)) == [bf1]
+@test mergeBasisFuncsIn([bfm1]) == mergeBasisFuncsIn((bfm1,)) == [bfm1]
+@test mergeBasisFuncsIn([bf1, bf2]) == mergeBasisFuncsIn((bf1, bf2)) == [bf1, bf2]
+@test mergeBasisFuncsIn([bfm1, bf2]) == mergeBasisFuncsIn((bfm1, bf2)) == [bf2, bfm1]
+@test mergeBasisFuncsIn(collect(bf4_3)) == [bf4_3]
+@test mergeBasisFuncsIn(collect(bf4_3)|>shuffle) == [bf4_3]
+@test sortBasis(mergeBasisFuncsIn(vcat(bf1, bf4_3..., bfm1)|>shuffle)) == [bf4_3, bf1, bfm1]
 
 
 # function add, mul, gaussProd
@@ -550,9 +563,9 @@ dm1 = reshape([bf_d_1], 1, 1)
 @test hasEqual(decompose(bf_d_2), reshape([bf_d_2], 1, 1))
 dm2 = reshape([genBasisFunc([1.0, 0.0, 0.0], (2.0, 0.1)), bf_d_1], 2, 1)
 @test hasEqual(decompose(bf_d_2, true), dm2)
-@test hasEqual(decompose(bf_d_3), reshape(bf_d_3[:], 1, 3))
+@test hasEqual(decompose(bf_d_3), reshape(collect(bf_d_3), 1, 3))
 @test hasEqual(decompose(bf_d_3, true), 
-               hcat(decompose.(bf_d_3[:], true)...))
+               hcat(decompose.(collect(bf_d_3), true)...))
 @test hasIdentical(decompose(bm_d_1), reshape([bm_d_1], 1, 1))
 @test hasEqual(decompose(bm_d_1, true), 
                vcat(decompose.(bm_d_1.BasisFunc, true)...))
@@ -612,9 +625,9 @@ txt1 = genBasisFuncText(bs1, printCenter=false, groupCenters=false) |> join
 txt2 = genBasisFuncText(bs1, printCenter=false) |> join
 bs2_1 = genBFuncsFromText(txt1)
 bs2_2 = genBFuncsFromText(txt2)
-assignCenInVal!.(cens, bs1)
-assignCenInVal!.(cens, bs2_1)
-assignCenInVal!.(cens, bs2_2)
+assignCenInVal!.(bs1, cens)
+assignCenInVal!.(bs2_1, cens)
+assignCenInVal!.(bs2_2, cens)
 txt3 = genBasisFuncText(bs1) |> join
 bs2_3 = genBFuncsFromText(txt3)
 @test hasEqual.(bs1, bs2_1, ignoreFunction=true) |> all
@@ -637,7 +650,7 @@ bf6 = genBasisFunc(missing, "STO-3G")[]
 coord = [1.0, 0.0, 0.0]
 bf6_1 = genBasisFunc(coord, "STO-3G")[]
 @test !hasEqual(bf6, bf6_1)
-assignCenInVal!(coord, bf6)
+assignCenInVal!(bf6, coord)
 @test hasEqual(bf6, bf6_1)
 
 
@@ -807,7 +820,8 @@ bf_mul17s = [sum(i) for i in eachcol(sgfs .* ns)]
 # function absorbNormFactor
 @test absorbNormFactor(bf1) === bf1
 @test absorbNormFactor(bf_mul8_0) === bf_mul8_0
-@test absorbNormFactor(bf2_P_norm2) === bf2_P_norm2
+@test absorbNormFactor(bf2_P_norm2)[] === bf2_P_norm2
+@test absorbNormFactor(bf2_P_norm2[1:1])[] === bf2_P_norm2[1]
 bfForabsorbNorm1 = genBasisFunc(bf5, true)
 @test bfForabsorbNorm1 isa BasisFunc
 @test isapprox(overlaps([bfForabsorbNorm1])[], overlaps([bf5*getNormFactor(bf5)[]])[], 
@@ -815,11 +829,11 @@ bfForabsorbNorm1 = genBasisFunc(bf5, true)
 
 bfForabsorbNorm2 = genBasisFunc(bf2_P_norm2, true)
 @test isapprox(overlaps([bfForabsorbNorm2]), 
-               overlaps(bf2_P_norm2[:].*unique(getNormFactor(bf2_P_norm2))), atol=1e-15)
+               overlaps(bf2_P_norm2.*unique(getNormFactor(bf2_P_norm2))), atol=1e-15)
 
 bsForabsorbNorm1 = genBasisFunc(missing, "cc-pVTZ", "Ca") |> Tuple
 for b in bsForabsorbNorm1
-    assignCenInVal!(rand(3), b)
+    assignCenInVal!(b, rand(3))
 end
 bsForabsorbNorm2 = absorbNormFactor(bsForabsorbNorm1)
 bsForabsorbNorm1_2 = bsForabsorbNorm1 |> flatten
@@ -833,5 +847,19 @@ bfmForabsorbNorm2 = BasisFuncMix(bsForabsorbNorm2_2)
 
 @test isapprox(overlap(bfmForabsorbNorm1, bfmForabsorbNorm2), 
                overlaps(bsForabsorbNorm1) |> sum, atol=1e-12)
+
+
+# function normalizeBasis
+t = 5e-16
+bf1N = normalizeBasis(bf1)
+@test isapprox(overlap(bf1N, bf1N), 1, atol=t)
+bfmN = normalizeBasis(bfm)
+@test isapprox(overlap(bfmN, bfmN), 1, atol=t)
+bf4_3N = normalizeBasis(bf4_3)
+@test typeof(bf4_3N[]) == typeof(bf4_3)
+@test isapprox(max( abs.((overlaps(bf4_3N)|>diag) .- 1)... ), 0, atol=t)
+bf4_4N = normalizeBasis(bf4_4)
+@test length(bf4_4N) == 2
+@test isapprox(max( abs.((overlaps(bf4_4N)|>diag) .- 1)... ), 0, atol=t)
 
 end
