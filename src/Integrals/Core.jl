@@ -372,6 +372,15 @@ function reformatIntData1((_, lj, _, kiOrji)::Tuple{Val{false}, Bool, Val{false}
     (data1, data2, data3, data4)
 end
 
+function reformatIntData1((_, lj, _, _)::Tuple{Val{false}, Bool, Val{false}, Val{false}}, 
+                          bfs::NTuple{4, FGTBasisFuncs1O{T, D}}) where {T, D}
+    data4 = reformatIntData1(bfs[4])
+    data3 = reformatIntData1(bfs[3])
+    data2 = lj ? data4 : reformatIntData1(bfs[2])
+    data1 = reformatIntData1(bfs[1])
+    (data1, data2, data3, data4)
+end
+
 function reformatIntData1((_, _, kj, _)::Tuple{Val{false}, Val{false}, Bool, Val{false}}, 
                           bfs::NTuple{4, FGTBasisFuncs1O{T, D}}) where {T, D}
     data4 = reformatIntData1(bfs[4])
@@ -876,16 +885,16 @@ end
 const Int2eBIndexLabels = Dict([( true,  true,  true,  true), #1111
                                 ( true, false, false,  true), #1122
                                 (false,  true, false,  true), #1212
-                                (false,  true, false, false), #1232
-                                (false, false,  true, false), #122X
+                                (false,  true, false, false), #1323
+                                (false, false,  true, false), #1223
                                 (false, false,  true,  true), #1112
                                 (false, false, false,  true), #1123
                                 ( true,  true,  true, false), #1222
-                                ( true, false, false, false), #12XX
-                                (false, false, false, false)  #123X
+                                ( true, false, false, false), #1233
+                                (false, false, false, false)  #1234
                                ] .=> 
-                               [Val(:aaaa), Val(:aabb), Val(:abab), Val(:abcx), Val(:abbx), 
-                                Val(:aabc), Val(:aabc), Val(:abxx), Val(:abxx), Val(:abcx)])
+                               [Val(:aaaa), Val(:aabb), Val(:abab), Val(:acbc), Val(:abbc), 
+                                Val(:aabc), Val(:aabc), Val(:abcc), Val(:abcc), Val(:abcd)])
 
 # 2e integrals for BasisFuncs/BasisFuncMix-mixed bases
 function getCompositeIntCore(::Val{T}, ::Val{D}, ::Val{BL}, ::Val{:aaaa}, ∫::F, 
@@ -937,28 +946,6 @@ function getCompositeIntCore(::Val{T}, ::Val{D}, ::Val{BL}, ::Val{:abab}, ∫::F
     res
 end
 
-function getCompositeIntCore(::Val{T}, ::Val{D}, ::Val{BL}, ::Val{:abbx}, ∫::F, 
-                             bs::Tuple{BT1, BT2, BT2, BT3}, optArgs...) where 
-                            {T, D, BL, F<:Function, BT1<:SpatialBasis{T, D}, 
-                                                    BT2<:SpatialBasis{T, D}, 
-                                                    BT3<:SpatialBasis{T, D}}
-    if bs[begin] === bs[end]
-        a, b = ab = bs[[1, 2]]
-        ON1, ON2 = getON.(Val(BL), ab)
-        res = zeros(T, ON1, ON2, ON2, ON1)
-        rng = Iterators.product(1:ON1, 1:ON2)
-        for (x, (l,k)) in enumerate(rng), (_, (i,j)) in zip(1:x, rng)
-            bl = (Val(false), Val(false), k==j, Val(false))
-            res[k, l, i, j] = res[i, j, k, l] = 
-            getCompositeInt(∫, bl, (getBF(Val(BL), a, i), getBF(Val(BL), b, j), 
-                                    getBF(Val(BL), b, k), getBF(Val(BL), a, l)), optArgs...)
-        end
-    else
-        res = getCompositeIntCore(Val(T), Val(D), Val(BL), Val(:abcx), ∫, bs, optArgs...)
-    end
-    res
-end
-
 function getCompositeIntCore(::Val{T}, ::Val{D}, ::Val{BL}, ::Val{:aabc}, ∫::F, 
                              bs::Tuple{BT1, BT1, BT2, BT3}, optArgs...) where 
                             {T, D, BL, F<:Function, BT1<:SpatialBasis{T, D}, 
@@ -976,7 +963,7 @@ function getCompositeIntCore(::Val{T}, ::Val{D}, ::Val{BL}, ::Val{:aabc}, ∫::F
     res
 end
 
-function getCompositeIntCore(::Val{T}, ::Val{D}, ::Val{BL}, ::Val{:abxx}, ∫::F, 
+function getCompositeIntCore(::Val{T}, ::Val{D}, ::Val{BL}, ::Val{:abcc}, ∫::F, 
                              bs::Tuple{BT1, BT2, BT3, BT3}, optArgs...) where 
                             {T, D, BL, F<:Function, BT1<:SpatialBasis{T, D}, 
                                                     BT2<:SpatialBasis{T, D}, 
@@ -993,15 +980,22 @@ function getCompositeIntCore(::Val{T}, ::Val{D}, ::Val{BL}, ::Val{:abxx}, ∫::F
     res
 end
 
-function getCompositeIntCore(::Val{T}, ::Val{D}, ::Val{BL}, ::Val{:abcx}, ∫::F, 
+const IndexABXYbools = Dict([Val{:acbc}, Val{:abbc}, Val{:abcd}] .=> 
+                            [(j,_,l) -> (Val(false), l==j, Val(false), Val(false)), 
+                             (j,k,_) -> (Val(false), Val(false), k==j, Val(false)), 
+                             (_,_,_) ->  Val(false)])
+
+function getCompositeIntCore(::Val{T}, ::Val{D}, ::Val{BL}, ::IT, ∫::F, 
                              bs::NTuple{4, SpatialBasis{T, D}}, optArgs...) where 
-                            {T, D, BL, F<:Function}
+                            {T, D, BL, IT<:Union{Val{:acbc}, Val{:abbc}, Val{:abcd}}, 
+                             F<:Function}
     bfsI, bfsJ, bfsK, bfsL = bs = getBFs.(Val(BL), bs)
     ON1, ON2, ON3, ON4 = length.(bs)
     res = zeros(T, ON1, ON2, ON3, ON4)
     for (l, bfl) in enumerate(bfsL), (k, bfk) in enumerate(bfsK), 
         (j, bfj) in enumerate(bfsJ), (i, bfi) in enumerate(bfsI)
-        res[i,j,k,l] = getCompositeInt(∫, Val(false), (bfi, bfj, bfk, bfl), optArgs...)
+        bl = IndexABXYbools[IT](j,k,l)
+        res[i,j,k,l] = getCompositeInt(∫, bl, (bfi, bfj, bfk, bfl), optArgs...)
     end
     res
 end
