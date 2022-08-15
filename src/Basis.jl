@@ -1,9 +1,10 @@
 export GaussFunc, genExponent, genContraction, SpatialPoint, genSpatialPoint, coordOf, 
        BasisFunc, BasisFuncs, genBasisFunc, lOf, subshellOf, centerOf, centerCoordOf, 
        unpackBasis, gaussCoeffOf, dimOf, GTBasis, sortBasisFuncs, sortPermBasisFuncs, 
-       sortBasis, sortPermBasis, add, mul, shift, decompose, orbitalNumOf, 
-       genBasisFuncText, genBFuncsFromText, assignCenInVal!, getParams, copyBasis, 
-       markParams!, hasNormFactor, getNormFactor, absorbNormFactor
+       sortBasis, sortPermBasis, add, mergeBasisFuncsIn, mul, shift, decompose, 
+       orbitalNumOf, genBasisFuncText, genBFuncsFromText, assignCenInVal!, getParams, 
+       copyBasis, markParams!, hasNormFactor, getNormFactor, absorbNormFactor, 
+       normalizeBasis
 
 export P1D, P2D, P3D
 
@@ -784,9 +785,8 @@ getTypeParams(::BasisFuncMix{T, D, BN, BFT}) where {T, D, BN, BFT} = (T, D, BN, 
 Unpack `b` to return all the `FloatingGTBasisFuncs` inside it.
 """
 unpackBasis(::EmptyBasisFunc) = ()
-unpackBasis(b::BasisFunc)  = (b,)
 unpackBasis(b::BasisFuncMix)  = b.BasisFunc
-unpackBasis(b::BFuncs1O)  = (BasisFunc(b),)
+unpackBasis(b::FGTBasisFuncs1O)  = (BasisFunc(b),)
 
 
 """
@@ -1159,6 +1159,30 @@ mergeBasisFuncs(bf1::FloatingGTBasisFuncs{T, D}, bf2::FloatingGTBasisFuncs{T, D}
                 roundAtol::Real=getAtolVal(T)) where {T, D} = 
 mergeMultiObjs(FloatingGTBasisFuncs{T, D}, mergeBasisFuncs, bf1, bf2, bf3, bf4...; 
                roundAtol)
+
+
+"""
+
+    mergeBasisFuncsIn(bs::Union{AbstractVector{<:GTBasisFuncs{T, D}}, 
+                                Tuple{Vararg{GTBasisFuncs{T, D}}}}; 
+                      roundAtol::Real=NaN) where {T, D} -> 
+    Vector{<:GTBasisFuncs{T, D}}
+
+Try merging multiple `FloatingGTBasisFuncs` (if there's any) in `bs` into 
+`FloatingGTBasisFuncs{T, D, <:Any, <:Any, <:Any, ON}` where `ON > 1` if possible and then 
+return the resulted basis collection. If no merging is performed, then the returned 
+collection is same as (but not necessarily identical to) `bs`.
+"""
+function mergeBasisFuncsIn(bs::Union{AbstractVector{<:GTBasisFuncs{T, D}}, 
+                                     Tuple{Vararg{GTBasisFuncs{T, D}}}}; 
+                           roundAtol::Real=NaN) where {T, D}
+    ids = findall(x->isa(x, FGTBasisFuncs1O), bs)
+    if isempty(ids)
+        collect(bs)
+    else
+        vcat(mergeBasisFuncs(bs[ids]...; roundAtol), collect(bs[1:end .∉ [ids]]))
+    end
+end
 
 
 """
@@ -1967,3 +1991,26 @@ vcat(absorbNormFactor.(bs)...)
 
 absorbNormFactor(bs::Tuple{Vararg{GTBasisFuncs{T, 3}}}) where {T} = 
 absorbNormFactor(bs |> collect) |> Tuple
+
+
+"""
+
+    normalizeBasis(b::GTBasisFuncs{T, D, 1}) where {T, D} -> GTBasisFuncs{T, D, 1}
+
+Multiply the contraction coefficient(s) inside `b` by constant coefficient(s) to normalizeBasis 
+the `b`, and then return the normalized basis.
+"""
+function normalizeBasis(b::GTBasisFuncs{T}) where {T}
+    nrm = roundToMultiOfStep(overlap(b,b), exp10(-getAtolDigits(T)-1))
+    mul(b, inv(nrm|>sqrt), roundAtol=NaN)
+end
+
+"""
+
+    normalizeBasis(b::BasisFuncs{T, D}) where {T, D} -> Vector{<:FloatingGTBasisFuncs{T, D}}
+
+Normalize each [`BasisFunc`](@ref) inside `b` and try to merge them back to one 
+[`BasisFuncs`](@ref). If the merge is performed, the returned result is a 1-element 
+`Vector`.
+"""
+normalizeBasis(bfs::BasisFuncs) = mergeBasisFuncs(normalizeBasis.(bfs)...)

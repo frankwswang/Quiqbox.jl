@@ -249,7 +249,7 @@ T = eKinetics([bfm])[]
 @test isapprox(T, eKinetics(bs1) |> sum, atol=errorThreshold2)
 V = neAttractions([bfm], nuc, nucCoords)[]
 @test V == neAttraction(bfm, bfm, nuc, nucCoords)[]
-@test isapprox(V, neAttractions(bs1, nuc, nucCoords) |> sum, atol=errorThreshold2)
+@test isapprox(V, neAttractions(bs1, nuc, nucCoords) |> sum, atol=1.5errorThreshold2)
 eeI = eeInteractions([bfm])[]
 @test eeI == eeInteraction(bfm, bfm, bfm, bfm)[]
 @test isapprox(eeI, eeInteractions(bs1) |> sum, atol=errorThreshold2)
@@ -349,7 +349,7 @@ gf_merge3 = GaussFunc(1.5, 1.0)
 @test hasIdentical(mergeGaussFuncs(gf_merge1, gf_merge3), [gf_merge1, gf_merge3])
 
 
-# mergeBasisFuncs
+# function mergeBasisFuncs
 @test mergeBasisFuncs(bf1)[] === bf1
 @test mergeBasisFuncs(bf1, bf2) == [bf1, bf2]
 @test mergeBasisFuncs(bf4_3)[] === bf4_3
@@ -365,6 +365,16 @@ mergedbfs = [bf3_1, bf4_3, bf4_4]
 bfMerge1 = genBasisFunc(cen, gf1, (1,0,0))
 bfMerge2 = genBasisFunc(cen, gf2, [(0,0,1), (0,1,0)])
 @test hasEqual(mergeBasisFuncs(bfMerge1, bfMerge2)[], genBasisFunc(cen, gf1, "P"))
+
+
+# function mergeBasisFuncsIn
+@test mergeBasisFuncsIn([bf1]) == mergeBasisFuncsIn((bf1,)) == [bf1]
+@test mergeBasisFuncsIn([bfm1]) == mergeBasisFuncsIn((bfm1,)) == [bfm1]
+@test mergeBasisFuncsIn([bf1, bf2]) == mergeBasisFuncsIn((bf1, bf2)) == [bf1, bf2]
+@test mergeBasisFuncsIn([bfm1, bf2]) == mergeBasisFuncsIn((bfm1, bf2)) == [bf2, bfm1]
+@test mergeBasisFuncsIn(collect(bf4_3)) == [bf4_3]
+@test mergeBasisFuncsIn(collect(bf4_3)|>shuffle) == [bf4_3]
+@test sortBasis(mergeBasisFuncsIn(vcat(bf1, bf4_3..., bfm1)|>shuffle)) == [bf4_3, bf1, bfm1]
 
 
 # function add, mul, gaussProd
@@ -836,5 +846,19 @@ bfmForabsorbNorm2 = BasisFuncMix(bsForabsorbNorm2_2)
 
 @test isapprox(overlap(bfmForabsorbNorm1, bfmForabsorbNorm2), 
                overlaps(bsForabsorbNorm1) |> sum, atol=1e-12)
+
+
+# function normalizeBasis
+t = 4e-16
+bf1N = normalizeBasis(bf1)
+@test isapprox(overlap(bf1N, bf1N), 1, atol=t)
+bfmN = normalizeBasis(bfm)
+@test isapprox(overlap(bfmN, bfmN), 1, atol=t)
+bf4_3N = normalizeBasis(bf4_3)
+@test typeof(bf4_3N[]) == typeof(bf4_3)
+@test isapprox(max( abs.((overlaps(bf4_3N)|>diag) .- 1)... ), 0, atol=t)
+bf4_4N = normalizeBasis(bf4_4)
+@test length(bf4_4N) == 2
+@test isapprox(max( abs.((overlaps(bf4_4N)|>diag) .- 1)... ), 0, atol=t)
 
 end
