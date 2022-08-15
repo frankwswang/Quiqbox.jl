@@ -39,7 +39,7 @@ If you want to postpone the specification of the center, you can replace the fir
 ```jldoctest myLabel1
 julia> bsO = genBasisFunc(missing, "STO-3G", "O");
 
-julia> [assignCenInVal!(fill(1.0, 3), b) for b in bsO]
+julia> [assignCenInVal!(b, fill(1.0, 3)) for b in bsO]
 3-element Vector{SpatialPoint{Float64, 3, Tuple{ParamBox{Float64, :X, FLevel{0}}, ParamBox{Float64, :Y, FLevel{0}}, ParamBox{Float64, :Z, FLevel{0}}}}}:
  SpatialPoint{Float64, 3, P3D{Float64, 0, 0, 0}}(param)[1.0, 1.0, 1.0][∂][∂][∂]
  SpatialPoint{Float64, 3, P3D{Float64, 0, 0, 0}}(param)[1.0, 1.0, 1.0][∂][∂][∂]

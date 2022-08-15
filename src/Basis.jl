@@ -1742,13 +1742,13 @@ end
 
 """
 
-    assignCenInVal!(center::AbstractVector{<:Real}, b::FloatingGTBasisFuncs{T, D}) -> 
+    assignCenInVal!(b::FloatingGTBasisFuncs{T, D}, center::AbstractVector{<:Real}) -> 
     SpatialPoint{T, D}
 
 Change the input value of data stored in `b.center` (meaning the output value will also 
 change according to the mapping function). Then, return the altered center.
 """
-function assignCenInVal!(center::AbstractVector{<:Real}, b::FloatingGTBasisFuncs)
+function assignCenInVal!(b::FloatingGTBasisFuncs, center::AbstractVector{<:Real})
     for (i,j) in zip(b.center, center)
         i[] = j
     end

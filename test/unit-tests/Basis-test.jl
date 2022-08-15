@@ -625,9 +625,9 @@ txt1 = genBasisFuncText(bs1, printCenter=false, groupCenters=false) |> join
 txt2 = genBasisFuncText(bs1, printCenter=false) |> join
 bs2_1 = genBFuncsFromText(txt1)
 bs2_2 = genBFuncsFromText(txt2)
-assignCenInVal!.(cens, bs1)
-assignCenInVal!.(cens, bs2_1)
-assignCenInVal!.(cens, bs2_2)
+assignCenInVal!.(bs1, cens)
+assignCenInVal!.(bs2_1, cens)
+assignCenInVal!.(bs2_2, cens)
 txt3 = genBasisFuncText(bs1) |> join
 bs2_3 = genBFuncsFromText(txt3)
 @test hasEqual.(bs1, bs2_1, ignoreFunction=true) |> all
@@ -650,7 +650,7 @@ bf6 = genBasisFunc(missing, "STO-3G")[]
 coord = [1.0, 0.0, 0.0]
 bf6_1 = genBasisFunc(coord, "STO-3G")[]
 @test !hasEqual(bf6, bf6_1)
-assignCenInVal!(coord, bf6)
+assignCenInVal!(bf6, coord)
 @test hasEqual(bf6, bf6_1)
 
 
@@ -832,7 +832,7 @@ bfForabsorbNorm2 = genBasisFunc(bf2_P_norm2, true)
 
 bsForabsorbNorm1 = genBasisFunc(missing, "cc-pVTZ", "Ca") |> Tuple
 for b in bsForabsorbNorm1
-    assignCenInVal!(rand(3), b)
+    assignCenInVal!(b, rand(3))
 end
 bsForabsorbNorm2 = absorbNormFactor(bsForabsorbNorm1)
 bsForabsorbNorm1_2 = bsForabsorbNorm1 |> flatten
