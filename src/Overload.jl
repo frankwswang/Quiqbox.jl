@@ -235,9 +235,14 @@ lastindex(sp::SpatialPoint) = lastindex(sp.param)
 eachindex(sp::SpatialPoint) = eachindex(sp.param)
 axes(sp::SpatialPoint) = axes(sp.param)
 
+getindex(b::CGTBasisFuncs1O, ::Val{:first}) = itself(b)
+getindex(b::CGTBasisFuncs1O, ::Val{:last}) = itself(b)
+firstindex(::CGTBasisFuncs1O) = Val(:first)
+lastindex(::CGTBasisFuncs1O) = Val(:last)
+
 @inline function getindex(bf::CGTBasisFuncs1O, i::Int)
     @boundscheck ( i==1 || throw(BoundsError(bf, i)) )
-    bf
+    bf[begin]
 end
 
 getindex(bfs::BasisFuncs, is::AbstractVector{Int}) = 

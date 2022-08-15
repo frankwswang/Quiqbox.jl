@@ -925,7 +925,7 @@ sortPermBasis(bs::Tuple{Vararg{CompositeGTBasisFuncs{T, D}}};
 sortPermBasis(collect(bs); roundAtol)
 
 
-function sumOfCore(bfs::AbstractVector{<:BasisFunc{T, D}}; 
+function sumOfCore(bfs::AbstractArray{<:BasisFunc{T, D}}; 
                    roundAtol::Real=getAtolVal(T)) where {T, D}
     arr1 = convert(Vector{BasisFunc{T, D}}, sortBasisFuncs(bfs; roundAtol))
     arr2 = BasisFunc{T, D}[]
@@ -946,12 +946,12 @@ function sumOfCore(bfs::AbstractVector{<:BasisFunc{T, D}};
 end
 
 sumOfCore(bs::Union{Tuple{Vararg{GTBasisFuncs{T, D, 1}}}, 
-                    AbstractVector{<:GTBasisFuncs{T, D, 1}}}; 
+                    AbstractArray{<:GTBasisFuncs{T, D, 1}}}; 
           roundAtol::Real=getAtolVal(T)) where {T, D} = 
 sumOfCore(BasisFunc{T, D}[joinTuple(unpackBasis.(bs)...)...]; roundAtol)
 
 function sumOf(bs::Union{Tuple{Vararg{GTBasisFuncs{T, D, 1}}}, 
-                         AbstractVector{<:GTBasisFuncs{T, D, 1}}}; 
+                         AbstractArray{<:GTBasisFuncs{T, D, 1}}}; 
                roundAtol::Real=getAtolVal(T)) where {T, D}
     length(bs) == 1 && (return bs[1])
     sumOfCore(bs; roundAtol)
@@ -1939,16 +1939,18 @@ hcat(getNormFactor.(b)...)
 
 """
 
-    absorbNormFactor(b::FloatingGTBasisFuncs{T, 3, 𝑙, GN, PT, ON}) where 
-                    {T, 𝑙, GN, PT, ON} -> 
-    Union{FloatingGTBasisFuncs{T, 3, 𝑙, GN, PT}, 
-          Vector{<:FloatingGTBasisFuncs{T, 3, 𝑙, GN, PT}}}
+    absorbNormFactor(b::BasisFunc{T, 3, 𝑙, GN, PT}) where {T, 𝑙, GN, PT} -> 
+    FloatingGTBasisFuncs{T, 3, 𝑙, GN, PT}
+
+    absorbNormFactor(b::BasisFuncs{T, 3, 𝑙, GN, PT}) where {T, 𝑙, GN, PT} -> 
+    Vector{<:FloatingGTBasisFuncs{T, 3, 𝑙, GN, PT}}
 
 If `hasNormFactor(`b`) == true`, absorb the normalization factor of each Gaussian-type 
 orbital inside `b` into the orbital's corresponding contraction coefficient and then set 
-`.normalizeGTO` of `b` to `false`. Otherwise, directly return `b`.
+`.normalizeGTO` of `b` to `false`. Otherwise, directly return `b` when it's a `BasisFunc`, 
+or `[b]` when it's a `BasisFuncs`.
 """
-function absorbNormFactor(b::FloatingGTBasisFuncs{<:Any, 3})
+function absorbNormFactor(b::BasisFunc{<:Any, 3})
     if hasNormFactor(b)
         absorbNormFactorCore(b)
     else
@@ -1956,15 +1958,16 @@ function absorbNormFactor(b::FloatingGTBasisFuncs{<:Any, 3})
     end
 end
 
-absorbNormFactorCore(b::FGTBasisFuncs1O{<:Any, 3, <:Any, 1}) = 
-(genBasisFunc(b, false) * getNormFactor(b)[begin])
+absorbNormFactorCore(b::BasisFunc{<:Any, 3, <:Any, 1}) = 
+mul(genBasisFunc(b, false), getNormFactor(b)[begin], roundAtol=NaN)
 
-absorbNormFactorCore(b::FGTBasisFuncs1O{<:Any, 3}) = 
-sum( decomposeCore(Val(true), genBasisFunc(b, false)) .* getNormFactor(b) )
+absorbNormFactorCore(b::BasisFunc{<:Any, 3}) = 
+sumOf( mul.(decomposeCore(Val(true), genBasisFunc(b, false)), 
+          getNormFactor(b), roundAtol=NaN), 
+     roundAtol=NaN)
 
-absorbNormFactorCore(b::FloatingGTBasisFuncs{<:Any, 3, <:Any, <:Any, <:Any, ON}) where 
-                    {ON} = 
-mergeBasisFuncs(absorbNormFactorCore.(b)...)
+absorbNormFactor(b::BasisFuncs{<:Any, 3, <:Any, <:Any, <:Any, ON}) where {ON} = 
+mergeBasisFuncs(absorbNormFactor.(b)...)
 
 """
 

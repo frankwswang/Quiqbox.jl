@@ -292,8 +292,12 @@ bfs1_alter = genBasisFunc.(Ref(fill(0.0, 3)), Ref((2.0,1.0)), [(1,0,0), (0,1,0),
 for i in eachindex(bfs1)
     @test hasEqual(getindex(bfs1, i), bfs1[i], bfs1_alter[i])
 end
+@test sp1[begin] === sp1[1]
+@test sp1[end] === sp1[dimOf(sp1)]
+@test bf1[begin] === bf1 === bf1[end]
+@test bfm11[begin] === bfm11 === bfm11[end]
 @test hasEqual(bfs1[begin], bfs1[1])
-@test hasEqual(bfs1[end], bfs1[3])
+@test hasEqual(bfs1[end], bfs1[orbitalNumOf("P")])
 
 @test firstindex(sp1) == 1
 @test lastindex(sp1) == D
