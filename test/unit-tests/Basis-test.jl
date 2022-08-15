@@ -135,7 +135,7 @@ bf2_P_norm3 = genBasisFunc(cen, gf2, "P")
 @test hasEqual(bf2_P_norm2, bf2_P_norm3)
 @test BasisFuncs(bf2_P_norm3) === bf2_P_norm3
 bfsp = BasisFuncs(genSpatialPoint(cen), gf2, (Quiqbox.LTuple(1,0,0),))
-@test hasEqual(bfsp[:][], BasisFunc(bfsp), bf2_P_norm3[1])
+@test hasEqual(collect(bfsp)[], BasisFunc(bfsp), bf2_P_norm3[1])
 @test getTypeParams(bf2_P_norm3) == (Float64, 3, 1, 1, Quiqbox.P3D{Float64, 0,0,0}, 3)
 
 bf3_1 = genBasisFunc(fill(0.0, 3), "STO-3G")[]
@@ -230,7 +230,7 @@ bfm1 = BasisFuncMix(bf1)
 bf5_2 = genBasisFunc(fill(0.0, 3), (2.0, 1.0), [(1,0,0)])
 bfm2 = BasisFuncMix(bf5)
 @test hasEqual(bfm2, BasisFuncMix(bf5_2))
-bfm_bf2_P =  BasisFuncMix(bf2_P_norm3[:])
+bfm_bf2_P =  BasisFuncMix(bf2_P_norm3|>collect)
 @test hasEqual(bfm_bf2_P, BasisFuncMix([bfsp, bf2_P_norm3[2:end]...]))
 @test collect(gaussCoeffOf.(bfm_bf2_P.BasisFunc)) == fill(gaussCoeffOf(bf2_P_norm3), 3)
 @test getTypeParams(bfm1) == 
@@ -350,9 +350,12 @@ gf_merge3 = GaussFunc(1.5, 1.0)
 
 
 # mergeBasisFuncs
-@test mergeBasisFuncs(bf4_3[:]...) == [bf4_3]
-@test mergeBasisFuncs(shuffle(bf4_4[:])...) == [bf4_4]
-bfsComps = vcat(bf4_3[:], bf4_4[:])
+@test mergeBasisFuncs(bf1)[] === bf1
+@test mergeBasisFuncs(bf1, bf2) == [bf1, bf2]
+@test mergeBasisFuncs(bf4_3)[] === bf4_3
+@test mergeBasisFuncs(bf4_3...) == [bf4_3]
+@test mergeBasisFuncs(shuffle(bf4_4|>collect)...) == [bf4_4]
+bfsComps = vcat(collect(bf4_3), bf4_4...)
 mySort = xs->sort(xs, by=x->getTypeParams(x)[2:4])
 @test mySort(mergeBasisFuncs(shuffle(bfsComps)...)) == [bf4_3, bf4_4]
 mergedbfs = [bf3_1, bf4_3, bf4_4]
@@ -550,9 +553,9 @@ dm1 = reshape([bf_d_1], 1, 1)
 @test hasEqual(decompose(bf_d_2), reshape([bf_d_2], 1, 1))
 dm2 = reshape([genBasisFunc([1.0, 0.0, 0.0], (2.0, 0.1)), bf_d_1], 2, 1)
 @test hasEqual(decompose(bf_d_2, true), dm2)
-@test hasEqual(decompose(bf_d_3), reshape(bf_d_3[:], 1, 3))
+@test hasEqual(decompose(bf_d_3), reshape(collect(bf_d_3), 1, 3))
 @test hasEqual(decompose(bf_d_3, true), 
-               hcat(decompose.(bf_d_3[:], true)...))
+               hcat(decompose.(collect(bf_d_3), true)...))
 @test hasIdentical(decompose(bm_d_1), reshape([bm_d_1], 1, 1))
 @test hasEqual(decompose(bm_d_1, true), 
                vcat(decompose.(bm_d_1.BasisFunc, true)...))
@@ -815,7 +818,7 @@ bfForabsorbNorm1 = genBasisFunc(bf5, true)
 
 bfForabsorbNorm2 = genBasisFunc(bf2_P_norm2, true)
 @test isapprox(overlaps([bfForabsorbNorm2]), 
-               overlaps(bf2_P_norm2[:].*unique(getNormFactor(bf2_P_norm2))), atol=1e-15)
+               overlaps(bf2_P_norm2.*unique(getNormFactor(bf2_P_norm2))), atol=1e-15)
 
 bsForabsorbNorm1 = genBasisFunc(missing, "cc-pVTZ", "Ca") |> Tuple
 for b in bsForabsorbNorm1

@@ -302,6 +302,26 @@ end
 @test lastindex(lt1) == D
 @test axes(lt1) == (eachindex(lt1),) == (Base.OneTo(D),)
 
+@test p3[:] == (p3[1], p3[2], p3[3])
+@test bfs1[:] === bfs1[begin:end] === bfs1[[1,2,3]] === bfs1
+
+collection1 = collect(pb1); collection1t = [pb1[]]
+@test collection1 == collection1t
+collection2 = collect(p3); collection2t = collect(p3[:])
+@test collection2 == collection2t
+collection3 = collect(bf1); collection3t = [bf1]
+@test collection3 == collection3t == [i for i in bf1]
+collection4 = collect(bfm1); collection4t = [bfm1]
+@test collection4 == collection4t == [i for i in bfm1]
+collection5 = collect(bfs1); collection5t = [bfs1[1], bfs1[2], bfs1[3]]
+@test collection5 == collection5t == [i for i in bfs1]
+
+@test typeof(collection1) == typeof(collection1t)
+@test typeof(collection2) == typeof(collection2t)
+@test typeof(collection3) == typeof(collection3t)
+@test typeof(collection4) == typeof(collection4t)
+@test typeof(collection5) == typeof(collection5t)
+
 
 # function broadcastable
 @test getproperty.(pb1, [:data, :map]) == [pb1.data, pb1.map]

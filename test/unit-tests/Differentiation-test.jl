@@ -63,6 +63,7 @@ end
                                  atol=1e-15)
 
 
+# function gradOfHFenergy
 fDiffOfHFenergyCore! = function (pars, bs, nuc, nucCoords, Δx, config)
     map(pars) do par
         @assert (isDiffParam(par) || Quiqbox.getFLevel(par.map) == 0)
@@ -79,7 +80,6 @@ fDiffOfHFenergy = function (pars, bs, nuc, nucCoords, Δx=1e-6; config=DHFO)
     (Eus - Eds) ./ (2Δx)
 end
 
-# function gradOfHFenergy
 nuc = ["H", "H"]
 nucCoords = [[-0.7,0.0,0.0], [0.7,0.0,0.0]]
 

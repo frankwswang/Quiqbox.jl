@@ -1054,13 +1054,58 @@ function add(bf1::BasisFunc{T, D, 𝑙1, GN1, PT1}, bf2::BasisFunc{T, D, 𝑙2, 
     end
 end
 
-mergeBasisFuncs(bf1::FloatingGTBasisFuncs{T, D}, bf2::FloatingGTBasisFuncs{T, D}, 
-                bf3::FloatingGTBasisFuncs{T, D}, bf4::FloatingGTBasisFuncs{T, D}...; 
-                roundAtol::Real=getAtolVal(T)) where {T, D} = 
-mergeMultiObjs(FloatingGTBasisFuncs{T, D}, mergeBasisFuncs, bf1, bf2, bf3, bf4...; 
-               roundAtol)
+add(bfm::BasisFuncMix{T}; roundAtol::Real=getAtolVal(T)) where {T} = 
+sumOf(bfm.BasisFunc; roundAtol)
 
-mergeBasisFuncs(bs::Vararg{GTBasisFuncs{T, D}, 2}; roundAtol::Real=NaN) where {T, D} = 
+add(bf1::BasisFuncMix{T, D, 1}, bf2::BasisFunc{T, D, 𝑙}; 
+    roundAtol::Real=getAtolVal(T)) where {T, D, 𝑙} = 
+add(bf1.BasisFunc[1], bf2; roundAtol)
+
+add(bf1::BasisFunc{T, D, 𝑙}, bf2::BasisFuncMix{T, D, 1}; 
+    roundAtol::Real=getAtolVal(T)) where {T, D, 𝑙} = 
+add(bf2, bf1; roundAtol)
+
+add(bf::BasisFunc{T, D}, bfm::BasisFuncMix{T, D, BN}; 
+    roundAtol::Real=getAtolVal(T)) where {T, D, BN} = 
+sumOf((bf, bfm.BasisFunc...); roundAtol)
+
+add(bfm::BasisFuncMix{T, D, BN}, bf::BasisFunc{T, D}; 
+    roundAtol::Real=getAtolVal(T)) where {T, D, BN} = 
+add(bf, bfm; roundAtol)
+
+add(bf1::BasisFuncMix{T, D, 1}, bf2::BasisFuncMix{T, D, 1}; 
+    roundAtol::Real=getAtolVal(T)) where {T, D} = 
+add(bf1.BasisFunc[1], bf2.BasisFunc[1]; roundAtol)
+
+add(bf::BasisFuncMix{T, D, 1}, bfm::BasisFuncMix{T, D, BN}; 
+    roundAtol::Real=getAtolVal(T)) where {T, D, BN} = 
+add(bf.BasisFunc[1], bfm; roundAtol)
+
+add(bfm::BasisFuncMix{T, D, BN}, bf::BasisFuncMix{T, D, 1}; 
+    roundAtol::Real=getAtolVal(T)) where {T, D, BN} = 
+add(bf, bfm; roundAtol)
+
+add(bfm1::BasisFuncMix{T, D, BN1}, bfm2::BasisFuncMix{T, D, BN2}; 
+    roundAtol::Real=getAtolVal(T)) where {T, D, BN1, BN2} = 
+sumOf((bfm1.BasisFunc..., bfm2.BasisFunc...); roundAtol)
+
+add(::EmptyBasisFunc{<:Any, D}, b::CGTBasisFuncs1O{<:Any, D}; 
+    roundAtol::Real=NaN) where {D} = 
+itself(b)
+
+add(b::CGTBasisFuncs1O{<:Any, D}, ::EmptyBasisFunc{<:Any, D}; 
+    roundAtol::Real=NaN) where {D} = 
+itself(b)
+
+add(::EmptyBasisFunc{T1, D}, ::EmptyBasisFunc{T2, D}; 
+    roundAtol::Real=NaN) where {D, T1, T2} = 
+EmptyBasisFunc{promote_type(T1, T2), D}()
+
+
+mergeBasisFuncs(bf::FloatingGTBasisFuncs{T, D}; roundAtol::Real=NaN) where {T, D} = [bf]
+
+mergeBasisFuncs(bs::Vararg{FloatingGTBasisFuncs{T, D}, 2}; 
+                roundAtol::Real=NaN) where {T, D} = 
 collect(bs)
 
 function mergeBasisFuncs(bf1::FloatingGTBasisFuncs{T, D, 𝑙, GN, PT1, ON1}, 
@@ -1109,52 +1154,11 @@ function mergeBasisFuncs(bf1::FloatingGTBasisFuncs{T, D, 𝑙, GN, PT1, ON1},
     end
 end
 
-add(bfm::BasisFuncMix{T}; roundAtol::Real=getAtolVal(T)) where {T} = 
-sumOf(bfm.BasisFunc; roundAtol)
-
-add(bf1::BasisFuncMix{T, D, 1}, bf2::BasisFunc{T, D, 𝑙}; 
-    roundAtol::Real=getAtolVal(T)) where {T, D, 𝑙} = 
-add(bf1.BasisFunc[1], bf2; roundAtol)
-
-add(bf1::BasisFunc{T, D, 𝑙}, bf2::BasisFuncMix{T, D, 1}; 
-    roundAtol::Real=getAtolVal(T)) where {T, D, 𝑙} = 
-add(bf2, bf1; roundAtol)
-
-add(bf::BasisFunc{T, D}, bfm::BasisFuncMix{T, D, BN}; 
-    roundAtol::Real=getAtolVal(T)) where {T, D, BN} = 
-sumOf((bf, bfm.BasisFunc...); roundAtol)
-
-add(bfm::BasisFuncMix{T, D, BN}, bf::BasisFunc{T, D}; 
-    roundAtol::Real=getAtolVal(T)) where {T, D, BN} = 
-add(bf, bfm; roundAtol)
-
-add(bf1::BasisFuncMix{T, D, 1}, bf2::BasisFuncMix{T, D, 1}; 
-    roundAtol::Real=getAtolVal(T)) where {T, D} = 
-add(bf1.BasisFunc[1], bf2.BasisFunc[1]; roundAtol)
-
-add(bf::BasisFuncMix{T, D, 1}, bfm::BasisFuncMix{T, D, BN}; 
-    roundAtol::Real=getAtolVal(T)) where {T, D, BN} = 
-add(bf.BasisFunc[1], bfm; roundAtol)
-
-add(bfm::BasisFuncMix{T, D, BN}, bf::BasisFuncMix{T, D, 1}; 
-    roundAtol::Real=getAtolVal(T)) where {T, D, BN} = 
-add(bf, bfm; roundAtol)
-
-add(bfm1::BasisFuncMix{T, D, BN1}, bfm2::BasisFuncMix{T, D, BN2}; 
-    roundAtol::Real=getAtolVal(T)) where {T, D, BN1, BN2} = 
-sumOf((bfm1.BasisFunc..., bfm2.BasisFunc...); roundAtol)
-
-add(::EmptyBasisFunc{<:Any, D}, b::CGTBasisFuncs1O{<:Any, D}; 
-    roundAtol::Real=NaN) where {D} = 
-itself(b)
-
-add(b::CGTBasisFuncs1O{<:Any, D}, ::EmptyBasisFunc{<:Any, D}; 
-    roundAtol::Real=NaN) where {D} = 
-itself(b)
-
-add(::EmptyBasisFunc{T1, D}, ::EmptyBasisFunc{T2, D}; 
-    roundAtol::Real=NaN) where {D, T1, T2} = 
-EmptyBasisFunc{promote_type(T1, T2), D}()
+mergeBasisFuncs(bf1::FloatingGTBasisFuncs{T, D}, bf2::FloatingGTBasisFuncs{T, D}, 
+                bf3::FloatingGTBasisFuncs{T, D}, bf4::FloatingGTBasisFuncs{T, D}...; 
+                roundAtol::Real=getAtolVal(T)) where {T, D} = 
+mergeMultiObjs(FloatingGTBasisFuncs{T, D}, mergeBasisFuncs, bf1, bf2, bf3, bf4...; 
+               roundAtol)
 
 
 """
@@ -1760,7 +1764,7 @@ cs[findall(x->paramFilter(x, symbol, forDifferentiation), cs)]
 
 getParams(pbc::ParameterizedContainer, symbol::Union{Symbol, Missing}=missing; 
           forDifferentiation::Bool=false) = 
-filter(x->paramFilter(x, symbol, forDifferentiation), pbc.param) |> collect
+[x for x in pbc.param if paramFilter(x, symbol, forDifferentiation)]
 
 getParams(cs::AbstractArray{<:ParameterizedContainer}, 
           symbol::Union{Symbol, Missing}=missing; forDifferentiation::Bool=false) = 
@@ -1877,8 +1881,8 @@ end
 
     hasNormFactor(b::FloatingGTBasisFuncs) -> Bool
 
-Indicate whether `b`' will be treated as having additional normalization factor(s) 
-multiplied to its Gaussian-type orbital(s) during any calculation.
+Indicate whether `b`' is be treated as having additional normalization factor(s) which its 
+Gaussian-type orbital(s) will be multiplied by during any calculation.
 """
 hasNormFactor(b::FloatingGTBasisFuncs) = b.normalizeGTO
 

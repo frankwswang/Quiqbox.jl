@@ -180,7 +180,7 @@ iterate(sp::SpatialPoint) = iterate(sp.param)
 iterate(sp::SpatialPoint, state) = iterate(sp.param, state)
 size(::SpatialPoint{<:Any, D}) where {D} = (D,)
 length(::SpatialPoint{<:Any, D}) where {D} = D
-eltype(::SpatialPoint{T}) where {T} = ParamBox{T}
+eltype(sp::SpatialPoint) = eltype(sp.param)
 function size(::SpatialPoint{<:Any, D}, d::Integer) where {D}
     @boundscheck ( d > 0 || throw(BoundsError()) )
     ifelse(d==1, D, 1)
@@ -196,6 +196,7 @@ iterate(bf::CGTBasisFuncs1O) = (bf, nothing)
 iterate(::CGTBasisFuncs1O, _) = nothing
 size(::CGTBasisFuncs1O) = ()
 length(::CGTBasisFuncs1O) = 1
+eltype(::T) where {T<:CGTBasisFuncs1O} = T
 
 function iterate(bfs::BasisFuncs)
     item, state = iterate(bfs.l)
@@ -243,8 +244,7 @@ getindex(bfs::BasisFuncs, is::AbstractVector{Int}) =
 BasisFuncs(bfs.center, bfs.gauss, bfs.l[is], bfs.normalizeGTO)
 getindex(bfs::BasisFuncs, i::Int) = 
 BasisFunc(bfs.center, bfs.gauss, bfs.l[i], bfs.normalizeGTO)
-getindex(bfs::BasisFuncs{T, D, 𝑙, GN, PT, ON}, ::Colon) where {T, D, 𝑙, GN, PT, ON} = 
-BasisFunc{T, D, 𝑙, GN, PT}[getindex(bfs, i) for i=1:ON]
+getindex(bfs::BasisFuncs, ::Colon) = itself(bfs)
 firstindex(bfs::BasisFuncs) = 1
 lastindex(::BFuncsON{ON}) where {ON} = ON
 eachindex(bfs::BFuncsON) = Base.OneTo(lastindex(bfs))
@@ -262,7 +262,7 @@ import Base: broadcastable
 broadcastable(pb::ParamBox) = Ref(pb)
 broadcastable(gf::GaussFunc) = Ref(gf)
 broadcastable(bf::CGTBasisFuncs1O) = Ref(bf)
-broadcastable(bfs::BasisFuncs) = getindex(bfs, :)
+broadcastable(bfs::BasisFuncs) = [i for i in bfs]
 Base.broadcastable(sp::SpatialPoint) = Base.broadcastable(sp.param)
 
 
