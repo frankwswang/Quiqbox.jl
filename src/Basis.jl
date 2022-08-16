@@ -780,13 +780,13 @@ getTypeParams(::BasisFuncMix{T, D, BN, BFT}) where {T, D, BN, BFT} = (T, D, BN, 
 
 """
 
-    unpackBasis(b::GTBasisFuncs) -> Tuple
+    unpackBasis(b::GTBasisFuncs{T, D}) -> Vector{<:BasisFunc{T, D}}
 
-Unpack `b` to return all the `FloatingGTBasisFuncs` inside it.
+Unpack `b` to return all the `BasisFunc` inside it.
 """
-unpackBasis(::EmptyBasisFunc) = ()
-unpackBasis(b::BasisFuncMix)  = b.BasisFunc
-unpackBasis(b::FGTBasisFuncs1O)  = (BasisFunc(b),)
+unpackBasis(::EmptyBasisFunc{T, D}) where {T, D} = BasisFunc{T, D}[]
+unpackBasis(b::BasisFuncMix)  = collect(b.BasisFunc)
+unpackBasis(b::FloatingGTBasisFuncs)  = [i for i in b]
 
 
 """
@@ -948,7 +948,7 @@ end
 sumOfCore(bs::Union{Tuple{Vararg{GTBasisFuncs{T, D, 1}}}, 
                     AbstractArray{<:GTBasisFuncs{T, D, 1}}}; 
           roundAtol::Real=getAtolVal(T)) where {T, D} = 
-sumOfCore(BasisFunc{T, D}[joinTuple(unpackBasis.(bs)...)...]; roundAtol)
+sumOfCore(BasisFunc{T, D}[vcat(unpackBasis.(bs)...)...]; roundAtol)
 
 function sumOf(bs::Union{Tuple{Vararg{GTBasisFuncs{T, D, 1}}}, 
                          AbstractArray{<:GTBasisFuncs{T, D, 1}}}; 

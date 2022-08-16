@@ -546,10 +546,12 @@ bf_os3 = genBasisFunc(fill(0.0, 3), (2.0, 1.0), (2,0,0))
 
 
 # function unpackBasis
-@test unpackBasis(bfm1)[1] == bf1
-@test unpackBasis(bf1) == (bf1,)
-@test unpackBasis(EmptyBasisFunc{Float64, 1}()) == ()
-@test unpackBasis(bfsp) == (bfsp[end],)
+@test unpackBasis(bfm1)[] == bf1
+@test unpackBasis(bf1) == [bf1]
+@test unpackBasis(EmptyBasisFunc{Float64, 1}()) == []
+@test eltype(unpackBasis(EmptyBasisFunc{Float64, 1}())) == eltype(BasisFunc{Float64, 1}[])
+@test unpackBasis(bfsp) == [bfsp[end]]
+@test unpackBasis(bf4_4) == collect(bf4_4)
 
 
 # function decompose
