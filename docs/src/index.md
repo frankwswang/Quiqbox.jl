@@ -8,35 +8,34 @@
 * Floating and fixed-position contracted Gaussian-type orbital (CGTO).
 * Linear combination of multi-center GTOs (MCGTO) as a basis function.
 * Restricted (closed-shell) and unrestricted (open-shell) Hartree–Fock methods (RHF & UHF).
-* Variational optimization of orbital parameters based on automatic differentiation (AD).
+* Variational optimization of basis sets based on automatic differentiation (AD) 
+and symbolic differentiation (SD).
 
 ## Setup
 
-### Supported system platforms (64-bit)
-
+### Supported operating systems (64-bit)
 * Linux
 * Mac OS
 * Windows
 
-### Julia environment
-
-* [1.6+](https://github.com/frankwswang/Quiqbox.jl/actions/workflows/CI.yml)
+### Julia version compatibility
+Quiqbox will always try to support the [latest released version](https://julialang.org/downloads/#current_stable_release) of Julia as soon as possible. On the other hand, the backward compatibility for previous Julia versions is not guaranteed but can be checked [here](https://github.com/frankwswang/Quiqbox.jl/actions/workflows/CI-JS-older.yml).
 
 ### Installation in Julia [REPL](https://docs.julialang.org/en/v1/manual/getting-started/)
 
-Type `]` to enter the [`Pkg` mode](https://docs.julialang.org/en/v1/stdlib/REPL/#Pkg-mode):
+Type `]` in the default [Julian mode](https://docs.julialang.org/en/v1/stdlib/REPL/#The-Julian-mode) to switch to the [Pkg mode](https://docs.julialang.org/en/v1/stdlib/REPL/#Pkg-mode):
 
 ```julia
 (@v1.x) pkg>
 ```
 
-Type `add Quiqbox` and hit *Enter* key to install Quiqbox:
+Type the following command and hit *Enter* key to install Quiqbox:
 
 ```julia
 (@v1.x) pkg> add Quiqbox
 ```
 
-After the installation completes, hit *Backspace* key to go back to Julia REPL and use [`using`](https://docs.julialang.org/en/v1/base/base/#using) to load Quiqbox:
+After the installation completes, hit *Backspace* key to go back to the Julian mode and use [`using`](https://docs.julialang.org/en/v1/base/base/#using) to load Quiqbox:
 
 ```julia
 julia> using Quiqbox
