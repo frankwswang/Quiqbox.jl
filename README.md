@@ -85,7 +85,7 @@ optimizeParams!(pars, bs, nuc, coords)
 
 # Documentation
 
-For more information on the package, please read the [documentation of the latest versions][Doc-stable]. For unreleased/experimental features, please refer to the [development documentation][Doc-latest].
+For more information on the package, please read the [documentation of the latest release][Doc-stable]. For unreleased/experimental features, please refer to the [development documentation][Doc-latest].
 
 <br />
 <br />
