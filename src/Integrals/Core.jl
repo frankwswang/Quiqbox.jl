@@ -627,7 +627,7 @@ function getIntX1X2X2X1!(n, uniquePairs, uPairCoeffs, flags, ps₁, ps₂)
             g1111 = (A,)
             g1122 = ()
             g1212 = ()
-            g1123 = ((A, A, C), (A, C, A), (A, C, B))
+            g1123 = ((A, A, B), (A, C, A), (A, C, B))
             g1233 = ((A, C, A), (B, A, A), (B, C, A))
             g1234 = ((A, C, A, B), (A, C, C, B), (B, A, C, A),
                      (B, A, C, B), (B, C, A, B), (B, C, C, A))
