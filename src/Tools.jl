@@ -732,7 +732,6 @@ function arrayDiffCore!(vs::NTuple{N, Array{T}}) where {N, T}
     head = vs[argmin(length.(vs))]
     coms = T[]
     l = length(head)
-    sizehint!(coms, l)
     i = 0
     while i < l
         i += 1
@@ -758,7 +757,6 @@ function arrayDiffCore!(v1::Array{T}, v2::Array{T}) where {T}
     a1, a2 = ifelse((length(v1) > length(v2)), (v2, v1), (v1, v2))
     coms = T[]
     l = length(a1)
-    sizehint!(coms, l)
     i = 0
     while i < l
         i += 1
