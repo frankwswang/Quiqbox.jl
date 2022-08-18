@@ -732,12 +732,11 @@ function arrayDiffCore!(vs::NTuple{N, Array{T}}) where {N, T}
     head = vs[argmin(length.(vs))]
     coms = T[]
     l = length(head)
-    sizehint!(coms, l)
     i = 0
+    ids = zeros(Int, N)
     while i < l
         i += 1
         ele = head[i]
-        ids = zeros(Int, N)
         flag = false
         for (j, v) in enumerate(vs)
             k = findfirst(isequal(ele), v)
@@ -754,18 +753,16 @@ function arrayDiffCore!(vs::NTuple{N, Array{T}}) where {N, T}
     (coms, vs...)
 end
 
-function arrayDiffCore!(v1::Array{T}, v2::Array{T}) where {T}
-    a1, a2 = ifelse((length(v1) > length(v2)), (v2, v1), (v1, v2))
+function arrayDiffCore!((v1, v2)::NTuple{2, Array{T}}) where {T}
     coms = T[]
-    l = length(a1)
-    sizehint!(coms, l)
+    l = length(v1)
     i = 0
     while i < l
         i += 1
-        j = findfirst(isequal(a1[i]), a2)
+        j = findfirst(isequal(v1[i]), v2)
         if j !== nothing
-            popat!(a1, i)
-            push!(coms, popat!(a2, j))
+            popat!(v1, i)
+            push!(coms, popat!(v2, j))
             i -= 1
             l -= 1
         end
@@ -773,11 +770,7 @@ function arrayDiffCore!(v1::Array{T}, v2::Array{T}) where {T}
     coms, v1, v2
 end
 
-arrayDiff!(v1::Array{T}, v2::Array{T}) where {T} = arrayDiffCore!(v1, v2)
-
-arrayDiff!(vs::Vararg{Array{T}, N}) where {T, N} = arrayDiffCore!(vs)
-
-tupleDiff(ts::Vararg{NTuple{<:Any, T}, N}) where {T, N} = arrayDiff!((ts .|> collect)...)
+tupleDiff(ts::Vararg{NTuple{<:Any, T}}) where {T} = arrayDiffCore!(ts .|> collect)
 
 
 function genIndex(index::Int)

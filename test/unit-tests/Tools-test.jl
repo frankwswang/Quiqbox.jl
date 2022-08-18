@@ -3,9 +3,9 @@ using Quiqbox
 using Quiqbox: getAtolVal, getAtolDigits, roundToMultiOfStep, nearestHalfOf, getNearestMid, 
                isApprox, tryIncluding, sizeOf, hasBoolRelation, flatten, joinTuple, 
                markUnique, getUnique!, itself, themselves, replaceSymbol, renameFunc, 
-               groupedSort, mapPermute, TypedFunction, Pf, Sf, getFunc, nameOf, arrayDiff!, 
-               tupleDiff, genIndex, fillObj, arrayToTuple, genTupleCoords, callGenFunc, 
-               uniCallFunc, mergeMultiObjs, isNaN, getBool
+               groupedSort, mapPermute, TypedFunction, Pf, Sf, getFunc, nameOf, tupleDiff, 
+               genIndex, fillObj, arrayToTuple, genTupleCoords, callGenFunc, uniCallFunc, 
+               mergeMultiObjs, isNaN, getBool
 using Suppressor: @capture_out
 
 @testset "Tools.jl" begin
@@ -204,13 +204,13 @@ tff = nameOf(tf1) |> getFunc
 @test nameOf(pf1) == Pf{Float64, typeof(abs)}
 
 
-# function arrayDiff! tupleDiff
-a = [1,1,2,2,3]
-b = [3,2,2,1,3]
-@test arrayDiff!(a,b) == ([1, 2, 2, 3], [1], [3])
-c = (1,1,2,2,3)
-d = (3,2,2,1,3)
-@test tupleDiff(c,d) == ([1, 2, 2, 3], a, b)
+# function tupleDiff
+a = (1,1,2,2,3)
+b = (3,2,2,1,3)
+c = (4,2,1,3,2)
+d = (2,4,5,1,3)
+@test tupleDiff(a,b) == ([1, 2, 2, 3], [1], [3])
+@test tupleDiff(a,b,c,d) == ([1, 2, 3], [1,2], [2,3], [4,2], [4,5])
 
 
 # function genIndex
