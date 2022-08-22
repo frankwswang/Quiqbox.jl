@@ -400,7 +400,7 @@ Change the mapping function of `pb`. The name of the output variable of the retu
 function changeMapping(pb::ParamBox{T, V, FL}, mapFunction::F, outputName::Symbol=V; 
                        canDiff::Bool=true) where {T, V, FL, F<:Function}
     dn = pb.dataName
-    if (FL==FI && FLevel(F)!=FI) 
+    if (FL==FI && FLevel(F)!=FI)
         dnStr = string(dn)
         dn = Symbol(dnStr * "_" * dnStr)
     end

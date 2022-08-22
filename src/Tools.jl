@@ -511,7 +511,7 @@ end
 """
 function markUnique(arr::AbstractArray{T}, args...; 
                     compareFunction::F=hasEqual, kws...) where {T<:Any, F<:Function}
-    @assert length(arr) >= 1 "The length of input array should be not less than 1."
+    isempty(arr) && (return arr)
     f = (b...)->compareFunction((b..., args...)...; kws...)
     res = Int[1]
     cmprList = T[arr[1]]
@@ -561,7 +561,7 @@ julia> arr
 """
 function getUnique!(arr::AbstractVector{T}, args...; 
                     compareFunction::F = hasEqual, kws...) where {T<:Any, F<:Function}
-    @assert length(arr) > 0 "The length of input array should be larger than 0."
+    isempty(arr) && (return arr)
     f = (b...)->compareFunction((b..., args...)...; kws...)
     cmprList = T[arr[1]]
     delList = Bool[false]
