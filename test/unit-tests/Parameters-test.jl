@@ -10,7 +10,9 @@ pb1 = ParamBox(1, :a)
 @test pb1[] == pb1() == 1 == outValOf(pb1)
 @test pb1.map == Quiqbox.itself == mapOf(pb1)
 @test pb1.canDiff[] == false == isDiffParam(pb1)
+@test !isDepParam(pb1)
 toggleDiff!(pb1)
+@test !isDepParam(pb1)
 @test pb1.canDiff[] == true
 disableDiff!(pb1)
 @test pb1.canDiff[] == false
@@ -26,6 +28,9 @@ pb3 = ParamBox(-1, :b, abs)
 @test inSymOfCore(pb3) == :x_b
 @test outSymOfCore(pb3) == :b
 @test mapOf(pb3) == abs
+@test isDepParam(pb3)
+toggleDiff!(pb3)
+@test !isDepParam(pb3)
 
 pb4 = ParamBox(1.2, :c, x->x^2, :x)
 @test inSymOfCore(pb4) == :x
@@ -101,7 +106,7 @@ markParams!(vcat(bfs_gv, bfm_gv), true)
 @test getVarDict(pb4) == Dict([:x=>1.2, :c=>1.44])
 pb1_2 = changeMapping(pb1, x->x+2)
 @test getVarDict(pb1_2) == Dict(:a_a=>1, :a=>3)
-@test getVarDict(pb3) == Dict(:x_b=>-1, :b=>1)
+@test getVarDict(pb3) == Dict(:b=>1)
 pb4_3 = changeMapping(pb4, x->x+2)
 @test getVarDict(pb4_3) == Dict(:c=>3.2, :x=>1.2)
 @test getVarDict(bf_gv6.param) == Dict( ( (  getVar.(bf_gv6.param) .=> 
