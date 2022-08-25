@@ -207,14 +207,14 @@ julia> bs7 = genBasisFunc.([[0.0, 0.1, 0.0], [1.4, 0.3, 0.0]], Ref(gf4));
 julia> markParams!(bs7)
 10-element Vector{ParamBox{Float64, V, FLevel{0}} where V}:
  ParamBox{Float64, :X, FLevel{0}}(0.0)[∂][X₁]
- ParamBox{Float64, :X, FLevel{0}}(1.4)[∂][X₂]
  ParamBox{Float64, :Y, FLevel{0}}(0.1)[∂][Y₁]
- ParamBox{Float64, :Y, FLevel{0}}(0.3)[∂][Y₂]
  ParamBox{Float64, :Z, FLevel{0}}(0.0)[∂][Z₁]
- ParamBox{Float64, :Z, FLevel{0}}(0.0)[∂][Z₂]
- ParamBox{Float64, :α, FLevel{0}}(2.5)[∂][α₁]
  ParamBox{Float64, :α, FLevel{0}}(2.5)[∂][α₁]
  ParamBox{Float64, :d, FLevel{0}}(0.5)[∂][d₁]
+ ParamBox{Float64, :X, FLevel{0}}(1.4)[∂][X₂]
+ ParamBox{Float64, :Y, FLevel{0}}(0.3)[∂][Y₂]
+ ParamBox{Float64, :Z, FLevel{0}}(0.0)[∂][Z₂]
+ ParamBox{Float64, :α, FLevel{0}}(2.5)[∂][α₁]
  ParamBox{Float64, :d, FLevel{0}}(0.5)[∂][d₁]
 ```
 

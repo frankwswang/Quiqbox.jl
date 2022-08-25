@@ -49,7 +49,7 @@ local Es2L, ps2L, grads2L
 end
 
 E_t2 = -1.16652582930629
-# L, α
+# L₁, α₁
 par_t2  = [2.846505123098946, 0.225501045327590]
 grad_t2 = [0.375222524865646, 0.683095213465142]
 @test Es2L[1] > Es2L[end]
@@ -64,7 +64,7 @@ grid2 = GridBox(1, 3.0)
 bs2_2 = genBasisFunc.(grid2.point, Ref([gf2_2]))
 gf3 = GaussFunc(0.5, 1.0)
 bs3 = bs2_2 .+ genBasisFunc(fill(0.0, 3), gf3)
-pars3 = markParams!(bs3, true)[[1,5:end...]]
+pars3 = markParams!(bs3, true)[1:5]
 local Es3L, ps3L, grads3L
 
 @suppress_out begin

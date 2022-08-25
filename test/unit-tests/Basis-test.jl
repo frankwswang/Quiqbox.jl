@@ -769,24 +769,19 @@ bf_gv5 = genBasisFunc(cen_gv3, gf_gv1)
 bf_gv6 = genBasisFunc(cen_gv3, [gf_gv12, gf_gv23, gf_gv31])
 bfm_gv = BasisFuncMix([bf_gv2, bf_gv4, bf_gv6])
 
-@test markParams!(bf_gv4) == [cen_gv1..., e_gv3, c_gv3]
+@test markParams!(bf_gv4) == [cen_gv1..., e_gv3, c_gv3] == markParams!(bf_gv4.param)
 
 pbs_gv1 = markParams!([bf_gv1, bf_gv2])
-pbs_gv1_0 = [cen_gv1[1], cen_gv2[1], 
-             cen_gv1[2], cen_gv2[2], 
-             cen_gv1[3], cen_gv2[3], 
-                  e_gv1,      e_gv2, 
-                  c_gv1,      c_gv2]
+pbs_gv1_0 = [cen_gv1[1], cen_gv1[2], cen_gv1[3], e_gv1, c_gv1, 
+             cen_gv2[1], cen_gv2[2], cen_gv2[3], e_gv2, c_gv2]
 @test pbs_gv1 == pbs_gv1_0
 @test hasIdentical(pbs_gv1, pbs_gv1_0)
 
 pbs_gv2 = markParams!([bf_gv2, bf_gv1, bf_gv3])
 
-pbs_gv2_0 = [cen_gv2[1], cen_gv1[1], cen_gv2[1], 
-             cen_gv2[2], cen_gv1[2], cen_gv2[2], 
-             cen_gv2[3], cen_gv1[3], cen_gv2[3], 
-             e_gv2, e_gv1, e_gv1, e_gv2,
-             c_gv2, c_gv1, c_gv1, c_gv2]
+pbs_gv2_0 = [cen_gv2[1], cen_gv2[2], cen_gv2[3], e_gv2, c_gv2, 
+             cen_gv1[1], cen_gv1[2], cen_gv1[3], e_gv1, c_gv1, 
+             cen_gv2[1], cen_gv2[2], cen_gv2[3], e_gv1, c_gv1, e_gv2, c_gv2]
 @test pbs_gv2 == pbs_gv2_0
 @test hasIdentical(pbs_gv2, pbs_gv2_0)
 
@@ -807,6 +802,18 @@ pbs_gv3_2 = sort(pbs_gv3, by=x->(typeof(x).parameters[2], x.index[]))
 @test pbs_gv3_2 == pbs_gv0_2
 @test hasEqual(pbs_gv3_2, pbs_gv0_2)
 @test hasIdentical(pbs_gv3_2, pbs_gv0_2)
+
+pb_gv1 = ParamBox(1.0, :X, x->x+1, :I)
+pb_gv2 = ParamBox(1.0, :Y, x->x+2, :I)
+pb_gv3 = ParamBox(1.0, :Z, x->x+3, :I)
+sp_gv1 = genSpatialPoint((pb_gv1, pb_gv2, pb_gv3))
+gf_gv4 = GaussFunc(genExponent(pb_gv1), genContraction(pb_gv3))
+gf_gv5 = GaussFunc(genExponent(pb_gv2), genContraction(0.5))
+bf_gv7 = genBasisFunc(sp_gv1, (gf_gv4, gf_gv5))
+pars_gv = markParams!(bf_gv7, true)
+@test pars_gv == [pb_gv1, pb_gv2, pb_gv3, gf_gv5.con]
+@test getVar.(pars_gv) == [:X₁, :Y₂, :Z₃, :d₁]
+@test getVar.(pars_gv, true) == [:I₁, :I₂, :I₃, :d₁]
 
 
 # function hasNormFactor getNormFactor

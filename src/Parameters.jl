@@ -1,6 +1,6 @@
 export ParamBox, inValOf, inSymOf, inSymOfCore, inSymValOf, outValOf, outSymOf, 
        outSymOfCore, outSymValOf, dataOf, mapOf, getVar, getVarDict, outValCopy, inVarCopy, 
-       enableDiff!, disableDiff!, isDiffParam, toggleDiff!, changeMapping
+       enableDiff!, disableDiff!, isDiffParam, toggleDiff!, isDepParam, changeMapping
 
 export FLevel
 
@@ -389,6 +389,17 @@ toggleDiff!(pb::ParamBox) = begin pb.canDiff[] = !isDiffParam(pb) end
 
 """
 
+    isDepParam(pb::ParamBox) -> Bool
+
+Return the Boolean value of if `pb` is considered a dependent parameter that is a 
+differentiable function with respect to the input variable it stores.
+"""
+isDepParam(pb::ParamBox{<:Any, <:Any, FI}) = false
+isDepParam(pb::ParamBox{<:Any, <:Any, FL}) where {FL} = isDiffParam(pb)
+
+
+"""
+
     changeMapping(pb::ParamBox, mapFunction::Function, outputName::Symbol=V; 
                   canDiff::Bool=true) -> 
     ParamBox{T, outputName}
@@ -400,7 +411,7 @@ Change the mapping function of `pb`. The name of the output variable of the retu
 function changeMapping(pb::ParamBox{T, V, FL}, mapFunction::F, outputName::Symbol=V; 
                        canDiff::Bool=true) where {T, V, FL, F<:Function}
     dn = pb.dataName
-    if (FL==FI && FLevel(F)!=FI) 
+    if (FL==FI && FLevel(F)!=FI)
         dnStr = string(dn)
         dn = Symbol(dnStr * "_" * dnStr)
     end

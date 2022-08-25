@@ -511,7 +511,7 @@ end
 """
 function markUnique(arr::AbstractArray{T}, args...; 
                     compareFunction::F=hasEqual, kws...) where {T<:Any, F<:Function}
-    @assert length(arr) >= 1 "The length of input array should be not less than 1."
+    isempty(arr) && (return arr)
     f = (b...)->compareFunction((b..., args...)...; kws...)
     res = Int[1]
     cmprList = T[arr[1]]
@@ -561,7 +561,7 @@ julia> arr
 """
 function getUnique!(arr::AbstractVector{T}, args...; 
                     compareFunction::F = hasEqual, kws...) where {T<:Any, F<:Function}
-    @assert length(arr) > 0 "The length of input array should be larger than 0."
+    isempty(arr) && (return arr)
     f = (b...)->compareFunction((b..., args...)...; kws...)
     cmprList = T[arr[1]]
     delList = Bool[false]
@@ -862,5 +862,23 @@ end
 isNaN(::Any) = false
 isNaN(n::Number) = isnan(n)
 
+
 getBool(bl::Bool) = itself(bl)
 getBool(::Val{BL}) where {BL} = BL::Bool
+
+
+function skipIndices(arr::AbstractArray{Int}, ints::AbstractVector{Int})
+    @assert min(arr...) > 0
+    if isempty(ints)
+        arr
+    else
+        @assert min(ints...) > 0
+        maxIdx = max(arr...)
+        maxIdxN = maxIdx + length(ints)
+        ints = filter!(x->x<=maxIdxN, sort(ints))
+        idsN = deleteat!(collect(1:maxIdxN), ints)
+        map(arr) do x
+            idsN[x]
+        end
+    end
+end

@@ -86,7 +86,7 @@ nucCoords = [[-0.7,0.0,0.0], [0.7,0.0,0.0]]
 grid = GridBox(1, 3.0)
 gf1 = GaussFunc(0.7, 1.0)
 bs1 = genBasisFunc.(grid.point, Ref([gf1]))
-pars1 = markParams!(bs1)[[1, 9, 25, 33]]
+pars1 = markParams!(bs1)[[1, 2, 4, 5]]
 S1 = overlaps(bs1)
 HFres1 = runHF(bs1, nuc, nucCoords, DHFO, printInfo=false)
 grad1 = gradOfHFenergy(pars1, bs1, S1, HFres1.C, nuc, nucCoords)

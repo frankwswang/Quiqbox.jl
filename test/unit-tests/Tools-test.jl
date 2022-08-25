@@ -5,7 +5,7 @@ using Quiqbox: getAtolVal, getAtolDigits, roundToMultiOfStep, nearestHalfOf, get
                markUnique, getUnique!, itself, themselves, replaceSymbol, renameFunc, 
                groupedSort, mapPermute, TypedFunction, Pf, Sf, getFunc, nameOf, tupleDiff, 
                genIndex, fillObj, arrayToTuple, genTupleCoords, callGenFunc, uniCallFunc, 
-               mergeMultiObjs, isNaN, getBool
+               mergeMultiObjs, isNaN, getBool, skipIndices
 using Suppressor: @capture_out
 
 @testset "Tools.jl" begin
@@ -260,5 +260,16 @@ mergeFunc1 = (x,y; atol) -> ifelse(isapprox(abs(x), abs(y); atol), [abs(x)], abs
 # function getBool
 @test getBool(true)
 @test getBool(Val(true))
+
+
+# function skipIndices
+idsR1 = [3, 6, 7, 11, 12, 15, 18]
+idsR2 = [3, 6, 11, 7, 15, 12, 18]
+idsT = [1, 2, 6, 5, 6, 7, 8, 4, 9, 10, 3]
+@test skipIndices(idsT, idsR1) == skipIndices(idsT, idsR2) == 
+      [1, 2, 9, 8, 9, 10, 13, 5, 14, 16, 4]
+@test skipIndices(idsT, Int[]) === idsT
+@test try skipIndices(idsT, [-1, 2]) catch; true end
+@test try skipIndices([-1, 2, 3], idsR1) catch; true end
 
 end
