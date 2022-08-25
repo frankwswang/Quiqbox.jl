@@ -27,7 +27,7 @@ getFLevel(::Type{T}) where {T} = getFLevel(T |> FLevel)
 """
 
     ParamBox{T, V, FL<:FLevel} <: DifferentiableParameter{T, ParamBox}
- 
+
 Parameter container that can enable differentiation.
 
 ≡≡≡ Field(s) ≡≡≡
