@@ -3,8 +3,8 @@ using Quiqbox
 using Quiqbox: getAtolVal, getAtolDigits, roundToMultiOfStep, nearestHalfOf, getNearestMid, 
                isApprox, tryIncluding, sizeOf, hasBoolRelation, flatten, joinTuple, 
                markUnique, getUnique!, itself, themselves, replaceSymbol, renameFunc, 
-               groupedSort, mapPermute, TypedFunction, Pf, Sf, getFunc, nameOf, tupleDiff, 
-               genIndex, fillObj, arrayToTuple, genTupleCoords, callGenFunc, uniCallFunc, 
+               groupedSort, mapPermute, Pf, Sf, getFunc, nameOf, tupleDiff, genIndex, 
+               fillObj, arrayToTuple, genTupleCoords, callGenFunc, uniCallFunc, 
                mergeMultiObjs, isNaN, getBool, skipIndices
 using Suppressor: @capture_out
 
@@ -166,20 +166,12 @@ end
 @test bl3
 
 
-# struct TypedFunction
-tf1 = TypedFunction(abs)
-@test nameOf(tf1) == nameOf(abs) == nameof(abs)
-v = -abs(rand())
-@test tf1(v) === abs(v)
-@test TypedFunction(tf1) === tf1
-
-
 # struct Pf
 pf1 = Pf(-1.5, abs)
 @test pf1(-2.0) == -3.0
 @test nameOf(pf1) == typeof(pf1)
 pf2 = Pf(-1.5, abs)
-@test pf2(-2) == Pf(-1.5, tf1)(-2) == -3.0
+@test pf2(-2) == -3.0
 @test Pf(-1.0, pf2)(-2.0) == 3.0
 @test Pf(-1.0, Pf(-1.5, itself))(-2) == -3.0
 
@@ -193,8 +185,6 @@ sf2 = Sf(3, sf1)
 
 # function getFunc
 @test getFunc(abs) == abs
-tff = nameOf(tf1) |> getFunc
-@test tff == tf1.f == getFunc(tf1) == abs
 @test getFunc(:abs) == abs
 @test getFunc(:getTwoBodyInts) == Quiqbox.getTwoBodyInts
 @test getFunc(:f1_getFunc)(rand()) isa Missing
@@ -203,7 +193,6 @@ tff = nameOf(tf1) |> getFunc
 
 # function nameOf
 @test nameOf(abs) == :abs
-@test nameOf(tf1) == :abs
 @test nameOf(pf1) == Pf{Float64, typeof(abs)}
 
 

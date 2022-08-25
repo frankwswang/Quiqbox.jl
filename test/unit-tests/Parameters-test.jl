@@ -7,11 +7,11 @@ using Quiqbox: getVarCore, FLevel, getFLevel
 # struct FLevel & function getFLevel
 @test FLevel{getFLevel(:itself)} == FLevel(identity) == FLevel{0}
 @test FLevel(abs) == FLevel{1}
-tf1 = Quiqbox.TypedFunction(abs)
+tf1 = Quiqbox.Sf(2.2, abs)
 @test FLevel{getFLevel(tf1)} == FLevel(tf1)
 pf1 = Quiqbox.Pf(1.5, tf1)
-@test FLevel(pf1) == FLevel{2}
-@test getFLevel(FLevel(tf1)) == getFLevel(typeof(tf1)) == getFLevel(tf1) == 1
+@test FLevel(pf1) == FLevel{3}
+@test getFLevel(FLevel(tf1)) == getFLevel(typeof(tf1)) == getFLevel(tf1) == 2
 
 
 pb1 = ParamBox(1, :a)

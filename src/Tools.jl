@@ -663,41 +663,22 @@ function mapPermute(arr, permFunction)
 end
 
 
-struct TypedFunction{F<:Function} <: StructFunction{F}
-    f::F
-    n::Symbol
-
-    TypedFunction(f::F) where {F<:Function} = new{F}(f, nameOf(f))
-end
-
-TypedFunction(f::TypedFunction) = itself(f)
-
-(tf::TypedFunction{F})(x...) where {F} = tf.f(x...)
-
-
 # Product Function
-struct Pf{T<:Number, F<:Function} <: ParameterizedFunction{Pf, F}
+struct Pf{T, F<:Function} <: ParameterizedFunction{Pf, F}
     c::T
-    f::TypedFunction{F}
+    f::F
 end
-
-PfCore(c::T, f::Pf{T, F}) where {T, F} = Pf{T, F}(f.c*c, f.f)
-PfCore(c::T, f::F) where {T, F<:Function} = Pf{T, F}(c, TypedFunction(f))
-Pf(c::T, f::F) where {T, F<:Function} = ifelse(c == T(1), f, PfCore(c, f))
-
-(f::Pf)(x::T) where {T<:Number} = f.c * f.f.f(x)
+Pf(c::T, f::Pf{T, F}) where {T, F<:Function} = Pf{T, F}(f.c*c, f.f)
+(f::Pf)(x::T) where {T} = f.c * f.f(x)
 
 
 # Sum Function
-struct Sf{T<:Number, F<:Function} <: ParameterizedFunction{Sf, F}
+struct Sf{T, F<:Function} <: ParameterizedFunction{Sf, F}
     c::T
-    f::TypedFunction{F}
+    f::F
 end
-SfCore(c::T, f::Sf{T, F}) where {T, F} = Sf{T, F}(f.c+c, f.f)
-SfCore(c::T, f::F) where {T, F<:Function} = Sf{T, F}(c, TypedFunction(f))
-Sf(c::T, f::F) where {T, F<:Function} = ifelse(c == T(0), f, SfCore(c, f))
-
-(f::Sf)(x::T) where {T<:Number} = f.c + f.f.f(x)
+Sf(c::T, f::Sf{T, F}) where {T, F<:Function} = Sf{T, F}(f.c+c, f.f)
+(f::Sf)(x::T) where {T} = f.c + f.f(x)
 
 
 function getFunc(fSym::Symbol, failedResult=missing)
@@ -716,14 +697,10 @@ function getFunc(fSym::Symbol, failedResult=missing)
     end
 end
 
-getFunc(tf::TypedFunction) = tf.f
-
 getFunc(f::Function, _=missing) = itself(f)
 
 
 nameOf(f::ParameterizedFunction) = typeof(f)
-
-nameOf(f::TypedFunction) = f.n
 
 nameOf(f) = nameof(f)
 
