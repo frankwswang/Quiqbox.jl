@@ -511,7 +511,7 @@ end
 """
 function markUnique(arr::AbstractArray{T}, args...; 
                     compareFunction::F=hasEqual, kws...) where {T<:Any, F<:Function}
-    isempty(arr) && (return arr)
+    isempty(arr) && (return arr, T[])
     f = (b...)->compareFunction((b..., args...)...; kws...)
     res = Int[1]
     cmprList = T[arr[1]]
@@ -800,9 +800,9 @@ function genNamedTupleC(name::Symbol, defaultVars::AbstractArray)
 end
 
 
-fillObj(num::Any) = fill(num)
+fillObj(obj::Any) = fill(obj)
 
-fillObj(num::Array{<:Any, 0}) = itself(num)
+fillObj(obj::Array{<:Any, 0}) = itself(obj)
 
 
 arrayToTuple(arr::AbstractArray) = Tuple(arr)
