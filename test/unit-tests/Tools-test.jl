@@ -88,6 +88,9 @@ v0 = fill(1)
 
 # function markUnique
 @test markUnique([1,3,2,2,5]) == ([1,2,3,3,4], [1,3,2,5])
+emptyArr = Int[]
+res1, res2 = markUnique(emptyArr)
+res1 === emptyArr == res2
 
 
 # function getUnique!
