@@ -8,9 +8,8 @@ function oneBodyDerivativeCore(::Val{false},
                                ∂bfs::AbstractVector{<:GTBasisFuncs{T, D, 1}}, 
                                bfs::AbstractVector{<:GTBasisFuncs{T, D, 1}}, 
                                X::AbstractMatrix{T}, ∂X::AbstractMatrix{T}, 
-                               tf::TypedFunction{F}) where {T, D, F}
+                               ʃ::F) where {T, D, F<:Function}
     BN = length(bfs)
-    ʃ = getFunc(tf)
     ∂ʃ = Array{T}(undef, BN, BN)
     ʃab = Array{T}(undef, BN, BN)
     ∂ʃab = Array{T}(undef, BN, BN)
@@ -38,9 +37,8 @@ function twoBodyDerivativeCore(::Val{false},
                                ∂bfs::AbstractVector{<:GTBasisFuncs{T, D, 1}}, 
                                bfs::AbstractVector{<:GTBasisFuncs{T, D, 1}}, 
                                X::AbstractMatrix{T}, ∂X::AbstractMatrix{T}, 
-                               tf::TypedFunction{F}) where {T, D, F}
+                               ʃ::F) where {T, D, F<:Function}
     BN = length(bfs)
-    ʃ = getFunc(tf)
     ∂ʃ = Array{T}(undef, BN, BN, BN, BN)
     ʃabcd = Array{T}(undef, BN, BN, BN, BN)
     ʃ∂abcd = Array{T}(undef, BN, BN, BN, BN)
@@ -82,8 +80,7 @@ end
 function derivativeCore(FoutputIsVector::Val{B}, 
                         bfs::AbstractVector{<:GTBasisFuncs{T, D, 1}}, 
                         par::ParamBox, S::AbstractMatrix{T}, 
-                        oneBodyF::TypedFunction{F1}, twoBodyF::TypedFunction{F2}) where 
-                       {B, T, D, F1, F2}
+                        ʃ2::F1, ʃ4::F2) where {B, T, D, F1<:Function, F2<:Function}
     BN = length(bfs)
     ∂bfs = ∂Basis.(par, bfs)
     ∂S = Array{T}(undef, BN, BN)
@@ -102,8 +99,8 @@ function derivativeCore(FoutputIsVector::Val{B},
                                           (sqrt(λ[i]) + sqrt(λ[j])) ) )
     end
     ∂X = 𝑣*∂X₀*𝑣'
-    ∂ʃ2 = oneBodyDerivativeCore(FoutputIsVector, ∂bfs, bfs, X, ∂X, oneBodyF)
-    ∂ʃ4 = twoBodyDerivativeCore(FoutputIsVector, ∂bfs, bfs, X, ∂X, twoBodyF)
+    ∂ʃ2 = oneBodyDerivativeCore(FoutputIsVector, ∂bfs, bfs, X, ∂X, ʃ2)
+    ∂ʃ4 = twoBodyDerivativeCore(FoutputIsVector, ∂bfs, bfs, X, ∂X, ʃ4)
     ∂ʃ2, ∂ʃ4
 end
 
@@ -117,8 +114,7 @@ function ∂HFenergy(par::ParamBox{T},
                    N::NTuple{HFTS, Int}) where {T, D, HFTS, NN}
     Xinv = sqrt(S)::Matrix{T} # necessary assertion for type stability
     cH = (i, j)->coreHij(i, j, nuc, nucCoords)
-    ∂hij, ∂hijkl = derivativeCore(Val(false), bs, par, S, 
-                                  TypedFunction(cH), TypedFunction(eeInteraction))
+    ∂hij, ∂hijkl = derivativeCore(Val(false), bs, par, S, cH, eeInteraction)
     getEᵗ(∂hij, ∂hijkl, Ref(Xinv).*C, N)
 end
 

@@ -68,7 +68,7 @@ pars3 = markParams!(bs3, true)[1:5]
 local Es3L, ps3L, grads3L
 
 @suppress_out begin
-    Es3L, ps3L, grads3L = optimizeParams!(pars3, bs3, nuc, nucCoords, 
+    Es3L, ps3L, grads3L = optimizeParams!(pars3, bs3, nuc, nucCoords, getCharge(nuc), 
                                           POconfig((maxStep=50,)))
 end
 

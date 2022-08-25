@@ -26,7 +26,7 @@ After building the basis set, we need to use [`markParams!`](@ref) to mark all t
 pars = markParams!(bs, true)
 ```
 
-When `markParams!`'s second argument is set to `true`, it will return only the `ParamBox`s that have unique independent variables. Thus, the length of `pars` is 3 for the aforementioned three independent parameters, despite the basis set having eight basis functions with a total of 40 parameters. However, if we take a step further, we can remove the `ParamBox` representing ``d`` since each basis function here is just one same Gaussian function. Thus, input the rest parameters (along with other necessary arguments) into [`optimizeParams!`](@ref) and we will have a more efficient optimization iteration: 
+When `markParams!`'s second argument is set to `true`, it will return only the `ParamBox`es that have unique independent variables. Thus, the length of `pars` is 3 for the aforementioned three independent parameters, despite the basis set having eight basis functions with a total of 40 parameters. However, if we take a step further, we can remove the `ParamBox` representing ``d`` since each basis function here is just one same Gaussian function. Thus, input the rest parameters (along with other necessary arguments) into [`optimizeParams!`](@ref) and we will have a more efficient optimization iteration: 
 ```@repl 3
 parsPartial = pars[1:2];
 

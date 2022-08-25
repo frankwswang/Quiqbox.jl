@@ -998,7 +998,7 @@ mergeMultiObjs(GaussFunc{T}, mergeGaussFuncs, gf1, gf2, gf3, gf4...; roundAtol)
         roundAtol::Real=getAtolVal(T)) where {T, D} -> 
     CompositeGTBasisFuncs{T, D, <:Any, 1}
 
-Addition between two `CompositeGTBasisFuncs{T, D, <:Any, 1}`s such as [`BasisFunc`](@ref) 
+Addition between two `CompositeGTBasisFuncs{T, D, <:Any, 1}` such as [`BasisFunc`](@ref) 
 and [`BasisFuncMix`](@ref). `roundAtol` specifies the absolute approximation tolerance of 
 comparing parameters stored in each `CompositeGTBasisFuncs` to determine whether they are 
 treated as "equal"; each parameter in the returned `CompositeGTBasisFuncs` is set to the 
@@ -1254,7 +1254,7 @@ GaussFunc(    genExponent(roundToMultiOfStep(gf1.xpn()+gf2.xpn(), roundAtol)),
         roundAtol::Real=getAtolVal(T)) where {T, D} -> 
     CompositeGTBasisFuncs{T, D, <:Any, 1}
 
-Multiplication between two `CompositeGTBasisFuncs{T, D, <:Any, 1}`s (e.g.,  
+Multiplication between two `CompositeGTBasisFuncs{T, D, <:Any, 1}` (e.g.,  
 [`BasisFunc`](@ref) and [`BasisFuncMix`](@ref)), or a `Real` number and a 
 `CompositeGTBasisFuncs{T, D, <:Any, 1}`. If `normalizeGTO` is set to `missing` (in 
 default), The [`GaussFunc`](@ref) inside the output containers will be normalized only if 

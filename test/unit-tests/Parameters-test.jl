@@ -1,8 +1,18 @@
 using Test
 using Quiqbox
-using Quiqbox: getVarCore
+using Quiqbox: getVarCore, FLevel, getFLevel, compareParamBox
 
 @testset "Parameters.jl" begin
+
+# struct FLevel & function getFLevel
+@test FLevel{getFLevel(:itself)} == FLevel(identity) == FLevel{0}
+@test FLevel(abs) == FLevel{1}
+tf1 = Quiqbox.Sf(2.2, abs)
+@test FLevel{getFLevel(tf1)} == FLevel(tf1)
+pf1 = Quiqbox.Pf(1.5, tf1)
+@test FLevel(pf1) == FLevel{3}
+@test getFLevel(FLevel(tf1)) == getFLevel(typeof(tf1)) == getFLevel(tf1) == 2
+
 
 pb1 = ParamBox(1, :a)
 @test inSymOfCore(pb1) == :a == outSymOfCore(pb1)
@@ -100,7 +110,9 @@ sortTuple = t -> (collect(t) |> sort)
                                                  :d₁, :d₂, :d₃, :x_α₁, :α₂, :α₃]
 @test sortTuple(getVar.(bfm_gv.param)) == [:X₁, :X₁, :X₂, :Y₁, :Y₂, :Y₂, :Z₁, :Z₂, :Z₃, 
                                            :d₁, :d₂, :d₂, :d₃, :d₃, :α₁, :α₁, :α₂, :α₃, :α₃]
-@test sortTuple(getVar.(bfm_gv.param, true)) == [:X₁, :X₁, :X₂, :Y₁, :Y₂, :Y₂, :Z₁, :Z₂, :Z₃, :d₁, :d₂, :d₂, :d₃, :d₃, :x_α₁, :x_α₁, :α₂, :α₃, :α₃]
+@test sortTuple(getVar.(bfm_gv.param, true)) == [:X₁, :X₁, :X₂, :Y₁, :Y₂, :Y₂, :Z₁, :Z₂, 
+                                                 :Z₃, :d₁, :d₂, :d₂, :d₃, :d₃, 
+                                                 :x_α₁, :x_α₁, :α₂, :α₃, :α₃]
 
 
 @test getVarDict(e_gv1) == Dict(:α₂=>2.0)
@@ -122,5 +134,21 @@ pb4_3 = changeMapping(pb4, x->x+2)
 @test getVarDict(bfm_gv.param) != getVarDict(getUnique!(bfm_gv.param|>collect))
 @test getVarDict(bfm_gv.param) == getVarDict(getUnique!(bfm_gv.param|>collect, 
                                                         compareFunction=hasIdentical))
+
+
+# function compareParamBox
+@test compareParamBox(pb1, pb2)
+toggleDiff!(pb2)
+@test compareParamBox(pb1, pb2)
+toggleDiff!(pb2)
+@test compareParamBox(pb1, pb1_2) == compareParamBox(pb1_2, pb1) == true
+toggleDiff!(pb1_2)
+@test !compareParamBox(pb1, pb1_2)
+toggleDiff!(pb1_2)
+@test compareParamBox(pb4, pb4_3)
+toggleDiff!(pb4_3)
+@test !compareParamBox(pb4, pb4_3)
+@test compareParamBox(pb4_3, ParamBox(Val(:C), pb4_3)) && (Quiqbox.getTypeParams(pb4_3)!=:C)
+toggleDiff!(pb4_3)
 
 end

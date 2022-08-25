@@ -10,24 +10,21 @@ struct FLevel{L} <: MetaParam{FLevel} end
 FLevel(::Type{itselfT}) = FLevel{0}
 FLevel(::Type{typeof(Base.identity)}) = FLevel{0}
 FLevel(::Type{<:Function}) = FLevel{1}
+FLevel(::Type{StructFunction{F}}) where {F} = FLevel(F)
 FLevel(::Type{<:ParameterizedFunction{T1, T2}}) where {T1, T2} = 
-      FLevel{getFLevel(T1) + getFLevel(T2)}
+FLevel{getFLevel(T1)+getFLevel(T2)}
 FLevel(::F) where {F<:Function} = FLevel(F)
 const FI = FLevel(itself)
 
-FLevel(sym::Symbol) = FLevel(getFunc(sym))
-FLevel(::TypedFunction{F}) where {F} = FLevel(F)
-FLevel(::Type{TypedFunction{F}}) where {F} = FLevel(F)
-
 getFLevel(::Type{FLevel{L}}) where {L} = L
-getFLevel(f::Function) = getFLevel(f |> FLevel)
-getFLevel(::TypedFunction{F}) where {F} = getFLevel(F |> FLevel)
-getFLevel(::Type{T}) where {T} = getFLevel(T |> FLevel)
+getFLevel(::Type{F}) where {F<:Function} = (getFLevel∘FLevel)(F)
+getFLevel(::F) where {F<:Function} = getFLevel(F)
+getFLevel(sym::Symbol) = (getFLevel∘getFunc)(sym)
 
 """
 
     ParamBox{T, V, FL<:FLevel} <: DifferentiableParameter{T, ParamBox}
- 
+
 Parameter container that can enable differentiation.
 
 ≡≡≡ Field(s) ≡≡≡
@@ -153,9 +150,6 @@ ParamBox(Val(dataName), fillObj(data), genIndex(index))
 ParamBox(data::T, name::Symbol, mapFunction::F, dataName::Symbol=:undef; 
          index::Union{Int, Nothing}=nothing, canDiff::Bool=true) where {T, F<:Function} = 
 ParamBox(Val(name), mapFunction, fillObj(data), genIndex(index), fill(canDiff), dataName)
-
-
-mapTypeOf(::ParamBox{<:Any, <:Any, FL}) where {FL} = FL
 
 
 """
