@@ -50,14 +50,16 @@ bfs3 = genBasisFunc([0.0, 0.0, 0.0], (2.0, 1.0), [(2,0,0), (1,1,0)])
 bfe = Quiqbox.EmptyBasisFunc{Float64, 3}()
 @test (@capture_out show(bfe)) == string(typeof(bfe))
 
-bfm1 = BasisFuncMix([bf1, bf2])
+box1 = GridBox(2, 1.5)
+@test (@capture_out show(box1)) == string(typeStrOf(box1))*getFieldNameStr(box1)
+
+bf3 = genBasisFunc(box1.point[1], (2.0, 1.0))
+
+bfm1 = BasisFuncMix([bf1, bf2, bf3])
 @test (@capture_out show(bfm1)) == string(typeStrOf(bfm1))*getFieldNameStr(bfm1)
 
 GTb1 = GTBasis([bf1, bfs2])
 @test (@capture_out show(GTb1)) == string(typeof(GTb1))*getFieldNameStr(GTb1)
-
-box1 = GridBox(2, 1.5)
-@test (@capture_out show(box1)) == string(typeStrOf(box1))*getFieldNameStr(box1)
 
 fVar1 = runHF(GTb1, ["H", "H"], [[0.0, 0.0, 0.0], [1.0, 2.0, 1.0]], HFconfig((C0=:Hcore,)), 
               printInfo=false)

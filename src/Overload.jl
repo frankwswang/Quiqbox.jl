@@ -53,6 +53,8 @@ function typeStrOf(bT::Type{<:FloatingGTBasisFuncs{<:Any, <:Any, <:Any, <:Any, P
     replace(bTstrO, pbsTstrO=>pbsTstrN, count=1)
 end
 
+typeStrOf(::Type{T}) where {T<:FloatingGTBasisFuncs} = string(T)
+
 typeStrOf(::T) where {T<:FloatingGTBasisFuncs} = typeStrOf(T)
 
 function typeStrOf(gbT::Type{<:GridBox{<:Any, <:Any, <:Any, SPT}}) where {SPT}
