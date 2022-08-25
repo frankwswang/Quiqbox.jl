@@ -87,8 +87,6 @@ mutable struct POconfig{T, M, CBT<:ConfigBox, F<:Function} <: ConfigBox{T, POcon
     GD::F
 end
 
-POconfig(a1::Symbol, args...) = POconfig(Val(a1), args...)
-
 POconfig(t::NamedTuple) = genNamedTupleC(:POconfig, defaultPOconfigPars)(t)
 
 POconfig(;kws...) = 
@@ -172,7 +170,7 @@ function optimizeParams!(pbs::AbstractVector{<:ParamBox{T}},
         detectConverge = ifelse(isnan(threshold), false, true)
 
         if isnan(target)
-            isConverged = (Es) -> isOscillateConverged(Es, threshold, minimalCycles=3)[1]
+            isConverged = Es -> isOscillateConverged(Es, threshold, minimalCycles=3)[1]
         else
             isConverged = Es -> (abs(Es[end] - target) < threshold)
         end

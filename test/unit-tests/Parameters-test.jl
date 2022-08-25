@@ -1,6 +1,6 @@
 using Test
 using Quiqbox
-using Quiqbox: getVarCore, FLevel, getFLevel
+using Quiqbox: getVarCore, FLevel, getFLevel, compareParamBox
 
 @testset "Parameters.jl" begin
 
@@ -137,6 +137,18 @@ pb4_3 = changeMapping(pb4, x->x+2)
 
 
 # function compareParamBox
-
+@test compareParamBox(pb1, pb2)
+toggleDiff!(pb2)
+@test compareParamBox(pb1, pb2)
+toggleDiff!(pb2)
+@test compareParamBox(pb1, pb1_2) == compareParamBox(pb1_2, pb1) == true
+toggleDiff!(pb1_2)
+@test !compareParamBox(pb1, pb1_2)
+toggleDiff!(pb1_2)
+@test compareParamBox(pb4, pb4_3)
+toggleDiff!(pb4_3)
+@test !compareParamBox(pb4, pb4_3)
+@test compareParamBox(pb4_3, ParamBox(Val(:C), pb4_3)) && (getTypeParams(pb4_3) != :C)
+toggleDiff!(pb4_3)
 
 end
