@@ -32,7 +32,7 @@ A container of multiple `D`-dimensional grid points.
 
 ≡≡≡ Field(s) ≡≡≡
 
-`spacing::T`: The distance between adjacent grid points, a.k.a the edge length of each grid.
+`spacing::NTuple{D, T}`: The distance between adjacent grid points along each dimension.
 
 `nPoint::Int`: Total number of the grid points.
 
@@ -42,8 +42,14 @@ A container of multiple `D`-dimensional grid points.
 
 ≡≡≡ Initialization Method(s) ≡≡≡
 
-    GridBox(nGrids::NTuple{D, Int}, spacing::Union{T, Array{T, 0}}, 
+    GridBox(nGrids::NTuple{D, Int}, spacing::NTuple{D, Union{Array{T, 0}, T}}, 
             center::Union{AbstractVector{T}, NTuple{D, T}}=ntuple(_->T(0),Val(D)); 
+            canDiff::NTuple{D, Bool}=ntuple(_->true, Val(D)), 
+            index::NTuple{D, Int}=ntuple(_->0, Val(D))) where {T<:AbstractFloat, D} -> 
+    GridBox{T, D}
+
+    GridBox(nGrids::NTuple{D, Int}, spacingForAllDim::Union{T, Array{T, 0}}, 
+            center::Union{AbstractVector{T}, NTuple{D, T}}=ntuple(_->T(0), Val(D)); 
             canDiff::Bool=true, index::Int=0) where {T<:AbstractFloat, D} -> 
     GridBox{T, D}
 
@@ -53,28 +59,33 @@ Construct a general `D`-dimensional `GridBox`.
 
 `nGrids::NTuple{D, Int}`: The numbers of grids along each dimension.
 
-`spacing::Union{T, Array{T, 0}}`: The edge length of each grid.
+`spacing::NTuple{D, Union{Array{T, 0}, T}}`: The spacing between grid points along each 
+dimension.
+
+`spacingForAllDim::NTuple{D, Union{Array{T, 0}, T}}`: A single spacing applied for all 
+dimensions.
 
 `center::Union{AbstractVector{T}, NTuple{D, T}}`: The coordinate of the geometric center of 
 the grid box.
 
 === Keyword argument(s) ===
 
-`canDiff`: If all the `ParamBox`es stored in the constructed `GridBox` will be marked as 
-differentiable.
+`canDiff`::NTuple{D, Bool}: Whether the `ParamBox`es of each dimension stored in the 
+constructed `GridBox` will be marked as differentiable.
 
-`index`: The Index that will be assigned to the shared input variable 
-`$(ParamList[:spacing])` of all the stored `ParamBox`es.
+`index`::NTuple{D, Int}: The Index(s) that will be assigned to the shared input variable(s) 
+`$(ParamList[:spacing])` of the stored `ParamBox`es.
 """
 struct GridBox{T, D, NP, GPT<:SpatialPoint{T, D}} <: SpatialStructure{T, D}
-    spacing::T
+    spacing::NTuple{D, T}
     nPoint::Int
     point::NTuple{NP, GPT}
     param::Tuple{Vararg{ParamBox{T}}}
 
-    function GridBox(nGrids::NTuple{D, Int}, spacing::Union{T, Array{T, 0}}, 
+    function GridBox(nGrids::NTuple{D, Int}, spacing::NTuple{D, Union{Array{T, 0}, T}}, 
                      center::Union{AbstractVector{T}, NTuple{D, T}}=ntuple(_->T(0),Val(D)); 
-                     canDiff::Bool=true, index::Int=0) where {T<:AbstractFloat, D}
+                     canDiff::NTuple{D, Bool}=ntuple(_->true, Val(D)), 
+                     index::NTuple{D, Int}=ntuple(_->0, Val(D))) where {T<:AbstractFloat, D}
         @assert all(nGrids.>=0) "The number of gird of each edge must be no less than 0."
         @assert length(center)==D "The dimension of center coordinate must be equal to $D."
         NP = prod(nGrids .+ 1)
@@ -83,33 +94,39 @@ struct GridBox{T, D, NP, GPT<:SpatialPoint{T, D}} <: SpatialStructure{T, D}
         point = Array{SpatialPoint{T, D}}(undef, NP)
         param = Array{ParamBox{T}}(undef, D*NP)
         funcs = makeGridFuncsCore.(nGrids)
-        spcData = ifelse(spacing isa AbstractFloat, fill(spacing), spacing)
-        data = makeGridPBoxData.(fill.(center), Ref(spcData), nGrids)
+        spacing = fillObj.(spacing)
+        data = makeGridPBoxData.(fill.(center), spacing, nGrids)
         for (n, i) in enumerate( CartesianIndices(nGrids .+ 1) )
             fs = makeGridFuncs.(center, [funcs[j][k] for (j, k) in enumerate(i|>Tuple)])
-            p = ParamBox.(data, oVsym, fs, iVsym; canDiff, index) |> Tuple
+            p = broadcast((a, b, c, d, canDiff, index) -> 
+                          ParamBox(a, b, c, d; canDiff, index), 
+                          data, oVsym, fs, iVsym, canDiff, index)|>Tuple
             point[n] = SpatialPoint(p)
             param[D*(n-1)+1 : D*n] .= p
         end
         point = Tuple(point)
-        new{T, D, NP, eltype(point)}(spacing, NP, point, Tuple(param))
+        new{T, D, NP, eltype(point)}(getindex.(spacing), NP, point, Tuple(param))
     end
 end
 
+GridBox(nGrids::NTuple{D, Int}, spacingForAllDim::Union{T, Array{T, 0}}, 
+        center::Union{AbstractVector{T}, NTuple{D, T}}=ntuple(_->T(0), Val(D)); 
+        canDiff::Bool=true, index::Int=0) where {T<:AbstractFloat, D} = 
+GridBox(nGrids, Tuple(fill(fillObj(spacingForAllDim), D)), center; 
+        canDiff=Tuple(fill(canDiff, D)), index=Tuple(fill(index, D)))
+
 """
 
-    GridBox(nGridPerEdge::Int, spacing::T, 
-            center::Union{AbstractVector{T}, NTuple{D, T}}=ntuple(_->T(0), 3); 
-            canDiff::Bool=true, index::Int=0) where {T<:AbstractFloat, D} -> 
+    GridBox(nGridPerEdge::Int, spacing, center=ntuple(_->eltype(spacing[begin])(0), 3); 
+            canDiff::Bool=true, index::Int=0) -> 
     GridBox{T, D}
 
 The method of generating a cubic `GridBox`. Aside from the common arguments, `nGridPerEdge` 
 specifies the number of grids for every dimension. The dimension of the grid box is 
 determined by the dimension of `center`.
 """
-GridBox(nGridPerEdge::Int, spacing::T, 
-        center::Union{AbstractVector{T}, NTuple{D, T}}=ntuple(_->T(0), 3); 
-        canDiff::Bool=true, index::Int=0) where {T<:AbstractFloat, D} = 
+GridBox(nGridPerEdge::Int, spacing, center=ntuple(_->eltype(spacing[begin])(0), 3); 
+        canDiff::Bool=true, index::Int=0) = 
 GridBox(ntuple(_->nGridPerEdge, length(center)), spacing, center; canDiff, index)
 
 
