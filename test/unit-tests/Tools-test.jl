@@ -169,7 +169,6 @@ end
 # struct Pf
 pf1 = Pf(-1.5, abs)
 @test pf1(-2.0) == -3.0
-@test nameOf(pf1) == typeof(pf1)
 pf2 = Pf(-1.5, abs)
 @test pf2(-2) == -3.0
 @test Pf(-1.0, pf2)(-2.0) == 3.0
@@ -193,7 +192,7 @@ sf2 = Sf(3, sf1)
 
 # function nameOf
 @test nameOf(abs) == :abs
-@test nameOf(pf1) == Pf{Float64, typeof(abs)}
+@test nameOf(pf1) == typeof(pf1) == Pf{Float64, typeof(abs)}
 
 
 # function tupleDiff
