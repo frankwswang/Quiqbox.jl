@@ -1873,64 +1873,57 @@ markParams!(b::Union{AbstractVector{T}, T, Tuple{Vararg{T}}},
 markParams!(getParams(b), filterMapping)
 
 function markParams!(pars::AbstractVector{<:ParamBox}, filterMapping::Bool=false)
-    ids = findall(isDependentParam, pars)
-
-    parsSorted = eltype(pars)[]
-    ids1, items = markUnique(outSymOfCore.(pars))
-    for i= 1:length(items)
-        parsSameV = view(pars, findall(isequal(i), ids1))
-        append!(parsSorted, parsSameV)
-    end
-
+    ids = findall(isDepParam, pars)
     if isempty(ids)
         res = markParamsCore1!(pars)
     else
         res1, d = markParamsCore2!(view(pars, ids))
-        res2 = markParamsCore1!(pars[1:end .∉ Ref(ids)], d)
+        res2 = markParamsCore1!((@view pars[1:end .∉ Ref(ids)]), d)
         res = vcat(res1, res2)
     end
-    filterMapping ? unique(x->(objectid(x.data), x.index[]), parsSorted) : parsSorted
+    filterMapping ? res : pars
 end
 
 function markParamsCore1!(pars::AbstractVector{<:ParamBox}, 
-                          d::Dict{Symbol, Int}=Dict{Symbol, Int}())
+                          d::Dict{Symbol, Vector{Int}}=Dict{Symbol, Vector{Int}}())
     ids1, items = markUnique(outSymOfCore.(pars))
     uniqueParams = eltype(pars)[]
     for i=1:length(items)
         parsSameV = view(pars, findall(isequal(i), ids1))
-        ids2, uniqueParams = markUnique(parsSameV, compareFunction=compareParamBox)
-        for (par, i) in zip(parsSameV, ids2)
-            par.index[] = i + get(d, outSymOfCore(par), 0)
+        ids2, iPars = markUnique(parsSameV, compareFunction=compareParamBox)
+        for (i, par) in enumerate(parsSameV)
+            # par.index[] = i + get(d, outSymOfCore(par), 0)
+            par.index[] = skipIndices(ids2, get(d, outSymOfCore(par), Int[]))[i]
         end
-        append!(uniqueParams, uniqueParams)
+        append!(uniqueParams, iPars)
     end
     uniqueParams
 end
 
-isDependentParam(pb::ParamBox{<:Any, <:Any, FI}) = false
-isDependentParam(pb::ParamBox{<:Any, <:Any, FL}) where {FL} = isDiffParam(pb)
-
 function markParamsCore2!(parArray::AbstractVector{<:ParamBox})
     uniqueParams = eltype(parArray)[]
     idDict = Dict{UInt, Tuple{Symbol, Int}}()
-    dVDict = Dict{Symbol, Int}()
+    iVDict = Dict{Symbol, Int}()
+    dVidDict = Dict{Symbol, Vector{Int}}()
     for par in parArray
         id = objectid(par.data)
         idx = get(idDict, id, (:nothing, 0))[end]
         if iszero(idx)
-            iParSym = outSymOfCore(par)
-            idx = get!(dVDict, iParSym, 0) + 1
+            iParSym = inSymOfCore(par)
+            idx = get!(iVDict, iParSym, 0) + 1
             push!(idDict, id=>(iParSym, idx))
-            if isone(idx)
-                push!(dVDict, iParSym=>idx)
-            else
-                dVDict[iParSym] += 1
-            end
+            iVDict[iParSym] += 1
             push!(uniqueParams, par)
+            dParSym = outSymOfCore(par)
+            if haskey(dVidDict, dParSym)
+                push!(dVidDict[dParSym], idx)
+            else
+                dVidDict[dParSym] = [idx]
+            end
         end
         par.index[] = idx
     end
-    uniqueParams, dVDict
+    uniqueParams, dVidDict
 end
 
 markParams!(parTuple::Tuple{Vararg{ParamBox}}, filterMapping::Bool=false) = 

@@ -862,5 +862,23 @@ end
 isNaN(::Any) = false
 isNaN(n::Number) = isnan(n)
 
+
 getBool(bl::Bool) = itself(bl)
 getBool(::Val{BL}) where {BL} = BL::Bool
+
+
+function skipIndices(arr::AbstractArray{Int}, ints::AbstractVector{Int})
+    @assert min(arr...) > 0
+    if isempty(ints)
+        arr
+    else
+        @assert min(ints...) > 0
+        maxIdx = max(arr...)
+        maxIdxN = maxIdx + length(ints)
+        ints = filter!(x->x<=maxIdxN, sort(ints))
+        idsN = deleteat!(collect(1:maxIdxN), ints)
+        map(arr) do x
+            idsN[x]
+        end
+    end
+end

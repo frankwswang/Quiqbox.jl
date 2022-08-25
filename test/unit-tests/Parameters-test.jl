@@ -94,15 +94,16 @@ bfm_gv = Quiqbox.BasisFuncMix([bf_gv2, bf_gv4, bf_gv6])
 bfs_gv = sortBasisFuncs([bf_gv1, bf_gv2, bf_gv3, bf_gv4, bf_gv5, bf_gv6])
 markParams!(bfs_gv, true)
 markParams!(vcat(bfs_gv, bfm_gv), true)
-@test getVar.(bf_gv6.param) == (:X₁, :Y₂, :Z₂, :α₁, :d₃, :α₃, :d₂, :α₂, :d₁)
-@test getVar.(bf_gv6.param, true) == (:X₁, :Y₂, :Z₂, :α₁, :d₃, :α₃, :d₂, :x_α₂, :d₁)
-@test getVar.(bfm_gv.param) == (:X₁, :Y₁, :Z₁, :α₂, :d₂, :X₁, :Y₂, :Z₂, :α₁, :d₃, :α₃, :d₂, 
-                                :α₂, :d₁, :X₂, :Y₂, :Z₃, :α₃, :d₃)
-@test getVar.(bfm_gv.param, true) == (:X₁, :Y₁, :Z₁, :x_α₂, :d₂, :X₁, :Y₂, :Z₂, :α₁, :d₃, 
-                                      :α₃, :d₂, :x_α₂, :d₁, :X₂, :Y₂, :Z₃, :α₃, :d₃)
+sortTuple = t -> (collect(t) |> sort)
+@test sortTuple(getVar.(bf_gv6.param)) == [:X₁, :Y₂, :Z₂, :d₁, :d₂, :d₃, :α₁, :α₂, :α₃]
+@test sortTuple(getVar.(bf_gv6.param, true)) == [:X₁, :Y₂, :Z₂, 
+                                                 :d₁, :d₂, :d₃, :x_α₁, :α₂, :α₃]
+@test sortTuple(getVar.(bfm_gv.param)) == [:X₁, :X₁, :X₂, :Y₁, :Y₂, :Y₂, :Z₁, :Z₂, :Z₃, 
+                                           :d₁, :d₂, :d₂, :d₃, :d₃, :α₁, :α₁, :α₂, :α₃, :α₃]
+@test sortTuple(getVar.(bfm_gv.param, true)) == [:X₁, :X₁, :X₂, :Y₁, :Y₂, :Y₂, :Z₁, :Z₂, :Z₃, :d₁, :d₂, :d₂, :d₃, :d₃, :x_α₁, :x_α₁, :α₂, :α₃, :α₃]
 
 
-@test getVarDict(e_gv1) == Dict(:α₁=>2.0)
+@test getVarDict(e_gv1) == Dict(:α₂=>2.0)
 @test getVarDict(pb4) == Dict([:x=>1.2, :c=>1.44])
 pb1_2 = changeMapping(pb1, x->x+2)
 @test getVarDict(pb1_2) == Dict(:a_a=>1, :a=>3)
