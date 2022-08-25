@@ -1,4 +1,4 @@
-export CanOrbital, getCanOrbitals, changeHbasis, MatterByHF, nnRepulsions
+export CanOrbital, genCanOrbitals, changeHbasis, MatterByHF, nnRepulsions
 
 using LinearAlgebra: norm
 using Tullio: @tullio
@@ -11,7 +11,7 @@ using TensorOperations: @tensor as @TOtensor
 The spatial part (orbital) of a canonical spin-orbital (the set of which diagonalizes the 
 Fock matrix of a Hartree-Fock state) with its occupation information. This means the 
 maximal occupation number for the mode corresponding to the orbital (namely a canonical 
-orbital) equals 2. Please refer to [`getCanOrbitals`](@ref) for the construction of a 
+orbital) equals 2. Please refer to [`genCanOrbitals`](@ref) for the construction of a 
 `CanOrbital`.
 
 ≡≡≡ Field(s) ≡≡≡
@@ -45,7 +45,7 @@ struct CanOrbital{T, D, NN} <: AbstractSpinOrbital{T, D}
 end
 
 
-function getCanOrbitalsCore(::Val{I}, fVars::HFfinalVars{<:Any, <:Any, <:Any, <:Any, BN}; 
+function genCanOrbitalsCore(::Val{I}, fVars::HFfinalVars{<:Any, <:Any, <:Any, <:Any, BN}; 
                             roundAtol::Real=getAtolVal(T)) where {I, BN}
     OON = fVars.Ns[I]
     rngO = 1:OON
@@ -57,31 +57,34 @@ function getCanOrbitalsCore(::Val{I}, fVars::HFfinalVars{<:Any, <:Any, <:Any, <:
     )
 end
 
-function getCanOrbitalsCore(fVars::HFfinalVars{<:Any, <:Any, :RHF}; 
+function genCanOrbitalsCore(fVars::HFfinalVars{<:Any, <:Any, :RHF}; 
                             roundAtol::Real=getAtolVal(T))
-    ((a, b), (c, d)) = getCanOrbitalsCore(Val(1), fVars; roundAtol)
+    ((a, b), (c, d)) = genCanOrbitalsCore(Val(1), fVars; roundAtol)
     ((a,), (b,)), ((c,), (d,))
 end
 
-function getCanOrbitalsCore(fVars::HFfinalVars{<:Any, <:Any, :UHF}; 
+function genCanOrbitalsCore(fVars::HFfinalVars{<:Any, <:Any, :UHF}; 
                             roundAtol::Real=getAtolVal(T))
     ((a, b), (c, d)), ((e, f), (g, h)) = 
-    getCanOrbitalsCore.((Val(1), Val(2)), Ref(fVars); roundAtol)
+    genCanOrbitalsCore.((Val(1), Val(2)), Ref(fVars); roundAtol)
     ((a, e), (b, f)), ((c, g), (d, h))
 end
 
 """
 
-    getCanOrbitals(fVars::HFfinalVars{T, D, <:Any, NN}; 
+    genCanOrbitals(fVars::HFfinalVars{T, D, <:Any, NN}; 
                    roundAtol::Real=getAtolVal(T)) where {T, D, NN} -> 
-    CanOrbital{T, D, NN}
+    NTuple{2, Vector{CanOrbital{T, D, NN}}}
 
-Generate a set of canonical orbitals from the result of a Hartree-Fock approximation. Each 
-parameter stored in the constructed [`CanOrbital`](@ref) will be rounded to the nearest 
-multiple of `roundAtol`; when `roundAtol` is set to `NaN`, no rounding will be performed.
+Generate the occupied and unoccupied canonical orbitals from the result of a Hartree-Fock 
+approximation `fVars`. Each parameter stored in the constructed [`CanOrbital`](@ref) will 
+be rounded to the nearest multiple of `roundAtol`; when `roundAtol` is set to `NaN`, no 
+rounding will be performed.
 """
-getCanOrbitals(fVars::HFfinalVars; roundAtol::Real=getAtolVal(T)) = 
-getCanOrbitalsCore(fVars; roundAtol)[1]
+function genCanOrbitals(fVars::HFfinalVars{T}; roundAtol::Real=getAtolVal(T)) where {T}
+    res = genCanOrbitalsCore(fVars; roundAtol)[1]
+    vcat(res[1]...), vcat(res[2]...)
+end
 
 
 """
@@ -223,7 +226,7 @@ struct MatterByHF{T, D, NN, N, BN, HFTS} <:MatterData{T, D, N}
         nucCoords = fVars.nucCoord
         Ns = fVars.Ns
         basis = fVars.basis
-        (osO, osU), (CO, CU) = getCanOrbitalsCore(fVars; roundAtol)
+        (osO, osU), (CO, CU) = genCanOrbitalsCore(fVars; roundAtol)
         ints = changeHbasis(fVars)
         if HFTS == 1
             cH = (ints[1],)
