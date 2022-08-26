@@ -652,9 +652,12 @@ bsO_STO3G = genBasisFunc(fill(0.0, 3), "STO-3G", "O")
 @test (genBasisFunc(missing, (2.0, 1.1), "D")[[1,3,5]] |> genBasisFuncText) == 
 """
 X      NaN                      NaN                      NaN                 
-D    1   1.0  1 3 5
+D    1   1.0   false   1 3 5
          2.0                       1.1
 """
+@test hasEqual((genBFuncsFromText∘genBasisFuncText)(bf2_P_norm3)[], bf2_P_norm3)
+bf_TextTest = genBasisFunc([0.0, 1.2, 0.3], ([1.5, 1.2], [0.5, 0.4]), [(2,0,0), (1,0,1)])
+@test hasEqual((genBFuncsFromText∘genBasisFuncText)(bf_TextTest)[], bf_TextTest)
 
 
 # function assignCenInVal!

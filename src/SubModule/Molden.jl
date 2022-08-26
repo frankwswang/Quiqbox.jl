@@ -31,6 +31,9 @@ function makeMoldenFile(mol::MatterByHF{T, 3};
     @assert all(basis .|> isaFullShellBasisFuncs) "The basis set stored in the input " * 
                                                   "`MatterByHF` is not supported by " * 
                                                   "the Molden format."
+    @assert all(getproperty.(basis, :normalizeGTO)) "`.normalizeGTO` must be `true` for "*
+                                                    "every `FloatingGTBasisFuncs` inside "*
+                                                    "the basis set."
     occuC = getindex.(mol.occuC, Ref(ids), :)
     unocC = getindex.(mol.unocC, Ref(ids), :)
     nucCoords = mol.nucCoord |> collect
@@ -47,9 +50,12 @@ function makeMoldenFile(mol::MatterByHF{T, 3};
         Cgroups = occuC
     end
     iNucPoint = 0
-    strs = joinConcentricBFuncStr.(groupedSort(basis, centerCoordOf))
-    strs = split.(strs, "\n", limit=2)
-    gCoeffs = getindex.(strs, 2)
+    conCentricBfs = groupedSort(basis, centerCoordOf)
+    nbfs = length.(conCentricBfs)
+    strs = split.(joinConcentricBFuncStr.(conCentricBfs; roundDigits), "\n", limit=2)
+    gCoeffs = map(getindex.(strs, 2), nbfs) do str, count
+        replace(str, "   true"=>""; count)
+    end
     lpadN = 8
 
     text = """
@@ -59,11 +65,11 @@ function makeMoldenFile(mol::MatterByHF{T, 3};
            [Atoms] (AU)
            """
 
-    centers = getindex.(strs, 1)
+    centers = centerCoordOf.(getindex.(conCentricBfs, 1))
     for cen in centers
         iNucPoint += 1
-        coord = parse.(T, split(cen[5:end]))
-        if (i = findfirst(x->all(isapprox.(x, coord, atol=getAtolVal(T))), nucCoords); 
+        # coord = parse.(T, split(cen[5:end]))
+        if (i = findfirst(x->all(isapprox.(x, cen, atol=getAtolVal(T))), nucCoords); 
             i !== nothing)
             n = popat!(nuc, i)
             atmName = rpad("$(n)", 5)
@@ -73,9 +79,9 @@ function makeMoldenFile(mol::MatterByHF{T, 3};
             atmName = "X    "
             atmNumber = "X   "
         end
-        coordStr = alignNum(coord[1], lpadN; roundDigits) * 
-                   alignNum(coord[2], lpadN; roundDigits) * 
-                   alignNum(coord[3], lpadN, 0; roundDigits)
+        coordStr = alignNum(cen[1], lpadN; roundDigits) * 
+                   alignNum(cen[2], lpadN; roundDigits) * 
+                   alignNum(cen[3], lpadN, 0; roundDigits)
         text *= atmName*rpad("$iNucPoint", 5)*atmNumber*coordStr*"\n"
     end
     for (n, coord) in zip(nuc, nucCoords)
@@ -95,10 +101,6 @@ function makeMoldenFile(mol::MatterByHF{T, 3};
             text *= "Sym=   " * getOrbitalType(mo) * "\n"
             moe = mo.energy
             MOcoeffs = Cgroups[spinIdx][:, i]
-            if roundDigits > 0
-                moe = round(moe, sigdigits=roundDigits)
-                MOcoeffs = round.(MOcoeffs, sigdigits=roundDigits)
-            end
             text *= "Ene=  "*alignNumSign(moe; roundDigits)*"\n"
             text *= "Spin=  $(spinStrs[spinIdx])\n"
             text *= "Occup= $(sum(mo.occu)[])\n"
