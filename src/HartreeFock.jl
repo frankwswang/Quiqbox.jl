@@ -77,7 +77,7 @@ breakSymOfC(::Val{:RHF}, C::AbstractMatrix{T}) where {T} = (C,)
 breakSymOfC(::Val{:RHF}, Hcore, HeeI, X, Dᵅ, Dᵝ) = 
 getC.( Ref(X), getF(Hcore, HeeI, ((Dᵅ + Dᵝ)./2,)) )
 
-breakSymOfC(::Val{:UHF}, Hcore, HeeI, X, Dᵅ, Dᵝ) =
+breakSymOfC(::Val{:UHF}, Hcore, HeeI, X, Dᵅ, Dᵝ) = 
 getC.( Ref(X), getF(Hcore, HeeI, (Dᵅ, Dᵝ)) )
 
 
@@ -324,6 +324,7 @@ struct SCFconfig{T, L} <: ImmutableParameter{T, SCFconfig}
     function SCFconfig(methods::NTuple{L, Symbol}, intervals::NTuple{L, T}, 
                        config::Dict{Int, <:AbstractVector{<:Pair}}=Dict(1=>Pair[]);
                        oscillateThreshold::Real=defultOscThreshold) where {L, T}
+        @assert all(intervals .>= 0) "Thresholds in `intervals` must all be non-negative."
         kwPairs = [Pair[] for _=1:L]
         for i in keys(config)
             kwPairs[i] = config[i]
@@ -702,6 +703,8 @@ function runHFcore(::Val{HFT},
     printInfo && println(rpad(HFT, 4)*rpad(" | Initial Gauss", 18), "E = $(Etots[end])")
     isConverged = true
     i = 0
+    ΔE = 0.0
+    ΔDrms = 0.0
     for (m, kws, breakPoint, l) in 
         zip(scfConfig.method, scfConfig.methodConfig, scfConfig.interval, 1:L)
         isConverged = true
@@ -715,12 +718,23 @@ function runHFcore(::Val{HFT},
             res = HFcore(m, N, Hcore, HeeI, S, X, vars; kws...)
             pushHFtempVars!(vars, res)
 
-            diff = Etots[end] - Etots[end-1]
-            relDiff = diff / abs(Etots[end-1])
-            if n > 1 && (!isConverged || (bl = relDiff > sqrt(breakPoint)))
+            ΔE = Etots[end] - Etots[end-1]
+            relDiff = ΔE / abs(Etots[end-1])
+            sqrtBreakPoint = sqrt(breakPoint)
+
+            if l==L
+                ΔD = vars[1].shared.Dtots[end] - vars[1].shared.Dtots[end-1]
+                ΔDrms = sqrt( sum(ΔD .^ 2) ./ length(ΔD) )
+            end
+
+            if n > 1 && (!isConverged || (bl = relDiff > max(sqrtBreakPoint, 1e-5)))
                 flag, Std = isOscillateConverged(Etots, 10breakPoint)
                 if flag
-                    isConverged = ifelse(Std > max(breakPoint, oscThreshold), false, true)
+                    isConverged = ifelse(
+                        begin
+                            bl2 = Std > max(breakPoint, oscThreshold)
+                            ifelse(l==L, bl2 || (ΔDrms > sqrtBreakPoint), bl2)
+                        end, false, true)
                 else
                     earlyStop && bl && 
                     (i = terminateSCF(i, vars, m, printInfo); isConverged=false; break)
@@ -730,11 +744,15 @@ function runHFcore(::Val{HFT},
             printInfo && (i % floor(log(4, i) + 1) == 0 || i == maxStep) && 
             println(rpad("Step $i", 10), rpad("#$l ($(m))", 12), "E = $(Etots[end])")
 
-            isConverged && abs(diff) <= breakPoint && break
+            isConverged && abs(ΔE) <= breakPoint && break
         end
     end
     negStr = ifelse(isConverged, "is ", "has not ")
-    printInfo && println("The SCF procedure ", negStr, "converged.\n")
+    if printInfo
+        println("\nThe SCF iteration ", negStr, "converged at step $i:\n", 
+                "|ΔE| = ", round(abs(ΔE), sigdigits=7), " Ha, ", 
+                "RMS(ΔD) = ", round(ΔDrms, sigdigits=7), ".\n")
+    end
     vars, isConverged
 end
 
