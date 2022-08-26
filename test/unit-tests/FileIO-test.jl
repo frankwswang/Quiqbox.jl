@@ -46,6 +46,8 @@ for (d,f) in zip(ds, fs)
     end
     @test str == f(num)
 end
+@test numToSups(nothing) == ""
+@test numToSubs(nothing) == ""
 
 
 # function typeStrNotUnionAll

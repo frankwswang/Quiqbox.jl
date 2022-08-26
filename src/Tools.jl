@@ -763,7 +763,7 @@ function genIndexCore(index)
     res
 end
 
-function genNamedTupleC(name::Symbol, defaultVars::AbstractArray)
+function genNamedTupleC(name::Symbol, defaultVars::AbstractVector)
     @inline function (t::T) where {T<:NamedTuple}
         container = getproperty(Quiqbox, name)
         res = deepcopy(defaultVars)

@@ -40,15 +40,21 @@ for i=1:2 gf1.param[i][] = x[i] end
 # function genExponent genContraction
 m1 = x->x^2
 v1 = round(rand(), digits=6)
+v1c = fill(v1)
 e1 = genExponent(v1, m1)
+e1_2 = genExponent(v1c, m1)
+e1_3 = genExponent(v1c)
 @test typeof(e1).parameters[2] == ParamList[:xpn]
 @test e1[] == v1
 @test e1() == m1(v1)
 
 c1 = genContraction(v1, m1)
+c1_2 = genContraction(v1c, m1)
+c1_3 = genContraction(v1c)
 @test typeof(c1).parameters[2] == ParamList[:con]
 @test c1[] == v1
 @test e1() == m1(v1)
+@test e1_2.data === c1_2.data === e1_3.data === c1_3.data
 
 e2 = genExponent(e1)
 e3 = genExponent(c1)
@@ -95,7 +101,9 @@ v3_2 = genSpatialPoint((1.0, 2.0, 3.0))
 @test hasIdentical(v1[1], v2[1], v1_2[1], v2_2[1])
 @test !hasIdentical(v1[2:3], v2[2:3])
 @test coordOf(v1) == [k[], 2.0, 3.0]
-@test genSpatialPoint(1.0, 1) == v1[1]
+@test genSpatialPoint(1.0, 1) == v1[1] == genSpatialPoint(k, 1)
+@test genSpatialPoint(-1.0, 1, abs, dataName=:x1) == 
+      genSpatialPoint(fill(-1.0), 1, abs, dataName=:x1)
 @test hasIdentical(genSpatialPoint(k, 1), v1[1])
 v4 = genSpatialPoint([2.0, k, 3.0])
 @test hasIdentical(genSpatialPoint(v4[2], 1), v1[1])
@@ -109,7 +117,7 @@ bf1 = genBasisFunc(cen, [gf1])
 bf1_1 = genBasisFunc(cen, [gf1])
 bf1_2 = genBasisFunc(bf1)
 bf1_3 = genBasisFunc(cenPar, gf1)
-bf1_4 = genBasisFunc(cenPar, gf1)
+bf1_4 = genBasisFunc(SpatialPoint(cenPar), (gf1,), [Quiqbox.LTuple(0,0,0)])
 bf2 = genBasisFunc(cen, [gf2])
 @test bf1 !== bf2
 @test hasEqual(bf1, bf1_1, bf1_2, bf1_3, bf1_4, bf2)
@@ -395,6 +403,7 @@ bf_add2_2 = BasisFuncMix(bf_add2)
 @test hasEqual(add(bf_add1_2, bf_add2_2), add(bf_add1, bf_add2))
 @test hasEqual(add(bfm_add1, bf_add1), add(bf_add1, bfm_add1), 
                BasisFuncMix([bfm_add1.BasisFunc..., bf_add1]))
+@test hasEqual(add(bfm, bfm1), add(bfm1, bfm), add(bf1, bfm))
 
 for bs in (bs2, bs2_2, bs2_3)
     X = overlaps(bs)^(-0.5)
@@ -541,6 +550,7 @@ bf_os3 = genBasisFunc(fill(0.0, 3), (2.0, 1.0), (2,0,0))
 @test hasEqual(shift(bf_os2, didjdk), bf_os2S)
 @test shift(bf_os2, didjdk, -) == EmptyBasisFunc{Float64, 3}()
 @test hasIdentical(shift(bf_os2, (0,0,0), -), bf_os2)
+@test hasIdentical(shift(bf1, (0,0,0), -), bf1)
 @test hasEqual(shift(bf_os3, ijk, -), bf_os1)
 @test shift(bfe2, rand(0:2, 3)|>Tuple) == bfe2
 

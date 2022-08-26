@@ -32,6 +32,8 @@ lt3 = lt1 + lt2
 @test lt0 < lt1 < lt2
 @test lt2 .+ 1 == ( lt2 + LTuple(1,1,1) ).tuple == t2 .+ 1
 @test lt2 .- 1 == t2 .- 1
+@test eltype(lt3) == Int
+@test sum(abs2, lt3) == sum(abs2, t1.+t2)
 
 @test orbitalLin("P") == ((1,0,0), (0,1,0), (0,0,1))
 

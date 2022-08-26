@@ -393,15 +393,10 @@ struct HFtempVars{T, HFT} <: HartreeFockintermediateData{T}
     shared::HFinterrelatedVars{T}
 end
 
-HFtempVars(::Val{HFT}, N::Int, 
+HFtempVars(::Val{HFT}, Nˢ::Int, 
            C::AbstractMatrix{T}, D::AbstractMatrix{T}, F::AbstractMatrix{T}, E::T) where 
           {HFT, T} = 
-HFtempVars{T, HFT}(N, [C], [D], [F], [E], HFinterrelatedVars{T}())
-
-HFtempVars(::Val{HFT}, N::Int, 
-           C::AbstractMatrix{T}, D::AbstractMatrix{T}, F::AbstractMatrix{T}, E::T, 
-           Dtot::AbstractMatrix{T}, Etot::T) where {HFT, T} = 
-HFtempVars{T, HFT}(N, [C], [D], [F], [E], HFinterrelatedVars([Dtot], [Etot]))
+HFtempVars{T, HFT}(Nˢ, [C], [D], [F], [E], HFinterrelatedVars{T}())
 
 HFtempVars(::Val{HFT}, Nˢ::Int, 
            Cs::AbstractVector{<:AbstractMatrix{T}}, 
@@ -506,7 +501,7 @@ The container of Hartree-Fock method configuration.
 $(string(HFtypes)[2:end-1]).
 
 `C0::InitialC{T1, HFT, F}`: Initial guess of the coefficient matrix(s) C of the canonical 
-orbitals. When `C0` is a `Val{T}`, the available values of `T` are 
+orbitals. When `C0` is a `Val{T}`, the available values of `T1` are 
 `$((guessCmethods|>typeof|>fieldnames|>string)[2:end-1])`.
 
 `SCF::SCFconfig{T2, L}`: SCF iteration configuration. For more information please refer to 
@@ -519,9 +514,9 @@ when its performance becomes unstable or poor.
 
 ≡≡≡ Initialization Method(s) ≡≡≡
 
-    HFconfig(;HF::Symbol=:$(defaultHFconfigPars[1]), 
-              C0::Union{Tuple{AbstractMatrix}, 
-                        NTuple{2, AbstractMatrix}, Symbol}=:$(defaultHFconfigPars[2]), 
+    HFconfig(;HF::Union{Symbol, Val}=:$(defaultHFconfigPars[1]), 
+              C0::Union{Tuple{AbstractMatrix}, NTuple{2, AbstractMatrix}, 
+                        Symbol, Val}=:$(defaultHFconfigPars[2]), 
               SCF::SCFconfig=$(defaultHFconfigPars[3]), 
               maxStep::Int=$(defaultHFconfigPars[4]), 
               earlyStop::Bool=$(defaultHFconfigPars[5])) -> 

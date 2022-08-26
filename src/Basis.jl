@@ -1498,12 +1498,11 @@ shift(bf::FGTBasisFuncs1O{<:Any, D, 𝑙, GN}, dl::NTuple{D, Int}, op::F=+) wher
      {D, 𝑙, GN, F<:Function} = 
 shiftCore(op, bf, LTuple(dl))
 
-shiftCore(::typeof(+), bf::FGTBasisFuncs1O{<:Any, D, 𝑙1, GN}, dl::LTuple{D, 𝑙2}) where 
-         {D, 𝑙1, 𝑙2, GN} = 
+shiftCore(::typeof(+), bf::FGTBasisFuncs1O{<:Any, D, 𝑙1}, dl::LTuple{D, 𝑙2}) where 
+         {D, 𝑙1, 𝑙2} = 
 BasisFunc(bf.center, bf.gauss, bf.l[1]+dl, bf.normalizeGTO)
 
-shiftCore(::typeof(-), bf::FGTBasisFuncs1O{<:Any, D, 0, GN}, ::LTuple{D, 0}) where 
-         {D, GN} = 
+shiftCore(::typeof(-), bf::FGTBasisFuncs1O{<:Any, D, 0}, ::LTuple{D, 0}) where {D} = 
 BasisFunc(bf.center, bf.gauss, bf.l[1], bf.normalizeGTO)
 
 shiftCore(::typeof(-), bf::FGTBasisFuncs1O{T, D, 0}, dl::LTuple{D}) where {T, D} = 

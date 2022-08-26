@@ -1,10 +1,23 @@
 using Test
 using Quiqbox
+using Quiqbox: splitSpins, groupSpins
 using Suppressor: @suppress_out, @capture_out
 
 include("../../test/test-functions/Shared.jl")
 
 @testset "HartreeFock.jl" begin
+
+# function splitSpins & groupSpins
+@test splitSpins(Val(:RHF), 5) == (2,)
+@test splitSpins(Val(:RHF), (2,)) == (2,)
+@test splitSpins(Val(:RHF), (1,3)) == (2,)
+@test splitSpins(Val(:UHF), 5) == (2,3)
+@test splitSpins(Val(:UHF), (2,)) == (2,2)
+@test splitSpins(Val(:UHF), (3,2)) == (3,2)
+
+@test groupSpins(Val(:RHF), (2,)) == (2,2)
+@test groupSpins(Val(:UHF), (2,3)) == (2,3)
+
 
 errorThreshold = 5e-8
 
@@ -12,6 +25,7 @@ nucCoords = [[-0.7,0.0,0.0], [0.7,0.0,0.0], [0.0, 0.0, 0.0]]
 nuc = ["H", "H", "O"]
 bs = genBasisFunc.(nucCoords, "STO-3G", ["H", "H", "O"]) |> flatten
 S = overlaps(bs)
+X = S^(-0.5)
 Hcore = coreH(bs, nuc, nucCoords)
 HeeI = eeInteractions(bs)
 Ne = getCharge(nuc)
@@ -20,29 +34,35 @@ thresholds = (1e-4, 1e-8, 1e-10, 1e-15)
 solvers = Dict(1=>[:solver=>:LCM], 2=>[:solver=>:LCM], 
                3=>[:solver=>:LCM], 4=>[:solver=>:LCM])
 
-local res1, res1_2, res1_3, res1_4, res2, res2_2
+local res1, res1_2, res1_3, res1_4, res1_5, res2, res2_2, res2_3
 SCFc1 = SCFconfig(scfMethods, thresholds)
 SCFc2 = SCFconfig(scfMethods, thresholds, solvers)
-HFc1 = HFconfig((C0=:Hcore, SCF=SCFc1))
+HFc1 = HFconfig((C0=Val(:Hcore), SCF=SCFc1))
 HFc2 = HFconfig((SCF=SCFc1,))
 HFc3 = HFconfig(HF=:UHF, C0=:GWH, SCF=SCFc2)
-HFc4 = HFconfig((HF=:UHF, SCF=SCFc2))
+HFc3_2 = HFconfig(HF=:UHF, C0=Quiqbox.getCfromGWH(Val(:UHF), S, Hcore, X), SCF=SCFc2)
+HFc4 = HFconfig((HF=Val(:UHF), SCF=SCFc2))
 HFc5 = HFconfig((C0=:Hcore, SCF=SCFconfig(threshold=1e-15)))
 HFc6 = HFconfig((C0=:Hcore, SCF=SCFconfig()))
+HFc6_2 = HFconfig((C0=Quiqbox.getCfromHcore(Val(:RHF), X, Hcore), SCF=SCFconfig()))
 
 @suppress_out begin
     res1   = runHF(bs, nuc, nucCoords, HFc1)
     res1_2 = runHF(bs, nuc, nucCoords, HFc2)
     res1_3 = runHF(bs, nuc, nucCoords, HFc5)
     res1_4 = runHF(bs, nuc, nucCoords, HFc6)
+    res1_5 = runHF(bs, nuc, nucCoords, HFc6_2)
     res2   = runHF(bs, nuc, nucCoords, HFc3)
     res2_2 = runHF(bs, nuc, nucCoords, HFc4)
+    res2_3 = runHF(bs, nuc, nucCoords, HFc3_2)
 end
 
 @test isapprox(res2.Ehf, res2_2.Ehf, atol=100errorThreshold)
 @test isapprox(res1.Ehf, res1_2.Ehf, atol=errorThreshold)
 @test isapprox(res1.Ehf, res1_3.Ehf, atol=errorThreshold)
 @test isapprox(res1_3.Ehf, res1_4.Ehf, atol=2e-12)
+@test hasEqual(res1_4, res1_5)
+@test hasEqual(res2, res2_3)
 
 @test begin
     tVars1 = deepcopy(res1.temp[1])
