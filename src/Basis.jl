@@ -949,7 +949,7 @@ end
 sumOfCore(bs::Union{Tuple{Vararg{GTBasisFuncs{T, D, 1}}}, 
                     AbstractArray{<:GTBasisFuncs{T, D, 1}}}; 
           roundAtol::Real=getAtolVal(T)) where {T, D} = 
-sumOfCore(BasisFunc{T, D}[vcat(unpackBasis.(bs)...)...]; roundAtol)
+sumOfCore(BasisFunc{T, D}[vcat(unpackBasis.(bs)...);]; roundAtol)
 
 function sumOf(bs::Union{Tuple{Vararg{GTBasisFuncs{T, D, 1}}}, 
                          AbstractArray{<:GTBasisFuncs{T, D, 1}}}; 
