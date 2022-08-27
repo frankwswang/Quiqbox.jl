@@ -1741,7 +1741,7 @@ function genBFuncsFromText(content::String;
             end
             subshellInfo = oInfo[1] |> string
             if length(oInfo) > 4
-                subshellInfo = SubshellOrientationList[d][subshellInfo][oInfo[5:end]]
+                subshellInfo = SubshellOrientationList[d][subshellInfo][oInfo[5:end].|>Int]
             end
             push!(bfs, genBasisFunc((unlinkCenter ? deepcopy(center) : center), 
                                     gs1, subshellInfo; normalizeGTO))
