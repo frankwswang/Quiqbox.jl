@@ -257,7 +257,7 @@ lastindex(::BFuncsON{ON}) where {ON} = ON
 eachindex(bfs::BFuncsON) = Base.OneTo(lastindex(bfs))
 
 getindex(xyz::LTuple) = xyz.tuple
-getindex(xyz::LTuple, args...) = getindex(xyz.tuple, args...)
+getindex(xyz::LTuple, args) = getindex(xyz.tuple, args)
 firstindex(xyz::LTuple) = firstindex(xyz.tuple)
 lastindex(xyz::LTuple) = lastindex(xyz.tuple)
 eachindex(xyz::LTuple) = eachindex(xyz.tuple)

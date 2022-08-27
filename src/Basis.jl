@@ -575,7 +575,7 @@ genBasisFunc(cen, (GaussFunc(xpnANDcon[1], xpnANDcon[2]),), lOrSubshell; normali
 
 genBasisFunc(cen::SpatialPoint{T, D}, gs::Tuple, subshell::String, 
              lFilter::Tuple{Vararg{Bool}}; normalizeGTO::Bool=false) where {T, D} = 
-genBasisFunc(cen, gs, SubshellOrientationList[D][subshell][1:end .∈ [findall(lFilter)]]; 
+genBasisFunc(cen, gs, SubshellOrientationList[D][subshell][1:end .∈ Ref(findall(lFilter))]; 
              normalizeGTO)
 
 function genBasisFunc(center::SpatialPoint{T, D}, BSkey::String, atm::String="H"; 
@@ -1181,7 +1181,7 @@ function mergeBasisFuncsIn(bs::Union{AbstractVector{<:GTBasisFuncs{T, D}},
     if isempty(ids)
         collect(bs)
     else
-        vcat(mergeBasisFuncs(bs[ids]...; roundAtol), collect(bs[1:end .∉ [ids]]))
+        vcat(mergeBasisFuncs(bs[ids]...; roundAtol), collect(bs[1:end .∉ Ref(ids)]))
     end
 end
 
@@ -1809,7 +1809,7 @@ function getParams(cs::AbstractArray, symbol::Union{Symbol, Missing}=missing;
                    forDifferentiation::Bool=false)
     pbIdx = findall(x->x isa ParamBox, cs)
     vcat(getParams(convert(Vector{ParamBox}, cs[pbIdx]), symbol; forDifferentiation), 
-         getParams(convert(Vector{ParameterizedContainer}, cs[1:end .∉ [pbIdx]]), symbol; 
+         getParams(convert(Vector{ParameterizedContainer}, cs[1:end.∉Ref(pbIdx)]), symbol; 
                    forDifferentiation))
 end
 
