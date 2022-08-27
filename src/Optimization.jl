@@ -62,12 +62,12 @@ detection.
 
 ≡≡≡ Initialization Method(s) ≡≡≡
 
-    POconfig(;method=$(defaultPOconfigPars[1]), 
-              config=$(defaultHFCStr), 
-              target=$(defaultPOconfigPars[3]), 
-              threshold=$(defaultPOconfigPars[4]), 
-              maxStep=$(defaultPOconfigPars[5]), 
-              GD=$(defaultPOconfigPars[6])) -> 
+    POconfig(;method::Val=$(defaultPOconfigPars[1]), 
+              config::ConfigBox=$(defaultHFCStr), 
+              target::T=$(defaultPOconfigPars[3]), 
+              threshold::T=$(defaultPOconfigPars[4]), 
+              maxStep::Int=$(defaultPOconfigPars[5]), 
+              GD::Function=$(defaultPOconfigPars[6])) where {T} -> 
     POconfig
 
 ≡≡≡ Example(s) ≡≡≡

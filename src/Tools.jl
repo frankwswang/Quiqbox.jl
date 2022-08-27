@@ -512,7 +512,7 @@ end
 function markUnique(arr::AbstractArray{T}, args...; 
                     compareFunction::F=hasEqual, kws...) where {T<:Any, F<:Function}
     isempty(arr) && (return arr, T[])
-    f = (b...)->compareFunction((b..., args...)...; kws...)
+    f = (a, b) -> compareFunction(a, b, args...; kws...)
     res = Int[1]
     cmprList = T[arr[1]]
     for i = 2:length(arr)
@@ -562,7 +562,7 @@ julia> arr
 function getUnique!(arr::AbstractVector{T}, args...; 
                     compareFunction::F = hasEqual, kws...) where {T<:Any, F<:Function}
     isempty(arr) && (return arr)
-    f = (b...)->compareFunction((b..., args...)...; kws...)
+    f = (a, b) -> compareFunction(a, b, args...; kws...)
     cmprList = T[arr[1]]
     delList = Bool[false]
     for i = 2:length(arr)
@@ -763,7 +763,7 @@ function genIndexCore(index)
     res
 end
 
-function genNamedTupleC(name::Symbol, defaultVars::AbstractArray)
+function genNamedTupleC(name::Symbol, defaultVars::AbstractVector)
     @inline function (t::T) where {T<:NamedTuple}
         container = getproperty(Quiqbox, name)
         res = deepcopy(defaultVars)

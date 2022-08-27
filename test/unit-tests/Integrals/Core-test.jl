@@ -8,7 +8,7 @@ include("../../../test/test-functions/Shared.jl")
 @testset "Core.jl tests" begin
 
 tolerance1 = 5e-17
-tolerance2 = 2Quiqbox.getAtolVal(Float64)
+tolerance2 = 5Quiqbox.getAtolVal(Float64)
 perturbStep = rand(-1e-1:2e-3:1e-1)
 fNumInt = (γ, u) -> quadgk(t -> t^(2γ)*exp(-u*t^2), 0, 1; order=25, rtol=tolerance1)[1]
 rng = -20:(0.2+perturbStep):9

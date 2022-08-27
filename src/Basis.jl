@@ -575,14 +575,15 @@ genBasisFunc(cen, (GaussFunc(xpnANDcon[1], xpnANDcon[2]),), lOrSubshell; normali
 
 genBasisFunc(cen::SpatialPoint{T, D}, gs::Tuple, subshell::String, 
              lFilter::Tuple{Vararg{Bool}}; normalizeGTO::Bool=false) where {T, D} = 
-genBasisFunc(cen, gs, SubshellOrientationList[D][subshell][1:end .∈ [findall(lFilter)]]; 
+genBasisFunc(cen, gs, SubshellOrientationList[D][subshell][1:end .∈ Ref(findall(lFilter))]; 
              normalizeGTO)
 
 function genBasisFunc(center::SpatialPoint{T, D}, BSkey::String, atm::String="H"; 
                       unlinkCenter::Bool=false) where {T, D}
     BSstr = BasisSetList[BSkey][AtomicNumberList[atm]]
     @assert BSstr!==nothing "Quiqbox DOES NOT have basis set "*BSkey*" for "*atm*"."
-    genBFuncsFromText(BSstr; adjustContent=true, excludeLastNlines=1, center, unlinkCenter)
+    genBFuncsFromText(BSstr; adjustContent=true, excludeLastNlines=1, center, unlinkCenter, 
+                      normalizeGTO=true)
 end
 
 # A few methods for convenient arguments omissions and mutations.
@@ -948,7 +949,7 @@ end
 sumOfCore(bs::Union{Tuple{Vararg{GTBasisFuncs{T, D, 1}}}, 
                     AbstractArray{<:GTBasisFuncs{T, D, 1}}}; 
           roundAtol::Real=getAtolVal(T)) where {T, D} = 
-sumOfCore(BasisFunc{T, D}[vcat(unpackBasis.(bs)...)...]; roundAtol)
+sumOfCore(BasisFunc{T, D}[vcat(unpackBasis.(bs)...);]; roundAtol)
 
 function sumOf(bs::Union{Tuple{Vararg{GTBasisFuncs{T, D, 1}}}, 
                          AbstractArray{<:GTBasisFuncs{T, D, 1}}}; 
@@ -1180,7 +1181,7 @@ function mergeBasisFuncsIn(bs::Union{AbstractVector{<:GTBasisFuncs{T, D}},
     if isempty(ids)
         collect(bs)
     else
-        vcat(mergeBasisFuncs(bs[ids]...; roundAtol), collect(bs[1:end .∉ [ids]]))
+        vcat(mergeBasisFuncs(bs[ids]...; roundAtol), collect(bs[1:end .∉ Ref(ids)]))
     end
 end
 
@@ -1498,12 +1499,11 @@ shift(bf::FGTBasisFuncs1O{<:Any, D, 𝑙, GN}, dl::NTuple{D, Int}, op::F=+) wher
      {D, 𝑙, GN, F<:Function} = 
 shiftCore(op, bf, LTuple(dl))
 
-shiftCore(::typeof(+), bf::FGTBasisFuncs1O{<:Any, D, 𝑙1, GN}, dl::LTuple{D, 𝑙2}) where 
-         {D, 𝑙1, 𝑙2, GN} = 
+shiftCore(::typeof(+), bf::FGTBasisFuncs1O{<:Any, D, 𝑙1}, dl::LTuple{D, 𝑙2}) where 
+         {D, 𝑙1, 𝑙2} = 
 BasisFunc(bf.center, bf.gauss, bf.l[1]+dl, bf.normalizeGTO)
 
-shiftCore(::typeof(-), bf::FGTBasisFuncs1O{<:Any, D, 0, GN}, ::LTuple{D, 0}) where 
-         {D, GN} = 
+shiftCore(::typeof(-), bf::FGTBasisFuncs1O{<:Any, D, 0}, ::LTuple{D, 0}) where {D} = 
 BasisFunc(bf.center, bf.gauss, bf.l[1], bf.normalizeGTO)
 
 shiftCore(::typeof(-), bf::FGTBasisFuncs1O{T, D, 0}, dl::LTuple{D}) where {T, D} = 
@@ -1607,7 +1607,8 @@ function genBasisFuncText(bf::FloatingGTBasisFuncs{T, D}; norm::Real=1.0,
     cen = centerCoordOf(bf)
     firstLine = printCenter ? "X "*(alignNum.(cen; roundDigits) |> join)*"\n" : ""
     firstLine * "$(bf|>subshellOf)    $(getTypeParams(bf)[4])   $(T(norm))" * 
-    ( isaFullShellBasisFuncs(bf) ? "" : " " * 
+    "   $(bf.normalizeGTO)" * 
+    ( isaFullShellBasisFuncs(bf) ? "" : "  " * 
       join( [" $i" for i in get.(Ref(AngMomIndexList[D]), bf.l, "")] |> join ) ) * "\n" * 
     (GFs|>join)
 end
@@ -1661,7 +1662,8 @@ end
                       center::Union{AbstractArray, 
                                     NTuple{N, ParamBox}, 
                                     Missing}=missing, 
-                      unlinkCenter::Bool=false) where {N, F<:Function} -> 
+                      unlinkCenter::Bool=false, 
+                      normalizeGTO::Union{Bool, Missing}=missing) where {N, F<:Function} -> 
     Array{<:FloatingGTBasisFuncs, 1}
 
 Generate a basis set from `content` which is either a basis set `String` in Gaussian format 
@@ -1682,6 +1684,12 @@ the `FloatingGTBasisFuncs`. E.g.:
 \"\"\"
 $( genBasisFuncText(genBasisFunc([1.0, 0.0, 0.0], (2.0, 1.0))) )\"\"\"
 ```
+Finally, `normalizeGTO` specifies the field `.normalizeGTO` of the generated 
+`FloatingGTBasisFuncs`. If it's set to `missing` (in default), the normalization 
+configuration of each `FloatingGTBasisFuncs` will depend on `content`, so different basis 
+functions may have different normalization configurations. However, when it's set to a 
+`Bool` value, `.normalizeGTO` of all the generated basis functions will be set to that 
+value.
 """
 function genBFuncsFromText(content::String; 
                            adjustContent::Bool=false, 
@@ -1692,7 +1700,9 @@ function genBFuncsFromText(content::String;
                                          NTuple{D, ParamBox{T}}, 
                                          SpatialPoint{T, D}, 
                                          Missing}=(NaN, NaN, NaN), 
-                           unlinkCenter::Bool=false) where {D, T<:AbstractFloat}
+                           unlinkCenter::Bool=false, 
+                           normalizeGTO::Union{Bool, Missing}=missing) where 
+                          {D, T<:AbstractFloat}
     cenIsMissing = ( (all(center.|>isNaN) && (center=missing; true)) || center isa Missing )
     typ = ifelse(cenIsMissing, Float64, T)
     adjustContent && (content = adjustFunction(content))
@@ -1716,6 +1726,7 @@ function genBFuncsFromText(content::String;
             d = length(cenStr)
         end
         normFactor = oInfo[3]
+        (normalizeGTO isa Missing) && (normalizeGTO = parse(Bool, oInfo[4]))
         if oInfo[1] == "SP"
             gs2 = GaussFunc{typ}[]
             for j = i+1 : i+ng
@@ -1723,17 +1734,17 @@ function genBFuncsFromText(content::String;
                 push!(gs2, GaussFunc(data[j][1], normFactor*data[j][3]))
             end
             append!(bfs, genBasisFunc.(Ref(unlinkCenter ? deepcopy(center) : center), 
-                                       [gs1, gs2], ["S", "P"], normalizeGTO=true))
+                                       [gs1, gs2], ["S", "P"]; normalizeGTO))
         else
             for j = i+1 : i+ng
                 push!(gs1, GaussFunc(data[j]...))
             end
             subshellInfo = oInfo[1] |> string
-            if length(oInfo) > 3
-                subshellInfo = SubshellOrientationList[d][subshellInfo][oInfo[2:end]]
+            if length(oInfo) > 4
+                subshellInfo = SubshellOrientationList[d][subshellInfo][oInfo[5:end].|>Int]
             end
             push!(bfs, genBasisFunc((unlinkCenter ? deepcopy(center) : center), 
-                                    gs1, subshellInfo, normalizeGTO=true))
+                                    gs1, subshellInfo; normalizeGTO))
         end
         center = centerOld
     end
@@ -1798,7 +1809,7 @@ function getParams(cs::AbstractArray, symbol::Union{Symbol, Missing}=missing;
                    forDifferentiation::Bool=false)
     pbIdx = findall(x->x isa ParamBox, cs)
     vcat(getParams(convert(Vector{ParamBox}, cs[pbIdx]), symbol; forDifferentiation), 
-         getParams(convert(Vector{ParameterizedContainer}, cs[1:end .∉ [pbIdx]]), symbol; 
+         getParams(convert(Vector{ParameterizedContainer}, cs[1:end.∉Ref(pbIdx)]), symbol; 
                    forDifferentiation))
 end
 
