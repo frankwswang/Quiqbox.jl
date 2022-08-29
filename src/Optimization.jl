@@ -48,13 +48,13 @@ optimization. Available values of `M` from Quiqbox are $(string(OFtypes)[2:end-1
 `config::CBT`: The configuration for the selected `method`. E.g., for `:HF` it's 
 [`HFconfig`](@ref).
 
-`target::T`: The value of target function aimed to achieve. If it's set to `NaN`, the 
-convergence will be solely based on `threshold` between the latest updated function values 
-rather then the latest value and `target`.
+`target::T`: The target value of the objective function. The difference between the 
+last-step value and the target value will be used for convergence detection. If it's set to 
+`NaN`, the gradient of the latest step and the difference between the function values of 
+latest two steps are used instead.
 
-`threshold::T`: The error threshold (i.e. the absolute value of the function loss with 
-respect to `target`) for the convergence; when set to `NaN`, there will be no convergence 
-detection.
+`threshold::T`: The error threshold for the convergence determination; when set to `NaN`, 
+there will be no convergence detection.
 
 `maxStep::Int`: Maximum iteration steps allowed regardless if the iteration converges.
 
@@ -109,15 +109,18 @@ end
 
     optimizeParams!(pbs, bs, nuc, nucCoords, 
                     config=$(defaultPOconfigStr), N=getCharge(nuc); printInfo=true) -> 
-    Tuple{Vector{T}, Matrix{T}, Matrix{T}} where {T}
+    Tuple{Vector{T}, Matrix{T}, Matrix{T}, Union{Bool, Missing}} where {T}
 
     optimizeParams!(pbs, bs, nuc, nucCoords, 
                     N=getCharge(nuc), config=$(defaultPOconfigStr); printInfo=true) -> 
-    Tuple{Vector{T}, Matrix{T}, Matrix{T}} where {T}
+    Tuple{Vector{T}, Matrix{T}, Matrix{T}, Union{Bool, Missing}} where {T}
 
 The main function to optimize the parameters of a given basis set. It returns a `Tuple` of 
-the energies, the parameter values and the gradients of all the steps. For latter two, each 
-column is the result of each step.
+relevant information. The first three elements are the energies, the parameter values, and 
+the gradients from all the iteration steps respectively (For latter two, each column 
+corresponds to each step). The last element is the indicator of whether the optimization is 
+converged if the convergence detection is on (i.e., `isnan(config.threshold)!=true`), or 
+else it's set to `missing`.
 
 === Positional argument(s) ===
 
@@ -168,12 +171,8 @@ function optimizeParams!(pbs::AbstractVector{<:ParamBox{T}},
         maxStep = config.maxStep
         gap = min(100, max(maxStep ÷ 200 * 10, 1))
         detectConverge = ifelse(isnan(threshold), false, true)
-
-        if isnan(target)
-            isConverged = Es -> isOscillateConverged(Es, threshold, minimalCycles=3)[1]
-        else
-            isConverged = Es -> (abs(Es[end] - target) < threshold)
-        end
+        isConverged = genDetectConvFunc(target, threshold)
+        blConv = ifelse(detectConverge, true, missing)
 
         pvsL = getindex.(pbs)
 
@@ -196,7 +195,7 @@ function optimizeParams!(pbs::AbstractVector{<:ParamBox{T}},
                 println("Step duration: ", t, " seconds.\n")
             end
 
-            !(detectConverge && isConverged(Es)) && i < maxStep || break
+            !( detectConverge && (blConv = isConverged(Es, grads)) ) && i < maxStep || break
 
             setindex!.(pbs, config.GD(pvsL, grad))
 
@@ -214,12 +213,23 @@ function optimizeParams!(pbs::AbstractVector{<:ParamBox{T}},
         println(IOContext(stdout, :limit => true), grads[:, end])
         println("Optimization duration: ", tAll/60, " minutes.")
         if detectConverge
-            println("The result has" * ifelse(isConverged(Es), "", " not") *" converged.")
+            println("The result has" * ifelse(blConv, "", " not") *" converged.")
         end
     end
 
-    Es, pvs, grads
+    Es, pvs, grads, blConv
 end
 
 optimizeParams!(pbs, bs, nuc, nucCoords, N::Int, config=defaultPOconfig; printInfo=true) = 
 optimizeParams!(pbs, bs, nuc, nucCoords, config, N; printInfo)
+
+function genDetectConvFunc(target, threshold)
+    if isnan(target)
+        function (Es, gs)
+            bl = isOscillateConverged(Es, threshold, minimalCycles=4)[1]
+            ifelse(!bl || any(g > threshold for g in gs[end]), false, true)
+        end
+    else
+        (Es, _) = Es -> (abs(Es[end] - target) < threshold)
+    end
+end
