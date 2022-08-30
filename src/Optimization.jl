@@ -32,11 +32,13 @@ function gradDescent!(vars::AbstractVector{T}, grad::AbstractVector{T}, η::T=T(
 end
 
 
-const defaultPOconfigPars = Any[Val(:HF), defaultHFforHFgrad, NaN, 5e-7, 500, gradDescent!]
+const defaultPOconfigPars = 
+      [Val(:HF), defaultHFforHFgrad, NaN, (5e-7, 5e-6), 500, gradDescent!]
 
 """
 
-    POconfig{T, M, CBT<:ConfigBox, F<:Function} <: ConfigBox{T, POconfig, M}
+    POconfig{T, M, CBT<:ConfigBox, TH<:Union{T, NTuple{2, T}}, 
+             F<:Function} <: ConfigBox{T, POconfig, M}
 
 The mutable container of parameter optimization configurations.
 
@@ -53,7 +55,13 @@ last-step value and the target value will be used for convergence detection. If 
 `NaN`, the gradient of the latest step and the difference between the function values of 
 latest two steps are used instead.
 
-`threshold::T`: The error threshold for the convergence determination; when set to `NaN`, 
+`threshold::TH`: The error threshold/thresholds for the function value difference and 
+the gradient both/respectively to determine whether the optimization iteration has 
+converged. When it's (or either of them) set to `NaN`, there will be no corresponding 
+convergence detection, and when `target` is not `NaN`, the threshold for the gradient won't 
+be used because the gradient won't be part of the convergence criteria.
+
+`gradThreshold::T`: The error threshold for the convergence determination; when set to `NaN`, 
 there will be no convergence detection.
 
 `maxStep::Int`: Maximum iteration steps allowed regardless if the iteration converges.
@@ -78,11 +86,12 @@ julia> POconfig();
 julia> POconfig(maxStep=100);
 ```
 """
-mutable struct POconfig{T, M, CBT<:ConfigBox, F<:Function} <: ConfigBox{T, POconfig, M}
+mutable struct POconfig{T, M, CBT<:ConfigBox, TH<:Union{T, NTuple{2, T}}, 
+                        F<:Function} <: ConfigBox{T, POconfig, M}
     method::Val{M}
     config::CBT
     target::T
-    threshold::T
+    threshold::TH
     maxStep::Int
     GD::F
 end
@@ -119,7 +128,7 @@ The main function to optimize the parameters of a given basis set. It returns a 
 relevant information. The first three elements are the energies, the parameter values, and 
 the gradients from all the iteration steps respectively (For latter two, each column 
 corresponds to each step). The last element is the indicator of whether the optimization is 
-converged if the convergence detection is on (i.e., `isnan(config.threshold)!=true`), or 
+converged if the convergence detection is on (i.e., `config.threshold` is not `NaN`), or 
 else it's set to `missing`.
 
 === Positional argument(s) ===
@@ -155,7 +164,7 @@ function optimizeParams!(pbs::AbstractVector{<:ParamBox{T}},
                                    AbstractVector{<:AbstractGTBasisFuncs{T, D}}}, 
                          nuc::Union{NTuple{NN, String}, AbstractVector{String}}, 
                          nucCoords::SpatialCoordType{T, D, NN}, 
-                         config::POconfig{<:Any, M, CBT, F}=defaultPOconfig, 
+                         config::POconfig{<:Any, M, CBT, <:Any, F}=defaultPOconfig, 
                          N::Union{Int, Tuple{Int}, NTuple{2, Int}}=getCharge(nuc); 
                          printInfo::Bool=true) where {T, D, NN, M, CBT, F}
     tAll = @elapsed begin
@@ -170,8 +179,17 @@ function optimizeParams!(pbs::AbstractVector{<:ParamBox{T}},
         target = config.target
         maxStep = config.maxStep
         gap = min(100, max(maxStep ÷ 200 * 10, 1))
-        detectConverge = ifelse(isnan(threshold), false, true)
-        isConverged = genDetectConvFunc(target, threshold)
+
+        detectConverge, arg = if isNaN(target)
+            ifelse(isNaN(threshold), false, true), (Val(1), threshold)
+        else
+            ifelse(isNaN(threshold[begin]), false, true), (Val(2), target, threshold)
+        end
+        isConverged = if detectConverge
+            genDetectConvFunc(arg...)
+        else
+            (_, _) -> false
+        end
         blConv = ifelse(detectConverge, true, missing)
 
         pvsL = getindex.(pbs)
@@ -195,7 +213,7 @@ function optimizeParams!(pbs::AbstractVector{<:ParamBox{T}},
                 println("Step duration: ", t, " seconds.\n")
             end
 
-            !( detectConverge && (blConv = isConverged(Es, grads)) ) && i < maxStep || break
+            !( blConv = isConverged(Es, grads) ) && i < maxStep || break
 
             setindex!.(pbs, config.GD(pvsL, grad))
 
@@ -223,14 +241,14 @@ end
 optimizeParams!(pbs, bs, nuc, nucCoords, N::Int, config=defaultPOconfig; printInfo=true) = 
 optimizeParams!(pbs, bs, nuc, nucCoords, config, N; printInfo)
 
-function genDetectConvFunc(target, threshold)
-    if isnan(target)
-        function (Es, gs)
-            bl = any(abs(g) > threshold for g in view(gs, :, size(gs)[end]))
-            ifelse(bl || !(isOscillateConverged(Es, threshold, minimalCycles=4)[1]), 
-                   false, true)
-        end
-    else
-        (Es, _) = Es -> (abs(Es[end] - target) <= threshold)
+function genDetectConvFunc(::Val{1}, threshold)
+    function (Es, gs)
+        bl = any(abs(g) > threshold[end] for g in view(gs, :, size(gs)[end]))
+        ifelse(bl || !(isOscillateConverged(Es, threshold[begin], minimalCycles=4)[1]), 
+                false, true)
     end
+end
+
+function genDetectConvFunc(::Val{2}, target, threshold)
+    (Es, _) = Es -> (abs(Es[end] - target) <= threshold[begin])
 end
