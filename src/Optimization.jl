@@ -14,7 +14,7 @@ const defaultHFforHFgrad = HFconfig(SCF=SCFconfig(threshold=defaultHFthresholdFo
 """
 
     gradDescent!(vars::AbstractVector{T}, grad::AbstractVector{T}, η::T=T(0.001), 
-                 threshold::T=2sqrt(length(grad))/(25norm(η))) where {T} -> 
+                 threshold::T=0.05length(grad)/norm(η)) where {T} -> 
     vars::AbstractVector{T}
 
 Default gradient descent (GD) method used in [`optimizeParams!`](@ref). `vars` are the 
@@ -25,7 +25,7 @@ will be renormalized if it's larger then `threshold` to prevent gradient explodi
 more advanced GD function through customizing [`POconfig`](@ref).
 """
 function gradDescent!(vars::AbstractVector{T}, grad::AbstractVector{T}, η::T=T(0.001), 
-                      threshold::T=2sqrt(length(grad))/(25norm(η))) where {T}
+                      threshold::T=0.05length(grad)/norm(η)) where {T}
     gNorm = norm(grad)
     gradNew = ifelse(gNorm > threshold, (threshold / gNorm * grad), grad)
     vars .-= η*gradNew
