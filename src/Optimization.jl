@@ -226,10 +226,11 @@ optimizeParams!(pbs, bs, nuc, nucCoords, config, N; printInfo)
 function genDetectConvFunc(target, threshold)
     if isnan(target)
         function (Es, gs)
-            bl = isOscillateConverged(Es, threshold, minimalCycles=4)[1]
-            ifelse(!bl || any(g > threshold for g in gs[end]), false, true)
+            bl = any(abs(g) > threshold for g in view(gs, :, size(gs)[end]))
+            ifelse(bl || !(isOscillateConverged(Es, threshold, minimalCycles=4)[1]), 
+                   false, true)
         end
     else
-        (Es, _) = Es -> (abs(Es[end] - target) < threshold)
+        (Es, _) = Es -> (abs(Es[end] - target) <= threshold)
     end
 end
