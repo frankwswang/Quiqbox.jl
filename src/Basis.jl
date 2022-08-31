@@ -1784,10 +1784,10 @@ end
 Return the parameter(s) stored in the input container. If `symbol` is set to `missing`, 
 then return all parameter(s); if it's set to the `Symbol` of a parameter (e.g., `:α₁` will 
 match any `pb::`[`ParamBox`](@ref) such that `getVar(pb) == :α₁`; `:α` will match all the 
-`pb`s that are `ParamBox{<:Any, α}`. `forDifferentiation` determines whether searching 
-through the `Symbol`(s) of the independent variable(s) represented by `pbc` during the 
-differentiation process. If the first argument is a collection, its entries must be 
-`ParamBox` containers.
+`pb`s such that `(string∘getVar)(pb)` contains `'α'`. `forDifferentiation` determines 
+whether searching through the `Symbol`(s) of the independent variable(s) represented by 
+`pbc` during the differentiation process. If the first argument is a collection, its 
+entries must be `ParamBox` containers.
 """
 getParams(pb::ParamBox, symbol::Union{Symbol, Missing}=missing; 
           forDifferentiation::Bool=false) = 
