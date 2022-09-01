@@ -1,6 +1,6 @@
 using Test
 using Quiqbox
-using Quiqbox: getVarCore, FLevel, getFLevel, compareParamBox
+using Quiqbox: getVarCore, FLevel, getFLevel, compareParamBox, isNotDiffNorInVar
 
 @testset "Parameters.jl" begin
 
@@ -21,7 +21,9 @@ pb1 = ParamBox(1, :a)
 @test pb1.map == Quiqbox.itself == mapOf(pb1)
 @test pb1.canDiff[] == false == isDiffParam(pb1)
 @test !isDepParam(pb1)
+@test !isNotDiffNorInVar(pb1)
 toggleDiff!(pb1)
+@test !isNotDiffNorInVar(pb1)
 @test !isDepParam(pb1)
 @test pb1.canDiff[] == true
 disableDiff!(pb1)
@@ -43,6 +45,10 @@ toggleDiff!(pb3)
 @test !isDepParam(pb3)
 
 pb4 = ParamBox(1.2, :c, x->x^2, :x)
+toggleDiff!(pb4)
+@test isNotDiffNorInVar(pb4)
+toggleDiff!(pb4)
+@test !isNotDiffNorInVar(pb4)
 @test inSymOfCore(pb4) == :x
 @test outSymOfCore(pb4) == :c
 @test startswith(nameof(pb4.map) |> string, "f_c")
@@ -53,10 +59,12 @@ pair2 = outSymValOf(pb4)
 pb4_2 = ParamBox(1.2, :c)
 @test inSymOf(pb4_2) == outSymOf(pb4_2) == :c
 
-
 pb5 = outValCopy(pb4)
 @test pb5() == pb5[] == pb4()
 @test pb5.map == Quiqbox.itself
+
+pb5_2 = fullVarCopy(pb4)
+@test hasIdentical(pb5_2, pb4)
 
 pb6 = ParamBox(1.1, :p1, abs, :x)
 pb7 = changeMapping(pb6, x->x^1.5)
