@@ -330,7 +330,7 @@ collection5 = collect(bfs1); collection5t = [bfs1[1], bfs1[2], bfs1[3]]
 
 
 # function broadcastable
-@test getproperty.(pb1, [:data, :map]) == [pb1.data, pb1.map]
+@test all(getproperty.(pb1, [:data, :map]) .=== [pb1.data, pb1.map])
 @test getproperty.(gf1, [:xpn, :con]) == [gf1.xpn, gf1.con]
 @test hasEqual(bf1 .* [1.0, 3.0], [bf1*1.0, bf1*3.0])
 bfm12 = bf1 + genBasisFunc([1.0, 2.0, 2.0], (2.0, 3.0))

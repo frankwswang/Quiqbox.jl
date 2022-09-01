@@ -29,9 +29,9 @@ Parameter container that can enable differentiation.
 
 ≡≡≡ Field(s) ≡≡≡
 
-`data::Array{T, 0}`: The container of the data (i.e. the value of the input variable) 
-stored in the `ParamBox` that can be accessed by syntax `[]`. The data value stored in an 
-arbitrary `ParamBox{T}` `pb` can be modified using the syntax `pb[] = aNewVal`.
+`data::Array{Array{T, 0}}`: The container of the data (i.e. the input variable) stored in 
+the `ParamBox` that can be accessed by syntax `[]`. The value of the data stored in an 
+arbitrary `ParamBox{T}` `pb` can be modified using the syntax `pb[]`.
 
 `dataName::Symbol`: The name of the input variable.
 
@@ -55,7 +55,7 @@ as a dependent variable or an independent variable.
 === Positional argument(s) ===
 
 `data::Union{Array{T, 0}, T}`: The input value to be stored or the container of it. If the 
-latter is the first argument, then it will directly be assigned to `.data`.
+latter is the first argument, then it will directly be assigned to `.data[]`.
 
 `name::Symbol`: Specify the name of the output variable represented by the constructed 
 `ParamBox`. It's not required when `mapFunction` is not provided because then the output 
@@ -102,7 +102,7 @@ to the corresponding input variable can also be computed to when the `ParamBox` 
 as differentiable.
 """
 struct ParamBox{T, V, FL<:FLevel} <: DifferentiableParameter{T, ParamBox}
-    data::Array{T, 0}
+    data::Array{Array{T, 0}, 0}
     dataName::Symbol
     map::Function
     canDiff::Array{Bool, 0}
@@ -112,11 +112,11 @@ struct ParamBox{T, V, FL<:FLevel} <: DifferentiableParameter{T, ParamBox}
                             dataName=:undef) where {T, V, F<:Function}
         @assert Base.return_types(f, (T,))[1] == T
         dName = ifelse(dataName == :undef, Symbol("x_" * string(V)), dataName)
-        new{T, V, FLevel(F)}(data, dName, f, canDiff, index)
+        new{T, V, FLevel(F)}(fill(data), dName, f, canDiff, index)
     end
 
     ParamBox{T, V}(data::Array{T, 0}, index) where {T, V} = 
-    new{T, V, FI}(data, V, itself, fill(false), index)
+    new{T, V, FI}(fill(data), V, itself, fill(false), index)
 end
 
 function ParamBox(::Val{V}, mapFunction::F, data::Array{T, 0}, index, canDiff, 
@@ -139,10 +139,10 @@ ParamBox(::Val{V}, ::itselfT, data::Array{T, 0}, index, _...) where {V, T} =
 ParamBox{T, V}(data, index)
 
 ParamBox(::Val{V}, pb::ParamBox{T, <:Any, FI}) where {V, T} = 
-ParamBox{T, V}(pb.data, pb.index)
+ParamBox{T, V}(pb.data[], pb.index)
 
 ParamBox(::Val{V}, pb::ParamBox{T}; canDiff::Array{Bool, 0}=pb.canDiff) where {T, V} = 
-ParamBox{T, V}(pb.map, pb.data, pb.index, canDiff, pb.dataName)
+ParamBox{T, V}(pb.map, pb.data[], pb.index, canDiff, pb.dataName)
 
 ParamBox(data::T, dataName::Symbol=:undef; index::Union{Int, Nothing}=nothing) where {T} = 
 ParamBox(Val(dataName), fillObj(data), genIndex(index))
@@ -158,7 +158,7 @@ ParamBox(Val(name), mapFunction, fillObj(data), genIndex(index), fill(canDiff), 
 
 Return the value of the input variable of `pb`. Equivalent to `pb[]`.
 """
-@inline inValOf(pb::ParamBox) = pb.data[]
+@inline inValOf(pb::ParamBox) = pb.data[][]
 
 
 """
@@ -177,7 +177,7 @@ inSymOf(pb::ParamBox) = ( string(inSymOfCore(pb)) * numToSubs(pb.index[]) ) |> S
 Return a `Pair` of the name (with the index if available) and the value of the input 
 variable of `pb`.
 """
-@inline inSymValOf(pb::ParamBox{T}) where {T} = (inSymOf(pb) => pb.data[])
+@inline inSymValOf(pb::ParamBox{T}) where {T} = (inSymOf(pb) => pb.data[][])
 
 
 """
@@ -186,12 +186,12 @@ variable of `pb`.
 
 Return the value of the output variable of `pb`. Equivalent to `pb()`.
 """
-@inline outValOf(pb::ParamBox) = callGenFunc(pb.map, pb.data[])
+@inline outValOf(pb::ParamBox) = callGenFunc(pb.map, pb.data[][])
 
 @inline outValOf(pb::ParamBox{<:Any, <:Any, FI}) = inValOf(pb)
 
 (pb::ParamBox)() = outValOf(pb)
-# (pb::ParamBox)() = Base.invokelatest(pb.map, pb.data[])::Float64
+# (pb::ParamBox)() = Base.invokelatest(pb.map, pb.data[][])::Float64
 
 
 """
@@ -241,7 +241,7 @@ getTypeParams(::ParamBox{T, V, FL}) where {T, V, FL} = (T, V, FL)
 
 Return the 0-D `Array` containing data stored in `pb`.
 """
-@inline dataOf(pb::ParamBox) = pb.data
+@inline dataOf(pb::ParamBox) = pb.data[]
 
 
 """
@@ -333,7 +333,7 @@ julia> pb2[]
 ```
 """
 inVarCopy(pb::ParamBox{T}) where {T} = 
-ParamBox{T, inSymOfCore(pb)}(pb.data, genIndex(nothing))
+ParamBox{T, inSymOfCore(pb)}(pb.data[], genIndex(nothing))
 
 
 const NoDiffMark = superscriptSym['!']
@@ -409,12 +409,12 @@ function changeMapping(pb::ParamBox{T, V, FL}, mapFunction::F, outputName::Symbo
         dnStr = string(dn)
         dn = Symbol(dnStr * "_" * dnStr)
     end
-    ParamBox(Val(outputName), mapFunction, pb.data, 
+    ParamBox(Val(outputName), mapFunction, pb.data[], 
              genIndex( ifelse(canDiff, pb.index[], nothing) ), fill(canDiff), dn)
 end
 
 
-compareParamBoxCore1(pb1::ParamBox, pb2::ParamBox) = (pb1.data === pb2.data)
+compareParamBoxCore1(pb1::ParamBox, pb2::ParamBox) = (pb1.data[] === pb2.data[])
 
 compareParamBoxCore2(pb1::ParamBox, pb2::ParamBox) = 
 compareParamBoxCore1(pb1, pb2) && (typeof(pb1.map) === typeof(pb2.map))
@@ -443,7 +443,7 @@ compareParamBox(pb2, pb1)
 
 function mulParamBoxCore(c::T1, con::ParamBox{T2, <:Any, FI}, 
                          roundAtol::Real=nearestHalfOf(getAtolVal(T))) where {T1, T2}
-    conNew = fill(roundToMultiOfStep(convert(T2, con.data[]*c), roundAtol))
+    conNew = fill(roundToMultiOfStep(convert(T2, con.data[][]*c), roundAtol))
     mapFunction = itself
     dataName = :undef
     conNew, mapFunction, dataName
@@ -451,7 +451,7 @@ end
 
 function mulParamBoxCore(c::T1, con::ParamBox{T2}, 
                          roundAtol::Real=nearestHalfOf(getAtolVal(T))) where {T1, T2}
-    conNew = con.data
+    conNew = con.data[]
     mapFunction = Pf(convert(T2, roundToMultiOfStep(c, roundAtol)), con.map)
     conNew, mapFunction, con.dataName
 end

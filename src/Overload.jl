@@ -19,7 +19,7 @@ diffColorSym(pb::ParamBox) = ifelse(isDiffParam(pb), :green, :light_black)
 import Base: show
 const nSigShown = 10
 function show(io::IO, pb::ParamBox)
-    v = pb.data[]
+    v = pb.data[][]
     print(io, typeof(pb))
     print(io, "(", v isa Integer ? v : round(v, sigdigits=nSigShown), ")")
     print(io, "[")
@@ -171,12 +171,12 @@ import Base: *
 
 ## Iteration Interface
 import Base: iterate, size, length, eltype
-iterate(pb::ParamBox) = (pb.data[], nothing)
+iterate(pb::ParamBox) = (pb.data[][], nothing)
 iterate(::ParamBox, _) = nothing
 size(::ParamBox) = ()
 length(::ParamBox) = 1
 eltype(::ParamBox{T}) where {T} = T
-size(pb::ParamBox, d::Integer) = size(pb.data[], d)
+size(pb::ParamBox, d::Integer) = size(pb.data[][], d)
 
 iterate(sp::SpatialPoint) = iterate(sp.param)
 iterate(sp::SpatialPoint, state) = iterate(sp.param, state)
@@ -221,10 +221,10 @@ end
 
 ## Indexing Interface
 import Base: getindex, setindex!, firstindex, lastindex, eachindex, axes
-getindex(pb::ParamBox) = pb.data[]
+getindex(pb::ParamBox) = pb.data[][]
 getindex(pb::ParamBox, ::Val{:first}) = getindex(pb)
 getindex(pb::ParamBox, ::Val{:last}) = getindex(pb)
-setindex!(pb::ParamBox, d) = begin pb.data[] = d end
+setindex!(pb::ParamBox, d) = begin pb.data[][] = d end
 firstindex(::ParamBox) = Val(:first)
 lastindex(::ParamBox) = Val(:last)
 axes(::ParamBox) = ()
@@ -284,11 +284,11 @@ function hasBoolRelation(boolFunc::F,
     else
         ifelse(V1 == V2, 
             ifelse((ignoreFunction || F1 == F2 == FI), 
-                boolFunc(pb1.data, pb2.data), 
+                boolFunc(pb1.data[], pb2.data[]), 
 
                 ( boolFunc(isDiffParam(pb1), isDiffParam(pb2)) && 
                   boolFunc(pb1.map, pb2.map) && 
-                  boolFunc(pb1.data, pb2.data) )
+                  boolFunc(pb1.data[], pb2.data[]) )
             ), 
 
             false

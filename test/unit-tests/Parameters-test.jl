@@ -29,7 +29,7 @@ disableDiff!(pb1)
 enableDiff!(pb1)
 @test pb1.canDiff[] == true
 pb2 = inVarCopy(pb1)
-@test dataOf(pb1) === dataOf(pb2) === pb1.data
+@test dataOf(pb1) === dataOf(pb2) === pb1.data[]
 pb2_2 = outValCopy(pb1)
 @test dataOf(pb1) == dataOf(pb2_2)
 @test dataOf(pb1) !== dataOf(pb2_2)
@@ -62,7 +62,7 @@ pb6 = ParamBox(1.1, :p1, abs, :x)
 pb7 = changeMapping(pb6, x->x^1.5)
 pb8 = changeMapping(pb6, x->x^1.5, :p2)
 @test pb8() == pb7() == 1.1^1.5
-@test pb8.data === pb7.data === pb6.data
+@test pb8.data[] === pb7.data[] === pb6.data[]
 @test pb8.dataName == pb7.dataName == :x
 @test typeof(pb7).parameters[2] == :p1
 @test typeof(pb8).parameters[2] == :p2

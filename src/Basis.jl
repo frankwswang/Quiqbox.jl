@@ -1917,7 +1917,7 @@ function markParamsCore2!(parArray::AbstractVector{<:ParamBox})
     iVDict = Dict{Symbol, Int}()
     dVidDict = Dict{Symbol, Vector{Int}}()
     for par in parArray
-        id = objectid(par.data)
+        id = objectid(par.data[])
         idx = get(idDict, id, (:nothing, 0))[end]
         if iszero(idx)
             iParSym = inSymOfCore(par)

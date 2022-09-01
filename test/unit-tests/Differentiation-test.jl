@@ -34,7 +34,7 @@ sgfN = genBasisFunc([1.0, 0.0, 0.0], GaussFunc(xpn, genContraction(1/con()*con()
 con2 = genContraction(con)
 enableDiff!(con)
 @test !isDiffParam(con2) == isDiffParam(con)
-@test con2.data === con.data
+@test con2.data[] === con.data[]
 @test hasEqual(∂Basis(con2, sgf1), sgfN)
 toggleDiff!.([con, con2])
 @test ∂Basis(con2, sgf1) == Quiqbox.EmptyBasisFunc{Float64, 3}()
@@ -42,7 +42,7 @@ enableDiff!(con)
 sgfN2 = genBasisFunc([1.0, 0.0, 0.0], GaussFunc(xpn, genContraction(gd(vd))), (1,0,0))
 @test hasEqual(∂Basis(con2, sgf1), ∂Basis(con, sgf1), sgfN2)
 
-con3 = genContraction(xpn.data, fd)
+con3 = genContraction(xpn.data[], fd)
 sgf2 = genBasisFunc([1.0, 0.0, 0.0], GaussFunc(xpn, con3), (1,0,0))
 @test hasEqual(∂Basis(con3, sgf1), ∂Basis(xpn, sgf1), ∂Basis(xα, sgf1))
 @test hasEqual(∂Basis(con3, sgf2), ∂Basis(xpn, sgf2), ∂Basis(xα, sgf2))
