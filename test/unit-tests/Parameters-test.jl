@@ -156,7 +156,8 @@ toggleDiff!(pb1_2)
 @test compareParamBox(pb4, pb4_3)
 toggleDiff!(pb4_3)
 @test !compareParamBox(pb4, pb4_3)
-@test compareParamBox(pb4_3, ParamBox(Val(:C), pb4_3)) && (Quiqbox.getTypeParams(pb4_3)!=:C)
+@test !compareParamBox(pb4_3, ParamBox(Val(:C), pb4_3)) && 
+      (Quiqbox.getTypeParams(pb4_3)!=:C) && !isDiffParam(pb4_3)
 toggleDiff!(pb4_3)
 
 end

@@ -430,8 +430,8 @@ end
 
 compareParamBoxCore1(pb1::ParamBox, pb2::ParamBox) = (pb1.data[] === pb2.data[])
 
-compareParamBoxCore2(pb1::ParamBox, pb2::ParamBox) = 
-compareParamBoxCore1(pb1, pb2) && (typeof(pb1.map) === typeof(pb2.map))
+compareParamBoxCore2(pb1::ParamBox{<:Any, V1}, pb2::ParamBox{<:Any, V2}) where {V1, V2} = 
+V1==V2 && compareParamBoxCore1(pb1, pb2) && (typeof(pb1.map) === typeof(pb2.map))
 
 function compareParamBox(pb1::ParamBox, pb2::ParamBox)
     ifelse(( (bl=isDiffParam(pb1)) == isDiffParam(pb2) ),
