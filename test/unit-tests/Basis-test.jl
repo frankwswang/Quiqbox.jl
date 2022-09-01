@@ -729,30 +729,32 @@ gf_cb2 = copyBasis(gf_cb1)
 @test hasEqual(gf_cb1.con, gf_cb2.con)
 @test gf_cb1.xpn() == gf_cb2.xpn() == gf_cb2.xpn[] != gf_cb1.xpn[]
 gf_cb3 = copyBasis(gf_cb1, false)
-@test !hasEqual(gf_cb1, gf_cb3)
-@test gf_cb1.xpn() != gf_cb3.xpn() == gf_cb3.xpn[] == gf_cb1.xpn[]
+@test hasEqual(gf_cb1, gf_cb3)
+@test gf_cb1.xpn() == gf_cb3.xpn()
+@test gf_cb3.xpn.data[] === gf_cb1.xpn.data[]
 cen_cb1 = rand(3)
 
-bf_cb1 = genBasisFunc(cen_cb1, [gf_cb1, gf_cb3])
+bf_cb1 = genBasisFunc(cen_cb1, [gf_cb1, gf_cb2])
 bf_cb2 = copyBasis(bf_cb1)
 bf_cb3 = copyBasis(bf_cb1, false)
+@test hasIdentical(bf_cb1, bf_cb3)
 testbf_cb = function (bf1, bf2)
     @test bf1.center == bf2.center
     @test bf1.l == bf2.l
     @test bf1.normalizeGTO == bf2.normalizeGTO
 end
 testbf_cb(bf_cb1, bf_cb2)
-testbf_cb(bf_cb1, bf_cb3)
-@test hasEqual(bf_cb2.gauss, (gf_cb2, gf_cb3))
-@test hasEqual(bf_cb3.gauss, (gf_cb3, gf_cb3))
+testbf_cb(bf_cb2, bf_cb3)
+@test hasEqual(bf_cb2.gauss, (gf_cb2, gf_cb2))
 
-bfm_cb1 = BasisFuncMix([bf_cb1, bf_cb3])
+bfm_cb1 = BasisFuncMix([bf_cb1, bf_cb2])
 bfm_cb2 = copyBasis(bfm_cb1)
 bfm_cb3 = copyBasis(bfm_cb1, false)
+bfm_cb4 = Quiqbox.copyBasisCore(bfm_cb1, _->false)
+@test hasIdentical(bfm_cb1, bfm_cb3, bfm_cb4)
 testbf_cb.(bfm_cb1.BasisFunc, bfm_cb2.BasisFunc)
-testbf_cb.(bfm_cb1.BasisFunc, bfm_cb3.BasisFunc)
-@test hasEqual(bfm_cb2.BasisFunc |> collect, [bf_cb2, bf_cb3])
-@test hasEqual(bfm_cb3.BasisFunc |> collect, [bf_cb3, bf_cb3])
+testbf_cb.(bfm_cb2.BasisFunc, bfm_cb3.BasisFunc)
+@test hasEqual(bfm_cb2.BasisFunc |> collect, fill(bf_cb2, 2))
 
 
 # function markParams!

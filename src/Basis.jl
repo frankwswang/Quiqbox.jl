@@ -1851,19 +1851,29 @@ julia> (gf1.xpn[] |> gf1.xpn.map) == gf2.xpn[]
 true
 ```
 """
-function copyBasis(g::GaussFunc, copyOutVal::Bool=true)
-    pbs = g.param .|> ifelse(copyOutVal, outValCopy, inVarCopy)
-    GaussFunc(pbs...)
-end
+copyBasis(g::GaussFunc, copyOutVal::Bool=true) = 
+copyBasisCore(g, _->copyOutVal)
 
-function copyBasis(bfs::T, copyOutVal::Bool=true) where {T<:FloatingGTBasisFuncs}
-    cen = bfs.center .|> ifelse(copyOutVal, outValCopy, inVarCopy)
-    gs = copyBasis.(bfs.gauss, copyOutVal)
+copyBasis(bfs::FloatingGTBasisFuncs, copyOutVal::Bool=true) = 
+copyBasisCore(bfs, _->copyOutVal)
+
+copyBasis(bfm::BasisFuncMix, copyOutVal::Bool=true) = 
+copyBasisCore(bfm, _->copyOutVal)
+
+copyBasisCore(pb::ParamBox, outValCopyFilter::Function) = 
+outValCopyFilter(pb) ? outValCopy(pb) : fullVarCopy(pb)
+
+copyBasisCore(g::GaussFunc, outValCopyFilter::Function) = 
+GaussFunc(copyBasisCore.(g.param, outValCopyFilter)...)
+
+function copyBasisCore(bfs::T, outValCopyFilter::Function) where {T<:FloatingGTBasisFuncs}
+    cen = copyBasisCore.(bfs.center, outValCopyFilter)
+    gs = copyBasisCore.(bfs.gauss, outValCopyFilter)
     genBasisFunc(cen, gs, bfs.l; normalizeGTO=bfs.normalizeGTO)::T
 end
 
-function copyBasis(bfm::T, copyOutVal::Bool=true) where {T<:BasisFuncMix}
-    bfs = copyBasis.(bfm.BasisFunc, copyOutVal)
+function copyBasisCore(bfm::T, outValCopyFilter::Function) where {T<:BasisFuncMix}
+    bfs = copyBasisCore.(bfm.BasisFunc, outValCopyFilter)
     BasisFuncMix(bfs)::T
 end
 
