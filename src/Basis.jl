@@ -1820,6 +1820,32 @@ paramFilter(pb::ParamBox, sym::Union{Symbol, Missing}, forDifferentiation::Bool)
 sym isa Missing || inSymbol(sym, getVar(pb, forDifferentiation))
 
 
+copyParContainer(pb::ParamBox, 
+                 filterFunc::Function, trueConstr::Function, falseConstr::Function) = 
+filterFunc(pb) ? trueConstr(pb) : falseConstr(pb)
+
+copyParContainer(sp::SpatialPoint, 
+                 filterFunc::Function, trueConstr::Function, falseConstr::Function) = 
+copyParContainer.(sp.param, filterFunc, trueConstr, falseConstr) |> SpatialPoint
+
+copyParContainer(g::GaussFunc, 
+                 filterFunc::Function, trueConstr::Function, falseConstr::Function) = 
+GaussFunc(copyParContainer.(g.param, filterFunc, trueConstr, falseConstr)...)
+
+function copyParContainer(bfs::FloatingGTBasisFuncs, 
+                          filterFunc::Function, trueConstr::Function, falseConstr::Function)
+    cen = copyParContainer(bfs.center, filterFunc, trueConstr, falseConstr)
+    gs = copyParContainer.(bfs.gauss, filterFunc, trueConstr, falseConstr)
+    BasisFunc(cen, gs, bfs.l, bfs.normalizeGTO)
+end
+
+function copyParContainer(bfm::BasisFuncMix, 
+                          filterFunc::Function, trueConstr::Function, falseConstr::Function)
+    bfs = copyParContainer.(bfm.BasisFunc, filterFunc, trueConstr, falseConstr)
+    BasisFuncMix(bfs)
+end
+
+
 """
 
     copyBasis(b::GaussFunc, copyOutVal::Bool=true) -> GaussFunc
@@ -1852,30 +1878,13 @@ true
 ```
 """
 copyBasis(g::GaussFunc, copyOutVal::Bool=true) = 
-copyBasisCore(g, _->copyOutVal)
+copyParContainer(g, _->copyOutVal, outValCopy, fullVarCopy)
 
 copyBasis(bfs::FloatingGTBasisFuncs, copyOutVal::Bool=true) = 
-copyBasisCore(bfs, _->copyOutVal)
+copyParContainer(bfs, _->copyOutVal, outValCopy, fullVarCopy)
 
 copyBasis(bfm::BasisFuncMix, copyOutVal::Bool=true) = 
-copyBasisCore(bfm, _->copyOutVal)
-
-copyBasisCore(pb::ParamBox, outValCopyFilter::Function) = 
-outValCopyFilter(pb) ? outValCopy(pb) : fullVarCopy(pb)
-
-copyBasisCore(g::GaussFunc, outValCopyFilter::Function) = 
-GaussFunc(copyBasisCore.(g.param, outValCopyFilter)...)
-
-function copyBasisCore(bfs::T, outValCopyFilter::Function) where {T<:FloatingGTBasisFuncs}
-    cen = copyBasisCore.(bfs.center, outValCopyFilter)
-    gs = copyBasisCore.(bfs.gauss, outValCopyFilter)
-    genBasisFunc(cen, gs, bfs.l; normalizeGTO=bfs.normalizeGTO)::T
-end
-
-function copyBasisCore(bfm::T, outValCopyFilter::Function) where {T<:BasisFuncMix}
-    bfs = copyBasisCore.(bfm.BasisFunc, outValCopyFilter)
-    BasisFuncMix(bfs)::T
-end
+copyParContainer(bfm, _->copyOutVal, outValCopy, fullVarCopy)
 
 
 """

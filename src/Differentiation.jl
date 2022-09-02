@@ -251,11 +251,14 @@ const czIndex = findfirst(x->getTypeParams(x)[2]==czSym, sgfSample.param)
 const xpnIndex = findfirst(x->getTypeParams(x)[2]==xpnSym, sgfSample.param)
 const conIndex = findfirst(x->getTypeParams(x)[2]==conSym, sgfSample.param)
 
-paramIndex(::Val{cxSym}, ::Val) = cxIndex
-paramIndex(::Val{cySym}, ::Val) = cyIndex
-paramIndex(::Val{czSym}, ::Val) = czIndex
-paramIndex(::Val{xpnSym}, ::Val{D}) where {D} = xpnIndex - 3 + D
-paramIndex(::Val{conSym}, ::Val{D}) where {D} = conIndex - 3 + D
+getVpar(sgf::FGTBasisFuncs1O{<:Any, <:Any, <:Any, 1}, ::Val{cxSym}) = sgf.param[cxIndex]
+getVpar(sgf::FGTBasisFuncs1O{<:Any, <:Any, <:Any, 1}, ::Val{cySym}) = sgf.param[cyIndex]
+getVpar(sgf::FGTBasisFuncs1O{<:Any, <:Any, <:Any, 1}, ::Val{czSym}) = sgf.param[czIndex]
+getVpar(sgf::FGTBasisFuncs1O{<:Any, D, <:Any, 1}, ::Val{xpnSym}) where {D} = 
+sgf.param[xpnIndex-3+D]
+getVpar(sgf::FGTBasisFuncs1O{<:Any, D, <:Any, 1}, ::Val{conSym}) where {D} = 
+sgf.param[conIndex-3+D]
+getVpar(::FGTBasisFuncs1O{T, D, <:Any, 1}, ::Val) where {T, D} = ParamBox(0.0)
 
 function ∂BasisCore1(par::ParamBox{T, V, FL}, sgf::FGTBasisFuncs1O{T, D, <:Any, 1}) where 
                     {T, FL, V, D}
@@ -276,7 +279,7 @@ end
 
 function ∂BasisCore2(par::ParamBox{T, V, FL}, sgf::FGTBasisFuncs1O{T, D, <:Any, 1}) where 
                     {T, V, FL, D}
-    dividend = sgf.param[paramIndex(Val(V), Val(D))]
+    dividend = getVpar(sgf, Val(V))
     if compareParamBoxCore2(par, dividend)
         ∂SGFcore(Val(V), sgf)
     else

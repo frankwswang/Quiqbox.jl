@@ -287,7 +287,7 @@ Pair{Symbol, T}[inSymOf(pb) => inValOf(pb)]
     Dict{Symbol}
 
 Return a `Dict` that stores the independent variable(s) of the parameter container(s) and 
-its(their) corresponding value(s). 
+its(their) corresponding value(s).
 
 **NOTE: Once `obj` is mutated, the generated `Dict` may no longer be up to date.**
 """
@@ -409,7 +409,7 @@ isNotDiffNorInVar(pb::ParamBox{<:Any, <:Any, FL}) where {FL} = !isDiffParam(pb)
 """
 
     changeMapping(pb::ParamBox, mapFunction::Function, outputName::Symbol=V; 
-                  canDiff::Bool=true) -> 
+                  canDiff::Bool=isDiffParam(pb)) -> 
     ParamBox{T, outputName}
 
 Change the mapping function of `pb`. The name of the output variable of the returned 
@@ -417,7 +417,7 @@ Change the mapping function of `pb`. The name of the output variable of the retu
 `canDiff`.
 """
 function changeMapping(pb::ParamBox{T, V, FL}, mapFunction::F, outputName::Symbol=V; 
-                       canDiff::Bool=true) where {T, V, FL, F<:Function}
+                       canDiff::Bool=isDiffParam(pb)) where {T, V, FL, F<:Function}
     dn = pb.dataName
     if (FL==FI && FLevel(F)!=FI)
         dnStr = string(dn)
