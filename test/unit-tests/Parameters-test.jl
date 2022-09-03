@@ -15,7 +15,8 @@ pf1 = Quiqbox.Pf(1.5, tf1)
 
 
 pb1 = ParamBox(1, :a)
-@test inSymOfCore(pb1) == :a == outSymOfCore(pb1)
+@test inSymOfCore(pb1) == :x_a
+@test outSymOfCore(pb1) == :a
 @test dataOf(pb1)[] == pb1[] == inValOf(pb1)
 @test pb1[] == pb1() == 1 == outValOf(pb1)
 @test pb1.map == Quiqbox.itself == mapOf(pb1)
@@ -56,8 +57,6 @@ pair1 = inSymValOf(pb4)
 @test Tuple(pair1) == (inSymOf(pb4), 1.2) == (:x, 1.2)
 pair2 = outSymValOf(pb4)
 @test Tuple(pair2) == (outSymOf(pb4), pb4()) == (:c, pb4.map(1.2))
-pb4_2 = ParamBox(1.2, :c)
-@test inSymOf(pb4_2) == outSymOf(pb4_2) == :c
 
 pb5 = outValCopy(pb4)
 @test pb5() == pb5[] == pb4()
@@ -77,7 +76,7 @@ pb8 = changeMapping(pb6, x->x^1.5, :p2)
 
 
 # function getVarCore getVar getVarDict
-@test getVarCore(pb1) == [:a=>1]
+@test getVarCore(pb1) == [:a=>1, :x_a => 1]
 @test getVarCore(pb4) == [:c=>1.44, :x=>1.2]
 pb9 = ParamBox(pb4[], getVar(pb4), pb4.map, pb4.dataName, canDiff=false)
 @test getVarCore(pb9) == [:c=>1.44]
@@ -126,18 +125,17 @@ sortTuple = t -> (collect(t) |> sort)
 @test getVarDict(e_gv1) == Dict(:α₂=>2.0)
 @test getVarDict(pb4) == Dict([:x=>1.2, :c=>1.44])
 pb1_2 = changeMapping(pb1, x->x+2)
-@test getVarDict(pb1_2) == Dict(:a_a=>1, :a=>3)
+@test getVarDict(pb1_2) == Dict(:x_a=>1, :a=>3)
 @test getVarDict(pb3) == Dict(:b=>1)
 pb4_3 = changeMapping(pb4, x->x+2)
 @test getVarDict(pb4_3) == Dict(:c=>3.2, :x=>1.2)
-@test getVarDict(bf_gv6.param) == Dict( ( (  getVar.(bf_gv6.param) .=> 
-                                           outValOf.(bf_gv6.param))..., 
-                                          ( inSymOf.(bf_gv6.param) .=> 
-                                           getindex.(bf_gv6.param))... ) )
-@test getVarDict(bfm_gv.param) == Dict( ( (  getVar.(bfm_gv.param) .=> 
-                                           outValOf.(bfm_gv.param))..., 
-                                         (  inSymOf.(bfm_gv.param) .=> 
-                                           getindex.(bfm_gv.param))... ) )
+@test getVarDict(bf_gv6.param) == 
+      Dict( ( (getVar.(bf_gv6.param) .=> outValOf.(bf_gv6.param))..., 
+              [inSymOf(i)=>i[] for i in bf_gv6.param if isDiffParam(i)]... ) )
+
+@test getVarDict(bfm_gv.param) == 
+      Dict( ( (getVar.(bfm_gv.param) .=> outValOf.(bfm_gv.param))..., 
+              [inSymOf(i)=>i[] for i in bfm_gv.param if isDiffParam(i)]... ) )
 @test getVarDict(bfm_gv.param) == getVarDict(unique(bfm_gv.param))
 @test getVarDict(bfm_gv.param) != getVarDict(getUnique!(bfm_gv.param|>collect))
 @test getVarDict(bfm_gv.param) == getVarDict(getUnique!(bfm_gv.param|>collect, 
@@ -145,7 +143,7 @@ pb4_3 = changeMapping(pb4, x->x+2)
 
 
 # function compareParamBox
-@test compareParamBox(pb1, pb2)
+@test !compareParamBox(pb1, pb2) && isDiffParam(pb1) && !isDiffParam(pb2)
 toggleDiff!(pb2)
 @test compareParamBox(pb1, pb2)
 toggleDiff!(pb2)

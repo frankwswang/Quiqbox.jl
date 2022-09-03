@@ -21,6 +21,8 @@ K = changeMapping(X, X.map, :K)
 disableDiff!(K)
 
 @test ∂Basis(J, sgf1) == Quiqbox.EmptyBasisFunc{Float64, 3}()
+@test ∂Basis(K, sgf1) == Quiqbox.EmptyBasisFunc{Float64, 3}()
+enableDiff!(K)
 @test hasEqual(∂Basis(K, sgf1), ∂Basis(X, sgf1))
 @test hasEqual(∂Basis(X, sgf1), -1*shift(sgf1, (1,0,0), -) + 2xpn()*shift(sgf1, (1,0,0)))
 @test hasEqual(∂Basis(Y, sgf1), 2xpn()*shift(sgf1, (0,1,0)))

@@ -171,6 +171,15 @@ const cxSym = SpatialParamSyms[1]
 const cySym = SpatialParamSyms[2]
 const czSym = SpatialParamSyms[3]
 
+const IVsymSuffix = :x_
+
+const xpnIVsym = Symbol(IVsymSuffix, xpnSym)
+const conIVsym = Symbol(IVsymSuffix, conSym)
+const cxIVsym  = Symbol(IVsymSuffix, cxSym)
+const cyIVsym  = Symbol(IVsymSuffix, cySym)
+const czIVsym  = Symbol(IVsymSuffix, czSym)
+const cenIVsym = (cxIVsym, cyIVsym, czIVsym)
+
 const spinOccupations = ("0", "↿", "⇂", "↿⇂")
 const OrbitalOccupation = ((false, false), (true, false), (false, true), (true, true))
 const SpinOrbitalOccupation = Dict(spinOccupations .=> OrbitalOccupation)

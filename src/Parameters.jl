@@ -14,6 +14,7 @@ FLevel(::Type{<:Function}) = FLevel{1}
 FLevel(::Type{StructFunction{F}}) where {F} = FLevel(F)
 FLevel(::Type{<:ParameterizedFunction{T1, T2}}) where {T1, T2} = 
 FLevel{getFLevel(T1)+getFLevel(T2)}
+FLevel(::Type{DressedItself{L}}) where {L} = FLevel{L}
 FLevel(::F) where {F<:Function} = FLevel(F)
 const FI = FLevel(itself)
 
@@ -48,26 +49,27 @@ as a dependent variable or an independent variable.
 
 ≡≡≡ Initialization Method(s) ≡≡≡
 
-    ParamBox(data, dataName=:undef; index=nothing) -> ParamBox{<:Any, dataName, $(FI)}
+    ParamBox(data, name=:undef, dataName=Symbol($(IVsymSuffix), name); 
+             index=nothing, canDiff=false) -> 
+    ParamBox{<:Any, dataName, $(FI)}
 
-    ParamBox(data, name, mapFunction, dataName=:undef; index=nothing, canDiff=true) ->
+    ParamBox(data, name, mapFunction, dataName=Symbol($(IVsymSuffix), name); 
+             index=nothing, canDiff=true) -> 
     ParamBox{<:Any, name}
 
 === Positional argument(s) ===
 
-`data::Union{Array{T, 0}, T}`: The input value to be stored or the container of it. If the 
-latter is the first argument, then it will directly be assigned to `.data[]`.
+`data::Union{Array{T, 0}, T}`: The input variable (`Array{T, 0}`) or the value of it to be 
+stored. If the latter is the first argument, then it will directly be assigned to `.data[]`.
 
 `name::Symbol`: Specify the name of the output variable represented by the constructed 
-`ParamBox`. It's not required when `mapFunction` is not provided because then the output 
-variable is considered the same as the input variable. It's equal to the type parameter `V` 
-of the constructed `ParamBox`.
+`ParamBox`. It's equal to the type parameter `V` of the constructed `ParamBox`.
 
-`mapFunction::Function`: The mapping of the stored data (`mapFunction(::T)->T`), which will 
-be assigned to the field `.map`. After constructing a `ParamBox`, e.g 
+`mapFunction::Function`: The mapping (`mapFunction(::T)->T`) of the stored data (input 
+variable), which will be assigned to the field `.map`. After constructing a `ParamBox`, e.g 
 `pb = ParamBox(x, yName, f)`, `pb[]` returns the value of `x`, and `pb()` returns the value 
 of `f(x)::T`. When `mapFunction` is not provided, `.map` is set to [`itself`](@ref) that 
-maps the stored data to itself.
+maps the stored data to an identical output variable.
 
 `dataName::Symbol`: The name of the stored data, i.e, the name of the input variable.
 
@@ -77,7 +79,8 @@ maps the stored data to itself.
 with its default value unless the user plans to utilize the index of a `ParamBox` for 
 specific application other than differentiation.
 
-`canDiff::Bool`: Determine whether the output variable is marked as "differentiable".
+`canDiff::Bool`: Determine whether the output variable is marked as "differentiable" with 
+respect to the input variable.
 
 ≡≡≡ Example(s) ≡≡≡
 
@@ -109,19 +112,19 @@ struct ParamBox{T, V, FL<:FLevel} <: DifferentiableParameter{T, ParamBox}
     canDiff::Array{Bool, 0}
     index::Array{<:Union{Int, Nothing}, 0}
 
-    function ParamBox{T, V}(f::F, data::Array{T, 0}, index, canDiff, 
-                            dataName=:undef) where {T, V, F<:Function}
+    function ParamBox{T, V}(f::F, data::Array{T, 0}, index, canDiff, dataName) where 
+                           {T, V, F<:Function}
         @assert Base.return_types(f, (T,))[1] == T
-        dName = ifelse(dataName == :undef, Symbol("x_" * string(V)), dataName)
-        new{T, V, FLevel(F)}(fill(data), dName, f, canDiff, index)
+        new{T, V, FLevel(F)}(fill(data), dataName, f, canDiff, index)
     end
 
-    ParamBox{T, V}(data::Array{T, 0}, index) where {T, V} = 
-    new{T, V, FI}(fill(data), V, itself, fill(false), index)
+    ParamBox{T, V}(data::Array{T, 0}, index, canDiff, dataName) where {T, V} = 
+    new{T, V, FI}(fill(data), dataName, itself, canDiff, index)
 end
 
-function ParamBox(::Val{V}, mapFunction::F, data::Array{T, 0}, index, canDiff, 
-                  dataName=:undef) where {V, F<:Function, T}
+function ParamBox(::Val{V}, mapFunction::F, data::Array{T, 0}, 
+                  index=genIndex(nothing), canDiff=fill(true), 
+                  dataName=Symbol(IVsymSuffix, V)) where {V, F<:Function, T}
     if getFLevel(F) != 0
         fSym = mapFunction |> nameOf
         fStr = fSym |> string
@@ -134,21 +137,25 @@ function ParamBox(::Val{V}, mapFunction::F, data::Array{T, 0}, index, canDiff,
     ParamBox{T, V}(mapFunction, data, index, canDiff, dataName)
 end
 
-ParamBox(::Val{V}, data::Array{T, 0}, index) where {V, T} = ParamBox{T, V}(data, index)
+ParamBox(::Val{V}, data::Array{T, 0}, index=genIndex(nothing), 
+         canDiff=fill(false), dataName=Symbol(IVsymSuffix, V)) where {V, T} = 
+ParamBox{T, V}(data, index, canDiff, dataName)
 
-ParamBox(::Val{V}, ::itselfT, data::Array{T, 0}, index, _...) where {V, T} = 
-ParamBox{T, V}(data, index)
+ParamBox(::Val{V}, ::itselfT, data::Array{T, 0}, index=genIndex(nothing), 
+         canDiff=fill(false), dataName=Symbol(IVsymSuffix, V)) where {V, T} = 
+ParamBox{T, V}(data, index, canDiff, dataName)
 
 ParamBox(::Val{V}, pb::ParamBox{T, <:Any, FI}) where {V, T} = 
-ParamBox{T, V}(pb.data[], pb.index)
+ParamBox{T, V}(pb.data[], pb.index, pb.canDiff, pb.dataName)
 
 ParamBox(::Val{V}, pb::ParamBox{T}; canDiff::Array{Bool, 0}=pb.canDiff) where {T, V} = 
 ParamBox{T, V}(pb.map, pb.data[], pb.index, canDiff, pb.dataName)
 
-ParamBox(data::T, dataName::Symbol=:undef; index::Union{Int, Nothing}=nothing) where {T} = 
-ParamBox(Val(dataName), fillObj(data), genIndex(index))
+ParamBox(data::T, name::Symbol=:undef, dataName::Symbol=Symbol(IVsymSuffix, name); 
+         index::Union{Int, Nothing}=nothing, canDiff::Bool=false) where {T} = 
+ParamBox(Val(name), fillObj(data), genIndex(index), fill(canDiff), dataName)
 
-ParamBox(data::T, name::Symbol, mapFunction::F, dataName::Symbol=:undef; 
+ParamBox(data::T, name::Symbol, mapFunction::F, dataName::Symbol=Symbol(IVsymSuffix, name); 
          index::Union{Int, Nothing}=nothing, canDiff::Bool=true) where {T, F<:Function} = 
 ParamBox(Val(name), mapFunction, fillObj(data), genIndex(index), fill(canDiff), dataName)
 
@@ -221,7 +228,6 @@ variable of `pb`.
 Return the `Symbol` of the input variable of `pb`.
 """
 @inline inSymOfCore(pb::ParamBox) = pb.dataName
-@inline inSymOfCore(pb::ParamBox{<:Any, <:Any, FI}) = outSymOfCore(pb)
 
 
 """
@@ -269,16 +275,11 @@ function getVar(pb::ParamBox, forDifferentiation::Bool=false)
     end
 end
 
-function getVarCore(pb::ParamBox{T, <:Any, FL}) where {T, FL}
-    dvSym = outSymOf(pb)
-    ivVal = inValOf(pb)
-    ovVal = outValOf(pb)
-    ifelse(isDiffParam(pb), Pair{Symbol, T}[dvSym=>ovVal, inSymOf(pb)=>ivVal], 
-                            Pair{Symbol, T}[dvSym=>ovVal])
+function getVarCore(pb::ParamBox{T}) where {T}
+    outVarVal = outSymOf(pb)=>outValOf(pb)
+    isDiffParam(pb) ? Pair{Symbol, T}[outVarVal, inSymOf(pb)=>inValOf(pb)] : 
+                      Pair{Symbol, T}[outVarVal]
 end
-
-getVarCore(pb::ParamBox{T, <:Any, FI}) where {T} = 
-Pair{Symbol, T}[inSymOf(pb) => inValOf(pb)]
 
 
 """
@@ -321,7 +322,7 @@ julia> pb1 = ParamBox(-2.0, :a, abs)
 ParamBox{Float64, :a, $(FLevel(abs))}(-2.0)[∂][x_a]
 
 julia> pb2 = inVarCopy(pb1)
-ParamBox{Float64, :x_a, $(FI)}(-2.0)[∂][x_a]
+ParamBox{Float64, :a, $(FI)}(-2.0)[∂][a]
 
 julia> pb1[] == pb2[] == -2.0
 true
@@ -333,8 +334,8 @@ julia> pb2[]
 1.1
 ```
 """
-inVarCopy(pb::ParamBox{T}) where {T} = 
-ParamBox{T, inSymOfCore(pb)}(pb.data[], genIndex(nothing))
+inVarCopy(pb::ParamBox{<:Any, V}) where {V} = 
+ParamBox(Val(V), pb.data[], genIndex(nothing), fill(false), pb.dataName)
 
 
 """
@@ -416,16 +417,10 @@ Change the mapping function of `pb`. The name of the output variable of the retu
 `ParamBox` can be specified by `outputName`, and its differentiability is determined by 
 `canDiff`.
 """
-function changeMapping(pb::ParamBox{T, V, FL}, mapFunction::F, outputName::Symbol=V; 
-                       canDiff::Bool=isDiffParam(pb)) where {T, V, FL, F<:Function}
-    dn = pb.dataName
-    if (FL==FI && FLevel(F)!=FI)
-        dnStr = string(dn)
-        dn = Symbol(dnStr * "_" * dnStr)
-    end
-    ParamBox(Val(outputName), mapFunction, pb.data[], 
-             genIndex( ifelse(canDiff, pb.index[], nothing) ), fill(canDiff), dn)
-end
+changeMapping(pb::ParamBox{T, V, FL}, mapFunction::F, outputName::Symbol=V; 
+              canDiff::Bool=isDiffParam(pb)) where {T, V, FL, F<:Function} = 
+ParamBox(Val(outputName), mapFunction, pb.data[], 
+         genIndex( ifelse(canDiff, pb.index[], nothing) ), fill(canDiff), pb.dataName)
 
 
 compareParamBoxCore1(pb1::ParamBox, pb2::ParamBox) = (pb1.data[] === pb2.data[])
@@ -433,7 +428,11 @@ compareParamBoxCore1(pb1::ParamBox, pb2::ParamBox) = (pb1.data[] === pb2.data[])
 compareParamBoxCore2(pb1::ParamBox{<:Any, V1}, pb2::ParamBox{<:Any, V2}) where {V1, V2} = 
 V1==V2 && compareParamBoxCore1(pb1, pb2) && (typeof(pb1.map) === typeof(pb2.map))
 
-function compareParamBox(pb1::ParamBox, pb2::ParamBox)
+compareParamBoxCore2(pb1::ParamBox{<:Any, V1, FI}, 
+                     pb2::ParamBox{<:Any, V2, FI}) where {V1, V2} = 
+V1==V2 && compareParamBoxCore1(pb1, pb2)
+
+@inline function compareParamBox(pb1::ParamBox, pb2::ParamBox)
     ifelse(( (bl=isDiffParam(pb1)) == isDiffParam(pb2) ),
         ifelse( bl, 
             compareParamBoxCore1(pb1, pb2), 
@@ -445,27 +444,78 @@ function compareParamBox(pb1::ParamBox, pb2::ParamBox)
     )
 end
 
-compareParamBox(pb1::ParamBox{<:Any, <:Any, FI}, pb2::ParamBox{<:Any, <:Any, FI}) = 
-compareParamBoxCore1(pb1, pb2)
 
-compareParamBox(pb1::ParamBox{<:Any, <:Any, FI}, pb2::ParamBox) = 
-ifelse(isDiffParam(pb2), compareParamBoxCore1(pb1, pb2), false)
-
-compareParamBox(pb1::ParamBox, pb2::ParamBox{<:Any, <:Any, FI}) = 
-compareParamBox(pb2, pb1)
-
-
-function mulParamBoxCore(c::T1, con::ParamBox{T2, <:Any, FI}, 
-                         roundAtol::Real=nearestHalfOf(getAtolVal(T))) where {T1, T2}
-    conNew = fill(roundToMultiOfStep(convert(T2, con.data[][]*c), roundAtol))
-    mapFunction = itself
-    dataName = :undef
-    conNew, mapFunction, dataName
+function addParamBox(pb1::ParamBox{T, V, FI}, pb2::ParamBox{T, V, FI}, 
+                     roundAtol::Real) where {T, V}
+    if compareParamBox(pb1, pb2)
+        mulParamBox(2, pb1)
+    else
+        ParamBox(Val(V), itself, fill(roundToMultiOfStep(pb1[] + pb2[], roundAtol)))
+    end
 end
 
-function mulParamBoxCore(c::T1, con::ParamBox{T2}, 
-                         roundAtol::Real=nearestHalfOf(getAtolVal(T))) where {T1, T2}
-    conNew = con.data[]
-    mapFunction = Pf(convert(T2, roundToMultiOfStep(c, roundAtol)), con.map)
-    conNew, mapFunction, con.dataName
+function addParamBox(pb1::ParamBox{T, V, FL1}, pb2::ParamBox{T, V, FL2}, 
+                     roundAtol::Real) where {T, V, FL1, FL2}
+    if isDiffParam(pb1) && compareParamBox(pb1, pb2)
+        # bl = isDiffParam(pb1)
+        # pbs = (pb1, pb2)
+        # pb1, pb2 = bl ? pbs : outValCopy.(pbs)
+        ParamBox(Val(V), combineParFunc(+, pb1.map, pb2.map), pb1.data[], 
+                 genIndex(nothing), fill(pb1.canDiff[]), min(pb1.dataName, pb2.dataName))
+    else
+        ParamBox(Val(V), fill(roundToMultiOfStep(pb1() + pb2(), roundAtol)))
+    end
+end
+
+
+function mulParamBox(c::T1, pb::ParamBox{T2, V}, 
+                     roundAtol::Real=nearestHalfOf(getAtolVal(T2))) where {T1, T2, V}
+    if isDiffParam(pb)
+        mapFunc = Pf(convert(T2, roundToMultiOfStep(c, roundAtol)), pb.map)
+        ParamBox(Val(V), mapFunc, pb.data[], genIndex(nothing), fill(true), pb.dataName)
+    else
+        ParamBox(Val(V), itself, 
+                 fill(roundToMultiOfStep(convert(T2, pb()*c), roundAtol)))
+    end
+end
+
+function mulParamBox(pb1::ParamBox{T, V, FI}, pb2::ParamBox{T, V, FI}, 
+                     roundAtol::Real=nearestHalfOf(getAtolVal(T))) where {T, V}
+    if isDiffParam(pb1) && compareParamBox(pb1, pb2)
+        ParamBox(Val(V), Xf(2, itself), pb1.data[], genIndex(nothing), 
+                 fill(pb1.canDiff[]), min(pb1.dataName, pb2.dataName))
+    else
+        ParamBox(Val(V), fill(roundToMultiOfStep(pb1[] * pb2[], roundAtol)))
+    end
+end
+
+function mulParamBox(pb1::ParamBox{T, V, FL1}, pb2::ParamBox{T, V, FL2}, 
+                     roundAtol::Real=nearestHalfOf(getAtolVal(T))) where {T, V, FL1, FL2}
+    if isDiffParam(pb1) && compareParamBox(pb1, pb2)
+        # bl = isDiffParam(pb1)
+        # pbs = (pb1, pb2)
+        # pb1, pb2 = bl ? pbs : outValCopy.(pbs)
+        ParamBox(Val(V), combineParFunc(*, pb1.map, pb2.map), pb1.data[], 
+                 genIndex(nothing), fill(pb1.canDiff[]), min(pb1.dataName, pb2.dataName))
+    else
+        ParamBox(Val(V), fill(roundToMultiOfStep(pb1() * pb2(), roundAtol)))
+    end
+end
+
+function reduceParamBoxes(pb1::ParamBox{T, V, FL1}, pb2::ParamBox{T, V, FL2}, 
+                          roundAtol::Real=nearestHalfOf(getAtolVal(T))) where 
+                         {T, V, FL1, FL2}
+    if pb1 === pb2 || hasIdentical(pb1, pb2)
+        [pb1]
+    elseif hasEqual(pb1, pb2)
+        [deepcopy(pb1)]
+    else
+        outVal1 = pb1()
+        outVal2 = pb2()
+        if isApprox(outVal1, outVal2, atol=2roundAtol)
+            [genExponent( getNearestMid(outVal1, outVal2, roundAtol) )]
+        else
+            [pb1, pb2]
+        end
+    end
 end

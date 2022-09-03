@@ -287,8 +287,8 @@ function ∂BasisCore2(par::ParamBox{T, V, FL}, sgf::FGTBasisFuncs1O{T, D, <:Any
     end
 end
 
-∂Basis(par::ParamBox{T, V, FI}, sgf::FGTBasisFuncs1O{T, D, <:Any, 1}) where {T, V, D} = 
-∂BasisCore1(par, sgf)
+# ∂Basis(par::ParamBox{T, V, FI}, sgf::FGTBasisFuncs1O{T, D, <:Any, 1}) where {T, V, D} = 
+# ∂BasisCore1(par, sgf)
 
 ∂Basis(par::ParamBox{T, V, FL}, sgf::FGTBasisFuncs1O{T, D, <:Any, 1}) where {T, V, FL, D} = 
 isDiffParam(par) ? ∂BasisCore1(par, sgf) : ∂BasisCore2(par, sgf)
