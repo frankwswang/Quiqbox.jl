@@ -446,7 +446,7 @@ end
 
 
 function addParamBox(pb1::ParamBox{T, V, FI}, pb2::ParamBox{T, V, FI}, 
-                     roundAtol::Real) where {T, V}
+                     roundAtol::Real=nearestHalfOf(getAtolVal(T))) where {T, V}
     if compareParamBox(pb1, pb2)
         mulParamBox(2, pb1)
     else
@@ -455,7 +455,7 @@ function addParamBox(pb1::ParamBox{T, V, FI}, pb2::ParamBox{T, V, FI},
 end
 
 function addParamBox(pb1::ParamBox{T, V, FL1}, pb2::ParamBox{T, V, FL2}, 
-                     roundAtol::Real) where {T, V, FL1, FL2}
+                     roundAtol::Real=nearestHalfOf(getAtolVal(T))) where {T, V, FL1, FL2}
     if isDiffParam(pb1) && compareParamBox(pb1, pb2)
         # bl = isDiffParam(pb1)
         # pbs = (pb1, pb2)

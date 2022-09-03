@@ -984,15 +984,15 @@ function sumOf(bs::Union{Tuple{Vararg{GTBasisFuncs{T, D, 1}}},
 end
 
 function mergeGaussFuncs(gf1::GaussFunc{T}, gf2::GaussFunc{T}; 
-                         roundAtol::Real=getAtolVal(T)) where {T}
-    halfAtol = nearestHalfOf(roundAtol)
-    xpnRes = reduceParamBoxes(gf1.xpn, gf2.xpn, halfAtol)
+                         roundAtol::Real=nearestHalfOf(getAtolVal(T))) where {T}
+    xpnRes = reduceParamBoxes(gf1.xpn, gf2.xpn, roundAtol)
     length(xpnRes) > 1 && (return [gf1, gf2])
-    [GaussFunc(xpnRes[], addParamBox(gf1.con, gf2.con, halfAtol))]
+    [GaussFunc(xpnRes[], addParamBox(gf1.con, gf2.con, roundAtol))]
 end
 
 mergeGaussFuncs(gf1::GaussFunc{T}, gf2::GaussFunc{T}, gf3::GaussFunc{T}, 
-                gf4::GaussFunc{T}...; roundAtol::Real=getAtolVal(T)) where {T} = 
+                gf4::GaussFunc{T}...; 
+                roundAtol::Real=nearestHalfOf(getAtolVal(T))) where {T} = 
 mergeMultiObjs(GaussFunc{T}, mergeGaussFuncs, gf1, gf2, gf3, gf4...; roundAtol)
 
 
@@ -1037,29 +1037,16 @@ function reduceBasisFuncCenters(cen1, cen2, roundAtol)
     res = reduceParamBoxes.(cen1, cen2, roundAtol)
     any(length(i) > 1 for i in res) && return [cen1, cen2]
     [SpatialPoint(map(x->x[], res))]
-
-    # if cen1 === cen2 || hasIdentical(cen1, cen2)
-    #     cen1
-    # elseif hasEqual(cen1, cen2)
-    #     deepcopy(cen1)
-    # else
-    #     c1 = coordOf(cen1)
-    #     c2 = coordOf(cen2)
-    #     if all(isApprox.(c1, c2, atol=roundAtol))
-    #         genSpatialPoint( getNearestMid.(c1, c2, nearestHalfOf(roundAtol)) )
-    #     else
-    #         nothing
-    #     end
-    # end
 end
 
 function add(bf1::BasisFunc{T, D, 𝑙1, GN1, PT1}, bf2::BasisFunc{T, D, 𝑙2, GN2, PT2}; 
              roundAtol::Real=getAtolVal(T)) where 
             {T, D, 𝑙1, 𝑙2, GN1, GN2, PT1, PT2}
+    halfAtol = nearestHalfOf(roundAtol)
     if 𝑙1 == 𝑙2 && bf1.l == bf2.l && bf1.normalizeGTO == bf2.normalizeGTO
-        cenRes = reduceBasisFuncCenters(bf1.center, bf2.center, roundAtol)
+        cenRes = reduceBasisFuncCenters(bf1.center, bf2.center, halfAtol)
         length(cenRes) > 1 && (return BasisFuncMix([bf1, bf2]))
-        gfsN = mergeGaussFuncs(bf1.gauss..., bf2.gauss...; roundAtol) |> Tuple
+        gfsN = mergeGaussFuncs(bf1.gauss..., bf2.gauss..., roundAtol=halfAtol) |> Tuple
         BasisFunc(cenRes[], gfsN, bf1.l, bf1.normalizeGTO)
     else
         BasisFuncMix([bf1, bf2])
@@ -1137,8 +1124,9 @@ function mergeBasisFuncs(bf1::FloatingGTBasisFuncs{T, D, 𝑙, GN, PT1, ON1},
     bf1.l == bf2.l && ( return [bf1, bf2] )
     ss = SubshellXYZsizes[𝑙+1]
     (ON1 == ss || ON2 == ss) && ( return [bf1, bf2] )
+    halfAtol = nearestHalfOf(roundAtol)
     if bf1.normalizeGTO == bf2.normalizeGTO
-        cenRes = reduceBasisFuncCenters(bf1.center, bf2.center, roundAtol)
+        cenRes = reduceBasisFuncCenters(bf1.center, bf2.center, halfAtol)
         length(cenRes) > 1 && (return [bf1, bf2])
         if bf1.gauss===bf2.gauss || hasIdentical(bf1.gauss, bf2.gauss)
             gfs = bf1.gauss
@@ -1151,25 +1139,8 @@ function mergeBasisFuncs(bf1::FloatingGTBasisFuncs{T, D, 𝑙, GN, PT1, ON1},
             gfs1 = bf1.gauss[ids]
             gfs2 = bf2.gauss[sortperm(gfPairs2)]
             gfs = Array{GaussFunc{T}}(undef, GN)
-            # for (id, (i, gf1), gf2) in zip(ids, enumerate(gfs1), gfs2)
-            #     res = if gf1 === gf2 || hasIdentical(gf1, gf2)
-            #         gf1
-            #     elseif hasEqual(gf1, gf2)
-            #         deepcopy(gf1)
-            #     else
-            #         p1 = gfPairs1[i]
-            #         p2 = gfPairs2[i]
-            #         if all(isApprox.(p1, p2, atol=roundAtol))
-            #             pair = getNearestMid.(p1, p2, nearestHalfOf(roundAtol))
-            #             GaussFunc(pair...)
-            #         else
-            #             false
-            #         end
-            #     end
-            #     (res == false) ? (return [bf1, bf2]) : (gfs[id] = res)
-            # end
             for (id, gf1, gf2) in zip(ids, gfs1, gfs2)
-                gfRes = reduceGaussFuncs(gf1, gf2, nearestHalfOf(roundAtol))
+                gfRes = reduceGaussFuncs(gf1, gf2, halfAtol)
                 length(gfRes) > 1 && (return [bf1, bf2])
                 gfs[id] = gfRes[]
             end
@@ -1260,9 +1231,11 @@ end
 mul(coeff::Real, gf::GaussFunc{T}; roundAtol::Real=getAtolVal(T)) where {T} = 
 mul(gf, coeff; roundAtol)
 
-mul(gf1::GaussFunc{T}, gf2::GaussFunc{T}; roundAtol::Real=getAtolVal(T)) where {T} = 
-GaussFunc( addParamBox(gf1.xpn, gf2.xpn, nearestHalfOf(roundAtol)), 
-           mulParamBox(gf1.con, gf2.con, nearestHalfOf(roundAtol)) )
+function mul(gf1::GaussFunc{T}, gf2::GaussFunc{T}; roundAtol::Real=getAtolVal(T)) where {T}
+    halfAtol = nearestHalfOf(roundAtol)
+    GaussFunc( addParamBox(gf1.xpn, gf2.xpn, halfAtol), 
+               mulParamBox(gf1.con, gf2.con, halfAtol) )
+end
 
 """
 
@@ -1314,28 +1287,24 @@ function mul(sgf1::BasisFunc{T, D, 𝑙1, 1, PT1}, sgf2::BasisFunc{T, D, 𝑙2, 
              normalizeGTO::Union{Bool, Missing}=missing, 
              roundAtol::Real=getAtolVal(T)) where {T, D, 𝑙1, 𝑙2, PT1, PT2}
     halfAtol = nearestHalfOf(roundAtol)
-    α₁ = sgf1.gauss[1].xpn()
-    α₂ = sgf2.gauss[1].xpn()
-    d₁ = sgf1.gauss[1].con()
-    d₂ = sgf2.gauss[1].con()
+    xpn1, con1 = sgf1.gauss[begin].param
+    xpn2, con2 = sgf2.gauss[begin].param
     n₁ = sgf1.normalizeGTO
     n₂ = sgf2.normalizeGTO
-    n₁ && (d₁ *= getNormFactor(sgf1)[])
-    n₂ && (d₂ *= getNormFactor(sgf2)[])
     normalizeGTO isa Missing && (normalizeGTO = n₁*n₂)
+    cen1 = sgf1.center
+    cen2 = sgf2.center
 
-    R = if (cen1 = sgf1.center) === (cen2 = sgf2.center) || hasIdentical(cen1, cen2)
-        cen1
-    elseif hasEqual(cen1, cen2)
-        deepcopy(cen1)
-    else
+    cenRes = reduceBasisFuncCenters(cen1, cen2, halfAtol)
+    R = if length(cenRes) > 1
+        α₁ = xpn1()
+        α₂ = xpn2()
+        d₁ = con1() * (n₁ ? getNormFactor(sgf1)[] : 1)
+        d₂ = con2() * (n₂ ? getNormFactor(sgf2)[] : 1)
         R₁ = coordOf(cen1)
         R₂ = coordOf(cen2)
-        if all(isApprox.(R₁, R₂, atol=roundAtol))
-            genSpatialPoint( getNearestMid.(R₁, R₂, halfAtol) )
-        else
-            l1 = sgf1.l[1]
-            l2 = sgf2.l[1]
+        l1 = sgf1.l[begin]
+            l2 = sgf2.l[begin]
             xpn, con, cen = gaussProd((α₁, d₁, R₁), (α₂, d₂, R₂))
             shiftPolyFunc = @inline (n, c1, c2) -> [(c2 - c1)^k*binomial(n,k) for k=n:-1:0]
             coeffs = map(1:3) do i
@@ -1346,7 +1315,8 @@ function mul(sgf1::BasisFunc{T, D, 𝑙1, 1, PT1}, sgf2::BasisFunc{T, D, 𝑙2, 
                 m = c1N * transpose(c2N |> reverse)
                 [diag(m, k)|>sum for k = n2 : (-1)^(-n1 < n2) : -n1]
             end
-            lCs = cat(Ref(coeffs[1] * transpose(coeffs[2])) .* coeffs[3]..., dims=3) # TC
+            lCs = cat(Ref(coeffs[begin] * transpose(coeffs[begin+1])) .* 
+                      coeffs[begin+2]..., dims=3) # TC
             cen = genSpatialPoint(roundToMultiOfStep.(cen, halfAtol))
             pbα = genExponent(roundToMultiOfStep(xpn, halfAtol))
             return BasisFuncMix(
@@ -1357,13 +1327,51 @@ function mul(sgf1::BasisFunc{T, D, 𝑙1, 1, PT1}, sgf2::BasisFunc{T, D, 𝑙2, 
                     LTuple(i.I .- 1), 
                     normalizeGTO)
                  for i in CartesianIndices(lCs)])
-        end
+    else
+        cenRes[]
     end
 
-    xpn = roundToMultiOfStep(α₁ + α₂, halfAtol)
-    con = roundToMultiOfStep(d₁ * d₂, halfAtol)
-    BasisFunc(R, GaussFunc(genExponent(xpn), genContraction(con)), (sgf1.l .+ sgf2.l), 
-              normalizeGTO)
+    # R = if (cen1 = sgf1.center) === (cen2 = sgf2.center) || hasIdentical(cen1, cen2)
+    #     cen1
+    # elseif hasEqual(cen1, cen2)
+    #     deepcopy(cen1)
+    # else
+    #     R₁ = coordOf(cen1)
+    #     R₂ = coordOf(cen2)
+    #     if all(isApprox.(R₁, R₂, atol=roundAtol))
+    #         genSpatialPoint( getNearestMid.(R₁, R₂, halfAtol) )
+    #     else
+    #         l1 = sgf1.l[1]
+    #         l2 = sgf2.l[1]
+    #         xpn, con, cen = gaussProd((α₁, d₁, R₁), (α₂, d₂, R₂))
+    #         shiftPolyFunc = @inline (n, c1, c2) -> [(c2 - c1)^k*binomial(n,k) for k=n:-1:0]
+    #         coeffs = map(1:3) do i
+    #             n1 = l1[i]
+    #             n2 = l2[i]
+    #             c1N = shiftPolyFunc(n1, R₁[i], cen[i])
+    #             c2N = shiftPolyFunc(n2, R₂[i], cen[i])
+    #             m = c1N * transpose(c2N |> reverse)
+    #             [diag(m, k)|>sum for k = n2 : (-1)^(-n1 < n2) : -n1]
+    #         end
+    #         lCs = cat(Ref(coeffs[1] * transpose(coeffs[2])) .* coeffs[3]..., dims=3) # TC
+    #         cen = genSpatialPoint(roundToMultiOfStep.(cen, halfAtol))
+    #         pbα = genExponent(roundToMultiOfStep(xpn, halfAtol))
+    #         return BasisFuncMix(
+    #             [BasisFunc(
+    #                 cen, 
+    #                 GaussFunc(pbα, 
+    #                           genContraction(roundToMultiOfStep(con*lCs[i], halfAtol))), 
+    #                 LTuple(i.I .- 1), 
+    #                 normalizeGTO)
+    #              for i in CartesianIndices(lCs)])
+    #     end
+    # end
+
+    # xpn = roundToMultiOfStep(α₁ + α₂, halfAtol)
+    # con = roundToMultiOfStep(d₁ * d₂, halfAtol)
+    xpn = addParamBox(xpn1, xpn2, halfAtol)
+    con = mulParamBox(con1, con2, halfAtol)
+    BasisFunc(R, GaussFunc(xpn, con), (sgf1.l .+ sgf2.l), normalizeGTO)
 end
 
 function mul(sgf1::BasisFunc{T, D, 0, 1, PT1}, sgf2::BasisFunc{T, D, 0, 1, PT2}; 
