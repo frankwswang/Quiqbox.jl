@@ -8,10 +8,10 @@ struct FLevel{L} <: MetaParam{FLevel} end
 FLevel(::Type{itselfT}) = FLevel{0}
 FLevel(::Type{typeof(Base.identity)}) = FLevel{0}
 FLevel(::Type{<:Function}) = FLevel{1}
-FLevel(::Type{StructFunction{F}}) where {F} = FLevel(F)
+FLevel(::Type{<:StructFunction{F}}) where {F} = FLevel(F)
 FLevel(::Type{<:ParameterizedFunction{T1, T2}}) where {T1, T2} = 
 FLevel{getFLevel(T1)+getFLevel(T2)}
-FLevel(::Type{DressedItself{L}}) where {L} = FLevel{L}
+FLevel(::Type{<:DressedItself{L}}) where {L} = FLevel{L}
 FLevel(::F) where {F<:Function} = FLevel(F)
 const FI = FLevel(itself)
 
@@ -226,6 +226,12 @@ getTypeParams(::ParamBox{T, V, FL}) where {T, V, FL} = (T, V, FL)
 Return the `Pair` of the input variable and its symbol.
 """
 @inline dataOf(pb::ParamBox) = pb.data[]
+
+
+isInSym(pb::ParamBox, sym::Symbol) = (dataOf(pb)[end] == sym)
+
+
+isOutSym(::ParamBox{<:Any, V}, sym::Symbol) where {V} = (V == sym)
 
 
 """

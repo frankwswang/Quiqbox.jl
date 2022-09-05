@@ -38,7 +38,7 @@ compr2Arrays3((Eend_1to6=Eend[1:6], Eend_7toEnd=Eend[7:end]), 1e-5)
 # Grid-based basis set
 grid = GridBox(1, 3.0)
 gf2 = GaussFunc(0.7, 1.0)
-bs2 = genBasisFunc.(grid.point, Ref([gf2]))
+bs2 = genBasisFunc.(grid.point, Ref([gf2])) |> collect
 
 pars2 = markParams!(bs2, true)[1:2]
 
@@ -63,7 +63,7 @@ gf2_2 = GaussFunc(0.7, 1.0)
 grid2 = GridBox(1, 3.0)
 bs2_2 = genBasisFunc.(grid2.point, Ref([gf2_2]))
 gf3 = GaussFunc(0.5, 1.0)
-bs3 = bs2_2 .+ genBasisFunc(fill(0.0, 3), gf3)
+bs3 = (bs2_2 .+ genBasisFunc(fill(0.0, 3), gf3)) |> collect
 pars3 = markParams!(bs3, true)[1:5]
 local Es3L, ps3L, grads3L
 
