@@ -144,6 +144,9 @@ d1 = Dict(indVarOf.(bfm_gv.param))
 
 d2 = Dict(indVarOf.(getUnique!(bfm_gv.param|>collect, compareFunction=hasIdentical)))
 d3 = Dict(indVarOf.(getUnique!(bfm_gv.param|>collect, compareFunction=compareParamBox)))
+@show d1
+@show d2
+@show d3
 @test d1 == d2
 @test d1 == d3
 
