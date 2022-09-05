@@ -1,5 +1,6 @@
 using Test
 using Quiqbox
+using Quiqbox: formatTunableParams!, makeAbsLayerForXpnParams, compareParamBox, absMap
 using Suppressor: @suppress_out
 
 include("../../test/test-functions/Shared.jl")
@@ -7,6 +8,80 @@ include("../../test/test-functions/Shared.jl")
 @testset "Optimization.jl" begin
 
 errorThreshold = 1e-10
+
+grid0 = GridBox(1, 3.0)
+gf0 = GaussFunc(0.65, 1.2)
+enableDiff!(gf0.xpn)
+bs0 = genBasisFunc.(grid0.point, Ref([gf0])) |> collect
+toggleDiff!.(bs0[1].center)
+pars0 = markParams!(bs0, true)
+bs0_0 = deepcopy(bs0)
+pars0_0 = deepcopy(pars0)
+bs0_1 = [bs0...]
+pars0_1 = [pars0...]
+arr0Ds = formatTunableParams!(pars0_1, bs0_1)
+@test arr0Ds == map(x->fill(isDiffParam(x) ? x[] : x()), pars0_1)
+@test mapreduce(hasEqual, *, bs0, bs0_0)
+@test mapreduce(hasEqual, *, pars0, pars0_0)
+testDetachedPars = function(ps0, ps1)
+    bl = true
+    map(ps0, ps1) do p0, p1
+        if isDiffParam(p0) && isDiffParam(p1)
+            bl1 = p0 === p1
+            bl1 || (@show bl1)
+            bl *= bl1
+        else
+            bl2 = p0() == p1[] == p1()
+            bl2 || (@show bl2)
+            bl3 = ( typeof(p1.map) == 
+                    Quiqbox.DressedItself{Quiqbox.getFLevel(p0.map), typeof(p0.map)} )
+            bl3 || (@show bl3)
+            bl4 = outSymOf(p0) == outSymOf(p1)
+            bl4 || (@show bl4)
+            bl5 = isDiffParam(p0) == isDiffParam(p1)
+            bl5 || (@show bl5)
+            bl *= bl2*bl3*bl4*bl5
+        end
+    end
+    bl
+end
+@test testDetachedPars(pars0, pars0_1)
+parsAll0 = getParams(bs0)
+parsAll0_1 = getParams(bs0_1)
+@test testDetachedPars(parsAll0, parsAll0_1)
+findDifferentiableParIdx(differ) = x->findfirst(y->compareParamBox(y, x), differ)!==nothing
+parsToBeMutated0 = findall(findDifferentiableParIdx(pars0), parsAll0)
+parsToBeMutated0_1 = findall(findDifferentiableParIdx(pars0_1), parsAll0_1)
+@test parsToBeMutated0 == parsToBeMutated0_1
+
+testαabsPars = function(ps0, ps1)
+    bl = true
+    map(ps0, ps1) do p0, p1
+        if isOutSymEqual(p0, :α) && isOutSymEqual(p1, :α)
+            bl1 = p0.data[] === p1.data[]
+            bl1 || (@show bl1)
+            bl2 = p0.map === p1.map.f
+            bl2 || (@show bl2)
+            bl3 = p1.map isa absMap
+            bl3 || (@show bl3)
+            bl4 = p0.canDiff == p1.canDiff
+            bl4 || (@show bl4)
+            bl5 = p0.index == p1.index
+            bl5 || (@show bl5)
+            bl *= bl1*bl2*bl3*bl4*bl5
+        else
+            bl6 = p0 === p1
+            bl6 || (@show bl6)
+            bl *= bl6
+        end
+    end
+    bl
+end
+pars0_2, bs0_2 = makeAbsLayerForXpnParams(pars0_1, bs0_1)
+parsAll0_2 = getParams(bs0_2)
+@test testαabsPars(pars0_1, pars0_2)
+@test testαabsPars(parsAll0_1, parsAll0_2)
+
 
 # Floating basis set
 nucCoords = [[-0.7,0.0,0.0], [0.7,0.0,0.0]]

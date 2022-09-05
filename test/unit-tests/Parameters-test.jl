@@ -1,6 +1,6 @@
 using Test
 using Quiqbox
-using Quiqbox: FLevel, getFLevel, compareParamBox, isNotDiffNorInVar
+using Quiqbox: FLevel, getFLevel, compareParamBox
 
 @testset "Parameters.jl" begin
 
@@ -22,9 +22,7 @@ pb1 = ParamBox(1, :a)
 @test pb1[] == pb1() == 1 == outValOf(pb1)
 @test pb1.map == Quiqbox.itself == mapOf(pb1)
 @test pb1.canDiff[] == false == isDiffParam(pb1)
-@test !isNotDiffNorInVar(pb1)
 toggleDiff!(pb1)
-@test !isNotDiffNorInVar(pb1)
 @test pb1.canDiff[] == true
 @test !disableDiff!(pb1)
 @test pb1.canDiff[] == false
@@ -135,15 +133,19 @@ e_gv1.index[] = e_gv1_3.index[]
 
 @test Dict(indVarOf(pb3)) == Dict(:b=>1)
 pb4_3 = changeMapping(pb4, x->x+2)
-@test Dict(indVarOf.(bfm_gv.param)) == 
-      Dict( vcat( [Symbol(outSymOf(i), Quiqbox.numToSubs(i.index[]))=>i() 
-                   for i in bfm_gv.param if !isDiffParam(i)], 
-                  [Symbol(inSymOf(i), Quiqbox.numToSubs(i.index[]))=>i[] 
-                   for i in bfm_gv.param if isDiffParam(i)] ) )
-@test Dict(indVarOf.(bfm_gv.param)) == Dict(indVarOf.(unique(bfm_gv.param)))
-@test Dict(indVarOf.(bfm_gv.param)) != Dict(indVarOf.(getUnique!(bfm_gv.param|>collect)))
-@test Dict(indVarOf.(bfm_gv.param)) == Dict(indVarOf.(getUnique!(bfm_gv.param|>collect, 
-                                                        compareFunction=hasIdentical)))
+d1 = Dict(indVarOf.(bfm_gv.param))
+@test d1 == Dict( vcat( [Symbol(outSymOf(i), Quiqbox.numToSubs(i.index[]))=>i() 
+                        for i in bfm_gv.param if !isDiffParam(i)], 
+                        [Symbol(inSymOf(i), Quiqbox.numToSubs(i.index[]))=>i[] 
+                        for i in bfm_gv.param if isDiffParam(i)] ) )
+@test d1 == Dict(indVarOf.(unique(bfm_gv.param)))
+@test d1 != Dict(indVarOf.(getUnique!(bfm_gv.param|>collect)))
+
+
+d2 = Dict(indVarOf.(getUnique!(bfm_gv.param|>collect, compareFunction=hasIdentical)))
+d3 = Dict(indVarOf.(getUnique!(bfm_gv.param|>collect, compareFunction=compareParamBox)))
+@test d1 == d2
+@test d1 == d3
 
 
 # function compareParamBox
