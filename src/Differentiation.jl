@@ -263,13 +263,9 @@ getVpar(::FGTBasisFuncs1O{T, D, <:Any, 1}, ::Val) where {T, D} = ParamBox(0.0)
 function ∂BasisCore1(par::ParamBox{T, V, FL}, sgf::FGTBasisFuncs1O{T, D, <:Any, 1}) where 
                     {T, FL, V, D}
     mapreduce(+, sgf.param) do fPar
-        c = if compareParamBoxCore1(fPar, par)
+        c = if isDiffParam(fPar) && compareParamBoxCore1(fPar, par)
             _, V2, FL2 = getTypeParams(fPar)
-            if FL2 == FI || isDiffParam(fPar)
-                𝑑f(FL2, fPar.map, fPar[])
-            else
-                0
-            end
+            𝑑f(FL2, fPar.map, fPar[])
         else
             0
         end
@@ -280,15 +276,12 @@ end
 function ∂BasisCore2(par::ParamBox{T, V, FL}, sgf::FGTBasisFuncs1O{T, D, <:Any, 1}) where 
                     {T, V, FL, D}
     dividend = getVpar(sgf, Val(V))
-    if compareParamBoxCore2(par, dividend)
+    if !isDiffParam(dividend) && compareParamBoxCore2(par, dividend)
         ∂SGFcore(Val(V), sgf)
     else
         EmptyBasisFunc{T, D}()
     end
 end
-
-# ∂Basis(par::ParamBox{T, V, FI}, sgf::FGTBasisFuncs1O{T, D, <:Any, 1}) where {T, V, D} = 
-# ∂BasisCore1(par, sgf)
 
 ∂Basis(par::ParamBox{T, V, FL}, sgf::FGTBasisFuncs1O{T, D, <:Any, 1}) where {T, V, FL, D} = 
 isDiffParam(par) ? ∂BasisCore1(par, sgf) : ∂BasisCore2(par, sgf)

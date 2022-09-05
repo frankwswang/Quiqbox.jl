@@ -169,7 +169,7 @@ Sometimes you may want the parameters of basis functions (or `GaussFunc`) to be 
 julia> gf1
 GaussFunc{Float64, FLevel{0}, FLevel{0}}(xpn()=2.0, con()=1.0, param)
 ```
-The two fields of a `GaussFunc`, `.xpn`, and `.con` are `ParamBox`, and their input value (stored data) can be accessed through syntax `[]`:
+The two fields of a `GaussFunc`, `.xpn`, and `.con` are `ParamBox`, and their input value (i.e. the value of the input variable) can be accessed through syntax `[]`:
 ```jldoctest myLabel2
 julia> gf1.xpn
 ParamBox{Float64, :α, FLevel{0}}(2.0)[∂][α]
@@ -222,9 +222,9 @@ julia> markParams!(bs7)
 
 ## Dependent variable as a parameter
 
-Another control the user have on the parameters in Quiqbox is making a `ParamBox` represent a variable equal to the returned value of a mapping function taking the stored data as the argument. In other words, the data stored in the `ParamBox` is an "input variable", while the represented variable is the "output variable".
+Another control the user have on the parameters in Quiqbox is through a `ParamBox` represent a variable equal to the returned value of a mapping function taking the data value stored in the `ParamBox` as the input argument. In other words, the data stored in the `ParamBox` is an "input variable", while the represented variable is an "output variable".
 
-Such a mapping function is stored in the `map` field of the `ParamBox` (which normally is an ``R \to R`` mapping). The "output value" can be accessed through syntax `()`. In default, the input variable is mapped to itself:
+Such a mapping function is stored in the `map` field of the `ParamBox` (which normally is an ``R \to R`` mapping). The "output value" can be accessed through syntax `()`. In default, the input variable is mapped to an output variable that has the identical value:
 ```jldoctest myLabel2
 julia> pb1 = gf4.xpn
 ParamBox{Float64, :α, FLevel{0}}(2.5)[∂][α₁]
@@ -232,19 +232,12 @@ ParamBox{Float64, :α, FLevel{0}}(2.5)[∂][α₁]
 julia> pb1.map
 itself (generic function with 1 method)
 
-julia> pb1[] == pb1()
+julia> pb1[] === pb1()
 true
 ```
 
-You can get a clearer view of the variable value(s) in a `ParamBox` using `getVarDict`
-```jldoctest myLabel2
-julia> getVarDict(pb1)
-Dict{Symbol, Float64} with 1 entry:
-  :α₁ => 2.5
-```
-
 !!! info "Parameter represented by `ParamBox`"
-    The output variable of a `ParamBox` is always used in the construction of any basis function component. If you want to optimize the input variable when the mapping is nontrivial (i.e. not [`Quiqbox.itself`](@ref)), the `ParamBox` needs to be marked as "differentiable". For more information on parameter optimization, please see the docstring of [`optimizeParams!`](@ref) and section [Parameter Optimization](@ref).
+    The output variable of a `ParamBox` is always used in the construction of any basis function component. To optimize the input variable stored in an arbitrary `ParamBox` `pb`, `pb` needs to be marked as "differentiable" (i.e., `isDiffParam(pb)==true`). For more information on parameter optimization, please see the docstring of [`optimizeParams!`](@ref) and section [Parameter Optimization](@ref).
 
 ## Linear combinations of basis functions
 
