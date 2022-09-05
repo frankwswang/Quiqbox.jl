@@ -138,15 +138,9 @@ d1 = Dict(indVarOf.(bfm_gv.param))
                         for i in bfm_gv.param if !isDiffParam(i)], 
                         [Symbol(inSymOf(i), Quiqbox.numToSubs(i.index[]))=>i[] 
                         for i in bfm_gv.param if isDiffParam(i)] ) )
-@test d1 == Dict(indVarOf.(unique(bfm_gv.param)))
 @test d1 != Dict(indVarOf.(getUnique!(bfm_gv.param|>collect)))
-
-
 d2 = Dict(indVarOf.(getUnique!(bfm_gv.param|>collect, compareFunction=hasIdentical)))
 d3 = Dict(indVarOf.(getUnique!(bfm_gv.param|>collect, compareFunction=compareParamBox)))
-@show d1
-@show d2
-@show d3
 @test d1 == d2
 @test d1 == d3
 
