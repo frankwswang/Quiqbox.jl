@@ -57,7 +57,7 @@ pars5 = markParams!(grid5.point, true)
 @test length(pars5) == 2
 @test hasEqual(pars3[1], pars4[1], pars5[1])
 @test hasEqual(pars4[2], pars5[2], changeMapping(pars4[3], pars4[3].map, :Y))
-@test pars3[].data === pars5[2].data
+@test pars3[].data[] === pars5[2].data[]
 
 grid6 = GridBox((1,2,0), L1)
 grid7 = GridBox((1,2,0), (1.4, 1.4, L1))

@@ -1,8 +1,7 @@
 # Julia internal methods overload.
 
 import Base: ==
-==(pb1::ParamBox, pb2::ParamBox) = (pb1[] == pb2[] && 
-                                    pb1.dataName == pb2.dataName && 
+==(pb1::ParamBox, pb2::ParamBox) = (pb1.data == pb2.data && 
                                     isDiffParam(pb1) == isDiffParam(pb2) && 
                                     pb1.index[] == pb2.index[] && 
                                     typeof(pb1.map) === typeof(pb2.map))
@@ -19,13 +18,13 @@ diffColorSym(pb::ParamBox) = ifelse(isDiffParam(pb), :green, :light_black)
 import Base: show
 const nSigShown = 10
 function show(io::IO, pb::ParamBox)
-    v = pb.data[]
+    v = pb.data[][begin][]
     print(io, typeof(pb))
     print(io, "(", v isa Integer ? v : round(v, sigdigits=nSigShown), ")")
     print(io, "[")
     printstyled(io, "∂", color=diffColorSym(pb))
     print(io, "][")
-    printstyled(io, "$(getVar(pb, true))", color=:cyan)
+    printstyled(io, "$(indVarOf(pb)[begin])", color=:cyan)
     print(io, "]")
 end
 
@@ -171,12 +170,12 @@ import Base: *
 
 ## Iteration Interface
 import Base: iterate, size, length, eltype
-iterate(pb::ParamBox) = (pb.data[], nothing)
+iterate(pb::ParamBox) = (pb.data[][begin][], nothing)
 iterate(::ParamBox, _) = nothing
 size(::ParamBox) = ()
 length(::ParamBox) = 1
 eltype(::ParamBox{T}) where {T} = T
-size(pb::ParamBox, d::Integer) = size(pb.data[], d)
+size(pb::ParamBox, d::Integer) = size(pb.data[][begin][], d)
 
 iterate(sp::SpatialPoint) = iterate(sp.param)
 iterate(sp::SpatialPoint, state) = iterate(sp.param, state)
@@ -221,10 +220,10 @@ end
 
 ## Indexing Interface
 import Base: getindex, setindex!, firstindex, lastindex, eachindex, axes
-getindex(pb::ParamBox) = pb.data[]
+getindex(pb::ParamBox) = pb.data[][begin][]
 getindex(pb::ParamBox, ::Val{:first}) = getindex(pb)
 getindex(pb::ParamBox, ::Val{:last}) = getindex(pb)
-setindex!(pb::ParamBox, d) = begin pb.data[] = d end
+setindex!(pb::ParamBox, d) = begin pb.data[][begin][] = d end
 firstindex(::ParamBox) = Val(:first)
 lastindex(::ParamBox) = Val(:last)
 axes(::ParamBox) = ()
@@ -279,21 +278,17 @@ function hasBoolRelation(boolFunc::F,
                          pb1::ParamBox{<:Any, V1, F1}, pb2::ParamBox{<:Any, V2, F2}; 
                          ignoreFunction::Bool=false, ignoreContainer::Bool=false, 
                          kws...) where {F<:Function, V1, V2, F1, F2}
-    if ignoreContainer
-        boolFunc(pb1(), pb2())
-    else
-        ifelse(V1 == V2, 
-            ifelse((ignoreFunction || F1 == F2 == FI), 
-                boolFunc(pb1.data, pb2.data), 
+    ifelse(ignoreContainer || V1 == V2, 
+        ifelse((ignoreFunction || F1 == F2 == FI), 
+            boolFunc(pb1.data[][begin], pb2.data[][begin]), 
 
-                ( boolFunc(isDiffParam(pb1), isDiffParam(pb2)) && 
-                  boolFunc(pb1.map, pb2.map) && 
-                  boolFunc(pb1.data, pb2.data) )
-            ), 
+            ( boolFunc(isDiffParam(pb1), isDiffParam(pb2)) && 
+                boolFunc(pb1.map, pb2.map) && 
+                boolFunc(pb1.data[][begin], pb2.data[][begin]) )
+        ), 
 
-            false
-        )
-    end
+        false
+    )
 end
 
 

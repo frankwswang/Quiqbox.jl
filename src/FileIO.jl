@@ -20,7 +20,7 @@ there is a file with the same name.
 function checkFname(Fname::String; showWarning::Bool=true)
     FnameN = Fname
     while isfile(FnameN) == true
-        i = contains(FnameN, ".") ? ( findlast(".", FnameN)|>last ) : ( (FnameN|>length)+1 )
+        i = contains(FnameN, ".") ? (findlast(".", FnameN)|>last) : (lastindex(FnameN)+1)
         FnameN = FnameN[1:i-1] * "_N" * FnameN[i:end]
     end
     FnamePrint, FnameNPrint = map([Fname, FnameN]) do f
@@ -105,9 +105,9 @@ function inSymbol(sym::Symbol, src::Symbol)
     for i in subscripts
         i == symStr[end] && (bl = true; break)
     end
-    l1 = length(symStr)
-    l2 = length(srcStr)
-    bl ? (l1 == l2 && symStr == srcStr) : (l1 <= l2 && symStr == srcStr[1:l1])
+    l1 = sizeof(symStr)
+    l2 = sizeof(srcStr)
+    bl ? (l1 == l2 && symStr == srcStr) : (l1 <= l2 && startswith(srcStr, symStr))
 end
 
 

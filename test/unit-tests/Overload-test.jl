@@ -97,6 +97,7 @@ pb5 = ParamBox(-1, :fa, abs)
 pb6 = ParamBox(-1, :x, abs)
 pb7 = ParamBox(-1.0, :undef, identity, index=1)
 pb8 = ParamBox(-1, :a, abs, index=2)
+pb9 = ParamBox(Val(:a), pb1)
 @test false == (pb3 == pb5)
 @test true  == (pb3 == pb6)
 @test false  == hasBoolRelation(==, pb1, pb2)
@@ -107,10 +108,10 @@ toggleDiff!(pb1)
 @test true  == hasBoolRelation(==, pb1, pb2, ignoreContainer=true)
 @test true  == hasBoolRelation(==, pb1, pb7, ignoreContainer=true)
 @test true  == hasBoolRelation(==, pb1, pb4)
-@test false == hasBoolRelation(===, pb1, pb4)
-@test true  == hasBoolRelation(===, pb1, pb4, ignoreContainer=true)
 @test false == hasBoolRelation(==, pb2, pb8)
 @test true  == hasBoolRelation(==, pb2, pb8, ignoreFunction = true)
+@test false == hasBoolRelation(===, pb1, pb9)
+@test true  == hasBoolRelation(===, pb1, pb9, ignoreContainer=true)
 
 
 # function +
@@ -330,7 +331,7 @@ collection5 = collect(bfs1); collection5t = [bfs1[1], bfs1[2], bfs1[3]]
 
 
 # function broadcastable
-@test getproperty.(pb1, [:data, :map]) == [pb1.data, pb1.map]
+@test all(getproperty.(pb1, [:data, :map]) .=== [pb1.data, pb1.map])
 @test getproperty.(gf1, [:xpn, :con]) == [gf1.xpn, gf1.con]
 @test hasEqual(bf1 .* [1.0, 3.0], [bf1*1.0, bf1*3.0])
 bfm12 = bf1 + genBasisFunc([1.0, 2.0, 2.0], (2.0, 3.0))

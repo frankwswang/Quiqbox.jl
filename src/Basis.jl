@@ -49,36 +49,40 @@ GaussFunc(genExponent(e), genContraction(d))
 
 """
 
-    genExponent(e::T, mapFunction::Function; canDiff::Bool=true, 
-                dataName::Symbol=:undef) where {T<:AbstractFloat} -> 
+    genExponent(e::T, mapFunction::Function=$(itself); 
+                canDiff::Bool=ifelse($(FLevel)(mapFunction)==$(FI), false, true), 
+                inSym::Symbol=$(xpnIVsym)) where {T<:AbstractFloat} -> 
     ParamBox{T, :$(xpnSym)}
 
-    genExponent(e::Array{T, 0}, mapFunction::Function; canDiff::Bool=true, 
-                dataName::Symbol=:undef) where {T<:AbstractFloat} -> 
+    genExponent(e::Array{T, 0}, mapFunction::Function=$(itself); 
+                canDiff::Bool=ifelse($(FLevel)(mapFunction)==$(FI), false, true), 
+                inSym::Symbol=$(xpnIVsym)) where {T<:AbstractFloat} -> 
     ParamBox{T, :$(xpnSym)}
 
-Construct a [`ParamBox`](@ref) for an exponent coefficient given a value. Keywords 
-`mapFunction` and `canDiff` work the same way as in a general constructor of a `ParamBox`.
+    genExponent(eData::Pair{Array{T, 0}, Symbol}, 
+                mapFunction::Function=$(itself); 
+                canDiff::Bool=ifelse($(FLevel)(mapFunction)==$(FI), false, true)) where 
+               {T<:AbstractFloat} -> 
+    ParamBox{T, :$(xpnSym)}
+
+Construct an exponent coefficient given a value or variable (with its symbol). 
+`mapFunction`, `canDiff`, and `inSym` work the same way as in a general constructor of a 
+[`ParamBox`](@ref).
 """
-genExponent(e::AbstractFloat, mapFunction::Function; 
-            canDiff::Bool=true, dataName::Symbol=:undef) = 
-ParamBox(Val(xpnSym), mapFunction, fill(e), genIndex(nothing), fill(canDiff), dataName)
+genExponent(eData::Pair{Array{T, 0}, Symbol}, mapFunction::Function=itself; 
+            canDiff::Bool=ifelse(FLevel(mapFunction)==FI, false, true)) where 
+           {T<:AbstractFloat} = 
+ParamBox(Val(xpnSym), mapFunction, eData, genIndex(nothing), fill(canDiff))
 
-genExponent(e::Array{<:AbstractFloat, 0}, mapFunction::Function; 
-            canDiff::Bool=true, dataName::Symbol=:undef) = 
-ParamBox(Val(xpnSym), mapFunction, e, genIndex(nothing), fill(canDiff), dataName)
+genExponent(e::Array{T, 0}, mapFunction::Function=itself; 
+            canDiff::Bool=ifelse(FLevel(mapFunction)==FI, false, true), 
+            inSym::Symbol=xpnIVsym) where {T<:AbstractFloat} = 
+genExponent(e=>inSym, mapFunction; canDiff)
 
-"""
-
-    genExponent(e::T) where {T<:AbstractFloat} -> ParamBox{T, :$(xpnSym)}
-
-    genExponent(e::Array{T, 0}) where {T<:AbstractFloat} -> ParamBox{T, :$(xpnSym)}
-
-"""
-genExponent(e::AbstractFloat) = ParamBox(Val(xpnSym), itself, fill(e), genIndex(nothing))
-
-genExponent(e::Array{<:AbstractFloat, 0}) = 
-ParamBox(Val(xpnSym), itself, e, genIndex(nothing))
+genExponent(e::AbstractFloat, mapFunction::Function=itself; 
+            canDiff::Bool=ifelse(FLevel(mapFunction)==FI, false, true), 
+            inSym::Symbol=xpnIVsym) = 
+genExponent(fill(e)=>inSym, mapFunction; canDiff)
 
 """
 
@@ -86,41 +90,47 @@ ParamBox(Val(xpnSym), itself, e, genIndex(nothing))
 
 Convert a [`ParamBox`](@ref) to the container of an exponent coefficient.
 """
-genExponent(pb::ParamBox) = ParamBox(Val(xpnSym), pb, canDiff=fill(pb|>isDiffParam))
+genExponent(pb::ParamBox) = ParamBox(Val(xpnSym), pb, fill(pb.canDiff[]))
 
 
 """
 
-    genContraction(c::T, mapFunction::Function; canDiff::Bool=true, 
-                   dataName::Symbol=:undef) where {T<:AbstractFloat} -> 
+    genContraction(d::T, mapFunction::Function=$(itself); 
+                   canDiff::Bool=ifelse($(FLevel)(mapFunction)==$(FI), false, true), 
+                   inSym::Symbol=$(conIVsym)) where {T<:AbstractFloat} -> 
     ParamBox{T, :$(conSym)}
 
-    genContraction(c::Array{T, 0}, mapFunction::Function; canDiff::Bool=true, 
-                   dataName::Symbol=:undef) where {T<:AbstractFloat} -> 
+    genContraction(d::Array{T, 0}, mapFunction::Function=$(itself); 
+                   canDiff::Bool=ifelse($(FLevel)(mapFunction)==$(FI), false, true), 
+                   inSym::Symbol=$(conIVsym)) where {T<:AbstractFloat} -> 
     ParamBox{T, :$(conSym)}
 
-Construct a [`ParamBox`](@ref) for an contraction coefficient given a value. Keywords 
-`mapFunction` and `canDiff` work the same way as in a general constructor of a `ParamBox`.
+    genContraction(dData::Pair{Array{T, 0}, Symbol}, 
+                   mapFunction::Function=$(itself); 
+                   canDiff::Bool=ifelse($(FLevel)(mapFunction)==$(FI), false, true)) where 
+                  {T<:AbstractFloat} -> 
+    ParamBox{T, :$(conSym)}
+
+Construct a contraction coefficient given a value or variable (with its symbol). 
+`mapFunction`, `canDiff`, and `inSym` work the same way as in a general constructor of a 
+[`ParamBox`](@ref).
 """
-genContraction(c::AbstractFloat, mapFunction::Function; 
-               canDiff::Bool=true, dataName::Symbol=:undef) = 
-ParamBox(Val(conSym), mapFunction, fill(c), genIndex(nothing), fill(canDiff), dataName)
+genContraction(dData::Pair{Array{T, 0}, Symbol}, 
+               mapFunction::Function=itself; 
+               canDiff::Bool=ifelse(FLevel(mapFunction)==FI, false, true)) where 
+              {T<:AbstractFloat} = 
+ParamBox(Val(conSym), mapFunction, dData, genIndex(nothing), fill(canDiff))
 
-genContraction(c::Array{<:AbstractFloat, 0}, mapFunction::Function; 
-               canDiff::Bool=true, dataName::Symbol=:undef) = 
-ParamBox(Val(conSym), mapFunction, c, genIndex(nothing), fill(canDiff), dataName)
+genContraction(d::Array{T, 0}, mapFunction::Function=itself; 
+               canDiff::Bool=ifelse(FLevel(mapFunction)==FI, false, true), 
+               inSym::Symbol=conIVsym) where {T<:AbstractFloat} = 
+genContraction(d=>inSym, mapFunction; canDiff)
 
-"""
+genContraction(d::AbstractFloat, mapFunction::Function=itself; 
+               canDiff::Bool=ifelse(FLevel(mapFunction)==FI, false, true), 
+               inSym::Symbol=conIVsym) = 
+genContraction(fill(d)=>inSym, mapFunction; canDiff)
 
-    genContraction(c::T) where {T<:AbstractFloat} -> ParamBox{T, :$(conSym)}
-
-    genContraction(c::Array{T, 0}) where {T<:AbstractFloat} -> ParamBox{T, :$(conSym)}
-
-"""
-genContraction(c::AbstractFloat) = ParamBox(Val(conSym), itself, fill(c), genIndex(nothing))
-
-genContraction(c::Array{<:AbstractFloat, 0}) = 
-ParamBox(Val(conSym), itself, c, genIndex(nothing))
 
 """
 
@@ -128,7 +138,7 @@ ParamBox(Val(conSym), itself, c, genIndex(nothing))
 
 Convert a [`ParamBox`](@ref) to an exponent coefficient parameter.
 """
-genContraction(pb) = ParamBox(Val(conSym), pb, canDiff=fill(pb|>isDiffParam))
+genContraction(pb::ParamBox) = ParamBox(Val(conSym), pb, fill(pb.canDiff[]))
 
 
 const P1D{T, Lx} = Tuple{ParamBox{T, cxSym, FLevel{Lx}}}
@@ -159,20 +169,14 @@ struct SpatialPoint{T, D, PT} <: AbstractSpatialPoint{T, D}
     SpatialPoint(pbs::SPointT{T}) where {T} = new{T, length(pbs), typeof(pbs)}(pbs)
 end
 
+
 """
 
-    genSpatialPoint(point::Union{Tuple{Vararg{AbstractFloat}}, 
-                                       AbstractVector{<:AbstractFloat}}, 
-                    mapFunction::F=itself; canDiff::Bool=true, dataName::Symbol=:undef) -> 
-    SpatialPoint
+    genSpatialPoint(point::Union{NTuple{D, Union{T, Array{T, 0}}}, 
+                                 AbstractVector}) where {D, T<:AbstractFloat} -> 
+    SpatialPoint{T, D}
 
-    genSpatialPoint(point::Union{Tuple{Vararg{Array{<:AbstractFloat, 0}}}, 
-                                 AbstractVector{<:Array{<:AbstractFloat, 0}}}, 
-                    mapFunction::F=itself; canDiff::Bool=true, dataName::Symbol=:undef) -> 
-    SpatialPoint
-
-The constructor of [`SpatialPoint`](@ref). Keywords `mapFunction` and `canDiff` work the 
-same way as in a general constructor of a `ParamBox`.
+Construct a [`SpatialPoint`](@ref) from a collection of coordinate components.
 ≡≡≡ Example(s) ≡≡≡
 
 ```jldoctest; setup = :(push!(LOAD_PATH, "../../src/"); using Quiqbox)
@@ -193,29 +197,37 @@ julia> p2[1]
 ParamBox{Float64, :X, $(FI)}(1.2)[∂][X]
 ```
 """
-genSpatialPoint(v::AbstractVector, optArgs...) = genSpatialPoint(Tuple(v), optArgs...)
-genSpatialPoint(v::NTuple{N, Any}, optArgs...) where {N} = 
-genSpatialPoint.(v, Tuple([1:N;]), optArgs...) |> genSpatialPointCore
+genSpatialPoint(v::AbstractVector) = genSpatialPoint(Tuple(v))
+genSpatialPoint(v::NTuple{D, Union{T, Array{T, 0}}}) where {D, T<:AbstractFloat} = 
+genSpatialPoint.(v, Tuple([1:D;])) |> genSpatialPointCore
 
 """
 
-    genSpatialPoint(comp::T, index::Int) where {T<:AbstractFloat} -> ParamBox{T}
-
-    genSpatialPoint(comp::Array{T, 0}, index::Int) where {T<:AbstractFloat} -> ParamBox{T}
-
-    genSpatialPoint(comp::T, index::Int, mapFunction::Function; canDiff::Bool=true, 
-                    dataName::Symbol=:undef) where {T<:AbstractFloat} -> 
+    genSpatialPoint(comp::T, compIndex::Int, 
+                    mapFunction::Function=itself; 
+                    canDiff::Bool=ifelse(FLevel(mapFunction)==FI, false, true), 
+                    inSym::Symbol=conIVsym) where {T<:AbstractFloat} -> 
     ParamBox{T}
 
-    genSpatialPoint(comp::Array{T, 0}, index::Int, mapFunction::Function; 
-                    canDiff::Bool=true, dataName::Symbol=:undef) where 
-                   {T<:AbstractFloat} -> 
+    genSpatialPoint(comp::Array{T, 0}, compIndex::Int, 
+                    mapFunction::Function=itself; 
+                    canDiff::Bool=ifelse(FLevel(mapFunction)==FI, false, true), 
+                    inSym::Symbol=conIVsym) where {T<:AbstractFloat} -> 
     ParamBox{T}
 
-    genSpatialPoint(comp::ParamBox{T}, index::Int) where {T<:AbstractFloat} -> ParamBox{T}
+    genSpatialPoint(compData::Pair{Array{T, 0}, Symbol}, compIndex::Int, 
+                    mapFunction::Function=itself; 
+                    canDiff::Bool=ifelse(FLevel(mapFunction)==FI, false, true)) -> 
+    ParamBox{T}
 
-Return the component of a [`SpatialPoint`](@ref) given its value (or 0-D container) and 
-index.
+Construct a [`ParamBox`](@ref) as the `compIndex` th component of a [`SpatialPoint`](@ref) 
+given a value or variable (with its symbol). `mapFunction`, `canDiff`, and `inSym` work 
+the same way as in a general constructor of a `ParamBox`.
+
+    genSpatialPoint(point::ParamBox{T}, compIndex::Int) where {T<:AbstractFloat} -> 
+    ParamBox{T}
+
+Convert a `ParamBox` to the `compIndex` th component of a `SpatialPoint`.
 
 ≡≡≡ Example(s) ≡≡≡
 
@@ -234,34 +246,39 @@ julia> Y1
 ParamBox{Float64, :Y, $(FI)}(1.5)[∂][Y]
 ```
 """
-genSpatialPoint(comp::AbstractFloat, index::Int, mapFunction::Function; 
-                canDiff::Bool=true, dataName::Symbol=:undef) = 
-ParamBox(Val(SpatialParamSyms[index]), mapFunction, fill(comp), 
-         genIndex(nothing), fill(canDiff), dataName)
+genSpatialPoint(compData::Pair{Array{T, 0}, Symbol}, compIndex::Int, 
+                mapFunction::Function=itself; 
+                canDiff::Bool=ifelse(FLevel(mapFunction)==FI, false, true)) where 
+               {T<:AbstractFloat} = 
+ParamBox(Val(SpatialParamSyms[compIndex]), mapFunction, compData, genIndex(nothing), 
+         fill(canDiff))
 
-genSpatialPoint(comp::Array{<:AbstractFloat, 0}, index::Int, mapFunction::Function; 
-                canDiff::Bool=true, dataName::Symbol=:undef) = 
-ParamBox(Val(SpatialParamSyms[index]), mapFunction, comp, genIndex(nothing), fill(canDiff), 
-         dataName)
+genSpatialPoint(comp::Array{T, 0}, compIndex::Int, 
+                mapFunction::Function=itself; 
+                canDiff::Bool=ifelse(FLevel(mapFunction)==FI, false, true), 
+                inSym::Symbol=conIVsym) where {T<:AbstractFloat} = 
+genSpatialPoint(comp=>inSym, compIndex, mapFunction; canDiff)
 
-genSpatialPoint(comp::AbstractFloat, index::Int) = 
-ParamBox(Val(SpatialParamSyms[index]), itself, fill(comp), genIndex(nothing))
+genSpatialPoint(comp::AbstractFloat, compIndex::Int, 
+                mapFunction::Function=itself; 
+                canDiff::Bool=ifelse(FLevel(mapFunction)==FI, false, true), 
+                inSym::Symbol=conIVsym) = 
+genSpatialPoint(fill(comp)=>inSym, compIndex, mapFunction; canDiff)
 
-genSpatialPoint(comp::Array{<:AbstractFloat, 0}, index::Int) = 
-ParamBox(Val(SpatialParamSyms[index]), itself, comp, genIndex(nothing))
-
-genSpatialPoint(point::ParamBox, index::Int) = 
-ParamBox(Val(SpatialParamSyms[index]), point, canDiff=fill(point|>isDiffParam))
+genSpatialPoint(point::ParamBox, compIndex::Int) = 
+ParamBox(Val(SpatialParamSyms[compIndex]), point, fill(point.canDiff[]))
 
 """
 
-    genSpatialPoint(point::Union{Tuple{Vararg{ParamBox}}, AbstractVector{<:ParamBox}}) -> 
-    SpatialPoint
+    genSpatialPoint(point::Union{Tuple{Vararg{ParamBox{T}}}, 
+                    AbstractVector{<:ParamBox{T}}}) where {T} -> 
+    SpatialPoint{T}
 
 Convert a collection of [`ParamBox`](@ref)s to a [`SpatialPoint`](@ref).
 """
-genSpatialPoint(point::NTuple{N, ParamBox}) where {N} = 
-ParamBox.(Val.(SpatialParamSyms[1:N]), point) |> genSpatialPointCore
+genSpatialPoint(point::NTuple{D, ParamBox{T}}) where {D, T} = 
+ParamBox.(Val.(SpatialParamSyms[1:D]), point, 
+          (fill∘getindex∘getproperty).(point, :canDiff)) |> genSpatialPointCore
 
 genSpatialPointCore(point::Union{P1D, P2D, P3D}) = SpatialPoint(point)
 
@@ -285,7 +302,7 @@ A (floating) Gaussian-type basis function with its center assigned to a defined 
 
 `center::SpatialPoint{T, D, PT}`: The `D`-dimensional center.
 
-`gauss::NTuple{N, GaussFunc{T, <:Any}}`: Gaussian functions within the basis function.
+`gauss::NTuple{GN, GaussFunc{T, <:Any}}`: Gaussian functions within the basis function.
 
 `l::Tuple{LTuple{D, 𝑙}}`: Cartesian representation of the angular momentum. E.g., 
 `$(LTuple(1, 0, 0))` (X¹Y⁰Z⁰) would correspond to an specific angular momentum 
@@ -959,36 +976,15 @@ function sumOf(bs::Union{Tuple{Vararg{GTBasisFuncs{T, D, 1}}},
 end
 
 function mergeGaussFuncs(gf1::GaussFunc{T}, gf2::GaussFunc{T}; 
-                         roundAtol::Real=getAtolVal(T)) where {T}
-    halfAtol = nearestHalfOf(roundAtol)
-    xpn = if (xpn1 = gf1.xpn) === (xpn2 = gf2.xpn) || hasIdentical(xpn1, xpn2)
-        xpn1
-    elseif hasEqual(xpn1, xpn2)
-        deepcopy(xpn1)
-    else
-        xpn1R = xpn1()
-        xpn2R = xpn2()
-        if isApprox(xpn1R, xpn2R, atol=roundAtol)
-            genExponent( getNearestMid(xpn1R, xpn2R, halfAtol) )
-        else
-            return [gf1, gf2]
-        end
-    end
-
-    res = if (con1 = gf1.con) === (con2 = gf2.con) || hasIdentical(con1, con2)
-        mul(GaussFunc(xpn, con1), 2; roundAtol)
-    elseif hasEqual(con1, con2)
-        mul(GaussFunc(xpn, deepcopy(con1)), 2; roundAtol)
-    else
-        GaussFunc(xpn, genContraction(roundToMultiOfStep(con1() + con2(), halfAtol)))
-    end
-
-    [res]
+                         roundAtol::Real=nearestHalfOf(getAtolVal(T))) where {T}
+    xpnRes = reduceParamBoxes(gf1.xpn, gf2.xpn, roundAtol)
+    length(xpnRes) > 1 && (return [gf1, gf2])
+    [GaussFunc(xpnRes[], addParamBox(gf1.con, gf2.con, roundAtol))]
 end
 
 mergeGaussFuncs(gf1::GaussFunc{T}, gf2::GaussFunc{T}, gf3::GaussFunc{T}, 
                 gf4::GaussFunc{T}...; 
-                roundAtol::Real=getAtolVal(T)) where {T} = 
+                roundAtol::Real=nearestHalfOf(getAtolVal(T))) where {T} = 
 mergeMultiObjs(GaussFunc{T}, mergeGaussFuncs, gf1, gf2, gf3, gf4...; roundAtol)
 
 
@@ -1005,7 +1001,9 @@ comparing parameters stored in each `CompositeGTBasisFuncs` to determine whether
 treated as "equal"; each parameter in the returned `CompositeGTBasisFuncs` is set to the 
 nearest exact multiple of `0.5atol`. When `roundAtol` is set to `NaN`, there will be no 
 approximation nor rounding. This function can be called using `+` syntax with the keyword 
-argument set to it default value.
+argument set to it default value. **NOTE: For the `ParamBox` (stored in the input 
+arguments) that are marked as non-differentiable, they will be fused together if possible 
+to generate new `ParamBox`(s) no longer linked to the input variable stored in them.**
 
 ≡≡≡ Example(s) ≡≡≡
 
@@ -1026,30 +1024,21 @@ end
 
 add(b::BasisFunc) = itself(b)
 
-function margeBasisFuncCenters(cen1, cen2, roundAtol)
-    if cen1 === cen2 || hasIdentical(cen1, cen2)
-        cen1
-    elseif hasEqual(cen1, cen2)
-        deepcopy(cen1)
-    else
-        c1 = coordOf(cen1)
-        c2 = coordOf(cen2)
-        if all(isApprox.(c1, c2, atol=roundAtol))
-            genSpatialPoint( getNearestMid.(c1, c2, nearestHalfOf(roundAtol)) )
-        else
-            nothing
-        end
-    end
+function reduceBasisFuncCenters(cen1, cen2, roundAtol)
+    res = reduceParamBoxes.(cen1, cen2, roundAtol)
+    any(length(i) > 1 for i in res) && return [cen1, cen2]
+    [SpatialPoint(map(x->x[], res))]
 end
 
 function add(bf1::BasisFunc{T, D, 𝑙1, GN1, PT1}, bf2::BasisFunc{T, D, 𝑙2, GN2, PT2}; 
              roundAtol::Real=getAtolVal(T)) where 
             {T, D, 𝑙1, 𝑙2, GN1, GN2, PT1, PT2}
+    halfAtol = nearestHalfOf(roundAtol)
     if 𝑙1 == 𝑙2 && bf1.l == bf2.l && bf1.normalizeGTO == bf2.normalizeGTO
-        cen = margeBasisFuncCenters(bf1.center, bf2.center, roundAtol)
-        cen === nothing && (return BasisFuncMix([bf1, bf2]))
-        gfsN = mergeGaussFuncs(bf1.gauss..., bf2.gauss...; roundAtol) |> Tuple
-        BasisFunc(cen, gfsN, bf1.l, bf1.normalizeGTO)
+        cenRes = reduceBasisFuncCenters(bf1.center, bf2.center, halfAtol)
+        length(cenRes) > 1 && (return BasisFuncMix([bf1, bf2]))
+        gfsN = mergeGaussFuncs(bf1.gauss..., bf2.gauss..., roundAtol=halfAtol) |> Tuple
+        BasisFunc(cenRes[], gfsN, bf1.l, bf1.normalizeGTO)
     else
         BasisFuncMix([bf1, bf2])
     end
@@ -1103,6 +1092,16 @@ add(::EmptyBasisFunc{T1, D}, ::EmptyBasisFunc{T2, D};
 EmptyBasisFunc{promote_type(T1, T2), D}()
 
 
+function reduceGaussFuncs(gf1, gf2, roundAtol)
+    xpn1, con1 = gf1.param
+    xpn2, con2 = gf2.param
+    res1 = reduceParamBoxes(xpn1, xpn2, roundAtol)
+    length(res1) > 1 && return [gf1, gf2]
+    res2 = reduceParamBoxes(con1, con2, roundAtol)
+    length(res2) > 1 && return [gf1, gf2]
+    [GaussFunc(res1, res2)]
+end
+
 mergeBasisFuncs(bf::FloatingGTBasisFuncs{T, D}; roundAtol::Real=NaN) where {T, D} = [bf]
 
 mergeBasisFuncs(bs::Vararg{FloatingGTBasisFuncs{T, D}, 2}; 
@@ -1116,9 +1115,10 @@ function mergeBasisFuncs(bf1::FloatingGTBasisFuncs{T, D, 𝑙, GN, PT1, ON1},
     bf1.l == bf2.l && ( return [bf1, bf2] )
     ss = SubshellXYZsizes[𝑙+1]
     (ON1 == ss || ON2 == ss) && ( return [bf1, bf2] )
+    halfAtol = nearestHalfOf(roundAtol)
     if bf1.normalizeGTO == bf2.normalizeGTO
-        cen = margeBasisFuncCenters(bf1.center, bf2.center, roundAtol)
-        cen === nothing && (return [bf1, bf2])
+        cenRes = reduceBasisFuncCenters(bf1.center, bf2.center, halfAtol)
+        length(cenRes) > 1 && (return [bf1, bf2])
         if bf1.gauss===bf2.gauss || hasIdentical(bf1.gauss, bf2.gauss)
             gfs = bf1.gauss
         elseif hasEqual(bf1.gauss, bf2.gauss)
@@ -1130,26 +1130,14 @@ function mergeBasisFuncs(bf1::FloatingGTBasisFuncs{T, D, 𝑙, GN, PT1, ON1},
             gfs1 = bf1.gauss[ids]
             gfs2 = bf2.gauss[sortperm(gfPairs2)]
             gfs = Array{GaussFunc{T}}(undef, GN)
-            for (id, (i, gf1), gf2) in zip(ids, enumerate(gfs1), gfs2)
-                res = if gf1 === gf2 || hasIdentical(gf1, gf2)
-                    gf1
-                elseif hasEqual(gf1, gf2)
-                    deepcopy(gf1)
-                else
-                    p1 = gfPairs1[i]
-                    p2 = gfPairs2[i]
-                    if all(isApprox.(p1, p2, atol=roundAtol))
-                        pair = getNearestMid.(p1, p2, nearestHalfOf(roundAtol))
-                        GaussFunc(pair...)
-                    else
-                        false
-                    end
-                end
-                (res == false) ? (return [bf1, bf2]) : (gfs[id] = res)
+            for (id, gf1, gf2) in zip(ids, gfs1, gfs2)
+                gfRes = reduceGaussFuncs(gf1, gf2, halfAtol)
+                length(gfRes) > 1 && (return [bf1, bf2])
+                gfs[id] = gfRes[]
             end
             gfs = Tuple(gfs)
         end
-        [BasisFuncs(cen, gfs, (bf1.l..., bf2.l...), bf1.normalizeGTO)]
+        [BasisFuncs(cenRes[], gfs, (bf1.l..., bf2.l...), bf1.normalizeGTO)]
     else
         [bf1, bf2]
     end
@@ -1202,7 +1190,10 @@ Multiplication between a `Real` number and a [`GaussFunc`](@ref) or two `GaussFu
 in each `GaussFunc` to determine whether they are treated as "equal"; each parameter in the 
 returned `GaussFunc` is set to the nearest exact multiple of `0.5atol`. When `roundAtol` is 
 set to `NaN`, there will be no approximation nor rounding. This function can be called 
-using `*` syntax with the keyword argument set to it default value.
+using `*` syntax with the keyword argument set to it default value. **NOTE: For the 
+`ParamBox` (stored in the input arguments) that are marked as non-differentiable, they will 
+be fused together if possible to generate new `ParamBox`(s) no longer linked to the data 
+(input variable) stored in them.**
 
 ≡≡≡ Example(s) ≡≡≡
 
@@ -1224,18 +1215,18 @@ function mul(gf::GaussFunc{T}, coeff::Real; roundAtol::Real=getAtolVal(T)) where
     if isone(coeff)
         itself(gf)
     else
-        con, mapFunc, dataName = mulParamBoxCore(coeff, gf.con, nearestHalfOf(roundAtol))
-        conNew = genContraction(con, mapFunc; dataName, canDiff=isDiffParam(gf.con))
-        GaussFunc(gf.xpn, conNew)
+        GaussFunc(gf.xpn, mulParamBox(coeff, gf.con, nearestHalfOf(roundAtol)))
     end
 end
 
 mul(coeff::Real, gf::GaussFunc{T}; roundAtol::Real=getAtolVal(T)) where {T} = 
 mul(gf, coeff; roundAtol)
 
-mul(gf1::GaussFunc{T}, gf2::GaussFunc{T}; roundAtol::Real=getAtolVal(T)) where {T} = 
-GaussFunc(    genExponent(roundToMultiOfStep(gf1.xpn()+gf2.xpn(), roundAtol)), 
-           genContraction(roundToMultiOfStep(gf1.con()*gf2.con(), roundAtol)) )
+function mul(gf1::GaussFunc{T}, gf2::GaussFunc{T}; roundAtol::Real=getAtolVal(T)) where {T}
+    halfAtol = nearestHalfOf(roundAtol)
+    GaussFunc( addParamBox(gf1.xpn, gf2.xpn, halfAtol), 
+               mulParamBox(gf1.con, gf2.con, halfAtol) )
+end
 
 """
 
@@ -1287,28 +1278,24 @@ function mul(sgf1::BasisFunc{T, D, 𝑙1, 1, PT1}, sgf2::BasisFunc{T, D, 𝑙2, 
              normalizeGTO::Union{Bool, Missing}=missing, 
              roundAtol::Real=getAtolVal(T)) where {T, D, 𝑙1, 𝑙2, PT1, PT2}
     halfAtol = nearestHalfOf(roundAtol)
-    α₁ = sgf1.gauss[1].xpn()
-    α₂ = sgf2.gauss[1].xpn()
-    d₁ = sgf1.gauss[1].con()
-    d₂ = sgf2.gauss[1].con()
+    xpn1, con1 = sgf1.gauss[begin].param
+    xpn2, con2 = sgf2.gauss[begin].param
     n₁ = sgf1.normalizeGTO
     n₂ = sgf2.normalizeGTO
-    n₁ && (d₁ *= getNormFactor(sgf1)[])
-    n₂ && (d₂ *= getNormFactor(sgf2)[])
     normalizeGTO isa Missing && (normalizeGTO = n₁*n₂)
+    cen1 = sgf1.center
+    cen2 = sgf2.center
 
-    R = if (cen1 = sgf1.center) === (cen2 = sgf2.center) || hasIdentical(cen1, cen2)
-        cen1
-    elseif hasEqual(cen1, cen2)
-        deepcopy(cen1)
-    else
+    cenRes = reduceBasisFuncCenters(cen1, cen2, halfAtol)
+    R = if length(cenRes) > 1
+        α₁ = xpn1()
+        α₂ = xpn2()
+        d₁ = con1() * (n₁ ? getNormFactor(sgf1)[] : 1)
+        d₂ = con2() * (n₂ ? getNormFactor(sgf2)[] : 1)
         R₁ = coordOf(cen1)
         R₂ = coordOf(cen2)
-        if all(isApprox.(R₁, R₂, atol=roundAtol))
-            genSpatialPoint( getNearestMid.(R₁, R₂, halfAtol) )
-        else
-            l1 = sgf1.l[1]
-            l2 = sgf2.l[1]
+        l1 = sgf1.l[begin]
+            l2 = sgf2.l[begin]
             xpn, con, cen = gaussProd((α₁, d₁, R₁), (α₂, d₂, R₂))
             shiftPolyFunc = @inline (n, c1, c2) -> [(c2 - c1)^k*binomial(n,k) for k=n:-1:0]
             coeffs = map(1:3) do i
@@ -1319,7 +1306,8 @@ function mul(sgf1::BasisFunc{T, D, 𝑙1, 1, PT1}, sgf2::BasisFunc{T, D, 𝑙2, 
                 m = c1N * transpose(c2N |> reverse)
                 [diag(m, k)|>sum for k = n2 : (-1)^(-n1 < n2) : -n1]
             end
-            lCs = cat(Ref(coeffs[1] * transpose(coeffs[2])) .* coeffs[3]..., dims=3) # TC
+            lCs = cat(Ref(coeffs[begin] * transpose(coeffs[begin+1])) .* 
+                      coeffs[begin+2]..., dims=3) # TC
             cen = genSpatialPoint(roundToMultiOfStep.(cen, halfAtol))
             pbα = genExponent(roundToMultiOfStep(xpn, halfAtol))
             return BasisFuncMix(
@@ -1330,13 +1318,13 @@ function mul(sgf1::BasisFunc{T, D, 𝑙1, 1, PT1}, sgf2::BasisFunc{T, D, 𝑙2, 
                     LTuple(i.I .- 1), 
                     normalizeGTO)
                  for i in CartesianIndices(lCs)])
-        end
+    else
+        cenRes[]
     end
 
-    xpn = roundToMultiOfStep(α₁ + α₂, halfAtol)
-    con = roundToMultiOfStep(d₁ * d₂, halfAtol)
-    BasisFunc(R, GaussFunc(genExponent(xpn), genContraction(con)), (sgf1.l .+ sgf2.l), 
-              normalizeGTO)
+    xpn = addParamBox(xpn1, xpn2, halfAtol)
+    con = mulParamBox(con1, con2, halfAtol)
+    BasisFunc(R, GaussFunc(xpn, con), (sgf1.l .+ sgf2.l), normalizeGTO)
 end
 
 function mul(sgf1::BasisFunc{T, D, 0, 1, PT1}, sgf2::BasisFunc{T, D, 0, 1, PT2}; 
@@ -1660,10 +1648,10 @@ end
                       adjustFunction::F=sciNotReplace, 
                       excludeFirstNlines::Int=0, excludeLastNlines::Int=0, 
                       center::Union{AbstractArray, 
-                                    NTuple{N, ParamBox}, 
+                                    NTuple{D, ParamBox}, 
                                     Missing}=missing, 
                       unlinkCenter::Bool=false, 
-                      normalizeGTO::Union{Bool, Missing}=missing) where {N, F<:Function} -> 
+                      normalizeGTO::Union{Bool, Missing}=missing) where {D, F<:Function} -> 
     Array{<:FloatingGTBasisFuncs, 1}
 
 Generate a basis set from `content` which is either a basis set `String` in Gaussian format 
@@ -1756,8 +1744,8 @@ end
     assignCenInVal!(b::FloatingGTBasisFuncs{T, D}, center::AbstractVector{<:Real}) -> 
     SpatialPoint{T, D}
 
-Change the input value of data stored in `b.center` (meaning the output value will also 
-change according to the mapping function). Then, return the altered center.
+Change the input value of the `ParamBox` stored in `b.center` (meaning the output value 
+will also change according to the mapping function). Then, return the altered center.
 """
 function assignCenInVal!(b::FloatingGTBasisFuncs, center::AbstractVector{<:Real})
     for (i,j) in zip(b.center, center)
@@ -1769,55 +1757,72 @@ end
 
 """
 
-    getParams(pbc::ParamBox, symbol::Union{Symbol, Missing}=missing; 
-              forDifferentiation::Bool=false) -> 
+    getParams(pbc::ParamBox, symbol::Union{Symbol, Missing}=missing) -> 
     Union{ParamBox, Nothing}
 
-    getParams(pbc::ParameterizedContainer, symbol::Union{Symbol, Missing}=missing; 
-              forDifferentiation::Bool=false) -> 
+    getParams(pbc::ParameterizedContainer, symbol::Union{Symbol, Missing}=missing) -> 
     AbstractVector{<:ParamBox}
 
-    getParams(pbc::Union{AbstractArray, Tuple}, symbol::Union{Symbol, Missing}=missing; 
-              forDifferentiation::Bool=false) -> 
+    getParams(pbc::Union{AbstractArray, Tuple}, symbol::Union{Symbol, Missing}=missing) -> 
     AbstractVector{<:ParamBox}
 
 Return the parameter(s) stored in the input container. If `symbol` is set to `missing`, 
-then return all parameter(s); if it's set to the `Symbol` of a parameter (e.g., `:α₁` will 
-match any `pb::`[`ParamBox`](@ref) such that `getVar(pb) == :α₁`; `:α` will match all the 
-`pb`s that are `ParamBox{<:Any, α}`. `forDifferentiation` determines whether searching 
-through the `Symbol`(s) of the independent variable(s) represented by `pbc` during the 
-differentiation process. If the first argument is a collection, its entries must be 
-`ParamBox` containers.
+then return all the parameter(s). If it's set to a `Symbol` tied to a parameter, for 
+example `:α₁`, the function will match any `pb::`[`ParamBox`](@ref) such that 
+[`indVarOf`](@ref)`(pb)[begin] == :α₁`. If it's set to a `Symbol` without any subscript, 
+for example `:α`, the function will match it with all the `pb`s such that 
+`string(indVarOf(pb)[begin])` contains `'α'`. If the first argument is a collection, its 
+entries must be `ParamBox` containers.
 """
-getParams(pb::ParamBox, symbol::Union{Symbol, Missing}=missing; 
-          forDifferentiation::Bool=false) = 
-ifelse(paramFilter(pb, symbol, forDifferentiation), pb, nothing)
+getParams(pb::ParamBox, symbol::Union{Symbol, Missing}=missing) = 
+ifelse(paramFilter(pb, symbol), pb, nothing)
 
-getParams(cs::AbstractArray{<:ParamBox}, symbol::Union{Symbol, Missing}=missing; 
-          forDifferentiation::Bool=false) = 
-cs[findall(x->paramFilter(x, symbol, forDifferentiation), cs)]
+getParams(cs::AbstractArray{<:ParamBox}, symbol::Union{Symbol, Missing}=missing) = 
+cs[findall(x->paramFilter(x, symbol), cs)]
 
-getParams(pbc::ParameterizedContainer, symbol::Union{Symbol, Missing}=missing; 
-          forDifferentiation::Bool=false) = 
-[x for x in pbc.param if paramFilter(x, symbol, forDifferentiation)]
+getParams(pbc::ParameterizedContainer, symbol::Union{Symbol, Missing}=missing) = 
+[x for x in pbc.param if paramFilter(x, symbol)]
 
 getParams(cs::AbstractArray{<:ParameterizedContainer}, 
-          symbol::Union{Symbol, Missing}=missing; forDifferentiation::Bool=false) = 
-vcat(getParams.(cs, symbol; forDifferentiation)...)
+          symbol::Union{Symbol, Missing}=missing) = 
+vcat(getParams.(cs, symbol)...)
 
-function getParams(cs::AbstractArray, symbol::Union{Symbol, Missing}=missing; 
-                   forDifferentiation::Bool=false)
+function getParams(cs::AbstractArray, symbol::Union{Symbol, Missing}=missing)
     pbIdx = findall(x->x isa ParamBox, cs)
-    vcat(getParams(convert(Vector{ParamBox}, cs[pbIdx]), symbol; forDifferentiation), 
-         getParams(convert(Vector{ParameterizedContainer}, cs[1:end.∉Ref(pbIdx)]), symbol; 
-                   forDifferentiation))
+    vcat(getParams(convert(Vector{ParamBox}, cs[pbIdx]), symbol), 
+         getParams(convert(Vector{ParameterizedContainer}, cs[1:end.∉Ref(pbIdx)]), symbol))
 end
 
-getParams(cs::Tuple, symbol=missing; forDifferentiation::Bool=false) = 
-getParams(collect(cs), symbol; forDifferentiation)
+getParams(cs::Tuple, symbol=missing) = getParams(collect(cs), symbol)
 
-paramFilter(pb::ParamBox, sym::Union{Symbol, Missing}, forDifferentiation::Bool) = 
-sym isa Missing || inSymbol(sym, getVar(pb, forDifferentiation))
+paramFilter(pb::ParamBox, sym::Union{Symbol, Missing}) = 
+sym isa Missing || inSymbol(sym, indVarOf(pb)[begin])
+
+
+copyParContainer(pb::ParamBox, 
+                 filterFunc::Function, trueConstr::Function, falseConstr::Function) = 
+filterFunc(pb) ? trueConstr(pb) : falseConstr(pb)
+
+copyParContainer(sp::SpatialPoint, 
+                 filterFunc::Function, trueConstr::Function, falseConstr::Function) = 
+copyParContainer.(sp.param, filterFunc, trueConstr, falseConstr) |> SpatialPoint
+
+copyParContainer(g::GaussFunc, 
+                 filterFunc::Function, trueConstr::Function, falseConstr::Function) = 
+GaussFunc(copyParContainer.(g.param, filterFunc, trueConstr, falseConstr)...)
+
+function copyParContainer(bfs::FloatingGTBasisFuncs, 
+                          filterFunc::Function, trueConstr::Function, falseConstr::Function)
+    cen = copyParContainer(bfs.center, filterFunc, trueConstr, falseConstr)
+    gs = copyParContainer.(bfs.gauss, filterFunc, trueConstr, falseConstr)
+    BasisFunc(cen, gs, bfs.l, bfs.normalizeGTO)
+end
+
+function copyParContainer(bfm::BasisFuncMix, 
+                          filterFunc::Function, trueConstr::Function, falseConstr::Function)
+    bfs = copyParContainer.(bfm.BasisFunc, filterFunc, trueConstr, falseConstr)
+    BasisFuncMix(bfs)
+end
 
 
 """
@@ -1827,8 +1832,8 @@ sym isa Missing || inSymbol(sym, getVar(pb, forDifferentiation))
     copyBasis(b::CompositeGTBasisFuncs, copyOutVal::Bool=true) -> CompositeGTBasisFuncs
 
 Return a copy of the input basis. If `copyOutVal` is set to `true`, then only the output 
-value(s) of the stored data will be copied, i.e., [`outValCopy`](@ref) is used to copy the 
-[`ParamBox`](@ref)s, otherwise [`inVarCopy`](@ref) is used.
+value(s) of the [`ParamBox`](@ref)(s) stored in `b` will be copied, i.e., 
+[`outValCopy`](@ref) is used, otherwise [`fullVarCopy`](@ref) is used.
 
 ≡≡≡ Example(s) ≡≡≡
 
@@ -1851,21 +1856,14 @@ julia> (gf1.xpn[] |> gf1.xpn.map) == gf2.xpn[]
 true
 ```
 """
-function copyBasis(g::GaussFunc, copyOutVal::Bool=true)
-    pbs = g.param .|> ifelse(copyOutVal, outValCopy, inVarCopy)
-    GaussFunc(pbs...)
-end
+copyBasis(g::GaussFunc, copyOutVal::Bool=true) = 
+copyParContainer(g, _->copyOutVal, outValCopy, fullVarCopy)
 
-function copyBasis(bfs::T, copyOutVal::Bool=true) where {T<:FloatingGTBasisFuncs}
-    cen = bfs.center .|> ifelse(copyOutVal, outValCopy, inVarCopy)
-    gs = copyBasis.(bfs.gauss, copyOutVal)
-    genBasisFunc(cen, gs, bfs.l; normalizeGTO=bfs.normalizeGTO)::T
-end
+copyBasis(bfs::FloatingGTBasisFuncs, copyOutVal::Bool=true) = 
+copyParContainer(bfs, _->copyOutVal, outValCopy, fullVarCopy)
 
-function copyBasis(bfm::T, copyOutVal::Bool=true) where {T<:BasisFuncMix}
-    bfs = copyBasis.(bfm.BasisFunc, copyOutVal)
-    BasisFuncMix(bfs)::T
-end
+copyBasis(bfm::BasisFuncMix, copyOutVal::Bool=true) = 
+copyParContainer(bfm, _->copyOutVal, outValCopy, fullVarCopy)
 
 
 """
@@ -1874,37 +1872,37 @@ end
                 filterMapping::Bool=false) where {T<:ParameterizedContainer} -> 
     Vector{<:ParamBox}
 
-Mark the parameters ([`ParamBox`](@ref)) in `b`. The parameters that will be considered 
-identical in the differentiation procedure will be marked with same index. `filterMapping` 
-determines whether filtering out (i.e. not return) the extra `ParamBox`s that have the same 
-indices despite may having different mapping functions.
+Mark the parameters ([`ParamBox`](@ref)) in `b`. The parameters that hold the same 
+independent variable (in other words, considered identical in the differentiation 
+procedure) will be marked with same index. `filterMapping` determines whether filtering out 
+(i.e. not return) the extra `ParamBox`es that hold the same independent variables but 
+represent different output variables. The independent variable held by a `ParamBox` can be 
+inspected using [`indVarOf`](@ref).
 """
 markParams!(b::Union{AbstractVector{T}, T, Tuple{Vararg{T}}}, 
             filterMapping::Bool=false) where {T<:ParameterizedContainer} = 
 markParams!(getParams(b), filterMapping)
 
 function markParams!(pars::AbstractVector{<:ParamBox}, filterMapping::Bool=false)
-    ids = findall(isDepParam, pars)
+    ids = findall(isDiffParam, pars)
     if isempty(ids)
         res = markParamsCore1!(pars)
     else
-        res1, d = markParamsCore2!(view(pars, ids))
-        res2 = markParamsCore1!((@view pars[1:end .∉ Ref(ids)]), d)
+        res1 = markParamsCore2!(view(pars, ids))
+        res2 = markParamsCore1!((@view pars[1:end .∉ Ref(ids)]))
         res = vcat(res1, res2)
     end
     filterMapping ? res : pars
 end
 
-function markParamsCore1!(pars::AbstractVector{<:ParamBox}, 
-                          d::Dict{Symbol, Vector{Int}}=Dict{Symbol, Vector{Int}}())
-    ids1, items = markUnique(outSymOfCore.(pars))
+function markParamsCore1!(pars::AbstractVector{<:ParamBox})
+    ids1, items = markUnique(outSymOf.(pars))
     uniqueParams = eltype(pars)[]
-    for i=1:length(items)
+    for i in eachindex(items)
         parsSameV = view(pars, findall(isequal(i), ids1))
         ids2, iPars = markUnique(parsSameV, compareFunction=compareParamBox)
-        for (i, par) in enumerate(parsSameV)
-            # par.index[] = i + get(d, outSymOfCore(par), 0)
-            par.index[] = skipIndices(ids2, get(d, outSymOfCore(par), Int[]))[i]
+        for (par, idx) in zip(parsSameV, ids2)
+            par.index[] = idx
         end
         append!(uniqueParams, iPars)
     end
@@ -1912,29 +1910,27 @@ function markParamsCore1!(pars::AbstractVector{<:ParamBox},
 end
 
 function markParamsCore2!(parArray::AbstractVector{<:ParamBox})
+    parArray = sort(parArray, by=x->x.data[][end])
     uniqueParams = eltype(parArray)[]
-    idDict = Dict{UInt, Tuple{Symbol, Int}}()
-    iVDict = Dict{Symbol, Int}()
-    dVidDict = Dict{Symbol, Vector{Int}}()
+    fullNameOfInVar = Dict{UInt, Tuple{Symbol, Int}}()
+    lastIndexOfIV = Dict{Symbol, Int}()
     for par in parArray
-        id = objectid(par.data)
-        idx = get(idDict, id, (:nothing, 0))[end]
+        parInVar, parIV = par.data[]
+        id = objectid(parInVar)
+        IVsym, idx = get(fullNameOfInVar, id, (parIV, 0))
         if iszero(idx)
-            iParSym = inSymOfCore(par)
-            idx = get!(iVDict, iParSym, 0) + 1
-            push!(idDict, id=>(iParSym, idx))
-            iVDict[iParSym] += 1
+            idx = get!(lastIndexOfIV, IVsym, 0) + 1
+            fullNameOfInVar[id] = (IVsym, idx)
+            lastIndexOfIV[IVsym] += 1
             push!(uniqueParams, par)
-            dParSym = outSymOfCore(par)
-            if haskey(dVidDict, dParSym)
-                push!(dVidDict[dParSym], idx)
-            else
-                dVidDict[dParSym] = [idx]
+        else
+            if IVsym != parIV
+                par.data[] = Pair(parIV, IVsym)
             end
         end
         par.index[] = idx
     end
-    uniqueParams, dVidDict
+    uniqueParams
 end
 
 markParams!(parTuple::Tuple{Vararg{ParamBox}}, filterMapping::Bool=false) = 

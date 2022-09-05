@@ -137,10 +137,7 @@ else it's set to `missing`.
 from the basis set. If the parameter is marked as "differentiable", the value of its input 
 variable will be optimized.
 
-`bs::Union{
-    Tuple{Vararg{AbstractGTBasisFuncs{T, D}}}, 
-    AbstractVector{<:AbstractGTBasisFuncs{T, D}}
-}`: The basis set to be optimized.
+`bs::AbstractVector{<:AbstractGTBasisFuncs{T, D}}`: The basis set to be optimized.
 
 `nuc::Union{
     NTuple{NN, String} where NN, 
@@ -160,8 +157,7 @@ electrons with same spin configurations(s).
 `printInfo::Bool`: Whether print out the information of iteration steps.
 """
 function optimizeParams!(pbs::AbstractVector{<:ParamBox{T}}, 
-                         bs::Union{Tuple{Vararg{AbstractGTBasisFuncs{T, D}}}, 
-                                   AbstractVector{<:AbstractGTBasisFuncs{T, D}}}, 
+                         bs::AbstractVector{<:AbstractGTBasisFuncs{T, D}}, 
                          nuc::Union{NTuple{NN, String}, AbstractVector{String}}, 
                          nucCoords::SpatialCoordType{T, D, NN}, 
                          config::POconfig{<:Any, M, CBT, <:Any, F}=defaultPOconfig, 
@@ -169,6 +165,10 @@ function optimizeParams!(pbs::AbstractVector{<:ParamBox{T}},
                          printInfo::Bool=true) where {T, D, NN, M, CBT, F}
     tAll = @elapsed begin
 
+        detachNonDiffParams!(pbs, bs)
+        xpnFilter = x->isOutSym(x, xpnSym)
+        pbs = copyParContainer.(pbs, xpnFilter, absExponentParam, itself)
+        bs = copyParContainer.(bs, xpnFilter, absExponentParam, itself)
         nuc = arrayToTuple(nuc)
         nucCoords = genTupleCoords(T, nucCoords)
         i = 0
@@ -251,4 +251,41 @@ end
 
 function genDetectConvFunc(::Val{2}, target, threshold)
     (Es, _) = Es -> (abs(Es[end] - target) <= threshold[begin])
+end
+
+
+function detachNonDiffParams!(pbs::AbstractVector{<:ParamBox{T}}, 
+                                 pbcs::AbstractVector{<:ParameterizedContainer{T}}, 
+                                 filterParsForSafety::Bool=true) where {T}
+    filterParsForSafety && getUnique!(pbs, compareFunction=compareParamBox)
+    d = Dict{UInt, Array{T, 0}}()
+    pbsNew = map(pbs) do p
+        isDiffParam(p) ? p : changeMapping(outValCopy(p), DressedItself(p.map))
+    end
+    for (j, c) in enumerate(pbcs)
+        cNew = copyParContainer(c, 
+            isDiffParam, 
+            itself, 
+            function (y)
+                idx = findfirst(p->compareParamBoxCore2(y, p), pbs)
+                if idx === nothing
+                    yN = fullVarCopy(y)
+                    data, sym = y.data[]
+                    yN.data[] = get!(d, objectid(data), fill(y[])) => sym
+                    yN
+                else
+                    pbsNew[idx]
+                end
+            end
+        )
+        pbcs[j] = cNew
+    end
+    pbs .= pbsNew
+    map(x->dataOf(x)[begin], pbsNew) # Vector of parameters to be optimized.
+end
+
+function absExponentParam(pb::ParamBox{<:Any, xpnSym})
+    pbProtected = changeMapping(pb, absMap(pb.map))
+    pbProtected.index[] = pb.index[]
+    pbProtected
 end

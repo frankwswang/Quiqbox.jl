@@ -54,7 +54,9 @@ c1_3 = genContraction(v1c)
 @test typeof(c1).parameters[2] == ParamList[:con]
 @test c1[] == v1
 @test e1() == m1(v1)
-@test e1_2.data === c1_2.data === e1_3.data === c1_3.data
+@test e1_2.data[] === e1_3.data[]
+@test c1_2.data[] === c1_3.data[]
+@test e1_2.data[][begin] === c1_2.data[][begin]
 
 e2 = genExponent(e1)
 e3 = genExponent(c1)
@@ -65,12 +67,12 @@ e3 = genExponent(c1)
 @test e1.map !== e3.map
 v2 = rand()
 @test e1.map(v2) == e3.map(v2)
-e4 = genExponent(e1.data)
+e4 = genExponent(e1.data[])
 @test !hasIdentical(e4, e1)
-@test e4.data === e1.data
-e5 = genExponent(e1.data, m1)
+@test e4.data[] === e1.data[]
+e5 = genExponent(e1.data[], m1)
 @test e5() == m1(e1[])
-@test e4.data === e1.data
+@test e4.data[] === e1.data[]
 
 c2 = genExponent(c1)
 c3 = genExponent(e1)
@@ -80,8 +82,8 @@ c3 = genExponent(e1)
 @test c1() == c3()
 @test c1.map !== c3.map
 @test c1.map(v2) == c3.map(v2)
-c4 = genExponent(c1.data)
-@test c4.data === c1.data
+c4 = genExponent(c1.data[])
+@test c4.data[] === c1.data[]
 
 
 # function genSpatialPoint coordOf
@@ -102,8 +104,8 @@ v3_2 = genSpatialPoint((1.0, 2.0, 3.0))
 @test !hasIdentical(v1[2:3], v2[2:3])
 @test coordOf(v1) == [k[], 2.0, 3.0]
 @test genSpatialPoint(1.0, 1) == v1[1] == genSpatialPoint(k, 1)
-@test genSpatialPoint(-1.0, 1, abs, dataName=:x1) == 
-      genSpatialPoint(fill(-1.0), 1, abs, dataName=:x1)
+@test genSpatialPoint(-1.0, 1, abs, inSym=:x1) == 
+      genSpatialPoint(fill(-1.0), 1, abs, inSym=:x1)
 @test hasIdentical(genSpatialPoint(k, 1), v1[1])
 v4 = genSpatialPoint([2.0, k, 3.0])
 @test hasIdentical(genSpatialPoint(v4[2], 1), v1[1])
@@ -675,7 +677,7 @@ pb1 = ParamBox(2, :p)
 @test getParams(pb1, :p) == pb1
 @test getParams(pb1, :P) === nothing
 @test getParams(pb1, :p₁) === nothing
-@test getParams(pb1, forDifferentiation=true) === pb1
+@test getParams(pb1) === pb1
 pb1.index[] = 1
 @test getParams(pb1, :p) === getParams(pb1, :p₁) === pb1
 
@@ -683,20 +685,20 @@ pb2 = ParamBox(2, :q)
 @test getParams([pb1, pb2]) == [pb1, pb2]
 @test getParams([pb1, pb2], :p) == [pb1]
 
-pb3 = ParamBox(2.1, :l, x->x^2)
+pb3 = ParamBox(2.1, :l, x->x^2, canDiff=false)
 @test getParams(pb3, :l) === pb3
 @test getParams(pb3, :l₂) === nothing
 @test getParams(pb3, :x_l) === nothing
-@test getParams(pb3, :x_l, forDifferentiation=true) === pb3
-@test getParams(pb3, :x_l₂, forDifferentiation=true) === nothing
+enableDiff!(pb3)
+@test getParams(pb3, :l) === nothing
+@test getParams(pb3, :x_l) === pb3
+@test getParams(pb3, :x_l₂) === nothing
 pb3.index[] = 2
-@test getParams(pb3, :l) === pb3
 @test getParams(pb3, :l₁) === nothing
-@test getParams(pb3, :l₂) === pb3
-@test getParams(pb3, :l, forDifferentiation=true) === nothing
-@test getParams(pb3, :x_l, forDifferentiation=true) === pb3
-@test getParams(pb3, :x_l₁, forDifferentiation=true) === nothing
-@test getParams(pb3, :x_l₂, forDifferentiation=true) === pb3
+@test getParams(pb3, :l₂) === nothing
+@test getParams(pb3, :x_l) === pb3
+@test getParams(pb3, :x_l₁) === nothing
+@test getParams(pb3, :x_l₂) === pb3
 
 gf_pbTest1 = GaussFunc(2.0, 1.0)
 @test getParams(gf_pbTest1) == gf_pbTest1.param |> collect
@@ -729,30 +731,32 @@ gf_cb2 = copyBasis(gf_cb1)
 @test hasEqual(gf_cb1.con, gf_cb2.con)
 @test gf_cb1.xpn() == gf_cb2.xpn() == gf_cb2.xpn[] != gf_cb1.xpn[]
 gf_cb3 = copyBasis(gf_cb1, false)
-@test !hasEqual(gf_cb1, gf_cb3)
-@test gf_cb1.xpn() != gf_cb3.xpn() == gf_cb3.xpn[] == gf_cb1.xpn[]
+@test hasEqual(gf_cb1, gf_cb3)
+@test gf_cb1.xpn() == gf_cb3.xpn()
+@test gf_cb3.xpn.data[] === gf_cb1.xpn.data[]
 cen_cb1 = rand(3)
 
-bf_cb1 = genBasisFunc(cen_cb1, [gf_cb1, gf_cb3])
+bf_cb1 = genBasisFunc(cen_cb1, [gf_cb1, gf_cb2])
 bf_cb2 = copyBasis(bf_cb1)
 bf_cb3 = copyBasis(bf_cb1, false)
+@test hasIdentical(bf_cb1, bf_cb3)
 testbf_cb = function (bf1, bf2)
-    @test bf1.center == bf2.center
+    @test hasEqual(bf1.center, bf2.center)
     @test bf1.l == bf2.l
     @test bf1.normalizeGTO == bf2.normalizeGTO
 end
 testbf_cb(bf_cb1, bf_cb2)
-testbf_cb(bf_cb1, bf_cb3)
-@test hasEqual(bf_cb2.gauss, (gf_cb2, gf_cb3))
-@test hasEqual(bf_cb3.gauss, (gf_cb3, gf_cb3))
+testbf_cb(bf_cb2, bf_cb3)
+@test hasEqual(bf_cb2.gauss, (gf_cb2, gf_cb2))
 
-bfm_cb1 = BasisFuncMix([bf_cb1, bf_cb3])
+bfm_cb1 = BasisFuncMix([bf_cb1, bf_cb2])
 bfm_cb2 = copyBasis(bfm_cb1)
 bfm_cb3 = copyBasis(bfm_cb1, false)
+bfm_cb4 = Quiqbox.copyParContainer(bfm_cb1, _->false, outValCopy, fullVarCopy)
+@test hasIdentical(bfm_cb1, bfm_cb3, bfm_cb4)
 testbf_cb.(bfm_cb1.BasisFunc, bfm_cb2.BasisFunc)
-testbf_cb.(bfm_cb1.BasisFunc, bfm_cb3.BasisFunc)
-@test hasEqual(bfm_cb2.BasisFunc |> collect, [bf_cb2, bf_cb3])
-@test hasEqual(bfm_cb3.BasisFunc |> collect, [bf_cb3, bf_cb3])
+testbf_cb.(bfm_cb2.BasisFunc, bfm_cb3.BasisFunc)
+@test hasEqual(bfm_cb2.BasisFunc |> collect, fill(bf_cb2, 2))
 
 
 # function markParams!
@@ -810,8 +814,8 @@ pbs_gv0 = [cen_gv1[1], cen_gv2[1],
            cen_gv1[3], cen_gv2[3], cen_gv3[3], 
            e_gv1, e_gv2, e_gv3, 
            c_gv1, c_gv2, c_gv3]
-pbs_gv0_2 = sort(pbs_gv0, by=x->(typeof(x).parameters[2], x.index[]))
-pbs_gv3_2 = sort(pbs_gv3, by=x->(typeof(x).parameters[2], x.index[]))
+pbs_gv0_2 = sort(pbs_gv0, by=x->(Quiqbox.getFLevel(x.map), x.data[][end], x.index[]))
+pbs_gv3_2 = sort(pbs_gv3, by=x->(Quiqbox.getFLevel(x.map), x.data[][end], x.index[]))
 @test pbs_gv3_2 == pbs_gv0_2
 @test hasEqual(pbs_gv3_2, pbs_gv0_2)
 @test hasIdentical(pbs_gv3_2, pbs_gv0_2)
@@ -825,8 +829,7 @@ gf_gv5 = GaussFunc(genExponent(pb_gv2), genContraction(0.5))
 bf_gv7 = genBasisFunc(sp_gv1, (gf_gv4, gf_gv5))
 pars_gv = markParams!(bf_gv7, true)
 @test pars_gv == [pb_gv1, pb_gv2, pb_gv3, gf_gv5.con]
-@test getVar.(pars_gv) == [:X₁, :Y₂, :Z₃, :d₁]
-@test getVar.(pars_gv, true) == [:I₁, :I₂, :I₃, :d₁]
+@test (first∘indVarOf).(pars_gv) == [:I₁, :I₂, :I₃, :d₁]
 
 
 # function hasNormFactor getNormFactor
