@@ -181,21 +181,20 @@ order of `bs` (`basis.basis`).
 """
 gradOfHFenergy(par::AbstractVector{<:ParamBox}, b::GTBasis{T, D}, 
                C::NTuple{HFTS, AbstractMatrix{T}}, 
-               nuc::Union{NTuple{NN, String}, AbstractVector{String}}, 
+               nuc::VectorOrNTuple{String, NN}, 
                nucCoords::SpatialCoordType{T, D, NN}, 
                N::Union{Int, Tuple{Int}, NTuple{2, Int}}=getCharge(nuc)) where 
               {T, D, HFTS, NN} = 
 gradOfHFenergy(par, b.basis, b.S, C, nuc, nucCoords, N)
 
 function gradOfHFenergy(par::AbstractVector{<:ParamBox{T}}, 
-                        bs::Union{NTuple{BN, GTBasisFuncs{T, D, 1}}, 
-                                  AbstractVector{<:GTBasisFuncs{T, D, 1}}}, 
+                        bs::VectorOrNTuple{GTBasisFuncs{T, D, 1}}, 
                         S::AbstractMatrix{T}, 
                         C::NTuple{HFTS, AbstractMatrix{T}}, 
-                        nuc::Union{NTuple{NN, String}, AbstractVector{String}}, 
+                        nuc::VectorOrNTuple{String, NN}, 
                         nucCoords::SpatialCoordType{T, D, NN}, 
                         N::Union{Int, Tuple{Int}, NTuple{2, Int}}=getCharge(nuc)) where 
-                       {BN, T, D, HFTS, NN}
+                       {T, D, HFTS, NN}
     nuc = arrayToTuple(nuc)
     nucCoords = genTupleCoords(T, nucCoords)
     Ns = splitSpins(Val(HFTS), N)

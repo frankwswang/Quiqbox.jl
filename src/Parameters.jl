@@ -1,5 +1,6 @@
-export ParamBox, inValOf, outValOf, inSymOf, outSymOf, indVarOf, dataOf, mapOf, outValCopy, 
-       fullVarCopy, enableDiff!, disableDiff!, isDiffParam, toggleDiff!, changeMapping
+export ParamBox, inValOf, outValOf, inSymOf, outSymOf, isInSymEqual, isOutSymEqual, 
+       indVarOf, dataOf, mapOf, outValCopy, fullVarCopy, enableDiff!, disableDiff!, 
+       isDiffParam, toggleDiff!, changeMapping
 
 export FLevel
 
@@ -199,6 +200,25 @@ Return the symbol of the output variable of `pb`.
 
 """
 
+    isInSymEqual(pb::ParamBox, sym::Symbol) -> Bool
+
+Return the Boolean value of whether the symbol of  `pb`'s input variable equals `sym`.
+"""
+isInSymEqual(pb::ParamBox, sym::Symbol) = (dataOf(pb)[end] == sym)
+
+
+
+"""
+
+    isOutSymEqual(::ParamBox, sym::Symbol) -> Bool
+
+Return the Boolean value of whether the symbol of  `pb`'s output variable equals `sym`.
+"""
+isOutSymEqual(::ParamBox{<:Any, V}, sym::Symbol) where {V} = (V == sym)
+
+
+"""
+
     indVarOf(pb::ParamBox{T}) -> Pair{}
 
 Return (the name and the value of) the independent variable tied to `pb`. Specifically, 
@@ -226,12 +246,6 @@ getTypeParams(::ParamBox{T, V, FL}) where {T, V, FL} = (T, V, FL)
 Return the `Pair` of the input variable and its symbol.
 """
 @inline dataOf(pb::ParamBox) = pb.data[]
-
-
-isInSym(pb::ParamBox, sym::Symbol) = (dataOf(pb)[end] == sym)
-
-
-isOutSym(::ParamBox{<:Any, V}, sym::Symbol) where {V} = (V == sym)
 
 
 """
@@ -315,10 +329,6 @@ function toggleDiff!(pb::ParamBox)
     pb.index[] = nothing
     pb.canDiff[] = !pb.canDiff[]
 end
-
-
-isNotDiffNorInVar(pb::ParamBox{<:Any, <:Any, FI}) = false
-isNotDiffNorInVar(pb::ParamBox{<:Any, <:Any, FL}) where {FL} = !isDiffParam(pb)
 
 
 """

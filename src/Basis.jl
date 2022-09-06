@@ -963,13 +963,11 @@ function sumOfCore(bfs::AbstractArray{<:BasisFunc{T, D}};
     end
 end
 
-sumOfCore(bs::Union{Tuple{Vararg{GTBasisFuncs{T, D, 1}}}, 
-                    AbstractArray{<:GTBasisFuncs{T, D, 1}}}; 
+sumOfCore(bs::ArrayOrNTuple{GTBasisFuncs{T, D, 1}}; 
           roundAtol::Real=getAtolVal(T)) where {T, D} = 
 sumOfCore(BasisFunc{T, D}[vcat(unpackBasis.(bs)...);]; roundAtol)
 
-function sumOf(bs::Union{Tuple{Vararg{GTBasisFuncs{T, D, 1}}}, 
-                         AbstractArray{<:GTBasisFuncs{T, D, 1}}}; 
+function sumOf(bs::ArrayOrNTuple{GTBasisFuncs{T, D, 1}}; 
                roundAtol::Real=getAtolVal(T)) where {T, D}
     length(bs) == 1 && (return bs[1])
     sumOfCore(bs; roundAtol)
