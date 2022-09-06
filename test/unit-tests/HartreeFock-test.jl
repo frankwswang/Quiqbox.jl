@@ -1,6 +1,6 @@
 using Test
 using Quiqbox
-using Quiqbox: splitSpins, groupSpins
+using Quiqbox: splitSpins, groupSpins, HFfinalVars
 using Suppressor: @suppress_out, @capture_out
 
 include("../../test/test-functions/Shared.jl")
@@ -24,6 +24,7 @@ errorThreshold = 5e-8
 nucCoords = [[-0.7,0.0,0.0], [0.7,0.0,0.0], [0.0, 0.0, 0.0]]
 nuc = ["H", "H", "O"]
 bs = genBasisFunc.(nucCoords, "STO-3G", ["H", "H", "O"]) |> flatten
+gtb = GTBasis(bs)
 S = overlaps(bs)
 X = S^(-0.5)
 Hcore = coreH(bs, nuc, nucCoords)
@@ -48,9 +49,11 @@ HFc6_2 = HFconfig((C0=Quiqbox.getCfromHcore(Val(:RHF), X, Hcore), SCF=SCFconfig(
 
 @suppress_out begin
     res1   = runHF(bs, nuc, nucCoords, HFc1)
-    res1_2 = runHF(bs, nuc, nucCoords, HFc2)
-    res1_3 = runHF(bs, nuc, nucCoords, HFc5)
-    res1_4 = runHF(bs, nuc, nucCoords, HFc6)
+    res1_2interm = runHFcore(bs, nuc, nucCoords, HFc2)
+    res1_2 = HFfinalVars(gtb, nuc, nucCoords, X, res1_2interm...)
+    res1_3interm = runHFcore(bs, nuc, nucCoords, Ne, HFc5)
+    res1_3 = HFfinalVars(gtb, nuc, nucCoords, X, res1_3interm...)
+    res1_4 = runHF(bs, nuc, nucCoords, Ne, HFc6)
     res1_5 = runHF(bs, nuc, nucCoords, HFc6_2)
     res2   = runHF(bs, nuc, nucCoords, HFc3)
     res2_2 = runHF(bs, nuc, nucCoords, HFc4)

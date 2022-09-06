@@ -458,11 +458,16 @@ struct HFfinalVars{T, D, HFT, NN, BN, HFTS} <: HartreeFockFinalValue{T, HFT}
     isConverged::Bool
     basis::GTBasis{T, D, BN}
 
-    function HFfinalVars(basis::GTBasis{T, 𝐷, BN}, 
-                         nuc::NTuple{NN, String}, nucCoords::NTuple{NN, NTuple{𝐷, T}}, 
-                         X::AbstractMatrix{T}, vars::NTuple{HFTS, HFtempVars{T, HFT}}, 
-                         isConverged::Bool) where {T, 𝐷, BN, NN, HFTS, HFT}
+    @inline function HFfinalVars(basis::GTBasis{T, 𝐷, BN}, 
+                                 nuc::VectorOrNTuple{String, NN}, 
+                                 nucCoords::SpatialCoordType{T, 𝐷, NN}, 
+                                 X::AbstractMatrix{T}, 
+                                 vars::NTuple{HFTS, HFtempVars{T, HFT}}, 
+                                 isConverged::Bool) where {T, 𝐷, BN, NN, HFTS, HFT}
+        @assert (NNval = length(nuc)) == length(nucCoords)
         Ehf = vars[1].shared.Etots[end]
+        nuc = arrayToTuple(nuc)
+        nucCoords = genTupleCoords(T, nucCoords)
         Enn = nnRepulsions(nuc, nucCoords)
         Ns = getproperty.(vars, :N)
         C = last.(getproperty.(vars, :Cs))
@@ -470,7 +475,7 @@ struct HFfinalVars{T, D, HFT, NN, BN, HFTS} <: HartreeFockFinalValue{T, HFT}
         F = last.(getproperty.(vars, :Fs))
         Eo = getindex.(getCϵ.(Ref(X), F), 2)
         occu = getSpinOccupations(Val(HFT), Ns, BN)
-        new{T, 𝐷, HFT, NN, BN, HFTS}(Ehf, Enn, groupSpins(Val(HFT), Ns), nuc, nucCoords, 
+        new{T, 𝐷, HFT, NNval, BN, HFTS}(Ehf, Enn, groupSpins(Val(HFT), Ns), nuc, nucCoords, 
                                      C, D, F, Eo, occu, vars, isConverged, basis)
     end
 end
@@ -581,7 +586,14 @@ const C0methodArgOrders = (itself=(1,),
     runHF(bs, nuc, nucCoords, N=getCharge(nuc), config=$(defaultHFCStr); printInfo=true) -> 
     HFfinalVars
 
-Main function to run Hartree-Fock in Quiqbox.
+Main function to run a Hartree-Fock method in Quiqbox. The returned result and relevant 
+information is stored in a [`HFfinalVars`](@ref).
+
+    runHFcore(args...; printInfo=false) -> Tuple{Tuple{Vararg{HFtempVars}}, Bool}
+
+The core function of `runHF` that accept the same positional arguments as `runHF`, except 
+it returns the data (`HFtempVars`) collected during the iteration and the boolean result of 
+whether the SCF procedure is converged.
 
 ≡≡≡ Positional argument(s) ≡≡≡
 
@@ -608,26 +620,9 @@ electrons with same spin configurations(s).
 
 `printInfo::Bool`: Whether print out the information of iteration steps and result.
 """
-function runHF(bs::GTBasis{T1, D, BN, BFT}, 
-               nuc::Union{NTuple{NN, String}, AbstractVector{String}}, 
-               nucCoords::SpatialCoordType{T1, D, NN}, 
-               config::HFconfig{T2, HFT}=defaultHFC, 
-               N::Union{Int, Tuple{Int}, NTuple{2, Int}}=getCharge(nuc); 
-               printInfo::Bool=true) where {T1, D, BN, BFT, NN, HFT, T2}
-    @assert N > (HFT==:RHF) "$(HFT) requires more than $(HFT==:RHF) electrons."
-    Ns = splitSpins(Val(HFT), N)
-    leastNb = max(Ns...)
-    @assert BN >= leastNb "The number of basis functions should be no less than $(leastNb)."
-    nuc = arrayToTuple(nuc)
-    nucCoords = genTupleCoords(T1, nucCoords)
-    Hcore = coreH(bs, nuc, nucCoords)
-    X = getX(bs.S)
-    getC0f = config.C0.f
-    C0 = uniCallFunc(getC0f, getproperty(C0methodArgOrders, nameOf(getC0f)), config.C0.mat, 
-                     Val(HFT), bs.S, X, Hcore, bs.eeI, bs.basis, nuc, nucCoords)
-    vars, isConverged = runHFcore(Val(HFT), config.SCF, Ns, Hcore, bs.eeI, bs.S, X, 
-                                  C0, printInfo, config.maxStep, config.earlyStop)
-    res = HFfinalVars(bs, nuc, nucCoords, X, vars, isConverged)
+function runHF(bs::GTBasis, args...; printInfo::Bool=true)
+    vars, isConverged = runHFcore(bs, args...; printInfo)
+    res = HFfinalVars(bs, args[begin], args[begin+1], getX(bs.S), vars, isConverged)
     if printInfo
         Etot = round(res.Ehf + res.Enn, digits=10)
         Ehf = round(res.Ehf, digits=10)
@@ -639,14 +634,38 @@ function runHF(bs::GTBasis{T1, D, BN, BFT},
     res
 end
 
-runHF(bs::BasisSetData, nuc, nucCoords, N::Int, config=defaultHFC; printInfo=true) = 
-runHF(bs::BasisSetData, nuc, nucCoords, config, N; printInfo)
-
-runHF(bs::Union{Tuple{Vararg{AbstractGTBasisFuncs{T, D}}}, 
-                AbstractVector{<:AbstractGTBasisFuncs{T, D}}}, args...; 
-     printInfo=true) where {T, D} = 
+runHF(bs::VectorOrNTuple{AbstractGTBasisFuncs{T, D}}, args...; 
+      printInfo::Bool=true) where {T, D} = 
 runHF(GTBasis(bs), args...; printInfo)
 
+@inline function runHFcore(bs::GTBasis{T1, D, BN, BFT}, 
+                           nuc::VectorOrNTuple{String, NN}, 
+                           nucCoords::SpatialCoordType{T1, D, NN}, 
+                           config::HFconfig{T2, HFT}=defaultHFC, 
+                           N::Union{Int, Tuple{Int}, NTuple{2, Int}}=getCharge(nuc); 
+                           printInfo::Bool=false) where {T1, D, BN, BFT, NN, HFT, T2}
+    @assert N > (HFT==:RHF) "$(HFT) requires more than $(HFT==:RHF) electrons."
+    Ns = splitSpins(Val(HFT), N)
+    leastNb = max(Ns...)
+    @assert BN >= leastNb "The number of basis functions should be no less than $(leastNb)."
+    nuc = arrayToTuple(nuc)
+    nucCoords = genTupleCoords(T1, nucCoords)
+    Hcore = coreH(bs, nuc, nucCoords)
+    X = getX(bs.S)
+    getC0f = config.C0.f
+    C0 = uniCallFunc(getC0f, getproperty(C0methodArgOrders, nameOf(getC0f)), config.C0.mat, 
+                     Val(HFT), bs.S, X, Hcore, bs.eeI, bs.basis, nuc, nucCoords)
+    runHFcore(Val(HFT), config.SCF, Ns, Hcore, bs.eeI, bs.S, X, 
+              C0, printInfo, config.maxStep, config.earlyStop)
+end
+
+runHFcore(bs::BasisSetData, nuc, nucCoords, N::Int, config=defaultHFC; 
+          printInfo::Bool=false) = 
+runHFcore(bs::BasisSetData, nuc, nucCoords, config, N; printInfo)
+
+runHFcore(bs::VectorOrNTuple{AbstractGTBasisFuncs{T, D}}, args...; 
+          printInfo::Bool=false) where {T, D} = 
+runHFcore(GTBasis(bs), args...; printInfo)
 
 """
 
@@ -654,8 +673,8 @@ runHF(GTBasis(bs), args...; printInfo)
               printInfo=false, maxStep=1000, earlyStop=true) -> 
     Tuple{Tuple{Vararg{HFtempVars}}, Bool}
 
-The core function of `runHF` which returns the data collected during the iteration and the 
-result of whether the SCF procedure is converged.
+Another method of `runHFcore` that has the same return value, but takes more underlying 
+data as arguments.
 
 === Positional argument(s) ===
 

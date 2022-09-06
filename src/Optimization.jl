@@ -197,7 +197,7 @@ electrons with same spin configurations(s).
 """
 function optimizeParams!(pbs::AbstractVector{<:ParamBox{T}}, 
                          bs::AbstractVector{<:AbstractGTBasisFuncs{T, D}}, 
-                         nuc::Union{NTuple{NN, String}, AbstractVector{String}}, 
+                         nuc::VectorOrNTuple{String, NN}, 
                          nucCoords::SpatialCoordType{T, D, NN}, 
                          config::POconfig{<:Any, M, CBT, <:Any, F}=defaultPOconfig, 
                          N::Union{Int, Tuple{Int}, NTuple{2, Int}}=getCharge(nuc); 
