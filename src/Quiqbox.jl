@@ -8,7 +8,7 @@ include("FileIO.jl")
 include("../lib/BasisSets/BasisSets.jl")
 
 include("Library.jl")
-include("mapping.jl")
+include("Mapping.jl")
 include("Parameters.jl")
 include("Basis.jl")
 include("HartreeFock.jl")
