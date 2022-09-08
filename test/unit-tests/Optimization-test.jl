@@ -139,9 +139,9 @@ E_t2 = -1.6679941925321318
 par_t2  = [0.6798695445498076, 0.3635953878334846]
 grad_t2 = [0.006074017206680493, 0.003461336621272404]
 @test all(Es2L[i]<=Es2L[i-1] for i in 2:lastindex(Es2L))
-@test isapprox(Es2L[end], E_t2, atol=errorThreshold)
-@test isapprox(ps2L[:, end], par_t2, atol=errorThreshold)
-@test isapprox(grads2L[:, end], grad_t2, atol=errorThreshold)
+@test isapprox(Es2L[end], E_t2, atol=10errorThreshold)
+@test isapprox(ps2L[:, end], par_t2, atol=10errorThreshold)
+@test isapprox(grads2L[:, end], grad_t2, atol=10errorThreshold)
 
 
 # BasisFuncMix basis set
