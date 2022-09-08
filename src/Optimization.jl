@@ -1,44 +1,82 @@
-export gradDescent!, POconfig, optimizeParams!
+export GDconfig, POconfig, optimizeParams!
 
 using LinearAlgebra: norm
+using LineSearches
 
 const OFtypes = (:HF,)
+const OFfunctions = Dict([:HF] .=> [((runHF,          x->x.Ehf), 
+                                     (gradOfHFenergy, itself  ))])
 
 const defaultPOconfigStr = "POconfig()"
-
 const defaultHFthresholdForHFgrad = getAtolVal(Float64)
-
 const defaultHFforHFgrad = HFconfig(SCF=SCFconfig(threshold=defaultHFthresholdForHFgrad))
 
 
 """
 
-    gradDescent!(vars::AbstractVector{T}, grad::AbstractVector{T}, η::T=T(0.001), 
-                 threshold::T=0.05length(grad)/norm(η)) where {T} -> 
-    vars::AbstractVector{T}
+    GDconfig{T, M, ST<:Union{Array{T, 0}, T}} <: ConfigBox{T, GDconfig, M}
 
-Default gradient descent (GD) method used in [`optimizeParams!`](@ref). `vars` are the 
-input variables of a function with corresponding gradient `grad`. `η` is the learning rate 
-(step size) of the gradient descent. `threshold` is the clipping threshold of `grad` which 
-will be renormalized if it's larger then `threshold` to prevent gradient exploding. 
-`gradDescent!` modifies the `vars` and returns the updated value. It can be replaced by a 
-more advanced GD function through customizing [`POconfig`](@ref).
+The mutable container of configurations for the default gradient descent method used to 
+optimize parameters.
+
+≡≡≡ Field(s) ≡≡≡
+
+`lineSearchMethod::M`: The selected line search method to optimize the step size for each 
+gradient descent iteration. It can be any algorithm defined in the Julia package 
+[LineSearches.jl](https://github.com/JuliaNLSolvers/LineSearches.jl), or [`itself`](@ref) 
+so that the step size will be fixed to a constant value during all the iterations.
+
+`initialStep::ST`: The value of the initial step size in each iteration. If it's an 
+`Array{T, 0}`, then the final step size (optimized by `lineSearchMethod`) in current 
+interaction will be set as the initial step size for the next iteration.
+
+`stepBound::NTuple{2, T}`: The lower bound and upper bound of the step size to enforce 
+`stepBound[begin] ≤ η ≤ stepBound[end]` (where `η` is the step size in each iteration). 
+Whenever the size size is out of the boundary, it will be clipped to a bound value.
+
+`scaleStepBound::Bool`: Determine whether `stepBound` will be scaled so that the norm of 
+the gradient descent in each iteration is constrained within the initially configured 
+`stepBound`, i.e., `stepBound[begin] ≤ norm(η*∇f) ≤ stepBound[end]` (where `∇f` is the 
+gradient of some function `f` in each iteration).
+
+≡≡≡ Initialization Method(s) ≡≡≡
+
+    GDconfig(lineSearchMethod::M=BackTracking(), 
+             initialStep::ST=ifelse(M==itselfT, 0.1, 1.0); 
+             stepBound::NTuple{2, T}=convert.(eltype(initialStep), (0, Inf)), 
+             scaleStepBound::Bool=ifelse(M==typeof($(itself)), true, false)) where 
+            {M, T<:AbstractFloat, ST<:Union{Array{T, 0}, T}} -> 
+    GDconfig{T, M, ST}
 """
-function gradDescent!(vars::AbstractVector{T}, grad::AbstractVector{T}, η::T=T(0.001), 
-                      threshold::T=0.05length(grad)/norm(η)) where {T}
-    gNorm = norm(grad)
-    gradNew = ifelse(gNorm > threshold, (threshold / gNorm * grad), grad)
-    vars .-= η*gradNew
+mutable struct GDconfig{T, M, ST<:Union{Array{T, 0}, T}} <: ConfigBox{T, GDconfig, M}
+    lineSearchMethod::M
+    initialStep::ST
+    stepBound::NTuple{2, T}
+    scaleStepBound::Bool
+
+    function GDconfig(lineSearchMethod::M=BackTracking(), 
+                      initialStep::ST=ifelse(M==itselfT, 0.1, 1.0); 
+                      stepBound::NTuple{2, T}=convert.(eltype(initialStep), (0, Inf)), 
+                      scaleStepBound::Bool=ifelse(M==itselfT, true, false)) where 
+                     {M, T<:AbstractFloat, ST<:Union{Array{T, 0}, T}}
+        @assert 0 < initialStep[] "The initial step size must be positive."
+        @assert stepBound[begin] <= stepBound[end] "The bound set for initialStep must be"*
+                " a valid closed interval."
+        @assert (M == itselfT) || 
+                hasproperty(LineSearches, (nameof∘typeof)(lineSearchMethod)) "The input"*
+                " line search method is NOT supported."
+        new{T, M, ST}(lineSearchMethod, initialStep, stepBound, scaleStepBound)
+    end
 end
 
 
 const defaultPOconfigPars = 
-      [Val(:HF), defaultHFforHFgrad, NaN, (5e-7, 5e-6), 500, gradDescent!]
+      [Val(:HF), defaultHFforHFgrad, NaN, (5e-7, 5e-6), 500, GDconfig()]
 
 """
 
     POconfig{T, M, CBT<:ConfigBox, TH<:Union{T, NTuple{2, T}}, 
-             F<:Function} <: ConfigBox{T, POconfig, M}
+                        OM} <: ConfigBox{T, POconfig, M}
 
 The mutable container of parameter optimization configurations.
 
@@ -66,7 +104,15 @@ there will be no convergence detection.
 
 `maxStep::Int`: Maximum iteration steps allowed regardless if the iteration converges.
 
-`GD::F`: Applied gradient descent `Function`. Default method is [`gradDescent!`](@ref).
+`optimizer::F`: Applied parameter optimizer. The default setting is [`GDconfig`](@ref)`()`. 
+To use a function implemented by the user as the optimizer, it should have the following 
+function signature: 
+
+    o!(x::Vector{T}, gx::Vector{T}, fx::T, f::Function, gf::Function) where {T}
+
+where `x` are the initial input variables of `Function` `f`, and the returned value of `f`, 
+`f(x)`,  is equal to `fx`. `x` will be optimized, in another word, mutated by the 
+optimizer `o!` each time `o!` runs. `gf` is a `Function` such that `gf(x) == (gx, fx)`.
 
 ≡≡≡ Initialization Method(s) ≡≡≡
 
@@ -75,8 +121,8 @@ there will be no convergence detection.
               target::T=$(defaultPOconfigPars[3]), 
               threshold::T=$(defaultPOconfigPars[4]), 
               maxStep::Int=$(defaultPOconfigPars[5]), 
-              GD::Function=$(defaultPOconfigPars[6])) where {T} -> 
-    POconfig
+              optimizer::Function=$(defaultPOconfigPars[6]|>typeof|>nameof)()) where {T} -> 
+    POconfig{T}
 
 ≡≡≡ Example(s) ≡≡≡
 
@@ -87,13 +133,13 @@ julia> POconfig(maxStep=100);
 ```
 """
 mutable struct POconfig{T, M, CBT<:ConfigBox, TH<:Union{T, NTuple{2, T}}, 
-                        F<:Function} <: ConfigBox{T, POconfig, M}
+                        OM} <: ConfigBox{T, POconfig, M}
     method::Val{M}
     config::CBT
     target::T
     threshold::TH
     maxStep::Int
-    GD::F
+    optimizer::OM
 end
 
 POconfig(t::NamedTuple) = genNamedTupleC(:POconfig, defaultPOconfigPars)(t)
@@ -102,6 +148,84 @@ POconfig(;kws...) =
 length(kws) == 0 ? POconfig(defaultPOconfigPars...) : POconfig(kws|>NamedTuple)
 
 const defaultPOconfig = Meta.parse(defaultPOconfigStr) |> eval
+
+
+function genLineSearchOpt(GDc::GDconfig{T, M, ST}, 
+                          f::Function, gf::Function) where {T, M, ST}
+    l = GDc.lineSearchMethod
+    η₀ = GDc.initialStep
+    lo, up = GDc.stepBound
+    @inline function (x, gx, fx)
+        ϕForLS(η) = f(x .- η.*gx)
+        𝑑ϕForLS(η) = dot(gf(x .- η.*gx)[begin], -gx)
+        function ϕ𝑑ϕForLS(η)
+            grad, ϕ = gf(x .- η.*gx)
+            (ϕ, dot(grad, -gx))
+        end
+        η = if GDc.scaleStepBound
+            clamp(η₀[], lo, up)
+        else
+            n = norm(gx)
+            clamp(η₀[], lo/n, up/n)
+        end
+        ηNew = l(ϕForLS, 𝑑ϕForLS, ϕ𝑑ϕForLS, η, fx, -dot(gx, gx))[begin] # new step η
+        ST <: Array{T, 0} && (η₀[] = ηNew)
+        x .-= ηNew.*gx
+    end
+end
+
+function genLineSearchOpt(GDc::GDconfig{T, itselfT, ST}, _::Function, _::Function) where 
+                         {T, ST}
+    η₀ = GDc.initialStep
+    lo, up = GDc.stepBound
+    @inline function (x, gx, _)
+        η = if GDc.scaleStepBound
+            clamp(η₀[], lo, up)
+        else
+            n = norm(gx)
+            clamp(η₀[], lo/n, up/n)
+        end
+        x .-= η.*gx
+    end
+end
+
+function convertExternalOpt(o!::F, f::Function, gf::Function) where {F}
+    @inline function (x, gx, fx)
+        o!(x, gx, fx, f, gf)
+    end
+end
+
+getOptimizerConstructor(::Type{<:GDconfig}) = genLineSearchOpt
+
+getOptimizerConstructor(::Type{<:Any}) =  convertExternalOpt
+
+function genOptimizer(config::POconfig{<:Any, OFT, <:ConfigBox{T1, HFconfig}}, 
+                      pars::AbstractVector{Array{T2, 0}}, bs, 
+                      nuc, nucCoords, N) where {OFT, T1, T2}
+
+    (f0, getOFval), (g0, getOGval) = OFfunctions[OFT]
+
+    f = function (x)
+        xTemp = getindex.(pars)
+        setindex!.(pars, x)
+        res = f0(GTBasis(bs), nuc, nucCoords, N, config.config, printInfo=false)
+        setindex!.(pars, xTemp)
+        getOFval(res)
+    end
+
+    gf = function (x)
+        xTemp = getindex.(pars)
+        setindex!.(pars, x)
+        fRes = f0(GTBasis(bs), nuc, nucCoords, N, config.config, printInfo=false)
+        grad = g0(pars, fRes, printInfo=false)
+        setindex!.(pars, xTemp)
+        getOGval(grad), getOFval(fRes)
+    end
+
+    opt = config.optimizer
+    generator = getOptimizerConstructor(typeof(opt))
+    generator(opt, f, gf)
+end
 
 
 function getGradE(config::POconfig{<:Any, :HF, <:ConfigBox{T, HFconfig}}, 
@@ -144,11 +268,30 @@ function formatTunableParams!(pbs::AbstractVector{<:ParamBox{T}},
     map(x->dataOf(x)[begin], pbsNew) # Vector of parameters to be optimized.
 end
 
-function makeAbsLayerForXpnParams(pbs, bs)
-    xpnFilter = x->isOutSymEqual(x, xpnSym)
-    absXpn = pb->changeMapping(pb, absMap(pb.map))
-    pbs = copyParContainer.(pbs, xpnFilter, absXpn, itself)
-    bs = copyParContainer.(bs, xpnFilter, absXpn, itself)
+function makeAbsLayerForXpnParams(pbs, bs, onlyForNegXpn::Bool=false; 
+                                  forceDiffOn::Bool=false, tryJustFlipNegSign::Bool=true)
+    xpnFilter = pb->(isOutSymEqual(pb, xpnSym) && (onlyForNegXpn ? pb()<0 : true))
+    pbsDiffConfig = getproperty.(pbs, :canDiff)
+    newDiffConfig = forceDiffOn ? Ref(fill(true)) : (fill∘getindex).(pbsDiffConfig)
+    d = IdDict(pbsDiffConfig .=> newDiffConfig)
+    absXpn1 = (pb::ParamBox)->changeMapping( pb, Absolute(pb.map), 
+                                             canDiff=get!(d, pb.canDiff, 
+                                                          fill(forceDiffOn ? 
+                                                               true : pb.canDiff[])) )
+    absXpn2 = if tryJustFlipNegSign
+        function (pb::ParamBox)
+            if getTypeParams(pb)[end] == FI || pb.map isa DressedItself
+                pb[] *= sign(pb[])
+                pb
+            else
+                absXpn1(pb)
+            end
+        end
+    else
+        absXpn1
+    end
+    pbs = copyParContainer.(pbs, xpnFilter, absXpn2, itself)
+    bs = copyParContainer.(bs, xpnFilter, absXpn2, itself)
     pbs, bs
 end
 
@@ -204,8 +347,11 @@ function optimizeParams!(pbs::AbstractVector{<:ParamBox{T}},
                          printInfo::Bool=true) where {T, D, NN, M, CBT, F}
     tAll = @elapsed begin
 
-        formatTunableParams!(pbs, bs)
-        pbs, bs = makeAbsLayerForXpnParams(pbs, bs)
+        pars = formatTunableParams!(pbs, bs)
+        parVals = getindex.(pars)
+        pbsN, bsN = makeAbsLayerForXpnParams(pbs, bs, 
+                                             forceDiffOn=true, tryJustFlipNegSign=false)
+
         nuc = arrayToTuple(nuc)
         nucCoords = genTupleCoords(T, nucCoords)
         i = 0
@@ -215,7 +361,7 @@ function optimizeParams!(pbs::AbstractVector{<:ParamBox{T}},
         threshold = config.threshold
         target = config.target
         maxStep = config.maxStep
-        gap = min(100, max(maxStep ÷ 200 * 10, 1))
+        gap = min(100, max(maxStep ÷ 100 * 10, 1))
 
         detectConverge, arg = if isNaN(target)
             ifelse(isNaN(threshold), false, true), (Val(1), threshold)
@@ -229,22 +375,22 @@ function optimizeParams!(pbs::AbstractVector{<:ParamBox{T}},
         end
         blConv = ifelse(detectConverge, true, missing)
 
-        pvsL = getindex.(pbs)
+        optimize! = genOptimizer(config, pars, bsN, nuc, nucCoords, N)
 
         while true
-            gtb = GTBasis(bs)
+            gtb = GTBasis(bsN)
 
             t = @elapsed begin
-                grad, E = getGradE(config, pbs, gtb, nuc, nucCoords, N)
+                grad, E = getGradE(config, pbsN, gtb, nuc, nucCoords, N)
             end
             push!(Es, E)
-            pvs = hcat(pvs, pvsL)
+            pvs = hcat(pvs, parVals)
             grads = hcat(grads, grad)
 
             if i%gap == 0 && printInfo
                 println(rpad("Step $i: ", 15), rpad("E = $(E)", 26))
                 print(rpad("", 10), "params = ")
-                println(IOContext(stdout, :limit => true), pvsL)
+                println(IOContext(stdout, :limit => true), parVals)
                 print(rpad("", 12), "grad = ")
                 println(IOContext(stdout, :limit => true), grad)
                 println("Step duration: ", t, " seconds.\n")
@@ -252,7 +398,8 @@ function optimizeParams!(pbs::AbstractVector{<:ParamBox{T}},
 
             !( blConv = isConverged(Es, grads) ) && i < maxStep || break
 
-            setindex!.(pbs, config.GD(pvsL, grad))
+            optimize!(parVals, grad, E)
+            setindex!.(pars, parVals)
 
             i += 1
         end
@@ -271,6 +418,8 @@ function optimizeParams!(pbs::AbstractVector{<:ParamBox{T}},
             println("The result has" * ifelse(blConv, "", " not") *" converged.")
         end
     end
+
+    pbs, bs = makeAbsLayerForXpnParams(pbs, bs, true)
 
     Es, pvs, grads, blConv
 end
