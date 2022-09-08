@@ -620,9 +620,11 @@ electrons with same spin configurations(s).
 
 `printInfo::Bool`: Whether print out the information of iteration steps and result.
 """
-function runHF(bs::GTBasis, args...; printInfo::Bool=true)
-    vars, isConverged = runHFcore(bs, args...; printInfo)
-    res = HFfinalVars(bs, args[begin], args[begin+1], getX(bs.S), vars, isConverged)
+function runHF(bs::GTBasis{T}, args...; printInfo::Bool=true) where {T}
+    nuc = arrayToTuple(args[begin])
+    nucCoords = genTupleCoords(T, args[begin+1])
+    vars, isConverged = runHFcore(bs, nuc, nucCoords, args[begin+2:end]...; printInfo)
+    res = HFfinalVars(bs, nuc, nucCoords, getX(bs.S), vars, isConverged)
     if printInfo
         Etot = round(res.Ehf + res.Enn, digits=10)
         Ehf = round(res.Ehf, digits=10)
@@ -641,8 +643,8 @@ runHF(GTBasis(bs), args...; printInfo)
 @inline function runHFcore(bs::GTBasis{T1, D, BN, BFT}, 
                            nuc::VectorOrNTuple{String, NN}, 
                            nucCoords::SpatialCoordType{T1, D, NN}, 
-                           config::HFconfig{T2, HFT}=defaultHFC, 
-                           N::Union{Int, Tuple{Int}, NTuple{2, Int}}=getCharge(nuc); 
+                           N::Union{Int, Tuple{Int}, NTuple{2, Int}}=getCharge(nuc), 
+                           config::HFconfig{T2, HFT}=defaultHFC; 
                            printInfo::Bool=false) where {T1, D, BN, BFT, NN, HFT, T2}
     @assert N > (HFT==:RHF) "$(HFT) requires more than $(HFT==:RHF) electrons."
     Ns = splitSpins(Val(HFT), N)
@@ -659,9 +661,9 @@ runHF(GTBasis(bs), args...; printInfo)
               C0, printInfo, config.maxStep, config.earlyStop)
 end
 
-runHFcore(bs::BasisSetData, nuc, nucCoords, N::Int, config=defaultHFC; 
+runHFcore(bs::BasisSetData, nuc, nucCoords, config::HFconfig, N::Int=getCharge(nuc); 
           printInfo::Bool=false) = 
-runHFcore(bs::BasisSetData, nuc, nucCoords, config, N; printInfo)
+runHFcore(bs::BasisSetData, nuc, nucCoords, N, config; printInfo)
 
 runHFcore(bs::VectorOrNTuple{AbstractGTBasisFuncs{T, D}}, args...; 
           printInfo::Bool=false) where {T, D} = 
