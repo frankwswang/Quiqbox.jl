@@ -4,7 +4,7 @@ using Documenter
 
 @testset "Quiqbox tests" begin
 
-    println("Number of threads for tests: ", Threads.nthreads(), "\n")
+    println("Number of threads used for testing: ", Threads.nthreads(), "\n")
 
     Random.seed!(1000)
 
@@ -22,6 +22,7 @@ using Documenter
         unit2_1 = "Main Functions"
         println("Testing $(unit2_1)...")
         t2_1 = @elapsed @testset "$(unit2_1)" begin
+            include("unit-tests/Mapping-test.jl")
             include("unit-tests/Parameters-test.jl")
             include("unit-tests/Basis-test.jl")
             include("unit-tests/Integrals/Core-test.jl")

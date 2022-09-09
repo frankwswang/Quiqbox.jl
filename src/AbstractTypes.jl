@@ -81,9 +81,9 @@ const FGTBasisFuncs1O{T, D, 𝑙, GN, PT} = FloatingGTBasisFuncs{T, D, 𝑙, GN,
 
 
 const SpatialCoordType{T, D, N} = Union{ AbstractVector{NTuple{D, T}}, 
-                                          NTuple{N, AbstractVector{<:T}}, 
-                                          NTuple{N, NTuple{D, T}}, 
-                                          AbstractVector{<:AbstractVector{<:T}} }
+                                         NTuple{N, AbstractVector{<:T}}, 
+                                         NTuple{N, NTuple{D, T}}, 
+                                         AbstractVector{<:AbstractVector{<:T}} }
 
 const VectorOrNTuple{T, N} = Union{NTuple{N, T}, AbstractVector{<:T}}
 
