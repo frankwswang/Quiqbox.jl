@@ -626,9 +626,9 @@ function runHF(bs::GTBasis{T}, args...; printInfo::Bool=true) where {T}
     vars, isConverged = runHFcore(bs, nuc, nucCoords, args[begin+2:end]...; printInfo)
     res = HFfinalVars(bs, nuc, nucCoords, getX(bs.S), vars, isConverged)
     if printInfo
-        Etot = round(res.Ehf + res.Enn, digits=10)
-        Ehf = round(res.Ehf, digits=10)
-        Enn = round(res.Enn, digits=10)
+        Etot = round(res.Ehf + res.Enn, digits=nDigitShown)
+        Ehf = round(res.Ehf, digits=nDigitShown)
+        Enn = round(res.Enn, digits=nDigitShown)
         println(rpad("Hartree-Fock Energy", 20), "| ", rpad("Nuclear Repulsion", 20), 
                 "| Total Energy")
         println(rpad(string(Ehf)* " Ha", 22), rpad(string(Enn)* " Ha", 22), Etot, " Ha\n")
@@ -721,7 +721,8 @@ function runHFcore(::Val{HFT},
     vars = initializeSCF(Val(HFT), Hcore, HeeI, C0, N)
     Etots = vars[1].shared.Etots
     oscThreshold = scfConfig.oscillateThreshold
-    printInfo && println(rpad(HFT, 4)*rpad(" | Initial Gauss", 18), "E = $(Etots[end])")
+    printInfo && println(rpad(HFT, 8)*rpad(" | Initial Gauss", 18), 
+                         "E = ", alignNumSign(Etots[end], roundDigits=getAtolDigits(T2)))
     isConverged = true
     i = 0
     ΔE = 0.0
@@ -763,7 +764,8 @@ function runHFcore(::Val{HFT},
             end
 
             printInfo && (i % floor(log(4, i) + 1) == 0 || i == maxStep) && 
-            println(rpad("Step $i", 10), rpad("#$l ($(m))", 12), "E = $(Etots[end])")
+            println(rpad("Step $i", 9), rpad("| #$l ($(m))", 17), 
+                    "E = ", alignNumSign(Etots[end], roundDigits=getAtolDigits(T2)))
 
             isConverged && abs(ΔE) <= breakPoint && break
         end
@@ -771,8 +773,8 @@ function runHFcore(::Val{HFT},
     negStr = ifelse(isConverged, "is ", "has not ")
     if printInfo
         println("\nThe SCF iteration ", negStr, "converged at step $i:\n", 
-                "|ΔE| = ", round(abs(ΔE), sigdigits=7), " Ha, ", 
-                "RMS(ΔD) = ", round(ΔDrms, sigdigits=7), ".\n")
+                "|ΔE| → ", round(abs(ΔE), digits=nDigitShown), " Ha, ", 
+                "RMS(ΔD) → ", round(ΔDrms, digits=nDigitShown), ".\n")
     end
     vars, isConverged
 end
