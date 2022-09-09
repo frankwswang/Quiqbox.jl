@@ -8,7 +8,8 @@ const OFfunctions = Dict([:HFenergy] .=>
     [
         ( ( runHFcore, x->x[begin][begin].shared.Etots[end], 0 ), 
           ( (tVars, pbs, gtb, nuc, nucCoords, N)->
-            gradOfHFenergy(pbs, gtb, last.(getproperty.(tVars[begin], :Cs)), nuc, nucCoords, N), 
+            gradOfHFenergy(pbs, gtb, last.(getproperty.(tVars[begin], :Cs)), 
+                           nuc, nucCoords, N), 
             itself )
         )
     ]
@@ -106,8 +107,8 @@ converged. When it's (or either of them) set to `NaN`, there will be no correspo
 convergence detection, and when `target` is not `NaN`, the threshold for the gradient won't 
 be used because the gradient won't be part of the convergence criteria.
 
-`gradThreshold::T`: The error threshold for the convergence determination; when set to `NaN`, 
-there will be no convergence detection.
+`gradThreshold::T`: The error threshold for the convergence determination; when set to 
+`NaN`, there will be no convergence detection.
 
 `maxStep::Int`: Maximum iteration steps allowed regardless if the iteration converges.
 
@@ -246,7 +247,9 @@ function formatTunableParams!(pbs::AbstractVector{<:ParamBox{T}},
     filterParsForSafety && getUnique!(pbs, compareFunction=compareParamBox)
     d = Dict{UInt, Array{T, 0}}()
     pbsNew = map(pbs) do p
-        isDiffParam(p) ? p : changeMapping(outValCopy(p), DressedItself(p.map))
+        res = isDiffParam(p) ? p : changeMapping(outValCopy(p), DressedItself(p.map))
+        res.index[] = p.index[]
+        res
     end
     for (j, c) in enumerate(pbcs)
         cNew = copyParContainer(c, 
@@ -352,8 +355,9 @@ function optimizeParams!(pbs::AbstractVector{<:ParamBox{T}},
                          nucCoords::SpatialCoordType{T, D, NN}, 
                          config::POconfig{<:Any, M, CBT, <:Any, F}=defaultPOconfig, 
                          N::Union{Int, Tuple{Int}, NTuple{2, Int}}=getCharge(nuc); 
-                         printInfo::Bool=true) where {T, D, NN, M, CBT, F}
-    tStart = time()
+                         printInfo::Bool=true) where {T, D, NN
+                                , M, CBT, F}
+    tBegin = time()
 
     pars = formatTunableParams!(pbs, bs)
     parsVal = getindex.(pars)
@@ -384,8 +388,12 @@ function optimizeParams!(pbs::AbstractVector{<:ParamBox{T}},
     nucCoords = genTupleCoords(T, nucCoords)
     optimize! = genOptimizer(config, pbsN, bsN, nuc, nucCoords, N)
     (f0, getOFval, fD), (g0, getOGval) = OFfunctions[M]
+    fD in (0, 1) || throw(DomainError(fD, "The dimension of the returned value of the "*
+                                          "objective function can only be 0 or 1, i.e., "*
+                                          "a scalar or a vector."))
     fVals = fD==0 ? T[] : Array{T, fD}[]
     grads = Array{T, fD+1}[]
+    fStr = fD==0 ? "𝑓" : "𝒇"
 
     while true
         gtbN = GTBasis(bsN)
@@ -401,12 +409,15 @@ function optimizeParams!(pbs::AbstractVector{<:ParamBox{T}},
         push!(parsVals, parsVal)
 
         if i%gap == 0 && printInfo
-            println(rpad("Step $i: ", 15), rpad("$M = $(fVal)", 26))
-            print(rpad("", 10), "params = ")
-            println(IOContext(stdout, :limit => true), parsVal)
-            print(rpad("", 12), "grad = ")
-            println(IOContext(stdout, :limit => true), grad)
-            println("Step duration: ", Δt₁+Δt₂, " seconds.\n")
+            println(rpad("Step $(i): ", 11), lpad("$(fStr) = ", 6), 
+                    alignNumSign(fVal, roundDigits=nDigitShown))
+            print(rpad("", 11), lpad("𝒙 = ", 6))
+            println(IOContext(stdout, :limit => true), 
+                    round.(parsVal, digits=nDigitShown))
+            print(rpad("", 11), lpad("∇$(fStr) = ", 6))
+            println(IOContext(stdout, :limit => true), 
+                    round.(grad, digits=nDigitShown))
+            println("Step duration: ", round(Δt₁+Δt₂, digits=6), " seconds.\n")
         end
 
         !( blConv = isConverged(fVals, grads) ) && i < maxStep || break
@@ -423,15 +434,26 @@ function optimizeParams!(pbs::AbstractVector{<:ParamBox{T}},
     tEnd = time()
 
     if printInfo
-        println("The iteration just ended at")
-        println(rpad("Step $(i): ", 15), rpad("$M = $(fVals[end])", 26))
-        print(rpad("", 10), "params = ")
-        println(IOContext(stdout, :limit => true), parsVals[end])
-        print(rpad("", 12), "grad = ")
-        println(IOContext(stdout, :limit => true), grads[end])
-        println("Optimization duration: ", (tEnd-tStart)/60, " minutes.")
+        print("The optimization of parameters \n    𝒙 := ")
+        println(IOContext(stdout, :limit => true), "$((first∘indVarOf).(pbs)) ")
+        println("with respect to $(fStr)(𝒙) from profile :$M just ended at")
+        println(rpad("Step $(i): ", 11), lpad("$(fStr) = ", 6), 
+                alignNumSign(fVals[end], roundDigits=nDigitShown))
+        print(rpad("", 11), lpad("𝒙 = ", 6))
+        println(IOContext(stdout, :limit => true), 
+                round.(parsVals[end], digits=nDigitShown))
+        print(rpad("", 11), lpad("∇$(fStr) = ", 6))
+        println(IOContext(stdout, :limit => true), 
+                round.(grads[end], digits=nDigitShown))
+        println("Optimization duration: ", round((tEnd-tBegin)/60, digits=6), 
+                " minutes.")
         if detectConverge
-            println("The result has" * ifelse(blConv, "", " not") *" converged.")
+            println("The result has" * ifelse(blConv, "", " not") *" converged: ")
+            println("∥Δ$(fStr)∥₂ → ", round(norm(fVals[end] - fVals[end-1]), 
+                                            digits=nDigitShown), ", ", 
+                    "∥vec(Δ(∇$(fStr)))∥₂ → ", round(norm(grads[end] - grads[end-1]), 
+                                                    digits=nDigitShown), 
+                    ".\n")
         end
     end
 

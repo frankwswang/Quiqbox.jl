@@ -10,7 +10,7 @@ include("../../test/test-functions/Shared.jl")
 
 @testset "Optimization.jl" begin
 
-errorThreshold = 1e-9
+errorThreshold = 5e-9
 
 
 # formatTunableParams!
@@ -203,7 +203,7 @@ for (po, E_t2, par_t2, grad_t2) in zip(pos, E_t2s, par_t2s, grad_t2s)
     @test all(Es2L[i]<=Es2L[i-1] for i in 2:lastindex(Es2L))
     @test isapprox(Es2L[end], E_t2, atol=errorThreshold)
     @test isapprox(ps2L[end], par_t2, atol=errorThreshold)
-    @test isapprox(grads2L[end], grad_t2, atol=5errorThreshold)
+    @test isapprox(grads2L[end], grad_t2, atol=errorThreshold)
 end
 
 
