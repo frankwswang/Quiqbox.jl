@@ -434,7 +434,7 @@ function optimizeParams!(pbs::AbstractVector{<:ParamBox{T}},
     tEnd = time()
 
     if printInfo
-        print("The optimization of parameters \n    𝒙 := ")
+        print("The optimization of parameters \n𝒙 := ")
         println(IOContext(stdout, :limit => true), "$((first∘indVarOf).(pbs)) ")
         println("with respect to $(fStr)(𝒙) from profile :$M just ended at")
         println(rpad("Step $(i): ", 11), lpad("$(fStr) = ", 6), 
