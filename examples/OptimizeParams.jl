@@ -14,7 +14,7 @@ pars = markParams!(bs, true)
 
 parsPartial = pars[1:2]
 
-Es, ps, grads = optimizeParams!(parsPartial, bs, nuc, nucCoords, POconfig(maxStep=10))
+Es, ps, grads = optimizeParams!(parsPartial, bs, nuc, nucCoords, POconfig(maxStep=5))
 
 # # You can also use more advanced optimizers from other packages.
 # using Flux # First do `using Pkg; Pkg.add("Flux")` if you haven't installed the package.

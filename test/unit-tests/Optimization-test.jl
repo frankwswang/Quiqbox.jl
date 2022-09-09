@@ -10,7 +10,7 @@ include("../../test/test-functions/Shared.jl")
 
 @testset "Optimization.jl" begin
 
-errorThreshold = 5e-9
+errorThreshold = 1e-8
 
 
 # formatTunableParams!

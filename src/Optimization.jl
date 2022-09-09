@@ -6,7 +6,7 @@ using LineSearches
 const OFtypes = (:HFenergy,)
 const OFfunctions = Dict([:HFenergy] .=> 
     [
-        ( ( runHFcore, x->x[begin][begin].shared.Etots[end], 0 ), 
+        ( ( runHFcore, x->x[begin][begin].shared.Etots[end] ), 
           ( (tVars, pbs, gtb, nuc, nucCoords, N)->
             gradOfHFenergy(pbs, gtb, last.(getproperty.(tVars[begin], :Cs)), 
                            nuc, nucCoords, N), 
@@ -167,8 +167,8 @@ function genLineSearchOpt(GDc::GDconfig{T, M, ST},
         ϕForLS(η) = f(x .- η.*gx)
         𝑑ϕForLS(η) = dot(gf(x .- η.*gx)[begin], -gx)
         function ϕ𝑑ϕForLS(η)
-            grad, ϕ = gf(x .- η.*gx)
-            (ϕ, dot(grad, -gx))
+            gxNew, ϕ = gf(x .- η.*gx)
+            (ϕ, dot(gxNew, -gx))
         end
         η = if GDc.scaleStepBound
             clamp(η₀[], lo, up)
@@ -208,19 +208,18 @@ getOptimizerConstructor(::Type{<:GDconfig}) = genLineSearchOpt
 
 getOptimizerConstructor(::Type{<:Any}) =  convertExternalOpt
 
-@inline function genOptimizer(config::POconfig{<:Any, M, <:ConfigBox{<:Any, HFconfig}}, 
+@inline function genOptimizer(::Val{M}, Mconfig::ConfigBox{T}, optimizer::O, 
                               pbs::AbstractVector{<:ParamBox{T}}, 
                               bs::AbstractVector{<:AbstractGTBasisFuncs{T, D}}, 
                               nuc::NTuple{NN, String}, 
-                              nucCoords::NTuple{NN, NTuple{D, T}}, N) where {M, T, NN, D}
-
-    (f0, getOFval, _), (g0, getOGval) = OFfunctions[M]
+                              nucCoords::NTuple{NN, NTuple{D, T}}, N) where {M, T, O, NN, D}
+    (f0, getOFval), (g0, getOGval) = OFfunctions[M]
 
     f = function (x)
         xTemp = getindex.(pbs)
         setindex!.(pbs, x)
         gtb = GTBasis(bs)
-        res = f0(gtb, nuc, nucCoords, N, config.config, printInfo=false)
+        res = f0(gtb, nuc, nucCoords, N, Mconfig, printInfo=false)
         setindex!.(pbs, xTemp)
         getOFval(res)
     end
@@ -229,15 +228,14 @@ getOptimizerConstructor(::Type{<:Any}) =  convertExternalOpt
         xTemp = getindex.(pbs)
         setindex!.(pbs, x)
         gtb = GTBasis(bs)
-        fRes = f0(gtb, nuc, nucCoords, N, config.config, printInfo=false)
-        grad = g0(fRes, pbs, gtb, nuc, nucCoords, N)
+        fRes = f0(gtb, nuc, nucCoords, N, Mconfig, printInfo=false)
+        gRes = g0(fRes, pbs, gtb, nuc, nucCoords, N)
         setindex!.(pbs, xTemp)
-        getOGval(grad), getOFval(fRes)
+        getOGval(gRes), getOFval(fRes)
     end
 
-    opt = config.optimizer
-    generator = getOptimizerConstructor(typeof(opt))
-    generator(opt, f, gf)
+    generator = getOptimizerConstructor(O)
+    generator(optimizer, f, gf)
 end
 
 
@@ -354,12 +352,11 @@ function optimizeParams!(pbs::AbstractVector{<:ParamBox{T}},
                          nucCoords::SpatialCoordType{T, D, NN}, 
                          config::POconfig{<:Any, M, CBT, <:Any, F}=defaultPOconfig, 
                          N::Union{Int, Tuple{Int}, NTuple{2, Int}}=getCharge(nuc); 
-                         printInfo::Bool=true) where {T, D, NN
-                                , M, CBT, F}
+                         printInfo::Bool=true) where {T, D, NN, M, CBT, F}
     tBegin = time()
 
     pars = formatTunableParams!(pbs, bs)
-    parsVal = getindex.(pars)
+    x = getindex.(pars)
     pbsN, bsN = makeAbsLayerForXpnParams(pbs, bs, 
                                          forceDiffOn=true, tryJustFlipNegSign=false)
     parsVals = Vector{T}[]
@@ -385,48 +382,38 @@ function optimizeParams!(pbs::AbstractVector{<:ParamBox{T}},
 
     nuc = arrayToTuple(nuc)
     nucCoords = genTupleCoords(T, nucCoords)
-    optimize! = genOptimizer(config, pbsN, bsN, nuc, nucCoords, N)
-    (f0, getOFval, fD), (g0, getOGval) = OFfunctions[M]
-    fD in (0, 1) || throw(DomainError(fD, "The dimension of the returned value of the "*
-                                          "objective function can only be 0 or 1, i.e., "*
-                                          "a scalar or a vector."))
-    fVals = fD==0 ? T[] : Array{T, fD}[]
-    grads = Array{T, fD+1}[]
-    fStr = fD==0 ? "𝑓" : "𝒇"
+    f0s, g0s = OFfunctions[M]
+    f0config = config.config
+    optimize! = genOptimizer(Val(M), f0config, config.optimizer, 
+                             pbsN, bsN, nuc, nucCoords, N)
 
-    while true
-        gtbN = GTBasis(bsN)
+    fx, gx, Δt₁ = optimizeParamsCore(f0s, g0s, pbsN, bsN, nuc, nucCoords, N, f0config)
+    fVstr = ndims(fx)==0 ? "𝑓" : "𝒇"
+    fVals = [fx]
+    grads = [gx]
 
-        t1 = time_ns()
-        fRes = f0(gtbN, nuc, nucCoords, N, config.config, printInfo=false)
-        fVal = getOFval(fRes)
-        grad = (getOGval∘g0)(fRes, pbsN, gtbN, nuc, nucCoords, N)
-        t2 = time_ns()
-        Δt₁ = (t2 - t1) / 1e9
-        push!(fVals, fVal)
-        push!(grads, grad)
-        push!(parsVals, parsVal)
+    while !isConverged(fVals, gx) && i < maxStep
 
         if i%gap == 0 && printInfo
-            println(rpad("Step $(i): ", 11), lpad("$(fStr) = ", 6), 
-                    alignNumSign(fVal, roundDigits=nDigitShown))
+            println(rpad("Step $(i): ", 11), lpad("$(fVstr) = ", 6), 
+                    alignNumSign(fx, roundDigits=nDigitShown))
             print(rpad("", 11), lpad("𝒙 = ", 6))
-            println(IOContext(stdout, :limit => true), 
-                    round.(parsVal, digits=nDigitShown))
-            print(rpad("", 11), lpad("∇$(fStr) = ", 6))
-            println(IOContext(stdout, :limit => true), 
-                    round.(grad, digits=nDigitShown))
+            println(IOContext(stdout, :limit => true), round.(x, digits=nDigitShown))
+            print(rpad("", 11), lpad("∇$(fVstr) = ", 6))
+            println(IOContext(stdout, :limit => true), round.(gx, digits=nDigitShown))
             println("Step duration: ", round(Δt₁+Δt₂, digits=6), " seconds.\n")
         end
 
-        !( blConv = isConverged(fVals, grad) ) && i < maxStep || break
-
         t3 = time_ns()
-        optimize!(parsVal, grad, fVal)
+        optimize!(x, gx, fx)
         t4 = time_ns()
         Δt₂ = (t4 - t3) / 1e9
-        setindex!.(pars, parsVal)
+        setindex!.(pars, x)
 
+        fx, gx, Δt₁ = optimizeParamsCore(f0s, g0s, pbsN, bsN, nuc, nucCoords, N, f0config)
+        push!(fVals, fx)
+        push!(grads, gx)
+        push!(parsVals, x)
         i += 1
     end
 
@@ -435,25 +422,25 @@ function optimizeParams!(pbs::AbstractVector{<:ParamBox{T}},
     if printInfo
         print("The optimization of parameters \n𝒙 := ")
         println(IOContext(stdout, :limit => true), "$((first∘indVarOf).(pbs)) ")
-        print("with respect to $(fStr)(𝒙) from the profile ")
-        printstyled(":$M", underline=true, bold=true)
+        print("with respect to $(fVstr)(𝒙) from the profile ")
+        printstyled(":$M", underline=true)
         println(" just ended at")
-        println(rpad("Step $(i): ", 11), lpad("$(fStr) = ", 6), 
+        println(rpad("Step $(i): ", 11), lpad("$(fVstr) = ", 6), 
                 alignNumSign(fVals[end], roundDigits=nDigitShown))
         print(rpad("", 11), lpad("𝒙 = ", 6))
         println(IOContext(stdout, :limit => true), 
                 round.(parsVals[end], digits=nDigitShown))
-        print(rpad("", 11), lpad("∇$(fStr) = ", 6))
+        print(rpad("", 11), lpad("∇$(fVstr) = ", 6))
         println(IOContext(stdout, :limit => true), 
                 round.(grads[end], digits=nDigitShown))
         println("Optimization duration: ", round((tEnd-tBegin)/60, digits=6), 
                 " minutes.")
         if detectConverge
             println("The result has" * ifelse(blConv, "", " not") *" converged: ")
-            println("∥Δ$(fStr)∥₂ → ", round(norm(fVals[end] - fVals[end-1]), 
-                                            digits=nDigitShown), ", ", 
-                    "∥vec(∇$(fStr))∥₂ → ", round(norm(grads[end]), digits=nDigitShown), 
-                    ".\n")
+            println("∥Δ$(fVstr)∥₂ → ", 
+                    round(norm(fVals[end] - fVals[end-1]), digits=nDigitShown), ", ", 
+                    "∥vec(∇$(fVstr))∥₂ → ", 
+                    round(norm(grads[end]), digits=nDigitShown), ".\n")
         end
     end
 
@@ -465,6 +452,16 @@ end
 optimizeParams!(pbs, bs, nuc, nucCoords, N::Int, config=defaultPOconfig; printInfo=true) = 
 optimizeParams!(pbs, bs, nuc, nucCoords, config, N; printInfo)
 
+function optimizeParamsCore((f0, getOFval), (g0, getOGval), 
+                            pbs, bs, nuc, nucCoords, N, config)
+    gtb = GTBasis(bs)
+    t1 = time_ns()
+    fRes = f0(gtb, nuc, nucCoords, N, config, printInfo=false)
+    fx = getOFval(fRes)
+    gx = (getOGval∘g0)(fRes, pbs, gtb, nuc, nucCoords, N)
+    t2 = time_ns()
+    fx, gx, (t2 - t1) / 1e9
+end
 
 function genDetectConvFunc(::Val{1}, threshold)
     function (fVals, grads)
