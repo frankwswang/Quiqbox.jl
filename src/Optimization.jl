@@ -419,7 +419,7 @@ function optimizeParams!(pbs::AbstractVector{<:ParamBox{T}},
             println("Step duration: ", round(Δt₁+Δt₂, digits=6), " seconds.\n")
         end
 
-        !( blConv = isConverged(fVals, grads) ) && i < maxStep || break
+        !( blConv = isConverged(fVals, grad) ) && i < maxStep || break
 
         t3 = time_ns()
         optimize!(parsVal, grad, fVal)
@@ -450,8 +450,7 @@ function optimizeParams!(pbs::AbstractVector{<:ParamBox{T}},
             println("The result has" * ifelse(blConv, "", " not") *" converged: ")
             println("∥Δ$(fStr)∥₂ → ", round(norm(fVals[end] - fVals[end-1]), 
                                             digits=nDigitShown), ", ", 
-                    "∥vec(Δ(∇$(fStr)))∥₂ → ", round(norm(grads[end] - grads[end-1]), 
-                                                    digits=nDigitShown), 
+                    "∥vec(∇$(fStr))∥₂ → ", round(norm(grads[end]), digits=nDigitShown), 
                     ".\n")
         end
     end
@@ -466,8 +465,8 @@ optimizeParams!(pbs, bs, nuc, nucCoords, config, N; printInfo)
 
 
 function genDetectConvFunc(::Val{1}, threshold)
-    function (fVals, grads)
-        bl = norm(grads[end]) > threshold[end] * sqrt(grads[end]|>length)
+    function (fVals, latestGrad)
+        bl = norm(latestGrad) > threshold[end] * sqrt(latestGrad|>length)
         ifelse(bl || !(isOscillateConverged(fVals, threshold[begin], minimalCycles=4)[1]), 
                 false, true)
     end
