@@ -319,10 +319,9 @@ end
 
 The main function to optimize the parameters of a given basis set. It returns a `Tuple` of 
 relevant information. The first three elements are the energies, the parameter values, and 
-the gradients from all the iteration steps respectively (For latter two, each column 
-corresponds to each step). The last element is the indicator of whether the optimization is 
-converged if the convergence detection is on (i.e., `config.threshold` is not `NaN`), or 
-else it's set to `missing`.
+the gradients from all the iteration steps respectively. The last element is the indicator 
+of whether the optimization is converged if the convergence detection is on (i.e., 
+`config.threshold` is not `NaN`), or else it's set to `missing`.
 
 === Positional argument(s) ===
 
@@ -468,12 +467,13 @@ optimizeParams!(pbs, bs, nuc, nucCoords, config, N; printInfo)
 
 function genDetectConvFunc(::Val{1}, threshold)
     function (fVals, grads)
-        bl = any(abs(grad) > threshold[end] for grad in grads[end])
+        bl = norm(grads[end]) > threshold[end] * sqrt(grads[end]|>length)
         ifelse(bl || !(isOscillateConverged(fVals, threshold[begin], minimalCycles=4)[1]), 
                 false, true)
     end
 end
 
 function genDetectConvFunc(::Val{2}, target, threshold)
-    (fVals, _) = fVals -> (abs(fVals[end] - target) <= threshold[begin])
+    (fVals, _) = fVals -> (norm(fVals[end] - target) <= 
+                           threshold[begin] * sqrt(fVals[end]|>length))
 end

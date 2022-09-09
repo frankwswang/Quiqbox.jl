@@ -1,7 +1,7 @@
 export hasEqual, hasIdentical, hasApprox, flatten, markUnique, getUnique!, itself
 
 using Statistics: std, mean
-using LinearAlgebra: eigvals, svdvals, eigen
+using LinearAlgebra: eigvals, svdvals, eigen, norm
 
 """
 
@@ -623,12 +623,12 @@ function isOscillateConverged(seq::AbstractVector{T},
                               convergeToMax::Bool=false) where {T}
     @assert minimalCycles>0 && nPartition>1
     len = length(seq)
-    len < minimalCycles && (return (false, T(0)))
+    len < minimalCycles && (return (false, zero(T)))
     slice = len ÷ nPartition
     lastPortion = seq[max(end-slice, 1) : end]
     remain = sort!(lastPortion)[ifelse(convergeToMax, (end÷2+1 : end), (1 : end÷2+1))]
     b = std(remain) < stdThreshold && 
-        abs(seq[end] - (convergeToMax ? max(remain...) : min(remain...))) < ValDiffThreshold
+        norm(seq[end]-(convergeToMax ? max(remain...) : min(remain...))) < ValDiffThreshold
     b, std(lastPortion)
 end
 
