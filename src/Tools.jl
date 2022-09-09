@@ -623,11 +623,11 @@ function isOscillateConverged(seq::AbstractVector{T},
                               convergeToMax::Bool=false) where {T}
     @assert minimalCycles>0 && nPartition>1
     len = length(seq)
-    len < minimalCycles && (return (false, zero(T)))
+    len < minimalCycles && (return (false, zero(seq[begin])))
     slice = len ÷ nPartition
     lastPortion = seq[max(end-slice, 1) : end]
     remain = sort!(lastPortion)[ifelse(convergeToMax, (end÷2+1 : end), (1 : end÷2+1))]
-    b = std(remain) < stdThreshold && 
+    b = all(std(remain) .< stdThreshold) && 
         norm(seq[end]-(convergeToMax ? max(remain...) : min(remain...))) < ValDiffThreshold
     b, std(lastPortion)
 end

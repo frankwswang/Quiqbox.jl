@@ -381,7 +381,7 @@ function optimizeParams!(pbs::AbstractVector{<:ParamBox{T}},
     else
         (_, _) -> false
     end
-    blConv = ifelse(detectConverge, true, missing)
+    blConv = ifelse(detectConverge, false, missing)
 
     nuc = arrayToTuple(nuc)
     nucCoords = genTupleCoords(T, nucCoords)
@@ -435,7 +435,9 @@ function optimizeParams!(pbs::AbstractVector{<:ParamBox{T}},
     if printInfo
         print("The optimization of parameters \n𝒙 := ")
         println(IOContext(stdout, :limit => true), "$((first∘indVarOf).(pbs)) ")
-        println("with respect to $(fStr)(𝒙) from profile :$M just ended at")
+        print("with respect to $(fStr)(𝒙) from the profile ")
+        printstyled(":$M", underline=true, bold=true)
+        println(" just ended at")
         println(rpad("Step $(i): ", 11), lpad("$(fStr) = ", 6), 
                 alignNumSign(fVals[end], roundDigits=nDigitShown))
         print(rpad("", 11), lpad("𝒙 = ", 6))
@@ -465,10 +467,11 @@ optimizeParams!(pbs, bs, nuc, nucCoords, config, N; printInfo)
 
 
 function genDetectConvFunc(::Val{1}, threshold)
-    function (fVals, latestGrad)
-        bl = norm(latestGrad) > threshold[end] * sqrt(latestGrad|>length)
-        ifelse(bl || !(isOscillateConverged(fVals, threshold[begin], minimalCycles=4)[1]), 
-                false, true)
+    function (fVals, grads)
+        ifelse((isOscillateConverged(grads, threshold[end]*sqrt(grads[end]|>length), 
+                                     minimalCycles=4)[1]) && 
+               (isOscillateConverged(fVals, threshold[begin], minimalCycles=4)[1]), 
+                true, false)
     end
 end
 
