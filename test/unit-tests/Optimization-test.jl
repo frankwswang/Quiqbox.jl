@@ -151,8 +151,8 @@ Ne = getCharge(nuc)
 
 
 # Floating basis set
-configs = [(maxStep=100)->POconfig(;maxStep, threshold=NaN), 
-           (maxStep=100)->POconfig(;maxStep, threshold=NaN, config=HFconfig((HF=:UHF,)))]
+configs = [(maxStep=100)->POconfig(;maxStep, threshold=(NaN, NaN)), 
+           (maxStep=100)->POconfig(;maxStep, threshold=(NaN,), config=HFconfig((HF=:UHF,)))]
 
 Es1Ls = Vector{Float64}[]
 gradEnd = Float64[]
@@ -177,9 +177,10 @@ compr2Arrays3((Eend_1to6=last.(Es1Ls[1:6]), Eend_7toEnd=last.(Es1Ls[7:end])), 1e
 
 # Grid-based basis set
 ## default Line-search GD optimizer
-po1 = POconfig((maxStep=50,))
+po1 = POconfig((maxStep=50, target=-10.0, threshold=(1e-10,)))
 ## vanilla GD optimizer
-po2 = POconfig(maxStep=200, optimizer=GDconfig(itself, 0.001, stepBound=(0.0, 2.0)))
+po2 = POconfig(maxStep=200, target=-10.0, threshold=(1e-10, 1e-10), 
+               optimizer=GDconfig(itself, 0.001, stepBound=(0.0, 2.0)))
 pos = (po1, po2)
 E_t2s = (-1.6679941925321318, -1.1665258293062994)
 ## L₁, α₁
@@ -209,7 +210,7 @@ end
 
 # BasisFuncMix basis set
 ## default Line-search GD optimizer
-po3 = POconfig(maxStep=50)
+po3 = POconfig(maxStep=50, target=-10.0)
 ## L-BFGS optimizer from Optim
 lbfgs! = function (x, _, _, f, gf)
     method = LBFGS()

@@ -83,8 +83,8 @@ const defaultPOconfigPars =
 
 """
 
-    POconfig{T, M, CBT<:ConfigBox, TH<:Union{T, NTuple{2, T}}, 
-                        OM} <: ConfigBox{T, POconfig, M}
+    POconfig{T, M, CBT<:ConfigBox, TH<:Union{Tuple{T}, NTuple{2, T}}, 
+             OM} <: ConfigBox{T, POconfig, M}
 
 The mutable container of parameter optimization configurations.
 
@@ -103,12 +103,10 @@ latest two steps are used instead.
 
 `threshold::TH`: The error threshold/thresholds for the function value difference and 
 the gradient both/respectively to determine whether the optimization iteration has 
-converged. When it's (or either of them) set to `NaN`, there will be no corresponding 
-convergence detection, and when `target` is not `NaN`, the threshold for the gradient won't 
-be used because the gradient won't be part of the convergence criteria.
-
-`gradThreshold::T`: The error threshold for the convergence determination; when set to 
-`NaN`, there will be no convergence detection.
+converged. When the element(s) of `threshold` is(are) set to `NaN`, there will be no 
+convergence detection to the corresponding quantity(s), and when `target` is not `NaN`, the 
+threshold for the gradient won't be used because the gradient won't be part of the 
+convergence criteria.
 
 `maxStep::Int`: Maximum iteration steps allowed regardless if the iteration converges.
 
@@ -127,7 +125,7 @@ optimizer `o!` each time `o!` runs. `gf` is a `Function` such that `gf(x) == (gx
     POconfig(;method::Val=$(defaultPOconfigPars[1]), 
               config::ConfigBox=$(defaultHFCStr), 
               target::T=$(defaultPOconfigPars[3]), 
-              threshold::T=$(defaultPOconfigPars[4]), 
+              threshold::Union{Tuple{T}, NTuple{2, T}}=$(defaultPOconfigPars[4]), 
               maxStep::Int=$(defaultPOconfigPars[5]), 
               optimizer::Function=$(defaultPOconfigPars[6]|>typeof|>nameof)()) where {T} -> 
     POconfig{T}
@@ -140,7 +138,7 @@ julia> POconfig();
 julia> POconfig(maxStep=100);
 ```
 """
-mutable struct POconfig{T, M, CBT<:ConfigBox, TH<:Union{T, NTuple{2, T}}, 
+mutable struct POconfig{T, M, CBT<:ConfigBox, TH<:Union{Tuple{T}, NTuple{2, T}}, 
                         OM} <: ConfigBox{T, POconfig, M}
     method::Val{M}
     config::CBT
@@ -368,17 +366,18 @@ function optimizeParams!(pbs::AbstractVector{<:ParamBox{T}},
     maxStep = config.maxStep
     gap = min(100, max(maxStep ÷ 100 * 10, 1))
 
-    detectConverge, arg = if isNaN(target)
-        ifelse(isNaN(threshold), false, true), (Val(1), threshold)
-    else
-        ifelse(isNaN(threshold[begin]), false, true), (Val(2), target, threshold)
+    target = ifelse(isNaN(target), (threshold[begin],), threshold)
+    detectConverge = false
+    isConverged = map(target) do tar
+        if isNaN(tar)
+            _->true
+        else
+            detectConverge |= true
+            vrs->isOscillateConverged(vrs, tar*sqrt(vrs[end]|>length), minimalCycles=4)[1]
+        end
     end
-    isConverged = if detectConverge
-        genDetectConvFunc(arg...)
-    else
-        (_, _) -> false
-    end
-    blConv = ifelse(detectConverge, false, missing)
+    detectConverge || (isConverged = _->false)
+    blConv = false
 
     nuc = arrayToTuple(nuc)
     nucCoords = genTupleCoords(T, nucCoords)
@@ -392,7 +391,7 @@ function optimizeParams!(pbs::AbstractVector{<:ParamBox{T}},
     fVals = [fx]
     grads = [gx]
 
-    while !isConverged(fVals, gx) && i < maxStep
+    while !all(f(x) for (f, x) in zip(isConverged, (fVals, grads))) && i < maxStep
 
         if i%gap == 0 && printInfo
             println(rpad("Step $(i): ", 11), lpad("$(fVstr) = ", 6), 
@@ -446,7 +445,7 @@ function optimizeParams!(pbs::AbstractVector{<:ParamBox{T}},
 
     pbs, bs = makeAbsLayerForXpnParams(pbs, bs, true)
 
-    fVals, parsVals, grads, blConv
+    fVals, parsVals, grads, ifelse(detectConverge, blConv, missing)
 end
 
 optimizeParams!(pbs, bs, nuc, nucCoords, N::Int, config=defaultPOconfig; printInfo=true) = 
@@ -461,18 +460,4 @@ function optimizeParamsCore((f0, getOFval), (g0, getOGval),
     gx = (getOGval∘g0)(fRes, pbs, gtb, nuc, nucCoords, N)
     t2 = time_ns()
     fx, gx, (t2 - t1) / 1e9
-end
-
-function genDetectConvFunc(::Val{1}, threshold)
-    function (fVals, grads)
-        ifelse((isOscillateConverged(grads, threshold[end]*sqrt(grads[end]|>length), 
-                                     minimalCycles=4)[1]) && 
-               (isOscillateConverged(fVals, threshold[begin], minimalCycles=4)[1]), 
-                true, false)
-    end
-end
-
-function genDetectConvFunc(::Val{2}, target, threshold)
-    (fVals, _) = fVals -> (norm(fVals[end] - target) <= 
-                           threshold[begin] * sqrt(fVals[end]|>length))
 end
