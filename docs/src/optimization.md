@@ -18,7 +18,7 @@ grid = GridBox(1, 3.0)
 
 gf1 = GaussFunc(0.7, 1.0);
 
-bs = genBasisFunc.(grid.point, Ref(gf1));
+bs = genBasisFunc.(grid.point, Ref(gf1)) |> collect;
 ```
 
 After building the basis set, we need to use [`markParams!`](@ref) to mark all the unique parameters that can also be optimized later:
