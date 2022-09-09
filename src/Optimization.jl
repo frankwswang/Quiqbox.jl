@@ -79,7 +79,7 @@ end
 
 
 const defaultPOconfigPars = 
-      [Val(:HFenergy), defaultHFforHFgrad, NaN, (5e-7, 5e-6), 500, GDconfig()]
+      [Val(:HFenergy), defaultHFforHFgrad, NaN, (5e-7, 5e-6), 200, GDconfig()]
 
 """
 
