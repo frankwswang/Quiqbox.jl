@@ -780,16 +780,19 @@ genTupleCoords(::Type{T}, coords::Tuple{Vararg{NTuple{D, T}}}) where {D, T} = it
 genTupleCoords(::Type{T}, coords::AbstractVector{NTuple{D, T}}) where {D, T} = 
 arrayToTuple(coords)
 
-function callGenFunc(f::F, x::T) where {F<:Function, T}
-    if worldAgeSafe(F) || applicable(f, zero(T))
-        !worldAgeSafe(F) && (@eval worldAgeSafe(::Type{$F}) = true)
-        f(x)
-    else
+
+callGenFunc(f::F, x) where {F<:Function} = callGenFuncCore(worldAgeSafe(F), f, x)
+callGenFuncCore(::Val{true}, f, x) = f(x)
+function callGenFuncCore(::Val{false}, f::F, x) where {F}
+    try
+        callGenFuncCore(Val(true), f, x)
+    catch
+        @eval worldAgeSafe(::Type{$F}) = Val(true)
         Base.invokelatest(f, x)
     end
 end
 
-worldAgeSafe(::Type{<:Function}) = false
+worldAgeSafe(::Type{<:Function}) = Val(false)
 
 
 uniCallFunc(f::F, argsOrder::NTuple{N, Int}, args...) where {F<:Function, N} = 
