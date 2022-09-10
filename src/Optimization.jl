@@ -83,7 +83,7 @@ const defaultPOconfigPars =
 
 """
 
-    POconfig{T, M, CBT<:ConfigBox, TH<:Union{Tuple{T}, NTuple{2, T}}, 
+    POconfig{T, M, CBT<:ConfigBox, TH<:Union{T, NTuple{2, T}}, 
              OM} <: ConfigBox{T, POconfig, M}
 
 The mutable container of parameter optimization configurations.
@@ -103,10 +103,9 @@ latest two steps are used instead.
 
 `threshold::TH`: The error threshold/thresholds for the function value difference and 
 the gradient both/respectively to determine whether the optimization iteration has 
-converged. When the element(s) of `threshold` is(are) set to `NaN`, there will be no 
-convergence detection to the corresponding quantity(s), and when `target` is not `NaN`, the 
-threshold for the gradient won't be used because the gradient won't be part of the 
-convergence criteria.
+converged. When it's (or either of them) set to `NaN`, there will be no corresponding 
+convergence detection, and when `target` is not `NaN`, the threshold for the gradient won't 
+be used because the gradient won't be part of the convergence criteria.
 
 `maxStep::Int`: Maximum iteration steps allowed regardless if the iteration converges.
 
@@ -125,7 +124,7 @@ optimizer `o!` each time `o!` runs. `gf` is a `Function` such that `gf(x) == (gx
     POconfig(;method::Val=$(defaultPOconfigPars[1]), 
               config::ConfigBox=$(defaultHFCStr), 
               target::T=$(defaultPOconfigPars[3]), 
-              threshold::Union{Tuple{T}, NTuple{2, T}}=$(defaultPOconfigPars[4]), 
+              threshold::Union{T, NTuple{2, T}}=$(defaultPOconfigPars[4]), 
               maxStep::Int=$(defaultPOconfigPars[5]), 
               optimizer::Function=$(defaultPOconfigPars[6]|>typeof|>nameof)()) where {T} -> 
     POconfig{T}
@@ -366,7 +365,7 @@ function optimizeParams!(pbs::AbstractVector{<:ParamBox{T}},
     maxStep = config.maxStep
     gap = min(100, max(maxStep ÷ 100 * 10, 1))
 
-    target = ifelse(isNaN(target), (threshold[begin],), threshold)
+    target = ifelse(isNaN(target), (threshold[begin], threshold[end]), (threshold[begin],))
     detectConverge = false
     isConverged = map(target) do tar
         if isNaN(tar)
@@ -376,7 +375,7 @@ function optimizeParams!(pbs::AbstractVector{<:ParamBox{T}},
             vrs->isOscillateConverged(vrs, tar*sqrt(vrs[end]|>length), minimalCycles=4)[1]
         end
     end
-    detectConverge || (isConverged = _->false)
+    detectConverge || (isConverged = (_->false,))
     blConv = false
 
     nuc = arrayToTuple(nuc)
