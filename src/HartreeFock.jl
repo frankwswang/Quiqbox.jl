@@ -620,13 +620,15 @@ electrons with same spin configurations(s).
 
 `printInfo::Bool`: Whether print out the information of iteration steps and result.
 """
-function runHF(bs::GTBasis, args...; printInfo::Bool=true)
-    vars, isConverged = runHFcore(bs, args...; printInfo)
-    res = HFfinalVars(bs, args[begin], args[begin+1], getX(bs.S), vars, isConverged)
+function runHF(bs::GTBasis{T}, args...; printInfo::Bool=true) where {T}
+    nuc = arrayToTuple(args[begin])
+    nucCoords = genTupleCoords(T, args[begin+1])
+    vars, isConverged = runHFcore(bs, nuc, nucCoords, args[begin+2:end]...; printInfo)
+    res = HFfinalVars(bs, nuc, nucCoords, getX(bs.S), vars, isConverged)
     if printInfo
-        Etot = round(res.Ehf + res.Enn, digits=10)
-        Ehf = round(res.Ehf, digits=10)
-        Enn = round(res.Enn, digits=10)
+        Etot = round(res.Ehf + res.Enn, digits=nDigitShown)
+        Ehf = round(res.Ehf, digits=nDigitShown)
+        Enn = round(res.Enn, digits=nDigitShown)
         println(rpad("Hartree-Fock Energy", 20), "| ", rpad("Nuclear Repulsion", 20), 
                 "| Total Energy")
         println(rpad(string(Ehf)* " Ha", 22), rpad(string(Enn)* " Ha", 22), Etot, " Ha\n")
@@ -641,8 +643,8 @@ runHF(GTBasis(bs), args...; printInfo)
 @inline function runHFcore(bs::GTBasis{T1, D, BN, BFT}, 
                            nuc::VectorOrNTuple{String, NN}, 
                            nucCoords::SpatialCoordType{T1, D, NN}, 
-                           config::HFconfig{T2, HFT}=defaultHFC, 
-                           N::Union{Int, Tuple{Int}, NTuple{2, Int}}=getCharge(nuc); 
+                           N::Union{Int, Tuple{Int}, NTuple{2, Int}}=getCharge(nuc), 
+                           config::HFconfig{T2, HFT}=defaultHFC; 
                            printInfo::Bool=false) where {T1, D, BN, BFT, NN, HFT, T2}
     @assert N > (HFT==:RHF) "$(HFT) requires more than $(HFT==:RHF) electrons."
     Ns = splitSpins(Val(HFT), N)
@@ -659,9 +661,9 @@ runHF(GTBasis(bs), args...; printInfo)
               C0, printInfo, config.maxStep, config.earlyStop)
 end
 
-runHFcore(bs::BasisSetData, nuc, nucCoords, N::Int, config=defaultHFC; 
+runHFcore(bs::BasisSetData, nuc, nucCoords, config::HFconfig, N::Int=getCharge(nuc); 
           printInfo::Bool=false) = 
-runHFcore(bs::BasisSetData, nuc, nucCoords, config, N; printInfo)
+runHFcore(bs::BasisSetData, nuc, nucCoords, N, config; printInfo)
 
 runHFcore(bs::VectorOrNTuple{AbstractGTBasisFuncs{T, D}}, args...; 
           printInfo::Bool=false) where {T, D} = 
@@ -719,7 +721,8 @@ function runHFcore(::Val{HFT},
     vars = initializeSCF(Val(HFT), Hcore, HeeI, C0, N)
     Etots = vars[1].shared.Etots
     oscThreshold = scfConfig.oscillateThreshold
-    printInfo && println(rpad(HFT, 4)*rpad(" | Initial Gauss", 18), "E = $(Etots[end])")
+    printInfo && println(rpad(HFT, 8)*rpad(" | Initial Gauss", 18), 
+                         "E = ", alignNumSign(Etots[end], roundDigits=getAtolDigits(T2)))
     isConverged = true
     i = 0
     ΔE = 0.0
@@ -761,7 +764,8 @@ function runHFcore(::Val{HFT},
             end
 
             printInfo && (i % floor(log(4, i) + 1) == 0 || i == maxStep) && 
-            println(rpad("Step $i", 10), rpad("#$l ($(m))", 12), "E = $(Etots[end])")
+            println(rpad("Step $i", 9), rpad("| #$l ($(m))", 17), 
+                    "E = ", alignNumSign(Etots[end], roundDigits=getAtolDigits(T2)))
 
             isConverged && abs(ΔE) <= breakPoint && break
         end
@@ -769,8 +773,8 @@ function runHFcore(::Val{HFT},
     negStr = ifelse(isConverged, "is ", "has not ")
     if printInfo
         println("\nThe SCF iteration ", negStr, "converged at step $i:\n", 
-                "|ΔE| = ", round(abs(ΔE), sigdigits=7), " Ha, ", 
-                "RMS(ΔD) = ", round(ΔDrms, sigdigits=7), ".\n")
+                "|ΔE| → ", round(abs(ΔE), digits=nDigitShown), " Ha, ", 
+                "RMS(ΔD) → ", round(ΔDrms, digits=nDigitShown), ".\n")
     end
     vars, isConverged
 end

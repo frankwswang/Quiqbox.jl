@@ -1,20 +1,12 @@
 using Test
 using Quiqbox
-using Quiqbox: FLevel, getFLevel, compareParamBox
+using Quiqbox: getTypeParams, FLevel, getFLevel, compareParamBox
 
 @testset "Parameters.jl" begin
 
-# struct FLevel & function getFLevel
-@test FLevel{getFLevel(:itself)} == FLevel(identity) == FLevel{0}
-@test FLevel(abs) == FLevel{1}
-tf1 = Quiqbox.Sf(2.2, abs)
-@test FLevel{getFLevel(tf1)} == FLevel(tf1)
-pf1 = Quiqbox.Pf(1.5, tf1)
-@test FLevel(pf1) == FLevel{3}
-@test getFLevel(FLevel(tf1)) == getFLevel(typeof(tf1)) == getFLevel(tf1) == 2
-
 
 pb1 = ParamBox(1, :a)
+@test getTypeParams(pb1) == (Int, :a, Quiqbox.FI)
 @test inSymOf(pb1) == :x_a
 @test outSymOf(pb1) == :a
 @test dataOf(pb1)[begin][] == pb1[] == inValOf(pb1)
@@ -41,6 +33,7 @@ pb3 = ParamBox(-1, :b, abs)
 toggleDiff!(pb3)
 
 pb4 = ParamBox(1.2, :c, x->x^2, :x)
+@test getTypeParams(pb4) == (Float64, :c, FLevel(pb4.map))
 toggleDiff!(pb4)
 @test toggleDiff!(pb4)
 @test inSymOf(pb4) == :x

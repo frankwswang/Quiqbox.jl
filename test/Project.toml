@@ -8,6 +8,7 @@ libcint_jll = "574b78ca-bebd-517c-801d-4735c93a9686"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
 ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
+Optim = "429524aa-4258-5aef-a3af-852621145aeb"
 
 [compat]
 libcint_jll = "~3.0.0, ~4.4"

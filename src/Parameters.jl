@@ -2,26 +2,6 @@ export ParamBox, inValOf, outValOf, inSymOf, outSymOf, isInSymEqual, isOutSymEqu
        indVarOf, dataOf, mapOf, outValCopy, fullVarCopy, enableDiff!, disableDiff!, 
        isDiffParam, toggleDiff!, changeMapping
 
-export FLevel
-
-struct FLevel{L} <: MetaParam{FLevel} end
-
-FLevel(::Type{itselfT}) = FLevel{0}
-FLevel(::Type{typeof(Base.identity)}) = FLevel{0}
-FLevel(::Type{<:Function}) = FLevel{1}
-FLevel(::Type{<:StructFunction{F}}) where {F} = FLevel(F)
-FLevel(::Type{<:ParameterizedFunction{T1, T2}}) where {T1, T2} = 
-FLevel{getFLevel(T1)+getFLevel(T2)}
-FLevel(::Type{<:DressedItself{L}}) where {L} = FLevel{L}
-FLevel(::F) where {F<:Function} = FLevel(F)
-const FI = FLevel(itself)
-
-getFLevel(::Type{FLevel{L}}) where {L} = L
-getFLevel(::Type{F}) where {F<:Function} = (getFLevel∘FLevel)(F)
-getFLevel(::F) where {F<:Function} = getFLevel(F)
-getFLevel(sym::Symbol) = (getFLevel∘getFunc)(sym)
-
-
 """
 
     ParamBox{T, V, FL<:FLevel} <: DifferentiableParameter{T, ParamBox}
@@ -172,7 +152,7 @@ Return the value of the input variable of `pb`. Equivalent to `pb[]`.
 
 Return the value of the output variable of `pb`. Equivalent to `pb()`.
 """
-@inline outValOf(pb::ParamBox) = callGenFunc(pb.map, pb.data[][begin][])
+@inline outValOf(pb::ParamBox) = callGenFunc(pb.map, inValOf(pb))
 
 @inline outValOf(pb::ParamBox{<:Any, <:Any, FI}) = inValOf(pb)
 
@@ -333,19 +313,22 @@ end
 
 """
 
-    changeMapping(pb::ParamBox, mapFunction::Function=$(itself), outSym::Symbol=V; 
-                  canDiff::Bool=isDiffParam(pb)) -> 
+    changeMapping(pb::ParamBox{T, V}, mapFunction::Function=itself, outSym::Symbol=V; 
+                  canDiff::Union{Bool, Array{Bool, 0}}=isDiffParam(pb)) where {T, V} -> 
     ParamBox{T, outSym}
 
 Change the mapping function of `pb`. The symbol of the output variable of the returned 
 `ParamBox` can be specified by `outSym`, and its differentiability is determined by 
 `canDiff`.
 """
-changeMapping(pb::ParamBox{T, V, FL}, mapFunction::F=itself, outSym::Symbol=V; 
-              canDiff::Bool=isDiffParam(pb)) where {T, V, FL, F<:Function} = 
-ParamBox(Val(outSym), mapFunction, pb.data[], 
-         genIndex( ifelse(canDiff==isDiffParam(pb)==true, pb.index[], nothing) ), 
-         fill(canDiff))
+function changeMapping(pb::ParamBox{T, V}, 
+                       mapFunction::Function=itself, outSym::Symbol=V; 
+                       canDiff::Union{Bool, Array{Bool, 0}}=isDiffParam(pb)) where {T, V}
+    canDiff = fillObj(canDiff)
+    ParamBox(Val(outSym), mapFunction, pb.data[], 
+             genIndex( ifelse(canDiff[]==isDiffParam(pb)==true, pb.index[], nothing) ), 
+             canDiff)
+end
 
 
 compareParamBoxCore1(pb1::ParamBox, pb2::ParamBox) = 

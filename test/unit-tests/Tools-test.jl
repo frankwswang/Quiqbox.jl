@@ -3,9 +3,9 @@ using Quiqbox
 using Quiqbox: getAtolVal, getAtolDigits, roundToMultiOfStep, nearestHalfOf, getNearestMid, 
                isApprox, tryIncluding, sizeOf, hasBoolRelation, flatten, joinTuple, 
                markUnique, getUnique!, itself, themselves, replaceSymbol, renameFunc, 
-               groupedSort, mapPermute, Pf, Sf, getFunc, nameOf, tupleDiff, genIndex, 
-               fillObj, arrayToTuple, genTupleCoords, callGenFunc, uniCallFunc, 
-               mergeMultiObjs, isNaN, getBool, skipIndices
+               groupedSort, mapPermute, getFunc, nameOf, tupleDiff, genIndex, fillObj, 
+               arrayToTuple, genTupleCoords, callGenFunc, uniCallFunc, mergeMultiObjs, 
+               isNaN, getBool, skipIndices
 using Suppressor: @capture_out
 
 @testset "Tools.jl" begin
@@ -166,22 +166,6 @@ end
 @test bl3
 
 
-# struct Pf
-pf1 = Pf(-1.5, abs)
-@test pf1(-2.0) == -3.0
-pf2 = Pf(-1.5, abs)
-@test pf2(-2) == -3.0
-@test Pf(-1.0, pf2)(-2.0) == 3.0
-@test Pf(-1.0, Pf(-1.5, itself))(-2) == -3.0
-
-
-# struct Sf
-sf1 = Sf(2, abs)
-@test sf1(-1) == 3
-sf2 = Sf(3, sf1)
-@test sf2(-1) == 6
-
-
 # function getFunc
 @test getFunc(abs) == abs
 @test getFunc(:abs) == abs
@@ -191,8 +175,9 @@ sf2 = Sf(3, sf1)
 
 
 # function nameOf
+pf1 = Quiqbox.Pf(-1.5, abs)
 @test nameOf(abs) == :abs
-@test nameOf(pf1) == typeof(pf1) == Pf{Float64, typeof(abs)}
+@test nameOf(pf1) == typeof(pf1) == Quiqbox.Pf{Float64, typeof(abs)}
 
 
 # function tupleDiff

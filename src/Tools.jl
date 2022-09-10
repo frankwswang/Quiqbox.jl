@@ -1,7 +1,7 @@
-export hasEqual, hasIdentical, hasApprox, flatten, markUnique, getUnique!
+export hasEqual, hasIdentical, hasApprox, flatten, markUnique, getUnique!, itself
 
 using Statistics: std, mean
-using LinearAlgebra: eigvals, svdvals, eigen
+using LinearAlgebra: eigvals, svdvals, eigen, norm
 
 """
 
@@ -623,12 +623,12 @@ function isOscillateConverged(seq::AbstractVector{T},
                               convergeToMax::Bool=false) where {T}
     @assert minimalCycles>0 && nPartition>1
     len = length(seq)
-    len < minimalCycles && (return (false, T(0)))
+    len < minimalCycles && (return (false, zero(seq[begin])))
     slice = len ÷ nPartition
     lastPortion = seq[max(end-slice, 1) : end]
     remain = sort!(lastPortion)[ifelse(convergeToMax, (end÷2+1 : end), (1 : end÷2+1))]
-    b = std(remain) < stdThreshold && 
-        abs(seq[end] - (convergeToMax ? max(remain...) : min(remain...))) < ValDiffThreshold
+    b = all(std(remain) .< stdThreshold) && 
+        norm(seq[end]-(convergeToMax ? max(remain...) : min(remain...))) < ValDiffThreshold
     b, std(lastPortion)
 end
 
@@ -663,79 +663,6 @@ function mapPermute(arr, permFunction)
 end
 
 
-# Product Function
-struct Pf{T, F<:Function} <: ParameterizedFunction{Pf, F}
-    c::T
-    f::F
-end
-Pf(c, f::Pf{T, F}) where {T, F<:Function} = Pf{T, F}(f.c*T(c), f.f)
-(f::Pf)(x::T) where {T} = f.c * f.f(x)
-
-
-# Sum Function
-struct Sf{T, F<:Function} <: ParameterizedFunction{Sf, F}
-    c::T
-    f::F
-end
-Sf(c, f::Sf{T, F}) where {T, F<:Function} = Sf{T, F}(f.c+T(c), f.f)
-(f::Sf)(x::T) where {T} = f.c + f.f(x)
-
-# Exponent Function
-struct Xf{P, F<:Function} <: ParameterizedFunction{Xf, F}
-    f::F
-    Xf(P::Int, f::F) where {F<:Function} = new{P, F}(f)
-end
-Xf(PN::Int, f::Xf{P, F}) where {P, F<:Function} = Xf(P+PN, f.f)
-(f::Xf{P})(x) where {P} = f.f(x)^P
-
-
-function combineParFunc(::typeof(+), pf1::F1, pf2::F2) where 
-                       {F, F1<:ParameterizedFunction{Pf, F}, 
-                           F2<:ParameterizedFunction{Pf, F}}
-    c = (pf1.c + pf2.c)
-    isone(c) ? pf1.f : Pf(c, pf1.f)
-end
-
-function combineParFunc(::typeof(+), pf1::F1, pf2::F2) where 
-              {F, F1<:ParameterizedFunction{Sf, F}, F2<:ParameterizedFunction{Sf, F}}
-    c = pf1.c + pf2.c
-    iszero(c) ? Pf(2, pf1.f) : Sf(c, Pf(2, pf1.f))
-end
-
-function combineParFunc(::typeof(+), pf1::F1, pf2::F2) where 
-              {F, F1<:ParameterizedFunction{Pf, F}, F2<:ParameterizedFunction{Sf, F}}
-    c = pf1.c + 1
-    isone(c) ? Sf(pf2.c, pf1.f) : Sf(pf2.c, Pf(c, pf1.f))
-end
-
-combineParFunc(::typeof(+), pf1::F1, pf2::F2) where 
-              {F, F1<:ParameterizedFunction{Sf, F}, F2<:ParameterizedFunction{Pf, F}} = 
-combineParFunc(+, pf2, pf1)
-
-combineParFunc(op::Function, pf1::Function, pf2::Function) = x->op(pf1(x), pf2(x))
-
-function combineParFunc(::typeof(*), pf1::F1, pf2::F2) where 
-              {F, F1<:ParameterizedFunction{Pf, F}, F2<:ParameterizedFunction{Pf, F}}
-    c = pf1.c * pf2.c
-    isone(c) ? Xf(2, pf1.f) : Pf(c, Xf(2, pf1.f))
-end
-
-function combineParFunc(::typeof(*), pf1::Xf{P1, F}, pf2::Xf{P2, F}) where {P1, P2, F}
-    P = P1 + P2
-    iszero(P) ? (_->1) : (isone(P) ? pf1.f : Xf(P, pf1.f))
-end
-
-function combineParFunc(::typeof(*), pf1::Xf{P, F}, pf2::Pf{<:Any, F}) where {P, F}
-    P2 = P + 1
-    f = iszero(P2) ? (_->1) : (isone(P2) ? pf1.f : Xf(P2, pf1.f))
-    Pf(pf2.c, f)
-end
-
-combineParFunc(::typeof(*), pf1::F1, pf2::F2) where 
-              {F, F1<:ParameterizedFunction{Sf, F}, F2<:ParameterizedFunction{Pf, F}} = 
-combineParFunc(+, pf2, pf1)
-
-
 function getFunc(fSym::Symbol, failedResult=missing)
     try
         getproperty(Quiqbox, fSym)
@@ -755,7 +682,7 @@ end
 getFunc(f::Function, _=missing) = itself(f)
 
 
-nameOf(f::ParameterizedFunction) = typeof(f)
+nameOf(f::StructuredFunction) = typeof(f)
 
 nameOf(f) = nameof(f)
 
@@ -914,18 +841,3 @@ function skipIndices(arr::AbstractArray{Int}, ints::AbstractVector{Int})
         end
     end
 end
-
-struct absMap{F<:Function} <: StructFunction{F}
-    f::F
-end
-
-(f::absMap)(x) = f.f(x) |> abs
-
-struct DressedItself{L, F<:Function} <: StructFunction{F}
-    f::F
-    DressedItself(f::F) where {F} = new{getFLevel(F), F}(f)
-    DressedItself(di::DressedItself{L, F}) where {L, F} = new{L, F}(di.f)
-end
-
-(::DressedItself)(x) = itself(x)
-(di::DressedItself)() = di.f

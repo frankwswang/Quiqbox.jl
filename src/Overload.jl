@@ -16,11 +16,10 @@ import Base: ==
 diffColorSym(pb::ParamBox) = ifelse(isDiffParam(pb), :green, :light_black)
 
 import Base: show
-const nSigShown = 10
 function show(io::IO, pb::ParamBox)
     v = pb.data[][begin][]
     print(io, typeof(pb))
-    print(io, "(", v isa Integer ? v : round(v, sigdigits=nSigShown), ")")
+    print(io, "(", v isa Integer ? v : round(v, sigdigits=nDigitShown), ")")
     print(io, "[")
     printstyled(io, "∂", color=diffColorSym(pb))
     print(io, "][")
@@ -89,8 +88,8 @@ end
 
 function show(io::IO, gf::GaussFunc)
     str = getFieldNameStr(gf)
-    str = replace(str, "xpn"=>"xpn()=$(round(gf.xpn(), sigdigits=nSigShown))")
-    str = replace(str, "con"=>"con()=$(round(gf.con(), sigdigits=nSigShown))")
+    str = replace(str, "xpn"=>"xpn()=$(round(gf.xpn(), sigdigits=nDigitShown))")
+    str = replace(str, "con"=>"con()=$(round(gf.con(), sigdigits=nDigitShown))")
     print(io, typeof(gf), str)
 end
 
@@ -98,7 +97,7 @@ function show(io::IO, bf::BasisFunc)
     print(io, typeStrOf(bf))
     print(io, getFieldNameStr(bf), "[")
     printstyled(io, bf.l[1]|>LtoStr, color=:cyan)
-    cen = round.([i() for i in bf.center], sigdigits=nSigShown)
+    cen = round.([i() for i in bf.center], sigdigits=nDigitShown)
     print(io, "]", cen)
 end
 
@@ -110,7 +109,7 @@ function show(io::IO, bfs::BasisFuncs{<:Any, <:Any, 𝑙, <:Any, <:Any, ON}) whe
     print(io, getFieldNameStr(bfs), "[")
     printstyled(io, xyz1, color=:cyan)
     print(io, xyz2)
-    cen = round.([i() for i in bfs.center], sigdigits=nSigShown)
+    cen = round.([i() for i in bfs.center], sigdigits=nDigitShown)
     print(io, "]", cen)
 end
 
@@ -133,8 +132,8 @@ end
 function show(io::IO, vars::HFtempVars)
     print(io, typeof(vars))
     str = getFieldNameStr(vars)
-    Etot0 = round(vars.shared.Etots[1], sigdigits=nSigShown)
-    EtotL = round(vars.shared.Etots[end], sigdigits=nSigShown)
+    Etot0 = round(vars.shared.Etots[1], sigdigits=nDigitShown)
+    EtotL = round(vars.shared.Etots[end], sigdigits=nDigitShown)
     str = replace(str, "shared"=>"shared.Etots=[$(Etot0), … , $(EtotL)]")
     print(io, str)
 end
@@ -142,7 +141,7 @@ end
 function show(io::IO, vars::HFfinalVars)
     print(io, typeof(vars))
     str = getFieldNameStr(vars)
-    Ehf = round(vars.Ehf, sigdigits=nSigShown)
+    Ehf = round(vars.Ehf, sigdigits=nDigitShown)
     str = replace(str, "Ehf"=>"Ehf=$(Ehf)")
     print(io, str)
 end

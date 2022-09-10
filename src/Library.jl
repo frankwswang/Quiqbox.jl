@@ -239,3 +239,5 @@ function getValI(i::Int)
 end
 
 const πvals = Dict([-0.75, 0.5, 2.5] .=> big(π).^[-0.75, 0.5, 2.5])
+
+const nDigitShown = 10
