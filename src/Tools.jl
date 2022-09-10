@@ -784,10 +784,10 @@ arrayToTuple(coords)
 callGenFunc(f::F, x) where {F<:Function} = callGenFuncCore(worldAgeSafe(F), f, x)
 callGenFuncCore(::Val{true}, f, x) = f(x)
 function callGenFuncCore(::Val{false}, f::F, x) where {F}
+    @eval worldAgeSafe(::Type{$F}) = Val(true)
     try
         callGenFuncCore(Val(true), f, x)
     catch
-        @eval worldAgeSafe(::Type{$F}) = Val(true)
         Base.invokelatest(f, x)
     end
 end
