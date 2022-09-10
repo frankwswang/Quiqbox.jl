@@ -605,15 +605,15 @@ function replaceSymbol(sym::Symbol, pair::Pair{String, String}; count::Int=typem
 end
 
 
-function renameFunc(fName::Symbol, f::F, ::Type{T}, N::Int=1) where {F<:Function, T}
-    @eval ($(fName))(a::Vararg{$T, $N}) = $f(a...)::$T
-end
+# function renameFunc(fName::Symbol, f::F, ::Type{T}, N::Int=1) where {F<:Function, T}
+#     @eval ($(fName))(a::Vararg{$T, $N}) = $f(a...)::$T
+# end
 
-function renameFunc(fName::Symbol, f::F, N::Int=1) where {F<:Function}
-    @eval ($(fName))(a::Vararg{Any, $N}) = $f(a...)
-end
+# function renameFunc(fName::Symbol, f::F, N::Int=1) where {F<:Function}
+#     @eval ($(fName))(a::Vararg{Any, $N}) = $f(a...)
+# end
 
-renameFunc(fName::String, args...) = renameFunc(Symbol(fName), args...)
+# renameFunc(fName::String, args...) = renameFunc(Symbol(fName), args...)
 
 
 function isOscillateConverged(seq::AbstractVector{T}, 
@@ -781,16 +781,20 @@ genTupleCoords(::Type{T}, coords::AbstractVector{NTuple{D, T}}) where {D, T} =
 arrayToTuple(coords)
 
 
-callGenFunc(f::F, x) where {F<:Function} = callGenFuncCore(worldAgeSafe(F), f, x)
-callGenFuncCore(::Val{true}, f, x) = f(x)
-function callGenFuncCore(::Val{false}, f::F, x) where {F}
-    @eval worldAgeSafe(::Type{$F}) = Val(true)
-    try
-        callGenFuncCore(Val(true), f, x)
-    catch
-        Base.invokelatest(f, x)
-    end
-end
+# callGenFunc(f::F, x) where {F<:Function} = callGenFuncCore(worldAgeSafe(F), f, x)
+# # callGenFuncCore(::Val{true}, f, x) = f(x)
+# @generated function callGenFuncCore(::Val{BL}, f::F, x) where {BL, F}
+#     if BL
+#         return :( f(x) )
+#     else
+#         # @eval worldAgeSafe(::Type{F}) = Val(true)
+#         expr = Expr(:(=), Expr(:call, :worldAgeSafe, Expr(:(::), Expr(:curly, :Type, :Int))), Expr(:call, :Val, :true))
+#         return quote
+#             $expr
+#             Base.invokelatest(f, x)
+#         end
+#     end
+# end
 
 worldAgeSafe(::Type{<:Function}) = Val(false)
 

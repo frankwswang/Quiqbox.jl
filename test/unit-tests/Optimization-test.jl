@@ -30,21 +30,21 @@ arr0Ds = formatTunableParams!(pars0_1, bs0_1)
 @test mapreduce(hasEqual, *, pars0, pars0_0)
 testDetachedPars = function(ps0, ps1)
     bl = true
-    map(ps0, ps1) do p0, p1
+    map(enumerate(ps0), ps1) do (i, p0), p1
         if isDiffParam(p0) && isDiffParam(p1)
             bl1 = p0 === p1
-            bl1 || (@show bl1)
+            bl1 || (@show i bl1)
             bl *= bl1
         else
             bl2 = p0() == p1[] == p1()
-            bl2 || (@show bl2)
+            bl2 || (@show (i, bl2) p0() p1[] p1())
             bl3 = ( typeof(p1.map) == 
                     Quiqbox.DressedItself{Quiqbox.getFLevel(p0.map), typeof(p0.map)} )
-            bl3 || (@show bl3)
+            bl3 || (@show (i, bl3) typeof(p1.map) typeof(p0.map))
             bl4 = outSymOf(p0) == outSymOf(p1)
-            bl4 || (@show bl4)
+            bl4 || (@show (i, bl4))
             bl5 = isDiffParam(p0) == isDiffParam(p1)
-            bl5 || (@show bl5)
+            bl5 || (@show (i, bl5) isDiffParam(p0) isDiffParam(p1))
             bl *= bl2*bl3*bl4*bl5
         end
     end

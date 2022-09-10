@@ -38,7 +38,6 @@ toggleDiff!(pb4)
 @test toggleDiff!(pb4)
 @test inSymOf(pb4) == :x
 @test outSymOf(pb4) == :c
-@test startswith(nameof(pb4.map) |> string, "f_c")
 
 pb5 = outValCopy(pb4)
 @test pb5() == pb5[] == pb4()

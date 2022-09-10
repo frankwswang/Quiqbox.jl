@@ -1,21 +1,11 @@
 export gridBoxCoords, GridBox, gridCoordOf
 
 function makeGridFuncsCore(nG::Int)
-    res = Array{Function}(undef, nG+1)
-    if nG == 0
-        res[] = itself
+    if iszero(nG)
+        [itself]
     else
-        for i = 0:nG
-            funcName = "G$(nG)" * numToSups(i)
-            funcSym = Symbol(funcName)
-            res[i+1] = if isdefined(Quiqbox, funcSym)
-                getproperty(Quiqbox, funcSym)
-            else
-                renameFunc(funcName, L -> (i - 0.5nG)*L)
-            end
-        end
+        Pf.((0:nG) .- 0.5nG, itself)
     end
-    res
 end
 
 makeGridFuncs(c, f::F) where {F<:Function} = Sf(c, f)

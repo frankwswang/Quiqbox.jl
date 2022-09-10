@@ -103,19 +103,9 @@ struct ParamBox{T, V, FL<:FLevel} <: DifferentiableParameter{T, ParamBox}
     new{T, V, FI}(fill(data), itself, canDiff, index)
 end
 
-function ParamBox(::Val{V}, mapFunction::F, data::Pair{Array{T, 0}, Symbol}, 
-                  index=genIndex(nothing), canDiff=fill(true)) where {V, F<:Function, T}
-    if getFLevel(F) != 0
-        fSym = mapFunction |> nameOf
-        fStr = fSym |> string
-        if startswith(fStr, '#')
-            idx = parse(Int, fStr[2:end])
-            fSym = Symbol("f_", V,  numToSubs(idx))
-            mapFunction = renameFunc(fSym, mapFunction)
-        end
-    end
-    ParamBox{T, V}(mapFunction, data, index, canDiff)
-end
+ParamBox(::Val{V}, mapFunction::F, data::Pair{Array{T, 0}, Symbol}, 
+         index=genIndex(nothing), canDiff=fill(true)) where {V, F<:Function, T} = 
+ParamBox{T, V}(mapFunction, data, index, canDiff)
 
 ParamBox(::Val{V}, ::itselfT, data::Pair{Array{T, 0}, Symbol}, index=genIndex(nothing), 
          canDiff=fill(false)) where {V, T} = 
@@ -152,7 +142,7 @@ Return the value of the input variable of `pb`. Equivalent to `pb[]`.
 
 Return the value of the output variable of `pb`. Equivalent to `pb()`.
 """
-@inline outValOf(pb::ParamBox) = callGenFunc(pb.map, inValOf(pb))
+@inline outValOf(pb::ParamBox) = (pb.map∘inValOf)(pb)
 
 @inline outValOf(pb::ParamBox{<:Any, <:Any, FI}) = inValOf(pb)
 
@@ -335,7 +325,7 @@ compareParamBoxCore1(pb1::ParamBox, pb2::ParamBox) =
 (pb1.data[][begin] === pb2.data[][begin])
 
 compareParamBoxCore2(pb1::ParamBox{<:Any, V1}, pb2::ParamBox{<:Any, V2}) where {V1, V2} = 
-V1==V2 && compareParamBoxCore1(pb1, pb2) && (typeof(pb1.map) === typeof(pb2.map))
+V1==V2 && compareParamBoxCore1(pb1, pb2) && (pb1.map === pb2.map)
 
 compareParamBoxCore2(pb1::ParamBox{<:Any, V1, FI}, 
                      pb2::ParamBox{<:Any, V2, FI}) where {V1, V2} = 

@@ -61,10 +61,10 @@ c1_3 = genContraction(v1c)
 e2 = genExponent(e1)
 e3 = genExponent(c1)
 @test hasIdentical(e1, e2)
-@test !hasEqual(e1, e3)
+@test hasEqual(e1, e3)
 @test e1[] == e3[]
 @test e1() == e3()
-@test e1.map !== e3.map
+@test e1.map == e3.map
 v2 = rand()
 @test e1.map(v2) == e3.map(v2)
 e4 = genExponent(e1.data[])
@@ -80,7 +80,7 @@ c3 = genExponent(e1)
 @test !hasEqual(c1, c3)
 @test c1[] == c3[]
 @test c1() == c3()
-@test c1.map !== c3.map
+@test c1.map == c3.map
 @test c1.map(v2) == c3.map(v2)
 c4 = genExponent(c1.data[])
 @test c4.data[] === c1.data[]
