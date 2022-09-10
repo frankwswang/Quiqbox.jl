@@ -721,8 +721,8 @@ function runHFcore(::Val{HFT},
     vars = initializeSCF(Val(HFT), Hcore, HeeI, C0, N)
     Etots = vars[1].shared.Etots
     oscThreshold = scfConfig.oscillateThreshold
-    printInfo && println(rpad(HFT, 8)*rpad(" | Initial Gauss", 18), 
-                         "E = ", alignNumSign(Etots[end], roundDigits=getAtolDigits(T2)))
+    printInfo && println(rpad(HFT, 9)*rpad("| Initial Gauss", 16), 
+                         "| E = ", alignNumSign(Etots[end], roundDigits=getAtolDigits(T2)))
     isConverged = true
     i = 0
     ΔE = 0.0
@@ -764,8 +764,8 @@ function runHFcore(::Val{HFT},
             end
 
             printInfo && (i % floor(log(4, i) + 1) == 0 || i == maxStep) && 
-            println(rpad("Step $i", 9), rpad("| #$l ($(m))", 17), 
-                    "E = ", alignNumSign(Etots[end], roundDigits=getAtolDigits(T2)))
+            println(rpad("Step $i", 9), rpad("| #$l ($(m))", 16), 
+                    "| E = ", alignNumSign(Etots[end], roundDigits=getAtolDigits(T2)))
 
             isConverged && abs(ΔE) <= breakPoint && break
         end
@@ -781,7 +781,11 @@ end
 
 function terminateSCF(i, vars, method, printInfo)
     popHFtempVars!(vars)
-    printInfo && println("Early termination of ", method, " due to the poor performance.")
+    if printInfo
+        print("Early termination of ")
+        printstyled(method, underline=true)
+        println(" due to its poor performance.")
+    end
     i-1
 end
 
