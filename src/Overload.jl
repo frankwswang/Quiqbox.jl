@@ -4,7 +4,7 @@ import Base: ==
 ==(pb1::ParamBox, pb2::ParamBox) = (pb1.data == pb2.data && 
                                     isDiffParam(pb1) == isDiffParam(pb2) && 
                                     pb1.index[] == pb2.index[] && 
-                                    pb1.map == pb2.map)
+                                    hasEqual(pb1.map, pb2.map))
 
 ==(cp1::SpatialPoint, cp2::SpatialPoint) = (cp1.param == cp2.param)
 ==(t1::LTuple, t2::LTuple) = (t1.tuple == t2.tuple)

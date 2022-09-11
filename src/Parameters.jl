@@ -325,7 +325,7 @@ compareParamBoxCore1(pb1::ParamBox, pb2::ParamBox) =
 (pb1.data[][begin] === pb2.data[][begin])
 
 compareParamBoxCore2(pb1::ParamBox{<:Any, V1}, pb2::ParamBox{<:Any, V2}) where {V1, V2} = 
-V1==V2 && compareParamBoxCore1(pb1, pb2) && (pb1.map === pb2.map)
+V1==V2 && compareParamBoxCore1(pb1, pb2) && hasIdentical(pb1.map, pb2.map)
 
 compareParamBoxCore2(pb1::ParamBox{<:Any, V1, FI}, 
                      pb2::ParamBox{<:Any, V2, FI}) where {V1, V2} = 
@@ -360,7 +360,7 @@ end
 function mulParamBox(c::Number, pb::ParamBox{T, V}, 
                      roundAtol::Real=nearestHalfOf(getAtolVal(T))) where {T, V}
     if isDiffParam(pb)
-        mapFunc = Pf(convert(T, roundToMultiOfStep(c, roundAtol)), pb.map)
+        mapFunc = Pf(pb.map, convert(T, roundToMultiOfStep(c, roundAtol)))
         ParamBox(Val(V), mapFunc, pb.data[], genIndex(nothing), fill(true))
     else
         ParamBox(Val(V), itself, 

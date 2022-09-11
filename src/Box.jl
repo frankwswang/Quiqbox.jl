@@ -4,12 +4,12 @@ function makeGridFuncsCore(nG::Int)
     if iszero(nG)
         [itself]
     else
-        Pf.((0:nG) .- 0.5nG, itself)
+        Pf.(itself, (0:nG) .- 0.5nG)
     end
 end
 
-makeGridFuncs(c, f::F) where {F<:Function} = Sf(c, f)
-makeGridFuncs(_, ::itselfT) = itself
+makeGridFuncs(f::F, c) where {F<:Function} = Sf(f, c)
+makeGridFuncs(::itselfT, _) = itself
 
 makeGridPBoxData(cenCompData::Array{T, 0}, spacingData::Array{T, 0}, nG::Int) where {T} = 
 ifelse(nG>0, spacingData, cenCompData)
@@ -87,7 +87,7 @@ struct GridBox{T, D, NP, GPT<:SpatialPoint{T, D}} <: SpatialStructure{T, D}
         spacing = fillObj.(spacing)
         data = makeGridPBoxData.(fill.(center), spacing, nGrids)
         for (n, i) in enumerate( CartesianIndices(nGrids .+ 1) )
-            fs = makeGridFuncs.(center, [funcs[j][k] for (j, k) in enumerate(i|>Tuple)])
+            fs = makeGridFuncs.([funcs[j][k] for (j, k) in enumerate(i|>Tuple)], center)
             p = broadcast((a, b, c, d, canDiff, index) -> 
                           ParamBox(a, b, c, d; canDiff, index), 
                           data, oVsym, fs, iVsym, canDiff, index)|>Tuple

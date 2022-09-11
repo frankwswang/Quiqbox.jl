@@ -419,7 +419,7 @@ xpn2 = genExponent(1.2)
 con2 = genContraction(1.2, x->x^2)
 bf_pf = genBasisFunc([1.0, 2.0, 3.0], GaussFunc(xpn2, con2))
 bf_pf2 = (bf_pf*0.4)*5
-@test bf_pf2.gauss[1].con.map isa Quiqbox.Pf{Float64}
+@test bf_pf2.gauss[1].con.map isa Quiqbox.Pf{<:Function, Float64}
 @test hasEqual(bf_pf2, mul(bf_pf, 2.0))
 @test hasEqual(add(bf_add1, bf_add1), 
                add(bf_add1, deepcopy(bf_add1)), 

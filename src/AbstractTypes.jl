@@ -15,12 +15,11 @@ abstract type MetaParam{T} <: MetaParameter end
 
 
 abstract type CompositeFunction{F2, F1} <: StructFunction{F1} end
-abstract type DressedFunction{FL, F} <: StructFunction{F} end
 
 abstract type QuiqboxVariableBox{T} <: QuiqboxContainer{T} end
 
 
-abstract type ParameterizedFunction{P, F} <: CompositeFunction{P, F} end
+abstract type ParameterizedFunction{P, F, T} <: CompositeFunction{P, F} end
 
 abstract type QuiqboxParameter{T, ParameterT, ContainerT} <: QuiqboxVariableBox{T} end
 abstract type QuiqboxDataBox{T} <: QuiqboxVariableBox{T} end

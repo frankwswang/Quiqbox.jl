@@ -174,9 +174,9 @@ end
 
 
 # function nameOf
-pf1 = Quiqbox.Pf(-1.5, abs)
+pf1 = Quiqbox.Pf(abs, -1.5)
 @test nameOf(abs) == :abs
-@test nameOf(pf1) == typeof(pf1) == Quiqbox.Pf{Float64, typeof(abs)}
+@test nameOf(pf1) == typeof(pf1) == Quiqbox.Pf{typeof(abs), Float64}
 
 
 # function tupleDiff

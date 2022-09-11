@@ -170,9 +170,10 @@ function hasBoolRelation(boolOp::F, obj1::T1, obj2::T2;
     res
 end
 
-hasBoolRelation(boolOp::Function, obj1::Function, obj2::Function; 
+hasBoolRelation(boolOp::Function, obj1::F1, obj2::F2; 
                 ignoreFunction::Bool=false, ignoreContainer::Bool=false, 
-                decomposeNumberCollection::Bool=false) = 
+                decomposeNumberCollection::Bool=false) where 
+               {StructuredFunction<:F1<:Function, StructuredFunction<:F2<:Function} = 
 ifelse(ignoreFunction, true, boolOp(obj1, obj2))
 
 hasBoolRelation(boolOp::Function, obj1::Number, obj2::Number; 
