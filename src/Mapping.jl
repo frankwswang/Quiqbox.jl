@@ -9,18 +9,14 @@ end
 (::DressedItself)(x) = itself(x)
 (di::DressedItself)() = di.f
 
-
-struct FLevel{L} <: MetaParam{FLevel} end
-
-FLevel(::Type{itselfT}) = FLevel{0}
-FLevel(::Type{typeof(Base.identity)}) = FLevel{0}
+FLevel(::Type{<:IF}) = FLevel{0}
 FLevel(::Type{<:Function}) = FLevel{1}
 FLevel(::Type{<:DressedItself{L}}) where {L} = FLevel{L}
 FLevel(::Type{<:CompositeFunction{F2, F1}}) where {F1, F2} = 
 FLevel{getFLevel(F2)+getFLevel(F1)}
 FLevel(::F) where {F<:Function} = FLevel(F)
 
-const FI = FLevel(itself)
+const IL = FLevel(itself)
 
 getFLevel(::Type{FLevel{L}}) where {L} = L
 getFLevel(::Type{F}) where {F<:Function} = (getFLevel∘FLevel)(F)

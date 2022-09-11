@@ -14,6 +14,8 @@ abstract type QuiqboxContainer{T} <: AbstractQuiqboxContainer end
 abstract type MetaParam{T} <: MetaParameter end
 
 
+abstract type FLevel{L} <: MetaParam{FLevel} end
+
 abstract type CompositeFunction{F2, F1} <: StructFunction{F1} end
 
 abstract type QuiqboxVariableBox{T} <: QuiqboxContainer{T} end
@@ -71,6 +73,8 @@ abstract type CompositeGTBasisFuncs{NumberT, D, NofLinearlyCombinedBasis, Orbita
 
 abstract type FloatingGTBasisFuncs{NumberT, D, 𝑙, GaussFuncN, PointT, OrbitalN} <: CompositeGTBasisFuncs{NumberT, D, 1, OrbitalN} end
 
+
+const IF = Union{itselfT, typeof(Base.identity)}
 
 const CGTBasisFuncsON{ON} = CompositeGTBasisFuncs{<:Any, <:Any, <:Any, ON}
 const CGTBasisFuncs1O{T, D, BN} = CompositeGTBasisFuncs{T, D, BN, 1}

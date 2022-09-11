@@ -6,7 +6,7 @@ using Quiqbox: getTypeParams, FLevel, getFLevel, compareParamBox
 
 
 pb1 = ParamBox(1, :a)
-@test getTypeParams(pb1) == (Int, :a, Quiqbox.FI)
+@test getTypeParams(pb1) == (Int, :a, Quiqbox.IL)
 @test inSymOf(pb1) == :x_a
 @test outSymOf(pb1) == :a
 @test dataOf(pb1)[begin][] == pb1[] == inValOf(pb1)

@@ -32,7 +32,7 @@ as a dependent variable or an independent variable.
     ParamBox(inVar::Union{T, Array{T, 0}}, outSym::Symbol=:undef, 
              inSym::Symbol=Symbol(IVsymSuffix, outSym); 
              index::Union{Int, Nothing}=nothing, canDiff::Bool=false) where {T} -> 
-    ParamBox{T, outSym, $(FI)}
+    ParamBox{T, outSym, $(IL)}
 
     ParamBox(inVar::Union{T, Array{T, 0}}, outSym::Symbol, mapFunction::Function, 
              inSym::Symbol=Symbol(IVsymSuffix, outSym); 
@@ -67,10 +67,10 @@ respect to the input variable.
 
 ```jldoctest; setup = :(push!(LOAD_PATH, "../../src/"); using Quiqbox)
 julia> ParamBox(1.0)
-ParamBox{Float64, :undef, $(FI)}(1.0)[∂][undef]
+ParamBox{Float64, :undef, $(IL)}(1.0)[∂][undef]
 
 julia> ParamBox(1.0, :a)
-ParamBox{Float64, :a, $(FI)}(1.0)[∂][a]
+ParamBox{Float64, :a, $(IL)}(1.0)[∂][a]
 
 julia> ParamBox(1.0, :a, abs)
 ParamBox{Float64, :a, $(FLevel(abs))}(1.0)[∂][x_a]
@@ -100,7 +100,7 @@ struct ParamBox{T, V, FL<:FLevel} <: DifferentiableParameter{T, ParamBox}
     end
 
     ParamBox{T, V}(data::Pair{Array{T, 0}, Symbol}, index, canDiff) where {T, V} = 
-    new{T, V, FI}(fill(data), itself, canDiff, index)
+    new{T, V, IL}(fill(data), itself, canDiff, index)
 end
 
 ParamBox(::Val{V}, mapFunction::F, data::Pair{Array{T, 0}, Symbol}, 
@@ -144,7 +144,7 @@ Return the value of the output variable of `pb`. Equivalent to `pb()`.
 """
 @inline outValOf(pb::ParamBox) = (pb.map∘inValOf)(pb)
 
-@inline outValOf(pb::ParamBox{<:Any, <:Any, FI}) = inValOf(pb)
+@inline outValOf(pb::ParamBox{<:Any, <:Any, IL}) = inValOf(pb)
 
 (pb::ParamBox)() = outValOf(pb)
 # (pb::ParamBox)() = Base.invokelatest(pb.map, pb.data[][begin][])::Float64
@@ -229,7 +229,7 @@ Return the mapping function of `pb`.
 
 """
 
-    outValCopy(pb::ParamBox{T, V}) where {T} -> ParamBox{T, V, $(FI)}
+    outValCopy(pb::ParamBox{T, V}) where {T} -> ParamBox{T, V, $(IL)}
 
 Return a new `ParamBox` of which the input variable's value is equal to the output 
 variable's value of `pb`.
@@ -327,8 +327,8 @@ compareParamBoxCore1(pb1::ParamBox, pb2::ParamBox) =
 compareParamBoxCore2(pb1::ParamBox{<:Any, V1}, pb2::ParamBox{<:Any, V2}) where {V1, V2} = 
 V1==V2 && compareParamBoxCore1(pb1, pb2) && hasIdentical(pb1.map, pb2.map)
 
-compareParamBoxCore2(pb1::ParamBox{<:Any, V1, FI}, 
-                     pb2::ParamBox{<:Any, V2, FI}) where {V1, V2} = 
+compareParamBoxCore2(pb1::ParamBox{<:Any, V1, IL}, 
+                     pb2::ParamBox{<:Any, V2, IL}) where {V1, V2} = 
 V1==V2 && compareParamBoxCore1(pb1, pb2)
 
 @inline function compareParamBox(pb1::ParamBox, pb2::ParamBox)

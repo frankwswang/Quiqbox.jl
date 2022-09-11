@@ -204,7 +204,7 @@ end
 
 𝑑f(::Type{FL}, f::F, x::T) where {FL<:FLevel, F<:Function, T} = ForwardDerivative(f, x)
 
-𝑑f(::Type{FI}, ::Function, ::T) where {T} = T(1.0)
+𝑑f(::Type{IL}, ::Function, ::T) where {T} = T(1.0)
 
 ∂SGFcore(::Val{xpnSym}, sgf::FGTBasisFuncs1O{T, 3, 𝑙, 1}, c::T=T(1)) where {T, 𝑙} = 
 hasNormFactor(sgf) ? ∂SGF∂xpn2(sgf, c) : ∂SGF∂xpn1(sgf, c)

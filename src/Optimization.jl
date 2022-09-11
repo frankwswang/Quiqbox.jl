@@ -280,7 +280,7 @@ function makeAbsLayerForXpnParams(pbs, bs, onlyForNegXpn::Bool=false;
                                                                true : pb.canDiff[])) )
     absXpn2 = if tryJustFlipNegSign
         function (pb::ParamBox)
-            if getTypeParams(pb)[end] == FI || pb.map isa DressedItself
+            if getTypeParams(pb)[end] == IL || pb.map isa DressedItself
                 pb[] *= sign(pb[])
                 pb
             else

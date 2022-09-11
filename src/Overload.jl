@@ -274,11 +274,11 @@ Base.broadcastable(sp::SpatialPoint) = Base.broadcastable(sp.param)
 # Quiqbox methods overload.
 ## Method overload of `hasBoolRelation` from Tools.jl.
 function hasBoolRelation(boolFunc::F, 
-                         pb1::ParamBox{<:Any, V1, F1}, pb2::ParamBox{<:Any, V2, F2}; 
+                         pb1::ParamBox{<:Any, V1, FL1}, pb2::ParamBox{<:Any, V2, FL2}; 
                          ignoreFunction::Bool=false, ignoreContainer::Bool=false, 
-                         kws...) where {F<:Function, V1, V2, F1, F2}
+                         kws...) where {F<:Function, V1, V2, FL1, FL2}
     ifelse(ignoreContainer || V1 == V2, 
-        ifelse((ignoreFunction || F1 == F2 == FI), 
+        ifelse((ignoreFunction || FL1 == FL2 == IL), 
             boolFunc(pb1.data[][begin], pb2.data[][begin]), 
 
             ( boolFunc(isDiffParam(pb1), isDiffParam(pb2)) && 
