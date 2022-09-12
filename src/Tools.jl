@@ -142,30 +142,23 @@ function hasBoolRelation(boolOp::F, obj1::T1, obj2::T2;
                          ignoreContainer::Bool=false, 
                          decomposeNumberCollection::Bool=false) where {T1, T2, F<:Function}
     res = true
-    if T1 != T2 && !ignoreContainer && 
-          ( !ignoreFunction || typejoin(T1, T2) == Any || 
-            !(isa.([T1.parameters...], Type{<:FLevel}) |> any) || 
-            !(isa.([T2.parameters...], Type{<:FLevel}) |> any) )
-        return false
-    else
-        fs1 = fieldnames(T1)
-        fs2 = fieldnames(T2)
-        if fs1 == fs2
-            if length(fs1) == 0
-                res = boolOp(obj1, obj2)
-            else
-                for i in fs1
-                    isdefined(obj1, i) == (fieldDefined = isdefined(obj2, i)) && 
-                    (fieldDefined ? nothing : continue)
-                    res *= hasBoolRelation(boolOp, getproperty(obj1, i), 
-                                           getproperty(obj2, i); ignoreFunction, 
-                                           ignoreContainer, decomposeNumberCollection)
-                    !res && (return false)
-                end
-            end
+    fs1 = fieldnames(T1)
+    fs2 = fieldnames(T2)
+    if fs1 == fs2
+        if length(fs1) == 0
+            res = boolOp(obj1, obj2)
         else
-            return false
+            for i in fs1
+                isdefined(obj1, i) == (fieldDefined = isdefined(obj2, i)) && 
+                (fieldDefined ? nothing : continue)
+                res *= hasBoolRelation(boolOp, getproperty(obj1, i), 
+                                        getproperty(obj2, i); ignoreFunction, 
+                                        ignoreContainer, decomposeNumberCollection)
+                !res && (return false)
+            end
         end
+    else
+        return false
     end
     res
 end
@@ -244,14 +237,14 @@ false
 true
 ```
 """
-function hasBoolRelation(boolOp::F, obj1, obj2, obj3...; 
+function hasBoolRelation(boolOp::F, obj1, obj2, obj3, obj4...; 
                          ignoreFunction::Bool=false, 
                          ignoreContainer::Bool=false,
                          decomposeNumberCollection::Bool=false) where {F<:Function}
     res = hasBoolRelation(boolOp, obj1, obj2; ignoreFunction, ignoreContainer)
     tmp = obj2
     if res
-        for i in obj3[1:end]
+        for i in (obj3, obj4...)
             res *= hasBoolRelation(boolOp, tmp, i; ignoreFunction, ignoreContainer,
                                    decomposeNumberCollection)
             !res && break
