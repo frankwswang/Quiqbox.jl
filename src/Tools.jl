@@ -62,7 +62,7 @@ function tryIncluding(subModuleName::String; subModulePath=(@__DIR__)[:]*"/SubMo
 
             $(err)
 
-        `///magenta///However, this DOES NOT affect the functionality of the main module.`
+        `///magenta///However, this does not affect the functionality of the main module.`
         """
         printStyledInfo(warning, title="WARNING:\n", titleColor=:light_yellow)
         return false
@@ -378,7 +378,7 @@ If you want to highlight other contents in different colors, you can also start 
 "///theColorSymbolName///" and then enclose it with ``. The available color names follows 
 the values of `color` keyword argument in function `Base.printstyled`.
 
-NOTE: There can only be one color in one ` ` quote.
+**NOTE:** There can only be one color in one ` ` quote.
 
 ≡≡≡ Example(s) ≡≡≡
 
@@ -604,13 +604,16 @@ function isOscillateConverged(seq::AbstractVector{T},
                               stdThreshold::Real=0.65ValDiffThreshold; 
                               nPartition::Int=5, minimalCycles::Int=nPartition, 
                               convergeToMax::Bool=false) where {T}
-    @assert minimalCycles>0 && nPartition>1
+    minimalCycles > 0 || 
+    throw(DomainError(minimalCycles, "`minimalCycles` should be positive."))
+    nPartition > 1 || 
+    throw(DomainError(nPartition, "`nPartition` should be larger than 1."))
     len = length(seq)
     len < minimalCycles && (return (false, zero(seq[begin])))
     slice = len ÷ nPartition
     lastPortion = seq[max(end-slice, 1) : end]
     remain = sort!(lastPortion)[ifelse(convergeToMax, (end÷2+1 : end), (1 : end÷2+1))]
-    b = all(std(remain) .< stdThreshold) && 
+    b = all(std(r) < stdThreshold for r in remain) && 
         norm(seq[end]-(convergeToMax ? max(remain...) : min(remain...))) < ValDiffThreshold
     b, std(lastPortion)
 end
@@ -716,7 +719,7 @@ tupleDiff(ts::Vararg{NTuple{<:Any, T}}) where {T} = arrayDiffCore!(ts .|> collec
 
 
 function genIndex(index::Int)
-    @assert index >= 0
+    index < 0 && throw(DomainError(index, "`index` should be non-negative."))
     genIndexCore(index)
 end
 
@@ -817,11 +820,13 @@ getBool(::Val{BL}) where {BL} = BL::Bool
 
 
 function skipIndices(arr::AbstractArray{Int}, ints::AbstractVector{Int})
-    @assert min(arr...) > 0
+    all(i > 0 for i in arr) || 
+    throw(DomainError(arr, "Every element of `arr` should be positive."))
     if isempty(ints)
         arr
     else
-        @assert min(ints...) > 0
+        all(i > 0 for i in ints) || 
+        throw(DomainError(ints, "Every element of `ints` should be positive."))
         maxIdx = max(arr...)
         maxIdxN = maxIdx + length(ints)
         ints = filter!(x->x<=maxIdxN, sort(ints))

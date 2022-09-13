@@ -41,7 +41,8 @@ struct LTuple{D, L}
     tuple::NTuple{D, Int}
 
     function LTuple{D, L}(t::NTuple{D, Int}) where {D, L}
-        @assert all(t .>= 0)
+        any(i < 0 for i in t) && throw(DomainError(t, "The element(s) of the input "*
+                                       "`Tuple` `t` should all be non-negative."))
         new{D, sum(t)}(t)
     end
 
@@ -219,12 +220,15 @@ function checkBSList(;printInfo::Bool=false)
         if text !== nothing
             sBool = startswith(text, r"[A-Z][a-z]?     [0-9]\n")
             eBool = endswith(text, BStextEndingMarker*"\n")
-            @assert (sBool && eBool) """\n
-            The format of 'Basis functions' is NOT CORRECT!
-            "[A-Z][a-z]?     [0-9]\\n" (regex) should exit as the first line of the string!
-            "$(BStextEndingMarker)\\n" should exit as the last line of the string!
-            The incorrect text content is:\n$(text)
-            """
+            (sBool && eBool) || throw(AssertionError(
+                """\n
+                The format of 'Basis functions' is not correct.
+                The first line of the content should meet the regular expression: 
+                "[A-Z][a-z]?     [0-9]\\n".
+                Also, "$(BStextEndingMarker)\\n" should be the last line of the content.
+                The incorrect text content is:\n$(text)
+                """
+            ))
         end
     end
     printInfo && println("Basis function list checked.")

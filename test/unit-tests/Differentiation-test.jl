@@ -77,7 +77,9 @@ end
 # function gradOfHFenergy
 fDiffOfHFenergyCore! = function (pars, bs, nuc, nucCoords, Δx, config)
     map(pars) do par
-        @assert (isDiffParam(par) || Quiqbox.getFLevel(par.map) == 0)
+        (isDiffParam(par) || Quiqbox.getFLevel(par.map) == 0) || 
+        throw(DomainError(par, "This `par` in `pars` is not supported by the finite "*
+              "difference method."))
         par[] += Δx
         E = runHF(bs, nuc, nucCoords, config, printInfo=false).Ehf
         par[] -= Δx

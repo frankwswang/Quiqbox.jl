@@ -18,21 +18,21 @@ pb3_2 = changeMapping(pb3, Quiqbox.DI(pb3.map))
       itselfTshorten(typeof(pb3))*"(-1)[∂][x_x]"
 
 p1 = genSpatialPoint((1.,))
-@test (@capture_out show(p1)) == "SpatialPoint{Float64, 1, P1D{Float64, 0}}(param)[1.0][∂]"
+@test (@capture_out show(p1)) == "SpatialPoint{Float64, 1}{PBFL{(0,)}}(param)[1.0][∂]"
 
 p2 = genSpatialPoint((1.,2.))
-@test (@capture_out show(p2)) == "SpatialPoint{Float64, 2, P2D{Float64, 0, 0}}(param)"*
-                                 "[1.0, 2.0][∂][∂]"
+@test (@capture_out show(p2)) == "SpatialPoint{Float64, 2}{PBFL{(0, 0)}}(param)[1.0, 2.0]"*
+                                 "[∂][∂]"
 
 p3 = genSpatialPoint((1.,2.,3.))
-@test (@capture_out show(p3)) == "SpatialPoint{Float64, 3, P3D{Float64, 0, 0, 0}}(param)"*
-                                              "[1.0, 2.0, 3.0][∂][∂][∂]"
+@test (@capture_out show(p3)) == "SpatialPoint{Float64, 3}{PBFL{(0, 0, 0)}}(param)"*
+                                 "[1.0, 2.0, 3.0][∂][∂][∂]"
 
 bf1 = genBasisFunc([1.0, 2.0, 1.0], (2.0, 1.0))
 gf1 = bf1.gauss[1]
 gf2 = GaussFunc(changeMapping.(gf1.param, Quiqbox.DI.(getproperty.(gf1.param, :map)))...)
 @test (@capture_out show(gf1)) == (@capture_out show(gf2)) == 
-      itselfTshorten(typeof(gf1))*"(xpn()=$(gf1.xpn()), con()=$(gf1.con()), param)"
+      itselfTshorten(typeof(gf1))*"(xpn()=$(gf1.xpn()), con()=$(gf1.con()), param)[∂][∂]"
 
 bFieldStr = getFieldNameStr(bf1)
 @test (@capture_out show(bf1)) == string(typeStrOf(bf1))*bFieldStr*"[X⁰Y⁰Z⁰][1.0, 2.0, 1.0]"

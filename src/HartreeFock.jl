@@ -324,7 +324,8 @@ struct SCFconfig{T, L} <: ImmutableParameter{T, SCFconfig}
     function SCFconfig(methods::NTuple{L, Symbol}, intervals::NTuple{L, T}, 
                        config::Dict{Int, <:AbstractVector{<:Pair}}=Dict(1=>Pair[]);
                        oscillateThreshold::Real=defultOscThreshold) where {L, T}
-        @assert all(intervals .>= 0) "Thresholds in `intervals` must all be non-negative."
+        any(i < 0 for i in intervals) && throw(DomainError(intervals, "Thresholds in "*
+                                               "`intervals` must all be non-negative."))
         kwPairs = [Pair[] for _=1:L]
         for i in keys(config)
             kwPairs[i] = config[i]
@@ -381,9 +382,9 @@ each iteration during the Hartree-Fock SCF procedure.
 
 `shared.Etots::Vector{T}`: The total Hartree-Fock energy.
 
-**NOTE: For unrestricted Hartree-Fock, there are 2 `HFtempVars` being updated during the 
+**NOTE:** For unrestricted Hartree-Fock, there are 2 `HFtempVars` being updated during the 
 iterations, and changing the field `shared.Dtots` or `shared.Etots` of one `HFtempVars` 
-will affect the other one's.**
+will affect the other one's.
 """
 struct HFtempVars{T, HFT} <: HartreeFockintermediateData{T}
     N::Int
@@ -464,7 +465,11 @@ struct HFfinalVars{T, D, HFT, NN, BN, HFTS} <: HartreeFockFinalValue{T, HFT}
                                  X::AbstractMatrix{T}, 
                                  vars::NTuple{HFTS, HFtempVars{T, HFT}}, 
                                  isConverged::Bool) where {T, 𝐷, BN, NN, HFTS, HFT}
-        @assert (NNval = length(nuc)) == length(nucCoords)
+        (NNval = length(nuc)) == length(nucCoords) || 
+        throw(AssertionError("The length of `nuc` and `nucCoords` should be the same."))
+        any(length(i)!=𝐷 for i in nucCoords) && 
+        throw(DomainError(nucCoords, "The lengths of the elements in `nucCoords` should "*
+               "all be length $D."))
         Ehf = vars[1].shared.Etots[end]
         nuc = arrayToTuple(nuc)
         nucCoords = genTupleCoords(T, nucCoords)
@@ -476,7 +481,7 @@ struct HFfinalVars{T, D, HFT, NN, BN, HFTS} <: HartreeFockFinalValue{T, HFT}
         Eo = getindex.(getCϵ.(Ref(X), F), 2)
         occu = getSpinOccupations(Val(HFT), Ns, BN)
         new{T, 𝐷, HFT, NNval, BN, HFTS}(Ehf, Enn, groupSpins(Val(HFT), Ns), nuc, nucCoords, 
-                                     C, D, F, Eo, occu, vars, isConverged, basis)
+                                        C, D, F, Eo, occu, vars, isConverged, basis)
     end
 end
 
@@ -646,10 +651,12 @@ runHF(GTBasis(bs), args...; printInfo)
                            N::Union{Int, Tuple{Int}, NTuple{2, Int}}=getCharge(nuc), 
                            config::HFconfig{T2, HFT}=defaultHFC; 
                            printInfo::Bool=false) where {T1, D, BN, BFT, NN, HFT, T2}
-    @assert N > (HFT==:RHF) "$(HFT) requires more than $(HFT==:RHF) electrons."
+    Nlow = Int(HFT==:RHF)
+    N > Nlow || throw(DomainError(N, "$(HFT) requires more than $(Nlow) electrons."))
     Ns = splitSpins(Val(HFT), N)
     leastNb = max(Ns...)
-    @assert BN >= leastNb "The number of basis functions should be no less than $(leastNb)."
+    BN < leastNb &&  throw(DomainError(BN, "The number of basis functions should be no "*
+                           "less than $(leastNb)."))
     nuc = arrayToTuple(nuc)
     nucCoords = genTupleCoords(T1, nucCoords)
     Hcore = coreH(bs, nuc, nucCoords)
@@ -781,18 +788,15 @@ end
 
 function terminateSCF(i, vars, method, printInfo)
     popHFtempVars!(vars)
-    if printInfo
-        print("Early termination of ")
-        printstyled(method, underline=true)
-        println(" due to its poor performance.")
-    end
+    printInfo && println("Early termination of ", method, " due to its poor performance.")
     i-1
 end
 
 
 function DDcore(Nˢ::Int, X::AbstractMatrix{T}, F::AbstractMatrix{T}, D::AbstractMatrix{T}, 
                 dampStrength::T=T(defaultDS)) where {T}
-    @assert 0 <= dampStrength <= 1 "The range of `dampStrength`::$(T) is [0,1]."
+    0 <= dampStrength <= 1 || throw(DomainError(dampStrength, "The value of `dampStrength`"*
+                                    " should be between 0 and 1."))
     Dnew = getD(X, F, Nˢ)
     (1 - dampStrength)*Dnew + dampStrength*D
 end

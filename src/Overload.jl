@@ -15,8 +15,16 @@ import Base: ==
 
 diffColorSym(pb::ParamBox) = ifelse(isDiffParam(pb), :green, :light_black)
 
+function printDiffSym(io::IO, pb::ParamBox)
+    print(io, "[")
+    printstyled(io, ifelse(isDiffParam(pb), "𝛛", "∂"), color=diffColorSym(pb))
+    print(io, "]")
+end
+
+
 itselfTshorten(str::String) = replace(str, "$(iT)"=>"iT")
 itselfTshorten(::Type{T}) where{T} = itselfTshorten(string(T))
+
 
 import Base: show
 function show(io::IO, pb::ParamBox)
@@ -31,26 +39,29 @@ function show(io::IO, pb::ParamBox)
         print(io, pbTstr)
     end
     print(io, "(", v isa Integer ? v : round(v, sigdigits=nDigitShown), ")")
+    printDiffSym(io, pb)
     print(io, "[")
-    printstyled(io, "∂", color=diffColorSym(pb))
-    print(io, "][")
     printstyled(io, "$(indVarOf(pb)[begin])", color=:cyan)
     print(io, "]")
 end
 
+getSPNDstringCore(::Type{T}) where {T<:SPointT} = 
+( ", "*string(T)*"}", "}{"*replace(string(PBFL(T)), "Quiqbox."=>"", count=1)*"}" )
+
 getSPNDstring(t::Type{P1D{T, Fx}}) where {T, Fx} = 
-(string(t), "P1D{$T, $(Fx|>getFLevel)}")
+( getSPNDstringCore(t), (string(t), itselfTshorten("P1D{$T, $(Fx)}")) )
 
 getSPNDstring(t::Type{P2D{T, Fx, Fy}}) where {T, Fx, Fy} = 
-(string(t), "P2D{$T, $(Fx|>getFLevel), $(Fy|>getFLevel)}")
+( getSPNDstringCore(t), (string(t), itselfTshorten("P2D{$T, $(Fx), $(Fy)}")) )
 
 getSPNDstring(t::Type{P3D{T, Fx, Fy, Fz}}) where {T, Fx, Fy, Fz} = 
-(string(t), "P3D{$T, $(Fx|>getFLevel), $(Fy|>getFLevel), $(Fz|>getFLevel)}")
+( getSPNDstringCore(t), (string(t), itselfTshorten("P3D{$T, $(Fx), $(Fy), $(Fz)}")) )
 
 function typeStrOf(sp::Type{SpatialPoint{T, D, PDT}}) where {T, D, PDT}
     spTstrO = sp |> string
-    pbsTstrO, pbsTstrN = PDT |> getSPNDstring
-    replace(spTstrO, pbsTstrO=>pbsTstrN, count=1)
+    (pbsTstrO1, pbsTstrN1), (pbsTstrO2, pbsTstrN2) = PDT |> getSPNDstring
+    spTstrO = replace(spTstrO, pbsTstrO1=>pbsTstrN1)
+    replace(spTstrO, pbsTstrO2=>pbsTstrN2)
 end
 
 typeStrOf(::T) where {T<:SpatialPoint} = typeStrOf(T)
@@ -58,8 +69,9 @@ typeStrOf(::T) where {T<:SpatialPoint} = typeStrOf(T)
 function typeStrOf(bT::Type{<:FloatingGTBasisFuncs{<:Any, <:Any, <:Any, <:Any, PDT}}) where 
                   {PDT}
     bTstrO = bT |> string
-    pbsTstrO, pbsTstrN = PDT |> getSPNDstring
-    replace(bTstrO, pbsTstrO=>pbsTstrN, count=1)
+    (pbsTstrO1, pbsTstrN1), (pbsTstrO2, pbsTstrN2) = PDT |> getSPNDstring
+    bTstrO = replace(bTstrO, pbsTstrO1=>pbsTstrN1)
+    replace(bTstrO, pbsTstrO2=>pbsTstrN2)
 end
 
 typeStrOf(::Type{T}) where {T<:FloatingGTBasisFuncs} = string(T)
@@ -90,11 +102,7 @@ function show(io::IO, sp::SpatialPoint)
     pbs = sp.param
     print(io, typeStrOf(sp), getFieldNameStr(sp))
     print(io, [i() for i in pbs])
-    for pb in pbs
-        print(io, "[")
-        printstyled(io, ifelse(isDiffParam(pb), "𝛛", "∂"), color=diffColorSym(pb))
-        print(io, "]")
-    end
+    printDiffSym.(io, pbs)
 end
 
 function show(io::IO, gf::GaussFunc)
@@ -116,6 +124,7 @@ function show(io::IO, gf::GaussFunc)
     fieldStr = replace(fieldStr, "xpn"=>"xpn()=$(round(gf.xpn(), sigdigits=nDigitShown))")
     fieldStr = replace(fieldStr, "con"=>"con()=$(round(gf.con(), sigdigits=nDigitShown))")
     print(io, "}", fieldStr)
+    printDiffSym.(io, gf.param)
 end
 
 function show(io::IO, bf::BasisFunc)
@@ -353,3 +362,4 @@ itself(bs)
 
 ## Function __ : 
 ### getTypeParams
+### getFLevel

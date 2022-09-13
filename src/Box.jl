@@ -76,8 +76,11 @@ struct GridBox{T, D, NP, GPT<:SpatialPoint{T, D}} <: SpatialStructure{T, D}
                      center::Union{AbstractVector{T}, NTuple{D, T}}=ntuple(_->T(0),Val(D)); 
                      canDiff::NTuple{D, Bool}=ntuple(_->true, Val(D)), 
                      index::NTuple{D, Int}=ntuple(_->0, Val(D))) where {T<:AbstractFloat, D}
-        @assert all(nGrids.>=0) "The number of gird of each edge must be no less than 0."
-        @assert length(center)==D "The dimension of center coordinate must be equal to $D."
+        any(i < 0 for i in nGrids) && 
+        throw(DomainError(nGrid, "The grid number per dimension in `nGrids` should be "*
+              "non-negative."))
+        cD = length(center)
+        cD==D || throw(DomainError(cD, "The dimension of `center` must be equal to $D."))
         NP = prod(nGrids .+ 1)
         iVsym = ParamList[:spacing]
         oVsym = SpatialParamSyms[1:D]

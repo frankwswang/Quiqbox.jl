@@ -837,11 +837,9 @@ function getCompositeInt(::typeof(∫nucAttractionCore), bls::Union{Tuple{Bool},
                          bfs::NTuple{2, FGTBasisFuncs1O{T, D}}, 
                          nuc::NTuple{NN, String}, 
                          nucCoords::NTuple{NN, NTuple{D, T}}) where {T, D, NN}
-    res = T(0.0)
-    for (ele, coord) in zip(nuc, nucCoords)
-        res += getOneBodyInt(∫nucAttractionCore, bls, bfs..., getCharge(ele), coord|>Tuple)
+    mapreduce(+, nuc, nucCoords) do ele, coord
+        getOneBodyInt(∫nucAttractionCore, bls, bfs..., getCharge(ele), coord|>Tuple)
     end
-    res
 end
                           #       j==i      j!=i
 const Int1eBIndexLabels = Dict([( true,), (false,)] .=> [Val(:aa), Val(:ab)])
@@ -1016,7 +1014,7 @@ getCompositeIntCore(Val(T), Val(D), Val(:ContainBasisFuncs),
 function getCompositeInt(∫::F, bls::Union{Tuple{Bool}, NTuple{4, Any}, Val{false}}, 
                          bs::NTuple{BN, SpatialBasis{T, D, 1}}, 
                          optArgs...) where {F<:Function, BN, T, D}
-    if any(fieldtypes(typeof(bs)) .<: EmptyBasisFunc)
+    if any(t <: EmptyBasisFunc for t in (fieldtypes∘typeof)(bs))
         zero(T)
     else
         getCompositeIntCore(Val(T), Val(D), Val(:WithoutBasisFuncs), 

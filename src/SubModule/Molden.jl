@@ -28,12 +28,12 @@ function makeMoldenFile(mol::MatterByHF{T, 3};
     roundAtol = roundDigits<0 ? NaN : exp10(-roundDigits)
     ids = sortPermBasis(basis; roundAtol)
     basis = mergeBasisFuncs(basis[ids]...; roundAtol)
-    @assert all(basis .|> isaFullShellBasisFuncs) "The basis set stored in the input " * 
-                                                  "`MatterByHF` is not supported by " * 
-                                                  "the Molden format."
-    @assert all(getproperty.(basis, :normalizeGTO)) "`.normalizeGTO` must be `true` for "*
-                                                    "every `FloatingGTBasisFuncs` inside "*
-                                                    "the basis set."
+    all(isaFullShellBasisFuncs(b) for b in basis) || 
+    throw(AssertionError("The basis set stored in `mol.basis.basis` is not supported "*
+          "by the Molden format."))
+    all(b.normalizeGTO for b in basis) || 
+    throw(AssertionError("`.normalizeGTO` must be `true` for every `FloatingGTBasisFuncs` "*
+          "inside `mol.basis.basis`."))
     occuC = getindex.(mol.occuC, Ref(ids), :)
     unocC = getindex.(mol.unocC, Ref(ids), :)
     nucCoords = mol.nucCoord |> collect
@@ -69,7 +69,8 @@ function makeMoldenFile(mol::MatterByHF{T, 3};
     for cen in centers
         iNucPoint += 1
         # coord = parse.(T, split(cen[5:end]))
-        if (i = findfirst(x->all(isapprox.(x, cen, atol=getAtolVal(T))), nucCoords); 
+        if (i = findfirst(x->all(isapprox(xc, cc, atol=getAtolVal(T)) 
+                                 for (xc, cc) in zip(x, cen)), nucCoords); 
             i !== nothing)
             n = popat!(nuc, i)
             atmName = rpad("$(n)", 5)
