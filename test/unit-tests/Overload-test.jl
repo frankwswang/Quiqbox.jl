@@ -1,19 +1,21 @@
 using Test
 using Quiqbox
-using Quiqbox: BasisFuncMix, hasBoolRelation, typeStrOf, getFieldNameStr
+using Quiqbox: BasisFuncMix, hasBoolRelation, typeStrOf, getFieldNameStr, itselfTshorten
 using Suppressor: @capture_out
 
 @testset "Overload.jl" begin
 
 # function show
 pb1 = ParamBox(-1)
-@test (@capture_out show(pb1)) == string(typeof(pb1))*"(-1)[∂][undef]"
+@test (@capture_out show(pb1)) == itselfTshorten(typeof(pb1))*"(-1)[∂][undef]"
 
 pb2 = ParamBox(-1, :a, index=1)
-@test (@capture_out show(pb2)) == string(typeof(pb2))*"(-1)[∂][a₁]"
+@test (@capture_out show(pb2)) == itselfTshorten(typeof(pb2))*"(-1)[∂][a₁]"
 
 pb3 = ParamBox(-1, :x, abs)
-@test (@capture_out show(pb3)) == string(typeof(pb3))*"(-1)[∂][x_x]"
+pb3_2 = changeMapping(pb3, Quiqbox.DI(pb3.map))
+@test (@capture_out show(pb3)) == (@capture_out show(pb3_2))
+      itselfTshorten(typeof(pb3))*"(-1)[∂][x_x]"
 
 p1 = genSpatialPoint((1.,))
 @test (@capture_out show(p1)) == "SpatialPoint{Float64, 1, P1D{Float64, 0}}(param)[1.0][∂]"
@@ -23,13 +25,14 @@ p2 = genSpatialPoint((1.,2.))
                                  "[1.0, 2.0][∂][∂]"
 
 p3 = genSpatialPoint((1.,2.,3.))
-@test (@capture_out show(p3)) == "SpatialPoint{Float64, 3, P3D{Float64, 0, 0, 0}}(param)"* 
-                                 "[1.0, 2.0, 3.0][∂][∂][∂]"
+@test (@capture_out show(p3)) == "SpatialPoint{Float64, 3, P3D{Float64, 0, 0, 0}}(param)"*
+                                              "[1.0, 2.0, 3.0][∂][∂][∂]"
 
 bf1 = genBasisFunc([1.0, 2.0, 1.0], (2.0, 1.0))
 gf1 = bf1.gauss[1]
-@test (@capture_out show(gf1)) == string(typeof(gf1))*"(xpn()=$(gf1.xpn()), "*
-                                                       "con()=$(gf1.con()), param)"
+gf2 = GaussFunc(changeMapping.(gf1.param, Quiqbox.DI.(getproperty.(gf1.param, :map)))...)
+@test (@capture_out show(gf1)) == (@capture_out show(gf2)) == 
+      itselfTshorten(typeof(gf1))*"(xpn()=$(gf1.xpn()), con()=$(gf1.con()), param)"
 
 bFieldStr = getFieldNameStr(bf1)
 @test (@capture_out show(bf1)) == string(typeStrOf(bf1))*bFieldStr*"[X⁰Y⁰Z⁰][1.0, 2.0, 1.0]"
@@ -89,6 +92,12 @@ info3 = (@capture_out show(SCFconfig((:DD, :ADIIS, :DIIS),
 H2 = MatterByHF(fVar1)
 info4 = (@capture_out show(H2))
 @test info4 == string(H2|>typeof) * getFieldNameStr(H2)
+
+info5 = (@capture_out show(POconfig()))
+@test info5 == "POconfig{Float64, :HFenergy, HFconfig{Float64, :RHF, "*
+               "typeof(Quiqbox.getCfromSAD), Float64, 2}, Tuple{Float64, Float64}, "*
+               "GDconfig{Float64, LineSearches.BackTracking{Float64, Int64}, Float64}}"*
+               "(method=Val{:HFenergy}(), config, target, threshold, maxStep, optimizer)"
 
 
 # function ==, hasBoolRelation

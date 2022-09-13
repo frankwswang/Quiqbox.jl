@@ -13,15 +13,15 @@ using ForwardDiff: derivative as ForwardDerivative
 
 """
 
-    GaussFunc{T, FL1, FL2} <: AbstractGaussFunc{T}
+    GaussFunc{T, F1, F2} <: AbstractGaussFunc{T}
 
 A contracted primitive Gaussian-type function.
 
 ≡≡≡ Field(s) ≡≡≡
 
-`xpn::ParamBox{T, :$(xpnSym), FL1}`：The exponent coefficient.
+`xpn::ParamBox{T, :$(xpnSym), F1}`：The exponent coefficient.
 
-`con::ParamBox{T, :$(conSym), FL2}`: The contraction coefficient.
+`con::ParamBox{T, :$(conSym), F2}`: The contraction coefficient.
 
 `param::Tuple{ParamBox{T, $(xpnSym)}, ParamBox{T, $(conSym)}}`: The parameter containers 
 inside a `GaussFunc`.
@@ -33,14 +33,14 @@ inside a `GaussFunc`.
     GaussFunc{T}
 
 """
-struct GaussFunc{T, FLxpn, FLcon} <: AbstractGaussFunc{T}
-    xpn::ParamBox{T, xpnSym, FLxpn}
-    con::ParamBox{T, conSym, FLcon}
-    param::Tuple{ParamBox{T, xpnSym, FLxpn}, ParamBox{T, conSym, FLcon}}
+struct GaussFunc{T, Fxpn, Fcon} <: AbstractGaussFunc{T}
+    xpn::ParamBox{T, xpnSym, Fxpn}
+    con::ParamBox{T, conSym, Fcon}
+    param::Tuple{ParamBox{T, xpnSym, Fxpn}, ParamBox{T, conSym, Fcon}}
 
-    GaussFunc(xpn::ParamBox{T, xpnSym, FL1}, con::ParamBox{T, conSym, FL2}) where 
-             {T<:AbstractFloat, FL1, FL2} = 
-    new{T, FL1, FL2}(xpn, con, (xpn, con))
+    GaussFunc(xpn::ParamBox{T, xpnSym, F1}, con::ParamBox{T, conSym, F2}) where 
+             {T<:AbstractFloat, F1, F2} = 
+    new{T, F1, F2}(xpn, con, (xpn, con))
 end
 
 GaussFunc(e::Union{T, ParamBox{T}}, d::Union{T, ParamBox{T}}) where {T<:AbstractFloat} = 
@@ -50,18 +50,18 @@ GaussFunc(genExponent(e), genContraction(d))
 """
 
     genExponent(e::T, mapFunction::Function=$(itself); 
-                canDiff::Bool=ifelse($(FLevel)(mapFunction)==$(FI), false, true), 
+                canDiff::Bool=ifelse($(FLevel)(mapFunction)==$(IL), false, true), 
                 inSym::Symbol=$(xpnIVsym)) where {T<:AbstractFloat} -> 
     ParamBox{T, :$(xpnSym)}
 
     genExponent(e::Array{T, 0}, mapFunction::Function=$(itself); 
-                canDiff::Bool=ifelse($(FLevel)(mapFunction)==$(FI), false, true), 
+                canDiff::Bool=ifelse($(FLevel)(mapFunction)==$(IL), false, true), 
                 inSym::Symbol=$(xpnIVsym)) where {T<:AbstractFloat} -> 
     ParamBox{T, :$(xpnSym)}
 
     genExponent(eData::Pair{Array{T, 0}, Symbol}, 
                 mapFunction::Function=$(itself); 
-                canDiff::Bool=ifelse($(FLevel)(mapFunction)==$(FI), false, true)) where 
+                canDiff::Bool=ifelse($(FLevel)(mapFunction)==$(IL), false, true)) where 
                {T<:AbstractFloat} -> 
     ParamBox{T, :$(xpnSym)}
 
@@ -70,17 +70,17 @@ Construct an exponent coefficient given a value or variable (with its symbol).
 [`ParamBox`](@ref).
 """
 genExponent(eData::Pair{Array{T, 0}, Symbol}, mapFunction::Function=itself; 
-            canDiff::Bool=ifelse(FLevel(mapFunction)==FI, false, true)) where 
+            canDiff::Bool=ifelse(FLevel(mapFunction)==IL, false, true)) where 
            {T<:AbstractFloat} = 
 ParamBox(Val(xpnSym), mapFunction, eData, genIndex(nothing), fill(canDiff))
 
 genExponent(e::Array{T, 0}, mapFunction::Function=itself; 
-            canDiff::Bool=ifelse(FLevel(mapFunction)==FI, false, true), 
+            canDiff::Bool=ifelse(FLevel(mapFunction)==IL, false, true), 
             inSym::Symbol=xpnIVsym) where {T<:AbstractFloat} = 
 genExponent(e=>inSym, mapFunction; canDiff)
 
 genExponent(e::AbstractFloat, mapFunction::Function=itself; 
-            canDiff::Bool=ifelse(FLevel(mapFunction)==FI, false, true), 
+            canDiff::Bool=ifelse(FLevel(mapFunction)==IL, false, true), 
             inSym::Symbol=xpnIVsym) = 
 genExponent(fill(e)=>inSym, mapFunction; canDiff)
 
@@ -96,18 +96,18 @@ genExponent(pb::ParamBox) = ParamBox(Val(xpnSym), pb, fill(pb.canDiff[]))
 """
 
     genContraction(d::T, mapFunction::Function=$(itself); 
-                   canDiff::Bool=ifelse($(FLevel)(mapFunction)==$(FI), false, true), 
+                   canDiff::Bool=ifelse($(FLevel)(mapFunction)==$(IL), false, true), 
                    inSym::Symbol=$(conIVsym)) where {T<:AbstractFloat} -> 
     ParamBox{T, :$(conSym)}
 
     genContraction(d::Array{T, 0}, mapFunction::Function=$(itself); 
-                   canDiff::Bool=ifelse($(FLevel)(mapFunction)==$(FI), false, true), 
+                   canDiff::Bool=ifelse($(FLevel)(mapFunction)==$(IL), false, true), 
                    inSym::Symbol=$(conIVsym)) where {T<:AbstractFloat} -> 
     ParamBox{T, :$(conSym)}
 
     genContraction(dData::Pair{Array{T, 0}, Symbol}, 
                    mapFunction::Function=$(itself); 
-                   canDiff::Bool=ifelse($(FLevel)(mapFunction)==$(FI), false, true)) where 
+                   canDiff::Bool=ifelse($(FLevel)(mapFunction)==$(IL), false, true)) where 
                   {T<:AbstractFloat} -> 
     ParamBox{T, :$(conSym)}
 
@@ -117,17 +117,17 @@ Construct a contraction coefficient given a value or variable (with its symbol).
 """
 genContraction(dData::Pair{Array{T, 0}, Symbol}, 
                mapFunction::Function=itself; 
-               canDiff::Bool=ifelse(FLevel(mapFunction)==FI, false, true)) where 
+               canDiff::Bool=ifelse(FLevel(mapFunction)==IL, false, true)) where 
               {T<:AbstractFloat} = 
 ParamBox(Val(conSym), mapFunction, dData, genIndex(nothing), fill(canDiff))
 
 genContraction(d::Array{T, 0}, mapFunction::Function=itself; 
-               canDiff::Bool=ifelse(FLevel(mapFunction)==FI, false, true), 
+               canDiff::Bool=ifelse(FLevel(mapFunction)==IL, false, true), 
                inSym::Symbol=conIVsym) where {T<:AbstractFloat} = 
 genContraction(d=>inSym, mapFunction; canDiff)
 
 genContraction(d::AbstractFloat, mapFunction::Function=itself; 
-               canDiff::Bool=ifelse(FLevel(mapFunction)==FI, false, true), 
+               canDiff::Bool=ifelse(FLevel(mapFunction)==IL, false, true), 
                inSym::Symbol=conIVsym) = 
 genContraction(fill(d)=>inSym, mapFunction; canDiff)
 
@@ -141,12 +141,12 @@ Convert a [`ParamBox`](@ref) to an exponent coefficient parameter.
 genContraction(pb::ParamBox) = ParamBox(Val(conSym), pb, fill(pb.canDiff[]))
 
 
-const P1D{T, Lx} = Tuple{ParamBox{T, cxSym, FLevel{Lx}}}
-const P2D{T, Lx, Ly} = Tuple{ParamBox{T, cxSym, FLevel{Lx}}, 
-                             ParamBox{T, cySym, FLevel{Ly}}}
-const P3D{T, Lx, Ly, Lz} = Tuple{ParamBox{T, cxSym, FLevel{Lx}}, 
-                                 ParamBox{T, cySym, FLevel{Ly}}, 
-                                 ParamBox{T, czSym, FLevel{Lz}}}
+const P1D{T, Fx} = 
+      Tuple{ParamBox{T, cxSym, Fx}}
+const P2D{T, Fx, Fy} = 
+      Tuple{ParamBox{T, cxSym, Fx}, ParamBox{T, cySym, Fy}}
+const P3D{T, Fx, Fy, Fz} = 
+      Tuple{ParamBox{T, cxSym, Fx}, ParamBox{T, cySym, Fy}, ParamBox{T, czSym, Fz}}
 
 const SPointT{T} = Union{P1D{T}, P2D{T}, P3D{T}}
 
@@ -188,13 +188,13 @@ $( SpatialPoint(ParamBox.((1.0, 2.0, 3.0), SpatialParamSyms)) )
 julia> v2 = [fill(1.0), 2.0, 3.0];
 
 julia> p2 = genSpatialPoint(v2); p2[1]
-ParamBox{Float64, :X, $(FI)}(1.0)[∂][X]
+ParamBox{Float64, :X, iT}(1.0)[∂][X]
 
 julia> v2[1][] = 1.2
 1.2
 
 julia> p2[1]
-ParamBox{Float64, :X, $(FI)}(1.2)[∂][X]
+ParamBox{Float64, :X, iT}(1.2)[∂][X]
 ```
 """
 genSpatialPoint(v::AbstractVector) = genSpatialPoint(Tuple(v))
@@ -205,19 +205,19 @@ genSpatialPoint.(v, Tuple([1:D;])) |> genSpatialPointCore
 
     genSpatialPoint(comp::T, compIndex::Int, 
                     mapFunction::Function=itself; 
-                    canDiff::Bool=ifelse(FLevel(mapFunction)==FI, false, true), 
+                    canDiff::Bool=ifelse(FLevel(mapFunction)==IL, false, true), 
                     inSym::Symbol=conIVsym) where {T<:AbstractFloat} -> 
     ParamBox{T}
 
     genSpatialPoint(comp::Array{T, 0}, compIndex::Int, 
                     mapFunction::Function=itself; 
-                    canDiff::Bool=ifelse(FLevel(mapFunction)==FI, false, true), 
+                    canDiff::Bool=ifelse(FLevel(mapFunction)==IL, false, true), 
                     inSym::Symbol=conIVsym) where {T<:AbstractFloat} -> 
     ParamBox{T}
 
     genSpatialPoint(compData::Pair{Array{T, 0}, Symbol}, compIndex::Int, 
                     mapFunction::Function=itself; 
-                    canDiff::Bool=ifelse(FLevel(mapFunction)==FI, false, true)) -> 
+                    canDiff::Bool=ifelse(FLevel(mapFunction)==IL, false, true)) -> 
     ParamBox{T}
 
 Construct a [`ParamBox`](@ref) as the `compIndex` th component of a [`SpatialPoint`](@ref) 
@@ -233,35 +233,35 @@ Convert a `ParamBox` to the `compIndex` th component of a `SpatialPoint`.
 
 ```jldoctest; setup = :(push!(LOAD_PATH, "../../src/"); using Quiqbox)
 julia> genSpatialPoint(1.2, 1)
-ParamBox{Float64, :X, $(FI)}(1.2)[∂][X]
+ParamBox{Float64, :X, iT}(1.2)[∂][X]
 
 julia> pointY1 = fill(2.0);
 
 julia> Y1 = genSpatialPoint(pointY1, 2)
-ParamBox{Float64, :Y, $(FI)}(2.0)[∂][Y]
+ParamBox{Float64, :Y, iT}(2.0)[∂][Y]
 
 julia> pointY1[] = 1.5;
 
 julia> Y1
-ParamBox{Float64, :Y, $(FI)}(1.5)[∂][Y]
+ParamBox{Float64, :Y, iT}(1.5)[∂][Y]
 ```
 """
 genSpatialPoint(compData::Pair{Array{T, 0}, Symbol}, compIndex::Int, 
                 mapFunction::Function=itself; 
-                canDiff::Bool=ifelse(FLevel(mapFunction)==FI, false, true)) where 
+                canDiff::Bool=ifelse(FLevel(mapFunction)==IL, false, true)) where 
                {T<:AbstractFloat} = 
 ParamBox(Val(SpatialParamSyms[compIndex]), mapFunction, compData, genIndex(nothing), 
          fill(canDiff))
 
 genSpatialPoint(comp::Array{T, 0}, compIndex::Int, 
                 mapFunction::Function=itself; 
-                canDiff::Bool=ifelse(FLevel(mapFunction)==FI, false, true), 
+                canDiff::Bool=ifelse(FLevel(mapFunction)==IL, false, true), 
                 inSym::Symbol=conIVsym) where {T<:AbstractFloat} = 
 genSpatialPoint(comp=>inSym, compIndex, mapFunction; canDiff)
 
 genSpatialPoint(comp::AbstractFloat, compIndex::Int, 
                 mapFunction::Function=itself; 
-                canDiff::Bool=ifelse(FLevel(mapFunction)==FI, false, true), 
+                canDiff::Bool=ifelse(FLevel(mapFunction)==IL, false, true), 
                 inSym::Symbol=conIVsym) = 
 genSpatialPoint(fill(comp)=>inSym, compIndex, mapFunction; canDiff)
 
@@ -671,8 +671,9 @@ tolerance of comparing the center coordinates to determine whether they are trea
                     x->roundToMultiOfStep.(centerCoordOf(x), 
                                           nearestHalfOf(roundAtol))) ) do subbs
         # Reversed order within same subshell.
-        sort!(subbs, by=x->[-getTypeParams(x)[3], x.l[1].tuple, getTypeParams(x)[4]], 
-              rev=true)
+        sort!(subbs, by=x->[-getTypeParams(x)[begin+2], 
+                            x.l[begin].tuple, 
+                            getTypeParams(x)[begin+3]], rev=true)
     end
     groupCenters ? bfBlocks : vcat(bfBlocks...)
 end
@@ -703,7 +704,9 @@ sortPermBasisFuncs(bs::AbstractArray{<:FloatingGTBasisFuncs{T, D}};
                    roundAtol::Real=getAtolVal(T)) where {T, D} = 
 sortperm(reshape(bs, :), 
          by=x->[-1*roundToMultiOfStep.(centerCoordOf(x), nearestHalfOf(roundAtol)), 
-                -getTypeParams(x)[3], x.l[1].tuple, getTypeParams(x)[4]], rev=true)
+                -getTypeParams(x)[begin+2], 
+                x.l[begin].tuple, 
+                getTypeParams(x)[begin+3]], rev=true)
 
 sortPermBasisFuncs(bs::Tuple{Vararg{FloatingGTBasisFuncs{T, D}}}; 
                    roundAtol::Real=getAtolVal(T)) where {T, D} = 
@@ -1592,7 +1595,7 @@ function genBasisFuncText(bf::FloatingGTBasisFuncs{T, D}; norm::Real=1.0,
     GFs = map(x -> genGaussFuncText(x.xpn(), x.con(); roundDigits), bf.gauss)
     cen = centerCoordOf(bf)
     firstLine = printCenter ? "X "*(alignNum.(cen; roundDigits) |> join)*"\n" : ""
-    firstLine * "$(bf|>subshellOf)    $(getTypeParams(bf)[4])   $(T(norm))" * 
+    firstLine * "$(bf|>subshellOf)    $(getTypeParams(bf)[begin+3])   $(T(norm))" * 
     "   $(bf.normalizeGTO)" * 
     ( isaFullShellBasisFuncs(bf) ? "" : "  " * 
       join( [" $i" for i in get.(Ref(AngMomIndexList[D]), bf.l, "")] |> join ) ) * "\n" * 
@@ -1836,8 +1839,8 @@ value(s) of the [`ParamBox`](@ref)(s) stored in `b` will be copied, i.e.,
 ≡≡≡ Example(s) ≡≡≡
 
 ```jldoctest; setup = :(push!(LOAD_PATH, "../../src/"); using Quiqbox)
-julia> e = genExponent(3.0, x->x^2)
-$( genExponent(3.0, x->x^2) )
+julia> f(x)=x^2; e = genExponent(3.0, f)
+ParamBox{Float64, :α, typeof(f)}(3.0)[∂][x_α]
 
 julia> c = genContraction(2.0)
 $( genContraction(2.0) )

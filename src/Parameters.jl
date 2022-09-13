@@ -4,7 +4,7 @@ export ParamBox, inValOf, outValOf, inSymOf, outSymOf, isInSymEqual, isOutSymEqu
 
 """
 
-    ParamBox{T, V, FL<:FLevel} <: DifferentiableParameter{T, ParamBox}
+    ParamBox{T, V, F<:Function} <: DifferentiableParameter{T, ParamBox}
 
 Parameter container that can enable differentiation.
 
@@ -16,9 +16,9 @@ value of the input variable can be accessed by syntax `[]`; to modify it, for ex
 `pb::ParamBox{T}`, use the syntax `pb[] = newVal` where `newVal` is the new value that is 
 or can be converted into type `T`.
 
-`map::Function`: The mapping of the value of the input variable (i.e. the input value) 
-within the same domain (`.map(::T)->T`). The result (i.e., the value of the output 
-variable, or the "output value") can be accessed by syntax `()`.
+`map::Union{F, `[`DI`](@ref)`{F}}`: The mapping of the value of the input variable (i.e. 
+the input value) within the same domain (`.map(::T)->T`). The result (i.e., the value of 
+the output variable, or the "output value") can be accessed by syntax `()`.
 
 `canDiff::Array{Bool, 0}`: Indicator of whether the output variable is "marked" as 
 differentiable with respect to the input variable in the differentiation process. In other 
@@ -32,7 +32,7 @@ as a dependent variable or an independent variable.
     ParamBox(inVar::Union{T, Array{T, 0}}, outSym::Symbol=:undef, 
              inSym::Symbol=Symbol(IVsymSuffix, outSym); 
              index::Union{Int, Nothing}=nothing, canDiff::Bool=false) where {T} -> 
-    ParamBox{T, outSym, $(FI)}
+    ParamBox{T, outSym, $(iT)}
 
     ParamBox(inVar::Union{T, Array{T, 0}}, outSym::Symbol, mapFunction::Function, 
              inSym::Symbol=Symbol(IVsymSuffix, outSym); 
@@ -67,13 +67,13 @@ respect to the input variable.
 
 ```jldoctest; setup = :(push!(LOAD_PATH, "../../src/"); using Quiqbox)
 julia> ParamBox(1.0)
-ParamBox{Float64, :undef, $(FI)}(1.0)[∂][undef]
+ParamBox{Float64, :undef, iT}(1.0)[∂][undef]
 
 julia> ParamBox(1.0, :a)
-ParamBox{Float64, :a, $(FI)}(1.0)[∂][a]
+ParamBox{Float64, :a, iT}(1.0)[∂][a]
 
 julia> ParamBox(1.0, :a, abs)
-ParamBox{Float64, :a, $(FLevel(abs))}(1.0)[∂][x_a]
+ParamBox{Float64, :a, $(typeof(abs))}(1.0)[∂][x_a]
 ```
 
 **NOTE 1:** The rightmost "`[∂][IV]`" in the printed info indicates the differentiability 
@@ -87,37 +87,29 @@ parameter functional (e.g., the Hartree-Fock energy). However, the derivative wi
 to the stored input variable can also be computed to when the `ParamBox` is marked as 
 differentiable.
 """
-struct ParamBox{T, V, FL<:FLevel} <: DifferentiableParameter{T, ParamBox}
+struct ParamBox{T, V, F<:Function} <: DifferentiableParameter{T, ParamBox}
     data::Array{Pair{Array{T, 0}, Symbol}, 0}
-    map::Function
+    map::Union{F, DI{F}}
     canDiff::Array{Bool, 0}
     index::Array{<:Union{Int, Nothing}, 0}
 
     function ParamBox{T, V}(f::F, data::Pair{Array{T, 0}, Symbol}, index, canDiff) where 
                            {T, V, F<:Function}
-        @assert Base.return_types(f, (T,))[1] == T
-        new{T, V, FLevel(F)}(fill(data), f, canDiff, index)
+        Base.return_types(f, (T,))[1] == T || 
+        throw(AssertionError("The mapping function `$(f)` should return the same data " * 
+                             "type as it input."))
+        new{T, V, dressOf(F)}(fill(data), f, canDiff, index)
     end
 
     ParamBox{T, V}(data::Pair{Array{T, 0}, Symbol}, index, canDiff) where {T, V} = 
-    new{T, V, FI}(fill(data), itself, canDiff, index)
+    new{T, V, iT}(fill(data), itself, canDiff, index)
 end
 
-function ParamBox(::Val{V}, mapFunction::F, data::Pair{Array{T, 0}, Symbol}, 
-                  index=genIndex(nothing), canDiff=fill(true)) where {V, F<:Function, T}
-    if getFLevel(F) != 0
-        fSym = mapFunction |> nameOf
-        fStr = fSym |> string
-        if startswith(fStr, '#')
-            idx = parse(Int, fStr[2:end])
-            fSym = Symbol("f_", V,  numToSubs(idx))
-            mapFunction = renameFunc(fSym, mapFunction)
-        end
-    end
-    ParamBox{T, V}(mapFunction, data, index, canDiff)
-end
+ParamBox(::Val{V}, mapFunction::F, data::Pair{Array{T, 0}, Symbol}, 
+         index=genIndex(nothing), canDiff=fill(true)) where {V, F<:Function, T} = 
+ParamBox{T, V}(mapFunction, data, index, canDiff)
 
-ParamBox(::Val{V}, ::itselfT, data::Pair{Array{T, 0}, Symbol}, index=genIndex(nothing), 
+ParamBox(::Val{V}, ::IF, data::Pair{Array{T, 0}, Symbol}, index=genIndex(nothing), 
          canDiff=fill(false)) where {V, T} = 
 ParamBox{T, V}(data, index, canDiff)
 
@@ -152,9 +144,7 @@ Return the value of the input variable of `pb`. Equivalent to `pb[]`.
 
 Return the value of the output variable of `pb`. Equivalent to `pb()`.
 """
-@inline outValOf(pb::ParamBox) = callGenFunc(pb.map, inValOf(pb))
-
-@inline outValOf(pb::ParamBox{<:Any, <:Any, FI}) = inValOf(pb)
+@inline outValOf(pb::ParamBox) = (pb.map∘inValOf)(pb)
 
 (pb::ParamBox)() = outValOf(pb)
 # (pb::ParamBox)() = Base.invokelatest(pb.map, pb.data[][begin][])::Float64
@@ -216,7 +206,7 @@ function indVarOf(pb::ParamBox)
 end
 
 
-getTypeParams(::ParamBox{T, V, FL}) where {T, V, FL} = (T, V, FL)
+getTypeParams(::ParamBox{T, V, F}) where {T, V, F} = (T, V, F)
 
 
 """
@@ -239,7 +229,7 @@ Return the mapping function of `pb`.
 
 """
 
-    outValCopy(pb::ParamBox{T, V}) where {T} -> ParamBox{T, V, $(FI)}
+    outValCopy(pb::ParamBox{T, V}) where {T} -> ParamBox{T, V, $(iT)}
 
 Return a new `ParamBox` of which the input variable's value is equal to the output 
 variable's value of `pb`.
@@ -334,12 +324,15 @@ end
 compareParamBoxCore1(pb1::ParamBox, pb2::ParamBox) = 
 (pb1.data[][begin] === pb2.data[][begin])
 
-compareParamBoxCore2(pb1::ParamBox{<:Any, V1}, pb2::ParamBox{<:Any, V2}) where {V1, V2} = 
-V1==V2 && compareParamBoxCore1(pb1, pb2) && (typeof(pb1.map) === typeof(pb2.map))
-
-compareParamBoxCore2(pb1::ParamBox{<:Any, V1, FI}, 
-                     pb2::ParamBox{<:Any, V2, FI}) where {V1, V2} = 
-V1==V2 && compareParamBoxCore1(pb1, pb2)
+function compareParamBoxCore2(pb1::ParamBox{<:Any, V1, F1}, 
+                              pb2::ParamBox{<:Any, V2, F2}) where {V1, V2, F1, F2}
+    bl = V1==V2 && compareParamBoxCore1(pb1, pb2)
+    if FLevel(F1) == FLevel(F2) == IL
+        bl
+    else
+        bl * hasIdentical(pb1.map, pb2.map)
+    end
+end
 
 @inline function compareParamBox(pb1::ParamBox, pb2::ParamBox)
     ifelse(( (bl=isDiffParam(pb1)) == isDiffParam(pb2) ),
@@ -357,7 +350,7 @@ end
 function addParamBox(pb1::ParamBox{T, V, FL1}, pb2::ParamBox{T, V, FL2}, 
                      roundAtol::Real=nearestHalfOf(getAtolVal(T))) where {T, V, FL1, FL2}
     if isDiffParam(pb1) && compareParamBox(pb1, pb2)
-        ParamBox(Val(V), combineParFunc(+, pb1.map, pb2.map), 
+        ParamBox(Val(V), combinePF(+, pb1.map, pb2.map), 
                  pb1.data[][begin]=>min(pb1.data[][end], pb2.data[][end]), 
                  genIndex(nothing), fill(true))
     else
@@ -370,7 +363,7 @@ end
 function mulParamBox(c::Number, pb::ParamBox{T, V}, 
                      roundAtol::Real=nearestHalfOf(getAtolVal(T))) where {T, V}
     if isDiffParam(pb)
-        mapFunc = Pf(convert(T, roundToMultiOfStep(c, roundAtol)), pb.map)
+        mapFunc = PF(pb.map, *, convert(T, roundToMultiOfStep(c, roundAtol)))
         ParamBox(Val(V), mapFunc, pb.data[], genIndex(nothing), fill(true))
     else
         ParamBox(Val(V), itself, 
@@ -381,7 +374,7 @@ end
 function mulParamBox(pb1::ParamBox{T, V, FL1}, pb2::ParamBox{T, V, FL2}, 
                      roundAtol::Real=nearestHalfOf(getAtolVal(T))) where {T, V, FL1, FL2}
     if isDiffParam(pb1) && compareParamBox(pb1, pb2)
-        ParamBox(Val(V), combineParFunc(*, pb1.map, pb2.map), 
+        ParamBox(Val(V), combinePF(*, pb1.map, pb2.map), 
                  pb1.data[][begin]=>min(pb1.data[][end], pb2.data[][end]), 
                  genIndex(nothing), fill(true))
     else

@@ -2,10 +2,9 @@ using Test
 using Quiqbox
 using Quiqbox: getAtolVal, getAtolDigits, roundToMultiOfStep, nearestHalfOf, getNearestMid, 
                isApprox, tryIncluding, sizeOf, hasBoolRelation, flatten, joinTuple, 
-               markUnique, getUnique!, itself, themselves, replaceSymbol, renameFunc, 
-               groupedSort, mapPermute, getFunc, nameOf, tupleDiff, genIndex, fillObj, 
-               arrayToTuple, genTupleCoords, callGenFunc, uniCallFunc, mergeMultiObjs, 
-               isNaN, getBool, skipIndices
+               markUnique, getUnique!, itself, themselves, replaceSymbol, groupedSort, 
+               mapPermute, getFunc, nameOf, tupleDiff, genIndex, fillObj, arrayToTuple, 
+               genTupleCoords, uniCallFunc, mergeMultiObjs, isNaN, getBool, skipIndices
 using Suppressor: @capture_out
 
 @testset "Tools.jl" begin
@@ -110,28 +109,6 @@ x1 = rand(10)
 @test replaceSymbol(:sombol, "o"=>"y", count=1) == :symbol
 
 
-# function renameFunc
-f1 = renameFunc(:f_renameFunc_1, x->abs(x))
-@test f1(-0.1) === 0.1
-@test f1(-1) === 1
-@test nameof(f1) == :f_renameFunc_1
-
-f2 = renameFunc(:f_renameFunc_2, +, 2)
-arg1 = rand()
-arg2 = rand()
-@test f2(arg1, arg2) === (arg1 + arg2)
-@test try f2(1, arg1, arg2) catch; true end
-
-f3 = renameFunc(:f_renameFunc_3, abs, Float64)
-@test f3(-0.1) === 0.1
-@test try f3(-1) catch; true end
-@test typeof(f3) != typeof(abs)
-
-f4 = renameFunc("f_renameFunc_3", x->x+1, Float64)
-nameof(f4) == :f_renameFunc_3
-@test f3(-0.1) === 0.9
-
-
 # function groupedSort
 a = [rand(1:5, 2) for i=1:20]
 a2 = groupedSort(a)
@@ -175,9 +152,9 @@ end
 
 
 # function nameOf
-pf1 = Quiqbox.Pf(-1.5, abs)
+pf1 = Quiqbox.PF(abs, *, -1.5)
 @test nameOf(abs) == :abs
-@test nameOf(pf1) == typeof(pf1) == Quiqbox.Pf{Float64, typeof(abs)}
+@test nameOf(pf1) == typeof(pf1) == Quiqbox.PF{typeof(abs), typeof(*), Float64}
 
 
 # function tupleDiff
@@ -214,8 +191,8 @@ c4 = c3 |> Tuple
 @test c4 == genTupleCoords(Float64, c4)
 
 
-# function callGenFunc
-@test callGenFunc(f1, -1) == 1
+# # function callGenFunc
+# @test callGenFunc(f1, -1) == 1
 
 
 # function uniCallFunc

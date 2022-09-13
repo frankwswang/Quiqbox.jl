@@ -4,7 +4,7 @@ import Base: ==
 ==(pb1::ParamBox, pb2::ParamBox) = (pb1.data == pb2.data && 
                                     isDiffParam(pb1) == isDiffParam(pb2) && 
                                     pb1.index[] == pb2.index[] && 
-                                    typeof(pb1.map) === typeof(pb2.map))
+                                    pb1.map == pb2.map)
 
 ==(cp1::SpatialPoint, cp2::SpatialPoint) = (cp1.param == cp2.param)
 ==(t1::LTuple, t2::LTuple) = (t1.tuple == t2.tuple)
@@ -15,10 +15,21 @@ import Base: ==
 
 diffColorSym(pb::ParamBox) = ifelse(isDiffParam(pb), :green, :light_black)
 
+itselfTshorten(str::String) = replace(str, "$(iT)"=>"iT")
+itselfTshorten(::Type{T}) where{T} = itselfTshorten(string(T))
+
 import Base: show
 function show(io::IO, pb::ParamBox)
     v = pb.data[][begin][]
-    print(io, typeof(pb))
+    pbTstr = (itselfTshorten∘typeof)(pb)
+    if pb.map isa DI
+        idx = findlast(',', pbTstr)
+        print(io, pbTstr[begin:idx])
+        printstyled(io, pbTstr[idx+1:end-1], color=:light_black)
+        print(io, pbTstr[end])
+    else
+        print(io, pbTstr)
+    end
     print(io, "(", v isa Integer ? v : round(v, sigdigits=nDigitShown), ")")
     print(io, "[")
     printstyled(io, "∂", color=diffColorSym(pb))
@@ -27,14 +38,14 @@ function show(io::IO, pb::ParamBox)
     print(io, "]")
 end
 
-getSPNDstring(t::Type{P1D{T, Lx}}) where {T, Lx} = 
-(string(t), "P1D{$T, $(Lx)}")
+getSPNDstring(t::Type{P1D{T, Fx}}) where {T, Fx} = 
+(string(t), "P1D{$T, $(Fx|>getFLevel)}")
 
-getSPNDstring(t::Type{P2D{T, Lx, Ly}}) where {T, Lx, Ly} = 
-(string(t), "P2D{$T, $(Lx), $(Ly)}")
+getSPNDstring(t::Type{P2D{T, Fx, Fy}}) where {T, Fx, Fy} = 
+(string(t), "P2D{$T, $(Fx|>getFLevel), $(Fy|>getFLevel)}")
 
-getSPNDstring(t::Type{P3D{T, Lx, Ly, Lz}}) where {T, Lx, Ly, Lz} = 
-(string(t), "P3D{$T, $(Lx), $(Ly), $(Lz)}")
+getSPNDstring(t::Type{P3D{T, Fx, Fy, Fz}}) where {T, Fx, Fy, Fz} = 
+(string(t), "P3D{$T, $(Fx|>getFLevel), $(Fy|>getFLevel), $(Fz|>getFLevel)}")
 
 function typeStrOf(sp::Type{SpatialPoint{T, D, PDT}}) where {T, D, PDT}
     spTstrO = sp |> string
@@ -87,10 +98,24 @@ function show(io::IO, sp::SpatialPoint)
 end
 
 function show(io::IO, gf::GaussFunc)
-    str = getFieldNameStr(gf)
-    str = replace(str, "xpn"=>"xpn()=$(round(gf.xpn(), sigdigits=nDigitShown))")
-    str = replace(str, "con"=>"con()=$(round(gf.con(), sigdigits=nDigitShown))")
-    print(io, typeof(gf), str)
+    gfTstr = (itselfTshorten∘typeof)(gf)
+    idx1, idx2 = findall(',', gfTstr)
+    print(io, gfTstr[begin:idx1+1])
+    if gf.xpn.map isa DI
+        printstyled(io, gfTstr[idx1+2:idx2-1], color=:light_black)
+    else
+        print(io, gfTstr[idx1+2:idx2-1])
+    end
+    print(io, ", ")
+    if gf.con.map isa DI
+        printstyled(io, gfTstr[idx2+2:end-1], color=:light_black)
+    else
+        print(io, gfTstr[idx2+2:end-1])
+    end
+    fieldStr = getFieldNameStr(gf)
+    fieldStr = replace(fieldStr, "xpn"=>"xpn()=$(round(gf.xpn(), sigdigits=nDigitShown))")
+    fieldStr = replace(fieldStr, "con"=>"con()=$(round(gf.con(), sigdigits=nDigitShown))")
+    print(io, "}", fieldStr)
 end
 
 function show(io::IO, bf::BasisFunc)
@@ -143,6 +168,13 @@ function show(io::IO, vars::HFfinalVars)
     str = getFieldNameStr(vars)
     Ehf = round(vars.Ehf, sigdigits=nDigitShown)
     str = replace(str, "Ehf"=>"Ehf=$(Ehf)")
+    print(io, str)
+end
+
+function show(io::IO, config::POconfig)
+    print(io, typeof(config))
+    str = getFieldNameStr(config)
+    str = replace(str, "method,"=>"method=$(config.method),")
     print(io, str)
 end
 
@@ -278,12 +310,12 @@ function hasBoolRelation(boolFunc::F,
                          ignoreFunction::Bool=false, ignoreContainer::Bool=false, 
                          kws...) where {F<:Function, V1, V2, F1, F2}
     ifelse(ignoreContainer || V1 == V2, 
-        ifelse((ignoreFunction || F1 == F2 == FI), 
+        ifelse((ignoreFunction || FLevel(F1) == FLevel(F2) == IL), 
             boolFunc(pb1.data[][begin], pb2.data[][begin]), 
 
             ( boolFunc(isDiffParam(pb1), isDiffParam(pb2)) && 
-                boolFunc(pb1.map, pb2.map) && 
-                boolFunc(pb1.data[][begin], pb2.data[][begin]) )
+              hasBoolRelation(boolFunc, pb1.map, pb2.map) && 
+              boolFunc(pb1.data[][begin], pb2.data[][begin]) )
         ), 
 
         false

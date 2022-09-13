@@ -8,8 +8,8 @@ The data structures defined by Quiqbox in each step, form levels of data complex
 | :---:  |   :---:   |      :---:      |     :---:    |
 | 4 | basis set | `Array`, `Tuple`, `GTBasis` | `Vector{<:BasisFunc{Float64, 3}}`, `GTBasis{Float64, 3, 2}`...|
 | 3 | basis function | `GTBasisFuncs` | `BasisFunc{Float64, 3, 0, 6}`, `Quiqbox.BasisFuncMix{Float64, 3, 2}`...|
-| 2 | Gaussian-type function | `AbstractGaussFunc` | `GaussFunc{Float64, FLevel{0}, FLevel{0}}`...|
-| 1 | tunable parameter | `ParamBox`, `SpatialPoint` | `ParamBox{Float64, :α, FLevel{0}}`, `SpatialPoint{Float64, 3, P3D{Float64, 0, 0, 0}}`... |
+| 2 | Gaussian-type function | `AbstractGaussFunc` | `GaussFunc{Float64, iT, iT}`...|
+| 1 | tunable parameter | `ParamBox`, `SpatialPoint` | `ParamBox{Float64, :α, iT}`, `SpatialPoint{Float64, 3, P3D{Float64, 0, 0, 0}}`... |
 
 Depending on how much control the user wants to have over each step, Quiqbox defines several [methods](https://docs.julialang.org/en/v1/manual/methods/) of related functions to provide the freedom of balancing between efficiency and customizability.
 
@@ -40,7 +40,7 @@ If you want to postpone the specification of the center, you can replace the fir
 julia> bsO = genBasisFunc(missing, "STO-3G", "O");
 
 julia> [assignCenInVal!(b, fill(1.0, 3)) for b in bsO]
-3-element Vector{SpatialPoint{Float64, 3, Tuple{ParamBox{Float64, :X, FLevel{0}}, ParamBox{Float64, :Y, FLevel{0}}, ParamBox{Float64, :Z, FLevel{0}}}}}:
+3-element Vector{SpatialPoint{Float64, 3, Tuple{ParamBox{Float64, :X, typeof(itself)}, ParamBox{Float64, :Y, typeof(itself)}, ParamBox{Float64, :Z, typeof(itself)}}}}:
  SpatialPoint{Float64, 3, P3D{Float64, 0, 0, 0}}(param)[1.0, 1.0, 1.0][∂][∂][∂]
  SpatialPoint{Float64, 3, P3D{Float64, 0, 0, 0}}(param)[1.0, 1.0, 1.0][∂][∂][∂]
  SpatialPoint{Float64, 3, P3D{Float64, 0, 0, 0}}(param)[1.0, 1.0, 1.0][∂][∂][∂]
@@ -49,11 +49,11 @@ julia> [assignCenInVal!(b, fill(1.0, 3)) for b in bsO]
 If you omit the atom in the arguments, `"H"` will be set in default. Notice that even though there's only one single basis function in H's STO-3G basis set, the returned value is still a `Vector`.
 ```jldoctest myLabel1
 julia> bsH_1 = genBasisFunc([-0.5, 0, 0], "STO-3G")
-1-element Vector{BasisFunc{Float64, 3, 0, 3, Tuple{ParamBox{Float64, :X, FLevel{0}}, ParamBox{Float64, :Y, FLevel{0}}, ParamBox{Float64, :Z, FLevel{0}}}}}:
+1-element Vector{BasisFunc{Float64, 3, 0, 3, Tuple{ParamBox{Float64, :X, typeof(itself)}, ParamBox{Float64, :Y, typeof(itself)}, ParamBox{Float64, :Z, typeof(itself)}}}}:
  BasisFunc{Float64, 3, 0, 3, P3D{Float64, 0, 0, 0}}(center, gauss, l, normalizeGTO, param)[X⁰Y⁰Z⁰][-0.5, 0.0, 0.0]
 
 julia> bsH_2 = genBasisFunc([ 0.5, 0, 0], "STO-3G")
-1-element Vector{BasisFunc{Float64, 3, 0, 3, Tuple{ParamBox{Float64, :X, FLevel{0}}, ParamBox{Float64, :Y, FLevel{0}}, ParamBox{Float64, :Z, FLevel{0}}}}}:
+1-element Vector{BasisFunc{Float64, 3, 0, 3, Tuple{ParamBox{Float64, :X, typeof(itself)}, ParamBox{Float64, :Y, typeof(itself)}, ParamBox{Float64, :Z, typeof(itself)}}}}:
  BasisFunc{Float64, 3, 0, 3, P3D{Float64, 0, 0, 0}}(center, gauss, l, normalizeGTO, param)[X⁰Y⁰Z⁰][0.5, 0.0, 0.0]
 ```
 
@@ -130,10 +130,10 @@ genBFuncsFromText(txt_Kr_631G, adjustContent=true);
 If you want to specify the parameters of each basis function when constructing a basis set, you can first construct the container for primitive GTO: `GaussFunc`, and then construct the basis function from them:
 ```jldoctest myLabel2; setup = :( push!(LOAD_PATH,"../../src/"); using Quiqbox )
 julia> gf1 = GaussFunc(2.0, 1.0)
-GaussFunc{Float64, FLevel{0}, FLevel{0}}(xpn()=2.0, con()=1.0, param)
+GaussFunc{Float64, iT, iT}(xpn()=2.0, con()=1.0, param)
 
 julia> gf2 = GaussFunc(2.5, 0.75)
-GaussFunc{Float64, FLevel{0}, FLevel{0}}(xpn()=2.5, con()=0.75, param)
+GaussFunc{Float64, iT, iT}(xpn()=2.5, con()=0.75, param)
 
 julia> bf1 = genBasisFunc([1.0, 0, 0], [gf1, gf2])
 BasisFunc{Float64, 3, 0, 2, P3D{Float64, 0, 0, 0}}(center, gauss, l, normalizeGTO, param)[X⁰Y⁰Z⁰][1.0, 0.0, 0.0]
@@ -167,15 +167,15 @@ true
 Sometimes you may want the parameters of basis functions (or `GaussFunc`) to be under some constraints (which can be crucial for the later basis set optimization), this is when you need a deeper level of control over the parameters, through its direct container: [`ParamBox`](@ref). In fact, in the above example, we have already had a glimpse of it through the printed info in the REPL:
 ```jldoctest myLabel2
 julia> gf1
-GaussFunc{Float64, FLevel{0}, FLevel{0}}(xpn()=2.0, con()=1.0, param)
+GaussFunc{Float64, iT, iT}(xpn()=2.0, con()=1.0, param)
 ```
 The two fields of a `GaussFunc`, `.xpn`, and `.con` are `ParamBox`, and their input value (i.e. the value of the input variable) can be accessed through syntax `[]`:
 ```jldoctest myLabel2
 julia> gf1.xpn
-ParamBox{Float64, :α, FLevel{0}}(2.0)[∂][α]
+ParamBox{Float64, :α, iT}(2.0)[∂][α]
 
 julia> gf1.con
-ParamBox{Float64, :d, FLevel{0}}(1.0)[∂][d]
+ParamBox{Float64, :d, iT}(1.0)[∂][d]
 
 julia> gf1.xpn[]
 2.0
@@ -205,17 +205,17 @@ julia> gf4 = GaussFunc(2.5, 0.5);
 julia> bs7 = genBasisFunc.([[0.0, 0.1, 0.0], [1.4, 0.3, 0.0]], Ref(gf4));
 
 julia> markParams!(bs7)
-10-element Vector{ParamBox{Float64, V, FLevel{0}} where V}:
- ParamBox{Float64, :X, FLevel{0}}(0.0)[∂][X₁]
- ParamBox{Float64, :Y, FLevel{0}}(0.1)[∂][Y₁]
- ParamBox{Float64, :Z, FLevel{0}}(0.0)[∂][Z₁]
- ParamBox{Float64, :α, FLevel{0}}(2.5)[∂][α₁]
- ParamBox{Float64, :d, FLevel{0}}(0.5)[∂][d₁]
- ParamBox{Float64, :X, FLevel{0}}(1.4)[∂][X₂]
- ParamBox{Float64, :Y, FLevel{0}}(0.3)[∂][Y₂]
- ParamBox{Float64, :Z, FLevel{0}}(0.0)[∂][Z₂]
- ParamBox{Float64, :α, FLevel{0}}(2.5)[∂][α₁]
- ParamBox{Float64, :d, FLevel{0}}(0.5)[∂][d₁]
+10-element Vector{ParamBox{Float64, V, typeof(itself)} where V}:
+ ParamBox{Float64, :X, iT}(0.0)[∂][X₁]
+ ParamBox{Float64, :Y, iT}(0.1)[∂][Y₁]
+ ParamBox{Float64, :Z, iT}(0.0)[∂][Z₁]
+ ParamBox{Float64, :α, iT}(2.5)[∂][α₁]
+ ParamBox{Float64, :d, iT}(0.5)[∂][d₁]
+ ParamBox{Float64, :X, iT}(1.4)[∂][X₂]
+ ParamBox{Float64, :Y, iT}(0.3)[∂][Y₂]
+ ParamBox{Float64, :Z, iT}(0.0)[∂][Z₂]
+ ParamBox{Float64, :α, iT}(2.5)[∂][α₁]
+ ParamBox{Float64, :d, iT}(0.5)[∂][d₁]
 ```
 
 `markParams!` marks all the parameters of a given basis set. Even though `bs7` has two `GaussFunc`s as basis functions, overall it only has one unique coefficient exponent ``\alpha_1`` and one unique contraction coefficient ``d_1`` besides the center coordinates.
@@ -227,7 +227,7 @@ Another control the user have on the parameters in Quiqbox is through a `ParamBo
 Such a mapping function is stored in the `map` field of the `ParamBox` (which normally is an ``R \to R`` mapping). The "output value" can be accessed through syntax `()`. In default, the input variable is mapped to an output variable that has the identical value:
 ```jldoctest myLabel2
 julia> pb1 = gf4.xpn
-ParamBox{Float64, :α, FLevel{0}}(2.5)[∂][α₁]
+ParamBox{Float64, :α, iT}(2.5)[∂][α₁]
 
 julia> pb1.map
 itself (generic function with 1 method)

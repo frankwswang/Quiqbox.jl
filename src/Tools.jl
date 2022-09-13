@@ -142,37 +142,31 @@ function hasBoolRelation(boolOp::F, obj1::T1, obj2::T2;
                          ignoreContainer::Bool=false, 
                          decomposeNumberCollection::Bool=false) where {T1, T2, F<:Function}
     res = true
-    if T1 != T2 && !ignoreContainer && 
-          ( !ignoreFunction || typejoin(T1, T2) == Any || 
-            !(isa.([T1.parameters...], Type{<:FLevel}) |> any) || 
-            !(isa.([T2.parameters...], Type{<:FLevel}) |> any) )
-        return false
-    else
-        fs1 = fieldnames(T1)
-        fs2 = fieldnames(T2)
-        if fs1 == fs2
-            if length(fs1) == 0
-                res = boolOp(obj1, obj2)
-            else
-                for i in fs1
-                    isdefined(obj1, i) == (fieldDefined = isdefined(obj2, i)) && 
-                    (fieldDefined ? nothing : continue)
-                    res *= hasBoolRelation(boolOp, getproperty(obj1, i), 
-                                           getproperty(obj2, i); ignoreFunction, 
-                                           ignoreContainer, decomposeNumberCollection)
-                    !res && (return false)
-                end
-            end
+    fs1 = fieldnames(T1)
+    fs2 = fieldnames(T2)
+    if fs1 == fs2
+        if length(fs1) == 0
+            res = boolOp(obj1, obj2)
         else
-            return false
+            for i in fs1
+                isdefined(obj1, i) == (fieldDefined = isdefined(obj2, i)) && 
+                (fieldDefined ? nothing : continue)
+                res *= hasBoolRelation(boolOp, getproperty(obj1, i), 
+                                        getproperty(obj2, i); ignoreFunction, 
+                                        ignoreContainer, decomposeNumberCollection)
+                !res && (return false)
+            end
         end
+    else
+        return false
     end
     res
 end
 
-hasBoolRelation(boolOp::Function, obj1::Function, obj2::Function; 
+hasBoolRelation(boolOp::Function, obj1::F1, obj2::F2; 
                 ignoreFunction::Bool=false, ignoreContainer::Bool=false, 
-                decomposeNumberCollection::Bool=false) = 
+                decomposeNumberCollection::Bool=false) where 
+               {StructuredFunction<:F1<:Function, StructuredFunction<:F2<:Function} = 
 ifelse(ignoreFunction, true, boolOp(obj1, obj2))
 
 hasBoolRelation(boolOp::Function, obj1::Number, obj2::Number; 
@@ -243,14 +237,14 @@ false
 true
 ```
 """
-function hasBoolRelation(boolOp::F, obj1, obj2, obj3...; 
+function hasBoolRelation(boolOp::F, obj1, obj2, obj3, obj4...; 
                          ignoreFunction::Bool=false, 
                          ignoreContainer::Bool=false,
                          decomposeNumberCollection::Bool=false) where {F<:Function}
     res = hasBoolRelation(boolOp, obj1, obj2; ignoreFunction, ignoreContainer)
     tmp = obj2
     if res
-        for i in obj3[1:end]
+        for i in (obj3, obj4...)
             res *= hasBoolRelation(boolOp, tmp, i; ignoreFunction, ignoreContainer,
                                    decomposeNumberCollection)
             !res && break
@@ -588,7 +582,7 @@ A dummy function that returns its argument.
 """
 @inline itself(x) = x
 
-const itselfT = typeof(itself)
+const iT = typeof(itself)
 
 @inline themselves(xs::Vararg) = xs
 
@@ -603,17 +597,6 @@ Similar as `Base.replace` but for Symbols.
 function replaceSymbol(sym::Symbol, pair::Pair{String, String}; count::Int=typemax(Int))
     replace(sym |> string, pair; count) |> Symbol
 end
-
-
-function renameFunc(fName::Symbol, f::F, ::Type{T}, N::Int=1) where {F<:Function, T}
-    @eval ($(fName))(a::Vararg{$T, $N}) = $f(a...)::$T
-end
-
-function renameFunc(fName::Symbol, f::F, N::Int=1) where {F<:Function}
-    @eval ($(fName))(a::Vararg{Any, $N}) = $f(a...)
-end
-
-renameFunc(fName::String, args...) = renameFunc(Symbol(fName), args...)
 
 
 function isOscillateConverged(seq::AbstractVector{T}, 
@@ -780,16 +763,23 @@ genTupleCoords(::Type{T}, coords::Tuple{Vararg{NTuple{D, T}}}) where {D, T} = it
 genTupleCoords(::Type{T}, coords::AbstractVector{NTuple{D, T}}) where {D, T} = 
 arrayToTuple(coords)
 
-function callGenFunc(f::F, x::T) where {F<:Function, T}
-    if worldAgeSafe(F) || applicable(f, zero(T))
-        !worldAgeSafe(F) && (@eval worldAgeSafe(::Type{$F}) = true)
-        f(x)
-    else
-        Base.invokelatest(f, x)
-    end
-end
 
-worldAgeSafe(::Type{<:Function}) = false
+# callGenFunc(f::F, x) where {F<:Function} = callGenFuncCore(worldAgeSafe(F), f, x)
+# # callGenFuncCore(::Val{true}, f, x) = f(x)
+# @generated function callGenFuncCore(::Val{BL}, f::F, x) where {BL, F}
+#     if BL
+#         return :( f(x) )
+#     else
+#         # @eval worldAgeSafe(::Type{F}) = Val(true)
+#         expr = Expr(:(=), Expr(:call, :worldAgeSafe, Expr(:(::), Expr(:curly, :Type, :Int))), Expr(:call, :Val, :true))
+#         return quote
+#             $expr
+#             Base.invokelatest(f, x)
+#         end
+#     end
+# end
+
+worldAgeSafe(::Type{<:Function}) = Val(false)
 
 
 uniCallFunc(f::F, argsOrder::NTuple{N, Int}, args...) where {F<:Function, N} = 

@@ -202,9 +202,9 @@ function gradOfHFenergy(par::AbstractVector{<:ParamBox{T}},
 end
 
 
-𝑑f(::Type{FL}, f::F, x::T) where {FL<:FLevel, F<:Function, T} = ForwardDerivative(f, x)
+𝑑f(f::Function, x) = ForwardDerivative(f, x)
 
-𝑑f(::Type{FI}, ::Function, ::T) where {T} = T(1.0)
+𝑑f(::DI, ::T) where {T} = T(1.0)
 
 ∂SGFcore(::Val{xpnSym}, sgf::FGTBasisFuncs1O{T, 3, 𝑙, 1}, c::T=T(1)) where {T, 𝑙} = 
 hasNormFactor(sgf) ? ∂SGF∂xpn2(sgf, c) : ∂SGF∂xpn1(sgf, c)
@@ -244,11 +244,11 @@ end
 
 const sgfSample = genBasisFunc([0.0, 0.0, 0.0], (2.0, 1.0))
 
-const cxIndex = findfirst(x->getTypeParams(x)[2]==cxSym, sgfSample.param)
-const cyIndex = findfirst(x->getTypeParams(x)[2]==cySym, sgfSample.param)
-const czIndex = findfirst(x->getTypeParams(x)[2]==czSym, sgfSample.param)
-const xpnIndex = findfirst(x->getTypeParams(x)[2]==xpnSym, sgfSample.param)
-const conIndex = findfirst(x->getTypeParams(x)[2]==conSym, sgfSample.param)
+const cxIndex  = findfirst(x -> outSymOf(x) ==  cxSym, sgfSample.param)
+const cyIndex  = findfirst(x -> outSymOf(x) ==  cySym, sgfSample.param)
+const czIndex  = findfirst(x -> outSymOf(x) ==  czSym, sgfSample.param)
+const xpnIndex = findfirst(x -> outSymOf(x) == xpnSym, sgfSample.param)
+const conIndex = findfirst(x -> outSymOf(x) == conSym, sgfSample.param)
 
 getVpar(sgf::FGTBasisFuncs1O{<:Any, <:Any, <:Any, 1}, ::Val{cxSym}) = sgf.param[cxIndex]
 getVpar(sgf::FGTBasisFuncs1O{<:Any, <:Any, <:Any, 1}, ::Val{cySym}) = sgf.param[cyIndex]
@@ -263,12 +263,11 @@ function ∂BasisCore1(par::ParamBox{T, V, FL}, sgf::FGTBasisFuncs1O{T, D, <:Any
                     {T, FL, V, D}
     mapreduce(+, sgf.param) do fPar
         c = if isDiffParam(fPar) && compareParamBoxCore1(fPar, par)
-            _, V2, FL2 = getTypeParams(fPar)
-            𝑑f(FL2, fPar.map, fPar[])
+            𝑑f(fPar.map, fPar[])
         else
             0
         end
-        iszero(c) ? EmptyBasisFunc{T, D}() : ∂SGFcore(Val(V2), sgf, c)
+        iszero(c) ? EmptyBasisFunc{T, D}() : ∂SGFcore(Val(outSymOf(fPar)), sgf, c)
     end
 end
 

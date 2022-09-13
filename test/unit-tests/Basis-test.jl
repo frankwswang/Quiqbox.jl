@@ -1,6 +1,6 @@
 using Test
 using Quiqbox
-using Quiqbox: EmptyBasisFunc, BasisFuncMix, isaFullShellBasisFuncs, unpackBasis, 
+using Quiqbox: EmptyBasisFunc, BasisFuncMix, isaFullShellBasisFuncs, unpackBasis, iT, 
                ElementNames, sortBasisFuncs, ParamList, sumOf, mergeGaussFuncs, gaussProd, 
                getNormFactor, mergeBasisFuncs, getTypeParams
 using LinearAlgebra
@@ -61,10 +61,10 @@ c1_3 = genContraction(v1c)
 e2 = genExponent(e1)
 e3 = genExponent(c1)
 @test hasIdentical(e1, e2)
-@test !hasEqual(e1, e3)
+@test hasEqual(e1, e3)
 @test e1[] == e3[]
 @test e1() == e3()
-@test e1.map !== e3.map
+@test e1.map == e3.map
 v2 = rand()
 @test e1.map(v2) == e3.map(v2)
 e4 = genExponent(e1.data[])
@@ -80,7 +80,7 @@ c3 = genExponent(e1)
 @test !hasEqual(c1, c3)
 @test c1[] == c3[]
 @test c1() == c3()
-@test c1.map !== c3.map
+@test c1.map == c3.map
 @test c1.map(v2) == c3.map(v2)
 c4 = genExponent(c1.data[])
 @test c4.data[] === c1.data[]
@@ -146,7 +146,8 @@ bf2_P_norm3 = genBasisFunc(cen, gf2, "P")
 @test BasisFuncs(bf2_P_norm3) === bf2_P_norm3
 bfsp = BasisFuncs(genSpatialPoint(cen), gf2, (Quiqbox.LTuple(1,0,0),))
 @test hasEqual(collect(bfsp)[], BasisFunc(bfsp), bf2_P_norm3[1])
-@test getTypeParams(bf2_P_norm3) == (Float64, 3, 1, 1, Quiqbox.P3D{Float64, 0,0,0}, 3)
+@test getTypeParams(bf2_P_norm3) == 
+      (Float64, 3, 1, 1, Quiqbox.P3D{Float64, iT, iT, iT}, 3)
 
 bf3_1 = genBasisFunc(fill(0.0, 3), "STO-3G")[]
 bf3_2 = genBasisFunc(fill(0.0, 3), "STO-3G", "He")[]
@@ -244,7 +245,7 @@ bfm_bf2_P =  BasisFuncMix(bf2_P_norm3|>collect)
 @test hasEqual(bfm_bf2_P, BasisFuncMix([bfsp, bf2_P_norm3[2:end]...]))
 @test collect(gaussCoeffOf.(bfm_bf2_P.BasisFunc)) == fill(gaussCoeffOf(bf2_P_norm3), 3)
 @test getTypeParams(bfm1) == 
-      (Float64, 3, 1, BasisFunc{Float64, 3, 0, 1, P3D{Float64, 0, 0, 0}})
+      (Float64, 3, 1, BasisFunc{Float64, 3, 0, 1, P3D{Float64, iT, iT, iT}})
 
 errorThreshold2 = 5e-15
 bs1 = genBasisFunc.(gridCoordOf(GridBox(1,1.5)), Ref(GaussFunc(1.0, 0.5)))
@@ -419,7 +420,7 @@ xpn2 = genExponent(1.2)
 con2 = genContraction(1.2, x->x^2)
 bf_pf = genBasisFunc([1.0, 2.0, 3.0], GaussFunc(xpn2, con2))
 bf_pf2 = (bf_pf*0.4)*5
-@test bf_pf2.gauss[1].con.map isa Quiqbox.Pf{Float64}
+@test bf_pf2.gauss[1].con.map isa Quiqbox.PF{<:Function, typeof(*), Float64}
 @test hasEqual(bf_pf2, mul(bf_pf, 2.0))
 @test hasEqual(add(bf_add1, bf_add1), 
                add(bf_add1, deepcopy(bf_add1)), 
@@ -814,8 +815,9 @@ pbs_gv0 = [cen_gv1[1], cen_gv2[1],
            cen_gv1[3], cen_gv2[3], cen_gv3[3], 
            e_gv1, e_gv2, e_gv3, 
            c_gv1, c_gv2, c_gv3]
-pbs_gv0_2 = sort(pbs_gv0, by=x->(Quiqbox.getFLevel(x.map), x.data[][end], x.index[]))
-pbs_gv3_2 = sort(pbs_gv3, by=x->(Quiqbox.getFLevel(x.map), x.data[][end], x.index[]))
+sortFunc = x->(string(Quiqbox.getFLevel(x.map)), x.data[][end], x.index[])
+pbs_gv0_2 = sort(pbs_gv0, by=sortFunc)
+pbs_gv3_2 = sort(pbs_gv3, by=sortFunc)
 @test pbs_gv3_2 == pbs_gv0_2
 @test hasEqual(pbs_gv3_2, pbs_gv0_2)
 @test hasIdentical(pbs_gv3_2, pbs_gv0_2)
