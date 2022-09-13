@@ -423,7 +423,7 @@ function optimizeParams!(pbs::AbstractVector{<:ParamBox{T}},
         print("The optimization of parameters \n𝒙 := ")
         println(IOContext(stdout, :limit => true), "$((first∘indVarOf).(pbs)) ")
         print("with respect to $(fVstr)(𝒙) from the profile ")
-        VERSION < v"1.7" ? print(":$M") : printstyled(":$M", underline=true)
+        printstyled(":$M", bold=true)
         println(" just ended at")
         println(rpad("Step $(i): ", 11), lpad("$(fVstr) = ", 6), 
                 alignNumSign(fVals[end], roundDigits=nDigitShown))

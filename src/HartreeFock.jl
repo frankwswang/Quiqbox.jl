@@ -788,11 +788,7 @@ end
 
 function terminateSCF(i, vars, method, printInfo)
     popHFtempVars!(vars)
-    if printInfo
-        print("Early termination of ")
-        VERSION < v"1.7" ? print(method) : printstyled(method, underline=true)
-        println(" due to its poor performance.")
-    end
+    printInfo && println("Early termination of ", method, " due to its poor performance.")
     i-1
 end
 
