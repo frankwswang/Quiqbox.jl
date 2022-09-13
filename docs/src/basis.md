@@ -9,7 +9,7 @@ The data structures defined by Quiqbox in each step, form levels of data complex
 | 4 | basis set | `Array`, `Tuple`, `GTBasis` | `Vector{<:BasisFunc{Float64, 3}}`, `GTBasis{Float64, 3, 2}`...|
 | 3 | basis function | `GTBasisFuncs` | `BasisFunc{Float64, 3, 0, 6}`, `Quiqbox.BasisFuncMix{Float64, 3, 2}`...|
 | 2 | Gaussian-type function | `AbstractGaussFunc` | `GaussFunc{Float64, iT, iT}`...|
-| 1 | tunable parameter | `ParamBox`, `SpatialPoint` | `ParamBox{Float64, :α, iT}`, `SpatialPoint{Float64, 3, P3D{Float64, 0, 0, 0}}`... |
+| 1 | tunable parameter | `ParamBox`, `SpatialPoint` | `ParamBox{Float64, :α, iT}`, `SpatialPoint{Float64, 3, P3D{Float64, iT, iT, iT}}`... |
 
 Depending on how much control the user wants to have over each step, Quiqbox defines several [methods](https://docs.julialang.org/en/v1/manual/methods/) of related functions to provide the freedom of balancing between efficiency and customizability.
 
@@ -24,10 +24,10 @@ First, you can construct an atomic basis set at one coordinate by inputting its 
 julia> bsO = Quiqbox.genBasisFunc(fill(1.0, 3), "STO-3G", "O");
 
 julia> bsO[begin]
-BasisFunc{Float64, 3, 0, 3, P3D{Float64, 0, 0, 0}}(center, gauss, l, normalizeGTO, param)[X⁰Y⁰Z⁰][1.0, 1.0, 1.0]
+BasisFunc{Float64, 3, 0, 3}{PBFL{(0, 0, 0)}}(center, gauss, l, normalizeGTO, param)[X⁰Y⁰Z⁰][1.0, 1.0, 1.0]
 
 julia> bsO[end]
-BasisFuncs{Float64, 3, 1, 3, P3D{Float64, 0, 0, 0}, 3}(center, gauss, l, normalizeGTO, param)[3/3][1.0, 1.0, 1.0]
+BasisFuncs{Float64, 3, 1, 3, P3D{Float64, iT, iT, iT}, 3}(center, gauss, l, normalizeGTO, param)[3/3][1.0, 1.0, 1.0]
 ```
 
 Notice that in the returned `bsO` there are two types of elements: `BasisFunc` and `BasisFuncs`. `BasisFunc` is the most basic `DataType` to hold the data of a basis function; `BasisFuncs` is very similar except it may hold multiple orbitals with only the spherical harmonics ``Y_{ml}`` being different when the orbital angular momentum ``l>0``.
@@ -41,20 +41,20 @@ julia> bsO = genBasisFunc(missing, "STO-3G", "O");
 
 julia> [assignCenInVal!(b, fill(1.0, 3)) for b in bsO]
 3-element Vector{SpatialPoint{Float64, 3, Tuple{ParamBox{Float64, :X, typeof(itself)}, ParamBox{Float64, :Y, typeof(itself)}, ParamBox{Float64, :Z, typeof(itself)}}}}:
- SpatialPoint{Float64, 3, P3D{Float64, 0, 0, 0}}(param)[1.0, 1.0, 1.0][∂][∂][∂]
- SpatialPoint{Float64, 3, P3D{Float64, 0, 0, 0}}(param)[1.0, 1.0, 1.0][∂][∂][∂]
- SpatialPoint{Float64, 3, P3D{Float64, 0, 0, 0}}(param)[1.0, 1.0, 1.0][∂][∂][∂]
+ SpatialPoint{Float64, 3}{PBFL{(0, 0, 0)}}(param)[1.0, 1.0, 1.0][∂][∂][∂]
+ SpatialPoint{Float64, 3}{PBFL{(0, 0, 0)}}(param)[1.0, 1.0, 1.0][∂][∂][∂]
+ SpatialPoint{Float64, 3}{PBFL{(0, 0, 0)}}(param)[1.0, 1.0, 1.0][∂][∂][∂]
 ```
 
 If you omit the atom in the arguments, `"H"` will be set in default. Notice that even though there's only one single basis function in H's STO-3G basis set, the returned value is still a `Vector`.
 ```jldoctest myLabel1
 julia> bsH_1 = genBasisFunc([-0.5, 0, 0], "STO-3G")
 1-element Vector{BasisFunc{Float64, 3, 0, 3, Tuple{ParamBox{Float64, :X, typeof(itself)}, ParamBox{Float64, :Y, typeof(itself)}, ParamBox{Float64, :Z, typeof(itself)}}}}:
- BasisFunc{Float64, 3, 0, 3, P3D{Float64, 0, 0, 0}}(center, gauss, l, normalizeGTO, param)[X⁰Y⁰Z⁰][-0.5, 0.0, 0.0]
+ BasisFunc{Float64, 3, 0, 3}{PBFL{(0, 0, 0)}}(center, gauss, l, normalizeGTO, param)[X⁰Y⁰Z⁰][-0.5, 0.0, 0.0]
 
 julia> bsH_2 = genBasisFunc([ 0.5, 0, 0], "STO-3G")
 1-element Vector{BasisFunc{Float64, 3, 0, 3, Tuple{ParamBox{Float64, :X, typeof(itself)}, ParamBox{Float64, :Y, typeof(itself)}, ParamBox{Float64, :Z, typeof(itself)}}}}:
- BasisFunc{Float64, 3, 0, 3, P3D{Float64, 0, 0, 0}}(center, gauss, l, normalizeGTO, param)[X⁰Y⁰Z⁰][0.5, 0.0, 0.0]
+ BasisFunc{Float64, 3, 0, 3}{PBFL{(0, 0, 0)}}(center, gauss, l, normalizeGTO, param)[X⁰Y⁰Z⁰][0.5, 0.0, 0.0]
 ```
 
 Finally, you can use Quiqbox's included tool function [`flatten`](@ref) to merge the three atomic basis sets into one molecular basis set:
@@ -130,28 +130,28 @@ genBFuncsFromText(txt_Kr_631G, adjustContent=true);
 If you want to specify the parameters of each basis function when constructing a basis set, you can first construct the container for primitive GTO: `GaussFunc`, and then construct the basis function from them:
 ```jldoctest myLabel2; setup = :( push!(LOAD_PATH,"../../src/"); using Quiqbox )
 julia> gf1 = GaussFunc(2.0, 1.0)
-GaussFunc{Float64, iT, iT}(xpn()=2.0, con()=1.0, param)
+GaussFunc{Float64, iT, iT}(xpn()=2.0, con()=1.0, param)[∂][∂]
 
 julia> gf2 = GaussFunc(2.5, 0.75)
-GaussFunc{Float64, iT, iT}(xpn()=2.5, con()=0.75, param)
+GaussFunc{Float64, iT, iT}(xpn()=2.5, con()=0.75, param)[∂][∂]
 
 julia> bf1 = genBasisFunc([1.0, 0, 0], [gf1, gf2])
-BasisFunc{Float64, 3, 0, 2, P3D{Float64, 0, 0, 0}}(center, gauss, l, normalizeGTO, param)[X⁰Y⁰Z⁰][1.0, 0.0, 0.0]
+BasisFunc{Float64, 3, 0, 2}{PBFL{(0, 0, 0)}}(center, gauss, l, normalizeGTO, param)[X⁰Y⁰Z⁰][1.0, 0.0, 0.0]
 ```
 
 Unlike `BasisFunc`, there's no additional constructor function for `GaussFunc`. As for the method of `genBasisFunc` in this case, the subshell is set to "S" as the default option since the third argument is omitted. You can construct a `BasisFuncs` which contains all the orbitals within one specified subshell:
 ```jldoctest myLabel2
 julia> bf2 = genBasisFunc([1.0, 0, 0], [gf1, gf2], "P")
-BasisFuncs{Float64, 3, 1, 2, P3D{Float64, 0, 0, 0}, 3}(center, gauss, l, normalizeGTO, param)[3/3][1.0, 0.0, 0.0]
+BasisFuncs{Float64, 3, 1, 2, P3D{Float64, iT, iT, iT}, 3}(center, gauss, l, normalizeGTO, param)[3/3][1.0, 0.0, 0.0]
 ```
 
 You can even select one or few orbitals to keep by specifying the corresponding orbital angular momentums in the Cartesian representation using `NTuple{3, Int}`:
 ```jldoctest myLabel2
 julia> bf3 = genBasisFunc([1.0, 0, 0], [gf1, gf2], (1,0,0))
-BasisFunc{Float64, 3, 1, 2, P3D{Float64, 0, 0, 0}}(center, gauss, l, normalizeGTO, param)[X¹Y⁰Z⁰][1.0, 0.0, 0.0]
+BasisFunc{Float64, 3, 1, 2}{PBFL{(0, 0, 0)}}(center, gauss, l, normalizeGTO, param)[X¹Y⁰Z⁰][1.0, 0.0, 0.0]
 
 julia> bf4 = genBasisFunc([1.0, 0, 0], [gf1, gf2], [(1,0,0), (0,0,1)])
-BasisFuncs{Float64, 3, 1, 2, P3D{Float64, 0, 0, 0}, 2}(center, gauss, l, normalizeGTO, param)[2/3][1.0, 0.0, 0.0]
+BasisFuncs{Float64, 3, 1, 2, P3D{Float64, iT, iT, iT}, 2}(center, gauss, l, normalizeGTO, param)[2/3][1.0, 0.0, 0.0]
 ```
 
 Again, if you want a faster solution, you can directly define the exponent coefficients and the contraction coefficients separately in a 2-element `Tuple` as the second argument of `genBasisFunc`:
@@ -167,7 +167,7 @@ true
 Sometimes you may want the parameters of basis functions (or `GaussFunc`) to be under some constraints (which can be crucial for the later basis set optimization), this is when you need a deeper level of control over the parameters, through its direct container: [`ParamBox`](@ref). In fact, in the above example, we have already had a glimpse of it through the printed info in the REPL:
 ```jldoctest myLabel2
 julia> gf1
-GaussFunc{Float64, iT, iT}(xpn()=2.0, con()=1.0, param)
+GaussFunc{Float64, iT, iT}(xpn()=2.0, con()=1.0, param)[∂][∂]
 ```
 The two fields of a `GaussFunc`, `.xpn`, and `.con` are `ParamBox`, and their input value (i.e. the value of the input variable) can be accessed through syntax `[]`:
 ```jldoctest myLabel2
@@ -244,13 +244,13 @@ true
 Apart from the flexible control of basis function parameters, another major feature of Quiqbox is the ability to construct a basis function from the linear combination of other basis functions. Specifically, additional methods of `+` and `*` (operator syntax for [`add`](@ref) and [`mul`](@ref)) are implemented for `CompositeGTBasisFuncs`:
 ```jldoctest myLabel3; setup = :( push!(LOAD_PATH,"../../src/"); using Quiqbox )
 julia> bf7 = genBasisFunc([1.0, 0.0, 1.0], (1.5, 3.0))
-BasisFunc{Float64, 3, 0, 1, P3D{Float64, 0, 0, 0}}(center, gauss, l, normalizeGTO, param)[X⁰Y⁰Z⁰][1.0, 0.0, 1.0]
+BasisFunc{Float64, 3, 0, 1}{PBFL{(0, 0, 0)}}(center, gauss, l, normalizeGTO, param)[X⁰Y⁰Z⁰][1.0, 0.0, 1.0]
 
 julia> bf8 = genBasisFunc([1.0, 0.0, 1.0], (2.0, 4.0))
-BasisFunc{Float64, 3, 0, 1, P3D{Float64, 0, 0, 0}}(center, gauss, l, normalizeGTO, param)[X⁰Y⁰Z⁰][1.0, 0.0, 1.0]
+BasisFunc{Float64, 3, 0, 1}{PBFL{(0, 0, 0)}}(center, gauss, l, normalizeGTO, param)[X⁰Y⁰Z⁰][1.0, 0.0, 1.0]
 
 julia> bf9 = bf7*0.5 + bf8
-BasisFunc{Float64, 3, 0, 2, P3D{Float64, 0, 0, 0}}(center, gauss, l, normalizeGTO, param)[X⁰Y⁰Z⁰][1.0, 0.0, 1.0]
+BasisFunc{Float64, 3, 0, 2}{PBFL{(0, 0, 0)}}(center, gauss, l, normalizeGTO, param)[X⁰Y⁰Z⁰][1.0, 0.0, 1.0]
 
 julia> bf9.gauss[1].con() == 3 * 0.5
 true
