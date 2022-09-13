@@ -67,12 +67,14 @@ mutable struct GDconfig{T, M, ST<:Union{Array{T, 0}, T}} <: ConfigBox{T, GDconfi
                       stepBound::NTuple{2, T}=convert.(eltype(initialStep), (0, Inf)), 
                       scaleStepBound::Bool=ifelse(M==iT, true, false)) where 
                      {M, T<:AbstractFloat, ST<:Union{Array{T, 0}, T}}
-        @assert 0 < initialStep[] "The initial step size must be positive."
-        @assert stepBound[begin] <= stepBound[end] "The bound set for initialStep must be"*
-                " a valid closed interval."
-        @assert (M == iT) || 
-                hasproperty(LineSearches, (nameof∘typeof)(lineSearchMethod)) "The input"*
-                " line search method is NOT supported."
+        0 < initialStep[] || throw(DomainError(initialStep[], "The initial step size "*
+                                   "should be positive.")) 
+        stepBound[begin] > stepBound[end] && 
+        throw(DomainError(stepBound, "The bound set for initialStep should be a valid "*
+              "closed interval."))
+        (M == iT || hasproperty(LineSearches, (nameof∘typeof)(lineSearchMethod))) || 
+        throw(DomainError(lineSearchMethod, 
+              "The input `lineSearchMethod` is not supported."))
         new{T, M, ST}(lineSearchMethod, initialStep, stepBound, scaleStepBound)
     end
 end
@@ -280,7 +282,7 @@ function makeAbsLayerForXpnParams(pbs, bs, onlyForNegXpn::Bool=false;
                                                                true : pb.canDiff[])) )
     absXpn2 = if tryJustFlipNegSign
         function (pb::ParamBox)
-            if FLevel(getTypeParams(pb)[end]) == IL || pb.map isa DI
+            if (FLevel∘getFLevel)(pb) == IL || pb.map isa DI
                 pb[] *= sign(pb[])
                 pb
             else
@@ -421,7 +423,7 @@ function optimizeParams!(pbs::AbstractVector{<:ParamBox{T}},
         print("The optimization of parameters \n𝒙 := ")
         println(IOContext(stdout, :limit => true), "$((first∘indVarOf).(pbs)) ")
         print("with respect to $(fVstr)(𝒙) from the profile ")
-        printstyled(":$M", underline=true)
+        VERSION < v"1.7" ? print(":$M") : printstyled(":$M", underline=true)
         println(" just ended at")
         println(rpad("Step $(i): ", 11), lpad("$(fVstr) = ", 6), 
                 alignNumSign(fVals[end], roundDigits=nDigitShown))

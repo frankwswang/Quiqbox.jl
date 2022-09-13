@@ -1,12 +1,13 @@
 using Test
 using Quiqbox
-using Quiqbox: getTypeParams, getFLevel, compareParamBox
+using Quiqbox: getTypeParams, compareParamBox, getFLevel, FLevel, PBFL
 
 @testset "Parameters.jl" begin
 
 
 pb1 = ParamBox(1, :a)
 @test getTypeParams(pb1) == (Int, :a, Quiqbox.iT)
+@test (FLevel∘getFLevel)(pb1) == FLevel(pb1.map) == FLevel(Quiqbox.iT)
 @test inSymOf(pb1) == :x_a
 @test outSymOf(pb1) == :a
 @test dataOf(pb1)[begin][] == pb1[] == inValOf(pb1)
@@ -31,6 +32,7 @@ pb3 = ParamBox(-1, :b, abs)
 @test outSymOf(pb3) == :b
 @test mapOf(pb3) == abs
 toggleDiff!(pb3)
+@test PBFL((pb1, pb2, pb3)) == PBFL{(0, 0, 1)}
 
 pb4 = ParamBox(1.2, :c, x->x^2, :x)
 @test getTypeParams(pb4) == (Float64, :c, typeof(pb4.map))

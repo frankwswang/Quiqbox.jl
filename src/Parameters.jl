@@ -73,14 +73,15 @@ julia> ParamBox(1.0, :a)
 ParamBox{Float64, :a, iT}(1.0)[∂][a]
 
 julia> ParamBox(1.0, :a, abs)
-ParamBox{Float64, :a, $(typeof(abs))}(1.0)[∂][x_a]
+ParamBox{Float64, :a, $(typeof(abs))}(1.0)[𝛛][x_a]
 ```
 
 **NOTE 1:** The rightmost "`[∂][IV]`" in the printed info indicates the differentiability 
 and the name (the symbol with an assigned index if applied) of the independent variable 
-tied to the `ParamBox`. When the `ParamBox` is marked as differentiable, "`[∂]`" is green 
-and `IV` is the name of the stored input variable; when it's marked as non-differentiable, 
-"`[∂]`" is grey and `IV` is the name of the output variable.
+tied to the `ParamBox`. When the `ParamBox` is marked as non-differentiable, "`[∂]`" is 
+grey and `IV` is the name of the output variable; when it's marked as differentiable, 
+"`[∂]`" becomes a green "`[𝛛]`", and `IV` corresponds to the name of the stored input 
+variable.
 
 **NOTE 2:** The output variable of a `ParamBox` is normally used to differentiate a 
 parameter functional (e.g., the Hartree-Fock energy). However, the derivative with respect 
@@ -96,8 +97,8 @@ struct ParamBox{T, V, F<:Function} <: DifferentiableParameter{T, ParamBox}
     function ParamBox{T, V}(f::F, data::Pair{Array{T, 0}, Symbol}, index, canDiff) where 
                            {T, V, F<:Function}
         Base.return_types(f, (T,))[1] == T || 
-        throw(AssertionError("The mapping function `$(f)` should return the same data " * 
-                             "type as it input."))
+        throw(AssertionError("The mapping function `f`: `$(f)` should return the same "*
+                             "data type as its input argument."))
         new{T, V, dressOf(F)}(fill(data), f, canDiff, index)
     end
 
@@ -206,7 +207,19 @@ function indVarOf(pb::ParamBox)
 end
 
 
-getTypeParams(::ParamBox{T, V, F}) where {T, V, F} = (T, V, F)
+getTypeParams(::Type{ParamBox{T, V, F}}) where {T, V, F} = (T, V, F)
+
+getTypeParams(::T) where {T<:ParamBox} = getTypeParams(T)
+
+
+getFLevel(::Type{<:ParamBox{<:Any, <:Any, F}}) where {F} = getFLevel(F)
+
+getFLevel(::T) where {T<:ParamBox} = getFLevel(T)
+
+
+struct PBFL{LS} <: MetaParam{PBFL} end
+PBFL(::Type{T}) where {T<:Tuple{Vararg{ParamBox}}} = PBFL{getFLevel.(fieldtypes(T))}
+PBFL(::T) where {T<:Tuple{Vararg{ParamBox}}} = PBFL(T)
 
 
 """
