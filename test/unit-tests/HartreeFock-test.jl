@@ -251,10 +251,12 @@ for i in rng
     info1 = @capture_out begin
         @show i
         res1 = runHF(bs, nuc2, nucCoords2, printInfo=true)
+        @show length(res1.temp[begin].Es) res1.Ehf
     end
     info2 = @capture_out begin
         @show i
         res2 = runHF(bs, nuc2, nucCoords2, HFconfig((HF=:UHF,)), printInfo=true)
+        @show length(res2.temp[begin].Es) res2.Ehf
     end
     push!(Et1, res1.Ehf+res1.Enn)
     push!(Et2, res2.Ehf+res1.Enn)
