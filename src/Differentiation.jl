@@ -174,7 +174,7 @@ electrons with same spin configurations(s).
 `S::AbstractMatrix{T} where T`: The overlap lap of the basis set when `bs` is provided as 
 the second argument.
 
-**NOTE 1:** If any of these two methods is applied, the user needs to make sure the row 
+**NOTE:** If any of these two methods is applied, the user needs to make sure the row 
 orders as well as the colum orders of `C` and (or) `S` are consistent with the element 
 order of `bs` (`basis.basis`).
 ``

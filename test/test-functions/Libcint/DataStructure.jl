@@ -75,8 +75,8 @@ end
 function addToDataChain!(env::Vector{Float64}, atm::Vector{Int32}, 
                          nuclei::Vector{String}, 
                          nucleiCoords::Vector{<:AbstractArray{<:Real}})
-    @assert length(nuclei) == length(nucleiCoords) "The length of nuclei and their " * 
-            "coordinates are NOT equal."
+    length(nuclei) == length(nucleiCoords) || 
+    throw(AssertionError("The length of `nuclei` and `nucleiCoords` should be the same."))
     envEndIndex = length(env)
     len = length(nuclei)
     atmsConfig = Int32[]

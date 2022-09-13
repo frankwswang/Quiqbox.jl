@@ -368,8 +368,8 @@ struct BasisFuncs{T, D, 𝑙, GN, PT, ON} <: FloatingGTBasisFuncs{T, D, 𝑙, GN
                         ls::NTuple{ON, LTuple{D, 𝑙}}, normalizeGTO::Bool=false) where 
                        {T, D, PT, 𝑙, GN, ON}
         ss = SubshellXYZsizes[𝑙+1]
-        @assert ON <= ss "The total number of `l` should be no more than $(ss) as " * 
-                         "they are in $(subshell) subshell."
+        ON > ss && throw(DomainError(ON, "The length of `ls` should be no more than $(ss) "*
+                         "as the orbitals are in $(subshell) subshell."))
         ls = sort!(collect(ls), rev=true) |> Tuple
         pars = joinTuple(cen.param, getproperty.(gs, :param)...)
         new{T, D, 𝑙, GN, PT, ON}(cen, gs, ls, normalizeGTO, pars)
@@ -399,13 +399,13 @@ isaFullShellBasisFuncs(::FloatingGTBasisFuncs{<:Any, D, 𝑙, <:Any, <:Any, ON})
 isaFullShellBasisFuncs(::FloatingGTBasisFuncs{<:Any, <:Any, 0}) = true
 
 
-const Doc_genBasisFunc_eg1 = "BasisFunc{Float64, 3, 1, 1, P3D{Float64, 0, 0, 0}}(center, "*
+const Doc_genBasisFunc_eg1 = "BasisFunc{Float64, 3, 1, 1}{PBFL{(0, 0, 0)}}(center, "*
                              "gauss, l, normalizeGTO, param)[X⁰Y¹Z⁰][0.0, 0.0, 0.0]"
 
-const Doc_genBasisFunc_eg2 = "BasisFuncs{Float64, 3, 1, 1, P3D{Float64, 0, 0, 0}, 3}"*
+const Doc_genBasisFunc_eg2 = "BasisFuncs{Float64, 3, 1, 1, P3D{Float64, iT, iT, iT}, 3}"*
                              "(center, gauss, l, normalizeGTO, param)[3/3][0.0, 0.0, 0.0]"
 
-const Doc_genBasisFunc_eg3 = "BasisFuncs{Float64, 3, 1, 1, P3D{Float64, 0, 0, 0}, 2}"*
+const Doc_genBasisFunc_eg3 = "BasisFuncs{Float64, 3, 1, 1, P3D{Float64, iT, iT, iT}, 2}"*
                              "(center, gauss, l, normalizeGTO, param)[2/3][0.0, 0.0, 0.0]"
 
 """
@@ -581,8 +581,9 @@ end
 function genBasisFunc(cen::SpatialPoint{T, D}, xpnsANDcons::NTuple{2, AbstractVector{T}}, 
                       lOrSubshell=LTuple(fill(0, D)); normalizeGTO::Bool=false) where 
                      {T, D}
-    @assert ==(length.(xpnsANDcons)...) "The length of exponent coefficients and " * 
-                                        "contraction coefficients are NOT equal."
+    ==(length.(xpnsANDcons)...) || throw(AssertionError("The length of exponent "*
+                                         "coefficients and contraction coefficients should"*
+                                         " be equal."))
     genBasisFunc(cen, GaussFunc.(xpnsANDcons[1], xpnsANDcons[2]), lOrSubshell; normalizeGTO)
 end
 
@@ -598,7 +599,8 @@ genBasisFunc(cen, gs, SubshellOrientationList[D][subshell][1:end .∈ Ref(findal
 function genBasisFunc(center::SpatialPoint{T, D}, BSkey::String, atm::String="H"; 
                       unlinkCenter::Bool=false) where {T, D}
     BSstr = BasisSetList[BSkey][AtomicNumberList[atm]]
-    @assert BSstr!==nothing "Quiqbox DOES NOT have basis set "*BSkey*" for "*atm*"."
+    BSstr===nothing && throw(DomainError((BSkey, atm), 
+                             "Quiqbox does not have this basis set pre-stored."))
     genBFuncsFromText(BSstr; adjustContent=true, excludeLastNlines=1, center, unlinkCenter, 
                       normalizeGTO=true)
 end
@@ -1002,9 +1004,11 @@ comparing parameters stored in each `CompositeGTBasisFuncs` to determine whether
 treated as "equal"; each parameter in the returned `CompositeGTBasisFuncs` is set to the 
 nearest exact multiple of `0.5atol`. When `roundAtol` is set to `NaN`, there will be no 
 approximation nor rounding. This function can be called using `+` syntax with the keyword 
-argument set to it default value. **NOTE: For the `ParamBox` (stored in the input 
+argument set to it default value. 
+
+**NOTE:** For the `ParamBox` (stored in the input 
 arguments) that are marked as non-differentiable, they will be fused together if possible 
-to generate new `ParamBox`(s) no longer linked to the input variable stored in them.**
+to generate new `ParamBox`(s) no longer linked to the input variable stored in them.
 
 ≡≡≡ Example(s) ≡≡≡
 
@@ -1191,10 +1195,11 @@ Multiplication between a `Real` number and a [`GaussFunc`](@ref) or two `GaussFu
 in each `GaussFunc` to determine whether they are treated as "equal"; each parameter in the 
 returned `GaussFunc` is set to the nearest exact multiple of `0.5atol`. When `roundAtol` is 
 set to `NaN`, there will be no approximation nor rounding. This function can be called 
-using `*` syntax with the keyword argument set to it default value. **NOTE: For the 
-`ParamBox` (stored in the input arguments) that are marked as non-differentiable, they will 
-be fused together if possible to generate new `ParamBox`(s) no longer linked to the data 
-(input variable) stored in them.**
+using `*` syntax with the keyword argument set to it default value. 
+
+**NOTE:** For the `ParamBox` (stored in the input arguments) that are marked as 
+non-differentiable, they will be fused together if possible to generate new `ParamBox`(s) 
+no longer linked to the data (input variable) stored in them.
 
 ≡≡≡ Example(s) ≡≡≡
 
@@ -1692,7 +1697,8 @@ function genBFuncsFromText(content::String;
                            unlinkCenter::Bool=false, 
                            normalizeGTO::Union{Bool, Missing}=missing) where 
                           {D, T<:AbstractFloat}
-    cenIsMissing = ( (all(center.|>isNaN) && (center=missing; true)) || center isa Missing )
+    cenIsMissing = ( (all(isNaN(b) for b in center) && (center=missing; true)) || 
+                     center isa Missing )
     typ = ifelse(cenIsMissing, Float64, T)
     adjustContent && (content = adjustFunction(content))
     lines = split.(content |> IOBuffer |> readlines)
@@ -1840,7 +1846,7 @@ value(s) of the [`ParamBox`](@ref)(s) stored in `b` will be copied, i.e.,
 
 ```jldoctest; setup = :(push!(LOAD_PATH, "../../src/"); using Quiqbox)
 julia> f(x)=x^2; e = genExponent(3.0, f)
-ParamBox{Float64, :α, typeof(f)}(3.0)[∂][x_α]
+ParamBox{Float64, :α, typeof(f)}(3.0)[𝛛][x_α]
 
 julia> c = genContraction(2.0)
 $( genContraction(2.0) )
