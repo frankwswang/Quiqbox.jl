@@ -188,13 +188,13 @@ $( SpatialPoint(ParamBox.((1.0, 2.0, 3.0), SpatialParamSyms)) )
 julia> v2 = [fill(1.0), 2.0, 3.0];
 
 julia> p2 = genSpatialPoint(v2); p2[1]
-ParamBox{Float64, :X, $(IL)}(1.0)[∂][X]
+ParamBox{Float64, :X, iT}(1.0)[∂][X]
 
 julia> v2[1][] = 1.2
 1.2
 
 julia> p2[1]
-ParamBox{Float64, :X, $(IL)}(1.2)[∂][X]
+ParamBox{Float64, :X, iT}(1.2)[∂][X]
 ```
 """
 genSpatialPoint(v::AbstractVector) = genSpatialPoint(Tuple(v))
@@ -233,17 +233,17 @@ Convert a `ParamBox` to the `compIndex` th component of a `SpatialPoint`.
 
 ```jldoctest; setup = :(push!(LOAD_PATH, "../../src/"); using Quiqbox)
 julia> genSpatialPoint(1.2, 1)
-ParamBox{Float64, :X, $(IL)}(1.2)[∂][X]
+ParamBox{Float64, :X, iT}(1.2)[∂][X]
 
 julia> pointY1 = fill(2.0);
 
 julia> Y1 = genSpatialPoint(pointY1, 2)
-ParamBox{Float64, :Y, $(IL)}(2.0)[∂][Y]
+ParamBox{Float64, :Y, iT}(2.0)[∂][Y]
 
 julia> pointY1[] = 1.5;
 
 julia> Y1
-ParamBox{Float64, :Y, $(IL)}(1.5)[∂][Y]
+ParamBox{Float64, :Y, iT}(1.5)[∂][Y]
 ```
 """
 genSpatialPoint(compData::Pair{Array{T, 0}, Symbol}, compIndex::Int, 
@@ -1839,8 +1839,8 @@ value(s) of the [`ParamBox`](@ref)(s) stored in `b` will be copied, i.e.,
 ≡≡≡ Example(s) ≡≡≡
 
 ```jldoctest; setup = :(push!(LOAD_PATH, "../../src/"); using Quiqbox)
-julia> e = genExponent(3.0, x->x^2)
-$( genExponent(3.0, x->x^2) )
+julia> f(x)=x^2; e = genExponent(3.0, f)
+ParamBox{Float64, :α, typeof(f)}(3.0)[∂][x_α]
 
 julia> c = genContraction(2.0)
 $( genContraction(2.0) )

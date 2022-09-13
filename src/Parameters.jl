@@ -67,10 +67,10 @@ respect to the input variable.
 
 ```jldoctest; setup = :(push!(LOAD_PATH, "../../src/"); using Quiqbox)
 julia> ParamBox(1.0)
-ParamBox{Float64, :undef, $(iT)}(1.0)[∂][undef]
+ParamBox{Float64, :undef, iT}(1.0)[∂][undef]
 
 julia> ParamBox(1.0, :a)
-ParamBox{Float64, :a, $(iT)}(1.0)[∂][a]
+ParamBox{Float64, :a, iT}(1.0)[∂][a]
 
 julia> ParamBox(1.0, :a, abs)
 ParamBox{Float64, :a, $(typeof(abs))}(1.0)[∂][x_a]
