@@ -13,15 +13,15 @@ using ForwardDiff: derivative as ForwardDerivative
 
 """
 
-    GaussFunc{T, FL1, FL2} <: AbstractGaussFunc{T}
+    GaussFunc{T, F1, F2} <: AbstractGaussFunc{T}
 
 A contracted primitive Gaussian-type function.
 
 ≡≡≡ Field(s) ≡≡≡
 
-`xpn::ParamBox{T, :$(xpnSym), FL1}`：The exponent coefficient.
+`xpn::ParamBox{T, :$(xpnSym), F1}`：The exponent coefficient.
 
-`con::ParamBox{T, :$(conSym), FL2}`: The contraction coefficient.
+`con::ParamBox{T, :$(conSym), F2}`: The contraction coefficient.
 
 `param::Tuple{ParamBox{T, $(xpnSym)}, ParamBox{T, $(conSym)}}`: The parameter containers 
 inside a `GaussFunc`.
@@ -33,14 +33,14 @@ inside a `GaussFunc`.
     GaussFunc{T}
 
 """
-struct GaussFunc{T, FLxpn, FLcon} <: AbstractGaussFunc{T}
-    xpn::ParamBox{T, xpnSym, FLxpn}
-    con::ParamBox{T, conSym, FLcon}
-    param::Tuple{ParamBox{T, xpnSym, FLxpn}, ParamBox{T, conSym, FLcon}}
+struct GaussFunc{T, Fxpn, Fcon} <: AbstractGaussFunc{T}
+    xpn::ParamBox{T, xpnSym, Fxpn}
+    con::ParamBox{T, conSym, Fcon}
+    param::Tuple{ParamBox{T, xpnSym, Fxpn}, ParamBox{T, conSym, Fcon}}
 
-    GaussFunc(xpn::ParamBox{T, xpnSym, FL1}, con::ParamBox{T, conSym, FL2}) where 
-             {T<:AbstractFloat, FL1, FL2} = 
-    new{T, FL1, FL2}(xpn, con, (xpn, con))
+    GaussFunc(xpn::ParamBox{T, xpnSym, F1}, con::ParamBox{T, conSym, F2}) where 
+             {T<:AbstractFloat, F1, F2} = 
+    new{T, F1, F2}(xpn, con, (xpn, con))
 end
 
 GaussFunc(e::Union{T, ParamBox{T}}, d::Union{T, ParamBox{T}}) where {T<:AbstractFloat} = 
@@ -141,12 +141,12 @@ Convert a [`ParamBox`](@ref) to an exponent coefficient parameter.
 genContraction(pb::ParamBox) = ParamBox(Val(conSym), pb, fill(pb.canDiff[]))
 
 
-const P1D{T, Lx} = Tuple{ParamBox{T, cxSym, FLevel{Lx}}}
-const P2D{T, Lx, Ly} = Tuple{ParamBox{T, cxSym, FLevel{Lx}}, 
-                             ParamBox{T, cySym, FLevel{Ly}}}
-const P3D{T, Lx, Ly, Lz} = Tuple{ParamBox{T, cxSym, FLevel{Lx}}, 
-                                 ParamBox{T, cySym, FLevel{Ly}}, 
-                                 ParamBox{T, czSym, FLevel{Lz}}}
+const P1D{T, Fx} = 
+      Tuple{ParamBox{T, cxSym, Fx}}
+const P2D{T, Fx, Fy} = 
+      Tuple{ParamBox{T, cxSym, Fx}, ParamBox{T, cySym, Fy}}
+const P3D{T, Fx, Fy, Fz} = 
+      Tuple{ParamBox{T, cxSym, Fx}, ParamBox{T, cySym, Fy}, ParamBox{T, czSym, Fz}}
 
 const SPointT{T} = Union{P1D{T}, P2D{T}, P3D{T}}
 
@@ -671,8 +671,9 @@ tolerance of comparing the center coordinates to determine whether they are trea
                     x->roundToMultiOfStep.(centerCoordOf(x), 
                                           nearestHalfOf(roundAtol))) ) do subbs
         # Reversed order within same subshell.
-        sort!(subbs, by=x->[-getTypeParams(x)[3], x.l[1].tuple, getTypeParams(x)[4]], 
-              rev=true)
+        sort!(subbs, by=x->[-getTypeParams(x)[begin+2], 
+                            x.l[begin].tuple, 
+                            getTypeParams(x)[begin+3]], rev=true)
     end
     groupCenters ? bfBlocks : vcat(bfBlocks...)
 end
@@ -703,7 +704,9 @@ sortPermBasisFuncs(bs::AbstractArray{<:FloatingGTBasisFuncs{T, D}};
                    roundAtol::Real=getAtolVal(T)) where {T, D} = 
 sortperm(reshape(bs, :), 
          by=x->[-1*roundToMultiOfStep.(centerCoordOf(x), nearestHalfOf(roundAtol)), 
-                -getTypeParams(x)[3], x.l[1].tuple, getTypeParams(x)[4]], rev=true)
+                -getTypeParams(x)[begin+2], 
+                x.l[begin].tuple, 
+                getTypeParams(x)[begin+3]], rev=true)
 
 sortPermBasisFuncs(bs::Tuple{Vararg{FloatingGTBasisFuncs{T, D}}}; 
                    roundAtol::Real=getAtolVal(T)) where {T, D} = 
@@ -1592,7 +1595,7 @@ function genBasisFuncText(bf::FloatingGTBasisFuncs{T, D}; norm::Real=1.0,
     GFs = map(x -> genGaussFuncText(x.xpn(), x.con(); roundDigits), bf.gauss)
     cen = centerCoordOf(bf)
     firstLine = printCenter ? "X "*(alignNum.(cen; roundDigits) |> join)*"\n" : ""
-    firstLine * "$(bf|>subshellOf)    $(getTypeParams(bf)[4])   $(T(norm))" * 
+    firstLine * "$(bf|>subshellOf)    $(getTypeParams(bf)[begin+3])   $(T(norm))" * 
     "   $(bf.normalizeGTO)" * 
     ( isaFullShellBasisFuncs(bf) ? "" : "  " * 
       join( [" $i" for i in get.(Ref(AngMomIndexList[D]), bf.l, "")] |> join ) ) * "\n" * 

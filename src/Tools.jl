@@ -582,7 +582,7 @@ A dummy function that returns its argument.
 """
 @inline itself(x) = x
 
-const itselfT = typeof(itself)
+const iT = typeof(itself)
 
 @inline themselves(xs::Vararg) = xs
 
@@ -597,17 +597,6 @@ Similar as `Base.replace` but for Symbols.
 function replaceSymbol(sym::Symbol, pair::Pair{String, String}; count::Int=typemax(Int))
     replace(sym |> string, pair; count) |> Symbol
 end
-
-
-# function renameFunc(fName::Symbol, f::F, ::Type{T}, N::Int=1) where {F<:Function, T}
-#     @eval ($(fName))(a::Vararg{$T, $N}) = $f(a...)::$T
-# end
-
-# function renameFunc(fName::Symbol, f::F, N::Int=1) where {F<:Function}
-#     @eval ($(fName))(a::Vararg{Any, $N}) = $f(a...)
-# end
-
-# renameFunc(fName::String, args...) = renameFunc(Symbol(fName), args...)
 
 
 function isOscillateConverged(seq::AbstractVector{T}, 

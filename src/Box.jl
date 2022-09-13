@@ -4,12 +4,12 @@ function makeGridFuncsCore(nG::Int)
     if iszero(nG)
         [itself]
     else
-        Pf.(itself, (0:nG) .- 0.5nG)
+        PF.(itself, *, (0:nG) .- 0.5nG)
     end
 end
 
-makeGridFuncs(f::F, c) where {F<:Function} = Sf(f, c)
-makeGridFuncs(::itselfT, _) = itself
+makeGridFuncs(f::F, c) where {F<:Function} = PF(f, +, c)
+makeGridFuncs(::iT, _) = itself
 
 makeGridPBoxData(cenCompData::Array{T, 0}, spacingData::Array{T, 0}, nG::Int) where {T} = 
 ifelse(nG>0, spacingData, cenCompData)

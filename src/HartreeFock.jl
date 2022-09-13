@@ -487,10 +487,10 @@ struct InitialC{T<:Number, HFT, F<:Function}
     InitialC(::Val{HFT}, f::F, ::Type{T}) where {HFT, F, T} = new{T, HFT, F}((), f)
 
     InitialC(::Val{:RHF}, C0::NTuple{1, AbstractMatrix{T}}) where {T} = 
-    new{T, :RHF, itselfT}(C0, itself)
+    new{T, :RHF, iT}(C0, itself)
 
     InitialC(::Val{:UHF}, C0::NTuple{2, AbstractMatrix{T}}) where {T} = 
-    new{T, :UHF, itselfT}(C0, itself)
+    new{T, :UHF, iT}(C0, itself)
 end
 
 const defaultHFconfigPars = [:RHF, :SAD, defaultSCFconfig, 100, true]
@@ -546,12 +546,12 @@ mutable struct HFconfig{T1, HFT, F, T2, L} <: ConfigBox{T1, HFconfig, HFT}
     HFconfig(::Val{:UHF}, 
              a2::NTuple{2, AbstractMatrix{T1}}, a3::SCFconfig{T2, L}, a4, a5) where 
             {T1, T2, L} = 
-    new{T1, :UHF, itselfT, T2, L}(Val(:UHF), InitialC(Val(:UHF), a2), a3, a4, a5)
+    new{T1, :UHF, iT, T2, L}(Val(:UHF), InitialC(Val(:UHF), a2), a3, a4, a5)
 
     HFconfig(::Val{:RHF}, 
              a2::Tuple{AbstractMatrix{T1}}, a3::SCFconfig{T2, L}, a4, a5) where 
             {T1, T2, L} = 
-    new{T1, :RHF, itselfT, T2, L}(Val(:RHF), InitialC(Val(:RHF), a2), a3, a4, a5)
+    new{T1, :RHF, iT, T2, L}(Val(:RHF), InitialC(Val(:RHF), a2), a3, a4, a5)
 
     function HFconfig(::Val{HFT}, a2::Val{CF}, a3::SCFconfig{T, L}, a4, a5) where 
                      {T, HFT, CF, L}

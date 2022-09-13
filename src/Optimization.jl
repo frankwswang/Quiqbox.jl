@@ -50,7 +50,7 @@ gradient of some function `f` in each iteration).
 ≡≡≡ Initialization Method(s) ≡≡≡
 
     GDconfig(lineSearchMethod::M=BackTracking(), 
-             initialStep::ST=ifelse(M==itselfT, 0.1, 1.0); 
+             initialStep::ST=ifelse(M==$(iT), 0.1, 1.0); 
              stepBound::NTuple{2, T}=convert.(eltype(initialStep), (0, Inf)), 
              scaleStepBound::Bool=ifelse(M==typeof($(itself)), true, false)) where 
             {M, T<:AbstractFloat, ST<:Union{Array{T, 0}, T}} -> 
@@ -63,14 +63,14 @@ mutable struct GDconfig{T, M, ST<:Union{Array{T, 0}, T}} <: ConfigBox{T, GDconfi
     scaleStepBound::Bool
 
     function GDconfig(lineSearchMethod::M=BackTracking(), 
-                      initialStep::ST=ifelse(M==itselfT, 0.1, 1.0); 
+                      initialStep::ST=ifelse(M==iT, 0.1, 1.0); 
                       stepBound::NTuple{2, T}=convert.(eltype(initialStep), (0, Inf)), 
-                      scaleStepBound::Bool=ifelse(M==itselfT, true, false)) where 
+                      scaleStepBound::Bool=ifelse(M==iT, true, false)) where 
                      {M, T<:AbstractFloat, ST<:Union{Array{T, 0}, T}}
         @assert 0 < initialStep[] "The initial step size must be positive."
         @assert stepBound[begin] <= stepBound[end] "The bound set for initialStep must be"*
                 " a valid closed interval."
-        @assert (M == itselfT) || 
+        @assert (M == iT) || 
                 hasproperty(LineSearches, (nameof∘typeof)(lineSearchMethod)) "The input"*
                 " line search method is NOT supported."
         new{T, M, ST}(lineSearchMethod, initialStep, stepBound, scaleStepBound)
@@ -179,7 +179,7 @@ function genLineSearchOpt(GDc::GDconfig{T, M, ST},
     end
 end
 
-function genLineSearchOpt(GDc::GDconfig{T, itselfT, ST}, _::Function, _::Function) where 
+function genLineSearchOpt(GDc::GDconfig{T, iT, ST}, _::Function, _::Function) where 
                          {T, ST}
     η₀ = GDc.initialStep
     lo, up = GDc.stepBound
@@ -242,7 +242,7 @@ function formatTunableParams!(pbs::AbstractVector{<:ParamBox{T}},
     filterParsForSafety && getUnique!(pbs, compareFunction=compareParamBox)
     d = Dict{UInt, Array{T, 0}}()
     pbsNew = map(pbs) do p
-        res = isDiffParam(p) ? p : changeMapping(outValCopy(p), DressedItself(p.map))
+        res = isDiffParam(p) ? p : changeMapping(outValCopy(p), DI(p.map))
         res.index[] = p.index[]
         res
     end
@@ -280,7 +280,7 @@ function makeAbsLayerForXpnParams(pbs, bs, onlyForNegXpn::Bool=false;
                                                                true : pb.canDiff[])) )
     absXpn2 = if tryJustFlipNegSign
         function (pb::ParamBox)
-            if getTypeParams(pb)[end] == IL || pb.map isa DressedItself
+            if FLevel(getTypeParams(pb)[end]) == IL || pb.map isa DI
                 pb[] *= sign(pb[])
                 pb
             else

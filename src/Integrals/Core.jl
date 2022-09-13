@@ -986,16 +986,16 @@ const IndexABXYbools = Dict([Val{:acbc}, Val{:abbc}, Val{:abcd}] .=>
                              (j,k,_) -> (Val(false), Val(false), k==j, Val(false)), 
                              (_,_,_) ->  Val(false)])
 
-function getCompositeIntCore(::Val{T}, ::Val{D}, ::Val{BL}, ::IT, ∫::F, 
+function getCompositeIntCore(::Val{T}, ::Val{D}, ::Val{BL}, ::IDV, ∫::F, 
                              bs::NTuple{4, SpatialBasis{T, D}}, optArgs...) where 
-                            {T, D, BL, IT<:Union{Val{:acbc}, Val{:abbc}, Val{:abcd}}, 
+                            {T, D, BL, IDV<:Union{Val{:acbc}, Val{:abbc}, Val{:abcd}}, 
                              F<:Function}
     bfsI, bfsJ, bfsK, bfsL = bs = getBFs.(Val(BL), bs)
     ON1, ON2, ON3, ON4 = length.(bs)
     res = zeros(T, ON1, ON2, ON3, ON4)
     for (l, bfl) in enumerate(bfsL), (k, bfk) in enumerate(bfsK), 
         (j, bfj) in enumerate(bfsJ), (i, bfi) in enumerate(bfsI)
-        bl = IndexABXYbools[IT](j,k,l)
+        bl = IndexABXYbools[IDV](j,k,l)
         res[i,j,k,l] = getCompositeInt(∫, bl, (bfi, bfj, bfk, bfl), optArgs...)
     end
     res

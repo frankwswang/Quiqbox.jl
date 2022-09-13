@@ -1,105 +1,134 @@
 export FLevel
 
-struct DressedItself{L, F<:Function} <: StructFunction{F}
+"""
+
+    DI{F<:Function} <: StructFunction{F}
+
+A "dressed-up" [`itself`](@ref) that carries the information of a function (of type `F`). 
+For an instance `di=$(DI)(someFunction)` where `someFunction isa Function`, 
+`di(anyArgument) === anyArgument` and `di() === someFunction`.
+"""
+struct DI{F<:Function} <: StructFunction{F}
     f::F
-    DressedItself(f::F) where {F} = new{getFLevel(F), F}(f)
-    DressedItself(di::DressedItself{L, F}) where {L, F} = new{L, F}(di.f)
+    DI(f::F) where {F} = new{F}(f)
+    DI(di::DI{F}) where {F} = new{F}(di.f)
 end
 
-(::DressedItself)(x) = itself(x)
-(di::DressedItself)() = di.f
+(::DI)(x) = itself(x)
+(di::DI)() = di.f
 
-FLevel(::Type{<:IF}) = FLevel{0}
-FLevel(::Type{<:Function}) = FLevel{1}
-FLevel(::Type{<:DressedItself{L}}) where {L} = FLevel{L}
-FLevel(::Type{<:CompositeFunction{F2, F1}}) where {F1, F2} = 
-FLevel{getFLevel(F2)+getFLevel(F1)}
+dressOf(::Type{DI{F}}) where {F} = F
+dressOf(::Type{F}) where {F<:Function} = F
+
+
+const IF = Union{iT, typeof(Base.identity)}
+
+getFLevel(::Type{<:IF}) = 0
+getFLevel(::Type{<:Function}) = 1
+getFLevel(::Type{<:DI{F}}) where {F} = getFLevel(F)
+getFLevel(::Type{<:CompositeFunction{F1, F2}}) where {F1, F2} = getFLevel(F1)+getFLevel(F2)
+getFLevel(::F) where {F<:Function} = getFLevel(F)
+
+struct FLevel{L} <: MetaParam{FLevel} end
+
+FLevel(::Type{F}) where {F<:Function} = FLevel{getFLevel(F)}
 FLevel(::F) where {F<:Function} = FLevel(F)
+FLevel(L::Int) = FLevel{L}
 
 const IL = FLevel(itself)
 
-getFLevel(::Type{FLevel{L}}) where {L} = L
-getFLevel(::Type{F}) where {F<:Function} = (getFLevel∘FLevel)(F)
-getFLevel(::F) where {F<:Function} = getFLevel(F)
-getFLevel(sym::Symbol) = (getFLevel∘getFunc)(sym)
 
-
-# struct Inverse{F<:Function} <: StructFunction{F} end
-
-struct Layered{F2, F1<:Function} <: CompositeFunction{F2, F1}
-    outer::F2
+struct Layered{F1<:Function, F2} <: CompositeFunction{F1, F2}
     inner::F1
-    Layered(outer::F2, inner::F1) where {F1, F2} = new{F2, F1}(outer, inner)
-    # Layered(::Inverse{F}, ::F) where {F} = itself
-    # Layered(::F, ::Inverse{F}) where {F} = itself
+    outer::F2
+    Layered(inner::F1, outer::F2) where {F1, F2} = new{F1, F2}(inner, outer)
 end
 
 (lf::Layered)(x) = (lf.outer∘lf.inner)(x)
 
-Absolute(f) = Layered(abs, f)
+Absolute(f) = Layered(f, abs)
+
+const Labs{F} = Layered{F, typeof(abs)}
 
 
-# Product Function
-struct Pf{F<:Function, T} <: ParameterizedFunction{Pf, F, T} # Pf{T} ?
+const PFfusingOperators = Dict([*, +, ^] .=> [*, +, *])
+
+struct PF{F, O, T} <: ChainedFunction{F, O, PF}
     f::F
+    o::O
     c::T
 end
-Pf(f::Pf{F, T}, c) where {F<:Function, T} = Pf{F, T}(f.f, f.c*T(c))
-(f::Pf)(x::T) where {T} = f.f(x)*f.c
+PF(pf::PF{F, O, T1}, o::O, c::T2) where {F, O, T1, T2} = 
+PF{F, O, promote_type(T1, T2)}(pf.f, o, PFfusingOperators[o](pf.c, c))
+(pf::PF)(x) = pf.o(pf.f(x), pf.c)
 
+struct ChainedPF{FI, N, OS<:NTuple{N, Function}, 
+                        TS<:NTuple{N, Any}} <: ChainedFunction{FI, OS, ChainedPF}
+    fi::FI
+    os::OS
+    cs::TS
 
-# Sum Function
-struct Sf{F<:Function, T} <: ParameterizedFunction{Sf, F, T}
-    f::F
+    ChainedPF(fi::FI, os::OS, cs::TS) where 
+             {FI<:Function, N, OS<:NTuple{N, Function}, TS<:NTuple{N, Any}} = 
+    new{FI, N, OS, TS}(fi, os, cs)
+end
+
+PF(pf::PF, o::O, c) where {O} = ChainedPF(pf.f, (pf.o, o), (pf.c, c))
+
+PF(cf::ChainedPF, o::O, c) where {O} = ChainedPF(cf.fi, (cf.os..., o), (cf.cs..., c))
+
+(cf::ChainedPF{FI, N})(x) where {FI, N} = chainPF(cf.fi(x), cf.os, cf.cs, Val(N))
+
+chainPF(x, os, cs, ::Val{N}) where {N} = os[N](chainPF(x, os, cs, Val(N-1)), cs[N])
+chainPF(x, os, cs, ::Val{1}) = os[begin](x, cs[begin])
+
+# Return Constant
+struct RC{T} <: StructuredFunction
     c::T
 end
-Sf(f::Sf{F, T}, c) where {F<:Function, T} = Sf{F, T}(f.f, f.c+T(c))
-(f::Sf)(x::T) where {T} = f.f(x)+f.c
-
-# Exponent Function
-struct Xf{F<:Function, T} <: ParameterizedFunction{Xf, F, T}
-    f::F
-    c::T
-end
-Xf(f::Xf{F, T}, c) where {F<:Function, T} = Xf{F, T}(f.f, f.c*T(c))
-(f::Xf)(x::T) where {T} = f.f(x)^f.c
+(rc::RC{T})(_) where {T} = rc.c
 
 
-function combineParFunc(::typeof(+), pf1::Pf{F}, pf2::Pf{F}) where {F}
+function combinePF(::typeof(+), pf1::PF{F, typeof(*)}, pf2::PF{F, typeof(*)}) where {F}
     c = (pf1.c + pf2.c)
-    isone(c) ? pf1.f : Pf(pf1.f, c)
+    iszero(c) ? RC(typeof(c)(0)) : (isone(c) ? pf1.f : PF(pf1.f, *, c))
 end
 
-function combineParFunc(::typeof(+), pf1::Sf{F}, pf2::Sf{F}) where {F}
+function combinePF(::typeof(+), pf1::PF{F, typeof(+)}, pf2::PF{F, typeof(+)}) where {F}
     c = pf1.c + pf2.c
-    iszero(c) ? Pf(pf1.f, 2) : Sf(f(pf1.f, 2), c)
+    res = PF(pf1.f, *, 2)
+    iszero(c) ? res : PF(res, +, c)
 end
 
-function combineParFunc(::typeof(+), pf1::Pf{F}, pf2::Sf{F}) where {F}
+function combinePF(::typeof(+), pf1::PF{F, typeof(*)}, pf2::PF{F, typeof(+)}) where {F}
     c = pf1.c + 1
-    isone(c) ? Sf(pf1.f, pf2.c) : Sf(Pf(pf1.f, c), pf2.c)
+    iszero(c) ? RC(pf2.c) : (isone(c) ? PF(pf1.f, +, pf2.c) : PF(PF(pf1.f, *, c), +, pf2.c))
 end
 
-combineParFunc(::typeof(+), pf1::Sf{F}, pf2::Pf{F}) where {F} = 
-combineParFunc(+, pf2, pf1)
+combinePF(::typeof(+), pf1::PF{F, typeof(+)}, pf2::PF{F, typeof(*)}) where {F} = 
+combinePF(+, pf2, pf1)
 
-combineParFunc(op::Function, pf1::Function, pf2::Function) = x->op(pf1(x), pf2(x))
+combinePF(op::Function, pf1::Function, pf2::Function) = x->op(pf1(x), pf2(x))
 
-function combineParFunc(::typeof(*), pf1::Pf{F}, pf2::Pf{F}) where {F}
+function combinePF(::typeof(*), pf1::PF{F, typeof(*)}, pf2::PF{F, typeof(*)}) where {F}
     c = pf1.c * pf2.c
-    isone(c) ? Xf(pf1.f, 2) : Pf(Xf(pf1.f, 2), c)
+    iszero(c) ? RC(typeof(c)(0)) : (isone(c) ? PF(pf1.f, ^, 2) : PF(PF(pf1.f, ^, 2), *, c))
 end
 
-function combineParFunc(::typeof(*), pf1::Xf{F}, pf2::Xf{F}) where {F}
+function combinePF(::typeof(*), pf1::PF{F, typeof(^)}, pf2::PF{F, typeof(^)}) where {F}
     c = pf1.c + pf2.c
-    iszero(c) ? (_->1) : (isone(c) ? pf1.f : Xf(pf1.f, c))
+    iszero(c) ? RC(typeof(c)(1)) : (isone(c) ? pf1.f : PF(pf1.f, ^, c))
 end
 
-function combineParFunc(::typeof(*), pf1::Xf{F}, pf2::Pf{F}) where {F}
+function combinePF(::typeof(*), pf1::PF{F, typeof(^)}, pf2::PF{F, typeof(*)}) where {F}
     c = pf1.c + 1
-    f = iszero(c) ? (_->1) : (isone(c) ? pf1.f : Xf(pf1.f, c))
-    Pf(f, pf2.c)
+    if iszero(c)
+        RC(pf2.c)
+    else
+        f = isone(c) ? pf1.f : PF(pf1.f, ^, c)
+        PF(f, *, pf2.c)
+    end
 end
 
-combineParFunc(::typeof(*), pf1::Sf{F}, pf2::Pf{F}) where {F} = 
-combineParFunc(+, pf2, pf1)
+combinePF(::typeof(*), pf1::PF{F, typeof(*)}, pf2::PF{F, typeof(^)}) where {F} = 
+combinePF(*, pf2, pf1)

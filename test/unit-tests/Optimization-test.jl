@@ -39,7 +39,7 @@ testDetachedPars = function(ps0, ps1)
             bl2 = p0() == p1[] == p1()
             bl2 || (@show (i, bl2) p0() p1[] p1())
             bl3 = ( typeof(p1.map) == 
-                    Quiqbox.DressedItself{Quiqbox.getFLevel(p0.map), typeof(p0.map)} )
+                    Quiqbox.DI{typeof(p0.map)} )
             bl3 || (@show (i, bl3) typeof(p1.map) typeof(p0.map))
             bl4 = outSymOf(p0) == outSymOf(p1)
             bl4 || (@show (i, bl4))
@@ -69,7 +69,7 @@ testαabsPars1 = function(ps0, ps1; sameDiff=true)
             bl1 || (@show bl1)
             bl2 = p0.map === p1.map.inner
             bl2 || (@show bl2)
-            bl3 = p1.map isa Quiqbox.Layered{typeof(abs)}
+            bl3 = p1.map isa Quiqbox.Labs
             bl3 || (@show bl3)
             bl4 = if sameDiff
                 p0.canDiff == p1.canDiff && p0.canDiff !== p1.canDiff
@@ -111,7 +111,7 @@ testαabsPars2 = function(ps0, ps1; onlyNegα=false)
             else
                 bl1 = p0.data[] === p1.data[]
                 bl2 = p0.map === p1.map.inner
-                bl3 = p1.map isa Quiqbox.Layered{typeof(abs)}
+                bl3 = p1.map isa Quiqbox.Labs
             end
             bl1 || (@show bl1)
             bl2 || (@show bl2)
