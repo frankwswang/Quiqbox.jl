@@ -63,19 +63,20 @@ mutable struct GDconfig{T, M, ST<:Union{Array{T, 0}, T}} <: ConfigBox{T, GDconfi
     scaleStepBound::Bool
 
     function GDconfig(lineSearchMethod::M=BackTracking(), 
-                      initialStep::ST=ifelse(M==iT, 0.1, 1.0); 
+                      initialStep::Union{Array{T, 0}, T}=ifelse(M==iT, 0.1, 1.0); 
                       stepBound::NTuple{2, T}=convert.(eltype(initialStep), (0, Inf)), 
                       scaleStepBound::Bool=ifelse(M==iT, true, false)) where 
-                     {M, T<:AbstractFloat, ST<:Union{Array{T, 0}, T}}
+                     {M, T<:AbstractFloat}
         0 < initialStep[] || throw(DomainError(initialStep[], "The initial step size "*
-                                   "should be positive.")) 
+                                   "should be positive."))
         stepBound[begin] > stepBound[end] && 
         throw(DomainError(stepBound, "The bound set for initialStep should be a valid "*
               "closed interval."))
         (M == iT || hasproperty(LineSearches, (nameof∘typeof)(lineSearchMethod))) || 
         throw(DomainError(lineSearchMethod, 
               "The input `lineSearchMethod` is not supported."))
-        new{T, M, ST}(lineSearchMethod, initialStep, stepBound, scaleStepBound)
+        new{T, M, typeof(initialStep)}(lineSearchMethod, initialStep, stepBound, 
+                                       scaleStepBound)
     end
 end
 
