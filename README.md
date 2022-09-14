@@ -18,8 +18,7 @@
 * Floating and fixed-position contracted Gaussian-type orbital (CGTO).
 * Linear combination of multi-center GTOs (MCGTO) as a basis function.
 * Restricted (closed-shell) and unrestricted (open-shell) Hartree–Fock methods (RHF & UHF).
-* Variational optimization of basis sets based on automatic differentiation (AD) 
-and symbolic differentiation (SD).
+* Variational optimization of basis sets based on automatic differentiation (AD) and symbolic differentiation (SD).
 
 # Setup
 
@@ -28,7 +27,7 @@ and symbolic differentiation (SD).
 * Mac OS
 * Windows
 
-## Julia version compatibility
+## Julia compatibility
 Quiqbox will always try to support the [latest released version](https://julialang.org/downloads/#current_stable_release) of Julia as soon as possible. On the other hand, the backward compatibility for previous Julia versions is not guaranteed but can be checked [here](https://github.com/frankwswang/Quiqbox.jl/actions/workflows/CI-JS-older.yml).
 
 ## Installation in Julia [REPL](https://docs.julialang.org/en/v1/manual/getting-started/)

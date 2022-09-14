@@ -454,9 +454,9 @@ function getOneBodyInt(∫1e::F, bls::Union{Tuple{Bool}, Val{false}},
     (R₁, ijk₁, ps₁), (R₂, ijk₂, ps₂) = reformatIntData1(bls, (bf1, bf2))
     !(𝑙1==𝑙2==0) && isIntZero(F, R₁, R₂, ijk₁, ijk₂, optArgs) && (return T(0.0))
     uniquePairs, uPairCoeffs = get1BodyUniquePairs(R₁==R₂ && ijk₁==ijk₂, ps₁, ps₂)
-    map(uniquePairs, uPairCoeffs) do x, y
+    mapreduce(+, uniquePairs, uPairCoeffs) do x, y
         ∫1e(optArgs..., R₁, R₂, ijk₁, x[1], ijk₂, x[2])::T * y
-    end |> sum
+    end
 end
 
 function get1BodyUniquePairs(flag::Bool, 

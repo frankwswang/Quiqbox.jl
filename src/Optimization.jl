@@ -436,7 +436,7 @@ function optimizeParams!(pbs::AbstractVector{<:ParamBox{T}},
         println("Optimization duration: ", round((tEnd-tBegin)/60, digits=6), 
                 " minutes.")
         if detectConverge
-            println("The result has" * ifelse(blConv, "", " not") *" converged: ")
+            println("The iteration has" * ifelse(blConv, "", " not") *" converged: ")
             println("∥Δ$(fVstr)∥₂ → ", 
                     round(norm(fVals[end] - fVals[end-1]), digits=nDigitShown), ", ", 
                     "∥vec(∇$(fVstr))∥₂ → ", 
