@@ -1650,14 +1650,19 @@ end
 
 """
 
-    genBFuncsFromText(content::String; adjustContent::Bool=false, 
-                      adjustFunction::F=sciNotReplace, 
+    genBFuncsFromText(content::String; 
+                      adjustContent::Bool=false, 
+                      adjustFunction::Function=sciNotReplace, 
                       excludeFirstNlines::Int=0, excludeLastNlines::Int=0, 
-                      center::Union{AbstractArray, 
-                                    NTuple{D, ParamBox}, 
-                                    Missing}=missing, 
+                      center::Union{AbstractArray{T}, 
+                                    NTuple{D, T}, 
+                                    NTuple{D, ParamBox{T}}, 
+                                    SpatialPoint{T, D}, 
+                                    Missing}=(NaN, NaN, NaN), 
                       unlinkCenter::Bool=false, 
-                      normalizeGTO::Union{Bool, Missing}=missing) where {D, F<:Function} -> 
+                      normalizeGTO::Union{Bool, Missing}=
+                                    ifelse(adjustContent, true, missing)) where 
+                     {D, T<:AbstractFloat} -> 
     Array{<:FloatingGTBasisFuncs, 1}
 
 Generate a basis set from `content` which is either a basis set `String` in Gaussian format 
@@ -1695,7 +1700,8 @@ function genBFuncsFromText(content::String;
                                          SpatialPoint{T, D}, 
                                          Missing}=(NaN, NaN, NaN), 
                            unlinkCenter::Bool=false, 
-                           normalizeGTO::Union{Bool, Missing}=missing) where 
+                           normalizeGTO::Union{Bool, Missing}=
+                                         ifelse(adjustContent, true, missing)) where 
                           {D, T<:AbstractFloat}
     cenIsMissing = ( (all(isNaN(b) for b in center) && (center=missing; true)) || 
                      center isa Missing )
@@ -1721,7 +1727,16 @@ function genBFuncsFromText(content::String;
             d = length(cenStr)
         end
         normFactor = oInfo[3]
-        (normalizeGTO isa Missing) && (normalizeGTO = parse(Bool, oInfo[4]))
+        if normalizeGTO isa Missing
+            normalizeGTO = if length(oInfo) < 4
+                defaultNGTOb = false
+                println("Could not find the information of `.normalizeGTO` for the basis "*
+                        "function based on the input text, set it to `$(defaultNGTOb)`.")
+                defaultNGTOb
+            else
+                parse(Bool, oInfo[begin+3])
+            end
+        end
         if oInfo[1] == "SP"
             gs2 = GaussFunc{typ}[]
             for j = i+1 : i+ng
