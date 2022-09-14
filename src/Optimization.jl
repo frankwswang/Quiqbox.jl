@@ -50,11 +50,11 @@ gradient of some function `f` in each iteration).
 ≡≡≡ Initialization Method(s) ≡≡≡
 
     GDconfig(lineSearchMethod::M=BackTracking(), 
-             initialStep::ST=ifelse(M==$(iT), 0.1, 1.0); 
+             initialStep::Union{Array{T, 0}, T}=ifelse(M==$(iT), 0.1, 1.0); 
              stepBound::NTuple{2, T}=convert.(eltype(initialStep), (0, Inf)), 
              scaleStepBound::Bool=ifelse(M==typeof($(itself)), true, false)) where 
-            {M, T<:AbstractFloat, ST<:Union{Array{T, 0}, T}} -> 
-    GDconfig{T, M, ST}
+            {M, T<:AbstractFloat} -> 
+    GDconfig{T, M, typeof(initialStep)}
 """
 mutable struct GDconfig{T, M, ST<:Union{Array{T, 0}, T}} <: ConfigBox{T, GDconfig, M}
     lineSearchMethod::M
