@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Tool Functions · Quiqbox.jl</title><script data-outdated-warner src="../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.045/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.13.24/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL=".."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../assets/documenter.js"></script><script src="../siteinfo.js"></script><script src="../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><a class="docs-logo" href="../"><img src="../assets/logo.png" alt="Quiqbox.jl logo"/></a><div class="docs-package-name"><span class="docs-autofit"><a href="../">Quiqbox.jl</a></span></div><form class="docs-search" action="../search/"><input class="docs-search-query" id="documenter-search-query" name="q" type="text" placeholder="Search docs"/></form><ul class="docs-menu"><li><a class="tocitem" href="../">Home</a></li><li><span class="tocitem">Manual</span><ul><li><a class="tocitem" href="../basis/">Basis Sets</a></li><li><a class="tocitem" href="../SCF/">Self-Consistent Field Methods</a></li><li><a class="tocitem" href="../optimization/">Parameter Optimization</a></li></ul></li><li><span class="tocitem">Base</span><ul><li><a class="tocitem" href="../coreFunction/">Core Functions</a></li><li><a class="tocitem" href="../coreType/">Core Types</a></li><li class="is-active"><a class="tocitem" href>Tool Functions</a></li></ul></li><li><span class="tocitem">Submodule</span><ul><li><a class="tocitem" href="../molden/">Molden</a></li></ul></li><li><a class="tocitem" href="../list/">Index</a></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Base</a></li><li class="is-active"><a href>Tool Functions</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Tool Functions</a></li></ul></nav><div class="docs-right"><a class="docs-edit-link" href="https://github.com/frankwswang/Quiqbox.jl/blob/main/docs/src/toolFunction.md" title="Edit on GitHub"><span class="docs-icon fab"></span><span class="docs-label is-hidden-touch">Edit on GitHub</span></a><a class="docs-settings-button fas fa-cog" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-sidebar-button fa fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a></div></header><article class="content" id="documenter-page"><h1 id="Tool-Functions"><a class="docs-heading-anchor" href="#Tool-Functions">Tool Functions</a><a id="Tool-Functions-1"></a><a class="docs-heading-anchor-permalink" href="#Tool-Functions" title="Permalink"></a></h1><article class="docstring"><header><a class="docstring-binding" id="Quiqbox.flatten-Union{Tuple{AbstractVector{T}}, Tuple{T}} where T" href="#Quiqbox.flatten-Union{Tuple{AbstractVector{T}}, Tuple{T}} where T"><code>Quiqbox.flatten</code></a> — <span class="docstring-category">Method</span></header><section><div><pre><code class="language-julia hljs">flatten(a::Tuple) -&gt; Tuple
+
+flatten(a::AbstractVector) -&gt; AbstractVector</code></pre><p>Flatten <code>a::Union{AbstractVector, Tuple}</code> that contains <code>AbstractArray</code>s and/or <code>Tuple</code>s.  Only operate on the outermost container.</p><p>≡≡≡ Example(s) ≡≡≡</p><pre><code class="language-julia-repl hljs">julia&gt; flatten((:one, 2, [3, 4.0], ([5], &quot;six&quot;), &quot;7&quot;))
+(:one, 2, 3.0, 4.0, [5], &quot;six&quot;, &quot;7&quot;)
+
+julia&gt; flatten([:one, 2, [3, 4.0], ([5], &quot;six&quot;), &quot;7&quot;])
+7-element Vector{Any}:
+  :one
+ 2
+ 3.0
+ 4.0
+  [5]
+  &quot;six&quot;
+  &quot;7&quot;</code></pre></div><a class="docs-sourcelink" target="_blank" href="https://github.com/frankwswang/Quiqbox.jl/blob/49a2946021096cc288e790f7a59e7d4ff3ee0b48/src/Tools.jl#L424-L448">source</a></section></article><article class="docstring"><header><a class="docstring-binding" id="Quiqbox.getAtolDigits-Union{Tuple{Type{T}}, Tuple{T}} where T&lt;:Real" href="#Quiqbox.getAtolDigits-Union{Tuple{Type{T}}, Tuple{T}} where T&lt;:Real"><code>Quiqbox.getAtolDigits</code></a> — <span class="docstring-category">Method</span></header><section><div><pre><code class="language-julia hljs">getAtolDigits(::Type{T}) where {T&lt;:Real} -&gt; Int</code></pre><p>Return the maximal number of digits kept after rounding of the input real number type <code>T</code>.</p></div><a class="docs-sourcelink" target="_blank" href="https://github.com/frankwswang/Quiqbox.jl/blob/49a2946021096cc288e790f7a59e7d4ff3ee0b48/src/Tools.jl#L6-L11">source</a></section></article><article class="docstring"><header><a class="docstring-binding" id="Quiqbox.getAtolVal-Union{Tuple{Type{T}}, Tuple{T}} where T&lt;:Real" href="#Quiqbox.getAtolVal-Union{Tuple{Type{T}}, Tuple{T}} where T&lt;:Real"><code>Quiqbox.getAtolVal</code></a> — <span class="docstring-category">Method</span></header><section><div><pre><code class="language-julia hljs">getAtolVal(::Type{T}) where {T&lt;:Real} -&gt; Real</code></pre><p>Return the absolute precision tolerance of the input real number type <code>T</code>.</p></div><a class="docs-sourcelink" target="_blank" href="https://github.com/frankwswang/Quiqbox.jl/blob/49a2946021096cc288e790f7a59e7d4ff3ee0b48/src/Tools.jl#L18-L23">source</a></section></article><article class="docstring"><header><a class="docstring-binding" id="Quiqbox.getUnique!-Union{Tuple{F}, Tuple{T}, Tuple{AbstractVector{T}, Vararg{Any}}} where {T, F&lt;:Function}" href="#Quiqbox.getUnique!-Union{Tuple{F}, Tuple{T}, Tuple{AbstractVector{T}, Vararg{Any}}} where {T, F&lt;:Function}"><code>Quiqbox.getUnique!</code></a> — <span class="docstring-category">Method</span></header><section><div><pre><code class="language-julia hljs">getUnique!(arr::AbstractVector, args...; compareFunction::Function = hasEqual, 
+           kws...) -&gt; 
+AbstractVector</code></pre><p>Similar to <a href="#Quiqbox.markUnique-Union{Tuple{F}, Tuple{T}, Tuple{AbstractArray{T}, Vararg{Any}}} where {T, F&lt;:Function}"><code>markUnique</code></a> but instead, directly return the modified <code>arr</code> so that the  repeated entries are deleted.</p><p>≡≡≡ Example(s) ≡≡≡</p><pre><code class="language-julia-repl hljs">julia&gt; arr = [1, [1, 2],&quot;s&quot;, [1, 2]]
+4-element Vector{Any}:
+ 1
+  [1, 2]
+  &quot;s&quot;
+  [1, 2]
+
+julia&gt; getUnique!(arr);
+
+julia&gt; arr
+3-element Vector{Any}:
+ 1
+  [1, 2]
+  &quot;s&quot;</code></pre></div><a class="docs-sourcelink" target="_blank" href="https://github.com/frankwswang/Quiqbox.jl/blob/49a2946021096cc288e790f7a59e7d4ff3ee0b48/src/Tools.jl#L528-L555">source</a></section></article><article class="docstring"><header><a class="docstring-binding" id="Quiqbox.hasApprox-Tuple{Any, Any, Vararg{Any}}" href="#Quiqbox.hasApprox-Tuple{Any, Any, Vararg{Any}}"><code>Quiqbox.hasApprox</code></a> — <span class="docstring-category">Method</span></header><section><div><pre><code class="language-julia hljs">hasApprox(obj1, obj2, obj3...; ignoreFunction::Bool=false, ignoreContainer::Bool=false,
+          decomposeNumberCollection::Bool=false, atol::Real=1e-15) -&gt; 
+Bool</code></pre><p>Similar to <a href="#Quiqbox.hasEqual-Tuple{Any, Any, Vararg{Any}}"><code>hasEqual</code></a>, except it does not require the <code>Number</code>-typed fields  (e.g. <code>Float64</code>) of the compared containers to have the exact same values, but rather the  approximate values within an error threshold determined by <code>atol</code>, like in <code>isapprox</code>.</p></div><a class="docs-sourcelink" target="_blank" href="https://github.com/frankwswang/Quiqbox.jl/blob/49a2946021096cc288e790f7a59e7d4ff3ee0b48/src/Tools.jl#L336-L345">source</a></section></article><article class="docstring"><header><a class="docstring-binding" id="Quiqbox.hasBoolRelation-Union{Tuple{F}, Tuple{F, Any, Any, Any, Vararg{Any}}} where F&lt;:Function" href="#Quiqbox.hasBoolRelation-Union{Tuple{F}, Tuple{F, Any, Any, Any, Vararg{Any}}} where F&lt;:Function"><code>Quiqbox.hasBoolRelation</code></a> — <span class="docstring-category">Method</span></header><section><div><pre><code class="language-julia hljs">hasBoolRelation(boolOp::Function, obj1, obj2, obj3...; 
+                ignoreFunction::Bool=false, 
+                ignoreContainer::Bool=false,
+                decomposeNumberCollection::Bool=false) -&gt; 
+Bool</code></pre><p>Method for more than 2 objects. If returns true if and only if <code>hasBoolRelation</code> returns  true for every unique combination of two objects from the all the input objects under the  transitive relation. E.g.: <code>hasBoolRelation(&gt;, a, b, c)</code> is equivalent to  <code>hasBoolRelation(&gt;, a, b) &amp;&amp; hasBoolRelation(&gt;, b, c)</code>.</p><p>≡≡≡ Example(s) ≡≡≡</p><pre><code class="language-julia hljs">begin
+    struct S
+        a::Int
+        b::Float64
+    end
+
+    a = S(1, 1.0)
+    b = S(2, 0.5)
+    c = S(2, 1.5)
+    d = S(3, 2.0)
+
+    Quiqbox.hasBoolRelation(&gt;=, c, b, a) |&gt; println
+    Quiqbox.hasBoolRelation(&gt;=, d, c, b) |&gt; println
+end
+
+# output
+false
+true</code></pre></div><a class="docs-sourcelink" target="_blank" href="https://github.com/frankwswang/Quiqbox.jl/blob/49a2946021096cc288e790f7a59e7d4ff3ee0b48/src/Tools.jl#L204-L239">source</a></section></article><article class="docstring"><header><a class="docstring-binding" id="Quiqbox.hasBoolRelation-Union{Tuple{F}, Tuple{T2}, Tuple{T1}, Tuple{F, T1, T2}} where {T1, T2, F&lt;:Function}" href="#Quiqbox.hasBoolRelation-Union{Tuple{F}, Tuple{T2}, Tuple{T1}, Tuple{F, T1, T2}} where {T1, T2, F&lt;:Function}"><code>Quiqbox.hasBoolRelation</code></a> — <span class="docstring-category">Method</span></header><section><div><pre><code class="language-julia hljs">hasBoolRelation(boolOp::Function, obj1, obj2; ignoreFunction::Bool=false, 
+                ignoreContainer::Bool=false, decomposeNumberCollection::Bool=false) -&gt; 
+Bool</code></pre><p>Recursively apply the specified boolean operator <code>boolOp</code> to all the fields inside two  objects (e.g., two <code>struct</code>s of the same type). It returns <code>true</code> if and only if all  comparisons performed return <code>true</code>. Note that the boolean operator should have method(s)  defined for all the possible fields inside the compared objects.</p><p>If <code>ignoreFunction = true</code>, comparisons between Function-type fields will be ignored.</p><p>If <code>ignoreContainer = true</code>, the difference of the container(s) will be ignored as long as  the boolean operator returns true for the field(s)/entry(s) from two objects respectively.</p><p>If <code>decomposeNumberCollection = true</code>, <code>Tuple{Vararg{Number}}</code> and <code>Array{&lt;:Number}</code> will  be treated as decomposable containers.</p><p>≡≡≡ Example(s) ≡≡≡</p><pre><code class="language-julia hljs">begin
+    struct S
+        a::Int
+        b::Float64
+    end
+
+    a = S(1, 1.0)
+    b = S(2, 0.5)
+    c = S(2, 1.5)
+
+    Quiqbox.hasBoolRelation(&gt;, a, b) |&gt; println
+    Quiqbox.hasBoolRelation(&gt;, b, a) |&gt; println
+    Quiqbox.hasBoolRelation(&gt;, c, a) |&gt; println
+end
+
+# output
+false
+false
+true</code></pre><pre><code class="language-julia hljs">begin
+    struct S
+        a::Int
+        b::Float64
+    end
+
+    struct S2
+        a::Int
+        b::Float64
+    end
+
+    Quiqbox.hasBoolRelation(==, S(1,2), S2(1,2), ignoreContainer=true)
+end
+
+# output
+true</code></pre></div><a class="docs-sourcelink" target="_blank" href="https://github.com/frankwswang/Quiqbox.jl/blob/49a2946021096cc288e790f7a59e7d4ff3ee0b48/src/Tools.jl#L78-L139">source</a></section></article><article class="docstring"><header><a class="docstring-binding" id="Quiqbox.hasEqual-Tuple{Any, Any, Vararg{Any}}" href="#Quiqbox.hasEqual-Tuple{Any, Any, Vararg{Any}}"><code>Quiqbox.hasEqual</code></a> — <span class="docstring-category">Method</span></header><section><div><pre><code class="language-julia hljs">hasEqual(obj1, obj2, obj3...; 
+         ignoreFunction::Bool=false, 
+         ignoreContainer::Bool=false,
+         decomposeNumberCollection::Bool=false) -&gt; 
+Bool</code></pre><p>Compare if two containers (e.g. <code>struct</code>) are equal. An instantiation of  <a href="#Quiqbox.hasBoolRelation-Union{Tuple{F}, Tuple{F, Any, Any, Any, Vararg{Any}}} where F&lt;:Function"><code>hasBoolRelation</code></a>. ≡≡≡ Example(s) ≡≡≡</p><pre><code class="language-julia hljs">begin
+    struct S
+        a::Int
+        b::Float64
+    end
+    a = S(1, 1.0)
+    b = S(1, 1.0)
+    c = S(1, 1.0)
+    d = S(1, 1.1)
+
+    hasEqual(a, b, c) |&gt; println
+    hasEqual(a, b, c, d) |&gt; println
+end
+
+# output
+true
+false</code></pre></div><a class="docs-sourcelink" target="_blank" href="https://github.com/frankwswang/Quiqbox.jl/blob/49a2946021096cc288e790f7a59e7d4ff3ee0b48/src/Tools.jl#L258-L289">source</a></section></article><article class="docstring"><header><a class="docstring-binding" id="Quiqbox.hasIdentical-Tuple{Any, Any, Vararg{Any}}" href="#Quiqbox.hasIdentical-Tuple{Any, Any, Vararg{Any}}"><code>Quiqbox.hasIdentical</code></a> — <span class="docstring-category">Method</span></header><section><div><pre><code class="language-julia hljs">hasIdentical(obj1, obj2, obj3...; 
+             ignoreFunction::Bool=false, 
+             ignoreContainer::Bool=false,
+             decomposeNumberCollection::Bool=false) -&gt; 
+Bool</code></pre><p>Compare if two containers (e.g. <code>struct</code>) are the Identical. An instantiation of  <a href="#Quiqbox.hasBoolRelation-Union{Tuple{F}, Tuple{F, Any, Any, Any, Vararg{Any}}} where F&lt;:Function"><code>hasBoolRelation</code></a>.</p><p>≡≡≡ Example(s) ≡≡≡</p><pre><code class="language-julia hljs">begin
+    struct S
+        a::Int
+        b::Vector{Float64}
+    end
+
+    a = S(1, [1.0, 1.1])
+    b = a
+    c = b
+    d = S(1, [1.0, 1.1])
+
+    hasIdentical(a, b, c) |&gt; println
+    hasIdentical(a, b, c, d) |&gt; println
+end
+
+# output
+true
+false</code></pre></div><a class="docs-sourcelink" target="_blank" href="https://github.com/frankwswang/Quiqbox.jl/blob/49a2946021096cc288e790f7a59e7d4ff3ee0b48/src/Tools.jl#L296-L329">source</a></section></article><article class="docstring"><header><a class="docstring-binding" id="Quiqbox.itself-Tuple{Any}" href="#Quiqbox.itself-Tuple{Any}"><code>Quiqbox.itself</code></a> — <span class="docstring-category">Method</span></header><section><div><pre><code class="language-julia hljs">itself(::T) -&gt; T</code></pre><p>A dummy function that returns its argument.</p></div><a class="docs-sourcelink" target="_blank" href="https://github.com/frankwswang/Quiqbox.jl/blob/49a2946021096cc288e790f7a59e7d4ff3ee0b48/src/Tools.jl#L577-L582">source</a></section></article><article class="docstring"><header><a class="docstring-binding" id="Quiqbox.markUnique-Union{Tuple{F}, Tuple{T}, Tuple{AbstractArray{T}, Vararg{Any}}} where {T, F&lt;:Function}" href="#Quiqbox.markUnique-Union{Tuple{F}, Tuple{T}, Tuple{AbstractArray{T}, Vararg{Any}}} where {T, F&lt;:Function}"><code>Quiqbox.markUnique</code></a> — <span class="docstring-category">Method</span></header><section><div><pre><code class="language-julia hljs">markUnique(arr::AbstractArray{T}, args...; 
+           compareFunction::Function=hasEqual, kws...) where {T} -&gt; 
+Tuple{Vector{Int}, Vector{T}}</code></pre><p>Return a <code>Vector{Int}</code> whose elements are indices to mark the elements inside <code>arr</code> such  that same element will be marked with same index, and a <code>Vector{T}</code> containing all the  unique elements. The definition of &quot;unique&quot; (or &quot;same&quot;) is based on <code>compareFunction</code>  which is set to <a href="#Quiqbox.hasEqual-Tuple{Any, Any, Vararg{Any}}"><code>hasEqual</code></a> in default. <code>args</code> and <code>kws</code> are placeholders for the  positional arguments and keyword arguments for <code>compareFunction</code> respectively.</p><p>≡≡≡ Example(s) ≡≡≡</p><pre><code class="language-julia hljs">markUnique([1, [1, 2],&quot;s&quot;, [1, 2]])
+
+# output
+([1, 2, 3, 2], Any[1, [1, 2], &quot;s&quot;])</code></pre><pre><code class="language-julia hljs">begin
+    struct S
+        a::Int
+        b::Float64
+    end
+
+    a = S(1, 2.0)
+    b = S(1, 2.0)
+    c = S(1, 2.1)
+    d = a
+
+    markUnique([a,b,c,d])
+end
+
+# output
+([1, 1, 2, 1], S[S(1, 2.0), S(1, 2.1)])</code></pre></div><a class="docs-sourcelink" target="_blank" href="https://github.com/frankwswang/Quiqbox.jl/blob/49a2946021096cc288e790f7a59e7d4ff3ee0b48/src/Tools.jl#L466-L505">source</a></section></article><article class="docstring"><header><a class="docstring-binding" id="Quiqbox.printStyledInfo-Tuple{String}" href="#Quiqbox.printStyledInfo-Tuple{String}"><code>Quiqbox.printStyledInfo</code></a> — <span class="docstring-category">Method</span></header><section><div><pre><code class="language-julia hljs">printStyledInfo(str::String; title::String=&quot;&quot;, titleColor::Symbol=:light_blue) -&gt; 
+Nothing</code></pre><p>Print info with colorful title and automatically highlighted code blocks enclosed by <code></code>.</p><p>If you want to highlight other contents in different colors, you can also start it with  &quot;///theColorSymbolName///&quot; and then enclose it with `<code>. The available color names follows  the values of</code>color<code>keyword argument in function</code>Base.printstyled`.</p><p><strong>NOTE:</strong> There can only be one color in one <code></code> quote.</p><p>≡≡≡ Example(s) ≡≡≡</p><pre><code class="language-julia-repl hljs">julia&gt; Quiqbox.printStyledInfo(&quot;This `///magenta///word` is in color magenta.&quot;)
+This word is in color magenta.</code></pre></div><a class="docs-sourcelink" target="_blank" href="https://github.com/frankwswang/Quiqbox.jl/blob/49a2946021096cc288e790f7a59e7d4ff3ee0b48/src/Tools.jl#L370-L389">source</a></section></article><article class="docstring"><header><a class="docstring-binding" id="Quiqbox.replaceSymbol-Tuple{Symbol, Pair{String, String}}" href="#Quiqbox.replaceSymbol-Tuple{Symbol, Pair{String, String}}"><code>Quiqbox.replaceSymbol</code></a> — <span class="docstring-category">Method</span></header><section><div><pre><code class="language-julia hljs">replaceSymbol(sym::Symbol, pair::Pair{String, String}; count::Int=typemax(Int)) -&gt; 
+Symbol</code></pre><p>Similar as <code>Base.replace</code> but for Symbols.</p></div><a class="docs-sourcelink" target="_blank" href="https://github.com/frankwswang/Quiqbox.jl/blob/49a2946021096cc288e790f7a59e7d4ff3ee0b48/src/Tools.jl#L590-L596">source</a></section></article><article class="docstring"><header><a class="docstring-binding" id="Quiqbox.checkFname-Tuple{String}" href="#Quiqbox.checkFname-Tuple{String}"><code>Quiqbox.checkFname</code></a> — <span class="docstring-category">Method</span></header><section><div><pre><code class="language-julia hljs">checkFname(Fname::String; showWarning::Bool=true) -&gt; String</code></pre><p>Check if there is a file with the same name in the current directory. If so, add a <code>&quot;_N&quot;</code>  at the end of <code>Fname</code>. <code>showWarning</code> determines whether to print out the WARNING info when  there is a file with the same name.</p></div><a class="docs-sourcelink" target="_blank" href="https://github.com/frankwswang/Quiqbox.jl/blob/49a2946021096cc288e790f7a59e7d4ff3ee0b48/src/FileIO.jl#L12-L19">source</a></section></article><article class="docstring"><header><a class="docstring-binding" id="Quiqbox.flatten-Union{Tuple{AbstractVector{&lt;:GTBasisFuncs{T, D}}}, Tuple{D}, Tuple{T}} where {T, D}" href="#Quiqbox.flatten-Union{Tuple{AbstractVector{&lt;:GTBasisFuncs{T, D}}}, Tuple{D}, Tuple{T}} where {T, D}"><code>Quiqbox.flatten</code></a> — <span class="docstring-category">Method</span></header><section><div><pre><code class="language-julia hljs">flatten(bs::AbstractVector{&lt;:GTBasisFuncs{T, D}}) where {T, D} -&gt; 
+AbstractVector{&lt;:GTBasisFuncs{T, D, 1}}
+
+flatten(bs::Tuple{Vararg{GTBasisFuncs{T, D}}}) where {T, D} -&gt; 
+Tuple{Vararg{GTBasisFuncs{T, D, 1}}}</code></pre><p>Flatten a collection of <code>GTBasisFuncs</code> by decomposing every <code>GTBasisFuncs{T, D, ON}</code>  where <code>ON &gt; 1</code> into multiple <code>GTBasisFuncs{T, D, 1}</code>.</p></div><a class="docs-sourcelink" target="_blank" href="https://github.com/frankwswang/Quiqbox.jl/blob/49a2946021096cc288e790f7a59e7d4ff3ee0b48/src/Overload.jl#L335-L345">source</a></section></article></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../coreType/">« Core Types</a><a class="docs-footer-nextpage" href="../molden/">Molden »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 0.27.23 on <span class="colophon-date" title="Wednesday 14 September 2022 23:25">Wednesday 14 September 2022</span>. Using Julia version 1.8.1.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
