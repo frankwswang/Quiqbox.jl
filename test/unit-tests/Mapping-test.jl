@@ -19,6 +19,7 @@ DressedPf1 = DI(pf1)
 @test DressedPf1 == DI(DressedPf1)
 a0 = fill(2.2)
 @test DressedPf1(a0) === a0
+@test DressedPf1() === pf1
 
 
 # struct PF and ChainedPF
