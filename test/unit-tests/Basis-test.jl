@@ -5,6 +5,7 @@ using Quiqbox: EmptyBasisFunc, BasisFuncMix, isaFullShellBasisFuncs, unpackBasis
                getNormFactor, mergeBasisFuncs, getTypeParams
 using LinearAlgebra
 using Random
+using Suppressor: @capture_out
 
 @testset "Basis.jl" begin
 
@@ -661,6 +662,56 @@ D    1   1.0   false   1 3 5
 @test hasEqual((genBFuncsFromText∘genBasisFuncText)(bf2_P_norm3)[], bf2_P_norm3)
 bf_TextTest = genBasisFunc([0.0, 1.2, 0.3], ([1.5, 1.2], [0.5, 0.4]), [(2,0,0), (1,0,1)])
 @test hasEqual((genBFuncsFromText∘genBasisFuncText)(bf_TextTest)[], bf_TextTest)
+txt_Kr_631G = """
+Kr     0
+S    6   1.00
+      0.1205524000D+06       0.1714050000D-02
+      0.1810225000D+05       0.1313805000D-01
+      0.4124126000D+04       0.6490006000D-01
+      0.1163472000D+04       0.2265185000D+00
+      0.3734612000D+03       0.4764961000D+00
+      0.1280897000D+03       0.3591952000D+00
+SP   6   1.00
+      0.2634681000D+04       0.2225111000D-02       0.3761911000D-02
+      0.6284533000D+03       0.2971122000D-01       0.2977531000D-01
+      0.2047081000D+03       0.1253926000D+00       0.1311878000D+00
+      0.7790827000D+02       0.1947058000D-02       0.3425019000D+00
+      0.3213816000D+02      -0.5987388000D+00       0.4644938000D+00
+      0.1341845000D+02      -0.4958972000D+00       0.2087284000D+00
+SP   6   1.00
+      0.1175107000D+03      -0.6157662000D-02      -0.6922855000D-02
+      0.4152553000D+02       0.5464841000D-01      -0.3069239000D-01
+      0.1765290000D+02       0.2706994000D+00       0.4480260000D-01
+      0.7818313000D+01      -0.1426136000D+00       0.3636775000D+00
+      0.3571775000D+01      -0.7216781000D+00       0.4952412000D+00
+      0.1623750000D+01      -0.3412008000D+00       0.2086340000D+00
+SP   3   1.00
+      0.2374560000D+01       0.3251184000D+00      -0.3009554000D-01
+      0.8691930000D+00      -0.2141533000D+00       0.3598893000D+00
+      0.3474730000D+00      -0.9755083000D+00       0.7103098000D+00
+SP   1   1.00
+      0.1264790000D+00       0.1000000000D+01       0.1000000000D+01
+D    3   1.00
+      0.6853888000D+02       0.7530705000D-01
+      0.1914333000D+02       0.3673551000D+00
+      0.6251213000D+01       0.7120146000D+00
+D    1   1.00
+      0.1979236000D+01       1.0000000
+"""
+bs_STO3G_Kr1 = genBFuncsFromText(txt_Kr_631G, adjustContent=true)
+local bs_STO3G_Kr2
+@test (@capture_out bs_STO3G_Kr2 = genBFuncsFromText(txt_Kr_631G, 
+                                                     adjustContent=true, 
+                                                     normalizeGTO=missing)) == 
+      "Could not find the information of `.normalizeGTO` for the basis function based "*
+      "on the input text, set it to `false`.\n"
+bs_STO3G_Kr3 = genBasisFunc.(bs_STO3G_Kr2, true)
+comprFunc = function (x,y)
+    if Quiqbox.isNaN.(x) == Quiqbox.isNaN.(y)
+        true
+    end
+end
+@test Quiqbox.hasBoolRelation(comprFunc, bs_STO3G_Kr1, bs_STO3G_Kr3)
 
 
 # function assignCenInVal!

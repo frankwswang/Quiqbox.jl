@@ -58,7 +58,7 @@ julia> using Quiqbox
 ```julia
 points = GridBox((1,0,0), 1.4).point
 
-bsH₂ = genBasisFunc.(points, "STO-3G") |> flatten
+bsH₂ = vcat(genBasisFunc.(points, "STO-3G")...)
 ```
 
 ## Build a customized basis set
