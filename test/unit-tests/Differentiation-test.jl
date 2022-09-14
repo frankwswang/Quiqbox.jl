@@ -8,7 +8,16 @@ include("../../test/test-functions/Shared.jl")
 
 @testset "Differentiation.jl" begin
 
-# function ∂Basis
+# ParamBox indices
+bf0 = genBasisFunc(rand(3), (2.2, 1.1))
+bf0Pars = bf0.param
+outSymOf(bf0Pars[Quiqbox.cxIndex]) == :X
+outSymOf(bf0Pars[Quiqbox.cyIndex]) == :Y
+outSymOf(bf0Pars[Quiqbox.czIndex]) == :Z
+outSymOf(bf0Pars[Quiqbox.xpnIndex]) == :α
+outSymOf(bf0Pars[Quiqbox.conIndex]) == :d
+
+# function ∂Basis 𝑑f
 fα = x->sqrt(x); gα = x->1/2sqrt(x); vα = 1.2
 xpn = genExponent(vα, fα)
 fd = x->x^3; gd = x->3x^2; vd = 1.2
@@ -55,6 +64,11 @@ sgf2 = genBasisFunc([1.0, 0.0, 0.0], GaussFunc(xpn, con3), (1,0,0))
 @test hasEqual(∂Basis(con3, sgf2), ∂Basis(xα, sgf1)+sgfN2)
 disableDiff!(con3)
 @test hasEqual(∂Basis(con3, sgf2), sgfN)
+
+f = x->x^3
+@test Quiqbox.𝑑f(Quiqbox.DI(f), rand()) == 1
+r1 = rand()
+@test Quiqbox.𝑑f(f, r1) == ForwardDerivative(f, r1)
 
 sgf3 = genBasisFunc(sgf1, true)
 ijk1 = sgf1.l[1].tuple
