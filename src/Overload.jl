@@ -107,7 +107,7 @@ end
 
 function show(io::IO, gf::GaussFunc)
     gfTstr = (itselfTshorten∘typeof)(gf)
-    idx1, idx2 = findall(',', gfTstr)
+    idx1, idx2 = first.(findall(",", gfTstr))
     print(io, gfTstr[begin:idx1+1])
     if gf.xpn.map isa DI
         printstyled(io, gfTstr[idx1+2:idx2-1], color=:light_black)
