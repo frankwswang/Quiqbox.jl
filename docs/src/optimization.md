@@ -30,7 +30,7 @@ When `markParams!`'s second argument is set to `true`, it will return only the `
 ```@repl 3
 parsPartial = pars[1:2];
 
-Es, ps, grads = optimizeParams!(parsPartial, bs, nuc, nucCoords, POconfig((maxStep=10,)));
+Es, ps, grads = optimizeParams!(parsPartial, bs, nuc, nucCoords, POconfig(maxStep=10));
 ```
 
 After the optimization, you can check the original `bs` and find that the inside parameters are changed as well. This is because the `!` in the function name indicates that `optimizeParams!` is [a function that modifies its arguments](https://docs.julialang.org/en/v1/manual/style-guide/#bang-convention).
