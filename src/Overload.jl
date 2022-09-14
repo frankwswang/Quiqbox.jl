@@ -102,7 +102,7 @@ function show(io::IO, sp::SpatialPoint)
     pbs = sp.param
     print(io, typeStrOf(sp), getFieldNameStr(sp))
     print(io, [i() for i in pbs])
-    printDiffSym.(io, pbs)
+    printDiffSym.(Ref(io), pbs)
 end
 
 function show(io::IO, gf::GaussFunc)
@@ -124,7 +124,7 @@ function show(io::IO, gf::GaussFunc)
     fieldStr = replace(fieldStr, "xpn"=>"xpn()=$(round(gf.xpn(), sigdigits=nDigitShown))")
     fieldStr = replace(fieldStr, "con"=>"con()=$(round(gf.con(), sigdigits=nDigitShown))")
     print(io, "}", fieldStr)
-    printDiffSym.(io, gf.param)
+    printDiffSym.(Ref(io), gf.param)
 end
 
 function show(io::IO, bf::BasisFunc)
