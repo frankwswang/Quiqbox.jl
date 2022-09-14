@@ -115,11 +115,11 @@ compr2Arrays3((grad1=grad1, grad1_fd=grad1_fd), 2t3, true)
 config = HFconfig(HF=:UHF, SCF=SCFconfig(threshold=DHFOthreshold))
 HFres1_2 = runHF(bs1, nuc, nucCoords, config, printInfo=false)
 grad1_2 = gradOfHFenergy(pars1, bs1, overlaps(bs1), HFres1.C, nuc, nucCoords)
-grad1_2_fd = fDiffOfHFenergy(pars1, bs1, nuc, nucCoords, 1e-10; config)
+grad1_2_fd = fDiffOfHFenergy(pars1, bs1, nuc, nucCoords, 1e-9; config)
 @test isapprox(grad1_2[1], grad1_2[2], atol=t1)
 compr2Arrays3((grad1_2=grad1_2, grad1_t=grad1_t), t2, true)
 @test all(abs.((grad1_2_fd[1:3] - grad1_2[1:3]) ./ grad1_2[1:3]) .< 0.05)
-@test abs(grad1_2_fd[end] - grad1_2[end]) < 5e-5
+@test abs(grad1_2[end]) < t1
 
 bfSource = genBasisFunc(missing, "STO-2G", "H")[]
 gfs = bfSource.gauss |> collect
