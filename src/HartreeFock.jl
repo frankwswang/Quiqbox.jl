@@ -364,7 +364,7 @@ getSpinOccupations(::Val{:UHF}, (Nᵅ, Nᵝ)::NTuple{2, Int}, BN) =
     HFtempVars{T, HFT} <: HartreeFockintermediateData{T}
 
 The container to store the intermediate values (only of the one spin configuration) for 
-each iteration during the Hartree-Fock SCF procedure. 
+each iteration during the Hartree-Fock SCF procedure.
 
 ≡≡≡ Field(s) ≡≡≡
 
@@ -777,9 +777,9 @@ function runHFcore(::Val{HFT},
             isConverged && abs(ΔE) <= breakPoint && break
         end
     end
-    negStr = ifelse(isConverged, "is ", "has not ")
+    negStr = ifelse(isConverged, "converged", "stopped but not converged")
     if printInfo
-        println("\nThe SCF iteration ", negStr, "converged at step $i:\n", 
+        println("\nThe SCF iteration is ", negStr, " at step $i:\n", 
                 "|ΔE| → ", round(abs(ΔE), digits=nDigitShown), " Ha, ", 
                 "RMS(ΔD) → ", round(ΔDrms, digits=nDigitShown), ".\n")
     end
@@ -966,7 +966,8 @@ function LBFGSBsolver(::Val{CCB}, v::AbstractVector{T}, B::AbstractMatrix{T}) wh
                                  linesearch=HagerZhang(linesearchmax=100, epsilon=1e-7), 
                                  alphaguess=InitialHagerZhang())
     res = OptimOptimize(f, g!, fill(lb, vL), fill(T(Inf), vL), c0, Fminbox(innerOptimizer), 
-                        OptimOptions(g_tol=exp10(-getAtolDigits(T)), iterations=20000))
+                        OptimOptions(g_tol=exp10(-getAtolDigits(T)), iterations=10000, 
+                        allow_f_increases=false))
     c = OptimMinimizer(res)
     c ./ sum(c)
 end
