@@ -1597,14 +1597,14 @@ inside `bf`; when set to negative, no rounding will be performed.
 """
 function genBasisFuncText(bf::FloatingGTBasisFuncs{T, D}; norm::Real=1.0, 
                           printCenter::Bool=true, roundDigits::Int=-1) where {T, D}
-    GFs = map(x -> genGaussFuncText(x.xpn(), x.con(); roundDigits), bf.gauss)
+    GFstr = mapreduce(x -> genGaussFuncText(x.xpn(), x.con(); roundDigits), *, bf.gauss)
     cen = centerCoordOf(bf)
     firstLine = printCenter ? "X "*(alignNum.(cen; roundDigits) |> join)*"\n" : ""
     firstLine * "$(bf|>subshellOf)    $(getTypeParams(bf)[begin+3])   $(T(norm))" * 
     "   $(bf.normalizeGTO)" * 
     ( isaFullShellBasisFuncs(bf) ? "" : "  " * 
       join( [" $i" for i in get.(Ref(AngMomIndexList[D]), bf.l, "")] |> join ) ) * "\n" * 
-    (GFs|>join)
+    GFstr
 end
 
 """
