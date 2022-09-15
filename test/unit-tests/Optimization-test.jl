@@ -8,7 +8,7 @@ using Random: shuffle
 
 include("../../test/test-functions/Shared.jl")
 
-# @testset "Optimization.jl" begin
+@testset "Optimization.jl" begin
 
 errorThreshold = 1e-8
 
@@ -261,5 +261,7 @@ pars4 = markParams!(bs4, true)
 αs = getParams(pars4, :α)
 res = optimizeParams!(αs, bs4, nuc, nucCoords, printInfo=false)
 @test res[end]
+@test αs[][] >= 0
+@test isapprox(res[begin][end], -1.6904752562813066, atol=errorThreshold)
 
 end

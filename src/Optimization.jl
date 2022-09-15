@@ -421,6 +421,10 @@ function optimizeParams!(pbs::AbstractVector{<:ParamBox{T}},
 
     tEnd = time()
 
+    pbsT, bsT = makeAbsLayerForXpnParams(pbs, bs, true)
+    pbs .= pbsT
+    bs  .= bsT
+
     if printInfo
         print("The optimization of parameters \n𝒙 := ")
         println(IOContext(stdout, :limit => true), "$((first∘indVarOf).(pbs)) ")
@@ -431,12 +435,8 @@ function optimizeParams!(pbs::AbstractVector{<:ParamBox{T}},
                 alignNumSign(fVals[end], roundDigits=nDigitShown))
         print(rpad("", 11), lpad("𝒙 = ", 6))
         println(IOContext(stdout, :limit => true), 
-                round.(parsVals[end], digits=nDigitShown))
-        print(rpad("", 11), lpad("∇$(fVstr) = ", 6))
-        println(IOContext(stdout, :limit => true), 
-                round.(grads[end], digits=nDigitShown))
-        println("Optimization duration: ", round((tEnd-tBegin)/60, digits=6), 
-                " minutes.")
+                round.(getindex.(pbs), digits=nDigitShown))
+        print("after ", round((tEnd-tBegin)/60, digits=6), " minutes. ")
         if detectConverge
             println("The iteration has" * ifelse(blConv, "", " not") *" converged: ")
             println("∥Δ$(fVstr)∥₂ → ", 
@@ -445,8 +445,6 @@ function optimizeParams!(pbs::AbstractVector{<:ParamBox{T}},
                     round(norm(grads[end]), digits=nDigitShown), ".\n")
         end
     end
-
-    pbs, bs = makeAbsLayerForXpnParams(pbs, bs, true)
 
     fVals, parsVals, grads, ifelse(detectConverge, blConv, missing)
 end
