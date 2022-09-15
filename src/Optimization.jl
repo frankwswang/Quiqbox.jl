@@ -393,7 +393,7 @@ function optimizeParams!(pbs::AbstractVector{<:ParamBox{T}},
     fVals = [fx]
     grads = [gx]
 
-    while !all(f(x) for (f, x) in zip(isConverged, (fVals, grads))) && i < maxStep
+    while !(blConv = all(f(x) for (f, x) in zip(isConverged, (fVals, grads)))) && i<maxStep
 
         if i%gap == 0 && printInfo
             println(rpad("Step $(i): ", 11), lpad("$(fVstr) = ", 6), 
