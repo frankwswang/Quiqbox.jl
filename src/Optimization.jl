@@ -366,7 +366,7 @@ function optimizeParams!(pbs::AbstractVector{<:ParamBox{T}},
     threshold = config.threshold
     target = config.target
     maxStep = config.maxStep
-    gap = min(100, max(maxStep ÷ 100 * 10, 1))
+    gap = min(250, max(maxStep ÷ 100 * 10, 1))
 
     target = ifelse(isNaN(target), (threshold[begin], threshold[end]), (threshold[begin],))
     detectConverge = false
