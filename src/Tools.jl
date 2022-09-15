@@ -599,23 +599,48 @@ function replaceSymbol(sym::Symbol, pair::Pair{String, String}; count::Int=typem
 end
 
 
-function isOscillateConverged(seq::AbstractVector{T}, 
-                              ValDiffThreshold::Real, 
-                              stdThreshold::Real=0.65ValDiffThreshold; 
-                              nPartition::Int=5, minimalCycles::Int=nPartition, 
-                              convergeToMax::Bool=false) where {T}
-    minimalCycles > 0 || 
-    throw(DomainError(minimalCycles, "`minimalCycles` should be positive."))
-    nPartition > 1 || 
-    throw(DomainError(nPartition, "`nPartition` should be larger than 1."))
+function isOscillateConvergedHead(seq, minCycles, maxRemains)
+    minCycles > 1 || 
+    throw(DomainError(minCycles, "`minCycles` should be larger than 1."))
     len = length(seq)
-    len < minimalCycles && (return (false, zero(seq[begin])))
-    slice = len ÷ nPartition
-    lastPortion = seq[max(end-slice, 1) : end]
-    remain = sort!(lastPortion)[ifelse(convergeToMax, (end÷2+1 : end), (1 : end÷2+1))]
-    b = all(rStd < stdThreshold for rStd in std(remain)) && 
-        norm(seq[end]-(convergeToMax ? max(remain...) : min(remain...))) < ValDiffThreshold
-    b, std(lastPortion)
+    len < minCycles && (return zero(seq[begin]))
+    maxRemains > 1 || 
+    throw(DomainError(maxRemains, "`maxRemains` should be larger than 1."))
+    slice = min(maxRemains, len÷3+1)
+    seq[end-slice : end]
+end
+
+function isOscillateConverged(seq::AbstractVector{<:Real}, 
+                              tarThreshold::Real, 
+                              target::Real=NaN, 
+                              stdThreshold::Real=0.75tarThreshold; 
+                              minCycles::Int=5, maxRemains::Int=10, 
+                              convergeToMax::Bool=false)
+    tailEles = isOscillateConvergedHead(seq, minCycles, maxRemains)
+    length(tailEles) < 2 && (return (false, tailEles))
+    valleys = sort!(tailEles)[ifelse(convergeToMax, (end÷2+1 : end), (1 : end÷2+1))]
+    if isnan(target)
+        target = convergeToMax ? valleys[argmax(valleys)] : valleys[argmin(valleys)]
+    end
+    b = std(valleys) <= stdThreshold && norm(target - seq[end]) <= tarThreshold
+    # b || @show ("Scalar", std(valleys), norm(target - seq[end]))
+    b, std(tailEles)
+end
+
+function isOscillateConverged(seq::AbstractVector{<:Array{<:Real}}, 
+                              tarThreshold::Real, 
+                              target::Real=0, 
+                              stdThreshold::Real=0.75tarThreshold; 
+                              minCycles::Int=5, maxRemains::Int=10)
+    isnan(target) && throw(AssertionError("`target` cannot be `NaN`."))
+    tailEles = isOscillateConvergedHead(seq, minCycles, maxRemains)
+    length(tailEles) < 2 && (return (false, tailEles))
+    lastPortionDiff = [norm(target .- val) for val in tailEles]
+    lastDiff = lastPortionDiff[end]
+    valleyIds = sortperm(lastPortionDiff)[begin : end÷2+1]
+    b = lastDiff <= tarThreshold && all(i <= stdThreshold for i in std(tailEles[valleyIds]))
+    # b || @show ("Vector", std(tailEles[valleyIds]), lastDiff)
+    b, std(tailEles)
 end
 
 

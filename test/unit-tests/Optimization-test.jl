@@ -8,7 +8,7 @@ using Random: shuffle
 
 include("../../test/test-functions/Shared.jl")
 
-@testset "Optimization.jl" begin
+# @testset "Optimization.jl" begin
 
 errorThreshold = 1e-8
 
@@ -252,5 +252,14 @@ for (po, E_t3, par_t3, grad_t3) in zip(pos2, E_t3s, par_t3s, grad_t3s)
     @test isapprox(ps3L[end], par_t3, atol=errorThreshold)
     @test isapprox(grads3L[end], grad_t3, atol=errorThreshold)
 end
+
+
+# Convergence test
+gf4 = GaussFunc(1.0, 0.5)
+bs4 = genBasisFunc.(nucCoords, Ref(gf4))
+pars4 = markParams!(bs4, true)
+αs = getParams(pars4, :α)
+res = optimizeParams!(αs, bs4, nuc, nucCoords, printInfo=false)
+@test res[end]
 
 end

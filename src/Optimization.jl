@@ -364,18 +364,19 @@ function optimizeParams!(pbs::AbstractVector{<:ParamBox{T}},
     i = 0
     Δt₁ = Δt₂ = 0
     threshold = config.threshold
-    target = config.target
+    targets = (config.target, 0) # (fTarget, gTarget)
     maxStep = config.maxStep
     gap = min(250, max(maxStep ÷ 100 * 10, 1))
 
-    target = ifelse(isNaN(target), (threshold[begin], threshold[end]), (threshold[begin],))
+    thresholds = ifelse(isNaN(config.target), 
+                        [threshold[begin], threshold[end]], [threshold[begin]])
     detectConverge = false
-    isConverged = map(target) do tar
-        if isNaN(tar)
+    isConverged = map(targets, thresholds) do target, thd
+        if isNaN(thd)
             _->true
         else
             detectConverge |= true
-            vrs->isOscillateConverged(vrs, tar*sqrt(vrs[end]|>length), minimalCycles=4)[1]
+            vrs->isOscillateConverged(vrs, thd*sqrt(vrs[end]|>length), target)[1]
         end
     end
     detectConverge || (isConverged = (_->false,))
