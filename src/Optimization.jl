@@ -210,7 +210,7 @@ getOptimizerConstructor(::Type{<:Any}) =  convertExternalOpt
 
 @inline function genOptimizer(::Val{M}, Mconfig::ConfigBox{T}, optimizer::O, 
                               pbs::AbstractVector{<:ParamBox{T}}, 
-                              bs::AbstractVector{<:AbstractGTBasisFuncs{T, D}}, 
+                              bs::AbstractVector{<:GTBasisFuncs{T, D}}, 
                               nuc::NTuple{NN, String}, 
                               nucCoords::NTuple{NN, NTuple{D, T}}, N) where {M, T, O, NN, D}
     (f0, getOFval), (g0, getOGval) = OFfunctions[M]
@@ -327,7 +327,7 @@ of whether the optimization is converged if the convergence detection is on (i.e
 from the basis set. If the parameter is marked as "differentiable", the value of its input 
 variable will be optimized.
 
-`bs::AbstractVector{<:AbstractGTBasisFuncs{T, D}}`: The basis set to be optimized.
+`bs::AbstractVector{<:GTBasisFuncs{T, D}}`: The basis set to be optimized.
 
 `nuc::Union{
     NTuple{NN, String} where NN, 
@@ -347,7 +347,7 @@ electrons with same spin configurations(s).
 `printInfo::Bool`: Whether print out the information of iteration steps.
 """
 function optimizeParams!(pbs::AbstractVector{<:ParamBox{T}}, 
-                         bs::AbstractVector{<:AbstractGTBasisFuncs{T, D}}, 
+                         bs::AbstractVector{<:GTBasisFuncs{T, D}}, 
                          nuc::VectorOrNTuple{String, NN}, 
                          nucCoords::SpatialCoordType{T, D, NN}, 
                          config::POconfig{<:Any, M, CBT, <:Any, F}=defaultPOconfig, 
