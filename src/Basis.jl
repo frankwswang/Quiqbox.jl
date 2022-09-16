@@ -1837,7 +1837,7 @@ function copyParContainer(bfs::FloatingGTBasisFuncs,
                           filterFunc::Function, trueConstr::Function, falseConstr::Function)
     cen = copyParContainer(bfs.center, filterFunc, trueConstr, falseConstr)
     gs = copyParContainer.(bfs.gauss, filterFunc, trueConstr, falseConstr)
-    BasisFunc(cen, gs, bfs.l, bfs.normalizeGTO)
+    genBasisFunc(cen, gs, bfs.l, normalizeGTO=bfs.normalizeGTO)
 end
 
 function copyParContainer(bfm::BasisFuncMix, 
