@@ -50,6 +50,8 @@ Absolute(f) = Layered(f, abs)
 
 const Labs{F} = Layered{F, typeof(abs)}
 
+Absolute(f::Labs) = itself(f)
+
 
 const PFfusingOperators = Dict([*, +, ^] .=> [*, +, *])
 
