@@ -344,10 +344,10 @@ Flatten a collection of `GTBasisFuncs` by decomposing every `GTBasisFuncs{T, D, 
 where `ON > 1` into multiple `GTBasisFuncs{T, D, 1}`.
 """
 flatten(bs::AbstractVector{<:GTBasisFuncs{T, D}}) where {T, D} = 
-reshape(hcat(decomposeCore.(Val(false), bs)...), :)
+reshape(mapreduce(b->decomposeCore(Val(false), b), hcat, bs), :)
 
 flatten(bs::Tuple{Vararg{GTBasisFuncs{T, D}}}) where {T, D} = 
-hcat(decomposeCore.(Val(false), bs)...) |> Tuple
+mapreduce(b->decomposeCore(Val(false), b), hcat, bs) |> Tuple
 
 flatten(bs::Union{AbstractVector{<:GTBasisFuncs{T, D, 1}}, 
                   Tuple{Vararg{FGTBasisFuncs1O{T, D}}}}) where {T, D} = 

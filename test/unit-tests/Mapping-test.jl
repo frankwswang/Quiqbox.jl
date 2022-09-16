@@ -4,7 +4,7 @@ using Quiqbox: FLevel, getFLevel, Absolute, DI, PF, combinePF, RC
 
 @testset "Mapping.jl" begin
 
-# struct FLevel & function getFLevel & struct DI
+# struct FLevel DI & function getFLevel Absolute
 @test FLevel{getFLevel(itself)} == FLevel(identity) == FLevel{0}
 @test FLevel(abs) == FLevel{1}
 tf1 = PF(abs, +, 2.2)
@@ -12,7 +12,9 @@ tf1 = PF(abs, +, 2.2)
 pf1 = PF(tf1, *, 1.5)
 @test FLevel(pf1) == FLevel{2}
 @test FLevel(tf1) == FLevel(typeof(tf1)) == FLevel(getFLevel(tf1)) == FLevel{2}
-@test getFLevel(Absolute(itself)) == 1
+absItself = Absolute(itself)
+@test getFLevel(absItself) == 1
+@test Absolute(absItself) === absItself
 @test getFLevel(Absolute(abs)) == 2
 DressedPf1 = DI(pf1)
 @test getFLevel(DressedPf1) == 2

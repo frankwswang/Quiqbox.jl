@@ -4,8 +4,10 @@ using Quiqbox: getAtolVal, getAtolDigits, roundToMultiOfStep, nearestHalfOf, get
                isApprox, tryIncluding, sizeOf, hasBoolRelation, flatten, joinTuple, 
                markUnique, getUnique!, itself, themselves, replaceSymbol, groupedSort, 
                mapPermute, getFunc, nameOf, tupleDiff, genIndex, fillObj, arrayToTuple, 
-               genTupleCoords, uniCallFunc, mergeMultiObjs, isNaN, getBool, skipIndices
+               genTupleCoords, uniCallFunc, mergeMultiObjs, isNaN, getBool, skipIndices, 
+               isOscillateConverged
 using Suppressor: @capture_out
+using LinearAlgebra: norm
 
 @testset "Tools.jl" begin
 
@@ -224,5 +226,46 @@ idsT = [1, 2, 6, 5, 6, 7, 8, 4, 9, 10, 3]
 @test skipIndices(idsT, Int[]) === idsT
 @test try skipIndices(idsT, [-1, 2]) catch; true end
 @test try skipIndices([-1, 2, 3], idsR1) catch; true end
+
+
+# function isOscillateConverged
+shift = x-> x+0.01
+convVal = 1.215
+convAtol = 1e-6
+y1 = x -> (1-abs(cos(5x)/(0.7(0.5x+2))))/(shift(3x)+1)^1.25 + convVal + 2e-4randn()/(x+1)
+y2 = x -> log(shift(x)+x)/(shift(3x)+1)^1.5 + convVal + 2e-4randn()/(x+1)
+y3 = x -> [y1(x), y2(x)]
+
+xs = collect(0:0.01:100)
+y1s = y1.(xs)
+y3s = y2.(xs)
+
+y1s = Float64[]
+convRes1 = []
+for x in collect(0:0.01:1000)
+    push!(y1s, y1(x))
+    bl, resStd = isOscillateConverged(y1s, 1e-7)
+    if bl
+        @test isapprox(y1(x), convVal, atol=5e-4)
+        push!(convRes1, bl, resStd)
+        break
+    end
+end
+@test convRes1[begin]
+@test convRes1[end] < convAtol
+
+y3s = Vector{Float64}[]
+convRes2 = []
+for x in collect(0:100:5000)
+    push!(y3s, y3(x))
+    bl, resStd = isOscillateConverged(y3s, 1e-5, convVal)
+    if bl
+        @test all(isapprox.(y3(x), convVal, atol=1e-4))
+        push!(convRes2, bl, resStd)
+        break
+    end
+end
+@test convRes2[begin]
+@test norm(convRes2[end]) < convAtol*(sqrt∘length)(convRes2[end])
 
 end

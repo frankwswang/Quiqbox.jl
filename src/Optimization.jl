@@ -210,7 +210,7 @@ getOptimizerConstructor(::Type{<:Any}) =  convertExternalOpt
 
 @inline function genOptimizer(::Val{M}, Mconfig::ConfigBox{T}, optimizer::O, 
                               pbs::AbstractVector{<:ParamBox{T}}, 
-                              bs::AbstractVector{<:AbstractGTBasisFuncs{T, D}}, 
+                              bs::AbstractVector{<:GTBasisFuncs{T, D}}, 
                               nuc::NTuple{NN, String}, 
                               nucCoords::NTuple{NN, NTuple{D, T}}, N) where {M, T, O, NN, D}
     (f0, getOFval), (g0, getOGval) = OFfunctions[M]
@@ -327,7 +327,7 @@ of whether the optimization is converged if the convergence detection is on (i.e
 from the basis set. If the parameter is marked as "differentiable", the value of its input 
 variable will be optimized.
 
-`bs::AbstractVector{<:AbstractGTBasisFuncs{T, D}}`: The basis set to be optimized.
+`bs::AbstractVector{<:GTBasisFuncs{T, D}}`: The basis set to be optimized.
 
 `nuc::Union{
     NTuple{NN, String} where NN, 
@@ -347,7 +347,7 @@ electrons with same spin configurations(s).
 `printInfo::Bool`: Whether print out the information of iteration steps.
 """
 function optimizeParams!(pbs::AbstractVector{<:ParamBox{T}}, 
-                         bs::AbstractVector{<:AbstractGTBasisFuncs{T, D}}, 
+                         bs::AbstractVector{<:GTBasisFuncs{T, D}}, 
                          nuc::VectorOrNTuple{String, NN}, 
                          nucCoords::SpatialCoordType{T, D, NN}, 
                          config::POconfig{<:Any, M, CBT, <:Any, F}=defaultPOconfig, 
@@ -364,18 +364,19 @@ function optimizeParams!(pbs::AbstractVector{<:ParamBox{T}},
     i = 0
     Δt₁ = Δt₂ = 0
     threshold = config.threshold
-    target = config.target
+    targets = (config.target, 0) # (fTarget, gTarget)
     maxStep = config.maxStep
-    gap = min(100, max(maxStep ÷ 100 * 10, 1))
+    gap = min(250, max(maxStep ÷ 100 * 10, 1))
 
-    target = ifelse(isNaN(target), (threshold[begin], threshold[end]), (threshold[begin],))
+    thresholds = ifelse(isNaN(config.target), 
+                        [threshold[begin], threshold[end]], [threshold[begin]])
     detectConverge = false
-    isConverged = map(target) do tar
-        if isNaN(tar)
+    isConverged = map(targets, thresholds) do target, thd
+        if isNaN(thd)
             _->true
         else
             detectConverge |= true
-            vrs->isOscillateConverged(vrs, tar*sqrt(vrs[end]|>length), minimalCycles=4)[1]
+            vrs->isOscillateConverged(vrs, thd*sqrt(vrs[end]|>length), target)[1]
         end
     end
     detectConverge || (isConverged = (_->false,))
@@ -393,7 +394,7 @@ function optimizeParams!(pbs::AbstractVector{<:ParamBox{T}},
     fVals = [fx]
     grads = [gx]
 
-    while !all(f(x) for (f, x) in zip(isConverged, (fVals, grads))) && i < maxStep
+    while !(blConv = all(f(x) for (f, x) in zip(isConverged, (fVals, grads)))) && i<maxStep
 
         if i%gap == 0 && printInfo
             println(rpad("Step $(i): ", 11), lpad("$(fVstr) = ", 6), 
@@ -420,6 +421,10 @@ function optimizeParams!(pbs::AbstractVector{<:ParamBox{T}},
 
     tEnd = time()
 
+    pbsT, bsT = makeAbsLayerForXpnParams(pbs, bs, true)
+    pbs .= pbsT
+    bs  .= bsT
+
     if printInfo
         print("The optimization of parameters \n𝒙 := ")
         println(IOContext(stdout, :limit => true), "$((first∘indVarOf).(pbs)) ")
@@ -430,12 +435,8 @@ function optimizeParams!(pbs::AbstractVector{<:ParamBox{T}},
                 alignNumSign(fVals[end], roundDigits=nDigitShown))
         print(rpad("", 11), lpad("𝒙 = ", 6))
         println(IOContext(stdout, :limit => true), 
-                round.(parsVals[end], digits=nDigitShown))
-        print(rpad("", 11), lpad("∇$(fVstr) = ", 6))
-        println(IOContext(stdout, :limit => true), 
-                round.(grads[end], digits=nDigitShown))
-        println("Optimization duration: ", round((tEnd-tBegin)/60, digits=6), 
-                " minutes.")
+                round.(getindex.(pbs), digits=nDigitShown))
+        print("after ", round((tEnd-tBegin)/60, digits=6), " minutes. ")
         if detectConverge
             println("The iteration has" * ifelse(blConv, "", " not") *" converged: ")
             println("∥Δ$(fVstr)∥₂ → ", 
@@ -444,8 +445,6 @@ function optimizeParams!(pbs::AbstractVector{<:ParamBox{T}},
                     round(norm(grads[end]), digits=nDigitShown), ".\n")
         end
     end
-
-    pbs, bs = makeAbsLayerForXpnParams(pbs, bs, true)
 
     fVals, parsVals, grads, ifelse(detectConverge, blConv, missing)
 end

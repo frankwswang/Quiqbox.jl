@@ -145,8 +145,8 @@ parsAll0_6 = getParams(bs0_6)
 pars0_1[2][] *= -1
 
 
-nucCoords = [[-0.7,0.0,0.0], [0.7,0.0,0.0]]
 nuc = ["H", "H"]
+nucCoords = [[-0.7,0.0,0.0], [0.7,0.0,0.0]]
 Ne = getCharge(nuc)
 
 
@@ -252,5 +252,16 @@ for (po, E_t3, par_t3, grad_t3) in zip(pos2, E_t3s, par_t3s, grad_t3s)
     @test isapprox(ps3L[end], par_t3, atol=errorThreshold)
     @test isapprox(grads3L[end], grad_t3, atol=errorThreshold)
 end
+
+
+# Convergence test
+gf4 = GaussFunc(1.0, 0.5)
+bs4 = genBasisFunc.(nucCoords, Ref(gf4), ["S", "P"])
+pars4 = markParams!(bs4, true)
+αs = getParams(pars4, :α)
+res = optimizeParams!(αs, bs4, nuc, nucCoords, printInfo=false)
+@test res[end]
+@test αs[][] >= 0
+@test isapprox(res[begin][end], -1.5376111420710188, atol=errorThreshold)
 
 end
