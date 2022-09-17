@@ -32,7 +32,7 @@
 ## Julia (64-bit) compatibility
 Quiqbox will always try to support the [latest stable release](https://julialang.org/downloads/#current_stable_release) of 64-bit Julia as soon as possible. On the other hand, backward compatibility with previous versions is not guaranteed but can be checked [here](https://github.com/frankwswang/Quiqbox.jl/actions/workflows/CI-JS-older.yml).
 
-## Installation in Julia [REPL](https://docs.julialang.org/en/v1/manual/getting-started/)
+## Installation in Julia [REPL](https://docs.julialang.org/en/v1/stdlib/REPL/)
 
 Type `]` in the default [Julian mode](https://docs.julialang.org/en/v1/stdlib/REPL/#The-Julian-mode) to switch to the [Pkg mode](https://docs.julialang.org/en/v1/stdlib/REPL/#Pkg-mode):
 
