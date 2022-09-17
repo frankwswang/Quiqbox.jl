@@ -27,14 +27,16 @@ const ElementNames =
 
 const SubshellNames = 
 [
-"S",
-"P",
-"D",
-"F",
-"G",
-"H",
-"I"
+"s",
+"p",
+"d",
+"f",
+"g",
+"h",
+"i"
 ]
+
+const SubshellNamesUppercase = uppercase.(SubshellNames)
 
 
 struct LTuple{D, L}
@@ -142,10 +144,14 @@ const sciNotReplace = (txt)->replace(txt, SciNotMarker => "e")
 const BStextEndingMarker = "****"
 const BasisSetList = Dict(BasisSetNames .=> BasisFuncTexts)
 const AtomicNumberList = Dict(ElementNames .=> collect(1 : length(ElementNames)))
-const AngularMomentumList = Dict(SubshellNames .=> collect(0 : length(SubshellNames)-1))
-const SubshellOrientationList = [Dict(SubshellNames .=> SubshellLs[1]), 
-                                 Dict(SubshellNames .=> SubshellLs[2]), 
-                                 Dict(SubshellNames .=> SubshellLs[3])]
+const AngMomNumberList = Dict(SubshellNames .=> collect(0 : length(SubshellNames)-1))
+const SubshellAngMomList = [Dict(SubshellNames .=> SubshellLs[1]), 
+                            Dict(SubshellNames .=> SubshellLs[2]), 
+                            Dict(SubshellNames .=> SubshellLs[3])]
+const ToSubshellLN = Dict(vcat(SubshellNames, SubshellNamesUppercase) .=> 
+                          repeat(SubshellNames, 2))
+const ToSubshellUN = Dict(vcat(SubshellNames, SubshellNamesUppercase) .=> 
+                          repeat(SubshellNamesUppercase, 2))
 const SubshellSizeList = [Dict(SubshellNames .=> SubshellXsizes),
                           Dict(SubshellNames .=> SubshellXYsizes),
                           Dict(SubshellNames .=> SubshellXYZsizes)]
@@ -200,7 +206,7 @@ Return all the possible angular momentum configuration(s) within the input `subs
 `D` dimension.
 """
 orbitalLin(subshell::String, D::Int=3) = 
-getproperty.(SubshellLs[D][AngularMomentumList[subshell]+1], :tuple)
+getproperty.(SubshellLs[D][AngMomNumberList[ToSubshellLN[subshell]]+1], :tuple)
 
 
 """

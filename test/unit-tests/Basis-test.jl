@@ -129,7 +129,7 @@ bf2 = genBasisFunc(cen, [gf2])
 @test !hasIdentical(bf1, bf2)
 @test !hasIdentical(bf1, bf1_3)
 @test hasIdentical(bf1_3, bf1_4)
-@test subshellOf(bf1) == "S"
+@test subshellOf(bf1) == "s"
 @test bf1 isa BasisFunc
 
 bf11 = genBasisFunc(cen, [gf1, gf1])
@@ -140,9 +140,9 @@ bf11_2 = genBasisFunc(cen, ([xpn1, xpn1], [con1, con1]))
 @test hasEqual(bf11, bf11_2)
 @test !hasIdentical(bf11, bf11_2)
 bf2_P_norm2 = genBasisFunc(cen, [gf2], "P")
-@test subshellOf(bf2_P_norm2) == "P"
+@test subshellOf(bf2_P_norm2) == "p"
 @test bf2_P_norm2 isa BasisFuncs
-bf2_P_norm3 = genBasisFunc(cen, gf2, "P")
+bf2_P_norm3 = genBasisFunc(cen, gf2, "p")
 @test hasEqual(bf2_P_norm2, bf2_P_norm3)
 @test BasisFuncs(bf2_P_norm3) === bf2_P_norm3
 bfsp = BasisFuncs(genSpatialPoint(cen), gf2, (Quiqbox.LTuple(1,0,0),))
@@ -162,8 +162,8 @@ bf3s3 = genBasisFunc.(Ref(fill(0.0, 3)), "STO-3G", ["H", "He"]) |> flatten
 
 bf4_1 = genBasisFunc([0.0, 0.0, 0.0], (3.0, 1.0))
 bf4_2 = genBasisFunc([1.0, 0.0, 0.0], ps1)
-bf4_3 = genBasisFunc([0.0, 0.0, 0.0], ps1, "P")
-bf4_4 = genBasisFunc([0.0, 0.0, 0.0], (1.0, 1.0), "D")
+bf4_3 = genBasisFunc([0.0, 0.0, 0.0], ps1, "p")
+bf4_4 = genBasisFunc([0.0, 0.0, 0.0], (1.0, 1.0), "d")
 bf4_5 = genBasisFunc(bf4_4.center, bf4_4.gauss, bf4_4.l)
 @test hasIdentical(bf4_4, bf4_5)
 errorThreshold1 = 1e-11; errorThreshold3 = 1e-9
@@ -590,7 +590,7 @@ dm2 = reshape([genBasisFunc([1.0, 0.0, 0.0], (2.0, 0.1)), bf_d_1], 2, 1)
 # function orbitalNumOf
 @test orbitalNumOf("P") == 3
 @test orbitalNumOf("P", 2) == 2
-@test orbitalNumOf.(["S", "P", "D"]) == [1, 3, 6]
+@test orbitalNumOf.(["S", "p", "D"]) == [1, 3, 6]
 @test orbitalNumOf(bf1) == 1
 @test orbitalNumOf(bfm1) == 1 == orbitalNumOf(bfm2)
 @test orbitalNumOf.((bf1, bf2, bf4_3, bf5)) == (1, 1, 3, 1)
