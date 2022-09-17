@@ -70,13 +70,13 @@ end
     accuSize = vcat(0, accumulate(+, subSize))
     len = subSize |> sum
     nPage = (intFunc(BSet[1], BSet[1]) |> size)[3]
-    tensor = cat(fill(-2*ones(len, len), nPage)..., dims=3)
+    tensor = repeat(-2*ones(len, len), 1, 1, nPage)
     for i = 1:length(BSet), j = 1:i
         intTensor =  intFunc(BSet[i], BSet[j])
         for page = 1:nPage
             rowRange = accuSize[i]+1 : accuSize[i+1]
             colRange = accuSize[j]+1 : accuSize[j+1]
-            int = intTensor[:, :, page]
+            int = @view intTensor[:, :, page]
             tensor[rowRange, colRange, page] = int
             tensor[colRange, rowRange, page] = int |> transpose
         end

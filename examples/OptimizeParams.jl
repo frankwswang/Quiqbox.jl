@@ -20,5 +20,5 @@ Es, ps, grads = optimizeParams!(parsPartial, bs, nuc, nucCoords, POconfig(maxSte
 # using Flux # First do `using Pkg; Pkg.add("Flux")` if you haven't installed the package.
 # using Flux.Optimise: update!
 # optimizer = AMSGrad(0.01)
-# adamGD = (prs, grad, _, _, _) -> update!(optimizer, prs, grad)
-# optimizeParams!(parsPartial, bs, nuc, nucCoords, POconfig(optimizer=adamGD, maxStep=20))
+# adamGD! = (prs, grad, _, _, _) -> update!(optimizer, prs, grad)
+# optimizeParams!(parsPartial, bs, nuc, nucCoords, POconfig(optimizer=adamGD!, maxStep=20))
