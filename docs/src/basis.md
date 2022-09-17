@@ -139,9 +139,9 @@ julia> bf1 = genBasisFunc([1.0, 0, 0], [gf1, gf2])
 BasisFunc{Float64, 3, 0, 2}{PBFL{(0, 0, 0)}}(center, gauss, l, normalizeGTO, param)[X⁰Y⁰Z⁰][1.0, 0.0, 0.0]
 ```
 
-Unlike `BasisFunc`, there's no additional constructor function for `GaussFunc`. As for the method of `genBasisFunc` in this case, the subshell is set to "S" as the default option since the third argument is omitted. You can construct a `BasisFuncs` which contains all the orbitals within one specified subshell:
+Unlike `BasisFunc`, there's no additional constructor function for `GaussFunc`. As for the method of `genBasisFunc` in this case, the subshell is set to "s" as the default option since the third argument is omitted. You can construct a `BasisFuncs` which contains all the orbitals within one specified subshell:
 ```jldoctest myLabel2
-julia> bf2 = genBasisFunc([1.0, 0, 0], [gf1, gf2], "P")
+julia> bf2 = genBasisFunc([1.0, 0, 0], [gf1, gf2], "p")
 BasisFuncs{Float64, 3, 1, 2, P3D{Float64, iT, iT, iT}, 3}(center, gauss, l, normalizeGTO, param)[3/3][1.0, 0.0, 0.0]
 ```
 

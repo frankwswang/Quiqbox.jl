@@ -8,7 +8,7 @@ function Nlα(l, α)
     end
 end
 
-Nlα(subshell::String, α) = Nlα(Quiqbox.AngularMomentumList[subshell], α)
+Nlα(subshell::String, α) = Nlα(Quiqbox.AngMomNumberList[subshell], α)
 
 
 Nijk(i, j, k) = (2/π)^0.75 * sqrt( 2^(3*(i+j+k)) * factorial(i) * factorial(j) * 

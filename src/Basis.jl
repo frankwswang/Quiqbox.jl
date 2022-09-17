@@ -461,7 +461,7 @@ $(Doc_genBasisFunc_eg1)
 
 ≡≡≡ Method 2 ≡≡≡
 
-    genBasisFunc(center, GsOrCoeffs, subshell="S"; normalizeGTO=false) -> 
+    genBasisFunc(center, GsOrCoeffs, subshell="s"; normalizeGTO=false) -> 
     FloatingGTBasisFuncs
 
     genBasisFunc(center, GsOrCoeffs, subshell, lFilter; normalizeGTO=false) -> 
@@ -471,7 +471,7 @@ $(Doc_genBasisFunc_eg1)
 
 `subshell::String`: The third argument of the constructor can also be the name of a 
 subshell, which will make sure the output is a `BasisFuncs` that contains the spatial 
-orbitals that fully occupy the subshell. 
+orbitals that fully occupy the subshell.
 
 `lFilter::Tuple{Vararg{Bool}}`: When this 4th argument is provided, it can determine the 
 orbital(s) to be included based on the given `subshell`. The order of the corresponding 
@@ -484,10 +484,10 @@ orbital angular momentum(s) can be inspected using function `orbitalLin`.
 === Example(s) ===
 
 ```jldoctest; setup = :(push!(LOAD_PATH, "../../src/"); using Quiqbox)
-julia> genBasisFunc([0.,0.,0.], (2., 1.), "P")
+julia> genBasisFunc([0.,0.,0.], (2., 1.), "p")
 $(Doc_genBasisFunc_eg2)
 
-julia> genBasisFunc([0.,0.,0.], (2., 1.5), "P", (true, false, true))
+julia> genBasisFunc([0.,0.,0.], (2., 1.5), "p", (true, false, true))
 $(Doc_genBasisFunc_eg3)
 ```
 
@@ -575,7 +575,7 @@ genBasisFunc(cen, gs, l[1]; normalizeGTO)
 
 function genBasisFunc(cen::SpatialPoint{T, D}, gs::NTuple{GN, AbstractGaussFunc{T}}, 
                       subshell::String; normalizeGTO::Bool=false) where {T, D, GN}
-    genBasisFunc(cen, gs, SubshellOrientationList[D][subshell]; normalizeGTO)
+    genBasisFunc(cen, gs, SubshellAngMomList[D][ToSubshellLN[subshell]]; normalizeGTO)
 end
 
 function genBasisFunc(cen::SpatialPoint{T, D}, xpnsANDcons::NTuple{2, AbstractVector{T}}, 
@@ -593,7 +593,8 @@ genBasisFunc(cen, (GaussFunc(xpnANDcon[1], xpnANDcon[2]),), lOrSubshell; normali
 
 genBasisFunc(cen::SpatialPoint{T, D}, gs::Tuple, subshell::String, 
              lFilter::Tuple{Vararg{Bool}}; normalizeGTO::Bool=false) where {T, D} = 
-genBasisFunc(cen, gs, SubshellOrientationList[D][subshell][1:end .∈ Ref(findall(lFilter))]; 
+genBasisFunc(cen, gs, 
+             SubshellAngMomList[D][ToSubshellLN[subshell]][1:end.∈Ref(findall(lFilter))]; 
              normalizeGTO)
 
 function genBasisFunc(center::SpatialPoint{T, D}, BSkey::String, atm::String="H"; 
@@ -1565,7 +1566,8 @@ end
 
 Return the size (number of orbitals) of each subshell in `D` dimensional real space.
 """
-@inline orbitalNumOf(subshell::String, D::Integer=3) = SubshellSizeList[D][subshell]
+@inline orbitalNumOf(subshell::String, D::Integer=3) = 
+        SubshellSizeList[D][ToSubshellLN[subshell]]
 
 """
 
@@ -1600,8 +1602,8 @@ function genBasisFuncText(bf::FloatingGTBasisFuncs{T, D}; norm::Real=1.0,
     GFstr = mapreduce(x -> genGaussFuncText(x.xpn(), x.con(); roundDigits), *, bf.gauss)
     cen = centerCoordOf(bf)
     firstLine = printCenter ? "X "*(alignNum.(cen; roundDigits) |> join)*"\n" : ""
-    firstLine * "$(bf|>subshellOf)    $(getTypeParams(bf)[begin+3])   $(T(norm))" * 
-    "   $(bf.normalizeGTO)" * 
+    firstLine * "$(ToSubshellUN[bf|>subshellOf])    $(getTypeParams(bf)[begin+3])   " * 
+                "$(T(norm))   $(bf.normalizeGTO)" * 
     ( isaFullShellBasisFuncs(bf) ? "" : "  " * 
       join( [" $i" for i in get.(Ref(AngMomIndexList[D]), bf.l, "")] |> join ) ) * "\n" * 
     GFstr
@@ -1710,8 +1712,7 @@ function genBFuncsFromText(content::String;
     lines = split.(content |> IOBuffer |> readlines)
     lines = lines[1+excludeFirstNlines : end-excludeLastNlines]
     data = [advancedParse.(typ, i) for i in lines]
-    index = findall( x -> (eltype(x) != typ) && (length(x) > 2) && 
-                    (x[1] == "SP" || x[1] in SubshellNames), data )
+    index = findall(x -> eltype(x)!=typ && length(x)>2 && x[begin]!="X", data)
     bfs = FloatingGTBasisFuncs[]
     if !cenIsMissing
         d = (center isa AbstractArray) ? length(center) : D
@@ -1719,14 +1720,14 @@ function genBFuncsFromText(content::String;
     for i in index
         oInfo = data[i]
         gs1 = GaussFunc{typ}[]
-        ng = oInfo[2] |> Int
+        ng = oInfo[begin+1] |> Int
         centerOld = center
-        if center isa Missing && i != 1 && data[i-1][1] == "X"
+        if center isa Missing && i != 1 && data[i-1][1] == "X" # Marker for function center
             cenStr = data[i-1][2:end]
             center = convert(Vector{typ}, cenStr)
             d = length(cenStr)
         end
-        normFactor = oInfo[3]
+        normFactor = oInfo[begin+2]
         if normalizeGTO isa Missing
             normalizeGTO = if length(oInfo) < 4
                 defaultNGTOb = false
@@ -1737,24 +1738,28 @@ function genBFuncsFromText(content::String;
                 parse(Bool, oInfo[begin+3])
             end
         end
-        if oInfo[1] == "SP"
+        if oInfo[begin] == "SP"
             gs2 = GaussFunc{typ}[]
             for j = i+1 : i+ng
-                push!(gs1, GaussFunc(data[j][1], normFactor*data[j][2]))
-                push!(gs2, GaussFunc(data[j][1], normFactor*data[j][3]))
+                push!(gs1, GaussFunc(data[j][begin], normFactor*data[j][begin+1]))
+                push!(gs2, GaussFunc(data[j][begin], normFactor*data[j][begin+2]))
             end
             append!(bfs, genBasisFunc.(Ref(unlinkCenter ? deepcopy(center) : center), 
-                                       [gs1, gs2], ["S", "P"]; normalizeGTO))
+                                       [gs1, gs2], ["s", "p"]; normalizeGTO))
         else
             for j = i+1 : i+ng
                 push!(gs1, GaussFunc(data[j]...))
             end
-            subshellInfo = oInfo[1] |> string
+            subshell = ToSubshellLN[oInfo[begin]|>string]
+            subshell in SubshellNames || 
+            throw(DomainError(subshell, "This subshell in the input text is not "*
+                  "supported by Quiqbox."))
             if length(oInfo) > 4
-                subshellInfo = SubshellOrientationList[d][subshellInfo][oInfo[5:end].|>Int]
+                subshell = 
+                SubshellAngMomList[d][subshell][oInfo[begin+4:end].|>Int]
             end
             push!(bfs, genBasisFunc((unlinkCenter ? deepcopy(center) : center), 
-                                    gs1, subshellInfo; normalizeGTO))
+                                    gs1, subshell; normalizeGTO))
         end
         center = centerOld
     end
