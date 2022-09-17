@@ -14,13 +14,13 @@
 
 ### OS (64-bit) support
 * Generic Linux
-* MacOS
+* macOS
 * Windows
 
-**NOTE:** Each operating system (OS) platform is only tested on x86 architecture. The support of those systems on different architectures (such as MacOS on ARM architecture) is not guaranteed.
+**NOTE:** Each operating system (OS) platform is only tested on the x86-64 architecture. The support of those systems on different architectures (such as MacOS on ARM architecture) is not guaranteed.
 
 ### Julia (64-bit) compatibility
-Quiqbox will always try to support the [latest released version](https://julialang.org/downloads/#current_stable_release) of 64-bit Julia as soon as possible. On the other hand, the backward compatibility with previous versions is not guaranteed but can be checked [here](https://github.com/frankwswang/Quiqbox.jl/actions/workflows/CI-JS-older.yml).
+Quiqbox will always try to support the [latest stable release](https://julialang.org/downloads/#current_stable_release) of 64-bit Julia as soon as possible. On the other hand, backward compatibility with previous versions is not guaranteed but can be checked [here](https://github.com/frankwswang/Quiqbox.jl/actions/workflows/CI-JS-older.yml).
 
 ### Installation in Julia [REPL](https://docs.julialang.org/en/v1/manual/getting-started/)
 
@@ -36,7 +36,7 @@ Type the following command and hit *Enter* key to install Quiqbox:
 (@v1.x) pkg> add Quiqbox
 ```
 
-After the installation completes, hit *Backspace* key to go back to the Julian mode and use [`using`](https://docs.julialang.org/en/v1/base/base/#using) to load Quiqbox:
+After the installation completes, hit the *Backspace* key to go back to the Julian mode and use [`using`](https://docs.julialang.org/en/v1/base/base/#using) to load Quiqbox:
 
 ```julia
 julia> using Quiqbox
