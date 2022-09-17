@@ -1,6 +1,6 @@
 # Molden
 
-Quiqbox supports outputting the information of canonical spin-orbitals to [**Molden**](https://www3.cmbi.umcn.nl/molden/) file format.
+Quiqbox supports outputting the information of canonical spin-orbitals to *Molden* file format.
 
 ```@autodocs
 Modules = [Quiqbox.Molden]
@@ -9,6 +9,6 @@ Order   = [:function]
 ```
 
 !!! compat "Supported basis set type"
-    Due to the limitation of Molden format, only the basis sets that contain solely `FloatingGTBasisFuncs{<:Any, D, 𝑙, <:Any, <:Any, ON} where ON` such that each `ON` is equal to its maximal value. In other words, Only the basis sets built from full-subshell `FloatingGTBasisFuncs` are supported. Furthermore, the field `.normalizeGTO` for every inside basis function must all be `true` to avoid potential normalization issue.
+    *Molden* format only supports the basis sets that contain solely the basis`::FloatingGTBasisFuncs{<:Any, 3, 𝑙, <:Any, <:Any, ON}` where `ON` is equal to its maximal value. In other words, `makeMoldenFile` only supports [`MatterByHF`](@ref) whose `.basis.basis` are full-subshell `FloatingGTBasisFuncs`. Furthermore, the field `.normalizeGTO` for every inside basis function must all be `true` to avoid potential normalization issues.
 
-A concrete example of the above function can be found [here](https://github.com/frankwswang/Quiqbox.jl/tree/main/examples).
+An example of `makeMoldenFile` can be found [here](https://github.com/frankwswang/Quiqbox.jl/blob/main/examples/Jmol.jl).
