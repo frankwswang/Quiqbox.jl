@@ -85,7 +85,7 @@ optimizeParams!(pars, bs, nuc, coords)
 ```
 
 # Documentation
-Functions directly exported to the user in Quiqbox have the corresponding docstring that can be accessed through the [Help mode](https://docs.julialang.org/en/v1/stdlib/REPL/#Help-mode) in Julia REPL. The [latest release's documentation][Doc-stable] has all the docstrings and additional tutorials of the package. For unreleased/experimental features, please refer to the [developer documentation][Doc-latest].
+Objects defined by Quiqbox that are directly exported to the user have the corresponding docstring that can be accessed through the [Help mode](https://docs.julialang.org/en/v1/stdlib/REPL/#Help-mode) in Julia REPL. The [latest release's documentation][Doc-stable] has all the docstrings and additional tutorials of the package. For unreleased/experimental features, please refer to the [developer documentation][Doc-latest].
 
 <br />
 <br />
