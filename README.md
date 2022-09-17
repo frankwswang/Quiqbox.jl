@@ -27,7 +27,7 @@
 * macOS
 * Windows
 
-**NOTE:** Each operating system (OS) platform is only tested on the x86-64 architecture. The support of those systems on different architectures (such as MacOS on ARM architecture) is not guaranteed.
+**NOTE:** Each operating system (OS) platform is only tested on the x86-64 architecture. The support of those systems on different architectures (such as macOS on ARM architecture) is not guaranteed.
 
 ## Julia (64-bit) compatibility
 Quiqbox will always try to support the [latest stable release](https://julialang.org/downloads/#current_stable_release) of 64-bit Julia as soon as possible. On the other hand, backward compatibility with previous versions is not guaranteed but can be checked [here](https://github.com/frankwswang/Quiqbox.jl/actions/workflows/CI-JS-older.yml).
