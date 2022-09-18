@@ -4,7 +4,7 @@ function makeGridFuncsCore(nG::Int)
     if iszero(nG)
         [itself]
     else
-        PF.(itself, *, (0:nG) .- 0.5nG)
+        PF.(abs, *, (0:nG) .- 0.5nG)
     end
 end
 
@@ -91,10 +91,14 @@ struct GridBox{T, D, NP, GPT<:SpatialPoint{T, D}} <: SpatialStructure{T, D}
         data = makeGridPBoxData.(fill.(center), spacing, nGrids)
         for (n, i) in enumerate( CartesianIndices(nGrids .+ 1) )
             fs = makeGridFuncs.([funcs[j][k] for (j, k) in enumerate(i|>Tuple)], center)
-            p = broadcast((a, b, c, d, canDiff, index) -> 
-                          ParamBox(a, b, c, d; canDiff, index), 
-                          data, oVsym, fs, iVsym, canDiff, index)|>Tuple
-            point[n] = SpatialPoint(p)
+            p = map(data, oVsym, fs, canDiff, index) do d, V, f, c, i
+                if f isa iT
+                    ParamBox(d, V, canDiff=c, index=i)
+                else
+                    ParamBox(d, V, f, iVsym; canDiff=c, index=i)
+                end
+            end
+            point[n] = genSpatialPoint(p)
             param[D*(n-1)+1 : D*n] .= p
         end
         point = Tuple(point)
