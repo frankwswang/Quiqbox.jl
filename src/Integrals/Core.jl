@@ -32,7 +32,12 @@ end
 
 function getGQN(::Type{T}, u) where {T}
     u = abs(u) + getAtolVal(T)
-    getAtolDigits(T) + Int( round(0.4u + 2inv(sqrt(u))) ) + 1
+    res = getAtolDigits(T) + round(0.4u + 2inv(sqrt(u))) + 1
+    if res < typemax(Int) - 1
+        Int(res)
+    else
+        typemax(Int) - 1
+    end
 end
 
 function Fγ(γ::Int, u::T) where {T}
@@ -49,7 +54,7 @@ function F₀toFγ(γ::Int, u::T) where {T}
     γ > 0 || (return res)
     res[end] = Fγ(γ, u)
     for i in γ:-1:2
-        res[i] = (2u*res[i+1] + exp(-u)) / (2i - 1)
+        res[i] = expAdd(-u, 2u*res[i+1]) / (2i - 1)
     end
     res
 end
