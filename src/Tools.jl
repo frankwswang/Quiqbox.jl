@@ -11,7 +11,12 @@ Return the maximal number of digits kept after rounding of the input real number
 """
 function getAtolDigits(::Type{T}) where {T<:Real}
     val = log10(T|>eps)
-    max(0, -val) |> floor |> Int
+    res = max(0, -val) |> floor
+    if res > typemax(Int)
+        throw(DomainError(res, "This value is too large to be converted to Int."))
+    else
+        Int(res)
+    end
 end
 
 
@@ -613,7 +618,7 @@ end
 function isOscillateConverged(seq::AbstractVector{<:Real}, 
                               tarThreshold::Real, 
                               target::Real=NaN, 
-                              stdThreshold::Real=0.75tarThreshold; 
+                              stdThreshold::Real=0.8tarThreshold; 
                               minCycles::Int=5, maxRemains::Int=10, 
                               convergeToMax::Bool=false)
     tailEles = isOscillateConvergedHead(seq, minCycles, maxRemains)

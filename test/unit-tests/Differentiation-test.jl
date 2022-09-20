@@ -169,4 +169,22 @@ grad3_t = [-0.1606522922402765,    -0.24121983207381031, -0.1480105648704627,
             2.76294860945643,     -16.536548278392075]
 compr2Arrays3((grad3=grad3, grad3_t=grad3_t), 8000t2, true)
 
+
+# Edge case of accurate gradient requiring high-precision computation
+gf2 = GaussFunc(0.7, 1.0)
+gf3 = GaussFunc(0.5, 1.0)
+grid2 = GridBox(1, 3.0)
+bs4 = genBasisFunc.(grid2.point, Ref([gf2])) .+ genBasisFunc(fill(0.0, 3), gf3)
+pars4 = markParams!(bs4, true)[1:5]
+pVals = [0.06053894364993645, 0.14969526640945469, 0.6609406021835533, 
+         0.6053365604566768, 1.582624636863842]
+grad4_t = [ 0.00011524226901650934, 0.013112845298709097, 0.008472955326960456, 
+           -0.016166185015739958,   0.0061833882951649495]
+setindex!.(pars4, pVals)
+gtb4 = GTBasis(bs4)
+HFres4 = Quiqbox.runHFcore(gtb4, nuc, nucCoords, Quiqbox.defaultHFforHFgrad)
+grad4 = gradOfHFenergy(pars4, gtb4, (HFres4[begin][begin].Cs[end],), nuc, nucCoords)
+t4 = 5e-8
+@test isapprox(grad4, grad4_t, atol=t4)
+
 end

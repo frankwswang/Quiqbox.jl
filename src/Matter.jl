@@ -1,7 +1,6 @@
 export CanOrbital, genCanOrbitals, changeHbasis, MatterByHF, nnRepulsions
 
 using LinearAlgebra: norm
-using Tullio: @tullio
 using TensorOperations: @tensor as @TOtensor
 
 """
@@ -101,8 +100,16 @@ changeHbasis(oneBodyInt::AbstractMatrix{T}, C::AbstractMatrix{T}) where {T} =
 changeHbasis(twoBodyInt::AbstractArray{T, 4}, C::AbstractMatrix{T}) where {T} = 
 @TOtensor ijkl[i,j,k,l] := twoBodyInt[a,b,c,d] * C[a,i] * C[b,j] * C[c,k] * C[d,l]
 
-getJᵅᵝ(twoBodyInt::AbstractArray{T, 4}, (C1, C2)::NTuple{2, AbstractMatrix{T}}) where {T} = 
-@tullio iijj[i,j] := twoBodyInt[a,b,c,d] * C1[a,i] * C1[b,i] * C2[c,j] * C2[d,j]
+function getJᵅᵝ(twoBodyInt::AbstractArray{T, 4}, 
+                (C1, C2)::NTuple{2, AbstractMatrix{T}}) where {T}
+    m = axes(C1, 2)
+    n = axes(C2, 2)
+    map(Iterators.product(m, n)) do idx
+        C1c = view(C1, :, idx[begin])
+        C2c = view(C2, :, idx[end])
+        @TOtensor twoBodyInt[a,b,c,d] * C1c[a] * C1c[b] * C2c[c] * C2c[d]
+    end
+end
 
 """
 

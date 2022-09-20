@@ -82,7 +82,7 @@ end
 
 
 const defaultPOconfigPars = 
-      [Val(:HFenergy), defaultHFforHFgrad, NaN, (5e-7, 5e-6), 200, GDconfig()]
+      [Val(:HFenergy), defaultHFforHFgrad, NaN, (5e-7, 1e-5), 200, GDconfig()]
 
 """
 
@@ -116,11 +116,19 @@ be used because the gradient won't be part of the convergence criteria.
 To use a function implemented by the user as the optimizer, it should have the following 
 function signature: 
 
-    o!(x::Vector{T}, gx::Vector{T}, fx::T, f::Function, gf::Function) where {T}
+    optimizer(f::Function, gf::Function, x0::Vector{T}) where {T} -> Function
 
-where `x` are the initial input variables of `Function` `f`, and the returned value of `f`, 
-`f(x)`,  is equal to `fx`. `x` will be optimized, in another word, mutated by the 
-optimizer `o!` each time `o!` runs. `gf` is a `Function` such that `gf(x) == (gx, fx)`.
+where `f` is the objective function to be minimized, `gf` is a function that returns 
+both the gradient and the returned value of `f` given the input value as a vector. `x0` is 
+the initial input value. The output of `optimizer`, if we name it `optimize!`, should have 
+the corresponding function signature: 
+
+    optimize!(x::Vector{T}, gx::Vector{T}, fx::T) where {T}
+
+where `x`, `gx`, `fx` are the input value, the gradient, and the returned value of `f` 
+respectively at one step. In other words, `(fx, gx) == (f(x), gx) == gf(x)`. After 
+accepting those arguments, `optimizer` should update (i.e. mutate the elements of) `x` so 
+that f(x) will have lower returned value.
 
 ≡≡≡ Initialization Method(s) ≡≡≡
 
@@ -159,7 +167,7 @@ const defaultPOconfig = Meta.parse(defaultPOconfigStr) |> eval
 
 
 function genLineSearchOpt(GDc::GDconfig{T, M, ST}, 
-                          f::Function, gf::Function) where {T, M, ST}
+                          f::Function, gf::Function, _) where {T, M, ST}
     l = GDc.lineSearchMethod
     η₀ = GDc.initialStep
     lo, up = GDc.stepBound
@@ -182,8 +190,7 @@ function genLineSearchOpt(GDc::GDconfig{T, M, ST},
     end
 end
 
-function genLineSearchOpt(GDc::GDconfig{T, iT, ST}, _::Function, _::Function) where 
-                         {T, ST}
+function genLineSearchOpt(GDc::GDconfig{T, iT, ST}, ::Function, ::Function, _) where {T, ST}
     η₀ = GDc.initialStep
     lo, up = GDc.stepBound
     @inline function (x, gx, _)
@@ -197,9 +204,17 @@ function genLineSearchOpt(GDc::GDconfig{T, iT, ST}, _::Function, _::Function) wh
     end
 end
 
-function convertExternalOpt(o!::F, f::Function, gf::Function) where {F}
+# function convertExternalOpt(o!::F, f::Function, gf::Function) where {F}
+#     function (x, gx, fx)
+#         o!(x, gx, fx, f, gf)
+#         x
+#     end
+# end
+
+function convertExternalOpt(genO!::F, f::Function, gf::Function, x0) where {F}
+    o! = genO!(f, gf, x0)
     function (x, gx, fx)
-        o!(x, gx, fx, f, gf)
+        o!(x, gx, fx)
         x
     end
 end
@@ -235,7 +250,7 @@ getOptimizerConstructor(::Type{<:Any}) =  convertExternalOpt
     end
 
     generator = getOptimizerConstructor(O)
-    generator(optimizer, f, gf)
+    generator(optimizer, f, gf, getindex.(pbs))
 end
 
 
@@ -376,7 +391,7 @@ function optimizeParams!(pbs::AbstractVector{<:ParamBox{T}},
             _->true
         else
             detectConverge |= true
-            vrs->isOscillateConverged(vrs, thd*sqrt(vrs[end]|>length), target)[1]
+            vrs->isOscillateConverged(vrs, thd*sqrt(vrs[end]|>length), target)[begin]
         end
     end
     detectConverge || (isConverged = (_->false,))
@@ -442,8 +457,9 @@ function optimizeParams!(pbs::AbstractVector{<:ParamBox{T}},
             println("∥Δ$(fVstr)∥₂ → ", 
                     round(norm(fVals[end] - fVals[end-1]), digits=nDigitShown), ", ", 
                     "∥vec(∇$(fVstr))∥₂ → ", 
-                    round(norm(grads[end]), digits=nDigitShown), ".\n")
+                    round(norm(grads[end]), digits=nDigitShown), ".")
         end
+        println()
     end
 
     fVals, parsVals, grads, ifelse(detectConverge, blConv, missing)

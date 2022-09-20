@@ -30,6 +30,8 @@ gPoints = getproperty.(genSpatialPoint.(points), :param) |> flatten
 
 grid2 = GridBox((1,0,0), 1.4)
 @test gridCoordOf(grid2) == ([-0.7, 0.0, 0.0], [0.7, 0.0, 0.0])
+@test inSymOf.(grid2.param) == (:L, :x_Y, :x_Z, :L, :x_Y, :x_Z)
+@test outSymOf.(grid2.param) == (:X, :Y, :Z, :X, :Y, :Z)
 
 point1, point2 = grid2.point
 for i in point1

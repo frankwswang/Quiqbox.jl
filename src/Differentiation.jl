@@ -2,17 +2,18 @@ export gradOfHFenergy
 
 using LinearAlgebra: eigen, Symmetric, Hermitian
 using ForwardDiff: derivative as ForwardDerivative
-using Tullio: @tullio
+using TensorOperations: @tensor as @TOtensor
+using DoubleFloats: Double64
 
 function oneBodyDerivativeCore(::Val{false}, 
-                               ∂bfs::AbstractVector{<:GTBasisFuncs{T, D, 1}}, 
-                               bfs::AbstractVector{<:GTBasisFuncs{T, D, 1}}, 
-                               X::AbstractMatrix{T}, ∂X::AbstractMatrix{T}, 
-                               ʃ::F) where {T, D, F<:Function}
+                               ∂bfs::AbstractVector{<:GTBasisFuncs{T1, D, 1}}, 
+                               bfs::AbstractVector{<:GTBasisFuncs{T1, D, 1}}, 
+                               X::AbstractMatrix{T2}, ∂X::AbstractMatrix{T2}, 
+                               ʃ::F) where {T1, T2, D, F<:Function}
     BN = length(bfs)
-    ∂ʃ = Array{T}(undef, BN, BN)
-    ʃab = Array{T}(undef, BN, BN)
-    ∂ʃab = Array{T}(undef, BN, BN)
+    ∂ʃ = Array{T1}(undef, BN, BN)
+    ʃab = Array{T1}(undef, BN, BN)
+    ∂ʃab = Array{T1}(undef, BN, BN)
     @sync for i = 1:BN, j = 1:i
         Threads.@spawn ʃab[i,j] = ʃab[j,i] = ʃ(bfs[i], bfs[j])
     end
@@ -34,14 +35,14 @@ end
 
 
 function twoBodyDerivativeCore(::Val{false}, 
-                               ∂bfs::AbstractVector{<:GTBasisFuncs{T, D, 1}}, 
-                               bfs::AbstractVector{<:GTBasisFuncs{T, D, 1}}, 
-                               X::AbstractMatrix{T}, ∂X::AbstractMatrix{T}, 
-                               ʃ::F) where {T, D, F<:Function}
+                               ∂bfs::AbstractVector{<:GTBasisFuncs{T1, D, 1}}, 
+                               bfs::AbstractVector{<:GTBasisFuncs{T1, D, 1}}, 
+                               X::AbstractMatrix{T2}, ∂X::AbstractMatrix{T2}, 
+                               ʃ::F) where {T1, T2, D, F<:Function}
     BN = length(bfs)
-    ∂ʃ = Array{T}(undef, BN, BN, BN, BN)
-    ʃabcd = Array{T}(undef, BN, BN, BN, BN)
-    ʃ∂abcd = Array{T}(undef, BN, BN, BN, BN)
+    ∂ʃ = Array{T1}(undef, BN, BN, BN, BN)
+    ʃabcd = Array{T1}(undef, BN, BN, BN, BN)
+    ʃ∂abcd = Array{T1}(undef, BN, BN, BN, BN)
 
     # ijkl in the chemists' notation of spatial bases (ij|kl).
     @sync for i = 1:BN, j = 1:i, k = 1:i, l = 1:ifelse(k==i, j, k)
@@ -57,21 +58,28 @@ function twoBodyDerivativeCore(::Val{false},
         end
     end
     # [∂ʃ4[i,j,k,l] == ∂ʃ4[j,i,l,k] == ∂ʃ4[j,i,k,l] != ∂ʃ4[l,j,k,i]
+    X = Array(X)
     for i = 1:BN, j = 1:i, k = 1:i, l = 1:ifelse(k==i, j, k)
-        # ʃ∂abcd[i,j,k,l] == ʃ∂abcd[i,j,l,k] == ʃab∂cd[l,k,i,j] == ʃab∂cd[k,l,i,j]
-        @tullio val := begin
-            @inbounds ( X[a,$i]* X[b,$j]* X[c,$k]* X[d,$l] + 
-                        X[a,$j]* X[b,$i]* X[c,$k]* X[d,$l] + 
-                        X[c,$i]* X[d,$j]* X[a,$k]* X[b,$l] + 
-                        X[c,$i]* X[d,$j]* X[a,$l]* X[b,$k]  ) *ʃ∂abcd[a,b,c,d] + 
-                      (∂X[a,$i]* X[b,$j]* X[c,$k]* X[d,$l] + 
-                        X[a,$i]*∂X[b,$j]* X[c,$k]* X[d,$l] + 
-                        X[a,$i]* X[b,$j]*∂X[c,$k]* X[d,$l] + 
-                        X[a,$i]* X[b,$j]* X[c,$k]*∂X[d,$l]  ) * ʃabcd[a,b,c,d]
-        end
+    # @sync for i = 1:BN, j = 1:i, k = 1:i, l = 1:ifelse(k==i, j, k)
+        # Threads.@spawn begin
+            # ʃ∂abcd[i,j,k,l] == ʃ∂abcd[i,j,l,k] == ʃab∂cd[l,k,i,j] == ʃab∂cd[k,l,i,j]
+            Xvi = view(X, :, i)
+            Xvj = view(X, :, j)
+            Xvk = view(X, :, k)
+            Xvl = view(X, :, l)
+            @TOtensor val = 
+                (Xvi[a] * Xvj[b] * Xvk[c] * Xvl[d] + Xvj[a] * Xvi[b] * Xvk[c] * Xvl[d] + 
+                 Xvi[c] * Xvj[d] * Xvk[a] * Xvl[b] + Xvi[c] * Xvj[d] * Xvl[a] * Xvk[b]) * 
+                ʃ∂abcd[a,b,c,d] + 
+                (view(∂X, :, i)[a] * Xvj[b] * Xvk[c] * Xvl[d] + 
+                 Xvi[a] * view(∂X, :, j)[b] * Xvk[c] * Xvl[d] + 
+                 Xvi[a] * Xvj[b] * view(∂X, :, k)[c] * Xvl[d] + 
+                 Xvi[a] * Xvj[b] * Xvk[c] * view(∂X, :, l)[d] ) * 
+                ʃabcd[a,b,c,d]
 
-        ∂ʃ[i,j,k,l] = ∂ʃ[j,i,k,l] = ∂ʃ[j,i,l,k] = ∂ʃ[i,j,l,k] = 
-        ∂ʃ[l,k,i,j] = ∂ʃ[k,l,i,j] = ∂ʃ[k,l,j,i] = ∂ʃ[l,k,j,i] = val
+            ∂ʃ[i,j,k,l] = ∂ʃ[j,i,k,l] = ∂ʃ[j,i,l,k] = ∂ʃ[i,j,l,k] = 
+            ∂ʃ[l,k,i,j] = ∂ʃ[k,l,i,j] = ∂ʃ[k,l,j,i] = ∂ʃ[l,k,j,i] = val
+        # end
     end
     ∂ʃ
 end
@@ -91,6 +99,7 @@ function derivativeCore(FoutputIsVector::Val{B},
             ∂S[i,j] = ∂S[j,i] = overlap(∂bfs[i], bfs[j]) + overlap(bfs[i], ∂bfs[j])
         end
     end
+    eps(T) > eps(Double64) && (S = Double64.(S))
     X = getXcore1(S)
     λ, 𝑣 = eigen(S|>Hermitian)
     ∂S2 = 𝑣'*∂S*𝑣
