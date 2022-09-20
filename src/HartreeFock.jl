@@ -83,8 +83,10 @@ getC.( Ref(X), getF(Hcore, HeeI, (Dᵅ, Dᵝ)) )
 function getCfromGWH(::Val{HFT}, S::AbstractMatrix{T}, Hcore::AbstractMatrix{T}, 
                      X::AbstractMatrix{T}) where {HFT, T}
     H = similar(Hcore)
-    for j in 1:size(H, 1), i in 1:j
-        H[j,i] = H[i,j] = 3 * S[i,j] * (Hcore[i,i] + Hcore[j,j]) / 8
+    Threads.@threads for j in 1:size(H, 1)
+        for i in 1:j
+            H[j,i] = H[i,j] = 3 * S[i,j] * (Hcore[i,i] + Hcore[j,j]) / 8
+        end
     end
     Cˢ = getC(X, H)
     breakSymOfC(Val(HFT), Cˢ)
@@ -151,8 +153,8 @@ getD(Cˢ::AbstractMatrix{T}, Nˢ::Int) where {T} = @views (Cˢ[:,1:Nˢ]*Cˢ[:,1:
 function getGcore(HeeI::AbstractArray{T, 4}, 
                   DJ::AbstractMatrix{T}, DK::AbstractMatrix{T}) where {T}
     G = similar(DJ)
-    @sync for ν = 1:size(G, 1)
-        Threads.@spawn for μ = 1:ν # Spawn here is faster than spawn inside the loop.
+    Threads.@threads for ν = 1:size(G, 1)
+        for μ = 1:ν
             G[ν, μ] = G[μ, ν] = 
             dot(transpose(DJ), @view HeeI[μ,ν,:,:]) - dot(DK, @view HeeI[μ,:,:,ν])
         end
@@ -805,8 +807,10 @@ function EDIIScore(∇s::AbstractVector{<:AbstractMatrix{T}},
                    Ds::AbstractVector{<:AbstractMatrix{T}}, Es::AbstractVector{T}) where {T}
     len = length(Ds)
     B = similar(∇s[begin], len, len)
-    @sync for j=1:len, i=1:j
-        Threads.@spawn B[i,j] = B[j,i] = -dot(Ds[i]-Ds[j], ∇s[i]-∇s[j])
+    Threads.@threads for j in eachindex(Ds)
+        for i = 1:j
+            B[i,j] = B[j,i] = -dot(Ds[i]-Ds[j], ∇s[i]-∇s[j])
+        end
     end
     Es, B
 end
@@ -828,9 +832,11 @@ function DIIScore(∇s::AbstractVector{<:AbstractMatrix{T}},
     len = length(Ds)
     B = similar(∇s[begin], len, len)
     v = zeros(len)
-    @sync for j in 1:len, i=1:j
-        Threads.@spawn B[i,j] = B[j,i] = dot( ∇s[i]*Ds[i]*S - S*Ds[i]*∇s[i], 
-                                              ∇s[j]*Ds[j]*S - S*Ds[j]*∇s[j] )
+    Threads.@threads for j in eachindex(Ds)
+        for i = 1:j
+            B[i,j] = B[j,i] = dot( ∇s[i]*Ds[i]*S - S*Ds[i]*∇s[i], 
+                                   ∇s[j]*Ds[j]*S - S*Ds[j]*∇s[j] )
+        end
     end
     v, B
 end

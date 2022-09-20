@@ -1044,7 +1044,7 @@ function getOneBodyInts(∫1e::F, basisSet::AbstractVector{<:GTBasisFuncs{T, D}}
     accuSize = vcat(0, accumulate(+, subSize))
     totalSize = subSize |> sum
     buf = Array{T}(undef, totalSize, totalSize)
-    @sync for j = 1:length(basisSet), i = 1:j
+    @sync for j in eachindex(basisSet), i = 1:j
         Threads.@spawn begin
             int = getCompositeInt(∫1e, (j==i,), (basisSet[i], basisSet[j]), optArgs...)
             rowRange = accuSize[i]+1 : accuSize[i+1]
@@ -1059,7 +1059,7 @@ function getOneBodyInts(∫1e::F, basisSet::AbstractVector{<:GTBasisFuncs{T, D, 
                         optArgs...) where {F<:Function, T, D}
     BN = length(basisSet)
     buf = Array{T}(undef, BN, BN)
-    @sync for j = 1:BN, i = 1:j
+    @sync for j in eachindex(basisSet), i = 1:j
         Threads.@spawn begin
             int = getCompositeInt(∫1e, (j==i,), (basisSet[i], basisSet[j]), optArgs...)
             buf[j, i] = buf[i, j] = int
@@ -1096,7 +1096,7 @@ function getTwoBodyInts(∫2e::F, basisSet::AbstractVector{<:GTBasisFuncs{T, D}}
     accuSize = vcat(0, accumulate(+, subSize)...)
     totalSize = subSize |> sum
     buf = Array{T}(undef, totalSize, totalSize, totalSize, totalSize)
-    @sync for l = 1:length(basisSet), k = 1:l, j = 1:l, i = 1:ifelse(l==j, k, j)
+    @sync for l in eachindex(basisSet), k = 1:l, j = 1:l, i = 1:ifelse(l==j, k, j)
         Threads.@spawn begin
             I = accuSize[i]+1 : accuSize[i+1]
             J = accuSize[j]+1 : accuSize[j+1]
@@ -1115,7 +1115,7 @@ function getTwoBodyInts(∫2e::F, basisSet::AbstractVector{<:GTBasisFuncs{T, D, 
                        {F<:Function, T, D}
     BN = length(basisSet)
     buf = Array{T}(undef, BN, BN, BN, BN)
-    @sync for l = 1:BN, k = 1:l, j = 1:l, i = 1:ifelse(l==j, k, j)
+    @sync for l in eachindex(basisSet), k = 1:l, j = 1:l, i = 1:ifelse(l==j, k, j)
         Threads.@spawn begin
             bl = (l==k, l==j, k==j, ifelse(l==j, k, j)==i)
             int = getCompositeInt(∫2e, bl, (basisSet[i], basisSet[j], 
