@@ -59,8 +59,8 @@ function twoBodyDerivativeCore(::Val{false},
     end
     # [∂ʃ4[i,j,k,l] == ∂ʃ4[j,i,l,k] == ∂ʃ4[j,i,k,l] != ∂ʃ4[l,j,k,i]
     X = Array(X)
-    @sync for i = 1:BN, j = 1:i, k = 1:i, l = 1:ifelse(k==i, j, k)
-        Threads.@spawn begin
+    for i = 1:BN, j = 1:i, k = 1:i, l = 1:ifelse(k==i, j, k)
+        # Threads.@spawn begin
             # ʃ∂abcd[i,j,k,l] == ʃ∂abcd[i,j,l,k] == ʃab∂cd[l,k,i,j] == ʃab∂cd[k,l,i,j]
             Xvi = view(X, :, i)
             Xvj = view(X, :, j)
@@ -78,7 +78,7 @@ function twoBodyDerivativeCore(::Val{false},
 
             ∂ʃ[i,j,k,l] = ∂ʃ[j,i,k,l] = ∂ʃ[j,i,l,k] = ∂ʃ[i,j,l,k] = 
             ∂ʃ[l,k,i,j] = ∂ʃ[k,l,i,j] = ∂ʃ[k,l,j,i] = ∂ʃ[l,k,j,i] = val
-        end
+        # end
     end
     ∂ʃ
 end
