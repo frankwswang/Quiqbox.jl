@@ -5,7 +5,6 @@ using Combinatorics: powerset
 using LineSearches
 using Optim: LBFGS, Fminbox, optimize as OptimOptimize, minimizer as OptimMinimizer, 
              Options as OptimOptions
-using Tullio: @tullio
 
 const defaultDS = 0.5
 const defaultDIISconfig = (12, :LBFGS)
@@ -815,8 +814,11 @@ end
 
 function ADIIScore(∇s::AbstractVector{<:AbstractMatrix{T}}, 
                    Ds::AbstractVector{<:AbstractMatrix{T}}) where {T}
-    @tullio v[i] := dot(Ds[i] - Ds[end], ∇s[end])
-    @tullio B[i,j] := dot((Ds[i]-Ds[end]), (∇s[j]-∇s[end]))
+    v = dot.(Ds .- Ref(Ds[end]), Ref(∇s[end]))
+    B = map(Iterators.product(eachindex(Ds), eachindex(∇s))) do idx
+        i, j = idx
+        dot(Ds[i]-Ds[end], ∇s[j]-∇s[end])
+    end
     v, B
 end
 
