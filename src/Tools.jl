@@ -866,11 +866,3 @@ function skipIndices(arr::AbstractArray{Int}, ints::AbstractVector{Int})
         end
     end
 end
-
-function expAdd(p, c)
-    if abs(p) < 1e-14
-        expm1(p) + c + 1
-    else
-        exp(p) + c
-    end
-end

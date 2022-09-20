@@ -54,7 +54,7 @@ function F₀toFγ(γ::Int, u::T) where {T}
     γ > 0 || (return res)
     res[end] = Fγ(γ, u)
     for i in γ:-1:2
-        res[i] = expAdd(-u, 2u*res[i+1]) / (2i - 1)
+        res[i] = (expm1(-u) + 2u*res[i+1] + 1) / (2i - 1)
     end
     res
 end
