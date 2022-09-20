@@ -254,8 +254,8 @@ par_t3s  = ([2.683044395069885, 0.23864596287198328, 0.5379614398083751,
              0.7726143568590775, 1.505605770092433])
 grad_t3s = ([ 0.016737442500322317, 0.014772482377904794, 0.001854882588292155, 
              -0.0014810659836638402, 0.0008847402162058637], 
-            [-1.4080734136141717e-5, -0.0012385422547458447, 0.00020327495641051007, 
-             -1.7504200111968446e-6, 8.982428586149904e-7])
+            [-1.4081047097875285e-5, -0.0012383502029096882, 0.0002032661265648208, 
+             -1.773352516297455e-6, 9.100111433215253e-7])
 
 for ((i, po), E_t3, par_t3, grad_t3) in zip(enumerate(pos2), E_t3s, par_t3s, grad_t3s)
     gf2_2 = GaussFunc(0.7, 1.0)
@@ -276,7 +276,7 @@ for ((i, po), E_t3, par_t3, grad_t3) in zip(enumerate(pos2), E_t3s, par_t3s, gra
     test3bl2 = isapprox(Es3L[end], E_t3, atol=errorThreshold1)
     test3bl3 = isapprox(ps3L[end][2:end], par_t3[2:end], atol=errorThreshold3)
     test3bl4 = isapprox(abs(ps3L[end][1]), abs(par_t3[1]), atol=errorThreshold3)
-    test3bl5 = isapprox(grads3L[end], grad_t3, atol=10errorThreshold1)
+    test3bl5 = isapprox(grads3L[end], grad_t3, atol=50errorThreshold1)
 
     test3bl1 || (@show test3bl1 Es3Ldiffs)
     @test test3bl1
