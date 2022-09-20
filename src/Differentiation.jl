@@ -59,61 +59,25 @@ function twoBodyDerivativeCore(::Val{false},
     end
     # [∂ʃ4[i,j,k,l] == ∂ʃ4[j,i,l,k] == ∂ʃ4[j,i,k,l] != ∂ʃ4[l,j,k,i]
     X = Array(X)
-    Threads.@threads for i = 1:BN
-        Threads.@threads for j = 1:i
-            Threads.@threads for k = 1:i
-                Threads.@threads for l = 1:ifelse(k==i, j, k)
-                    # ʃ∂abcd[i,j,k,l] == ʃ∂abcd[i,j,l,k] == 
-                    # ʃab∂cd[l,k,i,j] == ʃab∂cd[k,l,i,j]
-                    Xvi = view(X, :, i)
-                    Xvj = view(X, :, j)
-                    Xvk = view(X, :, k)
-                    Xvl = view(X, :, l)
-                    @TOtensor val = 
-                        (Xvi[a] * Xvj[b] * Xvk[c] * Xvl[d] + 
-                         Xvj[a] * Xvi[b] * Xvk[c] * Xvl[d] + 
-                         Xvi[c] * Xvj[d] * Xvk[a] * Xvl[b] + 
-                         Xvi[c] * Xvj[d] * Xvl[a] * Xvk[b]) * ʃ∂abcd[a,b,c,d] + 
-                        (view(∂X, :, i)[a] * Xvj[b] * Xvk[c] * Xvl[d] + 
-                         Xvi[a] * view(∂X, :, j)[b] * Xvk[c] * Xvl[d] + 
-                         Xvi[a] * Xvj[b] * view(∂X, :, k)[c] * Xvl[d] + 
-                         Xvi[a] * Xvj[b] * Xvk[c] * view(∂X, :, l)[d] ) * ʃabcd[a,b,c,d]
+    @sync for i = 1:BN, j = 1:i, k = 1:i, l = 1:ifelse(k==i, j, k)
+        Threads.@spawn begin
+            # ʃ∂abcd[i,j,k,l] == ʃ∂abcd[i,j,l,k] == ʃab∂cd[l,k,i,j] == ʃab∂cd[k,l,i,j]
+            Xvi = view(X, :, i)
+            Xvj = view(X, :, j)
+            Xvk = view(X, :, k)
+            Xvl = view(X, :, l)
+            @TOtensor val = 
+                (Xvi[a] * Xvj[b] * Xvk[c] * Xvl[d] + Xvj[a] * Xvi[b] * Xvk[c] * Xvl[d] + 
+                 Xvi[c] * Xvj[d] * Xvk[a] * Xvl[b] + Xvi[c] * Xvj[d] * Xvl[a] * Xvk[b]) * 
+                ʃ∂abcd[a,b,c,d] + 
+                (view(∂X, :, i)[a] * Xvj[b] * Xvk[c] * Xvl[d] + 
+                 Xvi[a] * view(∂X, :, j)[b] * Xvk[c] * Xvl[d] + 
+                 Xvi[a] * Xvj[b] * view(∂X, :, k)[c] * Xvl[d] + 
+                 Xvi[a] * Xvj[b] * Xvk[c] * view(∂X, :, l)[d] ) * 
+                ʃabcd[a,b,c,d]
 
-                    # val = 0
-                    # for a = 1:BN, b = 1:BN, c = 1:BN, d = 1:BN
-                    #     @inbounds val += 
-                    #     ( big(X[a,i])*X[b,j]*X[c,k]*X[d,l] + big(X[a,j])*X[b,i]*X[c,k]*X[d,l] + 
-                    #       big(X[c,i])*X[d,j]*X[a,k]*X[b,l] + big(X[c,i])*X[d,j]*X[a,l]*X[b,k] ) * 
-                    #     ʃ∂abcd[a,b,c,d] + 
-                    #     (big(∂X[a,i])*X[b,j]* X[c,k]*X[d,l] + big(X[a,i])*∂X[b,j]*X[c,k]* X[d,l] + 
-                    #       big(X[a,i])*X[b,j]*∂X[c,k]*X[d,l] + big(X[a,i])* X[b,j]*X[c,k]*∂X[d,l] ) * 
-                    #     ʃabcd[a,b,c,d]
-                    # end
-
-                    # val = map(CartesianIndices(ʃabcd)) do cartIdx
-                    #     a, b, c, d = Tuple(cartIdx)
-                    #     ( big(X[a,i])*X[b,j]*X[c,k]*X[d,l] + big(X[a,j])*X[b,i]*X[c,k]*X[d,l] + 
-                    #       big(X[c,i])*X[d,j]*X[a,k]*X[b,l] + big(X[c,i])*X[d,j]*X[a,l]*X[b,k] ) * 
-                    #     ʃ∂abcd[cartIdx] + 
-                    #     (big(∂X[a,i])*X[b,j]* X[c,k]*X[d,l] + big(X[a,i])*∂X[b,j]*X[c,k]* X[d,l] + 
-                    #       big(X[a,i])*X[b,j]*∂X[c,k]*X[d,l] + big(X[a,i])* X[b,j]*X[c,k]*∂X[d,l] ) * 
-                    #     ʃabcd[cartIdx]
-                    # end |> sum
-
-                    # val = mapreduce(+, CartesianIndices(ʃabcd)) do cartIdx
-                    #     a, b, c, d = Tuple(cartIdx)
-                    #     ( big(X[a,i])*X[b,j]*X[c,k]*X[d,l] + big(X[a,j])*X[b,i]*X[c,k]*X[d,l] + 
-                    #       big(X[c,i])*X[d,j]*X[a,k]*X[b,l] +  big(X[c,i])*X[d,j]*X[a,l]*X[b,k] ) * 
-                    #     ʃ∂abcd[cartIdx] + 
-                    #     (big(∂X[a,i])*X[b,j]* X[c,k]*X[d,l] + big(X[a,i])*∂X[b,j]*X[c,k]* X[d,l] + 
-                    #      big(X[a,i])*X[b,j]*∂X[c,k]*X[d,l] +  big(X[a,i])* X[b,j]*X[c,k]*∂X[d,l] ) * 
-                    #     ʃabcd[cartIdx]
-                    # end
-
-                    ∂ʃ[i,j,k,l] = ∂ʃ[j,i,k,l] = ∂ʃ[j,i,l,k] = ∂ʃ[i,j,l,k] = 
-                    ∂ʃ[l,k,i,j] = ∂ʃ[k,l,i,j] = ∂ʃ[k,l,j,i] = ∂ʃ[l,k,j,i] = val
-                end
-            end
+            ∂ʃ[i,j,k,l] = ∂ʃ[j,i,k,l] = ∂ʃ[j,i,l,k] = ∂ʃ[i,j,l,k] = 
+            ∂ʃ[l,k,i,j] = ∂ʃ[k,l,i,j] = ∂ʃ[k,l,j,i] = ∂ʃ[l,k,j,i] = val
         end
     end
     ∂ʃ
