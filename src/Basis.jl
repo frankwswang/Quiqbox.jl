@@ -969,11 +969,11 @@ function sumOfCore(bfs::AbstractArray{<:BasisFunc{T, D}};
     end
 end
 
-sumOfCore(bs::ArrayOrNTuple{GTBasisFuncs{T, D, 1}}; 
+sumOfCore(bs::AArrayOrNTuple{GTBasisFuncs{T, D, 1}}; 
           roundAtol::Real=getAtolVal(T)) where {T, D} = 
 sumOfCore(BasisFunc{T, D}[vcat(unpackBasis.(bs)...);]; roundAtol)
 
-function sumOf(bs::ArrayOrNTuple{GTBasisFuncs{T, D, 1}}; 
+function sumOf(bs::AArrayOrNTuple{GTBasisFuncs{T, D, 1}}; 
                roundAtol::Real=getAtolVal(T)) where {T, D}
     length(bs) == 1 && (return bs[1])
     sumOfCore(bs; roundAtol)
@@ -1168,17 +1168,15 @@ Try merging multiple `FloatingGTBasisFuncs` (if there's any) in `bs` into
 return the resulted basis collection. If no merging is performed, then the returned 
 collection is same as (but not necessarily identical to) `bs`.
 """
-function mergeBasisFuncsIn(bs::AbstractVector{<:GTBasisFuncs{T, D}}; 
+function mergeBasisFuncsIn(bs::AVectorOrNTuple{Vararg{GTBasisFuncs{T, D}}}; 
                            roundAtol::Real=NaN) where {T, D}
     ids = findall(x->isa(x, FGTBasisFuncs1O), bs)
-    isempty(ids) || 
-    ( return vcat(mergeBasisFuncs(bs[ids]...; roundAtol), bs[begin:end .∉ Ref(ids)]) )
-    bs
+    if isempty(ids)
+        collectTuple(bs)
+    else
+        vcat(mergeBasisFuncs(bs[ids]...; roundAtol), collectTuple(bs[1:end .∉ Ref(ids)]))
+    end
 end
-
-mergeBasisFuncsIn(bs::Tuple{Vararg{GTBasisFuncs{T, D}}}; 
-                  roundAtol::Real=NaN) where {T, D} = 
-mergeBasisFuncsIn(collect(bs); roundAtol)
 
 
 """

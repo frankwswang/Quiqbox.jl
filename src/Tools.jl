@@ -796,24 +796,6 @@ genTupleCoords(::Type{T}, coords::Tuple{Vararg{NTuple{D, T}}}) where {D, T} = it
 genTupleCoords(::Type{T}, coords::AbstractVector{NTuple{D, T}}) where {D, T} = Tuple(coords)
 
 
-# callGenFunc(f::F, x) where {F<:Function} = callGenFuncCore(worldAgeSafe(F), f, x)
-# # callGenFuncCore(::Val{true}, f, x) = f(x)
-# @generated function callGenFuncCore(::Val{BL}, f::F, x) where {BL, F}
-#     if BL
-#         return :( f(x) )
-#     else
-#         # @eval worldAgeSafe(::Type{F}) = Val(true)
-#         expr = Expr(:(=), Expr(:call, :worldAgeSafe, Expr(:(::), Expr(:curly, :Type, :Int))), Expr(:call, :Val, :true))
-#         return quote
-#             $expr
-#             Base.invokelatest(f, x)
-#         end
-#     end
-# end
-
-worldAgeSafe(::Type{<:Function}) = Val(false)
-
-
 uniCallFunc(f::F, argsOrder::NTuple{N, Int}, args...) where {F<:Function, N} = 
 f(getindex.(Ref(args), argsOrder)...)
 
@@ -865,3 +847,10 @@ function skipIndices(arr::AbstractArray{Int}, ints::AbstractVector{Int})
         end
     end
 end
+
+
+collectTuple(t::Tuple) = collect(t)
+
+collectTuple(a::AbstractArray) = itself(a)
+
+collectTuple(o::Any) = collect(o)

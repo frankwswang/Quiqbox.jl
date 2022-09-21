@@ -215,7 +215,7 @@ getproperty.(SubshellLs[D][AngMomNumberList[ToSubshellLN[subshell]]+1], :tuple)
 
 Return the total electric charge (in 𝑒) of the input nuclei.
 """
-getCharge(nucs::VectorOrNTuple{String}) = getCharge.(nucs) |> sum
+getCharge(nucs::AVectorOrNTuple{String}) = getCharge.(nucs) |> sum
 
 getCharge(nucStr::String) = AtomicNumberList[nucStr]
 

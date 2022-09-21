@@ -5,7 +5,7 @@ using Quiqbox: getAtolVal, getAtolDigits, roundToMultiOfStep, nearestHalfOf, get
                markUnique, getUnique!, itself, themselves, replaceSymbol, groupedSort, 
                mapPermute, getFunc, nameOf, tupleDiff, genIndex, fillObj, arrayToTuple, 
                genTupleCoords, uniCallFunc, mergeMultiObjs, isNaN, getBool, skipIndices, 
-               isOscillateConverged
+               isOscillateConverged, collectTuple
 using Suppressor: @capture_out
 using LinearAlgebra: norm
 
@@ -267,5 +267,15 @@ for x in collect(0:100:5000)
 end
 @test convRes2[begin]
 @test norm(convRes2[end]) < convAtol*(sqrt∘length)(convRes2[end])
+
+
+# function collectTuple
+tpl1 = (1,2,3)
+arr1 = collect(tpl1)
+@test collectTuple(1:3) == arr1 == collect(1:3)
+@test collectTuple(1:3) !== arr1
+@test collectTuple(tpl1) == arr1
+@test collectTuple(tpl1) !== arr1
+@test collectTuple(arr1) === arr1
 
 end

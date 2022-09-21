@@ -101,7 +101,8 @@ end
 
 
 function getCfromSAD(::Val{HFT}, S::AbstractMatrix{T}, 
-                     Hcore::AbstractMatrix{T}, HeeI::AbstractArray{T, 4}, bs, 
+                     Hcore::AbstractMatrix{T}, HeeI::AbstractArray{T, 4}, 
+                     bs::AVectorOrNTuple{AbstractGTBasisFuncs{T, D}}, 
                      nuc::NTuple{NN, String}, nucCoords::NTuple{NN, NTuple{D, T}}, 
                      X::AbstractMatrix{T}, 
                      config=SCFconfig((:ADIIS,), (max(1e-2, 10getAtolVal(T)),))) where 
@@ -215,8 +216,8 @@ end
 
 
 function initializeSCFcore(::Val{HFT}, Hcore::AbstractMatrix{T}, HeeI::AbstractArray{T, 4}, 
-                       C::NTuple{HFTS, AbstractMatrix{T}}, N::NTuple{HFTS, Int}) where 
-                      {HFT, T, HFTS}
+                           C::NTuple{HFTS, AbstractMatrix{T}}, N::NTuple{HFTS, Int}) where 
+                          {HFT, T, HFTS}
     D = getD.(C, N)
     F = getF(Hcore, HeeI, D)
     E = getE.(Ref(Hcore), F, D)
@@ -460,7 +461,7 @@ struct HFfinalVars{T, D, HFT, NN, BN, HFTS} <: HartreeFockFinalValue{T, HFT}
     basis::GTBasis{T, D, BN}
 
     @inline function HFfinalVars(basis::GTBasis{T, 𝐷, BN}, 
-                                 nuc::VectorOrNTuple{String, NN}, 
+                                 nuc::AVectorOrNTuple{String, NN}, 
                                  nucCoords::SpatialCoordType{T, 𝐷, NN}, 
                                  X::AbstractMatrix{T}, 
                                  vars::NTuple{HFTS, HFtempVars{T, HFT}}, 
@@ -641,12 +642,12 @@ function runHF(bs::GTBasis{T}, args...; printInfo::Bool=true) where {T}
     res
 end
 
-runHF(bs::VectorOrNTuple{AbstractGTBasisFuncs{T, D}}, args...; 
+runHF(bs::AVectorOrNTuple{AbstractGTBasisFuncs{T, D}}, args...; 
       printInfo::Bool=true) where {T, D} = 
 runHF(GTBasis(bs), args...; printInfo)
 
 @inline function runHFcore(bs::GTBasis{T, D, BN, BFT}, 
-                           nuc::VectorOrNTuple{String, NN}, 
+                           nuc::AVectorOrNTuple{String, NN}, 
                            nucCoords::SpatialCoordType{T, D, NN}, 
                            N::Union{Int, Tuple{Int}, NTuple{2, Int}}=getCharge(nuc), 
                            config::HFconfig{<:Any, HFT}=defaultHFC; 
@@ -672,7 +673,7 @@ runHFcore(bs::BasisSetData, nuc, nucCoords, config::HFconfig, N::Int=getCharge(n
           printInfo::Bool=false) = 
 runHFcore(bs::BasisSetData, nuc, nucCoords, N, config; printInfo)
 
-runHFcore(bs::VectorOrNTuple{AbstractGTBasisFuncs{T, D}}, args...; 
+runHFcore(bs::AVectorOrNTuple{AbstractGTBasisFuncs{T, D}}, args...; 
           printInfo::Bool=false) where {T, D} = 
 runHFcore(GTBasis(bs), args...; printInfo)
 

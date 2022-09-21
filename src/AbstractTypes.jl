@@ -84,6 +84,6 @@ const SpatialCoordType{T, D, N} = Union{ AbstractVector{<:AbstractVector{<:T}},
                                          NTuple{N, <:AbstractVector{<:T}}, 
                                          NTuple{N, NTuple{D, T}} }
 
-const VectorOrNTuple{T, N} = Union{NTuple{N, T}, AbstractVector{<:T}}
+const AVectorOrNTuple{T, N} = Union{NTuple{N, T}, AbstractVector{<:T}}
 
-const ArrayOrNTuple{T, N} = Union{NTuple{N, T}, AbstractArray{<:T}}
+const AArrayOrNTuple{T, N} = Union{NTuple{N, T}, AbstractArray{<:T}}
