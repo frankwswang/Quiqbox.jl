@@ -1044,8 +1044,8 @@ function getOneBodyInts(∫1e::F, basisSet::AbstractVector{<:GTBasisFuncs{T, D}}
     accuSize = vcat(0, accumulate(+, subSize))
     totalSize = subSize |> sum
     buf = Array{T}(undef, totalSize, totalSize)
-    @sync for j in eachindex(basisSet), i = 1:j
-        Threads.@spawn begin
+    Threads.@threads for j in eachindex(basisSet)
+        Threads.@threads for i = 1:j
             int = getCompositeInt(∫1e, (j==i,), (basisSet[i], basisSet[j]), optArgs...)
             rowRange = accuSize[i]+1 : accuSize[i+1]
             colRange = accuSize[j]+1 : accuSize[j+1]
@@ -1059,8 +1059,8 @@ function getOneBodyInts(∫1e::F, basisSet::AbstractVector{<:GTBasisFuncs{T, D, 
                         optArgs...) where {F<:Function, T, D}
     BN = length(basisSet)
     buf = Array{T}(undef, BN, BN)
-    @sync for j in eachindex(basisSet), i = 1:j
-        Threads.@spawn begin
+    Threads.@threads for j in eachindex(basisSet)
+        Threads.@threads for i = 1:j
             int = getCompositeInt(∫1e, (j==i,), (basisSet[i], basisSet[j]), optArgs...)
             buf[j, i] = buf[i, j] = int
         end
