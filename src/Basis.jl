@@ -1168,16 +1168,17 @@ Try merging multiple `FloatingGTBasisFuncs` (if there's any) in `bs` into
 return the resulted basis collection. If no merging is performed, then the returned 
 collection is same as (but not necessarily identical to) `bs`.
 """
-function mergeBasisFuncsIn(bs::Union{AbstractVector{<:GTBasisFuncs{T, D}}, 
-                                     Tuple{Vararg{GTBasisFuncs{T, D}}}}; 
+function mergeBasisFuncsIn(bs::AbstractVector{<:GTBasisFuncs{T, D}}; 
                            roundAtol::Real=NaN) where {T, D}
     ids = findall(x->isa(x, FGTBasisFuncs1O), bs)
-    if isempty(ids)
-        collect(bs)
-    else
-        vcat(mergeBasisFuncs(bs[ids]...; roundAtol), collect(bs[1:end .∉ Ref(ids)]))
-    end
+    isempty(ids) || 
+    ( return vcat(mergeBasisFuncs(bs[ids]...; roundAtol), bs[begin:end .∉ Ref(ids)]) )
+    bs
 end
+
+mergeBasisFuncsIn(bs::Tuple{Vararg{GTBasisFuncs{T, D}}}; 
+                  roundAtol::Real=NaN) where {T, D} = 
+mergeBasisFuncsIn(collect(bs); roundAtol)
 
 
 """
@@ -1645,8 +1646,8 @@ function joinConcentricBFuncStr(bs::Union{AbstractVector{<:FloatingGTBasisFuncs{
                                           Tuple{Vararg{FloatingGTBasisFuncs{T, D}}}}; 
                                 norm::Real=1.0, printCenter::Bool=true, 
                                 roundDigits::Int=-1) where {T, D}
-    str = genBasisFuncText(bs[1]; norm, printCenter, roundDigits)
-    str *= genBasisFuncText.(bs[2:end]; norm, printCenter=false, roundDigits) |> join
+    str = genBasisFuncText(bs[begin]; norm, printCenter, roundDigits)
+    str *= genBasisFuncText.(bs[begin+1:end]; norm, printCenter=false, roundDigits) |> join
 end
 
 

@@ -785,16 +785,15 @@ arrayToTuple(arr::AbstractArray) = Tuple(arr)
 arrayToTuple(tpl::Tuple) = itself(tpl)
 
 
-genTupleCoords(::Type{T1}, coords::AbstractVector{<:AbstractVector{<:T2}}) where {T1, T2} = 
-Tuple(Tuple(i.|>T1) for i in coords)
-
 genTupleCoords(::Type{T1}, coords::Tuple{Vararg{AbstractVector{<:T2}}}) where {T1, T2} = 
 map(x->Tuple(x.|>T1), coords)
 
+genTupleCoords(::Type{T1}, coords::AbstractVector{<:AbstractVector{<:T2}}) where {T1, T2} = 
+genTupleCoords(T1, coords|>Tuple)
+
 genTupleCoords(::Type{T}, coords::Tuple{Vararg{NTuple{D, T}}}) where {D, T} = itself(coords)
 
-genTupleCoords(::Type{T}, coords::AbstractVector{NTuple{D, T}}) where {D, T} = 
-arrayToTuple(coords)
+genTupleCoords(::Type{T}, coords::AbstractVector{NTuple{D, T}}) where {D, T} = Tuple(coords)
 
 
 # callGenFunc(f::F, x) where {F<:Function} = callGenFuncCore(worldAgeSafe(F), f, x)

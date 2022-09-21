@@ -101,8 +101,7 @@ end
 
 
 function getCfromSAD(::Val{HFT}, S::AbstractMatrix{T}, 
-                     Hcore::AbstractMatrix{T}, HeeI::AbstractArray{T, 4},
-                     bs::NTuple{BN, AbstractGTBasisFuncs{T, D}}, 
+                     Hcore::AbstractMatrix{T}, HeeI::AbstractArray{T, 4}, bs, 
                      nuc::NTuple{NN, String}, nucCoords::NTuple{NN, NTuple{D, T}}, 
                      X::AbstractMatrix{T}, 
                      config=SCFconfig((:ADIIS,), (max(1e-2, 10getAtolVal(T)),))) where 
@@ -470,7 +469,7 @@ struct HFfinalVars{T, D, HFT, NN, BN, HFTS} <: HartreeFockFinalValue{T, HFT}
         throw(AssertionError("The length of `nuc` and `nucCoords` should be the same."))
         any(length(i)!=𝐷 for i in nucCoords) && 
         throw(DomainError(nucCoords, "The lengths of the elements in `nucCoords` should "*
-               "all be length $D."))
+               "all be length $𝐷."))
         Ehf = vars[1].shared.Etots[end]
         nuc = arrayToTuple(nuc)
         nucCoords = genTupleCoords(T, nucCoords)
@@ -646,12 +645,12 @@ runHF(bs::VectorOrNTuple{AbstractGTBasisFuncs{T, D}}, args...;
       printInfo::Bool=true) where {T, D} = 
 runHF(GTBasis(bs), args...; printInfo)
 
-@inline function runHFcore(bs::GTBasis{T1, D, BN, BFT}, 
+@inline function runHFcore(bs::GTBasis{T, D, BN, BFT}, 
                            nuc::VectorOrNTuple{String, NN}, 
-                           nucCoords::SpatialCoordType{T1, D, NN}, 
+                           nucCoords::SpatialCoordType{T, D, NN}, 
                            N::Union{Int, Tuple{Int}, NTuple{2, Int}}=getCharge(nuc), 
-                           config::HFconfig{T2, HFT}=defaultHFC; 
-                           printInfo::Bool=false) where {T1, D, BN, BFT, NN, HFT, T2}
+                           config::HFconfig{<:Any, HFT}=defaultHFC; 
+                           printInfo::Bool=false) where {T, D, BN, BFT, NN, HFT}
     Nlow = Int(HFT==:RHF)
     N > Nlow || throw(DomainError(N, "$(HFT) requires more than $(Nlow) electrons."))
     Ns = splitSpins(Val(HFT), N)
@@ -659,7 +658,7 @@ runHF(GTBasis(bs), args...; printInfo)
     BN < leastNb &&  throw(DomainError(BN, "The number of basis functions should be no "*
                            "less than $(leastNb)."))
     nuc = arrayToTuple(nuc)
-    nucCoords = genTupleCoords(T1, nucCoords)
+    nucCoords = genTupleCoords(T, nucCoords)
     Hcore = coreH(bs, nuc, nucCoords)
     X = getX(bs.S)
     getC0f = config.C0.f

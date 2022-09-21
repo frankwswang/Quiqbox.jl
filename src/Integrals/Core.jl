@@ -843,7 +843,7 @@ function getCompositeInt(::typeof(∫nucAttractionCore), bls::Union{Tuple{Bool},
                          nuc::NTuple{NN, String}, 
                          nucCoords::NTuple{NN, NTuple{D, T}}) where {T, D, NN}
     mapreduce(+, nuc, nucCoords) do ele, coord
-        getOneBodyInt(∫nucAttractionCore, bls, bfs..., getCharge(ele), coord|>Tuple)
+        getOneBodyInt(∫nucAttractionCore, bls, bfs..., getCharge(ele), coord)
     end
 end
                           #       j==i      j!=i

@@ -22,8 +22,10 @@ getCompositeInt(∫overlapCore, (bf2===bf1,), (bf1, bf2))
 
 Return the orbital overlap matrix given a basis set.
 """
-overlaps(bs::VectorOrNTuple{AbstractGTBasisFuncs{T, D}}) where {T, D} = 
-getOneBodyInts(∫overlapCore, collect(bs))
+overlaps(bs::AbstractVector{<:AbstractGTBasisFuncs{T, D}}) where {T, D} = 
+getOneBodyInts(∫overlapCore, bs)
+
+overlaps(bs::Tuple{Vararg{AbstractGTBasisFuncs{T, D}}}) where {T, D} = overlaps(bs|>collect)
 
 
 """
@@ -47,8 +49,11 @@ getCompositeInt(∫elecKineticCore, (bf2===bf1,), (bf1, bf2))
 
 Return the electron kinetic energy matrix given a basis set.
 """
-eKinetics(bs::VectorOrNTuple{AbstractGTBasisFuncs{T, D}}) where {T, D} = 
-getOneBodyInts(∫elecKineticCore, collect(bs))
+eKinetics(bs::AbstractVector{<:AbstractGTBasisFuncs{T, D}}) where {T, D} = 
+getOneBodyInts(∫elecKineticCore, bs)
+
+eKinetics(bs::Tuple{Vararg{AbstractGTBasisFuncs{T, D}}}) where {T, D} = 
+eKinetics(bs|>collect)
 
 
 """
@@ -79,11 +84,16 @@ getCompositeInt(∫nucAttractionCore, (bf2===bf1,), (bf1, bf2),
 Return the nuclear attraction matrix given a basis set and the corresponding nuclei with 
 their coordinates (in atomic units).
 """
-neAttractions(bs::VectorOrNTuple{AbstractGTBasisFuncs{T, D}}, 
+neAttractions(bs::AbstractVector{<:AbstractGTBasisFuncs{T, D}}, 
               nuc::VectorOrNTuple{String, NN}, 
               nucCoords::SpatialCoordType{T, D, NN}) where {T, D, NN} = 
-getOneBodyInts(∫nucAttractionCore, collect(bs), 
+getOneBodyInts(∫nucAttractionCore, bs, 
                arrayToTuple(nuc), genTupleCoords(T, nucCoords))
+
+neAttractions(bs::Tuple{Vararg{AbstractGTBasisFuncs{T, D}}}, 
+              nuc::VectorOrNTuple{String, NN}, 
+              nucCoords::SpatialCoordType{T, D, NN}) where {T, D, NN} = 
+neAttractions(collect(bs), nuc, nucCoords)
 
 
 """
@@ -117,6 +127,7 @@ coreH(bs::VectorOrNTuple{AbstractGTBasisFuncs{T, D}},
       nucCoords::SpatialCoordType{T, D, NN}) where {T, D, NN} = 
 eKinetics(bs) + neAttractions(bs, nuc, nucCoords)
 
-coreH(b::GTBasis{T, D}, nuc::Union{NTuple{NN, String}, AbstractVector{String}}, 
+coreH(b::GTBasis{T, D}, 
+      nuc::VectorOrNTuple{String, NN}, 
       nucCoords::SpatialCoordType{T, D, NN}) where {T, D, NN} = 
 neAttractions(b.basis, nuc, nucCoords) + b.Te

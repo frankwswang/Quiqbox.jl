@@ -25,7 +25,7 @@ differentiable with respect to the input variable in the differentiation process
 words, it determines whether the output variable represented by the `ParamBox` is treated 
 as a dependent variable or an independent variable.
 
-`index::Array{<:Union{Int, Nothing}, 0}`: Additional index assigned to the `ParamBox`.
+`index::Array{Union{Int, Nothing}, 0}`: Additional index assigned to the `ParamBox`.
 
 ≡≡≡ Initialization Method(s) ≡≡≡
 
@@ -92,7 +92,7 @@ struct ParamBox{T, V, F<:Function} <: DifferentiableParameter{T, ParamBox}
     data::Array{Pair{Array{T, 0}, Symbol}, 0}
     map::Union{F, DI{F}}
     canDiff::Array{Bool, 0}
-    index::Array{<:Union{Int, Nothing}, 0}
+    index::Array{Union{Int, Nothing}, 0}
 
     function ParamBox{T, V}(f::F, data::Pair{Array{T, 0}, Symbol}, index, canDiff) where 
                            {T, V, F<:Function}
