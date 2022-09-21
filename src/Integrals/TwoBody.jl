@@ -29,5 +29,5 @@ getCompositeInt(∫eeInteractionCore,
 Return the tensor of electron-electron interactions (in the chemists' notation) given a 
 basis set.
 """
-eeInteractions(bs::VectorOrNTuple{AbstractGTBasisFuncs{T, D}}) where {T, D} = 
-getTwoBodyInts(∫eeInteractionCore, collect(bs))
+eeInteractions(bs::AVectorOrNTuple{AbstractGTBasisFuncs{T, D}}) where {T, D} = 
+getTwoBodyInts(∫eeInteractionCore, collectTuple(bs))

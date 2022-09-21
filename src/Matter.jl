@@ -265,13 +265,12 @@ end
 
 Return the nuclear repulsion energy given nuclei `nuc` and their coordinates `nucCoords`.
 """
-function nnRepulsions(nuc::VectorOrNTuple{String, NN}, 
-                      nucCoords::SpatialCoordType{T, D, NN}) where {NN, D, T}
+function nnRepulsions(nuc::AVectorOrNTuple{String, NN}, 
+                      nucCoords::SpatialCoordType{T, <:Any, NN}) where {NN, T}
     nuc = arrayToTuple(nuc)
     nucCoords = genTupleCoords(T, nucCoords)
     E = T(0)
-    len = length(nuc)
-    for i = 1:len, j=i+1:len
+    for i in eachindex(nuc), j = (i+1):lastindex(nuc)
         E += getCharge(nuc[i]) * getCharge(nuc[j]) / norm(nucCoords[i] .- nucCoords[j])
     end
     E

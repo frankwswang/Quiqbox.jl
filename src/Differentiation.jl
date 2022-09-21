@@ -190,17 +190,17 @@ order of `bs` (`basis.basis`).
 """
 gradOfHFenergy(par::AbstractVector{<:ParamBox}, b::GTBasis{T, D}, 
                C::NTuple{HFTS, AbstractMatrix{T}}, 
-               nuc::VectorOrNTuple{String, NN}, 
+               nuc::AVectorOrNTuple{String, NN}, 
                nucCoords::SpatialCoordType{T, D, NN}, 
                N::Union{Int, Tuple{Int}, NTuple{2, Int}}=getCharge(nuc)) where 
               {T, D, HFTS, NN} = 
 gradOfHFenergy(par, b.basis, b.S, C, nuc, nucCoords, N)
 
 function gradOfHFenergy(par::AbstractVector{<:ParamBox{T}}, 
-                        bs::VectorOrNTuple{GTBasisFuncs{T, D, 1}}, 
+                        bs::AVectorOrNTuple{GTBasisFuncs{T, D, 1}}, 
                         S::AbstractMatrix{T}, 
                         C::NTuple{HFTS, AbstractMatrix{T}}, 
-                        nuc::VectorOrNTuple{String, NN}, 
+                        nuc::AVectorOrNTuple{String, NN}, 
                         nucCoords::SpatialCoordType{T, D, NN}, 
                         N::Union{Int, Tuple{Int}, NTuple{2, Int}}=getCharge(nuc)) where 
                        {T, D, HFTS, NN}

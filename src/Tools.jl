@@ -785,34 +785,15 @@ arrayToTuple(arr::AbstractArray) = Tuple(arr)
 arrayToTuple(tpl::Tuple) = itself(tpl)
 
 
-genTupleCoords(::Type{T1}, coords::AbstractVector{<:AbstractVector{<:T2}}) where {T1, T2} = 
-Tuple(Tuple(i.|>T1) for i in coords)
-
 genTupleCoords(::Type{T1}, coords::Tuple{Vararg{AbstractVector{<:T2}}}) where {T1, T2} = 
 map(x->Tuple(x.|>T1), coords)
 
+genTupleCoords(::Type{T1}, coords::AbstractVector{<:AbstractVector{<:T2}}) where {T1, T2} = 
+genTupleCoords(T1, coords|>Tuple)
+
 genTupleCoords(::Type{T}, coords::Tuple{Vararg{NTuple{D, T}}}) where {D, T} = itself(coords)
 
-genTupleCoords(::Type{T}, coords::AbstractVector{NTuple{D, T}}) where {D, T} = 
-arrayToTuple(coords)
-
-
-# callGenFunc(f::F, x) where {F<:Function} = callGenFuncCore(worldAgeSafe(F), f, x)
-# # callGenFuncCore(::Val{true}, f, x) = f(x)
-# @generated function callGenFuncCore(::Val{BL}, f::F, x) where {BL, F}
-#     if BL
-#         return :( f(x) )
-#     else
-#         # @eval worldAgeSafe(::Type{F}) = Val(true)
-#         expr = Expr(:(=), Expr(:call, :worldAgeSafe, Expr(:(::), Expr(:curly, :Type, :Int))), Expr(:call, :Val, :true))
-#         return quote
-#             $expr
-#             Base.invokelatest(f, x)
-#         end
-#     end
-# end
-
-worldAgeSafe(::Type{<:Function}) = Val(false)
+genTupleCoords(::Type{T}, coords::AbstractVector{NTuple{D, T}}) where {D, T} = Tuple(coords)
 
 
 uniCallFunc(f::F, argsOrder::NTuple{N, Int}, args...) where {F<:Function, N} = 
@@ -866,3 +847,10 @@ function skipIndices(arr::AbstractArray{Int}, ints::AbstractVector{Int})
         end
     end
 end
+
+
+collectTuple(t::Tuple) = collect(t)
+
+collectTuple(a::AbstractArray) = itself(a)
+
+collectTuple(o::Any) = collect(o)

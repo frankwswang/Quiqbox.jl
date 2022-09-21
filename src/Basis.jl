@@ -969,11 +969,11 @@ function sumOfCore(bfs::AbstractArray{<:BasisFunc{T, D}};
     end
 end
 
-sumOfCore(bs::ArrayOrNTuple{GTBasisFuncs{T, D, 1}}; 
+sumOfCore(bs::AArrayOrNTuple{GTBasisFuncs{T, D, 1}}; 
           roundAtol::Real=getAtolVal(T)) where {T, D} = 
 sumOfCore(BasisFunc{T, D}[vcat(unpackBasis.(bs)...);]; roundAtol)
 
-function sumOf(bs::ArrayOrNTuple{GTBasisFuncs{T, D, 1}}; 
+function sumOf(bs::AArrayOrNTuple{GTBasisFuncs{T, D, 1}}; 
                roundAtol::Real=getAtolVal(T)) where {T, D}
     length(bs) == 1 && (return bs[1])
     sumOfCore(bs; roundAtol)
@@ -1168,14 +1168,13 @@ Try merging multiple `FloatingGTBasisFuncs` (if there's any) in `bs` into
 return the resulted basis collection. If no merging is performed, then the returned 
 collection is same as (but not necessarily identical to) `bs`.
 """
-function mergeBasisFuncsIn(bs::Union{AbstractVector{<:GTBasisFuncs{T, D}}, 
-                                     Tuple{Vararg{GTBasisFuncs{T, D}}}}; 
+function mergeBasisFuncsIn(bs::AVectorOrNTuple{GTBasisFuncs{T, D}}; 
                            roundAtol::Real=NaN) where {T, D}
     ids = findall(x->isa(x, FGTBasisFuncs1O), bs)
     if isempty(ids)
-        collect(bs)
+        collectTuple(bs)
     else
-        vcat(mergeBasisFuncs(bs[ids]...; roundAtol), collect(bs[1:end .∉ Ref(ids)]))
+        vcat(mergeBasisFuncs(bs[ids]...; roundAtol), collectTuple(bs[1:end .∉ Ref(ids)]))
     end
 end
 
@@ -1645,8 +1644,8 @@ function joinConcentricBFuncStr(bs::Union{AbstractVector{<:FloatingGTBasisFuncs{
                                           Tuple{Vararg{FloatingGTBasisFuncs{T, D}}}}; 
                                 norm::Real=1.0, printCenter::Bool=true, 
                                 roundDigits::Int=-1) where {T, D}
-    str = genBasisFuncText(bs[1]; norm, printCenter, roundDigits)
-    str *= genBasisFuncText.(bs[2:end]; norm, printCenter=false, roundDigits) |> join
+    str = genBasisFuncText(bs[begin]; norm, printCenter, roundDigits)
+    str *= genBasisFuncText.(bs[begin+1:end]; norm, printCenter=false, roundDigits) |> join
 end
 
 

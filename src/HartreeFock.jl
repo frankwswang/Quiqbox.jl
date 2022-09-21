@@ -83,8 +83,10 @@ getC.( Ref(X), getF(Hcore, HeeI, (Dᵅ, Dᵝ)) )
 function getCfromGWH(::Val{HFT}, S::AbstractMatrix{T}, Hcore::AbstractMatrix{T}, 
                      X::AbstractMatrix{T}) where {HFT, T}
     H = similar(Hcore)
-    for j in 1:size(H, 1), i in 1:j
-        H[j,i] = H[i,j] = 3 * S[i,j] * (Hcore[i,i] + Hcore[j,j]) / 8
+    Threads.@threads for j in 1:size(H, 1)
+        for i in 1:j
+            H[j,i] = H[i,j] = 3 * S[i,j] * (Hcore[i,i] + Hcore[j,j]) / 8
+        end
     end
     Cˢ = getC(X, H)
     breakSymOfC(Val(HFT), Cˢ)
@@ -99,8 +101,8 @@ end
 
 
 function getCfromSAD(::Val{HFT}, S::AbstractMatrix{T}, 
-                     Hcore::AbstractMatrix{T}, HeeI::AbstractArray{T, 4},
-                     bs::NTuple{BN, AbstractGTBasisFuncs{T, D}}, 
+                     Hcore::AbstractMatrix{T}, HeeI::AbstractArray{T, 4}, 
+                     bs::AVectorOrNTuple{AbstractGTBasisFuncs{T, D}}, 
                      nuc::NTuple{NN, String}, nucCoords::NTuple{NN, NTuple{D, T}}, 
                      X::AbstractMatrix{T}, 
                      config=SCFconfig((:ADIIS,), (max(1e-2, 10getAtolVal(T)),))) where 
@@ -151,8 +153,8 @@ getD(Cˢ::AbstractMatrix{T}, Nˢ::Int) where {T} = @views (Cˢ[:,1:Nˢ]*Cˢ[:,1:
 function getGcore(HeeI::AbstractArray{T, 4}, 
                   DJ::AbstractMatrix{T}, DK::AbstractMatrix{T}) where {T}
     G = similar(DJ)
-    @sync for ν = 1:size(G, 1)
-        Threads.@spawn for μ = 1:ν # Spawn here is faster than spawn inside the loop.
+    Threads.@threads for ν = 1:size(G, 1)
+        for μ = 1:ν
             G[ν, μ] = G[μ, ν] = 
             dot(transpose(DJ), @view HeeI[μ,ν,:,:]) - dot(DK, @view HeeI[μ,:,:,ν])
         end
@@ -214,8 +216,8 @@ end
 
 
 function initializeSCFcore(::Val{HFT}, Hcore::AbstractMatrix{T}, HeeI::AbstractArray{T, 4}, 
-                       C::NTuple{HFTS, AbstractMatrix{T}}, N::NTuple{HFTS, Int}) where 
-                      {HFT, T, HFTS}
+                           C::NTuple{HFTS, AbstractMatrix{T}}, N::NTuple{HFTS, Int}) where 
+                          {HFT, T, HFTS}
     D = getD.(C, N)
     F = getF(Hcore, HeeI, D)
     E = getE.(Ref(Hcore), F, D)
@@ -459,7 +461,7 @@ struct HFfinalVars{T, D, HFT, NN, BN, HFTS} <: HartreeFockFinalValue{T, HFT}
     basis::GTBasis{T, D, BN}
 
     @inline function HFfinalVars(basis::GTBasis{T, 𝐷, BN}, 
-                                 nuc::VectorOrNTuple{String, NN}, 
+                                 nuc::AVectorOrNTuple{String, NN}, 
                                  nucCoords::SpatialCoordType{T, 𝐷, NN}, 
                                  X::AbstractMatrix{T}, 
                                  vars::NTuple{HFTS, HFtempVars{T, HFT}}, 
@@ -468,7 +470,7 @@ struct HFfinalVars{T, D, HFT, NN, BN, HFTS} <: HartreeFockFinalValue{T, HFT}
         throw(AssertionError("The length of `nuc` and `nucCoords` should be the same."))
         any(length(i)!=𝐷 for i in nucCoords) && 
         throw(DomainError(nucCoords, "The lengths of the elements in `nucCoords` should "*
-               "all be length $D."))
+               "all be length $𝐷."))
         Ehf = vars[1].shared.Etots[end]
         nuc = arrayToTuple(nuc)
         nucCoords = genTupleCoords(T, nucCoords)
@@ -640,16 +642,16 @@ function runHF(bs::GTBasis{T}, args...; printInfo::Bool=true) where {T}
     res
 end
 
-runHF(bs::VectorOrNTuple{AbstractGTBasisFuncs{T, D}}, args...; 
+runHF(bs::AVectorOrNTuple{AbstractGTBasisFuncs{T, D}}, args...; 
       printInfo::Bool=true) where {T, D} = 
 runHF(GTBasis(bs), args...; printInfo)
 
-@inline function runHFcore(bs::GTBasis{T1, D, BN, BFT}, 
-                           nuc::VectorOrNTuple{String, NN}, 
-                           nucCoords::SpatialCoordType{T1, D, NN}, 
+@inline function runHFcore(bs::GTBasis{T, D, BN, BFT}, 
+                           nuc::AVectorOrNTuple{String, NN}, 
+                           nucCoords::SpatialCoordType{T, D, NN}, 
                            N::Union{Int, Tuple{Int}, NTuple{2, Int}}=getCharge(nuc), 
-                           config::HFconfig{T2, HFT}=defaultHFC; 
-                           printInfo::Bool=false) where {T1, D, BN, BFT, NN, HFT, T2}
+                           config::HFconfig{<:Any, HFT}=defaultHFC; 
+                           printInfo::Bool=false) where {T, D, BN, BFT, NN, HFT}
     Nlow = Int(HFT==:RHF)
     N > Nlow || throw(DomainError(N, "$(HFT) requires more than $(Nlow) electrons."))
     Ns = splitSpins(Val(HFT), N)
@@ -657,7 +659,7 @@ runHF(GTBasis(bs), args...; printInfo)
     BN < leastNb &&  throw(DomainError(BN, "The number of basis functions should be no "*
                            "less than $(leastNb)."))
     nuc = arrayToTuple(nuc)
-    nucCoords = genTupleCoords(T1, nucCoords)
+    nucCoords = genTupleCoords(T, nucCoords)
     Hcore = coreH(bs, nuc, nucCoords)
     X = getX(bs.S)
     getC0f = config.C0.f
@@ -671,7 +673,7 @@ runHFcore(bs::BasisSetData, nuc, nucCoords, config::HFconfig, N::Int=getCharge(n
           printInfo::Bool=false) = 
 runHFcore(bs::BasisSetData, nuc, nucCoords, N, config; printInfo)
 
-runHFcore(bs::VectorOrNTuple{AbstractGTBasisFuncs{T, D}}, args...; 
+runHFcore(bs::AVectorOrNTuple{AbstractGTBasisFuncs{T, D}}, args...; 
           printInfo::Bool=false) where {T, D} = 
 runHFcore(GTBasis(bs), args...; printInfo)
 
@@ -805,8 +807,10 @@ function EDIIScore(∇s::AbstractVector{<:AbstractMatrix{T}},
                    Ds::AbstractVector{<:AbstractMatrix{T}}, Es::AbstractVector{T}) where {T}
     len = length(Ds)
     B = similar(∇s[begin], len, len)
-    @sync for j=1:len, i=1:j
-        Threads.@spawn B[i,j] = B[j,i] = -dot(Ds[i]-Ds[j], ∇s[i]-∇s[j])
+    Threads.@threads for j in eachindex(Ds)
+        for i = 1:j
+            B[i,j] = B[j,i] = -dot(Ds[i]-Ds[j], ∇s[i]-∇s[j])
+        end
     end
     Es, B
 end
@@ -828,9 +832,11 @@ function DIIScore(∇s::AbstractVector{<:AbstractMatrix{T}},
     len = length(Ds)
     B = similar(∇s[begin], len, len)
     v = zeros(len)
-    @sync for j in 1:len, i=1:j
-        Threads.@spawn B[i,j] = B[j,i] = dot( ∇s[i]*Ds[i]*S - S*Ds[i]*∇s[i], 
-                                              ∇s[j]*Ds[j]*S - S*Ds[j]*∇s[j] )
+    Threads.@threads for j in eachindex(Ds)
+        for i = 1:j
+            B[i,j] = B[j,i] = dot( ∇s[i]*Ds[i]*S - S*Ds[i]*∇s[i], 
+                                   ∇s[j]*Ds[j]*S - S*Ds[j]*∇s[j] )
+        end
     end
     v, B
 end
