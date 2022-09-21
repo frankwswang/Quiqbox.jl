@@ -1168,7 +1168,7 @@ Try merging multiple `FloatingGTBasisFuncs` (if there's any) in `bs` into
 return the resulted basis collection. If no merging is performed, then the returned 
 collection is same as (but not necessarily identical to) `bs`.
 """
-function mergeBasisFuncsIn(bs::AVectorOrNTuple{Vararg{GTBasisFuncs{T, D}}}; 
+function mergeBasisFuncsIn(bs::AVectorOrNTuple{GTBasisFuncs{T, D}}; 
                            roundAtol::Real=NaN) where {T, D}
     ids = findall(x->isa(x, FGTBasisFuncs1O), bs)
     if isempty(ids)
