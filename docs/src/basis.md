@@ -75,7 +75,7 @@ julia> hasEqual(bsH2O, bsH2O_2)
 true
 ```
 
-If the basis set you want to use is not pre-stored in Quiqbox, you can use `genBFuncsFromText` to generate the basis set from a **Gaussian** format `String`:
+If the basis set you want to use is not pre-stored in Quiqbox, you can use [`genBFuncsFromText`](@ref) to generate the basis set from a **Gaussian** format `String`:
 ```@setup 1
     push!(LOAD_PATH,"../../src/")
     using Quiqbox
