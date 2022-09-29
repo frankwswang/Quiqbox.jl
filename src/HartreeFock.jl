@@ -106,7 +106,7 @@ function getCfromSAD(::Val{HFT}, S::AbstractMatrix{T},
                      nuc::NTuple{NN, String}, nucCoords::NTuple{NN, NTuple{D, T}}, 
                      X::AbstractMatrix{T}, 
                      config=SCFconfig((:ADIIS,), (max(1e-2, 10getAtolVal(T)),))) where 
-                    {HFT, T, D, BN, NN}
+                    {HFT, T, D, NN}
     N₁tot = 0
     N₂tot = 0
     atmNs = fill((0,0), NN)
@@ -182,8 +182,7 @@ end
 
 # RHF or UHF
 @inline getE(Hcore::AbstractMatrix{T}, 
-             Fˢ::AbstractMatrix{T}, Dˢ::AbstractMatrix{T}) where {T} = 
-        dot(transpose(Dˢ), Hcore+Fˢ) / 2
+             Fˢ::AbstractMatrix{T}, Dˢ::AbstractMatrix{T}) where {T} = dot(Dˢ, Hcore+Fˢ) / 2
 
 get2SpinQuantity(O::NTuple{HFTS, T}) where {HFTS, T} = abs(3-HFTS) * sum(O)
 get2SpinQuantities(O, nRepeat::Int) = ntuple(_->get2SpinQuantity(O), nRepeat)
@@ -513,8 +512,10 @@ The container of Hartree-Fock method configuration.
 $(string(HFtypes)[2:end-1]).
 
 `C0::InitialC{T1, HFT, F}`: Initial guess of the coefficient matrix(s) C of the canonical 
-orbitals. When `C0` is a `Val{T}`, the available values of `T1` are 
-`$((guessCmethods|>typeof|>fieldnames|>string)[2:end-1])`.
+orbitals. When `C0` is as an argument of `HFconfig`'s constructor, it can be set to 
+`sym::Symbol` where available values of `sym` are 
+`$((guessCmethods|>typeof|>fieldnames|>string)[2:end-1])`; it can also be a `Tuple` of 
+prepared coefficient matrix(s) for the corresponding Hartree-Fock method type.
 
 `SCF::SCFconfig{T2, L}`: SCF iteration configuration. For more information please refer to 
 [`SCFconfig`](@ref).
@@ -946,30 +947,40 @@ function popHFtempVars!(αβVars::NTuple{HFTS, HFtempVars{T, HFT}}) where {HFTS,
     popHFtempVarsCore2!(αβVars[1])
 end
 
-
 # Included normalization condition, but not non-negative condition.
-@inline function genxDIISf(v, B)
+@inline function genxDIISf(v, B, shift)
     function (c)
         s = sum(c)
-        dot(v, c) / s + transpose(c) * B * c / (2s^2)
+        signedShift = asymSign(s)*shift
+        s += signedShift
+        c[end] += signedShift
+        res = dot(v, c) / s + transpose(c) * B * c / (2s^2)
+        c[end] -= signedShift
+        res
     end
 end
 
-@inline function genxDIIS∇f(v, B)
+@inline function genxDIIS∇f(v, B, shift)
     function (g, c)
         s = sum(c)
-        g.= v./c + (B + transpose(B))*c ./ (2s^2) .- (dot(v, c)/s^2 + transpose(c)*B*c/s^3)
+        signedShift = asymSign(s)*shift
+        s += signedShift
+        c[end] += signedShift
+        g.= v./s + (B + transpose(B))*c ./ (2s^2) .- (dot(v, c)/s^2 + transpose(c)*B*c/s^3)
+        c[end] -= signedShift
+        g
     end
 end
 
 
 # Default method
 function LBFGSBsolver(::Val{CCB}, v::AbstractVector{T}, B::AbstractMatrix{T}) where {CCB, T}
-    f = genxDIISf(v, B)
-    g! = genxDIIS∇f(v, B)
+    shift = getAtolVal(T)
+    f = genxDIISf(v, B, shift)
+    g! = genxDIIS∇f(v, B, shift)
     lb = ifelse(CCB, T(0), T(-Inf))
     vL = length(v)
-    c0 = fill(T(1)/vL, vL)
+    c0 = collect(1 : T(1) : vL) ./ vL
     innerOptimizer = LBFGS(m=min(getAtolDigits(T), 50), 
                                  linesearch=HagerZhang(linesearchmax=100, epsilon=1e-7), 
                                  alphaguess=InitialHagerZhang())
@@ -977,7 +988,11 @@ function LBFGSBsolver(::Val{CCB}, v::AbstractVector{T}, B::AbstractMatrix{T}) wh
                         OptimOptions(g_tol=exp10(-getAtolDigits(T)), iterations=10000, 
                         allow_f_increases=false))
     c = OptimMinimizer(res)
-    c ./ sum(c)
+    s = sum(c)
+    signedShift = asymSign(s)*shift
+    c[end] += signedShift
+    s += signedShift
+    c ./ s
 end
 
 function CMsolver(::Val{CCB}, v::AbstractVector{T}, B::AbstractMatrix{T}, 

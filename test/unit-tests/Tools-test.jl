@@ -278,4 +278,10 @@ arr1 = collect(tpl1)
 @test collectTuple(tpl1) !== arr1
 @test collectTuple(arr1) === arr1
 
+
+# function asymSign
+@test asymSign(0) == 1
+@test asymSign(1.1) == 1
+@test asymSign(-1.1) == -1
+
 end
