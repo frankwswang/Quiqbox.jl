@@ -4,11 +4,15 @@ using LinearAlgebra: norm
 using LineSearches
 
 const OFtypes = (:HFenergy,)
+const OFconversions = Dict([runHFcore] .=> 
+                           [( x->x[begin][begin].shared.Etots[end], 
+                              x->last.(getproperty.(x[begin], :Cs)) )
+                           ])
 const OFfunctions = Dict([:HFenergy] .=> 
     [
-        ( ( runHFcore, x->x[begin][begin].shared.Etots[end] ), 
+        ( ( runHFcore, OFconversions[runHFcore][begin] ), 
           ( (tVars, pbs, gtb, nuc, nucCoords, N)->
-            gradOfHFenergy(pbs, gtb, last.(getproperty.(tVars[begin], :Cs)), 
+            gradOfHFenergy(pbs, gtb, OFconversions[runHFcore][end](tVars), 
                            nuc, nucCoords, N), 
             itself )
         )
@@ -204,13 +208,6 @@ function genLineSearchOpt(GDc::GDconfig{T, iT, ST}, ::Function, ::Function, _) w
     end
 end
 
-# function convertExternalOpt(o!::F, f::Function, gf::Function) where {F}
-#     function (x, gx, fx)
-#         o!(x, gx, fx, f, gf)
-#         x
-#     end
-# end
-
 function convertExternalOpt(genO!::F, f::Function, gf::Function, x0) where {F}
     o! = genO!(f, gf, x0)
     function (x, gx, fx)
@@ -401,10 +398,12 @@ function optimizeParams!(pbs::AbstractVector{<:ParamBox{T}},
     nucCoords = genTupleCoords(T, nucCoords)
     f0s, g0s = OFfunctions[M]
     f0config = config.config
+    initializeOFconfig!(f0config, bsN, nuc, nucCoords)
     optimize! = genOptimizer(Val(M), f0config, config.optimizer, 
                              pbsN, bsN, nuc, nucCoords, N)
 
-    fx, gx, Δt₁ = optimizeParamsCore(f0s, g0s, pbsN, bsN, nuc, nucCoords, N, f0config)
+    fx, gx, fRes, Δt₁ = optimizeParamsCore(f0s, g0s, pbsN, bsN, nuc, nucCoords, N, f0config)
+    updateOFconfig!(f0config, f0s[begin], fRes)
     fVstr = ndims(fx)==0 ? "𝑓" : "𝒇"
     fVals = [fx]
     grads = [gx]
@@ -427,7 +426,9 @@ function optimizeParams!(pbs::AbstractVector{<:ParamBox{T}},
         Δt₂ = (t4 - t3) / 1e9
         setindex!.(pars, x)
 
-        fx, gx, Δt₁ = optimizeParamsCore(f0s, g0s, pbsN, bsN, nuc, nucCoords, N, f0config)
+        fx, gx, fRes, Δt₁ = optimizeParamsCore(f0s, g0s, pbsN, bsN, nuc, nucCoords, N, 
+                                               f0config)
+        updateOFconfig!(f0config, f0s[begin], fRes)
         push!(fVals, fx)
         push!(grads, gx)
         push!(parsVals, x)
@@ -476,5 +477,33 @@ function optimizeParamsCore((f0, getOFval), (g0, getOGval),
     fx = getOFval(fRes)
     gx = (getOGval∘g0)(fRes, pbs, gtb, nuc, nucCoords, N)
     t2 = time_ns()
-    fx, gx, (t2 - t1) / 1e9
+    fx, gx, fRes, (t2 - t1) / 1e9
+end
+
+
+initializeOFconfig!(ofc::HFconfig, _, _, _) = itself(ofc)
+
+function initializeOFconfig!(ofc::HFconfig{<:Any, HFT, iT}, bs, nuc, nucCoords) where {HFT}
+    bls = iszero.(ofc.C0.mat)
+    if any(bls)
+        b = GTBasis(bs)
+        X = getX(b.S)
+        Hcore = coreH(b, nuc, nucCoords)
+        C0new = getCfromSAD(Val(HFT), b.S, Hcore, b.eeI, b.basis, nuc, nucCoords, X)
+        for (co, cn, bl) in zip(ofc.C0.mat, C0new, bls)
+            bl && (co .= cn)
+        end
+    end
+    ofc
+end
+
+
+updateOFconfig!(ofc::HFconfig, _, _) = itself(ofc)
+
+function updateOFconfig!(ofc::HFconfig{<:Any, <:Any, iT}, f::Function, fRes)
+    C0new = OFconversions[f][end](fRes)
+    map(ofc.C0.mat, C0new) do co, cn
+        co .= cn
+    end
+    ofc
 end
