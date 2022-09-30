@@ -947,13 +947,18 @@ function popHFtempVars!(αβVars::NTuple{HFTS, HFtempVars{T, HFT}}) where {HFTS,
     popHFtempVarsCore2!(αβVars[1])
 end
 
+function shiftLastEle!(v, shiftVal)
+    s = sum(v)
+    signedShift = asymSign(s)*shiftVal
+    s += signedShift
+    v[end] += signedShift
+    s, signedShift
+end
+
 # Included normalization condition, but not non-negative condition.
 @inline function genxDIISf(v, B, shift)
     function (c)
-        s = sum(c)
-        signedShift = asymSign(s)*shift
-        s += signedShift
-        c[end] += signedShift
+        s, signedShift = shiftLastEle!(c, shift)
         res = dot(v, c) / s + transpose(c) * B * c / (2s^2)
         c[end] -= signedShift
         res
@@ -962,10 +967,7 @@ end
 
 @inline function genxDIIS∇f(v, B, shift)
     function (g, c)
-        s = sum(c)
-        signedShift = asymSign(s)*shift
-        s += signedShift
-        c[end] += signedShift
+        s, signedShift = shiftLastEle!(c, shift)
         g.= v./s + (B + transpose(B))*c ./ (2s^2) .- (dot(v, c)/s^2 + transpose(c)*B*c/s^3)
         c[end] -= signedShift
         g
@@ -988,10 +990,7 @@ function LBFGSBsolver(::Val{CCB}, v::AbstractVector{T}, B::AbstractMatrix{T}) wh
                         OptimOptions(g_tol=exp10(-getAtolDigits(T)), iterations=10000, 
                         allow_f_increases=false))
     c = OptimMinimizer(res)
-    s = sum(c)
-    signedShift = asymSign(s)*shift
-    c[end] += signedShift
-    s += signedShift
+    s, _ = shiftLastEle!(c, shift)
     c ./ s
 end
 

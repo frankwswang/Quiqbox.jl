@@ -563,7 +563,7 @@ function get2BodyUniquePairs(flags::NTuple{5, Bool},
         getIntCore1111!(i, uniquePairs, uPairCoeffs, flagRijk, ps₁)
 
     elseif (ps₁ == ps₂ && ps₃ == ps₄ && flags[1] && flags[2])
-            getIntX1X1X2X2!(i, uniquePairs, uPairCoeffs, flagRijk, ps₁, ps₃)
+        getIntX1X1X2X2!(i, uniquePairs, uPairCoeffs, flagRijk, ps₁, ps₃)
 
     elseif (ps₁ == ps₄ && ps₂ == ps₃ && flags[4] && flags[5])
         getIntX1X2X2X1!(i, uniquePairs, uPairCoeffs, flagRijk, ps₁, ps₂)
