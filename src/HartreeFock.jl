@@ -664,7 +664,12 @@ runHF(GTBasis(bs), args...; printInfo)
     Hcore = coreH(bs, nuc, nucCoords)
     X = getX(bs.S)
     getC0f = config.C0.f
-    C0 = uniCallFunc(getC0f, getproperty(C0methodArgOrders, nameOf(getC0f)), config.C0.mat, 
+    C0mats = config.C0.mat
+    getC0f isa iT && 
+    ( all(all(size(C) .== BN) for C in C0mats) || 
+      throw(DimensionMismatch("The size of the input initial coefficient matrix(s) C "*
+            "($(size.(C0mats))) does not match the size of the input basis set ($BN).")) )
+    C0 = uniCallFunc(getC0f, getproperty(C0methodArgOrders, nameOf(getC0f)), C0mats, 
                      Val(HFT), bs.S, X, Hcore, bs.eeI, bs.basis, nuc, nucCoords)
     runHFcore(Val(HFT), config.SCF, Ns, Hcore, bs.eeI, bs.S, X, 
               C0, printInfo, config.maxStep, config.earlyStop)
