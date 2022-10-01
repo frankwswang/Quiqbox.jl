@@ -155,9 +155,9 @@ Ne = getCharge(nuc)
 
 # Floating basis set
 configs = [(maxStep, C0)->POconfig(;maxStep, config=HFconfig(;C0), 
-                                    threshold=(5errorThreshold1, 5errorThreshold1)), 
+                                    threshold=(NaN, NaN)), 
            (maxStep, C0)->POconfig(;maxStep, config=HFconfig(;HF=:UHF, C0), 
-                                    threshold=(5errorThreshold1,))]
+                                    threshold=(NaN,))]
 
 Es1Ls = Vector{Float64}[]
 gradEnd = Float64[]

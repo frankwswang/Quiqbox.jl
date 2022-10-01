@@ -130,7 +130,7 @@ the corresponding function signature:
     optimize!(x::Vector{T}, gx::Vector{T}, fx::T) where {T}
 
 where `x`, `gx`, `fx` are the input value, the gradient, and the returned value of `f` 
-respectively at one step. In other words, `(fx, gx) == (f(x), gx) == gf(x)`. After 
+respectively at one step. In other words, `(gx, fx) == (gx, f(x)) == gf(x)`. After 
 accepting those arguments, `optimizer` should update (i.e. mutate the elements of) `x` so 
 that f(x) will have lower returned value.
 
@@ -160,6 +160,7 @@ mutable struct POconfig{T, M, CBT<:ConfigBox, TH<:Union{Tuple{T}, NTuple{2, T}},
     threshold::TH
     maxStep::Int
     optimizer::OM
+    # saveOFres::Bool
 end
 
 POconfig(t::NamedTuple) = genNamedTupleC(:POconfig, defaultPOconfigPars)(t)
@@ -171,26 +172,42 @@ const defaultPOconfig = Meta.parse(defaultPOconfigStr) |> eval
 
 
 function genLineSearchOpt(GDc::GDconfig{T, M, ST}, 
-                          f::Function, gf::Function, _) where {T, M, ST}
+                          f::Function, gf::Function, x0) where {T, M, ST}
     l = GDc.lineSearchMethod
     η₀ = GDc.initialStep
     lo, up = GDc.stepBound
+    xBuf = deepcopy(x0)
+    gBuf = similar(x0)
+    s = similar(gBuf)
+
+    ϕForLS(η) = f(xBuf .+ η.*s)
+
+    function 𝑑ϕForLS!(η)
+        gBuf .= gf(xBuf .+ η.*s)[begin]
+        dot(gBuf, s)
+    end
+
+    function ϕ𝑑ϕForLS!(η)
+        gxN, ϕ = gf(xBuf .+ η.*s)
+        gBuf .= gxN
+        𝑑ϕ = dot(gBuf, s)
+        ϕ, 𝑑ϕ
+    end
+
     @inline function (x, gx, fx)
-        ϕForLS(η) = f(x .- η.*gx)
-        𝑑ϕForLS(η) = dot(gf(x .- η.*gx)[begin], -gx)
-        function ϕ𝑑ϕForLS(η)
-            gxNew, ϕ = gf(x .- η.*gx)
-            (ϕ, dot(gxNew, -gx))
-        end
         η = if GDc.scaleStepBound
-            clamp(η₀[], lo, up)
-        else
             n = norm(gx)
             clamp(η₀[], lo/n, up/n)
+        else
+            clamp(η₀[], lo, up)
         end
-        ηNew = l(ϕForLS, 𝑑ϕForLS, ϕ𝑑ϕForLS, η, fx, -dot(gx, gx))[begin] # new step η
+        s .= -gx
+        gBuf .= gx
+        dϕ₀ = dot(s, gBuf)
+        ηNew, _ = l(ϕForLS, 𝑑ϕForLS!, ϕ𝑑ϕForLS!, η, fx, dϕ₀) # new step η
         ST <: Array{T, 0} && (η₀[] = ηNew)
         x .-= ηNew.*gx
+        xBuf .= x
     end
 end
 
@@ -199,17 +216,17 @@ function genLineSearchOpt(GDc::GDconfig{T, iT, ST}, ::Function, ::Function, _) w
     lo, up = GDc.stepBound
     @inline function (x, gx, _)
         η = if GDc.scaleStepBound
-            clamp(η₀[], lo, up)
-        else
             n = norm(gx)
             clamp(η₀[], lo/n, up/n)
+        else
+            clamp(η₀[], lo, up)
         end
         x .-= η.*gx
     end
 end
 
-function convertExternalOpt(genO!::F, f::Function, gf::Function, x0) where {F}
-    o! = genO!(f, gf, x0)
+function convertExternalOpt(genO::F, f::Function, gf::Function, x0) where {F}
+    o! = genO(f, gf, x0)
     function (x, gx, fx)
         o!(x, gx, fx)
         x
@@ -403,7 +420,6 @@ function optimizeParams!(pbs::AbstractVector{<:ParamBox{T}},
                              pbsN, bsN, nuc, nucCoords, N)
 
     fx, gx, fRes, Δt₁ = optimizeParamsCore(f0s, g0s, pbsN, bsN, nuc, nucCoords, N, f0config)
-    updateOFconfig!(f0config, f0s[begin], fRes)
     fVstr = ndims(fx)==0 ? "𝑓" : "𝒇"
     fVals = [fx]
     grads = [gx]
@@ -425,10 +441,10 @@ function optimizeParams!(pbs::AbstractVector{<:ParamBox{T}},
         t4 = time_ns()
         Δt₂ = (t4 - t3) / 1e9
         setindex!.(pars, x)
+        updateOFconfig!(f0config, f0s[begin], fRes)
 
         fx, gx, fRes, Δt₁ = optimizeParamsCore(f0s, g0s, pbsN, bsN, nuc, nucCoords, N, 
                                                f0config)
-        updateOFconfig!(f0config, f0s[begin], fRes)
         push!(fVals, fx)
         push!(grads, gx)
         push!(parsVals, x)
