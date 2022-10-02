@@ -156,8 +156,7 @@ saveTrace = (true, false, true, false)
 # Floating basis set
 configs = [(maxStep, C0)->POconfig(;maxStep, config=HFconfig(;C0), 
                                     threshold=(NaN, NaN), saveTrace), 
-           (maxStep, C0)->POconfig(;maxStep, config=HFconfig(;HF=:UHF, C0), 
-                                    threshold=(NaN,), saveTrace)]
+           (maxStep, C0)->POconfig(;maxStep, config=HFconfig(;HF=:UHF, C0), saveTrace)]
 
 Es1Ls = Vector{Float64}[]
 gradEnd = Float64[]
@@ -170,7 +169,7 @@ for (m, config) in enumerate(configs), (i,j) in zip((1,2,7,8,9,10), (2,2,7,9,9,1
     bs1 = genBasisFunc.(cens, Ref((gf1, gf2)), normalizeGTO=true)
     siz = orbitalNumOf.(bs1) |> sum
     pars1 = markParams!(bs1, true)
-    addiCfgs = (i==10 ? 1000 : 50, 
+    addiCfgs = (i==10 ? 1200 : 50, 
                 if iseven(i)
                     (m==1 ? (zeros(siz, siz),) : (zeros(siz, siz), zeros(siz, siz)))
                 else

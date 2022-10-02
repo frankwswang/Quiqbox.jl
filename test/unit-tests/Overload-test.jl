@@ -96,8 +96,8 @@ info4 = (@capture_out show(H2))
 info5 = (@capture_out show(POconfig()))
 @test info5 == "POconfig{Float64, :HFenergy, HFconfig{Float64, :RHF, "*
                "typeof(Quiqbox.getCfromSAD), Float64, 2}, Tuple{Float64, Float64}, "*
-               "$(typeof(POconfig().optimizer))}"*
-               "(method=Val{:HFenergy}(), config, target, threshold, maxStep, optimizer)"
+               "$(typeof(POconfig().optimizer))}(method=Val{:HFenergy}(), "*
+               "config, target, threshold, maxStep, optimizer, saveTrace)"
 
 
 # function ==, hasBoolRelation

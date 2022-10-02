@@ -157,8 +157,8 @@ function hasBoolRelation(boolOp::F, obj1::T1, obj2::T2;
                 isdefined(obj1, i) == (fieldDefined = isdefined(obj2, i)) && 
                 (fieldDefined ? nothing : continue)
                 res *= hasBoolRelation(boolOp, getproperty(obj1, i), 
-                                        getproperty(obj2, i); ignoreFunction, 
-                                        ignoreContainer, decomposeNumberCollection)
+                                       getproperty(obj2, i); ignoreFunction, 
+                                       ignoreContainer, decomposeNumberCollection)
                 !res && (return false)
             end
         end
@@ -199,7 +199,7 @@ function hasBoolRelation(boolOp::F,
     res = true
     for (i,j) in zip(obj1, obj2)
         res *= hasBoolRelation(boolOp, i, j; ignoreFunction, ignoreContainer, 
-                                decomposeNumberCollection)
+                               decomposeNumberCollection)
         !res && (return false)
     end
     res
