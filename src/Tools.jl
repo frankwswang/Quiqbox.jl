@@ -854,3 +854,6 @@ collectTuple(t::Tuple) = collect(t)
 collectTuple(a::AbstractArray) = itself(a)
 
 collectTuple(o::Any) = collect(o)
+
+
+asymSign(a::Real) = ifelse(a<0, -1, 1)

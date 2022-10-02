@@ -2062,8 +2062,8 @@ absorbNormFactor(bs |> collect) |> Tuple
 
     normalizeBasis(b::GTBasisFuncs{T, D, 1}) where {T, D} -> GTBasisFuncs{T, D, 1}
 
-Multiply the contraction coefficient(s) inside `b` by constant coefficient(s) to normalizeBasis 
-the `b`, and then return the normalized basis.
+Multiply the contraction coefficient(s) inside `b` by constant coefficient(s) to 
+normalizeBasis the `b`, and then return the normalized basis.
 """
 function normalizeBasis(b::GTBasisFuncs{T}) where {T}
     nrm = roundToMultiOfStep(overlap(b,b), exp10(-getAtolDigits(T)-1))
@@ -2075,7 +2075,7 @@ end
     normalizeBasis(b::BasisFuncs{T, D}) where {T, D} -> Vector{<:FloatingGTBasisFuncs{T, D}}
 
 Normalize each [`BasisFunc`](@ref) inside `b` and try to merge them back to one 
-[`BasisFuncs`](@ref). If the merge is performed, the returned result is a 1-element 
-`Vector`.
+[`BasisFuncs`](@ref). If the all the `BasisFunc`(s) can be merged, the returned result will 
+be a 1-element `Vector`.
 """
 normalizeBasis(bfs::BasisFuncs) = mergeBasisFuncs(normalizeBasis.(bfs)...)

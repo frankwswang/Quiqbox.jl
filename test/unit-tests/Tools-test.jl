@@ -5,7 +5,7 @@ using Quiqbox: getAtolVal, getAtolDigits, roundToMultiOfStep, nearestHalfOf, get
                markUnique, getUnique!, itself, themselves, replaceSymbol, groupedSort, 
                mapPermute, getFunc, nameOf, tupleDiff, genIndex, fillObj, arrayToTuple, 
                genTupleCoords, uniCallFunc, mergeMultiObjs, isNaN, getBool, skipIndices, 
-               isOscillateConverged, collectTuple
+               isOscillateConverged, collectTuple, asymSign
 using Suppressor: @capture_out
 using LinearAlgebra: norm
 
@@ -277,5 +277,11 @@ arr1 = collect(tpl1)
 @test collectTuple(tpl1) == arr1
 @test collectTuple(tpl1) !== arr1
 @test collectTuple(arr1) === arr1
+
+
+# function asymSign
+@test asymSign(0) == 1
+@test asymSign(1.1) == 1
+@test asymSign(-1.1) == -1
 
 end

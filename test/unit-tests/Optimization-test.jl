@@ -1,6 +1,7 @@
 using Test
 using Quiqbox
-using Quiqbox: formatTunableParams!, makeAbsLayerForXpnParams, compareParamBox, Absolute
+using Quiqbox: formatTunableParams!, makeAbsLayerForXpnParams, compareParamBox, Absolute, 
+               initializeOFconfig!
 using LinearAlgebra: norm
 using Suppressor: @capture_out
 using Optim
@@ -153,20 +154,30 @@ Ne = getCharge(nuc)
 
 
 # Floating basis set
-configs = [(maxStep)->POconfig(;maxStep, threshold=(NaN, NaN)), 
-           (maxStep)->POconfig(;maxStep, threshold=(NaN,), config=HFconfig((HF=:UHF,)))]
+configs = [(maxStep, C0)->POconfig(;maxStep, config=HFconfig(;C0), 
+                                    threshold=(NaN, NaN)), 
+           (maxStep, C0)->POconfig(;maxStep, config=HFconfig(;HF=:UHF, C0), 
+                                    threshold=(NaN,))]
 
 Es1Ls = Vector{Float64}[]
 gradEnd = Float64[]
 
-for config in configs, (i,j) in zip((1,2,7,8,9,10), (2,2,7,9,9,10))
+for (m, config) in enumerate(configs), (i,j) in zip((1,2,7,8,9,10), (2,2,7,9,9,10))
     # 1->X₁, 2->X₂, 7->α₁, 8->α₂, 9->d₁, 10->d₂
     gf1 = GaussFunc(1.7, 0.8)
     gf2 = GaussFunc(0.45, 0.25)
     cens = genSpatialPoint.(nucCoords)
     bs1 = genBasisFunc.(cens, Ref((gf1, gf2)), normalizeGTO=true)
+    siz = orbitalNumOf.(bs1) |> sum
     pars1 = markParams!(bs1, true)
-    c = i==10 ? config(1000) : config(100)
+    addiCfgs = (i==10 ? 1000 : 50, 
+                if iseven(i)
+                    (m==1 ? (zeros(siz, siz),) : (zeros(siz, siz), zeros(siz, siz)))
+                else
+                    :SAD
+                end
+                )
+    c = config(addiCfgs...)
     Es1L, _, grads, _ = optimizeParams!(pars1[i:j], bs1, nuc, nucCoords, c, printInfo=false)
     push!(Es1Ls, Es1L)
     push!(gradEnd, norm(grads[end]))
@@ -175,7 +186,8 @@ end
 @test all(all(Es1L[i]<=Es1L[i-1] || isapprox(Es1L[i], Es1L[i-1], atol=errorThreshold2)
               for i in 2:lastindex(Es1L)) for Es1L in Es1Ls)
 @test all(abs.(gradEnd) .< 5e-5)
-compr2Arrays3((Eend_1to6=last.(Es1Ls[1:6]), Eend_7toEnd=last.(Es1Ls[7:end])), 1e-5)
+compr2Arrays3((Eend_1to6=last.(Es1Ls[1:6]), Eend_7toEnd=last.(Es1Ls[7:end])), 
+              errorThreshold1)
 
 
 # Grid-based basis set
@@ -303,5 +315,20 @@ res = optimizeParams!(αs, bs4, nuc, nucCoords, printInfo=false)
 @test res[end]
 @test αs[][] >= 0
 @test isapprox(res[begin][end], -1.5376111420710188, atol=errorThreshold1)
+
+
+# function initializeOFconfig!
+nucCoords2 = [[-0.7,0.0,0.0], [0.7,0.0,0.0], [0.0, 0.0, 0.0]]
+nuc2 = ["H", "H", "O"]
+bs2 = genBasisFunc.(nucCoords2, "STO-3G", ["H", "H", "O"]) |> flatten
+siz = orbitalNumOf.(bs2) |> sum
+HFc1 = HFconfig(C0=(zeros(siz, siz),))
+HFc2 = HFconfig(C0=:SAD)
+res1 = runHF(bs2, nuc2, nucCoords2, 
+             initializeOFconfig!(HFc1, bs2, Quiqbox.arrayToTuple(nuc2), 
+                                 Quiqbox.genTupleCoords(Float64, nucCoords2)), 
+             printInfo=false)
+res2 = runHF(bs2, nuc2, nucCoords2, HFc2, printInfo=false)
+@test hasEqual(res1, res2)
 
 end
