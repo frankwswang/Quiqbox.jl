@@ -86,7 +86,8 @@ end
 
 
 const defaultPOconfigPars = 
-      [Val(:HFenergy), defaultHFforHFgrad, NaN, (5e-7, 1e-5), 200, GDconfig()]
+      [Val(:HFenergy), defaultHFforHFgrad, NaN, (5e-7, 1e-5), 200, GDconfig(), 
+       (true, false, false, false)]
 
 """
 
@@ -97,7 +98,7 @@ The mutable container of parameter optimization configurations.
 
 ≡≡≡ Field(s) ≡≡≡
 
-`method::Val{M}`: The method to calculate objective function (e.g., HF energy) for 
+`method::Val{M}`: The method that defines the objective function (e.g., HF energy) for the 
 optimization. Available values of `M` from Quiqbox are $(string(OFtypes)[2:end-1]).
 
 `config::CBT`: The configuration for the selected `method`. E.g., for `:HFenergy` it's 
@@ -134,6 +135,16 @@ respectively at one step. In other words, `(gx, fx) == (gx, f(x)) == gf(x)`. Aft
 accepting those arguments, `optimizer` should update (i.e. mutate the elements of) `x` so 
 that f(x) will have lower returned value.
 
+`saveTrace::NTuple{4, Bool}`: Determine whether saving (by pushing) the intermediate 
+information from all the iterations steps to the output of `optimizeParams!`.
+The types of relevant information are:
+| Sequence | Corresponding Information |
+|  :----   | :---:                     |
+| 1 | function value of applied method |
+| 2 | parameter value |
+| 3 | gradient |
+| 4 | complete output of applied method |
+
 ≡≡≡ Initialization Method(s) ≡≡≡
 
     POconfig(;method::Val=$(defaultPOconfigPars[1]), 
@@ -160,7 +171,7 @@ mutable struct POconfig{T, M, CBT<:ConfigBox, TH<:Union{Tuple{T}, NTuple{2, T}},
     threshold::TH
     maxStep::Int
     optimizer::OM
-    # saveOFres::Bool
+    saveTrace::NTuple{4, Bool}
 end
 
 POconfig(t::NamedTuple) = genNamedTupleC(:POconfig, defaultPOconfigPars)(t)
@@ -332,23 +343,17 @@ end
 
     optimizeParams!(pbs, bs, nuc, nucCoords, 
                     config=$(defaultPOconfigStr), N=getCharge(nuc); printInfo=true) -> 
-    Tuple{Union{Vector{T}, Vector{<:Array{T}}}, 
-          Vector{T}, 
-          Vector{<:Array{T}}, 
-          Union{Bool, Missing}} where {T}
+    Vector{Any}
 
     optimizeParams!(pbs, bs, nuc, nucCoords, 
                     N=getCharge(nuc), config=$(defaultPOconfigStr); printInfo=true) -> 
-    Tuple{Union{Vector{T}, Vector{<:Array{T}}}, 
-          Vector{T}, 
-          Vector{<:Array{T}}, 
-          Union{Bool, Missing}} where {T}
+    Vector{Any}
 
-The main function to optimize the parameters of a given basis set. It returns a `Tuple` of 
-relevant information. The first three elements are the energies, the parameter values, and 
-the gradients from all the iteration steps respectively. The last element is the indicator 
-of whether the optimization is converged if the convergence detection is on (i.e., 
-`config.threshold` is not `NaN`), or else it's set to `missing`.
+The main function to optimize the parameters of a given basis set. It returns a `Vector` of 
+the relevant information. The first element is the indicator of whether the 
+optimization is converged if the convergence detection is on (i.e., `config.threshold` is 
+not `NaN`), or else it's set to `missing`. More elements may be pushed to the returned 
+result in order depending on `config.method`.
 
 === Positional argument(s) ===
 
@@ -388,7 +393,6 @@ function optimizeParams!(pbs::AbstractVector{<:ParamBox{T}},
     x = getindex.(pars)
     pbsN, bsN = makeAbsLayerForXpnParams(pbs, bs, 
                                          forceDiffOn=true, tryJustFlipNegSign=false)
-    parsVals = Vector{T}[]
 
     i = 0
     Δt₁ = Δt₂ = 0
@@ -422,7 +426,11 @@ function optimizeParams!(pbs::AbstractVector{<:ParamBox{T}},
     fx, gx, fRes, Δt₁ = optimizeParamsCore(f0s, g0s, pbsN, bsN, nuc, nucCoords, N, f0config)
     fVstr = ndims(fx)==0 ? "𝑓" : "𝒇"
     fVals = [fx]
+    pVals = [x]
     grads = [gx]
+    fRess = [fRes]
+    allInfo = [fVals, pVals, grads, fRess]
+    saveTrace = config.saveTrace
 
     while !(blConv = all(f(x) for (f, x) in zip(isConverged, (fVals, grads)))) && i<maxStep
 
@@ -447,7 +455,8 @@ function optimizeParams!(pbs::AbstractVector{<:ParamBox{T}},
                                                f0config)
         push!(fVals, fx)
         push!(grads, gx)
-        push!(parsVals, x)
+        saveTrace[begin+1] && push!(pVals, x)
+        saveTrace[end]     && push!(fRess, fRes)
         i += 1
     end
 
@@ -478,8 +487,9 @@ function optimizeParams!(pbs::AbstractVector{<:ParamBox{T}},
         end
         println()
     end
-
-    fVals, parsVals, grads, ifelse(detectConverge, blConv, missing)
+    res = Any[ifelse(detectConverge, blConv, missing)]
+    append!(res, allInfo[findall(itself, saveTrace)])
+    res
 end
 
 optimizeParams!(pbs, bs, nuc, nucCoords, N::Int, config=defaultPOconfig; printInfo=true) = 

@@ -151,13 +151,13 @@ pars0_1[2][] *= -1
 nuc = ["H", "H"]
 nucCoords = [[-0.7,0.0,0.0], [0.7,0.0,0.0]]
 Ne = getCharge(nuc)
-
+saveTrace = (true, false, true, false)
 
 # Floating basis set
 configs = [(maxStep, C0)->POconfig(;maxStep, config=HFconfig(;C0), 
-                                    threshold=(NaN, NaN)), 
+                                    threshold=(NaN, NaN), saveTrace), 
            (maxStep, C0)->POconfig(;maxStep, config=HFconfig(;HF=:UHF, C0), 
-                                    threshold=(NaN,))]
+                                    threshold=(NaN,), saveTrace)]
 
 Es1Ls = Vector{Float64}[]
 gradEnd = Float64[]
@@ -178,7 +178,7 @@ for (m, config) in enumerate(configs), (i,j) in zip((1,2,7,8,9,10), (2,2,7,9,9,1
                 end
                 )
     c = config(addiCfgs...)
-    Es1L, _, grads, _ = optimizeParams!(pars1[i:j], bs1, nuc, nucCoords, c, printInfo=false)
+    _, Es1L, grads = optimizeParams!(pars1[i:j], bs1, nuc, nucCoords, c, printInfo=false)
     push!(Es1Ls, Es1L)
     push!(gradEnd, norm(grads[end]))
 end
@@ -191,11 +191,13 @@ compr2Arrays3((Eend_1to6=last.(Es1Ls[1:6]), Eend_7toEnd=last.(Es1Ls[7:end])),
 
 
 # Grid-based basis set
+saveTrace2 = (true, true, true, false)
 ## default Line-search GD optimizer
-po1 = POconfig((maxStep=maxStep, target=-10.0, threshold=(1e-10,)))
+po1 = POconfig((maxStep=maxStep, target=-10.0, threshold=(1e-10,), saveTrace=saveTrace2))
 ## vanilla GD optimizer
-po2 = POconfig(maxStep=200, target=-10.0, threshold=(1e-10, 1e-10), 
-               optimizer=GDconfig(itself, 0.001, stepBound=(0.0, 2.0)))
+po2 = POconfig(;maxStep=200, target=-10.0, threshold=(1e-10, 1e-10), 
+               optimizer=GDconfig(itself, 0.001, stepBound=(0.0, 2.0)), 
+               saveTrace=saveTrace2)
 pos = (po1, po2)
 E_t2s = (-1.6667086781377394, -1.1665258293062994)
 ## L₁, α₁
@@ -213,7 +215,7 @@ for ((i, po), E_t2, par_t2, grad_t2) in zip(enumerate(pos), E_t2s, par_t2s, grad
 
     local Es2L, ps2L, grads2L
     output = @capture_out begin
-        Es2L, ps2L, grads2L = optimizeParams!(pars2, bs2, nuc, nucCoords, po)
+        _, Es2L, ps2L, grads2L = optimizeParams!(pars2, bs2, nuc, nucCoords, po)
     end
 
     Es2Ldiffs = [Es2L[i]-Es2L[i-1] for i in 2:lastindex(Es2L)]
@@ -238,8 +240,9 @@ end
 
 
 # BasisFuncMix basis set
+saveTrace3 = (true, true, true, true)
 ## default Line-search GD optimizer
-po3 = POconfig(;maxStep, target=-10.0)
+po3 = POconfig(;maxStep, target=-10.0, saveTrace=saveTrace3)
 ## L-BFGS optimizer from Optim
 lbfgs = function (f, gf, x0)
     # om = LBFGS(linesearch=Optim.LineSearches.BackTracking())
@@ -256,7 +259,7 @@ lbfgs = function (f, gf, x0)
     end
 end
 
-po4 = POconfig(;maxStep, optimizer=lbfgs, threshold=(NaN, NaN))
+po4 = POconfig(;maxStep, optimizer=lbfgs, threshold=(NaN, NaN), saveTrace=saveTrace3)
 pos2 = (po3, po4)
 E_t3s = (-1.7380134127830982, -1.7476281333814627)
 # L, α₁, α₂, d₁, d₂
@@ -277,11 +280,12 @@ for ((i, po), E_t3, par_t3, grad_t3) in zip(enumerate(pos2), E_t3s, par_t3s, gra
     bs3 = (bs2_2 .+ genBasisFunc(fill(0.0, 3), gf3)) |> collect
     pars3 = markParams!(bs3, true)[1:5]
 
-    local Es3L, ps3L, grads3L
+    local Es3L, ps3L, grads3L, fRess3
     output = @capture_out begin
-        Es3L, ps3L, grads3L = optimizeParams!(pars3, bs3, nuc, nucCoords, Ne, po)
+        _, Es3L, ps3L, grads3L, fRess3 = optimizeParams!(pars3, bs3, nuc, nucCoords, Ne, po)
     end
 
+    @test fRess3[end][begin][begin].shared.Etots[end] == Es3L[end]
     Es3Ldiffs = [Es3L[i]-Es3L[i-1] for i in 2:lastindex(Es3L)]
 
     test3bl1 = all(i<=0 || isapprox(i, 0, atol=errorThreshold2) for i in Es3Ldiffs)
@@ -312,9 +316,10 @@ bs4 = genBasisFunc.(nucCoords, Ref(gf4), ["S", "P"])
 pars4 = markParams!(bs4, true)
 αs = getParams(pars4, :α)
 res = optimizeParams!(αs, bs4, nuc, nucCoords, printInfo=false)
-@test res[end]
+@test length(res) == 2
+@test res[begin]
 @test αs[][] >= 0
-@test isapprox(res[begin][end], -1.5376111420710188, atol=errorThreshold1)
+@test isapprox(res[begin+1][end], -1.5376111420710188, atol=errorThreshold1)
 
 
 # function initializeOFconfig!
