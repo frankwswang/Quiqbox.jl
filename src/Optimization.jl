@@ -138,6 +138,7 @@ that f(x) will have lower returned value.
 `saveTrace::NTuple{4, Bool}`: Determine whether saving (by pushing) the intermediate 
 information from all the iterations steps to the output of `optimizeParams!`.
 The types of relevant information are:
+
 | Sequence | Corresponding Information |
 |  :----   | :---:                     |
 | 1 | function value of applied method |

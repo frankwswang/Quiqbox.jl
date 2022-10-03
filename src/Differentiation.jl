@@ -60,26 +60,23 @@ function twoBodyDerivativeCore(::Val{false},
     # [∂ʃ4[i,j,k,l] == ∂ʃ4[j,i,l,k] == ∂ʃ4[j,i,k,l] != ∂ʃ4[l,j,k,i]
     X = Array(X)
     for i = 1:BN, j = 1:i, k = 1:i, l = 1:ifelse(k==i, j, k)
-    # @sync for i = 1:BN, j = 1:i, k = 1:i, l = 1:ifelse(k==i, j, k)
-        # Threads.@spawn begin
-            # ʃ∂abcd[i,j,k,l] == ʃ∂abcd[i,j,l,k] == ʃab∂cd[l,k,i,j] == ʃab∂cd[k,l,i,j]
-            Xvi = view(X, :, i)
-            Xvj = view(X, :, j)
-            Xvk = view(X, :, k)
-            Xvl = view(X, :, l)
-            @TOtensor val = 
-                (Xvi[a] * Xvj[b] * Xvk[c] * Xvl[d] + Xvj[a] * Xvi[b] * Xvk[c] * Xvl[d] + 
-                 Xvi[c] * Xvj[d] * Xvk[a] * Xvl[b] + Xvi[c] * Xvj[d] * Xvl[a] * Xvk[b]) * 
-                ʃ∂abcd[a,b,c,d] + 
-                (view(∂X, :, i)[a] * Xvj[b] * Xvk[c] * Xvl[d] + 
-                 Xvi[a] * view(∂X, :, j)[b] * Xvk[c] * Xvl[d] + 
-                 Xvi[a] * Xvj[b] * view(∂X, :, k)[c] * Xvl[d] + 
-                 Xvi[a] * Xvj[b] * Xvk[c] * view(∂X, :, l)[d] ) * 
-                ʃabcd[a,b,c,d]
+        # ʃ∂abcd[i,j,k,l] == ʃ∂abcd[i,j,l,k] == ʃab∂cd[l,k,i,j] == ʃab∂cd[k,l,i,j]
+        Xvi = view(X, :, i)
+        Xvj = view(X, :, j)
+        Xvk = view(X, :, k)
+        Xvl = view(X, :, l)
+        @TOtensor val = 
+            (Xvi[a] * Xvj[b] * Xvk[c] * Xvl[d] + Xvj[a] * Xvi[b] * Xvk[c] * Xvl[d] + 
+             Xvi[c] * Xvj[d] * Xvk[a] * Xvl[b] + Xvi[c] * Xvj[d] * Xvl[a] * Xvk[b]) * 
+            ʃ∂abcd[a,b,c,d] + 
+            (view(∂X, :, i)[a] * Xvj[b] * Xvk[c] * Xvl[d] + 
+             Xvi[a] * view(∂X, :, j)[b] * Xvk[c] * Xvl[d] + 
+             Xvi[a] * Xvj[b] * view(∂X, :, k)[c] * Xvl[d] + 
+             Xvi[a] * Xvj[b] * Xvk[c] * view(∂X, :, l)[d] ) * 
+            ʃabcd[a,b,c,d]
 
-            ∂ʃ[i,j,k,l] = ∂ʃ[j,i,k,l] = ∂ʃ[j,i,l,k] = ∂ʃ[i,j,l,k] = 
-            ∂ʃ[l,k,i,j] = ∂ʃ[k,l,i,j] = ∂ʃ[k,l,j,i] = ∂ʃ[l,k,j,i] = val
-        # end
+        ∂ʃ[i,j,k,l] = ∂ʃ[j,i,k,l] = ∂ʃ[j,i,l,k] = ∂ʃ[i,j,l,k] = 
+        ∂ʃ[l,k,i,j] = ∂ʃ[k,l,i,j] = ∂ʃ[k,l,j,i] = ∂ʃ[l,k,j,i] = val
     end
     ∂ʃ
 end

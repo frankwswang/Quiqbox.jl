@@ -964,7 +964,7 @@ end
 @inline function genxDIISf(v, B, shift)
     function (c)
         s, signedShift = shiftLastEle!(c, shift)
-        res = dot(v, c) / s + transpose(c) * B * c / (2s^2)
+        res = dot(v, c) / s + dot(c, B, c) / (2s^2)
         c[end] -= signedShift
         res
     end
@@ -973,7 +973,7 @@ end
 @inline function genxDIIS∇f(v, B, shift)
     function (g, c)
         s, signedShift = shiftLastEle!(c, shift)
-        g.= v./s + (B + transpose(B))*c ./ (2s^2) .- (dot(v, c)/s^2 + transpose(c)*B*c/s^3)
+        g.= v./s + (B + transpose(B))*c ./ (2s^2) .- (dot(v, c)/s^2 + dot(c, B, c)/s^3)
         c[end] -= signedShift
         g
     end
