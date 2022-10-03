@@ -156,8 +156,8 @@ S3 = overlaps(bs3)
 HFres3 = runHF(bs3, nuc, nucCoords, DHFO, printInfo=false)
 grad3 = gradOfHFenergy(pars3, HFres3)
 grad3_fd = fDiffOfHFenergy(pars3, bs3, nuc, nucCoords, 1e-7)
-compr2Arrays3((grad3p=grad3[1:end-1], grad3_fdp=grad3_fd[1:end-1]), t3, true)
-@test isapprox(grad3[end], grad3_fd[end], atol=t3)
+compr2Arrays3((grad3p=grad3[1:end-1], grad3_fdp=grad3_fd[1:end-1]), 2t3, true)
+@test isapprox(grad3[end], grad3_fd[end], atol=10t3)
 grad3_t = [-0.16065229305017475,  -0.24121983365900732, -0.14801056361872944, 
             0.004774655873521621, -0.08411039061867616, -0.33217357077286414, 
            -0.41546847658657454,  -0.05739800455726261, -0.30588239774460935, 
@@ -165,7 +165,7 @@ grad3_t = [-0.16065229305017475,  -0.24121983365900732, -0.14801056361872944,
             1.2107782439785262,    0.13565576182237693,  1.6060314706531165, 
             0.05883837996795874,   0.7017475755862608,  -1.2886966025209632, 
             2.762948606659436,   -16.536548192471372]
-compr2Arrays3((grad3=grad3, grad3_t=grad3_t), t3, true)
+compr2Arrays3((grad3=grad3, grad3_t=grad3_t), 10t3, true)
 
 
 # Edge case of accurate gradient requiring high-precision computation
