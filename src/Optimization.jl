@@ -140,11 +140,11 @@ information from all the iterations steps to the output of `optimizeParams!`.
 The types of relevant information are:
 
 | Sequence | Corresponding Information |
-|  :----   | :---:                     |
-| 1 | function value of applied method |
-| 2 | parameter value |
-| 3 | gradient |
-| 4 | complete output of applied method |
+|  :---:   | :---:                     |
+| 1 | function value of the applied method |
+| 2 | parameter value(s) |
+| 3 | function gradient with respect to the parameter(s) |
+| 4 | complete output of the applied method |
 
 ≡≡≡ Initialization Method(s) ≡≡≡
 
