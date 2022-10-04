@@ -426,6 +426,8 @@ bf_pf2 = (bf_pf*0.4)*5
 @test hasEqual(add(bf_add1, bf_add1), 
                add(bf_add1, deepcopy(bf_add1)), 
                2bf_add1, genBasisFunc([1.0, 2.0, 1.0], (2.0, 2.2)))
+gf1_1 = Quiqbox.reduceGaussFuncs(gf1, gf1, 1e-16)[]
+@test hasEqual(gf1, gf1_1)
 
 
 α₁, α₂ = rand(1:0.01:10, 2)
