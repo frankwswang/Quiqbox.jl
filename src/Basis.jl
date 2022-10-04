@@ -1105,7 +1105,7 @@ function reduceGaussFuncs(gf1, gf2, roundAtol)
     length(res1) > 1 && return [gf1, gf2]
     res2 = reduceParamBoxes(con1, con2, roundAtol)
     length(res2) > 1 && return [gf1, gf2]
-    [GaussFunc(res1, res2)]
+    [GaussFunc(res1[], res2[])]
 end
 
 mergeBasisFuncs(bf::FloatingGTBasisFuncs{T, D}; roundAtol::Real=NaN) where {T, D} = [bf]
