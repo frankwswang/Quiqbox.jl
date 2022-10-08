@@ -1,6 +1,6 @@
 using Test
 using Quiqbox
-using Quiqbox: ∂Basis, defaultHFforHFgrad as DHFO, 
+using Quiqbox: ∂Basis, defaultHFconfigForPO as DHFO, 
                defaultHFthresholdForHFgrad as DHFOthreshold
 using ForwardDiff: derivative as ForwardDerivative
 
@@ -180,7 +180,7 @@ grad4_t = [ 0.00011524520850385555, 0.01311284575947802, 0.008472955328531387,
            -0.016166185002661947,   0.006183388294490479]
 setindex!.(pars4, pVals)
 gtb4 = GTBasis(bs4)
-HFres4 = Quiqbox.runHFcore(gtb4, nuc, nucCoords, Quiqbox.defaultHFforHFgrad)
+HFres4 = Quiqbox.runHFcore(gtb4, nuc, nucCoords, Quiqbox.defaultHFconfigForPO)
 grad4 = gradOfHFenergy(pars4, gtb4, (HFres4[begin][begin].Cs[end],), nuc, nucCoords)
 @test isapprox(grad4, grad4_t, atol=t3)
 

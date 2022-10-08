@@ -1,6 +1,6 @@
 export SCFconfig, HFconfig, runHF, runHFcore
 
-using LinearAlgebra: dot, Hermitian, \, det, I, ishermitian
+using LinearAlgebra: dot, Hermitian, \, det, I, ishermitian, diag
 using Combinatorics: powerset
 using LineSearches
 using Optim: LBFGS, Fminbox, optimize as OptimOptimize, minimizer as OptimMinimizer, 
@@ -188,17 +188,56 @@ get2SpinQuantity(O::NTuple{HFTS, T}) where {HFTS, T} = abs(3-HFTS) * sum(O)
 get2SpinQuantities(O, nRepeat::Int) = ntuple(_->get2SpinQuantity(O), nRepeat)
 
 # RHF or UHF
-getEᵗcore(Hcore::AbstractMatrix{T}, 
-          Fˢ::NTuple{HFTS, AbstractMatrix{T}}, Dˢ::NTuple{HFTS, AbstractMatrix{T}}) where 
-         {T, HFTS} = 
+getEhfCore(Hcore::AbstractMatrix{T}, 
+           Fˢ::NTuple{HFTS, AbstractMatrix{T}}, Dˢ::NTuple{HFTS, AbstractMatrix{T}}) where 
+          {T, HFTS} = 
 get2SpinQuantity(getE.(Ref(Hcore), Fˢ, Dˢ))
 
 # RHF or UHF
-function getEᵗ(Hcore::AbstractMatrix{T}, HeeI::AbstractArray{T, 4}, 
-               C::NTuple{HFTS, AbstractMatrix{T}}, N::NTuple{HFTS, Int}) where {T, HFTS}
+function getEhf(Hcore::AbstractMatrix{T}, HeeI::AbstractArray{T, 4}, 
+                C::NTuple{HFTS, AbstractMatrix{T}}, N::NTuple{HFTS, Int}) where {T, HFTS}
     D = getD.(C, N)
     F = getF(Hcore, HeeI, D)
-    getEᵗcore(Hcore, F, D)
+    getEhfCore(Hcore, F, D)
+end
+
+# RHF for MO
+function getEhf((HcoreMO,)::Tuple{<:AbstractMatrix{T}}, 
+                (HeeIMO,)::Tuple{<:AbstractArray{T, 4}}, (Nˢ,)::Tuple{Int}) where {T}
+    term1 = 2 * (sum∘view)(diag(HcoreMO), 1:Nˢ)
+    term2 = T(0)
+    for i in 1:Nˢ, j in 1:Nˢ
+        term2 += 2 * HeeIMO[i,i,j,j] - HeeIMO[i,j,j,i]
+    end
+    term1 + term2
+end
+
+function getEhf(gtb::GTBasis{T, D, BN}, 
+                nuc::AVectorOrNTuple{String, NN}, 
+                nucCoords::SpatialCoordType{T, D, NN}, 
+                N::Union{Int, Tuple{Int}, NTuple{2, Int}}; 
+                errorThreshold::Real=10getAtolVal(T)) where {T, D, BN, NN}
+    Hcore = coreH(gtb, nuc, nucCoords)
+    HeeI = gtb.eeI
+    S = gtb.S
+    if !isapprox(S, I, atol=errorThreshold)
+        X = (Array∘getXcore1)(S)
+        Hcore = changeHbasis(Hcore, X)
+        HeeI = changeHbasis(HeeI, X)
+    end
+    getEhf((Hcore,), (HeeI,), splitSpins(Val(1), N))
+end
+
+# UHF for MO
+function getEhf(HcoreMOs::NTuple{2, <:AbstractMatrix{T}}, 
+                HeeIMOs::NTuple{2, <:AbstractArray{T, 4}}, 
+                Jᵅᵝ::AbstractMatrix{T}, 
+                N::NTuple{2, Int}) where {T}
+    res = mapreduce(+, HcoreMOs, HeeIMOs, N) do HcoreMO, HeeIMO, Nˢ
+        (sum∘view)(diag(HcoreMO), 1:Nˢ) + 
+        sum((HeeIMO[i,i,j,j] - HeeIMO[i,j,j,i]) for j in 1:Nˢ for i in 1:(j-1))
+    end
+    res + sum(Jᵅᵝ[i,j] for i=1:N[begin], j=1:N[end])
 end
 
 

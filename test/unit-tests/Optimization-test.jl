@@ -11,7 +11,7 @@ include("../../test/test-functions/Shared.jl")
 @testset "Optimization.jl" begin
 
 errorThreshold1 = 1e-8
-errorThreshold2 = 5e-12
+errorThreshold2 = 1e-12
 errorThreshold3 = 1e-5
 maxStep = 25
 
@@ -334,5 +334,28 @@ res1 = runHF(bs2, nuc2, nucCoords2,
              printInfo=false)
 res2 = runHF(bs2, nuc2, nucCoords2, HFc2, printInfo=false)
 @test hasEqual(res1, res2)
+
+# PO method :DirectRHFenergy vs :HFenergy
+points = GridBox((1,0,0), 1.4).point
+coords = coordOf.(points)
+bs3bf1 = genBasisFunc(points[begin], "STO-3G", "H")[]
+bs3bf2 = genBasisFunc(bs3bf1, points[end])
+bs3 = [bs3bf1, bs3bf2]
+
+bs3_1 = deepcopy(bs3)
+res3 = runHF(bs3, nuc, coords, printInfo=false)
+bs3_2 = [sum(c.*bs3) for c in eachcol(res3.C[begin])]
+
+pars1 = markParams!(bs3_1, true)
+pcfg1 = POconfig(method=:HFenergy, optimizer=lbfgs)
+poRes3_1 = optimizeParams!(pars1, bs3_1, nuc, coords, pcfg1, printInfo=false)
+
+pcfg2 = POconfig(method=:DirectRHFenergy, optimizer=lbfgs)
+pars2 = markParams!(bs3_2, true)
+poRes3_2 = optimizeParams!(pars2, bs3_2, nuc, coords, pcfg2, printInfo=false)
+
+@test poRes3_1[begin]
+@test poRes3_2[begin]
+@test isapprox(poRes3_1[end][end], poRes3_2[end][end], atol=0.1errorThreshold2)
 
 end

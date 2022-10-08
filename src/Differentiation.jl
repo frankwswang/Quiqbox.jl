@@ -121,7 +121,8 @@ function ∂HFenergy(par::ParamBox{T},
     Xinv = sqrt(S)::Matrix{T} # necessary assertion for type stability
     cH = (i, j)->coreHij(i, j, nuc, nucCoords)
     ∂hij, ∂hijkl = derivativeCore(Val(false), bs, par, S, cH, eeInteraction)
-    getEᵗ(∂hij, ∂hijkl, Ref(Xinv).*C, N)
+    # ∂hij and ∂hijkl are on an orthonormal basis.
+    getEhf(∂hij, ∂hijkl, Ref(Xinv).*C, N)
 end
 
 
