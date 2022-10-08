@@ -857,3 +857,16 @@ collectTuple(o::Any) = collect(o)
 
 
 asymSign(a::Real) = ifelse(a<0, -1, 1)
+
+
+mutable struct FuncArgConfig{F} <: ConfigBox{Any, FuncArgConfig, F}
+    posArgs::Vector{<:Any}
+    keyArgs::Vector{<:Pair{Symbol}}
+end
+
+FuncArgConfig(::F, posArgs, keyArgs) where {F} = FuncArgConfig{F}(posArgs, keyArgs)
+FuncArgConfig(::F, posArgs) where {F} = FuncArgConfig{F}(posArgs, Pair{Symbol}[])
+FuncArgConfig(::F) where {F} = FuncArgConfig{F}(Any[], Pair{Symbol}[])
+
+(facfg::FuncArgConfig{F})(f::F, args...; kws...) where {F} = 
+f(args..., facfg.posArgs...; kws..., facfg.keyArgs...)

@@ -19,11 +19,13 @@ include("../../test/test-functions/Shared.jl")
 @test groupSpins(Val(:UHF), (2,3)) == (2,3)
 
 
-errorThreshold = 5e-8
+errorThreshold1 = 5e-8
+errorThreshold2 = 1e-12
+errorThreshold3 = 1e-5
 
 nucCoords = [[-0.7,0.0,0.0], [0.7,0.0,0.0], [0.0, 0.0, 0.0]]
 nuc = ["H", "H", "O"]
-bs = genBasisFunc.(nucCoords, "STO-3G", ["H", "H", "O"]) |> flatten
+bs = genBasisFunc.(nucCoords, "STO-3G", nuc) |> flatten
 gtb = GTBasis(bs)
 S = overlaps(bs)
 X = S^(-0.5)
@@ -66,9 +68,9 @@ end
     res2_3 = runHF(bs, nuc, nucCoords, HFc3_2)
 end
 
-@test isapprox(res2.Ehf, res2_2.Ehf, atol=100errorThreshold)
-@test isapprox(res1.Ehf, res1_2.Ehf, atol=errorThreshold)
-@test isapprox(res1.Ehf, res1_3.Ehf, atol=errorThreshold)
+@test isapprox(res2.Ehf, res2_2.Ehf, atol=100errorThreshold1)
+@test isapprox(res1.Ehf, res1_2.Ehf, atol=errorThreshold1)
+@test isapprox(res1.Ehf, res1_3.Ehf, atol=errorThreshold1)
 @test isapprox(res1_3.Ehf, res1_4.Ehf, atol=2e-12)
 @test hasEqual(res1_4, res1_5)
 @test hasEqual(res2, res2_3)
@@ -85,8 +87,14 @@ end
     hasEqual(tVars1, res1.temp[1])
 end
 
-@test res1.Ehf == Quiqbox.getEᵗ(Hcore, HeeI, res1.C, (Ne÷2,))
-@test isapprox(res1.Ehf, -93.7878386328627, atol=errorThreshold)
+@test res1.Ehf == Quiqbox.getEhf(Hcore, HeeI, res1.C, (Ne÷2,))
+res1Ehf1 = Quiqbox.getEhf((changeHbasis(Hcore, res1.C[begin]),), 
+                          (changeHbasis(HeeI, res1.C[begin]),), (Ne÷2,))
+@test isapprox(res1.Ehf, res1Ehf1, atol=errorThreshold2)
+gtb2 = [sum(c.*gtb.basis) for c in eachcol(res1.C[begin])] |> GTBasis
+res1Ehf2 = Quiqbox.getEhf(gtb2, nuc, nucCoords, Ne)
+@test isapprox(res1Ehf1, res1Ehf2, atol=errorThreshold2)
+@test isapprox(res1.Ehf, -93.7878386328627, atol=errorThreshold1)
 
 # Note: the orbital coefficients of 4th and 5th columns are so close that based on the 
 # numerical error of each machine the position of them might switch.
@@ -99,11 +107,11 @@ end
   0.0          0.0          1.094020465  0.0  0.0  0.0          2.778672546; 
   0.0          0.0          0.0          1.0  0.0  0.0          0.0; 
   0.0          0.0          0.0          0.0  1.0  0.0          0.0][1:5, [1,2,3,6,7]], 
-atol=errorThreshold)
+atol=errorThreshold1)
 
 @test  isapprox(vcat(res1.C[1][6:7,:][:], res1.C[1][1:5, 4:5][:]) |> sort, 
-                vcat(fill(0,22), fill(1,2)), atol=errorThreshold)
-@test  isapprox(res1.C[1][6:7, 4:5][:] |> sort, [0,0,1,1], atol=errorThreshold)
+                vcat(fill(0,22), fill(1,2)), atol=errorThreshold1)
+@test  isapprox(res1.C[1][6:7, 4:5][:] |> sort, [0,0,1,1], atol=errorThreshold1)
 
 @test isapprox(res1.F[1], 
     [-2.255358688 -1.960982029  -4.484369214 -2.511689786  0.483603806  0.0  0.0; 
@@ -113,15 +121,15 @@ atol=errorThreshold)
       0.483603806 -0.483603806   0.0          0.0         -1.280927053  0.0  0.0; 
       0.0          0.0           0.0          0.0          0.0 -0.661307596  0.0; 
       0.0          0.0           0.0          0.0          0.0  0.0 -0.661307596], 
-atol=errorThreshold)
+atol=errorThreshold1)
 @test isapprox(res1.Eo[1], 
     [-20.930384473, -1.616675719, -1.284466204, -0.661307596, 
       -0.661307596,  1.060815281,  1.847804072], 
-atol=errorThreshold)
+atol=errorThreshold1)
 @test res1.occu[1] == ("↿⇂", "↿⇂", "↿⇂", "↿⇂", "↿⇂", "0", "0")
 
 D1 = res1.D[1]
-@test isapprox(D1*S*D1, D1, atol=errorThreshold)
+@test isapprox(D1*S*D1, D1, atol=errorThreshold1)
 
 
 @test begin
@@ -140,8 +148,12 @@ D1 = res1.D[1]
     hasEqual(tVars2, res2.temp)
 end
 
-@test res2.Ehf == Quiqbox.getEᵗ(Hcore, HeeI, res2.C, (Ne÷2, Ne-Ne÷2))
-@test isapprox(res2.Ehf, -93.78783863286264, atol=errorThreshold)
+@test res2.Ehf == Quiqbox.getEhf(Hcore, HeeI, res2.C, (Ne÷2, Ne-Ne÷2))
+HcoreUHF2 = changeHbasis.(Ref(Hcore), res2.C)
+a, b, c = changeHbasis(HeeI, res2.C...)
+res2Ehf1 = Quiqbox.getEhf(HcoreUHF2, (a, b), c, Quiqbox.splitSpins(Val(:UHF), Ne))
+@test isapprox(res2.Ehf, res2Ehf1, atol=errorThreshold2)
+@test isapprox(res2.Ehf, -93.78783863286264, atol=errorThreshold1)
 
 res2_C1t = [ 0.01089592   0.088980957  0.121608177  0.0  0.0  1.914545206  3.615733309; 
              0.01089592   0.088980957 -0.121608177  0.0  0.0  1.914545206 -3.615733309; 
@@ -160,16 +172,16 @@ res2_C2t = [ 0.010895919  0.088981246  0.121607591  0.0  0.0  1.914545192  3.615
              0.0          0.0          0.0          0.0  1.0  0.0          0.0]
 
 ids = [1,2,3,6,7]
-@test isapprox(res2.C[1][1:5, ids], res2_C1t[1:5, ids], atol=200errorThreshold)
-@test isapprox(res2.C[2][1:5, ids], res2_C2t[1:5, ids], atol=200errorThreshold)
+@test isapprox(res2.C[1][1:5, ids], res2_C1t[1:5, ids], atol=errorThreshold3)
+@test isapprox(res2.C[2][1:5, ids], res2_C2t[1:5, ids], atol=errorThreshold3)
 
 @test  isapprox(vcat(res2.C[1][6:7,:][:], res2.C[1][1:5, 4:5][:]) |> sort, 
-                vcat(fill(0,22), fill(1,2)), atol=errorThreshold)
-@test  isapprox(res2.C[1][6:7, 4:5][:] |> sort, [0,0,1,1], atol=errorThreshold)
+                vcat(fill(0,22), fill(1,2)), atol=errorThreshold1)
+@test  isapprox(res2.C[1][6:7, 4:5][:] |> sort, [0,0,1,1], atol=errorThreshold1)
 
 @test  isapprox(vcat(res2.C[2][6:7,:][:], res2.C[2][1:5, 4:5][:]) |> sort, 
-                vcat(fill(0,22), fill(1,2)), atol=errorThreshold)
-@test  isapprox(res2.C[2][6:7, 4:5][:] |> sort, [0,0,1,1], atol=errorThreshold)
+                vcat(fill(0,22), fill(1,2)), atol=errorThreshold1)
+@test  isapprox(res2.C[2][6:7, 4:5][:] |> sort, [0,0,1,1], atol=errorThreshold1)
 
 res2_F1t = [-2.255358683 -1.960982031 -4.484369221  -2.511689801  0.483603803  0.0  0.0; 
             -1.960982031 -2.255358683 -4.484369221  -2.511689801 -0.483603803  0.0  0.0; 
@@ -187,8 +199,8 @@ res2_F2t = [-2.255358705 -1.960982032  -4.484369213 -2.511689786  0.483603812  0
              0.0          0.0           0.0          0.0          0.0 -0.661307591  0.0; 
              0.0          0.0           0.0          0.0          0.0  0.0 -0.661307591]
 
-@test isapprox(res2.F[1], res2_F1t, atol=200errorThreshold)
-@test isapprox(res2.F[2], res2_F2t, atol=200errorThreshold)
+@test isapprox(res2.F[1], res2_F1t, atol=errorThreshold3)
+@test isapprox(res2.F[2], res2_F2t, atol=errorThreshold3)
 
 res2_Eo1t = [-20.93038451, -1.616675748, -1.28446622,  -0.66130762, 
               -0.66130762,  1.060815274,  1.847804062]
@@ -196,14 +208,14 @@ res2_Eo1t = [-20.93038451, -1.616675748, -1.28446622,  -0.66130762,
 res2_Eo2t = [-20.93038449, -1.616675711, -1.284466186, -0.661307591, 
               -0.661307591, 1.060815276,  1.847804083]
 
-compr2Arrays3((res2_Eo1=res2.Eo[1], res2_Eo1t=res2_Eo1t), 10errorThreshold)
-compr2Arrays3((res2_Eo2=res2.Eo[2], res2_Eo2t=res2_Eo2t), 10errorThreshold)
+compr2Arrays3((res2_Eo1=res2.Eo[1], res2_Eo1t=res2_Eo1t), 10errorThreshold1)
+compr2Arrays3((res2_Eo2=res2.Eo[2], res2_Eo2t=res2_Eo2t), 10errorThreshold1)
 
 @test all( res2.occu .== ( ("↿", "↿", "↿", "↿", "↿", "0", "0"), 
                            ("⇂", "⇂", "⇂", "⇂", "⇂", "0", "0") ) )
 D2s = res2.D
 for D in D2s
-    @test isapprox(D*S*D, D, atol=errorThreshold)
+    @test isapprox(D*S*D, D, atol=errorThreshold1)
 end
 
 # Potential energy curve tests.
@@ -266,11 +278,11 @@ for i in rng
     end
     push!(Et1, res1.Ehf+res1.Enn)
     push!(Et2, res2.Ehf+res1.Enn)
-    !isapprox(Et1[n], rhfs[n], atol=errorThreshold) && println(info1)
-    !isapprox(Et2[n], uhfs[n], atol=errorThreshold) && println(info2)
+    !isapprox(Et1[n], rhfs[n], atol=errorThreshold1) && println(info1)
+    !isapprox(Et2[n], uhfs[n], atol=errorThreshold1) && println(info2)
 end
 
-compr2Arrays2((Et1=Et1, rhfs=rhfs), 95, errorThreshold, 0.6)
-compr2Arrays2((Et2=Et2, uhfs=uhfs), 16, errorThreshold, 5e-5, <)
+compr2Arrays2((Et1=Et1, rhfs=rhfs), 95, errorThreshold1, 0.6)
+compr2Arrays2((Et2=Et2, uhfs=uhfs), 16, errorThreshold1, 5e-5, <)
 
 end

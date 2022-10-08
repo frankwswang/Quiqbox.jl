@@ -3,25 +3,39 @@ export GDconfig, POconfig, optimizeParams!
 using LinearAlgebra: norm
 using LineSearches
 
-const OFtypes = (:HFenergy,)
+const OFmethods = [:HFenergy, :DirectRHFenergy]
+
 const OFconversions = Dict([runHFcore] .=> 
                            [( x->x[begin][begin].shared.Etots[end], 
                               x->last.(getproperty.(x[begin], :Cs)) )
                            ])
-const OFfunctions = Dict([:HFenergy] .=> 
+const OFfunctions = Dict(OFmethods .=> 
     [
-        ( ( runHFcore, OFconversions[runHFcore][begin] ), 
-          ( (tVars, pbs, gtb, nuc, nucCoords, N)->
-            gradOfHFenergy(pbs, gtb, OFconversions[runHFcore][end](tVars), 
-                           nuc, nucCoords, N), 
+        (
+            ( runHFcore, OFconversions[runHFcore][begin] ), 
+            ( (tVars, pbs, gtb, nuc, nucCoords, N)->
+               gradOfHFenergy(pbs, gtb, OFconversions[runHFcore][end](tVars), 
+                              nuc, nucCoords, N), 
             itself )
+        ), 
+        (
+            ( (gtb::GTBasis, nuc, nucCoords, N, config; printInfo) -> 
+               config(getEhf, gtb, nuc, nucCoords, N), 
+              itself ), 
+            ( ((_, pbs, gtb::GTBasis{T, D, BN}, nuc, nucCoords, N) where {T, D, BN}) -> 
+              gradOfHFenergy(pbs, gtb, (getXcore1(gtb.S),), nuc, nucCoords, N), 
+              itself )
         )
     ]
 )
 
 const defaultPOconfigStr = "POconfig()"
 const defaultHFthresholdForHFgrad = getAtolVal(Float64)
-const defaultHFforHFgrad = HFconfig(SCF=SCFconfig(threshold=defaultHFthresholdForHFgrad))
+const defaultHFconfigForPO = HFconfig(SCF=SCFconfig(threshold=defaultHFthresholdForHFgrad))
+const defaultDRHFconfigForPO = FuncArgConfig(getEhf)
+const defaultOFmethodConfigs = [defaultHFconfigForPO, defaultDRHFconfigForPO]
+const defaultOFconfigs = Dict(OFmethods .=> defaultOFmethodConfigs)
+const defaultOFmethod = OFmethods[begin]
 
 
 """
@@ -85,9 +99,15 @@ mutable struct GDconfig{T, M, ST<:Union{Array{T, 0}, T}} <: ConfigBox{T, GDconfi
 end
 
 
-const defaultPOconfigPars = 
-      [Val(:HFenergy), defaultHFforHFgrad, NaN, (5e-7, 1e-5), 200, GDconfig(), 
-       (true, false, false, false)]
+const partialDefaultPOconfigPars = [NaN, (5e-7, 1e-5), 200, GDconfig(), 
+                                    (true, false, false, false)]
+
+const defaultPOconfigPars = begin
+    OFmethodVals = Val.(OFmethods)
+    cfgs = vcat.( OFmethodVals, getindex.(Ref(defaultOFconfigs), OFmethods), 
+                  Ref(partialDefaultPOconfigPars) )
+    Dict(vcat(OFmethods.=>cfgs, OFmethodVals.=>cfgs))
+end
 
 """
 
@@ -99,7 +119,7 @@ The mutable container of parameter optimization configurations.
 ≡≡≡ Field(s) ≡≡≡
 
 `method::Val{M}`: The method that defines the objective function (e.g., HF energy) for the 
-optimization. Available values of `M` from Quiqbox are $(string(OFtypes)[2:end-1]).
+optimization. Available values of `M` from Quiqbox are $(string(OFmethods)[2:end-1]).
 
 `config::CBT`: The configuration for the selected `method`. E.g., for `:HFenergy` it's 
 [`HFconfig`](@ref).
@@ -148,13 +168,14 @@ The types of relevant information are:
 
 ≡≡≡ Initialization Method(s) ≡≡≡
 
-    POconfig(;method::Val=$(defaultPOconfigPars[1]), 
-              config::ConfigBox=$(defaultHFCStr), 
-              target::T=$(defaultPOconfigPars[3]), 
-              threshold::Union{T, NTuple{2, T}}=$(defaultPOconfigPars[4]), 
-              maxStep::Int=$(defaultPOconfigPars[5]), 
-              optimizer::Function=$(defaultPOconfigPars[6]|>typeof|>nameof)()) where {T} -> 
-    POconfig{T}
+    POconfig(;method::Union{Val{M}, Symbol}=$(defaultOFmethod), 
+              config::ConfigBox=Quiqbox.defaultOFconfigs[method], 
+              target::T=$(partialDefaultPOconfigPars[1]), 
+              threshold::Union{T, NTuple{2, T}}=$(partialDefaultPOconfigPars[2]), 
+              maxStep::Int=$(partialDefaultPOconfigPars[3]), 
+              optimizer::Function=$(partialDefaultPOconfigPars[4]|>typeof|>nameof)()) where 
+            {T, M} -> 
+    POconfig{T, M}
 
 ≡≡≡ Example(s) ≡≡≡
 
@@ -175,10 +196,15 @@ mutable struct POconfig{T, M, CBT<:ConfigBox, TH<:Union{Tuple{T}, NTuple{2, T}},
     saveTrace::NTuple{4, Bool}
 end
 
-POconfig(t::NamedTuple) = genNamedTupleC(:POconfig, defaultPOconfigPars)(t)
+POconfig(a1::Symbol, args...) = POconfig(Val(a1), args...)
+
+function POconfig(t::NamedTuple)
+    bl = hasproperty(t, :method)
+    genNamedTupleC(:POconfig, defaultPOconfigPars[bl ? t.method : defaultOFmethod])(t)
+end
 
 POconfig(;kws...) = 
-length(kws) == 0 ? POconfig(defaultPOconfigPars...) : POconfig(kws|>NamedTuple)
+isempty(kws) ? POconfig(defaultPOconfigPars[defaultOFmethod]...) : POconfig(kws|>NamedTuple)
 
 const defaultPOconfig = Meta.parse(defaultPOconfigStr) |> eval
 
@@ -249,11 +275,12 @@ getOptimizerConstructor(::Type{<:GDconfig}) = genLineSearchOpt
 
 getOptimizerConstructor(::Type{<:Any}) =  convertExternalOpt
 
-@inline function genOptimizer(::Val{M}, Mconfig::ConfigBox{T}, optimizer::O, 
-                              pbs::AbstractVector{<:ParamBox{T}}, 
-                              bs::AbstractVector{<:GTBasisFuncs{T, D}}, 
+@inline function genOptimizer(::Val{M}, Mconfig::ConfigBox{T1}, optimizer::O, 
+                              pbs::AbstractVector{<:ParamBox{T2}}, 
+                              bs::AbstractVector{<:GTBasisFuncs{T2, D}}, 
                               nuc::NTuple{NN, String}, 
-                              nucCoords::NTuple{NN, NTuple{D, T}}, N) where {M, T, O, NN, D}
+                              nucCoords::NTuple{NN, NTuple{D, T2}}, N) where 
+                             {M, T1, T2, O, NN, D}
     (f0, getOFval), (g0, getOGval) = OFfunctions[M]
 
     f = function (x)
@@ -508,7 +535,7 @@ function optimizeParamsCore((f0, getOFval), (g0, getOGval),
 end
 
 
-initializeOFconfig!(ofc::HFconfig, _, _, _) = itself(ofc)
+initializeOFconfig!(ofc::ConfigBox, _, _, _) = itself(ofc)
 
 function initializeOFconfig!(ofc::HFconfig{<:Any, HFT, iT}, bs, nuc, nucCoords) where {HFT}
     bls = iszero.(ofc.C0.mat)
@@ -525,7 +552,7 @@ function initializeOFconfig!(ofc::HFconfig{<:Any, HFT, iT}, bs, nuc, nucCoords) 
 end
 
 
-updateOFconfig!(ofc::HFconfig, _, _) = itself(ofc)
+updateOFconfig!(ofc::ConfigBox, _, _) = itself(ofc)
 
 function updateOFconfig!(ofc::HFconfig{<:Any, <:Any, iT}, f::Function, fRes)
     C0new = OFconversions[f][end](fRes)
