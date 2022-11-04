@@ -185,7 +185,7 @@ julia> POconfig();
 julia> POconfig(maxStep=100);
 ```
 """
-mutable struct POconfig{T, M, CBT<:ConfigBox, TH<:Union{Tuple{T}, NTuple{2, T}}, 
+mutable struct POconfig{T, M, CBT<:ConfigBox, TH<:Union{T, NTuple{2, T}}, 
                         OM} <: ConfigBox{T, POconfig, M}
     method::Val{M}
     config::CBT

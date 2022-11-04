@@ -154,14 +154,13 @@ Ne = getCharge(nuc)
 saveTrace = (true, false, true, false)
 
 # Floating basis set
-configs = [(maxStep, C0)->POconfig(;maxStep, config=HFconfig(;C0), 
-                                    threshold=(NaN, NaN), saveTrace), 
-           (maxStep, C0)->POconfig(;maxStep, config=HFconfig(;HF=:UHF, C0), saveTrace)]
+cfgs = [(maxStep, C0)->POconfig(;maxStep, config=HFconfig(;C0), threshold=NaN, saveTrace), 
+        (maxStep, C0)->POconfig(;maxStep, config=HFconfig(;HF=:UHF, C0), saveTrace)]
 
 Es1Ls = Vector{Float64}[]
 gradEnd = Float64[]
 
-for (m, config) in enumerate(configs), (i,j) in zip((1,2,7,8,9,10), (2,2,7,9,9,10))
+for (m, config) in enumerate(cfgs), (i,j) in zip((1,2,7,8,9,10), (2,2,7,9,9,10))
     # 1->X₁, 2->X₂, 7->α₁, 8->α₂, 9->d₁, 10->d₂
     gf1 = GaussFunc(1.7, 0.8)
     gf2 = GaussFunc(0.45, 0.25)
@@ -192,7 +191,7 @@ compr2Arrays3((Eend_1to6=last.(Es1Ls[1:6]), Eend_7toEnd=last.(Es1Ls[7:end])),
 # Grid-based basis set
 saveTrace2 = (true, true, true, false)
 ## default Line-search GD optimizer
-po1 = POconfig((maxStep=maxStep, target=-10.0, threshold=(1e-10,), saveTrace=saveTrace2))
+po1 = POconfig((maxStep=maxStep, target=-10.0, threshold=1e-10, saveTrace=saveTrace2))
 ## vanilla GD optimizer
 po2 = POconfig(;maxStep=200, target=-10.0, threshold=(1e-10, 1e-10), 
                optimizer=GDconfig(itself, 0.001, stepBound=(0.0, 2.0)), 
