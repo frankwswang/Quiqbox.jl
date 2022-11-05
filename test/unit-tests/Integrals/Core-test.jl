@@ -10,7 +10,7 @@ include("../../../test/test-functions/Shared.jl")
 tolerance1 = 5e-17
 tolerance2 = 5Quiqbox.getAtolVal(Float64)
 perturbStep = rand(-1e-1:2e-3:1e-1)
-fNumInt = (γ, u) -> quadgk(t -> t^(2γ)*exp(-u*t^2), 0, 1; order=25, rtol=tolerance1)[1]
+fNumInt = (γ, u) -> quadgk(t -> t^(2γ)*exp(-u*t^2), 0.0, 1.0; order=25, rtol=tolerance1)[1]
 rng = -20:(0.2+perturbStep):9
 for γ in 0:24
     f = ifelse(γ==0, (_, u)->F0(u), Fγ)
