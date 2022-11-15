@@ -18,7 +18,7 @@ TensorOperations = "6aa20fa7-93e2-5fca-9bc0-fbd0db3c71a2"
 [compat]
 Combinatorics = "1"
 DoubleFloats = "^1.2"
-FastGaussQuadrature = "0.4"
+FastGaussQuadrature = "0.5"
 ForwardDiff = "^0.10.25"
 LineSearches = "^7.1.1"
 Optim = "^1.7.0"
