@@ -130,7 +130,7 @@ function getCfromSAD(::Val{HFT}, S::AbstractMatrix{T},
         Threads.@spawn begin
             h1 = coreH(bs, (atm,), (coord,))
             r, _ = runHFcore(Val(:UHF), 
-                            config, atmN, h1, HeeI, S, X, getCfromHcore(Val(:UHF), X, h1))
+                             config, atmN, h1, HeeI, S, X, getCfromHcore(Val(:UHF), X, h1))
             Dᵅs[Threads.threadid()] += r[1].Ds[end]
             Dᵝs[Threads.threadid()] += r[2].Ds[end]
         end
