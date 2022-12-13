@@ -16,7 +16,7 @@
 
 * Native 1-electron and 2-electron integral functions.
 * Floating and fixed-position contracted Gaussian-type orbital (CGTO).
-* Linear combination of multi-center GTOs (MCGTO) as a basis function.
+* Mixed-contracted GTO (linear combination of GTOs with mixed centers or orbital angular momentum) as a basis function.
 * Restricted (closed-shell) and unrestricted (open-shell) Hartree–Fock methods (RHF & UHF).
 * Variational optimization of basis sets based on automatic differentiation (AD) and symbolic differentiation (SD).
 

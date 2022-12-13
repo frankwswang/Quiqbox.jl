@@ -262,7 +262,7 @@ bf10 = genBasisFunc(fill(1.0, 3), (1.2, 3.0))
 
 bf11 = bf8 + bf10
 ```
-The type of `bf11` is called [`Quiqbox.BasisFuncMix`](@ref), which means it cannot be expressed as a contracted Gaussian-type orbital (CGTO), but rather a "mixture" of multi-center GTOs (MCGTO).
+The type of `bf11` is called [`Quiqbox.BasisFuncMix`](@ref), which means it cannot be expressed as a single contracted Gaussian-type orbital (CGTO) as it is a **mixed-contracted** GTO (MCGTO).
 
 There are other cases that can result in a `BasisFuncMix` as the returned object. For example:
 ```@repl 1
