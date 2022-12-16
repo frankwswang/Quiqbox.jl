@@ -102,9 +102,9 @@ Objects defined by Quiqbox that are directly exported to the user have the corre
 [Doc-latest]:  https://frankwswang.github.io/Quiqbox.jl/dev
 [Doc-s-img]:   https://img.shields.io/github/v/release/frankwswang/Quiqbox.jl?label=latest%20release
 [Doc-l-img]:   https://img.shields.io/badge/docs-latest-blue.svg
-[GA-CI-img]:   https://img.shields.io/github/workflow/status/frankwswang/Quiqbox.jl/CI-JS-latest?label=Julia%20latest
+[GA-CI-img]:   https://github.com/frankwswang/Quiqbox.jl/actions/workflows/CI-JS-latest.yml/badge.svg
 [GA-CI-url]:   https://github.com/frankwswang/Quiqbox.jl/actions/workflows/CI-JS-latest.yml
-[GA-CI-JN-img]:https://img.shields.io/github/workflow/status/frankwswang/Quiqbox.jl/CI-JN?label=Julia%20nightly
+[GA-CI-JN-img]:https://github.com/frankwswang/Quiqbox.jl/actions/workflows/CI-JN.yml/badge.svg
 [GA-CI-JN-url]:https://github.com/frankwswang/Quiqbox.jl/actions/workflows/CI-JN.yml
 [codecov-img]: https://img.shields.io/codecov/c/github/frankwswang/Quiqbox.jl/main?label=coverage&token=Z1XOA39DV2
 [New-commits-img]: https://img.shields.io/github/commits-since/frankwswang/Quiqbox.jl/latest?color=teal&include_prereleases
