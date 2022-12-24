@@ -5,7 +5,7 @@ using Quiqbox: getAtolVal, getAtolDigits, roundToMultiOfStep, nearestHalfOf, get
                markUnique, getUnique!, itself, themselves, replaceSymbol, groupedSort, 
                mapPermute, getFunc, nameOf, tupleDiff, genIndex, fillObj, arrayToTuple, 
                genTupleCoords, uniCallFunc, mergeMultiObjs, isNaN, getBool, skipIndices, 
-               isOscillateConverged, collectTuple, asymSign
+               isOscillateConverged, collectTuple, asymSign, numEps
 using Suppressor: @capture_out
 using LinearAlgebra: norm
 
@@ -13,6 +13,7 @@ using LinearAlgebra: norm
 
 # function getAtolVal getAtolDigits
 @test getAtolVal(Float64) == 4e-16
+@test getAtolVal(Int) == 1
 @test getAtolDigits(Float64) == 15
 
 
@@ -20,6 +21,10 @@ using LinearAlgebra: norm
 @test roundToMultiOfStep(3811.47123123, 0.01) == 3811.47
 @test roundToMultiOfStep(0.1+0.2, 1e-17) == 0.30000000000000004
 @test roundToMultiOfStep(0.1+0.2, 1e-16) == 0.3
+@test roundToMultiOfStep(2, 2) == 2
+@test roundToMultiOfStep(2, 3) == 3
+@test roundToMultiOfStep(2, 4) == 0
+@test roundToMultiOfStep(2, 5) == 0
 
 @test nearestHalfOf(0.1 + 0.2) == 0.15
 @test getNearestMid(0.1, 0.2, 1e-16) == 0.15
@@ -283,5 +288,11 @@ arr1 = collect(tpl1)
 @test asymSign(0) == 1
 @test asymSign(1.1) == 1
 @test asymSign(-1.1) == -1
+
+
+# function numEps
+@test numEps(Float64) == eps(Float64)
+@test numEps(Int64) == one(Int64)
+@test numEps(Complex{Float64}) == eps(Float64)
 
 end
