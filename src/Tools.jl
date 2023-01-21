@@ -10,7 +10,7 @@ using LinearAlgebra: eigvals, svdvals, eigen, norm
 Return the maximal number of digits kept after rounding of the input real number type `T`.
 """
 function getAtolDigits(::Type{T}) where {T<:Real}
-    val = log10(T|>eps)
+    val = log10(T|>numEps)
     res = max(0, -val) |> floor
     if res > typemax(Int)
         throw(DomainError(res, "This value is too large to be converted to Int."))
@@ -26,10 +26,11 @@ end
 
 Return the absolute precision tolerance of the input real number type `T`.
 """
-getAtolVal(::Type{T}) where {T<:Real} = ceil(eps(T)*1.5, sigdigits=1)
+getAtolVal(::Type{T}) where {T<:Real} = ceil(numEps(T)*1.5, sigdigits=1)
+getAtolVal(::Type{T}) where {T<:Integer} = one(T)
 
 
-function roundToMultiOfStep(num::Number, step::Real)
+function roundToMultiOfStep(num::T, step::T) where {T<:Real}
     if isnan(step)
         num
     else
@@ -38,9 +39,13 @@ function roundToMultiOfStep(num::Number, step::Real)
     end
 end
 
+roundToMultiOfStep(num::T, step::T) where {T<:Integer} = round(T, num/step) * step
+
 
 nearestHalfOf(val::T) where {T<:Real} = 
-roundToMultiOfStep(val/2, floor(eps(T), sigdigits=1))
+roundToMultiOfStep(val/2, floor(numEps(T), sigdigits=1))
+
+nearestHalfOf(val::Integer) = itself(val)
 
 
 getNearestMid(num1::T, num2::T, atol::Real) where {T} = 
@@ -870,3 +875,7 @@ FuncArgConfig(::F) where {F} = FuncArgConfig{F}(Any[], Pair{Symbol}[])
 
 (facfg::FuncArgConfig{F})(f::F, args...; kws...) where {F} = 
 f(args..., facfg.posArgs...; kws..., facfg.keyArgs...)
+
+numEps(::Type{T}) where {T<:AbstractFloat} = eps(T)
+numEps(::Type{T}) where {T<:Integer} = one(T)
+numEps(::Type{Complex{T}}) where {T} = eps(T)

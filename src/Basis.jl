@@ -1221,7 +1221,7 @@ function mul(gf::GaussFunc{T}, coeff::Real; roundAtol::Real=getAtolVal(T)) where
     if isone(coeff)
         itself(gf)
     else
-        GaussFunc(gf.xpn, mulParamBox(coeff, gf.con, nearestHalfOf(roundAtol)))
+        GaussFunc(gf.xpn, mulParamBox(convert(T, coeff), gf.con, nearestHalfOf(roundAtol)))
     end
 end
 

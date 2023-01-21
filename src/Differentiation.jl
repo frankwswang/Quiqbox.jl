@@ -96,7 +96,7 @@ function derivativeCore(FoutputIsVector::Val{B},
             ∂S[i,j] = ∂S[j,i] = overlap(∂bfs[i], bfs[j]) + overlap(bfs[i], ∂bfs[j])
         end
     end
-    eps(T) > eps(Double64) && (S = Double64.(S))
+    numEps(T) > eps(Double64) && (S = Double64.(S))
     X = getXcore1(S)
     λ, 𝑣 = eigen(S|>Hermitian)
     ∂S2 = 𝑣'*∂S*𝑣

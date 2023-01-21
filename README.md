@@ -6,9 +6,16 @@
 
 **Quiqbox** is a quantum chemistry and quantum physics software package that starts around Gaussian basis set optimization for electronic structure problems. Quiqbox is written in pure [Julia](https://julialang.org/). This work is supported by the U.S. Department of Energy under Award No. DESC0019374.
 
-| Documentation | Code Status | License |
-| :---: | :---: | :---: |
-| [![][Doc-s-img]][Doc-stable] | [![codecov][codecov-img]][codecov-url] [![CI][GA-CI-img]][GA-CI-url] [![CI-JN][GA-CI-JN-img]][GA-CI-JN-url] [![][New-commits-img]][New-commits-url] | [![License: MIT][License-img]][License-url] |
+| Documentation | DOI | Paper | License |
+| :---: | :---: | :---: | :---: |
+| [![][Doc-l-img]][Doc-latest] | [![][Zenodo-DOI-img]][Zenodo-DOI-url] |[![][arXiv-img]][arXiv-url] | [![License: MIT][License-img]][License-url] |
+
+
+
+| Development Status |
+|:---:|
+| [![codecov][codecov-img]][codecov-url] [![CI][GA-CI-img]][GA-CI-url] [![CI-JN][GA-CI-JN-img]][GA-CI-JN-url] [![][New-commits-img]][New-commits-url] [![][Genie-PkgDC-img]][Releases-url]|
+
 
 <br />
 
@@ -18,7 +25,7 @@
 * Floating and fixed-position contracted Gaussian-type orbital (CGTO).
 * Mixed-contracted GTO (linear combination of GTOs with mixed centers or orbital angular momentum) as a basis function.
 * Restricted (closed-shell) and unrestricted (open-shell) Hartree–Fock methods (RHF & UHF).
-* Variational optimization of basis sets based on automatic differentiation (AD) and symbolic differentiation (SD).
+* Variational optimization of basis set parameters based on a hybrid analytical differentiation design combining automatic differentiation (AD) and symbolic differentiation (SD).
 
 # Setup
 
@@ -85,30 +92,43 @@ optimizeParams!(pars, bs, nuc, coords)
 ```
 
 # Documentation
-Objects defined by Quiqbox that are directly exported to the user have the corresponding docstring, which can be accessed through the [Help mode](https://docs.julialang.org/en/v1/stdlib/REPL/#Help-mode) in Julia REPL. The [latest release's documentation][Doc-stable] contains all the docstrings and additional tutorials of the package. For unreleased/experimental features, please refer to the [developer documentation][Doc-latest].
+Objects defined by Quiqbox that are directly exported to the user have the corresponding docstring, which can be accessed through the [Help mode](https://docs.julialang.org/en/v1/stdlib/REPL/#Help-mode) in Julia REPL. The [latest release's documentation][Doc-latest] contains all the docstrings and additional tutorials of the package. For unreleased/experimental features, please refer to the [developer documentation][Doc-dev].
 
 <br />
 <br />
 
 <p align="center">
     <a href="https://jdwhitfield.com/">
-        <img width=400 src="docs/src/assets/groupLogo.svg" alt="Whitfield Group">
+        <img width=450 src="docs/src/assets/groupLogo.png" alt="Whitfield Group">
     </a>
 </p>
 
 <br />
 
-[Doc-stable]:  https://frankwswang.github.io/Quiqbox.jl/stable
-[Doc-latest]:  https://frankwswang.github.io/Quiqbox.jl/dev
-[Doc-s-img]:   https://img.shields.io/github/v/release/frankwswang/Quiqbox.jl?label=latest%20release
-[Doc-l-img]:   https://img.shields.io/badge/docs-latest-blue.svg
+[Doc-l-img]:   https://img.shields.io/github/v/release/frankwswang/Quiqbox.jl?label=latest%20release
+[Doc-latest]:  https://frankwswang.github.io/Quiqbox.jl/stable
+[Doc-dev]:  https://frankwswang.github.io/Quiqbox.jl/dev
+
 [GA-CI-img]:   https://github.com/frankwswang/Quiqbox.jl/actions/workflows/CI-JS-latest.yml/badge.svg
 [GA-CI-url]:   https://github.com/frankwswang/Quiqbox.jl/actions/workflows/CI-JS-latest.yml
+
 [GA-CI-JN-img]:https://github.com/frankwswang/Quiqbox.jl/actions/workflows/CI-JN.yml/badge.svg
 [GA-CI-JN-url]:https://github.com/frankwswang/Quiqbox.jl/actions/workflows/CI-JN.yml
-[codecov-img]: https://img.shields.io/codecov/c/github/frankwswang/Quiqbox.jl/main?label=coverage&token=Z1XOA39DV2
+
+[codecov-img]: https://codecov.io/gh/frankwswang/Quiqbox.jl/branch/main/graph/badge.svg?token=Z1XOA39DV2
+[codecov-url]: https://codecov.io/gh/frankwswang/Quiqbox.jl
+
 [New-commits-img]: https://img.shields.io/github/commits-since/frankwswang/Quiqbox.jl/latest?color=teal&include_prereleases
 [New-commits-url]: https://github.com/frankwswang/Quiqbox.jl/commits/main
-[codecov-url]: https://codecov.io/gh/frankwswang/Quiqbox.jl
-[License-img]: https://img.shields.io/badge/MIT%20License-blueviolet.svg
+
+[Genie-PkgDC-img]: https://shields.io/endpoint?url=https://pkgs.genieframework.com/api/v1/badge/Quiqbox
+[Releases-url]: https://github.com/frankwswang/Quiqbox.jl/releases
+
+[Zenodo-DOI-img]: https://zenodo.org/badge/DOI/10.5281/zenodo.7448314.svg
+[Zenodo-DOI-url]: https://zenodo.org/record/7448314
+
+[arXiv-img]: https://img.shields.io/badge/arXiv-2212.04586-b31b1b.svg
+[arXiv-url]: https://arxiv.org/abs/2212.04586
+
+[License-img]: https://img.shields.io/badge/License-MIT-yellow.svg
 [License-url]: https://github.com/frankwswang/Quiqbox.jl/blob/main/LICENSE

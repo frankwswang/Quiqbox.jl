@@ -407,7 +407,9 @@ function reduceParamBoxes(pb1::ParamBox{T, V, FL1}, pb2::ParamBox{T, V, FL2},
         outVal1 = pb1()
         outVal2 = pb2()
         if isApprox(outVal1, outVal2, atol=2roundAtol)
-            [genExponent( getNearestMid(outVal1, outVal2, roundAtol) )]
+            res = outValCopy(pb1)
+            res[] = getNearestMid(outVal1, outVal2, roundAtol)
+            [res]
         else
             [pb1, pb2]
         end

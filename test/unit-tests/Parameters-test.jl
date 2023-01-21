@@ -1,6 +1,7 @@
 using Test
 using Quiqbox
-using Quiqbox: getTypeParams, compareParamBox, getFLevel, FLevel, PBFL
+using Quiqbox: getTypeParams, compareParamBox, getFLevel, FLevel, PBFL, addParamBox, 
+               mulParamBox, reduceParamBoxes
 
 @testset "Parameters.jl" begin
 
@@ -8,8 +9,8 @@ using Quiqbox: getTypeParams, compareParamBox, getFLevel, FLevel, PBFL
 pb1 = ParamBox(1, :a)
 @test getTypeParams(pb1) == (Int, :a, Quiqbox.iT)
 @test (FLevel∘getFLevel)(pb1) == FLevel(pb1.map) == FLevel(Quiqbox.iT)
-@test inSymOf(pb1) == :x_a
-@test outSymOf(pb1) == :a
+@test inSymOf(pb1) == :x_a && isInSymEqual(pb1, :x_a)
+@test outSymOf(pb1) == :a && isOutSymEqual(pb1, :a)
 @test dataOf(pb1)[begin][] == pb1[] == inValOf(pb1)
 @test dataOf(pb1)[end] == :x_a
 @test pb1[] == pb1() == 1 == outValOf(pb1)
@@ -155,7 +156,73 @@ toggleDiff!(pb1_2)
 toggleDiff!(pb4_3)
 @test !compareParamBox(pb4, pb4_3)
 @test !compareParamBox(pb4_3, ParamBox(Val(:C), pb4_3)) && 
-      (Quiqbox.getTypeParams(pb4_3)!=:C) && !isDiffParam(pb4_3)
+      (getTypeParams(pb4_3)!=:C) && !isDiffParam(pb4_3)
 toggleDiff!(pb4_3)
+
+
+# function addParamBox
+pb10 = ParamBox(4, :a, x->x^2)
+pb11 = changeMapping(pb10, x->x^3)
+pb12 = addParamBox(pb10, pb11)
+@test pb12() == (pb10() + pb11())
+@test (pb12.data .=== pb10.data) && (pb10.data .=== pb11.data)
+@test isDiffParam(pb12) && (pb12.index[] == nothing)
+pb13 = ParamBox(3, :a)
+pb14 = ParamBox(3, :a)
+pb15 = addParamBox(pb13, pb14)
+@test getTypeParams(pb15) == (Int, :a, Quiqbox.iT)
+@test pb15() == 2pb13[] == pb15[]
+@test !isDiffParam(pb15) && (pb15.index[] == nothing)
+pb16 = ParamBox(1.5, :a)
+pb17 = ParamBox(1.5, :a)
+pb18 = addParamBox(pb16, pb17)
+@test getTypeParams(pb18) == (Float64, :a, Quiqbox.iT)
+@test pb18() == 2pb16[] == pb18[]
+@test !isDiffParam(pb18) && (pb18.index[] == nothing)
+
+
+# function mulParamBox
+pb12_2 = mulParamBox(pb10, pb11)
+@test pb12_2() == (pb10() * pb11())
+@test pb12_2.data .=== pb10.data
+@test isDiffParam(pb12_2) && (pb12_2.index[] == nothing)
+pb15_2 = mulParamBox(pb13, pb14)
+@test getTypeParams(pb15_2) == (Int, :a, Quiqbox.iT)
+@test pb15_2() == pb13[]*pb14[] == pb15_2[]
+@test !isDiffParam(pb15_2) && (pb15_2.index[] == nothing)
+pb18_2 = mulParamBox(pb16, pb17)
+@test getTypeParams(pb18_2) == (Float64, :a, Quiqbox.iT)
+@test pb18_2() == pb16[]*pb17[] == pb18_2[]
+@test !isDiffParam(pb18_2) && (pb18_2.index[] == nothing)
+
+c1 = 2
+pb19 = mulParamBox(c1, pb10)
+@test pb19() == c1*pb10()
+@test pb19.data .=== pb10.data
+@test isDiffParam(pb19) && (pb19.index[] == nothing)
+
+c2 = 3
+pb20 = mulParamBox(c2, pb13)
+@test getTypeParams(pb20) == (Int, :a, Quiqbox.iT)
+@test pb20() == c2*pb13() == pb20[]
+@test !isDiffParam(pb20) && (pb19.index[] == nothing)
+
+
+# function reduceParamBoxes
+pb10_2 = changeMapping(pb10, pb10.map)
+pb10_3 = reduceParamBoxes(pb10, pb10_2)[]
+@test pb10_3 === pb10
+@test pb10_3 !== pb10_2 && hasIdentical(pb10_3, pb10_2)
+
+pb13_14 = reduceParamBoxes(pb13, pb14)[]
+@test !hasIdentical(pb13_14, pb13) && hasEqual(pb13_14, pb13)
+@test !hasIdentical(pb13_14, pb14) && hasEqual(pb13_14, pb14)
+
+pb16_a1 = ParamBox(1.5 + 2e-16, :a)
+pb16_a2 = ParamBox(1.5 + 1e-10, :a)
+pb16_r1 = reduceParamBoxes(pb16_a1, pb16)[]
+pb16_r2 = reduceParamBoxes(pb16_a2, pb16)
+@test length(pb16_r2) == 2
+@test pb16_r2[begin] === pb16_a2 && pb16_r2[end] === pb16
 
 end
