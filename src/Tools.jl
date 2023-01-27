@@ -713,7 +713,7 @@ function arrayDiffCore!(vs::NTuple{N, Array{T}}) where {N, T}
     coms = T[]
     l = length(head)
     i = 0
-    ids = zeros(Int, N)
+    ids = Array{Int}(undef, N)
     while i < l
         i += 1
         ele = head[i]

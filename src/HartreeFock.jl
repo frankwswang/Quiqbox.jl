@@ -876,7 +876,7 @@ function DIIScore(∇s::AbstractVector{<:AbstractMatrix{T}},
                   Ds::AbstractVector{<:AbstractMatrix{T}}, S::AbstractMatrix{T}) where {T}
     len = length(Ds)
     B = similar(∇s[begin], len, len)
-    v = zeros(len)
+    v = zeros(T, len)
     Threads.@threads for j in eachindex(Ds)
         for i = 1:j
             B[i,j] = B[j,i] = dot( ∇s[i]*Ds[i]*S - S*Ds[i]*∇s[i], 
@@ -1041,7 +1041,7 @@ end
 function CMsolver(::Val{CCB}, v::AbstractVector{T}, B::AbstractMatrix{T}, 
                   ϵ::T=T(1e-6)) where {CCB, T}
     len = length(v)
-    getA = (B)->[B  ones(len); ones(1, len) 0]
+    getA = M->[M  ones(T, len); ones(T, 1, len) T(0)]
     b = vcat(-v, 1)
     local c
     while true
