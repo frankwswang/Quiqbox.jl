@@ -4,7 +4,9 @@ using SpecialFunctions: erf
 using FastGaussQuadrature: gausslegendre
 using LinearAlgebra: dot
 
-# Reference: DOI: 10.1088/0143-0807/31/1/004
+# Reference(s): 
+## [DOI] 10.1088/0143-0807/31/1/004
+
 function genFγIntegrand(γ::Int, u::T) where {T}
     function (x)
         ( (x+1)/2 )^(2γ) * exp(-u * (x+1)^2 / 4) / 2

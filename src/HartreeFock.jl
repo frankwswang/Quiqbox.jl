@@ -13,6 +13,12 @@ const defaultHFCStr = "HFconfig()"
 const defaultSCFconfigArgs = ( (:ADIIS, :DIIS), (5e-3, 1e-12) )
 const defultOscThreshold = 1e-6
 
+# Reference(s):
+## [ISBN-13] 978-0486691862
+## [DOI] 10.1016/0009-2614(80)80396-4
+## [DOI] 10.1002/jcc.540030413
+## [DOI] 10.1063/1.1470195
+## [DOI] 10.1063/1.3304922
 
 getXcore1(S::AbstractMatrix{T}) where {T} = Hermitian(S)^(-T(0.5))
 
