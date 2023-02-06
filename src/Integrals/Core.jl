@@ -548,7 +548,7 @@ diFoldCount(i::T, j::T) where {T} = ifelse(i==j, 1, 2)
     i != j && (m += 1)
     k != l && (m += 1)
     (i != k || j != l) && (m += 1)
-    2^m
+    1 << m
 end
 
 function get2BodyUniquePairs(flags::NTuple{5, Bool}, 
@@ -792,7 +792,7 @@ end
     oneSidePairs = Iterators.product(eachindex(ps₁), eachindex(ps₂))
     for (x, (i₁,i₂)) in enumerate(oneSidePairs), (_, (i₃,i₄)) in zip(1:x, oneSidePairs)
         n = getUniquePair!(n, uniquePairs, uPairCoeffs, flags, 
-                           (ps₁[i₁], ps₂[i₂], ps₁[i₃], ps₂[i₄]), 2^(i₁!=i₃ || i₂!=i₄))
+                           (ps₁[i₁], ps₂[i₂], ps₁[i₃], ps₂[i₄]), 1<<(i₁!=i₃ || i₂!=i₄))
     end
     n
 end
@@ -801,7 +801,7 @@ end
     oneSidePairs = Iterators.product(eachindex(ps₁), eachindex(ps₂))
     for (x, (i₁,i₂)) in enumerate(oneSidePairs), (_, (i₃,i₄)) in zip(1:x, oneSidePairs)
         n = getUniquePair!(n, uniquePairs, uPairCoeffs, flags, 
-                           (ps₁[i₁], ps₂[i₂], ps₂[i₄], ps₁[i₃]), 2^(i₁!=i₃ || i₂!=i₄))
+                           (ps₁[i₁], ps₂[i₂], ps₂[i₄], ps₁[i₃]), 1<<(i₁!=i₃ || i₂!=i₄))
     end
     n
 end
