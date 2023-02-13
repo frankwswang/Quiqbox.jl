@@ -54,7 +54,9 @@ splitSpins(::Val{N}, Ns::NTuple{N, Int}) where {N} = itself(Ns)
 
 splitSpins(::Val{2}, (Nˢ,)::Tuple{Int}) = (Nˢ, Nˢ)
 
-splitSpins(::Val{1}, Ns::NTuple{2, Int}) = (sum(Ns)÷2,)
+splitSpins(::Val{:RHF}, Ns::NTuple{2, Int}) = 
+error("For restricted closed-shell Hartree-Fock (RHF), the input spin configuration $(Ns)"*
+      " is not supported.")
 
 splitSpins(::Val{:RHF}, N) = splitSpins(Val(HFtypeSizeList[:RHF]), N)
 
@@ -218,6 +220,7 @@ function getEhf((HcoreMO,)::Tuple{<:AbstractMatrix{T}},
     term1 + term2
 end
 
+#  RHF for MO in GTBasis
 function getEhf(gtb::GTBasis{T, D, BN}, 
                 nuc::AVectorOrNTuple{String, NN}, 
                 nucCoords::SpatialCoordType{T, D, NN}, 
@@ -666,7 +669,8 @@ whether the SCF procedure is converged.
 please refer to [`HFconfig`](@ref).
 
 `N::Union{Int, Tuple{Int}, NTuple{2, Int}}`: Total number of electrons, or the number(s) of 
-electrons with same spin configurations(s).
+electrons with same spin configurations(s). **NOTE:** `N::NTuple{2, Int}` is only supported 
+by unrestricted Hartree-Fock (UHF).
 
 ≡≡≡ Keyword argument(s) ≡≡≡
 
@@ -699,7 +703,8 @@ runHF(GTBasis(bs), args...; printInfo)
                            config::HFconfig{<:Any, HFT}=defaultHFC; 
                            printInfo::Bool=false) where {T, D, BN, BFT, NN, HFT}
     Nlow = Int(HFT==:RHF)
-    N > Nlow || throw(DomainError(N, "$(HFT) requires more than $(Nlow) electrons."))
+    totN = (N isa Int) ? N : (N[begin] + N[end])
+    totN > Nlow || throw(DomainError(N, "$(HFT) requires more than $(Nlow) electrons."))
     Ns = splitSpins(Val(HFT), N)
     leastNb = max(Ns...)
     BN < leastNb &&  throw(DomainError(BN, "The number of basis functions should be no "*

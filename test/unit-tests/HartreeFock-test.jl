@@ -10,7 +10,7 @@ include("../../test/test-functions/Shared.jl")
 # function splitSpins & groupSpins
 @test splitSpins(Val(:RHF), 5) == (2,)
 @test splitSpins(Val(:RHF), (2,)) == (2,)
-@test splitSpins(Val(:RHF), (1,3)) == (2,)
+try splitSpins(Val(:RHF), (1,3)) == (2,) catch err; @test (err isa ErrorException) end
 @test splitSpins(Val(:UHF), 5) == (2,3)
 @test splitSpins(Val(:UHF), (2,)) == (2,2)
 @test splitSpins(Val(:UHF), (3,2)) == (3,2)
@@ -55,17 +55,23 @@ catch err
     @test (err isa DimensionMismatch)
 end
 
+try
+    runHF(bs, nuc, nucCoords, splitSpins(Val(:UHF), Ne))
+catch err
+    @test (err isa ErrorException)
+end
+
 @suppress_out begin
     res1   = runHF(bs, nuc, nucCoords, HFc1)
     res1_2interm = runHFcore(bs, nuc, nucCoords, HFc2)
     res1_2 = HFfinalVars(gtb, nuc, nucCoords, X, res1_2interm...)
     res1_3interm = runHFcore(bs, nuc, nucCoords, Ne, HFc5)
     res1_3 = HFfinalVars(gtb, nuc, nucCoords, X, res1_3interm...)
-    res1_4 = runHF(bs, nuc, nucCoords, Ne, HFc6)
-    res1_5 = runHF(bs, nuc, nucCoords, HFc6_2)
+    res1_4 = runHF(bs, nuc, nucCoords, splitSpins(Val(:RHF), Ne), HFc6)
+    res1_5 = runHF(bs, nuc, nucCoords, Ne, HFc6_2)
     res2   = runHF(bs, nuc, nucCoords, HFc3)
     res2_2 = runHF(bs, nuc, nucCoords, HFc4)
-    res2_3 = runHF(bs, nuc, nucCoords, HFc3_2)
+    res2_3 = runHF(bs, nuc, nucCoords, HFc3_2, splitSpins(Val(:UHF), Ne))
 end
 
 @test isapprox(res2.Ehf, res2_2.Ehf, atol=100errorThreshold1)
