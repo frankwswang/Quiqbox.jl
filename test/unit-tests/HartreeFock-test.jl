@@ -1,22 +1,19 @@
 using Test
 using Quiqbox
-using Quiqbox: splitSpins, groupSpins, HFfinalVars
+using Quiqbox: splitSpins, HFfinalVars
 using Suppressor: @suppress_out, @capture_out
 
 include("../../test/test-functions/Shared.jl")
 
 @testset "HartreeFock.jl" begin
 
-# function splitSpins & groupSpins
+# function splitSpins
 @test splitSpins(Val(:RHF), 5) == (2,)
 @test splitSpins(Val(:RHF), (2,)) == (2,)
 try splitSpins(Val(:RHF), (1,3)) == (2,) catch err; @test (err isa ErrorException) end
 @test splitSpins(Val(:UHF), 5) == (2,3)
 @test splitSpins(Val(:UHF), (2,)) == (2,2)
 @test splitSpins(Val(:UHF), (3,2)) == (3,2)
-
-@test groupSpins(Val(:RHF), (2,)) == (2,2)
-@test groupSpins(Val(:UHF), (2,3)) == (2,3)
 
 
 errorThreshold1 = 5e-8

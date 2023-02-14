@@ -62,15 +62,6 @@ splitSpins(::Val{:RHF}, N) = splitSpins(Val(HFtypeSizeList[:RHF]), N)
 
 splitSpins(::Val{:UHF}, N) = splitSpins(Val(HFtypeSizeList[:UHF]), N)
 
-groupSpins(::Val{1}, (Nˢ,)::Tuple{Int}) = (Nˢ, Nˢ)
-
-groupSpins(::Val{2}, Ns::NTuple{2, Int}) = itself(Ns)
-
-groupSpins(::Val{:RHF}, Ns::Tuple{Vararg{Int}}) = groupSpins(Val(HFtypeSizeList[:RHF]), Ns)
-
-groupSpins(::Val{:UHF}, Ns::Tuple{Vararg{Int}}) = groupSpins(Val(HFtypeSizeList[:UHF]), Ns)
-
-
 function breakSymOfC(::Val{:UHF}, C::AbstractMatrix{T}) where {T}
     C2 = copy(C)
     l = min(size(C2, 1), 2)
@@ -470,7 +461,9 @@ The container of the final values after a Hartree-Fock SCF procedure.
 
 `Enn::T`: The nuclear repulsion energy.
 
-`Ns::NTuple{2, Int}`: The numbers of two different spins respectively.
+`Ns::NTuple{HFTS, Int}`: The number(s) of electrons with same spin configurations(s). For 
+restricted closed-shell Hartree-Fock (RHF), the single element in `.Ns` represents both 
+spin-up electrons and spin-down electrons.
 
 `nuc::NTuple{NN, String}`: The nuclei in the studied system.
 
@@ -484,7 +477,7 @@ The container of the final values after a Hartree-Fock SCF procedure.
 
 `Eo::NTuple{HFTS, Vector{T}}`: Energies of canonical orbitals.
 
-`occu::NTuple{HFTS, NTuple{BN, String}}`: Occupations of canonical orbitals.
+`occu::NTuple{HFTS, NTuple{BN, Int}}`: Occupations of canonical orbitals.
 
 `temp::NTuple{HFTS, HFtempVars{T, HFT}}`: the intermediate values.
 
@@ -495,7 +488,7 @@ The container of the final values after a Hartree-Fock SCF procedure.
 struct HFfinalVars{T, D, HFT, NN, BN, HFTS} <: HartreeFockFinalValue{T, HFT}
     Ehf::T
     Enn::T
-    Ns::NTuple{2, Int}
+    Ns::NTuple{HFTS, Int}
     nuc::NTuple{NN, String}
     nucCoord::NTuple{NN, NTuple{D, T}}
     C::NTuple{HFTS, Matrix{T}}
@@ -528,7 +521,7 @@ struct HFfinalVars{T, D, HFT, NN, BN, HFTS} <: HartreeFockFinalValue{T, HFT}
         F = last.(getproperty.(vars, :Fs))
         Eo = getindex.(getCϵ.(Ref(X), F), 2)
         occu = getSpinOccupations(Val(HFT), Ns, BN)
-        new{T, 𝐷, HFT, NNval, BN, HFTS}(Ehf, Enn, groupSpins(Val(HFT), Ns), nuc, nucCoords, 
+        new{T, 𝐷, HFT, NNval, BN, HFTS}(Ehf, Enn, Ns, nuc, nucCoords, 
                                         C, D, F, Eo, occu, vars, isConverged, basis)
     end
 end

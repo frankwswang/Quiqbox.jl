@@ -33,7 +33,7 @@ abstract type MutableDataBox{T} <: QuiqboxDataBox{T} end
 
 abstract type AbstractHartreeFockFinalValue{T} <: ImmutableDataBox{T} end
 abstract type AbstractBasisSetData{T} <: ImmutableDataBox{T} end
-abstract type ManyFermionDataBox{T, D, N} <: ImmutableDataBox{T} end
+abstract type ManyFermionDataBox{T, D} <: ImmutableDataBox{T} end
 
 abstract type HartreeFockintermediateData{T} <: MutableDataBox{T} end
 
@@ -44,7 +44,7 @@ abstract type HartreeFockFinalValue{T, HFT} <: AbstractHartreeFockFinalValue{T} 
 
 abstract type BasisSetData{T, D, BFT} <: AbstractBasisSetData{T} end
 
-abstract type MatterData{T, D, N} <: ManyFermionDataBox{T, D, N} end
+abstract type MatterData{T, D} <: ManyFermionDataBox{T, D} end
 
 abstract type ParameterizedContainer{T} <: QuiqboxContainer{T} end
 
