@@ -5,6 +5,9 @@ using ForwardDiff: derivative as ForwardDerivative
 using TensorOperations: @tensor as @TOtensor
 using DoubleFloats: Double64
 
+# Reference(s):
+## [DOI] 10.1063/1.445528
+
 function oneBodyDerivativeCore(::Val{false}, 
                                ∂bfs::AbstractVector{<:GTBasisFuncs{T1, D, 1}}, 
                                bfs::AbstractVector{<:GTBasisFuncs{T1, D, 1}}, 

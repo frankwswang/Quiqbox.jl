@@ -162,9 +162,10 @@ changeHbasis(HFres::HFfinalVars) =
 changeHbasis(HFres.basis, HFres.nuc, HFres.nucCoord, HFres.C...)
 
 
+# Connect to ReferenceState, SDstate?
 """
 
-    MatterByHF{T, D, NN, N, BN, HFTS} <:MatterData{T, D, N}
+    MatterByHF{T, D, NN, BN, HFTS} <:MatterData{T, D}
 
 Container of the electronic structure information of a quantum system.
 
@@ -178,7 +179,11 @@ Container of the electronic structure information of a quantum system.
 
 `Enn::T`: The nuclear repulsion energy.
 
-`Ns::NTuple{2, Int}`: The numbers of two different spins respectively.
+`Ns::NTuple{HFTS, Int}`: The number(s) of electrons with same spin configurations(s). For 
+restricted closed-shell Hartree-Fock (RHF), the single element in `.Ns` represents both 
+spin-up electrons and spin-down electrons.
+
+`occu::NTuple{HFTS, NTuple{BN, Int}}`: Occupations of canonical orbitals.
 
 `occuOrbital::NTuple{HFTS, Tuple{Vararg{CanOrbital{T, D, NN}}}}`: The occupied canonical 
 orbitals.
@@ -205,19 +210,20 @@ spins.
 
     MatterByHF(HFres::HFfinalVars{T, D, <:Any, NN, BN, HFTS}; 
                roundAtol::Real=getAtolVal(T)) where {T, D, NN, BN, HFTS} -> 
-    MatterByHF{T, D, NN, <:Any, BN, HFTS}
+    MatterByHF{T, D, NN, BN, HFTS}
 
 Construct a `MatterByHF` from the result of a Hartree-Fock method `HFres`. 
 Each parameter stored in the constructed [`CanOrbital`](@ref)s in `.occuOrbital` and 
 `.unocOrbital` will be rounded to the nearest multiple of `roundAtol`; when `roundAtol` is 
 set to `NaN`, no rounding will be performed.
 """
-struct MatterByHF{T, D, NN, N, BN, HFTS} <:MatterData{T, D, N}
+struct MatterByHF{T, D, NN, BN, HFTS} <:MatterData{T, D}
     Ehf::T
     nuc::NTuple{NN, String}
     nucCoord::NTuple{NN, NTuple{D, T}}
     Enn::T
-    Ns::NTuple{2, Int}
+    Ns::NTuple{HFTS, Int}
+    occu::NTuple{HFTS, NTuple{BN, String}}
     occuOrbital::NTuple{HFTS, Tuple{Vararg{CanOrbital{T, D, NN}}}}
     unocOrbital::NTuple{HFTS, Tuple{Vararg{CanOrbital{T, D, NN}}}}
     occuC::NTuple{HFTS, Matrix{T}}
@@ -250,9 +256,8 @@ struct MatterByHF{T, D, NN, N, BN, HFTS} <:MatterData{T, D, N}
         else
             error("The input data format is not supported: HFTS = $(HFTS).")
         end
-        new{T, D, NN, sum(Ns), BN, HFTS}(fVars.Ehf, nuc, nucCoords, fVars.Enn, Ns, 
-                                         Tuple.(osO), Tuple.(osU), CO, CU, 
-                                         cH, eeI, Jᵅᵝ, basis)
+        new{T, D, NN, BN, HFTS}(fVars.Ehf, nuc, nucCoords, fVars.Enn, Ns, fVars.occu, 
+                                Tuple.(osO), Tuple.(osU), CO, CU, cH, eeI, Jᵅᵝ, basis)
     end
 end
 

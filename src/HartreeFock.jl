@@ -13,6 +13,12 @@ const defaultHFCStr = "HFconfig()"
 const defaultSCFconfigArgs = ( (:ADIIS, :DIIS), (5e-3, 1e-12) )
 const defultOscThreshold = 1e-6
 
+# Reference(s):
+## [ISBN-13] 978-0486691862
+## [DOI] 10.1016/0009-2614(80)80396-4
+## [DOI] 10.1002/jcc.540030413
+## [DOI] 10.1063/1.1470195
+## [DOI] 10.1063/1.3304922
 
 getXcore1(S::AbstractMatrix{T}) where {T} = Hermitian(S)^(-T(0.5))
 
@@ -48,20 +54,13 @@ splitSpins(::Val{N}, Ns::NTuple{N, Int}) where {N} = itself(Ns)
 
 splitSpins(::Val{2}, (Nˢ,)::Tuple{Int}) = (Nˢ, Nˢ)
 
-splitSpins(::Val{1}, Ns::NTuple{2, Int}) = (sum(Ns)÷2,)
+splitSpins(::Val{:RHF}, Ns::NTuple{2, Int}) = 
+error("For restricted closed-shell Hartree-Fock (RHF), the input spin configuration $(Ns)"*
+      " is not supported.")
 
 splitSpins(::Val{:RHF}, N) = splitSpins(Val(HFtypeSizeList[:RHF]), N)
 
 splitSpins(::Val{:UHF}, N) = splitSpins(Val(HFtypeSizeList[:UHF]), N)
-
-groupSpins(::Val{1}, (Nˢ,)::Tuple{Int}) = (Nˢ, Nˢ)
-
-groupSpins(::Val{2}, Ns::NTuple{2, Int}) = itself(Ns)
-
-groupSpins(::Val{:RHF}, Ns::Tuple{Vararg{Int}}) = groupSpins(Val(HFtypeSizeList[:RHF]), Ns)
-
-groupSpins(::Val{:UHF}, Ns::Tuple{Vararg{Int}}) = groupSpins(Val(HFtypeSizeList[:UHF]), Ns)
-
 
 function breakSymOfC(::Val{:UHF}, C::AbstractMatrix{T}) where {T}
     C2 = copy(C)
@@ -212,6 +211,7 @@ function getEhf((HcoreMO,)::Tuple{<:AbstractMatrix{T}},
     term1 + term2
 end
 
+#  RHF for MO in GTBasis
 function getEhf(gtb::GTBasis{T, D, BN}, 
                 nuc::AVectorOrNTuple{String, NN}, 
                 nucCoords::SpatialCoordType{T, D, NN}, 
@@ -461,7 +461,9 @@ The container of the final values after a Hartree-Fock SCF procedure.
 
 `Enn::T`: The nuclear repulsion energy.
 
-`Ns::NTuple{2, Int}`: The numbers of two different spins respectively.
+`Ns::NTuple{HFTS, Int}`: The number(s) of electrons with same spin configurations(s). For 
+restricted closed-shell Hartree-Fock (RHF), the single element in `.Ns` represents both 
+spin-up electrons and spin-down electrons.
 
 `nuc::NTuple{NN, String}`: The nuclei in the studied system.
 
@@ -475,7 +477,7 @@ The container of the final values after a Hartree-Fock SCF procedure.
 
 `Eo::NTuple{HFTS, Vector{T}}`: Energies of canonical orbitals.
 
-`occu::NTuple{HFTS, NTuple{BN, String}}`: Occupations of canonical orbitals.
+`occu::NTuple{HFTS, NTuple{BN, Int}}`: Occupations of canonical orbitals.
 
 `temp::NTuple{HFTS, HFtempVars{T, HFT}}`: the intermediate values.
 
@@ -486,7 +488,7 @@ The container of the final values after a Hartree-Fock SCF procedure.
 struct HFfinalVars{T, D, HFT, NN, BN, HFTS} <: HartreeFockFinalValue{T, HFT}
     Ehf::T
     Enn::T
-    Ns::NTuple{2, Int}
+    Ns::NTuple{HFTS, Int}
     nuc::NTuple{NN, String}
     nucCoord::NTuple{NN, NTuple{D, T}}
     C::NTuple{HFTS, Matrix{T}}
@@ -519,7 +521,7 @@ struct HFfinalVars{T, D, HFT, NN, BN, HFTS} <: HartreeFockFinalValue{T, HFT}
         F = last.(getproperty.(vars, :Fs))
         Eo = getindex.(getCϵ.(Ref(X), F), 2)
         occu = getSpinOccupations(Val(HFT), Ns, BN)
-        new{T, 𝐷, HFT, NNval, BN, HFTS}(Ehf, Enn, groupSpins(Val(HFT), Ns), nuc, nucCoords, 
+        new{T, 𝐷, HFT, NNval, BN, HFTS}(Ehf, Enn, Ns, nuc, nucCoords, 
                                         C, D, F, Eo, occu, vars, isConverged, basis)
     end
 end
@@ -660,7 +662,8 @@ whether the SCF procedure is converged.
 please refer to [`HFconfig`](@ref).
 
 `N::Union{Int, Tuple{Int}, NTuple{2, Int}}`: Total number of electrons, or the number(s) of 
-electrons with same spin configurations(s).
+electrons with same spin configurations(s). **NOTE:** `N::NTuple{2, Int}` is only supported 
+by unrestricted Hartree-Fock (UHF).
 
 ≡≡≡ Keyword argument(s) ≡≡≡
 
@@ -693,7 +696,8 @@ runHF(GTBasis(bs), args...; printInfo)
                            config::HFconfig{<:Any, HFT}=defaultHFC; 
                            printInfo::Bool=false) where {T, D, BN, BFT, NN, HFT}
     Nlow = Int(HFT==:RHF)
-    N > Nlow || throw(DomainError(N, "$(HFT) requires more than $(Nlow) electrons."))
+    totN = (N isa Int) ? N : (N[begin] + N[end])
+    totN > Nlow || throw(DomainError(N, "$(HFT) requires more than $(Nlow) electrons."))
     Ns = splitSpins(Val(HFT), N)
     leastNb = max(Ns...)
     BN < leastNb &&  throw(DomainError(BN, "The number of basis functions should be no "*
@@ -714,7 +718,7 @@ runHF(GTBasis(bs), args...; printInfo)
               C0, printInfo, config.maxStep, config.earlyStop)
 end
 
-runHFcore(bs::BasisSetData, nuc, nucCoords, config::HFconfig, N::Int=getCharge(nuc); 
+runHFcore(bs::BasisSetData, nuc, nucCoords, config::HFconfig, N=getCharge(nuc); 
           printInfo::Bool=false) = 
 runHFcore(bs::BasisSetData, nuc, nucCoords, N, config; printInfo)
 

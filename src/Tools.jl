@@ -1,7 +1,7 @@
 export hasEqual, hasIdentical, hasApprox, flatten, markUnique, getUnique!, itself
 
 using Statistics: std, mean
-using LinearAlgebra: eigvals, svdvals, eigen, norm
+using LinearAlgebra: norm
 
 """
 
