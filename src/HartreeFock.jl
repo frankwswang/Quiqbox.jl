@@ -725,7 +725,7 @@ runHF(GTBasis(bs), args...; printInfo)
               C0, printInfo, config.maxStep, config.earlyStop)
 end
 
-runHFcore(bs::BasisSetData, nuc, nucCoords, config::HFconfig, N::Int=getCharge(nuc); 
+runHFcore(bs::BasisSetData, nuc, nucCoords, config::HFconfig, N=getCharge(nuc); 
           printInfo::Bool=false) = 
 runHFcore(bs::BasisSetData, nuc, nucCoords, N, config; printInfo)
 
