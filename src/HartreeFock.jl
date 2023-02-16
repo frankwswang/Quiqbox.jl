@@ -11,7 +11,7 @@ const defaultDS = 0.5
 const defaultDIISconfig = (12, :LBFGS)
 
 const defaultHFCStr = "HFconfig()"
-const defaultSCFconfigArgs = ( (:ADIIS, :DIIS), (1e-3, 1e-12) )
+const defaultSCFconfigArgs = ( (:ADIIS, :DIIS), (2e-3, 1e-12) )
 const defultOscThreshold = 1e-6
 
 # Reference(s):
@@ -297,7 +297,7 @@ const Doc_SCFconfig_SPGB = "[Spectral Projected Gradient Method with box constra
                            "(https://github.com/m3g/SPGBox.jl)."
 
 const Doc_SCFconfig_eg1 = "SCFconfig{Float64, 2, Tuple{Val{:ADIIS}, Val{:DIIS}}}(method, "*
-                          "interval=(0.005, 1.0e-8), methodConfig, oscillateThreshold)"
+                          "interval=(0.002, 1.0e-8), methodConfig, oscillateThreshold)"
 
 """
 
@@ -549,7 +549,7 @@ struct InitialC{T<:Number, HFT, F<:Function}
     new{T, :UHF, iT}(C0, itself)
 end
 
-const defaultHFconfigPars = [:RHF, :SAD, defaultSCFconfig, 200, true]
+const defaultHFconfigPars = [:RHF, :SAD, defaultSCFconfig, 150, true]
 
 """
 
@@ -783,6 +783,7 @@ function runHFcore(::Val{HFT},
                    X::AbstractMatrix{T2}, 
                    C0::NTuple{HFTS, AbstractMatrix{T2}}, 
                    printInfo::Bool=false, 
+                   printLevel::Int=4, 
                    maxStep::Int=1000, 
                    earlyStop::Bool=true) where {HFT, T1, L, MS, HFTS, T2}
     vars = initializeSCF(Val(HFT), Hcore, HeeI, C0, Ns)
@@ -802,9 +803,9 @@ function runHFcore(::Val{HFT},
         n = 0
 
         while true
+            i < maxStep || (isConverged = false) || break
             i += 1
             n += 1
-            i <= maxStep || (isConverged = false) || break
 
             res = HFcore(Ns, Hcore, HeeI, S, X, vars)
             pushHFtempVars!(vars, res)
@@ -832,7 +833,7 @@ function runHFcore(::Val{HFT},
                 end
             end
 
-            printInfo && (i % floor(log(4, i) + 1) == 0 || i == maxStep) && 
+            printInfo && (i % floor(log(abs(printLevel)+1, i) + 1) == 0 || i == maxStep) && 
             println(rpad("Step $i", 9), rpad("| #$l ($(mSym))", 16), 
                     "| E = ", alignNumSign(Etots[end], roundDigits=getAtolDigits(T2)))
 
