@@ -11,7 +11,7 @@ const defaultDS = 0.5
 const defaultDIISconfig = (12, :LBFGS)
 
 const defaultHFCStr = "HFconfig()"
-const defaultSCFconfigArgs = ( (:ADIIS, :DIIS), (5e-3, 1e-12) )
+const defaultSCFconfigArgs = ( (:ADIIS, :DIIS), (1e-3, 1e-12) )
 const defultOscThreshold = 1e-6
 
 # Reference(s):
@@ -376,10 +376,7 @@ struct SCFconfig{T, L, MS<:NTuple{L, Val}} <: ImmutableParameter{T, SCFconfig}
                                                "`intervals` must all be non-negative."))
         kwPairs = [Pair[] for _=1:L]
         for i in keys(config)
-            kwPairs[i] = map(config[i]) do p
-                (p[begin]==slvArgN) && (p[end] isa Symbol) && (p = p[begin]=>Val(p[end]))
-                p
-            end
+            kwPairs[i] = config[i]
         end
         methods = Val.(methods)
         new{T, L, typeof(methods)}(methods, intervals, Tuple(kwPairs), oscillateThreshold)
@@ -552,7 +549,7 @@ struct InitialC{T<:Number, HFT, F<:Function}
     new{T, :UHF, iT}(C0, itself)
 end
 
-const defaultHFconfigPars = [:RHF, :SAD, defaultSCFconfig, 100, true]
+const defaultHFconfigPars = [:RHF, :SAD, defaultSCFconfig, 200, true]
 
 """
 
@@ -917,7 +914,7 @@ end
 
 function xDIIS(::Type{T}, ::Val{M}; 
                DIISsize::Int=defaultDIISconfig[begin], 
-               solver::Val{SM}=Val(defaultDIISconfig[end])) where {T, M, SM}
+               solver::Symbol=defaultDIISconfig[end]) where {T, M}
     c = collect(T, 1:DIISsize)
     cvxConstraint, mDIIS = getproperty(DIISconfigs, M)
     @inline function (_Ns, _Hcore, _HeeI, S::AbstractMatrix{T}, 
@@ -940,7 +937,7 @@ function xDIIScore!(mDIIS::F, c::AbstractVector{T}, S::AbstractMatrix{T},
                     Es::AbstractVector{T}, 
                     DIISsize::Int, 
                     cvxConstraint::Val{CCB}, 
-                    solver::Val{SM}) where {F, T, CCB, SM}
+                    solver::Symbol) where {F, T, CCB}
     if length(Fs) > DIISsize
         push!(c, 0)
         popfirst!(c)
@@ -954,7 +951,7 @@ function xDIIScore!(mDIIS::F, c::AbstractVector{T}, S::AbstractMatrix{T},
     Ds = view(Ds, is)
     Es = view(Es, is)
     v, B = mDIIS(∇s, Ds, Es, S)
-    constraintSolver!(cp, v, B, cvxConstraint, solver)
+    constraintSolver!(cvxConstraint, cp, v, B, solver)
     sum(cp.*∇s) # Fnew
 end
 
@@ -1117,6 +1114,7 @@ end
 
 const ConstraintSolvers = (LCM=CMsolver!, LBFGS=LBFGSBsolver!, SPGB=SPGBsolver!)
 
-constraintSolver!(c::AbstractVector{T}, v::AbstractVector{T}, B::AbstractMatrix{T}, 
-                  ::Val{CCB}, ::Val{SM}) where {T, CCB, SM} = 
-getproperty(ConstraintSolvers, SM)(Val(CCB), c, v, B)
+constraintSolver!(::Val{CCB}, 
+                  c::AbstractVector{T}, v::AbstractVector{T}, B::AbstractMatrix{T}, 
+                  solver::Symbol) where {T, CCB} = 
+getproperty(ConstraintSolvers, solver)(Val(CCB), c, v, B)

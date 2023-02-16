@@ -99,6 +99,11 @@ info5 = (@capture_out show(POconfig()))
                ", Tuple{Float64, Float64}, $(typeof(POconfig().optimizer))}(method=Val"*
                "{:HFenergy}(), config, target, threshold, maxStep, optimizer, saveTrace)"
 
+info6 = (@capture_out show(HFconfig(SCF=SCFconfig((:ADIIS, :DIIS), (5e-3, 1e-12), 
+                                                  Dict(1=>[:solver=>:SPGB])))))
+@test info6 == "HFconfig{Float64, :RHF, typeof(Quiqbox.getCfromSAD), Float64, 2, "*
+               "Tuple{Val{:ADIIS}, Val{:DIIS}}}(HF, C0, SCF, maxStep, earlyStop)"
+
 
 # function ==, hasBoolRelation
 pb4 = deepcopy(pb1)
