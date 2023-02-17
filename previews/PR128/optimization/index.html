@@ -5,59 +5,39 @@
  ParamBox{Float64, :d, iT}(1.0)[∂][d₁]</code></pre><p>When <code>markParams!</code>&#39;s second argument is set to <code>true</code>, it will return only the <code>ParamBox</code>es that have unique independent variables. Thus, the length of <code>pars</code> is 3 for the aforementioned three independent parameters, despite the basis set having eight basis functions with a total of 40 parameters. However, if we take a step further, we can remove the <code>ParamBox</code> representing <span>$d$</span> since each basis function here is just one same Gaussian function. Thus, input the rest parameters (along with other necessary arguments) into <a href="../coreFunction/#Quiqbox.optimizeParams!-Union{Tuple{F}, Tuple{CBT}, Tuple{M}, Tuple{NN}, Tuple{D}, Tuple{T}, Tuple{AbstractVector{&lt;:ParamBox{T}}, AbstractVector{&lt;:GTBasisFuncs{T, D}}, Union{Tuple{Vararg{String, NN}}, AbstractVector{&lt;:String}}, Union{AbstractArray{Tuple{Vararg{T, D}}, 1}, Tuple{Vararg{Tuple{Vararg{T, D}}, NN}}, AbstractVector{&lt;:AbstractVector{&lt;:T}}, Tuple{Vararg{var&quot;#s43&quot;, NN}} where var&quot;#s43&quot;&lt;:(AbstractVector{&lt;:T})}}, Tuple{AbstractVector{&lt;:ParamBox{T}}, AbstractVector{&lt;:GTBasisFuncs{T, D}}, Union{Tuple{Vararg{String, NN}}, AbstractVector{&lt;:String}}, Union{AbstractArray{Tuple{Vararg{T, D}}, 1}, Tuple{Vararg{Tuple{Vararg{T, D}}, NN}}, AbstractVector{&lt;:AbstractVector{&lt;:T}}, Tuple{Vararg{var&quot;#s43&quot;, NN}} where var&quot;#s43&quot;&lt;:(AbstractVector{&lt;:T})}, POconfig{&lt;:Any, M, CBT, &lt;:Any, F}}, Tuple{AbstractVector{&lt;:ParamBox{T}}, AbstractVector{&lt;:GTBasisFuncs{T, D}}, Union{Tuple{Vararg{String, NN}}, AbstractVector{&lt;:String}}, Union{AbstractArray{Tuple{Vararg{T, D}}, 1}, Tuple{Vararg{Tuple{Vararg{T, D}}, NN}}, AbstractVector{&lt;:AbstractVector{&lt;:T}}, Tuple{Vararg{var&quot;#s43&quot;, NN}} where var&quot;#s43&quot;&lt;:(AbstractVector{&lt;:T})}, POconfig{&lt;:Any, M, CBT, &lt;:Any, F}, Union{Int64, Tuple{Int64}, Tuple{Int64, Int64}}}} where {T, D, NN, M, CBT, F}"><code>optimizeParams!</code></a> and we will have a more efficient optimization iteration: </p><pre><code class="language-julia-repl hljs" style="display:block;">julia&gt; parsPartial = pars[1:2];</code><code class="nohighlight hljs ansi" style="display:block;"></code><br/><code class="language-julia-repl hljs" style="display:block;">julia&gt; isConverged, Es = optimizeParams!(parsPartial, bs, nuc, nucCoords, POconfig(maxStep=10));</code><code class="nohighlight hljs ansi" style="display:block;">Step 0:      𝑓 =  0.3326881586
              𝒙 = [3.0, 0.7]
             ∇𝑓 = [1.2560795063, 4.050658426]
-Step duration: 53.560029 seconds.
+Step duration: 51.075461 seconds.
 
 Step 1:      𝑓 = -0.1273032362
              𝒙 = [2.5504863745, -0.7496105903]
             ∇𝑓 = [1.6265750416, -3.6201616512]
-Step duration: 1.817622 seconds.
+Step duration: 1.673969 seconds.
 
 Step 2:      𝑓 = -0.8591381805
              𝒙 = [1.7560843124, 1.0184381055]
             ∇𝑓 = [1.9620644869, 2.0920040688]
-Step duration: 1.559689 seconds.
-
-Step 3:      𝑓 = -1.5904931379
-             𝒙 = [1.3990192948, 0.6377261184]
-            ∇𝑓 = [0.229053831, 0.3459198332]
-Step duration: 1.839549 seconds.
+Step duration: 1.454781 seconds.
 
 Step 4:      𝑓 = -1.6187899322
              𝒙 = [1.1699654638, 0.2918062852]
             ∇𝑓 = [0.1020363607, -0.6204956866]
-Step duration: 1.560241 seconds.
-
-Step 5:      𝑓 = -1.6460093370
-             𝒙 = [1.1331356303, 0.5157730423]
-            ∇𝑓 = [0.0087958637, 0.2165789517]
-Step duration: 1.564436 seconds.
+Step duration: 1.434613 seconds.
 
 Step 6:      𝑓 = -1.6568761234
              𝒙 = [1.1299745771, 0.4379390049]
             ∇𝑓 = [0.05017543, 0.0468287077]
-Step duration: 1.56957 seconds.
-
-Step 7:      𝑓 = -1.6589188022
-             𝒙 = [1.0797991472, 0.3911102972]
-            ∇𝑓 = [0.0567991123, -0.082205501]
-Step duration: 1.563247 seconds.
-
-Step 8:      𝑓 = -1.6605832956
-             𝒙 = [1.059790424, 0.4200689736]
-            ∇𝑓 = [0.0367925865, 0.0299279968]
-Step duration: 1.596354 seconds.
+Step duration: 1.440372 seconds.
 
 Step 9:      𝑓 = -1.6616817382
              𝒙 = [1.0229978375, 0.3901409768]
             ∇𝑓 = [0.0431795408, -0.0587329459]
-Step duration: 1.561885 seconds.
+Step duration: 1.434237 seconds.
 
 The optimization of parameters 
 𝒙 := [:L₁, :α₁] 
 with respect to 𝑓(𝒙) from the profile :HFenergy just ended at
 Step 10:     𝑓 = -1.6625356874
              𝒙 = [1.0085804138, 0.4097516014]
-after 1.223499 minutes. The iteration has not converged: 
+after 1.159402 minutes. The iteration has not converged: 
 ∥Δ𝑓∥₂ → 0.0008539492, ∥vec(∇𝑓)∥₂ → 0.0374825956.</code></pre><p>After the optimization, you can check the original <code>bs</code> and find that the inside parameters are changed as well. This is because the <code>!</code> in the function name indicates that <code>optimizeParams!</code> is <a href="https://docs.julialang.org/en/v1/manual/style-guide/#bang-convention">a function that modifies its arguments</a>.</p><pre><code class="language-julia-repl hljs" style="display:block;">julia&gt; getParams(bs)</code><code class="nohighlight hljs ansi" style="display:block;">40-element Vector{ParamBox{Float64}}:
  ParamBox{Float64, :X, Quiqbox.ChainedPF{typeof(abs), 2, Tuple{typeof(*), typeof(+)}, Tuple{Float64, Float64}}}(1.008580414)[𝛛][L₁]
  ParamBox{Float64, :Y, Quiqbox.ChainedPF{typeof(abs), 2, Tuple{typeof(*), typeof(+)}, Tuple{Float64, Float64}}}(1.008580414)[𝛛][L₁]
@@ -78,4 +58,4 @@ after 1.223499 minutes. The iteration has not converged:
  ParamBox{Float64, :Y, Quiqbox.ChainedPF{typeof(abs), 2, Tuple{typeof(*), typeof(+)}, Tuple{Float64, Float64}}}(1.008580414)[𝛛][L₁]
  ParamBox{Float64, :Z, Quiqbox.ChainedPF{typeof(abs), 2, Tuple{typeof(*), typeof(+)}, Tuple{Float64, Float64}}}(1.008580414)[𝛛][L₁]
  ParamBox{Float64, :α, iT}(0.4097516014)[∂][α₁]
- ParamBox{Float64, :d, iT}(1.0)[∂][d₁]</code></pre><p>If you want to go through the above example by yourself, you can find the script <a href="https://github.com/frankwswang/Quiqbox.jl/blob/main/examples/OptimizeParams.jl">here</a>.</p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../SCF/">« Self-Consistent Field Methods</a><a class="docs-footer-nextpage" href="../coreFunction/">Core Functions »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 0.27.24 on <span class="colophon-date" title="Friday 17 February 2023 17:14">Friday 17 February 2023</span>. Using Julia version 1.8.5.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+ ParamBox{Float64, :d, iT}(1.0)[∂][d₁]</code></pre><p>If you want to go through the above example by yourself, you can find the script <a href="https://github.com/frankwswang/Quiqbox.jl/blob/main/examples/OptimizeParams.jl">here</a>.</p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../SCF/">« Self-Consistent Field Methods</a><a class="docs-footer-nextpage" href="../coreFunction/">Core Functions »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 0.27.24 on <span class="colophon-date" title="Friday 17 February 2023 21:36">Friday 17 February 2023</span>. Using Julia version 1.8.5.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
