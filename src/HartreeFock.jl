@@ -9,9 +9,11 @@ using SPGBox: spgbox!
 
 const defaultDS = 0.5
 const defaultDIISconfig = (12, :LBFGS)
+const SADHFmaxStep = 50
 
+const HFOminCycle = 10
 const defaultHFCStr = "HFconfig()"
-const defaultSCFconfigArgs = ( (:ADIIS, :DIIS), (2e-3, 1e-12) )
+const defaultSCFconfigArgs = ( (:ADIIS, :DIIS), (1e-3, 1e-12) )
 const defultOscThreshold = 1e-6
 
 # Reference(s):
@@ -130,7 +132,8 @@ function getCfromSAD(::Val{HFT}, S::AbstractMatrix{T},
         Threads.@spawn begin
             h1 = coreH(bs, (atm,), (coord,))
             r, _ = runHFcore(Val(:UHF), 
-                             config, atmN, h1, HeeI, S, X, getCfromHcore(Val(:UHF), X, h1))
+                             config, atmN, h1, HeeI, S, X, getCfromHcore(Val(:UHF), X, h1), 
+                             SADHFmaxStep, true)
             Dᵅs[Threads.threadid()] += r[1].Ds[end]
             Dᵝs[Threads.threadid()] += r[2].Ds[end]
         end
@@ -297,7 +300,7 @@ const Doc_SCFconfig_SPGB = "[Spectral Projected Gradient Method with box constra
                            "(https://github.com/m3g/SPGBox.jl)."
 
 const Doc_SCFconfig_eg1 = "SCFconfig{Float64, 2, Tuple{Val{:ADIIS}, Val{:DIIS}}}(method, "*
-                          "interval=(0.002, 1.0e-8), methodConfig, oscillateThreshold)"
+                          "interval=(0.001, 1.0e-8), methodConfig, oscillateThreshold)"
 
 """
 
@@ -549,7 +552,8 @@ struct InitialC{T<:Number, HFT, F<:Function}
     new{T, :UHF, iT}(C0, itself)
 end
 
-const defaultHFconfigPars = [:RHF, :SAD, defaultSCFconfig, 150, true]
+const defaultHFmaxStep = 150
+const defaultHFconfigPars = [:RHF, :SAD, defaultSCFconfig, defaultHFmaxStep, true]
 
 """
 
@@ -637,17 +641,23 @@ const C0methodArgOrders = (itself=(1,),
                            getCfromHcore=(2,4,5), 
                            getCfromSAD=(2,3,5,6,7,8,9,4))
 
+
+const defaultInfoL = 3
+
 """
-    runHF(bs, nuc, nucCoords, config=$(defaultHFCStr), N=getCharge(nuc); printInfo=true) -> 
+    runHF(bs, nuc, nucCoords, config=$(defaultHFCStr), N=getCharge(nuc); 
+          printInfo=true, infoLevel=$(defaultInfoL)) -> 
     HFfinalVars
 
-    runHF(bs, nuc, nucCoords, N=getCharge(nuc), config=$(defaultHFCStr); printInfo=true) -> 
+    runHF(bs, nuc, nucCoords, N=getCharge(nuc), config=$(defaultHFCStr); 
+          printInfo=true, infoLevel=$(defaultInfoL)) -> 
     HFfinalVars
 
 Main function to run a Hartree-Fock method in Quiqbox. The returned result and relevant 
 information is stored in a [`HFfinalVars`](@ref).
 
-    runHFcore(args...; printInfo=false) -> Tuple{Tuple{Vararg{HFtempVars}}, Bool}
+    runHFcore(args...; printInfo=false, infoLevel=$(defaultInfoL)) -> 
+    Tuple{Tuple{Vararg{HFtempVars}}, Bool}
 
 The core function of `runHF` that accept the same positional arguments as `runHF`, except 
 it returns the data (`HFtempVars`) collected during the iteration and the boolean result of 
@@ -678,11 +688,17 @@ by unrestricted Hartree-Fock (UHF).
 ≡≡≡ Keyword argument(s) ≡≡≡
 
 `printInfo::Bool`: Whether print out the information of iteration steps and result.
+
+`infoLevel::Int`: Printed info's level of details when `printInfo=true`. The higher 
+(the absolute value of) it is, more intermediate steps will be printed. Once `infoLevel` 
+achieve `5`, every step will be printed.
 """
-function runHF(bs::GTBasis{T}, args...; printInfo::Bool=true) where {T}
+function runHF(bs::GTBasis{T}, args...; 
+               printInfo::Bool=true, infoLevel::Int=defaultInfoL) where {T}
     nuc = arrayToTuple(args[begin])
     nucCoords = genTupleCoords(T, args[begin+1])
-    vars, isConverged = runHFcore(bs, nuc, nucCoords, args[begin+2:end]...; printInfo)
+    vars, isConverged = runHFcore(bs, nuc, nucCoords, args[begin+2:end]...; 
+                                  printInfo, infoLevel)
     res = HFfinalVars(bs, nuc, nucCoords, getX(bs.S), vars, isConverged)
     if printInfo
         Etot = round(res.Ehf + res.Enn, digits=nDigitShown)
@@ -696,15 +712,16 @@ function runHF(bs::GTBasis{T}, args...; printInfo::Bool=true) where {T}
 end
 
 runHF(bs::AVectorOrNTuple{AbstractGTBasisFuncs{T, D}}, args...; 
-      printInfo::Bool=true) where {T, D} = 
-runHF(GTBasis(bs), args...; printInfo)
+      printInfo::Bool=true, infoLevel::Int=defaultInfoL) where {T, D} = 
+runHF(GTBasis(bs), args...; printInfo, infoLevel)
 
 @inline function runHFcore(bs::GTBasis{T, D, BN, BFT}, 
                            nuc::AVectorOrNTuple{String, NN}, 
                            nucCoords::SpatialCoordType{T, D, NN}, 
                            N::Union{Int, Tuple{Int}, NTuple{2, Int}}=getCharge(nuc), 
                            config::HFconfig{<:Any, HFT}=defaultHFC; 
-                           printInfo::Bool=false) where {T, D, BN, BFT, NN, HFT}
+                           printInfo::Bool=false, 
+                           infoLevel::Int=defaultInfoL) where {T, D, BN, BFT, NN, HFT}
     Nlow = Int(HFT==:RHF)
     totN = (N isa Int) ? N : (N[begin] + N[end])
     totN > Nlow || throw(DomainError(N, "$(HFT) requires more than $(Nlow) electrons."))
@@ -725,21 +742,21 @@ runHF(GTBasis(bs), args...; printInfo)
     C0 = uniCallFunc(getC0f, getproperty(C0methodArgOrders, nameOf(getC0f)), C0mats, 
                      Val(HFT), bs.S, X, Hcore, bs.eeI, bs.basis, nuc, nucCoords)
     runHFcore(Val(HFT), config.SCF, Ns, Hcore, bs.eeI, bs.S, X, 
-              C0, printInfo, config.maxStep, config.earlyStop)
+              C0, config.maxStep, config.earlyStop, printInfo, infoLevel)
 end
 
 runHFcore(bs::BasisSetData, nuc, nucCoords, config::HFconfig, N=getCharge(nuc); 
-          printInfo::Bool=false) = 
-runHFcore(bs::BasisSetData, nuc, nucCoords, N, config; printInfo)
+          printInfo::Bool=false, infoLevel::Int=defaultInfoL) = 
+runHFcore(bs::BasisSetData, nuc, nucCoords, N, config; printInfo, infoLevel)
 
 runHFcore(bs::AVectorOrNTuple{AbstractGTBasisFuncs{T, D}}, args...; 
-          printInfo::Bool=false) where {T, D} = 
-runHFcore(GTBasis(bs), args...; printInfo)
+          printInfo::Bool=false, infoLevel::Int=defaultInfoL) where {T, D} = 
+runHFcore(GTBasis(bs), args...; printInfo, infoLevel)
 
 """
 
-    runHFcore(HTtype, scfConfig, Ns, Hcore, HeeI, S, X, C0, 
-              printInfo=false, maxStep=1000, earlyStop=true) -> 
+    runHFcore(HTtype, scfConfig, Ns, Hcore, HeeI, S, X, C0, maxStep, earlyStop, 
+              printInfo=false, infoLevel=$(defaultInfoL)) -> 
     Tuple{Tuple{Vararg{HFtempVars}}, Bool}
 
 Another method of `runHFcore` that has the same return value, but takes more underlying 
@@ -767,12 +784,16 @@ Correlations.
 `C0::NTuple{HFTS, AbstractMatrix{T}} where {HFTS, T}`: Initial guess of the coefficient 
 matrix(s) of the canonical spin-orbitals.
 
-`printInfo::Bool`: Whether print out the information of iteration steps and result.
-
 `maxStep::Int`: Maximum iteration steps allowed regardless if the iteration converges.
 
 `earlyStop::Bool`: Whether automatically terminate (or skip) a convergence method early 
 when its performance becomes unstable or poor.
+
+`printInfo::Bool`: Whether print out the information of iteration steps and result.
+
+`infoLevel::Int`: Printed info's level of details when `printInfo=true`. The higher 
+(the absolute value of) it is, more intermediate steps will be printed. Once `infoLevel` 
+achieve `5`, every step will be printed.
 """
 function runHFcore(::Val{HFT}, 
                    scfConfig::SCFconfig{T1, L, MS}, 
@@ -782,10 +803,10 @@ function runHFcore(::Val{HFT},
                    S::AbstractMatrix{T2}, 
                    X::AbstractMatrix{T2}, 
                    C0::NTuple{HFTS, AbstractMatrix{T2}}, 
+                   maxStep::Int, 
+                   earlyStop::Bool, 
                    printInfo::Bool=false, 
-                   printLevel::Int=4, 
-                   maxStep::Int=1000, 
-                   earlyStop::Bool=true) where {HFT, T1, L, MS, HFTS, T2}
+                   infoLevel::Int=defaultInfoL) where {HFT, T1, L, MS, HFTS, T2}
     vars = initializeSCF(Val(HFT), Hcore, HeeI, C0, Ns)
     Etots = vars[1].shared.Etots
     oscThreshold = scfConfig.oscillateThreshold
@@ -797,6 +818,7 @@ function runHFcore(::Val{HFT},
     ΔDrms = 0.0
     HFcores = [genHFcore(T2, m; kws...) for (m, kws) in 
                zip(fieldtypes(MS), scfConfig.methodConfig)]
+    adaptStepBl = genAdaptStepBl(infoLevel, maxStep)
 
     for ((HFcore, mSym), breakPoint, l) in zip(HFcores, scfConfig.interval, 1:L)
         isConverged = true
@@ -819,8 +841,8 @@ function runHFcore(::Val{HFT},
                 ΔDrms = sqrt( sum(ΔD .^ 2) ./ length(ΔD) )
             end
 
-            if n > 1 && (!isConverged || (bl = relDiff > max(sqrtBreakPoint, 1e-5)))
-                flag, Std = isOscillateConverged(Etots, 10breakPoint)
+            if n > 1 && (!isConverged || (bl = relDiff > 1e-3))
+                flag, Std = isOscillateConverged(Etots, 10breakPoint, minCycles=HFOminCycle)
                 if flag
                     isConverged = ifelse(
                         begin
@@ -828,12 +850,12 @@ function runHFcore(::Val{HFT},
                             ifelse(l==L, bl2 || (ΔDrms > sqrtBreakPoint), bl2)
                         end, false, true)
                 else
-                    earlyStop && bl && 
+                    earlyStop && bl && (i > HFOminCycle) && 
                     (i = terminateSCF(i, vars, mSym, printInfo); isConverged=false; break)
                 end
             end
 
-            printInfo && (i % floor(log(abs(printLevel)+1, i) + 1) == 0 || i == maxStep) && 
+            printInfo && (adaptStepBl(i) || i == maxStep) && 
             println(rpad("Step $i", 9), rpad("| #$l ($(mSym))", 16), 
                     "| E = ", alignNumSign(Etots[end], roundDigits=getAtolDigits(T2)))
 
