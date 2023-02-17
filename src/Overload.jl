@@ -158,8 +158,13 @@ show(io::IO, box::GridBox) = print(io, typeStrOf(box), getFieldNameStr(box))
 function show(io::IO, config::SCFconfig)
     print(io, typeof(config))
     str = getFieldNameStr(config)
-    str = replace(str, "method,"=>"method=$(config.method),")
     str = replace(str, "interval"=>"interval=$(config.interval)")
+    print(io, str)
+end
+
+function show(io::IO, config::HFconfig)
+    print(io, typeof(config))
+    str = getFieldNameStr(config)
     print(io, str)
 end
 

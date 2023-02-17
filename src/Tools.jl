@@ -613,7 +613,7 @@ function isOscillateConvergedHead(seq, minCycles, maxRemains)
     minCycles > 1 || 
     throw(DomainError(minCycles, "`minCycles` should be larger than 1."))
     len = length(seq)
-    len < minCycles && (return zero(seq[begin]))
+    len < minCycles && (return [zero(seq[begin])])
     maxRemains > 1 || 
     throw(DomainError(maxRemains, "`maxRemains` should be larger than 1."))
     slice = min(maxRemains, len÷3+1)
@@ -876,6 +876,18 @@ FuncArgConfig(::F) where {F} = FuncArgConfig{F}(Any[], Pair{Symbol}[])
 (facfg::FuncArgConfig{F})(f::F, args...; kws...) where {F} = 
 f(args..., facfg.posArgs...; kws..., facfg.keyArgs...)
 
+
 numEps(::Type{T}) where {T<:AbstractFloat} = eps(T)
 numEps(::Type{T}) where {T<:Integer} = one(T)
 numEps(::Type{Complex{T}}) where {T} = eps(T)
+
+
+function genAdaptStepBl(infoLevel::Int, maxStep::Int)
+    if infoLevel == 0
+        (::Int)->false
+    else
+        function (i::Int)
+            i % floor(log(abs(infoLevel^5*0.00032maxStep)+2, i) + 1) == 0
+        end
+    end
+end

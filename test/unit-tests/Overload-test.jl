@@ -86,7 +86,7 @@ l3 = length(fVarStrP1)
 
 info3 = (@capture_out show(SCFconfig((:DD, :ADIIS, :DIIS), 
                                      (1e-4, 1e-12, 1e-13), Dict(2=>[:solver=>:LCM]))))
-@test info3 == "SCFconfig{Float64, 3}(method=(:DD, :ADIIS, :DIIS), "*
+@test info3 == "SCFconfig{Float64, 3, Tuple{Val{:DD}, Val{:ADIIS}, Val{:DIIS}}}(method, "*
                "interval=(0.0001, 1.0e-12, 1.0e-13), methodConfig, oscillateThreshold)"
 
 H2 = MatterByHF(fVar1)
@@ -95,9 +95,14 @@ info4 = (@capture_out show(H2))
 
 info5 = (@capture_out show(POconfig()))
 @test info5 == "POconfig{Float64, :HFenergy, HFconfig{Float64, :RHF, "*
-               "typeof(Quiqbox.getCfromSAD), Float64, 2}, Tuple{Float64, Float64}, "*
-               "$(typeof(POconfig().optimizer))}(method=Val{:HFenergy}(), "*
-               "config, target, threshold, maxStep, optimizer, saveTrace)"
+               "typeof(Quiqbox.getCfromSAD), Float64, 2, Tuple{Val{:ADIIS}, Val{:DIIS}}}"*
+               ", Tuple{Float64, Float64}, $(typeof(POconfig().optimizer))}(method=Val"*
+               "{:HFenergy}(), config, target, threshold, maxStep, optimizer, saveTrace)"
+
+info6 = (@capture_out show(HFconfig(SCF=SCFconfig((:ADIIS, :DIIS), (5e-3, 1e-12), 
+                                                  Dict(1=>[:solver=>:SPGB])))))
+@test info6 == "HFconfig{Float64, :RHF, typeof(Quiqbox.getCfromSAD), Float64, 2, "*
+               "Tuple{Val{:ADIIS}, Val{:DIIS}}}(HF, C0, SCF, maxStep, earlyStop)"
 
 
 # function ==, hasBoolRelation

@@ -5,7 +5,7 @@ using Quiqbox: getAtolVal, getAtolDigits, roundToMultiOfStep, nearestHalfOf, get
                markUnique, getUnique!, itself, themselves, replaceSymbol, groupedSort, 
                mapPermute, getFunc, nameOf, tupleDiff, genIndex, fillObj, arrayToTuple, 
                genTupleCoords, uniCallFunc, mergeMultiObjs, isNaN, getBool, skipIndices, 
-               isOscillateConverged, collectTuple, asymSign, numEps
+               isOscillateConverged, collectTuple, asymSign, numEps, genAdaptStepBl
 using Suppressor: @capture_out
 using LinearAlgebra: norm
 
@@ -294,5 +294,20 @@ arr1 = collect(tpl1)
 @test numEps(Float64) == eps(Float64)
 @test numEps(Int64) == one(Int64)
 @test numEps(Complex{Float64}) == eps(Float64)
+
+
+# function genAdaptStepBl
+countBl = function (l, N)
+    j = 0
+    for i = 0:N
+        f = genAdaptStepBl(l, N)
+        f(i) && (j+=1)
+    end
+    j
+end
+maxStep = rand(-1000:1000)
+res = hcat([countBl.(collect(0:6), N) for N in collect(0:sign(maxStep):maxStep)]...)
+@test all(res[1, :] .== 0)
+@test all(sort(c) == c for c in eachcol(res))
 
 end

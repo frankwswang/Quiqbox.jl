@@ -4,6 +4,7 @@ using LinearAlgebra: norm
 using LineSearches
 
 const OFmethods = [:HFenergy, :DirectRHFenergy]
+const defaultPOinfoL = 2
 
 const OFconversions = Dict([runHFcore] .=> 
                            [( x->x[begin][begin].shared.Etots[end], 
@@ -370,11 +371,13 @@ end
 """
 
     optimizeParams!(pbs, bs, nuc, nucCoords, 
-                    config=$(defaultPOconfigStr), N=getCharge(nuc); printInfo=true) -> 
+                    config=$(defaultPOconfigStr), N=getCharge(nuc); 
+                    printInfo=true, infoLevel=$(defaultPOinfoL)) -> 
     Vector{Any}
 
     optimizeParams!(pbs, bs, nuc, nucCoords, 
-                    N=getCharge(nuc), config=$(defaultPOconfigStr); printInfo=true) -> 
+                    N=getCharge(nuc), config=$(defaultPOconfigStr); 
+                    printInfo=true, infoLevel=$(defaultPOinfoL)) -> 
     Vector{Any}
 
 The main function to optimize the parameters of a given basis set. It returns a `Vector` of 
@@ -407,6 +410,10 @@ electrons with same spin configurations(s).
 === Keyword argument(s) ===
 
 `printInfo::Bool`: Whether print out the information of iteration steps.
+
+`infoLevel::Int`: Printed info's level of details when `printInfo=true`. The higher 
+(the absolute value of) it is, more intermediate steps will be printed. Once `infoLevel` 
+achieve `5`, every step will be printed.
 """
 function optimizeParams!(pbs::AbstractVector{<:ParamBox{T}}, 
                          bs::AbstractVector{<:GTBasisFuncs{T, D}}, 
@@ -414,7 +421,8 @@ function optimizeParams!(pbs::AbstractVector{<:ParamBox{T}},
                          nucCoords::SpatialCoordType{T, D, NN}, 
                          config::POconfig{<:Any, M, CBT, <:Any, F}=defaultPOconfig, 
                          N::Union{Int, Tuple{Int}, NTuple{2, Int}}=getCharge(nuc); 
-                         printInfo::Bool=true) where {T, D, NN, M, CBT, F}
+                         printInfo::Bool=true, 
+                         infoLevel::Int=defaultPOinfoL) where {T, D, NN, M, CBT, F}
     tBegin = time()
 
     pars = formatTunableParams!(pbs, bs)
@@ -427,7 +435,7 @@ function optimizeParams!(pbs::AbstractVector{<:ParamBox{T}},
     threshold = config.threshold
     targets = (config.target, 0) # (fTarget, gTarget)
     maxStep = config.maxStep
-    gap = min(250, max(maxStep ÷ 100 * 10, 1))
+    adaptStepBl = genAdaptStepBl(infoLevel, maxStep)
 
     thresholds = ifelse(isNaN(config.target), 
                         [threshold[begin], threshold[end]], [threshold[begin]])
@@ -462,7 +470,7 @@ function optimizeParams!(pbs::AbstractVector{<:ParamBox{T}},
 
     while !(blConv = all(f(x) for (f, x) in zip(isConverged, (fVals, grads)))) && i<maxStep
 
-        if i%gap == 0 && printInfo
+        if printInfo && adaptStepBl(i)
             println(rpad("Step $(i): ", 11), lpad("$(fVstr) = ", 6), 
                     alignNumSign(fx, roundDigits=nDigitShown))
             print(rpad("", 11), lpad("𝒙 = ", 6))
@@ -520,8 +528,9 @@ function optimizeParams!(pbs::AbstractVector{<:ParamBox{T}},
     res
 end
 
-optimizeParams!(pbs, bs, nuc, nucCoords, N::Int, config=defaultPOconfig; printInfo=true) = 
-optimizeParams!(pbs, bs, nuc, nucCoords, config, N; printInfo)
+optimizeParams!(pbs, bs, nuc, nucCoords, N::Int, config=defaultPOconfig; 
+                printInfo=true, infoLevel=defaultPOinfoL) = 
+optimizeParams!(pbs, bs, nuc, nucCoords, config, N; printInfo, infoLevel)
 
 function optimizeParamsCore((f0, getOFval), (g0, getOGval), 
                             pbs, bs, nuc, nucCoords, N, config)
