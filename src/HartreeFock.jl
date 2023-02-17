@@ -10,6 +10,7 @@ using SPGBox: spgbox!
 const defaultDS = 0.5
 const defaultDIISconfig = (12, :LBFGS)
 const SADHFmaxStep = 50
+const defaultHFinfoL = 3
 
 const HFOminCycle = 10
 const defaultHFCStr = "HFconfig()"
@@ -642,21 +643,19 @@ const C0methodArgOrders = (itself=(1,),
                            getCfromSAD=(2,3,5,6,7,8,9,4))
 
 
-const defaultInfoL = 3
-
 """
     runHF(bs, nuc, nucCoords, config=$(defaultHFCStr), N=getCharge(nuc); 
-          printInfo=true, infoLevel=$(defaultInfoL)) -> 
+          printInfo=true, infoLevel=$(defaultHFinfoL)) -> 
     HFfinalVars
 
     runHF(bs, nuc, nucCoords, N=getCharge(nuc), config=$(defaultHFCStr); 
-          printInfo=true, infoLevel=$(defaultInfoL)) -> 
+          printInfo=true, infoLevel=$(defaultHFinfoL)) -> 
     HFfinalVars
 
 Main function to run a Hartree-Fock method in Quiqbox. The returned result and relevant 
 information is stored in a [`HFfinalVars`](@ref).
 
-    runHFcore(args...; printInfo=false, infoLevel=$(defaultInfoL)) -> 
+    runHFcore(args...; printInfo=false, infoLevel=$(defaultHFinfoL)) -> 
     Tuple{Tuple{Vararg{HFtempVars}}, Bool}
 
 The core function of `runHF` that accept the same positional arguments as `runHF`, except 
@@ -694,7 +693,7 @@ by unrestricted Hartree-Fock (UHF).
 achieve `5`, every step will be printed.
 """
 function runHF(bs::GTBasis{T}, args...; 
-               printInfo::Bool=true, infoLevel::Int=defaultInfoL) where {T}
+               printInfo::Bool=true, infoLevel::Int=defaultHFinfoL) where {T}
     nuc = arrayToTuple(args[begin])
     nucCoords = genTupleCoords(T, args[begin+1])
     vars, isConverged = runHFcore(bs, nuc, nucCoords, args[begin+2:end]...; 
@@ -712,7 +711,7 @@ function runHF(bs::GTBasis{T}, args...;
 end
 
 runHF(bs::AVectorOrNTuple{AbstractGTBasisFuncs{T, D}}, args...; 
-      printInfo::Bool=true, infoLevel::Int=defaultInfoL) where {T, D} = 
+      printInfo::Bool=true, infoLevel::Int=defaultHFinfoL) where {T, D} = 
 runHF(GTBasis(bs), args...; printInfo, infoLevel)
 
 @inline function runHFcore(bs::GTBasis{T, D, BN, BFT}, 
@@ -721,7 +720,7 @@ runHF(GTBasis(bs), args...; printInfo, infoLevel)
                            N::Union{Int, Tuple{Int}, NTuple{2, Int}}=getCharge(nuc), 
                            config::HFconfig{<:Any, HFT}=defaultHFC; 
                            printInfo::Bool=false, 
-                           infoLevel::Int=defaultInfoL) where {T, D, BN, BFT, NN, HFT}
+                           infoLevel::Int=defaultHFinfoL) where {T, D, BN, BFT, NN, HFT}
     Nlow = Int(HFT==:RHF)
     totN = (N isa Int) ? N : (N[begin] + N[end])
     totN > Nlow || throw(DomainError(N, "$(HFT) requires more than $(Nlow) electrons."))
@@ -746,17 +745,17 @@ runHF(GTBasis(bs), args...; printInfo, infoLevel)
 end
 
 runHFcore(bs::BasisSetData, nuc, nucCoords, config::HFconfig, N=getCharge(nuc); 
-          printInfo::Bool=false, infoLevel::Int=defaultInfoL) = 
+          printInfo::Bool=false, infoLevel::Int=defaultHFinfoL) = 
 runHFcore(bs::BasisSetData, nuc, nucCoords, N, config; printInfo, infoLevel)
 
 runHFcore(bs::AVectorOrNTuple{AbstractGTBasisFuncs{T, D}}, args...; 
-          printInfo::Bool=false, infoLevel::Int=defaultInfoL) where {T, D} = 
+          printInfo::Bool=false, infoLevel::Int=defaultHFinfoL) where {T, D} = 
 runHFcore(GTBasis(bs), args...; printInfo, infoLevel)
 
 """
 
     runHFcore(HTtype, scfConfig, Ns, Hcore, HeeI, S, X, C0, maxStep, earlyStop, 
-              printInfo=false, infoLevel=$(defaultInfoL)) -> 
+              printInfo=false, infoLevel=$(defaultHFinfoL)) -> 
     Tuple{Tuple{Vararg{HFtempVars}}, Bool}
 
 Another method of `runHFcore` that has the same return value, but takes more underlying 
@@ -806,7 +805,7 @@ function runHFcore(::Val{HFT},
                    maxStep::Int, 
                    earlyStop::Bool, 
                    printInfo::Bool=false, 
-                   infoLevel::Int=defaultInfoL) where {HFT, T1, L, MS, HFTS, T2}
+                   infoLevel::Int=defaultHFinfoL) where {HFT, T1, L, MS, HFTS, T2}
     vars = initializeSCF(Val(HFT), Hcore, HeeI, C0, Ns)
     Etots = vars[1].shared.Etots
     oscThreshold = scfConfig.oscillateThreshold

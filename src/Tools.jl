@@ -887,7 +887,7 @@ function genAdaptStepBl(infoLevel::Int, maxStep::Int)
         (::Int)->false
     else
         function (i::Int)
-            i % floor(log(abs(0.00032maxStep*infoLevel^5)+2, i) + 1) == 0
+            i % floor(log(abs(infoLevel^5*0.00032maxStep)+2, i) + 1) == 0
         end
     end
 end
