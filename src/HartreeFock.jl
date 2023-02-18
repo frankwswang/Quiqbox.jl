@@ -961,7 +961,7 @@ function xDIIScore!(mDIIS::F, c::AbstractVector{T}, S::AbstractMatrix{T},
                     cvxConstraint::Val{CCB}, 
                     solver::Symbol) where {F, T, CCB}
     if length(Fs) > DIISsize
-        push!(c, 0)
+        push!(c, c[end])
         popfirst!(c)
         is = ( (1-DIISsize):0 ) .+ lastindex(Fs)
         cp = c
@@ -1112,7 +1112,7 @@ function CMsolver!(::Val{CCB}, c::AbstractVector{T},
             B += ϵ*I
             A = getA(B)
         end
-        c .= (A \ b)[begin:end-1]
+        c .= @view (A \ b)[begin:end-1]
         (CCB && findfirst(x->x<0, c) !== nothing) || (return c)
         idx = powerset(sortperm(abs.(c)), 1)
 
@@ -1120,7 +1120,8 @@ function CMsolver!(::Val{CCB}, c::AbstractVector{T},
             Atemp = @view A[begin:end .∉ Ref(is), begin:end .∉ Ref(is)]
             det(Atemp) == 0 && continue
             btemp = @view b[begin:end .∉ Ref(is)]
-            cL = (Atemp \ btemp)[begin:end-1]
+            cL = Atemp \ btemp
+            popat!(cL, lastindex(cL))
             for i in sort(is)
                 insert!(cL, i, 0.0)
             end
