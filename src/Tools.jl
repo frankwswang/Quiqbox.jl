@@ -617,7 +617,7 @@ function isOscillateConvergedHead(seq, minCycles, maxRemains)
     maxRemains > 1 || 
     throw(DomainError(maxRemains, "`maxRemains` should be larger than 1."))
     slice = min(maxRemains, len÷3+1)
-    seq[end-slice : end]
+    seq[(end-slice+1) : end]
 end
 
 function isOscillateConverged(seq::AbstractVector{<:Real}, 

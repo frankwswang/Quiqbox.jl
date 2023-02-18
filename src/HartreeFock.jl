@@ -47,7 +47,7 @@ end
 
 @inline getC(X::AbstractMatrix{T}, Fˢ::AbstractMatrix{T}, 
              stabilizeSign::Bool=true) where {T} = 
-        getCϵ(X, Fˢ, stabilizeSign)[1]
+        getCϵ(X, Fˢ, stabilizeSign)[begin]
 
 
 splitSpins(::Val{1}, N::Int) = (N÷2,)
@@ -71,7 +71,7 @@ function breakSymOfC(::Val{:UHF}, C::AbstractMatrix{T}) where {T}
     l = min(size(C2, 1), 2)
     C2[1:l, 1:l] .= 0 # Breaking spin symmetry.
     # C2[l, :] .= 0 # Another way.
-    (copy(C), C2)
+    (C, C2)
 end
 
 breakSymOfC(::Val{:RHF}, C::AbstractMatrix{T}) where {T} = (C,)
@@ -351,7 +351,7 @@ method stored as `Tuple`s of `Pair`s.
 for each methods by a `Pair` of which the key `i::Int` is for `i`th method and the pointed 
 `AbstractVector{<:Pair}` is the pairs of keyword arguments and their values respectively.
 
-    SCFconfig(;threshold::AbstractFloat=$(defaultSCFconfigArgs[2][1:end]), 
+    SCFconfig(;threshold::AbstractFloat=$(defaultSCFconfigArgs[2]), 
                oscillateThreshold::Real=defultOscThreshold) -> 
     SCFconfig{$(defaultSCFconfigArgs[2] |> eltype), $(defaultSCFconfigArgs[1] |> length)}
 
@@ -392,7 +392,7 @@ const defaultSCFconfig = SCFconfig(defaultSCFconfigArgs...)
 SCFconfig(;threshold::AbstractFloat=defaultSCFconfigArgs[2][end], 
           oscillateThreshold::Real=defultOscThreshold) = 
 SCFconfig( defaultSCFconfigArgs[1], 
-          (defaultSCFconfigArgs[2][1:end-1]..., Float64(threshold)); 
+          (defaultSCFconfigArgs[2][begin:end-1]..., Float64(threshold)); 
            oscillateThreshold )
 
 
@@ -407,11 +407,11 @@ mutable struct HFinterrelatedVars{T} <: HartreeFockintermediateData{T}
 end
 
 getSpinOccupations(::Val{:RHF}, (Nˢ,)::Tuple{Int}, BN) = 
-((fill(spinOccupations[4], Nˢ)..., fill(spinOccupations[1], BN-Nˢ)...),)
+((fill(spinOccupations[4], Nˢ)..., fill(spinOccupations[begin], BN-Nˢ)...),)
 
 getSpinOccupations(::Val{:UHF}, (Nᵅ, Nᵝ)::NTuple{2, Int}, BN) = 
-( (fill(spinOccupations[2], Nᵅ)..., fill(spinOccupations[1], BN-Nᵅ)...), 
-  (fill(spinOccupations[3], Nᵝ)..., fill(spinOccupations[1], BN-Nᵝ)...) )
+( (fill(spinOccupations[2], Nᵅ)..., fill(spinOccupations[begin], BN-Nᵅ)...), 
+  (fill(spinOccupations[3], Nᵝ)..., fill(spinOccupations[begin], BN-Nᵝ)...) )
 
 """
     HFtempVars{T, HFT} <: HartreeFockintermediateData{T}
@@ -423,7 +423,7 @@ each iteration during the Hartree-Fock SCF procedure.
 
 `N::Int`: The number of electrons with the one spin function.
 
-`Cs::Vector{Matrix{T}}`: Coefficient matrices.
+`Cs::Vector{Matrix{T}}`: Orbital coefficient matrices.
 
 `Ds::Vector{Matrix{T}}`: Density matrices corresponding to only spin configuration.
 
@@ -483,7 +483,7 @@ spin-up electrons and spin-down electrons.
 
 `nucCoords::NTuple{NN, NTuple{D, T}}`: The coordinates of corresponding nuclei.
 
-`C::NTuple{HFTS, Matrix{T}}`: Coefficient matrix(s) for one spin configuration.
+`C::NTuple{HFTS, Matrix{T}}`: Orbital coefficient matrix(s) for one spin configuration.
 
 `D::NTuple{HFTS, Matrix{T}}`: Density matrix(s) for one spin configuration.
 
@@ -525,7 +525,7 @@ struct HFfinalVars{T, D, HFT, NN, BN, HFTS} <: HartreeFockFinalValue{T, HFT}
         any(length(i)!=𝐷 for i in nucCoords) && 
         throw(DomainError(nucCoords, "The lengths of the elements in `nucCoords` should "*
                "all be length $𝐷."))
-        Ehf = vars[1].shared.Etots[end]
+        Ehf = vars[begin].shared.Etots[end]
         nuc = arrayToTuple(nuc)
         nucCoords = genTupleCoords(T, nucCoords)
         Enn = nnRepulsions(nuc, nucCoords)
@@ -567,11 +567,11 @@ The container of Hartree-Fock method configuration.
 `HF::Val{HFT}`: Hartree-Fock method type. Available values of `HFT` are 
 $(string(HFtypes)[2:end-1]).
 
-`C0::InitialC{T1, HFT, F}`: Initial guess of the coefficient matrix(s) C of the canonical 
-orbitals. When `C0` is as an argument of `HFconfig`'s constructor, it can be set to 
-`sym::Symbol` where available values of `sym` are 
+`C0::InitialC{T1, HFT, F}`: Initial guess of the orbital coefficient matrix(s) C of the 
+canonical orbitals. When `C0` is as an argument of `HFconfig`'s constructor, it can be set 
+to `sym::Symbol` where available values of `sym` are 
 `$((guessCmethods|>typeof|>fieldnames|>string)[2:end-1])`; it can also be a `Tuple` of 
-prepared coefficient matrix(s) for the corresponding Hartree-Fock method type.
+prepared orbital coefficient matrix(s) for the corresponding Hartree-Fock method type.
 
 `SCF::SCFconfig{T2, L, MS}`: SCF iteration configuration. For more information please refer 
 to [`SCFconfig`](@ref).
@@ -736,7 +736,7 @@ runHF(GTBasis(bs), args...; printInfo, infoLevel)
     C0mats = config.C0.mat
     getC0f isa iT && 
     ( all(all(size(C) .== BN) for C in C0mats) || 
-      throw(DimensionMismatch("The size of the input initial coefficient matrix(s) C "*
+      throw(DimensionMismatch("The input initial orbital coefficient matrix(s)'s size "*
             "($(size.(C0mats))) does not match the size of the input basis set ($BN).")) )
     C0 = uniCallFunc(getC0f, getproperty(C0methodArgOrders, nameOf(getC0f)), C0mats, 
                      Val(HFT), bs.S, X, Hcore, bs.eeI, bs.basis, nuc, nucCoords)
@@ -807,7 +807,7 @@ function runHFcore(::Val{HFT},
                    printInfo::Bool=false, 
                    infoLevel::Int=defaultHFinfoL) where {HFT, T1, L, MS, HFTS, T2}
     vars = initializeSCF(Val(HFT), Hcore, HeeI, C0, Ns)
-    Etots = vars[1].shared.Etots
+    Etots = vars[begin].shared.Etots
     oscThreshold = scfConfig.oscillateThreshold
     printInfo && println(rpad(HFT, 9)*rpad("| Initial Gauss", 16), 
                          "| E = ", alignNumSign(Etots[end], roundDigits=getAtolDigits(T2)))
@@ -836,7 +836,7 @@ function runHFcore(::Val{HFT},
             sqrtBreakPoint = sqrt(breakPoint)
 
             if l==L
-                ΔD = vars[1].shared.Dtots[end] - vars[1].shared.Dtots[end-1]
+                ΔD = vars[begin].shared.Dtots[end] - vars[begin].shared.Dtots[end-1]
                 ΔDrms = sqrt( sum(ΔD .^ 2) ./ length(ΔD) )
             end
 
@@ -1021,7 +1021,7 @@ function pushHFtempVars!(αβVars::NTuple{HFTS, HFtempVars{T, HFT}},
                                            AbstractMatrix{T}, T, 
                                            AbstractMatrix{T}, T}}) where {HFTS, T, HFT}
     pushHFtempVarsCore1!.(αβVars, res)
-    pushHFtempVarsCore2!(αβVars[1], res[1])
+    pushHFtempVarsCore2!(αβVars[begin], res[begin])
 end
 
 
@@ -1039,7 +1039,7 @@ end
 
 function popHFtempVars!(αβVars::NTuple{HFTS, HFtempVars{T, HFT}}) where {HFTS, T, HFT}
     popHFtempVarsCore1!.(αβVars)
-    popHFtempVarsCore2!(αβVars[1])
+    popHFtempVarsCore2!(αβVars[begin])
 end
 
 function shiftLastEle!(v, shiftVal)
@@ -1117,9 +1117,9 @@ function CMsolver!(::Val{CCB}, c::AbstractVector{T},
         idx = powerset(sortperm(abs.(c)), 1)
 
         for is in idx
-            Atemp = A[begin:end .∉ Ref(is), begin:end .∉ Ref(is)]
+            Atemp = @view A[begin:end .∉ Ref(is), begin:end .∉ Ref(is)]
             det(Atemp) == 0 && continue
-            btemp = b[begin:end .∉ Ref(is)]
+            btemp = @view b[begin:end .∉ Ref(is)]
             cL = (Atemp \ btemp)[begin:end-1]
             for i in sort(is)
                 insert!(cL, i, 0.0)
