@@ -3,12 +3,11 @@ export SCFconfig, HFconfig, runHF, runHFcore
 using LinearAlgebra: dot, Hermitian, \, det, I, ishermitian, diag, norm
 using Combinatorics: powerset
 using LineSearches
-using Optim: LBFGS, Fminbox, optimize as OptimOptimize, minimizer as OptimMinimizer, 
-             Options as OptimOptions
 using SPGBox: spgbox!
+using LBFGSB: lbfgsb
 
 const defaultDS = 0.5
-const defaultDIISsize = 12
+const defaultDIISsize = 10
 const defaultDIISconfig = (defaultDIISsize, :LBFGS)
 const SADHFmaxStep = 50
 const defaultHFinfoL = 3
@@ -938,7 +937,7 @@ function runHFcore(::Val{HFT},
 
             ΔE = Etots[end] - Etots[end-1]
             relDiff = ΔE / abs(Etots[end-1])
-            sqrtBreakPoint = sqrt(breakPoint)
+            sqrtBreakPoint = sqrt(breakPoint|>abs)
 
             if l==L
                 ΔD = vars[begin].shared.Dtots[end] - vars[begin].shared.Dtots[end-1]
@@ -1138,15 +1137,9 @@ function LBFGSBsolver!(::Val{CCB}, c::AbstractVector{T},
     f = genxDIISf(v, B, shift)
     g! = genxDIIS∇f(v, B, shift)
     lb = ifelse(CCB, T(0), T(-Inf))
-    vL = length(v)
-    innerOptimizer = LBFGS(m=min(getAtolDigits(T), 50), 
-                                 linesearch=HagerZhang(linesearchmax=100, epsilon=1e-7), 
-                                 alphaguess=InitialHagerZhang())
-    c .= OptimOptimize(f, g!, fill(lb, vL), fill(T(Inf), vL), 
-                       collect(T, 1:vL), 
-                       Fminbox(innerOptimizer), 
-                       OptimOptions(g_tol=exp10(-getAtolDigits(T)), iterations=10000, 
-                       allow_f_increases=false)) |> OptimMinimizer
+    c .= lbfgsb(f, g!, c; lb, m=min(getAtolDigits(T), 50), 
+                factr=1e5, pgtol=exp10(-getAtolDigits(T)), 
+                iprint=-1, maxfun=10000, maxiter=10000)[end]
     s, _ = shiftLastEle!(c, shift)
     c ./= s
 end
@@ -1158,13 +1151,14 @@ function SPGBsolver!(::Val{CCB}, c::AbstractVector{T},
     g! = genxDIIS∇f(v, B, shift)
     lb = ifelse(CCB, T(0), T(-Inf))
     vL = length(v)
-    spgbox!(f, g!, c, lower=fill(lb, vL), eps=1e-6)
+    spgbox!(f, g!, c, lower=fill(lb, vL), 
+            eps=exp10(-getAtolDigits(T)), nitmax=10000, nfevalmax=10000, m=20)
     s, _ = shiftLastEle!(c, shift)
     c ./= s
 end
 
 function CMsolver!(::Val{CCB}, c::AbstractVector{T}, 
-                   v::AbstractVector{T}, B::AbstractMatrix{T}, ϵ::T=T(1e-6)) where {CCB, T}
+                   v::AbstractVector{T}, B::AbstractMatrix{T}, ϵ::T=T(1e-9)) where {CCB, T}
     len = length(v)
     getA = M->[M  ones(T, len); ones(T, 1, len) T(0)]
     b = vcat(-v, 1)
