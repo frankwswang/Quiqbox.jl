@@ -5,6 +5,7 @@ using LineSearches
 
 const OFmethods = [:HFenergy, :DirectRHFenergy]
 const defaultPOinfoL = 2
+const POinterValMaxStore = 50
 
 const OFconversions = Dict([runHFcore] .=> 
                            [( x->x[begin][begin].shared.Etots[end], 
@@ -436,7 +437,6 @@ function optimizeParams!(pbs::AbstractVector{<:ParamBox{T}},
     targets = (config.target, 0) # (fTarget, gTarget)
     maxStep = config.maxStep
     adaptStepBl = genAdaptStepBl(infoLevel, maxStep)
-    maxRemains = 50
 
     thresholds = ifelse(isNaN(config.target), 
                         [threshold[begin], threshold[end]], [threshold[begin]])
@@ -446,8 +446,8 @@ function optimizeParams!(pbs::AbstractVector{<:ParamBox{T}},
             _->true
         else
             detectConverge |= true
-            vrs->isOscillateConverged(vrs, thd*sqrt(vrs[end]|>length), target; 
-                                      maxRemains)[begin]
+            vrs->isOscillateConverged(vrs, thd*sqrt(vrs[end]|>length), target, 
+                                      maxRemains=POinterValMaxStore)[begin]
         end
     end
     detectConverge || (isConverged = (_->false,))
@@ -492,9 +492,9 @@ function optimizeParams!(pbs::AbstractVector{<:ParamBox{T}},
         fx, gx, fRes, Δt₁ = optimizeParamsCore(f0s, g0s, pbsN, bsN, nuc, nucCoords, N, 
                                                f0config)
         i += 1
-        saveTrace[begin]   || i < maxRemains    || popfirst!(fVals)
+        saveTrace[begin]   || i < POinterValMaxStore || popfirst!(fVals)
         saveTrace[begin+1] && push!(pVals, x)
-        saveTrace[begin+2] || i < maxRemains    || popfirst!(grads)
+        saveTrace[begin+2] || i < POinterValMaxStore || popfirst!(grads)
         saveTrace[end]     && push!(fRess, fRes)
         push!(fVals, fx)
         push!(grads, gx)
