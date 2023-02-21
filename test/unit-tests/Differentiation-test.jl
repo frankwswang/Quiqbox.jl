@@ -118,7 +118,7 @@ S1 = overlaps(bs1)
 HFres1 = runHF(bs1, nuc, nucCoords, DHFO, printInfo=false)
 grad1 = gradOfHFenergy(pars1, bs1, S1, HFres1.C, nuc, nucCoords)
 grad1_fd = fDiffOfHFenergy(pars1, bs1, nuc, nucCoords, 5e-8)
-grad1_t = [1.2560795063145105, 1.2560795063145105, 4.050658426012205, 0]
+grad1_t = [1.2560795063145094, 1.2560795063145094, 4.050658426012204, 0]
 t1 = 1e-14
 t2 = 1e-10
 t3 = 5e-8
@@ -144,10 +144,10 @@ grad2 = gradOfHFenergy(pars2, bs2, S2, HFres2.C, nuc, nucCoords)
 grad2_fd = fDiffOfHFenergy(pars2, bs2, nuc, nucCoords, 5e-8)
 compr2Arrays3((grad2=grad2, grad2_fd=grad2_fd), t3, true)
 @test isapprox(grad2[1], -grad2[2], atol=t2)
-@test isapprox(grad2[1], -0.06786383130892266, atol=t2)
+@test isapprox(grad2[1], -0.06786383130892265, atol=t2)
 @test all(grad2[3:6] .== 0)
-grad2_tp = [0.006457377706861628, 0.17348694557592673, 
-            0.09464147744656638, -0.05996050268876732]
+grad2_tp = [0.006457377706861556, 0.1734869455759266, 
+            0.09464147744656637, -0.05996050268876735]
 compr2Arrays3((grad2_7toEnd=grad2[7:end], grad2_tp=grad2_tp), t2, true)
 
 bs3 = bs1[[1,5]] .* bs2 # basis set of BasisFuncMix
@@ -155,16 +155,16 @@ pars3 = markParams!(bs3, true)
 S3 = overlaps(bs3)
 HFres3 = runHF(bs3, nuc, nucCoords, DHFO, printInfo=false)
 grad3 = gradOfHFenergy(pars3, HFres3)
-grad3_fd = fDiffOfHFenergy(pars3, bs3, nuc, nucCoords, 1e-7)
+grad3_fd = fDiffOfHFenergy(pars3, bs3, nuc, nucCoords, 5e-7)
 compr2Arrays3((grad3p=grad3[1:end-1], grad3_fdp=grad3_fd[1:end-1]), 2t3, true)
 @test isapprox(grad3[end], grad3_fd[end], atol=10t3)
-grad3_t = [-0.16065229305017475,  -0.24121983365900732, -0.14801056361872944, 
-            0.004774655873521621, -0.08411039061867616, -0.33217357077286414, 
-           -0.41546847658657454,  -0.05739800455726261, -0.30588239774460935, 
-           -0.4189742200497788,    0.6569617771953619,   0.10172360581762034, 
-            1.2107782439785262,    0.13565576182237693,  1.6060314706531165, 
-            0.05883837996795874,   0.7017475755862608,  -1.2886966025209632, 
-            2.762948606659436,   -16.536548192471372]
+grad3_t = [-0.16065229121206354,  -0.24121983006131092, -0.14801056645961025, 
+            0.004774655525683808, -0.08411038969476041, -0.33217356554081107, 
+           -0.41546848152885285,  -0.05739800530364568, -0.30588239544157225, 
+           -0.4189742139749344,    0.6569617804529125,   0.10172360637941631, 
+            1.2107782206334075,    0.1356557596514777,   1.606031495974234, 
+            0.05883838067278252,   0.7017475880547892,  -1.2886966023073554, 
+            2.762948613007392,   -16.536548387473335]
 compr2Arrays3((grad3=grad3, grad3_t=grad3_t), 10t3, true)
 
 
@@ -176,8 +176,8 @@ bs4 = genBasisFunc.(grid2.point, Ref([gf2])) .+ genBasisFunc(fill(0.0, 3), gf3)
 pars4 = markParams!(bs4, true)[1:5]
 pVals = [0.06053894364993645, 0.14969526640945469, 0.6609406021835533, 
          0.6053365604566768, 1.582624636863842]
-grad4_t = [ 0.00011524520850385555, 0.01311284575947802, 0.008472955328531387, 
-           -0.016166185002661947,   0.006183388294490479]
+grad4_t = [ 0.00011524075562293066, 0.01311284575533922, 0.008472955329341184, 
+           -0.016166185039220123,   0.00618338829544636]
 setindex!.(pars4, pVals)
 gtb4 = GTBasis(bs4)
 HFres4 = Quiqbox.runHFcore(gtb4, nuc, nucCoords, Quiqbox.defaultHFconfigForPO)
