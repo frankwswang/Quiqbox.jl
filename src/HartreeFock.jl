@@ -264,6 +264,133 @@ function getCDFE(Hcore::AbstractMatrix{T}, HeeI::AbstractArray{T, 4}, X::Abstrac
 end
 
 
+mutable struct HFinterrelatedVars{T} <: HartreeFockintermediateData{T}
+    Dtots::Vector{Matrix{T}}
+    Etots::Vector{T}
+
+    HFinterrelatedVars{T}() where {T} = new{T}()
+    HFinterrelatedVars(Dts::AbstractVector{<:AbstractMatrix{T}}, 
+                       Ets::AbstractVector{T}) where {T} = 
+    new{T}(Dts, Ets)
+end
+
+const HFIVfields = (:Dtots, :Etots)
+
+getSpinOccupations(::Val{:RHF}, (Nˢ,)::Tuple{Int}, BN) = 
+((fill(spinOccupations[4], Nˢ)..., fill(spinOccupations[begin], BN-Nˢ)...),)
+
+getSpinOccupations(::Val{:UHF}, (Nᵅ, Nᵝ)::NTuple{2, Int}, BN) = 
+( (fill(spinOccupations[2], Nᵅ)..., fill(spinOccupations[begin], BN-Nᵅ)...), 
+  (fill(spinOccupations[3], Nᵝ)..., fill(spinOccupations[begin], BN-Nᵝ)...) )
+
+"""
+    HFtempVars{T, HFT} <: HartreeFockintermediateData{T}
+
+The container to store the intermediate values (only of the one spin configuration) for 
+each iteration during the Hartree-Fock SCF procedure.
+
+≡≡≡ Field(s) ≡≡≡
+
+`N::Int`: The number of electrons with the one spin function.
+
+`Cs::Vector{Matrix{T}}`: Orbital coefficient matrices.
+
+`Ds::Vector{Matrix{T}}`: Density matrices corresponding to only spin configuration.
+
+`Fs::Vector{Matrix{T}}`: Fock matrices.
+
+`Es::Vector{T}`: Part of the Hartree-Fock energy corresponding to one spin configuration.
+
+`shared.Dtots::Vector{Matrix{T}}`: The total density matrices.
+
+`shared.Etots::Vector{T}`: The total Hartree-Fock energy.
+
+**NOTE:** For unrestricted Hartree-Fock, there are 2 `HFtempVars` being updated during the 
+iterations, and changing the field `shared.Dtots` or `shared.Etots` of one `HFtempVars` 
+will affect the other one's.
+"""
+struct HFtempVars{T, HFT} <: HartreeFockintermediateData{T}
+    N::Int
+    Cs::Vector{Matrix{T}}
+    Ds::Vector{Matrix{T}}
+    Fs::Vector{Matrix{T}}
+    Es::Vector{T}
+    shared::HFinterrelatedVars{T}
+end
+
+const HFTVVfields = (:Cs, :Ds, :Fs, :Es)
+
+HFtempVars(::Val{HFT}, Nˢ::Int, 
+           C::AbstractMatrix{T}, D::AbstractMatrix{T}, F::AbstractMatrix{T}, E::T) where 
+          {HFT, T} = 
+HFtempVars{T, HFT}(Nˢ, [C], [D], [F], [E], HFinterrelatedVars{T}())
+
+HFtempVars(::Val{HFT}, Nˢ::Int, 
+           Cs::AbstractVector{<:AbstractMatrix{T}}, 
+           Ds::AbstractVector{<:AbstractMatrix{T}}, 
+           Fs::AbstractVector{<:AbstractMatrix{T}}, 
+           Es::AbstractVector{T}, 
+           Dtots::AbstractVector{<:AbstractMatrix{T}}, Etots::AbstractVector{T}) where 
+          {HFT, T} = 
+HFtempVars{T, HFT}(Nˢ, Cs, Ds, Fs, Es, HFinterrelatedVars(Dtots, Etots))
+
+function getHFTVforUpdate1(tVars::HFtempVars)
+    getproperty.(Ref(tVars), HFTVVfields)
+end
+
+function getHFTVforUpdate2(tVars::HFtempVars)
+    getproperty.(Ref(tVars.shared), HFIVfields)
+end
+
+function updateHFTVcore!(varMaxLen::Int, var::Vector{T}, res::T) where {T}
+    length(var) < varMaxLen || popfirst!(var)
+    push!(var, res)
+end
+
+function updateHFtempVars!(maxLens::NTuple{4, Int}, 
+                           αβVars::NTuple{HFTS, HFtempVars{T, HFT}}, 
+                           ress::NTuple{HFTS, 
+                                        Tuple{AbstractMatrix{T}, AbstractMatrix{T}, 
+                                              AbstractMatrix{T}, T, 
+                                              AbstractMatrix{T}, T}}) where {HFTS, T, HFT}
+    for (tVars, res) in zip(αβVars, ress)
+        fs = getHFTVforUpdate1(tVars)
+        for (s, f, r) in zip(maxLens, fs, res)
+            updateHFTVcore!(s, f, r)
+        end
+    end
+    for (s, f, r) in zip(maxLens[DEtotIndices], 
+                          getHFTVforUpdate2(αβVars[begin]), ress[begin][end-1:end])
+        updateHFTVcore!(s, f, r)
+    end
+end
+
+function popHFtempVars!(αβVars::NTuple{HFTS, T}) where {HFTS, T<:HFtempVars}
+    for tVars in αβVars
+        fs = getHFTVforUpdate1(tVars)
+        for fEach in fs
+            pop!(fEach)
+        end
+    end
+    for fTot in getHFTVforUpdate2(αβVars[begin])
+        pop!(fTot)
+    end
+end
+
+function clearHFtempVars!(saveTrace::NTuple{4, Bool}, αβVars::NTuple{HFTS, T}) where 
+                         {HFTS, T<:HFtempVars}
+    for tVars in αβVars
+        fs = getHFTVforUpdate1(tVars)
+        for (bl, fEach) in zip(saveTrace, fs)
+            bl || keepat!(fEach, lastindex(fEach))
+        end
+    end
+    for (bl, fTot) in zip(saveTrace[DEtotIndices], getHFTVforUpdate2(αβVars[begin]))
+        bl || keepat!(fTot, lastindex(fTot))
+    end
+end
+
+
 function initializeSCFcore(::Val{HFT}, Hcore::AbstractMatrix{T}, HeeI::AbstractArray{T, 4}, 
                            C::NTuple{HFTS, AbstractMatrix{T}}, Ns::NTuple{HFTS, Int}) where 
                           {HFT, T, HFTS}
@@ -416,132 +543,6 @@ function getMaxSCFsizes(scfConfig::SCFconfig)
         maxSize = max(maxSize, newSize)
     end
     (1, maxSize, maxSize, maxSize) # Cs, Ds, Fs, Es
-end
-
-mutable struct HFinterrelatedVars{T} <: HartreeFockintermediateData{T}
-    Dtots::Vector{Matrix{T}}
-    Etots::Vector{T}
-
-    HFinterrelatedVars{T}() where {T} = new{T}()
-    HFinterrelatedVars(Dts::AbstractVector{<:AbstractMatrix{T}}, 
-                       Ets::AbstractVector{T}) where {T} = 
-    new{T}(Dts, Ets)
-end
-
-const HFIVfields = (:Dtots, :Etots)
-
-getSpinOccupations(::Val{:RHF}, (Nˢ,)::Tuple{Int}, BN) = 
-((fill(spinOccupations[4], Nˢ)..., fill(spinOccupations[begin], BN-Nˢ)...),)
-
-getSpinOccupations(::Val{:UHF}, (Nᵅ, Nᵝ)::NTuple{2, Int}, BN) = 
-( (fill(spinOccupations[2], Nᵅ)..., fill(spinOccupations[begin], BN-Nᵅ)...), 
-  (fill(spinOccupations[3], Nᵝ)..., fill(spinOccupations[begin], BN-Nᵝ)...) )
-
-"""
-    HFtempVars{T, HFT} <: HartreeFockintermediateData{T}
-
-The container to store the intermediate values (only of the one spin configuration) for 
-each iteration during the Hartree-Fock SCF procedure.
-
-≡≡≡ Field(s) ≡≡≡
-
-`N::Int`: The number of electrons with the one spin function.
-
-`Cs::Vector{Matrix{T}}`: Orbital coefficient matrices.
-
-`Ds::Vector{Matrix{T}}`: Density matrices corresponding to only spin configuration.
-
-`Fs::Vector{Matrix{T}}`: Fock matrices.
-
-`Es::Vector{T}`: Part of the Hartree-Fock energy corresponding to one spin configuration.
-
-`shared.Dtots::Vector{Matrix{T}}`: The total density matrices.
-
-`shared.Etots::Vector{T}`: The total Hartree-Fock energy.
-
-**NOTE:** For unrestricted Hartree-Fock, there are 2 `HFtempVars` being updated during the 
-iterations, and changing the field `shared.Dtots` or `shared.Etots` of one `HFtempVars` 
-will affect the other one's.
-"""
-struct HFtempVars{T, HFT} <: HartreeFockintermediateData{T}
-    N::Int
-    Cs::Vector{Matrix{T}}
-    Ds::Vector{Matrix{T}}
-    Fs::Vector{Matrix{T}}
-    Es::Vector{T}
-    shared::HFinterrelatedVars{T}
-end
-
-const HFTVVfields = (:Cs, :Ds, :Fs, :Es)
-
-HFtempVars(::Val{HFT}, Nˢ::Int, 
-           C::AbstractMatrix{T}, D::AbstractMatrix{T}, F::AbstractMatrix{T}, E::T) where 
-          {HFT, T} = 
-HFtempVars{T, HFT}(Nˢ, [C], [D], [F], [E], HFinterrelatedVars{T}())
-
-HFtempVars(::Val{HFT}, Nˢ::Int, 
-           Cs::AbstractVector{<:AbstractMatrix{T}}, 
-           Ds::AbstractVector{<:AbstractMatrix{T}}, 
-           Fs::AbstractVector{<:AbstractMatrix{T}}, 
-           Es::AbstractVector{T}, 
-           Dtots::AbstractVector{<:AbstractMatrix{T}}, Etots::AbstractVector{T}) where 
-          {HFT, T} = 
-HFtempVars{T, HFT}(Nˢ, Cs, Ds, Fs, Es, HFinterrelatedVars(Dtots, Etots))
-
-function getHFTVforUpdate1(tVars::HFtempVars)
-    getproperty.(Ref(tVars), HFTVVfields)
-end
-
-function getHFTVforUpdate2(tVars::HFtempVars)
-    getproperty.(Ref(tVars.shared), HFIVfields)
-end
-
-function updateHFTVcore!(varMaxLen::Int, var::Vector{T}, res::T) where {T}
-    length(var) < varMaxLen || popfirst!(var)
-    push!(var, res)
-end
-
-function updateHFtempVars!(maxLens::NTuple{4, Int}, 
-                           αβVars::NTuple{HFTS, HFtempVars{T, HFT}}, 
-                           ress::NTuple{HFTS, 
-                                        Tuple{AbstractMatrix{T}, AbstractMatrix{T}, 
-                                              AbstractMatrix{T}, T, 
-                                              AbstractMatrix{T}, T}}) where {HFTS, T, HFT}
-    for (tVars, res) in zip(αβVars, ress)
-        fs = getHFTVforUpdate1(tVars)
-        for (s, f, r) in zip(maxLens, fs, res)
-            updateHFTVcore!(s, f, r)
-        end
-    end
-    for (s, f, r) in zip(maxLens[DEtotIndices], 
-                          getHFTVforUpdate2(αβVars[begin]), ress[begin][end-1:end])
-        updateHFTVcore!(s, f, r)
-    end
-end
-
-function popHFtempVars!(αβVars::NTuple{HFTS, T}) where {HFTS, T<:HFtempVars}
-    for tVars in αβVars
-        fs = getHFTVforUpdate1(tVars)
-        for fEach in fs
-            pop!(fEach)
-        end
-    end
-    for fTot in getHFTVforUpdate2(αβVars[begin])
-        pop!(fTot)
-    end
-end
-
-function clearHFtempVars!(saveTrace::NTuple{4, Bool}, αβVars::NTuple{HFTS, T}) where 
-                         {HFTS, T<:HFtempVars}
-    for tVars in αβVars
-        fs = getHFTVforUpdate1(tVars)
-        for (bl, fEach) in zip(saveTrace, fs)
-            bl || keepat!(fEach, lastindex(fEach))
-        end
-    end
-    for (bl, fTot) in zip(saveTrace[DEtotIndices], getHFTVforUpdate2(αβVars[begin]))
-        bl || keepat!(fTot, lastindex(fTot))
-    end
 end
 
 
@@ -1044,6 +1045,22 @@ function DIIScore(Ds::AbstractVector{<:AbstractMatrix{T}},
     v, B
 end
 
+#                     convex constraint|unified function signature
+const DIISconfigs = ( DIIS=(Val(false), (Ds, ∇s, Es, S)-> DIIScore(Ds, ∇s, S)), 
+                      EDIIS=(Val(true), (Ds, ∇s, Es, S)->EDIIScore(Ds, ∇s, Es)), 
+                      ADIIS=(Val(true), (Ds, ∇s, Es, S)->ADIIScore(Ds, ∇s)) )
+
+function xDIIScore!(mDIIS::F, c::Vector{T}, S::AbstractMatrix{T}, 
+                    Ds::AbstractVector{<:AbstractMatrix{T}}, 
+                    Fs::AbstractVector{<:AbstractMatrix{T}}, 
+                    Es::AbstractVector{T}, 
+                    cvxConstraint::Val{CCB}, 
+                    solver::Symbol) where {F<:Function, T, CCB}
+    v, B = mDIIS(Ds, Fs, Es, S)
+    constraintSolver!(cvxConstraint, c, v, B, solver)
+    sum(c.*Fs) # Fnew
+end
+
 function genxDIIS(::Type{Val{M}}, αβVars::NTuple{HFTS, HFtempVars{T, HFT}}, 
                   S::AbstractMatrix{T}, X::AbstractMatrix{T}, Ns::NTuple{HFTS, Int}, 
                   Hcore::AbstractMatrix{T}, HeeI::AbstractArray{T, 4}; 
@@ -1081,22 +1098,6 @@ function genxDIIS(::Type{Val{M}}, αβVars::NTuple{HFTS, HFtempVars{T, HFT}},
         push!.(Ess, getindex.(res, 4))
         res
     end
-end
-
-#                     convex constraint|unified function signature
-const DIISconfigs = ( DIIS=(Val(false), (Ds, ∇s, Es, S)-> DIIScore(Ds, ∇s, S)), 
-                      EDIIS=(Val(true), (Ds, ∇s, Es, S)->EDIIScore(Ds, ∇s, Es)), 
-                      ADIIS=(Val(true), (Ds, ∇s, Es, S)->ADIIScore(Ds, ∇s)) )
-
-function xDIIScore!(mDIIS::F, c::Vector{T}, S::AbstractMatrix{T}, 
-                    Ds::AbstractVector{<:AbstractMatrix{T}}, 
-                    Fs::AbstractVector{<:AbstractMatrix{T}}, 
-                    Es::AbstractVector{T}, 
-                    cvxConstraint::Val{CCB}, 
-                    solver::Symbol) where {F<:Function, T, CCB}
-    v, B = mDIIS(Ds, Fs, Es, S)
-    constraintSolver!(cvxConstraint, c, v, B, solver)
-    sum(c.*Fs) # Fnew
 end
 
 
