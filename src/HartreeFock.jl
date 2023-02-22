@@ -381,11 +381,11 @@ function clearHFtempVars!(saveTrace::NTuple{4, Bool}, αβVars::NTuple{HFTS, T})
     for tVars in αβVars
         fs = getHFTVforUpdate1(tVars)
         for (bl, fEach) in zip(saveTrace, fs)
-            bl || keepat!(fEach, lastindex(fEach))
+            bl || deleteat!(fEach, firstindex(fEach):(lastindex(fEach)-1))
         end
     end
     for (bl, fTot) in zip(saveTrace[DEtotIndices], getHFTVforUpdate2(αβVars[begin]))
-        bl || keepat!(fTot, lastindex(fTot))
+        bl || deleteat!(fTot, firstindex(fTot):(lastindex(fTot)-1))
     end
 end
 
