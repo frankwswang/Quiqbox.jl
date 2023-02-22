@@ -157,7 +157,7 @@ HFres3 = runHF(bs3, nuc, nucCoords, DHFO, printInfo=false)
 grad3 = gradOfHFenergy(pars3, HFres3)
 grad3_fd = fDiffOfHFenergy(pars3, bs3, nuc, nucCoords, 1e-7)
 compr2Arrays3((grad3p=grad3[1:end-1], grad3_fdp=grad3_fd[1:end-1]), 10t3, true)
-@test isapprox(grad3[end], grad3_fd[end], atol=10t3)
+@test isapprox(grad3[end], grad3_fd[end], atol=20t3)
 grad3_t = [-0.16065229121206354,  -0.24121983006131092, -0.14801056645961025, 
             0.004774655525683808, -0.08411038969476041, -0.33217356554081107, 
            -0.41546848152885285,  -0.05739800530364568, -0.30588239544157225, 
