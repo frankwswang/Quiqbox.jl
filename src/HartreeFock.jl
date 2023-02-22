@@ -944,7 +944,7 @@ function runHFcore(::Val{HFT},
                 ΔDrms = sqrt( sum(ΔD .^ 2) ./ length(ΔD) )
             end
 
-            if n > 1 && (!isConverged || (bl = relDiff > 1e-3))
+            if n > 1 && (!isConverged || (bl = relDiff > max(sqrtBreakPoint, 5e-5)))
                 flag, Std = isOscillateConverged(Etots, 10breakPoint, 
                                                  minLen=HFminItr, 
                                                  maxRemains=HFinterEstoreSize)
