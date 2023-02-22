@@ -943,8 +943,8 @@ function runHFcore(::Val{HFT},
                 ΔD = vars[begin].shared.Dtots[end] - vars[begin].shared.Dtots[end-1]
                 ΔDrms = sqrt( sum(ΔD .^ 2) ./ length(ΔD) )
             end
-
-            if n > 1 && (!isConverged || (bl = relDiff > max(sqrtBreakPoint, 5e-5)))
+                                                                           # ≈0.5kJ/mol
+            if n > 1 && (!isConverged || (bl = relDiff > max(sqrtBreakPoint, 2e-4)))
                 flag, Std = isOscillateConverged(Etots, 10breakPoint, 
                                                  minLen=HFminItr, 
                                                  maxRemains=HFinterEstoreSize)
