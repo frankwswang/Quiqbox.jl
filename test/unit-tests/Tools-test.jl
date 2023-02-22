@@ -5,7 +5,8 @@ using Quiqbox: getAtolVal, getAtolDigits, roundToMultiOfStep, nearestHalfOf, get
                markUnique, getUnique!, itself, themselves, replaceSymbol, groupedSort, 
                mapPermute, getFunc, nameOf, tupleDiff, genIndex, fillObj, arrayToTuple, 
                genTupleCoords, uniCallFunc, mergeMultiObjs, isNaN, getBool, skipIndices, 
-               isOscillateConverged, collectTuple, asymSign, numEps, genAdaptStepBl
+               isOscillateConverged, collectTuple, asymSign, numEps, genAdaptStepBl, 
+               shiftLastEle!, getValParm
 using Suppressor: @capture_out
 using LinearAlgebra: norm
 
@@ -309,5 +310,23 @@ maxStep = rand(-1000:1000)
 res = hcat([countBl.(collect(0:6), N) for N in collect(0:sign(maxStep):maxStep)]...)
 @test all(res[1, :] .== 0)
 @test all(sort(c) == c for c in eachcol(res))
+
+
+# function shiftLastEle!
+vect = rand(5)
+vectBackup = deepcopy(vect)
+shiftVal = rand()
+s, signedShift = shiftLastEle!(vect, shiftVal)
+@test isapprox(s, sum(vect), atol=2e-15)
+residuum =  vect - vectBackup
+@test all(residuum[1:4] .== 0)
+@test isapprox(residuum[end], signedShift, atol=2e-15)
+@test abs(s) >= (abs∘sum)(vectBackup)
+
+
+# function getValParm
+vNum = rand()
+v = Val(vNum)
+@test getValParm(v) == getValParm(typeof(v)) == vNum
 
 end

@@ -9,7 +9,7 @@ Quiqbox supports basic Hartree-Fock methods with various configurations:
 | HF Types | restricted closed-shell (RHF), unrestricted open-shell (UHF) |
 | Initial Guesses | core Hamiltonian, generalized Wolfsberg-Helmholtz, superposition of atomic densities (SAD), pre-defined coefficient matrix |
 | Converging Methods | direct diagonalization, [direct inversion in the iterative subspace (DIIS)](https://onlinelibrary.wiley.com/doi/10.1002/jcc.540030413), [E-DIIS](https://aip.scitation.org/doi/abs/10.1063/1.1470195), [A-DIIS](https://aip.scitation.org/doi/10.1063/1.3304922), combinations of multiple methods |
-| DIIS-type Method Solvers | Lagrange multiplier solver, [L-BFGS](https://github.com/JuliaNLSolvers/Optim.jl) solver |
+| DIIS-type Method Solvers | Lagrange multiplier solver, [L-BFGS](https://github.com/Gnimuc/LBFGSB.jl) solver |
 
 ### Basic Hartree-Fock
 

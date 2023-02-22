@@ -102,7 +102,7 @@ info5 = (@capture_out show(POconfig()))
 info6 = (@capture_out show(HFconfig(SCF=SCFconfig((:ADIIS, :DIIS), (5e-3, 1e-12), 
                                                   Dict(1=>[:solver=>:SPGB])))))
 @test info6 == "HFconfig{Float64, :RHF, typeof(Quiqbox.getCfromSAD), Float64, 2, "*
-               "Tuple{Val{:ADIIS}, Val{:DIIS}}}(HF, C0, SCF, maxStep, earlyStop)"
+               "Tuple{Val{:ADIIS}, Val{:DIIS}}}(HF, C0, SCF, maxStep, earlyStop, saveTrace)"
 
 
 # function ==, hasBoolRelation

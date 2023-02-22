@@ -609,24 +609,24 @@ function replaceSymbol(sym::Symbol, pair::Pair{String, String}; count::Int=typem
 end
 
 
-function isOscillateConvergedHead(seq, minCycles, maxRemains)
-    minCycles > 1 || 
-    throw(DomainError(minCycles, "`minCycles` should be larger than 1."))
+function isOscillateConvergedHead(seq, minLen, maxRemains)
+    minLen > 1 || 
+    throw(DomainError(minLen, "`minLen` should be larger than 1."))
     len = length(seq)
-    len < minCycles && (return [zero(seq[begin])])
+    len < minLen && (return [zero(seq[begin])])
     maxRemains > 1 || 
     throw(DomainError(maxRemains, "`maxRemains` should be larger than 1."))
     slice = min(maxRemains, len÷3+1)
-    seq[end-slice : end]
+    seq[(end-slice+1) : end]
 end
 
 function isOscillateConverged(seq::AbstractVector{<:Real}, 
                               tarThreshold::Real, 
                               target::Real=NaN, 
                               stdThreshold::Real=0.8tarThreshold; 
-                              minCycles::Int=5, maxRemains::Int=10, 
+                              minLen::Int=5, maxRemains::Int=10, 
                               convergeToMax::Bool=false)
-    tailEles = isOscillateConvergedHead(seq, minCycles, maxRemains)
+    tailEles = isOscillateConvergedHead(seq, minLen, maxRemains)
     length(tailEles) < 2 && (return (false, tailEles))
     valleys = sort!(tailEles)[ifelse(convergeToMax, (end÷2+1 : end), (1 : end÷2+1))]
     if isnan(target)
@@ -641,9 +641,9 @@ function isOscillateConverged(seq::AbstractVector{<:Array{<:Real}},
                               tarThreshold::Real, 
                               target::Real=0, 
                               stdThreshold::Real=0.75tarThreshold; 
-                              minCycles::Int=5, maxRemains::Int=10)
+                              minLen::Int=5, maxRemains::Int=10)
     isnan(target) && throw(AssertionError("`target` cannot be `NaN`."))
-    tailEles = isOscillateConvergedHead(seq, minCycles, maxRemains)
+    tailEles = isOscillateConvergedHead(seq, minLen, maxRemains)
     length(tailEles) < 2 && (return (false, tailEles))
     lastPortionDiff = [norm(target .- val) for val in tailEles]
     lastDiff = lastPortionDiff[end]
@@ -891,3 +891,16 @@ function genAdaptStepBl(infoLevel::Int, maxStep::Int)
         end
     end
 end
+
+
+function shiftLastEle!(v, shiftVal)
+    s = sum(v)
+    signedShift = asymSign(s)*shiftVal
+    s += signedShift
+    v[end] += signedShift
+    s, signedShift
+end
+
+
+getValParm(::Val{T}) where {T} = T
+getValParm(::Type{Val{T}}) where {T} = T

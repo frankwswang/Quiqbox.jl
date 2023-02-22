@@ -5,6 +5,7 @@ using LineSearches
 
 const OFmethods = [:HFenergy, :DirectRHFenergy]
 const defaultPOinfoL = 2
+const POinterValMaxStore = 50
 
 const OFconversions = Dict([runHFcore] .=> 
                            [( x->x[begin][begin].shared.Etots[end], 
@@ -100,7 +101,7 @@ mutable struct GDconfig{T, M, ST<:Union{Array{T, 0}, T}} <: ConfigBox{T, GDconfi
 end
 
 
-const partialDefaultPOconfigPars = [NaN, (5e-7, 1e-5), 200, GDconfig(), 
+const partialDefaultPOconfigPars = [NaN, (5e-8, 5e-5), 200, GDconfig(), 
                                     (true, false, false, false)]
 
 const defaultPOconfigPars = begin
@@ -445,7 +446,8 @@ function optimizeParams!(pbs::AbstractVector{<:ParamBox{T}},
             _->true
         else
             detectConverge |= true
-            vrs->isOscillateConverged(vrs, thd*sqrt(vrs[end]|>length), target)[begin]
+            vrs->isOscillateConverged(vrs, thd*sqrt(vrs[end]|>length), target, 
+                                      maxRemains=POinterValMaxStore)[begin]
         end
     end
     detectConverge || (isConverged = (_->false,))
@@ -489,11 +491,13 @@ function optimizeParams!(pbs::AbstractVector{<:ParamBox{T}},
 
         fx, gx, fRes, Δt₁ = optimizeParamsCore(f0s, g0s, pbsN, bsN, nuc, nucCoords, N, 
                                                f0config)
+        i += 1
+        saveTrace[begin]   || i < POinterValMaxStore || popfirst!(fVals)
+        saveTrace[begin+1] && push!(pVals, x)
+        saveTrace[begin+2] || i < POinterValMaxStore || popfirst!(grads)
+        saveTrace[end]     && push!(fRess, fRes)
         push!(fVals, fx)
         push!(grads, gx)
-        saveTrace[begin+1] && push!(pVals, x)
-        saveTrace[end]     && push!(fRess, fRes)
-        i += 1
     end
 
     tEnd = time()
@@ -524,7 +528,7 @@ function optimizeParams!(pbs::AbstractVector{<:ParamBox{T}},
         println()
     end
     res = Any[ifelse(detectConverge, blConv, missing)]
-    append!(res, allInfo[findall(itself, saveTrace)])
+    append!(res, view(allInfo, findall(itself, saveTrace)))
     res
 end
 
