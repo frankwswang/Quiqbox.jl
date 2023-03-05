@@ -61,7 +61,7 @@ function twoBodyDerivativeCore(::Val{false},
         end
     end
     # [∂ʃ4[i,j,k,l] == ∂ʃ4[j,i,l,k] == ∂ʃ4[j,i,k,l] != ∂ʃ4[l,j,k,i]
-    X = Array(X)
+    (X isa Matrix) || (X = Array(X))
     for i = 1:BN, j = 1:i, k = 1:i, l = 1:ifelse(k==i, j, k)
         # ʃ∂abcd[i,j,k,l] == ʃ∂abcd[i,j,l,k] == ʃab∂cd[l,k,i,j] == ʃab∂cd[k,l,i,j]
         Xvi = view(X, :, i)
