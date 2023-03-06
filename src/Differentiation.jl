@@ -129,7 +129,7 @@ function ∂HFenergy(par::ParamBox{T},
     ∂hij, ∂hijkl = derivativeCore(Val(false), bs, par, S, X, cH, eeInteraction)
     # ∂hij and ∂hijkl are on an orthonormal basis.
     Cₓs = convert.(Matrix{eltype(∂hij)}, (Ref∘inv)(X).*C)
-    getEhf(∂hij, ∂hijkl, Cₓs, N)
+    convert(T, getEhf(∂hij, ∂hijkl, Cₓs, N))
 end
 
 
