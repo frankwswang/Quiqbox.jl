@@ -14,7 +14,7 @@ function oneBodyDerivativeCore(::Val{false},
                                X::AbstractMatrix{T2}, ∂X::AbstractMatrix{T2}, 
                                ʃ::F) where {T1, T2, D, F<:Function}
     BN = length(bfs)
-    ∂ʃ = Array{T1}(undef, BN, BN)
+    ∂ʃ = Array{promote_type(T1, T2)}(undef, BN, BN)
     ʃab = Array{T1}(undef, BN, BN)
     ∂ʃab = Array{T1}(undef, BN, BN)
     @sync for i = 1:BN, j = 1:i
@@ -43,7 +43,7 @@ function twoBodyDerivativeCore(::Val{false},
                                X::AbstractMatrix{T2}, ∂X::AbstractMatrix{T2}, 
                                ʃ::F) where {T1, T2, D, F<:Function}
     BN = length(bfs)
-    ∂ʃ = Array{T1}(undef, BN, BN, BN, BN)
+    ∂ʃ = Array{promote_type(T1, T2)}(undef, BN, BN, BN, BN)
     ʃabcd = Array{T1}(undef, BN, BN, BN, BN)
     ʃ∂abcd = Array{T1}(undef, BN, BN, BN, BN)
 
@@ -61,7 +61,7 @@ function twoBodyDerivativeCore(::Val{false},
         end
     end
     # [∂ʃ4[i,j,k,l] == ∂ʃ4[j,i,l,k] == ∂ʃ4[j,i,k,l] != ∂ʃ4[l,j,k,i]
-    X = Array(X)
+    (X isa Matrix) || (X = Array(X))
     for i = 1:BN, j = 1:i, k = 1:i, l = 1:ifelse(k==i, j, k)
         # ʃ∂abcd[i,j,k,l] == ʃ∂abcd[i,j,l,k] == ʃab∂cd[l,k,i,j] == ʃab∂cd[k,l,i,j]
         Xvi = view(X, :, i)
@@ -86,21 +86,19 @@ end
 
 
 function derivativeCore(FoutputIsVector::Val{B}, 
-                        bfs::AbstractVector{<:GTBasisFuncs{T, D, 1}}, 
-                        par::ParamBox, S::AbstractMatrix{T}, 
-                        ʃ2::F1, ʃ4::F2) where {B, T, D, F1<:Function, F2<:Function}
+                        bfs::AbstractVector{<:GTBasisFuncs{T1, D, 1}}, 
+                        par::ParamBox, S::AbstractMatrix{T2}, X::AbstractMatrix{T2}, 
+                        ʃ2::F1, ʃ4::F2) where {B, T1, T2, D, F1<:Function, F2<:Function}
     BN = length(bfs)
     ∂bfs = ∂Basis.(par, bfs)
-    ∂S = Array{T}(undef, BN, BN)
-    ∂X = Array{T}(undef, BN, BN) # ∂X corresponds to the derivative of X = S^(-0.5)
-    ∂X₀ = Array{T}(undef, BN, BN) # ∂X in its eigen basis
+    ∂S = Array{T2}(undef, BN, BN)
+    ∂X = Array{T2}(undef, BN, BN) # ∂X corresponds to the derivative of X = S^(-0.5)
+    ∂X₀ = Array{T2}(undef, BN, BN) # ∂X in its eigen basis
     @sync for i=1:BN, j=1:i
         Threads.@spawn begin
             ∂S[i,j] = ∂S[j,i] = overlap(∂bfs[i], bfs[j]) + overlap(bfs[i], ∂bfs[j])
         end
     end
-    numEps(T) > eps(Double64) && (S = Double64.(S))
-    X = getXcore1(S)
     λ, 𝑣 = eigen(S|>Hermitian)
     ∂S2 = 𝑣'*∂S*𝑣
     for i=1:BN, j=1:i # Faster without multi-threading
@@ -108,6 +106,10 @@ function derivativeCore(FoutputIsVector::Val{B},
                                           (sqrt(λ[i]) + sqrt(λ[j])) ) )
     end
     ∂X = 𝑣*∂X₀*𝑣'
+    if (0.02 < norm(∂X) < 5) && (0.5 < norm(X) < 2)
+        X = convert(Matrix{T1}, X)
+        ∂X = convert(Matrix{T1}, ∂X)
+    end
     ∂ʃ2 = oneBodyDerivativeCore(FoutputIsVector, ∂bfs, bfs, X, ∂X, ʃ2)
     ∂ʃ4 = twoBodyDerivativeCore(FoutputIsVector, ∂bfs, bfs, X, ∂X, ʃ4)
     ∂ʃ2, ∂ʃ4
@@ -121,11 +123,13 @@ function ∂HFenergy(par::ParamBox{T},
                    nuc::NTuple{NN, String}, 
                    nucCoords::NTuple{NN, NTuple{D, T}}, 
                    N::NTuple{HFTS, Int}) where {T, D, HFTS, NN}
-    Xinv = sqrt(S)::Matrix{T} # necessary assertion for type stability
+    numEps(T) > eps(Double64) && (S = Double64.(S))
+    X = getXcore1(S)
     cH = (i, j)->coreHij(i, j, nuc, nucCoords)
-    ∂hij, ∂hijkl = derivativeCore(Val(false), bs, par, S, cH, eeInteraction)
+    ∂hij, ∂hijkl = derivativeCore(Val(false), bs, par, S, X, cH, eeInteraction)
     # ∂hij and ∂hijkl are on an orthonormal basis.
-    getEhf(∂hij, ∂hijkl, Ref(Xinv).*C, N)
+    Cₓs = convert.(Matrix{eltype(∂hij)}, (Ref∘inv)(X).*C)
+    convert(T, getEhf(∂hij, ∂hijkl, Cₓs, N))
 end
 
 

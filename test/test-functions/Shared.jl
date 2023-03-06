@@ -38,9 +38,9 @@ function compr2Arrays2(cprTuple::NamedTuple{<:Any, <:NTuple{2}},
     end
 end
 
-function compr2Arrays3(cprTuple::NamedTuple{<:Any, <:NTuple{2, T}}, atol::Real, 
+function compr2Arrays3(cprTuple::NamedTuple{<:Any, <:Tuple{T1, T2}}, atol::Real, 
                        showAllDiff::Bool=false; additionalInfo::String="") where 
-                      {T<:AbstractArray{<:Number}}
+                      {T1<:AbstractArray{<:Number}, T2<:AbstractArray{<:Number}}
     name1, name2 = keys(cprTuple)
     arr1, arr2 = cprTuple
     length(arr1) == length(arr2) || 
