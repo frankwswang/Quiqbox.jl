@@ -106,7 +106,7 @@ function derivativeCore(FoutputIsVector::Val{B},
                                           (sqrt(λ[i]) + sqrt(λ[j])) ) )
     end
     ∂X = 𝑣*∂X₀*𝑣'
-    if (0.2 < norm(∂X) < 5) && (0.2 < norm(X) < 5)
+    if (0.02 < norm(∂X) < 5) && (0.5 < norm(X) < 2)
         X = convert(Matrix{T1}, X)
         ∂X = convert(Matrix{T1}, ∂X)
     end
