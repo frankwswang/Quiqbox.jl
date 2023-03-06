@@ -904,3 +904,6 @@ end
 
 getValParm(::Val{T}) where {T} = T
 getValParm(::Type{Val{T}}) where {T} = T
+
+
+fct(a::Real) = factorial(a|>Int)
