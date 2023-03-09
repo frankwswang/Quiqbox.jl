@@ -854,11 +854,11 @@ function skipIndices(arr::AbstractArray{Int}, ints::AbstractVector{Int})
 end
 
 
-collectTuple(t::Tuple) = collect(t)
+collectTuple(@nospecialize t::Tuple) = collect(t)
 
-collectTuple(a::AbstractArray) = itself(a)
+collectTuple(@nospecialize a::AbstractArray) = itself(a)
 
-collectTuple(o::Any) = collect(o)
+collectTuple(@nospecialize o::Any) = collect(o)
 
 
 asymSign(a::Real) = ifelse(a<0, -1, 1)
@@ -907,3 +907,9 @@ getValParm(::Type{Val{T}}) where {T} = T
 
 
 fct(a::Real) = factorial(a|>Int)
+
+
+δ(a::Int, b::Int) = Int(a == b)
+
+
+fastIsApprox(x::T1, y::T2=0.0) where {T1, T2} = abs(x - y) < 2(numEps∘promote_type)(T1, T2)

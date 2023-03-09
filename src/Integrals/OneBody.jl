@@ -11,7 +11,7 @@ Return the orbital overlap between two basis functions.
 """
 overlap(bf1::AbstractGTBasisFuncs{T, D, 1}, bf2::AbstractGTBasisFuncs{T, D, 1}) where 
        {T, D} = 
-getCompositeInt(∫overlapCore, (bf2===bf1,), (bf1, bf2))
+getCompositeInt(∫overlapCore, (), (bf2===bf1,), bf1, bf2)
 
 
 """
@@ -23,7 +23,7 @@ getCompositeInt(∫overlapCore, (bf2===bf1,), (bf1, bf2))
 Return the orbital overlap matrix given a basis set.
 """
 overlaps(bs::AVectorOrNTuple{AbstractGTBasisFuncs{T, D}}) where {T, D} = 
-getOneBodyInts(∫overlapCore, collectTuple(bs))
+getOneBodyInts(∫overlapCore, (), collectTuple(bs))
 
 
 """
@@ -36,7 +36,7 @@ Return the electron kinetic energy between two basis functions.
 """
 eKinetic(bf1::AbstractGTBasisFuncs{T, D, 1}, bf2::AbstractGTBasisFuncs{T, D, 1}) where 
         {D, T} = 
-getCompositeInt(∫elecKineticCore, (bf2===bf1,), (bf1, bf2))
+getCompositeInt(∫elecKineticCore, (), (bf2===bf1,), bf1, bf2)
 
 
 """
@@ -48,7 +48,7 @@ getCompositeInt(∫elecKineticCore, (bf2===bf1,), (bf1, bf2))
 Return the electron kinetic energy matrix given a basis set.
 """
 eKinetics(bs::AVectorOrNTuple{AbstractGTBasisFuncs{T, D}}) where {T, D} = 
-getOneBodyInts(∫elecKineticCore, collectTuple(bs))
+getOneBodyInts(∫elecKineticCore, (), collectTuple(bs))
 
 
 """
@@ -64,8 +64,8 @@ their coordinates (in the atomic units).
 neAttraction(bf1::AbstractGTBasisFuncs{T, D, 1}, bf2::AbstractGTBasisFuncs{T, D, 1}, 
              nuc::AVectorOrNTuple{String, NN}, 
              nucCoords::SpatialCoordType{T, D, NN}) where {T, D, NN} = 
-getCompositeInt(∫nucAttractionCore, (bf2===bf1,), (bf1, bf2), 
-                arrayToTuple(nuc), genTupleCoords(T, nucCoords))
+getCompositeInt(∫nucAttractionCore, (arrayToTuple(nuc), genTupleCoords(T, nucCoords)), 
+                (bf2===bf1,), bf1, bf2)
 
 
 """
@@ -82,8 +82,8 @@ their coordinates (in atomic units).
 neAttractions(bs::AVectorOrNTuple{AbstractGTBasisFuncs{T, D}}, 
               nuc::AVectorOrNTuple{String, NN}, 
               nucCoords::SpatialCoordType{T, D, NN}) where {T, D, NN} = 
-getOneBodyInts(∫nucAttractionCore, collectTuple(bs), 
-               arrayToTuple(nuc), genTupleCoords(T, nucCoords))
+getOneBodyInts(∫nucAttractionCore, (arrayToTuple(nuc), genTupleCoords(T, nucCoords)), 
+               collectTuple(bs))
 
 
 """
