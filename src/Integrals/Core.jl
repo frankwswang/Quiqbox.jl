@@ -832,21 +832,24 @@ end
 
 getCompositeInt(∫::F, optPosArgs::Tuple, 
                 bls::Union{Tuple{Bool}, Val{false}}, 
-                bfs::Vararg{FGTBasisFuncs1O{T, D}, 2}) where {F<:Function, T, D} = 
-getOneBodyInt(∫, optPosArgs, bls, bfs...)
+                bf1::FGTBasisFuncs1O{T, D}, bf2::FGTBasisFuncs1O{T, D}) where 
+               {F<:Function, T, D} = 
+getOneBodyInt(∫, optPosArgs, bls, bf1, bf2)
 
 getCompositeInt(∫::F, optPosArgs::Tuple, 
                 bls::Union{NTuple{4, Any}, Val{false}}, 
-                bfs::Vararg{FGTBasisFuncs1O{T, D}, 4}) where {F<:Function, T, D} = 
-getTwoBodyInt(∫, optPosArgs, bls, bfs...)
+                bf1::FGTBasisFuncs1O{T, D}, bf2::FGTBasisFuncs1O{T, D}, 
+                bf3::FGTBasisFuncs1O{T, D}, bf4::FGTBasisFuncs1O{T, D}) where 
+               {F<:Function, T, D} = 
+getTwoBodyInt(∫, optPosArgs, bls, bf1, bf2, bf3, bf4)
 
 function getCompositeInt(::typeof(∫nucAttractionCore), 
                          nucAndCoords::Tuple{NTuple{NN, String}, NTuple{NN, NTuple{D, T}}}, 
                          bls::Union{Tuple{Bool}, Val{false}}, 
-                         bfs::Vararg{FGTBasisFuncs1O{T, D}, 2}) where 
+                         bf1::FGTBasisFuncs1O{T, D}, bf2::FGTBasisFuncs1O{T, D}) where 
                         {T, D, NN}
     mapreduce(+, nucAndCoords[begin], nucAndCoords[end]) do ele, coord
-        getOneBodyInt(∫nucAttractionCore, (getCharge(ele), coord), bls, bfs...)
+        getOneBodyInt(∫nucAttractionCore, (getCharge(ele), coord), bls, bf1, bf2)
     end
 end
                           #       j==i      j!=i
@@ -1023,9 +1026,8 @@ getBasisIndexL(::Val{4}, ::Val{false}) = Int2eBIndexLabels[(false, false, false,
 getBasisIndexL(::Val{4}, bls::NTuple{4, Any}) = Int2eBIndexLabels[getBool.(bls)]
 
 getCompositeInt(∫::F, optPosArgs::Tuple, 
-                bls::T1, bfs::Vararg{SpatialBasis{T2, D}, VN}) where 
-               {F<:Function, T1<:Union{Tuple{Bool}, NTuple{4, Any}, Val{false}}, 
-                T2, D, VN} = 
+                bls::T1, bfs::Vararg{SpatialBasis{T2, D}, VN}) where {F<:Function, 
+                T1<:Union{Tuple{Bool}, NTuple{4, Any}, Val{false}}, T2, D, VN} = 
 getCompositeIntCore(Val(T2), Val(D), Val(:ContainBasisFuncs), 
                     getBasisIndexL(Val(VN), bls), ∫, optPosArgs, bfs...)
 
