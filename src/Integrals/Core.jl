@@ -876,7 +876,7 @@ getBFs(::Val{:ContainBasisFuncs}, b::SpatialBasis) = itself(b)
 getBFs(::Val{:WithoutBasisFuncs}, b::CGTBasisFuncs1O) = unpackBasis(b)
 
 # 1e integrals for BasisFuncs/BasisFuncMix-mixed bases
-function getCompositeIntCore(::Val{T}, ::Val{D}, ::Val{BL}, ::Val{:aa}, 
+function getCompositeIntCore(::Val{BL}, ::Val{:aa}, 
                              ∫::F, optPosArgs::Tuple, a::BT, ::BT) where 
                             {T, D, BL, F<:Function, BT<:SpatialBasis{T, D}}
     ON = getON(Val(BL), a)
@@ -888,7 +888,7 @@ function getCompositeIntCore(::Val{T}, ::Val{D}, ::Val{BL}, ::Val{:aa},
     res
 end
 
-function getCompositeIntCore(::Val{T}, ::Val{D}, ::Val{BL}, ::Val{:ab}, 
+function getCompositeIntCore(::Val{BL}, ::Val{:ab}, 
                              ∫::F, optPosArgs::Tuple, 
                              a::SpatialBasis{T, D}, b::SpatialBasis{T, D}) where 
                             {T, D, BL, F<:Function}
@@ -917,7 +917,7 @@ const Int2eBIndexLabels = Dict([( true,  true,  true,  true), #1111
                                 Val(:aabc), Val(:aabc), Val(:abcc), Val(:abcc), Val(:abcd)])
 
 # 2e integrals for BasisFuncs/BasisFuncMix-mixed bases
-function getCompositeIntCore(::Val{T}, ::Val{D}, ::Val{BL}, ::Val{:aaaa}, 
+function getCompositeIntCore(::Val{BL}, ::Val{:aaaa}, 
                              ∫::F, optPosArgs::Tuple, 
                              a::BT, ::BT, ::BT, ::BT) where 
                             {T, D, BL, F<:Function, BT<:SpatialBasis{T, D}}
@@ -933,7 +933,7 @@ function getCompositeIntCore(::Val{T}, ::Val{D}, ::Val{BL}, ::Val{:aaaa},
     res
 end
 
-function getCompositeIntCore(::Val{T}, ::Val{D}, ::Val{BL}, ::Val{:aabb}, 
+function getCompositeIntCore(::Val{BL}, ::Val{:aabb}, 
                              ∫::F, optPosArgs::Tuple, 
                              a::BT1, ::BT1, b::BT2, ::BT2) where 
                             {T, D, BL, F<:Function, BT1<:SpatialBasis{T, D}, 
@@ -950,7 +950,7 @@ function getCompositeIntCore(::Val{T}, ::Val{D}, ::Val{BL}, ::Val{:aabb},
     res
 end
 
-function getCompositeIntCore(::Val{T}, ::Val{D}, ::Val{BL}, ::Val{:abab}, 
+function getCompositeIntCore(::Val{BL}, ::Val{:abab}, 
                              ∫::F, optPosArgs::Tuple, 
                              a::BT1, b::BT2, ::BT1, ::BT2) where 
                             {T, D, BL, F<:Function, BT1<:SpatialBasis{T, D}, 
@@ -968,7 +968,7 @@ function getCompositeIntCore(::Val{T}, ::Val{D}, ::Val{BL}, ::Val{:abab},
     res
 end
 
-function getCompositeIntCore(::Val{T}, ::Val{D}, ::Val{BL}, ::Val{:aabc}, 
+function getCompositeIntCore(::Val{BL}, ::Val{:aabc}, 
                              ∫::F, optPosArgs::Tuple, 
                              a::BT1, ::BT1, b::BT2, c::BT3) where 
                             {T, D, BL, F<:Function, BT1<:SpatialBasis{T, D}, 
@@ -987,7 +987,7 @@ function getCompositeIntCore(::Val{T}, ::Val{D}, ::Val{BL}, ::Val{:aabc},
     res
 end
 
-function getCompositeIntCore(::Val{T}, ::Val{D}, ::Val{BL}, ::Val{:abcc}, 
+function getCompositeIntCore(::Val{BL}, ::Val{:abcc}, 
                              ∫::F, optPosArgs::Tuple, 
                              a::BT1, b::BT2, c::BT3, ::BT3) where 
                             {T, D, BL, F<:Function, BT1<:SpatialBasis{T, D}, 
@@ -1011,7 +1011,7 @@ const IndexABXYbools = Dict([Val{:acbc}, Val{:abbc}, Val{:abcd}] .=>
                              (j,k,_) -> (Val(false), Val(false), k==j, Val(false)), 
                              (_,_,_) ->  Val(false)])
 
-function getCompositeIntCore(::Val{T}, ::Val{D}, ::Val{BL}, ::IDV, 
+function getCompositeIntCore(::Val{BL}, ::IDV, 
                              ∫::F, optPosArgs::Tuple, 
                              a::SpatialBasis{T, D}, b::SpatialBasis{T, D}, 
                              c::SpatialBasis{T, D}, d::SpatialBasis{T, D}) where 
@@ -1039,7 +1039,7 @@ getBasisIndexL(::Val{4}, bls::NTuple{4, Any}) = Int2eBIndexLabels[getBool.(bls)]
 getCompositeInt(∫::F, optPosArgs::Tuple, 
                 bls::T1, bfs::Vararg{SpatialBasis{T2, D}, VN}) where {F<:Function, 
                 T1<:Union{Tuple{Bool}, NTuple{4, Any}, Val{false}}, T2, D, VN} = 
-getCompositeIntCore(Val(T2), Val(D), Val(:ContainBasisFuncs), 
+getCompositeIntCore(Val(:ContainBasisFuncs), 
                     getBasisIndexL(Val(VN), bls), ∫, optPosArgs, bfs...)
 
 function getCompositeInt(∫::F, optPosArgs::Tuple, 
@@ -1049,7 +1049,7 @@ function getCompositeInt(∫::F, optPosArgs::Tuple,
     if any(bf isa EmptyBasisFunc for bf in bfs)
         zero(T2)
     else
-        getCompositeIntCore(Val(T2), Val(D), Val(:WithoutBasisFuncs), 
+        getCompositeIntCore(Val(:WithoutBasisFuncs), 
                             getBasisIndexL(Val(VN), bls), ∫, optPosArgs, bfs...) |> sum
     end
 end
