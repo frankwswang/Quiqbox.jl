@@ -32,7 +32,7 @@ function F0(u::T) where {T}
     )
 end
 
-function getGQN(::Type{T}, u) where {T}
+function getGQN(u::T) where {T}
     u = abs(u) + getAtolVal(T)
     res = getAtolDigits(T) + round(0.4u + 2inv(sqrt(u))) + 1
     if res < typemax(Int) - 1
@@ -46,7 +46,7 @@ function Fγ(γ::Int, u::T) where {T}
     if u < getAtolVal(T)
         T(2γ + 1) |> inv
     else
-        FγCore(γ, u, getValI( getGQN(T, u) ))
+        FγCore(γ, u, (getValI∘getGQN)(u))
     end
 end
 
@@ -89,12 +89,6 @@ function genIntOverlapCore(Δx::T,
     res
 end
 
-∫overlapCore(R₁::NTuple{3, T}, R₂::NTuple{3, T}, 
-             ijk₁::NTuple{3, Int}, α₁::T, 
-             ijk₂::NTuple{3, Int}, α₂::T) where {T} = 
-∫overlapCore(R₁.-R₂, ijk₁, α₁, ijk₂, α₂)
-
-
 function ∫overlapCore(ΔR::NTuple{3, T}, 
                       ijk₁::NTuple{3, Int}, α₁::T, 
                       ijk₂::NTuple{3, Int}, α₂::T) where {T}
@@ -111,6 +105,14 @@ function ∫overlapCore(ΔR::NTuple{3, T},
     res
 end
 
+∫overlapCore(R₁::NTuple{3, T}, R₂::NTuple{3, T}, 
+             ijk₁::NTuple{3, Int}, α₁::T, 
+             ijk₂::NTuple{3, Int}, α₂::T) where {T} = 
+∫overlapCore(R₁.-R₂, ijk₁, α₁, ijk₂, α₂)
+
+precompile(∫overlapCore, (fill(NTuple{3, Float64}, 2)..., 
+                          repeat([NTuple{3, Int}, Float64], 2)...))
+
 function ∫elecKineticCore(R₁::NTuple{3, T}, R₂::NTuple{3, T}, 
                           ijk₁::NTuple{3, Int}, α₁::T,
                           ijk₂::NTuple{3, Int}, α₂::T) where {T}
@@ -121,6 +123,9 @@ function ∫elecKineticCore(R₁::NTuple{3, T}, R₂::NTuple{3, T},
       sum(ijk₂ .* (ijk₂.-1) .* 
           ∫overlapCore.(Ref(ΔR), Ref(ijk₁), α₁, map.(-, Ref(ijk₂), shifts), α₂)) ) / 2
 end
+
+precompile(∫elecKineticCore, (fill(NTuple{3, Float64}, 2)..., 
+                              repeat([NTuple{3, Int}, Float64], 2)...))
 
 function genIntTerm1(Δx::T1, 
                      l₁::T2, o₁::T2, 
@@ -207,6 +212,9 @@ function ∫nucAttractionCore(Z₀::Int, R₀::NTuple{3, T},
             genIntNucAttCore1(ΔRR₀, ΔR₁R₂, β, ijk₁, α₁, ijk₂, α₂)
     res
 end
+
+precompile(∫nucAttractionCore, (Int, fill(NTuple{3, Float64}, 3)..., 
+                                repeat([NTuple{3, Int}, Float64], 2)...))
 
 function genIntTerm3(Δx::T1, 
                      l₁::T2, o₁::T2, 
@@ -316,6 +324,9 @@ function ∫eeInteractionCore(R₁::NTuple{3, T}, ijk₁::NTuple{3, Int}, α₁:
     res * J
 end
 
+precompile(∫eeInteractionCore, 
+           (Tuple∘repeat)([NTuple{3, Float64}, NTuple{3, Int}, Float64], 4))
+
 
 reformatIntData2((o1, o2)::NTuple{2, T}, flag::Bool) where {T} = 
 ( (flag && isless(o2, o1)) ? (o2, o1) : (o1, o2) )
@@ -342,7 +353,7 @@ function reformatIntData1(bf::FGTBasisFuncs1O{T, D, 𝑙, GN}) where {T, D, 𝑙
 end
 
 function reformatIntData1((ji,)::Tuple{Bool}, 
-                          bfs::NTuple{2, FGTBasisFuncs1O{T, D}}) where {T, D}
+                          bfs::Vararg{FGTBasisFuncs1O{T, D}, 2}) where {T, D}
     if ji
         data1 = reformatIntData1(bfs[begin])
         (data1, data1)
@@ -352,7 +363,7 @@ function reformatIntData1((ji,)::Tuple{Bool},
 end
 
 function reformatIntData1((lk, lj, kj, kiOrji)::NTuple{4, Bool}, 
-                          bfs::NTuple{4, FGTBasisFuncs1O{T, D}}) where {T, D}
+                          bfs::Vararg{FGTBasisFuncs1O{T, D}, 4}) where {T, D}
     data4 = reformatIntData1(bfs[4])
     data3 = lk ? data4 : reformatIntData1(bfs[3])
     data2 = lj ? data4 : (kj ? data3 : reformatIntData1(bfs[2]))
@@ -362,7 +373,7 @@ function reformatIntData1((lk, lj, kj, kiOrji)::NTuple{4, Bool},
 end
 
 function reformatIntData1((lk, _, _, ji)::Tuple{Bool, Val{false}, Val{false}, Bool}, 
-                          bfs::NTuple{4, FGTBasisFuncs1O{T, D}}) where {T, D}
+                          bfs::Vararg{FGTBasisFuncs1O{T, D}, 4}) where {T, D}
     data4 = reformatIntData1(bfs[4])
     data3 = lk ? data4 : reformatIntData1(bfs[3])
     data2 = reformatIntData1(bfs[2])
@@ -371,7 +382,7 @@ function reformatIntData1((lk, _, _, ji)::Tuple{Bool, Val{false}, Val{false}, Bo
 end
 
 function reformatIntData1((_, lj, _, kiOrji)::Tuple{Val{false}, Bool, Val{false}, Bool}, 
-                          bfs::NTuple{4, FGTBasisFuncs1O{T, D}}) where {T, D}
+                          bfs::Vararg{FGTBasisFuncs1O{T, D}, 4}) where {T, D}
     data4 = reformatIntData1(bfs[4])
     data3 = reformatIntData1(bfs[3])
     data2 = lj ? data4 : reformatIntData1(bfs[2])
@@ -380,7 +391,7 @@ function reformatIntData1((_, lj, _, kiOrji)::Tuple{Val{false}, Bool, Val{false}
 end
 
 function reformatIntData1((_, lj, _, _)::Tuple{Val{false}, Bool, Val{false}, Val{false}}, 
-                          bfs::NTuple{4, FGTBasisFuncs1O{T, D}}) where {T, D}
+                          bfs::Vararg{FGTBasisFuncs1O{T, D}, 4}) where {T, D}
     data4 = reformatIntData1(bfs[4])
     data3 = reformatIntData1(bfs[3])
     data2 = lj ? data4 : reformatIntData1(bfs[2])
@@ -389,7 +400,7 @@ function reformatIntData1((_, lj, _, _)::Tuple{Val{false}, Bool, Val{false}, Val
 end
 
 function reformatIntData1((_, _, kj, _)::Tuple{Val{false}, Val{false}, Bool, Val{false}}, 
-                          bfs::NTuple{4, FGTBasisFuncs1O{T, D}}) where {T, D}
+                          bfs::Vararg{FGTBasisFuncs1O{T, D}, 4}) where {T, D}
     data4 = reformatIntData1(bfs[4])
     data3 = reformatIntData1(bfs[3])
     data2 = kj ? data3 : reformatIntData1(bfs[2])
@@ -398,7 +409,7 @@ function reformatIntData1((_, _, kj, _)::Tuple{Val{false}, Val{false}, Bool, Val
 end
 
 function reformatIntData1((_, _, _, ji)::Tuple{Val{false}, Val{false}, Val{false}, Bool}, 
-                          bfs::NTuple{4, FGTBasisFuncs1O{T, D}}) where {T, D}
+                          bfs::Vararg{FGTBasisFuncs1O{T, D}, 4}) where {T, D}
     data4 = reformatIntData1(bfs[4])
     data3 = reformatIntData1(bfs[3])
     data2 = reformatIntData1(bfs[2])
@@ -407,7 +418,7 @@ function reformatIntData1((_, _, _, ji)::Tuple{Val{false}, Val{false}, Val{false
 end
 
 function reformatIntData1((lk, _, _, _)::Tuple{Bool, Val{false}, Val{false}, Val{false}}, 
-                          bfs::NTuple{4, FGTBasisFuncs1O{T, D}}) where {T, D}
+                          bfs::Vararg{FGTBasisFuncs1O{T, D}, 4}) where {T, D}
     data4 = reformatIntData1(bfs[4])
     data3 = lk ? data4 : reformatIntData1(bfs[3])
     data2 = reformatIntData1(bfs[2])
@@ -415,7 +426,7 @@ function reformatIntData1((lk, _, _, _)::Tuple{Bool, Val{false}, Val{false}, Val
     (data1, data2, data3, data4)
 end
 
-reformatIntData1(::Val{false}, bfs::Tuple{Vararg{FGTBasisFuncs1O{T, D}}}) where {T, D} = 
+reformatIntData1(::Val{false}, bfs::Vararg{FGTBasisFuncs1O{T, D}, VN}) where {T, D, VN} = 
 reformatIntData1.(bfs)
 
 
@@ -458,7 +469,7 @@ function getOneBodyInt(∫1e::F, optPosArgs::Tuple, bls::Union{Tuple{Bool}, Val{
                        bf1::FGTBasisFuncs1O{T, D, 𝑙1}, 
                        bf2::FGTBasisFuncs1O{T, D, 𝑙2}) where 
                       {F<:Function, T, D, 𝑙1, 𝑙2}
-    (R₁, ijk₁, ps₁), (R₂, ijk₂, ps₂) = reformatIntData1(bls, (bf1, bf2))
+    (R₁, ijk₁, ps₁), (R₂, ijk₂, ps₂) = reformatIntData1(bls, bf1, bf2)
     !(𝑙1==𝑙2==0) && isIntZero(F, optPosArgs, R₁, R₂, ijk₁, ijk₂) && (return T(0.0))
     uniquePairs, uPairCoeffs = get1BodyUniquePairs(R₁==R₂ && ijk₁==ijk₂, ps₁, ps₂)
     mapreduce(+, uniquePairs, uPairCoeffs) do x, y
@@ -523,7 +534,7 @@ function getTwoBodyInt(∫2e::F, optPosArgs::Tuple, bls::Union{NTuple{4, Any}, V
                        bf4::FGTBasisFuncs1O{T, D, 𝑙4}) where 
                       {F<:Function, T, D, 𝑙1, 𝑙2, 𝑙3, 𝑙4}
     (R₁, ijk₁, ps₁), (R₂, ijk₂, ps₂), (R₃, ijk₃, ps₃), (R₄, ijk₄, ps₄) = 
-    reformatIntData1(bls, (bf1, bf2, bf3, bf4))
+    reformatIntData1(bls, bf1, bf2, bf3, bf4)
 
     !(𝑙1==𝑙2==𝑙3==𝑙4==0) && 
     isIntZero(F, optPosArgs, R₁, R₂, R₃, R₄, ijk₁, ijk₂, ijk₃, ijk₄) && 
@@ -552,9 +563,9 @@ function octaFoldCount(i::T, j::T, k::T, l::T) where {T}
 end
 
 function get2BodyUniquePairs(flags::NTuple{5, Bool}, 
-                             ps₁::NTuple{GN1, NTuple{2, T}},
-                             ps₂::NTuple{GN2, NTuple{2, T}},
-                             ps₃::NTuple{GN3, NTuple{2, T}},
+                             ps₁::NTuple{GN1, NTuple{2, T}}, 
+                             ps₂::NTuple{GN2, NTuple{2, T}}, 
+                             ps₃::NTuple{GN3, NTuple{2, T}}, 
                              ps₄::NTuple{GN4, NTuple{2, T}}) where {GN1, GN2, GN3, GN4, T}
     uniquePairs = NTuple{4, T}[]
     uPairCoeffs = Array{T}(undef, GN1*GN2*GN3*GN4)
@@ -1054,6 +1065,9 @@ function update2DarrBlock!(arr::AbstractMatrix{T1},
     nothing
 end
 
+precompile(update2DarrBlock!, (fill(Matrix{Float64}, 2)..., fill(UnitRange{Int}, 2)...))
+precompile(update2DarrBlock!, (Matrix{Float64}, Float64, fill(UnitRange{Int}, 2)...))
+
 function getOneBodyInts(∫1e::F, optPosArgs::Tuple, 
                         basisSet::AbstractVector{<:GTBasisFuncs{T, D}}) where 
                        {F<:Function, T, D}
@@ -1107,6 +1121,9 @@ function update4DarrBlock!(arr::AbstractArray{T1, 4},
     end
     nothing
 end
+
+precompile(update4DarrBlock!, (fill(Array{Float64, 4}, 2)..., fill(UnitRange{Int}, 4)...))
+precompile(update4DarrBlock!, (Array{Float64, 4}, Float64, fill(UnitRange{Int}, 4)...))
 
 function getTwoBodyInts(∫2e::F, optPosArgs::Tuple, 
                         basisSet::AbstractVector{<:GTBasisFuncs{T, D}}) where 
