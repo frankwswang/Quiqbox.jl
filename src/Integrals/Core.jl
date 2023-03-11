@@ -3,6 +3,7 @@ export eeIuniqueIndicesOf
 using SpecialFunctions: erf
 using FastGaussQuadrature: gausslegendre
 using LinearAlgebra: dot
+using Base: OneTo, Iterators.product
 
 # Reference(s): 
 ## [DOI] 10.1088/0143-0807/31/1/004
@@ -499,7 +500,7 @@ function get1BodyUniquePairs(flag::Bool,
 end
 
 function getIntCore11!(n, uniquePairs, uPairCoeffs, flag, ps₁)
-    for (i₁, p₁) in enumerate(ps₁), (i₂, p₂) in zip(1:i₁, ps₁)
+    for (i₁, p₁) in enumerate(ps₁), (i₂, p₂) in zip(OneTo(i₁), ps₁)
         n = getUniquePair!(n, uniquePairs, uPairCoeffs, flag, (p₁, p₂), diFoldCount(i₁, i₂))
     end
     n
@@ -569,7 +570,7 @@ function get2BodyUniquePairs(flags::NTuple{5, Bool},
                              ps₄::NTuple{GN4, NTuple{2, T}}) where {GN1, GN2, GN3, GN4, T}
     uniquePairs = NTuple{4, T}[]
     uPairCoeffs = Array{T}(undef, GN1*GN2*GN3*GN4)
-    flagRijk = flags[1:3]
+    flagRijk = flags[begin:3]
     i = 0
 
     if (ps₁ == ps₂ && ps₂ == ps₃ && ps₃ == ps₄ && flags[1] && flags[2] && flags[3])
@@ -782,8 +783,8 @@ function getIntXAXBXCXDcore!(n, uniquePairs, uPairCoeffs, flags, groups)
 end
 
 function getIntCore1111!(n, uniquePairs, uPairCoeffs, flags, ps₁)
-    for (i₁, p₁) in enumerate(ps₁), (i₂, p₂) in zip(1:i₁, ps₁), 
-        (i₃, p₃) in zip(1:i₁, ps₁), (i₄, p₄) in zip(1:ifelse(i₃==i₁, i₂, i₃), ps₁)
+    for (i₁, p₁) in enumerate(ps₁), (i₂, p₂) in zip(OneTo(i₁), ps₁), 
+        (i₃, p₃) in zip(OneTo(i₁), ps₁), (i₄, p₄) in zip((OneTo∘ifelse)(i₃==i₁, i₂,i₃), ps₁)
         n = getUniquePair!(n, uniquePairs, uPairCoeffs, flags, (p₁,p₂,p₃,p₄), 
                            octaFoldCount(i₁,i₂,i₃,i₄))
     end
@@ -791,8 +792,8 @@ function getIntCore1111!(n, uniquePairs, uPairCoeffs, flags, ps₁)
 end
 
 function getIntCore1122!(n, uniquePairs, uPairCoeffs, flags, (ps₁, ps₂))
-    for (i₁, p₁) in enumerate(ps₁), (i₂, p₂) in zip(1:i₁, ps₁), 
-        (i₃, p₃) in enumerate(ps₂), (i₄, p₄) in zip(1:i₃, ps₂)
+    for (i₁, p₁) in enumerate(ps₁), (i₂, p₂) in zip(OneTo(i₁), ps₁), 
+        (i₃, p₃) in enumerate(ps₂), (i₄, p₄) in zip(OneTo(i₃), ps₂)
         n = getUniquePair!(n, uniquePairs, uPairCoeffs, flags, (p₁, p₂, p₃, p₄), 
                            diFoldCount(i₁, i₂)*diFoldCount(i₃, i₄))
     end
@@ -800,8 +801,8 @@ function getIntCore1122!(n, uniquePairs, uPairCoeffs, flags, (ps₁, ps₂))
 end
 
 function getIntCore1212!(n, uniquePairs, uPairCoeffs, flags, (ps₁, ps₂))
-    oneSidePairs = Iterators.product(eachindex(ps₁), eachindex(ps₂))
-    for (x, (i₁,i₂)) in enumerate(oneSidePairs), (_, (i₃,i₄)) in zip(1:x, oneSidePairs)
+    oneSidePairs = product(eachindex(ps₁), eachindex(ps₂))
+    for (x, (i₁,i₂)) in enumerate(oneSidePairs), (_, (i₃,i₄)) in zip(OneTo(x), oneSidePairs)
         n = getUniquePair!(n, uniquePairs, uPairCoeffs, flags, 
                            (ps₁[i₁], ps₂[i₂], ps₁[i₃], ps₂[i₄]), 1<<(i₁!=i₃ || i₂!=i₄))
     end
@@ -809,8 +810,8 @@ function getIntCore1212!(n, uniquePairs, uPairCoeffs, flags, (ps₁, ps₂))
 end
 
 function getIntCore1221!(n, uniquePairs, uPairCoeffs, flags, (ps₁, ps₂))
-    oneSidePairs = Iterators.product(eachindex(ps₁), eachindex(ps₂))
-    for (x, (i₁,i₂)) in enumerate(oneSidePairs), (_, (i₃,i₄)) in zip(1:x, oneSidePairs)
+    oneSidePairs = product(eachindex(ps₁), eachindex(ps₂))
+    for (x, (i₁,i₂)) in enumerate(oneSidePairs), (_, (i₃,i₄)) in zip(OneTo(x), oneSidePairs)
         n = getUniquePair!(n, uniquePairs, uPairCoeffs, flags, 
                            (ps₁[i₁], ps₂[i₂], ps₂[i₄], ps₁[i₃]), 1<<(i₁!=i₃ || i₂!=i₄))
     end
@@ -818,7 +819,7 @@ function getIntCore1221!(n, uniquePairs, uPairCoeffs, flags, (ps₁, ps₂))
 end
 
 function getIntCore1123!(n, uniquePairs, uPairCoeffs, flags, (ps₁, ps₂, ps₃))
-    for (i₁, p₁) in enumerate(ps₁), (i₂, p₂) in zip(1:i₁, ps₁), p₃ in ps₂, p₄ in ps₃
+    for (i₁, p₁) in enumerate(ps₁), (i₂, p₂) in zip(OneTo(i₁), ps₁), p₃ in ps₂, p₄ in ps₃
         n = getUniquePair!(n, uniquePairs, uPairCoeffs, flags, (p₁, p₂, p₃, p₄), 
                            diFoldCount(i₁, i₂))
     end
@@ -826,7 +827,7 @@ function getIntCore1123!(n, uniquePairs, uPairCoeffs, flags, (ps₁, ps₂, ps�
 end
 
 function getIntCore1233!(n, uniquePairs, uPairCoeffs, flags, (ps₁, ps₂, ps₃))
-    for p₁ in ps₁, p₂ in ps₂, (i₃, p₃) in enumerate(ps₃), (i₄, p₄) in zip(1:i₃, ps₃)
+    for p₁ in ps₁, p₂ in ps₂, (i₃, p₃) in enumerate(ps₃), (i₄, p₄) in zip(OneTo(i₃), ps₃)
         n = getUniquePair!(n, uniquePairs, uPairCoeffs, flags, (p₁, p₂, p₃, p₄), 
                            diFoldCount(i₃, i₄))
     end
@@ -881,7 +882,7 @@ function getCompositeIntCore(::Val{BL}, ::Val{:aa},
                             {T, D, BL, F<:Function, BT<:SpatialBasis{T, D}}
     ON = getON(Val(BL), a)
     res = Array{T}(undef, ON, ON)
-    for j=1:ON, i=1:j
+    for j=OneTo(ON), i=OneTo(j)
         res[j,i] = res[i,j] = getCompositeInt(∫, optPosArgs, (j==i,), 
                                               getBF(Val(BL), a, i), getBF(Val(BL), a, j))
     end
@@ -923,7 +924,7 @@ function getCompositeIntCore(::Val{BL}, ::Val{:aaaa},
                             {T, D, BL, F<:Function, BT<:SpatialBasis{T, D}}
     ON = getON(Val(BL), a)
     res = Array{T}(undef, ON, ON, ON, ON)
-    for l = 1:ON, k = 1:l, j = 1:l, i = 1:ifelse(l==j, k, j)
+    for l in OneTo(ON), k in OneTo(l), j in OneTo(l), i in (OneTo∘ifelse)(l==j, k, j)
         bl = (l==k, l==j, k==j, ifelse(l==j, k, j)==i)
         res[l, k, j, i] = res[k, l, j, i] = res[k, l, i, j] = res[l, k, i, j] = 
         res[i, j, l, k] = res[j, i, l, k] = res[j, i, k, l] = res[i, j, k, l] = 
@@ -941,7 +942,7 @@ function getCompositeIntCore(::Val{BL}, ::Val{:aabb},
     ON1 = getON(Val(BL), a)
     ON2 = getON(Val(BL), b)
     res = Array{T}(undef, ON1, ON1, ON2, ON2)
-    for l = 1:ON2, k = 1:l, j = 1:ON1, i = 1:j
+    for l in OneTo(ON2), k in OneTo(l), j in OneTo(ON1), i in OneTo(j)
         bl = (l==k, Val(false), Val(false), j==i)
         res[i, j, l, k] = res[j, i, l, k] = res[j, i, k, l] = res[i, j, k, l] = 
         getCompositeInt(∫, optPosArgs, bl, getBF(Val(BL), a, i), getBF(Val(BL), a, j), 
@@ -958,8 +959,8 @@ function getCompositeIntCore(::Val{BL}, ::Val{:abab},
     ON1 = getON(Val(BL), a)
     ON2 = getON(Val(BL), b)
     res = Array{T}(undef, ON1, ON2, ON1, ON2)
-    rng = Iterators.product(1:ON2, 1:ON1)
-    for (x, (l,k)) in enumerate(rng), (_, (j,i)) in zip(1:x, rng)
+    rng = product(OneTo(ON2), OneTo(ON1))
+    for (x, (l,k)) in enumerate(rng), (_, (j,i)) in zip(OneTo(x), rng)
         bl = (Val(false), l==j, Val(false), ifelse(l==j, k==i, false))
         res[k, l, i, j] = res[i, j, k, l] = 
         getCompositeInt(∫, optPosArgs, bl, getBF(Val(BL), a, i), getBF(Val(BL), b, j), 
@@ -978,7 +979,7 @@ function getCompositeIntCore(::Val{BL}, ::Val{:aabc},
     ON2 = getON(Val(BL), b)
     ON3 = getON(Val(BL), c)
     res = Array{T}(undef, ON1, ON1, ON2, ON3)
-    for l=1:ON3, k=1:ON2, j=1:ON1, i=1:j
+    for l=OneTo(ON3), k=OneTo(ON2), j=OneTo(ON1), i=OneTo(j)
         bl = (Val(false), Val(false), Val(false), j==i)
         res[j, i, k, l] = res[i, j, k, l] = 
         getCompositeInt(∫, optPosArgs, bl, getBF(Val(BL), a, i), getBF(Val(BL), a, j), 
@@ -997,7 +998,7 @@ function getCompositeIntCore(::Val{BL}, ::Val{:abcc},
     ON2 = getON(Val(BL), b)
     ON3 = getON(Val(BL), c)
     res = Array{T}(undef, ON1, ON2, ON3, ON3)
-    for l=1:ON3, k=1:l, j=1:ON2, i=1:ON1
+    for l=OneTo(ON3), k=OneTo(l), j=OneTo(ON2), i=OneTo(ON1)
         bl = (l==k, Val(false), Val(false), Val(false))
         res[i, j, l, k] = res[i, j, k, l] = 
         getCompositeInt(∫, optPosArgs, bl, getBF(Val(BL), a, i), getBF(Val(BL), b, j), 
@@ -1076,7 +1077,7 @@ function getOneBodyInts(∫1e::F, optPosArgs::Tuple,
     totalSize = subSize |> sum
     buf = Array{T}(undef, totalSize, totalSize)
     Threads.@threads for j in eachindex(basisSet)
-        Threads.@threads for i = 1:j
+        Threads.@threads for i in OneTo(j)
             int = getCompositeInt(∫1e, optPosArgs, (j==i,), basisSet[i], basisSet[j])
             rowRange = accuSize[i]+1 : accuSize[i+1]
             colRange = accuSize[j]+1 : accuSize[j+1]
@@ -1092,9 +1093,9 @@ function getOneBodyInts(∫1e::F, optPosArgs::Tuple,
     BN = length(basisSet)
     buf = Array{T}(undef, BN, BN)
     Threads.@threads for j in eachindex(basisSet)
-        Threads.@threads for i = 1:j
+        Threads.@threads for i in OneTo(j)
             int = getCompositeInt(∫1e, optPosArgs, (j==i,), basisSet[i], basisSet[j])
-            buf[j, i] = buf[i, j] = int
+            @inbounds buf[j, i] = buf[i, j] = int
         end
     end
     buf
@@ -1132,7 +1133,8 @@ function getTwoBodyInts(∫2e::F, optPosArgs::Tuple,
     accuSize = vcat(0, accumulate(+, subSize)...)
     totalSize = subSize |> sum
     buf = Array{T}(undef, totalSize, totalSize, totalSize, totalSize)
-    @sync for l in eachindex(basisSet), k = 1:l, j = 1:l, i = 1:ifelse(l==j, k, j)
+    @sync for l in eachindex(basisSet), k in OneTo(l), 
+              j in OneTo(l), i in (OneTo∘ifelse)(l==j, k, j)
         Threads.@spawn begin
             I = accuSize[i]+1 : accuSize[i+1]
             J = accuSize[j]+1 : accuSize[j+1]
@@ -1152,13 +1154,16 @@ function getTwoBodyInts(∫2e::F, optPosArgs::Tuple,
                        {F<:Function, T, D}
     BN = length(basisSet)
     buf = Array{T}(undef, BN, BN, BN, BN)
-    @sync for l in eachindex(basisSet), k = 1:l, j = 1:l, i = 1:ifelse(l==j, k, j)
+    @sync for l in eachindex(basisSet), k in OneTo(l), 
+              j in OneTo(l), i in (OneTo∘ifelse)(l==j, k, j)
         Threads.@spawn begin
             bl = (l==k, l==j, k==j, ifelse(l==j, k, j)==i)
             int = getCompositeInt(∫2e, optPosArgs, bl, 
                                   basisSet[i], basisSet[j], basisSet[k], basisSet[l])
-            buf[l, k, j, i] = buf[k, l, j, i] = buf[k, l, i, j] = buf[l, k, i, j] = 
-            buf[i, j, l, k] = buf[j, i, l, k] = buf[j, i, k, l] = buf[i, j, k, l] = int
+            @inbounds begin
+                buf[l, k, j, i] = buf[k, l, j, i] = buf[k, l, i, j] = buf[l, k, i, j] = 
+                buf[i, j, l, k] = buf[j, i, l, k] = buf[j, i, k, l] = buf[i, j, k, l] = int
+            end
         end
     end
     buf
@@ -1177,7 +1182,8 @@ function eeIuniqueIndicesOf(basisSetSize::Int)
                                     6*binomial(basisSetSize, 3) + 
                                     4*binomial(basisSetSize, 2) + basisSetSize))
     index = 1
-    for i = 1:basisSetSize, j = 1:i, k = 1:i, l = 1:ifelse(k==i, j, k)
+    for i in OneTo(basisSetSize), j in OneTo(i), 
+        k in OneTo(i), l in (OneTo∘ifelse)(k==i, j, k)
         uniqueIdx[index] = [i, j, k, l]
         index += 1
     end
