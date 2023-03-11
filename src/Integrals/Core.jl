@@ -899,7 +899,7 @@ function getCompositeIntCore(::Val{BL}, ::Val{:aa},
                             {T, D, BL, F<:Function, BT<:SpatialBasis{T, D}}
     ON = getON(Val(BL), a)
     res = Array{T}(undef, ON, ON)
-    for j=OneTo(ON), i=OneTo(j)
+    for j in OneTo(ON), i in OneTo(j)
         res[j,i] = res[i,j] = getCompositeInt(∫, optPosArgs, (j==i,), 
                                               getBF(Val(BL), a, i), getBF(Val(BL), a, j))
     end
@@ -996,7 +996,7 @@ function getCompositeIntCore(::Val{BL}, ::Val{:aabc},
     ON2 = getON(Val(BL), b)
     ON3 = getON(Val(BL), c)
     res = Array{T}(undef, ON1, ON1, ON2, ON3)
-    for l=OneTo(ON3), k=OneTo(ON2), j=OneTo(ON1), i=OneTo(j)
+    for l in OneTo(ON3), k in OneTo(ON2), j in OneTo(ON1), i in OneTo(j)
         bl = (Val(false), Val(false), Val(false), j==i)
         res[j, i, k, l] = res[i, j, k, l] = 
         getCompositeInt(∫, optPosArgs, bl, getBF(Val(BL), a, i), getBF(Val(BL), a, j), 
@@ -1015,7 +1015,7 @@ function getCompositeIntCore(::Val{BL}, ::Val{:abcc},
     ON2 = getON(Val(BL), b)
     ON3 = getON(Val(BL), c)
     res = Array{T}(undef, ON1, ON2, ON3, ON3)
-    for l=OneTo(ON3), k=OneTo(l), j=OneTo(ON2), i=OneTo(ON1)
+    for l in OneTo(ON3), k in OneTo(l), j in OneTo(ON2), i in OneTo(ON1)
         bl = (l==k, Val(false), Val(false), Val(false))
         res[i, j, l, k] = res[i, j, k, l] = 
         getCompositeInt(∫, optPosArgs, bl, getBF(Val(BL), a, i), getBF(Val(BL), b, j), 
