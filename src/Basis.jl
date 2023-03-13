@@ -1565,8 +1565,8 @@ end
 
 Return the size (number of orbitals) of each subshell in `D` dimensional real space.
 """
-@inline orbitalNumOf(subshell::String, D::Integer=3) = 
-        SubshellSizeList[D][ToSubshellLN[subshell]]
+orbitalNumOf(subshell::String, D::Integer=3) = 
+SubshellSizeList[D][ToSubshellLN[subshell]]
 
 """
 
@@ -1574,7 +1574,7 @@ Return the size (number of orbitals) of each subshell in `D` dimensional real sp
 
 Return the numbers of orbitals of the input basis.
 """
-@inline orbitalNumOf(::QuiqboxBasis{<:Any, <:Any, ON}) where {ON} = ON
+orbitalNumOf(::QuiqboxBasis{<:Any, <:Any, ON}) where {ON} = ON
 
 
 # Core function to generate a customized X-Gaussian (X>1) basis function.
