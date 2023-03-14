@@ -11,8 +11,7 @@ Return the orbital overlap between two basis functions.
 """
 overlap(bf1::AbstractGTBasisFuncs{T, D, 1}, bf2::AbstractGTBasisFuncs{T, D, 1}) where 
        {T, D} = 
-getCompositeInt(T, Val(D), ∫overlapCore, (), (bf2===bf1,), 
-                (1, 1), bf1, bf2)
+get1BCompInt(T, Val(D), ∫overlapCore, (), (bf2===bf1,), (1, 1), bf1, bf2)
 
 
 """
@@ -37,8 +36,7 @@ Return the electron kinetic energy between two basis functions.
 """
 eKinetic(bf1::AbstractGTBasisFuncs{T, D, 1}, bf2::AbstractGTBasisFuncs{T, D, 1}) where 
         {D, T} = 
-getCompositeInt(T, Val(D), ∫elecKineticCore, (), (bf2===bf1,), 
-                (1, 1), bf1, bf2)
+get1BCompInt(T, Val(D), ∫elecKineticCore, (), (bf2===bf1,), (1, 1), bf1, bf2)
 
 
 """
@@ -66,9 +64,9 @@ their coordinates (in the atomic units).
 neAttraction(bf1::AbstractGTBasisFuncs{T, D, 1}, bf2::AbstractGTBasisFuncs{T, D, 1}, 
              nuc::AVectorOrNTuple{String, NN}, 
              nucCoords::SpatialCoordType{T, D, NN}) where {T, D, NN} = 
-getCompositeInt(T, Val(D), ∫nucAttractionCore, 
-                (arrayToTuple(nuc), genTupleCoords(T, nucCoords)), (bf2===bf1,), 
-                (1, 1), bf1, bf2)
+get1BCompInt(T, Val(D), ∫nucAttractionCore, 
+             (arrayToTuple(nuc), genTupleCoords(T, nucCoords)), (bf2===bf1,), 
+             (1, 1), bf1, bf2)
 
 
 """
