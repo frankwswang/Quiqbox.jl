@@ -995,8 +995,10 @@ const Int1eBIndexLabels = Dict([( true,), (false,)] .=> [Val(:aa), Val(:ab)])
 getBN(::Val{:ContainBasisFuncs}, b::SpatialBasis) = orbitalNumOf(b)
 getBN(::Val{:WithoutBasisFuncs}, ::CGTBasisFuncs1O{<:Any, <:Any, BN}) where {BN} = BN
 
-getBF(::Val, b::SpatialBasis, i) = @inbounds getindex(b, i)
-getBF(::Val{:WithoutBasisFuncs}, b::BasisFuncMix, i) = @inbounds getindex(b.BasisFunc, i)
+getBF(::Val, ::Type{T}, ::Val{D}, 
+      b::SpatialBasis{T, D}, i) where {T, D} = @inbounds getindex(b, i)
+getBF(::Val{:WithoutBasisFuncs}, ::Type{T}, ::Val{D}, 
+      b::BasisFuncMix{T, D}, i) where {T, D} = @inbounds getindex(b.BasisFunc, i)
 
 # 1e integrals for BasisFuncs/BasisFuncMix-mixed bases
 function getCompositeIntCore(::Type{T}, ::Val{D}, ::Val{BL}, ::Val{:aa}, 
@@ -1009,8 +1011,9 @@ function getCompositeIntCore(::Type{T}, ::Val{D}, ::Val{BL}, ::Val{:aa},
     res = Array{T}(undef, BN, BN)
     for j in OneTo(BN), i in OneTo(j)
         res[j,i] = res[i,j] = 
-        getCompositeInt(T, Val(D), ∫, optPosArgs, (j==i,), getBF(Val(BL), a, i), 
-                                                           getBF(Val(BL), a, j))
+        getCompositeInt(T, Val(D), ∫, optPosArgs, (j==i,), 
+                        getBF(Val(BL), T, Val(D), a, i), 
+                        getBF(Val(BL), T, Val(D), a, j))
     end
     res
 end
@@ -1026,8 +1029,9 @@ function getCompositeIntCore(::Type{T}, ::Val{D}, ::Val{BL}, ::Val{:ab},
     res = Array{T}(undef, BN1, BN2)
     for j in OneTo(BN2), i in OneTo(BN1)
         res[i,j] = 
-        getCompositeInt(T, Val(D), ∫, optPosArgs, Val(false), getBF(Val(BL), a, i), 
-                                                              getBF(Val(BL), b, j))
+        getCompositeInt(T, Val(D), ∫, optPosArgs, Val(false), 
+                        getBF(Val(BL), T, Val(D), a, i), 
+                        getBF(Val(BL), T, Val(D), b, j))
     end
     res
 end
@@ -1060,10 +1064,10 @@ function getCompositeIntCore(::Type{T}, ::Val{D}, ::Val{BL}, ::Val{:aaaa},
         iBl = (l==k, l==j, k==j, ifelse(l==j, k, j)==i)
         res[l, k, j, i] = res[k, l, j, i] = res[k, l, i, j] = res[l, k, i, j] = 
         res[i, j, l, k] = res[j, i, l, k] = res[j, i, k, l] = res[i, j, k, l] = 
-        getCompositeInt(T, Val(D), ∫, optPosArgs, iBl, getBF(Val(BL), a, i), 
-                                                       getBF(Val(BL), a, j), 
-                                                       getBF(Val(BL), a, k), 
-                                                       getBF(Val(BL), a, l))
+        getCompositeInt(T, Val(D), ∫, optPosArgs, iBl, getBF(Val(BL), T, Val(D), a, i), 
+                                                       getBF(Val(BL), T, Val(D), a, j), 
+                                                       getBF(Val(BL), T, Val(D), a, k), 
+                                                       getBF(Val(BL), T, Val(D), a, l))
     end
     res
 end
@@ -1082,10 +1086,10 @@ function getCompositeIntCore(::Type{T}, ::Val{D}, ::Val{BL}, ::Val{:aabb},
     for l in OneTo(BN2), k in OneTo(l), j in OneTo(BN1), i in OneTo(j)
         iBl = (l==k, Val(false), Val(false), j==i)
         res[i, j, l, k] = res[j, i, l, k] = res[j, i, k, l] = res[i, j, k, l] = 
-        getCompositeInt(T, Val(D), ∫, optPosArgs, iBl, getBF(Val(BL), a, i), 
-                                                       getBF(Val(BL), a, j), 
-                                                       getBF(Val(BL), b, k), 
-                                                       getBF(Val(BL), b, l))
+        getCompositeInt(T, Val(D), ∫, optPosArgs, iBl, getBF(Val(BL), T, Val(D), a, i), 
+                                                       getBF(Val(BL), T, Val(D), a, j), 
+                                                       getBF(Val(BL), T, Val(D), b, k), 
+                                                       getBF(Val(BL), T, Val(D), b, l))
     end
     res
 end
@@ -1105,10 +1109,10 @@ function getCompositeIntCore(::Type{T}, ::Val{D}, ::Val{BL}, ::Val{:abab},
     for (x, (l,k)) in enumerate(rng), (_, (j,i)) in zip(OneTo(x), rng)
         iBl = (Val(false), l==j, Val(false), ifelse(l==j, k==i, false))
         res[k, l, i, j] = res[i, j, k, l] = 
-        getCompositeInt(T, Val(D), ∫, optPosArgs, iBl, getBF(Val(BL), a, i), 
-                                                       getBF(Val(BL), b, j), 
-                                                       getBF(Val(BL), a, k), 
-                                                       getBF(Val(BL), b, l))
+        getCompositeInt(T, Val(D), ∫, optPosArgs, iBl, getBF(Val(BL), T, Val(D), a, i), 
+                                                       getBF(Val(BL), T, Val(D), b, j), 
+                                                       getBF(Val(BL), T, Val(D), a, k), 
+                                                       getBF(Val(BL), T, Val(D), b, l))
     end
     res
 end
@@ -1130,10 +1134,10 @@ function getCompositeIntCore(::Type{T}, ::Val{D}, ::Val{BL}, ::Val{:aabc},
     for l in OneTo(BN3), k in OneTo(BN2), j in OneTo(BN1), i in OneTo(j)
         iBl = (Val(false), Val(false), Val(false), j==i)
         res[j, i, k, l] = res[i, j, k, l] = 
-        getCompositeInt(T, Val(D), ∫, optPosArgs, iBl, getBF(Val(BL), a, i), 
-                                                       getBF(Val(BL), a, j), 
-                                                       getBF(Val(BL), b, k), 
-                                                       getBF(Val(BL), c, l))
+        getCompositeInt(T, Val(D), ∫, optPosArgs, iBl, getBF(Val(BL), T, Val(D), a, i), 
+                                                       getBF(Val(BL), T, Val(D), a, j), 
+                                                       getBF(Val(BL), T, Val(D), b, k), 
+                                                       getBF(Val(BL), T, Val(D), c, l))
     end
     res
 end
@@ -1155,10 +1159,10 @@ function getCompositeIntCore(::Type{T}, ::Val{D}, ::Val{BL}, ::Val{:abcc},
     for l in OneTo(BN3), k in OneTo(l), j in OneTo(BN2), i in OneTo(BN1)
         iBl = (l==k, Val(false), Val(false), Val(false))
         res[i, j, l, k] = res[i, j, k, l] = 
-        getCompositeInt(T, Val(D), ∫, optPosArgs, iBl, getBF(Val(BL), a, i), 
-                                                       getBF(Val(BL), b, j), 
-                                                       getBF(Val(BL), c, k), 
-                                                       getBF(Val(BL), c, l))
+        getCompositeInt(T, Val(D), ∫, optPosArgs, iBl, getBF(Val(BL), T, Val(D), a, i), 
+                                                       getBF(Val(BL), T, Val(D), b, j), 
+                                                       getBF(Val(BL), T, Val(D), c, k), 
+                                                       getBF(Val(BL), T, Val(D), c, l))
     end
     res
 end
@@ -1184,10 +1188,10 @@ function getCompositeIntCore(::Type{T}, ::Val{D}, ::Val{BL}, ::IDV,
     for l in OneTo(BN4), k in OneTo(BN3), j in OneTo(BN2), i in OneTo(BN1)
         iBl = IndexABXYbools[IDV](j,k,l)
         res[i,j,k,l] = 
-        getCompositeInt(T, Val(D), ∫, optPosArgs, iBl, getBF(Val(BL), a, i), 
-                                                       getBF(Val(BL), b, j), 
-                                                       getBF(Val(BL), c, k), 
-                                                       getBF(Val(BL), d, l))
+        getCompositeInt(T, Val(D), ∫, optPosArgs, iBl, getBF(Val(BL), T, Val(D), a, i), 
+                                                       getBF(Val(BL), T, Val(D), b, j), 
+                                                       getBF(Val(BL), T, Val(D), c, k), 
+                                                       getBF(Val(BL), T, Val(D), d, l))
     end
     res
 end

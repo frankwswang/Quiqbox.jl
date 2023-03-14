@@ -13,9 +13,9 @@ import Base: ==
 ==(::LTuple{1, 0}, ::LTuple{1, 0}) = true
 
 
-diffColorSym(pb::ParamBox) = ifelse(isDiffParam(pb), :green, :light_black)
+diffColorSym(@nospecialize(pb::ParamBox)) = ifelse(isDiffParam(pb), :green, :light_black)
 
-function printDiffSym(io::IO, pb::ParamBox)
+function printDiffSym(io::IO, @nospecialize(pb::ParamBox))
     print(io, "[")
     printstyled(io, ifelse(isDiffParam(pb), "𝛛", "∂"), color=diffColorSym(pb))
     print(io, "]")
@@ -27,7 +27,7 @@ itselfTshorten(::Type{T}) where{T} = itselfTshorten(string(T))
 
 
 import Base: show
-function show(io::IO, pb::ParamBox)
+function show(io::IO, @nospecialize(pb::ParamBox))
     v = pb.data[][begin][]
     pbTstr = (itselfTshorten∘typeof)(pb)
     if pb.map isa DI
@@ -98,14 +98,14 @@ function getFieldNameStr(::T) where {T}
     replace(str, ':'=>"")
 end
 
-function show(io::IO, sp::SpatialPoint)
+function show(io::IO, @nospecialize(sp::SpatialPoint))
     pbs = sp.param
     print(io, typeStrOf(sp), getFieldNameStr(sp))
     print(io, [i() for i in pbs])
     printDiffSym.(Ref(io), pbs)
 end
 
-function show(io::IO, gf::GaussFunc)
+function show(io::IO, @nospecialize(gf::GaussFunc))
     gfTstr = (itselfTshorten∘typeof)(gf)
     idx1, idx2 = first.(findall(",", gfTstr))
     print(io, gfTstr[begin:idx1+1])
@@ -127,7 +127,7 @@ function show(io::IO, gf::GaussFunc)
     printDiffSym.(Ref(io), gf.param)
 end
 
-function show(io::IO, bf::BasisFunc)
+function show(io::IO, @nospecialize(bf::BasisFunc))
     print(io, typeStrOf(bf))
     print(io, getFieldNameStr(bf), "[")
     printstyled(io, bf.l[1]|>LtoStr, color=:cyan)
@@ -135,8 +135,8 @@ function show(io::IO, bf::BasisFunc)
     print(io, "]", cen)
 end
 
-function show(io::IO, bfs::BasisFuncs{<:Any, <:Any, 𝑙, <:Any, <:Any, ON}) where {𝑙, ON}
-    SON = SubshellXYZsizes[𝑙+1]
+function show(io::IO, @nospecialize(bfs::BasisFuncs))
+    SON = SubshellXYZsizes[lOf(bfs)+1]
     xyz1 = "$(bfs.l |> length)"
     xyz2 = "/$(SON)"
     print(io, typeStrOf(bfs))
@@ -147,28 +147,29 @@ function show(io::IO, bfs::BasisFuncs{<:Any, <:Any, 𝑙, <:Any, <:Any, ON}) whe
     print(io, "]", cen)
 end
 
-show(io::IO, bfm::BasisFuncMix) = print(io, typeStrOf(bfm), getFieldNameStr(bfm))
+show(io::IO, @nospecialize(bfm::BasisFuncMix)) = 
+print(io, typeStrOf(bfm), getFieldNameStr(bfm))
 
 show(io::IO, ::T) where {T<:EmptyBasisFunc} = print(io, T)
 
-show(io::IO, gtb::GTBasis) = print(io, typeof(gtb), getFieldNameStr(gtb))
+show(io::IO, @nospecialize(gtb::GTBasis)) = print(io, typeof(gtb), getFieldNameStr(gtb))
 
-show(io::IO, box::GridBox) = print(io, typeStrOf(box), getFieldNameStr(box))
+show(io::IO, @nospecialize(box::GridBox)) = print(io, typeStrOf(box), getFieldNameStr(box))
 
-function show(io::IO, config::SCFconfig)
+function show(io::IO, @nospecialize(config::SCFconfig))
     print(io, typeof(config))
     str = getFieldNameStr(config)
     str = replace(str, "interval"=>"interval=$(config.interval)")
     print(io, str)
 end
 
-function show(io::IO, config::HFconfig)
+function show(io::IO, @nospecialize(config::HFconfig))
     print(io, typeof(config))
     str = getFieldNameStr(config)
     print(io, str)
 end
 
-function show(io::IO, vars::HFtempVars)
+function show(io::IO, @nospecialize(vars::HFtempVars))
     print(io, typeof(vars))
     str = getFieldNameStr(vars)
     Etot0 = round(vars.shared.Etots[1], sigdigits=nDigitShown)
@@ -177,7 +178,7 @@ function show(io::IO, vars::HFtempVars)
     print(io, str)
 end
 
-function show(io::IO, vars::HFfinalVars)
+function show(io::IO, @nospecialize(vars::HFfinalVars))
     print(io, typeof(vars))
     str = getFieldNameStr(vars)
     Ehf = round(vars.Ehf, sigdigits=nDigitShown)
@@ -185,14 +186,15 @@ function show(io::IO, vars::HFfinalVars)
     print(io, str)
 end
 
-function show(io::IO, config::POconfig)
+function show(io::IO, @nospecialize(config::POconfig))
     print(io, typeof(config))
     str = getFieldNameStr(config)
     str = replace(str, "method,"=>"method=$(config.method),")
     print(io, str)
 end
 
-show(io::IO, matter::MatterByHF) = print(io, typeof(matter), getFieldNameStr(matter))
+show(io::IO, @nospecialize(matter::MatterByHF)) = 
+print(io, typeof(matter), getFieldNameStr(matter))
 
 
 import Base: +
@@ -216,7 +218,7 @@ import Base: *
 ## Iteration Interface
 import Base: iterate, size, length, eltype
 iterate(pb::ParamBox) = (pb.data[][begin][], nothing)
-iterate(::ParamBox, _) = nothing
+iterate(@nospecialize(_::ParamBox), _) = nothing
 size(::ParamBox) = ()
 length(::ParamBox) = 1
 eltype(::ParamBox{T}) where {T} = T
@@ -233,13 +235,13 @@ function size(::SpatialPoint{<:Any, D}, d::Integer) where {D}
 end
 
 iterate(gf::GaussFunc) = (gf, nothing)
-iterate(::GaussFunc, _) = nothing
+iterate(@nospecialize(_::GaussFunc), _) = nothing
 size(::GaussFunc) = ()
 length(::GaussFunc) = 1
 size(::GaussFunc, d::Integer) = (d > 0) ? 1 : throw(BoundsError())
 
 iterate(bf::CGTBasisFuncs1O) = (bf, nothing)
-iterate(::CGTBasisFuncs1O, _) = nothing
+iterate(@nospecialize(_::CGTBasisFuncs1O), _) = nothing
 size(::CGTBasisFuncs1O) = ()
 length(::CGTBasisFuncs1O) = 1
 eltype(::T) where {T<:CGTBasisFuncs1O} = T
@@ -269,9 +271,9 @@ getindex(pb::ParamBox) = pb.data[][begin][]
 getindex(pb::ParamBox, ::Val{:first}) = getindex(pb)
 getindex(pb::ParamBox, ::Val{:last}) = getindex(pb)
 setindex!(pb::ParamBox, d) = begin pb.data[][begin][] = d end
-firstindex(::ParamBox) = Val(:first)
-lastindex(::ParamBox) = Val(:last)
-axes(::ParamBox) = ()
+firstindex(@nospecialize(_::ParamBox)) = Val(:first)
+lastindex(@nospecialize(_::ParamBox)) = Val(:last)
+axes(@nospecialize(_::ParamBox)) = ()
 
 getindex(container::ParameterizedContainer) = container.param
 
@@ -283,8 +285,8 @@ axes(sp::SpatialPoint) = axes(sp.param)
 
 getindex(b::CGTBasisFuncs1O, ::Val{:first}) = itself(b)
 getindex(b::CGTBasisFuncs1O, ::Val{:last}) = itself(b)
-firstindex(::CGTBasisFuncs1O) = Val(:first)
-lastindex(::CGTBasisFuncs1O) = Val(:last)
+firstindex(@nospecialize(_::CGTBasisFuncs1O)) = Val(:first)
+lastindex(@nospecialize(_::CGTBasisFuncs1O)) = Val(:last)
 
 @inline function getindex(bf::CGTBasisFuncs1O, i::Int)
     @boundscheck ( i==1 || throw(BoundsError(bf, i)) )
@@ -296,7 +298,7 @@ BasisFuncs(bfs.center, bfs.gauss, bfs.l[is], bfs.normalizeGTO)
 getindex(bfs::BasisFuncs, i::Int) = 
 BasisFunc(bfs.center, bfs.gauss, bfs.l[i], bfs.normalizeGTO)
 getindex(bfs::BasisFuncs, ::Colon) = itself(bfs)
-firstindex(bfs::BasisFuncs) = 1
+firstindex(@nospecialize(_::BasisFuncs)) = 1
 lastindex(::BFuncsON{ON}) where {ON} = ON
 eachindex(bfs::BFuncsON) = Base.OneTo(lastindex(bfs))
 
@@ -351,11 +353,11 @@ where `ON > 1` into multiple `GTBasisFuncs{T, D, 1}`.
 flatten(bs::AbstractVector{<:GTBasisFuncs{T, D}}) where {T, D} = 
 reshape(mapreduce(b->decomposeCore(Val(false), b), hcat, bs), :)
 
-flatten(bs::Tuple{Vararg{GTBasisFuncs{T, D}}}) where {T, D} = 
+flatten(@nospecialize(bs::Tuple{Vararg{GTBasisFuncs{T, D}}} where {T, D})) = 
 mapreduce(b->decomposeCore(Val(false), b), hcat, bs) |> Tuple
 
-flatten(bs::Union{AbstractVector{<:GTBasisFuncs{T, D, 1}}, 
-                  Tuple{Vararg{FGTBasisFuncs1O{T, D}}}}) where {T, D} = 
+flatten(@nospecialize(bs::Union{AbstractVector{<:GTBasisFuncs{T, D, 1}}, 
+                          Tuple{Vararg{FGTBasisFuncs1O{T, D}}}} where {T, D})) = 
 itself(bs)
 
 
