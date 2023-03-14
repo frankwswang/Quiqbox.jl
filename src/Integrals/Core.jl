@@ -972,18 +972,20 @@ end
 
 
 getCompositeInt(::Type{T}, ::Val{D}, ∫::F, @nospecialize(optPosArgs::Tuple), iBl::BL, 
+                ::NTuple{2, Int}, 
                 @nospecialize(bfs::NTupleOfFGTBF{2, TL, DL} where {TL, DL})) where 
                {T, D, F<:Function, BL<:iBlTypes[1]} = 
 getOneBodyInt(T, Val(D), ∫, optPosArgs, iBl, bfs)
 
 getCompositeInt(::Type{T}, ::Val{D}, ∫::F, @nospecialize(optPosArgs::Tuple), iBl::BL, 
+                ::NTuple{4, Int}, 
                 @nospecialize(bfs::NTupleOfFGTBF{4, TL, DL} where {TL, DL})) where 
                {T, D, F<:Function, BL<:iBlTypes[2]} = 
 getTwoBodyInt(T, Val(D), ∫, optPosArgs, iBl, bfs)
 
 getCompositeInt(::Type{T}, ::Val{D}, ::typeof(∫nucAttractionCore), 
                 nucAndCoords::Tuple{NTuple{NN, String}, NTuple{NN, NTuple{D, T}}}, 
-                iBl::iBlTypes[1], 
+                iBl::iBlTypes[1], ::NTuple{2, Int}, 
                 @nospecialize(bfs::NTupleOfFGTBF{2, TL, DL} where {TL, DL})) where 
                {T, D, NN} = 
 mapreduce(+, nucAndCoords[1], nucAndCoords[2]) do ele, coord
@@ -992,46 +994,52 @@ end
                           #       j==i      j!=i
 const Int1eBIndexLabels = Dict([( true,), (false,)] .=> [Val(:aa), Val(:ab)])
 
-getBN(::Val{:ContainBasisFuncs}, b::SpatialBasis) = orbitalNumOf(b)
-getBN(::Val{:WithoutBasisFuncs}, ::CGTBasisFuncs1O{<:Any, <:Any, BN}) where {BN} = BN
+getBF(::Val, ::Type{T}, ::Val{D}, b::SpatialBasis{T, D}, i) where {T, D} = 
+@inbounds getindex(b, i)
 
-getBF(::Val, ::Type{T}, ::Val{D}, 
-      b::SpatialBasis{T, D}, i) where {T, D} = @inbounds getindex(b, i)
-getBF(::Val{:WithoutBasisFuncs}, ::Type{T}, ::Val{D}, 
-      b::BasisFuncMix{T, D}, i) where {T, D} = @inbounds getindex(b.BasisFunc, i)
+# When not containing BasisFuncs
+getBF(::Val{false}, ::Type{T}, ::Val{D}, b::BasisFuncMix{T, D}, i) where {T, D} = 
+@inbounds getindex(b.BasisFunc, i)
 
 # 1e integrals for BasisFuncs/BasisFuncMix-mixed bases
 function getCompositeIntCore(::Type{T}, ::Val{D}, ::Val{BL}, ::Val{:aa}, 
                              ∫::F, @nospecialize(optPosArgs::Tuple), 
+                             sizes::NTuple{2, Int}, 
                              @nospecialize(bfs::NTuple{2, BT} where 
                                                 {TL, DL, BT<:SpatialBasis{TL, DL}})) where 
                             {T, D, BL, F<:Function}
     a = bfs[1]
-    BN = getBN(Val(BL), a)
+    BN = if BL
+        sizes[1]
+    else
+        centerNumOf(a)
+    end
     res = Array{T}(undef, BN, BN)
     for j in OneTo(BN), i in OneTo(j)
         res[j,i] = res[i,j] = 
-        getCompositeInt(T, Val(D), ∫, optPosArgs, (j==i,), 
-                        getBF(Val(BL), T, Val(D), a, i), 
-                        getBF(Val(BL), T, Val(D), a, j))
+        getCompositeInt(T, Val(D), ∫, optPosArgs, (j==i,), sizes, 
+                        getBF(Val(BL), T, Val(D), a, i), getBF(Val(BL), T, Val(D), a, j))
     end
     res
 end
 
 function getCompositeIntCore(::Type{T}, ::Val{D}, ::Val{BL}, ::Val{:ab}, 
                              ∫::F, @nospecialize(optPosArgs::Tuple), 
+                             sizes::NTuple{2, Int}, 
                              @nospecialize(bfs::NTupleOfSBN{2, TL, DL} where 
                                                 {TL, DL})) where 
                             {T, D, BL, F<:Function}
     a, b = bfs
-    BN1 = getBN(Val(BL), a)
-    BN2 = getBN(Val(BL), b)
+    BN1, BN2 = if BL
+        sizes
+    else
+        centerNumOf(a), centerNumOf(b)
+    end
     res = Array{T}(undef, BN1, BN2)
     for j in OneTo(BN2), i in OneTo(BN1)
         res[i,j] = 
-        getCompositeInt(T, Val(D), ∫, optPosArgs, Val(false), 
-                        getBF(Val(BL), T, Val(D), a, i), 
-                        getBF(Val(BL), T, Val(D), b, j))
+        getCompositeInt(T, Val(D), ∫, optPosArgs, Val(false), sizes, 
+                        getBF(Val(BL), T, Val(D), a, i), getBF(Val(BL), T, Val(D), b, j))
     end
     res
 end
@@ -1054,71 +1062,82 @@ const Int2eBIndexLabels = Dict([( true,  true,  true,  true), #1111
 # 2e integrals for BasisFuncs/BasisFuncMix-mixed bases
 function getCompositeIntCore(::Type{T}, ::Val{D}, ::Val{BL}, ::Val{:aaaa}, 
                              ∫::F, @nospecialize(optPosArgs::Tuple), 
+                             sizes::NTuple{4, Int}, 
                              @nospecialize(bfs::NTuple{4, BT} where 
                                                 {TL, DL, BT<:SpatialBasis{TL, DL}})) where 
                             {T, D, BL, F<:Function}
     a = bfs[1]
-    BN = getBN(Val(BL), a)
+    BN = if BL
+        sizes[1]
+    else
+        centerNumOf(a)
+    end
     res = Array{T}(undef, BN, BN, BN, BN)
     for l in OneTo(BN), k in OneTo(l), j in OneTo(l), i in (OneTo∘ifelse)(l==j, k, j)
         iBl = (l==k, l==j, k==j, ifelse(l==j, k, j)==i)
         res[l, k, j, i] = res[k, l, j, i] = res[k, l, i, j] = res[l, k, i, j] = 
         res[i, j, l, k] = res[j, i, l, k] = res[j, i, k, l] = res[i, j, k, l] = 
-        getCompositeInt(T, Val(D), ∫, optPosArgs, iBl, getBF(Val(BL), T, Val(D), a, i), 
-                                                       getBF(Val(BL), T, Val(D), a, j), 
-                                                       getBF(Val(BL), T, Val(D), a, k), 
-                                                       getBF(Val(BL), T, Val(D), a, l))
+        getCompositeInt(T, Val(D), ∫, optPosArgs, iBl, sizes, 
+                        getBF(Val(BL), T, Val(D), a, i), getBF(Val(BL), T, Val(D), a, j), 
+                        getBF(Val(BL), T, Val(D), a, k), getBF(Val(BL), T, Val(D), a, l))
     end
     res
 end
 
 function getCompositeIntCore(::Type{T}, ::Val{D}, ::Val{BL}, ::Val{:aabb}, 
                              ∫::F, @nospecialize(optPosArgs::Tuple), 
+                             sizes::NTuple{4, Int}, 
                              @nospecialize(bfs::Tuple{BT1, BT1, BT2, BT2} where 
                                                 {TL, DL, BT1<:SpatialBasis{TL, DL}, 
                                                          BT2<:SpatialBasis{TL, DL}})) where 
                             {T, D, BL, F<:Function}
     a = bfs[1]
     b = bfs[3]
-    BN1 = getBN(Val(BL), a)
-    BN2 = getBN(Val(BL), b)
+    BN1, BN2 = if BL
+        sizes[1], sizes[3]
+    else
+        centerNumOf(a), centerNumOf(b)
+    end
     res = Array{T}(undef, BN1, BN1, BN2, BN2)
     for l in OneTo(BN2), k in OneTo(l), j in OneTo(BN1), i in OneTo(j)
         iBl = (l==k, Val(false), Val(false), j==i)
         res[i, j, l, k] = res[j, i, l, k] = res[j, i, k, l] = res[i, j, k, l] = 
-        getCompositeInt(T, Val(D), ∫, optPosArgs, iBl, getBF(Val(BL), T, Val(D), a, i), 
-                                                       getBF(Val(BL), T, Val(D), a, j), 
-                                                       getBF(Val(BL), T, Val(D), b, k), 
-                                                       getBF(Val(BL), T, Val(D), b, l))
+        getCompositeInt(T, Val(D), ∫, optPosArgs, iBl, sizes, 
+                        getBF(Val(BL), T, Val(D), a, i), getBF(Val(BL), T, Val(D), a, j), 
+                        getBF(Val(BL), T, Val(D), b, k), getBF(Val(BL), T, Val(D), b, l))
     end
     res
 end
 
 function getCompositeIntCore(::Type{T}, ::Val{D}, ::Val{BL}, ::Val{:abab}, 
                              ∫::F, @nospecialize(optPosArgs::Tuple), 
+                             sizes::NTuple{4, Int}, 
                              @nospecialize(bfs::Tuple{BT1, BT2, BT1, BT2} where 
                                                 {TL, DL, BT1<:SpatialBasis{TL, DL}, 
                                                          BT2<:SpatialBasis{TL, DL}})) where 
                             {T, D, BL, F<:Function}
     a = bfs[1]
     b = bfs[2]
-    BN1 = getBN(Val(BL), a)
-    BN2 = getBN(Val(BL), b)
+    BN1, BN2 = if BL
+        sizes[1], sizes[2]
+    else
+        centerNumOf(a), centerNumOf(b)
+    end
     res = Array{T}(undef, BN1, BN2, BN1, BN2)
     rng = product(OneTo(BN2), OneTo(BN1))
     for (x, (l,k)) in enumerate(rng), (_, (j,i)) in zip(OneTo(x), rng)
         iBl = (Val(false), l==j, Val(false), ifelse(l==j, k==i, false))
         res[k, l, i, j] = res[i, j, k, l] = 
-        getCompositeInt(T, Val(D), ∫, optPosArgs, iBl, getBF(Val(BL), T, Val(D), a, i), 
-                                                       getBF(Val(BL), T, Val(D), b, j), 
-                                                       getBF(Val(BL), T, Val(D), a, k), 
-                                                       getBF(Val(BL), T, Val(D), b, l))
+        getCompositeInt(T, Val(D), ∫, optPosArgs, iBl, sizes, 
+                        getBF(Val(BL), T, Val(D), a, i), getBF(Val(BL), T, Val(D), b, j), 
+                        getBF(Val(BL), T, Val(D), a, k), getBF(Val(BL), T, Val(D), b, l))
     end
     res
 end
 
 function getCompositeIntCore(::Type{T}, ::Val{D}, ::Val{BL}, ::Val{:aabc}, 
                              ∫::F, @nospecialize(optPosArgs::Tuple), 
+                             sizes::NTuple{4, Int}, 
                              @nospecialize(bfs::Tuple{BT1, BT1, BT2, BT3} where 
                                                 {TL, DL, BT1<:SpatialBasis{TL, DL}, 
                                                          BT2<:SpatialBasis{TL, DL}, 
@@ -1127,23 +1146,25 @@ function getCompositeIntCore(::Type{T}, ::Val{D}, ::Val{BL}, ::Val{:aabc},
     a = bfs[1]
     b = bfs[3]
     c = bfs[4]
-    BN1 = getBN(Val(BL), a)
-    BN2 = getBN(Val(BL), b)
-    BN3 = getBN(Val(BL), c)
+    BN1, BN2, BN3 = if BL
+        sizes[1], sizes[3], sizes[4]
+    else
+        centerNumOf(a), centerNumOf(b), centerNumOf(c)
+    end
     res = Array{T}(undef, BN1, BN1, BN2, BN3)
     for l in OneTo(BN3), k in OneTo(BN2), j in OneTo(BN1), i in OneTo(j)
         iBl = (Val(false), Val(false), Val(false), j==i)
         res[j, i, k, l] = res[i, j, k, l] = 
-        getCompositeInt(T, Val(D), ∫, optPosArgs, iBl, getBF(Val(BL), T, Val(D), a, i), 
-                                                       getBF(Val(BL), T, Val(D), a, j), 
-                                                       getBF(Val(BL), T, Val(D), b, k), 
-                                                       getBF(Val(BL), T, Val(D), c, l))
+        getCompositeInt(T, Val(D), ∫, optPosArgs, iBl, sizes, 
+                        getBF(Val(BL), T, Val(D), a, i), getBF(Val(BL), T, Val(D), a, j), 
+                        getBF(Val(BL), T, Val(D), b, k), getBF(Val(BL), T, Val(D), c, l))
     end
     res
 end
 
 function getCompositeIntCore(::Type{T}, ::Val{D}, ::Val{BL}, ::Val{:abcc}, 
                              ∫::F, @nospecialize(optPosArgs::Tuple), 
+                             sizes::NTuple{4, Int}, 
                              @nospecialize(bfs::Tuple{BT1, BT2, BT3, BT3} where 
                                                 {TL, DL, BT1<:SpatialBasis{TL, DL}, 
                                                          BT2<:SpatialBasis{TL, DL}, 
@@ -1152,17 +1173,18 @@ function getCompositeIntCore(::Type{T}, ::Val{D}, ::Val{BL}, ::Val{:abcc},
     a = bfs[1]
     b = bfs[2]
     c = bfs[3]
-    BN1 = getBN(Val(BL), a)
-    BN2 = getBN(Val(BL), b)
-    BN3 = getBN(Val(BL), c)
+    BN1, BN2, BN3 = if BL
+        sizes[1], sizes[2], sizes[3]
+    else
+        centerNumOf(a), centerNumOf(b), centerNumOf(c)
+    end
     res = Array{T}(undef, BN1, BN2, BN3, BN3)
     for l in OneTo(BN3), k in OneTo(l), j in OneTo(BN2), i in OneTo(BN1)
         iBl = (l==k, Val(false), Val(false), Val(false))
         res[i, j, l, k] = res[i, j, k, l] = 
-        getCompositeInt(T, Val(D), ∫, optPosArgs, iBl, getBF(Val(BL), T, Val(D), a, i), 
-                                                       getBF(Val(BL), T, Val(D), b, j), 
-                                                       getBF(Val(BL), T, Val(D), c, k), 
-                                                       getBF(Val(BL), T, Val(D), c, l))
+        getCompositeInt(T, Val(D), ∫, optPosArgs, iBl, sizes, 
+                        getBF(Val(BL), T, Val(D), a, i), getBF(Val(BL), T, Val(D), b, j), 
+                        getBF(Val(BL), T, Val(D), c, k), getBF(Val(BL), T, Val(D), c, l))
     end
     res
 end
@@ -1175,23 +1197,24 @@ const IndexABXYbools =
 
 function getCompositeIntCore(::Type{T}, ::Val{D}, ::Val{BL}, ::IDV, 
                              ∫::F, @nospecialize(optPosArgs::Tuple), 
+                             sizes::NTuple{4, Int}, 
                              @nospecialize(bfs::NTupleOfSBN{4, TL, DL} where 
                                                 {TL, DL})) where 
                             {T, D, BL, IDV<:Union{Val{:acbc}, Val{:abbc}, Val{:abcd}}, 
                              F<:Function}
     a, b, c, d = bfs
-    BN1 = getBN(Val(BL), a)
-    BN2 = getBN(Val(BL), b)
-    BN3 = getBN(Val(BL), c)
-    BN4 = getBN(Val(BL), d)
+    BN1, BN2, BN3, BN4 = if BL
+        sizes
+    else
+        centerNumOf(a), centerNumOf(b), centerNumOf(c), centerNumOf(d)
+    end
     res = Array{T}(undef, BN1, BN2, BN3, BN4)
     for l in OneTo(BN4), k in OneTo(BN3), j in OneTo(BN2), i in OneTo(BN1)
         iBl = IndexABXYbools[IDV](j,k,l)
         res[i,j,k,l] = 
-        getCompositeInt(T, Val(D), ∫, optPosArgs, iBl, getBF(Val(BL), T, Val(D), a, i), 
-                                                       getBF(Val(BL), T, Val(D), b, j), 
-                                                       getBF(Val(BL), T, Val(D), c, k), 
-                                                       getBF(Val(BL), T, Val(D), d, l))
+        getCompositeInt(T, Val(D), ∫, optPosArgs, iBl, sizes, 
+                        getBF(Val(BL), T, Val(D), a, i), getBF(Val(BL), T, Val(D), b, j), 
+                        getBF(Val(BL), T, Val(D), c, k), getBF(Val(BL), T, Val(D), d, l))
     end
     res
 end
@@ -1208,10 +1231,12 @@ function genExpr!getCompositeInt!1(n::Int)
     quote
         getCompositeInt(::Type{T}, ::Val{D}, ∫::F, 
                         @nospecialize(optPosArgs::Tuple), iBl::BL, 
+                        sizes::NTuple{$n, Int}, 
                         @nospecialize(bfs::NTupleOfSBN{$n, TL, DL} where {TL, DL})) where 
                        {T, D, F<:Function, BL<:$iBlType} = 
-        getCompositeIntCore(T, Val(D), Val(:ContainBasisFuncs), 
-                            getBasisIndexL(Val($n), iBl), ∫, optPosArgs, bfs)
+        getCompositeIntCore(T, Val(D), Val(true), # Containing BasisFuncs
+                            getBasisIndexL(Val($n), iBl), ∫, optPosArgs, sizes, 
+                            bfs)
     end
 end
 
@@ -1220,13 +1245,15 @@ function genExpr!getCompositeInt!2(n::Int)
     quote
         getCompositeInt(::Type{T}, ::Val{D}, ∫::F, 
                         @nospecialize(optPosArgs::Tuple), iBl::BL, 
+                        sizes::NTuple{$n, Int}, 
                         @nospecialize(bfs::NTupleOfSB1{$n, TL, DL} where {TL, DL})) where 
                        {T, D, F<:Function, BL<:$iBlType} = 
         if any(bf isa EmptyBasisFunc for bf in bfs)
             zero(T)
         else
-            getCompositeIntCore(T, Val(D), Val(:WithoutBasisFuncs), 
-                                getBasisIndexL(Val($n), iBl), ∫, optPosArgs, bfs) |> sum
+            (sum∘getCompositeIntCore)(T, Val(D), Val(false), # Not containing BasisFuncs
+                                      getBasisIndexL(Val($n), iBl), ∫, optPosArgs, sizes, 
+                                      bfs)
         end
     end
 end
@@ -1238,15 +1265,17 @@ end
 
 getCompositeInt(::Type{T}, ::Val{D}, ∫::F, 
                 @nospecialize(optPosArgs::Tuple), iBl::BL, 
+                sizes::NTuple{2, Int}, 
                 @nospecialize(bfs::Vararg{SpatialBasis, 2})) where 
                {T, D, F<:Function, BL<:iBlTypes[1]} = 
-getCompositeInt(T, Val(D), ∫, optPosArgs, iBl, bfs)
+getCompositeInt(T, Val(D), ∫, optPosArgs, iBl, sizes, bfs)
 
 getCompositeInt(::Type{T}, ::Val{D}, ∫::F, 
                 @nospecialize(optPosArgs::Tuple), iBl::BL, 
+                sizes::NTuple{4, Int}, 
                 @nospecialize(bfs::Vararg{SpatialBasis, 4})) where 
                {T, D, F<:Function, BL<:iBlTypes[2]} = 
-getCompositeInt(T, Val(D), ∫, optPosArgs, iBl, bfs)
+getCompositeInt(T, Val(D), ∫, optPosArgs, iBl, sizes, bfs)
 
 
 function update2DarrBlock!(arr::AbstractMatrix{T1}, 
@@ -1270,6 +1299,7 @@ function getOneBodyInts(∫1e::F, optPosArgs::Tuple,
     Threads.@threads for j in eachindex(basisSet)
         Threads.@threads for i in OneTo(j)
             int = getCompositeInt(T, Val(D), ∫1e, optPosArgs, (j==i,), 
+                                  (subSize[i], subSize[j]), 
                                   basisSet[i], basisSet[j])
             rowRange = accuSize[i]+1 : accuSize[i+1]
             colRange = accuSize[j]+1 : accuSize[j+1]
@@ -1287,6 +1317,7 @@ function getOneBodyInts(∫1e::F, optPosArgs::Tuple,
     Threads.@threads for j in eachindex(basisSet)
         Threads.@threads for i in OneTo(j)
             int = getCompositeInt(T, Val(D), ∫1e, optPosArgs, (j==i,), 
+                                  (1, 1), 
                                   basisSet[i], basisSet[j])
             buf[j, i] = buf[i, j] = int
         end
@@ -1333,6 +1364,7 @@ function getTwoBodyInts(∫2e::F, optPosArgs::Tuple,
             L = accuSize[l]+1 : accuSize[l+1]
             iBl = (l==k, l==j, k==j, ifelse(l==j, k, j)==i)
             int = getCompositeInt(T, Val(D), ∫2e, optPosArgs, iBl, 
+                                  (subSize[i], subSize[j], subSize[k], subSize[l]), 
                                   basisSet[i], basisSet[j], basisSet[k], basisSet[l])
             update4DarrBlock!(buf, int, I, J, K, L)
         end
@@ -1350,6 +1382,7 @@ function getTwoBodyInts(∫2e::F, optPosArgs::Tuple,
         Threads.@spawn begin
             iBl = (l==k, l==j, k==j, ifelse(l==j, k, j)==i)
             int = getCompositeInt(T, Val(D), ∫2e, optPosArgs, iBl, 
+                                  (1, 1, 1, 1), 
                                   basisSet[i], basisSet[j], basisSet[k], basisSet[l])
                 buf[l, k, j, i] = buf[k, l, j, i] = buf[k, l, i, j] = buf[l, k, i, j] = 
                 buf[i, j, l, k] = buf[j, i, l, k] = buf[j, i, k, l] = buf[i, j, k, l] = int

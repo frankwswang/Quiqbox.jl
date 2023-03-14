@@ -17,7 +17,7 @@ eeInteraction(bf1::AbstractGTBasisFuncs{T, D, 1},
               bf4::AbstractGTBasisFuncs{T, D, 1}) where {T, D} = 
 getCompositeInt(T, Val(D), ∫eeInteractionCore, (), 
                 (bf4===bf3, bf4===bf2, bf3===bf2, ifelse(bf4===bf2, bf3, bf2)===bf1), 
-                bf1, bf2, bf3, bf4)
+                (1, 1, 1, 1), bf1, bf2, bf3, bf4)
 
 
 """
