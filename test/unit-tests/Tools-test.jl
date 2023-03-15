@@ -5,8 +5,8 @@ using Quiqbox: getAtolVal, getAtolDigits, roundToMultiOfStep, nearestHalfOf, get
                markUnique, getUnique!, itself, themselves, replaceSymbol, groupedSort, 
                mapPermute, getFunc, nameOf, tupleDiff, genIndex, fillObj, arrayToTuple, 
                genTupleCoords, uniCallFunc, mergeMultiObjs, isNaN, getBool, skipIndices, 
-               isOscillateConverged, collectTuple, asymSign, numEps, genAdaptStepBl, 
-               shiftLastEle!, getValParm
+               isOscillateConverged, lazyCollect, asymSign, numEps, genAdaptStepBl, 
+               shiftLastEle!, getValParm, fct, δ
 using Suppressor: @capture_out
 using LinearAlgebra: norm
 
@@ -275,15 +275,15 @@ end
 @test norm(convRes2[end]) < convAtol*(sqrt∘length)(convRes2[end])
 
 
-# function collectTuple
+# function lazyCollect
 tpl1 = (1,2,3)
 arr1 = collect(tpl1)
-@test collectTuple(1) == fill(1)
-@test collectTuple(1:3) == arr1 == collect(1:3)
-@test collectTuple(1:3) !== arr1
-@test collectTuple(tpl1) == arr1
-@test collectTuple(tpl1) !== arr1
-@test collectTuple(arr1) === arr1
+@test lazyCollect(1) == fill(1)
+@test lazyCollect(1:3) == arr1 == collect(1:3)
+@test lazyCollect(1:3) !== arr1
+@test lazyCollect(tpl1) == arr1
+@test lazyCollect(tpl1) !== arr1
+@test lazyCollect(arr1) === arr1
 
 
 # function asymSign
