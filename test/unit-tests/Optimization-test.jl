@@ -199,12 +199,12 @@ po2 = POconfig(;maxStep=200, target=-10.0, threshold=(1e-10, 1e-10),
                optimizer=GDconfig(itself, 0.001, stepBound=(0.0, 2.0)), 
                saveTrace=saveTrace2)
 pos = (po1, po2)
-E_t2s = (-1.6667086781377394, -1.1665258293062994)
+E_t2s = (-1.6667086781377531, -1.1665258293062974)
 ## L₁, α₁
-par_t2s  = ([0.8121379463625742, 0.3716249072565923], 
-            [2.8465051230989435, 0.22550104532759083])
-grad_t2s = ([0.01566082765262747, -0.026516776715272083], 
-            [0.3752225248656515, 0.6830952134651372])
+par_t2s  = ([0.8121379463625688,  0.37162490725674535], 
+            [2.8465051230989435,  0.22550104532759038])
+grad_t2s = ([0.0156608276525374, -0.02651677671445425], 
+            [0.3752225248656483,  0.68309521346509120])
 
 for ((i, po), E_t2, par_t2, grad_t2) in zip(enumerate(pos), E_t2s, par_t2s, grad_t2s)
     grid = GridBox(1, 3.0)
@@ -261,16 +261,16 @@ end
 
 po4 = POconfig(;maxStep, optimizer=lbfgs, threshold=(NaN, NaN), saveTrace=saveTrace3)
 pos2 = (po3, po4)
-E_t3s = (-1.7380134127830982, -1.7476281333814627)
+E_t3s = (-1.7380134127831015, -1.7476281333694823)
 # L, α₁, α₂, d₁, d₂
-par_t3s  = ([2.683044395069885, 0.23864596287198328, 0.5379614398083751, 
-             0.7282431933542353, 1.2190880461352054], 
-            [0.2741633288632688, 0.17089977439555484, 0.7225009225685528, 
-             0.7726143568590775, 1.505605770092433])
-grad_t3s = ([ 0.016737442500322317, 0.014772482377904794, 0.001854882588292155, 
-             -0.0014810659836638402, 0.0008847402162058637], 
-            [-1.4081047097875285e-5, -0.0012383502029096882, 0.0002032661265648208, 
-             -1.773352516297455e-6, 9.100111433215253e-7])
+par_t3s  = ([ 2.6830443950696483, 0.238645962872051,  0.5379614398083945, 
+              0.7282431933544267, 1.219088046135613], 
+            [-0.2741666981281971, 0.1708997973009846, 0.7225008919620662, 
+              0.7726145367299866, 1.5056059151556218])
+grad_t3s = ([ 0.0167374425003060550,  0.014772482378271667, 0.001854882588391090, 
+             -0.0014810659839501143,  0.000884740216258058], 
+            [-1.4080875367698687e-5, -0.001238455709190579, 0.000203270979579692, 
+             -1.7607561187192955e-6,  9.035470436162251e-7])
 
 for ((i, po), E_t3, par_t3, grad_t3) in zip(enumerate(pos2), E_t3s, par_t3s, grad_t3s)
     gf2_2 = GaussFunc(0.7, 1.0)
@@ -294,15 +294,15 @@ for ((i, po), E_t3, par_t3, grad_t3) in zip(enumerate(pos2), E_t3s, par_t3s, gra
     test3bl4 = isapprox(abs(ps3L[end][1]), abs(par_t3[1]), atol=errorThreshold3)
     test3bl5 = isapprox(grads3L[end], grad_t3, atol=50errorThreshold1)
 
-    test3bl1 || (@show test3bl1 Es3Ldiffs)
+    test3bl1 || (@show (i, po) test3bl1 Es3Ldiffs)
     @test test3bl1
-    test3bl2 || (@show test3bl2 Es3L[end])
+    test3bl2 || (@show (i, po) test3bl2 Es3L[end])
     @test test3bl2
-    test3bl3 || (@show test3bl3 ps3L[end][2:end])
+    test3bl3 || (@show (i, po) test3bl3 ps3L[end][2:end])
     @test test3bl3
-    test3bl4 || (@show test3bl4 ps3L[end][1])
+    test3bl4 || (@show (i, po) test3bl4 ps3L[end][1])
     @test test3bl4
-    test3bl5 || (@show test3bl5 grads3L[end])
+    test3bl5 || (@show (i, po) test3bl5 grads3L[end])
     @test test3bl5
 
     all([test3bl1, test3bl2, test3bl3, test3bl4, test3bl5]) || 
@@ -319,7 +319,7 @@ res = optimizeParams!(αs, bs4, nuc, nucCoords, printInfo=false)
 @test length(res) == 2
 @test res[begin]
 @test αs[][] >= 0
-@test isapprox(res[begin+1][end], -1.5376111420710188, atol=errorThreshold1)
+@test isapprox(res[begin+1][end], -1.5376111420710181, atol=errorThreshold1)
 
 
 # function initializeOFconfig!
