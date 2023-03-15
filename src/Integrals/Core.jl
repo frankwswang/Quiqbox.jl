@@ -180,7 +180,7 @@ function genIntNucAttCore(ΔRR₀::NTuple{3, T}, ΔR₁R₂::NTuple{3, T}, β::T
 
                 for u in 0:(μˣ÷2), v in 0:(μʸ÷2), w in 0:(μᶻ÷2)
                     γ = μsum - u - v - w
-                    tmp += prod((u, v, w) .|> core2s) * 2Fγs[γ+1]
+                    @inbounds tmp += prod((u, v, w) .|> core2s) * 2Fγs[γ+1]
                 end
 
                 A += prod(rst .|> core1s) * tmp
@@ -291,7 +291,7 @@ function ∫eeInteractionCore1234(ΔRl::NTuple{3, T}, ΔRr::NTuple{3, T},
 
                 for u in 0:(μˣ÷2), v in 0:(μʸ÷2), w in 0:(μᶻ÷2)
                     γ = μsum - u - v - w
-                    tmp += prod((u, v, w) .|> core3s) * 2Fγs[γ+1]
+                    @inbounds tmp += prod((u, v, w) .|> core3s) * 2Fγs[γ+1]
                 end
 
                 A += prod(rst₁ .|> core1s) * prod(rst₂ .|> core2s) * tmp
@@ -611,8 +611,9 @@ function getIntCore1212!(n::Int,
                          (ps₁, ps₂)) where {T}
     oneSidePairs = product(eachindex(ps₁), eachindex(ps₂))
     for (x, (i₁,i₂)) in enumerate(oneSidePairs), (_, (i₃,i₄)) in zip(OneTo(x), oneSidePairs)
-        n = getUniquePair!(n, uniquePairs, uPairCoeffs, flags, 
-                           (ps₁[i₁], ps₂[i₂], ps₁[i₃], ps₂[i₄]), 1<<(i₁!=i₃ || i₂!=i₄))
+        @inbounds n = getUniquePair!(n, uniquePairs, uPairCoeffs, flags, 
+                                     (ps₁[i₁], ps₂[i₂], ps₁[i₃], ps₂[i₄]), 
+                                     1<<(i₁!=i₃ || i₂!=i₄))
     end
     n
 end
@@ -624,8 +625,9 @@ function getIntCore1221!(n::Int,
                          (ps₁, ps₂)) where {T}
     oneSidePairs = product(eachindex(ps₁), eachindex(ps₂))
     for (x, (i₁,i₂)) in enumerate(oneSidePairs), (_, (i₃,i₄)) in zip(OneTo(x), oneSidePairs)
-        n = getUniquePair!(n, uniquePairs, uPairCoeffs, flags, 
-                           (ps₁[i₁], ps₂[i₂], ps₂[i₄], ps₁[i₃]), 1<<(i₁!=i₃ || i₂!=i₄))
+        @inbounds n = getUniquePair!(n, uniquePairs, uPairCoeffs, flags, 
+                                     (ps₁[i₁], ps₂[i₂], ps₂[i₄], ps₁[i₃]), 
+                                     1<<(i₁!=i₃ || i₂!=i₄))
     end
     n
 end
@@ -991,10 +993,11 @@ function get1BCompIntCore(::Type{T}, ::Val{D}, ::Val{BL}, ::Val{:aa},
         centerNumOf(a)
     end
     res = Array{T}(undef, BN, BN)
-    @inbounds for j in OneTo(BN), i in OneTo(j)
-        res[j,i] = res[i,j] = 
-        get1BCompInt(T, Val(D), ∫, optPosArgs, (j==i,), sizes, 
-                     getBF(Val(BL), T, Val(D), a, i), getBF(Val(BL), T, Val(D), a, j))
+    for j in OneTo(BN), i in OneTo(j)
+        @inbounds res[j,i] = res[i,j] = 
+                  get1BCompInt(T, Val(D), ∫, optPosArgs, (j==i,), sizes, 
+                               getBF(Val(BL), T, Val(D), a, i), 
+                               getBF(Val(BL), T, Val(D), a, j))
     end
     res
 end
@@ -1011,10 +1014,11 @@ function get1BCompIntCore(::Type{T}, ::Val{D}, ::Val{BL}, ::Val{:ab},
         centerNumOf(a), centerNumOf(b)
     end
     res = Array{T}(undef, BN1, BN2)
-    @inbounds for j in OneTo(BN2), i in OneTo(BN1)
-        res[i,j] = 
-        get1BCompInt(T, Val(D), ∫, optPosArgs, Val(false), sizes, 
-                     getBF(Val(BL), T, Val(D), a, i), getBF(Val(BL), T, Val(D), b, j))
+    for j in OneTo(BN2), i in OneTo(BN1)
+        @inbounds res[i,j] = 
+                  get1BCompInt(T, Val(D), ∫, optPosArgs, Val(false), sizes, 
+                               getBF(Val(BL), T, Val(D), a, i), 
+                               getBF(Val(BL), T, Val(D), b, j))
     end
     res
 end
@@ -1048,13 +1052,15 @@ function get2BCompIntCore(::Type{T}, ::Val{D}, ::Val{BL}, ::Val{:aaaa},
         centerNumOf(a)
     end
     res = Array{T}(undef, BN, BN, BN, BN)
-    @inbounds for l in OneTo(BN), k in OneTo(l), j in OneTo(l), i in (OneTo∘ifelse)(l==j, k, j)
+    for l in OneTo(BN), k in OneTo(l), j in OneTo(l), i in (OneTo∘ifelse)(l==j, k, j)
         iBl = (l==k, l==j, k==j, ifelse(l==j, k, j)==i)
-        res[l, k, j, i] = res[k, l, j, i] = res[k, l, i, j] = res[l, k, i, j] = 
-        res[i, j, l, k] = res[j, i, l, k] = res[j, i, k, l] = res[i, j, k, l] = 
-        get2BCompInt(T, Val(D), ∫, optPosArgs, iBl, sizes, 
-                     getBF(Val(BL), T, Val(D), a, i), getBF(Val(BL), T, Val(D), a, j), 
-                     getBF(Val(BL), T, Val(D), a, k), getBF(Val(BL), T, Val(D), a, l))
+        @inbounds res[l, k, j, i] = res[k, l, j, i] = res[k, l, i, j] = res[l, k, i, j] = 
+                  res[i, j, l, k] = res[j, i, l, k] = res[j, i, k, l] = res[i, j, k, l] = 
+                  get2BCompInt(T, Val(D), ∫, optPosArgs, iBl, sizes, 
+                               getBF(Val(BL), T, Val(D), a, i), 
+                               getBF(Val(BL), T, Val(D), a, j), 
+                               getBF(Val(BL), T, Val(D), a, k), 
+                               getBF(Val(BL), T, Val(D), a, l))
     end
     res
 end
@@ -1073,12 +1079,14 @@ function get2BCompIntCore(::Type{T}, ::Val{D}, ::Val{BL}, ::Val{:aabb},
         centerNumOf(a), centerNumOf(b)
     end
     res = Array{T}(undef, BN1, BN1, BN2, BN2)
-    @inbounds for l in OneTo(BN2), k in OneTo(l), j in OneTo(BN1), i in OneTo(j)
+    for l in OneTo(BN2), k in OneTo(l), j in OneTo(BN1), i in OneTo(j)
         iBl = (l==k, Val(false), Val(false), j==i)
-        res[i, j, l, k] = res[j, i, l, k] = res[j, i, k, l] = res[i, j, k, l] = 
-        get2BCompInt(T, Val(D), ∫, optPosArgs, iBl, sizes, 
-                     getBF(Val(BL), T, Val(D), a, i), getBF(Val(BL), T, Val(D), a, j), 
-                     getBF(Val(BL), T, Val(D), b, k), getBF(Val(BL), T, Val(D), b, l))
+        @inbounds res[i, j, l, k] = res[j, i, l, k] = res[j, i, k, l] = res[i, j, k, l] = 
+                  get2BCompInt(T, Val(D), ∫, optPosArgs, iBl, sizes, 
+                               getBF(Val(BL), T, Val(D), a, i), 
+                               getBF(Val(BL), T, Val(D), a, j), 
+                               getBF(Val(BL), T, Val(D), b, k), 
+                               getBF(Val(BL), T, Val(D), b, l))
     end
     res
 end
@@ -1098,12 +1106,14 @@ function get2BCompIntCore(::Type{T}, ::Val{D}, ::Val{BL}, ::Val{:abab},
     end
     res = Array{T}(undef, BN1, BN2, BN1, BN2)
     rng = product(OneTo(BN2), OneTo(BN1))
-    @inbounds for (x, (l,k)) in enumerate(rng), (_, (j,i)) in zip(OneTo(x), rng)
+    for (x, (l,k)) in enumerate(rng), (_, (j,i)) in zip(OneTo(x), rng)
         iBl = (Val(false), l==j, Val(false), ifelse(l==j, k==i, false))
-        res[k, l, i, j] = res[i, j, k, l] = 
-        get2BCompInt(T, Val(D), ∫, optPosArgs, iBl, sizes, 
-                     getBF(Val(BL), T, Val(D), a, i), getBF(Val(BL), T, Val(D), b, j), 
-                     getBF(Val(BL), T, Val(D), a, k), getBF(Val(BL), T, Val(D), b, l))
+        @inbounds res[k, l, i, j] = res[i, j, k, l] = 
+                  get2BCompInt(T, Val(D), ∫, optPosArgs, iBl, sizes, 
+                               getBF(Val(BL), T, Val(D), a, i), 
+                               getBF(Val(BL), T, Val(D), b, j), 
+                               getBF(Val(BL), T, Val(D), a, k), 
+                               getBF(Val(BL), T, Val(D), b, l))
     end
     res
 end
@@ -1123,12 +1133,14 @@ function get2BCompIntCore(::Type{T}, ::Val{D}, ::Val{BL}, ::Val{:aabc},
         centerNumOf(a), centerNumOf(b), centerNumOf(c)
     end
     res = Array{T}(undef, BN1, BN1, BN2, BN3)
-    @inbounds for l in OneTo(BN3), k in OneTo(BN2), j in OneTo(BN1), i in OneTo(j)
+    for l in OneTo(BN3), k in OneTo(BN2), j in OneTo(BN1), i in OneTo(j)
         iBl = (Val(false), Val(false), Val(false), j==i)
-        res[j, i, k, l] = res[i, j, k, l] = 
-        get2BCompInt(T, Val(D), ∫, optPosArgs, iBl, sizes, 
-                     getBF(Val(BL), T, Val(D), a, i), getBF(Val(BL), T, Val(D), a, j), 
-                     getBF(Val(BL), T, Val(D), b, k), getBF(Val(BL), T, Val(D), c, l))
+        @inbounds res[j, i, k, l] = res[i, j, k, l] = 
+                  get2BCompInt(T, Val(D), ∫, optPosArgs, iBl, sizes, 
+                               getBF(Val(BL), T, Val(D), a, i), 
+                               getBF(Val(BL), T, Val(D), a, j), 
+                               getBF(Val(BL), T, Val(D), b, k), 
+                               getBF(Val(BL), T, Val(D), c, l))
     end
     res
 end
@@ -1148,12 +1160,14 @@ function get2BCompIntCore(::Type{T}, ::Val{D}, ::Val{BL}, ::Val{:abcc},
         centerNumOf(a), centerNumOf(b), centerNumOf(c)
     end
     res = Array{T}(undef, BN1, BN2, BN3, BN3)
-    @inbounds for l in OneTo(BN3), k in OneTo(l), j in OneTo(BN2), i in OneTo(BN1)
+    for l in OneTo(BN3), k in OneTo(l), j in OneTo(BN2), i in OneTo(BN1)
         iBl = (l==k, Val(false), Val(false), Val(false))
-        res[i, j, l, k] = res[i, j, k, l] = 
-        get2BCompInt(T, Val(D), ∫, optPosArgs, iBl, sizes, 
-                     getBF(Val(BL), T, Val(D), a, i), getBF(Val(BL), T, Val(D), b, j), 
-                     getBF(Val(BL), T, Val(D), c, k), getBF(Val(BL), T, Val(D), c, l))
+        @inbounds res[i, j, l, k] = res[i, j, k, l] = 
+                  get2BCompInt(T, Val(D), ∫, optPosArgs, iBl, sizes, 
+                               getBF(Val(BL), T, Val(D), a, i), 
+                               getBF(Val(BL), T, Val(D), b, j), 
+                               getBF(Val(BL), T, Val(D), c, k), 
+                               getBF(Val(BL), T, Val(D), c, l))
     end
     res
 end
@@ -1177,12 +1191,14 @@ function get2BCompIntCore(::Type{T}, ::Val{D}, ::Val{BL}, ::IDV,
         centerNumOf.(bfs)
     end
     res = Array{T}(undef, BN1, BN2, BN3, BN4)
-    @inbounds for l in OneTo(BN4), k in OneTo(BN3), j in OneTo(BN2), i in OneTo(BN1)
+    for l in OneTo(BN4), k in OneTo(BN3), j in OneTo(BN2), i in OneTo(BN1)
         iBl = IndexABXYbools[IDV](j,k,l)
-        res[i,j,k,l] = 
-        get2BCompInt(T, Val(D), ∫, optPosArgs, iBl, sizes, 
-                     getBF(Val(BL), T, Val(D), a, i), getBF(Val(BL), T, Val(D), b, j), 
-                     getBF(Val(BL), T, Val(D), c, k), getBF(Val(BL), T, Val(D), d, l))
+        @inbounds res[i,j,k,l] = 
+                  get2BCompInt(T, Val(D), ∫, optPosArgs, iBl, sizes, 
+                               getBF(Val(BL), T, Val(D), a, i), 
+                               getBF(Val(BL), T, Val(D), b, j), 
+                               getBF(Val(BL), T, Val(D), c, k), 
+                               getBF(Val(BL), T, Val(D), d, l))
     end
     res
 end
