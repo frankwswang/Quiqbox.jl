@@ -9,7 +9,6 @@ export GaussFunc, genExponent, genContraction, SpatialPoint, genSpatialPoint, co
 export P1D, P2D, P3D
 
 using LinearAlgebra: diag
-using ForwardDiff: derivative as ForwardDerivative
 
 """
 
@@ -198,8 +197,9 @@ ParamBox{Float64, :X, iT}(1.2)[∂][X]
 ```
 """
 genSpatialPoint(v::AbstractVector) = genSpatialPoint(Tuple(v))
-genSpatialPoint(v::NTuple{D, Union{T, Array{T, 0}}}) where {D, T<:AbstractFloat} = 
-genSpatialPoint.(v, Tuple([1:D;])) |> genSpatialPointCore
+genSpatialPoint(v::Tuple{Union{T, Array{T, 0}}, Vararg{Union{T, Array{T, 0}}, D}}) where 
+               {D, T<:AbstractFloat} = 
+genSpatialPoint.(v, Tuple([1:(D+1);])) |> genSpatialPointCore
 
 """
 
@@ -548,13 +548,13 @@ genBasisFunc(cen::SpatialPoint{T, D}, gs::NTuple{GN, AbstractGaussFunc{T}},
 BasisFunc(cen, gs, l|>LTuple, normalizeGTO)
 
 genBasisFunc(cen::SpatialPoint{T, D}, gs::NTuple{GN, AbstractGaussFunc{T}}, 
-             ls::NTuple{ON, LTuple{D, 𝑙}}; normalizeGTO::Bool=false) where 
-            {T, D, GN, ON, 𝑙} = 
+             ls::Tuple{LTuple{D, 𝑙}, Vararg{LTuple{D, 𝑙}}}; normalizeGTO::Bool=false) where 
+            {T, D, GN, 𝑙} = 
 BasisFuncs(cen, gs, ls, normalizeGTO)
 
 genBasisFunc(cen::SpatialPoint{T, D}, gs::NTuple{GN, AbstractGaussFunc{T}}, 
-             ls::NTuple{ON, NTuple{D, Int}}; normalizeGTO::Bool=false) where 
-            {T, D, GN, ON} = 
+             ls::Tuple{NTuple{D, Int}, Vararg{NTuple{D, Int}}}; 
+             normalizeGTO::Bool=false) where {T, D, GN} = 
 BasisFuncs(cen, gs, ls.|>LTuple, normalizeGTO)
 
 genBasisFunc(cen::SpatialPoint{T, D}, gs::NTuple{GN, AbstractGaussFunc{T}}, 
@@ -624,12 +624,12 @@ genBasisFunc(bf::FloatingGTBasisFuncs) = itself(bf)
 genBasisFunc(bf::FloatingGTBasisFuncs{T, D}, cen::SpatialPoint{T, D}) where {T, D} = 
 genBasisFunc(cen, bf.gauss, bf.l, normalizeGTO=bf.normalizeGTO)
 
-genBasisFunc(bf::FloatingGTBasisFuncs{T, D}, gs::Tuple{Vararg{AbstractGaussFunc{T}}}) where 
-            {T, D} = 
+genBasisFunc(bf::FloatingGTBasisFuncs{T, D}, 
+             gs::Tuple{AbstractGaussFunc{T}, Vararg{AbstractGaussFunc{T}}}) where {T, D} = 
 genBasisFunc(bf.center, gs, bf.l, normalizeGTO=bf.normalizeGTO)
 
-genBasisFunc(bf::FloatingGTBasisFuncs{T, D}, ls::Tuple{Vararg{LTuple{D, 𝑙}}}) where 
-            {T, D, 𝑙} = 
+genBasisFunc(bf::FloatingGTBasisFuncs{T, D}, 
+             ls::Tuple{LTuple{D, 𝑙}, Vararg{LTuple{D, 𝑙}}}) where {T, D, 𝑙} = 
 genBasisFunc(bf.center, bf.gauss, ls, normalizeGTO=bf.normalizeGTO)
 
 genBasisFunc(bf::FloatingGTBasisFuncs{T, D}, normalizeGTO::Bool) where {T, D} = 
@@ -1914,8 +1914,13 @@ procedure) will be marked with same index. `filterMapping` determines whether fi
 represent different output variables. The independent variable held by a `ParamBox` can be 
 inspected using [`indVarOf`](@ref).
 """
-markParams!(b::Union{AbstractVector{T}, T, Tuple{Vararg{T}}}, 
-            filterMapping::Bool=false) where {T<:ParameterizedContainer} = 
+markParams!(b::Union{AbstractVector{T}, T}, filterMapping::Bool=false) where 
+           {T<:ParameterizedContainer} = 
+markParams!(getParams(b), filterMapping)
+
+markParams!(@nospecialize(b::Tuple{ParameterizedContainer, 
+                                   Vararg{ParameterizedContainer}}), 
+            filterMapping::Bool=false) = 
 markParams!(getParams(b), filterMapping)
 
 function markParams!(pars::AbstractVector{<:ParamBox}, filterMapping::Bool=false)
@@ -1968,7 +1973,8 @@ function markParamsCore2!(parArray::AbstractVector{<:ParamBox})
     uniqueParams
 end
 
-markParams!(parTuple::Tuple{Vararg{ParamBox}}, filterMapping::Bool=false) = 
+markParams!(@nospecialize(parTuple::Tuple{ParamBox, Vararg{ParamBox}}), 
+            filterMapping::Bool=false) = 
 markParams!(collect(parTuple), filterMapping)
 
 
