@@ -278,6 +278,7 @@ end
 # function collectTuple
 tpl1 = (1,2,3)
 arr1 = collect(tpl1)
+@test collectTuple(1) == fill(1)
 @test collectTuple(1:3) == arr1 == collect(1:3)
 @test collectTuple(1:3) !== arr1
 @test collectTuple(tpl1) == arr1
@@ -289,6 +290,18 @@ arr1 = collect(tpl1)
 @test asymSign(0) == 1
 @test asymSign(1.1) == 1
 @test asymSign(-1.1) == -1
+
+
+# struct FuncArgConfig
+fWrapper1 = Quiqbox.FuncArgConfig(isapprox, [20, 20.0005], [:atol=>1e-3])
+@test fWrapper1(isapprox)
+
+fWrapper2 = Quiqbox.FuncArgConfig(isapprox, [20, 20+2e-12])
+@test fWrapper2(isapprox)
+
+foo1 = ()->true
+fWrapper3 = Quiqbox.FuncArgConfig(foo1)
+@test fWrapper3(foo1)
 
 
 # function numEps
@@ -328,5 +341,11 @@ residuum =  vect - vectBackup
 vNum = rand()
 v = Val(vNum)
 @test getValParm(v) == getValParm(typeof(v)) == vNum
+
+
+# function fct δ
+num = 3.0
+@test fct(num) == factorial(Int(num))
+@test δ(0, δ(1, 2)) == 1
 
 end
