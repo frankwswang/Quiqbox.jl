@@ -249,7 +249,8 @@ bfm_bf2_P =  BasisFuncMix(bf2_P_norm3|>collect)
       (Float64, 3, 1, BasisFunc{Float64, 3, 0, 1, P3D{Float64, iT, iT, iT}})
 
 errorThreshold2 = 5e-15
-bs1 = genBasisFunc.(gridCoordOf(GridBox(1,1.5)), Ref(GaussFunc(1.0, 0.5)))
+gb1 = GridBox(1,1.5)
+bs1 = genBasisFunc.(gridCoordOf(gb1), Ref(GaussFunc(1.0, 0.5)))
 nuc = ["H", "H"]
 nucCoords = [rand(3), rand(3)]
 bfm = BasisFuncMix(bs1)
@@ -265,6 +266,11 @@ V = neAttractions([bfm], nuc, nucCoords)[]
 eeI = eeInteractions([bfm])[]
 @test eeI == eeInteraction(bfm, bfm, bfm, bfm)[]
 @test isapprox(eeI, eeInteractions(bs1) |> sum, atol=errorThreshold2)
+
+# function centerNumOf
+@test centerNumOf(bfs1[end]) == 1
+@test centerNumOf(bf5) == centerNumOf(bf5_2) == 1
+@test centerNumOf(bfm) == length(gb1.point)
 
 
 # function isaFullShellBasisFuncs

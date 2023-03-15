@@ -1,9 +1,9 @@
 export GaussFunc, genExponent, genContraction, SpatialPoint, genSpatialPoint, coordOf, 
        BasisFunc, BasisFuncs, genBasisFunc, lOf, subshellOf, centerOf, centerCoordOf, 
-       unpackBasis, gaussCoeffOf, dimOf, GTBasis, sortBasisFuncs, sortPermBasisFuncs, 
-       sortBasis, sortPermBasis, add, mergeBasisFuncsIn, mul, shift, decompose, 
-       orbitalNumOf, genBasisFuncText, genBFuncsFromText, assignCenInVal!, getParams, 
-       copyBasis, markParams!, hasNormFactor, getNormFactor, absorbNormFactor, 
+       centerNumOf, unpackBasis, gaussCoeffOf, dimOf, GTBasis, sortBasisFuncs, 
+       sortPermBasisFuncs, sortBasis, sortPermBasis, add, mergeBasisFuncsIn, mul, shift, 
+       decompose, orbitalNumOf, genBasisFuncText, genBFuncsFromText, assignCenInVal!, 
+       getParams, copyBasis, markParams!, hasNormFactor, getNormFactor, absorbNormFactor, 
        normalizeBasis
 
 export P1D, P2D, P3D
@@ -732,6 +732,15 @@ centerOf(bf::FloatingGTBasisFuncs) = bf.center
 Return the center coordinate of the input `FloatingGTBasisFuncs`.
 """
 centerCoordOf(bf::FloatingGTBasisFuncs) = coordOf(bf.center)
+
+
+"""
+
+    centerNumOf(bf::CompositeGTBasisFuncs) -> Int
+
+Return the number of center (coordinates) associated with the input `CompositeGTBasisFuncs`.
+"""
+centerNumOf(::CompositeGTBasisFuncs{<:Any, <:Any, BN}) where {BN} = BN
 
 
 """
@@ -1565,8 +1574,8 @@ end
 
 Return the size (number of orbitals) of each subshell in `D` dimensional real space.
 """
-@inline orbitalNumOf(subshell::String, D::Integer=3) = 
-        SubshellSizeList[D][ToSubshellLN[subshell]]
+orbitalNumOf(subshell::String, D::Integer=3) = 
+SubshellSizeList[D][ToSubshellLN[subshell]]
 
 """
 
@@ -1574,7 +1583,7 @@ Return the size (number of orbitals) of each subshell in `D` dimensional real sp
 
 Return the numbers of orbitals of the input basis.
 """
-@inline orbitalNumOf(::QuiqboxBasis{<:Any, <:Any, ON}) where {ON} = ON
+orbitalNumOf(::QuiqboxBasis{<:Any, <:Any, ON}) where {ON} = ON
 
 
 # Core function to generate a customized X-Gaussian (X>1) basis function.

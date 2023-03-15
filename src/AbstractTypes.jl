@@ -72,6 +72,7 @@ abstract type CompositeGTBasisFuncs{NumberT, D, NofLinearlyCombinedBasis, Orbita
 abstract type FloatingGTBasisFuncs{NumberT, D, 𝑙, GaussFuncN, PointT, OrbitalN} <: CompositeGTBasisFuncs{NumberT, D, 1, OrbitalN} end
 
 
+const SpatialBasis1O{T, D} = SpatialBasis{T, D, 1}
 const CGTBasisFuncsON{ON} = CompositeGTBasisFuncs{<:Any, <:Any, <:Any, ON}
 const CGTBasisFuncs1O{T, D, BN} = CompositeGTBasisFuncs{T, D, BN, 1}
 
@@ -87,3 +88,8 @@ const SpatialCoordType{T, D, N} = Union{ AbstractVector{<:AbstractVector{<:T}},
 const AVectorOrNTuple{T, N} = Union{NTuple{N, T}, AbstractVector{<:T}}
 
 const AArrayOrNTuple{T, N} = Union{NTuple{N, T}, AbstractArray{<:T}}
+
+
+const NTupleOfFGTBF{BN, T, D} = NTuple{BN, FGTBasisFuncs1O{T, D}}
+const NTupleOfSB1{BN, T, D} = NTuple{BN, SpatialBasis1O{T, D}}
+const NTupleOfSBN{BN, T, D} = NTuple{BN, SpatialBasis{T, D}}
