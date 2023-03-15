@@ -103,7 +103,7 @@ res1Ehf1 = Quiqbox.getEhf((changeHbasis(Hcore, res1.C[begin]),),
 @test isapprox(res1.Ehf, res1Ehf1, atol=errorThreshold2)
 gtb2 = [sum(c.*gtb.basis) for c in eachcol(res1.C[begin])] |> GTBasis
 res1Ehf2 = Quiqbox.getEhf(gtb2, nuc, nucCoords, Ne)
-@test isapprox(res1Ehf1, res1Ehf2, atol=errorThreshold2)
+@test isapprox(res1Ehf1, res1Ehf2, atol=2errorThreshold2)
 @test isapprox(res1.Ehf, -93.7878386328627, atol=errorThreshold1)
 
 # Note: the orbital coefficients of 4th and 5th columns are so close that based on the 

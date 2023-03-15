@@ -1181,9 +1181,9 @@ function mergeBasisFuncsIn(bs::AVectorOrNTuple{GTBasisFuncs{T, D}};
                            roundAtol::Real=NaN) where {T, D}
     ids = findall(x->isa(x, FGTBasisFuncs1O), bs)
     if isempty(ids)
-        collectTuple(bs)
+        lazyCollect(bs)
     else
-        vcat(mergeBasisFuncs(bs[ids]...; roundAtol), collectTuple(bs[1:end .∉ Ref(ids)]))
+        vcat(mergeBasisFuncs(bs[ids]...; roundAtol), lazyCollect(bs[1:end .∉ Ref(ids)]))
     end
 end
 

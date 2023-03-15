@@ -23,7 +23,7 @@ get1BCompInt(T, Val(D), ∫overlapCore, (), (bf2===bf1,), (1, 1), bf1, bf2)
 Return the orbital overlap matrix given a basis set.
 """
 overlaps(bs::AVectorOrNTuple{AbstractGTBasisFuncs{T, D}}) where {T, D} = 
-getOneBodyInts(∫overlapCore, (), collectTuple(bs))
+getOneBodyInts(∫overlapCore, (), lazyCollect(bs))
 
 
 """
@@ -48,7 +48,7 @@ get1BCompInt(T, Val(D), ∫elecKineticCore, (), (bf2===bf1,), (1, 1), bf1, bf2)
 Return the electron kinetic energy matrix given a basis set.
 """
 eKinetics(bs::AVectorOrNTuple{AbstractGTBasisFuncs{T, D}}) where {T, D} = 
-getOneBodyInts(∫elecKineticCore, (), collectTuple(bs))
+getOneBodyInts(∫elecKineticCore, (), lazyCollect(bs))
 
 
 """
@@ -84,7 +84,7 @@ neAttractions(bs::AVectorOrNTuple{AbstractGTBasisFuncs{T, D}},
               nuc::AVectorOrNTuple{String, NN}, 
               nucCoords::SpatialCoordType{T, D, NN}) where {T, D, NN} = 
 getOneBodyInts(∫nucAttractionCore, (arrayToTuple(nuc), genTupleCoords(T, nucCoords)), 
-               collectTuple(bs))
+               lazyCollect(bs))
 
 
 """
