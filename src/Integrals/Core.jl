@@ -561,13 +561,11 @@ isIntZero(::Type{typeof(∫eeInteractionCore)}, _,
 isIntZeroCore(Val(2), R₁, R₂, R₃, R₄, ijk₁, ijk₂, ijk₃, ijk₄)
 
 
-const nBFuncs = [2, 4]
-const iBlTypes = [Union{Tuple{Bool}, Val{false}}, Union{NTuple{4, Any}, Val{false}}]
-const iBlTypeDict = Dict(nBFuncs .=> iBlTypes)
+const iBlTs = [Tuple{Bool}, NTuple{4, Any}, Val{false}]
 
 
 function getOneBodyInt(::Type{T}, ::Val{D}, ∫1e::F, @nospecialize(optPosArgs::Tuple), 
-                       iBl::iBlTypes[1], bfs::NTupleOfFGTBF{2, T, D}) where 
+                       iBl::Union{iBlTs[1], iBlTs[3]}, bfs::NTupleOfFGTBF{2, T, D}) where 
                        {T, D, F<:Function}
     (R₁, ijk₁, ps₁, 𝑙₁), (R₂, ijk₂, ps₂, 𝑙₂) = reformatIntData1(iBl, bfs)
     𝑙₁==𝑙₂==0 || isIntZero(F, optPosArgs, R₁,R₂, ijk₁,ijk₂) && (return T(0.0))
@@ -927,7 +925,7 @@ end
 
 
 function getTwoBodyInt(::Type{T}, ::Val{D}, ∫2e::F, @nospecialize(optPosArgs::Tuple), 
-                       iBl::iBlTypes[2], bfs::NTupleOfFGTBF{4, T, D}) where 
+                       iBl::Union{iBlTs[2], iBlTs[3]}, bfs::NTupleOfFGTBF{4, T, D}) where 
                        {T, D, F<:Function}
     (R₁, ijk₁, ps₁, 𝑙₁), (R₂, ijk₂, ps₂, 𝑙₂), (R₃, ijk₃, ps₃, 𝑙₃), (R₄, ijk₄, ps₄, 𝑙₄) = 
     reformatIntData1(iBl, bfs)
@@ -952,22 +950,40 @@ function getTwoBodyInt(::Type{T}, ::Val{D}, ∫2e::F, @nospecialize(optPosArgs::
 end
 
 
+lAndGNof(::FGTBasisFuncs1O{<:Any, <:Any, 𝑙, GN}) where {𝑙, GN} = (𝑙, GN)
+
+function orderFGTBG((a, b)::NTupleOfFGTBF{2})
+    lAndGNof(a) > lAndGNof(b) ? (b, a) : (a, b)
+end
+
+function orderFGTBG((a, b, c, d)::NTupleOfFGTBF{4})
+    a, b = orderFGTBG((a, b))
+    c, d = orderFGTBG((c, d))
+    lAndGNof(a) > lAndGNof(c) ? (c, d, a, b) : (a, b, c, d)
+end
+
 get1BCompInt(::Type{T}, ::Val{D}, ∫::F, @nospecialize(optPosArgs::Tuple), iBl::BL, 
              ::NTuple{2, Int}, bfs::NTupleOfFGTBF{2, T, D}) where 
-            {T, D, F<:Function, BL<:iBlTypes[1]} = 
-getOneBodyInt(T, Val(D), ∫, optPosArgs, iBl, bfs)
+            {T, D, F<:Function, BL<:Union{iBlTs[1], iBlTs[3]}} = 
+getOneBodyInt(T, Val(D), ∫, optPosArgs, iBl, orderFGTBG(bfs))
 
-get2BCompInt(::Type{T}, ::Val{D}, ∫::F, @nospecialize(optPosArgs::Tuple), iBl::BL, 
+get2BCompInt(::Type{T}, ::Val{D}, ∫::F, @nospecialize(optPosArgs::Tuple), iBl::iBlTs[2], 
              ::NTuple{4, Int}, bfs::NTupleOfFGTBF{4, T, D}) where 
-            {T, D, F<:Function, BL<:iBlTypes[2]} = 
+            {T, D, F<:Function} = 
 getTwoBodyInt(T, Val(D), ∫, optPosArgs, iBl, bfs)
+
+get2BCompInt(::Type{T}, ::Val{D}, ∫::F, @nospecialize(optPosArgs::Tuple), iBl::iBlTs[3], 
+             ::NTuple{4, Int}, bfs::NTupleOfFGTBF{4, T, D}) where 
+            {T, D, F<:Function} = 
+getTwoBodyInt(T, Val(D), ∫, optPosArgs, iBl, orderFGTBG(bfs))
 
 get1BCompInt(::Type{T}, ::Val{D}, ::typeof(∫nucAttractionCore), 
              nucAndCoords::Tuple{NTuple{NN, String}, NTuple{NN, NTuple{D, T}}}, 
-             iBl::iBlTypes[1], ::NTuple{2, Int}, 
+             iBl::Union{iBlTs[1], iBlTs[3]}, ::NTuple{2, Int}, 
              bfs::NTupleOfFGTBF{2, T, D}) where {T, D, NN} = 
 mapreduce(+, nucAndCoords[1], nucAndCoords[2]) do ele, coord
-    getOneBodyInt(T, Val(D), ∫nucAttractionCore, (getCharge(ele), coord), iBl, bfs)
+    getOneBodyInt(T, Val(D), ∫nucAttractionCore, (getCharge(ele), coord), iBl, 
+                  orderFGTBG(bfs))
 end
                           #       j==i      j!=i
 const Int1eBIndexLabels = Dict([( true,), (false,)] .=> [Val(:aa), Val(:ab)])
@@ -1211,19 +1227,19 @@ getBasisIndexL(::Val{4}, iBl::NTuple{4, Any}) = Int2eBIndexLabels[getBool.(iBl)]
 
 get1BCompInt(::Type{T}, ::Val{D}, ∫::F, @nospecialize(optPosArgs::Tuple), iBl::BL, 
              sizes::NTuple{2, Int}, @nospecialize(bfs::NTupleOfSBN{2})) where 
-            {T, D, F<:Function, BL<:iBlTypes[1]} = 
+            {T, D, F<:Function, BL<:Union{iBlTs[1], iBlTs[3]}} = 
 get1BCompIntCore(T, Val(D), Val(true), getBasisIndexL(Val(2), iBl), ∫, optPosArgs, sizes, 
                  bfs)
 
 get2BCompInt(::Type{T}, ::Val{D}, ∫::F, @nospecialize(optPosArgs::Tuple), iBl::BL, 
              sizes::NTuple{4, Int}, @nospecialize(bfs::NTupleOfSBN{4})) where 
-            {T, D, F<:Function, BL<:iBlTypes[2]} = 
+            {T, D, F<:Function, BL<:Union{iBlTs[2], iBlTs[3]}} = 
 get2BCompIntCore(T, Val(D), Val(true), getBasisIndexL(Val(4), iBl), ∫, optPosArgs, sizes, 
                  bfs)
 
 get1BCompInt(::Type{T}, ::Val{D}, ∫::F, @nospecialize(optPosArgs::Tuple), iBl::BL, 
              sizes::NTuple{2, Int}, @nospecialize(bfs::NTupleOfSB1{2})) where 
-            {T, D, F<:Function, BL<:iBlTypes[1]} = 
+            {T, D, F<:Function, BL<:Union{iBlTs[1], iBlTs[3]}} = 
 if any(bf isa EmptyBasisFunc for bf in bfs)
     zero(T)
 else
@@ -1233,7 +1249,7 @@ end
 
 get2BCompInt(::Type{T}, ::Val{D}, ∫::F, @nospecialize(optPosArgs::Tuple), iBl::BL, 
              sizes::NTuple{4, Int}, @nospecialize(bfs::NTupleOfSB1{4})) where 
-            {T, D, F<:Function, BL<:iBlTypes[2]} = 
+            {T, D, F<:Function, BL<:Union{iBlTs[2], iBlTs[3]}} = 
 if any(bf isa EmptyBasisFunc for bf in bfs)
     zero(T)
 else
@@ -1243,12 +1259,12 @@ end
 
 get1BCompInt(::Type{T}, ::Val{D}, ∫::F, @nospecialize(optPosArgs::Tuple), iBl::BL, 
              sizes::NTuple{2, Int}, @nospecialize(bfs::Vararg{SpatialBasis, 2})) where 
-            {T, D, F<:Function, BL<:iBlTypes[1]} = 
+            {T, D, F<:Function, BL<:Union{iBlTs[1], iBlTs[3]}} = 
 get1BCompInt(T, Val(D), ∫, optPosArgs, iBl, sizes, bfs)
 
 get2BCompInt(::Type{T}, ::Val{D}, ∫::F, @nospecialize(optPosArgs::Tuple), iBl::BL, 
              sizes::NTuple{4, Int}, @nospecialize(bfs::Vararg{SpatialBasis, 4})) where 
-            {T, D, F<:Function, BL<:iBlTypes[2]} = 
+            {T, D, F<:Function, BL<:Union{iBlTs[2], iBlTs[3]}} = 
 get2BCompInt(T, Val(D), ∫, optPosArgs, iBl, sizes, bfs)
 
 
