@@ -57,7 +57,7 @@ function F₀toFγ(γ::Int, u::T) where {T}
     γ > 0 || (return res)
     res[end] = Fγ(γ, u)
     for i in γ:-1:2
-        res[i] = (expm1(-u) + 2u*res[i+1] + 1) / (2i - 1)
+        @inbounds res[i] = (expm1(-u) + 2u*res[i+1] + 1) / (2i - 1)
     end
     res
 end
@@ -991,7 +991,7 @@ function get1BCompIntCore(::Type{T}, ::Val{D}, ::Val{BL}, ::Val{:aa},
         centerNumOf(a)
     end
     res = Array{T}(undef, BN, BN)
-    for j in OneTo(BN), i in OneTo(j)
+    @inbounds for j in OneTo(BN), i in OneTo(j)
         res[j,i] = res[i,j] = 
         get1BCompInt(T, Val(D), ∫, optPosArgs, (j==i,), sizes, 
                      getBF(Val(BL), T, Val(D), a, i), getBF(Val(BL), T, Val(D), a, j))
@@ -1011,7 +1011,7 @@ function get1BCompIntCore(::Type{T}, ::Val{D}, ::Val{BL}, ::Val{:ab},
         centerNumOf(a), centerNumOf(b)
     end
     res = Array{T}(undef, BN1, BN2)
-    for j in OneTo(BN2), i in OneTo(BN1)
+    @inbounds for j in OneTo(BN2), i in OneTo(BN1)
         res[i,j] = 
         get1BCompInt(T, Val(D), ∫, optPosArgs, Val(false), sizes, 
                      getBF(Val(BL), T, Val(D), a, i), getBF(Val(BL), T, Val(D), b, j))
@@ -1048,7 +1048,7 @@ function get2BCompIntCore(::Type{T}, ::Val{D}, ::Val{BL}, ::Val{:aaaa},
         centerNumOf(a)
     end
     res = Array{T}(undef, BN, BN, BN, BN)
-    for l in OneTo(BN), k in OneTo(l), j in OneTo(l), i in (OneTo∘ifelse)(l==j, k, j)
+    @inbounds for l in OneTo(BN), k in OneTo(l), j in OneTo(l), i in (OneTo∘ifelse)(l==j, k, j)
         iBl = (l==k, l==j, k==j, ifelse(l==j, k, j)==i)
         res[l, k, j, i] = res[k, l, j, i] = res[k, l, i, j] = res[l, k, i, j] = 
         res[i, j, l, k] = res[j, i, l, k] = res[j, i, k, l] = res[i, j, k, l] = 
@@ -1073,7 +1073,7 @@ function get2BCompIntCore(::Type{T}, ::Val{D}, ::Val{BL}, ::Val{:aabb},
         centerNumOf(a), centerNumOf(b)
     end
     res = Array{T}(undef, BN1, BN1, BN2, BN2)
-    for l in OneTo(BN2), k in OneTo(l), j in OneTo(BN1), i in OneTo(j)
+    @inbounds for l in OneTo(BN2), k in OneTo(l), j in OneTo(BN1), i in OneTo(j)
         iBl = (l==k, Val(false), Val(false), j==i)
         res[i, j, l, k] = res[j, i, l, k] = res[j, i, k, l] = res[i, j, k, l] = 
         get2BCompInt(T, Val(D), ∫, optPosArgs, iBl, sizes, 
@@ -1098,7 +1098,7 @@ function get2BCompIntCore(::Type{T}, ::Val{D}, ::Val{BL}, ::Val{:abab},
     end
     res = Array{T}(undef, BN1, BN2, BN1, BN2)
     rng = product(OneTo(BN2), OneTo(BN1))
-    for (x, (l,k)) in enumerate(rng), (_, (j,i)) in zip(OneTo(x), rng)
+    @inbounds for (x, (l,k)) in enumerate(rng), (_, (j,i)) in zip(OneTo(x), rng)
         iBl = (Val(false), l==j, Val(false), ifelse(l==j, k==i, false))
         res[k, l, i, j] = res[i, j, k, l] = 
         get2BCompInt(T, Val(D), ∫, optPosArgs, iBl, sizes, 
@@ -1123,7 +1123,7 @@ function get2BCompIntCore(::Type{T}, ::Val{D}, ::Val{BL}, ::Val{:aabc},
         centerNumOf(a), centerNumOf(b), centerNumOf(c)
     end
     res = Array{T}(undef, BN1, BN1, BN2, BN3)
-    for l in OneTo(BN3), k in OneTo(BN2), j in OneTo(BN1), i in OneTo(j)
+    @inbounds for l in OneTo(BN3), k in OneTo(BN2), j in OneTo(BN1), i in OneTo(j)
         iBl = (Val(false), Val(false), Val(false), j==i)
         res[j, i, k, l] = res[i, j, k, l] = 
         get2BCompInt(T, Val(D), ∫, optPosArgs, iBl, sizes, 
@@ -1148,7 +1148,7 @@ function get2BCompIntCore(::Type{T}, ::Val{D}, ::Val{BL}, ::Val{:abcc},
         centerNumOf(a), centerNumOf(b), centerNumOf(c)
     end
     res = Array{T}(undef, BN1, BN2, BN3, BN3)
-    for l in OneTo(BN3), k in OneTo(l), j in OneTo(BN2), i in OneTo(BN1)
+    @inbounds for l in OneTo(BN3), k in OneTo(l), j in OneTo(BN2), i in OneTo(BN1)
         iBl = (l==k, Val(false), Val(false), Val(false))
         res[i, j, l, k] = res[i, j, k, l] = 
         get2BCompInt(T, Val(D), ∫, optPosArgs, iBl, sizes, 
@@ -1177,7 +1177,7 @@ function get2BCompIntCore(::Type{T}, ::Val{D}, ::Val{BL}, ::IDV,
         centerNumOf.(bfs)
     end
     res = Array{T}(undef, BN1, BN2, BN3, BN4)
-    for l in OneTo(BN4), k in OneTo(BN3), j in OneTo(BN2), i in OneTo(BN1)
+    @inbounds for l in OneTo(BN4), k in OneTo(BN3), j in OneTo(BN2), i in OneTo(BN1)
         iBl = IndexABXYbools[IDV](j,k,l)
         res[i,j,k,l] = 
         get2BCompInt(T, Val(D), ∫, optPosArgs, iBl, sizes, 
@@ -1236,13 +1236,11 @@ get2BCompInt(::Type{T}, ::Val{D}, ∫::F, @nospecialize(optPosArgs::Tuple), iBl:
 get2BCompInt(T, Val(D), ∫, optPosArgs, iBl, sizes, bfs)
 
 
-function update2DarrBlock!(arr::AbstractMatrix{T1}, 
-                           block::Union{T1, AbstractMatrix{T1}}, 
-                           I::T2, J::T2) where {T1, T2<:UnitRange{Int}}
-    @inbounds begin
-        arr[I, J] .= block
-        arr[J, I] .= (J!=I ? transpose(block) : block)
-    end
+@inline function update2DarrBlock!(arr::AbstractMatrix{T1}, 
+                                   block::Union{T1, AbstractMatrix{T1}}, 
+                                   I::T2, J::T2) where {T1, T2<:UnitRange{Int}}
+    arr[I, J] .= block
+    arr[J, I] .= (J!=I ? transpose(block) : block)
     nothing
 end
 
@@ -1255,12 +1253,14 @@ function getOneBodyInts(∫1e::F, optPosArgs::Tuple,
     totalSize = subSize |> sum
     buf = Array{T}(undef, totalSize, totalSize)
     Threads.@threads for j in eachindex(basisSet)
-        Threads.@threads for i in OneTo(j)
-            int = get1BCompInt(T, Val(D), ∫1e, optPosArgs, (j==i,), 
-                               (subSize[i],  subSize[j]), basisSet[i], basisSet[j])
-            rowRange = accuSize[i]+1 : accuSize[i+1]
-            colRange = accuSize[j]+1 : accuSize[j+1]
-            update2DarrBlock!(buf, int, rowRange, colRange)
+        for i in OneTo(j)
+            @inbounds begin
+                int = get1BCompInt(T, Val(D), ∫1e, optPosArgs, (j==i,), 
+                                   (subSize[i],  subSize[j]), basisSet[i], basisSet[j])
+                rowRange = accuSize[i]+1 : accuSize[i+1]
+                colRange = accuSize[j]+1 : accuSize[j+1]
+                update2DarrBlock!(buf, int, rowRange, colRange)
+            end
         end
     end
     buf
@@ -1272,10 +1272,12 @@ function getOneBodyInts(∫1e::F, optPosArgs::Tuple,
     BN = length(basisSet)
     buf = Array{T}(undef, BN, BN)
     Threads.@threads for j in eachindex(basisSet)
-        Threads.@threads for i in OneTo(j)
-            int = get1BCompInt(T, Val(D), ∫1e, optPosArgs, (j==i,), 
-                               (1, 1), basisSet[i], basisSet[j])
-            buf[j, i] = buf[i, j] = int
+        for i in OneTo(j)
+            @inbounds begin
+                int = get1BCompInt(T, Val(D), ∫1e, optPosArgs, (j==i,), 
+                                   (1, 1), basisSet[i], basisSet[j])
+                buf[j, i] = buf[i, j] = int
+            end
         end
     end
     buf
@@ -1285,21 +1287,20 @@ end
 permuteDims(arr::AbstractArray{T, N}, order) where {T, N} = permutedims(arr, order)
 permuteDims(arr::Number, _) = itself(arr)
 
-function update4DarrBlock!(arr::AbstractArray{T1, 4}, 
-                           block::Union{AbstractArray{T1, 4}, T1}, 
-                           I::T2, J::T2, K::T2, L::T2) where {T1, T2<:UnitRange{Int}}
+@inline function update4DarrBlock!(arr::AbstractArray{T1, 4}, 
+                                   block::Union{AbstractArray{T1, 4}, T1}, 
+                                   I::T2, J::T2, K::T2, L::T2) where 
+                                  {T1, T2<:UnitRange{Int}}
     local blockTemp
-    @inbounds begin
-        arr[I, J, K, L] .= block
-        arr[J, I, K, L] .= (blockTemp = (J!=I ? permuteDims(block, (2,1,3,4)) : block))
-        arr[J, I, L, K] .= (blockTemp = (L!=K ? permuteDims(block, (2,1,4,3)) : blockTemp))
-        arr[I, J, L, K] .= (blockTemp = (I!=J ? permuteDims(block, (1,2,4,3)) : blockTemp))
-        arr[L, K, I, J] .= (blockTemp = ((L, K, I, J) != (I, J, L, K) ? 
-                                                permuteDims(block, (4,3,1,2)) : blockTemp))
-        arr[K, L, I, J] .= (blockTemp = (K!=L ? permuteDims(block, (3,4,1,2)) : blockTemp))
-        arr[K, L, J, I] .= (blockTemp = (J!=I ? permuteDims(block, (3,4,2,1)) : blockTemp))
-        arr[L, K, J, I] .= (L!=K ? permuteDims(block, (4,3,2,1)) : blockTemp)
-    end
+    arr[I, J, K, L] .= block
+    arr[J, I, K, L] .= (blockTemp = (J!=I ? permuteDims(block, (2,1,3,4)) : block))
+    arr[J, I, L, K] .= (blockTemp = (L!=K ? permuteDims(block, (2,1,4,3)) : blockTemp))
+    arr[I, J, L, K] .= (blockTemp = (I!=J ? permuteDims(block, (1,2,4,3)) : blockTemp))
+    arr[L, K, I, J] .= (blockTemp = ((L, K, I, J) != (I, J, L, K) ? 
+                                            permuteDims(block, (4,3,1,2)) : blockTemp))
+    arr[K, L, I, J] .= (blockTemp = (K!=L ? permuteDims(block, (3,4,1,2)) : blockTemp))
+    arr[K, L, J, I] .= (blockTemp = (J!=I ? permuteDims(block, (3,4,2,1)) : blockTemp))
+    arr[L, K, J, I] .= (L!=K ? permuteDims(block, (4,3,2,1)) : blockTemp)
     nothing
 end
 
@@ -1314,15 +1315,17 @@ function getTwoBodyInts(∫2e::F, optPosArgs::Tuple,
     @sync for l in eachindex(basisSet), k in OneTo(l), 
               j in OneTo(l), i in (OneTo∘ifelse)(l==j, k, j)
         Threads.@spawn begin
-            I = accuSize[i]+1 : accuSize[i+1]
-            J = accuSize[j]+1 : accuSize[j+1]
-            K = accuSize[k]+1 : accuSize[k+1]
-            L = accuSize[l]+1 : accuSize[l+1]
             iBl = (l==k, l==j, k==j, ifelse(l==j, k, j)==i)
-            int = get2BCompInt(T, Val(D), ∫2e, optPosArgs, iBl, 
-                               (subSize[i],  subSize[j],  subSize[k],  subSize[l]), 
-                               basisSet[i], basisSet[j], basisSet[k], basisSet[l])
-            update4DarrBlock!(buf, int, I, J, K, L)
+            @inbounds begin
+                I = accuSize[i]+1 : accuSize[i+1]
+                J = accuSize[j]+1 : accuSize[j+1]
+                K = accuSize[k]+1 : accuSize[k+1]
+                L = accuSize[l]+1 : accuSize[l+1]
+                int = get2BCompInt(T, Val(D), ∫2e, optPosArgs, iBl, 
+                                   (subSize[i],  subSize[j],  subSize[k],  subSize[l]), 
+                                   basisSet[i], basisSet[j], basisSet[k], basisSet[l])
+                update4DarrBlock!(buf, int, I, J, K, L)
+            end
         end
     end
     buf
@@ -1337,11 +1340,13 @@ function getTwoBodyInts(∫2e::F, optPosArgs::Tuple,
               j in OneTo(l), i in (OneTo∘ifelse)(l==j, k, j)
         Threads.@spawn begin
             iBl = (l==k, l==j, k==j, ifelse(l==j, k, j)==i)
-            int = get2BCompInt(T, Val(D), ∫2e, optPosArgs, iBl, 
-                               (1, 1, 1, 1), 
-                               basisSet[i], basisSet[j], basisSet[k], basisSet[l])
+            @inbounds begin
+                int = get2BCompInt(T, Val(D), ∫2e, optPosArgs, iBl, 
+                                   (1, 1, 1, 1), 
+                                   basisSet[i], basisSet[j], basisSet[k], basisSet[l])
                 buf[l, k, j, i] = buf[k, l, j, i] = buf[k, l, i, j] = buf[l, k, i, j] = 
                 buf[i, j, l, k] = buf[j, i, l, k] = buf[j, i, k, l] = buf[i, j, k, l] = int
+            end
         end
     end
     buf
