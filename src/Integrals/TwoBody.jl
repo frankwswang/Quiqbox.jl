@@ -30,4 +30,4 @@ Return the tensor of electron-electron interactions (in the chemists' notation) 
 basis set.
 """
 eeInteractions(bs::AVectorOrNTuple{AbstractGTBasisFuncs{T, D}}) where {T, D} = 
-getTwoBodyInts(∫eeInteractionCore, (), collectTuple(bs))
+getTwoBodyInts(∫eeInteractionCore, (), lazyCollect(bs))

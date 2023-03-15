@@ -854,17 +854,17 @@ function skipIndices(arr::AbstractArray{Int}, ints::AbstractVector{Int})
 end
 
 
-collectTuple(@nospecialize t::Tuple) = collect(t)
+lazyCollect(@nospecialize t::Tuple) = collect(t)
 
-collectTuple(@nospecialize a::AbstractArray) = itself(a)
+lazyCollect(@nospecialize a::AbstractArray) = itself(a)
 
-collectTuple(@nospecialize o::Any) = collect(o)
+lazyCollect(@nospecialize o::Any) = collect(o)
 
 
 asymSign(a::Real) = ifelse(a<0, -1, 1)
 
 
-mutable struct FuncArgConfig{F} <: ConfigBox{Any, FuncArgConfig, F}
+mutable struct FuncArgConfig{F<:Function} <: ConfigBox{Any, FuncArgConfig, F}
     posArgs::Vector{<:Any}
     keyArgs::Vector{<:Pair{Symbol}}
 end
