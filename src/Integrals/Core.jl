@@ -978,9 +978,10 @@ get2BCompInt(::Type{T}, ::Val{D}, ∫::F, @nospecialize(optPosArgs::Tuple), iBl:
 getTwoBodyInt(T, Val(D), ∫, optPosArgs, iBl, orderFGTBG(bfs))
 
 get1BCompInt(::Type{T}, ::Val{D}, ::typeof(∫nucAttractionCore), 
-             nucAndCoords::Tuple{NTuple{NN, String}, NTuple{NN, NTuple{D, T}}}, 
+             nucAndCoords::Tuple{Tuple{String, Vararg{String, NNMO}}, 
+                                 Tuple{NTuple{D, T}, Vararg{NTuple{D, T}, NNMO}}}, 
              iBl::Union{iBlTs[1], iBlTs[3]}, ::NTuple{2, Int}, 
-             bfs::NTupleOfFGTBF{2, T, D}) where {T, D, NN} = 
+             bfs::NTupleOfFGTBF{2, T, D}) where {T, D, NNMO} = 
 mapreduce(+, nucAndCoords[1], nucAndCoords[2]) do ele, coord
     getOneBodyInt(T, Val(D), ∫nucAttractionCore, (getCharge(ele), coord), iBl, 
                   orderFGTBG(bfs))

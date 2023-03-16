@@ -129,9 +129,10 @@ changeHbasis(twoBodyInt::AbstractArray{T, 4}, C::Vararg{AbstractMatrix{T}, 2}) w
 """
 
     changeHbasis(b::GTBasis{T, D}, 
-                 nuc::NTuple{NN, String}, nucCoords::NTuple{NN, NTuple{D, T}}, 
+                 nuc::Tuple{String, Vararg{String, NNMO}}, 
+                 nucCoords::Tuple{NTuple{D, T}, Vararg{NTuple{D, T}, NNMO}}, 
                  C::Union{AbstractMatrix{T}, NTuple{2, AbstractMatrix{T}}}) where 
-                {T, D, NN} -> 
+                {T, D, NNMO} -> 
     NTuple{2, Any}
 
 Return the one-body and two-body integrals after a change of basis based on the input `C`, 
@@ -139,13 +140,15 @@ given the basis set information `b`. The type of each element in the returned `T
 consistent with the cases where the first argument of `changeHbasis` is an `AbstractArray`.
 """
 changeHbasis(b::GTBasis{T, D}, 
-             nuc::NTuple{NN, String}, nucCoords::NTuple{NN, NTuple{D, T}}, 
-             C::AbstractMatrix{T}) where {T, D, NN} = 
+             nuc::Tuple{String, Vararg{String, NNMO}}, 
+             nucCoords::Tuple{NTuple{D, T}, Vararg{NTuple{D, T}, NNMO}}, 
+             C::AbstractMatrix{T}) where {T, D, NNMO} = 
 changeHbasis.((coreH(b, nuc, nucCoords), b.eeI), Ref(C))
 
 function changeHbasis(b::GTBasis{T, D}, 
-                      nuc::NTuple{NN, String}, nucCoords::NTuple{NN, NTuple{D, T}}, 
-                      C::Vararg{AbstractMatrix{T}, 2}) where {T, D, NN}
+                      nuc::Tuple{String, Vararg{String, NNMO}}, 
+                      nucCoords::Tuple{NTuple{D, T}, Vararg{NTuple{D, T}, NNMO}}, 
+                      C::Vararg{AbstractMatrix{T}, 2}) where {T, D, NNMO}
     Hcs = changeHbasis.(Ref(coreH(b, nuc, nucCoords)), C)
     eeIs = changeHbasis(b.eeI, C...)
     Hcs, eeIs
@@ -264,14 +267,14 @@ end
 
 """
 
-    nnRepulsions(nuc::Union{NTuple{NN, String}, AbstractVector{String}}, 
-                 nucCoords::$(SpatialCoordType|>typeStrNotUnionAll)) where {NN, D, T} -> 
+    nnRepulsions(nuc::Union{Tuple{String, Vararg{String, NNMO}}, AbstractVector{String}}, 
+                 nucCoords::$(SpatialCoordType|>typeStrNotUnionAll)) where {NNMO, D, T} -> 
     T
 
 Return the nuclear repulsion energy given nuclei `nuc` and their coordinates `nucCoords`.
 """
-function nnRepulsions(nuc::AVectorOrNTuple{String, NN}, 
-                      nucCoords::SpatialCoordType{T, <:Any, NN}) where {NN, T}
+function nnRepulsions(nuc::AVectorOrNTuple{String, NNMO}, 
+                      nucCoords::SpatialCoordType{T, <:Any, NNMO}) where {NNMO, T}
     nuc = arrayToTuple(nuc)
     nucCoords = genTupleCoords(T, nucCoords)
     E = T(0)

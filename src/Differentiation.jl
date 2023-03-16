@@ -120,9 +120,9 @@ function ∂HFenergy(par::ParamBox{T},
                    bs::AbstractVector{<:GTBasisFuncs{T, D, 1}}, 
                    S::AbstractMatrix{T}, 
                    C::NTuple{HFTS, AbstractMatrix{T}}, 
-                   nuc::NTuple{NN, String}, 
-                   nucCoords::NTuple{NN, NTuple{D, T}}, 
-                   N::NTuple{HFTS, Int}) where {T, D, HFTS, NN}
+                   nuc::Tuple{String, Vararg{String, NNMO}}, 
+                   nucCoords::Tuple{NTuple{D, T}, Vararg{NTuple{D, T}, NNMO}}, 
+                   N::NTuple{HFTS, Int}) where {T, D, HFTS, NNMO}
     numEps(T) > eps(Double64) && (S = Double64.(S))
     X = getXcore1(S)
     cH = (i, j)->coreHij(i, j, nuc, nucCoords)
@@ -171,7 +171,7 @@ Two methods of `gradOfHFenergy`.
 orbitals with respect to the selected basis set.
 
 `nuc::Union{
-    NTuple{NN, String} where NN, 
+    Tuple{String, Vararg{String, NNMO}} where NNMO, 
     AbstractVector{String}
 }`: The nuclei in the studied system.
 
@@ -195,20 +195,20 @@ order of `bs` (`basis.basis`).
 """
 gradOfHFenergy(par::AbstractVector{<:ParamBox}, b::GTBasis{T, D}, 
                C::NTuple{HFTS, AbstractMatrix{T}}, 
-               nuc::AVectorOrNTuple{String, NN}, 
-               nucCoords::SpatialCoordType{T, D, NN}, 
+               nuc::AVectorOrNTuple{String, NNMO}, 
+               nucCoords::SpatialCoordType{T, D, NNMO}, 
                N::Union{Int, Tuple{Int}, NTuple{2, Int}}=getCharge(nuc)) where 
-              {T, D, HFTS, NN} = 
+              {T, D, HFTS, NNMO} = 
 gradOfHFenergy(par, b.basis, b.S, C, nuc, nucCoords, N)
 
 function gradOfHFenergy(par::AbstractVector{<:ParamBox{T}}, 
                         bs::AVectorOrNTuple{GTBasisFuncs{T, D, 1}}, 
                         S::AbstractMatrix{T}, 
                         C::NTuple{HFTS, AbstractMatrix{T}}, 
-                        nuc::AVectorOrNTuple{String, NN}, 
-                        nucCoords::SpatialCoordType{T, D, NN}, 
+                        nuc::AVectorOrNTuple{String, NNMO}, 
+                        nucCoords::SpatialCoordType{T, D, NNMO}, 
                         N::Union{Int, Tuple{Int}, NTuple{2, Int}}=getCharge(nuc)) where 
-                       {T, D, HFTS, NN}
+                       {T, D, HFTS, NNMO}
     nuc = arrayToTuple(nuc)
     nucCoords = genTupleCoords(T, nucCoords)
     Ns = splitSpins(Val(HFTS), N)

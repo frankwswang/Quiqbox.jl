@@ -80,14 +80,15 @@ const FGTBasisFuncsON{ON} = FloatingGTBasisFuncs{<:Any, <:Any, <:Any, <:Any, <:A
 const FGTBasisFuncs1O{T, D, 𝑙, GN, PT} = FloatingGTBasisFuncs{T, D, 𝑙, GN, PT, 1}
 
 
-const SpatialCoordType{T, D, N} = Union{ AbstractVector{<:AbstractVector{<:T}}, 
-                                         AbstractVector{NTuple{D, T}}, 
-                                         NTuple{N, <:AbstractVector{<:T}}, 
-                                         NTuple{N, NTuple{D, T}} }
+const SpatialCoordType{T, D, NNMO} = Union{ 
+    AbstractVector{<:AbstractVector{<:T}}, 
+    AbstractVector{NTuple{D, T}}, 
+    Tuple{TL, Vararg{TL, NNMO}} where TL<:AbstractVector{<:T}, 
+    Tuple{NTuple{D, T}, Vararg{NTuple{D, T}, NNMO}} }
 
-const AVectorOrNTuple{T, N} = Union{NTuple{N, T}, AbstractVector{<:T}}
+const AVectorOrNTuple{T, NNMO} = Union{Tuple{T, Vararg{T, NNMO}}, AbstractVector{<:T}}
 
-const AArrayOrNTuple{T, N} = Union{NTuple{N, T}, AbstractArray{<:T}}
+const AArrayOrNTuple{T, NNMO} = Union{Tuple{T, Vararg{T, NNMO}}, AbstractArray{<:T}}
 
 
 const NTupleOfFGTBF{BN, T, D} = NTuple{BN, FGTBasisFuncs1O{T, D}}

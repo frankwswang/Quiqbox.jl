@@ -111,13 +111,14 @@ end
 function getCfromSAD(::Val{HFT}, S::AbstractMatrix{T}, 
                      Hcore::AbstractMatrix{T}, HeeI::AbstractArray{T, 4}, 
                      bs::AVectorOrNTuple{AbstractGTBasisFuncs{T, D}}, 
-                     nuc::NTuple{NN, String}, nucCoords::NTuple{NN, NTuple{D, T}}, 
+                     nuc::Tuple{String, Vararg{String, NNMO}}, 
+                     nucCoords::Tuple{NTuple{D, T}, Vararg{NTuple{D, T}, NNMO}}, 
                      X::AbstractMatrix{T}, 
                      config=SCFconfig((:ADIIS,), (max(1e-2, 10getAtolVal(T)),))) where 
-                    {HFT, T, D, NN}
+                    {HFT, T, D, NNMO}
     N₁tot = 0
     N₂tot = 0
-    atmNs = fill((0,0), NN)
+    atmNs = fill((0,0), NNMO+1)
     order = sortperm(collect(nuc), by=x->AtomicNumberList[x])
     orderedNuc = nuc[order]
     for (i, N) in enumerate(orderedNuc .|> getCharge)
@@ -220,10 +221,10 @@ end
 
 #  RHF for MO in GTBasis
 function getEhf(gtb::GTBasis{T, D, BN}, 
-                nuc::AVectorOrNTuple{String, NN}, 
-                nucCoords::SpatialCoordType{T, D, NN}, 
+                nuc::AVectorOrNTuple{String, NNMO}, 
+                nucCoords::SpatialCoordType{T, D, NNMO}, 
                 N::Union{Int, Tuple{Int}, NTuple{2, Int}}; 
-                errorThreshold::Real=10getAtolVal(T)) where {T, D, BN, NN}
+                errorThreshold::Real=10getAtolVal(T)) where {T, D, BN, NNMO}
     Hcore = coreH(gtb, nuc, nucCoords)
     HeeI = gtb.eeI
     S = gtb.S
@@ -595,11 +596,11 @@ struct HFfinalVars{T, D, HFT, NN, BN, HFTS} <: HartreeFockFinalValue{T, HFT}
     basis::GTBasis{T, D, BN}
 
     function HFfinalVars(basis::GTBasis{T, 𝐷, BN}, 
-                         nuc::AVectorOrNTuple{String, NN}, 
-                         nucCoords::SpatialCoordType{T, 𝐷, NN}, 
+                         nuc::AVectorOrNTuple{String, NNMO}, 
+                         nucCoords::SpatialCoordType{T, 𝐷, NNMO}, 
                          X::AbstractMatrix{T}, 
                          vars::NTuple{HFTS, HFtempVars{T, HFT}}, 
-                         isConverged::Bool) where {T, 𝐷, BN, NN, HFTS, HFT}
+                         isConverged::Bool) where {T, 𝐷, BN, NNMO, HFTS, HFT}
         (NNval = length(nuc)) == length(nucCoords) || 
         throw(AssertionError("The length of `nuc` and `nucCoords` should be the same."))
         any(length(i)!=𝐷 for i in nucCoords) && 
@@ -764,7 +765,7 @@ whether the SCF procedure is converged.
 } where {T, D}`: The basis set used for the Hartree-Fock approximation.
 
 `nuc::Union{
-    NTuple{NN, String} where NN, 
+    Tuple{String, Vararg{String, NNMO}} where NNMO, 
     AbstractVector{String}
 }`: The nuclei in the studied system.
 
@@ -808,12 +809,12 @@ runHF(bs::AVectorOrNTuple{AbstractGTBasisFuncs{T, D}}, args...;
 runHF(GTBasis(bs), args...; printInfo, infoLevel)
 
 function runHFcore(bs::GTBasis{T, D, BN, BFT}, 
-                   nuc::AVectorOrNTuple{String, NN}, 
-                   nucCoords::SpatialCoordType{T, D, NN}, 
+                   nuc::AVectorOrNTuple{String, NNMO}, 
+                   nucCoords::SpatialCoordType{T, D, NNMO}, 
                    N::Union{Int, Tuple{Int}, NTuple{2, Int}}=getCharge(nuc), 
                    config::HFconfig{<:Any, HFT}=defaultHFC; 
                    printInfo::Bool=false, 
-                   infoLevel::Int=defaultHFinfoL) where {T, D, BN, BFT, NN, HFT}
+                   infoLevel::Int=defaultHFinfoL) where {T, D, BN, BFT, NNMO, HFT}
     Nlow = Int(HFT==:RHF)
     totN = (N isa Int) ? N : (N[begin] + N[end])
     totN > Nlow || throw(DomainError(N, "$(HFT) requires more than $(Nlow) electrons."))
