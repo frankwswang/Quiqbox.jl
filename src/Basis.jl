@@ -159,20 +159,25 @@ A `D`-dimensional spatial point.
 
 `param::PT`: A `Tuple` of [`ParamBox`](@ref)s as the components of the spatial coordinate.
 
+`marker::Symbol`: A marker that indicates the purpose or meaning of the constructed 
+`SpatialPoint`. The default marker is set to `:$defaultSPointMarker`.
+
 ≡≡≡ Initialization Method(s) ≡≡≡
 
     SpatialPoint(pbs::$(SPointT)) -> SpatialPoint
 """
 struct SpatialPoint{T, D, PT} <: AbstractSpatialPoint{T, D}
     param::PT
-    SpatialPoint(pbs::SPointT{T}) where {T} = new{T, length(pbs), typeof(pbs)}(pbs)
+    marker::Symbol
+    SpatialPoint(pbs::SPointT{T}, marker::Symbol=defaultSPointMarker) where {T} = 
+    new{T, length(pbs), typeof(pbs)}(pbs, marker)
 end
 
 
 """
 
-    genSpatialPoint(point::Union{NTuple{D, Union{T, Array{T, 0}}}, 
-                                 AbstractVector}) where {D, T<:AbstractFloat} -> 
+    genSpatialPoint(point::Union{NTuple{D, Union{T, Array{T, 0}}}, AbstractVector}, 
+                    marker::Symbol=:$defaultSPointMarker) where {D, T<:AbstractFloat} -> 
     SpatialPoint{T, D}
 
 Construct a [`SpatialPoint`](@ref) from a collection of coordinate components.
@@ -181,8 +186,11 @@ Construct a [`SpatialPoint`](@ref) from a collection of coordinate components.
 ```jldoctest; setup = :(push!(LOAD_PATH, "../../src/"); using Quiqbox)
 julia> v1 = [1.0, 2.0, 3.0];
 
-julia> genSpatialPoint(v1)
-$( SpatialPoint(ParamBox.((1.0, 2.0, 3.0), SpatialParamSyms)) )
+julia> p1 = genSpatialPoint(v1, :p1)
+$( SpatialPoint(ParamBox.((1.0, 2.0, 3.0), SpatialParamSyms), :p1) )
+
+julia> p1.marker
+:p1
 
 julia> v2 = [fill(1.0), 2.0, 3.0];
 
@@ -196,10 +204,12 @@ julia> p2[1]
 ParamBox{Float64, :X, iT}(1.2)[∂][X]
 ```
 """
-genSpatialPoint(v::AbstractVector) = genSpatialPoint(Tuple(v))
-genSpatialPoint(v::Tuple{Union{T, Array{T, 0}}, Vararg{Union{T, Array{T, 0}}, D}}) where 
-               {D, T<:AbstractFloat} = 
-genSpatialPoint.(v, Tuple([1:(D+1);])) |> genSpatialPointCore
+genSpatialPoint(v::AbstractVector, marker::Symbol=defaultSPointMarker) = 
+                genSpatialPoint(Tuple(v), marker)
+
+genSpatialPoint(v::Tuple{Union{T, Array{T, 0}}, Vararg{Union{T, Array{T, 0}}, D}}, 
+                marker::Symbol=defaultSPointMarker) where {D, T<:AbstractFloat} = 
+genSpatialPointCore(genSpatialPoint.(v, Tuple([1:(D+1);])), marker)
 
 """
 
@@ -270,17 +280,20 @@ ParamBox(Val(SpatialParamSyms[compIndex]), point, fill(point.canDiff[]))
 
 """
 
-    genSpatialPoint(point::Union{Tuple{Vararg{ParamBox{T}}}, 
-                    AbstractVector{<:ParamBox{T}}}) where {T} -> 
+    genSpatialPoint(point::Union{Tuple{ParamBox{T}, Vararg{ParamBox{T}}}, 
+                                 AbstractVector{<:ParamBox{T}}}, 
+                    marker::Symbol=:$defaultSPointMarker) where {T} -> 
     SpatialPoint{T}
 
 Convert a collection of [`ParamBox`](@ref)s to a [`SpatialPoint`](@ref).
 """
-genSpatialPoint(point::NTuple{D, ParamBox{T}}) where {D, T} = 
-ParamBox.(Val.(SpatialParamSyms[1:D]), point, 
-          (fill∘getindex∘getproperty).(point, :canDiff)) |> genSpatialPointCore
+genSpatialPoint(point::Tuple{ParamBox{T}, Vararg{ParamBox{T}, D}}, 
+                marker::Symbol=defaultSPointMarker) where {D, T} = 
+genSpatialPointCore(ParamBox.(Val.(SpatialParamSyms[1:D+1]), point, 
+          (fill∘getindex∘getproperty).(point, :canDiff)), marker)
 
-genSpatialPointCore(point::Union{P1D, P2D, P3D}) = SpatialPoint(point)
+genSpatialPointCore(point::Union{P1D, P2D, P3D}, marker::Symbol) = 
+SpatialPoint(point, marker)
 
 
 """

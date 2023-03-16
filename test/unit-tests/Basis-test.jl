@@ -95,6 +95,7 @@ v3 = genSpatialPoint([1.0, 2, 3.0])
 v1_2 = genSpatialPoint((k, 2.0, 3.0))
 v2_2 = genSpatialPoint((k, 2.0, 3.0))
 v3_2 = genSpatialPoint((1.0, 2.0, 3.0))
+@test v1.marker == Quiqbox.defaultSPointMarker
 @test v1 == v2
 @test v1_2 == v2_2
 @test hasEqual(v1, v2)
@@ -108,8 +109,9 @@ v3_2 = genSpatialPoint((1.0, 2.0, 3.0))
 @test genSpatialPoint(-1.0, 1, abs, inSym=:x1) == 
       genSpatialPoint(fill(-1.0), 1, abs, inSym=:x1)
 @test hasIdentical(genSpatialPoint(k, 1), v1[1])
-v4 = genSpatialPoint([2.0, k, 3.0])
+v4 = genSpatialPoint([2.0, k, 3.0], :v4)
 @test hasIdentical(genSpatialPoint(v4[2], 1), v1[1])
+@test v4.marker == :v4
 
 
 # struct BasisFunc BasisFuncs & function genBasisFunc

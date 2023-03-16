@@ -41,9 +41,9 @@ julia> bsO = genBasisFunc(missing, "STO-3G", "O");
 
 julia> [assignCenInVal!(b, fill(1.0, 3)) for b in bsO]
 3-element Vector{SpatialPoint{Float64, 3, Tuple{ParamBox{Float64, :X, typeof(itself)}, ParamBox{Float64, :Y, typeof(itself)}, ParamBox{Float64, :Z, typeof(itself)}}}}:
- SpatialPoint{Float64, 3}{PBFL{(0, 0, 0)}}(param)[1.0, 1.0, 1.0][∂][∂][∂]
- SpatialPoint{Float64, 3}{PBFL{(0, 0, 0)}}(param)[1.0, 1.0, 1.0][∂][∂][∂]
- SpatialPoint{Float64, 3}{PBFL{(0, 0, 0)}}(param)[1.0, 1.0, 1.0][∂][∂][∂]
+ SpatialPoint{Float64, 3}{PBFL{(0, 0, 0)}}(param, marker)[1.0, 1.0, 1.0][∂][∂][∂]
+ SpatialPoint{Float64, 3}{PBFL{(0, 0, 0)}}(param, marker)[1.0, 1.0, 1.0][∂][∂][∂]
+ SpatialPoint{Float64, 3}{PBFL{(0, 0, 0)}}(param, marker)[1.0, 1.0, 1.0][∂][∂][∂]
 ```
 
 If you omit the atom in the arguments, `"H"` will be set in default. Notice that even though there's only one single basis function in H's STO-3G basis set, the returned value is still a `Vector`.

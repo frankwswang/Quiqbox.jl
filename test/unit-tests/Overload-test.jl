@@ -18,14 +18,15 @@ pb3_2 = changeMapping(pb3, Quiqbox.DI(pb3.map))
       itselfTshorten(typeof(pb3))*"(-1)[∂][x_x]"
 
 p1 = genSpatialPoint((1.,))
-@test (@capture_out show(p1)) == "SpatialPoint{Float64, 1}{PBFL{(0,)}}(param)[1.0][∂]"
+@test (@capture_out show(p1)) == "SpatialPoint{Float64, 1}{PBFL{(0,)}}(param, marker)"*
+                                 "[1.0][∂]"
 
 p2 = genSpatialPoint((1.,2.))
-@test (@capture_out show(p2)) == "SpatialPoint{Float64, 2}{PBFL{(0, 0)}}(param)[1.0, 2.0]"*
-                                 "[∂][∂]"
+@test (@capture_out show(p2)) == "SpatialPoint{Float64, 2}{PBFL{(0, 0)}}(param, marker)"*
+                                 "[1.0, 2.0][∂][∂]"
 
 p3 = genSpatialPoint((1.,2.,3.))
-@test (@capture_out show(p3)) == "SpatialPoint{Float64, 3}{PBFL{(0, 0, 0)}}(param)"*
+@test (@capture_out show(p3)) == "SpatialPoint{Float64, 3}{PBFL{(0, 0, 0)}}(param, marker)"*
                                  "[1.0, 2.0, 3.0][∂][∂][∂]"
 
 bf1 = genBasisFunc([1.0, 2.0, 1.0], (2.0, 1.0))

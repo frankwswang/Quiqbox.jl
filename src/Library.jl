@@ -187,6 +187,8 @@ const cyIVsym  = Symbol(IVsymSuffix, cySym)
 const czIVsym  = Symbol(IVsymSuffix, czSym)
 const cenIVsym = (cxIVsym, cyIVsym, czIVsym)
 
+const defaultSPointMarker = :point
+
 const spinOccupations = ("0", "↿", "⇂", "↿⇂")
 const OrbitalOccupation = ((false, false), (true, false), (false, true), (true, true))
 const SpinOrbitalOccupation = Dict(spinOccupations .=> OrbitalOccupation)
