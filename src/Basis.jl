@@ -160,7 +160,7 @@ A `D`-dimensional spatial point.
 `param::PT`: A `Tuple` of [`ParamBox`](@ref)s as the components of the spatial coordinate.
 
 `marker::Symbol`: A marker that indicates the purpose or meaning of the constructed 
-`SpatialPoint`. The default marker is set to `:$defaultSPointMarker`.
+`SpatialPoint`. The default marker is set to `:$(defaultSPointMarker)`.
 
 ≡≡≡ Initialization Method(s) ≡≡≡
 
@@ -177,7 +177,7 @@ end
 """
 
     genSpatialPoint(point::Union{NTuple{D, Union{T, Array{T, 0}}}, AbstractVector}, 
-                    marker::Symbol=:$defaultSPointMarker) where {D, T<:AbstractFloat} -> 
+                    marker::Symbol=:$(defaultSPointMarker)) where {D, T<:AbstractFloat} -> 
     SpatialPoint{T, D}
 
 Construct a [`SpatialPoint`](@ref) from a collection of coordinate components.
@@ -282,7 +282,7 @@ ParamBox(Val(SpatialParamSyms[compIndex]), point, fill(point.canDiff[]))
 
     genSpatialPoint(point::Union{Tuple{ParamBox{T}, Vararg{ParamBox{T}}}, 
                                  AbstractVector{<:ParamBox{T}}}, 
-                    marker::Symbol=:$defaultSPointMarker) where {T} -> 
+                    marker::Symbol=:$(defaultSPointMarker)) where {T} -> 
     SpatialPoint{T}
 
 Convert a collection of [`ParamBox`](@ref)s to a [`SpatialPoint`](@ref).
@@ -497,9 +497,9 @@ $(Doc_genBasisFunc_eg1)
 
 === Positional argument(s) ===
 
-`subshell::String`: The third argument of the constructor can also be the name of a 
-subshell, which will make sure the output is a `BasisFuncs` that contains the spatial 
-orbitals that fully occupy the subshell.
+`subshell::$(StrOrSym)`: The third argument of the constructor can also be the 
+name of a subshell, which will make sure the output is a `BasisFuncs` that contains the 
+spatial orbitals that fully occupy the subshell.
 
 `lFilter::Tuple{Vararg{Bool}}`: When this 4th argument is provided, it can determine the 
 orbital(s) to be included based on the given `subshell`. The order of the corresponding 
@@ -529,8 +529,8 @@ $(Doc_genBasisFunc_eg3)
 `BSkey::String`: The name of an existed atomic basis set. The supported options are in 
 `$(BasisSetNames)`.
 
-`atm::String`: The name of the atom corresponding to the chosen basis set. The supported 
-options are in `$(ElementNames)`.
+`atm::$(StrOrSym)`: The name of the atom corresponding to the chosen basis set. 
+The supported options are in `$(ElementNames)`.
 
 === Keyword argument(s) ===
 
@@ -615,7 +615,7 @@ genBasisFunc(cen::SpatialPoint{T, D}, gs::NTuple{GN, AbstractGaussFunc{T}},
 genBasisFunc(cen, gs, l[1]; normalizeGTO)
 
 function genBasisFunc(cen::SpatialPoint{T, D}, gs::NTuple{GN, AbstractGaussFunc{T}}, 
-                      subshell::String; normalizeGTO::Bool=false) where {T, D, GN}
+                      subshell::StrOrSym; normalizeGTO::Bool=false) where {T, D, GN}
     genBasisFunc(cen, gs, SubshellAngMomList[D][ToSubshellLN[subshell]]; normalizeGTO)
 end
 
@@ -632,13 +632,13 @@ genBasisFunc(cen::SpatialPoint{T, D}, xpnANDcon::NTuple{2, T},
              lOrSubshell=LTuple(fill(0, D)); normalizeGTO::Bool=false) where {T, D} = 
 genBasisFunc(cen, (GaussFunc(xpnANDcon[1], xpnANDcon[2]),), lOrSubshell; normalizeGTO)
 
-genBasisFunc(cen::SpatialPoint{T, D}, gs::Tuple, subshell::String, 
+genBasisFunc(cen::SpatialPoint{T, D}, gs::Tuple, subshell::StrOrSym, 
              lFilter::Tuple{Vararg{Bool}}; normalizeGTO::Bool=false) where {T, D} = 
 genBasisFunc(cen, gs, 
              SubshellAngMomList[D][ToSubshellLN[subshell]][1:end.∈Ref(findall(lFilter))]; 
              normalizeGTO)
 
-function genBasisFunc(center::SpatialPoint{T, D}, BSkey::String, atm::String="H"; 
+function genBasisFunc(center::SpatialPoint{T, D}, BSkey::String, atm::StrOrSym="H"; 
                       unlinkCenter::Bool=false) where {T, D}
     BSstr = BasisSetList[BSkey][AtomicNumberList[atm]]
     BSstr===nothing && throw(DomainError((BSkey, atm), 
@@ -1616,11 +1616,11 @@ end
 
 """
 
-    orbitalNumOf(subshell::String, D::Integer=3) -> Int
+    orbitalNumOf(subshell::$(StrOrSym), D::Integer=3) -> Int
 
 Return the size (number of orbitals) of each subshell in `D` dimensional real space.
 """
-orbitalNumOf(subshell::String, D::Integer=3) = 
+orbitalNumOf(subshell::StrOrSym, D::Integer=3) = 
 SubshellSizeList[D][ToSubshellLN[subshell]]
 
 """
