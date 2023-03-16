@@ -54,16 +54,16 @@ getOneBodyInts(∫elecKineticCore, (), lazyCollect(bs))
 """
 
     neAttraction(bf1::AbstractGTBasisFuncs{T, D, 1}, bf2::AbstractGTBasisFuncs{T, D, 1}, 
-                 nuc::Union{NTuple{NN, String}, AbstractVector{String}}, 
-                 nucCoords::$(SpatialCoordType|>typeStrNotUnionAll)) where {T, D, NN} -> 
+                 nuc::Union{Tuple{String, Vararg{String, NNMO}}, AbstractVector{String}}, 
+                 nucCoords::$(SpatialCoordType|>typeStrNotUnionAll)) where {T, D, NNMO} -> 
     T
 
 Return the nuclear attraction between two basis functions, provided with the nuclei and 
 their coordinates (in the atomic units).
 """
 neAttraction(bf1::AbstractGTBasisFuncs{T, D, 1}, bf2::AbstractGTBasisFuncs{T, D, 1}, 
-             nuc::AVectorOrNTuple{String, NN}, 
-             nucCoords::SpatialCoordType{T, D, NN}) where {T, D, NN} = 
+             nuc::AVectorOrNTuple{String, NNMO}, 
+             nucCoords::SpatialCoordType{T, D, NNMO}) where {T, D, NNMO} = 
 get1BCompInt(T, Val(D), ∫nucAttractionCore, 
              (arrayToTuple(nuc), genTupleCoords(T, nucCoords)), (bf2===bf1,), 
              (1, 1), bf1, bf2)
@@ -73,16 +73,16 @@ get1BCompInt(T, Val(D), ∫nucAttractionCore,
 
     neAttractions(bs::Union{Tuple{Vararg{AbstractGTBasisFuncs{T, D}}}, 
                             AbstractVector{<:AbstractGTBasisFuncs{T, D}}}, 
-                  nuc::Union{NTuple{NN, String}, AbstractVector{String}}, 
-                  nucCoords::$(SpatialCoordType|>typeStrNotUnionAll)) where {T, D, NN} -> 
+                  nuc::Union{Tuple{String, Vararg{String, NNMO}}, AbstractVector{String}}, 
+                  nucCoords::$(SpatialCoordType|>typeStrNotUnionAll)) where {T, D, NNMO} -> 
     Matrix{T}
 
 Return the nuclear attraction matrix given a basis set and the corresponding nuclei with 
 their coordinates (in atomic units).
 """
 neAttractions(bs::AVectorOrNTuple{AbstractGTBasisFuncs{T, D}}, 
-              nuc::AVectorOrNTuple{String, NN}, 
-              nucCoords::SpatialCoordType{T, D, NN}) where {T, D, NN} = 
+              nuc::AVectorOrNTuple{String, NNMO}, 
+              nucCoords::SpatialCoordType{T, D, NNMO}) where {T, D, NNMO} = 
 getOneBodyInts(∫nucAttractionCore, (arrayToTuple(nuc), genTupleCoords(T, nucCoords)), 
                lazyCollect(bs))
 
@@ -90,15 +90,15 @@ getOneBodyInts(∫nucAttractionCore, (arrayToTuple(nuc), genTupleCoords(T, nucCo
 """
 
     coreHij(bf1::AbstractGTBasisFuncs{T, D, 1}, bf2::AbstractGTBasisFuncs{T, D, 1}, 
-            nuc::Union{NTuple{NN, String}, AbstractVector{String}}, 
-            nucCoords::$(SpatialCoordType|>typeStrNotUnionAll)) where {T, D, NN} -> 
+            nuc::Union{Tuple{String, Vararg{String, NNMO}}, AbstractVector{String}}, 
+            nucCoords::$(SpatialCoordType|>typeStrNotUnionAll)) where {T, D, NNMO} -> 
     T
 
 Return a matrix element of the core Hamiltonian given two basis functions.
 """
 coreHij(bf1::AbstractGTBasisFuncs{T, D, 1}, bf2::AbstractGTBasisFuncs{T, D, 1}, 
-        nuc::AVectorOrNTuple{String, NN}, 
-        nucCoords::SpatialCoordType{T, D, NN}) where {T, D, NN} = 
+        nuc::AVectorOrNTuple{String, NNMO}, 
+        nucCoords::SpatialCoordType{T, D, NNMO}) where {T, D, NNMO} = 
 eKinetic(bf1, bf2) + neAttraction(bf1, bf2, nuc, nucCoords)
 
 
@@ -106,19 +106,19 @@ eKinetic(bf1, bf2) + neAttraction(bf1, bf2, nuc, nucCoords)
 
     coreH(bs::Union{GTBasis, Tuple{Vararg{AbstractGTBasisFuncs{T, D}}}, 
                     AbstractVector{<:AbstractGTBasisFuncs{T, D}}}, 
-          nuc::Union{NTuple{NN, String}, AbstractVector{String}}, 
-          nucCoords::$(SpatialCoordType|>typeStrNotUnionAll)) where {T, D, NN} -> 
+          nuc::Union{Tuple{String, Vararg{String, NNMO}}, AbstractVector{String}}, 
+          nucCoords::$(SpatialCoordType|>typeStrNotUnionAll)) where {T, D, NNMO} -> 
     Matrix{T}
 
 Return the core Hamiltonian given a basis set and the corresponding nuclei with their 
 coordinates (in atomic units).
 """
 coreH(bs::AVectorOrNTuple{AbstractGTBasisFuncs{T, D}}, 
-      nuc::AVectorOrNTuple{String, NN}, 
-      nucCoords::SpatialCoordType{T, D, NN}) where {T, D, NN} = 
+      nuc::AVectorOrNTuple{String, NNMO}, 
+      nucCoords::SpatialCoordType{T, D, NNMO}) where {T, D, NNMO} = 
 eKinetics(bs) + neAttractions(bs, nuc, nucCoords)
 
 coreH(b::GTBasis{T, D}, 
-      nuc::AVectorOrNTuple{String, NN}, 
-      nucCoords::SpatialCoordType{T, D, NN}) where {T, D, NN} = 
+      nuc::AVectorOrNTuple{String, NNMO}, 
+      nucCoords::SpatialCoordType{T, D, NNMO}) where {T, D, NNMO} = 
 neAttractions(b.basis, nuc, nucCoords) + b.Te

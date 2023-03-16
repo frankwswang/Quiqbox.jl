@@ -280,9 +280,10 @@ getOptimizerConstructor(::Type{<:Any}) =  convertExternalOpt
 @inline function genOptimizer(::Val{M}, Mconfig::ConfigBox{T1}, optimizer::O, 
                               pbs::AbstractVector{<:ParamBox{T2}}, 
                               bs::AbstractVector{<:GTBasisFuncs{T2, D}}, 
-                              nuc::NTuple{NN, String}, 
-                              nucCoords::NTuple{NN, NTuple{D, T2}}, N) where 
-                             {M, T1, T2, O, NN, D}
+                              nuc::Tuple{String, Vararg{String, NNMO}}, 
+                              nucCoords::Tuple{NTuple{D, T2}, 
+                                               Vararg{NTuple{D, T2}, NNMO}},
+                              N) where {M, T1, T2, O, NNMO, D}
     (f0, getOFval), (g0, getOGval) = OFfunctions[M]
 
     f = function (x)
@@ -396,7 +397,7 @@ variable will be optimized.
 `bs::AbstractVector{<:GTBasisFuncs{T, D}}`: The basis set to be optimized.
 
 `nuc::Union{
-    NTuple{NN, String} where NN, 
+    Tuple{String, Vararg{String, NNMO}} where NNMO, 
     AbstractVector{String}
 }`: The nuclei in the studied system.
 
@@ -418,12 +419,12 @@ achieve `5`, every step will be printed.
 """
 function optimizeParams!(pbs::AbstractVector{<:ParamBox{T}}, 
                          bs::AbstractVector{<:GTBasisFuncs{T, D}}, 
-                         nuc::AVectorOrNTuple{String, NN}, 
-                         nucCoords::SpatialCoordType{T, D, NN}, 
+                         nuc::AVectorOrNTuple{String, NNMO}, 
+                         nucCoords::SpatialCoordType{T, D, NNMO}, 
                          config::POconfig{<:Any, M, CBT, <:Any, F}=defaultPOconfig, 
                          N::Union{Int, Tuple{Int}, NTuple{2, Int}}=getCharge(nuc); 
                          printInfo::Bool=true, 
-                         infoLevel::Int=defaultPOinfoL) where {T, D, NN, M, CBT, F}
+                         infoLevel::Int=defaultPOinfoL) where {T, D, NNMO, M, CBT, F}
     tBegin = time()
 
     pars = formatTunableParams!(pbs, bs)

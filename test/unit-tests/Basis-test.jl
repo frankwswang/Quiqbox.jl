@@ -145,7 +145,7 @@ bf2_P_norm2 = genBasisFunc(cen, [gf2], "P")
 bf2_P_norm3 = genBasisFunc(cen, gf2, "p")
 @test hasEqual(bf2_P_norm2, bf2_P_norm3)
 @test BasisFuncs(bf2_P_norm3) === bf2_P_norm3
-bfsp = BasisFuncs(genSpatialPoint(cen), gf2, (Quiqbox.LTuple(1,0,0),))
+bfsp = BasisFuncs(genSpatialPoint(cen), gf2, (Quiqbox.LTuple(1,0,0),), false)
 @test hasEqual(collect(bfsp)[], BasisFunc(bfsp), bf2_P_norm3[1])
 @test getTypeParams(bf2_P_norm3) == 
       (Float64, 3, 1, 1, Quiqbox.P3D{Float64, iT, iT, iT}, 3)
@@ -197,6 +197,16 @@ bf4_8 = genBasisFunc(bf4_4, bf4_5.l)
 @test hasIdentical(bf4_8, bf4_4)
 bf4_9 = genBasisFunc(bf4_5, false)
 @test hasIdentical(bf4_9, bf4_4)
+
+ebf0 = EmptyBasisFunc{Float64, 3}()
+ebf1 = genBasisFunc([1.0, 2, 3], (Float64[], Float64[]))
+@test ebf1 == ebf0
+ebf2 = genBasisFunc([1.0, 2, 3], ())
+@test ebf2 == ebf0
+ebf3 = genBasisFunc([1.0, 2, 3], (Float64[], Float64[]), "P")
+@test ebf3 == ebf0
+ebf4 = genBasisFunc([1.0, 2, 3], (), "P")
+@test ebf4 == ebf0
 
 
 # function sortBasisFuncs sortPermBasisFuncs
