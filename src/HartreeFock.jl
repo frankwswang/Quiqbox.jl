@@ -130,22 +130,19 @@ function getCfromSAD(::Val{HFT}, S::AbstractMatrix{T},
         atmNs[i] = (N₁, N₂)
     end
 
-    nThreads = Threads.nthreads()
     len1, len2 = size(Hcore)
-    Dᵅs = [zeros(T, len1, len2) for _=1:nThreads]
-    Dᵝs = [zeros(T, len1, len2) for _=1:nThreads]
-    @sync for (atm, atmN, coord) in zip(orderedNuc, atmNs, nucCoords[order])
-        Threads.@spawn begin
-            h1 = coreH(bs, (atm,), (coord,))
-            r, _ = runHFcore(Val(:UHF), 
-                             config, atmN, h1, HeeI, S, X, getCfromHcore(Val(:UHF), X, h1), 
-                             SADHFmaxStep, true, (false, false, false, false))
-            Dᵅs[Threads.threadid()] += r[1].Ds[end]
-            Dᵝs[Threads.threadid()] += r[2].Ds[end]
-        end
+    Dᵅ = zeros(T, len1, len2)
+    Dᵝ = zeros(T, len1, len2)
+    for (atm, atmN, coord) in zip(orderedNuc, atmNs, nucCoords[order])
+        h1 = coreH(bs, (atm,), (coord,))
+        r, _ = runHFcore(Val(:UHF), 
+                         config, atmN, h1, HeeI, S, X, getCfromHcore(Val(:UHF), X, h1), 
+                         SADHFmaxStep, true, (false, false, false, false))
+        Dᵅ += r[1].Ds[end]
+        Dᵝ += r[2].Ds[end]
     end
 
-    breakSymOfC(Val(HFT), Hcore, HeeI, X, sum(Dᵅs), sum(Dᵝs))
+    breakSymOfC(Val(HFT), Hcore, HeeI, X, Dᵅ, Dᵝ)
 end
 
 

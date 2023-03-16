@@ -1,4 +1,4 @@
-export gridBoxCoords, GridBox, gridCoordOf
+export GridBox, gridCoordOf
 
 function makeGridFuncsCore(nG::Int)
     if iszero(nG)

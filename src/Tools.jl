@@ -790,15 +790,19 @@ arrayToTuple(arr::AbstractArray) = Tuple(arr)
 arrayToTuple(tpl::Tuple) = itself(tpl)
 
 
-genTupleCoords(::Type{T1}, coords::Tuple{Vararg{AbstractVector{<:T2}}}) where {T1, T2} = 
+genTupleCoords(::Type{T1}, 
+               coords::Tuple{AbstractVector{<:T2}, Vararg{AbstractVector{<:T2}}}) where 
+              {T1, T2} = 
 map(x->Tuple(x.|>T1), coords)
 
 genTupleCoords(::Type{T1}, coords::AbstractVector{<:AbstractVector{<:T2}}) where {T1, T2} = 
 genTupleCoords(T1, coords|>Tuple)
 
-genTupleCoords(::Type{T}, coords::Tuple{Vararg{NTuple{D, T}}}) where {D, T} = itself(coords)
+genTupleCoords(::Type{T}, coords::Tuple{NTuple{D, T}, Vararg{NTuple{D, T}}}) where {D, T} = 
+itself(coords)
 
-genTupleCoords(::Type{T}, coords::AbstractVector{NTuple{D, T}}) where {D, T} = Tuple(coords)
+genTupleCoords(::Type{T}, coords::AbstractVector{NTuple{D, T}}) where {D, T} = 
+Tuple(coords)
 
 
 uniCallFunc(f::F, argsOrder::NTuple{N, Int}, args...) where {F<:Function, N} = 
