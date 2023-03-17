@@ -106,10 +106,13 @@ function derivativeCore(FoutputIsVector::Val{B},
                                           (sqrt(λ[i]) + sqrt(λ[j])) ) )
     end
     ∂X = 𝑣*∂X₀*𝑣'
-    # if (0.02 < norm(∂X) < 5) && (0.5 < norm(X) < 2)
-    #     X = convert(Matrix{T1}, X)
-    #     ∂X = convert(Matrix{T1}, ∂X)
-    # end
+    nX = norm(X)
+    n∂X = norm(∂X)
+    if (0.05 < nX     < 2) && (0.05 <      n∂X < 2) && 
+       (0.02 < nX*n∂X < 5) && (0.02 < nX^3*n∂X < 5)
+         X = convert(Matrix{T1},  X)
+        ∂X = convert(Matrix{T1}, ∂X)
+    end
     ∂ʃ2 = oneBodyDerivativeCore(FoutputIsVector, ∂bfs, bfs, X, ∂X, ʃ2)
     ∂ʃ4 = twoBodyDerivativeCore(FoutputIsVector, ∂bfs, bfs, X, ∂X, ʃ4)
     ∂ʃ2, ∂ʃ4
