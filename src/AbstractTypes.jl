@@ -94,3 +94,6 @@ const AArrayOrNTuple{T, NNMO} = Union{Tuple{T, Vararg{T, NNMO}}, AbstractArray{<
 const NTupleOfFGTBF{BN, T, D} = NTuple{BN, FGTBasisFuncs1O{T, D}}
 const NTupleOfSB1{BN, T, D} = NTuple{BN, SpatialBasis1O{T, D}}
 const NTupleOfSBN{BN, T, D} = NTuple{BN, SpatialBasis{T, D}}
+
+
+const StrOrSym = Union{String, Symbol}

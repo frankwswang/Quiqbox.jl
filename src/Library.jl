@@ -139,22 +139,26 @@ function LtoStr(lt::LTuple{D}) where {D}
 end
 
 
+addSymToX(keys::AbstractVector{String}, vals::AbstractVector{<:T}) where {T} = 
+vcat(keys .=> vals, Symbol.(keys) .=> vals)
+
+
 const SciNotMarker = r"D(?=[\+\-])"
 const sciNotReplace = (txt)->replace(txt, SciNotMarker => "e")
 const BStextEndingMarker = "****"
 const BasisSetList = Dict(BasisSetNames .=> BasisFuncTexts)
-const AtomicNumberList = Dict(ElementNames .=> collect(1 : length(ElementNames)))
-const AngMomNumberList = Dict(SubshellNames .=> collect(0 : length(SubshellNames)-1))
-const SubshellAngMomList = [Dict(SubshellNames .=> SubshellLs[1]), 
-                            Dict(SubshellNames .=> SubshellLs[2]), 
-                            Dict(SubshellNames .=> SubshellLs[3])]
-const ToSubshellLN = Dict(vcat(SubshellNames, SubshellNamesUppercase) .=> 
-                          repeat(SubshellNames, 2))
-const ToSubshellUN = Dict(vcat(SubshellNames, SubshellNamesUppercase) .=> 
-                          repeat(SubshellNamesUppercase, 2))
-const SubshellSizeList = [Dict(SubshellNames .=> SubshellXsizes),
-                          Dict(SubshellNames .=> SubshellXYsizes),
-                          Dict(SubshellNames .=> SubshellXYZsizes)]
+const AtomicNumberList = (Dict∘addSymToX)(ElementNames, collect(1:length(ElementNames)))
+const AngMomNumberList = (Dict∘addSymToX)(SubshellNames, collect(0:length(SubshellNames)-1))
+const SubshellAngMomList = [(Dict∘addSymToX)(SubshellNames, SubshellLs[1]), 
+                            (Dict∘addSymToX)(SubshellNames, SubshellLs[2]), 
+                            (Dict∘addSymToX)(SubshellNames, SubshellLs[3])]
+const ToSubshellLN = (Dict∘addSymToX)(vcat(SubshellNames, SubshellNamesUppercase),  
+                                      repeat(SubshellNames, 2))
+const ToSubshellUN = (Dict∘addSymToX)(vcat(SubshellNames, SubshellNamesUppercase),  
+                                      repeat(SubshellNamesUppercase, 2))
+const SubshellSizeList = [(Dict∘addSymToX)(SubshellNames, SubshellXsizes  ),
+                          (Dict∘addSymToX)(SubshellNames, SubshellXYsizes ),
+                          (Dict∘addSymToX)(SubshellNames, SubshellXYZsizes)]
 const AngMomIndexList = [Dict(flatten(SubshellLs[1]) .=> 
                               flatten([collect(1:length(i)) for i in SubshellLs[1]])),
                          Dict(flatten(SubshellLs[2]) .=> 
@@ -186,6 +190,8 @@ const cxIVsym  = Symbol(IVsymSuffix, cxSym)
 const cyIVsym  = Symbol(IVsymSuffix, cySym)
 const czIVsym  = Symbol(IVsymSuffix, czSym)
 const cenIVsym = (cxIVsym, cyIVsym, czIVsym)
+
+const defaultSPointMarker = :point
 
 const spinOccupations = ("0", "↿", "⇂", "↿⇂")
 const OrbitalOccupation = ((false, false), (true, false), (false, true), (true, true))
