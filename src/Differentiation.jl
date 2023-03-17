@@ -108,8 +108,8 @@ function derivativeCore(FoutputIsVector::Val{B},
     ∂X = 𝑣*∂X₀*𝑣'
     nX = norm(X)
     n∂X = norm(∂X)
-    if (0.05 < nX     < 2) && (0.05 <      n∂X < 2) && 
-       (0.02 < nX*n∂X < 5) && (0.02 < nX^3*n∂X < 5)
+    if (0.05 < nX     <  2) && (0.05 <      n∂X <  2) && 
+       (0.01 < nX*n∂X < 10) && (0.01 < nX^3*n∂X < 10)
          X = convert(Matrix{T1},  X)
         ∂X = convert(Matrix{T1}, ∂X)
     end
