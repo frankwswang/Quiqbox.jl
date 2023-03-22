@@ -1,106 +1,111 @@
 using Test
 using Quiqbox
-using Quiqbox: BasisFuncMix, hasBoolRelation, typeStrOf, getFieldNameStr, itselfTshorten
+using Quiqbox: BasisFuncMix, hasBoolRelation, getFieldNameStr
 using Suppressor: @capture_out
 
 @testset "Overload.jl" begin
 
+replShow = obj->show(stdout, MIME"text/plain"(), obj)
+
 # function show
 pb1 = ParamBox(-1)
-@test (@capture_out show(pb1)) == itselfTshorten(typeof(pb1))*"(-1)[∂][undef]"
+@test (@capture_out replShow(pb1)) == "ParamBox{Int64, :undef, …}{0}[∂][undef]⟦=⟧[-1]"
 
 pb2 = ParamBox(-1, :a, index=1)
-@test (@capture_out show(pb2)) == itselfTshorten(typeof(pb2))*"(-1)[∂][a₁]"
+@test (@capture_out replShow(pb2)) == "ParamBox{Int64, :a, …}{0}[∂][a₁]⟦=⟧[-1]"
 
 pb3 = ParamBox(-1, :x, abs)
 pb3_2 = changeMapping(pb3, Quiqbox.DI(pb3.map))
-@test (@capture_out show(pb3)) == (@capture_out show(pb3_2))
-      itselfTshorten(typeof(pb3))*"(-1)[∂][x_x]"
+@test (@capture_out replShow(pb3))[begin:end-2]*"-1]" == (@capture_out replShow(pb3_2))
 
 p1 = genSpatialPoint((1.,))
-@test (@capture_out show(p1)) == "SpatialPoint{Float64, 1}{PBFL{(0,)}}(param, marker)"*
-                                 "[1.0][∂]"
+@test (@capture_out replShow(p1)) == "SpatialPoint{Float64, …}{0}[∂][(1.0)]"
 
 p2 = genSpatialPoint((1.,2.))
-@test (@capture_out show(p2)) == "SpatialPoint{Float64, 2}{PBFL{(0, 0)}}(param, marker)"*
-                                 "[1.0, 2.0][∂][∂]"
+@test (@capture_out replShow(p2)) == "SpatialPoint{Float64, …}{0, 0}[∂∂][(1.0, 2.0)]"
 
 p3 = genSpatialPoint((1.,2.,3.))
-@test (@capture_out show(p3)) == "SpatialPoint{Float64, 3}{PBFL{(0, 0, 0)}}(param, marker)"*
-                                 "[1.0, 2.0, 3.0][∂][∂][∂]"
+@test (@capture_out replShow(p3)) == 
+      "SpatialPoint{Float64, …}{0, 0, 0}[∂∂∂][(1.0, 2.0, 3.0)]"
 
 bf1 = genBasisFunc([1.0, 2.0, 1.0], (2.0, 1.0))
 gf1 = bf1.gauss[1]
 gf2 = GaussFunc(changeMapping.(gf1.param, Quiqbox.DI.(getproperty.(gf1.param, :map)))...)
-@test (@capture_out show(gf1)) == (@capture_out show(gf2)) == 
-      itselfTshorten(typeof(gf1))*"(xpn()=$(gf1.xpn()), con()=$(gf1.con()), param)[∂][∂]"
+@test (@capture_out replShow(gf1)) == (@capture_out replShow(gf2)) == 
+      "GaussFunc{Float64, …}{0, 0}[∂∂][{2.0, 1.0}]"
 
-bFieldStr = getFieldNameStr(bf1)
-@test (@capture_out show(bf1)) == string(typeStrOf(bf1))*bFieldStr*"[X⁰Y⁰Z⁰][1.0, 2.0, 1.0]"
+@test (@capture_out replShow(bf1)) == 
+      "BasisFunc{Float64, 3, 0, 1, …}{0, 0, 0}[(1.0, 2.0, 1.0)][X⁰Y⁰Z⁰]"
 
 bf2 = genBasisFunc(missing, "STO-3G")[]
-@test (@capture_out show(bf2)) == string(typeStrOf(bf2))*bFieldStr*"[X⁰Y⁰Z⁰][NaN, NaN, NaN]"
+@test (@capture_out replShow(bf2)) == 
+      "BasisFunc{Float64, 3, 0, 3, …}{0, 0, 0}[(NaN, NaN, NaN)][X⁰Y⁰Z⁰]"
 
 bfs1 = genBasisFunc([0.0, 0.0, 0.0], (2.0, 1.0), "P")
-@test (@capture_out show(bfs1)) == string(typeStrOf(bfs1))*bFieldStr*"[3/3][0.0, 0.0, 0.0]"
+@test (@capture_out replShow(bfs1)) == 
+      "BasisFuncs{Float64, 3, 1, 1, …}{0, 0, 0}[(0.0, 0.0, 0.0)][3/3]"
 
 bfs2 = genBasisFunc([0.0 ,0.0 , 0.0], (2.0, 1.0), [(2,0,0)])
-@test (@capture_out show(bfs2)) == string(typeStrOf(bfs2))*bFieldStr*
-                                   "[X²Y⁰Z⁰]"*"[0.0, 0.0, 0.0]"
+@test (@capture_out replShow(bfs2)) == 
+      "BasisFunc{Float64, 3, 2, 1, …}{0, 0, 0}[(0.0, 0.0, 0.0)][X²Y⁰Z⁰]"
 bfs3 = genBasisFunc([0.0, 0.0, 0.0], (2.0, 1.0), [(2,0,0), (1,1,0)])
-@test (@capture_out show(bfs3)) == string(typeStrOf(bfs3))*bFieldStr*
-                                   "[2/6]"*"[0.0, 0.0, 0.0]"
+@test (@capture_out replShow(bfs3)) == 
+      "BasisFuncs{Float64, 3, 2, 1, …}{0, 0, 0}[(0.0, 0.0, 0.0)][2/6]"
 
 bfe = Quiqbox.EmptyBasisFunc{Float64, 3}()
-@test (@capture_out show(bfe)) == string(typeof(bfe))
+@test (@capture_out replShow(bfe)) == string(typeof(bfe))
 
 box1 = GridBox(2, 1.5)
-@test (@capture_out show(box1)) == string(typeStrOf(box1))*getFieldNameStr(box1)
+@test (@capture_out replShow(box1)) == 
+      "GridBox{Float64, 3, 27, …}" * getFieldNameStr(box1|>typeof)
 
 bf3 = genBasisFunc(box1.point[1], (2.0, 1.0))
 
 bfm1 = BasisFuncMix([bf1, bf2, bf3])
-@test (@capture_out show(bfm1)) == string(typeStrOf(bfm1))*getFieldNameStr(bfm1)
+@test (@capture_out replShow(bfm1)) == 
+      "BasisFuncMix{Float64, 3, 3, BasisFunc{Float64, 3, 0}}"
 
 GTb1 = GTBasis([bf1, bfs2])
-@test (@capture_out show(GTb1)) == string(typeof(GTb1))*getFieldNameStr(GTb1)
+@test (@capture_out replShow(GTb1)) == "GTBasis{Float64, 3, 2, BasisFunc{Float64, 3, 𝑙, "*
+                                       "1, Tuple{Vararg{ParamBox{…}}}} where 𝑙}"*
+                                       getFieldNameStr(GTb1|>typeof)
 
 fVar1 = runHF(GTb1, ["H", "H"], [[0.0, 0.0, 0.0], [1.0, 2.0, 1.0]], HFconfig((C0=:Hcore,)), 
               printInfo=false)
 
-info1 = (@capture_out show(fVar1.temp[1]))
+info1 = (@capture_out replShow(fVar1.temp[1]))
 tVarStrP1 = string(typeof(fVar1.temp[1]))
 l1 = length(tVarStrP1)
 @test info1[1:l1] == tVarStrP1
-tVarStrP2 = getFieldNameStr(fVar1.temp[1])
+tVarStrP2 = getFieldNameStr(fVar1.temp[1]|>typeof)
 l2 = length(tVarStrP2)
 @test info1[l1+1:l1+l2-1] == tVarStrP2[1:end-1]
 @test info1[l1+l2:l1+l2+7] == ".Etots=["
 @test info1[end-1:end] == "])"
 
-info2 = (@capture_out show(fVar1))
+info2 = (@capture_out replShow(fVar1))
 fVarStrP1 = string(typeof(fVar1))
-fVarStrP2 = getFieldNameStr(fVar1)
+fVarStrP2 = getFieldNameStr(fVar1|>typeof)
 l3 = length(fVarStrP1)
 @test info2[1:l3] == fVarStrP1
 @test info2[l3+1:l3+4] * info2[l3+17:end] == fVarStrP2
 
-info3 = (@capture_out show(SCFconfig((:DD, :ADIIS, :DIIS), 
-                                     (1e-4, 1e-12, 1e-13), Dict(2=>[:solver=>:LCM]))))
+info3 = (@capture_out replShow(SCFconfig((:DD, :ADIIS, :DIIS), 
+                                         (1e-4, 1e-12, 1e-13), Dict(2=>[:solver=>:LCM]))))
 @test info3 == "SCFconfig{Float64, 3, Tuple{Val{:DD}, Val{:ADIIS}, Val{:DIIS}}}(method, "*
                "interval=(0.0001, 1.0e-12, 1.0e-13), methodConfig, oscillateThreshold)"
 
 H2 = MatterByHF(fVar1)
-info4 = (@capture_out show(H2))
-@test info4 == string(H2|>typeof) * getFieldNameStr(H2)
+info4 = (@capture_out replShow(H2))
+@test info4 == string(H2|>typeof) * getFieldNameStr(H2|>typeof)
 
-info5 = (@capture_out show(POconfig()))
+info5 = (@capture_out replShow(POconfig()))
 @test info5 == "POconfig{Float64, :HFenergy, HFconfig{Float64, :RHF, "*
                "typeof(Quiqbox.getCfromSAD), Float64, 2, Tuple{Val{:ADIIS}, Val{:DIIS}}}"*
                ", Tuple{Float64, Float64}, $(typeof(POconfig().optimizer))}(method=Val"*
                "{:HFenergy}(), config, target, threshold, maxStep, optimizer, saveTrace)"
 
-info6 = (@capture_out show(HFconfig(SCF=SCFconfig((:ADIIS, :DIIS), (5e-3, 1e-12), 
+info6 = (@capture_out replShow(HFconfig(SCF=SCFconfig((:ADIIS, :DIIS), (5e-3, 1e-12), 
                                                   Dict(1=>[:solver=>:SPGB])))))
 @test info6 == "HFconfig{Float64, :RHF, typeof(Quiqbox.getCfromSAD), Float64, 2, "*
                "Tuple{Val{:ADIIS}, Val{:DIIS}}}(HF, C0, SCF, maxStep, earlyStop, saveTrace)"

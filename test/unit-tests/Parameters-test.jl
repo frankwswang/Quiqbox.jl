@@ -1,7 +1,7 @@
 using Test
 using Quiqbox
-using Quiqbox: getTypeParams, compareParamBox, getFLevel, FLevel, PBFL, addParamBox, 
-               mulParamBox, reduceParamBoxes
+using Quiqbox: getTypeParams, compareParamBox, getFLevel, FLevel, addParamBox, mulParamBox, 
+               reduceParamBoxes
 
 @testset "Parameters.jl" begin
 
@@ -33,7 +33,6 @@ pb3 = ParamBox(-1, :b, abs)
 @test outSymOf(pb3) == :b
 @test mapOf(pb3) == abs
 toggleDiff!(pb3)
-@test PBFL((pb1, pb2, pb3)) == PBFL{(0, 0, 1)}
 
 pb4 = ParamBox(1.2, :c, x->x^2, :x)
 @test getTypeParams(pb4) == (Float64, :c, typeof(pb4.map))
