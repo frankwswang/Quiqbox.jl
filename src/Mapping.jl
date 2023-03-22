@@ -27,6 +27,7 @@ getFLevel(::Type{<:IF}) = 0
 getFLevel(::Type{<:Function}) = 1
 getFLevel(::Type{<:DI{F}}) where {F} = getFLevel(F)
 getFLevel(::Type{<:CompositeFunction{F1, F2}}) where {F1, F2} = getFLevel(F1)+getFLevel(F2)
+getFLevel(::Type{Function}) = Inf
 getFLevel(::F) where {F<:Function} = getFLevel(F)
 
 struct FLevel{L} <: MetaParam{FLevel} end
@@ -134,3 +135,6 @@ end
 
 combinePF(::typeof(*), pf1::PF{F, typeof(*)}, pf2::PF{F, typeof(^)}) where {F} = 
 combinePF(*, pf2, pf1)
+
+
+const AllStructFunctions = [DI, Layered, PF, ChainedPF, RC]

@@ -46,6 +46,9 @@ GaussFunc(e::Union{T, ParamBox{T}}, d::Union{T, ParamBox{T}}) where {T<:Abstract
 GaussFunc(genExponent(e), genContraction(d))
 
 
+getTypeParams(::GaussFunc{T, Fxpn, Fcon}) where {T, Fxpn, Fcon} = (T, Fxpn, Fcon)
+
+
 """
 
     genExponent(e::T, mapFunction::Function=$(itself); 
@@ -174,6 +177,9 @@ struct SpatialPoint{T, D, PT} <: AbstractSpatialPoint{T, D}
 end
 
 
+getTypeParams(::SpatialPoint{T, D, PT}) where {T, D, PT} = (T, D, PT)
+
+
 """
 
     genSpatialPoint(point::Union{NTuple{D, Union{T, Array{T, 0}}}, AbstractVector}, 
@@ -187,7 +193,7 @@ Construct a [`SpatialPoint`](@ref) from a collection of coordinate components.
 julia> v1 = [1.0, 2.0, 3.0];
 
 julia> p1 = genSpatialPoint(v1, :p1)
-$( SpatialPoint(ParamBox.((1.0, 2.0, 3.0), SpatialParamSyms), :p1) )
+SpatialPoint{Float64, …}{0, 0, 0}[∂∂∂][(1.0, 2.0, 3.0)]
 
 julia> p1.marker
 :p1
@@ -195,13 +201,13 @@ julia> p1.marker
 julia> v2 = [fill(1.0), 2.0, 3.0];
 
 julia> p2 = genSpatialPoint(v2); p2[1]
-ParamBox{Float64, :X, iT}(1.0)[∂][X]
+ParamBox{Float64, :X, …}{0}[∂][X]⟦=⟧[1.0]
 
 julia> v2[1][] = 1.2
 1.2
 
 julia> p2[1]
-ParamBox{Float64, :X, iT}(1.2)[∂][X]
+ParamBox{Float64, :X, …}{0}[∂][X]⟦=⟧[1.2]
 ```
 """
 genSpatialPoint(v::AbstractVector, marker::Symbol=defaultSPointMarker) = 
@@ -243,17 +249,17 @@ Convert a `ParamBox` to the `compIndex` th component of a `SpatialPoint`.
 
 ```jldoctest; setup = :(push!(LOAD_PATH, "../../src/"); using Quiqbox)
 julia> genSpatialPoint(1.2, 1)
-ParamBox{Float64, :X, iT}(1.2)[∂][X]
+ParamBox{Float64, :X, …}{0}[∂][X]⟦=⟧[1.2]
 
 julia> pointY1 = fill(2.0);
 
 julia> Y1 = genSpatialPoint(pointY1, 2)
-ParamBox{Float64, :Y, iT}(2.0)[∂][Y]
+ParamBox{Float64, :Y, …}{0}[∂][Y]⟦=⟧[2.0]
 
 julia> pointY1[] = 1.5;
 
 julia> Y1
-ParamBox{Float64, :Y, iT}(1.5)[∂][Y]
+ParamBox{Float64, :Y, …}{0}[∂][Y]⟦=⟧[1.5]
 ```
 """
 genSpatialPoint(compData::Pair{Array{T, 0}, Symbol}, compIndex::Int, 
@@ -422,15 +428,6 @@ isaFullShellBasisFuncs(::FloatingGTBasisFuncs{<:Any, D, 𝑙, <:Any, <:Any, ON})
 isaFullShellBasisFuncs(::FloatingGTBasisFuncs{<:Any, <:Any, 0}) = true
 
 
-const Doc_genBasisFunc_eg1 = "BasisFunc{Float64, 3, 1, 1}{PBFL{(0, 0, 0)}}(center, "*
-                             "gauss, l, normalizeGTO, param)[X⁰Y¹Z⁰][0.0, 0.0, 0.0]"
-
-const Doc_genBasisFunc_eg2 = "BasisFuncs{Float64, 3, 1, 1, P3D{Float64, iT, iT, iT}, 3}"*
-                             "(center, gauss, l, normalizeGTO, param)[3/3][0.0, 0.0, 0.0]"
-
-const Doc_genBasisFunc_eg3 = "BasisFuncs{Float64, 3, 1, 1, P3D{Float64, iT, iT, iT}, 2}"*
-                             "(center, gauss, l, normalizeGTO, param)[2/3][0.0, 0.0, 0.0]"
-
 """
 
     genBasisFunc(center::Union{AbstractVector{T}, Tuple{Vararg{T}}, SpatialPoint, Missing}, 
@@ -484,7 +481,7 @@ during the calculation.
 
 ```jldoctest; setup = :(push!(LOAD_PATH, "../../src/"); using Quiqbox)
 julia> genBasisFunc([0.,0.,0.], GaussFunc(2.,1.), (0,1,0))
-$(Doc_genBasisFunc_eg1)
+BasisFunc{Float64, 3, 1, 1, …}{0, 0, 0}[(0.0, 0.0, 0.0)][X⁰Y¹Z⁰]
 ```
 
 ≡≡≡ Method 2 ≡≡≡
@@ -513,10 +510,10 @@ orbital angular momentum(s) can be inspected using function `orbitalLin`.
 
 ```jldoctest; setup = :(push!(LOAD_PATH, "../../src/"); using Quiqbox)
 julia> genBasisFunc([0.,0.,0.], (2., 1.), "p")
-$(Doc_genBasisFunc_eg2)
+BasisFuncs{Float64, 3, 1, 1, …}{0, 0, 0}[(0.0, 0.0, 0.0)][3/3]
 
 julia> genBasisFunc([0.,0.,0.], (2., 1.5), "p", (true, false, true))
-$(Doc_genBasisFunc_eg3)
+BasisFuncs{Float64, 3, 1, 1, …}{0, 0, 0}[(0.0, 0.0, 0.0)][2/3]
 ```
 
 ≡≡≡ Method 3 ≡≡≡
@@ -1260,16 +1257,16 @@ no longer linked to the data (input variable) stored in them.
 
 ```jldoctest; setup = :(push!(LOAD_PATH, "../../src/"); using Quiqbox)
 julia> gf1 = GaussFunc(3.0, 1.0)
-$( GaussFunc(3.0, 1.0) )
+GaussFunc{Float64, …}{0, 0}[∂∂][{3.0, 1.0}]
 
 julia> gf1 * 2
-$( GaussFunc(3.0, 2.0) )
+GaussFunc{Float64, …}{0, 0}[∂∂][{3.0, 2.0}]
 
 julia> gf1 * gf1
-$( GaussFunc(6.0, 1.0) )
+GaussFunc{Float64, …}{0, 0}[∂∂][{6.0, 1.0}]
 
 julia> gf1 * 2 * gf1
-$( GaussFunc(6.0, 2.0) )
+GaussFunc{Float64, …}{0, 0}[∂∂][{6.0, 2.0}]
 ```
 """
 function mul(gf::GaussFunc{T}, coeff::Real; roundAtol::Real=getAtolVal(T)) where {T}
@@ -1322,17 +1319,27 @@ argument set to it default value.
 ≡≡≡ Example(s) ≡≡≡
 
 ```jldoctest; setup = :(push!(LOAD_PATH, "../../src/"); using Quiqbox)
-julia> bf1 = genBasisFunc([1.0, 1.0, 1.0], ([2.0, 1.0], [0.1, 0.2]))
-$( genBasisFunc([1.0, 1.0, 1.0], ([2.0, 1.0], [0.1, 0.2])) )
+julia> bf1 = genBasisFunc([1.0, 1.0, 1.0], ([2.0, 1.0], [0.1, 0.2]));
 
-julia> bf2 = bf1 * 2
-$( genBasisFunc([1.0, 1.0, 1.0], ([2.0, 1.0], [0.2, 0.4])) )
+julia> gaussCoeffOf(bf1)
+2×2 Matrix{Float64}:
+ 2.0  0.1
+ 1.0  0.2
 
-julia> getindex.(getproperty.(bf2.gauss, :con))
-$( (0.2, 0.4) )
+julia> bf2 = bf1 * 2;
 
-julia> bf3 = bf1 * bf2
-$( genBasisFunc([1.0, 1.0, 1.0], ([4.0, 3.0, 2.0], [0.02, 0.08, 0.08])) )
+julia> gaussCoeffOf(bf2)
+2×2 Matrix{Float64}:
+ 2.0  0.2
+ 1.0  0.4
+
+julia> bf3 = bf1 * bf2;
+
+julia> gaussCoeffOf(bf3)
+3×2 Matrix{Float64}:
+ 4.0  0.02
+ 3.0  0.08
+ 2.0  0.08
 ```
 """
 function mul(sgf1::BasisFunc{T, D, 𝑙1, 1, PT1}, sgf2::BasisFunc{T, D, 𝑙2, 1, PT2}; 
@@ -1939,15 +1946,15 @@ value(s) of the [`ParamBox`](@ref)(s) stored in `b` will be copied, i.e.,
 
 ```jldoctest; setup = :(push!(LOAD_PATH, "../../src/"); using Quiqbox)
 julia> f(x)=x^2; e = genExponent(3.0, f)
-ParamBox{Float64, :α, typeof(f)}(3.0)[𝛛][x_α]
+ParamBox{Float64, :α, …}{1}[𝛛][x_α]⟦→⟧[9.0]
 
 julia> c = genContraction(2.0)
-$( genContraction(2.0) )
+ParamBox{Float64, :d, …}{0}[∂][d]⟦=⟧[2.0]
 
 julia> gf1 = GaussFunc(e, c);
 
 julia> gf2 = copyBasis(gf1)
-$( GaussFunc(9.0, 2.0) )
+GaussFunc{Float64, …}{0, 0}[∂∂][{9.0, 2.0}]
 
 julia> gf1.xpn() == gf2.xpn()
 true

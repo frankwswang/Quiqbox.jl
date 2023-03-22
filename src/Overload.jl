@@ -13,188 +13,266 @@ import Base: ==
 ==(::LTuple{1, 0}, ::LTuple{1, 0}) = true
 
 
+function omitLastTypeParPrint(io::IO, str::String, nRepeat::Int=1)
+    for _ in 1:nRepeat
+        str = str[begin:prevind(str, findlast(',', str))]
+    end
+    print(io, str)
+    nRepeat > 0 && print(io, ", …", "}")
+end
+
+
+function printFLcore(io::IO, ::Type{F}) where {F<:Function}
+    FL = getFLevel(F)
+    if F <: DI
+        printstyled(io, FL, color=:light_black)
+    else
+        print(io, FL)
+    end
+end
+
+printFLcore(io, ::Type{<:ParamBox{<:Any, <:Any, F}}) where {F<:Function} = 
+printFLcore(io, F)
+
+
+function printFL(io::IO, ::Type{T}) where {T}
+    print(io, "{")
+    printFLcore(io, T)
+    print(io, "}")
+end
+
+function printFL(io::IO, Fs::Tuple{Vararg{Type}})
+    print(io, "{")
+    for (i, F) in enumerate(Fs)
+        printFLcore(io, F)
+        i < length(Fs) && print(io, ", ")
+    end
+    print(io, "}")
+end
+
+printFL(io::IO, ::Type{T}) where {T<:Tuple{Vararg{ParamBox}}} = printFL(io, fieldtypes(T))
+
+printFL(io::IO, ::F) where {F<:Function} = printFL(io, F)
+
+printFL(io, ::Type{<:FloatingGTBasisFuncs{<:Any, <:Any, <:Any, <:Any, F}}) where {F} = 
+printFL(io, F)
+
+
 diffColorSym(@nospecialize(pb::ParamBox)) = ifelse(isDiffParam(pb), :green, :light_black)
 
+printDiffSymCore(io::IO, bl::Bool, pb::ParamBox) = 
+printstyled(io, ifelse(bl, "𝛛", "∂"), color=diffColorSym(pb))
+
 function printDiffSym(io::IO, @nospecialize(pb::ParamBox))
+    bl = isDiffParam(pb)
     print(io, "[")
-    printstyled(io, ifelse(isDiffParam(pb), "𝛛", "∂"), color=diffColorSym(pb))
+    printDiffSymCore(io, bl, pb)
     print(io, "]")
+    ifelse(bl, "⟦→⟧", "⟦=⟧")
 end
 
-
-itselfTshorten(str::String) = replace(str, "$(iT)"=>"iT")
-itselfTshorten(::Type{T}) where{T} = itselfTshorten(string(T))
-
-
-import Base: show
-function show(io::IO, @nospecialize(pb::ParamBox))
-    v = pb.data[][begin][]
-    pbTstr = (itselfTshorten∘typeof)(pb)
-    if pb.map isa DI
-        idx = findlast(',', pbTstr)
-        print(io, pbTstr[begin:idx])
-        printstyled(io, pbTstr[idx+1:end-1], color=:light_black)
-        print(io, pbTstr[end])
-    else
-        print(io, pbTstr)
+function printDiffSym(io::IO, @nospecialize(pbs::Tuple{Vararg{ParamBox}}))
+    print(io, "[")
+    bl1 = true
+    for pb in pbs
+        bl2 = isDiffParam(pb)
+        bl1 *= !bl2
+        printDiffSymCore(io, bl2, pb)
     end
-    print(io, "(", v isa Integer ? v : round(v, sigdigits=nDigitShown), ")")
-    printDiffSym(io, pb)
-    print(io, "[")
+    print(io, "]")
+    ifelse(bl1, "=", "→")
+end
+
+
+function printIndVarCore(io::IO, pb::ParamBox)
     printstyled(io, "$(indVarOf(pb)[begin])", color=:cyan)
+end
+
+function printIndVar(io::IO, @nospecialize(pb::ParamBox))
+    print(io, "[")
+    printIndVarCore(io, pb)
     print(io, "]")
 end
 
-getSPNDstringCore(::Type{T}) where {T<:SPointT} = 
-( ", "*string(T)*"}", "}{"*replace(string(PBFL(T)), "Quiqbox."=>"", count=1)*"}" )
-
-getSPNDstring(t::Type{P1D{T, Fx}}) where {T, Fx} = 
-( getSPNDstringCore(t), (string(t), itselfTshorten("P1D{$T, $(Fx)}")) )
-
-getSPNDstring(t::Type{P2D{T, Fx, Fy}}) where {T, Fx, Fy} = 
-( getSPNDstringCore(t), (string(t), itselfTshorten("P2D{$T, $(Fx), $(Fy)}")) )
-
-getSPNDstring(t::Type{P3D{T, Fx, Fy, Fz}}) where {T, Fx, Fy, Fz} = 
-( getSPNDstringCore(t), (string(t), itselfTshorten("P3D{$T, $(Fx), $(Fy), $(Fz)}")) )
-
-function typeStrOf(sp::Type{SpatialPoint{T, D, PDT}}) where {T, D, PDT}
-    spTstrO = sp |> string
-    (pbsTstrO1, pbsTstrN1), (pbsTstrO2, pbsTstrN2) = PDT |> getSPNDstring
-    spTstrO = replace(spTstrO, pbsTstrO1=>pbsTstrN1)
-    replace(spTstrO, pbsTstrO2=>pbsTstrN2)
+function printIndVar(io::IO, @nospecialize(pbs::Tuple{Vararg{ParamBox}}))
+    print(io, "[")
+    for (i, pb) in pbs
+        printIndVarCore(io, pb)
+        i < length(pbs) && print(io, ", ")
+    end
+    print(io, "]")
 end
 
-typeStrOf(::T) where {T<:SpatialPoint} = typeStrOf(T)
 
-function typeStrOf(bT::Type{<:FloatingGTBasisFuncs{<:Any, <:Any, <:Any, <:Any, PDT}}) where 
-                  {PDT}
-    bTstrO = bT |> string
-    (pbsTstrO1, pbsTstrN1), (pbsTstrO2, pbsTstrN2) = PDT |> getSPNDstring
-    bTstrO = replace(bTstrO, pbsTstrO1=>pbsTstrN1)
-    replace(bTstrO, pbsTstrO2=>pbsTstrN2)
+function printValCore(io::IO, n::Number)
+    print(io, n isa Integer ? n : round(n, sigdigits=nDigitShown))
 end
 
-typeStrOf(::Type{T}) where {T<:FloatingGTBasisFuncs} = string(T)
-
-typeStrOf(::T) where {T<:FloatingGTBasisFuncs} = typeStrOf(T)
-
-function typeStrOf(gbT::Type{<:GridBox{<:Any, <:Any, <:Any, SPT}}) where {SPT}
-    gbTstrO = gbT |> string
-    pbsTstrN = SPT |> typeStrOf
-    replace(gbTstrO, string(SPT)=>pbsTstrN, count=1)
+function printVal(io::IO, n::Number)
+    print(io, "[")
+    printValCore(io, n)
+    print(io, "]")
 end
 
-typeStrOf(::T) where {T<:GridBox} = typeStrOf(T)
+function printVal(io::IO, v::Union{Vector{<:Number}, Tuple{Vararg{Number}}}, 
+                  isVec::Bool=false)
+    print(io, "[")
+    print(io, ifelse(isVec, "(", "{"))
+    for (i, n) in enumerate(v)
+        print(io, n isa Integer ? n : round(n, sigdigits=nDigitShown))
+        i < length(v) && print(io, ", ")
+    end
+    print(io, ifelse(isVec, ")", "}"))
+    print(io, "]")
+end
 
-typeStrOf(bfmT::Type{<:BasisFuncMix{<:Any, <:Any, <:Any, BFT}}) where {BFT} = 
-replace(string(bfmT), string(BFT)=>typeStrOf(BFT), count=1)
 
-typeStrOf(::T) where {T<:BasisFuncMix} = typeStrOf(T)
+function shortenTuplePB(str::String)
+    TPBmarker = "#TPB#"
+    str = replace(str, "Tuple{ParamBox{"=>TPBmarker*"{ParamBox{")
+    str = ShortenStrClip(str, TPBmarker)
+    replace(str, TPBmarker*"{…}"=>"Tuple{Vararg{ParamBox{…}}}")
+end
 
-function getFieldNameStr(::T) where {T} 
+function shortenFandTPB(str::String)
+    str = replace(str, "$(iT)"=>"Quiqbox.iT")
+    str = shortenTuplePB(str)
+    for SF in AllStructFunctions
+        str = ShortenStrClip(str, "$(SF)")
+    end
+    str
+end
+
+shortenFandTPB(::Type{T}) where {T} = (shortenF∘string)(T)
+
+shortenFandTPB(obj) = (shortenF∘typeof)(obj)
+
+
+function printAMconfig(io, (l,)::Tuple{LTuple})
+    print(io, "[")
+    printstyled(io, LtoStr(l), color=:cyan)
+    print(io, "]")
+end
+
+function printAMconfig(io, ::NTuple{N, LTuple{D, L}}) where {N, D, L}
+    SON = SubshellXYZsizes[L+1]
+    xyzN = "$(N)"
+    xyzNmax = "/$(SON)"
+    print(io, "[")
+    printstyled(io, xyzN, color=:cyan)
+    print(io, xyzNmax)
+    print(io, "]")
+end
+
+
+function getFieldNameStr(::Type{T}) where {T}
     fields = fieldnames(T)
     str = fields |> string
     length(fields) == 1 && (str = str[1:end-2]*")")
     replace(str, ':'=>"")
 end
 
-function show(io::IO, @nospecialize(sp::SpatialPoint))
+
+import Base: show
+function show(io::IO, ::MIME"text/plain", @nospecialize(pb::ParamBox))
+    Tstr = (string∘typeof)(pb)
+    Tstr = shortenFandTPB(Tstr)
+    omitLastTypeParPrint(io, Tstr)
+    printFL(io, pb.map)
+    symInfo = printDiffSym(io, pb)
+    printIndVar(io, pb)
+    print(io, symInfo)
+    printVal(io, pb())
+end
+
+function show(io::IO, ::MIME"text/plain", @nospecialize(sp::SpatialPoint))
+    Tstr = (string∘typeof)(sp)
+    Tstr = shortenFandTPB(Tstr)
+    omitLastTypeParPrint(io, Tstr, 2)
+    printFL(io, getTypeParams(sp)[end])
     pbs = sp.param
-    print(io, typeStrOf(sp), getFieldNameStr(sp))
-    print(io, [i() for i in pbs])
-    printDiffSym.(Ref(io), pbs)
+    printDiffSym(io, pbs)
+    printVal(io, coordOf(sp), true)
 end
 
-function show(io::IO, @nospecialize(gf::GaussFunc))
-    gfTstr = (itselfTshorten∘typeof)(gf)
-    idx1, idx2 = first.(findall(",", gfTstr))
-    print(io, gfTstr[begin:idx1+1])
-    if gf.xpn.map isa DI
-        printstyled(io, gfTstr[idx1+2:idx2-1], color=:light_black)
-    else
-        print(io, gfTstr[idx1+2:idx2-1])
-    end
-    print(io, ", ")
-    if gf.con.map isa DI
-        printstyled(io, gfTstr[idx2+2:end-1], color=:light_black)
-    else
-        print(io, gfTstr[idx2+2:end-1])
-    end
-    fieldStr = getFieldNameStr(gf)
-    fieldStr = replace(fieldStr, "xpn"=>"xpn()=$(round(gf.xpn(), sigdigits=nDigitShown))")
-    fieldStr = replace(fieldStr, "con"=>"con()=$(round(gf.con(), sigdigits=nDigitShown))")
-    print(io, "}", fieldStr)
-    printDiffSym.(Ref(io), gf.param)
+function show(io::IO, ::MIME"text/plain", @nospecialize(gf::GaussFunc))
+    Tstr = (string∘typeof)(gf)
+    Tstr = shortenFandTPB(Tstr)
+    omitLastTypeParPrint(io, Tstr, 2)
+    printFL(io, getTypeParams(gf)[end-1:end])
+    pbs = gf.param
+    printDiffSym(io, pbs)
+    printVal(io, (gf.xpn(), gf.con()))
 end
 
-function show(io::IO, @nospecialize(bf::BasisFunc))
-    print(io, typeStrOf(bf))
-    print(io, getFieldNameStr(bf), "[")
-    printstyled(io, bf.l[1]|>LtoStr, color=:cyan)
-    cen = round.([i() for i in bf.center], sigdigits=nDigitShown)
-    print(io, "]", cen)
+function show(io::IO, ::MIME"text/plain", @nospecialize(bf::FloatingGTBasisFuncs))
+    Tstr = (string∘typeof)(bf)
+    Tstr = shortenFandTPB(Tstr)
+    omitLastTypeParPrint(io, Tstr, ifelse(bf isa BasisFunc, 1, 2))
+    printFL(io, getTypeParams(bf)[end-1])
+    printVal(io, centerCoordOf(bf), true)
+    printAMconfig(io, bf.l)
 end
 
-function show(io::IO, @nospecialize(bfs::BasisFuncs))
-    SON = SubshellXYZsizes[lOf(bfs)+1]
-    xyz1 = "$(bfs.l |> length)"
-    xyz2 = "/$(SON)"
-    print(io, typeStrOf(bfs))
-    print(io, getFieldNameStr(bfs), "[")
-    printstyled(io, xyz1, color=:cyan)
-    print(io, xyz2)
-    cen = round.([i() for i in bfs.center], sigdigits=nDigitShown)
-    print(io, "]", cen)
+function show(io::IO, ::MIME"text/plain", gb::GridBox)
+    Tstr = (string∘typeof)(gb)
+    Tstr = shortenFandTPB(Tstr)
+    Tstr = ShortenStrClip(Tstr, "$(SpatialPoint)")
+    omitLastTypeParPrint(io, Tstr)
+    print(io, getFieldNameStr(gb|>typeof))
 end
 
-show(io::IO, @nospecialize(bfm::BasisFuncMix)) = 
-print(io, typeStrOf(bfm), getFieldNameStr(bfm))
+function show(io::IO, ::MIME"text/plain", obj::QuiqboxContainer, printFieldNames::Bool=true)
+    Tstr = (string∘typeof)(obj)
+    Tstr = shortenFandTPB(Tstr)
+    print(io, Tstr)
+    printFieldNames && print(io, getFieldNameStr(obj|>typeof))
+end
 
-show(io::IO, ::T) where {T<:EmptyBasisFunc} = print(io, T)
+show(io::IO, mime::MIME"text/plain", bfm::BasisFuncMix) = show(io, mime, bfm, false)
 
-show(io::IO, @nospecialize(gtb::GTBasis)) = print(io, typeof(gtb), getFieldNameStr(gtb))
+show(io::IO, ::MIME"text/plain", ::T) where {T<:EmptyBasisFunc} = print(io, T)
 
-show(io::IO, @nospecialize(box::GridBox)) = print(io, typeStrOf(box), getFieldNameStr(box))
 
-function show(io::IO, @nospecialize(config::SCFconfig))
+function show(io::IO, ::MIME"text/plain", @nospecialize(config::SCFconfig))
     print(io, typeof(config))
-    str = getFieldNameStr(config)
+    str = getFieldNameStr(SCFconfig)
     str = replace(str, "interval"=>"interval=$(config.interval)")
     print(io, str)
 end
 
-function show(io::IO, @nospecialize(config::HFconfig))
+function show(io::IO, ::MIME"text/plain", @nospecialize(config::HFconfig))
     print(io, typeof(config))
-    str = getFieldNameStr(config)
+    str = getFieldNameStr(HFconfig)
     print(io, str)
 end
 
-function show(io::IO, @nospecialize(vars::HFtempVars))
+function show(io::IO, ::MIME"text/plain", @nospecialize(vars::HFtempVars))
     print(io, typeof(vars))
-    str = getFieldNameStr(vars)
+    str = getFieldNameStr(HFtempVars)
     Etot0 = round(vars.shared.Etots[1], sigdigits=nDigitShown)
     EtotL = round(vars.shared.Etots[end], sigdigits=nDigitShown)
     str = replace(str, "shared"=>"shared.Etots=[$(Etot0), … , $(EtotL)]")
     print(io, str)
 end
 
-function show(io::IO, @nospecialize(vars::HFfinalVars))
+function show(io::IO, ::MIME"text/plain", @nospecialize(vars::HFfinalVars))
     print(io, typeof(vars))
-    str = getFieldNameStr(vars)
+    str = getFieldNameStr(HFfinalVars)
     Ehf = round(vars.Ehf, sigdigits=nDigitShown)
     str = replace(str, "Ehf"=>"Ehf=$(Ehf)")
     print(io, str)
 end
 
-function show(io::IO, @nospecialize(config::POconfig))
+function show(io::IO, ::MIME"text/plain", @nospecialize(config::POconfig))
     print(io, typeof(config))
-    str = getFieldNameStr(config)
+    str = getFieldNameStr(POconfig)
     str = replace(str, "method,"=>"method=$(config.method),")
     print(io, str)
 end
 
-show(io::IO, @nospecialize(matter::MatterByHF)) = 
-print(io, typeof(matter), getFieldNameStr(matter))
+show(io::IO, ::MIME"text/plain", @nospecialize(matter::MatterByHF)) = 
+print(io, typeof(matter), getFieldNameStr(MatterByHF))
 
 
 import Base: +
@@ -258,7 +336,7 @@ end
 
 size(::CGTBasisFuncsON{ON}) where {ON} = (ON,)
 length(::CGTBasisFuncsON{ON}) where {ON} = ON
-eltype(::BasisFuncs{T, D, 𝑙, GN, PT}) where {T, D, 𝑙, GN, PT} = BasisFunc{T, D, 𝑙, GN, PT}
+eltype(::BasisFuncs{T, D, 𝑙, GN, F}) where {T, D, 𝑙, GN, F} = BasisFunc{T, D, 𝑙, GN, F}
 
 function size(x::SpatialBasis, d::Integer)
     @boundscheck ( d > 0 || throw(BoundsError(x, d)) )

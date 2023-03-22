@@ -67,21 +67,21 @@ respect to the input variable.
 
 ```jldoctest; setup = :(push!(LOAD_PATH, "../../src/"); using Quiqbox)
 julia> ParamBox(1.0)
-ParamBox{Float64, :undef, iT}(1.0)[∂][undef]
+ParamBox{Float64, :undef, …}{0}[∂][undef]⟦=⟧[1.0]
 
 julia> ParamBox(1.0, :a)
-ParamBox{Float64, :a, iT}(1.0)[∂][a]
+ParamBox{Float64, :a, …}{0}[∂][a]⟦=⟧[1.0]
 
 julia> ParamBox(1.0, :a, abs)
-ParamBox{Float64, :a, $(typeof(abs))}(1.0)[𝛛][x_a]
+ParamBox{Float64, :a, …}{1}[𝛛][x_a]⟦→⟧[1.0]
 ```
 
-**NOTE 1:** The rightmost "`[∂][IV]`" in the printed info indicates the differentiability 
-and the name (the symbol with an assigned index if applied) of the independent variable 
-tied to the `ParamBox`. When the `ParamBox` is marked as non-differentiable, "`[∂]`" is 
-grey and `IV` is the name of the output variable; when it's marked as differentiable, 
-"`[∂]`" becomes a green "`[𝛛]`", and `IV` corresponds to the name of the stored input 
-variable.
+**NOTE 1:** The markers "`[∂][IV]`" in the printed info indicate the differentiability and 
+the name (the symbol with an assigned index if applied) respectively of the independent 
+variable tied to the `ParamBox`. When the `ParamBox` is marked as non-differentiable, 
+"`[∂]`" is grey and `IV` corresponds to the name of the output variable; when the 
+`ParamBox` is  marked as differentiable, "`[∂]`" becomes a green "`[𝛛]`", and `IV` 
+corresponds to the name of the stored input variable.
 
 **NOTE 2:** The output variable of a `ParamBox` is normally used to differentiate a 
 parameter functional (e.g., the Hartree-Fock energy). However, the derivative with respect 
@@ -215,11 +215,6 @@ getTypeParams(::T) where {T<:ParamBox} = getTypeParams(T)
 getFLevel(::Type{<:ParamBox{<:Any, <:Any, F}}) where {F} = getFLevel(F)
 
 getFLevel(::T) where {T<:ParamBox} = getFLevel(T)
-
-
-struct PBFL{LS} <: MetaParam{PBFL} end
-PBFL(::Type{T}) where {T<:Tuple{Vararg{ParamBox}}} = PBFL{getFLevel.(fieldtypes(T))}
-PBFL(::T) where {T<:Tuple{Vararg{ParamBox}}} = PBFL(T)
 
 
 """

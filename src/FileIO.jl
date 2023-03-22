@@ -120,3 +120,49 @@ function typeStrNotUnionAll(::Type{T}) where {T}
         strT[1:rng[1]-2]
     end
 end
+
+
+function findFirstEnclosureRange(str::String, startIdx::Int=1, 
+                                 bracketPair::NTuple{2, Char}=('{', '}'))
+    strLeft = str[startIdx:end]
+    opBkt = bracketPair[begin]
+    clBkt = bracketPair[end]
+    idxBegin = findfirst(opBkt, strLeft)
+    idxEnd = idxBegin-1
+    idx = idxBegin
+    offset = 1
+    while offset > 0 && idx < lastindex(str)
+        idx = nextind(strLeft, idx)
+        strLeft[idx] == opBkt && (offset+=1)
+        strLeft[idx] == clBkt && (offset-=1; idxEnd=idx)
+    end
+    (startIdx-1) .+ (idxBegin:idxEnd)
+end
+
+
+function ShortenStrClip(str::String, clip::AbstractString)
+    clip = string(clip)
+    tempSym = "#tempSym#"
+    while (ids1 = findfirst(clip, str); ids1 !== nothing)
+        ids2 = findFirstEnclosureRange(str, ids1[end])
+        idxL = lastindex(str)
+        ids2L = ids2[end]
+        tail = if str[thisind(str, min(idxL, ids2L+1)):thisind(str, min(idxL, ids2L+7))] == 
+                  " where "
+            tailStartIdx = if str[ids2L+8] == '{'
+                findFirstEnclosureRange(str, ids2L+7)[end] + 1
+            else
+                id1, id2 = findnext.((',', '}'), str, ids2L+7)
+                id1 === nothing && (id1 = idxL)
+                id2 === nothing && (id2 = idxL)
+                min(id1, id2)
+            end
+            str[tailStartIdx:end]
+        else
+            str[ids2L+1:end]
+        end
+        abbrev = ifelse(str[nextind(str, ids1[end])] == '{', "{…}", "")
+        str = str[begin:prevind(str, ids1[begin])] * tempSym * abbrev * tail
+    end
+    replace(str, tempSym=>clip)
+end
