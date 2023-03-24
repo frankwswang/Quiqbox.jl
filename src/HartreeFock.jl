@@ -1,6 +1,7 @@
 export SCFconfig, HFconfig, runHF, runHFcore
 
 using LinearAlgebra: dot, Hermitian, \, det, I, ishermitian, diag, norm
+using Base: OneTo
 using Combinatorics: powerset
 using LineSearches
 using SPGBox: spgbox!
@@ -44,8 +45,8 @@ function getCϵ(X::AbstractMatrix{T}, Fˢ::AbstractMatrix{T},
     ϵ, Cₓ = eigen(X'*Fˢ*X |> Hermitian)
     outC = X*Cₓ
     # Stabilize the sign factor of each column.
-    stabilizeSign && for j = 1:size(outC, 2)
-       outC[:, j] *= ifelse(outC[1,j] < 0, -1, 1)
+    stabilizeSign && for j in axes(outC, 2)
+       outC[:, j] *= ifelse(outC[begin, j] < 0, -1, 1)
     end
     outC, ϵ
 end
@@ -74,7 +75,7 @@ splitSpins(::Val{:UHF}, N) = splitSpins(Val(HFtypeSizeList[:UHF]), N)
 function breakSymOfC(::Val{:UHF}, C::AbstractMatrix{T}) where {T}
     C2 = copy(C)
     l = min(size(C2, 1), 2)
-    C2[1:l, 1:l] .= 0 # Breaking spin symmetry.
+    C2[begin:(begin+l-1), begin:(begin+l-1)] .= 0 # Breaking spin symmetry.
     # C2[l, :] .= 0 # Another way.
     (C, C2)
 end
@@ -91,9 +92,11 @@ getC.( Ref(X), getF(Hcore, HeeI, (Dᵅ, Dᵝ)) )
 function getCfromGWH(::Val{HFT}, S::AbstractMatrix{T}, Hcore::AbstractMatrix{T}, 
                      X::AbstractMatrix{T}) where {HFT, T}
     H = similar(Hcore)
-    Threads.@threads for j in 1:size(H, 1)
-        for i in 1:j
-            H[j,i] = H[i,j] = 3 * S[i,j] * (Hcore[i,i] + Hcore[j,j]) / 8
+    iBegin = firstindex(Hcore, 1)
+    idxShift = firstindex(S, 1) - iBegin
+    Threads.@threads for j in axes(H, 2)
+        for i in iBegin:j
+            H[j,i] = H[i,j] = 3 * S[i+idxShift, j+idxShift] * (Hcore[i,i] + Hcore[j,j]) / 8
         end
     end
     Cˢ = getC(X, H)
@@ -150,20 +153,26 @@ end
 const guessCmethods = (GWH=getCfromGWH, Hcore=getCfromHcore, SAD=getCfromSAD)
 
 
-getD(Cˢ::AbstractMatrix{T}, Nˢ::Int) where {T} = @views (Cˢ[:,1:Nˢ]*Cˢ[:,1:Nˢ]')
+function getD(Cˢ::AbstractMatrix{T}, Nˢ::Int) where {T}
+    iBegin = firstindex(Cˢ, 1)
+    @views (Cˢ[:, iBegin:(iBegin+Nˢ-1)]*Cˢ[:, iBegin:(iBegin+Nˢ-1)]')
+end
 # Nˢ: number of electrons with the same spin.
 
 @inline getD(X::AbstractMatrix{T}, Fˢ::AbstractMatrix{T}, Nˢ::Int) where {T} = 
         getD(getC(X, Fˢ), Nˢ)
 
 
-function getGcore(HeeI::AbstractArray{T, 4}, 
-                  DJ::AbstractMatrix{T}, DK::AbstractMatrix{T}) where {T}
+function getGcore(HeeI::AbstractArray{T1, 4}, DJ::T2, DK::T2) where 
+                 {T1, T2<:AbstractMatrix{T1}}
     G = similar(DJ)
-    Threads.@threads for ν = 1:size(G, 1)
-        for μ = 1:ν
+    iBegin = firstindex(DJ, 1)
+    idxShift = firstindex(HeeI, 1) - iBegin
+    Threads.@threads for ν in axes(G, 2)
+        for μ in iBegin:ν
             G[ν, μ] = G[μ, ν] = 
-            dot(transpose(DJ), @view HeeI[μ,ν,:,:]) - dot(DK, @view HeeI[μ,:,:,ν])
+            dot(transpose(DJ), @view HeeI[μ+idxShift,ν+idxShift,:,:]) - 
+            dot(DK, @view HeeI[μ+idxShift,:,:,ν+idxShift])
         end
     end
     G
@@ -174,16 +183,17 @@ end
         ( getGcore(HeeI, 2Dˢ, Dˢ), )
 
 # UHF
-@inline getG(HeeI::AbstractArray{T, 4}, (Dᵅ, Dᵝ)::NTuple{2, AbstractMatrix{T}}) where {T} = 
+@inline getG(HeeI::AbstractArray{T1, 4}, (Dᵅ, Dᵝ)::NTuple{2, T2}) where 
+            {T1, T2<:AbstractMatrix{T1}} = 
         ( getGcore(HeeI, Dᵅ+Dᵝ, Dᵅ), getGcore(HeeI, Dᵅ+Dᵝ, Dᵝ) )
 
 
-@inline getF(Hcore::AbstractMatrix{T}, G::NTuple{HFTS, AbstractMatrix{T}}) where 
-            {T, HFTS} = 
+@inline getF(Hcore::AbstractMatrix{T1}, G::NTuple{HFTS, T2}) where 
+            {T1, HFTS, T2<:AbstractMatrix{T1}} = 
         Ref(Hcore) .+ G
 
-@inline getF(Hcore::AbstractMatrix{T}, HeeI::AbstractArray{T, 4}, 
-             D::NTuple{HFTS, AbstractMatrix{T}}) where {T, HFTS} = 
+@inline getF(Hcore::AbstractMatrix{T1}, HeeI::AbstractArray{T1, 4}, 
+             D::NTuple{HFTS, T2}) where {T1, HFTS, T2<:AbstractMatrix{T1}} = 
         getF(Hcore, getG(HeeI, D))
 
 
@@ -195,25 +205,28 @@ get2SpinQuantity(O::NTuple{HFTS, T}) where {HFTS, T} = abs(3-HFTS) * sum(O)
 get2SpinQuantities(O, nRepeat::Int) = ntuple(_->get2SpinQuantity(O), nRepeat)
 
 # RHF or UHF
-getEhfCore(Hcore::AbstractMatrix{T}, 
-           Fˢ::NTuple{HFTS, AbstractMatrix{T}}, Dˢ::NTuple{HFTS, AbstractMatrix{T}}) where 
-          {T, HFTS} = 
+getEhfCore(Hcore::AbstractMatrix{T1}, Fˢ::NTuple{HFTS, T2}, Dˢ::NTuple{HFTS, T2}) where 
+          {T1, HFTS, T2<:AbstractMatrix{T1}} = 
 get2SpinQuantity(getE.(Ref(Hcore), Fˢ, Dˢ))
 
 # RHF or UHF
-function getEhf(Hcore::AbstractMatrix{T}, HeeI::AbstractArray{T, 4}, 
-                C::NTuple{HFTS, AbstractMatrix{T}}, Ns::NTuple{HFTS, Int}) where {T, HFTS}
+function getEhf(Hcore::AbstractMatrix{T1}, HeeI::AbstractArray{T1, 4}, 
+                C::NTuple{HFTS, T2}, Ns::NTuple{HFTS, Int}) where 
+               {T1, HFTS, T2<:AbstractMatrix{T1}}
     D = getD.(C, Ns)
     F = getF(Hcore, HeeI, D)
     getEhfCore(Hcore, F, D)
 end
 
 # RHF for MO
-function getEhf((HcoreMO,)::Tuple{<:AbstractMatrix{T}}, 
-                (HeeIMO,)::Tuple{<:AbstractArray{T, 4}}, (Nˢ,)::Tuple{Int}) where {T}
-    term1 = 2 * (sum∘view)(diag(HcoreMO), 1:Nˢ)
+function getEhf((HcoreMO,)::Tuple{AbstractMatrix{T}}, 
+                (HeeIMO,)::Tuple{AbstractArray{T, 4}}, (Nˢ,)::Tuple{Int}) where {T}
+    shift1 = firstindex(HcoreMO, 1) - 1
+    shift2 = firstindex( HeeIMO, 1) - 1
+    term1 = 2 * (sum∘view)(diag(HcoreMO), OneTo(Nˢ).+shift1)
     term2 = T(0)
-    for i in 1:Nˢ, j in 1:Nˢ
+    rng = OneTo(Nˢ) .+ shift2
+    for i in rng, j in rng
         term2 += 2 * HeeIMO[i,i,j,j] - HeeIMO[i,j,j,i]
     end
     term1 + term2
@@ -241,11 +254,15 @@ function getEhf(HcoreMOs::NTuple{2, <:AbstractMatrix{T}},
                 HeeIMOs::NTuple{2, <:AbstractArray{T, 4}}, 
                 Jᵅᵝ::AbstractMatrix{T}, 
                 Ns::NTuple{2, Int}) where {T}
+    shift1 = firstindex(HcoreMOs[begin], 1) - 1
+    shift2 = firstindex( HeeIMOs[begin], 1) - 1
+    shift3 = firstindex(Jᵅᵝ, 1) - 1
     res = mapreduce(+, HcoreMOs, HeeIMOs, Ns) do HcoreMO, HeeIMO, Nˢ
-        (sum∘view)(diag(HcoreMO), 1:Nˢ) + 
-        sum((HeeIMO[i,i,j,j] - HeeIMO[i,j,j,i]) for j in 1:Nˢ for i in 1:(j-1))
+        (sum∘view)(diag(HcoreMO), OneTo(Nˢ).+shift1) + 
+        sum((HeeIMO[i,i,j,j] - HeeIMO[i,j,j,i]) for j in (OneTo(Nˢ ).+shift2)
+                                                for i in (OneTo(j-1).+shift2))
     end
-    res + sum(Jᵅᵝ[i,j] for i=1:Ns[begin], j=1:Ns[end])
+    res + sum(Jᵅᵝ[i,j] for i=OneTo(Ns[begin]).+shift3, j=OneTo(Ns[end]).+shift3)
 end
 
 
@@ -507,7 +524,7 @@ struct SCFconfig{T, L, MS<:NTuple{L, Val}} <: ImmutableParameter{T, SCFconfig}
                        oscillateThreshold::Real=defultOscThreshold) where {L, T}
         any(i < 0 for i in intervals) && throw(DomainError(intervals, "Thresholds in "*
                                                "`intervals` must all be non-negative."))
-        kwPairs = [Pair[] for _=1:L]
+        kwPairs = [Pair[] for _ in OneTo(L)]
         for i in keys(config)
             kwPairs[i] = config[i]
         end
@@ -1006,37 +1023,38 @@ function genDD(αβVars::NTuple{HFTS, HFtempVars{T, HFT}}, X::AbstractMatrix{T},
 end
 
 
-function EDIIScore(Ds::AbstractVector{<:AbstractMatrix{T}}, 
-                   ∇s::AbstractVector{<:AbstractMatrix{T}}, Es::AbstractVector{T}) where {T}
+function EDIIScore(Ds::Vector{<:AbstractMatrix{T}}, 
+                   ∇s::Vector{<:AbstractMatrix{T}}, Es::Vector{T}) where {T}
     len = length(Ds)
     B = similar(∇s[begin], len, len)
     Threads.@threads for j in eachindex(Ds)
-        for i = 1:j
-            B[i,j] = B[j,i] = -dot(Ds[i]-Ds[j], ∇s[i]-∇s[j])
+        for i = OneTo(j)
+            @inbounds B[i,j] = B[j,i] = -dot(Ds[i]-Ds[j], ∇s[i]-∇s[j])
         end
     end
     Es, B
 end
 
-function ADIIScore(Ds::AbstractVector{<:AbstractMatrix{T}}, 
-                   ∇s::AbstractVector{<:AbstractMatrix{T}}) where {T}
+function ADIIScore(Ds::Vector{<:AbstractMatrix{T}}, 
+                   ∇s::Vector{<:AbstractMatrix{T}}) where {T}
     v = dot.(Ds .- Ref(Ds[end]), Ref(∇s[end]))
-    B = map(Iterators.product(eachindex(Ds), eachindex(∇s))) do idx
-        i, j = idx
-        dot(Ds[i]-Ds[end], ∇s[j]-∇s[end])
+    DsL = Ds[end]
+    ∇sL = ∇s[end]
+    B = map(Iterators.product(eachindex(Ds), eachindex(∇s))) do (i,j)
+        @inbounds dot(Ds[i]-DsL, ∇s[j]-∇sL)
     end
     v, B
 end
 
-function DIIScore(Ds::AbstractVector{<:AbstractMatrix{T}}, 
-                  ∇s::AbstractVector{<:AbstractMatrix{T}}, S::AbstractMatrix{T}) where {T}
+function DIIScore(Ds::Vector{<:AbstractMatrix{T}}, 
+                  ∇s::Vector{<:AbstractMatrix{T}}, S::AbstractMatrix{T}) where {T}
     len = length(Ds)
     B = similar(∇s[begin], len, len)
     v = zeros(T, len)
     Threads.@threads for j in eachindex(Ds)
-        for i = 1:j
-            B[i,j] = B[j,i] = dot( ∇s[i]*Ds[i]*S - S*Ds[i]*∇s[i], 
-                                   ∇s[j]*Ds[j]*S - S*Ds[j]*∇s[j] )
+        for i = OneTo(j)
+            @inbounds B[i,j] = B[j,i] = dot( ∇s[i]*Ds[i]*S - S*Ds[i]*∇s[i], 
+                                             ∇s[j]*Ds[j]*S - S*Ds[j]*∇s[j] )
         end
     end
     v, B
@@ -1048,9 +1066,9 @@ const DIISconfigs = ( DIIS=(Val(false), (Ds, ∇s, Es, S)-> DIIScore(Ds, ∇s, S
                       ADIIS=(Val(true), (Ds, ∇s, Es, S)->ADIIScore(Ds, ∇s)) )
 
 function xDIIScore!(mDIIS::F, c::Vector{T}, S::AbstractMatrix{T}, 
-                    Ds::AbstractVector{<:AbstractMatrix{T}}, 
-                    Fs::AbstractVector{<:AbstractMatrix{T}}, 
-                    Es::AbstractVector{T}, 
+                    Ds::Vector{<:AbstractMatrix{T}}, 
+                    Fs::Vector{<:AbstractMatrix{T}}, 
+                    Es::Vector{T}, 
                     cvxConstraint::Val{CCB}, 
                     solver::Symbol) where {F<:Function, T, CCB}
     v, B = mDIIS(Ds, Fs, Es, S)
@@ -1068,7 +1086,7 @@ function genxDIIS(::Type{Val{M}}, αβVars::NTuple{HFTS, HFtempVars{T, HFT}},
         getproperty(αβVars[begin], fieldSym) |> length
     end
     initialSize = min(DIISsize, DFElens...)
-    cs = Tuple(collect(T, 1:initialSize) for _=1:HFTS)
+    cs = Tuple(collect(T, OneTo(initialSize)) for _ in OneTo(HFTS))
     Dss, Fss, Ess = map(DFEsyms) do fieldSym
         fs = getproperty.(αβVars, fieldSym)
         iEnd = lastindex(fs[begin])

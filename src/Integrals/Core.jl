@@ -1285,11 +1285,13 @@ function getOneBodyInts(∫1e::F, optPosArgs::Tuple,
     accuSize = vcat(0, accumulate(+, subSize))
     totalSize = subSize |> sum
     buf = Array{T}(undef, totalSize, totalSize)
-    Threads.@threads for j in eachindex(basisSet)
-        for i in OneTo(j)
+    idxShift = firstindex(basisSet) - 1
+    Threads.@threads for j in OneTo(basisSet|>length)
+        Threads.@threads for i in OneTo(j)
             @inbounds begin
                 int = get1BCompInt(T, Val(D), ∫1e, optPosArgs, (j==i,), 
-                                   (subSize[i],  subSize[j]), basisSet[i], basisSet[j])
+                                   (subSize[i],  subSize[j]), 
+                                   basisSet[i+idxShift], basisSet[j+idxShift])
                 rowRange = accuSize[i]+1 : accuSize[i+1]
                 colRange = accuSize[j]+1 : accuSize[j+1]
                 update2DarrBlock!(buf, int, rowRange, colRange)
@@ -1304,11 +1306,12 @@ function getOneBodyInts(∫1e::F, optPosArgs::Tuple,
                        {F<:Function, T, D}
     BN = length(basisSet)
     buf = Array{T}(undef, BN, BN)
-    Threads.@threads for j in eachindex(basisSet)
-        for i in OneTo(j)
+    idxShift = firstindex(basisSet) - 1
+    Threads.@threads for j in OneTo(BN)
+        Threads.@threads for i in OneTo(j)
             @inbounds begin
                 int = get1BCompInt(T, Val(D), ∫1e, optPosArgs, (j==i,), 
-                                   (1, 1), basisSet[i], basisSet[j])
+                                   (1, 1), basisSet[i+idxShift], basisSet[j+idxShift])
                 buf[j, i] = buf[i, j] = int
             end
         end
@@ -1345,7 +1348,8 @@ function getTwoBodyInts(∫2e::F, optPosArgs::Tuple,
     accuSize = vcat(0, accumulate(+, subSize)...)
     totalSize = subSize |> sum
     buf = Array{T}(undef, totalSize, totalSize, totalSize, totalSize)
-    @sync for l in eachindex(basisSet), k in OneTo(l), 
+    idxShift = firstindex(basisSet) - 1
+    @sync for l in OneTo(basisSet|>length), k in OneTo(l), 
               j in OneTo(l), i in (OneTo∘ifelse)(l==j, k, j)
         Threads.@spawn begin
             iBl = (l==k, l==j, k==j, ifelse(l==j, k, j)==i)
@@ -1356,7 +1360,8 @@ function getTwoBodyInts(∫2e::F, optPosArgs::Tuple,
                 L = accuSize[l]+1 : accuSize[l+1]
                 int = get2BCompInt(T, Val(D), ∫2e, optPosArgs, iBl, 
                                    (subSize[i],  subSize[j],  subSize[k],  subSize[l]), 
-                                   basisSet[i], basisSet[j], basisSet[k], basisSet[l])
+                                    basisSet[i+idxShift], basisSet[j+idxShift], 
+                                    basisSet[k+idxShift], basisSet[l+idxShift])
                 update4DarrBlock!(buf, int, I, J, K, L)
             end
         end
@@ -1369,14 +1374,16 @@ function getTwoBodyInts(∫2e::F, optPosArgs::Tuple,
                        {F<:Function, T, D}
     BN = length(basisSet)
     buf = Array{T}(undef, BN, BN, BN, BN)
-    @sync for l in eachindex(basisSet), k in OneTo(l), 
+    idxShift = firstindex(basisSet) - 1
+    @sync for l in OneTo(BN), k in OneTo(l), 
               j in OneTo(l), i in (OneTo∘ifelse)(l==j, k, j)
         Threads.@spawn begin
             iBl = (l==k, l==j, k==j, ifelse(l==j, k, j)==i)
             @inbounds begin
                 int = get2BCompInt(T, Val(D), ∫2e, optPosArgs, iBl, 
                                    (1, 1, 1, 1), 
-                                   basisSet[i], basisSet[j], basisSet[k], basisSet[l])
+                                   basisSet[i+idxShift], basisSet[j+idxShift], 
+                                   basisSet[k+idxShift], basisSet[l+idxShift])
                 buf[l, k, j, i] = buf[k, l, j, i] = buf[k, l, i, j] = buf[l, k, i, j] = 
                 buf[i, j, l, k] = buf[j, i, l, k] = buf[j, i, k, l] = buf[i, j, k, l] = int
             end
