@@ -114,8 +114,9 @@ ParamBox(::Val{V}, ::IF, data::Pair{Array{T, 0}, Symbol}, index=genIndex(nothing
          canDiff=fill(false)) where {V, T} = 
 ParamBox{T, V}(data, index, canDiff)
 
-ParamBox(::Val{V}, pb::ParamBox{T}, canDiff::Array{Bool, 0}=pb.canDiff) where {V, T} = 
-ParamBox{T, V}(pb.map, pb.data[], pb.index, canDiff)
+ParamBox(::Val{V}, pb::ParamBox{T}, index=genIndex(pb.canDiff[] ? pb.index[] : nothing), 
+         canDiff::Array{Bool, 0}=copy(pb.canDiff)) where {V, T} = 
+ParamBox{T, V}(pb.map, pb.data[], index, canDiff)
 
 ParamBox(inVar::Union{T, Array{T, 0}}, outSym::Symbol=:undef, 
          inSym::Symbol=Symbol(IVsymSuffix, outSym); 
@@ -252,7 +253,7 @@ ParamBox(Val(V), itself, fill(pb())=>Symbol(IVsymSuffix, V))
 
 A shallow copy of the input `ParamBox`.
 """
-fullVarCopy(pb::ParamBox{<:Any, V}) where {V} = ParamBox(Val(V), pb)
+fullVarCopy(pb::ParamBox{<:Any, V}) where {V} = ParamBox(Val(V), pb, pb.index, pb.canDiff)
 
 
 """

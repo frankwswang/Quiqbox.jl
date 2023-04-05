@@ -5,7 +5,6 @@ using Quiqbox: getTypeParams, compareParamBox, getFLevel, FLevel, addParamBox, m
 
 @testset "Parameters.jl" begin
 
-
 pb1 = ParamBox(1, :a)
 @test getTypeParams(pb1) == (Int, :a, Quiqbox.iT)
 @test (FLevel∘getFLevel)(pb1) == FLevel(pb1.map) == FLevel(Quiqbox.iT)
@@ -34,10 +33,23 @@ pb3 = ParamBox(-1, :b, abs)
 @test mapOf(pb3) == abs
 toggleDiff!(pb3)
 
-pb4 = ParamBox(1.2, :c, x->x^2, :x)
+idx1 = 111
+pb4 = ParamBox(1.2, :c, x->x^2, :x, index=idx1)
 @test getTypeParams(pb4) == (Float64, :c, typeof(pb4.map))
-toggleDiff!(pb4)
-@test toggleDiff!(pb4)
+@test pb4.index[] == idx1
+pb4_o1 = ParamBox(Val(:c), pb4)
+@test pb4 == pb4_o1 && outSymOf(pb4) == outSymOf(pb4_o1)
+pb4_o2 = ParamBox(Val(:C), pb4)
+@test pb4 == pb4_o2 && outSymOf(pb4) != outSymOf(pb4_o2)
+disableDiff!(pb4)
+pb4_o3 = ParamBox(Val(:c), pb4)
+@test pb4 == pb4_o3
+@test pb4_o3.index[] === nothing
+pb4.index[] = idx1
+pb4_o4 = ParamBox(Val(:c), pb4)
+@test pb4 != pb4_o4
+@test enableDiff!(pb4)
+@test pb4.index[] === nothing
 @test inSymOf(pb4) == :x
 @test outSymOf(pb4) == :c
 
@@ -106,25 +118,29 @@ sortTuple = t -> (collect(t) |> sort)
 
 
 # function enableDiff! & disableDiff! & toggleDiff! with indices
-@test Dict(indVarOf(e_gv1)) == Dict(:α₁=>2.0)
-e_gv1_2 = changeMapping(e_gv1, x->x+3.2)
-@test Dict(indVarOf(e_gv1_2)) == Dict(:α=>5.2)
-enableDiff!(e_gv1)
-@test e_gv1.index[] === nothing
-e_gv1.index[] = 1
-@test (enableDiff!(e_gv1) && e_gv1.index[] == 1)
-e_gv1_3 = changeMapping(e_gv1, e_gv1_2.map)
-@test Dict(indVarOf(e_gv1_3)) == Dict(indVarOf(e_gv1)) == Dict(:x_α₁=>2.0)
-@test isDiffParam(e_gv1_3)
-disableDiff!(e_gv1_3)
-@test indVarOf(e_gv1_3) === indVarOf(e_gv1_2)
-e_gv1_3.index[] = 1
-@test (disableDiff!(e_gv1_3) || e_gv1_3.index[] == 1)
-@test toggleDiff!(e_gv1_3)
-e_gv1.index[] = e_gv1_3.index[]
-@test Dict(indVarOf(e_gv1_3)) == Dict(indVarOf(e_gv1)) == Dict(:x_α=>2.0)
+idx2 = 12
+pbt1 = ParamBox(1, :a, itself, :a, index=idx2, canDiff=false)
+@test toggleDiff!(pbt1)
+@test pbt1.index[] === nothing
+pbt1.index[] = idx2
+@test !disableDiff!(pbt1)
+@test pbt1.index[] === nothing
+pbt1.index[] = idx2
+@test enableDiff!(pbt1)
+@test pbt1.index[] === nothing
+
+pbt2 = ParamBox(1, :a, index=idx2, canDiff=true)
+@test !toggleDiff!(pbt2)
+@test pbt2.index[] === nothing
+pbt2.index[] = idx2
+@test enableDiff!(pbt2)
+@test pbt2.index[] === nothing
+pbt2.index[] = idx2
+@test !disableDiff!(pbt2)
+@test pbt2.index[] === nothing
 
 
+# function indVarOf
 @test Dict(indVarOf(pb3)) == Dict(:b=>1)
 pb4_3 = changeMapping(pb4, x->x+2)
 d1 = Dict(indVarOf.(bfm_gv.param))
@@ -137,6 +153,19 @@ d2 = Dict(indVarOf.(getUnique!(bfm_gv.param|>collect, compareFunction=hasIdentic
 d3 = Dict(indVarOf.(getUnique!(bfm_gv.param|>collect, compareFunction=compareParamBox)))
 @test d1 == d2
 @test d1 == d3
+
+
+# function changeMapping
+e_gv1_2 = changeMapping(e_gv1, x->x+3.2)
+@test Dict(indVarOf(e_gv1_2)) == Dict(:α=>5.2)
+enableDiff!(e_gv1)
+e_gv1_3 = changeMapping(e_gv1, e_gv1_2.map)
+@test Dict(indVarOf(e_gv1_3)) == Dict(indVarOf(e_gv1)) == Dict(:x_α=>2.0)
+@test isDiffParam(e_gv1_3)
+disableDiff!(e_gv1_3)
+@test indVarOf(e_gv1_3) === indVarOf(e_gv1_2)
+e_gv1_4 = changeMapping(e_gv1, e_gv1.map)
+@test hasEqual(e_gv1, e_gv1_4) && (e_gv1 == e_gv1_4)
 
 
 # function compareParamBox
@@ -165,46 +194,46 @@ pb11 = changeMapping(pb10, x->x^3)
 pb12 = addParamBox(pb10, pb11)
 @test pb12() == (pb10() + pb11())
 @test (pb12.data .=== pb10.data) && (pb10.data .=== pb11.data)
-@test isDiffParam(pb12) && (pb12.index[] == nothing)
+@test isDiffParam(pb12) && (pb12.index[] === nothing)
 pb13 = ParamBox(3, :a)
 pb14 = ParamBox(3, :a)
 pb15 = addParamBox(pb13, pb14)
 @test getTypeParams(pb15) == (Int, :a, Quiqbox.iT)
 @test pb15() == 2pb13[] == pb15[]
-@test !isDiffParam(pb15) && (pb15.index[] == nothing)
+@test !isDiffParam(pb15) && (pb15.index[] === nothing)
 pb16 = ParamBox(1.5, :a)
 pb17 = ParamBox(1.5, :a)
 pb18 = addParamBox(pb16, pb17)
 @test getTypeParams(pb18) == (Float64, :a, Quiqbox.iT)
 @test pb18() == 2pb16[] == pb18[]
-@test !isDiffParam(pb18) && (pb18.index[] == nothing)
+@test !isDiffParam(pb18) && (pb18.index[] === nothing)
 
 
 # function mulParamBox
 pb12_2 = mulParamBox(pb10, pb11)
 @test pb12_2() == (pb10() * pb11())
 @test pb12_2.data .=== pb10.data
-@test isDiffParam(pb12_2) && (pb12_2.index[] == nothing)
+@test isDiffParam(pb12_2) && (pb12_2.index[] === nothing)
 pb15_2 = mulParamBox(pb13, pb14)
 @test getTypeParams(pb15_2) == (Int, :a, Quiqbox.iT)
 @test pb15_2() == pb13[]*pb14[] == pb15_2[]
-@test !isDiffParam(pb15_2) && (pb15_2.index[] == nothing)
+@test !isDiffParam(pb15_2) && (pb15_2.index[] === nothing)
 pb18_2 = mulParamBox(pb16, pb17)
 @test getTypeParams(pb18_2) == (Float64, :a, Quiqbox.iT)
 @test pb18_2() == pb16[]*pb17[] == pb18_2[]
-@test !isDiffParam(pb18_2) && (pb18_2.index[] == nothing)
+@test !isDiffParam(pb18_2) && (pb18_2.index[] === nothing)
 
 c1 = 2
 pb19 = mulParamBox(c1, pb10)
 @test pb19() == c1*pb10()
 @test pb19.data .=== pb10.data
-@test isDiffParam(pb19) && (pb19.index[] == nothing)
+@test isDiffParam(pb19) && (pb19.index[] === nothing)
 
 c2 = 3
 pb20 = mulParamBox(c2, pb13)
 @test getTypeParams(pb20) == (Int, :a, Quiqbox.iT)
 @test pb20() == c2*pb13() == pb20[]
-@test !isDiffParam(pb20) && (pb19.index[] == nothing)
+@test !isDiffParam(pb20) && (pb19.index[] === nothing)
 
 
 # function reduceParamBoxes
