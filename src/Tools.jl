@@ -518,19 +518,19 @@ function markUnique(arr::AbstractArray{T}, args...;
     isempty(arr) && (return arr, T[])
     f = (a, b) -> compareFunction(a, b, args...; kws...)
     res = Int[1]
-    cmprList = T[arr[1]]
-    for i = 2:length(arr)
-        local j
+    cmprList = T[first(arr)]
+    for ele in view(arr, (firstindex(arr)+1):lastindex(arr))
+        j = firstindex(cmprList)
         isNew = true
-        for outer j = eachindex(cmprList)
-            if f(cmprList[j], arr[i])
+        while j <= lastindex(cmprList)
+            if f(cmprList[j], ele)
                 isNew = false
                 break
             end
             j += 1
         end
         push!(res, j)
-        isNew && push!(cmprList, arr[i])
+        isNew && push!(cmprList, ele)
     end
     res, cmprList
 end
@@ -569,15 +569,15 @@ function getUnique!(arr::AbstractVector{T}, args...;
     f = (a, b) -> compareFunction(a, b, args...; kws...)
     cmprList = T[arr[1]]
     delList = Bool[false]
-    for i = 2:length(arr)
+    for ele in view(arr, (firstindex(arr)+1):lastindex(arr))
         isNew = true
-        for j = 1:length(cmprList)
-            if f(cmprList[j], arr[i])
+        for candid in cmprList
+            if f(candid, ele)
                 isNew = false
                 break
             end
         end
-        isNew && push!(cmprList, arr[i])
+        isNew && push!(cmprList, ele)
         push!(delList, !isNew)
     end
     deleteat!(arr, delList)
@@ -654,10 +654,10 @@ function isOscillateConverged(seq::AbstractVector{<:Array{<:Real}},
 end
 
 
-function groupedSort(v::T, sortFunction::F=itself) where {T<:AbstractVector, F<:Function}
+function groupedSort(v::AbstractVector{T}, sortFunction::F=itself) where {T, F<:Function}
     sortedArr = sort(v, by=sortFunction)
     state1 = 1
-    groups = T[]
+    groups = Vector{T}[]
     next = iterate(sortedArr)
     while next !== nothing
         item, state = next

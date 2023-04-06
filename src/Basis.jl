@@ -2011,7 +2011,7 @@ function markParams!(pars::AbstractVector{T}, filterMapping::Bool=false) where {
 end
 
 function markParamsCore1!(pars::AbstractVector{<:ParamBox})
-    ids1, items = markUnique(outSymOf.(pars))
+    ids1, items = markUnique(outSymOf.(pars), compareFunction=(==))
     uniqueParams = eltype(pars)[]
     for i in eachindex(items)
         parsSameV = view(pars, findall(isequal(i), ids1))
