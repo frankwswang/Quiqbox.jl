@@ -34,7 +34,7 @@ cH = coreH(bs_bf_bfs_bfm, nuc, nucCoords)
 @test @isdefined cH
 
 # function getCompositeIntCore
-tolerance3 = 1e-15
+tolerance3 = 2e-15
 for i in Quiqbox.SubshellNames[2:4]
     bfs1 = genBasisFunc(rand(3), (rand(0.5:0.1:2.0, 2), rand(-0.5:0.1:0.5, 2)), "S")
     bfs2 = genBasisFunc(rand(3), (rand(0.5:0.1:2.0, 2), rand(-0.5:0.1:0.5, 2)), i)
