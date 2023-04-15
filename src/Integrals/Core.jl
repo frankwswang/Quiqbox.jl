@@ -1299,18 +1299,6 @@ function getOneBodyInts(∫1e::F, optPosArgs::Tuple,
             update2DarrBlock!(buf, int, rowRange, colRange)
         end
     end
-    # Threads.@threads for j in OneTo(basisSet|>length)
-    #     Threads.@threads for i in OneTo(j)
-    #         @inbounds begin
-    #             int = get1BCompInt(T, Val(D), ∫1e, optPosArgs, (j==i,), 
-    #                                (subSize[i],  subSize[j]), 
-    #                                basisSet[i+idxShift], basisSet[j+idxShift])
-    #             rowRange = accuSize[i]+1 : accuSize[i+1]
-    #             colRange = accuSize[j]+1 : accuSize[j+1]
-    #             update2DarrBlock!(buf, int, rowRange, colRange)
-    #         end
-    #     end
-    # end
     buf
 end
 
@@ -1329,15 +1317,6 @@ function getOneBodyInts(∫1e::F, optPosArgs::Tuple,
             buf[j, i] = buf[i, j] = int
         end
     end
-    # Threads.@threads for j in OneTo(BN)
-    #     Threads.@threads for i in OneTo(j)
-    #         @inbounds begin
-    #             int = get1BCompInt(T, Val(D), ∫1e, optPosArgs, (j==i,), 
-    #                                (1, 1), basisSet[i+idxShift], basisSet[j+idxShift])
-    #             buf[j, i] = buf[i, j] = int
-    #         end
-    #     end
-    # end
     buf
 end
 
@@ -1390,23 +1369,6 @@ function getTwoBodyInts(∫2e::F, optPosArgs::Tuple,
             end
         end
     end
-    # @sync for l in OneTo(basisSet|>length), k in OneTo(l), 
-    #           j in OneTo(l), i in (OneTo∘ifelse)(l==j, k, j)
-    #     Threads.@spawn begin
-    #         iBl = (l==k, l==j, k==j, ifelse(l==j, k, j)==i)
-    #         @inbounds begin
-    #             I = accuSize[i]+1 : accuSize[i+1]
-    #             J = accuSize[j]+1 : accuSize[j+1]
-    #             K = accuSize[k]+1 : accuSize[k+1]
-    #             L = accuSize[l]+1 : accuSize[l+1]
-    #             int = get2BCompInt(T, Val(D), ∫2e, optPosArgs, iBl, 
-    #                                (subSize[i],  subSize[j],  subSize[k],  subSize[l]), 
-    #                                 basisSet[i+idxShift], basisSet[j+idxShift], 
-    #                                 basisSet[k+idxShift], basisSet[l+idxShift])
-    #             update4DarrBlock!(buf, int, I, J, K, L)
-    #         end
-    #     end
-    # end
     buf
 end
 
@@ -1431,20 +1393,6 @@ function getTwoBodyInts(∫2e::F, optPosArgs::Tuple,
             end
         end
     end
-    # @sync for l in OneTo(BN), k in OneTo(l), 
-    #           j in OneTo(l), i in (OneTo∘ifelse)(l==j, k, j)
-    #     Threads.@spawn begin
-    #         iBl = (l==k, l==j, k==j, ifelse(l==j, k, j)==i)
-    #         @inbounds begin
-    #             int = get2BCompInt(T, Val(D), ∫2e, optPosArgs, iBl, 
-    #                                (1, 1, 1, 1), 
-    #                                basisSet[i+idxShift], basisSet[j+idxShift], 
-    #                                basisSet[k+idxShift], basisSet[l+idxShift])
-    #             buf[l, k, j, i] = buf[k, l, j, i] = buf[k, l, i, j] = buf[l, k, i, j] = 
-    #             buf[i, j, l, k] = buf[j, i, l, k] = buf[j, i, k, l] = buf[i, j, k, l] = int
-    #         end
-    #     end
-    # end
     buf
 end
 
@@ -1457,12 +1405,10 @@ Return the unique matrix element indices (in the chemists' notation) of electron
 interactions given the size of a basis set.
 """
 function eeIuniqueIndicesOf(basisSetSize::Int)
-    uniqueIdx = fill(Int[0,0,0,0], (3*binomial(basisSetSize, 4) + 
-                                    6*binomial(basisSetSize, 3) + 
-                                    4*binomial(basisSetSize, 2) + basisSetSize))
+    uniqueIdx = fill(Int[0,0,0,0], (triMatEleNum∘triMatEleNum)(basisSetSize))
     index = 1
-    for i in OneTo(basisSetSize), j in OneTo(i), 
-        k in OneTo(i), l in (OneTo∘ifelse)(k==i, j, k)
+    for l in OneTo(basisSetSize), k in OneTo(l), 
+        j in OneTo(l), i in (OneTo∘ifelse)(l==j, k, j)
         uniqueIdx[index] = [i, j, k, l]
         index += 1
     end
