@@ -92,12 +92,13 @@ getC.( Ref(X), getF(Hcore, HeeI, (Dᵅ, Dᵝ)) )
 function getCfromGWH(::Val{HFT}, S::AbstractMatrix{T}, Hcore::AbstractMatrix{T}, 
                      X::AbstractMatrix{T}) where {HFT, T}
     H = similar(Hcore)
-    iBegin = firstindex(Hcore, 1)
-    idxShift = firstindex(S, 1) - iBegin
-    Threads.@threads for j in axes(H, 2)
-        for i in iBegin:j
-            H[j,i] = H[i,j] = 3 * S[i+idxShift, j+idxShift] * (Hcore[i,i] + Hcore[j,j]) / 8
-        end
+    Δi1 = firstindex(S, 1) - 1
+    Δi2 = firstindex(H, 1) - 1
+    len = size(H, 1)
+    Threads.@threads for k in (OneTo∘triMatEleNum)(len)
+        i, j = convert1DidxTo2D(len, k)
+        H[j+Δi2, i+Δi2] = H[i+Δi2, j+Δi2] = 
+        3 * S[i+Δi1, j+Δi1] * (Hcore[i+Δi2, i+Δi2] + Hcore[j+Δi2, j+Δi2]) / 8
     end
     Cˢ = getC(X, H)
     breakSymOfC(Val(HFT), Cˢ)
@@ -166,14 +167,14 @@ end
 function getGcore(HeeI::AbstractArray{T1, 4}, DJ::T2, DK::T2) where 
                  {T1, T2<:AbstractMatrix{T1}}
     G = similar(DJ)
-    iBegin = firstindex(DJ, 1)
-    idxShift = firstindex(HeeI, 1) - iBegin
-    Threads.@threads for ν in axes(G, 2)
-        for μ in iBegin:ν
-            G[ν, μ] = G[μ, ν] = 
-            dot(transpose(DJ), @view HeeI[μ+idxShift,ν+idxShift,:,:]) - 
-            dot(DK, @view HeeI[μ+idxShift,:,:,ν+idxShift])
-        end
+    Δi1 = firstindex(HeeI, 1) - 1
+    Δi2 = firstindex(DJ, 1) - 1
+    len = size(G, 1)
+    Threads.@threads for k in (OneTo∘triMatEleNum)(len)
+        μ, ν = convert1DidxTo2D(len, k)
+        G[ν+Δi2, μ+Δi2] = G[μ+Δi2, ν+Δi2] = 
+        dot(transpose(DJ), @view HeeI[μ+Δi1,ν+Δi1,:,:]) - 
+        dot(          DK,  @view HeeI[μ+Δi1,:,:,ν+Δi1])
     end
     G
 end
@@ -1027,10 +1028,10 @@ function EDIIScore(Ds::Vector{<:AbstractMatrix{T}},
                    ∇s::Vector{<:AbstractMatrix{T}}, Es::Vector{T}) where {T}
     len = length(Ds)
     B = similar(∇s[begin], len, len)
-    Threads.@threads for j in eachindex(Ds)
-        for i = OneTo(j)
-            @inbounds B[i,j] = B[j,i] = -dot(Ds[i]-Ds[j], ∇s[i]-∇s[j])
-        end
+    Δi = firstindex(B, 1) - 1
+    Threads.@threads for k in (OneTo∘triMatEleNum)(len)
+        i, j = convert1DidxTo2D(len, k)
+        @inbounds B[i+Δi, j+Δi] = B[j+Δi, i+Δi] = -dot(Ds[i]-Ds[j], ∇s[i]-∇s[j])
     end
     Es, B
 end
@@ -1051,11 +1052,11 @@ function DIIScore(Ds::Vector{<:AbstractMatrix{T}},
     len = length(Ds)
     B = similar(∇s[begin], len, len)
     v = zeros(T, len)
-    Threads.@threads for j in eachindex(Ds)
-        for i = OneTo(j)
-            @inbounds B[i,j] = B[j,i] = dot( ∇s[i]*Ds[i]*S - S*Ds[i]*∇s[i], 
-                                             ∇s[j]*Ds[j]*S - S*Ds[j]*∇s[j] )
-        end
+    Δi = firstindex(B, 1) - 1
+    Threads.@threads for k in (OneTo∘triMatEleNum)(len)
+        i, j = convert1DidxTo2D(len, k)
+        @inbounds B[i+Δi, j+Δi] = B[j+Δi, i+Δi] = dot( ∇s[i]*Ds[i]*S - S*Ds[i]*∇s[i], 
+                                                       ∇s[j]*Ds[j]*S - S*Ds[j]*∇s[j] )
     end
     v, B
 end

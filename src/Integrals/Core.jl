@@ -1287,8 +1287,7 @@ function getOneBodyInts(∫1e::F, optPosArgs::Tuple,
     buf = Array{T}(undef, totalSize, totalSize)
     idxShift = firstindex(basisSet) - 1
     BN = length(basisSet)
-    nIter = triMatEleNum(BN)
-    Threads.@threads for k in OneTo(nIter)
+    Threads.@threads for k in (OneTo∘triMatEleNum)(BN)
         i, j = convert1DidxTo2D(BN, k)
         @inbounds begin
             int = get1BCompInt(T, Val(D), ∫1e, optPosArgs, (j==i,), 
@@ -1308,8 +1307,7 @@ function getOneBodyInts(∫1e::F, optPosArgs::Tuple,
     BN = length(basisSet)
     buf = Array{T}(undef, BN, BN)
     idxShift = firstindex(basisSet) - 1
-    nIter = triMatEleNum(BN)
-    Threads.@threads for k in OneTo(nIter)
+    Threads.@threads for k in (OneTo∘triMatEleNum)(BN)
         i, j = convert1DidxTo2D(BN, k)
         @inbounds begin
             int = get1BCompInt(T, Val(D), ∫1e, optPosArgs, (j==i,), 
@@ -1351,8 +1349,7 @@ function getTwoBodyInts(∫2e::F, optPosArgs::Tuple,
     buf = Array{T}(undef, totalSize, totalSize, totalSize, totalSize)
     idxShift = firstindex(basisSet) - 1
     BN = length(basisSet)
-    nIter = (triMatEleNum∘triMatEleNum)(BN)
-    @sync for m in OneTo(nIter)
+    @sync for m in (OneTo∘triMatEleNum∘triMatEleNum)(BN)
         Threads.@spawn begin
             i, j, k, l = convert1DidxTo4D(BN, m)
             iBl = (l==k, l==j, k==j, ifelse(l==j, k, j)==i)
@@ -1378,8 +1375,7 @@ function getTwoBodyInts(∫2e::F, optPosArgs::Tuple,
     BN = length(basisSet)
     buf = Array{T}(undef, BN, BN, BN, BN)
     idxShift = firstindex(basisSet) - 1
-    nIter = (triMatEleNum∘triMatEleNum)(BN)
-    @sync for m in OneTo(nIter)
+    @sync for m in (OneTo∘triMatEleNum∘triMatEleNum)(BN)
         Threads.@spawn begin
             i, j, k, l = convert1DidxTo4D(BN, m)
             iBl = (l==k, l==j, k==j, ifelse(l==j, k, j)==i)

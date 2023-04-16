@@ -29,13 +29,12 @@ function oneBodyDerivativeCore(::Val{false},
                   ʃ(∂bfs[i+shift2], bfs[j+shift1]) + ʃ(bfs[i+shift1], ∂bfs[j+shift2])
     end
     @views begin
-        Threads.@threads for i=OneTo(BN)
-            for j=OneTo(i)
-                # X[i,j] == X[j,i]
-                @inbounds ∂ʃ[i,j] = ∂ʃ[j,i] = X[:,i+shift3]' * ∂ʃab *  X[:,j+shift3] + 
-                                             ∂X[:,i+shift4]' *  ʃab *  X[:,j+shift3] + 
-                                              X[:,i+shift3]' *  ʃab * ∂X[:,j+shift4]
-            end
+        Threads.@threads for k in (OneTo∘triMatEleNum)(BN)
+            i, j = convert1DidxTo2D(BN, k)
+            # X[i,j] == X[j,i]
+            @inbounds ∂ʃ[i,j] = ∂ʃ[j,i] = X[:,i+shift3]' * ∂ʃab *  X[:,j+shift3] + 
+                                         ∂X[:,i+shift4]' *  ʃab *  X[:,j+shift3] + 
+                                          X[:,i+shift3]' *  ʃab * ∂X[:,j+shift4]
         end
     end
     ∂ʃ
@@ -110,11 +109,10 @@ function derivativeCore(FoutputIsVector::Val{B},
     end
     λ, 𝑣 = eigen(S|>Hermitian)
     ∂S2 = 𝑣'*∂S*𝑣
-    Threads.@threads for i=OneTo(BN)
-        for j=OneTo(i)
-            @inbounds ∂X₀[i,j] = ∂X₀[j,i] = ( -∂S2[i,j] / ( sqrt(λ[i]) * sqrt(λ[j]) * 
-                                              (sqrt(λ[i]) + sqrt(λ[j])) ) )
-        end
+    Threads.@threads for k in (OneTo∘triMatEleNum)(BN)
+        i, j = convert1DidxTo2D(BN, k)
+        @inbounds ∂X₀[i,j] = ∂X₀[j,i] = ( -∂S2[i,j] / ( sqrt(λ[i]) * sqrt(λ[j]) * 
+                                          (sqrt(λ[i]) + sqrt(λ[j])) ) )
     end
     ∂X = 𝑣*∂X₀*𝑣'
     nX = norm(X)
