@@ -455,8 +455,8 @@ to a `FloatingGTBasisFuncs` with no `GaussFunc` stored inside of it, e.g.,
     AbstractGaussFunc{T1}, 
     AbstractVector{<:AbstractGaussFunc{T1}}, 
     Tuple{Vararg{AbstractGaussFunc{T1}}}, 
-    NTuple{2, T1}, 
-    NTuple{2, AbstractVector{T1}}
+    NTuple{2, Union{T1, Array{T1, 0}, ParamBox{T1}}, 
+    NTuple{2, AbstractVector{<:Union{T1, Array{T1, 0}, ParamBox{T1}}}}
 } where {T1<:AbstractFloat}`: A collection of concentric `GaussFunc` that will be used to 
 construct the basis function. To simplify the procedure, it can also be in the form of a 
 `NTuple{2}` of the exponent coefficient(s)`::Union{AbstractFloat, 
@@ -481,7 +481,7 @@ during the calculation.
 === Example(s) ===
 
 ```jldoctest; setup = :(push!(LOAD_PATH, "../../src/"); using Quiqbox)
-julia> genBasisFunc([0.,0.,0.], GaussFunc(2.,1.), (0,1,0))
+julia> genBasisFunc([0.,0.,0.], GaussFunc(2., 1.), (0, 1, 0))
 BasisFunc{Float64, 3, 1, 1, …}{0, 0, 0}[(0.0, 0.0, 0.0)][X⁰Y¹Z⁰]
 ```
 
@@ -552,7 +552,7 @@ julia> genBasisFunc([0.,0.,0.], "STO-3G", "Li");
 
 === Positional argument(s) ===
 
-`field::Union{
+`newFieldVal::Union{
     SpatialPoint{T, D}, 
     Tuple{AbstractGaussFunc{T}, Vararg{AbstractGaussFunc{T}}}, 
     Tuple{LTuple{D, 𝑙}, Vararg{LTuple{D, 𝑙}}} where 𝑙, 
