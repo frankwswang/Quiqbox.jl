@@ -248,8 +248,9 @@ struct MatterByHF{T, D, NN, BN, HFTS} <:MatterData{T, D}
             cH = (ints[1],)
             eeI = ints[2]
             Jᵅᵝ = Array{T}(undef, BN, BN)
-            for i=1:BN, j=i:BN
-               Jᵅᵝ[i,j] = Jᵅᵝ[j,i] = eeI[i,i,j,j]
+            idxShift = firstindex(eeI, 1) - 1
+            for i in Base.OneTo(BN), j in i:BN
+               Jᵅᵝ[i, j] = Jᵅᵝ[j, i] = eeI[i+idxShift, i+idxShift, j+idxShift, j+idxShift]
             end
             eeI = (eeI,)
         elseif HFTS == 2

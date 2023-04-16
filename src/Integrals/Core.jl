@@ -1285,15 +1285,17 @@ function getOneBodyInts(∫1e::F, optPosArgs::Tuple,
     accuSize = vcat(0, accumulate(+, subSize))
     totalSize = subSize |> sum
     buf = Array{T}(undef, totalSize, totalSize)
-    Threads.@threads for j in eachindex(basisSet)
-        for i in OneTo(j)
-            @inbounds begin
-                int = get1BCompInt(T, Val(D), ∫1e, optPosArgs, (j==i,), 
-                                   (subSize[i],  subSize[j]), basisSet[i], basisSet[j])
-                rowRange = accuSize[i]+1 : accuSize[i+1]
-                colRange = accuSize[j]+1 : accuSize[j+1]
-                update2DarrBlock!(buf, int, rowRange, colRange)
-            end
+    idxShift = firstindex(basisSet) - 1
+    BN = length(basisSet)
+    Threads.@threads for k in (OneTo∘triMatEleNum)(BN)
+        i, j = convert1DidxTo2D(BN, k)
+        @inbounds begin
+            int = get1BCompInt(T, Val(D), ∫1e, optPosArgs, (j==i,), 
+                               (subSize[i],  subSize[j]), 
+                               basisSet[i+idxShift], basisSet[j+idxShift])
+            rowRange = accuSize[i]+1 : accuSize[i+1]
+            colRange = accuSize[j]+1 : accuSize[j+1]
+            update2DarrBlock!(buf, int, rowRange, colRange)
         end
     end
     buf
@@ -1304,13 +1306,13 @@ function getOneBodyInts(∫1e::F, optPosArgs::Tuple,
                        {F<:Function, T, D}
     BN = length(basisSet)
     buf = Array{T}(undef, BN, BN)
-    Threads.@threads for j in eachindex(basisSet)
-        for i in OneTo(j)
-            @inbounds begin
-                int = get1BCompInt(T, Val(D), ∫1e, optPosArgs, (j==i,), 
-                                   (1, 1), basisSet[i], basisSet[j])
-                buf[j, i] = buf[i, j] = int
-            end
+    idxShift = firstindex(basisSet) - 1
+    Threads.@threads for k in (OneTo∘triMatEleNum)(BN)
+        i, j = convert1DidxTo2D(BN, k)
+        @inbounds begin
+            int = get1BCompInt(T, Val(D), ∫1e, optPosArgs, (j==i,), 
+                               (1, 1), basisSet[i+idxShift], basisSet[j+idxShift])
+            buf[j, i] = buf[i, j] = int
         end
     end
     buf
@@ -1345,9 +1347,11 @@ function getTwoBodyInts(∫2e::F, optPosArgs::Tuple,
     accuSize = vcat(0, accumulate(+, subSize)...)
     totalSize = subSize |> sum
     buf = Array{T}(undef, totalSize, totalSize, totalSize, totalSize)
-    @sync for l in eachindex(basisSet), k in OneTo(l), 
-              j in OneTo(l), i in (OneTo∘ifelse)(l==j, k, j)
+    idxShift = firstindex(basisSet) - 1
+    BN = length(basisSet)
+    @sync for m in (OneTo∘triMatEleNum∘triMatEleNum)(BN)
         Threads.@spawn begin
+            i, j, k, l = convert1DidxTo4D(BN, m)
             iBl = (l==k, l==j, k==j, ifelse(l==j, k, j)==i)
             @inbounds begin
                 I = accuSize[i]+1 : accuSize[i+1]
@@ -1356,7 +1360,8 @@ function getTwoBodyInts(∫2e::F, optPosArgs::Tuple,
                 L = accuSize[l]+1 : accuSize[l+1]
                 int = get2BCompInt(T, Val(D), ∫2e, optPosArgs, iBl, 
                                    (subSize[i],  subSize[j],  subSize[k],  subSize[l]), 
-                                   basisSet[i], basisSet[j], basisSet[k], basisSet[l])
+                                   basisSet[i+idxShift], basisSet[j+idxShift], 
+                                   basisSet[k+idxShift], basisSet[l+idxShift])
                 update4DarrBlock!(buf, int, I, J, K, L)
             end
         end
@@ -1369,14 +1374,16 @@ function getTwoBodyInts(∫2e::F, optPosArgs::Tuple,
                        {F<:Function, T, D}
     BN = length(basisSet)
     buf = Array{T}(undef, BN, BN, BN, BN)
-    @sync for l in eachindex(basisSet), k in OneTo(l), 
-              j in OneTo(l), i in (OneTo∘ifelse)(l==j, k, j)
+    idxShift = firstindex(basisSet) - 1
+    @sync for m in (OneTo∘triMatEleNum∘triMatEleNum)(BN)
         Threads.@spawn begin
+            i, j, k, l = convert1DidxTo4D(BN, m)
             iBl = (l==k, l==j, k==j, ifelse(l==j, k, j)==i)
             @inbounds begin
                 int = get2BCompInt(T, Val(D), ∫2e, optPosArgs, iBl, 
                                    (1, 1, 1, 1), 
-                                   basisSet[i], basisSet[j], basisSet[k], basisSet[l])
+                                   basisSet[i+idxShift], basisSet[j+idxShift], 
+                                   basisSet[k+idxShift], basisSet[l+idxShift])
                 buf[l, k, j, i] = buf[k, l, j, i] = buf[k, l, i, j] = buf[l, k, i, j] = 
                 buf[i, j, l, k] = buf[j, i, l, k] = buf[j, i, k, l] = buf[i, j, k, l] = int
             end
@@ -1394,12 +1401,10 @@ Return the unique matrix element indices (in the chemists' notation) of electron
 interactions given the size of a basis set.
 """
 function eeIuniqueIndicesOf(basisSetSize::Int)
-    uniqueIdx = fill(Int[0,0,0,0], (3*binomial(basisSetSize, 4) + 
-                                    6*binomial(basisSetSize, 3) + 
-                                    4*binomial(basisSetSize, 2) + basisSetSize))
+    uniqueIdx = fill(Int[0,0,0,0], (triMatEleNum∘triMatEleNum)(basisSetSize))
     index = 1
-    for i in OneTo(basisSetSize), j in OneTo(i), 
-        k in OneTo(i), l in (OneTo∘ifelse)(k==i, j, k)
+    for l in OneTo(basisSetSize), k in OneTo(l), 
+        j in OneTo(l), i in (OneTo∘ifelse)(l==j, k, j)
         uniqueIdx[index] = [i, j, k, l]
         index += 1
     end

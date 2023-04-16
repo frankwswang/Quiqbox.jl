@@ -6,7 +6,8 @@ using Quiqbox: getAtolVal, getAtolDigits, roundToMultiOfStep, nearestHalfOf, get
                mapPermute, getFunc, nameOf, tupleDiff, genIndex, fillObj, arrayToTuple, 
                genTupleCoords, uniCallFunc, mergeMultiObjs, isNaN, getBool, skipIndices, 
                isOscillateConverged, lazyCollect, asymSign, numEps, genAdaptStepBl, 
-               shiftLastEle!, getValParm, fct, δ
+               shiftLastEle!, getValParm, fct, δ, triMatEleNum, convert1DidxTo2D, 
+               convert1DidxTo4D
 using Suppressor: @capture_out
 using LinearAlgebra: norm
 
@@ -347,5 +348,64 @@ v = Val(vNum)
 num = 3.0
 @test fct(num) == factorial(Int(num))
 @test δ(0, δ(1, 2)) == 1
+
+
+# function triMatEleNum
+@test triMatEleNum(6) == 21
+
+
+# function convert1DidxTo2D, convert1DidxTo4D
+iterate1BintsN = function (n::Int)
+    res = Array{NTuple{2, Int}}(undef, n, n)
+    Threads.@threads for k=1:triMatEleNum(n)
+        i, j = convert1DidxTo2D(BN, k)
+        res[i,j] = res[j,i] = (i, j)
+    end
+    res
+end
+
+iterate1Bints0 = function (n::Int)
+    res = Array{NTuple{2, Int}}(undef, n, n)
+    Threads.@threads for i=1:n
+        for j=1:i
+            res[i,j] = res[j,i] = (i,j)
+        end
+    end
+    res
+end
+
+BN = rand(1:100)
+res = (iterate1Bints0(BN) == iterate1BintsN(BN))
+res || println("BN = ", BN)
+@test res
+
+iterate2BintsN = function (n::Int)
+    res = fill([0,0,0,0], n, n, n, n)
+    n1 = n*(n+1)÷2
+    len = n1*(n1+1)÷2
+    for idx in 1:len
+        i,j,k,l = convert1DidxTo4D(n, idx)
+        res[l, k, j, i] = res[k, l, j, i] = res[k, l, i, j] = res[l, k, i, j] = 
+        res[i, j, l, k] = res[j, i, l, k] = res[j, i, k, l] = res[i, j, k, l] = 
+        sort([i, j, k, l])
+    end
+    res
+end
+
+iterate2Bints0 = function (n::Int)
+    res = fill([0,0,0,0], n, n, n, n)
+    for l in 1:n, k in 1:l, j in 1:l, i in 1:ifelse(l==j, k, j)
+        res[l, k, j, i] = res[k, l, j, i] = res[k, l, i, j] = res[l, k, i, j] = 
+        res[i, j, l, k] = res[j, i, l, k] = res[j, i, k, l] = res[i, j, k, l] = 
+        sort([i, j, k, l])
+    end
+    res
+end
+
+test2Bints = x->( iterate2BintsN(x) == iterate2Bints0(x) )
+
+@test all(test2Bints(i) for i in  1:20)
+@test all(test2Bints(i) for i in 21:40)
+@test all(test2Bints(i) for i in 41:50)
 
 end

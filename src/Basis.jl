@@ -92,7 +92,7 @@ genExponent(fill(e)=>inSym, mapFunction; canDiff)
 
 Convert a [`ParamBox`](@ref) to the container of an exponent coefficient.
 """
-genExponent(pb::ParamBox) = ParamBox(Val(xpnSym), pb, fill(pb.canDiff[]))
+genExponent(pb::ParamBox) = ParamBox(Val(xpnSym), pb)
 
 
 """
@@ -140,7 +140,7 @@ genContraction(fill(d)=>inSym, mapFunction; canDiff)
 
 Convert a [`ParamBox`](@ref) to an exponent coefficient parameter.
 """
-genContraction(pb::ParamBox) = ParamBox(Val(conSym), pb, fill(pb.canDiff[]))
+genContraction(pb::ParamBox) = ParamBox(Val(conSym), pb)
 
 
 const P1D{T, Fx} = 
@@ -282,7 +282,7 @@ genSpatialPoint(comp::AbstractFloat, compIndex::Int,
 genSpatialPoint(fill(comp)=>inSym, compIndex, mapFunction; canDiff)
 
 genSpatialPoint(point::ParamBox, compIndex::Int) = 
-ParamBox(Val(SpatialParamSyms[compIndex]), point, fill(point.canDiff[]))
+ParamBox(Val(SpatialParamSyms[compIndex]), point)
 
 """
 
@@ -295,8 +295,7 @@ Convert a collection of [`ParamBox`](@ref)s to a [`SpatialPoint`](@ref).
 """
 genSpatialPoint(point::Tuple{ParamBox{T}, Vararg{ParamBox{T}, D}}, 
                 marker::Symbol=defaultSPointMarker) where {D, T} = 
-genSpatialPointCore(ParamBox.(Val.(SpatialParamSyms[1:D+1]), point, 
-          (fill∘getindex∘getproperty).(point, :canDiff)), marker)
+genSpatialPointCore(ParamBox.(Val.(SpatialParamSyms[1:D+1]), point), marker)
 
 genSpatialPointCore(point::Union{P1D, P2D, P3D}, marker::Symbol) = 
 SpatialPoint(point, marker)
@@ -2012,7 +2011,7 @@ function markParams!(pars::AbstractVector{T}, filterMapping::Bool=false) where {
 end
 
 function markParamsCore1!(pars::AbstractVector{<:ParamBox})
-    ids1, items = markUnique(outSymOf.(pars))
+    ids1, items = markUnique(outSymOf.(pars), compareFunction=(==))
     uniqueParams = eltype(pars)[]
     for i in eachindex(items)
         parsSameV = view(pars, findall(isequal(i), ids1))

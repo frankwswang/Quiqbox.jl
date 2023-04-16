@@ -518,19 +518,19 @@ function markUnique(arr::AbstractArray{T}, args...;
     isempty(arr) && (return arr, T[])
     f = (a, b) -> compareFunction(a, b, args...; kws...)
     res = Int[1]
-    cmprList = T[arr[1]]
-    for i = 2:length(arr)
-        local j
+    cmprList = T[first(arr)]
+    for ele in view(arr, (firstindex(arr)+1):lastindex(arr))
+        j = firstindex(cmprList)
         isNew = true
-        for outer j = eachindex(cmprList)
-            if f(cmprList[j], arr[i])
+        while j <= lastindex(cmprList)
+            if f(cmprList[j], ele)
                 isNew = false
                 break
             end
             j += 1
         end
         push!(res, j)
-        isNew && push!(cmprList, arr[i])
+        isNew && push!(cmprList, ele)
     end
     res, cmprList
 end
@@ -569,15 +569,15 @@ function getUnique!(arr::AbstractVector{T}, args...;
     f = (a, b) -> compareFunction(a, b, args...; kws...)
     cmprList = T[arr[1]]
     delList = Bool[false]
-    for i = 2:length(arr)
+    for ele in view(arr, (firstindex(arr)+1):lastindex(arr))
         isNew = true
-        for j = 1:length(cmprList)
-            if f(cmprList[j], arr[i])
+        for candid in cmprList
+            if f(candid, ele)
                 isNew = false
                 break
             end
         end
-        isNew && push!(cmprList, arr[i])
+        isNew && push!(cmprList, ele)
         push!(delList, !isNew)
     end
     deleteat!(arr, delList)
@@ -654,10 +654,10 @@ function isOscillateConverged(seq::AbstractVector{<:Array{<:Real}},
 end
 
 
-function groupedSort(v::T, sortFunction::F=itself) where {T<:AbstractVector, F<:Function}
+function groupedSort(v::AbstractVector{T}, sortFunction::F=itself) where {T, F<:Function}
     sortedArr = sort(v, by=sortFunction)
     state1 = 1
-    groups = T[]
+    groups = Vector{T}[]
     next = iterate(sortedArr)
     while next !== nothing
         item, state = next
@@ -917,3 +917,34 @@ fct(a::Real) = factorial(a|>Int)
 
 
 fastIsApprox(x::T1, y::T2=0.0) where {T1, T2} = abs(x - y) < 2(numEps∘promote_type)(T1, T2)
+
+
+triMatEleNum(n::Int) = n * (n + 1) ÷ 2
+
+
+function convert1DidxTo2D(n::Int, k::Int)
+    bl = iseven(n)
+    nRow = n + bl
+    j, i = fldmod1(k, nRow)
+    if j > i - bl
+        i = n - i + 1
+        j = n - j + 2 - bl
+    else
+        i -= bl
+    end
+    i, j
+end
+
+
+function convert1DidxTo4D(n::Int, m::Int)
+    # Original solution
+    # rangeShifter = 1e-12 # can't be too large or too small
+    # nG = floor(Int, (sqrt(1+8m) + 1)/2 - rangeShifter)
+    nGupper = (sqrt(1+8m) + 1)/2
+    nG = floor(nGupper)
+    nG = Int(nG - (nG==nGupper))
+    l, k = convert1DidxTo2D(n, nG)
+    rsd = m - nG*(nG-1)÷2
+    j, i = convert1DidxTo2D(n, rsd)
+    i, j, k, l
+end

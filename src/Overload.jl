@@ -275,6 +275,10 @@ show(io::IO, ::MIME"text/plain", @nospecialize(matter::MatterByHF)) =
 print(io, typeof(matter), getFieldNameStr(MatterByHF))
 
 
+show(io::IO, @nospecialize(obj::AbstractQuiqboxContainer)) = 
+show(io, MIME"text/plain"(), obj)
+
+
 import Base: +
 +(bfm1::CGTBasisFuncs1O{T, D}, bfm2::CGTBasisFuncs1O{T, D}) where {T, D} = add(bfm1, bfm2)
 
