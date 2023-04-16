@@ -12,7 +12,7 @@ using Suppressor: @capture_out
 # struct GaussFunc
 xpn1, con1 = ps1 = (2.0, 1.0)
 gf1 = GaussFunc(xpn1, con1)
-gf2 = GaussFunc(xpn1, con1)
+gf2 = GaussFunc(xpn1, fill(con1))
 @test typeof(gf1) == typeof(gf2)
 @test (gf1, gf2) isa Tuple{GaussFunc, GaussFunc}
 @test (gf1, gf2) isa NTuple{2, GaussFunc}
@@ -89,7 +89,7 @@ c4 = genExponent(c1.data[])
 
 # function genSpatialPoint coordOf
 k = fill(1.0)
-v1 = genSpatialPoint([k, 2.0, 3.0])
+v1 = genSpatialPoint([k, 2.0, ParamBox(3.0, :Z)])
 v2 = genSpatialPoint([k, 2.0, 3.0])
 v3 = genSpatialPoint([1.0, 2, 3.0])
 v1_2 = genSpatialPoint((k, 2.0, 3.0))
@@ -138,7 +138,7 @@ bf11 = genBasisFunc(cen, [gf1, gf1])
 bf1_3 = genBasisFunc(cen, (xpn1, con1))
 @test hasEqual(bf1, bf1_3)
 @test !hasIdentical(bf1, bf1_3)
-bf11_2 = genBasisFunc(cen, ([xpn1, xpn1], [con1, con1]))
+bf11_2 = genBasisFunc(cen, ([xpn1, fill(xpn1)], [ParamBox(con1), con1]))
 @test hasEqual(bf11, bf11_2)
 @test !hasIdentical(bf11, bf11_2)
 bf2_P_norm2 = genBasisFunc(cen, [gf2], "P")

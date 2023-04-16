@@ -130,6 +130,8 @@ ParamBox(inVar::Union{T, Array{T, 0}}, outSym::Symbol, mapFunction::Function,
 ParamBox(Val(outSym), mapFunction, 
          fillObj(inVar)=>inSym, genIndex(index), fill(canDiff))
 
+const VPB{T} = Union{T, Array{T, 0}, ParamBox{T}}
+
 
 """
 
