@@ -9,6 +9,7 @@ export GaussFunc, genExponent, genContraction, SpatialPoint, genSpatialPoint, co
 export P1D, P2D, P3D
 
 using LinearAlgebra: diag
+using Base: OneTo
 
 """
 
@@ -27,7 +28,7 @@ inside a `GaussFunc`.
 
 ≡≡≡ Initialization Method(s) ≡≡≡
 
-    GaussFunc(e::Union{T, ParamBox{T}}, d::Union{T, ParamBox{T}}) where 
+    GaussFunc(e::Union{T, Array{T, 0}, ParamBox{T}}, d::Union{T, ParamBox{T}}) where 
              {T<:AbstractFloat} -> 
     GaussFunc{T}
 
@@ -42,7 +43,7 @@ struct GaussFunc{T, Fxpn, Fcon} <: AbstractGaussFunc{T}
     new{T, F1, F2}(xpn, con, (xpn, con))
 end
 
-GaussFunc(e::Union{T, ParamBox{T}}, d::Union{T, ParamBox{T}}) where {T<:AbstractFloat} = 
+GaussFunc(e::VPB{T}, d::VPB{T}) where {T<:AbstractFloat} = 
 GaussFunc(genExponent(e), genContraction(d))
 
 
@@ -182,7 +183,8 @@ getTypeParams(::SpatialPoint{T, D, PT}) where {T, D, PT} = (T, D, PT)
 
 """
 
-    genSpatialPoint(point::Union{NTuple{D, Union{T, Array{T, 0}}}, AbstractVector}, 
+    genSpatialPoint(point::Union{NTuple{D, Union{T, Array{T, 0}, ParamBox{T}}}, 
+                                 AbstractVector}, 
                     marker::Symbol=:$(defaultSPointMarker)) where {D, T<:AbstractFloat} -> 
     SpatialPoint{T, D}
 
@@ -213,22 +215,22 @@ ParamBox{Float64, :X, …}{0}[∂][X]⟦=⟧[1.2]
 genSpatialPoint(v::AbstractVector, marker::Symbol=defaultSPointMarker) = 
                 genSpatialPoint(Tuple(v), marker)
 
-genSpatialPoint(v::Tuple{Union{T, Array{T, 0}}, Vararg{Union{T, Array{T, 0}}, D}}, 
+genSpatialPoint(v::Tuple{VPB{T}, Vararg{VPB{T}, D}}, 
                 marker::Symbol=defaultSPointMarker) where {D, T<:AbstractFloat} = 
-genSpatialPointCore(genSpatialPoint.(v, Tuple([1:(D+1);])), marker)
+genSpatialPointCore(genSpatialPoint.(v, Tuple([OneTo(D+1);])), marker)
 
 """
 
     genSpatialPoint(comp::T, compIndex::Int, 
                     mapFunction::Function=itself; 
                     canDiff::Bool=ifelse(FLevel(mapFunction)==IL, false, true), 
-                    inSym::Symbol=conIVsym) where {T<:AbstractFloat} -> 
+                    inSym::Symbol=$(cenIVsym)[compIndex]) where {T<:AbstractFloat} -> 
     ParamBox{T}
 
     genSpatialPoint(comp::Array{T, 0}, compIndex::Int, 
                     mapFunction::Function=itself; 
                     canDiff::Bool=ifelse(FLevel(mapFunction)==IL, false, true), 
-                    inSym::Symbol=conIVsym) where {T<:AbstractFloat} -> 
+                    inSym::Symbol=$(cenIVsym)[compIndex]) where {T<:AbstractFloat} -> 
     ParamBox{T}
 
     genSpatialPoint(compData::Pair{Array{T, 0}, Symbol}, compIndex::Int, 
@@ -272,13 +274,13 @@ ParamBox(Val(SpatialParamSyms[compIndex]), mapFunction, compData, genIndex(nothi
 genSpatialPoint(comp::Array{T, 0}, compIndex::Int, 
                 mapFunction::Function=itself; 
                 canDiff::Bool=ifelse(FLevel(mapFunction)==IL, false, true), 
-                inSym::Symbol=conIVsym) where {T<:AbstractFloat} = 
+                inSym::Symbol=cenIVsym[compIndex]) where {T<:AbstractFloat} = 
 genSpatialPoint(comp=>inSym, compIndex, mapFunction; canDiff)
 
 genSpatialPoint(comp::AbstractFloat, compIndex::Int, 
                 mapFunction::Function=itself; 
                 canDiff::Bool=ifelse(FLevel(mapFunction)==IL, false, true), 
-                inSym::Symbol=conIVsym) = 
+                inSym::Symbol=cenIVsym[compIndex]) = 
 genSpatialPoint(fill(comp)=>inSym, compIndex, mapFunction; canDiff)
 
 genSpatialPoint(point::ParamBox, compIndex::Int) = 
@@ -295,7 +297,7 @@ Convert a collection of [`ParamBox`](@ref)s to a [`SpatialPoint`](@ref).
 """
 genSpatialPoint(point::Tuple{ParamBox{T}, Vararg{ParamBox{T}, D}}, 
                 marker::Symbol=defaultSPointMarker) where {D, T} = 
-genSpatialPointCore(ParamBox.(Val.(SpatialParamSyms[1:D+1]), point), marker)
+genSpatialPointCore(ParamBox.(Val.(SpatialParamSyms[OneTo(D+1)]), point), marker)
 
 genSpatialPointCore(point::Union{P1D, P2D, P3D}, marker::Symbol) = 
 SpatialPoint(point, marker)
@@ -453,8 +455,8 @@ to a `FloatingGTBasisFuncs` with no `GaussFunc` stored inside of it, e.g.,
     AbstractGaussFunc{T1}, 
     AbstractVector{<:AbstractGaussFunc{T1}}, 
     Tuple{Vararg{AbstractGaussFunc{T1}}}, 
-    NTuple{2, T1}, 
-    NTuple{2, AbstractVector{T1}}
+    NTuple{2, Union{T1, Array{T1, 0}, ParamBox{T1}}, 
+    NTuple{2, AbstractVector{<:Union{T1, Array{T1, 0}, ParamBox{T1}}}}
 } where {T1<:AbstractFloat}`: A collection of concentric `GaussFunc` that will be used to 
 construct the basis function. To simplify the procedure, it can also be in the form of a 
 `NTuple{2}` of the exponent coefficient(s)`::Union{AbstractFloat, 
@@ -479,7 +481,7 @@ during the calculation.
 === Example(s) ===
 
 ```jldoctest; setup = :(push!(LOAD_PATH, "../../src/"); using Quiqbox)
-julia> genBasisFunc([0.,0.,0.], GaussFunc(2.,1.), (0,1,0))
+julia> genBasisFunc([0.,0.,0.], GaussFunc(2., 1.), (0, 1, 0))
 BasisFunc{Float64, 3, 1, 1, …}{0, 0, 0}[(0.0, 0.0, 0.0)][X⁰Y¹Z⁰]
 ```
 
@@ -550,7 +552,7 @@ julia> genBasisFunc([0.,0.,0.], "STO-3G", "Li");
 
 === Positional argument(s) ===
 
-`field::Union{
+`newFieldVal::Union{
     SpatialPoint{T, D}, 
     Tuple{AbstractGaussFunc{T}, Vararg{AbstractGaussFunc{T}}}, 
     Tuple{LTuple{D, 𝑙}, Vararg{LTuple{D, 𝑙}}} where 𝑙, 
@@ -567,7 +569,7 @@ contains [`ParamBox`](@ref)).
 ```jldoctest; setup = :(push!(LOAD_PATH, "../../src/"); using Quiqbox)
 julia> bf1 = genBasisFunc([1., 2., 3.], (2.0, 1.0), (0, 0, 0));
 
-julia> bf2 = genBasisFunc([1., 2., 3.], (2.0, 1.0), (0, 0, 1));
+julia> bf2 = genBasisFunc([1., 2., 3.], (2.0, fill(1.0)), (0, 0, 1));
 
 julia> bf1 = genBasisFunc(bf1, bf2.l);
 
@@ -615,23 +617,25 @@ function genBasisFunc(cen::SpatialPoint{T, D}, gs::NTuple{GN, AbstractGaussFunc{
     genBasisFunc(cen, gs, SubshellAngMomList[D][ToSubshellLN[subshell]]; normalizeGTO)
 end
 
-function genBasisFunc(cen::SpatialPoint{T, D}, xpnsANDcons::NTuple{2, AbstractVector{T}}, 
+function genBasisFunc(cen::SpatialPoint{T, D}, xpnsANDcons::NTuple{2, AbstractVector}, 
                       lOrSubshell=LTuple(fill(0, D)); normalizeGTO::Bool=false) where 
                      {T, D}
     ==(length.(xpnsANDcons)...) || throw(AssertionError("The length of exponent "*
                                          "coefficients and contraction coefficients should"*
                                          " be equal."))
-    genBasisFunc(cen, GaussFunc.(xpnsANDcons[1], xpnsANDcons[2]), lOrSubshell; normalizeGTO)
+    genBasisFunc(cen, GaussFunc.(xpnsANDcons[begin], xpnsANDcons[end]), lOrSubshell; 
+                 normalizeGTO)
 end
 
-genBasisFunc(cen::SpatialPoint{T, D}, xpnANDcon::NTuple{2, T}, 
+genBasisFunc(cen::SpatialPoint{T, D}, xpnANDcon::NTuple{2, VPB{T}}, 
              lOrSubshell=LTuple(fill(0, D)); normalizeGTO::Bool=false) where {T, D} = 
 genBasisFunc(cen, (GaussFunc(xpnANDcon[1], xpnANDcon[2]),), lOrSubshell; normalizeGTO)
 
 genBasisFunc(cen::SpatialPoint{T, D}, gs::Tuple, subshell::StrOrSym, 
              lFilter::Tuple{Vararg{Bool}}; normalizeGTO::Bool=false) where {T, D} = 
 genBasisFunc(cen, gs, 
-             SubshellAngMomList[D][ToSubshellLN[subshell]][1:end.∈Ref(findall(lFilter))]; 
+             SubshellAngMomList[D][ToSubshellLN[subshell]][begin:end .∈ 
+                                                           Ref(findall(lFilter))]; 
              normalizeGTO)
 
 function genBasisFunc(center::SpatialPoint{T, D}, BSkey::String, atm::StrOrSym="H"; 
@@ -1225,7 +1229,7 @@ function mergeBasisFuncsIn(bs::AVectorOrNTuple{GTBasisFuncs{T, D}};
     if isempty(ids)
         lazyCollect(bs)
     else
-        vcat(mergeBasisFuncs(bs[ids]...; roundAtol), lazyCollect(bs[1:end .∉ Ref(ids)]))
+        vcat(mergeBasisFuncs(bs[ids]...; roundAtol), lazyCollect(bs[begin:end .∉ Ref(ids)]))
     end
 end
 
@@ -1365,7 +1369,7 @@ function mul(sgf1::BasisFunc{T, D, 𝑙1, 1, PT1}, sgf2::BasisFunc{T, D, 𝑙2, 
             l2 = sgf2.l[begin]
             xpn, con, cen = gaussProd((α₁, d₁, R₁), (α₂, d₂, R₂))
             shiftPolyFunc = @inline (n, c1, c2) -> [(c2 - c1)^k*binomial(n,k) for k=n:-1:0]
-            coeffs = map(1:3) do i
+            coeffs = map(OneTo(3)) do i
                 n1 = l1[i]
                 n2 = l2[i]
                 c1N = shiftPolyFunc(n1, R₁[i], cen[i])
@@ -1892,8 +1896,8 @@ function getParams(cs::AbstractArray{<:QuiqboxContainer},
     else
         pbIdx = findall(x->x isa ParamBox, cs)
         vcat(getParams(convert(Vector{ParamBox}, cs[pbIdx]), symbol), 
-             getParams(convert(Vector{ParameterizedContainer}, cs[1:end.∉Ref(pbIdx)]), 
-                       symbol))
+             getParams(convert(Vector{ParameterizedContainer}, 
+                               cs[begin:end .∉ Ref(pbIdx)]), symbol))
     end
 end
 
@@ -2003,7 +2007,7 @@ function markParams!(pars::AbstractVector{T}, filterMapping::Bool=false) where {
             res = markParamsCore1!(pars)
         else
             res1 = markParamsCore2!(view(pars, ids))
-            res2 = markParamsCore1!((@view pars[1:end .∉ Ref(ids)]))
+            res2 = markParamsCore1!((@view pars[begin:end .∉ Ref(ids)]))
             res = vcat(res1, res2)
         end
         filterMapping ? res : pars
