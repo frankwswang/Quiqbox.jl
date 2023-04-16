@@ -36,11 +36,7 @@ end
 function getGQN(u::T) where {T}
     u = abs(u) + getAtolVal(T)
     res = getAtolDigits(T) + round(0.4u + 2inv(sqrt(u))) + 1
-    if res < typemax(Int) - 1
-        Int(res)
-    else
-        typemax(Int) - 1
-    end
+    (Int∘min)(res, typemax(Int) - 1)
 end
 
 function Fγ(γ::Int, u::T) where {T}

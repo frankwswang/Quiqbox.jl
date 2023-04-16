@@ -31,10 +31,17 @@ function compr2Arrays2(cprTuple::NamedTuple{<:Any, <:NTuple{2}},
         for (name, val) in zip(keys(cprTuple), cprTuple)
             println(lpad(name, 8), "[$(ids)] = ", val[ids])
         end
-        @test all(idxDirecFunc(idx, cutoffIdx) for idx in ids) && 
-              all(abs(arr1[idx]-arr2[idx]) < atol2 for idx in ids)
+        res1 = [idxDirecFunc(idx, cutoffIdx) for idx in ids]
+        ids1 = findall(isequal(false), res1)
+        bl1 = isempty(ids1)
+        bl1 || (@show ids1)
+        res2 = [abs(arr1[idx]-arr2[idx]) < atol2 for idx in ids]
+        ids2 = findall(isequal(false), res2)
+        bl2 = isempty(ids2)
+        bl2 || (@show ids2)
+        bl1 && bl2
     else
-        @test true
+        true
     end
 end
 
@@ -53,5 +60,5 @@ function compr2Arrays3(cprTuple::NamedTuple{<:Any, <:Tuple{T1, T2}}, atol::Real,
         v, i  = findmax(abs, diff)
         println("max(abs.($(name1) - $(name2))...) = ", v, "  index = ", i)
     end
-    @test res
+    res
 end
