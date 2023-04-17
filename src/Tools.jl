@@ -940,7 +940,7 @@ function convert1DidxTo4D(n::Int, m::Int)
     # Original solution
     # rangeShifter = 1e-12 # can't be too large or too small
     # nG = floor(Int, (sqrt(1+8m) + 1)/2 - rangeShifter)
-    nGupper = (sqrt(1+8m) + 1)/2
+    nGupper = 0.5*(sqrt(1+8m) + 1)
     nG = floor(nGupper)
     nG = Int(nG - (nG==nGupper))
     l, k = convert1DidxTo2D(n, nG)

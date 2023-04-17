@@ -90,7 +90,7 @@ function ∫overlapCore(::Val{3},
     res = (π/α)^T(1.5) * exp(-α₁ / α * α₂* sum(abs2, ΔR))
 
     for (i₁, i₂, ΔRᵢ) in zip(ijk₁, ijk₂, ΔR)
-        res *= (-1)^(i₁) * factorial(i₁) * factorial(i₂) / α^(i₁+i₂) * 
+        res *= (-1)^(i₁) * factorial(i₁) * factorial(i₂) * α^(-i₁-i₂) * 
                genIntOverlapCore(ΔRᵢ, i₁, α₁, i₂, α₂)
     end
 
@@ -136,7 +136,7 @@ end
 
 function genIntTerm2(Δx::T1, α::T1, o₁::T2, o₂::T2, μ::T2, r::T2) where {T1, T2<:Integer}
     (u::T2) -> 
-        genIntTerm2core(Δx, μ)(u) / α^(o₁+o₂-r+u)
+        genIntTerm2core(Δx, μ)(u) * α^(r-o₁-o₂-u)
 end
 
 
@@ -303,9 +303,9 @@ function ∫eeInteractionCore(::Val{3},
                                                       exp(-ηr * sum(abs2, ΔRr))
     res *= ( @. (-1)^(ijk₁ + ijk₂) * 
                 factorial(ijk₁) * factorial(ijk₂) * factorial(ijk₃) * factorial(ijk₄) * 
-                (αl^(-ijk₁-ijk₂) / αr^(ijk₃+ijk₄)) ) |> prod
-        J = ∫eeInteractionCore1234(ΔRl, ΔRr, ΔRc, β, η, 
-                                   ijk₁, α₁, ijk₂, α₂, ijk₃, α₃, ijk₄, α₄)
+                (αl^(-ijk₁-ijk₂) * αr^(-ijk₃-ijk₄)) ) |> prod
+    J = ∫eeInteractionCore1234(ΔRl, ΔRr, ΔRc, β, η, 
+                               ijk₁, α₁, ijk₂, α₂, ijk₃, α₃, ijk₄, α₄)
     res * J
 end
 
