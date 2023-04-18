@@ -948,3 +948,9 @@ function convert1DidxTo4D(n::Int, m::Int)
     j, i = convert1DidxTo2D(n, rsd)
     i, j, k, l
 end
+
+
+mapMapReduce(tp::NTuple{N}, fs::NTuple{N, Function}, op::F=*) where {N, F} = 
+mapreduce((x, y)->y(x), op, tp, fs)
+
+mapMapReduce(tp::NTuple{N}, f::F1, op::F2=*) where {N, F1, F2} = mapreduce(f, op, tp)

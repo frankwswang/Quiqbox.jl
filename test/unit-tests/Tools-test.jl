@@ -7,7 +7,7 @@ using Quiqbox: getAtolVal, getAtolDigits, roundToMultiOfStep, nearestHalfOf, get
                genTupleCoords, uniCallFunc, mergeMultiObjs, isNaN, getBool, skipIndices, 
                isOscillateConverged, lazyCollect, asymSign, numEps, genAdaptStepBl, 
                shiftLastEle!, getValParm, fct, δ, triMatEleNum, convert1DidxTo2D, 
-               convert1DidxTo4D
+               convert1DidxTo4D, mapMapReduce
 using Suppressor: @capture_out
 using LinearAlgebra: norm
 
@@ -198,10 +198,6 @@ c4 = c3 |> Tuple
 @test c4 == genTupleCoords(Float64, c2)
 @test c4 == genTupleCoords(Float64, c3)
 @test c4 == genTupleCoords(Float64, c4)
-
-
-# # function callGenFunc
-# @test callGenFunc(f1, -1) == 1
 
 
 # function uniCallFunc
@@ -407,5 +403,14 @@ test2Bints = x->( iterate2BintsN(x) == iterate2Bints0(x) )
 @test all(test2Bints(i) for i in  1:20)
 @test all(test2Bints(i) for i in 21:40)
 @test all(test2Bints(i) for i in 41:50)
+
+
+# function mapMapReduce
+tp = (1, 2, -3)
+f1 = x->x^2
+@test mapMapReduce(tp, f1) == 36
+@test mapMapReduce(tp, f1, +) == 14
+@test mapMapReduce(tp, (itself, f1, abs)) == 12
+@test mapMapReduce(tp, (f1, itself, abs), +) == 6
 
 end

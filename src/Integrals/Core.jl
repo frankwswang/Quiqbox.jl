@@ -140,12 +140,6 @@ function genIntTerm2(Δx::T1, α::T1, o₁::T2, o₂::T2, μ::T2, r::T2) where {
 end
 
 
-mapMapReduce(tp::NTuple{N}, fs::NTuple{N, Function}, op::F=*) where {N, F} = 
-mapreduce((x, y)->y(x), op, tp, fs)
-
-mapMapReduce(tp::NTuple{N}, f::F1, op::F2=*) where {N, F1, F2} = mapreduce(f, op, tp)
-
-
 function genIntNucAttCore(ΔRR₀::NTuple{3, T}, ΔR₁R₂::NTuple{3, T}, β::T, 
                           ijk₁::NTuple{3, Int}, α₁::T, 
                           ijk₂::NTuple{3, Int}, α₂::T) where {T}
