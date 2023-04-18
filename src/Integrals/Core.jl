@@ -140,6 +140,12 @@ function genIntTerm2(Δx::T1, α::T1, o₁::T2, o₂::T2, μ::T2, r::T2) where {
 end
 
 
+mapMapReduce(tp::NTuple{N}, fs::NTuple{N, Function}, op::F=*) where {N, F} = 
+mapreduce((x, y)->y(x), op, tp, fs)
+
+mapMapReduce(tp::NTuple{N}, f::F1, op::F2=*) where {N, F1, F2} = mapreduce(f, op, tp)
+
+
 function genIntNucAttCore(ΔRR₀::NTuple{3, T}, ΔR₁R₂::NTuple{3, T}, β::T, 
                           ijk₁::NTuple{3, Int}, α₁::T, 
                           ijk₂::NTuple{3, Int}, α₂::T) where {T}
@@ -171,11 +177,9 @@ function genIntNucAttCore(ΔRR₀::NTuple{3, T}, ΔR₁R₂::NTuple{3, T}, β::T
 
                 for u in 0:(μˣ÷2), v in 0:(μʸ÷2), w in 0:(μᶻ÷2)
                     γ = μsum - u - v - w
-                    @inbounds tmp += prod((u, v, w) .|> core2s) * 2Fγs[γ+1]
+                    @inbounds tmp += mapMapReduce((u, v, w), core2s) * 2Fγs[γ+1]
                 end
-
-                A += prod(rst .|> core1s) * tmp
-
+                A += mapMapReduce(rst, core1s) * tmp
             end
         end
 
@@ -203,9 +207,9 @@ function ∫nucAttractionCore(::Val{3},
     β = α * sum(abs2, ΔRR₀)
     genIntNucAttCore(ΔRR₀, ΔR₁R₂, β, ijk₁, α₁, ijk₂, α₂) * 
     (π / α) * exp(-α₁ / α * α₂ * sum(abs2, ΔR₁R₂)) * 
-    ( -Z₀ * (-1)^sum(ijk₁.+ijk₂) * prod(factorial.(ijk₁)) * prod(factorial.(ijk₂)) )
+    ( -Z₀ * (-1)^sum(ijk₁ .+ ijk₂) * 
+      mapMapReduce(ijk₁, factorial) * mapMapReduce(ijk₂, factorial) )
 end
-
 
 function genIntTerm3(Δx::T1, 
                      l₁::T2, o₁::T2, 
@@ -273,11 +277,9 @@ function ∫eeInteractionCore1234(ΔRl::NTuple{3, T}, ΔRr::NTuple{3, T},
 
                 for u in 0:(μˣ÷2), v in 0:(μʸ÷2), w in 0:(μᶻ÷2)
                     γ = μsum - u - v - w
-                    @inbounds tmp += prod((u, v, w) .|> core3s) * 2Fγs[γ+1]
+                    @inbounds tmp += mapMapReduce((u, v, w), core3s) * 2Fγs[γ+1]
                 end
-
-                A += prod(rst₁ .|> core1s) * prod(rst₂ .|> core2s) * tmp
-
+                A += mapMapReduce(rst₁, core1s) * mapMapReduce(rst₂, core2s) * tmp
             end
         end
 
@@ -428,7 +430,7 @@ function getUniquePair!(i::Int,
                         N, TT<:NTuple{N, T}, TTT<:NTuple{N, NTuple{2, T}}}
     pair = reformatIntData2(first.(psc), flag)
     idx = findfirst(isequal(pair), uniquePairs)
-    con = (last.(psc) |> prod) * nFold
+    con = mapMapReduce(psc, last) * nFold
     if idx === nothing
         i += 1
         push!(uniquePairs, pair)
