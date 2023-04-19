@@ -1421,7 +1421,7 @@ end
 function gaussProd((α₁, d₁, R₁)::T, (α₂, d₂, R₂)::T) where 
                   {T<:Tuple{Number, Number, AbstractArray{<:Number}}}
     α = α₁ + α₂
-    d = d₁ * d₂ * exp(-α₁ * α₂ / α * sum(abs2, R₁-R₂))
+    d = d₁ * d₂ * exp(-α₁ / α * α₂* sum(abs2, R₁-R₂))
     R = (α₁*R₁ + α₂*R₂) / α
     (α, d, R)
 end

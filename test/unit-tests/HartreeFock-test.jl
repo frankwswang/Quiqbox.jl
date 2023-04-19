@@ -218,8 +218,8 @@ res2_Eo1t = [-20.93038451, -1.616675748, -1.28446622,  -0.66130762,
 res2_Eo2t = [-20.93038449, -1.616675711, -1.284466186, -0.661307591, 
               -0.661307591, 1.060815276,  1.847804083]
 
-compr2Arrays3((res2_Eo1=res2.Eo[1], res2_Eo1t=res2_Eo1t), 10errorThreshold1)
-compr2Arrays3((res2_Eo2=res2.Eo[2], res2_Eo2t=res2_Eo2t), 10errorThreshold1)
+@test compr2Arrays3((res2_Eo1=res2.Eo[1], res2_Eo1t=res2_Eo1t), 10errorThreshold1)
+@test compr2Arrays3((res2_Eo2=res2.Eo[2], res2_Eo2t=res2_Eo2t), 10errorThreshold1)
 
 @test all( res2.occu .== ( ("↿", "↿", "↿", "↿", "↿", "0", "0"), 
                            ("⇂", "⇂", "⇂", "⇂", "⇂", "0", "0") ) )
@@ -292,7 +292,7 @@ for i in rng
     !isapprox(Et2[n], uhfs[n], atol=errorThreshold1) && println(info2)
 end
 
-compr2Arrays2((Et1=Et1, rhfs=rhfs), 95, errorThreshold1, 0.6)
-compr2Arrays2((Et2=Et2, uhfs=uhfs), 16, errorThreshold1, 5e-5, <)
+@test compr2Arrays2((Et1=Et1, rhfs=rhfs), 95, errorThreshold1, 0.6)
+@test compr2Arrays2((Et2=Et2, uhfs=uhfs), 16, errorThreshold1, 5e-5, <)
 
 end

@@ -186,8 +186,8 @@ end
 @test all(all(Es1L[i]<=Es1L[i-1] || isapprox(Es1L[i], Es1L[i-1], atol=errorThreshold2)
               for i in 2:lastindex(Es1L)) for Es1L in Es1Ls)
 @test all(abs.(gradEnd) .< 5e-5)
-compr2Arrays3((Eend_1to6=last.(Es1Ls[1:6]), Eend_7toEnd=last.(Es1Ls[7:end])), 
-              errorThreshold1)
+@test compr2Arrays3((Eend_1to6=last.(Es1Ls[1:6]), Eend_7toEnd=last.(Es1Ls[7:end])), 
+                    errorThreshold1)
 
 
 # Grid-based basis set

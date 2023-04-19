@@ -940,7 +940,7 @@ function convert1DidxTo4D(n::Int, m::Int)
     # Original solution
     # rangeShifter = 1e-12 # can't be too large or too small
     # nG = floor(Int, (sqrt(1+8m) + 1)/2 - rangeShifter)
-    nGupper = (sqrt(1+8m) + 1)/2
+    nGupper = 0.5*(sqrt(1+8m) + 1)
     nG = floor(nGupper)
     nG = Int(nG - (nG==nGupper))
     l, k = convert1DidxTo2D(n, nG)
@@ -948,3 +948,9 @@ function convert1DidxTo4D(n::Int, m::Int)
     j, i = convert1DidxTo2D(n, rsd)
     i, j, k, l
 end
+
+
+mapMapReduce(tp::NTuple{N}, fs::NTuple{N, Function}, op::F=*) where {N, F} = 
+mapreduce((x, y)->y(x), op, tp, fs)
+
+mapMapReduce(tp::NTuple{N}, f::F1, op::F2=*) where {N, F1, F2} = mapreduce(f, op, tp)

@@ -123,14 +123,14 @@ t1 = 1e-14
 t2 = 1e-10
 t3 = 5e-8
 @test isapprox(grad1[1], grad1[2], atol=t1)
-compr2Arrays3((grad1=grad1, grad1_t=grad1_t), t2, true)
-compr2Arrays3((grad1=grad1, grad1_fd=grad1_fd), t3, true)
+@test compr2Arrays3((grad1=grad1, grad1_t=grad1_t), t2, true)
+@test compr2Arrays3((grad1=grad1, grad1_fd=grad1_fd), t3, true)
 
 config = HFconfig(HF=:UHF, SCF=SCFconfig(threshold=DHFOthreshold))
 HFres1_2 = runHF(bs1, nuc, nucCoords, config, printInfo=false)
 grad1_2 = gradOfHFenergy(pars1, bs1, overlaps(bs1), HFres1.C, nuc, nucCoords)
 @test isapprox(grad1_2[1], grad1_2[2], atol=t1)
-compr2Arrays3((grad1_2=grad1_2, grad1_t=grad1_t), t2, true)
+@test compr2Arrays3((grad1_2=grad1_2, grad1_t=grad1_t), t2, true)
 @test abs(grad1_2[end]) < t1
 
 bfSource = genBasisFunc(missing, "STO-2G", "H")[]
@@ -142,13 +142,13 @@ S2 = overlaps(bs2)
 HFres2 = runHF(bs2, nuc, nucCoords, DHFO, printInfo=false)
 grad2 = gradOfHFenergy(pars2, bs2, S2, HFres2.C, nuc, nucCoords)
 grad2_fd = fDiffOfHFenergy(pars2, bs2, nuc, nucCoords, 5e-8)
-compr2Arrays3((grad2=grad2, grad2_fd=grad2_fd), t3, true)
+@test compr2Arrays3((grad2=grad2, grad2_fd=grad2_fd), t3, true)
 @test isapprox(grad2[1], -grad2[2], atol=t2)
 @test isapprox(grad2[1], -0.06786383130892265, atol=t2)
 @test all(grad2[3:6] .== 0)
 grad2_tp = [0.006457377706861556, 0.1734869455759266, 
             0.09464147744656637, -0.05996050268876735]
-compr2Arrays3((grad2_7toEnd=grad2[7:end], grad2_tp=grad2_tp), t2, true)
+@test compr2Arrays3((grad2_7toEnd=grad2[7:end], grad2_tp=grad2_tp), t2, true)
 
 bs3 = bs1[[1,5]] .* bs2 # basis set of BasisFuncMix
 pars3 = markParams!(bs3, true)
@@ -156,7 +156,7 @@ S3 = overlaps(bs3)
 HFres3 = runHF(bs3, nuc, nucCoords, DHFO, printInfo=false)
 grad3 = gradOfHFenergy(pars3, HFres3)
 grad3_fd = fDiffOfHFenergy(pars3, bs3, nuc, nucCoords, 1e-7)
-compr2Arrays3((grad3p=grad3[1:end-1], grad3_fdp=grad3_fd[1:end-1]), 10t3, true)
+@test compr2Arrays3((grad3p=grad3[1:end-1], grad3_fdp=grad3_fd[1:end-1]), 10t3, true)
 @test isapprox(grad3[end], grad3_fd[end], atol=20t3)
 grad3_t = [-0.16065229121206354,  -0.24121983006131092, -0.14801056645961025, 
             0.004774655525683808, -0.08411038969476041, -0.33217356554081107, 
@@ -165,7 +165,7 @@ grad3_t = [-0.16065229121206354,  -0.24121983006131092, -0.14801056645961025,
             1.2107782206334075,    0.1356557596514777,   1.606031495974234, 
             0.05883838067278252,   0.7017475880547892,  -1.2886966023073554, 
             2.762948613007392,   -16.536548387473335]
-compr2Arrays3((grad3=grad3, grad3_t=grad3_t), 10t3, true)
+@test compr2Arrays3((grad3=grad3, grad3_t=grad3_t), 10t3, true)
 
 
 # Edge case of accurate gradient requiring high-precision computation

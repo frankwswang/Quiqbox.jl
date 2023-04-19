@@ -62,8 +62,9 @@ box1 = GridBox(2, 1.5)
 bf3 = genBasisFunc(box1.point[1], (2.0, 1.0))
 
 bfm1 = BasisFuncMix([bf1, bf2, bf3])
-@test (@capture_out replShow(bfm1)) == 
-      "BasisFuncMix{Float64, 3, 3, BasisFunc{Float64, 3, 0}}"
+info = @capture_out replShow(bfm1)
+@test info == "BasisFuncMix{Float64, 3, 3, BasisFunc{Float64, 3, 0}}" || 
+      info == "BasisFuncMix{Float64, 3, 3, BasisFunc{Float64, 3, 0, GN, PT} where {GN, PT}}"
 
 GTb1 = GTBasis([bf1, bfs2])
 @test (@capture_out replShow(GTb1)) == "GTBasis{Float64, 3, 2, BasisFunc{Float64, 3, 𝑙, "*

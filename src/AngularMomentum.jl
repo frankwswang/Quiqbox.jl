@@ -37,9 +37,9 @@ function genCGcoeffCoreCore(op::F, m1::Real, m2::Real,
                             cgcB::CGcoeff{T2, DJ1, DJ2, DJ3}) where 
                            {F<:Function, T1, T2, DJ1, DJ2, DJ3}
     m3 = m1 + m2
-    j1 = DJ1 / 2
-    j2 = DJ2 / 2
-    j3 = DJ3 / 2
+    j1 = 0.5DJ1
+    j2 = 0.5DJ2
+    j3 = 0.5DJ3
     cA = cgcA.coeff
     cB = cgcB.coeff
     rc1 = (j1 + op(-m1) + 1) * (j1 + op(m1))
@@ -99,14 +99,13 @@ function getCGcoeffCore(j₁::Real, m₁::Real, j₂::Real, m₂::Real, j::Real)
     m = m₁+m₂
     ss = (j₁+j₂-j, j₁-m₁, j₂+m₂, j-j₂+m₁, j-j₁-m₂)
     p1 = fct(j+m)*fct(j-m) * fct(j₁+m₁)*fct(j₁-m₁) * fct(j₂+m₂)*fct(j₂-m₂) * 
-            (2j+1) * fct(j+j₁-j₂)*fct(j-j₁+j₂)*fct(j₁+j₂-j) / fct(j₁+j₂+j+1)
+            (2j+1) * ( fct(j+j₁-j₂)*fct(j-j₁+j₂)*fct(j₁+j₂-j) / fct(j₁+j₂+j+1) )
     kUpper = min(ss[1], ss[2], ss[3]) |> Int
     kLower = max(0, -min(ss[4], ss[5])) |> Int
     p2 = mapreduce(+, kLower:kUpper) do k
         (-1)^k / 
-        ( fct(k) * 
-            fct(ss[1] - k)*fct(ss[2] - k)*fct(ss[3] - k) * 
-            fct(ss[4] + k)*fct(ss[5] + k) )
+        ( fct(k) * fct(ss[1] - k) * fct(ss[2] - k) * fct(ss[3] - k) * 
+                   fct(ss[4] + k) * fct(ss[5] + k) )
     end
     sqrt(p1) * p2
 end

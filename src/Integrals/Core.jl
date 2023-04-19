@@ -36,16 +36,12 @@ end
 function getGQN(u::T) where {T}
     u = abs(u) + getAtolVal(T)
     res = getAtolDigits(T) + round(0.4u + 2inv(sqrt(u))) + 1
-    if res < typemax(Int) - 1
-        Int(res)
-    else
-        typemax(Int) - 1
-    end
+    (Int∘min)(res, typemax(Int) - 1)
 end
 
 function Fγ(γ::Int, u::T) where {T}
     if u < getAtolVal(T)
-        T(2γ + 1) |> inv
+        (inv∘T∘muladd)(2, γ, 1)
     else
         FγCore(γ, u, (getValI∘getGQN)(u))
     end
@@ -54,8 +50,7 @@ end
 function F₀toFγ(γ::Int, u::T) where {T}
     res = Array{T}(undef, γ+1)
     res[begin] = F0(u)
-    γ > 0 || (return res)
-    res[end] = Fγ(γ, u)
+    γ > 0 && (res[end] = Fγ(γ, u))
     for i in γ:-1:2
         @inbounds res[i] = (expm1(-u) + 2u*res[i+1] + 1) / (2i - 1)
     end
@@ -68,23 +63,17 @@ function genIntOverlapCore(Δx::T,
                            i₂::Int, α₂::T) where {T}
     res = T(0.0)
     for l₁ in 0:(i₁÷2), l₂ in 0:(i₂÷2)
-        Ω = i₁ + i₂ - 2*(l₁ + l₂)
+        Ω = muladd(-2, l₁ + l₂, i₁ + i₂)
         halfΩ = Ω÷2
         oRange = 0:halfΩ
         Δx == 0.0 && (iseven(Ω) ? (oRange = halfΩ:halfΩ) : continue)
         for o in oRange
-            res += (-1)^o * factorial(Ω) * 
-                    α₁^(i₂ - l₁ - 2l₂ - o) * 
-                    α₂^(i₁ - l₂ - 2l₁ - o) * 
-                    (α₁ + α₂)^(2 * (l₁ + l₂) + o) * 
-                    Δx^(Ω-2o) / 
-                    ( 4^(l₁ + l₂ + o) * 
-                        factorial(l₁) * 
-                        factorial(l₂) * 
-                        factorial(o ) * 
-                        factorial(i₁ - 2l₁) * 
-                        factorial(i₂ - 2l₂) * 
-                        factorial(Ω  - 2o ) )
+            res += Δx^(Ω-2o) * 
+                   ( α₁^(i₂ - l₁ - 2l₂ - o) / (factorial(l₂) * factorial(i₁-2l₁)) ) * 
+                   ( α₂^(i₁ - l₂ - 2l₁ - o) / (factorial(l₁) * factorial(i₂-2l₂)) ) * 
+                   ( (-1)^o * factorial(Ω) / 
+                     (4^(l₁+ l₂ + o) * factorial(o) * factorial(Ω-2o)) ) * 
+                   (α₁ + α₂)^muladd(2, (l₁ + l₂), o)
         end
     end
     res
@@ -97,13 +86,13 @@ function ∫overlapCore(::Val{3},
     any(n -> n<0, (ijk₁..., ijk₂...)) && (return T(0.0))
 
     α = α₁ + α₂
-    res = (π/α)^T(1.5) * exp(-α₁ * α₂ / α * sum(abs2, ΔR))
-
-        for (i₁, i₂, ΔRᵢ) in zip(ijk₁, ijk₂, ΔR)
-            res *= (-1)^(i₁) * factorial(i₁) * factorial(i₂) / α^(i₁+i₂) * 
-                   genIntOverlapCore(ΔRᵢ, i₁, α₁, i₂, α₂)
-        end
-
+    res = T(1)
+    for (i₁, i₂, ΔRᵢ) in zip(ijk₁, ijk₂, ΔR)
+        int = genIntOverlapCore(ΔRᵢ, i₁, α₁, i₂, α₂)
+        iszero(int) && (return T(0))
+        res *= (-1)^(i₁) * factorial(i₁) * factorial(i₂) * α^(-i₁-i₂) * int
+    end
+    res *= sqrt((π/α)^3) * exp(-α₁ / α * α₂* sum(abs2, ΔR))
     res
 end
 
@@ -120,10 +109,11 @@ function ∫elecKineticCore(::Val{3},
                           ijk₂::NTuple{3, Int}, α₂::T) where {T}
     ΔR = R₁ .- R₂
     shifts = ((2,0,0), (0,2,0), (0,0,2))
-    (α₂ * (4*sum(ijk₂) + 6) * ∫overlapCore(Val(3), ΔR, ijk₁, α₁, ijk₂, α₂) - 4 * α₂^2 * 
-     sum(∫overlapCore.(Val(3), Ref(ΔR),Ref(ijk₁), α₁, map.(+,Ref(ijk₂),shifts), α₂)) - 
-     sum(ijk₂ .* (ijk₂.-1) .* 
-         ∫overlapCore.(Val(3), Ref(ΔR),Ref(ijk₁), α₁, map.(-,Ref(ijk₂),shifts), α₂))) / 2
+    resTemp = mapreduce(+, ijk₂, shifts) do l₂, Δl
+        2α₂^2 * ∫overlapCore(Val(3), ΔR, ijk₁, α₁, map(+, ijk₂, Δl), α₂) + 
+        (l₂-1) * l₂ / 2 * ∫overlapCore(Val(3), ΔR, ijk₁, α₁, map(-, ijk₂, Δl), α₂)
+    end
+    ∫overlapCore(Val(3), ΔR, ijk₁, α₁, ijk₂, α₂) * α₂ * muladd(2, sum(ijk₂), 3) - resTemp
 end
 
 
@@ -133,19 +123,20 @@ function genIntTerm1(Δx::T1,
                      i₁::T2, α₁::T1, 
                      i₂::T2, α₂::T1) where {T1, T2<:Integer}
     (r::T2) -> 
-        (-1)^(o₂+r) * factorial(o₁+o₂) * α₁^(o₂-l₁-r) * α₂^(o₁-l₂-r) * Δx^(o₁+o₂-2r) / 
-        (
-            4^(l₁+l₂+r) * 
-            factorial(l₁) * factorial(l₂) * factorial(o₁) * factorial(o₂) * 
-            factorial(r) * factorial(i₁-2l₁-o₁) * factorial(i₂-2l₂-o₂) * 
-            factorial(o₁+o₂-2r)
-        )
+        ( Δx^muladd(-2, r, o₁+o₂) / (factorial(r ) * (factorial∘muladd)(-2, r, o₁+o₂)) ) * 
+        ( α₁^(o₂-l₁- r) / (factorial(l₁) * factorial(i₁-2l₁-o₁)) ) * 
+        ( α₂^(o₁-l₂- r) / (factorial(l₂) * factorial(i₂-2l₂-o₂)) ) * 
+        ( (-1)^(o₂+r) * factorial(o₁+o₂) / (4^(l₁+l₂+r) * factorial(o₁) * factorial(o₂)) )
+end
+
+function genIntTerm2core(Δx::T1,  μ::T2) where {T1, T2<:Integer}
+    (u::T2) -> 
+        Δx^(μ-2u) * ( (-1)^u * factorial(μ) / (4^u * factorial(u) * factorial(μ-2u)) )
 end
 
 function genIntTerm2(Δx::T1, α::T1, o₁::T2, o₂::T2, μ::T2, r::T2) where {T1, T2<:Integer}
     (u::T2) -> 
-        (-1)^u * factorial(μ) * Δx^(μ-2u) / 
-        ( 4^u * factorial(u) * factorial(μ-2u) * α^(o₁+o₂-r+u) )
+        genIntTerm2core(Δx, μ)(u) * α^(r-o₁-o₂-u)
 end
 
 
@@ -167,7 +158,7 @@ function genIntNucAttCore(ΔRR₀::NTuple{3, T}, ΔR₁R₂::NTuple{3, T}, β::T
             opq₁ = (o₁, p₁, q₁)
             opq₂ = (o₂, p₂, q₂)
 
-            μˣ, μʸ, μᶻ = μv = @. ijk₁ + ijk₂ - 2*(lmn₁ + lmn₂) - (opq₁ + opq₂)
+            μˣ, μʸ, μᶻ = μv = @. ijk₁ + ijk₂ - muladd(2, lmn₁+lmn₂, opq₁+opq₂)
             μsum = sum(μv)
             Fγs = F₀toFγ(μsum, β)
             core1s = genIntTerm1.(ΔR₁R₂, lmn₁, opq₁, lmn₂, opq₂, ijk₁, α₁, ijk₂, α₂)
@@ -180,11 +171,9 @@ function genIntNucAttCore(ΔRR₀::NTuple{3, T}, ΔR₁R₂::NTuple{3, T}, β::T
 
                 for u in 0:(μˣ÷2), v in 0:(μʸ÷2), w in 0:(μᶻ÷2)
                     γ = μsum - u - v - w
-                    @inbounds tmp += prod((u, v, w) .|> core2s) * 2Fγs[γ+1]
+                    @inbounds tmp += mapMapReduce((u, v, w), core2s) * 2Fγs[γ+1]
                 end
-
-                A += prod(rst .|> core1s) * tmp
-
+                A += mapMapReduce(rst, core1s) * tmp
             end
         end
 
@@ -210,12 +199,11 @@ function ∫nucAttractionCore(::Val{3},
     ΔRR₀ = R .- R₀
     ΔR₁R₂ = R₁ .- R₂
     β = α * sum(abs2, ΔRR₀)
-    res = -Z₀ * (π / α) * exp(-α₁ * α₂ / α * sum(abs2, ΔR₁R₂))
-    res *= (-1)^sum(ijk₁ .+ ijk₂) * (factorial.((ijk₁..., ijk₂...)) |> prod) * 
-            genIntNucAttCore(ΔRR₀, ΔR₁R₂, β, ijk₁, α₁, ijk₂, α₂)
-    res
+    genIntNucAttCore(ΔRR₀, ΔR₁R₂, β, ijk₁, α₁, ijk₂, α₂) * 
+    (π / α) * exp(-α₁ / α * α₂ * sum(abs2, ΔR₁R₂)) * 
+    ( -Z₀ * (-1)^sum(ijk₁ .+ ijk₂) * 
+      mapMapReduce(ijk₁, factorial) * mapMapReduce(ijk₂, factorial) )
 end
-
 
 function genIntTerm3(Δx::T1, 
                      l₁::T2, o₁::T2, 
@@ -223,20 +211,12 @@ function genIntTerm3(Δx::T1,
                      i₁::T2, α₁::T1, 
                      i₂::T2, α₂::T1) where {T1, T2<:Integer}
     (r::T2) -> 
-        (-1)^(o₂+r) * factorial(o₁+o₂) * α₁^(o₂-l₁-r) * α₂^(o₁-l₂-r) * 
-        (α₁+α₂)^(2*(l₁+l₂) + r) * Δx^(o₁+o₂-2r) / 
-        (
-            4^(l₁+l₂+r) * 
-            factorial(l₁) * factorial(l₂) * factorial(o₁) * factorial(o₂) * 
-            factorial(r) * factorial(i₁-2l₁-o₁) * factorial(i₂-2l₂-o₂) * 
-            factorial(o₁+o₂-2r)
-        )
+        genIntTerm1(Δx, l₁, o₁, l₂, o₂, i₁, α₁, i₂, α₂)(r) * (α₁+α₂)^muladd(2, l₁+l₂, r)
 end
 
 function genIntTerm4(Δx::T1, η::T1, μ::T2) where {T1, T2<:Integer}
     (u::T2) -> 
-        (-1)^u * factorial(μ) * η^(μ-u) * Δx^(μ-2u) / 
-        ( 4^u * factorial(u) * factorial(μ-2u) )
+        genIntTerm2core(Δx, μ)(u) * η^(μ-u)
 end
 
 
@@ -272,7 +252,7 @@ function ∫eeInteractionCore1234(ΔRl::NTuple{3, T}, ΔRr::NTuple{3, T},
             opq₄ = (o₄, p₄, q₄)
 
             μˣ, μʸ, μᶻ = μv = begin
-                @. IJK - (lmn₁ + lmn₂ + lmn₃ + lmn₄) * 2 - (opq₁ + opq₂ + opq₃ + opq₄)
+                @. IJK - muladd(2, lmn₁+lmn₂+lmn₃+lmn₄, opq₁+opq₂+opq₃+opq₄)
             end
 
             μsum = sum(μv)
@@ -291,11 +271,9 @@ function ∫eeInteractionCore1234(ΔRl::NTuple{3, T}, ΔRr::NTuple{3, T},
 
                 for u in 0:(μˣ÷2), v in 0:(μʸ÷2), w in 0:(μᶻ÷2)
                     γ = μsum - u - v - w
-                    @inbounds tmp += prod((u, v, w) .|> core3s) * 2Fγs[γ+1]
+                    @inbounds tmp += mapMapReduce((u, v, w), core3s) * 2Fγs[γ+1]
                 end
-
-                A += prod(rst₁ .|> core1s) * prod(rst₂ .|> core2s) * tmp
-
+                A += mapMapReduce(rst₁, core1s) * mapMapReduce(rst₂, core2s) * tmp
             end
         end
 
@@ -313,19 +291,18 @@ function ∫eeInteractionCore(::Val{3},
     ΔRr = R₃ .- R₄
     αl = α₁ + α₂
     αr = α₃ + α₄
-    ηl = α₁ * α₂ / αl
-    ηr = α₃ * α₄ / αr
-    ΔRc = @. (α₁*R₁ + α₂*R₂)/αl - (α₃*R₃ + α₄*R₄)/αr
-    η = αl * αr / (α₁ + α₂ + α₃ + α₄)
+    ηl = α₁ / αl * α₂
+    ηr = α₃ / αr * α₄
+    ΔRc = @. (α₁*R₁ + α₂*R₂) / αl - (α₃*R₃ + α₄*R₄) / αr
+    η = αl / (α₁ + α₂ + α₃ + α₄) * αr
     β = η * sum(abs2, ΔRc)
-    res = T(πvals[2.5]) / (αl * αr * sqrt(αl + αr)) * exp(-ηl * sum(abs2, ΔRl)) * 
-                                                      exp(-ηr * sum(abs2, ΔRr))
-    res *= ( @. (-1)^(ijk₁ + ijk₂) * factorial(ijk₁) * factorial(ijk₂) * 
-                factorial(ijk₃) * factorial(ijk₄) * 
-                αl^(-ijk₁-ijk₂) / αr^(ijk₃+ijk₄) ) |> prod
-        J = ∫eeInteractionCore1234(ΔRl, ΔRr, ΔRc, β, η, 
-                                   ijk₁, α₁, ijk₂, α₂, ijk₃, α₃, ijk₄, α₄)
-    res * J
+    ∫eeInteractionCore1234(ΔRl, ΔRr, ΔRc, β, η, ijk₁, α₁, ijk₂, α₂, ijk₃, α₃, ijk₄, α₄) * 
+    T(πvals[2.5]) / (αl * αr * sqrt(αl + αr)) * 
+    exp(-ηl * sum(abs2, ΔRl)) * exp(-ηr * sum(abs2, ΔRr)) * 
+    mapreduce(*, ijk₁, ijk₂, ijk₃, ijk₄) do l₁, l₂, l₃, l₄
+        (-1)^(l₁+l₂) * factorial(l₁) * factorial(l₂) * factorial(l₃) * factorial(l₄) / 
+        (αl^(l₁+l₂) * αr^(l₃+l₄))
+    end
 end
 
 
@@ -447,7 +424,7 @@ function getUniquePair!(i::Int,
                         N, TT<:NTuple{N, T}, TTT<:NTuple{N, NTuple{2, T}}}
     pair = reformatIntData2(first.(psc), flag)
     idx = findfirst(isequal(pair), uniquePairs)
-    con = (last.(psc) |> prod) * nFold
+    con = mapMapReduce(psc, last) * nFold
     if idx === nothing
         i += 1
         push!(uniquePairs, pair)
@@ -680,7 +657,6 @@ function getIntX1X1X2X2!(n::Int,
             g1123 = ((A, A, C), (A, C, A), (B, A, C), (B, C, A))
             g1233 = ((A, B, A), (B, A, A), (A, B, C), (B, A, C))
             g1234 = ((A, B, A, C), (A, B, C, A), (A, B, C, A), (B, A, C, A))
-
             return getIntXAXBXCXDcore!(n, uniquePairs, uPairCoeffs, flags, 
                                        (g1111, g1122, g1212, g1123, g1233, g1234))
         end
