@@ -922,7 +922,7 @@ function getTwoBodyInt(::Type{T}, ::Val{D}, ∫2e::F, @nospecialize(optPosArgs::
                                    R₂, ijk₂, x[2], 
                                    R₃, ijk₃, x[3], 
                                    R₄, ijk₄, x[4])::T * y
-    end |> sum
+    end |> sum # Fewer allocations than mapreduce.
 end
 
 
@@ -986,7 +986,8 @@ function get1BCompIntCore(::Type{T}, ::Val{D}, ::Val{BL}, ::Val{:aa},
         centerNumOf(a)
     end
     res = Array{T}(undef, BN, BN)
-    for j in OneTo(BN), i in OneTo(j)
+    Threads.@threads for k in (OneTo∘triMatEleNum)(BN)
+        i, j = convert1DidxTo2D(BN, k)
         @inbounds res[j,i] = res[i,j] = 
                   get1BCompInt(T, Val(D), ∫, optPosArgs, (j==i,), sizes, 
                                getBF(Val(BL), T, Val(D), a, i), 
@@ -1007,11 +1008,13 @@ function get1BCompIntCore(::Type{T}, ::Val{D}, ::Val{BL}, ::Val{:ab},
         centerNumOf(a), centerNumOf(b)
     end
     res = Array{T}(undef, BN1, BN2)
-    for j in OneTo(BN2), i in OneTo(BN1)
-        @inbounds res[i,j] = 
-                  get1BCompInt(T, Val(D), ∫, optPosArgs, Val(false), sizes, 
-                               getBF(Val(BL), T, Val(D), a, i), 
-                               getBF(Val(BL), T, Val(D), b, j))
+    @sync for j in OneTo(BN2), i in OneTo(BN1)
+        Threads.@spawn begin
+            @inbounds res[i,j] = 
+                      get1BCompInt(T, Val(D), ∫, optPosArgs, Val(false), sizes, 
+                                   getBF(Val(BL), T, Val(D), a, i), 
+                                   getBF(Val(BL), T, Val(D), b, j))
+        end
     end
     res
 end
@@ -1045,7 +1048,8 @@ function get2BCompIntCore(::Type{T}, ::Val{D}, ::Val{BL}, ::Val{:aaaa},
         centerNumOf(a)
     end
     res = Array{T}(undef, BN, BN, BN, BN)
-    for l in OneTo(BN), k in OneTo(l), j in OneTo(l), i in (OneTo∘ifelse)(l==j, k, j)
+    Threads.@threads for m in (OneTo∘triMatEleNum∘triMatEleNum)(BN)
+        i, j, k, l = convert1DidxTo4D(BN, m)
         iBl = (l==k, l==j, k==j, ifelse(l==j, k, j)==i)
         @inbounds res[l, k, j, i] = res[k, l, j, i] = res[k, l, i, j] = res[l, k, i, j] = 
                   res[i, j, l, k] = res[j, i, l, k] = res[j, i, k, l] = res[i, j, k, l] = 
@@ -1072,14 +1076,19 @@ function get2BCompIntCore(::Type{T}, ::Val{D}, ::Val{BL}, ::Val{:aabb},
         centerNumOf(a), centerNumOf(b)
     end
     res = Array{T}(undef, BN1, BN1, BN2, BN2)
-    for l in OneTo(BN2), k in OneTo(l), j in OneTo(BN1), i in OneTo(j)
-        iBl = (l==k, Val(false), Val(false), j==i)
-        @inbounds res[i, j, l, k] = res[j, i, l, k] = res[j, i, k, l] = res[i, j, k, l] = 
-                  get2BCompInt(T, Val(D), ∫, optPosArgs, iBl, sizes, 
-                               getBF(Val(BL), T, Val(D), a, i), 
-                               getBF(Val(BL), T, Val(D), a, j), 
-                               getBF(Val(BL), T, Val(D), b, k), 
-                               getBF(Val(BL), T, Val(D), b, l))
+    @sync for lk in (OneTo∘triMatEleNum)(BN2), ji in (OneTo∘triMatEleNum)(BN1)
+        Threads.@spawn begin
+            i, j = convert1DidxTo2D(BN1, ji)
+            k, l = convert1DidxTo2D(BN2, lk)
+            iBl = (l==k, Val(false), Val(false), j==i)
+            @inbounds res[i, j, l, k] = res[j, i, l, k] = 
+                      res[j, i, k, l] = res[i, j, k, l] = 
+                      get2BCompInt(T, Val(D), ∫, optPosArgs, iBl, sizes, 
+                                  getBF(Val(BL), T, Val(D), a, i), 
+                                  getBF(Val(BL), T, Val(D), a, j), 
+                                  getBF(Val(BL), T, Val(D), b, k), 
+                                  getBF(Val(BL), T, Val(D), b, l))
+        end
     end
     res
 end
@@ -1098,8 +1107,11 @@ function get2BCompIntCore(::Type{T}, ::Val{D}, ::Val{BL}, ::Val{:abab},
         centerNumOf(a), centerNumOf(b)
     end
     res = Array{T}(undef, BN1, BN2, BN1, BN2)
-    rng = product(OneTo(BN2), OneTo(BN1))
-    for (x, (l,k)) in enumerate(rng), (_, (j,i)) in zip(OneTo(x), rng)
+    rng = (collect∘product)(OneTo(BN2), OneTo(BN1))
+    Threads.@threads for yx in (OneTo∘triMatEleNum)(BN2*BN1)
+        x, y = convert1DidxTo2D(BN2*BN1, yx)
+        l, k = rng[y]
+        j, i = rng[x]
         iBl = (Val(false), l==j, Val(false), ifelse(l==j, k==i, false))
         @inbounds res[k, l, i, j] = res[i, j, k, l] = 
                   get2BCompInt(T, Val(D), ∫, optPosArgs, iBl, sizes, 
@@ -1126,14 +1138,17 @@ function get2BCompIntCore(::Type{T}, ::Val{D}, ::Val{BL}, ::Val{:aabc},
         centerNumOf(a), centerNumOf(b), centerNumOf(c)
     end
     res = Array{T}(undef, BN1, BN1, BN2, BN3)
-    for l in OneTo(BN3), k in OneTo(BN2), j in OneTo(BN1), i in OneTo(j)
-        iBl = (Val(false), Val(false), Val(false), j==i)
-        @inbounds res[j, i, k, l] = res[i, j, k, l] = 
-                  get2BCompInt(T, Val(D), ∫, optPosArgs, iBl, sizes, 
-                               getBF(Val(BL), T, Val(D), a, i), 
-                               getBF(Val(BL), T, Val(D), a, j), 
-                               getBF(Val(BL), T, Val(D), b, k), 
-                               getBF(Val(BL), T, Val(D), c, l))
+    @sync for l in OneTo(BN3), k in OneTo(BN2), ji in (OneTo∘triMatEleNum)(BN1)
+        Threads.@spawn begin
+            i, j = convert1DidxTo2D(BN1, ji)
+            iBl = (Val(false), Val(false), Val(false), j==i)
+            @inbounds res[j, i, k, l] = res[i, j, k, l] = 
+                      get2BCompInt(T, Val(D), ∫, optPosArgs, iBl, sizes, 
+                                   getBF(Val(BL), T, Val(D), a, i), 
+                                   getBF(Val(BL), T, Val(D), a, j), 
+                                   getBF(Val(BL), T, Val(D), b, k), 
+                                   getBF(Val(BL), T, Val(D), c, l))
+        end
     end
     res
 end
@@ -1153,14 +1168,17 @@ function get2BCompIntCore(::Type{T}, ::Val{D}, ::Val{BL}, ::Val{:abcc},
         centerNumOf(a), centerNumOf(b), centerNumOf(c)
     end
     res = Array{T}(undef, BN1, BN2, BN3, BN3)
-    for l in OneTo(BN3), k in OneTo(l), j in OneTo(BN2), i in OneTo(BN1)
-        iBl = (l==k, Val(false), Val(false), Val(false))
-        @inbounds res[i, j, l, k] = res[i, j, k, l] = 
-                  get2BCompInt(T, Val(D), ∫, optPosArgs, iBl, sizes, 
-                               getBF(Val(BL), T, Val(D), a, i), 
-                               getBF(Val(BL), T, Val(D), b, j), 
-                               getBF(Val(BL), T, Val(D), c, k), 
-                               getBF(Val(BL), T, Val(D), c, l))
+    @sync for lk in (OneTo∘triMatEleNum)(BN3), j in OneTo(BN2), i in OneTo(BN1)
+        Threads.@spawn begin
+            k, l = convert1DidxTo2D(BN3, lk)
+            iBl = (l==k, Val(false), Val(false), Val(false))
+            @inbounds res[i, j, l, k] = res[i, j, k, l] = 
+                      get2BCompInt(T, Val(D), ∫, optPosArgs, iBl, sizes, 
+                                   getBF(Val(BL), T, Val(D), a, i), 
+                                   getBF(Val(BL), T, Val(D), b, j), 
+                                   getBF(Val(BL), T, Val(D), c, k), 
+                                   getBF(Val(BL), T, Val(D), c, l))
+        end
     end
     res
 end
@@ -1184,14 +1202,16 @@ function get2BCompIntCore(::Type{T}, ::Val{D}, ::Val{BL}, ::IDV,
         centerNumOf.(bfs)
     end
     res = Array{T}(undef, BN1, BN2, BN3, BN4)
-    for l in OneTo(BN4), k in OneTo(BN3), j in OneTo(BN2), i in OneTo(BN1)
-        iBl = IndexABXYbools[IDV](j,k,l)
-        @inbounds res[i,j,k,l] = 
-                  get2BCompInt(T, Val(D), ∫, optPosArgs, iBl, sizes, 
-                               getBF(Val(BL), T, Val(D), a, i), 
-                               getBF(Val(BL), T, Val(D), b, j), 
-                               getBF(Val(BL), T, Val(D), c, k), 
-                               getBF(Val(BL), T, Val(D), d, l))
+    @sync for l in OneTo(BN4), k in OneTo(BN3), j in OneTo(BN2), i in OneTo(BN1)
+        Threads.@spawn begin
+            iBl = IndexABXYbools[IDV](j,k,l)
+            @inbounds res[i,j,k,l] = 
+                      get2BCompInt(T, Val(D), ∫, optPosArgs, iBl, sizes, 
+                                   getBF(Val(BL), T, Val(D), a, i), 
+                                   getBF(Val(BL), T, Val(D), b, j), 
+                                   getBF(Val(BL), T, Val(D), c, k), 
+                                   getBF(Val(BL), T, Val(D), d, l))
+        end
     end
     res
 end
