@@ -111,4 +111,9 @@ uniqueInts2 = [eeIs3[i...] for i in uniqueIdx]
 @test uniqueInts1  ⊆ unique(eeIs1)
 @test isapprox(sort(uniqueInts1), sort(uniqueInts2), atol=errT1)
 
+bfF32_1 = genBasisFunc(Float32[1.0, 1.0, 1.0], (1.2f0, 2.3f0))
+bfF32_2 = genBasisFunc(Float32[1.0, 3.0, 0.0], ([1.25f0, 5.12f0], [2.3f0, -1.1f0]), :d)
+bsF32 = [bfF32_1, bfF32_2]
+@test eeInteractions(bsF32) isa Array{Float32, 4}
+
 end

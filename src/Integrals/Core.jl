@@ -71,8 +71,8 @@ function genIntOverlapCore(Δx::T,
             res += Δx^(Ω-2o) * 
                    ( α₁^(i₂ - l₁ - 2l₂ - o) / (factorial(l₂) * factorial(i₁-2l₁)) ) * 
                    ( α₂^(i₁ - l₂ - 2l₁ - o) / (factorial(l₁) * factorial(i₂-2l₂)) ) * 
-                   ( (-1)^o * factorial(Ω) / 
-                     (4^(l₁+ l₂ + o) * factorial(o) * factorial(Ω-2o)) ) * 
+                   T( (-1)^o * factorial(Ω) / 
+                      (4^(l₁+ l₂ + o) * factorial(o) * factorial(Ω-2o)) ) * 
                    (α₁ + α₂)^muladd(2, (l₁ + l₂), o)
         end
     end
@@ -111,7 +111,7 @@ function ∫elecKineticCore(::Val{3},
     shifts = ((2,0,0), (0,2,0), (0,0,2))
     resTemp = mapreduce(+, ijk₂, shifts) do l₂, Δl
         2α₂^2 * ∫overlapCore(Val(3), ΔR, ijk₁, α₁, map(+, ijk₂, Δl), α₂) + 
-        (l₂-1) * l₂ / 2 * ∫overlapCore(Val(3), ΔR, ijk₁, α₁, map(-, ijk₂, Δl), α₂)
+        (l₂-1) * l₂ * ∫overlapCore(Val(3), ΔR, ijk₁, α₁, map(-, ijk₂, Δl), α₂) / 2
     end
     ∫overlapCore(Val(3), ΔR, ijk₁, α₁, ijk₂, α₂) * α₂ * muladd(2, sum(ijk₂), 3) - resTemp
 end
@@ -126,12 +126,12 @@ function genIntTerm1(Δx::T1,
         ( Δx^muladd(-2, r, o₁+o₂) / (factorial(r ) * (factorial∘muladd)(-2, r, o₁+o₂)) ) * 
         ( α₁^(o₂-l₁- r) / (factorial(l₁) * factorial(i₁-2l₁-o₁)) ) * 
         ( α₂^(o₁-l₂- r) / (factorial(l₂) * factorial(i₂-2l₂-o₂)) ) * 
-        ( (-1)^(o₂+r) * factorial(o₁+o₂) / (4^(l₁+l₂+r) * factorial(o₁) * factorial(o₂)) )
+        T1( (-1)^(o₂+r) * factorial(o₁+o₂) / (4^(l₁+l₂+r) * factorial(o₁) * factorial(o₂)) )
 end
 
 function genIntTerm2core(Δx::T1,  μ::T2) where {T1, T2<:Integer}
     (u::T2) -> 
-        Δx^(μ-2u) * ( (-1)^u * factorial(μ) / (4^u * factorial(u) * factorial(μ-2u)) )
+        Δx^(μ-2u) * T1( (-1)^u * factorial(μ) / (4^u * factorial(u) * factorial(μ-2u)) )
 end
 
 function genIntTerm2(Δx::T1, α::T1, o₁::T2, o₂::T2, μ::T2, r::T2) where {T1, T2<:Integer}

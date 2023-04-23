@@ -57,4 +57,11 @@ V = [
     ]
 @test isapprox(neAttractions((bfs,), nucs, cens), V, atol=errT3)
 
+bfF32_1 = genBasisFunc(Float32[1.0, 1.0, 1.0], (1.2f0, 2.3f0), :p)
+bfF32_2 = genBasisFunc(Float32[1.0, 3.0, 0.0], ([1.25f0, 5.12f0], [2.3f0, -1.1f0]))
+bsF32 = [bfF32_1, bfF32_2]
+H2 = ["H", "H"]
+H2coords = [[0.4f0, 0.0f0, 0.0f0], [-0.4f0, 0.02f0, 0.0f0]]
+@test coreH(bsF32, H2, H2coords) isa Matrix{Float32}
+
 end
