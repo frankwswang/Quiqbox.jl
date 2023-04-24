@@ -5,7 +5,7 @@ include("../../../test/test-functions/Shared.jl")
 
 @testset "TwoBody.jl tests" begin
 
-errT1 = 1e-10
+errT1 = 5e-14
 errT2 = 1e-14
 
 b1 = genBasisFunc([0.0, 1.0, 0.0], (3.0, 2.0), (1,0,0), normalizeGTO=true)
