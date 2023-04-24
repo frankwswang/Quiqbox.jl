@@ -109,13 +109,6 @@ function ∫elecKineticCore(::Val{3},
                           ijk₁::NTuple{3, Int}, α₁::T,
                           ijk₂::NTuple{3, Int}, α₂::T) where {T}
     ΔR = R₁ .- R₂
-    # shifts = ((2,0,0), (0,2,0), (0,0,2))
-    # resTemp = mapreduce(+, ijk₂, shifts) do l₂, Δl
-    #     2α₂^2 * ∫overlapCore(Val(3), ΔR, ijk₁, α₁, map(+, ijk₂, Δl), α₂) + 
-    #     (l₂-1) * l₂ * ∫overlapCore(Val(3), ΔR, ijk₁, α₁, map(-, ijk₂, Δl), α₂) / 2
-    # end
-    # ∫overlapCore(Val(3), ΔR, ijk₁, α₁, ijk₂, α₂) * α₂ * muladd(2, sum(ijk₂), 3) - resTemp
-
     shifts = ((1,0,0), (0,1,0), (0,0,1))
     mapreduce(+, ijk₁, ijk₂, shifts) do 𝑙₁c, 𝑙₂c, Δ𝑙
         ∫overlapCore(Val(3), ΔR, map(-, ijk₁, Δ𝑙), α₁, map(-, ijk₂, Δ𝑙), α₂) * 𝑙₁c*𝑙₂c/2 + 

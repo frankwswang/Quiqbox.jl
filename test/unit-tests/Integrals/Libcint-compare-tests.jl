@@ -14,9 +14,9 @@ end
 nuc = ["H", "H"]
 nucCoords = [[-0.7, 0.0, 0.0], [0.7, 0.0, 0.0]]
 center = [0, rand(0:0.2:1), 0]
-errT1 = 1e-12
+errT1 = 5e-13
 
-oFilter(f) = bs-> f(filter(i->lOf(i)<2, bs))
+oFilter(f) = bs -> f(filter(i->lOf(i)<2, bs))
 
 fs1 = (oFilter(overlaps), 
        oFilter(eKinetics), 
@@ -30,10 +30,10 @@ fns = (:overlaps, :eKinetics, :neAttractions, :eeInteractions)
 
 for (f1, f2, fn) in zip(fs1, fs2, fns), pair in zip(BasisSetNames, atms)
     bs = genBasisFunc(center, pair...)
-    if (orbitalNumOf.(bs) |> sum) < 12
+    if (orbitalNumOf.(bs) |> sum) < 26
         bs2 = hcat(decompose.(bs)...) |> vec
         # Test result consistency of libcint functions for BasisFuncs
-        res = compr2Arrays1(f2(bs), f2(bs2), 0.001errT1)
+        res = compr2Arrays1(f2(bs), f2(bs2), 0.002errT1)
         !res && println("The above errors are from Libcint functions for: ", (fn, pair...))
         @test res
     end
@@ -51,7 +51,8 @@ gf1 = GaussFunc(2.2, 0.3)
 bf1 = genBasisFunc([-0.7, 0.0, 0.0], (bfSource.gauss..., gf1), normalizeGTO=true)
 gf2 = GaussFunc(2.5, -0.25)
 bf2 = genBasisFunc([-0.7, 0.0, 0.0], (bfSource.gauss..., gf2), normalizeGTO=true)
-bf3 = genBasisFunc([-0.7, 0.0, 0.0], (gf1, bfSource.gauss[1:end-1]..., gf2), normalizeGTO=true)
+bf3 = genBasisFunc([-0.7, 0.0, 0.0], (gf1, bfSource.gauss[1:end-1]..., gf2), 
+                   normalizeGTO=true)
 gf3 = GaussFunc(2.5, -0.15)
 bf4 = genBasisFunc([-0.7, 0.0, 0.0], (bfSource.gauss[2:end]..., gf3), normalizeGTO=true)
 
