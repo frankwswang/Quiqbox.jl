@@ -442,7 +442,7 @@ const Doc_SCFconfig_DIIS = "[Direct inversion in the iterative subspace]"*
 const Doc_SCFconfig_ADIIS = "[DIIS based on the augmented Roothaan–Hall (ARH) energy "*
                             "function](https://aip.scitation.org/doi/10.1063/1.3304922)."
 const Doc_SCFconfig_LBFGSB = "[Limited-memory BFGS with box constraints]"*
-                             "(https://github.com/JuliaNLSolvers/Optim.jl)."
+                             "(https://github.com/Gnimuc/LBFGSB.jl)."
 
 const Doc_SCFconfig_SPGB = "[Spectral Projected Gradient Method with box constraints]"*
                            "(https://github.com/m3g/SPGBox.jl)."
@@ -1154,9 +1154,12 @@ function LBFGSBsolver!(::Val{CCB}, c::AbstractVector{T},
     f = genxDIISf(v, B, shift)
     g! = genxDIIS∇f(v, B, shift)
     lb = ifelse(CCB, T(0), T(-Inf))
+    oldstd = stdout
+    redirect_stdout(devnull)
     c .= lbfgsb(f, g!, c; lb, m=min(getAtolDigits(T), 50), 
                 factr=1e5, pgtol=exp10(-getAtolDigits(T)), 
                 iprint=-1, maxfun=10000, maxiter=10000)[end]
+    redirect_stdout(oldstd)
     s, _ = shiftLastEle!(c, shift)
     c ./= s
 end
