@@ -1154,9 +1154,12 @@ function LBFGSBsolver!(::Val{CCB}, c::AbstractVector{T},
     f = genxDIISf(v, B, shift)
     g! = genxDIIS∇f(v, B, shift)
     lb = ifelse(CCB, T(0), T(-Inf))
+    oldstd = stdout
+    redirect_stdout(devnull)
     c .= lbfgsb(f, g!, c; lb, m=min(getAtolDigits(T), 50), 
                 factr=1e5, pgtol=exp10(-getAtolDigits(T)), 
                 iprint=-1, maxfun=10000, maxiter=10000)[end]
+    redirect_stdout(oldstd)
     s, _ = shiftLastEle!(c, shift)
     c ./= s
 end
