@@ -442,7 +442,7 @@ const Doc_SCFconfig_DIIS = "[Direct inversion in the iterative subspace]"*
 const Doc_SCFconfig_ADIIS = "[DIIS based on the augmented Roothaan–Hall (ARH) energy "*
                             "function](https://aip.scitation.org/doi/10.1063/1.3304922)."
 const Doc_SCFconfig_LBFGSB = "[Limited-memory BFGS with box constraints]"*
-                             "(https://github.com/JuliaNLSolvers/Optim.jl)."
+                             "(https://github.com/Gnimuc/LBFGSB.jl)."
 
 const Doc_SCFconfig_SPGB = "[Spectral Projected Gradient Method with box constraints]"*
                            "(https://github.com/m3g/SPGBox.jl)."
