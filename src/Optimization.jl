@@ -553,13 +553,13 @@ initializeOFconfig!(ofc::ConfigBox, _, _, _) = itself(ofc)
 
 function initializeOFconfig!(ofc::HFconfig{<:Any, HFT, iT}, bs, nuc, nucCoords) where {HFT}
     bls = iszero.(ofc.C0.mat)
-    if any(bls)
+    if all(bls)
         b = GTBasis(bs)
         X = getX(b.S)
         Hcore = coreH(b, nuc, nucCoords)
         C0new = getCfromSAD(Val(HFT), b.S, Hcore, b.eeI, b.basis, nuc, nucCoords, X)
-        for (co, cn, bl) in zip(ofc.C0.mat, C0new, bls)
-            bl && (co .= cn)
+        map(ofc.C0.mat, C0new) do co, cn
+            co .= cn
         end
     end
     ofc
