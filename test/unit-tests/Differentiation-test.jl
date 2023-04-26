@@ -114,9 +114,8 @@ grid = GridBox(1, 3.0)
 gf1 = GaussFunc(0.7, 1.0)
 bs1 = genBasisFunc.(grid.point, Ref([gf1]))
 pars1 = markParams!(bs1)[[1, 2, 4, 5]]
-S1 = overlaps(bs1)
 HFres1 = runHF(bs1, nuc, nucCoords, DHFO, printInfo=false)
-grad1 = gradOfHFenergy(pars1, bs1, S1, HFres1.C, nuc, nucCoords)
+grad1 = gradOfHFenergy(pars1, bs1, HFres1.C, nuc, nucCoords)
 grad1_fd = fDiffOfHFenergy(pars1, bs1, nuc, nucCoords, 5e-8)
 grad1_t = [1.2560795063145094, 1.2560795063145094, 4.050658426012204, 0]
 t1 = 1e-14
@@ -128,7 +127,7 @@ t3 = 5e-8
 
 config = HFconfig(HF=:UHF, SCF=SCFconfig(threshold=DHFOthreshold))
 HFres1_2 = runHF(bs1, nuc, nucCoords, config, printInfo=false)
-grad1_2 = gradOfHFenergy(pars1, bs1, overlaps(bs1), HFres1.C, nuc, nucCoords)
+grad1_2 = gradOfHFenergy(pars1, bs1, HFres1.C, nuc, nucCoords)
 @test isapprox(grad1_2[1], grad1_2[2], atol=t1)
 @test compr2Arrays3((grad1_2=grad1_2, grad1_t=grad1_t), t2, true)
 @test abs(grad1_2[end]) < t1
@@ -138,9 +137,8 @@ gfs = bfSource.gauss |> collect
 cens = genSpatialPoint.(nucCoords)
 bs2 = genBasisFunc.(cens, Ref(gfs), normalizeGTO=true)
 pars2 = markParams!(bs2, true)
-S2 = overlaps(bs2)
 HFres2 = runHF(bs2, nuc, nucCoords, DHFO, printInfo=false)
-grad2 = gradOfHFenergy(pars2, bs2, S2, HFres2.C, nuc, nucCoords)
+grad2 = gradOfHFenergy(pars2, bs2, HFres2.C, nuc, nucCoords)
 grad2_fd = fDiffOfHFenergy(pars2, bs2, nuc, nucCoords, 5e-8)
 @test compr2Arrays3((grad2=grad2, grad2_fd=grad2_fd), t3, true)
 @test isapprox(grad2[1], -grad2[2], atol=t2)
