@@ -8,64 +8,40 @@ using DoubleFloats: Double64
 # Reference(s):
 ## [DOI] 10.1063/1.445528
 
-function oneBodyDerivativeCore(::Val{false}, 
-                               bfs::AbstractVector{<:GTBasisFuncs{T1, D, 1}}, 
-                               ∂bfs::AbstractVector{<:GTBasisFuncs{T1, D, 1}}, 
-                               X::AbstractMatrix{T2}, ∂X::AbstractMatrix{T2}, 
-                               ʃ::F) where {T1, T2, D, F<:Function}
+function ∂1BodyCore(bfs::AbstractVector{<:GTBasisFuncs{T1, D1, 1}}, 
+                    ∂bfs::AbstractVector{<:GTBasisFuncs{T1, D1, 1}}, 
+                    X::Matrix{T2}, ∂X::Matrix{T2}, 
+                    ʃab::Array{T1}, ʃ::F) where {T1, D1, T2, F<:Function}
     BN = length(bfs)
-    ∂ʃ = Array{promote_type(T1, T2)}(undef, BN, BN)
-    ʃab = Array{T1}(undef, BN, BN)
-    ∂ʃab = Array{T1}(undef, BN, BN)
+    ∂ʃab = similar(ʃab)
     shift1 = firstindex( bfs) - 1
     shift2 = firstindex(∂bfs) - 1
-    shift3 = firstindex( X, 1) - 1
-    shift4 = firstindex(∂X, 1) - 1
-    for i in OneTo(BN), j in OneTo(i)
-        @inbounds ʃab[i,j] = ʃab[j,i] = ʃ(bfs[i+shift1], bfs[j+shift2])
-    end
-    for i in OneTo(BN), j in OneTo(i)
+    Threads.@threads for k in (OneTo∘triMatEleNum)(BN)
+        i, j = convert1DidxTo2D(BN, k)
         @inbounds ∂ʃab[i,j] = ∂ʃab[j,i] = 
                   ʃ(∂bfs[i+shift2], bfs[j+shift1]) + ʃ(bfs[i+shift1], ∂bfs[j+shift2])
     end
-    @views begin
-        Threads.@threads for k in (OneTo∘triMatEleNum)(BN)
-            i, j = convert1DidxTo2D(BN, k)
-            # X[i,j] == X[j,i]
-            @inbounds ∂ʃ[i,j] = ∂ʃ[j,i] = X[:,i+shift3]' * ∂ʃab *  X[:,j+shift3] + 
-                                         ∂X[:,i+shift4]' *  ʃab *  X[:,j+shift3] + 
-                                          X[:,i+shift3]' *  ʃab * ∂X[:,j+shift4]
-        end
-    end
-    ∂ʃ
+    X' * ∂ʃab * X + ∂X' * ʃab * X + X' * ʃab * ∂X
 end
 
-
-function twoBodyDerivativeCore(::Val{false}, 
-                               bfs::AbstractVector{<:GTBasisFuncs{T1, D, 1}}, 
-                               ∂bfs::AbstractVector{<:GTBasisFuncs{T1, D, 1}}, 
-                               X::AbstractMatrix{T2}, ∂X::AbstractMatrix{T2}, 
-                               ʃ::F) where {T1, T2, D, F<:Function}
+function ∂2BodyCore(bfs::AbstractVector{<:GTBasisFuncs{T1, D1, 1}}, 
+                    ∂bfs::AbstractVector{<:GTBasisFuncs{T1, D1, 1}}, 
+                    X::Matrix{T2}, ∂X::Matrix{T2}, 
+                    ʃabcd::Array{T1, D2}, ʃ::F) where {T1, D1, T2, D2, F<:Function}
     BN = length(bfs)
-    ∂ʃ = Array{promote_type(T1, T2)}(undef, BN, BN, BN, BN)
-    ʃabcd = Array{T1}(undef, BN, BN, BN, BN)
-    ʃ∂abcd = Array{T1}(undef, BN, BN, BN, BN)
+    ʃ∂abcd = similar(ʃabcd)
+    ∂ʃ = Array{promote_type(T1, T2)}(undef, size(ʃabcd)...)
     shift1 = firstindex( bfs) - 1
     shift2 = firstindex(∂bfs) - 1
-
     # ijkl in the chemists' notation of spatial bases (ij|kl).
-    for i in OneTo(BN), j in OneTo(i), k in OneTo(i), l = (OneTo∘ifelse)(k==i, j, k)
-        @inbounds ʃabcd[i,j,k,l] = ʃabcd[j,i,k,l] = ʃabcd[j,i,l,k] = ʃabcd[i,j,l,k] = 
-                  ʃabcd[l,k,i,j] = ʃabcd[k,l,i,j] = ʃabcd[k,l,j,i] = ʃabcd[l,k,j,i] = 
-                  ʃ(bfs[i+shift1],  bfs[j+shift1],  bfs[k+shift1],  bfs[l+shift1])
-    end
-    for l in OneTo(BN), k=OneTo(l), j=OneTo(BN), i=OneTo(BN)
-        @inbounds ʃ∂abcd[i,j,l,k] = ʃ∂abcd[i,j,k,l] = 
-                  ʃ(∂bfs[i+shift2], bfs[j+shift1],  bfs[k+shift1],  bfs[l+shift1])
+    @sync for lk in (OneTo∘triMatEleNum)(BN), j=OneTo(BN), i=OneTo(BN)
+        Threads.@spawn begin
+            k, l = convert1DidxTo2D(BN, lk)
+            @inbounds ʃ∂abcd[i,j,l,k] = ʃ∂abcd[i,j,k,l] = 
+                      ʃ(∂bfs[i+shift2], bfs[j+shift1],  bfs[k+shift1],  bfs[l+shift1])
+        end
     end
     # [∂ʃ4[i,j,k,l] == ∂ʃ4[j,i,l,k] == ∂ʃ4[j,i,k,l] != ∂ʃ4[l,j,k,i]
-    ( X isa Matrix) || ( X = Array( X))
-    (∂X isa Matrix) || (∂X = Array(∂X))
     for i in OneTo(BN), j in OneTo(i), k in OneTo(i), l = (OneTo∘ifelse)(k==i, j, k)
         # ʃ∂abcd[i,j,k,l] == ʃ∂abcd[i,j,l,k] == ʃab∂cd[l,k,i,j] == ʃab∂cd[k,l,i,j]
         @inbounds begin
@@ -91,10 +67,10 @@ function twoBodyDerivativeCore(::Val{false},
 end
 
 
-function derivativeCore(FoutputIsVector::Val{B}, 
-                        bfs::AbstractVector{<:GTBasisFuncs{T1, D, 1}}, 
-                        par::ParamBox, S::AbstractMatrix{T2}, X::AbstractMatrix{T2}, 
-                        ʃ2::F1, ʃ4::F2) where {B, T1, T2, D, F1<:Function, F2<:Function}
+function ∂NBodyInts(bfs::AbstractVector{<:GTBasisFuncs{T1, D, 1}}, par::ParamBox, 
+                    S::AbstractMatrix{T2}, X::AbstractMatrix{T2}, 
+                    ʃab::Array{T1}, ʃabcd::Array{T1}, 
+                    ʃ2::F1, ʃ4::F2) where {T1, T2, D, F1<:Function, F2<:Function}
     BN = length(bfs)
     ∂bfs = ∂Basis.(par, bfs)
     ∂S = Array{T2}(undef, BN, BN)
@@ -102,14 +78,15 @@ function derivativeCore(FoutputIsVector::Val{B},
     ∂X₀ = Array{T2}(undef, BN, BN) # ∂X in its eigen basis
     shift1 = firstindex( bfs) - 1
     shift2 = firstindex(∂bfs) - 1
-    for i=OneTo(BN), j=OneTo(i)
-        @inbounds ∂S[i,j] = ∂S[j,i] = 
-                  overlap(∂bfs[i+shift2],  bfs[j+shift1]) + 
-                  overlap( bfs[i+shift1], ∂bfs[j+shift2])
+    rng = (OneTo∘triMatEleNum)(BN)
+    Threads.@threads for k in rng
+        i, j = convert1DidxTo2D(BN, k)
+        @inbounds ∂S[i,j] = ∂S[j,i] = overlap(∂bfs[i+shift2],  bfs[j+shift1]) + 
+                                      overlap( bfs[i+shift1], ∂bfs[j+shift2])
     end
     λ, 𝑣 = eigen(S|>Hermitian)
     ∂S2 = 𝑣'*∂S*𝑣
-    Threads.@threads for k in (OneTo∘triMatEleNum)(BN)
+    Threads.@threads for k in rng
         i, j = convert1DidxTo2D(BN, k)
         @inbounds ∂X₀[i,j] = ∂X₀[j,i] = ( -∂S2[i,j] / ( sqrt(λ[i]) * sqrt(λ[j]) * 
                                           (sqrt(λ[i]) + sqrt(λ[j])) ) )
@@ -117,31 +94,36 @@ function derivativeCore(FoutputIsVector::Val{B},
     ∂X = 𝑣*∂X₀*𝑣'
     nX = norm(X)
     n∂X = norm(∂X)
-    if (0.317 < nX < 1.778) && # ⁴√0.01 < nX < ⁴√10
-       (0.01    < n∂X < 10) && (0.01 < nX*n∂X < 10) && (0.01 < nX^3*n∂X < 10)
-         X = convert(Matrix{T1},  X)
-        ∂X = convert(Matrix{T1}, ∂X)
-    end
-    ∂ʃ2 = oneBodyDerivativeCore(FoutputIsVector, bfs, ∂bfs, X, ∂X, ʃ2)
-    ∂ʃ4 = twoBodyDerivativeCore(FoutputIsVector, bfs, ∂bfs, X, ∂X, ʃ4)
+    T = ifelse( (0.317 < nX < 1.778) && # ⁴√0.01 < nX < ⁴√10
+                (0.01    < n∂X < 10) && (0.01 < nX*n∂X < 10) && (0.01 < nX^3*n∂X < 10), 
+        T1, T2)
+    X  = convert(Matrix{T},  X)
+    ∂X = convert(Matrix{T}, ∂X)
+    ∂ʃ2 = ∂1BodyCore(bfs, ∂bfs, X, ∂X, ʃab,   ʃ2)
+    ∂ʃ4 = ∂2BodyCore(bfs, ∂bfs, X, ∂X, ʃabcd, ʃ4)
     ∂ʃ2, ∂ʃ4
 end
 
 
-function ∂HFenergy(par::ParamBox{T}, 
-                   bs::AbstractVector{<:GTBasisFuncs{T, D, 1}}, 
-                   S::AbstractMatrix{T}, 
-                   C::NTuple{HFTS, AbstractMatrix{T}}, 
-                   nuc::Tuple{String, Vararg{String, NNMO}}, 
-                   nucCoords::Tuple{NTuple{D, T}, Vararg{NTuple{D, T}, NNMO}}, 
-                   N::NTuple{HFTS, Int}) where {T, D, HFTS, NNMO}
+function ∇Ehf(pars::AbstractVector{<:ParamBox}, 
+              b::GTBasis{T, D}, 
+              C::NTuple{HFTS, AbstractMatrix{T}}, 
+              nuc::Tuple{String, Vararg{String, NNMO}}, 
+              nucCoords::Tuple{NTuple{D, T}, Vararg{NTuple{D, T}, NNMO}}, 
+              N::NTuple{HFTS, Int}) where {T, D, HFTS, NNMO}
+    bfs = collect(b.basis)
+    S = b.S
     numEps(T) > eps(Double64) && (S = Double64.(S))
     X = getXcore1(S)
+    Hcore = coreH(b, nuc, nucCoords)
+    eeI = b.eeI
     cH = (i, j)->coreHij(i, j, nuc, nucCoords)
-    ∂hij, ∂hijkl = derivativeCore(Val(false), bs, par, S, X, cH, eeInteraction)
-    # ∂hij and ∂hijkl are on an orthonormal basis.
-    Cₓs = convert.(Matrix{eltype(∂hij)}, (Ref∘inv)(X).*C)
-    convert(T, getEhf(∂hij, ∂hijkl, Cₓs, N))
+    map(pars) do par
+        ∂hij, ∂hijkl = ∂NBodyInts(bfs, par, S, X, Hcore, eeI, cH, eeInteraction)
+        # ∂hij and ∂hijkl are on an orthonormal basis.
+        Cₓs = convert.(Matrix{eltype(∂hij)}, (Ref∘inv)(X).*C)
+        convert(T, getEhf(∂hij, ∂hijkl, Cₓs, N))
+    end
 end
 
 
@@ -165,11 +147,9 @@ gradOfHFenergy(par, HFres.basis, HFres.C, HFres.nuc, HFres.nucCoord, HFres.Ns)
 
 """
 
-    gradOfHFenergy(par, basis, C, nuc, nucCoords, N=getCharge(nuc)) ->
-    AbstractVector
+    gradOfHFenergy(par, basis, C, nuc, nucCoords, N=getCharge(nuc)) -> AbstractVector
 
-    gradOfHFenergy(par, bs, S, C, nuc, nucCoords, N=getCharge(nuc)) ->
-    AbstractVector
+    gradOfHFenergy(par, bs, C, nuc, nucCoords, N=getCharge(nuc)) -> AbstractVector
 
 Two methods of `gradOfHFenergy`.
 
@@ -197,35 +177,27 @@ electrons with same spin configurations(s).
     AbstractVector{<:GTBasisFuncs{T, D, 1}}
 } where {T, D}`: A collection of basis functions.
 
-`S::AbstractMatrix{T} where T`: The overlap lap of the basis set when `bs` is provided as 
-the second argument.
-
 **NOTE:** If any of these two methods is applied, the user needs to make sure the row 
-orders as well as the colum orders of `C` and (or) `S` are consistent with the element 
-order of `bs` (`basis.basis`).
+orders as well as the colum orders of `C` are consistent with the element order of `bs` 
+(`basis.basis`).
 ``
 """
-gradOfHFenergy(par::AbstractVector{<:ParamBox}, b::GTBasis{T, D}, 
+gradOfHFenergy(pars::AbstractVector{<:ParamBox}, b::GTBasis{T, D}, 
                C::NTuple{HFTS, AbstractMatrix{T}}, 
                nuc::AVectorOrNTuple{String, NNMO}, 
                nucCoords::SpatialCoordType{T, D, NNMO}, 
                N::Union{Int, Tuple{Int}, NTuple{2, Int}}=getCharge(nuc)) where 
               {T, D, HFTS, NNMO} = 
-gradOfHFenergy(par, b.basis, b.S, C, nuc, nucCoords, N)
+∇Ehf(pars, b, C, arrayToTuple(nuc), genTupleCoords(T, nucCoords), splitSpins(Val(HFTS), N))
 
-function gradOfHFenergy(par::AbstractVector{<:ParamBox{T}}, 
-                        bs::AVectorOrNTuple{GTBasisFuncs{T, D, 1}}, 
-                        S::AbstractMatrix{T}, 
-                        C::NTuple{HFTS, AbstractMatrix{T}}, 
-                        nuc::AVectorOrNTuple{String, NNMO}, 
-                        nucCoords::SpatialCoordType{T, D, NNMO}, 
-                        N::Union{Int, Tuple{Int}, NTuple{2, Int}}=getCharge(nuc)) where 
-                       {T, D, HFTS, NNMO}
-    nuc = arrayToTuple(nuc)
-    nucCoords = genTupleCoords(T, nucCoords)
-    Ns = splitSpins(Val(HFTS), N)
-    ∂HFenergy.(par, Ref(bs|>collect), Ref(S), Ref(C), Ref(nuc), Ref(nucCoords), Ref(Ns))
-end
+gradOfHFenergy(pars::AbstractVector{<:ParamBox{T}}, 
+               bs::AVectorOrNTuple{GTBasisFuncs{T, D, 1}}, 
+               C::NTuple{HFTS, AbstractMatrix{T}}, 
+               nuc::AVectorOrNTuple{String, NNMO}, 
+               nucCoords::SpatialCoordType{T, D, NNMO}, 
+               N::Union{Int, Tuple{Int}, NTuple{2, Int}}=getCharge(nuc)) where 
+              {T, D, HFTS, NNMO} = 
+gradOfHFenergy(pars, GTBasis(bs), C, nuc, nucCoords, N)
 
 
 𝑑f(f::Function, x) = ForwardDerivative(f, x)
