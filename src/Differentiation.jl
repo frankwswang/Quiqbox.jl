@@ -42,8 +42,9 @@ function ∂2BodyCore(bfs::AbstractVector{<:GTBasisFuncs{T1, D1, 1}},
         end
     end
     # [∂ʃ4[i,j,k,l] == ∂ʃ4[j,i,l,k] == ∂ʃ4[j,i,k,l] != ∂ʃ4[l,j,k,i]
-    for i in OneTo(BN), j in OneTo(i), k in OneTo(i), l = (OneTo∘ifelse)(k==i, j, k)
+    Threads.@threads for m in (OneTo∘triMatEleNum∘triMatEleNum)(BN)
         # ʃ∂abcd[i,j,k,l] == ʃ∂abcd[i,j,l,k] == ʃab∂cd[l,k,i,j] == ʃab∂cd[k,l,i,j]
+        i, j, k, l = convert1DidxTo4D(BN, m)
         @inbounds begin
             Xvi = view(X, :, i)
             Xvj = view(X, :, j)
@@ -85,13 +86,13 @@ function ∂NBodyInts(bfs::AbstractVector{<:GTBasisFuncs{T1, D, 1}}, par::ParamB
                                       overlap( bfs[i+shift1], ∂bfs[j+shift2])
     end
     λ, 𝑣 = eigen(S|>Hermitian)
-    ∂S2 = 𝑣'*∂S*𝑣
+    ∂S2 = 𝑣' * ∂S * 𝑣
     Threads.@threads for k in rng
         i, j = convert1DidxTo2D(BN, k)
         @inbounds ∂X₀[i,j] = ∂X₀[j,i] = ( -∂S2[i,j] / ( sqrt(λ[i]) * sqrt(λ[j]) * 
                                           (sqrt(λ[i]) + sqrt(λ[j])) ) )
     end
-    ∂X = 𝑣*∂X₀*𝑣'
+    ∂X = 𝑣 * ∂X₀ * 𝑣'
     nX = norm(X)
     n∂X = norm(∂X)
     T = ifelse( (0.317 < nX < 1.778) && # ⁴√0.01 < nX < ⁴√10
