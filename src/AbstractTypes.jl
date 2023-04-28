@@ -1,3 +1,5 @@
+using Base: Slice, OneTo
+
 export FloatingGTBasisFuncs, CompositeGTBasisFuncs, AbstractGaussFunc, GTBasisFuncs, 
        AbstractGTBasisFuncs, AbstractSpatialPoint
 
@@ -97,3 +99,6 @@ const NTupleOfSBN{BN, T, D} = NTuple{BN, SpatialBasis{T, D}}
 
 
 const StrOrSym = Union{String, Symbol}
+
+
+const MatrixCol{T} = Vector{SubArray{T, 1, Matrix{T}, Tuple{Slice{OneTo{Int}}, Int}, true}}
