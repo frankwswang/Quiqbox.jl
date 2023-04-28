@@ -4,6 +4,7 @@ using LinearAlgebra: eigen, Symmetric, Hermitian
 using ForwardDiff: derivative as ForwardDerivative
 using TensorOperations: @tensor as @TOtensor
 using DoubleFloats: Double64
+using Base: OneTo
 
 # Reference(s):
 ## [DOI] 10.1063/1.445528
@@ -26,7 +27,7 @@ end
 
 function ∂2BodyCore(bfs::AbstractVector{<:GTBasisFuncs{T1, D1, 1}}, 
                     ∂bfs::AbstractVector{<:GTBasisFuncs{T1, D1, 1}}, 
-                    X::Matrix{T2}, ∂X::Matrix{T2}, 
+                    Xcols::MatrixCol{T2}, ∂Xcols::MatrixCol{T2}, 
                     ʃabcd::Array{T1, D2}, ʃ::F) where {T1, D1, T2, D2, F<:Function}
     BN = length(bfs)
     ʃ∂abcd = similar(ʃabcd)
@@ -46,18 +47,23 @@ function ∂2BodyCore(bfs::AbstractVector{<:GTBasisFuncs{T1, D1, 1}},
         # ʃ∂abcd[i,j,k,l] == ʃ∂abcd[i,j,l,k] == ʃab∂cd[l,k,i,j] == ʃab∂cd[k,l,i,j]
         i, j, k, l = convert1DidxTo4D(BN, m)
         @inbounds begin
-            Xvi = view(X, :, i)
-            Xvj = view(X, :, j)
-            Xvk = view(X, :, k)
-            Xvl = view(X, :, l)
+             Xvi =  Xcols[i]
+             Xvj =  Xcols[j]
+             Xvk =  Xcols[k]
+             Xvl =  Xcols[l]
+            ∂Xvi = ∂Xcols[i]
+            ∂Xvj = ∂Xcols[j]
+            ∂Xvk = ∂Xcols[k]
+            ∂Xvl = ∂Xcols[l]
+
             @TOtensor val = 
                 (Xvi[a] * Xvj[b] * Xvk[c] * Xvl[d] + Xvj[a] * Xvi[b] * Xvk[c] * Xvl[d] + 
                  Xvi[c] * Xvj[d] * Xvk[a] * Xvl[b] + Xvi[c] * Xvj[d] * Xvl[a] * Xvk[b]) * 
                 ʃ∂abcd[a,b,c,d] + 
-                (view(∂X, :, i)[a] * Xvj[b] * Xvk[c] * Xvl[d] + 
-                 Xvi[a] * view(∂X, :, j)[b] * Xvk[c] * Xvl[d] + 
-                 Xvi[a] * Xvj[b] * view(∂X, :, k)[c] * Xvl[d] + 
-                 Xvi[a] * Xvj[b] * Xvk[c] * view(∂X, :, l)[d] ) * 
+                (∂Xvi[a] *  Xvj[b] *  Xvk[c] *  Xvl[d] + 
+                  Xvi[a] * ∂Xvj[b] *  Xvk[c] *  Xvl[d] + 
+                  Xvi[a] *  Xvj[b] * ∂Xvk[c] *  Xvl[d] + 
+                  Xvi[a] *  Xvj[b] *  Xvk[c] * ∂Xvl[d] ) * 
                 ʃabcd[a,b,c,d]
 
             ∂ʃ[i,j,k,l] = ∂ʃ[j,i,k,l] = ∂ʃ[j,i,l,k] = ∂ʃ[i,j,l,k] = 
@@ -69,7 +75,7 @@ end
 
 
 function ∂NBodyInts(bfs::AbstractVector{<:GTBasisFuncs{T1, D, 1}}, par::ParamBox, 
-                    S::AbstractMatrix{T2}, X::AbstractMatrix{T2}, 
+                    (λ, 𝑣)::Tuple{Vector{T2}, Matrix{T2}}, X::Hermitian{T2, Matrix{T2}}, 
                     ʃab::Array{T1}, ʃabcd::Array{T1}, 
                     ʃ2::F1, ʃ4::F2) where {T1, T2, D, F1<:Function, F2<:Function}
     BN = length(bfs)
@@ -85,7 +91,6 @@ function ∂NBodyInts(bfs::AbstractVector{<:GTBasisFuncs{T1, D, 1}}, par::ParamB
         @inbounds ∂S[i,j] = ∂S[j,i] = overlap(∂bfs[i+shift2],  bfs[j+shift1]) + 
                                       overlap( bfs[i+shift1], ∂bfs[j+shift2])
     end
-    λ, 𝑣 = eigen(S|>Hermitian)
     ∂S2 = 𝑣' * ∂S * 𝑣
     Threads.@threads for k in rng
         i, j = convert1DidxTo2D(BN, k)
@@ -98,10 +103,12 @@ function ∂NBodyInts(bfs::AbstractVector{<:GTBasisFuncs{T1, D, 1}}, par::ParamB
     T = ifelse( (0.317 < nX < 1.778) && # ⁴√0.01 < nX < ⁴√10
                 (0.01    < n∂X < 10) && (0.01 < nX*n∂X < 10) && (0.01 < nX^3*n∂X < 10), 
         T1, T2)
-    X  = convert(Matrix{T},  X)
+    X = convert(Matrix{T}, X)
     ∂X = convert(Matrix{T}, ∂X)
-    ∂ʃ2 = ∂1BodyCore(bfs, ∂bfs, X, ∂X, ʃab,   ʃ2)
-    ∂ʃ4 = ∂2BodyCore(bfs, ∂bfs, X, ∂X, ʃabcd, ʃ4)
+    Xcols = (collect∘eachcol)(X)
+    ∂Xcols = (collect∘eachcol)(∂X)
+    ∂ʃ2 = ∂1BodyCore(bfs, ∂bfs, X,     ∂X,     ʃab,   ʃ2)
+    ∂ʃ4 = ∂2BodyCore(bfs, ∂bfs, Xcols, ∂Xcols, ʃabcd, ʃ4)
     ∂ʃ2, ∂ʃ4
 end
 
@@ -115,12 +122,13 @@ function ∇Ehf(pars::AbstractVector{<:ParamBox},
     bfs = collect(b.basis)
     S = b.S
     numEps(T) > eps(Double64) && (S = Double64.(S))
+    (λ, 𝑣) = eigen(S|>Hermitian)
     X = getXcore1(S)
     Hcore = coreH(b, nuc, nucCoords)
     eeI = b.eeI
     cH = (i, j)->coreHij(i, j, nuc, nucCoords)
     map(pars) do par
-        ∂hij, ∂hijkl = ∂NBodyInts(bfs, par, S, X, Hcore, eeI, cH, eeInteraction)
+        ∂hij, ∂hijkl = ∂NBodyInts(bfs, par, (λ, 𝑣), X, Hcore, eeI, cH, eeInteraction)
         # ∂hij and ∂hijkl are on an orthonormal basis.
         Cₓs = convert.(Matrix{eltype(∂hij)}, (Ref∘inv)(X).*C)
         convert(T, getEhf(∂hij, ∂hijkl, Cₓs, N))
