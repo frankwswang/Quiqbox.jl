@@ -310,7 +310,7 @@ each iteration during the Hartree-Fock SCF procedure.
 
 `Cs::Vector{Matrix{T}}`: Orbital coefficient matrices.
 
-`Ds::Vector{Matrix{T}}`: Density matrices corresponding to only spin configuration.
+`Ds::Vector{Matrix{T}}`: Density matrices corresponding to only one spin configuration.
 
 `Fs::Vector{Matrix{T}}`: Fock matrices.
 
@@ -941,7 +941,7 @@ function runHFcore(::Val{HFT},
 
     for (MVal, kws, breakPoint, l) in 
         zip(fieldtypes(MS), scfConfig.methodConfig, scfConfig.interval, 1:L)
-        HFcore = genHFcore(MVal, vars, S, X, Ns, Hcore, HeeI; kws...)
+        HFcore = genHFcore(MVal, vars, S, X, Ns, Hcore, HeeI, breakPoint; kws...)
         m = getValParm(MVal)
         isConverged = true
         n = 0
@@ -1012,8 +1012,8 @@ function DDcore(Nˢ::Int, X::AbstractMatrix{T}, F::AbstractMatrix{T}, D::Abstrac
 end
 
 function genDD(αβVars::NTuple{HFTS, HFtempVars{T, HFT}}, X::AbstractMatrix{T}, 
-               Ns::NTuple{HFTS, Int}, Hcore::AbstractMatrix{T}, HeeI::AbstractArray{T, 4}; 
-               kw...) where {HFTS, T, HFT}
+               Ns::NTuple{HFTS, Int}, Hcore::AbstractMatrix{T}, HeeI::AbstractArray{T, 4}, 
+               ::Number; kw...) where {HFTS, T, HFT}
     dampStrength = get(kw, :dampStrength, T(defaultDS))
     function ()
         Fs = last.(getproperty.(αβVars, :Fs))
@@ -1079,13 +1079,15 @@ end
 
 function genxDIIS(::Type{Val{M}}, αβVars::NTuple{HFTS, HFtempVars{T, HFT}}, 
                   S::AbstractMatrix{T}, X::AbstractMatrix{T}, Ns::NTuple{HFTS, Int}, 
-                  Hcore::AbstractMatrix{T}, HeeI::AbstractArray{T, 4}; 
+                  Hcore::AbstractMatrix{T}, HeeI::AbstractArray{T, 4}, breakPoint::Real; 
                   DIISsize::Int=defaultDIISconfig[begin], 
                   solver::Symbol=defaultDIISconfig[end]) where {M, HFTS, T, HFT}
+    DIISsize < 2 && (throw∘DomainError)(intervals, "$M space need to be at least 2.")
     DFEsyms = HFTVVfields[begin+1:end]
     DFElens = map(DFEsyms) do fieldSym
         getproperty(αβVars[begin], fieldSym) |> length
     end
+    breakPoint = ifelse(isnan(breakPoint), getAtolVal(T), breakPoint)
     initialSize = min(DIISsize, DFElens...)
     cs = Tuple(collect(T, OneTo(initialSize)) for _ in OneTo(HFTS))
     Dss, Fss, Ess = map(DFEsyms) do fieldSym
@@ -1098,20 +1100,27 @@ function genxDIIS(::Type{Val{M}}, αβVars::NTuple{HFTS, HFtempVars{T, HFT}},
     function ()
         Fn = xDIIScore!.(mDIIS, cs, Ref(S), Dss, Fss, Ess, cvxConstraint, solver)
         res = getCDFE(Hcore, HeeI, X, Ns, Fn)
-        l = length(cs[begin])
-        if l >= DIISsize
-            for (c, Ds, Fs, Es) in zip(cs, Dss, Fss, Ess)
-                popIndex = argmin(norm.(c))
-                popat!(c, popIndex)
-                popat!(Ds, popIndex)
-                popat!(Fs, popIndex)
-                popat!(Es, popIndex)
-            end
-        end
-        push!.(cs, last.(cs))
+        push!.(cs, 1)
         push!.(Dss, getindex.(res, 2))
         push!.(Fss, getindex.(res, 3))
         push!.(Ess, getindex.(res, 4))
+        map(cs, Dss, Fss, Ess) do c, Ds, Fs, Es
+            if (Es[end] - Es[end-1] > breakPoint) || abs(c[end]) < getAtolVal(T)
+                keepIndex = lastindex(Es) - 1
+                keepat!(c,   keepIndex)
+                keepat!(Ds,  keepIndex)
+                keepat!(Fs,  keepIndex)
+                keepat!(Es,  keepIndex)
+            else
+                if length(c) > DIISsize
+                    popIndex = argmax(Es)
+                    popat!(c,   popIndex)
+                    popat!(Ds,  popIndex)
+                    popat!(Fs,  popIndex)
+                    popat!(Es,  popIndex)
+                end
+            end
+        end
         res
     end
 end
@@ -1130,18 +1139,16 @@ genDD(vars, args...; kws...)
 # Included normalization condition, but not non-negative condition.
 @inline function genxDIISf(v, B, shift)
     function (c)
-        s, signedShift = shiftLastEle!(c, shift)
+        s, _ = shiftLastEle!(c, shift)
         res = dot(v, c) / s + dot(c, B, c) / (2s^2)
-        c[end] -= signedShift
         res
     end
 end
 
 @inline function genxDIIS∇f(v, B, shift)
     function (g, c)
-        s, signedShift = shiftLastEle!(c, shift)
+        s, _ = shiftLastEle!(c, shift)
         g.= v./s + (B + transpose(B))*c ./ (2s^2) .- (dot(v, c)/s^2 + dot(c, B, c)/s^3)
-        c[end] -= signedShift
         g
     end
 end

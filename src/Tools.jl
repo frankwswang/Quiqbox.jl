@@ -899,10 +899,16 @@ end
 
 function shiftLastEle!(v, shiftVal)
     s = sum(v)
-    signedShift = asymSign(s)*shiftVal
-    s += signedShift
-    v[end] += signedShift
-    s, signedShift
+    shiftVal = abs(shiftVal)
+    offset = if s < shiftVal
+        signedShift = asymSign(s)*shiftVal
+        s += signedShift
+        v[end] += signedShift
+        signedShift
+    else
+        zero(s)
+    end
+    s, offset
 end
 
 
