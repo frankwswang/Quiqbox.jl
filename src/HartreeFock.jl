@@ -151,7 +151,13 @@ function getCfromSAD(::Val{HFT}, S::AbstractMatrix{T},
 end
 
 
-const guessCmethods = (GWH=getCfromGWH, Hcore=getCfromHcore, SAD=getCfromSAD)
+const C0methods = (GWH=getCfromGWH, Hcore=getCfromHcore, SAD=getCfromSAD)
+
+getC0symbol(::iT) = :InputC
+getC0symbol(::typeof(getCfromGWH)) = :GWH
+getC0symbol(::typeof(getCfromSAD)) = :SAD
+getC0symbol(::typeof(getCfromHcore)) = :Hcore
+getC0symbol(::F) where {F<:Function} = Symbol(F)
 
 
 function getD(Cˢ::AbstractMatrix{T}, Nˢ::Int) where {T}
@@ -669,7 +675,7 @@ $(string(HFtypes)[2:end-1]).
 `C0::InitialC{T1, HFT, F}`: Initial guess of the orbital coefficient matrix(s) C of the 
 canonical orbitals. When `C0` is as an argument of `HFconfig`'s constructor, it can be set 
 to `sym::Symbol` where available values of `sym` are 
-`$((guessCmethods|>typeof|>fieldnames|>string)[2:end-1])`; it can also be a `Tuple` of 
+`$((C0methods|>typeof|>fieldnames|>string)[2:end-1])`; it can also be a `Tuple` of 
 prepared orbital coefficient matrix(s) for the corresponding Hartree-Fock method type.
 
 `SCF::SCFconfig{T2, L, MS}`: SCF iteration configuration. For more information please refer 
@@ -730,7 +736,7 @@ mutable struct HFconfig{T1, HFT, F, T2, L, MS} <: ConfigBox{T1, HFconfig, HFT}
 
     function HFconfig(::Val{HFT}, a2::Val{CF}, a3::SCFconfig{T, L, MS}, a4, a5, a6) where 
                      {T, HFT, CF, L, MS}
-        f = getproperty(guessCmethods, CF)
+        f = getproperty(C0methods, CF)
         new{T, HFT, typeof(f), T, L, MS}(Val(HFT), InitialC(Val(HFT), f, T), a3, a4, a5, a6)
     end
 end
@@ -927,12 +933,24 @@ function runHFcore(::Val{HFT},
     vars = initializeSCF(Val(HFT), Hcore, HeeI, C0, Ns)
     Etots = vars[begin].shared.Etots
     oscThreshold = scfConfig.oscillateThreshold
-    printInfo && println(rpad(HFT, 9)*rpad("| Initial Gauss", 16), 
-                         "| E = ", alignNumSign(Etots[end], roundDigits=getAtolDigits(T2)))
-    isConverged = true
     i = 0
-    ΔE = 0.0
-    ΔDrms = 0.0
+    ΔEabs = T2(0.0)
+    ΔDrms = T2(0.0)
+    ∇Erms = getLatest∇Erms(vars, S)
+    isConverged = true
+    printDigits = 1
+
+    if printInfo
+        finalT = scfConfig.interval[end]
+        printDigits = (getAtolDigits∘ifelse)(isnan(finalT), T2, finalT)
+        print(rpad(HFT, 8)*rpad("¦ Init. Gauss", 13), 
+              " ¦ E = ", alignNumSign(Etots[end], roundDigits=printDigits))
+        if infoLevel > 1
+            print(" ¦ RMS(∇E) = ", alignNumSign(∇Erms, roundDigits=printDigits))
+        end
+        println()
+    end
+
     adaptStepBl = genAdaptStepBl(infoLevel, maxStep)
     maxLens = map(saveTrace, 
                   getMaxSCFsizes(scfConfig), HFinterValStoreSizes) do bl, scfSize, storeSize
@@ -951,13 +969,14 @@ function runHFcore(::Val{HFT},
             n += 1
             updateHFtempVars!(maxLens, vars, HFcore())
 
-            ΔE = Etots[end] - Etots[end-1]
-            relDiff = ΔE / abs(Etots[end-1])
+            ΔEabs = abs(Etots[end] - Etots[end-1])
+            relDiff = ΔEabs / abs(Etots[end-1])
             sqrtBreakPoint = sqrt(breakPoint|>abs)
 
-            if l==L
+            if l==L || printInfo
                 ΔD = vars[begin].shared.Dtots[end] - vars[begin].shared.Dtots[end-1]
-                ΔDrms = sqrt( sum(ΔD .^ 2) ./ length(ΔD) )
+                ΔDrms = rmsOf(ΔD)
+                ∇Erms = getLatest∇Erms(vars, S)
             end
                                                                            # ≈0.5kJ/mol
             if n > 1 && (!isConverged || (bl = relDiff > max(sqrtBreakPoint, 2e-4)))
@@ -980,21 +999,38 @@ function runHFcore(::Val{HFT},
                 end
             end
 
-            printInfo && (adaptStepBl(i) || i == maxStep) && 
-            println(rpad("Step $i", 9), rpad("| #$l ($m)", 16), 
-                    "| E = ", alignNumSign(Etots[end], roundDigits=getAtolDigits(T2)))
+            if printInfo && (adaptStepBl(i) || i == maxStep)
+                print(rpad("# $i", 8), rpad("¦ $l) $m", 13), 
+                      " ¦ E = ", alignNumSign(Etots[end], roundDigits=printDigits))
+                if infoLevel > 1
+                    print(" ¦ RMS(∇E) = ", alignNumSign(∇Erms, roundDigits=printDigits), 
+                          " ¦ |ΔE| = ",    alignNumSign(ΔEabs, roundDigits=printDigits), 
+                          " ¦ RMS(ΔD) = ", alignNumSign(ΔDrms, roundDigits=printDigits))
+                end
+                println()
+            end
 
-            isConverged && (abs(ΔE) <= breakPoint) && break
+            isConverged && (ΔEabs <= breakPoint) && (∇Erms <= sqrtBreakPoint) && break
         end
     end
     negStr = ifelse(isConverged, "converged", "stopped but not converged")
     if printInfo
         println("\nThe SCF iteration is ", negStr, " at step $i:\n", 
-                "|ΔE| → ", round(abs(ΔE), digits=nDigitShown), " Ha, ", 
+                "|ΔE| → ", round(ΔEabs, digits=nDigitShown), " Ha, ", 
+                "RMS(∇E) → ", round(∇Erms, digits=nDigitShown), ", ", 
                 "RMS(ΔD) → ", round(ΔDrms, digits=nDigitShown), ".\n")
     end
     clearHFtempVars!(saveTrace, vars)
     vars, isConverged
+end
+
+function getLatest∇Erms(vars::NTuple{HFTS, HFtempVars{T, HFT}}, 
+                        S::AbstractMatrix{T}) where {HFTS, T, HFT}
+    mapreduce(+, vars) do tVar
+        D = tVar.Ds[end]
+        F = tVar.Fs[end]
+        (rmsOf∘getEresidual)(F, D, S)
+    end / length(vars)
 end
 
 function terminateSCF!(vars, method, printInfo)
@@ -1047,6 +1083,9 @@ function ADIIScore(Ds::Vector{<:AbstractMatrix{T}},
     v, B
 end
 
+getEresidual(F::AbstractMatrix{T}, D::AbstractMatrix{T}, S::AbstractMatrix{T}) where {T} = 
+F*D*S - S*D*F
+
 function DIIScore(Ds::Vector{<:AbstractMatrix{T}}, 
                   ∇s::Vector{<:AbstractMatrix{T}}, S::AbstractMatrix{T}) where {T}
     len = length(Ds)
@@ -1055,8 +1094,8 @@ function DIIScore(Ds::Vector{<:AbstractMatrix{T}},
     Δi = firstindex(B, 1) - 1
     Threads.@threads for k in (OneTo∘triMatEleNum)(len)
         i, j = convert1DidxTo2D(len, k)
-        @inbounds B[i+Δi, j+Δi] = B[j+Δi, i+Δi] = dot( ∇s[i]*Ds[i]*S - S*Ds[i]*∇s[i], 
-                                                       ∇s[j]*Ds[j]*S - S*Ds[j]*∇s[j] )
+        @inbounds B[i+Δi, j+Δi] = B[j+Δi, i+Δi] = dot( getEresidual(∇s[i], Ds[i], S), 
+                                                       getEresidual(∇s[j], Ds[j], S) )
     end
     v, B
 end
@@ -1105,8 +1144,10 @@ function genxDIIS(::Type{Val{M}}, αβVars::NTuple{HFTS, HFtempVars{T, HFT}},
         push!.(Fss, getindex.(res, 3))
         push!.(Ess, getindex.(res, 4))
         map(cs, Dss, Fss, Ess) do c, Ds, Fs, Es
-            if (Es[end] - Es[end-1] > breakPoint) || abs(c[end]) < getAtolVal(T)
+            if length(Es) > 2 && # Let the new (not first) DIIS space have 2+ samples
+               Es[end] - Es[end-1] > breakPoint
                 keepIndex = lastindex(Es) - 1
+                keepIndex == 1 && (@show keepIndex)
                 keepat!(c,   keepIndex)
                 keepat!(Ds,  keepIndex)
                 keepat!(Fs,  keepIndex)
