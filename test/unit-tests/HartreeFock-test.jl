@@ -295,4 +295,54 @@ end
 @test compr2Arrays2((Et1=Et1, rhfs=rhfs), 95, errorThreshold1, 0.6)
 @test compr2Arrays2((Et2=Et2, uhfs=uhfs), 16, errorThreshold1, 5e-5, <)
 
+
+# Extreme Case tests
+AtoBr = 1.8897259886
+
+## H2O2
+t1 = 1e-10
+
+nuc_H2O2 = ["O", "O", "H", "H"]
+coords_H2O2 = [[0., 0.731, 0.], [0., -0.731, 0.], 
+               [0.936, 0.916, 0.], [-0.936, -0.916, 0.]] .* AtoBr
+Ehf_H2O2 = -187.42063898359095
+
+HFc0 = HFconfig()
+
+HFc1 = HFconfig(C0=:SAD, SCF=SCFconfig(threshold=t1))
+HFc2 = HFconfig(C0=:Hcore, SCF=SCFconfig(threshold=t1))
+HFc3 = HFconfig(C0=:GWH, SCF=SCFconfig(threshold=t1))
+
+HFc4 = HFconfig(C0=:SAD, SCF=SCFconfig((:DIIS,), (t1,)))
+HFc5 = HFconfig(C0=:SAD, SCF=SCFconfig((:EDIIS,), (t1,)))
+HFc6 = HFconfig(C0=:SAD, SCF=SCFconfig((:ADIIS,), (t1,)))
+
+HFc7 = HFconfig(C0=:Hcore, SCF=SCFconfig((:DIIS,), (t1,)))
+HFc8 = HFconfig(C0=:Hcore, SCF=SCFconfig((:EDIIS,), (t1,)))
+HFc9 = HFconfig(C0=:Hcore, SCF=SCFconfig((:ADIIS,), (t1,)))
+
+HFc10 = HFconfig(C0=:GWH, SCF=SCFconfig((:DIIS,), (t1,)))
+HFc11 = HFconfig(C0=:GWH, SCF=SCFconfig((:EDIIS,), (t1,)))
+HFc12 = HFconfig(C0=:GWH, SCF=SCFconfig((:ADIIS,), (t1,)))
+
+HFc13 = HFconfig(C0=:SAD, SCF=SCFconfig(threshold=1e-9, secondaryConvRatio=1))
+HFc14 = HFconfig(C0=:Hcore, SCF=SCFconfig(threshold=1e-9, secondaryConvRatio=1))
+HFc15 = HFconfig(C0=:GWH, SCF=SCFconfig(threshold=1e-9, secondaryConvRatio=1))
+
+HFcs = (HFc0,  HFc1,  HFc2,  HFc3,  HFc4,  HFc5,  HFc6,  HFc7,  HFc8,  HFc9, 
+        HFc10, HFc11, HFc12, HFc13, HFc14, HFc15)
+
+for HFc in (HFcs)
+    bs = genBasisFunc.(coords_H2O2, "6-31G", nuc_H2O2) |> flatten
+    local res3
+    info3 = @capture_out begin
+        @show HFc
+        res3 = runHF(bs, nuc_H2O2, coords_H2O2, HFc, printInfo=true)
+    end
+    bl = isapprox(res3.Ehf, Ehf_H2O2, atol=t1)
+    bl || println(info3)
+    @test bl
+    @test res3.isConverged
+end
+
 end

@@ -20,8 +20,9 @@ const HFminItr = 10
 const HFinterEstoreSize = 15
 const HFinterValStoreSizes = (2,3,2, HFinterEstoreSize) # C(>1), D(>2), F(>1), E(>1)
 const defaultHFCStr = "HFconfig()"
-const defaultSCFconfigArgs = ( (:ADIIS, :DIIS), (1e-3, 1e-12) )
-const defultOscThreshold = 1e-6
+const defaultSCFconfigArgs = ( (:ADIIS, :DIIS), (1e-3, 1e-10) )
+const defaultSecConvRatio = 100
+const defaultOscThreshold = 1e-6
 
 # Reference(s):
 ## [ISBN-13] 978-0486691862
@@ -151,7 +152,13 @@ function getCfromSAD(::Val{HFT}, S::AbstractMatrix{T},
 end
 
 
-const guessCmethods = (GWH=getCfromGWH, Hcore=getCfromHcore, SAD=getCfromSAD)
+const C0methods = (GWH=getCfromGWH, Hcore=getCfromHcore, SAD=getCfromSAD)
+
+getC0symbol(::iT) = :InputC
+getC0symbol(::typeof(getCfromGWH)) = :GWH
+getC0symbol(::typeof(getCfromSAD)) = :SAD
+getC0symbol(::typeof(getCfromHcore)) = :Hcore
+getC0symbol(::F) where {F<:Function} = Symbol(F)
 
 
 function getD(Cˢ::AbstractMatrix{T}, Nˢ::Int) where {T}
@@ -310,7 +317,7 @@ each iteration during the Hartree-Fock SCF procedure.
 
 `Cs::Vector{Matrix{T}}`: Orbital coefficient matrices.
 
-`Ds::Vector{Matrix{T}}`: Density matrices corresponding to only spin configuration.
+`Ds::Vector{Matrix{T}}`: Density matrices corresponding to only one spin configuration.
 
 `Fs::Vector{Matrix{T}}`: Fock matrices.
 
@@ -380,15 +387,19 @@ function updateHFtempVars!(maxLens::NTuple{4, Int},
     end
 end
 
-function popHFtempVars!(αβVars::NTuple{HFTS, T}) where {HFTS, T<:HFtempVars}
+function popHFtempVars!(αβVars::NTuple{HFTS, T}, counts::Int=1) where {HFTS, T<:HFtempVars}
     for tVars in αβVars
         fs = getHFTVforUpdate1(tVars)
         for fEach in fs
-            pop!(fEach)
+            for _ in OneTo(counts)
+                pop!(fEach)
+            end
         end
     end
     for fTot in getHFTVforUpdate2(αβVars[begin])
-        pop!(fTot)
+        for _ in OneTo(counts)
+            pop!(fTot)
+        end
     end
 end
 
@@ -433,9 +444,11 @@ initializeSCFcore(Val(:UHF), Hcore, HeeI, C, Ns)
 const slvArgN = :solver
 
 const Doc_SCFconfig_OneRowTable = "|`:DIIS`, `:EDIIS`, `:ADIIS`|subspace size; "*
-                                  "DIIS-Method solver|`DIISsize`; `$(slvArgN)`"*
-                                  "|`1`,`2`...; `:LBFGS`... |`$(defaultDIISconfig[1])"*
-                                  "`; `:$(defaultDIISconfig[2])`|"
+                                  "DIIS-Method solver; reset threshold¹|"*
+                                  "`DIISsize`; `$(slvArgN)`; `resetThreshold`"*
+                                  "|`1`,`2`...; `:LBFGS`...; `1e-14`... |"*
+                                  "`$(defaultDIISconfig[1])`; `:$(defaultDIISconfig[2])`;"*
+                                  " N/A|"
 
 const Doc_SCFconfig_DIIS = "[Direct inversion in the iterative subspace]"*
                            "(https://onlinelibrary.wiley.com/doi/10.1002/jcc.540030413)."
@@ -448,7 +461,8 @@ const Doc_SCFconfig_SPGB = "[Spectral Projected Gradient Method with box constra
                            "(https://github.com/m3g/SPGBox.jl)."
 
 const Doc_SCFconfig_eg1 = "SCFconfig{Float64, 2, Tuple{Val{:ADIIS}, Val{:DIIS}}}(method, "*
-                          "interval=(0.001, 1.0e-8), methodConfig, oscillateThreshold)"
+                          "interval=(0.001, 1.0e-8), methodConfig, secondaryConvRatio, "*
+                          "oscillateThreshold)"
 
 """
 
@@ -468,6 +482,13 @@ in terms of keyword arguments are:
 | `:DD`                 | damping strength |`dampStrength`|    [`0`, `1`]  |`$(defaultDS)`|
 $(Doc_SCFconfig_OneRowTable)
 
+¹ The reset threshold (`resetThreshold::Real`) determines when to clear the memory of the 
+DIIS-based method's subspace and reset the second-to-latest residual vector as the first 
+reference. The reset is executed when the latest computed energy increases an amount above 
+the threshold compared to the second-to-latest computed energy. In default, the threshold 
+is always slightly larger than the machine epsilon of the numerical data type for the SCF 
+computation.
+
 ### Convergence Methods
 * `:DD`: Direct diagonalization of the Fock matrix.
 * `:DIIS`: $(Doc_SCFconfig_DIIS)
@@ -484,13 +505,19 @@ $(Doc_SCFconfig_OneRowTable)
 `methodConfig::NTuple{L, Vector{<:Pair}}`: The additional keywords arguments for each 
 method stored as `Tuple`s of `Pair`s.
 
+`secondaryConvRatio::T`: The ratio of all the secondary convergence criteria (e.g., the 
+convergence of density matrix and the residual matrix based on commutation relationship 
+between the Fock matrix and the density matrix) to the primary convergence indicator, i.e., 
+the convergence of the energy.
+
 `oscillateThreshold::T`: The threshold for oscillating convergence.
 
 ≡≡≡ Initialization Method(s) ≡≡≡
 
     SCFconfig(methods::NTuple{L, Symbol}, intervals::NTuple{L, T}, 
-              config::Dict{Int, <:AbstractVector{<:Pair}}=Dict(1=>Pair[]);
-              oscillateThreshold::Real=$(defultOscThreshold)) where {L, T} -> 
+              config::Dict{Int, <:AbstractVector{<:Pair}}=Dict(1=>Pair[]); 
+              secondaryConvRatio::Real=$(defaultSecConvRatio), 
+              oscillateThreshold::Real=$(defaultOscThreshold)) where {L, T} -> 
     SCFconfig{T, L}
 
 `methods` and `intervals` are the convergence methods to be applied and their stopping 
@@ -499,7 +526,8 @@ for each methods by a `Pair` of which the key `i::Int` is for `i`th method and t
 `AbstractVector{<:Pair}` is the pairs of keyword arguments and their values respectively.
 
     SCFconfig(;threshold::AbstractFloat=$(defaultSCFconfigArgs[2]), 
-               oscillateThreshold::Real=defultOscThreshold) -> 
+               secondaryConvRatio::Real=$(defaultSecConvRatio), 
+               oscillateThreshold::Real=defaultOscThreshold) -> 
     SCFconfig{$(defaultSCFconfigArgs[2] |> eltype), $(defaultSCFconfigArgs[1] |> length)}
 
 `threshold` will update the stopping threshold of the default SCF configuration used in 
@@ -518,11 +546,13 @@ struct SCFconfig{T, L, MS<:NTuple{L, Val}} <: ImmutableParameter{T, SCFconfig}
     method::MS
     interval::NTuple{L, T}
     methodConfig::NTuple{L, Vector{<:Pair}}
+    secondaryConvRatio::T
     oscillateThreshold::T
 
     function SCFconfig(methods::NTuple{L, Symbol}, intervals::NTuple{L, T}, 
-                       config::Dict{Int, <:AbstractVector{<:Pair}}=Dict(1=>Pair[]);
-                       oscillateThreshold::Real=defultOscThreshold) where {L, T}
+                       config::Dict{Int, <:AbstractVector{<:Pair}}=Dict(1=>Pair[]); 
+                       secondaryConvRatio::Real=defaultSecConvRatio, 
+                       oscillateThreshold::Real=defaultOscThreshold) where {L, T}
         any(i < 0 for i in intervals) && throw(DomainError(intervals, "Thresholds in "*
                                                "`intervals` must all be non-negative."))
         kwPairs = [Pair[] for _ in OneTo(L)]
@@ -530,17 +560,19 @@ struct SCFconfig{T, L, MS<:NTuple{L, Val}} <: ImmutableParameter{T, SCFconfig}
             kwPairs[i] = config[i]
         end
         methods = Val.(methods)
-        new{T, L, typeof(methods)}(methods, intervals, Tuple(kwPairs), oscillateThreshold)
+        new{T, L, typeof(methods)}(methods, intervals, Tuple(kwPairs), 
+                                   secondaryConvRatio, oscillateThreshold)
     end
 end
 
 const defaultSCFconfig = SCFconfig(defaultSCFconfigArgs...)
 
 SCFconfig(;threshold::AbstractFloat=defaultSCFconfigArgs[2][end], 
-          oscillateThreshold::Real=defultOscThreshold) = 
+          secondaryConvRatio::Real=defaultSecConvRatio, 
+          oscillateThreshold::Real=defaultOscThreshold) = 
 SCFconfig( defaultSCFconfigArgs[1], 
           (defaultSCFconfigArgs[2][begin:end-1]..., Float64(threshold)); 
-           oscillateThreshold )
+           secondaryConvRatio, oscillateThreshold )
 
 function getMaxSCFsizes(scfConfig::SCFconfig)
     maxSize = 0
@@ -669,7 +701,7 @@ $(string(HFtypes)[2:end-1]).
 `C0::InitialC{T1, HFT, F}`: Initial guess of the orbital coefficient matrix(s) C of the 
 canonical orbitals. When `C0` is as an argument of `HFconfig`'s constructor, it can be set 
 to `sym::Symbol` where available values of `sym` are 
-`$((guessCmethods|>typeof|>fieldnames|>string)[2:end-1])`; it can also be a `Tuple` of 
+`$((C0methods|>typeof|>fieldnames|>string)[2:end-1])`; it can also be a `Tuple` of 
 prepared orbital coefficient matrix(s) for the corresponding Hartree-Fock method type.
 
 `SCF::SCFconfig{T2, L, MS}`: SCF iteration configuration. For more information please refer 
@@ -730,7 +762,7 @@ mutable struct HFconfig{T1, HFT, F, T2, L, MS} <: ConfigBox{T1, HFconfig, HFT}
 
     function HFconfig(::Val{HFT}, a2::Val{CF}, a3::SCFconfig{T, L, MS}, a4, a5, a6) where 
                      {T, HFT, CF, L, MS}
-        f = getproperty(guessCmethods, CF)
+        f = getproperty(C0methods, CF)
         new{T, HFT, typeof(f), T, L, MS}(Val(HFT), InitialC(Val(HFT), f, T), a3, a4, a5, a6)
     end
 end
@@ -925,14 +957,31 @@ function runHFcore(::Val{HFT},
                    printInfo::Bool=false, 
                    infoLevel::Int=defaultHFinfoL) where {HFT, T1, L, MS, HFTS, T2}
     vars = initializeSCF(Val(HFT), Hcore, HeeI, C0, Ns)
-    Etots = vars[begin].shared.Etots
-    oscThreshold = scfConfig.oscillateThreshold
-    printInfo && println(rpad(HFT, 9)*rpad("| Initial Gauss", 16), 
-                         "| E = ", alignNumSign(Etots[end], roundDigits=getAtolDigits(T2)))
+    secondaryConvRatio = scfConfig.secondaryConvRatio
+    varsShared = vars[begin].shared
+    Etots = varsShared.Etots
+    ΔEs = zeros(T2, 1)
+    ΔDrms = zeros(T2, 1)
+    ∇Erms = [getLatest∇Erms(vars, S)]
     isConverged = true
+    printDigits = 1
+    stepPrintLen = max(ndigits(maxStep)+2, (length∘string)(HFT)) + 1
+    rollbackRange = 0 : (HFminItr÷3)
+    rollbackCount = length(rollbackRange)
     i = 0
-    ΔE = 0.0
-    ΔDrms = 0.0
+
+    if printInfo
+        endThreshold = scfConfig.interval[end]
+        printDigits = min( getAtolDigits(T2), 
+                           (getAtolDigits∘ifelse)(isnan(endThreshold), T2, endThreshold) )
+        print(rpad(HFT, stepPrintLen)*rpad("¦ Init. Gauss", 13), 
+              " ¦ E = ", alignNumSign(Etots[end], roundDigits=printDigits))
+        if infoLevel > 1
+            print(" ¦ RMS(∇E) = ", alignNumSign(∇Erms[], roundDigits=printDigits))
+        end
+        println()
+    end
+
     adaptStepBl = genAdaptStepBl(infoLevel, maxStep)
     maxLens = map(saveTrace, 
                   getMaxSCFsizes(scfConfig), HFinterValStoreSizes) do bl, scfSize, storeSize
@@ -942,63 +991,96 @@ function runHFcore(::Val{HFT},
     for (MVal, kws, breakPoint, l) in 
         zip(fieldtypes(MS), scfConfig.methodConfig, scfConfig.interval, 1:L)
         HFcore = genHFcore(MVal, vars, S, X, Ns, Hcore, HeeI; kws...)
+        oscThreshold = max(breakPoint, scfConfig.oscillateThreshold)
+        flucThreshold = max(10breakPoint, 1.5e-3) # ≈3.8kJ/mol (0.95 chemical accuracy)
         m = getValParm(MVal)
-        isConverged = true
+        isConverged = false
+        endM = l==L
         n = 0
+
         while true
-            i < maxStep || (isConverged = false) || break
+            i < maxStep || break
             i += 1
             n += 1
+
             updateHFtempVars!(maxLens, vars, HFcore())
 
-            ΔE = Etots[end] - Etots[end-1]
-            relDiff = ΔE / abs(Etots[end-1])
-            sqrtBreakPoint = sqrt(breakPoint|>abs)
-
-            if l==L
-                ΔD = vars[begin].shared.Dtots[end] - vars[begin].shared.Dtots[end-1]
-                ΔDrms = sqrt( sum(ΔD .^ 2) ./ length(ΔD) )
+            push!(ΔEs, Etots[end] - Etots[end-1])
+            if endM || printInfo
+                push!(ΔDrms, rmsOf(varsShared.Dtots[end] - varsShared.Dtots[end-1]))
+                push!(∇Erms, getLatest∇Erms(vars, S))
             end
-                                                                           # ≈0.5kJ/mol
-            if n > 1 && (!isConverged || (bl = relDiff > max(sqrtBreakPoint, 2e-4)))
-                flag, Std = isOscillateConverged(Etots, 10breakPoint, 
-                                                 minLen=HFminItr, 
-                                                 maxRemains=HFinterEstoreSize)
-                if flag
-                    isConverged = ifelse(
-                        begin
-                            bl2 = Std > max(breakPoint, oscThreshold)
-                            ifelse(l==L, bl2 || (ΔDrms > sqrtBreakPoint), bl2)
-                        end, false, true)
-                else
-                    if earlyStop && bl && (i > HFminItr)
-                        terminateSCF!(vars, m, printInfo)
-                        i -= 1
-                        isConverged = false
+            ΔEᵢ = ΔEs[end]
+            ΔDrmsᵢ = ΔDrms[end]
+            ∇Ermsᵢ = ∇Erms[end]
+            ΔEᵢabs = abs(ΔEᵢ)
+
+            if printInfo && (adaptStepBl(i) || i == maxStep)
+                print(rpad("# $i", stepPrintLen), rpad("¦ $l) $m", 13), 
+                      " ¦ E = ", alignNumSign(Etots[end], roundDigits=printDigits))
+                if infoLevel > 1
+                    print(" ¦ RMS(∇E) = ", alignNumSign(∇Ermsᵢ, roundDigits=printDigits), 
+                          " ¦ ΔE = ",      alignNumSign(ΔEᵢ, roundDigits=printDigits), 
+                          " ¦ RMS(ΔD) = ", alignNumSign(ΔDrmsᵢ, roundDigits=printDigits))
+                end
+                println()
+            end
+
+            convThresholds = ifelse(∇Ermsᵢ <= secondaryConvRatio*breakPoint, 
+                                    (1, secondaryConvRatio), (0, 0)) .* breakPoint
+            ΔEᵢabs <= convThresholds[begin] && ΔDrmsᵢ <= convThresholds[end] && 
+            (isConverged=true; break)
+
+            # oscillating convergence & early termination of non-convergence.
+            if n > 1 && i > HFminItr && ΔEᵢ > flucThreshold
+                isOsc, _ = isOscillateConverged(Etots, 10oscThreshold, 
+                                                minLen=HFminItr, 
+                                                maxRemains=HFinterEstoreSize)
+                if isOsc
+                    if ΔEᵢabs <= oscThreshold && 
+                       (endM ? (∇Ermsᵢ <= secondaryConvRatio*oscThreshold && 
+                                ΔDrmsᵢ <= secondaryConvRatio*oscThreshold) : true)
+                        isConverged=true
                         break
+                    end
+                else
+                    if earlyStop
+                        isRaising = all(rollbackRange) do j
+                            ΔEs[end-j] > 10flucThreshold
+                        end
+                        if isRaising
+                            rbCount = min(rollbackCount, length(Etots))
+                            terminateSCF!(vars, rbCount, m, printInfo)
+                            i -= rbCount
+                            break
+                        end
                     end
                 end
             end
-
-            printInfo && (adaptStepBl(i) || i == maxStep) && 
-            println(rpad("Step $i", 9), rpad("| #$l ($m)", 16), 
-                    "| E = ", alignNumSign(Etots[end], roundDigits=getAtolDigits(T2)))
-
-            isConverged && (abs(ΔE) <= breakPoint) && break
         end
     end
     negStr = ifelse(isConverged, "converged", "stopped but not converged")
     if printInfo
         println("\nThe SCF iteration is ", negStr, " at step $i:\n", 
-                "|ΔE| → ", round(abs(ΔE), digits=nDigitShown), " Ha, ", 
-                "RMS(ΔD) → ", round(ΔDrms, digits=nDigitShown), ".\n")
+                "|ΔE| → ", round(abs(ΔEs[end]), digits=nDigitShown), " Ha, ", 
+                "RMS(∇E) → ", round(∇Erms[end], digits=nDigitShown), ", ", 
+                "RMS(ΔD) → ", round(ΔDrms[end], digits=nDigitShown), ".\n")
     end
     clearHFtempVars!(saveTrace, vars)
     vars, isConverged
 end
 
-function terminateSCF!(vars, method, printInfo)
-    popHFtempVars!(vars)
+function getLatest∇Erms(vars::NTuple{HFTS, HFtempVars{T, HFT}}, 
+                        S::AbstractMatrix{T}) where {HFTS, T, HFT}
+    mapreduce(+, vars) do tVar
+        D = tVar.Ds[end]
+        F = tVar.Fs[end]
+        (rmsOf∘getEresidual)(F, D, S)
+    end / length(vars)
+end
+
+function terminateSCF!(vars, counts, method, printInfo)
+    popHFtempVars!(vars, counts)
     printInfo && println("Early termination of ", method, " due to its poor performance.")
 end
 
@@ -1047,6 +1129,9 @@ function ADIIScore(Ds::Vector{<:AbstractMatrix{T}},
     v, B
 end
 
+getEresidual(F::AbstractMatrix{T}, D::AbstractMatrix{T}, S::AbstractMatrix{T}) where {T} = 
+F*D*S - S*D*F
+
 function DIIScore(Ds::Vector{<:AbstractMatrix{T}}, 
                   ∇s::Vector{<:AbstractMatrix{T}}, S::AbstractMatrix{T}) where {T}
     len = length(Ds)
@@ -1055,8 +1140,8 @@ function DIIScore(Ds::Vector{<:AbstractMatrix{T}},
     Δi = firstindex(B, 1) - 1
     Threads.@threads for k in (OneTo∘triMatEleNum)(len)
         i, j = convert1DidxTo2D(len, k)
-        @inbounds B[i+Δi, j+Δi] = B[j+Δi, i+Δi] = dot( ∇s[i]*Ds[i]*S - S*Ds[i]*∇s[i], 
-                                                       ∇s[j]*Ds[j]*S - S*Ds[j]*∇s[j] )
+        @inbounds B[i+Δi, j+Δi] = B[j+Δi, i+Δi] = dot( getEresidual(∇s[i], Ds[i], S), 
+                                                       getEresidual(∇s[j], Ds[j], S) )
     end
     v, B
 end
@@ -1080,8 +1165,10 @@ end
 function genxDIIS(::Type{Val{M}}, αβVars::NTuple{HFTS, HFtempVars{T, HFT}}, 
                   S::AbstractMatrix{T}, X::AbstractMatrix{T}, Ns::NTuple{HFTS, Int}, 
                   Hcore::AbstractMatrix{T}, HeeI::AbstractArray{T, 4}; 
+                  resetThreshold::Real=10getAtolVal(T), 
                   DIISsize::Int=defaultDIISconfig[begin], 
                   solver::Symbol=defaultDIISconfig[end]) where {M, HFTS, T, HFT}
+    DIISsize < 2 && (throw∘DomainError)(intervals, "$M space need to be at least 2.")
     DFEsyms = HFTVVfields[begin+1:end]
     DFElens = map(DFEsyms) do fieldSym
         getproperty(αβVars[begin], fieldSym) |> length
@@ -1098,20 +1185,28 @@ function genxDIIS(::Type{Val{M}}, αβVars::NTuple{HFTS, HFtempVars{T, HFT}},
     function ()
         Fn = xDIIScore!.(mDIIS, cs, Ref(S), Dss, Fss, Ess, cvxConstraint, solver)
         res = getCDFE(Hcore, HeeI, X, Ns, Fn)
-        l = length(cs[begin])
-        if l >= DIISsize
-            for (c, Ds, Fs, Es) in zip(cs, Dss, Fss, Ess)
-                popIndex = argmin(norm.(c))
-                popat!(c, popIndex)
-                popat!(Ds, popIndex)
-                popat!(Fs, popIndex)
-                popat!(Es, popIndex)
-            end
-        end
-        push!.(cs, last.(cs))
+        push!.(cs, 1)
         push!.(Dss, getindex.(res, 2))
         push!.(Fss, getindex.(res, 3))
         push!.(Ess, getindex.(res, 4))
+        map(cs, Dss, Fss, Ess) do c, Ds, Fs, Es
+            if length(Es) > 2 && # Let the new (not first) DIIS space have 2+ samples
+               Es[end] - Es[end-1] > resetThreshold
+                keepIndex = lastindex(Es) - 1
+                keepat!(c,   keepIndex)
+                keepat!(Ds,  keepIndex)
+                keepat!(Fs,  keepIndex)
+                keepat!(Es,  keepIndex)
+            else
+                if length(c) > DIISsize
+                    popIndex = argmax(Es)
+                    popat!(c,   popIndex)
+                    popat!(Ds,  popIndex)
+                    popat!(Fs,  popIndex)
+                    popat!(Es,  popIndex)
+                end
+            end
+        end
         res
     end
 end
@@ -1130,18 +1225,16 @@ genDD(vars, args...; kws...)
 # Included normalization condition, but not non-negative condition.
 @inline function genxDIISf(v, B, shift)
     function (c)
-        s, signedShift = shiftLastEle!(c, shift)
+        s, _ = shiftLastEle!(c, shift)
         res = dot(v, c) / s + dot(c, B, c) / (2s^2)
-        c[end] -= signedShift
         res
     end
 end
 
 @inline function genxDIIS∇f(v, B, shift)
     function (g, c)
-        s, signedShift = shiftLastEle!(c, shift)
+        s, _ = shiftLastEle!(c, shift)
         g.= v./s + (B + transpose(B))*c ./ (2s^2) .- (dot(v, c)/s^2 + dot(c, B, c)/s^3)
-        c[end] -= signedShift
         g
     end
 end

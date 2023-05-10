@@ -19,6 +19,19 @@ function getAtolDigits(::Type{T}) where {T<:Real}
     end
 end
 
+function getAtolDigits(num::Real)
+    str = string(num)
+    idx1 = findlast('e', str)
+    if idx1 === nothing
+        idx2 = findlast('.', str)
+        length(str) - idx2
+    elseif str[idx1+1] == '-'
+        parse(Int, str[idx1+2:end])
+    else
+        0
+    end
+end
+
 
 """
 
@@ -899,10 +912,16 @@ end
 
 function shiftLastEle!(v, shiftVal)
     s = sum(v)
-    signedShift = asymSign(s)*shiftVal
-    s += signedShift
-    v[end] += signedShift
-    s, signedShift
+    shiftVal = abs(shiftVal)
+    offset = if s < shiftVal
+        signedShift = asymSign(s)*shiftVal
+        s += signedShift
+        v[end] += signedShift
+        signedShift
+    else
+        zero(s)
+    end
+    s, offset
 end
 
 
@@ -954,3 +973,5 @@ mapMapReduce(tp::NTuple{N}, fs::NTuple{N, Function}, op::F=*) where {N, F} =
 mapreduce((x, y)->y(x), op, tp, fs)
 
 mapMapReduce(tp::NTuple{N}, f::F1, op::F2=*) where {N, F1, F2} = mapreduce(f, op, tp)
+
+rmsOf(arr::AbstractArray) = sqrt( sum(arr .^ 2) ./ length(arr) )

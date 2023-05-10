@@ -94,7 +94,8 @@ l3 = length(fVarStrP1)
 info3 = (@capture_out replShow(SCFconfig((:DD, :ADIIS, :DIIS), 
                                          (1e-4, 1e-12, 1e-13), Dict(2=>[:solver=>:LCM]))))
 @test info3 == "SCFconfig{Float64, 3, Tuple{Val{:DD}, Val{:ADIIS}, Val{:DIIS}}}(method, "*
-               "interval=(0.0001, 1.0e-12, 1.0e-13), methodConfig, oscillateThreshold)"
+               "interval=(0.0001, 1.0e-12, 1.0e-13), methodConfig, secondaryConvRatio, "*
+               "oscillateThreshold)"
 
 H2 = MatterByHF(fVar1)
 info4 = (@capture_out replShow(H2))
