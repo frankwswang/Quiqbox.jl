@@ -331,7 +331,7 @@ HFc15 = HFconfig(C0=:GWH, SCF=SCFconfig(threshold=1e-9, secondaryConvRatio=1))
 HFcs = (HFc0,  HFc1,  HFc2,  HFc3,  HFc4,  HFc5,  HFc6,  HFc7,  HFc8,  HFc9, 
         HFc10, HFc11, HFc12, HFc13, HFc14, HFc15)
 
-for HFc in (HFcs)
+for (idx, HFc) in enumerate(HFcs)
     bs = genBasisFunc.(coords_H2O2, "6-31G", nuc_H2O2) |> flatten
     local res3
     info3 = @capture_out begin
@@ -339,11 +339,17 @@ for HFc in (HFcs)
         res3 = runHF(bs, nuc_H2O2, coords_H2O2, HFc, printInfo=true, infoLevel=5)
         @show res3
     end
-    bl = isapprox(res3.Ehf, Ehf_H2O2, atol=t1)
-    bl || println(info3)
-    @test bl
-    bl || (@show res3.isConverged)
-    @test res3.isConverged
+    bl1 = isapprox(res3.Ehf, Ehf_H2O2, atol=t1)
+    bl2 = res3.isConverged
+    if !(bl && bl2)
+        println("===>>>")
+        println("Case $(idx):")
+        println(info3)
+        @show bl1, bl2
+        println("<<<===")
+    end
+    @test bl1
+    @test bl2
 end
 
 end
