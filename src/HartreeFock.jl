@@ -1064,7 +1064,7 @@ function runHFcore(::Val{HFT},
             ∇Ermsᵢ = ∇Erms[end]
             ΔEᵢabs = abs(ΔEᵢ)
 
-            if printInfo && (adaptStepBl(i) || i == maxStep)
+            if printInfo && infoLevel > 0 && (adaptStepBl(i) || i == maxStep)
                 print( "| ", rpad("$i", colSpaces[1]), 
                       " | ", alignNumSign(Etots[end], colSpaces[2]; roundDigits), 
                       " | ", alignNumSign(ΔEᵢ, colSpaces[3]; roundDigits) )
