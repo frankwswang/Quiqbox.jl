@@ -20,15 +20,19 @@ function getAtolDigits(::Type{T}) where {T<:Real}
 end
 
 function getAtolDigits(num::Real)
-    str = string(num)
-    idx1 = findlast('e', str)
-    if idx1 === nothing
-        idx2 = findlast('.', str)
-        length(str) - idx2
-    elseif str[idx1+1] == '-'
-        parse(Int, str[idx1+2:end])
+    if isnan(num)
+        getAtolDigits(num|>typeof)
     else
-        0
+        str = string(num)
+        idx1 = findlast('e', str)
+        if idx1 === nothing
+            idx2 = findlast('.', str)
+            length(str) - idx2
+        elseif str[idx1+1] == '-'
+            parse(Int, str[idx1+2:end])
+        else
+            0
+        end
     end
 end
 
