@@ -3,7 +3,7 @@ using Quiqbox
 using Quiqbox: splitSpins, HFfinalVars
 using Suppressor: @suppress_out, @capture_out
 
-include("../../test/test-functions/Shared.jl")
+isdefined(Main, :SharedTestFunctions) || include("../../test/test-functions/Shared.jl")
 
 @testset "HartreeFock.jl" begin
 

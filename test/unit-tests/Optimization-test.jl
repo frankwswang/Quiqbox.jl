@@ -6,7 +6,7 @@ using LinearAlgebra: norm
 using Suppressor: @capture_out
 using Optim
 
-include("../../test/test-functions/Shared.jl")
+isdefined(Main, :SharedTestFunctions) || include("../../test/test-functions/Shared.jl")
 
 @testset "Optimization.jl" begin
 

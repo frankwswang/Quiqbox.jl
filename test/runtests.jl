@@ -2,7 +2,11 @@ using Test
 using Random
 using Documenter
 
+const SharedTestFunctions = true
+
 @testset "Quiqbox tests" begin
+
+    include("test-functions/Shared.jl")
 
     println("Number of threads used for testing: ", Threads.nthreads(), "\n")
 

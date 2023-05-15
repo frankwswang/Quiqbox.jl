@@ -4,7 +4,7 @@ using Quiqbox: ∂Basis, defaultHFconfigForPO as DHFO,
                defaultHFthresholdForHFgrad as DHFOthreshold
 using ForwardDiff: derivative as ForwardDerivative
 
-include("../../test/test-functions/Shared.jl")
+isdefined(Main, :SharedTestFunctions) || include("../../test/test-functions/Shared.jl")
 
 @testset "Differentiation.jl" begin
 

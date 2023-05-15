@@ -2,7 +2,7 @@ using Test
 using Quiqbox
 using Quiqbox: BasisFuncTexts, ElementNames, BasisSetNames
 
-include("../../../test/test-functions/Shared.jl")
+isdefined(Main, :SharedTestFunctions) || include("../../../test/test-functions/Shared.jl")
 include("../../../test/test-functions/Libcint/Libcint.jl")
 
 @testset "Quiqbox and Libcint Gaussian integral tests" begin
