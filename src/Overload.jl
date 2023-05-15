@@ -104,8 +104,8 @@ function printIndVar(io::IO, @nospecialize(pbs::Tuple{Vararg{ParamBox}}))
 end
 
 
-function printValCore(io::IO, n::Number)
-    print(io, n isa Integer ? n : round(n, sigdigits=nDigitShown))
+function printValCore(io::IO, n::T) where {T<:Number}
+    print(io, n isa Integer ? n : round(n, sigdigits=min(DefaultDigits, getAtolDigits(T))))
 end
 
 function printVal(io::IO, n::Number)
@@ -114,12 +114,13 @@ function printVal(io::IO, n::Number)
     print(io, "]")
 end
 
-function printVal(io::IO, v::Union{Vector{<:Number}, Tuple{Vararg{Number}}}, 
-                  isVec::Bool=false)
+function printVal(io::IO, v::Union{Vector{<:T}, Tuple{Vararg{T}}}, 
+                  isVec::Bool=false) where {T<:Number}
     print(io, "[")
     print(io, ifelse(isVec, "(", "{"))
     for (i, n) in enumerate(v)
-        print(io, n isa Integer ? n : round(n, sigdigits=nDigitShown))
+        print(io, 
+              n isa Integer ? n : round(n, sigdigits=min(DefaultDigits, getAtolDigits(T))))
         i < length(v) && print(io, ", ")
     end
     print(io, ifelse(isVec, ")", "}"))
@@ -247,19 +248,19 @@ function show(io::IO, ::MIME"text/plain", @nospecialize(config::HFconfig))
     print(io, str)
 end
 
-function show(io::IO, ::MIME"text/plain", @nospecialize(vars::HFtempVars))
+function show(io::IO, ::MIME"text/plain", vars::HFtempVars{T}) where {T}
     print(io, typeof(vars))
     str = getFieldNameStr(HFtempVars)
-    Etot0 = round(vars.shared.Etots[1], sigdigits=nDigitShown)
-    EtotL = round(vars.shared.Etots[end], sigdigits=nDigitShown)
+    Etot0 = round(vars.shared.Etots[1], sigdigits=min(DefaultDigits, getAtolDigits(T)))
+    EtotL = round(vars.shared.Etots[end], sigdigits=min(DefaultDigits, getAtolDigits(T)))
     str = replace(str, "shared"=>"shared.Etots=[$(Etot0), … , $(EtotL)]")
     print(io, str)
 end
 
-function show(io::IO, ::MIME"text/plain", @nospecialize(vars::HFfinalVars))
+function show(io::IO, ::MIME"text/plain", vars::HFfinalVars{T}) where {T}
     print(io, typeof(vars))
     str = getFieldNameStr(HFfinalVars)
-    Ehf = round(vars.Ehf, sigdigits=nDigitShown)
+    Ehf = round(vars.Ehf, sigdigits=min(DefaultDigits, getAtolDigits(T)))
     str = replace(str, "Ehf"=>"Ehf=$(Ehf)")
     print(io, str)
 end
