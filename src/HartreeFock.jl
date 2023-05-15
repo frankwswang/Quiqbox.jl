@@ -899,10 +899,12 @@ function runHFcore(bs::GTBasis{T, D, BN, BFT},
         println()
         print("Hartree–Fock ($HFT) Initialization")
         if timerBool
-            t = round((tEnd - tBegin) / 1e9, digits=6)
-            print(" (Finished in $(t) second", ifelse(t>1, "s", ""), ")")
+            t = (tEnd - tBegin) / 1e9
+            tStr = alignNum(t, 0, roundDigits=TimerDigits)
+            print(" (Finished in ", tStr, " second", ifelse(t>1, "s", ""), ")")
         end
         println(":")
+        println("•Basis Set Size: ", BN)
         println("•Initial Guess Method: ", getC0symbol(getC0f))
     end
     runHFcore(Val(HFT), config.SCF, Ns, Hcore, bs.eeI, bs.S, X, 
@@ -1108,8 +1110,9 @@ function runHFcore(::Val{HFT},
     end
     timerBool && (tEnd = time_ns())
     tStr = if timerBool
-        t = round((tEnd - tBegin) / 1e9, digits=6)
-        " after $t second" * ifelse(t>1, "s", "")
+        t = (tEnd - tBegin) / 1e9
+        tStr = alignNum(t, 0, roundDigits=TimerDigits)
+        " after $(tStr) second" * ifelse(t>1, "s", "")
     else
         ""
     end

@@ -257,3 +257,5 @@ end
 const πvals = Dict([-0.75, 0.5, 2.5] .=> big(π).^[-0.75, 0.5, 2.5])
 
 const DefaultDigits = 10
+
+const TimerDigits = 6
