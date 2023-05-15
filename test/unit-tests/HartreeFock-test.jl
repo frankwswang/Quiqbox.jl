@@ -341,7 +341,7 @@ for (idx, HFc) in enumerate(HFcs)
     end
     bl1 = isapprox(res3.Ehf, Ehf_H2O2, atol=t1)
     bl2 = res3.isConverged
-    if !(bl && bl2)
+    if !(bl1 && bl2)
         println("===>>>")
         println("Case $(idx):")
         println(info3)
