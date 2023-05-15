@@ -9,9 +9,9 @@ using LBFGSB: lbfgsb
 
 const defaultDS = 0.5
 const defaultDIISsize = 10
-const defaultDIISconfig = (defaultDIISsize, :LBFGS)
+const defaultDIISsolver = :LBFGS
 const SADHFmaxStep = 50
-const defaultHFinfoL = 3
+const defaultHFinfoL = 2
 const defaultHFmaxStep = 150
 const defaultHFsaveTrace = (false, false, false, true) # C, D, F, E
 const DEtotIndices = [2, 4]
@@ -441,13 +441,11 @@ initializeSCF(::Val{:UHF}, Hcore::AbstractMatrix{T}, HeeI::AbstractArray{T, 4},
 initializeSCFcore(Val(:UHF), Hcore, HeeI, C, Ns)
 
 
-const slvArgN = :solver
-
 const Doc_SCFconfig_OneRowTable = "|`:DIIS`, `:EDIIS`, `:ADIIS`|subspace size; "*
                                   "DIIS-Method solver; reset threshold¹|"*
-                                  "`DIISsize`; `$(slvArgN)`; `resetThreshold`"*
+                                  "`DIISsize`; `solver`; `resetThreshold`"*
                                   "|`1`,`2`...; `:LBFGS`...; `1e-14`... |"*
-                                  "`$(defaultDIISconfig[1])`; `:$(defaultDIISconfig[2])`;"*
+                                  "`$(defaultDIISsize)`; `:$(defaultDIISsolver)`;"*
                                   " N/A|"
 
 const Doc_SCFconfig_DIIS = "[Direct inversion in the iterative subspace]"*
@@ -536,7 +534,7 @@ $(defaultHFCStr) with a new value. In other words, it updates the stopping thres
 
 ≡≡≡ Example(s) ≡≡≡
 ```jldoctest; setup = :(push!(LOAD_PATH, "../../src/"); using Quiqbox)
-julia> SCFconfig((:DD, :ADIIS, :DIIS), (1e-4, 1e-12, 1e-13), Dict(2=>[:$(slvArgN)=>:LCM]));
+julia> SCFconfig((:DD, :ADIIS, :DIIS), (1e-4, 1e-12, 1e-13), Dict(2=>[:solver=>:LCM]));
 
 julia> SCFconfig(threshold=1e-8, oscillateThreshold=1e-5)
 $(Doc_SCFconfig_eg1)
@@ -847,8 +845,8 @@ function runHF(bs::GTBasis{T}, args...;
         Etot = round(res.Ehf + res.Enn, digits=nDigitShown)
         Ehf = round(res.Ehf, digits=nDigitShown)
         Enn = round(res.Enn, digits=nDigitShown)
-        println(rpad("Hartree-Fock Energy", 20), "| ", rpad("Nuclear Repulsion", 20), 
-                "| Total Energy")
+        println(rpad("Hartree-Fock Energy", 20), "‖ ", rpad("Nuclear Repulsion", 20), 
+                "‖ Total Energy")
         println(rpad(string(Ehf)* " Ha", 22), rpad(string(Enn)* " Ha", 22), Etot, " Ha\n")
     end
     res
@@ -964,8 +962,7 @@ function runHFcore(::Val{HFT},
     ΔDrms = zeros(T2, 1)
     ∇Erms = [getLatest∇Erms(vars, S)]
     isConverged = true
-    printDigits = 1
-    stepPrintLen = max(ndigits(maxStep)+2, (length∘string)(HFT)) + 1
+    # printDigits = 1
     rollbackRange = 0 : (HFminItr÷3)
     rollbackCount = length(rollbackRange)
     i = 0
@@ -974,12 +971,26 @@ function runHFcore(::Val{HFT},
         endThreshold = scfConfig.interval[end]
         printDigits = min( getAtolDigits(T2), 
                            (getAtolDigits∘ifelse)(isnan(endThreshold), T2, endThreshold) )
-        print(rpad(HFT, stepPrintLen)*rpad("¦ Init. Gauss", 13), 
-              " ¦ E = ", alignNumSign(Etots[end], roundDigits=printDigits))
-        if infoLevel > 1
-            print(" ¦ RMS(∇E) = ", alignNumSign(∇Erms[], roundDigits=printDigits))
+        titleNum = 2 + 2*(infoLevel > 1)
+        titles = ["step", "E (Ha)", "ΔE (Ha)", "RMS(∇E) (a.u.)", "RMS(ΔD)"][1:titleNum+1]
+        stepPrintLen = max(ndigits(maxStep), (length∘string)(HFT), length(titles[1]))
+        numSpace = printDigits + (ndigits∘floor)(Int, Etots[end]) + 3
+        colSpaces = max.(length.(titles), vcat(stepPrintLen, fill(numSpace, titleNum)))
+
+        # print(rpad(HFT, stepPrintLen)*rpad(" ¦ Init. Gauss", 13), 
+        #       " ¦ E = ", alignNumSign(Etots[end], roundDigits=printDigits))
+        # if infoLevel > 1
+        #     print(" ¦ RMS(∇E) = ", alignNumSign(∇Erms[], roundDigits=printDigits))
+        # end
+        # println()
+
+        titleStr = mapreduce(*, titles, colSpaces) do title, printSpace
+            "| " * rpad(title, printSpace) * " "
         end
-        println()
+        if printInfo && infoLevel > 0
+            println(titleStr)
+            (println∘replace)(titleStr, r"[^|]"=>'=')
+        end
     end
 
     adaptStepBl = genAdaptStepBl(infoLevel, maxStep)
@@ -990,13 +1001,26 @@ function runHFcore(::Val{HFT},
 
     for (MVal, kws, breakPoint, l) in 
         zip(fieldtypes(MS), scfConfig.methodConfig, scfConfig.interval, 1:L)
-        HFcore = genHFcore(MVal, vars, S, X, Ns, Hcore, HeeI; kws...)
+        HFcore, keyArgs = genHFcore(MVal, vars, S, X, Ns, Hcore, HeeI; kws...)
         oscThreshold = max(breakPoint, scfConfig.oscillateThreshold)
         flucThreshold = max(10breakPoint, 1.5e-3) # ≈3.8kJ/mol (0.95 chemical accuracy)
         m = getValParm(MVal)
         isConverged = false
         endM = l==L
         n = 0
+
+        if printInfo && infoLevel > 1
+            print('|', repeat('–', colSpaces[1]+1), "<$l>–", ("[:$m"))
+            if infoLevel > 2
+                kaStr = mapreduce(*, keyArgs) do ka
+                    key = ka[begin]
+                    val = ka[end]
+                    string(key) * "=" * ifelse(val isa Symbol, ":", "") * string(val) * ", "
+                end
+                print(", (", kaStr[begin:end-2], ")")
+            end
+            println("]")
+        end
 
         while true
             i < maxStep || break
@@ -1016,12 +1040,12 @@ function runHFcore(::Val{HFT},
             ΔEᵢabs = abs(ΔEᵢ)
 
             if printInfo && (adaptStepBl(i) || i == maxStep)
-                print(rpad("# $i", stepPrintLen), rpad("¦ $l) $m", 13), 
-                      " ¦ E = ", alignNumSign(Etots[end], roundDigits=printDigits))
+                print("| ", rpad("$i", colSpaces[1]), 
+                      " | ", alignNumSign(Etots[end], colSpaces[2], roundDigits=printDigits), 
+                      " | ", alignNumSign(ΔEᵢ, colSpaces[3], roundDigits=printDigits) )
                 if infoLevel > 1
-                    print(" ¦ RMS(∇E) = ", alignNumSign(∇Ermsᵢ, roundDigits=printDigits), 
-                          " ¦ ΔE = ",      alignNumSign(ΔEᵢ, roundDigits=printDigits), 
-                          " ¦ RMS(ΔD) = ", alignNumSign(ΔDrmsᵢ, roundDigits=printDigits))
+                    print(" | ", alignNumSign(∇Ermsᵢ, colSpaces[4], roundDigits=printDigits), 
+                          " | ", alignNumSign(ΔDrmsᵢ, colSpaces[5], roundDigits=printDigits))
                 end
                 println()
             end
@@ -1063,7 +1087,7 @@ function runHFcore(::Val{HFT},
     if printInfo
         println("\nThe SCF iteration is ", negStr, " at step $i:\n", 
                 "|ΔE| → ", round(abs(ΔEs[end]), digits=nDigitShown), " Ha, ", 
-                "RMS(∇E) → ", round(∇Erms[end], digits=nDigitShown), ", ", 
+                "RMS(∇E) → ", round(∇Erms[end], digits=nDigitShown), " a.u., ", 
                 "RMS(ΔD) → ", round(ΔDrms[end], digits=nDigitShown), ".\n")
     end
     clearHFtempVars!(saveTrace, vars)
@@ -1086,7 +1110,7 @@ end
 
 
 function DDcore(Nˢ::Int, X::AbstractMatrix{T}, F::AbstractMatrix{T}, D::AbstractMatrix{T}, 
-                dampStrength::T=T(defaultDS)) where {T}
+                dampStrength::T) where {T}
     0 <= dampStrength <= 1 || throw(DomainError(dampStrength, "The value of `dampStrength`"*
                                     " should be between 0 and 1."))
     Dnew = getD(X, F, Nˢ)
@@ -1095,14 +1119,15 @@ end
 
 function genDD(αβVars::NTuple{HFTS, HFtempVars{T, HFT}}, X::AbstractMatrix{T}, 
                Ns::NTuple{HFTS, Int}, Hcore::AbstractMatrix{T}, HeeI::AbstractArray{T, 4}; 
-               kw...) where {HFTS, T, HFT}
-    dampStrength = get(kw, :dampStrength, T(defaultDS))
-    function ()
+               dampStrength::T=T(defaultDS)) where {HFTS, T, HFT}
+    f = function ()
         Fs = last.(getproperty.(αβVars, :Fs))
         Ds = last.(getproperty.(αβVars, :Ds))
         Dnew = DDcore.(Ns, Ref(X), Fs, Ds, dampStrength)
         getCDFE(Hcore, HeeI, X, Ns, getF(Hcore, HeeI, Dnew))
     end
+    keyArgs = (:dampStrength=>dampStrength,)
+    f, keyArgs
 end
 
 
@@ -1166,8 +1191,8 @@ function genxDIIS(::Type{Val{M}}, αβVars::NTuple{HFTS, HFtempVars{T, HFT}},
                   S::AbstractMatrix{T}, X::AbstractMatrix{T}, Ns::NTuple{HFTS, Int}, 
                   Hcore::AbstractMatrix{T}, HeeI::AbstractArray{T, 4}; 
                   resetThreshold::Real=10getAtolVal(T), 
-                  DIISsize::Int=defaultDIISconfig[begin], 
-                  solver::Symbol=defaultDIISconfig[end]) where {M, HFTS, T, HFT}
+                  DIISsize::Int=defaultDIISsize, 
+                  solver::Symbol=defaultDIISsolver) where {M, HFTS, T, HFT}
     DIISsize < 2 && (throw∘DomainError)(intervals, "$M space need to be at least 2.")
     DFEsyms = HFTVVfields[begin+1:end]
     DFElens = map(DFEsyms) do fieldSym
@@ -1182,7 +1207,7 @@ function genxDIIS(::Type{Val{M}}, αβVars::NTuple{HFTS, HFtempVars{T, HFT}},
     end
     cvxConstraint, mDIIS = getproperty(DIISconfigs, M)
 
-    function ()
+    f = function ()
         Fn = xDIIScore!.(mDIIS, cs, Ref(S), Dss, Fss, Ess, cvxConstraint, solver)
         res = getCDFE(Hcore, HeeI, X, Ns, Fn)
         push!.(cs, 1)
@@ -1209,6 +1234,8 @@ function genxDIIS(::Type{Val{M}}, αβVars::NTuple{HFTS, HFtempVars{T, HFT}},
         end
         res
     end
+    keyArgs = (:resetThreshold=>resetThreshold, :DIISsize=>DIISsize, :solver=>solver)
+    f, keyArgs
 end
 
 
@@ -1271,7 +1298,8 @@ function SPGBsolver!(::Val{CCB}, c::AbstractVector{T},
 end
 
 function CMsolver!(::Val{CCB}, c::AbstractVector{T}, 
-                   v::AbstractVector{T}, B::AbstractMatrix{T}, ϵ::T=T(1e-9)) where {CCB, T}
+                   v::AbstractVector{T}, B::AbstractMatrix{T}, 
+                   ϵ::T=T(1000getAtolVal(T))) where {CCB, T}
     len = length(v)
     getA = M->[M  ones(T, len); ones(T, 1, len) T(0)]
     b = vcat(-v, 1)
