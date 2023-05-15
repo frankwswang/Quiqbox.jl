@@ -7,7 +7,7 @@ using Quiqbox: getAtolVal, getAtolDigits, roundToMultiOfStep, nearestHalfOf, get
                genTupleCoords, uniCallFunc, mergeMultiObjs, isNaN, getBool, skipIndices, 
                isOscillateConverged, lazyCollect, asymSign, numEps, genAdaptStepBl, 
                shiftLastEle!, getValParm, fct, δ, triMatEleNum, convert1DidxTo2D, 
-               convert1DidxTo4D, mapMapReduce
+               convert1DidxTo4D, mapMapReduce, keepOnly!
 using Suppressor: @capture_out
 using LinearAlgebra: norm
 
