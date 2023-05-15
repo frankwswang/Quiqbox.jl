@@ -475,11 +475,11 @@ function optimizeParams!(pbs::AbstractVector{<:ParamBox{T}},
 
         if printInfo && adaptStepBl(i)
             println(rpad("Step $(i): ", 11), lpad("$(fVstr) = ", 6), 
-                    alignNumSign(fx, roundDigits=nDigitShown))
+                    alignNumSign(fx, roundDigits=DefaultDigits))
             print(rpad("", 11), lpad("𝒙 = ", 6))
-            println(IOContext(stdout, :limit => true), round.(x, digits=nDigitShown))
+            println(IOContext(stdout, :limit => true), round.(x, digits=DefaultDigits))
             print(rpad("", 11), lpad("∇$(fVstr) = ", 6))
-            println(IOContext(stdout, :limit => true), round.(gx, digits=nDigitShown))
+            println(IOContext(stdout, :limit => true), round.(gx, digits=DefaultDigits))
             println("Step duration: ", round(Δt₁+Δt₂, digits=6), " seconds.\n")
         end
 
@@ -514,17 +514,18 @@ function optimizeParams!(pbs::AbstractVector{<:ParamBox{T}},
         printstyled(":$M", bold=true)
         println(" just ended at")
         println(rpad("Step $(i): ", 11), lpad("$(fVstr) = ", 6), 
-                alignNumSign(fVals[end], roundDigits=nDigitShown))
+                alignNumSign(fVals[end], roundDigits=DefaultDigits))
         print(rpad("", 11), lpad("𝒙 = ", 6))
         println(IOContext(stdout, :limit => true), 
-                round.(getindex.(pbs), digits=nDigitShown))
-        print("after ", round((tEnd-tBegin)/60, digits=6), " minutes. ")
+                round.(getindex.(pbs), digits=DefaultDigits))
+        t = round((tEnd-tBegin)/60, digits=6)
+        print("after ", t, " minute", ifelse(t>1, "s", ""), ".")
         if detectConverge
             println("The iteration has" * ifelse(blConv, "", " not") *" converged: ")
             println("∥Δ$(fVstr)∥₂ → ", 
-                    round(norm(fVals[end] - fVals[end-1]), digits=nDigitShown), ", ", 
+                    round(norm(fVals[end] - fVals[end-1]), digits=DefaultDigits), ", ", 
                     "∥vec(∇$(fVstr))∥₂ → ", 
-                    round(norm(grads[end]), digits=nDigitShown), ".")
+                    round(norm(grads[end]), digits=DefaultDigits), ".")
         end
         println()
     end
