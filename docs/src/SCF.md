@@ -1,8 +1,8 @@
 # Self-Consistent Field Methods
 
-## Hartree-Fock methods
+## Hartree–Fock methods
 
-Quiqbox supports basic Hartree-Fock methods with various configurations: 
+Quiqbox supports basic Hartree–Fock methods with various configurations: 
 
 | Items | Options |
 | :---  |  ---:   |
@@ -11,9 +11,9 @@ Quiqbox supports basic Hartree-Fock methods with various configurations:
 | Converging Methods | direct diagonalization, [direct inversion in the iterative subspace (DIIS)](https://onlinelibrary.wiley.com/doi/10.1002/jcc.540030413), [E-DIIS](https://aip.scitation.org/doi/abs/10.1063/1.1470195), [A-DIIS](https://aip.scitation.org/doi/10.1063/1.3304922), combinations of multiple methods |
 | DIIS-type Method Solvers | Lagrange multiplier solver, [L-BFGS](https://github.com/Gnimuc/LBFGSB.jl) solver |
 
-### Basic Hartree-Fock
+### Basic Hartree–Fock
 
-To run a Hartree-Fock method, the lines of code required in Quiqbox are as simple as below:
+To run a Hartree–Fock method, the lines of code required in Quiqbox are as simple as below:
 ```@setup 2
     push!(LOAD_PATH,"../../src/")
     using Quiqbox

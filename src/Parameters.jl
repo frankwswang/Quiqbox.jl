@@ -84,7 +84,7 @@ variable tied to the `ParamBox`. When the `ParamBox` is marked as non-differenti
 corresponds to the name of the stored input variable.
 
 **NOTE 2:** The output variable of a `ParamBox` is normally used to differentiate a 
-parameter functional (e.g., the Hartree-Fock energy). However, the derivative with respect 
+parameter functional (e.g., the Hartree–Fock energy). However, the derivative with respect 
 to the stored input variable can also be computed to when the `ParamBox` is marked as 
 differentiable.
 """
