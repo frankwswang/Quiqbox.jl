@@ -32,7 +32,7 @@ const OFfunctions = Dict(OFmethods .=>
 )
 
 const defaultPOconfigStr = "POconfig()"
-const defaultHFthresholdForHFgrad = getAtolVal(Float64)
+const defaultHFthresholdForHFgrad = 1000getAtolVal(Float64)
 const defaultHFconfigForPO = HFconfig(SCF=SCFconfig(threshold=defaultHFthresholdForHFgrad))
 const defaultDRHFconfigForPO = FuncArgConfig(getEhf)
 const defaultOFmethodConfigs = [defaultHFconfigForPO, defaultDRHFconfigForPO]
