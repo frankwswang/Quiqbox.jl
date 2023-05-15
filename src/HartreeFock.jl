@@ -1251,10 +1251,10 @@ function genxDIIS(::Type{Val{M}}, αβVars::NTuple{HFTS, HFtempVars{T, HFT}},
             if length(Es) > 2 && # Let the new (not first) DIIS space have 2+ samples
                Es[end] - Es[end-1] > resetThreshold
                 keepIndex = lastindex(Es) - 1
-                keepat!(c,   keepIndex)
-                keepat!(Ds,  keepIndex)
-                keepat!(Fs,  keepIndex)
-                keepat!(Es,  keepIndex)
+                keepOnly!(c,   keepIndex)
+                keepOnly!(Ds,  keepIndex)
+                keepOnly!(Fs,  keepIndex)
+                keepOnly!(Es,  keepIndex)
             else
                 if length(c) > DIISsize
                     popIndex = argmax(Es)

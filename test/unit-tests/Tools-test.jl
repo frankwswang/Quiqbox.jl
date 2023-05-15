@@ -413,4 +413,16 @@ f1 = x->x^2
 @test mapMapReduce(tp, (itself, f1, abs)) == 12
 @test mapMapReduce(tp, (f1, itself, abs), +) == 6
 
+
+# function keepOnly!
+arr3 = collect(1:5)
+idx2 = 3
+res3 = keepOnly!(arr3, idx2)
+@test arr3[] == res3 == idx2
+
+arr4 = rand(1)
+ele = arr4[]
+res4 = keepOnly!(arr4, 1)
+@test ele == res4
+
 end
