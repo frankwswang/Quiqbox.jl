@@ -624,14 +624,14 @@ bfCoeff = [[6.163845031, 1.097161308], [0.4301284983, 0.6789135305],
 bfCoeff2 = vcat([[bfCoeff[2i+1]'; bfCoeff[2i+2]']' for i=0:2]...)
 content1 = """
 S    2   1.0
-         6.163845031               0.4301284983
-         1.097161308               0.6789135305
+         6.163845031                    0.4301284983
+         1.097161308                    0.6789135305
 S    2   1.0
-         0.245916322               0.0494717692
-         0.06237087296             0.9637824081
+         0.245916322                    0.0494717692
+         0.06237087296                  0.9637824081
 P    2   1.0
-         0.245916322               0.5115407076
-         0.06237087296             0.6128198961
+         0.245916322                    0.5115407076
+         0.06237087296                  0.6128198961
 """
 lines1 = (content1 |> IOBuffer |> readlines)
 @test map(i->Quiqbox.genGaussFuncText(bfCoeff2[i,:]...), 1:size(bfCoeff2)[1] |> collect) == 
@@ -676,9 +676,9 @@ bsO_STO3G = genBasisFunc(fill(0.0, 3), "STO-3G", :O)
 @test hasEqual(bsO_STO3G, genBasisFuncText.(bsO_STO3G) |> join |> genBFuncsFromText)
 @test (genBasisFunc(missing, (2.0, 1.1), "D")[[1,3,5]] |> genBasisFuncText) == 
 """
-X      NaN                      NaN                      NaN                 
+X      NaN       NaN       NaN  
 D    1   1.0   false   1 3 5
-         2.0                       1.1
+         2.0                            1.1
 """
 @test hasEqual((genBFuncsFromText∘genBasisFuncText)(bf2_P_norm3)[], bf2_P_norm3)
 bf_TextTest = genBasisFunc([0.0, 1.2, 0.3], ([1.5, 1.2], [0.5, 0.4]), [(2,0,0), (1,0,1)])

@@ -8,7 +8,7 @@ using TensorOperations: @tensor as @TOtensor
     CanOrbital{T, D, NN} <: AbstractSpinOrbital{T, D}
 
 The spatial part (orbital) of a canonical spin-orbital (the set of which diagonalizes the 
-Fock matrix of a Hartree-Fock state) with its occupation information. This means the 
+Fock matrix of a Hartree–Fock state) with its occupation information. This means the 
 maximal occupation number for the mode corresponding to the orbital (namely a canonical 
 orbital) equals 2. Please refer to [`genCanOrbitals`](@ref) for the construction of a 
 `CanOrbital`.
@@ -75,7 +75,7 @@ end
                    roundAtol::Real=getAtolVal(T)) where {T, D, NN} -> 
     NTuple{2, Vector{CanOrbital{T, D, NN}}}
 
-Generate the occupied and unoccupied canonical orbitals from the result of a Hartree-Fock 
+Generate the occupied and unoccupied canonical orbitals from the result of a Hartree–Fock 
 approximation `fVars`. Each parameter stored in the constructed [`CanOrbital`](@ref) will 
 be rounded to the nearest multiple of `roundAtol`; when `roundAtol` is set to `NaN`, no 
 rounding will be performed.
@@ -159,7 +159,7 @@ end
     changeHbasis(HFres::HFfinalVars) -> NTuple{2, Any}
 
 Return the one-body and two-body integrals on the basis of the canonical orbitals 
-using the result of a Hartree-Fock method `HFres`.
+using the result of a Hartree–Fock method `HFres`.
 """
 changeHbasis(HFres::HFfinalVars) = 
 changeHbasis(HFres.basis, HFres.nuc, HFres.nucCoord, HFres.C...)
@@ -174,7 +174,7 @@ Container of the electronic structure information of a quantum system.
 
 ≡≡≡ Field(s) ≡≡≡
 
-`Ehf::T`: Hartree-Fock energy of the electronic Hamiltonian.
+`Ehf::T`: Hartree–Fock energy of the electronic Hamiltonian.
 
 `nuc::NTuple{NN, String}`: The nuclei in the studied system.
 
@@ -183,7 +183,7 @@ Container of the electronic structure information of a quantum system.
 `Enn::T`: The nuclear repulsion energy.
 
 `Ns::NTuple{HFTS, Int}`: The number(s) of electrons with same spin configurations(s). For 
-restricted closed-shell Hartree-Fock (RHF), the single element in `.Ns` represents both 
+restricted closed-shell Hartree–Fock (RHF), the single element in `.Ns` represents both 
 spin-up electrons and spin-down electrons.
 
 `occu::NTuple{HFTS, NTuple{BN, Int}}`: Occupations of canonical orbitals.
@@ -207,7 +207,7 @@ integrals) of the canonical orbitals with same spin configuration(s).
 `eeIdiffSpin::Matrix{T}`: Coulomb interactions between canonical orbitals with different 
 spins.
 
-`basis::GTBasis{T, D, BN}`: The basis set used for the Hartree-Fock approximation.
+`basis::GTBasis{T, D, BN}`: The basis set used for the Hartree–Fock approximation.
 
 ≡≡≡ Initialization Method(s) ≡≡≡
 
@@ -215,7 +215,7 @@ spins.
                roundAtol::Real=getAtolVal(T)) where {T, D, NN, BN, HFTS} -> 
     MatterByHF{T, D, NN, BN, HFTS}
 
-Construct a `MatterByHF` from the result of a Hartree-Fock method `HFres`. 
+Construct a `MatterByHF` from the result of a Hartree–Fock method `HFres`. 
 Each parameter stored in the constructed [`CanOrbital`](@ref)s in `.occuOrbital` and 
 `.unocOrbital` will be rounded to the nearest multiple of `roundAtol`; when `roundAtol` is 
 set to `NaN`, no rounding will be performed.

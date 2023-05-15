@@ -2,7 +2,7 @@ using Test
 using Quiqbox
 using LinearAlgebra: norm, diag
 
-include("../../test/test-functions/Shared.jl")
+isdefined(Main, :SharedTestFunctions) || include("../../test/test-functions/Shared.jl")
 
 @testset "MatterByHF.jl tests" begin
 

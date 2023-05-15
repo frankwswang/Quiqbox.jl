@@ -63,39 +63,89 @@ end
 
 numToSubs(::Nothing) = ""
 
-
-function alignNum(x::T, lpadN::Int=8, rpadN::Union{Int, Missing}=missing; 
-                  roundDigits::Int=-1) where {T<:Real}
-    if rpadN isa Missing
-        rpadN = getAtolDigits(T)+2
-        if roundDigits >= 0
-            rpadN = min(rpadN, roundDigits+2)
-        end
-    end
-    if roundDigits < 0
-        str = x |> string
+function getSNxpn(x::Real)
+    x = abs(x)
+    if x == 0
+        0
     else
-        format = "%.$(roundDigits)f"
-        str = :(@sprintf($format, $x)) |> eval
+        floor(Int, log10(x))
+    end
+end
+
+function getSigDecimal(x)
+    xabsStr = string(x|>abs)
+    idx = findfirst('e', xabsStr)
+    idx = if idx === nothing
+        length(xabsStr)
+    else
+        idx - 1
+    end
+    xDigitsStr = xabsStr[begin:idx]
+    if xDigitsStr[begin] == '0'
+        xDigitsStr = xDigitsStr[3:end]
+        idx = findfirst(x->x!='0', xDigitsStr)
+        idx === nothing && (idx = 0)
+        idx = length(xDigitsStr) - idx + 1
+    elseif endswith(xDigitsStr, ".0")
+        idx -= 2
+        while xDigitsStr[idx] == '0'
+            idx -= 1
+        end
+    else
+        idx -= 1
+    end
+    idx - 1
+end
+
+function alignNum(x::T, lPad::Int=8, rPad::Union{Int, Missing}=missing; 
+                  roundDigits::Int=-1) where {T<:Real}
+    notNumber = isnan(x)
+    noRounding = roundDigits < 0
+    xTypeDigits = ifelse(notNumber, -3, getAtolDigits(T))
+    rPad = ifelse(rPad isa Missing, ifelse(noRounding, xTypeDigits+5, roundDigits), rPad)
+    str = if x isa Integer || notNumber || noRounding
+        str = string(x)
+    else
+        if 1 <= abs(x) < 10
+            format = "%.$(roundDigits)f"
+        else
+            xpn = getSNxpn(x)
+            xpnDigits = max(2, (ndigits∘abs)(xpn)) + 2
+            sigDecimal = getSigDecimal(x)
+            minDigits = roundDigits - xpnDigits
+            format = if roundDigits >= xpnDigits && 
+                        min(sigDecimal, roundDigits+xpn+1) <= minDigits && 
+                        (-xpn >= xpnDigits || xpn >= max(lPad-signbit(x), 1))
+                "%.$(minDigits)e"
+            elseif xpn > 0
+                maxDigits = xTypeDigits - xpn
+                maxDigits < 0 && (x = (BigFloat∘string)(x))
+                "%.$(min(roundDigits, max(0, maxDigits)))f"
+            else
+                maxDigits = max(sigDecimal + 1 - xpn, xTypeDigits+1)
+                "%.$(min(roundDigits, maxDigits))f"
+            end
+        end
+        :(@sprintf($format, $x)) |> eval
     end
     body = split(str, '.')
     if length(body) == 2
         head, tail = body
         tail = "."*tail
-        rpadN += 1
+        rPad += 1
     else
         head = body[]
         tail = ""
     end
-    lpad(head, lpadN) * rpad(tail, rpadN)
+    lpad(head, lPad) * rpad(tail, rPad)
 end
 
-function alignNumSign(c::Real; roundDigits::Int=-1)
-    if c < 0
-        alignNum(c, 0, 0; roundDigits)
-    else
-        " "*alignNum(c, 0, 0; roundDigits)
+function alignNumSign(c::Real, rPad::Int=0; roundDigits::Int=-1)
+    cStr = alignNum(c, 0, 0; roundDigits)
+    if cStr[begin] != '-'
+        cStr = " "*cStr
     end
+    rpad(cStr, rPad)
 end
 
 

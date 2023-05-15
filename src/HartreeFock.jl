@@ -9,9 +9,9 @@ using LBFGSB: lbfgsb
 
 const defaultDS = 0.5
 const defaultDIISsize = 10
-const defaultDIISconfig = (defaultDIISsize, :LBFGS)
+const defaultDIISsolver = :LBFGS
 const SADHFmaxStep = 50
-const defaultHFinfoL = 3
+const defaultHFinfoL = 2
 const defaultHFmaxStep = 150
 const defaultHFsaveTrace = (false, false, false, true) # C, D, F, E
 const DEtotIndices = [2, 4]
@@ -66,7 +66,7 @@ splitSpins(::Val{N}, Ns::NTuple{N, Int}) where {N} = itself(Ns)
 splitSpins(::Val{2}, (Nˢ,)::Tuple{Int}) = (Nˢ, Nˢ)
 
 splitSpins(::Val{:RHF}, Ns::NTuple{2, Int}) = 
-error("For restricted closed-shell Hartree-Fock (RHF), the input spin configuration $(Ns)"*
+error("For restricted closed-shell Hartree–Fock (RHF), the input spin configuration $(Ns)"*
       " is not supported.")
 
 splitSpins(::Val{:RHF}, N) = splitSpins(Val(HFtypeSizeList[:RHF]), N)
@@ -309,7 +309,7 @@ getSpinOccupations(::Val{:UHF}, (Nᵅ, Nᵝ)::NTuple{2, Int}, BN) =
     HFtempVars{T, HFT} <: HartreeFockintermediateData{T}
 
 The container to store the intermediate values (only of the one spin configuration) for 
-each iteration during the Hartree-Fock SCF procedure.
+each iteration during the Hartree–Fock SCF procedure.
 
 ≡≡≡ Field(s) ≡≡≡
 
@@ -321,13 +321,13 @@ each iteration during the Hartree-Fock SCF procedure.
 
 `Fs::Vector{Matrix{T}}`: Fock matrices.
 
-`Es::Vector{T}`: Part of the Hartree-Fock energy corresponding to one spin configuration.
+`Es::Vector{T}`: Part of the Hartree–Fock energy corresponding to one spin configuration.
 
 `shared.Dtots::Vector{Matrix{T}}`: The total density matrices.
 
-`shared.Etots::Vector{T}`: The total Hartree-Fock energy.
+`shared.Etots::Vector{T}`: The total Hartree–Fock energy.
 
-**NOTE:** For unrestricted Hartree-Fock, there are 2 `HFtempVars` being updated during the 
+**NOTE:** For unrestricted Hartree–Fock, there are 2 `HFtempVars` being updated during the 
 iterations, and changing the field `shared.Dtots` or `shared.Etots` of one `HFtempVars` 
 will affect the other one's.
 """
@@ -441,13 +441,11 @@ initializeSCF(::Val{:UHF}, Hcore::AbstractMatrix{T}, HeeI::AbstractArray{T, 4},
 initializeSCFcore(Val(:UHF), Hcore, HeeI, C, Ns)
 
 
-const slvArgN = :solver
-
 const Doc_SCFconfig_OneRowTable = "|`:DIIS`, `:EDIIS`, `:ADIIS`|subspace size; "*
                                   "DIIS-Method solver; reset threshold¹|"*
-                                  "`DIISsize`; `$(slvArgN)`; `resetThreshold`"*
+                                  "`DIISsize`; `solver`; `resetThreshold`"*
                                   "|`1`,`2`...; `:LBFGS`...; `1e-14`... |"*
-                                  "`$(defaultDIISconfig[1])`; `:$(defaultDIISconfig[2])`;"*
+                                  "`$(defaultDIISsize)`; `:$(defaultDIISsolver)`;"*
                                   " N/A|"
 
 const Doc_SCFconfig_DIIS = "[Direct inversion in the iterative subspace]"*
@@ -536,7 +534,7 @@ $(defaultHFCStr) with a new value. In other words, it updates the stopping thres
 
 ≡≡≡ Example(s) ≡≡≡
 ```jldoctest; setup = :(push!(LOAD_PATH, "../../src/"); using Quiqbox)
-julia> SCFconfig((:DD, :ADIIS, :DIIS), (1e-4, 1e-12, 1e-13), Dict(2=>[:$(slvArgN)=>:LCM]));
+julia> SCFconfig((:DD, :ADIIS, :DIIS), (1e-4, 1e-12, 1e-13), Dict(2=>[:solver=>:LCM]));
 
 julia> SCFconfig(threshold=1e-8, oscillateThreshold=1e-5)
 $(Doc_SCFconfig_eg1)
@@ -597,16 +595,16 @@ end
 
     HFfinalVars{T, D, HFT, NN, BN, HFTS} <: HartreeFockFinalValue{T, HFT}
 
-The container of the final values after a Hartree-Fock SCF procedure.
+The container of the final values after a Hartree–Fock SCF procedure.
 
 ≡≡≡ Field(s) ≡≡≡
 
-`Ehf::T`: Hartree-Fock energy of the electronic Hamiltonian.
+`Ehf::T`: Hartree–Fock energy of the electronic Hamiltonian.
 
 `Enn::T`: The nuclear repulsion energy.
 
 `Ns::NTuple{HFTS, Int}`: The number(s) of electrons with same spin configurations(s). For 
-restricted closed-shell Hartree-Fock (RHF), the single element in `.Ns` represents both 
+restricted closed-shell Hartree–Fock (RHF), the single element in `.Ns` represents both 
 spin-up electrons and spin-down electrons.
 
 `nuc::NTuple{NN, String}`: The nuclei in the studied system.
@@ -624,11 +622,11 @@ spin-up electrons and spin-down electrons.
 `occu::NTuple{HFTS, NTuple{BN, Int}}`: Occupations of canonical orbitals.
 
 `temp::NTuple{HFTS, [HFtempVars](@ref){T, HFT}}`: the intermediate values stored during 
-the Hartree-Fock interactions.
+the Hartree–Fock interactions.
 
 `isConverged::Bool`: Whether the SCF procedure is converged in the end.
 
-`basis::GTBasis{T, D, BN}`: The basis set used for the Hartree-Fock approximation.
+`basis::GTBasis{T, D, BN}`: The basis set used for the Hartree–Fock approximation.
 """
 struct HFfinalVars{T, D, HFT, NN, BN, HFTS} <: HartreeFockFinalValue{T, HFT}
     Ehf::T
@@ -691,18 +689,18 @@ const defaultHFconfigPars = [:RHF, :SAD, defaultSCFconfig, defaultHFmaxStep, tru
 
     HFconfig{T1, HFT, F, T2, L, MS} <: ConfigBox{T1, HFconfig, HFT}
 
-The container of Hartree-Fock method configuration.
+The container of Hartree–Fock method configuration.
 
 ≡≡≡ Field(s) ≡≡≡
 
-`HF::Val{HFT}`: Hartree-Fock method type. Available values of `HFT` are 
+`HF::Val{HFT}`: Hartree–Fock method type. Available values of `HFT` are 
 $(string(HFtypes)[2:end-1]).
 
 `C0::InitialC{T1, HFT, F}`: Initial guess of the orbital coefficient matrix(s) C of the 
 canonical orbitals. When `C0` is as an argument of `HFconfig`'s constructor, it can be set 
 to `sym::Symbol` where available values of `sym` are 
 `$((C0methods|>typeof|>fieldnames|>string)[2:end-1])`; it can also be a `Tuple` of 
-prepared orbital coefficient matrix(s) for the corresponding Hartree-Fock method type.
+prepared orbital coefficient matrix(s) for the corresponding Hartree–Fock method type.
 
 `SCF::SCFconfig{T2, L, MS}`: SCF iteration configuration. For more information please refer 
 to [`SCFconfig`](@ref).
@@ -721,7 +719,7 @@ information from all the iterations steps to the field `.temp` of the output
 | 1 | orbital coefficient matrix(s)      | `.Cs`                       |
 | 2 | density matrix(s)                  | `.Ds`, `.shared.Dtots`      |
 | 3 | Fock matrix(s)                     | `.Fs`                       |
-| 4 | unconverged Hartree-Fock energy(s) | `.Es`, `.shared.Etots`      |
+| 4 | unconverged Hartree–Fock energy(s) | `.Es`, `.shared.Etots`      |
 
 ≡≡≡ Initialization Method(s) ≡≡≡
 
@@ -796,7 +794,7 @@ const C0methodArgOrders = (itself=(1,),
           printInfo=true, infoLevel=$(defaultHFinfoL)) -> 
     HFfinalVars
 
-Main function to run a Hartree-Fock method in Quiqbox. The returned result and relevant 
+Main function to run a Hartree–Fock method in Quiqbox. The returned result and relevant 
 information is stored in a [`HFfinalVars`](@ref).
 
     runHFcore(args...; printInfo=false, infoLevel=$(defaultHFinfoL)) -> 
@@ -812,7 +810,7 @@ whether the SCF procedure is converged.
     BasisSetData{T, D}, 
     AbstractVector{<:AbstractGTBasisFuncs{T, D}}, 
     Tuple{Vararg{AbstractGTBasisFuncs{T, D}}}
-} where {T, D}`: The basis set used for the Hartree-Fock approximation.
+} where {T, D}`: The basis set used for the Hartree–Fock approximation.
 
 `nuc::Union{
     Tuple{String, Vararg{String, NNMO}} where NNMO, 
@@ -821,12 +819,12 @@ whether the SCF procedure is converged.
 
 `nucCoords::$(SpatialCoordType)`: The coordinates of corresponding nuclei.
 
-`config::HFconfig`: The Configuration of selected Hartree-Fock method. For more information 
+`config::HFconfig`: The Configuration of selected Hartree–Fock method. For more information 
 please refer to [`HFconfig`](@ref).
 
 `N::Union{Int, Tuple{Int}, NTuple{2, Int}}`: Total number of electrons, or the number(s) of 
 electrons with same spin configurations(s). **NOTE:** `N::NTuple{2, Int}` is only supported 
-by unrestricted Hartree-Fock (UHF).
+by unrestricted Hartree–Fock (UHF).
 
 ≡≡≡ Keyword argument(s) ≡≡≡
 
@@ -843,13 +841,16 @@ function runHF(bs::GTBasis{T}, args...;
     vars, isConverged = runHFcore(bs, nuc, nucCoords, args[begin+2:end]...; 
                                   printInfo, infoLevel)
     res = HFfinalVars(bs, nuc, nucCoords, getX(bs.S), vars, isConverged)
+    roundDigits = min(DefaultDigits, getAtolDigits(T))
     if printInfo
-        Etot = round(res.Ehf + res.Enn, digits=nDigitShown)
-        Ehf = round(res.Ehf, digits=nDigitShown)
-        Enn = round(res.Enn, digits=nDigitShown)
-        println(rpad("Hartree-Fock Energy", 20), "| ", rpad("Nuclear Repulsion", 20), 
-                "| Total Energy")
-        println(rpad(string(Ehf)* " Ha", 22), rpad(string(Enn)* " Ha", 22), Etot, " Ha\n")
+        EhfStr  = alignNum(res.Ehf, 0; roundDigits)
+        EnnStr  = alignNum(res.Enn, 0; roundDigits)
+        EtotStr = alignNum(res.Ehf+res.Enn, 0; roundDigits)
+        len = max(19, length(EhfStr)+3, length(EnnStr)+3, length(EtotStr)+3)
+        println(rpad("Hartree–Fock Energy", len), " ¦ ", rpad("Nuclear Repulsion", len), 
+                " ¦ Total Energy")
+        println(rpad(EhfStr*" Ha", len), "   ", rpad(EnnStr*" Ha", len), "   ", 
+                EtotStr, " Ha\n")
     end
     res
 end
@@ -865,6 +866,8 @@ function runHFcore(bs::GTBasis{T, D, BN, BFT},
                    config::HFconfig{<:Any, HFT}=defaultHFC; 
                    printInfo::Bool=false, 
                    infoLevel::Int=defaultHFinfoL) where {T, D, BN, BFT, NNMO, HFT}
+    timerBool = printInfo && infoLevel > 2
+    timerBool && (tBegin = time_ns())
     Nlow = Int(HFT==:RHF)
     totN = (N isa Int) ? N : (N[begin] + N[end])
     totN > Nlow || throw(DomainError(N, "$(HFT) requires more than $(Nlow) electrons."))
@@ -884,6 +887,26 @@ function runHFcore(bs::GTBasis{T, D, BN, BFT},
             "($(size.(C0mats))) does not match the size of the input basis set ($BN).")) )
     C0 = uniCallFunc(getC0f, getproperty(C0methodArgOrders, nameOf(getC0f)), C0mats, 
                      Val(HFT), bs.S, X, Hcore, bs.eeI, bs.basis, nuc, nucCoords)
+    timerBool && (tEnd = time_ns())
+    if printInfo && infoLevel > 1
+        roundDigits = min(DefaultDigits, getAtolDigits(T))
+        println("$N-Electron System Information: ")
+        for (atm, coord) in zip(nuc, nucCoords)
+            println("•", atm, ": ", "[", alignNumSign(coord[1]; roundDigits), ", ", 
+                                          alignNumSign(coord[2]; roundDigits), ", ", 
+                                          alignNumSign(coord[3]; roundDigits), "]")
+        end
+        println()
+        print("Hartree–Fock ($HFT) Initialization")
+        if timerBool
+            t = (tEnd - tBegin) / 1e9
+            tStr = alignNum(t, 0, roundDigits=TimerDigits)
+            print(" (Finished in ", tStr, " second", ifelse(t>1, "s", ""), ")")
+        end
+        println(":")
+        println("•Basis Set Size: ", BN)
+        println("•Initial Guess Method: ", getC0symbol(getC0f))
+    end
     runHFcore(Val(HFT), config.SCF, Ns, Hcore, bs.eeI, bs.S, X, 
               C0, config.maxStep, config.earlyStop, config.saveTrace, printInfo, infoLevel)
 end
@@ -907,7 +930,7 @@ data as arguments.
 
 === Positional argument(s) ===
 
-`HTtype::Val{HFT} where HFT`: Hartree-Fock method type. Available values of `HFT` are 
+`HTtype::Val{HFT} where HFT`: Hartree–Fock method type. Available values of `HFT` are 
 $(string(HFtypes)[2:end-1]).
 
 `scfConfig::SCFconfig`: The SCF iteration configuration.
@@ -956,6 +979,8 @@ function runHFcore(::Val{HFT},
                    saveTrace::NTuple{4, Bool}, 
                    printInfo::Bool=false, 
                    infoLevel::Int=defaultHFinfoL) where {HFT, T1, L, MS, HFTS, T2}
+    timerBool = printInfo && infoLevel > 2
+    timerBool && (tBegin = time_ns())
     vars = initializeSCF(Val(HFT), Hcore, HeeI, C0, Ns)
     secondaryConvRatio = scfConfig.secondaryConvRatio
     varsShared = vars[begin].shared
@@ -964,22 +989,33 @@ function runHFcore(::Val{HFT},
     ΔDrms = zeros(T2, 1)
     ∇Erms = [getLatest∇Erms(vars, S)]
     isConverged = true
-    printDigits = 1
-    stepPrintLen = max(ndigits(maxStep)+2, (length∘string)(HFT)) + 1
     rollbackRange = 0 : (HFminItr÷3)
     rollbackCount = length(rollbackRange)
     i = 0
 
     if printInfo
         endThreshold = scfConfig.interval[end]
-        printDigits = min( getAtolDigits(T2), 
+        roundDigits = min( getAtolDigits(T2), 
                            (getAtolDigits∘ifelse)(isnan(endThreshold), T2, endThreshold) )
-        print(rpad(HFT, stepPrintLen)*rpad("¦ Init. Gauss", 13), 
-              " ¦ E = ", alignNumSign(Etots[end], roundDigits=printDigits))
-        if infoLevel > 1
-            print(" ¦ RMS(∇E) = ", alignNumSign(∇Erms[], roundDigits=printDigits))
+        titleNum = 2 + 2*(infoLevel > 1)
+        titles = ["step", "E (Ha)", "ΔE (Ha)", "RMS(∇E) (a.u.)", "RMS(ΔD)"][1:titleNum+1]
+        stepPrintLen = max(ndigits(maxStep), (length∘string)(HFT), length(titles[1]))
+        numSpace = roundDigits + (ndigits∘floor)(Int, Etots[end]) + 3
+        colSpaces = max.(length.(titles), vcat(stepPrintLen, fill(numSpace, titleNum)))
+
+        titleStr = mapreduce(*, titles, colSpaces) do title, printSpace
+            "| " * rpad(title, printSpace) * " "
         end
-        println()
+
+        if infoLevel > 0
+            println("•Initial E: ", alignNum(Etots[end], 0; roundDigits), " Ha")
+            println("•Initial RMS(∇E): ", alignNum(∇Erms[], 0; roundDigits), " a.u.\n")
+
+            println("Self-Consistent Field (SCF) Iteration:")
+            (println∘repeat)('=', length(titleStr))
+            println(titleStr)
+            (println∘replace)(titleStr, r"[^|]"=>'=')
+        end
     end
 
     adaptStepBl = genAdaptStepBl(infoLevel, maxStep)
@@ -990,13 +1026,26 @@ function runHFcore(::Val{HFT},
 
     for (MVal, kws, breakPoint, l) in 
         zip(fieldtypes(MS), scfConfig.methodConfig, scfConfig.interval, 1:L)
-        HFcore = genHFcore(MVal, vars, S, X, Ns, Hcore, HeeI; kws...)
+        HFcore, keyArgs = genHFcore(MVal, vars, S, X, Ns, Hcore, HeeI; kws...)
         oscThreshold = max(breakPoint, scfConfig.oscillateThreshold)
         flucThreshold = max(10breakPoint, 1.5e-3) # ≈3.8kJ/mol (0.95 chemical accuracy)
         m = getValParm(MVal)
         isConverged = false
         endM = l==L
         n = 0
+
+        if printInfo && infoLevel > 1
+            print('|', repeat('–', colSpaces[1]+1), "<$l>–", ("[:$m"))
+            if infoLevel > 2
+                kaStr = mapreduce(*, keyArgs) do ka
+                    key = ka[begin]
+                    val = ka[end]
+                    string(key) * "=" * ifelse(val isa Symbol, ":", "") * string(val) * ", "
+                end
+                print(", (", kaStr[begin:end-2], ")")
+            end
+            println("]")
+        end
 
         while true
             i < maxStep || break
@@ -1015,13 +1064,13 @@ function runHFcore(::Val{HFT},
             ∇Ermsᵢ = ∇Erms[end]
             ΔEᵢabs = abs(ΔEᵢ)
 
-            if printInfo && (adaptStepBl(i) || i == maxStep)
-                print(rpad("# $i", stepPrintLen), rpad("¦ $l) $m", 13), 
-                      " ¦ E = ", alignNumSign(Etots[end], roundDigits=printDigits))
+            if printInfo && infoLevel > 0 && (adaptStepBl(i) || i == maxStep)
+                print( "| ", rpad("$i", colSpaces[1]), 
+                      " | ", alignNumSign(Etots[end], colSpaces[2]; roundDigits), 
+                      " | ", alignNumSign(ΔEᵢ, colSpaces[3]; roundDigits) )
                 if infoLevel > 1
-                    print(" ¦ RMS(∇E) = ", alignNumSign(∇Ermsᵢ, roundDigits=printDigits), 
-                          " ¦ ΔE = ",      alignNumSign(ΔEᵢ, roundDigits=printDigits), 
-                          " ¦ RMS(ΔD) = ", alignNumSign(ΔDrmsᵢ, roundDigits=printDigits))
+                    print(" | ", alignNumSign(∇Ermsᵢ, colSpaces[4]; roundDigits), 
+                          " | ", alignNumSign(ΔDrmsᵢ, colSpaces[5]; roundDigits))
                 end
                 println()
             end
@@ -1059,12 +1108,20 @@ function runHFcore(::Val{HFT},
             end
         end
     end
+    timerBool && (tEnd = time_ns())
+    tStr = if timerBool
+        t = (tEnd - tBegin) / 1e9
+        tStr = alignNum(t, 0, roundDigits=TimerDigits)
+        " after $(tStr) second" * ifelse(t>1, "s", "")
+    else
+        ""
+    end
     negStr = ifelse(isConverged, "converged", "stopped but not converged")
     if printInfo
-        println("\nThe SCF iteration is ", negStr, " at step $i:\n", 
-                "|ΔE| → ", round(abs(ΔEs[end]), digits=nDigitShown), " Ha, ", 
-                "RMS(∇E) → ", round(∇Erms[end], digits=nDigitShown), ", ", 
-                "RMS(ΔD) → ", round(ΔDrms[end], digits=nDigitShown), ".\n")
+        println("\nThe SCF iteration is ", negStr, " at step $i", tStr, ":\n", 
+                "|ΔE| → ", alignNum(abs(ΔEs[end]), 0; roundDigits), " Ha, ", 
+                "RMS(∇E) → ", alignNum(∇Erms[end], 0; roundDigits), " a.u., ", 
+                "RMS(ΔD) → ", alignNum(ΔDrms[end], 0; roundDigits), ".\n")
     end
     clearHFtempVars!(saveTrace, vars)
     vars, isConverged
@@ -1086,7 +1143,7 @@ end
 
 
 function DDcore(Nˢ::Int, X::AbstractMatrix{T}, F::AbstractMatrix{T}, D::AbstractMatrix{T}, 
-                dampStrength::T=T(defaultDS)) where {T}
+                dampStrength::T) where {T}
     0 <= dampStrength <= 1 || throw(DomainError(dampStrength, "The value of `dampStrength`"*
                                     " should be between 0 and 1."))
     Dnew = getD(X, F, Nˢ)
@@ -1095,14 +1152,15 @@ end
 
 function genDD(αβVars::NTuple{HFTS, HFtempVars{T, HFT}}, X::AbstractMatrix{T}, 
                Ns::NTuple{HFTS, Int}, Hcore::AbstractMatrix{T}, HeeI::AbstractArray{T, 4}; 
-               kw...) where {HFTS, T, HFT}
-    dampStrength = get(kw, :dampStrength, T(defaultDS))
-    function ()
+               dampStrength::T=T(defaultDS)) where {HFTS, T, HFT}
+    f = function ()
         Fs = last.(getproperty.(αβVars, :Fs))
         Ds = last.(getproperty.(αβVars, :Ds))
         Dnew = DDcore.(Ns, Ref(X), Fs, Ds, dampStrength)
         getCDFE(Hcore, HeeI, X, Ns, getF(Hcore, HeeI, Dnew))
     end
+    keyArgs = (:dampStrength=>dampStrength,)
+    f, keyArgs
 end
 
 
@@ -1166,8 +1224,8 @@ function genxDIIS(::Type{Val{M}}, αβVars::NTuple{HFTS, HFtempVars{T, HFT}},
                   S::AbstractMatrix{T}, X::AbstractMatrix{T}, Ns::NTuple{HFTS, Int}, 
                   Hcore::AbstractMatrix{T}, HeeI::AbstractArray{T, 4}; 
                   resetThreshold::Real=10getAtolVal(T), 
-                  DIISsize::Int=defaultDIISconfig[begin], 
-                  solver::Symbol=defaultDIISconfig[end]) where {M, HFTS, T, HFT}
+                  DIISsize::Int=defaultDIISsize, 
+                  solver::Symbol=defaultDIISsolver) where {M, HFTS, T, HFT}
     DIISsize < 2 && (throw∘DomainError)(intervals, "$M space need to be at least 2.")
     DFEsyms = HFTVVfields[begin+1:end]
     DFElens = map(DFEsyms) do fieldSym
@@ -1182,7 +1240,7 @@ function genxDIIS(::Type{Val{M}}, αβVars::NTuple{HFTS, HFtempVars{T, HFT}},
     end
     cvxConstraint, mDIIS = getproperty(DIISconfigs, M)
 
-    function ()
+    f = function ()
         Fn = xDIIScore!.(mDIIS, cs, Ref(S), Dss, Fss, Ess, cvxConstraint, solver)
         res = getCDFE(Hcore, HeeI, X, Ns, Fn)
         push!.(cs, 1)
@@ -1209,6 +1267,8 @@ function genxDIIS(::Type{Val{M}}, αβVars::NTuple{HFTS, HFtempVars{T, HFT}},
         end
         res
     end
+    keyArgs = (:resetThreshold=>resetThreshold, :DIISsize=>DIISsize, :solver=>solver)
+    f, keyArgs
 end
 
 
@@ -1271,7 +1331,8 @@ function SPGBsolver!(::Val{CCB}, c::AbstractVector{T},
 end
 
 function CMsolver!(::Val{CCB}, c::AbstractVector{T}, 
-                   v::AbstractVector{T}, B::AbstractMatrix{T}, ϵ::T=T(1e-9)) where {CCB, T}
+                   v::AbstractVector{T}, B::AbstractMatrix{T}, 
+                   ϵ::T=T(1000getAtolVal(T))) where {CCB, T}
     len = length(v)
     getA = M->[M  ones(T, len); ones(T, 1, len) T(0)]
     b = vcat(-v, 1)

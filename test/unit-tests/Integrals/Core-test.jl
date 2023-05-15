@@ -3,7 +3,7 @@ using Quiqbox
 using Quiqbox: Fγ, F0
 using QuadGK: quadgk
 
-include("../../../test/test-functions/Shared.jl")
+isdefined(Main, :SharedTestFunctions) || include("../../../test/test-functions/Shared.jl")
 
 @testset "Core.jl tests" begin
 

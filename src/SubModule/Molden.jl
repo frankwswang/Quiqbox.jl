@@ -4,7 +4,7 @@ export makeMoldenFile
 
 import ..Quiqbox: CanOrbital, MatterByHF, sortPermBasis, mergeBasisFuncs, getAtolDigits, 
                   isaFullShellBasisFuncs, checkFname, AtomicNumberList, centerCoordOf, 
-                  groupedSort, joinConcentricBFuncStr, alignNumSign, alignNum, getAtolVal
+                  groupedSort, joinConcentricBFuncStr, alignNumSign, getAtolVal
 
 const spinStrs = ["Alpha", "Beta"]
 
@@ -56,7 +56,7 @@ function makeMoldenFile(mol::MatterByHF{T, 3};
     gCoeffs = map(getindex.(strs, 2), nbfs) do str, count
         replace(str, "   true"=>""; count)
     end
-    lpadN = 8
+    lPad = repeat(" ", 8)
 
     text = """
            [Molden Format]
@@ -80,17 +80,17 @@ function makeMoldenFile(mol::MatterByHF{T, 3};
             atmName = "X    "
             atmNumber = "X   "
         end
-        coordStr = alignNum(cen[1], lpadN; roundDigits) * 
-                   alignNum(cen[2], lpadN; roundDigits) * 
-                   alignNum(cen[3], lpadN, 0; roundDigits)
-        text *= atmName*rpad("$iNucPoint", 5)*atmNumber*coordStr*"\n"
+        coordStr = lPad * alignNumSign(cen[1]; roundDigits) * 
+                   lPad * alignNumSign(cen[2]; roundDigits) * 
+                   lPad * alignNumSign(cen[3], 0; roundDigits)
+        text *= atmName * rpad("$iNucPoint", 5) * atmNumber * coordStr * "\n"
     end
     for (n, coord) in zip(nuc, nucCoords)
         iNucPoint += 1
         text *= rpad("$(n)", 5) * rpad(iNucPoint, 5) * rpad("$(AtomicNumberList[n])", 4)*
-                alignNum(coord[1], lpadN; roundDigits) * 
-                alignNum(coord[2], lpadN; roundDigits) * 
-                alignNum(coord[3], lpadN, 0; roundDigits) * "\n"
+                lPad * alignNumSign(coord[1]; roundDigits) * 
+                lPad * alignNumSign(coord[2]; roundDigits) * 
+                lPad * alignNumSign(coord[3], 0; roundDigits) * "\n"
     end
     text *= "\n[GTO]"
     for (i, gs) in enumerate(gCoeffs)
@@ -105,7 +105,7 @@ function makeMoldenFile(mol::MatterByHF{T, 3};
             text *= "Ene=  "*alignNumSign(moe; roundDigits)*"\n"
             text *= "Spin=  $(spinStrs[spinIdx])\n"
             text *= "Occup= $(sum(mo.occu)[])\n"
-            text *= join([rpad("   $j", 6)*alignNum(c, lpadN, 0; roundDigits)*
+            text *= join([rpad("   $j", 8)*alignNumSign(c, 0; roundDigits)*
                         "\n" for (j,c) in enumerate(MOcoeffs)])
         end
     end

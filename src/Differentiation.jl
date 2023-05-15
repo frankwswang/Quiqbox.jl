@@ -141,7 +141,7 @@ end
     gradOfHFenergy(par::AbstractVector{<:ParamBox{T}}, HFres::HFfinalVars{T}) where {T} -> 
     AbstractVector{T}
 
-Given a Hartree-Fock approximation result `HFres`, return the gradient of the Hartree-Fock 
+Given a Hartree–Fock approximation result `HFres`, return the gradient of the Hartree–Fock 
 energy with respect to a collection of parameters `par`. Specifically, for any 
 [`ParamBox`](@ref) in `par`, unlike other cases where the it is always the output variable 
 that is represented by the `ParamBox`, here the corresponding independent variable is 

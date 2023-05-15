@@ -1648,7 +1648,8 @@ function genGaussFuncText(xpn::Real, con::Real; roundDigits::Int=-1)
         xpn = round(xpn, digits=roundDigits)
         con = round(con, digits=roundDigits)
     end
-    "  " * alignNum(xpn; roundDigits) * (alignNum(con; roundDigits) |> rstrip) * "\n"
+    "  " * alignNum(xpn; roundDigits) * repeat(" ", 8) * 
+    (rstrip∘alignNumSign)(con; roundDigits) * "\n"
 end
 
 """

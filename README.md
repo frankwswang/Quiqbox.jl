@@ -75,7 +75,7 @@ gf = GaussFunc(1.0, 0.75)
 bs = genBasisFunc.(points, Ref(gf)) .+ bsH₂
 ```
 
-## Run the Hartree-Fock method
+## Run the Hartree–Fock method
 ```julia
 nuc = ["H", "H"]
 

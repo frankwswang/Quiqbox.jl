@@ -1,7 +1,7 @@
 using Test
 using Quiqbox
 
-include("../../../test/test-functions/Shared.jl")
+isdefined(Main, :SharedTestFunctions) || include("../../../test/test-functions/Shared.jl")
 
 @testset "TwoBody.jl tests" begin
 

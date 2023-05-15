@@ -3,7 +3,7 @@ using Quiqbox
 using Quiqbox: splitSpins, HFfinalVars
 using Suppressor: @suppress_out, @capture_out
 
-include("../../test/test-functions/Shared.jl")
+isdefined(Main, :SharedTestFunctions) || include("../../test/test-functions/Shared.jl")
 
 @testset "HartreeFock.jl" begin
 
@@ -31,10 +31,8 @@ HeeI = eeInteractions(bs)
 Ne = getCharge(nuc)
 scfMethods = (:ADIIS, :DIIS, :EDIIS, :DD)
 thresholds = (1e-4, 1e-8, 1e-10, 1e-15)
-solvers1 = Dict(1=>[:solver=>:LCM], 2=>[:solver=>:LCM], 
-                3=>[:solver=>:LCM], 4=>[:solver=>:LCM])
-solvers2 = Dict(1=>[:solver=>:SPGB], 2=>[:solver=>:SPGB], 
-                3=>[:solver=>:SPGB], 4=>[:solver=>:SPGB])
+solvers1 = Dict(1=>[:solver=>:LCM], 2=>[:solver=>:LCM], 3=>[:solver=>:LCM])
+solvers2 = Dict(1=>[:solver=>:SPGB], 2=>[:solver=>:SPGB], 3=>[:solver=>:SPGB])
 
 local res1, res1_1, res1_2, res1_3, res1_4, res1_5, res2, res2_2, res2_3
 SCFc1 = SCFconfig(scfMethods, thresholds)
@@ -278,12 +276,13 @@ for i in rng
     local res1, res2
     info1 = @capture_out begin
         @show i
-        res1 = runHF(bs, nuc2, nucCoords2, printInfo=true)
+        res1 = runHF(bs, nuc2, nucCoords2, printInfo=true, infoLevel=5)
         @show length(res1.temp[begin].Es) res1.Ehf
     end
     info2 = @capture_out begin
         @show i
-        res2 = runHF(bs, nuc2, nucCoords2, HFconfig((HF=:UHF,)), printInfo=true)
+        res2 = runHF(bs, nuc2, nucCoords2, HFconfig((HF=:UHF,)), 
+                     printInfo=true, infoLevel=5)
         @show length(res2.temp[begin].Es) res2.Ehf
     end
     push!(Et1, res1.Ehf+res1.Enn)
@@ -337,7 +336,8 @@ for HFc in (HFcs)
     local res3
     info3 = @capture_out begin
         @show HFc
-        res3 = runHF(bs, nuc_H2O2, coords_H2O2, HFc, printInfo=true)
+        res3 = runHF(bs, nuc_H2O2, coords_H2O2, HFc, printInfo=true, infoLevel=5)
+        @show res3
     end
     bl = isapprox(res3.Ehf, Ehf_H2O2, atol=t1)
     bl || println(info3)
