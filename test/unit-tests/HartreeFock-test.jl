@@ -338,9 +338,12 @@ for HFc in (HFcs)
         @show HFc
         res3 = runHF(bs, nuc_H2O2, coords_H2O2, HFc, printInfo=true, infoLevel=5)
         @show res3
+        @show res3.Ehf, Ehf_H2O2
+        @show res3.isConverged
     end
     bl = isapprox(res3.Ehf, Ehf_H2O2, atol=t1)
     bl || println(info3)
+    @show res3.Ehf, Ehf_H2O2, res3.isConverged
     @test bl
     @test res3.isConverged
 end
