@@ -979,7 +979,7 @@ mapreduce((x, y)->y(x), op, tp, fs)
 mapMapReduce(tp::NTuple{N}, f::F1, op::F2=*) where {N, F1, F2} = mapreduce(f, op, tp)
 
 
-rmsOf(arr::AbstractArray) = sqrt( sum(arr .^ 2) ./ length(arr) )
+rmsOf(arr::AbstractArray) = norm(arr) / (sqrt∘length)(arr)
 
 
 function keepOnly!(a::AbstractArray, idx::Int)

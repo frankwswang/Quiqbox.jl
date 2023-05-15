@@ -7,7 +7,7 @@ using Quiqbox: getAtolVal, getAtolDigits, roundToMultiOfStep, nearestHalfOf, get
                genTupleCoords, uniCallFunc, mergeMultiObjs, isNaN, getBool, skipIndices, 
                isOscillateConverged, lazyCollect, asymSign, numEps, genAdaptStepBl, 
                shiftLastEle!, getValParm, fct, δ, triMatEleNum, convert1DidxTo2D, 
-               convert1DidxTo4D, mapMapReduce, keepOnly!
+               convert1DidxTo4D, mapMapReduce, rmsOf, keepOnly!
 using Suppressor: @capture_out
 using LinearAlgebra: norm
 
@@ -413,16 +413,20 @@ f1 = x->x^2
 @test mapMapReduce(tp, (itself, f1, abs)) == 12
 @test mapMapReduce(tp, (f1, itself, abs), +) == 6
 
+# function rmsOf
+rmsTest = arr -> sqrt( sum(arr .^ 2) ./ length(arr) )
+arr3 = rand(100)
+isapprox(rmsTest(arr3), rmsOf(arr3), atol=5e-15)
 
 # function keepOnly!
-arr3 = collect(1:5)
+arr4 = collect(1:5)
 idx2 = 3
-res3 = keepOnly!(arr3, idx2)
-@test arr3[] == res3 == idx2
+res3 = keepOnly!(arr4, idx2)
+@test arr4[] == res3 == idx2
 
-arr4 = rand(1)
-ele = arr4[]
-res4 = keepOnly!(arr4, 1)
+arr5 = rand(1)
+ele = arr5[]
+res4 = keepOnly!(arr5, 1)
 @test ele == res4
 
 end

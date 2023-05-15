@@ -1,10 +1,10 @@
 export GridBox, gridCoordOf
 
-function makeGridFuncsCore(nG::Int)
+function makeGridFuncsCore(::Type{T}, nG::Int) where {T<:Real}
     if iszero(nG)
         [itself]
     else
-        PF.(abs, *, (0:nG) .- 0.5nG)
+        PF.(abs, *, (0:nG) .- nG/T(2))
     end
 end
 
@@ -86,7 +86,7 @@ struct GridBox{T, D, NP, GPT<:SpatialPoint{T, D}} <: SpatialStructure{T, D}
         oVsym = SpatialParamSyms[1:D]
         point = Array{SpatialPoint{T, D}}(undef, NP)
         param = Array{ParamBox{T}}(undef, D*NP)
-        funcs = makeGridFuncsCore.(nGrids)
+        funcs = makeGridFuncsCore.(T, nGrids)
         spacing = fillObj.(spacing)
         data = makeGridPBoxData.(fill.(center), spacing, nGrids)
         for (n, i) in enumerate( CartesianIndices(nGrids .+ 1) )
