@@ -498,17 +498,19 @@ computation.
 * `:LCM`: Lagrange multiplier solver.
 * `:SPGB`: $(Doc_SCFconfig_SPGB)
 
-`interval::NTuple{L, T}`: The stopping (or skipping) thresholds for required methods.
+`interval::NTuple{L, T}`: The stopping (or skipping) thresholds for required methods. The 
+last threshold will be the convergence threshold for the SCF procedure. When the last 
+threshold is set to `NaN`, there will be no convergence detection.
 
 `methodConfig::NTuple{L, Vector{<:Pair}}`: The additional keywords arguments for each 
 method stored as `Tuple`s of `Pair`s.
 
 `secondaryConvRatio::T`: The ratio of all the secondary convergence criteria (e.g., the 
-convergence of density matrix and the residual matrix based on commutation relationship 
+convergence of density matrix, the error array based on the commutation relationship 
 between the Fock matrix and the density matrix) to the primary convergence indicator, i.e., 
 the convergence of the energy.
 
-`oscillateThreshold::T`: The threshold for oscillating convergence.
+`oscillateThreshold::T`: The threshold for oscillatory convergence.
 
 ≡≡≡ Initialization Method(s) ≡≡≡
 
@@ -624,7 +626,8 @@ spin-up electrons and spin-down electrons.
 `temp::NTuple{HFTS, [HFtempVars](@ref){T, HFT}}`: the intermediate values stored during 
 the Hartree–Fock interactions.
 
-`isConverged::Bool`: Whether the SCF procedure is converged in the end.
+`isConverged::Union{Bool, Missing}`: Whether the SCF iteration is converged in the end. 
+When convergence detection is off (see [SCFconfig](@ref)), it is set to `missing`.
 
 `basis::GTBasis{T, D, BN}`: The basis set used for the Hartree–Fock approximation.
 """
@@ -640,7 +643,7 @@ struct HFfinalVars{T, D, HFT, NN, BN, HFTS} <: HartreeFockFinalValue{T, HFT}
     Eo::NTuple{HFTS, Vector{T}}
     occu::NTuple{HFTS, NTuple{BN, String}}
     temp::NTuple{HFTS, HFtempVars{T, HFT}}
-    isConverged::Bool
+    isConverged::Union{Bool, Missing}
     basis::GTBasis{T, D, BN}
 
     function HFfinalVars(basis::GTBasis{T, 𝐷, BN}, 
@@ -648,7 +651,8 @@ struct HFfinalVars{T, D, HFT, NN, BN, HFTS} <: HartreeFockFinalValue{T, HFT}
                          nucCoords::SpatialCoordType{T, 𝐷, NNMO}, 
                          X::AbstractMatrix{T}, 
                          vars::NTuple{HFTS, HFtempVars{T, HFT}}, 
-                         isConverged::Bool) where {T, 𝐷, BN, NNMO, HFTS, HFT}
+                         isConverged::Union{Bool, Missing}) where 
+                        {T, 𝐷, BN, NNMO, HFTS, HFT}
         (NNval = length(nuc)) == length(nucCoords) || 
         throw(AssertionError("The length of `nuc` and `nucCoords` should be the same."))
         any(length(i)!=𝐷 for i in nucCoords) && 
@@ -978,23 +982,25 @@ function runHFcore(::Val{HFT},
                    infoLevel::Int=defaultHFinfoL) where {HFT, T1, L, MS, HFTS, T2}
     timerBool = printInfo && infoLevel > 2
     timerBool && (tBegin = time_ns())
+
     vars = initializeSCF(Val(HFT), Hcore, HeeI, C0, Ns)
     secondaryConvRatio = scfConfig.secondaryConvRatio
     varsShared = vars[begin].shared
     Etots = varsShared.Etots
     ΔEs = zeros(T2, 1)
     ΔDrms = zeros(T2, 1)
-    𝐞rms = T2[getErrorNrms(vars, S)]
-    isConverged = true
+    δFrms = T2[getErrorNrms(vars, S)]
+    endThreshold = scfConfig.interval[end]
+    detectConvergence = !isnan(endThreshold)
+    isConverged::Union{Bool, Missing, Int} = true
     rollbackRange = 0 : (HFminItr÷3)
     rollbackCount = length(rollbackRange)
     i = 0
 
     if printInfo
-        endThreshold = scfConfig.interval[end]
         roundDigits = setNumDigits(T2, endThreshold)
         titleNum = 2 + 2*(infoLevel > 1)
-        titles = ("Step", "E (Ha)", "ΔE (Ha)", "RMS(𝐞) (a.u.)", "RMS(ΔD)")
+        titles = ("Step", "E (Ha)", "ΔE (Ha)", "RMS(FDS-SDF)", "RMS(ΔD)")
         colSpaces = (
             max(ndigits(maxStep), (length∘string)(HFT), length(titles[begin])), 
             roundDigits + (ndigits∘floor)(Int, Etots[]) + 2, 
@@ -1008,9 +1014,17 @@ function runHFcore(::Val{HFT},
         end
 
         if infoLevel > 0
-            println("•Initial E: ", alignNum(Etots[], 0; roundDigits), " Ha")
-            println("•Initial RMS(𝐞): ", alignNum(𝐞rms[], 0; roundDigits), " a.u.\n")
-
+            println("•Initial $HFT energy E: ", alignNum(Etots[], 0; roundDigits), " Ha")
+            println("•Initial RMS(FDS-SDF): ", 
+                      alignNum(δFrms[], 0; roundDigits))
+            println("•Convergence Threshold: ", endThreshold, " a.u.")
+            if infoLevel > 2
+                println("•Secondary Convergence Threshold: ", 
+                        secondaryConvRatio*endThreshold, " a.u.")
+                println("•Oscillatory Convergence Threshold: ", 
+                        scfConfig.oscillateThreshold, " a.u.")
+            end
+            println()
             println("Self-Consistent Field (SCF) Iteration:")
             (println∘repeat)('=', length(titleStr))
             println(titleStr)
@@ -1057,11 +1071,11 @@ function runHFcore(::Val{HFT},
             push!(ΔEs, Etots[end] - Etots[end-1])
             if endM || printInfo
                 push!(ΔDrms, rmsOf(varsShared.Dtots[end] - varsShared.Dtots[end-1]))
-                push!(𝐞rms, getErrorNrms(vars, S))
+                push!(δFrms, getErrorNrms(vars, S))
             end
             ΔEᵢ = ΔEs[end]
             ΔDrmsᵢ = ΔDrms[end]
-            𝐞rmsᵢ = 𝐞rms[end]
+            δFrmsᵢ = δFrms[end]
             ΔEᵢabs = abs(ΔEᵢ)
 
             if printInfo && infoLevel > 0 && (adaptStepBl(i) || i == maxStep)
@@ -1069,16 +1083,16 @@ function runHFcore(::Val{HFT},
                       " | ", cropStrR(alignNumSign(Etots[end]; roundDigits), colSpaces[2]), 
                       " | ", cropStrR(alignNumSign(ΔEᵢ; roundDigits), colSpaces[3]) )
                 if infoLevel > 1
-                    print( " | ", cropStrR(alignNum(𝐞rmsᵢ, 0; roundDigits), colSpaces[4]), 
+                    print( " | ", cropStrR(alignNum(δFrmsᵢ, 0; roundDigits), colSpaces[4]), 
                            " | ", cropStrR(alignNum(ΔDrmsᵢ, 0; roundDigits), colSpaces[5]) )
                 end
                 println()
             end
 
-            convThresholds = ifelse(𝐞rmsᵢ <= secondaryConvRatio*breakPoint, 
+            convThresholds = ifelse(δFrmsᵢ <= secondaryConvRatio*breakPoint, 
                                     (1, secondaryConvRatio), (0, 0)) .* breakPoint
             ΔEᵢabs <= convThresholds[begin] && ΔDrmsᵢ <= convThresholds[end] && 
-            (isConverged=true; break)
+            (isConverged = true; break)
 
             # oscillating convergence & early termination of non-convergence.
             if n > 1 && i > HFminItr && ΔEᵢ > flucThreshold
@@ -1087,9 +1101,9 @@ function runHFcore(::Val{HFT},
                                                 maxRemains=HFinterEstoreSize)
                 if isOsc
                     if ΔEᵢabs <= oscThreshold && 
-                       (endM ? (𝐞rmsᵢ <= secondaryConvRatio*oscThreshold && 
+                       (endM ? (δFrmsᵢ <= secondaryConvRatio*oscThreshold && 
                                 ΔDrmsᵢ <= secondaryConvRatio*oscThreshold) : true)
-                        isConverged=true
+                        isConverged = 1
                         break
                     end
                 else
@@ -1108,20 +1122,24 @@ function runHFcore(::Val{HFT},
             end
         end
     end
+
     timerBool && (tEnd = time_ns())
-    tStr = if timerBool
-        " after " * genTimeStr(tEnd - tBegin)
-    else
-        ""
-    end
-    negStr = ifelse(isConverged, "converged", "stopped but not converged")
+
     if printInfo
-        println("\nThe SCF iteration is ", negStr, " at step $i", tStr, ":\n", 
+        tStr = timerBool ? " after "*genTimeStr(tEnd - tBegin) : ""
+        negStr = if detectConvergence
+            ifelse(isConverged===1, (isConverged=true; "converged to an oscillation"), 
+                   ifelse(isConverged, "converged", "stopped but not converged"))
+        else
+            "stopped"
+        end
+        println("\nThe SCF iteration has ", negStr, " at step $i", tStr, ":\n", 
                 "|ΔE| → ", alignNum(abs(ΔEs[end]), 0; roundDigits), " Ha, ", 
-                "RMS(𝐞) → ", alignNum(𝐞rms[end], 0; roundDigits), " a.u., ", 
+                "RMS(FDS-SDF) → ", alignNum(δFrms[end], 0; roundDigits), ", ", 
                 "RMS(ΔD) → ", alignNum(ΔDrms[end], 0; roundDigits), ".\n")
     end
     clearHFtempVars!(saveTrace, vars)
+    detectConvergence || (isConverged = missing)
     vars, isConverged
 end
 
@@ -1162,8 +1180,8 @@ function genDD(αβVars::NTuple{HFTS, HFtempVars{T, HFT}}, X::AbstractMatrix{T},
 end
 
 
-function EDIIScore(Ds::Vector{<:AbstractMatrix{T}}, 
-                   ∇s::Vector{<:AbstractMatrix{T}}, Es::Vector{T}) where {T}
+function EDIIScore(Ds::Vector{<:AbstractMatrix{T}}, ∇s::Vector{<:AbstractMatrix{T}}, 
+                   Es::Vector{T}) where {T}
     len = length(Ds)
     B = similar(∇s[begin], len, len)
     Δi = firstindex(B, 1) - 1
@@ -1174,8 +1192,8 @@ function EDIIScore(Ds::Vector{<:AbstractMatrix{T}},
     Es, B
 end
 
-function ADIIScore(Ds::Vector{<:AbstractMatrix{T}}, 
-                   ∇s::Vector{<:AbstractMatrix{T}}) where {T}
+function ADIIScore(Ds::Vector{<:AbstractMatrix{T}}, ∇s::Vector{<:AbstractMatrix{T}}) where 
+                  {T}
     v = dot.(Ds .- Ref(Ds[end]), Ref(∇s[end]))
     DsL = Ds[end]
     ∇sL = ∇s[end]
@@ -1188,32 +1206,32 @@ end
 getEresidual(F::AbstractMatrix{T}, D::AbstractMatrix{T}, S::AbstractMatrix{T}) where {T} = 
 F*D*S - S*D*F
 
-function DIIScore(Ds::Vector{<:AbstractMatrix{T}}, 
-                  ∇s::Vector{<:AbstractMatrix{T}}, S::AbstractMatrix{T}) where {T}
+function DIIScore(Ds::Vector{<:AbstractMatrix{T}}, ∇s::Vector{<:AbstractMatrix{T}}, 
+                  S::AbstractMatrix{T}, X::AbstractMatrix{T}) where {T}
     len = length(Ds)
     B = similar(∇s[begin], len, len)
     v = zeros(T, len)
     Δi = firstindex(B, 1) - 1
     Threads.@threads for k in (OneTo∘triMatEleNum)(len)
         i, j = convert1DidxTo2D(len, k)
-        @inbounds B[i+Δi, j+Δi] = B[j+Δi, i+Δi] = dot( getEresidual(∇s[i], Ds[i], S), 
-                                                       getEresidual(∇s[j], Ds[j], S) )
+        @inbounds B[i+Δi, j+Δi] = B[j+Δi, i+Δi] = dot( X'*getEresidual(∇s[i], Ds[i], S)*X, 
+                                                       X'*getEresidual(∇s[j], Ds[j], S)*X )
     end
     v, B
 end
 
 #                     convex constraint|unified function signature
-const DIISconfigs = ( DIIS=(Val(false), (Ds, ∇s, Es, S)-> DIIScore(Ds, ∇s, S)), 
-                      EDIIS=(Val(true), (Ds, ∇s, Es, S)->EDIIScore(Ds, ∇s, Es)), 
-                      ADIIS=(Val(true), (Ds, ∇s, Es, S)->ADIIScore(Ds, ∇s)) )
+const DIISconfigs = ( DIIS=(Val(false), (Ds, ∇s, Es, S, X)-> DIIScore(Ds, ∇s, S, X)), 
+                      EDIIS=(Val(true), (Ds, ∇s, Es, S, X)->EDIIScore(Ds, ∇s, Es)), 
+                      ADIIS=(Val(true), (Ds, ∇s, Es, S, X)->ADIIScore(Ds, ∇s)) )
 
-function xDIIScore!(mDIIS::F, c::Vector{T}, S::AbstractMatrix{T}, 
+function xDIIScore!(mDIIS::F, c::Vector{T}, S::AbstractMatrix{T}, X::AbstractMatrix{T}, 
                     Ds::Vector{<:AbstractMatrix{T}}, 
                     Fs::Vector{<:AbstractMatrix{T}}, 
                     Es::Vector{T}, 
                     cvxConstraint::Val{CCB}, 
                     solver::Symbol) where {F<:Function, T, CCB}
-    v, B = mDIIS(Ds, Fs, Es, S)
+    v, B = mDIIS(Ds, Fs, Es, S, X)
     constraintSolver!(cvxConstraint, c, v, B, solver)
     sum(c.*Fs) # Fnew
 end
@@ -1239,7 +1257,7 @@ function genxDIIS(::Type{Val{M}}, αβVars::NTuple{HFTS, HFtempVars{T, HFT}},
     cvxConstraint, mDIIS = getproperty(DIISconfigs, M)
 
     f = function ()
-        Fn = xDIIScore!.(mDIIS, cs, Ref(S), Dss, Fss, Ess, cvxConstraint, solver)
+        Fn = xDIIScore!.(mDIIS, cs, Ref(S), Ref(X), Dss, Fss, Ess, cvxConstraint, solver)
         res = getCDFE(Hcore, HeeI, X, Ns, Fn)
         push!.(cs, 1)
         push!.(Dss, getindex.(res, 2))
