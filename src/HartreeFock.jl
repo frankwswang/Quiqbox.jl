@@ -506,7 +506,7 @@ threshold is set to `NaN`, there will be no convergence detection.
 method stored as `Tuple`s of `Pair`s.
 
 `secondaryConvRatio::T`: The ratio of all the secondary convergence criteria (e.g., the 
-convergence of density matrix and the residual matrix based on commutation relationship 
+convergence of density matrix, the error array based on the commutation relationship 
 between the Fock matrix and the density matrix) to the primary convergence indicator, i.e., 
 the convergence of the energy.
 
@@ -989,7 +989,7 @@ function runHFcore(::Val{HFT},
     Etots = varsShared.Etots
     ΔEs = zeros(T2, 1)
     ΔDrms = zeros(T2, 1)
-    𝐞rms = T2[getErrorNrms(vars, S)]
+    δFrms = T2[getErrorNrms(vars, S)]
     endThreshold = scfConfig.interval[end]
     detectConvergence = !isnan(endThreshold)
     isConverged::Union{Bool, Missing, Int} = true
@@ -1000,7 +1000,7 @@ function runHFcore(::Val{HFT},
     if printInfo
         roundDigits = setNumDigits(T2, endThreshold)
         titleNum = 2 + 2*(infoLevel > 1)
-        titles = ("Step", "E (Ha)", "ΔE (Ha)", "RMS(𝐞) (a.u.)", "RMS(ΔD)")
+        titles = ("Step", "E (Ha)", "ΔE (Ha)", "RMS(FDS-SDF)", "RMS(ΔD)")
         colSpaces = (
             max(ndigits(maxStep), (length∘string)(HFT), length(titles[begin])), 
             roundDigits + (ndigits∘floor)(Int, Etots[]) + 2, 
@@ -1014,8 +1014,9 @@ function runHFcore(::Val{HFT},
         end
 
         if infoLevel > 0
-            println("•Initial E: ", alignNum(Etots[], 0; roundDigits), " Ha")
-            println("•Initial RMS(𝐞): ", alignNum(𝐞rms[], 0; roundDigits), " a.u.")
+            println("•Initial $HFT energy E: ", alignNum(Etots[], 0; roundDigits), " Ha")
+            println("•Initial RMS(FDS-SDF): ", 
+                      alignNum(δFrms[], 0; roundDigits))
             println("•Convergence Threshold: ", endThreshold, " a.u.")
             if infoLevel > 2
                 println("•Secondary Convergence Threshold: ", 
@@ -1070,11 +1071,11 @@ function runHFcore(::Val{HFT},
             push!(ΔEs, Etots[end] - Etots[end-1])
             if endM || printInfo
                 push!(ΔDrms, rmsOf(varsShared.Dtots[end] - varsShared.Dtots[end-1]))
-                push!(𝐞rms, getErrorNrms(vars, S))
+                push!(δFrms, getErrorNrms(vars, S))
             end
             ΔEᵢ = ΔEs[end]
             ΔDrmsᵢ = ΔDrms[end]
-            𝐞rmsᵢ = 𝐞rms[end]
+            δFrmsᵢ = δFrms[end]
             ΔEᵢabs = abs(ΔEᵢ)
 
             if printInfo && infoLevel > 0 && (adaptStepBl(i) || i == maxStep)
@@ -1082,13 +1083,13 @@ function runHFcore(::Val{HFT},
                       " | ", cropStrR(alignNumSign(Etots[end]; roundDigits), colSpaces[2]), 
                       " | ", cropStrR(alignNumSign(ΔEᵢ; roundDigits), colSpaces[3]) )
                 if infoLevel > 1
-                    print( " | ", cropStrR(alignNum(𝐞rmsᵢ, 0; roundDigits), colSpaces[4]), 
+                    print( " | ", cropStrR(alignNum(δFrmsᵢ, 0; roundDigits), colSpaces[4]), 
                            " | ", cropStrR(alignNum(ΔDrmsᵢ, 0; roundDigits), colSpaces[5]) )
                 end
                 println()
             end
 
-            convThresholds = ifelse(𝐞rmsᵢ <= secondaryConvRatio*breakPoint, 
+            convThresholds = ifelse(δFrmsᵢ <= secondaryConvRatio*breakPoint, 
                                     (1, secondaryConvRatio), (0, 0)) .* breakPoint
             ΔEᵢabs <= convThresholds[begin] && ΔDrmsᵢ <= convThresholds[end] && 
             (isConverged = true; break)
@@ -1100,7 +1101,7 @@ function runHFcore(::Val{HFT},
                                                 maxRemains=HFinterEstoreSize)
                 if isOsc
                     if ΔEᵢabs <= oscThreshold && 
-                       (endM ? (𝐞rmsᵢ <= secondaryConvRatio*oscThreshold && 
+                       (endM ? (δFrmsᵢ <= secondaryConvRatio*oscThreshold && 
                                 ΔDrmsᵢ <= secondaryConvRatio*oscThreshold) : true)
                         isConverged = 1
                         break
@@ -1134,7 +1135,7 @@ function runHFcore(::Val{HFT},
         end
         println("\nThe SCF iteration has ", negStr, " at step $i", tStr, ":\n", 
                 "|ΔE| → ", alignNum(abs(ΔEs[end]), 0; roundDigits), " Ha, ", 
-                "RMS(𝐞) → ", alignNum(𝐞rms[end], 0; roundDigits), " a.u., ", 
+                "RMS(FDS-SDF) → ", alignNum(δFrms[end], 0; roundDigits), ", ", 
                 "RMS(ΔD) → ", alignNum(ΔDrms[end], 0; roundDigits), ".\n")
     end
     clearHFtempVars!(saveTrace, vars)
