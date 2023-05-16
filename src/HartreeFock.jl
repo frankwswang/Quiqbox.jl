@@ -1180,8 +1180,8 @@ function genDD(αβVars::NTuple{HFTS, HFtempVars{T, HFT}}, X::AbstractMatrix{T},
 end
 
 
-function EDIIScore(Ds::Vector{<:AbstractMatrix{T}}, 
-                   ∇s::Vector{<:AbstractMatrix{T}}, Es::Vector{T}) where {T}
+function EDIIScore(Ds::Vector{<:AbstractMatrix{T}}, ∇s::Vector{<:AbstractMatrix{T}}, 
+                   Es::Vector{T}) where {T}
     len = length(Ds)
     B = similar(∇s[begin], len, len)
     Δi = firstindex(B, 1) - 1
@@ -1192,8 +1192,8 @@ function EDIIScore(Ds::Vector{<:AbstractMatrix{T}},
     Es, B
 end
 
-function ADIIScore(Ds::Vector{<:AbstractMatrix{T}}, 
-                   ∇s::Vector{<:AbstractMatrix{T}}) where {T}
+function ADIIScore(Ds::Vector{<:AbstractMatrix{T}}, ∇s::Vector{<:AbstractMatrix{T}}) where 
+                  {T}
     v = dot.(Ds .- Ref(Ds[end]), Ref(∇s[end]))
     DsL = Ds[end]
     ∇sL = ∇s[end]
@@ -1206,32 +1206,32 @@ end
 getEresidual(F::AbstractMatrix{T}, D::AbstractMatrix{T}, S::AbstractMatrix{T}) where {T} = 
 F*D*S - S*D*F
 
-function DIIScore(Ds::Vector{<:AbstractMatrix{T}}, 
-                  ∇s::Vector{<:AbstractMatrix{T}}, S::AbstractMatrix{T}) where {T}
+function DIIScore(Ds::Vector{<:AbstractMatrix{T}}, ∇s::Vector{<:AbstractMatrix{T}}, 
+                  S::AbstractMatrix{T}, X::AbstractMatrix{T}) where {T}
     len = length(Ds)
     B = similar(∇s[begin], len, len)
     v = zeros(T, len)
     Δi = firstindex(B, 1) - 1
     Threads.@threads for k in (OneTo∘triMatEleNum)(len)
         i, j = convert1DidxTo2D(len, k)
-        @inbounds B[i+Δi, j+Δi] = B[j+Δi, i+Δi] = dot( getEresidual(∇s[i], Ds[i], S), 
-                                                       getEresidual(∇s[j], Ds[j], S) )
+        @inbounds B[i+Δi, j+Δi] = B[j+Δi, i+Δi] = dot( X'*getEresidual(∇s[i], Ds[i], S)*X, 
+                                                       X'*getEresidual(∇s[j], Ds[j], S)*X )
     end
     v, B
 end
 
 #                     convex constraint|unified function signature
-const DIISconfigs = ( DIIS=(Val(false), (Ds, ∇s, Es, S)-> DIIScore(Ds, ∇s, S)), 
-                      EDIIS=(Val(true), (Ds, ∇s, Es, S)->EDIIScore(Ds, ∇s, Es)), 
-                      ADIIS=(Val(true), (Ds, ∇s, Es, S)->ADIIScore(Ds, ∇s)) )
+const DIISconfigs = ( DIIS=(Val(false), (Ds, ∇s, Es, S, X)-> DIIScore(Ds, ∇s, S, X)), 
+                      EDIIS=(Val(true), (Ds, ∇s, Es, S, X)->EDIIScore(Ds, ∇s, Es)), 
+                      ADIIS=(Val(true), (Ds, ∇s, Es, S, X)->ADIIScore(Ds, ∇s)) )
 
-function xDIIScore!(mDIIS::F, c::Vector{T}, S::AbstractMatrix{T}, 
+function xDIIScore!(mDIIS::F, c::Vector{T}, S::AbstractMatrix{T}, X::AbstractMatrix{T}, 
                     Ds::Vector{<:AbstractMatrix{T}}, 
                     Fs::Vector{<:AbstractMatrix{T}}, 
                     Es::Vector{T}, 
                     cvxConstraint::Val{CCB}, 
                     solver::Symbol) where {F<:Function, T, CCB}
-    v, B = mDIIS(Ds, Fs, Es, S)
+    v, B = mDIIS(Ds, Fs, Es, S, X)
     constraintSolver!(cvxConstraint, c, v, B, solver)
     sum(c.*Fs) # Fnew
 end
@@ -1257,7 +1257,7 @@ function genxDIIS(::Type{Val{M}}, αβVars::NTuple{HFTS, HFtempVars{T, HFT}},
     cvxConstraint, mDIIS = getproperty(DIISconfigs, M)
 
     f = function ()
-        Fn = xDIIScore!.(mDIIS, cs, Ref(S), Dss, Fss, Ess, cvxConstraint, solver)
+        Fn = xDIIScore!.(mDIIS, cs, Ref(S), Ref(X), Dss, Fss, Ess, cvxConstraint, solver)
         res = getCDFE(Hcore, HeeI, X, Ns, Fn)
         push!.(cs, 1)
         push!.(Dss, getindex.(res, 2))
