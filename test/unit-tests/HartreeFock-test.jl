@@ -299,21 +299,22 @@ end
 AtoBr = 1.8897259886
 
 ## H2O2
-t1 = 1e-10
+t1 = 5e-10
 maxStep1 = 200
+secondaryConvRatio1 = 10
 
 nuc_H2O2 = ["O", "O", "H", "H"]
 coords_H2O2 = [[0., 0.731, 0.], [0., -0.731, 0.], 
                [0.936, 0.916, 0.], [-0.936, -0.916, 0.]] .* AtoBr
 Ehf_H2O2 = -187.42063898359095
 
-HFc0 = HFconfig()
-
 SCFc1 = SCFconfig(threshold=t1)
-SCFc2 = SCFconfig((:DIIS,), (t1,))
-SCFc3 = SCFconfig((:EDIIS,), (t1,))
-SCFc4 = SCFconfig((:ADIIS,), (t1,))
-SCFc5 = SCFconfig(threshold=t1, secondaryConvRatio=1)
+SCFc2 = SCFconfig((:DIIS, ), (t1,), secondaryConvRatio=secondaryConvRatio1)
+SCFc3 = SCFconfig((:EDIIS,), (t1,), secondaryConvRatio=secondaryConvRatio1)
+SCFc4 = SCFconfig((:ADIIS,), (t1,), secondaryConvRatio=secondaryConvRatio1)
+SCFc5 = SCFconfig(threshold=t1, secondaryConvRatio=secondaryConvRatio1)
+
+HFc0 = HFconfig()
 
 HFc1 = HFconfig(C0=:SAD,   SCF=SCFc1, maxStep=maxStep1)
 HFc2 = HFconfig(C0=:Hcore, SCF=SCFc1, maxStep=maxStep1)
