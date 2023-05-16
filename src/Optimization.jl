@@ -446,17 +446,17 @@ function optimizeParams!(pbs::AbstractVector{<:ParamBox{T}},
     thresholds = ifelse(isNaN(config.target), 
                         [threshold[begin], threshold[end]], [threshold[begin]])
     roundDigits = setNumDigits(T, thresholds[begin])
-    detectConverge = false
+    detectConvergence = false
     isConverged = map(targets, thresholds) do target, thd
         if isNaN(thd)
             _->true
         else
-            detectConverge |= true
+            detectConvergence |= true
             vrs->isOscillateConverged(vrs, thd*sqrt(vrs[end]|>length), target, 
                                       maxRemains=POinterValMaxStore)[begin]
         end
     end
-    detectConverge || (isConverged = (_->false,))
+    detectConvergence || (isConverged = (_->false,))
     blConv = false
 
     nuc = arrayToTuple(nuc)
@@ -530,7 +530,7 @@ function optimizeParams!(pbs::AbstractVector{<:ParamBox{T}},
         println(IOContext(stdout, :limit=>expandVectors), 
                 round.(getindex.(pbs), sigdigits=roundDigits))
         print("after ", genTimeStr(tEnd - tBegin, 1e9), ". ")
-        if detectConverge
+        if detectConvergence
             println("The iteration has" * ifelse(blConv, "", " not") *" converged: ")
             println("∥Δ$(fVstr)∥₂ → ", 
                     alignNum(norm(fVals[end] - fVals[end-1]), 0; roundDigits), ", ", 
@@ -539,7 +539,7 @@ function optimizeParams!(pbs::AbstractVector{<:ParamBox{T}},
         end
         println()
     end
-    res = Any[ifelse(detectConverge, blConv, missing)]
+    res = Any[ifelse(detectConvergence, blConv, missing)]
     append!(res, view(allInfo, findall(itself, saveTrace)))
     res
 end
