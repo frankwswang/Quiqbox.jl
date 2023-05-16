@@ -308,7 +308,7 @@ coords_H2O2 = [[0., 0.731, 0.], [0., -0.731, 0.],
                [0.936, 0.916, 0.], [-0.936, -0.916, 0.]] .* AtoBr
 Ehf_H2O2 = -187.42063898359095
 
-SCFc1 = SCFconfig(threshold=t1)
+SCFc1 = SCFconfig(threshold=1e-10)
 SCFc2 = SCFconfig((:DIIS, ), (t1,), secondaryConvRatio=secondaryConvRatio1)
 SCFc3 = SCFconfig((:EDIIS,), (t1,), secondaryConvRatio=secondaryConvRatio1)
 SCFc4 = SCFconfig((:ADIIS,), (t1,), secondaryConvRatio=secondaryConvRatio1)
