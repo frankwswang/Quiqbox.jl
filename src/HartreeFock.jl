@@ -498,7 +498,9 @@ computation.
 * `:LCM`: Lagrange multiplier solver.
 * `:SPGB`: $(Doc_SCFconfig_SPGB)
 
-`interval::NTuple{L, T}`: The stopping (or skipping) thresholds for required methods.
+`interval::NTuple{L, T}`: The stopping (or skipping) thresholds for required methods. The 
+last threshold will be the convergence threshold for the SCF procedure. When the last 
+threshold is set to `NaN`, there will be no convergence detection.
 
 `methodConfig::NTuple{L, Vector{<:Pair}}`: The additional keywords arguments for each 
 method stored as `Tuple`s of `Pair`s.
@@ -625,7 +627,7 @@ spin-up electrons and spin-down electrons.
 the Hartree–Fock interactions.
 
 `isConverged::Union{Bool, Missing}`: Whether the SCF iteration is converged in the end. 
-When the iteration converged to an oscillation, it is set to `missing`.
+When convergence detection is off (see [SCFconfig](@ref)), it is set to `missing`.
 
 `basis::GTBasis{T, D, BN}`: The basis set used for the Hartree–Fock approximation.
 """
@@ -980,6 +982,7 @@ function runHFcore(::Val{HFT},
                    infoLevel::Int=defaultHFinfoL) where {HFT, T1, L, MS, HFTS, T2}
     timerBool = printInfo && infoLevel > 2
     timerBool && (tBegin = time_ns())
+
     vars = initializeSCF(Val(HFT), Hcore, HeeI, C0, Ns)
     secondaryConvRatio = scfConfig.secondaryConvRatio
     varsShared = vars[begin].shared
@@ -987,13 +990,14 @@ function runHFcore(::Val{HFT},
     ΔEs = zeros(T2, 1)
     ΔDrms = zeros(T2, 1)
     𝐞rms = T2[getErrorNrms(vars, S)]
-    isConverged = true
+    endThreshold = scfConfig.interval[end]
+    detectConvergence = !isnan(endThreshold)
+    isConverged::Union{Bool, Missing, Int} = true
     rollbackRange = 0 : (HFminItr÷3)
     rollbackCount = length(rollbackRange)
     i = 0
 
     if printInfo
-        endThreshold = scfConfig.interval[end]
         roundDigits = setNumDigits(T2, endThreshold)
         titleNum = 2 + 2*(infoLevel > 1)
         titles = ("Step", "E (Ha)", "ΔE (Ha)", "RMS(𝐞) (a.u.)", "RMS(ΔD)")
@@ -1098,7 +1102,7 @@ function runHFcore(::Val{HFT},
                     if ΔEᵢabs <= oscThreshold && 
                        (endM ? (𝐞rmsᵢ <= secondaryConvRatio*oscThreshold && 
                                 ΔDrmsᵢ <= secondaryConvRatio*oscThreshold) : true)
-                        isConverged = missing
+                        isConverged = 1
                         break
                     end
                 else
@@ -1117,21 +1121,24 @@ function runHFcore(::Val{HFT},
             end
         end
     end
+
     timerBool && (tEnd = time_ns())
-    tStr = if timerBool
-        " after " * genTimeStr(tEnd - tBegin)
-    else
-        ""
-    end
-    negStr = ifelse(isConverged===missing, "converged to an oscillation", 
-                    ifelse(isConverged, "converged", "stopped but not converged"))
+
     if printInfo
-        println("\nThe SCF iteration is ", negStr, " at step $i", tStr, ":\n", 
+        tStr = timerBool ? " after "*genTimeStr(tEnd - tBegin) : ""
+        negStr = if detectConvergence
+            ifelse(isConverged==1, (isConverged=true; "converged to an oscillation"), 
+                   ifelse(isConverged, "converged", "stopped but not converged"))
+        else
+            "stopped"
+        end
+        println("\nThe SCF iteration has ", negStr, " at step $i", tStr, ":\n", 
                 "|ΔE| → ", alignNum(abs(ΔEs[end]), 0; roundDigits), " Ha, ", 
                 "RMS(𝐞) → ", alignNum(𝐞rms[end], 0; roundDigits), " a.u., ", 
                 "RMS(ΔD) → ", alignNum(ΔDrms[end], 0; roundDigits), ".\n")
     end
     clearHFtempVars!(saveTrace, vars)
+    detectConvergence || (isConverged = missing)
     vars, isConverged
 end
 
