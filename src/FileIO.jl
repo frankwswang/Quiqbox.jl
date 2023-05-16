@@ -216,3 +216,13 @@ function ShortenStrClip(str::String, clip::AbstractString)
     end
     replace(str, tempSym=>clip)
 end
+
+
+function cropStrR(str::String, maxLen::Int)
+    strLen = length(str)
+    if maxLen > strLen
+        rpad(str, maxLen)
+    else
+        str[begin:maxLen]
+    end
+end
