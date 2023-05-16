@@ -308,11 +308,10 @@ coords_H2O2 = [[0., 0.731, 0.], [0., -0.731, 0.],
                [0.936, 0.916, 0.], [-0.936, -0.916, 0.]] .* AtoBr
 Ehf_H2O2 = -187.42063898359095
 
-SCFc1 = SCFconfig(threshold=1e-10)
+SCFc1 = SCFconfig(threshold=t1, secondaryConvRatio=secondaryConvRatio1)
 SCFc2 = SCFconfig((:DIIS, ), (t1,), secondaryConvRatio=secondaryConvRatio1)
 SCFc3 = SCFconfig((:EDIIS,), (t1,), secondaryConvRatio=secondaryConvRatio1)
 SCFc4 = SCFconfig((:ADIIS,), (t1,), secondaryConvRatio=secondaryConvRatio1)
-SCFc5 = SCFconfig(threshold=t1, secondaryConvRatio=secondaryConvRatio1)
 
 HFc0 = HFconfig()
 
@@ -332,12 +331,8 @@ HFc10 = HFconfig(C0=:GWH,  SCF=SCFc2, maxStep=maxStep1)
 HFc11 = HFconfig(C0=:GWH,  SCF=SCFc3, maxStep=maxStep1)
 HFc12 = HFconfig(C0=:GWH,  SCF=SCFc4, maxStep=maxStep1)
 
-HFc13 = HFconfig(C0=:SAD,  SCF=SCFc5, maxStep=maxStep1)
-HFc14 = HFconfig(C0=:Hcore,SCF=SCFc5, maxStep=maxStep1)
-HFc15 = HFconfig(C0=:GWH,  SCF=SCFc5, maxStep=maxStep1)
-
 HFcs = (HFc0,  HFc1,  HFc2,  HFc3,  HFc4,  HFc5,  HFc6,  HFc7,  HFc8,  HFc9, 
-        HFc10, HFc11, HFc12, HFc13, HFc14, HFc15)
+        HFc10, HFc11, HFc12)
 
 for (idx, HFc) in enumerate(HFcs)
     bs = genBasisFunc.(coords_H2O2, "6-31G", nuc_H2O2) |> flatten
