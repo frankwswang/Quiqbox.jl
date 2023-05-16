@@ -624,7 +624,8 @@ spin-up electrons and spin-down electrons.
 `temp::NTuple{HFTS, [HFtempVars](@ref){T, HFT}}`: the intermediate values stored during 
 the Hartree–Fock interactions.
 
-`isConverged::Bool`: Whether the SCF procedure is converged in the end.
+`isConverged::Union{Bool, Missing}`: Whether the SCF iteration is converged in the end. 
+When the iteration converged to an oscillation, it is set to `missing`.
 
 `basis::GTBasis{T, D, BN}`: The basis set used for the Hartree–Fock approximation.
 """
@@ -640,7 +641,7 @@ struct HFfinalVars{T, D, HFT, NN, BN, HFTS} <: HartreeFockFinalValue{T, HFT}
     Eo::NTuple{HFTS, Vector{T}}
     occu::NTuple{HFTS, NTuple{BN, String}}
     temp::NTuple{HFTS, HFtempVars{T, HFT}}
-    isConverged::Bool
+    isConverged::Union{Bool, Missing}
     basis::GTBasis{T, D, BN}
 
     function HFfinalVars(basis::GTBasis{T, 𝐷, BN}, 
@@ -648,7 +649,8 @@ struct HFfinalVars{T, D, HFT, NN, BN, HFTS} <: HartreeFockFinalValue{T, HFT}
                          nucCoords::SpatialCoordType{T, 𝐷, NNMO}, 
                          X::AbstractMatrix{T}, 
                          vars::NTuple{HFTS, HFtempVars{T, HFT}}, 
-                         isConverged::Bool) where {T, 𝐷, BN, NNMO, HFTS, HFT}
+                         isConverged::Union{Bool, Missing}) where 
+                        {T, 𝐷, BN, NNMO, HFTS, HFT}
         (NNval = length(nuc)) == length(nucCoords) || 
         throw(AssertionError("The length of `nuc` and `nucCoords` should be the same."))
         any(length(i)!=𝐷 for i in nucCoords) && 
@@ -1078,7 +1080,7 @@ function runHFcore(::Val{HFT},
             convThresholds = ifelse(𝐞rmsᵢ <= secondaryConvRatio*breakPoint, 
                                     (1, secondaryConvRatio), (0, 0)) .* breakPoint
             ΔEᵢabs <= convThresholds[begin] && ΔDrmsᵢ <= convThresholds[end] && 
-            (isConverged=true; break)
+            (isConverged = true; break)
 
             # oscillating convergence & early termination of non-convergence.
             if n > 1 && i > HFminItr && ΔEᵢ > flucThreshold
@@ -1089,7 +1091,7 @@ function runHFcore(::Val{HFT},
                     if ΔEᵢabs <= oscThreshold && 
                        (endM ? (𝐞rmsᵢ <= secondaryConvRatio*oscThreshold && 
                                 ΔDrmsᵢ <= secondaryConvRatio*oscThreshold) : true)
-                        isConverged=true
+                        isConverged = missing
                         break
                     end
                 else
@@ -1114,7 +1116,8 @@ function runHFcore(::Val{HFT},
     else
         ""
     end
-    negStr = ifelse(isConverged, "converged", "stopped but not converged")
+    negStr = ifelse(isConverged===missing, "converged to an oscillation", 
+                    ifelse(isConverged, "converged", "stopped but not converged"))
     if printInfo
         println("\nThe SCF iteration is ", negStr, " at step $i", tStr, ":\n", 
                 "|ΔE| → ", alignNum(abs(ΔEs[end]), 0; roundDigits), " Ha, ", 
