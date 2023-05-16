@@ -301,7 +301,7 @@ AtoBr = 1.8897259886
 ## H2O2
 t1 = 5e-10
 maxStep1 = 200
-secondaryConvRatio1 = 10
+secondaryConvRatio1 = 5
 
 nuc_H2O2 = ["O", "O", "H", "H"]
 coords_H2O2 = [[0., 0.731, 0.], [0., -0.731, 0.], 
