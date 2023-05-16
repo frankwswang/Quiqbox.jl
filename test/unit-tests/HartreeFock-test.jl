@@ -324,9 +324,9 @@ HFc10 = HFconfig(C0=:GWH, SCF=SCFconfig((:DIIS,), (t1,)))
 HFc11 = HFconfig(C0=:GWH, SCF=SCFconfig((:EDIIS,), (t1,)))
 HFc12 = HFconfig(C0=:GWH, SCF=SCFconfig((:ADIIS,), (t1,)))
 
-HFc13 = HFconfig(C0=:SAD, SCF=SCFconfig(threshold=1e-9, secondaryConvRatio=1))
-HFc14 = HFconfig(C0=:Hcore, SCF=SCFconfig(threshold=1e-9, secondaryConvRatio=1))
-HFc15 = HFconfig(C0=:GWH, SCF=SCFconfig(threshold=1e-9, secondaryConvRatio=1))
+HFc13 = HFconfig(C0=:SAD, SCF=SCFconfig(threshold=5e-10, secondaryConvRatio=1))
+HFc14 = HFconfig(C0=:Hcore, SCF=SCFconfig(threshold=5e-10, secondaryConvRatio=1))
+HFc15 = HFconfig(C0=:GWH, SCF=SCFconfig(threshold=5e-10, secondaryConvRatio=1))
 
 HFcs = (HFc0,  HFc1,  HFc2,  HFc3,  HFc4,  HFc5,  HFc6,  HFc7,  HFc8,  HFc9, 
         HFc10, HFc11, HFc12, HFc13, HFc14, HFc15)
