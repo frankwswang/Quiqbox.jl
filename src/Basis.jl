@@ -886,7 +886,8 @@ The container of basis set information.
 
 ≡≡≡ Field(s) ≡≡≡
 
-`basis::NTuple{BN, BFT}`: Stored basis set.
+`basis::Vector{BFT}`: Stored basis set with its size equal to `BN` by default 
+(assuming no deleting or appending to basis set has been made).
 
 `S::Matrix{T}`: Overlap matrix.
 
@@ -903,15 +904,15 @@ The container of basis set information.
 Construct a `GTBasis` given a basis set.
 """
 struct GTBasis{T, D, BN, BFT<:GTBasisFuncs{T, D, 1}} <: BasisSetData{T, D, BFT}
-    basis::NTuple{BN, BFT}
+    basis::Vector{BFT}
     S::Matrix{T}
     Te::Matrix{T}
     eeI::Array{T, 4}
 
-    GTBasis(bfs::Tuple{Vararg{GTBasisFuncs{T, D, 1}, BN}}) where {T<:Real, D, BN} = 
-    new{T, D, BN, eltype(bfs)}(bfs, overlaps(bfs), eKinetics(bfs), eeInteractions(bfs))
+    GTBasis(bfs::AbstractVector{BFT}) where {T, D, BFT<:GTBasisFuncs{T, D, 1}} = 
+    new{T, D, length(bfs), BFT}(bfs, overlaps(bfs), eKinetics(bfs), eeInteractions(bfs))
 
-    function GTBasis(bs::Tuple{Vararg{GTBasisFuncs{T, D}}}) where {T, D}
+    function GTBasis(bs::AbstractVector{<:GTBasisFuncs{T, D}}) where {T, D}
         bfs = flatten(bs)
         S = overlaps(bs)
         Te = eKinetics(bs)
@@ -920,7 +921,7 @@ struct GTBasis{T, D, BN, BFT<:GTBasisFuncs{T, D, 1}} <: BasisSetData{T, D, BFT}
     end
 end
 
-GTBasis(bs::AbstractVector{<:GTBasisFuncs{T, D}}) where {T, D} = GTBasis(bs |> Tuple)
+GTBasis(bs::Tuple{Vararg{GTBasisFuncs{T, D}}}) where {T, D} = (GTBasis∘collect)(bs)
 
 
 """
@@ -1649,7 +1650,7 @@ function genGaussFuncText(xpn::Real, con::Real; roundDigits::Int=-1)
         con = round(con, digits=roundDigits)
     end
     "  " * alignNum(xpn; roundDigits) * repeat(" ", 8) * 
-    (rstrip∘alignNumSign)(con; roundDigits) * "\n"
+    rstrip(alignNumSign(con; roundDigits)) * "\n"
 end
 
 """

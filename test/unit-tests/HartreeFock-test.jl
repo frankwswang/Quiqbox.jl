@@ -300,6 +300,7 @@ AtoBr = 1.8897259886
 
 ## H2O2
 t1 = 1e-10
+maxStep1 = 200
 
 nuc_H2O2 = ["O", "O", "H", "H"]
 coords_H2O2 = [[0., 0.731, 0.], [0., -0.731, 0.], 
@@ -308,30 +309,36 @@ Ehf_H2O2 = -187.42063898359095
 
 HFc0 = HFconfig()
 
-HFc1 = HFconfig(C0=:SAD, SCF=SCFconfig(threshold=t1))
-HFc2 = HFconfig(C0=:Hcore, SCF=SCFconfig(threshold=t1))
-HFc3 = HFconfig(C0=:GWH, SCF=SCFconfig(threshold=t1))
+SCFc1 = SCFconfig(threshold=t1)
+SCFc2 = SCFconfig((:DIIS,), (t1,))
+SCFc3 = SCFconfig((:EDIIS,), (t1,))
+SCFc4 = SCFconfig((:ADIIS,), (t1,))
+SCFc5 = SCFconfig(threshold=t1, secondaryConvRatio=1)
 
-HFc4 = HFconfig(C0=:SAD, SCF=SCFconfig((:DIIS,), (t1,)))
-HFc5 = HFconfig(C0=:SAD, SCF=SCFconfig((:EDIIS,), (t1,)))
-HFc6 = HFconfig(C0=:SAD, SCF=SCFconfig((:ADIIS,), (t1,)))
+HFc1 = HFconfig(C0=:SAD,   SCF=SCFc1, maxStep=maxStep1)
+HFc2 = HFconfig(C0=:Hcore, SCF=SCFc1, maxStep=maxStep1)
+HFc3 = HFconfig(C0=:GWH,   SCF=SCFc1, maxStep=maxStep1)
 
-HFc7 = HFconfig(C0=:Hcore, SCF=SCFconfig((:DIIS,), (t1,)))
-HFc8 = HFconfig(C0=:Hcore, SCF=SCFconfig((:EDIIS,), (t1,)))
-HFc9 = HFconfig(C0=:Hcore, SCF=SCFconfig((:ADIIS,), (t1,)))
+HFc4 = HFconfig(C0=:SAD,   SCF=SCFc2, maxStep=maxStep1)
+HFc5 = HFconfig(C0=:SAD,   SCF=SCFc3, maxStep=maxStep1)
+HFc6 = HFconfig(C0=:SAD,   SCF=SCFc4, maxStep=maxStep1)
 
-HFc10 = HFconfig(C0=:GWH, SCF=SCFconfig((:DIIS,), (t1,)))
-HFc11 = HFconfig(C0=:GWH, SCF=SCFconfig((:EDIIS,), (t1,)))
-HFc12 = HFconfig(C0=:GWH, SCF=SCFconfig((:ADIIS,), (t1,)))
+HFc7 = HFconfig(C0=:Hcore, SCF=SCFc2, maxStep=maxStep1)
+HFc8 = HFconfig(C0=:Hcore, SCF=SCFc3, maxStep=maxStep1)
+HFc9 = HFconfig(C0=:Hcore, SCF=SCFc4, maxStep=maxStep1)
 
-HFc13 = HFconfig(C0=:SAD, SCF=SCFconfig(threshold=1e-9, secondaryConvRatio=1))
-HFc14 = HFconfig(C0=:Hcore, SCF=SCFconfig(threshold=1e-9, secondaryConvRatio=1))
-HFc15 = HFconfig(C0=:GWH, SCF=SCFconfig(threshold=1e-9, secondaryConvRatio=1))
+HFc10 = HFconfig(C0=:GWH,  SCF=SCFc2, maxStep=maxStep1)
+HFc11 = HFconfig(C0=:GWH,  SCF=SCFc3, maxStep=maxStep1)
+HFc12 = HFconfig(C0=:GWH,  SCF=SCFc4, maxStep=maxStep1)
+
+HFc13 = HFconfig(C0=:SAD,  SCF=SCFc5, maxStep=maxStep1)
+HFc14 = HFconfig(C0=:Hcore,SCF=SCFc5, maxStep=maxStep1)
+HFc15 = HFconfig(C0=:GWH,  SCF=SCFc5, maxStep=maxStep1)
 
 HFcs = (HFc0,  HFc1,  HFc2,  HFc3,  HFc4,  HFc5,  HFc6,  HFc7,  HFc8,  HFc9, 
         HFc10, HFc11, HFc12, HFc13, HFc14, HFc15)
 
-for HFc in (HFcs)
+for (idx, HFc) in enumerate(HFcs)
     bs = genBasisFunc.(coords_H2O2, "6-31G", nuc_H2O2) |> flatten
     local res3
     info3 = @capture_out begin
@@ -339,10 +346,17 @@ for HFc in (HFcs)
         res3 = runHF(bs, nuc_H2O2, coords_H2O2, HFc, printInfo=true, infoLevel=5)
         @show res3
     end
-    bl = isapprox(res3.Ehf, Ehf_H2O2, atol=t1)
-    bl || println(info3)
-    @test bl
-    @test res3.isConverged
+    bl1 = isapprox(res3.Ehf, Ehf_H2O2, atol=t1)
+    bl2 = res3.isConverged
+    if !(bl1 && bl2)
+        println("===>>>")
+        println("Case $(idx):")
+        println(info3)
+        @show bl1, bl2
+        println("<<<===")
+    end
+    @test bl1
+    @test bl2
 end
 
 end

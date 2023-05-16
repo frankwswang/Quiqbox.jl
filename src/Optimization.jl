@@ -414,8 +414,9 @@ electrons with same spin configurations(s).
 `printInfo::Bool`: Whether print out the information of iteration steps.
 
 `infoLevel::Int`: Printed info's level of details when `printInfo=true`. The higher 
-(the absolute value of) it is, more intermediate steps will be printed. Once `infoLevel` 
-achieve `5`, every step will be printed.
+(the absolute value of) it is, more intermediate steps and other information will be 
+printed. Once `infoLevel` achieve `5`, every step and all available information will be 
+printed.
 """
 function optimizeParams!(pbs::AbstractVector{<:ParamBox{T}}, 
                          bs::AbstractVector{<:GTBasisFuncs{T, D}}, 
@@ -425,7 +426,7 @@ function optimizeParams!(pbs::AbstractVector{<:ParamBox{T}},
                          N::Union{Int, Tuple{Int}, NTuple{2, Int}}=getCharge(nuc); 
                          printInfo::Bool=true, 
                          infoLevel::Int=defaultPOinfoL) where {T, D, NNMO, M, CBT, F}
-    tBegin = time()
+    printInfo && (tBegin = time())
 
     pars = formatTunableParams!(pbs, bs)
     x = getindex.(pars)
@@ -438,9 +439,13 @@ function optimizeParams!(pbs::AbstractVector{<:ParamBox{T}},
     targets = (config.target, 0) # (fTarget, gTarget)
     maxStep = config.maxStep
     adaptStepBl = genAdaptStepBl(infoLevel, maxStep)
+    expandVectors = ifelse(infoLevel > 3, false, true)
+
+    printInfo && ( stepSpace = ndigits(maxStep) )
 
     thresholds = ifelse(isNaN(config.target), 
                         [threshold[begin], threshold[end]], [threshold[begin]])
+    roundDigits = setNumDigits(T, thresholds[begin])
     detectConverge = false
     isConverged = map(targets, thresholds) do target, thd
         if isNaN(thd)
@@ -473,20 +478,26 @@ function optimizeParams!(pbs::AbstractVector{<:ParamBox{T}},
 
     while !(blConv = all(f(x) for (f, x) in zip(isConverged, (fVals, grads)))) && i<maxStep
 
-        if printInfo && adaptStepBl(i)
-            println(rpad("Step $(i): ", 11), lpad("$(fVstr) = ", 6), 
-                    alignNumSign(fx, roundDigits=DefaultDigits))
-            print(rpad("", 11), lpad("𝒙 = ", 6))
-            println(IOContext(stdout, :limit => true), round.(x, digits=DefaultDigits))
-            print(rpad("", 11), lpad("∇$(fVstr) = ", 6))
-            println(IOContext(stdout, :limit => true), round.(gx, digits=DefaultDigits))
-            println("Step duration: ", round(Δt₁+Δt₂, digits=6), " seconds.\n")
+        if printInfo && infoLevel > 0 && adaptStepBl(i)
+            println(rpad("Step $(i): ", 8+stepSpace), lpad("$(fVstr) = ", 6), 
+                    alignNumSign(fx; roundDigits))
+            if infoLevel > 2
+                print(lpad("𝒙 = ", 14+stepSpace))
+                println(IOContext(stdout, :limit=>expandVectors), 
+                        round.(x, sigdigits=roundDigits))
+                print(lpad("∇$(fVstr) = ", 14+stepSpace))
+                println(IOContext(stdout, :limit =>expandVectors), 
+                        round.(gx, sigdigits=roundDigits))
+            end
+            println(lpad("∥vec(∇$(fVstr))∥₂ = ", 14+stepSpace), 
+                    alignNumSign(norm(grads[end]); roundDigits))
+            println("Step duration: ", genTimeStr(Δt₁ + Δt₂), ".\n")
         end
 
         t3 = time_ns()
         optimize!(x, gx, fx)
         t4 = time_ns()
-        Δt₂ = (t4 - t3) / 1e9
+        Δt₂ = t4 - t3
         setindex!.(pars, x)
         updateOFconfig!(f0config, f0s[begin], fRes)
 
@@ -501,7 +512,7 @@ function optimizeParams!(pbs::AbstractVector{<:ParamBox{T}},
         push!(grads, gx)
     end
 
-    tEnd = time()
+    printInfo && (tEnd = time())
 
     pbsT, bsT = makeAbsLayerForXpnParams(pbs, bs, true)
     pbs .= pbsT
@@ -513,19 +524,18 @@ function optimizeParams!(pbs::AbstractVector{<:ParamBox{T}},
         print("with respect to $(fVstr)(𝒙) from the profile ")
         printstyled(":$M", bold=true)
         println(" just ended at")
-        println(rpad("Step $(i): ", 11), lpad("$(fVstr) = ", 6), 
+        println(rpad("Step $(i): ", 8+stepSpace), lpad("$(fVstr) = ", 6), 
                 alignNumSign(fVals[end], roundDigits=DefaultDigits))
-        print(rpad("", 11), lpad("𝒙 = ", 6))
-        println(IOContext(stdout, :limit => true), 
-                round.(getindex.(pbs), digits=DefaultDigits))
-        t = round((tEnd-tBegin)/60, digits=6)
-        print("after ", t, " minute", ifelse(t>1, "s", ""), ".")
+        print(lpad("𝒙 = ", 14+stepSpace))
+        println(IOContext(stdout, :limit=>expandVectors), 
+                round.(getindex.(pbs), sigdigits=roundDigits))
+        print("after ", genTimeStr(tEnd - tBegin, 1e9), ". ")
         if detectConverge
             println("The iteration has" * ifelse(blConv, "", " not") *" converged: ")
             println("∥Δ$(fVstr)∥₂ → ", 
-                    round(norm(fVals[end] - fVals[end-1]), digits=DefaultDigits), ", ", 
+                    alignNum(norm(fVals[end] - fVals[end-1]), 0; roundDigits), ", ", 
                     "∥vec(∇$(fVstr))∥₂ → ", 
-                    round(norm(grads[end]), digits=DefaultDigits), ".")
+                    alignNum(norm(grads[end]), 0; roundDigits), ".")
         end
         println()
     end
@@ -546,7 +556,7 @@ function optimizeParamsCore((f0, getOFval), (g0, getOGval),
     fx = getOFval(fRes)
     gx = (getOGval∘g0)(fRes, pbs, gtb, nuc, nucCoords, N)
     t2 = time_ns()
-    fx, gx, fRes, (t2 - t1) / 1e9
+    fx, gx, fRes, (t2 - t1)
 end
 
 

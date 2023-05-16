@@ -893,16 +893,12 @@ function runHFcore(bs::GTBasis{T, D, BN, BFT},
         println("$N-Electron System Information: ")
         for (atm, coord) in zip(nuc, nucCoords)
             println("•", atm, ": ", "[", alignNumSign(coord[1]; roundDigits), ", ", 
-                                          alignNumSign(coord[2]; roundDigits), ", ", 
-                                          alignNumSign(coord[3]; roundDigits), "]")
+                                         alignNumSign(coord[2]; roundDigits), ", ", 
+                                         alignNumSign(coord[3]; roundDigits), "]")
         end
         println()
         print("Hartree–Fock ($HFT) Initialization")
-        if timerBool
-            t = (tEnd - tBegin) / 1e9
-            tStr = alignNum(t, 0, roundDigits=TimerDigits)
-            print(" (Finished in ", tStr, " second", ifelse(t>1, "s", ""), ")")
-        end
+        timerBool && print(" (Finished in ", genTimeStr(tEnd - tBegin), ")")
         println(":")
         println("•Basis Set Size: ", BN)
         println("•Initial Guess Method: ", getC0symbol(getC0f))
@@ -963,8 +959,9 @@ information from all the iterations steps to the output [`HFtempVars`](@ref) of
 `printInfo::Bool`: Whether print out the information of iteration steps and result.
 
 `infoLevel::Int`: Printed info's level of details when `printInfo=true`. The higher 
-(the absolute value of) it is, more intermediate steps will be printed. Once `infoLevel` 
-achieve `5`, every step will be printed.
+(the absolute value of) it is, more intermediate steps and other information will be 
+printed. Once `infoLevel` achieve `5`, every step and all available information will be 
+printed.
 """
 function runHFcore(::Val{HFT}, 
                    scfConfig::SCFconfig{T1, L, MS}, 
@@ -987,7 +984,7 @@ function runHFcore(::Val{HFT},
     Etots = varsShared.Etots
     ΔEs = zeros(T2, 1)
     ΔDrms = zeros(T2, 1)
-    ∇Erms = [getLatest∇Erms(vars, S)]
+    𝐞rms = T2[getErrorNrms(vars, S)]
     isConverged = true
     rollbackRange = 0 : (HFminItr÷3)
     rollbackCount = length(rollbackRange)
@@ -995,21 +992,24 @@ function runHFcore(::Val{HFT},
 
     if printInfo
         endThreshold = scfConfig.interval[end]
-        roundDigits = min( getAtolDigits(T2), 
-                           (getAtolDigits∘ifelse)(isnan(endThreshold), T2, endThreshold) )
+        roundDigits = setNumDigits(T2, endThreshold)
         titleNum = 2 + 2*(infoLevel > 1)
-        titles = ["step", "E (Ha)", "ΔE (Ha)", "RMS(∇E) (a.u.)", "RMS(ΔD)"][1:titleNum+1]
-        stepPrintLen = max(ndigits(maxStep), (length∘string)(HFT), length(titles[1]))
-        numSpace = roundDigits + (ndigits∘floor)(Int, Etots[end]) + 3
-        colSpaces = max.(length.(titles), vcat(stepPrintLen, fill(numSpace, titleNum)))
-
-        titleStr = mapreduce(*, titles, colSpaces) do title, printSpace
-            "| " * rpad(title, printSpace) * " "
+        titles = ("Step", "E (Ha)", "ΔE (Ha)", "RMS(𝐞) (a.u.)", "RMS(ΔD)")
+        colSpaces = (
+            max(ndigits(maxStep), (length∘string)(HFT), length(titles[begin])), 
+            roundDigits + (ndigits∘floor)(Int, Etots[]) + 2, 
+            roundDigits + 3
+        )
+        titleStr = ""
+        colSpaces = map(titles, (1, 2, 3, 3, 3)[begin:titleNum+1]) do title, idx
+            printSpace = max(length(title), colSpaces[idx])
+            titleStr *= "| " * rpad(title, printSpace) * " "
+            printSpace
         end
 
         if infoLevel > 0
-            println("•Initial E: ", alignNum(Etots[end], 0; roundDigits), " Ha")
-            println("•Initial RMS(∇E): ", alignNum(∇Erms[], 0; roundDigits), " a.u.\n")
+            println("•Initial E: ", alignNum(Etots[], 0; roundDigits), " Ha")
+            println("•Initial RMS(𝐞): ", alignNum(𝐞rms[], 0; roundDigits), " a.u.\n")
 
             println("Self-Consistent Field (SCF) Iteration:")
             (println∘repeat)('=', length(titleStr))
@@ -1057,25 +1057,25 @@ function runHFcore(::Val{HFT},
             push!(ΔEs, Etots[end] - Etots[end-1])
             if endM || printInfo
                 push!(ΔDrms, rmsOf(varsShared.Dtots[end] - varsShared.Dtots[end-1]))
-                push!(∇Erms, getLatest∇Erms(vars, S))
+                push!(𝐞rms, getErrorNrms(vars, S))
             end
             ΔEᵢ = ΔEs[end]
             ΔDrmsᵢ = ΔDrms[end]
-            ∇Ermsᵢ = ∇Erms[end]
+            𝐞rmsᵢ = 𝐞rms[end]
             ΔEᵢabs = abs(ΔEᵢ)
 
             if printInfo && infoLevel > 0 && (adaptStepBl(i) || i == maxStep)
                 print( "| ", rpad("$i", colSpaces[1]), 
-                      " | ", alignNumSign(Etots[end], colSpaces[2]; roundDigits), 
-                      " | ", alignNumSign(ΔEᵢ, colSpaces[3]; roundDigits) )
+                      " | ", cropStrR(alignNumSign(Etots[end]; roundDigits), colSpaces[2]), 
+                      " | ", cropStrR(alignNumSign(ΔEᵢ; roundDigits), colSpaces[3]) )
                 if infoLevel > 1
-                    print(" | ", alignNumSign(∇Ermsᵢ, colSpaces[4]; roundDigits), 
-                          " | ", alignNumSign(ΔDrmsᵢ, colSpaces[5]; roundDigits))
+                    print( " | ", cropStrR(alignNum(𝐞rmsᵢ, 0; roundDigits), colSpaces[4]), 
+                           " | ", cropStrR(alignNum(ΔDrmsᵢ, 0; roundDigits), colSpaces[5]) )
                 end
                 println()
             end
 
-            convThresholds = ifelse(∇Ermsᵢ <= secondaryConvRatio*breakPoint, 
+            convThresholds = ifelse(𝐞rmsᵢ <= secondaryConvRatio*breakPoint, 
                                     (1, secondaryConvRatio), (0, 0)) .* breakPoint
             ΔEᵢabs <= convThresholds[begin] && ΔDrmsᵢ <= convThresholds[end] && 
             (isConverged=true; break)
@@ -1087,7 +1087,7 @@ function runHFcore(::Val{HFT},
                                                 maxRemains=HFinterEstoreSize)
                 if isOsc
                     if ΔEᵢabs <= oscThreshold && 
-                       (endM ? (∇Ermsᵢ <= secondaryConvRatio*oscThreshold && 
+                       (endM ? (𝐞rmsᵢ <= secondaryConvRatio*oscThreshold && 
                                 ΔDrmsᵢ <= secondaryConvRatio*oscThreshold) : true)
                         isConverged=true
                         break
@@ -1110,9 +1110,7 @@ function runHFcore(::Val{HFT},
     end
     timerBool && (tEnd = time_ns())
     tStr = if timerBool
-        t = (tEnd - tBegin) / 1e9
-        tStr = alignNum(t, 0, roundDigits=TimerDigits)
-        " after $(tStr) second" * ifelse(t>1, "s", "")
+        " after " * genTimeStr(tEnd - tBegin)
     else
         ""
     end
@@ -1120,15 +1118,15 @@ function runHFcore(::Val{HFT},
     if printInfo
         println("\nThe SCF iteration is ", negStr, " at step $i", tStr, ":\n", 
                 "|ΔE| → ", alignNum(abs(ΔEs[end]), 0; roundDigits), " Ha, ", 
-                "RMS(∇E) → ", alignNum(∇Erms[end], 0; roundDigits), " a.u., ", 
+                "RMS(𝐞) → ", alignNum(𝐞rms[end], 0; roundDigits), " a.u., ", 
                 "RMS(ΔD) → ", alignNum(ΔDrms[end], 0; roundDigits), ".\n")
     end
     clearHFtempVars!(saveTrace, vars)
     vars, isConverged
 end
 
-function getLatest∇Erms(vars::NTuple{HFTS, HFtempVars{T, HFT}}, 
-                        S::AbstractMatrix{T}) where {HFTS, T, HFT}
+function getErrorNrms(vars::NTuple{HFTS, HFtempVars{T, HFT}}, 
+                      S::AbstractMatrix{T}) where {HFTS, T, HFT}
     mapreduce(+, vars) do tVar
         D = tVar.Ds[end]
         F = tVar.Fs[end]
@@ -1251,10 +1249,10 @@ function genxDIIS(::Type{Val{M}}, αβVars::NTuple{HFTS, HFtempVars{T, HFT}},
             if length(Es) > 2 && # Let the new (not first) DIIS space have 2+ samples
                Es[end] - Es[end-1] > resetThreshold
                 keepIndex = lastindex(Es) - 1
-                keepat!(c,   keepIndex)
-                keepat!(Ds,  keepIndex)
-                keepat!(Fs,  keepIndex)
-                keepat!(Es,  keepIndex)
+                keepOnly!(c,   keepIndex)
+                keepOnly!(Ds,  keepIndex)
+                keepOnly!(Fs,  keepIndex)
+                keepOnly!(Es,  keepIndex)
             else
                 if length(c) > DIISsize
                     popIndex = argmax(Es)
