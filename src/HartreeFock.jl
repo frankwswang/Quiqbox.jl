@@ -898,11 +898,7 @@ function runHFcore(bs::GTBasis{T, D, BN, BFT},
         end
         println()
         print("Hartree–Fock ($HFT) Initialization")
-        if timerBool
-            t = (tEnd - tBegin) / 1e9
-            tStr = alignNum(t, 0, roundDigits=TimerDigits)
-            print(" (Finished in ", tStr, " second", ifelse(t>1, "s", ""), ")")
-        end
+        timerBool && print(" (Finished in ", genTimeStr(tEnd - tBegin), ")")
         println(":")
         println("•Basis Set Size: ", BN)
         println("•Initial Guess Method: ", getC0symbol(getC0f))
@@ -963,8 +959,9 @@ information from all the iterations steps to the output [`HFtempVars`](@ref) of
 `printInfo::Bool`: Whether print out the information of iteration steps and result.
 
 `infoLevel::Int`: Printed info's level of details when `printInfo=true`. The higher 
-(the absolute value of) it is, more intermediate steps will be printed. Once `infoLevel` 
-achieve `5`, every step will be printed.
+(the absolute value of) it is, more intermediate steps and other information will be 
+printed. Once `infoLevel` achieve `5`, every step and all available information will be 
+printed.
 """
 function runHFcore(::Val{HFT}, 
                    scfConfig::SCFconfig{T1, L, MS}, 
@@ -995,8 +992,7 @@ function runHFcore(::Val{HFT},
 
     if printInfo
         endThreshold = scfConfig.interval[end]
-        roundDigits = min( getAtolDigits(T2), 
-                           (getAtolDigits∘ifelse)(isnan(endThreshold), T2, endThreshold) )
+        roundDigits = setNumDigits(T2, endThreshold)
         titleNum = 2 + 2*(infoLevel > 1)
         titles = ("Step", "E (Ha)", "ΔE (Ha)", "RMS(𝐞) (a.u.)", "RMS(ΔD)")
         colSpaces = (
@@ -1114,9 +1110,7 @@ function runHFcore(::Val{HFT},
     end
     timerBool && (tEnd = time_ns())
     tStr = if timerBool
-        t = (tEnd - tBegin) / 1e9
-        tStr = alignNum(t, 0, roundDigits=TimerDigits)
-        " after $(tStr) second" * ifelse(t>1, "s", "")
+        " after " * genTimeStr(tEnd - tBegin)
     else
         ""
     end

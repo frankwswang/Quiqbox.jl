@@ -226,3 +226,29 @@ function cropStrR(str::String, maxLen::Int)
         str[begin:maxLen]
     end
 end
+
+
+function setNumDigits(::Type{T1}, num::T2) where {T1<:Real, T2<:Real}
+    d1 = getAtolDigits(T1)
+    min(ifelse(isnan(num), d1, getAtolDigits(num)), d1)
+end
+
+
+function genTimeStr(ns::Real, ratioTons::Real=1; 
+                    autoUnit::Bool=true, roundDigits::Int=TimerDigits)
+    t = ratioTons / 1e9 * ns
+    unit = "second"
+    if !autoUnit || 1e-2 <= t <=60
+    elseif t > 3600
+        t /= 3600
+        unit = "hour"
+    elseif t > 60
+        t /= 60
+        unit = "minute"
+    else
+        t *= 1000
+        unit = "millisecond"
+    end
+    unit = ifelse(t>1, unit*'s', unit)
+    alignNum(t, 0; roundDigits) * " " * unit
+end
