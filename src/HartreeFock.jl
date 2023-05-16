@@ -508,7 +508,7 @@ convergence of density matrix and the residual matrix based on commutation relat
 between the Fock matrix and the density matrix) to the primary convergence indicator, i.e., 
 the convergence of the energy.
 
-`oscillateThreshold::T`: The threshold for oscillating convergence.
+`oscillateThreshold::T`: The threshold for oscillatory convergence.
 
 ≡≡≡ Initialization Method(s) ≡≡≡
 
@@ -1011,8 +1011,15 @@ function runHFcore(::Val{HFT},
 
         if infoLevel > 0
             println("•Initial E: ", alignNum(Etots[], 0; roundDigits), " Ha")
-            println("•Initial RMS(𝐞): ", alignNum(𝐞rms[], 0; roundDigits), " a.u.\n")
-
+            println("•Initial RMS(𝐞): ", alignNum(𝐞rms[], 0; roundDigits), " a.u.")
+            println("•Convergence Threshold: ", endThreshold, " a.u.")
+            if infoLevel > 2
+                println("•Secondary Convergence Threshold: ", 
+                        secondaryConvRatio*endThreshold, " a.u.")
+                println("•Oscillatory Convergence Threshold: ", 
+                        scfConfig.oscillateThreshold, " a.u.")
+            end
+            println()
             println("Self-Consistent Field (SCF) Iteration:")
             (println∘repeat)('=', length(titleStr))
             println(titleStr)
