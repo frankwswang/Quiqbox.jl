@@ -836,7 +836,7 @@ by unrestricted Hartree–Fock (UHF).
 
 `infoLevel::Int`: Printed info's level of details when `printInfo=true`. The higher 
 (the absolute value of) it is, more intermediate steps will be printed. Once `infoLevel` 
-achieve `5`, every step will be printed.
+achieve `$FullStepLevel`, every step will be printed.
 """
 function runHF(bs::GTBasis{T}, args...; 
                printInfo::Bool=true, infoLevel::Int=defaultHFinfoL) where {T}
@@ -892,17 +892,23 @@ function runHFcore(bs::GTBasis{T, D, BN, BFT},
     C0 = uniCallFunc(getC0f, getproperty(C0methodArgOrders, nameOf(getC0f)), C0mats, 
                      Val(HFT), bs.S, X, Hcore, bs.eeI, bs.basis, nuc, nucCoords)
     timerBool && (tEnd = time_ns())
-    if printInfo && infoLevel > 1
+    if printInfo && infoLevel > 3
         roundDigits = min(DefaultDigits, getAtolDigits(T))
+        nucNum = length(nuc)
         println(ifelse(Ntot>1, "Many", "Single"), "-Electron System Information: ")
-        println("•Electron Number: ", Ntot)
+        println("•Number Of Electrons: ", Ntot)
+        println("•Number Of Nuclei: ", nucNum)
         println("•Nuclear Coordinate: ")
-        for (atm, coord) in zip(nuc, nucCoords)
-            println(" ∘", atm, ": ", "[", alignNumSign(coord[1]; roundDigits), ", ", 
-                                         alignNumSign(coord[2]; roundDigits), ", ", 
-                                         alignNumSign(coord[3]; roundDigits), "]")
+        nucNumStrLen = ndigits(nucNum) + 3
+        for (i, atm, coord) in zip(OneTo(nucNum), nuc, nucCoords)
+            println(rpad(" $i)", nucNumStrLen), atm, ": ", "[", 
+                    alignNumSign(coord[1]; roundDigits), ", ", 
+                    alignNumSign(coord[2]; roundDigits), ", ", 
+                    alignNumSign(coord[3]; roundDigits), "]")
         end
         println()
+    end
+    if printInfo && infoLevel > 1
         print("Hartree–Fock (HF) Initialization")
         timerBool && print(" (Finished in ", genTimeStr(tEnd - tBegin), ")")
         println(":")
@@ -967,8 +973,8 @@ information from all the iterations steps to the output [`HFtempVars`](@ref) of
 
 `infoLevel::Int`: Printed info's level of details when `printInfo=true`. The higher 
 (the absolute value of) it is, more intermediate steps and other information will be 
-printed. Once `infoLevel` achieve `5`, every step and all available information will be 
-printed.
+printed. Once `infoLevel` achieve `$FullStepLevel`, every step and all available 
+information will be printed.
 """
 function runHFcore(::Val{HFT}, 
                    scfConfig::SCFconfig{T1, L, MS}, 
@@ -1003,16 +1009,16 @@ function runHFcore(::Val{HFT},
     if printInfo
         roundDigits = setNumDigits(T2, endThreshold)
         titles = ("Step", "E (Ha)", "ΔE (Ha)", "RMS(FDS-SDF)", "RMS(ΔD)")
-        titleRange = 1 : (3 + 2*(infoLevel > 1))
-        colSpaces = (
-            max(ndigits(maxStep), (length∘string)(HFT), length(titles[begin])), 
-            roundDigits + (ndigits∘floor)(Int, Etots[]) + 2, 
-            roundDigits + 3
-        )
+        colPFs = (  lpad, cropStrR,  cropStrR,       cropStrR,  cropStrR)
+        colSps = (max(ndigits(maxStep), (length∘string)(HFT), length(titles[begin])), 
+                  roundDigits + (ndigits∘floor)(Int, Etots[]) + 2, 
+                  roundDigits + 3)
+        colSls = (1, 2, 3, 3, 3)
         titleStr = ""
-        colSpaces = map(titles[titleRange], (1, 2, 3, 3, 3)[titleRange]) do title, idx
-            printSpace = max(length(title), colSpaces[idx])
-            titleStr *= "| " * rpad(title, printSpace) * " "
+        titleRng = 1 : (3 + 2*(infoLevel > 1))
+        colSps = map(titles[titleRng], colPFs[titleRng], colSls[titleRng]) do title, f, idx
+            printSpace = max(length(title), colSps[idx])
+            titleStr *= "| " * f(title, printSpace) * " "
             printSpace
         end
 
@@ -1026,6 +1032,7 @@ function runHFcore(::Val{HFT},
                         secondaryConvRatio*endThreshold, " a.u.")
                 println("•Oscillatory Convergence Threshold: ", 
                         scfConfig.oscillateThreshold, " a.u.")
+                println("•Maximum Number Of Iterations Allowed: ", maxStep)
             end
             println()
             println("Self-Consistent Field (SCF) Iteration:")
@@ -1052,7 +1059,7 @@ function runHFcore(::Val{HFT},
         n = 0
 
         if printInfo && infoLevel > 1
-            print('|', repeat('–', colSpaces[1]+1), "<$l>–", ("[:$m"))
+            print('|', repeat('–', colSps[1]+1), "<$l>–", ("[:$m"))
             if infoLevel > 2
                 kaStr = mapreduce(*, keyArgs) do ka
                     key = ka[begin]
@@ -1082,12 +1089,12 @@ function runHFcore(::Val{HFT},
             ΔEᵢabs = abs(ΔEᵢ)
 
             if printInfo && infoLevel > 0 && (adaptStepBl(i) || i == maxStep)
-                print( "| ", rpad("$i", colSpaces[1]), 
-                      " | ", cropStrR(alignNumSign(Etots[end]; roundDigits), colSpaces[2]), 
-                      " | ", cropStrR(alignNumSign(ΔEᵢ; roundDigits), colSpaces[3]) )
+                print( "| ", colPFs[1]("$i", colSps[1]), 
+                      " | ", colPFs[2](alignNumSign(Etots[end]; roundDigits), colSps[2]), 
+                      " | ", colPFs[3](alignNumSign(ΔEᵢ; roundDigits), colSps[3]) )
                 if infoLevel > 1
-                    print( " | ", cropStrR(alignNum(δFrmsᵢ, 0; roundDigits), colSpaces[4]), 
-                           " | ", cropStrR(alignNum(ΔDrmsᵢ, 0; roundDigits), colSpaces[5]) )
+                    print( " | ", colPFs[4](alignNum(δFrmsᵢ, 0; roundDigits), colSps[4]), 
+                           " | ", colPFs[5](alignNum(ΔDrmsᵢ, 0; roundDigits), colSps[5]) )
                 end
                 println()
             end
@@ -1131,8 +1138,12 @@ function runHFcore(::Val{HFT},
     if printInfo
         tStr = timerBool ? " after "*genTimeStr(tEnd - tBegin) : ""
         negStr = if detectConvergence
-            ifelse(isConverged===1, (isConverged=true; "converged to an oscillation"), 
-                   ifelse(isConverged, "converged", "stopped but not converged"))
+            if isConverged===1
+                isConverged=true
+                "converged to an oscillation"
+            else
+                ifelse(isConverged, "converged", "stopped but not converged")
+            end
         else
             "stopped"
         end

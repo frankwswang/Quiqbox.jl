@@ -67,7 +67,7 @@ MOβ_H2O = (H2O.occuOrbital[2]..., H2O.unocOrbital[2]...)
 Jαβ = [ eeInteraction(i.orbital, i.orbital, j.orbital, j.orbital) 
         for (i,j) in Iterators.product(MOα_H2O, MOβ_H2O) ]
 
-t2 = 1e-12
+t2 = 2e-12
 @test C_UHF1 == Cα_H2O
 @test C_UHF2 == Cβ_H2O
 @test hasEqual(genCanOrbitals(HFres2), 

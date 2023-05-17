@@ -913,6 +913,8 @@ function genAdaptStepBl(infoLevel::Int, maxStep::Int)
     end
 end
 
+const FullStepLevel = 5
+
 
 function shiftLastEle!(v, shiftVal)
     s = sum(v)
