@@ -73,6 +73,7 @@ t2 = 1e-12
 @test hasEqual(genCanOrbitals(HFres2), 
                (vcat(collect.(H2O.occuOrbital)...), vcat(collect.(H2O.unocOrbital)...)))
 @test H2O.Ehf == Quiqbox.getEhf(Hc2, basis2.eeI, H2O.occuC, H2O.Ns)
+@show H2O.Ehf
 @test H2O.coreHsameSpin == changeHbasis.(Ref(Hc2), HFres2.C)
 @test compr2Arrays3((H2O_cHα1=H2O.coreHsameSpin[1], 
                      H2O_cHα2=get1spinHcore(C_UHF1, Hc2)), t2)
