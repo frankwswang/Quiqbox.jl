@@ -873,8 +873,8 @@ function runHFcore(bs::GTBasis{T, D, BN, BFT},
     timerBool = printInfo && infoLevel > 2
     timerBool && (tBegin = time_ns())
     Nlow = Int(HFT==:RHF)
-    totN = (N isa Int) ? N : (N[begin] + N[end])
-    totN > Nlow || throw(DomainError(N, "$(HFT) requires more than $(Nlow) electrons."))
+    Ntot = (N isa Int) ? N : (N[begin] + N[end])
+    Ntot > Nlow || throw(DomainError(N, "$(HFT) requires more than $(Nlow) electrons."))
     Ns = splitSpins(Val(HFT), N)
     leastNb = max(Ns...)
     BN < leastNb &&  throw(DomainError(BN, "The number of basis functions should be no "*
@@ -894,8 +894,8 @@ function runHFcore(bs::GTBasis{T, D, BN, BFT},
     timerBool && (tEnd = time_ns())
     if printInfo && infoLevel > 1
         roundDigits = min(DefaultDigits, getAtolDigits(T))
-        println(ifelse(N>1, "Many", "Single"), "-Electron System Information: ")
-        println("•Electron Number: ", N)
+        println(ifelse(Ntot>1, "Many", "Single"), "-Electron System Information: ")
+        println("•Electron Number: ", Ntot)
         println("•Nuclear Coordinate: ")
         for (atm, coord) in zip(nuc, nucCoords)
             println(" ∘", atm, ": ", "[", alignNumSign(coord[1]; roundDigits), ", ", 
