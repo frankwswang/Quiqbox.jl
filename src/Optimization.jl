@@ -415,8 +415,8 @@ electrons with same spin configurations(s).
 
 `infoLevel::Int`: Printed info's level of details when `printInfo=true`. The higher 
 (the absolute value of) it is, more intermediate steps and other information will be 
-printed. Once `infoLevel` achieve `5`, every step and all available information will be 
-printed.
+printed. Once `infoLevel` achieve `$FullStepLevel`, every step and all available 
+information will be printed.
 """
 function optimizeParams!(pbs::AbstractVector{<:ParamBox{T}}, 
                          bs::AbstractVector{<:GTBasisFuncs{T, D}}, 

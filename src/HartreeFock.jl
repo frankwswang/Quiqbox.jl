@@ -836,7 +836,7 @@ by unrestricted Hartree–Fock (UHF).
 
 `infoLevel::Int`: Printed info's level of details when `printInfo=true`. The higher 
 (the absolute value of) it is, more intermediate steps will be printed. Once `infoLevel` 
-achieve `5`, every step will be printed.
+achieve `$FullStepLevel`, every step will be printed.
 """
 function runHF(bs::GTBasis{T}, args...; 
                printInfo::Bool=true, infoLevel::Int=defaultHFinfoL) where {T}
@@ -892,17 +892,23 @@ function runHFcore(bs::GTBasis{T, D, BN, BFT},
     C0 = uniCallFunc(getC0f, getproperty(C0methodArgOrders, nameOf(getC0f)), C0mats, 
                      Val(HFT), bs.S, X, Hcore, bs.eeI, bs.basis, nuc, nucCoords)
     timerBool && (tEnd = time_ns())
-    if printInfo && infoLevel > 1
+    if printInfo && infoLevel > 3
         roundDigits = min(DefaultDigits, getAtolDigits(T))
+        nucNum = length(nuc)
         println(ifelse(Ntot>1, "Many", "Single"), "-Electron System Information: ")
-        println("•Electron Number: ", Ntot)
+        println("•Number Of Electrons: ", Ntot)
+        println("•Number Of Nuclei: ", nucNum)
         println("•Nuclear Coordinate: ")
-        for (atm, coord) in zip(nuc, nucCoords)
-            println(" ∘", atm, ": ", "[", alignNumSign(coord[1]; roundDigits), ", ", 
-                                         alignNumSign(coord[2]; roundDigits), ", ", 
-                                         alignNumSign(coord[3]; roundDigits), "]")
+        nucNumStrLen = ndigits(nucNum) + 3
+        for (i, atm, coord) in zip(OneTo(nucNum), nuc, nucCoords)
+            println(rpad(" $i)", nucNumStrLen), atm, ": ", "[", 
+                    alignNumSign(coord[1]; roundDigits), ", ", 
+                    alignNumSign(coord[2]; roundDigits), ", ", 
+                    alignNumSign(coord[3]; roundDigits), "]")
         end
         println()
+    end
+    if printInfo && infoLevel > 1
         print("Hartree–Fock (HF) Initialization")
         timerBool && print(" (Finished in ", genTimeStr(tEnd - tBegin), ")")
         println(":")
@@ -967,8 +973,8 @@ information from all the iterations steps to the output [`HFtempVars`](@ref) of
 
 `infoLevel::Int`: Printed info's level of details when `printInfo=true`. The higher 
 (the absolute value of) it is, more intermediate steps and other information will be 
-printed. Once `infoLevel` achieve `5`, every step and all available information will be 
-printed.
+printed. Once `infoLevel` achieve `$FullStepLevel`, every step and all available 
+information will be printed.
 """
 function runHFcore(::Val{HFT}, 
                    scfConfig::SCFconfig{T1, L, MS}, 
