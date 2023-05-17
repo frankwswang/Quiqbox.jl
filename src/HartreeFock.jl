@@ -1009,16 +1009,16 @@ function runHFcore(::Val{HFT},
     if printInfo
         roundDigits = setNumDigits(T2, endThreshold)
         titles = ("Step", "E (Ha)", "ΔE (Ha)", "RMS(FDS-SDF)", "RMS(ΔD)")
-        titleRange = 1 : (3 + 2*(infoLevel > 1))
-        colSpaces = (
-            max(ndigits(maxStep), (length∘string)(HFT), length(titles[begin])), 
-            roundDigits + (ndigits∘floor)(Int, Etots[]) + 2, 
-            roundDigits + 3
-        )
+        colPFs = (  lpad, cropStrR,  cropStrR,       cropStrR,  cropStrR)
+        colSps = (max(ndigits(maxStep), (length∘string)(HFT), length(titles[begin])), 
+                  roundDigits + (ndigits∘floor)(Int, Etots[]) + 2, 
+                  roundDigits + 3)
+        colSls = (1, 2, 3, 3, 3)
         titleStr = ""
-        colSpaces = map(titles[titleRange], (1, 2, 3, 3, 3)[titleRange]) do title, idx
-            printSpace = max(length(title), colSpaces[idx])
-            titleStr *= "| " * rpad(title, printSpace) * " "
+        titleRng = 1 : (3 + 2*(infoLevel > 1))
+        colSps = map(titles[titleRng], colPFs[titleRng], colSls[titleRng]) do title, f, idx
+            printSpace = max(length(title), colSps[idx])
+            titleStr *= "| " * f(title, printSpace) * " "
             printSpace
         end
 
@@ -1058,7 +1058,7 @@ function runHFcore(::Val{HFT},
         n = 0
 
         if printInfo && infoLevel > 1
-            print('|', repeat('–', colSpaces[1]+1), "<$l>–", ("[:$m"))
+            print('|', repeat('–', colSps[1]+1), "<$l>–", ("[:$m"))
             if infoLevel > 2
                 kaStr = mapreduce(*, keyArgs) do ka
                     key = ka[begin]
@@ -1088,12 +1088,12 @@ function runHFcore(::Val{HFT},
             ΔEᵢabs = abs(ΔEᵢ)
 
             if printInfo && infoLevel > 0 && (adaptStepBl(i) || i == maxStep)
-                print( "| ", rpad("$i", colSpaces[1]), 
-                      " | ", cropStrR(alignNumSign(Etots[end]; roundDigits), colSpaces[2]), 
-                      " | ", cropStrR(alignNumSign(ΔEᵢ; roundDigits), colSpaces[3]) )
+                print( "| ", colPFs[1]("$i", colSps[1]), 
+                      " | ", colPFs[2](alignNumSign(Etots[end]; roundDigits), colSps[2]), 
+                      " | ", colPFs[3](alignNumSign(ΔEᵢ; roundDigits), colSps[3]) )
                 if infoLevel > 1
-                    print( " | ", cropStrR(alignNum(δFrmsᵢ, 0; roundDigits), colSpaces[4]), 
-                           " | ", cropStrR(alignNum(ΔDrmsᵢ, 0; roundDigits), colSpaces[5]) )
+                    print( " | ", colPFs[4](alignNum(δFrmsᵢ, 0; roundDigits), colSps[4]), 
+                           " | ", colPFs[5](alignNum(ΔDrmsᵢ, 0; roundDigits), colSps[5]) )
                 end
                 println()
             end
