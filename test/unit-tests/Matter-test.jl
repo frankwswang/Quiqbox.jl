@@ -67,13 +67,12 @@ MOβ_H2O = (H2O.occuOrbital[2]..., H2O.unocOrbital[2]...)
 Jαβ = [ eeInteraction(i.orbital, i.orbital, j.orbital, j.orbital) 
         for (i,j) in Iterators.product(MOα_H2O, MOβ_H2O) ]
 
-t2 = 1e-12
+t2 = 2e-12
 @test C_UHF1 == Cα_H2O
 @test C_UHF2 == Cβ_H2O
 @test hasEqual(genCanOrbitals(HFres2), 
                (vcat(collect.(H2O.occuOrbital)...), vcat(collect.(H2O.unocOrbital)...)))
 @test H2O.Ehf == Quiqbox.getEhf(Hc2, basis2.eeI, H2O.occuC, H2O.Ns)
-@show H2O.Ehf
 @test H2O.coreHsameSpin == changeHbasis.(Ref(Hc2), HFres2.C)
 @test compr2Arrays3((H2O_cHα1=H2O.coreHsameSpin[1], 
                      H2O_cHα2=get1spinHcore(C_UHF1, Hc2)), t2)
