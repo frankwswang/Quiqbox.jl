@@ -894,16 +894,19 @@ function runHFcore(bs::GTBasis{T, D, BN, BFT},
     timerBool && (tEnd = time_ns())
     if printInfo && infoLevel > 1
         roundDigits = min(DefaultDigits, getAtolDigits(T))
-        println("$N-Electron System Information: ")
+        println(ifelse(N>1, "Many", "Single"), "-Electron System Information: ")
+        println("•Electron Number: ", N)
+        println("•Nuclear Coordinate: ")
         for (atm, coord) in zip(nuc, nucCoords)
-            println("•", atm, ": ", "[", alignNumSign(coord[1]; roundDigits), ", ", 
+            println(" ∘", atm, ": ", "[", alignNumSign(coord[1]; roundDigits), ", ", 
                                          alignNumSign(coord[2]; roundDigits), ", ", 
                                          alignNumSign(coord[3]; roundDigits), "]")
         end
         println()
-        print("Hartree–Fock ($HFT) Initialization")
+        print("Hartree–Fock (HF) Initialization")
         timerBool && print(" (Finished in ", genTimeStr(tEnd - tBegin), ")")
         println(":")
+        println("•HF Type: ", HFT)
         println("•Basis Set Size: ", BN)
         println("•Initial Guess Method: ", getC0symbol(getC0f))
     end
@@ -999,22 +1002,22 @@ function runHFcore(::Val{HFT},
 
     if printInfo
         roundDigits = setNumDigits(T2, endThreshold)
-        titleNum = 2 + 2*(infoLevel > 1)
         titles = ("Step", "E (Ha)", "ΔE (Ha)", "RMS(FDS-SDF)", "RMS(ΔD)")
+        titleRange = 1 : (3 + 2*(infoLevel > 1))
         colSpaces = (
             max(ndigits(maxStep), (length∘string)(HFT), length(titles[begin])), 
             roundDigits + (ndigits∘floor)(Int, Etots[]) + 2, 
             roundDigits + 3
         )
         titleStr = ""
-        colSpaces = map(titles, (1, 2, 3, 3, 3)[begin:titleNum+1]) do title, idx
+        colSpaces = map(titles[titleRange], (1, 2, 3, 3, 3)[titleRange]) do title, idx
             printSpace = max(length(title), colSpaces[idx])
             titleStr *= "| " * rpad(title, printSpace) * " "
             printSpace
         end
 
         if infoLevel > 0
-            println("•Initial $HFT energy E: ", alignNum(Etots[], 0; roundDigits), " Ha")
+            println("•Initial HF energy E: ", alignNum(Etots[], 0; roundDigits), " Ha")
             println("•Initial RMS(FDS-SDF): ", 
                       alignNum(δFrms[], 0; roundDigits))
             println("•Convergence Threshold: ", endThreshold, " a.u.")
@@ -1133,7 +1136,7 @@ function runHFcore(::Val{HFT},
         else
             "stopped"
         end
-        println("\nThe SCF iteration has ", negStr, " at step $i", tStr, ":\n", 
+        println("\nThe SCF iteration of $HFT has ", negStr, " at step $i", tStr, ":\n", 
                 "|ΔE| → ", alignNum(abs(ΔEs[end]), 0; roundDigits), " Ha, ", 
                 "RMS(FDS-SDF) → ", alignNum(δFrms[end], 0; roundDigits), ", ", 
                 "RMS(ΔD) → ", alignNum(ΔDrms[end], 0; roundDigits), ".\n")
