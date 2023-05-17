@@ -21,7 +21,7 @@ const HFinterEstoreSize = 15
 const HFinterValStoreSizes = (2,3,2, HFinterEstoreSize) # C(>1), D(>2), F(>1), E(>1)
 const defaultHFCStr = "HFconfig()"
 const defaultSCFconfigArgs = ( (:ADIIS, :DIIS), (1e-3, 1e-10) )
-const defaultSecConvRatio = 100
+const defaultSecConvRatio = 50
 const defaultOscThreshold = 1e-6
 
 # Reference(s):
