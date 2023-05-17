@@ -1131,8 +1131,12 @@ function runHFcore(::Val{HFT},
     if printInfo
         tStr = timerBool ? " after "*genTimeStr(tEnd - tBegin) : ""
         negStr = if detectConvergence
-            ifelse(isConverged===1, (isConverged=true; "converged to an oscillation"), 
-                   ifelse(isConverged, "converged", "stopped but not converged"))
+            if isConverged===1
+                isConverged=true
+                "converged to an oscillation"
+            else
+                ifelse(isConverged, "converged", "stopped but not converged")
+            end
         else
             "stopped"
         end
