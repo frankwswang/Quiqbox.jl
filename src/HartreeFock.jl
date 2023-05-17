@@ -1032,6 +1032,7 @@ function runHFcore(::Val{HFT},
                         secondaryConvRatio*endThreshold, " a.u.")
                 println("•Oscillatory Convergence Threshold: ", 
                         scfConfig.oscillateThreshold, " a.u.")
+                println("•Maximum Number Of Iterations Allowed: ", maxStep)
             end
             println()
             println("Self-Consistent Field (SCF) Iteration:")
