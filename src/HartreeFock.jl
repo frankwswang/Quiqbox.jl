@@ -1000,10 +1000,17 @@ function runHFcore(::Val{HFT},
     ΔDrms = zeros(T2, 1)
     δFrms = T2[getErrorNrms(vars, S)]
     endThreshold = scfConfig.interval[end]
+    secondaryBreakPoints = secondaryConvRatio .* scfConfig.interval
+    oscThresholds = max.(scfConfig.interval, scfConfig.oscillateThreshold)
+    secondaryOscThresholds = secondaryConvRatio .* oscThresholds
     detectConvergence = !isnan(endThreshold)
     isConverged::Union{Bool, Missing, Int} = true
     rollbackRange = 0 : (HFminItr÷3)
     rollbackCount = length(rollbackRange)
+    maxLens = map(saveTrace, 
+                  getMaxSCFsizes(scfConfig), HFinterValStoreSizes) do bl, scfSize, storeSize
+        max((ifelse(bl, maxStep+1, 1)), scfSize, storeSize)
+    end
     i = 0
 
     if printInfo
@@ -1023,6 +1030,7 @@ function runHFcore(::Val{HFT},
         end
 
         if infoLevel > 0
+            adaptStepBl = genAdaptStepBl(infoLevel, maxStep)
             println("•Initial HF energy E: ", alignNum(Etots[], 0; roundDigits), " Ha")
             println("•Initial RMS(FDS-SDF): ", 
                       alignNum(δFrms[], 0; roundDigits))
@@ -1042,16 +1050,9 @@ function runHFcore(::Val{HFT},
         end
     end
 
-    adaptStepBl = genAdaptStepBl(infoLevel, maxStep)
-    maxLens = map(saveTrace, 
-                  getMaxSCFsizes(scfConfig), HFinterValStoreSizes) do bl, scfSize, storeSize
-        max((ifelse(bl, maxStep+1, 1)), scfSize, storeSize)
-    end
-
     for (MVal, kws, breakPoint, l) in 
-        zip(fieldtypes(MS), scfConfig.methodConfig, scfConfig.interval, 1:L)
+        zip(fieldtypes(MS), scfConfig.methodConfig, scfConfig.interval, OneTo(L))
         HFcore, keyArgs = genHFcore(MVal, vars, S, X, Ns, Hcore, HeeI; kws...)
-        oscThreshold = max(breakPoint, scfConfig.oscillateThreshold)
         flucThreshold = max(10breakPoint, 1.5e-3) # ≈3.8kJ/mol (0.95 chemical accuracy)
         m = getValParm(MVal)
         isConverged = false
@@ -1099,34 +1100,34 @@ function runHFcore(::Val{HFT},
                 println()
             end
 
-            convThresholds = ifelse(δFrmsᵢ <= secondaryConvRatio*breakPoint, 
-                                    (1, secondaryConvRatio), (0, 0)) .* breakPoint
+            convThresholds = ifelse(δFrmsᵢ <= secondaryBreakPoints[l], 
+                                    (breakPoint, secondaryBreakPoints[l]), (0, 0))
             ΔEᵢabs <= convThresholds[begin] && ΔDrmsᵢ <= convThresholds[end] && 
             (isConverged = true; break)
 
             # oscillating convergence & early termination of non-convergence.
             if n > 1 && i > HFminItr && ΔEᵢ > flucThreshold
-                isOsc, _ = isOscillateConverged(Etots, 10oscThreshold, 
-                                                minLen=HFminItr, 
-                                                maxRemains=HFinterEstoreSize)
-                if isOsc
-                    if ΔEᵢabs <= oscThreshold && 
-                       (endM ? (δFrmsᵢ <= secondaryConvRatio*oscThreshold && 
-                                ΔDrmsᵢ <= secondaryConvRatio*oscThreshold) : true)
+                isOsc = false
+                if scfConfig.oscillateThreshold > 0
+                    isOsc, _ = isOscillateConverged(Etots, 10oscThresholds[l], 
+                                                    minLen=HFminItr, 
+                                                    maxRemains=HFinterEstoreSize)
+                    if isOsc && ΔEᵢabs <= oscThresholds[l] && 
+                       (endM ? (δFrmsᵢ <= secondaryOscThresholds[l] && 
+                                ΔDrmsᵢ <= secondaryOscThresholds[l]) : true)
                         isConverged = 1
                         break
                     end
-                else
-                    if earlyStop
-                        isRaising = all(rollbackRange) do j
-                            ΔEs[end-j] > 10flucThreshold
-                        end
-                        if isRaising
-                            rbCount = min(rollbackCount, length(Etots))
-                            terminateSCF!(vars, rbCount, m, printInfo)
-                            i -= rbCount
-                            break
-                        end
+                end
+                if earlyStop && !isOsc
+                    isRaising = all(rollbackRange) do j
+                        ΔEs[end-j] > 10flucThreshold
+                    end
+                    if isRaising
+                        rbCount = min(rollbackCount, length(Etots))
+                        terminateSCF!(vars, rbCount, m, printInfo)
+                        i -= rbCount
+                        break
                     end
                 end
             end
