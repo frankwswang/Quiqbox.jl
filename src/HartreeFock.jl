@@ -10,6 +10,7 @@ using LBFGSB: lbfgsb
 const defaultDS = 0.5
 const defaultDIISsize = 10
 const defaultDIISsolver = :LBFGS
+const DIISresetThresholdRatio = 10
 const SADHFmaxStep = 50
 const defaultHFinfoL = 2
 const defaultHFmaxStep = 150
@@ -1254,7 +1255,7 @@ end
 function genxDIIS(::Type{Val{M}}, αβVars::NTuple{HFTS, HFtempVars{T, HFT}}, 
                   S::AbstractMatrix{T}, X::AbstractMatrix{T}, Ns::NTuple{HFTS, Int}, 
                   Hcore::AbstractMatrix{T}, HeeI::AbstractArray{T, 4}; 
-                  resetThreshold::Real=10getAtolVal(T), 
+                  resetThreshold::Real=DIISresetThresholdRatio*getAtolVal(T), 
                   DIISsize::Int=defaultDIISsize, 
                   solver::Symbol=defaultDIISsolver) where {M, HFTS, T, HFT}
     DIISsize < 2 && (throw∘DomainError)(intervals, "$M space need to be at least 2.")
