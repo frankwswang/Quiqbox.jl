@@ -22,7 +22,7 @@ const HFinterEstoreSize = 15
 const HFinterValStoreSizes = (2,3,2, HFinterEstoreSize) # C(>1), D(>2), F(>1), E(>1)
 const defaultHFCStr = "HFconfig()"
 const defaultSCFconfigArgs = ( (:ADIIS, :DIIS), (1e-3, 1e-10) )
-const defaultSecConvRatio = (100, 800)
+const defaultSecConvRatio = (100, 100)
 const defaultOscThreshold = 1e-6
 
 # Reference(s):
@@ -1012,11 +1012,11 @@ function runHFcore(::Val{HFT},
     ΔDrms = zeros(T2, 1)
     δFrms = T2[getErrorNrms(vars, S)]
     ΔEendThreshold = scfConfig.interval[end]
-    ΔDbreakPoints = secondaryConvRatio[1] .* scfConfig.interval
-    δFbreakPoints = secondaryConvRatio[2] .* scfConfig.interval
+    δFbreakPoints = secondaryConvRatio[1] .* scfConfig.interval
+    ΔDbreakPoints = secondaryConvRatio[2] .* scfConfig.interval
     ΔEoscThresholds = max.(scfConfig.interval, scfConfig.oscillateThreshold)
-    ΔDoscThresholds = secondaryConvRatio[1] .* ΔEoscThresholds
-    δFoscThresholds = secondaryConvRatio[2] .* ΔEoscThresholds
+    δFoscThresholds = secondaryConvRatio[1] .* ΔEoscThresholds
+    ΔDoscThresholds = secondaryConvRatio[2] .* ΔEoscThresholds
     detectConvergence = !isnan(ΔEendThreshold)
     isConverged::Union{Bool, Missing, Int} = true
     rollbackRange = 0 : (HFminItr÷3)
@@ -1046,12 +1046,11 @@ function runHFcore(::Val{HFT},
         if infoLevel > 0
             adaptStepBl = genAdaptStepBl(infoLevel, maxStep)
             println("•Initial HF energy E: ", alignNum(Etots[], 0; roundDigits), " Ha")
-            println("•Initial RMS(FDS-SDF): ", 
-                      alignNum(δFrms[], 0; roundDigits))
+            println("•Initial RMS(FDS-SDF): ", alignNum(δFrms[], 0; roundDigits))
             println("•Convergence Threshold of E: ", ΔEendThreshold, " Ha")
+            println("•Convergence Threshold Ratios of (FDS-SDF, D) to E: ", 
+                    secondaryConvRatio)
             if infoLevel > 2
-                println("•Convergence Threshold of FDS-SDF: ", δFoscThresholds[end])
-                println("•Convergence Threshold of D: ", ΔDoscThresholds[end])
                 println("•Oscillatory Convergence Threshold: ", 
                         scfConfig.oscillateThreshold)
                 println("•Maximum Number Of Iterations Allowed: ", maxStep)
