@@ -908,8 +908,8 @@ function runHFcore(bs::GTBasis{T, D, BN, BFT},
         roundDigits = min(DefaultDigits, getAtolDigits(T))
         nucNum = length(nuc)
         println(ifelse(Ntot>1, "Many", "Single"), "-Electron System Information: ")
-        println("•Number Of Electrons: ", Ntot)
-        println("•Number Of Nuclei: ", nucNum)
+        println("•Number of Electrons: ", Ntot)
+        println("•Number of Nuclei: ", nucNum)
         println("•Nuclear Coordinate: ")
         nucNumStrLen = ndigits(nucNum) + 3
         for (i, atm, coord) in zip(OneTo(nucNum), nuc, nucCoords)
@@ -1053,7 +1053,7 @@ function runHFcore(::Val{HFT},
             if infoLevel > 2
                 println("•Oscillatory Convergence Threshold: ", 
                         scfConfig.oscillateThreshold)
-                println("•Maximum Number Of Iterations Allowed: ", maxStep)
+                println("•Maximum Number of Iterations Allowed: ", maxStep)
             end
             println()
             println("Self-Consistent Field (SCF) Iteration:")
