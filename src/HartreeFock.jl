@@ -22,7 +22,7 @@ const HFinterEstoreSize = 15
 const HFinterValStoreSizes = (2,3,2, HFinterEstoreSize) # C(>1), D(>2), F(>1), E(>1)
 const defaultHFCStr = "HFconfig()"
 const defaultSCFconfigArgs = ( (:ADIIS, :DIIS), (1e-3, 1e-10) )
-const defaultSecConvRatio = 50
+const defaultSecConvRatio = (100, 100)
 const defaultOscThreshold = 1e-6
 
 # Reference(s):
@@ -459,13 +459,17 @@ const Doc_SCFconfig_LBFGSB = "[Limited-memory BFGS with box constraints]"*
 const Doc_SCFconfig_SPGB = "[Spectral Projected Gradient Method with box constraints]"*
                            "(https://github.com/m3g/SPGBox.jl)."
 
+const Doc_SCFconfig_SecConv1 = "root mean square of the error matrix defined in DIIS"
+
+const Doc_SCFconfig_SecConv2 = "root mean square of the change of the density matrix"
+
 const Doc_SCFconfig_eg1 = "SCFconfig{Float64, 2, Tuple{Val{:ADIIS}, Val{:DIIS}}}(method, "*
                           "interval=(0.001, 1.0e-8), methodConfig, secondaryConvRatio, "*
                           "oscillateThreshold)"
 
 """
 
-    SCFconfig{T, L, MS<:NTuple{L, Val}} <: ImmutableParameter{T, SCFconfig}
+    SCFconfig{T<:Real, L, MS<:NTuple{L, Val}} <: ImmutableParameter{T, SCFconfig}
 
 The `struct` for self-consistent field (SCF) iteration configurations.
 
@@ -506,10 +510,13 @@ threshold is set to `NaN`, there will be no convergence detection.
 `methodConfig::NTuple{L, Vector{<:Pair}}`: The additional keywords arguments for each 
 method stored as `Tuple`s of `Pair`s.
 
-`secondaryConvRatio::T`: The ratio of all the secondary convergence criteria (e.g., the 
-convergence of density matrix, the error array based on the commutation relationship 
-between the Fock matrix and the density matrix) to the primary convergence indicator, i.e., 
-the convergence of the energy.
+`secondaryConvRatio::NTuple{2, T}`: The ratios of the secondary convergence criteria to the 
+primary convergence indicator, i.e., the change of the energy (ΔE):
+
+| Order |Symbols       | Meaning                   | Default                   |
+| :---- | :---:        | :---:                     | :---:                     |
+| 1     | RMS(FDS-SDF) | $(Doc_SCFconfig_SecConv1) | $(defaultSecConvRatio[1]) |
+| 2     | RMS(ΔD)      | $(Doc_SCFconfig_SecConv2) | $(defaultSecConvRatio[2]) |
 
 `oscillateThreshold::T`: The threshold for oscillatory convergence.
 
@@ -517,17 +524,19 @@ the convergence of the energy.
 
     SCFconfig(methods::NTuple{L, Symbol}, intervals::NTuple{L, T}, 
               config::Dict{Int, <:AbstractVector{<:Pair}}=Dict(1=>Pair[]); 
-              secondaryConvRatio::Real=$(defaultSecConvRatio), 
+              secondaryConvRatio::Union{Real, NTuple{2, Real}}=$(defaultSecConvRatio), 
               oscillateThreshold::Real=$(defaultOscThreshold)) where {L, T} -> 
     SCFconfig{T, L}
 
 `methods` and `intervals` are the convergence methods to be applied and their stopping 
 (or skipping) thresholds respectively. `config` specifies additional keyword argument(s) 
 for each methods by a `Pair` of which the key `i::Int` is for `i`th method and the pointed 
-`AbstractVector{<:Pair}` is the pairs of keyword arguments and their values respectively.
+`AbstractVector{<:Pair}` is the pairs of keyword arguments and their values respectively. 
+If `secondaryConvRatio` is `Real`, it will be assigned as the value for all the secondary 
+convergence ratios.
 
     SCFconfig(;threshold::AbstractFloat=$(defaultSCFconfigArgs[2]), 
-               secondaryConvRatio::Real=$(defaultSecConvRatio), 
+               secondaryConvRatio::Union{Real, NTuple{2, Real}}=$(defaultSecConvRatio), 
                oscillateThreshold::Real=defaultOscThreshold) -> 
     SCFconfig{$(defaultSCFconfigArgs[2] |> eltype), $(defaultSCFconfigArgs[1] |> length)}
 
@@ -543,17 +552,17 @@ julia> SCFconfig(threshold=1e-8, oscillateThreshold=1e-5)
 $(Doc_SCFconfig_eg1)
 ```
 """
-struct SCFconfig{T, L, MS<:NTuple{L, Val}} <: ImmutableParameter{T, SCFconfig}
+struct SCFconfig{T<:Real, L, MS<:NTuple{L, Val}} <: ImmutableParameter{T, SCFconfig}
     method::MS
     interval::NTuple{L, T}
     methodConfig::NTuple{L, Vector{<:Pair}}
-    secondaryConvRatio::T
+    secondaryConvRatio::NTuple{2, T}
     oscillateThreshold::T
 
-    function SCFconfig(methods::NTuple{L, Symbol}, intervals::NTuple{L, T}, 
+    function SCFconfig(methods::NTuple{L, Symbol}, intervals::NTuple{L, T1}, 
                        config::Dict{Int, <:AbstractVector{<:Pair}}=Dict(1=>Pair[]); 
-                       secondaryConvRatio::Real=defaultSecConvRatio, 
-                       oscillateThreshold::Real=defaultOscThreshold) where {L, T}
+                       secondaryConvRatio::Union{T2, NTuple{2, T2}}=defaultSecConvRatio, 
+                       oscillateThreshold::Real=defaultOscThreshold) where {L, T1, T2}
         any(i < 0 for i in intervals) && throw(DomainError(intervals, "Thresholds in "*
                                                "`intervals` must all be non-negative."))
         kwPairs = [Pair[] for _ in OneTo(L)]
@@ -561,6 +570,8 @@ struct SCFconfig{T, L, MS<:NTuple{L, Val}} <: ImmutableParameter{T, SCFconfig}
             kwPairs[i] = config[i]
         end
         methods = Val.(methods)
+        T = promote_type(T1, T2)
+        secondaryConvRatio = (secondaryConvRatio[begin], secondaryConvRatio[end])
         new{T, L, typeof(methods)}(methods, intervals, Tuple(kwPairs), 
                                    secondaryConvRatio, oscillateThreshold)
     end
@@ -569,7 +580,7 @@ end
 const defaultSCFconfig = SCFconfig(defaultSCFconfigArgs...)
 
 SCFconfig(;threshold::AbstractFloat=defaultSCFconfigArgs[2][end], 
-          secondaryConvRatio::Real=defaultSecConvRatio, 
+          secondaryConvRatio::Union{Real, NTuple{2, Real}}=defaultSecConvRatio, 
           oscillateThreshold::Real=defaultOscThreshold) = 
 SCFconfig( defaultSCFconfigArgs[1], 
           (defaultSCFconfigArgs[2][begin:end-1]..., Float64(threshold)); 
@@ -897,8 +908,8 @@ function runHFcore(bs::GTBasis{T, D, BN, BFT},
         roundDigits = min(DefaultDigits, getAtolDigits(T))
         nucNum = length(nuc)
         println(ifelse(Ntot>1, "Many", "Single"), "-Electron System Information: ")
-        println("•Number Of Electrons: ", Ntot)
-        println("•Number Of Nuclei: ", nucNum)
+        println("•Number of Electrons: ", Ntot)
+        println("•Number of Nuclei: ", nucNum)
         println("•Nuclear Coordinate: ")
         nucNumStrLen = ndigits(nucNum) + 3
         for (i, atm, coord) in zip(OneTo(nucNum), nuc, nucCoords)
@@ -1000,11 +1011,13 @@ function runHFcore(::Val{HFT},
     ΔEs = zeros(T2, 1)
     ΔDrms = zeros(T2, 1)
     δFrms = T2[getErrorNrms(vars, S)]
-    endThreshold = scfConfig.interval[end]
-    secondaryBreakPoints = secondaryConvRatio .* scfConfig.interval
-    oscThresholds = max.(scfConfig.interval, scfConfig.oscillateThreshold)
-    secondaryOscThresholds = secondaryConvRatio .* oscThresholds
-    detectConvergence = !isnan(endThreshold)
+    ΔEendThreshold = scfConfig.interval[end]
+    δFbreakPoints = secondaryConvRatio[1] .* scfConfig.interval
+    ΔDbreakPoints = secondaryConvRatio[2] .* scfConfig.interval
+    ΔEoscThresholds = max.(scfConfig.interval, scfConfig.oscillateThreshold)
+    δFoscThresholds = secondaryConvRatio[1] .* ΔEoscThresholds
+    ΔDoscThresholds = secondaryConvRatio[2] .* ΔEoscThresholds
+    detectConvergence = !isnan(ΔEendThreshold)
     isConverged::Union{Bool, Missing, Int} = true
     rollbackRange = 0 : (HFminItr÷3)
     rollbackCount = length(rollbackRange)
@@ -1015,7 +1028,7 @@ function runHFcore(::Val{HFT},
     i = 0
 
     if printInfo
-        roundDigits = setNumDigits(T2, endThreshold)
+        roundDigits = setNumDigits(T2, ΔEendThreshold)
         titles = ("Step", "E (Ha)", "ΔE (Ha)", "RMS(FDS-SDF)", "RMS(ΔD)")
         colPFs = (  lpad, cropStrR,  cropStrR,       cropStrR,  cropStrR)
         colSps = (max(ndigits(maxStep), (length∘string)(HFT), length(titles[begin])), 
@@ -1033,15 +1046,14 @@ function runHFcore(::Val{HFT},
         if infoLevel > 0
             adaptStepBl = genAdaptStepBl(infoLevel, maxStep)
             println("•Initial HF energy E: ", alignNum(Etots[], 0; roundDigits), " Ha")
-            println("•Initial RMS(FDS-SDF): ", 
-                      alignNum(δFrms[], 0; roundDigits))
-            println("•Convergence Threshold: ", endThreshold, " a.u.")
+            println("•Initial RMS(FDS-SDF): ", alignNum(δFrms[], 0; roundDigits))
+            println("•Convergence Threshold of E: ", ΔEendThreshold, " Ha")
+            println("•Convergence Threshold Ratios of (FDS-SDF, D) to E: ", 
+                    secondaryConvRatio)
             if infoLevel > 2
-                println("•Secondary Convergence Threshold: ", 
-                        secondaryConvRatio*endThreshold, " a.u.")
                 println("•Oscillatory Convergence Threshold: ", 
-                        scfConfig.oscillateThreshold, " a.u.")
-                println("•Maximum Number Of Iterations Allowed: ", maxStep)
+                        scfConfig.oscillateThreshold)
+                println("•Maximum Number of Iterations Allowed: ", maxStep)
             end
             println()
             println("Self-Consistent Field (SCF) Iteration:")
@@ -1101,8 +1113,8 @@ function runHFcore(::Val{HFT},
                 println()
             end
 
-            convThresholds = ifelse(δFrmsᵢ <= secondaryBreakPoints[l], 
-                                    (breakPoint, secondaryBreakPoints[l]), (0, 0))
+            convThresholds = ifelse(δFrmsᵢ <= δFbreakPoints[l], 
+                                    (breakPoint, ΔDbreakPoints[l]), (0, 0))
             ΔEᵢabs <= convThresholds[begin] && ΔDrmsᵢ <= convThresholds[end] && 
             (isConverged = true; break)
 
@@ -1110,12 +1122,12 @@ function runHFcore(::Val{HFT},
             if n > 1 && i > HFminItr && ΔEᵢ > flucThreshold
                 isOsc = false
                 if scfConfig.oscillateThreshold > 0
-                    isOsc, _ = isOscillateConverged(Etots, 10oscThresholds[l], 
+                    isOsc, _ = isOscillateConverged(Etots, 10ΔEoscThresholds[l], 
                                                     minLen=HFminItr, 
                                                     maxRemains=HFinterEstoreSize)
-                    if isOsc && ΔEᵢabs <= oscThresholds[l] && 
-                       (endM ? (δFrmsᵢ <= secondaryOscThresholds[l] && 
-                                ΔDrmsᵢ <= secondaryOscThresholds[l]) : true)
+                    if isOsc && ΔEᵢabs <= ΔEoscThresholds[l] && 
+                       (endM ? (δFrmsᵢ <= δFoscThresholds[l] && 
+                                ΔDrmsᵢ <= ΔDoscThresholds[l]) : true)
                         isConverged = 1
                         break
                     end
