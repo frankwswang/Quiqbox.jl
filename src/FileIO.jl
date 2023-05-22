@@ -223,7 +223,11 @@ function cropStrR(str::String, maxLen::Int)
     if maxLen > strLen
         rpad(str, maxLen)
     else
-        str[begin:maxLen]
+        i = 0
+        mapreduce(*, 1:maxLen) do _
+            i = nextind(str, i)
+            str[i]
+        end
     end
 end
 
