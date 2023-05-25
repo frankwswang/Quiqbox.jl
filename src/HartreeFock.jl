@@ -1113,8 +1113,8 @@ function runHFcore(::Val{HFT},
                 println()
             end
 
-            convThresholds = ifelse(δFrmsᵢ <= δFbreakPoints[l], 
-                                    (breakPoint, ΔDbreakPoints[l]), (0, 0))
+            convThresholds = (breakPoint, ΔDbreakPoints[l])
+            δFrmsᵢ > δFbreakPoints[l] && (convThresholds = convThresholds .* 0)
             ΔEᵢabs <= convThresholds[begin] && ΔDrmsᵢ <= convThresholds[end] && 
             (isConverged = true; break)
 
