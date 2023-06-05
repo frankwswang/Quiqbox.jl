@@ -906,9 +906,13 @@ numEps(::Type{Complex{T}}) where {T} = eps(T)
 function genAdaptStepBl(infoLevel::Int, maxStep::Int)
     if infoLevel == 0
         (::Int)->false
+    elseif infoLevel > 5
+        (::Int)->true
     else
         function (i::Int)
-            i % floor(log(abs(infoLevel^5*0.00032maxStep)+2, i) + 1) == 0
+            power = ceil(2 * maxStep^0.2)
+            bound = 1 / 5^power
+            i % floor(log(abs(infoLevel^power*bound*maxStep)+2, i) + 1) == 0
         end
     end
 end

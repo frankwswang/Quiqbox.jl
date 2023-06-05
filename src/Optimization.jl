@@ -4,7 +4,7 @@ using LinearAlgebra: norm
 using LineSearches
 
 const OFmethods = [:HFenergy, :DirectRHFenergy]
-const defaultPOinfoL = 2
+const defaultPOinfoL = 1
 const POinterValMaxStore = 50
 
 const OFconversions = Dict([runHFcore] .=> 
@@ -439,7 +439,7 @@ function optimizeParams!(pbs::AbstractVector{<:ParamBox{T}},
     targets = (config.target, 0) # (fTarget, gTarget)
     maxStep = config.maxStep
     adaptStepBl = genAdaptStepBl(infoLevel, maxStep)
-    expandVectors = ifelse(infoLevel > 3, false, true)
+    expandVectors = ifelse(infoLevel > 2, false, true)
 
     printInfo && ( stepSpace = ndigits(maxStep) )
 
@@ -481,12 +481,12 @@ function optimizeParams!(pbs::AbstractVector{<:ParamBox{T}},
         if printInfo && infoLevel > 0 && adaptStepBl(i)
             println(rpad("Step $(i): ", 8+stepSpace), lpad("$(fVstr) = ", 6), 
                     alignNumSign(fx; roundDigits))
-            if infoLevel > 2
+            if infoLevel > 1
                 print(lpad("𝒙 = ", 14+stepSpace))
-                println(IOContext(stdout, :limit=>expandVectors), 
+                println(IOContext(stdout, :limit=>expandVectors, :compact=>false), 
                         round.(x, sigdigits=roundDigits))
                 print(lpad("∇$(fVstr) = ", 14+stepSpace))
-                println(IOContext(stdout, :limit =>expandVectors), 
+                println(IOContext(stdout, :limit=>expandVectors, :compact=>false), 
                         round.(gx, sigdigits=roundDigits))
             end
             println(lpad("∥vec(∇$(fVstr))∥₂ = ", 14+stepSpace), 
