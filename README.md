@@ -124,8 +124,8 @@ Objects defined by Quiqbox that are directly exported to the user have the corre
 [Genie-PkgDC-img]: https://shields.io/endpoint?url=https://pkgs.genieframework.com/api/v1/badge/Quiqbox
 [Releases-url]: https://frankwswang.github.io/Quiqbox.jl/stable/#Installation-in-Julia-[REPL](https://docs.julialang.org/en/v1/manual/getting-started/)
 
-[Zenodo-DOI-img]: https://zenodo.org/badge/DOI/10.5281/zenodo.7448314.svg
-[Zenodo-DOI-url]: https://zenodo.org/record/7448314
+[Zenodo-DOI-img]: https://zenodo.org/badge/DOI/10.5281/zenodo.7448313.svg
+[Zenodo-DOI-url]: https://doi.org/10.5281/zenodo.7448313
 
 [arXiv-img]: https://img.shields.io/badge/arXiv-2212.04586-b31b1b.svg
 [arXiv-url]: https://arxiv.org/abs/2212.04586
