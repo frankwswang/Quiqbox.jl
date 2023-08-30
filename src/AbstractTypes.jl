@@ -39,8 +39,10 @@ abstract type ManyFermionDataBox{T, D} <: ImmutableDataBox{T} end
 
 abstract type HartreeFockintermediateData{T} <: MutableDataBox{T} end
 
-abstract type DifferentiableParameter{DataT, ContainerT} <: SemiMutableParameter{DataT, ContainerT} end
-abstract type ConfigBox{T, ContainerT, MethodT} <: MutableParameter{ContainerT, T} end
+abstract type VariableBox{T, ContainerT} <: SemiMutableParameter{T, ContainerT} end
+abstract type ConfigBox{T, ContainerT, MethodT} <: MutableParameter{T, ContainerT} end
+
+abstract type ParamBox{T, V, F} <: VariableBox{T, ParamBox} end
 
 abstract type HartreeFockFinalValue{T, HFT} <: AbstractHartreeFockFinalValue{T} end
 
@@ -102,3 +104,41 @@ const StrOrSym = Union{String, Symbol}
 
 
 const MatrixCol{T} = Vector{SubArray{T, 1, Matrix{T}, Tuple{Slice{OneTo{Int}}, Int}, true}}
+
+const Array0D{T} = Array{T, 0}
+
+const Union0D{T} = Union{T, Array0D{T}}
+
+const MTuple{M, T} = NTuple{M, Array0D{T}} # M: mutable
+
+const UTuple{U, T} = NTuple{U, Union0D{T}} # U: union
+
+const NMOTuple{NMO, T} = Tuple{T, Vararg{T, NMO}}
+
+const MMOTuple{MMO, T} = Tuple{Array0D{T}, Vararg{Array0D{T}, MMO}}
+
+const UMOTuple{UMO, T} = Tuple{Union0D{T}, Vararg{Union0D{T}, UMO}}
+
+const NMTTuple{NMO, T} = Tuple{T, T, Vararg{T, NMO}}
+
+const MMTTuple{MMO, T} = Tuple{Array0D{T}, Array0D{T}, Vararg{Array0D{T}, MMO}}
+
+const UMTTuple{UMO, T} = Tuple{Union0D{T}, Union0D{T}, Vararg{Union0D{T}, UMO}}
+
+const TorTuple{T} = Union{T, Tuple{T}}
+
+const TorTupleLong{T} = Union{T, Tuple{T, Vararg{T}}}
+
+const TorAbstractVec{T} = Union{T, AbstractVector{<:T}}
+
+const IntOrNone = Union{Int, Nothing}
+const IntOrMiss = Union{Int, Missing}
+
+const MutableIndex = Array0D{IntOrNone}
+
+
+const MonoParam{T} = OneParam{T}
+
+const DualParam{T} = Tuple{OneParam{T}, OneParam{T}}
+
+const MoreParam{T} = Tuple{OneParam{T}, OneParam{T}, OneParam{T}, Vector{OneParam{T}}}

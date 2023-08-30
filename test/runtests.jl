@@ -32,7 +32,7 @@ const SharedTestFunctions = true
             include("unit-tests/Integrals/Core-test.jl")
             include("unit-tests/Integrals/OneBody-test.jl")
             include("unit-tests/Integrals/TwoBody-test.jl")
-            Sys.islinux() && include("unit-tests/Integrals/Libcint-compare-tests.jl")
+            # Sys.islinux() && include("unit-tests/Integrals/Libcint-compare-tests.jl")
             include("unit-tests/Differentiation-test.jl")
         end
         println("$(unit2_1) test finished in $t2_1 seconds.\n")

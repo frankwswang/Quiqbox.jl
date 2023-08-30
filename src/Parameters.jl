@@ -1,6 +1,33 @@
 export ParamBox, inValOf, outValOf, inSymOf, outSymOf, isInSymEqual, isOutSymEqual, 
-       indVarOf, dataOf, mapOf, outValCopy, fullVarCopy, enableDiff!, disableDiff!, 
-       isDiffParam, toggleDiff!, changeMapping
+       indParOf, indSymOf, dataOf, mapOf, outValCopy, fullVarCopy, enableDiff!, 
+       disableDiff!, isDiffParam, toggleDiff!, changeMapping
+
+using StructArrays
+
+struct OneParam{T} <: VariableBox{T, OneParam}
+    label::Symbol
+    data::Array0D{T}
+    index::MutableIndex
+end
+
+OneParam(label::Symbol, data::Union0D{T}, index::IntOrNone=nothing) where {T} = 
+OneParam{T}(label, fillObj(data), genIndex(index))
+
+OneParam(labelToData::Pair{Symbol, <:Union0D{T}}, index::IntOrNone=nothing) where {T} = 
+OneParam{T}(labelToData[begin], fillObj(labelToData[end]), genIndex(index))
+
+OneParam(op::OneParam) = itself(op)
+
+const OPessential{T} = Union{OneParam{T}, Pair{Symbol, <:Union0D{T}}}
+
+const OneParamStructVec{T} = 
+      StructVector{OneParam{T}, NamedTuple{(:label, :data, :index), 
+                   Tuple{Vector{Symbol}, Vector{Array0D{T}}, Vector{MutableIndex}}}, Int}
+
+
+valOf(par::OneParam) = par.data[]
+symOf(par::OneParam) = Symbol(par.label, numToSubs(par.index[]))
+# indexOf(par::OneParam) = par.index[]
 
 """
 
@@ -48,7 +75,8 @@ stored. If the latter is the type of `data`, then it will directly used to const
 `outSym::Symbol`: The symbol of the output variable represented by the constructed 
 `ParamBox`. It's equal to the type parameter `V` of the constructed `ParamBox`.
 
-`inSym::Symbol`: The symbol of the input variable held by the constructed `ParamBox`.
+`inSym::Symbol`: The symbol of the input variable (without the index) held by the 
+constructed `ParamBox`.
 
 `mapFunction::Function`: The mapping (`mapFunction(::T)->T`) of the input variable, which 
 will be assigned to the field `.map`. When `mapFunction` is not provided, `.map` is set to 
@@ -88,49 +116,143 @@ parameter functional (e.g., the Hartree–Fock energy). However, the derivative 
 to the stored input variable can also be computed to when the `ParamBox` is marked as 
 differentiable.
 """
-struct ParamBox{T, V, F<:Function} <: DifferentiableParameter{T, ParamBox}
-    data::Array{Pair{Array{T, 0}, Symbol}, 0}
+struct MonoParamBox{T, V, F<:Function} <: ParamBox{T, V, F}
+    data::Array0D{OneParam{T}}
     map::Union{F, DI{F}}
-    canDiff::Array{Bool, 0}
-    index::Array{Union{Int, Nothing}, 0}
+    index::MutableIndex
+    canDiff::Array0D{Bool}
 
-    function ParamBox{T, V}(f::F, data::Pair{Array{T, 0}, Symbol}, index, canDiff) where 
-                           {T, V, F<:Function}
-        Base.return_types(f, (T,))[1] == T || 
-        throw(AssertionError("The mapping function `f`: `$(f)` should return the same "*
-                             "data type as its input argument."))
-        new{T, V, dressOf(F)}(fill(data), f, canDiff, index)
+    function MonoParamBox{T, V}(mapFunction::F, data::OneParam{T}, 
+                                index::Array0D{<:IntOrNone}, canDiff::Array0D{Bool}) where 
+                               {T, V, F<:Function}
+        checkFuncReturn(mapFunction, :mapFunction, T, T)
+        new{T, V, dressOf(F)}(fill(data), mapFunction, index, canDiff)
     end
 
-    ParamBox{T, V}(data::Pair{Array{T, 0}, Symbol}, index, canDiff) where {T, V} = 
-    new{T, V, iT}(fill(data), itself, canDiff, index)
+    MonoParamBox{T, V}(::IF, data::OneParam{T}, index, canDiff) where {T, V} = 
+    new{T, V, iT}(fill(data), itself, index, canDiff)
 end
 
-ParamBox(::Val{V}, mapFunction::F, data::Pair{Array{T, 0}, Symbol}, 
-         index=genIndex(nothing), canDiff=fill(true)) where {V, F<:Function, T} = 
-ParamBox{T, V}(mapFunction, data, index, canDiff)
+const DefaultMPBoxMap = itself
 
-ParamBox(::Val{V}, ::IF, data::Pair{Array{T, 0}, Symbol}, index=genIndex(nothing), 
-         canDiff=fill(false)) where {V, T} = 
-ParamBox{T, V}(data, index, canDiff)
+struct PolyParamBox{T, V, F<:Function} <: ParamBox{T, V, F}
+    data1::Array0D{OneParam{T}}
+    data2::Array0D{OneParam{T}}
+    data3::OneParamStructVec{T}
+    map::Union{F, DI{F}}
+    index::MutableIndex
+    canDiff::Array0D{Bool}
 
-ParamBox(::Val{V}, pb::ParamBox{T}, index=genIndex(pb.canDiff[] ? pb.index[] : nothing), 
-         canDiff::Array{Bool, 0}=copy(pb.canDiff)) where {V, T} = 
-ParamBox{T, V}(pb.map, pb.data[], index, canDiff)
+    function PolyParamBox{T, V}(mapFunction::F, data1::OneParam{T}, data2::OneParam{T}, 
+                                data3::AbstractVector{OneParam{T}}, 
+                                index::Array0D{<:IntOrNone}, canDiff::Array0D{Bool}) where 
+                               {T, V, F<:Function}
+        checkFuncReturn(mapFunction, :mapFunction, Vector{T}, T)
+        new{T, V, dressOf(F)}(fill(data1), fill(data2) StructArray(data3), 
+                              f, index, canDiff)
+    end
+end
 
-ParamBox(inVar::Union{T, Array{T, 0}}, outSym::Symbol=:undef, 
-         inSym::Symbol=Symbol(IVsymSuffix, outSym); 
-         index::Union{Int, Nothing}=nothing, canDiff::Bool=false) where {T} = 
-ParamBox(Val(outSym), itself, 
-         fillObj(inVar)=>inSym, genIndex(index), fill(canDiff))
+const DefaultPPBoxMap = sum
 
-ParamBox(inVar::Union{T, Array{T, 0}}, outSym::Symbol, mapFunction::Function, 
-         inSym::Symbol=Symbol(IVsymSuffix, outSym); 
-         index::Union{Int, Nothing}=nothing, canDiff::Bool=true) where {T} = 
-ParamBox(Val(outSym), mapFunction, 
-         fillObj(inVar)=>inSym, genIndex(index), fill(canDiff))
+genParamBox(::Val{V}, mapFunction::F, data::OneParam{T}, 
+            index::Union0D{<:IntOrNone}=genIndex(), 
+            canDiff::Union0D{Bool}=getFLevel(F)>0) where {T, V, F<:Function} = 
+MonoParamBox{T, V}(mapFunction, data, fillObj(index), fillObj(canDiff))
 
-const VPB{T} = Union{T, Array{T, 0}, ParamBox{T}}
+genParamBox(::Val{V}, mapFunction::F, data1::OneParam{T}, data2::OneParam{T}, 
+            data3::AbstractVector{OneParam{T}}, 
+            index::Union0D{<:IntOrNone}=genIndex(), 
+            canDiff::Union0D{Bool}=false) where {T, V, F<:Function} = 
+PolyParamBox{T, V}(mapFunction, data1, data2, data3, fillObj(index), fillObj(canDiff))
+
+function genParamBox(::Val{V}, mapFunction::F, data::AbstractVector{OneParam{T}}, 
+                     index::Union0D{<:IntOrNone}=genIndex(), 
+                     canDiff::Union0D{Bool}=getFLevel(F)>0) where {T, V, F<:Function}
+    isLenOne = checkCollectionMinLen(data, :data, 1)
+    if isLenOne
+        genParamBox(Val(V), mapFunction, data[], index, canDiff)
+    else
+        genParamBox(Val(V), mapFunction, data[begin], data[begin+1], data[begin+2:end], 
+                    index, canDiff)
+    end
+end
+
+genParamBox(::Val{V}, pb::MonoParamBox{T}, index::Union0D{<:IntOrNone}=genIndex(), 
+            canDiff::Array0D{Bool}=copy(pb.canDiff)) where {V, T} = 
+genParamBox(Val(V), pb.map, pb.data[], index, canDiff)
+
+genParamBox(::Val{V}, pb::PolyParamBox{T}, index::Union0D{<:IntOrNone}=genIndex(), 
+            canDiff::Array0D{Bool}=copy(pb.canDiff)) where {V, T} = 
+genParamBox(Val(V), pb.map, pb.data1[], pb.data2[], pb.data3, index, canDiff)
+
+genParamBox(data::OPessential{T}, outSym::Symbol=:undef, mapFunction::F=DefaultMPBoxMap; 
+            index::IntOrNone=nothing, 
+            canDiff::Bool=getFLevel(F)>0) where {T, F<:Function} = 
+genParamBox(Val(outSym), mapFunction, OneParam(data), index, fill(canDiff))
+
+function genParamBox(data::AbstractVector{<:Union{Union0D{T}, OPessential{T}}}, 
+                     outSym::Symbol=:undef, 
+                     mapFunction::F=ifelse(checkCollectionMinLen(data, :data, 1), 
+                                           DefaultMPBoxMap, DefaultPPBoxMap); 
+                     defaultDataLabel::Symbol=Symbol(IVsymSuffix, outSym), 
+                     index::IntOrNone=nothing, 
+                     canDiff::Bool=getFLevel(F)>0) where {T, F<:Function}
+    data = map(data) do item
+        item isa Union0D ? OneParam(defaultDataLabel, item) : OneParam(item)
+    end
+    genParamBox(Val(outSym), mapFunction, data, index, canDiff)
+end
+
+# function ParamBox(data::Union0D{T}, outSym::Symbol=:undef, mapFunction::F=itself; 
+#                   defaultDataLabel::Symbol=Symbol(IVsymSuffix, outSym), 
+#                   index::IntOrNone=nothing, canDiff::Bool=getFLevel(F)>0) where 
+#                   {T, F<:Function}
+#     data = map(data|>tupleObj) do item
+#         item isa Union0D ? OneParam(defaultDataLabel, item) : item
+#     end
+#     ParamBox(Val(outSym), mapFunction, OneParam.(tupleObj(data)), 
+#              genIndex(index), fill(canDiff))
+# end
+
+# function ParamBox(data::TorTupleLong{Union{Union0D{T}, OPessential{T}}}, 
+#                   outSym::Symbol=:undef, mapFunction::Function=itself; 
+#                   defaultDataLabel::Symbol=Symbol(IVsymSuffix, outSym), 
+#                   index::Union{Int, Nothing}=nothing, canDiff::Bool=false)
+#     data = map(data|>tupleObj) do item
+#         item isa Union0D ? OneParam(defaultDataLabel, item) : item
+#     end
+#     ParamBox(Val(outSym), mapFunction, OneParam.(tupleObj(data)), 
+#              genIndex(index), fill(canDiff))
+# end
+
+# ParamBox(inVar::Union0D{T}, outSym::Symbol=:undef, 
+#          inSym::Symbol=(Symbol(IVsymSuffix, outSym),); 
+#          index::Union{Int, Nothing}=nothing, canDiff::Bool=false) where {T} = 
+# ParamBox(Val(outSym), itself, OneParam(inVar, inSym), genIndex(index), fill(canDiff))
+
+# ParamBox(inVar::Union0D{T}, outSym::Symbol, mapFunction::Function, 
+#          inSym::Symbol=Symbol(IVsymSuffix, outSym); 
+#          index::Union{Int, Nothing}=nothing, canDiff::Bool=true) where {T} = 
+# ParamBox(Val(outSym), mapFunction, OneParam(inVar, inSym), genIndex(index), fill(canDiff))
+
+# ParamBox(inVar::UMOTuple{NPMO, T}, outSym::Symbol, mapFunction::Function, 
+#          inSym::NMOTuple{NPMO, Symbol}=ntuple(_->Symbol(IVsymSuffix, outSym), Val(NPMO)); 
+#          index::Union{Int, Nothing}=nothing, canDiff::Bool=true) where {NPMO, T} = 
+# ParamBox(Val(outSym), mapFunction, 
+#          OneParam.(inVar, inSym), genIndex(index), fill(canDiff))
+
+const VPB{T} = Union{T, Array0D{T}, ParamBox{T}}
+
+
+"""
+
+    dataOf(pb::ParamBox{T}) where {T} -> Pair{Array{T, 0}, Symbol}
+
+Return the `Pair` of the input variable and its symbol.
+"""
+@inline dataOf(pb::MonoParamBox) = pb.data
+@inline dataOf(pb::PolyParamBox) = vcat(pb.data1, pb.data2, pb.data3)
 
 
 """
@@ -139,7 +261,7 @@ const VPB{T} = Union{T, Array{T, 0}, ParamBox{T}}
 
 Return the value of the input variable of `pb`. Equivalent to `pb[]`.
 """
-@inline inValOf(pb::ParamBox) = pb.data[][begin][]
+@inline inValOf(pb::ParamBox) = valOf.(dataOf(pb))
 
 
 """
@@ -148,7 +270,7 @@ Return the value of the input variable of `pb`. Equivalent to `pb[]`.
 
 Return the value of the output variable of `pb`. Equivalent to `pb()`.
 """
-@inline outValOf(pb::ParamBox) = (pb.map∘inValOf)(pb)
+@inline outValOf(pb::ParamBox) = pb.map(inValOf(pb))
 
 (pb::ParamBox)() = outValOf(pb)
 # (pb::ParamBox)() = Base.invokelatest(pb.map, pb.data[][begin][])::Float64
@@ -160,7 +282,7 @@ Return the value of the output variable of `pb`. Equivalent to `pb()`.
 
 Return the symbol of the input variable of `pb`.
 """
-@inline inSymOf(pb::ParamBox) = pb.data[][end]
+@inline inSymOf(pb::ParamBox) = symOf.(dataOf(pb))
 
 
 """
@@ -172,45 +294,50 @@ Return the symbol of the output variable of `pb`.
 @inline outSymOf(::ParamBox{<:Any, V}) where {V} = V
 
 
+# """
+
+#     isInSymEqual(pb::ParamBox, sym::Symbol) -> Bool
+
+# Return the Boolean value of whether the symbol of  `pb`'s input variable equals `sym`.
+# """
+# isInSymEqual(pb::ParamBox{<:Any, <:Any, <:Any, 1}, sym::TotTuple{Symbol}) = 
+# inSymOf(pb) == unzipObj(sym)
+
+# isInSymEqual(pb::ParamBox{<:Any, <:Any, <:Any, NP}, sym::NTuple{NP, Symbol}) where {NP} = 
+# all(i==j for (i,j) in zip(inSymOfCore(pb), sym))
+
+# isInSymEqual(pb::ParamBox, sym::Symbol, i::Int) = symOf(pb.data[][i]) == sym
+
+
+# """
+
+#     isOutSymEqual(::ParamBox, sym::Symbol) -> Bool
+
+# Return the Boolean value of whether the symbol of  `pb`'s output variable equals `sym`.
+# """
+# isOutSymEqual(::ParamBox{<:Any, V}, sym::Symbol) where {V} = (V == sym)
+
+
 """
 
-    isInSymEqual(pb::ParamBox, sym::Symbol) -> Bool
-
-Return the Boolean value of whether the symbol of  `pb`'s input variable equals `sym`.
-"""
-isInSymEqual(pb::ParamBox, sym::Symbol) = (dataOf(pb)[end] == sym)
-
-
-
-"""
-
-    isOutSymEqual(::ParamBox, sym::Symbol) -> Bool
-
-Return the Boolean value of whether the symbol of  `pb`'s output variable equals `sym`.
-"""
-isOutSymEqual(::ParamBox{<:Any, V}, sym::Symbol) where {V} = (V == sym)
-
-
-"""
-
-    indVarOf(pb::ParamBox{T}) -> Pair{}
+    indParOf(pb::ParamBox{<:Any, <:Any, <:Any, NP}) -> Tuple{Vararg{SemiMutableParameter{T}, NP}}
 
 Return (the name and the value of) the independent variable tied to `pb`. Specifically, 
 return the input variable stored in `pb` when `pb` is marked as differentiable; return the 
 output variable of `pb` when `pb` is marked as non-differentiable. Thus, it is the variable 
 `pb` represents to differentiate any (differentiable) function of [`ParamBox`](@ref)es.
 """
-function indVarOf(pb::ParamBox)
-    idx = numToSubs(pb.index[])
-    if isDiffParam(pb)
-        Symbol(inSymOf(pb), idx) => inValOf(pb)
-    else
-        Symbol(outSymOf(pb), idx) => outValOf(pb)
-    end
-end
+indParOf(pb::ParamBox) = (unzipObj∘ifelse)(isDiffParam(pb), dataOf(pb), pb)
+
+"""
+
+    indSymOf
+
+"""
+indSymOf(pb::ParamBox) = ifelse(isDiffParam(pb), outSymOf, inSymOf)(pb)
 
 
-getTypeParams(::Type{ParamBox{T, V, F}}) where {T, V, F} = (T, V, F)
+getTypeParams(::Type{<:ParamBox{T, V, F}}) where {T, V, F} = (T, V, F)
 
 getTypeParams(::T) where {T<:ParamBox} = getTypeParams(T)
 
@@ -218,15 +345,6 @@ getTypeParams(::T) where {T<:ParamBox} = getTypeParams(T)
 getFLevel(::Type{<:ParamBox{<:Any, <:Any, F}}) where {F} = getFLevel(F)
 
 getFLevel(::T) where {T<:ParamBox} = getFLevel(T)
-
-
-"""
-
-    dataOf(pb::ParamBox{T}) where {T} -> Pair{Array{T, 0}, Symbol}
-
-Return the `Pair` of the input variable and its symbol.
-"""
-@inline dataOf(pb::ParamBox) = pb.data[]
 
 
 """
@@ -246,8 +364,7 @@ Return a new `ParamBox` of which the input variable's value is equal to the outp
 variable's value of `pb`.
 """
 outValCopy(pb::ParamBox{<:Any, V}) where {V} = 
-ParamBox(Val(V), itself, fill(pb())=>Symbol(IVsymSuffix, V))
-
+genParamBox(Val(V), itself, OneParam(pb(), Symbol(IVsymSuffix, V)))
 
 """
 
@@ -255,7 +372,8 @@ ParamBox(Val(V), itself, fill(pb())=>Symbol(IVsymSuffix, V))
 
 A shallow copy of the input `ParamBox`.
 """
-fullVarCopy(pb::ParamBox{<:Any, V}) where {V} = ParamBox(Val(V), pb, pb.index, pb.canDiff)
+fullVarCopy(pb::ParamBox{<:Any, V}) where {V} = 
+genParamBox(Val(V), pb, pb.index[], pb.canDiff[])
 
 
 """
@@ -314,7 +432,7 @@ end
 
 """
 
-    changeMapping(pb::ParamBox{T, V}, mapFunction::Function=itself, outSym::Symbol=V; 
+    changeMapping(pb::ParamBox{T, V}, mapFunction::Function, outSym::Symbol=V; 
                   canDiff::Union{Bool, Array{Bool, 0}}=isDiffParam(pb)) where {T, V} -> 
     ParamBox{T, outSym}
 
@@ -322,22 +440,35 @@ Change the mapping function of `pb`. The symbol of the output variable of the re
 `ParamBox` can be specified by `outSym`, and its differentiability is determined by 
 `canDiff`.
 """
-function changeMapping(pb::ParamBox{T, V}, 
-                       mapFunction::Function=itself, outSym::Symbol=V; 
-                       canDiff::Union{Bool, Array{Bool, 0}}=isDiffParam(pb)) where {T, V}
-    canDiff = fillObj(canDiff)
-    ParamBox(Val(outSym), mapFunction, pb.data[], 
-             genIndex( ifelse(canDiff[]==isDiffParam(pb)==true, pb.index[], nothing) ), 
-             canDiff)
+changeMapping(pb::ParamBox{T, V}, mapFunction::Function, outSym::Symbol=V; 
+              canDiff::Union0D{Bool}=isDiffParam(pb)) where {T, V} = 
+genParamBox(Val(outSym), mapFunction, dataOf(pb), genIndex(), canDiff)
+
+
+compareOneParam(op1::OneParam, op2::OneParam) = op1.data === op2.data
+
+compareParamBoxCore1(pb1::MonoParamBox{T}, pb2::MonoParamBox{T}) where {T} = 
+compareOneParam(dataOf(pb1)[], dataOf(pb2)[])
+
+function compareParamBoxCore1(pb1::PloyParamBox{T}, pb2::PloyParamBox{T}) where {T}
+    dataPb1 = dataOf(pb1)
+    dataPb2 = dataOf(pb2)
+    if length(dataPb1) == length(dataPb2)
+        all( compareOneParam(op1, op2) for (op1, op2) in zip(dataPb1, dataPb2) )
+    else
+        false
+    end
 end
 
+# compareParamBoxCore1(pb1::ParamBox{<:Any, <:Any, <:Any, NP}, 
+#                      pb2::ParamBox{<:Any, <:Any, <:Any, NP}) where {NP} = 
+# all( compareOneParam(op1, op2) for (op1, op2) in zip(pb1.data[], pb2.data))
 
-compareParamBoxCore1(pb1::ParamBox, pb2::ParamBox) = 
-(pb1.data[][begin] === pb2.data[][begin])
+compareParamBoxCore1(pb1::ParamBox, pb2::ParamBox) = false
 
-function compareParamBoxCore2(pb1::ParamBox{<:Any, V1, F1}, 
-                              pb2::ParamBox{<:Any, V2, F2}) where {V1, V2, F1, F2}
-    bl = V1==V2 && compareParamBoxCore1(pb1, pb2)
+function compareParamBoxCore2(pb1::ParamBox{T1, V1, F1}, 
+                              pb2::ParamBox{T2, V2, F2}) where {T1, T2, V1, V2, F1, F2}
+    bl = T1==T2 && V1==V2 && compareParamBoxCore1(pb1, pb2)
     if FLevel(F1) == FLevel(F2) == IL
         bl
     else
@@ -347,47 +478,41 @@ end
 
 @inline function compareParamBox(pb1::ParamBox, pb2::ParamBox)
     ifelse(( (bl=isDiffParam(pb1)) == isDiffParam(pb2) ),
-        ifelse( bl, 
-            compareParamBoxCore1(pb1, pb2), 
-
-            compareParamBoxCore2(pb1, pb2)
-        ),
-
-        false
+        (bl ? compareParamBoxCore1(pb1, pb2) : compareParamBoxCore2(pb1, pb2)), false
     )
 end
 
 
-function addParamBox(pb1::ParamBox{T, V, FL1}, pb2::ParamBox{T, V, FL2}, 
+function addParamBox(pb1::MonoParamBox{T, V, FL1}, pb2::MonoParamBox{T, V, FL2}, 
                      roundAtol::Real=nearestHalfOf(getAtolVal(T))) where {T, V, FL1, FL2}
     if isDiffParam(pb1) && compareParamBox(pb1, pb2)
-        ParamBox(Val(V), combinePF(+, pb1.map, pb2.map), 
-                 pb1.data[][begin]=>min(pb1.data[][end], pb2.data[][end]), 
-                 genIndex(nothing), fill(true))
+        genParamBox(Val(V), combinePF(+, pb1.map, pb2.map), 
+                    pb1.data[][begin]=>min(pb1.data[][end], pb2.data[][end]), 
+                    genIndex(), fill(true))
     else
-        ParamBox(Val(V), itself, 
+        genParamBox(Val(V), itself, 
                  fill(roundToMultiOfStep(pb1() + pb2(), roundAtol))=>Symbol(IVsymSuffix, V))
     end
 end
 
 
-function mulParamBox(c::Number, pb::ParamBox{T, V}, 
+function mulParamBox(c::Number, pb::MonoParamBox{T, V}, 
                      roundAtol::Real=nearestHalfOf(getAtolVal(T))) where {T, V}
     if isDiffParam(pb)
         mapFunc = PF(pb.map, *, convert(T, roundToMultiOfStep(c, roundAtol)))
-        ParamBox(Val(V), mapFunc, pb.data[], genIndex(nothing), fill(true))
+        ParamBox(Val(V), mapFunc, pb.data[], genIndex(), true)
     else
         ParamBox(Val(V), itself, 
                  fill(roundToMultiOfStep(T(pb()*c), roundAtol))=>Symbol(IVsymSuffix, V))
     end
 end
 
-function mulParamBox(pb1::ParamBox{T, V, FL1}, pb2::ParamBox{T, V, FL2}, 
+function mulParamBox(pb1::MonoParamBox{T, V, FL1}, pb2::MonoParamBox{T, V, FL2}, 
                      roundAtol::Real=nearestHalfOf(getAtolVal(T))) where {T, V, FL1, FL2}
     if isDiffParam(pb1) && compareParamBox(pb1, pb2)
         ParamBox(Val(V), combinePF(*, pb1.map, pb2.map), 
                  pb1.data[][begin]=>min(pb1.data[][end], pb2.data[][end]), 
-                 genIndex(nothing), fill(true))
+                 genIndex(), fill(true))
     else
         ParamBox(Val(V), itself, 
                  fill(roundToMultiOfStep(pb1() * pb2(), roundAtol))=>Symbol(IVsymSuffix, V))

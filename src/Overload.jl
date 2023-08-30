@@ -1,9 +1,13 @@
 # Julia internal methods overload.
 
 import Base: ==
+==(op1::OneParam, op2::OneParam) = op1.data == op2.data &&
+                                   op1.label == op2.label && 
+                                   op1.index[] === op2.index[]
+
 ==(pb1::ParamBox, pb2::ParamBox) = (pb1.data == pb2.data && 
                                     isDiffParam(pb1) == isDiffParam(pb2) && 
-                                    pb1.index[] == pb2.index[] && 
+                                    pb1.index[] === pb2.index[] && 
                                     pb1.map == pb2.map)
 
 ==(cp1::SpatialPoint, cp2::SpatialPoint) = (cp1.param == cp2.param)
@@ -85,7 +89,7 @@ end
 
 
 function printIndVarCore(io::IO, pb::ParamBox)
-    printstyled(io, "$(indVarOf(pb)[begin])", color=:cyan)
+    printstyled(io, "$(indSymOf(pb))", color=:cyan)
 end
 
 function printIndVar(io::IO, @nospecialize(pb::ParamBox))
@@ -300,12 +304,14 @@ import Base: *
 
 ## Iteration Interface
 import Base: iterate, size, length, eltype
-iterate(pb::ParamBox) = (pb.data[][begin][], nothing)
-iterate(@nospecialize(_::ParamBox), _) = nothing
-size(::ParamBox) = ()
-length(::ParamBox) = 1
+
+iterate(pb::ParamBox) = iterate(pb.data[])
+iterate(pb::ParamBox, i) = iterate(pb.data[], i)
+size(::ParamBox{<:Any, <:Any, <:Any, 1}) = ()
+size(::ParamBox{<:Any, <:Any, <:Any, NP}) where {NP} = (NP,)
+size(pb::ParamBox, d::Integer) = size(pb.data[], d)
+length(::ParamBox{<:Any, <:Any, <:Any, NP}) where {NP} = NP
 eltype(::ParamBox{T}) where {T} = T
-size(pb::ParamBox, d::Integer) = size(pb.data[][begin][], d)
 
 iterate(sp::SpatialPoint) = iterate(sp.param)
 iterate(sp::SpatialPoint, state) = iterate(sp.param, state)
@@ -350,10 +356,13 @@ end
 
 ## Indexing Interface
 import Base: getindex, setindex!, firstindex, lastindex, eachindex, axes
-getindex(pb::ParamBox) = pb.data[][begin][]
+getindex(op::OneParam) = op.data[]
+getindex(pb::ParamBox) = inValOf(pb)
 getindex(pb::ParamBox, ::Val{:first}) = getindex(pb)
 getindex(pb::ParamBox, ::Val{:last}) = getindex(pb)
-setindex!(pb::ParamBox, d) = begin pb.data[][begin][] = d end
+setindex!(op::OneParam, d) = begin op.data[] = d end
+setindex!(pb::ParamBox{<:Any, <:Any, <:Any, 1}, d) = begin pb.data[][begin] = d end
+setindex!(pb::ParamBox, d, index) = begin pb.data[][index] = d end
 firstindex(@nospecialize(_::ParamBox)) = Val(:first)
 lastindex(@nospecialize(_::ParamBox)) = Val(:last)
 axes(@nospecialize(_::ParamBox)) = ()

@@ -775,7 +775,8 @@ function genIndex(index::Int)
     genIndexCore(index)
 end
 
-genIndex(index::Nothing) = genIndexCore(index)
+genIndex() = genIndexCore(nothing)
+genIndex(::Nothing) = genIndex()
 
 function genIndexCore(index)
     res = reshape(Union{Int, Nothing}[0], ()) |> collect
@@ -797,14 +798,27 @@ function genNamedTupleC(name::Symbol, defaultVars::AbstractVector)
 end
 
 
-fillObj(obj::Any) = fill(obj)
+fillObj(@nospecialize(obj::Any)) = fill(obj)
 
-fillObj(obj::Array{<:Any, 0}) = itself(obj)
+fillObj(@nospecialize(obj::Array{<:Any, 0})) = itself(obj)
 
 
-arrayToTuple(arr::AbstractArray) = Tuple(arr)
+tupleObj(@nospecialize(obj::Any)) = (obj,)
 
-arrayToTuple(tpl::Tuple) = itself(tpl)
+tupleObj(@nospecialize(obj::Tuple{Any})) = itself(obj)
+
+
+@inline unzipObj(obj::Tuple{T}) where {T} = obj[begin]
+
+unzipObj(@nospecialize(obj::Union{Tuple, Array})) = 
+ifelse(length(obj)==1, obj[begin], obj)
+
+unzipObj(@nospecialize(obj::Any)) = itself(obj)
+
+
+arrayToTuple(@nospecialize(arr::AbstractArray)) = Tuple(arr)
+
+arrayToTuple(@nospecialize(tpl::Tuple)) = itself(tpl)
 
 
 genTupleCoords(::Type{T1}, 
