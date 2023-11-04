@@ -8,7 +8,7 @@
 
 | Documentation | Digital Object Identifier | Paper | License |
 | :---: | :---: | :---: | :---: |
-| [![][Doc-l-img]][Doc-latest] | [![][Zenodo-DOI-img]][Zenodo-DOI-url] |[![][arXiv-img]][arXiv-url] | [![License: MIT][License-img]][License-url] |
+| [![][Doc-l-img]][Doc-latest] | [![][Zenodo-DOI-img]][Zenodo-DOI-url] |[![][JCTC-img]][JCTC-url] | [![License: MIT][License-img]][License-url] |
 
 
 
@@ -127,8 +127,8 @@ Objects defined by Quiqbox that are directly exported to the user have the corre
 [Zenodo-DOI-img]: https://zenodo.org/badge/DOI/10.5281/zenodo.7448313.svg
 [Zenodo-DOI-url]: https://doi.org/10.5281/zenodo.7448313
 
-[arXiv-img]: https://img.shields.io/badge/arXiv-2212.04586-b31b1b.svg
-[arXiv-url]: https://arxiv.org/abs/2212.04586
+[JCTC-img]: https://img.shields.io/badge/JCTC-10.1021/acs.jctc.3c00011-darkgreen.svg
+[JCTC-url]: https://pubs.acs.org/doi/10.1021/acs.jctc.3c00011
 
 [License-img]: https://img.shields.io/badge/License-MIT-yellow.svg
 [License-url]: https://github.com/frankwswang/Quiqbox.jl/blob/main/LICENSE
