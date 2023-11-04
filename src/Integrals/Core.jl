@@ -10,7 +10,7 @@ using Base: OneTo, Iterators.product
 ## [DOI] 10.48550/arXiv.2007.12057
 
 function genFγIntegrand(γ::Int, u::T) where {T}
-    function (x)
+    function (x::T)
         ( (x+1)/2 )^(2γ) * exp(-u * (x+1)^2 / 4) / 2
     end
 end
@@ -25,19 +25,18 @@ for ValI in ValInts[begin:end .<= 1000]
 end
 
 function F0(u::T) where {T}
-    ifelse(u < getAtolVal(T), 
-        T(1), 
-        begin
-            ur = sqrt(u)
-            T(πvals[0.5]) * erf(ur) / (2ur)
-        end
-    )
+    if u < getAtolVal(T)
+        T(1)
+    else
+        ur = sqrt(u)
+        T(πvals[0.5]) * erf(ur) / (2ur)
+    end
 end
 
 function getGQN(u::T) where {T}
     u = abs(u) + getAtolVal(T)
-    res = getAtolDigits(T) + round(0.4u + 2inv(sqrt(u))) + 1
-    (Int∘min)(res, typemax(Int) - 1)
+    res = getAtolDigits(T) + (Int∘round)(0.4u + 2inv(sqrt(u))) + 1
+    min(res, typemax(Int) - 1)
 end
 
 function Fγ(γ::Int, u::T) where {T}
