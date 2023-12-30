@@ -904,7 +904,7 @@ bf_gv7 = genBasisFunc(sp_gv1, (gf_gv4, gf_gv5))
 pars_gv = markParams!(bf_gv7, true)
 pars_gv_t = markParams!([pb_gv1, pb_gv2, pb_gv3, gf_gv5.con])
 @test pars_gv == pars_gv_t
-@test indSymOf.(pars_gv) == [:I₁, :I₂, :I₃, :d₁]
+@test (first∘indVarOf).(pars_gv) == [:I₁, :I₂, :I₃, :d₁]
 
 
 # function hasNormFactor getNormFactor

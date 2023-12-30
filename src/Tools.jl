@@ -775,8 +775,8 @@ function genIndex(index::Int)
     genIndexCore(index)
 end
 
-genIndex() = genIndexCore(nothing)
-genIndex(::Nothing) = genIndex()
+genIndex(::Nothing) = genIndexCore(nothing)
+genIndex() = genIndex(nothing)
 
 function genIndexCore(index)
     res = reshape(Union{Int, Nothing}[0], ()) |> collect

@@ -68,25 +68,24 @@ getTypeParams(::GaussFunc{T, Fxpn, Fcon}) where {T, Fxpn, Fcon} = (T, Fxpn, Fcon
                {T<:AbstractFloat} -> 
     ParamBox{T, :$(xpnSym)}
 
-Construct an exponent coefficient given a value or variable (and its symbol without the 
-index). `mapFunction`, `canDiff`, and `inSym` work the same way as in a general constructor 
-of a [`ParamBox`](@ref).
+Construct an exponent coefficient given a value or variable (with its symbol). 
+`mapFunction`, `canDiff`, and `inSym` work the same way as in a general constructor of a 
+[`ParamBox`](@ref).
 """
-genExponent(eData::TorTuple{OneParam{T}}, mapFunction::Function=itself; 
+genExponent(eData::Pair{Array{T, 0}, Symbol}, mapFunction::Function=itself; 
             canDiff::Bool=ifelse(FLevel(mapFunction)==IL, false, true)) where 
            {T<:AbstractFloat} = 
-ParamBox(Val(xpnSym), mapFunction, eData, genIndex(), fill(canDiff))
+ParamBox(Val(xpnSym), mapFunction, eData, genIndex(nothing), fill(canDiff))
 
-genExponent(eData::TorTuple{Union0D{T}}, mapFunction::Function=itself; 
-            canDiff::Bool=ifelse(FLevel(mapFunction)==IL, false, true), 
-            inSym::TorTuple{Symbol}=(xpnIVsym,)) where {T<:AbstractFloat} = 
-genExponent(OneParam.(tupleObj(eData), inSym), mapFunction; canDiff)
-
-genExponent(eData::NMOTuple{NPMO, Union{Union0D{T}, OneParam{T}}}, 
-            mapFunction::Function=itself; 
+genExponent(e::Array{T, 0}, mapFunction::Function=itself; 
             canDiff::Bool=ifelse(FLevel(mapFunction)==IL, false, true), 
             inSym::Symbol=xpnIVsym) where {T<:AbstractFloat} = 
-genExponent(OneParam.(tupleObj(eData), inSym), mapFunction; canDiff)
+genExponent(e=>inSym, mapFunction; canDiff)
+
+genExponent(e::AbstractFloat, mapFunction::Function=itself; 
+            canDiff::Bool=ifelse(FLevel(mapFunction)==IL, false, true), 
+            inSym::Symbol=xpnIVsym) = 
+genExponent(fill(e)=>inSym, mapFunction; canDiff)
 
 """
 
@@ -115,15 +114,15 @@ genExponent(pb::ParamBox) = ParamBox(Val(xpnSym), pb)
                   {T<:AbstractFloat} -> 
     ParamBox{T, :$(conSym)}
 
-Construct a contraction coefficient given a value or variable (and its symbol without the 
-index).`mapFunction`, `canDiff`, and `inSym` work the same way as in a general constructor 
-of a [`ParamBox`](@ref).
+Construct a contraction coefficient given a value or variable (with its symbol). 
+`mapFunction`, `canDiff`, and `inSym` work the same way as in a general constructor of a 
+[`ParamBox`](@ref).
 """
 genContraction(dData::Pair{Array{T, 0}, Symbol}, 
                mapFunction::Function=itself; 
                canDiff::Bool=ifelse(FLevel(mapFunction)==IL, false, true)) where 
               {T<:AbstractFloat} = 
-ParamBox(Val(conSym), mapFunction, dData, genIndex(), fill(canDiff))
+ParamBox(Val(conSym), mapFunction, dData, genIndex(nothing), fill(canDiff))
 
 genContraction(d::Array{T, 0}, mapFunction::Function=itself; 
                canDiff::Bool=ifelse(FLevel(mapFunction)==IL, false, true), 
@@ -269,7 +268,7 @@ genSpatialPoint(compData::Pair{Array{T, 0}, Symbol}, compIndex::Int,
                 mapFunction::Function=itself; 
                 canDiff::Bool=ifelse(FLevel(mapFunction)==IL, false, true)) where 
                {T<:AbstractFloat} = 
-ParamBox(Val(SpatialParamSyms[compIndex]), mapFunction, compData, genIndex(), 
+ParamBox(Val(SpatialParamSyms[compIndex]), mapFunction, compData, genIndex(nothing), 
          fill(canDiff))
 
 genSpatialPoint(comp::Array{T, 0}, compIndex::Int, 
@@ -1869,9 +1868,9 @@ end
 Return the parameter(s) stored in the input container. If `symbol` is set to `missing`, 
 then return all the parameter(s). If it's set to a `Symbol` tied to a parameter, for 
 example `:α₁`, the function will match any `pb::`[`ParamBox`](@ref) such that 
-[`indSymOf`](@ref)`(pb) == :α₁`. If it's set to a `Symbol` without any subscript, 
+[`indVarOf`](@ref)`(pb)[begin] == :α₁`. If it's set to a `Symbol` without any subscript, 
 for example `:α`, the function will match it with all the `pb`s such that 
-`string(indSymOf(pb))` contains `'α'`. If the first argument is a collection, its 
+`string(indVarOf(pb)[begin])` contains `'α'`. If the first argument is a collection, its 
 entries must be `ParamBox` containers.
 """
 getParams(pb::ParamBox, symbol::Union{Symbol, Missing}=missing) = 
@@ -1909,7 +1908,7 @@ getParams(@nospecialize(cs::Tuple{QuiqboxContainer, Vararg{QuiqboxContainer}}),
 getParams(lazyCollect(cs), symbol)
 
 paramFilter(pb::ParamBox, sym::Union{Symbol, Missing}) = 
-sym isa Missing || inSymbol(sym, indSymOf(pb))
+sym isa Missing || inSymbol(sym, indVarOf(pb)[begin])
 
 
 copyParContainer(pb::ParamBox, 
@@ -1990,7 +1989,7 @@ independent variable (in other words, considered identical in the differentiatio
 procedure) will be marked with same index. `filterMapping` determines whether filtering out 
 (i.e. not return) the extra `ParamBox`es that hold the same independent variables but 
 represent different output variables. The independent variable held by a `ParamBox` can be 
-inspected using [`indSymOf`](@ref).
+inspected using [`indVarOf`](@ref).
 """
 markParams!(b::Union{AbstractVector{T}, T}, filterMapping::Bool=false) where 
            {T<:ParameterizedContainer} = 

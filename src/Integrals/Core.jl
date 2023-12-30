@@ -17,6 +17,8 @@ end
 
 @generated function FγCore(γ::Int, u::T, ::Val{GQN}) where {T, GQN}
     GQnodes, GQweights = gausslegendre(GQN)
+    GQnodes = convert(Vector{T}, GQnodes)
+    GQweights = convert(Vector{T}, GQweights)
     return :(dot($GQweights, genFγIntegrand(γ, u).($GQnodes)))
 end
 
