@@ -9,22 +9,6 @@ using Base: OneTo, Iterators.product
 ## [DOI] 10.1088/0143-0807/31/1/004
 ## [DOI] 10.48550/arXiv.2007.12057
 
-# function genFγIntegrand(γ::Int, u::T) where {T}
-#     function (x::T)
-#         ( (x+1)/2 )^(2γ) * exp(-u * (x+1)^2 / 4) / 2
-#     end
-# end
-
-## Ineffective solution
-# struct FγIntegrand{T}
-#     γ::Int
-#     u::T
-# end
-# (FγI::FγIntegrand{T})(x::T) where {T} = ( (x+1)/2 )^(2FγI.γ) * exp(-FγI.u * (x+1)^2 / 4) / 2
-# function genFγIntegrand(γ::Int, u::T) where {T}
-#     FγIntegrand(γ, u)
-# end
-
 function genFγIntegrand(γ::Int, u::T) where {T}
     f = let γLoc=γ, uLoc=u
         @inline function (x::T) # @inline does improve performance as of Julia 1.10.0
