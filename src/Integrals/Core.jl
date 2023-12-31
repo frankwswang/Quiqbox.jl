@@ -4,6 +4,7 @@ using SpecialFunctions: erf
 using FastGaussQuadrature: gausslegendre
 using LinearAlgebra: dot
 using Base: OneTo, Iterators.product
+using LRUCache
 
 # Reference(s): 
 ## [DOI] 10.1088/0143-0807/31/1/004
@@ -12,22 +13,48 @@ using Base: OneTo, Iterators.product
 function genFγIntegrand(γ::Int, u::T) where {T}
     f = let γLoc=γ, uLoc=u
         @inline function (x::T) # @inline does improve performance as of Julia 1.10.0
-            ( (x+1)/2 )^(2γLoc) * exp(-uLoc * (x+1)^2 / 4) / 2
+            ((x + 1) / 2)^(2γLoc) * exp(-uLoc * (x+1)^2 / 4) / 2
         end
     end
     f
 end
 
-@generated function FγCore(γ::Int, u::T, ::Val{GQN}) where {T, GQN}
-    GQnodes, GQweights = gausslegendre(GQN)
+const NodesAndWeightsOfGQ = LRU{Int, Tuple{Vector{Float64}, Vector{Float64}}}(maxsize=200)
+
+const MaxGQpointNum = 10000
+
+function FγCore(γ::Int, u::T, GQpointNum::Int) where {T}
+    GQpointNum = min(GQpointNum, MaxGQpointNum)
+    GQnodes, GQweights = get!(NodesAndWeightsOfGQ, GQpointNum) do
+      gausslegendre(GQpointNum)
+    end
     GQnodes = convert(Vector{T}, GQnodes)
     GQweights = convert(Vector{T}, GQweights)
-    return :(dot($GQweights, genFγIntegrand(γ, u).($GQnodes)))
+    dot(GQweights, genFγIntegrand(γ, u).(GQnodes))
 end
 
-for ValI in ValInts[begin:end .<= 1000]
-    precompile(FγCore, (Int, Float64, ValI))
-end
+## Multi-threaded version: too much overhead!
+# const ThreadNum = Threads.nthreads()
+# chopIter(len, startIdx=1) = Iterators.partition( startIdx:(startIdx+len-1), 
+#                                                  (1 + len ÷ 2ThreadNum) )
+# function FγCore(γ::Int, u::T, GQpointNum::Int) where {T}
+#     GQpointNum = min(GQpointNum, MaxGQpointNum)
+#     GQnodes, GQweights = get!(NodesAndWeightsOfGQ, GQpointNum) do
+#       gausslegendre(GQpointNum)
+#     end
+#     GQnodes = convert(Vector{T}, GQnodes)
+#     GQweights = convert(Vector{T}, GQweights)
+#     let f = genFγIntegrand(γ, u)
+#         tasks = map(chopIter(GQpointNum, firstindex(GQnodes))) do idx
+#             Threads.@spawn begin
+#                 mapreduce(+, view(GQweights, idx), view(GQnodes, idx)) do weight, node
+#                     weight * f(node)
+#                 end
+#             end
+#         end
+#         mapreduce(fetch, +, tasks)
+#     end
+# end
 
 function F0(u::T) where {T}
     if u < getAtolVal(T)
@@ -38,17 +65,17 @@ function F0(u::T) where {T}
     end
 end
 
-function getGQN(u::T) where {T}
+function getGQpointNum(u::T) where {T}
     u = abs(u) + getAtolVal(T)
-    res = getAtolDigits(T) + (Int∘round)(0.4u + 2inv(sqrt(u))) + 1
+    res = getAtolDigits(T) + (Int∘round)(0.4u + 2(inv∘sqrt)(u)) + 1
     min(res, typemax(Int) - 1)
 end
 
 function Fγ(γ::Int, u::T) where {T}
     if u < getAtolVal(T)
-        (inv∘T∘muladd)(2, γ, 1)
+        (T∘inv∘muladd)(2, γ, 1)
     else
-        FγCore(γ, u, (getValI∘getGQN)(u))
+        FγCore(γ, u, getGQpointNum(u))
     end
 end
 
