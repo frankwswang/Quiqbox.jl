@@ -1008,3 +1008,23 @@ function keepOnly!(a::AbstractArray, idx::Int)
     deleteat!(a, (firstindex(a)+1):lastindex(a))
     a[] = e
 end
+
+
+function betterSum(x) # Improved Kahan–Babuška algorithm fro array summation
+    xFirxt = first(x)
+    s = xFirxt .- xFirxt
+    c = xFirxt .- xFirxt
+
+    for xi in x
+        t = s .+ xi
+        c += map(s, t, xi) do si, ti, xij
+            if abs(si) >= abs(xij)
+                (si - ti) + xij
+            else
+                (xij - ti) + si
+            end
+        end
+        s = t
+    end
+    s .+ c
+end

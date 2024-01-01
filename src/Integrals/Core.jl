@@ -5,6 +5,7 @@ using FastGaussQuadrature: gausslegendre
 using LinearAlgebra: dot
 using Base: OneTo, Iterators.product
 using LRUCache
+using LazyArrays: BroadcastArray
 
 # Reference(s): 
 ## [DOI] 10.1088/0143-0807/31/1/004
@@ -26,35 +27,13 @@ const MaxGQpointNum = 10000
 function FγCore(γ::Int, u::T, GQpointNum::Int) where {T}
     GQpointNum = min(GQpointNum, MaxGQpointNum)
     GQnodes, GQweights = get!(NodesAndWeightsOfGQ, GQpointNum) do
-      gausslegendre(GQpointNum)
+        gausslegendre(GQpointNum)
     end
     GQnodes = convert(Vector{T}, GQnodes)
     GQweights = convert(Vector{T}, GQweights)
-    dot(GQweights, genFγIntegrand(γ, u).(GQnodes))
+    betterSum(GQweights .* BroadcastArray(genFγIntegrand(γ, u), GQnodes))
 end
 
-## Multi-threaded version: too much overhead!
-# const ThreadNum = Threads.nthreads()
-# chopIter(len, startIdx=1) = Iterators.partition( startIdx:(startIdx+len-1), 
-#                                                  (1 + len ÷ 2ThreadNum) )
-# function FγCore(γ::Int, u::T, GQpointNum::Int) where {T}
-#     GQpointNum = min(GQpointNum, MaxGQpointNum)
-#     GQnodes, GQweights = get!(NodesAndWeightsOfGQ, GQpointNum) do
-#       gausslegendre(GQpointNum)
-#     end
-#     GQnodes = convert(Vector{T}, GQnodes)
-#     GQweights = convert(Vector{T}, GQweights)
-#     let f = genFγIntegrand(γ, u)
-#         tasks = map(chopIter(GQpointNum, firstindex(GQnodes))) do idx
-#             Threads.@spawn begin
-#                 mapreduce(+, view(GQweights, idx), view(GQnodes, idx)) do weight, node
-#                     weight * f(node)
-#                 end
-#             end
-#         end
-#         mapreduce(fetch, +, tasks)
-#     end
-# end
 
 function F0(u::T) where {T}
     if u < getAtolVal(T)
@@ -79,14 +58,13 @@ function Fγ(γ::Int, u::T) where {T}
     end
 end
 
-function F₀toFγ(γ::Int, u::T) where {T}
-    res = Array{T}(undef, γ+1)
-    res[begin] = F0(u)
-    γ > 0 && (res[end] = Fγ(γ, u))
+function F₀toFγ(γ::Int, u::T, resHolder::Vector{T}=Array{T}(undef, γ+1)) where {T}
+    resHolder[begin] = F0(u)
+    γ > 0 && (resHolder[γ+1] = Fγ(γ, u))
     for i in γ:-1:2
-        @inbounds res[i] = (expm1(-u) + 2u*res[i+1] + 1) / (2i - 1)
+        @inbounds resHolder[i] = (expm1(-u) + 2u*resHolder[i+1] + 1) / (2i - 1)
     end
-    res
+    resHolder
 end
 
 
@@ -179,6 +157,8 @@ function genIntNucAttCore(ΔRR₀::NTuple{3, T}, ΔR₁R₂::NTuple{3, T}, β::T
     A = T(0.0)
     i₁, j₁, k₁ = ijk₁
     i₂, j₂, k₂ = ijk₂
+    # ijkSum = sum(ijk₁) + sum(ijk₂)
+    # Fγss = [F₀toFγ(γ, β) for γ in 0:ijkSum]
     for l₁ in 0:(i₁÷2), m₁ in 0:(j₁÷2), n₁ in 0:(k₁÷2), 
         l₂ in 0:(i₂÷2), m₂ in 0:(j₂÷2), n₂ in 0:(k₂÷2)
 
@@ -194,6 +174,7 @@ function genIntNucAttCore(ΔRR₀::NTuple{3, T}, ΔR₁R₂::NTuple{3, T}, β::T
             μˣ, μʸ, μᶻ = μv = @. ijk₁ + ijk₂ - muladd(2, lmn₁+lmn₂, opq₁+opq₂)
             μsum = sum(μv)
             Fγs = F₀toFγ(μsum, β)
+            # Fγs = Fγss[μsum+1]
             core1s = genIntTerm1.(ΔR₁R₂, lmn₁, opq₁, lmn₂, opq₂, ijk₁, α₁, ijk₂, α₂)
 
             for r in 0:((o₁+o₂)÷2), s in 0:((p₁+p₂)÷2), t in 0:((q₁+q₂)÷2)
