@@ -72,17 +72,17 @@ function genIntOverlapCore(Δx::T,
                            i₁::Int, α₁::T, 
                            i₂::Int, α₂::T) where {T}
     res = T(0.0)
+    getRange = ifelse( iszero(Δx), 
+                       Ω::Int -> ifelse(iseven(Ω), begin halfΩ=Ω÷2; halfΩ:halfΩ end, 1:0), 
+                       Ω::Int -> 0:(Ω÷2) )
     for l₁ in 0:(i₁÷2), l₂ in 0:(i₂÷2)
         Ω = muladd(-2, l₁ + l₂, i₁ + i₂)
-        halfΩ = Ω÷2
-        oRange = 0:halfΩ
-        Δx == 0.0 && (iseven(Ω) ? (oRange = halfΩ:halfΩ) : continue)
-        for o in oRange
+        for o in getRange(Ω)
             res += Δx^(Ω-2o) * 
                    ( α₁^(i₂ - l₁ - 2l₂ - o) / (factorial(l₂) * factorial(i₁-2l₁)) ) * 
                    ( α₂^(i₁ - l₂ - 2l₁ - o) / (factorial(l₁) * factorial(i₂-2l₂)) ) * 
-                   T( (-1)^o * factorial(Ω) / 
-                      (4^(l₁+ l₂ + o) * factorial(o) * factorial(Ω-2o)) ) * 
+                   ( T(-1)^o * factorial(Ω) / 
+                     (( 1 << 2(l₁+ l₂ + o) ) * factorial(o ) * factorial(Ω -2o )) ) * 
                    (α₁ + α₂)^muladd(2, (l₁ + l₂), o)
         end
     end
@@ -92,18 +92,18 @@ end
 function ∫overlapCore(::Val{3}, 
                       ΔR::NTuple{3, T}, 
                       ijk₁::NTuple{3, Int}, α₁::T, 
-                      ijk₂::NTuple{3, Int}, α₂::T) where {T}
+                      ijk₂::NTuple{3, Int}, α₂::T, coeff::T=T(1)) where {T}
     any(n -> n<0, (ijk₁..., ijk₂...)) && (return T(0.0))
 
     α = α₁ + α₂
     res = T(1)
     for (i₁, i₂, ΔRᵢ) in zip(ijk₁, ijk₂, ΔR)
         int = genIntOverlapCore(ΔRᵢ, i₁, α₁, i₂, α₂)
-        iszero(int) && (return T(0))
+        iszero(int) && (return T(0.0))
         res *= (-1)^(i₁) * factorial(i₁) * factorial(i₂) * α^(-i₁-i₂) * int
     end
-    res *= sqrt((π/α)^3) * exp(-α₁ / α * α₂* sum(abs2, ΔR))
-    res
+    res *= sqrt((π/α)^3) * exp(-α₁ / α * α₂ * sum(abs2, ΔR))
+    res * coeff
 end
 
 ∫overlapCore(::Val{3}, 
@@ -120,10 +120,15 @@ function ∫elecKineticCore(::Val{3},
     ΔR = R₁ .- R₂
     shifts = ((1,0,0), (0,1,0), (0,0,1))
     mapreduce(+, ijk₁, ijk₂, shifts) do 𝑙₁c, 𝑙₂c, Δ𝑙
-        ∫overlapCore(Val(3), ΔR, map(-, ijk₁, Δ𝑙), α₁, map(-, ijk₂, Δ𝑙), α₂) * 𝑙₁c*𝑙₂c/2 + 
-        ∫overlapCore(Val(3), ΔR, map(+, ijk₁, Δ𝑙), α₁, map(+, ijk₂, Δ𝑙), α₂) * 2α₁*α₂ - 
-        ∫overlapCore(Val(3), ΔR, map(+, ijk₁, Δ𝑙), α₁, map(-, ijk₂, Δ𝑙), α₂) * α₁*𝑙₂c - 
-        ∫overlapCore(Val(3), ΔR, map(-, ijk₁, Δ𝑙), α₁, map(+, ijk₂, Δ𝑙), α₂) * α₂*𝑙₁c
+        Δijk1 = map(-, ijk₁, Δ𝑙)
+        Δijk2 = map(-, ijk₂, Δ𝑙)
+        Δijk3 = map(+, ijk₁, Δ𝑙)
+        Δijk4 = map(+, ijk₂, Δ𝑙)
+        int1 = ∫overlapCore(Val(3), ΔR, Δijk1, α₁, Δijk2, α₂, T(𝑙₁c*𝑙₂c/2))
+        int2 = ∫overlapCore(Val(3), ΔR, Δijk3, α₁, Δijk4, α₂, 2α₁*α₂)
+        int3 = ∫overlapCore(Val(3), ΔR, Δijk3, α₁, Δijk2, α₂, α₁*𝑙₂c)
+        int4 = ∫overlapCore(Val(3), ΔR, Δijk1, α₁, Δijk4, α₂, α₂*𝑙₁c)
+        int1 + int2 - int3 - int4
     end
 end
 
@@ -134,15 +139,17 @@ function genIntTerm1(Δx::T1,
                      i₁::T2, α₁::T1, 
                      i₂::T2, α₂::T1) where {T1, T2<:Integer}
     (r::T2) -> 
-        ( Δx^muladd(-2, r, o₁+o₂) / (factorial(r ) * (factorial∘muladd)(-2, r, o₁+o₂)) ) * 
+        ( Δx^muladd(-2, r, o₁+o₂) / (factorial(r) * (factorial∘muladd)(-2, r, o₁+o₂)) ) * 
         ( α₁^(o₂-l₁- r) / (factorial(l₁) * factorial(i₁-2l₁-o₁)) ) * 
         ( α₂^(o₁-l₂- r) / (factorial(l₂) * factorial(i₂-2l₂-o₂)) ) * 
-        T1( (-1)^(o₂+r) * factorial(o₁+o₂) / (4^(l₁+l₂+r) * factorial(o₁) * factorial(o₂)) )
+        T1( (-1)^(o₂+r) * factorial(o₁+o₂) / 
+            ((1 << 2(l₁+l₂+r)) * factorial(o₁) * factorial(o₂)) )
 end
 
 function genIntTerm2core(Δx::T1,  μ::T2) where {T1, T2<:Integer}
     (u::T2) -> 
-        Δx^(μ-2u) * T1( (-1)^u * factorial(μ) / (4^u * factorial(u) * factorial(μ-2u)) )
+        Δx^(μ-2u) * T1( (-1)^u * factorial(μ) / 
+                        ((1 << 2u) * factorial(u) * factorial(μ-2u)) )
 end
 
 function genIntTerm2(Δx::T1, α::T1, o₁::T2, o₂::T2, μ::T2, r::T2) where {T1, T2<:Integer}
@@ -157,8 +164,8 @@ function genIntNucAttCore(ΔRR₀::NTuple{3, T}, ΔR₁R₂::NTuple{3, T}, β::T
     A = T(0.0)
     i₁, j₁, k₁ = ijk₁
     i₂, j₂, k₂ = ijk₂
-    # ijkSum = sum(ijk₁) + sum(ijk₂)
-    # Fγss = [F₀toFγ(γ, β) for γ in 0:ijkSum]
+    ijkSum = sum(ijk₁) + sum(ijk₂)
+    Fγss = [F₀toFγ(γ, β) for γ in 0:ijkSum]
     for l₁ in 0:(i₁÷2), m₁ in 0:(j₁÷2), n₁ in 0:(k₁÷2), 
         l₂ in 0:(i₂÷2), m₂ in 0:(j₂÷2), n₂ in 0:(k₂÷2)
 
@@ -173,8 +180,7 @@ function genIntNucAttCore(ΔRR₀::NTuple{3, T}, ΔR₁R₂::NTuple{3, T}, β::T
 
             μˣ, μʸ, μᶻ = μv = @. ijk₁ + ijk₂ - muladd(2, lmn₁+lmn₂, opq₁+opq₂)
             μsum = sum(μv)
-            Fγs = F₀toFγ(μsum, β)
-            # Fγs = Fγss[μsum+1]
+            Fγs = @inbounds Fγss[μsum+1]
             core1s = genIntTerm1.(ΔR₁R₂, lmn₁, opq₁, lmn₂, opq₂, ijk₁, α₁, ijk₂, α₂)
 
             for r in 0:((o₁+o₂)÷2), s in 0:((p₁+p₂)÷2), t in 0:((q₁+q₂)÷2)
