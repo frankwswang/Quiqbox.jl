@@ -37,7 +37,7 @@ end
 
 function F0(u::T) where {T}
     if u < getAtolVal(T)
-        T(1)
+        T(1.0)
     else
         ur = sqrt(u)
         T(πvals[0.5]) * erf(ur) / (2ur)
@@ -68,37 +68,95 @@ function F₀toFγ(γ::Int, u::T, resHolder::Vector{T}=Array{T}(undef, γ+1)) wh
 end
 
 
-function genIntOverlapCore(Δx::T, 
-                           i₁::Int, α₁::T, 
-                           i₂::Int, α₂::T) where {T}
-    res = T(0.0)
-    getRange = ifelse( iszero(Δx), 
-                       Ω::Int -> ifelse(iseven(Ω), begin halfΩ=Ω÷2; halfΩ:halfΩ end, 1:0), 
-                       Ω::Int -> 0:(Ω÷2) )
-    for l₁ in 0:(i₁÷2), l₂ in 0:(i₂÷2)
-        Ω = muladd(-2, l₁ + l₂, i₁ + i₂)
-        for o in getRange(Ω)
-            res += Δx^(Ω-2o) * 
-                   ( α₁^(i₂ - l₁ - 2l₂ - o) / (factorial(l₂) * factorial(i₁-2l₁)) ) * 
-                   ( α₂^(i₁ - l₂ - 2l₁ - o) / (factorial(l₁) * factorial(i₂-2l₂)) ) * 
-                   ( T(-1)^o * factorial(Ω) / 
-                     (( 1 << 2(l₁+ l₂ + o) ) * factorial(o ) * factorial(Ω -2o )) ) * 
-                   (α₁ + α₂)^muladd(2, (l₁ + l₂), o)
+function genIntOverlapTermAA(getRangeFunc::F, Δx::T, i::Int, α::T) where {F, T}
+    f = let getRange=getRangeFunc, Δx=Δx, i=i, α=α
+        function (l₁::Int, l₂::Int)
+            res = T(0.0)
+            Ω = muladd(-2, l₁ + l₂, 2i)
+            for o in getRange(Ω)
+                res += Δx^(Ω-2o) * 
+                    ( α^(2i - 3l₁ - 3l₂ - 2o) / (factorial(l₂) * factorial(i-2l₁) * 
+                                                 factorial(l₁) * factorial(i-2l₂)) ) * 
+                    ( T(-1)^o * factorial(Ω) / 
+                      ((1 << 2(l₁ + l₂ + o))  *  factorial(o ) * factorial(Ω-2o )) ) * 
+                    (2α)^muladd(2, (l₁ + l₂), o)
+            end
+            res
         end
     end
+    f
+end
+
+function genIntOverlapTermAB(getRangeFunc::F, Δx::T, i₁::Int, α₁::T, 
+                                                     i₂::Int, α₂::T) where {F, T}
+    f = let getRange=getRangeFunc, Δx=Δx, i₁=i₁, α₁=α₁, i₂=i₂, α₂=α₂
+        function (l₁::Int, l₂::Int)
+            res = T(0.0)
+            Ω = muladd(-2, l₁ + l₂, i₁ + i₂)
+            for o in getRange(Ω)
+                res += Δx^(Ω-2o) * 
+                    ( α₁^(i₂ - l₁ - 2l₂ - o) / (factorial(l₂) * factorial(i₁-2l₁)) ) * 
+                    ( α₂^(i₁ - l₂ - 2l₁ - o) / (factorial(l₁) * factorial(i₂-2l₂)) ) * 
+                    ( T(-1)^o * factorial(Ω) / 
+                      ((1 << 2(l₁ + l₂ + o)) *  factorial(o ) * factorial(Ω -2o )) ) * 
+                    (α₁ + α₂)^muladd(2, (l₁ + l₂), o)
+            end
+            res
+        end
+    end
+    f
+end
+
+function genIntOverlapCore11(Δx::T, i::Int, α::T, 
+                             sameCen::Bool=false) where {T}
+    getRange = ifelse( sameCen || iszero(Δx), 
+                       Ω::Int -> ifelse(iseven(Ω), begin ΩHalf=Ω÷2; ΩHalf:ΩHalf end, 1:0), 
+                       Ω::Int -> 0:(Ω÷2) )
+    f = genIntOverlapTermAA(getRange, Δx, i, α)
+    res = T(0.0)
+    iHalf = i÷2
+    for l₁ in 0:iHalf, l₂ in l₁:iHalf
+        res += f(l₁, l₂) * (1 + (l₁!=l₂))
+    end
     res
+end
+
+
+function genIntOverlapCore12(Δx::T, i₁::Int, α₁::T, 
+                                    i₂::Int, α₂::T, 
+                             sameCen::Bool=false) where {T}
+    getRange = ifelse( sameCen || iszero(Δx), 
+                       Ω::Int -> ifelse(iseven(Ω), begin ΩHalf=Ω÷2; ΩHalf:ΩHalf end, 1:0), 
+                       Ω::Int -> 0:(Ω÷2) )
+    f = genIntOverlapTermAB(getRange, Δx, i₁, α₁, i₂, α₂)
+    res = T(0.0)
+    for l₁ in 0:(i₁÷2), l₂ in 0:(i₂÷2)
+        res += f(l₁, l₂)
+    end
+    res
+end
+
+function genIntOverlapCore(Δx::T, i₁::Int, α₁::T, 
+                                  i₂::Int, α₂::T, 
+                           (sameCenAngXpn)::NTuple{3, Bool}=(false, false, false)) where {T}
+    if (sameCenAngXpn[2] || i₁==i₂) && (sameCenAngXpn[3] || α₁==α₂)
+        genIntOverlapCore11(Δx, i₁, α₁, sameCenAngXpn[1])
+    else
+        genIntOverlapCore12(Δx, i₁, α₁, i₂, α₂, sameCenAngXpn[1])
+    end
 end
 
 function ∫overlapCore(::Val{3}, 
                       ΔR::NTuple{3, T}, 
                       ijk₁::NTuple{3, Int}, α₁::T, 
-                      ijk₂::NTuple{3, Int}, α₂::T, coeff::T=T(1)) where {T}
+                      ijk₂::NTuple{3, Int}, α₂::T, 
+                      sameCenAngXpn::NTuple{3, Bool}=(false, false, false), 
+                      coeff::T=T(1.0)) where {T}
     any(n -> n<0, (ijk₁..., ijk₂...)) && (return T(0.0))
-
     α = α₁ + α₂
-    res = T(1)
+    res = T(1.0)
     for (i₁, i₂, ΔRᵢ) in zip(ijk₁, ijk₂, ΔR)
-        int = genIntOverlapCore(ΔRᵢ, i₁, α₁, i₂, α₂)
+        int = genIntOverlapCore(ΔRᵢ, i₁, α₁, i₂, α₂, sameCenAngXpn)
         iszero(int) && (return T(0.0))
         res *= (-1)^(i₁) * factorial(i₁) * factorial(i₂) * α^(-i₁-i₂) * int
     end
@@ -109,35 +167,51 @@ end
 ∫overlapCore(::Val{3}, 
              R₁::NTuple{3, T}, R₂::NTuple{3, T}, 
              ijk₁::NTuple{3, Int}, α₁::T, 
-             ijk₂::NTuple{3, Int}, α₂::T) where {T} = 
-∫overlapCore(Val(3), R₁.-R₂, ijk₁, α₁, ijk₂, α₂)
+             ijk₂::NTuple{3, Int}, α₂::T, 
+             sameCenAngXpn::NTuple{3, Bool}=(false, false, false), 
+             coeff::T=T(1.0)) where {T} = 
+∫overlapCore(Val(3), R₁.-R₂, ijk₁, α₁, ijk₂, α₂, sameCenAngXpn, coeff)
 
 
 function ∫elecKineticCore(::Val{3}, 
                           R₁::NTuple{3, T}, R₂::NTuple{3, T}, 
                           ijk₁::NTuple{3, Int}, α₁::T,
-                          ijk₂::NTuple{3, Int}, α₂::T) where {T}
+                          ijk₂::NTuple{3, Int}, α₂::T, 
+                          (blC, _, blX)::NTuple{3, Bool}=(false, false, false)) where {T}
+    sameCenAngXpn = (blC, false, blX)
     ΔR = R₁ .- R₂
     shifts = ((1,0,0), (0,1,0), (0,0,1))
-    mapreduce(+, ijk₁, ijk₂, shifts) do 𝑙₁c, 𝑙₂c, Δ𝑙
+    mapreduce(+, ijk₁, ijk₂, shifts) do i₁, i₂, Δ𝑙
         Δijk1 = map(-, ijk₁, Δ𝑙)
         Δijk2 = map(-, ijk₂, Δ𝑙)
         Δijk3 = map(+, ijk₁, Δ𝑙)
         Δijk4 = map(+, ijk₂, Δ𝑙)
-        int1 = ∫overlapCore(Val(3), ΔR, Δijk1, α₁, Δijk2, α₂, T(𝑙₁c*𝑙₂c/2))
-        int2 = ∫overlapCore(Val(3), ΔR, Δijk3, α₁, Δijk4, α₂, 2α₁*α₂)
-        int3 = ∫overlapCore(Val(3), ΔR, Δijk3, α₁, Δijk2, α₂, α₁*𝑙₂c)
-        int4 = ∫overlapCore(Val(3), ΔR, Δijk1, α₁, Δijk4, α₂, α₂*𝑙₁c)
+        int1 = ∫overlapCore(Val(3), ΔR, Δijk1, α₁, Δijk2, α₂, sameCenAngXpn, T(i₁*i₂/2))
+        int2 = ∫overlapCore(Val(3), ΔR, Δijk3, α₁, Δijk4, α₂, sameCenAngXpn,  2α₁*α₂   )
+        int3 = ∫overlapCore(Val(3), ΔR, Δijk3, α₁, Δijk2, α₂, sameCenAngXpn,   α₁*i₂   )
+        int4 = ∫overlapCore(Val(3), ΔR, Δijk1, α₁, Δijk4, α₂, sameCenAngXpn,   α₂*i₁   )
         int1 + int2 - int3 - int4
     end
 end
 
 
-function genIntTerm1(Δx::T1, 
-                     l₁::T2, o₁::T2, 
-                     l₂::T2, o₂::T2, 
-                     i₁::T2, α₁::T1, 
-                     i₂::T2, α₂::T1) where {T1, T2<:Integer}
+# function genIntTerm1AA(Δx::T1, 
+#                        l₁::T2, o₁::T2, 
+#                        l₂::T2, o₂::T2, 
+#                         i::T2,  α::T1) where {T1, T2<:Integer}
+#     (r::T2) -> 
+#         ( Δx^muladd(-2, r, o₁+o₂) / (factorial(r) * (factorial∘muladd)(-2, r, o₁+o₂)) ) * 
+#         ( α₁^(o₂-l₁- r) / (factorial(l₁) * factorial(i₁-2l₁-o₁)) ) * 
+#         ( α₂^(o₁-l₂- r) / (factorial(l₂) * factorial(i₂-2l₂-o₂)) ) * 
+#         T1( (-1)^(o₂+r) * factorial(o₁+o₂) / 
+#             ((1 << 2(l₁+l₂+r)) * factorial(o₁) * factorial(o₂)) )
+# end
+
+function genIntTerm1AB(Δx::T1, 
+                       l₁::T2, o₁::T2, 
+                       l₂::T2, o₂::T2, 
+                       i₁::T2, α₁::T1, 
+                       i₂::T2, α₂::T1) where {T1, T2<:Integer}
     (r::T2) -> 
         ( Δx^muladd(-2, r, o₁+o₂) / (factorial(r) * (factorial∘muladd)(-2, r, o₁+o₂)) ) * 
         ( α₁^(o₂-l₁- r) / (factorial(l₁) * factorial(i₁-2l₁-o₁)) ) * 
@@ -160,7 +234,8 @@ end
 
 function genIntNucAttCore(ΔRR₀::NTuple{3, T}, ΔR₁R₂::NTuple{3, T}, β::T, 
                           ijk₁::NTuple{3, Int}, α₁::T, 
-                          ijk₂::NTuple{3, Int}, α₂::T) where {T}
+                          ijk₂::NTuple{3, Int}, α₂::T, 
+                          sameCenAngXpn::NTuple{3, Bool}=(false, false, false)) where {T}
     A = T(0.0)
     i₁, j₁, k₁ = ijk₁
     i₂, j₂, k₂ = ijk₂
@@ -181,7 +256,7 @@ function genIntNucAttCore(ΔRR₀::NTuple{3, T}, ΔR₁R₂::NTuple{3, T}, β::T
             μˣ, μʸ, μᶻ = μv = @. ijk₁ + ijk₂ - muladd(2, lmn₁+lmn₂, opq₁+opq₂)
             μsum = sum(μv)
             Fγs = @inbounds Fγss[μsum+1]
-            core1s = genIntTerm1.(ΔR₁R₂, lmn₁, opq₁, lmn₂, opq₂, ijk₁, α₁, ijk₂, α₂)
+            core1s = genIntTerm1AB.(ΔR₁R₂, lmn₁, opq₁, lmn₂, opq₂, ijk₁, α₁, ijk₂, α₂)
 
             for r in 0:((o₁+o₂)÷2), s in 0:((p₁+p₂)÷2), t in 0:((q₁+q₂)÷2)
 
@@ -206,20 +281,14 @@ function ∫nucAttractionCore(::Val{3},
                             Z₀::Int, R₀::NTuple{3, T}, 
                             R₁::NTuple{3, T}, R₂::NTuple{3, T}, 
                             ijk₁::NTuple{3, Int}, α₁::T,
-                            ijk₂::NTuple{3, Int}, α₂::T) where {T}
-    if α₁ == α₂
-        α = 2α₁
-        R = @. (R₁ + R₂) / 2
-        flag = true
-    else
-        α = α₁ + α₂
-        R = @. (α₁*R₁ + α₂*R₂) / α
-        flag = false
-    end
+                            ijk₂::NTuple{3, Int}, α₂::T, 
+                            sameCenAngXpn::NTuple{3, Bool}=(false, false, false)) where {T}
+    α = α₁ + α₂
+    R = @. (α₁*R₁ + α₂*R₂) / α
     ΔRR₀ = R .- R₀
     ΔR₁R₂ = R₁ .- R₂
     β = α * sum(abs2, ΔRR₀)
-    genIntNucAttCore(ΔRR₀, ΔR₁R₂, β, ijk₁, α₁, ijk₂, α₂) * 
+    genIntNucAttCore(ΔRR₀, ΔR₁R₂, β, ijk₁, α₁, ijk₂, α₂, sameCenAngXpn) * 
     (π / α) * exp(-α₁ / α * α₂ * sum(abs2, ΔR₁R₂)) * 
     ( -Z₀ * (-1)^sum(ijk₁ .+ ijk₂) * 
       mapMapReduce(ijk₁, factorial) * mapMapReduce(ijk₂, factorial) )
@@ -231,7 +300,7 @@ function genIntTerm3(Δx::T1,
                      i₁::T2, α₁::T1, 
                      i₂::T2, α₂::T1) where {T1, T2<:Integer}
     (r::T2) -> 
-        genIntTerm1(Δx, l₁, o₁, l₂, o₂, i₁, α₁, i₂, α₂)(r) * (α₁+α₂)^muladd(2, l₁+l₂, r)
+        genIntTerm1AB(Δx, l₁, o₁, l₂, o₂, i₁, α₁, i₂, α₂)(r) * (α₁+α₂)^muladd(2, l₁+l₂, r)
 end
 
 function genIntTerm4(Δx::T1, η::T1, μ::T2) where {T1, T2<:Integer}
@@ -458,13 +527,8 @@ end
 
 diFoldCount(i::T, j::T) where {T} = ifelse(i==j, 1, 2)
 
-function octaFoldCount(i::T, j::T, k::T, l::T) where {T}
-    m = 0
-    i != j && (m += 1)
-    k != l && (m += 1)
-    (i != k || j != l) && (m += 1)
-    1 << m
-end
+octaFoldCount(i::T, j::T, k::T, l::T) where {T} = 
+1 << ( (i != j) + (k != l) + (i != k || j != l) )
 
 
 function getIntCore11!(n::Int, 
@@ -566,9 +630,11 @@ function getOneBodyInt(::Type{T}, ::Val{D}, ∫1e::F, @nospecialize(optPosArgs::
                        {T, D, F<:Function}
     (R₁, ijk₁, ps₁, 𝑙₁), (R₂, ijk₂, ps₂, 𝑙₂) = reformatIntData1(iBl, bfs)
     𝑙₁==𝑙₂==0 || isIntZero(F, optPosArgs, R₁,R₂, ijk₁,ijk₂) && (return T(0.0))
-    uniquePairs, uPairCoeffs = getOneBodyUniquePairs(R₁==R₂ && ijk₁==ijk₂, ps₁, ps₂)
+    sameCenAngXpn = (R₁==R₂, ijk₁==ijk₂, false) # There might be a way to get the 3rd entry.
+    uniquePairs, uPairCoeffs = getOneBodyUniquePairs(sameCenAngXpn[1] && sameCenAngXpn[2], 
+                                                     ps₁, ps₂)
     mapreduce(+, uniquePairs, uPairCoeffs) do x, y
-        ∫1e(Val(D), optPosArgs..., R₁, R₂, ijk₁, x[1], ijk₂, x[2])::T * y
+        ∫1e(Val(D), optPosArgs..., R₁, R₂, ijk₁, x[1], ijk₂, x[2], sameCenAngXpn)::T * y
     end
 end
 
