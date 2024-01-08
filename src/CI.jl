@@ -19,7 +19,7 @@ struct CSF{𝑠, 𝑚ₛ, ON} <: RCI{𝑚ₛ, ON}
 
     function RSD(spatialOccu::NTuple{ON, Bool}, basis::NTuple{ON, <:GTBasisFuncs{T, D, 1}})
         
-        for 
+        # for 
         new{Nup-Ndn, ON}(Nup+Ndn, spinUpOccu, spinDnOccu, objectid(basis))
     end
 end
