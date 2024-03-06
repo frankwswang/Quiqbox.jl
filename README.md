@@ -14,7 +14,7 @@
 
 | Development Status |
 |:---:|
-| [![codecov][codecov-img]][codecov-url] [![CI][GA-CI-img]][GA-CI-url] [![CI-JN][GA-CI-JN-img]][GA-CI-JN-url] [![][New-commits-img]][New-commits-url] [![][Genie-PkgDC-img]][Releases-url]|
+| [![codecov][codecov-img]][codecov-url] [![CI][GA-CI-img]][GA-CI-url] [![CI-JN][GA-CI-JN-img]][GA-CI-JN-url] [![][New-commits-img]][New-commits-url] |
 
 
 <br />
@@ -94,6 +94,10 @@ optimizeParams!(pars, bs, nuc, coords)
 # Documentation
 Objects defined by Quiqbox that are directly exported to the user have the corresponding docstring, which can be accessed through the [Help mode](https://docs.julialang.org/en/v1/stdlib/REPL/#Help-mode) in Julia REPL. The [latest release's documentation][Doc-latest] contains all the docstrings and additional tutorials of the package. For unreleased/experimental features, please refer to the [developer documentation][Doc-dev].
 
+# Citation
+If you use Quiqbox in your research, please cite the following paper:
+- Wang, W., & Whitfield, J. D. (2023). Basis set generation and optimization in the NISQ era with Quiqbox.jl. *Journal of Chemical Theory and Computation*, 19(22), 8032-8052.
+
 <br />
 <br />
 
@@ -120,9 +124,6 @@ Objects defined by Quiqbox that are directly exported to the user have the corre
 
 [New-commits-img]: https://img.shields.io/github/commits-since/frankwswang/Quiqbox.jl/latest?color=teal&include_prereleases
 [New-commits-url]: https://github.com/frankwswang/Quiqbox.jl/commits/main
-
-[Genie-PkgDC-img]: https://shields.io/endpoint?url=https://pkgs.genieframework.com/api/v1/badge/Quiqbox
-[Releases-url]: https://frankwswang.github.io/Quiqbox.jl/stable/#Installation-in-Julia-[REPL](https://docs.julialang.org/en/v1/manual/getting-started/)
 
 [Zenodo-DOI-img]: https://zenodo.org/badge/DOI/10.5281/zenodo.7448313.svg
 [Zenodo-DOI-url]: https://doi.org/10.5281/zenodo.7448313
