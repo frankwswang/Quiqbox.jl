@@ -96,7 +96,7 @@ Objects defined by Quiqbox that are directly exported to the user have the corre
 
 # Citation
 If you use Quiqbox in your research, please cite the following paper:
-- Wang, W., & Whitfield, J. D. (2023). Basis set generation and optimization in the NISQ era with Quiqbox.jl. *Journal of Chemical Theory and Computation*, 19(22), 8032-8052.
+- Wang, W., & Whitfield, J. D. (2023). Basis set generation and optimization in the NISQ era with Quiqbox.jl. *Journal of Chemical Theory and Computation, 19*(22), 8032-8052.
 
 <br />
 <br />
