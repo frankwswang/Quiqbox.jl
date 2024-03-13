@@ -994,9 +994,9 @@ end
 
 
 mapMapReduce(tp::NTuple{N}, fs::NTuple{N, Function}, op::F=*) where {N, F} = 
-mapreduce((x, y)->y(x), op, tp, fs)
+reduce(op, map((x, y)->y(x), tp, fs))
 
-mapMapReduce(tp::NTuple{N}, f::F1, op::F2=*) where {N, F1, F2} = mapreduce(f, op, tp)
+mapMapReduce(tp::NTuple{N}, f::F1, op::F2=*) where {N, F1, F2} = reduce(op, map(f, tp))
 
 
 rmsOf(arr::AbstractArray) = norm(arr) / (sqrt∘length)(arr)
