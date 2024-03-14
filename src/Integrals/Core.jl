@@ -26,7 +26,7 @@ const MaxGQpointNum = 10000
 
 function FγCore(γ::Int, u::T, GQpointNum::Int) where {T}
     GQpointNum = min(GQpointNum, MaxGQpointNum)
-    GQnodes, GQweights = get!(NodesAndWeightsOfGQ, GQpointNum) do
+    GQnodes, GQweights = LRUCache.get!(NodesAndWeightsOfGQ, GQpointNum) do
         gausslegendre(GQpointNum)
     end
     GQnodes = convert(Vector{T}, GQnodes)
@@ -176,6 +176,8 @@ function genIntTerm1(Δx::T1,
                 ( T1(-1)^(o₂+r) * factorial(o₁+o₂) / 
                   ((1 << 2(l₁+l₂+r)) * factorial(o₁) * factorial(o₂)) )
             end
+
+            # Take T1(-1)^(o₂+r) outside of the closure to make it symmetric
         end
     end
     f
@@ -678,9 +680,9 @@ function getOneBodyInt(::Type{T}, ::Val{D}, ∫1e::F, @nospecialize(optPosArgs::
     𝑙₁==𝑙₂==0 || isIntZero(F, optPosArgs, R₁,R₂, ijk₁,ijk₂) && (return T(0.0))
     sameCen = iszero.(R₁ .- R₂)
     uniquePairs, uPairCoeffs = getOneBodyUniquePairs(prod(sameCen)*(ijk₁==ijk₂), ps₁, ps₂)
-    mapreduce(+, uniquePairs, uPairCoeffs) do x, y
+    map(uniquePairs, uPairCoeffs) do x, y
         ∫1e(Val(D), optPosArgs..., R₁, R₂, ijk₁, x[1], ijk₂, x[2], sameCen)::T * y
-    end
+    end |> sum
 end
 
 
@@ -1093,10 +1095,10 @@ get1BCompInt(::Type{T}, ::Val{D}, ::typeof(∫nucAttractionCore),
                                  Tuple{NTuple{D, T}, Vararg{NTuple{D, T}, NNMO}}}, 
              iBl::Union{iBlTs[1], iBlTs[3]}, ::NTuple{2, Int}, 
              bfs::NTupleOfFGTBF{2, T, D}) where {T, D, NNMO} = 
-mapreduce(+, nucAndCoords[1], nucAndCoords[2]) do ele, coord
+map(nucAndCoords[1], nucAndCoords[2]) do ele, coord
     getOneBodyInt(T, Val(D), ∫nucAttractionCore, (getCharge(ele), coord), iBl, 
                   orderFGTBG(bfs))
-end
+end |> sum
                           #       j==i      j!=i
 const Int1eBIndexLabels = Dict([( true,), (false,)] .=> [Val(:aa), Val(:ab)])
 
