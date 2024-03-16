@@ -878,7 +878,7 @@ function skipIndices(arr::AbstractArray{Int}, ints::AbstractVector{Int})
     else
         all(i > 0 for i in ints) || 
         throw(DomainError(ints, "Every element of `ints` should be positive."))
-        maxIdx = max(arr...)
+        maxIdx = maximum(arr)
         maxIdxN = maxIdx + length(ints)
         ints = filter!(x->x<=maxIdxN, sort(ints))
         idsN = deleteat!(collect(1:maxIdxN), ints)
@@ -1028,3 +1028,6 @@ function betterSum(x) # Improved Kahan–Babuška algorithm fro array summation
     end
     s .+ c
 end
+
+n1Power(x::Int) = ifelse(isodd(x), -1, 1)
+n1Power(x::Int, ::Type{T}) where {T} = ifelse(isodd(x), T(-1), T(1))

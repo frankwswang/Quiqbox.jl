@@ -78,9 +78,8 @@ function genIntOverlapTerm(getRangeFunc::F, Δx::T, i₁::Int, α₁::T,
                 res += Δx^(Ω-2o) * 
                     ( α₁^(i₂ - l₁ - 2l₂ - o) / (factorial(l₂) * factorial(i₁-2l₁)) ) * 
                     ( α₂^(i₁ - l₂ - 2l₁ - o) / (factorial(l₁) * factorial(i₂-2l₂)) ) * 
-                    ( T(-1)^o * factorial(Ω) / 
-                      ((1 << 2(l₁ + l₂ + o)) *  factorial(o ) * factorial(Ω -2o )) ) * 
-                    (α₁ + α₂)^muladd(2, (l₁ + l₂), o)
+                    ( n1Power(o) * factorial(Ω) * (α₁ + α₂)^muladd(2, (l₁ + l₂), o) / 
+                      ((1 << 2(l₁ + l₂ + o)) *  factorial(o ) * factorial(Ω -2o )) )
             end
             res
         end
@@ -114,7 +113,7 @@ function ∫overlapCore(::Val{3},
     for (i₁, i₂, ΔRᵢ, zeroΔx) in zip(ijk₁, ijk₂, ΔR, sameCen)
         int = genIntOverlapCore(ΔRᵢ, i₁, α₁, i₂, α₂, zeroΔx)
         iszero(int) && (return T(0.0))
-        res *= (-1)^(i₁) * factorial(i₁) * factorial(i₂) * α^(-i₁-i₂) * int
+        res *= n1Power(i₁) * factorial(i₁) * factorial(i₂) * α^(-i₁-i₂) * int
     end
     res *= sqrt((π/α)^3) * exp(-α₁ / α * α₂ * sum(abs2, ΔR))
     res * coeff
@@ -150,34 +149,27 @@ function ∫elecKineticCore(::Val{3},
 end
 
 
+function genIntTerm1Core(r::Int, l₁::Int, o₁::Int, i₁::Int, α₁::T, 
+                                 l₂::Int, o₂::Int, i₂::Int, α₂::T) where {T}
+    ( α₁^(o₂-l₁- r) / (factorial(l₁) * factorial(i₁-2l₁-o₁)) ) * 
+    ( α₂^(o₁-l₂- r) / (factorial(l₂) * factorial(i₂-2l₂-o₂)) ) * 
+    ( n1Power(o₂+r, T) * factorial(o₁+o₂) / ((1 << 2(l₁+l₂+r)) * 
+               factorial(r) * factorial(o₁) * factorial(o₂)) )
+end
+
 function genIntTerm1(Δx::T1, 
                      l₁::T2, o₁::T2, i₁::T2, α₁::T1, 
                      l₂::T2, o₂::T2, i₂::T2, α₂::T1, zeroΔx::Bool=false) where 
                     {T1, T2<:Integer}
     f = let Δx=Δx, l₁=l₁, o₁=o₁, i₁=i₁, α₁=α₁, l₂=l₂, o₂=o₂, i₂=i₂, α₂=α₂, zeroΔx=zeroΔx
-        if zeroΔx
-            function (r::T2)
-                pwr = muladd(-2, r, o₁+o₂)
-                if iszero(pwr)
-                    ( α₁^(o₂-l₁- r) / (factorial(l₁) * factorial(i₁-2l₁-o₁)) ) * 
-                    ( α₂^(o₁-l₂- r) / (factorial(l₂) * factorial(i₂-2l₂-o₂)) ) * 
-                    ( T1(-1)^(o₂+r) * factorial(o₁+o₂) / ((1 << 2(l₁+l₂+r)) * 
-                      factorial(r) * factorial(o₁) * factorial(o₂)) )
-                else
-                    T1(0.0)
-                end
+        function (r::T2)
+            pwr = muladd(-2, r, o₁+o₂)
+            coeff = if zeroΔx
+                iszero(pwr) ? T1(1) : (return T1(0.0))
+            else
+                Δx^pwr / factorial(pwr)
             end
-        else
-            function (r::T2)
-                pwr = muladd(-2, r, o₁+o₂)
-                ( Δx^pwr        / (factorial(r ) * factorial(pwr      )) ) * 
-                ( α₁^(o₂-l₁- r) / (factorial(l₁) * factorial(i₁-2l₁-o₁)) ) * 
-                ( α₂^(o₁-l₂- r) / (factorial(l₂) * factorial(i₂-2l₂-o₂)) ) * 
-                ( T1(-1)^(o₂+r) * factorial(o₁+o₂) / 
-                  ((1 << 2(l₁+l₂+r)) * factorial(o₁) * factorial(o₂)) )
-            end
-
-            # Take T1(-1)^(o₂+r) outside of the closure to make it symmetric
+            coeff * genIntTerm1Core(r, l₁, o₁, i₁, α₁, l₂, o₂, i₂, α₂)
         end
     end
     f
@@ -249,7 +241,8 @@ function genIntNucAttCore(ΔRR₀::NTuple{3, T}, ΔR₁R₂::NTuple{3, T}, β::T
                 core2s = genIntTerm2.(ΔRR₀, α₁+α₂, opq₁, opq₂, μv, rst, sameRR₀)
 
                 for u in 0:(μˣ÷2), v in 0:(μʸ÷2), w in 0:(μᶻ÷2)
-                    γ = μsum - u - v - w
+                    uvw = u + v + w
+                    γ = μsum - uvw
                     @inbounds tmp += mapMapReduce((u, v, w), core2s) * 2Fγs[γ+1]
                 end
                 A += mapMapReduce(rst, core1s) * tmp
