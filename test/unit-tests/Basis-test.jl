@@ -957,9 +957,9 @@ bfmN = normalizeBasis(bfm)
 @test isapprox(overlap(bfmN, bfmN), 1, atol=t)
 bf4_3N = normalizeBasis(bf4_3)
 @test typeof(bf4_3N[]) == typeof(bf4_3)
-@test isapprox(max( abs.((overlaps(bf4_3N)|>diag) .- 1)... ), 0, atol=t)
+@test isapprox(maximum( abs.((overlaps(bf4_3N)|>diag) .- 1) ), 0, atol=t)
 bf4_4N = normalizeBasis(bf4_4)
 @test length(bf4_4N) == 2
-@test isapprox(max( abs.((overlaps(bf4_4N)|>diag) .- 1)... ), 0, atol=t)
+@test isapprox(maximum( abs.((overlaps(bf4_4N)|>diag) .- 1) ), 0, atol=t)
 
 end

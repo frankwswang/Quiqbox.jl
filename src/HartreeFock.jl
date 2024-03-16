@@ -888,7 +888,7 @@ function runHFcore(bs::GTBasis{T, D, BN, BFT},
     Ntot = (N isa Int) ? N : (N[begin] + N[end])
     Ntot > Nlow || throw(DomainError(N, "$(HFT) requires more than $(Nlow) electrons."))
     Ns = splitSpins(Val(HFT), N)
-    leastNb = max(Ns...)
+    leastNb = maximum(Ns)
     BN < leastNb &&  throw(DomainError(BN, "The number of basis functions should be no "*
                            "less than $(leastNb)."))
     nuc = arrayToTuple(nuc)
