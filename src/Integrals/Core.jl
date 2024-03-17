@@ -149,60 +149,44 @@ function ∫elecKineticCore(::Val{3},
 end
 
 
-function genIntTerm1Core(r::Int, l₁::Int, o₁::Int, i₁::Int, α₁::T, 
-                                 l₂::Int, o₂::Int, i₂::Int, α₂::T) where {T}
-    ( α₁^(o₂-l₁- r) / (factorial(l₁) * factorial(i₁-2l₁-o₁)) ) * 
-    ( α₂^(o₁-l₂- r) / (factorial(l₂) * factorial(i₂-2l₂-o₂)) ) * 
-    ( n1Power(o₂+r, T) * factorial(o₁+o₂) / ((1 << 2(l₁+l₂+r)) * 
-               factorial(r) * factorial(o₁) * factorial(o₂)) )
-end
-
-function genIntTerm1(Δx::T1, 
-                     l₁::T2, o₁::T2, i₁::T2, α₁::T1, 
-                     l₂::T2, o₂::T2, i₂::T2, α₂::T1, zeroΔx::Bool=false) where 
-                    {T1, T2<:Integer}
-    f = let Δx=Δx, l₁=l₁, o₁=o₁, i₁=i₁, α₁=α₁, l₂=l₂, o₂=o₂, i₂=i₂, α₂=α₂, zeroΔx=zeroΔx
-        function (r::T2)
-            pwr = muladd(-2, r, o₁+o₂)
+function genIntTerm(arg1::T1, Δx::T2, zeroΔx::Bool) where {T1<:Integer, T2<:Real}
+    fRes = let arg1=arg1, Δx=Δx, zeroΔx=zeroΔx
+        function (arg2::T1)
+            pwr = muladd(-2, arg2, arg1)
             coeff = if zeroΔx
-                iszero(pwr) ? T1(1) : (return T1(0.0))
+                iszero(pwr) ? T2(1) : (return T2(0))
             else
                 Δx^pwr / factorial(pwr)
             end
-            coeff * genIntTerm1Core(r, l₁, o₁, i₁, α₁, l₂, o₂, i₂, α₂)
+            coeff / factorial(arg2)
         end
     end
-    f
+    fRes
 end
 
-function genIntTerm2core(Δx::T1,  μ::T2, zeroΔx::Bool=false) where {T1, T2<:Integer}
-    f = let Δx=Δx, μ=μ, zeroΔx=zeroΔx
-        if zeroΔx
-            function (u::T2)
-                if μ == 2u
-                    T1(-1)^u * factorial(μ) / ((1 << 2u) * factorial(u))
-                else
-                    T1(0.0)
-                end
-            end
-        else
-            function (u::T2)
-                Δx^(μ-2u) * ( T1(-1)^u * factorial(μ) / 
-                                ((1 << 2u) * factorial(u) * factorial(μ-2u)) )
-            end
-        end
-    end
-    f
+function termProd1(lmn₁::NTuple{3, T1}, lmn₂::NTuple{3, T1}) where {T1<:Integer}
+    prod( @. factorial(lmn₁) * factorial(lmn₂) )
 end
 
-function genIntTerm2(Δx::T1, α::T1, o₁::T2, o₂::T2, μ::T2, r::T2, 
-                     zeroΔx::Bool=false) where {T1, T2<:Integer}
-    f = let Δx=Δx, α=α, o₁=o₁, o₂=o₂, μ=μ, r=r, zeroΔx=zeroΔx
-        function (u::T2)
-            genIntTerm2core(Δx, μ, zeroΔx)(u) * α^(r-o₁-o₂-u)
-        end
-    end
-    f
+function termProd2(v::NTuple{3, T1}) where {T1<:Integer}
+    prod( factorial.(v) )
+end
+
+function termProd3(ijk₁::NTuple{3, T1}, lmn₁::NTuple{3, T1}, opq₁::NTuple{3, T1}, 
+                   ijk₂::NTuple{3, T1}, lmn₂::NTuple{3, T1}, opq₂::NTuple{3, T1}) where 
+                  {T1<:Integer}
+    prod( @. ( factorial(opq₁) * factorial(ijk₁-2lmn₁-opq₁) *
+               factorial(opq₂) * factorial(ijk₂-2lmn₂-opq₂) ) )
+end
+function termProd4(lmn₁Sum::T1, opq₁Sum::T1, lmn₂Sum::T1, opq₂Sum::T1, rstSum::T1, 
+                   (α₁, α₂)::NTuple{2, T2}) where {T1<:Integer, T2<:Real}
+    ( n1Power(opq₂Sum + rstSum) * α₁^(opq₂Sum - lmn₁Sum - rstSum) * 
+                                  α₂^(opq₁Sum - lmn₂Sum - rstSum) ) / 
+                               ( 1<<2(lmn₁Sum + lmn₂Sum + rstSum) )
+end
+
+function termProd5(uvwSum::T1, ::Type{T2}) where {T1<:Integer, T2<:Real}
+    n1Power(uvwSum, T2) / (1 << 2uvwSum)
 end
 
 
@@ -212,6 +196,7 @@ function genIntNucAttCore(ΔRR₀::NTuple{3, T}, ΔR₁R₂::NTuple{3, T}, β::T
                           (sameRR₀, sameR₁R₂)::NTuple{2, NTuple{3, Bool}}=
                           (Tuple∘fill)((false, false, false), 2)) where {T}
     A = T(0.0)
+    α = α₁ + α₂
     i₁, j₁, k₁ = ijk₁
     i₂, j₂, k₂ = ijk₂
     ijkSum = sum(ijk₁) + sum(ijk₂)
@@ -221,87 +206,52 @@ function genIntNucAttCore(ΔRR₀::NTuple{3, T}, ΔR₁R₂::NTuple{3, T}, β::T
 
         lmn₁ = (l₁, m₁, n₁)
         lmn₂ = (l₂, m₂, n₂)
+        lmn₁Sum = sum(lmn₁)
+        lmn₂Sum = sum(lmn₂)
+        term1Coeff1 = termProd1(lmn₁, lmn₂)
 
         for o₁ in 0:(i₁-2l₁), p₁ in 0:(j₁-2m₁), q₁ in 0:(k₁-2n₁), 
             o₂ in 0:(i₂-2l₂), p₂ in 0:(j₂-2m₂), q₂ in 0:(k₂-2n₂)
 
             opq₁ = (o₁, p₁, q₁)
             opq₂ = (o₂, p₂, q₂)
+            opq  = opq₁ .+ opq₂
+            opq₁Sum = sum(opq₁)
+            opq₂Sum = sum(opq₂)
+            opqSum = opq₁Sum + opq₂Sum
+            term1Coeff2 = termProd2(opq)
+            term1Coeff3 = termProd3(ijk₁, lmn₁, opq₁, ijk₂, lmn₂, opq₂)
 
-            μˣ, μʸ, μᶻ = μv = @. ijk₁ + ijk₂ - muladd(2, lmn₁+lmn₂, opq₁+opq₂)
-            μsum = sum(μv)
-            Fγs = @inbounds Fγss[μsum+1]
-            core1s = genIntTerm1.(ΔR₁R₂, lmn₁, opq₁, ijk₁, α₁, lmn₂, opq₂, ijk₂, α₂, 
-                                  sameR₁R₂)
+            μˣ, μʸ, μᶻ = μv = @. ijk₁ + ijk₂ - muladd(2, lmn₁+lmn₂, opq)
+            term2Coeff1 = termProd2(μv)
+            μSum = sum(μv)
+            Fγs = @inbounds Fγss[μSum+1]
+            core1s = genIntTerm.(opq₁.+opq₂, ΔR₁R₂, sameR₁R₂)
 
             for r in 0:((o₁+o₂)÷2), s in 0:((p₁+p₂)÷2), t in 0:((q₁+q₂)÷2)
 
                 rst = (r, s, t)
+                rstSum = sum(rst)
+                term1Coeff4 = termProd4(lmn₁Sum, opq₁Sum, lmn₂Sum, opq₂Sum, rstSum, (α₁,α₂))
                 tmp = T(0.0)
-                core2s = genIntTerm2.(ΔRR₀, α₁+α₂, opq₁, opq₂, μv, rst, sameRR₀)
+                core2s = genIntTerm.(μv, ΔRR₀, sameRR₀)
 
                 for u in 0:(μˣ÷2), v in 0:(μʸ÷2), w in 0:(μᶻ÷2)
-                    uvw = u + v + w
-                    γ = μsum - uvw
-                    @inbounds tmp += mapMapReduce((u, v, w), core2s) * 2Fγs[γ+1]
+                    uvwSum = u + v + w
+                    γ = μSum - uvwSum
+                    term2Coeff2 = termProd5(uvwSum, T) * 2Fγs[γ+1] * 
+                                  α^(rstSum - opqSum - uvwSum)
+                    @inbounds tmp += mapMapReduce((u, v, w), core2s) * 
+                                     term2Coeff1 * term2Coeff2
                 end
-                A += mapMapReduce(rst, core1s) * tmp
+                A += mapMapReduce(rst, core1s) * tmp * 
+                     (term1Coeff2 * term1Coeff4 / (term1Coeff1 * term1Coeff3))
             end
         end
 
     end
     A
 end
-
-# function genIntNucAttCore(ΔRR₀::NTuple{3, T}, ΔR₁R₂::NTuple{3, T}, β::T, 
-#                           ijk₁::NTuple{3, Int}, α₁::T, 
-#                           ijk₂::NTuple{3, Int}, α₂::T) where {T}
-#     A = T(0.0)
-#     i₁, j₁, k₁ = ijk₁
-#     i₂, j₂, k₂ = ijk₂
-#     ijkSum = sum(ijk₁) + sum(ijk₂)
-#     Fγss = [F₀toFγ(γ, β) for γ in 0:ijkSum]
-#     for l₁ in 0:(i₁÷2), m₁ in 0:(j₁÷2), n₁ in 0:(k₁÷2), 
-#         l₂ in 0:(i₂÷2), m₂ in 0:(j₂÷2), n₂ in 0:(k₂÷2)
-
-#         lmn₁ = (l₁, m₁, n₁)
-#         lmn₂ = (l₂, m₂, n₂)
-
-#         res = T(0)
-
-#         for o₁ in 0:(i₁-2l₁), p₁ in 0:(j₁-2m₁), q₁ in 0:(k₁-2n₁), 
-#             o₂ in 0:(i₂-2l₂), p₂ in 0:(j₂-2m₂), q₂ in 0:(k₂-2n₂)
-
-#             opq₁ = (o₁, p₁, q₁)
-#             opq₂ = (o₂, p₂, q₂)
-
-#             μˣ, μʸ, μᶻ = μv = @. ijk₁ + ijk₂ - muladd(2, lmn₁+lmn₂, opq₁+opq₂)
-#             μsum = sum(μv)
-#             Fγs = @inbounds Fγss[μsum+1]
-#             core1s = genIntTerm1.(ΔR₁R₂, lmn₁, opq₁, ijk₁, α₁, lmn₂, opq₂, ijk₂, α₂)
-
-#             for r in 0:((o₁+o₂)÷2), s in 0:((p₁+p₂)÷2), t in 0:((q₁+q₂)÷2)
-
-#                 rst = (r, s, t)
-#                 tmp = T(0.0)
-#                 core2s = genIntTerm2.(ΔRR₀, α₁+α₂, opq₁, opq₂, μv, rst)
-
-#                 for u in 0:(μˣ÷2), v in 0:(μʸ÷2), w in 0:(μᶻ÷2)
-#                     γ = μsum - u - v - w
-#                     @inbounds tmp += mapMapReduce((u, v, w), core2s) * 2Fγs[γ+1]
-#                 end
-#                 rr1 = mapMapReduce(rst, core1s)
-#                 rr2 = tmp
-#                 println(((rr1, (o₁+o₂)÷2, (p₁+p₂)÷2, (q₁+q₂)÷2), (rr2, μˣ, μʸ, μᶻ)), ",")
-#                 res += rr1 * rr2
-#             end
-#         end
-#         A += res
-#     end
-#     println()
-#     A
-# end
-
 
 function ∫nucAttractionCore(::Val{3}, 
                             Z₀::Int, R₀::NTuple{3, T}, 
@@ -321,28 +271,6 @@ function ∫nucAttractionCore(::Val{3},
       mapMapReduce(ijk₁, factorial) * mapMapReduce(ijk₂, factorial) )
 end
 
-function genIntTerm3(Δx::T1, 
-                     l₁::T2, o₁::T2, i₁::T2, α₁::T1, 
-                     l₂::T2, o₂::T2, i₂::T2, α₂::T1, 
-                     zeroΔx::Bool=false) where {T1, T2<:Integer}
-    f = let Δx=Δx, l₁=l₁, o₁=o₁, i₁=i₁, α₁=α₁, l₂=l₂, o₂=o₂, i₂=i₂, α₂=α₂, zeroΔx=zeroΔx
-        function (r::T2)
-            genIntTerm1(Δx, l₁, o₁, i₁, α₁, l₂, o₂, i₂, α₂, zeroΔx)(r) * 
-            (α₁+α₂)^muladd(2, l₁+l₂, r)
-        end
-    end
-    f
-end
-
-function genIntTerm4(Δx::T1, η::T1, μ::T2, zeroΔx::Bool=false) where {T1, T2<:Integer}
-    f = let Δx=Δx, η=η, μ=μ, zeroΔx=zeroΔx
-        function (u::T2)
-            genIntTerm2core(Δx, μ, zeroΔx)(u) * η^(μ-u)
-        end
-    end
-    f
-end
-
 
 function ∫eeInteractionCore1234(ΔRl::NTuple{3, T}, ΔRr::NTuple{3, T}, 
                                 ΔRc::NTuple{3, T}, β::T, η::T, 
@@ -356,6 +284,8 @@ function ∫eeInteractionCore1234(ΔRl::NTuple{3, T}, ΔRr::NTuple{3, T},
     (i₁, j₁, k₁), (i₂, j₂, k₂), (i₃, j₃, k₃), (i₄, j₄, k₄) = ijk₁, ijk₂, ijk₃, ijk₄
 
     IJK = @. ijk₁ + ijk₂ + ijk₃ + ijk₄
+    αL = α₁ + α₂
+    αR = α₃ + α₄
 
     for l₁ in 0:(i₁÷2), m₁ in 0:(j₁÷2), n₁ in 0:(k₁÷2), 
         l₂ in 0:(i₂÷2), m₂ in 0:(j₂÷2), n₂ in 0:(k₂÷2), 
@@ -366,6 +296,14 @@ function ∫eeInteractionCore1234(ΔRl::NTuple{3, T}, ΔRr::NTuple{3, T},
         lmn₂ = (l₂, m₂, n₂)
         lmn₃ = (l₃, m₃, n₃)
         lmn₄ = (l₄, m₄, n₄)
+        lmn₁Sum = sum(lmn₁)
+        lmn₂Sum = sum(lmn₂)
+        lmn₃Sum = sum(lmn₃)
+        lmn₄Sum = sum(lmn₄)
+        lmnLSum = lmn₁Sum + lmn₂Sum
+        lmnRSum = lmn₃Sum + lmn₄Sum
+        term1Coeff1 = termProd1(lmn₁, lmn₂)
+        term2Coeff1 = termProd1(lmn₄, lmn₃)
 
         for o₁ in 0:(i₁-2l₁), p₁ in 0:(j₁-2m₁), q₁ in 0:(k₁-2n₁), 
             o₂ in 0:(i₂-2l₂), p₂ in 0:(j₂-2m₂), q₂ in 0:(k₂-2n₂), 
@@ -376,30 +314,50 @@ function ∫eeInteractionCore1234(ΔRl::NTuple{3, T}, ΔRr::NTuple{3, T},
             opq₂ = (o₂, p₂, q₂)
             opq₃ = (o₃, p₃, q₃)
             opq₄ = (o₄, p₄, q₄)
+            opqL = opq₁ .+ opq₂
+            opqR = opq₃ .+ opq₄
+            opq₁Sum = sum(opq₁)
+            opq₂Sum = sum(opq₂)
+            opq₃Sum = sum(opq₃)
+            opq₄Sum = sum(opq₄)
+            term1Coeff2 = termProd2(opqL)
+            term2Coeff2 = termProd2(opqR)
+            term1Coeff3 = termProd3(ijk₁, lmn₁, opq₁, ijk₂, lmn₂, opq₂)
+            term2Coeff3 = termProd3(ijk₄, lmn₄, opq₄, ijk₃, lmn₃, opq₃)
 
             μˣ, μʸ, μᶻ = μv = begin
-                @. IJK - muladd(2, lmn₁+lmn₂+lmn₃+lmn₄, opq₁+opq₂+opq₃+opq₄)
+                @. IJK - muladd(2, lmn₁+lmn₂+lmn₃+lmn₄, opqL+opqR)
             end
-
+            term3Coeff1 = termProd2(μv)
             μsum = sum(μv)
             Fγs = F₀toFγ(μsum, β)
 
-            core1s = genIntTerm3.(ΔRl, lmn₁, opq₁, ijk₁, α₁, lmn₂, opq₂, ijk₂, α₂, sameRl)
-            core2s = genIntTerm3.(ΔRr, lmn₄, opq₄, ijk₄, α₄, lmn₃, opq₃, ijk₃, α₃, sameRr)
-            core3s = genIntTerm4.(ΔRc, η, μv, sameRc)
+            core1s = genIntTerm.(opqL, ΔRl, sameRl)
+            core2s = genIntTerm.(opqR, ΔRr, sameRr)
+            core3s = genIntTerm.(μv,   ΔRc, sameRc)
 
             for r₁ in 0:((o₁+o₂)÷2), s₁ in 0:((p₁+p₂)÷2), t₁ in 0:((q₁+q₂)÷2), 
                 r₂ in 0:((o₃+o₄)÷2), s₂ in 0:((p₃+p₄)÷2), t₂ in 0:((q₃+q₄)÷2)
 
                 rst₁ = (r₁, s₁, t₁)
                 rst₂ = (r₂, s₂, t₂)
+                rst₁Sum = sum(rst₁)
+                rst₂Sum = sum(rst₂)
+                term1Coeff4 = termProd4(lmn₁Sum, opq₁Sum, lmn₂Sum, opq₂Sum, rst₁Sum, (α₁, α₂)) * (αL)^muladd(2, lmnLSum, rst₁Sum)
+                term2Coeff4 = termProd4(lmn₄Sum, opq₄Sum, lmn₃Sum, opq₃Sum, rst₂Sum, (α₄, α₃)) * (αR)^muladd(2, lmnRSum, rst₂Sum)
                 tmp = T(0.0)
 
                 for u in 0:(μˣ÷2), v in 0:(μʸ÷2), w in 0:(μᶻ÷2)
-                    γ = μsum - u - v - w
-                    @inbounds tmp += mapMapReduce((u, v, w), core3s) * 2Fγs[γ+1]
+                    uvwSum = u + v + w
+                    γ = μsum - uvwSum
+                    term3Coeff2 = termProd5(uvwSum, T) * 2Fγs[γ+1] * η^γ
+                    @inbounds tmp += mapMapReduce((u, v, w), core3s) * 
+                                     term3Coeff1 * term3Coeff2
                 end
-                A += mapMapReduce(rst₁, core1s) * mapMapReduce(rst₂, core2s) * tmp
+                A += mapMapReduce(rst₁, core1s) * mapMapReduce(rst₂, core2s) * 
+                     (term1Coeff2 * term1Coeff4 / (term1Coeff1 * term1Coeff3)) * 
+                     (term2Coeff2 * term2Coeff4 / (term2Coeff1 * term2Coeff3)) * 
+                     tmp
             end
         end
 
