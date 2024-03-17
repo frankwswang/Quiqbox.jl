@@ -226,29 +226,41 @@ function genIntNucAttCore(ΔRR₀::NTuple{3, T}, ΔR₁R₂::NTuple{3, T}, β::T
             subterm3 = termProd2(μv)
             μSum = sum(μv)
             Fγs = @inbounds Fγss[μSum+1]
+
             genTerm1s = genIntTerm.(opq₁.+opq₂, ΔR₁R₂, sameR₁R₂)
+            genTerm2s = genIntTerm.(μv,         ΔRR₀,  sameRR₀ )
 
             for r in 0:((o₁+o₂)÷2), s in 0:((p₁+p₂)÷2), t in 0:((q₁+q₂)÷2)
 
                 rst = (r, s, t)
-                rstSum = sum(rst)
-                term1Coeff = termProd4(lmn₁Sum, opq₁Sum, lmn₂Sum, opq₂Sum, rstSum, 
-                                       (α₁, α₂)) * subterm2
-                term2 = T(0.0)
-                genTerm2s = genIntTerm.(μv, ΔRR₀, sameRR₀)
+                term1base = mapMapReduce(rst, genTerm1s)
 
-                for u in 0:(μˣ÷2), v in 0:(μʸ÷2), w in 0:(μᶻ÷2)
-                    uvwSum = u + v + w
-                    γ = μSum - uvwSum
-                    @inbounds term2Coeff = subterm3 * termProd5(uvwSum, T) * 2Fγs[γ+1] * 
-                                           α^(rstSum - opqSum - uvwSum)
-                    term2 += mapMapReduce((u, v, w), genTerm2s) * term2Coeff
+                if !iszero(term1base)
+
+                    rstSum = sum(rst)
+                    term1Coeff = termProd4(lmn₁Sum, opq₁Sum, lmn₂Sum, opq₂Sum, rstSum, 
+                                           (α₁, α₂)) * subterm2
+                    term2 = T(0.0)
+
+                    for u in 0:(μˣ÷2), v in 0:(μʸ÷2), w in 0:(μᶻ÷2)
+
+                        uvwSum = u + v + w
+                        γ = μSum - uvwSum
+                        term2base = mapMapReduce((u, v, w), genTerm2s)
+
+                        if !iszero(term2base)
+                            @inbounds term2Coeff = subterm3 * termProd5(uvwSum, T) * 
+                                                   α^(rstSum - opqSum - uvwSum) * 2Fγs[γ+1]
+                            term2 += term2base * term2Coeff
+                        end
+                    end
+
+                    A += term1base * term1Coeff * term2
                 end
-                A += mapMapReduce(rst, genTerm1s) * term1Coeff * term2
             end
         end
-
     end
+
     A
 end
 
@@ -338,29 +350,41 @@ function ∫eeInteractionCore1234(ΔRl::NTuple{3, T}, ΔRr::NTuple{3, T},
 
                 rst₁ = (r₁, s₁, t₁)
                 rst₂ = (r₂, s₂, t₂)
-                rst₁Sum = sum(rst₁)
-                rst₂Sum = sum(rst₂)
-                term1Coeff = termProd4(lmn₁Sum, opq₁Sum, lmn₂Sum, opq₂Sum, rst₁Sum, 
-                                        (α₁, α₂)) * (αL)^muladd(2, lmnLSum, rst₁Sum) * 
-                                        subterm2L
-                term2Coeff = termProd4(lmn₄Sum, opq₄Sum, lmn₃Sum, opq₃Sum, rst₂Sum, 
-                                        (α₄, α₃)) * (αR)^muladd(2, lmnRSum, rst₂Sum) * 
-                                        subterm2R
-                term3 = T(0.0)
+                term1base = mapMapReduce(rst₁, genTerm1s)
+                term2base = mapMapReduce(rst₂, genTerm2s)
+                term12base = term1base * term2base
 
-                for u in 0:(μˣ÷2), v in 0:(μʸ÷2), w in 0:(μᶻ÷2)
-                    uvwSum = u + v + w
-                    γ = μsum - uvwSum
-                    @inbounds term3Coeff = subterm3 * termProd5(uvwSum, T) * 2Fγs[γ+1] * η^γ
-                    term3 += mapMapReduce((u, v, w), genTerm3s) * term3Coeff
+                if !iszero(term12base)
+
+                    rst₁Sum = sum(rst₁)
+                    rst₂Sum = sum(rst₂)
+                    term1Coeff = termProd4(lmn₁Sum, opq₁Sum, lmn₂Sum, opq₂Sum, rst₁Sum, 
+                                           (α₁, α₂)) * (αL)^muladd(2, lmnLSum, rst₁Sum) * 
+                                           subterm2L
+                    term2Coeff = termProd4(lmn₄Sum, opq₄Sum, lmn₃Sum, opq₃Sum, rst₂Sum, 
+                                           (α₄, α₃)) * (αR)^muladd(2, lmnRSum, rst₂Sum) * 
+                                           subterm2R
+                    term3 = T(0.0)
+
+                    for u in 0:(μˣ÷2), v in 0:(μʸ÷2), w in 0:(μᶻ÷2)
+
+                        uvwSum = u + v + w
+                        γ = μsum - uvwSum
+                        term3base = mapMapReduce((u, v, w), genTerm3s)
+
+                        if !iszero(term3base)
+                            @inbounds term3Coeff = subterm3 * termProd5(uvwSum, T) * 
+                                                   η^γ * 2Fγs[γ+1]
+                            term3 += term3base * term3Coeff
+                        end
+                    end
+
+                    A += term12base * term1Coeff * term2Coeff * term3
                 end
-                A += mapMapReduce(rst₁, genTerm1s) * term1Coeff * 
-                     mapMapReduce(rst₂, genTerm2s) * term2Coeff * 
-                     term3
             end
         end
-
     end
+
     A
 end
 
