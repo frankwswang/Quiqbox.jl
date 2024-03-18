@@ -40,7 +40,7 @@ function F0(u::T) where {T}
         T(1.0)
     else
         ur = sqrt(u)
-        T(πvals[0.5]) * erf(ur) / (2ur)
+        T(πPowers[:p0d5]) * erf(ur) / (2ur)
     end
 end
 
@@ -67,36 +67,6 @@ function F₀toFγ(γ::Int, u::T, resHolder::Vector{T}=Array{T}(undef, γ+1)) wh
     resHolder
 end
 
-## Not very efficient.
-# function getIntRange(doubleUpper::T1, zeroΔx::Bool) where {T1<:Integer}
-#     if zeroΔx
-#         if iseven(doubleUpper)
-#             let Ω=doubleUpper÷2
-#                 Ω:Ω
-#             end
-#         else
-#             T1(1):T1(0)
-#         end
-#     else
-#         T1(0):(doubleUpper÷2)
-#     end
-# end
-
-# function genIntTerm(doubleUpper::T1, Δx::T2, zeroΔx::Bool) where {T1<:Integer, T2<:Real}
-#     f = if zeroΔx
-#         function (arg::T1)
-#             (inv∘T2∘factorial)(arg)
-#         end
-#     else
-#         let doubleUpper=doubleUpper, Δx=Δx
-#             function (arg::T1)
-#                 pwr = muladd(-2, arg, doubleUpper)
-#                 Δx^pwr / factorial(pwr) / factorial(arg)
-#             end
-#         end
-#     end
-#     f
-# end
 
 function genIntTerm(arg1::T1, Δx::T2, zeroΔx::Bool) where {T1<:Integer, T2<:Real}
     fRes = let arg1=arg1, Δx=Δx, zeroΔx=zeroΔx
@@ -114,12 +84,19 @@ function genIntTerm(arg1::T1, Δx::T2, zeroΔx::Bool) where {T1<:Integer, T2<:Re
 end
 
 
+computeUnit1(::Val{S}, divider::T) where {S, T} = T(πPowers[S]) / divider
+
+computeUnit2(η::T, ΔR::NTuple{N, T}) where {T, N} = exp(-η * sum(abs2, ΔR))
+
+computeUnit3(ijk₁::NTuple{N, T1}, ijk₂::NTuple{N, T1}, α::T2) where {N, T1, T2} = 
+prod(@. factorial(ijk₁) * factorial(ijk₂) / α^(ijk₁ + ijk₂))
+
+
 function ∫overlapCore(::Val{3}, 
                       ΔR::NTuple{3, T}, 
                       ijk₁::NTuple{3, Int}, α₁::T, 
                       ijk₂::NTuple{3, Int}, α₂::T, 
-                      sameCen::NTuple{3, Bool}=(false, false, false), 
-                      coeff::T=T(1.0)) where {T}
+                      sameCen::NTuple{3, Bool}=(false, false, false)) where {T}
     any(n -> n<0, (ijk₁..., ijk₂...)) && (return T(0.0))
     α = α₁ + α₂
     int = T(1.0)
@@ -136,14 +113,13 @@ function ∫overlapCore(::Val{3},
             subterm1 = (T∘factorial)(Ω) / ( factorial(l₁) * factorial(i₁-2l₁) * 
                                             factorial(l₂) * factorial(i₂-2l₂) )
             term = T(0.0)
-            # oRange = getIntRange(Ω,     zeroΔx)
             genTerm = genIntTerm(Ω, Δx, zeroΔx)
 
             for o in 0:(Ω÷2)
                 termBase = genTerm(o)
                 if !iszero(termBase)
                     subterm2 = n1Power(o) * (α₁ + α₂)^muladd(2, l, o) * 
-                            α₁^(i₂ - l - l₂ - o) * α₂^(i₁ - l - l₁ - o) / (1 << 2(l + o))
+                               α₁^(i₂ - l - l₂ - o) * α₂^(i₁ - l - l₁ - o) / (1 << 2(l + o))
                     term += termBase * subterm1 * subterm2
                 end
             end
@@ -158,17 +134,17 @@ function ∫overlapCore(::Val{3},
         end
     end
 
-    int * prod(@. n1Power(ijk₁) * factorial(ijk₁) * factorial(ijk₂) / α^(ijk₁ + ijk₂)) * 
-    sqrt((π/α)^3) * exp(-α₁ / α * α₂ * sum(abs2, ΔR)) * coeff
+    η = α₁ / α * α₂
+    int * computeUnit1(Val(:p1d5), α^T(1.5)) * computeUnit2(η, ΔR) * 
+          computeUnit3(ijk₁, ijk₂, α) * n1Power(ijk₁)
 end
 
 ∫overlapCore(::Val{3}, 
              R₁::NTuple{3, T}, R₂::NTuple{3, T}, 
              ijk₁::NTuple{3, Int}, α₁::T, 
              ijk₂::NTuple{3, Int}, α₂::T, 
-             sameCen::NTuple{3, Bool}=(false, false, false), 
-             coeff::T=T(1.0)) where {T} = 
-∫overlapCore(Val(3), R₁.-R₂, ijk₁, α₁, ijk₂, α₂, sameCen, coeff)
+             sameCen::NTuple{3, Bool}=(false, false, false)) where {T} = 
+∫overlapCore(Val(3), R₁.-R₂, ijk₁, α₁, ijk₂, α₂, sameCen)
 
 
 function ∫elecKineticCore(::Val{3}, 
@@ -178,17 +154,17 @@ function ∫elecKineticCore(::Val{3},
                           sameCen::NTuple{3, Bool}=(false, false, false)) where {T}
     ΔR = R₁ .- R₂
     shifts = ((1,0,0), (0,1,0), (0,0,1))
-    mapreduce(+, ijk₁, ijk₂, shifts) do i₁, i₂, Δ𝑙
+    map(ijk₁, ijk₂, shifts) do i₁, i₂, Δ𝑙
         Δijk1 = map(-, ijk₁, Δ𝑙)
         Δijk2 = map(-, ijk₂, Δ𝑙)
         Δijk3 = map(+, ijk₁, Δ𝑙)
         Δijk4 = map(+, ijk₂, Δ𝑙)
-        int1 = ∫overlapCore(Val(3), ΔR, Δijk1, α₁, Δijk2, α₂, sameCen, T(i₁*i₂/2))
-        int2 = ∫overlapCore(Val(3), ΔR, Δijk3, α₁, Δijk4, α₂, sameCen,  2α₁*α₂   )
-        int3 = ∫overlapCore(Val(3), ΔR, Δijk3, α₁, Δijk2, α₂, sameCen,   α₁*i₂   )
-        int4 = ∫overlapCore(Val(3), ΔR, Δijk1, α₁, Δijk4, α₂, sameCen,   α₂*i₁   )
-        int1 + int2 - int3 - int4
-    end
+        int1 = ∫overlapCore(Val(3), ΔR, Δijk1, α₁, Δijk2, α₂, sameCen)
+        int2 = ∫overlapCore(Val(3), ΔR, Δijk3, α₁, Δijk4, α₂, sameCen)
+        int3 = ∫overlapCore(Val(3), ΔR, Δijk3, α₁, Δijk2, α₂, sameCen)
+        int4 = ∫overlapCore(Val(3), ΔR, Δijk1, α₁, Δijk4, α₂, sameCen)
+        int1*i₁*i₂/2 + int2*2α₁*α₂ - int3*α₁*i₂ - int4*α₂*i₁
+    end |> sum
 end
 
 
@@ -250,18 +226,14 @@ function genIntNucAttCore(ΔRR₀::NTuple{3, T}, ΔR₁R₂::NTuple{3, T}, β::T
             opqSum = opq₁Sum + opq₂Sum
             subterm2 = termProd3(ijk₁, lmn₁, opq₁, ijk₂, lmn₂, opq₂, T) / subterm1
 
-            # μv = @. ijk₁ + ijk₂ - muladd(2, lmn₁+lmn₂, opq)
             μˣ, μʸ, μᶻ = μv = @. ijk₁ + ijk₂ - muladd(2, lmn₁+lmn₂, opq)
             subterm3 = termProd2(μv)
             μSum = sum(μv)
             Fγs = @inbounds Fγss[μSum+1]
 
-            # rstRange  = getIntRange.(opq₁.+opq₂,        sameR₁R₂)
             genTerm1s = genIntTerm.(opq₁.+opq₂, ΔR₁R₂, sameR₁R₂)
-            # uvwRange  = getIntRange.(μv,                sameRR₀ )
             genTerm2s = genIntTerm.(μv,         ΔRR₀,  sameRR₀ )
 
-            # for r in rstRange[1], s in rstRange[2], t in rstRange[3]
             for r in 0:((o₁+o₂)÷2), s in 0:((p₁+p₂)÷2), t in 0:((q₁+q₂)÷2)
 
                 rst = (r, s, t)
@@ -274,7 +246,6 @@ function genIntNucAttCore(ΔRR₀::NTuple{3, T}, ΔR₁R₂::NTuple{3, T}, β::T
                                            (α₁, α₂)) * subterm2
                     term2 = T(0.0)
 
-                    # for u in uvwRange[1], v in uvwRange[2], w in uvwRange[3]
                     for u in 0:(μˣ÷2), v in 0:(μʸ÷2), w in 0:(μᶻ÷2)
 
                         uvwSum = u + v + w
@@ -305,14 +276,17 @@ function ∫nucAttractionCore(::Val{3},
                             sameR₁R₂::NTuple{3, Bool}=(false, false, false)) where {T}
     α = α₁ + α₂
     R = @. (α₁*R₁ + α₂*R₂) / α
-    ΔRR₀ = R .- R₀
+    ΔRR₀  = R  .- R₀
     ΔR₁R₂ = R₁ .- R₂
     β = α * sum(abs2, ΔRR₀)
     sameRR₀ = iszero.(ΔRR₀)
-    genIntNucAttCore(ΔRR₀, ΔR₁R₂, β, ijk₁, α₁, ijk₂, α₂, (sameRR₀, sameR₁R₂)) * 
-    (π / α) * exp(-α₁ / α * α₂ * sum(abs2, ΔR₁R₂)) * 
-    ( -Z₀ * (-1)^sum(ijk₁ .+ ijk₂) * 
-      mapMapReduce(ijk₁, factorial) * mapMapReduce(ijk₂, factorial) )
+    res = genIntNucAttCore(ΔRR₀, ΔR₁R₂, β, ijk₁, α₁, ijk₂, α₂, (sameRR₀, sameR₁R₂))
+    if !iszero(res)
+        η = α₁ / α * α₂
+        res *= computeUnit1(Val(:p1d0), α) * computeUnit2(η, ΔR₁R₂) * 
+               prod(@. factorial(ijk₁) * factorial(ijk₂)) * (-Z₀ * n1Power(ijk₁ .+ ijk₂))
+    end
+    res
 end
 
 
@@ -429,24 +403,25 @@ function ∫eeInteractionCore(::Val{3},
                             R₄::NTuple{3, T}, ijk₄::NTuple{3, Int}, α₄::T, 
                             (sameR₁R₂, sameR₃R₄)::NTuple{2, NTuple{3, Bool}}=
                             (Tuple∘fill)((false, false, false), 2)) where {T}
-    ΔRl = R₁ .- R₂
-    ΔRr = R₃ .- R₄
     αl = α₁ + α₂
     αr = α₃ + α₄
-    ηl = α₁ / αl * α₂
-    ηr = α₃ / αr * α₄
+    ΔRl = R₁ .- R₂
+    ΔRr = R₃ .- R₄
     ΔRc = @. (α₁*R₁ + α₂*R₂) / αl - (α₃*R₃ + α₄*R₄) / αr
     zeroΔRc = iszero.(ΔRc)
     η = αl / (α₁ + α₂ + α₃ + α₄) * αr
     β = η * sum(abs2, ΔRc)
-    ∫eeInteractionCore1234(ΔRl, ΔRr, ΔRc, β, η, ijk₁, α₁, ijk₂, α₂, ijk₃, α₃, ijk₄, α₄, 
-                           (sameR₁R₂, sameR₃R₄, zeroΔRc)) * 
-    T(πvals[2.5]) / (αl * αr * sqrt(αl + αr)) * 
-    exp(-ηl * sum(abs2, ΔRl)) * exp(-ηr * sum(abs2, ΔRr)) * 
-    mapreduce(*, ijk₁, ijk₂, ijk₃, ijk₄) do l₁, l₂, l₃, l₄
-        (-1)^(l₁+l₂) * factorial(l₁) * factorial(l₂) * factorial(l₃) * factorial(l₄) / 
-        (αl^(l₁+l₂) * αr^(l₃+l₄))
+    res = ∫eeInteractionCore1234(ΔRl, ΔRr, ΔRc, β, η, 
+                                 ijk₁, α₁, ijk₂, α₂, ijk₃, α₃, ijk₄, α₄, 
+                                 (sameR₁R₂, sameR₃R₄, zeroΔRc))
+    if !iszero(res)
+        ηl = α₁ / αl * α₂
+        ηr = α₃ / αr * α₄
+        res *= computeUnit1(Val(:p2d5), αl*αr*sqrt(αl + αr)) * 
+               computeUnit2(ηl, ΔRl) * computeUnit3(ijk₁, ijk₂, αl) * 
+               computeUnit2(ηr, ΔRr) * computeUnit3(ijk₃, ijk₄, αr) * n1Power(ijk₁ .+ ijk₂)
     end
+    res
 end
 
 

@@ -2070,7 +2070,7 @@ hasNormFactor(b::FloatingGTBasisFuncs) = b.normalizeGTO
 
 
 getNijk(::Type{T}, i::Integer, j::Integer, k::Integer) where {T} = 
-T(πvals[-0.75]) * 2^T(1.5*(i+j+k) + 0.75) * T(sqrt( factorial(i) * factorial(j) * 
+T(πPowers[:n0d75]) * 2^T(1.5*(i+j+k) + 0.75) * T(sqrt( factorial(i) * factorial(j) * 
 factorial(k) / (factorial(2i) * factorial(2j) * factorial(2k)) ))
 
 getNα(i::Integer, j::Integer, k::Integer, α::T) where {T} = 

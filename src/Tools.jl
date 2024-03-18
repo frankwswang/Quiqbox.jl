@@ -1031,3 +1031,5 @@ end
 
 n1Power(x::Int) = ifelse(isodd(x), -1, 1)
 n1Power(x::Int, ::Type{T}) where {T} = ifelse(isodd(x), T(-1), T(1))
+n1Power(x::NTuple{N, Int}) where {N} = (n1Power∘sum)(x)
+n1Power(x::NTuple{N, Int}, ::Type{T}) where {N, T} = n1Power(sum(x), T)
