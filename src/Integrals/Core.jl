@@ -67,39 +67,52 @@ function F₀toFγ(γ::Int, u::T, resHolder::Vector{T}=Array{T}(undef, γ+1)) wh
     resHolder
 end
 
+## Not very efficient.
+# function getIntRange(doubleUpper::T1, zeroΔx::Bool) where {T1<:Integer}
+#     if zeroΔx
+#         if iseven(doubleUpper)
+#             let Ω=doubleUpper÷2
+#                 Ω:Ω
+#             end
+#         else
+#             T1(1):T1(0)
+#         end
+#     else
+#         T1(0):(doubleUpper÷2)
+#     end
+# end
 
-function genIntOverlapTerm(getRangeFunc::F, Δx::T, i₁::Int, α₁::T, 
-                                                   i₂::Int, α₂::T) where {F, T}
-    f = let getRange=getRangeFunc, Δx=Δx, i₁=i₁, α₁=α₁, i₂=i₂, α₂=α₂
-        function (l₁::Int, l₂::Int)
-            res = T(0.0)
-            Ω = muladd(-2, l₁ + l₂, i₁ + i₂)
-            for o in getRange(Ω)
-                res += Δx^(Ω-2o) * 
-                    ( α₁^(i₂ - l₁ - 2l₂ - o) / (factorial(l₂) * factorial(i₁-2l₁)) ) * 
-                    ( α₂^(i₁ - l₂ - 2l₁ - o) / (factorial(l₁) * factorial(i₂-2l₂)) ) * 
-                    ( n1Power(o) * factorial(Ω) * (α₁ + α₂)^muladd(2, (l₁ + l₂), o) / 
-                      ((1 << 2(l₁ + l₂ + o)) *  factorial(o ) * factorial(Ω -2o )) )
+# function genIntTerm(doubleUpper::T1, Δx::T2, zeroΔx::Bool) where {T1<:Integer, T2<:Real}
+#     f = if zeroΔx
+#         function (arg::T1)
+#             (inv∘T2∘factorial)(arg)
+#         end
+#     else
+#         let doubleUpper=doubleUpper, Δx=Δx
+#             function (arg::T1)
+#                 pwr = muladd(-2, arg, doubleUpper)
+#                 Δx^pwr / factorial(pwr) / factorial(arg)
+#             end
+#         end
+#     end
+#     f
+# end
+
+function genIntTerm(arg1::T1, Δx::T2, zeroΔx::Bool) where {T1<:Integer, T2<:Real}
+    fRes = let arg1=arg1, Δx=Δx, zeroΔx=zeroΔx
+        function (arg2::T1)
+            pwr = muladd(-2, arg2, arg1)
+            coeff = if zeroΔx
+                iszero(pwr) ? T2(1.0) : (return T2(0.0))
+            else
+                Δx^pwr / factorial(pwr)
             end
-            res
+            coeff / factorial(arg2)
         end
     end
-    f
+    fRes
 end
 
-function genIntOverlapCore(Δx::T, i₁::Int, α₁::T, 
-                                  i₂::Int, α₂::T, 
-                           zeroΔx::Bool=false) where {T}
-    getRange = ifelse( zeroΔx, 
-                       Ω::Int -> ifelse(iseven(Ω), begin ΩHalf=Ω÷2; ΩHalf:ΩHalf end, 1:0), 
-                       Ω::Int -> 0:(Ω÷2) )
-    f = genIntOverlapTerm(getRange, Δx, i₁, α₁, i₂, α₂)
-    res = T(0.0)
-    for l₁ in 0:(i₁÷2), l₂ in 0:(i₂÷2)
-        res += f(l₁, l₂)
-    end
-    res
-end
 
 function ∫overlapCore(::Val{3}, 
                       ΔR::NTuple{3, T}, 
@@ -109,14 +122,44 @@ function ∫overlapCore(::Val{3},
                       coeff::T=T(1.0)) where {T}
     any(n -> n<0, (ijk₁..., ijk₂...)) && (return T(0.0))
     α = α₁ + α₂
-    res = T(1.0)
-    for (i₁, i₂, ΔRᵢ, zeroΔx) in zip(ijk₁, ijk₂, ΔR, sameCen)
-        int = genIntOverlapCore(ΔRᵢ, i₁, α₁, i₂, α₂, zeroΔx)
-        iszero(int) && (return T(0.0))
-        res *= n1Power(i₁) * factorial(i₁) * factorial(i₂) * α^(-i₁-i₂) * int
+    int = T(1.0)
+
+    for (i₁, i₂, Δx, zeroΔx) in zip(ijk₁, ijk₂, ΔR, sameCen)
+
+        i = i₁ + i₂
+        res = T(0.0)
+
+        for l₁ in 0:(i₁÷2), l₂ in 0:(i₂÷2)
+
+            l = l₁ + l₂
+            Ω = muladd(-2, l, i)
+            subterm1 = (T∘factorial)(Ω) / ( factorial(l₁) * factorial(i₁-2l₁) * 
+                                            factorial(l₂) * factorial(i₂-2l₂) )
+            term = T(0.0)
+            # oRange = getIntRange(Ω,     zeroΔx)
+            genTerm = genIntTerm(Ω, Δx, zeroΔx)
+
+            for o in 0:(Ω÷2)
+                termBase = genTerm(o)
+                if !iszero(termBase)
+                    subterm2 = n1Power(o) * (α₁ + α₂)^muladd(2, l, o) * 
+                            α₁^(i₂ - l - l₂ - o) * α₂^(i₁ - l - l₁ - o) / (1 << 2(l + o))
+                    term += termBase * subterm1 * subterm2
+                end
+            end
+
+            res += term
+        end
+
+        if iszero(res)
+            return T(0.0)
+        else
+            int *= res
+        end
     end
-    res *= sqrt((π/α)^3) * exp(-α₁ / α * α₂ * sum(abs2, ΔR))
-    res * coeff
+
+    int * prod(@. n1Power(ijk₁) * factorial(ijk₁) * factorial(ijk₂) / α^(ijk₁ + ijk₂)) * 
+    sqrt((π/α)^3) * exp(-α₁ / α * α₂ * sum(abs2, ΔR)) * coeff
 end
 
 ∫overlapCore(::Val{3}, 
@@ -149,21 +192,6 @@ function ∫elecKineticCore(::Val{3},
 end
 
 
-function genIntTerm(arg1::T1, Δx::T2, zeroΔx::Bool) where {T1<:Integer, T2<:Real}
-    fRes = let arg1=arg1, Δx=Δx, zeroΔx=zeroΔx
-        function (arg2::T1)
-            pwr = muladd(-2, arg2, arg1)
-            coeff = if zeroΔx
-                iszero(pwr) ? T2(1.0) : (return T2(0.0))
-            else
-                Δx^pwr / factorial(pwr)
-            end
-            coeff / factorial(arg2)
-        end
-    end
-    fRes
-end
-
 function termProd1(lmn₁::NTuple{3, T1}, lmn₂::NTuple{3, T1}) where {T1<:Integer}
     prod( @. factorial(lmn₁) * factorial(lmn₂) )
 end
@@ -176,8 +204,8 @@ function termProd3(ijk₁::NTuple{3, T1}, lmn₁::NTuple{3, T1}, opq₁::NTuple{
                    ijk₂::NTuple{3, T1}, lmn₂::NTuple{3, T1}, opq₂::NTuple{3, T1}, 
                    ::Type{T2}) where {T1<:Integer, T2<:Real}
     (T2∘termProd2)(opq₁ .+ opq₂) / 
-    prod( @. ( factorial(opq₁) * factorial(ijk₁-2lmn₁-opq₁) *
-               factorial(opq₂) * factorial(ijk₂-2lmn₂-opq₂) ) )
+    prod( @. factorial(opq₁) * factorial(ijk₁-2lmn₁-opq₁) *
+             factorial(opq₂) * factorial(ijk₂-2lmn₂-opq₂) )
 end
 function termProd4(lmn₁Sum::T1, opq₁Sum::T1, lmn₂Sum::T1, opq₂Sum::T1, rstSum::T1, 
                    (α₁, α₂)::NTuple{2, T2}) where {T1<:Integer, T2<:Real}
@@ -222,14 +250,18 @@ function genIntNucAttCore(ΔRR₀::NTuple{3, T}, ΔR₁R₂::NTuple{3, T}, β::T
             opqSum = opq₁Sum + opq₂Sum
             subterm2 = termProd3(ijk₁, lmn₁, opq₁, ijk₂, lmn₂, opq₂, T) / subterm1
 
+            # μv = @. ijk₁ + ijk₂ - muladd(2, lmn₁+lmn₂, opq)
             μˣ, μʸ, μᶻ = μv = @. ijk₁ + ijk₂ - muladd(2, lmn₁+lmn₂, opq)
             subterm3 = termProd2(μv)
             μSum = sum(μv)
             Fγs = @inbounds Fγss[μSum+1]
 
+            # rstRange  = getIntRange.(opq₁.+opq₂,        sameR₁R₂)
             genTerm1s = genIntTerm.(opq₁.+opq₂, ΔR₁R₂, sameR₁R₂)
+            # uvwRange  = getIntRange.(μv,                sameRR₀ )
             genTerm2s = genIntTerm.(μv,         ΔRR₀,  sameRR₀ )
 
+            # for r in rstRange[1], s in rstRange[2], t in rstRange[3]
             for r in 0:((o₁+o₂)÷2), s in 0:((p₁+p₂)÷2), t in 0:((q₁+q₂)÷2)
 
                 rst = (r, s, t)
@@ -242,6 +274,7 @@ function genIntNucAttCore(ΔRR₀::NTuple{3, T}, ΔR₁R₂::NTuple{3, T}, β::T
                                            (α₁, α₂)) * subterm2
                     term2 = T(0.0)
 
+                    # for u in uvwRange[1], v in uvwRange[2], w in uvwRange[3]
                     for u in 0:(μˣ÷2), v in 0:(μʸ÷2), w in 0:(μᶻ÷2)
 
                         uvwSum = u + v + w
