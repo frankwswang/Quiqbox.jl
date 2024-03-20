@@ -20,6 +20,7 @@ TensorOperations = "6aa20fa7-93e2-5fca-9bc0-fbd0db3c71a2"
 
 [compat]
 Combinatorics = "1"
+Documenter = "1"
 DoubleFloats = "^1.2"
 FastGaussQuadrature = "1"
 ForwardDiff = "^0.10.25"
@@ -28,9 +29,29 @@ LRUCache = "^1.6"
 LazyArrays = "^1.8"
 LineSearches = "^7.1.1"
 LinearAlgebra = "1"
+Optim = "1"
 Printf = "1"
+QuadGK = "2"
+Random = "1"
 SPGBox = "0.7"
 SpecialFunctions = "2"
 Statistics = "1"
+Suppressor = "0.2"
 TensorOperations = "^4.0.5"
+Test = "1"
 julia = "^1.6"
+libcint_jll = "5"
+
+[extras]
+Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
+ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+Optim = "429524aa-4258-5aef-a3af-852621145aeb"
+QuadGK = "1fd47b50-473d-5c70-9696-f719f8f3bcdc"
+Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
+Suppressor = "fd094767-a336-5f1f-9728-57cf17d0bbfb"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+libcint_jll = "574b78ca-bebd-517c-801d-4735c93a9686"
+
+[targets]
+test = ["Documenter", "ForwardDiff", "LinearAlgebra", "Optim", "QuadGK", "Random", "Suppressor", "Test", "libcint_jll"]
