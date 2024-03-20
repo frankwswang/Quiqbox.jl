@@ -775,7 +775,8 @@ function genIndex(index::Int)
     genIndexCore(index)
 end
 
-genIndex(index::Nothing) = genIndexCore(index)
+genIndex(::Nothing) = genIndexCore(nothing)
+genIndex() = genIndex(nothing)
 
 function genIndexCore(index)
     res = reshape(Union{Int, Nothing}[0], ()) |> collect
@@ -797,14 +798,27 @@ function genNamedTupleC(name::Symbol, defaultVars::AbstractVector)
 end
 
 
-fillObj(obj::Any) = fill(obj)
+fillObj(@nospecialize(obj::Any)) = fill(obj)
 
-fillObj(obj::Array{<:Any, 0}) = itself(obj)
+fillObj(@nospecialize(obj::Array{<:Any, 0})) = itself(obj)
 
 
-arrayToTuple(arr::AbstractArray) = Tuple(arr)
+tupleObj(@nospecialize(obj::Any)) = (obj,)
 
-arrayToTuple(tpl::Tuple) = itself(tpl)
+tupleObj(@nospecialize(obj::Tuple{Any})) = itself(obj)
+
+
+@inline unzipObj(obj::Tuple{T}) where {T} = obj[begin]
+
+unzipObj(@nospecialize(obj::Union{Tuple, Array})) = 
+ifelse(length(obj)==1, obj[begin], obj)
+
+unzipObj(@nospecialize(obj::Any)) = itself(obj)
+
+
+arrayToTuple(@nospecialize(arr::AbstractArray)) = Tuple(arr)
+
+arrayToTuple(@nospecialize(tpl::Tuple)) = itself(tpl)
 
 
 genTupleCoords(::Type{T1}, 
@@ -864,7 +878,7 @@ function skipIndices(arr::AbstractArray{Int}, ints::AbstractVector{Int})
     else
         all(i > 0 for i in ints) || 
         throw(DomainError(ints, "Every element of `ints` should be positive."))
-        maxIdx = max(arr...)
+        maxIdx = maximum(arr)
         maxIdxN = maxIdx + length(ints)
         ints = filter!(x->x<=maxIdxN, sort(ints))
         idsN = deleteat!(collect(1:maxIdxN), ints)
@@ -980,9 +994,9 @@ end
 
 
 mapMapReduce(tp::NTuple{N}, fs::NTuple{N, Function}, op::F=*) where {N, F} = 
-mapreduce((x, y)->y(x), op, tp, fs)
+reduce(op, map((x, y)->y(x), tp, fs))
 
-mapMapReduce(tp::NTuple{N}, f::F1, op::F2=*) where {N, F1, F2} = mapreduce(f, op, tp)
+mapMapReduce(tp::NTuple{N}, f::F1, op::F2=*) where {N, F1, F2} = reduce(op, map(f, tp))
 
 
 rmsOf(arr::AbstractArray) = norm(arr) / (sqrt∘length)(arr)
@@ -994,3 +1008,28 @@ function keepOnly!(a::AbstractArray, idx::Int)
     deleteat!(a, (firstindex(a)+1):lastindex(a))
     a[] = e
 end
+
+
+function betterSum(x) # Improved Kahan–Babuška algorithm fro array summation
+    xFirxt = first(x)
+    s = xFirxt .- xFirxt
+    c = xFirxt .- xFirxt
+
+    for xi in x
+        t = s .+ xi
+        c += map(s, t, xi) do si, ti, xij
+            if abs(si) >= abs(xij)
+                (si - ti) + xij
+            else
+                (xij - ti) + si
+            end
+        end
+        s = t
+    end
+    s .+ c
+end
+
+n1Power(x::Int) = ifelse(isodd(x), -1, 1)
+n1Power(x::Int, ::Type{T}) where {T} = ifelse(isodd(x), T(-1), T(1))
+n1Power(x::NTuple{N, Int}) where {N} = (n1Power∘sum)(x)
+n1Power(x::NTuple{N, Int}, ::Type{T}) where {N, T} = n1Power(sum(x), T)

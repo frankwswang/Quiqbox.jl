@@ -58,7 +58,7 @@ function compr2Arrays3(cprTuple::NamedTuple{<:Any, <:Tuple{T1, T2}}, atol::Real,
         showAllDiff && !res && println("$(name1) - $(name2) = ", diff)
         println(additionalInfo)
         v, i  = findmax(abs, diff)
-        println("max(abs.($(name1) - $(name2))...) = ", v, "  index = ", i)
+        println("maximum(abs.($(name1) - $(name2))) = ", v, "  index = ", i)
     end
     res
 end

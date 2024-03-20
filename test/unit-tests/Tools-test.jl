@@ -177,7 +177,7 @@ d = (2,4,5,1,3)
 
 # function genIndex
 @test genIndex(1) == fill(1)
-@test genIndex(nothing) == fill(nothing)
+@test genIndex() == fill(nothing)
 
 
 # function fillObj

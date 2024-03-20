@@ -21,7 +21,7 @@ toggleDiff!(pb1)
 @test pb1.canDiff[] == false
 @test enableDiff!(pb1)
 @test pb1.canDiff[] == true
-pb2 = changeMapping(pb1)
+pb2 = changeMapping(pb1, itself)
 @test dataOf(pb1) === dataOf(pb2) === pb1.data[]
 pb2_2 = outValCopy(pb1)
 @test dataOf(pb1) == dataOf(pb2_2)

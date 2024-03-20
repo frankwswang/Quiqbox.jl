@@ -2,6 +2,7 @@ module Quiqbox
 
 include("AbstractTypes.jl")
 
+include("Exception.jl")
 include("Tools.jl")
 include("FileIO.jl")
 
