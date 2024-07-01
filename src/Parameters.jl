@@ -1,415 +1,412 @@
-export ParamBox, inValOf, outValOf, inSymOf, outSymOf, isInSymEqual, isOutSymEqual, 
-       indVarOf, dataOf, mapOf, outValCopy, fullVarCopy, enableDiff!, disableDiff!, 
-       isDiffParam, toggleDiff!, changeMapping
+export RealVar, ParamNode, NodeTuple, setScreenLevel!, setScreenLevel, symOf, 
+       dataOf, valOf, screenLevelOf, markParams!, topoSort, getParams, getSingleParams, 
+       genComputeGraph, computeTreeGraph
 
-"""
+using Base: Fix2
 
-    ParamBox{T, V, F<:Function} <: DifferentiableParameter{T, ParamBox}
+struct StableReduce{T, F<:Function} <: Function
+    f::F
 
-Parameter container that can enable differentiation.
-
-≡≡≡ Field(s) ≡≡≡
-
-`data::Array{Pair{Array{T, 0}, Symbol}, 0}`: The container of the input variable data 
-in the form of a `Pair` of its value container and symbol) stored in the `ParamBox`. The 
-value of the input variable can be accessed by syntax `[]`; to modify it, for example for a 
-`pb::ParamBox{T}`, use the syntax `pb[] = newVal` where `newVal` is the new value that is 
-or can be converted into type `T`.
-
-`map::Union{F, `[`DI`](@ref)`{F}}`: The mapping of the value of the input variable (i.e. 
-the input value) within the same domain (`.map(::T)->T`). The result (i.e., the value of 
-the output variable, or the "output value") can be accessed by syntax `()`.
-
-`canDiff::Array{Bool, 0}`: Indicator of whether the output variable is "marked" as 
-differentiable with respect to the input variable in the differentiation process. In other 
-words, it determines whether the output variable represented by the `ParamBox` is treated 
-as a dependent variable or an independent variable.
-
-`index::Array{Union{Int, Nothing}, 0}`: Additional index assigned to the `ParamBox`.
-
-≡≡≡ Initialization Method(s) ≡≡≡
-
-    ParamBox(inVar::Union{T, Array{T, 0}}, outSym::Symbol=:undef, 
-             inSym::Symbol=Symbol(IVsymSuffix, outSym); 
-             index::Union{Int, Nothing}=nothing, canDiff::Bool=false) where {T} -> 
-    ParamBox{T, outSym, $(iT)}
-
-    ParamBox(inVar::Union{T, Array{T, 0}}, outSym::Symbol, mapFunction::Function, 
-             inSym::Symbol=Symbol(IVsymSuffix, outSym); 
-             index::Union{Int, Nothing}=nothing, canDiff::Bool=true) where {T} -> 
-    ParamBox{T, outSym}
-
-=== Positional argument(s) ===
-
-`inVar::Union{T, Array{T, 0}}`: The value or the container of the input variable to be 
-stored. If the latter is the type of `data`, then it will directly used to construct 
-`.data[]` with without any copy.
-
-`outSym::Symbol`: The symbol of the output variable represented by the constructed 
-`ParamBox`. It's equal to the type parameter `V` of the constructed `ParamBox`.
-
-`inSym::Symbol`: The symbol of the input variable held by the constructed `ParamBox`.
-
-`mapFunction::Function`: The mapping (`mapFunction(::T)->T`) of the input variable, which 
-will be assigned to the field `.map`. When `mapFunction` is not provided, `.map` is set to 
-[`itself`](@ref) that maps the input variable to an identical-valued output variable.
-
-=== Keyword argument(s) ===
-
-`index::Union{Int, Nothing}`: The index of the constructed `ParamBox`. It's should be left 
-with its default value unless the user plans to utilize the index of a `ParamBox` for 
-specific application other than differentiation.
-
-`canDiff::Bool`: Determine whether the output variable is marked as "differentiable" with 
-respect to the input variable.
-
-≡≡≡ Example(s) ≡≡≡
-
-```jldoctest; setup = :(push!(LOAD_PATH, "../../src/"); using Quiqbox)
-julia> ParamBox(1.0)
-ParamBox{Float64, :undef, …}{0}[∂][undef]⟦=⟧[1.0]
-
-julia> ParamBox(1.0, :a)
-ParamBox{Float64, :a, …}{0}[∂][a]⟦=⟧[1.0]
-
-julia> ParamBox(1.0, :a, abs)
-ParamBox{Float64, :a, …}{1}[𝛛][x_a]⟦→⟧[1.0]
-```
-
-**NOTE 1:** The markers "`[∂][IV]`" in the printed info indicate the differentiability and 
-the name (the symbol with an assigned index if applied) respectively of the independent 
-variable tied to the `ParamBox`. When the `ParamBox` is marked as non-differentiable, 
-"`[∂]`" is grey and `IV` corresponds to the name of the output variable; when the 
-`ParamBox` is  marked as differentiable, "`[∂]`" becomes a green "`[𝛛]`", and `IV` 
-corresponds to the name of the stored input variable.
-
-**NOTE 2:** The output variable of a `ParamBox` is normally used to differentiate a 
-parameter functional (e.g., the Hartree–Fock energy). However, the derivative with respect 
-to the stored input variable can also be computed to when the `ParamBox` is marked as 
-differentiable.
-"""
-struct ParamBox{T, V, F<:Function} <: DifferentiableParameter{T, ParamBox}
-    data::Array{Pair{Array{T, 0}, Symbol}, 0}
-    map::Union{F, DI{F}}
-    canDiff::Array{Bool, 0}
-    index::Array{Union{Int, Nothing}, 0}
-
-    function ParamBox{T, V}(f::F, data::Pair{Array{T, 0}, Symbol}, index, canDiff) where 
-                           {T, V, F<:Function}
-        Base.return_types(f, (T,))[1] == T || 
-        throw(AssertionError("The mapping function `f`: `$(f)` should return the same "*
-                             "data type as its input argument."))
-        new{T, V, dressOf(F)}(fill(data), f, canDiff, index)
-    end
-
-    ParamBox{T, V}(data::Pair{Array{T, 0}, Symbol}, index, canDiff) where {T, V} = 
-    new{T, V, iT}(fill(data), itself, canDiff, index)
-end
-
-ParamBox(::Val{V}, mapFunction::F, data::Pair{Array{T, 0}, Symbol}, 
-         index=genIndex(nothing), canDiff=fill(true)) where {V, F<:Function, T} = 
-ParamBox{T, V}(mapFunction, data, index, canDiff)
-
-ParamBox(::Val{V}, ::IF, data::Pair{Array{T, 0}, Symbol}, index=genIndex(nothing), 
-         canDiff=fill(false)) where {V, T} = 
-ParamBox{T, V}(data, index, canDiff)
-
-ParamBox(::Val{V}, pb::ParamBox{T}, index=genIndex(pb.canDiff[] ? pb.index[] : nothing), 
-         canDiff::Array{Bool, 0}=copy(pb.canDiff)) where {V, T} = 
-ParamBox{T, V}(pb.map, pb.data[], index, canDiff)
-
-ParamBox(inVar::Union{T, Array{T, 0}}, outSym::Symbol=:undef, 
-         inSym::Symbol=Symbol(IVsymSuffix, outSym); 
-         index::Union{Int, Nothing}=nothing, canDiff::Bool=false) where {T} = 
-ParamBox(Val(outSym), itself, 
-         fillObj(inVar)=>inSym, genIndex(index), fill(canDiff))
-
-ParamBox(inVar::Union{T, Array{T, 0}}, outSym::Symbol, mapFunction::Function, 
-         inSym::Symbol=Symbol(IVsymSuffix, outSym); 
-         index::Union{Int, Nothing}=nothing, canDiff::Bool=true) where {T} = 
-ParamBox(Val(outSym), mapFunction, 
-         fillObj(inVar)=>inSym, genIndex(index), fill(canDiff))
-
-const VPB{T} = Union{T, Array{T, 0}, ParamBox{T}}
-
-
-"""
-
-    inValOf(pb::ParamBox{T}) where {T} -> T
-
-Return the value of the input variable of `pb`. Equivalent to `pb[]`.
-"""
-@inline inValOf(pb::ParamBox) = pb.data[][begin][]
-
-
-"""
-
-    outValOf(pb::ParamBox) -> Number
-
-Return the value of the output variable of `pb`. Equivalent to `pb()`.
-"""
-@inline outValOf(pb::ParamBox) = (pb.map∘inValOf)(pb)
-
-(pb::ParamBox)() = outValOf(pb)
-# (pb::ParamBox)() = Base.invokelatest(pb.map, pb.data[][begin][])::Float64
-
-
-"""
-
-    inSymOf(pb::ParamBox) -> Symbol
-
-Return the symbol of the input variable of `pb`.
-"""
-@inline inSymOf(pb::ParamBox) = pb.data[][end]
-
-
-"""
-
-    outSymOf(pb::ParamBox) -> Symbol
-
-Return the symbol of the output variable of `pb`.
-"""
-@inline outSymOf(::ParamBox{<:Any, V}) where {V} = V
-
-
-"""
-
-    isInSymEqual(pb::ParamBox, sym::Symbol) -> Bool
-
-Return the Boolean value of whether the symbol of  `pb`'s input variable equals `sym`.
-"""
-isInSymEqual(pb::ParamBox, sym::Symbol) = (dataOf(pb)[end] == sym)
-
-
-
-"""
-
-    isOutSymEqual(::ParamBox, sym::Symbol) -> Bool
-
-Return the Boolean value of whether the symbol of  `pb`'s output variable equals `sym`.
-"""
-isOutSymEqual(::ParamBox{<:Any, V}, sym::Symbol) where {V} = (V == sym)
-
-
-"""
-
-    indVarOf(pb::ParamBox{T}) -> Pair{}
-
-Return (the name and the value of) the independent variable tied to `pb`. Specifically, 
-return the input variable stored in `pb` when `pb` is marked as differentiable; return the 
-output variable of `pb` when `pb` is marked as non-differentiable. Thus, it is the variable 
-`pb` represents to differentiate any (differentiable) function of [`ParamBox`](@ref)es.
-"""
-function indVarOf(pb::ParamBox)
-    idx = numToSubs(pb.index[])
-    if isDiffParam(pb)
-        Symbol(inSymOf(pb), idx) => inValOf(pb)
-    else
-        Symbol(outSymOf(pb), idx) => outValOf(pb)
+    function StableReduce(::Type{AT}, f::F) where {T, AT<:Union{T, AbstractArray{T}}, F}
+        Base.return_types(f, (AT,))[1] == T || 
+        throw(AssertionError("The lambda function `f`: `$f` should return `$T`."))
+        new{T, F}(f)
     end
 end
 
+StableReduce(::Type{<:Union{T, AbstractArray{T}}}, srf::StableReduce{T}) where {T} = srf
+StableReduce(::Type{AT}, srf::StableReduce{T1}) where 
+            {T1, T2, AT<:Union{T2, AbstractArray{T2}}} = 
+StableReduce(srf.f, AT)
 
-getTypeParams(::Type{ParamBox{T, V, F}}) where {T, V, F} = (T, V, F)
+StableReduce(::Type{T}) where {T} = StableReduce(T, itself)
 
-getTypeParams(::T) where {T<:ParamBox} = getTypeParams(T)
-
-
-getFLevel(::Type{<:ParamBox{<:Any, <:Any, F}}) where {F} = getFLevel(F)
-
-getFLevel(::T) where {T<:ParamBox} = getFLevel(T)
-
-
-"""
-
-    dataOf(pb::ParamBox{T}) where {T} -> Pair{Array{T, 0}, Symbol}
-
-Return the `Pair` of the input variable and its symbol.
-"""
-@inline dataOf(pb::ParamBox) = pb.data[]
+(sf::StableReduce{T, F})(arg::T) where {F, T} = T(sf.f(arg))
+(sf::StableReduce{T, F})(arg::Array0D{T}) where {F, T} = sf(arg[])
+(sf::StableReduce{T, F})(arg::AbstractArray{T}) where {F, T} = T(sf.f(arg))
 
 
-"""
+struct RealVar{T<:Real} <: SinglePrimP{T}
+    data::RefVal{T}
+    symbol::IndexedSym
 
-    mapOf(pb::ParamBox) -> Function
+    RealVar(data::RefVal{T}, symbol::Union{IndexedSym, Symbol}) where {T} = 
+    new{T}(Ref(data[]), IndexedSym(symbol))
+end
 
-Return the mapping function of `pb`.
-"""
-@inline mapOf(pb::ParamBox) = pb.map
-
-
-"""
-
-    outValCopy(pb::ParamBox{T, V}) where {T} -> ParamBox{T, V, $(iT)}
-
-Return a new `ParamBox` of which the input variable's value is equal to the output 
-variable's value of `pb`.
-"""
-outValCopy(pb::ParamBox{<:Any, V}) where {V} = 
-ParamBox(Val(V), itself, fill(pb())=>Symbol(IVsymSuffix, V))
+RealVar(data::Real, symbol::Symbol) = RealVar(Ref(data), symbol)
 
 
-"""
+struct ParamNode{T, F<:Function, I<:SParamAbtArray{T}} <: ParamBox{T, I}
+    lambda::StableReduce{T, F}
+    data::I
+    symbol::IndexedSym
+    offset::RefVal{T}
+    screen::RefVal{TernaryNumber}
 
-    fullVarCopy(pb::T) where {T<:ParamBox} -> T
-
-A shallow copy of the input `ParamBox`.
-"""
-fullVarCopy(pb::ParamBox{<:Any, V}) where {V} = ParamBox(Val(V), pb, pb.index, pb.canDiff)
-
-
-"""
-
-    isDiffParam(pb::ParamBox) -> Bool
-
-Return the Boolean value of whether `pb` is differentiable with respect to its input 
-variable.
-"""
-isDiffParam(pb::ParamBox) = pb.canDiff[]
-
-
-"""
-
-    enableDiff!(pb::ParamBox) -> Bool
-
-Mark `pb` as "differentiable" and then return `true`.
-"""
-function enableDiff!(pb::ParamBox)
-    if pb.canDiff[]
-        true
-    else
-        pb.index[] = nothing
-        pb.canDiff[] = true
+    function ParamNode(lambda::StableReduce{T, F}, data::I, 
+                       symbol::Union{IndexedSym, Symbol}, 
+                       offset::RefVal{T}, 
+                       screen::RefVal{TernaryNumber}=Ref(TUS0)) where {T, I, F}
+        isempty(data) && throw(AssertionError("`data` should not be empty."))
+        new{T, F, I}(lambda, data, 
+                     IndexedSym(symbol), 
+                     Ref(offset[]), 
+                     Ref{TernaryNumber}(screen[]))
     end
+
+    ParamNode(::StableReduce{T, <:iTalike}, data::Array0D{P}, 
+              symbol::Union{IndexedSym, Symbol}, 
+              offset::RefVal{T}, 
+              screen::RefVal{TernaryNumber}=Ref(TUS0)) where {T, P<:SinglePrimP{T}} = 
+    new{T, iT, Array0D{P}}(StableReduce(T, itself), data, 
+                           IndexedSym(symbol), 
+                           Ref(offset[]), 
+                           Ref{TernaryNumber}(screen[]))
 end
 
+ParamNode(::StableReduce{T, <:iTalike}, ::Any, ::Union{IndexedSym, Symbol}, ::RefVal{T}, 
+          ::RefVal{TernaryNumber}=Ref(TUS0)) where {T} = 
+throw(AssertionError("Second argument should be an `Array0D{<:SinglePrimP{$T}}`."))
 
-"""
+ParamNode(lambda::Function, data::SParamAbtArray{T}, symbol::Symbol) where {T} = 
+ParamNode(StableReduce(Vector{T}, lambda), data, symbol, (Ref∘zero)(T), Ref(TUS0))
 
-    disableDiff!(pb::ParamBox) -> Bool
+ParamNode(lambda::Function, vars::AbstractArray{<:Real}, varsSym::AbtArrayOfOr{Symbol}, 
+          symbol::Symbol) = 
+ParamNode(lambda, RealVar.(vars, varsSym), symbol)
 
-Mark `pb` as "non-differentiable" and then return `false`.
-"""
-function disableDiff!(pb::ParamBox)
-    if pb.canDiff[]
-        pb.index[] = nothing
-        pb.canDiff[] = false
-    else
-        false
+ParamNode(lambda::Function, data::SingleParam{T}, symbol::Symbol) where {T} = 
+ParamNode(StableReduce(T, lambda), fill(data), symbol, (Ref∘zero)(T), Ref(TUS0))
+
+ParamNode(lambda::Function, var::Real, varSym::Symbol, symbol::Symbol) = 
+ParamNode(lambda, RealVar(var, varSym), symbol)
+
+ParamNode(data::RealVar{T}, symbol::Symbol=symOf(data)) where {T} = 
+ParamNode(StableReduce(T, itself), fill(data), symbol, (Ref∘zero)(T), Ref(TUS0))
+
+ParamNode(var::ParamNode, symbol::Symbol=symOf(var)) = 
+ParamNode(var.lambda, var.data, symbol, var.offset, var.screen)
+
+ParamNode(var::Real, varSym::Symbol, symbol::Symbol=varSym) = 
+ParamNode(RealVar(var, varSym), symbol)
+
+
+screenLevelOf(pn::ParamNode) = Int(pn.screen[])
+
+screenLevelOf(::RealVar) = 1
+
+function setScreenLevel!(pn::ParamNode, level::Int)
+    levelOld = screenLevelOf(pn)
+    if levelOld == level
+    elseif levelOld == 0
+        pn.offset[] = valOf(pn)
+    elseif level == 0
+        pn.offset[] -= pn.lambda(pn|>dataOf.|>valOf)
     end
+    pn.screen[] = TernaryNumber(level)
+    pn
+end
+
+function setScreenLevel(pn::ParamNode, level::Int)
+    pnNew = ParamNode(pn.lambda, pn.data, pn.symbol, pn.offset, pn.screen)
+    setScreenLevel!(pnNew, level)
 end
 
 
-"""
+struct NodeTuple{T<:Real, N, PT<:NTuple{N, ParamNode{T}}} <: ParamStack{T, PT, N}
+    data::PT
+    symbol::IndexedSym
 
-    toggleDiff!(pb::ParamBox) -> Bool
-
-Toggle the differentiability of the input `pb` and then return the updated boolean value.
-"""
-function toggleDiff!(pb::ParamBox)
-    pb.index[] = nothing
-    pb.canDiff[] = !pb.canDiff[]
+    NodeTuple(data::PT, symbol::Union{IndexedSym, Symbol}) where 
+             {T, N, PT<:NTuple{N, ParamNode{T}}} = 
+    new{T, N, PT}(data, IndexedSym(symbol))
 end
 
-
-"""
-
-    changeMapping(pb::ParamBox{T, V}, mapFunction::Function=itself, outSym::Symbol=V; 
-                  canDiff::Union{Bool, Array{Bool, 0}}=isDiffParam(pb)) where {T, V} -> 
-    ParamBox{T, outSym}
-
-Change the mapping function of `pb`. The symbol of the output variable of the returned 
-`ParamBox` can be specified by `outSym`, and its differentiability is determined by 
-`canDiff`.
-"""
-function changeMapping(pb::ParamBox{T, V}, 
-                       mapFunction::Function=itself, outSym::Symbol=V; 
-                       canDiff::Union{Bool, Array{Bool, 0}}=isDiffParam(pb)) where {T, V}
-    canDiff = fillObj(canDiff)
-    ParamBox(Val(outSym), mapFunction, pb.data[], 
-             genIndex( ifelse(canDiff[]==isDiffParam(pb)==true, pb.index[], nothing) ), 
-             canDiff)
-end
+NodeTuple(nt::NodeTuple, symbol::Symbol) = NodeTuple(nt.data, symbol)
 
 
-compareParamBoxCore1(pb1::ParamBox, pb2::ParamBox) = 
-(pb1.data[][begin] === pb2.data[][begin])
+symOf(sv::ParamContainer) = sv.symbol.name
 
-function compareParamBoxCore2(pb1::ParamBox{<:Any, V1, F1}, 
-                              pb2::ParamBox{<:Any, V2, F2}) where {V1, V2, F1, F2}
-    bl = V1==V2 && compareParamBoxCore1(pb1, pb2)
-    if FLevel(F1) == FLevel(F2) == IL
-        bl
-    else
-        bl * hasIdentical(pb1.map, pb2.map)
+dataOf(sv::ParamContainer) = sv.data
+
+mapOf(pn::ParamNode) = pn.lambda
+
+valOf(sv::SinglePrimP) = dataOf(sv)[]
+
+function valOf(pn::ParamNode)
+    res = pn.offset[]
+    if screenLevelOf(pn) == 0
+        res += pn.lambda(pn|>dataOf.|>valOf)
     end
+    res
 end
 
-@inline function compareParamBox(pb1::ParamBox, pb2::ParamBox)
-    ifelse(( (bl=isDiffParam(pb1)) == isDiffParam(pb2) ),
-        ifelse( bl, 
-            compareParamBoxCore1(pb1, pb2), 
+valOf(pc::ParamContainer) = valOf.(dataOf(pc))
 
-            compareParamBoxCore2(pb1, pb2)
-        ),
+(pn::ParamContainer)() = valOf(pn)
 
-        false
+
+import Base: iterate, size, length, eltype, broadcastable
+length(::TupleParam{<:Any, N}) where {N} = N
+eltype(np::TupleParam) = eltype(np.data)
+
+iterate(np::TupleParam{<:Any, 1}, args...) = iterate(1, args...)
+size(np::TupleParam{<:Any, 1}, args...) = size(1, args...)
+broadcastable(np::TupleParam{<:Any, 1}) = Ref(np)
+
+iterate(np::TupleParam, args...) = iterate(np.data, args...)
+size(np::TupleParam, args...) = size(np.data, args...)
+broadcastable(np::TupleParam) = Base.broadcastable(np.data)
+
+
+struct Marker <: AbstractMarker{UInt}
+    typeID::UInt
+    valueID::UInt
+
+    Marker(data::T) where {T} = new(objectid(T), objectid(data))
+end
+
+struct ContainerMarker{N, M<:NTuple{N, AbstractMarker{UInt}}} <: AbstractMarker{UInt}
+    typeID::UInt
+    dataMarker::M
+    funcID::UInt
+    metaID::UInt
+end
+
+const NothingID = objectid(nothing)
+
+function ContainerMarker(sv::T) where {T<:RealVar}
+    m = Marker(sv.data)
+    ContainerMarker{1, Tuple{Marker}}(objectid(T), (m,), NothingID, NothingID)
+end
+
+function ContainerMarker(pn::T) where {T<:ParamNode}
+    m = Marker(pn.data)
+    ContainerMarker{1, Tuple{Marker}}(
+        objectid(T), (m,), objectid(pn.lambda.f), 
+        objectid((pn.offset[], screenLevelOf(pn)))
     )
 end
 
-
-function addParamBox(pb1::ParamBox{T, V, FL1}, pb2::ParamBox{T, V, FL2}, 
-                     roundAtol::Real=nearestHalfOf(getAtolVal(T))) where {T, V, FL1, FL2}
-    if isDiffParam(pb1) && compareParamBox(pb1, pb2)
-        ParamBox(Val(V), combinePF(+, pb1.map, pb2.map), 
-                 pb1.data[][begin]=>min(pb1.data[][end], pb2.data[][end]), 
-                 genIndex(nothing), fill(true))
-    else
-        ParamBox(Val(V), itself, 
-                 fill(roundToMultiOfStep(pb1() + pb2(), roundAtol))=>Symbol(IVsymSuffix, V))
-    end
+function ContainerMarker(nt::T) where {N, T<:NodeTuple{<:Any, N}}
+    ms = ContainerMarker.(nt.data)
+    ContainerMarker{N, typeof(ms)}(objectid(T), ms, NothingID, NothingID)
 end
 
 
-function mulParamBox(c::Number, pb::ParamBox{T, V}, 
-                     roundAtol::Real=nearestHalfOf(getAtolVal(T))) where {T, V}
-    if isDiffParam(pb)
-        mapFunc = PF(pb.map, *, convert(T, roundToMultiOfStep(c, roundAtol)))
-        ParamBox(Val(V), mapFunc, pb.data[], genIndex(nothing), fill(true))
+compareParamContainer(::ParamContainer, ::ParamContainer) = false
+
+compareParamContainer(pc1::T, pc2::T) where {T<:ParamContainer} = 
+pc1 === pc2 || ContainerMarker(pc1) == ContainerMarker(pc2)
+
+
+operateBy(::typeof(+), pn1::ParamNode) = itself(pn1)
+operateBy(::typeof(-), pn1::ParamNode{T}) where {T} = operateBy(*, T(-1), pn1)
+
+repeatedlyApply(::typeof(+), pn::ParamNode{T}, times::Int) where {T} = 
+operateBy(*, pn, T(times))
+
+repeatedlyApply(::typeof(-), pn::ParamNode{T}, times::Int) where {T} = 
+operateBy(-, operateBy(*, pn, T(times)))
+
+repeatedlyApply(::typeof(*), pn::ParamNode{T}, times::Int) where {T} = 
+operateBy(^, pn, T(times))
+
+operateBy(op::F, pn1::ParamNode, num::Real) where {F<:Function} = 
+ParamNode(OFC(itself, op, num), pn1, pn1.symbol)
+
+operateBy(op::F, num::Real, pn1::ParamNode) where {F<:Function} = 
+ParamNode(OCF(itself, op, num), pn1, pn1.symbol)
+
+operateBy(op::CommutativeBinaryNumOps, num::Real, pn1::ParamNode) = 
+operateBy(op, pn1::ParamNode, num::Real)
+
+operateBy(op::F, pn::ParamNode{T}) where {F<:Function, T} = 
+ParamNode(op∘pn.lambda.f, pn.data, symbol, pn.offset[], pn.screen[])
+
+operateByCore(op::F, pn1::ParamNode{T}, pn2::ParamNode{T}) where {F<:Function, T} = 
+ParamNode(SplitArg{2}(op), [pn1, pn2], Symbol(pn1.symbol, pn2.symbol))
+
+operateByCore(op::F, pn1::ParamNode{T}, pn2::ParamNode{T}, 
+              pns::Vararg{ParamNode{T}, N}) where {F<:Function, T, N} = 
+ParamNode(SplitArg{N}(op), [pn1, pn2, pns...], Symbol(pn1.symbol, :_to_, pns[end].symbol))
+
+function operateBy(op::F, pn1::ParamNode{T}, pn2::ParamNode{T}) where 
+                  {F<:CommutativeBinaryNumOps, T}
+    if symFromIndexSym(pn1.symbol) > symFromIndexSym(pn2.symbol)
+        pn2, pn1 = pn1, pn2
+    end
+    if compareParamContainer(pn1, pn2)
+        repeatedlyApply(op, pn1, 2)
     else
-        ParamBox(Val(V), itself, 
-                 fill(roundToMultiOfStep(T(pb()*c), roundAtol))=>Symbol(IVsymSuffix, V))
+        operateByCore(op, pn1, pn2)
     end
 end
 
-function mulParamBox(pb1::ParamBox{T, V, FL1}, pb2::ParamBox{T, V, FL2}, 
-                     roundAtol::Real=nearestHalfOf(getAtolVal(T))) where {T, V, FL1, FL2}
-    if isDiffParam(pb1) && compareParamBox(pb1, pb2)
-        ParamBox(Val(V), combinePF(*, pb1.map, pb2.map), 
-                 pb1.data[][begin]=>min(pb1.data[][end], pb2.data[][end]), 
-                 genIndex(nothing), fill(true))
-    else
-        ParamBox(Val(V), itself, 
-                 fill(roundToMultiOfStep(pb1() * pb2(), roundAtol))=>Symbol(IVsymSuffix, V))
-    end
-end
+operateBy(op::F, pn1::ParamNode{T}, pns::Vararg{ParamNode{T}, N}) where {F<:Function, T, N} = 
+operateByCore(op, pn1, pns...)
 
-function reduceParamBoxes(pb1::ParamBox{T, V, FL1}, pb2::ParamBox{T, V, FL2}, 
-                          roundAtol::Real=nearestHalfOf(getAtolVal(T))) where 
-                         {T, V, FL1, FL2}
-    if pb1 === pb2 || hasIdentical(pb1, pb2)
-        [pb1]
-    elseif hasEqual(pb1, pb2)
-        [deepcopy(pb1)]
-    else
-        outVal1 = pb1()
-        outVal2 = pb2()
-        if isApprox(outVal1, outVal2, atol=2roundAtol)
-            res = outValCopy(pb1)
-            res[] = getNearestMid(outVal1, outVal2, roundAtol)
-            [res]
-        else
-            [pb1, pb2]
+operateBy(f::F, pns::AbstractArray{<:ParamNode{T}}) where {F<:Function, T} = 
+ParamNode(f, pns, Symbol(pns[begin].symbol.name, :_to_, pns[end].symbol.name))
+
+operateBy(f::F, ::Val{N}) where {F<:Function, N} = 
+((args::Vararg{ParamNode{T}, N}) where {T}) -> operateBy(f, args...)
+
+operateBy(f::F) where {F<:Function} = 
+((args::AbstractArray{<:ParamNode{T}}) where {T}) -> operateBy(f, args)
+
+
+addParamNode(pn1::ParamNode{T}, pn2::ParamNode{T}) where {T} = operateBy(+, pn1, pn2)
+
+mulParamNode(pn1::ParamNode{T}, pn2::ParamNode{T}) where {T} = operateBy(*, pn1, pn2)
+mulParamNode(pn::ParamNode{T}, coeff::T) where {T} = operateBy(*, pn, coeff)
+mulParamNode(coeff::T, pn::ParamNode{T}) where {T} = mulParamNode(pn, coeff)
+
+
+function sortParamContainers(::Type{C}, f::F, field::Symbol, roundAtol::T) where 
+                            {T, C<:ParamFunction{T}, F}
+    let roundAtol=roundAtol, f=f, field=field
+        function (container::C)
+            ele = getproperty(container, field)
+            ( roundToMultiOfStep(f(container), nearestHalfOf(roundAtol)), 
+              symFromIndexSym(ele.symbol), ContainerMarker(ele) )
         end
     end
+end
+
+
+function getParamFields(pf::T) where {T<:ParamFunction}
+    fields = fieldnames(pf)
+    ids = findall(x->(x isa ParamFunctions), fields)
+    getproperty.(pf, fields[ids])
+end
+
+getParamFields(pf::ParamFunctions) = itself(pf)
+
+const GetParTypes = (SingleParam, ParamContainer)
+
+function getParCore(::Val{N}, p::ParamContainer{T}, ::Missing) where {N, T}
+    GetParTypes[N]{T}[p]
+end
+
+function getParCore(::Val{N}, p::ParamContainer{T}, sym::Symbol) where {N, T}
+    res = GetParTypes[N]{T}[]
+    inSymbol(sym, symOf(ps)) && push!(res, p)
+    res
+end
+
+function getParsCore(::Val{1}, p::ParamContainer, sym::SymOrMiss=missing)
+    p isa SingleParam ? getParCore(Val(1), p, sym) : getParsCore(Val(1), p.data, sym)
+end
+
+function getParsCore(::Val{2}, p::ParamContainer, sym::SymOrMiss=missing)
+    getParCore(Val(2), p, sym)
+end
+
+function getParsCore(::Val{N}, v::NonEmptyTupleOrAbtArray{T}, sym::SymOrMiss=missing) where 
+                    {N, T<:Union{ParamContainer, ParamObject}}
+    if isempty(v)
+        genParamTypeVector(T, GetParTypes[N])
+    else
+        reduce(vcat, getParsCore.(Val(N), v, sym))
+    end
+end
+
+function getParsCore(::Val{N}, f::ParamFunction{T}, sym::SymOrMiss=missing) where {N, T}
+    mapreduce(vcat, getParamFields(f), init=GetParTypes[N]{T}[]) do field
+        getParsCore(Val(N), field, sym)
+    end
+end
+
+
+getSingleParams(data, sym::SymOrMiss=missing) = getParsCore(Val(1), data, sym)
+
+getParams(data, sym::SymOrMiss=missing) = getParsCore(Val(2), data, sym)
+
+throwScreenLevelError(sl) = 
+throw(DomainError(sl, "This value is not supported as the screen level of a `ParamNode`."))
+
+uniqueParams(ps::AbstractArray{<:ParamContainer}) = 
+markUnique(ps, compareFunction=compareParamContainer)[end]
+
+
+function markParams!(pars::AbstractVector{<:SingleParam})
+    nodes, marks1, marks2 = topoSort(pars)
+    leafNodes = nodes[.!marks1 .*   marks2]
+    rootNodes = nodes[  marks1 .* .!marks2]
+    selfNodes = nodes[.!marks1 .* .!marks2]
+    indexDict = IdDict{Symbol, Int}()
+    for i in leafNodes
+        sym = i.symbol.name
+        get!(indexDict, sym, 0)
+        i.symbol.index[] = (indexDict[sym] += 1)
+    end
+    (leafNodes, rootNodes, selfNodes)
+end
+
+markParams!(b::Union{AbstractVector{T}, T}) where {T<:ParamObject} = 
+markParams!(getSingleParams(b))
+
+
+function topoSortCore!(orderedNodes::Vector{<:SingleParam{T}}, 
+                       haveBranches::Vector{Bool}, connectRoots::Vector{Bool}, 
+                       node::SingleParam{T}, recursive::Bool=false) where {T}
+    sl = screenLevelOf(node)
+    if sl in (0, 1)
+        idx = findfirst(Fix2(compareParamContainer, node), orderedNodes)
+        if idx === nothing
+            hasBranch = if sl == 0
+                for child in node.data
+                    topoSortCore!(orderedNodes, haveBranches, connectRoots, child, true)
+                end
+                true
+            else
+                false
+            end
+            push!(orderedNodes, node)
+            push!(haveBranches, hasBranch)
+            push!(connectRoots, recursive)
+        else
+            connectRoots[idx] = recursive
+        end
+    else
+        sl == 2 || throwScreenLevelError(sl)
+    end
+    nothing
+end
+
+function topoSortINTERNAL(nodes::AbstractVector{<:SingleParam{T}}) where {T}
+    orderedNodes = SingleParam{T}[]
+    haveBranches = Bool[]
+    connectRoots = Bool[]
+    for node in nodes
+        topoSortCore!(orderedNodes, haveBranches, connectRoots, node)
+    end
+    orderedNodes, haveBranches, connectRoots
+end
+
+function topoSort(nodes::AbstractVector{<:SingleParam{T}}) where {T}
+    uniqueParams(nodes) |> topoSortINTERNAL
+end
+
+topoSort(node::ParamNode{T}) where {T} = topoSortINTERNAL([node])
+
+
+# Sever the connection of a node to other nodes
+sever(pv::RealVar) = RealVar(valOf(pv), pv.symbol)
+
+sever(pn::ParamNode) = ParamNode(valOf(pn), symOf(pn))
+
+sever(ps::T) where {T<:ParamStack} = T(sever.(ps.data), ps.symbol)
+
+sever(obj::Any) = deepcopy(obj)
+
+sever(obj::Union{Tuple, AbstractArray}) = sever.(obj)
+
+function sever(pf::T) where {T<:ParamFunction}
+    severedFields = map(fieldnames(pf)) do field
+        (sever∘getproperty)(pf, field)
+    end
+    T(severedFields...)
 end
