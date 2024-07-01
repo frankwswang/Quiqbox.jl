@@ -1,16 +1,17 @@
 module Quiqbox
 
-include("AbstractTypes.jl")
+include("TypeUnions.jl")
 
 include("Exception.jl")
 include("Tools.jl")
-include("FileIO.jl")
+include("StringIO.jl")
 
 include("../lib/BasisSets/BasisSets.jl")
 
 include("Library.jl")
 include("Mapping.jl")
 include("Parameters.jl")
+include("Graphs.jl")
 include("Basis.jl")
 include("HartreeFock.jl")
 include("Differentiation.jl")
