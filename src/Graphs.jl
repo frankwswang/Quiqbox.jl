@@ -1,38 +1,59 @@
-struct InnerNode{T} <: TreeNode{T, iT, 0}
-    idx::IntOrNone
+mutable struct ValueNode{T} <: TreeNode{T, iT, 0}
     val::T
+    marker::Symbol
 end
 
-struct OuterNode{T, F, N, I<:AbstractArray{<:TreeNode{T}, N}} <: TreeNode{T, F, N}
+mutable struct IndexNode{T} <: TreeNode{T, iT, 0}
+    val::T
+    idx::Int
+    marker::Symbol
+end
+
+struct LayerNode{T, F, N, I<:AbstractArray{<:TreeNode{T}, N}} <: TreeNode{T, F, N}
     connect::StableReduce{T, F}
     child::I
+    marker::Symbol
 end
 
+computeTreeGraph(::AbstractVector{T}, tn::ValueNode{T}) where {T} = tn.val
 
-function computeTreeGraph(data::AbstractVector{T}, tn::InnerNode{T}) where {T}
-   tn.idx === nothing ? tn.val : data[tn.idx]
+computeTreeGraph(data::AbstractVector{T}, tn::IndexNode{T}) where {T} = data[tn.idx]
+
+function computeTreeGraph(data::AbstractVector{T}, rn::LayerNode{T}) where {T}
+    broadcast(computeTreeGraph, Ref(data), rn.child) |> rn.connect
 end
 
-function computeTreeGraph(data::AbstractVector{T}, rn::OuterNode{T}) where {T}
-   strictVecBinaryOp(computeTreeGraph, Ref(data), rn.child) |> rn.connect
+# This is necessary for certain AD library to work properly/efficiently as of Julia 1.10
+function computeTreeGraph(data::AbstractVector{T}, rn::LayerNode{T, <:Any, 0}) where {T}
+    computeTreeGraph(data, rn.child[]) |> rn.connect
 end
+
+const symbolFromPar = symbolFrom∘idxSymOf
 
 function genComputeGraphCore(parSet, par::SingleParam{T}) where {T}
-    InnerNode(findfirst(Fix2(compareParamContainer, par), parSet), valOf(par))
+    idx = findfirst(Fix2(compareParamContainer, par), parSet)
+    if idx === nothing
+        ValueNode(valOf(par), symbolFromPar(par))
+    else
+        IndexNode(valOf(par), idx, symbolFromPar(par))
+    end
 end
 
 genComputeGraph(parSet, par::SinglePrimP{T}) where {T} = 
 genComputeGraphCore(parSet, par)
 
-function genComputeGraph(parSet, pn::ParamNode{T}) where {T}
-    sl = screenLevelOf(pn)
+function genComputeGraph(parSet, par::ParamNode{T}) where {T}
+    sl = screenLevelOf(par)
 
     if sl == 0
-        OuterNode(pn.lambda, strictVecBinaryOp(genComputeGraph, Ref(parSet), pn|>dataOf))
+        childNodes = map(dataOf(par)) do i
+            genComputeGraph(parSet, i)
+        end
+        LayerNode(par.lambda, childNodes, symbolFromPar(par))
     elseif sl == 1
-        genComputeGraphCore(parSet, pn)
+        genComputeGraphCore(parSet, par)
     elseif sl == 2
-        InnerNode(nothing, valOf(pn))
+        ValueNode(valOf(par), symbolFromPar(par))
     else
         throwScreenLevelError(sl)
     end
