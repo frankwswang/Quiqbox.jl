@@ -1,9 +1,11 @@
-mutable struct ValueNode{T} <: TreeNode{T, iT, 0}
+export genComputeGraph, computeTreeGraph, compressGraphNode
+
+struct ValueNode{T} <: TreeNode{T, iT, 0}
     val::T
     marker::Symbol
 end
 
-mutable struct IndexNode{T} <: TreeNode{T, iT, 0}
+struct IndexNode{T} <: TreeNode{T, iT, 0}
     val::T
     idx::Int
     marker::Symbol
@@ -13,6 +15,61 @@ struct LayerNode{T, F, N, I<:AbstractArray{<:TreeNode{T}, N}} <: TreeNode{T, F, 
     connect::StableReduce{T, F}
     child::I
     marker::Symbol
+end
+
+
+# function compressGraphNodeV1(tn::Quiqbox.ValueNode{T}) where {T}
+#     StableReduce(Vector{T}, (::AbstractVector{T})->tn.val)
+# end
+
+# function compressGraphNodeV1(tn::Quiqbox.IndexNode{T}) where {T}
+#     StableReduce(Vector{T}, (x::AbstractVector{T})->x[tn.idx])
+# end
+
+# function compressGraphNodeV1(tn::LayerNode{T}) where {T}
+#     let fs=map(compressGraphNodeV1, tn.child), connect=tn.connect
+#         # function (x::AbstractVector{T})
+#         #     connect.f(T[f(x) for f in fs])
+#         # end
+#         StableReduce(Vector{T}, (x::AbstractVector{T})->connect([f(x) for f in fs]))
+#     end
+# end
+
+# function compressGraphNodeV2(tn::Quiqbox.ValueNode{T}) where {T}
+#     (::AbstractVector{T})->tn.val
+# end
+
+# function compressGraphNodeV2(tn::Quiqbox.IndexNode{T}) where {T}
+#     (x::AbstractVector{T})->x[tn.idx]
+# end
+
+# function compressGraphNodeV2(tn::LayerNode{T}) where {T}
+#     let fs=map(compressGraphNodeV2, tn.child), connect=tn.connect
+#         function (x::AbstractVector{T})
+#             connect(T[f(x) for f in fs])
+#         end
+#     end
+# end
+
+# Best version
+function compressGraphNode(tn::ValueNode{T}) where {T}
+    (::AbstractVector{T})->tn.val
+end
+
+function compressGraphNode(tn::IndexNode{T}) where {T}
+    (x::AbstractVector{T})->x[tn.idx]
+end
+
+function compressGraphNode(tn::LayerNode{T}) where {T}
+    fArr = map(compressGraphNode, tn.child)
+    dim = size(fArr)
+    fs = Tuple(fArr)
+    let fs=fs, dim=dim, connect=tn.connect
+        function (x::AbstractVector{T})
+            fVals = collect(map(fs) do f; f(x) end)
+            reshape(fVals, dim) |> connect
+        end
+    end
 end
 
 computeTreeGraph(::AbstractVector{T}, tn::ValueNode{T}) where {T} = tn.val
