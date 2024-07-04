@@ -1,6 +1,5 @@
-export RealVar, ParamNode, NodeTuple, setScreenLevel!, setScreenLevel, symOf, 
-       dataOf, valOf, screenLevelOf, markParams!, topoSort, getParams, getSingleParams, 
-       genComputeGraph, computeTreeGraph
+export RealVar, ParamNode, NodeTuple, setScreenLevel!, setScreenLevel, symOf, inputOf, 
+       dataOf, valOf, screenLevelOf, markParams!, topoSort, getParams, getSingleParams
 
 using Base: Fix2
 
@@ -91,6 +90,8 @@ ParamNode(var.lambda, var.data, symbol, var.offset, var.screen)
 ParamNode(var::Real, varSym::Symbol, symbol::Symbol=varSym) = 
 ParamNode(RealVar(var, varSym), symbol)
 
+const TensorInputNode{T, F, PB, N} = ParamNode{T, F, <:AbstractArray{PB, N}}
+const ScalarInputNode{T, F, PB} = TensorInputNode{T, F, PB, 0}
 
 screenLevelOf(pn::ParamNode) = Int(pn.screen[])
 
@@ -126,9 +127,12 @@ end
 NodeTuple(nt::NodeTuple, symbol::Symbol) = NodeTuple(nt.data, symbol)
 
 
-symOf(sv::ParamContainer) = sv.symbol.name
 
-dataOf(sv::ParamContainer) = sv.data
+idxSymOf(pc::ParamContainer) = pc.symbol
+
+symOf(pc::ParamContainer) = idxSymOf(pc).name
+
+dataOf(pc::ParamContainer) = pc.data
 
 mapOf(pn::ParamNode) = pn.lambda
 
@@ -147,17 +151,34 @@ valOf(pc::ParamContainer) = valOf.(dataOf(pc))
 (pn::ParamContainer)() = valOf(pn)
 
 
+inputOf(pc::ParamContainer) = dataOf(pc)
+
+inputOfCore(pn::TensorInputNode) = pn.data
+inputOfCore(pn::ScalarInputNode) = pn.data[]
+
+function inputOf(pn::ParamNode{T}) where {T}
+    screen = screenLevelOf(pn)
+    if screen == 0
+        inputOfCore(pn)
+    elseif screen == 1
+        pn.offset
+    else # screen == 2
+        valOf(pn)
+    end
+end
+
+
 import Base: iterate, size, length, eltype, broadcastable
-length(::TupleParam{<:Any, N}) where {N} = N
-eltype(np::TupleParam) = eltype(np.data)
+length(::FixedSizeParam{<:Any, N}) where {N} = N
+eltype(np::FixedSizeParam) = eltype(np.data)
 
-iterate(np::TupleParam{<:Any, 1}, args...) = iterate(1, args...)
-size(np::TupleParam{<:Any, 1}, args...) = size(1, args...)
-broadcastable(np::TupleParam{<:Any, 1}) = Ref(np)
+iterate(::FixedSizeParam{<:Any, 1}, args...) = iterate(1, args...)
+size(::FixedSizeParam{<:Any, 1}, args...) = size(1, args...)
+broadcastable(np::FixedSizeParam{<:Any, 1}) = Ref(np)
 
-iterate(np::TupleParam, args...) = iterate(np.data, args...)
-size(np::TupleParam, args...) = size(np.data, args...)
-broadcastable(np::TupleParam) = Base.broadcastable(np.data)
+iterate(np::FixedSizeParam, args...) = iterate(np.data, args...)
+size(np::FixedSizeParam, args...) = size(np.data, args...)
+broadcastable(np::FixedSizeParam) = Base.broadcastable(np.data)
 
 
 struct Marker <: AbstractMarker{UInt}
