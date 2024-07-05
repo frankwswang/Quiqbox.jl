@@ -138,10 +138,18 @@ mapOf(pn::ParamNode) = pn.lambda
 
 valOf(sv::SinglePrimP) = dataOf(sv)[]
 
-function valOf(pn::ParamNode)
-    res = pn.offset[]
+function unsafeScreen!(pn::ParamNode{T}, screenLevel::Int, offset::T) where {T}
+    pn.screen[] = TernaryNumber(screenLevel)
+    pn.offset[] = offset
+end
+
+function valOf(pn::ParamNode{T}, fallbackValue::T=pn.offset[]) where {T}
+    originalOffset = pn.offset[]
+    res = originalOffset
     if screenLevelOf(pn) == 0
+        unsafeScreen!(pn, 2, fallbackValue)
         res += pn.lambda(pn|>dataOf.|>valOf)
+        unsafeScreen!(pn, 0, originalOffset)
     end
     res
 end
