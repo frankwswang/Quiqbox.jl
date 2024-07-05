@@ -35,60 +35,70 @@ end
 
 RealVar(data::Real, symbol::Symbol) = RealVar(Ref(data), symbol)
 
-
 struct ParamNode{T, F<:Function, I<:SParamAbtArray{T}} <: ParamBox{T, I}
     lambda::StableReduce{T, F}
     data::I
     symbol::IndexedSym
     offset::RefVal{T}
+    memory::RefVal{T}
     screen::RefVal{TernaryNumber}
 
     function ParamNode(lambda::StableReduce{T, F}, data::I, 
                        symbol::Union{IndexedSym, Symbol}, 
                        offset::RefVal{T}, 
+                       memory::RefVal{T}=Ref(T|>zero), 
                        screen::RefVal{TernaryNumber}=Ref(TUS0)) where {T, I, F}
         isempty(data) && throw(AssertionError("`data` should not be empty."))
-        new{T, F, I}(lambda, data, 
-                     IndexedSym(symbol), 
-                     Ref(offset[]), 
-                     Ref{TernaryNumber}(screen[]))
+        new{T, F, I}(lambda, data, IndexedSym(symbol), 
+                     Ref(offset[]), Ref(memory[]), Ref{TernaryNumber}(screen[]))
     end
 
-    ParamNode(::StableReduce{T, <:iTalike}, data::Array0D{P}, 
-              symbol::Union{IndexedSym, Symbol}, 
-              offset::RefVal{T}, 
-              screen::RefVal{TernaryNumber}=Ref(TUS0)) where {T, P<:SinglePrimP{T}} = 
-    new{T, iT, Array0D{P}}(StableReduce(T, itself), data, 
-                           IndexedSym(symbol), 
-                           Ref(offset[]), 
-                           Ref{TernaryNumber}(screen[]))
+    function ParamNode(::StableReduce{T, <:iTalike}, data::Array0D{P}, 
+                       symbol::Union{IndexedSym, Symbol}, 
+                       offset::RefVal{T}, 
+                       memory::RefVal{T}=Ref(valOf(data[])), 
+                       screen::RefVal{TernaryNumber}=Ref(TUS0)) where {T, P<:SinglePrimP{T}}
+        c = offset[]
+        initMem = memory[]
+        sl = Int(screen[])
+        bl = if sl==0; initMem==valOf(data[])+c elseif sl>0; initMem==c else true end
+        bl || @warn "The value stored in .memory of `ParamNode{$T, $iT, $(data|>typeof)}` "*
+                    "has been set to a value different from its output value."
+        new{T, iT, Array0D{P}}(StableReduce(T, itself), data, IndexedSym(symbol), 
+                               Ref(offset[]), Ref(initMem), Ref{TernaryNumber}(screen[]))
+    end
 end
 
 ParamNode(::StableReduce{T, <:iTalike}, ::Any, ::Union{IndexedSym, Symbol}, ::RefVal{T}, 
-          ::RefVal{TernaryNumber}=Ref(TUS0)) where {T} = 
+          ::RefVal{T}=Ref(T|>zero), ::RefVal{TernaryNumber}=Ref(TUS0)) where {T} = 
 throw(AssertionError("Second argument should be an `Array0D{<:SinglePrimP{$T}}`."))
 
-ParamNode(lambda::Function, data::SParamAbtArray{T}, symbol::Symbol) where {T} = 
-ParamNode(StableReduce(Vector{T}, lambda), data, symbol, (Ref∘zero)(T), Ref(TUS0))
+function ParamNode(lambda::Function, data::SParamAbtArray{T}, symbol::Symbol; 
+                   init::T=zero(T)) where {T}
+    VT = (map(valOf, data) |> typeof)
+    ParamNode(StableReduce(VT, lambda), data, symbol, (Ref∘zero)(T), Ref(init))
+end
 
-ParamNode(lambda::Function, vars::AbstractArray{<:Real}, varsSym::AbtArrayOfOr{Symbol}, 
-          symbol::Symbol) = 
-ParamNode(lambda, RealVar.(vars, varsSym), symbol)
+ParamNode(lambda::Function, vars::AbstractArray{T}, varsSym::AbtArrayOfOr{Symbol}, 
+          symbol::Symbol; init::T=zero(T)) where {T<:Real} = 
+ParamNode(lambda, RealVar.(vars, varsSym), symbol; init)
 
-ParamNode(lambda::Function, data::SingleParam{T}, symbol::Symbol) where {T} = 
-ParamNode(StableReduce(T, lambda), fill(data), symbol, (Ref∘zero)(T), Ref(TUS0))
+ParamNode(lambda::Function, data::SingleParam{T}, symbol::Symbol; 
+          init::T=zero(T)) where {T} = 
+ParamNode(StableReduce(T, lambda), fill(data), symbol, (Ref∘zero)(T), Ref(init))
 
-ParamNode(lambda::Function, var::Real, varSym::Symbol, symbol::Symbol) = 
-ParamNode(lambda, RealVar(var, varSym), symbol)
+ParamNode(lambda::Function, var::T, varSym::Symbol, symbol::Symbol; 
+          init::T=zero(T)) where {T<:Real} = 
+ParamNode(lambda, RealVar(var, varSym), symbol; init)
 
 ParamNode(data::RealVar{T}, symbol::Symbol=symOf(data)) where {T} = 
-ParamNode(StableReduce(T, itself), fill(data), symbol, (Ref∘zero)(T), Ref(TUS0))
-
-ParamNode(var::ParamNode, symbol::Symbol=symOf(var)) = 
-ParamNode(var.lambda, var.data, symbol, var.offset, var.screen)
+ParamNode(StableReduce(T, itself), fill(data), symbol, (Ref∘zero)(T))
 
 ParamNode(var::Real, varSym::Symbol, symbol::Symbol=varSym) = 
 ParamNode(RealVar(var, varSym), symbol)
+
+ParamNode(var::ParamNode{T}, symbol::Symbol=symOf(var); init::T=var.memory[]) where {T} = 
+ParamNode(var.lambda, var.data, symbol, var.offset, Ref(init), var.screen)
 
 const TensorInputNode{T, F, PB, N} = ParamNode{T, F, <:AbstractArray{PB, N}}
 const ScalarInputNode{T, F, PB} = TensorInputNode{T, F, PB, 0}
@@ -96,6 +106,10 @@ const ScalarInputNode{T, F, PB} = TensorInputNode{T, F, PB, 0}
 screenLevelOf(pn::ParamNode) = Int(pn.screen[])
 
 screenLevelOf(::RealVar) = 1
+
+function setScreenLevelCore!(pn::ParamNode, level::Int)
+    pn.screen[] = TernaryNumber(level)
+end
 
 function setScreenLevel!(pn::ParamNode, level::Int)
     levelOld = screenLevelOf(pn)
@@ -105,14 +119,11 @@ function setScreenLevel!(pn::ParamNode, level::Int)
     elseif level == 0
         pn.offset[] -= pn.lambda(pn|>dataOf.|>valOf)
     end
-    pn.screen[] = TernaryNumber(level)
+    setScreenLevelCore!(pn, level)
     pn
 end
 
-function setScreenLevel(pn::ParamNode, level::Int)
-    pnNew = ParamNode(pn.lambda, pn.data, pn.symbol, pn.offset, pn.screen)
-    setScreenLevel!(pnNew, level)
-end
+setScreenLevel(pn::ParamNode, level::Int) = setScreenLevel!(ParamNode(pn), level)
 
 
 struct NodeTuple{T<:Real, N, PT<:NTuple{N, ParamNode{T}}} <: ParamStack{T, PT, N}
@@ -138,20 +149,18 @@ mapOf(pn::ParamNode) = pn.lambda
 
 valOf(sv::SinglePrimP) = dataOf(sv)[]
 
-function unsafeScreen!(pn::ParamNode{T}, screenLevel::Int, offset::T) where {T}
-    pn.screen[] = TernaryNumber(screenLevel)
-    pn.offset[] = offset
-end
-
-function valOf(pn::ParamNode{T}, fallbackValue::T=pn.offset[]) where {T}
-    originalOffset = pn.offset[]
-    res = originalOffset
-    if screenLevelOf(pn) == 0
-        unsafeScreen!(pn, 2, fallbackValue)
+# Not thread-safe
+function valOf(pn::ParamNode{T}) where {T}
+    res = pn.offset[]
+    sl = screenLevelOf(pn)
+    if sl == 0
+        setScreenLevelCore!(pn, -1)
         res += pn.lambda(pn|>dataOf.|>valOf)
-        unsafeScreen!(pn, 0, originalOffset)
+        setScreenLevelCore!(pn,  0)
+    elseif sl == -1
+        return pn.memory[]
     end
-    res
+    pn.memory[] = res
 end
 
 valOf(pc::ParamContainer) = valOf.(dataOf(pc))
