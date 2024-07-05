@@ -58,14 +58,8 @@ struct ParamNode{T, F<:Function, I<:SParamAbtArray{T}} <: ParamBox{T, I}
                        offset::RefVal{T}, 
                        memory::RefVal{T}=Ref(valOf(data[])), 
                        screen::RefVal{TernaryNumber}=Ref(TUS0)) where {T, P<:SinglePrimP{T}}
-        c = offset[]
-        initMem = memory[]
-        sl = Int(screen[])
-        bl = if sl==0; initMem==valOf(data[])+c elseif sl>0; initMem==c else true end
-        bl || @warn "The value stored in .memory of `ParamNode{$T, $iT, $(data|>typeof)}` "*
-                    "has been set to a value different from its output value."
         new{T, iT, Array0D{P}}(StableReduce(T, itself), data, IndexedSym(symbol), 
-                               Ref(offset[]), Ref(initMem), Ref{TernaryNumber}(screen[]))
+                               Ref(offset[]), Ref(memory[]), Ref{TernaryNumber}(screen[]))
     end
 end
 
@@ -103,6 +97,7 @@ ParamNode(var.lambda, var.data, symbol, var.offset, Ref(init), var.screen)
 const TensorInputNode{T, F, PB, N} = ParamNode{T, F, <:AbstractArray{PB, N}}
 const ScalarInputNode{T, F, PB} = TensorInputNode{T, F, PB, 0}
 
+
 screenLevelOf(pn::ParamNode) = Int(pn.screen[])
 
 screenLevelOf(::RealVar) = 1
@@ -124,6 +119,10 @@ function setScreenLevel!(pn::ParamNode, level::Int)
 end
 
 setScreenLevel(pn::ParamNode, level::Int) = setScreenLevel!(ParamNode(pn), level)
+
+function refresh!(pn::ParamNode{T}, newMem::T=ValOf(pn)) where {T}
+    pn.memory[] = newMem
+end
 
 
 struct NodeTuple{T<:Real, N, PT<:NTuple{N, ParamNode{T}}} <: ParamStack{T, PT, N}
@@ -149,19 +148,32 @@ mapOf(pn::ParamNode) = pn.lambda
 
 valOf(sv::SinglePrimP) = dataOf(sv)[]
 
-# Not thread-safe
-function valOf(pn::ParamNode{T}) where {T}
+function valOf(pn::ParamNode{T}, fallbackVal::T=pn.memory[]) where {T}
+    idSet = Set{UInt}(pn|>objectid)
+    valOfCore(Val(false), pn, idSet, fallbackVal)
+end
+
+function valOfCore(::Val{BL}, pn::ParamNode{T}, 
+                   idSet::Set{UInt64}, fallbackVal::T) where {BL, T}
     res = pn.offset[]
     sl = screenLevelOf(pn)
     if sl == 0
-        setScreenLevelCore!(pn, -1)
-        res += pn.lambda(pn|>dataOf.|>valOf)
-        setScreenLevelCore!(pn,  0)
+        id = objectid(pn)
+        if BL && id in idSet
+            res = fallbackVal
+        else
+            push!(idSet, id)
+            res += map(dataOf(pn)) do child
+                valOfCore(Val(true), child, idSet, fallbackVal)
+            end |> pn.lambda
+        end
     elseif sl == -1
-        return pn.memory[]
+        res = fallbackVal
     end
-    pn.memory[] = res
+    res
 end
+
+valOfCore(::Val, par::PrimitiveParam{T},::Set{UInt}, ::T) where {T} = valOf(par)
 
 valOf(pc::ParamContainer) = valOf.(dataOf(pc))
 
