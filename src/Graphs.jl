@@ -56,9 +56,9 @@ const symbolFromPar = symbolFrom∘idxSymOf
 function genComputeGraphCore(parSet, par::SingleParam{T}) where {T}
     idx = findfirst(Fix2(compareParamContainer, par), parSet)
     if idx === nothing
-        FixedNode(valOf(par), symbolFromPar(par))
+        FixedNode(obtain(par), symbolFromPar(par))
     else
-        IndexNode(Ref(valOf(par)), symbolFromPar(par), idx)
+        IndexNode(Ref(obtain(par)), symbolFromPar(par), idx)
     end
 end
 
@@ -69,14 +69,14 @@ function genComputeGraph(parSet, par::ParamNode{T}) where {T}
     sl = screenLevelOf(par)
 
     if sl == 0
-        childNodes = map(dataOf(par)) do i
+        childNodes = map(par.input) do i
             genComputeGraph(parSet, i)
         end
         LayerNode(par.lambda, childNodes, symbolFromPar(par), par.offset[])
     elseif sl == 1
         genComputeGraphCore(parSet, par)
     elseif sl == 2
-        FixedNode(valOf(par), symbolFromPar(par))
+        FixedNode(obtain(par), symbolFromPar(par))
     else
         throwScreenLevelError(sl)
     end
