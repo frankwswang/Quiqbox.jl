@@ -108,11 +108,9 @@ selectInPSubset(::Val,    ps::AbstractVector{<:PrimDimParVecEle{T}}) where {T} =
 function genComputeGraphCore1(inPSet::AbstractVector{<:PrimDimParVecEle{T}}, 
                               par::DimensionalParam{T, N}) where {T, N}
     idx = findfirst(Fix2(compareParamContainer, par), selectInPSubset(Val(N), inPSet))
-    if idx === nothing
-        FixedNode(obtain(par), symbolFromPar(par))
-    else
-        IndexNode(fillElementalVal(T, obtain(par)), symbolFromPar(par), idx)
-    end
+    val = obtain(par)
+    sym = symbolFromPar(par)
+    idx === nothing ? FixedNode(val, sym) : IndexNode(fillElementalVal(T, val), sym, idx)
 end
 
 function genComputeGraphCore2(idDict::IdDict{ParamBox{T}, OperatorNode{T}}, 
