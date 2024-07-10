@@ -88,19 +88,15 @@ struct GridVar{T<:Real, N, V<:AbstractArray{T, N}} <: PrimitiveParam{T, N}
     value::V
     symbol::IndexedSym
     axis::NTuple{N, Symbol}
-    extent::NTuple{N, Int}
     screen::TernaryNumber
 
     function GridVar(value::V, symbol::SymOrIdxSym, 
                      axis::NonEmptyTuple{Symbol, NMO}=genSeqAxis(Val(N)), 
-                     extent::NonEmptyTuple{Int, NMO}=(size(value) .- 1), 
                      screen::TernaryNumber=TPS1) where 
                     {T, N, V<:AbstractArray{T, N}, NMO}
-        size(value) >= extent || 
-        throw(AssertionError("`size(value)` should be no less than (`>=`) `extent`."))
         sl = Int(screen)
         sl > 0 || throw(DomainError(screen, "`Int(screen) = $sl` is not supported."))
-        new{T, N, V}(value, IndexedSym(symbol), axis, extent, screen)
+        new{T, N, V}(value, IndexedSym(symbol), axis, screen)
     end
 end
 
@@ -275,27 +271,9 @@ symOf(pc::DimensionalParam) = idxSymOf(pc).name
 inputOf(pb::ParamBox) = pb.input
 
 
-obtain(sv::NodeVar) = sv.value
+obtain(nv::PrimitiveParam{<:Any, 0}) = nv.value
 
-function setIndexExtent(defaultRange::UnitRange{Int}, extent::Int)
-    if extent == 0
-        defaultRange
-    elseif extent > 0
-        firstIdx = defaultRange[begin]
-        firstIdx : (firstIdx + extent)
-    else
-        lastIdx = defaultRange[end]
-        (lastIdx + extent) : lastIdx
-    end
-end
-
-function obtain(sv::GridVar)
-    value = sv.value
-    idxExtend = sv.extent
-    defaultIdxRange = UnitRange.(axes(value))
-    idxRange = map(setIndexExtent, defaultIdxRange, idxExtend)
-    view(value, idxRange...)
-end
+obtain(gv::PrimitiveParam) = copy(gv.value)
 
 function obtain(pn::NodeParam{T}, fallbackVal::T=pn.memory) where {T}
     idSet = Set{UInt}()
