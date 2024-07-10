@@ -1,31 +1,88 @@
-export NodeVar, ParamNode, NodeTuple, setScreenLevel!, setScreenLevel, symOf, 
-       inputOf, obtain, setVal!, screenLevelOf, markParams!, topoSort, getParams, 
-       getSingleParams
+export NodeVar, GridVar, NodeParam, NodeTuple, setScreenLevel!, setScreenLevel, symOf, 
+       inputOf, obtain, setVal!, screenLevelOf, markParams!, topoSort, getParams
 
 using Base: Fix2, Threads.Atomic
+using LRUCache
 
-struct StableReduce{T, F<:Function} <: Function
+unpackAA0Dtype(arg::Type{<:AbtArray0D}) = eltype(arg)
+unpackAA0Dtype(arg::Type) = itself(arg)
+
+function checkReturnType(f::F, ::Type{T}, argTs::Tuple{Vararg{DataType}}) where {F, T}
+    bl = false
+    returnT = Any
+    try
+        returnT = Base.return_types(f, argTs)[]
+        bl = returnT <: T
+    finally
+        bl || throw(AssertionError("`f`: `$f` cannot be a generated function and it "*
+                                    "should only return one value of `$T.`"))
+    end
+    returnT
+end
+
+struct TypedReduction{T, F<:Function} <: TypedFunction{T, F}
     f::F
 
-    function StableReduce(::Type{AT}, f::F) where {T, AT<:Union{T, AbstractArray{T}}, F}
-        Base.return_types(f, (AT,))[1] == T || 
-        throw(AssertionError("The lambda function `f`: `$f` should return `$T`."))
+    function TypedReduction(f::F, aT::Type{T}, aTs::Type...) where {T, F}
+        Ts = (aT, aTs...) .|> unpackAA0Dtype
+        checkReturnType(f, T, Ts)
+        new{T, F}(f)
+    end
+
+    function TypedReduction(f::F, aT::Type{<:AbstractArray{T}}, aTs::Type...) where {T, F}
+        Ts = (aT, aTs...) .|> unpackAA0Dtype
+        checkReturnType(f, T, Ts)
         new{T, F}(f)
     end
 end
 
-StableReduce(::Type{<:Union{T, AbstractArray{T}}}, srf::StableReduce{T}) where {T} = srf
-StableReduce(::Type{AT}, srf::StableReduce{T1}) where 
-            {T1, T2, AT<:Union{T2, AbstractArray{T2}}} = 
-StableReduce(srf.f, AT)
+# TypedReduction(::Type{<:Union{T, AbstractArray{T}}}, srf::TypedReduction{T}) where {T} = srf
+# TypedReduction(::Type{AT}, srf::TypedReduction{T1}) where 
+#             {T1, T2, AT<:Union{T2, AbstractArray{T2}}} = 
+# TypedReduction(srf.f, AT)
 
-StableReduce(::Type{T}) where {T} = StableReduce(T, itself)
+unpackAA0D(arg::AbtArray0D) = arg[]
+unpackAA0D(arg::Any) = itself(arg)
 
-(sf::StableReduce{T, F})(arg::T) where {F, T} = T(sf.f(arg))
-(sf::StableReduce{T, F})(arg::Array0D{T}) where {F, T} = sf(arg[])
-(sf::StableReduce{T, F})(arg::AbstractArray{T}) where {F, T} = T(sf.f(arg))
+TypedReduction(::Type{T}) where {T} = TypedReduction(itself, T)
+
+(sf::TypedReduction{T, F})(arg1::AbtArrayOfOr{T}) where {T, F} = sf.f(unpackAA0D(arg1))
+
+(sf::TypedReduction{T, F})(arg1::AbtArrayOfOr{T}, arg2::AbtArrayOfOr{T}) where {T, F} = 
+sf.f(unpackAA0D(arg1), unpackAA0D(arg2))
+
+
+struct StableMorphism{T, F<:Function, N} <:TypedFunction{T, F}
+    f::F
+
+    function StableMorphism(f::F, aT::Type{T}, aTs::Type...) where {T, F}
+        Ts = (aT, aTs...) .|> unpackAA0Dtype
+        rT = checkReturnType(f, AbstractArray{T}, Ts)
+        new{T, F, ndims(rT)}(f)
+    end
+
+    function StableMorphism(f::F, aT::Type{<:AbstractArray{T}}, aTs::Type...) where {T, F}
+        Ts = (aT, aTs...) .|> unpackAA0Dtype
+        rT = checkReturnType(f, AbstractArray{T}, Ts)
+        new{T, F, ndims(rT)}(f)
+    end
+end
+
+(sf::StableMorphism{T, F})(arg1::AbtArrayOfOr{T}) where {F, T} = sf.f(unpackAA0D(arg1))
+
+(sf::StableMorphism{T, F})(arg1::AbtArrayOfOr{T}, arg2::AbtArrayOfOr{T}) where {F, T} = 
+sf.f(unpackAA0D(arg1), unpackAA0D(arg2))
 
 const SymOrIdxSym = Union{Symbol, IndexedSym}
+
+mutable struct NodeVar{T} <: PrimitiveParam{T, 0}
+    @atomic value::T
+    const symbol::IndexedSym
+
+    NodeVar(value::T, symbol::SymOrIdxSym) where {T} = new{T}(value, IndexedSym(symbol))
+end
+
+genSeqAxis(::Val{N}, sym::Symbol=:e) where {N} = (Symbol(sym, i) for i in 1:N) |> Tuple
 
 struct GridVar{T<:Real, N, V<:AbstractArray{T, N}}
     value::V
@@ -33,152 +90,202 @@ struct GridVar{T<:Real, N, V<:AbstractArray{T, N}}
     axis::NTuple{N, Symbol}
     extent::NTuple{N, Int}
 
-    function GridVar(value::V, symbol::SymOrIdxSym, axis::NTuple{N, Symbol}, 
-                     extent::NTuple{N, Int}=size(value)) where 
+    function GridVar(value::V, symbol::SymOrIdxSym, 
+                     axis::NonEmptyTuple{Symbol, N}=genSeqAxis(Val(N)), 
+                     extent::NonEmptyTuple{Int, N}=size(value)) where 
                     {T, N, V<:AbstractArray{T, N}}
+        size(value) >= extent || 
+        throw(AssertionError("`size(value)` should be no less than (`>=`) `extent`."))
         new{T, N, V}(value, IndexedSym(symbol), axis, extent)
     end
 end
 
-mutable struct NodeVar{T} <: SinglePrimP{T}
-    @atomic value::T
-    const symbol::IndexedSym
+getLambdaArgNum(::Type{<:NETupleOfDimPar{<:Any, NMO}}) where {NMO} = NMO + 1
+getLambdaArgNum(::Type{<:ParamBox{<:Any, I}}) where {I} = getLambdaArgNum(I)
+getLambdaArgNum(::T) where {T} = getLambdaArgNum(T)
 
-    NodeVar(value::T, symbol::SymOrIdxSym) where {T} = new{T}(value, IndexedSym(symbol))
-end
-
-
-mutable struct ParamNode{T, F<:Function, I<:DParamAbtArray{T}} <: ParamBox{T, I, 0}
-    const lambda::StableReduce{T, F}
+mutable struct NodeParam{T, F<:Function, I<:ParBoxInputType{T}} <: ParamBox{T, I, 0}
+    const lambda::TypedReduction{T, F}
     const input::I
     const symbol::IndexedSym
     @atomic offset::T
     @atomic memory::T
     @atomic screen::TernaryNumber
 
-    function ParamNode(lambda::StableReduce{T, F}, input::I, 
+    function NodeParam(lambda::TypedReduction{T, F}, input::I, 
                        symbol::SymOrIdxSym, 
                        offset::T, 
                        memory::T=zero(T), 
                        screen::TernaryNumber=TUS0) where {T, I, F}
-        isempty(input) && throw(AssertionError("`input` should not be empty."))
+        if any(x isa ElementalParam for x in input)
+            throw(AssertionError("`ElementalParam` must be contained by an `AbstractArray`."))
+        end
+        if any(isempty.(input))
+            throw(AssertionError("`input` must contain at least one parameter."))
+        end
         new{T, F, I}(lambda, input, IndexedSym(symbol), offset, memory, screen)
     end
 
-    function ParamNode(::StableReduce{T, <:iTalike}, input::I, 
+    function NodeParam(::TypedReduction{T, <:iTalike}, input::I, 
                        symbol::SymOrIdxSym, 
                        offset::T, 
-                       memory::T=obtain(input[]), 
+                       memory::T=obtain(first(input)[]), 
                        screen::TernaryNumber=TUS0) where 
-                      {T, P<:SinglePrimP{T}, I<:AbtArray0D{P}}
-        new{T, iT, I}(StableReduce(T, itself), input, IndexedSym(symbol), 
-                      offset, memory, screen)
+                      {T, I<:Tuple{AbtArray0D{<:ElementalParam{T}}}}
+        new{T, iT, I}(TypedReduction(T), input, IndexedSym(symbol), offset, memory, screen)
     end
 end
 
-ParamNode(::StableReduce{T, <:iTalike}, ::Any, ::SymOrIdxSym, ::T, 
-          ::T=zero(T), ::TernaryNumber=TUS0) where {T} = 
-throw(AssertionError("Second argument should be an `Array0D{<:SinglePrimP{$T}}`."))
-
-function ParamNode(lambda::Function, input::SParamAbtArray{T}, symbol::Symbol; 
-                   init::T=zero(T)) where {T}
-    VT = (map(obtain, input) |> typeof)
-    ParamNode(StableReduce(VT, lambda), input, symbol, zero(T), init)
+function NodeParam(::TypedReduction{T, <:iTalike}, ::I, ::SymOrIdxSym, ::T, 
+                   ::T=zero(T), ::TernaryNumber=TUS0) where {T, I}
+    throw(ArgumentError("`$I` is not supported as the second argument when `lambda` "*
+                        "functions like an identity morphism."))
 end
 
-ParamNode(lambda::Function, vars::AbstractArray{T}, varsSym::AbtArrayOfOr{Symbol}, 
-          symbol::Symbol; init::T=zero(T)) where {T<:Real} = 
-ParamNode(lambda, NodeVar.(vars, varsSym), symbol; init)
+packSParam(parArg::ElementalParam) = fill(parArg)
+packSParam(parArg::Any) = itself(parArg)
 
-ParamNode(lambda::Function, input::SingleParam{T}, symbol::Symbol; 
+function NodeParam(lambda::Function, input::ParBoxInputType{T}, 
+                   symbol::Symbol; init::T=zero(T)) where {T}
+    input = packSParam.(input)
+    ATs = map(x->typeof(obtain.(x)), input)
+    NodeParam(TypedReduction(lambda, ATs...), input, symbol, zero(T), init)
+end
+
+NodeParam(lambda::Function, input::DimParSingleArg{T}, symbol::Symbol; 
           init::T=zero(T)) where {T} = 
-ParamNode(StableReduce(T, lambda), fill(input), symbol, zero(T), init)
+NodeParam(lambda, (input,), symbol; init)
 
-ParamNode(lambda::Function, var::T, varSym::Symbol, symbol::Symbol; 
-          init::T=zero(T)) where {T<:Real} = 
-ParamNode(lambda, NodeVar(var, varSym), symbol; init)
+NodeParam(lambda::Function, input1::DimParSingleArg{T}, input2::DimParSingleArg{T}, 
+          symbol::Symbol; init::T=zero(T)) where {T} = 
+NodeParam(lambda, (input1, input2), symbol; init)
 
-ParamNode(input::NodeVar{T}, symbol::Symbol=symOf(input)) where {T} = 
-ParamNode(StableReduce(T, itself), fill(input), symbol, zero(T))
+NodeParam(input::NodeVar{T}, symbol::Symbol=symOf(input)) where {T} = 
+NodeParam(TypedReduction(T), (fill(input),), symbol, zero(T))
 
-ParamNode(var::Real, varSym::Symbol, symbol::Symbol=varSym) = 
-ParamNode(NodeVar(var, varSym), symbol)
+NodeParam(var::Real, varSym::Symbol, symbol::Symbol=varSym) = 
+NodeParam(NodeVar(var, varSym), symbol)
 
-ParamNode(var::ParamNode{T}, symbol::Symbol=symOf(var); init::T=var.memory) where {T} = 
-ParamNode(var.lambda, var.input, symbol, var.offset, init, var.screen)
+NodeParam(var::NodeParam{T}, symbol::Symbol=symOf(var); init::T=var.memory) where {T} = 
+NodeParam(var.lambda, var.input, symbol, var.offset, init, var.screen)
 
-const TensorInParamNode{T, F, PB, N} = ParamNode{T, F, <:AbstractArray{PB, N}}
-const ScalarInParamNode{T, F, PB} = TensorInParamNode{T, F, PB, 0}
+# const TensorInNodeParam{T, F, PB, N} = NodeParam{T, F, <:AbstractArray{PB, N}}
+# const ScalarInNodeParam{T, F, PB} = TensorInNodeParam{T, F, PB, 0}
 
+# mutable struct GridParam{T, F<:Function, I<:DParamAbtArray{T}} <: ParamBox{T, I, 0}
+#     const lambda::StableMorphism{T, F}
+#     const input::I
+#     const symbol::IndexedSym
+#     const axis::NTuple{N, Symbol}
+#     const extent::NTuple{N, Int}
+#     memory::LRU{Int, Tuple{Vector{Float64}, Vector{Float64}}}
 
-screenLevelOf(pn::ParamNode) = Int(pn.screen)
+#     function GridParam(lambda::TypedReduction{T, F}, input::I, 
+#                        symbol::SymOrIdxSym, 
+#                        offset::T, 
+#                        memory::T=zero(T), 
+#                        screen::TernaryNumber=TUS0) where {T, I, F}
+#         isempty(input) && throw(AssertionError("`input` should not be empty."))
+#         new{T, F, I}(lambda, input, IndexedSym(symbol), offset, memory, screen)
+#     end
 
-screenLevelOf(::NodeVar) = 1
+#     function GridParam(::TypedReduction{T, <:iTalike}, input::I, 
+#                        symbol::SymOrIdxSym, 
+#                        offset::T, 
+#                        memory::T=obtain(input[]), 
+#                        screen::TernaryNumber=TUS0) where 
+#                       {T, P<:DimensionalParam{T}, I<:AbtArray0D{P}}
+#         new{T, iT, I}(TypedReduction(T, itself), input, IndexedSym(symbol), 
+#                       offset, memory, screen)
+#     end
+# end
 
-function setScreenLevelCore!(pn::ParamNode, level::Int)
+screenLevelOf(pn::ParamBox) = Int(pn.screen)
+
+screenLevelOf(::PrimitiveParam) = 1
+
+function setScreenLevelCore!(pn::ParamBox, level::Int)
     @atomic pn.screen = TernaryNumber(level)
 end
 
-function setScreenLevel!(pn::ParamNode, level::Int)
+function setScreenLevel!(pn::ParamBox, level::Int)
     levelOld = screenLevelOf(pn)
     if levelOld == level
     elseif levelOld == 0
         @atomic pn.offset = obtain(pn)
     elseif level == 0
-        @atomic pn.offset -= pn.lambda(map(obtain, pn.input))
+        @atomic pn.offset -= pn.lambda((map(obtain, arg) for arg in pn.input)...)
     end
     setScreenLevelCore!(pn, level)
     pn
 end
 
-setScreenLevel(pn::ParamNode, level::Int) = setScreenLevel!(ParamNode(pn), level)
+setScreenLevel(pn::NodeParam, level::Int) = setScreenLevel!(NodeParam(pn), level)
 
 
-function memorize!(pn::ParamNode{T}, newMem::T=ValOf(pn)) where {T}
+function memorize!(pn::ParamBox{T}, newMem::T=ValOf(pn)) where {T}
     oldMem = pn.memory
     @atomic pn.memory = newMem
     oldMem
 end
 
 
-struct NodeTuple{T<:Real, N, PT<:NTuple{N, ParamNode{T}}} <: ParamBox{T, PT, N}
+struct NodeTuple{T<:Real, N, PT} <: ParamBox{T, PT, N}
     input::PT
     symbol::IndexedSym
 
-    NodeTuple(input::PT, symbol::SymOrIdxSym) where {T, N, PT<:NTuple{N, ParamNode{T}}} = 
+    NodeTuple(input::PT, symbol::SymOrIdxSym) where {T, N, PT<:NTuple{N, NodeParam{T}}} = 
     new{T, N, PT}(input, IndexedSym(symbol))
 end
 
 NodeTuple(nt::NodeTuple, symbol::Symbol) = NodeTuple(nt.input, symbol)
 
 
-idxSymOf(pc::ParamContainer) = pc.symbol
+idxSymOf(pc::DimensionalParam) = pc.symbol
 
-symOf(pc::ParamContainer) = idxSymOf(pc).name
+symOf(pc::DimensionalParam) = idxSymOf(pc).name
 
 inputOf(pb::ParamBox) = pb.input
 
 
-obtain(sv::PrimitiveParam) = sv.value
+obtain(sv::NodeVar) = sv.value
 
-function obtain(pn::ParamNode{T}, fallbackVal::T=pn.memory) where {T}
-    idSet = Set{UInt}(pn|>objectid)
-    obtainCore(Val(false), pn, idSet, fallbackVal)
+function obtain(sv::GridVar)
+    value = sv.value
+    idxExtend = sv.extent
+    idxAStart = first.(axes(value))
+    idxRange = map((x,y)->(x:y), idxAStart, idxExtend)
+    view(value, idxRange...)
 end
 
-function obtainCore(::Val{BL}, pn::ParamNode{T}, 
-                       idSet::Set{UInt64}, fallbackVal::T) where {BL, T}
+function obtain(pn::NodeParam{T}, fallbackVal::T=pn.memory) where {T}
+    idSet = Set{UInt}()
+    obtainCore(idSet, pn, fallbackVal)
+end
+
+function obtainCore(idSet::Set{UInt64}, input::AbstractArray{<:ElementalParam{T}}, 
+                    fallbackVal::T) where {T}
+    map(input) do child
+        obtainCore(idSet, child, fallbackVal)
+    end
+end
+
+function obtainCore(idSet::Set{UInt64}, pn::DimensionalParam{T}, fallbackVal::T) where {T}
+    #!!!!
+    T(0)
+end
+
+function obtainCore(idSet::Set{UInt64}, pn::NodeParam{T}, fallbackVal::T) where {T}
     res = pn.offset
     sl = screenLevelOf(pn)
     if sl == 0
         id = objectid(pn)
-        if BL && id in idSet
+        if id in idSet
             res = fallbackVal
         else
+            f = pn.lambda
             push!(idSet, id)
-            res += map(pn.input) do child
-                obtainCore(Val(true), child, idSet, fallbackVal)
-            end |> pn.lambda
+            res += f((obtainCore(idSet, x, fallbackVal) for x in pn.input)...)
         end
     elseif sl == -1
         res = fallbackVal
@@ -186,12 +293,12 @@ function obtainCore(::Val{BL}, pn::ParamNode{T},
     res
 end
 
-obtainCore(::Val, par::PrimitiveParam{T},::Set{UInt}, ::T) where {T} = obtain(par)
+obtainCore(::Set{UInt}, par::PrimitiveParam{T}, ::T) where {T} = obtain(par)
 
 # To be deprecated
 obtain(nt::NodeTuple) = obtain.(nt.input)
 
-(pn::ParamContainer)() = obtain(pn)
+(pn::DimensionalParam)() = obtain(pn)
 
 function setVal!(par::PrimitiveParam{T, 0}, val::T) where {T}
     @atomic par.value = val
@@ -201,7 +308,7 @@ function setVal!(par::PrimitiveParam{T, N}, val::AbstractArray{T, N}) where {T, 
     safelySetVal!(par.value, val)
 end
 
-function setVal!(par::ParamNode{T}, val::T) where {T}
+function setVal!(par::NodeParam{T}, val::T) where {T}
     isPrimitiveParam(par) || 
     throw(AssertionError("Input `par` does not behave like a primitive parameter."))
     @atomic par.offset = val
@@ -243,10 +350,10 @@ function ContainerMarker(sv::T) where {T<:NodeVar}
     ContainerMarker{1, Tuple{Marker}}(objectid(T), (m,), NothingID, NothingID)
 end
 
-function ContainerMarker(pn::T) where {T<:ParamNode}
-    m = Marker(pn.input)
+function ContainerMarker(pn::T) where {T<:NodeParam}
+    m = Marker.(pn.input)
     ContainerMarker{1, Tuple{Marker}}(
-        objectid(T), (m,), objectid(pn.lambda.f), 
+        objectid(T), m, objectid(pn.lambda.f), 
         objectid((pn.offset, screenLevelOf(pn)))
     )
 end
@@ -257,44 +364,44 @@ function ContainerMarker(nt::T) where {N, T<:NodeTuple{<:Any, N}}
 end
 
 
-compareParamContainer(::ParamContainer, ::ParamContainer) = false
+compareParamContainer(::DimensionalParam, ::DimensionalParam) = false
 
-compareParamContainer(pc1::T, pc2::T) where {T<:ParamContainer} = 
+compareParamContainer(pc1::T, pc2::T) where {T<:DimensionalParam} = 
 pc1 === pc2 || ContainerMarker(pc1) == ContainerMarker(pc2)
 
 
-operateBy(::typeof(+), pn1::ParamNode) = itself(pn1)
-operateBy(::typeof(-), pn1::ParamNode{T}) where {T} = operateBy(*, T(-1), pn1)
+operateBy(::typeof(+), pn1::NodeParam) = itself(pn1)
+operateBy(::typeof(-), pn1::NodeParam{T}) where {T} = operateBy(*, T(-1), pn1)
 
-repeatedlyApply(::typeof(+), pn::ParamNode{T}, times::Int) where {T} = 
+repeatedlyApply(::typeof(+), pn::NodeParam{T}, times::Int) where {T} = 
 operateBy(*, pn, T(times))
 
-repeatedlyApply(::typeof(-), pn::ParamNode{T}, times::Int) where {T} = 
+repeatedlyApply(::typeof(-), pn::NodeParam{T}, times::Int) where {T} = 
 operateBy(-, operateBy(*, pn, T(times)))
 
-repeatedlyApply(::typeof(*), pn::ParamNode{T}, times::Int) where {T} = 
+repeatedlyApply(::typeof(*), pn::NodeParam{T}, times::Int) where {T} = 
 operateBy(^, pn, T(times))
 
-operateBy(op::F, pn1::ParamNode, num::Real) where {F<:Function} = 
-ParamNode(OFC(itself, op, num), pn1, pn1.symbol)
+operateBy(op::F, pn1::NodeParam, num::Real) where {F<:Function} = 
+NodeParam(OFC(itself, op, num), pn1, pn1.symbol)
 
-operateBy(op::F, num::Real, pn1::ParamNode) where {F<:Function} = 
-ParamNode(OCF(itself, op, num), pn1, pn1.symbol)
+operateBy(op::F, num::Real, pn1::NodeParam) where {F<:Function} = 
+NodeParam(OCF(itself, op, num), pn1, pn1.symbol)
 
-operateBy(op::CommutativeBinaryNumOps, num::Real, pn1::ParamNode) = 
-operateBy(op, pn1::ParamNode, num::Real)
+operateBy(op::CommutativeBinaryNumOps, num::Real, pn1::NodeParam) = 
+operateBy(op, pn1::NodeParam, num::Real)
 
-operateBy(op::F, pn::ParamNode{T}) where {F<:Function, T} = 
-ParamNode(op∘pn.lambda.f, pn.input, symbol, pn.offset, pn.memory, pn.screen)
+operateBy(op::F, pn::NodeParam{T}) where {F<:Function, T} = 
+NodeParam(op∘pn.lambda.f, pn.input, symbol, pn.offset, pn.memory, pn.screen)
 
-operateByCore(op::F, pn1::ParamNode{T}, pn2::ParamNode{T}) where {F<:Function, T} = 
-ParamNode(SplitArg{2}(op), [pn1, pn2], Symbol(pn1.symbol, pn2.symbol))
+operateByCore(op::F, pn1::NodeParam{T}, pn2::NodeParam{T}) where {F<:Function, T} = 
+NodeParam(SplitArg{2}(op), [pn1, pn2], Symbol(pn1.symbol, pn2.symbol))
 
-operateByCore(op::F, pn1::ParamNode{T}, pn2::ParamNode{T}, 
-              pns::Vararg{ParamNode{T}, N}) where {F<:Function, T, N} = 
-ParamNode(SplitArg{N}(op), [pn1, pn2, pns...], Symbol(pn1.symbol, :_to_, pns[end].symbol))
+operateByCore(op::F, pn1::NodeParam{T}, pn2::NodeParam{T}, 
+              pns::Vararg{NodeParam{T}, N}) where {F<:Function, T, N} = 
+NodeParam(SplitArg{N}(op), [pn1, pn2, pns...], Symbol(pn1.symbol, :_to_, pns[end].symbol))
 
-function operateBy(op::F, pn1::ParamNode{T}, pn2::ParamNode{T}) where 
+function operateBy(op::F, pn1::NodeParam{T}, pn2::NodeParam{T}) where 
                   {F<:CommutativeBinaryNumOps, T}
     if symFromIndexSym(pn1.symbol) > symFromIndexSym(pn2.symbol)
         pn2, pn1 = pn1, pn2
@@ -306,24 +413,24 @@ function operateBy(op::F, pn1::ParamNode{T}, pn2::ParamNode{T}) where
     end
 end
 
-operateBy(op::F, pn1::ParamNode{T}, pns::Vararg{ParamNode{T}, N}) where {F<:Function, T, N} = 
+operateBy(op::F, pn1::NodeParam{T}, pns::Vararg{NodeParam{T}, N}) where {F<:Function, T, N} = 
 operateByCore(op, pn1, pns...)
 
-operateBy(f::F, pns::AbstractArray{<:ParamNode{T}}) where {F<:Function, T} = 
-ParamNode(f, pns, Symbol(pns[begin].symbol.name, :_to_, pns[end].symbol.name))
+operateBy(f::F, pns::AbstractArray{<:NodeParam{T}}) where {F<:Function, T} = 
+NodeParam(f, pns, Symbol(pns[begin].symbol.name, :_to_, pns[end].symbol.name))
 
 operateBy(f::F, ::Val{N}) where {F<:Function, N} = 
-((args::Vararg{ParamNode{T}, N}) where {T}) -> operateBy(f, args...)
+((args::Vararg{NodeParam{T}, N}) where {T}) -> operateBy(f, args...)
 
 operateBy(f::F) where {F<:Function} = 
-((args::AbstractArray{<:ParamNode{T}}) where {T}) -> operateBy(f, args)
+((args::AbstractArray{<:NodeParam{T}}) where {T}) -> operateBy(f, args)
 
 
-addParamNode(pn1::ParamNode{T}, pn2::ParamNode{T}) where {T} = operateBy(+, pn1, pn2)
+addNodeParam(pn1::NodeParam{T}, pn2::NodeParam{T}) where {T} = operateBy(+, pn1, pn2)
 
-mulParamNode(pn1::ParamNode{T}, pn2::ParamNode{T}) where {T} = operateBy(*, pn1, pn2)
-mulParamNode(pn::ParamNode{T}, coeff::T) where {T} = operateBy(*, pn, coeff)
-mulParamNode(coeff::T, pn::ParamNode{T}) where {T} = mulParamNode(pn, coeff)
+mulNodeParam(pn1::NodeParam{T}, pn2::NodeParam{T}) where {T} = operateBy(*, pn1, pn2)
+mulNodeParam(pn::NodeParam{T}, coeff::T) where {T} = operateBy(*, pn, coeff)
+mulNodeParam(coeff::T, pn::NodeParam{T}) where {T} = mulNodeParam(pn, coeff)
 
 
 function sortParamContainers(::Type{C}, f::F, field::Symbol, roundAtol::T) where 
@@ -346,85 +453,92 @@ end
 
 getParamFields(pf::ParamFunctions) = itself(pf)
 
-const GetParTypes = (SingleParam, ParamContainer)
+getParams(p::DimensionalParam) = [p]
 
-function getParCore(::Val{N}, p::ParamContainer{T}, ::Missing) where {N, T}
-    GetParTypes[N]{T}[p]
-end
+getParams(p::DimensionalParam, ::Missing) = [p]
 
-function getParCore(::Val{N}, p::ParamContainer{T}, sym::Symbol) where {N, T}
-    res = GetParTypes[N]{T}[]
+function getParams(p::DimensionalParam, sym::Symbol)
+    res = eltype(p)[]
     inSymbol(sym, symOf(ps)) && push!(res, p)
     res
 end
 
-function getParsCore(::Val{1}, p::ParamContainer, sym::SymOrMiss=missing)
-    p isa SingleParam ? getParCore(Val(1), p, sym) : getParsCore(Val(1), p.input, sym)
+function getParams(v::NonEmptyTupleOrAbtArray{T}, sym::SymOrMiss=missing) where 
+                  {T<:Union{ParamContainer, ParamObject}}
+    isempty(v) ? ParamContainer{T}[] : reduce(vcat, getParams.(v, sym))
 end
 
-function getParsCore(::Val{2}, p::ParamContainer, sym::SymOrMiss=missing)
-    getParCore(Val(2), p, sym)
-end
-
-function getParsCore(::Val{N}, v::NonEmptyTupleOrAbtArray{T}, sym::SymOrMiss=missing) where 
-                    {N, T<:Union{ParamContainer, ParamObject}}
-    if isempty(v)
-        genParamTypeVector(T, GetParTypes[N])
-    else
-        reduce(vcat, getParsCore.(Val(N), v, sym))
+function getParams(f::ParamFunction{T}, sym::SymOrMiss=missing) where {T}
+    res = map(getParamFields(f)) do field
+        getParams(field, sym)
     end
+    len = length.(res) |> sum
+    len == 0 ? ParamContainer{T}[] : reduce(vcat, res)
 end
-
-function getParsCore(::Val{N}, f::ParamFunction{T}, sym::SymOrMiss=missing) where {N, T}
-    mapreduce(vcat, getParamFields(f), init=GetParTypes[N]{T}[]) do field
-        getParsCore(Val(N), field, sym)
-    end
-end
-
-
-getSingleParams(input, sym::SymOrMiss=missing) = getParsCore(Val(1), input, sym)
-
-getParams(input, sym::SymOrMiss=missing) = getParsCore(Val(2), input, sym)
 
 throwScreenLevelError(sl) = 
-throw(DomainError(sl, "This value is not supported as the screen level of a `ParamNode`."))
+throw(DomainError(sl, "This value is not supported as the screen level of a `NodeParam`."))
 
-uniqueParams(ps::AbstractArray{<:ParamContainer}) = 
+uniqueParams(ps::AbstractArray{<:DimensionalParam}) = 
 markUnique(ps, compareFunction=compareParamContainer)[end]
 
 
-function markParams!(pars::AbstractVector{<:SingleParam})
-    nodes, marks1, marks2 = topoSort(pars)
-    leafNodes = nodes[.!marks1 .*   marks2]
-    rootNodes = nodes[  marks1 .* .!marks2]
-    selfNodes = nodes[.!marks1 .* .!marks2]
-    indexDict = IdDict{Symbol, Int}()
-    for i in leafNodes
+function markParamsCore!(indexDict::IdDict{Symbol, Int}, leafPars)
+    for i in leafPars
         sym = i.symbol.name
         get!(indexDict, sym, 0)
         i.symbol.index = (indexDict[sym] += 1)
     end
-    (leafNodes, rootNodes, selfNodes)
 end
 
-markParams!(b::Union{AbstractVector{T}, T}) where {T<:ParamObject} = 
-markParams!(getSingleParams(b))
+function markParams!(pars::AbstractVector{<:DimensionalParam{T}}) where {T}
+    nodes, marks1, marks2 = topoSort(pars)
+    leafPars = nodes[.!marks1 .*   marks2]
+    rootPars = nodes[  marks1 .* .!marks2]
+    selfPars = nodes[.!marks1 .* .!marks2]
+    parIdxDict = IdDict{Symbol, Int}()
+
+    par0Dids = findall(x->(x isa ElementalParam{T}), leafPars)
+    leafParsFormated = if isempty(par0Dids)
+        markParamsCore!(parIdxDict, leafPars)
+        convert(Vector{PrimDimParVecEle{T}}, leafPars)
+    else
+        leafP0Ds = ElementalParam{T}[splice!(leafPars, par0Dids)...]
+        markParamsCore!(parIdxDict, leafP0Ds)
+        markParamsCore!(parIdxDict, leafPars)
+        PrimDimParVecEle{T}[leafP0Ds, leafPars...]
+    end
+    (leafParsFormated, rootPars, selfPars)
+end
+
+markParams!(b::AbtArrayOfOr{<:ParamObject}) = markParams!(getParams(b))
 
 
-function topoSortCore!(orderedNodes::Vector{<:SingleParam{T}}, 
+function flattenPBoxInput(input::ParBoxInputType{T}) where {T}
+    mapreduce(vcat, input, init=DimensionalParam{T}[]) do parArg
+        parArg isa DimensionalParam ? DimensionalParam{T}[parArg] : vec(parArg)
+    end
+end
+
+function topoSortCore!(hbNodesIdSet::Set{UInt}, 
+                       orderedNodes::Vector{<:DimensionalParam{T}}, 
                        haveBranches::Vector{Bool}, connectRoots::Vector{Bool}, 
-                       node::SingleParam{T}, recursive::Bool=false) where {T}
+                       node::DimensionalParam{T}, recursive::Bool=false) where {T}
     sl = screenLevelOf(node)
     if sl in (0, 1)
         idx = findfirst(Fix2(compareParamContainer, node), orderedNodes)
         if idx === nothing
-            hasBranch = if sl == 0
-                for child in node.input
-                    topoSortCore!(orderedNodes, haveBranches, connectRoots, child, true)
+            hasBranch = ifelse(sl == 0, true, false)
+            if hasBranch
+                id = objectid(node)
+                isRegisteredSubRoot = (id in hbNodesIdSet)
+                if !isRegisteredSubRoot
+                    push!(hbNodesIdSet, objectid(node))
+                    for child in flattenPBoxInput(node.input)
+                        topoSortCore!(hbNodesIdSet, orderedNodes, haveBranches, 
+                                      connectRoots, child, true)
+                    end
                 end
-                true
-            else
-                false
             end
             push!(orderedNodes, node)
             push!(haveBranches, hasBranch)
@@ -438,29 +552,31 @@ function topoSortCore!(orderedNodes::Vector{<:SingleParam{T}},
     nothing
 end
 
-function topoSortINTERNAL(nodes::AbstractVector{<:SingleParam{T}}) where {T}
-    orderedNodes = SingleParam{T}[]
+function topoSortINTERNAL(nodes::AbstractVector{<:DimensionalParam{T}}) where {T}
+    orderedNodes = DimensionalParam{T}[]
     haveBranches = Bool[]
     connectRoots = Bool[]
+    hbNodesIdSet = Set{UInt}()
     for node in nodes
-        topoSortCore!(orderedNodes, haveBranches, connectRoots, node)
+        topoSortCore!(hbNodesIdSet, orderedNodes, haveBranches, connectRoots, node)
     end
     orderedNodes, haveBranches, connectRoots
 end
 
-function topoSort(nodes::AbstractVector{<:SingleParam{T}}) where {T}
+function topoSort(nodes::AbstractVector{<:DimensionalParam{T}}) where {T}
     uniqueParams(nodes) |> topoSortINTERNAL
 end
 
-topoSort(node::ParamNode{T}) where {T} = topoSortINTERNAL([node])
+topoSort(node::NodeParam{T}) where {T} = topoSortINTERNAL([node])
 
 
 # Sever the connection of a node to other nodes
 sever(pv::NodeVar) = NodeVar(obtain(pv), pv.symbol)
 
-sever(pn::ParamNode) = ParamNode(obtain(pn), symOf(pn))
+# function sever(ps::T) where {T<:ParamBox}
 
-sever(ps::T) where {T<:ParamBox} = T(sever.(ps.input), ps.symbol)
+#     T(sever.(ps.input), ps.symbol)
+# end
 
 sever(obj::Any) = deepcopy(obj)
 
