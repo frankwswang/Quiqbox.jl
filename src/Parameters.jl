@@ -41,8 +41,8 @@ end
 #             {T1, T2, AT<:Union{T2, AbstractArray{T2}}} = 
 # TypedReduction(srf.f, AT)
 
-unpackAA0D(arg::AbtArray0D) = arg[]
-unpackAA0D(arg::Any) = itself(arg)
+unpackAA0D(@nospecialize(arg::AbtArray0D)) = getindex(arg)
+unpackAA0D(@nospecialize(arg::Any)) = itself(arg)
 
 TypedReduction(::Type{T}) where {T} = TypedReduction(itself, T)
 
@@ -84,25 +84,50 @@ end
 
 genSeqAxis(::Val{N}, sym::Symbol=:e) where {N} = (Symbol(sym, i) for i in 1:N) |> Tuple
 
-struct GridVar{T<:Real, N, V<:AbstractArray{T, N}}
+struct GridVar{T<:Real, N, V<:AbstractArray{T, N}} <: PrimitiveParam{T, N}
     value::V
     symbol::IndexedSym
     axis::NTuple{N, Symbol}
     extent::NTuple{N, Int}
+    screen::TernaryNumber
 
     function GridVar(value::V, symbol::SymOrIdxSym, 
-                     axis::NonEmptyTuple{Symbol, N}=genSeqAxis(Val(N)), 
-                     extent::NonEmptyTuple{Int, N}=size(value)) where 
-                    {T, N, V<:AbstractArray{T, N}}
+                     axis::NonEmptyTuple{Symbol, NMO}=genSeqAxis(Val(N)), 
+                     extent::NonEmptyTuple{Int, NMO}=(size(value) .- 1), 
+                     screen::TernaryNumber=TPS1) where 
+                    {T, N, V<:AbstractArray{T, N}, NMO}
         size(value) >= extent || 
         throw(AssertionError("`size(value)` should be no less than (`>=`) `extent`."))
-        new{T, N, V}(value, IndexedSym(symbol), axis, extent)
+        sl = Int(screen)
+        sl > 0 || throw(DomainError(screen, "`Int(screen) = $sl` is not supported."))
+        new{T, N, V}(value, IndexedSym(symbol), axis, extent, screen)
     end
 end
 
-getLambdaArgNum(::Type{<:NETupleOfDimPar{<:Any, NMO}}) where {NMO} = NMO + 1
-getLambdaArgNum(::Type{<:ParamBox{<:Any, I}}) where {I} = getLambdaArgNum(I)
-getLambdaArgNum(::T) where {T} = getLambdaArgNum(T)
+# getLambdaArgNum(::Type{<:NETupleOfDimPar{<:Any, NMO}}) where {NMO} = NMO + 1
+# getLambdaArgNum(::Type{<:ParamBox{<:Any, I}}) where {I} = getLambdaArgNum(I)
+# getLambdaArgNum(::T) where {T} = getLambdaArgNum(T)
+
+function checkParamBoxInput(input::ParBoxInputType)
+    hasVariable = false
+    for x in input
+        if x isa AbstractArray
+            if isempty(x)
+                throw(AssertionError("Every `AbstractArray` in `input` must be non-empty."))
+            elseif !hasVariable && any( (screenLevelOf(y) < 2) for y in x )
+                hasVariable = true
+            end
+        elseif x isa ElementalParam
+            throw(AssertionError("`ElementalParam` must be inside an `AbstractArray`."))
+        elseif !hasVariable && screenLevelOf(x) < 2
+            hasVariable = true
+        end
+    end
+    if !hasVariable
+        throw(AssertionError("`input` must contain as least one non-constant parameter."))
+    end
+    nothing
+end
 
 mutable struct NodeParam{T, F<:Function, I<:ParBoxInputType{T}} <: ParamBox{T, I, 0}
     const lambda::TypedReduction{T, F}
@@ -117,12 +142,7 @@ mutable struct NodeParam{T, F<:Function, I<:ParBoxInputType{T}} <: ParamBox{T, I
                        offset::T, 
                        memory::T=zero(T), 
                        screen::TernaryNumber=TUS0) where {T, I, F}
-        if any(x isa ElementalParam for x in input)
-            throw(AssertionError("`ElementalParam` must be contained by an `AbstractArray`."))
-        end
-        if any(isempty.(input))
-            throw(AssertionError("`input` must contain at least one parameter."))
-        end
+        checkParamBoxInput(input)
         new{T, F, I}(lambda, input, IndexedSym(symbol), offset, memory, screen)
     end
 
@@ -148,7 +168,7 @@ packSParam(parArg::Any) = itself(parArg)
 function NodeParam(lambda::Function, input::ParBoxInputType{T}, 
                    symbol::Symbol; init::T=zero(T)) where {T}
     input = packSParam.(input)
-    ATs = map(x->typeof(obtain.(x)), input)
+    ATs = map(x->typeof(x|>obtain), input)
     NodeParam(TypedReduction(lambda, ATs...), input, symbol, zero(T), init)
 end
 
@@ -200,9 +220,13 @@ NodeParam(var.lambda, var.input, symbol, var.offset, init, var.screen)
 #     end
 # end
 
+
 screenLevelOf(pn::ParamBox) = Int(pn.screen)
 
-screenLevelOf(::PrimitiveParam) = 1
+screenLevelOf(::PrimitiveParam{<:Any, 0}) = 1
+
+screenLevelOf(pp::PrimitiveParam) = Int(pp.screen)
+
 
 function setScreenLevelCore!(pn::ParamBox, level::Int)
     @atomic pn.screen = TernaryNumber(level)
@@ -220,7 +244,10 @@ function setScreenLevel!(pn::ParamBox, level::Int)
     pn
 end
 
+
 setScreenLevel(pn::NodeParam, level::Int) = setScreenLevel!(NodeParam(pn), level)
+
+setScreenLevel(gv::GridVar, level::Int) = setScreenLevel!(GridVar(gv), level)
 
 
 function memorize!(pn::ParamBox{T}, newMem::T=ValOf(pn)) where {T}
@@ -250,11 +277,23 @@ inputOf(pb::ParamBox) = pb.input
 
 obtain(sv::NodeVar) = sv.value
 
+function setIndexExtent(defaultRange::UnitRange{Int}, extent::Int)
+    if extent == 0
+        defaultRange
+    elseif extent > 0
+        firstIdx = defaultRange[begin]
+        firstIdx : (firstIdx + extent)
+    else
+        lastIdx = defaultRange[end]
+        (lastIdx + extent) : lastIdx
+    end
+end
+
 function obtain(sv::GridVar)
     value = sv.value
     idxExtend = sv.extent
-    idxAStart = first.(axes(value))
-    idxRange = map((x,y)->(x:y), idxAStart, idxExtend)
+    defaultIdxRange = UnitRange.(axes(value))
+    idxRange = map(setIndexExtent, defaultIdxRange, idxExtend)
     view(value, idxRange...)
 end
 
@@ -295,6 +334,8 @@ end
 
 obtainCore(::Set{UInt}, par::PrimitiveParam{T}, ::T) where {T} = obtain(par)
 
+obtain(pars::AbstractArray{<:ElementalParam{T}}) where {T} = obtain.(pars)
+
 # To be deprecated
 obtain(nt::NodeTuple) = obtain.(nt.input)
 
@@ -305,7 +346,11 @@ function setVal!(par::PrimitiveParam{T, 0}, val::T) where {T}
 end
 
 function setVal!(par::PrimitiveParam{T, N}, val::AbstractArray{T, N}) where {T, N}
-    safelySetVal!(par.value, val)
+    if Int(par.screen) == 1
+        safelySetVal!(par.value, val)
+    else
+        throw(AssertionError("`par` is a constant parameter that should not be modified."))
+    end
 end
 
 function setVal!(par::NodeParam{T}, val::T) where {T}
