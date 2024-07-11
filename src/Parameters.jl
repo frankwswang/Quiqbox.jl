@@ -46,10 +46,16 @@ unpackAA0D(@nospecialize(arg::Any)) = itself(arg)
 
 TypedReduction(::Type{T}) where {T} = TypedReduction(itself, T)
 
-(sf::TypedReduction{T, F})(arg1::AbtArrayOfOr{T}) where {T, F} = sf.f(unpackAA0D(arg1))
+# Type annotation prevents Enzyme.jl (v0.12.22) from breaking sometimes.
+function (sf::TypedReduction{T, F})(arg1::AbtArrayOfOr{T}) where {T, F}
+    sf.f(unpackAA0D(arg1))::T
+end
 
-(sf::TypedReduction{T, F})(arg1::AbtArrayOfOr{T}, arg2::AbtArrayOfOr{T}) where {T, F} = 
-sf.f(unpackAA0D(arg1), unpackAA0D(arg2))
+# Type annotation prevents Enzyme.jl (v0.12.22) from breaking sometimes.
+function (sf::TypedReduction{T, F})(arg1::AbtArrayOfOr{T}, 
+                                    arg2::AbtArrayOfOr{T}) where {T, F}
+    sf.f(unpackAA0D(arg1), unpackAA0D(arg2))::T
+end
 
 
 struct StableMorphism{T, F<:Function, N} <:TypedFunction{T, F}
@@ -68,10 +74,14 @@ struct StableMorphism{T, F<:Function, N} <:TypedFunction{T, F}
     end
 end
 
-(sf::StableMorphism{T, F})(arg1::AbtArrayOfOr{T}) where {F, T} = sf.f(unpackAA0D(arg1))
+function (sf::StableMorphism{T, F, N})(arg1::AbtArrayOfOr{T}) where {T, F, N}
+    sf.f(unpackAA0D(arg1))::AbstractArray{T, N}
+end
 
-(sf::StableMorphism{T, F})(arg1::AbtArrayOfOr{T}, arg2::AbtArrayOfOr{T}) where {F, T} = 
-sf.f(unpackAA0D(arg1), unpackAA0D(arg2))
+function (sf::StableMorphism{T, F, N})(arg1::AbtArrayOfOr{T}, 
+                                       arg2::AbtArrayOfOr{T}) where {T, F, N}
+    sf.f(unpackAA0D(arg1), unpackAA0D(arg2))::AbstractArray{T, N}
+end
 
 const SymOrIdxSym = Union{Symbol, IndexedSym}
 
@@ -373,10 +383,16 @@ function ContainerMarker(sv::T) where {T<:NodeVar}
     ContainerMarker{1, Tuple{Marker}}(objectid(T), (m,), NothingID, NothingID)
 end
 
+function ContainerMarker(gv::T) where {T<:GridVar}
+    m = Marker(gv.value)
+    ContainerMarker{1, Tuple{Marker}}(objectid(T), (m,), NothingID, 
+                                      objectid(screenLevelOf(gv)))
+end
+
 function ContainerMarker(pn::T) where {T<:NodeParam}
-    m = Marker.(pn.input)
-    ContainerMarker{1, Tuple{Marker}}(
-        objectid(T), m, objectid(pn.lambda.f), 
+    ms = Marker.(pn.input)
+    ContainerMarker{length(ms), typeof(ms)}(
+        objectid(T), ms, objectid(pn.lambda.f), 
         objectid((pn.offset, screenLevelOf(pn)))
     )
 end

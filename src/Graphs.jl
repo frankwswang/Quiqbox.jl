@@ -5,8 +5,8 @@ struct FixedNode{T} <: StorageNode{T, 0}
     marker::Symbol
 end
 
-struct IndexNode{T, N} <: StorageNode{T, N}
-    var::Array{T, N}
+struct IndexNode{T, O} <: StorageNode{T, O}
+    var::Array{T, O}
     marker::Symbol
     idx::Int
 end
@@ -25,47 +25,60 @@ struct ReductionNode{T, I<:NodeChildrenType{T}, F} <: OperatorNode{T, 0, I, F}
     bias::T
 end
 
-struct ReferenceNode{T, N, I, F, G<:OperatorNode{T, N, I, F}} <: OperatorNode{T, N, I, F}
+struct ReferenceNode{T, O, I, F, G<:OperatorNode{T, O, I, F}} <: EffectNode{T, O, I}
     ref::G
-    history::Array{T, N}
+    history::Array{T, O}
 end
 
 
 function compressGraphNode(gn::FixedNode{T}) where {T}
-    (::AbstractVector{<:AbstractArray{T}})->gn.val
+    (::AbtVecOfAbtArray{T})->itself.(gn.val)
 end
 
 function compressGraphNode(gn::IndexNode{T, 0}) where {T}
-    (x::AbstractVector{<:AbstractArray{T}})->x[begin][gn.idx]
+    (x::AbtVecOfAbtArray{T})->x[begin][gn.idx]
 end
 
 function compressGraphNode(gn::IndexNode{T}) where {T}
-    (x::AbstractVector{<:AbstractArray{T}})->x[gn.idx]
+    (x::AbtVecOfAbtArray{T})->x[gn.idx]
 end
 
-function compressGraphNode(gn::OperatorNode{T, N, I}) where {T, N, I}
+function compressGraphNode(gn::OperatorNode{T, O, I}) where {T, O, I}
     ChildNum = getChildNum(I)
     compressGraphNodeCore(Val(ChildNum), gn)
 end
 
-function compressGraphNodeCore(::Val{1}, gn::OperatorNode{T}) where {T}
-    fArr = map(compressGraphNode, gn.child[1])
-    let fs=Tuple(fArr), dim=size(fArr), apply=gn.apply, b=gn.bias
-        function (x::AbstractVector{<:AbstractArray{T}})
+function compressGraphNode(gn::ReferenceNode{T}) where {T}
+    (::AbtVecOfAbtArray{T})->itself.(gn.val)
+end
+
+function makeGraphFuncComp(graphChild::AbstractArray{<:GraphNode{T, 0}}) where {T}
+    fArr = map(compressGraphNode, graphChild)
+    let fs=Tuple(fArr), dim=size(fArr)
+        function (x::AbtVecOfAbtArray{T})
             fVals = collect(map(f->f(x), fs))
-            apply( reshape(fVals, dim) ) + b
+            reshape(fVals, dim)
         end
     end
 end
 
-function compressGraphNodeCore(::Val{2}, gn::OperatorNode{T}) where {T}
-    fArr1, fArr2 = map.(compressGraphNode, gn.child)
-    let fs1=Tuple(fArr1), dim1=size(fArr1), apply=gn.apply, b=gn.bias, 
-        fs2=Tuple(fArr2), dim2=size(fArr2)
-        function (x::AbstractVector{<:AbstractArray{T}})
-            fVals1 = collect(map(f->f(x), fs1))
-            fVals2 = collect(map(f->f(x), fs2))
-            apply( reshape(fVals1, dim1), reshape(fVals2, dim2) ) + b
+makeGraphFuncComp(graphChild::GraphNode) = compressGraphNode(graphChild)
+
+function compressGraphNodeCore(::Val{1}, node::OperatorNode{T}) where {T}
+    f = makeGraphFuncComp(node.child[1])
+    let apply1=f, apply2=node.apply, b=node.bias
+        function (x::AbtVecOfAbtArray{T})
+            # (apply2∘apply1)(x) + b # This causes Enzyme.jl (v0.12.22) to fail.
+            apply2( apply1(x) ) + b
+        end
+    end
+end
+
+function compressGraphNodeCore(::Val{2}, node::OperatorNode{T}) where {T}
+    f1, f2 = makeGraphFuncComp.(node.child)
+    let apply1L=f1, apply1R=f2, apply2=node.apply, b=node.bias
+        function (x::AbtVecOfAbtArray{T})
+            apply2( apply1L(x), apply1R(x) ) + b
         end
     end
 end
@@ -90,7 +103,7 @@ function evalGraphNodeCore(parInput::AbstractArray{<:GraphNode{T, 0}},
     broadcast(evalGraphNode, parInput, Ref(data))
 end
 
-# Necessary for certain AD library to work properly/efficiently as of Julia 1.10.4
+# Necessary for certain AD libraries to work properly/efficiently as of Julia 1.10.4
 function evalGraphNodeCore(parInput::AbtArray0D{<:GraphNode{T, 0}}, 
                            data::AbtVecOfAbtArray{T}) where {T}
     evalGraphNode(parInput[], data)
@@ -122,9 +135,7 @@ function genComputeGraphCore2(idDict::IdDict{ParamBox{T}, OperatorNode{T}},
         refNode = get(idDict, par, nothing)
         if refNode === nothing
             childNodes = map(par.input) do arg
-                map(arg) do i
-                    genComputeGraphCore2(idDict, inPSet, i)
-                end
+                genComputeGraphCore2(idDict, inPSet, arg)
             end
             node = ReductionNode(par.lambda, childNodes, symbolFromPar(par), par.offset)
             setindex!(idDict, node, par)
@@ -141,10 +152,19 @@ function genComputeGraphCore2(idDict::IdDict{ParamBox{T}, OperatorNode{T}},
     end
 end
 
-genComputeGraph(inPSet::AbstractVector{<:PrimDimParVecEle{T}}, par::PrimitiveParam{T}) where {T} = 
-genComputeGraphCore1(inPSet, par)
+function genComputeGraphCore2(idDict, inPSet, 
+                              pars::AbstractArray{<:DimensionalParam{T}}) where {T}
+    map(pars) do par
+        genComputeGraphCore2(idDict, inPSet, par)
+    end
+end
 
-function genComputeGraph(inPSet::AbstractVector{<:PrimDimParVecEle{T}}, par::ParamBox{T}) where {T}
+function genComputeGraph(inPSet::AbstractVector{<:PrimDimParVecEle{T}}, 
+                         par::ParamBox{T}) where {T}
     idDict = IdDict{ParamBox{T}, OperatorNode{T}}()
     genComputeGraphCore2(idDict, inPSet, par)
 end
+
+genComputeGraph(inPSet::AbstractVector{<:PrimDimParVecEle{T}}, 
+                par::PrimitiveParam{T}) where {T} = 
+genComputeGraphCore1(inPSet, par)
