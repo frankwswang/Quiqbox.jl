@@ -57,6 +57,12 @@ function (sf::TypedReduction{T, F})(arg1::AbtArrayOfOr{T},
     sf.f(unpackAA0D(arg1), unpackAA0D(arg2))::T
 end
 
+function (sf::TypedReduction{T, F})(arg1::AbtArrayOfOr{T}, 
+                                    arg2::AbtArrayOfOr{T}, 
+                                    arg3::AbtArrayOfOr{T}) where {T, F}
+    sf.f(unpackAA0D(arg1), unpackAA0D(arg2), unpackAA0D(arg3))::T
+end
+
 
 struct StableMorphism{T, F<:Function, N} <:TypedFunction{T, F}
     f::F
@@ -83,6 +89,12 @@ end
 function (sf::StableMorphism{T, F, N})(arg1::AbtArrayOfOr{T}, 
                                        arg2::AbtArrayOfOr{T}) where {T, F, N}
     sf.f(unpackAA0D(arg1), unpackAA0D(arg2))::AbstractArray{T, N}
+end
+
+function (sf::StableMorphism{T, F, N})(arg1::AbtArrayOfOr{T}, 
+                                       arg2::AbtArrayOfOr{T}, 
+                                       arg3::AbtArrayOfOr{T}) where {T, F, N}
+    sf.f(unpackAA0D(arg1), unpackAA0D(arg2), unpackAA0D(arg3))::AbstractArray{T, N}
 end
 
 const SymOrIdxSym = Union{Symbol, IndexedSym}
@@ -394,6 +406,10 @@ compareParamContainer(::DimensionalParam, ::DimensionalParam) = false
 
 compareParamContainer(pc1::T, pc2::T) where {T<:DimensionalParam} = 
 pc1 === pc2 || ContainerMarker(pc1) == ContainerMarker(pc2)
+
+compareParamContainer(::DimensionalParam, ::Any) = false
+
+compareParamContainer(::Any, ::DimensionalParam) = false
 
 
 operateBy(::typeof(+), pn1::NodeParam) = itself(pn1)
