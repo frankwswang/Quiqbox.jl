@@ -40,10 +40,11 @@ abstract type DimensionalParam{T, N} <: ParamContainer{T} end
 abstract type CompositeParam{T, N} <: DimensionalParam{T, N} end
 abstract type PrimitiveParam{T, N} <: DimensionalParam{T, N} end
 
-abstract type GraphNode{T, OD} <: ComputableGraph{T} end
+abstract type GraphNode{T, O} <: ComputableGraph{T} end
 
-abstract type OperatorNode{T, OD, I, F} <: GraphNode{T, OD} end
-abstract type StorageNode{T, OD} <: GraphNode{T, OD} end
+abstract type OperatorNode{T, O, I, F} <: GraphNode{T, O} end
+abstract type EffectNode{T, O, I} <: GraphNode{T, O} end
+abstract type StorageNode{T, O} <: GraphNode{T, O} end
 
 abstract type ParamBox{T, I, D} <: CompositeParam{T, D} end
 
@@ -145,26 +146,23 @@ const CommutativeBinaryNumOps = Union{typeof(+), typeof(*)}
 
 const RefOrA0D{T, V<:AbstractArray{T, 0}} =  Union{RefVal{T}, V}
 
-# const AtbArrayOf0DPar{T, N} = AbstractArray{<:DimensionalParam{T, 0}, N}
-# const SingleDimParArg{T, N} = Union{AtbArrayOf0DPar{T, N}, DimensionalParam{T, N}}
+# const ElemParamAbtArray{T, N} = AbstractArray{<:DimensionalParam{T, 0}, N}
+# const SingleDimParArg{T, N} = Union{ElemParamAbtArray{T, N}, DimensionalParam{T, N}}
 # const MultiNDParTuple{T, N, M} = NTuple{M, SingleDimParArg{T, N}}
 # const MonoDimParTuple{T, N} = MultiNDParTuple{T, N, 1}
 # const DualDimParTuple{T, N} = MultiNDParTuple{T, N, 2}
-# const ParBoxInputType{T, N} = Union{MonoDimParTuple{T, N}, DualDimParTuple{T, N}}
+# const ParamBoxInputType{T, N} = Union{MonoDimParTuple{T, N}, DualDimParTuple{T, N}}
 
 # const AbtArrTypeTuple{T, N, M} = NTuple{M, Type{<:AbstractArray{T, N}}}
 # const ArgTypeOfNDPVal{T, N} = Union{AbtArrTypeTuple{T, N, 1}, AbtArrTypeTuple{T, N, 2}}
 
 # const TypeNTuple{T, N} = NTuple{N, Type{T}}
 
-const AtbArrayOf0DPar{T, N} = AbstractArray{<:ElementalParam{T}, N}
-const DimParSingleArg{T, N} = Union{AtbArrayOf0DPar{T, N}, DimensionalParam{T, N}}
-const PrimDimParVecEle{T} = Union{AbstractVector{<:ElementalParam{T}}, DimensionalParam{T}}
-# const MonoDimParTuple{T, N} = Tuple{DimParSingleArg{T, N}}
-# const DualDimParTuple{T, N, M} = Tuple{DimParSingleArg{T, N}, DimParSingleArg{T, M}}
-const NETupleOfDimPar{T, NMO} = NonEmptyTuple{DimParSingleArg{T}, NMO}
-const ParBoxInputType{T} = Union{NETupleOfDimPar{T, 0}, NETupleOfDimPar{T, 1}}
-
+const TernaryTupleUnion{T} = Union{(NonEmptyTuple{T, N} for N in 0:2)...}
+const ElemParamAbtArray{T, N} = AbstractArray{<:ElementalParam{T}, N}
+const ParamBoxSingleArg{T, N} = Union{ElemParamAbtArray{T, N}, DimensionalParam{T, N}}
+const ParamBoxInputType{T} = TernaryTupleUnion{ParamBoxSingleArg{T}}
+const PrimDParSetEltype{T} = Union{AbstractVector{<:ElementalParam{T}}, DimensionalParam{T}}
 const ArgTypeOfNDPIVal{T} = Union{
     Tuple{Type{T}}, 
     Tuple{Type{T}, Type{T}}, 
@@ -183,4 +181,3 @@ const PBoxInputValType{T} = Union{NETupleOfPBoxVal{T, 0}, NETupleOfPBoxVal{T, 1}
 const AbtVecOfAbtArray{T} = AbstractVector{<:AbstractArray{T}}
 
 const GraphArgDataType{T} = Union{AbtVecOfAbtArray{T}, NonEmptyTuple{AbstractArray{T}}}
-

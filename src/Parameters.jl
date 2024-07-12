@@ -113,7 +113,7 @@ end
 # getLambdaArgNum(::Type{<:ParamBox{<:Any, I}}) where {I} = getLambdaArgNum(I)
 # getLambdaArgNum(::T) where {T} = getLambdaArgNum(T)
 
-function checkParamBoxInput(input::ParBoxInputType)
+function checkParamBoxInput(input::ParamBoxInputType)
     hasVariable = false
     for x in input
         if x isa AbstractArray
@@ -134,7 +134,7 @@ function checkParamBoxInput(input::ParBoxInputType)
     nothing
 end
 
-mutable struct NodeParam{T, F<:Function, I<:ParBoxInputType{T}} <: ParamBox{T, I, 0}
+mutable struct NodeParam{T, F<:Function, I<:ParamBoxInputType{T}} <: ParamBox{T, I, 0}
     const lambda::TypedReduction{T, F}
     const input::I
     const symbol::IndexedSym
@@ -170,18 +170,18 @@ end
 packSParam(parArg::ElementalParam) = fill(parArg)
 packSParam(parArg::Any) = itself(parArg)
 
-function NodeParam(lambda::Function, input::ParBoxInputType{T}, 
+function NodeParam(lambda::Function, input::ParamBoxInputType{T}, 
                    symbol::Symbol; init::T=zero(T)) where {T}
     input = packSParam.(input)
     ATs = map(x->typeof(x|>obtain), input)
     NodeParam(TypedReduction(lambda, ATs...), input, symbol, zero(T), init)
 end
 
-NodeParam(lambda::Function, input::DimParSingleArg{T}, symbol::Symbol; 
+NodeParam(lambda::Function, input::ParamBoxSingleArg{T}, symbol::Symbol; 
           init::T=zero(T)) where {T} = 
 NodeParam(lambda, (input,), symbol; init)
 
-NodeParam(lambda::Function, input1::DimParSingleArg{T}, input2::DimParSingleArg{T}, 
+NodeParam(lambda::Function, input1::ParamBoxSingleArg{T}, input2::ParamBoxSingleArg{T}, 
           symbol::Symbol; init::T=zero(T)) where {T} = 
 NodeParam(lambda, (input1, input2), symbol; init)
 
@@ -198,7 +198,7 @@ NodeParam(var.lambda, var.input, symbol, var.offset, init, var.screen)
 # const ScalarInNodeParam{T, F, PB} = TensorInNodeParam{T, F, PB, 0}
 
 
-struct GridParam{T, F<:Function, I<:ParBoxInputType{T}, 
+struct GridParam{T, F<:Function, I<:ParamBoxInputType{T}, 
                  N, M<:AbstractArray{T, N}} <: ParamBox{T, I, N}
     lambda::StableMorphism{T, F, N}
     input::I
@@ -527,12 +527,12 @@ function markParams!(pars::AbstractVector{<:DimensionalParam{T}}) where {T}
     par0Dids = findall(x->(x isa ElementalParam{T}), leafPars)
     leafParsFormated = if isempty(par0Dids)
         markParamsCore!(parIdxDict, leafPars)
-        convert(Vector{PrimDimParVecEle{T}}, leafPars)
+        convert(Vector{PrimDParSetEltype{T}}, leafPars)
     else
         leafP0Ds = ElementalParam{T}[splice!(leafPars, par0Dids)...]
         markParamsCore!(parIdxDict, leafP0Ds)
         markParamsCore!(parIdxDict, leafPars)
-        PrimDimParVecEle{T}[leafP0Ds, leafPars...]
+        PrimDParSetEltype{T}[leafP0Ds, leafPars...]
     end
     (leafParsFormated, rootPars, selfPars)
 end
@@ -540,7 +540,7 @@ end
 markParams!(b::AbtArrayOfOr{<:ParamObject}) = markParams!(getParams(b))
 
 
-function flattenPBoxInput(input::ParBoxInputType{T}) where {T}
+function flattenPBoxInput(input::ParamBoxInputType{T}) where {T}
     mapreduce(vcat, input, init=DimensionalParam{T}[]) do parArg
         parArg isa DimensionalParam ? DimensionalParam{T}[parArg] : vec(parArg)
     end
