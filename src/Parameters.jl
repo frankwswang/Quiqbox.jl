@@ -23,13 +23,13 @@ end
 struct TypedReduction{T, F<:Function} <: TypedFunction{T, F}
     f::F
 
-    function TypedReduction(f::F, aT::Type{T}, aTs::Type...) where {T, F}
+    function TypedReduction(f::F, aT::Type{T}, aTs::Type...) where {F, T}
         Ts = (aT, aTs...) .|> unpackAA0Dtype
         checkReturnType(f, T, Ts)
         new{T, F}(f)
     end
 
-    function TypedReduction(f::F, aT::Type{<:AbstractArray{T}}, aTs::Type...) where {T, F}
+    function TypedReduction(f::F, aT::Type{<:AbstractArray{T}}, aTs::Type...) where {F, T}
         Ts = (aT, aTs...) .|> unpackAA0Dtype
         checkReturnType(f, T, Ts)
         new{T, F}(f)
@@ -74,6 +74,8 @@ struct StableMorphism{T, F<:Function, N} <:TypedFunction{T, F}
     end
 end
 
+StableMorphism(::Type{T}) where {T} = StableMorphism(itself, T)
+
 function (sf::StableMorphism{T, F, N})(arg1::AbtArrayOfOr{T}) where {T, F, N}
     sf.f(unpackAA0D(arg1))::AbstractArray{T, N}
 end
@@ -92,21 +94,18 @@ mutable struct NodeVar{T} <: PrimitiveParam{T, 0}
     NodeVar(value::T, symbol::SymOrIdxSym) where {T} = new{T}(value, IndexedSym(symbol))
 end
 
-genSeqAxis(::Val{N}, sym::Symbol=:e) where {N} = (Symbol(sym, i) for i in 1:N) |> Tuple
+# genSeqAxis(::Val{N}, sym::Symbol=:e) where {N} = (Symbol(sym, i) for i in 1:N) |> Tuple
 
 struct GridVar{T<:Real, N, V<:AbstractArray{T, N}} <: PrimitiveParam{T, N}
     value::V
     symbol::IndexedSym
-    axis::NTuple{N, Symbol}
     screen::TernaryNumber
 
     function GridVar(value::V, symbol::SymOrIdxSym, 
-                     axis::NonEmptyTuple{Symbol, NMO}=genSeqAxis(Val(N)), 
-                     screen::TernaryNumber=TPS1) where 
-                    {T, N, V<:AbstractArray{T, N}, NMO}
+                     screen::TernaryNumber=TPS1) where {T, N, V<:AbstractArray{T, N}}
         sl = Int(screen)
         sl > 0 || throw(DomainError(screen, "`Int(screen) = $sl` is not supported."))
-        new{T, N, V}(value, IndexedSym(symbol), axis, screen)
+        new{T, N, V}(value, IndexedSym(symbol), screen)
     end
 end
 
@@ -198,33 +197,21 @@ NodeParam(var.lambda, var.input, symbol, var.offset, init, var.screen)
 # const TensorInNodeParam{T, F, PB, N} = NodeParam{T, F, <:AbstractArray{PB, N}}
 # const ScalarInNodeParam{T, F, PB} = TensorInNodeParam{T, F, PB, 0}
 
-# mutable struct GridParam{T, F<:Function, I<:DParamAbtArray{T}} <: ParamBox{T, I, 0}
-#     const lambda::StableMorphism{T, F}
-#     const input::I
-#     const symbol::IndexedSym
-#     const axis::NTuple{N, Symbol}
-#     const extent::NTuple{N, Int}
-#     memory::LRU{Int, Tuple{Vector{Float64}, Vector{Float64}}}
 
-#     function GridParam(lambda::TypedReduction{T, F}, input::I, 
-#                        symbol::SymOrIdxSym, 
-#                        offset::T, 
-#                        memory::T=zero(T), 
-#                        screen::TernaryNumber=TUS0) where {T, I, F}
-#         isempty(input) && throw(AssertionError("`input` should not be empty."))
-#         new{T, F, I}(lambda, input, IndexedSym(symbol), offset, memory, screen)
-#     end
+struct GridParam{T, F<:Function, I<:ParBoxInputType{T}, 
+                 N, M<:AbstractArray{T, N}} <: ParamBox{T, I, N}
+    lambda::StableMorphism{T, F, N}
+    input::I
+    symbol::IndexedSym
+    memory::M
 
-#     function GridParam(::TypedReduction{T, <:iTalike}, input::I, 
-#                        symbol::SymOrIdxSym, 
-#                        offset::T, 
-#                        memory::T=obtain(input[]), 
-#                        screen::TernaryNumber=TUS0) where 
-#                       {T, P<:DimensionalParam{T}, I<:AbtArray0D{P}}
-#         new{T, iT, I}(TypedReduction(T, itself), input, IndexedSym(symbol), 
-#                       offset, memory, screen)
-#     end
-# end
+    function GridParam(lambda::StableMorphism{T, F, N}, input::I, 
+                       symbol::SymOrIdxSym, 
+                       memory::M=zeros(T, ntuple(i->0, N))) where {T, F, N, I, M}
+        checkParamBoxInput(input)
+        new{T, F, I, N, M}(lambda, input, IndexedSym(symbol), memory)
+    end
+end
 
 
 screenLevelOf(pn::ParamBox) = Int(pn.screen)
