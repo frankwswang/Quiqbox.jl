@@ -102,8 +102,6 @@ returnDimOf(::T) where {T<:StableMorphism} = returnDimOf(T)
 
 const SymOrIdxSym = Union{Symbol, IndexedSym}
 
-genDParamSelfRefErrorMessage(::Type{T}) where {T<:DimensionalParam} = 
-"`$T`is forbidden to directly (self) reference another DimensionalParam."
 
 function checkScreenLevel(sl::Int, levelMin::Int, levelMax::Int)
     levelRange = levelMax - levelMin
@@ -118,31 +116,17 @@ end
 checkScreenLevel(s::TernaryNumber, levelMin::Int, levelMax::Int) = 
 checkScreenLevel(Int(s), levelMin, levelMax)
 
-
-function checkGridVarInputType(input::AbstractArray{<:Any, N}) where {N}
-    N < 1 && throw(DomainError(N, "The dimension of `input` must be larger than 0."))
-    vals = flatten(input|>vec)
-    isempty(vals) && throw(ArgumentError("`input` must not be empty, nor can it be a "*
-                                         "collection of empty collections."))
-    if any(i isa DimensionalParam for i in vals)
-        throw(AssertionError(T |> genDParamSelfRefErrorMessage))
-    end
-    nothing
-end
-
-const DefaultGridVarInputTypes = Union{Number, Symbol, String, Bool}
-
-checkGridVarInputTypes(::AbstractArray{<:DefaultGridVarInputTypes}) = nothing
+const DefaultPrimParamTypes = Union{Number, Symbol, Bool}
 
 mutable struct NodeVar{T} <: PrimitiveParam{T, 0}
     @atomic input::T
     const symbol::IndexedSym
 
-    NodeVar(input::T, symbol::SymOrIdxSym) where {T} = new{T}(input, IndexedSym(symbol))
+    function NodeVar(input::T, symbol::SymOrIdxSym; 
+                     bound::Type{U}=DefaultPrimParamTypes) where {U, T<:U}
+        new{T}(deepcopy(input), IndexedSym(symbol))
+    end
 end
-
-NodeVar(::DimensionalParam, ::SymOrIdxSym) = 
-throw(AssertionError(NodeVar |> genDParamSelfRefErrorMessage))
 
 NodeVar(::AbstractArray, ::SymOrIdxSym) = 
 throw(ArgumentError("`NodeVar` does not support `AbstractArray`-type `input`."))
@@ -154,16 +138,15 @@ struct GridVar{T, N, V<:AbstractArray{T, N}} <: PrimitiveParam{T, N}
     symbol::IndexedSym
     screen::TernaryNumber
 
-    function GridVar(input::V, symbol::SymOrIdxSym, 
-                     screen::TernaryNumber=TPS1) where {T, N, V<:AbstractArray{T, N}}
+    function GridVar(input::V, symbol::SymOrIdxSym, screen::TernaryNumber=TPS1; 
+                     bound::Type{U}=DefaultPrimParamTypes) where 
+                    {U, T<:U, N, V<:AbstractArray{T, N}}
         checkScreenLevel(screen, 1, 2)
-        checkGridVarInputType(input)
-        new{T, N, V}(copy(input), IndexedSym(symbol), screen)
+        N < 1 && throw(DomainError(N, "The dimension of `input` must be larger than 0."))
+        isempty(input) && throw(ArgumentError("`input` must not be empty."))
+        new{T, N, V}(deepcopy(input), IndexedSym(symbol), screen)
     end
 end
-
-GridVar(::AbstractArray{<:DimensionalParam}, ::SymOrIdxSym) = 
-throw(AssertionError(GridVar |> genDParamSelfRefErrorMessage))
 
 #! use flatten to check ParamContainer Referencing ParamContainer
 
@@ -499,62 +482,111 @@ isPrimitiveParam(pn::ParamBox) = (screenLevelOf(pn) == 1)
 # broadcastable(np::FixedSizeParam) = Base.broadcastable(np.input)
 
 
-struct Marker <: AbstractMarker{UInt}
-    typeID::UInt
-    valueID::UInt
-
-    Marker(input::T) where {T} = new(objectid(T), objectid(input))
-end
-
 #!!!!! Marker of ParamBox is not defined
 
-struct ContainerMarker{N, M<:NTuple{N, AbstractMarker{UInt}}} <: AbstractMarker{UInt}
+struct ParamMarker{M<:NonEmptyTuple{AbstractMarker}} <: AbstractMarker{M}
     typeID::UInt
-    dataMarker::M
+    marker::M
     funcID::UInt
     metaID::UInt
 end
 
+struct ValueMarker <: AbstractMarker{UInt}
+    valueID::UInt
+
+    ValueMarker(input) = new(objectid(input))
+end
+
+struct CollectionMarker <: AbstractMarker{Union{AbstractArray, Tuple}}
+    data::Union{AbstractArray, Tuple}
+end
+
+struct ObjectMarker{T} <: AbstractMarker{T}
+    data::T
+end
+
+markObj(input::PrimitiveParam) = ValueMarker(input)
+
+markObj(input::DimensionalParam) = ParamMarker(input)
+
+function isPrimVarCollection(arg::AbstractArray{T}) where {T}
+    ET = isconcretetype(T) ? T : eltype(map(itself, arg))
+    isprimitivetype(ET)
+end
+
+function isPrimVarCollection(arg::Tuple)
+    all(isprimitivetype(i) for i in arg)
+end
+
+function markObj(input::Union{AbstractArray, Tuple})
+    isPrimVarCollection(input) ? ValueMarker(input) : CollectionMarker(input)
+end
+
+markObj(input) = ObjectMarker(input)
+
 const NothingID = objectid(nothing)
 
-function ContainerMarker(sv::T) where {T<:NodeVar}
-    m = Marker(sv.input)
-    ContainerMarker{1, Tuple{Marker}}(objectid(T), (m,), NothingID, NothingID)
-end
-
-function ContainerMarker(gv::T) where {T<:GridVar}
-    m = Marker(gv.input)
-    ContainerMarker{1, Tuple{Marker}}(objectid(T), (m,), NothingID, 
-                                      objectid(screenLevelOf(gv)))
-end
-
-function ContainerMarker(pn::T) where {T<:NodeParam}
-    ms = Marker.(pn.input)
-    ContainerMarker{length(ms), typeof(ms)}(
-        objectid(T), ms, objectid(pn.lambda.f), 
-        objectid((pn.offset, screenLevelOf(pn)))
+function ParamMarker(pn::T) where {T<:NodeParam}
+    ParamMarker(
+        objectid(T), markObj.((pn.input..., pn.offset)), objectid(pn.lambda.f), 
+        objectid(screenLevelOf(pn))
     )
 end
 
-function ContainerMarker(pn::T) where {T<:ArrayParam}
-    ms = Marker.(pn.input)
-    ContainerMarker{length(ms), typeof(ms)}(objectid(T), ms, objectid(pn.lambda.f))
+function ParamMarker(pn::T) where {T<:ArrayParam}
+    ParamMarker(objectid(T), markObj.(pn.input), objectid(pn.lambda.f), NothingID)
 end
 
-function ContainerMarker(nt::T) where {N, T<:NodeTuple{<:Any, N}}
-    ms = ContainerMarker.(nt.input)
-    ContainerMarker{N, typeof(ms)}(objectid(T), ms, NothingID, NothingID)
+#! To be discarded
+function ParamMarker(nt::T) where {N, T<:NodeTuple{<:Any, N}}
+    ms = ParamMarker.(nt.input)
+    ParamMarker(objectid(T), ms, NothingID, NothingID)
 end
 
+compareMarker(pm1::AbstractMarker, pm2::AbstractMarker) = false
+
+compareMarker(pm1::T, pm2::T) where {T<:ParamMarker{<:Tuple{Vararg{ValueMarker}}}} = 
+pm1 == pm2
+
+function compareMarker(pm1::T, pm2::T) where {T<:CollectionMarker}
+    if pm1.data === pm2.data
+        true
+    elseif length(pm1.data) == length(pm2.data)
+        isSame = true
+        for (i, j) in zip(pm1.data, pm2.data)
+            isSame = ( pm1.data === pm2.data || compareMarker(markObj(i), markObj(j)) )
+            isSame || break
+        end
+        isSame
+    else
+        false
+    end
+end
+
+compareMarker(pm1::T, pm2::T) where {T<:ObjectMarker} = pm1.data == pm2.data
+
+function compareMarker(pm1::T, pm2::T) where {T<:ParamMarker}
+    isSame = (pm1.funcID == pm2.funcID || pm1.metaID == pm2.metaID)
+    if isSame
+        for (marker1, marker2) in zip(pm1.marker, pm2.marker)
+            isSame = compareMarker(marker1, marker2)
+            isSame || break
+        end
+    end
+    isSame
+end
 
 compareParamContainer(::DimensionalParam, ::DimensionalParam) = false
-
-compareParamContainer(pc1::T, pc2::T) where {T<:DimensionalParam} = 
-pc1 === pc2 || ContainerMarker(pc1) == ContainerMarker(pc2)
 
 compareParamContainer(::DimensionalParam, ::Any) = false
 
 compareParamContainer(::Any, ::DimensionalParam) = false
+
+compareParamContainer(pc1::T, pc2::T) where {T<:PrimitiveParam} = pc1 === pc2
+
+compareParamContainer(pc1::PBoxTypeArgNumOutDim{T, A, O}, 
+                      pc2::PBoxTypeArgNumOutDim{T, A, O}) where {T, A, O} = 
+pc1 === pc2 || compareMarker(ParamMarker(pc1), ParamMarker(pc2))
 
 
 operateBy(::typeof(+), pn1::NodeParam) = itself(pn1)
@@ -626,7 +658,7 @@ function sortParamContainers(::Type{C}, f::F, field::Symbol, roundAtol::T) where
         function (container::C)
             ele = getproperty(container, field)
             ( roundToMultiOfStep(f(container), nearestHalfOf(roundAtol)), 
-              symFromIndexSym(ele.symbol), ContainerMarker(ele) )
+              symFromIndexSym(ele.symbol), ParamMarker(ele) )
         end
     end
 end

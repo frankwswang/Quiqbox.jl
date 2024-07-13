@@ -181,3 +181,5 @@ const PBoxInputValType{T} = Union{NETupleOfPBoxVal{T, 0}, NETupleOfPBoxVal{T, 1}
 const AbtVecOfAbtArray{T} = AbstractVector{<:AbstractArray{T}}
 
 const GraphArgDataType{T} = Union{AbtVecOfAbtArray{T}, NonEmptyTuple{AbstractArray{T}}}
+
+const PBoxTypeArgNumOutDim{T, A, O} = ParamBox{T, <:NTuple{A, ParamBoxSingleArg{T}}, O}
