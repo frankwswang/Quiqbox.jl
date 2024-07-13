@@ -1,7 +1,7 @@
 export NodeVar, GridVar, NodeParam, ArrayParam, NodeTuple, setScreenLevel!, setScreenLevel, 
        symOf, inputOf, obtain, setVal!, screenLevelOf, markParams!, topoSort, getParams
 
-using Base: Fix2, Threads.Atomic
+using Base: Fix2, Threads.Atomic, issingletontype
 using LRUCache
 
 unpackAA0Dtype(arg::Type{<:AbtArray0D}) = eltype(arg)
@@ -116,15 +116,27 @@ end
 checkScreenLevel(s::TernaryNumber, levelMin::Int, levelMax::Int) = 
 checkScreenLevel(Int(s), levelMin, levelMax)
 
-const DefaultPrimParamTypes = Union{Number, Symbol, Bool}
+function checkPrimParamType(::Type{T}) where {T}
+    isPermitted = isprimitivetype(T) || issingletontype(T) || isbitstype(T)
+    if !isPermitted
+        throw(DomainError(T, "The (elemental) type of `input`, when used as an argument, "*
+                             "should make at least one of these functions return `true`:\n"*
+                             "`$isprimitivetype`, `$issingletontype`, `$isbitstype`."))
+    end
+    nothing
+end
+
+checkPrimParamType(::Type{<:PrimitiveParam{T}}) where {T} = checkPrimParamType(T)
+
+checkPrimParamType(::PT) where {PT<:PrimitiveParam} = checkPrimParamType(PT)
 
 mutable struct NodeVar{T} <: PrimitiveParam{T, 0}
     @atomic input::T
     const symbol::IndexedSym
 
-    function NodeVar(input::T, symbol::SymOrIdxSym; 
-                     bound::Type{U}=DefaultPrimParamTypes) where {U, T<:U}
-        new{T}(deepcopy(input), IndexedSym(symbol))
+    function NodeVar(input::T, symbol::SymOrIdxSym) where {T}
+        checkPrimParamType(T)
+        new{T}(input, IndexedSym(symbol))
     end
 end
 
@@ -138,13 +150,12 @@ struct GridVar{T, N, V<:AbstractArray{T, N}} <: PrimitiveParam{T, N}
     symbol::IndexedSym
     screen::TernaryNumber
 
-    function GridVar(input::V, symbol::SymOrIdxSym, screen::TernaryNumber=TPS1; 
-                     bound::Type{U}=DefaultPrimParamTypes) where 
-                    {U, T<:U, N, V<:AbstractArray{T, N}}
+    function GridVar(input::V, symbol::SymOrIdxSym, screen::TernaryNumber=TPS1) where 
+                    {T, N, V<:AbstractArray{T, N}}
+        checkPrimParamType(T)
         checkScreenLevel(screen, 1, 2)
         N < 1 && throw(DomainError(N, "The dimension of `input` must be larger than 0."))
-        isempty(input) && throw(ArgumentError("`input` must not be empty."))
-        new{T, N, V}(deepcopy(input), IndexedSym(symbol), screen)
+        new{T, N, V}(copy(input), IndexedSym(symbol), screen)
     end
 end
 
