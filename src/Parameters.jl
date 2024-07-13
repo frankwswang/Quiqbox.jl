@@ -102,7 +102,7 @@ returnDimOf(::T) where {T<:StableMorphism} = returnDimOf(T)
 
 const SymOrIdxSym = Union{Symbol, IndexedSym}
 
-genDimParamSelfRefErrorMessage(::Type{T}) where {T<:DimensionalParam} = 
+genDParamSelfRefErrorMessage(::Type{T}) where {T<:DimensionalParam} = 
 "`$T`is forbidden to directly (self) reference another DimensionalParam."
 
 function checkScreenLevel(sl::Int, levelMin::Int, levelMax::Int)
@@ -130,9 +130,9 @@ function checkGridVarInputType(input::AbstractArray{<:Any, N}) where {N}
     nothing
 end
 
-const SafeGridVarInputTypes = Union{Number, Symbol, String, Bool}
+const DefaultGridVarInputTypes = Union{Number, Symbol, String, Bool}
 
-checkGridVarInputTypes(::AbstractArray{<:SafeGridVarInputTypes}) = nothing
+checkGridVarInputTypes(::AbstractArray{<:DefaultGridVarInputTypes}) = nothing
 
 mutable struct NodeVar{T} <: PrimitiveParam{T, 0}
     @atomic input::T
