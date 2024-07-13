@@ -161,7 +161,7 @@ end
 function genComputeGraphCore2(idDict::IdDict{ParamBox{T}, OperatorNode{T}}, 
                               inPSet::AbstractVector{<:PrimDParSetEltype{T}}, 
                               par::DimensionalParam{T}) where {T}
-    sl = screenLevelOf(par)
+    sl = checkScreenLevel(screenLevelOf(par), 0, 2)
 
     if sl == 0
         refNode = get(idDict, par, nothing)
@@ -177,10 +177,8 @@ function genComputeGraphCore2(idDict::IdDict{ParamBox{T}, OperatorNode{T}},
         end
     elseif sl == 1
         genComputeGraphCore1(inPSet, par)
-    elseif sl == 2
-        FixedNode(obtain(par), symbolFromPar(par))
     else
-        throwScreenLevelError(sl)
+        FixedNode(obtain(par), symbolFromPar(par))
     end
 end
 

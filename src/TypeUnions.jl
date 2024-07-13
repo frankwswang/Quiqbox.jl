@@ -73,11 +73,11 @@ const ParamObject{T} = Union{ParamContainer{T}, ParamFunction{T}}
 const ElementalParam{T} = DimensionalParam{T, 0}
 const PrimParCandidate{T} = Union{ElementalParam{T}, PrimitiveParam{T}}
 
-const PNodeIn1{T} = Union{T, ElementalParam{T}}
-const PNodeIn2{T, F<:Function} = Tuple{F, ElementalParam{T}}
-const PNodeIn3{T, F<:Function} = Tuple{F, AbstractArray{<:ElementalParam{T}}}
-const PNodeIn4{T, F} = Union{PNodeIn2{T, F}, PNodeIn3{T, F}}
-const PNodeInput{T} = Union{PNodeIn1{T}, PNodeIn4{T}}
+# const PNodeIn1{T} = Union{T, ElementalParam{T}}
+# const PNodeIn2{T, F<:Function} = Tuple{F, ElementalParam{T}}
+# const PNodeIn3{T, F<:Function} = Tuple{F, AbstractArray{<:ElementalParam{T}}}
+# const PNodeIn4{T, F} = Union{PNodeIn2{T, F}, PNodeIn3{T, F}}
+const PNodeInput{T} = Union{T, ElementalParam{T}}
 
 const SParamAbtArray{T, N} = AbstractArray{<:ElementalParam{T}, N}
 const PParamAbtArray{T, N} = AbstractArray{<:PrimitiveParam{T}, N}
@@ -140,7 +140,7 @@ const NonEmptyTupleOrAbtVector{T, A<:AbstractVector{T}} = Union{NonEmptyTuple{T}
     TPS2= 2
 end
 
-const AbtArrayOfOr{T, A<:AbstractArray{T}} = Union{T, A}
+const AbtArrayOr{T} = Union{T, AbstractArray{T}}
 
 const CommutativeBinaryNumOps = Union{typeof(+), typeof(*)}
 
@@ -175,7 +175,7 @@ const ArgTypeOfNDPIVal{T} = Union{
 # const NETupleOfAOOType{T, NMO} = NonEmptyTuple{AbtArrOOType{T}, NMO}
 # const ArgTypeOfNDPIVal{T} = Union{NETupleOfAOOType{T, 0}, NETupleOfAOOType{T, 1}}
 
-const NETupleOfPBoxVal{T, NMO} = NonEmptyTuple{AbtArrayOfOr{T}, NMO}
+const NETupleOfPBoxVal{T, NMO} = NonEmptyTuple{AbtArrayOr{T}, NMO}
 const PBoxInputValType{T} = Union{NETupleOfPBoxVal{T, 0}, NETupleOfPBoxVal{T, 1}}
 
 const AbtVecOfAbtArray{T} = AbstractVector{<:AbstractArray{T}}
