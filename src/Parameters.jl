@@ -419,10 +419,6 @@ symOf(pc::DimensionalParam) = idxSymOf(pc).name
 inputOf(pb::DimensionalParam) = pb.input
 
 
-obtain(nv::PrimitiveParam{<:Any, 0}) = nv.input
-
-obtain(gv::PrimitiveParam) = copy(gv.input)
-
 mutable struct NodeMarker
     @atomic counter::Int
     @atomic checked::Bool
@@ -430,11 +426,24 @@ end
 
 NodeMarker() = NodeMarker(1, false)
 
-function obtain(pn::ParamBox{T}) where {T}
-    nodeMarkerDict = IdDict{DimensionalParam{T}, NodeMarker}()
+obtain(p::PrimitiveParam) = obtainINTERNAL(p)
+
+function obtain(p::Union{ParamBox{T}, AbstractArray{<:ElementalParam{T}}}) where {T}
     lock( ReentrantLock() ) do
-        obtainCore(nodeMarkerDict, pn)
+        obtainINTERNAL(p)
     end
+end
+
+obtainINTERNAL(p::PrimitiveParam{<:Any, 0}) = p.input
+
+obtainINTERNAL(p::PrimitiveParam) = copy(p.input)
+
+# Sugar syntax. E.g., for obtaining values of the first element in a parameter set.
+obtainINTERNAL(pars::AbstractArray{<:ElementalParam{T}}) where {T} = obtainINTERNAL.(pars)
+
+function obtainINTERNAL(p::ParamBox{T}) where {T}
+    nodeMarkerDict = IdDict{DimensionalParam{T}, NodeMarker}()
+    obtainCore(nodeMarkerDict, p)
 end
 
 function obtainCore(nodeMarkerDict::IdDict{DimensionalParam{T}, NodeMarker}, 
@@ -445,64 +454,59 @@ function obtainCore(nodeMarkerDict::IdDict{DimensionalParam{T}, NodeMarker},
 end
 
 function obtainCore(nodeMarkerDict::IdDict{DimensionalParam{T}, NodeMarker}, 
-                    pn::ArrayParam{T}) where {T}
-    marker = get(nodeMarkerDict, pn, nothing)
+                    p::ArrayParam{T}) where {T}
+    marker = get(nodeMarkerDict, p, nothing)
     freshStart = if marker === nothing
-        marker = (nodeMarkerDict[pn] = NodeMarker())
+        marker = (nodeMarkerDict[p] = NodeMarker())
         true
     else
         false
     end
     if marker.counter == 1
         res = if freshStart || marker.checked
-            f = pn.lambda
-            f((obtainCore(nodeMarkerDict, x) for x in pn.input)...)
+            f = p.lambda
+            f((obtainCore(nodeMarkerDict, x) for x in p.input)...)
         else
             @atomic marker.counter = 2
-            pn.memory
+            p.memory
         end
-        @atomic marker.checked = true
+        marker.checked || (@atomic marker.checked = true)
         res
     else
-        @assert marker.counter == 2
-        pn.memory
+        p.memory
     end
 end
 
 function obtainCore(nodeMarkerDict::IdDict{DimensionalParam{T}, NodeMarker}, 
-                    pn::NodeParam{T}) where {T}
-    res = pn.offset
-    sl = screenLevelOf(pn)
+                    p::NodeParam{T}) where {T}
+    res = p.offset
+    sl = screenLevelOf(p)
     if sl == 0
-        marker = get(nodeMarkerDict, pn, nothing)
+        marker = get(nodeMarkerDict, p, nothing)
         freshStart = if marker === nothing
-            marker = (nodeMarkerDict[pn] = NodeMarker())
+            marker = (nodeMarkerDict[p] = NodeMarker())
             true
         else
             false
         end
         if marker.counter == 1
             if freshStart || marker.checked
-                f = pn.lambda
-                res += f((obtainCore(nodeMarkerDict, x) for x in pn.input)...)
+                f = p.lambda
+                res += f((obtainCore(nodeMarkerDict, x) for x in p.input)...)
             else
                 @atomic marker.counter = 2
-                res = pn.memory
+                res = p.memory
             end
-            @atomic marker.checked = true
+            marker.checked || (@atomic marker.checked = true)
         else
-            @assert marker.counter == 2
-            res = pn.memory
+            res = p.memory
         end
     end
     res
 end
 
-obtainCore(::IdDict{DimensionalParam{T}, NodeMarker}, par::PrimitiveParam{T}) where {T} = 
-obtain(par)
-
-# Sugar syntax. E.g., for obtaining values of the first element in a parameter set.
-obtain(pars::AbstractArray{<:ElementalParam{T}}) where {T} = obtain.(pars)
+obtainCore(::IdDict{DimensionalParam{T}, NodeMarker}, p::PrimitiveParam{T}) where {T} = 
+obtain(p)
 
 # To be deprecated
 obtain(nt::NodeTuple) = obtain.(nt.input)
