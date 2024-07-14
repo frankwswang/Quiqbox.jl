@@ -419,12 +419,12 @@ symOf(pc::DimensionalParam) = idxSymOf(pc).name
 inputOf(pb::DimensionalParam) = pb.input
 
 
-mutable struct NodeMarker
-    @atomic counter::Int
-    @atomic checked::Bool
+mutable struct NodeMarker{T}
+    checked::Bool
+    value::T
 end
 
-NodeMarker() = NodeMarker(1, false)
+NodeMarker(init) = NodeMarker(false, init)
 
 obtain(p::PrimitiveParam) = obtainINTERNAL(p)
 
@@ -442,71 +442,66 @@ obtainINTERNAL(p::PrimitiveParam) = copy(p.input)
 obtainINTERNAL(pars::AbstractArray{<:ElementalParam{T}}) where {T} = obtainINTERNAL.(pars)
 
 function obtainINTERNAL(p::ParamBox{T}) where {T}
-    nodeMarkerDict = IdDict{DimensionalParam{T}, NodeMarker}()
+    nodeMarkerDict = IdDict{ParamBox{T}, NodeMarker}()
     obtainCore(nodeMarkerDict, p)
 end
 
-function obtainCore(nodeMarkerDict::IdDict{DimensionalParam{T}, NodeMarker}, 
+function obtainCore(nodeMarkerDict::IdDict{ParamBox{T}, NodeMarker}, 
                     input::AbstractArray{<:DimensionalParam{T}}) where {T}
     map(input) do child
         obtainCore(nodeMarkerDict, child)
     end
 end
 
-function obtainCore(nodeMarkerDict::IdDict{DimensionalParam{T}, NodeMarker}, 
+function obtainCore(nodeMarkerDict::IdDict{ParamBox{T}, NodeMarker}, 
                     p::ArrayParam{T}) where {T}
     marker = get(nodeMarkerDict, p, nothing)
     freshStart = if marker === nothing
-        marker = (nodeMarkerDict[p] = NodeMarker())
+        marker = (nodeMarkerDict[p] = NodeMarker(p.memory))
         true
     else
         false
     end
-    if marker.counter == 1
-        res = if freshStart || marker.checked
-            f = p.lambda
-            f((obtainCore(nodeMarkerDict, x) for x in p.input)...)
-        else
-            @atomic marker.counter = 2
-            p.memory
-        end
-        marker.checked || (@atomic marker.checked = true)
-        res
-    else
+    if freshStart
+        val = p.lambda((obtainCore(nodeMarkerDict, x) for x in p.input)...)
+        marker.checked = true
+        marker.value = val
+        val
+    elseif !marker.checked
+        marker.checked = true
         p.memory
+    else
+        marker.value
     end
 end
 
-function obtainCore(nodeMarkerDict::IdDict{DimensionalParam{T}, NodeMarker}, 
+function obtainCore(nodeMarkerDict::IdDict{ParamBox{T}, NodeMarker}, 
                     p::NodeParam{T}) where {T}
     res = p.offset
     sl = screenLevelOf(p)
     if sl == 0
         marker = get(nodeMarkerDict, p, nothing)
         freshStart = if marker === nothing
-            marker = (nodeMarkerDict[p] = NodeMarker())
+            marker = (nodeMarkerDict[p] = NodeMarker(p.memory))
             true
         else
             false
         end
-        if marker.counter == 1
-            if freshStart || marker.checked
-                f = p.lambda
-                res += f((obtainCore(nodeMarkerDict, x) for x in p.input)...)
-            else
-                @atomic marker.counter = 2
-                res = p.memory
-            end
-            marker.checked || (@atomic marker.checked = true)
-        else
+        if freshStart
+            res += p.lambda((obtainCore(nodeMarkerDict, x) for x in p.input)...)
+            marker.checked = true
+            marker.value = res
+        elseif !marker.checked
+            marker.checked = true
             res = p.memory
+        else
+            res = marker.value
         end
     end
     res
 end
 
-obtainCore(::IdDict{DimensionalParam{T}, NodeMarker}, p::PrimitiveParam{T}) where {T} = 
-obtain(p)
+obtainCore(::IdDict{ParamBox{T}, NodeMarker}, p::PrimitiveParam{T}) where {T} = obtain(p)
 
 # To be deprecated
 obtain(nt::NodeTuple) = obtain.(nt.input)
