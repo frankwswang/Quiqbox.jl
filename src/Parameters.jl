@@ -160,12 +160,6 @@ struct GridVar{T, N, V<:AbstractArray{T, N}} <: PrimitiveParam{T, N}
     end
 end
 
-#! use flatten to check ParamContainer Referencing ParamContainer
-
-# getLambdaArgNum(::Type{<:NETupleOfDimPar{<:Any, NMO}}) where {NMO} = NMO + 1
-# getLambdaArgNum(::Type{<:ParamBox{<:Any, I}}) where {I} = getLambdaArgNum(I)
-# getLambdaArgNum(::T) where {T} = getLambdaArgNum(T)
-
 getParamBoxArgDim(::Type{<:ParamBoxSingleArg{<:Any, N}}) where {N} = N
 getParamBoxArgDim(::T) where {T<:ParamBoxSingleArg} = getParamBoxArgDim(T)
 
@@ -202,7 +196,7 @@ function checkParamBoxInputCore(hasVariable::Bool, arg::T, dimMinMax::NTuple{2, 
 end
 
 #! Need to reformulate following `checkArrayParamArg`
-mutable struct NodeParam{T, F<:Function, I<:ParamBoxInputType{T}} <: ParamBox{T, I, 0}
+mutable struct NodeParam{T, F<:Function, I<:ParamBoxInputType{T}} <: ParamBox{T, 0, I}
     const lambda::TypedReduction{T, F}
     const input::I
     const symbol::IndexedSym
@@ -302,7 +296,7 @@ function checkArrayParamArg(::StableMorphism{T, F, N}, input::I,
 end
 
 mutable struct ArrayParam{T, F<:Function, I<:ParamBoxInputType{T}, 
-                          N, M<:AbstractArray{T, N}} <: ParamBox{T, I, N}
+                          N, M<:AbstractArray{T, N}} <: ParamBox{T, N, I}
     const lambda::StableMorphism{T, F, N}
     const input::I
     const symbol::IndexedSym
@@ -367,9 +361,11 @@ ArrayParam(GridVar(val, valSym), symbol)
 
 screenLevelOf(pn::ParamBox) = Int(pn.screen)
 
-screenLevelOf(::PrimitiveParam{<:Any, 0}) = 1
+screenLevelOf(pn::ArrayParam) = 0
 
 screenLevelOf(pp::PrimitiveParam) = Int(pp.screen)
+
+screenLevelOf(::PrimitiveParam{<:Any, 0}) = 1
 
 
 function setScreenLevelCore!(pn::ParamBox, level::Int)
@@ -401,7 +397,7 @@ function memorize!(pn::ParamBox{T}, newMem::T=ValOf(pn)) where {T}
 end
 
 
-struct NodeTuple{T<:Real, N, PT} <: ParamBox{T, PT, N}
+struct NodeTuple{T<:Real, N, PT} <: ParamBox{T, N, PT}
     input::PT
     symbol::IndexedSym
 
@@ -420,11 +416,11 @@ inputOf(pb::DimensionalParam) = pb.input
 
 
 mutable struct NodeMarker{T}
-    checked::Bool
+    visited::Bool
     value::T
 end
 
-NodeMarker(init) = NodeMarker(false, init)
+NodeMarker(init::T, ::Type{U}=T) where {T, U} = NodeMarker{U}(false, init)
 
 obtain(p::PrimitiveParam) = obtainINTERNAL(p)
 
@@ -434,74 +430,54 @@ function obtain(p::Union{ParamBox{T}, AbstractArray{<:ElementalParam{T}}}) where
     end
 end
 
-obtainINTERNAL(p::PrimitiveParam{<:Any, 0}) = p.input
-
-obtainINTERNAL(p::PrimitiveParam) = copy(p.input)
-
 # Sugar syntax. E.g., for obtaining values of the first element in a parameter set.
 obtainINTERNAL(pars::AbstractArray{<:ElementalParam{T}}) where {T} = obtainINTERNAL.(pars)
 
+obtainINTERNAL(p::PrimitiveParam) = directObtain(p)
+
+directObtain(p::PrimitiveParam{<:Any, 0}) = p.input
+
+directObtain(p::PrimitiveParam) = copy(p.input)
+
 function obtainINTERNAL(p::ParamBox{T}) where {T}
     nodeMarkerDict = IdDict{ParamBox{T}, NodeMarker}()
-    obtainCore(nodeMarkerDict, p)
+    searchObtain(nodeMarkerDict, p)
 end
 
-function obtainCore(nodeMarkerDict::IdDict{ParamBox{T}, NodeMarker}, 
-                    input::AbstractArray{<:DimensionalParam{T}}) where {T}
+function searchObtain(nodeMarkerDict::IdDict{ParamBox{T}, NodeMarker}, 
+                      input::AbstractArray{<:DimensionalParam{T}}) where {T}
     map(input) do child
-        obtainCore(nodeMarkerDict, child)
+        searchObtain(nodeMarkerDict, child)
     end
 end
 
-function obtainCore(nodeMarkerDict::IdDict{ParamBox{T}, NodeMarker}, 
-                    p::ArrayParam{T}) where {T}
-    marker = get(nodeMarkerDict, p, nothing)
-    freshStart = if marker === nothing
-        marker = (nodeMarkerDict[p] = NodeMarker(p.memory))
-        true
-    else
-        false
-    end
-    if freshStart
-        val = p.lambda((obtainCore(nodeMarkerDict, x) for x in p.input)...)
-        marker.checked = true
-        marker.value = val
-        val
-    elseif !marker.checked
-        marker.checked = true
-        p.memory
+function obtainSearchCore(nodeMarkerDict::IdDict{ParamBox{T}, NodeMarker}, 
+                          p::ParamBox{T}) where {T}
+    f = hasfield(typeof(p), :offset) ? Fix2(+, p.offset) : itself
+    # Depth-first search by recursive calling
+    marker = get!(nodeMarkerDict, p, NodeMarker(p.memory))
+    if !marker.visited
+        marker.visited = true
+        res = p.lambda((searchObtain(nodeMarkerDict, x) for x in p.input)...) |> f
+        marker.value = res
     else
         marker.value
     end
 end
 
-function obtainCore(nodeMarkerDict::IdDict{ParamBox{T}, NodeMarker}, 
-                    p::NodeParam{T}) where {T}
-    res = p.offset
-    sl = screenLevelOf(p)
-    if sl == 0
-        marker = get(nodeMarkerDict, p, nothing)
-        freshStart = if marker === nothing
-            marker = (nodeMarkerDict[p] = NodeMarker(p.memory))
-            true
-        else
-            false
-        end
-        if freshStart
-            res += p.lambda((obtainCore(nodeMarkerDict, x) for x in p.input)...)
-            marker.checked = true
-            marker.value = res
-        elseif !marker.checked
-            marker.checked = true
-            res = p.memory
-        else
-            res = marker.value
-        end
-    end
-    res
+function searchObtain(nodeMarkerDict::IdDict{ParamBox{T}, NodeMarker}, 
+                      p::ArrayParam{T}) where {T}
+    obtainSearchCore(nodeMarkerDict, p)
 end
 
-obtainCore(::IdDict{ParamBox{T}, NodeMarker}, p::PrimitiveParam{T}) where {T} = obtain(p)
+function searchObtain(nodeMarkerDict::IdDict{ParamBox{T}, NodeMarker}, 
+                      p::NodeParam{T}) where {T}
+    screenLevelOf(p) == 0 ? obtainSearchCore(nodeMarkerDict, p) : p.offset
+end
+
+function searchObtain(::IdDict{ParamBox{T}, NodeMarker}, p::PrimitiveParam{T}) where {T}
+    obtainINTERNAL(p)
+end
 
 # To be deprecated
 obtain(nt::NodeTuple) = obtain.(nt.input)
@@ -643,8 +619,8 @@ compareParamContainer(::Any, ::DimensionalParam) = false
 
 compareParamContainer(pc1::T, pc2::T) where {T<:PrimitiveParam} = pc1 === pc2
 
-compareParamContainer(pc1::PBoxTypeArgNumOutDim{T, A, O}, 
-                      pc2::PBoxTypeArgNumOutDim{T, A, O}) where {T, A, O} = 
+compareParamContainer(pc1::PBoxTypeArgNumOutDim{T, N, A}, 
+                      pc2::PBoxTypeArgNumOutDim{T, N, A}) where {T, N, A} = 
 pc1 === pc2 || compareMarker(ParamMarker(pc1), ParamMarker(pc2))
 
 

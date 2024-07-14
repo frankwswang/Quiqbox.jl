@@ -40,13 +40,13 @@ abstract type DimensionalParam{T, N} <: ParamContainer{T} end
 abstract type CompositeParam{T, N} <: DimensionalParam{T, N} end
 abstract type PrimitiveParam{T, N} <: DimensionalParam{T, N} end
 
-abstract type GraphNode{T, O} <: ComputableGraph{T} end
+abstract type GraphNode{T, N} <: ComputableGraph{T} end
 
-abstract type OperatorNode{T, O, I, F} <: GraphNode{T, O} end
-abstract type EffectNode{T, O, I} <: GraphNode{T, O} end
-abstract type StorageNode{T, O} <: GraphNode{T, O} end
+abstract type OperatorNode{T, N, I, F} <: GraphNode{T, N} end
+abstract type EffectNode{T, N, I} <: GraphNode{T, N} end
+abstract type StorageNode{T, N} <: GraphNode{T, N} end
 
-abstract type ParamBox{T, I, D} <: CompositeParam{T, D} end
+abstract type ParamBox{T, N, I} <: CompositeParam{T, N} end
 
 abstract type SingleVarFunction{T} <: ParamFunction{T} end
 abstract type MultiDimFunction{T, D} <: ParamFunction{T} end
@@ -182,4 +182,4 @@ const AbtVecOfAbtArray{T} = AbstractVector{<:AbstractArray{T}}
 
 const GraphArgDataType{T} = Union{AbtVecOfAbtArray{T}, NonEmptyTuple{AbstractArray{T}}}
 
-const PBoxTypeArgNumOutDim{T, A, O} = ParamBox{T, <:NTuple{A, ParamBoxSingleArg{T}}, O}
+const PBoxTypeArgNumOutDim{T, N, A} = ParamBox{T, N, <:NTuple{A, ParamBoxSingleArg{T}}}
