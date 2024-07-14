@@ -126,6 +126,7 @@ function checkPrimParamType(::Type{T}) where {T}
     nothing
 end
 
+#! Should be remove. Cause recursive self-reference
 checkPrimParamType(::Type{<:PrimitiveParam{T}}) where {T} = checkPrimParamType(T)
 
 checkPrimParamType(::PT) where {PT<:PrimitiveParam} = checkPrimParamType(PT)
@@ -168,7 +169,7 @@ end
 getParamBoxArgDim(::Type{<:ParamBoxSingleArg{<:Any, N}}) where {N} = N
 getParamBoxArgDim(::T) where {T<:ParamBoxSingleArg} = getParamBoxArgDim(T)
 
-function checkParamBoxInput(input::ParamBoxInputType; dimMin::Int=-0, dimMax=64)
+function checkParamBoxInput(input::ParamBoxInputType; dimMin::Int=0, dimMax=64)
     hasVariable = false
     for x in input
         hasVariable = checkParamBoxInputCore(hasVariable, x, (dimMin, dimMax))
@@ -200,6 +201,7 @@ function checkParamBoxInputCore(hasVariable::Bool, arg::T, dimMinMax::NTuple{2, 
     hasVariable::Bool
 end
 
+#! Need to reformulate following `checkArrayParamArg`
 mutable struct NodeParam{T, F<:Function, I<:ParamBoxInputType{T}} <: ParamBox{T, I, 0}
     const lambda::TypedReduction{T, F}
     const input::I
@@ -213,6 +215,7 @@ mutable struct NodeParam{T, F<:Function, I<:ParamBoxInputType{T}} <: ParamBox{T,
                        offset::T, 
                        memory::T=zero(T), 
                        screen::TernaryNumber=TUS0) where {T, I, F}
+        checkScreenLevel(screen, 0, 2)
         checkParamBoxInput(input)
         new{T, F, I}(lambda, input, IndexedSym(symbol), offset, memory, screen)
     end
@@ -223,6 +226,7 @@ mutable struct NodeParam{T, F<:Function, I<:ParamBoxInputType{T}} <: ParamBox{T,
                        memory::T=obtain(first(input)[]), 
                        screen::TernaryNumber=TUS0) where 
                       {T, I<:Tuple{AbtArray0D{<:ElementalParam{T}}}}
+        checkScreenLevel(screen, 0, 2)
         checkParamBoxInput(input, dimMax=0)
         new{T, iT, I}(TypedReduction(T), input, IndexedSym(symbol), offset, memory, screen)
     end
@@ -277,6 +281,26 @@ function prepareArrayInit(::Type{T}, ::Val{N}, init::AbstractArray{T, N}) where 
     copy(init)
 end
 
+function checkArrayParamArg(::StableMorphism{T, <:iTalike, N}, input::I, 
+                            init::Union{Missing, AbstractArray{T, N}}) where {T, N, I}
+    if !(I <: Tuple{ParamBoxSingleArg{T, N}})
+        throw(ArgumentError("`$I` is not supported as the second argument when `lambda` "*
+                            "functions like an identity morphism."))
+    end
+    checkParamBoxInput(input, dimMin=1)
+    ismissing(init) ? (input |> first |> obtain) : deepcopy(init)
+end
+
+function checkArrayParamArg(::StableMorphism{T, F, N}, input::I, 
+                            init::Union{Missing, AbstractArray{T, N}}) where {T, F, N, I}
+    checkParamBoxInput(input)
+    if ismissing(init)
+        reshape(fill(input|>first|>obtain|>first|>deepcopy), ntuple(_->1, Val(N)))
+    else
+        deepcopy(init)
+    end
+end
+
 mutable struct ArrayParam{T, F<:Function, I<:ParamBoxInputType{T}, 
                           N, M<:AbstractArray{T, N}} <: ParamBox{T, I, N}
     const lambda::StableMorphism{T, F, N}
@@ -286,63 +310,46 @@ mutable struct ArrayParam{T, F<:Function, I<:ParamBoxInputType{T},
 
     function ArrayParam(lambda::StableMorphism{T, F, N}, input::I, 
                         symbol::SymOrIdxSym, 
-                        memory::M=prepareArrayInit(T, Val(N))) where {T, F, N, I, M}
-        checkParamBoxInput(input)
-        new{T, F, I, N, M}(lambda, input, IndexedSym(symbol), copy(memory))
-    end
-
-    function ArrayParam(::StableMorphism{T, <:iTalike, N}, input::I, 
-                        symbol::SymOrIdxSym, 
-                        memory::M=obtain(first(input))) where 
-                       {T, N, I<:Tuple{ParamBoxSingleArg{T, N}}, M}
-        checkParamBoxInput(input, dimMin=1)
-        new{T, iT, I, N, M}(StableMorphism(T, Val(N)), input, IndexedSym(symbol), 
-                            copy(memory))
+                        memory::Union{Missing, AbstractArray{T, N}}=missing) where 
+                       {T, F, N, I<:ParamBoxInputType{T}}
+        memory = checkArrayParamArg(lambda, input, memory)
+        new{T, F, I, N, typeof(memory)}(lambda, input, IndexedSym(symbol), memory)
     end
 end
 
-function ArrayParam(::StableMorphism{T, <:iTalike}, ::I, ::SymOrIdxSym, 
-                   ::T=fill(zero(T))) where {T, I}
-    throw(ArgumentError("`$I` is not supported as the second argument when `lambda` "*
-                        "functions like an identity morphism."))
-end
-
-function ArrayParam(lambda::Function, input::ParamBoxInputType{T}, 
-                    symbol::Symbol; init::AbtArrayOr{T}=zero(T)) where {T}
+function ArrayParam(lambda::Function, input::ParamBoxInputType{T}, symbol::SymOrIdxSym; 
+                    init::Union{Missing, AbstractArray{T}}=missing) where {T}
     input = packElemParam.(input)
     ATs = map(x->typeof(x|>obtain), input)
     lambda = StableMorphism(lambda, ATs...)
-    ArrayParam(lambda, input, symbol, prepareArrayInit(T, Val(lambda|>returnDimOf), init))
+    ArrayParam(lambda, input, symbol, init)
 end
 
-ArrayParam(lambda::Function, input::ParamBoxSingleArg{T}, symbol::Symbol; 
-           init::AbtArrayOr{T}=zero(T)) where {T} = 
+ArrayParam(lambda::Function, input::ParamBoxSingleArg{T}, symbol::SymOrIdxSym; 
+           init::Union{Missing, AbstractArray{T}}=missing) where {T} = 
 ArrayParam(lambda, (input,), symbol; init)
 
 ArrayParam(lambda::Function, input1::ParamBoxSingleArg{T}, input2::ParamBoxSingleArg{T}, 
-           symbol::Symbol; init::AbtArrayOr{T}=zero(T)) where {T} = 
+           symbol::SymOrIdxSym; init::Union{Missing, AbstractArray{T}}=missing) where {T} = 
 ArrayParam(lambda, (input1, input2), symbol; init)
 
 ArrayParam(lambda::Function, input1::ParamBoxSingleArg{T}, input2::ParamBoxSingleArg{T}, 
-           input3::ParamBoxSingleArg{T}, symbol::Symbol; 
-           init::AbtArrayOr{T}=zero(T)) where {T} = 
+           input3::ParamBoxSingleArg{T}, symbol::SymOrIdxSym; 
+           init::Union{Missing, AbstractArray{T}}=missing) where {T} = 
 ArrayParam(lambda, (input1, input2, input3), symbol; init)
 
-ArrayParam(par::ArrayParam{T}, symbol::Symbol=symOf(par); 
-           init::AbtArrayOr{T}=par.memory) where {T} = 
+ArrayParam(par::ArrayParam{T}, symbol::SymOrIdxSym=symOf(par); 
+           init::Union{Missing, AbstractArray{T}}=par.memory) where {T} = 
 ArrayParam(par.lambda, par.input, symbol, init)
 
-ArrayParam(input::PrimitiveParam{T, N}, symbol::Symbol=symOf(input)) where {T, N} = 
+ArrayParam(input::PrimitiveParam{T, N}, symbol::SymOrIdxSym=symOf(input)) where {T, N} = 
 ArrayParam(StableMorphism(T, Val(N)), (input,), symbol)
 
-ArrayParam(input::AbstractArray{<:ElementalParam{T}, N}, symbol::Symbol) where {T, N} = 
+ArrayParam(input::AbstractArray{<:ElementalParam{T}, N}, symbol::SymOrIdxSym) where {T, N} = 
 ArrayParam(StableMorphism(T, Val(N)), (input,), symbol)
 
-ArrayParam(val::AbstractArray, valSym::Symbol, symbol::Symbol=valSym) = 
-ArrayParam(Grid(val, valSym), symbol)
-
-
-
+ArrayParam(val::AbstractArray, valSym::SymOrIdxSym, symbol::SymOrIdxSym=valSym) = 
+ArrayParam(GridVar(val, valSym), symbol)
 
 
 #!! Should disallow NodeVar of NodeVar etc... , Instead, design ReferenceNode
@@ -416,43 +423,85 @@ obtain(nv::PrimitiveParam{<:Any, 0}) = nv.input
 
 obtain(gv::PrimitiveParam) = copy(gv.input)
 
-function obtain(pn::NodeParam{T}, fallbackVal::T=pn.memory) where {T}
-    idSet = Set{UInt}()
-    obtainCore(idSet, pn, fallbackVal)
+mutable struct NodeMarker
+    @atomic counter::Int
+    @atomic checked::Bool
 end
 
-function obtainCore(idSet::Set{UInt64}, input::AbstractArray{<:ElementalParam{T}}, 
-                    fallbackVal::T) where {T}
-    map(input) do child
-        obtainCore(idSet, child, fallbackVal)
+NodeMarker() = NodeMarker(1, false)
+
+function obtain(pn::ParamBox{T}) where {T}
+    nodeMarkerDict = IdDict{DimensionalParam{T}, NodeMarker}()
+    lock( ReentrantLock() ) do
+        obtainCore(nodeMarkerDict, pn)
     end
 end
 
-function obtainCore(idSet::Set{UInt64}, pn::DimensionalParam{T}, fallbackVal::T) where {T}
-    #!!!!
-    T(0)
+function obtainCore(nodeMarkerDict::IdDict{DimensionalParam{T}, NodeMarker}, 
+                    input::AbstractArray{<:DimensionalParam{T}}) where {T}
+    map(input) do child
+        obtainCore(nodeMarkerDict, child)
+    end
 end
 
-function obtainCore(idSet::Set{UInt64}, pn::NodeParam{T}, fallbackVal::T) where {T}
+function obtainCore(nodeMarkerDict::IdDict{DimensionalParam{T}, NodeMarker}, 
+                    pn::ArrayParam{T}) where {T}
+    marker = get(nodeMarkerDict, pn, nothing)
+    freshStart = if marker === nothing
+        marker = (nodeMarkerDict[pn] = NodeMarker())
+        true
+    else
+        false
+    end
+    if marker.counter == 1
+        res = if freshStart || marker.checked
+            f = pn.lambda
+            f((obtainCore(nodeMarkerDict, x) for x in pn.input)...)
+        else
+            @atomic marker.counter = 2
+            pn.memory
+        end
+        @atomic marker.checked = true
+        res
+    else
+        @assert marker.counter == 2
+        pn.memory
+    end
+end
+
+function obtainCore(nodeMarkerDict::IdDict{DimensionalParam{T}, NodeMarker}, 
+                    pn::NodeParam{T}) where {T}
     res = pn.offset
     sl = screenLevelOf(pn)
     if sl == 0
-        id = objectid(pn)
-        if id in idSet
-            res = fallbackVal
+        marker = get(nodeMarkerDict, pn, nothing)
+        freshStart = if marker === nothing
+            marker = (nodeMarkerDict[pn] = NodeMarker())
+            true
         else
-            f = pn.lambda
-            push!(idSet, id)
-            res += f((obtainCore(idSet, x, fallbackVal) for x in pn.input)...)
+            false
         end
-    elseif sl == -1
-        res = fallbackVal
+        if marker.counter == 1
+            if freshStart || marker.checked
+                f = pn.lambda
+                res += f((obtainCore(nodeMarkerDict, x) for x in pn.input)...)
+            else
+                @atomic marker.counter = 2
+                res = pn.memory
+            end
+            @atomic marker.checked = true
+        else
+            @assert marker.counter == 2
+            res = pn.memory
+        end
     end
     res
 end
 
-obtainCore(::Set{UInt}, par::PrimitiveParam{T}, ::T) where {T} = obtain(par)
+obtainCore(::IdDict{DimensionalParam{T}, NodeMarker}, par::PrimitiveParam{T}) where {T} = 
+obtain(par)
 
+# Sugar syntax. E.g., for obtaining values of the first element in a parameter set.
 obtain(pars::AbstractArray{<:ElementalParam{T}}) where {T} = obtain.(pars)
 
 # To be deprecated
