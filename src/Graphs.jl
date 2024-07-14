@@ -1,15 +1,19 @@
 export genComputeGraph, evalGraphNode, compressGraphNode
 
-struct FixedNode{T} <: StorageNode{T, 0}
-    val::T
+struct FixedNode{T, N} <: StorageNode{T, N}
+    val::Array{T, N}
     marker::Symbol
 end
 
-struct IndexNode{T, O} <: StorageNode{T, O}
-    var::Array{T, O}
+struct IndexNode{T, N} <: StorageNode{T, N}
+    val::Array{T, N}
     marker::Symbol
     idx::Int
 end
+
+struct EmptyNode{T, N} <: GraphNode{T, N} end
+
+EmptyNode(::DimensionalParam{T, N}) where {T, N} = EmptyNode{T, N}()
 
 const ChildNodeType{T, N} = Union{AbstractArray{<:GraphNode{T, 0}, N}, GraphNode{T, N}}
 
@@ -32,9 +36,15 @@ struct ReductionNode{T, I<:NodeChildrenType{T}, F} <: OperatorNode{T, 0, I, F}
     bias::T
 end
 
-struct ReferenceNode{T, O, I, F, G<:OperatorNode{T, O, I, F}} <: EffectNode{T, O, I}
-    ref::G
-    history::Array{T, O}
+fillElementalVal(::Val{0}, obj::Any) = fill(obj)
+fillElementalVal(::Val,    obj::AbstractArray) = itself(obj)
+
+struct ReferenceNode{T, N} <: StorageNode{T, N}
+    id::UInt
+    val::Array{T, N}
+
+    ReferenceNode(pb::ParamBox{T, N}) where {T, N} = 
+    new{T, N}(objectid(pb), fillElementalVal(Val(N), pb.memory))
 end
 
 
@@ -50,7 +60,12 @@ function compressGraphNode(gn::IndexNode{T}) where {T}
     (x::AbtVecOfAbtArray{T})->x[gn.idx]
 end
 
-function compressGraphNode(gn::OperatorNode{T, O, I}) where {T, O, I}
+function compressGraphNode(::EmptyNode{T, N}) where {T, N}
+    val = reshape( fill( T() ), ntuple(_->1, Val(N)) )
+    (::AbtVecOfAbtArray{T})->itself.(val)
+end
+
+function compressGraphNode(gn::OperatorNode{T, N, I}) where {T, N, I}
     ChildNum = getChildNum(I)
     compressGraphNodeCore(Val(ChildNum), gn)
 end
@@ -105,7 +120,7 @@ function compressGraphNodeCore(::Val{3}, node::OperatorNode{T}) where {T}
 end
 
 # # Failed generalization attempt due to Enzyme (v0.12.22).
-# function compressGraphNodeCore(::Val{N}, node::OperatorNode{T, O, I}) where {N, T, O, I}
+# function compressGraphNodeCore(::Val{N}, node::OperatorNode{T, N, I}) where {N, T, N, I}
 #     fs = makeGraphFuncComp.(node.child)
 #     rT = Tuple{(ifelse(n==0, T, AbstractArray{T, n}) for n in getChildDim(I))...}
 #     let apply1s=fs, apply2=node.apply, b=node.bias, argT=rT
@@ -116,11 +131,21 @@ end
 # end
 
 
-evalGraphNode(gn::FixedNode{T}, ::AbtVecOfAbtArray{T}) where {T} = gn.val
+function evalGraphNode(gn::FixedNode{T}, ::AbtVecOfAbtArray{T}) where {T}
+    itself.(gn.val)
+end
 
-evalGraphNode(gn::IndexNode{T, 0}, data::AbtVecOfAbtArray{T}) where {T} = data[begin][gn.idx]
+function evalGraphNode(gn::IndexNode{T, 0}, data::AbtVecOfAbtArray{T}) where {T}
+    data[begin][gn.idx]
+end
 
-evalGraphNode(gn::IndexNode{T}, data::AbtVecOfAbtArray{T}) where {T} = data[gn.idx]
+function evalGraphNode(gn::IndexNode{T}, data::AbtVecOfAbtArray{T}) where {T}
+    data[gn.idx]
+end
+
+function evalGraphNode(gn::ReferenceNode{T}, ::AbtVecOfAbtArray{T}) where {T}
+    itself.(gn.val)
+end
 
 function evalGraphNode(gn::ReductionNode{T}, data::AbtVecOfAbtArray{T}) where {T}
     gn.apply( broadcast(evalGraphNodeCore, gn.child, Ref(data))... ) + gn.bias
@@ -144,41 +169,39 @@ end
 
 const symbolFromPar = symbolFrom∘idxSymOf
 
-fillElementalVal(::Type{T}, ele::T) where {T} = fill(ele)
-fillElementalVal(::Type{T}, obj::AbstractArray{T}) where {T} = itself(obj)
-
 selectInPSubset(::Val{0}, ps::AbstractVector{<:PrimDParSetEltype{T}}) where {T} = first(ps)
 selectInPSubset(::Val,    ps::AbstractVector{<:PrimDParSetEltype{T}}) where {T} = itself(ps)
 
 function genComputeGraphCore1(inPSet::AbstractVector{<:PrimDParSetEltype{T}}, 
                               par::DimensionalParam{T, N}) where {T, N}
     idx = findfirst(Fix2(compareParamContainer, par), selectInPSubset(Val(N), inPSet))
-    val = obtain(par)
+    val = fillElementalVal(Val(N), obtain(par))
     sym = symbolFromPar(par)
-    idx === nothing ? FixedNode(val, sym) : IndexNode(fillElementalVal(T, val), sym, idx)
+    idx === nothing ? FixedNode(val, sym) : IndexNode(val, sym, idx)
 end
 
-function genComputeGraphCore2(idDict::IdDict{ParamBox{T}, OperatorNode{T}}, 
+function genComputeGraphCore2(idDict::IdDict{ParamBox{T}, NodeMarker{<:GraphNode{T}}}, 
                               inPSet::AbstractVector{<:PrimDParSetEltype{T}}, 
-                              par::DimensionalParam{T}) where {T}
+                              par::DimensionalParam{T, N}) where {T, N}
     sl = checkScreenLevel(screenLevelOf(par), 0, 2)
 
     if sl == 0
-        refNode = get(idDict, par, nothing)
-        if refNode === nothing
+        # Depth-first search by recursive calling
+        marker = get!(idDict, par, NodeMarker(ReferenceNode(par), GraphNode{T, N}))
+        if !marker.visited
+            marker.visited = true
             childNodes = map(par.input) do arg
                 genComputeGraphCore2(idDict, inPSet, arg)
             end
-            node = ReductionNode(par.lambda, childNodes, symbolFromPar(par), par.offset)
-            setindex!(idDict, node, par)
-            node
+            res = ReductionNode(par.lambda, childNodes, symbolFromPar(par), par.offset)
+            marker.value = res
         else
-            ReferenceNode(refNode, fillElementalVal(T, par.memory))
+            marker.value
         end
     elseif sl == 1
         genComputeGraphCore1(inPSet, par)
     else
-        FixedNode(obtain(par), symbolFromPar(par))
+        FixedNode(fillElementalVal(Val(N), par|>obtain), symbolFromPar(par))
     end
 end
 
@@ -191,7 +214,7 @@ end
 
 function genComputeGraph(inPSet::AbstractVector{<:PrimDParSetEltype{T}}, 
                          par::ParamBox{T}) where {T}
-    idDict = IdDict{ParamBox{T}, OperatorNode{T}}()
+    idDict = IdDict{ParamBox{T}, NodeMarker{<:GraphNode{T}}}()
     genComputeGraphCore2(idDict, inPSet, par)
 end
 
