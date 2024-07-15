@@ -4,9 +4,6 @@ export NodeVar, GridVar, NodeParam, ArrayParam, NodeTuple, setScreenLevel!, setS
 using Base: Fix2, Threads.Atomic, issingletontype
 using LRUCache
 
-unpackAA0Dtype(arg::Type{<:AbtArray0D}) = eltype(arg)
-unpackAA0Dtype(arg::Type) = itself(arg)
-
 function checkReturnType(f::F, ::Type{T}, argTs::Tuple{Vararg{DataType}}) where {F, T}
     bl = false
     returnT = Any
@@ -24,13 +21,13 @@ struct TypedReduction{T, F<:Function} <: TypedFunction{T, F}
     f::F
 
     function TypedReduction(f::F, aT::Type{T}, aTs::Type...) where {F, T}
-        Ts = (aT, aTs...) .|> unpackAA0Dtype
+        Ts = (aT, aTs...)
         checkReturnType(f, T, Ts)
         new{T, F}(f)
     end
 
     function TypedReduction(f::F, aT::Type{<:AbstractArray{T}}, aTs::Type...) where {F, T}
-        Ts = (aT, aTs...) .|> unpackAA0Dtype
+        Ts = (aT, aTs...)
         checkReturnType(f, T, Ts)
         new{T, F}(f)
     end
@@ -41,26 +38,23 @@ end
 #             {T1, T2, AT<:Union{T2, AbstractArray{T2}}} = 
 # TypedReduction(srf.f, AT)
 
-unpackAA0D(@nospecialize(arg::AbtArray0D)) = getindex(arg)
-unpackAA0D(@nospecialize(arg::Any)) = itself(arg)
-
 TypedReduction(::Type{T}) where {T} = TypedReduction(itself, T)
 
 # Type annotation prevents Enzyme.jl (v0.12.22) from breaking sometimes.
 function (sf::TypedReduction{T, F})(arg1::AbtArrayOr{T}) where {T, F}
-    sf.f(unpackAA0D(arg1))::T
+    sf.f(arg1)::T
 end
 
 # Type annotation prevents Enzyme.jl (v0.12.22) from breaking sometimes.
 function (sf::TypedReduction{T, F})(arg1::AbtArrayOr{T}, 
                                     arg2::AbtArrayOr{T}) where {T, F}
-    sf.f(unpackAA0D(arg1), unpackAA0D(arg2))::T
+    sf.f(arg1, arg2)::T
 end
 
 function (sf::TypedReduction{T, F})(arg1::AbtArrayOr{T}, 
                                     arg2::AbtArrayOr{T}, 
                                     arg3::AbtArrayOr{T}) where {T, F}
-    sf.f(unpackAA0D(arg1), unpackAA0D(arg2), unpackAA0D(arg3))::T
+    sf.f(arg1, arg2, arg3)::T
 end
 
 
@@ -68,13 +62,13 @@ struct StableMorphism{T, F<:Function, N} <:TypedFunction{T, F}
     f::F
 
     function StableMorphism(f::F, aT::Type{T}, aTs::Type...) where {T, F}
-        Ts = (aT, aTs...) .|> unpackAA0Dtype
+        Ts = (aT, aTs...)
         rT = checkReturnType(f, AbstractArray{T}, Ts)
         new{T, F, ndims(rT)}(f)
     end
 
     function StableMorphism(f::F, aT::Type{<:AbstractArray{T}}, aTs::Type...) where {T, F}
-        Ts = (aT, aTs...) .|> unpackAA0Dtype
+        Ts = (aT, aTs...)
         rT = checkReturnType(f, AbstractArray{T}, Ts)
         new{T, F, ndims(rT)}(f)
     end
@@ -83,18 +77,18 @@ struct StableMorphism{T, F<:Function, N} <:TypedFunction{T, F}
 end
 
 function (sf::StableMorphism{T, F, N})(arg1::AbtArrayOr{T}) where {T, F, N}
-    sf.f(unpackAA0D(arg1))::AbstractArray{T, N}
+    sf.f(arg1)::AbstractArray{T, N}
 end
 
 function (sf::StableMorphism{T, F, N})(arg1::AbtArrayOr{T}, 
                                        arg2::AbtArrayOr{T}) where {T, F, N}
-    sf.f(unpackAA0D(arg1), unpackAA0D(arg2))::AbstractArray{T, N}
+    sf.f(arg1, arg2)::AbstractArray{T, N}
 end
 
 function (sf::StableMorphism{T, F, N})(arg1::AbtArrayOr{T}, 
                                        arg2::AbtArrayOr{T}, 
                                        arg3::AbtArrayOr{T}) where {T, F, N}
-    sf.f(unpackAA0D(arg1), unpackAA0D(arg2), unpackAA0D(arg3))::AbstractArray{T, N}
+    sf.f(arg1, arg2, arg3)::AbstractArray{T, N}
 end
 
 returnDimOf(::Type{<:StableMorphism{<:Any, <:Any, N}}) where {N} = N
@@ -103,7 +97,7 @@ returnDimOf(::T) where {T<:StableMorphism} = returnDimOf(T)
 const SymOrIdxSym = Union{Symbol, IndexedSym}
 
 
-function checkScreenLevel(sl::Int, levelMin::Int, levelMax::Int)
+function checkScreenLevel(sl::Int, (levelMin, levelMax)::NTuple{2, Int})
     levelRange = levelMax - levelMin
     levelRange < 0 && 
     throw(DomainError(levelRange, "`levelMax - levelMin` must be nonnegative."))
@@ -113,8 +107,8 @@ function checkScreenLevel(sl::Int, levelMin::Int, levelMax::Int)
     sl
 end
 
-checkScreenLevel(s::TernaryNumber, levelMin::Int, levelMax::Int) = 
-checkScreenLevel(Int(s), levelMin, levelMax)
+checkScreenLevel(s::TernaryNumber, levelMinMax::NTuple{2, Int}) = 
+checkScreenLevel(Int(s), levelMinMax)
 
 function checkPrimParamType(::Type{T}) where {T}
     isPermitted = isprimitivetype(T) || issingletontype(T) || isbitstype(T)
@@ -154,7 +148,7 @@ struct GridVar{T, N, V<:AbstractArray{T, N}} <: PrimitiveParam{T, N}
     function GridVar(input::V, symbol::SymOrIdxSym, screen::TernaryNumber=TPS1) where 
                     {T, N, V<:AbstractArray{T, N}}
         checkPrimParamType(T)
-        checkScreenLevel(screen, 1, 2)
+        checkScreenLevel(screen, getScreenLevelRange(PrimitiveParam))
         N < 1 && throw(DomainError(N, "The dimension of `input` must be larger than 0."))
         new{T, N, V}(copy(input), IndexedSym(symbol), screen)
     end
@@ -187,8 +181,6 @@ function checkParamBoxInputCore(hasVariable::Bool, arg::T, dimMinMax::NTuple{2, 
         elseif !hasVariable && any( (screenLevelOf(y) < 2) for y in arg )
             hasVariable = true
         end
-    elseif T <: ElementalParam
-        throw(ArgumentError("`arg::ElementalParam` must be inside an `AbstractArray`."))
     elseif !hasVariable && screenLevelOf(arg) < 2
         hasVariable = true
     end
@@ -209,7 +201,7 @@ mutable struct NodeParam{T, F<:Function, I<:ParamBoxInputType{T}} <: ParamBox{T,
                        offset::T, 
                        memory::T=zero(T), 
                        screen::TernaryNumber=TUS0) where {T, I, F}
-        checkScreenLevel(screen, 0, 2)
+        checkScreenLevel(screen, getScreenLevelRange(ParamBox{T, 0}))
         checkParamBoxInput(input)
         new{T, F, I}(lambda, input, IndexedSym(symbol), offset, memory, screen)
     end
@@ -217,10 +209,10 @@ mutable struct NodeParam{T, F<:Function, I<:ParamBoxInputType{T}} <: ParamBox{T,
     function NodeParam(::TypedReduction{T, <:iTalike}, input::I, 
                        symbol::SymOrIdxSym, 
                        offset::T, 
-                       memory::T=obtain(first(input)[]), 
+                       memory::T=obtain(input|>first), 
                        screen::TernaryNumber=TUS0) where 
-                      {T, I<:Tuple{AbtArray0D{<:ElementalParam{T}}}}
-        checkScreenLevel(screen, 0, 2)
+                      {T, I<:Tuple{ElementalParam{T}}}
+        checkScreenLevel(screen, getScreenLevelRange(ParamBox{T, 0}))
         checkParamBoxInput(input, dimMax=0)
         new{T, iT, I}(TypedReduction(T), input, IndexedSym(symbol), offset, memory, screen)
     end
@@ -232,12 +224,8 @@ function NodeParam(::TypedReduction{T, <:iTalike}, ::I, ::SymOrIdxSym, ::T,
                         "functions like an identity morphism."))
 end
 
-packElemParam(parArg::ElementalParam) = fill(parArg)
-packElemParam(parArg::Any) = itself(parArg)
-
 function NodeParam(lambda::Function, input::ParamBoxInputType{T}, 
                    symbol::Symbol; init::T=zero(T)) where {T}
-    input = packElemParam.(input)
     ATs = map(x->typeof(x|>obtain), input)
     NodeParam(TypedReduction(lambda, ATs...), input, symbol, zero(T), init)
 end
@@ -258,7 +246,7 @@ NodeParam(par::NodeParam{T}, symbol::Symbol=symOf(par); init::T=par.memory) wher
 NodeParam(par.lambda, par.input, symbol, par.offset, init, par.screen)
 
 NodeParam(var::PrimitiveParam{T, 0}, symbol::Symbol=symOf(var)) where {T} = 
-NodeParam(TypedReduction(T), (fill(var),), symbol, zero(T))
+NodeParam(TypedReduction(T), (var,), symbol, zero(T))
 
 NodeParam(var, varSym::Symbol, symbol::Symbol=varSym) = 
 NodeParam(NodeVar(var, varSym), symbol)
@@ -313,7 +301,6 @@ end
 
 function ArrayParam(lambda::Function, input::ParamBoxInputType{T}, symbol::SymOrIdxSym; 
                     init::Union{Missing, AbstractArray{T}}=missing) where {T}
-    input = packElemParam.(input)
     ATs = map(x->typeof(x|>obtain), input)
     lambda = StableMorphism(lambda, ATs...)
     ArrayParam(lambda, input, symbol, init)
@@ -358,12 +345,23 @@ ArrayParam(GridVar(val, valSym), symbol)
 
 # end
 
+getScreenLevelRange(::Type{<:ParamBox}) = (0, 0)
 
-screenLevelOf(pn::ParamBox) = Int(pn.screen)
+getScreenLevelRange(::Type{<:PrimitiveParam}) = (1, 2)
 
-screenLevelOf(pn::ArrayParam) = 0
+getScreenLevelRange(::Type{<:ParamBox{<:Any, 0}}) = (0, 2)
 
-screenLevelOf(pp::PrimitiveParam) = Int(pp.screen)
+getScreenLevelRange(::Type{<:PrimitiveParam{<:Any, 0}}) = (1, 1)
+
+getScreenLevelRange(::Type{<:DimensionalParam}) = (0, 2)
+
+getScreenLevelRange(::T) where {T<:DimensionalParam} = getScreenLevelRange(T)
+
+screenLevelOf(::ParamBox) = 0
+
+screenLevelOf(p::PrimitiveParam) = Int(p.screen)
+
+screenLevelOf(p::ParamBox{<:Any, 0}) = Int(p.screen)
 
 screenLevelOf(::PrimitiveParam{<:Any, 0}) = 1
 
@@ -378,7 +376,7 @@ function setScreenLevel!(pn::ParamBox, level::Int)
     elseif levelOld == 0
         @atomic pn.offset = obtain(pn)
     elseif level == 0
-        @atomic pn.offset -= pn.lambda((map(obtain, arg) for arg in pn.input)...)
+        @atomic pn.offset -= pn.lambda((obtain(arg) for arg in pn.input)...)
     end
     setScreenLevelCore!(pn, level)
     pn
@@ -776,7 +774,7 @@ function topoSortCore!(hbNodesIdSet::Set{UInt},
                        orderedNodes::Vector{<:DimensionalParam{T}}, 
                        haveBranches::Vector{Bool}, connectRoots::Vector{Bool}, 
                        node::DimensionalParam{T}, recursive::Bool=false) where {T}
-    sl = checkScreenLevel(screenLevelOf(node), 0, 2)
+    sl = checkScreenLevel(screenLevelOf(node), getScreenLevelRange(DimensionalParam{T}))
 
     if sl in (0, 1)
         idx = findfirst(Fix2(compareParamContainer, node), orderedNodes)
