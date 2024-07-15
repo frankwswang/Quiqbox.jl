@@ -22,11 +22,11 @@ function genConstFunc(::Type{T1}, val::T2) where {T1, T2}
 end
 
 
-struct FixedNode{T, N, V<:AbstractArray{T, N}} <: StorageNode{T, N}
+struct ValueNode{T, N, V<:AbstractArray{T, N}} <: StorageNode{T, N}
     val::V
     marker::Symbol
 
-    function FixedNode(::Val{N}, obj, marker::Symbol) where {N}
+    function ValueNode(::Val{N}, obj, marker::Symbol) where {N}
         val = packElementalVal(Val(N), obj)
         new{eltype(val), ndims(val), typeof(val)}(val, marker)
     end
@@ -79,12 +79,12 @@ genOperatorNode(par::ArrayParam{T, <:Any, <:NTuple{A, ParamBoxSingleArg{T}}},
 MorphismNode(par.lambda, childNodes, symbolFromPar(par))
 
 
-function compressGraphNode(gn::FixedNode{T}) where {T}
+function compressGraphNode(gn::ValueNode{T}) where {T}
     genConstFunc(AbtVecOfAbtArray{T}, deepcopy( itself.(gn.val) ))
 end
 
 # # This might make Enzyme (v0.12.22-23) crash or output wrong gradient and pollute data
-# function compressGraphNode(gn::FixedNode{T}) where {T}
+# function compressGraphNode(gn::ValueNode{T}) where {T}
 #     let val = deepcopy(gn.val)
 #         (::AbtVecOfAbtArray{T})->itself.(val)
 #     end
@@ -171,7 +171,7 @@ end
 # end
 
 
-function evalGraphNode(gn::FixedNode{T}, ::AbtVecOfAbtArray{T}) where {T}
+function evalGraphNode(gn::ValueNode{T}, ::AbtVecOfAbtArray{T}) where {T}
     itself.(gn.val)
 end
 
@@ -211,7 +211,7 @@ function evalGraphNodeCore(parInput::AbtArray0D{<:GraphNode{T, 0}},
 end
 
 
-const symbolFromPar = symbolFrom∘idxSymOf
+const symbolFromPar = symbolFrom∘indexedSymOf
 
 selectInPSubset(::Val{0}, ps::AbstractVector{<:PrimDParSetEltype{T}}) where {T} = first(ps)
 selectInPSubset(::Val,    ps::AbstractVector{<:PrimDParSetEltype{T}}) where {T} = itself(ps)
@@ -221,7 +221,7 @@ function genComputeGraphCore1(inPSet::AbstractVector{<:PrimDParSetEltype{T}},
     idx = findfirst(Fix2(compareParamContainer, par), selectInPSubset(Val(N), inPSet))
     val = obtain(par)
     sym = symbolFromPar(par)
-    idx === nothing ? FixedNode(Val(N), val, sym) : IndexNode(Val(N), val, sym, idx)
+    idx === nothing ? ValueNode(Val(N), val, sym) : IndexNode(Val(N), val, sym, idx)
 end
 
 function genComputeGraphCore2(idDict::IdDict{ParamBox{T}, NodeMarker{<:GraphNode{T}}}, 
@@ -245,7 +245,7 @@ function genComputeGraphCore2(idDict::IdDict{ParamBox{T}, NodeMarker{<:GraphNode
     elseif sl == 1
         genComputeGraphCore1(inPSet, par)
     else
-        FixedNode(Val(N), obtain(par), symbolFromPar(par))
+        ValueNode(Val(N), obtain(par), symbolFromPar(par))
     end
 end
 
@@ -256,12 +256,45 @@ function genComputeGraphCore2(idDict, inPSet,
     end
 end
 
-function genComputeGraph(inPSet::AbstractVector{<:PrimDParSetEltype{T}}, 
-                         par::ParamBox{T}) where {T}
+function genComputeGraphINTERNAL(inPSet::AbstractVector{<:PrimDParSetEltype{T}}, 
+                                 par::ParamBox{T}) where {T}
     idDict = IdDict{ParamBox{T}, NodeMarker{<:GraphNode{T}}}()
     genComputeGraphCore2(idDict, inPSet, par)
 end
 
-genComputeGraph(inPSet::AbstractVector{<:PrimDParSetEltype{T}}, 
-                par::PrimitiveParam{T}) where {T} = 
-genComputeGraphCore1(inPSet, par)
+function genComputeGraphINTERNAL(inPSet::AbstractVector{<:PrimDParSetEltype{T}}, 
+                                 par::PrimitiveParam{T}) where {T}
+    genComputeGraphCore1(inPSet, par)
+end
+
+
+const ParamSetErrorMessage1 = "`$ElementalParam` must all be enclosed in a single array "*
+                              "as the first element of `inputParamSet`."
+
+const ParamSetErrorMessage2 = "The screen level of the input parameter (inspected by "*
+                              "`$screenLevelOf`) for a dependent parameter must be 1."
+
+function genComputeGraph(inputParamSet::AbstractVector{<:PrimDParSetEltype{T}}, 
+                         par::DimensionalParam{T}) where {T}
+    for i in eachindex(inputParamSet)
+        p = inputParamSet[i]
+
+        bl1 = i == firstindex(inputParamSet)
+        bl2 = p isa AbstractArray{<:ElementalParam{T}}
+        bl3 = (p isa DimensionalParam && !(p isa ElementalParam))
+        if !( ( !bl1 && bl3 ) || ( bl1 && (bl2 || bl3) ) )
+            throw(AssertionError(ParamSetErrorMessage1))
+        end
+
+        bl2 || (p = [p])
+
+        for pp in p
+            sl = screenLevelOf(pp)
+            if sl != 1
+                throw(DomainError((pp, sl), ParamSetErrorMessage2))
+            end
+        end
+    end
+
+    genComputeGraphINTERNAL(inputParamSet, par)
+end
