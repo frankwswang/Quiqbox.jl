@@ -128,10 +128,12 @@ checkPrimParamType(::PT) where {PT<:PrimitiveParam} = checkPrimParamType(PT)
 mutable struct NodeVar{T} <: PrimitiveParam{T, 0}
     @atomic input::T
     const symbol::IndexedSym
+    @atomic screen::TernaryNumber
 
-    function NodeVar(input::T, symbol::SymOrIdxSym) where {T}
+    function NodeVar(input::T, symbol::SymOrIdxSym, screen::TernaryNumber=TPS1) where {T}
         checkPrimParamType(T)
-        new{T}(input, IndexedSym(symbol))
+        checkScreenLevel(screen, getScreenLevelRange(PrimitiveParam))
+        new{T}(input, IndexedSym(symbol), screen)
     end
 end
 
@@ -140,10 +142,10 @@ throw(ArgumentError("`NodeVar` does not support `AbstractArray`-type `input`."))
 
 # genSeqAxis(::Val{N}, sym::Symbol=:e) where {N} = (Symbol(sym, i) for i in 1:N) |> Tuple
 
-struct GridVar{T, N, V<:AbstractArray{T, N}} <: PrimitiveParam{T, N}
-    input::V
-    symbol::IndexedSym
-    screen::TernaryNumber
+mutable struct GridVar{T, N, V<:AbstractArray{T, N}} <: PrimitiveParam{T, N}
+    const input::V
+    const symbol::IndexedSym
+    @atomic screen::TernaryNumber
 
     function GridVar(input::V, symbol::SymOrIdxSym, screen::TernaryNumber=TPS1) where 
                     {T, N, V<:AbstractArray{T, N}}
@@ -347,45 +349,46 @@ ArrayParam(GridVar(val, valSym), symbol)
 
 getScreenLevelRange(::Type{<:ParamBox}) = (0, 0)
 
-getScreenLevelRange(::Type{<:PrimitiveParam}) = (1, 2)
-
 getScreenLevelRange(::Type{<:ParamBox{<:Any, 0}}) = (0, 2)
 
-getScreenLevelRange(::Type{<:PrimitiveParam{<:Any, 0}}) = (1, 1)
+getScreenLevelRange(::Type{<:PrimitiveParam}) = (1, 2)
 
 getScreenLevelRange(::Type{<:DimensionalParam}) = (0, 2)
 
 getScreenLevelRange(::T) where {T<:DimensionalParam} = getScreenLevelRange(T)
 
-screenLevelOf(::ParamBox) = 0
 
-screenLevelOf(p::PrimitiveParam) = Int(p.screen)
+screenLevelOf(::ParamBox) = 0
 
 screenLevelOf(p::ParamBox{<:Any, 0}) = Int(p.screen)
 
-screenLevelOf(::PrimitiveParam{<:Any, 0}) = 1
+screenLevelOf(p::PrimitiveParam) = Int(p.screen)
 
 
-function setScreenLevelCore!(pn::ParamBox, level::Int)
-    @atomic pn.screen = TernaryNumber(level)
+function setScreenLevelCore!(p::DimensionalParam, level::Int)
+    @atomic p.screen = TernaryNumber(level)
 end
 
-function setScreenLevel!(pn::ParamBox, level::Int)
-    levelOld = screenLevelOf(pn)
+function setScreenLevel!(p::NodeParam, level::Int)
+    levelOld = screenLevelOf(p)
     if levelOld == level
     elseif levelOld == 0
-        @atomic pn.offset = obtain(pn)
+        @atomic p.offset = obtain(p)
     elseif level == 0
-        @atomic pn.offset -= pn.lambda((obtain(arg) for arg in pn.input)...)
+        @atomic p.offset -= p.lambda((obtain(arg) for arg in p.input)...)
     end
-    setScreenLevelCore!(pn, level)
-    pn
+    setScreenLevelCore!(p, level)
+    p
 end
+
+setScreenLevel!(p::PrimitiveParam, level::Int) = setScreenLevelCore!(p, level)
 
 
 setScreenLevel(pn::NodeParam, level::Int) = setScreenLevel!(NodeParam(pn), level)
 
-setScreenLevel(gv::GridVar, level::Int) = setScreenLevel!(GridVar(gv), level)
+setScreenLevel(p::NodeVar, level::Int) = NodeVar(p.input, p.symbol, TernaryNumber(level))
+
+setScreenLevel(p::GridVar, level::Int) = GridVar(p.input, p.symbol, TernaryNumber(level))
 
 
 function memorize!(pn::ParamBox{T}, newMem::T=ValOf(pn)) where {T}
@@ -406,9 +409,9 @@ end
 NodeTuple(nt::NodeTuple, symbol::Symbol) = NodeTuple(nt.input, symbol)
 
 
-idxSymOf(pc::DimensionalParam) = pc.symbol
+indexedSymOf(pc::DimensionalParam) = pc.symbol
 
-symOf(pc::DimensionalParam) = idxSymOf(pc).name
+symOf(pc::DimensionalParam) = indexedSymOf(pc).name
 
 inputOf(pb::DimensionalParam) = pb.input
 
