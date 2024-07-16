@@ -43,12 +43,12 @@ end
 
 Return the absolute precision tolerance of the input real number type `T`.
 """
-getAtolVal(::Type{T}) where {T<:Real} = ceil(numEps(T)*1.5, sigdigits=1)
+getAtolVal(::Type{T}) where {T<:Real} = ceil(3numEps(T)/2, sigdigits=1)
 getAtolVal(::Type{T}) where {T<:Integer} = one(T)
 
 
 function roundToMultiOfStep(num::T, step::T) where {T<:Real}
-    if isnan(step)
+    if iszero(step) || isnan(step)
         num
     else
         invStep = inv(step)
@@ -56,7 +56,12 @@ function roundToMultiOfStep(num::T, step::T) where {T<:Real}
     end
 end
 
-roundToMultiOfStep(num::T, step::T) where {T<:Integer} = round(T, num/step) * step
+function roundToMultiOfStep(num::T, step::T) where {T<:Integer}
+    iszero(step) ? num : round(T, num/step) * step
+end
+
+roundToMultiOfStep(nums::AbstractArray{T}, step::T) where {T} = 
+roundToMultiOfStep.(nums, step)
 
 
 nearestHalfOf(val::T) where {T<:Real} = 
@@ -65,8 +70,8 @@ roundToMultiOfStep(val/2, floor(numEps(T), sigdigits=1))
 nearestHalfOf(val::Integer) = itself(val)
 
 
-getNearestMid(num1::T, num2::T, atol::Real) where {T} = 
-(isnan(atol) || num1==num2) ? num1 : roundToMultiOfStep((num1+num2)/2, atol)
+getNearestMid(num1::T, num2::T, atol::T) where {T} = 
+num1==num2 ? num1 : roundToMultiOfStep((num1+num2)/2, atol)
 
 
 function isApprox(x::T, y::T; atol=0) where {T}
@@ -611,6 +616,8 @@ A dummy function that returns its argument.
 
 const iT = typeof(itself)
 
+const iTalike = Union{iT, typeof(identity)}
+
 @inline themselves(xs::Vararg) = xs
 
 
@@ -758,7 +765,7 @@ function arrayDiffCore!((v1, v2)::NTuple{2, Array{T}}) where {T}
         i += 1
         j = findfirst(isequal(v1[i]), v2)
         if j !== nothing
-            popat!(v1, i)
+            popat!(v1, i) 
             push!(coms, popat!(v2, j))
             i -= 1
             l -= 1
@@ -770,19 +777,24 @@ end
 tupleDiff(ts::Vararg{NTuple{<:Any, T}}) where {T} = arrayDiffCore!(ts .|> collect)
 
 
-function genIndex(index::Int)
-    index < 0 && throw(DomainError(index, "`index` should be non-negative."))
-    genIndexCore(index)
-end
+# function genIndex(index::Int)
+#     index < 0 && throw(DomainError(index, "`index` should be non-negative."))
+#     genIndexCore(index)
+# end
 
+genIndexCore(index) = RefVal{Union{Int, Nothing}}(index)
+genIndex(index::Int) = genIndexCore(index)
 genIndex(::Nothing) = genIndexCore(nothing)
 genIndex() = genIndex(nothing)
 
-function genIndexCore(index)
-    res = reshape(Union{Int, Nothing}[0], ()) |> collect
-    res[] = index
-    res
-end
+deref(a) = getindex(a)
+deref(::Nothing) = nothing
+
+# function genArray0D(::Type{T}, val) where {T}
+#     res = reshape(T[0], ()) |> collect
+#     res[] = val
+#     res
+# end
 
 function genNamedTupleC(name::Symbol, defaultVars::AbstractVector)
     @inline function (t::T) where {T<:NamedTuple}
@@ -839,10 +851,10 @@ Tuple(coords)
 uniCallFunc(f::F, argsOrder::NTuple{N, Int}, args...) where {F<:Function, N} = 
 f(getindex.(Ref(args), argsOrder)...)
 
-
-function mergeMultiObjs(::Type{T}, merge2Ofunc::F, o1::T, o2::T, o3::T, o4::T...; 
+#! TODO: Find best merge algorithm
+function mergeMultiObjs(::Type{T}, merge2Ofunc::F, os::AbstractArray{<:T}; 
                         kws...) where {T, F<:Function}
-    arr1 = T[o1, o2, o3, o4...]
+    arr1 = (collect∘vec)(a)
     arr2 = T[]
     while length(arr1) >= 1
         i = 1
@@ -1033,3 +1045,24 @@ n1Power(x::Int) = ifelse(isodd(x), -1, 1)
 n1Power(x::Int, ::Type{T}) where {T} = ifelse(isodd(x), T(-1), T(1))
 n1Power(x::NTuple{N, Int}) where {N} = (n1Power∘sum)(x)
 n1Power(x::NTuple{N, Int}, ::Type{T}) where {N, T} = n1Power(sum(x), T)
+
+# reduceTwoBy(compareFunc::F, o1, o2) where {F<:Function} = 
+# compareFunc(o1, o2) ? [o1] : [o1, o2]
+
+
+struct SplitArg{N, F<:Function} <: Function
+    f::F
+
+    SplitArg{N}(f::F) where {N, F} = new{N, F}(f)
+end
+
+(f::SplitArg{N, F})(arg::AbstractArray) where {N, F} = f.f(arg[begin:begin+(N-1)]...)
+
+function getTypeParam(::Type{T}, idx::Int, default=Any) where {T}
+    hasproperty(T, :parameters) ? T.parameters[idx] : default
+end
+
+function genParamTypeVector(::Type{PT1}, ::Type{PT2}, idx::Int=1) where {PT1, PT2}
+    T = getTypeParam(PT1, idx)
+    ifelse(T===Any, PT2[], PT2{numT}[])
+end
