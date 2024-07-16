@@ -25,10 +25,11 @@ end
 struct ValueNode{T, N, V<:AbstractArray{T, N}} <: StorageNode{T, N}
     val::V
     marker::Symbol
+    frozen::Bool
 
-    function ValueNode(::Val{N}, obj, marker::Symbol) where {N}
+    function ValueNode(::Val{N}, obj, marker::Symbol, frozen::Bool) where {N}
         val = packElementalVal(Val(N), obj)
-        new{eltype(val), ndims(val), typeof(val)}(val, marker)
+        new{eltype(val), ndims(val), typeof(val)}(val, marker, frozen)
     end
 end
 
@@ -218,10 +219,19 @@ selectInPSubset(::Val,    ps::AbstractVector{<:PrimDParSetEltype{T}}) where {T} 
 
 function genComputeGraphCore1(inPSet::AbstractVector{<:PrimDParSetEltype{T}}, 
                               par::DimensionalParam{T, N}) where {T, N}
-    idx = findfirst(Fix2(compareParamContainer, par), selectInPSubset(Val(N), inPSet))
-    val = obtain(par)
+    sl = checkScreenLevel(screenLevelOf(par), (1, 2))
     sym = symbolFromPar(par)
-    idx === nothing ? ValueNode(Val(N), val, sym) : IndexNode(Val(N), val, sym, idx)
+    val = obtain(par)
+    idx = if sl == 2
+        nothing
+    else
+        findfirst(Fix2(compareParamContainer, par), selectInPSubset(Val(N), inPSet))
+    end
+    if idx === nothing
+        ValueNode(Val(N), val, sym, Bool(sl-1))
+    else
+        IndexNode(Val(N), val, sym, idx)
+    end
 end
 
 function genComputeGraphCore2(idDict::IdDict{ParamBox{T}, NodeMarker{<:GraphNode{T}}}, 
@@ -242,10 +252,8 @@ function genComputeGraphCore2(idDict::IdDict{ParamBox{T}, NodeMarker{<:GraphNode
         else
             marker.value
         end
-    elseif sl == 1
-        genComputeGraphCore1(inPSet, par)
     else
-        ValueNode(Val(N), obtain(par), symbolFromPar(par))
+        genComputeGraphCore1(inPSet, par)
     end
 end
 
