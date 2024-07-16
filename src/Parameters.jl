@@ -33,6 +33,7 @@ struct TypedReduction{T, F<:Function} <: TypedFunction{T, F}
     end
 end
 
+#!  More builder for `TypedReduction` and `StableMorphism` when inputs are already them
 # TypedReduction(::Type{<:Union{T, AbstractArray{T}}}, srf::TypedReduction{T}) where {T} = srf
 # TypedReduction(::Type{AT}, srf::TypedReduction{T1}) where 
 #             {T1, T2, AT<:Union{T2, AbstractArray{T2}}} = 
@@ -110,20 +111,16 @@ end
 checkScreenLevel(s::TernaryNumber, levelMinMax::NTuple{2, Int}) = 
 checkScreenLevel(Int(s), levelMinMax)
 
-function checkPrimParamType(::Type{T}) where {T}
-    isPermitted = isprimitivetype(T) || issingletontype(T) || isbitstype(T)
+function checkPrimParamElementalType(::Type{T}) where {T}
+    isPermitted = isbitstype(T) || issingletontype(T)
     if !isPermitted
         throw(DomainError(T, "The (elemental) type of `input`, when used as an argument, "*
                              "should make at least one of these functions return `true`:\n"*
-                             "`$isprimitivetype`, `$issingletontype`, `$isbitstype`."))
+                             "`$isbitstype`, `$issingletontype`."))
     end
     nothing
 end
 
-#! Should be remove. Cause recursive self-reference
-checkPrimParamType(::Type{<:PrimitiveParam{T}}) where {T} = checkPrimParamType(T)
-
-checkPrimParamType(::PT) where {PT<:PrimitiveParam} = checkPrimParamType(PT)
 
 mutable struct NodeVar{T} <: PrimitiveParam{T, 0}
     @atomic input::T
@@ -131,7 +128,7 @@ mutable struct NodeVar{T} <: PrimitiveParam{T, 0}
     @atomic screen::TernaryNumber
 
     function NodeVar(input::T, symbol::SymOrIdxSym, screen::TernaryNumber=TPS1) where {T}
-        checkPrimParamType(T)
+        checkPrimParamElementalType(T)
         checkScreenLevel(screen, getScreenLevelRange(PrimitiveParam))
         new{T}(input, IndexedSym(symbol), screen)
     end
@@ -149,7 +146,7 @@ mutable struct GridVar{T, N, V<:AbstractArray{T, N}} <: PrimitiveParam{T, N}
 
     function GridVar(input::V, symbol::SymOrIdxSym, screen::TernaryNumber=TPS1) where 
                     {T, N, V<:AbstractArray{T, N}}
-        checkPrimParamType(T)
+        checkPrimParamElementalType(T)
         checkScreenLevel(screen, getScreenLevelRange(PrimitiveParam))
         N < 1 && throw(DomainError(N, "The dimension of `input` must be larger than 0."))
         new{T, N, V}(copy(input), IndexedSym(symbol), screen)
