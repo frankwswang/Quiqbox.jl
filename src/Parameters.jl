@@ -22,7 +22,7 @@ function checkTypedOpMethods(::Type{NonEmptyTuple{T, N}}) where {T, N}
 end
 
 
-function checkReturnType(f::F, ::Type{T}, argTs::Tuple{Vararg{DataType}}) where {F, T}
+function checkReturnType(f::F, ::Type{T}, argTs::NonEmptyTuple{DataType}) where {F, T}
     bl = false
     returnT = Any
     try
@@ -38,8 +38,8 @@ end
 struct TypedReduction{T, F<:Function} <: TypedFunction{T, F}
     f::F
 
-    function TypedReduction(f::F, aT::Type{T}, aTs::Type...) where {F, T}
-        Ts = (aT, aTs...)
+    function TypedReduction(f::F, ::Type{T}, aTs::Type...) where {F, T}
+        Ts = (T, aTs...)
         checkReturnType(f, T, Ts)
         new{T, F}(f)
     end
@@ -51,11 +51,11 @@ struct TypedReduction{T, F<:Function} <: TypedFunction{T, F}
     end
 end
 
-#!  More builder for `TypedReduction` and `StableMorphism` when inputs are already them
-# TypedReduction(::Type{<:Union{T, AbstractArray{T}}}, srf::TypedReduction{T}) where {T} = srf
-# TypedReduction(::Type{AT}, srf::TypedReduction{T1}) where 
-#             {T1, T2, AT<:Union{T2, AbstractArray{T2}}} = 
-# TypedReduction(srf.f, AT)
+TypedReduction(srf::TypedReduction, ::Type{T}, Ts::Type...) where {T} = 
+TypedReduction(srf.f, T, Ts...)
+
+TypedReduction(srf::TypedReduction, aT::Type{<:AbstractArray{T}}, Ts::Type...) where {T} = 
+TypedReduction(srf.f, aT, Ts...)
 
 TypedReduction(::Type{T}) where {T} = TypedReduction(itself, T)
 
@@ -80,8 +80,8 @@ end
 struct StableMorphism{T, F<:Function, N} <:TypedFunction{T, F}
     f::F
 
-    function StableMorphism(f::F, aT::Type{T}, aTs::Type...) where {T, F}
-        Ts = (aT, aTs...)
+    function StableMorphism(f::F, ::Type{T}, aTs::Type...) where {T, F}
+        Ts = (T, aTs...)
         rT = checkReturnType(f, AbstractArray{T}, Ts)
         new{T, F, ndims(rT)}(f)
     end
@@ -94,6 +94,12 @@ struct StableMorphism{T, F<:Function, N} <:TypedFunction{T, F}
 
     StableMorphism(::Type{T}, ::Val{N}) where {T, N} = new{T, iT, N}(itself)
 end
+
+StableMorphism(srf::StableMorphism, ::Type{T}, Ts::Type...) where {T} = 
+StableMorphism(srf.f, T, Ts...)
+
+StableMorphism(srf::StableMorphism, aT::Type{<:AbstractArray{T}}, Ts::Type...) where {T} = 
+StableMorphism(srf.f, aT, Ts...)
 
 function (sf::StableMorphism{T, F, N})(arg1::AbtArrayOr{T}) where {T, F, N}
     sf.f(arg1)::AbstractArray{T, N}
