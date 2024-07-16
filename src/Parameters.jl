@@ -95,8 +95,6 @@ end
 returnDimOf(::Type{<:StableMorphism{<:Any, <:Any, N}}) where {N} = N
 returnDimOf(::T) where {T<:StableMorphism} = returnDimOf(T)
 
-const SymOrIdxSym = Union{Symbol, IndexedSym}
-
 
 function checkScreenLevel(sl::Int, (levelMin, levelMax)::NTuple{2, Int})
     levelRange = levelMax - levelMin
@@ -112,8 +110,7 @@ checkScreenLevel(s::TernaryNumber, levelMinMax::NTuple{2, Int}) =
 checkScreenLevel(Int(s), levelMinMax)
 
 function checkPrimParamElementalType(::Type{T}) where {T}
-    isPermitted = isbitstype(T) || issingletontype(T)
-    if !isPermitted
+    if !(isbitstype(T) || issingletontype(T))
         throw(DomainError(T, "The (elemental) type of `input`, when used as an argument, "*
                              "should make at least one of these functions return `true`:\n"*
                              "`$isbitstype`, `$issingletontype`."))
@@ -121,20 +118,28 @@ function checkPrimParamElementalType(::Type{T}) where {T}
     nothing
 end
 
+function checkPrimParamElementalType(::Type{<:Union{Nothing, Missing}})
+    throw(DomainError(T, "The (elemental) type of `input` cannot be `$Missing` or "*
+                         "`$Nothing`"))
+end
+
+const SymOrIndexedSym = Union{Symbol, IndexedSym}
+
 
 mutable struct NodeVar{T} <: PrimitiveParam{T, 0}
     @atomic input::T
     const symbol::IndexedSym
     @atomic screen::TernaryNumber
 
-    function NodeVar(input::T, symbol::SymOrIdxSym, screen::TernaryNumber=TPS1) where {T}
+    function NodeVar(input::T, symbol::SymOrIndexedSym, 
+                     screen::TernaryNumber=TPS1) where {T}
         checkPrimParamElementalType(T)
         checkScreenLevel(screen, getScreenLevelRange(PrimitiveParam))
         new{T}(input, IndexedSym(symbol), screen)
     end
 end
 
-NodeVar(::AbstractArray, ::SymOrIdxSym) = 
+NodeVar(::AbstractArray, ::SymOrIndexedSym) = 
 throw(ArgumentError("`NodeVar` does not support `AbstractArray`-type `input`."))
 
 # genSeqAxis(::Val{N}, sym::Symbol=:e) where {N} = (Symbol(sym, i) for i in 1:N) |> Tuple
@@ -144,7 +149,7 @@ mutable struct GridVar{T, N, V<:AbstractArray{T, N}} <: PrimitiveParam{T, N}
     const symbol::IndexedSym
     @atomic screen::TernaryNumber
 
-    function GridVar(input::V, symbol::SymOrIdxSym, screen::TernaryNumber=TPS1) where 
+    function GridVar(input::V, symbol::SymOrIndexedSym, screen::TernaryNumber=TPS1) where 
                     {T, N, V<:AbstractArray{T, N}}
         checkPrimParamElementalType(T)
         checkScreenLevel(screen, getScreenLevelRange(PrimitiveParam))
@@ -186,100 +191,107 @@ function checkParamBoxInputCore(hasVariable::Bool, arg::T, dimMinMax::NTuple{2, 
     hasVariable::Bool
 end
 
-#! Need to reformulate following `checkArrayParamArg`
+function checkNodeParamArg(::TypedReduction{T, <:iTalike}, input::I, 
+                           init::Union{T, Missing}) where {T, I}
+    if !(I <: Tuple{ElementalParam{T}})
+        throw(ArgumentError("`$I` is not supported as argument `input` when `lambda` "*
+                            "functions like an identity morphism."))
+    end
+    checkParamBoxInput(input, dimMax=0)
+    TypedReduction(T), iT, deepcopy(ismissing(init) ? (input[1]|>obtain) : init)
+end
+
+function checkNodeParamArg(f::TypedReduction{T, F}, input::I, 
+                           init::Union{T, Missing}) where {T, F, I}
+    checkParamBoxInput(input)
+    f, F, deepcopy(ismissing(init) ? (packElementalVal(T, input[1]|>obtain)|>first) : init)
+end
+
+initializeOffset(::Type) = nothing
+initializeOffset(::Type{T}) where {T<:Number} = zero(T)
+
 mutable struct NodeParam{T, F<:Function, I<:ParamBoxInputType{T}} <: ParamBox{T, 0, I}
     const lambda::TypedReduction{T, F}
     const input::I
     const symbol::IndexedSym
-    @atomic offset::T
+    @atomic offset::Union{T, Nothing}
     @atomic memory::T
     @atomic screen::TernaryNumber
 
     function NodeParam(lambda::TypedReduction{T, F}, input::I, 
-                       symbol::SymOrIdxSym, 
-                       offset::T, 
-                       memory::T=zero(T), 
-                       screen::TernaryNumber=TUS0) where {T, I, F}
-        checkScreenLevel(screen, getScreenLevelRange(ParamBox{T, 0}))
-        checkParamBoxInput(input)
-        new{T, F, I}(lambda, input, IndexedSym(symbol), offset, memory, screen)
-    end
-
-    function NodeParam(::TypedReduction{T, <:iTalike}, input::I, 
-                       symbol::SymOrIdxSym, 
-                       offset::T, 
-                       memory::T=obtain(input|>first), 
-                       screen::TernaryNumber=TUS0) where 
-                      {T, I<:Tuple{ElementalParam{T}}}
-        checkScreenLevel(screen, getScreenLevelRange(ParamBox{T, 0}))
-        checkParamBoxInput(input, dimMax=0)
-        new{T, iT, I}(TypedReduction(T), input, IndexedSym(symbol), offset, memory, screen)
+                       symbol::SymOrIndexedSym, 
+                       offset::Union{T, Nothing}=initializeOffset(T), 
+                       memory::Union{T, Missing}=missing, 
+                       screen::TernaryNumber=TUS0) where {T, F, I<:ParamBoxInputType{T}}
+        sl = checkScreenLevel(screen, getScreenLevelRange(ParamBox{T, 0}))
+        lambda, Ftype, memory = checkNodeParamArg(lambda, input, memory)
+        if offset === nothing && sl > 0
+            tmpPar = new{T, F, I}(lambda, input, IndexedSym(symbol), 
+                                  initializeOffset(T), memory, TUS0)
+            offset = obtain(tmpPar)
+        end
+        new{T, Ftype, I}(lambda, input, IndexedSym(symbol), offset, memory, screen)
     end
 end
 
-function NodeParam(::TypedReduction{T, <:iTalike}, ::I, ::SymOrIdxSym, ::T, 
-                   ::T=zero(T), ::TernaryNumber=TUS0) where {T, I}
-    throw(ArgumentError("`$I` is not supported as the second argument when `lambda` "*
-                        "functions like an identity morphism."))
-end
-
-function NodeParam(lambda::Function, input::ParamBoxInputType{T}, 
-                   symbol::Symbol; init::T=zero(T)) where {T}
+function NodeParam(lambda::Function, input::ParamBoxInputType{T}, symbol::SymOrIndexedSym; 
+                   init::Union{T, Missing}=missing) where {T}
     ATs = map(x->typeof(x|>obtain), input)
-    NodeParam(TypedReduction(lambda, ATs...), input, symbol, zero(T), init)
+    NodeParam(TypedReduction(lambda, ATs...), input, symbol, initializeOffset(T), init)
 end
 
-NodeParam(lambda::Function, input::ParamBoxSingleArg{T}, symbol::Symbol; 
-          init::T=zero(T)) where {T} = 
+NodeParam(lambda::Function, input::ParamBoxSingleArg{T}, symbol::SymOrIndexedSym; 
+          init::Union{T, Missing}=missing) where {T} = 
 NodeParam(lambda, (input,), symbol; init)
 
 NodeParam(lambda::Function, input1::ParamBoxSingleArg{T}, input2::ParamBoxSingleArg{T}, 
-          symbol::Symbol; init::T=zero(T)) where {T} = 
+          symbol::SymOrIndexedSym; 
+          init::Union{T, Missing}=missing) where {T} = 
 NodeParam(lambda, (input1, input2), symbol; init)
 
 NodeParam(lambda::Function, input1::ParamBoxSingleArg{T}, input2::ParamBoxSingleArg{T}, 
-          input3::ParamBoxSingleArg{T}, symbol::Symbol; init::T=zero(T)) where {T} = 
+          input3::ParamBoxSingleArg{T}, symbol::SymOrIndexedSym; 
+          init::Union{T, Missing}=missing) where {T} = 
 NodeParam(lambda, (input1, input2, input3), symbol; init)
 
-NodeParam(par::NodeParam{T}, symbol::Symbol=symOf(par); init::T=par.memory) where {T} = 
+NodeParam(par::NodeParam{T}, symbol::SymOrIndexedSym=symOf(par); 
+          init::Union{T, Missing}=par.memory) where {T} = 
 NodeParam(par.lambda, par.input, symbol, par.offset, init, par.screen)
 
-NodeParam(var::PrimitiveParam{T, 0}, symbol::Symbol=symOf(var)) where {T} = 
-NodeParam(TypedReduction(T), (var,), symbol, zero(T))
+NodeParam(input::PrimitiveParam{T, 0}, 
+          symbol::SymOrIndexedSym=symOf(input)) where {T} = 
+NodeParam(TypedReduction(T), (input,), symbol)
 
-NodeParam(var, varSym::Symbol, symbol::Symbol=varSym) = 
+NodeParam(var, varSym::SymOrIndexedSym, symbol::SymOrIndexedSym=varSym) = 
 NodeParam(NodeVar(var, varSym), symbol)
 
 # const TensorInNodeParam{T, F, PB, N} = NodeParam{T, F, <:AbstractArray{PB, N}}
 # const ScalarInNodeParam{T, F, PB} = TensorInNodeParam{T, F, PB, 0}
 
-
-function prepareArrayInit(::Type{T}, ::Val{N}, init::T=zero(T)) where {N, T}
-    reshape(fill(init), ntuple(_->1, Val(N)))
-end
-
-function prepareArrayInit(::Type{T}, ::Val{N}, init::AbstractArray{T, N}) where {N, T}
-    copy(init)
-end
-
 function checkArrayParamArg(::StableMorphism{T, <:iTalike, N}, input::I, 
-                            init::Union{Missing, AbstractArray{T, N}}) where {T, N, I}
+                            init::Union{AbstractArray{T, N}, Missing}) where {T, N, I}
     if !(I <: Tuple{ParamBoxSingleArg{T, N}})
-        throw(ArgumentError("`$I` is not supported as the second argument when `lambda` "*
+        throw(ArgumentError("`$I` is not supported as argument `input` when `lambda` "*
                             "functions like an identity morphism."))
     end
     checkParamBoxInput(input, dimMin=1)
-    ismissing(init) ? (input |> first |> obtain) : deepcopy(init)
+    StableMorphism(T, Val(N)), iT, deepcopy(ismissing(init) ? (input[1]|>obtain) : init)
 end
 
-function checkArrayParamArg(::StableMorphism{T, F, N}, input::I, 
-                            init::Union{Missing, AbstractArray{T, N}}) where {T, F, N, I}
+function checkArrayParamArg(f::StableMorphism{T, F, N}, input::I, 
+                            init::Union{AbstractArray{T, N}, Missing}) where {T, F, N, I}
+    if N < 1
+        throw(ArgumentError("Returned array should have dimension `N` larger than 0. Use "*
+                            "`$NodeParam` for returning scalar-type output."))
+    end
     checkParamBoxInput(input)
-    if ismissing(init)
-        reshape(fill(input|>first|>obtain|>first|>deepcopy), ntuple(_->1, Val(N)))
+    memory = if ismissing(init)
+        reshape( fill(packElementalVal(T, input[1]|>obtain)|>first|>deepcopy), 
+                 ntuple(_->1, Val(N)) )
     else
         deepcopy(init)
     end
+    f, F, memory
 end
 
 mutable struct ArrayParam{T, F<:Function, I<:ParamBoxInputType{T}, 
@@ -290,51 +302,51 @@ mutable struct ArrayParam{T, F<:Function, I<:ParamBoxInputType{T},
     @atomic memory::M
 
     function ArrayParam(lambda::StableMorphism{T, F, N}, input::I, 
-                        symbol::SymOrIdxSym, 
-                        memory::Union{Missing, AbstractArray{T, N}}=missing) where 
+                        symbol::SymOrIndexedSym, 
+                        memory::Union{AbstractArray{T, N}, Missing}=missing) where 
                        {T, F, N, I<:ParamBoxInputType{T}}
-        memory = checkArrayParamArg(lambda, input, memory)
-        new{T, F, I, N, typeof(memory)}(lambda, input, IndexedSym(symbol), memory)
+        lambda, Ftype, memory = checkArrayParamArg(lambda, input, memory)
+        new{T, Ftype, I, N, typeof(memory)}(lambda, input, IndexedSym(symbol), memory)
     end
 end
 
-function ArrayParam(lambda::Function, input::ParamBoxInputType{T}, symbol::SymOrIdxSym; 
-                    init::Union{Missing, AbstractArray{T}}=missing) where {T}
+function ArrayParam(lambda::Function, input::ParamBoxInputType{T}, symbol::SymOrIndexedSym; 
+                    init::Union{AbstractArray{T}, Missing}=missing) where {T}
     ATs = map(x->typeof(x|>obtain), input)
-    lambda = StableMorphism(lambda, ATs...)
-    ArrayParam(lambda, input, symbol, init)
+    ArrayParam(StableMorphism(lambda, ATs...), input, symbol, init)
 end
 
-ArrayParam(lambda::Function, input::ParamBoxSingleArg{T}, symbol::SymOrIdxSym; 
-           init::Union{Missing, AbstractArray{T}}=missing) where {T} = 
+ArrayParam(lambda::Function, input::ParamBoxSingleArg{T}, symbol::SymOrIndexedSym; 
+           init::Union{AbstractArray{T}, Missing}=missing) where {T} = 
 ArrayParam(lambda, (input,), symbol; init)
 
 ArrayParam(lambda::Function, input1::ParamBoxSingleArg{T}, input2::ParamBoxSingleArg{T}, 
-           symbol::SymOrIdxSym; init::Union{Missing, AbstractArray{T}}=missing) where {T} = 
+           symbol::SymOrIndexedSym; 
+           init::Union{AbstractArray{T}, Missing}=missing) where {T} = 
 ArrayParam(lambda, (input1, input2), symbol; init)
 
 ArrayParam(lambda::Function, input1::ParamBoxSingleArg{T}, input2::ParamBoxSingleArg{T}, 
-           input3::ParamBoxSingleArg{T}, symbol::SymOrIdxSym; 
-           init::Union{Missing, AbstractArray{T}}=missing) where {T} = 
+           input3::ParamBoxSingleArg{T}, symbol::SymOrIndexedSym; 
+           init::Union{AbstractArray{T}, Missing}=missing) where {T} = 
 ArrayParam(lambda, (input1, input2, input3), symbol; init)
 
-ArrayParam(par::ArrayParam{T}, symbol::SymOrIdxSym=symOf(par); 
-           init::Union{Missing, AbstractArray{T}}=par.memory) where {T} = 
+ArrayParam(par::ArrayParam{T}, symbol::SymOrIndexedSym=symOf(par); 
+           init::Union{AbstractArray{T}, Missing}=par.memory) where {T} = 
 ArrayParam(par.lambda, par.input, symbol, init)
 
-ArrayParam(input::PrimitiveParam{T, N}, symbol::SymOrIdxSym=symOf(input)) where {T, N} = 
+ArrayParam(input::PrimitiveParam{T, N}, 
+           symbol::SymOrIndexedSym=symOf(input)) where {T, N} = 
 ArrayParam(StableMorphism(T, Val(N)), (input,), symbol)
 
-ArrayParam(input::AbstractArray{<:ElementalParam{T}, N}, symbol::SymOrIdxSym) where {T, N} = 
+ArrayParam(input::AbstractArray{<:ElementalParam{T}, N}, 
+           symbol::SymOrIndexedSym) where {T, N} = 
 ArrayParam(StableMorphism(T, Val(N)), (input,), symbol)
 
-ArrayParam(val::AbstractArray, valSym::SymOrIdxSym, symbol::SymOrIdxSym=valSym) = 
+ArrayParam(val::AbstractArray, valSym::SymOrIndexedSym, symbol::SymOrIndexedSym=valSym) = 
 ArrayParam(GridVar(val, valSym), symbol)
 
 
-#!! Should disallow NodeVar of NodeVar etc... , Instead, design ReferenceNode
-
-# struct ChainParam
+#!! struct ChainParam
 
 # end
 
@@ -362,7 +374,8 @@ screenLevelOf(p::ParamBox{<:Any, 0}) = Int(p.screen)
 screenLevelOf(p::PrimitiveParam) = Int(p.screen)
 
 
-function setScreenLevelCore!(p::DimensionalParam, level::Int)
+function setScreenLevelCore!(p::T, level::Int) where {T<:DimensionalParam}
+    checkScreenLevel(level, getScreenLevelRange(T))
     @atomic p.screen = TernaryNumber(level)
 end
 
@@ -399,7 +412,7 @@ struct NodeTuple{T<:Real, N, PT} <: ParamBox{T, N, PT}
     input::PT
     symbol::IndexedSym
 
-    NodeTuple(input::PT, symbol::SymOrIdxSym) where {T, N, PT<:NTuple{N, NodeParam{T}}} = 
+    NodeTuple(input::PT, symbol::SymOrIndexedSym) where {T, N, PT<:NTuple{N, NodeParam{T}}} = 
     new{T, N, PT}(input, IndexedSym(symbol))
 end
 
@@ -449,9 +462,13 @@ function searchObtain(nodeMarkerDict::IdDict{ParamBox{T}, NodeMarker},
     end
 end
 
-function obtainSearchCore(nodeMarkerDict::IdDict{ParamBox{T}, NodeMarker}, 
+function searchObtainCore(nodeMarkerDict::IdDict{ParamBox{T}, NodeMarker}, 
                           p::ParamBox{T}) where {T}
-    f = hasfield(typeof(p), :offset) ? Fix2(+, p.offset) : itself
+    f = if hasfield(typeof(p), :offset) && (p.offset !== nothing)
+        Fix2(+, p.offset)
+    else
+        itself
+    end
     # Depth-first search by recursive calling
     marker = get!(nodeMarkerDict, p, NodeMarker(p.memory))
     if !marker.visited
@@ -465,12 +482,13 @@ end
 
 function searchObtain(nodeMarkerDict::IdDict{ParamBox{T}, NodeMarker}, 
                       p::ArrayParam{T}) where {T}
-    obtainSearchCore(nodeMarkerDict, p)
+    searchObtainCore(nodeMarkerDict, p)
 end
 
 function searchObtain(nodeMarkerDict::IdDict{ParamBox{T}, NodeMarker}, 
-                      p::NodeParam{T}) where {T}
-    screenLevelOf(p) == 0 ? obtainSearchCore(nodeMarkerDict, p) : p.offset
+                      p::ParamBox{T, N}) where {T, N}
+    sl = checkScreenLevel(screenLevelOf(p), getScreenLevelRange(ParamBox{T, N}))
+    sl == 0 ? searchObtainCore(nodeMarkerDict, p) : p.offset
 end
 
 function searchObtain(::IdDict{ParamBox{T}, NodeMarker}, p::PrimitiveParam{T}) where {T}
@@ -514,8 +532,6 @@ isPrimitiveParam(pn::ParamBox) = (screenLevelOf(pn) == 1)
 # size(np::FixedSizeParam, args...) = size(np.input, args...)
 # broadcastable(np::FixedSizeParam) = Base.broadcastable(np.input)
 
-
-#!!!!! Marker of ParamBox is not defined
 
 struct ParamMarker{M<:NonEmptyTuple{AbstractMarker}} <: AbstractMarker{M}
     typeID::UInt

@@ -134,7 +134,6 @@ const NonEmptyTupleOrAbtArray{T, A<:AbstractArray{T}} = Union{NonEmptyTuple{T}, 
 const NonEmptyTupleOrAbtVector{T, A<:AbstractVector{T}} = Union{NonEmptyTuple{T}, A}
 
 @enum TernaryNumber::Int8 begin
-    TMS1=-1
     TUS0= 0
     TPS1= 1
     TPS2= 2

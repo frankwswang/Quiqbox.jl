@@ -1066,3 +1066,9 @@ function genParamTypeVector(::Type{PT1}, ::Type{PT2}, idx::Int=1) where {PT1, PT
     T = getTypeParam(PT1, idx)
     ifelse(T===Any, PT2[], PT2{numT}[])
 end
+
+packElementalVal(::Val{0}, obj::Any) = fill(obj)
+packElementalVal(::Val{0}, obj::AbtArray0D) = copy(obj)
+packElementalVal(::Val,    obj::AbstractArray) = copy(obj)
+packElementalVal(::Type{U}, obj::T) where {U, T<:U} = fill(obj)
+packElementalVal(::Type{U}, obj::AbstractArray{<:U}) where {U} = copy(obj)

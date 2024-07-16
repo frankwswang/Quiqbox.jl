@@ -1,14 +1,12 @@
 export genComputeGraph, evalGraphNode, compressGraphNode
 
+using Base: Fix2
+
 const ChildNodeType{T, N} = Union{AbstractArray{<:GraphNode{T, 0}, N}, GraphNode{T, N}}
 const NodeChildrenType{T} = TernaryTupleUnion{ChildNodeType{T}}
 
 
 getChildNum(::Type{<:NonEmptyTuple{ChildNodeType{T}, N}}) where {T, N} = N+1
-
-packElementalVal(::Val{0}, obj::Any) = fill(obj)
-packElementalVal(::Val,    obj::AbstractArray) = copy(obj)
-packElementalVal(::Val{0}, obj::AbstractArray{<:Any, 0}) = copy(obj)
 
 unpackAA0D(::Type{T}, obj::AbtArray0D{<:T}) where {T} = obj[]
 unpackAA0D(::Type{T}, obj::AbstractArray{<:T}) where {T} = itself(obj)
@@ -58,11 +56,18 @@ struct EmptyNode{T, N} <: GraphNode{T, N} end
 
 EmptyNode(::DimensionalParam{T, N}) where {T, N} = EmptyNode{T, N}()
 
-struct ReductionNode{T, I<:NodeChildrenType{T}, F} <: OperatorNode{T, 0, I, F}
+struct ReductionNode{T, I<:NodeChildrenType{T}, 
+                     F, S<:Union{iT, Fix2{typeof(+), T}}} <: OperatorNode{T, 0, I, F}
     apply::TypedReduction{T, F}
     child::I
     marker::Symbol
-    bias::T
+    shift::S
+
+    function ReductionNode(apply::TypedReduction{T, F}, child::I, 
+                           marker::Symbol, bias::Union{T, Nothing}) where {T, F, I}
+        f = ( (bias === nothing && T !== nothing) ? itself : Fix2(+, bias))
+        new{T, I, F, typeof(f)}(apply, child, marker, f)
+    end
 end
 
 struct MorphismNode{T, I<:NodeChildrenType{T}, F, N} <: OperatorNode{T, N, I, F}
@@ -132,7 +137,7 @@ compressGraphNode(graphChild[])
 # This has to be manually coded up, otherwise Enzyme (v0.12.22) will break down.
 function compressGraphNodeCore(::Val{1}, node::OperatorNode{T}) where {T}
     f1 = makeGraphFuncComp(node.child[1])
-    f2 = hasfield(typeof(node), :bias) ? Fix2(+, deepcopy(node.bias)) : itself
+    f2 = hasfield(typeof(node), :shift) ? node.shift : itself
     let apply1=f1, apply2=node.apply, apply3=f2
         function (x::AbtVecOfAbtArray{T})
             x |> apply1 |> apply2 |> apply3
@@ -142,7 +147,7 @@ end
 
 function compressGraphNodeCore(::Val{2}, node::OperatorNode{T}) where {T}
     fL, fR = makeGraphFuncComp.(node.child)
-    f2 = hasfield(typeof(node), :bias) ? Fix2(+, deepcopy(node.bias)) : itself
+    f2 = hasfield(typeof(node), :shift) ? node.shift : itself
     let apply1L=fL, apply1R=fR, apply2=node.apply, apply3=f2
         function (x::AbtVecOfAbtArray{T})
             apply2( apply1L(x), apply1R(x) ) |> apply3
@@ -152,7 +157,7 @@ end
 
 function compressGraphNodeCore(::Val{3}, node::OperatorNode{T}) where {T}
     fL, fC, fR = makeGraphFuncComp.(node.child)
-    f2 = hasfield(typeof(node), :bias) ? Fix2(+, deepcopy(node.bias)) : itself
+    f2 = hasfield(typeof(node), :shift) ? node.shift : itself
     let apply1L=fL, apply1C=fC, apply1R=fR, apply2=node.apply, apply3=f2
         function (x::AbtVecOfAbtArray{T})
             apply2( apply1L(x), apply1C(x), apply1R(x) ) |> apply3
@@ -164,9 +169,9 @@ end
 # function compressGraphNodeCore(::Val{N}, node::OperatorNode{T, N, I}) where {N, T, N, I}
 #     fs = makeGraphFuncComp.(node.child)
 #     rT = Tuple{(ifelse(n==0, T, AbstractArray{T, n}) for n in getChildDim(I))...}
-#     let apply1s=fs, apply2=node.apply, b=node.bias, argT=rT
+#     let apply1s=fs, apply2=node.apply, b=node.shift, argT=rT
 #         function (x::AbtVecOfAbtArray{T})
-#             splat(apply2)( map(f->f(x), apply1s)::argT ) + b
+#             splat(apply2)( map(f->f(x), apply1s)::argT ) |> b
 #         end
 #     end
 # end
@@ -189,7 +194,7 @@ function evalGraphNode(gn::ReferenceNode{T}, ::AbtVecOfAbtArray{T}) where {T}
 end
 
 function evalGraphNode(gn::ReductionNode{T}, data::AbtVecOfAbtArray{T}) where {T}
-    gn.apply( broadcast(evalGraphNodeCore, gn.child, Ref(data))... ) + gn.bias
+    gn.apply( broadcast(evalGraphNodeCore, gn.child, Ref(data))... ) |> gn.shift
 end
 
 function evalGraphNode(gn::MorphismNode{T}, data::AbtVecOfAbtArray{T}) where {T}
