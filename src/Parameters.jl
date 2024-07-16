@@ -2,6 +2,7 @@ export NodeVar, GridVar, NodeParam, ArrayParam, NodeTuple, setScreenLevel!, setS
        symOf, inputOf, obtain, setVal!, screenLevelOf, markParams!, topoSort, getParams
 
 using Base: Fix2, Threads.Atomic, issingletontype
+using Test: @inferred
 using LRUCache
 
 
@@ -22,42 +23,32 @@ function checkTypedOpMethods(::Type{NonEmptyTuple{T, N}}) where {T, N}
 end
 
 
-function checkReturnType(f::F, ::Type{T}, argTs::NonEmptyTuple{DataType}) where {F, T}
-    bl = false
-    returnT = Any
-    try
-        returnT = Base.return_types(f, argTs)[]
-        bl = returnT <: T
-    finally
-        bl || throw(AssertionError("`f`: `$f` cannot be a generated function and it "*
-                                    "should only return one value of `$T.`"))
-    end
-    returnT
+function checkReturnType(f::F, ::Type{T}, args::NonEmptyTuple{Any}) where {F, T}
+    @inferred T f(args...)
+    typeof( f(args...) )
 end
 
 struct TypedReduction{T, F<:Function} <: TypedFunction{T, F}
     f::F
 
-    function TypedReduction(f::F, ::Type{T}, aTs::Type...) where {F, T}
-        Ts = (T, aTs...)
-        checkReturnType(f, T, Ts)
+    function TypedReduction(f::F, arg::T, args...) where {F, T}
+        checkReturnType(f, T, (arg, args...))
         new{T, F}(f)
     end
 
-    function TypedReduction(f::F, aT::Type{<:AbstractArray{T}}, aTs::Type...) where {F, T}
-        Ts = (aT, aTs...)
-        checkReturnType(f, T, Ts)
+    function TypedReduction(f::F, arg::AbstractArray{T}, args...) where {F, T}
+        checkReturnType(f, T, (arg, args...))
         new{T, F}(f)
     end
+
+    TypedReduction(::Type{T}) where {T} = new{T, iT}(itself)
 end
 
-TypedReduction(srf::TypedReduction, ::Type{T}, Ts::Type...) where {T} = 
-TypedReduction(srf.f, T, Ts...)
+TypedReduction(srf::TypedReduction, arg::T, args...) where {T} = 
+TypedReduction(srf.f, arg, args...)
 
-TypedReduction(srf::TypedReduction, aT::Type{<:AbstractArray{T}}, Ts::Type...) where {T} = 
-TypedReduction(srf.f, aT, Ts...)
-
-TypedReduction(::Type{T}) where {T} = TypedReduction(itself, T)
+TypedReduction(srf::TypedReduction, arg::AbstractArray{T}, args...) where {T} = 
+TypedReduction(srf.f, arg, args...)
 
 # Type annotation prevents Enzyme.jl (v0.12.22) from breaking sometimes.
 function (sf::TypedReduction{T, F})(arg1::AbtArrayOr{T}) where {T, F}
@@ -80,26 +71,24 @@ end
 struct StableMorphism{T, F<:Function, N} <:TypedFunction{T, F}
     f::F
 
-    function StableMorphism(f::F, ::Type{T}, aTs::Type...) where {T, F}
-        Ts = (T, aTs...)
-        rT = checkReturnType(f, AbstractArray{T}, Ts)
+    function StableMorphism(f::F, arg::T, args...) where {T, F}
+        rT = checkReturnType(f, AbstractArray{T}, (arg, args...))
         new{T, F, ndims(rT)}(f)
     end
 
-    function StableMorphism(f::F, aT::Type{<:AbstractArray{T}}, aTs::Type...) where {T, F}
-        Ts = (aT, aTs...)
-        rT = checkReturnType(f, AbstractArray{T}, Ts)
+    function StableMorphism(f::F, arg::AbstractArray{T}, args...) where {T, F}
+        rT = checkReturnType(f, AbstractArray{T}, (arg, args...))
         new{T, F, ndims(rT)}(f)
     end
 
     StableMorphism(::Type{T}, ::Val{N}) where {T, N} = new{T, iT, N}(itself)
 end
 
-StableMorphism(srf::StableMorphism, ::Type{T}, Ts::Type...) where {T} = 
-StableMorphism(srf.f, T, Ts...)
+StableMorphism(srf::StableMorphism, arg::T, args...) where {T} = 
+StableMorphism(srf.f, arg, args...)
 
-StableMorphism(srf::StableMorphism, aT::Type{<:AbstractArray{T}}, Ts::Type...) where {T} = 
-StableMorphism(srf.f, aT, Ts...)
+StableMorphism(srf::StableMorphism, arg::AbstractArray{T}, args...) where {T} = 
+StableMorphism(srf.f, arg, args...)
 
 function (sf::StableMorphism{T, F, N})(arg1::AbtArrayOr{T}) where {T, F, N}
     sf.f(arg1)::AbstractArray{T, N}
@@ -248,35 +237,35 @@ mutable struct NodeParam{T, F<:Function, I<:ParamBoxInputType{T}} <: ParamBox{T,
                        memory::Union{T, Missing}=missing, 
                        screen::TernaryNumber=TUS0) where {T, F, I<:ParamBoxInputType{T}}
         sl = checkScreenLevel(screen, getScreenLevelRange(ParamBox{T, 0}))
-        lambda, Ftype, memory = checkNodeParamArg(lambda, input, memory)
+        lambda, funcType, memory = checkNodeParamArg(lambda, input, memory)
         if offset === nothing && sl > 0
             tmpPar = new{T, F, I}(lambda, input, IndexedSym(symbol), 
                                   initializeOffset(T), memory, TUS0)
             offset = obtain(tmpPar)
         end
-        new{T, Ftype, I}(lambda, input, IndexedSym(symbol), offset, memory, screen)
+        new{T, funcType, I}(lambda, input, IndexedSym(symbol), offset, memory, screen)
     end
 end
 
-function NodeParam(lambda::Function, input::ParamBoxInputType{T}, symbol::SymOrIndexedSym; 
+function NodeParam(func::Function, input::ParamBoxInputType{T}, symbol::SymOrIndexedSym; 
                    init::Union{T, Missing}=missing) where {T}
-    ATs = map(x->typeof(x|>obtain), input)
-    NodeParam(TypedReduction(lambda, ATs...), input, symbol, initializeOffset(T), init)
+    lambda = TypedReduction(func, obtain.(input)...)
+    NodeParam(lambda, input, symbol, initializeOffset(T), init)
 end
 
-NodeParam(lambda::Function, input::ParamBoxSingleArg{T}, symbol::SymOrIndexedSym; 
+NodeParam(func::Function, input::ParamBoxSingleArg{T}, symbol::SymOrIndexedSym; 
           init::Union{T, Missing}=missing) where {T} = 
-NodeParam(lambda, (input,), symbol; init)
+NodeParam(func, (input,), symbol; init)
 
-NodeParam(lambda::Function, input1::ParamBoxSingleArg{T}, input2::ParamBoxSingleArg{T}, 
+NodeParam(func::Function, input1::ParamBoxSingleArg{T}, input2::ParamBoxSingleArg{T}, 
           symbol::SymOrIndexedSym; 
           init::Union{T, Missing}=missing) where {T} = 
-NodeParam(lambda, (input1, input2), symbol; init)
+NodeParam(func, (input1, input2), symbol; init)
 
-NodeParam(lambda::Function, input1::ParamBoxSingleArg{T}, input2::ParamBoxSingleArg{T}, 
+NodeParam(func::Function, input1::ParamBoxSingleArg{T}, input2::ParamBoxSingleArg{T}, 
           input3::ParamBoxSingleArg{T}, symbol::SymOrIndexedSym; 
           init::Union{T, Missing}=missing) where {T} = 
-NodeParam(lambda, (input1, input2, input3), symbol; init)
+NodeParam(func, (input1, input2, input3), symbol; init)
 
 NodeParam(par::NodeParam{T}, symbol::SymOrIndexedSym=symOf(par); 
           init::Union{T, Missing}=par.memory) where {T} = 
@@ -329,30 +318,30 @@ mutable struct ArrayParam{T, F<:Function, I<:ParamBoxInputType{T},
                         symbol::SymOrIndexedSym, 
                         memory::Union{AbstractArray{T, N}, Missing}=missing) where 
                        {T, F, N, I<:ParamBoxInputType{T}}
-        lambda, Ftype, memory = checkArrayParamArg(lambda, input, memory)
-        new{T, Ftype, I, N, typeof(memory)}(lambda, input, IndexedSym(symbol), memory)
+        lambda, funcType, memory = checkArrayParamArg(lambda, input, memory)
+        new{T, funcType, I, N, typeof(memory)}(lambda, input, IndexedSym(symbol), memory)
     end
 end
 
-function ArrayParam(lambda::Function, input::ParamBoxInputType{T}, symbol::SymOrIndexedSym; 
+function ArrayParam(func::Function, input::ParamBoxInputType{T}, symbol::SymOrIndexedSym; 
                     init::Union{AbstractArray{T}, Missing}=missing) where {T}
-    ATs = map(x->typeof(x|>obtain), input)
-    ArrayParam(StableMorphism(lambda, ATs...), input, symbol, init)
+    lambda = StableMorphism(func, obtain.(input)...)
+    ArrayParam(lambda, input, symbol, init)
 end
 
-ArrayParam(lambda::Function, input::ParamBoxSingleArg{T}, symbol::SymOrIndexedSym; 
+ArrayParam(func::Function, input::ParamBoxSingleArg{T}, symbol::SymOrIndexedSym; 
            init::Union{AbstractArray{T}, Missing}=missing) where {T} = 
-ArrayParam(lambda, (input,), symbol; init)
+ArrayParam(func, (input,), symbol; init)
 
-ArrayParam(lambda::Function, input1::ParamBoxSingleArg{T}, input2::ParamBoxSingleArg{T}, 
+ArrayParam(func::Function, input1::ParamBoxSingleArg{T}, input2::ParamBoxSingleArg{T}, 
            symbol::SymOrIndexedSym; 
            init::Union{AbstractArray{T}, Missing}=missing) where {T} = 
-ArrayParam(lambda, (input1, input2), symbol; init)
+ArrayParam(func, (input1, input2), symbol; init)
 
-ArrayParam(lambda::Function, input1::ParamBoxSingleArg{T}, input2::ParamBoxSingleArg{T}, 
+ArrayParam(func::Function, input1::ParamBoxSingleArg{T}, input2::ParamBoxSingleArg{T}, 
            input3::ParamBoxSingleArg{T}, symbol::SymOrIndexedSym; 
            init::Union{AbstractArray{T}, Missing}=missing) where {T} = 
-ArrayParam(lambda, (input1, input2, input3), symbol; init)
+ArrayParam(func, (input1, input2, input3), symbol; init)
 
 ArrayParam(par::ArrayParam{T}, symbol::SymOrIndexedSym=symOf(par); 
            init::Union{AbstractArray{T}, Missing}=par.memory) where {T} = 
