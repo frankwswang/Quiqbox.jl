@@ -56,8 +56,8 @@ struct EmptyNode{T, N} <: GraphNode{T, N} end
 
 EmptyNode(::DimensionalParam{T, N}) where {T, N} = EmptyNode{T, N}()
 
-struct ReductionNode{T, I<:NodeChildrenType{T}, 
-                     F, S<:Union{iT, Fix2{typeof(+), T}}} <: OperatorNode{T, 0, I, F}
+struct ReductionNode{T, I<:NodeChildrenType{T}, F, 
+                     S<:Union{iT, Fix2{typeof(typedAdd), T}}} <: OperatorNode{T, 0, I, F}
     apply::TypedReduction{T, F}
     child::I
     marker::Symbol
@@ -65,7 +65,7 @@ struct ReductionNode{T, I<:NodeChildrenType{T},
 
     function ReductionNode(apply::TypedReduction{T, F}, child::I, 
                            marker::Symbol, bias::Union{T, Nothing}) where {T, F, I}
-        f = ( (bias === nothing && T !== nothing) ? itself : Fix2(+, bias))
+        f = ( (bias === nothing && T !== nothing) ? itself : Fix2(typedAdd, bias))
         new{T, I, F, typeof(f)}(apply, child, marker, f)
     end
 end

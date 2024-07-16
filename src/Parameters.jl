@@ -4,6 +4,24 @@ export NodeVar, GridVar, NodeParam, ArrayParam, NodeTuple, setScreenLevel!, setS
 using Base: Fix2, Threads.Atomic, issingletontype
 using LRUCache
 
+
+const BasicBinaryOpTargets = Union{Number, Bool}
+
+typedAdd(a::T, b::T) where {T<:BasicBinaryOpTargets} = a + b
+typedAdd(a::NonEmptyTuple{T, N}, b::NonEmptyTuple{T, N}) where {T, N} = typedAdd.(a, b)
+
+typedSub(a::T, b::T) where {T<:BasicBinaryOpTargets} = a - b
+typedSub(a::NonEmptyTuple{T, N}, b::NonEmptyTuple{T, N}) where {T, N} = typedSub.(a, b)
+
+function checkTypedOpMethods(::Type{T}) where {T}
+    hasmethod(typedAdd, NTuple{2, T}) && hasmethod(typedSub, NTuple{2, T})
+end
+
+function checkTypedOpMethods(::Type{NonEmptyTuple{T, N}}) where {T, N}
+    hasmethod(typedAdd, NTuple{2, T}) && hasmethod(typedSub, NTuple{2, T})
+end
+
+
 function checkReturnType(f::F, ::Type{T}, argTs::Tuple{Vararg{DataType}}) where {F, T}
     bl = false
     returnT = Any
@@ -358,7 +376,7 @@ ArrayParam(GridVar(val, valSym), symbol)
 
 getScreenLevelRange(::Type{<:ParamBox}) = (0, 0)
 
-getScreenLevelRange(::Type{<:ParamBox{<:Any, 0}}) = (0, 2)
+getScreenLevelRange(::Type{<:ParamBox{T, 0}}) where {T} = (0, checkTypedOpMethods(T) * 2)
 
 getScreenLevelRange(::Type{<:PrimitiveParam}) = (1, 2)
 
@@ -385,7 +403,8 @@ function setScreenLevel!(p::NodeParam, level::Int)
     elseif levelOld == 0
         @atomic p.offset = obtain(p)
     elseif level == 0
-        @atomic p.offset -= p.lambda((obtain(arg) for arg in p.input)...)
+        newVal = p.lambda((obtain(arg) for arg in p.input)...)
+        @atomic p.offset = typedSub(p.offset, newVal)
     end
     setScreenLevelCore!(p, level)
     p
@@ -426,7 +445,7 @@ symOf(pc::DimensionalParam) = indexedSymOf(pc).name
 inputOf(pb::DimensionalParam) = pb.input
 
 
-mutable struct NodeMarker{T}
+mutable struct NodeMarker{T} #!Type-unstable
     visited::Bool
     value::T
 end
@@ -465,7 +484,7 @@ end
 function searchObtainCore(nodeMarkerDict::IdDict{ParamBox{T}, NodeMarker}, 
                           p::ParamBox{T}) where {T}
     f = if hasfield(typeof(p), :offset) && (p.offset !== nothing)
-        Fix2(+, p.offset)
+        Fix2(typedAdd, p.offset)
     else
         itself
     end
