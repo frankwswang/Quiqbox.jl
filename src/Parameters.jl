@@ -22,6 +22,12 @@ function checkTypedOpMethods(::Type{NonEmptyTuple{T, N}}) where {T, N}
     hasmethod(typedAdd, NTuple{2, T}) && hasmethod(typedSub, NTuple{2, T})
 end
 
+genValShifter(::Type, val::Nothing) = itself
+genValShifter(::Type{T}, val::T) where {T} = Fix2(typedAdd, val)
+genValShifter(::Type{Nothing}, ::Nothing) = 
+throw(ArgumentError("`genValShifter` does not support generating shifter for `Nothing`."))
+const ValShifter{T} = Fix2{typeof(typedAdd), T}
+
 
 function checkReturnType(f::F, ::Type{T}, args::NonEmptyTuple{Any}) where {F, T}
     @inferred T f(args...)
@@ -205,19 +211,19 @@ function checkParamBoxInputCore(hasVariable::Bool, arg::T, dimMinMax::NTuple{2, 
 end
 
 function checkNodeParamArg(::TypedReduction{T, <:iTalike}, input::I, 
-                           init::Union{T, Missing}) where {T, I}
+                           shifter::S, init::Union{T, Missing}) where {T, I, S}
     if !(I <: Tuple{ElementalParam{T}})
         throw(ArgumentError("`$I` is not supported as argument `input` when `lambda` "*
                             "functions like an identity morphism."))
     end
     checkParamBoxInput(input, dimMax=0)
-    TypedReduction(T), iT, deepcopy(ismissing(init) ? (input[1]|>obtain) : init)
+    TypedReduction(T), iT, deepcopy(ismissing(init) ? (input[1]|>obtain|>shifter) : init)
 end
 
-function checkNodeParamArg(f::TypedReduction{T, F}, input::I, 
-                           init::Union{T, Missing}) where {T, F, I}
+function checkNodeParamArg(f::TypedReduction{T, F}, input::I, shifter::S, 
+                           init::Union{T, Missing}) where {T, F, I, S}
     checkParamBoxInput(input)
-    f, F, deepcopy(ismissing(init) ? (packElementalVal(T, input[1]|>obtain)|>first) : init)
+    f, F, deepcopy(ismissing(init) ? shifter( f(obtain.(input)...) ) : init)
 end
 
 initializeOffset(::Type) = nothing
@@ -227,30 +233,34 @@ mutable struct NodeParam{T, F<:Function, I<:ParamBoxInputType{T}} <: ParamBox{T,
     const lambda::TypedReduction{T, F}
     const input::I
     const symbol::IndexedSym
-    @atomic offset::Union{T, Nothing}
     @atomic memory::T
     @atomic screen::TernaryNumber
+    @atomic offset::T
 
     function NodeParam(lambda::TypedReduction{T, F}, input::I, 
                        symbol::SymOrIndexedSym, 
-                       offset::Union{T, Nothing}=initializeOffset(T), 
                        memory::Union{T, Missing}=missing, 
-                       screen::TernaryNumber=TUS0) where {T, F, I<:ParamBoxInputType{T}}
-        sl = checkScreenLevel(screen, getScreenLevelRange(ParamBox{T, 0}))
-        lambda, funcType, memory = checkNodeParamArg(lambda, input, memory)
-        if offset === nothing && sl > 0
-            tmpPar = new{T, F, I}(lambda, input, IndexedSym(symbol), 
-                                  initializeOffset(T), memory, TUS0)
-            offset = obtain(tmpPar)
+                       screen::TernaryNumber=TUS0, 
+                       offset::Union{T, Nothing}=initializeOffset(T)) where 
+                      {T, F, I<:ParamBoxInputType{T}}
+        slRange = getScreenLevelRange(ParamBox{T, 0})
+        sl = checkScreenLevel(screen, slRange)
+        shifter = genValShifter(T, offset)
+        lambda, funcType, memory = checkNodeParamArg(lambda, input, shifter, memory)
+        symbol = IndexedSym(symbol)
+        if slRange == (0, 0)
+            new{T, funcType, I}(lambda, input, symbol, memory, screen)
+        else
+            offset===nothing && ( offset = (sl > 0 ? memory : typedSub(memory, memory)) )
+            new{T, funcType, I}(lambda, input, symbol, memory, screen, offset)
         end
-        new{T, funcType, I}(lambda, input, IndexedSym(symbol), offset, memory, screen)
     end
 end
 
 function NodeParam(func::Function, input::ParamBoxInputType{T}, symbol::SymOrIndexedSym; 
                    init::Union{T, Missing}=missing) where {T}
     lambda = TypedReduction(func, obtain.(input)...)
-    NodeParam(lambda, input, symbol, initializeOffset(T), init)
+    NodeParam(lambda, input, symbol, init, TUS0, initializeOffset(T))
 end
 
 NodeParam(func::Function, input::ParamBoxSingleArg{T}, symbol::SymOrIndexedSym; 
@@ -267,9 +277,11 @@ NodeParam(func::Function, input1::ParamBoxSingleArg{T}, input2::ParamBoxSingleAr
           init::Union{T, Missing}=missing) where {T} = 
 NodeParam(func, (input1, input2, input3), symbol; init)
 
-NodeParam(par::NodeParam{T}, symbol::SymOrIndexedSym=symOf(par); 
-          init::Union{T, Missing}=par.memory) where {T} = 
-NodeParam(par.lambda, par.input, symbol, par.offset, init, par.screen)
+function NodeParam(par::NodeParam{T}, symbol::SymOrIndexedSym=symOf(par); 
+                   init::Union{T, Missing}=par.memory) where {T}
+    offset = isOffsetEnabled(par) ? par.offset : nothing
+    NodeParam(par.lambda, par.input, symbol, init, par.screen, offset)
+end
 
 NodeParam(input::PrimitiveParam{T, 0}, 
           symbol::SymOrIndexedSym=symOf(input)) where {T} = 
@@ -281,30 +293,50 @@ NodeParam(NodeVar(var, varSym), symbol)
 # const TensorInNodeParam{T, F, PB, N} = NodeParam{T, F, <:AbstractArray{PB, N}}
 # const ScalarInNodeParam{T, F, PB} = TensorInNodeParam{T, F, PB, 0}
 
-function checkArrayParamArg(::StableMorphism{T, <:iTalike, N}, input::I, 
-                            init::Union{AbstractArray{T, N}, Missing}) where {T, N, I}
-    if !(I <: Tuple{ParamBoxSingleArg{T, N}})
-        throw(ArgumentError("`$I` is not supported as argument `input` when `lambda` "*
-                            "functions like an identity morphism."))
-    end
-    checkParamBoxInput(input, dimMin=1)
-    StableMorphism(T, Val(N)), iT, deepcopy(ismissing(init) ? (input[1]|>obtain) : init)
+function throwArrayParamArgTypeErrorMessage1(I::Type)
+    throw(ArgumentError("`$I` is not supported as argument `input` when `lambda` "*
+                        "functions like an identity morphism."))
 end
 
-function checkArrayParamArg(f::StableMorphism{T, F, N}, input::I, 
-                            init::Union{AbstractArray{T, N}, Missing}) where {T, F, N, I}
-    if N < 1
-        throw(ArgumentError("Returned array should have dimension `N` larger than 0. Use "*
-                            "`$NodeParam` for returning scalar-type output."))
-    end
+function throwArrayParamArgTypeErrorMessage2(M1::Type, M2::Type)
+    throw(AssertionError("The first element of `input` (`::$M1`) and `init` (`::$M2`) "*
+                         "should be the same type."))
+end
+
+function checkArrayParamArg(::StableMorphism{T, <:iTalike, N}, input::I, init::M) where 
+                           {T, N, I, M<:AbstractArray{T, N}}
+    (I <: Tuple{ParamBoxSingleArg{T, N}}) || throwArrayParamArgTypeErrorMessage1(I)
+    MI = typeof(input[1])
+    MI == M || throwArrayParamArgTypeErrorMessage2(MI, M)
+    checkParamBoxInput(input, dimMin=1)
+    StableMorphism(T, Val(N)), iT, deepcopy(init)
+end
+
+function checkArrayParamArg(::StableMorphism{T, <:iTalike, N}, input::I, ::Missing) where 
+                           {T, N, I}
+    (I <: Tuple{ParamBoxSingleArg{T, N}}) || throwArrayParamArgTypeErrorMessage1(I)
+    checkParamBoxInput(input, dimMin=1)
+    StableMorphism(T, Val(N)), iT, deepcopy(input[1]|>obtain)
+end
+
+function throwArrayParamDimErrorMessage()
+    throw(ArgumentError("Returned array should have dimension `N` larger than 0. Use "*
+                        "`$NodeParam` for returning scalar-type output."))
+end
+
+function checkArrayParamArg(f::StableMorphism{T, F, N}, input::I, init::M) where 
+                           {T, F, N, I, M<:AbstractArray{T, N}}
+    N < 1 && throwArrayParamDimErrorMessage()
     checkParamBoxInput(input)
-    memory = if ismissing(init)
-        reshape( fill(packElementalVal(T, input[1]|>obtain)|>first|>deepcopy), 
-                 ntuple(_->1, Val(N)) )
-    else
-        deepcopy(init)
-    end
-    f, F, memory
+    checkReturnType(f, M, obtain.(input))
+    f, F, deepcopy(init)
+end
+
+function checkArrayParamArg(f::StableMorphism{T, F, N}, input::I, ::Missing) where 
+                           {T, F, N, I}
+    N < 1 && throwArrayParamDimErrorMessage()
+    checkParamBoxInput(input)
+    f, F, deepcopy( f(obtain.(input)...) )
 end
 
 mutable struct ArrayParam{T, F<:Function, I<:ParamBoxInputType{T}, 
@@ -379,6 +411,17 @@ getScreenLevelRange(::Type{<:DimensionalParam}) = (0, 2)
 
 getScreenLevelRange(::T) where {T<:DimensionalParam} = getScreenLevelRange(T)
 
+function isScreenLevelChangeable(::T) where {T<:DimensionalParam}
+    minLevel, maxLevel = getScreenLevelRange(T)
+    (maxLevel - minLevel) > 0
+end
+
+isOffsetEnabled(::DimensionalParam) = false
+
+function isOffsetEnabled(pb::T) where {T<:NodeParam}
+    isScreenLevelChangeable(pb) && getScreenLevelRange(T)[end] > 0 && 
+    isdefined(pb, :offset) # Only for safety
+end
 
 screenLevelOf(::ParamBox) = 0
 
@@ -387,12 +430,12 @@ screenLevelOf(p::ParamBox{<:Any, 0}) = Int(p.screen)
 screenLevelOf(p::PrimitiveParam) = Int(p.screen)
 
 
-function setScreenLevelCore!(p::T, level::Int) where {T<:DimensionalParam}
-    checkScreenLevel(level, getScreenLevelRange(T))
+function setScreenLevelCore!(p::DimensionalParam, level::Int)
     @atomic p.screen = TernaryNumber(level)
 end
 
-function setScreenLevel!(p::NodeParam, level::Int)
+function setScreenLevel!(p::T, level::Int) where {T<:NodeParam}
+    checkScreenLevel(level, getScreenLevelRange(T))
     levelOld = screenLevelOf(p)
     if levelOld == level
     elseif levelOld == 0
@@ -405,7 +448,10 @@ function setScreenLevel!(p::NodeParam, level::Int)
     p
 end
 
-setScreenLevel!(p::PrimitiveParam, level::Int) = setScreenLevelCore!(p, level)
+function setScreenLevel!(p::T, level::Int) where {T<:PrimitiveParam}
+    checkScreenLevel(level, getScreenLevelRange(T))
+    setScreenLevelCore!(p, level)
+end
 
 
 setScreenLevel(pn::NodeParam, level::Int) = setScreenLevel!(NodeParam(pn), level)
@@ -465,49 +511,52 @@ directObtain(p::PrimitiveParam{<:Any, 0}) = p.input
 directObtain(p::PrimitiveParam) = copy(p.input)
 
 function obtainINTERNAL(p::ParamBox{T}) where {T}
-    nodeMarkerDict = IdDict{ParamBox{T}, NodeMarker}()
-    searchObtain(nodeMarkerDict, p)
+    markerDict = IdDict{ParamBox{T}, NodeMarker{<:AbstractArray{T}}}()
+    searchObtain(markerDict, p)
 end
 
-function searchObtain(nodeMarkerDict::IdDict{ParamBox{T}, NodeMarker}, 
-                      input::AbstractArray{<:DimensionalParam{T}}) where {T}
+function searchObtainLoop(markerDict::IdDict{ParamBox{T}, NodeMarker{<:AbstractArray{T}}}, 
+                          input::AbstractArray{<:DimensionalParam{T}}) where {T}
     map(input) do child
-        searchObtain(nodeMarkerDict, child)
+        searchObtain(markerDict, child)
     end
 end
 
-function searchObtainCore(nodeMarkerDict::IdDict{ParamBox{T}, NodeMarker}, 
-                          p::ParamBox{T}) where {T}
-    f = if hasfield(typeof(p), :offset) && (p.offset !== nothing)
-        Fix2(typedAdd, p.offset)
-    else
-        itself
-    end
+function searchObtainLoop(markerDict::IdDict{ParamBox{T}, NodeMarker{<:AbstractArray{T}}}, 
+                          input::DimensionalParam{T}) where {T}
+    searchObtain(markerDict, input)
+end
+
+function searchObtainCore(shiftVal::F, 
+                          markerDict::IdDict{ParamBox{T}, NodeMarker{<:AbstractArray{T}}}, 
+                          p::ParamBox{T, N}) where {T, F<:Union{iT, ValShifter{T}}, N}
     # Depth-first search by recursive calling
-    marker = get!(nodeMarkerDict, p, NodeMarker(p.memory))
+    marker = get!(markerDict, p, NodeMarker( packElementalVal(Val(N), p.memory) ))
     if !marker.visited
         marker.visited = true
-        res = p.lambda((searchObtain(nodeMarkerDict, x) for x in p.input)...) |> f
-        marker.value = res
+        res = p.lambda( (searchObtainLoop(markerDict, x) for x in p.input)... ) |> shiftVal
+        marker.value = packElementalVal(T, res)
     else
         marker.value
     end
 end
 
-function searchObtain(nodeMarkerDict::IdDict{ParamBox{T}, NodeMarker}, 
-                      p::ArrayParam{T}) where {T}
-    searchObtainCore(nodeMarkerDict, p)
-end
-
-function searchObtain(nodeMarkerDict::IdDict{ParamBox{T}, NodeMarker}, 
+function searchObtain(markerDict::IdDict{ParamBox{T}, NodeMarker{<:AbstractArray{T}}}, 
                       p::ParamBox{T, N}) where {T, N}
     sl = checkScreenLevel(screenLevelOf(p), getScreenLevelRange(ParamBox{T, N}))
-    sl == 0 ? searchObtainCore(nodeMarkerDict, p) : p.offset
+    if sl == 0
+        shiftVal = genValShifter(T, (isOffsetEnabled(p) ? p.offset : nothing))
+        obtainElementalVal(T, searchObtainCore(shiftVal, markerDict, p))
+    else
+        p.offset
+    end
 end
 
-function searchObtain(::IdDict{ParamBox{T}, NodeMarker}, p::PrimitiveParam{T}) where {T}
-    obtainINTERNAL(p)
-end
+searchObtain(::IdDict{ParamBox{T}, NodeMarker{<:AbstractArray{T}}}, 
+             p::PrimitiveParam{T}) where {T} = 
+directObtain(p)
+
+#! Certain type of NodeParam (0,0) should not need to include offset.
 
 # To be deprecated
 obtain(nt::NodeTuple) = obtain.(nt.input)
@@ -590,8 +639,9 @@ markObj(input) = ObjectMarker(input)
 const NothingID = objectid(nothing)
 
 function ParamMarker(pn::T) where {T<:NodeParam}
+    offset = isOffsetEnabled(pn) ? pn.offset : nothing
     ParamMarker(
-        objectid(T), markObj.((pn.input..., pn.offset)), objectid(pn.lambda.f), 
+        objectid(T), markObj.((pn.input..., offset)), objectid(pn.lambda.f), 
         objectid(screenLevelOf(pn))
     )
 end
@@ -673,8 +723,8 @@ NodeParam(OCF(itself, op, num), pn1, pn1.symbol)
 operateBy(op::CommutativeBinaryNumOps, num::Real, pn1::NodeParam) = 
 operateBy(op, pn1::NodeParam, num::Real)
 
-operateBy(op::F, pn::NodeParam{T}) where {F<:Function, T} = 
-NodeParam(op∘pn.lambda.f, pn.input, symbol, pn.offset, pn.memory, pn.screen)
+# operateBy(op::F, pn::NodeParam{T}) where {F<:Function, T} = 
+# NodeParam(op∘pn.lambda.f, pn.input, symbol, pn.offset, pn.memory, pn.screen)
 
 operateByCore(op::F, pn1::NodeParam{T}, pn2::NodeParam{T}) where {F<:Function, T} = 
 NodeParam(SplitArg{2}(op), [pn1, pn2], Symbol(pn1.symbol, pn2.symbol))

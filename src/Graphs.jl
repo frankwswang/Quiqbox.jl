@@ -8,8 +8,6 @@ const NodeChildrenType{T} = TernaryTupleUnion{ChildNodeType{T}}
 
 getChildNum(::Type{<:NonEmptyTuple{ChildNodeType{T}, N}}) where {T, N} = N+1
 
-unpackAA0D(::Type{T}, obj::AbtArray0D{<:T}) where {T} = obj[]
-unpackAA0D(::Type{T}, obj::AbstractArray{<:T}) where {T} = itself(obj)
 
 function genConstFunc(::Type{T1}, val::T2) where {T1, T2}
     let res = val
@@ -57,7 +55,7 @@ struct EmptyNode{T, N} <: GraphNode{T, N} end
 EmptyNode(::DimensionalParam{T, N}) where {T, N} = EmptyNode{T, N}()
 
 struct ReductionNode{T, I<:NodeChildrenType{T}, F, 
-                     S<:Union{iT, Fix2{typeof(typedAdd), T}}} <: OperatorNode{T, 0, I, F}
+                     S<:Union{iT, ValShifter{T}}} <: OperatorNode{T, 0, I, F}
     apply::TypedReduction{T, F}
     child::I
     marker::Symbol
@@ -65,7 +63,7 @@ struct ReductionNode{T, I<:NodeChildrenType{T}, F,
 
     function ReductionNode(apply::TypedReduction{T, F}, child::I, 
                            marker::Symbol, bias::Union{T, Nothing}) where {T, F, I}
-        f = ( (bias === nothing && T !== nothing) ? itself : Fix2(typedAdd, bias))
+        f = genValShifter(T, bias)
         new{T, I, F, typeof(f)}(apply, child, marker, f)
     end
 end
@@ -76,9 +74,11 @@ struct MorphismNode{T, I<:NodeChildrenType{T}, F, N} <: OperatorNode{T, N, I, F}
     marker::Symbol
 end
 
-genOperatorNode(par::NodeParam{T, <:Any, <:NTuple{A, ParamBoxSingleArg{T}}}, 
-                childNodes::NTuple{A, ChildNodeType{T}}) where {A, T} = 
-ReductionNode(par.lambda, childNodes, symbolFromPar(par), par.offset)
+function genOperatorNode(par::NodeParam{T, <:Any, <:NTuple{A, ParamBoxSingleArg{T}}}, 
+                childNodes::NTuple{A, ChildNodeType{T}}) where {A, T}
+    offset = (isOffsetEnabled(par) ? par.offset : nothing)
+    ReductionNode(par.lambda, childNodes, symbolFromPar(par), offset)
+end
 
 genOperatorNode(par::ArrayParam{T, <:Any, <:NTuple{A, ParamBoxSingleArg{T}}}, 
                 childNodes::NTuple{A, ChildNodeType{T}}) where {A, T} = 
