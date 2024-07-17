@@ -1075,5 +1075,3 @@ packElementalVal(::Type{U}, obj::AbstractArray{<:U}) where {U} = copy(obj)
 
 obtainElementalVal(::Type{U}, obj::AbtArray0D{<:U}) where {U} = obj[]
 obtainElementalVal(::Type{U}, obj::AbstractArray{<:U}) where {U} = copy(obj)
-obtainElementalVal(::Val{0}, obj::AbtArray0D) = obj[]
-obtainElementalVal(::Val, obj::AbstractArray) = copy(obj)

@@ -531,7 +531,8 @@ function searchObtainCore(shiftVal::F,
                           markerDict::IdDict{ParamBox{T}, NodeMarker{<:AbstractArray{T}}}, 
                           p::ParamBox{T, N}) where {T, F<:Union{iT, ValShifter{T}}, N}
     # Depth-first search by recursive calling
-    marker = get!(markerDict, p, NodeMarker( packElementalVal(Val(N), p.memory) ))
+    valBox = packElementalVal(Val(N), p.memory)
+    marker = get!(markerDict, p, NodeMarker(valBox))::NodeMarker{typeof(valBox)}
     if !marker.visited
         marker.visited = true
         res = p.lambda( (searchObtainLoop(markerDict, x) for x in p.input)... ) |> shiftVal
