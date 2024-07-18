@@ -74,13 +74,13 @@ struct MorphismNode{T, I<:NodeChildrenType{T}, F, N} <: OperatorNode{T, N, I, F}
     marker::Symbol
 end
 
-function genOperatorNode(par::NodeParam{T, <:Any, <:NTuple{A, ParamBoxSingleArg{T}}}, 
+function genOperatorNode(par::CellParam{T, <:Any, <:NTuple{A, ParamBoxSingleArg{T}}}, 
                 childNodes::NTuple{A, ChildNodeType{T}}) where {A, T}
     offset = (isOffsetEnabled(par) ? par.offset : nothing)
     ReductionNode(par.lambda, childNodes, symbolFromPar(par), offset)
 end
 
-genOperatorNode(par::ArrayParam{T, <:Any, <:NTuple{A, ParamBoxSingleArg{T}}}, 
+genOperatorNode(par::GridParam{T, <:Any, <:NTuple{A, ParamBoxSingleArg{T}}}, 
                 childNodes::NTuple{A, ChildNodeType{T}}) where {A, T} = 
 MorphismNode(par.lambda, childNodes, symbolFromPar(par))
 
