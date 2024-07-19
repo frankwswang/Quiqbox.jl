@@ -31,6 +31,8 @@ abstract type ConfigBox{T, ContainerT, MethodT} <: ValueContainer{T} end
 abstract type ComputableGraph{T} <: ValueContainer{T} end
 abstract type AbstractMarker{T} <: ValueContainer{T} end
 
+abstract type TupleOfAbtArrays{T, N, V<:AbstractArray{T, N}, R<:Tuple{V, Vararg{V}}} <: ValueContainer{T} end
+
 abstract type HartreeFockFinalValue{T, HFT} <: MixedContainer{T} end
 abstract type BasisSetData{T, D, BS} <: MixedContainer{T} end
 abstract type MatterData{T, D} <: MixedContainer{T} end
@@ -47,6 +49,8 @@ abstract type EffectNode{T, N, I} <: GraphNode{T, N} end
 abstract type StorageNode{T, N} <: GraphNode{T, N} end
 
 abstract type ParamBox{T, N, I} <: CompositeParam{T, N} end
+abstract type ParamHeap{T, N, I} <: CompositeParam{T, N} end
+abstract type ParamStack{T, N, I} <: CompositeParam{T, N} end
 
 abstract type SingleVarFunction{T} <: ParamFunction{T} end
 abstract type MultiDimFunction{T, D} <: ParamFunction{T} end
@@ -158,6 +162,7 @@ const RefOrA0D{T, V<:AbstractArray{T, 0}} =  Union{RefVal{T}, V}
 # const TypeNTuple{T, N} = NTuple{N, Type{T}}
 
 const TernaryTupleUnion{T} = Union{(NonEmptyTuple{T, N} for N in 0:2)...}
+const TwiceThriceNTuple{T} = Union{(NonEmptyTuple{T, N} for N in 1:2)...}
 const ElemParamAbtArray{T, N} = AbstractArray{<:ElementalParam{T}, N}
 const ParamBoxSingleArg{T, N} = Union{ElemParamAbtArray{T, N}, DimensionalParam{T, N}}
 const ParamBoxInputType{T} = TernaryTupleUnion{ParamBoxSingleArg{T}}

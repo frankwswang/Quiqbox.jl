@@ -56,22 +56,8 @@ TypedReduction(srf.f, arg, args...)
 TypedReduction(srf::TypedReduction, arg::AbstractArray{T}, args...) where {T} = 
 TypedReduction(srf.f, arg, args...)
 
-# Type annotation prevents Enzyme.jl (v0.12.22) from breaking sometimes.
-function (sf::TypedReduction{T, F})(arg1::AbtArrayOr{T}) where {T, F}
-    sf.f(arg1)::T
-end
-
-# Type annotation prevents Enzyme.jl (v0.12.22) from breaking sometimes.
-function (sf::TypedReduction{T, F})(arg1::AbtArrayOr{T}, 
-                                    arg2::AbtArrayOr{T}) where {T, F}
-    sf.f(arg1, arg2)::T
-end
-
-function (sf::TypedReduction{T, F})(arg1::AbtArrayOr{T}, 
-                                    arg2::AbtArrayOr{T}, 
-                                    arg3::AbtArrayOr{T}) where {T, F}
-    sf.f(arg1, arg2, arg3)::T
-end
+(sf::TypedReduction{T, F})(arg::AbtArrayOr{T}, args::AbtArrayOr{T}...) where {T, F} = 
+sf.f(arg, args...)::T
 
 
 struct StableMorphism{T, F<:Function, N} <:TypedFunction{T, F}
@@ -96,23 +82,49 @@ StableMorphism(srf.f, arg, args...)
 StableMorphism(srf::StableMorphism, arg::AbstractArray{T}, args...) where {T} = 
 StableMorphism(srf.f, arg, args...)
 
-function (sf::StableMorphism{T, F, N})(arg1::AbtArrayOr{T}) where {T, F, N}
-    sf.f(arg1)::AbstractArray{T, N}
+(sf::StableMorphism{T, F, N})(arg::AbtArrayOr{T}, args::AbtArrayOr{T}...) where {T, F, N} = 
+sf.f(arg, args...)::AbstractArray{T, N}
+
+
+struct BatchInterlock{T, F<:Function, N, L}
+    f::F
+
+    function BatchInterlock(f::F, R::Type{<:TwiceThriceNTuple{T}}, arg, args...) where 
+                           {F, T}
+        checkReturnType(f, NTuple{L, AbstractArray{T, N}}, (arg, args...))
+        new{T, F, 0, fieldcount(R)}(f)
+    end
+
+    function BatchInterlock(f::F, R::Type{<:TwiceThriceNTuple{AbstractArray{T, N}}}, 
+                            arg, args...) where {F, T, N}
+        L = fieldcount(R)
+        N==0 && throw(AssertionError("`BatchInterlock` does not support returning a "*
+                                     "`Tuple` of 0-dimensional array."))
+        checkReturnType(f, NTuple{L, AbstractArray{T, N}}, (arg, args...))
+        new{T, F, N, L}(f)
+    end
+
+    function BatchInterlock(::Type{T}, ::Val{N}, ::Val{L}) where {T, N, L}
+        if !( L isa Int && L > 1)
+            throw(ArgumentError("`L` needs to be an `Int` larger than 1 to ensure 
+                                `BatchInterlock` always returns a multi-element `Tuple`."))
+        end
+        new{T, FOfThem, N, L}(themselves)
+    end
 end
 
-function (sf::StableMorphism{T, F, N})(arg1::AbtArrayOr{T}, 
-                                       arg2::AbtArrayOr{T}) where {T, F, N}
-    sf.f(arg1, arg2)::AbstractArray{T, N}
-end
+BatchInterlock(srf::BatchInterlock{T, F, N, L}, arg::AbtArrayOr{T}, args...) where 
+              {T, F, N, L} = 
+BatchInterlock(srf.f, NTuple{L, AbstractArray{T, N}}, arg, args...)
 
-function (sf::StableMorphism{T, F, N})(arg1::AbtArrayOr{T}, 
-                                       arg2::AbtArrayOr{T}, 
-                                       arg3::AbtArrayOr{T}) where {T, F, N}
-    sf.f(arg1, arg2, arg3)::AbstractArray{T, N}
-end
+BatchInterlock(srf::BatchInterlock{T, F, 0, L}, arg::AbtArrayOr{T}, args...) where 
+              {T, F, L} = 
+BatchInterlock(srf.f, NTuple{Vararg{T, L}}, arg, args...)
 
-returnDimOf(::Type{<:StableMorphism{<:Any, <:Any, N}}) where {N} = N
-returnDimOf(::T) where {T<:StableMorphism} = returnDimOf(T)
+function (sf::BatchInterlock{T, F, N, L})(arg::AbtArrayOr{T}, args::AbtArrayOr{T}...) where 
+                                         {T, F, N, L}
+    sf.f(arg, args...)::NTuple{L, AbstractArray{T, N}}
+end
 
 
 function checkScreenLevel(sl::Int, (levelMin, levelMax)::NTuple{2, Int})
@@ -210,20 +222,23 @@ function checkParamBoxInputCore(hasVariable::Bool, arg::T, dimMinMax::NTuple{2, 
     hasVariable::Bool
 end
 
+function throwParamContainerArgTypeErrorMessage1(I::Type)
+    throw(ArgumentError("`$I` is not supported as argument `input` when `lambda` "*
+                        "functions like an identity morphism."))
+end
+
 function checkCellParamArg(::TypedReduction{T, <:iTalike}, input::I, 
-                           shifter::S, init::Union{T, Missing}) where {T, I, S}
-    if !(I <: Tuple{ElementalParam{T}})
-        throw(ArgumentError("`$I` is not supported as argument `input` when `lambda` "*
-                            "functions like an identity morphism."))
-    end
+                           shifter::S, memory::Union{T, Missing}) where {T, I, S}
+    I <: Tuple{ElementalParam{T}} || throwParamContainerArgTypeErrorMessage1(I)
     checkParamBoxInput(input, dimMax=0)
-    TypedReduction(T), iT, deepcopy(ismissing(init) ? (input[1]|>obtain|>shifter) : init)
+    memory = deepcopy(ismissing(memory) ? (input[1]|>obtain|>shifter) : memory)
+    TypedReduction(T), iT, memory
 end
 
 function checkCellParamArg(f::TypedReduction{T, F}, input::I, shifter::S, 
-                           init::Union{T, Missing}) where {T, F, I, S}
+                           memory::Union{T, Missing}) where {T, F, I, S}
     checkParamBoxInput(input)
-    f, F, deepcopy(ismissing(init) ? shifter( f(obtain.(input)...) ) : init)
+    f, F, deepcopy(ismissing(memory) ? shifter( f(obtain.(input)...) ) : memory)
 end
 
 initializeOffset(::Type) = nothing
@@ -293,28 +308,23 @@ CellParam(CellVar(var, varSym), symbol)
 # const TensorInCellParam{T, F, PB, N} = CellParam{T, F, <:AbstractArray{PB, N}}
 # const ScalarInCellParam{T, F, PB} = TensorInCellParam{T, F, PB, 0}
 
-function throwGridParamArgTypeErrorMessage1(I::Type)
-    throw(ArgumentError("`$I` is not supported as argument `input` when `lambda` "*
-                        "functions like an identity morphism."))
-end
-
-function throwGridParamArgTypeErrorMessage2(M1::Type, M2::Type)
-    throw(AssertionError("The first element of `input` (`::$M1`) and `init` (`::$M2`) "*
+function throwParamContainerArgTypeErrorMessage2(M1::Type, M2::Type)
+    throw(AssertionError("The first element of `input` (`::$M1`) and `memory` (`::$M2`) "*
                          "should be the same type."))
 end
 
-function checkGridParamArg(::StableMorphism{T, <:iTalike, N}, input::I, init::M) where 
+function checkGridParamArg(::StableMorphism{T, <:iTalike, N}, input::I, memory::M) where 
                            {T, N, I, M<:AbstractArray{T, N}}
-    (I <: Tuple{ParamBoxSingleArg{T, N}}) || throwGridParamArgTypeErrorMessage1(I)
+    (I <: Tuple{ParamBoxSingleArg{T, N}}) || throwParamContainerArgTypeErrorMessage1(I)
     MI = typeof(input[1])
-    MI == M || throwGridParamArgTypeErrorMessage2(MI, M)
+    MI == M || throwParamContainerArgTypeErrorMessage2(MI, M)
     checkParamBoxInput(input, dimMin=1)
-    StableMorphism(T, Val(N)), iT, deepcopy(init)
+    StableMorphism(T, Val(N)), iT, deepcopy(memory)
 end
 
 function checkGridParamArg(::StableMorphism{T, <:iTalike, N}, input::I, ::Missing) where 
                            {T, N, I}
-    (I <: Tuple{ParamBoxSingleArg{T, N}}) || throwGridParamArgTypeErrorMessage1(I)
+    (I <: Tuple{ParamBoxSingleArg{T, N}}) || throwParamContainerArgTypeErrorMessage1(I)
     checkParamBoxInput(input, dimMin=1)
     StableMorphism(T, Val(N)), iT, deepcopy(input[1]|>obtain)
 end
@@ -324,12 +334,12 @@ function throwGridParamDimErrorMessage()
                         "`$CellParam` for returning scalar-type output."))
 end
 
-function checkGridParamArg(f::StableMorphism{T, F, N}, input::I, init::M) where 
+function checkGridParamArg(f::StableMorphism{T, F, N}, input::I, memory::M) where 
                            {T, F, N, I, M<:AbstractArray{T, N}}
     N < 1 && throwGridParamDimErrorMessage()
     checkParamBoxInput(input)
     checkReturnType(f, M, obtain.(input))
-    f, F, deepcopy(init)
+    f, F, deepcopy(memory)
 end
 
 function checkGridParamArg(f::StableMorphism{T, F, N}, input::I, ::Missing) where 
@@ -465,6 +475,68 @@ function memorize!(pn::ParamBox{T}, newMem::T=ValOf(pn)) where {T}
     oldMem = pn.memory
     @atomic pn.memory = newMem
     oldMem
+end
+
+struct ParamList{T, N, P<:DimensionalParam{T, N}, 
+                 I<:AbstractVector{P}} <: ParamHeap{T, N, I}
+    input::I
+    symbol::IndexedSym
+
+    function ParamList(input::O, symbol::SymOrIndexedSym) where 
+                      {T, N, P<:DimensionalParam{T, N}, O<:AbstractVector{P}}
+        new{T, N, P, O}(input, IndexedSym(symbol))
+    end
+end
+
+ParamList(pl::ParamList, symbol::IndexedSym) = ParamList(pl.input, symbol)
+
+
+struct TwiceThriceAbtArray{T, N, V<:AbstractArray{T, N}, 
+                           R<:TwiceThriceNTuple{V}} <: TupleOfAbtArrays{T, N, V, R}
+    arr::R
+end
+
+eleTypeOf(::TupleOfAbtArrays{T}) where {T} = T
+arrTypeOf(::TupleOfAbtArrays{<:Any, <:Any, V}) where {V} = V
+
+function checkParamLinkArg(::BatchInterlock{T, FOfThem, N, L}, input::I, 
+                           init::Union{Tuple, Missing}) where {T, N, L, I}
+    if ismissing(init)
+        length(I) == L || throwParamContainerArgTypeErrorMessage1(I)
+        init = obatin.(input)
+    else
+        I == M || throwParamContainerArgTypeErrorMessage2(I, M)
+    end
+    checkParamBoxInput(input)
+    BatchInterlock(T, Val(N), Val(L)), FOfThem, deepcopy(init)
+end
+
+function checkParamLinkArg(f::BatchInterlock{T, F, N}, input::I, 
+                           init::Union{Tuple, Missing}) where {T, F, N, I}
+    checkParamBoxInput(input)
+    if ismissing(init)
+        init = f(obtain.(input)...)
+    else
+        checkReturnType(f, typeof(init), obtain.(input))
+    end
+    f, F, deepcopy(init)
+end
+
+mutable struct ParamLink{T, F<:Function, I<:ParamBoxInputType{T}, N, 
+                         V<:AbstractArray{T, N}, L} <: ParamStack{T, N, I}
+    const linker::BatchInterlock{T, F, N, L}
+    const input::I
+    const symbol::IndexedSym
+    @atomic memory::TwiceThriceAbtArray{T, N, V, NTuple{L, V}}
+
+    function ParamLink(linker::BatchInterlock{T, F, N, L}, input::I, 
+                       symbol::SymOrIndexedSym, 
+                       memory::Union{NTuple{L, AbstractArray{T, N}}, Missing}=missing) where 
+                      {T, F, N, L, I<:ParamBoxInputType{T}}
+        lambda, funcType, memory = checkParamLinkArg(linker, input, memory)
+        new{T, funcType, I, N, L, arrTypeOf(memory)}(lambda, input, IndexedSym(symbol), 
+                                                     memory)
+    end
 end
 
 
