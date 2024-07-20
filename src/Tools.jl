@@ -620,6 +620,8 @@ const iTalike = Union{iT, typeof(identity)}
 
 @inline themselves(xs::Vararg) = xs
 
+const FOfThem = typeof(themselves)
+
 
 """
 
@@ -732,12 +734,12 @@ nameOf(f::StructuredFunction) = typeof(f)
 nameOf(f) = nameof(f)
 
 
-function arrayDiffCore!(vs::NTuple{N, Array{T}}) where {N, T}
+function arrayDiffCore!(vs::Tuple{Array{T}, Array{T}, Vararg{Array{T}, N}}) where {N, T}
     head = vs[argmin(length.(vs))]
     coms = T[]
     l = length(head)
     i = 0
-    ids = Array{Int}(undef, N)
+    ids = Array{Int}(undef, N+2)
     while i < l
         i += 1
         ele = head[i]
@@ -774,7 +776,8 @@ function arrayDiffCore!((v1, v2)::NTuple{2, Array{T}}) where {T}
     coms, v1, v2
 end
 
-tupleDiff(ts::Vararg{NTuple{<:Any, T}}) where {T} = arrayDiffCore!(ts .|> collect)
+tupleDiff(t::NonEmptyTuple{T}, ts::NonEmptyTuple{T}...) where {T} = 
+arrayDiffCore!((t, ts...) .|> collect)
 
 
 # function genIndex(index::Int)
@@ -1069,8 +1072,8 @@ end
 
 packElementalVal(::Val{0}, obj::Any) = fill(obj)
 packElementalVal(::Val{0}, obj::AbtArray0D) = copy(obj)
-packElementalVal(::Val,    obj::AbstractArray) = copy(obj)
-packElementalVal(::Type{U}, obj::T) where {U, T<:U} = fill(obj)
+packElementalVal(::Val{N}, obj::AbstractArray{<:Any, N}) where {N} = copy(obj)
+packElementalVal(::Type{U}, obj::U) where {U} = fill(obj)
 packElementalVal(::Type{U}, obj::AbstractArray{<:U}) where {U} = copy(obj)
 
 obtainElementalVal(::Type{U}, obj::AbtArray0D{<:U}) where {U} = obj[]

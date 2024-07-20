@@ -145,8 +145,6 @@ end
 
 const AbtArrayOr{T} = Union{T, AbstractArray{T}}
 
-const CommutativeBinaryNumOps = Union{typeof(+), typeof(*)}
-
 const RefOrA0D{T, V<:AbstractArray{T, 0}} =  Union{RefVal{T}, V}
 
 # const ElemParamAbtArray{T, N} = AbstractArray{<:DimensionalParam{T, 0}, N}

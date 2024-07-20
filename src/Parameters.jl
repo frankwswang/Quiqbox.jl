@@ -544,8 +544,9 @@ struct NodeTuple{T<:Real, N, PT} <: ParamBox{T, N, PT}
     input::PT
     symbol::IndexedSym
 
-    NodeTuple(input::PT, symbol::SymOrIndexedSym) where {T, N, PT<:NTuple{N, CellParam{T}}} = 
-    new{T, N, PT}(input, IndexedSym(symbol))
+    NodeTuple(input::PT, symbol::SymOrIndexedSym) where 
+             {T, PT<:NonEmptyTuple{CellParam{T}}} = 
+    new{T, length(input), PT}(input, IndexedSym(symbol))
 end
 
 NodeTuple(nt::NodeTuple, symbol::Symbol) = NodeTuple(nt.input, symbol)
@@ -561,9 +562,9 @@ inputOf(pb::DimensionalParam) = pb.input
 mutable struct NodeMarker{T} #!Type-unstable
     visited::Bool
     value::T
-end
 
-NodeMarker(init::T, ::Type{U}=T) where {T, U} = NodeMarker{U}(false, init)
+    NodeMarker(init::T, ::Type{U}=T) where {T, U} = new{U}(false, init)
+end
 
 obtain(p::PrimitiveParam) = obtainINTERNAL(p)
 
@@ -775,67 +776,45 @@ compareParamContainer(pc1::PBoxTypeArgNumOutDim{T, N, A},
 pc1 === pc2 || compareMarker(ParamMarker(pc1), ParamMarker(pc2))
 
 
-operateBy(::typeof(+), pn1::CellParam) = itself(pn1)
-operateBy(::typeof(-), pn1::CellParam{T}) where {T} = operateBy(*, T(-1), pn1)
+# operateBy(op::F, pn1::CellParam, num::Real) where {F<:Function} = 
+# CellParam(OFC(itself, op, num), pn1, pn1.symbol)
 
-repeatedlyApply(::typeof(+), pn::CellParam{T}, times::Int) where {T} = 
-operateBy(*, pn, T(times))
+# operateBy(op::F, num::Real, pn1::CellParam) where {F<:Function} = 
+# CellParam(OCF(itself, op, num), pn1, pn1.symbol)
 
-repeatedlyApply(::typeof(-), pn::CellParam{T}, times::Int) where {T} = 
-operateBy(-, operateBy(*, pn, T(times)))
+# operateBy(op::CommutativeBinaryNumOps, num::Real, pn1::CellParam) = 
+# operateBy(op, pn1::CellParam, num::Real)
 
-repeatedlyApply(::typeof(*), pn::CellParam{T}, times::Int) where {T} = 
-operateBy(^, pn, T(times))
+# reformulate(::typeof(+), pn1::CellParam) = itself(pn1)
+# reformulate(::typeof(-), pn1::CellParam{T}) where {T} = reformulate(*, T(-1), pn1)
 
-operateBy(op::F, pn1::CellParam, num::Real) where {F<:Function} = 
-CellParam(OFC(itself, op, num), pn1, pn1.symbol)
+# repeatedlyApply(::typeof(+), pn::CellParam{T}, times::Int) where {T} = 
+# reformulate(*, pn, T(times))
 
-operateBy(op::F, num::Real, pn1::CellParam) where {F<:Function} = 
-CellParam(OCF(itself, op, num), pn1, pn1.symbol)
+# repeatedlyApply(::typeof(-), pn::CellParam{T}, times::Int) where {T} = 
+# reformulate(-, operateBy(*, pn, T(times)))
 
-operateBy(op::CommutativeBinaryNumOps, num::Real, pn1::CellParam) = 
-operateBy(op, pn1::CellParam, num::Real)
+# repeatedlyApply(::typeof(*), pn::CellParam{T}, times::Int) where {T} = 
+# reformulate(^, pn, T(times))
 
-# operateBy(op::F, pn::CellParam{T}) where {F<:Function, T} = 
-# CellParam(op∘pn.lambda.f, pn.input, symbol, pn.offset, pn.memory, pn.screen)
-
-operateByCore(op::F, pn1::CellParam{T}, pn2::CellParam{T}) where {F<:Function, T} = 
-CellParam(SplitArg{2}(op), [pn1, pn2], Symbol(pn1.symbol, pn2.symbol))
-
-operateByCore(op::F, pn1::CellParam{T}, pn2::CellParam{T}, 
-              pns::Vararg{CellParam{T}, N}) where {F<:Function, T, N} = 
-CellParam(SplitArg{N}(op), [pn1, pn2, pns...], Symbol(pn1.symbol, :_to_, pns[end].symbol))
-
-function operateBy(op::F, pn1::CellParam{T}, pn2::CellParam{T}) where 
-                  {F<:CommutativeBinaryNumOps, T}
-    if symFromIndexSym(pn1.symbol) > symFromIndexSym(pn2.symbol)
-        pn2, pn1 = pn1, pn2
-    end
-    if compareParamContainer(pn1, pn2)
-        repeatedlyApply(op, pn1, 2)
-    else
-        operateByCore(op, pn1, pn2)
-    end
-end
-
-operateBy(op::F, pn1::CellParam{T}, pns::Vararg{CellParam{T}, N}) where {F<:Function, T, N} = 
-operateByCore(op, pn1, pns...)
-
-operateBy(f::F, pns::AbstractArray{<:CellParam{T}}) where {F<:Function, T} = 
-CellParam(f, pns, Symbol(pns[begin].symbol.name, :_to_, pns[end].symbol.name))
-
-operateBy(f::F, ::Val{N}) where {F<:Function, N} = 
-((args::Vararg{CellParam{T}, N}) where {T}) -> operateBy(f, args...)
-
-operateBy(f::F) where {F<:Function} = 
-((args::AbstractArray{<:CellParam{T}}) where {T}) -> operateBy(f, args)
+# function reformulate(op::F, pn1::CellParam{T}, pn2::CellParam{T}) where 
+#                     {F<:Union{typeof(+), typeof(*)}, T<:Real}
+#     if symFromIndexSym(pn1.symbol) > symFromIndexSym(pn2.symbol)
+#         pn2, pn1 = pn1, pn2
+#     end
+#     if compareParamContainer(pn1, pn2)
+#         repeatedlyApply(op, pn1, 2)
+#     else
+#         operateByCore(op, pn1, pn2)
+#     end
+# end
 
 
-addCellParam(pn1::CellParam{T}, pn2::CellParam{T}) where {T} = operateBy(+, pn1, pn2)
+# addCellParam(pn1::CellParam{T}, pn2::CellParam{T}) where {T<:Real} = operateBy(+, pn1, pn2)
 
-mulCellParam(pn1::CellParam{T}, pn2::CellParam{T}) where {T} = operateBy(*, pn1, pn2)
-mulCellParam(pn::CellParam{T}, coeff::T) where {T} = operateBy(*, pn, coeff)
-mulCellParam(coeff::T, pn::CellParam{T}) where {T} = mulCellParam(pn, coeff)
+# mulCellParam(pn1::CellParam{T}, pn2::CellParam{T}) where {T<:Real} = operateBy(*, pn1, pn2)
+# mulCellParam(pn::CellParam{T}, coeff::T) where {T} = operateBy(*, pn, coeff)
+# mulCellParam(coeff::T, pn::CellParam{T}) where {T} = mulCellParam(pn, coeff)
 
 
 function sortParamContainers(::Type{C}, f::F, field::Symbol, roundAtol::T) where 
