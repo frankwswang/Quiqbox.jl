@@ -26,12 +26,14 @@ abstract type ValueContainer{T} <: CompositeContainer{T} end
 
 abstract type ChainedFunction{F, O, C} <: CompositeFunction{F, C} end
 
+abstract type DimensionalValue{T, N} <: ValueContainer{T} end
 abstract type HartreeFockintermediateData{T} <: ValueContainer{T} end
 abstract type ConfigBox{T, ContainerT, MethodT} <: ValueContainer{T} end
 abstract type ComputableGraph{T} <: ValueContainer{T} end
 abstract type AbstractMarker{T} <: ValueContainer{T} end
 
-abstract type TupleOfAbtArrays{T, N, V<:AbstractArray{T, N}, R<:Tuple{V, Vararg{V}}} <: ValueContainer{T} end
+abstract type TupleOfAbtArrays{T, N, V<:AbstractArray{T, N}, R<:Tuple{V, Vararg{V}}} <: DimensionalValue{T, N} end
+abstract type AbstractMemory{T, N} <: DimensionalValue{T, N} end
 
 abstract type HartreeFockFinalValue{T, HFT} <: MixedContainer{T} end
 abstract type BasisSetData{T, D, BS} <: MixedContainer{T} end
@@ -185,3 +187,5 @@ const AbtVecOfAbtArray{T} = AbstractVector{<:AbstractArray{T}}
 const GraphArgDataType{T} = Union{AbtVecOfAbtArray{T}, NonEmptyTuple{AbstractArray{T}}}
 
 const PBoxTypeArgNumOutDim{T, N, A} = ParamBox{T, N, <:NTuple{A, ParamBoxSingleArg{T}}}
+
+const AbtArrayOrMem{T, N} = Union{AbstractArray{T, N}, AbstractMemory{T, N}}
