@@ -6,15 +6,28 @@ using Test: @inferred
 using LRUCache
 
 
+function checkReshapingAxis(arr::AbstractArray, shape::Tuple{Vararg{Int}})
+    isempty(arr) && throw(AssertionError("the target array should not be empty."))
+    if any(i <= 0 for i in shape)
+        throw(AssertionError("The reshaping axis size should all be positive."))
+    end
+    if prod(shape) != length(arr)
+        throw(AssertionError("The product of reshaping axes should be equal to the "*
+                             "target array's length."))
+    end
+    nothing
+end
+
 struct ShapedMemory{T, N}
     value::Memory{T}
     shape::NTuple{N, Int}
 
-    ShapedMemory(value::AbstractArray{T}, 
-                 shape::Tuple{Vararg{Int}}=size(value)) where {T} = 
-    new{T, length(shape)}(value, vec(shape))
+    function ShapedMemory(value::AbstractArray{T}, 
+                          shape::Tuple{Vararg{Int}}=size(value)) where {T}
+        checkReshapingAxis(value, shape)
+        new{T, length(shape)}(value, vec(shape))
+    end
 end
-
 
 const BasicBinaryOpTargets = Union{Number, Bool}
 
@@ -128,15 +141,13 @@ end
 
 genSeqAxis(::Val{N}, sym::Symbol=:e) where {N} = (Symbol(sym, i) for i in 1:N) |> Tuple
 
-bundle(arg::T, args::T...) where {T} = collect( (arg, args...) )
+bundle(arg::T, args::T...) where {T} = collect( themselves(arg, args...) )
 const FofBundle = typeof(bundle)
 
-mutable struct MorphicLinkage{T, F<:Function, N}
-    const f::F
-    const extent::Int
-    @atomic axis::NonEmptyTuple{Tuple{Symbol, Int}}
-    #! Incorporate ShapedMemory
-
+struct MorphicLinkage{T, F<:Function, N, L}
+    f::F
+    extent::Int
+    axis::NTuple{L, Tuple{Symbol, Int}}
 
     function MorphicLinkage(f::F, ::Type{V}, arg, args...; 
                             axis::Union{NonEmptyTuple{Tuple{Symbol,Int}}, Missing}=missing, 
@@ -147,23 +158,35 @@ mutable struct MorphicLinkage{T, F<:Function, N}
         excludeAbtArray0D.(allArgs)
         val = checkReturnType(f, AbstractArray{<:T}, allArgs)
         ismissing(extent) && (extent = length(val))
-        ismissing(axis) && (axis = genSeqAxis( Val(1) ))
-        new{T, F, N}(f, extent, Memory{T}(undef, extent), axis)
+        if ismissing(axis)
+            axis = ()
+        else
+            checkReshapingAxis(extent, last.(axis))
+        end
+        new{T, F, N, length(axis)}(f, extent, Memory{T}(undef, extent), axis)
     end
 
     function MorphicLinkage(::V, ::V, ::Vararg{V, A}) where {V, A}
         T, N = checkAbtArrayInput(V)
         extent = A + 2
-        new{T, FofBundle, N}(bundle, extent, Memory{T}(undef, extent), genSeqAxis( Val(1) ))
+        new{T, FofBundle, N, 0}(bundle, extent, Memory{T}(undef, extent), ())
     end
 end
 
-function (ml::MorphicLinkage{T, F, N})(arg::T, args::T...) where {T, N, F}
+function callMorphicLinkageCore(ml::MorphicLinkage{T, <:Any, N}, arg, args...) where {T, N}
     allArgs = (arg, args...)
     excludeAbtArray0D.(allArgs)
-    res = ml.f(allArgs...)::AbstractArray{<:assertAbtArrayOutput(T, Val(N))}
+    ml.f(allArgs...)::AbstractArray{<:assertAbtArrayOutput(T, Val(N))}
+end
+
+function (ml::MorphicLinkage{T, F, N, L})(arg::T, args::T...) where {T, F, N, L}
+    res = callMorphicLinkageCore(ml, arg, args...)
     iBegin = firstindex(res)
     reshape(res[iBegin : (iBegin+ml.extent-1)], getindex.(ml.axis, 2))
+end
+
+function (ml::MorphicLinkage{T, F, N, 0})(arg::T, args::T...) where {T, F, N}
+    callMorphicLinkageCore(ml, arg, args...) |> vec
 end
 
 
@@ -577,34 +600,37 @@ function checkParamNestArg(ml::MorphicLinkage{T, F, N}, input::I,
     ml, F, deepcopy(memory)
 end
 
-struct LinkParam{T, F<:Function, I<:ParamBoxInputType{T}, N} <: ParamBox{T, N, I}
-    source::Tuple{MorphicLinkage{T, F, N}, I}
+struct LinkParam{T, F<:Function, I<:ParamBoxInputType{T}, N, L} <: ParamBox{T, N, I}
+    source::Tuple{MorphicLinkage{T, F, N, L}, I}
     index::Int
     memory::ShapedMemory{T, N}
 end
 
-struct ParamNest{T, F<:Function, I<:ParamBoxInputType{T}, N} <: ParamStack{T, N, I}
-    linker::MorphicLinkage{T, F, N}
+struct ParamNest{T, F<:Function, I<:ParamBoxInputType{T}, N, L} <: ParamStack{T, N, I}
+    linker::MorphicLinkage{T, F, N, L}
     input::I
     symbol::IndexedSym
-    output::Memory{LinkParam{T, F, I, N}}
+    output::Memory{LinkParam{T, F, I, N, L}}
 
-    function ParamNest(linker::MorphicLinkage{T, F, N}, input::I, 
+    function ParamNest(linker::MorphicLinkage{T, F, N, L}, input::I, 
                        symbol::SymOrIndexedSym, 
                        memory::Union{Memory{ShapedMemory{T, N}}, Missing}=missing) where 
-                      {T, N, F, I<:ParamBoxInputType{T}}
+                      {T, N, F, L, I<:ParamBoxInputType{T}}
         linker, funcType, memory = checkParamNestArg(linker, input, memory)
         lPars = map( enumerate(memory) ) do (idx, val)
             LinkParam((linker, input), idx, ShapedMemory(val))
         end
         output = Memory{LinkParam{T, F, I, N, V}}(lPars)
-        new{T, funcType, I, N}(linker, input, IndexedSym(symbol), output)
+        new{T, funcType, I, N, L}(linker, input, IndexedSym(symbol), output)
     end
 end
 
-ParamNest(linker::MorphicLinkage{T, F, N}, input::I, symbol::SymOrIndexedSym, 
-          output::Memory{LinkParam{T, F, I, N}}) where {T, N, F, I<:ParamBoxInputType{T}} = 
-ParamNest(linker, input, symbol, Memory{ShapedMemory{T, N}}(getproperty.(output, memory)))
+function ParamNest(linker::MorphicLinkage{T, F, N, L}, input::I, symbol::SymOrIndexedSym, 
+                   output::Memory{LinkParam{T, F, I, N, L}}) where 
+                  {T, N, F, L, I<:ParamBoxInputType{T}}
+    memory = Memory{ShapedMemory{T, N}}(getproperty.(output, :memory))
+    ParamNest(linker, input, symbol, memory)
+end
 
 
 function ParamNest(func::Function, input::ParamBoxInputType{T}, 
@@ -711,9 +737,7 @@ searchObtain(::IdDict{ParamBox{T}, NodeMarker{<:AbstractArray{T}}},
              p::PrimitiveParam{T}) where {T} = 
 directObtain(p)
 
-#! Certain type of CellParam (0,0) should not need to include offset.
-
-# To be deprecated
+#! To be deprecated
 obtain(nt::NodeTuple) = obtain.(nt.input)
 
 (pn::DimensionalParam)() = obtain(pn)
