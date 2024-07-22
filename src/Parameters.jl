@@ -200,7 +200,7 @@ const SymOrIndexedSym = Union{Symbol, IndexedSym}
 mutable struct CellVar{T} <: PrimitiveParam{T, 0}
     @atomic input::T
     const symbol::IndexedSym
-    @atomic screen::TernaryNumber
+    const screen::TernaryNumber
 
     function CellVar(input::T, symbol::SymOrIndexedSym, 
                      screen::TernaryNumber=TPS1) where {T}
@@ -213,10 +213,10 @@ end
 CellVar(::AbstractArray, ::SymOrIndexedSym) = 
 throw(ArgumentError("`CellVar` does not support `AbstractArray`-type `input`."))
 
-mutable struct GridVar{T, N, V<:AbstractArray{T, N}} <: PrimitiveParam{T, N}
-    const input::V
-    const symbol::IndexedSym
-    @atomic screen::TernaryNumber
+struct GridVar{T, N, V<:AbstractArray{T, N}} <: PrimitiveParam{T, N}
+    input::V
+    symbol::IndexedSym
+    screen::TernaryNumber
 
     function GridVar(input::V, symbol::SymOrIndexedSym, screen::TernaryNumber=TPS1) where 
                     {T, N, V<:AbstractArray{T, N}}
@@ -496,12 +496,6 @@ function setScreenLevel!(p::T, level::Int) where {T<:CellParam}
     setScreenLevelCore!(p, level)
     p
 end
-
-function setScreenLevel!(p::T, level::Int) where {T<:PrimitiveParam}
-    checkScreenLevel(level, getScreenLevelRange(T))
-    setScreenLevelCore!(p, level)
-end
-
 
 setScreenLevel(pn::CellParam, level::Int) = setScreenLevel!(CellParam(pn), level)
 
