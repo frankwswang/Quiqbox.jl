@@ -197,33 +197,35 @@ end
 const SymOrIndexedSym = Union{Symbol, IndexedSym}
 
 
+genTernaryNumber(num::Int) = TernaryNumber(num)
+genTernaryNumber(num::TernaryNumber) = itself(num)
+
 mutable struct CellVar{T} <: PrimitiveParam{T, 0}
     @atomic input::T
     const symbol::IndexedSym
     const screen::TernaryNumber
 
     function CellVar(input::T, symbol::SymOrIndexedSym, 
-                     screen::TernaryNumber=TPS1) where {T}
+                     screen::Union{TernaryNumber, Int}=TPS1) where {T}
         checkPrimParamElementalType(T)
         checkScreenLevel(screen, getScreenLevelRange(PrimitiveParam))
-        new{T}(input, IndexedSym(symbol), screen)
+        new{T}(input, IndexedSym(symbol), genTernaryNumber(screen))
     end
 end
 
-CellVar(::AbstractArray, ::SymOrIndexedSym) = 
-throw(ArgumentError("`CellVar` does not support `AbstractArray`-type `input`."))
 
 struct GridVar{T, N, V<:AbstractArray{T, N}} <: PrimitiveParam{T, N}
     input::V
     symbol::IndexedSym
     screen::TernaryNumber
 
-    function GridVar(input::V, symbol::SymOrIndexedSym, screen::TernaryNumber=TPS1) where 
+    function GridVar(input::V, symbol::SymOrIndexedSym, 
+                     screen::Union{TernaryNumber, Int}=TPS1) where 
                     {T, N, V<:AbstractArray{T, N}}
         checkPrimParamElementalType(T)
         checkScreenLevel(screen, getScreenLevelRange(PrimitiveParam))
         N < 1 && throw(DomainError(N, "The dimension of `input` must be larger than 0."))
-        new{T, N, V}(copy(input), IndexedSym(symbol), screen)
+        new{T, N, V}(copy(input), IndexedSym(symbol), genTernaryNumber(screen))
     end
 end
 
@@ -296,10 +298,11 @@ mutable struct CellParam{T, F<:Function, I<:ParamBoxInputType{T}} <: ParamBox{T,
     function CellParam(lambda::TypedReduction{T, F}, input::I, 
                        symbol::SymOrIndexedSym, 
                        memory::Union{T, Missing}=missing, 
-                       screen::TernaryNumber=TUS0, 
+                       screen::Union{TernaryNumber, Int}=TUS0, 
                        offset::Union{T, Nothing}=initializeOffset(T)) where 
                       {T, F, I<:ParamBoxInputType{T}}
         slRange = getScreenLevelRange(ParamBox{T, 0})
+        screen = genTernaryNumber(screen)
         sl = checkScreenLevel(screen, slRange)
         shifter = genValShifter(T, offset)
         lambda, funcType, memory = checkCellParamArg(lambda, input, shifter, memory)
