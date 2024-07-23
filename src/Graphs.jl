@@ -45,7 +45,7 @@ struct ReferenceNode{T, N, V<:AbstractArray{T, N}} <: StorageNode{T, N}
     id::UInt
 
     function ReferenceNode(pb::ParamBox{T, N}) where {T, N}
-        val = packElementalVal(Val(N), obtainMemoryVal(pb.memory))
+        val = packElementalVal(Val(N), obtainDimVal(pb.memory))
         new{T, N, typeof(val)}(val, objectid(pb))
     end
 end

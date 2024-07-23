@@ -1,5 +1,6 @@
-export NodeVar, NodeVar, CellParam, GridParam, NodeTuple, setScreenLevel!, setScreenLevel, 
-       symOf, inputOf, obtain, setVal!, screenLevelOf, markParams!, topoSort, getParams
+export NodeVar, NodeVar, CellParam, GridParam, ParamList, ParamNest, setScreenLevel!, 
+       setScreenLevel, symOf, inputOf, obtain, setVal!, screenLevelOf, markParams!, 
+       topoSort, getParams
 
 using Base: Fix2, Threads.Atomic, issingletontype
 using Test: @inferred
@@ -11,11 +12,12 @@ function checkReshapingAxis(arr::AbstractArray, shape::Tuple{Vararg{Int}})
     if any(i <= 0 for i in shape)
         throw(AssertionError("The reshaping axis size should all be positive."))
     end
-    if prod(shape) != length(arr)
+    len = length(arr)
+    if prod(shape) != len
         throw(AssertionError("The product of reshaping axes should be equal to the "*
                              "target array's length."))
     end
-    nothing
+    len
 end
 
 
@@ -32,12 +34,15 @@ end
 ShapedMemory(value::AbstractArray{T}, shape::Tuple{Vararg{Int}}=size(value)) where {T} = 
 ShapedMemory(Memory{T}( vec(value) ), shape)
 
-# ShapedMemory(::Type{T}, value::AbstractArray{T}) where {T} = ShapedMemory(value)
-# ShapedMemory(::Type{T}, value::T) where {T} = ShapedMemory( fill(value) )
+ShapedMemory(::Type{T}, value::AbstractArray{T}) where {T} = ShapedMemory(value)
+
+ShapedMemory(::Type{T}, value::T) where {T} = ShapedMemory( fill(value) )
 
 ShapedMemory(sm::ShapedMemory) = itself(sm)
 
-obtainMemoryVal(sm::ShapedMemory) = itself.( reshape(sm.value, sm.shape) )
+obtainDimVal(sm::ShapedMemory) = itself.( reshape(sm.value, sm.shape) )
+
+obtainDimVal(sm::AbstractArray) = itself(sm)
 
 
 const BasicBinaryOpTargets = Union{Number, Bool}
@@ -339,9 +344,9 @@ mutable struct CellParam{T, F<:Function, I<:ParamBoxInputType{T}} <: ParamBox{T,
         else
             if offset===nothing
                 offset = if sl > 0
-                    obtainMemoryVal(memory)
+                    obtainDimVal(memory)
                 else
-                    memVal = obtainMemoryVal(memory)
+                    memVal = obtainDimVal(memory)
                     typedSub(memVal, memVal)
                 end
             end
@@ -483,83 +488,20 @@ function GridParam(val::AbstractArray, valSym::SymOrIndexedSym,
 end
 
 
-#!! struct ChainParam
-
-# end
-
-# ChainParam -> NodeVar of NodeVar
-
-# struct ReferenceParam
-
-# end
-
-getScreenLevelRange(::Type{<:ParamBox}) = (0, 0)
-
-getScreenLevelRange(::Type{<:ParamBox{T, 0}}) where {T} = (0, checkTypedOpMethods(T) * 2)
-
-getScreenLevelRange(::Type{<:PrimitiveParam}) = (1, 2)
-
-getScreenLevelRange(::Type{<:DimensionalParam}) = (0, 2)
-
-getScreenLevelRange(::T) where {T<:DimensionalParam} = getScreenLevelRange(T)
-
-function isScreenLevelChangeable(::T) where {T<:DimensionalParam}
-    minLevel, maxLevel = getScreenLevelRange(T)
-    (maxLevel - minLevel) > 0
-end
-
-isOffsetEnabled(::DimensionalParam) = false
-
-function isOffsetEnabled(pb::T) where {T<:CellParam}
-    isScreenLevelChangeable(pb) && getScreenLevelRange(T)[end] > 0 && 
-    isdefined(pb, :offset) # Only for safety
-end
-
-screenLevelOf(::ParamBox) = 0
-
-screenLevelOf(p::ParamBox{<:Any, 0}) = Int(p.screen)
-
-screenLevelOf(p::PrimitiveParam) = Int(p.screen)
-
-
-function setScreenLevelCore!(p::DimensionalParam, level::Int)
-    @atomic p.screen = TernaryNumber(level)
-end
-
-function setScreenLevel!(p::T, level::Int) where {T<:CellParam}
-    checkScreenLevel(level, getScreenLevelRange(T))
-    levelOld = screenLevelOf(p)
-    if levelOld == level
-    elseif levelOld == 0
-        @atomic p.offset = obtain(p)
-    elseif level == 0
-        newVal = p.lambda((obtain(arg) for arg in p.input)...)
-        @atomic p.offset = typedSub(p.offset, newVal)
-    end
-    setScreenLevelCore!(p, level)
-    p
-end
-
-setScreenLevel(pn::CellParam, level::Int) = setScreenLevel!(CellParam(pn), level)
-
-setScreenLevel(p::NodeVar, level::Int) = NodeVar(p.input, p.symbol, TernaryNumber(level))
-
-
-function memorize!(pn::ParamBox{T}, newMem::T=ValOf(pn)) where {T}
-    oldMem = pn.memory
-    @atomic pn.memory = newMem
-    oldMem
-end
-
-struct ParamList{T, N, I<:DimensionalParam{T, N}} <: ParamHeap{T, N, I}
+struct ParamList{T, N, I<:DimensionalParam{T, N}} <: ParamPile{T, N, I}
     input::Memory{I}
     symbol::IndexedSym
 
-    function ParamList(input::AbstractArray{P}, symbol::SymOrIndexedSym) where 
-                      {T, N, P<:DimensionalParam{T, N}}
-        new{T, N, P}(Memory{P}(vec(input)), IndexedSym(symbol))
+    function ParamList(input::Memory{I}, symbol::SymOrIndexedSym) where 
+                      {T, N, I<:DimensionalParam{T, N}}
+        isempty(input) && throw(AssertionError("`input` should not be empty."))
+        new{T, N, I}(Memory{I}(input), IndexedSym(symbol))
     end
 end
+
+ParamList(input::AbstractArray{I}, symbol::SymOrIndexedSym) where 
+         {T, N, I<:DimensionalParam{T, N}} = 
+ParamList(Memory{I}( vec(input) ), symbol)
 
 ParamList(pl::ParamList, symbol::IndexedSym) = ParamList(pl.input, symbol)
 
@@ -603,33 +545,34 @@ function checkParamNestArg(ml::MorphicLinkage{T, F, N}, input::I,
     ml, F, deepcopy(memory)
 end
 
-struct LinkParam{T, F<:Function, I<:ParamBoxInputType{T}, N, L} <: ParamBox{T, N, I}
-    source::Tuple{MorphicLinkage{T, F, N, L}, I}
+struct LinkParam{T, N, I<:ParamGrid{T, N}} <: ParamBox{T, N, I}
+    input::I
     index::Int
     memory::ShapedMemory{T, N}
 end
 
-struct ParamNest{T, F<:Function, I<:ParamBoxInputType{T}, N, L} <: ParamStack{T, N, I}
+struct ParamNest{T, F<:Function, I<:ParamBoxInputType{T}, N, L} <: ParamGrid{T, N, I, L}
     linker::MorphicLinkage{T, F, N, L}
     input::I
     symbol::IndexedSym
-    output::Memory{LinkParam{T, F, I, N, L}}
+    output::Memory{LinkParam{T, N, I}}
 
     function ParamNest(linker::MorphicLinkage{T, F, N, L}, input::I, 
                        symbol::SymOrIndexedSym, 
                        memory::Union{Memory{ShapedMemory{T, N}}, Missing}=missing) where 
                       {T, N, F, L, I<:ParamBoxInputType{T}}
         linker, funcType, memory = checkParamNestArg(linker, input, memory)
-        lPars = map( enumerate(memory) ) do (idx, val)
-            LinkParam((linker, input), idx, ShapedMemory(val))
+        output = Memory{LinkParam{T, N, I}}(undef, length(memory))
+        pn = new{T, funcType, I, N, L}(linker, input, IndexedSym(symbol), output)
+        for (i, val) in zip(eachindex(output), memory)
+            pn.output[i] = LinkParam(pn, i, ShapedMemory(val))
         end
-        output = Memory{LinkParam{T, F, I, N, V}}(lPars)
-        new{T, funcType, I, N, L}(linker, input, IndexedSym(symbol), output)
+        pn
     end
 end
 
 function ParamNest(linker::MorphicLinkage{T, F, N, L}, input::I, symbol::SymOrIndexedSym, 
-                   output::Memory{LinkParam{T, F, I, N, L}}) where 
+                   output::Memory{LinkParam{T, N, I}}) where 
                   {T, N, F, L, I<:ParamBoxInputType{T}}
     memory = Memory{ShapedMemory{T, N}}(getproperty.(output, :memory))
     ParamNest(linker, input, symbol, memory)
@@ -650,16 +593,75 @@ ParamNest(input::TwiceThriceNTuple{ParamBoxSingleArg{T, N}},
 ParamNest(MorphicLinkage(obtain.(input)...), input, symbol)
 
 
-struct NodeTuple{T<:Real, N, PT} <: ParamBox{T, N, PT}
-    input::PT
-    symbol::IndexedSym
+getScreenLevelRange(::Type{<:LinkParam}) = (0, 0)
 
-    NodeTuple(input::PT, symbol::SymOrIndexedSym) where 
-             {T, PT<:NonEmptyTuple{CellParam{T}}} = 
-    new{T, length(input), PT}(input, IndexedSym(symbol))
+getScreenLevelRange(::Type{<:ParamBox}) = (0, 0)
+
+getScreenLevelRange(::Type{<:ParamBox{T, 0}}) where {T} = (0, checkTypedOpMethods(T) * 2)
+
+getScreenLevelRange(::Type{<:ParamPile}) = (0, 0)
+
+getScreenLevelRange(::Type{<:PrimitiveParam}) = (1, 2)
+
+getScreenLevelRange(::Type{<:DimensionalParam}) = (0, 2)
+
+getScreenLevelRange(::T) where {T<:DimensionalParam} = getScreenLevelRange(T)
+
+function isScreenLevelChangeable(::T) where {T<:DimensionalParam}
+    minLevel, maxLevel = getScreenLevelRange(T)
+    (maxLevel - minLevel) > 0
 end
 
-NodeTuple(nt::NodeTuple, symbol::Symbol) = NodeTuple(nt.input, symbol)
+isOffsetEnabled(::DimensionalParam) = false
+
+function isOffsetEnabled(pb::T) where {T<:CellParam}
+    isScreenLevelChangeable(pb) && getScreenLevelRange(T)[end] > 0 && 
+    isdefined(pb, :offset) # Only for safety
+end
+
+screenLevelOf(::ParamBox) = 0
+
+screenLevelOf(p::ParamBox{<:Any, 0}) = Int(p.screen)
+
+screenLevelOf(::LinkParam) = 0
+
+screenLevelOf(::ParamPile) = 0
+
+screenLevelOf(p::PrimitiveParam) = Int(p.screen)
+
+
+function setScreenLevelCore!(p::DimensionalParam, level::Int)
+    @atomic p.screen = TernaryNumber(level)
+end
+
+function setScreenLevel!(p::T, level::Int) where {T<:CellParam}
+    checkScreenLevel(level, getScreenLevelRange(T))
+    levelOld = screenLevelOf(p)
+    if levelOld == level
+    elseif levelOld == 0
+        @atomic p.offset = obtain(p)
+    elseif level == 0
+        newVal = p.lambda((obtain(arg) for arg in p.input)...)
+        @atomic p.offset = typedSub(p.offset, newVal)
+    end
+    setScreenLevelCore!(p, level)
+    p
+end
+
+setScreenLevel(p::CellParam, level::Int) = setScreenLevel!(CellParam(p), level)
+
+setScreenLevel(p::NodeVar, level::Int) = NodeVar(p.input, p.symbol, TernaryNumber(level))
+
+
+function memorize!(p::ParamBox{T, N}, newMem::AbtArrayOrMem{T, N}) where {T, N}
+    oldMem = obtainDimVal(p.memory)
+    safelySetVal!(p.memory.value, newMem)
+    oldMem
+end
+
+memorize!(p::ParamBox{T}, newMem::T) where {T} = memorize!(p, fill(newMem))
+
+memorize!(p::ParamBox) = memorize!(p, obtain(p))
 
 
 indexedSymOf(pc::DimensionalParam) = pc.symbol
@@ -678,7 +680,7 @@ end
 
 obtain(p::PrimitiveParam) = obtainINTERNAL(p)
 
-function obtain(p::Union{ParamBox{T}, AbstractArray{<:ElementalParam{T}}}) where {T}
+function obtain(p::Union{CompositeParam{T}, AbstractArray{<:ElementalParam{T}}}) where {T}
     lock( ReentrantLock() ) do
         obtainINTERNAL(p)
     end
@@ -689,57 +691,100 @@ obtainINTERNAL(pars::AbstractArray{<:ElementalParam{T}}) where {T} = obtainINTER
 
 obtainINTERNAL(p::PrimitiveParam) = directObtain(p)
 
-directObtain(p::PrimitiveParam) = obtainMemoryVal(p.input)
+directObtain(p::PrimitiveParam) = obtainDimVal(p.input)
 
-function obtainINTERNAL(p::ParamBox{T}) where {T}
-    markerDict = IdDict{ParamBox{T}, NodeMarker{<:ShapedMemory{T}}}()
-    searchObtain(markerDict, p)
+const ParamBMemDict{T} = IdDict{ParamBox{T}, NodeMarker{<:ShapedMemory{T}}}
+
+const ParamPMemDict{T} = IdDict{ParamPile{T}, NodeMarker{<:VectorOrMem{<:ShapedMemory{T}}}}
+
+function obtainINTERNAL(p::CompositeParam{T}) where {T}
+    pbDict = ParamBMemDict{T}()
+    ppDict = ParamPMemDict{T}()
+    searchObtain(pbDict, ppDict, p)
 end
 
-function searchObtainLoop(markerDict::IdDict{ParamBox{T}, NodeMarker{<:ShapedMemory{T}}}, 
+function searchObtain(pbDict::ParamBMemDict{T}, ppDict::ParamPMemDict{T}, 
+                      p::ParamList{T}) where {T}
+    searchObtain.(Ref(pbDict), Ref(ppDict), p.input)
+end
+
+function searchObtain(pbDict::ParamBMemDict{T}, ppDict::ParamPMemDict{T}, 
+                      p::ParamNest{T}) where {T}
+    inputVal = searchObtain.(Ref(pbDict), Ref(ppDict), p.input)
+    p.linker(inputVal...)
+end
+
+function searchObtainLoop(pbDict::ParamBMemDict{T}, ppDict::ParamPMemDict{T}, 
                           input::AbstractArray{<:DimensionalParam{T}}) where {T}
     map(input) do child
-        searchObtain(markerDict, child)
+        searchObtain(pbDict, ppDict, child)
     end
 end
 
-function searchObtainLoop(markerDict::IdDict{ParamBox{T}, NodeMarker{<:ShapedMemory{T}}}, 
+function searchObtainLoop(pbDict::ParamBMemDict{T}, ppDict::ParamPMemDict{T}, 
                           input::DimensionalParam{T}) where {T}
-    searchObtain(markerDict, input)
+    searchObtain(pbDict, ppDict, input)
 end
 
-function searchObtainCore(shiftVal::F, 
-                          markerDict::IdDict{ParamBox{T}, NodeMarker{<:ShapedMemory{T}}}, 
+function searchObtainCore(shiftVal::F, pbDict::ParamBMemDict{T}, ppDict::ParamPMemDict{T}, 
                           p::ParamBox{T, N}) where {T, F<:Union{iT, ValShifter{T}}, N}
     # Depth-first search by recursive calling
     valBox = p.memory
-    marker = get!(markerDict, p, NodeMarker(valBox))::NodeMarker{typeof(valBox)}
+    marker::NodeMarker{typeof(valBox)} = get!(pbDict, p, NodeMarker(valBox))
     if !marker.visited
         marker.visited = true
-        res = p.lambda( (searchObtainLoop(markerDict, x) for x in p.input)... ) |> shiftVal
-        marker.value = ShapedMemory( packElementalVal(T, res) )
+        f = p.lambda
+        res = f( (searchObtainLoop(pbDict, ppDict, x) for x in p.input)... ) |> shiftVal
+        marker.value = ShapedMemory(T, res)
     else
         marker.value
     end
 end
 
-function searchObtain(markerDict::IdDict{ParamBox{T}, NodeMarker{<:ShapedMemory{T}}}, 
+function searchObtainCore(::F, pbDict::ParamBMemDict{T}, ppDict::ParamPMemDict{T}, 
+                          p::LinkParam{T, N}) where {T, F<:Union{iT, ValShifter{T}}, N}
+    # Depth-first search by recursive calling
+    idx = p.index
+    input = p.input
+    lpMarkVal = p.memory
+    lpMarkValType = typeof(lpMarkVal)
+    len = length(marker.value)
+    if haskey(ppDict, input)
+        marker::NodeMarker{Vector{lpMarkValType}} = getindex(ppDict, input)
+    else
+        ppMarkVal = Array{lpMarkValType}(undef, idx)
+        ppMarkVal[end] = lpMarkVal
+        marker = NodeMarker(ppMarkVal)
+        setindex!(ppDict, ppMarkVal, input)
+    end
+    if !marker.visited
+        marker.visited = true
+        res = ShapedMemory.(T, searchObtain(pbDict, ppDict, p.input))
+        idx = length(res)
+        len < idx && append!(marker.value, Array{lpMarkValType}(undef, idx-len))
+        marker.value .= res
+    elseif len < idx
+        append!(marker.value, Array{lpMarkValType}(undef, idx-len))
+        marker.value[end] = lpMarkVal
+        lpMarkVal
+    else
+        marker.value[idx]
+    end
+end
+
+function searchObtain(pbDict::ParamBMemDict{T}, ppDict::ParamPMemDict{T}, 
                       p::ParamBox{T, N}) where {T, N}
     sl = checkScreenLevel(screenLevelOf(p), getScreenLevelRange(ParamBox{T, N}))
     if sl == 0
         shiftVal = genValShifter(T, (isOffsetEnabled(p) ? p.offset : nothing))
-        obtainMemoryVal( searchObtainCore(shiftVal, markerDict, p) )
+        obtainDimVal( searchObtainCore(shiftVal, pbDict, ppDict, p) )
     else
         p.offset
     end
 end
 
-searchObtain(::IdDict{ParamBox{T}, NodeMarker{<:ShapedMemory{T}}}, 
-             p::PrimitiveParam{T}) where {T} = 
+searchObtain(::ParamBMemDict{T}, ::ParamPMemDict{T}, p::PrimitiveParam{T}) where {T} = 
 directObtain(p)
-
-#! To be deprecated
-obtain(nt::NodeTuple) = obtain.(nt.input)
 
 (pn::DimensionalParam)() = obtain(pn)
 
@@ -816,22 +861,30 @@ markObj(input) = ObjectMarker(input)
 
 const NothingID = objectid(nothing)
 
-function ParamMarker(pn::T) where {T<:CellParam}
-    offset = isOffsetEnabled(pn) ? pn.offset : nothing
+function ParamMarker(p::T) where {T<:CellParam}
+    offset = isOffsetEnabled(p) ? p.offset : nothing
     ParamMarker(
-        objectid(T), markObj.((pn.input..., offset)), objectid(pn.lambda.f), 
-        objectid(screenLevelOf(pn))
+        objectid(T), markObj.((p.input..., offset)), objectid(p.lambda.f), 
+        objectid(screenLevelOf(p))
     )
 end
 
-function ParamMarker(pn::T) where {T<:GridParam}
-    ParamMarker(objectid(T), markObj.(pn.input), objectid(pn.lambda.f), NothingID)
+function ParamMarker(p::T) where {T<:GridParam}
+    ParamMarker(objectid(T), markObj.(p.input), objectid(p.lambda.f), NothingID)
 end
 
-#! To be discarded
-function ParamMarker(nt::T) where {N, T<:NodeTuple{<:Any, N}}
-    ms = ParamMarker.(nt.input)
-    ParamMarker(objectid(T), ms, NothingID, NothingID)
+function ParamMarker(p::T) where {T<:LinkParam}
+    ParamMarker(objectid(T), (markObj(p.input),), NothingID, objectid(p.index))
+end
+
+function ParamMarker(p::T) where {T<:ParamList}
+    ParamMarker(objectid(T), markObj.(p.input), NothingID, NothingID)
+end
+
+function ParamMarker(p::T) where {T<:ParamNest}
+    l = p.linker
+    ParamMarker(objectid(T), markObj.(pn.input), 
+                (objectid(l|>typeof), objectid(l.f), objectid(l.axis)), NothingID)
 end
 
 compareMarker(pm1::AbstractMarker, pm2::AbstractMarker) = false
@@ -873,11 +926,15 @@ compareParamContainer(::DimensionalParam, ::Any) = false
 
 compareParamContainer(::Any, ::DimensionalParam) = false
 
-compareParamContainer(pc1::T, pc2::T) where {T<:PrimitiveParam} = pc1 === pc2
+compareParamContainer(p1::T, p2::T) where {T<:PrimitiveParam} = p1 === p2
 
-compareParamContainer(pc1::PBoxTypeArgNumOutDim{T, N, A}, 
-                      pc2::PBoxTypeArgNumOutDim{T, N, A}) where {T, N, A} = 
-pc1 === pc2 || compareMarker(ParamMarker(pc1), ParamMarker(pc2))
+compareParamContainer(p1::ParBTypeArgNumOutDim{T, N, A}, 
+                      p2::ParBTypeArgNumOutDim{T, N, A}) where {T, N, A} = 
+p1 === p2 || compareMarker(ParamMarker(p1), ParamMarker(p2))
+
+compareParamContainer(p1::ParPTypeArgNumOutDim{T, N, A}, 
+                      p2::ParPTypeArgNumOutDim{T, N, A}) where {T, N, A} = 
+p1 === p2 || compareMarker(ParamMarker(p1), ParamMarker(p2))
 
 
 # operateBy(op::F, pn1::CellParam, num::Real) where {F<:Function} = 

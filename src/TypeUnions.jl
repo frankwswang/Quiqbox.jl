@@ -51,11 +51,12 @@ abstract type EffectNode{T, N, I} <: GraphNode{T, N} end
 abstract type StorageNode{T, N} <: GraphNode{T, N} end
 
 abstract type ParamBox{T, N, I} <: CompositeParam{T, N} end
-abstract type ParamHeap{T, N, I} <: CompositeParam{T, N} end
-abstract type ParamStack{T, N, I} <: CompositeParam{T, N} end
+abstract type ParamPile{T, N, I} <: CompositeParam{T, N} end
 
 abstract type SingleVarFunction{T} <: ParamFunction{T} end
 abstract type MultiDimFunction{T, D} <: ParamFunction{T} end
+
+abstract type ParamGrid{T, N, I, L} <: ParamPile{T, N, I} end
 
 abstract type RadialFunc{T} <: SingleVarFunction{T} end
 abstract type AbstractBasis{T, D, ON} <: MultiDimFunction{T, D} end
@@ -186,6 +187,10 @@ const AbtVecOfAbtArray{T} = AbstractVector{<:AbstractArray{T}}
 
 const GraphArgDataType{T} = Union{AbtVecOfAbtArray{T}, NonEmptyTuple{AbstractArray{T}}}
 
-const PBoxTypeArgNumOutDim{T, N, A} = ParamBox{T, N, <:NTuple{A, ParamBoxSingleArg{T}}}
+const ParBTypeArgNumOutDim{T, N, A} = ParamBox{T, N, <:NTuple{A, ParamBoxSingleArg{T}}}
+
+const ParPTypeArgNumOutDim{T, N, A} = ParamPile{T, N, <:NTuple{A, ParamBoxSingleArg{T}}}
 
 const AbtArrayOrMem{T, N} = Union{AbstractArray{T, N}, AbstractMemory{T, N}}
+
+const VectorOrMem{T} = Union{Vector{T}, Memory{T}}
