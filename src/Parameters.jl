@@ -157,46 +157,60 @@ function (sf::StableMorphism{T, F, N})(arg::AbtArrayOr{T}, args::AbtArrayOr{T}..
     sf.f(allArgs...)::AbstractArray{T, N}
 end
 
-genSeqAxis(::Val{N}, sym::Symbol=:e) where {N} = (Symbol(sym, i) for i in 1:N) |> Tuple
+function genSeqAxis(lens::NTuple{N, Int}, sym::Symbol=:e) where {N}
+    Tuple( (Symbol(sym, i), lens[i]) for i in 1:N )
+end
 
 bundle(arg::T, args::T...) where {T} = collect( themselves(arg, args...) )
 const FofBundle = typeof(bundle)
 
-struct MorphicLinkage{T, F<:Function, N, L}
+struct FixedShapeLink{T, F<:Function, N, L}
     f::F
     axis::NTuple{L, Tuple{Symbol, Int}}
+    extent::Int
 
-    function MorphicLinkage(f::F, ::Type{V}, arg, args...; 
+    function FixedShapeLink(f::F, ::Type{V}, arg, args...; 
                             axis::Union{NonEmptyTuple{Tuple{Symbol, Int}}, 
                                         Missing}=missing) where {F<:Function, V}
         T, N = checkAbtArrayInput(V)
         allArgs = (arg, args...)
         exclude0DimData.(allArgs)
         val = checkReturnType(f, AbstractArray{<:T}, allArgs)
-        ismissing(axis) ?  ( axis = () ) : checkReshapingAxis(val, last.(axis))
-        new{T, F, N, length(axis)}(f, axis)
+        if ismissing(axis)
+            axis = genSeqAxis(val|>size)
+        else
+            checkReshapingAxis(val, last.(axis))
+        end
+        L = length(axis)
+        L < 1 && throw(AssertionError("Return dimension of `FixedShapeLink` should at "*
+                                      "least be 1."))
+        new{T, F, N, L}(f, axis, prod(axis))
     end
 
-    function MorphicLinkage(::V, ::V, ::V...) where {V}
+    function FixedShapeLink(::V, args::V...; 
+                            axis::Union{Tuple{Tuple{Symbol, Int}}, Missing}=missing) where 
+                           {V}
         T, N = checkAbtArrayInput(V)
-        new{T, FofBundle, N, 0}(bundle, ())
+        extent = length(args) + 2
+        if ismissing(axis)
+            axis = genSeqAxis( (extent,) )
+        else
+            checkReshapingAxis(ones(extent), last.(axis))
+        end
+        new{T, FofBundle, N, 1}(bundle, axis, extent)
     end
 end
 
-function callMorphicLinkageCore(ml::MorphicLinkage{T, <:Any, N}, arg, args...) where {T, N}
+function callFixedShapeLinkCore(ml::FixedShapeLink{T, <:Any, N}, arg, args...) where {T, N}
     allArgs = (arg, args...)
     exclude0DimData.(allArgs)
     ml.f(allArgs...)::AbstractArray{<:assertAbtArrayOutput(T, Val(N))}
 end
 
-function (ml::MorphicLinkage{T, F, N, L})(arg::T, args::T...) where {T, F, N, L}
-    res = callMorphicLinkageCore(ml, arg, args...)
+function (ml::FixedShapeLink{T, F, N, L})(arg::T, args::T...) where {T, F, N, L}
+    res = callFixedShapeLinkCore(ml, arg, args...)
     iBegin = firstindex(res)
-    reshape(res[iBegin : (iBegin+ml.extent-1)], getindex.(ml.axis, 2))
-end
-
-function (ml::MorphicLinkage{T, F, N, 0})(arg::T, args::T...) where {T, F, N}
-    callMorphicLinkageCore(ml, arg, args...) |> vec
+    reshape(res[iBegin : (iBegin + ml.extent - 1)], getindex.(ml.axis, 2))
 end
 
 
@@ -388,8 +402,6 @@ CellParam(TypedReduction(T), (input,), symbol)
 CellParam(var, varSym::SymOrIndexedSym, symbol::SymOrIndexedSym=varSym) = 
 CellParam(NodeVar(var, varSym), symbol)
 
-# const TensorInCellParam{T, F, PB, N} = CellParam{T, F, <:AbstractArray{PB, N}}
-# const ScalarInCellParam{T, F, PB} = TensorInCellParam{T, F, PB, 0}
 
 function checkGridParamArg(::StableMorphism{T, <:iTalike, N}, input::I, memory::M) where 
                            {T, N, I, M<:AbtArrayOrMem{T, N}}
@@ -430,11 +442,11 @@ function checkGridParamArg(f::StableMorphism{T, F, N}, input::I, ::Missing) wher
     f, F, deepcopy( f(obtain.(input)...)|>ShapedMemory )
 end
 
-struct GridParam{T, F<:Function, I<:ParamBoxInputType{T}, N} <: ParamBox{T, N, I}
-    lambda::StableMorphism{T, F, N}
-    input::I
-    symbol::IndexedSym
-    memory::ShapedMemory{T, N}
+mutable struct GridParam{T, F<:Function, I<:ParamBoxInputType{T}, N} <: ParamBox{T, N, I}
+    const lambda::StableMorphism{T, F, N}
+    const input::I
+    const symbol::IndexedSym
+    @atomic memory::ShapedMemory{T, N}
 
     function GridParam(lambda::StableMorphism{T, F, N}, input::I, 
                        symbol::SymOrIndexedSym, 
@@ -514,13 +526,13 @@ end
 
 function checkParamContainerArgType3(name::AbstractString, len::Int, extent::Int)
     if len != extent
-        throw(DomainError(len, "The length of `$name` should match `ml::MorphicLinkage`'s "*
+        throw(DomainError(len, "The length of `$name` should match `ml::FixedShapeLink`'s "*
                                "specification: $extent."))
     end
     nothing
 end
 
-function checkParamNestArg(ml::MorphicLinkage{T, FofBundle, N}, input::I, 
+function checkParamNestArg(ml::FixedShapeLink{T, FofBundle, N}, input::I, 
                            memory::Union{Memory{ShapedMemory{T, N}}, Missing}) where 
                           {T, N, I}
     checkParamContainerArgType2(I, T, Val(N))
@@ -533,7 +545,7 @@ function checkParamNestArg(ml::MorphicLinkage{T, FofBundle, N}, input::I,
     ml, FofBundle, deepcopy(memory)
 end
 
-function checkParamNestArg(ml::MorphicLinkage{T, F, N}, input::I, 
+function checkParamNestArg(ml::FixedShapeLink{T, F, N}, input::I, 
                            memory::Union{Memory{ShapedMemory{T, N}}, Missing}) where 
                           {T, F, N, I}
     if ismissing(memory)
@@ -545,24 +557,32 @@ function checkParamNestArg(ml::MorphicLinkage{T, F, N}, input::I,
     ml, F, deepcopy(memory)
 end
 
-struct LinkParam{T, N, I<:ParamGrid{T, N}} <: ParamBox{T, N, I}
-    input::I
-    index::Int
-    memory::ShapedMemory{T, N}
+mutable struct LinkParam{T, N, I<:ParamGrid{T, N}} <: ParamBox{T, N, I}
+    const input::I
+    const index::Int
+    @atomic memory::ShapedMemory{T, N}
+
+    function LinkerParam(input::I, index::Int, memory::ShapedMemory{T, N}) where {I, T, N}
+        maxIndex = length(input.output)
+        if index < 1 || index > maxIndex
+            throw(DomainError(index, "`index is out of the allowed range: (1, $maxIndex)`"))
+        end
+        new{T, N, I}(input, index, memory)
+    end
 end
 
 struct ParamNest{T, F<:Function, I<:ParamBoxInputType{T}, N, L} <: ParamGrid{T, N, I, L}
-    linker::MorphicLinkage{T, F, N, L}
+    linker::FixedShapeLink{T, F, N, L}
     input::I
     symbol::IndexedSym
     output::Memory{LinkParam{T, N, I}}
 
-    function ParamNest(linker::MorphicLinkage{T, F, N, L}, input::I, 
+    function ParamNest(linker::FixedShapeLink{T, F, N, L}, input::I, 
                        symbol::SymOrIndexedSym, 
                        memory::Union{Memory{ShapedMemory{T, N}}, Missing}=missing) where 
                       {T, N, F, L, I<:ParamBoxInputType{T}}
         linker, funcType, memory = checkParamNestArg(linker, input, memory)
-        output = Memory{LinkParam{T, N, I}}(undef, length(memory))
+        output = Memory{LinkParam{T, N, I}}(undef, linker.extent)
         pn = new{T, funcType, I, N, L}(linker, input, IndexedSym(symbol), output)
         for (i, val) in zip(eachindex(output), memory)
             pn.output[i] = LinkParam(pn, i, ShapedMemory(val))
@@ -571,7 +591,7 @@ struct ParamNest{T, F<:Function, I<:ParamBoxInputType{T}, N, L} <: ParamGrid{T, 
     end
 end
 
-function ParamNest(linker::MorphicLinkage{T, F, N, L}, input::I, symbol::SymOrIndexedSym, 
+function ParamNest(linker::FixedShapeLink{T, F, N, L}, input::I, symbol::SymOrIndexedSym, 
                    output::Memory{LinkParam{T, N, I}}) where 
                   {T, N, F, L, I<:ParamBoxInputType{T}}
     memory = Memory{ShapedMemory{T, N}}(getproperty.(output, :memory))
@@ -584,13 +604,13 @@ function ParamNest(func::Function, input::ParamBoxInputType{T},
     inputVal = obtain.(input)
     out = func(inputVal...)
     out isa AbstractArray || throw(AssertionError("`func` should output an AbstractArray."))
-    linker = MorphicLinkage(func, typeof(out), inputVal...)
+    linker = FixedShapeLink(func, typeof(out), inputVal...)
     ParamNest(linker, input, symbol)
 end
 
 ParamNest(input::TwiceThriceNTuple{ParamBoxSingleArg{T, N}}, 
           symbol::SymOrIndexedSym) where {T, N} = 
-ParamNest(MorphicLinkage(obtain.(input)...), input, symbol)
+ParamNest(FixedShapeLink(obtain.(input)...), input, symbol)
 
 
 getScreenLevelRange(::Type{<:LinkParam}) = (0, 0)
@@ -655,6 +675,16 @@ setScreenLevel(p::NodeVar, level::Int) = NodeVar(p.input, p.symbol, TernaryNumbe
 
 function memorize!(p::ParamBox{T, N}, newMem::AbtArrayOrMem{T, N}) where {T, N}
     oldMem = obtainDimVal(p.memory)
+    if p.memory.shape == size(newMem)
+        safelySetVal!(p.memory.value, newMem)
+    else
+        @atomic p.memory = ShapedMemory(newMem)
+    end
+    oldMem
+end
+
+function memorize!(p::ParamBox{T, 0}, newMem::AbtArrayOrMem{T, 0}) where {T}
+    oldMem = obtainDimVal(p.memory)
     safelySetVal!(p.memory.value, newMem)
     oldMem
 end
@@ -671,7 +701,7 @@ symOf(pc::DimensionalParam) = indexedSymOf(pc).name
 inputOf(pb::DimensionalParam) = pb.input
 
 
-mutable struct NodeMarker{T} #!Type-unstable
+mutable struct NodeMarker{T}
     visited::Bool
     value::T
 
@@ -748,27 +778,31 @@ function searchObtainCore(::F, pbDict::ParamBMemDict{T}, ppDict::ParamPMemDict{T
     input = p.input
     lpMarkVal = p.memory
     lpMarkValType = typeof(lpMarkVal)
-    len = length(marker.value)
-    if haskey(ppDict, input)
-        marker::NodeMarker{Vector{lpMarkValType}} = getindex(ppDict, input)
+    marker::NodeMarker{lpMarkValType} = if haskey(pbDict, p)
+        getindex(pbDict, p)
     else
-        ppMarkVal = Array{lpMarkValType}(undef, idx)
-        ppMarkVal[end] = lpMarkVal
-        marker = NodeMarker(ppMarkVal)
-        setindex!(ppDict, ppMarkVal, input)
+        newMarker = if haskey(ppDict, input)
+            inputMarker::NodeMarker{Memory{lpMarkValType}} = getindex(ppDict, input)
+            NodeMarker(inputMarker.value[idx])
+        else
+            inputMarker = NodeMarker(Memory{lpMarkValType}(undef, input.linker.extent))
+            NodeMarker(lpMarkVal)
+        end
+        setindex!(pbDict, newMarker, p)
+        newMarker
     end
     if !marker.visited
         marker.visited = true
-        res = ShapedMemory.(T, searchObtain(pbDict, ppDict, p.input))
-        idx = length(res)
-        len < idx && append!(marker.value, Array{lpMarkValType}(undef, idx-len))
-        marker.value .= res
-    elseif len < idx
-        append!(marker.value, Array{lpMarkValType}(undef, idx-len))
-        marker.value[end] = lpMarkVal
-        lpMarkVal
+        if !inputMarker.visited
+            res = ShapedMemory.(T, searchObtain(pbDict, ppDict, p.input))
+            inputMarker.value .= res
+            inputMarker.visited = true
+            marker.value = res[idx]
+        else
+            marker.value = inputMarker.value[idx]
+        end
     else
-        marker.value[idx]
+        marker.value
     end
 end
 
