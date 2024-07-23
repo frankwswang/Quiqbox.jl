@@ -164,7 +164,7 @@ end
 bundle(arg::T, args::T...) where {T} = collect( themselves(arg, args...) )
 const FofBundle = typeof(bundle)
 
-struct FixedShapeLink{T, F<:Function, N, L}
+struct FixedShapeLink{T, F<:Function, N, L} <: StructFunction{T, F}
     f::F
     axis::NTuple{L, Tuple{Symbol, Int}}
     extent::Int
@@ -500,7 +500,7 @@ function GridParam(val::AbstractArray, valSym::SymOrIndexedSym,
 end
 
 
-struct ParamList{T, N, I<:DimensionalParam{T, N}} <: ParamPile{T, N, I}
+struct ParamList{T, N, I<:DimensionalParam{T, N}} <: ParamPile{T, N, I, 1}
     input::Memory{I}
     symbol::IndexedSym
 
@@ -515,7 +515,7 @@ ParamList(input::AbstractArray{I}, symbol::SymOrIndexedSym) where
          {T, N, I<:DimensionalParam{T, N}} = 
 ParamList(Memory{I}( vec(input) ), symbol)
 
-ParamList(pl::ParamList, symbol::IndexedSym) = ParamList(pl.input, symbol)
+ParamList(pl::ParamList, symbol::IndexedSym=pl.symbol) = ParamList(pl.input, symbol)
 
 
 function checkParamContainerArgType2(::Type{I}, ::Type{T}, ::Val{N}) where  {I, T, N}
@@ -853,11 +853,12 @@ isPrimitiveParam(pn::ParamBox) = (screenLevelOf(pn) == 1)
 # broadcastable(np::FixedSizeParam) = Base.broadcastable(np.input)
 
 
-struct ParamMarker{M<:NonEmptyTuple{AbstractMarker}} <: AbstractMarker{M}
+struct ParamMarker{M<:NonEmptyTuple{AbstractMarker}, MF<:AbstractMarker, 
+                   N} <: AbstractMarker{M}
     typeID::UInt
     marker::M
-    funcID::UInt
-    metaID::UInt
+    funcID::MF
+    metaID::NTuple{N, UInt}
 end
 
 struct ValueMarker <: AbstractMarker{UInt}
@@ -880,11 +881,11 @@ markObj(input::DimensionalParam) = ParamMarker(input)
 
 function isPrimVarCollection(arg::AbstractArray{T}) where {T}
     ET = isconcretetype(T) ? T : eltype(map(itself, arg))
-    isprimitivetype(ET)
+    isbitstype(ET)
 end
 
 function isPrimVarCollection(arg::Tuple)
-    all(isprimitivetype(i) for i in arg)
+    all(isbits(i) for i in arg)
 end
 
 function markObj(input::Union{AbstractArray, Tuple})
@@ -893,35 +894,50 @@ end
 
 markObj(input) = ObjectMarker(input)
 
-const NothingID = objectid(nothing)
+markObj(f::Function) = 
+markObj( (objectid(f),) )
+
+markObj(f::TypedFunction) = 
+markObj( (objectid(f),) )
+
+markObj(f::StructFunction) = 
+markObj( (objectid(f|>typeof), getproperty.(f, propertynames(f))...) )
+
+const NothingID = markObj( objectid(nothing) )
 
 function ParamMarker(p::T) where {T<:CellParam}
-    offset = isOffsetEnabled(p) ? p.offset : nothing
-    ParamMarker(
-        objectid(T), markObj.((p.input..., offset)), objectid(p.lambda.f), 
-        objectid(screenLevelOf(p))
-    )
+    offset = isOffsetEnabled(p) ? p.offset : objectid(nothing)
+    sl = screenLevelOf(p)
+    if sl > 0
+        ParamMarker(
+            objectid(T), markObj.((objectid(p), offset)), NothingID, (objectid(sl),)
+        )
+    else
+        ParamMarker(
+            objectid(T), markObj.((p.input..., offset)), markObj(p.lambda), (objectid(sl),)
+        )
+    end
 end
 
 function ParamMarker(p::T) where {T<:GridParam}
-    ParamMarker(objectid(T), markObj.(p.input), objectid(p.lambda.f), NothingID)
+    ParamMarker(objectid(T), markObj.(p.input), markObj(p.lambda), ())
 end
 
 function ParamMarker(p::T) where {T<:LinkParam}
-    ParamMarker(objectid(T), (markObj(p.input),), NothingID, objectid(p.index))
+    ParamMarker(objectid(T), (markObj(p.input),), NothingID, (objectid(p.index),))
 end
 
 function ParamMarker(p::T) where {T<:ParamList}
-    ParamMarker(objectid(T), markObj.(p.input), NothingID, NothingID)
+    ParamMarker(objectid(T), (markObj(p.input),), NothingID, ())
 end
 
 function ParamMarker(p::T) where {T<:ParamNest}
-    l = p.linker
-    ParamMarker(objectid(T), markObj.(pn.input), 
-                (objectid(l|>typeof), objectid(l.f), objectid(l.axis)), NothingID)
+    ParamMarker(objectid(T), markObj.(pn.input), markObj(p.linker), ())
 end
 
 compareMarker(pm1::AbstractMarker, pm2::AbstractMarker) = false
+
+compareMarker(pm1::ValueMarker, pm2::ValueMarker) = pm1 == pm2
 
 compareMarker(pm1::T, pm2::T) where {T<:ParamMarker{<:Tuple{Vararg{ValueMarker}}}} = 
 pm1 == pm2
@@ -932,7 +948,7 @@ function compareMarker(pm1::T, pm2::T) where {T<:CollectionMarker}
     elseif length(pm1.data) == length(pm2.data)
         isSame = true
         for (i, j) in zip(pm1.data, pm2.data)
-            isSame = ( pm1.data === pm2.data || compareMarker(markObj(i), markObj(j)) )
+            isSame = ( i===j || compareMarker(markObj(i), markObj(j)) )
             isSame || break
         end
         isSame
@@ -944,11 +960,16 @@ end
 compareMarker(pm1::T, pm2::T) where {T<:ObjectMarker} = pm1.data == pm2.data
 
 function compareMarker(pm1::T, pm2::T) where {T<:ParamMarker}
-    isSame = (pm1.funcID == pm2.funcID || pm1.metaID == pm2.metaID)
+    isSame = (pm1.metaID == pm2.metaID && compareMarker(pm1.funcID, pm2.funcID))
     if isSame
-        for (marker1, marker2) in zip(pm1.marker, pm2.marker)
-            isSame = compareMarker(marker1, marker2)
-            isSame || break
+        if pm1.marker === pm2.marker
+        elseif length(pm1.marker) == length(pm2.marker)
+            for (marker1, marker2) in zip(pm1.marker, pm2.marker)
+                isSame = compareMarker(marker1, marker2)
+                isSame || break
+            end
+        else
+            isSame = false
         end
     end
     isSame
@@ -962,12 +983,7 @@ compareParamContainer(::Any, ::DimensionalParam) = false
 
 compareParamContainer(p1::T, p2::T) where {T<:PrimitiveParam} = p1 === p2
 
-compareParamContainer(p1::ParBTypeArgNumOutDim{T, N, A}, 
-                      p2::ParBTypeArgNumOutDim{T, N, A}) where {T, N, A} = 
-p1 === p2 || compareMarker(ParamMarker(p1), ParamMarker(p2))
-
-compareParamContainer(p1::ParPTypeArgNumOutDim{T, N, A}, 
-                      p2::ParPTypeArgNumOutDim{T, N, A}) where {T, N, A} = 
+compareParamContainer(p1::CompositeParam{T, N}, p2::CompositeParam{T, N}) where {T, N} = 
 p1 === p2 || compareMarker(ParamMarker(p1), ParamMarker(p2))
 
 
