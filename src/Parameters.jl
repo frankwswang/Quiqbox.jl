@@ -26,7 +26,7 @@ struct ShapedMemory{T, N} <: AbstractMemory{T, N}
 
     function ShapedMemory(value::Memory{T}, shape::Tuple{Vararg{Int}}) where {T}
         checkReshapingAxis(value, shape)
-        new{T, length(shape)}(vec(value), shape)
+        new{T, length(shape)}(value, shape)
     end
 end
 
@@ -37,7 +37,7 @@ ShapedMemory(::Type{T}, value::AbstractArray{T}) where {T} = ShapedMemory(value)
 
 ShapedMemory(::Type{T}, value::T) where {T} = ShapedMemory( fill(value) )
 
-ShapedMemory(sm::ShapedMemory) = itself(sm)
+ShapedMemory(sm::ShapedMemory) = ShapedMemory(sm.value, sm.shape)
 
 obtainDimVal(sm::ShapedMemory) = itself.( reshape(sm.value, sm.shape) )
 
@@ -69,10 +69,12 @@ const ValShifter{T} = Fix2{typeof(typedAdd), T}
 
 exclude0DimData(::T) where {T} = exclude0DimData(T)
 exclude0DimData(::Type) = nothing
+exclude0DimData(::Type{<:AbtMemory0D}) = 
+throw(ArgumentError("`AbstractMemory{<:Any, 0}` is not allowed as the argument."))
 exclude0DimData(::Type{<:AbtArray0D}) = 
-throw(ArgumentError("`AbstractArray{<:Any, 0}` is not allowed as the input argument."))
-exclude0DimData(::Type{<:DimensionalParam{<:Any, 0}}) = 
-throw(ArgumentError("`DimensionalParam{<:Any, 0}` is not allowed as the input argument."))
+throw(ArgumentError("`AbstractArray{<:Any, 0}` is not allowed as the argument."))
+exclude0DimData(::Type{<:DimensionalParam{<:Any, 0, 0}}) = 
+throw(ArgumentError("`DimensionalParam{<:Any, 0, 0}` is not allowed as the argument."))
 
 excludeAbtArray(::T) where {T} = excludeAbtArray(T)
 excludeAbtArray(::Type) = nothing
@@ -160,9 +162,9 @@ function genSeqAxis(lens::NTuple{N, Int}, sym::Symbol=:e) where {N}
     Tuple( (Symbol(sym, i), lens[i]) for i in 1:N )
 end
 
-struct FixedShapeLink{T, F<:Function, N, L} <: StructFunction{T, F}
+struct FixedShapeLink{T, F<:Function, N, O} <: StructFunction{T, F}
     f::F
-    axis::NTuple{L, Tuple{Symbol, Int}}
+    axis::NTuple{O, Tuple{Symbol, Int}}
     extent::Int
 
     function FixedShapeLink(f::F, ::Type{V}, arg, args...; 
@@ -177,10 +179,10 @@ struct FixedShapeLink{T, F<:Function, N, L} <: StructFunction{T, F}
         else
             checkReshapingAxis(val, last.(axis))
         end
-        L = length(axis)
-        L < 1 && throw(AssertionError("Return dimension of `FixedShapeLink` should at "*
+        O = length(axis)
+        O < 1 && throw(AssertionError("Return dimension of `FixedShapeLink` should at "*
                                       "least be 1."))
-        new{T, F, N, L}(f, axis, prod( last.(axis) ))
+        new{T, F, N, O}(f, axis, prod( last.(axis) ))
     end
 end
 
@@ -190,7 +192,7 @@ function callFixedShapeLinkCore(ml::FixedShapeLink{T, <:Any, N}, arg, args...) w
     ml.f(allArgs...)::AbstractArray{<:assertAbtArrayOutput(T, Val(N))}
 end
 
-function (ml::FixedShapeLink{T, F, N, L})(arg, args...) where {T, F, N, L}
+function (ml::FixedShapeLink)(arg, args...)
     res = callFixedShapeLinkCore(ml, arg, args...)
     iBegin = firstindex(res)
     reshape(res[iBegin : (iBegin + ml.extent - 1)], getindex.(ml.axis, 2))
@@ -483,20 +485,23 @@ function GridParam(val::AbstractArray, valSym::SymOrIndexedSym,
 end
 
 
-struct ParamList{T, N, I<:DimensionalParam{T, N}} <: ParamGrid{T, N, I, 1}
-    input::Memory{I}
+struct ParamList{T, N, I<:DimensionalParam{T, N, 0}, O} <: ParamPile{T, N, I, O}
+    input::ShapedMemory{I, O}
     symbol::IndexedSym
 
-    function ParamList(input::Memory{I}, symbol::SymOrIndexedSym) where 
-                      {T, N, I<:DimensionalParam{T, N}}
-        isempty(input) && throw(AssertionError("`input` should not be empty."))
-        new{T, N, I}(Memory{I}(input), IndexedSym(symbol))
+    function ParamList(input::ShapedMemory{I, O}, symbol::SymOrIndexedSym) where 
+                      {T, N, I<:DimensionalParam{T, N, 0}, O}
+        exclude0DimData(input|>typeof)
+        isempty(input.value) && throw(AssertionError("`input` should not be empty."))
+        new{T, N, I, O}(input, IndexedSym(symbol))
     end
 end
 
-ParamList(input::AbstractArray{I}, symbol::SymOrIndexedSym) where 
-         {T, N, I<:DimensionalParam{T, N}} = 
-ParamList(Memory{I}( vec(input) ), symbol)
+function ParamList(input::AbstractArray{I, O}, symbol::SymOrIndexedSym) where 
+                  {T, N, I<:DimensionalParam{T, N, 0}, O}
+    exclude0DimData(input|>typeof)
+    ParamList(ShapedMemory(input), symbol)
+end
 
 ParamList(pl::ParamList, symbol::IndexedSym=pl.symbol) = ParamList(pl.input, symbol)
 
@@ -521,18 +526,18 @@ function checkParamMeshArg(ml::FixedShapeLink{T, F, N}, input::I,
     ml, F, deepcopy(memory)
 end
 
-struct ParamMesh{T, F<:Function, I<:ParamBoxInputType{T}, N, L} <: ParamGrid{T, N, I, L}
-    linker::FixedShapeLink{T, F, N, L}
+struct ParamMesh{T, F<:Function, I<:ParamBoxInputType{T}, N, O} <: ParamPile{T, N, I, O}
+    linker::FixedShapeLink{T, F, N, O}
     input::I
     symbol::IndexedSym
     memory::Memory{ShapedMemory{T, N}}
 
-    function ParamMesh(linker::FixedShapeLink{T, F, N, L}, input::I, 
+    function ParamMesh(linker::FixedShapeLink{T, F, N, O}, input::I, 
                        symbol::SymOrIndexedSym, 
                        memory::Union{Memory{ShapedMemory{T, N}}, Missing}=missing) where 
-                      {T, N, F, L, I<:ParamBoxInputType{T}}
+                      {T, N, F, O, I<:ParamBoxInputType{T}}
         linker, funcType, memory = checkParamMeshArg(linker, input, memory)
-        new{T, funcType, I, N, L}(linker, input, IndexedSym(symbol), memory)
+        new{T, funcType, I, N, O}(linker, input, IndexedSym(symbol), memory)
     end
 end
 
@@ -547,32 +552,32 @@ end
 
 genDefaultRefParSym(input::DimensionalParam) = IndexedSym(:_, input.symbol)
 
-struct NodeParam{T, F, I, N, L} <: ReferenceParam{T, N, I}
-    input::ParamMesh{T, F, I, N, L}
+struct NodeParam{T, F, I, N, O} <: ReferenceParam{T, N, I}
+    input::ParamMesh{T, F, I, N, O}
     index::Int
     symbol::IndexedSym
 
-    function NodeParam(input::ParamMesh{T, F, I, N, L}, index::Int, 
+    function NodeParam(input::ParamMesh{T, F, I, N, O}, index::Int, 
                        symbol::SymOrIndexedSym=genDefaultRefParSym(input)) where 
-                      {T, F, I, N, L}
+                      {T, F, I, N, O}
         maxIndex = length(input.memory)
         if index < 1 || index > maxIndex
             throw(DomainError(index, "`index is out of the allowed range: (1, $maxIndex)`"))
         end
-        new{T, F, I, N, L}(input, index, symbol)
+        new{T, F, I, N, O}(input, index, symbol)
     end
 end
 
 
-function fragment(pn::ParamMesh{T, F, I, N, L}) where {T, F, I, N, L}
-    res = Array{NodeParam{T, F, I, N, L}}(undef, last.(pn.linker.axis))
+function fragment(pn::ParamMesh{T, F, I, N, O}) where {T, F, I, N, O}
+    res = Array{NodeParam{T, F, I, N, O}}(undef, last.(pn.linker.axis))
     for i in eachindex(res)
         res[i] = NodeParam(pn, i)
     end
     res
 end
 
-fragment(pl::ParamList) = collect(pl.input)
+fragment(pl::ParamList) = obtainDimVal(pl.input)
 
 
 getScreenLevelRange(::Type{<:NodeParam}) = (0, 0)
@@ -585,7 +590,9 @@ getScreenLevelRange(::Type{<:ParamPile}) = (0, 0)
 
 getScreenLevelRange(::Type{<:PrimitiveParam}) = (1, 2)
 
-getScreenLevelRange(::Type{<:DimensionalParam}) = (0, 2)
+getScreenLevelRange(::Type{<:DimensionalParam}) = (0, 0)
+
+getScreenLevelRange(::Type{<:DimensionalParam{<:Any, <:Any, 0}}) = (0, 2)
 
 getScreenLevelRange(::T) where {T<:DimensionalParam} = getScreenLevelRange(T)
 
@@ -671,7 +678,7 @@ symOf(p::DimensionalParam) = indexedSymOf(p).name
 inputOf(p::DimensionalParam) = p.input
 
 
-mutable struct NodeMarker{T}
+mutable struct NodeMarker{T} <: StorageMarker{T}
     visited::Bool
     value::T
 
@@ -712,7 +719,9 @@ end
 
 function searchObtain(pbDict::ParamBMemDict{T}, ppDict::ParamPMemDict{T}, 
                       p::ParamList{T}) where {T}
-    searchObtain.(Ref(pbDict), Ref(ppDict), p.input)
+    shapedPars = p.input
+    val = searchObtain.(Ref(pbDict), Ref(ppDict), shapedPars.value)
+    collect( reshape(val, shapedPars.shape) )
 end
 
 function searchObtain(pbDict::ParamBMemDict{T}, ppDict::ParamPMemDict{T}, 
@@ -841,25 +850,25 @@ isPrimitiveParam(pn::ParamBox) = (screenLevelOf(pn) == 1)
 # broadcastable(np::FixedSizeParam) = Base.broadcastable(np.input)
 
 
-struct ParamMarker{M<:NonEmptyTuple{AbstractMarker}, MF<:AbstractMarker, 
-                   N} <: AbstractMarker{M}
+struct ParamMarker{M<:NonEmptyTuple{IdentityMarker}, MF<:IdentityMarker, 
+                   N} <: IdentityMarker{M}
     typeID::UInt
     marker::M
     funcID::MF
     metaID::NTuple{N, UInt}
 end
 
-struct ValueMarker <: AbstractMarker{UInt}
+struct ValueMarker <: IdentityMarker{UInt}
     valueID::UInt
 
     ValueMarker(input) = new(objectid(input))
 end
 
-struct CollectionMarker <: AbstractMarker{Union{AbstractArray, Tuple}}
+struct CollectionMarker <: IdentityMarker{Union{AbstractArray, Tuple}}
     data::Union{AbstractArray, Tuple}
 end
 
-struct ObjectMarker{T} <: AbstractMarker{T}
+struct ObjectMarker{T} <: IdentityMarker{T}
     data::T
 end
 
@@ -880,16 +889,21 @@ function markObj(input::Union{AbstractArray, Tuple})
     isPrimVarCollection(input) ? ValueMarker(input) : CollectionMarker(input)
 end
 
-markObj(input) = ObjectMarker(input)
+function markObj(input::T) where {T}
+    if isstructtype(input) && !( Base.issingletontype(input) )
+        markObj( (objectid(T), getproperty.(input, propertynames(input))...) )
+    else
+        ObjectMarker(input)
+    end
+end
 
-markObj(f::Function) = 
-markObj( (objectid(f),) )
+markObj(marker::IdentityMarker) = itself(marker)
 
-markObj(f::TypedFunction) = 
-markObj( (objectid(f),) )
+markObj(f::Function) = markObj( (objectid(f),) )
 
-markObj(f::StructFunction) = 
-markObj( (objectid(f|>typeof), getproperty.(f, propertynames(f))...) )
+markObj(f::TypedFunction) = markObj( (objectid(f),) )
+
+markObj(f::ShapedMemory) = markObj( (markObj(f.value), objectid(f.shape)) )
 
 const NothingID = markObj( objectid(nothing) )
 
@@ -923,7 +937,7 @@ function ParamMarker(p::T) where {T<:ParamMesh}
     ParamMarker(objectid(T), markObj.(pn.input), markObj(p.linker), ())
 end
 
-compareMarker(pm1::AbstractMarker, pm2::AbstractMarker) = false
+compareMarker(pm1::IdentityMarker, pm2::IdentityMarker) = false
 
 compareMarker(pm1::ValueMarker, pm2::ValueMarker) = pm1 == pm2
 
@@ -971,8 +985,10 @@ compareParamContainer(::Any, ::DimensionalParam) = false
 
 compareParamContainer(p1::T, p2::T) where {T<:PrimitiveParam} = p1 === p2
 
-compareParamContainer(p1::CompositeParam{T, N}, p2::CompositeParam{T, N}) where {T, N} = 
-p1 === p2 || compareMarker(ParamMarker(p1), ParamMarker(p2))
+function compareParamContainer(p1::CompositeParam{T, N, O}, 
+                               p2::CompositeParam{T, N, O}) where {T, N, O}
+    p1 === p2 || compareMarker(ParamMarker(p1), ParamMarker(p2))
+end
 
 
 # operateBy(op::F, pn1::CellParam, num::Real) where {F<:Function} = 
@@ -1105,7 +1121,7 @@ function topoSortCore!(hbNodesIdSet::Set{UInt},
                        orderedNodes::Vector{<:DimensionalParam{T}}, 
                        haveBranches::Vector{Bool}, connectRoots::Vector{Bool}, 
                        node::DimensionalParam{T}, recursive::Bool=false) where {T}
-    sl = checkScreenLevel(screenLevelOf(node), getScreenLevelRange(DimensionalParam{T}))
+    sl = checkScreenLevel(screenLevelOf(node), getScreenLevelRange(node))
 
     if sl in (0, 1)
         idx = findfirst(Fix2(compareParamContainer, node), orderedNodes)

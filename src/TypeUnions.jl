@@ -35,14 +35,18 @@ abstract type AbstractMarker{T} <: ValueContainer{T} end
 abstract type TupleOfAbtArrays{T, N, V<:AbstractArray{T, N}, R<:Tuple{V, Vararg{V}}} <: DimensionalValue{T, N} end
 abstract type AbstractMemory{T, N} <: DimensionalValue{T, N} end
 
+
+abstract type IdentityMarker{T} <: AbstractMarker{T} end
+abstract type StorageMarker{T} <: AbstractMarker{T} end
+
 abstract type HartreeFockFinalValue{T, HFT} <: MixedContainer{T} end
 abstract type BasisSetData{T, D, BS} <: MixedContainer{T} end
 abstract type MatterData{T, D} <: MixedContainer{T} end
 
-abstract type DimensionalParam{T, N} <: ParamContainer{T} end
+abstract type DimensionalParam{T, N, O} <: ParamContainer{T} end
 
-abstract type CompositeParam{T, N} <: DimensionalParam{T, N} end
-abstract type PrimitiveParam{T, N} <: DimensionalParam{T, N} end
+abstract type CompositeParam{T, N, O} <: DimensionalParam{T, N, O} end
+abstract type PrimitiveParam{T, N} <: DimensionalParam{T, N, 0} end
 
 abstract type GraphNode{T, N} <: ComputableGraph{T} end
 
@@ -50,15 +54,13 @@ abstract type OperatorNode{T, N, I, F} <: GraphNode{T, N} end
 abstract type EffectNode{T, N, I} <: GraphNode{T, N} end
 abstract type StorageNode{T, N} <: GraphNode{T, N} end
 
-abstract type ParamBox{T, N, I} <: CompositeParam{T, N} end
-abstract type ParamPile{T, N, I} <: CompositeParam{T, N} end
+abstract type ParamBox{T, N, I} <: CompositeParam{T, N, 0} end
+abstract type ParamPile{T, N, I, O} <: CompositeParam{T, N, O} end
 
 abstract type ReferenceParam{T, N, I} <: ParamBox{T, N, I} end
 
 abstract type SingleVarFunction{T} <: ParamFunction{T} end
 abstract type MultiDimFunction{T, D} <: ParamFunction{T} end
-
-abstract type ParamGrid{T, N, I, L} <: ParamPile{T, N, I} end
 
 abstract type RadialFunc{T} <: SingleVarFunction{T} end
 abstract type AbstractBasis{T, D, ON} <: MultiDimFunction{T, D} end
@@ -79,7 +81,8 @@ abstract type FloatingBasisFuncs{NumberT, D, 𝑙, PointT, RadialV, OrbitalN} <:
 
 
 const ParamObject{T} = Union{ParamContainer{T}, ParamFunction{T}}
-const ElementalParam{T} = DimensionalParam{T, 0}
+const ElementalParam{T} = DimensionalParam{T, 0, 0}
+const PlainParameter{T, N} = Union{DimensionalParam{T, N, 0}, DimensionalParam{T, 0, N}}
 const PrimParCandidate{T} = Union{ElementalParam{T}, PrimitiveParam{T}}
 
 # const PNodeIn1{T} = Union{T, ElementalParam{T}}
@@ -90,7 +93,7 @@ const PNodeInput{T} = Union{T, ElementalParam{T}}
 
 const SParamAbtArray{T, N} = AbstractArray{<:ElementalParam{T}, N}
 const PParamAbtArray{T, N} = AbstractArray{<:PrimitiveParam{T}, N}
-const DParamAbtArray{T, N} = AbstractArray{<:DimensionalParam{T}, N}
+const DParamAbtArray{T, N} = AbstractArray{<:DimensionalParam{T, <:Any, 0}, N}
 
 const SpatialBasis1O{T, D} = SpatialBasis{T, D, 1}
 const CBasisFuncsON{ON} = CompositeBasisFuncs{<:Any, <:Any, <:Any, ON}
@@ -167,9 +170,9 @@ const RefOrA0D{T, V<:AbstractArray{T, 0}} =  Union{RefVal{T}, V}
 const TernaryTupleUnion{T} = Union{(NonEmptyTuple{T, N} for N in 0:2)...}
 const TwiceThriceNTuple{T} = Union{(NonEmptyTuple{T, N} for N in 1:2)...}
 const ElemParamAbtArray{T, N} = AbstractArray{<:ElementalParam{T}, N}
-const ParamBoxSingleArg{T, N} = Union{ElemParamAbtArray{T, N}, DimensionalParam{T, N}}
+const ParamBoxSingleArg{T, N} = Union{ElemParamAbtArray{T, N}, DimensionalParam{T, N, 0}}
 const ParamBoxInputType{T} = TernaryTupleUnion{ParamBoxSingleArg{T}}
-const PrimDParSetEltype{T} = Union{AbstractVector{<:ElementalParam{T}}, DimensionalParam{T}}
+const PrimDParSetEltype{T} = Union{AbstractVector{<:ElementalParam{T}}, DimensionalParam{T, <:Any, 0}}
 const ArgTypeOfNDPIVal{T} = Union{
     Tuple{Type{T}}, 
     Tuple{Type{T}, Type{T}}, 
@@ -194,3 +197,5 @@ const ParBTypeArgNumOutDim{T, N, A} = ParamBox{T, N, <:NTuple{A, ParamBoxSingleA
 const AbtArrayOrMem{T, N} = Union{AbstractArray{T, N}, AbstractMemory{T, N}}
 
 const VectorOrMem{T} = Union{Vector{T}, Memory{T}}
+
+const AbtMemory0D{T} = AbstractMemory{T, 0}

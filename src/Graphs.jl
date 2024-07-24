@@ -52,7 +52,7 @@ end
 
 struct EmptyNode{T, N} <: GraphNode{T, N} end
 
-EmptyNode(::DimensionalParam{T, N}) where {T, N} = EmptyNode{T, N}()
+EmptyNode(::DimensionalParam{T, N, 0}) where {T, N} = EmptyNode{T, N}()
 
 struct ReductionNode{T, I<:NodeChildrenType{T}, F, 
                      S<:Union{iT, ValShifter{T}}} <: OperatorNode{T, 0, I, F}
