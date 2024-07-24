@@ -9,13 +9,13 @@ abstract type StructuredContainer <: Any end
 
 abstract type StructuredFunction <:Function end
 
-abstract type StructFunction{F} <: StructuredFunction end
+abstract type StructFunction{T, F} <: StructuredFunction end
+abstract type TypedFunction{T, F} <: StructuredFunction end
 abstract type ParamFunction{T} <: StructuredFunction end
-abstract type TypedFunction{F, T} <: StructuredFunction end
 
 abstract type Singleton <: TypeObject end
 
-abstract type CompositeFunction{F1, F2} <: StructFunction{F1} end
+# abstract type CompositeFunction{F1, F2} <: StructFunction{F1} end
 
 abstract type CompositeContainer{T} <: StructuredContainer end
 abstract type NoTypeParContainer <: StructuredContainer end
@@ -24,7 +24,7 @@ abstract type MixedContainer{T} <: CompositeContainer{T} end
 abstract type ParamContainer{T} <: CompositeContainer{T} end
 abstract type ValueContainer{T} <: CompositeContainer{T} end
 
-abstract type ChainedFunction{F, O, C} <: CompositeFunction{F, C} end
+# abstract type ChainedFunction{F, O, C} <: CompositeFunction{F, C} end
 
 abstract type DimensionalValue{T, N} <: ValueContainer{T} end
 abstract type HartreeFockintermediateData{T} <: ValueContainer{T} end
@@ -52,6 +52,8 @@ abstract type StorageNode{T, N} <: GraphNode{T, N} end
 
 abstract type ParamBox{T, N, I} <: CompositeParam{T, N} end
 abstract type ParamPile{T, N, I} <: CompositeParam{T, N} end
+
+abstract type ReferenceParam{T, N, I} <: ParamBox{T, N, I} end
 
 abstract type SingleVarFunction{T} <: ParamFunction{T} end
 abstract type MultiDimFunction{T, D} <: ParamFunction{T} end
@@ -188,8 +190,6 @@ const AbtVecOfAbtArray{T} = AbstractVector{<:AbstractArray{T}}
 const GraphArgDataType{T} = Union{AbtVecOfAbtArray{T}, NonEmptyTuple{AbstractArray{T}}}
 
 const ParBTypeArgNumOutDim{T, N, A} = ParamBox{T, N, <:NTuple{A, ParamBoxSingleArg{T}}}
-
-const ParPTypeArgNumOutDim{T, N, A} = ParamPile{T, N, <:NTuple{A, ParamBoxSingleArg{T}}}
 
 const AbtArrayOrMem{T, N} = Union{AbstractArray{T, N}, AbstractMemory{T, N}}
 

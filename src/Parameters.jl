@@ -1,6 +1,6 @@
 export NodeVar, NodeVar, CellParam, GridParam, ParamList, ParamNest, setScreenLevel!, 
-       setScreenLevel, symOf, inputOf, obtain, setVal!, screenLevelOf, markParams!, 
-       topoSort, getParams
+       setScreenLevel, symOf, inputOf, obtain, fragment, setVal!, screenLevelOf, 
+       markParams!, topoSort, getParams
 
 using Base: Fix2, Threads.Atomic, issingletontype
 using Test: @inferred
@@ -80,13 +80,13 @@ excludeAbtArray(::Type) = nothing
 excludeAbtArray(::Type{<:AbstractArray}) = 
 throw(ArgumentError("`AbstractArray` is not allowed as an input argument."))
 
-function checkAbtArrayInput(::Type{V}) where {T, V<:AbstractArray{T}}
+function checkAbtArrayArg(::Type{V}) where {T, V<:AbstractArray{T}}
     exclude0DimData(V)
     excludeAbtArray(T)
     (T, ndims(V))
 end
-checkAbtArrayInput(::Type{T}) where {T} = (T, 0)
-checkAbtArrayInput(::T) where {T} = checkAbtArrayInput(T)
+checkAbtArrayArg(::Type{T}) where {T} = (T, 0)
+checkAbtArrayArg(::T) where {T} = checkAbtArrayArg(T)
 
 assertAbtArrayOutput(::Type{T}, ::Val{N}) where {T, N} = AbstractArray{T, N}
 assertAbtArrayOutput(::Type{T}, ::Val{0}) where {T} = T
@@ -102,7 +102,7 @@ struct TypedReduction{T, F<:Function} <: TypedFunction{T, F}
 
     function TypedReduction(f::F, arg::T, args...) where {F, T}
         allArgs = (arg, args...)
-        checkAbtArrayInput.(allArgs)
+        checkAbtArrayArg.(allArgs)
         checkReturnType(f, T, allArgs)
         eleT = T <: AbstractArray ? eltype(T) : T
         new{eleT, F}(f)
@@ -132,14 +132,14 @@ struct StableMorphism{T, F<:Function, N} <:TypedFunction{T, F}
 
     function StableMorphism(f::F, arg::T, args...) where {T, F}
         allArgs = (arg, args...)
-        checkAbtArrayInput.(allArgs)
+        checkAbtArrayArg.(allArgs)
         val = checkReturnType(f, AbstractArray{T}, allArgs)
         eleT = T <: AbstractArray ? eltype(T) : T
         new{eleT, F, ndims(val)}(f)
     end
 
     function StableMorphism(::Type{V}) where {T, N, V<:AbstractArray{T, N}}
-        checkAbtArrayInput(V)
+        checkAbtArrayArg(V)
         new{T, iT, N}(itself)
     end
 end
@@ -153,16 +153,13 @@ StableMorphism(srf.f, arg, args...)
 function (sf::StableMorphism{T, F, N})(arg::AbtArrayOr{T}, args::AbtArrayOr{T}...) where 
                                       {T, F, N}
     allArgs = (arg, args...)
-    checkAbtArrayInput.(allArgs)
+    checkAbtArrayArg.(allArgs)
     sf.f(allArgs...)::AbstractArray{T, N}
 end
 
 function genSeqAxis(lens::NTuple{N, Int}, sym::Symbol=:e) where {N}
     Tuple( (Symbol(sym, i), lens[i]) for i in 1:N )
 end
-
-bundle(arg::T, args::T...) where {T} = collect( themselves(arg, args...) )
-const FofBundle = typeof(bundle)
 
 struct FixedShapeLink{T, F<:Function, N, L} <: StructFunction{T, F}
     f::F
@@ -172,7 +169,7 @@ struct FixedShapeLink{T, F<:Function, N, L} <: StructFunction{T, F}
     function FixedShapeLink(f::F, ::Type{V}, arg, args...; 
                             axis::Union{NonEmptyTuple{Tuple{Symbol, Int}}, 
                                         Missing}=missing) where {F<:Function, V}
-        T, N = checkAbtArrayInput(V)
+        T, N = checkAbtArrayArg(eltype(V))
         allArgs = (arg, args...)
         exclude0DimData.(allArgs)
         val = checkReturnType(f, AbstractArray{<:T}, allArgs)
@@ -184,20 +181,7 @@ struct FixedShapeLink{T, F<:Function, N, L} <: StructFunction{T, F}
         L = length(axis)
         L < 1 && throw(AssertionError("Return dimension of `FixedShapeLink` should at "*
                                       "least be 1."))
-        new{T, F, N, L}(f, axis, prod(axis))
-    end
-
-    function FixedShapeLink(::V, args::V...; 
-                            axis::Union{Tuple{Tuple{Symbol, Int}}, Missing}=missing) where 
-                           {V}
-        T, N = checkAbtArrayInput(V)
-        extent = length(args) + 2
-        if ismissing(axis)
-            axis = genSeqAxis( (extent,) )
-        else
-            checkReshapingAxis(ones(extent), last.(axis))
-        end
-        new{T, FofBundle, N, 1}(bundle, axis, extent)
+        new{T, F, N, L}(f, axis, prod( last.(axis) ))
     end
 end
 
@@ -207,7 +191,7 @@ function callFixedShapeLinkCore(ml::FixedShapeLink{T, <:Any, N}, arg, args...) w
     ml.f(allArgs...)::AbstractArray{<:assertAbtArrayOutput(T, Val(N))}
 end
 
-function (ml::FixedShapeLink{T, F, N, L})(arg::T, args::T...) where {T, F, N, L}
+function (ml::FixedShapeLink{T, F, N, L})(arg, args...) where {T, F, N, L}
     res = callFixedShapeLinkCore(ml, arg, args...)
     iBegin = firstindex(res)
     reshape(res[iBegin : (iBegin + ml.extent - 1)], getindex.(ml.axis, 2))
@@ -500,7 +484,7 @@ function GridParam(val::AbstractArray, valSym::SymOrIndexedSym,
 end
 
 
-struct ParamList{T, N, I<:DimensionalParam{T, N}} <: ParamPile{T, N, I, 1}
+struct ParamList{T, N, I<:DimensionalParam{T, N}} <: ParamGrid{T, N, I, 1}
     input::Memory{I}
     symbol::IndexedSym
 
@@ -518,86 +502,40 @@ ParamList(Memory{I}( vec(input) ), symbol)
 ParamList(pl::ParamList, symbol::IndexedSym=pl.symbol) = ParamList(pl.input, symbol)
 
 
-function checkParamContainerArgType2(::Type{I}, ::Type{T}, ::Val{N}) where  {I, T, N}
-    R = NonEmptyTuple{ParamBoxSingleArg{T, N}}
-    I <: R || throw(ArgumentError("`I` should be a subtype of `$R`."))
-    nothing
-end
-
-function checkParamContainerArgType3(name::AbstractString, len::Int, extent::Int)
+function checkParamContainerArgType2(len::Int, extent::Int)
     if len != extent
-        throw(DomainError(len, "The length of `$name` should match `ml::FixedShapeLink`'s "*
-                               "specification: $extent."))
+        throw(DomainError(len, "The length of `memory` should match "*
+                               "`ml::FixedShapeLink`'s specification: $extent."))
     end
     nothing
-end
-
-function checkParamNestArg(ml::FixedShapeLink{T, FofBundle, N}, input::I, 
-                           memory::Union{Memory{ShapedMemory{T, N}}, Missing}) where 
-                          {T, N, I}
-    checkParamContainerArgType2(I, T, Val(N))
-    if ismissing(memory)
-        memory = Memory{ShapedMemory{T, N}}(input.|>obtain|>collect.|>ShapedMemory)
-    else
-        checkParamContainerArgType3("memory", length(memory), ml.extent)
-    end
-    checkParamBoxInput(input)
-    ml, FofBundle, deepcopy(memory)
 end
 
 function checkParamNestArg(ml::FixedShapeLink{T, F, N}, input::I, 
                            memory::Union{Memory{ShapedMemory{T, N}}, Missing}) where 
                           {T, F, N, I}
     if ismissing(memory)
-        memory = Memory{ShapedMemory{T, N}}(ShapedMemory.(ml.f(obatin.(input)...)) |> vec)
+        memory = Memory{ShapedMemory{T, N}}(ShapedMemory.(T, ml.f(obtain.(input)...))|>vec)
     else
-        checkParamContainerArgType3("memory", length(memory), ml.extent)
+        checkParamContainerArgType2(length(memory), ml.extent)
     end
     checkParamBoxInput(input)
     ml, F, deepcopy(memory)
-end
-
-mutable struct LinkParam{T, N, I<:ParamGrid{T, N}} <: ParamBox{T, N, I}
-    const input::I
-    const index::Int
-    @atomic memory::ShapedMemory{T, N}
-
-    function LinkerParam(input::I, index::Int, memory::ShapedMemory{T, N}) where {I, T, N}
-        maxIndex = length(input.output)
-        if index < 1 || index > maxIndex
-            throw(DomainError(index, "`index is out of the allowed range: (1, $maxIndex)`"))
-        end
-        new{T, N, I}(input, index, memory)
-    end
 end
 
 struct ParamNest{T, F<:Function, I<:ParamBoxInputType{T}, N, L} <: ParamGrid{T, N, I, L}
     linker::FixedShapeLink{T, F, N, L}
     input::I
     symbol::IndexedSym
-    output::Memory{LinkParam{T, N, I}}
+    memory::Memory{ShapedMemory{T, N}}
 
     function ParamNest(linker::FixedShapeLink{T, F, N, L}, input::I, 
                        symbol::SymOrIndexedSym, 
                        memory::Union{Memory{ShapedMemory{T, N}}, Missing}=missing) where 
                       {T, N, F, L, I<:ParamBoxInputType{T}}
         linker, funcType, memory = checkParamNestArg(linker, input, memory)
-        output = Memory{LinkParam{T, N, I}}(undef, linker.extent)
-        pn = new{T, funcType, I, N, L}(linker, input, IndexedSym(symbol), output)
-        for (i, val) in zip(eachindex(output), memory)
-            pn.output[i] = LinkParam(pn, i, ShapedMemory(val))
-        end
-        pn
+        new{T, funcType, I, N, L}(linker, input, IndexedSym(symbol), memory)
     end
 end
-
-function ParamNest(linker::FixedShapeLink{T, F, N, L}, input::I, symbol::SymOrIndexedSym, 
-                   output::Memory{LinkParam{T, N, I}}) where 
-                  {T, N, F, L, I<:ParamBoxInputType{T}}
-    memory = Memory{ShapedMemory{T, N}}(getproperty.(output, :memory))
-    ParamNest(linker, input, symbol, memory)
-end
-
 
 function ParamNest(func::Function, input::ParamBoxInputType{T}, 
                    symbol::SymOrIndexedSym) where {T}
@@ -608,12 +546,37 @@ function ParamNest(func::Function, input::ParamBoxInputType{T},
     ParamNest(linker, input, symbol)
 end
 
-ParamNest(input::TwiceThriceNTuple{ParamBoxSingleArg{T, N}}, 
-          symbol::SymOrIndexedSym) where {T, N} = 
-ParamNest(FixedShapeLink(obtain.(input)...), input, symbol)
+genDefaultRefParSym(input::DimensionalParam) = IndexedSym(:_, input.symbol)
+
+struct NestParam{T, F, I, N, L} <: ReferenceParam{T, N, I}
+    input::ParamNest{T, F, I, N, L}
+    index::Int
+    symbol::IndexedSym
+
+    function NestParam(input::ParamNest{T, F, I, N, L}, index::Int, 
+                       symbol::SymOrIndexedSym=genDefaultRefParSym(input)) where 
+                      {T, F, I, N, L}
+        maxIndex = length(input.memory)
+        if index < 1 || index > maxIndex
+            throw(DomainError(index, "`index is out of the allowed range: (1, $maxIndex)`"))
+        end
+        new{T, F, I, N, L}(input, index, symbol)
+    end
+end
 
 
-getScreenLevelRange(::Type{<:LinkParam}) = (0, 0)
+function fragment(pn::ParamNest{T, F, I, N, L}) where {T, F, I, N, L}
+    res = Array{NestParam{T, F, I, N, L}}(undef, last.(pn.linker.axis))
+    for i in eachindex(res)
+        res[i] = NestParam(pn, i)
+    end
+    res
+end
+
+fragment(pl::ParamList) = collect(pl.input)
+
+
+getScreenLevelRange(::Type{<:NestParam}) = (0, 0)
 
 getScreenLevelRange(::Type{<:ParamBox}) = (0, 0)
 
@@ -643,7 +606,7 @@ screenLevelOf(::ParamBox) = 0
 
 screenLevelOf(p::ParamBox{<:Any, 0}) = Int(p.screen)
 
-screenLevelOf(::LinkParam) = 0
+screenLevelOf(::NestParam) = 0
 
 screenLevelOf(::ParamPile) = 0
 
@@ -673,6 +636,14 @@ setScreenLevel(p::CellParam, level::Int) = setScreenLevel!(CellParam(p), level)
 setScreenLevel(p::NodeVar, level::Int) = NodeVar(p.input, p.symbol, TernaryNumber(level))
 
 
+function memorizeCore!(p::ParamBox{T, N}, newMem::AbtArrayOrMem{T, N}) where {T, N}
+    safelySetVal!(p.memory.value, newMem)
+end
+
+function memorizeCore!(p::ReferenceParam{T, N}, newMem::AbtArrayOrMem{T, N}) where {T, N}
+    safelySetVal!(p.input.memory[p.index].value, newMem)
+end
+
 function memorize!(p::ParamBox{T, N}, newMem::AbtArrayOrMem{T, N}) where {T, N}
     oldMem = obtainDimVal(p.memory)
     if p.memory.shape == size(newMem)
@@ -694,11 +665,11 @@ memorize!(p::ParamBox{T}, newMem::T) where {T} = memorize!(p, fill(newMem))
 memorize!(p::ParamBox) = memorize!(p, obtain(p))
 
 
-indexedSymOf(pc::DimensionalParam) = pc.symbol
+indexedSymOf(p::DimensionalParam) = p.symbol
 
-symOf(pc::DimensionalParam) = indexedSymOf(pc).name
+symOf(p::DimensionalParam) = indexedSymOf(p).name
 
-inputOf(pb::DimensionalParam) = pb.input
+inputOf(p::DimensionalParam) = p.input
 
 
 mutable struct NodeMarker{T}
@@ -772,11 +743,11 @@ function searchObtainCore(shiftVal::F, pbDict::ParamBMemDict{T}, ppDict::ParamPM
 end
 
 function searchObtainCore(::F, pbDict::ParamBMemDict{T}, ppDict::ParamPMemDict{T}, 
-                          p::LinkParam{T, N}) where {T, F<:Union{iT, ValShifter{T}}, N}
+                          p::NestParam{T, N}) where {T, F<:Union{iT, ValShifter{T}}, N}
     # Depth-first search by recursive calling
     idx = p.index
     input = p.input
-    lpMarkVal = p.memory
+    lpMarkVal = input.memory[idx]
     lpMarkValType = typeof(lpMarkVal)
     marker::NodeMarker{lpMarkValType} = if haskey(pbDict, p)
         getindex(pbDict, p)
@@ -794,8 +765,8 @@ function searchObtainCore(::F, pbDict::ParamBMemDict{T}, ppDict::ParamPMemDict{T
     if !marker.visited
         marker.visited = true
         if !inputMarker.visited
-            res = ShapedMemory.(T, searchObtain(pbDict, ppDict, p.input))
-            inputMarker.value .= res
+            res = ShapedMemory.(T, searchObtain(pbDict, ppDict, input))
+            inputMarker.value .= vec(res)
             inputMarker.visited = true
             marker.value = res[idx]
         else
@@ -923,7 +894,7 @@ function ParamMarker(p::T) where {T<:GridParam}
     ParamMarker(objectid(T), markObj.(p.input), markObj(p.lambda), ())
 end
 
-function ParamMarker(p::T) where {T<:LinkParam}
+function ParamMarker(p::T) where {T<:NestParam}
     ParamMarker(objectid(T), (markObj(p.input),), NothingID, (objectid(p.index),))
 end
 
