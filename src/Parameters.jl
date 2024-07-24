@@ -4,7 +4,6 @@ export NodeVar, NodeVar, CellParam, GridParam, ParamList, ParamNest, setScreenLe
 
 using Base: Fix2, Threads.Atomic, issingletontype
 using Test: @inferred
-using LRUCache
 
 
 function checkReshapingAxis(arr::AbstractArray, shape::Tuple{Vararg{Int}})
@@ -679,16 +678,11 @@ mutable struct NodeMarker{T}
     NodeMarker(init::T, ::Type{U}=T) where {T, U} = new{U}(false, init)
 end
 
-obtain(p::PrimitiveParam) = obtainINTERNAL(p)
-
-function obtain(p::Union{CompositeParam{T}, AbstractArray{<:ElementalParam{T}}}) where {T}
+function obtain(p::AbtArrayOr{<:DimensionalParam{T}}) where {T}
     lock( ReentrantLock() ) do
         obtainINTERNAL(p)
     end
 end
-
-# Sugar syntax. E.g., for obtaining values of the first element in a parameter set.
-obtainINTERNAL(pars::AbstractArray{<:ElementalParam{T}}) where {T} = obtainINTERNAL.(pars)
 
 obtainINTERNAL(p::PrimitiveParam) = directObtain(p)
 
@@ -699,9 +693,21 @@ const ParamBMemDict{T} = IdDict{ParamBox{T}, NodeMarker{<:ShapedMemory{T}}}
 const ParamPMemDict{T} = IdDict{ParamPile{T}, NodeMarker{<:VectorOrMem{<:ShapedMemory{T}}}}
 
 function obtainINTERNAL(p::CompositeParam{T}) where {T}
-    pbDict = ParamBMemDict{T}()
+    pbDict = ParamBMemDict{T}() #! Replace IdDict with LRUCache for potential boost
     ppDict = ParamPMemDict{T}()
     searchObtain(pbDict, ppDict, p)
+end
+
+function obtainINTERNAL(pars::AbstractArray{<:ElementalParam{T}}) where {T}
+    map(obtainINTERNAL, pars)
+end
+
+function obtainINTERNAL(ps::AbstractArray{<:DimensionalParam{T}}) where {T}
+    pbDict = ParamBMemDict{T}()
+    ppDict = ParamPMemDict{T}()
+    map(ps) do p
+        searchObtain(pbDict, ppDict, p)
+    end
 end
 
 function searchObtain(pbDict::ParamBMemDict{T}, ppDict::ParamPMemDict{T}, 
@@ -710,9 +716,20 @@ function searchObtain(pbDict::ParamBMemDict{T}, ppDict::ParamPMemDict{T},
 end
 
 function searchObtain(pbDict::ParamBMemDict{T}, ppDict::ParamPMemDict{T}, 
-                      p::ParamNest{T}) where {T}
-    inputVal = searchObtain.(Ref(pbDict), Ref(ppDict), p.input)
-    p.linker(inputVal...)
+                      p::ParamNest{T, F, I, N}) where {T, F, I, N}
+    # Depth-first search by recursive calling
+    valBox = p.memory
+    linker = p.linker
+    marker::NodeMarker{typeof(valBox)} = get!(ppDict, p, NodeMarker(valBox))
+    res = if !marker.visited
+        marker.visited = true
+        valRaw = linker.f( (searchObtainLoop(pbDict, ppDict, x) for x in p.input)... )
+        mem = [ShapedMemory(T, valRaw[firstindex(valRaw)+i]) for i in 0:(linker.extent-1)]
+        marker.value = Memory{ShapedMemory{T, N}}(mem)
+    else
+        marker.value
+    end
+    reshape(obtainDimVal.(res), last.(linker.axis)) |> collect
 end
 
 function searchObtainLoop(pbDict::ParamBMemDict{T}, ppDict::ParamPMemDict{T}, 
