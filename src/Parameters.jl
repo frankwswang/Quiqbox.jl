@@ -1,4 +1,4 @@
-export NodeVar, NodeVar, CellParam, GridParam, ParamList, ParamNest, setScreenLevel!, 
+export TensorVar, CellParam, GridParam, ParamList, ParamMesh, setScreenLevel!, 
        setScreenLevel, symOf, inputOf, obtain, fragment, setVal!, screenLevelOf, 
        markParams!, topoSort, getParams
 
@@ -230,12 +230,12 @@ const SymOrIndexedSym = Union{Symbol, IndexedSym}
 genTernaryNumber(num::Int) = TernaryNumber(num)
 genTernaryNumber(num::TernaryNumber) = itself(num)
 
-struct NodeVar{T, N} <: PrimitiveParam{T, N}
+struct TensorVar{T, N} <: PrimitiveParam{T, N}
     input::ShapedMemory{T, N}
     symbol::IndexedSym
     screen::TernaryNumber
 
-    function NodeVar(input::AbtArrayOrMem{T, N}, symbol::SymOrIndexedSym, 
+    function TensorVar(input::AbtArrayOrMem{T, N}, symbol::SymOrIndexedSym, 
                      screen::Union{TernaryNumber, Int}=TPS1) where {T, N}
         checkPrimParamElementalType(T)
         checkScreenLevel(screen, getScreenLevelRange(PrimitiveParam))
@@ -244,9 +244,9 @@ struct NodeVar{T, N} <: PrimitiveParam{T, N}
     end
 end
 
-NodeVar(input::T, symbol::SymOrIndexedSym, 
+TensorVar(input::T, symbol::SymOrIndexedSym, 
         screen::Union{TernaryNumber, Int}=TPS1) where {T} = 
-NodeVar(fill(input), symbol, screen)
+TensorVar(fill(input), symbol, screen)
 
 
 function checkParamBoxInput(input::ParamBoxInputType; dimMin::Int=0, dimMax=64)
@@ -383,7 +383,7 @@ CellParam(input::PrimitiveParam{T, 0},
 CellParam(TypedReduction(T), (input,), symbol)
 
 CellParam(var, varSym::SymOrIndexedSym, symbol::SymOrIndexedSym=varSym) = 
-CellParam(NodeVar(var, varSym), symbol)
+CellParam(TensorVar(var, varSym), symbol)
 
 
 function checkGridParamArg(::StableMorphism{T, <:iTalike, N}, input::I, memory::M) where 
@@ -479,7 +479,7 @@ end
 function GridParam(val::AbstractArray, valSym::SymOrIndexedSym, 
                    symbol::SymOrIndexedSym=valSym)
     exclude0DimData(val)
-    GridParam(NodeVar(val, valSym), symbol)
+    GridParam(TensorVar(val, valSym), symbol)
 end
 
 
@@ -509,7 +509,7 @@ function checkParamContainerArgType2(len::Int, extent::Int)
     nothing
 end
 
-function checkParamNestArg(ml::FixedShapeLink{T, F, N}, input::I, 
+function checkParamMeshArg(ml::FixedShapeLink{T, F, N}, input::I, 
                            memory::Union{Memory{ShapedMemory{T, N}}, Missing}) where 
                           {T, F, N, I}
     if ismissing(memory)
@@ -521,38 +521,38 @@ function checkParamNestArg(ml::FixedShapeLink{T, F, N}, input::I,
     ml, F, deepcopy(memory)
 end
 
-struct ParamNest{T, F<:Function, I<:ParamBoxInputType{T}, N, L} <: ParamGrid{T, N, I, L}
+struct ParamMesh{T, F<:Function, I<:ParamBoxInputType{T}, N, L} <: ParamGrid{T, N, I, L}
     linker::FixedShapeLink{T, F, N, L}
     input::I
     symbol::IndexedSym
     memory::Memory{ShapedMemory{T, N}}
 
-    function ParamNest(linker::FixedShapeLink{T, F, N, L}, input::I, 
+    function ParamMesh(linker::FixedShapeLink{T, F, N, L}, input::I, 
                        symbol::SymOrIndexedSym, 
                        memory::Union{Memory{ShapedMemory{T, N}}, Missing}=missing) where 
                       {T, N, F, L, I<:ParamBoxInputType{T}}
-        linker, funcType, memory = checkParamNestArg(linker, input, memory)
+        linker, funcType, memory = checkParamMeshArg(linker, input, memory)
         new{T, funcType, I, N, L}(linker, input, IndexedSym(symbol), memory)
     end
 end
 
-function ParamNest(func::Function, input::ParamBoxInputType{T}, 
+function ParamMesh(func::Function, input::ParamBoxInputType{T}, 
                    symbol::SymOrIndexedSym) where {T}
     inputVal = obtain.(input)
     out = func(inputVal...)
     out isa AbstractArray || throw(AssertionError("`func` should output an AbstractArray."))
     linker = FixedShapeLink(func, typeof(out), inputVal...)
-    ParamNest(linker, input, symbol)
+    ParamMesh(linker, input, symbol)
 end
 
 genDefaultRefParSym(input::DimensionalParam) = IndexedSym(:_, input.symbol)
 
-struct NestParam{T, F, I, N, L} <: ReferenceParam{T, N, I}
-    input::ParamNest{T, F, I, N, L}
+struct NodeParam{T, F, I, N, L} <: ReferenceParam{T, N, I}
+    input::ParamMesh{T, F, I, N, L}
     index::Int
     symbol::IndexedSym
 
-    function NestParam(input::ParamNest{T, F, I, N, L}, index::Int, 
+    function NodeParam(input::ParamMesh{T, F, I, N, L}, index::Int, 
                        symbol::SymOrIndexedSym=genDefaultRefParSym(input)) where 
                       {T, F, I, N, L}
         maxIndex = length(input.memory)
@@ -564,10 +564,10 @@ struct NestParam{T, F, I, N, L} <: ReferenceParam{T, N, I}
 end
 
 
-function fragment(pn::ParamNest{T, F, I, N, L}) where {T, F, I, N, L}
-    res = Array{NestParam{T, F, I, N, L}}(undef, last.(pn.linker.axis))
+function fragment(pn::ParamMesh{T, F, I, N, L}) where {T, F, I, N, L}
+    res = Array{NodeParam{T, F, I, N, L}}(undef, last.(pn.linker.axis))
     for i in eachindex(res)
-        res[i] = NestParam(pn, i)
+        res[i] = NodeParam(pn, i)
     end
     res
 end
@@ -575,7 +575,7 @@ end
 fragment(pl::ParamList) = collect(pl.input)
 
 
-getScreenLevelRange(::Type{<:NestParam}) = (0, 0)
+getScreenLevelRange(::Type{<:NodeParam}) = (0, 0)
 
 getScreenLevelRange(::Type{<:ParamBox}) = (0, 0)
 
@@ -605,7 +605,7 @@ screenLevelOf(::ParamBox) = 0
 
 screenLevelOf(p::ParamBox{<:Any, 0}) = Int(p.screen)
 
-screenLevelOf(::NestParam) = 0
+screenLevelOf(::NodeParam) = 0
 
 screenLevelOf(::ParamPile) = 0
 
@@ -632,7 +632,7 @@ end
 
 setScreenLevel(p::CellParam, level::Int) = setScreenLevel!(CellParam(p), level)
 
-setScreenLevel(p::NodeVar, level::Int) = NodeVar(p.input, p.symbol, TernaryNumber(level))
+setScreenLevel(p::TensorVar, level::Int) = TensorVar(p.input, p.symbol, TernaryNumber(level))
 
 
 function memorizeCore!(p::ParamBox{T, N}, newMem::AbtArrayOrMem{T, N}) where {T, N}
@@ -716,7 +716,7 @@ function searchObtain(pbDict::ParamBMemDict{T}, ppDict::ParamPMemDict{T},
 end
 
 function searchObtain(pbDict::ParamBMemDict{T}, ppDict::ParamPMemDict{T}, 
-                      p::ParamNest{T, F, I, N}) where {T, F, I, N}
+                      p::ParamMesh{T, F, I, N}) where {T, F, I, N}
     # Depth-first search by recursive calling
     valBox = p.memory
     linker = p.linker
@@ -760,7 +760,7 @@ function searchObtainCore(shiftVal::F, pbDict::ParamBMemDict{T}, ppDict::ParamPM
 end
 
 function searchObtainCore(::F, pbDict::ParamBMemDict{T}, ppDict::ParamPMemDict{T}, 
-                          p::NestParam{T, N}) where {T, F<:Union{iT, ValShifter{T}}, N}
+                          p::NodeParam{T, N}) where {T, F<:Union{iT, ValShifter{T}}, N}
     # Depth-first search by recursive calling
     idx = p.index
     input = p.input
@@ -911,7 +911,7 @@ function ParamMarker(p::T) where {T<:GridParam}
     ParamMarker(objectid(T), markObj.(p.input), markObj(p.lambda), ())
 end
 
-function ParamMarker(p::T) where {T<:NestParam}
+function ParamMarker(p::T) where {T<:NodeParam}
     ParamMarker(objectid(T), (markObj(p.input),), NothingID, (objectid(p.index),))
 end
 
@@ -919,7 +919,7 @@ function ParamMarker(p::T) where {T<:ParamList}
     ParamMarker(objectid(T), (markObj(p.input),), NothingID, ())
 end
 
-function ParamMarker(p::T) where {T<:ParamNest}
+function ParamMarker(p::T) where {T<:ParamMesh}
     ParamMarker(objectid(T), markObj.(pn.input), markObj(p.linker), ())
 end
 
@@ -1151,7 +1151,7 @@ topoSort(node::CellParam{T}) where {T} = topoSortINTERNAL([node])
 
 
 # Sever the connection of a node to other nodes
-sever(pv::NodeVar) = NodeVar(obtain(pv), pv.symbol)
+sever(pv::TensorVar) = TensorVar(obtain(pv), pv.symbol)
 
 # function sever(ps::T) where {T<:ParamBox}
 
