@@ -52,7 +52,7 @@ end
 
 struct EmptyNode{T, N} <: GraphNode{T, N} end
 
-EmptyNode(::DimensionalParam{T, N, 0}) where {T, N} = EmptyNode{T, N}()
+EmptyNode(::DoubleDimParam{T, N, 0}) where {T, N} = EmptyNode{T, N}()
 
 struct ReductionNode{T, I<:NodeChildrenType{T}, F, 
                      S<:Union{iT, ValShifter{T}}} <: OperatorNode{T, 0, I, F}
@@ -223,7 +223,7 @@ selectInPSubset(::Val{0}, ps::AbstractVector{<:PrimDParSetEltype{T}}) where {T} 
 selectInPSubset(::Val,    ps::AbstractVector{<:PrimDParSetEltype{T}}) where {T} = itself(ps)
 
 function genComputeGraphCore1(inPSet::AbstractVector{<:PrimDParSetEltype{T}}, 
-                              par::DimensionalParam{T, N}) where {T, N}
+                              par::DoubleDimParam{T, N}) where {T, N}
     sl = checkScreenLevel(screenLevelOf(par), (1, 2))
     sym = symbolFromPar(par)
     val = obtain(par)
@@ -241,7 +241,7 @@ end
 
 function genComputeGraphCore2(idDict::IdDict{ParamBox{T}, NodeMarker{<:GraphNode{T}}}, 
                               inPSet::AbstractVector{<:PrimDParSetEltype{T}}, 
-                              par::DimensionalParam{T, N}) where {T, N}
+                              par::DoubleDimParam{T, N}) where {T, N}
     sl = checkScreenLevel(screenLevelOf(par), getScreenLevelRange(par))
 
     if sl == 0
@@ -263,7 +263,7 @@ function genComputeGraphCore2(idDict::IdDict{ParamBox{T}, NodeMarker{<:GraphNode
 end
 
 function genComputeGraphCore2(idDict, inPSet, 
-                              pars::AbstractArray{<:DimensionalParam{T}}) where {T}
+                              pars::AbstractArray{<:DoubleDimParam{T}}) where {T}
     map(pars) do par
         genComputeGraphCore2(idDict, inPSet, par)
     end
@@ -288,13 +288,13 @@ const ParamSetErrorMessage2 = "The screen level of the input parameter (inspecte
                               "`$screenLevelOf`) for a dependent parameter must be 1."
 
 function genComputeGraph(inputParamSet::AbstractVector{<:PrimDParSetEltype{T}}, 
-                         par::DimensionalParam{T}) where {T}
+                         par::DoubleDimParam{T}) where {T}
     for i in eachindex(inputParamSet)
         p = inputParamSet[i]
 
         bl1 = i == firstindex(inputParamSet)
         bl2 = p isa AbstractArray{<:ElementalParam{T}}
-        bl3 = (p isa DimensionalParam && !(p isa ElementalParam))
+        bl3 = (p isa DoubleDimParam && !(p isa ElementalParam))
         if !( ( !bl1 && bl3 ) || ( bl1 && (bl2 || bl3) ) )
             throw(AssertionError(ParamSetErrorMessage1))
         end

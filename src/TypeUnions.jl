@@ -43,10 +43,10 @@ abstract type HartreeFockFinalValue{T, HFT} <: MixedContainer{T} end
 abstract type BasisSetData{T, D, BS} <: MixedContainer{T} end
 abstract type MatterData{T, D} <: MixedContainer{T} end
 
-abstract type DimensionalParam{T, N, O} <: ParamContainer{T} end
+abstract type DoubleDimParam{T, N, O} <: ParamContainer{T} end
 
-abstract type CompositeParam{T, N, O} <: DimensionalParam{T, N, O} end
-abstract type PrimitiveParam{T, N} <: DimensionalParam{T, N, 0} end
+abstract type CompositeParam{T, N, O} <: DoubleDimParam{T, N, O} end
+abstract type PrimitiveParam{T, N} <: DoubleDimParam{T, N, 0} end
 
 abstract type GraphNode{T, N} <: ComputableGraph{T} end
 
@@ -81,10 +81,10 @@ abstract type FloatingBasisFuncs{NumberT, D, 𝑙, PointT, RadialV, OrbitalN} <:
 
 
 const ParamObject{T} = Union{ParamContainer{T}, ParamFunction{T}}
-const ElementalParam{T} = DimensionalParam{T, 0, 0}
-const PlainParameter{T, N} = Union{DimensionalParam{T, N, 0}, DimensionalParam{T, 0, N}}
+const ElementalParam{T} = DoubleDimParam{T, 0, 0}
+const SingleDimParam{T, N} = DoubleDimParam{T, N, 0}
+const PlainDataParam{T, N} = Union{SingleDimParam{T, N}, DoubleDimParam{T, 0, N}}
 const PrimParCandidate{T} = Union{ElementalParam{T}, PrimitiveParam{T}}
-
 # const PNodeIn1{T} = Union{T, ElementalParam{T}}
 # const PNodeIn2{T, F<:Function} = Tuple{F, ElementalParam{T}}
 # const PNodeIn3{T, F<:Function} = Tuple{F, AbstractArray{<:ElementalParam{T}}}
@@ -93,7 +93,7 @@ const PNodeInput{T} = Union{T, ElementalParam{T}}
 
 const SParamAbtArray{T, N} = AbstractArray{<:ElementalParam{T}, N}
 const PParamAbtArray{T, N} = AbstractArray{<:PrimitiveParam{T}, N}
-const DParamAbtArray{T, N} = AbstractArray{<:DimensionalParam{T, <:Any, 0}, N}
+const DParamAbtArray{T, N} = AbstractArray{<:DoubleDimParam{T, <:Any, 0}, N}
 
 const SpatialBasis1O{T, D} = SpatialBasis{T, D, 1}
 const CBasisFuncsON{ON} = CompositeBasisFuncs{<:Any, <:Any, <:Any, ON}
@@ -155,8 +155,8 @@ const AbtArrayOr{T} = Union{T, AbstractArray{T}}
 
 const RefOrA0D{T, V<:AbstractArray{T, 0}} =  Union{RefVal{T}, V}
 
-# const ElemParamAbtArray{T, N} = AbstractArray{<:DimensionalParam{T, 0}, N}
-# const SingleDimParArg{T, N} = Union{ElemParamAbtArray{T, N}, DimensionalParam{T, N}}
+# const ElemParamAbtArray{T, N} = AbstractArray{<:DoubleDimParam{T, 0}, N}
+# const SingleDimParArg{T, N} = Union{ElemParamAbtArray{T, N}, DoubleDimParam{T, N}}
 # const MultiNDParTuple{T, N, M} = NTuple{M, SingleDimParArg{T, N}}
 # const MonoDimParTuple{T, N} = MultiNDParTuple{T, N, 1}
 # const DualDimParTuple{T, N} = MultiNDParTuple{T, N, 2}
@@ -170,9 +170,9 @@ const RefOrA0D{T, V<:AbstractArray{T, 0}} =  Union{RefVal{T}, V}
 const TernaryTupleUnion{T} = Union{(NonEmptyTuple{T, N} for N in 0:2)...}
 const TwiceThriceNTuple{T} = Union{(NonEmptyTuple{T, N} for N in 1:2)...}
 const ElemParamAbtArray{T, N} = AbstractArray{<:ElementalParam{T}, N}
-const ParamBoxSingleArg{T, N} = Union{ElemParamAbtArray{T, N}, DimensionalParam{T, N, 0}}
+const ParamBoxSingleArg{T, N} = Union{ElemParamAbtArray{T, N}, DoubleDimParam{T, N, 0}}
 const ParamBoxInputType{T} = TernaryTupleUnion{ParamBoxSingleArg{T}}
-const PrimDParSetEltype{T} = Union{AbstractVector{<:ElementalParam{T}}, DimensionalParam{T, <:Any, 0}}
+const PrimDParSetEltype{T} = Union{AbstractVector{<:ElementalParam{T}}, DoubleDimParam{T, <:Any, 0}}
 const ArgTypeOfNDPIVal{T} = Union{
     Tuple{Type{T}}, 
     Tuple{Type{T}, Type{T}}, 

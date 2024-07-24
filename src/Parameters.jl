@@ -70,11 +70,11 @@ const ValShifter{T} = Fix2{typeof(typedAdd), T}
 exclude0DimData(::T) where {T} = exclude0DimData(T)
 exclude0DimData(::Type) = nothing
 exclude0DimData(::Type{<:AbtMemory0D}) = 
-throw(ArgumentError("`AbstractMemory{<:Any, 0}` is not allowed as the argument."))
+throw(ArgumentError("`$(AbstractMemory{<:Any, 0})` is not allowed as the argument."))
 exclude0DimData(::Type{<:AbtArray0D}) = 
-throw(ArgumentError("`AbstractArray{<:Any, 0}` is not allowed as the argument."))
-exclude0DimData(::Type{<:DimensionalParam{<:Any, 0, 0}}) = 
-throw(ArgumentError("`DimensionalParam{<:Any, 0, 0}` is not allowed as the argument."))
+throw(ArgumentError("`$(AbstractArray{<:Any, 0})` is not allowed as the argument."))
+exclude0DimParam(::Type{<:SingleDimParam{<:Any, 0}}) = 
+throw(ArgumentError("`$(SingleDimParam{<:Any, 0})` is not allowed as the argument."))
 
 excludeAbtArray(::T) where {T} = excludeAbtArray(T)
 excludeAbtArray(::Type) = nothing
@@ -468,7 +468,7 @@ GridParam(par.lambda, par.input, symbol, init)
 
 function GridParam(input::PrimitiveParam{T, N}, 
           symbol::SymOrIndexedSym=symOf(input)) where {T, N}
-    exclude0DimData(input)
+    exclude0DimParam(input)
     GridParam(StableMorphism(AbstractArray{T, N}), (input,), symbol)
 end
 
@@ -485,12 +485,12 @@ function GridParam(val::AbstractArray, valSym::SymOrIndexedSym,
 end
 
 
-struct ParamGrid{T, N, I<:DimensionalParam{T, N, 0}, O} <: ParamPile{T, N, I, O}
+struct ParamGrid{T, N, I<:PlainDataParam{T, N}, O} <: ParamPile{T, N, I, O}
     input::ShapedMemory{I, O}
     symbol::IndexedSym
 
     function ParamGrid(input::ShapedMemory{I, O}, symbol::SymOrIndexedSym) where 
-                      {T, N, I<:DimensionalParam{T, N, 0}, O}
+                      {T, N, I<:PlainDataParam{T, N}, O}
         exclude0DimData(input|>typeof)
         isempty(input.value) && throw(AssertionError("`input` should not be empty."))
         new{T, N, I, O}(input, IndexedSym(symbol))
@@ -498,7 +498,7 @@ struct ParamGrid{T, N, I<:DimensionalParam{T, N, 0}, O} <: ParamPile{T, N, I, O}
 end
 
 function ParamGrid(input::AbstractArray{I, O}, symbol::SymOrIndexedSym) where 
-                  {T, N, I<:DimensionalParam{T, N, 0}, O}
+                  {T, N, I<:PlainDataParam{T, N}, O}
     exclude0DimData(input|>typeof)
     ParamGrid(ShapedMemory(input), symbol)
 end
@@ -550,7 +550,7 @@ function ParamMesh(func::Function, input::ParamBoxInputType{T},
     ParamMesh(linker, input, symbol)
 end
 
-genDefaultRefParSym(input::DimensionalParam) = IndexedSym(:_, input.symbol)
+genDefaultRefParSym(input::DoubleDimParam) = IndexedSym(:_, input.symbol)
 
 struct NodeParam{T, F, I, N, O} <: ReferenceParam{T, N, I}
     input::ParamMesh{T, F, I, N, O}
@@ -590,18 +590,18 @@ getScreenLevelRange(::Type{<:ParamPile}) = (0, 0)
 
 getScreenLevelRange(::Type{<:PrimitiveParam}) = (1, 2)
 
-getScreenLevelRange(::Type{<:DimensionalParam}) = (0, 0)
+getScreenLevelRange(::Type{<:DoubleDimParam}) = (0, 0)
 
-getScreenLevelRange(::Type{<:DimensionalParam{<:Any, <:Any, 0}}) = (0, 2)
+getScreenLevelRange(::Type{<:DoubleDimParam{<:Any, <:Any, 0}}) = (0, 2)
 
-getScreenLevelRange(::T) where {T<:DimensionalParam} = getScreenLevelRange(T)
+getScreenLevelRange(::T) where {T<:DoubleDimParam} = getScreenLevelRange(T)
 
-function isScreenLevelChangeable(::T) where {T<:DimensionalParam}
+function isScreenLevelChangeable(::T) where {T<:DoubleDimParam}
     minLevel, maxLevel = getScreenLevelRange(T)
     (maxLevel - minLevel) > 0
 end
 
-isOffsetEnabled(::DimensionalParam) = false
+isOffsetEnabled(::DoubleDimParam) = false
 
 function isOffsetEnabled(pb::T) where {T<:CellParam}
     isScreenLevelChangeable(pb) && getScreenLevelRange(T)[end] > 0 && 
@@ -619,7 +619,7 @@ screenLevelOf(::ParamPile) = 0
 screenLevelOf(p::PrimitiveParam) = Int(p.screen)
 
 
-function setScreenLevelCore!(p::DimensionalParam, level::Int)
+function setScreenLevelCore!(p::DoubleDimParam, level::Int)
     @atomic p.screen = TernaryNumber(level)
 end
 
@@ -671,11 +671,11 @@ memorize!(p::ParamBox{T}, newMem::T) where {T} = memorize!(p, fill(newMem))
 memorize!(p::ParamBox) = memorize!(p, obtain(p))
 
 
-indexedSymOf(p::DimensionalParam) = p.symbol
+indexedSymOf(p::DoubleDimParam) = p.symbol
 
-symOf(p::DimensionalParam) = indexedSymOf(p).name
+symOf(p::DoubleDimParam) = indexedSymOf(p).name
 
-inputOf(p::DimensionalParam) = p.input
+inputOf(p::DoubleDimParam) = p.input
 
 
 mutable struct NodeMarker{T} <: StorageMarker{T}
@@ -685,7 +685,7 @@ mutable struct NodeMarker{T} <: StorageMarker{T}
     NodeMarker(init::T, ::Type{U}=T) where {T, U} = new{U}(false, init)
 end
 
-function obtain(p::AbtArrayOr{<:DimensionalParam{T}}) where {T}
+function obtain(p::AbtArrayOr{<:DoubleDimParam{T}}) where {T}
     lock( ReentrantLock() ) do
         obtainINTERNAL(p)
     end
@@ -709,7 +709,7 @@ function obtainINTERNAL(pars::AbstractArray{<:ElementalParam{T}}) where {T}
     map(obtainINTERNAL, pars)
 end
 
-function obtainINTERNAL(ps::AbstractArray{<:DimensionalParam{T}}) where {T}
+function obtainINTERNAL(ps::AbstractArray{<:DoubleDimParam{T}}) where {T}
     pbDict = ParamBMemDict{T}()
     ppDict = ParamPMemDict{T}()
     map(ps) do p
@@ -742,14 +742,14 @@ function searchObtain(pbDict::ParamBMemDict{T}, ppDict::ParamPMemDict{T},
 end
 
 function searchObtainLoop(pbDict::ParamBMemDict{T}, ppDict::ParamPMemDict{T}, 
-                          input::AbstractArray{<:DimensionalParam{T}}) where {T}
+                          input::AbstractArray{<:DoubleDimParam{T}}) where {T}
     map(input) do child
         searchObtain(pbDict, ppDict, child)
     end
 end
 
 function searchObtainLoop(pbDict::ParamBMemDict{T}, ppDict::ParamPMemDict{T}, 
-                          input::DimensionalParam{T}) where {T}
+                          input::DoubleDimParam{T}) where {T}
     searchObtain(pbDict, ppDict, input)
 end
 
@@ -817,7 +817,7 @@ end
 searchObtain(::ParamBMemDict{T}, ::ParamPMemDict{T}, p::PrimitiveParam{T}) where {T} = 
 directObtain(p)
 
-(pn::DimensionalParam)() = obtain(pn)
+(pn::DoubleDimParam)() = obtain(pn)
 
 function setVal!(par::PrimitiveParam{T, N}, val::AbstractArray{T, N}) where {T, N}
     if Int(par.screen) == 1
@@ -874,7 +874,7 @@ end
 
 markObj(input::PrimitiveParam) = ValueMarker(input)
 
-markObj(input::DimensionalParam) = ParamMarker(input)
+markObj(input::DoubleDimParam) = ParamMarker(input)
 
 function isPrimVarCollection(arg::AbstractArray{T}) where {T}
     ET = isconcretetype(T) ? T : eltype(map(itself, arg))
@@ -977,11 +977,11 @@ function compareMarker(pm1::T, pm2::T) where {T<:ParamMarker}
     isSame
 end
 
-compareParamContainer(::DimensionalParam, ::DimensionalParam) = false
+compareParamContainer(::DoubleDimParam, ::DoubleDimParam) = false
 
-compareParamContainer(::DimensionalParam, ::Any) = false
+compareParamContainer(::DoubleDimParam, ::Any) = false
 
-compareParamContainer(::Any, ::DimensionalParam) = false
+compareParamContainer(::Any, ::DoubleDimParam) = false
 
 compareParamContainer(p1::T, p2::T) where {T<:PrimitiveParam} = p1 === p2
 
@@ -1052,11 +1052,11 @@ end
 
 getParamFields(pf::ParamFunctions) = itself(pf)
 
-getParams(p::DimensionalParam) = [p]
+getParams(p::DoubleDimParam) = [p]
 
-getParams(p::DimensionalParam, ::Missing) = [p]
+getParams(p::DoubleDimParam, ::Missing) = [p]
 
-function getParams(p::DimensionalParam, sym::Symbol)
+function getParams(p::DoubleDimParam, sym::Symbol)
     res = eltype(p)[]
     inSymbol(sym, symOf(ps)) && push!(res, p)
     res
@@ -1076,7 +1076,7 @@ function getParams(f::ParamFunction{T}, sym::SymOrMiss=missing) where {T}
 end
 
 
-uniqueParams(ps::AbstractArray{<:DimensionalParam}) = 
+uniqueParams(ps::AbstractArray{<:DoubleDimParam}) = 
 markUnique(ps, compareFunction=compareParamContainer)[end]
 
 
@@ -1088,7 +1088,7 @@ function markParamsCore!(indexDict::IdDict{Symbol, Int}, leafPars)
     end
 end
 
-function markParams!(pars::AbstractVector{<:DimensionalParam{T}}) where {T}
+function markParams!(pars::AbstractVector{<:DoubleDimParam{T}}) where {T}
     nodes, marks1, marks2 = topoSort(pars)
     leafPars = nodes[.!marks1 .*   marks2]
     rootPars = nodes[  marks1 .* .!marks2]
@@ -1112,15 +1112,15 @@ markParams!(b::AbtArrayOr{<:ParamObject}) = markParams!(getParams(b))
 
 
 function flattenPBoxInput(input::ParamBoxInputType{T}) where {T}
-    mapreduce(vcat, input, init=DimensionalParam{T}[]) do parArg
-        parArg isa DimensionalParam ? DimensionalParam{T}[parArg] : vec(parArg)
+    mapreduce(vcat, input, init=DoubleDimParam{T}[]) do parArg
+        parArg isa DoubleDimParam ? DoubleDimParam{T}[parArg] : vec(parArg)
     end
 end
 
 function topoSortCore!(hbNodesIdSet::Set{UInt}, 
-                       orderedNodes::Vector{<:DimensionalParam{T}}, 
+                       orderedNodes::Vector{<:DoubleDimParam{T}}, 
                        haveBranches::Vector{Bool}, connectRoots::Vector{Bool}, 
-                       node::DimensionalParam{T}, recursive::Bool=false) where {T}
+                       node::DoubleDimParam{T}, recursive::Bool=false) where {T}
     sl = checkScreenLevel(screenLevelOf(node), getScreenLevelRange(node))
 
     if sl in (0, 1)
@@ -1148,8 +1148,8 @@ function topoSortCore!(hbNodesIdSet::Set{UInt},
     nothing
 end
 
-function topoSortINTERNAL(nodes::AbstractVector{<:DimensionalParam{T}}) where {T}
-    orderedNodes = DimensionalParam{T}[]
+function topoSortINTERNAL(nodes::AbstractVector{<:DoubleDimParam{T}}) where {T}
+    orderedNodes = DoubleDimParam{T}[]
     haveBranches = Bool[]
     connectRoots = Bool[]
     hbNodesIdSet = Set{UInt}()
@@ -1159,7 +1159,7 @@ function topoSortINTERNAL(nodes::AbstractVector{<:DimensionalParam{T}}) where {T
     orderedNodes, haveBranches, connectRoots
 end
 
-function topoSort(nodes::AbstractVector{<:DimensionalParam{T}}) where {T}
+function topoSort(nodes::AbstractVector{<:DoubleDimParam{T}}) where {T}
     uniqueParams(nodes) |> topoSortINTERNAL
 end
 
