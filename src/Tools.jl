@@ -231,7 +231,7 @@ function hasBoolRelation(boolOp::F,
     end
     res
 end
-## Refer overload for `ParamBox` to Overload.jl.
+## Refer overload for `ParamToken` to Overload.jl.
 
 """
 

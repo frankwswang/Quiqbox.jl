@@ -44,7 +44,7 @@ struct ReferenceNode{T, N, V<:AbstractArray{T, N}} <: StorageNode{T, N}
     val::V
     id::UInt
 
-    function ReferenceNode(pb::ParamBox{T, N}) where {T, N}
+    function ReferenceNode(pb::ParamToken{T, N}) where {T, N}
         val = packElementalVal(Val(N), obtainDimVal(pb.memory))
         new{T, N, typeof(val)}(val, objectid(pb))
     end
@@ -74,13 +74,13 @@ struct MorphismNode{T, I<:NodeChildrenType{T}, F, N} <: OperatorNode{T, N, I, F}
     marker::Symbol
 end
 
-function genOperatorNode(par::CellParam{T, <:Any, <:NTuple{A, ParamBoxSingleArg{T}}}, 
+function genOperatorNode(par::CellParam{T, <:Any, <:NTuple{A, ParamTokenSingleArg{T}}}, 
                 childNodes::NTuple{A, ChildNodeType{T}}) where {A, T}
     offset = (isOffsetEnabled(par) ? par.offset : nothing)
     ReductionNode(par.lambda, childNodes, symbolFromPar(par), offset)
 end
 
-genOperatorNode(par::GridParam{T, <:Any, <:NTuple{A, ParamBoxSingleArg{T}}}, 
+genOperatorNode(par::GridParam{T, <:Any, <:NTuple{A, ParamTokenSingleArg{T}}}, 
                 childNodes::NTuple{A, ChildNodeType{T}}) where {A, T} = 
 MorphismNode(par.lambda, childNodes, symbolFromPar(par))
 
@@ -239,7 +239,7 @@ function genComputeGraphCore1(inPSet::AbstractVector{<:PrimDParSetEltype{T}},
     end
 end
 
-function genComputeGraphCore2(idDict::IdDict{ParamBox{T}, NodeMarker{<:GraphNode{T}}}, 
+function genComputeGraphCore2(idDict::IdDict{ParamToken{T}, NodeMarker{<:GraphNode{T}}}, 
                               inPSet::AbstractVector{<:PrimDParSetEltype{T}}, 
                               par::DoubleDimParam{T, N}) where {T, N}
     sl = checkScreenLevel(screenLevelOf(par), getScreenLevelRange(par))
@@ -270,8 +270,8 @@ function genComputeGraphCore2(idDict, inPSet,
 end
 
 function genComputeGraphINTERNAL(inPSet::AbstractVector{<:PrimDParSetEltype{T}}, 
-                                 par::ParamBox{T}) where {T}
-    idDict = IdDict{ParamBox{T}, NodeMarker{<:GraphNode{T}}}()
+                                 par::ParamToken{T}) where {T}
+    idDict = IdDict{ParamToken{T}, NodeMarker{<:GraphNode{T}}}()
     genComputeGraphCore2(idDict, inPSet, par)
 end
 
