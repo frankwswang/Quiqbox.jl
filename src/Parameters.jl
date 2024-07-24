@@ -1,4 +1,4 @@
-export TensorVar, CellParam, GridParam, ParamList, ParamMesh, setScreenLevel!, 
+export TensorVar, CellParam, GridParam, ParamGrid, ParamMesh, setScreenLevel!, 
        setScreenLevel, symOf, inputOf, obtain, fragment, setVal!, screenLevelOf, 
        markParams!, topoSort, getParams
 
@@ -485,11 +485,11 @@ function GridParam(val::AbstractArray, valSym::SymOrIndexedSym,
 end
 
 
-struct ParamList{T, N, I<:DimensionalParam{T, N, 0}, O} <: ParamPile{T, N, I, O}
+struct ParamGrid{T, N, I<:DimensionalParam{T, N, 0}, O} <: ParamPile{T, N, I, O}
     input::ShapedMemory{I, O}
     symbol::IndexedSym
 
-    function ParamList(input::ShapedMemory{I, O}, symbol::SymOrIndexedSym) where 
+    function ParamGrid(input::ShapedMemory{I, O}, symbol::SymOrIndexedSym) where 
                       {T, N, I<:DimensionalParam{T, N, 0}, O}
         exclude0DimData(input|>typeof)
         isempty(input.value) && throw(AssertionError("`input` should not be empty."))
@@ -497,13 +497,13 @@ struct ParamList{T, N, I<:DimensionalParam{T, N, 0}, O} <: ParamPile{T, N, I, O}
     end
 end
 
-function ParamList(input::AbstractArray{I, O}, symbol::SymOrIndexedSym) where 
+function ParamGrid(input::AbstractArray{I, O}, symbol::SymOrIndexedSym) where 
                   {T, N, I<:DimensionalParam{T, N, 0}, O}
     exclude0DimData(input|>typeof)
-    ParamList(ShapedMemory(input), symbol)
+    ParamGrid(ShapedMemory(input), symbol)
 end
 
-ParamList(pl::ParamList, symbol::IndexedSym=pl.symbol) = ParamList(pl.input, symbol)
+ParamGrid(pl::ParamGrid, symbol::IndexedSym=pl.symbol) = ParamGrid(pl.input, symbol)
 
 
 function checkParamContainerArgType2(len::Int, extent::Int)
@@ -577,7 +577,7 @@ function fragment(pn::ParamMesh{T, F, I, N, O}) where {T, F, I, N, O}
     res
 end
 
-fragment(pl::ParamList) = obtainDimVal(pl.input)
+fragment(pl::ParamGrid) = obtainDimVal(pl.input)
 
 
 getScreenLevelRange(::Type{<:NodeParam}) = (0, 0)
@@ -718,7 +718,7 @@ function obtainINTERNAL(ps::AbstractArray{<:DimensionalParam{T}}) where {T}
 end
 
 function searchObtain(pbDict::ParamBMemDict{T}, ppDict::ParamPMemDict{T}, 
-                      p::ParamList{T}) where {T}
+                      p::ParamGrid{T}) where {T}
     shapedPars = p.input
     val = searchObtain.(Ref(pbDict), Ref(ppDict), shapedPars.value)
     collect( reshape(val, shapedPars.shape) )
@@ -929,7 +929,7 @@ function ParamMarker(p::T) where {T<:NodeParam}
     ParamMarker(objectid(T), (markObj(p.input),), NothingID, (objectid(p.index),))
 end
 
-function ParamMarker(p::T) where {T<:ParamList}
+function ParamMarker(p::T) where {T<:ParamGrid}
     ParamMarker(objectid(T), (markObj(p.input),), NothingID, ())
 end
 
