@@ -48,11 +48,11 @@ abstract type DoubleDimParam{T, N, O} <: ParamContainer{T} end
 abstract type CompositeParam{T, N, O} <: DoubleDimParam{T, N, O} end
 abstract type PrimitiveParam{T, N} <: DoubleDimParam{T, N, 0} end
 
-abstract type GraphNode{T, N} <: ComputableGraph{T} end
+abstract type GraphNode{T, N, O} <: ComputableGraph{T} end
 
-abstract type OperatorNode{T, N, I, F} <: GraphNode{T, N} end
-abstract type EffectNode{T, N, I} <: GraphNode{T, N} end
-abstract type StorageNode{T, N} <: GraphNode{T, N} end
+abstract type OperatorNode{T, N, I, O} <: GraphNode{T, N, O} end
+abstract type ClusterNode{T, N, O} <: GraphNode{T, N, O} end
+abstract type StorageNode{T, N} <: GraphNode{T, N, 0} end
 
 abstract type ParamToken{T, N, I} <: CompositeParam{T, N, 0} end
 abstract type ParamBatch{T, N, I, O} <: CompositeParam{T, N, O} end
@@ -152,6 +152,8 @@ const NonEmptyTupleOrAbtVector{T, A<:AbstractVector{T}} = Union{NonEmptyTuple{T}
 end
 
 const AbtArrayOr{T} = Union{T, AbstractArray{T}}
+const BiAbtArray{T, NI, NO} = AbstractArray{<:AbstractArray{T, NI}, NO}
+const AbtArr210D{T} = Union{T, AbstractArray{T}, AbstractArray{<:AbstractArray{T}}}
 
 const RefOrA0D{T, V<:AbstractArray{T, 0}} =  Union{RefVal{T}, V}
 
@@ -160,18 +162,16 @@ const RefOrA0D{T, V<:AbstractArray{T, 0}} =  Union{RefVal{T}, V}
 # const MultiNDParTuple{T, N, M} = NTuple{M, SingleDimParArg{T, N}}
 # const MonoDimParTuple{T, N} = MultiNDParTuple{T, N, 1}
 # const DualDimParTuple{T, N} = MultiNDParTuple{T, N, 2}
-# const ParamTokenInputType{T, N} = Union{MonoDimParTuple{T, N}, DualDimParTuple{T, N}}
+# const ParamInputType{T, N} = Union{MonoDimParTuple{T, N}, DualDimParTuple{T, N}}
 
 # const AbtArrTypeTuple{T, N, M} = NTuple{M, Type{<:AbstractArray{T, N}}}
 # const ArgTypeOfNDPVal{T, N} = Union{AbtArrTypeTuple{T, N, 1}, AbtArrTypeTuple{T, N, 2}}
 
 # const TypeNTuple{T, N} = NTuple{N, Type{T}}
 
-const TernaryTupleUnion{T} = Union{(NonEmptyTuple{T, N} for N in 0:2)...}
-const TwiceThriceNTuple{T} = Union{(NonEmptyTuple{T, N} for N in 1:2)...}
+const TernaryNTupleUnion{T} = Union{(NTuple{N, T} for N in 1:3)...}
 const ElemParamAbtArray{T, N} = AbstractArray{<:ElementalParam{T}, N}
-const ParamTokenSingleArg{T, N} = Union{ElemParamAbtArray{T, N}, DoubleDimParam{T, N, 0}}
-const ParamTokenInputType{T} = TernaryTupleUnion{ParamTokenSingleArg{T}}
+const ParamInputType{T} = TernaryNTupleUnion{DoubleDimParam{T}}
 const PrimDParSetEltype{T} = Union{AbstractVector{<:ElementalParam{T}}, DoubleDimParam{T, <:Any, 0}}
 const ArgTypeOfNDPIVal{T} = Union{
     Tuple{Type{T}}, 
@@ -192,7 +192,7 @@ const AbtVecOfAbtArray{T} = AbstractVector{<:AbstractArray{T}}
 
 const GraphArgDataType{T} = Union{AbtVecOfAbtArray{T}, NonEmptyTuple{AbstractArray{T}}}
 
-const ParBTypeArgNumOutDim{T, N, A} = ParamToken{T, N, <:NTuple{A, ParamTokenSingleArg{T}}}
+const ParBTypeArgNumOutDim{T, N, A} = ParamToken{T, N, <:NTuple{A, DoubleDimParam{T}}}
 
 const AbtArrayOrMem{T, N} = Union{AbstractArray{T, N}, AbstractMemory{T, N}}
 

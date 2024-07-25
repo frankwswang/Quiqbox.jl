@@ -1,6 +1,6 @@
 export TensorVar, CellParam, GridParam, ParamGrid, ParamMesh, setScreenLevel!, 
        setScreenLevel, symOf, inputOf, obtain, fragment, setVal!, screenLevelOf, 
-       markParams!, topoSort, getParams
+       markParams!, topoSort, getParams, ShapedMemory, viewElements, directObtain
 
 using Base: Fix2, Threads.Atomic, issingletontype
 using Test: @inferred
@@ -39,9 +39,10 @@ ShapedMemory(::Type{T}, value::T) where {T} = ShapedMemory( fill(value) )
 
 ShapedMemory(sm::ShapedMemory) = ShapedMemory(sm.value, sm.shape)
 
-obtainDimVal(sm::ShapedMemory) = itself.( reshape(sm.value, sm.shape) )
+viewElements(obj::ShapedMemory) = reshape(obj.value, obj.shape)
+viewElements(obj::AbstractArray) = itself(obj)
 
-obtainDimVal(sm::AbstractArray) = itself(sm)
+directObtain(obj::AbtArrayOrMem) = itself.( viewElements(obj) )
 
 
 const BasicBinaryOpTargets = Union{Number, Bool}
@@ -73,24 +74,21 @@ exclude0DimData(::Type{<:AbtMemory0D}) =
 throw(ArgumentError("`$(AbstractMemory{<:Any, 0})` is not allowed as the argument."))
 exclude0DimData(::Type{<:AbtArray0D}) = 
 throw(ArgumentError("`$(AbstractArray{<:Any, 0})` is not allowed as the argument."))
-exclude0DimParam(::Type{<:SingleDimParam{<:Any, 0}}) = 
-throw(ArgumentError("`$(SingleDimParam{<:Any, 0})` is not allowed as the argument."))
+exclude0DimParam(::Type{<:ElementalParam}) = 
+throw(ArgumentError("`$(ElementalParam)` is not allowed as the argument."))
 
 excludeAbtArray(::T) where {T} = excludeAbtArray(T)
 excludeAbtArray(::Type) = nothing
 excludeAbtArray(::Type{<:AbstractArray}) = 
 throw(ArgumentError("`AbstractArray` is not allowed as an input argument."))
 
-function checkAbtArrayArg(::Type{V}) where {T, V<:AbstractArray{T}}
+function checkAbtArrayArg(::Type{V}) where {T, N, V<:AbstractArray{T, N}}
     exclude0DimData(V)
-    excludeAbtArray(T)
-    (T, ndims(V))
+    (T, N)
 end
 checkAbtArrayArg(::Type{T}) where {T} = (T, 0)
 checkAbtArrayArg(::T) where {T} = checkAbtArrayArg(T)
 
-assertAbtArrayOutput(::Type{T}, ::Val{N}) where {T, N} = AbstractArray{T, N}
-assertAbtArrayOutput(::Type{T}, ::Val{0}) where {T} = T
 
 function checkReturnType(f::F, ::Type{T}, args::NonEmptyTuple{Any}) where {F, T}
     @inferred T f(args...)
@@ -101,12 +99,12 @@ end
 struct TypedReduction{T, F<:Function} <: TypedFunction{T, F}
     f::F
 
-    function TypedReduction(f::F, arg::T, args...) where {F, T}
+    function TypedReduction(f::F, arg, args...) where {F}
         allArgs = (arg, args...)
-        checkAbtArrayArg.(allArgs)
+        T = Union{(allArgs.|>checkAbtArrayArg.|>first.|>checkAbtArrayArg.|>first)...}
+        excludeAbtArray(T)
         checkReturnType(f, T, allArgs)
-        eleT = T <: AbstractArray ? eltype(T) : T
-        new{eleT, F}(f)
+        new{T, F}(f)
     end
 
     function TypedReduction(::Type{T}) where {T}
@@ -115,52 +113,48 @@ struct TypedReduction{T, F<:Function} <: TypedFunction{T, F}
     end
 end
 
-TypedReduction(srf::TypedReduction, arg::T, args...) where {T} = 
-TypedReduction(srf.f, arg, args...)
+TypedReduction(trf::TypedReduction, arg, args...) = TypedReduction(trf.f, arg, args...)
 
-TypedReduction(srf::TypedReduction, arg::AbstractArray{T}, args...) where {T} = 
-TypedReduction(srf.f, arg, args...)
-
-function (sf::TypedReduction{T, F})(arg::AbtArrayOr{T}, args::AbtArrayOr{T}...) where {T, F}
-    allArgs = (arg, args...)
-    exclude0DimData.(allArgs)
-    sf.f(allArgs...)::T
+function (sf::TypedReduction{T, F})(arg::AbtArr210D{T}, args::AbtArr210D{T}...) where {T, F}
+    sf.f(arg, args...)::T
 end
+
+(::TypedReduction{T, iT})(arg::T) where {T} = itself(arg)
 
 
 struct StableMorphism{T, F<:Function, N} <:TypedFunction{T, F}
     f::F
 
-    function StableMorphism(f::F, arg::T, args...) where {T, F}
+    function StableMorphism(f::F, arg, args...) where {F}
         allArgs = (arg, args...)
-        checkAbtArrayArg.(allArgs)
+        T = Union{(allArgs.|>checkAbtArrayArg.|>first.|>checkAbtArrayArg.|>first)...}
+        excludeAbtArray(T)
         val = checkReturnType(f, AbstractArray{T}, allArgs)
-        eleT = T <: AbstractArray ? eltype(T) : T
-        new{eleT, F, ndims(val)}(f)
+        new{T, F, ndims(val)}(f)
     end
 
-    function StableMorphism(::Type{V}) where {T, N, V<:AbstractArray{T, N}}
-        checkAbtArrayArg(V)
+    function StableMorphism(::Type{V}) where {N, V<:AbstractArray{<:Any, N}}
+        T = checkAbtArrayArg(V) |> first
+        excludeAbtArray(T)
         new{T, iT, N}(itself)
     end
 end
 
-StableMorphism(srf::StableMorphism, arg::T, args...) where {T} = 
-StableMorphism(srf.f, arg, args...)
+StableMorphism(srf::StableMorphism, arg, args...) = StableMorphism(srf.f, arg, args...)
 
-StableMorphism(srf::StableMorphism, arg::AbstractArray{T}, args...) where {T} = 
-StableMorphism(srf.f, arg, args...)
-
-function (sf::StableMorphism{T, F, N})(arg::AbtArrayOr{T}, args::AbtArrayOr{T}...) where 
+function (sf::StableMorphism{T, F, N})(arg::AbtArr210D{T}, args::AbtArr210D{T}...) where 
                                       {T, F, N}
-    allArgs = (arg, args...)
-    checkAbtArrayArg.(allArgs)
-    sf.f(allArgs...)::AbstractArray{T, N}
+    sf.f(arg, args...)::AbstractArray{T, N}
 end
+
+(::StableMorphism{T, iT, N})(arg::AbstractArray{T, N}) where {T, N} = itself(arg)
+
 
 function genSeqAxis(lens::NTuple{N, Int}, sym::Symbol=:e) where {N}
     Tuple( (Symbol(sym, i), lens[i]) for i in 1:N )
 end
+
+FixedShapeLinkAxisType = Union{NonEmptyTuple{Tuple{Symbol, Int}}, Missing}
 
 struct FixedShapeLink{T, F<:Function, N, O} <: StructFunction{T, F}
     f::F
@@ -168,11 +162,12 @@ struct FixedShapeLink{T, F<:Function, N, O} <: StructFunction{T, F}
     extent::Int
 
     function FixedShapeLink(f::F, ::Type{V}, arg, args...; 
-                            axis::Union{NonEmptyTuple{Tuple{Symbol, Int}}, 
-                                        Missing}=missing) where {F<:Function, V}
-        T, N = checkAbtArrayArg(eltype(V))
+                            axis::FixedShapeLinkAxisType=missing) where 
+                           {F<:Function, V<:AbstractArray}
+        T, N = checkAbtArrayArg( eltype(V) )
+        excludeAbtArray(T)
         allArgs = (arg, args...)
-        exclude0DimData.(allArgs)
+        allArgs .|> checkAbtArrayArg .|> first .|> checkAbtArrayArg
         val = checkReturnType(f, AbstractArray{<:T}, allArgs)
         if ismissing(axis)
             axis = genSeqAxis(val|>size)
@@ -180,37 +175,54 @@ struct FixedShapeLink{T, F<:Function, N, O} <: StructFunction{T, F}
             checkReshapingAxis(val, last.(axis))
         end
         O = length(axis)
-        O < 1 && throw(AssertionError("Return dimension of `FixedShapeLink` should at "*
-                                      "least be 1."))
+        exclude0DimData(AbstractArray{T, O})
         new{T, F, N, O}(f, axis, prod( last.(axis) ))
+    end
+
+    function FixedShapeLink(arg::V; axis::FixedShapeLinkAxisType=missing) where 
+                           {V<:AbstractArray}
+        T1, O = checkAbtArrayArg(V)
+        T2, N = checkAbtArrayArg(T1)
+        excludeAbtArray(T2)
+        if ismissing(axis)
+            axis = genSeqAxis(arg|>size)
+        else
+            checkReshapingAxis(arg, last.(axis))
+        end
+        new{T2, iT, N, O}(itself, axis, prod( last.(axis) ))
     end
 end
 
-function callFixedShapeLinkCore(ml::FixedShapeLink{T, <:Any, N}, arg, args...) where {T, N}
-    allArgs = (arg, args...)
-    exclude0DimData.(allArgs)
-    ml.f(allArgs...)::AbstractArray{<:assertAbtArrayOutput(T, Val(N))}
-end
+FixedShapeLink(fslf::FixedShapeLink, arg, args...) = FixedShapeLink(fslf.f, arg, args...)
 
-function (ml::FixedShapeLink)(arg, args...)
+callFixedShapeLinkCore(ml::FixedShapeLink{T, <:Any, N}, 
+                       arg::AbtArr210D{T}, args::AbtArr210D{T}...) where {T, N} = 
+ml.f(arg, args...)::AbstractArray{<:AbstractArray{T, N}}
+
+callFixedShapeLinkCore(ml::FixedShapeLink{T, <:Any, 0}, 
+                       arg::AbtArr210D{T}, args::AbtArr210D{T}...) where {T} = 
+ml.f(arg, args...)::AbstractArray{<:T}
+
+function (ml::FixedShapeLink{T})(arg::AbtArr210D{T}, args::AbtArr210D{T}...) where {T}
     res = callFixedShapeLinkCore(ml, arg, args...)
     iBegin = firstindex(res)
-    reshape(res[iBegin : (iBegin + ml.extent - 1)], getindex.(ml.axis, 2))
+    reshape(res[iBegin : (iBegin + ml.extent - 1)], last.(ml.axis))
 end
 
+(::FixedShapeLink{T, iT, 0, O})(arg::AbstractArray{T, O}) where {T, O} = itself(arg)
 
-function checkScreenLevel(sl::Int, (levelMin, levelMax)::NTuple{2, Int})
-    levelRange = levelMax - levelMin
-    levelRange < 0 && 
-    throw(DomainError(levelRange, "`levelMax - levelMin` must be nonnegative."))
-    if !(levelMin <= sl <= levelMax)
+(::FixedShapeLink{T, iT, N, O})(arg::BiAbtArray{T, N, O}) where {T, N, O} = itself(arg)
+
+
+function checkScreenLevel(sl::Int, levels::NonEmptyTuple{Int})
+    if !(sl in levels)
         throw(DomainError(sl, "This screen level ($(TernaryNumber(sl))) is not allowed."))
     end
     sl
 end
 
-checkScreenLevel(s::TernaryNumber, levelMinMax::NTuple{2, Int}) = 
-checkScreenLevel(Int(s), levelMinMax)
+checkScreenLevel(s::TernaryNumber, levels::NonEmptyTuple{Int}) = 
+checkScreenLevel(Int(s), levels)
 
 function checkPrimParamElementalType(::Type{T}) where {T}
     if !(isbitstype(T) || issingletontype(T))
@@ -240,7 +252,7 @@ struct TensorVar{T, N} <: PrimitiveParam{T, N}
     function TensorVar(input::AbtArrayOrMem{T, N}, symbol::SymOrIndexedSym, 
                      screen::Union{TernaryNumber, Int}=TPS1) where {T, N}
         checkPrimParamElementalType(T)
-        checkScreenLevel(screen, getScreenLevelRange(PrimitiveParam))
+        checkScreenLevel(screen, getScreenLevelOptions(PrimitiveParam))
         input = ShapedMemory(input|>deepcopy)
         new{T, N}(input, IndexedSym(symbol), genTernaryNumber(screen))
     end
@@ -251,10 +263,14 @@ TensorVar(input::T, symbol::SymOrIndexedSym,
 TensorVar(fill(input), symbol, screen)
 
 
-function checkParamTokenInput(input::ParamTokenInputType; dimMin::Int=0, dimMax=64)
+function checkParamInput(input::ParamInputType; 
+                         innerDimMin::Int=0, innerDimMax::Int=64, 
+                         outerDimMin::Int=0, outerDimMax::Int=64)
     hasVariable = false
+    innerDimMinMax = (innerDimMin, innerDimMax)
+    outerDimMinMax = (outerDimMin, outerDimMax)
     for x in input
-        hasVariable = checkParamTokenInputCore(hasVariable, x, (dimMin, dimMax))
+        hasVariable = checkParamInputCore(hasVariable, x, (innerDimMinMax, outerDimMinMax))
     end
     if !hasVariable
         throw(ArgumentError("`input` must contain as least one non-constant parameter."))
@@ -262,26 +278,17 @@ function checkParamTokenInput(input::ParamTokenInputType; dimMin::Int=0, dimMax=
     nothing
 end
 
-getParamTokenArgDim(::Type{<:ParamTokenSingleArg{<:Any, N}}) where {N} = N
-getParamTokenArgDim(::T) where {T<:ParamTokenSingleArg} = getParamTokenArgDim(T)
-
-function checkParamTokenInputCore(hasVariable::Bool, arg::T, dimMinMax::NTuple{2, Int}) where 
-                               {T<:ParamTokenSingleArg}
-    nDim = getParamTokenArgDim(arg)
-    if !(dimMinMax[begin] <= nDim <= dimMinMax[end])
-        throw(DomainError(nDim, "The input `arg`'s dimension falls outside the "*
-                                "permitted range: $dimMinMax."))
-    end
-    if T <: AbstractArray
-        if isempty(arg)
-            throw(ArgumentError("Every `AbstractArray` in `arg` must be non-empty."))
-        elseif !hasVariable && any( (screenLevelOf(y) < 2) for y in arg )
-            hasVariable = true
+function checkParamInputCore(hasVariable::Bool, par::P, 
+                             doubleDimMinMax::NTuple{2, NTuple{2, Int}}) where 
+                            {T, N, O, P<:DoubleDimParam{T, N, O}}
+    for (dim, str, minMax) in zip((N, O), ("inner", "outer"), doubleDimMinMax)
+        if !(minMax[begin] <= dim <= minMax[end])
+            throw(DomainError(dim, "The input `par`'s $str dimension falls outside the "*
+                                   "permitted range: $minMax."))
         end
-    elseif !hasVariable && screenLevelOf(arg) < 2
-        hasVariable = true
     end
-    hasVariable::Bool
+    hasVariable || (screenLevelOf(par) < 2) && (hasVariable = true)
+    hasVariable
 end
 
 function checkParamContainerArgType1(I::Type, R::Type)
@@ -295,7 +302,7 @@ end
 function checkCellParamArg(::TypedReduction{T, <:iTalike}, input::I, shifter::S, 
                            memory::Union{ShapedMemory{T, 0}, T, Missing}) where {T, I, S}
     checkParamContainerArgType1(I, Tuple{ElementalParam{T}})
-    checkParamTokenInput(input, dimMax=0)
+    checkParamInput(input, innerDimMax=0, outerDimMax=0)
     if ismissing(memory)
         memory = ShapedMemory( fill(input[1]|>obtain|>shifter) )
     elseif memory isa T
@@ -306,7 +313,7 @@ end
 
 function checkCellParamArg(f::TypedReduction{T, F}, input::I, shifter::S, 
                            memory::Union{ShapedMemory{T, 0}, T, Missing}) where {T, F, I, S}
-    checkParamTokenInput(input)
+    checkParamInput(input)
     if ismissing(memory)
         memory = ShapedMemory( fill(f(obtain.(input)...)|>shifter) )
     elseif memory isa T
@@ -318,7 +325,7 @@ end
 initializeOffset(::Type) = nothing
 initializeOffset(::Type{T}) where {T<:Number} = zero(T)
 
-mutable struct CellParam{T, F<:Function, I<:ParamTokenInputType{T}} <: ParamToken{T, 0, I}
+mutable struct CellParam{T, F<:Function, I<:ParamInputType{T}} <: ParamToken{T, 0, I}
     const lambda::TypedReduction{T, F}
     const input::I
     const symbol::IndexedSym
@@ -331,21 +338,21 @@ mutable struct CellParam{T, F<:Function, I<:ParamTokenInputType{T}} <: ParamToke
                        memory::Union{ShapedMemory{T, 0}, T, Missing}=missing, 
                        screen::Union{TernaryNumber, Int}=TUS0, 
                        offset::Union{T, Nothing}=initializeOffset(T)) where 
-                      {T, F, I<:ParamTokenInputType{T}}
-        slRange = getScreenLevelRange(ParamToken{T, 0})
+                      {T, F, I<:ParamInputType{T}}
+        levels = getScreenLevelOptions(ParamToken{T, 0})
         screen = genTernaryNumber(screen)
-        sl = checkScreenLevel(screen, slRange)
+        sl = checkScreenLevel(screen, levels)
         shifter = genValShifter(T, offset)
         lambda, funcType, memory = checkCellParamArg(lambda, input, shifter, memory)
         symbol = IndexedSym(symbol)
-        if slRange == (0, 0)
+        if levels == (0,)
             new{T, funcType, I}(lambda, input, symbol, memory, screen)
         else
             if offset===nothing
                 offset = if sl > 0
-                    obtainDimVal(memory)
+                    directObtain(memory)
                 else
-                    memVal = obtainDimVal(memory)
+                    memVal = directObtain(memory)
                     typedSub(memVal, memVal)
                 end
             end
@@ -354,23 +361,23 @@ mutable struct CellParam{T, F<:Function, I<:ParamTokenInputType{T}} <: ParamToke
     end
 end
 
-function CellParam(func::Function, input::ParamTokenInputType{T}, symbol::SymOrIndexedSym; 
+function CellParam(func::Function, input::ParamInputType{T}, symbol::SymOrIndexedSym; 
                    init::Union{ShapedMemory{T, 0}, T, Missing}=missing) where {T}
     lambda = TypedReduction(func, obtain.(input)...)
     CellParam(lambda, input, symbol, init, TUS0, initializeOffset(T))
 end
 
-CellParam(func::Function, input::ParamTokenSingleArg{T}, symbol::SymOrIndexedSym; 
+CellParam(func::Function, input::DoubleDimParam{T}, symbol::SymOrIndexedSym; 
           init::Union{ShapedMemory{T, 0}, T, Missing}=missing) where {T} = 
 CellParam(func, (input,), symbol; init)
 
-CellParam(func::Function, input1::ParamTokenSingleArg{T}, input2::ParamTokenSingleArg{T}, 
+CellParam(func::Function, input1::DoubleDimParam{T}, input2::DoubleDimParam{T}, 
           symbol::SymOrIndexedSym; 
           init::Union{ShapedMemory{T, 0}, T, Missing}=missing) where {T} = 
 CellParam(func, (input1, input2), symbol; init)
 
-CellParam(func::Function, input1::ParamTokenSingleArg{T}, input2::ParamTokenSingleArg{T}, 
-          input3::ParamTokenSingleArg{T}, symbol::SymOrIndexedSym; 
+CellParam(func::Function, input1::DoubleDimParam{T}, input2::DoubleDimParam{T}, 
+          input3::DoubleDimParam{T}, symbol::SymOrIndexedSym; 
           init::Union{ShapedMemory{T, 0}, T, Missing}=missing) where {T} = 
 CellParam(func, (input1, input2, input3), symbol; init)
 
@@ -380,8 +387,7 @@ function CellParam(par::CellParam{T}, symbol::SymOrIndexedSym=symOf(par);
     CellParam(par.lambda, par.input, symbol, init, par.screen, offset)
 end
 
-CellParam(input::PrimitiveParam{T, 0}, 
-          symbol::SymOrIndexedSym=symOf(input)) where {T} = 
+CellParam(input::PrimitiveParam{T, 0}, symbol::SymOrIndexedSym=symOf(input)) where {T} = 
 CellParam(TypedReduction(T), (input,), symbol)
 
 CellParam(var, varSym::SymOrIndexedSym, symbol::SymOrIndexedSym=varSym) = 
@@ -389,21 +395,20 @@ CellParam(TensorVar(var, varSym), symbol)
 
 
 function checkGridParamArg(::StableMorphism{T, <:iTalike, N}, input::I, memory::M) where 
-                           {T, N, I, M<:AbtArrayOrMem{T, N}}
-    checkParamContainerArgType1(I, Tuple{ParamTokenSingleArg{T, N}})
+                          {T, N, O, I<:DoubleDimParam{T, <:Any, O}, M<:AbtArrayOrMem{T, N}}
+    checkParamContainerArgType1(I, Tuple{PlainDataParam{T, N}})
     MI = typeof(input[1])
     if !(M <: MI)
-        throw(AssertionError("The type of memory should be the subtype of type of "*
-                             "`input[1]` (`::$M1`)"))
+        throw(AssertionError("The type of `memory` should be a subtype of `$M1`."))
     end
-    checkParamTokenInput(input, dimMin=1)
+    checkParamInput(input, innerDimMax=(O==0)*N, outerDimMax=(O==N)*N)
     StableMorphism(AbstractArray{T, N}), iT, deepcopy(memory|>ShapedMemory)
 end
 
 function checkGridParamArg(::StableMorphism{T, <:iTalike, N}, input::I, ::Missing) where 
-                           {T, N, I}
-    checkParamContainerArgType1(I, Tuple{ParamTokenSingleArg{T, N}})
-    checkParamTokenInput(input, dimMin=1)
+                          {T, N, O, I<:DoubleDimParam{T, <:Any, O}}
+    checkParamContainerArgType1(I, Tuple{PlainDataParam{T, N}})
+    checkParamInput(input, innerDimMax=(O==0)*N, outerDimMax=(O==N)*N)
     StableMorphism(AbstractArray{T, N}), iT, deepcopy(input[1]|>obtain|>ShapedMemory)
 end
 
@@ -415,7 +420,7 @@ end
 function checkGridParamArg(f::StableMorphism{T, F, N}, input::I, memory::M) where 
                            {T, F, N, I, M<:AbtArrayOrMem{T, N}}
     N < 1 && throwGridParamDimErrorMessage()
-    checkParamTokenInput(input)
+    checkParamInput(input)
     checkReturnType(f, M, obtain.(input))
     f, F, deepcopy(memory|>ShapedMemory)
 end
@@ -423,11 +428,11 @@ end
 function checkGridParamArg(f::StableMorphism{T, F, N}, input::I, ::Missing) where 
                            {T, F, N, I}
     N < 1 && throwGridParamDimErrorMessage()
-    checkParamTokenInput(input)
+    checkParamInput(input)
     f, F, deepcopy( f(obtain.(input)...)|>ShapedMemory )
 end
 
-mutable struct GridParam{T, F<:Function, I<:ParamTokenInputType{T}, N} <: ParamToken{T, N, I}
+mutable struct GridParam{T, F<:Function, I<:ParamInputType{T}, N} <: ParamToken{T, N, I}
     const lambda::StableMorphism{T, F, N}
     const input::I
     const symbol::IndexedSym
@@ -436,29 +441,29 @@ mutable struct GridParam{T, F<:Function, I<:ParamTokenInputType{T}, N} <: ParamT
     function GridParam(lambda::StableMorphism{T, F, N}, input::I, 
                        symbol::SymOrIndexedSym, 
                        memory::Union{AbtArrayOrMem{T, N}, Missing}=missing) where 
-                      {T, F, N, I<:ParamTokenInputType{T}}
+                      {T, F, N, I<:ParamInputType{T}}
         lambda, funcType, memory = checkGridParamArg(lambda, input, memory)
         new{T, funcType, I, N}(lambda, input, IndexedSym(symbol), memory)
     end
 end
 
-function GridParam(func::Function, input::ParamTokenInputType{T}, symbol::SymOrIndexedSym; 
+function GridParam(func::Function, input::ParamInputType{T}, symbol::SymOrIndexedSym; 
                    init::Union{AbtArrayOrMem{T}, Missing}=missing) where {T}
     lambda = StableMorphism(func, obtain.(input)...)
     GridParam(lambda, input, symbol, init)
 end
 
-GridParam(func::Function, input::ParamTokenSingleArg{T}, symbol::SymOrIndexedSym; 
+GridParam(func::Function, input::DoubleDimParam{T}, symbol::SymOrIndexedSym; 
           init::Union{AbtArrayOrMem{T}, Missing}=missing) where {T} = 
 GridParam(func, (input,), symbol; init)
 
-GridParam(func::Function, input1::ParamTokenSingleArg{T}, input2::ParamTokenSingleArg{T}, 
+GridParam(func::Function, input1::DoubleDimParam{T}, input2::DoubleDimParam{T}, 
           symbol::SymOrIndexedSym; 
           init::Union{AbtArrayOrMem{T}, Missing}=missing) where {T} = 
 GridParam(func, (input1, input2), symbol; init)
 
-GridParam(func::Function, input1::ParamTokenSingleArg{T}, input2::ParamTokenSingleArg{T}, 
-          input3::ParamTokenSingleArg{T}, symbol::SymOrIndexedSym; 
+GridParam(func::Function, input1::DoubleDimParam{T}, input2::DoubleDimParam{T}, 
+          input3::DoubleDimParam{T}, symbol::SymOrIndexedSym; 
           init::Union{AbtArrayOrMem{T}, Missing}=missing) where {T} = 
 GridParam(func, (input1, input2, input3), symbol; init)
 
@@ -466,23 +471,11 @@ GridParam(par::GridParam{T}, symbol::SymOrIndexedSym=symOf(par);
           init::Union{AbtArrayOrMem{T}, Missing}=par.memory) where {T} = 
 GridParam(par.lambda, par.input, symbol, init)
 
-function GridParam(input::PrimitiveParam{T, N}, 
-          symbol::SymOrIndexedSym=symOf(input)) where {T, N}
-    exclude0DimParam(input)
-    GridParam(StableMorphism(AbstractArray{T, N}), (input,), symbol)
-end
+GridParam(input::PlainDataParam{T, N}, symbol::SymOrIndexedSym=symOf(input)) where {T, N} = 
+GridParam(StableMorphism(AbstractArray{T, N}), (input,), symbol)
 
-function GridParam(input::AbstractArray{<:ElementalParam{T}, N}, 
-                   symbol::SymOrIndexedSym) where {T, N}
-    exclude0DimData(input)
-    GridParam(StableMorphism(AbstractArray{T, N}), (input,), symbol)
-end
-
-function GridParam(val::AbstractArray, valSym::SymOrIndexedSym, 
-                   symbol::SymOrIndexedSym=valSym)
-    exclude0DimData(val)
-    GridParam(TensorVar(val, valSym), symbol)
-end
+GridParam(val::AbstractArray, valSym::SymOrIndexedSym, symbol::SymOrIndexedSym=valSym) = 
+GridParam(TensorVar(val, valSym), symbol)
 
 
 struct ParamGrid{T, N, I<:PlainDataParam{T, N}, O} <: ParamBatch{T, N, I, O}
@@ -491,7 +484,7 @@ struct ParamGrid{T, N, I<:PlainDataParam{T, N}, O} <: ParamBatch{T, N, I, O}
 
     function ParamGrid(input::ShapedMemory{I, O}, symbol::SymOrIndexedSym) where 
                       {T, N, I<:PlainDataParam{T, N}, O}
-        exclude0DimData(input|>typeof)
+        exclude0DimData(input)
         isempty(input.value) && throw(AssertionError("`input` should not be empty."))
         new{T, N, I, O}(input, IndexedSym(symbol))
     end
@@ -499,7 +492,7 @@ end
 
 function ParamGrid(input::AbstractArray{I, O}, symbol::SymOrIndexedSym) where 
                   {T, N, I<:PlainDataParam{T, N}, O}
-    exclude0DimData(input|>typeof)
+    exclude0DimData(input)
     ParamGrid(ShapedMemory(input), symbol)
 end
 
@@ -522,11 +515,11 @@ function checkParamMeshArg(ml::FixedShapeLink{T, F, N}, input::I,
     else
         checkParamContainerArgType2(length(memory), ml.extent)
     end
-    checkParamTokenInput(input)
+    checkParamInput(input)
     ml, F, deepcopy(memory)
 end
 
-struct ParamMesh{T, F<:Function, I<:ParamTokenInputType{T}, N, O} <: ParamBatch{T, N, I, O}
+struct ParamMesh{T, F<:Function, I<:ParamInputType{T}, N, O} <: ParamBatch{T, N, I, O}
     linker::FixedShapeLink{T, F, N, O}
     input::I
     symbol::IndexedSym
@@ -535,20 +528,39 @@ struct ParamMesh{T, F<:Function, I<:ParamTokenInputType{T}, N, O} <: ParamBatch{
     function ParamMesh(linker::FixedShapeLink{T, F, N, O}, input::I, 
                        symbol::SymOrIndexedSym, 
                        memory::Union{Memory{ShapedMemory{T, N}}, Missing}=missing) where 
-                      {T, N, F, O, I<:ParamTokenInputType{T}}
+                      {T, N, F, O, I<:ParamInputType{T}}
         linker, funcType, memory = checkParamMeshArg(linker, input, memory)
         new{T, funcType, I, N, O}(linker, input, IndexedSym(symbol), memory)
     end
 end
 
-function ParamMesh(func::Function, input::ParamTokenInputType{T}, 
-                   symbol::SymOrIndexedSym) where {T}
+function ParamMesh(func::Function, input::ParamInputType, symbol::SymOrIndexedSym; 
+                   axis::FixedShapeLinkAxisType=missing)
     inputVal = obtain.(input)
     out = func(inputVal...)
     out isa AbstractArray || throw(AssertionError("`func` should output an AbstractArray."))
-    linker = FixedShapeLink(func, typeof(out), inputVal...)
+    linker = FixedShapeLink(func, typeof(out), inputVal...; axis)
     ParamMesh(linker, input, symbol)
 end
+
+ParamMesh(func::Function, input::DoubleDimParam{T}, symbol::SymOrIndexedSym; 
+          axis::FixedShapeLinkAxisType=missing) where {T} = 
+ParamMesh(func, (input,), symbol; axis)
+
+ParamMesh(func::Function, input1::DoubleDimParam{T}, input2::DoubleDimParam{T}, 
+          symbol::SymOrIndexedSym; 
+          axis::FixedShapeLinkAxisType=missing) where {T} = 
+ParamMesh(func, (input1, input2), symbol; axis)
+
+ParamMesh(func::Function, input1::DoubleDimParam{T}, input2::DoubleDimParam{T}, 
+          input3::DoubleDimParam{T}, symbol::SymOrIndexedSym; 
+          axis::FixedShapeLinkAxisType=missing) where {T} = 
+ParamMesh(func, (input1, input2, input3), symbol; axis)
+
+ParamMesh(input::DoubleDimParam, symbol::SymOrIndexedSym; 
+          axis::FixedShapeLinkAxisType=missing) = 
+ParamMesh(FixedShapeLink(obtain(input); axis), (input,), symbol)
+
 
 genDefaultRefParSym(input::DoubleDimParam) = IndexedSym(:_, input.symbol)
 
@@ -577,34 +589,35 @@ function fragment(pn::ParamMesh{T, F, I, N, O}) where {T, F, I, N, O}
     res
 end
 
-fragment(pl::ParamGrid) = obtainDimVal(pl.input)
+fragment(pl::ParamGrid) = directObtain(pl.input)
 
 
-getScreenLevelRange(::Type{<:NodeParam}) = (0, 0)
+getScreenLevelOptions(::Type{<:NodeParam}) = (0,)
 
-getScreenLevelRange(::Type{<:ParamToken}) = (0, 0)
+getScreenLevelOptions(::Type{<:ParamToken}) = (0,)
 
-getScreenLevelRange(::Type{<:ParamToken{T, 0}}) where {T} = (0, checkTypedOpMethods(T) * 2)
+getScreenLevelOptions(::Type{<:ParamToken{T, 0}}) where {T} = 
+Tuple(0:(checkTypedOpMethods(T) * 2))
 
-getScreenLevelRange(::Type{<:ParamBatch}) = (0, 0)
+getScreenLevelOptions(::Type{<:ParamGrid}) = (0, 2)
 
-getScreenLevelRange(::Type{<:PrimitiveParam}) = (1, 2)
+getScreenLevelOptions(::Type{<:ParamBatch}) = (0,)
 
-getScreenLevelRange(::Type{<:DoubleDimParam}) = (0, 0)
+getScreenLevelOptions(::Type{<:PrimitiveParam}) = (1, 2)
 
-getScreenLevelRange(::Type{<:DoubleDimParam{<:Any, <:Any, 0}}) = (0, 2)
+getScreenLevelOptions(::Type{<:DoubleDimParam}) = (0, 1, 2)
 
-getScreenLevelRange(::T) where {T<:DoubleDimParam} = getScreenLevelRange(T)
+getScreenLevelOptions(::T) where {T<:DoubleDimParam} = getScreenLevelOptions(T)
 
-function isScreenLevelChangeable(::T) where {T<:DoubleDimParam}
-    minLevel, maxLevel = getScreenLevelRange(T)
+function isScreenLevelChangeable(::Type{T}) where {T<:DoubleDimParam}
+    minLevel, maxLevel = extrema( getScreenLevelOptions(T) )
     (maxLevel - minLevel) > 0
 end
 
 isOffsetEnabled(::DoubleDimParam) = false
 
 function isOffsetEnabled(pb::T) where {T<:CellParam}
-    isScreenLevelChangeable(pb) && getScreenLevelRange(T)[end] > 0 && 
+    isScreenLevelChangeable(T) && maximum( getScreenLevelOptions(T) ) > 0 && 
     isdefined(pb, :offset) # Only for safety
 end
 
@@ -618,13 +631,15 @@ screenLevelOf(::ParamBatch) = 0
 
 screenLevelOf(p::PrimitiveParam) = Int(p.screen)
 
+screenLevelOf(p::ParamGrid) = ifelse(all(l==2 for l in screenLevelOf.(p.input.value)), 2, 0)
+
 
 function setScreenLevelCore!(p::DoubleDimParam, level::Int)
     @atomic p.screen = TernaryNumber(level)
 end
 
 function setScreenLevel!(p::T, level::Int) where {T<:CellParam}
-    checkScreenLevel(level, getScreenLevelRange(T))
+    checkScreenLevel(level, getScreenLevelOptions(T))
     levelOld = screenLevelOf(p)
     if levelOld == level
     elseif levelOld == 0
@@ -651,7 +666,7 @@ function memorizeCore!(p::ReferenceParam{T, N}, newMem::AbtArrayOrMem{T, N}) whe
 end
 
 function memorize!(p::ParamToken{T, N}, newMem::AbtArrayOrMem{T, N}) where {T, N}
-    oldMem = obtainDimVal(p.memory)
+    oldMem = directObtain(p.memory)
     if p.memory.shape == size(newMem)
         safelySetVal!(p.memory.value, newMem)
     else
@@ -661,7 +676,7 @@ function memorize!(p::ParamToken{T, N}, newMem::AbtArrayOrMem{T, N}) where {T, N
 end
 
 function memorize!(p::ParamToken{T, 0}, newMem::AbtArrayOrMem{T, 0}) where {T}
-    oldMem = obtainDimVal(p.memory)
+    oldMem = directObtain(p.memory)
     safelySetVal!(p.memory.value, newMem)
     oldMem
 end
@@ -691,9 +706,7 @@ function obtain(p::AbtArrayOr{<:DoubleDimParam{T}}) where {T}
     end
 end
 
-obtainINTERNAL(p::PrimitiveParam) = directObtain(p)
-
-directObtain(p::PrimitiveParam) = obtainDimVal(p.input)
+obtainINTERNAL(p::PrimitiveParam) = directObtain(p.input)
 
 const ParamBMemDict{T} = IdDict{ParamToken{T}, NodeMarker{<:ShapedMemory{T}}}
 
@@ -738,7 +751,7 @@ function searchObtain(pbDict::ParamBMemDict{T}, ppDict::ParamPMemDict{T},
     else
         marker.value
     end
-    reshape(obtainDimVal.(res), last.(linker.axis)) |> collect
+    reshape(directObtain.(res), last.(linker.axis)) |> collect
 end
 
 function searchObtainLoop(pbDict::ParamBMemDict{T}, ppDict::ParamPMemDict{T}, 
@@ -805,17 +818,17 @@ end
 
 function searchObtain(pbDict::ParamBMemDict{T}, ppDict::ParamPMemDict{T}, 
                       p::ParamToken{T, N}) where {T, N}
-    sl = checkScreenLevel(screenLevelOf(p), getScreenLevelRange(ParamToken{T, N}))
+    sl = checkScreenLevel(screenLevelOf(p), getScreenLevelOptions(ParamToken{T, N}))
     if sl == 0
         shiftVal = genValShifter(T, (isOffsetEnabled(p) ? p.offset : nothing))
-        obtainDimVal( searchObtainCore(shiftVal, pbDict, ppDict, p) )
+        directObtain( searchObtainCore(shiftVal, pbDict, ppDict, p) )
     else
         p.offset
     end
 end
 
 searchObtain(::ParamBMemDict{T}, ::ParamPMemDict{T}, p::PrimitiveParam{T}) where {T} = 
-directObtain(p)
+obtainINTERNAL(p)
 
 (pn::DoubleDimParam)() = obtain(pn)
 
@@ -1111,17 +1124,17 @@ end
 markParams!(b::AbtArrayOr{<:ParamObject}) = markParams!(getParams(b))
 
 
-function flattenPBoxInput(input::ParamTokenInputType{T}) where {T}
-    mapreduce(vcat, input, init=DoubleDimParam{T}[]) do parArg
-        parArg isa DoubleDimParam ? DoubleDimParam{T}[parArg] : vec(parArg)
-    end
-end
+flattenParamInput(pars::ParamInputType) = itself(pars)
+
+flattenParamInput(pars::ShapedMemory{<:PlainDataParam{T, N}}) where {T, N} = pars.value
+
+flattenParamInput(pars::ParamMesh) = pars.input
 
 function topoSortCore!(hbNodesIdSet::Set{UInt}, 
                        orderedNodes::Vector{<:DoubleDimParam{T}}, 
                        haveBranches::Vector{Bool}, connectRoots::Vector{Bool}, 
                        node::DoubleDimParam{T}, recursive::Bool=false) where {T}
-    sl = checkScreenLevel(screenLevelOf(node), getScreenLevelRange(node))
+    sl = checkScreenLevel(screenLevelOf(node), getScreenLevelOptions(node))
 
     if sl in (0, 1)
         idx = findfirst(Fix2(compareParamContainer, node), orderedNodes)
@@ -1132,7 +1145,7 @@ function topoSortCore!(hbNodesIdSet::Set{UInt},
                 isRegisteredSubRoot = (id in hbNodesIdSet)
                 if !isRegisteredSubRoot
                     push!(hbNodesIdSet, objectid(node))
-                    for child in flattenPBoxInput(node.input)
+                    for child in flattenParamInput(node.input)
                         topoSortCore!(hbNodesIdSet, orderedNodes, haveBranches, 
                                       connectRoots, child, true)
                     end
