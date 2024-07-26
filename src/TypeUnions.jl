@@ -52,6 +52,7 @@ abstract type GraphNode{T, N, O} <: ComputableGraph{T} end
 
 abstract type OperatorNode{T, N, I, O} <: GraphNode{T, N, O} end
 abstract type ClusterNode{T, N, O} <: GraphNode{T, N, O} end
+abstract type EffectNode{T, N, O} <: GraphNode{T, N, O} end
 abstract type StorageNode{T, N} <: GraphNode{T, N, 0} end
 
 abstract type ParamBatch{T, N, I, O} <: CompositeParam{T, N, O} end
@@ -59,7 +60,7 @@ abstract type ParamToken{T, N, I} <: CompositeParam{T, N, 0} end
 
 abstract type ParamLink{T, N, I, O} <: ParamBatch{T, N, I, O} end
 abstract type ParamNest{T, N, I, O} <: ParamBatch{T, N, I, O} end
-abstract type LinkParam{T, N, I} <: ParamToken{T, N, I} end
+abstract type ViewParam{T, N, I} <: ParamToken{T, N, I} end
 
 abstract type SingleVarFunction{T} <: ParamFunction{T} end
 abstract type MultiDimFunction{T, D} <: ParamFunction{T} end

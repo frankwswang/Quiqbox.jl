@@ -581,7 +581,7 @@ ParamMesh(FixedShapeLink(obtain(input); axis), (input,), symbol)
 
 genDefaultRefParSym(input::DoubleDimParam) = IndexedSym(:_, input.symbol)
 
-struct NodeParam{T, F, I, N, O} <: LinkParam{T, N, I}
+struct NodeParam{T, F, I, N, O} <: ViewParam{T, N, I}
     input::ParamMesh{T, F, I, N, O}
     index::Int
     symbol::IndexedSym
@@ -678,7 +678,7 @@ function memorizeCore!(p::ParamToken{T, N}, newMem::AbstractArray{T, N}) where {
     safelySetVal!(p.memory.value, newMem)
 end
 
-function memorizeCore!(p::LinkParam{T, N}, newMem::AbstractArray{T, N}) where {T, N}
+function memorizeCore!(p::ViewParam{T, N}, newMem::AbstractArray{T, N}) where {T, N}
     safelySetVal!(p.input.memory[p.index].value, newMem)
 end
 
@@ -777,7 +777,7 @@ function recursiveTransform(getMarker!::F1, transformer::F2, pDicts::ParamValDic
 end
 
 function recursiveTransform(getMarker!::F1, transformer::F2, pDicts::ParamValDicts{T}, 
-                            p::LinkParam{T, N}) where {F1, F2, T, N}
+                            p::ViewParam{T, N}) where {F1, F2, T, N}
     # Depth-first search by recursive calling
     idx = p.index
     input = p.input
@@ -801,20 +801,20 @@ end
 obtainCore(p::PrimitiveParam) = obtainINTERNAL(p)
 obtainCore(p::CompositeParam) = directObtain(p.memory)
 
-function obtainCore(inputVal::NTuple{N, AbtArr210L{T}}, 
-                    p::ParamToken{T, <:Any, <:ParamInput{T, N}}) where {T, N}
+function obtainCore(inputVal::NTuple{A, AbtArr210L{T}}, 
+                    p::ParamToken{T, <:Any, <:ParamInput{T, A}}) where {T, A}
     p.lambda(inputVal...)
 end
 
-function obtainCore(inputVal::NTuple{N, AbtArr210L{T}}, 
-                    p::ParamMesh{T, <:Any, <:ParamInput{T, N}}) where {T, N}
+function obtainCore(inputVal::NTuple{A, AbtArr210L{T}}, 
+                    p::ParamMesh{T, <:Any, <:ParamInput{T, A}}) where {T, A}
     f = p.lambda
     valRaw = f.f( inputVal... )
     Memory{eltype(valRaw)}(valRaw[begin:begin+f.extent-1])
 end
 
-function obtainCore(inputVal::NTuple{N, AbtArr210L{T}}, 
-                    p::CellParam{T, <:Any, <:ParamInput{T, N}}) where {T, N}
+function obtainCore(inputVal::NTuple{A, AbtArr210L{T}}, 
+                    p::CellParam{T, <:Any, <:ParamInput{T, A}}) where {T, A}
     sl = checkScreenLevel(screenLevelOf(p), getScreenLevelOptions(CellParam{T}))
     if sl == 0
         shiftVal = genValShifter(T, (isOffsetEnabled(p) ? p.offset : nothing))
@@ -840,7 +840,7 @@ function getParamValMarker!(pDicts::ParamValDicts{T},
     get!(pDicts[1 + (N > 0) + 2(O > 0)], p, NodeMarker(mem))::NodeMarker{typeof(mem)}
 end
 
-function getParamValMarker!(pDicts::ParamValDicts{T}, p::LinkParam{T, N}) where {T, N}
+function getParamValMarker!(pDicts::ParamValDicts{T}, p::ViewParam{T, N}) where {T, N}
     d = pDicts[1 + N>0]
     idx = p.index
     input = p.input
