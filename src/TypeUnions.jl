@@ -8,6 +8,7 @@ abstract type TypeObject <: Any end
 abstract type StructuredContainer <: Any end
 
 abstract type StructuredFunction <:Function end
+abstract type AbstractMemory{T, N} <: AbstractArray{T, N} end
 
 abstract type StructFunction{T, F} <: StructuredFunction end
 abstract type TypedFunction{T, F} <: StructuredFunction end
@@ -33,7 +34,6 @@ abstract type ComputableGraph{T} <: ValueContainer{T} end
 abstract type AbstractMarker{T} <: ValueContainer{T} end
 
 abstract type TupleOfAbtArrays{T, N, V<:AbstractArray{T, N}, R<:Tuple{V, Vararg{V}}} <: DimensionalValue{T, N} end
-abstract type AbstractMemory{T, N} <: DimensionalValue{T, N} end
 
 
 abstract type IdentityMarker{T} <: AbstractMarker{T} end
@@ -54,10 +54,12 @@ abstract type OperatorNode{T, N, I, O} <: GraphNode{T, N, O} end
 abstract type ClusterNode{T, N, O} <: GraphNode{T, N, O} end
 abstract type StorageNode{T, N} <: GraphNode{T, N, 0} end
 
-abstract type ParamToken{T, N, I} <: CompositeParam{T, N, 0} end
 abstract type ParamBatch{T, N, I, O} <: CompositeParam{T, N, O} end
+abstract type ParamToken{T, N, I} <: CompositeParam{T, N, 0} end
 
-abstract type ReferenceParam{T, N, I} <: ParamToken{T, N, I} end
+abstract type ParamLink{T, N, I, O} <: ParamBatch{T, N, I, O} end
+abstract type ParamNest{T, N, I, O} <: ParamBatch{T, N, I, O} end
+abstract type LinkParam{T, N, I} <: ParamToken{T, N, I} end
 
 abstract type SingleVarFunction{T} <: ParamFunction{T} end
 abstract type MultiDimFunction{T, D} <: ParamFunction{T} end
@@ -153,7 +155,8 @@ end
 
 const AbtArrayOr{T} = Union{T, AbstractArray{T}}
 const BiAbtArray{T, NI, NO} = AbstractArray{<:AbstractArray{T, NI}, NO}
-const AbtArr210D{T} = Union{T, AbstractArray{T}, AbstractArray{<:AbstractArray{T}}}
+const AbtArr210L{T} = Union{T, AbstractArray{T}, BiAbtArray{T}}
+const AbtArr21L{T} = Union{AbstractArray{T}, BiAbtArray{T}}
 
 const RefOrA0D{T, V<:AbstractArray{T, 0}} =  Union{RefVal{T}, V}
 
@@ -172,6 +175,7 @@ const RefOrA0D{T, V<:AbstractArray{T, 0}} =  Union{RefVal{T}, V}
 const TernaryNTupleUnion{T} = Union{(NTuple{N, T} for N in 1:3)...}
 const ElemParamAbtArray{T, N} = AbstractArray{<:ElementalParam{T}, N}
 const ParamInputType{T} = TernaryNTupleUnion{DoubleDimParam{T}}
+const ParamInput{T, N} = NTuple{N, DoubleDimParam{T}}
 const PrimDParSetEltype{T} = Union{AbstractVector{<:ElementalParam{T}}, DoubleDimParam{T, <:Any, 0}}
 const ArgTypeOfNDPIVal{T} = Union{
     Tuple{Type{T}}, 
@@ -193,9 +197,5 @@ const AbtVecOfAbtArray{T} = AbstractVector{<:AbstractArray{T}}
 const GraphArgDataType{T} = Union{AbtVecOfAbtArray{T}, NonEmptyTuple{AbstractArray{T}}}
 
 const ParBTypeArgNumOutDim{T, N, A} = ParamToken{T, N, <:NTuple{A, DoubleDimParam{T}}}
-
-const AbtArrayOrMem{T, N} = Union{AbstractArray{T, N}, AbstractMemory{T, N}}
-
-const VectorOrMem{T} = Union{Vector{T}, Memory{T}}
 
 const AbtMemory0D{T} = AbstractMemory{T, 0}
