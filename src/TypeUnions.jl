@@ -18,6 +18,8 @@ abstract type Singleton <: TypeObject end
 
 # abstract type CompositeFunction{F1, F2} <: StructFunction{F1} end
 
+abstract type ParamOperator{T, F, N, O} <: StructFunction{T, F} end
+
 abstract type CompositeContainer{T} <: StructuredContainer end
 abstract type NoTypeParContainer <: StructuredContainer end
 
@@ -50,10 +52,9 @@ abstract type PrimitiveParam{T, N} <: DoubleDimParam{T, N, 0} end
 
 abstract type GraphNode{T, N, O} <: ComputableGraph{T} end
 
-abstract type OperatorNode{T, N, I, O} <: GraphNode{T, N, O} end
-abstract type ClusterNode{T, N, O} <: GraphNode{T, N, O} end
-abstract type EffectNode{T, N, O} <: GraphNode{T, N, O} end
-abstract type StorageNode{T, N} <: GraphNode{T, N, 0} end
+abstract type OperationNode{T, N, O, I} <: GraphNode{T, N, O} end
+abstract type ReferenceNode{T, N, O, I} <: GraphNode{T, N, O} end
+abstract type ContainerNode{T, N, O}    <: GraphNode{T, N, O} end
 
 abstract type ParamBatch{T, N, I, O} <: CompositeParam{T, N, O} end
 abstract type ParamToken{T, N, I} <: CompositeParam{T, N, 0} end
@@ -85,8 +86,9 @@ abstract type FloatingBasisFuncs{NumberT, D, 𝑙, PointT, RadialV, OrbitalN} <:
 
 const ParamObject{T} = Union{ParamContainer{T}, ParamFunction{T}}
 const ElementalParam{T} = DoubleDimParam{T, 0, 0}
-const SingleDimParam{T, N} = DoubleDimParam{T, N, 0}
-const PlainDataParam{T, N} = Union{SingleDimParam{T, N}, DoubleDimParam{T, 0, N}}
+const InnerSpanParam{T, N} = DoubleDimParam{T, N, 0}
+const OuterSpanParam{T, N} = DoubleDimParam{T, 0, N}
+const SingleDimParam{T, N} = Union{InnerSpanParam{T, N}, OuterSpanParam{T, N}}
 const PrimParCandidate{T} = Union{ElementalParam{T}, PrimitiveParam{T}}
 # const PNodeIn1{T} = Union{T, ElementalParam{T}}
 # const PNodeIn2{T, F<:Function} = Tuple{F, ElementalParam{T}}
@@ -200,3 +202,6 @@ const GraphArgDataType{T} = Union{AbtVecOfAbtArray{T}, NonEmptyTuple{AbstractArr
 const ParBTypeArgNumOutDim{T, N, A} = ParamToken{T, N, <:NTuple{A, DoubleDimParam{T}}}
 
 const AbtMemory0D{T} = AbstractMemory{T, 0}
+
+const ParamFunctor{T, N, I} = Union{ParamLink{T, N, I}, ParamToken{T, N, I}}
+const ParamPointer{T, N, I} = Union{ViewParam{T, N, I}, ParamNest{ T, N, I}}

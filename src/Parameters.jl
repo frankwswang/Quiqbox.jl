@@ -26,7 +26,7 @@ struct ShapedMemory{T, N} <: AbstractMemory{T, N}
 
     function ShapedMemory(value::Memory{T}, shape::Tuple{Vararg{Int}}) where {T}
         checkReshapingAxis(value, shape)
-        new{T, length(shape)}(value, shape)
+        new{T, length(shape)}(copy(value), shape)
     end
 end
 
@@ -60,6 +60,7 @@ viewElements(obj::ShapedMemory) = reshape(obj.value, obj.shape)
 viewElements(obj::AbstractArray) = itself(obj)
 
 directObtain(obj::AbstractArray) = itself.( viewElements(obj) )
+directObtain(obj::Any) = itself(obj)
 
 
 const BasicBinaryOpTargets = Union{Number, Bool}
@@ -113,7 +114,7 @@ function checkReturnType(f::F, ::Type{T}, args::NonEmptyTuple{Any}) where {F, T}
 end
 
 
-struct TypedReduction{T, F<:Function} <: TypedFunction{T, F}
+struct TypedReduction{T, F<:Function} <: ParamOperator{T, F, 0, 0}
     f::F
 
     function TypedReduction(f::F, arg, args...) where {F}
@@ -139,7 +140,7 @@ end
 (::TypedReduction{T, iT})(arg::T) where {T} = itself(arg)
 
 
-struct StableMorphism{T, F<:Function, N} <:TypedFunction{T, F}
+struct StableMorphism{T, F<:Function, N} <: ParamOperator{T, F, N, 0}
     f::F
 
     function StableMorphism(f::F, arg, args...) where {F}
@@ -173,7 +174,7 @@ end
 
 FixedShapeLinkAxisType = Union{NonEmptyTuple{Tuple{Symbol, Int}}, Missing}
 
-struct FixedShapeLink{T, F<:Function, N, O} <: StructFunction{T, F}
+struct FixedShapeLink{T, F<:Function, N, O} <: ParamOperator{T, F, N, O}
     f::F
     axis::NTuple{O, Tuple{Symbol, Int}}
     extent::Int
@@ -413,7 +414,7 @@ CellParam(TensorVar(var, varSym), symbol)
 
 function checkGridParamArg(::StableMorphism{T, <:iTalike, N}, input::I, memory::M) where 
                           {T, N, O, I<:DoubleDimParam{T, <:Any, O}, M<:AbstractArray{T, N}}
-    checkParamContainerArgType1(I, Tuple{PlainDataParam{T, N}})
+    checkParamContainerArgType1(I, Tuple{SingleDimParam{T, N}})
     MI = typeof(input[1])
     if !(M <: MI)
         throw(AssertionError("The type of `memory` should be a subtype of `$M1`."))
@@ -424,7 +425,7 @@ end
 
 function checkGridParamArg(::StableMorphism{T, <:iTalike, N}, input::I, ::Missing) where 
                           {T, N, O, I<:DoubleDimParam{T, <:Any, O}}
-    checkParamContainerArgType1(I, Tuple{PlainDataParam{T, N}})
+    checkParamContainerArgType1(I, Tuple{SingleDimParam{T, N}})
     checkParamInput(input, innerDimMax=(O==0)*N, outerDimMax=(O==N)*N)
     StableMorphism(AbstractArray{T, N}), iT, deepcopy(input[1]|>obtain|>ShapedMemory)
 end
@@ -488,19 +489,19 @@ GridParam(par::GridParam{T}, symbol::SymOrIndexedSym=symOf(par);
           init::Union{AbstractArray{T}, Missing}=par.memory) where {T} = 
 GridParam(par.lambda, par.input, symbol, init)
 
-GridParam(input::PlainDataParam{T, N}, symbol::SymOrIndexedSym=symOf(input)) where {T, N} = 
+GridParam(input::SingleDimParam{T, N}, symbol::SymOrIndexedSym=symOf(input)) where {T, N} = 
 GridParam(StableMorphism(AbstractArray{T, N}), (input,), symbol)
 
 GridParam(val::AbstractArray, valSym::SymOrIndexedSym, symbol::SymOrIndexedSym=valSym) = 
 GridParam(TensorVar(val, valSym), symbol)
 
 
-struct ParamGrid{T, N, I<:PlainDataParam{T, N}, O} <: ParamNest{T, N, I, O}
+struct ParamGrid{T, N, I<:SingleDimParam{T, N}, O} <: ParamNest{T, N, I, O}
     input::ShapedMemory{I, O}
     symbol::IndexedSym
 
     function ParamGrid(input::ShapedMemory{I, O}, symbol::SymOrIndexedSym) where 
-                      {T, N, I<:PlainDataParam{T, N}, O}
+                      {T, N, I<:SingleDimParam{T, N}, O}
         exclude0DimData(input)
         isempty(input.value) && throw(AssertionError("`input` should not be empty."))
         new{T, N, I, O}(input, IndexedSym(symbol))
@@ -508,7 +509,7 @@ struct ParamGrid{T, N, I<:PlainDataParam{T, N}, O} <: ParamNest{T, N, I, O}
 end
 
 function ParamGrid(input::AbstractArray{I, O}, symbol::SymOrIndexedSym) where 
-                  {T, N, I<:PlainDataParam{T, N}, O}
+                  {T, N, I<:SingleDimParam{T, N}, O}
     exclude0DimData(input)
     ParamGrid(ShapedMemory(input), symbol)
 end
@@ -582,12 +583,12 @@ ParamMesh(FixedShapeLink(obtain(input); axis), (input,), symbol)
 genDefaultRefParSym(input::DoubleDimParam) = IndexedSym(:_, input.symbol)
 
 struct NodeParam{T, F, I, N, O} <: ViewParam{T, N, I}
-    input::ParamMesh{T, F, I, N, O}
+    input::Tuple{ParamMesh{T, F, I, N, O}}
     index::Int
     symbol::IndexedSym
 
-    function NodeParam(input::ParamMesh{T, F, I, N, O}, index::Int, 
-                       symbol::SymOrIndexedSym=genDefaultRefParSym(input)) where 
+    function NodeParam(input::Tuple{ParamMesh{T, F, I, N, O}}, index::Int, 
+                       symbol::SymOrIndexedSym=genDefaultRefParSym(input|>first)) where 
                       {T, F, I, N, O}
         maxIndex = length(input.memory)
         if index < 1 || index > maxIndex
@@ -596,6 +597,10 @@ struct NodeParam{T, F, I, N, O} <: ViewParam{T, N, I}
         new{T, F, I, N, O}(input, index, symbol)
     end
 end
+
+NodeParam(par::ParamMesh{T, F, I, N, O}, index::Int, 
+          symbol::SymOrIndexedSym=genDefaultRefParSym(par)) where {T, F, I, N, O} = 
+NodeParam(par, index, symbol)
 
 
 function fragment(pn::ParamMesh{T, F, I, N, O}) where {T, F, I, N, O}
@@ -717,89 +722,191 @@ mutable struct NodeMarker{T} <: StorageMarker{T}
     NodeMarker(init::T, ::Type{U}=T) where {T, U} = new{U}(false, init)
 end
 
-function obtain(p::AbtArrayOr{<:DoubleDimParam{T}}) where {T}
-    lock( ReentrantLock() ) do
-        obtainINTERNAL(p)
+const ParamDict0D{T, V} = IdDict{ElementalParam{T}, NodeMarker{<:V}}
+const ParamDictSD{T, V} = IdDict{SingleDimParam{T}, NodeMarker{<:V}}
+const ParamDictDD{T, V} = IdDict{DoubleDimParam{T}, NodeMarker{<:V}}
+
+const ParamInputIdMarker{T} = NodeMarker{<:Memory{<:DoubleDimParam{T}}}
+const ParamDictId{T} = IdDict{DoubleDimParam{T}, ParamInputIdMarker{T}}
+
+struct ParamPointerDict{T, V0, V1, V2} <: MixedContainer{T}
+    d0::ParamDict0D{T, V0}
+    d1::ParamDictSD{T, V1}
+    d2::ParamDictDD{T, V2}
+    id::ParamDictId{T}
+
+    ParamPointerDict(::Type{T}, ::Type{V0}, ::Type{V1}, ::Type{V2}) where {T, V0, V1, V2} = 
+    new{T, V0, V1, V2}( ParamDict0D{T, V0}(), ParamDictSD{T, V1}(), ParamDictDD{T, V2}(), 
+                        ParamDictId{T}() )
+end
+
+const ParamValDict{T} = ParamPointerDict{T, T, AbstractArray{T}, BiAbtArray{T}}
+
+genParamValDict(::Type{T}) where {T} = 
+ParamPointerDict(T, T, AbstractArray{T}, BiAbtArray{T})::ParamValDict{T}
+
+selectParamPointer(d::ParamPointerDict{T}, ::ElementalParam{T}) where {T} = d.d0
+selectParamPointer(d::ParamPointerDict{T}, ::SingleDimParam{T}) where {T} = d.d1
+selectParamPointer(d::ParamPointerDict{T}, ::DoubleDimParam{T}) where {T} = d.d2
+selectParamPointer(d::ParamPointerDict{T}, ::ParamPointer{T}) where {T} = d.id
+
+function getDataCore1(counter::Int, d::ParamPointerDict{T}, p::DoubleDimParam{T}, 
+                      failFlag, maxIter::Int) where {T}
+    counter += 1
+    if counter > maxIter
+        throw( ErrorException("The iterative calling times passed the limit: $maxIter.") )
     end
-end
-
-obtainINTERNAL(p::PrimitiveParam) = directObtain(p.input)
-
-const ParamValDict00{T} = IdDict{ CompositeParam{T, 0, 0}, 
-                                  NodeMarker{T} }
-const ParamValDictN0{T} = IdDict{ CompositeParam{T, <:Any, 0}, 
-                                  NodeMarker{<:AbstractArray{T}} }
-const ParamValDict0O{T} = IdDict{ CompositeParam{T, 0, <:Any}, 
-                                  NodeMarker{<:AbstractArray{T}} }
-const ParamValDictNO{T} = IdDict{ CompositeParam{T, <:Any, <:Any}, 
-                                  NodeMarker{<:BiAbtArray{T}} }
-
-const ParamValDicts{T} = Tuple{ ParamValDict00{T}, ParamValDictN0{T}, 
-                                ParamValDict0O{T}, ParamValDictNO{T} }
-
-function obtainINTERNAL(p::CompositeParam{T}) where {T}
-    pDicts = ( ParamValDict00{T}(), ParamValDictN0{T}(), 
-               ParamValDict0O{T}(), ParamValDictNO{T}() )
-    searchObtain(pDicts, p)
-end
-
-function obtainINTERNAL(ps::AbstractArray{<:ElementalParam{T}}) where {T}
-    map(obtainINTERNAL, ps)
-end
-
-function obtainINTERNAL(ps::AbstractArray{<:DoubleDimParam{T}}) where {T}
-    pDicts = ( ParamValDict00{T}(), ParamValDictN0{T}(), 
-               ParamValDict0O{T}(), ParamValDictNO{T}() )
-    map(ps) do p
-        searchObtain(pDicts, p)
-    end
-end
-
-
-function recursiveTransform(::Function, transformer::F, ::ParamValDicts{T}, 
-                   p::PrimitiveParam{T}) where {F, T}
-    transformer(p)
-end
-
-function recursiveTransform(getMarker!::F1, transformer::F2, pDicts::ParamValDicts{T}, 
-                            p::CompositeParam{T}) where {F1, F2, T}
-    # Depth-first search by recursive calling
-    marker = getMarker!(pDicts, p)
-    if !marker.visited
-        marker.visited = true
-        res = map( flattenParamInput(p.input) ) do ele
-            recursiveTransform(getMarker!, transformer, pDicts, ele)
-        end
-        marker.value = transformer(res, p)
+    res = get(selectParamPointer(d, p), p, failFlag)
+    if res !== failFlag && res isa ParamPointer
+        getDataCore2(counter, d, res, failFlag, maxIter)
     else
-        marker.value
+        res.value
     end
 end
 
-function recursiveTransform(getMarker!::F1, transformer::F2, pDicts::ParamValDicts{T}, 
-                            p::ViewParam{T, N}) where {F1, F2, T, N}
-    # Depth-first search by recursive calling
-    idx = p.index
+function getDataCore2(counter::Int, d::ParamPointerDict{T, V0, V1, V2}, p::ParamPointer{T}, 
+                      failFlag, maxIter::Int) where {T, V0, V1, V2}
     input = p.input
-    marker, inputMarker = getMarker!(pDicts, p)
+    container = Memory{Union{V0, V1, V2}}(undef, length(input))
+    flag = true
+    for i in eachindex(input)
+        res = getDataCore1(counter, d, input[i], failFlag, maxIter)
+        if res === failFlag
+            flag = false
+            break
+        else
+            container[i] = res
+        end
+    end
+    flag ? container : failFlag
+end
+
+function getData(d::ParamPointerDict{T, V0, V1, V2}, p::DoubleDimParam{T}, 
+                 default; failFlag=nothing, maxIter::Int=10) where 
+                {T, V0, V1, V2}
+    res = getDataCore1(0, d, p, failFlag, maxIter)
+    res===failFlag ? default : res
+end
+
+function getParamMarker!(pDict::ParamPointerDict{T}, transformer::F, 
+                         p::DoubleDimParam{T}) where {T, F}
+    mem = transformer(p)
+    markerType = NodeMarker{typeof(mem)}
+    get!(selectParamPointer(pDict, p), p, NodeMarker(mem))::markerType
+end
+
+function getParamMarker!(pDict::ParamPointerDict{T}, transformer::F, 
+                         p::ParamPointer{T}) where {F, T}
+    input = p.input
+    eleT = eltype(input)
+    parId = Memory{eleT}(undef, length(input))
+    for (i, par) in enumerate(input)
+        recursiveTransform!(transformer, pDict, par)
+        parId[i] = par
+    end
+    markerType = NodeMarker{Memory{eleT}}
+    get!(selectParamPointer(pDict, p), p, NodeMarker(Memory{eleT}(parId)))::markerType
+end
+
+# function getParamMarker!(pDict::ParamPointerDict{T}, ::Function, 
+#                          p::NodeParam{T, F, I, N, O}) where {T, F, I, N, O}
+#     markerType = NodeMarker{Memory{ParamMesh{T, F, I, N, O}}}
+#     get!(selectParamPointer(pDict, p), p, markerType([input]))::markerType
+# end
+
+# function getParamMarker!(pDict::ParamPointerDict{T}, transformer::F, 
+#                          p::ViewParam{T, N}) where {T, F, N}
+#     d = pDict[selectParamDict(p)]
+#     idx::Int = p.index
+#     input = p.input
+#     mem = transformer( (input, idx) )
+#     memType = typeof(mem)
+#     marker::NodeMarker{memType} = if haskey(d, p)
+#         getindex(d, p)
+#     else
+#         newMarker = if haskey(pDict[selectParamDict(input)], input)
+#             inputMarker::NodeMarker{Memory{memType}} = getindex(pDict, input)
+#             NodeMarker(inputMarker.value[idx])
+#         else
+#             inputMarker = NodeMarker(Memory{memType}(undef, input.lambda.extent))
+#             NodeMarker(mem)
+#         end
+#         setindex!(d, newMarker, p)
+#         newMarker
+#     end
+#     marker, inputMarker
+# end
+
+function recursiveTransformCore1!(generator::F, marker::NodeMarker, 
+                                  p::DoubleDimParam) where {F<:Function}
+    # Depth-first search by recursive calling
     if !marker.visited
         marker.visited = true
-        if !inputMarker.visited
-            res = recursiveTransform(getMarker!, transformer, pDicts, input)
-            inputMarker.value = res
-            inputMarker.visited = true
-            setindex!(pDicts[3 + (N > 0)], inputMarker, input)
-            marker.value = transformer(res, idx)
-        else
-            marker.value = transformer(inputMarker.value, idx)
-        end
+        marker.value = generator(p)
     else
         marker.value
     end
 end
 
-obtainCore(p::PrimitiveParam) = obtainINTERNAL(p)
-obtainCore(p::CompositeParam) = directObtain(p.memory)
+function recursiveTransformCore2!(generator::F, marker::NodeMarker, p::ParamPointer{T}, 
+                                  pDict::ParamPointerDict{T}) where {F<:Function, T}
+    val = map(par->getData(pDict, par, generator(par)), marker.value)
+    generator(val, p)
+end
+
+function recursiveTransform!(transformer::F, pDict::ParamPointerDict{T}, 
+                             p::PrimitiveParam{T, N}) where {F, T, N}
+    marker = getParamMarker!(pDict, transformer, p)
+    recursiveTransformCore1!(transformer, marker, p)
+    marker.value
+end
+
+function recursiveTransform!(transformer::F, pDict::ParamPointerDict{T}, 
+                             p::DoubleDimParam{T}) where {F, T}
+    marker = getParamMarker!(pDict, transformer, p)
+
+    recursiveTransformCore1!(marker, p) do par
+        sl = checkScreenLevel(screenLevelOf(par), getScreenLevelOptions(par|>typeof))
+        res = if sl == 0
+            map(ele->recursiveTransform!(transformer, pDict, ele), par.input)
+        else
+            T
+        end
+        transformer(res, par)
+    end
+
+    marker.value
+end
+
+function recursiveTransform!(transformer::F, pDict::ParamPointerDict{T}, 
+                             p::ParamPointer{T}) where {F, T}
+    marker = getParamMarker!(pDict, transformer, p)
+    recursiveTransformCore2!(transformer, marker, p, pDict)
+end
+
+# function recursiveTransform!(transformer::F, pDict::ParamPointerDict{T}, 
+#                             p::NodeParam{T, N}) where {F, T, N}
+#     input = p.input
+#     marker, inputMarker = getParamMarker!(pDict, transformer, p)
+
+#     recursiveTransformCore1!(marker, p) do par
+#         if !inputMarker.visited
+#             res = recursiveTransform!(transformer, pDict, input)
+#             inputMarker.value = res
+#             inputMarker.visited = true
+#             setindex!(pDict[3 + (N > 0)], inputMarker, input)
+#             transformer(res, par)
+#         else
+#             transformer(inputMarker.value, par)
+#         end
+#     end
+
+#     marker.value
+# end
+
+obtainCore(p::ParamFunctor) = directObtain(p.memory)
+obtainCore(p::ParamPointer) = obtainCore.(p.input)
+obtainCore(p::PrimitiveParam) = directObtain(p.input)
 
 function obtainCore(inputVal::NTuple{A, AbtArr210L{T}}, 
                     p::ParamToken{T, <:Any, <:ParamInput{T, A}}) where {T, A}
@@ -810,65 +917,58 @@ function obtainCore(inputVal::NTuple{A, AbtArr210L{T}},
                     p::ParamMesh{T, <:Any, <:ParamInput{T, A}}) where {T, A}
     f = p.lambda
     valRaw = f.f( inputVal... )
-    Memory{eltype(valRaw)}(valRaw[begin:begin+f.extent-1])
+    Memory{eltype(valRaw)}(valRaw[begin:(begin + f.extent - 1)])
 end
 
 function obtainCore(inputVal::NTuple{A, AbtArr210L{T}}, 
                     p::CellParam{T, <:Any, <:ParamInput{T, A}}) where {T, A}
-    sl = checkScreenLevel(screenLevelOf(p), getScreenLevelOptions(CellParam{T}))
-    if sl == 0
-        shiftVal = genValShifter(T, (isOffsetEnabled(p) ? p.offset : nothing))
-        p.lambda(inputVal...) |> shiftVal
-    else
-        p.offset
-    end
+    screenLevelOf(p)==0 || throw(AssertionError("The screen level of `p` should be 0."))
+    shiftVal = genValShifter(T, (isOffsetEnabled(p) ? p.offset : nothing))
+    p.lambda(inputVal...) |> shiftVal
 end
 
-obtainCore(tensorVal::AbtArr21L{T}, ::ParamGrid{T}) where {T} = itself(tensorVal)
+obtainCore(::Type{T}, p::CellParam{T}) where {T} = p.offset
 
-obtainCore(tensorVal::BiAbtArray, idx::Int) = getindex(tensorVal, idx)
+obtainCore(val::Memory{T}, p::ParamGrid{T, 0}) where {T} = 
+reshape(val, p.input.shape)
 
-function getParamValMarker!(pDicts::ParamValDicts{T}, 
-                            p::CompositeParam{T, N, O}) where {T, N, O}
-    mem = directObtain(p.memory)
-    get!(pDicts[1 + (N > 0) + 2(O > 0)], p, NodeMarker(mem))::NodeMarker{typeof(mem)}
-end
+obtainCore(val::Memory{<:AbstractArray{T, N}}, p::ParamGrid{T, N}) where {T, N} = 
+reshape(val, p.input.shape)
 
-function getParamValMarker!(pDicts::ParamValDicts{T}, 
-                            p::ParamNest{T, N, <:Any, O}) where {T, N, O}
-    mem = map(obtainCore, p.input)
-    get!(pDicts[1 + (N > 0) + 2(O > 0)], p, NodeMarker(mem))::NodeMarker{typeof(mem)}
-end
+obtainCore(val::Memory{<:AbstractArray{T}}, p::NodeParam{T, <:Any, <:Any, 0}) where {T} = 
+getindex(getindex(val), p.idx)
 
-function getParamValMarker!(pDicts::ParamValDicts{T}, p::ViewParam{T, N}) where {T, N}
-    d = pDicts[1 + N>0]
-    idx = p.index
-    input = p.input
-    pValMem = input.memory[idx]
-    pValMemType = typeof(pValMem)
-    marker = if haskey(d, p)
-        getindex(d, p)::NodeMarker{pValMemType}
-    else
-        newMarker = if haskey(pDicts[3 + (N > 0)], input)
-            inputMarker::NodeMarker{Memory{pValMemType}} = getindex(pDicts, input)
-            NodeMarker(inputMarker.value[idx])
-        else
-            inputMarker = NodeMarker(Memory{pValMemType}(undef, input.lambda.extent))
-            NodeMarker(pValMem)
-        end
-        setindex!(d, newMarker, p)
-        newMarker
-    end
-    marker, inputMarker
-end
+obtainCore(val::Memory{<:BiAbtArray{T, N}}, p::NodeParam{T, <:Any, <:Any, N}) where {T, N} = 
+getindex(getindex(val), p.idx)
 
-function searchObtain(pDicts::ParamValDicts{T}, p::ParamMesh{T}) where {T}
-    res = recursiveTransform(getParamValMarker!, obtainCore, pDicts, p)
+function searchObtain(pDict::ParamValDict{T}, p::ParamMesh{T}) where {T}
+    res = recursiveTransform!(obtainCore, pDict, p)
     reshape(res, last.(p.lambda.axis)) |> collect
 end
 
-searchObtain(pDicts::ParamValDicts{T}, p::CompositeParam{T}) where {T} = 
-recursiveTransform(getParamValMarker!, obtainCore, pDicts, p)
+searchObtain(pDict::ParamValDict{T}, p::CompositeParam{T}) where {T} = 
+recursiveTransform!(obtainCore, pDict, p)
+
+obtainINTERNAL(p::PrimitiveParam) = directObtain(p.input)
+
+function obtainINTERNAL(p::CompositeParam{T}) where {T}
+    searchObtain(genParamValDict(T), p)
+end
+
+function obtainINTERNAL(ps::AbstractArray{<:ElementalParam{T}}) where {T}
+    map(obtainINTERNAL, ps)
+end
+
+function obtainINTERNAL(ps::AbstractArray{<:DoubleDimParam{T}}) where {T}
+    pValDict = genParamValDict(T)
+    map(p->searchObtain(pValDict, p), ps)
+end
+
+function obtain(p::AbtArrayOr{<:DoubleDimParam{T}}) where {T}
+    lock( ReentrantLock() ) do
+        obtainINTERNAL(p)
+    end
+end
 
 ################################
 
@@ -932,7 +1032,7 @@ markObj(input::PrimitiveParam) = ValueMarker(input)
 markObj(input::DoubleDimParam) = ParamMarker(input)
 
 function isPrimVarCollection(arg::AbstractArray{T}) where {T}
-    ET = isconcretetype(T) ? T : eltype(map(itself, arg))
+    ET = isconcretetype(T) ? T : eltype( map(itself, arg) )
     isbitstype(ET)
 end
 
@@ -947,16 +1047,14 @@ end
 function markObj(input::T) where {T}
     if isstructtype(input) && !( Base.issingletontype(input) )
         markObj( (objectid(T), getproperty.(input, propertynames(input))...) )
+    elseif input isa Function
+        markObj( (objectid(input),) )
     else
         ObjectMarker(input)
     end
 end
 
 markObj(marker::IdentityMarker) = itself(marker)
-
-markObj(f::Function) = markObj( (objectid(f),) )
-
-markObj(f::TypedFunction) = markObj( (objectid(f),) )
 
 markObj(f::ShapedMemory) = markObj( (markObj(f.value), objectid(f.shape)) )
 
@@ -981,7 +1079,7 @@ function ParamMarker(p::T) where {T<:GridParam}
 end
 
 function ParamMarker(p::T) where {T<:NodeParam}
-    ParamMarker(objectid(T), (markObj(p.input),), NothingID, (objectid(p.index),))
+    ParamMarker(objectid(T), markObj.(p.input), NothingID, (objectid(p.index),))
 end
 
 function ParamMarker(p::T) where {T<:ParamGrid}
@@ -1123,9 +1221,7 @@ function getParams(v::NonEmptyTupleOrAbtArray{T}, sym::SymOrMiss=missing) where
 end
 
 function getParams(f::ParamFunction{T}, sym::SymOrMiss=missing) where {T}
-    res = map(getParamFields(f)) do field
-        getParams(field, sym)
-    end
+    res = map(field->getParams(field, sym), getParamFields(f))
     len = length.(res) |> sum
     len == 0 ? ParamContainer{T}[] : reduce(vcat, res)
 end
@@ -1165,13 +1261,6 @@ end
 
 markParams!(b::AbtArrayOr{<:ParamObject}) = markParams!(getParams(b))
 
-
-flattenParamInput(pars::ParamInputType) = itself(pars)
-
-flattenParamInput(pars::ShapedMemory{<:PlainDataParam{T, N}}) where {T, N} = itself(pars)
-
-flattenParamInput(pars::ParamMesh) = pars.input
-
 function topoSortCore!(hbNodesIdSet::Set{UInt}, 
                        orderedNodes::Vector{<:DoubleDimParam{T}}, 
                        haveBranches::Vector{Bool}, connectRoots::Vector{Bool}, 
@@ -1187,7 +1276,7 @@ function topoSortCore!(hbNodesIdSet::Set{UInt},
                 isRegisteredSubRoot = (id in hbNodesIdSet)
                 if !isRegisteredSubRoot
                     push!(hbNodesIdSet, objectid(node))
-                    for child in flattenParamInput(node.input)
+                    for child in node.input
                         topoSortCore!(hbNodesIdSet, orderedNodes, haveBranches, 
                                       connectRoots, child, true)
                     end
@@ -1234,8 +1323,6 @@ sever(obj::Any) = deepcopy(obj)
 sever(obj::Union{Tuple, AbstractArray}) = sever.(obj)
 
 function sever(pf::T) where {T<:ParamFunction}
-    severedFields = map(fieldnames(pf)) do field
-        (sever∘getproperty)(pf, field)
-    end
+    severedFields = map(field->(sever∘getproperty)(pf, field), fieldnames(pf))
     T(severedFields...)
 end
