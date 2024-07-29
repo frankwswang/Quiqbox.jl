@@ -34,9 +34,7 @@ abstract type HartreeFockintermediateData{T} <: ValueContainer{T} end
 abstract type ConfigBox{T, ContainerT, MethodT} <: ValueContainer{T} end
 abstract type ComputableGraph{T} <: ValueContainer{T} end
 abstract type AbstractMarker{T} <: ValueContainer{T} end
-
-abstract type TupleOfAbtArrays{T, N, V<:AbstractArray{T, N}, R<:Tuple{V, Vararg{V}}} <: DimensionalValue{T, N} end
-
+abstract type ValueStorage{T} <: ValueContainer{T} end
 
 abstract type IdentityMarker{T} <: AbstractMarker{T} end
 abstract type StorageMarker{T} <: AbstractMarker{T} end
@@ -83,6 +81,11 @@ abstract type CompositeBasisFuncs{NumberT, D, FBasisFuncN, OrbitalN} <: Abstract
 
 abstract type FloatingBasisFuncs{NumberT, D, 𝑙, PointT, RadialV, OrbitalN} <: CompositeBasisFuncs{NumberT, D, 1, OrbitalN} end
 
+
+const Dim0GNode{T} = GraphNode{T, 0, 0}
+const DimIGNode{T, N} = GraphNode{T, N, 0}
+const DimOGNode{T, N} = GraphNode{T, 0, N}
+const DimSGNode{T, N} = Union{DimIGNode{T, N}, DimOGNode{T, N}}
 
 const ParamObject{T} = Union{ParamContainer{T}, ParamFunction{T}}
 const ElementalParam{T} = DoubleDimParam{T, 0, 0}
