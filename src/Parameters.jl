@@ -211,7 +211,8 @@ struct FixedShapeLink{T, F<:Function, N, O} <: ParamOperator{T, F, N, O}
     end
 end
 
-FixedShapeLink(fslf::FixedShapeLink, arg, args...) = FixedShapeLink(fslf.f, arg, args...)
+FixedShapeLink(fslf::FixedShapeLink, ::Type{V}, arg, args...) where {V<:AbstractArray} = 
+FixedShapeLink(fslf.f, arg, args...)
 
 callFixedShapeLinkCore(ml::FixedShapeLink{T, <:Any, N}, 
                        arg::AbtArr210L{T}, args::AbtArr210L{T}...) where {T, N} = 
