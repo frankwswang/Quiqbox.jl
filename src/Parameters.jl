@@ -781,9 +781,8 @@ function getDataCore2(counter::Int, d::ParamPointerDict{T, V0, V1, V2}, p::Param
     flag ? container : failFlag
 end
 
-function getData(d::ParamPointerDict{T, V0, V1, V2}, p::DoubleDimParam{T}, 
-                 default; failFlag=nothing, maxIter::Int=10) where 
-                {T, V0, V1, V2}
+function getData(d::ParamPointerDict{T}, p::DoubleDimParam{T}, 
+                 default; failFlag=nothing, maxIter::Int=10) where {T}
     res = getDataCore1(0, d, p, failFlag, maxIter)
     res===failFlag ? default : res
 end
@@ -796,7 +795,7 @@ function getParamMarker!(pDict::ParamPointerDict{T}, transformer::F,
 end
 
 function getParamMarker!(pDict::ParamPointerDict{T}, transformer::F, 
-                         p::ParamPointer{T}) where {F, T}
+                         p::ParamPointer{T}) where {T, F}
     input = p.input
     eleT = eltype(input)
     parId = Memory{eleT}(undef, length(input))
@@ -805,37 +804,8 @@ function getParamMarker!(pDict::ParamPointerDict{T}, transformer::F,
         parId[i] = par
     end
     markerType = NodeMarker{Memory{eleT}}
-    get!(selectParamPointer(pDict, p), p, NodeMarker(Memory{eleT}(parId)))::markerType
+    get!(selectParamPointer(pDict, p), p, NodeMarker( Memory{eleT}(parId) ))::markerType
 end
-
-# function getParamMarker!(pDict::ParamPointerDict{T}, ::Function, 
-#                          p::NodeParam{T, F, I, N, O}) where {T, F, I, N, O}
-#     markerType = NodeMarker{Memory{ParamMesh{T, F, I, N, O}}}
-#     get!(selectParamPointer(pDict, p), p, markerType([input]))::markerType
-# end
-
-# function getParamMarker!(pDict::ParamPointerDict{T}, transformer::F, 
-#                          p::ViewParam{T, N}) where {T, F, N}
-#     d = pDict[selectParamDict(p)]
-#     idx::Int = p.index
-#     input = p.input
-#     mem = transformer( (input, idx) )
-#     memType = typeof(mem)
-#     marker::NodeMarker{memType} = if haskey(d, p)
-#         getindex(d, p)
-#     else
-#         newMarker = if haskey(pDict[selectParamDict(input)], input)
-#             inputMarker::NodeMarker{Memory{memType}} = getindex(pDict, input)
-#             NodeMarker(inputMarker.value[idx])
-#         else
-#             inputMarker = NodeMarker(Memory{memType}(undef, input.lambda.extent))
-#             NodeMarker(mem)
-#         end
-#         setindex!(d, newMarker, p)
-#         newMarker
-#     end
-#     marker, inputMarker
-# end
 
 function recursiveTransformCore1!(generator::F, marker::NodeMarker, 
                                   p::DoubleDimParam) where {F<:Function}
@@ -850,7 +820,11 @@ end
 
 function recursiveTransformCore2!(generator::F, marker::NodeMarker, p::ParamPointer{T}, 
                                   pDict::ParamPointerDict{T}) where {F<:Function, T}
-    val = map(par->getData(pDict, par, generator(par)), marker.value)
+    val = map(marker.value) do par
+        res = getData(pDict, par, nothing)
+        res === nothing && throw(ErrorException("Could note locate the value for $par."))
+        res
+    end
     generator(val, p)
 end
 
@@ -884,28 +858,8 @@ function recursiveTransform!(transformer::F, pDict::ParamPointerDict{T},
     recursiveTransformCore2!(transformer, marker, p, pDict)
 end
 
-# function recursiveTransform!(transformer::F, pDict::ParamPointerDict{T}, 
-#                             p::NodeParam{T, N}) where {F, T, N}
-#     input = p.input
-#     marker, inputMarker = getParamMarker!(pDict, transformer, p)
-
-#     recursiveTransformCore1!(marker, p) do par
-#         if !inputMarker.visited
-#             res = recursiveTransform!(transformer, pDict, input)
-#             inputMarker.value = res
-#             inputMarker.visited = true
-#             setindex!(pDict[3 + (N > 0)], inputMarker, input)
-#             transformer(res, par)
-#         else
-#             transformer(inputMarker.value, par)
-#         end
-#     end
-
-#     marker.value
-# end
 
 obtainCore(p::ParamFunctor) = directObtain(p.memory)
-obtainCore(p::ParamPointer) = obtainCore.(p.input)
 obtainCore(p::PrimitiveParam) = directObtain(p.input)
 
 function obtainCore(inputVal::NTuple{A, AbtArr210L{T}}, 
@@ -949,7 +903,8 @@ end
 searchObtain(pDict::ParamValDict{T}, p::CompositeParam{T}) where {T} = 
 recursiveTransform!(obtainCore, pDict, p)
 
-obtainINTERNAL(p::PrimitiveParam) = directObtain(p.input)
+
+obtainINTERNAL(p::PrimitiveParam) = obtainCore(p)
 
 function obtainINTERNAL(p::CompositeParam{T}) where {T}
     searchObtain(genParamValDict(T), p)
