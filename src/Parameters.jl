@@ -717,14 +717,14 @@ inputOf(p::DoubleDimParam) = p.input
 
 mutable struct NodeMarker{T} <: StorageMarker{T}
     visited::Bool
-    value::T
+    data::T
 
     NodeMarker(init::T, ::Type{U}=T) where {T, U} = new{U}(false, init)
 end
 
-const ParamDict0D{T, V} = IdDict{ElementalParam{T}, NodeMarker{<:V}}
-const ParamDictSD{T, V} = IdDict{SingleDimParam{T}, NodeMarker{<:V}}
-const ParamDictDD{T, V} = IdDict{DoubleDimParam{T}, NodeMarker{<:V}}
+const ParamDict0D{T, V} = IdDict{ElementalParam{T}, NodeMarker{V}}
+const ParamDictSD{T, V} = IdDict{SingleDimParam{T}, NodeMarker{V}}
+const ParamDictDD{T, V} = IdDict{DoubleDimParam{T}, NodeMarker{V}}
 
 const ParamInputIdMarker{T} = NodeMarker{<:Memory{<:DoubleDimParam{T}}}
 const ParamDictId{T} = IdDict{DoubleDimParam{T}, ParamInputIdMarker{T}}
@@ -740,15 +740,17 @@ struct ParamPointerDict{T, V0, V1, V2} <: MixedContainer{T}
                         ParamDictId{T}() )
 end
 
-const ParamValDict{T} = ParamPointerDict{T, T, AbstractArray{T}, BiAbtArray{T}}
-
-genParamValDict(::Type{T}) where {T} = 
-ParamPointerDict(T, T, AbstractArray{T}, BiAbtArray{T})::ParamValDict{T}
-
 selectParamPointer(d::ParamPointerDict{T}, ::ElementalParam{T}) where {T} = d.d0
 selectParamPointer(d::ParamPointerDict{T}, ::SingleDimParam{T}) where {T} = d.d1
 selectParamPointer(d::ParamPointerDict{T}, ::DoubleDimParam{T}) where {T} = d.d2
 selectParamPointer(d::ParamPointerDict{T}, ::ParamPointer{T}) where {T} = d.id
+
+getParamDataTypeUB(::ParamPointerDict{T, V0, <:Any, <:Any}, 
+                   ::ElementalParam{T}) where {T, V0} = V0
+getParamDataTypeUB(::ParamPointerDict{T, <:Any, V1, <:Any}, 
+                   ::SingleDimParam{T}) where {T, V1} = V1
+getParamDataTypeUB(::ParamPointerDict{T, <:Any, <:Any, V2}, 
+                   ::DoubleDimParam{T}) where {T, V2} = V2
 
 function getDataCore1(counter::Int, d::ParamPointerDict{T}, p::DoubleDimParam{T}, 
                       failFlag, maxIter::Int) where {T}
@@ -760,7 +762,7 @@ function getDataCore1(counter::Int, d::ParamPointerDict{T}, p::DoubleDimParam{T}
     if res !== failFlag && res isa ParamPointer
         getDataCore2(counter, d, res, failFlag, maxIter)
     else
-        res.value
+        res.data
     end
 end
 
@@ -790,8 +792,9 @@ end
 function getParamMarker!(pDict::ParamPointerDict{T}, transformer::F, 
                          p::DoubleDimParam{T}) where {T, F}
     mem = transformer(p)
-    markerType = NodeMarker{typeof(mem)}
-    get!(selectParamPointer(pDict, p), p, NodeMarker(mem))::markerType
+    tUB = getParamDataTypeUB(pDict, p)
+    markerType = NodeMarker{tUB}
+    get!(selectParamPointer(pDict, p), p, NodeMarker(mem, tUB))::markerType
 end
 
 function getParamMarker!(pDict::ParamPointerDict{T}, transformer::F, 
@@ -812,15 +815,15 @@ function recursiveTransformCore1!(generator::F, marker::NodeMarker,
     # Depth-first search by recursive calling
     if !marker.visited
         marker.visited = true
-        marker.value = generator(p)
+        marker.data = generator(p)
     else
-        marker.value
+        marker.data
     end
 end
 
 function recursiveTransformCore2!(generator::F, marker::NodeMarker, p::ParamPointer{T}, 
                                   pDict::ParamPointerDict{T}) where {F<:Function, T}
-    val = map(marker.value) do par
+    val = map(marker.data) do par
         res = getData(pDict, par, nothing)
         res === nothing && throw(ErrorException("Could note locate the value for $par."))
         res
@@ -832,7 +835,7 @@ function recursiveTransform!(transformer::F, pDict::ParamPointerDict{T},
                              p::PrimitiveParam{T, N}) where {F, T, N}
     marker = getParamMarker!(pDict, transformer, p)
     recursiveTransformCore1!(transformer, marker, p)
-    marker.value
+    marker.data
 end
 
 function recursiveTransform!(transformer::F, pDict::ParamPointerDict{T}, 
@@ -849,7 +852,7 @@ function recursiveTransform!(transformer::F, pDict::ParamPointerDict{T},
         transformer(res, par)
     end
 
-    marker.value
+    marker.data
 end
 
 function recursiveTransform!(transformer::F, pDict::ParamPointerDict{T}, 
@@ -857,6 +860,11 @@ function recursiveTransform!(transformer::F, pDict::ParamPointerDict{T},
     marker = getParamMarker!(pDict, transformer, p)
     recursiveTransformCore2!(transformer, marker, p, pDict)
 end
+
+const ParamValDict{T} = ParamPointerDict{T, T, AbstractArray{T}, BiAbtArray{T}}
+
+genParamValDict(::Type{T}) where {T} = 
+ParamPointerDict(T, T, AbstractArray{T}, BiAbtArray{T})::ParamValDict{T}
 
 
 obtainCore(p::ParamFunctor) = directObtain(p.memory)
