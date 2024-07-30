@@ -182,7 +182,7 @@ const TernaryNTupleUnion{T} = Union{(NTuple{N, T} for N in 1:3)...}
 const ElemParamAbtArray{T, N} = AbstractArray{<:ElementalParam{T}, N}
 const ParamInputType{T} = TernaryNTupleUnion{DoubleDimParam{T}}
 const ParamInput{T, N} = NTuple{N, DoubleDimParam{T}}
-const PrimDParSetEltype{T} = Union{AbstractVector{<:ElementalParam{T}}, DoubleDimParam{T, <:Any, 0}}
+const PrimDParSetEltype{T} = Union{AbstractVector{<:ElementalParam{T}}, InnerSpanParam{T}}
 const ArgTypeOfNDPIVal{T} = Union{
     Tuple{Type{T}}, 
     Tuple{Type{T}, Type{T}}, 
