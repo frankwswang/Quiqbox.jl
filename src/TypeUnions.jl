@@ -182,7 +182,8 @@ const TernaryNTupleUnion{T} = Union{(NTuple{N, T} for N in 1:3)...}
 const ElemParamAbtArray{T, N} = AbstractArray{<:ElementalParam{T}, N}
 const ParamInputType{T} = TernaryNTupleUnion{DoubleDimParam{T}}
 const ParamInput{T, N} = NTuple{N, DoubleDimParam{T}}
-const PrimDParSetEltype{T} = Union{AbstractVector{<:ElementalParam{T}}, InnerSpanParam{T}}
+const ParamSetEle{T} = Union{AbstractVector{<:ElementalParam{T}}, InnerSpanParam{T}}
+const DimParamSet{T} = AbstractVector{<:ParamSetEle{T}}
 const ArgTypeOfNDPIVal{T} = Union{
     Tuple{Type{T}}, 
     Tuple{Type{T}, Type{T}}, 
@@ -198,9 +199,9 @@ const ArgTypeOfNDPIVal{T} = Union{
 const NETupleOfPBoxVal{T, NMO} = NonEmptyTuple{AbtArrayOr{T}, NMO}
 const PBoxInputValType{T} = Union{NETupleOfPBoxVal{T, 0}, NETupleOfPBoxVal{T, 1}}
 
-const AbtVecOfAbtArray{T} = AbstractVector{<:AbstractArray{T}}
+const AbtVecOfAbtArr{T} = AbstractVector{<:AbstractArray{T}}
 
-const GraphArgDataType{T} = Union{AbtVecOfAbtArray{T}, NonEmptyTuple{AbstractArray{T}}}
+const GraphArgDataType{T} = Union{AbtVecOfAbtArr{T}, NonEmptyTuple{AbstractArray{T}}}
 
 const ParBTypeArgNumOutDim{T, N, A} = ParamToken{T, N, <:NTuple{A, DoubleDimParam{T}}}
 

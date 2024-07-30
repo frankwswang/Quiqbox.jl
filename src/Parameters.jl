@@ -1213,12 +1213,12 @@ function markParams!(pars::AbstractVector{<:DoubleDimParam{T}}) where {T}
     par0Dids = findall(x->(x isa ElementalParam{T}), leafPars)
     leafParsFormated = if isempty(par0Dids)
         markParamsCore!(parIdxDict, leafPars)
-        convert(Vector{PrimDParSetEltype{T}}, leafPars)
+        convert(Vector{ParamSetEle{T}}, leafPars)
     else
         leafP0Ds = ElementalParam{T}[splice!(leafPars, par0Dids)...]
         markParamsCore!(parIdxDict, leafP0Ds)
         markParamsCore!(parIdxDict, leafPars)
-        PrimDParSetEltype{T}[leafP0Ds, leafPars...]
+        ParamSetEle{T}[leafP0Ds, leafPars...]
     end
     (leafParsFormated, rootPars, selfPars)
 end

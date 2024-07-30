@@ -1,6 +1,6 @@
 export genGraphNode, evaluateNode, compressNode
 
-using Base: Fix2
+using Base: Fix1
 
 const NodeChildrenType{T} = TernaryNTupleUnion{GraphNode{T}}
 const getParSym = symbolFrom∘indexedSymOf
@@ -39,7 +39,8 @@ struct ValueNode{T, N} <: ContainerNode{T, N, 0}
     end
 end
 
-struct BatchNode{T, N, O, I<:ShapedMemory{<:DimSGNode{T, N}, O}} <: ReferenceNode{T, N, O, I}
+struct BatchNode{T, N, O, 
+                 I<:ShapedMemory{<:DimSGNode{T, N}, O}} <: ReferenceNode{T, N, O, I}
     source::I
     marker::Symbol
     id::UInt
@@ -121,6 +122,7 @@ end
 
 genGraphNode(p::PrimitiveParam) = genGraphNodeCore(p)
 
+
 evaluateNode(gn::ValueNode{T}) where {T} = directObtain(gn.value)
 
 evaluateNode(gn::BatchNode{T}) where {T} = map(evaluateNode, gn.source)
@@ -163,93 +165,111 @@ function genGetVal!(tempStorage::TemporaryStorage{T}, gn::ValueNode{T}) where {T
     else
         idx = last(data)
     end
-    function (storage::FixedSizeStorage{T}, ::AbtVecOfAbtArray{T})
+    function (storage::FixedSizeStorage{T}, ::AbtVecOfAbtArr{T})
         getindex(getproperty(storage, sectorSym), idx)
     end
 end
 
 function genGetVal!(::Type{T}, ::Val{N}, idx::Int) where {T, N}
-    function (::FixedSizeStorage{T}, input::AbtVecOfAbtArray{T})
+    function (::FixedSizeStorage{T}, input::AbtVecOfAbtArr{T})
         getindex(selectInPSubset(Val(N), input), idx)
     end
 end
 
 function compressNodeCore!(tStorage::TemporaryStorage{T}, 
-                           inParSet::AbstractVector{<:PrimDParSetEltype{T}}, 
-                           gn::ValueNode{T, N}) where {T, N}
+                           paramSet::DimParamSet{T}, gn::ValueNode{T, N}) where {T, N}
     varIdx = if gn.frozen
         nothing
     else
-        findfirst(par->objectid(par)==gn.id, selectInPSubset(Val(N), inParSet))
+        findfirst(par->objectid(par)==gn.id, selectInPSubset(Val(N), paramSet))
     end
     varIdx===nothing ? genGetVal!(tStorage, gn) : genGetVal!(T, Val(N), varIdx)
 end
 
 function compressNodeCore!(tStorage::TemporaryStorage{T}, 
-                           inParSet::AbstractVector{<:PrimDParSetEltype{T}}, 
-                           gn::BatchNode{T}) where {T}
-    let fs=map(x->compressNodeCore!(tStorage, inParSet, x), gn.source)
-        function (storage::FixedSizeStorage{T}, input::AbtVecOfAbtArray{T})
-            map(f->f(storage, input), fs)
+                           paramSet::DimParamSet{T}, node::BatchNode{T}) where {T}
+    fs=map(x->compressNodeCore!(tStorage, paramSet, x), node.source)
+    let gs=fs, iterRanges=Iterators.product(axes(fs)...)
+        function (storage::FixedSizeStorage{T}, input::AbtVecOfAbtArr{T})
+            map( enumerate(iterRanges) ) do (i, _)
+                gs[i](storage, input)
+            end
         end
     end
 end
 
 function compressNodeCore!(tStorage::TemporaryStorage{T}, 
-                           inParSet::AbstractVector{<:PrimDParSetEltype{T}}, 
-                           gn::BuildNode{T}) where {T}
-    sourceNum = getBuildNodeSourceNum(gn)
-    compressBuildNodeCore!(Val(sourceNum), tStorage, inParSet, gn)
+                           paramSet::DimParamSet{T}, node::BuildNode{T}) where {T}
+    sourceNum = getBuildNodeSourceNum(node)
+    compressBuildNodeCore!(Val(sourceNum), tStorage, paramSet, node)
 end
 
 function compressBuildNodeCore!(::Val{1}, tStorage::TemporaryStorage{T}, 
-                                inParSet::AbstractVector{<:PrimDParSetEltype{T}}, 
-                                node::BuildNode{T}) where {T}
-    f = compressNodeCore!(tStorage, inParSet, node.source[1])
-    let apply=f, operator=node.operator, shifter=node.shifter
-        function (storage::FixedSizeStorage{T}, input::AbtVecOfAbtArray{T})
-            operator( apply(storage, input) ) |> shifter
+                                paramSet::DimParamSet{T}, node::BuildNode{T}) where {T}
+    f = compressNodeCore!(tStorage, paramSet, node.source[1])
+    let g=f, op=node.operator, sh=node.shifter
+        function (storage::FixedSizeStorage{T}, input::AbtVecOfAbtArr{T})
+            op( g(storage, input) ) |> sh
         end
     end
 end
 
 function compressBuildNodeCore!(::Val{2}, tStorage::TemporaryStorage{T}, 
-                                inParSet::AbstractVector{<:PrimDParSetEltype{T}}, 
-                                node::BuildNode{T}) where {T}
-    fL, fR = compressNodeCore!.(Ref(tStorage), Ref(inParSet), node.source)
-    let applyL=fL, applyR=fR, operator=node.operator, shifter=node.shifter
-        function (storage::FixedSizeStorage{T}, input::AbtVecOfAbtArray{T})
-            operator( applyL(storage, input), applyR(storage, input) ) |> shifter
+                                paramSet::DimParamSet{T}, node::BuildNode{T}) where {T}
+    fL, fR = compressNodeCore!.(Ref(tStorage), Ref(paramSet), node.source)
+    let gL=fL, gR=fR, op=node.operator, sh=node.shifter
+        function (storage::FixedSizeStorage{T}, input::AbtVecOfAbtArr{T})
+            op( gL(storage, input), gR(storage, input) ) |> sh
         end
     end
 end
 
 function compressBuildNodeCore!(::Val{3}, tStorage::TemporaryStorage{T}, 
-                                inParSet::AbstractVector{<:PrimDParSetEltype{T}}, 
-                                node::BuildNode{T}) where {T}
-    fL, fC, fR = compressNodeCore!.(Ref(tStorage), Ref(inParSet), node.source)
-    let applyL=fL, applyC=fC, applyR=fR, operator=node.operator, shifter=node.shifter
-        function (storage::FixedSizeStorage{T}, input::AbtVecOfAbtArray{T})
-            operator( applyL(storage, input), applyC(storage, input), 
-                      applyR(storage, input) ) |> shifter
+                                paramSet::DimParamSet{T}, node::BuildNode{T}) where {T}
+    fL, fC, fR = compressNodeCore!.(Ref(tStorage), Ref(paramSet), node.source)
+    let gL=fL, gC=fC, gR=fR, op=node.operator, sh=node.shifter
+        function (storage::FixedSizeStorage{T}, input::AbtVecOfAbtArr{T})
+            op( gL(storage, input), gC(storage, input), gR(storage, input) ) |> sh
         end
     end
 end
 
 function compressNodeCore!(tStorage::TemporaryStorage{T}, 
-                           inParSet::AbstractVector{<:PrimDParSetEltype{T}}, 
-                           node::IndexNode{T}) where {T}
-    let apply=compressNodeCore!(tStorage, inParSet, node.source), idx=node.index
-        function (storage::FixedSizeStorage{T}, input::AbtVecOfAbtArray{T})
-            getindex(apply(storage, input), idx)
+                           paramSet::DimParamSet{T}, node::IndexNode{T}) where {T}
+    f = compressNodeCore!(tStorage, paramSet, node.source)
+    let g=f, idx=node.index
+        function (storage::FixedSizeStorage{T}, input::AbtVecOfAbtArr{T})
+            getindex(g(storage, input), idx)
         end
     end
 end
 
-function compressNodeINTERNAL(node::GraphNode{T}, 
-                              inParSet::AbstractVector{<:PrimDParSetEltype{T}}) where {T}
+
+struct GraphNodeFunc{T, F, S<:FixedSizeStorage{T}, 
+                     V<:AbtVecOfAbtArr{T}} <: StructFunction{T, F}
+    f::F
+    storage::S
+    param::V
+end
+
+(gnf::GraphNodeFunc)() = gnf(gnf.storage, gnf.param)
+
+(gnf::GraphNodeFunc{T})(ps::AbtVecOfAbtArr{T}) where {T} = gnf(gnf.storage, ps)
+
+(gnf::GraphNodeFunc)(s::FixedSizeStorage{T}, ps::AbtVecOfAbtArr{T}) where {T} = gnf.f(s, ps)
+
+# function (gnf::GraphNodeFunc{T})(ps::DimParamSet{T}; checkParamSet::Bool=true) where {T}
+#     if checkParamSet
+#         bl, errorMsg = isGraphParamSet(paramSet)
+#         bl || throw( AssertionError(errorMsg) )
+#     end
+#     gnf( obtain.(ps) )
+# end
+
+
+function compressNodeINTERNAL(node::GraphNode{T}, paramSet::DimParamSet{T}) where {T}
     tStorage = TemporaryStorage(T)
-    f = compressNodeCore!(tStorage, inParSet, node)
+    f = compressNodeCore!(tStorage, paramSet, node)
     sectors = map( getproperty.(Ref(tStorage), fieldnames(TemporaryStorage)) ) do data
         pairs = values(data)
         vals = first.(pairs)
@@ -261,25 +281,40 @@ function compressNodeINTERNAL(node::GraphNode{T},
         end
         sector
     end
-    f, FixedSizeStorage(sectors...)
+    GraphNodeFunc(f, FixedSizeStorage(sectors...), obtain.(paramSet))
 end
 
-const ParamSetErrorMessage1 = "`$ElementalParam` must all be enclosed in a single array "*
-                              "as the first element of `inputParamSet`."
+function compressNode(node::GraphNode{T}, paramSet::DimParamSet{T}) where {T}
+    bl, errorMsg = isGraphParamSet(paramSet)
+    bl || throw( AssertionError(errorMsg) )
+    compressNodeINTERNAL(node, paramSet)
+end
 
-const ParamSetErrorMessage2 = "The screen level of the input parameter (inspected by "*
-                              "`$screenLevelOf`) for a dependent parameter must be 1."
 
-function compressNode(node::GraphNode{T}, 
-                      inParSet::AbstractVector{<:PrimDParSetEltype{T}}) where {T}
-    for i in eachindex(inParSet)
-        p = inParSet[i]
+const ParamSetErrorMessage1 = "Input argument does not meet the type requirement of being "*
+                              "a parameter set: $(DimParamSet)"
 
-        bl1 = i == firstindex(inParSet)
-        bl2 = p isa AbstractArray{<:ElementalParam{T}}
-        bl3 = (p isa DoubleDimParam && !(p isa ElementalParam))
+const ParamSetErrorMessage2 = "All `$ElementalParam` must be inside a non-zero dimensional"*
+                              " `AbstractArray` as the first element of `paramSet`."
+
+const ParamSetErrorMessage3 = "The screen level of every input parameter (inspected by "*
+                              "`$screenLevelOf`) must all be 1."
+
+isGraphParamSet(::AbstractVector) = (false, ParamSetErrorMessage1)
+
+function isGraphParamSet(paramSet::DimParamSet{T}) where {T}
+    isInSet = true
+    errorMsg = ""
+    for i in eachindex(paramSet)
+        p = paramSet[i]
+
+        bl1 = i == firstindex(paramSet)
+        bl2 = p isa AbstractArray{<:ElementalParam{T}} && ndims(p) > 0
+        bl3 = (p isa InnerSpanParam && !(p isa ElementalParam))
         if !( ( !bl1 && bl3 ) || ( bl1 && (bl2 || bl3) ) )
-            throw(AssertionError(ParamSetErrorMessage1))
+            isInSet = false
+            errorMsg = ParamSetErrorMessage2
+            break
         end
 
         bl2 || (p = [p])
@@ -287,10 +322,12 @@ function compressNode(node::GraphNode{T},
         for pp in p
             sl = screenLevelOf(pp)
             if sl != 1
-                throw(DomainError((pp, sl), ParamSetErrorMessage2))
+                isInSet = false
+                errorMsg = ParamSetErrorMessage3
+                break
             end
         end
+        isInSet || break
     end
-
-    compressNodeINTERNAL(node, inParSet)
+    isInSet, errorMsg
 end
