@@ -591,7 +591,7 @@ struct NodeParam{T, F, I, N, O} <: ViewParam{T, N, I}
     function NodeParam(input::Tuple{ParamMesh{T, F, I, N, O}}, index::Int, 
                        symbol::SymOrIndexedSym=genDefaultRefParSym(input|>first)) where 
                       {T, F, I, N, O}
-        maxIndex = length(input.memory)
+        maxIndex = length(first(input).memory)
         if index < 1 || index > maxIndex
             throw(DomainError(index, "`index is out of the allowed range: (1, $maxIndex)`"))
         end
@@ -599,9 +599,8 @@ struct NodeParam{T, F, I, N, O} <: ViewParam{T, N, I}
     end
 end
 
-NodeParam(par::ParamMesh{T, F, I, N, O}, index::Int, 
-          symbol::SymOrIndexedSym=genDefaultRefParSym(par)) where {T, F, I, N, O} = 
-NodeParam(par, index, symbol)
+NodeParam(par::ParamMesh, index::Int, symbol::SymOrIndexedSym=genDefaultRefParSym(par)) = 
+NodeParam((par,), index, symbol)
 
 
 function fragment(pn::ParamMesh{T, F, I, N, O}) where {T, F, I, N, O}
@@ -612,7 +611,7 @@ function fragment(pn::ParamMesh{T, F, I, N, O}) where {T, F, I, N, O}
     res
 end
 
-fragment(pl::ParamGrid) = directObtain(pl.input)
+fragment(pl::ParamGrid) = directObtain(pl.input|>first)
 
 
 getScreenLevelOptions(::Type{<:NodeParam}) = (0,)
@@ -727,18 +726,24 @@ const ParamDict0D{T, V} = IdDict{ElementalParam{T}, NodeMarker{V}}
 const ParamDictSD{T, V} = IdDict{SingleDimParam{T}, NodeMarker{V}}
 const ParamDictDD{T, V} = IdDict{DoubleDimParam{T}, NodeMarker{V}}
 
-const ParamInputIdMarker{T} = NodeMarker{<:Memory{<:DoubleDimParam{T}}}
-const ParamDictId{T} = IdDict{DoubleDimParam{T}, ParamInputIdMarker{T}}
+const ParamInputSource{T} = Memory{<:DoubleDimParam{T}}
+const ParamDictId{T} = IdDict{DoubleDimParam{T}, NodeMarker{<:ParamInputSource{T}}}
 
-struct ParamPointerDict{T, V0, V1, V2} <: MixedContainer{T}
+const DefaultMaxParamPointerLevel = 10
+
+struct ParamPointerDict{T, V0, V1, V2, F<:Function} <: MixedContainer{T}
     d0::ParamDict0D{T, V0}
     d1::ParamDictSD{T, V1}
     d2::ParamDictDD{T, V2}
     id::ParamDictId{T}
+    generator::F
+    maxRecursion::Int
 
-    ParamPointerDict(::Type{T}, ::Type{V0}, ::Type{V1}, ::Type{V2}) where {T, V0, V1, V2} = 
-    new{T, V0, V1, V2}( ParamDict0D{T, V0}(), ParamDictSD{T, V1}(), ParamDictDD{T, V2}(), 
-                        ParamDictId{T}() )
+    ParamPointerDict(f::F, ::Type{T}, ::Type{V0}, ::Type{V1}, ::Type{V2}, 
+                     maxRecursion::Int=DefaultMaxParamPointerLevel) where 
+                    {F, T, V0, V1, V2} = 
+    new{T, V0, V1, V2, F}( ParamDict0D{T, V0}(), ParamDictSD{T, V1}(), 
+                           ParamDictDD{T, V2}(), ParamDictId{T}(), f, maxRecursion )
 end
 
 selectParamPointer(d::ParamPointerDict{T}, ::ElementalParam{T}) where {T} = d.d0
@@ -753,40 +758,50 @@ getParamDataTypeUB(::ParamPointerDict{T, <:Any, V1, <:Any},
 getParamDataTypeUB(::ParamPointerDict{T, <:Any, <:Any, V2}, 
                    ::DoubleDimParam{T}) where {T, V2} = V2
 
-function getDataCore1(counter::Int, d::ParamPointerDict{T}, p::DoubleDimParam{T}, 
-                      failFlag, maxIter::Int) where {T}
-    counter += 1
-    if counter > maxIter
-        throw( ErrorException("The iterative calling times passed the limit: $maxIter.") )
+function checkGetDataIterNum(counter::Int, maxRec::Int)
+    if counter > maxRec
+        throw( ErrorException("The recursive calling times passed the limit: $maxRec.") )
     end
-    res = get(selectParamPointer(d, p), p, failFlag)
-    if res !== failFlag && res isa ParamPointer
-        getDataCore2(counter, d, res, failFlag, maxIter)
-    else
-        res.data
-    end
+    nothing
 end
 
-function getDataCore2(counter::Int, d::ParamPointerDict{T, V0, V1, V2}, p::ParamPointer{T}, 
-                      failFlag, maxIter::Int) where {T, V0, V1, V2}
-    input = p.input
-    container = Memory{Union{V0, V1, V2}}(undef, length(input))
+function getDataCore1(counter::Int, d::ParamPointerDict{T}, p::DoubleDimParam{T}, 
+                      failFlag) where {T}
+    counter += 1
+    checkGetDataIterNum(counter, d.maxRecursion)
+    res = get(selectParamPointer(d, p), p, failFlag)
+    res===failFlag ? failFlag : res.data
+end
+
+function getDataCore1(counter::Int, d::ParamPointerDict{T}, p::ParamPointer{T}, 
+                      failFlag) where {T}
+    counter += 1
+    checkGetDataIterNum(counter, d.maxRecursion)
+    res = get(d.id, p, failFlag)
+    res===failFlag ? failFlag : d.generator(getDataCore2(counter, d, res.data, failFlag), p)
+end
+
+function getDataCore2(counter::Int, d::ParamPointerDict{T, V0, V1, V2}, 
+                      s::ParamInputSource{T}, failFlag) where {T, V0, V1, V2}
+    container = Memory{Any}(undef, length(s))
     flag = true
-    for i in eachindex(input)
-        res = getDataCore1(counter, d, input[i], failFlag, maxIter)
+    eleTset = Set{Type}()
+    for i in eachindex(s)
+        res = getDataCore1(counter, d, s[i], failFlag)
         if res === failFlag
             flag = false
             break
         else
             container[i] = res
+            push!(eleTset, typeof(res))
         end
     end
-    flag ? container : failFlag
+    flag ? ( Memory{Union{eleTset...}}(container)::Memory{<:Union{V0, V1, V2}} ) : failFlag
 end
 
-function getData(d::ParamPointerDict{T}, p::DoubleDimParam{T}, 
-                 default; failFlag=nothing, maxIter::Int=10) where {T}
-    res = getDataCore1(0, d, p, failFlag, maxIter)
+function getData(d::ParamPointerDict{T}, p::DoubleDimParam{T}, default; 
+                 failFlag=nothing) where {T}
+    res = getDataCore1(0, d, p, failFlag)
     res===failFlag ? default : res
 end
 
@@ -862,14 +877,10 @@ function recursiveTransform!(transformer::F, pDict::ParamPointerDict{T},
     recursiveTransformCore2!(transformer, marker, p, pDict)
 end
 
-const ParamValDict{T} = ParamPointerDict{T, T, AbstractArray{T}, BiAbtArray{T}}
 
-genParamValDict(::Type{T}) where {T} = 
-ParamPointerDict(T, T, AbstractArray{T}, BiAbtArray{T})::ParamValDict{T}
-
-
-obtainCore(p::ParamFunctor) = directObtain(p.memory)
 obtainCore(p::PrimitiveParam) = directObtain(p.input)
+obtainCore(p::ParamToken) = directObtain(p.memory)
+obtainCore(p::ParamBatch) = map(directObtain, p.memory)
 
 function obtainCore(inputVal::NTuple{A, AbtArr210L{T}}, 
                     p::ParamToken{T, <:Any, <:ParamInput{T, A}}) where {T, A}
@@ -892,45 +903,52 @@ end
 
 obtainCore(::Type{T}, p::CellParam{T}) where {T} = p.offset
 
-obtainCore(val::Memory{T}, p::ParamGrid{T, 0}) where {T} = 
-reshape(val, p.input.shape)
+function obtainCore(val::Memory{T}, p::ParamGrid{T, 0}) where {T}
+    reshape(val, p.input.shape)
+end
 
 obtainCore(val::Memory{<:AbstractArray{T, N}}, p::ParamGrid{T, N}) where {T, N} = 
 reshape(val, p.input.shape)
 
 obtainCore(val::Memory{<:AbstractArray{T}}, p::NodeParam{T, <:Any, <:Any, 0}) where {T} = 
-getindex(getindex(val), p.idx)
+getindex(getindex(val), p.index)
 
 obtainCore(val::Memory{<:BiAbtArray{T, N}}, p::NodeParam{T, <:Any, <:Any, N}) where {T, N} = 
-getindex(getindex(val), p.idx)
+getindex(getindex(val), p.index)
+
+const ParamValDict{T} = ParamPointerDict{ T, T, AbstractArray{T}, BiAbtArray{T}, 
+                                          typeof(obtainCore) }
+
+genParamValDict(::Type{T}, maxRecursion::Int=DefaultMaxParamPointerLevel) where {T} = 
+ParamPointerDict(obtainCore, T, T, AbstractArray{T}, BiAbtArray{T}, maxRecursion)
 
 function searchObtain(pDict::ParamValDict{T}, p::ParamMesh{T}) where {T}
     res = recursiveTransform!(obtainCore, pDict, p)
     reshape(res, last.(p.lambda.axis)) |> collect
 end
 
-searchObtain(pDict::ParamValDict{T}, p::CompositeParam{T}) where {T} = 
+searchObtain(pDict::ParamValDict{T}, p::DoubleDimParam{T}) where {T} = 
 recursiveTransform!(obtainCore, pDict, p)
 
+obtainINTERNAL(p::PrimitiveParam, ::Int) = obtainCore(p)
 
-obtainINTERNAL(p::PrimitiveParam) = obtainCore(p)
-
-function obtainINTERNAL(p::CompositeParam{T}) where {T}
-    searchObtain(genParamValDict(T), p)
+function obtainINTERNAL(p::CompositeParam{T}, maxRecursion::Int) where {T}
+    searchObtain(genParamValDict(T, maxRecursion), p)
 end
 
-function obtainINTERNAL(ps::AbstractArray{<:ElementalParam{T}}) where {T}
-    map(obtainINTERNAL, ps)
+function obtainINTERNAL(ps::AbstractArray{<:PrimitiveParam{T}}, ::Int) where {T}
+    map(x->obtainINTERNAL(x, 0), ps)
 end
 
-function obtainINTERNAL(ps::AbstractArray{<:DoubleDimParam{T}}) where {T}
-    pValDict = genParamValDict(T)
+function obtainINTERNAL(ps::AbstractArray{<:DoubleDimParam{T}}, maxRecursion::Int) where {T}
+    pValDict = genParamValDict(T, maxRecursion)
     map(p->searchObtain(pValDict, p), ps)
 end
 
-function obtain(p::AbtArrayOr{<:DoubleDimParam{T}}) where {T}
+function obtain(p::AbtArrayOr{<:DoubleDimParam{T}}; 
+                maxRecursion::Int=DefaultMaxParamPointerLevel) where {T}
     lock( ReentrantLock() ) do
-        obtainINTERNAL(p)
+        obtainINTERNAL(p, maxRecursion)
     end
 end
 
@@ -1187,7 +1205,7 @@ end
 function getParams(f::ParamFunction{T}, sym::SymOrMiss=missing) where {T}
     res = map(field->getParams(field, sym), getParamFields(f))
     len = length.(res) |> sum
-    len == 0 ? ParamContainer{T}[] : reduce(vcat, res)
+    isequal(len, 0) ? ParamContainer{T}[] : reduce(vcat, res)
 end
 
 

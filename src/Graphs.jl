@@ -93,10 +93,6 @@ struct IndexNode{T, N, I<:BuildNode{T, N}} <: ReferenceNode{T, N, 0, I}
     end
 end
 
-const ComputeNodeDict{T} = ParamPointerDict{T, Dim0GNode{T}, DimSGNode{T}, GraphNode{T}}
-
-genGraphNodeDict(::Type{T}) where {T} = 
-ParamPointerDict(T, Dim0GNode{T}, DimSGNode{T}, GraphNode{T})::ComputeNodeDict{T}
 
 genGraphNodeCore(p::ParamFunctor) = ValueNode(p)
 genGraphNodeCore(p::PrimitiveParam) = ValueNode(p)
@@ -115,8 +111,16 @@ genGraphNodeCore(val::Memory{<:GraphNode{T, N, O}},
                  p::NodeParam{T, <:Any, <:Any, N, O}) where {T, N, O} = 
 IndexNode(getindex(val), p)
 
-function genGraphNode(p::CompositeParam{T}) where {T}
-    gNodeDict = genGraphNodeDict(T)
+const ComputeNodeDict{T} = ParamPointerDict{ T, Dim0GNode{T}, DimSGNode{T}, 
+                                             GraphNode{T}, typeof(genGraphNodeCore) }
+
+genGraphNodeDict(::Type{T}, maxRecursion::Int=DefaultMaxParamPointerLevel) where {T} = 
+ParamPointerDict(genGraphNodeCore, T, Dim0GNode{T}, DimSGNode{T}, GraphNode{T}, 
+                 maxRecursion)
+
+function genGraphNode(p::CompositeParam{T}; 
+                      maxRecursion::Int=DefaultMaxParamPointerLevel) where {T}
+    gNodeDict = genGraphNodeDict(T, maxRecursion)
     recursiveTransform!(genGraphNodeCore, gNodeDict, p)
 end
 
