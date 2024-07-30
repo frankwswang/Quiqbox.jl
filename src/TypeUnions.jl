@@ -59,7 +59,8 @@ abstract type ParamToken{T, N, I} <: CompositeParam{T, N, 0} end
 
 abstract type ParamLink{T, N, I, O} <: ParamBatch{T, N, I, O} end
 abstract type ParamNest{T, N, I, O} <: ParamBatch{T, N, I, O} end
-abstract type ViewParam{T, N, I} <: ParamToken{T, N, I} end
+abstract type BaseParam{T, N, I} <: ParamToken{T, N, I} end
+abstract type LinkParam{T, N, I} <: ParamToken{T, N, I} end
 
 abstract type SingleVarFunction{T} <: ParamFunction{T} end
 abstract type MultiDimFunction{T, D} <: ParamFunction{T} end
@@ -208,4 +209,4 @@ const ParBTypeArgNumOutDim{T, N, A} = ParamToken{T, N, <:NTuple{A, DoubleDimPara
 const AbtMemory0D{T} = AbstractMemory{T, 0}
 
 const ParamFunctor{T, N, I} = Union{ParamLink{T, N, I}, ParamToken{T, N, I}}
-const ParamPointer{T, N, I} = Union{ViewParam{T, N, I}, ParamNest{ T, N, I}}
+const ParamPointer{T, N, I} = Union{LinkParam{T, N, I}, ParamNest{ T, N, I}}

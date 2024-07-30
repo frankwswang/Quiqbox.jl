@@ -87,7 +87,7 @@ struct IndexNode{T, N, I<:BuildNode{T, N}} <: ReferenceNode{T, N, 0, I}
     marker::Symbol
     id::UInt
 
-    function IndexNode(node::I, p::NodeParam{T, <:Any, <:Any, N, O}) where 
+    function IndexNode(node::I, p::KnotParam{T, <:Any, <:Any, N, O}) where 
                       {T, N, O, I<:BuildNode{T, N, O}}
         new{T, N, I}(node, p.index, getParSym(p), objectid(p))
     end
@@ -108,7 +108,7 @@ genGraphNodeCore(val::Memory{<:DimSGNode{T, N}}, p::ParamGrid{T, N}) where {T, N
 BatchNode(ShapedMemory(val, p.input.shape), p)
 
 genGraphNodeCore(val::Memory{<:GraphNode{T, N, O}}, 
-                 p::NodeParam{T, <:Any, <:Any, N, O}) where {T, N, O} = 
+                 p::KnotParam{T, <:Any, <:Any, N, O}) where {T, N, O} = 
 IndexNode(getindex(val), p)
 
 const ComputeNodeDict{T} = ParamPointerDict{ T, Dim0GNode{T}, DimSGNode{T}, 

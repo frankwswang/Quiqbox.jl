@@ -344,7 +344,7 @@ end
 initializeOffset(::Type) = nothing
 initializeOffset(::Type{T}) where {T<:Number} = zero(T)
 
-mutable struct CellParam{T, F<:Function, I<:ParamInputType{T}} <: ParamToken{T, 0, I}
+mutable struct CellParam{T, F<:Function, I<:ParamInputType{T}} <: BaseParam{T, 0, I}
     const lambda::TypedReduction{T, F}
     const input::I
     const symbol::IndexedSym
@@ -358,7 +358,7 @@ mutable struct CellParam{T, F<:Function, I<:ParamInputType{T}} <: ParamToken{T, 
                        screen::Union{TernaryNumber, Int}=TUS0, 
                        offset::Union{T, Nothing}=initializeOffset(T)) where 
                       {T, F, I<:ParamInputType{T}}
-        levels = getScreenLevelOptions(ParamToken{T, 0})
+        levels = getScreenLevelOptions(BaseParam{T, 0})
         screen = genTernaryNumber(screen)
         sl = checkScreenLevel(screen, levels)
         shifter = genValShifter(T, offset)
@@ -451,7 +451,7 @@ function checkGridParamArg(f::StableMorphism{T, F, N}, input::I, ::Missing) wher
     f, F, deepcopy( f(obtain.(input)...)|>ShapedMemory )
 end
 
-mutable struct GridParam{T, F<:Function, I<:ParamInputType{T}, N} <: ParamToken{T, N, I}
+mutable struct GridParam{T, F<:Function, I<:ParamInputType{T}, N} <: BaseParam{T, N, I}
     const lambda::StableMorphism{T, F, N}
     const input::I
     const symbol::IndexedSym
@@ -583,12 +583,12 @@ ParamMesh(FixedShapeLink(obtain(input); axis), (input,), symbol)
 
 genDefaultRefParSym(input::DoubleDimParam) = IndexedSym(:_, input.symbol)
 
-struct NodeParam{T, F, I, N, O} <: ViewParam{T, N, I}
+struct KnotParam{T, F, I, N, O} <: LinkParam{T, N, I}
     input::Tuple{ParamMesh{T, F, I, N, O}}
     index::Int
     symbol::IndexedSym
 
-    function NodeParam(input::Tuple{ParamMesh{T, F, I, N, O}}, index::Int, 
+    function KnotParam(input::Tuple{ParamMesh{T, F, I, N, O}}, index::Int, 
                        symbol::SymOrIndexedSym=genDefaultRefParSym(input|>first)) where 
                       {T, F, I, N, O}
         maxIndex = length(first(input).memory)
@@ -599,14 +599,14 @@ struct NodeParam{T, F, I, N, O} <: ViewParam{T, N, I}
     end
 end
 
-NodeParam(par::ParamMesh, index::Int, symbol::SymOrIndexedSym=genDefaultRefParSym(par)) = 
-NodeParam((par,), index, symbol)
+KnotParam(par::ParamMesh, index::Int, symbol::SymOrIndexedSym=genDefaultRefParSym(par)) = 
+KnotParam((par,), index, symbol)
 
 
 function fragment(pn::ParamMesh{T, F, I, N, O}) where {T, F, I, N, O}
-    res = Array{NodeParam{T, F, I, N, O}}(undef, last.(pn.lambda.axis))
+    res = Array{KnotParam{T, F, I, N, O}}(undef, last.(pn.lambda.axis))
     for i in eachindex(res)
-        res[i] = NodeParam(pn, i)
+        res[i] = KnotParam(pn, i)
     end
     res
 end
@@ -614,14 +614,14 @@ end
 fragment(pl::ParamGrid) = directObtain(pl.input|>first)
 
 
-getScreenLevelOptions(::Type{<:NodeParam}) = (0,)
+getScreenLevelOptions(::Type{<:ParamGrid}) = (0, 2)
 
-getScreenLevelOptions(::Type{<:ParamToken}) = (0,)
+getScreenLevelOptions(::Type{<:LinkParam}) = (0,)
 
-getScreenLevelOptions(::Type{<:ParamToken{T, 0}}) where {T} = 
+getScreenLevelOptions(::Type{<:BaseParam{T, 0}}) where {T} = 
 Tuple(0:(checkTypedOpMethods(T) * 2))
 
-getScreenLevelOptions(::Type{<:ParamGrid}) = (0, 2)
+getScreenLevelOptions(::Type{<:ParamToken}) = (0,)
 
 getScreenLevelOptions(::Type{<:ParamBatch}) = (0,)
 
@@ -643,11 +643,11 @@ function isOffsetEnabled(pb::T) where {T<:CellParam}
     isdefined(pb, :offset) # Only for safety
 end
 
+screenLevelOf(p::BaseParam{<:Any, 0}) = Int(p.screen)
+
+screenLevelOf(::KnotParam) = 0
+
 screenLevelOf(::ParamToken) = 0
-
-screenLevelOf(p::ParamToken{<:Any, 0}) = Int(p.screen)
-
-screenLevelOf(::NodeParam) = 0
 
 screenLevelOf(::ParamBatch) = 0
 
@@ -679,15 +679,15 @@ setScreenLevel(p::CellParam, level::Int) = setScreenLevel!(CellParam(p), level)
 setScreenLevel(p::TensorVar, level::Int) = TensorVar(p.input, p.symbol, TernaryNumber(level))
 
 
-function memorizeCore!(p::ParamToken{T, N}, newMem::AbstractArray{T, N}) where {T, N}
+function memorizeCore!(p::BaseParam{T, N}, newMem::AbstractArray{T, N}) where {T, N}
     safelySetVal!(p.memory.value, newMem)
 end
 
-function memorizeCore!(p::ViewParam{T, N}, newMem::AbstractArray{T, N}) where {T, N}
+function memorizeCore!(p::LinkParam{T, N}, newMem::AbstractArray{T, N}) where {T, N}
     safelySetVal!(p.input.memory[p.index].value, newMem)
 end
 
-function memorize!(p::ParamToken{T, N}, newMem::AbstractArray{T, N}) where {T, N}
+function memorize!(p::BaseParam{T, N}, newMem::AbstractArray{T, N}) where {T, N}
     oldMem = directObtain(p.memory)
     if p.memory.shape == size(newMem)
         safelySetVal!(p.memory.value, newMem)
@@ -697,15 +697,15 @@ function memorize!(p::ParamToken{T, N}, newMem::AbstractArray{T, N}) where {T, N
     oldMem
 end
 
-function memorize!(p::ParamToken{T, 0}, newMem::AbstractArray{T, 0}) where {T}
+function memorize!(p::BaseParam{T, 0}, newMem::AbstractArray{T, 0}) where {T}
     oldMem = directObtain(p.memory)
     safelySetVal!(p.memory.value, newMem)
     oldMem
 end
 
-memorize!(p::ParamToken{T}, newMem::T) where {T} = memorize!(p, fill(newMem))
+memorize!(p::BaseParam{T}, newMem::T) where {T} = memorize!(p, fill(newMem))
 
-memorize!(p::ParamToken) = memorize!(p, obtain(p))
+memorize!(p::BaseParam) = memorize!(p, obtain(p))
 
 
 indexedSymOf(p::DoubleDimParam) = p.symbol
@@ -879,11 +879,11 @@ end
 
 
 obtainCore(p::PrimitiveParam) = directObtain(p.input)
-obtainCore(p::ParamToken) = directObtain(p.memory)
-obtainCore(p::ParamBatch) = map(directObtain, p.memory)
+obtainCore(p::BaseParam) = directObtain(p.memory)
+obtainCore(p::ParamLink) = map(directObtain, p.memory)
 
 function obtainCore(inputVal::NTuple{A, AbtArr210L{T}}, 
-                    p::ParamToken{T, <:Any, <:ParamInput{T, A}}) where {T, A}
+                    p::BaseParam{T, <:Any, <:ParamInput{T, A}}) where {T, A}
     p.lambda(inputVal...)
 end
 
@@ -910,10 +910,10 @@ end
 obtainCore(val::Memory{<:AbstractArray{T, N}}, p::ParamGrid{T, N}) where {T, N} = 
 reshape(val, p.input.shape)
 
-obtainCore(val::Memory{<:AbstractArray{T}}, p::NodeParam{T, <:Any, <:Any, 0}) where {T} = 
+obtainCore(val::Memory{<:AbstractArray{T}}, p::KnotParam{T, <:Any, <:Any, 0}) where {T} = 
 getindex(getindex(val), p.index)
 
-obtainCore(val::Memory{<:BiAbtArray{T, N}}, p::NodeParam{T, <:Any, <:Any, N}) where {T, N} = 
+obtainCore(val::Memory{<:BiAbtArray{T, N}}, p::KnotParam{T, <:Any, <:Any, N}) where {T, N} = 
 getindex(getindex(val), p.index)
 
 const ParamValDict{T} = ParamPointerDict{ T, T, AbstractArray{T}, BiAbtArray{T}, 
@@ -972,7 +972,7 @@ function setVal!(par::CellParam{T}, val::T) where {T}
     @atomic par.offset = val
 end
 
-isPrimitiveParam(pn::ParamToken) = (screenLevelOf(pn) == 1)
+isPrimitiveParam(pn::BaseParam) = (screenLevelOf(pn) == 1)
 
 # import Base: iterate, size, length, eltype, broadcastable
 # length(::FixedSizeParam{<:Any, N}) where {N} = N
@@ -1060,7 +1060,7 @@ function ParamMarker(p::T) where {T<:GridParam}
     ParamMarker(objectid(T), markObj.(p.input), markObj(p.lambda), ())
 end
 
-function ParamMarker(p::T) where {T<:NodeParam}
+function ParamMarker(p::T) where {T<:KnotParam}
     ParamMarker(objectid(T), markObj.(p.input), NothingID, (objectid(p.index),))
 end
 
