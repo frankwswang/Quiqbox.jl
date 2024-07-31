@@ -208,5 +208,5 @@ const ParBTypeArgNumOutDim{T, N, A} = ParamToken{T, N, <:NTuple{A, DoubleDimPara
 
 const AbtMemory0D{T} = AbstractMemory{T, 0}
 
-const ParamFunctor{T, N, I} = Union{ParamLink{T, N, I}, ParamToken{T, N, I}}
-const ParamPointer{T, N, I} = Union{LinkParam{T, N, I}, ParamNest{ T, N, I}}
+const ParamFunctor{T, N, I} = Union{BaseParam{T, N, I}, ParamLink{T, N, I}}
+const ParamPointer{T, N, I} = Union{LinkParam{T, N, I}, ParamNest{T, N, I}}

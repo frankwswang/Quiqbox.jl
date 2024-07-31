@@ -1070,11 +1070,11 @@ function genParamTypeVector(::Type{PT1}, ::Type{PT2}, idx::Int=1) where {PT1, PT
     ifelse(T===Any, PT2[], PT2{numT}[])
 end
 
-packElementalVal(::Val{0}, obj::Any) = fill(obj)
-packElementalVal(::Val{0}, obj::AbtArray0D) = copy(obj)
-packElementalVal(::Val{N}, obj::AbstractArray{<:Any, N}) where {N} = copy(obj)
-packElementalVal(::Type{U}, obj::U) where {U} = fill(obj)
-packElementalVal(::Type{U}, obj::AbstractArray{<:U}) where {U} = copy(obj)
+# packElementalVal(::Val{0}, obj::Any) = fill(obj)
+# packElementalVal(::Val{0}, obj::AbtArray0D) = copy(obj)
+# packElementalVal(::Val{N}, obj::AbstractArray{<:Any, N}) where {N} = copy(obj)
+# packElementalVal(::Type{U}, obj::U) where {U} = fill(obj)
+# packElementalVal(::Type{U}, obj::AbstractArray{<:U}) where {U} = copy(obj)
 
-obtainElementalVal(::Type{U}, obj::AbtArray0D{<:U}) where {U} = obj[]
-obtainElementalVal(::Type{U}, obj::AbstractArray{<:U}) where {U} = copy(obj)
+# obtainElementalVal(::Type{U}, obj::AbtArray0D{<:U}) where {U} = obj[]
+# obtainElementalVal(::Type{U}, obj::AbstractArray{<:U}) where {U} = copy(obj)
