@@ -1,6 +1,6 @@
 export TensorVar, CellParam, GridParam, ParamGrid, ParamMesh, setScreenLevel!, 
        setScreenLevel, symOf, inputOf, obtain, fragment, setVal!, screenLevelOf, 
-       markParams!, topoSort, getParams, ShapedMemory, directObtain
+       markParams!, topoSort, getParams, ShapedMemory, directObtain, memorize!
 
 using Base: Fix2, Threads.Atomic, issingletontype
 using Test: @inferred
@@ -348,7 +348,7 @@ mutable struct CellParam{T, F<:Function, I<:ParamInputType{T}} <: BaseParam{T, 0
     const lambda::TypedReduction{T, F}
     const input::I
     const symbol::IndexedSym
-    const memory::ShapedMemory{T, 0}
+    @atomic memory::ShapedMemory{T, 0}
     @atomic screen::TernaryNumber
     @atomic offset::T
 
@@ -674,38 +674,64 @@ function setScreenLevel!(p::T, level::Int) where {T<:CellParam}
     p
 end
 
-setScreenLevel(p::CellParam, level::Int) = setScreenLevel!(CellParam(p), level)
+setScreenLevel(p::CellParam, level::Int) = 
+setScreenLevel!(CellParam(p), level)
 
-setScreenLevel(p::TensorVar, level::Int) = TensorVar(p.input, p.symbol, TernaryNumber(level))
+setScreenLevel(p::TensorVar, level::Int) = 
+TensorVar(p.input, p.symbol, TernaryNumber(level))
 
 
-function memorizeCore!(p::BaseParam{T, N}, newMem::AbstractArray{T, N}) where {T, N}
-    safelySetVal!(p.memory.value, newMem)
-end
-
-function memorizeCore!(p::LinkParam{T, N}, newMem::AbstractArray{T, N}) where {T, N}
-    safelySetVal!(p.input.memory[p.index].value, newMem)
-end
-
-function memorize!(p::BaseParam{T, N}, newMem::AbstractArray{T, N}) where {T, N}
-    oldMem = directObtain(p.memory)
-    if p.memory.shape == size(newMem)
-        safelySetVal!(p.memory.value, newMem)
-    else
-        @atomic p.memory = ShapedMemory(newMem)
+function swapParamMem!(p::ParamLink{T, N}, 
+                       memNew::AbstractArray{ShapedMemory{T, N}}) where {T, N}
+    if length(p.memory) != length(memNew)
+        throw(AssertionError("`memNew` should have the same length as `p`'s memory."))
     end
-    oldMem
+    res = lock( ReentrantLock() ) do
+        map(enumerate(memNew)) do (i, innerMemNew)
+            memOld = directObtain(p.memory[i])
+            p.memory[i] = innerMemNew
+            memOld
+        end
+    end
+    reshape(res, p.lambda.shape)
 end
 
-function memorize!(p::BaseParam{T, 0}, newMem::AbstractArray{T, 0}) where {T}
-    oldMem = directObtain(p.memory)
-    safelySetVal!(p.memory.value, newMem)
-    oldMem
+function swapParamMem!(p::ParamLink{T, N}, memNew::ShapedMemory{T, N}, 
+                       index::Int) where {T, N}
+    memOld = directObtain(p.memory[index])
+    lock( ReentrantLock() ) do; p.memory[index] = memNew end
+    memOld
 end
 
-memorize!(p::BaseParam{T}, newMem::T) where {T} = memorize!(p, fill(newMem))
+function swapParamMem!(p::LinkParam{T, N}, memNew::ShapedMemory{T, N}) where {T, N}
+    swapParamMem!(p.input, memNew, p.index)
+end
 
-memorize!(p::BaseParam) = memorize!(p, obtain(p))
+function swapParamMem!(p::BaseParam{T, N}, memNew::ShapedMemory{T, N}) where {T, N}
+    memOld = directObtain(p.memory)
+    @atomic p.memory = memNew
+    memOld
+end
+
+memorize!(p::ParamLink{T, N}, memNew::BiAbtArray{T, N}) where {T, N} = 
+swapParamMem!(p, map(ShapedMemory, memNew))
+
+memorize!(p::ParamLink{T, 0}, memNew::AbstractArray{T}) where {T} = 
+swapParamMem!(p, map(ShapedMemory∘fill, memNew))
+
+memorize!(p::LinkParam{T, N}, memNew::AbstractArray{T, N}) where {T, N} = 
+swapParamMem!(p, ShapedMemory(memNew))
+
+memorize!(p::LinkParam{T, 0}, memNew::T) where {T} = 
+swapParamMem!(p, (ShapedMemory∘fill)(memNew))
+
+memorize!(p::BaseParam{T, N}, memNew::AbstractArray{T, N}) where {T, N} = 
+swapParamMem!(p, ShapedMemory(memNew))
+
+memorize!(p::BaseParam{T, 0}, memNew::T) where {T} = 
+swapParamMem!(p, (ShapedMemory∘fill)(memNew))
+
+memorize!(p::ParamFunctor) = memorize!(p, obtain(p))
 
 
 indexedSymOf(p::DoubleDimParam) = p.symbol
