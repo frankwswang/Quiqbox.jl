@@ -37,7 +37,7 @@ ShapedMemory(::Type{T}, value::AbstractArray{T}) where {T} = ShapedMemory(value)
 
 ShapedMemory(::Type{T}, value::T) where {T} = ShapedMemory( fill(value) )
 
-ShapedMemory(sm::ShapedMemory) = ShapedMemory(sm.value, sm.shape)
+ShapedMemory(arr::ShapedMemory) = ShapedMemory(arr.value, arr.shape)
 
 import Base: size, getindex, setindex!, iterate, length
 size(arr::ShapedMemory) = arr.shape
@@ -693,7 +693,7 @@ function swapParamMem!(p::ParamLink{T, N},
             memOld
         end
     end
-    reshape(res, p.lambda.shape)
+    reshape(res, last.(p.lambda.axis))
 end
 
 function swapParamMem!(p::ParamLink{T, N}, memNew::ShapedMemory{T, N}, 
@@ -906,7 +906,7 @@ end
 
 obtainCore(p::PrimitiveParam) = directObtain(p.input)
 obtainCore(p::BaseParam) = directObtain(p.memory)
-obtainCore(p::ParamLink) = map(directObtain, p.memory)
+obtainCore(p::ParamLink) = reshape(map(directObtain, p.memory), last.(p.lambda.axis))
 
 function obtainCore(inputVal::NTuple{A, AbtArr210L{T}}, 
                     p::BaseParam{T, <:Any, <:ParamInput{T, A}}) where {T, A}
@@ -1064,7 +1064,7 @@ end
 
 markObj(marker::IdentityMarker) = itself(marker)
 
-markObj(f::ShapedMemory) = markObj( (markObj(f.value), objectid(f.shape)) )
+markObj(arr::ShapedMemory) = markObj( (markObj(arr.value), objectid(arr.shape)) )
 
 const NothingID = markObj( objectid(nothing) )
 
@@ -1318,19 +1318,14 @@ end
 topoSort(node::CellParam{T}) where {T} = topoSortINTERNAL([node])
 
 
-# Sever the connection of a node to other nodes
-sever(pv::TensorVar) = TensorVar(obtain(pv), pv.symbol)
+# # Sever the connection of a node to other nodes
+# sever(pv::TensorVar) = TensorVar(obtain(pv), pv.symbol)
 
-# function sever(ps::T) where {T<:ParamToken}
+# sever(obj::Any) = deepcopy(obj)
 
-#     T(sever.(ps.input), ps.symbol)
+# sever(obj::Union{Tuple, AbstractArray}) = sever.(obj)
+
+# function sever(pf::T) where {T<:ParamFunction}
+#     severedFields = map(field->(sever∘getproperty)(pf, field), fieldnames(pf))
+#     T(severedFields...)
 # end
-
-sever(obj::Any) = deepcopy(obj)
-
-sever(obj::Union{Tuple, AbstractArray}) = sever.(obj)
-
-function sever(pf::T) where {T<:ParamFunction}
-    severedFields = map(field->(sever∘getproperty)(pf, field), fieldnames(pf))
-    T(severedFields...)
-end
