@@ -1095,7 +1095,7 @@ function ParamMarker(p::T) where {T<:ParamGrid}
 end
 
 function ParamMarker(p::T) where {T<:ParamMesh}
-    ParamMarker(objectid(T), markObj.(pn.input), markObj(p.lambda), ())
+    ParamMarker(objectid(T), markObj.(p.input), markObj(p.lambda), ())
 end
 
 compareMarker(pm1::IdentityMarker, pm2::IdentityMarker) = false
