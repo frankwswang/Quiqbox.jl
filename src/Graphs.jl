@@ -14,28 +14,42 @@ function genConstFunc(::Type{T1}, val::T2) where {T1, T2}
 end
 
 
-struct ValueNode{T, N} <: ContainerNode{T, N, 0}
-    value::ShapedMemory{T, N}
+struct ValueNode{T, N, O} <: ContainerNode{T, N, O}
+    value::ShapedMemory{ShapedMemory{T, N}, O}
     frozen::Bool
     marker::Symbol
     id::UInt
 
-    function ValueNode(p::ParamToken{T, N}) where {T, N}
+    function ValueNode(p::BaseParam{T, N}) where {T, N}
         sl = screenLevelOf(p)
         if sl == 0
-            val = ShapedMemory(T, directObtain(p.memory))
+            valRaw = obtainCore(p)
             frozen = false
         else
-            val = ShapedMemory(T, obtain(p))
+            valRaw = obtain(p)
             frozen = Bool(sl-1)
         end
-        new{T, N}(val, frozen, getParSym(p), objectid(p))
+        new{T, N, 0}( (ShapedMemory∘fill∘ShapedMemory)(T, valRaw), frozen, 
+                      getParSym(p), objectid(p) )
+    end
+
+    function ValueNode(p::ParamLink{T, N, <:Any, O}) where {T, N, O}
+        sl = screenLevelOf(p)
+        if sl == 0
+            valRaw = obtainCore(p)
+            frozen = false
+        else
+            valRaw = obtain(p)
+            frozen = Bool(sl-1)
+        end
+        new{T, N, O}( ShapedMemory( map(x->ShapedMemory(T, x), valRaw) ), frozen, 
+                      getParSym(p), objectid(p) )
     end
 
     function ValueNode(p::PrimitiveParam{T, N}) where {T, N}
         frozen = (screenLevelOf(p) == 2)
-        val = ShapedMemory(T, obtain(p))
-        new{T, N}(val, frozen, getParSym(p), objectid(p))
+        val = (ShapedMemory∘fill∘ShapedMemory)(T, obtain(p))
+        new{T, N, 0}(val, frozen, getParSym(p), objectid(p))
     end
 end
 
@@ -59,7 +73,7 @@ struct BuildNode{T, N, O, F<:ParamOperator{T, <:Any, N, O}, S<:Union{iT, ValShif
     marker::Symbol
     id::UInt
 
-    function BuildNode(children::I, p::ParamToken{T, N}) where 
+    function BuildNode(children::I, p::BaseParam{T, N}) where 
                       {T, N, I<:NodeChildrenType{T}}
         operator = p.lambda
         includeOffset = hasfield(typeof(p), :offset) && isOffsetEnabled(p)
@@ -94,11 +108,11 @@ struct IndexNode{T, N, I<:BuildNode{T, N}} <: ReferenceNode{T, N, 0, I}
 end
 
 
-genGraphNodeCore(p::ParamFunctor) = ValueNode(p)
 genGraphNodeCore(p::PrimitiveParam) = ValueNode(p)
+genGraphNodeCore(p::ParamFunctor) = ValueNode(p)
 
 function genGraphNodeCore(source::NTuple{A, GraphNode{T}}, 
-                            p::ParamToken{T, <:Any, <:ParamInput{T, A}}) where {T, A}
+                          p::ParamFunctor{T, <:Any, <:ParamInput{T, A}}) where {T, A}
     BuildNode(source, p)
 end
 
@@ -127,7 +141,7 @@ end
 genGraphNode(p::PrimitiveParam) = genGraphNodeCore(p)
 
 
-evaluateNode(gn::ValueNode{T}) where {T} = directObtain(gn.value)
+evaluateNode(gn::ValueNode{T}) where {T} = directObtain.(gn.value)
 
 evaluateNode(gn::BatchNode{T}) where {T} = map(evaluateNode, gn.source)
 
@@ -165,7 +179,7 @@ function genGetVal!(tempStorage::TemporaryStorage{T}, gn::ValueNode{T}) where {T
     data = get(sector, id, nothing)
     if data === nothing
         idx = length(sector) + 1
-        setindex!(sector, (directObtain(gn.value), idx), id)
+        setindex!(sector, (evaluateNode(gn), idx), id)
     else
         idx = last(data)
     end
@@ -181,7 +195,7 @@ function genGetVal!(::Type{T}, ::Val{N}, idx::Int) where {T, N}
 end
 
 function compressNodeCore!(tStorage::TemporaryStorage{T}, 
-                           paramSet::DimParamSet{T}, gn::ValueNode{T, N}) where {T, N}
+                           paramSet::DimParamSet{T}, gn::ValueNode{T, N, 0}) where {T, N}
     varIdx = if gn.frozen
         nothing
     else
