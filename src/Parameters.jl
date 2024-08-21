@@ -784,7 +784,7 @@ getParamDataTypeUB(::ParamPointerDict{T, <:Any, V1, <:Any},
 getParamDataTypeUB(::ParamPointerDict{T, <:Any, <:Any, V2}, 
                    ::DoubleDimParam{T}) where {T, V2} = V2
 
-function checkGetDataIterNum(counter::Int, maxRec::Int)
+function checkGetDataRecNum(counter::Int, maxRec::Int)
     if counter > maxRec
         throw( ErrorException("The recursive calling times passed the limit: $maxRec.") )
     end
@@ -794,7 +794,7 @@ end
 function getDataCore1(counter::Int, d::ParamPointerDict{T}, p::DoubleDimParam{T}, 
                       failFlag) where {T}
     counter += 1
-    checkGetDataIterNum(counter, d.maxRecursion)
+    checkGetDataRecNum(counter, d.maxRecursion)
     res = get(selectParamPointer(d, p), p, failFlag)
     res===failFlag ? failFlag : res.data
 end
@@ -802,7 +802,7 @@ end
 function getDataCore1(counter::Int, d::ParamPointerDict{T}, p::ParamPointer{T}, 
                       failFlag) where {T}
     counter += 1
-    checkGetDataIterNum(counter, d.maxRecursion)
+    checkGetDataRecNum(counter, d.maxRecursion)
     res = get(d.id, p, failFlag)
     res===failFlag ? failFlag : d.generator(getDataCore2(counter, d, res.data, failFlag), p)
 end
