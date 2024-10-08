@@ -114,7 +114,7 @@ function checkReturnType(f::F, ::Type{T}, args::NonEmptyTuple{Any}) where {F, T}
 end
 
 
-struct TypedReduction{T, F<:Function} <: ParamOperator{T, F, 0, 0}
+struct TypedReduction{T, F<:Function} <: JaggedOperator{T, 0, 0}
     f::F
 
     function TypedReduction(f::F, arg, args...) where {F}
@@ -140,7 +140,7 @@ end
 (::TypedReduction{T, iT})(arg::T) where {T} = itself(arg)
 
 
-struct StableMorphism{T, F<:Function, N} <: ParamOperator{T, F, N, 0}
+struct StableMorphism{T, F<:Function, N} <: JaggedOperator{T, N, 0}
     f::F
 
     function StableMorphism(f::F, arg, args...) where {F}
@@ -174,7 +174,7 @@ end
 
 FixedShapeLinkAxisType = Union{NonEmptyTuple{Tuple{Symbol, Int}}, Missing}
 
-struct FixedShapeLink{T, F<:Function, N, O} <: ParamOperator{T, F, N, O}
+struct FixedShapeLink{T, F<:Function, N, O} <: JaggedOperator{T, N, O}
     f::F
     axis::NTuple{O, Tuple{Symbol, Int}}
     extent::Int
@@ -214,13 +214,13 @@ end
 FixedShapeLink(fslf::FixedShapeLink, ::Type{V}, arg, args...) where {V<:AbstractArray} = 
 FixedShapeLink(fslf.f, arg, args...)
 
-callFixedShapeLinkCore(ml::FixedShapeLink{T, <:Any, N}, 
-                       arg::AbtArr210L{T}, args::AbtArr210L{T}...) where {T, N} = 
-ml.f(arg, args...)::AbstractArray{<:AbstractArray{T, N}}
+callFixedShapeLinkCore(ml::FixedShapeLink{T, <:Any, N, O}, 
+                       arg::AbtArr210L{T}, args::AbtArr210L{T}...) where {T, N, O} = 
+ml.f(arg, args...)::AbstractArray{<:AbstractArray{T, N}, O}
 
-callFixedShapeLinkCore(ml::FixedShapeLink{T, <:Any, 0}, 
-                       arg::AbtArr210L{T}, args::AbtArr210L{T}...) where {T} = 
-ml.f(arg, args...)::AbstractArray{<:T}
+callFixedShapeLinkCore(ml::FixedShapeLink{T, <:Any, 0, O}, 
+                       arg::AbtArr210L{T}, args::AbtArr210L{T}...) where {T, O} = 
+ml.f(arg, args...)::AbstractArray{<:T, O}
 
 function (ml::FixedShapeLink{T})(arg::AbtArr210L{T}, args::AbtArr210L{T}...) where {T}
     res = callFixedShapeLinkCore(ml, arg, args...)
@@ -230,7 +230,7 @@ end
 
 (::FixedShapeLink{T, iT, 0, O})(arg::AbstractArray{T, O}) where {T, O} = itself(arg)
 
-(::FixedShapeLink{T, iT, N, O})(arg::BiAbtArray{T, N, O}) where {T, N, O} = itself(arg)
+(::FixedShapeLink{T, iT, N, O})(arg::JaggedAbtArray{T, N, O}) where {T, N, O} = itself(arg)
 
 
 function checkScreenLevel(sl::Int, levels::NonEmptyTuple{Int})
@@ -299,7 +299,7 @@ end
 
 function checkParamInputCore(hasVariable::Bool, par::P, 
                              doubleDimMinMax::NTuple{2, NTuple{2, Int}}) where 
-                            {T, N, O, P<:DoubleDimParam{T, N, O}}
+                            {T, N, O, P<:JaggedParam{T, N, O}}
     for (dim, str, minMax) in zip((N, O), ("inner", "outer"), doubleDimMinMax)
         if !(minMax[begin] <= dim <= minMax[end])
             throw(DomainError(dim, "The input `par`'s $str dimension falls outside the "*
@@ -386,17 +386,17 @@ function CellParam(func::Function, input::ParamInputType{T}, symbol::SymOrIndexe
     CellParam(lambda, input, symbol, init, TUS0, initializeOffset(T))
 end
 
-CellParam(func::Function, input::DoubleDimParam{T}, symbol::SymOrIndexedSym; 
+CellParam(func::Function, input::JaggedParam{T}, symbol::SymOrIndexedSym; 
           init::Union{ShapedMemory{T, 0}, T, Missing}=missing) where {T} = 
 CellParam(func, (input,), symbol; init)
 
-CellParam(func::Function, input1::DoubleDimParam{T}, input2::DoubleDimParam{T}, 
+CellParam(func::Function, input1::JaggedParam{T}, input2::JaggedParam{T}, 
           symbol::SymOrIndexedSym; 
           init::Union{ShapedMemory{T, 0}, T, Missing}=missing) where {T} = 
 CellParam(func, (input1, input2), symbol; init)
 
-CellParam(func::Function, input1::DoubleDimParam{T}, input2::DoubleDimParam{T}, 
-          input3::DoubleDimParam{T}, symbol::SymOrIndexedSym; 
+CellParam(func::Function, input1::JaggedParam{T}, input2::JaggedParam{T}, 
+          input3::JaggedParam{T}, symbol::SymOrIndexedSym; 
           init::Union{ShapedMemory{T, 0}, T, Missing}=missing) where {T} = 
 CellParam(func, (input1, input2, input3), symbol; init)
 
@@ -414,7 +414,7 @@ CellParam(TensorVar(var, varSym), symbol)
 
 
 function checkGridParamArg(::StableMorphism{T, <:iTalike, N}, input::I, memory::M) where 
-                          {T, N, O, I<:DoubleDimParam{T, <:Any, O}, M<:AbstractArray{T, N}}
+                          {T, N, O, I<:JaggedParam{T, <:Any, O}, M<:AbstractArray{T, N}}
     checkParamContainerArgType1(I, Tuple{SingleDimParam{T, N}})
     MI = typeof(input[1])
     if !(M <: MI)
@@ -425,7 +425,7 @@ function checkGridParamArg(::StableMorphism{T, <:iTalike, N}, input::I, memory::
 end
 
 function checkGridParamArg(::StableMorphism{T, <:iTalike, N}, input::I, ::Missing) where 
-                          {T, N, O, I<:DoubleDimParam{T, <:Any, O}}
+                          {T, N, O, I<:JaggedParam{T, <:Any, O}}
     checkParamContainerArgType1(I, Tuple{SingleDimParam{T, N}})
     checkParamInput(input, innerDimMax=(O==0)*N, outerDimMax=(O==N)*N)
     StableMorphism(AbstractArray{T, N}), iT, deepcopy(input[1]|>obtain|>ShapedMemory)
@@ -472,17 +472,17 @@ function GridParam(func::Function, input::ParamInputType{T}, symbol::SymOrIndexe
     GridParam(lambda, input, symbol, init)
 end
 
-GridParam(func::Function, input::DoubleDimParam{T}, symbol::SymOrIndexedSym; 
+GridParam(func::Function, input::JaggedParam{T}, symbol::SymOrIndexedSym; 
           init::Union{AbstractArray{T}, Missing}=missing) where {T} = 
 GridParam(func, (input,), symbol; init)
 
-GridParam(func::Function, input1::DoubleDimParam{T}, input2::DoubleDimParam{T}, 
+GridParam(func::Function, input1::JaggedParam{T}, input2::JaggedParam{T}, 
           symbol::SymOrIndexedSym; 
           init::Union{AbstractArray{T}, Missing}=missing) where {T} = 
 GridParam(func, (input1, input2), symbol; init)
 
-GridParam(func::Function, input1::DoubleDimParam{T}, input2::DoubleDimParam{T}, 
-          input3::DoubleDimParam{T}, symbol::SymOrIndexedSym; 
+GridParam(func::Function, input1::JaggedParam{T}, input2::JaggedParam{T}, 
+          input3::JaggedParam{T}, symbol::SymOrIndexedSym; 
           init::Union{AbstractArray{T}, Missing}=missing) where {T} = 
 GridParam(func, (input1, input2, input3), symbol; init)
 
@@ -562,26 +562,26 @@ function ParamMesh(func::Function, input::ParamInputType, symbol::SymOrIndexedSy
     ParamMesh(lambda, input, symbol)
 end
 
-ParamMesh(func::Function, input::DoubleDimParam{T}, symbol::SymOrIndexedSym; 
+ParamMesh(func::Function, input::JaggedParam{T}, symbol::SymOrIndexedSym; 
           axis::FixedShapeLinkAxisType=missing) where {T} = 
 ParamMesh(func, (input,), symbol; axis)
 
-ParamMesh(func::Function, input1::DoubleDimParam{T}, input2::DoubleDimParam{T}, 
+ParamMesh(func::Function, input1::JaggedParam{T}, input2::JaggedParam{T}, 
           symbol::SymOrIndexedSym; 
           axis::FixedShapeLinkAxisType=missing) where {T} = 
 ParamMesh(func, (input1, input2), symbol; axis)
 
-ParamMesh(func::Function, input1::DoubleDimParam{T}, input2::DoubleDimParam{T}, 
-          input3::DoubleDimParam{T}, symbol::SymOrIndexedSym; 
+ParamMesh(func::Function, input1::JaggedParam{T}, input2::JaggedParam{T}, 
+          input3::JaggedParam{T}, symbol::SymOrIndexedSym; 
           axis::FixedShapeLinkAxisType=missing) where {T} = 
 ParamMesh(func, (input1, input2, input3), symbol; axis)
 
-ParamMesh(input::DoubleDimParam, symbol::SymOrIndexedSym; 
+ParamMesh(input::JaggedParam, symbol::SymOrIndexedSym; 
           axis::FixedShapeLinkAxisType=missing) = 
 ParamMesh(FixedShapeLink(obtain(input); axis), (input,), symbol)
 
 
-genDefaultRefParSym(input::DoubleDimParam) = IndexedSym(:_, input.symbol)
+genDefaultRefParSym(input::JaggedParam) = IndexedSym(:_, input.symbol)
 
 struct KnotParam{T, F, I, N, O} <: LinkParam{T, N, I}
     input::Tuple{ParamMesh{T, F, I, N, O}}
@@ -627,16 +627,16 @@ getScreenLevelOptions(::Type{<:ParamBatch}) = (0,)
 
 getScreenLevelOptions(::Type{<:PrimitiveParam}) = (1, 2)
 
-getScreenLevelOptions(::Type{<:DoubleDimParam}) = (0, 1, 2)
+getScreenLevelOptions(::Type{<:JaggedParam}) = (0, 1, 2)
 
-getScreenLevelOptions(::T) where {T<:DoubleDimParam} = getScreenLevelOptions(T)
+getScreenLevelOptions(::T) where {T<:JaggedParam} = getScreenLevelOptions(T)
 
-function isScreenLevelChangeable(::Type{T}) where {T<:DoubleDimParam}
+function isScreenLevelChangeable(::Type{T}) where {T<:JaggedParam}
     minLevel, maxLevel = extrema( getScreenLevelOptions(T) )
     (maxLevel - minLevel) > 0
 end
 
-isOffsetEnabled(::DoubleDimParam) = false
+isOffsetEnabled(::JaggedParam) = false
 
 function isOffsetEnabled(pb::T) where {T<:CellParam}
     isScreenLevelChangeable(T) && maximum( getScreenLevelOptions(T) ) > 0 && 
@@ -656,7 +656,7 @@ screenLevelOf(p::PrimitiveParam) = Int(p.screen)
 screenLevelOf(p::ParamGrid) = ifelse(all(l==2 for l in screenLevelOf.(p.input.value)), 2, 0)
 
 
-function setScreenLevelCore!(p::DoubleDimParam, level::Int)
+function setScreenLevelCore!(p::JaggedParam, level::Int)
     @atomic p.screen = TernaryNumber(level)
 end
 
@@ -713,7 +713,7 @@ function swapParamMem!(p::BaseParam{T, N}, memNew::ShapedMemory{T, N}) where {T,
     memOld
 end
 
-memorize!(p::ParamLink{T, N}, memNew::BiAbtArray{T, N}) where {T, N} = 
+memorize!(p::ParamLink{T, N}, memNew::JaggedAbtArray{T, N}) where {T, N} = 
 swapParamMem!(p, map(ShapedMemory, memNew))
 
 memorize!(p::ParamLink{T, 0}, memNew::AbstractArray{T}) where {T} = 
@@ -734,11 +734,11 @@ swapParamMem!(p, (ShapedMemory∘fill)(memNew))
 memorize!(p::ParamFunctor) = memorize!(p, obtain(p))
 
 
-indexedSymOf(p::DoubleDimParam) = p.symbol
+indexedSymOf(p::JaggedParam) = p.symbol
 
-symOf(p::DoubleDimParam) = indexedSymOf(p).name
+symOf(p::JaggedParam) = indexedSymOf(p).name
 
-inputOf(p::DoubleDimParam) = p.input
+inputOf(p::JaggedParam) = p.input
 
 
 mutable struct NodeMarker{T} <: StorageMarker{T}
@@ -750,14 +750,14 @@ end
 
 const ParamDict0D{T, V} = IdDict{ElementalParam{T}, NodeMarker{V}}
 const ParamDictSD{T, V} = IdDict{SingleDimParam{T}, NodeMarker{V}}
-const ParamDictDD{T, V} = IdDict{DoubleDimParam{T}, NodeMarker{V}}
+const ParamDictDD{T, V} = IdDict{JaggedParam{T}, NodeMarker{V}}
 
-const ParamInputSource{T} = Memory{<:DoubleDimParam{T}}
-const ParamDictId{T} = IdDict{DoubleDimParam{T}, NodeMarker{<:ParamInputSource{T}}}
+const ParamInputSource{T} = Memory{<:JaggedParam{T}}
+const ParamDictId{T} = IdDict{JaggedParam{T}, NodeMarker{<:ParamInputSource{T}}}
 
 const DefaultMaxParamPointerLevel = 10
 
-struct ParamPointerDict{T, V0, V1, V2, F<:Function} <: MixedContainer{T}
+struct ParamPointerDict{T, V0, V1, V2, F<:Function} <: QueryBox{NodeMarker}
     d0::ParamDict0D{T, V0}
     d1::ParamDictSD{T, V1}
     d2::ParamDictDD{T, V2}
@@ -774,7 +774,7 @@ end
 
 selectParamPointer(d::ParamPointerDict{T}, ::ElementalParam{T}) where {T} = d.d0
 selectParamPointer(d::ParamPointerDict{T}, ::SingleDimParam{T}) where {T} = d.d1
-selectParamPointer(d::ParamPointerDict{T}, ::DoubleDimParam{T}) where {T} = d.d2
+selectParamPointer(d::ParamPointerDict{T}, ::JaggedParam{T}) where {T} = d.d2
 selectParamPointer(d::ParamPointerDict{T}, ::ParamPointer{T}) where {T} = d.id
 
 getParamDataTypeUB(::ParamPointerDict{T, V0, <:Any, <:Any}, 
@@ -782,7 +782,7 @@ getParamDataTypeUB(::ParamPointerDict{T, V0, <:Any, <:Any},
 getParamDataTypeUB(::ParamPointerDict{T, <:Any, V1, <:Any}, 
                    ::SingleDimParam{T}) where {T, V1} = V1
 getParamDataTypeUB(::ParamPointerDict{T, <:Any, <:Any, V2}, 
-                   ::DoubleDimParam{T}) where {T, V2} = V2
+                   ::JaggedParam{T}) where {T, V2} = V2
 
 function checkGetDataRecNum(counter::Int, maxRec::Int)
     if counter > maxRec
@@ -791,7 +791,7 @@ function checkGetDataRecNum(counter::Int, maxRec::Int)
     nothing
 end
 
-function getDataCore1(counter::Int, d::ParamPointerDict{T}, p::DoubleDimParam{T}, 
+function getDataCore1(counter::Int, d::ParamPointerDict{T}, p::JaggedParam{T}, 
                       failFlag) where {T}
     counter += 1
     checkGetDataRecNum(counter, d.maxRecursion)
@@ -825,14 +825,14 @@ function getDataCore2(counter::Int, d::ParamPointerDict{T, V0, V1, V2},
     flag ? ( Memory{Union{eleTset...}}(container)::Memory{<:Union{V0, V1, V2}} ) : failFlag
 end
 
-function getData(d::ParamPointerDict{T}, p::DoubleDimParam{T}, default; 
+function getData(d::ParamPointerDict{T}, p::JaggedParam{T}, default; 
                  failFlag=nothing) where {T}
     res = getDataCore1(0, d, p, failFlag)
     res===failFlag ? default : res
 end
 
 function getParamMarker!(pDict::ParamPointerDict{T}, transformer::F, 
-                         p::DoubleDimParam{T}) where {T, F}
+                         p::JaggedParam{T}) where {T, F}
     mem = transformer(p)
     tUB = getParamDataTypeUB(pDict, p)
     markerType = NodeMarker{tUB}
@@ -853,7 +853,7 @@ function getParamMarker!(pDict::ParamPointerDict{T}, transformer::F,
 end
 
 function recursiveTransformCore1!(generator::F, marker::NodeMarker, 
-                                  p::DoubleDimParam) where {F<:Function}
+                                  p::JaggedParam) where {F<:Function}
     # Depth-first search by recursive calling
     if !marker.visited
         marker.visited = true
@@ -881,7 +881,7 @@ function recursiveTransform!(transformer::F, pDict::ParamPointerDict{T},
 end
 
 function recursiveTransform!(transformer::F, pDict::ParamPointerDict{T}, 
-                             p::DoubleDimParam{T}) where {F, T}
+                             p::JaggedParam{T}) where {F, T}
     marker = getParamMarker!(pDict, transformer, p)
 
     recursiveTransformCore1!(marker, p) do par
@@ -939,21 +939,21 @@ reshape(val, p.input.shape)
 obtainCore(val::Memory{<:AbstractArray{T}}, p::KnotParam{T, <:Any, <:Any, 0}) where {T} = 
 getindex(getindex(val), p.index)
 
-obtainCore(val::Memory{<:BiAbtArray{T, N}}, p::KnotParam{T, <:Any, <:Any, N}) where {T, N} = 
+obtainCore(val::Memory{<:JaggedAbtArray{T, N}}, p::KnotParam{T, <:Any, <:Any, N}) where {T, N} = 
 getindex(getindex(val), p.index)
 
-const ParamValDict{T} = ParamPointerDict{ T, T, AbstractArray{T}, BiAbtArray{T}, 
+const ParamValDict{T} = ParamPointerDict{ T, T, AbstractArray{T}, JaggedAbtArray{T}, 
                                           typeof(obtainCore) }
 
 genParamValDict(::Type{T}, maxRecursion::Int=DefaultMaxParamPointerLevel) where {T} = 
-ParamPointerDict(obtainCore, T, T, AbstractArray{T}, BiAbtArray{T}, maxRecursion)
+ParamPointerDict(obtainCore, T, T, AbstractArray{T}, JaggedAbtArray{T}, maxRecursion)
 
 function searchObtain(pDict::ParamValDict{T}, p::ParamMesh{T}) where {T}
     res = recursiveTransform!(obtainCore, pDict, p)
     reshape(res, last.(p.lambda.axis)) |> collect
 end
 
-searchObtain(pDict::ParamValDict{T}, p::DoubleDimParam{T}) where {T} = 
+searchObtain(pDict::ParamValDict{T}, p::JaggedParam{T}) where {T} = 
 recursiveTransform!(obtainCore, pDict, p)
 
 obtainINTERNAL(p::PrimitiveParam, ::Int) = obtainCore(p)
@@ -966,12 +966,12 @@ function obtainINTERNAL(ps::AbstractArray{<:PrimitiveParam{T}}, ::Int) where {T}
     map(x->obtainINTERNAL(x, 0), ps)
 end
 
-function obtainINTERNAL(ps::AbstractArray{<:DoubleDimParam{T}}, maxRecursion::Int) where {T}
+function obtainINTERNAL(ps::AbstractArray{<:JaggedParam{T}}, maxRecursion::Int) where {T}
     pValDict = genParamValDict(T, maxRecursion)
     map(p->searchObtain(pValDict, p), ps)
 end
 
-function obtain(p::AbtArrayOr{<:DoubleDimParam{T}}; 
+function obtain(p::AbtArrayOr{<:JaggedParam{T}}; 
                 maxRecursion::Int=DefaultMaxParamPointerLevel) where {T}
     lock( ReentrantLock() ) do
         obtainINTERNAL(p, maxRecursion)
@@ -980,7 +980,7 @@ end
 
 ################################
 
-(pn::DoubleDimParam)() = obtain(pn)
+(pn::JaggedParam)() = obtain(pn)
 
 function setVal!(par::PrimitiveParam{T, N}, val::AbstractArray{T, N}) where {T, N}
     if Int(par.screen) == 1
@@ -1037,7 +1037,7 @@ end
 
 markObj(input::PrimitiveParam) = ValueMarker(input)
 
-markObj(input::DoubleDimParam) = ParamMarker(input)
+markObj(input::JaggedParam) = ParamMarker(input)
 
 function isPrimVarCollection(arg::AbstractArray{T}) where {T}
     ET = isconcretetype(T) ? T : eltype( map(itself, arg) )
@@ -1138,11 +1138,11 @@ function compareMarker(pm1::T, pm2::T) where {T<:ParamMarker}
     isSame
 end
 
-compareParamContainer(::DoubleDimParam, ::DoubleDimParam) = false
+compareParamContainer(::JaggedParam, ::JaggedParam) = false
 
-compareParamContainer(::DoubleDimParam, ::Any) = false
+compareParamContainer(::JaggedParam, ::Any) = false
 
-compareParamContainer(::Any, ::DoubleDimParam) = false
+compareParamContainer(::Any, ::JaggedParam) = false
 
 compareParamContainer(p1::T, p2::T) where {T<:PrimitiveParam} = p1 === p2
 
@@ -1193,49 +1193,33 @@ end
 # mulCellParam(coeff::T, pn::CellParam{T}) where {T} = mulCellParam(pn, coeff)
 
 
-function sortParamContainers(::Type{C}, f::F, field::Symbol, roundAtol::T) where 
-                            {T, C<:ParamFunction{T}, F}
-    let roundAtol=roundAtol, f=f, field=field
-        function (container::C)
-            ele = getproperty(container, field)
-            ( roundToMultiOfStep(f(container), nearestHalfOf(roundAtol)), 
-              symFromIndexSym(ele.symbol), ParamMarker(ele) )
-        end
+# function sortParamContainers(::Type{C}, f::F, field::Symbol, roundAtol::T) where 
+#                             {T, C<:ParamFunction{T}, F}
+#     let roundAtol=roundAtol, f=f, field=field
+#         function (container::C)
+#             ele = getproperty(container, field)
+#             ( roundToMultiOfStep(f(container), nearestHalfOf(roundAtol)), 
+#               symFromIndexSym(ele.symbol), ParamMarker(ele) )
+#         end
+#     end
+# end
+
+function getParams(p::JaggedParam, sym::SymOrMiss=missing)
+    if ismissing(sym) || inSymbol(sym, symOf(ps))
+        [p]
+    else
+        eltype(p)[]
     end
 end
 
-
-function getParamFields(pf::T) where {T<:ParamFunction}
-    fields = fieldnames(pf)
-    ids = findall(x->(x isa ParamFunctions), fields)
-    getproperty.(pf, fields[ids])
+function getParams(v::NonEmptyTupleOrAbtArray, sym::SymOrMiss=missing)
+    isempty(v) ? ParamBox[] : reduce(vcat, getParams.(v, sym))
 end
 
-getParamFields(pf::ParamFunctions) = itself(pf)
+getParams(obj, sym::SymOrMiss=missing) = 
+getParams(SelectTrait{ParamBoxAccess}()(obj), obj, sym)
 
-getParams(p::DoubleDimParam) = [p]
-
-getParams(p::DoubleDimParam, ::Missing) = [p]
-
-function getParams(p::DoubleDimParam, sym::Symbol)
-    res = eltype(p)[]
-    inSymbol(sym, symOf(ps)) && push!(res, p)
-    res
-end
-
-function getParams(v::NonEmptyTupleOrAbtArray{T}, sym::SymOrMiss=missing) where 
-                  {T<:Union{ParamContainer, ParamObject}}
-    isempty(v) ? ParamContainer{T}[] : reduce(vcat, getParams.(v, sym))
-end
-
-function getParams(f::ParamFunction{T}, sym::SymOrMiss=missing) where {T}
-    res = map(field->getParams(field, sym), getParamFields(f))
-    len = length.(res) |> sum
-    isequal(len, 0) ? ParamContainer{T}[] : reduce(vcat, res)
-end
-
-
-uniqueParams(ps::AbstractArray{<:DoubleDimParam}) = 
+uniqueParams(ps::AbstractArray{<:JaggedParam}) = 
 markUnique(ps, compareFunction=compareParamContainer)[end]
 
 
@@ -1247,7 +1231,7 @@ function markParamsCore!(indexDict::IdDict{Symbol, Int}, leafPars)
     end
 end
 
-function markParams!(pars::AbstractVector{<:DoubleDimParam{T}}) where {T}
+function markParams!(pars::AbstractVector{<:JaggedParam{T}}) where {T}
     nodes, marks1, marks2 = topoSort(pars)
     leafPars = nodes[.!marks1 .*   marks2]
     rootPars = nodes[  marks1 .* .!marks2]
@@ -1267,12 +1251,12 @@ function markParams!(pars::AbstractVector{<:DoubleDimParam{T}}) where {T}
     (leafParsFormated, rootPars, selfPars)
 end
 
-markParams!(b::AbtArrayOr{<:ParamObject}) = markParams!(getParams(b))
+markParams!(b::AbtArrayOr) = b |> getParams |> markParams!
 
 function topoSortCore!(hbNodesIdSet::Set{UInt}, 
-                       orderedNodes::Vector{<:DoubleDimParam{T}}, 
+                       orderedNodes::Vector{<:JaggedParam{T}}, 
                        haveBranches::Vector{Bool}, connectRoots::Vector{Bool}, 
-                       node::DoubleDimParam{T}, recursive::Bool=false) where {T}
+                       node::JaggedParam{T}, recursive::Bool=false) where {T}
     sl = checkScreenLevel(screenLevelOf(node), getScreenLevelOptions(node))
 
     if sl in (0, 1)
@@ -1300,8 +1284,8 @@ function topoSortCore!(hbNodesIdSet::Set{UInt},
     nothing
 end
 
-function topoSortINTERNAL(nodes::AbstractVector{<:DoubleDimParam{T}}) where {T}
-    orderedNodes = DoubleDimParam{T}[]
+function topoSortINTERNAL(nodes::AbstractVector{<:JaggedParam{T}}) where {T}
+    orderedNodes = JaggedParam{T}[]
     haveBranches = Bool[]
     connectRoots = Bool[]
     hbNodesIdSet = Set{UInt}()
@@ -1311,7 +1295,7 @@ function topoSortINTERNAL(nodes::AbstractVector{<:DoubleDimParam{T}}) where {T}
     orderedNodes, haveBranches, connectRoots
 end
 
-function topoSort(nodes::AbstractVector{<:DoubleDimParam{T}}) where {T}
+function topoSort(nodes::AbstractVector{<:JaggedParam{T}}) where {T}
     uniqueParams(nodes) |> topoSortINTERNAL
 end
 
