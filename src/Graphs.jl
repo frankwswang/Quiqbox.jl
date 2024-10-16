@@ -65,7 +65,7 @@ struct BatchNode{T, N, O,
     end
 end
 
-struct BuildNode{T, N, O, F<:ParamOperator{T, <:Any, N, O}, S<:Union{iT, ValShifter{T}}, 
+struct BuildNode{T, N, O, F<:JaggedOperator{T, N, O}, S<:Union{iT, ValShifter{T}}, 
                  I<:NodeChildrenType{T}} <: OperationNode{T, N, O, I}
     operator::F
     shifter::S
@@ -125,11 +125,11 @@ genGraphNodeCore(val::Memory{<:GraphNode{T, N, O}},
                  p::KnotParam{T, <:Any, <:Any, N, O}) where {T, N, O} = 
 IndexNode(getindex(val), p)
 
-const ComputeNodeDict{T} = ParamPointerDict{ T, Dim0GNode{T}, DimSGNode{T}, 
+const ComputeNodeDict{T} = ParamPointerBox{ T, Dim0GNode{T}, DimSGNode{T}, 
                                              GraphNode{T}, typeof(genGraphNodeCore) }
 
 genGraphNodeDict(::Type{T}, maxRecursion::Int=DefaultMaxParamPointerLevel) where {T} = 
-ParamPointerDict(genGraphNodeCore, T, Dim0GNode{T}, DimSGNode{T}, GraphNode{T}, 
+ParamPointerBox(genGraphNodeCore, T, Dim0GNode{T}, DimSGNode{T}, GraphNode{T}, 
                  maxRecursion)
 
 function genGraphNode(p::CompositeParam{T}; 
@@ -153,7 +153,7 @@ function evaluateNode(gn::IndexNode{T}) where {T}
     getindex(evaluateNode(gn.source), gn.index)
 end
 
-struct TemporaryStorage{T} <: ValueStorage{T}
+struct TemporaryStorage{T} <: QueryBox{Union{Tuple{T, Int}, Tuple{AbstractArray{T}, Int}}}
     d0::IdDict{UInt, Tuple{T, Int}}
     d1::IdDict{UInt, Tuple{AbstractArray{T}, Int}}
 
@@ -161,7 +161,7 @@ struct TemporaryStorage{T} <: ValueStorage{T}
     new{T}(IdDict{UInt, Tuple{T, Int}}(), IdDict{UInt, Tuple{AbstractArray{T}, Int}}())
 end
 
-struct FixedSizeStorage{T, V<:AbstractArray{T}} <: ValueStorage{T}
+struct FixedSizeStorage{T, V<:AbstractArray{T}} <: QueryBox{Union{T, V}}
     d0::Memory{T}
     d1::Memory{V}
 end
@@ -263,20 +263,20 @@ function compressNodeCore!(tStorage::TemporaryStorage{T},
 end
 
 
-struct GraphNodeFunc{T, F, S<:FixedSizeStorage{T}, 
-                     V<:AbtVecOfAbtArr{T}} <: StructFunction{T, F}
+struct EvalGraphNode{T, F<:Function, S<:FixedSizeStorage{T}, 
+                     V<:AbtVecOfAbtArr{T}} <: Evaluate{GraphNode{T}}
     f::F
     storage::S
     param::V
 end
 
-(gnf::GraphNodeFunc)() = gnf(gnf.storage, gnf.param)
+(gnf::EvalGraphNode)() = gnf(gnf.storage, gnf.param)
 
-(gnf::GraphNodeFunc{T})(ps::AbtVecOfAbtArr{T}) where {T} = gnf(gnf.storage, ps)
+(gnf::EvalGraphNode{T})(ps::AbtVecOfAbtArr{T}) where {T} = gnf(gnf.storage, ps)
 
-(gnf::GraphNodeFunc)(s::FixedSizeStorage{T}, ps::AbtVecOfAbtArr{T}) where {T} = gnf.f(s, ps)
+(gnf::EvalGraphNode)(s::FixedSizeStorage{T}, ps::AbtVecOfAbtArr{T}) where {T} = gnf.f(s, ps)
 
-# function (gnf::GraphNodeFunc{T})(ps::DimParamSet{T}; checkParamSet::Bool=true) where {T}
+# function (gnf::EvalGraphNode{T})(ps::DimParamSet{T}; checkParamSet::Bool=true) where {T}
 #     if checkParamSet
 #         bl, errorMsg = isGraphParamSet(paramSet)
 #         bl || throw( AssertionError(errorMsg) )
@@ -299,7 +299,7 @@ function compressNodeINTERNAL(node::GraphNode{T}, paramSet::DimParamSet{T}) wher
         end
         sector
     end
-    GraphNodeFunc(f, FixedSizeStorage(sectors...), obtain.(paramSet))
+    EvalGraphNode(f, FixedSizeStorage(sectors...), obtain.(paramSet))
 end
 
 function compressNode(node::GraphNode{T}, paramSet::DimParamSet{T}) where {T}
