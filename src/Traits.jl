@@ -1,5 +1,3 @@
-
-
 abstract type TraitAction{I} <: TaggedOperator end
 
 abstract type AnyInterface <: Any end
@@ -10,20 +8,20 @@ abstract type Trait{I<:AnyInterface} <: AnyTrait end
 
 struct SelectTrait{I<:AnyInterface} <: TraitAction{I} end
 
-abstract type StructureStyle <: AnyInterface end
-
-struct ParamBoxAccess <: StructureStyle end
-
-struct ContainParamBox <: Trait{ParamBoxAccess} end
-
-struct WithoutParamBox <: Trait{ParamBoxAccess} end
-
-function returnUndefinedTraitError(::Type{TR}, ::Type{T}) where {TR<:AnyTrait, T}
+function returnUndefinedTraitError(::Type{TR}, ::Type{T}) where {TR<:AnyInterface, T}
     throw(ArgumentError("The trait of `$T` for `$TR` has yet to been defined."))
 end
 
-(::SelectTrait{ParamBoxAccess})(::T) where {T} = 
-returnUndefinedTraitError(ParamBoxAccess, T)
+# abstract type StructureStyle <: AnyInterface end
+
+# struct ParamBoxAccess <: StructureStyle end
+
+# struct ContainParamBox <: Trait{ParamBoxAccess} end
+
+# struct WithoutParamBox <: Trait{ParamBoxAccess} end
+
+# (::SelectTrait{ParamBoxAccess})(::T) where {T} = 
+# returnUndefinedTraitError(ParamBoxAccess, T)
 
 
 abstract type PropertyStyle <: AnyInterface end
@@ -42,11 +40,9 @@ abstract type FunctionStyle <: AnyInterface end
 
 abstract type ParameterStyle <: FunctionStyle end
 
-struct HasParamBox <: ParameterStyle end
+struct IsParamFunc <: ParameterStyle end
 
-struct HasParamVal <: ParameterStyle end
-
-struct NoParameter <: ParameterStyle end
+struct NotParamFunc <: ParameterStyle end
 
 (::SelectTrait{ParameterStyle})(::T) where {T} = 
 returnUndefinedTraitError(ParameterStyle, T)
@@ -64,3 +60,13 @@ struct VectorInput <: InputStyle end
 
 (::SelectTrait{InputStyle})(::F) where {F<:Function} = 
 returnUndefinedTraitError(InputStyle, F)
+
+
+abstract type SquaredIntNormStyle <: FunctionStyle end
+
+struct SIntNormalizable <: SquaredIntNormStyle end
+
+struct SIntUnnormalized <: SquaredIntNormStyle end
+
+(::SelectTrait{SquaredIntNormStyle})(::F) where {F<:Function} = 
+returnUndefinedTraitError(SquaredIntNormStyle, F)

@@ -12,14 +12,15 @@ abstract type ParamBox{T} <: Box end
 abstract type GraphBox{T} <: Box end
 abstract type QueryBox{T} <: Box end
 
+# N: Inner dim, size mutable; O: Outer dim, size immutable
 abstract type JaggedOperator{T, N, O} <: StructuredFunction end
 abstract type TaggedOperator <: StructuredFunction end
-abstract type Evaluate{S} <: StructuredFunction end
+abstract type Evaluator{S} <: StructuredFunction end
 
-abstract type AbstractAmpTensor{T, O} <: JaggedOperator{T, 0, O} end
+abstract type AbstractAmpTensor{T, N} <: JaggedOperator{T, N, 0} end
 abstract type AbstractAmplitude{T} <: JaggedOperator{T, 0, 0} end
 
-abstract type SpatialAmpTensor{T, D, N, O} <: AbstractAmpTensor{T, O} end
+abstract type SpatialAmpTensor{T, D, N, M} <: AbstractAmpTensor{T, M} end
 
 abstract type SpatialAmplitude{T, D, N} <: AbstractAmplitude{T} end
 
@@ -71,7 +72,7 @@ const DimSGNode{T, N} = Union{DimIGNode{T, N}, DimOGNode{T, N}}
 
 const ElementalParam{T} = JaggedParam{T, 0, 0}
 const InnerSpanParam{T, N} = JaggedParam{T, N, 0}
-const OuterSpanParam{T, N} = JaggedParam{T, 0, N}
+const OuterSpanParam{T, O} = JaggedParam{T, 0, O}
 const SingleDimParam{T, N} = Union{InnerSpanParam{T, N}, OuterSpanParam{T, N}}
 
 const AVectorOrNTuple{T, NNMO} = Union{Tuple{T, Vararg{T, NNMO}}, AbstractVector{<:T}}
