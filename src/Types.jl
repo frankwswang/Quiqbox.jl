@@ -13,12 +13,15 @@ abstract type GraphBox{T} <: Box end
 abstract type QueryBox{T} <: Box end
 
 abstract type JaggedOperator{T, N, O} <: StructuredFunction end
-abstract type PackedFunction{F} <: StructuredFunction end
 abstract type TaggedOperator <: StructuredFunction end
+abstract type Evaluate{S} <: StructuredFunction end
 
+abstract type AbstractAmpTensor{T, O} <: JaggedOperator{T, 0, O} end
 abstract type AbstractAmplitude{T} <: JaggedOperator{T, 0, 0} end
 
-abstract type SpatialAmplitude{T, D} <: AbstractAmplitude{T} end
+abstract type SpatialAmpTensor{T, D, N, O} <: AbstractAmpTensor{T, O} end
+
+abstract type SpatialAmplitude{T, D, N} <: AbstractAmplitude{T} end
 
 abstract type GraphNode{T, N, O} <: GraphBox{T} end
 
@@ -43,6 +46,17 @@ abstract type ParamNest{T, N, I, O} <: ParamBatch{T, N, I, O} end
 abstract type BaseParam{T, N, I} <: ParamToken{T, N, I} end
 abstract type LinkParam{T, N, I} <: ParamToken{T, N, I} end
 
+abstract type SpatialOrbital{T, D, F} <: SpatialAmplitude{T, D, 1} end
+
+abstract type SpatialOrbPlex{T, D, F, O} <: SpatialAmpTensor{T, D, 1, O} end
+
+const SpatialOrbitals{T, D, F} = Union{SpatialOrbital{T, D, F}, SpatialOrbPlex{T, D, F}}
+
+# abstract type ManyParticleState{T} <: Any end
+
+# abstract type SpinfulState{T, N} <: ManyParticleState{T} end
+
+# abstract type FermionicState{T, 1} <: SpinfulState{T, 1} end
 
 @enum TernaryNumber::Int8 begin
     TUS0 = 0
@@ -68,6 +82,8 @@ const SymOrMiss = Union{Symbol, Missing}
 const AbtArray0D{T} = AbstractArray{T, 0}
 
 const RefVal = Base.RefValue
+
+const RealOrComplex{T<:Real} = Union{T, Complex{T}}
 
 const NonEmptyTupleOrAbtArray{T, A<:AbstractArray{T}} = Union{NonEmptyTuple{T}, A}
 
