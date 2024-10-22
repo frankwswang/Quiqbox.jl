@@ -198,7 +198,7 @@ end
 hasBoolRelation(boolOp::Function, obj1::F1, obj2::F2; 
                 ignoreFunction::Bool=false, ignoreContainer::Bool=false, 
                 decomposeNumberCollection::Bool=false) where 
-               {StructuredFunction<:F1<:Function, StructuredFunction<:F2<:Function} = 
+               {CompositeFunction<:F1<:Function, CompositeFunction<:F2<:Function} = 
 ifelse(ignoreFunction, true, boolOp(obj1, obj2))
 
 hasBoolRelation(boolOp::Function, obj1::Number, obj2::Number; 
@@ -453,46 +453,87 @@ function printStyledInfo(str::String;
 end
 
 
+# """
+#     flatten(a::Tuple) -> Tuple
+
+#     flatten(a::AbstractVector) -> AbstractVector
+
+# Flatten `a::Union{AbstractVector, Tuple}` that contains `AbstractArray`s and/or `Tuple`s. 
+# Only operate on the outermost container.
+
+# ≡≡≡ Example(s) ≡≡≡
+
+# ```jldoctest; setup = :(push!(LOAD_PATH, "../../src/"); using Quiqbox)
+# julia> flatten((:one, 2, [3, 4.0], ([5], "six"), "7"))
+# (:one, 2, 3.0, 4.0, [5], "six", "7")
+
+# julia> flatten([:one, 2, [3, 4.0], ([5], "six"), "7"])
+# 7-element Vector{Any}:
+#   :one
+#  2
+#  3.0
+#  4.0
+#   [5]
+#   "six"
+#   "7"
+# ```
+# """
+# function flatten(c::AbstractVector{T}) where {T}
+#     c2 = map( x->(x isa Union{AbstractArray, Tuple} ? x : (x,)), c )
+#     [(c2...)...]
+# end
+
+# function flatten(c::Tuple)
+#     c2 = map( x->(x isa Union{AbstractArray, Tuple} ? x : (x,)), c )
+#     ((c2...)...,)
+# end
+
+# flatten(c::AbstractVector{<:Tuple}) = joinTuple(c...) |> collect
+
+# joinTuple(t1::Tuple, t2::Tuple, t3::Tuple...) = (t1..., joinTuple(t2, t3...)...)
+
+# joinTuple(t::Tuple) = itself(t)
+
 """
-    flatten(a::Tuple) -> Tuple
 
-    flatten(a::AbstractVector) -> AbstractVector
-
-Flatten `a::Union{AbstractVector, Tuple}` that contains `AbstractArray`s and/or `Tuple`s. 
-Only operate on the outermost container.
+    flatVectorizeCore(a::Union{AbstractArray, Tuple, NamedTuple}) -> AbstractVector
 
 ≡≡≡ Example(s) ≡≡≡
 
 ```jldoctest; setup = :(push!(LOAD_PATH, "../../src/"); using Quiqbox)
-julia> flatten((:one, 2, [3, 4.0], ([5], "six"), "7"))
-(:one, 2, 3.0, 4.0, [5], "six", "7")
-
-julia> flatten([:one, 2, [3, 4.0], ([5], "six"), "7"])
-7-element Vector{Any}:
-  :one
- 2
- 3.0
- 4.0
-  [5]
-  "six"
-  "7"
+julia> flatVectorize([:one, 2, ([3, [:four, (five=5, six=6)]], "7"), "8", (9.0, 10)])
+10-element Vector{Any}:
+   :one
+  2
+  3
+   :four
+  5
+  6
+   "7"
+   "8"
+  9.0
+ 10.0
 ```
 """
-function flatten(c::AbstractVector{T}) where {T}
-    c2 = map( x->(x isa Union{AbstractArray, Tuple} ? x : (x,)), c )
-    [(c2...)...]
+flatVectorizeCore(a::Any) = fill(a)
+flatVectorizeCore(a::AbstractArray) = vec(a)
+flatVectorizeCore(a::Union{Tuple, NamedTuple}) = collect(a)
+
+const CollectionType = Union{Tuple, NamedTuple, AbstractArray}
+
+function flatVectorize(a::CollectionType)
+    if isempty(a)
+        Union{}[]
+    else
+        mapreduce(vcat, a) do i
+            if i isa CollectionType
+                flatVectorize(i)
+            else
+                flatVectorizeCore(i)
+            end
+        end |> flatVectorizeCore
+    end
 end
-
-function flatten(c::Tuple)
-    c2 = map( x->(x isa Union{AbstractArray, Tuple} ? x : (x,)), c )
-    ((c2...)...,)
-end
-
-flatten(c::AbstractVector{<:Tuple}) = joinTuple(c...) |> collect
-
-joinTuple(t1::Tuple, t2::Tuple, t3::Tuple...) = (t1..., joinTuple(t2, t3...)...)
-
-joinTuple(t::Tuple) = itself(t)
 
 
 """
@@ -729,7 +770,7 @@ end
 getFunc(f::Function, _=missing) = itself(f)
 
 
-nameOf(f::StructuredFunction) = typeof(f)
+nameOf(f::CompositeFunction) = typeof(f)
 
 nameOf(f) = nameof(f)
 
@@ -914,7 +955,7 @@ lazyCollect(@nospecialize o::Any) = collect(o)
 asymSign(a::Real) = ifelse(a<0, -1, 1)
 
 
-mutable struct FuncArgConfig{F<:Function} <: ConfigBox{Any, FuncArgConfig, F}
+mutable struct FuncArgConfig{F<:Function} <: ConfigBox
     posArgs::Vector{<:Any}
     keyArgs::Vector{<:Pair{Symbol}}
 end
