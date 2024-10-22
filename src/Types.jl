@@ -2,7 +2,8 @@ using Base: Slice, OneTo
 
 abstract type Box <: Any end
 
-abstract type StructuredFunction <: Function end
+abstract type CompositeFunction <: Function end
+abstract type FieldlessFunction <: Function end
 
 abstract type AbstractMemory{T, N} <: AbstractArray{T, N} end
 
@@ -13,16 +14,17 @@ abstract type GraphBox{T} <: Box end
 abstract type QueryBox{T} <: Box end
 
 # N: Inner dim, size mutable; O: Outer dim, size immutable
-abstract type JaggedOperator{T, N, O} <: StructuredFunction end
-abstract type TaggedOperator <: StructuredFunction end
-abstract type Evaluator{S} <: StructuredFunction end
+abstract type JaggedOperator{T, N, O} <: CompositeFunction end
+abstract type TaggedFunction <: CompositeFunction end
 
-abstract type AbstractAmpTensor{T, N} <: JaggedOperator{T, N, 0} end
+abstract type Evaluator{S} <: TaggedFunction end
+
+abstract type AbstractAmpTensor{T, O} <: JaggedOperator{T, 0, O} end
 abstract type AbstractAmplitude{T} <: JaggedOperator{T, 0, 0} end
+# M: Particle number
+abstract type SpatialAmpTensor{T, D, M, O} <: AbstractAmpTensor{T, O} end
 
-abstract type SpatialAmpTensor{T, D, N, M} <: AbstractAmpTensor{T, M} end
-
-abstract type SpatialAmplitude{T, D, N} <: AbstractAmplitude{T} end
+abstract type SpatialAmplitude{T, D, M} <: AbstractAmplitude{T} end
 
 abstract type GraphNode{T, N, O} <: GraphBox{T} end
 
@@ -78,8 +80,7 @@ const SingleDimParam{T, N} = Union{InnerSpanParam{T, N}, OuterSpanParam{T, N}}
 const AVectorOrNTuple{T, NNMO} = Union{Tuple{T, Vararg{T, NNMO}}, AbstractVector{<:T}}
 const NonEmptyTuple{T, NMO} = Tuple{T, Vararg{T, NMO}}
 
-const IntOrMiss = Union{Int, Missing}
-const SymOrMiss = Union{Symbol, Missing}
+const MissingOr{T} = Union{Missing, T}
 const AbtArray0D{T} = AbstractArray{T, 0}
 
 const RefVal = Base.RefValue
@@ -103,3 +104,5 @@ const DimParamSet{T} = AbstractVector{<:ParamSetEle{T}}
 
 const ParamFunctor{T, N, I} = Union{BaseParam{T, N, I}, ParamLink{T, N, I}}
 const ParamPointer{T, N, I} = Union{LinkParam{T, N, I}, ParamNest{T, N, I}}
+
+const PBoxCollection{T<:ParamBox} = NonEmptyTupleOrAbtArray{T}

@@ -1,4 +1,4 @@
-abstract type TraitAction{I} <: TaggedOperator end
+abstract type TraitAction{I} <: FieldlessFunction end
 
 abstract type AnyInterface <: Any end
 
