@@ -278,7 +278,7 @@ struct TensorVar{T, N} <: PrimitiveParam{T, N}
 end
 
 TensorVar(input::T, symbol::SymOrIndexedSym, 
-        screen::Union{TernaryNumber, Int}=TPS1) where {T} = 
+          screen::Union{TernaryNumber, Int}=TPS1) where {T} = 
 TensorVar(fill(input), symbol, screen)
 
 
@@ -411,6 +411,8 @@ CellParam(TypedReduction(T), (input,), symbol)
 
 CellParam(var, varSym::SymOrIndexedSym, symbol::SymOrIndexedSym=varSym) = 
 CellParam(TensorVar(var, varSym), symbol)
+
+const ItselfCParam{T} = CellParam{T, iT, Tuple{TensorVar{T, 0}}}
 
 
 function checkGridParamArg(::StableMorphism{T, <:iTalike, N}, input::I, memory::M) where 
@@ -1013,33 +1015,33 @@ isPrimitiveParam(pn::BaseParam) = (screenLevelOf(pn) == 1)
 # broadcastable(np::FixedSizeParam) = Base.broadcastable(np.input)
 
 
-struct CachedJParam{T, N, O, P<:JaggedParam{T, N, O}, 
-                    E<:Union{T, AbstractArray{T, N}}} <: QueryBox{P}
-    param::P
-    cache::ShapedMemory{E, O}
+# struct CachedJParam{T, N, O, P<:JaggedParam{T, N, O}, 
+#                     E<:Union{T, AbstractArray{T, N}}} <: QueryBox{P}
+#     source::P
+#     cache::ShapedMemory{E, O}
 
-    function CachedJParam(param::P) where {T, N, O, P<:JaggedParam{T, N, O}}
-        output = obtain(param)
-        new{T, N, O, P, eltype(output)}(param, ShapedMemory(output))
-    end
-end
+#     function CachedJParam(source::P) where {T, N, O, P<:JaggedParam{T, N, O}}
+#         output = obtain(source)
+#         new{T, N, O, P, eltype(output)}(source, ShapedMemory(output))
+#     end
+# end
 
-CachedJParam(param::CachedJParam) = CachedJParam(param.param)
+# CachedJParam(param::CachedJParam) = CachedJParam(param.param)
 
-function extract!(cp::CachedJParam{T}; returnCache::Bool=false, 
-                  updateCache::Bool=true) where {T}
-    if returnCache
-        res = cp.cache
-    else
-        res = obtain(cp.param)
-        updateCache && (box.cache .= res)
-    end
-    res
-end
+# function extract!(cp::CachedJParam{T}; returnCache::Bool=false, 
+#                   updateCache::Bool=true) where {T}
+#     if returnCache
+#         res = cp.cache
+#     else
+#         res = obtain(cp.param)
+#         updateCache && (box.cache .= res)
+#     end
+#     res
+# end
 
-const EleCJParam{T} = CachedJParam{T, 0, 0}
-const ISpCJParam{T, N} = CachedJParam{T, N, 0}
-const OSpCJParam{T, O} = CachedJParam{T, 0, O}
+# const EleCJParam{T} = CachedJParam{T, 0, 0}
+# const ISpCJParam{T, N} = CachedJParam{T, N, 0}
+# const OSpCJParam{T, O} = CachedJParam{T, 0, O}
 
 
 struct ParamMarker{M<:NonEmptyTuple{IdentityMarker}, MF<:IdentityMarker, 
@@ -1097,7 +1099,7 @@ markObj(arr::ShapedMemory) = markObj( (markObj(arr.value), objectid(arr.shape)) 
 
 markObj(::Nothing) = markObj( objectid(nothing) )
 
-markObj(p::CachedJParam) = ParamMarker(p.param)
+# markObj(p::CachedJParam) = ParamMarker(p.param)
 
 function ParamMarker(p::T) where {T<:CellParam}
     offset = isOffsetEnabled(p) ? p.offset : objectid(nothing)
@@ -1239,28 +1241,30 @@ end
 #         end
 #     end
 # end
-
-function getParams(p::JaggedParam, sym::SymOrMiss=missing)
-    if ismissing(sym) || inSymbol(sym, symOf(ps))
-        [p]
+function getParams(obj::Any)
+    nestedRes = getParamsCore(obj)
+    if nestedRes isa JaggedParam
+        [nestedRes]
+    elseif ismissing(nestedRes) || isempty(nestedRes)
+        ParamBox[]
     else
-        eltype(p)[]
+        (collect∘skipmissing∘flatVectorize)(nestedRes)
     end
 end
 
-function getParams(v::NonEmptyTupleOrAbtArray, sym::SymOrMiss=missing)
-    isempty(v) ? ParamBox[] : reduce(vcat, getParams.(v, sym))
+getParamsCore(p::JaggedParam) = itself(p)
+
+function getParamsCore(v::Union{Tuple, AbstractArray})
+    isempty(v) ? missing : map(getParamsCore, v)
 end
 
-function getParams(obj::Any, sym::SymOrMiss=missing)
-    if isstructtype(obj) && !( Base.issingletontype(obj) )
-        res = map( fieldnames(pf) ) do field
-            getParams(getproperty(pf, field), sym)
-        end
-        len = length.(res) |> sum
-        isequal(len, 0) ? ParamBox[] : reduce(vcat, res)
+function getParamsCore(obj::T) where {T}
+    if isstructtype(T) && !( Base.issingletontype(T) )
+        map( fieldnames(T) ) do field
+            field => getParamsCore(getfield(obj, field))
+        end |> NamedTuple
     else
-        ParamBox[]
+        missing
     end
 end
 
@@ -1293,7 +1297,7 @@ function markParams!(pars::AbstractVector{<:JaggedParam{T}}) where {T}
         markParamsCore!(parIdxDict, leafPars)
         ParamSetEle{T}[leafP0Ds, leafPars...]
     end
-    (leafParsFormated, rootPars, selfPars)
+    (leafParsFormated, rootPars, selfPars) # inputParam, outputParam, selfParam
 end
 
 markParams!(b::AbtArrayOr) = b |> getParams |> markParams!
@@ -1383,3 +1387,25 @@ topoSort(node::CellParam{T}) where {T} = topoSortINTERNAL([node])
 #     end
 #     res
 # end
+
+
+function locateParam!(paramSet::PBoxCollection, target::ParamBox)
+    idx = findfirst(x->compareParamBox(x, target), paramSet)
+    if idx === nothing
+        push!(paramSet, target)
+        idx = length(paramSet)
+    end
+    idx
+end
+
+function locateParam!(paramSet::PBoxCollection, target::PBoxCollection)
+    if target === paramSet
+        builder = ifelse(target isa Tuple, Tuple, collect)
+        (builder∘eachindex)(paramSet)
+    else
+        map(x->locateParam!(paramSet, x), target)
+    end
+end
+
+locateParam!(paramSet::PBoxCollection, target::NamedTuple) = 
+locateParam!(paramSet, values(target))
