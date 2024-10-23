@@ -14,3 +14,8 @@ function checkCollectionMinLen(data, dataSym::Symbol, minLen::Int)
     throw(ArgumentError("`$dataSym`: $data should contain at least $minLen element"* str))
     dataLen == minLen
 end
+
+function checkEmptiness(obj, name::Symbol)
+    isempty(obj) && throw(AssertionError("`$name` must not be empty."))
+    length(obj)
+end
