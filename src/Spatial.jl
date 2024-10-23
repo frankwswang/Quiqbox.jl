@@ -1,6 +1,9 @@
 (f::SpatialAmplitude{<:Any, <:Any, 1})(x) = 
 formatInputCall(SelectTrait{InputStyle}()(f), f, x)
 
+evalFunc(f::Evaluator{<:SpatialAmplitude{<:Any, <:Any, 1}}, input, param) = 
+f.f(input, param)
+
 
 # API: Evaluator, unpackParamFunc!
 struct GaussFunc{T<:Real, P1<:ElementalParam{T}, 
@@ -30,7 +33,7 @@ function unpackParamFunc!(f::GaussFunc{T1, <:ElementalParam{T1}, <:ElementalPara
     EvalGaussFunc(evalFunc), paramSet
 end
 
-(gf::GaussFunc)(r::Real) = evalFunc(gf, r)
+(f::GaussFunc)(r::Real) = evalFunc(f, r)
 
 
 struct AxialProd{T<:Real, D, F<:SpatialAmplitude{T, 0, 1}, 
@@ -38,28 +41,25 @@ struct AxialProd{T<:Real, D, F<:SpatialAmplitude{T, 0, 1},
     series::Memory{F}
     layout::L
 
-    function AxialProd(series::Memory{F}, layout::L) where 
+    function AxialProd(series::AbstractVector{F}, layout::L) where 
                       {T, F<:SpatialAmplitude{T, 0, 1}, D, 
-                       L<:NonEmptyTuple{Memory{<:ElementalParam{T}}, D}}
-        if isempty(series)
-            throw(AssertionError("`series` must not be empty."))
-        else
-            nFunc = length(series)
-            if any(l != nFunc for l in length.(layout))
-                throw(AssertionError("`series` and each `layout` element must have equal "*
-                                     "length."))
-            end
+                       L<:NonEmptyTuple{AbstractVector{<:ElementalParam{T}}, D}}
+        nFunc = checkEmptiness(series, :series)
+        if any(l != nFunc for l in length.(layout))
+            throw(AssertionError("`series` and each `layout` element must have equal "*
+                                 "length."))
         end
-        new{T, D+1, F, L}(series, layout)
+        formattedLayout = getMemory.(layout)
+        new{T, D+1, F, typeof(formattedLayout)}(getMemory(series), formattedLayout)
     end
 end
 
-function AxialProd(series::Memory{F}, dim::Int=3) where {T, F<:SpatialAmplitude{T, 0, 1}}
+function AxialProd(series::AbstractVector{F}, dim::Int=3) where {T, F<:SpatialAmplitude{T, 0, 1}}
     dim < 1 && throw(AssertionError("`dim` should be a positive integer."))
     cell = CellParam(zero(T), :r)
     setScreenLevel!(cell, 2)
     layout = fill(Memory{ItselfCParam{T}}( fill(cell, length(series)) ), dim) |> Tuple
-    AxialProd(series, layout)
+    AxialProd(getMemory(series), layout)
 end
 
 struct EvalAxialProd{F<:JoinParallel} <: Evaluator{AxialProd}
@@ -73,17 +73,22 @@ function unpackParamFunc!(f::AxialProd, paramSet::PBoxCollection)
         encoder = (x, y) -> (getindex(x, axisIndex) - y)
         mapreduce(JoinParallel(+), innerEvalFuncs, axisOffset) do ief, oPar
             parIds = (locateParam!(paramSet, oPar),)
-            InsertInward(ief.f, PointerFunc(encoder, parIds, pSetId))
+            InsertInward(ief, PointerFunc(encoder, parIds, pSetId))
         end
     end
     EvalAxialProd(evalFunc), paramSet
 end
 
-(gf::AxialProd{<:Any, D})(r::NTuple{D, Real}) where {D} = evalFunc(gf, r)
+(f::AxialProd{<:Any, D})(r::NTuple{D, Real}) where {D} = evalFunc(f, r)
 
 
 struct BundleSum{T, D, F<:SpatialAmplitude{T, D, 1}} <: SpatialAmplitude{T, D, 1}
     bundle::Memory{F}
+
+    function BundleSum(bundle::AbstractVector{F}) where {T, D, F<:SpatialAmplitude{T, D, 1}}
+        checkEmptiness(bundle, :bundle)
+        new{T, D, F}(getMemory(bundle))
+    end
 end
 
 struct EvalBundleSum{F<:JoinParallel} <: Evaluator{BundleSum}
@@ -92,8 +97,27 @@ end
 
 function unpackParamFunc!(f::BundleSum, paramSet::PBoxCollection)
     innerEvalFuncs = map(Fix2(unpackFunc!, paramSet), f.bundle) .|> first
-    evalFunc = mapreduce(JoinParallel(+), innerEvalFuncs) do ief; ief.f end
+    evalFunc = reduce(JoinParallel(+), innerEvalFuncs)
     EvalBundleSum(evalFunc), paramSet
 end
 
-(gf::BundleSum{<:Any, D})(r::NTuple{D, Real}) where {D} = evalFunc(gf, r)
+(f::BundleSum{<:Any, D})(r::NTuple{D, Real}) where {D} = evalFunc(f, r)
+
+
+struct Angularizer{T, D, A<:SphericalHarmonics{D}, 
+                   B<:SpatialAmplitude{T, D, 1}} <:SpatialAmplitude{T, D, 1}
+    angular::A
+    multiplier::B
+end
+
+struct EvalAngularizer{F<:JoinParallel} <: Evaluator{Angularizer}
+    f::F
+end
+
+function unpackParamFunc!(f::Angularizer, paramSet::PBoxCollection)
+    evalMulFunc = unpackFunc!(f.multiplier, paramSet) |> first
+    evalFunc = JoinParallel(evalMulFunc, OnlyInput(f.angular), *)
+    EvalBundleSum(evalFunc), paramSet
+end
+
+(f::Angularizer{<:Any, D})(r::NTuple{D, Real}) where {D} = evalFunc(f, r)
