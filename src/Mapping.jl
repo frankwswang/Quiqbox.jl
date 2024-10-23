@@ -1,41 +1,61 @@
-(ef::Evaluator)(args...) = ef.f(args...)
+(po::ParamOperator)(input, param) = evalFunc(po, input, param)
 
-abstract type ChainOperator <: Function end
 
-struct PointerFunc{F<:Function, T<:NonEmptyTuple{Union{Int, Memory{Int}}}} <: Function
+struct PointerFunc{F<:Function, T<:NonEmptyTuple{Union{Int, Memory{Int}}}} <: ParamOperator
     apply::F
     pointer::T
     sourceID::UInt
 end
 
-(f::PointerFunc)(input, par) = f.apply(input, getindex.(Ref(par), f.pointer)...)
+evalFunc(f::PointerFunc, input, param) = f.apply(input, getindex.(Ref(param), f.pointer)...)
 
-const ParamOp = Union{PointerFunc, ChainOperator}
 
-struct JoinParallel{C<:ParamOp, F<:ParamOp, J<:Function} <: ChainOperator
+struct OnlyInput{F<:Function} <: Evaluator{F}
+    f::F
+end
+
+evalFunc(f::OnlyInput, input, _) = f.f(input)
+
+
+struct OnlyParam{F<:Function} <: Evaluator{F}
+    f::F
+end
+
+evalFunc(f::OnlyParam, _, param) = f.f(param)
+
+
+struct ParamFunc{F<:Function} <: Evaluator{F}
+    f::F
+end
+
+evalFunc(f::ParamFunc, input, param) = f.f(input, param)
+
+
+struct JoinParallel{C<:ParamOperator, F<:ParamOperator, J<:Function} <: ChainOperator
     chain::C
     apply::F
     joint::J
 end
 
-(f::JoinParallel)(input, par) = f.joint(f.chain(input, par), f.apply(input, par))
+evalFunc(f::JoinParallel, input, param) = 
+f.joint(f.chain(input, param), f.apply(input, param))
 
 JoinParallel(joint::Function) =  (x, y)->JoinParallel(x, y, joint)
 
-struct InsertOnward{C<:ParamOp, F<:ParamOp} <: ChainOperator
+struct InsertOnward{C<:ParamOperator, F<:ParamOperator} <: ChainOperator
     chain::C
     apply::F
 end
 
-(f::InsertOnward)(input, par) = f.apply(f.chain(input, par), par)
+evalFunc(f::InsertOnward, input, param) = f.apply(f.chain(input, param), param)
 
 
-struct InsertInward{C<:ParamOp, F<:ParamOp} <: ChainOperator
+struct InsertInward{C<:ParamOperator, F<:ParamOperator} <: ChainOperator
     chain::C
     apply::F
 end
 
-(f::InsertInward)(input, par) = f.chain(f.apply(input, par), par)
+evalFunc(f::InsertInward, input, param) = f.chain(f.apply(input, param), param)
 
 
 function evalFunc(func::F, r) where {F<:Function}
