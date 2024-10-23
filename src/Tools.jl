@@ -1119,3 +1119,6 @@ end
 
 # obtainElementalVal(::Type{U}, obj::AbtArray0D{<:U}) where {U} = obj[]
 # obtainElementalVal(::Type{U}, obj::AbstractArray{<:U}) where {U} = copy(obj)
+
+getMemory(obj::Memory) = itself(obj)
+getMemory(obj::AbstractArray{T}) where {T} = Memory{T}(obj|>vec)
