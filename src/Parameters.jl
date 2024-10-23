@@ -7,11 +7,10 @@ using Test: @inferred
 
 
 function checkReshapingAxis(arr::AbstractArray, shape::Tuple{Vararg{Int}})
-    isempty(arr) && throw(AssertionError("the target array should not be empty."))
+    len = checkEmptiness(arr, :arr)
     if any(i <= 0 for i in shape)
         throw(AssertionError("The reshaping axis size should all be positive."))
     end
-    len = length(arr)
     if prod(shape) != len
         throw(AssertionError("The product of reshaping axes should be equal to the "*
                              "target array's length."))
@@ -506,7 +505,7 @@ struct ParamGrid{T, N, I<:SingleDimParam{T, N}, O} <: ParamNest{T, N, I, O}
     function ParamGrid(input::ShapedMemory{I, O}, symbol::SymOrIndexedSym) where 
                       {T, N, I<:SingleDimParam{T, N}, O}
         exclude0DimData(input)
-        isempty(input.value) && throw(AssertionError("`input` should not be empty."))
+        checkEmptiness(input.value, :input)
         new{T, N, I, O}(input, IndexedSym(symbol))
     end
 end
