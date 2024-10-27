@@ -3,6 +3,9 @@ abstract type SphericalHarmonics{D, L} <: TaggedFunction end
 abstract type RealSolidHarmonics{D, L} <: SphericalHarmonics{D, L} end
 
 
+azimuthalNumOf(::SphericalHarmonics{<:Any, L}) where {L} = L
+
+
 struct WeakComp{N, S} # Weak composition of an integer S
     tuple::NTuple{N, Int}
 
@@ -29,9 +32,15 @@ end
 (csh::CartSHarmonics{D, L})(r::NTuple{D, Real}) where {D, L} = 
 evalCartSHarmonicsCore(Val(D), csh.m, r)
 
+
 struct PureSHarmonics{D, L} <: RealSolidHarmonics{D, L}
     m::Int
 end
+
+function (psh::PureSHarmonics{D, L})(r::NTuple{D, Real}) where {D, L}
+    evalPureSHarmonicsCore(Val(D), L, psh.m, r)
+end
+
 
 function get3DimCtoPSHarmonicsCoeffN(::Val{L}, m::Int, ::Type{T}=Float64) where {T<:Real, L}
     T(1) / (2^abs(m) * factorial(L)) * 
@@ -44,6 +53,7 @@ function get3DimCtoPSHarmonicsCoeffC(::Val{L}, (m, t, u, v)::NTuple{4, Int},
     binomial(l, t) * binomial(l-t, abs(m)+t) * binomial(t, u) * binomial(abs(m), 2v)
 end
 
+
 function evalPureSHarmonicsCore(::Val{3}, l::Int, m::Int, r::NTuple{3, Real})
     res = T(0)
     vm = ifelse(m<0, T(1)/2, T(0))
@@ -54,12 +64,6 @@ function evalPureSHarmonicsCore(::Val{3}, l::Int, m::Int, r::NTuple{3, Real})
     end
     res * get3DimCtoPSHarmonicsCoeffN(l, m, T)
 end
-
-function (psh::PureSHarmonics{D, L})(r::NTuple{D, Real}) where {D, L}
-    evalPureSHarmonicsCore(Val(D), L, psh.m, r)
-end
-
-
 
 #########################################################
 
