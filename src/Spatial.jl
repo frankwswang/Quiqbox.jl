@@ -1,123 +1,160 @@
-(f::SpatialAmplitude{<:Any, <:Any, 1})(x) = 
-formatInputCall(SelectTrait{InputStyle}()(f), f, x)
+(f::FieldAmplitude)(x) = evalFunc(f, x)
 
-evalFunc(f::Evaluator{<:SpatialAmplitude{<:Any, <:Any, 1}}, input, param) = 
-f.f(input, param)
+abstract type EvalFieldAmp{D, F} <: Evaluator{F} end
+
+evalFunc(f::EvalFieldAmp, input, param) = 
+f.f(formatInput(SelectTrait{InputStyle}()(f), input), param)
 
 
-# API: Evaluator, unpackParamFunc!
-struct GaussFunc{T<:Real, P1<:ElementalParam{T}, 
-                 P2<:ElementalParam{<:RealOrComplex{T}}} <: SpatialAmplitude{T, 0, 1}
-    xpn::P1
-    con::P2
+struct PolyGaussFunc{T<:Real, P<:ElementalParam{T}} <: FieldAmplitude{T, 1}
+    exponent::P
+    degree::Int
+    normalize::Bool
 
-    GaussFunc(xpn::P1, con::P2) where {T, P1<:ElementalParam{T}, P2<:ElementalParam} = 
-    new{T, P1, P2}(xpn, con)
+    function PolyGaussFunc(exponent::P, degree::Int, normalize::Bool) where 
+                          {T, P<:ElementalParam{T}}
+        degree < 0 && throw(AssertionError("`degree` should be non-negative."))
+        new{T, P}(exponent, degree, normalize)
+    end
 end
 
-struct ComputeGaussFunc{T1, T2} <: FieldlessFunction end
+PolyGaussFunc(exponent::ElementalParam{<:Real}, degree::Int=0; normalize::Bool=true) = 
+PolyGaussFunc(exponent, degree, normalize)
 
-struct EvalGaussFunc{F<:PointerFunc{<:ComputeGaussFunc}} <: Evaluator{GaussFunc}
+struct ComputePGFunc{T} <: CompositeFunction
+    degree::Int
+    normalize::Bool
+end
+
+struct EvalPolyGaussFunc{F<:PointerFunc{<:ComputePGFunc}} <: EvalFieldAmp{1, PolyGaussFunc}
     f::F
 end
 
-function (::ComputeGaussFunc{T1, T2})(r::Real, xpnVal::T1, conVal::T2) where {T1, T2}
-    exp(-xpnVal * r * r) * conVal
+function (f::ComputePGFunc{T})(r::Real, xpnVal::T) where {T}
+    i = f.degree
+    factor = ifelse(f.normalize, polyGaussFuncNormFactor(xpnVal, i), one(T))
+    exp(-xpnVal * r * r) * r^i * factor
 end
 
-function unpackParamFunc!(f::GaussFunc{T1, <:ElementalParam{T1}, <:ElementalParam{T2}}, 
-                          paramSet::PBoxCollection) where {T1, T2}
-    evalFuncCore = ComputeGaussFunc{T1, T2}()
-    parIds = locateParam!(paramSet, getParamsCore(f))
+function unpackParamFunc!(f::PolyGaussFunc{T, <:ElementalParam{T}}, 
+                          paramSet::PBoxCollection) where {T}
+    evalFuncCore = ComputePGFunc{T}(f.degree, f.normalize)
+    parIds = (locateParam!(paramSet, f.exponent),)
     evalFunc = PointerFunc(evalFuncCore, parIds, objectid(paramSet))
-    EvalGaussFunc(evalFunc), paramSet
+    EvalPolyGaussFunc(evalFunc), paramSet
 end
 
-(f::GaussFunc)(r::Real) = evalFunc(f, r)
 
+struct ContractedSum{T, D, F<:FieldAmplitude{T, D}, 
+                     P<:ElementalParam{<:RealOrComplex{T}}} <: FieldAmplitude{T, D}
+    basis::Memory{F}
+    coeff::Memory{P}
 
-struct AxialProd{T<:Real, D, F<:SpatialAmplitude{T, 0, 1}, 
-                 L<:NTuple{D, Memory{<:ElementalParam{T}}}} <: SpatialAmplitude{T, D, 1}
-    series::Memory{F}
-    layout::L
-
-    function AxialProd(series::AbstractVector{F}, layout::L) where 
-                      {T, F<:SpatialAmplitude{T, 0, 1}, D, 
-                       L<:NonEmptyTuple{AbstractVector{<:ElementalParam{T}}, D}}
-        nFunc = checkEmptiness(series, :series)
-        if any(l != nFunc for l in length.(layout))
-            throw(AssertionError("`series` and each `layout` element must have equal "*
-                                 "length."))
+    function ContractedSum(basis::AbstractVector{F}, coeff::AbstractVector{P}) where {T, D, 
+                           F<:FieldAmplitude{T, D}, P<:ElementalParam{<:RealOrComplex{T}}}
+        if checkEmptiness(basis, :basis) != length(coeff)
+            throw(AssertionError("`basis` and `coeff` must have the same length."))
         end
-        formattedLayout = getMemory.(layout)
-        new{T, D+1, F, typeof(formattedLayout)}(getMemory(series), formattedLayout)
+        new{T, D, F, P}(getMemory(basis), getMemory(coeff))
     end
 end
 
-function AxialProd(series::AbstractVector{F}, dim::Int=3) where {T, F<:SpatialAmplitude{T, 0, 1}}
-    dim < 1 && throw(AssertionError("`dim` should be a positive integer."))
-    cell = CellParam(zero(T), :r)
-    setScreenLevel!(cell, 2)
-    layout = fill(Memory{ItselfCParam{T}}( fill(cell, length(series)) ), dim) |> Tuple
-    AxialProd(getMemory(series), layout)
-end
-
-struct EvalAxialProd{F<:JoinParallel} <: Evaluator{AxialProd}
+struct EvalContractedSum{D, F<:JoinParallel} <: EvalFieldAmp{D, ContractedSum}
     f::F
+
+    EvalContractedSum{D}(f::F) where {D, F} = new{D, F}(f)
 end
 
-function unpackParamFunc!(f::AxialProd, paramSet::PBoxCollection)
+function unpackParamFunc!(f::ContractedSum{<:Any, D}, paramSet::PBoxCollection) where {D}
     pSetId = objectid(paramSet)
-    innerEvalFuncs = map(Fix2(unpackFunc!, paramSet), f.series) .|> first
-    evalFunc = mapreduce(JoinParallel(*), enumerate(f.layout)) do (axisIndex, axisOffset)
-        encoder = (x, y) -> (getindex(x, axisIndex) - y)
-        mapreduce(JoinParallel(+), innerEvalFuncs, axisOffset) do ief, oPar
-            parIds = (locateParam!(paramSet, oPar),)
-            InsertInward(ief, PointerFunc(encoder, parIds, pSetId))
-        end
+    innerEvalFuncs = map(Fix2(unpackFunc!, paramSet), f.basis) .|> first
+    evalFunc = mapreduce(JoinParallel(+), innerEvalFuncs, f.coeff) do ief, coeff
+        parIds = (locateParam!(paramSet, coeff),)
+        JoinParallel(ief, PointerFunc(OnlyParam(itself), parIds, pSetId), *)
     end
-    EvalAxialProd(evalFunc), paramSet
+    EvalContractedSum{D}(evalFunc), paramSet
 end
 
-(f::AxialProd{<:Any, D})(r::NTuple{D, Real}) where {D} = evalFunc(f, r)
+
+struct OriginShifter{T, D, F<:FieldAmplitude{T, D}, 
+                     L<:NTuple{D, ElementalParam{T}}} <: FieldAmplitude{T, D}
+    func::F
+    shift::L
+
+    OriginShifter(func::F, shift::L) where {T, D, F<:FieldAmplitude{T, D}, 
+                                            L<:NonEmptyTuple{ElementalParam{T}}} = 
+    new{T, D, F, L}(func, shift)
+end
+
+function OriginShifter(func::F, shift::NonEmptyTuple{Real}=ntuple(_->T(0), Val(D))) where 
+                      {T, D, F<:FieldAmplitude{T, D}}
+    length(shift) != D && throw(AssertionError("The length of `shift` must match `D=$D`."))
+    shiftPars = CellParam.(T.(shift), :shift)
+    setScreenLevel!.(shiftPars, 2)
+    OriginShifter(func, shiftPars)
+end
+
+struct EvalOriginShifter{D, F<:InsertInward} <: EvalFieldAmp{D, OriginShifter}
+    f::F
+
+    EvalOriginShifter{D}(f::F) where {D, F} = new{D, F}(f)
+end
+
+function unpackParamFunc!(f::OriginShifter{T, D}, paramSet::PBoxCollection) where {T, D}
+    pSetId = objectid(paramSet)
+    parIds = locateParam!(paramSet, f.shift)
+    outerEvalFunc = unpackFunc!(f.func, paramSet) |> first
+    encoder = (inputOrigin, pVal::Vararg{T, D}) -> (inputOrigin .- pVal)
+    evalFunc = InsertInward(outerEvalFunc, PointerFunc(encoder, parIds, pSetId))
+    EvalOriginShifter{D}(evalFunc), paramSet
+end
 
 
-struct BundleSum{T, D, F<:SpatialAmplitude{T, D, 1}} <: SpatialAmplitude{T, D, 1}
-    bundle::Memory{F}
+struct AxialProduct{T, D, B<:NTuple{D, FieldAmplitude{T, 1}}} <: FieldAmplitude{T, D}
+    component::B
 
-    function BundleSum(bundle::AbstractVector{F}) where {T, D, F<:SpatialAmplitude{T, D, 1}}
-        checkEmptiness(bundle, :bundle)
-        new{T, D, F}(getMemory(bundle))
+    AxialProduct(component::B) where {T, B<:NonEmptyTuple{FieldAmplitude{T, 1}}} = 
+    new{T, length(component), B}(component)
+end
+
+AxialProduct((b,)::Tuple{FieldAmplitude{<:Any, 1}}) = itself(b)
+
+AxialProduct(compos::AbstractVector{<:FieldAmplitude{T, 1}}) where {T} = 
+AxialProduct( Tuple(compos) )
+
+struct EvalAxialProduct{D, F<:JoinParallel} <: EvalFieldAmp{D, AxialProduct}
+    f::F
+
+    EvalAxialProduct{D}(f::F) where {D, F} = new{D, F}(f)
+end
+
+function unpackParamFunc!(f::AxialProduct{<:Any, D}, paramSet::PBoxCollection) where {D}
+    evalFuncComps = map(Fix2(unpackFunc!, paramSet), f.component) .|> first
+    evalFunc = mapreduce(JoinParallel(*), evalFuncComps, 1:D) do efc, idx
+        InsertInward(efc, OnlyInput(input->getindex(input, idx)))
+    end
+    EvalAxialProduct{D}(evalFunc), paramSet
+end
+
+
+struct CartGaussOrb{T, D, L, B<:NTuple{D, PolyGaussFunc{T}}} <: FieldAmplitude{T, D}
+    product::AxialProduct{T, D, B}
+    angular::CartSHarmonics{D, L}
+
+    function CartGaussOrb(product::AxialProduct{T, D, B}) where 
+                         {T, D, B<:NTuple{D, PolyGaussFunc{T}}}
+        angular = CartSHarmonics(getfield.(product.component, :degree))
+        new{T, D, azimuthalNumOf(angular), B}(product, angular)
     end
 end
 
-struct EvalBundleSum{F<:JoinParallel} <: Evaluator{BundleSum}
+struct EvalCartGaussOrb{D, F<:EvalAxialProduct} <: EvalFieldAmp{D, CartGaussOrb}
     f::F
+
+    EvalCartGaussOrb{D}(f::F) where {D, F} = new{D, F}(f)
 end
 
-function unpackParamFunc!(f::BundleSum, paramSet::PBoxCollection)
-    innerEvalFuncs = map(Fix2(unpackFunc!, paramSet), f.bundle) .|> first
-    evalFunc = reduce(JoinParallel(+), innerEvalFuncs)
-    EvalBundleSum(evalFunc), paramSet
+function unpackParamFunc!(f::CartGaussOrb{<:Any, D}, paramSet::PBoxCollection) where {D}
+    evalFunc, pSet = unpackParamFunc!(f.product, paramSet)
+    EvalCartGaussOrb{D}(evalFunc), pSet
 end
-
-(f::BundleSum{<:Any, D})(r::NTuple{D, Real}) where {D} = evalFunc(f, r)
-
-
-struct Angularizer{T, D, A<:SphericalHarmonics{D}, 
-                   B<:SpatialAmplitude{T, D, 1}} <:SpatialAmplitude{T, D, 1}
-    angular::A
-    multiplier::B
-end
-
-struct EvalAngularizer{F<:JoinParallel} <: Evaluator{Angularizer}
-    f::F
-end
-
-function unpackParamFunc!(f::Angularizer, paramSet::PBoxCollection)
-    evalMulFunc = unpackFunc!(f.multiplier, paramSet) |> first
-    evalFunc = JoinParallel(evalMulFunc, OnlyInput(f.angular), *)
-    EvalBundleSum(evalFunc), paramSet
-end
-
-(f::Angularizer{<:Any, D})(r::NTuple{D, Real}) where {D} = evalFunc(f, r)
