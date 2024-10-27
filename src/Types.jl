@@ -53,9 +53,11 @@ abstract type ParamNest{T, N, I, O} <: ParamBatch{T, N, I, O} end
 abstract type BaseParam{T, N, I} <: ParamToken{T, N, I} end
 abstract type LinkParam{T, N, I} <: ParamToken{T, N, I} end
 
-abstract type SpatialOrbital{T, D, F} <: SpatialAmplitude{T, D, 1} end
-
 abstract type SpatialOrbPlex{T, D, F, O} <: SpatialAmpTensor{T, D, 1, O} end
+
+abstract type FieldAmplitude{T, D} <: SpatialAmplitude{T, D, 1} end
+
+abstract type SpatialOrbital{T, D, F} <: FieldAmplitude{T, D} end
 
 const SpatialOrbitals{T, D, F} = Union{SpatialOrbital{T, D, F}, SpatialOrbPlex{T, D, F}}
 
