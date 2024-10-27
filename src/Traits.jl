@@ -12,17 +12,6 @@ function returnUndefinedTraitError(::Type{TR}, ::Type{T}) where {TR<:AnyInterfac
     throw(ArgumentError("The trait of `$T` for `$TR` has yet to been defined."))
 end
 
-# abstract type StructureStyle <: AnyInterface end
-
-# struct ParamBoxAccess <: StructureStyle end
-
-# struct ContainParamBox <: Trait{ParamBoxAccess} end
-
-# struct WithoutParamBox <: Trait{ParamBoxAccess} end
-
-# (::SelectTrait{ParamBoxAccess})(::T) where {T} = 
-# returnUndefinedTraitError(ParamBoxAccess, T)
-
 
 abstract type PropertyStyle <: AnyInterface end
 
@@ -52,21 +41,12 @@ abstract type InputStyle <: FunctionStyle end
 
 struct AnyInput <: InputStyle end
 
-struct MagnitudeInput <: InputStyle end
-
 struct TupleInput{N} <: InputStyle end
 
 struct VectorInput <: InputStyle end
 
 (::SelectTrait{InputStyle})(::F) where {F<:Function} = 
+SelectTrait{InputStyle}()(F)
+
+(::SelectTrait{InputStyle})(::Type{F}) where {F<:Function} = 
 returnUndefinedTraitError(InputStyle, F)
-
-
-abstract type SquaredIntNormStyle <: FunctionStyle end
-
-struct SIntNormalizable <: SquaredIntNormStyle end
-
-struct SIntUnnormalized <: SquaredIntNormStyle end
-
-(::SelectTrait{SquaredIntNormStyle})(::F) where {F<:Function} = 
-returnUndefinedTraitError(SquaredIntNormStyle, F)
