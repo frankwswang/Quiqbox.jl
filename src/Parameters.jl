@@ -1,6 +1,6 @@
 export TensorVar, CellParam, GridParam, ParamGrid, ParamMesh, setScreenLevel!, 
        setScreenLevel, symOf, inputOf, obtain, fragment, setVal!, screenLevelOf, 
-       markParams!, topoSort, getParams, ShapedMemory, directObtain, memorize!
+       markParams!, topoSort, getParams, uniqueParams, ShapedMemory, directObtain, memorize!
 
 using Base: Fix2, Threads.Atomic, issingletontype
 using Test: @inferred
