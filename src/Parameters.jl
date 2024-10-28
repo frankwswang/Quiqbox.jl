@@ -1388,7 +1388,7 @@ topoSort(node::CellParam{T}) where {T} = topoSortINTERNAL([node])
 # end
 
 
-function locateParam!(paramSet::PBoxCollection, target::ParamBox)
+function locateParam!(paramSet::PBoxAbtArray, target::ParamBox)
     idx = findfirst(x->compareParamBox(x, target), paramSet)
     if idx === nothing
         push!(paramSet, target)
@@ -1397,7 +1397,7 @@ function locateParam!(paramSet::PBoxCollection, target::ParamBox)
     idx
 end
 
-function locateParam!(paramSet::PBoxCollection, target::PBoxCollection)
+function locateParam!(paramSet::PBoxAbtArray, target::PBoxCollection)
     if target === paramSet
         builder = ifelse(target isa Tuple, Tuple, collect)
         (builder∘eachindex)(paramSet)
@@ -1406,5 +1406,5 @@ function locateParam!(paramSet::PBoxCollection, target::PBoxCollection)
     end
 end
 
-locateParam!(paramSet::PBoxCollection, target::NamedTuple) = 
+locateParam!(paramSet::PBoxAbtArray, target::NamedTuple) = 
 locateParam!(paramSet, values(target))

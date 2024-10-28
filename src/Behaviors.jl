@@ -1,5 +1,5 @@
 (::SelectTrait{ParameterStyle})(::F) where {F<:Function} = 
-ifelse( hasmethod(unpackParamFunc!, Tuple{F, PBoxCollection}), 
+ifelse( hasmethod(unpackParamFunc!, Tuple{F, PBoxAbtArray}), 
         IsParamFunc(), NotParamFunc() )
 
 # formatInput
