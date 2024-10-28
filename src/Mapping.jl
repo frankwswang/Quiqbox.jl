@@ -37,6 +37,9 @@ struct JoinParallel{C<:ParamOperator, F<:ParamOperator, J<:Function} <: ChainOpe
     joint::J
 end
 
+const AddParallel{L, R} = JoinParallel{L, R, typeof(+)}
+const MulParallel{L, R} = JoinParallel{L, R, typeof(*)}
+
 evalFunc(f::JoinParallel, input, param) = 
 f.joint(f.chain(input, param), f.apply(input, param))
 
@@ -64,15 +67,15 @@ function evalFunc(func::F, r) where {F<:Function}
 end
 
 
-unpackFunc(f::Function) = unpackFunc!(f, (uniqueParams∘getParams)(f))
+unpackFunc(f::Function) = unpackFunc!(f, ParamBox[])
 
-unpackFunc!(f::Function, paramSet::PBoxCollection) = 
+unpackFunc!(f::Function, paramSet::PBoxAbtArray) = 
 unpackFunc!(SelectTrait{ParameterStyle}()(f), f, paramSet)
 
-unpackFunc!(::IsParamFunc, f::Function, paramSet::PBoxCollection) = 
+unpackFunc!(::IsParamFunc, f::Function, paramSet::PBoxAbtArray) = 
 unpackParamFunc!(f, paramSet)
 
-function unpackFunc!(::NotParamFunc, f::Function, paramSet::PBoxCollection)
+function unpackFunc!(::NotParamFunc, f::Function, paramSet::PBoxAbtArray)
     params = getParams(f)
     ids = locateParam!(paramSet, params)
     fCopy = deepcopy(f)
