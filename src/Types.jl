@@ -53,13 +53,10 @@ abstract type ParamNest{T, N, I, O} <: ParamBatch{T, N, I, O} end
 abstract type BaseParam{T, N, I} <: ParamToken{T, N, I} end
 abstract type LinkParam{T, N, I} <: ParamToken{T, N, I} end
 
-abstract type SpatialOrbPlex{T, D, F, O} <: SpatialAmpTensor{T, D, 1, O} end
+abstract type OrbitalBatch{T, D, F, O} <: SpatialAmpTensor{T, D, 1, O} end
 
+abstract type OrbitalBasis{T, D, F} <: SpatialAmplitude{T, D, 1} end
 abstract type FieldAmplitude{T, D} <: SpatialAmplitude{T, D, 1} end
-
-abstract type SpatialOrbital{T, D, F} <: FieldAmplitude{T, D} end
-
-const SpatialOrbitals{T, D, F} = Union{SpatialOrbital{T, D, F}, SpatialOrbPlex{T, D, F}}
 
 # abstract type ManyParticleState{T} <: Any end
 
@@ -92,6 +89,7 @@ const AbtArray0D{T} = AbstractArray{T, 0}
 const RefVal = Base.RefValue
 
 const RealOrComplex{T<:Real} = Union{T, Complex{T}}
+const ParamOrValue{T} = Union{ElementalParam{T}, T}
 
 const NonEmptyTupleOrAbtArray{T, A<:AbstractArray{T}} = Union{NonEmptyTuple{T}, A}
 
@@ -111,4 +109,5 @@ const DimParamSet{T} = AbstractVector{<:ParamSetEle{T}}
 const ParamFunctor{T, N, I} = Union{BaseParam{T, N, I}, ParamLink{T, N, I}}
 const ParamPointer{T, N, I} = Union{LinkParam{T, N, I}, ParamNest{T, N, I}}
 
+const PBoxAbtArray{T<:ParamBox} = AbstractArray{T}
 const PBoxCollection{T<:ParamBox} = NonEmptyTupleOrAbtArray{T}
