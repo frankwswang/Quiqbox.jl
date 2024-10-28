@@ -26,22 +26,22 @@ struct ComputePGFunc{T} <: CompositeFunction
     normalize::Bool
 end
 
-struct EvalPolyGaussFunc{F<:PointerFunc{<:ComputePGFunc}} <: EvalFieldAmp{1, PolyGaussFunc}
-    f::F
-end
-
 function (f::ComputePGFunc{T})(r::Real, xpnVal::T) where {T}
     i = f.degree
     factor = ifelse(f.normalize, polyGaussFuncNormFactor(xpnVal, i), one(T))
     exp(-xpnVal * r * r) * r^i * factor
 end
 
+struct EvalPolyGaussFunc{F<:PointerFunc{<:ComputePGFunc}} <: EvalFieldAmp{1, PolyGaussFunc}
+    f::F
+end
+
 function unpackParamFunc!(f::PolyGaussFunc{T, <:ElementalParam{T}}, 
-                          paramSet::PBoxCollection) where {T}
-    evalFuncCore = ComputePGFunc{T}(f.degree, f.normalize)
+                          paramSet::PBoxAbtArray) where {T}
+    fEvalCore = ComputePGFunc{T}(f.degree, f.normalize)
     parIds = (locateParam!(paramSet, f.exponent),)
-    evalFunc = PointerFunc(evalFuncCore, parIds, objectid(paramSet))
-    EvalPolyGaussFunc(evalFunc), paramSet
+    fEval = PointerFunc(fEvalCore, parIds, objectid(paramSet))
+    EvalPolyGaussFunc(fEval), paramSet
 end
 
 
@@ -65,14 +65,14 @@ struct EvalContractedSum{D, F<:JoinParallel} <: EvalFieldAmp{D, ContractedSum}
     EvalContractedSum{D}(f::F) where {D, F} = new{D, F}(f)
 end
 
-function unpackParamFunc!(f::ContractedSum{<:Any, D}, paramSet::PBoxCollection) where {D}
+function unpackParamFunc!(f::ContractedSum{<:Any, D}, paramSet::PBoxAbtArray) where {D}
     pSetId = objectid(paramSet)
-    innerEvalFuncs = map(Fix2(unpackFunc!, paramSet), f.basis) .|> first
-    evalFunc = mapreduce(JoinParallel(+), innerEvalFuncs, f.coeff) do ief, coeff
+    fEvalInners = map(Fix2(unpackFunc!, paramSet), f.basis) .|> first
+    fEval = mapreduce(JoinParallel(+), fEvalInners, f.coeff) do ief, coeff
         parIds = (locateParam!(paramSet, coeff),)
         JoinParallel(ief, PointerFunc(OnlyParam(itself), parIds, pSetId), *)
     end
-    EvalContractedSum{D}(evalFunc), paramSet
+    EvalContractedSum{D}(fEval), paramSet
 end
 
 
@@ -94,67 +94,88 @@ function OriginShifter(func::F, shift::NonEmptyTuple{Real}=ntuple(_->T(0), Val(D
     OriginShifter(func, shiftPars)
 end
 
+struct ShiftByArg{T<:Real, D} <: FieldlessFunction end
+
+(::ShiftByArg{T, D})(input, arg::Vararg{T, D}) where {T, D} = (input .- arg)
+
 struct EvalOriginShifter{D, F<:InsertInward} <: EvalFieldAmp{D, OriginShifter}
     f::F
 
     EvalOriginShifter{D}(f::F) where {D, F} = new{D, F}(f)
 end
 
-function unpackParamFunc!(f::OriginShifter{T, D}, paramSet::PBoxCollection) where {T, D}
+function unpackParamFunc!(f::OriginShifter{T, D}, paramSet::PBoxAbtArray) where {T, D}
     pSetId = objectid(paramSet)
     parIds = locateParam!(paramSet, f.shift)
-    outerEvalFunc = unpackFunc!(f.func, paramSet) |> first
-    encoder = (inputOrigin, pVal::Vararg{T, D}) -> (inputOrigin .- pVal)
-    evalFunc = InsertInward(outerEvalFunc, PointerFunc(encoder, parIds, pSetId))
-    EvalOriginShifter{D}(evalFunc), paramSet
+    fEvalOuter = unpackFunc!(f.func, paramSet) |> first
+    fEval = InsertInward(fEvalOuter, PointerFunc(ShiftByArg{T, D}(), parIds, pSetId))
+    EvalOriginShifter{D}(fEval), paramSet
 end
 
 
-struct AxialProduct{T, D, B<:NTuple{D, FieldAmplitude{T, 1}}} <: FieldAmplitude{T, D}
+struct AxialFuncProd{T, D, B<:NTuple{D, FieldAmplitude{T, 1}}} <: FieldAmplitude{T, D}
     component::B
 
-    AxialProduct(component::B) where {T, B<:NonEmptyTuple{FieldAmplitude{T, 1}}} = 
+    AxialFuncProd(component::B) where {T, B<:NonEmptyTuple{FieldAmplitude{T, 1}}} = 
     new{T, length(component), B}(component)
 end
 
-AxialProduct((b,)::Tuple{FieldAmplitude{<:Any, 1}}) = itself(b)
+AxialFuncProd((b,)::Tuple{FieldAmplitude{<:Any, 1}}) = itself(b)
 
-AxialProduct(compos::AbstractVector{<:FieldAmplitude{T, 1}}) where {T} = 
-AxialProduct( Tuple(compos) )
+AxialFuncProd(compos::AbstractVector{<:FieldAmplitude{T, 1}}) where {T} = 
+AxialFuncProd( Tuple(compos) )
 
-struct EvalAxialProduct{D, F<:JoinParallel} <: EvalFieldAmp{D, AxialProduct}
+function AxialFuncProd(b::FieldAmplitude{<:Any, 1}, dim::Int)
+    dim < 1 && throw(AssertionError("`dim` must be a positive integer."))
+    (AxialFuncProd∘Tuple∘fill)(b, dim)
+end
+
+struct EvalAxialFuncProd{D, F<:JoinParallel} <: EvalFieldAmp{D, AxialFuncProd}
     f::F
 
-    EvalAxialProduct{D}(f::F) where {D, F} = new{D, F}(f)
+    EvalAxialFuncProd{D}(f::F) where {D, F} = new{D, F}(f)
 end
 
-function unpackParamFunc!(f::AxialProduct{<:Any, D}, paramSet::PBoxCollection) where {D}
-    evalFuncComps = map(Fix2(unpackFunc!, paramSet), f.component) .|> first
-    evalFunc = mapreduce(JoinParallel(*), evalFuncComps, 1:D) do efc, idx
-        InsertInward(efc, OnlyInput(input->getindex(input, idx)))
+function unpackParamFunc!(f::AxialFuncProd{<:Any, D}, paramSet::PBoxAbtArray) where {D}
+    fEvalComps = map(Fix2(unpackFunc!, paramSet), f.component) .|> first
+    fEval = mapreduce(JoinParallel(*), fEvalComps, 1:D) do efc, idx
+        InsertInward(efc, (OnlyInput∘Base.Fix2)(getindex, idx))
     end
-    EvalAxialProduct{D}(evalFunc), paramSet
+    EvalAxialFuncProd{D}(fEval), paramSet
 end
 
 
-struct CartGaussOrb{T, D, L, B<:NTuple{D, PolyGaussFunc{T}}} <: FieldAmplitude{T, D}
-    product::AxialProduct{T, D, B}
+struct PolyGaussProd{T, D, L, B<:NTuple{D, PolyGaussFunc{T}}} <: FieldAmplitude{T, D}
+    product::AxialFuncProd{T, D, B}
     angular::CartSHarmonics{D, L}
 
-    function CartGaussOrb(product::AxialProduct{T, D, B}) where 
-                         {T, D, B<:NTuple{D, PolyGaussFunc{T}}}
+    function PolyGaussProd(product::AxialFuncProd{T, D, B}) where 
+                          {T, D, B<:NTuple{D, PolyGaussFunc{T}}}
         angular = CartSHarmonics(getfield.(product.component, :degree))
         new{T, D, azimuthalNumOf(angular), B}(product, angular)
     end
 end
 
-struct EvalCartGaussOrb{D, F<:EvalAxialProduct} <: EvalFieldAmp{D, CartGaussOrb}
-    f::F
-
-    EvalCartGaussOrb{D}(f::F) where {D, F} = new{D, F}(f)
+function PolyGaussProd(pgfs::NonEmptyTuple{PolyGaussFunc{T}}) where {T}
+    length(pgfs) < 2 && throw(AssertionError("`pgfs` must contain at least two elements."))
+    (PolyGaussProd∘AxialFuncProd)(pgfs)
 end
 
-function unpackParamFunc!(f::CartGaussOrb{<:Any, D}, paramSet::PBoxCollection) where {D}
-    evalFunc, pSet = unpackParamFunc!(f.product, paramSet)
-    EvalCartGaussOrb{D}(evalFunc), pSet
+PolyGaussProd(xpns::NonEmptyTuple{ElementalParam{T}, D}, 
+              ijk::NonEmptyTuple{Int, D}; normalize::Bool=true) where {T, D} = 
+PolyGaussFunc.(xpns, ijk; normalize) |> PolyGaussProd
+
+PolyGaussProd(xpn::ElementalParam{T}, 
+              ijk::NonEmptyTuple{Int, D}; normalize::Bool=true) where {T, D} = 
+PolyGaussProd((Tuple∘fill)(xpn, D), ijk; normalize)
+
+struct EvalPolyGaussProd{D, F<:EvalAxialFuncProd} <: EvalFieldAmp{D, PolyGaussProd}
+    f::F
+
+    EvalPolyGaussProd{D}(f::F) where {D, F} = new{D, F}(f)
+end
+
+function unpackParamFunc!(f::PolyGaussProd{<:Any, D}, paramSet::PBoxAbtArray) where {D}
+    fEval, pSet = unpackParamFunc!(f.product, paramSet)
+    EvalPolyGaussProd{D}(fEval), pSet
 end
