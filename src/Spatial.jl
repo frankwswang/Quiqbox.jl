@@ -1,3 +1,5 @@
+export PolyGaussFunc, ContractedSum, OriginShifter, AxialFuncProd, PolyGaussProd
+
 (f::FieldAmplitude)(x) = evalFunc(f, x)
 
 abstract type EvalFieldAmp{D, F} <: Evaluator{F} end
@@ -167,7 +169,7 @@ PolyGaussFunc.(xpns, ijk; normalize) |> PolyGaussProd
 
 PolyGaussProd(xpn::ElementalParam{T}, 
               ijk::NonEmptyTuple{Int, D}; normalize::Bool=true) where {T, D} = 
-PolyGaussProd((Tuple∘fill)(xpn, D), ijk; normalize)
+PolyGaussProd((Tuple∘fill)(xpn, D+1), ijk; normalize)
 
 struct EvalPolyGaussProd{D, F<:EvalAxialFuncProd} <: EvalFieldAmp{D, PolyGaussProd}
     f::F
