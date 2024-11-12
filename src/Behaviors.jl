@@ -17,8 +17,6 @@ formatInput(::ScalarInput, x::Any) = itself(x)
 formatInput(::VectorInput, x::AbstractArray) = vec(x)
 formatInput(::VectorInput, x::Tuple) = collect(x)
 
-formatInput(::TupleInput{1}, x::Any) = itself(x)
-formatInput(::TupleInput{1}, x::Tuple{Any}) = first(x)
 formatInput(::TupleInput{N}, x::Tuple{Vararg{Any, N}}) where {N} = itself(x)
 formatInput(::TupleInput{N}, x::AbstractArray) where {N} = 
 formatInput(TupleInput{N}(), Tuple(x))
