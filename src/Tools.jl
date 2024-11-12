@@ -1,4 +1,4 @@
-export hasEqual, hasIdentical, hasApprox, flatten, markUnique, getUnique!, itself
+export hasEqual, hasIdentical, hasApprox, markUnique, getUnique!, itself
 
 using Statistics: std, mean
 using LinearAlgebra: norm
@@ -452,47 +452,6 @@ function printStyledInfo(str::String;
     println()
 end
 
-
-# """
-#     flatten(a::Tuple) -> Tuple
-
-#     flatten(a::AbstractVector) -> AbstractVector
-
-# Flatten `a::Union{AbstractVector, Tuple}` that contains `AbstractArray`s and/or `Tuple`s. 
-# Only operate on the outermost container.
-
-# ≡≡≡ Example(s) ≡≡≡
-
-# ```jldoctest; setup = :(push!(LOAD_PATH, "../../src/"); using Quiqbox)
-# julia> flatten((:one, 2, [3, 4.0], ([5], "six"), "7"))
-# (:one, 2, 3.0, 4.0, [5], "six", "7")
-
-# julia> flatten([:one, 2, [3, 4.0], ([5], "six"), "7"])
-# 7-element Vector{Any}:
-#   :one
-#  2
-#  3.0
-#  4.0
-#   [5]
-#   "six"
-#   "7"
-# ```
-# """
-# function flatten(c::AbstractVector{T}) where {T}
-#     c2 = map( x->(x isa Union{AbstractArray, Tuple} ? x : (x,)), c )
-#     [(c2...)...]
-# end
-
-# function flatten(c::Tuple)
-#     c2 = map( x->(x isa Union{AbstractArray, Tuple} ? x : (x,)), c )
-#     ((c2...)...,)
-# end
-
-# flatten(c::AbstractVector{<:Tuple}) = joinTuple(c...) |> collect
-
-# joinTuple(t1::Tuple, t2::Tuple, t3::Tuple...) = (t1..., joinTuple(t2, t3...)...)
-
-# joinTuple(t::Tuple) = itself(t)
 
 """
 
