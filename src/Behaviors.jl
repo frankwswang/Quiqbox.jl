@@ -6,8 +6,13 @@ ifelse( hasmethod(unpackParamFunc!, Tuple{F, PBoxAbtArray}),
 (::SelectTrait{InputStyle})(::Type{<:SphericalHarmonics{D}}) where {D} = 
 TupleInput{D}()
 
-(::SelectTrait{InputStyle})(::Type{<:EvalFieldAmp{D}}) where {D} = 
+(::SelectTrait{InputStyle})(::Type{<:EvalFieldAmp{<:Any, D}}) where {D} = 
 TupleInput{D}()
+
+(::SelectTrait{InputStyle})(::Type{<:EvalFieldAmp{<:Any, 0}}) = 
+ScalarInput()
+
+formatInput(::ScalarInput, x::Any) = itself(x)
 
 formatInput(::VectorInput, x::AbstractArray) = vec(x)
 formatInput(::VectorInput, x::Tuple) = collect(x)

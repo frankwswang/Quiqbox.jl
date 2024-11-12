@@ -43,6 +43,8 @@ struct AnyInput <: InputStyle end
 
 struct TupleInput{N} <: InputStyle end
 
+struct ScalarInput <: InputStyle end
+
 struct VectorInput <: InputStyle end
 
 (::SelectTrait{InputStyle})(::F) where {F<:Function} = 
