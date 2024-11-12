@@ -65,7 +65,7 @@ struct BatchNode{T, N, O,
     end
 end
 
-struct BuildNode{T, N, O, F<:JaggedOperator{T, N, O}, S<:Union{iT, ValShifter{T}}, 
+struct BuildNode{T, N, O, F<:JaggedOperator{T, N, O}, S<:Union{ItsType, ValShifter{T}}, 
                  I<:NodeChildrenType{T}} <: OperationNode{T, N, O, I}
     operator::F
     shifter::S
@@ -85,7 +85,7 @@ struct BuildNode{T, N, O, F<:JaggedOperator{T, N, O}, S<:Union{iT, ValShifter{T}
     function BuildNode(children::I, p::ParamLink{T, N, <:Any, O}) where 
                       {T, N, O, I<:NodeChildrenType{T}}
         operator = p.lambda
-        new{T, N, O, typeof(operator), iT, I}(operator, itself, children, 
+        new{T, N, O, typeof(operator), ItsType, I}(operator, itself, children, 
                                               getParSym(p), objectid(p))
     end
 end

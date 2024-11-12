@@ -30,7 +30,7 @@ struct ShapedMemory{T, N} <: AbstractMemory{T, N}
 end
 
 ShapedMemory(value::AbstractArray{T}, shape::Tuple{Vararg{Int}}=size(value)) where {T} = 
-ShapedMemory(Memory{T}( vec(value) ), shape)
+ShapedMemory(getMemory(value), shape)
 
 ShapedMemory(::Type{T}, value::AbstractArray{T}) where {T} = ShapedMemory(value)
 
@@ -126,7 +126,7 @@ struct TypedReduction{T, F<:Function} <: JaggedOperator{T, 0, 0}
 
     function TypedReduction(::Type{T}) where {T}
         excludeAbtArray(T)
-        new{T, iT}(itself)
+        new{T, ItsType}(itself)
     end
 end
 
@@ -136,7 +136,7 @@ function (sf::TypedReduction{T, F})(arg::AbtArr210L{T}, args::AbtArr210L{T}...) 
     sf.f(arg, args...)::T
 end
 
-(::TypedReduction{T, iT})(arg::T) where {T} = itself(arg)
+(::TypedReduction{T, ItsType})(arg::T) where {T} = itself(arg)
 
 
 struct StableMorphism{T, F<:Function, N} <: JaggedOperator{T, N, 0}
@@ -153,7 +153,7 @@ struct StableMorphism{T, F<:Function, N} <: JaggedOperator{T, N, 0}
     function StableMorphism(::Type{V}) where {N, V<:AbstractArray{<:Any, N}}
         T = checkAbtArrayArg(V) |> first
         excludeAbtArray(T)
-        new{T, iT, N}(itself)
+        new{T, ItsType, N}(itself)
     end
 end
 
@@ -164,7 +164,7 @@ function (sf::StableMorphism{T, F, N})(arg::AbtArr210L{T}, args::AbtArr210L{T}..
     sf.f(arg, args...)::AbstractArray{T, N}
 end
 
-(::StableMorphism{T, iT, N})(arg::AbstractArray{T, N}) where {T, N} = itself(arg)
+(::StableMorphism{T, ItsType, N})(arg::AbstractArray{T, N}) where {T, N} = itself(arg)
 
 
 function genSeqAxis(lens::NTuple{N, Int}, sym::Symbol=:e) where {N}
@@ -206,7 +206,7 @@ struct FixedShapeLink{T, F<:Function, N, O} <: JaggedOperator{T, N, O}
         else
             checkReshapingAxis(arg, last.(axis))
         end
-        new{T2, iT, N, O}(itself, axis, prod( last.(axis) ))
+        new{T2, ItsType, N, O}(itself, axis, prod( last.(axis) ))
     end
 end
 
@@ -227,9 +227,9 @@ function (ml::FixedShapeLink{T})(arg::AbtArr210L{T}, args::AbtArr210L{T}...) whe
     reshape(res[iBegin : (iBegin + ml.extent - 1)], last.(ml.axis))
 end
 
-(::FixedShapeLink{T, iT, 0, O})(arg::AbstractArray{T, O}) where {T, O} = itself(arg)
+(::FixedShapeLink{T, ItsType, 0, O})(arg::AbstractArray{T, O}) where {T, O} = itself(arg)
 
-(::FixedShapeLink{T, iT, N, O})(arg::JaggedAbtArray{T, N, O}) where {T, N, O} = itself(arg)
+(::FixedShapeLink{T, ItsType, N, O})(arg::JaggedAbtArray{T, N, O}) where {T, N, O} = itself(arg)
 
 
 function checkScreenLevel(sl::Int, levels::NonEmptyTuple{Int})
@@ -317,7 +317,7 @@ function checkParamContainerArgType1(I::Type, R::Type)
     nothing
 end
 
-function checkCellParamArg(::TypedReduction{T, <:iTalike}, input::I, shifter::S, 
+function checkCellParamArg(::TypedReduction{T, <:ItsTalike}, input::I, shifter::S, 
                            memory::Union{ShapedMemory{T, 0}, T, Missing}) where {T, I, S}
     checkParamContainerArgType1(I, Tuple{ElementalParam{T}})
     checkParamInput(input, innerDimMax=0, outerDimMax=0)
@@ -326,7 +326,7 @@ function checkCellParamArg(::TypedReduction{T, <:iTalike}, input::I, shifter::S,
     elseif memory isa T
         memory = ShapedMemory( fill(memory) )
     end
-    TypedReduction(T), iT, deepcopy(memory)
+    TypedReduction(T), ItsType, deepcopy(memory)
 end
 
 function checkCellParamArg(f::TypedReduction{T, F}, input::I, shifter::S, 
@@ -411,10 +411,10 @@ CellParam(TypedReduction(T), (input,), symbol)
 CellParam(var, varSym::SymOrIndexedSym, symbol::SymOrIndexedSym=varSym) = 
 CellParam(TensorVar(var, varSym), symbol)
 
-const ItselfCParam{T} = CellParam{T, iT, Tuple{TensorVar{T, 0}}}
+const ItselfCParam{T} = CellParam{T, ItsType, Tuple{TensorVar{T, 0}}}
 
 
-function checkGridParamArg(::StableMorphism{T, <:iTalike, N}, input::I, memory::M) where 
+function checkGridParamArg(::StableMorphism{T, <:ItsTalike, N}, input::I, memory::M) where 
                           {T, N, O, I<:JaggedParam{T, <:Any, O}, M<:AbstractArray{T, N}}
     checkParamContainerArgType1(I, Tuple{SingleDimParam{T, N}})
     MI = typeof(input[1])
@@ -422,14 +422,14 @@ function checkGridParamArg(::StableMorphism{T, <:iTalike, N}, input::I, memory::
         throw(AssertionError("The type of `memory` should be a subtype of `$M1`."))
     end
     checkParamInput(input, innerDimMax=(O==0)*N, outerDimMax=(O==N)*N)
-    StableMorphism(AbstractArray{T, N}), iT, deepcopy(memory|>ShapedMemory)
+    StableMorphism(AbstractArray{T, N}), ItsType, deepcopy(memory|>ShapedMemory)
 end
 
-function checkGridParamArg(::StableMorphism{T, <:iTalike, N}, input::I, ::Missing) where 
+function checkGridParamArg(::StableMorphism{T, <:ItsTalike, N}, input::I, ::Missing) where 
                           {T, N, O, I<:JaggedParam{T, <:Any, O}}
     checkParamContainerArgType1(I, Tuple{SingleDimParam{T, N}})
     checkParamInput(input, innerDimMax=(O==0)*N, outerDimMax=(O==N)*N)
-    StableMorphism(AbstractArray{T, N}), iT, deepcopy(input[1]|>obtain|>ShapedMemory)
+    StableMorphism(AbstractArray{T, N}), ItsType, deepcopy(input[1]|>obtain|>ShapedMemory)
 end
 
 function throwGridParamDimErrorMessage()
