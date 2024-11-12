@@ -22,7 +22,7 @@ abstract type ParamOperator <: TaggedFunction end
 abstract type AbstractAmpTensor{T, O} <: JaggedOperator{T, 0, O} end
 abstract type AbstractAmplitude{T} <: JaggedOperator{T, 0, 0} end
 
-abstract type ChainOperator <: ParamOperator end
+abstract type ChainedOperator{J} <: ParamOperator end
 abstract type Evaluator{T} <: ParamOperator end
 
 # M: Particle number
@@ -91,7 +91,7 @@ const RefVal = Base.RefValue
 const RealOrComplex{T<:Real} = Union{T, Complex{T}}
 const ParamOrValue{T} = Union{ElementalParam{T}, T}
 
-const NonEmptyTupleOrAbtArray{T, A<:AbstractArray{T}} = Union{NonEmptyTuple{T}, A}
+const NonEmpTplOrAbtArr{T, A<:AbstractArray{T}} = Union{NonEmptyTuple{T}, A}
 
 const AbtVecOfAbtArr{T} = AbstractVector{<:AbstractArray{T}}
 const JaggedAbtArray{T, N, O} = AbstractArray{<:AbstractArray{T, N}, O}
@@ -110,4 +110,4 @@ const ParamFunctor{T, N, I} = Union{BaseParam{T, N, I}, ParamLink{T, N, I}}
 const ParamPointer{T, N, I} = Union{LinkParam{T, N, I}, ParamNest{T, N, I}}
 
 const PBoxAbtArray{T<:ParamBox} = AbstractArray{T}
-const PBoxCollection{T<:ParamBox} = NonEmptyTupleOrAbtArray{T}
+const PBoxCollection{T<:ParamBox} = NonEmpTplOrAbtArr{T}
