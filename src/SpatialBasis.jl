@@ -105,7 +105,7 @@ function CompositeOrb(basis::AbstractVector{<:ComposedOrb{T, D}},
                       weight::AbstractVector{<:ElementalParam{T}}, 
                       renormalize::Bool=false) where {T, D}
     checkEmptiness(basis, :basis)
-    primOrbs = mapreduce(decompose, vcat, basis)
+    primOrbs = mapfoldl(decompose, vcat, basis)
     CompositeOrb(primOrbs, weight, renormalize)
 end
 
@@ -121,38 +121,14 @@ CompositeOrb(ob::CompositeOrb) = itself(ob)
 const WeightedPrimField{T, D, F<:EvalPrimitiveOrb{T, D}} = 
       MulPair{<:F, PointOneFunc{OnlyParam{ItsType}}}
 
-# function getWeightedFieldTypeBound(::Type{T}, ::Val{D}, ::Type{F}) where 
-#                                   {T, D, F<:EvalComposedOrb{T, D}}
-#     isconcretetype(F) ? WeightedField{F} : WeightedField{<:F}
-# end
-
-# struct EvalCompositeOrb{T, D, B<:WeightedField{<:EvalComposedOrb{T, D}}, NB, 
-#                         F} <: EvalComposedOrb{T, D, B}
-#     f::MulPair{AddChain{B, NB}, OnlyParam{F}}
-# end
-
-# struct EvalCompositeOrb{T, D, B<:EvalPrimitiveOrb{T, D}, NB, F} <: EvalComposedOrb{T, D, B}
-#     f::MulPair{AddChain{WeightedPrimField{T, D, B}, NB}, OnlyParam{F}}
-
-#     function EvalCompositeOrb(::Type{B}, 
-#                               fs::Memory{WeightedPrimField{T, D, B}}, 
-#                               normalizer::OnlyParam{F}) where 
-#                              {T, D, B<:EvalPrimitiveOrb{T, D}, F}
-#         fMem = Memory{WeightedPrimField{T, D, B}}(fs)
-#         @show B
-#         new{T, D, B, length(fs), F}(PairCombine(*, ChainReduce(+, fMem), normalizer))
-#     end
-# end
-
-
 struct EvalCompositeOrb{T, D, B<:EvalPrimitiveOrb{T, D}, F} <: EvalComposedOrb{T, D, B}
     f::MulPair{AddChain{Memory{WeightedPrimField{T, D, B}}}, OnlyParam{F}}
 
-    function EvalCompositeOrb(weightedFs::AbstractVector{<:WeightedPrimField{T, D, <:EvalPrimitiveOrb{T, D}}}, 
+    function EvalCompositeOrb(weightedFs::AbstractVector{<:WeightedPrimField{T, D}}, 
                               normalizer::OnlyParam{F}) where {T, D, F}
-        fInnerObjs = reduce(∘, Base.Fix2.(getfield, (:f, :left))).(weightedFs)
-        fInnerType = eltype(reduce(∘, Base.Fix2.(getfield, (:apply, :left ))).(fInnerObjs))
-        nInnerType = eltype(reduce(∘, Base.Fix2.(getfield, (:f,     :right))).(fInnerObjs))
+        fInnerObjs = foldl(∘, Base.Fix2.(getfield, (:f, :left))).(weightedFs)
+        fInnerType = eltype(foldl(∘, Base.Fix2.(getfield, (:apply, :left ))).(fInnerObjs))
+        nInnerType = eltype(foldl(∘, Base.Fix2.(getfield, (:f,     :right))).(fInnerObjs))
         B = EvalPrimitiveOrb{T, D, <:fInnerType, <:nInnerType}
         weightedFieldMem = Memory{WeightedPrimField{T, D, B}}(weightedFs)
         new{T, D, B, F}(PairCombine(*, ChainReduce(+, weightedFieldMem), normalizer))
@@ -162,11 +138,11 @@ end
 function unpackParamFunc!(f::CompositeOrb{T, D}, paramSet::PBoxAbtArray) where {T, D}
     pSetId = objectid(paramSet)
     fInnerCores = map(Fix2(unpackFunc!, paramSet), f.basis) .|> first
-    weightedFields = mapreduce(vcat, fInnerCores, f.weight, init=WeightedPrimField{T, D, <:EvalPrimitiveOrb{T, D}}[]) do fic, w
+    init = WeightedPrimField{T, D, eltype(fInnerCores)}[]
+    weightedFields = mapfoldl(vcat, zip(fInnerCores, f.weight); init) do (i, w)
         parIds = (locateParam!(paramSet, w),)
-        PairCombine(*, fic, PointerFunc(OnlyParam(itself), parIds, pSetId))
+        PairCombine(*, i, PointerFunc(OnlyParam(itself), parIds, pSetId))
     end
-    # fEval = Memory{WeightedPrimField{T, D, fInnerCoreT}}(weightedFields) |> ChainReduce(+)
     EvalCompositeOrb(weightedFields, genNormalizer(f)), paramSet
 end
 
