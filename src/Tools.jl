@@ -655,9 +655,9 @@ A dummy function that returns its argument.
 """
 @inline itself(x) = x
 
-const iT = typeof(itself)
+const ItsType = typeof(itself)
 
-const iTalike = Union{iT, typeof(identity)}
+const ItsTalike = Union{ItsType, typeof(identity)}
 
 @inline themselves(xs::Vararg) = xs
 
@@ -1121,4 +1121,10 @@ end
 # obtainElementalVal(::Type{U}, obj::AbstractArray{<:U}) where {U} = copy(obj)
 
 getMemory(obj::Memory) = itself(obj)
-getMemory(obj::AbstractArray{T}) where {T} = Memory{T}(obj|>vec)
+
+function getMemory(obj::AbstractArray{T}) where {T}
+    arr = vec(isconcretetype(T) ? obj : itself.(obj))
+    Memory{T}(arr)
+end
+
+getMemory(obj::Tuple) = (getMemory∘collect)(obj)
