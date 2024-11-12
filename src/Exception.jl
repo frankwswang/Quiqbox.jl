@@ -19,3 +19,12 @@ function checkEmptiness(obj, name::Symbol)
     isempty(obj) && throw(AssertionError("`$name` must not be empty."))
     length(obj)
 end
+
+function checkLength(obj, name::Symbol, len::Int)
+    if len <= 0
+        checkEmptiness(obj, name)
+    elseif length(obj) != len
+        throw(AssertionError("The length of `$name` must match `len=$len`."))
+    end
+    nothing
+end
