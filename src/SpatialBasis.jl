@@ -34,9 +34,15 @@ function unpackParamFunc!(f::ComposedOrb{T, D}, paramSet::PBoxAbtArray) where {T
 end
 
 
-function prepareCellParamEncoder(::Type{T}, sym::Symbol) where {T}
+function genCellEncoder(::Type{T}, sym::Symbol) where {T}
     function (input)
-        input isa ElementalParam{T} ? input : CellParam(T(input), sym)
+        if input isa ElementalParam{T}
+            input
+        else
+            p = CellParam(T(input), sym)
+            setScreenLevel!(p, 1)
+            p
+        end
     end
 end
 
@@ -51,7 +57,7 @@ end
 function PrimitiveOrb(body::B, center::NTuple{D, ParamOrValue{T}}; 
                       renormalize::Bool=false) where {T, D, B<:FieldAmplitude{T, D}}
     length(center)!=D && throw(AssertionError("The length of `center` must match `D=$D`."))
-    encoder = prepareCellParamEncoder(T, :cen)
+    encoder = genCellEncoder(T, :cen)
     PrimitiveOrb(body, encoder.(center); renormalize)
 end
 
@@ -112,7 +118,7 @@ end
 function CompositeOrb(basis::AbstractVector{<:ComposedOrb{T, D}}, 
                       weight::AbstractVector{<:ParamOrValue{T}}; 
                       renormalize::Bool=false) where {T, D}
-    weightParams = prepareCellParamEncoder(T, :w).(weight)
+    weightParams = genCellEncoder(T, :w).(weight)
     CompositeOrb(basis, weightParams, renormalize)
 end
 
@@ -196,8 +202,8 @@ function genGaussTypeOrb(center::NonEmptyTuple{ParamOrValue{T}, D},
                          xpn::ParamOrValue{T}, 
                          ijk::NonEmptyTuple{Int, D}=ntuple(_->0, Val(D)); 
                          renormalize::Bool=false) where {T, D}
-    encoder1 = prepareCellParamEncoder(T, :xpn)
-    encoder2 = prepareCellParamEncoder(T, :cen)
+    encoder1 = genCellEncoder(T, :xpn)
+    encoder2 = genCellEncoder(T, :cen)
     gf = xpn |> encoder1 |> GaussFunc
     PrimitiveOrb(PolyRadialFunc(gf, ijk), encoder2.(center), renormalize)
 end
@@ -214,7 +220,7 @@ function genGaussTypeOrb(center::NonEmptyTuple{ParamOrValue{T}, D},
     if pgtoNum == 1
         genGaussTypeOrb(center, xpns[], cons[], ijk; renormalize)
     else
-        conParams = prepareCellParamEncoder(T, :con).(cons)
+        conParams = genCellEncoder(T, :con).(cons)
         pgtos = genGaussTypeOrb.(Ref(center), xpns, Ref(ijk); renormalize)
         CompositeOrb(pgtos, conParams; renormalize)
     end
