@@ -959,6 +959,14 @@ recursiveTransform!(obtainCore, pDict, p)
 
 obtainINTERNAL(p::PrimitiveParam, ::Int) = obtainCore(p)
 
+function obtainINTERNAL(p::BaseParam{T, 0}, maxRecursion::Int) where {T}
+    if screenLevelOf(p) < 1
+        searchObtain(genParamValDict(T, maxRecursion), p)
+    else
+        obtainCore(T, p)
+    end
+end
+
 function obtainINTERNAL(p::CompositeParam{T}, maxRecursion::Int) where {T}
     searchObtain(genParamValDict(T, maxRecursion), p)
 end
@@ -968,15 +976,17 @@ function obtainINTERNAL(ps::AbstractArray{<:PrimitiveParam{T}}, ::Int) where {T}
 end
 
 function obtainINTERNAL(ps::AbstractArray{<:JaggedParam{T}}, maxRecursion::Int) where {T}
-    pValDict = genParamValDict(T, maxRecursion)
-    map(p->searchObtain(pValDict, p), ps)
+    if any(x->(screenLevelOf(x) < 1), p)
+        pValDict = genParamValDict(T, maxRecursion)
+        map(p->searchObtain(pValDict, p), ps)
+    else
+        obtainINTERNAL.(p, maxRecursion)
+    end
 end
 
 function obtain(p::AbtArrayOr{<:JaggedParam{T}}; 
                 maxRecursion::Int=DefaultMaxParamPointerLevel) where {T}
-    lock( ReentrantLock() ) do
-        obtainINTERNAL(p, maxRecursion)
-    end
+    obtainINTERNAL(p, maxRecursion)
 end
 
 ################################
@@ -999,7 +1009,7 @@ function setVal!(par::CellParam{T}, val::T) where {T}
     @atomic par.offset = val
 end
 
-isPrimitiveParam(pn::BaseParam) = (screenLevelOf(pn) == 1)
+isPrimitiveParam(p::JaggedParam) = (screenLevelOf(p) == 1)
 
 # import Base: iterate, size, length, eltype, broadcastable
 # length(::FixedSizeParam{<:Any, N}) where {N} = N
