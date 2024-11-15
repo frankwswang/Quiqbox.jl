@@ -781,6 +781,10 @@ symOf(p::JaggedParam) = indexedSymOf(p).name
 
 inputOf(p::JaggedParam) = p.input
 
+isDependentParam(p::JaggedParam) = (screenLevelOf(p) < 1)
+
+isPrimitiveParam(p::JaggedParam) = (screenLevelOf(p) == 1)
+
 
 outputSizeOf(p::PrimitiveParam) = size(p.input)
 
@@ -1006,30 +1010,40 @@ end
 searchObtain(pDict::ParamValDict{T}, p::JaggedParam{T}) where {T} = 
 recursiveTransform!(obtainCore, pDict, p)
 
+obtainINTERNALcore(p::JaggedParam{T}, maxRecursion::Int) where {T} = 
+searchObtain(genParamValDict(T, maxRecursion), p)
+
+obtainINTERNALcore(ps::AbstractArray{<:JaggedParam{T}}, maxRecursion::Int) where {T} = 
+map(p->obtainINTERNAL(p, maxRecursion), ps)
+
 obtainINTERNAL(p::PrimitiveParam, ::Int) = obtainCore(p)
 
 function obtainINTERNAL(p::BaseParam{T, 0}, maxRecursion::Int) where {T}
-    if screenLevelOf(p) < 1
-        searchObtain(genParamValDict(T, maxRecursion), p)
-    else
-        obtainCore(T, p)
-    end
+    isDependentParam(p) ? obtainINTERNALcore(p, maxRecursion) : obtainCore(T, p)
 end
 
 function obtainINTERNAL(p::CompositeParam{T}, maxRecursion::Int) where {T}
-    searchObtain(genParamValDict(T, maxRecursion), p)
+    obtainINTERNALcore(p, maxRecursion)
+end
+
+function obtainINTERNAL(p::ParamNest{T}, maxRecursion::Int) where {T}
+    if any(isDependentParam, p.input)
+        obtainINTERNALcore(p, maxRecursion)
+    else
+        obtainINTERNALcore(p.input, maxRecursion)
+    end
 end
 
 function obtainINTERNAL(ps::AbstractArray{<:PrimitiveParam{T}}, ::Int) where {T}
-    map(x->obtainINTERNAL(x, 0), ps)
+    obtainINTERNALcore(ps, 0)
 end
 
 function obtainINTERNAL(ps::AbstractArray{<:JaggedParam{T}}, maxRecursion::Int) where {T}
-    if any(x->(screenLevelOf(x) < 1), ps)
+    if any(isDependentParam, ps)
         pValDict = genParamValDict(T, maxRecursion)
         map(p->searchObtain(pValDict, p), ps)
     else
-        map(p->obtainINTERNAL(p, maxRecursion), ps)
+        obtainINTERNALcore(ps, maxRecursion)
     end
 end
 
@@ -1057,8 +1071,6 @@ function setVal!(par::CellParam{T}, val::T) where {T}
     throw(ArgumentError("`par` must behave like a primitive parameter."))
     @atomic par.offset = val
 end
-
-isPrimitiveParam(p::JaggedParam) = (screenLevelOf(p) == 1)
 
 # import Base: iterate, size, length, eltype, broadcastable
 # length(::FixedSizeParam{<:Any, N}) where {N} = N
