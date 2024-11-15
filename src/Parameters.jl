@@ -742,6 +742,15 @@ symOf(p::JaggedParam) = indexedSymOf(p).name
 inputOf(p::JaggedParam) = p.input
 
 
+outputSizeOf(p::PrimitiveParam) = size(p.input)
+
+outputSizeOf(p::ParamFunctor) = size(p.memory)
+
+outputSizeOf(p::ParamGrid) = size(p.input)
+
+outputSizeOf(p::KnotParam) = size(first(p.input).memory[p.index])
+
+
 mutable struct NodeMarker{T} <: StorageMarker{T}
     visited::Bool
     data::T
