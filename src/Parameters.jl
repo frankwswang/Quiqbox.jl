@@ -976,11 +976,11 @@ function obtainINTERNAL(ps::AbstractArray{<:PrimitiveParam{T}}, ::Int) where {T}
 end
 
 function obtainINTERNAL(ps::AbstractArray{<:JaggedParam{T}}, maxRecursion::Int) where {T}
-    if any(x->(screenLevelOf(x) < 1), p)
+    if any(x->(screenLevelOf(x) < 1), ps)
         pValDict = genParamValDict(T, maxRecursion)
         map(p->searchObtain(pValDict, p), ps)
     else
-        obtainINTERNAL.(p, maxRecursion)
+        map(p->obtainINTERNAL(p, maxRecursion), ps)
     end
 end
 
