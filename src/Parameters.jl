@@ -602,6 +602,7 @@ indexIn(f::GetIndex) = f.x
 
 
 function indexParam(pb::SingleDimParam, idx::Int, sym::MissingOr{Symbol}=missing)
+    ismissing(sym) && (sym = Symbol(:_, pb.symbol.name))
     CellParam(genGetIndex(idx), pb, sym)
 end
 
@@ -616,6 +617,7 @@ function indexParam(pb::ElementalParam, idx::Int, sym::MissingOr{Symbol}=missing
 end
 
 function indexParam(pb::JaggedParam, idx::Int, sym::MissingOr{Symbol}=missing)
+    ismissing(sym) && (sym = Symbol(:_, pb.symbol.name))
     GridParam(genGetIndex(idx), pb, sym)
 end
 
