@@ -99,38 +99,16 @@ ChainReduce(joint, VectorMemory(chain))
 
 ChainReduce(joint::F) where {F<:Function} = Base.Fix1(ChainReduce, joint)
 
-evalFunc(f::ChainReduce, input, param) = 
+const CountedChainReduce{J, P, N} = ChainReduce{J, VectorMemory{P, N}}
+
+evalFunc(f::CountedChainReduce, input, param) = 
 mapreduce(o->o(input, param), f.joint, f.chain.value)
+
+evalFunc(f::ChainReduce, input, param) = 
+mapreduce(o->o(input, param), f.joint, f.chain)
 
 const AddChain{C} = ChainReduce{typeof(+), C}
 const MulChain{C} = ChainReduce{typeof(*), C}
-
-
-# struct JoinParallel{J<:Function, 
-#                     C<:Union{Memory{<:ParamOperator}, JoinParallel}} <: ChainedOperator
-#     joint::J
-#     chain::C
-
-#     # JoinParallel(joint::J, chain::C) where {J<:Function, C<:NonEmptyTuple{ParamOperator}} = 
-#     # new{J, eltype(C), C}(joint, chain)
-
-#     function JoinParallel(joint::J, chain::C) where 
-#                          {J<:Function, O<:ParamOperator, 
-#                           C<:Union{Memory{O}, NonEmptyTuple{O}}}
-#         checkEmptiness(chain, :chain)
-#         new{J, O, C}(joint, chain)
-#     end
-# end
-
-# JoinParallel(joint::J, f::F) where {J<:Function, F<:Function} = JoinParallel(joint, (f,))
-
-# evalFunc(f::JoinParallel, input, param) = 
-# mapreduce(fNode->fNode(input, param), f.joint, f.chain)
-
-# JoinParallel(joint::Function) = Base.Fix1(JoinParallel, joint)
-
-# const AddParallel{O, C} = JoinParallel{typeof(+), O, C}
-# const MulParallel{O, C} = JoinParallel{typeof(*), O, C}
 
 
 struct InsertOnward{C<:ParamOperator, F<:ParamOperator} <: ParamOperator
