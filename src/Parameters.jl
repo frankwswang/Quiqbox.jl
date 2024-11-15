@@ -405,7 +405,7 @@ function CellParam(par::CellParam{T}, symbol::SymOrIndexedSym=symOf(par);
     CellParam(par.lambda, par.input, symbol, init, par.screen, offset)
 end
 
-CellParam(input::PrimitiveParam{T, 0}, symbol::SymOrIndexedSym=symOf(input)) where {T} = 
+CellParam(input::ElementalParam{T}, symbol::SymOrIndexedSym=symOf(input)) where {T} = 
 CellParam(TypedReduction(T), (input,), symbol)
 
 CellParam(var, varSym::SymOrIndexedSym, symbol::SymOrIndexedSym=varSym) = 
