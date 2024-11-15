@@ -582,6 +582,44 @@ ParamMesh(input::JaggedParam, symbol::SymOrIndexedSym;
 ParamMesh(FixedShapeLink(obtain(input); axis), (input,), symbol)
 
 
+function indexParam(pb::ParamGrid{<:Any, N}, idx::Int, 
+                    sym::MissingOr{Symbol}=missing) where {N}
+    entry = pb.input[idx]
+    if ismissing(sym) || sym==symOf(entry)
+        entry
+    elseif iszero(N)
+        CellParam(entry, sym)
+    else
+        GridParam(entry, sym)
+    end
+end
+
+const GetIndex = Base.Fix2{typeof(getindex), Int}
+
+genGetIndex(idx::Int) = Base.Fix2(getindex, idx)
+
+indexIn(f::GetIndex) = f.x
+
+
+function indexParam(pb::SingleDimParam, idx::Int, sym::MissingOr{Symbol}=missing)
+    CellParam(genGetIndex(idx), pb, sym)
+end
+
+function indexParam(pb::ElementalParam, idx::Int, sym::MissingOr{Symbol}=missing)
+    if idx != 1
+        throw(BoundsError(pb, idx))
+    elseif ismissing(sym) || sym == symOf(res)
+        pb
+    else
+        CellParam(pb, sym)
+    end
+end
+
+function indexParam(pb::JaggedParam, idx::Int, sym::MissingOr{Symbol}=missing)
+    GridParam(genGetIndex(idx), pb, sym)
+end
+
+
 genDefaultRefParSym(input::JaggedParam) = IndexedSym(:_, input.symbol)
 
 struct KnotParam{T, F, I, N, O} <: LinkParam{T, N, I}
