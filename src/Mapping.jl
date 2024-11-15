@@ -153,7 +153,7 @@ function unpackFunc!(::NotParamFunc, f::Function, paramSet::PBoxAbtArray)
         end
         fCopy(x)
     end
-    PointerFunc(evalCore, ids, objectid(paramSet)), params
+    PointerFunc(evalCore, ids, objectid(paramSet)), paramSet
 end
 
 
