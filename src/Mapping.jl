@@ -32,6 +32,23 @@ const LinearMemory{T} = Union{Memory{T}, VectorMemory{T}}
 (po::ParamOperator)(input, param) = evalFunc(po, input, param)
 
 
+struct ReturnTyped{T, F<:Function} <: TaggedFunction
+    f::F
+
+    function ReturnTyped(f::F, ::Type{T}) where {F, T}
+        new{T, F}(f)
+    end
+end
+
+ReturnTyped(::Type{T}) where {T} = ReturnTyped(itself, T)
+
+(f::ReturnTyped{T, F})(arg) where {T, F} = convert(T, f.f(arg))
+
+const Return{T} = ReturnTyped{T, ItsType}
+
+
+
+
 struct PointerFunc{F<:Function, T<:NonEmptyTuple{Union{Int, Memory{Int}}}} <: ParamOperator
     apply::F
     pointer::T
@@ -41,6 +58,28 @@ end
 evalFunc(f::PointerFunc, input, param) = f.apply(input, getindex.(Ref(param), f.pointer)...)
 
 const PointOneFunc{F} = PointerFunc{F, Tuple{Int}}
+
+# struct PointerFunc{F<:Function, N, T<:Tuple{Vararg{Any, N}}} <: ParamOperator
+#     apply::F
+#     pointer::NTuple{N, Int}
+#     type::Type{T}
+#     sourceID::UInt
+
+#     function PointerFunc(apply::F, pointer::NonEmptyTuple{Int, N}, ::Type{T}, 
+#                          sourceID::UInt) where {F, N, T<:NonEmptyTuple{Any, N}}
+#         new{F, N+1, T}(apply, pointer, T, sourceID)
+#     end
+# end
+
+# function evalFunc(f::PointerFunc, input, param)
+#     # getIds = map((x, y)->ReturnTyped(y)∘GetIndex(x), f.pointer, fieldtypes(f.type))
+#     args = map(f.pointer, fieldtypes(f.type)) do x, y
+#         (ReturnTyped(y)∘getindex)(param, x)
+#     end
+#     f.apply(input, args...)
+# end
+
+# const PointOneFunc{F, T} = PointerFunc{F, 1, Tuple{T}}
 
 
 struct OnlyInput{F<:Function} <: Evaluator{F}
@@ -155,14 +194,3 @@ function unpackFunc!(::NotParamFunc, f::Function, paramSet::PBoxAbtArray)
     end
     PointerFunc(evalCore, ids, objectid(paramSet)), paramSet
 end
-
-
-struct ReturnTyped{T, F<:Function} <: TaggedFunction
-    f::F
-
-    function ReturnTyped(f::F, ::Type{T}) where {F, T}
-        new{T, F}(f)
-    end
-end
-
-(f::ReturnTyped{F, T})(arg) where {F, T} = convert(T, f(arg))
