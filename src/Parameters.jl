@@ -1360,12 +1360,12 @@ function markParams!(pars::AbstractVector{<:JaggedParam{T}}) where {T}
     par0Dids = findall(x->(x isa ElementalParam{T}), leafPars)
     leafParsFormated = if isempty(par0Dids)
         markParamsCore!(parIdxDict, leafPars)
-        convert(Vector{ParamSetEle{T}}, leafPars)
+        convert(Vector{InnerParamEle{T}}, leafPars)
     else
         leafP0Ds = ElementalParam{T}[splice!(leafPars, par0Dids)...]
         markParamsCore!(parIdxDict, leafP0Ds)
         markParamsCore!(parIdxDict, leafPars)
-        ParamSetEle{T}[leafP0Ds, leafPars...]
+        InnerParamEle{T}[leafP0Ds, leafPars...]
     end
     (leafParsFormated, rootPars, selfPars) # inputParam, outputParam, selfParam
 end

@@ -103,8 +103,8 @@ const TernaryNTupleUnion{T} = Union{(NTuple{N, T} for N in 1:3)...}
 const ParamInputType{T} = TernaryNTupleUnion{JaggedParam{T}}
 const ParamInput{T, N} = NTuple{N, JaggedParam{T}}
 
-const ParamSetEle{T} = Union{AbstractVector{<:ElementalParam{T}}, InnerSpanParam{T}}
-const DimParamSet{T} = AbstractVector{<:ParamSetEle{T}}
+const InnerParamEle{T} = Union{AbstractVector{<:ElementalParam{T}}, InnerSpanParam{T}}
+const InnerParamSet{T} = AbstractVector{<:InnerParamEle{T}}
 
 const ParamFunctor{T, N, I} = Union{BaseParam{T, N, I}, ParamLink{T, N, I}}
 const ParamPointer{T, N, I} = Union{LinkParam{T, N, I}, ParamNest{T, N, I}}
