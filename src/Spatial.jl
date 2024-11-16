@@ -6,7 +6,7 @@ using LinearAlgebra: norm
 
 abstract type EvalFieldAmp{T, D, F} <: Evaluator{F} end
 
-evalFunc(f::EvalFieldAmp, input, param) = 
+(f::EvalFieldAmp)(input, param) = 
 f.f(formatInput(SelectTrait{InputStyle}()(f), input), param)
 
 
@@ -41,12 +41,14 @@ function (f::ComputeGFunc{T})(r::Real, xpnVal::T) where {T}
 end
 
 struct EvalGaussFunc{T} <: EvalFieldAmp{T, 0, GaussFunc}
+    # f::PointOneFunc{ComputeGFunc{T}, T}
     f::PointOneFunc{ComputeGFunc{T}}
 end
 
 function unpackParamFunc!(f::GaussFunc{T, <:ElementalParam{T}}, 
                           paramSet::PBoxAbtArray) where {T}
     parIds = (locateParam!(paramSet, f.xpn),)
+    # fEval = PointerFunc(ComputeGFunc{T}(), parIds, Tuple{T}, objectid(paramSet))
     fEval = PointerFunc(ComputeGFunc{T}(), parIds, objectid(paramSet))
     EvalGaussFunc(fEval), paramSet
 end

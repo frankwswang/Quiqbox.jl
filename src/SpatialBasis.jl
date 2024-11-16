@@ -21,7 +21,7 @@ abstract type EvalComposedOrb{T, D, B} <: Evaluator{B} end
 
 (f::OrbitalBasis)(x) = evalFunc(f, x)
 
-evalFunc(f::EvalComposedOrb, input, param) = f.f(input, param)
+(f::EvalComposedOrb)(input, param) = f.f(input, param)
 
 function genNormalizer(f::ComposedOrb{T}) where {T}
     (OnlyParam∘unpackSquareIntNormalizer)( ifelse(f.renormalize, f, one(T)) )

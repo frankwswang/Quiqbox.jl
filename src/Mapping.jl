@@ -29,8 +29,6 @@ length(::VectorMemory{<:Any, L}) where {L} = L
 
 const LinearMemory{T} = Union{Memory{T}, VectorMemory{T}}
 
-(po::ParamOperator)(input, param) = evalFunc(po, input, param)
-
 
 struct ReturnTyped{T, F<:Function} <: TaggedFunction
     f::F
@@ -55,7 +53,7 @@ struct PointerFunc{F<:Function, T<:NonEmptyTuple{Union{Int, Memory{Int}}}} <: Pa
     sourceID::UInt
 end
 
-evalFunc(f::PointerFunc, input, param) = f.apply(input, getindex.(Ref(param), f.pointer)...)
+(f::PointerFunc)(input, param) = f.apply(input, getindex.(Ref(param), f.pointer)...)
 
 const PointOneFunc{F} = PointerFunc{F, Tuple{Int}}
 
@@ -86,21 +84,21 @@ struct OnlyInput{F<:Function} <: Evaluator{F}
     f::F
 end
 
-evalFunc(f::OnlyInput, input, _) = f.f(input)
+(f::OnlyInput)(input, _) = f.f(input)
 
 
 struct OnlyParam{F<:Function} <: Evaluator{F}
     f::F
 end
 
-evalFunc(f::OnlyParam, _, param) = f.f(param)
+(f::OnlyParam)(_, param) = f.f(param)
 
 
 struct ParamFunc{F<:Function} <: Evaluator{F}
     f::F
 end
 
-evalFunc(f::ParamFunc, input, param) = f.f(input, param)
+(f::ParamFunc)(input, param) = f.f(input, param)
 
 struct PairCombine{J<:Function, FL<:ParamOperator, FR<:ParamOperator} <: ChainedOperator{J}
     joint::J
@@ -114,8 +112,7 @@ const MulPair{FL, FR} = PairCombine{typeof(*), FL, FR}
 PairCombine(joint::F) where {F<:Function} = 
 (left::ParamOperator, right::ParamOperator) -> PairCombine(joint, left, right)
 
-evalFunc(f::PairCombine, input, param) = 
-f.joint( f.left(input, param), f.right(input, param) )
+(f::PairCombine)(input, param) = f.joint( f.left(input, param), f.right(input, param) )
 
 #! Test!!
 struct ChainReduce{J<:Function, C<:LinearMemory{<:ParamOperator}} <: ChainedOperator{J}
@@ -140,11 +137,10 @@ ChainReduce(joint::F) where {F<:Function} = Base.Fix1(ChainReduce, joint)
 
 const CountedChainReduce{J, P, N} = ChainReduce{J, VectorMemory{P, N}}
 
-evalFunc(f::CountedChainReduce, input, param) = 
+(f::CountedChainReduce)(input, param) = 
 mapreduce(o->o(input, param), f.joint, f.chain.value)
 
-evalFunc(f::ChainReduce, input, param) = 
-mapreduce(o->o(input, param), f.joint, f.chain)
+(f::ChainReduce)(input, param) = mapreduce(o->o(input, param), f.joint, f.chain)
 
 const AddChain{C} = ChainReduce{typeof(+), C}
 const MulChain{C} = ChainReduce{typeof(*), C}
@@ -155,7 +151,7 @@ struct InsertOnward{C<:ParamOperator, F<:ParamOperator} <: ParamOperator
     dress::F
 end
 
-evalFunc(f::InsertOnward, input, param) = f.dress(f.apply(input, param), param)
+(f::InsertOnward)(input, param) = f.dress(f.apply(input, param), param)
 
 
 struct InsertInward{C<:ParamOperator, F<:ParamOperator} <: ParamOperator
@@ -163,7 +159,7 @@ struct InsertInward{C<:ParamOperator, F<:ParamOperator} <: ParamOperator
     dress::F
 end
 
-evalFunc(f::InsertInward, input, param) = f.apply(f.dress(input, param), param)
+(f::InsertInward)(input, param) = f.apply(f.dress(input, param), param)
 
 
 function evalFunc(func::F, input) where {F<:Function}
