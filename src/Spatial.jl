@@ -22,7 +22,7 @@ struct EvalFieldFunc{T, F<:ReturnTyped{T}} <: EvalFieldAmp{T, 0, FieldFunc}
     f::F
 end
 
-function unpackParamFunc!(f::FieldFunc{T}, paramSet::PBoxAbtArray) where {T}
+function unpackParamFunc!(f::FieldFunc{T}, paramSet::AbstractVector) where {T}
     fEval, _ = unpackFunc!(f.f, paramSet)
     EvalFieldFunc(ReturnTyped(fEval, T)), paramSet
 end
@@ -41,14 +41,12 @@ function (f::ComputeGFunc{T})(r::Real, xpnVal::T) where {T}
 end
 
 struct EvalGaussFunc{T} <: EvalFieldAmp{T, 0, GaussFunc}
-    # f::PointOneFunc{ComputeGFunc{T}, T}
     f::PointOneFunc{ComputeGFunc{T}}
 end
 
 function unpackParamFunc!(f::GaussFunc{T, <:ElementalParam{T}}, 
-                          paramSet::PBoxAbtArray) where {T}
+                          paramSet::AbstractVector) where {T}
     parIds = (locateParam!(paramSet, f.xpn),)
-    # fEval = PointerFunc(ComputeGFunc{T}(), parIds, Tuple{T}, objectid(paramSet))
     fEval = PointerFunc(ComputeGFunc{T}(), parIds, objectid(paramSet))
     EvalGaussFunc(fEval), paramSet
 end
@@ -79,7 +77,7 @@ struct EvalAxialProdFunc{T, D, F<:EvalFieldAmp{T, 0}} <: EvalFieldAmp{T, D, Axia
     f::MulChain{VectorMemory{EvalAxialField{T, F}, D}}
 end
 
-function unpackParamFunc!(f::AxialProdFunc{T, D}, paramSet::PBoxAbtArray) where {T, D}
+function unpackParamFunc!(f::AxialProdFunc{<:Any, D}, paramSet::AbstractVector) where {D}
     fEvalComps = map(Fix2(unpackFunc!, paramSet), f.component) .|> first
     fEval = map(fEvalComps, Tuple(1:D)) do efc, idx
         InsertInward(efc, (OnlyInput∘Base.Fix2)(getindex, idx))
@@ -103,7 +101,7 @@ struct EvalPolyRadialFunc{T, D, F<:EvalFieldAmp{T, 0},
     f::MulPair{MagnitudeConverter{F}, OnlyInput{CartSHarmonics{D, L}}}
 end
 
-function unpackParamFunc!(f::PolyRadialFunc{<:Any, D}, paramSet::PBoxAbtArray) where {D}
+function unpackParamFunc!(f::PolyRadialFunc{<:Any, D}, paramSet::AbstractVector) where {D}
     fInner, _ = unpackParamFunc!(f.radial, paramSet)
     fEval = PairCombine(*, InsertInward(fInner, OnlyInput(norm)), OnlyInput(f.angular))
     EvalPolyRadialFunc(fEval), paramSet

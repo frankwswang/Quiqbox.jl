@@ -104,10 +104,16 @@ const ParamInputType{T} = TernaryNTupleUnion{JaggedParam{T}}
 const ParamInput{T, N} = NTuple{N, JaggedParam{T}}
 
 const InnerParamEle{T} = Union{AbstractVector{<:ElementalParam{T}}, InnerSpanParam{T}}
-const InnerParamSet{T} = AbstractVector{<:InnerParamEle{T}}
+const InnerParamVec{T} = AbstractVector{<:InnerParamEle{T}}
+
+const SingleDimPEle{T} = Union{AbstractVector{<:ElementalParam{T}}, SingleDimParam{T}}
+const SingleDimPVec{T} = AbstractVector{<:SingleDimPEle{T}}
+
+const MixedParamEle{T} = Union{AbstractVector{<:SingleDimPEle{T}}, JaggedParam{T}}
+const MixedParamVec{T} = AbstractVector{<:MixedParamEle{T}}
 
 const ParamFunctor{T, N, I} = Union{BaseParam{T, N, I}, ParamLink{T, N, I}}
 const ParamPointer{T, N, I} = Union{LinkParam{T, N, I}, ParamNest{T, N, I}}
 
-const PBoxAbtArray{T<:ParamBox} = AbstractArray{T}
-const PBoxCollection{T<:ParamBox} = NonEmpTplOrAbtArr{T}
+const PBoxTupleOrArr{T<:ParamBox} = NonEmpTplOrAbtArr{T}
+const ParamBoxVec{T<:ParamBox} = AbstractVector{T}

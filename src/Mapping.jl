@@ -45,39 +45,19 @@ ReturnTyped(::Type{T}) where {T} = ReturnTyped(itself, T)
 const Return{T} = ReturnTyped{T, ItsType}
 
 
-
-
-struct PointerFunc{F<:Function, T<:NonEmptyTuple{Union{Int, Memory{Int}}}} <: ParamOperator
+struct PointerFunc{F<:Function, T<:NonEmptyTuple{IndexPointer}} <: ParamOperator
     apply::F
     pointer::T
     sourceID::UInt
 end
 
-(f::PointerFunc)(input, param) = f.apply(input, getindex.(Ref(param), f.pointer)...)
+# PointerFunc(apply, idxGroup::NonEmptyTuple{Union{Int, NonEmptyTuple{Int}}}, 
+#             sourceID::UInt) = 
+# PointerFunc(apply, IndexPointer.(idxGroup), sourceID)
 
-const PointOneFunc{F} = PointerFunc{F, Tuple{Int}}
+(f::PointerFunc)(input, param) = f.apply(input, (Ref(param) .|> f.pointer)...)
 
-# struct PointerFunc{F<:Function, N, T<:Tuple{Vararg{Any, N}}} <: ParamOperator
-#     apply::F
-#     pointer::NTuple{N, Int}
-#     type::Type{T}
-#     sourceID::UInt
-
-#     function PointerFunc(apply::F, pointer::NonEmptyTuple{Int, N}, ::Type{T}, 
-#                          sourceID::UInt) where {F, N, T<:NonEmptyTuple{Any, N}}
-#         new{F, N+1, T}(apply, pointer, T, sourceID)
-#     end
-# end
-
-# function evalFunc(f::PointerFunc, input, param)
-#     # getIds = map((x, y)->ReturnTyped(y)∘GetIndex(x), f.pointer, fieldtypes(f.type))
-#     args = map(f.pointer, fieldtypes(f.type)) do x, y
-#         (ReturnTyped(y)∘getindex)(param, x)
-#     end
-#     f.apply(input, args...)
-# end
-
-# const PointOneFunc{F, T} = PointerFunc{F, 1, Tuple{T}}
+const PointOneFunc{F, N} = PointerFunc{F, Tuple{IndexPointer{N}}}
 
 
 struct OnlyInput{F<:Function} <: Evaluator{F}
@@ -161,22 +141,28 @@ end
 
 (f::InsertInward)(input, param) = f.apply(f.dress(input, param), param)
 
-
 function evalFunc(func::F, input) where {F<:Function}
     fCore, pars = unpackFunc(func)
-    fCore(input, map(obtain, pars))
+    fCore(input, evalParamSet(pars))
 end
 
 
+# unpackFunc(f::Function) = unpackFunc!(SelectTrait{ParameterStyle}()(f), f)
+
+# unpackFunc!(::NotParamFunc, f::Function) = unpackFunc!(f, ParamBox[])
+
 unpackFunc(f::Function) = unpackFunc!(f, ParamBox[])
 
-unpackFunc!(f::Function, paramSet::PBoxAbtArray) = 
+unpackFunc(f::JaggedOperator{T}) where {T} = 
+unpackFunc!(f, initializeParamSet(MixedParamVec{T}))
+
+unpackFunc!(f::Function, paramSet::AbstractVector) = 
 unpackFunc!(SelectTrait{ParameterStyle}()(f), f, paramSet)
 
-unpackFunc!(::IsParamFunc, f::Function, paramSet::PBoxAbtArray) = 
+unpackFunc!(::IsParamFunc, f::Function, paramSet::AbstractVector) = 
 unpackParamFunc!(f, paramSet)
 
-function unpackFunc!(::NotParamFunc, f::Function, paramSet::PBoxAbtArray)
+function unpackFunc!(::NotParamFunc, f::Function, paramSet::AbstractVector)
     params = getParams(f)
     ids = locateParam!(paramSet, params)
     fCopy = deepcopy(f)

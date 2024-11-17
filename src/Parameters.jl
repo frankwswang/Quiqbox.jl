@@ -1250,9 +1250,9 @@ end
 
 compareParamBox(::JaggedParam, ::JaggedParam) = false
 
-function compare(obj1::T1, obj2::T2) where {T1, T2}
+function compareObj(obj1::T1, obj2::T2) where {T1, T2}
     if T1 <: JaggedParam && T2 <: JaggedParam
-        compareParamBox(p1, p2)
+        compareParamBox(obj1, obj2)
     elseif T1 == T2
         obj1 === obj2 || compareMarker(markObj(obj1), markObj(obj2))
     else
@@ -1458,24 +1458,143 @@ topoSort(node::CellParam{T}) where {T} = topoSortINTERNAL([node])
 #     res
 # end
 
+#####
 
-function locateParam!(paramSet::PBoxAbtArray, target::ParamBox)
-    idx = findfirst(x->compareParamBox(x, target), paramSet)
-    if idx === nothing
+# SingleDimPVec: [[d0...], d1...]          # Used for  input-param set
+
+# MixedParamVec: [[[d0...], d1...], d2...] # Used for output-param set
+
+function initializeParamSet(::Type{<:SingleDimPVec{T}}) where {T}
+    InnerParamEle{T}[ ElementalParam{T}[] ]
+end
+
+function initializeParamSet(::Type{<:MixedParamVec{T}}) where {T}
+    MixedParamEle{T}[ SingleDimPEle{T}[ ElementalParam{T}[] ] ]
+end
+
+# struct IndexPointer{N}# <: CompositeFunction
+#     chain::NTuple{N, Int}
+
+#     IndexPointer(chain::NTuple{N, Int}) where {N} = new{N}(chain)
+# end
+
+# IndexPointer() = IndexPointer(())
+
+# IndexPointer(idx::Int) = IndexPointer((idx,))
+
+# IndexPointer(ip::IndexPointer, idx::Int) = IndexPointer((ip.chain..., idx,))
+
+# (::IndexPointer{0})(obj) = itself(obj)
+
+# (f::IndexPointer)(obj) = foldl((o, i)->getindex(o, i), f.chain, init=obj)
+
+
+# function getParamSector(paramSet::SingleDimPVec{T}, ::ElementalParam{T}) where {T}
+#     first(paramSet), IndexPointer(firstindex(paramSet))
+# end
+
+# function getParamSector(paramSet::SingleDimPVec{T}, ::InnerSpanParam{T}) where {T}
+#     paramSet, IndexPointer()
+# end
+
+# function getParamSector(paramSet::MixedParamVec{T}, ::ElementalParam{T}) where {T}
+#     ps1 = first(paramSet)
+#     first(ps1), IndexPointer((firstindex(paramSet), firstindex(ps1)))
+# end
+
+# function getParamSector(paramSet::MixedParamVec{T}, ::SingleDimParam{T}) where {T}
+#     first(paramSet), IndexPointer(firstindex(paramSet))
+# end
+
+# # function getParamSector(paramSet::Union{MixedParamVec{T}, ParamBoxAbtVec{T}}, 
+# #                         ::JaggedParam{T}) where {T}
+# #     paramSet, IndexPointer()
+# # end
+
+# function getParamSector(paramSet::AbstractVector, ::JaggedParam)
+#     paramSet, IndexPointer()
+# end
+
+
+
+#########
+
+struct Data0D end
+struct Data1D end
+struct Data2D end
+
+const DataDim = Union{Data0D, Data1D, Data2D}
+
+getDataDim(::Type{<:ElementalParam}) = Data0D()
+getDataDim(::Type{<:SingleDimParam}) = Data1D()
+getDataDim(::Type{<:JaggedParam}) = Data2D()
+getDataDim(::T) where {T<:JaggedParam} = getDataDim(T)
+
+
+struct IndexPointer{T<:DataDim} <: CompositeFunction
+    idx::Int
+    dim::T
+end
+
+IndexPointer(idx::Int, p::ParamBox) = IndexPointer(idx, getDataDim(p))
+
+
+getDataSector(source::PBoxTupleOrArr, ::DataDim) = itself(source)
+
+getDataSector(source::SingleDimPVec, ::Data0D) = first(source)
+
+getDataSector(source::SingleDimPVec, ::Data1D) = itself(source)
+
+getDataSector(source::MixedParamVec, ::Data0D) = (first∘first)(source)
+
+getDataSector(source::MixedParamVec, ::Data1D) = first(source)
+
+getDataSector(source::MixedParamVec, ::Data2D) = itself(source)
+
+
+getDataSector(source::NonEmpTplOrAbtArr, ::DataDim) = itself(source)
+
+getDataSector(source::AbtVecOfAbtArr, ::Data0D) = first(source)
+
+getDataSector(source::AbtVecOfAbtArr, ::Data1D) = itself(source)
+
+getDataSector(source::AbstractVector{<:JaggedAbtArray}, ::Data0D) = (first∘first)(source)
+
+getDataSector(source::AbstractVector{<:JaggedAbtArray}, ::Data1D) = first(source)
+
+getDataSector(source::AbstractVector{<:JaggedAbtArray}, ::Data2D) = itself(source)
+
+
+(f::IndexPointer)(source) = getindex(getDataSector(source, f.dim), f.idx)
+
+function locateParam!(paramSet::AbstractVector, target::ParamBox)
+    if isempty(paramSet)
         push!(paramSet, target)
-        idx = length(paramSet)
-    end
-    idx
-end
-
-function locateParam!(paramSet::PBoxAbtArray, target::PBoxCollection)
-    if target === paramSet
-        builder = ifelse(target isa Tuple, Tuple, collect)
-        (builder∘eachindex)(paramSet)
+        IndexPointer(firstindex(paramSet), target)
     else
-        map(x->locateParam!(paramSet, x), target)
+        targetDim = getDataDim(target)
+        paramSector = getDataSector(paramSet, targetDim)
+        idx = findfirst(x->compareObj(x, target), paramSector)
+        if idx === nothing
+            push!(paramSector, target)
+            idx = length(paramSector)
+        end
+        IndexPointer(idx, targetDim)
     end
 end
 
-locateParam!(paramSet::PBoxAbtArray, target::NamedTuple) = 
+function locateParam!(paramSet::AbstractVector, target::PBoxTupleOrArr)
+    map(x->locateParam!(paramSet, x), target)
+end
+
+locateParam!(paramSet::AbstractVector, target::NamedTuple) = 
 locateParam!(paramSet, values(target))
+
+
+evalParamSet(s::ParamBox) = obtain(s)
+
+evalParamSet(s::ParamBoxVec) = obtain(s)
+
+evalParamSet(s::SingleDimPVec) = map(obtain, s)
+
+evalParamSet(s::MixedParamVec) = map(evalParamSet, s)
