@@ -1,20 +1,5 @@
 export PrimitiveOrb, CompositeOrb, FrameworkOrb, genGaussTypeOrb
 
-function unpackSquareIntNormalizer(f::F) where {F<:Function}
-    inv∘sqrt∘genOverlap(f), nothing
-end
-
-struct Storage{T} <: CompositeFunction
-    val::T
-end
-
-(f::Storage)(_) = f.val
-
-function unpackSquareIntNormalizer(num::Number)
-    Storage(num)
-end
-
-
 abstract type ComposedOrb{T, D, B} <: OrbitalBasis{T, D, B} end
 
 abstract type EvalComposedOrb{T, D, B} <: Evaluator{B} end
@@ -23,13 +8,20 @@ abstract type EvalComposedOrb{T, D, B} <: Evaluator{B} end
 
 (f::EvalComposedOrb)(input, param) = f.f(input, param)
 
-function genNormalizer(f::ComposedOrb{T}) where {T}
-    (OnlyParam∘unpackSquareIntNormalizer)( ifelse(f.renormalize, f, one(T)) )
+
+function genNormalizer(f::ComposedOrb{T}, paramSet) where {T}
+    normalizer = if f.renormalize
+        genNormalizerCore(f, paramSet)
+    else
+        Storage(one(T))
+    end
+    ReturnTyped(normalizer, T)
 end
+
 
 function unpackParamFunc!(f::ComposedOrb, paramSet::AbstractVector)
     fEvalCore, _ = unpackParamFuncCore!(f, paramSet)
-    fEval = PairCombine(*, fEvalCore, genNormalizer(f))
+    fEval = PairCombine(*, fEvalCore, genNormalizer(f, paramSet))
     getEvaluator(f)(fEval), paramSet
 end
 
@@ -63,17 +55,20 @@ end
 
 PrimitiveOrb(ob::PrimitiveOrb) = itself(ob)
 
-struct ShiftByArg{T<:Real, D} <: FieldlessFunction end
-
-(::ShiftByArg{T, D})(input::NTuple{D, Real}, arg::Vararg{T, D}) where {T, D} = 
-(input .- arg)
-
+function genNormalizerCore(f::PrimitiveOrb, paramSet)
+    pSetId = objectid(paramSet)
+    nCore, nPars = genOverlap(f.body)
+    PointerFunc(OnlyBody(inv∘sqrt∘nCore), locateParam!(paramSet, nPars), pSetId)
+end
 
 const InputShifter{T, D, F} = 
       InsertInward{F, PointerFunc{ShiftByArg{T, D}, NTuple{D, IndexPointer{Data0D}}}}
 
-struct EvalPrimitiveOrb{T, D, B<:EvalFieldAmp{T, D}, F} <: EvalComposedOrb{T, D, B}
-    f::MulPair{InputShifter{T, D, B}, OnlyParam{F}}
+const NormFuncType{T, F<:Union{Storage{T}, PointerFunc{<:OnlyBody}}} = ReturnTyped{T, F}
+
+struct EvalPrimitiveOrb{T, D, B<:EvalFieldAmp{T, D}, 
+                        F<:NormFuncType{T}} <: EvalComposedOrb{T, D, B}
+    f::MulPair{InputShifter{T, D, B}, F}
 end
 
 function unpackParamFuncCore!(f::PrimitiveOrb{T, D}, paramSet::AbstractVector) where {T, D}
@@ -164,40 +159,71 @@ end
 
 CompositeOrb(ob::CompositeOrb) = itself(ob)
 
-const WeightedPrimField{T, D, F<:EvalPrimitiveOrb{T, D}} = 
-      MulPair{<:F, PointOneFunc{OnlyParam{GetIndex}, Data1D}}
+function genNormalizerCore(f::CompositeOrb, paramSet)
+    pSetId = objectid(paramSet)
+    nCore, nPars = genOverlap(f)
+    PointerFunc(OnlyBody(inv∘sqrt∘nCore), locateParam!(paramSet, nPars), pSetId)
+end
 
-struct EvalCompositeOrb{T, D, B<:EvalPrimitiveOrb{T, D}, F} <: EvalComposedOrb{T, D, B}
-    f::MulPair{AddChain{Memory{WeightedPrimField{T, D, B}}}, OnlyParam{F}}
+const WeightedPF{T, D, F<:EvalPrimitiveOrb{T, D}} = 
+      MulPair{F, PointOneFunc{OnlyBody{GetIndex}, Data1D}}
 
-    function EvalCompositeOrb(weightedFs::AbstractVector{<:WeightedPrimField{T, D}}, 
-                              normalizer::OnlyParam{F}) where {T, D, F}
+function compressWeightedPF(::Type{F}, ::Type{N}) where 
+                           {T, D, F<:EvalFieldAmp{T, D}, N<:NormFuncType{T}}
+    boolF = isconcretetype(F)
+    boolN = isconcretetype(N)
+    B = if boolF
+        if boolN
+            EvalPrimitiveOrb{T, D, F, N}
+        else
+            EvalPrimitiveOrb{T, D, F, <:N}
+        end
+    elseif boolN
+        EvalPrimitiveOrb{T, D, <:F, N}
+    else
+        EvalPrimitiveOrb{T, D, <:F, <:N}
+    end
+    V = if boolF && boolN
+        Memory{WeightedPF{T, D, B}}
+    else
+        Memory{WeightedPF{T, D, <:B}}
+    end
+    B, V
+end
+
+struct EvalCompositeOrb{T, D, B<:EvalPrimitiveOrb{T, D}, V<:Memory{<:WeightedPF{T, D, <:B}}, 
+                        F<:NormFuncType{T}} <: EvalComposedOrb{T, D, B}
+    f::MulPair{AddChain{V}, F}
+
+    function EvalCompositeOrb(weightedFs::AbstractVector{W}, 
+                              normalizer::F) where 
+                             {T, D, W<:WeightedPF{T, D}, F<:NormFuncType{T}}
         fInnerObjs = foldl(∘, Base.Fix2.(getfield, (:f, :left))).(weightedFs)
         fInnerType = eltype(foldl(∘, Base.Fix2.(getfield, (:apply, :left ))).(fInnerObjs))
-        nInnerType = eltype(foldl(∘, Base.Fix2.(getfield, (:f,     :right))).(fInnerObjs))
-        B = EvalPrimitiveOrb{T, D, <:fInnerType, <:nInnerType}
-        weightedFieldMem = Memory{WeightedPrimField{T, D, B}}(weightedFs)
-        new{T, D, B, F}(PairCombine(*, ChainReduce(+, weightedFieldMem), normalizer))
+        nInnerType = eltype(getfield.(fInnerObjs, :right))
+        B, V = compressWeightedPF(fInnerType, nInnerType)
+        weightedFieldMem = V(weightedFs)
+        new{T, D, B, V, F}(PairCombine(*, ChainReduce(+, weightedFieldMem), normalizer))
     end
 end
 
 function unpackParamFunc!(f::CompositeOrb{T, D}, paramSet::AbstractVector) where {T, D}
     pSetId = objectid(paramSet)
     fInnerCores = map(Fix2(unpackFunc!, paramSet), f.basis) .|> first
-    init = WeightedPrimField{T, D, eltype(fInnerCores)}[]
+    weightedFields = WeightedPF{T, D, <:eltype(fInnerCores)}[]
     weightId = (locateParam!(paramSet, f.weight),)
-    weightedFields = mapfoldl(vcat, enumerate(fInnerCores); init) do (i, fic)
-        getIdx = (OnlyParam∘genGetIndex)(i)
+    for (i, fic) in enumerate(fInnerCores)
+        getIdx = (OnlyBody∘genGetIndex)(i) # Replace/Simplify GetIndex
         weight = PointerFunc(getIdx, weightId, pSetId)
-        PairCombine(*, fic, weight)
+        push!(weightedFields, PairCombine(*, fic, weight))
     end
-    EvalCompositeOrb(weightedFields, genNormalizer(f)), paramSet
+    EvalCompositeOrb(weightedFields, genNormalizer(f, paramSet)), paramSet
 end
 
 getEvaluator(::CompositeOrb) = EvalCompositeOrb
 
-const PrimGTO{T, D, B<:PolyGaussFunc{T, D}, C} = PrimitiveOrb{T, D, B, C}
-const CompGTO{T, D, B<:PolyGaussFunc{T, D}, C, P} = CompositeOrb{T, D, B, C, P}
+const PrimGTO{T, D, B<:PolyGaussProd{T, D}, C} = PrimitiveOrb{T, D, B, C}
+const CompGTO{T, D, B<:PolyGaussProd{T, D}, C, P} = CompositeOrb{T, D, B, C, P}
 
 # concretizeBasisType(basis::AbstractArray{<:CompositeOrb})
 
@@ -215,8 +241,8 @@ struct FrameworkOrb{T, D, B<:EvalComposedOrb{T, D}, P<:ParamBox{T}} <: UnpackedO
     end
 end
 
-const EvalPrimGTO{T, D, B<:EvalPolyGaussFunc{T, D}, F} = EvalPrimitiveOrb{T, D, B, F}
-const EvalCompGTO{T, D, B<:EvalPrimGTO{T, D}, F} = EvalCompositeOrb{T, D, B, F}
+const EvalPrimGTO{T, D, B<:EvalPolyGaussProd{T, D}, F} = EvalPrimitiveOrb{T, D, B, F}
+const EvalCompGTO{T, D, B<:EvalPrimGTO{T, D}, V, F} = EvalCompositeOrb{T, D, B, V, F}
 
 const FPrimGTO{T, D, B<:EvalPrimGTO{T, D}, P} = FrameworkOrb{T, D, B, P}
 const FCompGTO{T, D, B<:EvalCompGTO{T, D}, P} = FrameworkOrb{T, D, B, P}
@@ -234,11 +260,6 @@ function forbidRenormalize!(b::OrbitalBasis)
     b.renormalize = false
 end
 
-
-# function unpackSquareIntNormalizer(f::GaussTypeOrb)
-#     # inv∘sqrt∘genOverlap(f, f) # input: parValSet
-#     # Base.Fix2(polyGaussFuncSquaredNorm, degree)
-# end
 
 function genGaussTypeOrb(center::NonEmptyTuple{ParamOrValue{T}, D}, 
                          xpn::ParamOrValue{T}, 
