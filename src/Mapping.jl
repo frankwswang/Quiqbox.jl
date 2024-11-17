@@ -40,7 +40,7 @@ end
 
 ReturnTyped(::Type{T}) where {T} = ReturnTyped(itself, T)
 
-(f::ReturnTyped{T, F})(arg) where {T, F} = convert(T, f.f(arg))
+(f::ReturnTyped{T, F})(arg...) where {T, F} = convert(T, f.f(arg...))
 
 const Return{T} = ReturnTyped{T, ItsType}
 
@@ -51,36 +51,26 @@ struct PointerFunc{F<:Function, T<:NonEmptyTuple{IndexPointer}} <: ParamOperator
     sourceID::UInt
 end
 
-# PointerFunc(apply, idxGroup::NonEmptyTuple{Union{Int, NonEmptyTuple{Int}}}, 
-#             sourceID::UInt) = 
-# PointerFunc(apply, IndexPointer.(idxGroup), sourceID)
-
 (f::PointerFunc)(input, param) = f.apply(input, (Ref(param) .|> f.pointer)...)
 
 const PointOneFunc{F, N} = PointerFunc{F, Tuple{IndexPointer{N}}}
 
 
-struct OnlyInput{F<:Function} <: Evaluator{F}
+struct OnlyHead{F<:Function} <: Evaluator{F}
     f::F
 end
 
-(f::OnlyInput)(input, _) = f.f(input)
+(f::OnlyHead)(arg1, _, ::Vararg) = f.f(arg1)
 
 
-struct OnlyParam{F<:Function} <: Evaluator{F}
+struct OnlyBody{F<:Function} <: Evaluator{F}
     f::F
 end
 
-(f::OnlyParam)(_, param) = f.f(param)
+(f::OnlyBody)(_, arg2, args...) = f.f(arg2, args...)
 
 
-struct ParamFunc{F<:Function} <: Evaluator{F}
-    f::F
-end
-
-(f::ParamFunc)(input, param) = f.f(input, param)
-
-struct PairCombine{J<:Function, FL<:ParamOperator, FR<:ParamOperator} <: ChainedOperator{J}
+struct PairCombine{J<:Function, FL<:Function, FR<:Function} <: ChainedOperator{J}
     joint::J
     left::FL
     right::FR
@@ -90,66 +80,76 @@ const AddPair{FL, FR} = PairCombine{typeof(+), FL, FR}
 const MulPair{FL, FR} = PairCombine{typeof(*), FL, FR}
 
 PairCombine(joint::F) where {F<:Function} = 
-(left::ParamOperator, right::ParamOperator) -> PairCombine(joint, left, right)
+(left::Function, right::Function) -> PairCombine(joint, left, right)
 
-(f::PairCombine)(input, param) = f.joint( f.left(input, param), f.right(input, param) )
+(f::PairCombine)(arg, args...) = f.joint( f.left(arg, args...), f.right(arg, args...) )
 
-#! Test!!
-struct ChainReduce{J<:Function, C<:LinearMemory{<:ParamOperator}} <: ChainedOperator{J}
+
+struct ChainReduce{J<:Function, C<:LinearMemory{<:Function}} <: ChainedOperator{J}
     joint::J
     chain::C
 
-    function ChainReduce(joint::J, chain::C) where {J, C<:VectorMemory{<:ParamOperator}}
+    function ChainReduce(joint::J, chain::C) where {J, C<:VectorMemory{<:Function}}
         checkEmptiness(chain, :chain)
         new{J, C}(joint, chain)
     end
 
-    function ChainReduce(joint::J, chain::C) where {J, C<:AbstractVector{<:ParamOperator}}
+    function ChainReduce(joint::J, chain::C) where {J, C<:AbstractVector{<:Function}}
         checkEmptiness(chain, :chain)
         new{J, C}(joint, getMemory(chain))
     end
 end
 
-ChainReduce(joint::Function, chain::NonEmptyTuple{ParamOperator}) = 
+ChainReduce(joint::Function, chain::NonEmptyTuple{Function}) = 
 ChainReduce(joint, VectorMemory(chain))
 
 ChainReduce(joint::F) where {F<:Function} = Base.Fix1(ChainReduce, joint)
 
 const CountedChainReduce{J, P, N} = ChainReduce{J, VectorMemory{P, N}}
 
-(f::CountedChainReduce)(input, param) = 
-mapreduce(o->o(input, param), f.joint, f.chain.value)
+(f::CountedChainReduce)(arg, args...) = 
+mapreduce(o->o(arg, args...), f.joint, f.chain.value)
 
-(f::ChainReduce)(input, param) = mapreduce(o->o(input, param), f.joint, f.chain)
+(f::ChainReduce)(arg, args...) = mapreduce(o->o(arg, args...), f.joint, f.chain)
 
 const AddChain{C} = ChainReduce{typeof(+), C}
 const MulChain{C} = ChainReduce{typeof(*), C}
 
 
-struct InsertOnward{C<:ParamOperator, F<:ParamOperator} <: ParamOperator
+struct InsertOnward{C<:Function, F<:Function} <: ParamOperator
     apply::C
     dress::F
 end
 
-(f::InsertOnward)(input, param) = f.dress(f.apply(input, param), param)
+(f::InsertOnward)(arg, args...) = f.dress(f.apply(arg, args...), args...)
 
 
-struct InsertInward{C<:ParamOperator, F<:ParamOperator} <: ParamOperator
+struct InsertInward{C<:Function, F<:Function} <: ParamOperator
     apply::C
     dress::F
 end
 
-(f::InsertInward)(input, param) = f.apply(f.dress(input, param), param)
+(f::InsertInward)(arg, args...) = f.apply(f.dress(arg, args...), args...)
 
-function evalFunc(func::F, input) where {F<:Function}
+
+struct Storage{T} <: CompositeFunction
+    val::T
+end
+
+(f::Storage)(::Vararg) = f.val
+
+
+struct ShiftByArg{T<:Real, D} <: FieldlessFunction end
+
+(::ShiftByArg{T, D})(input::NTuple{D, Real}, args::Vararg{T, D}) where {T, D} = 
+(input .- args)
+
+
+function evalFunc(func::F, input::T) where {F<:Function, T}
     fCore, pars = unpackFunc(func)
     fCore(input, evalParamSet(pars))
 end
 
-
-# unpackFunc(f::Function) = unpackFunc!(SelectTrait{ParameterStyle}()(f), f)
-
-# unpackFunc!(::NotParamFunc, f::Function) = unpackFunc!(f, ParamBox[])
 
 unpackFunc(f::Function) = unpackFunc!(f, ParamBox[])
 
