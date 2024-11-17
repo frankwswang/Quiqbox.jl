@@ -168,31 +168,30 @@ end
 const WeightedPF{T, D, F<:EvalPrimitiveOrb{T, D}} = 
       MulPair{F, PointOneFunc{OnlyBody{GetIndex}, Data1D}}
 
-function compressWeightedPF(::Type{F}, ::Type{N}) where 
-                           {T, D, F<:EvalFieldAmp{T, D}, N<:NormFuncType{T}}
-    boolF = isconcretetype(F)
-    boolN = isconcretetype(N)
-    B = if boolF
+function compressWeightedPF(::Type{B}, ::Type{F}) where 
+                           {T, D, B<:EvalFieldAmp{T, D}, F<:NormFuncType{T}}
+    boolF = isconcretetype(B)
+    boolN = isconcretetype(F)
+    U = if boolF
         if boolN
-            EvalPrimitiveOrb{T, D, F, N}
+            EvalPrimitiveOrb{T, D, B, F}
         else
-            EvalPrimitiveOrb{T, D, F, <:N}
+            EvalPrimitiveOrb{T, D, B, <:F}
         end
     elseif boolN
-        EvalPrimitiveOrb{T, D, <:F, N}
+        EvalPrimitiveOrb{T, D, <:B, F}
     else
-        EvalPrimitiveOrb{T, D, <:F, <:N}
+        EvalPrimitiveOrb{T, D, <:B, <:F}
     end
-    V = if boolF && boolN
-        Memory{WeightedPF{T, D, B}}
+    if boolF && boolN
+        Memory{WeightedPF{T, D, U}}
     else
-        Memory{WeightedPF{T, D, <:B}}
+        Memory{WeightedPF{T, D, <:U}}
     end
-    B, V
 end
 
-struct EvalCompositeOrb{T, D, B<:EvalPrimitiveOrb{T, D}, V<:Memory{<:WeightedPF{T, D, <:B}}, 
-                        F<:NormFuncType{T}} <: EvalComposedOrb{T, D, B}
+struct EvalCompositeOrb{T, D, V<:Memory{<:WeightedPF{T, D}}, 
+                        F<:NormFuncType{T}} <: EvalComposedOrb{T, D, V}
     f::MulPair{AddChain{V}, F}
 
     function EvalCompositeOrb(weightedFs::AbstractVector{W}, 
@@ -201,9 +200,9 @@ struct EvalCompositeOrb{T, D, B<:EvalPrimitiveOrb{T, D}, V<:Memory{<:WeightedPF{
         fInnerObjs = foldl(∘, Base.Fix2.(getfield, (:f, :left))).(weightedFs)
         fInnerType = eltype(foldl(∘, Base.Fix2.(getfield, (:apply, :left ))).(fInnerObjs))
         nInnerType = eltype(getfield.(fInnerObjs, :right))
-        B, V = compressWeightedPF(fInnerType, nInnerType)
+        V = compressWeightedPF(fInnerType, nInnerType)
         weightedFieldMem = V(weightedFs)
-        new{T, D, B, V, F}(PairCombine(*, ChainReduce(+, weightedFieldMem), normalizer))
+        new{T, D, V, F}(PairCombine(*, ChainReduce(+, weightedFieldMem), normalizer))
     end
 end
 
@@ -242,8 +241,8 @@ struct FrameworkOrb{T, D, B<:EvalComposedOrb{T, D}, P<:ParamBox{T}} <: UnpackedO
 end
 
 const EvalPrimGTO{T, D, B<:EvalPolyGaussProd{T, D}, F} = EvalPrimitiveOrb{T, D, B, F}
-const EvalCompGTO{T, D, B<:EvalPrimGTO{T, D}, V, F} = EvalCompositeOrb{T, D, B, V, F}
-
+const EvalCompGTO{T, D, U<:EvalPrimGTO{T, D}, F} = 
+      EvalCompositeOrb{T, D, <:Memory{<:WeightedPF{T, D, <:U}}, F}
 const FPrimGTO{T, D, B<:EvalPrimGTO{T, D}, P} = FrameworkOrb{T, D, B, P}
 const FCompGTO{T, D, B<:EvalCompGTO{T, D}, P} = FrameworkOrb{T, D, B, P}
 
