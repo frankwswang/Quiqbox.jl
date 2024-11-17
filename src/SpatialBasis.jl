@@ -208,7 +208,7 @@ struct FrameworkOrb{T, D, B<:EvalComposedOrb{T, D}, P<:ParamBox{T}} <: UnpackedO
     param::Memory{P} #! Need to be a proprietary type
 
     function FrameworkOrb(dob::ComposedOrb{T, D}, 
-                          paramSet::ParamBoxVec{<:ParamBox{T}}=ParamBox{T}[]) where {T, D}
+                          paramSet::ParamBoxArr{<:ParamBox{T}}=ParamBox{T}[]) where {T, D}
         core, params = unpackFunc!(dob, paramSet)
         typedParams = getMemory(params .|> itself) # first concretize the type
         new{T, D, typeof(core), eltype(typedParams)}(core, typedParams)

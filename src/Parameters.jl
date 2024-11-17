@@ -1047,10 +1047,19 @@ function obtainINTERNAL(ps::AbstractArray{<:JaggedParam{T}}, maxRecursion::Int) 
     end
 end
 
-function obtain(p::AbtArrayOr{<:JaggedParam{T}}; 
-                maxRecursion::Int=DefaultMaxParamPointerLevel) where {T}
-    obtainINTERNAL(p, maxRecursion)
+function obtainINTERNAL(p::AbtArrayOr{<:JaggedParam}, maxRecursion::Int)
+    map(i->obtainINTERNAL(i, maxRecursion), p)
 end
+
+obtain(p::ParamBox; maxRecursion::Int=DefaultMaxParamPointerLevel) = 
+obtainINTERNAL(p, maxRecursion)
+
+obtain(p::ParamBoxArr{<:ParamBox{T}}; 
+       maxRecursion::Int=DefaultMaxParamPointerLevel) where {T} = 
+obtainINTERNAL(p, maxRecursion)
+
+obtain(p::ParamBoxArr; maxRecursion::Int=DefaultMaxParamPointerLevel) = 
+obtainINTERNAL(itself.(p), maxRecursion)
 
 ################################
 
@@ -1593,7 +1602,7 @@ locateParam!(paramSet, values(target))
 
 evalParamSet(s::ParamBox) = obtain(s)
 
-evalParamSet(s::ParamBoxVec) = obtain(s)
+evalParamSet(s::ParamBoxArr{<:Any, 1}) = obtain(s)
 
 evalParamSet(s::SingleDimPVec) = map(obtain, s)
 

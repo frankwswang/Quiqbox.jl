@@ -116,4 +116,4 @@ const ParamFunctor{T, N, I} = Union{BaseParam{T, N, I}, ParamLink{T, N, I}}
 const ParamPointer{T, N, I} = Union{LinkParam{T, N, I}, ParamNest{T, N, I}}
 
 const PBoxTupleOrArr{T<:ParamBox} = NonEmpTplOrAbtArr{T}
-const ParamBoxVec{T<:ParamBox} = AbstractVector{T}
+const ParamBoxArr{T<:ParamBox, N} = AbstractArray{T, N}
