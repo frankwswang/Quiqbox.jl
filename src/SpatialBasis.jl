@@ -19,9 +19,9 @@ function genNormalizer(f::ComposedOrb{T}, paramSet) where {T}
 end
 
 
-function unpackParamFunc!(f::ComposedOrb, paramSet::AbstractVector)
+function unpackParamFunc!(f::ComposedOrb{T}, paramSet::AbstractVector) where {T}
     fEvalCore, _ = unpackParamFuncCore!(f, paramSet)
-    fEval = PairCombine(*, fEvalCore, genNormalizer(f, paramSet))
+    fEval = PairCombine(StableBinary(*, T), fEvalCore, genNormalizer(f, paramSet))
     getEvaluator(f)(fEval), paramSet
 end
 
@@ -68,7 +68,7 @@ const NormFuncType{T, F<:Union{Storage{T}, PointerFunc{<:OnlyBody}}} = ReturnTyp
 
 struct EvalPrimitiveOrb{T, D, B<:EvalFieldAmp{T, D}, 
                         F<:NormFuncType{T}} <: EvalComposedOrb{T, D, B}
-    f::MulPair{InputShifter{T, D, B}, F}
+    f::PairCombine{StableMul{T}, InputShifter{T, D, B}, F}
 end
 
 function unpackParamFuncCore!(f::PrimitiveOrb{T, D}, paramSet::AbstractVector) where {T, D}
@@ -166,7 +166,7 @@ function genNormalizerCore(f::CompositeOrb, paramSet)
 end
 
 const WeightedPF{T, D, F<:EvalPrimitiveOrb{T, D}} = 
-      MulPair{F, PointOneFunc{OnlyBody{GetIndex}, Data1D}}
+      PairCombine{StableMul{T}, F, PointOneFunc{OnlyBody{GetIndex}, Data1D}}
 
 function compressWeightedPF(::Type{B}, ::Type{F}) where 
                            {T, D, B<:EvalFieldAmp{T, D}, F<:NormFuncType{T}}
@@ -192,7 +192,7 @@ end
 
 struct EvalCompositeOrb{T, D, V<:Memory{<:WeightedPF{T, D}}, 
                         F<:NormFuncType{T}} <: EvalComposedOrb{T, D, V}
-    f::MulPair{AddChain{V}, F}
+    f::PairCombine{StableMul{T}, ChainReduce{StableAdd{T}, V}, F}
 
     function EvalCompositeOrb(weightedFs::AbstractVector{W}, 
                               normalizer::F) where 
@@ -201,8 +201,8 @@ struct EvalCompositeOrb{T, D, V<:Memory{<:WeightedPF{T, D}},
         fInnerType = eltype(foldl(∘, Base.Fix2.(getfield, (:apply, :left ))).(fInnerObjs))
         nInnerType = eltype(getfield.(fInnerObjs, :right))
         V = compressWeightedPF(fInnerType, nInnerType)
-        weightedFieldMem = V(weightedFs)
-        new{T, D, V, F}(PairCombine(*, ChainReduce(+, weightedFieldMem), normalizer))
+        cOrbCore = ChainReduce(StableBinary(+, T), V(weightedFs))
+        new{T, D, V, F}(PairCombine(StableBinary(*, T), cOrbCore, normalizer))
     end
 end
 
@@ -214,7 +214,7 @@ function unpackParamFunc!(f::CompositeOrb{T, D}, paramSet::AbstractVector) where
     for (i, fic) in enumerate(fInnerCores)
         getIdx = (OnlyBody∘genGetIndex)(i) # Replace/Simplify GetIndex
         weight = PointerFunc(getIdx, weightId, pSetId)
-        push!(weightedFields, PairCombine(*, fic, weight))
+        push!(weightedFields, PairCombine(StableBinary(*, T), fic, weight))
     end
     EvalCompositeOrb(weightedFields, genNormalizer(f, paramSet)), paramSet
 end

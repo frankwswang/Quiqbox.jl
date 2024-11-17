@@ -74,14 +74,14 @@ const EvalAxialField{T, F<:EvalFieldAmp{T, 0}} =
 InsertInward{F, OnlyHead{Base.Fix2{typeof(getindex), Int}}}
 
 struct EvalAxialProdFunc{T, D, F<:EvalFieldAmp{T, 0}} <: EvalFieldAmp{T, D, AxialProdFunc}
-    f::MulChain{VectorMemory{EvalAxialField{T, F}, D}}
+    f::ChainReduce{StableMul{T}, VectorMemory{EvalAxialField{T, F}, D}}
 end
 
-function unpackParamFunc!(f::AxialProdFunc{<:Any, D}, paramSet::AbstractVector) where {D}
+function unpackParamFunc!(f::AxialProdFunc{T, D}, paramSet::AbstractVector) where {T, D}
     fEvalComps = map(Fix2(unpackFunc!, paramSet), f.component) .|> first
     fEval = map(fEvalComps, Tuple(1:D)) do efc, idx
         InsertInward(efc, (OnlyHead∘Base.Fix2)(getindex, idx))
-    end |> ChainReduce(*)
+    end |> (ChainReduce∘StableBinary)(*, T)
     EvalAxialProdFunc(fEval), paramSet
 end
 
@@ -98,12 +98,13 @@ const MagnitudeConverter{F} = InsertInward{F, OnlyHead{typeof(norm)}}
 
 struct EvalPolyRadialFunc{T, D, F<:EvalFieldAmp{T, 0}, 
                           L} <: EvalFieldAmp{T, D, PolyRadialFunc}
-    f::MulPair{MagnitudeConverter{F}, OnlyHead{CartSHarmonics{D, L}}}
+    f::PairCombine{StableMul{T}, MagnitudeConverter{F}, OnlyHead{CartSHarmonics{D, L}}}
 end
 
-function unpackParamFunc!(f::PolyRadialFunc{<:Any, D}, paramSet::AbstractVector) where {D}
+function unpackParamFunc!(f::PolyRadialFunc{T, D}, paramSet::AbstractVector) where {T, D}
     fInner, _ = unpackParamFunc!(f.radial, paramSet)
-    fEval = PairCombine(*, InsertInward(fInner, OnlyHead(norm)), OnlyHead(f.angular))
+    coordEncoder = InsertInward(fInner, OnlyHead(norm))
+    fEval = PairCombine(StableBinary(*, T), coordEncoder, OnlyHead(f.angular))
     EvalPolyRadialFunc(fEval), paramSet
 end
 
