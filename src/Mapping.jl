@@ -33,7 +33,7 @@ const LinearMemory{T} = Union{Memory{T}, VectorMemory{T}}
 struct ReturnTyped{T, F<:Function} <: TaggedFunction
     f::F
 
-    function ReturnTyped(f::F, ::Type{T}) where {F, T}
+    function ReturnTyped(f::F, ::Type{T}) where {F<:Function, T}
         new{T, F}(f)
     end
 end
@@ -43,6 +43,22 @@ ReturnTyped(::Type{T}) where {T} = ReturnTyped(itself, T)
 (f::ReturnTyped{T, F})(arg...) where {T, F} = convert(T, f.f(arg...))
 
 const Return{T} = ReturnTyped{T, ItsType}
+
+
+struct StableBinary{T, F<:Function} <: TaggedFunction
+    f::F
+
+    function StableBinary(f::F, ::Type{T}) where {F<:Function, T}
+        new{T, F}(f)
+    end
+end
+
+(f::StableBinary{T, F})(argL::T, argR::T) where {T, F} = convert(T, f.f(argL, argR))
+
+const StableAdd{T} = StableBinary{T, typeof(+)}
+const StableMul{T} = StableBinary{T, typeof(*)}
+
+StableBinary(f::Function) = Base.Fix1(StableBinary, f)
 
 
 struct PointerFunc{F<:Function, T<:NonEmptyTuple{IndexPointer}} <: ParamOperator
@@ -76,9 +92,6 @@ struct PairCombine{J<:Function, FL<:Function, FR<:Function} <: ChainedOperator{J
     right::FR
 end
 
-const AddPair{FL, FR} = PairCombine{typeof(+), FL, FR}
-const MulPair{FL, FR} = PairCombine{typeof(*), FL, FR}
-
 PairCombine(joint::F) where {F<:Function} = 
 (left::Function, right::Function) -> PairCombine(joint, left, right)
 
@@ -111,9 +124,6 @@ const CountedChainReduce{J, P, N} = ChainReduce{J, VectorMemory{P, N}}
 mapreduce(o->o(arg, args...), f.joint, f.chain.value)
 
 (f::ChainReduce)(arg, args...) = mapreduce(o->o(arg, args...), f.joint, f.chain)
-
-const AddChain{C} = ChainReduce{typeof(+), C}
-const MulChain{C} = ChainReduce{typeof(*), C}
 
 
 struct InsertOnward{C<:Function, F<:Function} <: ParamOperator
