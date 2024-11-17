@@ -68,10 +68,10 @@ function AxialProdFunc(b::FieldAmplitude{<:Any, 0}, dim::Int)
 end
 
 # const AxialFieldProd{T, D, A<:EvalFieldAmp{T, 0}} = 
-#       NTuple{D, InsertInward{<:A, OnlyInput{Base.Fix2{typeof(getindex), Int}}}}
+#       NTuple{D, InsertInward{<:A, OnlyHead{Base.Fix2{typeof(getindex), Int}}}}
 
 const EvalAxialField{T, F<:EvalFieldAmp{T, 0}} = 
-InsertInward{F, OnlyInput{Base.Fix2{typeof(getindex), Int}}}
+InsertInward{F, OnlyHead{Base.Fix2{typeof(getindex), Int}}}
 
 struct EvalAxialProdFunc{T, D, F<:EvalFieldAmp{T, 0}} <: EvalFieldAmp{T, D, AxialProdFunc}
     f::MulChain{VectorMemory{EvalAxialField{T, F}, D}}
@@ -80,7 +80,7 @@ end
 function unpackParamFunc!(f::AxialProdFunc{<:Any, D}, paramSet::AbstractVector) where {D}
     fEvalComps = map(Fix2(unpackFunc!, paramSet), f.component) .|> first
     fEval = map(fEvalComps, Tuple(1:D)) do efc, idx
-        InsertInward(efc, (OnlyInput∘Base.Fix2)(getindex, idx))
+        InsertInward(efc, (OnlyHead∘Base.Fix2)(getindex, idx))
     end |> ChainReduce(*)
     EvalAxialProdFunc(fEval), paramSet
 end
@@ -94,18 +94,18 @@ end
 PolyRadialFunc(radial::FieldAmplitude{T, 0}, angular::NonEmptyTuple{Int}) where {T} = 
 PolyRadialFunc(radial, CartSHarmonics(angular))
 
-const MagnitudeConverter{F} = InsertInward{F, OnlyInput{typeof(norm)}}
+const MagnitudeConverter{F} = InsertInward{F, OnlyHead{typeof(norm)}}
 
 struct EvalPolyRadialFunc{T, D, F<:EvalFieldAmp{T, 0}, 
                           L} <: EvalFieldAmp{T, D, PolyRadialFunc}
-    f::MulPair{MagnitudeConverter{F}, OnlyInput{CartSHarmonics{D, L}}}
+    f::MulPair{MagnitudeConverter{F}, OnlyHead{CartSHarmonics{D, L}}}
 end
 
 function unpackParamFunc!(f::PolyRadialFunc{<:Any, D}, paramSet::AbstractVector) where {D}
     fInner, _ = unpackParamFunc!(f.radial, paramSet)
-    fEval = PairCombine(*, InsertInward(fInner, OnlyInput(norm)), OnlyInput(f.angular))
+    fEval = PairCombine(*, InsertInward(fInner, OnlyHead(norm)), OnlyHead(f.angular))
     EvalPolyRadialFunc(fEval), paramSet
 end
 
-const PolyGaussFunc{T, D, L} = PolyRadialFunc{T, D, <:GaussFunc{T}, L}
-const EvalPolyGaussFunc{T, D, L} = EvalPolyRadialFunc{T, D, EvalGaussFunc{T}, L}
+const PolyGaussProd{T, D, L} = PolyRadialFunc{T, D, <:GaussFunc{T}, L}
+const EvalPolyGaussProd{T, D, L} = EvalPolyRadialFunc{T, D, EvalGaussFunc{T}, L}
