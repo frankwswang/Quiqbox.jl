@@ -78,7 +78,7 @@ const DimSGNode{T, N} = Union{DimIGNode{T, N}, DimOGNode{T, N}}
 const ElementalParam{T} = JaggedParam{T, 0, 0}
 const InnerSpanParam{T, N} = JaggedParam{T, N, 0}
 const OuterSpanParam{T, O} = JaggedParam{T, 0, O}
-const SingleDimParam{T, N} = Union{InnerSpanParam{T, N}, OuterSpanParam{T, N}}
+const FlattenedParam{T, N} = Union{InnerSpanParam{T, N}, OuterSpanParam{T, N}}
 
 const AVectorOrNTuple{T, NNMO} = Union{Tuple{T, Vararg{T, NNMO}}, AbstractVector{<:T}}
 const NonEmptyTuple{T, NMO} = Tuple{T, Vararg{T, NMO}}
@@ -106,10 +106,10 @@ const ParamInput{T, N} = NTuple{N, JaggedParam{T}}
 const InnerParamEle{T} = Union{AbstractVector{<:ElementalParam{T}}, InnerSpanParam{T}}
 const InnerParamVec{T} = AbstractVector{<:InnerParamEle{T}}
 
-const SingleDimPEle{T} = Union{AbstractVector{<:ElementalParam{T}}, SingleDimParam{T}}
-const SingleDimPVec{T} = AbstractVector{<:SingleDimPEle{T}}
+const FlattenedPEle{T} = Union{AbstractVector{<:ElementalParam{T}}, FlattenedParam{T}}
+const FlattenedPVec{T} = AbstractVector{<:FlattenedPEle{T}}
 
-const MixedParamEle{T} = Union{AbstractVector{<:SingleDimPEle{T}}, JaggedParam{T}}
+const MixedParamEle{T} = Union{AbstractVector{<:FlattenedPEle{T}}, JaggedParam{T}}
 const MixedParamVec{T} = AbstractVector{<:MixedParamEle{T}}
 
 const ParamFunctor{T, N, I} = Union{BaseParam{T, N, I}, ParamLink{T, N, I}}
