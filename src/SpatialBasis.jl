@@ -11,12 +11,16 @@ abstract type EvalComposedOrb{T, D, B} <: Evaluator{B} end
 
 function genNormalizer(f::ComposedOrb{T}, paramSet) where {T}
     normalizer = if f.renormalize
-        genNormalizerCore(f, paramSet)
+        pSetId = objectid(paramSet)
+        nCore, nPars = genNormalizerCore(f|>getNormalizedField)
+        PointerFunc(OnlyBody(nCore), locateParam!(paramSet, nPars), pSetId)
     else
         Storage(one(T))
     end
     ReturnTyped(normalizer, T)
 end
+
+const NormFuncType{T, F<:Union{Storage{T}, PointerFunc{<:OnlyBody}}} = ReturnTyped{T, F}
 
 
 function unpackParamFunc!(f::ComposedOrb{T}, paramSet::AbstractVector) where {T}
@@ -55,16 +59,10 @@ end
 
 PrimitiveOrb(ob::PrimitiveOrb) = itself(ob)
 
-function genNormalizerCore(f::PrimitiveOrb, paramSet)
-    pSetId = objectid(paramSet)
-    nCore, nPars = genOverlap(f.body)
-    PointerFunc(OnlyBody(inv∘sqrt∘nCore), locateParam!(paramSet, nPars), pSetId)
-end
+getNormalizedField(f::PrimitiveOrb) = f.body
 
 const InputShifter{T, D, F} = 
       InsertInward{F, PointerFunc{ShiftByArg{T, D}, NTuple{D, IndexPointer{Data0D}}}}
-
-const NormFuncType{T, F<:Union{Storage{T}, PointerFunc{<:OnlyBody}}} = ReturnTyped{T, F}
 
 struct EvalPrimitiveOrb{T, D, B<:EvalFieldAmp{T, D}, 
                         F<:NormFuncType{T}} <: EvalComposedOrb{T, D, B}
@@ -82,13 +80,13 @@ end
 getEvaluator(::PrimitiveOrb) = EvalPrimitiveOrb
 
 struct CompositeOrb{T, D, B<:FieldAmplitude{T, D}, C<:NTuple{D, ElementalParam{T}}, 
-                    W<:SingleDimParam{T, 1}} <: ComposedOrb{T, D, B}
+                    W<:FlattenedParam{T, 1}} <: ComposedOrb{T, D, B}
     basis::Memory{PrimitiveOrb{T, D, <:B, <:C}}
     weight::W
     renormalize::Bool
 
     function CompositeOrb(basis::AbstractVector{<:ComposedOrb{T, D}}, 
-                          weight::SingleDimParam{T, 1}, 
+                          weight::FlattenedParam{T, 1}, 
                           renormalize::Bool=false) where {T, D}
         basis, weight = getWeightParam(basis, weight)
         B = getfield.(basis, :body) |> eltype
@@ -99,17 +97,17 @@ struct CompositeOrb{T, D, B<:FieldAmplitude{T, D}, C<:NTuple{D, ElementalParam{T
 end
 
 function getWeightParam(basis::AbstractVector{<:PrimitiveOrb{T, D}}, 
-                        weight::W) where {T, D, W<:SingleDimParam{T, 1}}
+                        weight::W) where {T, D, W<:FlattenedParam{T, 1}}
     getWeightParamCore(basis, weight)
 end
 
 function getWeightParam(basis::AbstractVector{<:ComposedOrb{T, D}}, 
-                        weight::W) where {T, D, W<:SingleDimParam{T, 1}}
+                        weight::W) where {T, D, W<:FlattenedParam{T, 1}}
     getWeightParamCore(itself.(basis), weight)
 end
 
 function getWeightParamCore(basis::AbstractVector{<:PrimitiveOrb{T, D}}, 
-                            weight::W) where {T, D, W<:SingleDimParam{T, 1}}
+                            weight::W) where {T, D, W<:FlattenedParam{T, 1}}
     if checkEmptiness(basis, :basis) != (first∘outputSizeOf)(weight)
         throw(AssertionError("`basis` and `weight` must have the same length."))
     end
@@ -117,7 +115,7 @@ function getWeightParamCore(basis::AbstractVector{<:PrimitiveOrb{T, D}},
 end
 
 function getWeightParamCore(basis::AbstractVector{<:ComposedOrb{T, D}}, 
-                            weight::W) where {T, D, W<:SingleDimParam{T, 1}}
+                            weight::W) where {T, D, W<:FlattenedParam{T, 1}}
     if checkEmptiness(basis, :basis) != (first∘outputSizeOf)(weight)
         throw(AssertionError("`basis` and `weight` must have the same length."))
     end
@@ -131,12 +129,12 @@ decomposeOrb(b::T) where {T<:PrimitiveOrb} = Memory{T}([b])
 decomposeOrb(b::CompositeOrb) = b.basis
 
 
-function getEffectiveWeight(::PrimitiveOrb{T}, weight::SingleDimParam{T, 1}, 
+function getEffectiveWeight(::PrimitiveOrb{T}, weight::FlattenedParam{T, 1}, 
                             idx::Int) where {T}
     [indexParam(weight, idx)]
 end
 
-function getEffectiveWeight(o::CompositeOrb{T}, weight::SingleDimParam{T, 1}, 
+function getEffectiveWeight(o::CompositeOrb{T}, weight::FlattenedParam{T, 1}, 
                             idx::Int) where {T}
     len = (first∘outputSizeOf)(o.weight)
     outWeight = indexParam(weight, idx)
@@ -144,7 +142,7 @@ function getEffectiveWeight(o::CompositeOrb{T}, weight::SingleDimParam{T, 1},
 end
 
 function getEffectiveWeight(o::AbstractVector{<:ComposedOrb{T, D}}, 
-                            weight::SingleDimParam{T, 1}) where {T, D}
+                            weight::FlattenedParam{T, 1}) where {T, D}
     mapreduce(vcat, enumerate(o)) do (i, x)
         getEffectiveWeight(x, weight, i)
     end
@@ -159,11 +157,7 @@ end
 
 CompositeOrb(ob::CompositeOrb) = itself(ob)
 
-function genNormalizerCore(f::CompositeOrb, paramSet)
-    pSetId = objectid(paramSet)
-    nCore, nPars = genOverlap(f)
-    PointerFunc(OnlyBody(inv∘sqrt∘nCore), locateParam!(paramSet, nPars), pSetId)
-end
+getNormalizedField(f::CompositeOrb) = itself(f)
 
 const WeightedPF{T, D, F<:EvalPrimitiveOrb{T, D}} = 
       PairCombine{StableMul{T}, F, PointOneFunc{OnlyBody{GetIndex}, Data1D}}

@@ -110,3 +110,5 @@ end
 
 const PolyGaussProd{T, D, L} = PolyRadialFunc{T, D, <:GaussFunc{T}, L}
 const EvalPolyGaussProd{T, D, L} = EvalPolyRadialFunc{T, D, EvalGaussFunc{T}, L}
+
+getAngTuple(f::PolyRadialFunc) = f.angular.m.tuple

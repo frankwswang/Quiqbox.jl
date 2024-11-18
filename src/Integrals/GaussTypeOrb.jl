@@ -105,6 +105,10 @@ function contrCarteGTOSquaredNorm(coeff::Memory{T},
     contrFieldSumSquaredNorm(coeff, m) * T(factor)
 end
 
+function unpackOverlaps(basis::Memory{<:PrimGTO{T, D}}, paramSet) where {T, D}
+    getOverlap, paramSet
+end
+
 
 function getOverlap(o1::PrimGTO{T, D}, o2::PrimGTO{T, D}) where {T, D}
     cPair = CenPair(obtain.(o1.center), obtain.(o2.center))
@@ -112,7 +116,9 @@ function getOverlap(o1::PrimGTO{T, D}, o2::PrimGTO{T, D}) where {T, D}
     fgo2 = o2.body
     xPair = XpnPair(obtain(fgo1.radial.xpn), obtain(fgo2.radial.xpn))
     aPair = AngPair(fgo1.angular.m.tuple, fgo2.angular.m.tuple)
-    overlapPGTO(cPair, xPair, aPair)
+    n1 = o1.renormalize ? genGTOnormalizer(T, getAngTuple(fgo1))(xPair.left)  : one(T)
+    n2 = o2.renormalize ? genGTOnormalizer(T, getAngTuple(fgo2))(xPair.right) : one(T)
+    overlapPGTO(cPair, xPair, aPair) * n1 * n2
 end
 
 function getOverlap(o1::CompGTO{T, D}, o2::CompGTO{T, D}) where {T, D}
@@ -125,12 +131,33 @@ function getOverlap(o1::CompGTO{T, D}, o2::CompGTO{T, D}) where {T, D}
     res
 end
 
-function genOverlap(o::PolyGaussProd)
-    ns = map(x->Base.Fix2(polyGaussFuncSquaredNorm, x), o.angular.m.tuple)
-    ChainReduce(*, VectorMemory(ns)), (o.radial.xpn,)
+function genGTOnormalizer(::Type{T}, ijk::NTuple{D, Int}) where {D, T<:Real}
+    ns = map(x->Base.Fix2(polyGaussFuncSquaredNorm, x), ijk)
+    inv∘sqrt∘ChainReduce(StableBinary(*, T), VectorMemory(ns))
 end
 
-function genOverlap(o::CompGTO)
-    ns = map(x->Base.Fix2(polyGaussFuncSquaredNorm, x), o.angular.m)
-    ChainReduce(*, VectorMemory(ns)), (o.radial.xpn,)
+function genNormalizerCore(o::PolyGaussProd{T}) where {T}
+    genGTOnormalizer(T, getAngTuple(o)), (o.radial.xpn,)
 end
+
+function genNormalizerCore(o::CompositeOrb{T, D}, paramSet::AbstractVector) where {T, D}
+    bs = o.basis
+    overlapsCore, overlapsPars = unpackOverlaps(bs, paramSet)
+    wParIds = locateParam!(paramSet, o.weight)
+    bParIds = locateParam!(paramSet, overlapsPars)
+    parIds = (wParIds, bParIds...)
+    nCore = function (c::AbstractVector{T}, args::Vararg)
+        m = overlapsCore(args...)::AbstractMatrix{T}
+        (inv∘sqrt∘dot)(c, m, c)
+    end
+    PointerFunc(OnlyBody(nCore), parIds, objectid(paramSet))
+end
+
+# function genNormCoeff(o::PrimitiveOrb{T}) where {T}
+#     if o.renormalize
+#         f, p = genOverlap(o.body)
+#         (inv∘sqrt∘f)(obtain.(p)...)
+#     else
+#         one(T)
+#     end
+# end
