@@ -38,8 +38,12 @@ ShapedMemory(::Type{T}, value::T) where {T} = ShapedMemory( fill(value) )
 
 ShapedMemory(arr::ShapedMemory) = ShapedMemory(arr.value, arr.shape)
 
-import Base: size, getindex, setindex!, iterate, length
+import Base: size, firstindex, lastindex, getindex, setindex!, iterate, length
 size(arr::ShapedMemory) = arr.shape
+
+firstindex(arr::ShapedMemory) = firstindex(arr.value)
+
+lastindex(arr::ShapedMemory) = lastindex(arr.value)
 
 getindex(arr::ShapedMemory, i::Int) = getindex(arr.value, i)
 getindex(arr::ShapedMemory{<:Any, N}, i::Vararg{Int, N}) where {N} = 
@@ -416,7 +420,7 @@ const ItselfCParam{T} = CellParam{T, ItsType, Tuple{TensorVar{T, 0}}}
 
 function checkGridParamArg(::StableMorphism{T, <:ItsTalike, N}, input::I, memory::M) where 
                           {T, N, O, I<:JaggedParam{T, <:Any, O}, M<:AbstractArray{T, N}}
-    checkParamContainerArgType1(I, Tuple{SingleDimParam{T, N}})
+    checkParamContainerArgType1(I, Tuple{FlattenedParam{T, N}})
     MI = typeof(input[1])
     if !(M <: MI)
         throw(AssertionError("The type of `memory` should be a subtype of `$M1`."))
@@ -427,7 +431,7 @@ end
 
 function checkGridParamArg(::StableMorphism{T, <:ItsTalike, N}, input::I, ::Missing) where 
                           {T, N, O, I<:JaggedParam{T, <:Any, O}}
-    checkParamContainerArgType1(I, Tuple{SingleDimParam{T, N}})
+    checkParamContainerArgType1(I, Tuple{FlattenedParam{T, N}})
     checkParamInput(input, innerDimMax=(O==0)*N, outerDimMax=(O==N)*N)
     StableMorphism(AbstractArray{T, N}), ItsType, deepcopy(input[1]|>obtain|>ShapedMemory)
 end
@@ -491,19 +495,19 @@ GridParam(par::GridParam{T}, symbol::SymOrIndexedSym=symOf(par);
           init::Union{AbstractArray{T}, Missing}=par.memory) where {T} = 
 GridParam(par.lambda, par.input, symbol, init)
 
-GridParam(input::SingleDimParam{T, N}, symbol::SymOrIndexedSym=symOf(input)) where {T, N} = 
+GridParam(input::FlattenedParam{T, N}, symbol::SymOrIndexedSym=symOf(input)) where {T, N} = 
 GridParam(StableMorphism(AbstractArray{T, N}), (input,), symbol)
 
 GridParam(val::AbstractArray, valSym::SymOrIndexedSym, symbol::SymOrIndexedSym=valSym) = 
 GridParam(TensorVar(val, valSym), symbol)
 
 
-struct ParamGrid{T, N, I<:SingleDimParam{T, N}, O} <: ParamNest{T, N, I, O}
+struct ParamGrid{T, N, I<:FlattenedParam{T, N}, O} <: ParamNest{T, N, I, O}
     input::ShapedMemory{I, O}
     symbol::IndexedSym
 
     function ParamGrid(input::ShapedMemory{I, O}, symbol::SymOrIndexedSym) where 
-                      {T, N, I<:SingleDimParam{T, N}, O}
+                      {T, N, I<:FlattenedParam{T, N}, O}
         exclude0DimData(input)
         checkEmptiness(input.value, :input)
         new{T, N, I, O}(input, IndexedSym(symbol))
@@ -511,7 +515,7 @@ struct ParamGrid{T, N, I<:SingleDimParam{T, N}, O} <: ParamNest{T, N, I, O}
 end
 
 function ParamGrid(input::AbstractArray{I, O}, symbol::SymOrIndexedSym) where 
-                  {T, N, I<:SingleDimParam{T, N}, O}
+                  {T, N, I<:FlattenedParam{T, N}, O}
     exclude0DimData(input)
     ParamGrid(ShapedMemory(input), symbol)
 end
@@ -601,7 +605,7 @@ genGetIndex(idx::Int) = Base.Fix2(getindex, idx)
 indexIn(f::GetIndex) = f.x
 
 
-function indexParam(pb::SingleDimParam, idx::Int, sym::MissingOr{Symbol}=missing)
+function indexParam(pb::FlattenedParam, idx::Int, sym::MissingOr{Symbol}=missing)
     ismissing(sym) && (sym = Symbol(:_, pb.symbol.name))
     CellParam(genGetIndex(idx), pb, sym)
 end
@@ -803,7 +807,7 @@ mutable struct NodeMarker{T} <: StorageMarker{T}
 end
 
 const ParamDict0D{T, V} = IdDict{ElementalParam{T}, NodeMarker{V}}
-const ParamDictSD{T, V} = IdDict{SingleDimParam{T}, NodeMarker{V}}
+const ParamDictSD{T, V} = IdDict{FlattenedParam{T}, NodeMarker{V}}
 const ParamDictDD{T, V} = IdDict{JaggedParam{T}, NodeMarker{V}}
 
 const ParamInputSource{T} = Memory{<:JaggedParam{T}}
@@ -827,14 +831,14 @@ struct ParamPointerBox{T, V0, V1, V2, F<:Function} <: QueryBox{NodeMarker}
 end
 
 selectParamPointer(d::ParamPointerBox{T}, ::ElementalParam{T}) where {T} = d.d0
-selectParamPointer(d::ParamPointerBox{T}, ::SingleDimParam{T}) where {T} = d.d1
+selectParamPointer(d::ParamPointerBox{T}, ::FlattenedParam{T}) where {T} = d.d1
 selectParamPointer(d::ParamPointerBox{T}, ::JaggedParam{T}) where {T} = d.d2
 selectParamPointer(d::ParamPointerBox{T}, ::ParamPointer{T}) where {T} = d.id
 
 getParamDataTypeUB(::ParamPointerBox{T, V0, <:Any, <:Any}, 
                    ::ElementalParam{T}) where {T, V0} = V0
 getParamDataTypeUB(::ParamPointerBox{T, <:Any, V1, <:Any}, 
-                   ::SingleDimParam{T}) where {T, V1} = V1
+                   ::FlattenedParam{T}) where {T, V1} = V1
 getParamDataTypeUB(::ParamPointerBox{T, <:Any, <:Any, V2}, 
                    ::JaggedParam{T}) where {T, V2} = V2
 
@@ -1469,65 +1473,6 @@ topoSort(node::CellParam{T}) where {T} = topoSortINTERNAL([node])
 
 #####
 
-# SingleDimPVec: [[d0...], d1...]          # Used for  input-param set
-
-# MixedParamVec: [[[d0...], d1...], d2...] # Used for output-param set
-
-function initializeParamSet(::Type{<:SingleDimPVec{T}}) where {T}
-    InnerParamEle{T}[ ElementalParam{T}[] ]
-end
-
-function initializeParamSet(::Type{<:MixedParamVec{T}}) where {T}
-    MixedParamEle{T}[ SingleDimPEle{T}[ ElementalParam{T}[] ] ]
-end
-
-# struct IndexPointer{N}# <: CompositeFunction
-#     chain::NTuple{N, Int}
-
-#     IndexPointer(chain::NTuple{N, Int}) where {N} = new{N}(chain)
-# end
-
-# IndexPointer() = IndexPointer(())
-
-# IndexPointer(idx::Int) = IndexPointer((idx,))
-
-# IndexPointer(ip::IndexPointer, idx::Int) = IndexPointer((ip.chain..., idx,))
-
-# (::IndexPointer{0})(obj) = itself(obj)
-
-# (f::IndexPointer)(obj) = foldl((o, i)->getindex(o, i), f.chain, init=obj)
-
-
-# function getParamSector(paramSet::SingleDimPVec{T}, ::ElementalParam{T}) where {T}
-#     first(paramSet), IndexPointer(firstindex(paramSet))
-# end
-
-# function getParamSector(paramSet::SingleDimPVec{T}, ::InnerSpanParam{T}) where {T}
-#     paramSet, IndexPointer()
-# end
-
-# function getParamSector(paramSet::MixedParamVec{T}, ::ElementalParam{T}) where {T}
-#     ps1 = first(paramSet)
-#     first(ps1), IndexPointer((firstindex(paramSet), firstindex(ps1)))
-# end
-
-# function getParamSector(paramSet::MixedParamVec{T}, ::SingleDimParam{T}) where {T}
-#     first(paramSet), IndexPointer(firstindex(paramSet))
-# end
-
-# # function getParamSector(paramSet::Union{MixedParamVec{T}, ParamBoxAbtVec{T}}, 
-# #                         ::JaggedParam{T}) where {T}
-# #     paramSet, IndexPointer()
-# # end
-
-# function getParamSector(paramSet::AbstractVector, ::JaggedParam)
-#     paramSet, IndexPointer()
-# end
-
-
-
-#########
-
 struct Data0D end
 struct Data1D end
 struct Data2D end
@@ -1535,7 +1480,7 @@ struct Data2D end
 const DataDim = Union{Data0D, Data1D, Data2D}
 
 getDataDim(::Type{<:ElementalParam}) = Data0D()
-getDataDim(::Type{<:SingleDimParam}) = Data1D()
+getDataDim(::Type{<:FlattenedParam}) = Data1D()
 getDataDim(::Type{<:JaggedParam}) = Data2D()
 getDataDim(::T) where {T<:JaggedParam} = getDataDim(T)
 
@@ -1550,9 +1495,9 @@ IndexPointer(idx::Int, p::ParamBox) = IndexPointer(idx, getDataDim(p))
 
 getDataSector(source::PBoxTupleOrArr, ::DataDim) = itself(source)
 
-getDataSector(source::SingleDimPVec, ::Data0D) = first(source)
+getDataSector(source::FlattenedPVec, ::Data0D) = first(source)
 
-getDataSector(source::SingleDimPVec, ::Data1D) = itself(source)
+getDataSector(source::FlattenedPVec, ::Data1D) = itself(source)
 
 getDataSector(source::MixedParamVec, ::Data0D) = (first∘first)(source)
 
@@ -1578,14 +1523,14 @@ getDataSector(source::AbstractVector{<:JaggedAbtArray}, ::Data2D) = itself(sourc
 
 function locateParam!(paramSet::AbstractVector, target::ParamBox)
     if isempty(paramSet)
-        push!(paramSet, target)
+        pushParam!(paramSet, target)
         IndexPointer(firstindex(paramSet), target)
     else
         targetDim = getDataDim(target)
         paramSector = getDataSector(paramSet, targetDim)
         idx = findfirst(x->compareObj(x, target), paramSector)
         if idx === nothing
-            push!(paramSector, target)
+            pushParam!(paramSector, target)
             idx = length(paramSector)
         end
         IndexPointer(idx, targetDim)
@@ -1604,6 +1549,151 @@ evalParamSet(s::ParamBox) = obtain(s)
 
 evalParamSet(s::ParamBoxArr{<:Any, 1}) = obtain(s)
 
-evalParamSet(s::SingleDimPVec) = map(obtain, s)
+evalParamSet(s::FlattenedPVec{T}) where {T} = map(obtain, s)
 
-evalParamSet(s::MixedParamVec) = map(evalParamSet, s)
+evalParamSet(s::MixedParamVec{T}) where {T} = map(evalParamSet, s)
+
+
+# FlattenedPVec: [[d0...], d1...]          # Used for  input-param set
+
+# MixedParamVec: [[[d0...], d1...], d2...] # Used for output-param set
+
+pushParam!(arr::AbstractArray, param::ParamBox) = push!(arr, param)
+
+struct FlatParamSet{T, P0<:ElementalParam{T}, 
+                    P1<:FlattenedParam{T}} <: AbstractVector{Union{Vector{P0}, P1}}
+    d0::Vector{P0}
+    d1::Vector{P1}
+end
+
+import Base: getproperty
+
+size(fps::FlatParamSet) = size(fps.d1) .+ 1
+
+firstindex(::FlatParamSet) = 1
+
+lastindex(fps::FlatParamSet) = length(fps.d1) + 1
+
+function getindex(fps::FlatParamSet, i::Int)
+    if i == 1
+        fps.d0
+    else
+        getindex(fps.d1, i+firstindex(fps.d1)-2)
+    end
+end
+
+function getindex(fps::FlatParamSet, sector::Symbol, i::Int)
+    getindex(getfield(fps, sector), i)
+end
+
+function setindex!(fps::FlatParamSet, val, i::Int)
+    if i == firstindex(fps)
+        fps.d0 .= val
+    else
+        setindex!(fps.d1, val, i+firstindex(fps.d1)-2)
+    end
+end
+
+function setindex!(fps::FlatParamSet, val, sector::Symbol, i::Int)
+    setindex!(getfield(fps, sector), val, i)
+end
+
+pushParam!(fps::FlatParamSet, a::ElementalParam) = push!(fps.d0, a)
+pushParam!(fps::FlatParamSet, a::FlattenedParam) = push!(fps.d1, a)
+
+iterate(fps::FlatParamSet) = (first(fps), firstindex(fps)+1)
+function iterate(fps::FlatParamSet, state)
+    if state > length(fps)
+        nothing
+    else
+        (getindex(fps, state), state+1)
+    end
+end
+
+length(fps::FlatParamSet) = length(fps.d1) + 1
+
+getproperty(fps::FlatParamSet, field::Symbol) = getfield(fps, field)
+
+
+struct MiscParamSet{T, P0<:ElementalParam{T}, P1<:FlattenedParam{T}, 
+                    P2<:JaggedParam{T}} <: AbstractVector{Union{FlatParamSet{T, P0, P1}, P2}}
+    single::FlatParamSet{T, P0, P1}
+    double::Vector{P2}
+end
+
+size(mps::MiscParamSet) = size(mps.double) .+ 1
+
+firstindex(::MiscParamSet) = 1
+
+lastindex(mps::MiscParamSet) = length(mps.double) + 1
+
+function getindex(mps::MiscParamSet, i::Int)
+    if i == 1
+        mps.single
+    else
+        getindex(mps.double, i+firstindex(mps.double)-2)
+    end
+end
+
+function getindex(mps::MiscParamSet, sector::Symbol, i::Int)
+    getindex(getfield(mps, sector), i)
+end
+
+function getindex(mps::MiscParamSet, sec1::Symbol, sec2::Symbol, i::Int)
+    getindex(getfield(getfield(mps, sec1), sec2), i)
+end
+
+function setindex!(mps::MiscParamSet, val, i::Int)
+    if i == firstindex(mps)
+        mps.single .= val
+    else
+        setindex!(mps.double, val, i+firstindex(mps.double)-2)
+    end
+end
+
+function setindex!(mps::MiscParamSet, val, sector::Symbol, i::Int)
+    setindex!(getfield(mps, sector), val, i)
+end
+
+function setindex!(mps::MiscParamSet, val, sec1::Symbol, sec2::Symbol, i::Int)
+    setindex!(getfield(getfield(mps, sec1), sec2), val, i)
+end
+
+pushParam!(fps::MiscParamSet, a::ElementalParam) = push!(fps.single.d0, a)
+pushParam!(fps::MiscParamSet, a::FlattenedParam) = push!(fps.single.d1, a)
+pushParam!(fps::MiscParamSet, a::JaggedParam) = push!(fps.double, a)
+
+iterate(mps::MiscParamSet) = (first(mps), firstindex(mps)+1)
+function iterate(mps::MiscParamSet, state)
+    if state > length(mps)
+        nothing
+    else
+        (getindex(mps, state), state+1)
+    end
+end
+
+length(mps::MiscParamSet) = length(mps.double) + 1
+
+getproperty(fps::MiscParamSet, field::Symbol) = getfield(fps, field)
+
+
+function initializeParamSet(::Type{<:FlattenedPVec{T}}) where {T}
+    InnerParamEle{T}[ ElementalParam{T}[] ]
+end
+
+function initializeParamSet(::Type{<:MixedParamVec{T}}) where {T}
+    MixedParamEle{T}[ FlattenedPEle{T}[ ElementalParam{T}[] ] ]
+end
+
+function initializeParamSet(::Type{FlatParamSet{T}}; 
+                            paramType0::Type{P0}=ElementalParam{T}, 
+                            paramType1::Type{P1}=FlattenedParam{T}) where {T, P0, P1}
+    FlatParamSet(P0[], P1[])
+end
+
+function initializeParamSet(::Type{MiscParamSet{T}}; 
+                            paramType0::Type{P0}=ElementalParam{T}, 
+                            paramType1::Type{P1}=FlattenedParam{T}, 
+                            paramType2::Type{P2}=JaggedParam{T}) where {T, P0, P1, P2}
+    MiscParamSet(FlatParamSet(P0[], P1[]), P2[])
+end
