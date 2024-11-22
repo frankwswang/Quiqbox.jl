@@ -169,6 +169,9 @@ end
 selectStorageSectorSym(::Dim0GNode) = :d0
 selectStorageSectorSym(::DimSGNode) = :d1
 
+#! Adjust ParamSet type from `PrimParamVec` to `PrimParamSet` for safety
+#! Incorporate IndexPointer to replace `selectInPSubset`
+
 selectInPSubset(::Val{0}, ps::AbstractVector) = first(ps)
 selectInPSubset(::Val,    ps::AbstractVector) = itself(ps)
 
@@ -195,7 +198,7 @@ function genGetVal!(::Type{T}, ::Val{N}, idx::Int) where {T, N}
 end
 
 function compressNodeCore!(tStorage::TemporaryStorage{T}, 
-                           paramSet::InnerParamVec{T}, gn::ValueNode{T, N, 0}) where {T, N}
+                           paramSet::PrimParamVec{T}, gn::ValueNode{T, N, 0}) where {T, N}
     varIdx = if gn.frozen
         nothing
     else
@@ -205,7 +208,7 @@ function compressNodeCore!(tStorage::TemporaryStorage{T},
 end
 
 function compressNodeCore!(tStorage::TemporaryStorage{T}, 
-                           paramSet::InnerParamVec{T}, node::BatchNode{T}) where {T}
+                           paramSet::PrimParamVec{T}, node::BatchNode{T}) where {T}
     fs=map(x->compressNodeCore!(tStorage, paramSet, x), node.source)
     let gs=fs, iterRanges=Iterators.product(axes(fs)...)
         function (storage::FixedSizeStorage{T}, input::AbtVecOfAbtArr{T})
@@ -217,13 +220,13 @@ function compressNodeCore!(tStorage::TemporaryStorage{T},
 end
 
 function compressNodeCore!(tStorage::TemporaryStorage{T}, 
-                           paramSet::InnerParamVec{T}, node::BuildNode{T}) where {T}
+                           paramSet::PrimParamVec{T}, node::BuildNode{T}) where {T}
     sourceNum = getBuildNodeSourceNum(node)
     compressBuildNodeCore!(Val(sourceNum), tStorage, paramSet, node)
 end
 
 function compressBuildNodeCore!(::Val{1}, tStorage::TemporaryStorage{T}, 
-                                paramSet::InnerParamVec{T}, node::BuildNode{T}) where {T}
+                                paramSet::PrimParamVec{T}, node::BuildNode{T}) where {T}
     f = compressNodeCore!(tStorage, paramSet, node.source[1])
     let g=f, op=node.operator, sh=node.shifter
         function (storage::FixedSizeStorage{T}, input::AbtVecOfAbtArr{T})
@@ -233,7 +236,7 @@ function compressBuildNodeCore!(::Val{1}, tStorage::TemporaryStorage{T},
 end
 
 function compressBuildNodeCore!(::Val{2}, tStorage::TemporaryStorage{T}, 
-                                paramSet::InnerParamVec{T}, node::BuildNode{T}) where {T}
+                                paramSet::PrimParamVec{T}, node::BuildNode{T}) where {T}
     fL, fR = compressNodeCore!.(Ref(tStorage), Ref(paramSet), node.source)
     let gL=fL, gR=fR, op=node.operator, sh=node.shifter
         function (storage::FixedSizeStorage{T}, input::AbtVecOfAbtArr{T})
@@ -243,7 +246,7 @@ function compressBuildNodeCore!(::Val{2}, tStorage::TemporaryStorage{T},
 end
 
 function compressBuildNodeCore!(::Val{3}, tStorage::TemporaryStorage{T}, 
-                                paramSet::InnerParamVec{T}, node::BuildNode{T}) where {T}
+                                paramSet::PrimParamVec{T}, node::BuildNode{T}) where {T}
     fL, fC, fR = compressNodeCore!.(Ref(tStorage), Ref(paramSet), node.source)
     let gL=fL, gC=fC, gR=fR, op=node.operator, sh=node.shifter
         function (storage::FixedSizeStorage{T}, input::AbtVecOfAbtArr{T})
@@ -253,7 +256,7 @@ function compressBuildNodeCore!(::Val{3}, tStorage::TemporaryStorage{T},
 end
 
 function compressNodeCore!(tStorage::TemporaryStorage{T}, 
-                           paramSet::InnerParamVec{T}, node::IndexNode{T}) where {T}
+                           paramSet::PrimParamVec{T}, node::IndexNode{T}) where {T}
     f = compressNodeCore!(tStorage, paramSet, node.source)
     let g=f, idx=node.index
         function (storage::FixedSizeStorage{T}, input::AbtVecOfAbtArr{T})
@@ -276,7 +279,7 @@ end
 
 (gnf::EvalGraphNode)(s::FixedSizeStorage{T}, ps::AbtVecOfAbtArr{T}) where {T} = gnf.f(s, ps)
 
-# function (gnf::EvalGraphNode{T})(ps::InnerParamVec{T}; checkParamSet::Bool=true) where {T}
+# function (gnf::EvalGraphNode{T})(ps::PrimParamVec{T}; checkParamSet::Bool=true) where {T}
 #     if checkParamSet
 #         bl, errorMsg = isGraphParamSet(paramSet)
 #         bl || throw( AssertionError(errorMsg) )
@@ -285,7 +288,7 @@ end
 # end
 
 
-function compressNodeINTERNAL(node::GraphNode{T}, paramSet::InnerParamVec{T}) where {T}
+function compressNodeINTERNAL(node::GraphNode{T}, paramSet::PrimParamVec{T}) where {T}
     tStorage = TemporaryStorage(T)
     f = compressNodeCore!(tStorage, paramSet, node)
     sectors = map( getproperty.(Ref(tStorage), fieldnames(TemporaryStorage)) ) do data
@@ -302,7 +305,7 @@ function compressNodeINTERNAL(node::GraphNode{T}, paramSet::InnerParamVec{T}) wh
     EvalGraphNode(f, FixedSizeStorage(sectors...), obtain.(paramSet))
 end
 
-function compressNode(node::GraphNode{T}, paramSet::InnerParamVec{T}) where {T}
+function compressNode(node::GraphNode{T}, paramSet::PrimParamVec{T}) where {T}
     bl, errorMsg = isGraphParamSet(paramSet)
     bl || throw( AssertionError(errorMsg) )
     compressNodeINTERNAL(node, paramSet)
@@ -310,7 +313,7 @@ end
 
 
 const ParamSetErrorMessage1 = "Input argument does not meet the type requirement of being "*
-                              "a parameter set: $(InnerParamVec)"
+                              "a parameter set: $(PrimParamVec)"
 
 const ParamSetErrorMessage2 = "All `$ElementalParam` must be inside a non-zero dimensional"*
                               " `AbstractArray` as the first element of `paramSet`."
@@ -320,7 +323,7 @@ const ParamSetErrorMessage3 = "The screen level of every input parameter (inspec
 
 isGraphParamSet(::AbstractVector) = (false, ParamSetErrorMessage1)
 
-function isGraphParamSet(paramSet::InnerParamVec{T}) where {T}
+function isGraphParamSet(paramSet::PrimParamVec{T}) where {T}
     isInSet = true
     errorMsg = ""
     for i in eachindex(paramSet)
