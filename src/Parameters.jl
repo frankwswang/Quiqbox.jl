@@ -1,6 +1,7 @@
 export TensorVar, CellParam, GridParam, ParamGrid, ParamMesh, setScreenLevel!, 
        setScreenLevel, symOf, inputOf, obtain, fragment, setVal!, screenLevelOf, 
-       markParams!, topoSort, getParams, uniqueParams, ShapedMemory, directObtain, memorize!
+       markParams!, topoSort, getParams, uniqueParams, ShapedMemory, directObtain, 
+       memorize!, evalParamSet
 
 using Base: Fix2, Threads.Atomic, issingletontype
 using Test: @inferred
@@ -598,16 +599,10 @@ function indexParam(pb::ParamGrid{<:Any, N}, idx::Int,
     end
 end
 
-const GetIndex = Base.Fix2{typeof(getindex), Int}
-
-genGetIndex(idx::Int) = Base.Fix2(getindex, idx)
-
-indexIn(f::GetIndex) = f.x
-
 
 function indexParam(pb::FlattenedParam, idx::Int, sym::MissingOr{Symbol}=missing)
     ismissing(sym) && (sym = Symbol(:_, pb.symbol.name))
-    CellParam(genGetIndex(idx), pb, sym)
+    CellParam(IndexPointer(idx), pb, sym)
 end
 
 function indexParam(pb::ElementalParam, idx::Int, sym::MissingOr{Symbol}=missing)
@@ -622,7 +617,7 @@ end
 
 function indexParam(pb::JaggedParam, idx::Int, sym::MissingOr{Symbol}=missing)
     ismissing(sym) && (sym = Symbol(:_, pb.symbol.name))
-    GridParam(genGetIndex(idx), pb, sym)
+    GridParam(IndexPointer(idx), pb, sym)
 end
 
 
@@ -1061,11 +1056,11 @@ end
 obtain(p::ParamBox; maxRecursion::Int=DefaultMaxParamPointerLevel) = 
 obtainINTERNAL(p, maxRecursion)
 
-obtain(p::ParamBoxArr{<:ParamBox{T}}; 
+obtain(p::ParamTypeArr{<:ParamBox{T}}; 
        maxRecursion::Int=DefaultMaxParamPointerLevel) where {T} = 
 obtainINTERNAL(p, maxRecursion)
 
-obtain(p::ParamBoxArr; maxRecursion::Int=DefaultMaxParamPointerLevel) = 
+obtain(p::ParamTypeArr; maxRecursion::Int=DefaultMaxParamPointerLevel) = 
 obtainINTERNAL(itself.(p), maxRecursion)
 
 ################################
@@ -1390,12 +1385,12 @@ function markParams!(pars::AbstractVector{<:JaggedParam{T}}) where {T}
     par0Dids = findall(x->(x isa ElementalParam{T}), leafPars)
     leafParsFormated = if isempty(par0Dids)
         markParamsCore!(parIdxDict, leafPars)
-        convert(Vector{InnerParamEle{T}}, leafPars)
+        convert(Vector{PrimParamEle{T}}, leafPars)
     else
         leafP0Ds = ElementalParam{T}[splice!(leafPars, par0Dids)...]
         markParamsCore!(parIdxDict, leafP0Ds)
         markParamsCore!(parIdxDict, leafPars)
-        InnerParamEle{T}[leafP0Ds, leafPars...]
+        PrimParamEle{T}[leafP0Ds, leafPars...]
     end
     (leafParsFormated, rootPars, selfPars) # inputParam, outputParam, selfParam
 end
@@ -1496,14 +1491,11 @@ getDataSector(source::MiscParamVec, ::Data0D) = (first∘first)(source)
 getDataSector(source::MiscParamVec, ::Data1D) = first(source)
 
 getDataSector(source::AbtVecOfAbtArr, ::Data0D) = first(source)
-
 getDataSector(source::AbtVecOfAbtArr, ::Data1D) = itself(source)
-
 getDataSector(source::AbstractVector{<:JaggedAbtArray}, ::Data0D) = (first∘first)(source)
-
 getDataSector(source::AbstractVector{<:JaggedAbtArray}, ::Data1D) = first(source)
 
-getDataSector(source::AbstractVector{<:JaggedAbtArray}, ::Data2D) = itself(source)
+getDataSector(source::Union{AbstractArray, Tuple}, ::DataDim) = itself(source)
 
 
 (f::IndexPointer)(source) = getindex(getDataSector(source, f.dim), f.idx)
@@ -1524,7 +1516,7 @@ function locateParam!(paramSet::AbstractVector, target::ParamBox)
     end
 end
 
-function locateParam!(paramSet::AbstractVector, target::PBoxTupleOrArr)
+function locateParam!(paramSet::AbstractVector, target::NonEmpTplOrAbtArr{<:ParamBox})
     map(x->locateParam!(paramSet, x), target)
 end
 
@@ -1534,16 +1526,16 @@ locateParam!(paramSet, values(target))
 
 evalParamSet(s::ParamBox) = obtain(s)
 
-evalParamSet(s::ParamBoxArr{<:Any, 1}) = obtain(s)
+evalParamSet(s::ParamTypeArr{<:Any, 1}) = obtain(s)
 
-evalParamSet(s::FlattenedPVec{T}) where {T} = map(obtain, s)
+evalParamSet(s::FlatParamVec{T}) where {T} = map(obtain, s)
 
-evalParamSet(s::MixedParamVec{T}) where {T} = map(evalParamSet, s)
+evalParamSet(s::MiscParamVec{T}) where {T} = map(evalParamSet, s)
 
 
-# FlattenedPVec: [[d0...], d1...]          # Used for  input-param set
+# FlatParamVec: [[d0...], d1...]          # Used for  input-param set
 
-# MixedParamVec: [[[d0...], d1...], d2...] # Used for output-param set
+# MiscParamVec: [[[d0...], d1...], d2...] # Used for output-param set
 
 pushParam!(arr::AbstractArray, param::ParamBox) = push!(arr, param)
 
@@ -1560,6 +1552,8 @@ size(fps::FlatParamSet) = size(fps.d1) .+ 1
 firstindex(::FlatParamSet) = 1
 
 lastindex(fps::FlatParamSet) = length(fps.d1) + 1
+
+const PrimParamSet{T, P0<:ElementalParam{T}, P1<:InnerSpanParam{T}} = FlatParamSet{T, P0, P1}
 
 function getindex(fps::FlatParamSet, i::Int)
     if i == 1
@@ -1663,14 +1657,10 @@ length(mps::MiscParamSet) = length(mps.double) + 1
 
 getproperty(fps::MiscParamSet, field::Symbol) = getfield(fps, field)
 
+const AbstractFlatParamSet{T} = Union{FlatParamSet{T}, SingleSpanParamVec{T}}
 
-function initializeParamSet(::Type{<:FlattenedPVec{T}}) where {T}
-    InnerParamEle{T}[ ElementalParam{T}[] ]
-end
-
-function initializeParamSet(::Type{<:MixedParamVec{T}}) where {T}
-    MixedParamEle{T}[ FlattenedPEle{T}[ ElementalParam{T}[] ] ]
-end
+const AbstractMiscParamSet{T} = Union{MiscParamSet{T}, SingleSpanParamVec{T}, 
+                                                       DoubleSpanParamVec{T}}
 
 function initializeParamSet(::Type{FlatParamSet{T}}; 
                             paramType0::Type{P0}=ElementalParam{T}, 
