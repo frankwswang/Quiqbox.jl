@@ -1473,40 +1473,10 @@ topoSort(node::CellParam{T}) where {T} = topoSortINTERNAL([node])
 
 #####
 
-struct Data0D end
-struct Data1D end
-struct Data2D end
-
-const DataDim = Union{Data0D, Data1D, Data2D}
-
-getDataDim(::Type{<:ElementalParam}) = Data0D()
-getDataDim(::Type{<:FlattenedParam}) = Data1D()
-getDataDim(::Type{<:JaggedParam}) = Data2D()
-getDataDim(::T) where {T<:JaggedParam} = getDataDim(T)
-
-
-struct IndexPointer{T<:DataDim} <: CompositeFunction
-    idx::Int
-    dim::T
-end
-
-IndexPointer(idx::Int, p::ParamBox) = IndexPointer(idx, getDataDim(p))
-
-
-getDataSector(source::PBoxTupleOrArr, ::DataDim) = itself(source)
-
-getDataSector(source::FlattenedPVec, ::Data0D) = first(source)
-
-getDataSector(source::FlattenedPVec, ::Data1D) = itself(source)
-
-getDataSector(source::MixedParamVec, ::Data0D) = (first∘first)(source)
-
-getDataSector(source::MixedParamVec, ::Data1D) = first(source)
-
-getDataSector(source::MixedParamVec, ::Data2D) = itself(source)
-
-
-getDataSector(source::NonEmpTplOrAbtArr, ::DataDim) = itself(source)
+getDataSector(source::FlatParamVec, ::Data0D) = first(source)
+getDataSector(source::FlatParamVec, ::Data1D) = itself(source)
+getDataSector(source::MiscParamVec, ::Data0D) = (first∘first)(source)
+getDataSector(source::MiscParamVec, ::Data1D) = first(source)
 
 getDataSector(source::AbtVecOfAbtArr, ::Data0D) = first(source)
 
