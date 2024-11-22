@@ -13,6 +13,8 @@ abstract type ParamBox{T} <: Box end
 abstract type GraphBox{T} <: Box end
 abstract type QueryBox{T} <: Box end
 
+abstract type StructuredType <: ConfigBox end
+
 # N: Inner dim, size mutable; O: Outer dim, size immutable
 abstract type JaggedOperator{T, N, O} <: CompositeFunction end
 abstract type TaggedFunction <: CompositeFunction end
@@ -103,17 +105,21 @@ const TernaryNTupleUnion{T} = Union{(NTuple{N, T} for N in 1:3)...}
 const ParamInputType{T} = TernaryNTupleUnion{JaggedParam{T}}
 const ParamInput{T, N} = NTuple{N, JaggedParam{T}}
 
-const InnerParamEle{T} = Union{AbstractVector{<:ElementalParam{T}}, InnerSpanParam{T}}
-const InnerParamVec{T} = AbstractVector{<:InnerParamEle{T}}
+const PrimParamEle{T} = Union{AbstractVector{<:ElementalParam{T}}, InnerSpanParam{T}}
+const PrimParamVec{T} = AbstractVector{<:PrimParamEle{T}}
 
-const FlattenedPEle{T} = Union{AbstractVector{<:ElementalParam{T}}, FlattenedParam{T}}
-const FlattenedPVec{T} = AbstractVector{<:FlattenedPEle{T}}
+const FlatParamEle{T} = Union{AbstractVector{<:ElementalParam{T}}, FlattenedParam{T}}
+const FlatParamVec{T} = AbstractVector{<:FlatParamEle{T}}
 
-const MixedParamEle{T} = Union{AbstractVector{<:FlattenedPEle{T}}, JaggedParam{T}}
-const MixedParamVec{T} = AbstractVector{<:MixedParamEle{T}}
+const MiscParamEle{T} = Union{AbstractVector{<:FlatParamEle{T}}, JaggedParam{T}}
+const MiscParamVec{T} = AbstractVector{<:MiscParamEle{T}}
+
+const SingleSpanParamVec{T, N} = AbstractVector{<:FlattenedParam{T, N}}
+const DoubleSpanParamVec{T, N, O} = AbstractVector{<:JaggedParam{T, N, O}}
+
+const ParamTypeArr{T<:ParamBox, N} = AbstractArray{T, N}
 
 const ParamFunctor{T, N, I} = Union{BaseParam{T, N, I}, ParamLink{T, N, I}}
 const ParamPointer{T, N, I} = Union{LinkParam{T, N, I}, ParamNest{T, N, I}}
 
-const PBoxTupleOrArr{T<:ParamBox} = NonEmpTplOrAbtArr{T}
-const ParamBoxArr{T<:ParamBox, N} = AbstractArray{T, N}
+const MissSymInt = MissingOr{Union{Symbol, Int}}
