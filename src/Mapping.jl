@@ -61,7 +61,7 @@ const StableMul{T} = StableBinary{T, typeof(*)}
 StableBinary(f::Function) = Base.Fix1(StableBinary, f)
 
 
-struct PointerFunc{F<:Function, T<:NonEmptyTuple{IndexPointer}} <: ParamOperator
+struct PointerFunc{F<:Function, T<:Tuple{Vararg{IndexPointer}}} <: ParamOperator
     apply::F
     pointer::T
     sourceID::UInt
@@ -163,8 +163,8 @@ end
 
 unpackFunc(f::Function) = unpackFunc!(f, ParamBox[])
 
-unpackFunc(f::JaggedOperator{T}) where {T} = 
-unpackFunc!(f, initializeParamSet(MixedParamVec{T}))
+unpackFunc(f::AbstractAmplitude{T}) where {T} = 
+unpackFunc!(f, initializeParamSet(FlatParamSet{T}))
 
 unpackFunc!(f::Function, paramSet::AbstractVector) = 
 unpackFunc!(SelectTrait{ParameterStyle}()(f), f, paramSet)
@@ -172,9 +172,24 @@ unpackFunc!(SelectTrait{ParameterStyle}()(f), f, paramSet)
 unpackFunc!(::IsParamFunc, f::Function, paramSet::AbstractVector) = 
 unpackParamFunc!(f, paramSet)
 
+const FieldPointerDict = Dict{<:FieldLinker, <:IndexPointer}
+
+function anchorFieldPointerDictCore(d::FieldPointerDict, 
+                                    anchor::Union{FieldLinker, FieldSymbol})
+    map( collect(d) ) do pair
+        FieldLinker(anchor, pair.first) => pair.second
+    end
+end
+
+function anchorFieldPointerDict(d::FieldPointerDict, 
+                                anchor::Union{FieldLinker, FieldSymbol})
+    (Dict∘anchorFieldPointerDictCore)(d, anchor)
+end
+
 function unpackFunc!(::NotParamFunc, f::Function, paramSet::AbstractVector)
-    params = getParams(f)
+    params, anchors = getFieldParams(f)
     ids = locateParam!(paramSet, params)
+    paramFieldDict = Dict(anchors .=> ids)
     fCopy = deepcopy(f)
     paramDoubles = deepcopy(params)
     foreach(p->setScreenLevel!(p.source, 1), paramDoubles)
@@ -184,5 +199,5 @@ function unpackFunc!(::NotParamFunc, f::Function, paramSet::AbstractVector)
         end
         fCopy(x)
     end
-    PointerFunc(evalCore, ids, objectid(paramSet)), paramSet
+    PointerFunc(evalCore, ids, objectid(paramSet)), paramSet, paramFieldDict
 end
