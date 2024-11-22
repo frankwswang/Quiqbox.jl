@@ -790,13 +790,16 @@ isDependentParam(p::JaggedParam) = (screenLevelOf(p) < 1)
 isPrimitiveParam(p::JaggedParam) = (screenLevelOf(p) == 1)
 
 
-outputSizeOf(p::PrimitiveParam) = size(p.input)
+outputTypeOf(p::PrimitiveParam) = TensorType(p.input)
 
-outputSizeOf(p::ParamFunctor) = size(p.memory)
+outputTypeOf(p::ParamFunctor) = TensorType(p.memory)
 
-outputSizeOf(p::ParamGrid) = size(p.input)
+#? Maybe a more general type signature?
+outputTypeOf(p::ParamGrid{T, N}) where {T, N} = 
+TensorType(AbstractArray{T, N}, size(p.input))
 
-outputSizeOf(p::KnotParam) = size(first(p.input).memory[p.index])
+outputTypeOf(p::KnotParam) = TensorType(first(p.input).memory[p.index])
+
 
 
 mutable struct NodeMarker{T} <: StorageMarker{T}
