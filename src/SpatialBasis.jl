@@ -23,10 +23,10 @@ end
 const NormFuncType{T, F<:Union{Storage{T}, PointerFunc{<:OnlyBody}}} = ReturnTyped{T, F}
 
 
-function unpackParamFunc!(f::ComposedOrb{T}, paramSet::AbstractVector) where {T}
-    fEvalCore, _ = unpackParamFuncCore!(f, paramSet)
+function unpackParamFunc!(f::ComposedOrb{T}, paramSet::AbstractFlatParamSet) where {T}
+    fEvalCore, _, paramFieldDict = unpackParamFuncCore!(f, paramSet)
     fEval = PairCombine(StableBinary(*, T), fEvalCore, genNormalizer(f, paramSet))
-    getEvaluator(f)(fEval), paramSet
+    getEvaluator(f)(fEval), paramSet, paramFieldDict
 end
 
 
@@ -69,12 +69,16 @@ struct EvalPrimitiveOrb{T, D, B<:EvalFieldAmp{T, D},
     f::PairCombine{StableMul{T}, InputShifter{T, D, B}, F}
 end
 
-function unpackParamFuncCore!(f::PrimitiveOrb{T, D}, paramSet::AbstractVector) where {T, D}
+function unpackParamFuncCore!(f::PrimitiveOrb{T, D}, 
+                              paramSet::AbstractFlatParamSet) where {T, D}
     pSetId = objectid(paramSet)
-    parIds = locateParam!(paramSet, f.center)
-    fEvalOuter = unpackFunc!(f.body, paramSet) |> first
-    fEval = InsertInward(fEvalOuter, PointerFunc(ShiftByArg{T, D}(), parIds, pSetId))
-    fEval, paramSet
+    cenIds = locateParam!(paramSet, f.center)
+    cenPointers = FieldSymbol.(1:D, Ref(T|>TensorType))
+    cenDict = Dict(FieldLinker.(:center, cenPointers) .=> cenIds)
+    fEvalCore, _, fCoreDict = unpackFunc!(f.body, paramSet)
+    fEval = InsertInward(fEvalCore, PointerFunc(ShiftByArg{T, D}(), cenIds, pSetId))
+    fEvalDict = anchorFieldPointerDict(fCoreDict, FieldSymbol(:body))
+    fEval, paramSet, merge(cenDict, fEvalDict)
 end
 
 getEvaluator(::PrimitiveOrb) = EvalPrimitiveOrb
@@ -108,7 +112,7 @@ end
 
 function getWeightParamCore(basis::AbstractVector{<:PrimitiveOrb{T, D}}, 
                             weight::W) where {T, D, W<:FlattenedParam{T, 1}}
-    if checkEmptiness(basis, :basis) != (first∘outputSizeOf)(weight)
+    if checkEmptiness(basis, :basis) != first(outputTypeOf(weight).size)
         throw(AssertionError("`basis` and `weight` must have the same length."))
     end
     basis, weight
@@ -116,7 +120,7 @@ end
 
 function getWeightParamCore(basis::AbstractVector{<:ComposedOrb{T, D}}, 
                             weight::W) where {T, D, W<:FlattenedParam{T, 1}}
-    if checkEmptiness(basis, :basis) != (first∘outputSizeOf)(weight)
+    if checkEmptiness(basis, :basis) != first(outputTypeOf(weight).size)
         throw(AssertionError("`basis` and `weight` must have the same length."))
     end
     weightPieces = getEffectiveWeight(basis, weight)
@@ -136,7 +140,7 @@ end
 
 function getEffectiveWeight(o::CompositeOrb{T}, weight::FlattenedParam{T, 1}, 
                             idx::Int) where {T}
-    len = (first∘outputSizeOf)(o.weight)
+    len = first(outputTypeOf(o.weight).size)
     outWeight = indexParam(weight, idx)
     map(i->CellParam(*, indexParam(o.weight, i), outWeight, :w), 1:len)
 end
@@ -188,11 +192,10 @@ struct EvalCompositeOrb{T, D, V<:Memory{<:WeightedPF{T, D}},
                         F<:NormFuncType{T}} <: EvalComposedOrb{T, D, V}
     f::PairCombine{StableMul{T}, ChainReduce{StableAdd{T}, V}, F}
 
-    function EvalCompositeOrb(weightedFs::AbstractVector{W}, 
-                              normalizer::F) where 
+    function EvalCompositeOrb(weightedFs::AbstractVector{W}, normalizer::F) where 
                              {T, D, W<:WeightedPF{T, D}, F<:NormFuncType{T}}
         fInnerObjs = foldl(∘, Base.Fix2.(getfield, (:f, :left))).(weightedFs)
-        fInnerType = eltype(foldl(∘, Base.Fix2.(getfield, (:apply, :left ))).(fInnerObjs))
+        fInnerType = eltype(foldl( ∘, Base.Fix2.(getfield, (:apply, :left)) ).(fInnerObjs))
         nInnerType = eltype(getfield.(fInnerObjs, :right))
         V = compressWeightedPF(fInnerType, nInnerType)
         cOrbCore = ChainReduce(StableBinary(+, T), V(weightedFs))
@@ -200,17 +203,22 @@ struct EvalCompositeOrb{T, D, V<:Memory{<:WeightedPF{T, D}},
     end
 end
 
-function unpackParamFunc!(f::CompositeOrb{T, D}, paramSet::AbstractVector) where {T, D}
+function unpackParamFunc!(f::CompositeOrb{T, D}, 
+                          paramSet::AbstractFlatParamSet) where {T, D}
     pSetId = objectid(paramSet)
-    fInnerCores = map(Fix2(unpackFunc!, paramSet), f.basis) .|> first
-    weightedFields = WeightedPF{T, D, <:eltype(fInnerCores)}[]
-    weightId = (locateParam!(paramSet, f.weight),)
-    for (i, fic) in enumerate(fInnerCores)
-        getIdx = (OnlyBody∘genGetIndex)(i) # Replace/Simplify GetIndex
-        weight = PointerFunc(getIdx, weightId, pSetId)
-        push!(weightedFields, PairCombine(StableBinary(*, T), fic, weight))
-    end
-    EvalCompositeOrb(weightedFields, genNormalizer(f, paramSet)), paramSet
+    weightedFields = WeightedPF{T, D, <:EvalPrimitiveOrb{T, D}}[]
+    weightIdx = locateParam!(paramSet, f.weight)
+    weightPointer = (FieldLinker∘FieldSymbol)(:weight, outputTypeOf(f.weight)) => weightIdx
+    paramFieldDict = mapfoldl(vcat, eachindex(f.basis), init=weightPointer) do i
+        anchor = FieldLinker(:basis, FieldSymbol(i))
+        fInnerCore, _, innerDict = unpackParamFunc!(f.basis[i], paramSet)
+        getIdx = (OnlyBody∘IndexPointer)(i)
+        weight = PointerFunc(getIdx, (weightIdx,), pSetId)
+        push!(weightedFields, PairCombine(StableBinary(*, T), fInnerCore, weight))
+        anchorFieldPointerDictCore(innerDict, anchor)
+    end |> Dict
+    normalizer = genNormalizer(f, paramSet)
+    EvalCompositeOrb(weightedFields, normalizer), paramSet, paramFieldDict
 end
 
 getEvaluator(::CompositeOrb) = EvalCompositeOrb
@@ -222,15 +230,17 @@ const CompGTO{T, D, B<:PolyGaussProd{T, D}, C, P} = CompositeOrb{T, D, B, C, P}
 
 abstract type UnpackedOrb{T, D, B} <: OrbitalBasis{T, D, B} end
 
-struct FrameworkOrb{T, D, B<:EvalComposedOrb{T, D}, P<:ParamBox{T}} <: UnpackedOrb{T, D, B}
+struct FrameworkOrb{T, D, B<:EvalComposedOrb{T, D}, P<:AbstractFlatParamSet{T}, 
+                    A<:FieldPointerDict} <: UnpackedOrb{T, D, B}
     core::B
-    param::Memory{P} #! Need to be a proprietary type
+    param::P
+    anchor::A
 
-    function FrameworkOrb(dob::ComposedOrb{T, D}, 
-                          paramSet::ParamBoxArr{<:ParamBox{T}}=ParamBox{T}[]) where {T, D}
-        core, params = unpackFunc!(dob, paramSet)
-        typedParams = getMemory(params .|> itself) # first concretize the type
-        new{T, D, typeof(core), eltype(typedParams)}(core, typedParams)
+    function FrameworkOrb(o::ComposedOrb{T, D}, 
+                          paramSet::P=initializeParamSet(FlatParamSet{T})) where 
+                         {T, D, P<:AbstractFlatParamSet{T}}
+        core, params, indexDict = unpackFunc!(o, paramSet)
+        new{T, D, typeof(core), P, typeof(indexDict)}(core, params, indexDict)
     end
 end
 

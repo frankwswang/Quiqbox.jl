@@ -1,6 +1,6 @@
 export FieldFunc, GaussFunc, AxialProdFunc, PolyRadialFunc
 
-using LinearAlgebra: norm
+using LinearAlgebra
 
 (f::FieldAmplitude)(x) = evalFunc(f, x)
 
@@ -22,9 +22,9 @@ struct EvalFieldFunc{T, F<:ReturnTyped{T}} <: EvalFieldAmp{T, 0, FieldFunc}
     f::F
 end
 
-function unpackParamFunc!(f::FieldFunc{T}, paramSet::AbstractVector) where {T}
-    fEval, _ = unpackFunc!(f.f, paramSet)
-    EvalFieldFunc(ReturnTyped(fEval, T)), paramSet
+function unpackParamFunc!(f::FieldFunc{T}, paramSet::AbstractFlatParamSet) where {T}
+    fEval, _, dict = unpackFunc!(f.f, paramSet)
+    EvalFieldFunc(ReturnTyped(fEval, T)), paramSet, dict
 end
 
 
@@ -44,19 +44,19 @@ struct EvalGaussFunc{T} <: EvalFieldAmp{T, 0, GaussFunc}
     f::PointOneFunc{ComputeGFunc{T}}
 end
 
-function unpackParamFunc!(f::GaussFunc{T, <:ElementalParam{T}}, 
-                          paramSet::AbstractVector) where {T}
-    parIds = (locateParam!(paramSet, f.xpn),)
-    fEval = PointerFunc(ComputeGFunc{T}(), parIds, objectid(paramSet))
-    EvalGaussFunc(fEval), paramSet
+function unpackParamFunc!(f::GaussFunc{T}, paramSet::AbstractFlatParamSet) where {T}
+    anchor = (FieldLinker∘FieldSymbol)(:xpn, outputTypeOf(f.xpn))
+    parIdx = locateParam!(paramSet, getField(f, anchor))
+    fEval = PointerFunc(ComputeGFunc{T}(), (parIdx,), objectid(paramSet))
+    EvalGaussFunc(fEval), paramSet, Dict(anchor=>parIdx)
 end
 
 
 struct AxialProdFunc{T, D, B<:NTuple{D, FieldAmplitude{T, 0}}} <: FieldAmplitude{T, D}
-    component::B
+    axis::B
 
-    AxialProdFunc(component::B) where {T, B<:NonEmptyTuple{FieldAmplitude{T, 0}}} = 
-    new{T, length(component), B}(component)
+    AxialProdFunc(axis::B) where {T, B<:NonEmptyTuple{FieldAmplitude{T, 0}}} = 
+    new{T, length(axis), B}(axis)
 end
 
 AxialProdFunc(compos::AbstractVector{<:FieldAmplitude{T, 0}}) where {T} = 
@@ -67,22 +67,25 @@ function AxialProdFunc(b::FieldAmplitude{<:Any, 0}, dim::Int)
     (AxialProdFunc∘Tuple∘fill)(b, dim)
 end
 
-# const AxialFieldProd{T, D, A<:EvalFieldAmp{T, 0}} = 
-#       NTuple{D, InsertInward{<:A, OnlyHead{Base.Fix2{typeof(getindex), Int}}}}
-
 const EvalAxialField{T, F<:EvalFieldAmp{T, 0}} = 
-InsertInward{F, OnlyHead{Base.Fix2{typeof(getindex), Int}}}
+InsertInward{F, OnlyHead{IndexPointer{DataXD}}}
 
 struct EvalAxialProdFunc{T, D, F<:EvalFieldAmp{T, 0}} <: EvalFieldAmp{T, D, AxialProdFunc}
     f::ChainReduce{StableMul{T}, VectorMemory{EvalAxialField{T, F}, D}}
 end
 
-function unpackParamFunc!(f::AxialProdFunc{T, D}, paramSet::AbstractVector) where {T, D}
-    fEvalComps = map(Fix2(unpackFunc!, paramSet), f.component) .|> first
-    fEval = map(fEvalComps, Tuple(1:D)) do efc, idx
-        InsertInward(efc, (OnlyHead∘Base.Fix2)(getindex, idx))
-    end |> (ChainReduce∘StableBinary)(*, T)
-    EvalAxialProdFunc(fEval), paramSet
+
+function unpackParamFunc!(f::AxialProdFunc{T, D}, paramSet::AbstractFlatParamSet) where 
+                         {T, D}
+    fEvalComps = Memory{Function}(undef, D)
+    paramFieldDict = mapfoldl(vcat, 1:D) do i
+        anchor = FieldLinker(:axis, FieldSymbol(i))
+        fInner, _, dictInner = unpackFunc!(f.axis[i], paramSet)
+        fEvalComps[i] = InsertInward(fInner, (OnlyHead∘IndexPointer)(i))
+        anchorFieldPointerDictCore(dictInner, anchor)
+    end |> Dict
+    fEval = Tuple(fEvalComps) |> (ChainReduce∘StableBinary)(*, T)
+    EvalAxialProdFunc(fEval), paramSet, paramFieldDict
 end
 
 
@@ -94,18 +97,20 @@ end
 PolyRadialFunc(radial::FieldAmplitude{T, 0}, angular::NonEmptyTuple{Int}) where {T} = 
 PolyRadialFunc(radial, CartSHarmonics(angular))
 
-const MagnitudeConverter{F} = InsertInward{F, OnlyHead{typeof(norm)}}
+const MagnitudeConverter{F} = InsertInward{F, OnlyHead{typeof(LinearAlgebra.norm)}}
 
 struct EvalPolyRadialFunc{T, D, F<:EvalFieldAmp{T, 0}, 
                           L} <: EvalFieldAmp{T, D, PolyRadialFunc}
     f::PairCombine{StableMul{T}, MagnitudeConverter{F}, OnlyHead{CartSHarmonics{D, L}}}
 end
 
-function unpackParamFunc!(f::PolyRadialFunc{T, D}, paramSet::AbstractVector) where {T, D}
-    fInner, _ = unpackParamFunc!(f.radial, paramSet)
-    coordEncoder = InsertInward(fInner, OnlyHead(norm))
+function unpackParamFunc!(f::PolyRadialFunc{T, D}, paramSet::AbstractFlatParamSet) where 
+                         {T, D}
+    fInner, _, paramFieldDictInner = unpackParamFunc!(f.radial, paramSet)
+    paramFieldDict = anchorFieldPointerDict(paramFieldDictInner, FieldSymbol(:radial))
+    coordEncoder = InsertInward(fInner, OnlyHead(LinearAlgebra.norm))
     fEval = PairCombine(StableBinary(*, T), coordEncoder, OnlyHead(f.angular))
-    EvalPolyRadialFunc(fEval), paramSet
+    EvalPolyRadialFunc(fEval), paramSet, paramFieldDict
 end
 
 const PolyGaussProd{T, D, L} = PolyRadialFunc{T, D, <:GaussFunc{T}, L}
