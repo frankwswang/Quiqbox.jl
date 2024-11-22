@@ -1324,31 +1324,45 @@ end
 #         end
 #     end
 # end
-function getParams(obj::Any)
-    nestedRes = getParamsCore(obj)
-    if nestedRes isa JaggedParam
-        [nestedRes]
-    elseif ismissing(nestedRes) || isempty(nestedRes)
-        ParamBox[]
-    else
-        (collect∘skipmissing∘flatVectorize)(nestedRes)
-    end
+function getParams(source)
+    (first∘getFieldParams)(source)
 end
 
-getParamsCore(p::JaggedParam) = itself(p)
-
-function getParamsCore(v::Union{Tuple, AbstractArray})
-    isempty(v) ? missing : map(getParamsCore, v)
+function getFieldParams(source::T) where {T}
+    paramPairs = Tuple{ParamBox, FieldLinker}[]
+    getFieldParamsCore!(paramPairs, source, FieldLinker(T))
+    first.(paramPairs), last.(paramPairs)
 end
 
-function getParamsCore(obj::T) where {T}
-    if isstructtype(T) && !( Base.issingletontype(T) )
-        map( fieldnames(T) ) do field
-            field => getParamsCore(getfield(obj, field))
-        end |> NamedTuple
-    else
-        missing
+function getFieldParamsCore!(paramPairs::Vector{Tuple{ParamBox, FieldLinker}}, 
+                             source::ParamBox, anchor::FieldLinker)
+    push!(paramPairs, (source, anchor))
+    nothing
+end
+
+function getFieldParamsCore!(paramPairs::Vector{Tuple{ParamBox, FieldLinker}}, 
+                             source::T, anchor::FieldLinker) where {T}
+    searchParam = false
+    if source isa Union{Tuple, AbstractArray}
+        if isempty(source)
+            return nothing
+        else
+            searchParam = true
+            content = eachindex(source)
+        end
+    elseif isstructtype(T) && !( Base.issingletontype(T) )
+        searchParam = true
+        content = fieldnames(T)
     end
+    if searchParam
+        for fieldSym in content
+            field = getField(source, fieldSym)
+            outputValConstraint = field isa ParamBox ? outputTypeOf(field) : TensorType(Any)
+            anchorNew = FieldLinker(anchor, FieldSymbol(fieldSym, outputValConstraint))
+            getFieldParamsCore!(paramPairs, field, anchorNew)
+        end
+    end
+    nothing
 end
 
 uniqueParams(ps::AbstractArray{<:JaggedParam}) = 
