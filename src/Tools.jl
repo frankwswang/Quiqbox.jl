@@ -1083,7 +1083,7 @@ getMemory(obj::Memory) = itself(obj)
 
 function getMemory(obj::AbstractArray{T}) where {T}
     arr = vec(isconcretetype(T) ? obj : itself.(obj))
-    Memory{T}(arr)
+    Memory{eltype(arr)}(arr)
 end
 
 getMemory(obj::Tuple) = (getMemory∘collect)(obj)
