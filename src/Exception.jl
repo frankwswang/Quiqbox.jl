@@ -28,3 +28,8 @@ function checkLength(obj, name::Symbol, len::Int)
     end
     nothing
 end
+
+function checkPositivity(num::Real)
+    num > 0 || throw(AssertionError("`num` should be positive."))
+    nothing
+end
