@@ -191,20 +191,18 @@ end
 struct EvalCompositeOrb{T, D, V<:Memory{<:WeightedPF{T, D}}, 
                         F<:NormFuncType{T}} <: EvalComposedOrb{T, D, V}
     f::PairCombine{StableMul{T}, ChainReduce{StableAdd{T}, V}, F}
-
-    function EvalCompositeOrb(weightedFs::AbstractVector{W}, normalizer::F) where 
-                             {T, D, W<:WeightedPF{T, D}, F<:NormFuncType{T}}
-        fInnerObjs = foldl(∘, Base.Fix2.(getfield, (:f, :left))).(weightedFs)
-        fInnerType = eltype(foldl( ∘, Base.Fix2.(getfield, (:apply, :left)) ).(fInnerObjs))
-        nInnerType = eltype(getfield.(fInnerObjs, :right))
-        V = compressWeightedPF(fInnerType, nInnerType)
-        cOrbCore = ChainReduce(StableBinary(+, T), V(weightedFs))
-        new{T, D, V, F}(PairCombine(StableBinary(*, T), cOrbCore, normalizer))
-    end
 end
 
-function unpackParamFunc!(f::CompositeOrb{T, D}, 
-                          paramSet::AbstractFlatParamSet) where {T, D}
+function restrainEvalOrbType(weightedFs::AbstractVector{<:WeightedPF{T, D}}) where {T, D}
+    fInnerObjs = foldl(∘, Base.Fix2.(getfield, (:f, :left))).(weightedFs)
+    fInnerType = eltype(foldl( ∘, Base.Fix2.(getfield, (:apply, :left)) ).(fInnerObjs))
+    nInnerType = eltype(getfield.(fInnerObjs, :right))
+    V = compressWeightedPF(fInnerType, nInnerType)
+    ChainReduce(StableBinary(+, T), V(weightedFs))
+end
+
+function unpackParamFuncCore!(f::CompositeOrb{T, D}, 
+                              paramSet::AbstractFlatParamSet) where {T, D}
     pSetId = objectid(paramSet)
     weightedFields = WeightedPF{T, D, <:EvalPrimitiveOrb{T, D}}[]
     weightIdx = locateParam!(paramSet, f.weight)
@@ -217,8 +215,7 @@ function unpackParamFunc!(f::CompositeOrb{T, D},
         push!(weightedFields, PairCombine(StableBinary(*, T), fInnerCore, weight))
         anchorFieldPointerDictCore(innerDict, anchor)
     end |> Dict
-    normalizer = genNormalizer(f, paramSet)
-    EvalCompositeOrb(weightedFields, normalizer), paramSet, paramFieldDict
+    restrainEvalOrbType(weightedFields), paramSet, paramFieldDict
 end
 
 getEvaluator(::CompositeOrb) = EvalCompositeOrb
