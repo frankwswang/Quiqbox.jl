@@ -267,7 +267,7 @@ end
 
 
 struct EvalGraphNode{T, F<:Function, S<:FixedSizeStorage{T}, 
-                     V<:AbtVecOfAbtArr{T}} <: Evaluator{GraphNode{T}}
+                     V<:AbtVecOfAbtArr{T}} <: TypedEvaluator{T, GraphNode{T}}
     f::F
     storage::S
     param::V

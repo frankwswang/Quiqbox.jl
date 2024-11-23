@@ -30,7 +30,7 @@ length(::VectorMemory{<:Any, L}) where {L} = L
 const LinearMemory{T} = Union{Memory{T}, VectorMemory{T}}
 
 
-struct ReturnTyped{T, F<:Function} <: TaggedFunction
+struct ReturnTyped{T, F<:Function} <: TypedEvaluator{T, F}
     f::F
 
     function ReturnTyped(f::F, ::Type{T}) where {F<:Function, T}
@@ -45,7 +45,7 @@ ReturnTyped(::Type{T}) where {T} = ReturnTyped(itself, T)
 const Return{T} = ReturnTyped{T, ItsType}
 
 
-struct StableBinary{T, F<:Function} <: TaggedFunction
+struct StableBinary{T, F<:Function} <: TypedEvaluator{T, F}
     f::F
 
     function StableBinary(f::F, ::Type{T}) where {F<:Function, T}
@@ -172,17 +172,17 @@ unpackFunc!(SelectTrait{ParameterStyle}()(f), f, paramSet)
 unpackFunc!(::IsParamFunc, f::Function, paramSet::AbstractVector) = 
 unpackParamFunc!(f, paramSet)
 
-const FieldPointerDict = Dict{<:FieldLinker, <:IndexPointer}
+const FieldPointerDict = Dict{<:ChainPointer, <:IndexPointer}
 
 function anchorFieldPointerDictCore(d::FieldPointerDict, 
-                                    anchor::Union{FieldLinker, FieldSymbol})
+                                    anchor::Union{ChainPointer, FieldPointer})
     map( collect(d) ) do pair
-        FieldLinker(anchor, pair.first) => pair.second
+        ChainPointer(anchor, pair.first) => pair.second
     end
 end
 
 function anchorFieldPointerDict(d::FieldPointerDict, 
-                                anchor::Union{FieldLinker, FieldSymbol})
+                                anchor::Union{ChainPointer, FieldPointer})
     (Dict∘anchorFieldPointerDictCore)(d, anchor)
 end
 

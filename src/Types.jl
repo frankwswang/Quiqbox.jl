@@ -20,12 +20,13 @@ abstract type JaggedOperator{T, N, O} <: CompositeFunction end
 abstract type TaggedFunction <: CompositeFunction end
 
 abstract type ParamOperator <: TaggedFunction end
+abstract type Evaluator{F} <: TaggedFunction end
 
 abstract type AbstractAmpTensor{T, O} <: JaggedOperator{T, 0, O} end
 abstract type AbstractAmplitude{T} <: JaggedOperator{T, 0, 0} end
 
 abstract type ChainedOperator{J} <: ParamOperator end
-abstract type Evaluator{T} <: ParamOperator end
+abstract type TypedEvaluator{T, F} <: Evaluator{F} end
 
 # M: Particle number
 abstract type SpatialAmpTensor{T, D, M, O} <: AbstractAmpTensor{T, O} end
