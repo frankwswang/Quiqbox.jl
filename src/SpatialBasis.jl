@@ -80,11 +80,11 @@ function unpackParamFuncCore!(f::PrimitiveOrb{T, D},
                               paramSet::AbstractFlatParamSet) where {T, D}
     pSetId = objectid(paramSet)
     cenIds = locateParam!(paramSet, f.center)
-    cenPointers = FieldSymbol.(1:D, Ref(T|>TensorType))
-    cenDict = Dict(FieldLinker.(:center, cenPointers) .=> cenIds)
+    cenPointers = FieldPointer.(1:D, Ref(T|>TensorType))
+    cenDict = Dict(ChainPointer.(:center, cenPointers) .=> cenIds)
     fEvalCore, _, fCoreDict = unpackFunc!(f.body, paramSet)
     fEval = InsertInward(fEvalCore, PointerFunc(ShiftByArg{T, D}(), cenIds, pSetId))
-    fEvalDict = anchorFieldPointerDict(fCoreDict, FieldSymbol(:body))
+    fEvalDict = anchorFieldPointerDict(fCoreDict, FieldPointer(:body))
     PrimitiveOrbCore(fEval), paramSet, merge(cenDict, fEvalDict)
 end
 
@@ -211,9 +211,9 @@ function unpackParamFuncCore!(f::CompositeOrb{T, D},
     pSetId = objectid(paramSet)
     weightedFields = WeightedPF{T, D, <:EvalPrimOrb{T, D}}[]
     weightIdx = locateParam!(paramSet, f.weight)
-    weightPointer = (FieldLinker∘FieldSymbol)(:weight, outputTypeOf(f.weight)) => weightIdx
+    weightPointer = ChainPointer(:weight, outputTypeOf(f.weight)) => weightIdx
     paramFieldDict = mapfoldl(vcat, eachindex(f.basis), init=weightPointer) do i
-        anchor = FieldLinker(:basis, FieldSymbol(i))
+        anchor = ChainPointer(:basis, FieldPointer(i))
         fInnerCore, _, innerDict = unpackParamFunc!(f.basis[i], paramSet)
         getIdx = (OnlyBody∘IndexPointer)(i)
         weight = PointerFunc(getIdx, (weightIdx,), pSetId)

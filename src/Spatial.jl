@@ -45,7 +45,7 @@ struct EvalGaussFunc{T} <: EvalFieldAmp{T, 0, GaussFunc}
 end
 
 function unpackParamFunc!(f::GaussFunc{T}, paramSet::AbstractFlatParamSet) where {T}
-    anchor = (FieldLinker∘FieldSymbol)(:xpn, outputTypeOf(f.xpn))
+    anchor = ChainPointer(:xpn, outputTypeOf(f.xpn))
     parIdx = locateParam!(paramSet, getField(f, anchor))
     fEval = PointerFunc(ComputeGFunc{T}(), (parIdx,), objectid(paramSet))
     EvalGaussFunc(fEval), paramSet, Dict(anchor=>parIdx)
@@ -79,7 +79,7 @@ function unpackParamFunc!(f::AxialProdFunc{T, D}, paramSet::AbstractFlatParamSet
                          {T, D}
     fEvalComps = Memory{Function}(undef, D)
     paramFieldDict = mapfoldl(vcat, 1:D) do i
-        anchor = FieldLinker(:axis, FieldSymbol(i))
+        anchor = ChainPointer(:axis, FieldPointer(i))
         fInner, _, dictInner = unpackFunc!(f.axis[i], paramSet)
         fEvalComps[i] = InsertInward(fInner, (OnlyHead∘IndexPointer)(i))
         anchorFieldPointerDictCore(dictInner, anchor)
@@ -109,7 +109,7 @@ end
 function unpackParamFunc!(f::PolyRadialFunc{T, D}, paramSet::AbstractFlatParamSet) where 
                          {T, D}
     fInner, _, paramFieldDictInner = unpackParamFunc!(f.radial, paramSet)
-    paramFieldDict = anchorFieldPointerDict(paramFieldDictInner, FieldSymbol(:radial))
+    paramFieldDict = anchorFieldPointerDict(paramFieldDictInner, FieldPointer(:radial))
     coordEncoder = InsertInward(fInner, OnlyHead(LinearAlgebra.norm))
     angularFunc = (OnlyHead∘ReturnTyped)(f.angular, T)
     fEval = PairCombine(StableBinary(*, T), coordEncoder, angularFunc)
