@@ -2,31 +2,41 @@ export PrimitiveOrb, CompositeOrb, FrameworkOrb, genGaussTypeOrb
 
 abstract type ComposedOrb{T, D, B} <: OrbitalBasis{T, D, B} end
 
-abstract type EvalComposedOrb{T, D, B} <: Evaluator{B} end
+abstract type EvalComposedOrb{T, D, B} <: TypedEvaluator{T, B} end
 
 (f::OrbitalBasis)(x) = evalFunc(f, x)
 
 (f::EvalComposedOrb)(input, param) = f.f(input, param)
 
 
-function genNormalizer(f::ComposedOrb{T}, paramSet) where {T}
-    normalizer = if f.renormalize
-        pSetId = objectid(paramSet)
-        nCore, nPars = genNormalizerCore(f|>getNormalizedField)
-        PointerFunc(OnlyBody(nCore), locateParam!(paramSet, nPars), pSetId)
-    else
-        Storage(one(T))
-    end
-    ReturnTyped(normalizer, T)
+struct ScaledOrbital{T, D, C<:EvalComposedOrb{T, D}, 
+                     F<:Function} <: EvalComposedOrb{T, D, C}
+    f::PairCombine{StableMul{T}, C, F}
 end
 
-const NormFuncType{T, F<:Union{Storage{T}, PointerFunc{<:OnlyBody}}} = ReturnTyped{T, F}
+function ScaledOrbital(orb::EvalComposedOrb{T}, scalar::Function) where {T}
+    (ScaledOrbital∘PairCombine)(StableBinary(*, T), orb, scalar)
+end
+
+
+function normalizeOrbital(fCore::EvalComposedOrb{T}, paramSet::AbstractFlatParamSet, 
+                          paramFieldDict::FieldPointerDict) where {T}
+    pSetId = objectid(paramSet)
+    nCore, nIds = genNormalizerCore(fCore, paramSet, paramFieldDict)
+    ScaledOrbital( fCore, ReturnTyped(T, PointerFunc(OnlyBody(nCore), nIds, pSetId)) )
+end
+
+const NormFuncType{T} = Union{ReturnTyped{T}, Storage{T}}
 
 
 function unpackParamFunc!(f::ComposedOrb{T}, paramSet::AbstractFlatParamSet) where {T}
     fEvalCore, _, paramFieldDict = unpackParamFuncCore!(f, paramSet)
-    fEval = PairCombine(StableBinary(*, T), fEvalCore, genNormalizer(f, paramSet))
-    getEvaluator(f)(fEval), paramSet, paramFieldDict
+    fEval = if f.renormalize
+        normalizeOrbital(fEvalCore, paramSet, paramFieldDict)
+    else
+        ScaledOrbital(fEvalCore, (Storage∘one)(T))
+    end
+    fEval, paramSet, paramFieldDict
 end
 
 
@@ -59,15 +69,12 @@ end
 
 PrimitiveOrb(ob::PrimitiveOrb) = itself(ob)
 
-getNormalizedField(f::PrimitiveOrb) = f.body
-
-const InputShifter{T, D, F} = 
-      InsertInward{F, PointerFunc{ShiftByArg{T, D}, NTuple{D, IndexPointer{Data0D}}}}
-
-struct EvalPrimitiveOrb{T, D, B<:EvalFieldAmp{T, D}, 
-                        F<:NormFuncType{T}} <: EvalComposedOrb{T, D, B}
-    f::PairCombine{StableMul{T}, InputShifter{T, D, B}, F}
+struct PrimitiveOrbCore{T, D, B<:EvalFieldAmp{T, D}} <: EvalComposedOrb{T, D, B}
+    f::InsertInward{B, PointerFunc{ShiftByArg{T, D}, NTuple{D, IndexPointer{Data0D}}}}
 end
+
+const EvalPrimOrb{T, D, B, F<:NormFuncType{T}} = 
+      ScaledOrbital{T, D, PrimitiveOrbCore{T, D, B}, F}
 
 function unpackParamFuncCore!(f::PrimitiveOrb{T, D}, 
                               paramSet::AbstractFlatParamSet) where {T, D}
@@ -78,10 +85,9 @@ function unpackParamFuncCore!(f::PrimitiveOrb{T, D},
     fEvalCore, _, fCoreDict = unpackFunc!(f.body, paramSet)
     fEval = InsertInward(fEvalCore, PointerFunc(ShiftByArg{T, D}(), cenIds, pSetId))
     fEvalDict = anchorFieldPointerDict(fCoreDict, FieldSymbol(:body))
-    fEval, paramSet, merge(cenDict, fEvalDict)
+    PrimitiveOrbCore(fEval), paramSet, merge(cenDict, fEvalDict)
 end
 
-getEvaluator(::PrimitiveOrb) = EvalPrimitiveOrb
 
 struct CompositeOrb{T, D, B<:FieldAmplitude{T, D}, C<:NTuple{D, ElementalParam{T}}, 
                     W<:FlattenedParam{T, 1}} <: ComposedOrb{T, D, B}
@@ -142,7 +148,7 @@ function getEffectiveWeight(o::CompositeOrb{T}, weight::FlattenedParam{T, 1},
                             idx::Int) where {T}
     len = first(outputTypeOf(o.weight).size)
     outWeight = indexParam(weight, idx)
-    map(i->CellParam(*, indexParam(o.weight, i), outWeight, :w), 1:len)
+    map(i->CellParam(StableBinary(*, T), indexParam(o.weight, i), outWeight, :w), 1:len)
 end
 
 function getEffectiveWeight(o::AbstractVector{<:ComposedOrb{T, D}}, 
@@ -161,25 +167,22 @@ end
 
 CompositeOrb(ob::CompositeOrb) = itself(ob)
 
-getNormalizedField(f::CompositeOrb) = itself(f)
+const WeightedPF{T, D, F<:EvalPrimOrb{T, D}} = 
+      ScaledOrbital{T, D, F, PointOneFunc{OnlyBody{GetIndex}, Data1D}}
 
-const WeightedPF{T, D, F<:EvalPrimitiveOrb{T, D}} = 
-      PairCombine{StableMul{T}, F, PointOneFunc{OnlyBody{GetIndex}, Data1D}}
-
-function compressWeightedPF(::Type{B}, ::Type{F}) where 
-                           {T, D, B<:EvalFieldAmp{T, D}, F<:NormFuncType{T}}
+function compressWeightedPF(::Type{B}, ::Type{F}) where {T, D, B<:EvalFieldAmp{T, D}, F}
     boolF = isconcretetype(B)
     boolN = isconcretetype(F)
     U = if boolF
         if boolN
-            EvalPrimitiveOrb{T, D, B, F}
+            EvalPrimOrb{T, D, B, F}
         else
-            EvalPrimitiveOrb{T, D, B, <:F}
+            EvalPrimOrb{T, D, B, <:F}
         end
     elseif boolN
-        EvalPrimitiveOrb{T, D, <:B, F}
+        EvalPrimOrb{T, D, <:B, F}
     else
-        EvalPrimitiveOrb{T, D, <:B, <:F}
+        EvalPrimOrb{T, D, <:B, <:F}
     end
     if boolF && boolN
         Memory{WeightedPF{T, D, U}}
@@ -188,14 +191,16 @@ function compressWeightedPF(::Type{B}, ::Type{F}) where
     end
 end
 
-struct EvalCompositeOrb{T, D, V<:Memory{<:WeightedPF{T, D}}, 
-                        F<:NormFuncType{T}} <: EvalComposedOrb{T, D, V}
-    f::PairCombine{StableMul{T}, ChainReduce{StableAdd{T}, V}, F}
+struct CompositeOrbCore{T, D, V<:Memory{<:WeightedPF{T, D}}} <: EvalComposedOrb{T, D, V}
+    f::ChainReduce{StableAdd{T}, V}
 end
 
+const EvalCompOrb{T, D, B, F<:NormFuncType{T}} = 
+      ScaledOrbital{T, D, CompositeOrbCore{T, D, B}, F}
+
 function restrainEvalOrbType(weightedFs::AbstractVector{<:WeightedPF{T, D}}) where {T, D}
-    fInnerObjs = foldl(∘, Base.Fix2.(getfield, (:f, :left))).(weightedFs)
-    fInnerType = eltype(foldl( ∘, Base.Fix2.(getfield, (:apply, :left)) ).(fInnerObjs))
+    fInnerObjs = foldl( ∘, Base.Fix2.(getfield, (:f, :left, :f)) ).(weightedFs)
+    fInnerType = eltype(foldl( ∘, Base.Fix2.(getfield, (:apply, :f, :left)) ).(fInnerObjs))
     nInnerType = eltype(getfield.(fInnerObjs, :right))
     V = compressWeightedPF(fInnerType, nInnerType)
     ChainReduce(StableBinary(+, T), V(weightedFs))
@@ -204,7 +209,7 @@ end
 function unpackParamFuncCore!(f::CompositeOrb{T, D}, 
                               paramSet::AbstractFlatParamSet) where {T, D}
     pSetId = objectid(paramSet)
-    weightedFields = WeightedPF{T, D, <:EvalPrimitiveOrb{T, D}}[]
+    weightedFields = WeightedPF{T, D, <:EvalPrimOrb{T, D}}[]
     weightIdx = locateParam!(paramSet, f.weight)
     weightPointer = (FieldLinker∘FieldSymbol)(:weight, outputTypeOf(f.weight)) => weightIdx
     paramFieldDict = mapfoldl(vcat, eachindex(f.basis), init=weightPointer) do i
@@ -212,18 +217,20 @@ function unpackParamFuncCore!(f::CompositeOrb{T, D},
         fInnerCore, _, innerDict = unpackParamFunc!(f.basis[i], paramSet)
         getIdx = (OnlyBody∘IndexPointer)(i)
         weight = PointerFunc(getIdx, (weightIdx,), pSetId)
-        push!(weightedFields, PairCombine(StableBinary(*, T), fInnerCore, weight))
+        push!(weightedFields, ScaledOrbital(fInnerCore, weight))
         anchorFieldPointerDictCore(innerDict, anchor)
     end |> Dict
-    restrainEvalOrbType(weightedFields), paramSet, paramFieldDict
+    CompositeOrbCore(restrainEvalOrbType(weightedFields)), paramSet, paramFieldDict
 end
 
-getEvaluator(::CompositeOrb) = EvalCompositeOrb
 
 const PrimGTO{T, D, B<:PolyGaussProd{T, D}, C} = PrimitiveOrb{T, D, B, C}
 const CompGTO{T, D, B<:PolyGaussProd{T, D}, C, P} = CompositeOrb{T, D, B, C, P}
 
-# concretizeBasisType(basis::AbstractArray{<:CompositeOrb})
+const EvalPrimGTO{T, D, B<:EvalPolyGaussProd{T, D}, F} = EvalPrimOrb{T, D, B, F}
+const EvalCompGTO{T, D, U<:EvalPrimGTO{T, D}, F} = 
+      EvalCompOrb{T, D, <:Memory{<:WeightedPF{T, D, <:U}}, F}
+
 
 abstract type UnpackedOrb{T, D, B} <: OrbitalBasis{T, D, B} end
 
@@ -241,9 +248,6 @@ struct FrameworkOrb{T, D, B<:EvalComposedOrb{T, D}, P<:AbstractFlatParamSet{T},
     end
 end
 
-const EvalPrimGTO{T, D, B<:EvalPolyGaussProd{T, D}, F} = EvalPrimitiveOrb{T, D, B, F}
-const EvalCompGTO{T, D, U<:EvalPrimGTO{T, D}, F} = 
-      EvalCompositeOrb{T, D, <:Memory{<:WeightedPF{T, D, <:U}}, F}
 const FPrimGTO{T, D, B<:EvalPrimGTO{T, D}, P} = FrameworkOrb{T, D, B, P}
 const FCompGTO{T, D, B<:EvalCompGTO{T, D}, P} = FrameworkOrb{T, D, B, P}
 

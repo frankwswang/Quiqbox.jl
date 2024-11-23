@@ -4,7 +4,7 @@ using LinearAlgebra
 
 (f::FieldAmplitude)(x) = evalFunc(f, x)
 
-abstract type EvalFieldAmp{T, D, F} <: Evaluator{F} end
+abstract type EvalFieldAmp{T, D, F} <: TypedEvaluator{T, F} end
 
 (f::EvalFieldAmp)(input, param) = 
 f.f(formatInput(SelectTrait{InputStyle}()(f), input), param)
@@ -99,9 +99,11 @@ PolyRadialFunc(radial, CartSHarmonics(angular))
 
 const MagnitudeConverter{F} = InsertInward{F, OnlyHead{typeof(LinearAlgebra.norm)}}
 
+const TypedAngularFunc{T, D, L} = OnlyHead{ReturnTyped{T, CartSHarmonics{D, L}}}
+
 struct EvalPolyRadialFunc{T, D, F<:EvalFieldAmp{T, 0}, 
                           L} <: EvalFieldAmp{T, D, PolyRadialFunc}
-    f::PairCombine{StableMul{T}, MagnitudeConverter{F}, OnlyHead{CartSHarmonics{D, L}}}
+    f::PairCombine{StableMul{T}, MagnitudeConverter{F}, TypedAngularFunc{T, D, L}}
 end
 
 function unpackParamFunc!(f::PolyRadialFunc{T, D}, paramSet::AbstractFlatParamSet) where 
@@ -109,7 +111,8 @@ function unpackParamFunc!(f::PolyRadialFunc{T, D}, paramSet::AbstractFlatParamSe
     fInner, _, paramFieldDictInner = unpackParamFunc!(f.radial, paramSet)
     paramFieldDict = anchorFieldPointerDict(paramFieldDictInner, FieldSymbol(:radial))
     coordEncoder = InsertInward(fInner, OnlyHead(LinearAlgebra.norm))
-    fEval = PairCombine(StableBinary(*, T), coordEncoder, OnlyHead(f.angular))
+    angularFunc = (OnlyHead∘ReturnTyped)(f.angular, T)
+    fEval = PairCombine(StableBinary(*, T), coordEncoder, angularFunc)
     EvalPolyRadialFunc(fEval), paramSet, paramFieldDict
 end
 
