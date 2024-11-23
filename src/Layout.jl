@@ -39,14 +39,14 @@ IndexPointer(idx::Int) = IndexPointer(idx, DataXD())
 
 const IntOrSym = Union{Int, Symbol}
 
-struct FieldPointer{C<:IntOrSym, T<:TensorType} <: TensorPointer{T}
+struct FieldPointer{T<:TensorType, C<:IntOrSym} <: TensorPointer{T}
     entry::C
     type::T
 end
 
 FieldPointer(entry::IntOrSym, objOrType=Any) = FieldPointer(entry, TensorType(objOrType))
 
-struct ChainPointer{C<:Tuple{Missing, Vararg{IntOrSym}}, T<:TensorType} <: TensorPointer{T}
+struct ChainPointer{T<:TensorType, C<:Tuple{Missing, Vararg{IntOrSym}}} <: TensorPointer{T}
     chain::C
     type::T
 end
