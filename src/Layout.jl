@@ -1,3 +1,16 @@
+struct TensorType{T, N} <: StructuredType
+    type::Type{T}
+    size::NTuple{N, Int}
+end
+
+TensorType(::Type{T}) where {T} = TensorType(T, ())
+
+TensorType(arr::AbstractArray{T}) where {T} = TensorType(T, size(arr))
+
+TensorType(::T) where {T} = TensorType(T)
+
+abstract type TensorPointer{T} end
+
 abstract type SymbolPointer end
 
 struct Data0D end
@@ -24,54 +37,40 @@ const GetIndex = IndexPointer{DataXD}
 IndexPointer(idx::Int, ele) = IndexPointer(idx, getDataDim(ele))
 IndexPointer(idx::Int) = IndexPointer(idx, DataXD())
 
+const IntOrSym = Union{Int, Symbol}
 
-struct TensorType{T, N} <: StructuredType
-    type::Type{T}
-    size::NTuple{N, Int}
-end
-
-TensorType(::Type{T}) where {T} = TensorType(T, ())
-
-TensorType(arr::AbstractArray{T}) where {T} = TensorType(T, size(arr))
-
-TensorType(::T) where {T} = TensorType(T)
-
-
-struct FieldSymbol{S<:MissSymInt, T<:TensorType} <: SymbolPointer
-    entry::S
+struct FieldPointer{C<:IntOrSym, T<:TensorType} <: TensorPointer{T}
+    entry::C
     type::T
-
-    FieldSymbol(entry::S, type::T=TensorType(Any)) where {S<:MissSymInt, T} = 
-    new{S, T}(entry, type)
 end
 
-FieldSymbol(::Type{T}=Any) where {T} = FieldSymbol(missing, TensorType(T))
+FieldPointer(entry::IntOrSym, objOrType=Any) = FieldPointer(entry, TensorType(objOrType))
 
-FieldSymbol(obj::FieldSymbol) = itself(obj)
-
-
-struct FieldLinker{S<:MissSymInt, T} <: SymbolPointer
-    prev::Union{FieldLinker, FieldSymbol}
-    here::FieldSymbol{S, T}
+struct ChainPointer{C<:Tuple{Missing, Vararg{IntOrSym}}, T<:TensorType} <: TensorPointer{T}
+    chain::C
+    type::T
 end
 
-FieldLinker(here::Union{FieldSymbol, MissSymInt}) = 
-FieldLinker(FieldSymbol(), FieldSymbol(here))
+ChainPointer(objOrType::Any=Any) = 
+ChainPointer((missing,), TensorType(objOrType))
 
-FieldLinker(prev::Union{FieldLinker, FieldSymbol}, here::FieldLinker) = 
-FieldLinker(FieldLinker(prev, here.prev), here.here)
+ChainPointer(entry::IntOrSym, type::TensorType=TensorType(Any)) = 
+ChainPointer((missing, entry), type)
 
-FieldLinker(prev::FieldLinker{Missing, Any}, here::FieldSymbol) = 
-FieldLinker(prev.prev, here)
+ChainPointer(prev::FieldPointer, here::FieldPointer) = 
+ChainPointer((missing, prev.entry, here.entry), here.type)
 
-FieldLinker(entry) = FieldLinker(FieldSymbol(entry), FieldSymbol())
+ChainPointer(prev::FieldPointer, here::ChainPointer) = 
+ChainPointer((missing, prev.entry, Base.tail(here.chain)...), here.type)
 
-FieldLinker(entry::Union{Symbol, Int}, here::Union{FieldSymbol, MissSymInt}) = 
-FieldLinker(FieldSymbol(entry), here)
+ChainPointer(prev::ChainPointer, here::FieldPointer) = 
+ChainPointer((prev.chain..., here.entry), here.type)
 
-# Only delete `FieldSymbol{Missing, Any}` at `.here`, as `FieldSymbol{Missing, Any}` at 
-# `.prev` is kept as the null symbol.
+ChainPointer(prev::ChainPointer, here::ChainPointer) = 
+ChainPointer((prev.chain..., Base.tail(here.chain)...), here.type)
 
+ChainPointer(prev::IntOrSym, here::Union{FieldPointer, ChainPointer}) = 
+ChainPointer(ChainPointer(prev), here)
 
 getField(obj, ::Missing) = itself(obj)
 
@@ -79,6 +78,6 @@ getField(obj, entry::Symbol) = getfield(obj, entry)
 
 getField(obj, entry::Int) = getindex(obj, entry)
 
-getField(obj, entry::FieldSymbol{<:Any, T}) where {T} = getField(obj, entry.entry)
+getField(obj, ptr::FieldPointer) = getField(obj, ptr.entry)
 
-getField(obj, ptr::FieldLinker) = getField(getField(obj, ptr.prev), ptr.here)
+getField(obj, ptr::ChainPointer) = foldl(getField, ptr.chain, init=obj)
