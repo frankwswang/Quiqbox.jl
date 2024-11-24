@@ -115,9 +115,6 @@ const FlatParamVec{T} = AbstractVector{<:FlatParamEle{T}}
 const MiscParamEle{T} = Union{AbstractVector{<:FlatParamEle{T}}, JaggedParam{T}}
 const MiscParamVec{T} = AbstractVector{<:MiscParamEle{T}}
 
-const SingleSpanParamVec{T, N} = AbstractVector{<:FlattenedParam{T, N}}
-const DoubleSpanParamVec{T, N, O} = AbstractVector{<:JaggedParam{T, N, O}}
-
 const ParamTypeArr{T<:ParamBox, N} = AbstractArray{T, N}
 
 const ParamFunctor{T, N, I} = Union{BaseParam{T, N, I}, ParamLink{T, N, I}}

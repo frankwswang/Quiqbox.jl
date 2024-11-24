@@ -29,9 +29,9 @@ abstract type FunctionStyle <: AnyInterface end
 
 abstract type ParameterStyle <: FunctionStyle end
 
-struct IsParamFunc <: ParameterStyle end
+struct DefinedParamFunc <: ParameterStyle end
 
-struct NotParamFunc <: ParameterStyle end
+struct GeneralParamFunc <: ParameterStyle end
 
 (::SelectTrait{ParameterStyle})(::T) where {T} = 
 returnUndefinedTraitError(ParameterStyle, T)
