@@ -61,15 +61,15 @@ const StableMul{T} = StableBinary{T, typeof(*)}
 StableBinary(f::Function) = Base.Fix1(StableBinary, f)
 
 
-struct PointerFunc{F<:Function, T<:Tuple{Vararg{IndexPointer}}} <: ParamOperator
+struct PointerFunc{F<:Function, T<:NonEmptyTuple{ChainPointer}} <: ParamOperator
     apply::F
     pointer::T
     sourceID::UInt
 end
 
-(f::PointerFunc)(input, param) = f.apply(input, (Ref(param) .|> f.pointer)...)
+(f::PointerFunc)(input, param) = f.apply(input, evalField.(Ref(param), f.pointer)...)
 
-const PointOneFunc{F, N} = PointerFunc{F, Tuple{IndexPointer{N}}}
+const PointOneFunc{F, T} = PointerFunc{F, Tuple{T}}
 
 
 struct OnlyHead{F<:Function} <: Evaluator{F}
@@ -161,35 +161,39 @@ function evalFunc(func::F, input::T) where {F<:Function, T}
 end
 
 
-unpackFunc(f::Function) = unpackFunc!(f, ParamBox[])
+unpackFunc(f::Function) = unpackFunc!(f, initializeParamSet(MiscParamSet))
 
 unpackFunc(f::AbstractAmplitude{T}) where {T} = 
-unpackFunc!(f, initializeParamSet(FlatParamSet{T}))
+unpackFunc!(f, initializeParamSet(FlatParamSet, T))
 
 unpackFunc!(f::Function, paramSet::AbstractVector) = 
 unpackFunc!(SelectTrait{ParameterStyle}()(f), f, paramSet)
 
-unpackFunc!(::IsParamFunc, f::Function, paramSet::AbstractVector) = 
+unpackFunc!(::DefinedParamFunc, f::Function, paramSet::AbstractVector) = 
 unpackParamFunc!(f, paramSet)
 
-const FieldPointerDict = Dict{<:ChainPointer, <:IndexPointer}
+const FieldPointerDict{T} = Dict{<:ChainPointer, <:ChainPointer{T}}
 
-function anchorFieldPointerDictCore(d::FieldPointerDict, 
-                                    anchor::Union{ChainPointer, FieldPointer})
+abstract type FieldParamPointer{R} <: Any end
+
+struct MixedFieldParamPointer{R<:FieldPointerDict} <: FieldParamPointer{R}
+    core::R
+end
+
+function anchorFieldPointerDictCore(d::FieldPointerDict, anchor::ChainPointer)
     map( collect(d) ) do pair
         ChainPointer(anchor, pair.first) => pair.second
     end
 end
 
-function anchorFieldPointerDict(d::FieldPointerDict, 
-                                anchor::Union{ChainPointer, FieldPointer})
+function anchorFieldPointerDict(d::FieldPointerDict, anchor::ChainPointer)
     (Dict∘anchorFieldPointerDictCore)(d, anchor)
 end
 
-function unpackFunc!(::NotParamFunc, f::Function, paramSet::AbstractVector)
+function unpackFunc!(::GeneralParamFunc, f::Function, paramSet::AbstractVector)
     params, anchors = getFieldParams(f)
     ids = locateParam!(paramSet, params)
-    paramFieldDict = Dict(anchors .=> ids)
+    paramFieldPointer = MixedFieldParamPointer(Dict(anchors .=> ids))
     fCopy = deepcopy(f)
     paramDoubles = deepcopy(params)
     foreach(p->setScreenLevel!(p.source, 1), paramDoubles)
@@ -199,5 +203,5 @@ function unpackFunc!(::NotParamFunc, f::Function, paramSet::AbstractVector)
         end
         fCopy(x)
     end
-    PointerFunc(evalCore, ids, objectid(paramSet)), paramSet, paramFieldDict
+    PointerFunc(evalCore, ids, objectid(paramSet)), paramSet, paramFieldPointer
 end
