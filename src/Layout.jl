@@ -1,4 +1,4 @@
-abstract type TensorPointer{T, N} <: CompositeFunction end
+abstract type TensorPointer{T, N} <: Any end
 
 struct TensorType{T, N} <: StructuredType
     TensorType(::Type{<:AbstractArray{T, N}}) where {T, N} = new{T, N}()
@@ -14,6 +14,10 @@ TensorType(::Type{<:JaggedParam{T, N, O}}) where {T, N, O} =
 TensorType(AbstractArray{AbstractArray{T, N}, O})
 
 TensorType(::T) where {T} = TensorType(T)
+
+(::TensorType{T, 0})() where {T} = T
+
+(::TensorType{T, N})() where {T, N} = AbstractArray{T, N}
 
 
 struct FirstIndex <: StructuredType end
@@ -48,7 +52,11 @@ getField(obj, entry::Int) = getindex(obj, entry)
 
 getField(obj, ptr::ChainPointer) = foldl(getField, ptr.chain, init=obj)
 
-getField(ptr) = Base.Fix2(getField, ptr)
 
+evalField(obj, ptr::ChainPointer) = convert(ptr.type(), getField(obj, ptr))
 
-const PointToField{T, N, C} = Base.Fix2{typeof(getField), ChainPointer{T, N, C}}
+evalField(obj, entry::GeneralIndex) = getField(obj, entry)
+
+evalField(ptr) = Base.Fix2(evalField, ptr)
+
+const EvalField{T, N, C} = Base.Fix2{typeof(evalField), ChainPointer{T, N, C}}
