@@ -22,9 +22,9 @@ struct EvalFieldFunc{T, F<:ReturnTyped{T}} <: EvalFieldAmp{T, 0, FieldFunc}
     f::F
 end
 
-function unpackParamFunc!(f::FieldFunc{T}, paramSet::AbstractFlatParamSet) where {T}
-    fEval, _, dict = unpackFunc!(f.f, paramSet)
-    EvalFieldFunc(ReturnTyped(fEval, T)), paramSet, dict
+function unpackParamFunc!(f::FieldFunc{T}, paramSet::FlatParamSet) where {T}
+    fEval, _, fieldParamPointer = unpackFunc!(f.f, paramSet)
+    EvalFieldFunc(ReturnTyped(fEval, T)), paramSet, fieldParamPointer
 end
 
 
@@ -41,14 +41,14 @@ function (f::ComputeGFunc{T})(r::Real, xpnVal::T) where {T}
 end
 
 struct EvalGaussFunc{T} <: EvalFieldAmp{T, 0, GaussFunc}
-    f::PointOneFunc{ComputeGFunc{T}}
+    f::PointOneFunc{ComputeGFunc{T}, ChainPointer{T, 0, Tuple{FirstIndex, Int}}}
 end
 
-function unpackParamFunc!(f::GaussFunc{T}, paramSet::AbstractFlatParamSet) where {T}
-    anchor = ChainPointer(:xpn, outputTypeOf(f.xpn))
+function unpackParamFunc!(f::GaussFunc{T}, paramSet::FlatParamSet) where {T}
+    anchor = ChainPointer(:xpn, TensorType(f.xpn))
     parIdx = locateParam!(paramSet, getField(f, anchor))
     fEval = PointerFunc(ComputeGFunc{T}(), (parIdx,), objectid(paramSet))
-    EvalGaussFunc(fEval), paramSet, Dict(anchor=>parIdx)
+    EvalGaussFunc(fEval), paramSet, (MixedFieldParamPointer∘Dict)(anchor=>parIdx)
 end
 
 
@@ -68,24 +68,24 @@ function AxialProdFunc(b::FieldAmplitude{<:Any, 0}, dim::Int)
 end
 
 const EvalAxialField{T, F<:EvalFieldAmp{T, 0}} = 
-InsertInward{F, OnlyHead{IndexPointer{DataXD}}}
+      InsertInward{F, OnlyHead{EvalField{T, 0, Tuple{Int}}}}
 
 struct EvalAxialProdFunc{T, D, F<:EvalFieldAmp{T, 0}} <: EvalFieldAmp{T, D, AxialProdFunc}
     f::ChainReduce{StableMul{T}, VectorMemory{EvalAxialField{T, F}, D}}
 end
 
-
-function unpackParamFunc!(f::AxialProdFunc{T, D}, paramSet::AbstractFlatParamSet) where 
+function unpackParamFunc!(f::AxialProdFunc{T, D}, paramSet::FlatParamSet) where 
                          {T, D}
     fEvalComps = Memory{Function}(undef, D)
-    paramFieldDict = mapfoldl(vcat, 1:D) do i
-        anchor = ChainPointer(:axis, FieldPointer(i))
-        fInner, _, dictInner = unpackFunc!(f.axis[i], paramSet)
-        fEvalComps[i] = InsertInward(fInner, (OnlyHead∘IndexPointer)(i))
+    fieldParamPointer = mapfoldl(vcat, 1:D) do i
+        anchor = ChainPointer(:axis, ChainPointer(i))
+        fInner, _, pointerInner = unpackFunc!(f.axis[i], paramSet)
+        dictInner = pointerInner.core
+        fEvalComps[i] = InsertInward(fInner, (OnlyHead∘evalField)(ChainPointer(i, T)))
         anchorFieldPointerDictCore(dictInner, anchor)
-    end |> Dict
+    end |> Dict |> MixedFieldParamPointer
     fEval = Tuple(fEvalComps) |> (ChainReduce∘StableBinary)(*, T)
-    EvalAxialProdFunc(fEval), paramSet, paramFieldDict
+    EvalAxialProdFunc(fEval), paramSet, fieldParamPointer
 end
 
 
@@ -106,14 +106,15 @@ struct EvalPolyRadialFunc{T, D, F<:EvalFieldAmp{T, 0},
     f::PairCombine{StableMul{T}, MagnitudeConverter{F}, TypedAngularFunc{T, D, L}}
 end
 
-function unpackParamFunc!(f::PolyRadialFunc{T, D}, paramSet::AbstractFlatParamSet) where 
+function unpackParamFunc!(f::PolyRadialFunc{T, D}, paramSet::FlatParamSet) where 
                          {T, D}
-    fInner, _, paramFieldDictInner = unpackParamFunc!(f.radial, paramSet)
-    paramFieldDict = anchorFieldPointerDict(paramFieldDictInner, FieldPointer(:radial))
+    fInner, _, fieldParamPointerInner = unpackParamFunc!(f.radial, paramSet)
+    dictInner = fieldParamPointerInner.core
+    fieldParamDict = anchorFieldPointerDict(dictInner, ChainPointer(:radial))
     coordEncoder = InsertInward(fInner, OnlyHead(LinearAlgebra.norm))
     angularFunc = (OnlyHead∘ReturnTyped)(f.angular, T)
     fEval = PairCombine(StableBinary(*, T), coordEncoder, angularFunc)
-    EvalPolyRadialFunc(fEval), paramSet, paramFieldDict
+    EvalPolyRadialFunc(fEval), paramSet, MixedFieldParamPointer(fieldParamDict)
 end
 
 const PolyGaussProd{T, D, L} = PolyRadialFunc{T, D, <:GaussFunc{T}, L}
