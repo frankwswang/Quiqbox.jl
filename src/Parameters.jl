@@ -603,7 +603,7 @@ end
 function indexParam(pb::FlattenedParam{T}, idx::Int, 
                     sym::MissingOr{Symbol}=missing) where {T}
     ismissing(sym) && (sym = Symbol(:_, pb.symbol.name))
-    CellParam(ChainPointer(idx, T), pb, sym)
+    CellParam(ChainPointer(idx, TensorType(T)), pb, sym)
 end
 
 function indexParam(pb::ElementalParam, idx::Int, sym::MissingOr{Symbol}=missing)
@@ -619,7 +619,8 @@ end
 function indexParam(pb::JaggedParam{T, N}, idx::Int, 
                     sym::MissingOr{Symbol}=missing) where {T, N}
     ismissing(sym) && (sym = Symbol(:_, pb.symbol.name))
-    GridParam(ChainPointer(idx, AbstractArray{T, N}), pb, sym)
+    type = TensorType(AbstractArray{T, N}, outputSizeOf(pb))
+    GridParam(ChainPointer(idx, type), pb, sym)
 end
 
 
@@ -1355,7 +1356,7 @@ function getFieldParamsCore!(paramPairs::Vector{Tuple{ParamBox, ChainPointer}},
     if searchParam
         for fieldSym in content
             field = getField(source, fieldSym)
-            outputValConstraint = field isa ParamBox ? TensorType(field) : TensorType(Any)
+            outputValConstraint = field isa ParamBox ? TensorType(field) : TensorType()
             anchorNew = ChainPointer(anchor, ChainPointer(fieldSym, outputValConstraint))
             getFieldParamsCore!(paramPairs, field, anchorNew)
         end
@@ -1684,9 +1685,10 @@ getParamSector(source::AbstractVector, ::Type{<:ParamBox}) =
 
 
 function locateParam!(paramSet::AbstractVector, target::P) where {P<:ParamBox}
+    returnType = TensorType(target)
     if isempty(paramSet)
         pushParam!(paramSet, target)
-        ChainPointer(missing, ChainPointer(firstindex(paramSet), P))
+        ChainPointer(missing, ChainPointer(firstindex(paramSet), returnType))
     else
         paramSector, anchor = getParamSector(paramSet, P)
         idx = findfirst(x->compareObj(x, target), paramSector)
@@ -1694,7 +1696,7 @@ function locateParam!(paramSet::AbstractVector, target::P) where {P<:ParamBox}
             pushParam!(paramSector, target)
             idx = length(paramSector)
         end
-        ChainPointer(anchor, ChainPointer(idx, P))
+        ChainPointer(anchor, ChainPointer(idx, returnType))
     end
 end
 
