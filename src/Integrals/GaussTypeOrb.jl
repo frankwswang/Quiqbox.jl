@@ -66,11 +66,13 @@ end
 function gaussProdCore2(x1::T, x2::T, x::T, lx1::Int, lx2::Int, lx::Int) where {T<:Real}
     lb = max(-lx,  lx - 2lx2)
     ub = min( lx, 2lx1 - lx )
-    map(lb:2:ub) do q
+    res = zero(T)
+    for q in lb:2:ub
         i = (lx + q) ÷ 2
         j = (lx - q) ÷ 2
-        binomial(lx1,  i) * binomial(lx2,  j) * (x - x1)^(lx1 -i) * (x - x2)^(lx2 -j)
-    end |> sum
+        res += binomial(lx1,  i) * binomial(lx2,  j) * (x - x1)^(lx1 -i) * (x - x2)^(lx2 -j)
+    end
+    res
 end
 
 
