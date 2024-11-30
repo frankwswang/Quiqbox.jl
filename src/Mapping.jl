@@ -204,16 +204,20 @@ end
 
 function unpackFunc!(::GeneralParamFunc, f::Function, paramSet::AbstractVector)
     params, anchors = getFieldParams(f)
-    ids = locateParam!(paramSet, params)
-    paramFieldPointer = MixedFieldParamPointer(Dict(anchors .=> ids))
-    fCopy = deepcopy(f)
-    paramDoubles = deepcopy(params)
-    foreach(p->setScreenLevel!(p.source, 1), paramDoubles)
-    evalCore = function (x, pVals::Vararg)
-        for (p, v) in zip(paramDoubles, pVals)
-            setVal!(p, v)
+    if isempty(params)
+        PointerFunc(f, (), pSetId), paramSet, MixedFieldParamPointer(T, pSetId)
+    else
+        ids = locateParam!(paramSet, params)
+        paramFieldPointer = MixedFieldParamPointer(Dict(anchors .=> ids), pSetId)
+        fCopy = deepcopy(f)
+        paramDoubles = deepcopy(params)
+        foreach(p->setScreenLevel!(p.source, 1), paramDoubles)
+        evalCore = function (x, pVals::Vararg)
+            for (p, v) in zip(paramDoubles, pVals)
+                setVal!(p, v)
+            end
+            fCopy(x)
         end
-        fCopy(x)
+        PointerFunc(evalCore, ids, pSetId), paramSet, paramFieldPointer
     end
-    PointerFunc(evalCore, ids, objectid(paramSet)), paramSet, paramFieldPointer
 end
