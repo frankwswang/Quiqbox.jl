@@ -51,6 +51,12 @@ ChainPointer(prev::ChainPointer, here::ChainPointer) =
 ChainPointer((prev.chain..., here.chain...), here.type)
 
 
+getField(ptr) = Base.Fix2(getField, ptr)
+
+const GetField{T, N, C} = Base.Fix2{typeof(getField), ChainPointer{T, N, C}}
+
+const GetIndex{T, N} = GetField{T, N, Tuple{Int}}
+
 getField(obj, ::FirstIndex) = first(obj)
 
 getField(obj, entry::Symbol) = getfield(obj, entry)
@@ -59,8 +65,14 @@ getField(obj, entry::Int) = getindex(obj, entry)
 
 getField(obj, ptr::ChainPointer) = foldl(getField, ptr.chain, init=obj)
 
+getField(obj::AbstractDict, ptr::ChainPointer) = getindex(obj, ptr)
 
-evalField(obj, ptr::ChainPointer) = convert(ptr.type(), getField(obj, ptr))
+
+function evalField(obj, ptr::ChainPointer)
+    field = getField(obj, ptr)
+    field isa ParamBox && (field = obtain(field))
+    convert(ptr.type(), field)
+end
 
 evalField(obj, entry::GeneralIndex) = getField(obj, entry)
 
