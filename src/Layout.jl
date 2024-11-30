@@ -1,19 +1,18 @@
 abstract type TensorPointer{T, N} <: Any end
 
 struct TensorType{T, N} <: StructuredType
-    TensorType(::Type{<:AbstractArray{T, N}}) where {T, N} = new{T, N}()
-    TensorType(::Type{TensorType{T, N}}) where {T, N} = new{T, N}()
-    TensorType(::Type{T}) where {T} = new{T, 0}()
+    shape::NTuple{N, Int}
+
+    TensorType(::T) where {T} = new{T, 0}(())
+    TensorType(::Type{T}=Any, shape::NTuple{N, Int}=()) where {T, N} = new{T, N}(shape)
 end
 
-TensorType(::Type{<:ElementalParam{T}}) where {T} = TensorType(AbstractArray{T, 0})
-
-TensorType(::Type{<:FlattenedParam{T, N}}) where {T, N} = TensorType(AbstractArray{T, N})
-
-TensorType(::Type{<:JaggedParam{T, N, O}}) where {T, N, O} = 
-TensorType(AbstractArray{AbstractArray{T, N}, O})
-
-TensorType(::T) where {T} = TensorType(T)
+TensorType(t::TensorType) = itself(t)
+TensorType(a::AbstractArray{T, N}) where {T, N} = TensorType(T, size(a))
+TensorType(::ElementalParam{T}) where {T} = TensorType(T)
+TensorType(p::FlattenedParam{T}) where {T} = TensorType(T, outputSizeOf(p))
+TensorType(p::JaggedParam{T, N}) where {T, N} = 
+TensorType(AbstractArray{T, N}, outputSizeOf(p))
 
 (::TensorType{T, 0})() where {T} = T
 
