@@ -221,3 +221,23 @@ function unpackFunc!(::GeneralParamFunc, f::Function, paramSet::AbstractVector)
         PointerFunc(evalCore, ids, pSetId), paramSet, paramFieldPointer
     end
 end
+
+
+abstract type DirectOperator <: FunctionModifier end
+
+struct Identity <: DirectOperator end
+
+(::Identity)(f::Function) = itself(f)
+
+
+struct LeftPartial{F<:Function, A<:NonEmptyTuple{Any}} <: FunctionModifier
+    f::F
+    header::A
+
+    function LeftPartial(f::F, arg, args...) where {F<:Function}
+        allArgs = (arg, args...)
+        new{F, typeof(allArgs)}(f, allArgs)
+    end
+end
+
+(f::LeftPartial)(arg...) = f.f(f.header..., arg...)
