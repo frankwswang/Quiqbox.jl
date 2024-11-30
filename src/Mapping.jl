@@ -160,12 +160,20 @@ struct ShiftByArg{T<:Real, D} <: FieldlessFunction end
 
 
 function evalFunc(func::F, input::T) where {F<:Function, T}
-    fCore, pars = unpackFunc(func)
-    fCore(input, evalParamSet(pars))
+    fCore, pSet = unpackFunc(func)
+    evalFunc(fCore, pSet, input)
+end
+
+function evalFunc(fCore::F, pSet::AbstractParamSet, input::T) where {F<:Function, T}
+    fCore(input, evalParamSet(pSet))
+end
+
+function evalFunc(fCore::F, pVals::AbtVecOfAbtArr, input::T) where {F<:Function, T}
+    fCore(input, pVals)
 end
 
 
-unpackFunc(f::Function) = unpackFunc!(f, initializeParamSet(MiscParamSet))
+unpackFunc(f::Function) = unpackFunc!(f, initializeParamSet(FlatParamSet))
 
 unpackFunc(f::AbstractAmplitude{T}) where {T} = 
 unpackFunc!(f, initializeParamSet(FlatParamSet, T))
