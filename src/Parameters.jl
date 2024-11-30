@@ -1580,6 +1580,8 @@ struct MiscParamSet{T, S1<:ElementalParam{<:T}, S2<:FlattenedParam{<:T},
     outer::Vector{S3}
 end
 
+const AbstractParamSet{T} = Union{AbstractFlatParamSet{T}, AbstractMiscParamSet{T}}
+
 size(mps::MiscParamSet) = size(mps.outer) .+ 1
 
 firstindex(::MiscParamSet) = 1
