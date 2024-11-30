@@ -27,14 +27,22 @@ const GeneralIndex = Union{Int, Symbol, FirstIndex}
 struct ChainPointer{T, N, C<:Tuple{Vararg{GeneralIndex}}} <: TensorPointer{T, N}
     chain::C
     type::TensorType{T, N}
+
+    ChainPointer(chain::C, type::TensorType{T, N}=TensorType()) where 
+                {T, N, C<:Tuple{Vararg{GeneralIndex}}} = 
+    new{T, N, C}(chain, type)
 end
 
 const IndexPointer{T, N} = ChainPointer{T, N, Tuple{Int}}
 
-ChainPointer(sourceType::TensorType=TensorType(Any)) = ChainPointer((), sourceType)
+const FlatPSetInnerPtr{T} = ChainPointer{T, 0, Tuple{FirstIndex, Int}}
 
-ChainPointer(entry::GeneralIndex, source::Any=Any) = 
-ChainPointer((entry,), TensorType(source))
+const FlatParamSetIdxPtr{T} = Union{IndexPointer{T}, FlatPSetInnerPtr{T}}
+
+ChainPointer(sourceType::TensorType=TensorType()) = ChainPointer((), sourceType)
+
+ChainPointer(entry::GeneralIndex, type::TensorType=TensorType()) = 
+ChainPointer((entry,), type)
 
 ChainPointer(prev::GeneralIndex, here::ChainPointer) = 
 ChainPointer(ChainPointer(prev), here)
