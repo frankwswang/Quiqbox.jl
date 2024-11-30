@@ -184,25 +184,63 @@ unpackFunc!(SelectTrait{ParameterStyle}()(f), f, paramSet)
 unpackFunc!(::DefinedParamFunc, f::Function, paramSet::AbstractVector) = 
 unpackParamFunc!(f, paramSet)
 
-const FieldPointerDict{T} = Dict{<:ChainPointer, <:ChainPointer{T}}
+const FieldPtrDict{T} = AbstractDict{<:ChainPointer, <:FlatParamSetIdxPtr{T}}
+const EmptyFieldPtrDict{T} = TypedEmptyDict{Union{}, FlatPSetInnerPtr{T}}
+const FiniteFieldPtrDict{T, N} = FiniteDict{N, <:ChainPointer, <:FlatParamSetIdxPtr{T}}
+
+const FieldValDict{T} = AbstractDict{<:FlatParamSetIdxPtr{T}, <:Union{T, AbstractArray{T}}}
+const ParamValOrDict{T} = Union{AbtVecOfAbtArr{T}, FieldValDict{T}}
 
 abstract type FieldParamPointer{R} <: Any end
 
-struct MixedFieldParamPointer{R<:FieldPointerDict} <: FieldParamPointer{R}
+struct MixedFieldParamPointer{T, R<:FieldPtrDict{T}} <: FieldParamPointer{R}
     core::R
+    sourceID::UInt
 end
 
-function anchorFieldPointerDictCore(d::FieldPointerDict, anchor::ChainPointer)
+MixedFieldParamPointer(pair::Pair, sourceID::UInt) = 
+MixedFieldParamPointer(buildDict(pair), sourceID)
+
+MixedFieldParamPointer(::Type{T}, sourceID::UInt) where {T} = 
+MixedFieldParamPointer(EmptyFieldPtrDict{T}(), sourceID)
+
+function anchorFieldPointerDictCore(d::FieldPtrDict{T}, anchor::ChainPointer) where {T}
     map( collect(d) ) do pair
         ChainPointer(anchor, pair.first) => pair.second
     end
 end
 
-function anchorFieldPointerDict(d::FieldPointerDict, anchor::ChainPointer)
-    (Dict∘anchorFieldPointerDictCore)(d, anchor)
+function anchorFieldPointerDict(d::FieldPtrDict{T}, anchor::ChainPointer) where {T}
+    buildDict( anchorFieldPointerDictCore(d, anchor), EmptyFieldPtrDict{T} )
 end
 
-function unpackFunc!(::GeneralParamFunc, f::Function, paramSet::AbstractVector)
+function anchorFieldPointerDict(d::FiniteFieldPtrDict{T, 0}, ::ChainPointer) where {T}
+    itself(d)
+end
+
+# function anchorFieldPointerDict(d::SingleParPtrDict, anchor::ChainPointer)
+#     buildDict( anchorFieldPointerDictCore(d, anchor)[] )
+# end
+
+# # Not as performant as Dict, even for small dictionaries.
+# function anchorFieldPointerDict(d::ImmutableDict{<:ChainPointer, <:ChainPointer}, 
+#                                 anchor::ChainPointer)
+#     res = anchorFieldPointerDictCore(d, anchor)
+#     if length(res) > 1
+#         head, body = res
+#         foldl(ImmutableDict, body, init=ImmutableDict(head))
+#     else
+#         ImmutableDict(res[])
+#     end
+# end
+
+# `f` should only take one input.
+unpackFunc!(::GeneralParamFunc, f::Function, paramSet::AbstractVector) = 
+unpackFunc!(GeneralParamFunc(), ReturnTyped(f, Any), paramSet)
+
+function unpackFunc!(::GeneralParamFunc, f::ReturnTyped{T}, 
+                     paramSet::AbstractVector) where {T}
+    pSetId = objectid(paramSet)
     params, anchors = getFieldParams(f)
     if isempty(params)
         PointerFunc(f, (), pSetId), paramSet, MixedFieldParamPointer(T, pSetId)
