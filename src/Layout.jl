@@ -79,3 +79,70 @@ evalField(obj, entry::GeneralIndex) = getField(obj, entry)
 evalField(ptr) = Base.Fix2(evalField, ptr)
 
 const EvalField{T, N, C} = Base.Fix2{typeof(evalField), ChainPointer{T, N, C}}
+
+
+abstract type FiniteDict{N, K, T} <: AbstractDict{K, T} end
+
+
+struct SingleEntryDict{K, T} <: FiniteDict{1, K, T}
+    key::K
+    value::T
+end
+
+
+struct TypedEmptyDict{K, T} <: FiniteDict{0, K, T} end
+
+TypedEmptyDict() = TypedEmptyDict{Union{}, Union{}}()
+
+
+buildDict(p::Pair{K, T}) where {K, T} = SingleEntryDict(p.first, p.second)
+
+function buildDict(ps::NonEmpTplOrAbtArr{<:Pair}, 
+                   emptyBuiler::Type{<:FiniteDict{0}}=TypedEmptyDict)
+    isempty(ps) ? emptyBuiler() : Dict(ps)
+end
+
+buildDict(::Tuple{}, emptyBuiler::Type{<:FiniteDict{0}}=TypedEmptyDict) = emptyBuiler()
+
+buildDict(emptyBuiler::Type{<:FiniteDict{0}}=TypedEmptyDict) = buildDict((), emptyBuiler)
+
+
+import Base: isempty, length, collect, keys, values, getindex, iterate
+
+isempty(::SingleEntryDict) = false
+isempty(::TypedEmptyDict) = true
+
+length(::FiniteDict{N}) where {N} = N
+
+collect(d::SingleEntryDict) = [d.key => d.value]
+collect(::TypedEmptyDict{K, T}) where {K, T} = Pair{K, T}[]
+
+keys(d::SingleEntryDict) = Set( (d.key,) )
+keys(::TypedEmptyDict{K}) where {K} = Set{K}()
+
+values(d::SingleEntryDict) = Set( (d.value,) )
+values(::TypedEmptyDict{<:Any, T}) where {T} = Set{T}()
+
+function getindex(d::SingleEntryDict{K}, key::K) where {K}
+    if key == d.key
+        d.value
+    else
+        throw(KeyError(key))
+    end
+end
+
+function getindex(::T, key) where {T<:TypedEmptyDict}
+    throw(AssertionError("This dictionary (`::$T`) is meant to be empty."))
+end
+
+function iterate(d::SingleEntryDict, state::Int)
+    if state <= 1
+        (d.key  => d.value, 2)
+    else
+        nothing
+    end
+end
+
+iterate(::TypedEmptyDict, state::Int) = nothing
+
+iterate(d::FiniteDict) = iterate(d, 1)
