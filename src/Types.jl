@@ -17,10 +17,11 @@ abstract type StructuredType <: ConfigBox end
 
 # N: Inner dim, size mutable; O: Outer dim, size immutable
 abstract type JaggedOperator{T, N, O} <: CompositeFunction end
+abstract type FunctionModifier <: CompositeFunction end
 abstract type TaggedFunction <: CompositeFunction end
 
-abstract type ParamOperator <: TaggedFunction end
-abstract type Evaluator{F} <: TaggedFunction end
+abstract type ParamOperator <: FunctionModifier end
+abstract type Evaluator{F} <:  TaggedFunction end
 
 abstract type AbstractAmpTensor{T, O} <: JaggedOperator{T, 0, O} end
 abstract type AbstractAmplitude{T} <: JaggedOperator{T, 0, 0} end
