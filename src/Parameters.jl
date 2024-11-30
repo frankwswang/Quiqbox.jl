@@ -1708,3 +1708,55 @@ end
 
 locateParam!(paramSet::AbstractVector, target::NamedTuple) = 
 locateParam!(paramSet, values(target))
+
+
+const DimensionalSpanMemory{T} = Union{T, ShapedMemory{T}, ShapedMemory{ShapedMemory{T}}}
+
+struct DimSpanDataCacheBox{T} <: QueryBox{DimensionalSpanMemory{T}}
+    d0::Dict{UInt, T}
+    d1::Dict{UInt, ShapedMemory{T}}
+    d2::Dict{UInt, ShapedMemory{ShapedMemory{T}}}
+end
+
+DimSpanDataCacheBox(::Type{T}) where {T} = 
+DimSpanDataCacheBox( Dict{UInt, T}(), 
+                     Dict{UInt, ShapedMemory{T}}(), 
+                     Dict{UInt, ShapedMemory{ShapedMemory{T}}}() )
+
+getDimSpanSector(cache::DimSpanDataCacheBox{T}, ::ElementalParam{T}) where {T} = cache.d0
+
+getDimSpanSector(cache::DimSpanDataCacheBox{T}, ::FlattenedParam{T}) where {T} = cache.d1
+
+getDimSpanSector(cache::DimSpanDataCacheBox{T}, ::JaggedParam{T}) where {T} = cache.d2
+
+formatDimSpanMemory(::Type{T}, val::T) where {T} = itself(val)
+
+formatDimSpanMemory(::Type{T}, val::AbstractArray{T}) where {T} = ShapedMemory(val)
+
+formatDimSpanMemory(::Type{T}, val::JaggedAbtArray{T}) where {T} = 
+ShapedMemory(ShapedMemory.(val))
+
+function cacheParam!(cache::DimSpanDataCacheBox{T}, param::ParamBox{T}) where {T}
+    get!(getDimSpanSector(cache, param), objectid(param)) do
+        formatDimSpanMemory(T, obtain(param))
+    end
+end
+
+function cacheParam!(cache::DimSpanDataCacheBox{T}, s::AbstractParamSet{T}, 
+                    idx::ChainPointer) where {T}
+    pb = getField(s, idx)
+    cacheParam!(cache, pb)
+end
+
+function cacheParam!(cache::DimSpanDataCacheBox{T}, 
+                     s::ParamTypeArr{<:ParamBox{T}, 1}) where {T}
+    map(s) do p
+        cacheParam!(cache, p)
+    end
+end
+
+function cacheParam!(cache::DimSpanDataCacheBox{T}, s::AbstractParamSet{T}) where {T}
+    map(s) do p
+        cacheParam!(cache, p)
+    end
+end
