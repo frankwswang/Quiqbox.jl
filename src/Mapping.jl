@@ -61,13 +61,17 @@ const StableMul{T} = StableBinary{T, typeof(*)}
 StableBinary(f::Function) = Base.Fix1(StableBinary, f)
 
 
-struct PointerFunc{F<:Function, T<:NonEmptyTuple{ChainPointer}} <: ParamOperator
+struct PointerFunc{F<:Function, T<:Tuple{Vararg{FlatParamSetIdxPtr}}} <: ParamOperator
     apply::F
     pointer::T
     sourceID::UInt
 end
 
-(f::PointerFunc)(input, param) = f.apply(input, evalField.(Ref(param), f.pointer)...)
+(f::PointerFunc)(input, param) = f.apply(input, getField.(Ref(param), f.pointer)...)
+
+(f::PointerFunc{<:Function, Tuple{}})(input) = f.apply(input)
+
+(f::PointerFunc{<:Function, Tuple{}})(input, _) = f(input)
 
 const PointOneFunc{F, T} = PointerFunc{F, Tuple{T}}
 
@@ -76,14 +80,14 @@ struct OnlyHead{F<:Function} <: Evaluator{F}
     f::F
 end
 
-(f::OnlyHead)(arg1, _, ::Vararg) = f.f(arg1)
+(f::OnlyHead)(arg1, ::Vararg) = f.f(arg1)
 
 
 struct OnlyBody{F<:Function} <: Evaluator{F}
     f::F
 end
 
-(f::OnlyBody)(_, arg2, args...) = f.f(arg2, args...)
+(f::OnlyBody)(_, args...) = f.f(args...)
 
 
 struct PairCombine{J<:Function, FL<:Function, FR<:Function} <: ChainedOperator{J}
