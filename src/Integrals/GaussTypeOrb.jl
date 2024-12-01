@@ -87,79 +87,198 @@ function overlapPGTO(cPair::CenPair{T, D}, xPair::XpnPair{T}, aPair::AngPair{D})
 end
 
 
-function contrFieldSumSquaredNorm(coeff::AbstractVector{<:Number}, 
-                                  overlapMat::AbstractMatrix{<:Number})
-    dot(coeff, overlapMat, coeff)
+function genNormalizer(o::PrimGTOcore{T, D}, paramPtr::PrimOrbParamPtr{T, D}) where {T, D}
+    nCore = (OnlyBody∘genGTOnormalizer∘getAngularFunc)(o)
+    ptrTuple = (getXpnPtr(paramPtr.body),)
+    PointerFunc(nCore, ptrTuple, paramPtr.sourceID)
 end
 
-function contrCarteGTOSquaredNorm(coeff::Memory{T}, 
-                                  αGroups::NonEmptyTuple{Memory{T}, D}, 
-                                  degrees::NonEmptyTuple{Int, D}) where {T<:Real, D}
-    factor = T(πPowers[:p0d5])^(D+1) * mapreduce(*, degrees) do degree
-        degree > 0 ? (oddFactorialCore(2degree-1) / 2^degree) : one(T)
+function genNormalizer(o::PrimitiveOrbCore{T, D}, 
+                       paramPtr::PrimOrbParamPtr{T, D}) where {T, D}
+    ptrTuple = (Tuple∘values)(paramPtr.body.core)
+    fInner = AbsSqrtInv ∘ (OnlyBody∘LeftPartial)(numericalOneBodyInt, Identity(), o.f.apply)
+    fCore = function (input, args...)
+        fInner(input, buildDict(ptrTuple .=> args))
     end
-    nCoeff = length(coeff)
-    m = zeros(T, nCoeff, nCoeff)
-    for i in 1:nCoeff, j in 1:i
-        m[i,j] = m[j,i] = 
-        (inv∘prod)((getindex.(αGroups, i) .+ getindex.(αGroups, j)) .^ (T(0.5) .+ degrees))
+    PointerFunc(fCore, ptrTuple, paramPtr.sourceID)
+end
+
+function getNormCoeff!(cache::DimSpanDataCacheBox{T}, 
+                       orbs::NonEmptyTuple{FrameworkOrb{T, D}}) where {T, D} # Optimal
+    ptr = ChainPointer((:core, :f, :right))
+    paramSets = map(Base.Fix2(getfield, :param), orbs) # better than broadcasting
+    normalizers = map(Base.Fix2(getField, ptr), orbs) # better than broadcasting
+    mapreduce(StableBinary(*, T), paramSets, normalizers, init=one(T)) do pSet, f
+        getNormCoeffCore!(cache, pSet, f)
     end
-    contrFieldSumSquaredNorm(coeff, m) * T(factor)
 end
 
-function unpackOverlaps(basis::Memory{<:PrimGTO{T, D}}, paramSet) where {T, D}
-    getOverlap, paramSet
+function getNormCoeff!(cache::DimSpanDataCacheBox{T}, orb::FrameworkOrb{T, D}, 
+                       degree::Int) where {T, D}
+    ptr = ChainPointer((:core, :f, :right))
+    normalizer = getField(orb, ptr)
+    normCoeff = getNormCoeffCore!(cache, orb.param, normalizer)
+    normCoeff^abs(degree)
 end
 
-
-function getOverlap(o1::PrimGTO{T, D}, o2::PrimGTO{T, D}) where {T, D}
-    cPair = CenPair(obtain.(o1.center), obtain.(o2.center))
-    fgo1 = o1.body
-    fgo2 = o2.body
-    xPair = XpnPair(obtain(fgo1.radial.xpn), obtain(fgo2.radial.xpn))
-    aPair = AngPair(fgo1.angular.m.tuple, fgo2.angular.m.tuple)
-    n1 = o1.renormalize ? genGTOnormalizer(T, getAngTuple(fgo1))(xPair.left)  : one(T)
-    n2 = o2.renormalize ? genGTOnormalizer(T, getAngTuple(fgo2))(xPair.right) : one(T)
-    overlapPGTO(cPair, xPair, aPair) * n1 * n2
+function getNormCoeffCore!(cache::DimSpanDataCacheBox{T}, pSet::FlatParamSet{T}, 
+                           normalizer::ReturnTyped{T, <:PointerFunc}) where {T}
+    ptrs = normalizer.f.pointer
+    pDict = if isempty(ptrs)
+        buildDict()
+    else
+        map(ptrs) do ptr
+            ptr => cacheParam!(cache, pSet, ptr)
+        end |> buildDict
+    end
+    normalizer(nothing, pDict)
 end
 
-function getOverlap(o1::CompGTO{T, D}, o2::CompGTO{T, D}) where {T, D}
+function getNormCoeffCore!(::DimSpanDataCacheBox{T}, ::FlatParamSet{T}, 
+                           normalizer::Storage{T}) where {T}
+    normalizer.val
+end
+
+function overlap(o1::ComposedOrb{T, D}, o2::ComposedOrb{T, D}) where {T, D}
+    fo1 = FrameworkOrb(o1)
+    o1 === o2 ? overlap(fo1) : overlap(fo1, FrameworkOrb(o2))
+end
+
+function overlap(o::FrameworkOrb{T, D}) where {T, D}
+    cache = DimSpanDataCacheBox(T)
+    res = getOverlapCore!(cache, o.core.f.left, o.param, o.pointer)
+    StableBinary(*, T)(res, getNormCoeff!(cache, o, 2))
+end
+
+function overlap(o1::FrameworkOrb{T, D}, o2::FrameworkOrb{T, D}) where {T, D}
+    if o1 === o2
+        overlap(o1)
+    else
+        cache = DimSpanDataCacheBox(T)
+        res = getOverlapCore!(cache, (o1.core.f.left,    o2.core.f.left), 
+                                     (o1.param,          o2.param), 
+                                     (o1.pointer,        o2.pointer) )
+        StableBinary(*, T)(res, getNormCoeff!( cache, (o1, o2) ))
+    end
+end
+
+const AbsSqrtInv = inv∘sqrt∘abs
+
+function genGTOnormalizer(angularFunc::ReturnTyped{T, <:CartSHarmonics{D}}) where {T, D}
+    ns = map(x->Base.Fix2(polyGaussFuncSquaredNorm, x), angularFunc.f.m.tuple)
+    AbsSqrtInv ∘ ChainReduce(StableBinary(*, T), VectorMemory(ns))
+end
+
+function getXpnPtr(paramPtr::MixedFieldParamPointer{T}) where {T}
+    xpnPtr = ChainPointer((:radial, :xpn), TensorType(T))
+    paramPtr.core[xpnPtr]
+end
+
+function getXpnPtr(paramPtr::MixedFieldParamPointer{T, <:SingleEntryDict}) where {T}
+    paramPtr.core.value
+end
+
+function getAngularFunc(o::PrimGTOcore)
+    o.f.apply.f.right.f
+end
+
+function getOverlapCore!(cache::DimSpanDataCacheBox{T}, o::PrimGTOcore{T, D}, 
+                         s::FlatParamSet{T}, p::PrimOrbParamPtr{T, D}) where {T, D}
+    overlapPGTO(preparePGTOparam!(cache, o, s, p)...)
+end
+
+function getOverlapCore!(cache::DimSpanDataCacheBox{T}, 
+                         (o1, o2)::NTuple{2, PrimGTOcore{T, D}}, 
+                         (s1, s2)::NTuple{2, FlatParamSet{T}}, 
+                         (p1, p2)::NTuple{2, PrimOrbParamPtr{T, D}}) where {T, D}
+    overlapPGTO(preparePGTOparam!(cache, o1, s1, p1, o2, s2, p2)...)
+end
+
+function getOverlapCore!(cache::DimSpanDataCacheBox{T}, o::CompositeOrbCore{T, D}, 
+                        s::FlatParamSet{T}, p::CompOrbParamPtr{T, D}) where {T, D}
     res = zero(T)
-    w1 = obtain(o1.weight)
-    w2 = obtain(o2.weight)
-    for (i, u) in zip(o1.basis, w1), (j, v) in zip(o2.basis, w2)
-        res += getOverlap(i, j) * u * v
+    # w = evalField(s, p.weight)
+    w = cacheParam!(cache, s, p.weight)
+    primOrbs = o.f.chain
+    for (i, m, u) in zip(primOrbs, p.basis, w), (j, n, v) in zip(primOrbs, p.basis, w)
+        o1core = i.f.left.f.left
+        o2core = j.f.left.f.left
+        temp = if i === j && m === n
+            getOverlapCore!(cache, o1core, s, m)
+        else
+            getOverlapCore!(cache, (o1core, o2core), (s, s), (m, n))
+        end
+        res += temp * u * v
     end
     res
 end
 
-function genGTOnormalizer(::Type{T}, ijk::NTuple{D, Int}) where {D, T<:Real}
-    ns = map(x->Base.Fix2(polyGaussFuncSquaredNorm, x), ijk)
-    inv∘sqrt∘ChainReduce(StableBinary(*, T), VectorMemory(ns))
-end
-
-function genNormalizerCore(o::PolyGaussProd{T}) where {T}
-    genGTOnormalizer(T, getAngTuple(o)), (o.radial.xpn,)
-end
-
-function genNormalizerCore(o::CompositeOrb{T, D}, paramSet::AbstractVector) where {T, D}
-    bs = o.basis
-    overlapsCore, overlapsPars = unpackOverlaps(bs, paramSet)
-    wParIds = locateParam!(paramSet, o.weight)
-    bParIds = locateParam!(paramSet, overlapsPars)
-    parIds = (wParIds, bParIds...)
-    nCore = function (c::AbstractVector{T}, args::Vararg)
-        m = overlapsCore(args...)::AbstractMatrix{T}
-        (inv∘sqrt∘dot)(c, m, c)
+function getOverlapCore!(cache::DimSpanDataCacheBox{T}, 
+                        (o1, o2)::NTuple{2, CompositeOrbCore{T, D}}, 
+                        (s1, s2)::NTuple{2, FlatParamSet{T}}, 
+                        (p1, p2)::NTuple{2, CompOrbParamPtr{T, D}}) where {T, D}
+    res = zero(T)
+    pSetBool = (s1 === s2)
+    # w1 = evalField(s1, p1.weight)
+    # w2 = evalField(s2, p2.weight)
+    w1 = cacheParam!(cache, s1, p1.weight)
+    w2 = cacheParam!(cache, s2, p2.weight)
+    for (i, m, u) in zip(o1.f.chain, p1.basis, w1), 
+        (j, n, v) in zip(o2.f.chain, p2.basis, w2)
+        o1core = i.f.left.f.left
+        o2core = j.f.left.f.left
+        temp = if pSetBool && i === j && m === n
+            getOverlapCore!(cache, o1core, s1, m)
+        else
+            getOverlapCore!(cache, (o1core, o2core), (s1, s2), (m, n))
+        end
+        res += temp * u * v
     end
-    PointerFunc(OnlyBody(nCore), parIds, objectid(paramSet))
+    res
 end
 
-# function genNormCoeff(o::PrimitiveOrb{T}) where {T}
-#     if o.renormalize
-#         f, p = genOverlap(o.body)
-#         (inv∘sqrt∘f)(obtain.(p)...)
-#     else
-#         one(T)
-#     end
-# end
+#! Implement memoization of parameter value
+function preparePGTOparamCore!(cache::DimSpanDataCacheBox{T}, 
+                               o::PrimGTOcore{T, D}, s::FlatParamSet{T}, 
+                               p::PrimOrbParamPtr{T, D}) where {T, D}
+    cen = map(p.center) do c
+        cacheParam!(cache, s, c)
+    end
+    # cen = evalField.(Ref(s), p.center)
+    xpn = cacheParam!(cache, s, getXpnPtr(p.body))
+    # xpn = evalField(s, getXpnPtr(p.body))
+    ang = getAngularFunc(o).f.m.tuple
+    cen, xpn, ang
+end
+
+function preparePGTOparam!(cache::DimSpanDataCacheBox{T}, o1::PrimGTOcore{T, D}, 
+                           s1::FlatParamSet{T}, p1::PrimOrbParamPtr{T, D}) where {T, D}
+    cen1, xpn1, ang1 = preparePGTOparamCore!(cache, o1, s1, p1)
+    CenPair(cen1, cen1), XpnPair(xpn1, xpn1), AngPair(ang1, ang1)
+end
+
+function preparePGTOparam!(cache::DimSpanDataCacheBox{T}, 
+                           o1::PrimGTOcore{T, D}, s1::FlatParamSet{T}, 
+                           p1::PrimOrbParamPtr{T, D}, 
+                           o2::PrimGTOcore{T, D}, s2::FlatParamSet{T}, 
+                           p2::PrimOrbParamPtr{T, D}) where {T, D}
+    cen1, xpn1, ang1 = preparePGTOparamCore!(cache, o1, s1, p1)
+    cen2, xpn2, ang2 = preparePGTOparamCore!(cache, o2, s2, p2)
+    CenPair(cen1, cen2), XpnPair(xpn1, xpn2), AngPair(ang1, ang2)
+end
+
+
+function getOverlapCore!(cache::DimSpanDataCacheBox{T}, o::PrimitiveOrbCore{T, D}, 
+                         s::FlatParamSet{T}, p::PrimOrbParamPtr{T, D}) where {T, D}
+    parDict = if isempty(p.body.core)
+        buildDict()
+    else
+         map((collect∘keys)(p.body.core)) do ptr
+            ptr => cacheParam!(cache, s, ptr)
+        end |> buildDict
+    end
+    # parDict = map(vcat( collect(p.center), (collect∘keys)(p.body.core) )) do ptr
+    #     ptr => cacheParam!(cache, s, ptr)
+    # end |> buildDict
+    numericalOneBodyInt(Identity(), o.f.apply, parDict)
+end
