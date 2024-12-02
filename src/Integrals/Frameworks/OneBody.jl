@@ -65,22 +65,23 @@ end
 
 
 
-function overlap(o1::ComposedOrb{T, D}, o2::ComposedOrb{T, D}) where {T, D}
+function overlap(o1::ComposedOrb{T, D}, o2::ComposedOrb{T, D}; 
+                 cache::DimSpanDataCacheBox{T}=DimSpanDataCacheBox(T)) where {T, D}
     fo1 = FrameworkOrb(o1)
-    o1 === o2 ? overlap(fo1) : overlap(fo1, FrameworkOrb(o2))
+    o1 === o2 ? overlap(fo1; cache) : overlap(fo1, FrameworkOrb(o2); cache)
 end
 
-function overlap(o::FrameworkOrb{T, D}) where {T, D}
-    cache = DimSpanDataCacheBox(T)
+function overlap(o::FrameworkOrb{T, D}; 
+                 cache::DimSpanDataCacheBox{T}=DimSpanDataCacheBox(T)) where {T, D}
     res = getOverlapCore!(cache, (o.core.f.left,), (o.param,), (o.pointer,))
     StableBinary(*, T)(res, getNormCoeff!(cache, o, 2))
 end
 
-function overlap(o1::FrameworkOrb{T, D}, o2::FrameworkOrb{T, D}) where {T, D}
+function overlap(o1::FrameworkOrb{T, D}, o2::FrameworkOrb{T, D}; 
+                 cache::DimSpanDataCacheBox{T}=DimSpanDataCacheBox(T)) where {T, D}
     if o1 === o2
-        overlap(o1)
+        overlap(o1; cache)
     else
-        cache = DimSpanDataCacheBox(T)
         res = getOverlapCore!(cache, (o1.core.f.left,    o2.core.f.left), 
                                      (o1.param,          o2.param), 
                                      (o1.pointer,        o2.pointer) )
