@@ -182,8 +182,9 @@ end
 
 CompositeOrb(ob::CompositeOrb) = itself(ob)
 
-const WeightedPF{T, D, U<:EvalPrimOrb{T, D}} = 
-      ScaledOrbital{T, D, U, PointOneFunc{OnlyBody{GetIndex{T, 0}}, IndexPointer{T, 1}}}
+const GetPFWeightEntry{T} = PointOneFunc{OnlyBody{GetIndex{T, 0}}, IndexPointer{T, 1}}
+
+const WeightedPF{T, D, U<:EvalPrimOrb{T, D}} = ScaledOrbital{T, D, U, GetPFWeightEntry{T}}
 
 function compressWeightedPF(::Type{B}, ::Type{F}) where {T, D, B<:EvalFieldAmp{T, D}, F}
     boolF = isconcretetype(B)

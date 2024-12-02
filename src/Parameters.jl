@@ -1748,14 +1748,9 @@ function cacheParam!(cache::DimSpanDataCacheBox{T}, s::AbstractParamSet{T},
     cacheParam!(cache, pb)
 end
 
-function cacheParam!(cache::DimSpanDataCacheBox{T}, 
-                     s::ParamTypeArr{<:ParamBox{T}, 1}) where {T}
-    map(s) do p
-        cacheParam!(cache, p)
-    end
-end
+const ParamCollection{T} = Union{AbstractParamSet{T}, ParamTypeArr{<:ParamBox{T}, 1}}
 
-function cacheParam!(cache::DimSpanDataCacheBox{T}, s::AbstractParamSet{T}) where {T}
+function cacheParam!(cache::DimSpanDataCacheBox{T}, s::ParamCollection{T}) where {T}
     map(s) do p
         cacheParam!(cache, p)
     end
