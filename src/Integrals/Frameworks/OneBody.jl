@@ -1,9 +1,9 @@
 function genNormalizer(o::PrimitiveOrbCore{T, D}, 
                        paramPtr::PrimOrbParamPtr{T, D}) where {T, D}
     ptrTuple = (Tuple∘values)(paramPtr.body.core)
-    fInner = AbsSqrtInv ∘ (OnlyBody∘LeftPartial)(numericalOneBodyInt, Identity(), o.f.apply)
+    fInner = (OnlyBody∘LeftPartial)(AbsSqrtInv∘numericalOneBodyInt, Identity(), (o.f.apply,))
     fCore = function (input, args...)
-        fInner(input, buildDict(ptrTuple .=> args))
+        fInner(input, (buildDict(ptrTuple .=> args),))
     end
     PointerFunc(fCore, ptrTuple, paramPtr.sourceID)
 end
@@ -28,16 +28,33 @@ function getNormCoeff!(cache::DimSpanDataCacheBox{T}, orb::FrameworkOrb{T, D},
 end
 
 
+const ParamPtrHolder{T} = Union{FieldPtrDict{T}, NonEmptyTuple{FlatParamSetIdxPtr{T}}}
+
+getParamPointers(input::FieldPtrDict) = (collect∘keys)(input)
+getParamPointers(input::NonEmptyTuple{FlatParamSetIdxPtr{T}}) where {T} = itself(input)
+
+function cacheParamDictCore!(cache::DimSpanDataCacheBox{T}, pSet::FlatParamSet{T}, 
+                             ptrs::NonEmpTplOrAbtArr{<:FlatParamSetIdxPtr{T}}) where {T}
+    map(ptrs) do ptr
+        ptr => cacheParam!(cache, pSet, ptr)
+    end |> buildDict
+end
+
+function cacheParamDict!(cache::DimSpanDataCacheBox{T}, pSet::FlatParamSet{T}, 
+                         input::Union{ParamPtrHolder{T}, Tuple{}}) where {T}
+    isempty(input) ? buildDict() : cacheParamDictCore!(cache, pSet, getParamPointers(input))
+end
+
+function cacheParamDict!(cache::DimSpanDataCacheBox{T}, pSet::FlatParamSet{T}, 
+                         input::PrimOrbParamPtr{T}) where {T}
+    ptrs = vcat(getParamPointers(input.body.core), input.center...)
+    cacheParamDictCore!(cache, pSet, ptrs)
+end
+
+
 function getNormCoeffCore!(cache::DimSpanDataCacheBox{T}, pSet::FlatParamSet{T}, 
                            normalizer::ReturnTyped{T, <:PointerFunc}) where {T}
-    ptrs = normalizer.f.pointer
-    pDict = if isempty(ptrs)
-        buildDict()
-    else
-        map(ptrs) do ptr
-            ptr => cacheParam!(cache, pSet, ptr)
-        end |> buildDict
-    end
+    pDict = cacheParamDict!(cache, pSet, normalizer.f.pointer)
     normalizer(nothing, pDict)
 end
 
@@ -76,18 +93,23 @@ function getOverlapCore!(cache::DimSpanDataCacheBox{T},
                          (o,)::Tuple{PrimitiveOrbCore{T, D}}, 
                          (s,)::Tuple{FlatParamSet{T}}, 
                          (p,)::Tuple{PrimOrbParamPtr{T, D}}) where {T, D}
-    parDict = if isempty(p.body.core)
-        buildDict()
-    else
-         map((collect∘keys)(p.body.core)) do ptr
-            ptr => cacheParam!(cache, s, ptr)
-        end |> buildDict
-    end
-    numericalOneBodyInt(Identity(), o.f.apply, parDict)
+    parDict = cacheParamDict!(cache, s, p.body.core)
+    numericalOneBodyInt(Identity(), (o.f.apply,), (parDict,))
 end
 
-function getIntegrandComponent(o, p, w, idx::Int)
-    o[idx].f.left.f.left, p[idx], w[idx]
+function getOverlapCore!(cache::DimSpanDataCacheBox{T}, 
+                         (o1, o2)::NTuple{2, PrimitiveOrbCore{T, D}}, 
+                         (s1, s2)::NTuple{2, FlatParamSet{T}}, 
+                         (p1, p2)::NTuple{2, PrimOrbParamPtr{T, D}}) where {T, D}
+    parDict1 = cacheParamDict!(cache, s1, p1)
+    parDict2 = cacheParamDict!(cache, s2, p2)
+    numericalOneBodyInt(Identity(), (o1.f.apply, o2.f.apply), (parDict1, parDict2))
+end
+
+function getIntegrandComponent(o::Memory{<:WeightedPF{T, D}}, 
+                               p::Memory{<:PrimOrbParamPtr{T, D}}, 
+                               w::ShapedMemory{T, 1}, idx::Int) where {T, D}
+    (o[idx].f.left.f.left, p[idx], w[idx])
 end
 
 function getOverlapCore!(cache::DimSpanDataCacheBox{T}, 
