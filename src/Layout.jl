@@ -150,9 +150,31 @@ iterate(d::FiniteDict) = iterate(d, 1)
 
 struct Identifier <: IdentityMarker{Any}
     code::UInt
-    source::WeakRef
+    link::WeakRef
 
-    Identifier(obj::Any) = new(objectid(obj), WeakRef(obj))
+    function Identifier(obj::Any)
+        res = new(objectid(obj), WeakRef(obj))
+        backupIdentifier(res)
+        res
+    end
+end
+
+const IdentifierCache = LRU{Identifier, Any}(maxsize=1000)
+
+function backupIdentifier(id::Identifier)
+    setindex!(IdentifierCache, id.link.value, id)
+    nothing
+end
+
+function emptyIdentifierCache()
+    empty!(IdentifierCache)
+    nothing
+end
+
+function resizeIdentifierCache(size::Int)
+    checkPositivity(size)
+    resize!(IdentifierCache, maxsize=size)
+    nothing
 end
 
 Identifier(t::NonEmptyTuple) = Identifier.(t)
@@ -163,8 +185,8 @@ function ==(id1::Identifier, id2::Identifier)
     code1 = id1.code
     code2 = id2.code
     if code1 == code2
-        source1 = id1.source.value
-        source2 = id2.source.value
+        source1 = id1.link.value
+        source2 = id2.link.value
         if code1 != objectid(source1)
             false
         else
@@ -175,7 +197,7 @@ function ==(id1::Identifier, id2::Identifier)
     end
 end
 
-function hash(id::Identifier, h::UInt)
-    h = hash(id.code, h)
-    hash(objectid(id.source.value), h)
+function hash(id::Identifier, hashCode::UInt)
+    hashCode = hash(id.code, hashCode)
+    hash(objectid(id.link.value), hashCode)
 end
