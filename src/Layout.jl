@@ -146,3 +146,36 @@ end
 iterate(::TypedEmptyDict, state::Int) = nothing
 
 iterate(d::FiniteDict) = iterate(d, 1)
+
+
+struct Identifier <: IdentityMarker{Any}
+    code::UInt
+    source::WeakRef
+
+    Identifier(obj::Any) = new(objectid(obj), WeakRef(obj))
+end
+
+Identifier(t::NonEmptyTuple) = Identifier.(t)
+
+import Base: ==, hash
+
+function ==(id1::Identifier, id2::Identifier)
+    code1 = id1.code
+    code2 = id2.code
+    if code1 == code2
+        source1 = id1.source.value
+        source2 = id2.source.value
+        if code1 != objectid(source1)
+            false
+        else
+            source1 === source2
+        end
+    else
+        false
+    end
+end
+
+function hash(id::Identifier, h::UInt)
+    h = hash(id.code, h)
+    hash(objectid(id.source.value), h)
+end
