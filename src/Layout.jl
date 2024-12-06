@@ -148,36 +148,27 @@ iterate(::TypedEmptyDict, state::Int) = nothing
 iterate(d::FiniteDict) = iterate(d, 1)
 
 
+struct BlackBox <: QueryBox{Any}
+    value::Any
+end
+
+
+function canDirectlyStore(::T) where {T}
+    isbitstype(T) || isprimitivetype(T) || issingletontype(T)
+end
+
+canDirectlyStore(::Union{String, Type, Symbol}) = true
+
 struct Identifier <: IdentityMarker{Any}
     code::UInt
-    link::WeakRef
+    link::Union{WeakRef, BlackBox}
 
     function Identifier(obj::Any)
-        res = new(objectid(obj), WeakRef(obj))
-        backupIdentifier(res)
-        res
+        link = canDirectlyStore(obj) ? BlackBox(obj) : WeakRef(obj)
+        new(objectid(obj), link)
     end
 end
 
-const IdentifierCache = LRU{Identifier, Any}(maxsize=1000)
-
-function backupIdentifier(id::Identifier)
-    setindex!(IdentifierCache, id.link.value, id)
-    nothing
-end
-
-function emptyIdentifierCache()
-    empty!(IdentifierCache)
-    nothing
-end
-
-function resizeIdentifierCache(size::Int)
-    checkPositivity(size)
-    resize!(IdentifierCache, maxsize=size)
-    nothing
-end
-
-Identifier(t::NonEmptyTuple) = Identifier.(t)
 
 import Base: ==, hash
 
