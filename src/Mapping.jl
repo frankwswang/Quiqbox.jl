@@ -61,8 +61,15 @@ const StableMul{T} = StableBinary{T, typeof(*)}
 StableBinary(f::Function) = Base.Fix1(StableBinary, f)
 
 
+struct ParamFilter{F<:Function, T<:NestedTensorPointer} <: ParamFuncBuilder{F}
+    apply::F
+    filter::T
+end
+
+(f::ParamFilter)(input, param) = f.apply(input, f.filter(param))
+
 struct PointerFunc{F<:Function, P1<:NestedTensorPointer, 
-                   P2<:Tuple{Vararg{ChainIndexer}}} <: ParamOperator
+                   P2<:Tuple{Vararg{ChainIndexer}}} <: ParamFuncBuilder{F}
     apply::F
     filter::P1
     select::P2
@@ -84,21 +91,21 @@ const TypedArrArrPtrFunc{T, F<:Function, P1<:OneLayerAllPass{T},
       PointerFunc{F, P1, P2}
 
 
-struct OnlyHead{F<:Function} <: Evaluator{F}
+struct OnlyHead{F<:Function} <: FunctionModifier
     f::F
 end
 
 (f::OnlyHead)(arg1, ::Vararg) = f.f(arg1)
 
 
-struct OnlyBody{F<:Function} <: Evaluator{F}
+struct OnlyBody{F<:Function} <: FunctionModifier
     f::F
 end
 
 (f::OnlyBody)(_, args...) = f.f(args...)
 
 
-struct PairCombine{J<:Function, FL<:Function, FR<:Function} <: ChainedOperator{J}
+struct PairCombine{J<:Function, FL<:Function, FR<:Function} <: JoinedOperator{J}
     joint::J
     left::FL
     right::FR
@@ -110,7 +117,7 @@ PairCombine(joint::F) where {F<:Function} =
 (f::PairCombine)(arg, args...) = f.joint( f.left(arg, args...), f.right(arg, args...) )
 
 
-struct ChainReduce{J<:Function, C<:LinearMemory{<:Function}} <: ChainedOperator{J}
+struct ChainReduce{J<:Function, C<:LinearMemory{<:Function}} <: JoinedOperator{J}
     joint::J
     chain::C
 
@@ -138,15 +145,15 @@ mapreduce(o->o(arg, args...), f.joint, f.chain.value)
 (f::ChainReduce)(arg, args...) = mapreduce(o->o(arg, args...), f.joint, f.chain)
 
 
-struct InsertOnward{C<:Function, F<:Function} <: ParamOperator
-    apply::C
-    dress::F
-end
+# struct InsertOnward{C<:Function, F<:Function}
+#     apply::C
+#     dress::F
+# end
 
-(f::InsertOnward)(arg, args...) = f.dress(f.apply(arg, args...), args...)
+# (f::InsertOnward)(arg, args...) = f.dress(f.apply(arg, args...), args...)
 
 
-struct InsertInward{C<:Function, F<:Function} <: ParamOperator
+struct InsertInward{C<:Function, F<:Function} <: FunctionComposer
     apply::C
     dress::F
 end
@@ -270,14 +277,12 @@ function unpackFunc!(::GeneralParamFunc, f::ReturnTyped{T},
 end
 
 
-abstract type DirectOperator <: FunctionModifier end
-
 struct Identity <: DirectOperator end
 
 (::Identity)(f::Function) = itself(f)
 
 
-struct LeftPartial{F<:Function, A<:NonEmptyTuple{Any}} <: FunctionModifier
+struct LeftPartial{F<:Function, A<:NonEmptyTuple{Any}} <: FunctionComposer
     f::F
     header::A
 

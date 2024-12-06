@@ -4,6 +4,7 @@ abstract type Box <: Any end
 
 abstract type CompositeFunction <: Function end
 abstract type FieldlessFunction <: Function end
+abstract type AnnotatedFunction <: Function end
 
 abstract type AbstractMemory{T, N} <: AbstractArray{T, N} end
 
@@ -13,21 +14,25 @@ abstract type ParamBox{T} <: Box end
 abstract type GraphBox{T} <: Box end
 abstract type QueryBox{T} <: Box end
 
-abstract type StructuredType <: ConfigBox end
+abstract type Evaluator{F} <: AnnotatedFunction end
 
 # N: Inner dim, size mutable; O: Outer dim, size immutable
 abstract type JaggedOperator{T, N, O} <: CompositeFunction end
 abstract type FunctionModifier <: CompositeFunction end
-abstract type TaggedFunction <: CompositeFunction end
+abstract type FunctionComposer <: CompositeFunction end
+abstract type PackedFunction{T} <: CompositeFunction end
 
-abstract type ParamOperator <: FunctionModifier end
-abstract type Evaluator{F} <:  TaggedFunction end
+abstract type TypedEvaluator{T, F} <: Evaluator{F} end
 
 abstract type AbstractAmpTensor{T, O} <: JaggedOperator{T, 0, O} end
 abstract type AbstractAmplitude{T} <: JaggedOperator{T, 0, 0} end
 
-abstract type ChainedOperator{J} <: ParamOperator end
-abstract type TypedEvaluator{T, F} <: Evaluator{F} end
+abstract type DirectOperator <: FunctionModifier end
+
+abstract type ParamFuncBuilder{F} <: FunctionComposer end
+abstract type JoinedOperator{J} <: FunctionComposer end
+
+abstract type StructuredType <: ConfigBox end
 
 # M: Particle number
 abstract type SpatialAmpTensor{T, D, M, O} <: AbstractAmpTensor{T, O} end

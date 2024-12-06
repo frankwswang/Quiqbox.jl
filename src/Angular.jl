@@ -1,4 +1,4 @@
-abstract type SphericalHarmonics{D, L} <: TaggedFunction end
+abstract type SphericalHarmonics{D, L} <: CompositeFunction end
 
 abstract type RealSolidHarmonics{D, L} <: SphericalHarmonics{D, L} end
 

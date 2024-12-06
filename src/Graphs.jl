@@ -266,20 +266,21 @@ function compressNodeCore!(tStorage::TemporaryStorage{T},
 end
 
 
-struct EvalGraphNode{T, F<:Function, S<:FixedSizeStorage{T}, 
-                     V<:AbtVecOfAbtArr{T}} <: TypedEvaluator{T, GraphNode{T}}
+#! Adjust the signature of `PackedFunction{T}`.
+struct CompressedNode{T, F<:Function, S<:FixedSizeStorage{T}, 
+                      V<:AbtVecOfAbtArr{T}} <: PackedFunction{T}
     f::F
     storage::S
     param::V
 end
 
-(gnf::EvalGraphNode)() = gnf(gnf.storage, gnf.param)
+(gnf::CompressedNode)() = gnf(gnf.storage, gnf.param)
 
-(gnf::EvalGraphNode{T})(ps::AbtVecOfAbtArr{T}) where {T} = gnf(gnf.storage, ps)
+(gnf::CompressedNode{T})(ps::AbtVecOfAbtArr{T}) where {T} = gnf(gnf.storage, ps)
 
-(gnf::EvalGraphNode)(s::FixedSizeStorage{T}, ps::AbtVecOfAbtArr{T}) where {T} = gnf.f(s, ps)
+(gnf::CompressedNode)(s::FixedSizeStorage{T}, ps::AbtVecOfAbtArr{T}) where {T} = gnf.f(s, ps)
 
-# function (gnf::EvalGraphNode{T})(ps::PrimParamVec{T}; checkParamSet::Bool=true) where {T}
+# function (gnf::CompressedNode{T})(ps::PrimParamVec{T}; checkParamSet::Bool=true) where {T}
 #     if checkParamSet
 #         bl, errorMsg = isGraphParamSet(paramSet)
 #         bl || throw( AssertionError(errorMsg) )
@@ -302,7 +303,7 @@ function compressNodeINTERNAL(node::GraphNode{T}, paramSet::PrimParamVec{T}) whe
         end
         sector
     end
-    EvalGraphNode(f, FixedSizeStorage(sectors...), obtain.(paramSet))
+    CompressedNode(f, FixedSizeStorage(sectors...), obtain.(paramSet))
 end
 
 function compressNode(node::GraphNode{T}, paramSet::PrimParamVec{T}) where {T}
