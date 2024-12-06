@@ -1,4 +1,4 @@
-abstract type TensorPointer{T, N} <: Any end
+abstract type NestedTensorPointer{T, L} <: Any end
 
 struct TensorType{T, N} <: StructuredType
     shape::NTuple{N, Int}
@@ -23,8 +23,10 @@ struct FirstIndex <: StructuredType end
 
 const GeneralIndex = Union{Int, Symbol, FirstIndex}
 
+const IndexTuple = NonEmptyTuple{Union{Int, FirstIndex}}
 
-struct ChainPointer{T, N, C<:Tuple{Vararg{GeneralIndex}}} <: TensorPointer{T, N}
+
+struct ChainPointer{T, N, C<:Tuple{Vararg{GeneralIndex}}} <: NestedTensorPointer{T, 0}
     chain::C
     type::TensorType{T, N}
 
@@ -35,9 +37,7 @@ end
 
 const IndexPointer{T, N} = ChainPointer{T, N, Tuple{Int}}
 
-const FlatPSetInnerPtr{T} = ChainPointer{T, 0, Tuple{FirstIndex, Int}}
-
-const FlatParamSetIdxPtr{T} = Union{IndexPointer{T}, FlatPSetInnerPtr{T}}
+const ChainIndexer{T, N, C<:IndexTuple} = ChainPointer{T, N, C}
 
 ChainPointer(sourceType::TensorType=TensorType()) = ChainPointer((), sourceType)
 
@@ -50,12 +50,27 @@ ChainPointer(ChainPointer(prev), here)
 ChainPointer(prev::ChainPointer, here::ChainPointer) = 
 ChainPointer((prev.chain..., here.chain...), here.type)
 
+struct AllPassPointer{T, N} <: NestedTensorPointer{T, N} end
+
+const OneLayerAllPass{T} = AllPassPointer{T, 1}
+
+
+function nestedLevelOf(obj::AbstractArray)
+    level = 0
+    if eltype(itself.(obj)) <: AbstractArray
+        level += 1 + (nestedLevelOf∘first)(obj)
+    end
+    level
+end
+
 
 getField(ptr) = Base.Fix2(getField, ptr)
 
 const GetField{T, N, C} = Base.Fix2{typeof(getField), ChainPointer{T, N, C}}
 
 const GetIndex{T, N} = GetField{T, N, Tuple{Int}}
+
+getField(obj, ::AllPassPointer) = itself(obj)
 
 getField(obj, ::FirstIndex) = first(obj)
 
