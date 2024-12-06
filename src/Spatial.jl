@@ -42,17 +42,17 @@ function (f::ComputeGFunc{T})(r::Real, xpnVal::T) where {T}
     exp(-xpnVal * r * r)
 end
 
-const GetEleParamInPset{T} = ChainPointer{T, 0, Tuple{FirstIndex, Int}}
+const GetEleParamInSNPSet{T} = ChainIndexer{T, 0, Tuple{FirstIndex, Int}}
 
 struct EvalGaussFunc{T} <: EvalFieldAmp{T, 0, GaussFunc}
-    f::PointOneFunc{ComputeGFunc{T}, GetEleParamInPset{T}}
+    f::SinglePtrFunc{ComputeGFunc{T}, OneLayerAllPass{T}, GetEleParamInSNPSet{T}}
 end
 
 function unpackParamFunc!(f::GaussFunc{T, P}, paramSet::FlatParamSet) where {T, P}
-    pSetId = objectid(paramSet)
+    pSetId = Identifier(paramSet)
     anchor = ChainPointer(:xpn, TensorType(T))
     parIdx = locateParam!(paramSet, getField(f, anchor))
-    fEval = PointerFunc(ComputeGFunc{T}(), (parIdx,), pSetId)
+    fEval = PointerFunc(ComputeGFunc{T}(), OneLayerAllPass{T}(), (parIdx,), pSetId)
     EvalGaussFunc(fEval), paramSet, MixedFieldParamPointer(anchor=>parIdx, pSetId)
 end
 
@@ -88,7 +88,7 @@ function unpackParamFunc!(f::AxialProdFunc{T, D}, paramSet::FlatParamSet) where 
         fEvalComps[i] = InsertInward(fInner, (OnlyHead∘getField)(ptr))
         anchorFieldPointerDictCore(dictInner, anchor)
     end |> buildDict
-    fieldParamPointer = MixedFieldParamPointer(fieldParamDict, objectid(paramSet))
+    fieldParamPointer = MixedFieldParamPointer(fieldParamDict, Identifier(paramSet))
     fEval = Tuple(fEvalComps) |> (ChainReduce∘StableBinary)(*, T)
     EvalAxialProdFunc(fEval), paramSet, fieldParamPointer
 end
@@ -119,7 +119,7 @@ function unpackParamFunc!(f::PolyRadialFunc{T, D}, paramSet::FlatParamSet) where
     coordEncoder = InsertInward(fInner, OnlyHead(LinearAlgebra.norm))
     angularFunc = (OnlyHead∘ReturnTyped)(f.angular, T)
     fEval = PairCombine(StableBinary(*, T), coordEncoder, angularFunc)
-    fieldParamPointer = MixedFieldParamPointer(fieldParamDict, objectid(paramSet))
+    fieldParamPointer = MixedFieldParamPointer(fieldParamDict, Identifier(paramSet))
     EvalPolyRadialFunc(fEval), paramSet, fieldParamPointer
 end
 

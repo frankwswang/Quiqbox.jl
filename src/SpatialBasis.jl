@@ -27,7 +27,7 @@ function normalizeOrbital(fCore::EvalComposedOrb{T, D}, paramSet::FlatParamSet,
     ScaledOrbital( fCore, ReturnTyped(normalizerCore, T) )
 end
 
-const NormFuncType{T} = Union{ReturnTyped{T, <:PointerFunc}, Storage{T}}
+const NormFuncType{T} = Union{ReturnTyped{T, <:TypedArrArrPtrFunc{T}}, Storage{T}}
 
 
 function unpackParamFunc!(f::ComposedOrb{T}, paramSet::FlatParamSet) where {T}
@@ -74,7 +74,8 @@ end
 PrimitiveOrb(ob::PrimitiveOrb) = itself(ob)
 
 struct PrimitiveOrbCore{T, D, B<:EvalFieldAmp{T, D}} <: EvalComposedOrb{T, D, B}
-    f::InsertInward{B, PointerFunc{ShiftByArg{T, D}, NTuple{D, GetEleParamInPset{T}}}}
+    f::InsertInward{B, PointerFunc{ ShiftByArg{T, D}, OneLayerAllPass{T}, 
+                                    NTuple{D, GetEleParamInSNPSet{T}} }}
 end
 
 const EvalPrimOrb{T, D, B, F<:NormFuncType{T}} = 
@@ -88,15 +89,16 @@ const EvalPrimGTO{T, D, B<:EvalPolyGaussProd{T, D}, F<:NormFuncType{T}} =
 
 struct PrimOrbParamPtr{T, D, R<:FieldPtrDict{T}} <: ComposedOrbParamPtr{T, D, R}
     body::MixedFieldParamPointer{T, R}
-    center::NTuple{D, GetEleParamInPset{T}}
-    sourceID::UInt
+    center::NTuple{D, GetEleParamInSNPSet{T}}
+    source::Identifier
 end
 
 function unpackParamFuncCore!(f::PrimitiveOrb{T, D}, paramSet::FlatParamSet) where {T, D}
-    pSetId = objectid(paramSet)
+    pSetId = Identifier(paramSet)
     cenPtr = locateParam!(paramSet, f.center)
     fEvalCore, _, fCorePointer = unpackFunc!(f.body, paramSet)
-    fEval = InsertInward(fEvalCore, PointerFunc(ShiftByArg{T, D}(), cenPtr, pSetId))
+    shifter = PointerFunc(ShiftByArg{T, D}(), OneLayerAllPass{T}(), cenPtr, pSetId)
+    fEval = InsertInward(fEvalCore, shifter)
     PrimitiveOrbCore(fEval), paramSet, PrimOrbParamPtr(fCorePointer, cenPtr, pSetId)
 end
 
@@ -182,7 +184,8 @@ end
 
 CompositeOrb(ob::CompositeOrb) = itself(ob)
 
-const GetPFWeightEntry{T} = PointOneFunc{OnlyBody{GetIndex{T, 0}}, IndexPointer{T, 1}}
+const GetPFWeightEntry{T} = 
+      SinglePtrFunc{OnlyBody{GetIndex{T, 0}}, OneLayerAllPass{T}, IndexPointer{T, 1}}
 
 const WeightedPF{T, D, U<:EvalPrimOrb{T, D}} = ScaledOrbital{T, D, U, GetPFWeightEntry{T}}
 
@@ -231,15 +234,15 @@ struct CompOrbParamPtr{T, D, R<:FieldPtrDict{T},
                        P<:PrimOrbParamPtr{T, D, <:R}} <: ComposedOrbParamPtr{T, D, R}
     basis::Memory{P}
     weight::IndexPointer{T, 1}
-    sourceID::UInt
+    source::Identifier
 
-    CompOrbParamPtr{R}(basis::Memory{P}, weight::ChainPointer, sourceID::UInt) where 
+    CompOrbParamPtr{R}(basis::Memory{P}, weight::ChainPointer, source::Identifier) where 
                       {T, D, R<:FieldPtrDict{T}, P<:PrimOrbParamPtr{T, D, <:R}} = 
-    new{T, D, R, P}(basis, weight, sourceID)
+    new{T, D, R, P}(basis, weight, source)
 end
 
 function unpackParamFuncCore!(f::CompositeOrb{T, D}, paramSet::FlatParamSet) where {T, D}
-    pSetId = objectid(paramSet)
+    pSetId = Identifier(paramSet)
     weightedFields = WeightedPF{T, D, <:EvalPrimOrb{T, D}}[]
     weightPtr = locateParam!(paramSet, f.weight)
     i = firstindex(f.basis) - 1
@@ -250,7 +253,7 @@ function unpackParamFuncCore!(f::CompositeOrb{T, D}, paramSet::FlatParamSet) whe
         innerDictType = typejoin(innerDictType, typeof(innerPointer.body.core))
         ptr = ChainPointer(i, TensorType(T))
         getIdx = (OnlyBody∘getField)(ptr)
-        weight = PointerFunc(getIdx, (weightPtr,), pSetId)
+        weight = PointerFunc(getIdx, OneLayerAllPass{T}(), (weightPtr,), pSetId)
         push!(weightedFields, ScaledOrbital(fInnerCore, weight))
         innerPointer
     end

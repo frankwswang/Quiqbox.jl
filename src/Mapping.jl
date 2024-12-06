@@ -61,19 +61,27 @@ const StableMul{T} = StableBinary{T, typeof(*)}
 StableBinary(f::Function) = Base.Fix1(StableBinary, f)
 
 
-struct PointerFunc{F<:Function, T<:Tuple{Vararg{FlatParamSetIdxPtr}}} <: ParamOperator
+struct PointerFunc{F<:Function, P1<:NestedTensorPointer, 
+                   P2<:Tuple{Vararg{ChainIndexer}}} <: ParamOperator
     apply::F
-    pointer::T
-    sourceID::UInt
+    filter::P1
+    select::P2
+    source::Identifier
 end
 
-(f::PointerFunc)(input, param) = f.apply(input, getField.(Ref(param), f.pointer)...)
+function (f::PointerFunc)(input, param)
+    paramSector = getField(param, f.filter)
+    f.apply(input, getField.(Ref(paramSector), f.select)...)
+end
 
-(f::PointerFunc{<:Function, Tuple{}})(input) = f.apply(input)
+(f::PointerFunc{<:Function, <:NestedTensorPointer, Tuple{}})(input, _) = f.apply(input)
 
-(f::PointerFunc{<:Function, Tuple{}})(input, _) = f(input)
+const SinglePtrFunc{F<:Function, P<:NestedTensorPointer, T<:ChainIndexer} = 
+      PointerFunc{F, P, Tuple{T}}
 
-const PointOneFunc{F, T} = PointerFunc{F, Tuple{T}}
+const TypedArrArrPtrFunc{T, F<:Function, P1<:OneLayerAllPass{T}, 
+                         P2<:Tuple{Vararg{ChainIndexer}}} = 
+      PointerFunc{F, P1, P2}
 
 
 struct OnlyHead{F<:Function} <: Evaluator{F}
@@ -172,7 +180,7 @@ function evalFunc(fCore::F, pVals::AbtVecOfAbtArr, input::T) where {F<:Function,
     fCore(input, pVals)
 end
 
-
+#! Possibly adding memoization in the future.
 unpackFunc(f::Function) = unpackFunc!(f, initializeParamSet(FlatParamSet))
 
 unpackFunc(f::AbstractAmplitude{T}) where {T} = 
@@ -195,14 +203,14 @@ abstract type FieldParamPointer{R} <: Any end
 
 struct MixedFieldParamPointer{T, R<:FieldPtrDict{T}} <: FieldParamPointer{R}
     core::R
-    sourceID::UInt
+    source::Identifier
 end
 
-MixedFieldParamPointer(pair::Pair, sourceID::UInt) = 
-MixedFieldParamPointer(buildDict(pair), sourceID)
+MixedFieldParamPointer(pair::Pair, source::Identifier) = 
+MixedFieldParamPointer(buildDict(pair), source)
 
-MixedFieldParamPointer(::Type{T}, sourceID::UInt) where {T} = 
-MixedFieldParamPointer(EmptyFieldPtrDict{T}(), sourceID)
+MixedFieldParamPointer(::Type{T}, source::Identifier) where {T} = 
+MixedFieldParamPointer(EmptyFieldPtrDict{T}(), source)
 
 function anchorFieldPointerDictCore(d::FieldPtrDict{T}, anchor::ChainPointer) where {T}
     map( collect(d) ) do pair
@@ -240,10 +248,11 @@ unpackFunc!(GeneralParamFunc(), ReturnTyped(f, Any), paramSet)
 
 function unpackFunc!(::GeneralParamFunc, f::ReturnTyped{T}, 
                      paramSet::AbstractVector) where {T}
-    pSetId = objectid(paramSet)
+    pSetId = Identifier(paramSet)
     params, anchors = getFieldParams(f)
+    filter = AllPassPointer{T, nestedLevelOf(paramSet)}()
     if isempty(params)
-        PointerFunc(f, (), pSetId), paramSet, MixedFieldParamPointer(T, pSetId)
+        PointerFunc(f, filter, (), pSetId), paramSet, MixedFieldParamPointer(T, pSetId)
     else
         ids = locateParam!(paramSet, params)
         paramFieldPointer = MixedFieldParamPointer(Dict(anchors .=> ids), pSetId)
@@ -256,7 +265,7 @@ function unpackFunc!(::GeneralParamFunc, f::ReturnTyped{T},
             end
             fCopy(x)
         end
-        PointerFunc(evalCore, ids, pSetId), paramSet, paramFieldPointer
+        PointerFunc(evalCore, filter, ids, pSetId), paramSet, paramFieldPointer
     end
 end
 
@@ -279,3 +288,6 @@ struct LeftPartial{F<:Function, A<:NonEmptyTuple{Any}} <: FunctionModifier
 end
 
 (f::LeftPartial)(arg...) = f.f(f.header..., arg...)
+
+
+const AbsSqrtInv = inv∘sqrt∘abs
