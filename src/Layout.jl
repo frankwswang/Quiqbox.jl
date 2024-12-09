@@ -174,13 +174,39 @@ end
 
 canDirectlyStore(::Union{String, Type, Symbol}) = true
 
+const DefaultIdentifierCacheSizeLimit = 500
+
+const IdentifierCache = LRU{RefVal{Any}, UInt}(maxsize=DefaultIdentifierCacheSizeLimit)
+
+function backupIdentifier(ref::RefVal{Any})
+    val = ref[]
+    id = objectid(val)
+    LRUCache.setindex!(IdentifierCache, id, ref)
+    id, WeakRef(val)
+end
+
+function emptyIdentifierCache()
+    LRUCache.empty!(IdentifierCache)
+    nothing
+end
+
+function resizeIdentifierCache(size::Int)
+    checkPositivity(size)
+    LRUCache.resize!(IdentifierCache, maxsize=size)
+    nothing
+end
+
 struct Identifier <: IdentityMarker{Any}
     code::UInt
     link::Union{WeakRef, BlackBox}
 
     function Identifier(obj::Any)
-        link = canDirectlyStore(obj) ? BlackBox(obj) : WeakRef(obj)
-        new(objectid(obj), link)
+        id, link = if canDirectlyStore(obj)
+            objectid(obj), BlackBox(obj)
+        else
+            backupIdentifier( Ref{Any}(obj) )
+        end
+        new(id, link)
     end
 end
 
