@@ -1,4 +1,4 @@
-abstract type NestedTensorPointer{T, L} <: Any end
+using LRUCache
 
 struct TensorType{T, N} <: StructuredType
     shape::NTuple{N, Int}
@@ -21,38 +21,37 @@ TensorType(AbstractArray{T, N}, outputSizeOf(p))
 
 struct FirstIndex <: StructuredType end
 
-const GeneralIndex = Union{Int, Symbol, FirstIndex}
-
-const IndexTuple = NonEmptyTuple{Union{Int, FirstIndex}}
+const GeneralFieldName = Union{Int, Symbol, FirstIndex, Nothing}
 
 
-struct ChainPointer{T, N, C<:Tuple{Vararg{GeneralIndex}}} <: NestedTensorPointer{T, 0}
+struct ChainPointer{T, N, L, C<:NTuple{L, GeneralFieldName}} <: NestedPointer{L, L}
     chain::C
     type::TensorType{T, N}
 
     ChainPointer(chain::C, type::TensorType{T, N}=TensorType()) where 
-                {T, N, C<:Tuple{Vararg{GeneralIndex}}} = 
-    new{T, N, C}(chain, type)
+                {T, N, L, C<:NTuple{L, GeneralFieldName}} = 
+    new{T, N, L, C}(chain, type)
 end
 
-const IndexPointer{T, N} = ChainPointer{T, N, Tuple{Int}}
+const AllPassPtr{T, N} = ChainPointer{T, N, 0, Tuple{}}
 
-const ChainIndexer{T, N, C<:IndexTuple} = ChainPointer{T, N, C}
+const IndexPointer{T, N} = ChainPointer{T, N, 1, Tuple{Int}}
+
+const ChainIndexer{T, N, L, C<:NTuple{L, Union{Int, FirstIndex, Nothing}}} = 
+      ChainPointer{T, N, L, C}
 
 ChainPointer(sourceType::TensorType=TensorType()) = ChainPointer((), sourceType)
 
-ChainPointer(entry::GeneralIndex, type::TensorType=TensorType()) = 
+ChainPointer(entry::GeneralFieldName, type::TensorType=TensorType()) = 
 ChainPointer((entry,), type)
 
-ChainPointer(prev::GeneralIndex, here::ChainPointer) = 
-ChainPointer(ChainPointer(prev), here)
 
-ChainPointer(prev::ChainPointer, here::ChainPointer) = 
+linkPointer(prev::ChainPointer, here::ChainPointer) = 
 ChainPointer((prev.chain..., here.chain...), here.type)
 
-struct AllPassPointer{T, N} <: NestedTensorPointer{T, N} end
-
-const OneLayerAllPass{T} = AllPassPointer{T, 1}
+linkPointer(prev::Union{GeneralFieldName, NonEmptyTuple{GeneralFieldName}}, 
+            here::ChainPointer) = 
+linkPointer(ChainPointer(prev), here)
 
 
 function nestedLevelOf(obj::AbstractArray)
@@ -66,11 +65,11 @@ end
 
 getField(ptr) = Base.Fix2(getField, ptr)
 
-const GetField{T, N, C} = Base.Fix2{typeof(getField), ChainPointer{T, N, C}}
+const GetField{T, N, L, C} = Base.Fix2{typeof(getField), ChainPointer{T, N, L, C}}
 
-const GetIndex{T, N} = GetField{T, N, Tuple{Int}}
+const GetIndex{T, N} = GetField{T, N, 1, Tuple{Int}}
 
-getField(obj, ::AllPassPointer) = itself(obj)
+getField(obj, ::ChainPointer{<:Any, <:Any, 0}) = itself(obj)
 
 getField(obj, ::FirstIndex) = first(obj)
 
@@ -78,22 +77,11 @@ getField(obj, entry::Symbol) = getfield(obj, entry)
 
 getField(obj, entry::Int) = getindex(obj, entry)
 
+getField(obj, ::Nothing) = getindex(obj)
+
 getField(obj, ptr::ChainPointer) = foldl(getField, ptr.chain, init=obj)
 
 getField(obj::AbstractDict, ptr::ChainPointer) = getindex(obj, ptr)
-
-
-function evalField(obj, ptr::ChainPointer)
-    field = getField(obj, ptr)
-    field isa ParamBox && (field = obtain(field))
-    convert(ptr.type(), field)
-end
-
-evalField(obj, entry::GeneralIndex) = getField(obj, entry)
-
-evalField(ptr) = Base.Fix2(evalField, ptr)
-
-const EvalField{T, N, C} = Base.Fix2{typeof(evalField), ChainPointer{T, N, C}}
 
 
 abstract type FiniteDict{N, K, T} <: AbstractDict{K, T} end
@@ -127,8 +115,6 @@ buildDict(::Tuple{}, emptyBuiler::Type{<:FiniteDict{0}}=TypedEmptyDict) = emptyB
 
 buildDict(emptyBuiler::Type{<:FiniteDict{0}}=TypedEmptyDict) = buildDict((), emptyBuiler)
 
-
-import Base: isempty, length, collect, keys, values, getindex, iterate
 
 isempty(::SingleEntryDict) = false
 isempty(::TypedEmptyDict) = true
@@ -225,9 +211,6 @@ struct Identifier <: IdentityMarker{Any}
         new(objectid(obj), link)
     end
 end
-
-
-import Base: ==, hash
 
 function ==(id1::Identifier, id2::Identifier)
     code1 = id1.code
