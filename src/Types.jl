@@ -1,5 +1,3 @@
-using Base: Slice, OneTo
-
 abstract type Box <: Any end
 
 abstract type CompositeFunction <: Function end
@@ -32,6 +30,7 @@ abstract type DirectOperator <: FunctionModifier end
 abstract type ParamFuncBuilder{F} <: FunctionComposer end
 abstract type JoinedOperator{J} <: FunctionComposer end
 
+abstract type NestedPointer{L, U} <: ConfigBox end
 abstract type StructuredType <: ConfigBox end
 
 # M: Particle number
@@ -127,3 +126,8 @@ const ParamFunctor{T, N, I} = Union{BaseParam{T, N, I}, ParamLink{T, N, I}}
 const ParamPointer{T, N, I} = Union{LinkParam{T, N, I}, ParamNest{T, N, I}}
 
 const MissSymInt = MissingOr{Union{Symbol, Int}}
+
+
+import Base: size, firstindex, lastindex, getindex, setindex!, iterate, length
+
+import Base: isempty, collect, keys, values, getproperty, ==, hash
