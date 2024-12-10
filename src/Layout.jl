@@ -167,6 +167,10 @@ struct BlackBox <: QueryBox{Any}
     value::Any
 end
 
+==(bb1::BlackBox, bb2::BlackBox) = (bb1.value === bb2.value)
+
+hash(bb::BlackBox, hashCode::UInt) = hash(objectid(bb.value), hashCode)
+
 
 function canDirectlyStore(::T) where {T}
     isbitstype(T) || isprimitivetype(T) || issingletontype(T)
@@ -176,13 +180,11 @@ canDirectlyStore(::Union{String, Type, Symbol}) = true
 
 const DefaultIdentifierCacheSizeLimit = 500
 
-const IdentifierCache = LRU{RefVal{Any}, UInt}(maxsize=DefaultIdentifierCacheSizeLimit)
+const IdentifierCache = LRU{BlackBox, RefVal{Any}}(maxsize=DefaultIdentifierCacheSizeLimit)
 
-function backupIdentifier(ref::RefVal{Any})
-    val = ref[]
-    id = objectid(val)
-    LRUCache.setindex!(IdentifierCache, id, ref)
-    id, WeakRef(val)
+function backupIdentifier(ref::BlackBox)
+    LRUCache.get!(IdentifierCache, ref, Ref{Any}(ref.value))
+    WeakRef(IdentifierCache[ref][])
 end
 
 function emptyIdentifierCache()
@@ -196,17 +198,23 @@ function resizeIdentifierCache(size::Int)
     nothing
 end
 
+function deleteIdentifierCacheKey(obj::Any)
+    key = BlackBox(obj)
+    LRUCache.delete!(IdentifierCache, key)
+    nothing
+end
+
 struct Identifier <: IdentityMarker{Any}
     code::UInt
     link::Union{WeakRef, BlackBox}
 
     function Identifier(obj::Any)
-        id, link = if canDirectlyStore(obj)
-            objectid(obj), BlackBox(obj)
+        link = if canDirectlyStore(obj)
+            BlackBox(obj)
         else
-            backupIdentifier( Ref{Any}(obj) )
+            backupIdentifier(BlackBox(obj))
         end
-        new(id, link)
+        new(objectid(obj), link)
     end
 end
 
