@@ -114,7 +114,13 @@ buildDict(p::Pair{K, T}) where {K, T} = SingleEntryDict(p.first, p.second)
 
 function buildDict(ps::NonEmpTplOrAbtArr{<:Pair}, 
                    emptyBuiler::Type{<:FiniteDict{0}}=TypedEmptyDict)
-    isempty(ps) ? emptyBuiler() : Dict(ps)
+    if isempty(ps)
+        emptyBuiler()
+    elseif length(ps) == 1
+        buildDict(ps|>first)
+    else
+        Dict(ps)
+    end
 end
 
 buildDict(::Tuple{}, emptyBuiler::Type{<:FiniteDict{0}}=TypedEmptyDict) = emptyBuiler()
