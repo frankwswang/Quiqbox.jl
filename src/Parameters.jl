@@ -39,7 +39,7 @@ ShapedMemory(::Type{T}, value::T) where {T} = ShapedMemory( fill(value) )
 
 ShapedMemory(arr::ShapedMemory) = ShapedMemory(arr.value, arr.shape)
 
-import Base: size, firstindex, lastindex, getindex, setindex!, iterate, length
+
 size(arr::ShapedMemory) = arr.shape
 
 firstindex(arr::ShapedMemory) = firstindex(arr.value)
@@ -1519,7 +1519,8 @@ struct FlatParamSet{T, S1<:ElementalParam{<:T},
     new{T, S1, S2}(d0, d1)
 end
 
-import Base: getproperty
+const PrimParamSet{T, S1<:ElementalParam{T}, S2<:InnerSpanParam{T}} = 
+      FlatParamSet{T, S1, S2}
 
 size(fps::FlatParamSet) = size(fps.d1) .+ 1
 
@@ -1527,20 +1528,21 @@ firstindex(::FlatParamSet) = 1
 
 lastindex(fps::FlatParamSet) = length(fps.d1) + 1
 
-const PrimParamSet{T, S1<:ElementalParam{T}, S2<:InnerSpanParam{T}} = 
-      FlatParamSet{T, S1, S2}
-
-function getindex(fps::FlatParamSet, i::Int)
+function getFlatSetIndex(target, i::Int)
     if i == 1
-        fps.d0
+        target.d0
     else
-        getindex(fps.d1, i+firstindex(fps.d1)-2)
+        getindex(target.d1, i+firstindex(target.d1)-2)
     end
 end
 
-function getindex(fps::FlatParamSet, sector::Symbol, i::Int)
-    getindex(getfield(fps, sector), i)
+function getFlatSetIndex(target, sector::Symbol, i::Int)
+    getindex(getfield(target, sector), i)
 end
+
+getindex(fps::FlatParamSet, i::Int) = getFlatSetIndex(fps, i)
+
+getindex(fps::FlatParamSet, sector::Symbol, i::Int) = getFlatSetIndex(fps, sector, i)
 
 function setindex!(fps::FlatParamSet, val, i::Int)
     if i == firstindex(fps)
@@ -1557,7 +1559,11 @@ end
 pushParam!(fps::FlatParamSet, a::ElementalParam) = push!(fps.d0, a)
 pushParam!(fps::FlatParamSet, a::FlattenedParam) = push!(fps.d1, a)
 
-iterate(fps::FlatParamSet) = (first(fps), firstindex(fps)+1)
+function iterate(fps::FlatParamSet)
+    i = firstindex(fps)
+    (getindex(fps, i), i+1)
+end
+
 function iterate(fps::FlatParamSet, state)
     if state > length(fps)
         nothing
@@ -1624,7 +1630,11 @@ pushParam!(fps::MiscParamSet, a::ElementalParam) = push!(fps.inner.d0, a)
 pushParam!(fps::MiscParamSet, a::FlattenedParam) = push!(fps.inner.d1, a)
 pushParam!(fps::MiscParamSet, a::JaggedParam) = push!(fps.outer, a)
 
-iterate(mps::MiscParamSet) = (first(mps), firstindex(mps)+1)
+function iterate(mps::MiscParamSet)
+    i = firstindex(mps)
+    (getindex(mps, i), i+1)
+end
+
 function iterate(mps::MiscParamSet, state)
     if state > length(mps)
         nothing
@@ -1655,6 +1665,13 @@ end
 initializeParamSet(::Type{FlatParamSet{T, S1, S2}}) where {T, S1, S2} = 
 FlatParamSet(S1[], S2[])
 
+initializeParamSet(f::Function) = 
+initializeParamSet(SelectTrait{ParameterizationStyle}()(f))
+
+initializeParamSet(::GenericFunction) = initializeParamSet(FlatParamSet)
+
+initializeParamSet(::TypedParamFunc{T}) where {T} = initializeParamSet(FlatParamSet, T)
+
 
 function initializeParamSet(::Type{MiscParamSet}, ::Type{T}=Any; 
                             d0Type::MissingOr{Type{S1}}=missing, 
@@ -1671,6 +1688,62 @@ end
 
 initializeParamSet(::Type{MiscParamSet{T, S1, S2, S3}}) where {T, S1, S2, S3} = 
 MiscParamSet(FlatParamSet(S1[], S2[]), S3[])
+
+
+#!  SingleNestParamSet
+#!  DoubleNestParamSet
+const FlatPSetInnerPtr{T} = ChainPointer{T, 0, 2, Tuple{FirstIndex, Int}}
+
+struct FlatParamSetFilter{T} <: NestedPointer{1, 2}
+    d0::Memory{FlatPSetInnerPtr{T}} #! Replace by immutable vector
+    d1::Memory{<:IndexPointer{T}}   #! Replace by immutable vector
+    sourceID::Identifier
+end
+
+function FlatParamSetFilter(pSet::FlatParamSet{T}, d0Ids::AbstractVector{Int}, 
+                            d1Ids::AbstractVector{Int}) where {T}
+    d0Ptr = map(d0Idx->ChainPointer((FirstIndex, d0Idx), TensorType(T)), d0Ids)
+    d1Ptr = map(d1Idx->ChainPointer((d1Idx+1,), TensorType(pSet.d1[d1Idx])), d1Ids)
+    FlatParamSetFilter(getMemory(d0Ptr), Memory{IndexPointer{T}}(d1Ptr), Identifier(pSet))
+end
+
+const FlatParamSetIdxPtr{T} = Union{FlatPSetInnerPtr{T}, IndexPointer{T}}
+
+size(fps::FlatParamSetFilter) = size(fps.d1) .+ 1
+
+firstindex(::FlatParamSetFilter) = 1
+
+lastindex(fps::FlatParamSetFilter) = length(fps.d1) + 1
+
+getindex(fps::FlatParamSetFilter, i::Int) = getFlatSetIndex(fps, i)
+
+getindex(fps::FlatParamSetFilter, sector::Symbol, i::Int) = getFlatSetIndex(fps, sector, i)
+
+function iterate(fps::FlatParamSetFilter)
+    i = firstindex(fps)
+    (getindex(fps, i), i+1)
+end
+
+function iterate(fps::FlatParamSetFilter, state)
+    if state > length(fps)
+        nothing
+    else
+        (getindex(fps, state), state+1)
+    end
+end
+
+length(fps::FlatParamSetFilter) = length(fps.d1) + 1
+
+getproperty(fps::FlatParamSetFilter, field::Symbol) = getfield(fps, field)
+
+#= Additional Method =#
+function getField(obj, p::FlatParamSetFilter)
+    vcat([getField.(Ref(obj), p.d0)], getField.(Ref(obj), p.d1))
+end
+
+#= Additional Method =#
+linkPointer(prev::FlatParamSetFilter{T}, here::FlatParamSetIdxPtr{T}) where {T} = 
+getField(prev, here)
 
 
 getParamSector(source::FlatParamSet, ::Type{<:ElementalParam}) = 
@@ -1690,7 +1763,7 @@ function locateParam!(paramSet::AbstractVector, target::P) where {P<:ParamBox}
     returnType = TensorType(target)
     if isempty(paramSet)
         pushParam!(paramSet, target)
-        ChainPointer(missing, ChainPointer(firstindex(paramSet), returnType))
+        ChainPointer(firstindex(paramSet), returnType)
     else
         paramSector, anchor = getParamSector(paramSet, P)
         idx = findfirst(x->compareObj(x, target), paramSector)
@@ -1698,16 +1771,46 @@ function locateParam!(paramSet::AbstractVector, target::P) where {P<:ParamBox}
             pushParam!(paramSector, target)
             idx = length(paramSector)
         end
-        ChainPointer(anchor, ChainPointer(idx, returnType))
+        linkPointer(anchor, ChainPointer(idx, returnType))
     end
 end
 
-function locateParam!(paramSet::AbstractVector, target::NonEmpTplOrAbtArr{<:ParamBox})
-    map(x->locateParam!(paramSet, x), target)
+function locateParam!(paramSet::AbstractVector, target::AbstractArray{<:ParamBox{T}, N}; 
+                      emptyReturnEltype::Type{<:ChainPointer{T}}=ChainPointer{T}) where 
+                     {T, N}
+    if isempty(target)
+        Array{emptyReturnEltype}(undef, ntuple(_->0, Val(N)))
+    else
+        map(x->locateParam!(paramSet, x), target)
+    end
+end
+
+function locateParam!(paramSet::AbstractVector, target::NonEmptyTuple{ParamBox})
+    locateParam!.(Ref(paramSet), target)
 end
 
 locateParam!(paramSet::AbstractVector, target::NamedTuple) = 
 locateParam!(paramSet, values(target))
+
+function locateParam!(paramSet::FlatParamSet{T}, target::FlatParamSet{T}) where {T}
+    d0ptrs, d1ptrs = map( fieldnames(FlatParamSet), 
+                          (FlatPSetInnerPtr{T}, IndexPointer{T}) ) do n, t
+        locateParam!(getfield(paramSet, n), getfield(target, n), emptyReturnEltype=t)
+    end
+    d0ptrs = linkPointer.(Ref(FirstIndex()), d0ptrs)
+    if !isempty(d1ptrs)
+        offset = 2 - firstindex(paramSet.d1)
+        d1ptrs = map(x->ChainPointer(x.chain .+ offset, x.type), d1ptrs)
+    end
+    FlatParamSetFilter(getMemory(d0ptrs), getMemory(d1ptrs), Identifier(paramSet))
+end
+
+function locateParam!(paramSet::AbstractVector, target::FlatParamSet{T}) where {T}
+    d0ptrs, d1ptrs = map(fieldnames(FlatParamSet)) do n
+        locateParam!.(Ref(paramSet), getfield(target, n))
+    end
+    FlatParamSetFilter(getMemory(d0ptrs), getMemory(d1ptrs), Identifier(paramSet))
+end
 
 
 const DimensionalSpanMemory{T} = Union{T, ShapedMemory{T}, ShapedMemory{ShapedMemory{T}}}
