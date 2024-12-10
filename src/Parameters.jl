@@ -1357,7 +1357,7 @@ function getFieldParamsCore!(paramPairs::Vector{Tuple{ParamBox, ChainPointer}},
         for fieldSym in content
             field = getField(source, fieldSym)
             outputValConstraint = field isa ParamBox ? TensorType(field) : TensorType()
-            anchorNew = ChainPointer(anchor, ChainPointer(fieldSym, outputValConstraint))
+            anchorNew = linkPointer(anchor, ChainPointer(fieldSym, outputValConstraint))
             getFieldParamsCore!(paramPairs, field, anchorNew)
         end
     end
