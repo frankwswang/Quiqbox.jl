@@ -198,9 +198,11 @@ function resizeIdentifierCache(size::Int)
     nothing
 end
 
-function deleteIdentifierCacheKey(obj::Any)
+function deleteIdentifierCacheFor(obj::Any)
     key = BlackBox(obj)
-    LRUCache.delete!(IdentifierCache, key)
+    if haskey(IdentifierCache, key)
+        LRUCache.delete!(IdentifierCache, key)
+    end
     nothing
 end
 
