@@ -1,6 +1,9 @@
-(::SelectTrait{ParameterStyle})(::F) where {F<:Function} = 
-ifelse( hasmethod(unpackParamFunc!, Tuple{F, FlatParamSet}), 
-        DefinedParamFunc(), GeneralParamFunc() )
+(::SelectTrait{ParameterizationStyle})(::F) where {F<:Function} = 
+GenericFunction()
+
+(::SelectTrait{ParameterizationStyle})(::AbstractAmplitude{T}) where {T} = 
+TypedParamFunc{T}()
+
 
 # formatInput
 (::SelectTrait{InputStyle})(::Type{<:SphericalHarmonics{D}}) where {D} = 
