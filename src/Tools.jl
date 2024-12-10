@@ -1082,7 +1082,7 @@ end
 getMemory(obj::Memory) = itself(obj)
 
 function getMemory(obj::AbstractArray{T}) where {T}
-    arr = vec(isconcretetype(T) ? obj : itself.(obj))
+    arr = vec(isconcretetype(T) || isempty(obj) ? obj : itself.(obj))
     Memory{eltype(arr)}(arr)
 end
 
