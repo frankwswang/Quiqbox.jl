@@ -27,14 +27,14 @@ returnUndefinedTraitError(Differentiability, T)
 
 abstract type FunctionStyle <: AnyInterface end
 
-abstract type ParameterStyle <: FunctionStyle end
+abstract type ParameterizationStyle <: FunctionStyle end
 
-struct DefinedParamFunc <: ParameterStyle end
+struct TypedParamFunc{T} <: ParameterizationStyle end
 
-struct GeneralParamFunc <: ParameterStyle end
+struct GenericFunction <: ParameterizationStyle end
 
-(::SelectTrait{ParameterStyle})(::T) where {T} = 
-returnUndefinedTraitError(ParameterStyle, T)
+(::SelectTrait{ParameterizationStyle})(::T) where {T} = 
+returnUndefinedTraitError(ParameterizationStyle, T)
 
 
 abstract type InputStyle <: FunctionStyle end

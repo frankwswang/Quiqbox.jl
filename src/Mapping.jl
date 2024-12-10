@@ -15,7 +15,6 @@ VectorMemory(getMemory(input), Val(L+1))
 
 VectorMemory(input::VectorMemory)  = itself(input)
 
-import Base: size, getindex, setindex!, iterate, length
 size(::VectorMemory{<:Any, L}) where {L} = (L,)
 
 getindex(arr::VectorMemory, i::Int) = getindex(arr.value, i)
@@ -61,34 +60,27 @@ const StableMul{T} = StableBinary{T, typeof(*)}
 StableBinary(f::Function) = Base.Fix1(StableBinary, f)
 
 
-struct ParamFilter{F<:Function, T<:NestedTensorPointer} <: ParamFuncBuilder{F}
+struct ParamFilterFunc{F<:Function, T<:NestedPointer} <: ParamFuncBuilder{F}
     apply::F
     filter::T
 end
 
-(f::ParamFilter)(input, param) = f.apply(input, f.filter(param))
+(f::ParamFilterFunc)(input, param) = f.apply(input, getField(param, f.filter))
 
-struct PointerFunc{F<:Function, P1<:NestedTensorPointer, 
-                   P2<:Tuple{Vararg{ChainIndexer}}} <: ParamFuncBuilder{F}
+struct ParamSelectFunc{F<:Function, T<:Tuple{Vararg{ChainIndexer}}} <: ParamFuncBuilder{F}
     apply::F
-    filter::P1
-    select::P2
-    source::Identifier
+    select::T
 end
 
-function (f::PointerFunc)(input, param)
-    paramSector = getField(param, f.filter)
-    f.apply(input, getField.(Ref(paramSector), f.select)...)
+ParamSelectFunc(f::Function) = ParamSelectFunc(f, ())
+
+function (f::ParamSelectFunc)(input, param)
+    f.apply(input, getField.(Ref(param), f.select)...)
 end
 
-(f::PointerFunc{<:Function, <:NestedTensorPointer, Tuple{}})(input, _) = f.apply(input)
+(f::ParamSelectFunc{<:Function, Tuple{}})(input, _) = f.apply(input)
 
-const SinglePtrFunc{F<:Function, P<:NestedTensorPointer, T<:ChainIndexer} = 
-      PointerFunc{F, P, Tuple{T}}
-
-const TypedArrArrPtrFunc{T, F<:Function, P1<:OneLayerAllPass{T}, 
-                         P2<:Tuple{Vararg{ChainIndexer}}} = 
-      PointerFunc{F, P1, P2}
+const GetParamFunc{F<:Function, T<:ChainIndexer} = ParamSelectFunc{F, Tuple{T}}
 
 
 struct OnlyHead{F<:Function} <: FunctionModifier
@@ -187,18 +179,22 @@ function evalFunc(fCore::F, pVals::AbtVecOfAbtArr, input::T) where {F<:Function,
     fCore(input, pVals)
 end
 
-#! Possibly adding memoization in the future.
-unpackFunc(f::Function) = unpackFunc!(f, initializeParamSet(FlatParamSet))
-
-unpackFunc(f::AbstractAmplitude{T}) where {T} = 
-unpackFunc!(f, initializeParamSet(FlatParamSet, T))
+#! Possibly adding memoization in the future to generate/use the same param set to avoid 
+#! bloating `Quiqbox.IdentifierCache` and prevent repeated computation.
+unpackFunc(f::Function) = unpackFunc!(f, initializeParamSet(f))
 
 unpackFunc!(f::Function, paramSet::AbstractVector) = 
-unpackFunc!(SelectTrait{ParameterStyle}()(f), f, paramSet)
+unpackFunc!(SelectTrait{ParameterizationStyle}()(f), f, paramSet)
 
-unpackFunc!(::DefinedParamFunc, f::Function, paramSet::AbstractVector) = 
+unpackFunc!(::TypedParamFunc, f::Function, paramSet::AbstractVector) = 
 unpackParamFunc!(f, paramSet)
 
+unpackFunc!(::GenericFunction, f::Function, paramSet::AbstractVector) = 
+unpackTypedFunc!(f, paramSet)
+
+const FlatPSetFilterFunc{T, F<:Function} = ParamFilterFunc{F, FlatParamSetFilter{T}}
+const PointerPairVec{T<:ChainPointer} = AbstractVector{<:Pair{<:ChainPointer, T}}
+const FieldPtrPairs{T} = PointerPairVec{<:FlatParamSetIdxPtr{T}}
 const FieldPtrDict{T} = AbstractDict{<:ChainPointer, <:FlatParamSetIdxPtr{T}}
 const EmptyFieldPtrDict{T} = TypedEmptyDict{Union{}, FlatPSetInnerPtr{T}}
 const FiniteFieldPtrDict{T, N} = FiniteDict{N, <:ChainPointer, <:FlatParamSetIdxPtr{T}}
@@ -210,70 +206,89 @@ abstract type FieldParamPointer{R} <: Any end
 
 struct MixedFieldParamPointer{T, R<:FieldPtrDict{T}} <: FieldParamPointer{R}
     core::R
-    source::Identifier
+    id::Identifier
 end
 
-MixedFieldParamPointer(pair::Pair, source::Identifier) = 
-MixedFieldParamPointer(buildDict(pair), source)
-
-MixedFieldParamPointer(::Type{T}, source::Identifier) where {T} = 
-MixedFieldParamPointer(EmptyFieldPtrDict{T}(), source)
-
-function anchorFieldPointerDictCore(d::FieldPtrDict{T}, anchor::ChainPointer) where {T}
-    map( collect(d) ) do pair
-        ChainPointer(anchor, pair.first) => pair.second
-    end
+function MixedFieldParamPointer(paramPairs::FieldPtrPairs{T}, 
+                                paramSet::FlatParamSet{T}) where {T}
+    coreDict = buildDict(paramPairs, EmptyFieldPtrDict{T})
+    MixedFieldParamPointer(coreDict, Identifier(paramSet))
 end
 
-function anchorFieldPointerDict(d::FieldPtrDict{T}, anchor::ChainPointer) where {T}
-    buildDict( anchorFieldPointerDictCore(d, anchor), EmptyFieldPtrDict{T} )
+# MixedFieldParamPointer(pair::Pair, source::Identifier) = 
+# MixedFieldParamPointer(buildDict(pair), source)
+
+# MixedFieldParamPointer(::Type{T}, source::Identifier) where {T} = 
+# MixedFieldParamPointer(EmptyFieldPtrDict{T}(), source)
+
+function getPointerPairs(dict::AbstractDict{<:ChainPointer, <:ChainPointer})
+    collect(dict)
 end
 
-function anchorFieldPointerDict(d::FiniteFieldPtrDict{T, 0}, ::ChainPointer) where {T}
-    itself(d)
+function getPointerPairs(paramPtr::MixedFieldParamPointer)
+    getPointerPairs(paramPtr.core)
 end
 
-# function anchorFieldPointerDict(d::SingleParPtrDict, anchor::ChainPointer)
-#     buildDict( anchorFieldPointerDictCore(d, anchor)[] )
-# end
+function anchorLeft(pairs::PointerPairVec, anchor::NestedPointer)
+    map(x->(linkPointer(anchor, x.first)=>x.second), pairs)
+end
 
-# # Not as performant as Dict, even for small dictionaries.
-# function anchorFieldPointerDict(d::ImmutableDict{<:ChainPointer, <:ChainPointer}, 
-#                                 anchor::ChainPointer)
-#     res = anchorFieldPointerDictCore(d, anchor)
-#     if length(res) > 1
-#         head, body = res
-#         foldl(ImmutableDict, body, init=ImmutableDict(head))
-#     else
-#         ImmutableDict(res[])
+function anchorRight(pairs::PointerPairVec, anchor::NestedPointer)
+    map(x->(x.first=>linkPointer(anchor, x.second)), pairs)
+end
+
+# function anchorFieldPointerDictCore(d::FieldPtrDict{T}, anchor::ChainPointer) where {T}
+#     map( collect(d) ) do pair
+#         linkPointer(anchor, pair.first) => pair.second
 #     end
 # end
 
-# `f` should only take one input.
-unpackFunc!(::GeneralParamFunc, f::Function, paramSet::AbstractVector) = 
-unpackFunc!(GeneralParamFunc(), ReturnTyped(f, Any), paramSet)
+# function anchorFieldPointerDict(d::FieldPtrDict{T}, anchor::ChainPointer) where {T}
+#     buildDict( anchorFieldPointerDictCore(d, anchor), EmptyFieldPtrDict{T} )
+# end
 
-function unpackFunc!(::GeneralParamFunc, f::ReturnTyped{T}, 
-                     paramSet::AbstractVector) where {T}
-    pSetId = Identifier(paramSet)
+# function anchorFieldPointerDict(d::FiniteFieldPtrDict{T, 0}, ::ChainPointer) where {T}
+#     itself(d)
+# end
+
+
+# function extendChainPointerDict(d::AbstractDict{<:ChainPointer, <:ChainPointer}, 
+#                                 key::NestedPointer, val::NestedPointer=ChainPointer())
+#     map( collect(d) ) do pair
+#         linkPointer(anchor, pair.first) => pair.second
+#     end
+# end
+
+
+# `f` should only take one input.
+unpackTypedFunc!(f::Function, paramSet::AbstractVector) = 
+unpackTypedFunc!(ReturnTyped(f, Any), paramSet)
+
+function unpackTypedFuncCore!(f::ReturnTyped{T}, paramSet::AbstractVector) where {T}
     params, anchors = getFieldParams(f)
-    filter = AllPassPointer{T, nestedLevelOf(paramSet)}()
     if isempty(params)
-        PointerFunc(f, filter, (), pSetId), paramSet, MixedFieldParamPointer(T, pSetId)
+        ParamSelectFunc(f), paramSet, Pair{<:ChainPointer, <:FlatParamSetIdxPtr{T}}[]
     else
         ids = locateParam!(paramSet, params)
-        paramFieldPointer = MixedFieldParamPointer(Dict(anchors .=> ids), pSetId)
-        fCopy = deepcopy(f)
-        paramDoubles = deepcopy(params)
+        fDummy = deepcopy(f.f)
+        paramDoubles = getFieldParams(fDummy)
         foreach(p->setScreenLevel!(p.source, 1), paramDoubles)
         evalCore = function (x, pVals::Vararg)
             for (p, v) in zip(paramDoubles, pVals)
                 setVal!(p, v)
             end
-            fCopy(x)
+            fDummy(x)
         end
-        PointerFunc(evalCore, filter, ids, pSetId), paramSet, paramFieldPointer
+        paramPairs = getMemory(linkPointer(:apply, anchors) .=> ids)
+        ParamSelectFunc(ReturnTyped(evalCore, T), ids), paramSet, paramPairs
     end
+end
+
+function unpackTypedFunc!(f::ReturnTyped{T}, paramSet::AbstractVector) where {T}
+    pSetId = Identifier(paramSet)
+    fCore, _, paramPairs = unpackTypedFuncCore!(f, paramSet)
+    paramPtr = MixedFieldParamPointer(buildDict(paramPairs, EmptyFieldPtrDict{T}), pSetId)
+    fCore, paramSet, paramPtr
 end
 
 
@@ -282,7 +297,7 @@ struct Identity <: DirectOperator end
 (::Identity)(f::Function) = itself(f)
 
 
-struct LeftPartial{F<:Function, A<:NonEmptyTuple{Any}} <: FunctionComposer
+struct LeftPartial{F<:Function, A<:NonEmptyTuple{Any}} <: FunctionModifier
     f::F
     header::A
 
