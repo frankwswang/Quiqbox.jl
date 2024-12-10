@@ -205,7 +205,7 @@ end
 
 CompositeOrb(ob::CompositeOrb) = itself(ob)
 
-const GetPFWeightEntry{T} = GetParamFunc{OnlyBody{GetIndex{T, 0}}, IndexPointer{T, 1}}
+const GetPFWeightEntry{T} = GetParamFunc{OnlyBody{GetScalarIdx{T}}, IndexPointer{Volume{T}}}
 
 const WeightedPF{T, D, U<:EvalPrimOrb{T, D}} = ScaledOrbital{T, D, U, GetPFWeightEntry{T}}
 
@@ -253,7 +253,7 @@ end
 struct CompOrbParamPtr{T, D, R<:FieldPtrDict{T}, 
                        P<:PrimOrbParamPtr{T, D, <:R}} <: ComposedOrbParamPtr{T, D, R}
     basis::Memory{P}
-    weight::IndexPointer{T, 1}
+    weight::IndexPointer{Volume{T}}
     id::Identifier
 
     CompOrbParamPtr{R}(basis::Memory{P}, weight::ChainPointer, id::Identifier) where 

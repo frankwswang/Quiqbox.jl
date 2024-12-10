@@ -1,22 +1,31 @@
 using LRUCache
 
-struct TensorType{T, N} <: StructuredType
-    shape::NTuple{N, Int}
+struct Flavor{T} <: StructuredType end
 
-    TensorType(::T) where {T} = new{T, 0}(())
-    TensorType(::Type{T}=Any, shape::NTuple{N, Int}=()) where {T, N} = new{T, N}(shape)
+struct Volume{T} <: StructuredType
+    axis::NonEmptyTuple{Int}
+
+    Volume{T}(axis::NonEmptyTuple{Int}) where {T} = new{T}(axis)
 end
 
+const TensorType{T} = Union{Flavor{T}, Volume{T}}
+
+TensorType(::Type{T}=Any) where {T} = Flavor{T}()
+
+TensorType(::Type{T}, axis::NonEmptyTuple{Int}) where {T} = Volume{T}(axis)
+
 TensorType(t::TensorType) = itself(t)
-TensorType(a::AbstractArray{T, N}) where {T, N} = TensorType(T, size(a))
-TensorType(::ElementalParam{T}) where {T} = TensorType(T)
-TensorType(p::FlattenedParam{T}) where {T} = TensorType(T, outputSizeOf(p))
+
+TensorType(::AbstractArray{T, 0}) where {T} = Flavor{T}()
+
+TensorType(a::AbstractArray{T}) where {T} = Volume{T}(size(a))
+
+TensorType(::ElementalParam{T}) where {T} = Flavor{T}()
+
+TensorType(p::FlattenedParam{T}) where {T} = Volume{T}(outputSizeOf(p))
+
 TensorType(p::JaggedParam{T, N}) where {T, N} = 
-TensorType(AbstractArray{T, N}, outputSizeOf(p))
-
-(::TensorType{T, 0})() where {T} = T
-
-(::TensorType{T, N})() where {T, N} = AbstractArray{T, N}
+Volume{AbstractArray{T, N}}(outputSizeOf(p))
 
 
 struct FirstIndex <: StructuredType end
@@ -24,21 +33,27 @@ struct FirstIndex <: StructuredType end
 const GeneralFieldName = Union{Int, Symbol, FirstIndex, Nothing}
 
 
-struct ChainPointer{T, N, L, C<:NTuple{L, GeneralFieldName}} <: NestedPointer{L, L}
+struct ChainPointer{A<:TensorType, L, C<:NTuple{L, GeneralFieldName}} <: NestedPointer{L, L}
     chain::C
-    type::TensorType{T, N}
+    type::A
 
-    ChainPointer(chain::C, type::TensorType{T, N}=TensorType()) where 
-                {T, N, L, C<:NTuple{L, GeneralFieldName}} = 
-    new{T, N, L, C}(chain, type)
+    ChainPointer(chain::C, type::A=TensorType()) where 
+                {A<:TensorType, L, C<:NTuple{L, GeneralFieldName}} = 
+    new{A, L, C}(chain, type)
 end
 
-const AllPassPtr{T, N} = ChainPointer{T, N, 0, Tuple{}}
+const AllPassPtr{A<:TensorType} = ChainPointer{A, 0, Tuple{}}
 
-const IndexPointer{T, N} = ChainPointer{T, N, 1, Tuple{Int}}
+const TypedPointer{T, A<:TensorType{T}} = ChainPointer{A}
 
-const ChainIndexer{T, N, L, C<:NTuple{L, Union{Int, FirstIndex, Nothing}}} = 
-      ChainPointer{T, N, L, C}
+const IndexPointer{A<:TensorType} = ChainPointer{A, 1, Tuple{Int}}
+
+const PointPointer{T, L, C<:NTuple{L, GeneralFieldName}} = ChainPointer{Flavor{T}, L, C}
+
+const ArrayPointer{T, L, C<:NTuple{L, GeneralFieldName}} = ChainPointer{Volume{T}, L, C}
+
+const ChainIndexer{A<:TensorType, L, C<:NTuple{L, Union{Int, FirstIndex, Nothing}}} = 
+      ChainPointer{A, L, C}
 
 ChainPointer(sourceType::TensorType=TensorType()) = ChainPointer((), sourceType)
 
@@ -65,11 +80,12 @@ end
 
 getField(ptr) = Base.Fix2(getField, ptr)
 
-const GetField{T, N, L, C} = Base.Fix2{typeof(getField), ChainPointer{T, N, L, C}}
+const GetField{A<:TensorType, L, C<:NTuple{L, GeneralFieldName}} = 
+      Base.Fix2{typeof(getField), ChainPointer{A, L, C}}
 
-const GetIndex{T, N} = GetField{T, N, 1, Tuple{Int}}
+const GetScalarIdx{T} = GetField{Flavor{T}, 1, Tuple{Int}}
 
-getField(obj, ::ChainPointer{<:Any, <:Any, 0}) = itself(obj)
+getField(obj, ::AllPassPtr) = itself(obj)
 
 getField(obj, ::FirstIndex) = first(obj)
 

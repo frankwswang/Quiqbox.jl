@@ -1692,11 +1692,13 @@ MiscParamSet(FlatParamSet(S1[], S2[]), S3[])
 
 #!  SingleNestParamSet
 #!  DoubleNestParamSet
-const FlatPSetInnerPtr{T} = ChainPointer{T, 0, 2, Tuple{FirstIndex, Int}}
+const FlatPSetInnerPtr{T} = PointPointer{T, 2, Tuple{FirstIndex, Int}}
+const FlatPSetOuterPtr{T} = IndexPointer{Volume{T}}
+const FlatParamSetIdxPtr{T} = Union{FlatPSetInnerPtr{T}, FlatPSetOuterPtr{T}}
 
 struct FlatParamSetFilter{T} <: NestedPointer{1, 2}
     d0::Memory{FlatPSetInnerPtr{T}} #! Replace by immutable vector
-    d1::Memory{<:IndexPointer{T}}   #! Replace by immutable vector
+    d1::Memory{FlatPSetOuterPtr{T}} #! Replace by immutable vector
     sourceID::Identifier
 end
 
@@ -1704,10 +1706,8 @@ function FlatParamSetFilter(pSet::FlatParamSet{T}, d0Ids::AbstractVector{Int},
                             d1Ids::AbstractVector{Int}) where {T}
     d0Ptr = map(d0Idx->ChainPointer((FirstIndex, d0Idx), TensorType(T)), d0Ids)
     d1Ptr = map(d1Idx->ChainPointer((d1Idx+1,), TensorType(pSet.d1[d1Idx])), d1Ids)
-    FlatParamSetFilter(getMemory(d0Ptr), Memory{IndexPointer{T}}(d1Ptr), Identifier(pSet))
+    FlatParamSetFilter(getMemory(d0Ptr), getMemory(d1Ptr), Identifier(pSet))
 end
-
-const FlatParamSetIdxPtr{T} = Union{FlatPSetInnerPtr{T}, IndexPointer{T}}
 
 size(fps::FlatParamSetFilter) = size(fps.d1) .+ 1
 
@@ -1776,7 +1776,7 @@ function locateParam!(paramSet::AbstractVector, target::P) where {P<:ParamBox}
 end
 
 function locateParam!(paramSet::AbstractVector, target::AbstractArray{<:ParamBox{T}, N}; 
-                      emptyReturnEltype::Type{<:ChainPointer{T}}=ChainPointer{T}) where 
+                      emptyReturnEltype::Type{<:TypedPointer{T}}=TypedPointer{T}) where 
                      {T, N}
     if isempty(target)
         Array{emptyReturnEltype}(undef, ntuple(_->0, Val(N)))
@@ -1794,7 +1794,7 @@ locateParam!(paramSet, values(target))
 
 function locateParam!(paramSet::FlatParamSet{T}, target::FlatParamSet{T}) where {T}
     d0ptrs, d1ptrs = map( fieldnames(FlatParamSet), 
-                          (FlatPSetInnerPtr{T}, IndexPointer{T}) ) do n, t
+                          (FlatPSetInnerPtr{T}, FlatPSetOuterPtr{T}) ) do n, t
         locateParam!(getfield(paramSet, n), getfield(target, n), emptyReturnEltype=t)
     end
     d0ptrs = linkPointer.(Ref(FirstIndex()), d0ptrs)

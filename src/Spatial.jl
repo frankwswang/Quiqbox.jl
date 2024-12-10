@@ -53,8 +53,10 @@ function (f::ComputeGFunc{T})(r::Real, xpnVal::T) where {T}
     exp(-xpnVal * r * r)
 end
 
+const EvalGaussFuncCore{T} = GetParamFunc{ComputeGFunc{T}, AllPassPtr{Flavor{T}}}
+
 struct EvalGaussFunc{T} <: EvalFieldAmp{T, 0, GaussFunc}
-    f::ParamFilterFunc{GetParamFunc{ComputeGFunc{T}, AllPassPtr{T, 0}}, FlatPSetInnerPtr{T}}
+    f::ParamFilterFunc{EvalGaussFuncCore{T}, FlatPSetInnerPtr{T}}
 end
 
 function unpackParamFuncCore!(f::GaussFunc{T, P}, paramSet::FlatParamSet) where {T, P}
@@ -82,7 +84,7 @@ function AxialProdFunc(b::FieldAmplitude{<:Any, 0}, dim::Int)
     (AxialProdFunc∘Tuple∘fill)(b, dim)
 end
 
-const EvalAxialField{T, F<:EvalFieldAmp{T, 0}} = InsertInward{F, OnlyHead{GetIndex{T, 0}}}
+const EvalAxialField{T, F<:EvalFieldAmp{T, 0}} = InsertInward{F, OnlyHead{GetScalarIdx{T}}}
 
 struct EvalAxialProdFunc{T, D, F<:EvalFieldAmp{T, 0}} <: EvalFieldAmp{T, D, AxialProdFunc}
     f::FlatPSetFilterFunc{T, CountedChainReduce{StableMul{T}, EvalAxialField{T, F}, D}}
