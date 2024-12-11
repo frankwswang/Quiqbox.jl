@@ -5,6 +5,7 @@ export TensorVar, CellParam, GridParam, ParamGrid, ParamMesh, setScreenLevel!,
 
 using Base: Fix2, Threads.Atomic, issingletontype
 using Test: @inferred
+using LazyArrays
 
 
 function checkReshapingAxis(arr::AbstractArray, shape::Tuple{Vararg{Int}})
@@ -1738,7 +1739,10 @@ getproperty(fps::FlatParamSetFilter, field::Symbol) = getfield(fps, field)
 
 #= Additional Method =#
 function getField(obj, p::FlatParamSetFilter)
-    vcat([getField.(Ref(obj), p.d0)], getField.(Ref(obj), p.d1))
+    refObj = LazyArrays.Fill(obj)
+    head = BroadcastArray(getField, refObj, p.d0)
+    body = BroadcastArray(getField, refObj, p.d1)
+    ApplyArray(vcat, LazyArrays.Fill(head), body)
 end
 
 #= Additional Method =#
