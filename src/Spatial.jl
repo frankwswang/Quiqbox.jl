@@ -27,17 +27,15 @@ struct FieldFunc{T<:Number, F<:Function} <: FieldAmplitude{T, 0}
     end
 end
 
-struct EvalFieldFunc{T, F<:FlatPSetFilterFunc{T, <:ParamSelectFunc{<:ReturnTyped{T}}}
+struct EvalFieldFunc{T, F<:ParamSelectFunc{<:ReturnTyped{T}}
                      } <: EvalFieldAmp{T, 0, FieldFunc}
     f::F
 end
 
 function unpackParamFuncCore!(f::FieldFunc{T}, paramSet::FlatParamSet) where {T}
     pSetLocal = initializeParamSet(FlatParamSet, T)
-    fEvalCore, _, innerPairs = unpackTypedFuncCore!(f, pSetLocal)
-    pFilter = locateParam!(paramSet, pSetLocal)
-    pairs = anchorRight(innerPairs, pFilter)
-    EvalFieldFunc(ParamFilterFunc(fEvalCore, pFilter)), paramSet, pairs
+    fEvalCore, _, pairs = unpackTypedFuncCore!(f, pSetLocal)
+    EvalFieldFunc(fEvalCore), paramSet, pairs
 end
 
 
@@ -53,19 +51,15 @@ function (f::ComputeGFunc{T})(r::Real, xpnVal::T) where {T}
     exp(-xpnVal * r * r)
 end
 
-const EvalGaussFuncCore{T} = GetParamFunc{ComputeGFunc{T}, AllPassPtr{Flavor{T}}}
-
 struct EvalGaussFunc{T} <: EvalFieldAmp{T, 0, GaussFunc}
-    f::ParamFilterFunc{EvalGaussFuncCore{T}, FlatPSetInnerPtr{T}}
+    f::GetParamFunc{ComputeGFunc{T}, FlatPSetInnerPtr{T}}
 end
 
 function unpackParamFuncCore!(f::GaussFunc{T, P}, paramSet::FlatParamSet) where {T, P}
     anchor = ChainPointer(:xpn, TensorType(T))
-    parIdxInner = ChainPointer((), TensorType(T))
-    parIdxOuter = locateParam!(paramSet, getField(f, anchor))
-    fEvalCore = ParamSelectFunc(ComputeGFunc{T}(), (parIdxInner,))
-    fEval = ParamFilterFunc(fEvalCore, parIdxOuter)
-    EvalGaussFunc(fEval), paramSet, [anchor=>parIdxOuter]
+    parIdx = locateParam!(paramSet, getField(f, anchor))
+    fEvalCore = ParamSelectFunc(ComputeGFunc{T}(), (parIdx,))
+    EvalGaussFunc(fEvalCore), paramSet, [anchor=>parIdx]
 end
 
 
@@ -84,26 +78,22 @@ function AxialProdFunc(b::FieldAmplitude{<:Any, 0}, dim::Int)
     (AxialProdFunc∘Tuple∘fill)(b, dim)
 end
 
-const EvalAxialField{T, F<:EvalFieldAmp{T, 0}} = InsertInward{F, OnlyHead{GetScalarIdx{T}}}
-
 struct EvalAxialProdFunc{T, D, F<:EvalFieldAmp{T, 0}} <: EvalFieldAmp{T, D, AxialProdFunc}
-    f::FlatPSetFilterFunc{T, CountedChainReduce{StableMul{T}, EvalAxialField{T, F}, D}}
+    f::CountedChainReduce{StableMul{T}, InsertInward{F, OnlyHead{GetScalarIdx{T}}}, D}
 end
 
 function unpackParamFuncCore!(f::AxialProdFunc{T, D}, paramSet::FlatParamSet) where {T, D}
     fEvalComps = Memory{Function}(undef, D)
     pSetLocal = initializeParamSet(FlatParamSet, T)
-    innerPairs = mapfoldl(vcat, 1:D) do i
+    pairs = mapfoldl(vcat, 1:D) do i
         anchor = ChainPointer((:axis, i))
         fInner, _, axialPairs = unpackParamFuncCore!(f.axis[i], pSetLocal)
         ptr = ChainPointer(i, TensorType(T))
         fEvalComps[i] = InsertInward(fInner, (OnlyHead∘getField)(ptr))
         anchorLeft(axialPairs, anchor)
     end
-    pFilter = locateParam!(paramSet, pSetLocal)
-    pairs = anchorRight(innerPairs, pFilter)
     fEvalCore = Tuple(fEvalComps) |> (ChainReduce∘StableBinary)(*, T)
-    EvalAxialProdFunc(ParamFilterFunc(fEvalCore, pFilter)), paramSet, pairs
+    EvalAxialProdFunc(fEvalCore), paramSet, pairs
 end
 
 
@@ -119,23 +109,19 @@ const MagnitudeConverter{F} = InsertInward{F, OnlyHead{typeof(LinearAlgebra.norm
 
 const TypedAngularFunc{T, D, L} = OnlyHead{ReturnTyped{T, CartSHarmonics{D, L}}}
 
-const EvalPolyRadialFuncCore{T, D, F, L} = 
-      PairCombine{StableMul{T}, MagnitudeConverter{F}, TypedAngularFunc{T, D, L}}
-
 struct EvalPolyRadialFunc{T, D, F<:EvalFieldAmp{T, 0}, 
                           L} <: EvalFieldAmp{T, D, PolyRadialFunc}
-    f::FlatPSetFilterFunc{T, EvalPolyRadialFuncCore{T, D, F, L}}
+    f::PairCombine{StableMul{T}, MagnitudeConverter{F}, TypedAngularFunc{T, D, L}}
 end
 
 function unpackParamFuncCore!(f::PolyRadialFunc{T, D}, paramSet::FlatParamSet) where {T, D}
     pSetLocal = initializeParamSet(FlatParamSet, T)
     fInner, _, radialPairs = unpackParamFuncCore!(f.radial, pSetLocal)
-    pFilter = locateParam!(paramSet, pSetLocal)
-    pairs = anchorRight(anchorLeft(radialPairs, ChainPointer(:radial)), pFilter)
+    pairs = anchorLeft(radialPairs, ChainPointer(:radial))
     coordEncoder = InsertInward(fInner, OnlyHead(LinearAlgebra.norm))
     angularFunc = (OnlyHead∘ReturnTyped)(f.angular, T)
     fEvalCore = PairCombine(StableBinary(*, T), coordEncoder, angularFunc)
-    EvalPolyRadialFunc(ParamFilterFunc(fEvalCore, pFilter)), paramSet, pairs
+    EvalPolyRadialFunc(fEvalCore), paramSet, pairs
 end
 
 const PolyGaussProd{T, D, L} = PolyRadialFunc{T, D, <:GaussFunc{T}, L}
