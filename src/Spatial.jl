@@ -33,8 +33,7 @@ struct EvalFieldFunc{T, F<:ParamSelectFunc{<:ReturnTyped{T}}
 end
 
 function unpackParamFuncCore!(f::FieldFunc{T}, paramSet::FlatParamSet) where {T}
-    pSetLocal = initializeParamSet(FlatParamSet, T)
-    fEvalCore, _, pairs = unpackTypedFuncCore!(f, pSetLocal)
+    fEvalCore, _, pairs = unpackTypedFuncCore!(f, paramSet)
     EvalFieldFunc(fEvalCore), paramSet, pairs
 end
 
@@ -84,10 +83,9 @@ end
 
 function unpackParamFuncCore!(f::AxialProdFunc{T, D}, paramSet::FlatParamSet) where {T, D}
     fEvalComps = Memory{Function}(undef, D)
-    pSetLocal = initializeParamSet(FlatParamSet, T)
     pairs = mapfoldl(vcat, 1:D) do i
         anchor = ChainPointer((:axis, i))
-        fInner, _, axialPairs = unpackParamFuncCore!(f.axis[i], pSetLocal)
+        fInner, _, axialPairs = unpackParamFuncCore!(f.axis[i], paramSet)
         ptr = ChainPointer(i, TensorType(T))
         fEvalComps[i] = InsertInward(fInner, (OnlyHead∘getField)(ptr))
         anchorLeft(axialPairs, anchor)
@@ -115,8 +113,7 @@ struct EvalPolyRadialFunc{T, D, F<:EvalFieldAmp{T, 0},
 end
 
 function unpackParamFuncCore!(f::PolyRadialFunc{T, D}, paramSet::FlatParamSet) where {T, D}
-    pSetLocal = initializeParamSet(FlatParamSet, T)
-    fInner, _, radialPairs = unpackParamFuncCore!(f.radial, pSetLocal)
+    fInner, _, radialPairs = unpackParamFuncCore!(f.radial, paramSet)
     pairs = anchorLeft(radialPairs, ChainPointer(:radial))
     coordEncoder = InsertInward(fInner, OnlyHead(LinearAlgebra.norm))
     angularFunc = (OnlyHead∘ReturnTyped)(f.angular, T)
