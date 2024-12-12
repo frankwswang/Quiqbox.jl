@@ -5,7 +5,6 @@ export TensorVar, CellParam, GridParam, ParamGrid, ParamMesh, setScreenLevel!,
 
 using Base: Fix2, Threads.Atomic, issingletontype
 using Test: @inferred
-using LazyArrays
 
 
 function checkReshapingAxis(arr::AbstractArray, shape::Tuple{Vararg{Int}})
@@ -1529,11 +1528,14 @@ firstindex(::FlatParamSet) = 1
 
 lastindex(fps::FlatParamSet) = length(fps.d1) + 1
 
+getFlatSetIndexCore(target, i::Int) = 
+getindex(target.d1, i+firstindex(target.d1)-2)
+
 function getFlatSetIndex(target, i::Int)
     if i == 1
         target.d0
     else
-        getindex(target.d1, i+firstindex(target.d1)-2)
+        getFlatSetIndexCore(target, i)
     end
 end
 
@@ -1697,7 +1699,7 @@ const FlatPSetInnerPtr{T} = PointPointer{T, 2, Tuple{FirstIndex, Int}}
 const FlatPSetOuterPtr{T} = IndexPointer{Volume{T}}
 const FlatParamSetIdxPtr{T} = Union{FlatPSetInnerPtr{T}, FlatPSetOuterPtr{T}}
 
-struct FlatParamSetFilter{T} <: NestedPointer{1, 2}
+struct FlatParamSetFilter{T} <: BlockPointer{1, 2}
     d0::Memory{FlatPSetInnerPtr{T}} #! Replace by immutable vector
     d1::Memory{FlatPSetOuterPtr{T}} #! Replace by immutable vector
     sourceID::Identifier
@@ -1738,11 +1740,17 @@ length(fps::FlatParamSetFilter) = length(fps.d1) + 1
 getproperty(fps::FlatParamSetFilter, field::Symbol) = getfield(fps, field)
 
 #= Additional Method =#
-function getField(obj, p::FlatParamSetFilter)
-    refObj = LazyArrays.Fill(obj)
-    head = BroadcastArray(getField, refObj, p.d0)
-    body = BroadcastArray(getField, refObj, p.d1)
-    ApplyArray(vcat, LazyArrays.Fill(head), body)
+getField(obj, p::FlatParamSetFilter) = map(x->getField(obj, x), p)
+
+getField(obj::FlatParamSetFilter, ptr::FlatPSetInnerPtr) = 
+getindex(obj.d0, last(ptr.chain))
+
+getField(obj::FlatParamSetFilter, ptr::FlatPSetOuterPtr) = 
+getFlatSetIndexCore(obj, first(ptr.chain))
+
+function getField(obj::PointedObject{<:Any, <:FlatParamSetFilter}, 
+                  ptr::FlatParamSetIdxPtr)
+    getField(obj.obj, getField(obj.ptr, ptr))
 end
 
 #= Additional Method =#

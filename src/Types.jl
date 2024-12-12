@@ -33,6 +33,11 @@ abstract type JoinedOperator{J} <: FunctionComposer end
 abstract type NestedPointer{L, U} <: ConfigBox end
 abstract type StructuredType <: ConfigBox end
 
+abstract type InstantPointer{L, U} <: NestedPointer{L, U} end
+
+abstract type BlockPointer{L, U} <: InstantPointer{L, U} end
+abstract type EntryPointer{L} <: InstantPointer{L, L} end
+
 # M: Particle number
 abstract type SpatialAmpTensor{T, D, M, O} <: AbstractAmpTensor{T, O} end
 

@@ -79,7 +79,7 @@ function AxialProdFunc(b::FieldAmplitude{<:Any, 0}, dim::Int)
 end
 
 struct EvalAxialProdFunc{T, D, F<:EvalFieldAmp{T, 0}} <: EvalFieldAmp{T, D, AxialProdFunc}
-    f::CountedChainReduce{StableMul{T}, InsertInward{F, OnlyHead{GetScalarIdx{T}}}, D}
+    f::CountedChainReduce{StableMul{T}, InsertInward{F, OnlyHead{GetIdxField{T}}}, D}
 end
 
 function unpackParamFuncCore!(f::AxialProdFunc{T, D}, paramSet::FlatParamSet) where {T, D}

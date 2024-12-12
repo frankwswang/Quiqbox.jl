@@ -67,6 +67,9 @@ end
 
 (f::ParamFilterFunc)(input, param) = f.apply(input, getField(param, f.filter))
 
+const LazyParamFilter{F<:Function, L, U, T<:InstantPointer} = 
+      ParamFilterFunc{F, DelayedPointer{L, U, T}}
+
 struct ParamSelectFunc{F<:Function, T<:Tuple{Vararg{ChainIndexer}}} <: ParamFuncBuilder{F}
     apply::F
     select::T
@@ -192,7 +195,7 @@ unpackParamFunc!(f, paramSet)
 unpackFunc!(::GenericFunction, f::Function, paramSet::AbstractVector) = 
 unpackTypedFunc!(f, paramSet)
 
-const FlatPSetFilterFunc{T, F<:Function} = ParamFilterFunc{F, FlatParamSetFilter{T}}
+const FlatPSetFilterFunc{T, F<:Function} = LazyParamFilter{F, 1, 2, FlatParamSetFilter{T}}
 const PointerPairVec{T<:ChainPointer} = AbstractVector{<:Pair{<:ChainPointer, T}}
 const FieldPtrPairs{T} = PointerPairVec{<:FlatParamSetIdxPtr{T}}
 const FieldPtrDict{T} = AbstractDict{<:ChainPointer, <:FlatParamSetIdxPtr{T}}

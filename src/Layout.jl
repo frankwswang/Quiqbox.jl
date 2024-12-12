@@ -33,7 +33,7 @@ struct FirstIndex <: StructuredType end
 const GeneralFieldName = Union{Int, Symbol, FirstIndex, Nothing}
 
 
-struct ChainPointer{A<:TensorType, L, C<:NTuple{L, GeneralFieldName}} <: NestedPointer{L, L}
+struct ChainPointer{A<:TensorType, L, C<:NTuple{L, GeneralFieldName}} <: EntryPointer{L}
     chain::C
     type::A
 
@@ -41,6 +41,8 @@ struct ChainPointer{A<:TensorType, L, C<:NTuple{L, GeneralFieldName}} <: NestedP
                 {A<:TensorType, L, C<:NTuple{L, GeneralFieldName}} = 
     new{A, L, C}(chain, type)
 end
+
+const GeneralInstantPtr = Union{GeneralFieldName, InstantPointer}
 
 const AllPassPtr{A<:TensorType} = ChainPointer{A, 0, Tuple{}}
 
@@ -78,12 +80,22 @@ function nestedLevelOf(obj::AbstractArray)
 end
 
 
+struct DelayedPointer{L, U, P<:InstantPointer{L, U}} <: NestedPointer{L, U}
+    ptr::P
+end
+
+DelayedPointer(ptr::DelayedPointer)  = itself(ptr)
+
+
+struct PointedObject{T, P<:NestedPointer} <: QueryBox{T}
+    obj::T
+    ptr::P
+end
+
+PointedObject(obj::Any, ptr::DelayedPointer) = PointedObject(obj, ptr.ptr)
+
+
 getField(ptr) = Base.Fix2(getField, ptr)
-
-const GetField{A<:TensorType, L, C<:NTuple{L, GeneralFieldName}} = 
-      Base.Fix2{typeof(getField), ChainPointer{A, L, C}}
-
-const GetScalarIdx{T} = GetField{Flavor{T}, 1, Tuple{Int}}
 
 getField(obj, ::AllPassPtr) = itself(obj)
 
@@ -98,6 +110,21 @@ getField(obj, ::Nothing) = getindex(obj)
 getField(obj, ptr::ChainPointer) = foldl(getField, ptr.chain, init=obj)
 
 getField(obj::AbstractDict, ptr::ChainPointer) = getindex(obj, ptr)
+
+function getField(obj, ptrs::NonEmpTplOrAbtArr{T}) where {T<:GeneralInstantPtr}
+    map(x->getField(obj, x), ptrs)
+end
+
+getField(obj, ptr::DelayedPointer) = PointedObject(obj, ptr)
+
+function getField(obj::PointedObject, ptr::GeneralInstantPtr)
+    getField(getField(obj.obj, obj.ptr), ptr)
+end
+
+const GetField{A<:TensorType, L, C<:NTuple{L, GeneralFieldName}} = 
+      Base.Fix2{typeof(getField), ChainPointer{A, L, C}}
+
+const GetIdxField{T} = GetField{Flavor{T}, 1, Tuple{Int}}
 
 
 abstract type FiniteDict{N, K, T} <: AbstractDict{K, T} end

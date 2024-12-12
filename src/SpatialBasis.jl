@@ -113,15 +113,10 @@ function unpackParamFuncCore!(f::PrimitiveOrb{T, D}, paramSet::FlatParamSet) whe
     pFilter = locateParam!(paramSet, pSetLocal)
     shifter = ParamSelectFunc(ShiftByArg{T, D}(), cenPtrInner)
     cenPtrs = linkPointer.(Ref(pFilter), cenPtrInner)
-    fEval = ParamFilterFunc(InsertInward(fEvalCore, shifter), pFilter)
+    fEval = ParamFilterFunc(InsertInward(fEvalCore, shifter), DelayedPointer(pFilter))
     paramPtr = PrimOrbParamPtr(cenPtrs, bodyPairs, paramSet)
     PrimitiveOrbCore(fEval), paramSet, paramPtr
 end
-
-# function unpackParamFuncCore!(f::PrimitiveOrb{T, D}, paramSet::FlatParamSet) where {T, D}
-#     fCore, _, (cenPtrs, bodyPairs) = unpackPrimitiveOrbCore!(f, paramSet)
-    
-# end
 
 
 struct CompositeOrb{T, D, B<:FieldAmplitude{T, D}, C<:NTuple{D, ElementalParam{T}}, 
@@ -205,7 +200,7 @@ end
 
 CompositeOrb(ob::CompositeOrb) = itself(ob)
 
-const GetPFWeightEntry{T} = GetParamFunc{OnlyBody{GetScalarIdx{T}}, IndexPointer{Volume{T}}}
+const GetPFWeightEntry{T} = GetParamFunc{OnlyBody{GetIdxField{T}}, IndexPointer{Volume{T}}}
 
 const WeightedPF{T, D, U<:EvalPrimOrb{T, D}} = ScaledOrbital{T, D, U, GetPFWeightEntry{T}}
 
@@ -283,7 +278,7 @@ function unpackParamFuncCore!(f::CompositeOrb{T, D}, paramSet::FlatParamSet) whe
     end
     innerDictType = eltype(getField.( basisPtr, Ref(ChainPointer( (:body, :core) )) ))
     paramPtr = CompOrbParamPtr{innerDictType}(basisPtr, weightPtr, Identifier(paramSet))
-    fEval = ParamFilterFunc(restrainEvalOrbType(weightedFields), pFilter)
+    fEval = ParamFilterFunc(restrainEvalOrbType(weightedFields), DelayedPointer(pFilter))
     CompositeOrbCore(fEval), paramSet, paramPtr
 end
 
