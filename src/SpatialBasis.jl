@@ -40,19 +40,6 @@ function unpackParamFunc!(f::ComposedOrb{T}, paramSet::FlatParamSet) where {T}
     fEval, paramSet, paramPointer
 end
 
-
-function genCellEncoder(::Type{T}, sym::Symbol) where {T}
-    function (input)
-        if input isa ElementalParam{T}
-            input
-        else
-            p = CellParam(T(input), sym)
-            setScreenLevel!(p, 1)
-            p
-        end
-    end
-end
-
 #! Change .center to the first field
 struct PrimitiveOrb{T, D, B<:FieldAmplitude{T, D}, 
                     C<:NTuple{D, ElementalParam{T}}} <: ComposedOrb{T, D, B}
@@ -192,8 +179,7 @@ function getEffectiveWeight(o::AbstractVector{<:ComposedOrb{T, D}},
 end
 
 function CompositeOrb(basis::AbstractVector{<:ComposedOrb{T, D}}, 
-                      weight::AbstractVector{<:ParamOrValue{T}}; 
-                      renormalize::Bool=false) where {T, D}
+                      weight::ParOrValVec{T}; renormalize::Bool=false) where {T, D}
     weightParams = ParamGrid(genCellEncoder(T, :w).(weight), :wBlock)
     CompositeOrb(basis, weightParams, renormalize)
 end
@@ -329,27 +315,36 @@ function genGaussTypeOrb(center::NonEmptyTuple{ParamOrValue{T}, D},
                          xpn::ParamOrValue{T}, 
                          ijk::NonEmptyTuple{Int, D}=ntuple(_->0, Val(D)); 
                          renormalize::Bool=false) where {T, D}
-    encoder1 = genCellEncoder(T, :xpn)
-    encoder2 = genCellEncoder(T, :cen)
-    gf = xpn |> encoder1 |> GaussFunc
-    PrimitiveOrb(PolyRadialFunc(gf, ijk), encoder2.(center), renormalize)
+    gf = GaussFunc(xpn)
+    PrimitiveOrb(PolyRadialFunc(gf, ijk), center; renormalize)
 end
 
 function genGaussTypeOrb(center::NonEmptyTuple{ParamOrValue{T}, D}, 
-                         xpns::AbstractVector{<:ParamOrValue{T}}, 
-                         cons::AbstractVector{<:ParamOrValue{T}}, 
+                         xpns::ParOrValVec{T}, 
+                         cons::Union{ParOrValVec{T}, FlattenedParam{T, 1}}, 
                          ijk::NonEmptyTuple{Int, D}=ntuple(_->0, Val(D)); 
                          renormalize::Bool=false) where {T, D}
-    pgtoNum = checkEmptiness(xpns, :xpns)
-    if pgtoNum != length(cons)
+    consLen = if cons isa FlattenedParam
+        len = (first∘outputSizeOf)(cons)
+        len < 2 && 
+        throw(AssertionError("The length of `cons::FlattenedParam` should be at least 2."))
+        len
+    else
+        cons = genCellEncoder(T, :con).(cons)
+        length(cons)
+    end
+
+    if consLen != checkEmptiness(xpns, :xpns)
         throw(AssertionError("`xpns` and `cons` must have the same length."))
     end
-    if pgtoNum == 1
-        genGaussTypeOrb(center, xpns[], cons[], ijk; renormalize)
+
+    cenParams = genCellEncoder(T, :cen).(center)
+
+    if consLen == 1
+        genGaussTypeOrb(cenParams, xpns[], cons[], ijk; renormalize)
     else
-        conParams = genCellEncoder(T, :con).(cons)
-        pgtos = genGaussTypeOrb.(Ref(center), xpns, Ref(ijk); renormalize)
-        CompositeOrb(pgtos, conParams; renormalize)
+        pgtos = genGaussTypeOrb.(Ref(cenParams), xpns, Ref(ijk); renormalize)
+        CompositeOrb(pgtos, cons; renormalize)
     end
 end
 
@@ -359,8 +354,8 @@ end
 #     subshell::NTuple{O, CartSHarmonics{D, L}}
 
 #     function GaussTypeSubshell(center::NonEmptyTuple{ParamOrValue{T}, D}, 
-#                                xpns::AbstractVector{<:ParamOrValue{T}}, 
-#                                cons::AbstractVector{<:ParamOrValue{T}}, 
+#                                xpns::ParOrValVec{T}, 
+#                                cons::ParOrValVec{T}, 
 #                                l::Int; 
 #                                renormalize::Bool=false)
 #         l < 0

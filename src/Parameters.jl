@@ -1487,6 +1487,19 @@ topoSort(node::CellParam{T}) where {T} = topoSortINTERNAL([node])
 #####
 
 
+function genCellEncoder(::Type{T}, sym::Symbol; defaultScreenLevel::Int=1) where {T}
+    function (input::ParamOrValue{T})
+        if input isa ElementalParam{T}
+            input
+        else
+            p = CellParam(T(input), sym)
+            setScreenLevel!(p, defaultScreenLevel)
+            p
+        end
+    end
+end
+
+
 evalParamSet(s::ParamBox) = obtain(s)
 
 evalParamSet(s::ParamTypeArr{<:Any, 1}) = obtain(s)

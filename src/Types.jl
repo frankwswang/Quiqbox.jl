@@ -103,6 +103,7 @@ const RefVal = Base.RefValue
 
 const RealOrComplex{T<:Real} = Union{T, Complex{T}}
 const ParamOrValue{T} = Union{ElementalParam{T}, T}
+const ParOrValVec{T} = AbstractVector{<:ParamOrValue{T}}
 
 const NonEmpTplOrAbtArr{T, A<:AbstractArray{T}} = Union{NonEmptyTuple{T}, A}
 

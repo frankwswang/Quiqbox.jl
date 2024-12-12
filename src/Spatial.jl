@@ -42,7 +42,8 @@ struct GaussFunc{T<:Real, P<:ElementalParam{T}} <: FieldAmplitude{T, 0}
     xpn::P
 end
 
-GaussFunc(xpn::Real) = GaussFunc(CellParam(xpn, :xpn))
+GaussFunc(xpn::T) where {T<:Real} = (GaussFunc∘genCellEncoder(T, :xpn))(xpn)
+
 
 struct ComputeGFunc{T} <: FieldlessFunction end
 
