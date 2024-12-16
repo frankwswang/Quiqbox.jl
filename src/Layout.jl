@@ -62,25 +62,41 @@ ChainPointer(sourceType::TensorType=TensorType()) = ChainPointer((), sourceType)
 ChainPointer(entry::GeneralFieldName, type::TensorType=TensorType()) = 
 ChainPointer((entry,), type)
 
-
-linkPointer(prev::ChainPointer, here::ChainPointer) = 
+ChainPointer(prev::ChainPointer, here::ChainPointer) = 
 ChainPointer((prev.chain..., here.chain...), here.type)
 
-linkPointer(prev::Union{GeneralFieldName, NonEmptyTuple{GeneralFieldName}}, 
-            here::ChainPointer) = 
-linkPointer(ChainPointer(prev), here)
+ChainPointer(prev::GeneralFieldName, here::ChainPointer) = 
+ChainPointer((prev, here.chain...), here.type)
 
+struct ChainFilter{L, U, C<:Tuple{Vararg{PointerStack{L, U}}}} <: PointerStack{L, U}
+    chain::C
 
-function nestedLevelOf(obj::AbstractArray)
-    level = 0
-    if eltype(itself.(obj)) <: AbstractArray
-        level += 1 + (nestedLevelOf∘first)(obj)
-    end
-    level
+    ChainFilter(::Tuple{}=()) = new{0, 0, Tuple{}}( () )
+
+    ChainFilter(chain::NonEmptyTuple{PointerStack{L, U}}) where {L, U} = 
+    new{L, U, typeof(chain)}(chain)
 end
 
+const AllPassFilter = ChainFilter{0, 0, Tuple{}}
 
-struct DelayedPointer{L, U, P<:InstantPointer{L, U}} <: NestedPointer{L, U}
+const SingleFilter{L, U, C<:PointerStack{L, U}} = ChainFilter{L, U, Tuple{C}}
+
+ChainFilter(prev::ChainFilter, here::ChainFilter) = 
+ChainFilter((prev.chain..., here.chain...))
+
+ChainFilter(prev::PointerStack, here::ChainFilter) = 
+ChainFilter((prev, here.chain...))
+
+ChainFilter(prev::ChainFilter, here::PointerStack) = 
+ChainFilter((prev.chain..., here))
+
+ChainFilter(prev::PointerStack, here::PointerStack) = ChainFilter((prev, here))
+
+ChainFilter(obj::ChainFilter) = itself(obj)
+ChainFilter(obj::PointerStack) = ChainFilter((obj,))
+
+
+struct AwaitFilter{P<:PointerStack} <: StaticPointer
     ptr::P
 end
 
