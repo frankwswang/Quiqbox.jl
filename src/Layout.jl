@@ -111,34 +111,101 @@ FilteredObject(obj::FilteredObject, ptr::PointerStack) = FilteredObject(obj.obj,
 FilteredObject(obj::FilteredObject, ptr::AwaitFilter) = FilteredObject(obj.obj, ptr.ptr)
 
 
-getField(obj, ::AllPassPtr) = itself(obj)
+getFieldCore(obj, ::AllPassPointer) = itself(obj)
 
-getField(obj, ::FirstIndex) = first(obj)
+getFieldCore(obj, ::FirstIndex) = first(obj)
 
-getField(obj, entry::Symbol) = getfield(obj, entry)
+getFieldCore(obj, entry::Symbol) = getfield(obj, entry)
 
-getField(obj, entry::Int) = getindex(obj, entry)
+getFieldCore(obj, entry::Int) = getindex(obj, entry)
 
-getField(obj, ::Nothing) = getindex(obj)
+getFieldCore(obj, ::Nothing) = getindex(obj)
 
-getField(obj, ptr::ChainPointer) = foldl(getField, ptr.chain, init=obj)
+getFieldCore(obj, ptr::ChainPointer) = foldl(getFieldCore, ptr.chain, init=obj)
 
-getField(obj::AbstractDict, ptr::ChainPointer) = getindex(obj, ptr)
+getField(obj, ptr::GeneralFieldName) = getFieldCore(obj, ptr)
 
-function getField(obj, ptrs::NonEmpTplOrAbtArr{T}) where {T<:GeneralInstantPtr}
+getField(obj, ptr::EntryPointer) = getFieldCore(obj, ptr)
+
+function getField(obj::FilteredObject, ptr::EntryPointer)
+    getFieldCore(obj.obj, getField(obj.ptr, ptr))
+end
+
+function getField(scope::ChainFilter, ptr::EntryPointer)
+    for i in reverse(scope.chain)
+        ptr = getField(i, ptr)
+    end
+    ptr
+end
+
+
+function filterObjectCore(obj, ptr::ChainFilter)
+    evalField(itself, obj, ptr)
+end
+
+function filterObjectCore(obj, ptr::PointerStack)
+    map(x->getField(obj, x), ptr)
+end
+
+getField(obj, ptr::PointerStack) = filterObjectCore(obj, ptr)
+
+function getField(scope::PointerStack, ptr::PointerStack)
+    ChainFilter(scope, ptr)
+end
+
+function getField(obj::FilteredObject, ptr::PointerStack)
+    FilteredObject(obj.obj, ChainFilter(obj.ptr, ptr))
+end
+
+function getField(obj, ptr::AwaitFilter)
+    FilteredObject(obj, ptr)
+end
+
+function getField(obj, ptrs::NonEmpTplOrAbtArr{<:ActivePointer})
     map(x->getField(obj, x), ptrs)
 end
 
-getField(obj, ptr::DelayedPointer) = PointedObject(obj, ptr)
+getField(obj::Any) = itself(obj)
 
-function getField(obj::PointedObject, ptr::GeneralInstantPtr)
-    getField(getField(obj.obj, obj.ptr), ptr)
+getField(obj::FilteredObject) = getField(obj.obj, obj.ptr)
+
+
+function evalField(f::F, obj, ptr::EntryPointer) where {F<:Function}
+    getField(obj, ptr) |> f
 end
 
-const GetField{A<:TensorType, L, C<:NTuple{L, GeneralFieldName}} = 
-      Base.Fix2{typeof(getField), ChainPointer{A, L, C}}
+function evalField(f::F, obj, ptr::PointerStack) where {F<:Function}
+    evalFieldCore(f, obj, ChainFilter(ptr))
+end
 
-const GetIdxField{T} = GetField{Flavor{T}, 1, Tuple{Int}}
+function evalField(f::F, obj::FilteredObject, ptr::PointerStack) where {F<:Function}
+    res = getField(obj, ptr)
+    evalFieldCore(f, res.obj, res.ptr)
+end
+
+function evalFieldCore(f::F, obj, ptr::ChainFilter) where {F<:Function}
+    body..., tip = ptr.chain
+    scope = ChainFilter(body)
+    map(tip) do idx
+        evalFieldCore(f, obj, scope, idx)
+    end
+end
+
+function evalFieldCore(f::F, obj, ::AllPassFilter) where {F<:Function}
+    f(obj)
+end
+
+function evalFieldCore(f::F, obj, scope::PointerStack, 
+                       ptr::ActivePointer) where {F<:Function}
+    evalField(f, obj, getField(scope, ptr))
+end
+
+function evalFieldCore(f::F, obj, scope::PointerStack, 
+                       ptrs::NonEmpTplOrAbtArr{<:ActivePointer}) where {F<:Function}
+    map(ptrs) do ptr
+        evalField(f, obj, getField(scope, ptr))
+    end
+end
 
 
 abstract type FiniteDict{N, K, T} <: AbstractDict{K, T} end
