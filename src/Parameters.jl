@@ -1841,15 +1841,15 @@ end
 const DimensionalSpanMemory{T} = Union{T, ShapedMemory{T}, ShapedMemory{ShapedMemory{T}}}
 
 struct DimSpanDataCacheBox{T} <: QueryBox{DimensionalSpanMemory{T}}
-    d0::Dict{UInt, T}
-    d1::Dict{UInt, ShapedMemory{T}}
-    d2::Dict{UInt, ShapedMemory{ShapedMemory{T}}}
+    d0::Dict{Identifier, T}
+    d1::Dict{Identifier, ShapedMemory{T}}
+    d2::Dict{Identifier, ShapedMemory{ShapedMemory{T}}}
 end
 
 DimSpanDataCacheBox(::Type{T}) where {T} = 
-DimSpanDataCacheBox( Dict{UInt, T}(), 
-                     Dict{UInt, ShapedMemory{T}}(), 
-                     Dict{UInt, ShapedMemory{ShapedMemory{T}}}() )
+DimSpanDataCacheBox( Dict{Identifier, T}(), 
+                     Dict{Identifier, ShapedMemory{T}}(), 
+                     Dict{Identifier, ShapedMemory{ShapedMemory{T}}}() )
 
 getDimSpanSector(cache::DimSpanDataCacheBox{T}, ::ElementalParam{T}) where {T} = cache.d0
 
