@@ -60,15 +60,13 @@ const StableMul{T} = StableBinary{T, typeof(*)}
 StableBinary(f::Function) = Base.Fix1(StableBinary, f)
 
 
-struct ParamFilterFunc{F<:Function, T<:NestedPointer} <: ParamFuncBuilder{F}
+struct ParamFilterFunc{F<:Function, T<:CompositePointer} <: ParamFuncBuilder{F}
     apply::F
-    filter::T
+    scope::T
 end
 
-(f::ParamFilterFunc)(input, param) = f.apply(input, getField(param, f.filter))
+(f::ParamFilterFunc)(input, param) = f.apply(input, getField(param, f.scope))
 
-const LazyParamFilter{F<:Function, L, U, T<:InstantPointer} = 
-      ParamFilterFunc{F, DelayedPointer{L, U, T}}
 
 struct ParamSelectFunc{F<:Function, T<:Tuple{Vararg{ChainIndexer}}} <: ParamFuncBuilder{F}
     apply::F
@@ -78,7 +76,7 @@ end
 ParamSelectFunc(f::Function) = ParamSelectFunc(f, ())
 
 function (f::ParamSelectFunc)(input, param)
-    f.apply(input, getField.(Ref(param), f.select)...)
+    f.apply(input, getField(param, f.select)...)
 end
 
 (f::ParamSelectFunc{<:Function, Tuple{}})(input, _) = f.apply(input)
@@ -195,9 +193,8 @@ unpackParamFunc!(f, paramSet)
 unpackFunc!(::GenericFunction, f::Function, paramSet::AbstractVector) = 
 unpackTypedFunc!(f, paramSet)
 
-const FlatPSetFilterFunc{T, F<:Function} = LazyParamFilter{F, 1, 2, FlatParamSetFilter{T}}
-const PointerPairVec{T<:ChainPointer} = AbstractVector{<:Pair{<:ChainPointer, T}}
-const FieldPtrPairs{T} = PointerPairVec{<:FlatParamSetIdxPtr{T}}
+const FieldPtrPair{T} = Pair{<:ChainPointer, <:FlatParamSetIdxPtr{T}}
+const FieldPtrPairs{T} = AbstractVector{<:FieldPtrPair{T}}
 const FieldPtrDict{T} = AbstractDict{<:ChainPointer, <:FlatParamSetIdxPtr{T}}
 const EmptyFieldPtrDict{T} = TypedEmptyDict{Union{}, FlatPSetInnerPtr{T}}
 const FiniteFieldPtrDict{T, N} = FiniteDict{N, <:ChainPointer, <:FlatParamSetIdxPtr{T}}
@@ -218,50 +215,6 @@ function MixedFieldParamPointer(paramPairs::FieldPtrPairs{T},
     MixedFieldParamPointer(coreDict, Identifier(paramSet))
 end
 
-# MixedFieldParamPointer(pair::Pair, source::Identifier) = 
-# MixedFieldParamPointer(buildDict(pair), source)
-
-# MixedFieldParamPointer(::Type{T}, source::Identifier) where {T} = 
-# MixedFieldParamPointer(EmptyFieldPtrDict{T}(), source)
-
-function getPointerPairs(dict::AbstractDict{<:ChainPointer, <:ChainPointer})
-    collect(dict)
-end
-
-function getPointerPairs(paramPtr::MixedFieldParamPointer)
-    getPointerPairs(paramPtr.core)
-end
-
-function anchorLeft(pairs::PointerPairVec, anchor::NestedPointer)
-    map(x->(linkPointer(anchor, x.first)=>x.second), pairs)
-end
-
-function anchorRight(pairs::PointerPairVec, anchor::NestedPointer)
-    map(x->(x.first=>linkPointer(anchor, x.second)), pairs)
-end
-
-# function anchorFieldPointerDictCore(d::FieldPtrDict{T}, anchor::ChainPointer) where {T}
-#     map( collect(d) ) do pair
-#         linkPointer(anchor, pair.first) => pair.second
-#     end
-# end
-
-# function anchorFieldPointerDict(d::FieldPtrDict{T}, anchor::ChainPointer) where {T}
-#     buildDict( anchorFieldPointerDictCore(d, anchor), EmptyFieldPtrDict{T} )
-# end
-
-# function anchorFieldPointerDict(d::FiniteFieldPtrDict{T, 0}, ::ChainPointer) where {T}
-#     itself(d)
-# end
-
-
-# function extendChainPointerDict(d::AbstractDict{<:ChainPointer, <:ChainPointer}, 
-#                                 key::NestedPointer, val::NestedPointer=ChainPointer())
-#     map( collect(d) ) do pair
-#         linkPointer(anchor, pair.first) => pair.second
-#     end
-# end
-
 
 # `f` should only take one input.
 unpackTypedFunc!(f::Function, paramSet::AbstractVector) = 
@@ -270,7 +223,7 @@ unpackTypedFunc!(ReturnTyped(f, Any), paramSet)
 function unpackTypedFuncCore!(f::ReturnTyped{T}, paramSet::AbstractVector) where {T}
     params, anchors = getFieldParams(f)
     if isempty(params)
-        ParamSelectFunc(f), paramSet, Pair{<:ChainPointer, <:FlatParamSetIdxPtr{T}}[]
+        ParamSelectFunc(f), paramSet, FieldPtrPair{T}[]
     else
         ids = locateParam!(paramSet, params)
         fDummy = deepcopy(f.f)
@@ -282,7 +235,7 @@ function unpackTypedFuncCore!(f::ReturnTyped{T}, paramSet::AbstractVector) where
             end
             fDummy(x)
         end
-        paramPairs = getMemory(linkPointer(:apply, anchors) .=> ids)
+        paramPairs = getMemory(ChainPointer(:apply, anchors) .=> ids)
         ParamSelectFunc(ReturnTyped(evalCore, T), ids), paramSet, paramPairs
     end
 end

@@ -1357,7 +1357,7 @@ function getFieldParamsCore!(paramPairs::Vector{Tuple{ParamBox, ChainPointer}},
         for fieldSym in content
             field = getField(source, fieldSym)
             outputValConstraint = field isa ParamBox ? TensorType(field) : TensorType()
-            anchorNew = linkPointer(anchor, ChainPointer(fieldSym, outputValConstraint))
+            anchorNew = ChainPointer(anchor, ChainPointer(fieldSym, outputValConstraint))
             getFieldParamsCore!(paramPairs, field, anchorNew)
         end
     end
@@ -1521,7 +1521,7 @@ const AbstractFlatParamSet{T, S1<:ElementalParam{<:T}, S2<:FlattenedParam{<:T}} 
 
 #? Possibly rename the field names in Flat/MiscParamSet?
 ## (Also applied for TemporaryStorage, FixedSizeStorage, ParamPointerBox)
-
+#? Allow AbstractParamSet to be empty if all sections are empty?
 struct FlatParamSet{T, S1<:ElementalParam{<:T}, 
                     S2<:FlattenedParam{<:T}} <: AbstractFlatParamSet{T, S1, S2}
     d0::Vector{S1}
@@ -1601,8 +1601,6 @@ struct MiscParamSet{T, S1<:ElementalParam{<:T}, S2<:FlattenedParam{<:T},
     inner::FlatParamSet{T, S1, S2}
     outer::Vector{S3}
 end
-
-const AbstractParamSet{T} = Union{AbstractFlatParamSet{T}, AbstractMiscParamSet{T}}
 
 size(mps::MiscParamSet) = size(mps.outer) .+ 1
 
@@ -1710,11 +1708,20 @@ const FlatPSetInnerPtr{T} = PointPointer{T, 2, Tuple{FirstIndex, Int}}
 const FlatPSetOuterPtr{T} = IndexPointer{Volume{T}}
 const FlatParamSetIdxPtr{T} = Union{FlatPSetInnerPtr{T}, FlatPSetOuterPtr{T}}
 
-struct FlatParamSetFilter{T} <: BlockPointer{1, 2}
+struct FlatParamSetFilter{T} <: PointerStack{1, 2}
     d0::Memory{FlatPSetInnerPtr{T}} #! Replace by immutable vector
     d1::Memory{FlatPSetOuterPtr{T}} #! Replace by immutable vector
     sourceID::Identifier
 end
+
+const ChainFlatParamSetFilter{T, N} = ChainFilter{1, 2, NTuple{N, FlatParamSetFilter{T}}}
+
+const FilteredFlatParamSet{T, N} = 
+      FilteredObject{<:FlatParamSet{T}, ChainFlatParamSetFilter{T, N}}
+
+const FlatParamSource{T} = Union{AbstractFlatParamSet{T}, FilteredFlatParamSet{T}}
+
+const AbstractParamSet{T} = Union{FlatParamSource{T}, AbstractMiscParamSet{T}}
 
 function FlatParamSetFilter(pSet::FlatParamSet{T}, d0Ids::AbstractVector{Int}, 
                             d1Ids::AbstractVector{Int}) where {T}
@@ -1751,22 +1758,11 @@ length(fps::FlatParamSetFilter) = length(fps.d1) + 1
 getproperty(fps::FlatParamSetFilter, field::Symbol) = getfield(fps, field)
 
 #= Additional Method =#
-getField(obj, p::FlatParamSetFilter) = map(x->getField(obj, x), p)
-
 getField(obj::FlatParamSetFilter, ptr::FlatPSetInnerPtr) = 
 getindex(obj.d0, last(ptr.chain))
 
 getField(obj::FlatParamSetFilter, ptr::FlatPSetOuterPtr) = 
 getFlatSetIndexCore(obj, first(ptr.chain))
-
-function getField(obj::PointedObject{<:Any, <:FlatParamSetFilter}, 
-                  ptr::FlatParamSetIdxPtr)
-    getField(obj.obj, getField(obj.ptr, ptr))
-end
-
-#= Additional Method =#
-linkPointer(prev::FlatParamSetFilter{T}, here::FlatParamSetIdxPtr{T}) where {T} = 
-getField(prev, here)
 
 
 getParamSector(source::FlatParamSet, ::Type{<:ElementalParam}) = 
@@ -1794,7 +1790,7 @@ function locateParam!(paramSet::AbstractVector, target::P) where {P<:ParamBox}
             pushParam!(paramSector, target)
             idx = length(paramSector)
         end
-        linkPointer(anchor, ChainPointer(idx, returnType))
+        ChainPointer(anchor, ChainPointer(idx, returnType))
     end
 end
 
@@ -1820,7 +1816,7 @@ function locateParam!(paramSet::FlatParamSet{T}, target::FlatParamSet{T}) where 
                           (FlatPSetInnerPtr{T}, FlatPSetOuterPtr{T}) ) do n, t
         locateParam!(getfield(paramSet, n), getfield(target, n), emptyReturnEltype=t)
     end
-    d0ptrs = linkPointer.(Ref(FirstIndex()), d0ptrs)
+    d0ptrs = ChainPointer.(Ref(FirstIndex()), d0ptrs)
     if !isempty(d1ptrs)
         offset = 2 - firstindex(paramSet.d1)
         d1ptrs = map(x->ChainPointer(x.chain .+ offset, x.type), d1ptrs)
@@ -1863,15 +1859,16 @@ formatDimSpanMemory(::Type{T}, val::JaggedAbtArray{T}) where {T} =
 ShapedMemory(ShapedMemory.(val))
 
 function cacheParam!(cache::DimSpanDataCacheBox{T}, param::ParamBox{T}) where {T}
-    get!(getDimSpanSector(cache, param), objectid(param)) do
+    get!(getDimSpanSector(cache, param), Identifier(param)) do
         formatDimSpanMemory(T, obtain(param))
     end
 end
 
 function cacheParam!(cache::DimSpanDataCacheBox{T}, s::AbstractParamSet{T}, 
-                    idx::ChainPointer) where {T}
-    pb = getField(s, idx)
-    cacheParam!(cache, pb)
+                     ptr::CompositePointer) where {T}
+    evalField(s, ptr) do par
+        cacheParam!(cache, par)
+    end
 end
 
 const ParamCollection{T} = Union{AbstractParamSet{T}, ParamTypeArr{<:ParamBox{T}, 1}}
