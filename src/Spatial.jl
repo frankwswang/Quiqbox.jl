@@ -33,7 +33,7 @@ struct EvalFieldFunc{T, F<:ParamSelectFunc{<:ReturnTyped{T}}
 end
 
 function unpackParamFuncCore!(f::FieldFunc{T}, paramSet::FlatParamSet) where {T}
-    fEvalCore, _, pairs = unpackTypedFuncCore!(f, paramSet)
+    fEvalCore, _, pairs = unpackTypedFuncCore!(f.f, paramSet)
     EvalFieldFunc(fEvalCore), paramSet, pairs
 end
 
@@ -78,8 +78,10 @@ function AxialProdFunc(b::FieldAmplitude{<:Any, 0}, dim::Int)
     (AxialProdFunc∘Tuple∘fill)(b, dim)
 end
 
+const GetIndex{T} = Base.Fix2{typeof(getField), ChainPointer{Flavor{T}, 1, Tuple{Int}}}
+
 struct EvalAxialProdFunc{T, D, F<:EvalFieldAmp{T, 0}} <: EvalFieldAmp{T, D, AxialProdFunc}
-    f::CountedChainReduce{StableMul{T}, InsertInward{F, OnlyHead{GetIdxField{T}}}, D}
+    f::CountedChainReduce{StableMul{T}, InsertInward{F, OnlyHead{GetIndex{T}}}, D}
 end
 
 function unpackParamFuncCore!(f::AxialProdFunc{T, D}, paramSet::FlatParamSet) where {T, D}
@@ -88,8 +90,8 @@ function unpackParamFuncCore!(f::AxialProdFunc{T, D}, paramSet::FlatParamSet) wh
         anchor = ChainPointer((:axis, i))
         fInner, _, axialPairs = unpackParamFuncCore!(f.axis[i], paramSet)
         ptr = ChainPointer(i, TensorType(T))
-        fEvalComps[i] = InsertInward(fInner, (OnlyHead∘getField)(ptr))
-        anchorLeft(axialPairs, anchor)
+        fEvalComps[i] = InsertInward(fInner, (OnlyHead∘Base.Fix2)(getField, ptr))
+        map(x->(ChainPointer(anchor, x.first)=>x.second), axialPairs)
     end
     fEvalCore = Tuple(fEvalComps) |> (ChainReduce∘StableBinary)(*, T)
     EvalAxialProdFunc(fEvalCore), paramSet, pairs
@@ -115,11 +117,14 @@ end
 
 function unpackParamFuncCore!(f::PolyRadialFunc{T, D}, paramSet::FlatParamSet) where {T, D}
     fInner, _, radialPairs = unpackParamFuncCore!(f.radial, paramSet)
-    pairs = anchorLeft(radialPairs, ChainPointer(:radial))
+    if !isempty(radialPairs)
+        anchor = ChainPointer(:radial)
+        radialPairs = map(x->(ChainPointer(anchor, x.first)=>x.second), radialPairs)
+    end
     coordEncoder = InsertInward(fInner, OnlyHead(LinearAlgebra.norm))
     angularFunc = (OnlyHead∘ReturnTyped)(f.angular, T)
     fEvalCore = PairCombine(StableBinary(*, T), coordEncoder, angularFunc)
-    EvalPolyRadialFunc(fEvalCore), paramSet, pairs
+    EvalPolyRadialFunc(fEvalCore), paramSet, radialPairs
 end
 
 const PolyGaussProd{T, D, L} = PolyRadialFunc{T, D, <:GaussFunc{T}, L}
