@@ -498,13 +498,13 @@ end
 """
 
     markUnique(arr::AbstractArray{T}, args...; 
-               compareFunction::Function=hasEqual, kws...) where {T} -> 
+               compareFunction::Function=isequal, kws...) where {T} -> 
     Tuple{Vector{Int}, Vector{T}}
 
 Return a `Vector{Int}` whose elements are indices to mark the elements inside `arr` such 
 that same element will be marked with same index, and a `Vector{T}` containing all the 
 unique elements. The definition of "unique" (or "same") is based on `compareFunction` 
-which is set to [`hasEqual`](@ref) in default. `args` and `kws` are placeholders for the 
+which is set to `Base.isequal` in default. `args` and `kws` are placeholders for the 
 positional arguments and keyword arguments for `compareFunction` respectively.
 
 ≡≡≡ Example(s) ≡≡≡
@@ -536,26 +536,43 @@ end
 ```
 """
 function markUnique(arr::AbstractArray{T}, args...; 
-                    compareFunction::F=hasEqual, kws...) where {T<:Any, F<:Function}
-    isempty(arr) && (return arr, T[])
+                    compareFunction::F=isequal, kws...) where {T<:Any, F<:Function}
+    cmprList = T[]
+    isempty(arr) && (return arr, cmprList)
     f = (a, b) -> compareFunction(a, b, args...; kws...)
-    res = Int[1]
-    cmprList = T[first(arr)]
-    for ele in view(arr, (firstindex(arr)+1):lastindex(arr))
-        j = firstindex(cmprList)
+    sizehint!(cmprList, length(arr))
+    markList = markUniqueCore!(f, cmprList, arr)
+    markList, cmprList
+end
+
+function markUnique(tpl::Tuple{Vararg{Any, N}}, args...; compareFunction::F=isequal,
+                    kws...) where {N, F<:Function}
+    isempty(tpl) && (return tpl, ())
+    f = (a, b) -> compareFunction(a, b, args...; kws...)
+    cmprList = Any[]
+    offset = firstindex(()) - firstindex(cmprList)
+    sizehint!(cmprList, N)
+    markList = markUniqueCore!(f, cmprList, tpl, offset)
+    markList, Tuple(cmprList)
+end
+
+function markUniqueCore!(compareFunc::F, compressedSeq::AbstractVector, 
+                         sequence::NonEmpTplOrAbtArr, offset::Int=0) where {F<:Function}
+    map(sequence) do ele
+        j = firstindex(compressedSeq)
         isNew = true
-        while j <= lastindex(cmprList)
-            if f(cmprList[j], ele)
+        while j <= lastindex(compressedSeq)
+            if compareFunc(compressedSeq[j], ele)
                 isNew = false
                 break
             end
             j += 1
         end
-        push!(res, j)
-        isNew && push!(cmprList, ele)
+        isNew && push!(compressedSeq, ele)
+        j + offset
     end
-    res, cmprList
 end
+
 
 """
 
