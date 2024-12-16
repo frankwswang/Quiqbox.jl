@@ -34,18 +34,18 @@ function composeOneBodyKernel(::Identity, ::Type{T}, term::F) where {T, F<:Funct
 end
 
 function numericalOneBodyInt(op::F, (orb,)::Tuple{EvalDimensionalKernel{T, D}}, 
-                             (pValDict,)::Tuple{ParamValOrDict{T}}) where 
+                             (pVal,)::Tuple{AbtVecOfAbtArr{T}}) where 
                             {F<:DirectOperator, T, D}
-    term = Base.Fix2(orb, pValDict)
+    term = Base.Fix2(orb, pVal)
     integrand = changeFuncRange(composeOneBodyKernel(op, T, term), T)
     bound = ntuple(_->one(T), Val(D))
     numericalIntegration(integrand, (.-(bound), bound))
 end
 
 function numericalOneBodyInt(op::F, orbs::NTuple{2, EvalDimensionalKernel{T, D}}, 
-                             pValGroups::NTuple{2, ParamValOrDict{T}}) where 
+                             pValPair::NTuple{2, AbtVecOfAbtArr{T}}) where 
                             {F<:DirectOperator, T, D}
-    termL, termR = Base.Fix2.(orbs, pValGroups)
+    termL, termR = Base.Fix2.(orbs, pValPair)
     integrand = changeFuncRange(composeOneBodyKernel(op, T, termL, termR), T)
     bound = ntuple(_->one(T), Val(D))
     numericalIntegration(integrand, (.-(bound), bound))

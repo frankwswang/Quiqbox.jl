@@ -87,7 +87,7 @@ function genNormalizer(o::PrimGTOcore{T, D}, paramPtr::PrimOrbParamPtr{T, D}) wh
     ns = map(x->Base.Fix2(polyGaussFuncSquaredNorm, x), angularFunc.f.m.tuple)
     nCore = OnlyBody( AbsSqrtInv ∘ ChainReduce(StableBinary(*, T), VectorMemory(ns)) )
     ptrTuple = (getXpnPtr(paramPtr.body),)
-    PointerFunc(nCore, ptrTuple, paramPtr.sourceID)
+    ParamFilterFunc(ParamSelectFunc(nCore, ptrTuple), paramPtr.scope)
 end
 
 
@@ -106,11 +106,13 @@ end
 
 
 function preparePGTOparam!(cache::DimSpanDataCacheBox{T}, o::PrimGTOcore{T, D}, 
-                           s::FlatParamSet{T}, p::PrimOrbParamPtr{T, D}) where {T, D}
+                           s::FlatParamSource{T}, p::PrimOrbParamPtr{T, D}) where {T, D}
+    # @show p.scope
+    sLocal = FilteredObject(s, ChainFilter(p.scope))
     cen = map(p.center) do c
-        cacheParam!(cache, s, c)
+        cacheParam!(cache, sLocal, c)
     end
-    xpn = cacheParam!(cache, s, getXpnPtr(p.body))
+    xpn = cacheParam!(cache, sLocal, getXpnPtr(p.body))
     ang = getAngularFunc(o).f.m.tuple
     cen, xpn, ang
 end
@@ -118,7 +120,7 @@ end
 
 function getOverlapCore!(cache::DimSpanDataCacheBox{T}, 
                          (o,)::Tuple{PrimGTOcore{T, D}}, 
-                         (s,)::Tuple{FlatParamSet{T}}, 
+                         (s,)::Tuple{FlatParamSource{T}}, 
                          (p,)::Tuple{PrimOrbParamPtr{T, D}}) where {T, D}
     cen, xpn, ang = preparePGTOparam!(cache, o, s, p)
     overlapPGTO(CenPair(cen, cen), XpnPair(xpn, xpn), AngPair(ang, ang))
@@ -126,7 +128,7 @@ end
 
 function getOverlapCore!(cache::DimSpanDataCacheBox{T}, 
                          o::NTuple{2, PrimGTOcore{T, D}}, 
-                         s::NTuple{2, FlatParamSet{T}}, 
+                         s::NTuple{2, FlatParamSource{T}}, 
                          p::NTuple{2, PrimOrbParamPtr{T, D}}) where {T, D}
     (cen1, xpn1, ang1), (cen2, xpn2, ang2) = map(o, s, p) do orb, pSet, pPtr
         preparePGTOparam!(cache, orb, pSet, pPtr)
