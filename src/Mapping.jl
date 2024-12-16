@@ -206,19 +206,19 @@ abstract type FieldParamPointer{R} <: Any end
 
 struct MixedFieldParamPointer{T, R<:FieldPtrDict{T}} <: FieldParamPointer{R}
     core::R
-    id::Identifier
+    tag::Identifier
 end
 
-function MixedFieldParamPointer(paramPairs::FieldPtrPairs{T}, 
-                                paramSet::FlatParamSet{T}) where {T}
+function MixedFieldParamPointer(paramPairs::FieldPtrPairs{T}, tag::Identifier) where {T}
     coreDict = buildDict(paramPairs, EmptyFieldPtrDict{T})
-    MixedFieldParamPointer(coreDict, Identifier(paramSet))
+    MixedFieldParamPointer(coreDict, tag)
 end
 
 
 # `f` should only take one input.
-unpackTypedFunc!(f::Function, paramSet::AbstractVector) = 
-unpackTypedFunc!(ReturnTyped(f, Any), paramSet)
+unpackTypedFunc!(f::Function, paramSet::AbstractVector, 
+                 paramSetId::Identifier=Identifier(paramSet)) = 
+unpackTypedFunc!(ReturnTyped(f, Any), paramSet, paramSetId)
 
 function unpackTypedFuncCore!(f::ReturnTyped{T}, paramSet::AbstractVector) where {T}
     params, anchors = getFieldParams(f)
@@ -240,10 +240,11 @@ function unpackTypedFuncCore!(f::ReturnTyped{T}, paramSet::AbstractVector) where
     end
 end
 
-function unpackTypedFunc!(f::ReturnTyped{T}, paramSet::AbstractVector) where {T}
-    pSetId = Identifier(paramSet)
+function unpackTypedFunc!(f::ReturnTyped{T}, paramSet::AbstractVector, 
+                          paramSetId::Identifier=Identifier(paramSet)) where {T}
     fCore, _, paramPairs = unpackTypedFuncCore!(f, paramSet)
-    paramPtr = MixedFieldParamPointer(buildDict(paramPairs, EmptyFieldPtrDict{T}), pSetId)
+    ptrDict = buildDict(paramPairs, EmptyFieldPtrDict{T})
+    paramPtr = MixedFieldParamPointer(ptrDict, paramSetId)
     fCore, paramSet, paramPtr
 end
 

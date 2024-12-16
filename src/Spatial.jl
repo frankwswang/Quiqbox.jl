@@ -12,9 +12,10 @@ abstract type EvalFieldAmp{T, D, F} <: EvalDimensionalKernel{T, D, F} end
 f.f(formatInput(SelectTrait{InputStyle}()(f), input), param)
 
 
-function unpackParamFunc!(f::FieldAmplitude{T}, paramSet::FlatParamSet) where {T}
+function unpackParamFunc!(f::FieldAmplitude{T}, paramSet::FlatParamSet, 
+                          paramSetId::Identifier=Identifier(paramSet)) where {T}
     fCore, _, paramPairs = unpackParamFuncCore!(f, paramSet)
-    paramPtr = MixedFieldParamPointer(paramPairs, paramSet)
+    paramPtr = MixedFieldParamPointer(paramPairs, paramSetId)
     fCore, paramSet, paramPtr
 end
 
