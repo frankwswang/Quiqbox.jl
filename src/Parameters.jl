@@ -1665,9 +1665,9 @@ getproperty(fps::MiscParamSet, field::Symbol) = getfield(fps, field)
 
 
 function initializeParamSet(::Type{FlatParamSet}, ::Type{T}=Any; 
-                            d0Type::MissingOr{Type{S1}}=missing, 
-                            d1Type::MissingOr{Type{S2}}=missing) where 
-                           {T, S1<:ElementalParam{<:T}, S2<:FlattenedParam{T}}
+                            d0Type::MissingOr{Type{<:FlattenedParam{<:T}}}=missing, 
+                            d1Type::MissingOr{Type{<:FlattenedParam{<:T}}}=missing) where 
+                           {T}
     bl = isconcretetype(T)
     if ismissing(d0Type)
         d0Type = ifelse(bl, ElementalParam{T}, ElementalParam{<:T})
@@ -1690,11 +1690,9 @@ initializeParamSet(::TypedParamFunc{T}) where {T} = initializeParamSet(FlatParam
 
 
 function initializeParamSet(::Type{MiscParamSet}, ::Type{T}=Any; 
-                            d0Type::MissingOr{Type{S1}}=missing, 
-                            d1Type::MissingOr{Type{S2}}=missing, 
-                            d2Type::MissingOr{Type{S3}}=missing) where 
-                           {T, S1<:ElementalParam{<:T}, S2<:FlattenedParam{T}, 
-                            S3<:JaggedParam{T}}
+                            d0Type::MissingOr{Type{<:ElementalParam{<:T}}}=missing, 
+                            d1Type::MissingOr{Type{<:FlattenedParam{<:T}}}=missing, 
+                            d2Type::MissingOr{Type{<:JaggedParam{<:T}}}=missing) where {T}
     inner = initializeParamSet(FlatParamSet, T; d0Type, d1Type)
     if ismissing(d2Type)
         d2Type = ifelse(isconcretetype(T), JaggedParam{T}, JaggedParam{<:T})
