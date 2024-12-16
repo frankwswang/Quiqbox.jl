@@ -30,13 +30,14 @@ abstract type DirectOperator <: FunctionModifier end
 abstract type ParamFuncBuilder{F} <: FunctionComposer end
 abstract type JoinedOperator{J} <: FunctionComposer end
 
-abstract type NestedPointer{L, U} <: ConfigBox end
+abstract type CompositePointer <: ConfigBox end
 abstract type StructuredType <: ConfigBox end
 
-abstract type InstantPointer{L, U} <: NestedPointer{L, U} end
+abstract type ActivePointer <: CompositePointer end
+abstract type StaticPointer <: CompositePointer end
 
-abstract type BlockPointer{L, U} <: InstantPointer{L, U} end
-abstract type EntryPointer{L} <: InstantPointer{L, L} end
+abstract type PointerStack{L, U} <: ActivePointer end
+abstract type EntryPointer <: ActivePointer end
 
 # M: Particle number
 abstract type SpatialAmpTensor{T, D, M, O} <: AbstractAmpTensor{T, O} end

@@ -33,7 +33,7 @@ struct FirstIndex <: StructuredType end
 const GeneralFieldName = Union{Int, Symbol, FirstIndex, Nothing}
 
 
-struct ChainPointer{A<:TensorType, L, C<:NTuple{L, GeneralFieldName}} <: EntryPointer{L}
+struct ChainPointer{A<:TensorType, L, C<:NTuple{L, GeneralFieldName}} <: EntryPointer
     chain::C
     type::A
 
@@ -42,9 +42,7 @@ struct ChainPointer{A<:TensorType, L, C<:NTuple{L, GeneralFieldName}} <: EntryPo
     new{A, L, C}(chain, type)
 end
 
-const GeneralInstantPtr = Union{GeneralFieldName, InstantPointer}
-
-const AllPassPtr{A<:TensorType} = ChainPointer{A, 0, Tuple{}}
+const AllPassPointer{A<:TensorType} = ChainPointer{A, 0, Tuple{}}
 
 const TypedPointer{T, A<:TensorType{T}} = ChainPointer{A}
 
@@ -100,18 +98,18 @@ struct AwaitFilter{P<:PointerStack} <: StaticPointer
     ptr::P
 end
 
-DelayedPointer(ptr::DelayedPointer)  = itself(ptr)
+AwaitFilter(ptr::AwaitFilter) = itself(ptr)
 
 
-struct PointedObject{T, P<:NestedPointer} <: QueryBox{T}
+struct FilteredObject{T, P<:PointerStack} <: QueryBox{T}
     obj::T
     ptr::P
 end
 
-PointedObject(obj::Any, ptr::DelayedPointer) = PointedObject(obj, ptr.ptr)
+FilteredObject(obj, ptr::AwaitFilter) = FilteredObject(obj, ptr.ptr)
+FilteredObject(obj::FilteredObject, ptr::PointerStack) = FilteredObject(obj.obj, ptr)
+FilteredObject(obj::FilteredObject, ptr::AwaitFilter) = FilteredObject(obj.obj, ptr.ptr)
 
-
-getField(ptr) = Base.Fix2(getField, ptr)
 
 getField(obj, ::AllPassPtr) = itself(obj)
 
