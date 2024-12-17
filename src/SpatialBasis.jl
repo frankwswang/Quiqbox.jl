@@ -154,9 +154,6 @@ function getWeightParamCore(basis::AbstractVector{<:ComposedOrb{T, D}},
     expandedBasis, expandedWeight
 end
 
-decomposeOrb(b::T) where {T<:PrimitiveOrb} = Memory{T}([b])
-decomposeOrb(b::CompositeOrb) = b.basis
-
 
 function getEffectiveWeight(::PrimitiveOrb{T}, weight::FlattenedParam{T, 1}, 
                             idx::Int) where {T}
@@ -287,14 +284,35 @@ struct FrameworkOrb{T, D, B<:EvalComposedOrb{T, D}, P<:FlatParamSet{T},
     end
 end
 
-const FPrimGTO{T, D, B<:EvalPrimGTO{T, D}, P<:FlatParamSet{T}, A<:FieldParamPointer} = 
+FrameworkOrb(o::FrameworkOrb) = itself(o)
+
+const FPrimOrb{T, D, B<:EvalPrimOrb{T, D}, P<:FlatParamSet{T}, A<:FieldParamPointer} = 
       FrameworkOrb{T, D, B, P, A}
+
+const FCompOrb{T, D, B<:EvalCompOrb{T, D}, P<:FlatParamSet{T}, A<:FieldParamPointer} = 
+      FrameworkOrb{T, D, B, P, A}
+
+const FPrimGTO{T, D, B<:EvalPrimGTO{T, D}, P<:FlatParamSet{T}, A<:FieldParamPointer} = 
+      FPrimOrb{T, D, B, P, A}
 
 const FCompGTO{T, D, B<:EvalCompGTO{T, D}, P<:FlatParamSet{T}, A<:FieldParamPointer} = 
-      FrameworkOrb{T, D, B, P, A}
+      FCompOrb{T, D, B, P, A}
+
+unpackFunc(o::FrameworkOrb) = (o.core, o.param, o.pointer)
 
 
-unpackFunc(b::FrameworkOrb) = (b.core, b.param)
+primitiveNumberOf(::PrimitiveOrb) = 1
+
+primitiveNumberOf(o::CompositeOrb) = length(o.basis)
+
+primitiveNumberOf(::FPrimOrb) = 1
+
+primitiveNumberOf(o::FCompOrb) = length(o.core.f.apply.left.f.chain)
+
+
+decomposeOrb(o::T) where {T<:PrimitiveOrb} = Memory{T}([o])
+
+decomposeOrb(o::CompositeOrb) = o.basis
 
 
 function permitRenormalize!(b::OrbitalBasis)
