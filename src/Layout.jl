@@ -141,31 +141,20 @@ function getField(scope::ChainFilter, ptr::EntryPointer)
     ptr
 end
 
-
-function filterObjectCore(obj, ptr::ChainFilter)
-    evalField(itself, obj, ptr)
-end
-
-function filterObjectCore(obj, ptr::PointerStack)
-    map(x->getField(obj, x), ptr)
-end
-
-getField(obj, ptr::PointerStack) = filterObjectCore(obj, ptr)
-
 function getField(scope::PointerStack, ptr::PointerStack)
     ChainFilter(scope, ptr)
 end
 
+const InstantPtrCollection = Union{PointerStack, NonEmpTplOrAbtArr{<:ActivePointer}}
+
+getField(obj, ptr::InstantPtrCollection) = evalField(itself, obj, ptr)
+
 function getField(obj::FilteredObject, ptr::PointerStack)
-    FilteredObject(obj.obj, ChainFilter(obj.ptr, ptr))
+    FilteredObject(obj, ptr)
 end
 
 function getField(obj, ptr::AwaitFilter)
     FilteredObject(obj, ptr)
-end
-
-function getField(obj, ptrs::NonEmpTplOrAbtArr{<:ActivePointer})
-    map(x->getField(obj, x), ptrs)
 end
 
 getField(obj::Any) = itself(obj)
@@ -173,20 +162,61 @@ getField(obj::Any) = itself(obj)
 getField(obj::FilteredObject) = getField(obj.obj, obj.ptr)
 
 
+# function evalField(f::F, obj, ptr::EntryPointer) where {F<:Function}
+#     getField(obj, ptr) |> f
+# end
+
+# function evalField(f::F, obj::FilteredObject, ptr::PointerStack) where {F<:Function}
+#     res = getField(obj, ptr)
+#     evalFieldCore(f, res.obj, res.ptr)
+# end
+
+# function evalField(f::F, obj, ptr::InstantPtrCollection) where {F<:Function}
+#     evalFieldCore(f, obj, ptr)
+# end
+
+# function evalFieldCore(f::F, obj, ptr::InstantPtrCollection) where {F<:Function}
+#     map(x->evalField(f, obj, x), ptr)
+# end
+
+# function evalFieldCore(f::F, obj, ptr::ChainFilter) where {F<:Function}
+#     body..., tip = ptr.chain
+#     scope = ChainFilter(body)
+#     map(tip) do idx
+#         evalFieldCore(f, obj, scope, idx)
+#     end
+# end
+
+# function evalFieldCore(f::F, obj, ptr::SingleFilter) where {F<:Function}
+#     evalField(f, obj, first(ptr.chain))
+# end
+
+# function evalFieldCore(f::F, obj, ::AllPassFilter) where {F<:Function}
+#     f(obj)
+# end
+
+# function evalFieldCore(f::F, obj, scope::PointerStack, 
+#                        ptr::ActivePointer) where {F<:Function}
+#     evalField(f, obj, getField(scope, ptr))
+# end
+
+# function evalFieldCore(f::F, obj, scope::PointerStack, 
+#                        ptrs::NonEmpTplOrAbtArr{<:ActivePointer}) where {F<:Function}
+#     map(ptrs) do ptr
+#         evalField(f, obj, getField(scope, ptr))
+#     end
+# end
+
+# More simplistic version
 function evalField(f::F, obj, ptr::EntryPointer) where {F<:Function}
     getField(obj, ptr) |> f
 end
 
-function evalField(f::F, obj, ptr::PointerStack) where {F<:Function}
-    evalFieldCore(f, obj, ChainFilter(ptr))
+function evalField(f::F, obj, ptr::InstantPtrCollection) where {F<:Function}
+    map(x->evalField(f, obj, x), ptr)
 end
 
-function evalField(f::F, obj::FilteredObject, ptr::PointerStack) where {F<:Function}
-    res = getField(obj, ptr)
-    evalFieldCore(f, res.obj, res.ptr)
-end
-
-function evalFieldCore(f::F, obj, ptr::ChainFilter) where {F<:Function}
+function evalField(f::F, obj, ptr::ChainFilter) where {F<:Function}
     body..., tip = ptr.chain
     scope = ChainFilter(body)
     map(tip) do idx
@@ -194,7 +224,11 @@ function evalFieldCore(f::F, obj, ptr::ChainFilter) where {F<:Function}
     end
 end
 
-function evalFieldCore(f::F, obj, ::AllPassFilter) where {F<:Function}
+function evalField(f::F, obj, ptr::SingleFilter) where {F<:Function}
+    evalField(f, obj, first(ptr.chain))
+end
+
+function evalField(f::F, obj, ::AllPassFilter) where {F<:Function}
     f(obj)
 end
 
@@ -209,6 +243,7 @@ function evalFieldCore(f::F, obj, scope::PointerStack,
         evalField(f, obj, getField(scope, ptr))
     end
 end
+
 
 
 abstract type FiniteDict{N, K, T} <: AbstractDict{K, T} end
