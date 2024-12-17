@@ -1519,18 +1519,18 @@ pushParam!(arr::AbstractArray, param::ParamBox) = push!(arr, param)
 #? Possibly rename the field names in Flat/MiscParamSet?
 ## (Also applied for TemporaryStorage, FixedSizeStorage, ParamPointerBox)
 #? Allow AbstractParamSet to be empty if all sections are empty?
-struct FlatParamSet{T, S1<:ElementalParam{<:T}, 
-                    S2<:FlattenedParam{<:T}} <: AbstractFlatParamSet{T, S1, S2}
-    d0::Vector{S1}
-    d1::Vector{S2}
+struct FlatParamSet{T, P1<:ElementalParam{<:T}, 
+                    P2<:FlattenedParam{<:T}} <: AbstractFlatParamSet{T, Vector{P1}, P2}
+    d0::Vector{P1}
+    d1::Vector{P2}
 
-    FlatParamSet{T}(d0::Vector{S1}, d1::Vector{S2}) where 
-                   {T, S1<:ElementalParam{<:T}, S2<:FlattenedParam{<:T}} = 
-    new{T, S1, S2}(d0, d1)
+    FlatParamSet{T}(d0::Vector{P1}, d1::Vector{P2}) where 
+                   {T, P1<:ElementalParam{<:T}, P2<:FlattenedParam{<:T}} = 
+    new{T, P1, P2}(d0, d1)
 end
 
-const PrimParamSet{T, S1<:ElementalParam{T}, S2<:InnerSpanParam{T}} = 
-      FlatParamSet{T, S1, S2}
+const PrimParamSet{T, P1<:ElementalParam{T}, P2<:InnerSpanParam{T}} = 
+      FlatParamSet{T, P1, P2}
 
 size(fps::FlatParamSet) = size(fps.d1) .+ 1
 
@@ -1589,11 +1589,14 @@ length(fps::FlatParamSet) = length(fps.d1) + 1
 
 getproperty(fps::FlatParamSet, field::Symbol) = getfield(fps, field)
 
+const FlatParamSetMixedVec{T, P1<:ElementalParam{<:T}, P2<:FlattenedParam{<:T}, 
+                           P3<:JaggedParam{<:T}} = 
+      AbstractMiscParamSet{T, FlatParamSet{T, P1, P2}, P3}
 
-struct MiscParamSet{T, S1<:ElementalParam{<:T}, S2<:FlattenedParam{<:T}, 
-                    S3<:JaggedParam{<:T}} <: AbstractMiscParamSet{T, S1, S2, S3}
-    inner::FlatParamSet{T, S1, S2}
-    outer::Vector{S3}
+struct MiscParamSet{T, P1<:ElementalParam{<:T}, P2<:FlattenedParam{<:T}, 
+                    P3<:JaggedParam{<:T}} <: FlatParamSetMixedVec{T, P1, P2, P3}
+    inner::FlatParamSet{T, P1, P2}
+    outer::Vector{P3}
 end
 
 size(mps::MiscParamSet) = size(mps.outer) .+ 1
@@ -1670,8 +1673,8 @@ function initializeParamSet(::Type{FlatParamSet}, ::Type{T}=Any;
     FlatParamSet{T}(d0Type[], d1Type[])
 end
 
-initializeParamSet(::Type{FlatParamSet{T, S1, S2}}) where {T, S1, S2} = 
-FlatParamSet(S1[], S2[])
+initializeParamSet(::Type{FlatParamSet{T, P1, P2}}) where {T, P1, P2} = 
+FlatParamSet(P1[], P2[])
 
 initializeParamSet(f::Function) = 
 initializeParamSet(SelectTrait{ParameterizationStyle}()(f))
@@ -1692,8 +1695,8 @@ function initializeParamSet(::Type{MiscParamSet}, ::Type{T}=Any;
     MiscParamSet(inner, d2Type[])
 end
 
-initializeParamSet(::Type{MiscParamSet{T, S1, S2, S3}}) where {T, S1, S2, S3} = 
-MiscParamSet(FlatParamSet(S1[], S2[]), S3[])
+initializeParamSet(::Type{MiscParamSet{T, P1, P2, P3}}) where {T, P1, P2, P3} = 
+MiscParamSet(FlatParamSet(P1[], P2[]), P3[])
 
 
 #!  SingleNestParamSet
@@ -1757,6 +1760,17 @@ getindex(obj.d0, last(ptr.chain))
 
 getField(obj::FlatParamSetFilter, ptr::FlatPSetOuterPtr) = 
 getFlatSetIndexCore(obj, first(ptr.chain))
+
+
+function intersectFilter(prev::FlatParamSetFilter, here::FlatParamSetFilter)
+    d0New = map(here.d0) do ptr
+        getField(prev, ptr)
+    end
+    d1New = map(here.d1) do ptr
+        getField(prev, ptr)
+    end
+    FlatParamSetFilter(d0New, d1New, prev.tag)
+end
 
 
 getParamSector(source::FlatParamSet, ::Type{<:ElementalParam}) = 

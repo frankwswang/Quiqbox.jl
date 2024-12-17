@@ -119,10 +119,13 @@ const TetraTupleUnion{T} = Union{(NTuple{N, T} for N in 1:4)...}
 const ParamInputType{T} = TriTupleUnion{JaggedParam{T}}
 const ParamInput{T, N} = NTuple{N, JaggedParam{T}}
 
-const PrimParamEle{T} = Union{AbstractVector{<:ElementalParam{T}}, InnerSpanParam{T}}
+const EleParamSpanVecTyped{T} =  AbstractVector{<:ElementalParam{T}}
+const EleParamSpanVecUnion{T} =  AbstractVector{<:ElementalParam{<:T}}
+
+const PrimParamEle{T} = Union{EleParamSpanVecTyped{T}, InnerSpanParam{T}}
 const PrimParamVec{T} = AbstractVector{<:PrimParamEle{T}}
 
-const FlatParamEle{T} = Union{AbstractVector{<:ElementalParam{T}}, FlattenedParam{T}}
+const FlatParamEle{T} = Union{EleParamSpanVecTyped{T}, FlattenedParam{T}}
 const FlatParamVec{T} = AbstractVector{<:FlatParamEle{T}}
 
 const MiscParamEle{T} = Union{AbstractVector{<:FlatParamEle{T}}, JaggedParam{T}}
@@ -135,11 +138,10 @@ const ParamPointer{T, N, I} = Union{LinkParam{T, N, I}, ParamNest{T, N, I}}
 
 const MissSymInt = MissingOr{Union{Symbol, Int}}
 
-const AbstractFlatParamSet{T, S1<:ElementalParam{<:T}, S2<:FlattenedParam{<:T}} = 
-      AbstractVector{Union{<:AbstractVector{S1}, S2}}
-const AbstractMiscParamSet{T, S1<:ElementalParam{<:T}, S2<:FlattenedParam{<:T}, 
-                           S3<:JaggedParam{<:T}} = 
-      AbstractVector{Union{<:AbstractFlatParamSet{T, S1, S2}, S3}}
+const AbstractFlatParamSet{T, V<:EleParamSpanVecUnion{<:T}, P<:FlattenedParam{<:T}} = 
+      AbstractVector{Union{V, P}}
+const AbstractMiscParamSet{T, S<:AbstractFlatParamSet{T}, P<:JaggedParam{<:T}} = 
+      AbstractVector{Union{S, P}}
 
 const AbstractParamSet{T} = Union{AbstractFlatParamSet{T}, AbstractMiscParamSet{T}}
 const ParamCollection{T} = Union{AbstractParamSet{T}, ParamTypeArr{<:ParamBox{T}, 1}}
