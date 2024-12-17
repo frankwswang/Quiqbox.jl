@@ -135,6 +135,15 @@ const ParamPointer{T, N, I} = Union{LinkParam{T, N, I}, ParamNest{T, N, I}}
 
 const MissSymInt = MissingOr{Union{Symbol, Int}}
 
+const AbstractFlatParamSet{T, S1<:ElementalParam{<:T}, S2<:FlattenedParam{<:T}} = 
+      AbstractVector{Union{<:AbstractVector{S1}, S2}}
+const AbstractMiscParamSet{T, S1<:ElementalParam{<:T}, S2<:FlattenedParam{<:T}, 
+                           S3<:JaggedParam{<:T}} = 
+      AbstractVector{Union{<:AbstractFlatParamSet{T, S1, S2}, S3}}
+
+const AbstractParamSet{T} = Union{AbstractFlatParamSet{T}, AbstractMiscParamSet{T}}
+const ParamCollection{T} = Union{AbstractParamSet{T}, ParamTypeArr{<:ParamBox{T}, 1}}
+
 
 import Base: size, firstindex, lastindex, getindex, setindex!, iterate, length
 

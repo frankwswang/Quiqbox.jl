@@ -1516,9 +1516,6 @@ evalParamSet(s::MiscParamVec{T}) where {T} = map(evalParamSet, s)
 pushParam!(arr::AbstractArray, param::ParamBox) = push!(arr, param)
 
 
-const AbstractFlatParamSet{T, S1<:ElementalParam{<:T}, S2<:FlattenedParam{<:T}} = 
-      AbstractVector{Union{Vector{S1}, S2}}
-
 #? Possibly rename the field names in Flat/MiscParamSet?
 ## (Also applied for TemporaryStorage, FixedSizeStorage, ParamPointerBox)
 #? Allow AbstractParamSet to be empty if all sections are empty?
@@ -1592,9 +1589,6 @@ length(fps::FlatParamSet) = length(fps.d1) + 1
 
 getproperty(fps::FlatParamSet, field::Symbol) = getfield(fps, field)
 
-const AbstractMiscParamSet{T, S1<:ElementalParam{<:T}, S2<:FlattenedParam{<:T}, 
-                           S3<:JaggedParam{<:T}} = 
-      AbstractVector{Union{FlatParamSet{T, S1, S2}, S3}}
 
 struct MiscParamSet{T, S1<:ElementalParam{<:T}, S2<:FlattenedParam{<:T}, 
                     S3<:JaggedParam{<:T}} <: AbstractMiscParamSet{T, S1, S2, S3}
@@ -1719,9 +1713,9 @@ const ChainFlatParamSetFilter{T, N} = ChainFilter{1, 2, NTuple{N, FlatParamSetFi
 const FilteredFlatParamSet{T, N} = 
       FilteredObject{<:FlatParamSet{T}, ChainFlatParamSetFilter{T, N}}
 
-const FlatParamSource{T} = Union{AbstractFlatParamSet{T}, FilteredFlatParamSet{T}}
+const FlatParamSource{T} = Union{FlatParamSet{T}, FilteredFlatParamSet{T}}
 
-const AbstractParamSet{T} = Union{FlatParamSource{T}, AbstractMiscParamSet{T}}
+const AbstractParamSource{T} = Union{AbstractParamSet{T}, FlatParamSource{T}}
 
 function FlatParamSetFilter(pSet::FlatParamSet{T}, d0Ids::AbstractVector{Int}, 
                             d1Ids::AbstractVector{Int}) where {T}
@@ -1864,14 +1858,12 @@ function cacheParam!(cache::DimSpanDataCacheBox{T}, param::ParamBox{T}) where {T
     end
 end
 
-function cacheParam!(cache::DimSpanDataCacheBox{T}, s::AbstractParamSet{T}, 
+function cacheParam!(cache::DimSpanDataCacheBox{T}, s::AbstractParamSource{T}, 
                      ptr::CompositePointer) where {T}
     evalField(s, ptr) do par
         cacheParam!(cache, par)
     end
 end
-
-const ParamCollection{T} = Union{AbstractParamSet{T}, ParamTypeArr{<:ParamBox{T}, 1}}
 
 function cacheParam!(cache::DimSpanDataCacheBox{T}, s::ParamCollection{T}) where {T}
     map(s) do p

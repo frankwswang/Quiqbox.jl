@@ -264,7 +264,7 @@ end
 
 abstract type UnpackedOrb{T, D, B} <: OrbitalBasis{T, D, B} end
 
-struct FrameworkOrb{T, D, B<:EvalComposedOrb{T, D}, P<:FlatParamSet{T}, 
+struct FrameworkOrb{T, D, B<:EvalComposedOrb{T, D}, P<:FlatParamSource{T}, 
                     A<:FieldParamPointer} <: UnpackedOrb{T, D, B}
     core::B
     param::P
