@@ -101,14 +101,17 @@ end
 AwaitFilter(ptr::AwaitFilter) = itself(ptr)
 
 
-struct FilteredObject{T, P<:PointerStack} <: QueryBox{T}
+struct FilteredObject{T, P<:ChainFilter} <: QueryBox{T}
     obj::T
     ptr::P
 end
 
+FilteredObject(obj::FilteredObject, ptr::ChainFilter) = 
+FilteredObject(obj.obj, ChainFilter(obj.ptr, ptr))
+
+FilteredObject(obj, ptr::PointerStack) = FilteredObject(obj, ChainFilter(ptr))
+
 FilteredObject(obj, ptr::AwaitFilter) = FilteredObject(obj, ptr.ptr)
-FilteredObject(obj::FilteredObject, ptr::PointerStack) = FilteredObject(obj.obj, ptr)
-FilteredObject(obj::FilteredObject, ptr::AwaitFilter) = FilteredObject(obj.obj, ptr.ptr)
 
 
 getFieldCore(obj, ::AllPassPointer) = itself(obj)

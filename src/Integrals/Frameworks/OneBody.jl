@@ -95,7 +95,7 @@ function getOverlapCore!(cache::DimSpanDataCacheBox{T},
                          (s,)::Tuple{FlatParamSet{T}}, 
                          (p,)::Tuple{CompOrbParamPtr{T, D}}) where {T, D}
     res = zero(T)
-    sL = FilteredObject(s, ChainFilter(p.scope))
+    sL = FilteredObject(s, p.scope)
     w = cacheParam!(cache, sL, p.weight)
     primOrbs = o.f.chain
     for j in eachindex(primOrbs), i in 1:j
@@ -116,8 +116,8 @@ function getOverlapCore!(cache::DimSpanDataCacheBox{T},
                          (s1, s2)::NTuple{2, FlatParamSet{T}}, 
                          (p1, p2)::NTuple{2, CompOrbParamPtr{T, D}}) where {T, D}
     res = zero(T)
-    s1L = FilteredObject(s1, ChainFilter(p1.scope))
-    s2L = FilteredObject(s2, ChainFilter(p2.scope))
+    s1L = FilteredObject(s1, p1.scope)
+    s2L = FilteredObject(s2, p2.scope)
     w1 = cacheParam!(cache, s1L, p1.weight)
     w2 = cacheParam!(cache, s2L, p2.weight)
     primOrbs1 = o1.f.chain

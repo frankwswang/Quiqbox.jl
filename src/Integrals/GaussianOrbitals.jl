@@ -108,7 +108,7 @@ end
 function preparePGTOparam!(cache::DimSpanDataCacheBox{T}, o::PrimGTOcore{T, D}, 
                            s::FlatParamSource{T}, p::PrimOrbParamPtr{T, D}) where {T, D}
     # @show p.scope
-    sLocal = FilteredObject(s, ChainFilter(p.scope))
+    sLocal = FilteredObject(s, p.scope)
     cen = map(p.center) do c
         cacheParam!(cache, sLocal, c)
     end
