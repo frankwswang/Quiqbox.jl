@@ -114,8 +114,9 @@ const AbtArrayOr{T} = Union{T, AbstractArray{T}}
 const AbtArr210L{T} = Union{T, AbstractArray{T}, JaggedAbtArray{T}}
 const AbtMemory0D{T} = AbstractMemory{T, 0}
 
-const TernaryNTupleUnion{T} = Union{(NTuple{N, T} for N in 1:3)...}
-const ParamInputType{T} = TernaryNTupleUnion{JaggedParam{T}}
+const TriTupleUnion{T} = Union{(NTuple{N, T} for N in 1:3)...}
+const TetraTupleUnion{T} = Union{(NTuple{N, T} for N in 1:4)...}
+const ParamInputType{T} = TriTupleUnion{JaggedParam{T}}
 const ParamInput{T, N} = NTuple{N, JaggedParam{T}}
 
 const PrimParamEle{T} = Union{AbstractVector{<:ElementalParam{T}}, InnerSpanParam{T}}
