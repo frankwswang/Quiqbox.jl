@@ -2,7 +2,7 @@ export genGraphNode, evaluateNode, compressNode
 
 using Base: Fix1
 
-const NodeChildrenType{T} = TernaryNTupleUnion{GraphNode{T}}
+const NodeChildrenType{T} = TriTupleUnion{GraphNode{T}}
 const getParSym = symbolFrom∘indexedSymOf
 
 function genConstFunc(::Type{T1}, val::T2) where {T1, T2}

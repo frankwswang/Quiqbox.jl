@@ -1705,7 +1705,7 @@ const FlatParamSetIdxPtr{T} = Union{FlatPSetInnerPtr{T}, FlatPSetOuterPtr{T}}
 struct FlatParamSetFilter{T} <: PointerStack{1, 2}
     d0::Memory{FlatPSetInnerPtr{T}} #! Replace by immutable vector
     d1::Memory{FlatPSetOuterPtr{T}} #! Replace by immutable vector
-    sourceID::Identifier
+    tag::Identifier
 end
 
 const ChainFlatParamSetFilter{T, N} = ChainFilter{1, 2, NTuple{N, FlatParamSetFilter{T}}}

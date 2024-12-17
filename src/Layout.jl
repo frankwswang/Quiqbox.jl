@@ -162,52 +162,6 @@ getField(obj::Any) = itself(obj)
 getField(obj::FilteredObject) = getField(obj.obj, obj.ptr)
 
 
-# function evalField(f::F, obj, ptr::EntryPointer) where {F<:Function}
-#     getField(obj, ptr) |> f
-# end
-
-# function evalField(f::F, obj::FilteredObject, ptr::PointerStack) where {F<:Function}
-#     res = getField(obj, ptr)
-#     evalFieldCore(f, res.obj, res.ptr)
-# end
-
-# function evalField(f::F, obj, ptr::InstantPtrCollection) where {F<:Function}
-#     evalFieldCore(f, obj, ptr)
-# end
-
-# function evalFieldCore(f::F, obj, ptr::InstantPtrCollection) where {F<:Function}
-#     map(x->evalField(f, obj, x), ptr)
-# end
-
-# function evalFieldCore(f::F, obj, ptr::ChainFilter) where {F<:Function}
-#     body..., tip = ptr.chain
-#     scope = ChainFilter(body)
-#     map(tip) do idx
-#         evalFieldCore(f, obj, scope, idx)
-#     end
-# end
-
-# function evalFieldCore(f::F, obj, ptr::SingleFilter) where {F<:Function}
-#     evalField(f, obj, first(ptr.chain))
-# end
-
-# function evalFieldCore(f::F, obj, ::AllPassFilter) where {F<:Function}
-#     f(obj)
-# end
-
-# function evalFieldCore(f::F, obj, scope::PointerStack, 
-#                        ptr::ActivePointer) where {F<:Function}
-#     evalField(f, obj, getField(scope, ptr))
-# end
-
-# function evalFieldCore(f::F, obj, scope::PointerStack, 
-#                        ptrs::NonEmpTplOrAbtArr{<:ActivePointer}) where {F<:Function}
-#     map(ptrs) do ptr
-#         evalField(f, obj, getField(scope, ptr))
-#     end
-# end
-
-# More simplistic version
 function evalField(f::F, obj, ptr::EntryPointer) where {F<:Function}
     getField(obj, ptr) |> f
 end
