@@ -25,12 +25,12 @@ end
 CartSHarmonics(t::NonEmptyTuple{Int}) = (CartSHarmonics∘WeakComp)(t)
 
 function evalCartSHarmonicsCore(::Val{D}, m::WeakComp{D, L}, 
-                                r::NTuple{D, Real}) where {D, L}
-    prod(r .^ m.tuple)
+                                dr::NTuple{D, Real}) where {D, L}
+    prod(abs.(dr) .^ m.tuple)
 end
 
-(csh::CartSHarmonics{D, L})(r::NTuple{D, Real}) where {D, L} = 
-evalCartSHarmonicsCore(Val(D), csh.m, r)
+(csh::CartSHarmonics{D, L})(dr::NTuple{D, Real}) where {D, L} = 
+evalCartSHarmonicsCore(Val(D), csh.m, dr)
 
 
 struct PureSHarmonics{D, L} <: RealSolidHarmonics{D, L}
