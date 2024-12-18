@@ -100,8 +100,7 @@ end
 
 AwaitFilter(ptr::AwaitFilter) = itself(ptr)
 
-
-struct FilteredObject{T, P<:ChainFilter} <: QueryBox{T}
+struct FilteredObject{T, P<:ChainFilter} <: ViewedObject{T, P}
     obj::T
     ptr::P
 end

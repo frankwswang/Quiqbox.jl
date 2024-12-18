@@ -106,7 +106,7 @@ end
 
 
 function preparePGTOparam!(cache::DimSpanDataCacheBox{T}, o::PrimGTOcore{T, D}, 
-                           s::FlatParamSource{T}, p::PrimOrbParamPtr{T, D}) where {T, D}
+                           s::TypedParamInput{T}, p::PrimOrbParamPtr{T, D}) where {T, D}
     # @show p.scope
     sLocal = FilteredObject(s, p.scope)
     cen = map(p.center) do c
@@ -120,7 +120,7 @@ end
 
 function getOverlapCore!(cache::DimSpanDataCacheBox{T}, 
                          (o,)::Tuple{PrimGTOcore{T, D}}, 
-                         (s,)::Tuple{FlatParamSource{T}}, 
+                         (s,)::Tuple{TypedParamInput{T}}, 
                          (p,)::Tuple{PrimOrbParamPtr{T, D}}) where {T, D}
     cen, xpn, ang = preparePGTOparam!(cache, o, s, p)
     overlapPGTO(CenPair(cen, cen), XpnPair(xpn, xpn), AngPair(ang, ang))
@@ -128,7 +128,7 @@ end
 
 function getOverlapCore!(cache::DimSpanDataCacheBox{T}, 
                          o::NTuple{2, PrimGTOcore{T, D}}, 
-                         s::NTuple{2, FlatParamSource{T}}, 
+                         s::NTuple{2, TypedParamInput{T}}, 
                          p::NTuple{2, PrimOrbParamPtr{T, D}}) where {T, D}
     (cen1, xpn1, ang1), (cen2, xpn2, ang2) = map(o, s, p) do orb, pSet, pPtr
         preparePGTOparam!(cache, orb, pSet, pPtr)

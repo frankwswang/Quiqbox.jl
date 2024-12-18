@@ -65,7 +65,7 @@ end
 
 function getOverlapCore!(cache::DimSpanDataCacheBox{T}, 
                          (o,)::Tuple{PrimitiveOrbCore{T, D}}, 
-                         (s,)::Tuple{FlatParamSource{T}}, 
+                         (s,)::Tuple{TypedParamInput{T}}, 
                          (p,)::Tuple{PrimOrbParamPtr{T}}) where {T, D}
     evalCore = (o.f.apply,)
     parBlock = cacheParam!(cache, s, p.scope)
@@ -74,7 +74,7 @@ end
 
 function getOverlapCore!(cache::DimSpanDataCacheBox{T}, 
                          (o1, o2)::NTuple{2, PrimitiveOrbCore{T, D}}, 
-                         (s1, s2)::NTuple{2, FlatParamSource{T}}, 
+                         (s1, s2)::NTuple{2, TypedParamInput{T}}, 
                          (p1, p2)::NTuple{2, PrimOrbParamPtr{T}}) where {T, D}
     evalCore = (o1.f.apply, o2.f.apply)
     parBlock1 = cacheParam!(cache, s1, p1.scope)

@@ -1057,11 +1057,11 @@ end
 obtain(p::ParamBox; maxRecursion::Int=DefaultMaxParamPointerLevel) = 
 obtainINTERNAL(p, maxRecursion)
 
-obtain(p::ParamTypeArr{<:ParamBox{T}}; 
+obtain(p::ParamBoxUnionArr{ParamBox{T}}; 
        maxRecursion::Int=DefaultMaxParamPointerLevel) where {T} = 
 obtainINTERNAL(p, maxRecursion)
 
-obtain(p::ParamTypeArr; maxRecursion::Int=DefaultMaxParamPointerLevel) = 
+obtain(p::ParamBoxUnionArr; maxRecursion::Int=DefaultMaxParamPointerLevel) = 
 obtainINTERNAL(itself.(p), maxRecursion)
 
 ################################
@@ -1502,7 +1502,7 @@ end
 
 evalParamSet(s::ParamBox) = obtain(s)
 
-evalParamSet(s::ParamTypeArr{<:Any, 1}) = obtain(s)
+evalParamSet(s::ParamBoxUnionArr{<:ParamBox, 1}) = obtain(s)
 
 evalParamSet(s::FlatParamVec{T}) where {T} = map(obtain, s)
 
@@ -1529,8 +1529,11 @@ struct FlatParamSet{T, P1<:ElementalParam{<:T},
     new{T, P1, P2}(d0, d1)
 end
 
-const PrimParamSet{T, P1<:ElementalParam{T}, P2<:InnerSpanParam{T}} = 
+const TypedFlatParamSet{T, P1<:ElementalParam{T}, P2<:FlattenedParam{T}} = 
       FlatParamSet{T, P1, P2}
+
+const PrimitiveParamSet{T, P1<:ElementalParam{T}, P2<:InnerSpanParam{T}} = 
+      TypedFlatParamSet{T, P1, P2}
 
 size(fps::FlatParamSet) = size(fps.d1) .+ 1
 
@@ -1598,6 +1601,10 @@ struct MiscParamSet{T, P1<:ElementalParam{<:T}, P2<:FlattenedParam{<:T},
     inner::FlatParamSet{T, P1, P2}
     outer::Vector{P3}
 end
+
+const TypedMiscParamSet{T, P1<:ElementalParam{T}, P2<:FlattenedParam{T}, 
+                        P3<:JaggedParam{T}} = 
+      MiscParamSet{T, P1, P2, P3}
 
 size(mps::MiscParamSet) = size(mps.outer) .+ 1
 
@@ -1714,11 +1721,9 @@ end
 const ChainFlatParamSetFilter{T, N} = ChainFilter{1, 2, NTuple{N, FlatParamSetFilter{T}}}
 
 const FilteredFlatParamSet{T, N} = 
-      FilteredObject{<:FlatParamSet{T}, ChainFlatParamSetFilter{T, N}}
+      FilteredObject{<:TypedFlatParamSet{T}, ChainFlatParamSetFilter{T, N}}
 
-const FlatParamSource{T} = Union{FlatParamSet{T}, FilteredFlatParamSet{T}}
-
-const AbstractParamSource{T} = Union{AbstractParamSet{T}, FlatParamSource{T}}
+const TypedParamInput{T} = Union{TypedFlatParamSet{T}, FilteredFlatParamSet{T}}
 
 function FlatParamSetFilter(pSet::FlatParamSet{T}, d0Ids::AbstractVector{Int}, 
                             d1Ids::AbstractVector{Int}) where {T}
@@ -1872,14 +1877,14 @@ function cacheParam!(cache::DimSpanDataCacheBox{T}, param::ParamBox{T}) where {T
     end
 end
 
-function cacheParam!(cache::DimSpanDataCacheBox{T}, s::AbstractParamSource{T}, 
+function cacheParam!(cache::DimSpanDataCacheBox{T}, s::GeneralParamSource{T}, 
                      ptr::CompositePointer) where {T}
     evalField(s, ptr) do par
         cacheParam!(cache, par)
     end
 end
 
-function cacheParam!(cache::DimSpanDataCacheBox{T}, s::ParamCollection{T}) where {T}
+function cacheParam!(cache::DimSpanDataCacheBox{T}, s::TypedParamSetVec{T}) where {T}
     map(s) do p
         cacheParam!(cache, p)
     end

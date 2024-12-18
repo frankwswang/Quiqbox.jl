@@ -264,7 +264,7 @@ end
 
 abstract type UnpackedOrb{T, D, B} <: OrbitalBasis{T, D, B} end
 
-struct FrameworkOrb{T, D, B<:EvalComposedOrb{T, D}, P<:FlatParamSource{T}, 
+struct FrameworkOrb{T, D, B<:EvalComposedOrb{T, D}, P<:TypedParamInput{T}, 
                     A<:FieldParamPointer} <: UnpackedOrb{T, D, B}
     core::B
     param::P
@@ -282,32 +282,42 @@ struct FrameworkOrb{T, D, B<:EvalComposedOrb{T, D}, P<:FlatParamSource{T},
         bl && (paramSet = FlatParamSet{T}(d0, d1))
         new{T, D, typeof(core), typeof(paramSet), typeof(ptr)}(core, paramSet, ptr)
     end
+
+    function FrameworkOrb(o::FrameworkOrb{T, D, <:EvalCompOrb{T, D}, <:TypedParamInput{T}}, 
+                          idx::Int) where {T, D}
+        oPointer = o.pointer
+        oCore = o.core.f.apply.left
+        subOrb = oCore.f.chain[idx].left
+        subPtr = oPointer.basis[idx]
+        subPar = FilteredObject(o.param, oPointer.scope)
+        new{T, D, typeof(subOrb), typeof(subPar), typeof(subPtr)}(subOrb, subPar, subPtr)
+    end
 end
 
 FrameworkOrb(o::FrameworkOrb) = itself(o)
 
-const FPrimOrb{T, D, B<:EvalPrimOrb{T, D}, P<:FlatParamSet{T}, A<:FieldParamPointer} = 
+const FPrimOrb{T, D, B<:EvalPrimOrb{T, D}, P<:TypedParamInput{T}, A<:FieldParamPointer} = 
       FrameworkOrb{T, D, B, P, A}
 
-const FCompOrb{T, D, B<:EvalCompOrb{T, D}, P<:FlatParamSet{T}, A<:FieldParamPointer} = 
+const FCompOrb{T, D, B<:EvalCompOrb{T, D}, P<:TypedParamInput{T}, A<:FieldParamPointer} = 
       FrameworkOrb{T, D, B, P, A}
 
-const FPrimGTO{T, D, B<:EvalPrimGTO{T, D}, P<:FlatParamSet{T}, A<:FieldParamPointer} = 
+const FPrimGTO{T, D, B<:EvalPrimGTO{T, D}, P<:TypedParamInput{T}, A<:FieldParamPointer} = 
       FPrimOrb{T, D, B, P, A}
 
-const FCompGTO{T, D, B<:EvalCompGTO{T, D}, P<:FlatParamSet{T}, A<:FieldParamPointer} = 
+const FCompGTO{T, D, B<:EvalCompGTO{T, D}, P<:TypedParamInput{T}, A<:FieldParamPointer} = 
       FCompOrb{T, D, B, P, A}
 
 unpackFunc(o::FrameworkOrb) = (o.core, o.param, o.pointer)
 
 
-primitiveNumberOf(::PrimitiveOrb) = 1
+getOrbitalSize(::PrimitiveOrb) = 1
 
-primitiveNumberOf(o::CompositeOrb) = length(o.basis)
+getOrbitalSize(o::CompositeOrb) = length(o.basis)
 
-primitiveNumberOf(::FPrimOrb) = 1
+getOrbitalSize(::FPrimOrb) = 1
 
-primitiveNumberOf(o::FCompOrb) = length(o.core.f.apply.left.f.chain)
+getOrbitalSize(o::FCompOrb) = length(o.core.f.apply.left.f.chain)
 
 
 decomposeOrb(o::T) where {T<:PrimitiveOrb} = Memory{T}([o])

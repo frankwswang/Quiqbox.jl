@@ -22,6 +22,8 @@ abstract type PackedFunction{T} <: CompositeFunction end
 
 abstract type TypedEvaluator{T, F} <: Evaluator{F} end
 
+abstract type ViewedObject{T, P} <: QueryBox{T} end
+
 abstract type AbstractAmpTensor{T, O} <: JaggedOperator{T, 0, O} end
 abstract type AbstractAmplitude{T} <: JaggedOperator{T, 0, 0} end
 
@@ -119,8 +121,8 @@ const TetraTupleUnion{T} = Union{(NTuple{N, T} for N in 1:4)...}
 const ParamInputType{T} = TriTupleUnion{JaggedParam{T}}
 const ParamInput{T, N} = NTuple{N, JaggedParam{T}}
 
-const EleParamSpanVecTyped{T} =  AbstractVector{<:ElementalParam{T}}
-const EleParamSpanVecUnion{T} =  AbstractVector{<:ElementalParam{<:T}}
+const EleParamSpanVecTyped{T} = AbstractVector{<:ElementalParam{T}}
+const EleParamSpanVecUnion{T} = AbstractVector{<:ElementalParam{<:T}}
 
 const PrimParamEle{T} = Union{EleParamSpanVecTyped{T}, InnerSpanParam{T}}
 const PrimParamVec{T} = AbstractVector{<:PrimParamEle{T}}
@@ -128,15 +130,11 @@ const PrimParamVec{T} = AbstractVector{<:PrimParamEle{T}}
 const FlatParamEle{T} = Union{EleParamSpanVecTyped{T}, FlattenedParam{T}}
 const FlatParamVec{T} = AbstractVector{<:FlatParamEle{T}}
 
-const MiscParamEle{T} = Union{AbstractVector{<:FlatParamEle{T}}, JaggedParam{T}}
+const MiscParamEle{T} = Union{FlatParamVec{T}, JaggedParam{T}}
 const MiscParamVec{T} = AbstractVector{<:MiscParamEle{T}}
 
-const ParamTypeArr{T<:ParamBox, N} = AbstractArray{T, N}
-
-const ParamFunctor{T, N, I} = Union{BaseParam{T, N, I}, ParamLink{T, N, I}}
-const ParamPointer{T, N, I} = Union{LinkParam{T, N, I}, ParamNest{T, N, I}}
-
-const MissSymInt = MissingOr{Union{Symbol, Int}}
+const ParamBoxTypedArr{T, N} = AbstractArray{<:ParamBox{T}, N}
+const ParamBoxUnionArr{P<:ParamBox, N} = AbstractArray{<:P, N}
 
 const AbstractFlatParamSet{T, V<:EleParamSpanVecUnion{<:T}, P<:FlattenedParam{<:T}} = 
       AbstractVector{Union{V, P}}
@@ -144,7 +142,16 @@ const AbstractMiscParamSet{T, S<:AbstractFlatParamSet{T}, P<:JaggedParam{<:T}} =
       AbstractVector{Union{S, P}}
 
 const AbstractParamSet{T} = Union{AbstractFlatParamSet{T}, AbstractMiscParamSet{T}}
-const ParamCollection{T} = Union{AbstractParamSet{T}, ParamTypeArr{<:ParamBox{T}, 1}}
+const TypedParamSetVec{T} = Union{FlatParamVec{T}, FlatParamVec{T}, ParamBoxTypedArr{T, 1}}
+
+const DirectParamSource{T} = Union{AbstractParamSet{T}, TypedParamSetVec{T}}
+const ViewedParamSource{T, P} = ViewedObject{<:DirectParamSource{T}, P}
+const GeneralParamSource{T} = Union{DirectParamSource{T}, ViewedParamSource{T}}
+
+const ParamFunctor{T, N, I} = Union{BaseParam{T, N, I}, ParamLink{T, N, I}}
+const ParamPointer{T, N, I} = Union{LinkParam{T, N, I}, ParamNest{T, N, I}}
+
+const MissSymInt = MissingOr{Union{Symbol, Int}}
 
 
 import Base: size, firstindex, lastindex, getindex, setindex!, iterate, length
