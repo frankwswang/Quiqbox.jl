@@ -174,7 +174,7 @@ end
 
 function evalFunc(fCore::F, pSet::Union{DirectParamSource, TypedParamInput}, 
                   input::T) where {F<:Function, T}
-    fCore(input, evalParamSet(pSet))
+    fCore(input, evalParamSource(pSet))
 end
 
 function evalFunc(fCore::F, pVals::AbtVecOfAbtArr, input::T) where {F<:Function, T}

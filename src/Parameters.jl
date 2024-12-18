@@ -1,7 +1,7 @@
 export TensorVar, CellParam, GridParam, ParamGrid, ParamMesh, setScreenLevel!, 
        setScreenLevel, symOf, inputOf, obtain, fragment, setVal!, screenLevelOf, 
        markParams!, topoSort, getParams, uniqueParams, ShapedMemory, directObtain, 
-       memorize!, evalParamSet
+       memorize!, evalParamSource
 
 using Base: Fix2, Threads.Atomic, issingletontype
 using Test: @inferred
@@ -1500,13 +1500,13 @@ function genCellEncoder(::Type{T}, sym::Symbol; defaultScreenLevel::Int=1) where
 end
 
 
-evalParamSet(s::ParamBox) = obtain(s)
+evalParamSource(s::ParamBox) = obtain(s)
 
-evalParamSet(s::ParamBoxUnionArr{<:ParamBox, 1}) = obtain(s)
+evalParamSource(s::ParamBoxUnionArr{<:ParamBox, 1}) = obtain(s)
 
-evalParamSet(s::FlatParamVec{T}) where {T} = map(obtain, s)
+evalParamSource(s::GeneralParamInput{T, <:FlatParamVec{T}}) where {T} = mapLayout(obtain, s)
 
-evalParamSet(s::MiscParamVec{T}) where {T} = map(evalParamSet, s)
+evalParamSource(s::GeneralParamInput) = mapLayout(evalParamSource, s)
 
 
 # FlatParamVec: [[d0...], d1...]          # Used for  input-param set
@@ -1886,7 +1886,7 @@ end
 
 function cacheParam!(cache::DimSpanDataCacheBox{T}, 
                      s::GeneralParamInput{T, <:TypedParamSetVec{T}}) where {T}
-    map(s) do p
+    mapLayout(s) do p
         cacheParam!(cache, p)
     end
 end

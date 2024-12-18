@@ -347,3 +347,12 @@ function hash(id::Identifier, hashCode::UInt)
     hashCode = hash(id.code, hashCode)
     hash(objectid(id.link.value), hashCode)
 end
+
+
+function mapLayout(op::F, collection::Any) where {F<:Function}
+    map(op, collection)
+end
+
+function mapLayout(op::F, collection::FilteredObject) where {F<:Function}
+    evalField(op, collection.obj, collection.ptr)
+end
