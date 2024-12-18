@@ -1877,14 +1877,15 @@ function cacheParam!(cache::DimSpanDataCacheBox{T}, param::ParamBox{T}) where {T
     end
 end
 
-function cacheParam!(cache::DimSpanDataCacheBox{T}, s::GeneralParamSource{T}, 
+function cacheParam!(cache::DimSpanDataCacheBox{T}, s::TypedParamInput{T}, 
                      ptr::CompositePointer) where {T}
     evalField(s, ptr) do par
         cacheParam!(cache, par)
     end
 end
 
-function cacheParam!(cache::DimSpanDataCacheBox{T}, s::TypedParamSetVec{T}) where {T}
+function cacheParam!(cache::DimSpanDataCacheBox{T}, 
+                     s::GeneralParamInput{T, <:TypedParamSetVec{T}}) where {T}
     map(s) do p
         cacheParam!(cache, p)
     end

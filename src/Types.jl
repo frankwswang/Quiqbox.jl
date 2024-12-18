@@ -145,8 +145,8 @@ const AbstractParamSet{T} = Union{AbstractFlatParamSet{T}, AbstractMiscParamSet{
 const TypedParamSetVec{T} = Union{FlatParamVec{T}, FlatParamVec{T}, ParamBoxTypedArr{T, 1}}
 
 const DirectParamSource{T} = Union{AbstractParamSet{T}, TypedParamSetVec{T}}
-const ViewedParamSource{T, P} = ViewedObject{<:DirectParamSource{T}, P}
-const GeneralParamSource{T} = Union{DirectParamSource{T}, ViewedParamSource{T}}
+const ViewedParamSource{T, S<:DirectParamSource{T}, P} = ViewedObject{S, P}
+const GeneralParamInput{T, S<:DirectParamSource{T}} = Union{S, ViewedParamSource{T, S}}
 
 const ParamFunctor{T, N, I} = Union{BaseParam{T, N, I}, ParamLink{T, N, I}}
 const ParamPointer{T, N, I} = Union{LinkParam{T, N, I}, ParamNest{T, N, I}}

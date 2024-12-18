@@ -172,7 +172,8 @@ function evalFunc(func::F, input::T) where {F<:Function, T}
     evalFunc(fCore, pSet, input)
 end
 
-function evalFunc(fCore::F, pSet::AbstractParamSource, input::T) where {F<:Function, T}
+function evalFunc(fCore::F, pSet::Union{DirectParamSource, TypedParamInput}, 
+                  input::T) where {F<:Function, T}
     fCore(input, evalParamSet(pSet))
 end
 
