@@ -1131,13 +1131,13 @@ struct ParamMarker{M<:NonEmptyTuple{IdentityMarker}, MF<:IdentityMarker,
     typeID::UInt
     marker::M
     funcID::MF
-    metaID::NTuple{N, UInt}
+    metaID::NTuple{N, Pair{Symbol, Float64}}
 end
 
-struct ValueMarker <: IdentityMarker{UInt}
-    valueID::UInt
+struct ValueMarker{T} <: IdentityMarker{T}
+    val::T
 
-    ValueMarker(input) = new(objectid(input))
+    ValueMarker(input::T) where {T} = new{T}(input)
 end
 
 struct CollectionMarker <: IdentityMarker{Union{AbstractArray, Tuple}}
@@ -1148,7 +1148,7 @@ struct ObjectMarker{T} <: IdentityMarker{T}
     data::T
 end
 
-markObj(input::PrimitiveParam) = ValueMarker(input)
+markObj(input::PrimitiveParam) = (ValueMarker∘Identifier)(input)
 
 markObj(input::JaggedParam) = ParamMarker(input)
 
@@ -1167,7 +1167,7 @@ end
 
 function markObj(input::T) where {T}
     if isstructtype(T) && !( Base.issingletontype(T) )
-        markObj( (objectid(T), getproperty.(input, propertynames(input))...) )
+        markObj( (objectid(T), getproperty.(Ref(input), propertynames(input))...) )
     elseif input isa Function
         markObj( (objectid(input),) )
     else
@@ -1187,13 +1187,11 @@ function ParamMarker(p::T) where {T<:CellParam}
     offset = isOffsetEnabled(p) ? p.offset : objectid(nothing)
     sl = screenLevelOf(p)
     if sl > 0
-        ParamMarker(
-            objectid(T), markObj.((objectid(p), offset)), markObj(nothing), (objectid(sl),)
-        )
+        ParamMarker( objectid(T), markObj.((objectid(p), offset)), markObj(nothing), 
+                     (:screen=>(Float64∘Int)(sl),) )
     else
-        ParamMarker(
-            objectid(T), markObj.((p.input..., offset)), markObj(p.lambda), (objectid(sl),)
-        )
+        ParamMarker( objectid(T), markObj.((p.input..., offset)), markObj(p.lambda), 
+                     (:screen=>(Float64∘Int)(sl),) )
     end
 end
 
@@ -1202,7 +1200,8 @@ function ParamMarker(p::T) where {T<:GridParam}
 end
 
 function ParamMarker(p::T) where {T<:KnotParam}
-    ParamMarker(objectid(T), markObj.(p.input), markObj(nothing), (objectid(p.index),))
+    ParamMarker( objectid(T), markObj.(p.input), markObj(nothing), 
+                 (:index=>Float64(p.index),) )
 end
 
 function ParamMarker(p::T) where {T<:ParamGrid}
@@ -1215,7 +1214,7 @@ end
 
 compareMarker(pm1::IdentityMarker, pm2::IdentityMarker) = false
 
-compareMarker(pm1::ValueMarker, pm2::ValueMarker) = pm1 == pm2
+compareMarker(pm1::ValueMarker, pm2::ValueMarker) = pm1.val == pm2.val
 
 compareMarker(pm1::T, pm2::T) where {T<:ParamMarker{<:Tuple{Vararg{ValueMarker}}}} = 
 pm1 == pm2
