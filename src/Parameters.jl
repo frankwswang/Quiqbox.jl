@@ -1715,7 +1715,6 @@ const FlatParamSetIdxPtr{T} = Union{FlatPSetInnerPtr{T}, FlatPSetOuterPtr{T}}
 struct FlatParamSetFilter{T} <: PointerStack{1, 2}
     d0::Memory{FlatPSetInnerPtr{T}} #! Replace by immutable vector
     d1::Memory{FlatPSetOuterPtr{T}} #! Replace by immutable vector
-    tag::Identifier
 end
 
 const ChainFlatParamSetFilter{T, N} = ChainFilter{1, 2, NTuple{N, FlatParamSetFilter{T}}}
@@ -1729,7 +1728,7 @@ function FlatParamSetFilter(pSet::FlatParamSet{T}, d0Ids::AbstractVector{Int},
                             d1Ids::AbstractVector{Int}) where {T}
     d0Ptr = map(d0Idx->ChainPointer((FirstIndex, d0Idx), TensorType(T)), d0Ids)
     d1Ptr = map(d1Idx->ChainPointer((d1Idx+1,), TensorType(pSet.d1[d1Idx])), d1Ids)
-    FlatParamSetFilter(getMemory(d0Ptr), getMemory(d1Ptr), Identifier(pSet))
+    FlatParamSetFilter(getMemory(d0Ptr), getMemory(d1Ptr))
 end
 
 size(fps::FlatParamSetFilter) = size(fps.d1) .+ 1
@@ -1774,7 +1773,7 @@ function intersectFilter(prev::FlatParamSetFilter, here::FlatParamSetFilter)
     d1New = map(here.d1) do ptr
         getField(prev, ptr)
     end
-    FlatParamSetFilter(d0New, d1New, prev.tag)
+    FlatParamSetFilter(d0New, d1New)
 end
 
 
@@ -1834,14 +1833,14 @@ function locateParam!(paramSet::FlatParamSet{T}, target::FlatParamSet{T}) where 
         offset = 2 - firstindex(paramSet.d1)
         d1ptrs = map(x->ChainPointer(x.chain .+ offset, x.type), d1ptrs)
     end
-    FlatParamSetFilter(getMemory(d0ptrs), getMemory(d1ptrs), Identifier(paramSet))
+    FlatParamSetFilter(getMemory(d0ptrs), getMemory(d1ptrs))
 end
 
 function locateParam!(paramSet::AbstractVector, target::FlatParamSet{T}) where {T}
     d0ptrs, d1ptrs = map(fieldnames(FlatParamSet)) do n
         locateParam!.(Ref(paramSet), getfield(target, n))
     end
-    FlatParamSetFilter(getMemory(d0ptrs), getMemory(d1ptrs), Identifier(paramSet))
+    FlatParamSetFilter(getMemory(d0ptrs), getMemory(d1ptrs))
 end
 
 
