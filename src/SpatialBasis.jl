@@ -324,6 +324,13 @@ decomposeOrb(o::T) where {T<:PrimitiveOrb} = Memory{T}([o])
 
 decomposeOrb(o::CompositeOrb) = o.basis
 
+decomposeOrb(o::T) where {T<:FPrimOrb} = Memory{T}([o])
+
+function decomposeOrb(o::FCompOrb)
+    map(getMemory( 1:getOrbitalSize(o) )) do i
+        FrameworkOrb(o, i)
+    end
+end
 
 function permitRenormalize!(b::OrbitalBasis)
     b.renormalize = true
