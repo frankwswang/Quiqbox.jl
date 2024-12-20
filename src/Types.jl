@@ -1,5 +1,7 @@
 abstract type Box <: Any end
 
+abstract type EqualityDict{K, T} <: AbstractDict{K, T} end
+
 abstract type CompositeFunction <: Function end
 abstract type FieldlessFunction <: Function end
 abstract type AnnotatedFunction <: Function end
@@ -153,7 +155,9 @@ const ParamPointer{T, N, I} = Union{LinkParam{T, N, I}, ParamNest{T, N, I}}
 
 const MissSymInt = MissingOr{Union{Symbol, Int}}
 
+const AbstractEqualityDict = Union{EqualityDict, Dict}
+
 
 import Base: size, firstindex, lastindex, getindex, setindex!, iterate, length
 
-import Base: isempty, collect, keys, values, getproperty, ==, hash
+import Base: isempty, collect, get, keys, values, getproperty, ==, hash

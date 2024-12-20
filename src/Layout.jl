@@ -198,8 +198,7 @@ function evalFieldCore(f::F, obj, scope::PointerStack,
 end
 
 
-
-abstract type FiniteDict{N, K, T} <: AbstractDict{K, T} end
+abstract type FiniteDict{N, K, T} <: EqualityDict{K, T} end
 
 
 struct SingleEntryDict{K, T} <: FiniteDict{1, K, T}
@@ -238,6 +237,14 @@ length(::FiniteDict{N}) where {N} = N
 
 collect(d::SingleEntryDict) = [d.key => d.value]
 collect(::TypedEmptyDict{K, T}) where {K, T} = Pair{K, T}[]
+
+function get(d::SingleEntryDict{K}, key::K, default::Any) where {K}
+    if key == d.key
+        d.value
+    else
+        default
+    end
+end
 
 keys(d::SingleEntryDict) = Set( (d.key,) )
 keys(::TypedEmptyDict{K}) where {K} = Set{K}()
