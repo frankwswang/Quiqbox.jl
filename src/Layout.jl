@@ -453,7 +453,19 @@ function markObj(input::Union{AbstractArray, Tuple})
     isPrimVarCollection(input) ? ValueMarker(input) : BlockMarker(input)
 end
 
-#!! Test on  ShapedMemory, LinearMemory
+function markObj(input::AbstractEqualityDict)
+    pairs = collect(input)
+    ks = getfield.(pairs, :first)
+    vs = map(pairs) do pair
+        markObj(pair.second)
+    end
+    newDict = Dict(ks .=> vs)
+    ValueMarker(newDict)
+end
+
+function markObj(input::AbstractDict)
+    ValueMarker(input)
+end
 
 function markObj(input::T) where {T}
     if isstructtype(T) && !issingletontype(T)
@@ -468,11 +480,6 @@ end
 markObj(marker::IdentityMarker) = itself(marker)
 
 ==(pm1::IdentityMarker, pm2::IdentityMarker) = false
-
-# markObj(arr::ShapedMemory) = markObj( (markObj(arr.value), objectid(arr.shape)) )
-
-# markObj(::Nothing) = markObj( objectid(nothing) )
-
 
 function hash(id::IdentityMarker, hashCode::UInt)
     hash(id.code, hashCode)
