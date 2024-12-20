@@ -1126,150 +1126,74 @@ end
 # const OSpCJParam{T, O} = CachedJParam{T, 0, O}
 
 
-struct ParamMarker{M<:NonEmptyTuple{IdentityMarker}, MF<:IdentityMarker, 
-                   N} <: IdentityMarker{M}
-    typeID::UInt
-    marker::M
-    funcID::MF
-    metaID::NTuple{N, Pair{Symbol, Float64}}
+struct ParamMarker{T, N, O, L} <: IdentityMarker{JaggedParam{T, N, O}}
+    code::UInt
+    data::NTuple{L, IdentityMarker}
+    func::IdentityMarker
+    meta::Tuple{ValMkrPair{<:Union{T, Nothing}}, ValMkrPair{Int}, ValMkrPair{Symbol}}
+
+    function ParamMarker(p::P) where {T, N, O, P<:JaggedParam{T, N, O}}
+        offset = :offset => markObj(isOffsetEnabled(p) ? p.offset : nothing)
+        code = offset.second.code
+
+        sl = screenLevelOf(p)
+        screen = :screen => markObj(sl)
+        code = hash(screen.second, code)
+
+        sym = :symbol => markObj(p.symbol.name)
+        code = hash(sym.second, code)
+
+        meta = (offset, screen, sym)
+
+        func = markObj((P <: ParamFunctor && sl == 0) ? p.lambda : nothing)
+        code = hash(func, code)
+
+        data =  makeParamDataMarkers(p)
+        code = leftFoldHash(data, code)
+
+        new{T, N, O, length(data)}(code, data, func, meta)
+    end
 end
 
-struct ValueMarker{T} <: IdentityMarker{T}
-    val::T
-
-    ValueMarker(input::T) where {T} = new{T}(input)
+function makeParamDataMarkers(p::PrimitiveParam)
+    (Identifier(p.input),)
 end
 
-struct CollectionMarker <: IdentityMarker{Union{AbstractArray, Tuple}}
-    data::Union{AbstractArray, Tuple}
+function makeParamDataMarkers(p::ParamFunctor)
+    if screenLevelOf(p) > 0
+        (Identifier(p.memory),)
+    else
+        markObj.(p.input)
+    end
 end
 
-struct ObjectMarker{T} <: IdentityMarker{T}
-    data::T
+function makeParamDataMarkers(p::ParamNest)
+    (markObj(p.input),)
 end
 
-markObj(input::PrimitiveParam) = (ValueMarker∘Identifier)(input)
+function makeParamDataMarkers(p::KnotParam)
+    markObj.((first(p.input), p.index))
+end
 
 markObj(input::JaggedParam) = ParamMarker(input)
 
-function isPrimVarCollection(arg::AbstractArray{T}) where {T}
-    ET = isconcretetype(T) ? T : eltype( map(itself, arg) )
-    isbitstype(ET)
-end
-
-function isPrimVarCollection(arg::Tuple)
-    all(isbits(i) for i in arg)
-end
-
-function markObj(input::Union{AbstractArray, Tuple})
-    isPrimVarCollection(input) ? ValueMarker(input) : CollectionMarker(input)
-end
-
-function markObj(input::T) where {T}
-    if isstructtype(T) && !( Base.issingletontype(T) )
-        markObj( (objectid(T), getproperty.(Ref(input), propertynames(input))...) )
-    elseif input isa Function
-        markObj( (objectid(input),) )
-    else
-        ObjectMarker(input)
-    end
-end
-
-markObj(marker::IdentityMarker) = itself(marker)
-
-markObj(arr::ShapedMemory) = markObj( (markObj(arr.value), objectid(arr.shape)) )
-
-markObj(::Nothing) = markObj( objectid(nothing) )
-
-# markObj(p::CachedJParam) = ParamMarker(p.param)
-
-function ParamMarker(p::T) where {T<:CellParam}
-    offset = isOffsetEnabled(p) ? p.offset : objectid(nothing)
-    sl = screenLevelOf(p)
-    if sl > 0
-        ParamMarker( objectid(T), markObj.((objectid(p), offset)), markObj(nothing), 
-                     (:screen=>(Float64∘Int)(sl),) )
-    else
-        ParamMarker( objectid(T), markObj.((p.input..., offset)), markObj(p.lambda), 
-                     (:screen=>(Float64∘Int)(sl),) )
-    end
-end
-
-function ParamMarker(p::T) where {T<:GridParam}
-    ParamMarker(objectid(T), markObj.(p.input), markObj(p.lambda), ())
-end
-
-function ParamMarker(p::T) where {T<:KnotParam}
-    ParamMarker( objectid(T), markObj.(p.input), markObj(nothing), 
-                 (:index=>Float64(p.index),) )
-end
-
-function ParamMarker(p::T) where {T<:ParamGrid}
-    ParamMarker(objectid(T), (markObj(p.input),), markObj(nothing), ())
-end
-
-function ParamMarker(p::T) where {T<:ParamMesh}
-    ParamMarker(objectid(T), markObj.(p.input), markObj(p.lambda), ())
-end
-
-compareMarker(pm1::IdentityMarker, pm2::IdentityMarker) = false
-
-compareMarker(pm1::ValueMarker, pm2::ValueMarker) = pm1.val == pm2.val
-
-compareMarker(pm1::T, pm2::T) where {T<:ParamMarker{<:Tuple{Vararg{ValueMarker}}}} = 
-pm1 == pm2
-
-function compareMarker(pm1::T, pm2::T) where {T<:CollectionMarker}
-    if pm1.data === pm2.data
-        true
-    elseif length(pm1.data) == length(pm2.data)
-        isSame = true
-        for (i, j) in zip(pm1.data, pm2.data)
-            isSame = ( i===j || compareMarker(markObj(i), markObj(j)) )
-            isSame || break
-        end
-        isSame
+function ==(marker1::T, marker2::T) where {T<:ParamMarker}
+    if marker1.code == marker2.code
+        marker1.data == marker2.data
     else
         false
     end
 end
 
-compareMarker(pm1::T, pm2::T) where {T<:ObjectMarker} = pm1.data == pm2.data
-
-function compareMarker(pm1::T, pm2::T) where {T<:ParamMarker}
-    isSame = (pm1.metaID == pm2.metaID && compareMarker(pm1.funcID, pm2.funcID))
-    if isSame
-        if pm1.marker === pm2.marker
-        elseif length(pm1.marker) == length(pm2.marker)
-            for (marker1, marker2) in zip(pm1.marker, pm2.marker)
-                isSame = compareMarker(marker1, marker2)
-                isSame || break
-            end
-        else
-            isSame = false
-        end
-    end
-    isSame
-end
 
 compareParamBox(p1::T, p2::T) where {T<:PrimitiveParam} = p1 === p2
 
-function compareParamBox(p1::CompositeParam{T, N, O}, 
-                         p2::CompositeParam{T, N, O}) where {T, N, O}
-    p1 === p2 || compareMarker(ParamMarker(p1), ParamMarker(p2))
+function compareParamBox(p1::JaggedParam{T, N, O}, 
+                         p2::JaggedParam{T, N, O}) where {T, N, O}
+    p1 === p2 || ParamMarker(p1) == ParamMarker(p2)
 end
 
 compareParamBox(::JaggedParam, ::JaggedParam) = false
-
-function compareObj(obj1::T1, obj2::T2) where {T1, T2}
-    if T1 <: JaggedParam && T2 <: JaggedParam
-        compareParamBox(obj1, obj2)
-    elseif T1 == T2
-        obj1 === obj2 || compareMarker(markObj(obj1), markObj(obj2))
-    else
-        false
-    end
-end
 
 # operateBy(op::F, pn1::CellParam, num::Real) where {F<:Function} = 
 # CellParam(OFC(itself, op, num), pn1, pn1.symbol)

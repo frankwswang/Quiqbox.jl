@@ -343,9 +343,136 @@ function ==(id1::Identifier, id2::Identifier)
     end
 end
 
-function hash(id::Identifier, hashCode::UInt)
-    hashCode = hash(id.code, hashCode)
-    hash(objectid(id.link.value), hashCode)
+
+struct ValueMarker{T} <: IdentityMarker{T}
+    code::UInt
+    data::T
+
+    ValueMarker(input::T) where {T} = new{T}(hash(input), input)
+end
+
+function ==(marker1::ValueMarker, marker2::ValueMarker)
+    if marker1.code == marker2.code
+        marker1.data == marker2.data
+    else
+        false
+    end
+end
+
+const IdMarkers = Union{AbstractArray{<:IdentityMarker}, Tuple{Vararg{IdentityMarker}}}
+
+function leftFoldHash(markers::IdMarkers, initHash::UInt)
+    mapfoldl((x, y)->hash(y, x), markers, init=initHash) do ele
+        ele.code
+    end
+end
+
+const IdMarkerPair{M<:IdentityMarker} = Pair{Symbol, M}
+
+const ValMkrPair{T} = IdMarkerPair{ValueMarker{T}}
+
+struct FieldMarker{S, N} <: IdentityMarker{S}
+    code::UInt
+    data::NTuple{N, IdMarkerPair}
+
+    function FieldMarker(input::T) where {T}
+        propertySyms = propertynames(input)
+        if issingletontype(T) || isempty(propertySyms)
+            return ValueMarker(input)
+        end
+        markers = getproperty.(Ref(input), propertySyms) .|> markObj
+        inputName = nameof(T)
+        data = propertySyms .=> markers
+        new{inputName, length(propertySyms)}(leftFoldHash(markers, hash(inputName)), data)
+    end
+end
+
+function ==(marker1::FieldMarker{S}, marker2::FieldMarker{S}) where {S}
+    if marker1.code == marker2.code
+        marker1.data == marker2.data
+    else
+        false
+    end
+end
+
+struct BlockMarker <: IdentityMarker{Union{AbstractArray, Tuple}}
+    code::UInt
+    data::Union{AbstractArray, Tuple}
+
+    function BlockMarker(input::Union{AbstractArray, Tuple})
+        containerHash = if input isa Tuple
+            hash(length(input), hash(Tuple))
+        else
+            hash(size(input), hash(AbstractArray))
+        end
+        code = mapfoldr(hash, input, init=containerHash) do ele
+            markObj(ele).code
+        end
+        new(code, input)
+    end
+end
+
+function ==(marker1::BlockMarker, marker2::BlockMarker)
+    if marker1.code == marker2.code
+        data1 = marker1.data
+        data2 = marker2.data
+        if data1 === data2
+            true
+        else
+            isSame = true
+            for (i, j) in zip(data1, data2)
+                isSame = ( i===j || markObj(i) == markObj(j) )
+                isSame || break
+            end
+            isSame
+        end
+    else
+        false
+    end
+end
+
+
+function isPrimVarCollection(arg::AbstractArray{T}) where {T}
+    ET = isconcretetype(T) ? T : eltype( map(itself, arg) )
+    canDirectlyStore(ET)
+end
+
+function isPrimVarCollection(arg::Tuple)
+    all((canDirectlyStore∘typeof)(i) for i in arg)
+end
+
+
+function markObj(input::Union{AbstractArray, Tuple})
+    isPrimVarCollection(input) ? ValueMarker(input) : BlockMarker(input)
+end
+
+#!! Test on  ShapedMemory, LinearMemory
+
+function markObj(input::T) where {T}
+    if isstructtype(T) && !issingletontype(T)
+        FieldMarker(input)
+    elseif canDirectlyStore(input)
+        ValueMarker(input)
+    else
+        Identifier(input)
+    end
+end
+
+markObj(marker::IdentityMarker) = itself(marker)
+
+==(pm1::IdentityMarker, pm2::IdentityMarker) = false
+
+# markObj(arr::ShapedMemory) = markObj( (markObj(arr.value), objectid(arr.shape)) )
+
+# markObj(::Nothing) = markObj( objectid(nothing) )
+
+
+function hash(id::IdentityMarker, hashCode::UInt)
+    hash(id.code, hashCode)
+end
+
+function compareObj(obj1::T1, obj2::T2) where {T1, T2}
+    obj1 === obj2 || markObj(obj1) == markObj(obj2)
 end
 
 
