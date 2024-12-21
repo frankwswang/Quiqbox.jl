@@ -59,6 +59,14 @@ iterate(arr::ShapedMemory, state) = iterate(arr.value, state)
 
 length(arr::ShapedMemory) = length(arr.value)
 
+function similar(arr::ShapedMemory, ::Type{T}=eltype(arr), 
+                 shape::Tuple{Vararg{Int}}=size(arr)) where {T}
+    ShapedMemory(similar(arr.value, T, prod(shape)), shape)
+end
+
+similar(arr::ShapedMemory{T}, shape::Tuple{Vararg{Int}}) where {T} = 
+similar(arr, T, shape)
+
 
 viewElements(obj::ShapedMemory) = reshape(obj.value, obj.shape)
 viewElements(obj::AbstractArray) = itself(obj)
