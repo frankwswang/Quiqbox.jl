@@ -8,9 +8,9 @@ using Test: @inferred
 
 
 function checkReshapingAxis(arr::AbstractArray, shape::Tuple{Vararg{Int}})
-    len = checkEmptiness(arr, :arr)
-    if any(i <= 0 for i in shape)
-        throw(AssertionError("The reshaping axis size should all be positive."))
+    len  = length(arr)
+    if any(i < 0 for i in shape)
+        throw(AssertionError("All axis sizes should be non-negative."))
     end
     if prod(shape) != len
         throw(AssertionError("The product of reshaping axes should be equal to the "*
@@ -191,6 +191,7 @@ struct FixedShapeLink{T, F<:Function, N, O} <: JaggedOperator{T, N, O}
         allArgs = (arg, args...)
         allArgs .|> checkAbtArrayArg .|> first .|> checkAbtArrayArg
         val = checkReturnType(f, AbstractArray{<:T}, allArgs)
+        checkEmptiness(val, :val)
         if ismissing(axis)
             axis = genSeqAxis(val|>size)
         else
@@ -203,6 +204,7 @@ struct FixedShapeLink{T, F<:Function, N, O} <: JaggedOperator{T, N, O}
 
     function FixedShapeLink(arg::V; axis::FixedShapeLinkAxisType=missing) where 
                            {V<:AbstractArray}
+        checkEmptiness(arg, :arg)
         T1, O = checkAbtArrayArg(V)
         T2, N = checkAbtArrayArg(T1)
         excludeAbtArray(T2)
