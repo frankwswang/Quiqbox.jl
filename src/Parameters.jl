@@ -1646,8 +1646,15 @@ const FlatPSetOuterPtr{T} = IndexPointer{Volume{T}}
 const FlatParamSetIdxPtr{T} = Union{FlatPSetInnerPtr{T}, FlatPSetOuterPtr{T}}
 
 struct FlatParamSetFilter{T} <: PointerStack{1, 2}
-    d0::Memory{FlatPSetInnerPtr{T}} #! Replace by immutable vector
-    d1::Memory{FlatPSetOuterPtr{T}} #! Replace by immutable vector
+    d0::ShapedMemory{FlatPSetInnerPtr{T}, 1} #! Replace by immutable vector
+    d1::ShapedMemory{FlatPSetOuterPtr{T}, 1} #! Replace by immutable vector
+end
+
+function FlatParamSetFilter(d0::AbstractVector{FlatPSetInnerPtr{T}}, 
+                            d1::AbstractVector{FlatPSetOuterPtr{T}}) where {T}
+    d0 isa ShapedMemory || (d0 = ShapedMemory(d0))
+    d1 isa ShapedMemory || (d1 = ShapedMemory(d1))
+    FlatParamSetFilter(d0, d1)
 end
 
 const ChainFlatParamSetFilter{T, N} = ChainFilter{1, 2, NTuple{N, FlatParamSetFilter{T}}}
@@ -1661,7 +1668,7 @@ function FlatParamSetFilter(pSet::FlatParamSet{T}, d0Ids::AbstractVector{Int},
                             d1Ids::AbstractVector{Int}) where {T}
     d0Ptr = map(d0Idx->ChainPointer((FirstIndex, d0Idx), TensorType(T)), d0Ids)
     d1Ptr = map(d1Idx->ChainPointer((d1Idx+1,), TensorType(pSet.d1[d1Idx])), d1Ids)
-    FlatParamSetFilter(getMemory(d0Ptr), getMemory(d1Ptr))
+    FlatParamSetFilter(d0Ptr, d1Ptr)
 end
 
 size(fps::FlatParamSetFilter) = size(fps.d1) .+ 1
@@ -1766,14 +1773,14 @@ function locateParam!(paramSet::FlatParamSet{T}, target::FlatParamSet{T}) where 
         offset = 2 - firstindex(paramSet.d1)
         d1ptrs = map(x->ChainPointer(x.chain .+ offset, x.type), d1ptrs)
     end
-    FlatParamSetFilter(getMemory(d0ptrs), getMemory(d1ptrs))
+    FlatParamSetFilter(d0ptrs, d1ptrs)
 end
 
 function locateParam!(paramSet::AbstractVector, target::FlatParamSet{T}) where {T}
     d0ptrs, d1ptrs = map(fieldnames(FlatParamSet)) do n
         locateParam!.(Ref(paramSet), getfield(target, n))
     end
-    FlatParamSetFilter(getMemory(d0ptrs), getMemory(d1ptrs))
+    FlatParamSetFilter(d0ptrs, d1ptrs)
 end
 
 
