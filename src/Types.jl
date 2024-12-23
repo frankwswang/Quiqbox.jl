@@ -158,6 +158,6 @@ const MissSymInt = MissingOr{Union{Symbol, Int}}
 const AbstractEqualityDict = Union{EqualityDict, Dict}
 
 
-import Base: size, firstindex, lastindex, getindex, setindex!, iterate, length
+import Base: size, firstindex, lastindex, getindex, setindex!, iterate, length, similar
 
 import Base: isempty, collect, get, keys, values, getproperty, ==, hash
