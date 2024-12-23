@@ -30,7 +30,7 @@ function normalizeOrbital(fCore::EvalComposedOrb{T, D},
     ScaledOrbital(fCore, ReturnTyped(normalizerCore, T), paramPointer.scope)
 end
 
-const NormFuncType{T} = Union{ReturnTyped{T, <:ParamFilterFunc}, Storage{T}}
+const NormFuncType{T} = Union{ReturnTyped{T}, Storage{T}}
 
 function unpackParamFunc!(f::ComposedOrb{T}, paramSet::FlatParamSet, 
                           paramSetId::Identifier=Identifier(paramSet)) where {T}

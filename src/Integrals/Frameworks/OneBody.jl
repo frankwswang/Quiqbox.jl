@@ -1,18 +1,19 @@
-function genNormalizer(o::PrimitiveOrbCore{T, D}, 
-                       paramPtr::PrimOrbParamPtr{T, D}) where {T, D}
+function genNormalizer(o::PrimitiveOrbCore{T, D}, ::PrimOrbParamPtr{T, D}) where {T, D}
     fCore = function (x::AbtVecOfAbtArr{T})
         (AbsSqrtInv∘numericalOneBodyInt)(Identity(), (o.f.apply,), (x,))
     end
-    ParamFilterFunc(OnlyBody(fCore∘getField), paramPtr.scope)
+    OnlyBody(fCore∘getField)
 end
 
 
 function getNormCoeff!(cache::DimSpanDataCacheBox{T}, 
                        orbs::NonEmptyTuple{FrameworkOrb{T, D}}) where {T, D}
     ptr = ChainPointer((:core, :f, :apply, :right))
-    paramSets = map(Base.Fix2(getfield, :param), orbs) # better than broadcasting
+    localParamSets = map(orbs) do orb # better than broadcasting
+        FilteredObject(orb.param, orb.pointer.scope)
+    end
     normalizers = map(Base.Fix2(getField, ptr), orbs) # better than broadcasting
-    mapreduce(StableBinary(*, T), paramSets, normalizers, init=one(T)) do pSet, f
+    mapreduce(StableBinary(*, T), localParamSets, normalizers, init=one(T)) do pSet, f
         getNormCoeffCore!(cache, pSet, f)
     end
 end
@@ -21,18 +22,19 @@ function getNormCoeff!(cache::DimSpanDataCacheBox{T}, orb::FrameworkOrb{T, D},
                        degree::Int) where {T, D}
     ptr = ChainPointer((:core, :f, :apply, :right))
     normalizer = getField(orb, ptr)
-    normCoeff = getNormCoeffCore!(cache, orb.param, normalizer)
+    normCoeff = getNormCoeffCore!(cache, FilteredObject(orb.param, orb.pointer.scope), 
+                                  normalizer)
     normCoeff^abs(degree)
 end
 
 
-function getNormCoeffCore!(cache::DimSpanDataCacheBox{T}, pSet::FlatParamSet{T}, 
-                           normalizer::ReturnTyped{T, <:ParamFilterFunc}) where {T}
-    paramVal = cacheParam!(cache, pSet, normalizer.f.scope)
-    normalizer.f.apply(nothing, paramVal)::T
+function getNormCoeffCore!(cache::DimSpanDataCacheBox{T}, pSource::TypedParamInput{T}, 
+                           normalizer::ReturnTyped{T}) where {T}
+    paramVal = cacheParam!(cache, pSource)
+    normalizer.f(nothing, paramVal)::T
 end
 
-function getNormCoeffCore!(::DimSpanDataCacheBox{T}, ::FlatParamSet{T}, 
+function getNormCoeffCore!(::DimSpanDataCacheBox{T}, ::TypedParamInput{T}, 
                            normalizer::Storage{T}) where {T}
     normalizer.val
 end

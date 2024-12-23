@@ -87,7 +87,7 @@ function genNormalizer(o::PrimGTOcore{T, D}, paramPtr::PrimOrbParamPtr{T, D}) wh
     ns = map(x->Base.Fix2(polyGaussFuncSquaredNorm, x), angularFunc.f.m.tuple)
     nCore = OnlyBody( AbsSqrtInv ∘ ChainReduce(StableBinary(*, T), VectorMemory(ns)) )
     ptrTuple = (getXpnPtr(paramPtr.body),)
-    ParamFilterFunc(ParamSelectFunc(nCore, ptrTuple), paramPtr.scope)
+    ParamSelectFunc(nCore, ptrTuple)
 end
 
 
