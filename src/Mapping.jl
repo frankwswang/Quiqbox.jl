@@ -160,6 +160,12 @@ end
 
 (f::Storage)(::Vararg) = f.val
 
+struct Plus{T} <: CompositeFunction
+    val::T
+end
+
+(f::Plus{T})(arg::T) where {T} = arg + f.val
+
 
 struct ShiftByArg{T<:Real, D} <: FieldlessFunction end
 
