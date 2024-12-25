@@ -135,3 +135,66 @@ function getOverlapCore!(cache::DimSpanDataCacheBox{T},
     end
     overlapPGTO(CenPair(cen1, cen2), XpnPair(xpn1, xpn2), AngPair(ang1, ang2))
 end
+
+
+## New functions to work with Interface.jl
+function overlapPGTO(xpn::T, ang::NTuple{D, Int}) where {T, D}
+    mapreduce(*, ang) do i
+        polyGaussFuncSquaredNorm(xpn, i)
+    end
+end
+
+function getAngularNums(orb::PrimATOcore)
+    getAngularFunc(orb).f.m.tuple
+end
+
+function getExponentPtr(orb::PrimGTOcore)
+    orb.f.apply.f.left.apply.f.select[begin]
+end
+
+function getCenCoordPtr(orb::PrimitiveOrbCore)
+    orb.f.dress.select
+end
+
+function preparePGTOconfig(orb::PrimGTOcore)
+    cenIds = getCenCoordPtr(orb)
+    xpnIdx = getExponentPtr(orb)
+    ang = getAngularNums(orb)
+    cenIds, xpnIdx, ang
+end
+
+struct OverlapGTOself{T, D} <: Function
+    xpn::FlatPSetInnerPtr{T}
+    ang::NTuple{D, Int}
+end
+
+function (f::OverlapGTOself{T})(pars::AbtVecOfAbtArr{T}) where {T}
+    xpnVal = getField(pars, f.xpn)
+    overlapPGTO(xpnVal, f.ang)
+end
+
+function genOverlapFunc(orb::PrimGTOcore{T, D}) where {T, D}
+    _, xpnIdx, ang = preparePGTOconfig(orb)
+    OverlapGTOself(xpnIdx, ang)
+end
+
+struct OverlapGTOpair{T, D} <: Function
+    cen::NTuple{2, NTuple{ D, FlatPSetInnerPtr{T} }}
+    xpn::NTuple{2, FlatPSetInnerPtr{T}}
+    ang::NTuple{2, NTuple{D, Int}}
+end
+
+function (f::OverlapGTOpair{T})(pars1::AbtVecOfAbtArr{T}, 
+                                pars2::AbtVecOfAbtArr{T}) where {T}
+    cen1 = getField(pars1, f.cen[1])
+    cen2 = getField(pars2, f.cen[2])
+    xpn1 = getField(pars1, f.xpn[1])
+    xpn2 = getField(pars2, f.xpn[2])
+    overlapPGTO(CenPair(cen1, cen2), XpnPair(xpn1, xpn2), AngPair(f.ang...))
+end
+
+function genOverlapFunc(orb1::PrimGTOcore{T, D}, orb2::PrimGTOcore{T, D}) where {T, D}
+    cenIds1, xpnIdx1, ang1 = preparePGTOconfig(orb1)
+    cenIds2, xpnIdx2, ang2 = preparePGTOconfig(orb2)
+    OverlapGTOpair((cenIds1, cenIds2), (xpnIdx1, xpnIdx2), (ang1, ang2))
+end
