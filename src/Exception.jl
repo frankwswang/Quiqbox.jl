@@ -20,13 +20,17 @@ function checkEmptiness(obj, name::Symbol)
     length(obj)
 end
 
-function checkLength(obj, name::Symbol, len::Int)
-    if len <= 0
-        checkEmptiness(obj, name)
-    elseif length(obj) != len
-        throw(AssertionError("The length of `$name` must match `len=$len`."))
+function checkLengthCore(objLen::Int, objName::Symbol, 
+                         len::Int, lenName::Union{Missing, String}=missing)
+    if objLen != len
+        str = ismissing(lenName) ? "be equal to $len" : "match $lenName: $len"
+        throw(AssertionError("The length of `$objName` must " * str * "."))
     end
     nothing
+end
+
+function checkLength(obj, name::Symbol, len::Int, lenName::Union{Missing, String}=missing)
+    checkLengthCore(length(obj), name, len, lenName)
 end
 
 function checkPositivity(num::Real)

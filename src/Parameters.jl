@@ -736,9 +736,7 @@ TensorVar(p.input, p.symbol, TernaryNumber(level))
 
 function swapParamMem!(p::ParamLink{T, N}, 
                        memNew::AbstractArray{ShapedMemory{T, N}}) where {T, N}
-    if length(p.memory) != length(memNew)
-        throw(AssertionError("`memNew` should have the same length as `p`'s memory."))
-    end
+    checkLength(memNew, :memNew, length(p.memory), "`length(p.memory)`")
     res = lock( ReentrantLock() ) do
         map(enumerate(memNew)) do (i, innerMemNew)
             memOld = directObtain(p.memory[i])

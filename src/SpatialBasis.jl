@@ -137,17 +137,15 @@ end
 
 function getWeightParamCore(basis::AbstractVector{<:PrimitiveOrb{T, D}}, 
                             weight::W) where {T, D, W<:FlattenedParam{T, 1}}
-    if checkEmptiness(basis, :basis) != first(outputSizeOf(weight))
-        throw(AssertionError("`basis` and `weight` must have the same length."))
-    end
+    checkLengthCore(checkEmptiness(basis, :basis), :basis, (first∘outputSizeOf)(weight), 
+                    "the output length of `weight`")
     basis, weight
 end
 
 function getWeightParamCore(basis::AbstractVector{<:ComposedOrb{T, D}}, 
                             weight::W) where {T, D, W<:FlattenedParam{T, 1}}
-    if checkEmptiness(basis, :basis) != first(outputSizeOf(weight))
-        throw(AssertionError("`basis` and `weight` must have the same length."))
-    end
+    checkLengthCore(checkEmptiness(basis, :basis), :basis, (first∘outputSizeOf)(weight), 
+                    "the output length of `weight`")
     weightPieces = getEffectiveWeight(basis, weight)
     expandedWeight = ParamGrid(weightPieces, :weight)
     expandedBasis = mapfoldl(decomposeOrb, vcat, basis)
@@ -365,9 +363,8 @@ function genGaussTypeOrb(center::NonEmptyTuple{ParamOrValue{T}, D},
         length(cons)
     end
 
-    if consLen != checkEmptiness(xpns, :xpns)
-        throw(AssertionError("`xpns` and `cons` must have the same length."))
-    end
+    checkLengthCore(checkEmptiness(xpns, :xpns), :xpns, consLen, 
+                    "the output length of `cons`")
 
     cenParams = genCellEncoder(T, :cen).(center)
 
