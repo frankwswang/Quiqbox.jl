@@ -550,9 +550,8 @@ function markUnique(tpl::Tuple{Vararg{Any, N}}, args...; compareFunction::F=iseq
     isempty(tpl) && (return tpl, ())
     f = (a, b) -> compareFunction(a, b, args...; kws...)
     cmprList = eltype(tpl)[]
-    offset = firstindex(()) - firstindex(cmprList)
     sizehint!(cmprList, N)
-    markList = markUniqueCore!(f, cmprList, tpl, offset)
+    markList = markUniqueCore!(f, cmprList, tpl)
     markList, Tuple(cmprList)
 end
 
@@ -566,7 +565,7 @@ function markUnique((a, b)::NTuple{2, Any}, args...; compareFunction::F=isequal,
 end
 
 function markUniqueCore!(compareFunc::F, compressedSeq::AbstractVector, 
-                         sequence::NonEmpTplOrAbtArr, offset::Int=0) where {F<:Function}
+                         sequence::NonEmpTplOrAbtArr) where {F<:Function}
     map(sequence) do ele
         j = firstindex(compressedSeq)
         isNew = true
@@ -578,7 +577,7 @@ function markUniqueCore!(compareFunc::F, compressedSeq::AbstractVector,
             j += 1
         end
         isNew && push!(compressedSeq, ele)
-        j + offset
+        j
     end
 end
 
