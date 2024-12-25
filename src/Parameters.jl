@@ -6,12 +6,17 @@ export TensorVar, CellParam, GridParam, ParamGrid, ParamMesh, setScreenLevel!,
 using Base: Fix2, Threads.Atomic, issingletontype
 using Test: @inferred
 
-
-function checkReshapingAxis(arr::AbstractArray, shape::Tuple{Vararg{Int}})
-    len  = length(arr)
+function checkReshapingAxis(shape::Tuple{Vararg{Int}})
     if any(i < 0 for i in shape)
         throw(AssertionError("All axis sizes should be non-negative."))
     end
+    nothing
+end
+
+
+function checkReshapingAxis(arr::AbstractArray, shape::Tuple{Vararg{Int}})
+    checkReshapingAxis(shape)
+    len  = length(arr)
     if prod(shape) != len
         throw(AssertionError("The product of reshaping axes should be equal to the "*
                              "target array's length."))
@@ -27,6 +32,11 @@ struct ShapedMemory{T, N} <: AbstractMemory{T, N}
     function ShapedMemory(value::Memory{T}, shape::Tuple{Vararg{Int}}) where {T}
         checkReshapingAxis(value, shape)
         new{T, length(shape)}(copy(value), shape)
+    end
+
+    function ShapedMemory{T}(::UndefInitializer, shape::NTuple{N, Int}) where {T, N}
+        checkReshapingAxis(shape)
+        new{T, N}(Memory{T}(undef, prod(shape)), shape)
     end
 end
 
@@ -58,6 +68,8 @@ iterate(arr::ShapedMemory) = iterate(arr.value)
 iterate(arr::ShapedMemory, state) = iterate(arr.value, state)
 
 length(arr::ShapedMemory) = length(arr.value)
+
+axes(arr::ShapedMemory)	= map(Base.OneTo, size(arr))
 
 function similar(arr::ShapedMemory, ::Type{T}=eltype(arr), 
                  shape::Tuple{Vararg{Int}}=size(arr)) where {T}
