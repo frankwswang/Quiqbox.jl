@@ -72,6 +72,9 @@ end
 const EvalPrimOrb{T, D, B, F<:NormFuncType{T}} = 
       ScaledOrbital{T, D, PrimitiveOrbCore{T, D, B}, F}
 
+const PrimATOcore{T, D, B<:EvalPolyGaussProd{T, D}} = 
+      PrimitiveOrbCore{T, D, B}
+
 const PrimGTOcore{T, D, B<:EvalPolyGaussProd{T, D}} = 
       PrimitiveOrbCore{T, D, B}
 
