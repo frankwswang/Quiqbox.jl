@@ -70,6 +70,12 @@ genPrimIntegrator(::Identity, orb1::PrimGTOcore{T, D}, orb2::PrimGTOcore{T, D}) 
                  {T, D} = 
 genOverlapFunc(orb1, orb2)
 
+isHermitian(::DirectOperator, ::FrameworkOrb{T, D}, ::FrameworkOrb{T, D}) where {T, D} = 
+false
+
+isHermitian(::Identity, ::FrameworkOrb{T, D}, ::FrameworkOrb{T, D}) where {T, D} = 
+true
+
 function computeOneBodyInt(op::DirectOperator, (oData,)::Tuple{OrbCoreInfoVec{T, D}}, 
                            (indexOffset,)::Tuple{Int}=(0,)) where {T, D}
     iFirst = firstindex(oData)
@@ -82,12 +88,20 @@ function computeOneBodyInt(op::DirectOperator, (oData,)::Tuple{OrbCoreInfoVec{T,
         (i+indexOffset,) => f(pars)
     end
 
-    pairs2 = map(1:triMatEleNum(nOrbs)) do l
-        j, i = convert1DidxTo2D(nOrbs, l) .|> dIdx
+    pairs2 = Pair{NTuple{2, Int}, T}[]
+    sizehint!(paris2, nOrbs^2)
+    for l in 1:triMatEleNum(nOrbs)
+        i, j = sortTensorIndex(convert1DidxTo2D(nOrbs, l) .|> dIdx)
         orb1, pars1 = oData[i]
         orb2, pars2 = oData[j]
-        f = ReturnTyped(genPrimIntegrator(op, orb1, orb2), T)
-        (i+indexOffset, j+indexOffset) => f(pars1, pars2)
+        fL = ReturnTyped(genPrimIntegrator(op, orb1, orb2), T)
+        iN = i + indexOffset
+        jN = j + indexOffset
+        push!(pairs2, (iN, jN) => fL(pars1, pars2))
+        if !isHermitian(op, orb1, orb2)
+            fR = ReturnTyped(genPrimIntegrator(op, orb2, orb1), T)
+            push!(pairs2, (jN, iN) => fR(pars2, pars1))
+        end
     end
 
     pairs1, pairs2
@@ -203,26 +217,6 @@ function cacheIntComponents!(intCache::IntegralCache{T, D},
 end
 
 
-# function initializeIntCache!(::Val{N}, op::DirectOperator, 
-#                              paramCache::DimSpanDataCacheBox{T}, 
-#                              orbs::FrameworkOrbSet{T, D}) where {N, T, D}
-#     pairs = map(x->markObj(x)=>x, orbs)
-#     ptrs, uniquePairs = markUnique(pairs, compareFunction=(x, y)->x.first==y.first)
-#     uniqueOrbData = map(uniquePairs) do pair
-#         (pair.second, cacheParam!(paramCache, orb.param))
-#     end
-#     orbDict = map(uniquePairs, eachindex(uniqueOrbData)) do pair, i
-#         pair.first => i
-#     end |> Dict
-#     basisCache = PrimOrbCoreCache(orbDict, uniqueOrbData)
-#     cache = IntegralCache(op, basisCache, initializeIntIndexer(T, Val(N)))
-#     updateIntCache!(cache, firstindex(cache.basis.list))
-#     idxerList = map(ptrs, orbs) do ptr, orb
-#         # BasisIndexer(uniqueOrbs[ptr], orb.renormalize)
-#     end
-#     cache, idxerList
-# end
-
 function initializeIntCache!(::Val{N}, op::DirectOperator, 
                              paramCache::DimSpanDataCacheBox{T}, 
                              orbs::FrameworkOrbSet{T, D}) where {N, T, D}
@@ -295,6 +289,88 @@ function getNBodyScalarProd((a, b, c, d)::NTuple{4, T}) where {T<:Number}
 end
 
 getNBodyScalarProd(args::Vararg) = getNBodyScalarProd(args)
+
+
+abstract type MarkedTensorIndex{N} <: Any end
+
+abstract type MultiBodyTensorIndex{N} <: MarkedTensorIndex{N} end
+
+struct OneBodyTensorIndex <: MultiBodyTensorIndex{2}
+    index::NTuple{2, Int} # (i,j)
+    hermiticity::Bool
+end
+
+struct TwoBodyTensorIndex <: MultiBodyTensorIndex{4}
+    index::NTuple{2, OneBodyTensorIndex} # ((i,j),(k,l))
+    hermiticity::Bool
+end
+
+const OneBodyIdxSymDict = let tempDict=Base.ImmutableDict((true,)=>:aa)
+    Base.ImmutableDict(tempDict, (false,)=>:ab)
+end
+
+const TwoBodyIdxSymDict = let
+    valTemp = (:aaaa, :aabb, :abab, :aaxy, :abxx, :abxy)
+    keyTemp = ((true,  true,  true), (true,  true, false), (false, false,  true), 
+               (true, false, false), (false, true, false), (false, false, false))
+    mapreduce(Base.ImmutableDict, keyTemp, valTemp, 
+              init=Base.ImmutableDict{NTuple{3, Bool}, Symbol}()) do key, val
+        key=>val
+    end
+end
+
+function sortTensorIndex((i, j)::NTuple{2, Int})
+    if i > j
+        (j, i)
+    else
+        (i, j)
+    end
+end
+
+function sortTensorIndex((i, j, k, l)::NTuple{4, Int})
+    pL = sortTensorIndex((i, j))
+    pR = sortTensorIndex((k, l))
+    if i+j > k+l
+        (pR, pL)
+    else
+        (pL, pR)
+    end
+end
+
+struct SortedTensorIndex{N, M} <: MarkedTensorIndex{N}
+    index::NTuple{N, Int}
+    relation::NTuple{M, Bool}
+    hermiticity::NTuple{M, Bool}
+    permutation::NTuple{M, Bool}
+
+    function SortedTensorIndex(idx::OneBodyTensorIndex)
+        hermiticity = idx.hermiticity
+        i, j = index = idx.index
+        permutation = if hermiticity && i > j
+            index = (j, i)
+            true
+        else
+            false
+        end
+        new{2, 1}(index, (i==j,), (hermiticity,), (permutation,))
+    end
+
+    function SortedTensorIndex(idx::TwoBodyTensorIndex)
+        subIdxL, subIdxR = subIndices = idx.index
+        iL, iR = SortedTensorIndex.(subIndices)
+        permutation = if idx.hermiticity && sum(subIdxL.index) > sum(subIdxR.index)
+            iL, iR = iR, iL
+            (first(iL.permutation), first(iR.permutation), true)
+        else
+            (first(iL.permutation), first(iR.permutation), false)
+        end
+        index = (iL.index..., iR.index...)
+        relation = (first(iL.relation), first(iR.relation), subIdxL.index==subIdxR.index)
+        hermiticity = (first(iL.hermiticity), first(iR.hermiticity), idx.hermiticity)
+        new{4, 3}(index, relation, hermiticity, permutation)
+    end
+end
+
 
 function buildOneBodyEleCore(intCache::IntegralCache{T, D, 1, F}, 
                              (intIdxer,)::Tuple{BasisIndexer{T}}, 
