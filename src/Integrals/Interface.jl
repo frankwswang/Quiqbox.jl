@@ -1,5 +1,7 @@
 const OneTwoTpl{T} = Union{Tuple{T}, NTuple{2, T}}
 
+const FrameworkOrbSet{T, D} = AbstractVector{<:FrameworkOrb{T, D}}
+
 const OrbCoreIdxDict{T} = 
       Dict{Tuple{FieldMarker{:PrimitiveOrbCore, 1}, AbtVecOfAbtArr{T}}, Int}
 
@@ -39,6 +41,8 @@ struct BasisIndexer{T}
     list::Memory{Pair{Int, T}}
     renormalize::Bool
 end
+
+const BasisIdxerVec{T} = AbstractVector{BasisIndexer{T}}
 
 abstract type IntegralIndexer{T, N} <: QueryBox{T} end
 
@@ -146,14 +150,10 @@ genPrimOneBodyIntVal(op, (oData, oData), idx)
 function computeOneBodyInt(op::DirectOperator, 
                            (oData1, oData2)::NTuple{2, OrbCoreInfoVec{T, D}}, 
                            (dIdx1, dIdx2)::NTuple{2, Int}) where {T, D}
-    pairs1 = Memory{Pair{Tuple{Int}, Tuple{T}}}([])
-
-    pairs2 = map(Iterators.product( eachindex(oData1), eachindex(oData2) )) do (i, j)
+    map(Iterators.product( eachindex(oData1), eachindex(oData2) )) do (i, j)
         ijValPair = genPrimOneBodyIntVal(op, (oData1, oData2), (i, j))
         (i+dIdx1, j+dIdx2) => ijValPair
     end |> vec
-
-    pairs1, pairs2
 end
 
 # function computeOneBodyInt(op::DirectOperator, 
@@ -244,8 +244,6 @@ function cacheIntComponents!(intCache::IntegralCache{T, D},
     BasisIndexer(pairs, isRenormalized(orb)), maxIdx
 end
 
-const FrameworkOrbSet{T, D} = AbstractVector{<:FrameworkOrb{T, D}}
-
 function cacheIntComponents!(intCache::IntegralCache{T, D}, 
                              paramCache::DimSpanDataCacheBox{T}, 
                              orbs::FrameworkOrbSet{T, D}) where {T, D}
@@ -281,10 +279,18 @@ initializeOverlapCache!(paramCache::DimSpanDataCacheBox{T},
 initializeIntCache!(Val(1), Identity(), paramCache, orbs)
 
 function updateIntCacheCore!(op::DirectOperator, idxer::OneBodyIntegralIndexer{T}, 
-                             basis::NonEmptyTuple{OrbCoreInfoVec{T, D}, N}, 
-                             offset::NonEmptyTuple{Int, N}) where {T, N, D}
+                             basis::Tuple{OrbCoreInfoVec{T, D}}, 
+                             offset::Tuple{Int}) where {T, D}
     pairs1, pairs2 = computeOneBodyInt(op, basis, offset)
     foreach(p->setIntegralIndexer!(idxer, p), pairs1)
+    foreach(p->setIntegralIndexer!(idxer, p), pairs2)
+    idxer
+end
+
+function updateIntCacheCore!(op::DirectOperator, idxer::OneBodyIntegralIndexer{T}, 
+                             basis::NTuple{2, OrbCoreInfoVec{T, D}}, 
+                             offset::NTuple{2, Int}) where {T, D}
+    pairs2 = computeOneBodyInt(op, basis, offset)
     foreach(p->setIntegralIndexer!(idxer, p), pairs2)
     idxer
 end
@@ -515,8 +521,6 @@ function buildOneBodyEleTuple(intConfig::Tuple{ OverlapCache{T, D},
                                                NTuple{2, BasisIndexer{T}} }) where {T, D}
     buildOneBodyEleTuple(intConfig, intConfig)
 end
-
-const BasisIdxerVec{T} = AbstractVector{BasisIndexer{T}}
 
 function buildOneBodyTensor(intConfig::Tuple{IntegralCache{T, D, 1}, BasisIdxerVec{T}}, 
                             nlzConfig::Tuple{ OverlapCache{T, D},    BasisIdxerVec{T}}
