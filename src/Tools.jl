@@ -1112,3 +1112,47 @@ function getMemory(obj::AbstractArray{T}) where {T}
 end
 
 getMemory(obj::Tuple) = (getMemory∘collect)(obj)
+
+
+function registerObjFrequency(objs::AbstractVector)
+    ofDict = Dict(objs .=> 0)
+    map(objs) do m
+        times = if haskey(ofDict, m)
+            ofDict[m] += 1
+        else
+            get!(ofDict, m, 1)
+        end
+        (m, times)
+    end
+end
+
+function intersectMultisetsCore!(s1::AbstractVector{T}, s2::AbstractVector) where {T}
+    sMkr1 = markObj.(s1)
+    sMkr2 = markObj.(s2)
+
+    sMkr1Counted = registerObjFrequency(sMkr1)
+    sMkr2Counted = registerObjFrequency(sMkr2)
+
+    sMkrMutual = intersect(sMkr1Counted, sMkr2Counted)
+
+    if !isempty(sMkrMutual)
+        sMkr1cDict = Dict(sMkr1Counted .=> eachindex(sMkr1))
+        sMkr2cDict = Dict(sMkr2Counted .=> eachindex(sMkr2))
+        i1 = getindex.(Ref(sMkr1cDict), sMkrMutual)
+        i2 = getindex.(Ref(sMkr2cDict), sMkrMutual)
+        deleteat!(s2, sort(i2))
+        splice!(s1, sort(i1))
+    else
+        similar(s1, 0)
+    end
+end
+
+function intersectMultisets!(s1::AbstractVector{T1}, s2::AbstractVector{T2}) where {T1, T2}
+    if s1 === s2
+        res = copy(s1)
+        empty!(s1)
+        res
+    else
+        intersectMultisetsCore!(s1, s2)
+    end
+end
