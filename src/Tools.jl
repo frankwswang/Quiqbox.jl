@@ -1005,17 +1005,17 @@ fastIsApprox(x::T1, y::T2=0.0) where {T1, T2} = abs(x - y) < 2(numEps∘promote_
 triMatEleNum(n::Int) = n * (n + 1) ÷ 2
 
 
-function convert1DidxTo2D(n::Int, k::Int)
+function convert1DidxTo2D(n::Int, k::Int) # {for j in 1:n, i=1:j} <=> {for k in 1:n(n+1)/2}
     bl = iseven(n)
     nRow = n + bl
-    j, i = fldmod1(k, nRow)
-    if j > i - bl
-        i = n - i + 1
-        j = n - j + 2 - bl
+    i, j = fldmod1(k, nRow)
+    if i > j - bl
+        j = n - j + 1
+        i = n - i + 2 - bl
     else
-        i -= bl
+        j -= bl
     end
-    i, j
+    j, i
 end
 
 
