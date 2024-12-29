@@ -1,6 +1,10 @@
+using LinearAlgebra: dot
+
 const OneTwoTpl{T} = Union{Tuple{T}, NTuple{2, T}}
 
 const FrameworkOrbSet{T, D} = AbstractVector{<:FrameworkOrb{T, D}}
+
+const FPrimOrbSet{T, D} = AbstractVector{<:FPrimOrb{T, D}}
 
 const OrbCoreIdxDict{T} = 
       Dict{Tuple{FieldMarker{:PrimitiveOrbCore, 1}, AbtVecOfAbtArr{T}}, Int}
@@ -9,6 +13,12 @@ const OrbCoreData{T, D, F<:PrimitiveOrbCore{T, D}, V<:AbtVecOfAbtArr{T}} = Tuple
 
 const OrbCoreInfoVec{T, D, F<:PrimitiveOrbCore{T, D}} = 
       Vector{ OrbCoreData{T, D, F, Vector{ ShapedMemory{T} }} }
+
+const AbtOrbCoreInfoVec{T, D, F<:PrimitiveOrbCore{T, D}, V<:AbtVecOfAbtArr{T}} = 
+      AbstractVector{OrbCoreData{T, D, F, V}}
+
+const OneBodyIntOrbInfo{T, D} = NTuple{2, AbtOrbCoreInfoVec{T, D}}
+const TwoBodyIntOrbInfo{T, D} = NTuple{4, AbtOrbCoreInfoVec{T, D}}
 
 const OneBodyIdxSymDict = let tempDict=Base.ImmutableDict(true=>:aa)
     Base.ImmutableDict(tempDict, false=>:ab)
@@ -91,82 +101,78 @@ isHermitian(::Identity,
             ::PrimitiveOrbCore{T, D}, ::PrimitiveOrbCore{T, D}) where {T, D} = 
 true
 
-function computeOneBodyInt(op::DirectOperator, (oData,)::Tuple{OrbCoreInfoVec{T, D}}, 
-                           (indexOffset,)::Tuple{Int}=(0,)) where {T, D}
+function genOneBodyPrimIntPairs(op::DirectOperator, 
+                                (oData,)::Tuple{AbtOrbCoreInfoVec{T, D}}, 
+                                (indexOffset,)::Tuple{Int}=(0,)) where {T, D}
     iFirst = firstindex(oData)
     nOrbs = length(oData)
     dIdx = Plus(iFirst - 1)
 
     pairs1 = map(eachindex(oData)) do i
-        iiVal = genPrimOneBodyIntVal(op, oData, i)
+        iiVal = computeOneBodyPrimIntVals(op, oData, i)
         (i+indexOffset,) => iiVal
     end
     pairs2 = map(1:triMatEleNum(nOrbs)) do l
         i, j = (sortTensorIndex∘convert1DidxTo2D)(nOrbs, l) .|> dIdx
-        ijValPair = genPrimOneBodyIntVal(op, oData, (i, j))
+        ijValPair = computeOneBodyPrimIntVals(op, oData, (i, j))
         (i+indexOffset, j+indexOffset) => ijValPair
     end
 
     pairs1, pairs2
 end
 
-function genPrimOneBodyIntVal(op::DirectOperator, oData::OrbCoreInfoVec{T}, 
-                              i::Int) where {T}
+function computeOneBodyPrimIntVals(op::DirectOperator, oData::AbtOrbCoreInfoVec{T}, 
+                                   i::Int) where {T}
     orb, pars = oData[i]
     f = ReturnTyped(genPrimIntegrator(op, orb), T)
     (f(pars),)
 end
 
-function genPrimOneBodyIntValCore(op::DirectOperator, 
+function computeOneBodyPrimIntCore(op::DirectOperator, 
                                   (orb1, pars1)::OrbCoreData{T, D}, 
                                   (orb2, pars2)::OrbCoreData{T, D}) where {T, D}
     f = ReturnTyped(genPrimIntegrator(op, orb1, orb2), T)
     f(pars1, pars2)
 end
 
-# function genPrimOneBodyIntVal(::Val{false}, op::DirectOperator, 
-#                               (oData1, oData2)::NTuple{2, OrbCoreInfoVec{T, D}}, 
-#                               (i, j)::NTuple{2, Int}) where {T, D}
-#     (genPrimOneBodyIntValCore(op, oData1[i], oData2[j]),)
-# end
-
-function genPrimOneBodyIntVal(op::DirectOperator, 
-                              (oData1, oData2)::NTuple{2, OrbCoreInfoVec{T, D}}, 
-                              (i, j)::NTuple{2, Int}) where {T, D}
+function computeOneBodyPrimIntVals(op::DirectOperator, 
+                                   (oData1, oData2)::OneBodyIntOrbInfo{T, D}, 
+                                   (i, j)::NTuple{2, Int}) where {T, D}
     orbPars1 = oData1[i]
     orbPars2 = oData2[j]
-    ijVal = genPrimOneBodyIntValCore(op, orbPars1, orbPars2)
+    ijVal = computeOneBodyPrimIntCore(op, orbPars1, orbPars2)
     jiVal = if isHermitian(op, first(orbPars1), first(orbPars2))
         ijVal'
     else
-        genPrimOneBodyIntValCore(op, orbPars2, orbPars1)
+        computeOneBodyPrimIntCore(op, orbPars2, orbPars1)
     end
     (ijVal, jiVal)
 end
 
-genPrimOneBodyIntVal(op::DirectOperator, oData::OrbCoreInfoVec, idx::NTuple{2, Int}) = 
-genPrimOneBodyIntVal(op, (oData, oData), idx)
+function computeOneBodyPrimIntVals(op::DirectOperator, oData::AbtOrbCoreInfoVec, 
+                                   idx::NTuple{2, Int})
+    computeOneBodyPrimIntVals(op, (oData, oData), idx)
+end
 
-function computeOneBodyInt(op::DirectOperator, 
-                           (oData1, oData2)::NTuple{2, OrbCoreInfoVec{T, D}}, 
-                           (dIdx1, dIdx2)::NTuple{2, Int}) where {T, D}
-    map(Iterators.product( eachindex(oData1), eachindex(oData2) )) do (i, j)
-        ijValPair = genPrimOneBodyIntVal(op, (oData1, oData2), (i, j))
+function genOneBodyPrimIntPairs(op::DirectOperator, data::OneBodyIntOrbInfo{T, D}, 
+                                (dIdx1, dIdx2)::NTuple{2, Int}) where {T, D}
+    map(Iterators.product( eachindex.(data) )) do (i, j)
+        ijValPair = computeOneBodyPrimIntVals(op, data, (i, j))
         (i+dIdx1, j+dIdx2) => ijValPair
     end |> vec
 end
 
-# function computeOneBodyInt(op::DirectOperator, 
-#                            (oData1, oData2)::NTuple{2, OrbCoreInfoVec{T, D}}) where {T, D}
-#     pairs1 = Memory{Pair{Tuple{Int}, T}}([])
-
-#     pairs2 = map(Iterators.product( eachindex(oData1), eachindex(oData2) )) do (i, j)
-#         ijVal = genPrimOneBodyIntVal(Val(false), op, (oData1, oData2), (i, j))
-#         (i+dIdx1, j+dIdx2) => ijVal
-#     end |> vec
-
-#     pairs1, pairs2
-# end
+function genPrimIntegralTensorCore(op::DirectOperator, 
+                                   data::OneBodyIntOrbInfo{T, D}) where {T, D}
+    oData1, oData2 = data
+    res = ShapedMemory{T}(undef, length.(data))
+    di, dj = Plus.(first.(axes(res)) .- firstindex.(data))
+    for j in eachindex(oData2), i in eachindex(oData1)
+        ijVal = computeOneBodyPrimIntCore(op, oData1[i], oData2[j])
+        res[di(i), dj(j)] = ijVal
+    end
+    res
+end
 
 
 function getOrbitalCores(orb::ScaledOrbital)
@@ -183,16 +189,20 @@ function getOrbitalCores(orb::FCompOrb)
     end
 end
 
+function genOrbCoreData!(paramCache::DimSpanDataCacheBox{T}, orb::FPrimOrb{T}) where {T}
+    oCore = getOrbitalCores(orb)[]
+    pVal = cacheParam!(paramCache, orb.param, orb.pointer.scope)
+    (oCore, pVal)
+end
 
 function tryAddPrimOrbCoreCache!(basisCache::PrimOrbCoreCache{T, D}, 
                                  paramCache::DimSpanDataCacheBox{T}, 
                                  orb::FPrimOrb{T, D}, 
                                  anchor::Int=firstindex(basisCache.list)) where {T, D}
-    oCore = getOrbitalCores(orb)[]
+    data = genOrbCoreData!(paramCache, orb)
     basis = basisCache.list
-    pVal = cacheParam!(paramCache, orb.param, orb.pointer.scope)
-    idx = get!(basisCache.dict, (markObj(oCore), pVal)) do
-        push!(basis, (oCore, pVal))
+    idx = get!(basisCache.dict, ((markObj∘first)(data), last(data))) do
+        push!(basis, data)
         lastindex(basis)
     end
     idx, max(idx, anchor)
@@ -202,35 +212,17 @@ function getScalar(orb::FrameworkOrb)
     orb.core.f.apply.right
 end
 
-#!! Designed a better wrapper for the normalizer
-#!! Designed a one(T) like function: SpecVal{T, F} -> F(T)
 
-function isRenormalized(orb::ComposedOrb)
-    orb.renormalize
-end
-
-function isRenormalized(orb::FrameworkOrb)
-    (isRenormalizedCore∘getScalar)(orb)
-end
-
-function isRenormalizedCore(orb::Storage)
-    false
-end
-
-function isRenormalizedCore(orb::ReturnTyped)
-    true
-end
-
-function cacheIntComponents!(intCache::IntegralCache{T, D}, 
-                             paramCache::DimSpanDataCacheBox{T}, 
-                             orb::FPrimOrb{T, D}) where {T, D}
+function cacheIntComponentCore!(intCache::IntegralCache{T, D}, 
+                                paramCache::DimSpanDataCacheBox{T}, 
+                                orb::FPrimOrb{T, D}) where {T, D}
     idx, maxIdx = tryAddPrimOrbCoreCache!(intCache.basis, paramCache, orb)
     BasisIndexer(getMemory((idx => one(T),)), isRenormalized(orb)), maxIdx
 end
 
-function cacheIntComponents!(intCache::IntegralCache{T, D}, 
-                             paramCache::DimSpanDataCacheBox{T}, 
-                             orb::FCompOrb{T, D}) where {T, D}
+function cacheIntComponentCore!(intCache::IntegralCache{T, D}, 
+                                paramCache::DimSpanDataCacheBox{T}, 
+                                orb::FCompOrb{T, D}) where {T, D}
     basis = intCache.basis
     pOrbs = decomposeOrb(orb)
     weightParam = getOrbitalWeight(orb)
@@ -252,7 +244,7 @@ function cacheIntComponents!(intCache::IntegralCache{T, D},
     offset = lastindex(basis.list)
     maxIdx = offset
     idxerList = map(orbs) do orb
-        idxer, maxIdx = cacheIntComponents!(intCache, paramCache, orb)
+        idxer, maxIdx = cacheIntComponentCore!(intCache, paramCache, orb)
         idxer
     end
     if maxIdx > offset
@@ -279,18 +271,18 @@ initializeOverlapCache!(paramCache::DimSpanDataCacheBox{T},
 initializeIntCache!(Val(1), Identity(), paramCache, orbs)
 
 function updateIntCacheCore!(op::DirectOperator, idxer::OneBodyIntegralIndexer{T}, 
-                             basis::Tuple{OrbCoreInfoVec{T, D}}, 
+                             basis::Tuple{AbtOrbCoreInfoVec{T, D}}, 
                              offset::Tuple{Int}) where {T, D}
-    pairs1, pairs2 = computeOneBodyInt(op, basis, offset)
+    pairs1, pairs2 = genOneBodyPrimIntPairs(op, basis, offset)
     foreach(p->setIntegralIndexer!(idxer, p), pairs1)
     foreach(p->setIntegralIndexer!(idxer, p), pairs2)
     idxer
 end
 
 function updateIntCacheCore!(op::DirectOperator, idxer::OneBodyIntegralIndexer{T}, 
-                             basis::NTuple{2, OrbCoreInfoVec{T, D}}, 
+                             basis::OneBodyIntOrbInfo{T, D}, 
                              offset::NTuple{2, Int}) where {T, D}
-    pairs2 = computeOneBodyInt(op, basis, offset)
+    pairs2 = genOneBodyPrimIntPairs(op, basis, offset)
     foreach(p->setIntegralIndexer!(idxer, p), pairs2)
     idxer
 end
@@ -326,10 +318,12 @@ function getNormCoeffCore(cache::OverlapCache{T}, cacheIdxer::BasisIndexer{T}) w
     end
 end
 
-function getNormCoeff(cache::OverlapCache{T}, 
-                      cacheIdxer::NonEmptyTuple{BasisIndexer{T}}) where {T}
-    map(cacheIdxer) do idxer
-        getNormCoeffCore(cache, idxer)
+function getNormCoeffCore(isNormalized::Bool, data::OrbCoreData)
+    if isNormalized
+        res = (first∘computeOneBodyPrimIntVals)(Identity(), data, firstindex(data))
+        AbsSqrtInv(res)
+    else
+        one(T)
     end
 end
 
@@ -499,11 +493,11 @@ end
 #     end
 # end
 
-function buildOneBodyEleTuple(intConfig::Tuple{IntegralCache{T, D, 1}, I}, 
-                              nlzConfig::Tuple{ OverlapCache{T, D},    I}) where 
+function buildOneBodyEleTuple((iCache, iIdxer)::Tuple{IntegralCache{T, D, 1}, I}, 
+                              (nCache, nIdxer)::Tuple{ OverlapCache{T, D},    I}) where 
                              {T, D, I<:OneTwoTpl{BasisIndexer{T}}}
-    resInner = buildOneBodyEleCore(intConfig...)
-    nCoeff = getNormCoeff(nlzConfig...) |> extendOneBodyBasis |> getNBodyScalarProd
+    resInner = buildOneBodyEleCore(iCache, iIdxer)
+    nCoeff = getNormCoeffCore.(Ref(nCache), nIdxer) |> extendOneBodyBasis |> getNBodyScalarProd
     resInner .* nCoeff
 end
 
@@ -583,6 +577,27 @@ end
 
 buildNBodyTensor(::Val{1}, args...) = buildOneBodyTensor(args...)
 
+
+function extractFPrimOrbSetData!(cache::DimSpanDataCacheBox{T}, 
+                                 pOrbs::FPrimOrbSet{T}) where {T}
+    normCoeffs = Memory{T}(undef, length(pOrbs))
+    coreData = map(pOrbs, eachindex(normCoeffs)) do o, i
+        d = genOrbCoreData!(cache, o)
+        normCoeffs[i] = getNormCoeffCore(isRenormalized(o), d)
+        d
+    end
+    coreData, normCoeffs
+end
+
+function genPrimIntegralTensor!(cache::DimSpanDataCacheBox{T}, op::DirectOperator, 
+                                pOrbs1::FPrimOrbSet{T, D}, pOrbs2::FPrimOrbSet{T, D}) where 
+                               {T, D}
+    data1, nCoeffs1 = extractFPrimOrbSetData!(cache, pOrbs1)
+    data2, nCoeffs2 = extractFPrimOrbSetData!(cache, pOrbs2)
+    tensor = genPrimIntegralTensorCore(op, (data1, data2))
+    dot(nCoeffs1, tensor, nCoeffs2)
+end
+
 function cacheIntegrateCore!(intCache::IntegralCache{T, D, N}, 
                              paramCache::IntegralCache{T, D, N}, 
                              basisSet::FrameworkOrbSet{T, D}, 
@@ -635,15 +650,23 @@ integrateNBody(Val(1), Identity(), basisSet; paramCache)
 #     integrateNBody(Identity(), bf1, bf2; paramCache)
 # end
 
+# function intersectBasisSets!(bs1::FrameworkOrbSet, bs::FrameworkOrbSet)
+#     ms1 = markObj.(bs1)
+#     ms2 = markObj.(bs2)
+#     intersect(ms1, ms2)
+#     # ...
+#     bs
+# end
+
 # function integrateNBody(op::DirectOperator, 
 #                         bf1::FrameworkOrb{T, D}, bf2::FrameworkOrb{T, D}; 
 #                         paramCache::DimSpanDataCacheBox{T}=DimSpanDataCacheBox(T)) where 
 #                        {T, D}
-#     if bf1 === bf2
-        
-#     else
-
-#     end
-# end
+#     pOrbs1 = decomposeOrb(bf1)
+#     pOrbs2 = decomposeOrb(bf2)
+#     pbfsm = intersectBasisSets!(pOrbs1, pOrbs2)
+#     intCache, intIdxers = initializeIntCache!(Val(2), op, paramCache, pbfsm)
+#     normCache, normIdxers = initializeOverlapCache!(paramCache, pbfsm)
+#     res = buildNBodyTensor(Val(N), (intCache, intIdxers), (normCache, normIdxers)) |> sum
 
 #!! Add element-mise integral interfaces
