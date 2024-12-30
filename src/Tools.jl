@@ -1126,9 +1126,12 @@ function registerObjFrequency(objs::AbstractVector)
     end
 end
 
-function intersectMultisetsCore!(s1::AbstractVector{T}, s2::AbstractVector) where {T}
-    sMkr1 = markObj.(s1)
-    sMkr2 = markObj.(s2)
+
+function intersectMultisetsCore!(transformation::F, 
+                                 s1::AbstractVector{T}, s2::AbstractVector) where 
+                                {T, F<:Function}
+    sMkr1 = map(transformation, s1)
+    sMkr2 = map(transformation, s2)
 
     sMkr1Counted = registerObjFrequency(sMkr1)
     sMkr2Counted = registerObjFrequency(sMkr2)
@@ -1147,12 +1150,14 @@ function intersectMultisetsCore!(s1::AbstractVector{T}, s2::AbstractVector) wher
     end
 end
 
-function intersectMultisets!(s1::AbstractVector{T1}, s2::AbstractVector{T2}) where {T1, T2}
+# If `x==y` is `true`, `transformation(x)==transformation(y)` should always return `true`.
+function intersectMultisets!(s1::AbstractVector{T1}, s2::AbstractVector{T2}; 
+                             transformation::F=itself) where {T1, T2, F}
     if s1 === s2
         res = copy(s1)
         empty!(s1)
         res
     else
-        intersectMultisetsCore!(s1, s2)
+        intersectMultisetsCore!(transformation, s1, s2)
     end
 end
