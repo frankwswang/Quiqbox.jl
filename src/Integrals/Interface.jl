@@ -14,8 +14,11 @@ const OrbCoreData{T, D, F<:PrimitiveOrbCore{T, D}, V<:AbtVecOfAbtArr{T}} = Tuple
 const OrbCoreInfoVec{T, D, F<:PrimitiveOrbCore{T, D}} = 
       Vector{ OrbCoreData{T, D, F, Vector{ ShapedMemory{T} }} }
 
+const AbtOrbCoreInfoArr{T, D, F<:PrimitiveOrbCore{T, D}, V<:AbtVecOfAbtArr{T}, N} = 
+      AbstractArray{OrbCoreData{T, D, F, V}, N}
+
 const AbtOrbCoreInfoVec{T, D, F<:PrimitiveOrbCore{T, D}, V<:AbtVecOfAbtArr{T}} = 
-      AbstractVector{OrbCoreData{T, D, F, V}}
+      AbtOrbCoreInfoArr{T, D, F, V, 1}
 
 const OneBodyIntOrbInfo{T, D} = NTuple{2, AbtOrbCoreInfoVec{T, D}}
 const TwoBodyIntOrbInfo{T, D} = NTuple{4, AbtOrbCoreInfoVec{T, D}}
@@ -121,7 +124,7 @@ function genOneBodyPrimIntPairs(op::DirectOperator,
     pairs1, pairs2
 end
 
-function computeOneBodyPrimIntVals(op::DirectOperator, oData::AbtOrbCoreInfoVec{T}, 
+function computeOneBodyPrimIntVals(op::DirectOperator, oData::AbtOrbCoreInfoArr{T}, 
                                    i::Int) where {T}
     orb, pars = oData[i]
     f = ReturnTyped(genPrimIntegrator(op, orb), T)
@@ -221,7 +224,7 @@ function cacheIntComponentCore!(intCache::IntegralCache{T, D},
                                 orb::FCompOrb{T, D}) where {T, D}
     basis = intCache.basis
     pOrbs = decomposeOrb(orb)
-    wVal = cacheParam!(paramCache, getOrbWeightCore(orb))
+    wVal = cacheOrbWeight!(paramCache, orb)
     maxIdx = lastindex(basis.list)
     i = firstindex(wVal) - 1
     pairs = map(pOrbs) do pOrb
@@ -315,7 +318,7 @@ end
 
 function getNormCoeffCore(isNormalized::Bool, data::OrbCoreData{T}) where {T}
     if isNormalized
-        res = (first∘computeOneBodyPrimIntVals)(Identity(), data, firstindex(data))
+        res = (first∘computeOneBodyPrimIntVals)(Identity(), fill(data), firstindex(data))
         AbsSqrtInv(res)
     else
         one(T)
@@ -654,18 +657,28 @@ function getOverlapN(bf1::FrameworkOrb{T, D}, bf2::FrameworkOrb{T, D};
     integrateNBody(Identity(), (bf1, bf2); paramCache, lazyCompute)
 end
 
+
+function cacheOrbWeight!(paramCache::DimSpanDataCacheBox{T}, orb::FCompOrb{T}) where {T}
+    cacheParam!(paramCache, getOrbWeightCore(orb))
+end
+
+function cacheOrbWeight!(::DimSpanDataCacheBox{T}, ::FPrimOrb{T}) where {T}
+    one(T)
+end
+
+
 function integrateNBody(op::DirectOperator, (bf1, bf2)::NTuple{2, FrameworkOrb{T, D}}; 
                         paramCache::DimSpanDataCacheBox{T}=DimSpanDataCacheBox(T), 
                         lazyCompute::Bool=false) where {T, D}
     pOrbs1 = decomposeOrb(bf1)
-    w1 = cacheParam!(paramCache, getOrbWeightCore(bf1))
+    w1 = cacheOrbWeight!(paramCache, bf1)
     bfBool = bf1 === bf2
     if bfBool
         pOrbs2 = pOrbs1
             w2 = w1
     else
         pOrbs2 = decomposeOrb(bf2)
-            w2 = cacheParam!(paramCache, getOrbWeightCore(bf2))
+            w2 = cacheOrbWeight!(paramCache, bf2)
     end
 
     tensor = if lazyCompute && length(pOrbs1) > 1 && length(pOrbs2) > 1
@@ -693,4 +706,18 @@ function integrateNBody(op::DirectOperator, (bf1, bf2)::NTuple{2, FrameworkOrb{T
     end
 
     dot(w1, tensor, w2)
+end
+
+function getOverlapN(bf1::FrameworkOrb{T, D}, bf2::FrameworkOrb{T, D}; 
+                     paramCache::DimSpanDataCacheBox{T}=DimSpanDataCacheBox(T), 
+                     lazyCompute::Bool=false) where {T, D}
+    integrateNBody(Identity(), (bf1, bf2); paramCache, lazyCompute)
+end
+
+function getOverlapN(orb1::OrbitalBasis{T, D}, orb2::OrbitalBasis{T, D}; 
+                     paramCache::DimSpanDataCacheBox{T}=DimSpanDataCacheBox(T), 
+                     lazyCompute::Bool=false) where {T, D}
+    bf1 = FrameworkOrb(orb1)
+    bf2 = orb1 === orb2 ? bf1 : FrameworkOrb(orb2)
+    getOverlapN(bf1, bf2; paramCache, lazyCompute)
 end
