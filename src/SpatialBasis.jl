@@ -43,6 +43,7 @@ function unpackParamFunc!(f::ComposedOrb{T}, paramSet::FlatParamSet,
     fEval, paramSet, paramPointer
 end
 
+#!! Allow .renormalize mutable
 #! Change .center to the first field
 struct PrimitiveOrb{T, D, B<:FieldAmplitude{T, D}, 
                     C<:NTuple{D, ElementalParam{T}}} <: ComposedOrb{T, D, B}
@@ -333,12 +334,30 @@ function decomposeOrb(o::FCompOrb)
     end
 end
 
-function permitRenormalize!(b::OrbitalBasis)
+
+function getOrbWeight(::Union{PrimitiveOrb{T}, FPrimOrb{T}}) where {T}
+    one(T)
+end
+
+function getOrbWeight(::Union{CompositeOrb{T}, FCompOrb{T}}) where {T}
+    getOrbWeightCore(o) |> obtain
+end
+
+function getOrbWeightCore(o::CompositeOrb{T}) where {T}
+    o.weight
+end
+
+function getOrbWeightCore(o::FCompOrb{T}) where {T}
+    getField(o.param, o.pointer.weight)
+end
+
+
+function enforceRenormalize!(b::ComposedOrb)
     b.renormalize = true
 end
 
 
-function forbidRenormalize!(b::OrbitalBasis)
+function preventRenormalize!(b::ComposedOrb)
     b.renormalize = false
 end
 
@@ -378,6 +397,30 @@ function genGaussTypeOrb(center::NonEmptyTuple{ParamOrValue{T}, D},
         CompositeOrb(pgtos, cons; renormalize)
     end
 end
+
+#!! Designed a better wrapper for the normalizer
+#!! Designed a one(T) like function: SpecVal{T, F} -> F(T)
+
+function getScalar(orb::FrameworkOrb)
+    orb.core.f.apply.right
+end
+
+function isRenormalized(orb::ComposedOrb)
+    orb.renormalize
+end
+
+function isRenormalized(orb::FrameworkOrb)
+    (isRenormalizedCore∘getScalar)(orb)
+end
+
+function isRenormalizedCore(orb::Storage)
+    false
+end
+
+function isRenormalizedCore(orb::ReturnTyped)
+    true
+end
+
 
 
 # struct GaussTypeSubshell{T, D, L, B, O} <: OrbitalBatch{T, D, PolyGaussProd{T, D, L, B}, O}
