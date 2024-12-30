@@ -651,16 +651,6 @@ integrateNBody(::Val{1}, ::Identity, basisSet::FrameworkOrbSet{T, D};
                paramCache::DimSpanDataCacheBox{T}=DimSpanDataCacheBox(T)) where {T, D} = 
 buildNBodyTensor(Val(1), initializeOverlapCache!(paramCache, basisSet))
 
-getOverlapsN(basisSet::FrameworkOrbSet{T}; 
-             paramCache::DimSpanDataCacheBox{T}=DimSpanDataCacheBox(T)) where {T} = 
-integrateNBody(Val(1), Identity(), basisSet; paramCache)
-
-function getOverlapN(bf1::FrameworkOrb{T, D}, bf2::FrameworkOrb{T, D}; 
-                     paramCache::DimSpanDataCacheBox{T}=DimSpanDataCacheBox(T), 
-                     lazyCompute::Bool=false) where {T, D}
-    integrateNBody(Identity(), (bf1, bf2); paramCache, lazyCompute)
-end
-
 
 function cacheOrbWeight!(paramCache::DimSpanDataCacheBox{T}, orb::FCompOrb{T}) where {T}
     cacheParam!(paramCache, getOrbWeightCore(orb))
@@ -705,16 +695,39 @@ function integrateNBody(::Val{1}, op::DirectOperator,
     dot(w1, tensor, w2)
 end
 
-function getOverlapN(bf1::FrameworkOrb{T, D}, bf2::FrameworkOrb{T, D}; 
-                     paramCache::DimSpanDataCacheBox{T}=DimSpanDataCacheBox(T), 
-                     lazyCompute::Bool=false) where {T, D}
-    integrateNBody(Identity(), (bf1, bf2); paramCache, lazyCompute)
+function integrateNBody(::Val{N}, op::DirectOperator, 
+                        (ids, obs)::Tuple{N24Tuple{Int}, NonEmptyTuple{OrbitalBasis{T, D}}}; 
+                        paramCache::DimSpanDataCacheBox{T}=DimSpanDataCacheBox(T), 
+                        lazyCompute::Bool=false) where {N, T, D}
+    bfs = getindex.(Ref(map(FrameworkOrb, obs)), ids)
+    integrateNBody(Val(N), op, bfs; paramCache, lazyCompute)
 end
+
+
+function integrateNBody(::Val{N}, op::DirectOperator, orbs::N24Tuple{OrbitalBasis{T, D}}; 
+                        paramCache::DimSpanDataCacheBox{T}=DimSpanDataCacheBox(T), 
+                        lazyCompute::Bool=false) where {N, T, D}
+    bfIdxer = markUnique(orbs, compareFunction=(===))
+    integrateNBody(Val(N), op, bfIdxer; paramCache, lazyCompute)
+end
+
+function integrateNBody(::Val{N}, op::DirectOperator, orbs::OrbitalBasisSet{T, D}; 
+                        paramCache::DimSpanDataCacheBox{T}=DimSpanDataCacheBox(T)) where 
+                       {N, T, D}
+    integrateNBody(Val(N), op, map(FrameworkOrb, orbs); paramCache)
+end
+
 
 function getOverlapN(orb1::OrbitalBasis{T, D}, orb2::OrbitalBasis{T, D}; 
                      paramCache::DimSpanDataCacheBox{T}=DimSpanDataCacheBox(T), 
                      lazyCompute::Bool=false) where {T, D}
-    bf1 = FrameworkOrb(orb1)
-    bf2 = orb1 === orb2 ? bf1 : FrameworkOrb(orb2)
-    getOverlapN(bf1, bf2; paramCache, lazyCompute)
+    if orb1 === orb2 && isRenormalized(orb1)
+        one(T)
+    else
+        integrateNBody(Val(1), Identity(), (orb1, orb2); paramCache, lazyCompute)
+    end
 end
+
+getOverlapsN(basisSet::OrbitalBasisSet{T}; 
+             paramCache::DimSpanDataCacheBox{T}=DimSpanDataCacheBox(T)) where {T} = 
+integrateNBody(Val(1), Identity(), basisSet; paramCache)
