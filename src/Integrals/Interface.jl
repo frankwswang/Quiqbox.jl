@@ -671,24 +671,19 @@ function cacheOrbWeight!(::DimSpanDataCacheBox{T}, ::FPrimOrb{T}) where {T}
 end
 
 
-function integrateNBody(op::DirectOperator, (bf1, bf2)::NTuple{2, FrameworkOrb{T, D}}; 
+function integrateNBody(::Val{1}, op::DirectOperator, 
+                        (bf1, bf2)::NTuple{2, FrameworkOrb{T, D}}; 
                         paramCache::DimSpanDataCacheBox{T}=DimSpanDataCacheBox(T), 
                         lazyCompute::Bool=false) where {T, D}
     pOrbs1 = decomposeOrb(bf1)
     w1 = cacheOrbWeight!(paramCache, bf1)
-    bfBool = bf1 === bf2
-    if bfBool
-        pOrbs2 = pOrbs1
+    if bf1 === bf2
             w2 = w1
+        tensor = integrateNBody(Val(1), op, pOrbs1; paramCache)
     else
         pOrbs2 = decomposeOrb(bf2)
             w2 = cacheOrbWeight!(paramCache, bf2)
-    end
-
-    tensor = if lazyCompute && length(pOrbs1) > 1 && length(pOrbs2) > 1
-        if bfBool
-            integrateNBody(Val(1), Identity(), pOrbs1; paramCache)
-        else
+        tensor = if lazyCompute
             pOrbs1 = Vector(pOrbs1)
             pOrbs2 = Vector(pOrbs2)
             transformation = (bf::FPrimOrb{T, D})->(markObj∘genOrbCoreData!)(paramCache, bf)
@@ -697,16 +692,14 @@ function integrateNBody(op::DirectOperator, (bf1, bf2)::NTuple{2, FrameworkOrb{T
             if isempty(pOrbsMutual)
                 block4
             else
-                iCache, iIdxers = initializeIntCache!(Val(1), op, paramCache, pOrbsMutual)
-                nCache, nIdxers = initializeOverlapCache!(paramCache, pOrbsMutual)
-                block1 = buildNBodyTensor(Val(1), (iCache, iIdxers), (nCache, nIdxers))
+                block1 = integrateNBody(Val(1), op, pOrbsMutual; paramCache)
                 block2 = computePrimIntTensor(paramCache, op, (pOrbs1, pOrbsMutual))
                 block3 = computePrimIntTensor(paramCache, op, (pOrbsMutual, pOrbs2))
                 hvcat((2, 2), block1, block3, block2, block4)
             end
+        else
+            computePrimIntTensor(paramCache, op, (pOrbs1, pOrbs2))
         end
-    else
-        computePrimIntTensor(paramCache, op, (pOrbs1, pOrbs2))
     end
 
     dot(w1, tensor, w2)
