@@ -2,6 +2,8 @@ export PrimitiveOrb, CompositeOrb, FrameworkOrb, genGaussTypeOrb
 
 abstract type ComposedOrb{T, D, B} <: OrbitalBasis{T, D, B} end
 
+abstract type UnpackedOrb{T, D, B} <: OrbitalBasis{T, D, B} end
+
 abstract type EvalComposedOrb{T, D, B} <: EvalDimensionalKernel{T, D, B} end
 
 abstract type ComposedOrbParamPtr{T, D, R} <: FieldParamPointer{R} end
@@ -264,8 +266,6 @@ function unpackComposedOrbCore!(f::CompositeOrb{T, D}, paramSet::FlatParamSet,
 end
 
 
-abstract type UnpackedOrb{T, D, B} <: OrbitalBasis{T, D, B} end
-
 struct FrameworkOrb{T, D, B<:EvalComposedOrb{T, D}, P<:TypedParamInput{T}, 
                     A<:FieldParamPointer} <: UnpackedOrb{T, D, B}
     core::B
@@ -313,13 +313,13 @@ const FCompGTO{T, D, B<:EvalCompGTO{T, D}, P<:TypedParamInput{T}, A<:FieldParamP
 unpackFunc(o::FrameworkOrb) = (o.core, o.param, o.pointer)
 
 
-getOrbitalSize(::PrimitiveOrb) = 1
+getOrbSize(::PrimitiveOrb) = 1
 
-getOrbitalSize(o::CompositeOrb) = length(o.basis)
+getOrbSize(o::CompositeOrb) = length(o.basis)
 
-getOrbitalSize(::FPrimOrb) = 1
+getOrbSize(::FPrimOrb) = 1
 
-getOrbitalSize(o::FCompOrb) = length(o.core.f.apply.left.f.chain)
+getOrbSize(o::FCompOrb) = length(o.core.f.apply.left.f.chain)
 
 
 decomposeOrb(o::T) where {T<:PrimitiveOrb} = Memory{T}([o])
@@ -329,7 +329,7 @@ decomposeOrb(o::CompositeOrb) = o.basis
 decomposeOrb(o::T) where {T<:FPrimOrb} = Memory{T}([o])
 
 function decomposeOrb(o::FCompOrb)
-    map(getMemory( 1:getOrbitalSize(o) )) do i
+    map(getMemory( 1:getOrbSize(o) )) do i
         FrameworkOrb(o, i)
     end
 end
