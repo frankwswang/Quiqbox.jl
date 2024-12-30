@@ -492,8 +492,8 @@ function buildOneBodyEleTuple((iCache, iIdxer)::Tuple{IntegralCache{T, D, 1}, I}
                               (nCache, nIdxer)::Tuple{ OverlapCache{T, D},    I}) where 
                              {T, D, I<:OneTwoTpl{BasisIndexer{T}}}
     resInner = buildOneBodyEleCore(iCache, iIdxer)
-    nCoeff = getNormCoeffCore.(Ref(nCache), nIdxer) |> extendOneBodyBasis |> getNBodyScalarProd
-    resInner .* nCoeff
+    nCoeffs = getNormCoeffCore.(Ref(nCache), nIdxer) |> extendOneBodyBasis
+    resInner .* getNBodyScalarProd(nCoeffs)
 end
 
 function buildOneBodyEleTuple(intConfig::Tuple{ OverlapCache{T, D}, 
