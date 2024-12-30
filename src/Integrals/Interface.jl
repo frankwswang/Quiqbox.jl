@@ -1,6 +1,9 @@
 using LinearAlgebra: dot
 
-const OneTwoTpl{T} = Union{Tuple{T}, NTuple{2, T}}
+const N12Tuple{T} = Union{Tuple{T}, NTuple{2, T}}
+const N24Tuple{T} = Union{NTuple{2, T}, NTuple{4, T}}
+
+const OrbitalBasisSet{T, D} = AbstractVector{<:OrbitalBasis{T, D}}
 
 const FrameworkOrbSet{T, D} = AbstractVector{<:FrameworkOrb{T, D}}
 
@@ -90,11 +93,9 @@ function setIntegralIndexer!(idxer::OneBodyIntegralIndexer{T},
 end
 
 
-genPrimIntegrator(::Identity, orb::PrimGTOcore) = genOverlapFunc(orb)
+genOneBodyPrimIntegrator(::Identity, orbs::N12Tuple{PrimGTOcore{T, D}}) where {T, D} = 
+genGTOverlapFunc(orbs)
 
-genPrimIntegrator(::Identity, orb1::PrimGTOcore{T, D}, orb2::PrimGTOcore{T, D}) where 
-                 {T, D} = 
-genOverlapFunc(orb1, orb2)
 
 isHermitian(::DirectOperator, 
             ::PrimitiveOrbCore{T, D}, ::PrimitiveOrbCore{T, D}) where {T, D} = 
@@ -131,14 +132,14 @@ end
 function computeOneBodyPrimIntVals(op::DirectOperator, oData::AbtOrbCoreInfoArr{T}, 
                                    i::Int) where {T}
     orb, pars = oData[i]
-    f = ReturnTyped(genPrimIntegrator(op, orb), T)
+    f = ReturnTyped(genOneBodyPrimIntegrator(op, (orb,)), T)
     (f(pars),)
 end
 
 function computeOneBodyPrimIntCore(op::DirectOperator, 
                                   (orb1, pars1)::OrbCoreData{T, D}, 
                                   (orb2, pars2)::OrbCoreData{T, D}) where {T, D}
-    f = ReturnTyped(genPrimIntegrator(op, orb1, orb2), T)
+    f = ReturnTyped(genOneBodyPrimIntegrator(op, (orb1, orb2)), T)
     f(pars1, pars2)
 end
 
@@ -170,7 +171,7 @@ function genOneBodyPrimIntPairs(op::DirectOperator, data::OneBodyIntOrbInfo{T, D
 end
 
 function computePrimCoreIntTensor(op::DirectOperator, 
-                                   data::OneBodyIntOrbInfo{T, D}) where {T, D}
+                                  data::OneBodyIntOrbInfo{T, D}) where {T, D}
     oData1, oData2 = data
     res = ShapedMemory{T}(undef, length.(data))
     di, dj = Plus.(first.(axes(res)) .- firstindex.(data))
@@ -497,7 +498,7 @@ end
 
 function buildOneBodyEleTuple((iCache, iIdxer)::Tuple{IntegralCache{T, D, 1}, I}, 
                               (nCache, nIdxer)::Tuple{ OverlapCache{T, D},    I}) where 
-                             {T, D, I<:OneTwoTpl{BasisIndexer{T}}}
+                             {T, D, I<:N12Tuple{BasisIndexer{T}}}
     resInner = buildOneBodyEleCore(iCache, iIdxer)
     nCoeffs = getNormCoeffCore.(Ref(nCache), nIdxer) |> extendOneBodyBasis
     resInner .* getNBodyScalarProd(nCoeffs)

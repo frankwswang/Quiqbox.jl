@@ -50,3 +50,11 @@ function numericalOneBodyInt(op::F, orbs::NTuple{2, EvalDimensionalKernel{T, D}}
     bound = ntuple(_->one(T), Val(D))
     numericalIntegration(integrand, (.-(bound), bound))
 end
+
+function genOneBodyPrimIntegrator(op::F, 
+                                  orbs::NonEmptyTuple{PrimitiveOrbCore{T, D}, N}) where 
+                                 {F<:DirectOperator, N, T, D}
+    function (pVal::AbtVecOfAbtArr{T}, pVals::Vararg{AbtVecOfAbtArr{T}, N}) where {T}
+        numericalOneBodyInt(op, orbs, (pVal, pVals...))
+    end
+end

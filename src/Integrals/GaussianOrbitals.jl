@@ -173,7 +173,7 @@ function (f::OverlapGTOself{T})(pars::AbtVecOfAbtArr{T}) where {T}
     overlapPGTO(xpnVal, f.ang)
 end
 
-function genOverlapFunc(orb::PrimGTOcore{T, D}) where {T, D}
+function genGTOverlapFunc((orb,)::Tuple{PrimGTOcore{T, D}}) where {T, D}
     _, xpnIdx, ang = preparePGTOconfig(orb)
     OverlapGTOself(xpnIdx, ang)
 end
@@ -193,8 +193,7 @@ function (f::OverlapGTOpair{T})(pars1::AbtVecOfAbtArr{T},
     overlapPGTO(CenPair(cen1, cen2), XpnPair(xpn1, xpn2), AngPair(f.ang...))
 end
 
-function genOverlapFunc(orb1::PrimGTOcore{T, D}, orb2::PrimGTOcore{T, D}) where {T, D}
-    cenIds1, xpnIdx1, ang1 = preparePGTOconfig(orb1)
-    cenIds2, xpnIdx2, ang2 = preparePGTOconfig(orb2)
-    OverlapGTOpair((cenIds1, cenIds2), (xpnIdx1, xpnIdx2), (ang1, ang2))
+function genGTOverlapFunc(orbs::NTuple{2, PrimGTOcore{T, D}}) where {T, D}
+    configs = preparePGTOconfig.(orbs)
+    OverlapGTOpair(getindex.(configs, 1), getindex.(configs, 2), getindex.(configs, 3))
 end
