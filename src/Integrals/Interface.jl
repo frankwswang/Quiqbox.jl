@@ -650,13 +650,13 @@ integrateNBody(Val(1), Identity(), basisSet; paramCache)
 
 function getOverlapN(bf1::FrameworkOrb{T, D}, bf2::FrameworkOrb{T, D}; 
                      paramCache::DimSpanDataCacheBox{T}=DimSpanDataCacheBox(T), 
-                     tryOptimize::Bool=false) where {T, D}
-    integrateNBody(Identity(), (bf1, bf2); paramCache, tryOptimize)
+                     lazyCompute::Bool=false) where {T, D}
+    integrateNBody(Identity(), (bf1, bf2); paramCache, lazyCompute)
 end
 
 function integrateNBody(op::DirectOperator, (bf1, bf2)::NTuple{2, FrameworkOrb{T, D}}; 
                         paramCache::DimSpanDataCacheBox{T}=DimSpanDataCacheBox(T), 
-                        tryOptimize::Bool=false) where {T, D}
+                        lazyCompute::Bool=false) where {T, D}
     pOrbs1 = decomposeOrb(bf1)
     w1 = cacheParam!(paramCache, getOrbWeightCore(bf1))
     bfBool = bf1 === bf2
@@ -668,20 +668,23 @@ function integrateNBody(op::DirectOperator, (bf1, bf2)::NTuple{2, FrameworkOrb{T
             w2 = cacheParam!(paramCache, getOrbWeightCore(bf2))
     end
 
-    tensor = if tryOptimize && length(pOrbs1) > 1 && length(pOrbs2) > 1
+    tensor = if lazyCompute && length(pOrbs1) > 1 && length(pOrbs2) > 1
         if bfBool
             integrateNBody(Val(1), Identity(), pOrbs1; paramCache)
         else
             pOrbs1 = Vector(pOrbs1)
             pOrbs2 = Vector(pOrbs2)
-            pOrbsMutual = intersectMultisets!(pOrbs1, pOrbs2)
-            if !isempty(pOrbsMutual)
+            transformation = (bf::FPrimOrb{T, D})->(markObj∘genOrbCoreData!)(paramCache, bf)
+            pOrbsMutual = intersectMultisets!(pOrbs1, pOrbs2; transformation)
+            block4 = computePrimIntTensor(paramCache, op, (pOrbs1, pOrbs2))
+            if isempty(pOrbsMutual)
+                block4
+            else
                 iCache, iIdxers = initializeIntCache!(Val(1), op, paramCache, pOrbsMutual)
                 nCache, nIdxers = initializeOverlapCache!(paramCache, pOrbsMutual)
                 block1 = buildNBodyTensor(Val(1), (iCache, iIdxers), (nCache, nIdxers))
                 block2 = computePrimIntTensor(paramCache, op, (pOrbs1, pOrbsMutual))
                 block3 = computePrimIntTensor(paramCache, op, (pOrbsMutual, pOrbs2))
-                block4 = computePrimIntTensor(paramCache, op, (pOrbs1,      pOrbs2))
                 hvcat((2, 2), block1, block3, block2, block4)
             end
         end
