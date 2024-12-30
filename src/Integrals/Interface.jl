@@ -111,14 +111,18 @@ function genOneBodyPrimIntPairs(op::DirectOperator,
     nOrbs = length(oData)
     dIdx = Plus(iFirst - 1)
 
-    pairs1 = map(eachindex(oData)) do i
-        iiVal = computeOneBodyPrimIntVals(op, oData, i)
-        (i+indexOffset,) => iiVal
-    end
+    pairs1 = Memory{Pair{Tuple{Int}, Tuple{T}}}(undef, nOrbs)
     pairs2 = map(1:triMatEleNum(nOrbs)) do l
-        i, j = (sortTensorIndex∘convert1DidxTo2D)(nOrbs, l) .|> dIdx
-        ijValPair = computeOneBodyPrimIntVals(op, oData, (i, j))
-        (i+indexOffset, j+indexOffset) => ijValPair
+        n, m = convert1DidxTo2D(nOrbs, l)
+        if m == n
+            i = dIdx(m)
+            iiVal = computeOneBodyPrimIntVals(op, oData, i)
+            pairs1[begin+n-1] = (i+indexOffset,) => iiVal
+        else
+            i, j = sortTensorIndex((m, n)) .|> dIdx
+            ijValPair = computeOneBodyPrimIntVals(op, oData, (i, j))
+            (i+indexOffset, j+indexOffset) => ijValPair
+        end
     end
 
     pairs1, pairs2
