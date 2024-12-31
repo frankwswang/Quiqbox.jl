@@ -154,7 +154,7 @@ function getWeightParamCore(basis::AbstractVector{<:ComposedOrb{T, D}},
                     "the output length of `weight`")
     weightPieces = getEffectiveWeight(basis, weight)
     expandedWeight = ParamGrid(weightPieces, :weight)
-    expandedBasis = mapfoldl(decomposeOrb, vcat, basis)
+    expandedBasis = mapfoldl(splitOrb, vcat, basis)
     expandedBasis, expandedWeight
 end
 
@@ -322,13 +322,13 @@ getOrbSize(::FPrimOrb) = 1
 getOrbSize(o::FCompOrb) = length(o.core.f.apply.left.f.chain)
 
 
-decomposeOrb(o::T) where {T<:PrimitiveOrb} = Memory{T}([o])
+splitOrb(o::T) where {T<:PrimitiveOrb} = Memory{T}([o])
 
-decomposeOrb(o::CompositeOrb) = o.basis
+splitOrb(o::CompositeOrb) = o.basis
 
-decomposeOrb(o::T) where {T<:FPrimOrb} = Memory{T}([o])
+splitOrb(o::T) where {T<:FPrimOrb} = Memory{T}([o])
 
-function decomposeOrb(o::FCompOrb)
+function splitOrb(o::FCompOrb)
     map(getMemory( 1:getOrbSize(o) )) do i
         FrameworkOrb(o, i)
     end
