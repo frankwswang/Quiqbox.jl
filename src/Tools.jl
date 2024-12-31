@@ -497,15 +497,13 @@ end
 
 """
 
-    markUnique(arr::AbstractArray{T}, args...; 
-               compareFunction::Function=isequal, kws...) where {T} -> 
+    markUnique(arr::AbstractArray{T}; compareFunction::Function=isequal) where {T} -> 
     Tuple{Vector{Int}, Vector{T}}
 
 Return a `Vector{Int}` whose elements are indices to mark the elements inside `arr` such 
 that same element will be marked with same index, and a `Vector{T}` containing all the 
 unique elements. The definition of "unique" (or "same") is based on `compareFunction` 
-which is set to `Base.isequal` in default. `args` and `kws` are placeholders for the 
-positional arguments and keyword arguments for `compareFunction` respectively.
+which is set to `Base.isequal` in default.
 
 ≡≡≡ Example(s) ≡≡≡
 
@@ -535,29 +533,26 @@ end
 ([1, 1, 2, 1], S[S(1, 2.0), S(1, 2.1)])
 ```
 """
-function markUnique(arr::AbstractArray{T}, args...; 
-                    compareFunction::F=isequal, kws...) where {T<:Any, F<:Function}
+function markUnique(arr::AbstractArray{T}; compareFunction::F=isequal) where 
+                   {T, F<:Function}
     cmprList = T[]
     isempty(arr) && (return arr, cmprList)
-    f = (a, b) -> compareFunction(a, b, args...; kws...)
     sizehint!(cmprList, length(arr))
-    markList = markUniqueCore!(f, cmprList, arr)
+    markList = markUniqueCore!(compareFunction, cmprList, arr)
     markList, cmprList
 end
 
-function markUnique(tpl::Tuple{Vararg{Any, N}}, args...; compareFunction::F=isequal,
-                    kws...) where {N, F<:Function}
+function markUnique(tpl::Tuple{Vararg{Any, N}}; compareFunction::F=isequal) where 
+                   {N, F<:Function}
     isempty(tpl) && (return tpl, ())
-    f = (a, b) -> compareFunction(a, b, args...; kws...)
     cmprList = eltype(tpl)[]
     sizehint!(cmprList, N)
-    markList = markUniqueCore!(f, cmprList, tpl)
+    markList = markUniqueCore!(compareFunction, cmprList, tpl)
     markList, Tuple(cmprList)
 end
 
-function markUnique((a, b)::NTuple{2, Any}, args...; compareFunction::F=isequal,
-                    kws...) where {F<:Function}
-    if compareFunction(a, b, args...; kws...)
+function markUnique((a, b)::NTuple{2, Any}; compareFunction::F=isequal) where {F<:Function}
+    if compareFunction(a, b)
         (1, 1), (a,)
     else
         (1, 2), (a, b)
@@ -613,7 +608,7 @@ julia> arr
 function getUnique!(arr::AbstractVector{T}, args...; 
                     compareFunction::F = hasEqual, kws...) where {T<:Any, F<:Function}
     isempty(arr) && (return arr)
-    f = (a, b) -> compareFunction(a, b, args...; kws...)
+    f = (a, b) -> compareFunction(a, b)
     cmprList = T[arr[1]]
     delList = Bool[false]
     for ele in view(arr, (firstindex(arr)+1):lastindex(arr))
