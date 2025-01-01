@@ -1,3 +1,74 @@
+abstract type SphericalHarmonics{D, L} <: CompositeFunction end
+
+abstract type RealSolidHarmonics{D, L} <: SphericalHarmonics{D, L} end
+
+
+azimuthalNumOf(::SphericalHarmonics{<:Any, L}) where {L} = L
+
+
+struct WeakComp{N, S} # Weak composition of an integer S
+    tuple::NTuple{N, Int}
+
+    function WeakComp(t::NonEmptyTuple{Int, M}) where {M}
+        if any(i < 0 for i in t)
+            throw(DomainError(t, "The element(s) of `t` should all be non-negative."))
+        end
+        new{M+1, sum(t)}(t)
+    end
+end
+
+
+struct CartSHarmonics{D, L} <: RealSolidHarmonics{D, L}
+    m::WeakComp{D, L}
+end
+
+CartSHarmonics(t::NonEmptyTuple{Int}) = (CartSHarmonics∘WeakComp)(t)
+
+function evalCartSHarmonicsCore(::Val{D}, m::WeakComp{D, L}, 
+                                dr::NTuple{D, Real}) where {D, L}
+    prod(abs.(dr) .^ m.tuple)
+end
+
+(csh::CartSHarmonics{D, L})(dr::NTuple{D, Real}) where {D, L} = 
+evalCartSHarmonicsCore(Val(D), csh.m, dr)
+
+
+struct PureSHarmonics{D, L} <: RealSolidHarmonics{D, L}
+    m::Int
+end
+
+function (psh::PureSHarmonics{D, L})(r::NTuple{D, Real}) where {D, L}
+    evalPureSHarmonicsCore(Val(D), L, psh.m, r)
+end
+
+
+function get3DimCtoPSHarmonicsCoeffN(::Val{L}, m::Int, ::Type{T}=Float64) where {T<:Real, L}
+    T(1) / (2^abs(m) * factorial(L)) * 
+    sqrt( T(2) * factorial(L + abs(m)) * factorial(L - abs(m)) / (1 + m==0) )
+end
+
+function get3DimCtoPSHarmonicsCoeffC(::Val{L}, (m, t, u, v)::NTuple{4, Int}, 
+                                     vm::Real, ::Type{T}=Float64) where {T<:Real, L}
+    ifelse(isodd(t + v - vm), -1, 1) * (T(1) / 4)^t * 
+    binomial(l, t) * binomial(l-t, abs(m)+t) * binomial(t, u) * binomial(abs(m), 2v)
+end
+
+
+function evalPureSHarmonicsCore(::Val{3}, l::Int, m::Int, r::NTuple{3, Real})
+    res = T(0)
+    vm = ifelse(m<0, T(1)/2, T(0))
+    for t in 0:( (l-abs(m))/2 ), u in 1:t, v in vm:( (abs(m)/2 - vm) + vm )
+        m = WeakComp( (2t+abs(m)-2(u+v), 2(u+v), l-2t-abs(m)) )
+        res += get3DimCtoPSHarmonicsCoeffC(Val(3), (m, t, u, v), vm, T) * 
+               evalCartSHarmonicsCore(Val(3), m, r)
+    end
+    res * get3DimCtoPSHarmonicsCoeffN(l, m, T)
+end
+
+#########################################################
+
+# Clebsch–Gordan coefficients & angular momentum addition
+
 function check1j1m(j, m)
     if j < 0 || !isinteger(2j) || abs(m) > j || !isinteger(2m)
         (throw∘DomainError)((j, m), 

@@ -1,4 +1,4 @@
-export hasEqual, hasIdentical, hasApprox, flatten, markUnique, getUnique!, itself
+export hasEqual, hasIdentical, hasApprox, markUnique, getUnique!, itself
 
 using Statistics: std, mean
 using LinearAlgebra: norm
@@ -43,12 +43,12 @@ end
 
 Return the absolute precision tolerance of the input real number type `T`.
 """
-getAtolVal(::Type{T}) where {T<:Real} = ceil(numEps(T)*1.5, sigdigits=1)
+getAtolVal(::Type{T}) where {T<:Real} = ceil(3numEps(T)/2, sigdigits=1)
 getAtolVal(::Type{T}) where {T<:Integer} = one(T)
 
 
 function roundToMultiOfStep(num::T, step::T) where {T<:Real}
-    if isnan(step)
+    if iszero(step) || isnan(step)
         num
     else
         invStep = inv(step)
@@ -56,7 +56,12 @@ function roundToMultiOfStep(num::T, step::T) where {T<:Real}
     end
 end
 
-roundToMultiOfStep(num::T, step::T) where {T<:Integer} = round(T, num/step) * step
+function roundToMultiOfStep(num::T, step::T) where {T<:Integer}
+    iszero(step) ? num : round(T, num/step) * step
+end
+
+roundToMultiOfStep(nums::AbstractArray{T}, step::T) where {T} = 
+roundToMultiOfStep.(nums, step)
 
 
 nearestHalfOf(val::T) where {T<:Real} = 
@@ -65,8 +70,8 @@ roundToMultiOfStep(val/2, floor(numEps(T), sigdigits=1))
 nearestHalfOf(val::Integer) = itself(val)
 
 
-getNearestMid(num1::T, num2::T, atol::Real) where {T} = 
-(isnan(atol) || num1==num2) ? num1 : roundToMultiOfStep((num1+num2)/2, atol)
+getNearestMid(num1::T, num2::T, atol::T) where {T} = 
+num1==num2 ? num1 : roundToMultiOfStep((num1+num2)/2, atol)
 
 
 function isApprox(x::T, y::T; atol=0) where {T}
@@ -193,7 +198,7 @@ end
 hasBoolRelation(boolOp::Function, obj1::F1, obj2::F2; 
                 ignoreFunction::Bool=false, ignoreContainer::Bool=false, 
                 decomposeNumberCollection::Bool=false) where 
-               {StructuredFunction<:F1<:Function, StructuredFunction<:F2<:Function} = 
+               {CompositeFunction<:F1<:Function, CompositeFunction<:F2<:Function} = 
 ifelse(ignoreFunction, true, boolOp(obj1, obj2))
 
 hasBoolRelation(boolOp::Function, obj1::Number, obj2::Number; 
@@ -226,7 +231,7 @@ function hasBoolRelation(boolOp::F,
     end
     res
 end
-## Refer overload for `ParamBox` to Overload.jl.
+## Refer overload for `ParamToken` to Overload.jl.
 
 """
 
@@ -449,58 +454,56 @@ end
 
 
 """
-    flatten(a::Tuple) -> Tuple
 
-    flatten(a::AbstractVector) -> AbstractVector
-
-Flatten `a::Union{AbstractVector, Tuple}` that contains `AbstractArray`s and/or `Tuple`s. 
-Only operate on the outermost container.
+    flatVectorizeCore(a::Union{AbstractArray, Tuple, NamedTuple}) -> AbstractVector
 
 ≡≡≡ Example(s) ≡≡≡
 
 ```jldoctest; setup = :(push!(LOAD_PATH, "../../src/"); using Quiqbox)
-julia> flatten((:one, 2, [3, 4.0], ([5], "six"), "7"))
-(:one, 2, 3.0, 4.0, [5], "six", "7")
-
-julia> flatten([:one, 2, [3, 4.0], ([5], "six"), "7"])
-7-element Vector{Any}:
-  :one
- 2
- 3.0
- 4.0
-  [5]
-  "six"
-  "7"
+julia> flatVectorize([:one, 2, ([3, [:four, (five=5, six=6)]], "7"), "8", (9.0, 10)])
+10-element Vector{Any}:
+   :one
+  2
+  3
+   :four
+  5
+  6
+   "7"
+   "8"
+  9.0
+ 10.0
 ```
 """
-function flatten(c::AbstractVector{T}) where {T}
-    c2 = map( x->(x isa Union{AbstractArray, Tuple} ? x : (x,)), c )
-    [(c2...)...]
+flatVectorizeCore(a::Any) = fill(a)
+flatVectorizeCore(a::AbstractArray) = vec(a)
+flatVectorizeCore(a::Union{Tuple, NamedTuple}) = collect(a)
+
+const CollectionType = Union{Tuple, NamedTuple, AbstractArray}
+
+function flatVectorize(a::CollectionType)
+    if isempty(a)
+        Union{}[]
+    else
+        mapreduce(vcat, a) do i
+            if i isa CollectionType
+                flatVectorize(i)
+            else
+                flatVectorizeCore(i)
+            end
+        end |> flatVectorizeCore
+    end
 end
-
-function flatten(c::Tuple)
-    c2 = map( x->(x isa Union{AbstractArray, Tuple} ? x : (x,)), c )
-    ((c2...)...,)
-end
-
-flatten(c::AbstractVector{<:Tuple}) = joinTuple(c...) |> collect
-
-joinTuple(t1::Tuple, t2::Tuple, t3::Tuple...) = (t1..., joinTuple(t2, t3...)...)
-
-joinTuple(t::Tuple) = itself(t)
 
 
 """
 
-    markUnique(arr::AbstractArray{T}, args...; 
-               compareFunction::Function=hasEqual, kws...) where {T} -> 
+    markUnique(arr::AbstractArray{T}; compareFunction::Function=isequal) where {T} -> 
     Tuple{Vector{Int}, Vector{T}}
 
 Return a `Vector{Int}` whose elements are indices to mark the elements inside `arr` such 
 that same element will be marked with same index, and a `Vector{T}` containing all the 
 unique elements. The definition of "unique" (or "same") is based on `compareFunction` 
-which is set to [`hasEqual`](@ref) in default. `args` and `kws` are placeholders for the 
-positional arguments and keyword arguments for `compareFunction` respectively.
+which is set to `Base.isequal` in default.
 
 ≡≡≡ Example(s) ≡≡≡
 
@@ -530,27 +533,49 @@ end
 ([1, 1, 2, 1], S[S(1, 2.0), S(1, 2.1)])
 ```
 """
-function markUnique(arr::AbstractArray{T}, args...; 
-                    compareFunction::F=hasEqual, kws...) where {T<:Any, F<:Function}
-    isempty(arr) && (return arr, T[])
-    f = (a, b) -> compareFunction(a, b, args...; kws...)
-    res = Int[1]
-    cmprList = T[first(arr)]
-    for ele in view(arr, (firstindex(arr)+1):lastindex(arr))
-        j = firstindex(cmprList)
+function markUnique(arr::AbstractArray{T}; compareFunction::F=isequal) where 
+                   {T, F<:Function}
+    cmprList = T[]
+    isempty(arr) && (return arr, cmprList)
+    sizehint!(cmprList, length(arr))
+    markList = markUniqueCore!(compareFunction, cmprList, arr)
+    markList, cmprList
+end
+
+function markUnique(tpl::Tuple{Vararg{Any, N}}; compareFunction::F=isequal) where 
+                   {N, F<:Function}
+    isempty(tpl) && (return tpl, ())
+    cmprList = eltype(tpl)[]
+    sizehint!(cmprList, N)
+    markList = markUniqueCore!(compareFunction, cmprList, tpl)
+    markList, Tuple(cmprList)
+end
+
+function markUnique((a, b)::NTuple{2, Any}; compareFunction::F=isequal) where {F<:Function}
+    if compareFunction(a, b)
+        (1, 1), (a,)
+    else
+        (1, 2), (a, b)
+    end
+end
+
+function markUniqueCore!(compareFunc::F, compressedSeq::AbstractVector, 
+                         sequence::NonEmpTplOrAbtArr) where {F<:Function}
+    map(sequence) do ele
+        j = firstindex(compressedSeq)
         isNew = true
-        while j <= lastindex(cmprList)
-            if f(cmprList[j], ele)
+        while j <= lastindex(compressedSeq)
+            if compareFunc(compressedSeq[j], ele)
                 isNew = false
                 break
             end
             j += 1
         end
-        push!(res, j)
-        isNew && push!(cmprList, ele)
+        isNew && push!(compressedSeq, ele)
+        j
     end
-    res, cmprList
 end
+
 
 """
 
@@ -583,7 +608,7 @@ julia> arr
 function getUnique!(arr::AbstractVector{T}, args...; 
                     compareFunction::F = hasEqual, kws...) where {T<:Any, F<:Function}
     isempty(arr) && (return arr)
-    f = (a, b) -> compareFunction(a, b, args...; kws...)
+    f = (a, b) -> compareFunction(a, b)
     cmprList = T[arr[1]]
     delList = Bool[false]
     for ele in view(arr, (firstindex(arr)+1):lastindex(arr))
@@ -609,9 +634,13 @@ A dummy function that returns its argument.
 """
 @inline itself(x) = x
 
-const iT = typeof(itself)
+const ItsType = typeof(itself)
+
+const ItsTalike = Union{ItsType, typeof(identity)}
 
 @inline themselves(xs::Vararg) = xs
+
+const FOfThem = typeof(themselves)
 
 
 """
@@ -720,17 +749,17 @@ end
 getFunc(f::Function, _=missing) = itself(f)
 
 
-nameOf(f::StructuredFunction) = typeof(f)
+nameOf(f::CompositeFunction) = typeof(f)
 
 nameOf(f) = nameof(f)
 
 
-function arrayDiffCore!(vs::NTuple{N, Array{T}}) where {N, T}
+function arrayDiffCore!(vs::Tuple{Array{T}, Array{T}, Vararg{Array{T}, N}}) where {N, T}
     head = vs[argmin(length.(vs))]
     coms = T[]
     l = length(head)
     i = 0
-    ids = Array{Int}(undef, N)
+    ids = Array{Int}(undef, N+2)
     while i < l
         i += 1
         ele = head[i]
@@ -758,7 +787,7 @@ function arrayDiffCore!((v1, v2)::NTuple{2, Array{T}}) where {T}
         i += 1
         j = findfirst(isequal(v1[i]), v2)
         if j !== nothing
-            popat!(v1, i)
+            popat!(v1, i) 
             push!(coms, popat!(v2, j))
             i -= 1
             l -= 1
@@ -767,22 +796,28 @@ function arrayDiffCore!((v1, v2)::NTuple{2, Array{T}}) where {T}
     coms, v1, v2
 end
 
-tupleDiff(ts::Vararg{NTuple{<:Any, T}}) where {T} = arrayDiffCore!(ts .|> collect)
+tupleDiff(t::NonEmptyTuple{T}, ts::NonEmptyTuple{T}...) where {T} = 
+arrayDiffCore!((t, ts...) .|> collect)
 
 
-function genIndex(index::Int)
-    index < 0 && throw(DomainError(index, "`index` should be non-negative."))
-    genIndexCore(index)
-end
+# function genIndex(index::Int)
+#     index < 0 && throw(DomainError(index, "`index` should be non-negative."))
+#     genIndexCore(index)
+# end
 
+genIndexCore(index) = RefVal{Union{Int, Nothing}}(index)
+genIndex(index::Int) = genIndexCore(index)
 genIndex(::Nothing) = genIndexCore(nothing)
 genIndex() = genIndex(nothing)
 
-function genIndexCore(index)
-    res = reshape(Union{Int, Nothing}[0], ()) |> collect
-    res[] = index
-    res
-end
+deref(a) = getindex(a)
+deref(::Nothing) = nothing
+
+# function genArray0D(::Type{T}, val) where {T}
+#     res = reshape(T[0], ()) |> collect
+#     res[] = val
+#     res
+# end
 
 function genNamedTupleC(name::Symbol, defaultVars::AbstractVector)
     @inline function (t::T) where {T<:NamedTuple}
@@ -839,10 +874,10 @@ Tuple(coords)
 uniCallFunc(f::F, argsOrder::NTuple{N, Int}, args...) where {F<:Function, N} = 
 f(getindex.(Ref(args), argsOrder)...)
 
-
-function mergeMultiObjs(::Type{T}, merge2Ofunc::F, o1::T, o2::T, o3::T, o4::T...; 
+#! TODO: Find best merge algorithm
+function mergeMultiObjs(::Type{T}, merge2Ofunc::F, os::AbstractArray{<:T}; 
                         kws...) where {T, F<:Function}
-    arr1 = T[o1, o2, o3, o4...]
+    arr1 = (collect∘vec)(a)
     arr2 = T[]
     while length(arr1) >= 1
         i = 1
@@ -899,7 +934,7 @@ lazyCollect(@nospecialize o::Any) = collect(o)
 asymSign(a::Real) = ifelse(a<0, -1, 1)
 
 
-mutable struct FuncArgConfig{F<:Function} <: ConfigBox{Any, FuncArgConfig, F}
+mutable struct FuncArgConfig{F<:Function} <: ConfigBox
     posArgs::Vector{<:Any}
     keyArgs::Vector{<:Pair{Symbol}}
 end
@@ -965,17 +1000,17 @@ fastIsApprox(x::T1, y::T2=0.0) where {T1, T2} = abs(x - y) < 2(numEps∘promote_
 triMatEleNum(n::Int) = n * (n + 1) ÷ 2
 
 
-function convert1DidxTo2D(n::Int, k::Int)
+function convert1DidxTo2D(n::Int, k::Int) # {for j in 1:n, i=1:j} <=> {for k in 1:n(n+1)/2}
     bl = iseven(n)
     nRow = n + bl
-    j, i = fldmod1(k, nRow)
-    if j > i - bl
-        i = n - i + 1
-        j = n - j + 2 - bl
+    i, j = fldmod1(k, nRow)
+    if i > j - bl
+        j = n - j + 1
+        i = n - i + 2 - bl
     else
-        i -= bl
+        j -= bl
     end
-    i, j
+    j, i
 end
 
 
@@ -1033,3 +1068,91 @@ n1Power(x::Int) = ifelse(isodd(x), -1, 1)
 n1Power(x::Int, ::Type{T}) where {T} = ifelse(isodd(x), T(-1), T(1))
 n1Power(x::NTuple{N, Int}) where {N} = (n1Power∘sum)(x)
 n1Power(x::NTuple{N, Int}, ::Type{T}) where {N, T} = n1Power(sum(x), T)
+
+# reduceTwoBy(compareFunc::F, o1, o2) where {F<:Function} = 
+# compareFunc(o1, o2) ? [o1] : [o1, o2]
+
+
+struct SplitArg{N, F<:Function} <: Function
+    f::F
+
+    SplitArg{N}(f::F) where {N, F} = new{N, F}(f)
+end
+
+(f::SplitArg{N, F})(arg::AbstractArray) where {N, F} = f.f(arg[begin:begin+(N-1)]...)
+
+function getTypeParam(::Type{T}, idx::Int, default=Any) where {T}
+    hasproperty(T, :parameters) ? T.parameters[idx] : default
+end
+
+function genParamTypeVector(::Type{PT1}, ::Type{PT2}, idx::Int=1) where {PT1, PT2}
+    T = getTypeParam(PT1, idx)
+    ifelse(T===Any, PT2[], PT2{numT}[])
+end
+
+# packElementalVal(::Val{0}, obj::Any) = fill(obj)
+# packElementalVal(::Val{0}, obj::AbtArray0D) = copy(obj)
+# packElementalVal(::Val{N}, obj::AbstractArray{<:Any, N}) where {N} = copy(obj)
+# packElementalVal(::Type{U}, obj::U) where {U} = fill(obj)
+# packElementalVal(::Type{U}, obj::AbstractArray{<:U}) where {U} = copy(obj)
+
+# obtainElementalVal(::Type{U}, obj::AbtArray0D{<:U}) where {U} = obj[]
+# obtainElementalVal(::Type{U}, obj::AbstractArray{<:U}) where {U} = copy(obj)
+
+getMemory(obj::Memory) = itself(obj)
+
+function getMemory(obj::AbstractArray{T}) where {T}
+    arr = vec(isconcretetype(T) || isempty(obj) ? obj : itself.(obj))
+    Memory{eltype(arr)}(arr)
+end
+
+getMemory(obj::Tuple) = (getMemory∘collect)(obj)
+
+
+function registerObjFrequency(objs::AbstractVector)
+    ofDict = Dict(objs .=> 0)
+    map(objs) do m
+        times = if haskey(ofDict, m)
+            ofDict[m] += 1
+        else
+            get!(ofDict, m, 1)
+        end
+        (m, times)
+    end
+end
+
+
+function intersectMultisetsCore!(transformation::F, 
+                                 s1::AbstractVector{T}, s2::AbstractVector) where 
+                                {T, F<:Function}
+    sMkr1 = map(transformation, s1)
+    sMkr2 = map(transformation, s2)
+
+    sMkr1Counted = registerObjFrequency(sMkr1)
+    sMkr2Counted = registerObjFrequency(sMkr2)
+
+    sMkrMutual = intersect(sMkr1Counted, sMkr2Counted)
+
+    if !isempty(sMkrMutual)
+        sMkr1cDict = Dict(sMkr1Counted .=> eachindex(sMkr1))
+        sMkr2cDict = Dict(sMkr2Counted .=> eachindex(sMkr2))
+        i1 = getindex.(Ref(sMkr1cDict), sMkrMutual)
+        i2 = getindex.(Ref(sMkr2cDict), sMkrMutual)
+        deleteat!(s2, sort(i2))
+        splice!(s1, sort(i1))
+    else
+        similar(s1, 0)
+    end
+end
+
+# If `x==y` is `true`, `transformation(x)==transformation(y)` should always return `true`.
+function intersectMultisets!(s1::AbstractVector{T1}, s2::AbstractVector{T2}; 
+                             transformation::F=itself) where {T1, T2, F}
+    if s1 === s2
+        res = copy(s1)
+        empty!(s1)
+        res
+    else
+        intersectMultisetsCore!(transformation, s1, s2)
+    end
+end
