@@ -2,9 +2,10 @@ module Quiqbox
 
 include("Types.jl")
 include("Traits.jl")
+include("Layout.jl")
 
 include("Tools.jl")
-include("Formulae.jl")
+# include("Formulae.jl")
 include("StringIO.jl")
 include("Exception.jl")
 include("ParallelUtils.jl")
@@ -19,7 +20,7 @@ include("Graphs.jl")
 
 include("Angular.jl")
 include("Spatial.jl")
-# include("Basis.jl")
+include("SpatialBasis.jl")
 # include("HartreeFock.jl")
 # include("Differentiation.jl")
 # include("Box.jl")
@@ -28,6 +29,11 @@ include("Spatial.jl")
 # include("Overload.jl")
 
 # include("Integrals/Core.jl")
+include("Integrals/Frameworks/OneBody.jl")
+include("Integrals/Frameworks/Numerical.jl")
+include("Integrals/GaussianOrbitals.jl")
+include("Integrals/Interface.jl")
+
 # include("Integrals/OneBody.jl")
 # include("Integrals/TwoBody.jl")
 
