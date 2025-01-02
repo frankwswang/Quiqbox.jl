@@ -286,11 +286,15 @@ end
 hash(bb::BlackBox, hashCode::UInt) = hash(objectid(bb.value), hashCode)
 
 
-function canDirectlyStore(::T) where {T}
+function canDirectlyStore(::Type{T}) where {T}
     isbitstype(T) || isprimitivetype(T) || issingletontype(T)
 end
 
-canDirectlyStore(::Union{String, Type, Symbol}) = true
+canDirectlyStore(::Type{Symbol}) = true
+
+canDirectlyStore(::Type{String}) = true
+
+canDirectlyStore(::T) where {T} = canDirectlyStore(T)
 
 const DefaultIdentifierCacheSizeLimit = 500
 
