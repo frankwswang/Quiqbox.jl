@@ -286,15 +286,17 @@ end
 hash(bb::BlackBox, hashCode::UInt) = hash(objectid(bb.value), hashCode)
 
 
-function canDirectlyStore(::Type{T}) where {T}
+function canDirectlyStoreInstanceOf(::Type{T}) where {T}
     isbitstype(T) || isprimitivetype(T) || issingletontype(T)
 end
 
-canDirectlyStore(::Type{Symbol}) = true
+canDirectlyStoreInstanceOf(::Type{Symbol}) = true
 
-canDirectlyStore(::Type{String}) = true
+canDirectlyStoreInstanceOf(::Type{String}) = true
 
-canDirectlyStore(::T) where {T} = canDirectlyStore(T)
+canDirectlyStore(::T) where {T} = canDirectlyStoreInstanceOf(T)
+
+canDirectlyStore(::Type) = true
 
 const DefaultIdentifierCacheSizeLimit = 500
 
@@ -445,11 +447,11 @@ end
 
 function isPrimVarCollection(arg::AbstractArray{T}) where {T}
     ET = isconcretetype(T) ? T : eltype( map(itself, arg) )
-    canDirectlyStore(ET)
+    canDirectlyStoreInstanceOf(ET)
 end
 
 function isPrimVarCollection(arg::Tuple)
-    all((canDirectlyStore∘typeof)(i) for i in arg)
+    all((canDirectlyStoreInstanceOf∘typeof)(i) for i in arg)
 end
 
 
