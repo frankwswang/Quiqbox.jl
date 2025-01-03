@@ -116,24 +116,24 @@ const Filtered{T} = Union{T, FilteredObject{T}}
 const FilteredVecOfArr{T} = Filtered{<:AbtVecOfAbtArr{T}}
 
 
-getFieldCore(obj, ::AllPassPointer) = itself(obj)
-
-getFieldCore(obj, ::FirstIndex) = first(obj)
+getFieldCore(obj, entry::Int) = getindex(obj, entry)
 
 getFieldCore(obj, entry::Symbol) = getfield(obj, entry)
 
-getFieldCore(obj, entry::Int) = getindex(obj, entry)
+getFieldCore(obj, ::FirstIndex) = first(obj)
 
 getFieldCore(obj, ::Nothing) = getindex(obj)
 
-getFieldCore(obj, ptr::ChainPointer) = foldl(getFieldCore, ptr.chain, init=obj)
+getFieldCore(obj, ::AllPassPointer) = itself(obj)
 
-getField(obj, ptr::GeneralFieldName) = getFieldCore(obj, ptr)
+getFieldCore(obj, ptr::ChainPointer) = foldl(getField, ptr.chain, init=obj)
 
-getField(obj, ptr::EntryPointer) = getFieldCore(obj, ptr)
+getField(obj, ptr::Union{EntryPointer, GeneralFieldName}) = getFieldCore(obj, ptr)
+
+getField(ptr::ChainPointer, idx::GeneralFieldName) = ChainPointer(ptr, ChainPointer(idx))
 
 function getField(obj::FilteredObject, ptr::EntryPointer)
-    getFieldCore(obj.obj, getField(obj.ptr, ptr))
+    getField(obj.obj, getField(obj.ptr, ptr))
 end
 
 function getField(scope::ChainFilter, ptr::EntryPointer)
