@@ -294,6 +294,8 @@ canDirectlyStoreInstanceOf(::Type{Symbol}) = true
 
 canDirectlyStoreInstanceOf(::Type{String}) = true
 
+canDirectlyStoreInstanceOf(::Type{<:IdentityMarker}) = true
+
 canDirectlyStore(::T) where {T} = canDirectlyStoreInstanceOf(T)
 
 canDirectlyStore(::Type) = true
@@ -451,7 +453,7 @@ function isPrimVarCollection(arg::AbstractArray{T}) where {T}
 end
 
 function isPrimVarCollection(arg::Tuple)
-    all((canDirectlyStoreInstanceOf∘typeof)(i) for i in arg)
+    all(canDirectlyStore(i) for i in arg)
 end
 
 
