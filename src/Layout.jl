@@ -94,7 +94,7 @@ ChainFilter(obj::ChainFilter) = itself(obj)
 ChainFilter(obj::PointerStack) = ChainFilter((obj,))
 
 
-struct AwaitFilter{P<:PointerStack} <: StaticPointer
+struct AwaitFilter{P<:PointerStack} <: StaticPointer{P}
     ptr::P
 end
 
@@ -111,6 +111,9 @@ FilteredObject(obj.obj, ChainFilter(obj.ptr, ptr))
 FilteredObject(obj, ptr::PointerStack) = FilteredObject(obj, ChainFilter(ptr))
 
 FilteredObject(obj, ptr::AwaitFilter) = FilteredObject(obj, ptr.ptr)
+
+const Filtered{T} = Union{T, FilteredObject{T}}
+const FilteredVecOfArr{T} = Filtered{<:AbtVecOfAbtArr{T}}
 
 
 getFieldCore(obj, ::AllPassPointer) = itself(obj)
