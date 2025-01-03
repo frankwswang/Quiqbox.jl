@@ -1146,9 +1146,9 @@ end
 # const OSpCJParam{T, O} = CachedJParam{T, 0, O}
 
 
-struct ParamMarker{T, N, O, L} <: IdentityMarker{JaggedParam{T, N, O}}
+struct ParamMarker{T, N, O} <: IdentityMarker{JaggedParam{T, N, O}}
     code::UInt
-    data::NTuple{L, IdentityMarker}
+    data::IdentityMarker
     func::IdentityMarker
     meta::Tuple{ValMkrPair{<:Union{T, Nothing}}, ValMkrPair{Int}, ValMkrPair{Symbol}}
 
@@ -1168,32 +1168,42 @@ struct ParamMarker{T, N, O, L} <: IdentityMarker{JaggedParam{T, N, O}}
         func = markObj((P <: ParamFunctor && sl == 0) ? p.lambda : nothing)
         code = hash(func, code)
 
-        data =  makeParamDataMarkers(p)
-        code = leftFoldHash(data, code)
+        data = markParam(p)
+        code = hash(data.code, code)
 
-        new{T, N, O, length(data)}(code, data, func, meta)
+        new{T, N, O}(code, data, func, meta)
     end
 end
 
-function makeParamDataMarkers(p::PrimitiveParam)
-    (Identifier(p.input),)
+function markParam(input::NonEmptyTuple{ParamBox}, refParam::JaggedParam)
+    markObj( markParam.(input, Ref(refParam)) )
 end
 
-function makeParamDataMarkers(p::ParamFunctor)
-    if screenLevelOf(p) > 0
-        (Identifier(p.memory),)
+function markParam(input::ParamBoxUnionArr, ::JaggedParam)
+    markObj(input)
+end
+
+function markParam(param::PrimitiveParam, ::JaggedParam)
+    Identifier(param.input)
+end
+
+function markParam(param::ParamFunctor, refParam::JaggedParam)
+    if screenLevelOf(param) > 0 || param === refParam
+        Identifier(param.memory)
     else
-        markObj.(p.input)
+        markParam(param.input, refParam)
     end
 end
 
-function makeParamDataMarkers(p::ParamNest)
-    (markObj(p.input),)
+function markParam(param::ParamNest, refParam::JaggedParam)
+    markParam(param.input, refParam)
 end
 
-function makeParamDataMarkers(p::KnotParam)
-    markObj.((first(p.input), p.index))
+function markParam(param::KnotParam, refParam::JaggedParam)
+    markObj((markParam(first(param.input), refParam), param.index))
 end
+
+markParam(param::JaggedParam) = markParam(param, param)
 
 markObj(input::JaggedParam) = ParamMarker(input)
 
