@@ -163,29 +163,29 @@ function preparePGTOconfig(orb::PrimGTOcore)
     cenIds, xpnIdx, ang
 end
 
-struct OverlapGTOself{T, D} <: Function
+struct OverlapGTOrbSelf{T, D} <: OrbitalIntegrator{T, D}
     xpn::FlatPSetInnerPtr{T}
     ang::NTuple{D, Int}
 end
 
-function (f::OverlapGTOself{T})(pars::AbtVecOfAbtArr{T}) where {T}
+function (f::OverlapGTOrbSelf{T})(pars::FilteredVecOfArr{T}) where {T}
     xpnVal = getField(pars, f.xpn)
     overlapPGTO(xpnVal, f.ang)
 end
 
-function genGTOverlapFunc((orb,)::Tuple{PrimGTOcore{T, D}}) where {T, D}
+function genGTOrbOverlapFunc((orb,)::Tuple{PrimGTOcore{T, D}}) where {T, D}
     _, xpnIdx, ang = preparePGTOconfig(orb)
-    OverlapGTOself(xpnIdx, ang)
+    OverlapGTOrbSelf(xpnIdx, ang)
 end
 
-struct OverlapGTOpair{T, D} <: Function
+struct OverlapGTOrbPair{T, D} <: OrbitalIntegrator{T, D}
     cen::NTuple{2, NTuple{ D, FlatPSetInnerPtr{T} }}
     xpn::NTuple{2, FlatPSetInnerPtr{T}}
     ang::NTuple{2, NTuple{D, Int}}
 end
 
-function (f::OverlapGTOpair{T})(pars1::AbtVecOfAbtArr{T}, 
-                                pars2::AbtVecOfAbtArr{T}) where {T}
+function (f::OverlapGTOrbPair{T})(pars1::FilteredVecOfArr{T}, 
+                                  pars2::FilteredVecOfArr{T}) where {T}
     cen1 = getField(pars1, f.cen[1])
     cen2 = getField(pars2, f.cen[2])
     xpn1 = getField(pars1, f.xpn[1])
@@ -193,7 +193,12 @@ function (f::OverlapGTOpair{T})(pars1::AbtVecOfAbtArr{T},
     overlapPGTO(CenPair(cen1, cen2), XpnPair(xpn1, xpn2), AngPair(f.ang...))
 end
 
-function genGTOverlapFunc(orbs::NTuple{2, PrimGTOcore{T, D}}) where {T, D}
+function genGTOrbOverlapFunc(orbs::NTuple{2, PrimGTOcore{T, D}}) where {T, D}
     configs = preparePGTOconfig.(orbs)
-    OverlapGTOpair(getindex.(configs, 1), getindex.(configs, 2), getindex.(configs, 3))
+    OverlapGTOrbPair(getindex.(configs, 1), getindex.(configs, 2), getindex.(configs, 3))
+end
+
+
+function buildNormalizerCore(o::PrimGTOcore{T, D}) where {T, D}
+    genGTOrbOverlapFunc((o,))
 end

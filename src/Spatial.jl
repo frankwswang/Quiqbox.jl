@@ -4,9 +4,9 @@ using LinearAlgebra
 
 (f::FieldAmplitude)(x) = evalFunc(f, x)
 
-abstract type EvalDimensionalKernel{T, D, F} <: TypedEvaluator{T, F} end
+abstract type EvalFieldFunction{T, D, F} <: EvalDimensionalFunc{T, D, F} end
 
-abstract type EvalFieldAmp{T, D, F} <: EvalDimensionalKernel{T, D, F} end
+abstract type EvalFieldAmp{T, D, F} <: EvalFieldFunction{T, D, F} end
 
 (f::EvalFieldAmp)(input, param) = 
 f.f(formatInput(SelectTrait{InputStyle}()(f), input), param)

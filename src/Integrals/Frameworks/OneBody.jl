@@ -20,7 +20,7 @@ end
 
 function getNormCoeff!(cache::DimSpanDataCacheBox{T}, orb::FrameworkOrb{T, D}, 
                        degree::Int) where {T, D}
-    ptr = ChainPointer((:core, :f, :apply, :right))
+    ptr = ChainPointer((:core, :f, :apply, :right, :f))
     normalizer = getField(orb, ptr)
     normCoeff = getNormCoeffCore!(cache, FilteredObject(orb.param, orb.pointer.scope), 
                                   normalizer)
@@ -29,14 +29,9 @@ end
 
 
 function getNormCoeffCore!(cache::DimSpanDataCacheBox{T}, pSource::TypedParamInput{T}, 
-                           normalizer::ReturnTyped{T}) where {T}
+                           normalizer::EvalOrbNormalizer{T}) where {T}
     paramVal = cacheParam!(cache, pSource)
-    normalizer.f(nothing, paramVal)::T
-end
-
-function getNormCoeffCore!(::DimSpanDataCacheBox{T}, ::TypedParamInput{T}, 
-                           normalizer::Storage{T}) where {T}
-    normalizer.val
+    normalizer.f(paramVal)::T
 end
 
 

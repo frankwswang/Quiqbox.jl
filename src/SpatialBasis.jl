@@ -4,18 +4,69 @@ abstract type ComposedOrb{T, D, B} <: OrbitalBasis{T, D, B} end
 
 abstract type UnpackedOrb{T, D, B} <: OrbitalBasis{T, D, B} end
 
-abstract type EvalComposedOrb{T, D, B} <: EvalDimensionalKernel{T, D, B} end
+abstract type EvalComposedOrb{T, D, B} <: EvalFieldFunction{T, D, B} end
 
 abstract type ComposedOrbParamPtr{T, D, R} <: FieldParamPointer{R} end
 
 (f::OrbitalBasis)(x) = evalFunc(f, x)
 
-(f::EvalComposedOrb)(input, param) = f.f(input, param)
+(f::EvalComposedOrb)(input, params) = f.f(input, params)
 
+
+struct NormalizePrimOrb{T, D, F<:OrbitalIntegrator{T, D}} <: OrbitalNormalizer{T, D}
+    core::F
+end
+
+(f::NormalizePrimOrb{T})(params::FilteredVecOfArr{T}) where {T} = 
+(AbsSqrtInv∘f.core)(params)
+
+const GetVolumeEntry{T} = GetParamFunc{OnlyBody{GetIndex{T}}, IndexPointer{Volume{T}}}
+
+struct NormalizeCompOrb{T, D, 
+                        F1<:ReturnTyped{ T, <:Union{Unit{T}, OrbitalIntegrator{T, D}} }, 
+                        F2<:ReturnTyped{ T, <:OrbitalIntegrator{T, D} }
+                        } <: OrbitalNormalizer{T, D}
+    core::HermitianContract{T, F1, F2}
+    weight::Memory{ReturnTyped{T, GetVolumeEntry{T}}}
+end
+
+function (f::NormalizeCompOrb{T})(input::FilteredVecOfArr{T}) where {T}
+    weightVals = map(f->f(input), f.weight)
+    res = f.core(input, weightVals)
+    AbsSqrtInv(res)
+end
+
+const OrbNormalizerCore{T, D} = 
+      Union{NormalizePrimOrb{T, D}, NormalizePrimOrb{T, D}, Power{Unit{T}, D}}
+
+struct EvalOrbNormalizer{T, D, F<:OrbNormalizerCore{T, D}} <: DimensionalEvaluator{T, D, F}
+    f::ReturnTyped{T, F}
+end
+
+EvalOrbNormalizer(f::Function, ::Type{T}) where {T} = 
+(EvalOrbNormalizer∘ReturnTyped)(f, T)
+
+EvalOrbNormalizer(::Type{T}, ::Val{D}) where {T, D} = 
+EvalOrbNormalizer(Power(Unit(T), Val(D)), T)
+
+(f::EvalOrbNormalizer)(params) = f.f(params)
+
+
+function unpackParamFunc!(f::ComposedOrb{T, D}, paramSet::FlatParamSet, 
+                          paramSetId::Identifier=Identifier(paramSet)) where {T, D}
+    fEvalCore, _, paramPointer = unpackComposedOrbCore!(f, paramSet, paramSetId)
+    normalizer = f.renormalize ? buildNormalizer(fEvalCore) : buildNormalizer(T, Val(D))
+    fEval = ScaledOrbital(fEvalCore, OnlyBody(normalizer), paramPointer.scope)
+    fEval, paramSet, paramPointer
+end
+
+
+const ParamSubsetApply{F, T} = 
+      ParamFilterFunc{F, Tuple{ AwaitFilter{FlatParamSetFilter{T}} }}
 
 struct ScaledOrbital{T, D, C<:EvalComposedOrb{T, D}, 
                      F<:Function} <: EvalComposedOrb{T, D, C}
-    f::ParamFilterFunc{PairCombine{StableMul{T}, C, F}, AwaitFilter{FlatParamSetFilter{T}}}
+    f::ParamSubsetApply{PairCombine{StableMul{T}, C, OnlyBody{F}}, T}
 end
 
 function ScaledOrbital(orb::EvalComposedOrb{T}, scalar::Function, 
@@ -26,26 +77,7 @@ function ScaledOrbital(orb::EvalComposedOrb{T}, scalar::Function,
 end
 
 
-function normalizeOrbital(fCore::EvalComposedOrb{T, D}, 
-                          paramPointer::ComposedOrbParamPtr{T, D}) where {T, D}
-    normalizerCore = genNormalizer(fCore, paramPointer)
-    ScaledOrbital(fCore, ReturnTyped(normalizerCore, T), paramPointer.scope)
-end
-
-const NormFuncType{T} = Union{ReturnTyped{T}, Storage{T}}
-
-function unpackParamFunc!(f::ComposedOrb{T}, paramSet::FlatParamSet, 
-                          paramSetId::Identifier=Identifier(paramSet)) where {T}
-    fEvalCore, _, paramPointer = unpackComposedOrbCore!(f, paramSet, paramSetId)
-    fEval = if f.renormalize
-        normalizeOrbital(fEvalCore, paramPointer)
-    else
-        ScaledOrbital(fEvalCore, (Storage∘one)(T), paramPointer.scope)
-    end
-    fEval, paramSet, paramPointer
-end
-
-#!! Allow .renormalize mutable
+#? Allow .renormalize mutable
 #! Change .center to the first field
 struct PrimitiveOrb{T, D, B<:FieldAmplitude{T, D}, 
                     C<:NTuple{D, ElementalParam{T}}} <: ComposedOrb{T, D, B}
@@ -72,7 +104,7 @@ struct PrimitiveOrbCore{T, D, B<:EvalFieldAmp{T, D}} <: EvalComposedOrb{T, D, B}
     f::InsertInward{B, OrbShifter{T, D}}
 end
 
-const EvalPrimOrb{T, D, B, F<:NormFuncType{T}} = 
+const EvalPrimOrb{T, D, B, F<:EvalOrbNormalizer{T, D}} = 
       ScaledOrbital{T, D, PrimitiveOrbCore{T, D, B}, F}
 
 const PrimATOcore{T, D, B<:EvalPolyGaussProd{T, D}} = 
@@ -81,7 +113,7 @@ const PrimATOcore{T, D, B<:EvalPolyGaussProd{T, D}} =
 const PrimGTOcore{T, D, B<:EvalPolyGaussProd{T, D}} = 
       PrimitiveOrbCore{T, D, B}
 
-const EvalPrimGTO{T, D, B<:EvalPolyGaussProd{T, D}, F<:NormFuncType{T}} = 
+const EvalPrimGTO{T, D, B<:EvalPolyGaussProd{T, D}, F<:EvalOrbNormalizer{T, D}} = 
       EvalPrimOrb{T, D, B, F}
 
 struct PrimOrbParamPtr{T, D, R<:FieldPtrDict{T}} <: ComposedOrbParamPtr{T, D, R}
@@ -166,6 +198,8 @@ end
 
 function getEffectiveWeight(o::CompositeOrb{T}, weight::FlattenedParam{T, 1}, 
                             idx::Int) where {T}
+    o.renormalize && throw(AssertionError("Merging the weight from a renormalized "*
+                           "`CompositeOrb` with another value is prohibited."))
     len = first(outputSizeOf(o.weight))
     outWeight = indexParam(weight, idx)
     map(i->CellParam(StableBinary(*, T), indexParam(o.weight, i), outWeight, :w), 1:len)
@@ -186,10 +220,8 @@ end
 
 CompositeOrb(ob::CompositeOrb) = itself(ob)
 
-const GetPFWeightEntry{T} = GetParamFunc{OnlyBody{GetIndex{T}}, IndexPointer{Volume{T}}}
-
 const WeightedPF{T, D, U<:EvalPrimOrb{T, D}} = 
-      PairCombine{StableMul{T}, U, GetPFWeightEntry{T}}
+      PairCombine{StableMul{T}, U, GetVolumeEntry{T}}
 
 function compressWeightedPF(::Type{B}, ::Type{F}) where {T, D, B<:EvalFieldAmp{T, D}, F}
     boolF = isconcretetype(B)
@@ -216,17 +248,17 @@ struct CompositeOrbCore{T, D, V<:Memory{<:WeightedPF{T, D}}} <: EvalComposedOrb{
     f::ChainReduce{StableAdd{T}, V}
 end
 
-const EvalCompOrb{T, D, B, F<:NormFuncType{T}} = 
+const EvalCompOrb{T, D, B, F<:EvalOrbNormalizer{T, D}} = 
       ScaledOrbital{T, D, CompositeOrbCore{T, D, B}, F}
 
-const EvalCompGTO{T, D, U<:EvalPrimGTO{T, D}, F<:NormFuncType{T}} = 
+const EvalCompGTO{T, D, U<:EvalPrimGTO{T, D}, F<:EvalOrbNormalizer{T, D}} = 
       EvalCompOrb{T, D, <:Memory{<:WeightedPF{T, D, <:U}}, F}
 
 function restrainEvalOrbType(weightedFs::AbstractVector{<:WeightedPF{T, D}}) where {T, D}
-    cPtrRef = ChainPointer((:left, :f, :apply)) |> Ref
-    fInnerObjs = getField.(weightedFs, cPtrRef)
-    fInnerType = eltype(getField.(fInnerObjs, cPtrRef))
-    nInnerType = eltype(getfield.(fInnerObjs, :right ))
+    cPtr = ChainPointer((:left, :f, :apply))
+    fInnerObjs = map(f->getField(f, cPtr), weightedFs)
+    fInnerType = (eltype∘map)(f->getField(f, cPtr), fInnerObjs)
+    nInnerType = (eltype∘map)(f->getField(f, ChainPointer( (:right, :f) )), fInnerObjs)
     V = compressWeightedPF(fInnerType, nInnerType)
     ChainReduce(StableBinary(+, T), V(weightedFs))
 end
@@ -398,30 +430,83 @@ function genGaussTypeOrb(center::NonEmptyTuple{ParamOrValue{T}, D},
     end
 end
 
-#!! Designed a better wrapper for the normalizer
+
 #!! Designed a one(T) like function: SpecVal{T, F} -> F(T)
 
-function getScalar(orb::FrameworkOrb)
-    orb.core.f.apply.right
+function buildNormalizer(f::PrimitiveOrbCore{T}) where {T}
+    nfInner = (NormalizePrimOrb∘buildNormalizerCore)(f)
+    EvalOrbNormalizer(nfInner, T)
 end
+
+function buildNormalizer(f::CompositeOrbCore{T}) where {T}
+    nfInner = NormalizeCompOrb(f)
+    EvalOrbNormalizer(nfInner, T)
+end
+
+function buildNormalizer(::Type{T}, ::Val{D}) where {T, D}
+    EvalOrbNormalizer(T, Val(D))
+end
+
+function NormalizeCompOrb(f::CompositeOrbCore{T, D}) where {T, D}
+    weightedOrbs = f.f.chain
+    nOrbs = length(weightedOrbs)
+    pOrbs = map(x->x.left, weightedOrbs)
+
+    diagFuncs = Memory{ReturnTyped{T}}(undef, nOrbs)
+    pOrbCores = Memory{PrimitiveOrbCore{T, D}}(undef, nOrbs)
+    pOrbScopes = Memory{AwaitFilter{FlatParamSetFilter{T}}}(undef, nOrbs)
+    for i in eachindex(pOrbs)
+        o = pOrbs[i]
+        oCore = o.f.apply
+        oScope = first(o.f.scope)
+        diagFuncs[i] = if isRenormalized(o)
+            ReturnTyped(Unit(T), T)
+        else
+            nfInner = genOneBodyCoreIntegrator(Identity(), (oCore,))
+            ReturnTyped(ParamFilterFunc(nfInner, oScope), T)
+        end
+        pOrbCores[i] = oCore
+        pOrbScopes[i] = oScope
+    end
+
+    utriFuncs = Memory{ReturnTyped{T}}(undef, nOrbs*(nOrbs-1)÷2)
+    for j in 1:length(utriFuncs)
+        n, m = convert1DidxTo2D(nOrbs-1, j)
+        corePairs = (pOrbCores[begin+m-1], pOrbCores[begin+n-1])
+        nfInner = genOneBodyCoreIntegrator(Identity(), corePairs)
+        filters = (pOrbScopes[begin+m-1], pOrbScopes[begin+n-1])
+        utriFuncs[begin+j-1] = ReturnTyped(ParamFilterFunc(nfInner, filters), T)
+    end
+
+    coreTransform = HermitianContract(map(itself, diagFuncs), map(itself, utriFuncs))
+    getWeights = map(b->ReturnTyped(b.right, T), weightedOrbs)
+    NormalizeCompOrb(coreTransform, getWeights)
+end
+
 
 function isRenormalized(orb::ComposedOrb)
     orb.renormalize
 end
 
 function isRenormalized(orb::FrameworkOrb)
-    (isRenormalizedCore∘getScalar)(orb)
+    isRenormalized(orb.core)
 end
 
-function isRenormalizedCore(orb::Storage)
-    false
+function isRenormalized(orb::Union{EvalPrimOrb, EvalCompOrb})
+    isRenormalizedCore(orb.f.apply.right.f)
 end
 
-function isRenormalizedCore(orb::ReturnTyped)
+function isRenormalizedCore(nf::EvalOrbNormalizer)
+    isRenormalizedCore(nf.f.f)
+end
+
+function isRenormalizedCore(::Union{NormalizePrimOrb, NormalizeCompOrb})
     true
 end
 
-
+function isRenormalizedCore(::Power{<:Unit})
+    false
+end
 
 # struct GaussTypeSubshell{T, D, L, B, O} <: OrbitalBatch{T, D, PolyGaussProd{T, D, L, B}, O}
 #     seed::PolyGaussProd{T, D, L, B}

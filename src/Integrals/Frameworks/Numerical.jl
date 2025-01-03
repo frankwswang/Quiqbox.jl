@@ -33,8 +33,8 @@ function composeOneBodyKernel(::Identity, ::Type{T}, term::F) where {T, F<:Funct
     end
 end
 
-function numericalOneBodyInt(op::F, (orb,)::Tuple{EvalDimensionalKernel{T, D}}, 
-                             (pVal,)::Tuple{AbtVecOfAbtArr{T}}) where 
+function numericalOneBodyInt(op::F, (orb,)::Tuple{EvalFieldFunction{T, D}}, 
+                             (pVal,)::Tuple{FilteredVecOfArr{T}}) where 
                             {F<:DirectOperator, T, D}
     term = Base.Fix2(orb, pVal)
     integrand = changeFuncRange(composeOneBodyKernel(op, T, term), T)
@@ -42,8 +42,8 @@ function numericalOneBodyInt(op::F, (orb,)::Tuple{EvalDimensionalKernel{T, D}},
     numericalIntegration(integrand, (.-(bound), bound))
 end
 
-function numericalOneBodyInt(op::F, orbs::NTuple{2, EvalDimensionalKernel{T, D}}, 
-                             pValPair::NTuple{2, AbtVecOfAbtArr{T}}) where 
+function numericalOneBodyInt(op::F, orbs::NTuple{2, EvalFieldFunction{T, D}}, 
+                             pValPair::NTuple{2, FilteredVecOfArr{T}}) where 
                             {F<:DirectOperator, T, D}
     termL, termR = Base.Fix2.(orbs, pValPair)
     integrand = changeFuncRange(composeOneBodyKernel(op, T, termL, termR), T)
@@ -51,7 +51,37 @@ function numericalOneBodyInt(op::F, orbs::NTuple{2, EvalDimensionalKernel{T, D}}
     numericalIntegration(integrand, (.-(bound), bound))
 end
 
-function genOneBodyPrimIntegrator(op::F, 
+
+struct NumOverlapOrbSelf{T, D, B<:PrimitiveOrbCore{T, D}} <: OrbitalIntegrator{T, D}
+    orb::Tuple{B}
+end
+
+function (f::NumOverlapOrbSelf{T})(pars::FilteredVecOfArr{T}) where {T}
+    numericalOneBodyInt(Identity(), f.orb, (pars,))
+end
+
+struct NumOverlapOrbPair{T, D, B1<:PrimitiveOrbCore{T, D}, 
+                         B2<:PrimitiveOrbCore{T, D}} <: OrbitalIntegrator{T, D}
+    orb::Tuple{B1, B2}
+end
+
+function (f::NumOverlapOrbPair{T})(pars::Vararg{FilteredVecOfArr{T}, 2}) where {T}
+    numericalOneBodyInt(Identity(), f.orb, pars)
+end
+
+genOneBodyCoreIntegrator(::Identity, orbs::Tuple{PrimitiveOrbCore{T, D}}) where {T, D} = 
+NumOverlapOrbSelf(orbs)
+
+genOneBodyCoreIntegrator(::Identity, orbs::NTuple{2, PrimitiveOrbCore{T, D}}) where {T, D} = 
+NumOverlapOrbPair(orbs)
+
+function buildNormalizerCore(o::PrimitiveOrbCore{T, D}) where {T, D}
+    genOneBodyCoreIntegrator(Identity(), (o,))
+end
+
+
+#!! Implement a functional struct (<:OrbitalIntegrator{T, D}) for the closure
+function genOneBodyCoreIntegrator(op::F, 
                                   orbs::NonEmptyTuple{PrimitiveOrbCore{T, D}, N}) where 
                                  {F<:DirectOperator, N, T, D}
     function (pVal::AbtVecOfAbtArr{T}, pVals::Vararg{AbtVecOfAbtArr{T}, N}) where {T}
