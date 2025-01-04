@@ -79,10 +79,8 @@ function AxialProdFunc(b::FieldAmplitude{<:Any, 0}, dim::Int)
     (AxialProdFunc∘Tuple∘fill)(b, dim)
 end
 
-const GetIndex{T} = Base.Fix2{typeof(getField), ChainPointer{Flavor{T}, 1, Tuple{Int}}}
-
 struct EvalAxialProdFunc{T, D, F<:EvalFieldAmp{T, 0}} <: EvalFieldAmp{T, D, AxialProdFunc}
-    f::CountedChainReduce{StableMul{T}, InsertInward{F, OnlyHead{GetIndex{T}}}, D}
+    f::CountedChainReduce{StableMul{T}, InsertInward{F, OnlyHead{ GetFlavor{T} }}, D}
 end
 
 function unpackParamFuncCore!(f::AxialProdFunc{T, D}, paramSet::FlatParamSet) where {T, D}
@@ -91,7 +89,7 @@ function unpackParamFuncCore!(f::AxialProdFunc{T, D}, paramSet::FlatParamSet) wh
         anchor = ChainPointer((:axis, i))
         fInner, _, axialPairs = unpackParamFuncCore!(f.axis[i], paramSet)
         ptr = ChainPointer(i, TensorType(T))
-        fEvalComps[i] = InsertInward(fInner, (OnlyHead∘Base.Fix2)(getField, ptr))
+        fEvalComps[i] = InsertInward(fInner, (OnlyHead∘Retrieve)(ptr))
         map(x->(ChainPointer(anchor, x.first)=>x.second), axialPairs)
     end
     fEvalCore = Tuple(fEvalComps) |> (ChainReduce∘StableBinary)(*, T)

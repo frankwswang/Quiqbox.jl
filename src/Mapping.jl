@@ -66,6 +66,8 @@ struct Retrieve{P<:CompositePointer} <: FunctionComposer
     rule::P
 end
 
+const GetFlavor{T} = Retrieve{IndexPointer{Flavor{T}, 1}}
+
 function (f::Retrieve)(input)
     getField(input, f.rule)
 end
