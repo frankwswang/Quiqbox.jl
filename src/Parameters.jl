@@ -1662,7 +1662,7 @@ MiscParamSet(FlatParamSet(P1[], P2[]), P3[])
 #!  SingleNestParamSet
 #!  DoubleNestParamSet
 const FlatPSetInnerPtr{T} = PointPointer{T, 2, Tuple{FirstIndex, Int}}
-const FlatPSetOuterPtr{T} = IndexPointer{Volume{T}}
+const FlatPSetOuterPtr{T} = IndexPointer{Volume{T}, 1}
 const FlatParamSetIdxPtr{T} = Union{FlatPSetInnerPtr{T}, FlatPSetOuterPtr{T}}
 
 struct FlatParamSetFilter{T} <: PointerStack{1, 2}

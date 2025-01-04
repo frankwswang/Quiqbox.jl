@@ -266,7 +266,7 @@ end
 struct CompOrbParamPtr{T, D, R<:FieldPtrDict{T}, 
                        P<:PrimOrbParamPtr{T, D, <:R}} <: ComposedOrbParamPtr{T, D, R}
     basis::Memory{P}
-    weight::IndexPointer{Volume{T}}
+    weight::IndexPointer{Volume{T}, 1}
     scope::FlatParamSetFilter{T}
     tag::Identifier
 

@@ -46,7 +46,7 @@ const AllPassPointer{A<:TensorType} = ChainPointer{A, 0, Tuple{}}
 
 const TypedPointer{T, A<:TensorType{T}} = ChainPointer{A}
 
-const IndexPointer{A<:TensorType} = ChainPointer{A, 1, Tuple{Int}}
+const IndexPointer{A<:TensorType, N} = ChainPointer{A, N, NTuple{N, Int}}
 
 const PointPointer{T, L, C<:NTuple{L, GeneralFieldName}} = ChainPointer{Flavor{T}, L, C}
 
