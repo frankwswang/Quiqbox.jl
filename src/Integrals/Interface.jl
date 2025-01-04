@@ -110,17 +110,17 @@ function genOneBodyPrimCoreIntPairs(op::DirectOperator,
                                     (indexOffset,)::Tuple{Int}=(0,)) where {T, D}
     iFirst = firstindex(oData)
     nOrbs = length(oData)
-    dIdx = Plus(iFirst - 1)
+    dm = Plus(iFirst - 1)
 
     pairs1 = Memory{Pair{Tuple{Int}, Tuple{T}}}(undef, nOrbs)
     pairs2 = map(1:triMatEleNum(nOrbs)) do l
         n, m = convert1DidxTo2D(nOrbs, l)
         if m == n
-            i = dIdx(m)
+            i = dm(m)
             iiVal = computeOneBodyPrimCoreIntVals(op, oData, i)
             pairs1[begin+n-1] = (i+indexOffset,) => iiVal
         else
-            i, j = sortTensorIndex((m, n)) .|> dIdx
+            i, j = sortTensorIndex((m, n)) .|> dm
             ijValPair = computeOneBodyPrimCoreIntVals(op, oData, (i, j))
             (i+indexOffset, j+indexOffset) => ijValPair
         end
@@ -173,11 +173,11 @@ end
 function computePrimCoreIntTensor(op::DirectOperator, 
                                   data::OneBodyIntOrbInfo{T, D}) where {T, D}
     oData1, oData2 = data
-    res = ShapedMemory{T}(undef, length.(data))
-    di, dj = Plus.(first.(axes(res)) .- firstindex.(data))
-    for j in eachindex(oData2), i in eachindex(oData1)
-        ijVal = evalOneBodyPrimCoreIntConfig(op, oData1[i], oData2[j])
-        res[di(i), dj(j)] = ijVal
+    len1, len2 = length.(data)
+    res = ShapedMemory{T}(undef, (len1, len2))
+    for j in 1:len2, i in 1:len1
+        ijVal = evalOneBodyPrimCoreIntConfig(op, oData1[begin+i-1], oData2[begin+j-1])
+        res[begin+i-1, begin+j-1] = ijVal
     end
     res
 end
@@ -522,19 +522,22 @@ function buildOneBodyTensor(intConfig::Tuple{IntegralCache{T, D, 1}, BasisIdxerV
     nBasis = length(iIdxers)
     checkLength(nIdxers, Symbol("nlzConfig[2]"), nBasis, "`length(intConfig[2])`")
     res = ShapedMemory{T}(undef, (nBasis, nBasis))
-    dh = Plus(firstindex(nIdxers) - firstindex(iIdxers))
-    di, dj = Plus.(first.(axes(res)) .- firstindex(iIdxers))
-    for j in eachindex(iIdxers), i in firstindex(iIdxers):j
+    di, dj = Plus.(first.(axes(res)) .- 1)
+    for j in 1:nBasis, i in 1:j
         m = di(i)
+        iBI = iIdxers[begin+i-1]
+        iBN = nIdxers[begin+i-1]
         if i == j
-            iConfigOrb = (iCache, (iIdxers[   i ],))
-            nConfigOrb = (nCache, (nIdxers[dh(i)],))
+            iConfigOrb = (iCache, (iBI,))
+            nConfigOrb = (nCache, (iBN,))
             temp = buildOneBodyEleTuple(iConfigOrb, nConfigOrb)
             setTensorEntry!(res, temp, m)
         else
             n = dj(j)
-            iConfigOrb = (iCache, (iIdxers[   i ], iIdxers[   j ]))
-            nConfigOrb = (nCache, (nIdxers[dh(i)], nIdxers[dh(j)]))
+            jBI = iIdxers[begin+j-1]
+            jBN = nIdxers[begin+j-1]
+            iConfigOrb = (iCache, (iBI, jBI))
+            nConfigOrb = (nCache, (iBN, jBN))
             temp = buildOneBodyEleTuple(iConfigOrb, nConfigOrb)
             setTensorEntry!(res, temp, (m, n))
         end
@@ -558,15 +561,17 @@ function buildOneBodyTensor(intConfig::Tuple{OverlapCache{T, D}, BasisIdxerVec{T
     iCache, iIdxers = intConfig
     nBasis = length(iIdxers)
     res = ShapedMemory{T}(undef, (nBasis, nBasis))
-    di, dj = Plus.(first.(axes(res)) .- firstindex(iIdxers))
-    for j in eachindex(iIdxers), i in firstindex(iIdxers):j
+    di, dj = Plus.(first.(axes(res)) .- 1)
+    for j in 1:nBasis, i in 1:j
         m = di(i)
+        iBI = iIdxers[begin+i-1]
         if i == j
-            temp = buildOneBodyEleTuple(( iCache, (iIdxers[i],) ))
+            temp = buildOneBodyEleTuple(( iCache, (iBI,) ))
             setTensorEntry!(res, temp, m)
         else
             n = dj(j)
-            temp = buildOneBodyEleTuple(( iCache, (iIdxers[i], iIdxers[j]) ))
+            jBI = iIdxers[begin+j-1]
+            temp = buildOneBodyEleTuple(( iCache, (iBI, jBI) ))
             setTensorEntry!(res, temp, (m, n))
         end
     end
@@ -601,9 +606,8 @@ function computePrimIntTensor!(cache::DimSpanDataCacheBox{T}, op::DirectOperator
             extractFPrimOrbSetData!(cache,  last(pOrbClusters))
         end
         tensor = computePrimCoreIntTensor(op, (data1, data2))
-        di, dj = Plus.(first.( axes(tensor) ) .- firstindex.( (nCoeffs1, nCoeffs2) )) #!! Need a function wrapper
-        for j in eachindex(nCoeffs2), i in eachindex(nCoeffs1)
-            tensor[di(i), dj(j)] *= nCoeffs1[i] * nCoeffs2[j]
+        for j in 1:length(nCoeffs2), i in 1:length(nCoeffs1)
+            tensor[begin+i-1, begin+j-1] *= nCoeffs1[begin+i-1] * nCoeffs2[begin+j-1]
         end
         tensor
     end
