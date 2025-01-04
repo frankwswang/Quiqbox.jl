@@ -20,14 +20,17 @@ end
 (f::NormalizePrimOrb{T})(params::FilteredVecOfArr{T}) where {T} = 
 (AbsSqrtInv∘f.core)(params)
 
-const GetVolumeEntry{T} = GetParamFunc{OnlyBody{GetIndex{T}}, IndexPointer{Volume{T}}}
+const GetParamSubset{T} = Retrieve{AwaitFilter{FlatParamSetFilter{T}}}
 
-struct NormalizeCompOrb{T, D, 
-                        F1<:ReturnTyped{ T, <:Union{Unit{T}, OrbitalIntegrator{T, D}} }, 
-                        F2<:ReturnTyped{ T, <:OrbitalIntegrator{T, D} }
-                        } <: OrbitalNormalizer{T, D}
+const VariedNormCore{T, D, N, F<:OrbitalIntegrator{T, D}} = 
+      ReturnTyped{T, <:EncodeApply{N, NTuple{N, GetParamSubset{T}}, F}}
+
+const UnitScalarCore{T} = ReturnTyped{T, Unit{T}}
+
+struct NormalizeCompOrb{T, D, F1<:Union{UnitScalarCore{T}, VariedNormCore{T, D, 1}}, 
+                        F2<:VariedNormCore{T, D, 2}} <: OrbitalNormalizer{T, D}
     core::HermitianContract{T, F1, F2}
-    weight::Memory{ReturnTyped{T, GetVolumeEntry{T}}}
+    weight::Memory{ReturnTyped{ T, Retrieve{IndexPointer{Flavor{T}, 2}} }}
 end
 
 function (f::NormalizeCompOrb{T})(input::FilteredVecOfArr{T}) where {T}
@@ -37,7 +40,7 @@ function (f::NormalizeCompOrb{T})(input::FilteredVecOfArr{T}) where {T}
 end
 
 const OrbNormalizerCore{T, D} = 
-      Union{NormalizePrimOrb{T, D}, NormalizePrimOrb{T, D}, Power{Unit{T}, D}}
+      Union{NormalizePrimOrb{T, D}, NormalizeCompOrb{T, D}, Power{Unit{T}, D}}
 
 struct EvalOrbNormalizer{T, D, F<:OrbNormalizerCore{T, D}} <: DimensionalEvaluator{T, D, F}
     f::ReturnTyped{T, F}
@@ -65,7 +68,7 @@ const ParamSubsetApply{F, T} =
       ParamFilterFunc{F, Tuple{ AwaitFilter{FlatParamSetFilter{T}} }}
 
 struct ScaledOrbital{T, D, C<:EvalComposedOrb{T, D}, 
-                     F<:Function} <: EvalComposedOrb{T, D, C}
+                     F<:EvalOrbNormalizer{T, D}} <: EvalComposedOrb{T, D, C}
     f::ParamSubsetApply{PairCombine{StableMul{T}, C, OnlyBody{F}}, T}
 end
 
@@ -221,7 +224,7 @@ end
 CompositeOrb(ob::CompositeOrb) = itself(ob)
 
 const WeightedPF{T, D, U<:EvalPrimOrb{T, D}} = 
-      PairCombine{StableMul{T}, U, GetVolumeEntry{T}}
+      PairCombine{StableMul{T}, U, OnlyBody{ Retrieve{IndexPointer{Flavor{T}, 2}} }}
 
 function compressWeightedPF(::Type{B}, ::Type{F}) where {T, D, B<:EvalFieldAmp{T, D}, F}
     boolF = isconcretetype(B)
@@ -286,9 +289,9 @@ function unpackComposedOrbCore!(f::CompositeOrb{T, D}, paramSet::FlatParamSet,
     basisPtrs = map(f.basis) do b
         i += 1
         fInnerCore, _, basisPtr = unpackParamFunc!(b, pSetLocal, paramSetId)
-        getIdx = (OnlyBody∘Base.Fix2)(getField, ChainPointer( i, TensorType(T) ))
-        weight = ParamSelectFunc(getIdx, (weightPtr,))
-        push!(weightedFields, PairCombine(StableBinary(*, T), fInnerCore, weight))
+        getWeight = Retrieve(ChainPointer( weightPtr, ChainPointer(i, TensorType(T)) ))
+        weightedPrimOrb = PairCombine(StableBinary(*, T), fInnerCore, OnlyBody(getWeight))
+        push!(weightedFields, weightedPrimOrb)
         basisPtr
     end
     pFilter = locateParam!(paramSet, pSetLocal)
@@ -457,13 +460,13 @@ function NormalizeCompOrb(f::CompositeOrbCore{T, D}) where {T, D}
     pOrbScopes = Memory{AwaitFilter{FlatParamSetFilter{T}}}(undef, nOrbs)
     for i in eachindex(pOrbs)
         o = pOrbs[i]
-        oCore = o.f.apply
+        oCore = o.f.apply.left
         oScope = first(o.f.scope)
         diagFuncs[i] = if isRenormalized(o)
             ReturnTyped(Unit(T), T)
         else
             nfInner = genOneBodyCoreIntegrator(Identity(), (oCore,))
-            ReturnTyped(ParamFilterFunc(nfInner, oScope), T)
+            ReturnTyped(EncodeApply((Retrieve(oScope),), nfInner), T)
         end
         pOrbCores[i] = oCore
         pOrbScopes[i] = oScope
@@ -475,11 +478,11 @@ function NormalizeCompOrb(f::CompositeOrbCore{T, D}) where {T, D}
         corePairs = (pOrbCores[begin+m-1], pOrbCores[begin+n-1])
         nfInner = genOneBodyCoreIntegrator(Identity(), corePairs)
         filters = (pOrbScopes[begin+m-1], pOrbScopes[begin+n-1])
-        utriFuncs[begin+j-1] = ReturnTyped(ParamFilterFunc(nfInner, filters), T)
+        utriFuncs[begin+j-1] = ReturnTyped(EncodeApply(Retrieve.(filters), nfInner), T)
     end
 
     coreTransform = HermitianContract(map(itself, diagFuncs), map(itself, utriFuncs))
-    getWeights = map(b->ReturnTyped(b.right, T), weightedOrbs)
+    getWeights = map(b->ReturnTyped(b.right.f, T), weightedOrbs)
     NormalizeCompOrb(coreTransform, getWeights)
 end
 
