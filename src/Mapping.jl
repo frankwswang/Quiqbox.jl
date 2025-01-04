@@ -62,6 +62,28 @@ const StableMul{T} = StableBinary{T, typeof(*)}
 StableBinary(f::Function) = Base.Fix1(StableBinary, f)
 
 
+struct Retrieve{P<:CompositePointer} <: FunctionComposer
+    rule::P
+end
+
+function (f::Retrieve)(input)
+    getField(input, f.rule)
+end
+
+const Select{P<:EntryPointer} = Retrieve{P}
+
+const Filter{P<:EffectivePtrStack} = Retrieve{P}
+
+struct EncodeApply{N, E<:NTuple{N, Function}, F<:Function} <: FunctionComposer
+    encode::E
+    apply::F
+end
+
+(f::EncodeApply)(args...) = f.apply(map(f->f(args...), f.encode)...)
+
+(f::EncodeApply{0})(args...) = f.apply(args...)
+
+
 struct ParamFilterFunc{F<:Function, 
                        T<:NonEmptyTuple{EffectivePtrStack}} <: ParamFuncBuilder{F}
     apply::F
