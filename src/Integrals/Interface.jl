@@ -11,14 +11,8 @@ const OrbCoreIdxDict{T} =
       Dict{Tuple{FieldMarker{:PrimitiveOrbCore, 1}, AbtVecOfAbtArr{T}}, Int}
 
 const OrbCoreData{T, D, F<:PrimitiveOrbCore{T, D}, V<:AbtVecOfAbtArr{T}} = Tuple{F, V}
-const OrbCoreDataVec{T, D, F<:PrimitiveOrbCore{T, D}} = 
-      Vector{ OrbCoreData{T, D, F, Vector{ ShapedMemory{T} }} }
-
-const OrbCoreDataAbtVec{T, D, F<:PrimitiveOrbCore{T, D}, V<:AbtVecOfAbtArr{T}, N} = 
-      AbstractArray{OrbCoreData{T, D, F, V}, 1}
-
-const OneBodyIntOrbInfo{T, D} = NTuple{2, OrbCoreDataAbtVec{T, D}}
-const TwoBodyIntOrbInfo{T, D} = NTuple{4, OrbCoreDataAbtVec{T, D}}
+const OrbCoreDataSeq{T, D, F<:PrimitiveOrbCore{T, D}, V<:AbtVecOfAbtArr{T}, N} = 
+      AbstractVector{OrbCoreData{T, D, F, V}}
 
 const OneBodyIdxSymDict = let tempDict=Base.ImmutableDict(true=>:aa)
     Base.ImmutableDict(tempDict, false=>:ab)
@@ -41,12 +35,12 @@ end
 
 struct PrimOrbCoreCache{T, D, F<:PrimitiveOrbCore{T, D}}
     dict::OrbCoreIdxDict{T}
-    list::OrbCoreDataVec{T, D, F}
+    list::Vector{OrbCoreData{ T, D, F, Vector{ShapedMemory{T}} }}
 end
 
 PrimOrbCoreCache(::Type{T}, ::Val{D}, ::Type{F}=PrimitiveOrbCore{T, D}) where 
                 {T, D, F<:PrimitiveOrbCore{T, D}} = 
-PrimOrbCoreCache(OrbCoreIdxDict{T}(), eltype(OrbCoreDataVec{T, D, F})[])
+PrimOrbCoreCache(OrbCoreIdxDict{T}(), OrbCoreData{ T, D, F, Vector{ShapedMemory{T}} }[])
 
 
 struct BasisWeightIndexer{T} <: QueryBox{T}
@@ -56,17 +50,18 @@ end
 
 abstract type IntegralIndexer{T, S} <: QueryBox{T} end
 
-struct GenericOneBodyIndexer{T<:Number} <: IntegralIndexer{T, OneBodyIntegral}
+struct OneBodyCompleteGraphIndexer{T<:Number} <: IntegralIndexer{T, OneBodyIntegral}
     aa::Dict{ Tuple{   Int},  Tuple{   T}}
     ab::Dict{NTuple{2, Int}, NTuple{2, T}}
 end
 
-function GenericOneBodyIndexer(::Type{T}) where {T}
-    GenericOneBodyIndexer(Dict{ Tuple{   Int},  Tuple{     T}}(), 
-                           Dict{NTuple{2, Int}, NTuple{2,   T}}())
-end
+OneBodyCompleteGraphIndexer(::Type{T}) where {T} = 
+OneBodyCompleteGraphIndexer(Dict{ Tuple{   Int},  Tuple{   T}}(), 
+                            Dict{NTuple{2, Int}, NTuple{2, T}}())
 
-initializeIntegralIndexer(::OneBodyIntegral, ::Type{T}) where {T} = GenericOneBodyIndexer(T)
+struct OneBodySymmetricDiffIndexer{T<:Number} <: IntegralIndexer{T, OneBodyIntegral}
+    ab::Dict{NTuple{2, Int}, T}
+end
 
 
 struct IntegralCache{T, D, F<:DirectOperator, V<:PrimitiveOrbCore{T, D}, 
@@ -85,25 +80,25 @@ const OverlapCache{T, D, V<:PrimitiveOrbCore{T, D},
       OneBodyIntCache{T, D, Identity, V, I}
 
 
-function setIntegralIndexer!(idxer::GenericOneBodyIndexer{T}, 
+function setIntegralIndexer!(idxer::OneBodyCompleteGraphIndexer{T}, 
                              pair::Pair{Tuple{Int}, Tuple{T}}) where {T}
     setindex!(getfield(idxer, OneBodyIdxSymDict[true ]), pair.second, pair.first)
     idxer
 end
 
-function setIntegralIndexer!(idxer::GenericOneBodyIndexer{T}, 
+function setIntegralIndexer!(idxer::OneBodyCompleteGraphIndexer{T}, 
                              pair::Pair{NTuple{2, Int}, NTuple{2, T}}) where {T}
     setindex!(getfield(idxer, OneBodyIdxSymDict[false]), pair.second, pair.first)
     idxer
 end
 
 
-function getPrimCoreIntData(cache::GenericOneBodyIndexer, formattedIdx::NTuple{2, Int})
-    getfield(cache, OneBodyIdxSymDict[false])[formattedIdx]
+function getPrimCoreIntData(cache::OneBodyCompleteGraphIndexer, idx::NTuple{2, Int})
+    getfield(cache, OneBodyIdxSymDict[false])[idx]
 end
 
-function getPrimCoreIntData(cache::GenericOneBodyIndexer, formattedIdx::Tuple{Int})
-    getfield(cache, OneBodyIdxSymDict[true ])[formattedIdx]
+function getPrimCoreIntData(cache::OneBodyCompleteGraphIndexer, idx::Tuple{Int})
+    getfield(cache, OneBodyIdxSymDict[true ])[idx]
 end
 
 
@@ -120,102 +115,142 @@ isHermitian(::PrimitiveOrbCore{T, D}, ::Identity,
 true
 
 
-function genOneBodyPrimCoreIntPairs(op::DirectOperator, 
-                                    (oData,)::Tuple{OrbCoreDataAbtVec{T, D}}, 
-                                    (indexOffset,)::Tuple{Int}=(0,)) where {T, D}
-    iFirst = firstindex(oData)
-    nOrbs = length(oData)
-    dm = Plus(iFirst - 1)
-
-    pairs1 = Memory{Pair{Tuple{Int}, Tuple{T}}}(undef, nOrbs)
-    pairs2 = map(1:triMatEleNum(nOrbs)) do l
-        n, m = convert1DidxTo2D(nOrbs, l)
-        if m == n
-            i = dm(m)
-            iiVal = computeOneBodyPrimCoreIntVals(op, oData, i)
-            pairs1[begin+n-1] = (i+indexOffset,) => iiVal
-        else
-            i, j = sortTensorIndex((m, n)) .|> dm
-            ijValPair = computeOneBodyPrimCoreIntVals(op, oData, (i, j))
-            (i+indexOffset, j+indexOffset) => ijValPair
-        end
-    end
-
-    pairs1, pairs2
-end
-
-
-function computeOneBodyPrimCoreIntVals(op::DirectOperator, oData::OrbCoreDataAbtVec{T}, 
-                                       i::Int) where {T}
-    orb, pars = oData[i]
-    f = ReturnTyped(genOneBodyCoreIntegrator(op, (orb,)), T)
-    (f(pars),)
-end
-
-
-function evalOneBodyPrimCoreIntConfig(op::DirectOperator, 
-                                      (orb1, pars1)::OrbCoreData{T, D}, 
-                                      (orb2, pars2)::OrbCoreData{T, D}) where {T, D}
+## evalOneBodyPrimCoreIntConfig
+function evalOneBodyPrimCoreIntegral(op::DirectOperator, 
+                                     (orb1, pars1)::OrbCoreData{T, D}, 
+                                     (orb2, pars2)::OrbCoreData{T, D}) where {T, D}
     f = ReturnTyped(genOneBodyCoreIntegrator(op, (orb1, orb2)), T)
     f(pars1, pars2)
 end
 
+function evalOneBodyPrimCoreIntegral(op::DirectOperator, 
+                                     (orb, pars)::OrbCoreData{T, D}) where {T, D}
+    f = ReturnTyped(genOneBodyCoreIntegrator(op, (orb,)), T)
+    f(pars)
+end
 
-function computeOneBodyPrimCoreIntVals(op::DirectOperator, 
-                                       (oData1, oData2)::OneBodyIntOrbInfo{T, D}, 
-                                       (i, j)::NTuple{2, Int}) where {T, D}
-    orbPars1 = oData1[i]
-    orbPars2 = oData2[j]
-    ijVal = evalOneBodyPrimCoreIntConfig(op, orbPars1, orbPars2)
+
+function sortTensorIndex((i, j)::NTuple{2, Int})
+    if i > j
+        (j, i)
+    else
+        (i, j)
+    end
+end
+
+function sortTensorIndex((i, j, k, l)::NTuple{4, Int})
+    pL = sortTensorIndex((i, j))
+    pR = sortTensorIndex((k, l))
+    if i+j > k+l
+        (pR, pL)
+    else
+        (pL, pR)
+    end
+end
+
+sortTensorIndex(arg::Vararg{Int}) = sortTensorIndex(arg)
+
+
+function genOneBodyCGIndexerPairsCore(op::DirectOperator, 
+                                      (oData,)::Tuple{OrbCoreDataSeq{T}}, 
+                                      (oneBasedIdx,)::Tuple{Int}) where {T}
+    iiVal = evalOneBodyPrimCoreIntegral(op, oData[begin+oneBasedIdx-1])
+    (iiVal,)
+end
+
+function genOneBodyCGIndexerPairsCore(op::DirectOperator, 
+                                      oDataPair::NTuple{2, OrbCoreDataSeq{T}}, 
+                                      oneBasedIdxPair::NTuple{2, Int}) where {T}
+    orbPars1, orbPars2 = map(oDataPair, oneBasedIdxPair) do data, idx
+        data[begin+idx-1]
+    end
+    ijVal = evalOneBodyPrimCoreIntegral(op, orbPars1, orbPars2)
     jiVal = if isHermitian(first(orbPars1), op, first(orbPars2))
         ijVal'
     else
-        evalOneBodyPrimCoreIntConfig(op, orbPars2, orbPars1)
+        evalOneBodyPrimCoreIntegral(op, orbPars2, orbPars1)
     end
     (ijVal, jiVal)
 end
 
 
-function computeOneBodyPrimCoreIntVals(op::DirectOperator, oData::OrbCoreDataAbtVec, 
-                                       idx::NTuple{2, Int})
-    computeOneBodyPrimCoreIntVals(op, (oData, oData), idx)
+function genOneBodyCGIndexerPairs(op::DirectOperator, 
+                                  (oData,)::Tuple{OrbCoreDataSeq{T, D}}, 
+                                  (indexOffset,)::Tuple{Int}=(0,)) where {T, D}
+    nOrbs = length(oData)
+    offset = indexOffset + firstindex(oData) - 1
+
+    pairs1 = map(1:nOrbs) do i
+        iiVal = genOneBodyCGIndexerPairsCore(op, (oData,), (i,))
+        (i + offset,) => iiVal
+    end
+
+    pairs2 = map(1:triMatEleNum(nOrbs-1)) do l
+        n, m = convert1DidxTo2D(nOrbs-1, l)
+        ijPair = sortTensorIndex((m, n+1))
+        ijValPair = genOneBodyCGIndexerPairsCore(op, (oData, oData), ijPair)
+        (ijPair .+ offset) => ijValPair
+    end
+
+    pairs1, pairs2
 end
 
+function genOneBodyCGIndexerPairs(op::DirectOperator, 
+                                  oDataPair::NTuple{2, OrbCoreDataSeq{T, D}}, 
+                                  indexOffsets::NTuple{2, Int}) where {T, D}
+    mnOrbs = length.(oDataPair)
+    offsets = indexOffsets .+ firstindex.(oDataPair) .- 1
 
-function genOneBodyPrimCoreIntPairs(op::DirectOperator, data::OneBodyIntOrbInfo{T, D}, 
-                                    (dIdx1, dIdx2)::NTuple{2, Int}) where {T, D}
-    map(Iterators.product( eachindex.(data)... )) do (i, j)
-        ijValPair = computeOneBodyPrimCoreIntVals(op, data, (i, j))
-        (i+dIdx1, j+dIdx2) => ijValPair
+    map(Iterators.product( Base.OneTo.(mnOrbs)... )) do mnIdx
+        idxPairOld = mnIdx .+ offsets
+        idxPairNew = sortTensorIndex(idxPairOld)
+        ijPair = ifelse(idxPairNew == idxPairOld, mnIdx, reverse(mnIdx))
+        ijValPair = genOneBodyCGIndexerPairsCore(op, oDataPair, ijPair)
+        idxPairNew => ijValPair
     end |> vec
 end
 
 
-#!! Add index offset and double-check index alignment.
+function setTensorEntries!(tensor::AbstractArray{T}, (val,)::Tuple{T}, 
+                           (oneBasedIdx,)::Tuple{Int}) where {T}
+    idxSet = first.(axes(tensor)) .+ oneBasedIdx .- 1
+    tensor[idxSet...] = val
+end
+
+function setTensorEntries!(tensor::AbstractMatrix{T}, valPair::NTuple{2, T}, 
+                           oneBasedIdxPair::NTuple{2, Int}) where {T}
+    i, j = first.(axes(tensor)) .+ oneBasedIdxPair .- 1
+    tensor[i, j] = first(valPair)
+    tensor[j, i] = last(valPair)
+end
+
+
 function computeOneBodyPrimCoreIntTensor(op::DirectOperator, 
-                                         (oData1,)::Tuple{OrbCoreDataAbtVec{T}}) where {T}
-    nBasis = length(oData1)
-    res = ShapedMemory{T}(undef, (nBasis, nBasis))
-    for i in 1:nBasis
-        temp = computeOneBodyPrimCoreIntVals(op, oData1, (i, i))
+                                         (oData,)::Tuple{OrbCoreDataSeq{T}}) where {T}
+    nOrbs = length(oData)
+    res = ShapedMemory{T}(undef, (nOrbs, nOrbs))
+
+    for i in 1:nOrbs
+        temp = genOneBodyCGIndexerPairsCore(op, (oData,), (i,))
         setTensorEntries!(res, temp, (i,))
     end
 
-    for l in 1:triMatEleNum(nBasis-1)
+    for l in 1:triMatEleNum(nOrbs-1)
         n, m = convert1DidxTo2D(mBasis-1, l)
-        temp = computeOneBodyPrimCoreIntVals(op, oData1, (m, n+1))
+        temp = genOneBodyCGIndexerPairsCore(op, (oData, oData), (m, n+1))
         setTensorEntries!(res, temp, (m, n+1))
     end
     res
 end
 
 function computeOneBodyPrimCoreIntTensor(op::DirectOperator, 
-                                         data::OneBodyIntOrbInfo{T, D}) where {T, D}
-    oData1, oData2 = data
-    len1, len2 = length.(data)
+                                         oDataPair::NTuple{2, OrbCoreDataSeq{T, D}}) where 
+                                        {T, D}
+    oData1, oData2 = oDataPair
+    len1, len2 = length.(oDataPair)
     res = ShapedMemory{T}(undef, (len1, len2))
     for j in 1:len2, i in 1:len1
-        ijVal = evalOneBodyPrimCoreIntConfig(op, oData1[begin+i-1], oData2[begin+j-1])
+        ijVal = evalOneBodyPrimCoreIntegral(op, oData1[begin+i-1], oData2[begin+j-1])
         res[begin+i-1, begin+j-1] = ijVal
     end
     res
@@ -314,19 +349,19 @@ function cachePrimCoreIntegrals!(intCache::IntegralCache{T, D},
 end
 
 
-function updateIntCacheCore!(op::DirectOperator, idxer::GenericOneBodyIndexer{T}, 
-                             basis::Tuple{OrbCoreDataAbtVec{T, D}}, 
+function updateIntCacheCore!(op::DirectOperator, idxer::OneBodyCompleteGraphIndexer{T}, 
+                             basis::Tuple{OrbCoreDataSeq{T, D}}, 
                              offset::Tuple{Int}) where {T, D}
-    pairs1, pairs2 = genOneBodyPrimCoreIntPairs(op, basis, offset)
+    pairs1, pairs2 = genOneBodyCGIndexerPairs(op, basis, offset)
     foreach(p->setIntegralIndexer!(idxer, p), pairs1)
     foreach(p->setIntegralIndexer!(idxer, p), pairs2)
     idxer
 end
 
-function updateIntCacheCore!(op::DirectOperator, idxer::GenericOneBodyIndexer{T}, 
-                             basis::OneBodyIntOrbInfo{T, D}, 
+function updateIntCacheCore!(op::DirectOperator, idxer::OneBodyCompleteGraphIndexer{T}, 
+                             basis::NTuple{2, OrbCoreDataSeq{T, D}}, 
                              offset::NTuple{2, Int}) where {T, D}
-    pairs2 = genOneBodyPrimCoreIntPairs(op, basis, offset)
+    pairs2 = genOneBodyCGIndexerPairs(op, basis, offset)
     foreach(p->setIntegralIndexer!(idxer, p), pairs2)
     idxer
 end
@@ -351,7 +386,7 @@ function updatePrimCoreIntCache!(cache::IntegralCache, startIdx::Int)
 end
 
 
-function decodePrimCoreInt(cache::GenericOneBodyIndexer{T}, ptrPair::NTuple{2, Int}, 
+function decodePrimCoreInt(cache::OneBodyCompleteGraphIndexer{T}, ptrPair::NTuple{2, Int}, 
                            (coeff1, coeff2)::NTuple{2, T}=( one(T), one(T) )) where {T}
     coeffProd = coeff1' * coeff2
     ptrPairNew = sortTensorIndex(ptrPair)
@@ -359,7 +394,7 @@ function decodePrimCoreInt(cache::GenericOneBodyIndexer{T}, ptrPair::NTuple{2, I
     (ptrPairNew == ptrPair ? data : reverse(data)) .* (coeffProd, coeffProd')
 end
 
-function decodePrimCoreInt(cache::GenericOneBodyIndexer{T}, ptr::Tuple{Int}, 
+function decodePrimCoreInt(cache::OneBodyCompleteGraphIndexer{T}, ptr::Tuple{Int}, 
                            (coeff1,)::Tuple{T}=( one(T), )) where {T}
     getPrimCoreIntData(cache, ptr) .* coeff1' .* coeff1
 end
@@ -488,27 +523,6 @@ function prepareIntegralConfig!(intCache::IntegralCache{T, D},
 end
 
 
-function sortTensorIndex((i, j)::NTuple{2, Int})
-    if i > j
-        (j, i)
-    else
-        (i, j)
-    end
-end
-
-function sortTensorIndex((i, j, k, l)::NTuple{4, Int})
-    pL = sortTensorIndex((i, j))
-    pR = sortTensorIndex((k, l))
-    if i+j > k+l
-        (pR, pL)
-    else
-        (pL, pR)
-    end
-end
-
-sortTensorIndex(arg::Vararg{Int}) = sortTensorIndex(arg)
-
-
 function buildIntegralEntries(intCache::OneBodyIntCache{T}, 
                               (intIdxer1,)::Tuple{BasisWeightIndexer{T}}) where {T}
     IdxerList = intIdxer1.list
@@ -545,32 +559,18 @@ function buildIntegralEntries(intCache::OneBodyIntCache{T},
 end
 
 
-function setTensorEntries!(tensor::AbstractMatrix{T}, valPair::NTuple{2, T}, 
-                           idxPair::NTuple{2, Int}) where {T}
-    i, j = first.(axes(tensor)) .+ idxPair .- 1
-    tensor[i, j] = first(valPair)
-    tensor[j, i] = last(valPair)
-end
-
-function setTensorEntries!(tensor::AbstractArray{T}, (val,)::Tuple{T}, 
-                           (idx,)::Tuple{Int}) where {T}
-    idxSet = first.(axes(tensor)) .+ idx .- 1
-    tensor[idxSet...] = val
-end
-
-
 function buildIntegralTensor(intCache::OneBodyIntCache{T}, 
                              intIdxers::AbstractVector{BasisWeightIndexer{T}}) where {T}
-    nBasis = length(intIdxers)
-    res = ShapedMemory{T}(undef, (nBasis, nBasis))
-    for i in 1:nBasis
+    nOrbs = length(intIdxers)
+    res = ShapedMemory{T}(undef, (nOrbs, nOrbs))
+    for i in 1:nOrbs
         iBI = intIdxers[begin+i-1]
         temp = buildIntegralEntries(intCache, (iBI,))
         setTensorEntries!(res, temp, (i,))
     end
 
-    for l in 1:triMatEleNum(nBasis-1)
-        n, m = convert1DidxTo2D(nBasis-1, l)
+    for l in 1:triMatEleNum(nOrbs-1)
+        n, m = convert1DidxTo2D(nOrbs-1, l)
         mBI = intIdxers[begin+m-1]
         nBI = intIdxers[begin+n]
         temp = buildIntegralEntries(intCache, (mBI, nBI))
@@ -588,7 +588,7 @@ function initializeIntegralCache!(::OneBodyIntegral, op::F,
         (eltype∘getPrimOrbCores)(orb)
     end
     basisCache = PrimOrbCoreCache(T, Val(D), orbCoreType)
-    IntegralCache(op, basisCache, initializeIntegralIndexer(OneBodyIntegral(), T))
+    IntegralCache(op, basisCache, OneBodyCompleteGraphIndexer(T))
 end
 
 initializeOverlapCache!(paramCache::DimSpanDataCacheBox{T}, orbs::OrbitalSet{T}) where {T} = 
