@@ -787,7 +787,7 @@ function arrayDiffCore!((v1, v2)::NTuple{2, Array{T}}) where {T}
         i += 1
         j = findfirst(isequal(v1[i]), v2)
         if j !== nothing
-            popat!(v1, i) 
+            popat!(v1, i)
             push!(coms, popat!(v2, j))
             i -= 1
             l -= 1
@@ -1106,7 +1106,13 @@ function getMemory(obj::AbstractArray{T}) where {T}
     Memory{eltype(arr)}(arr)
 end
 
-getMemory(obj::Tuple) = (getMemory∘collect)(obj)
+function getMemory(obj::NonEmptyTuple{Any})
+    mem = Memory{eltype(obj)}(undef, length(obj))
+    mem .= obj
+    mem
+end
+
+getMemory(obj::Any) = getMemory((obj,))
 
 
 function registerObjFrequency(objs::AbstractVector)
