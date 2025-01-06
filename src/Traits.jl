@@ -52,3 +52,11 @@ SelectTrait{InputStyle}()(F)
 
 (::SelectTrait{InputStyle})(::Type{F}) where {F<:Function} = 
 returnUndefinedTraitError(InputStyle, F)
+
+abstract type IntegralStyle <: AnyInterface end
+
+abstract type MultiBodyIntegral <: IntegralStyle end
+
+struct OneBodyIntegral <: MultiBodyIntegral end
+
+struct TwoBodyIntegral <: MultiBodyIntegral end
