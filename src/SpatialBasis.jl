@@ -408,7 +408,7 @@ end
 function genGaussTypeOrb(center::NonEmptyTuple{ParamOrValue{T}, D}, 
                          xpns::ParOrValVec{T}, 
                          cons::Union{ParOrValVec{T}, FlattenedParam{T, 1}}, 
-                         ijk::NonEmptyTuple{Int, D}=ntuple(_->0, Val(D)); 
+                         ijk::NonEmptyTuple{Int, D}=ntuple(_->0, Val(D+1)); 
                          renormalize::Bool=false) where {T, D}
     consLen = if cons isa FlattenedParam
         len = (first∘outputSizeOf)(cons)
