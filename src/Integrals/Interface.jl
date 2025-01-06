@@ -184,7 +184,7 @@ end
 
 function genOneBodyPrimCoreIntPairs(op::DirectOperator, data::OneBodyIntOrbInfo{T, D}, 
                                     (dIdx1, dIdx2)::NTuple{2, Int}) where {T, D}
-    map(Iterators.product( eachindex.(data) )) do (i, j)
+    map(Iterators.product( eachindex.(data)... )) do (i, j)
         ijValPair = computeOneBodyPrimCoreIntVals(op, data, (i, j))
         (i+dIdx1, j+dIdx2) => ijValPair
     end |> vec
@@ -340,8 +340,9 @@ function updatePrimCoreIntCache!(cache::IntegralCache, startIdx::Int)
     if startIdx == firstIdx
         updateIntCacheCore!(op, intIdxer, (basis,), (0,))
     elseif firstIdx < startIdx <= lastindex(basis)
-        oldBasis = @view basis[begin:startIdx-1]
-        newBasis = @view basis[startIdx:    end]
+        boundary = startIdx - 1
+        oldBasis = @view basis[begin:boundary]
+        newBasis = @view basis[startIdx:  end]
         updateIntCacheCore!(op, intIdxer, (newBasis,), (boundary,))
         updateIntCacheCore!(op, intIdxer, (oldBasis, newBasis,), (0, boundary))
     end
@@ -605,7 +606,8 @@ end
 function computeIntTensor!(intCache::IntegralCache{T, D}, 
                            normCache::OverlapCache{T, D}, 
                            basisSet::OrbitalSet{T, D}; 
-                           paramCache::DimSpanDataCacheBox{T}) where {T, D}
+                           paramCache::DimSpanDataCacheBox{T}=DimSpanDataCacheBox(T)) where 
+                          {T, D}
     idxers = prepareIntegralConfig!(intCache, normCache, paramCache, basisSet)
     buildIntegralTensor(intCache, idxers)
 end
