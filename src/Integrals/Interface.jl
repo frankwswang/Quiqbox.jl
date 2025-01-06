@@ -387,8 +387,9 @@ function buildOrbWeightInfoCore(::Val{true}, weights::AbstractVector{T},
                                 normCache::OverlapCache{T, D}) where {T, D}
     nOrbs = length(orbs)
     innerOverlapSum = zero(T)
+    overlapCache = normCache.data
     pOrbNormCoeffs = map(weights, orbs, ptrs) do w, pOrb, ptr
-        innerCoreDiagOverlap = decodePrimCoreInt(normCache, (ptr,)) |> first
+        innerCoreDiagOverlap = decodePrimCoreInt(overlapCache, (ptr,)) |> first
         innerDiagOverlap = w' * w
         if isRenormalized(pOrb)
             w *= AbsSqrtInv(innerCoreDiagOverlap)
@@ -403,7 +404,7 @@ function buildOrbWeightInfoCore(::Val{true}, weights::AbstractVector{T},
         n, m = convert1DidxTo2D(nOrbs-1, l)
         ptrPair = (ptrs[begin+m-1], ptrs[begin+n])
         coeffPair = (pOrbNormCoeffs[begin+m-1], pOrbNormCoeffs[begin+n])
-        (sum∘decodePrimCoreInt)(cache, ptrPair, coeffPair)
+        (sum∘decodePrimCoreInt)(overlapCache, ptrPair, coeffPair)
     end
 
     outerNormCoeff = AbsSqrtInv(innerOverlapSum)
