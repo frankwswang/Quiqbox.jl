@@ -271,57 +271,75 @@ function getPrimOrbCores(orb::FCompOrb)
     end
 end
 
+struct BasisIndexList
+    idx::Memory{Int}
+    ptr::Memory{Int}
 
-function genOrbCoreData!(paramCache::DimSpanDataCacheBox{T}, orb::FPrimOrb{T}) where {T}
-    oCore = getPrimOrbCores(orb)[]
+    function BasisIndexList(basisSizes::AbstractVector{Int})
+        idx = Memory{Int}(undef, sum(basisSizes))
+        ptr = Memory{Int}(undef, length(basisSizes)+1)
+        ptr[begin] = firstindex(idx)
+        i = firstindex(ptr)
+        for s in basisSizes
+            ptr[i+1] = ptr[i] + s
+            i += 1
+        end
+        new(idx, ptr)
+    end
+
+    function BasisIndexList(basisSize::Int)
+        idx = Memory{Int}(undef, basisSize)
+        ptr = Memory{Int}([firstindex(idx), lastindex(idx)+1])
+        new(idx, ptr)
+    end
+end
+
+
+function genOrbCoreData!(paramCache::DimSpanDataCacheBox{T}, 
+                         oCore::PrimitiveOrbCore{T}) where {T}
     pVal = cacheParam!(paramCache, orb.param, orb.pointer.scope)
     (oCore, pVal)
 end
 
-function genOrbCoreData!(paramCache::DimSpanDataCacheBox{T}, orbs::FPrimOrbSet{T}) where {T}
-    map(orbs) do orb
-        genOrbCoreData!(paramCache, orb)
-    end
-end
-
-
-function updatePrimOrbCoreCache!(basisCache::PrimOrbCoreCache{T, D}, 
-                                 paramCache::DimSpanDataCacheBox{T}, 
-                                 orb::FPrimOrb{T, D}, 
-                                 anchor::Int=firstindex(basisCache.list)) where {T, D}
-    data = genOrbCoreData!(paramCache, orb)
+function updateOrbCacheCore!(basisCache::PrimOrbCoreCache{T, D}, 
+                             paramCache::DimSpanDataCacheBox{T}, 
+                             orb::FrameworkOrb{T, D}, idx::Int) where {T, D}
+    orbData = genOrbCoreData!(paramCache, extractInnerOrb(orb, idx))
     basis = basisCache.list
-    idx = get!(basisCache.dict, ( (markObj∘first)(data), last(data) )) do
-        push!(basis, data)
-        lastindex(basis)
-    end
-    idx, max(idx, anchor)
-end
-
-function cachePrimOrbCoreDataCore!(basisCache::PrimOrbCoreCache{T, D}, 
-                                   paramCache::DimSpanDataCacheBox{T}, 
-                                   orb::FPrimOrb{T, D}) where {T, D}
-    data = genOrbCoreData!(paramCache, orb)
-    basis = basisCache.list
-    get!(basisCache.dict, ( (markObj∘first)(data), last(data) )) do
-        push!(basis, data)
+    get!(basisCache.dict, ( (markObj∘first)(orbData), last(orbData) )) do
+        push!(basis, orbData)
         lastindex(basis)
     end
 end
 
-function cachePrimOrbCoreData!(basisCache::PrimOrbCoreCache{T, D}, 
-                               paramCache::DimSpanDataCacheBox{T}, 
-                               orb::FPrimOrb{T, D}) where {T, D}
-    orb => (getMemory∘cachePrimOrbCoreDataCore!)(basisCache, paramCache, orb)
+function updateOrbCache!(basisCache::PrimOrbCoreCache{T, D}, 
+                         paramCache::DimSpanDataCacheBox{T}, 
+                         orb::FrameworkOrb{T, D}, list::BasisIndexList) where {T, D}
+    for j in eachindex(list.ptr)
+        iStart = list.ptr[j]
+        iFinal = list.ptr[j+1] - 1
+        for i in iStart:iFinal
+            list.idx[i] = updateOrbCacheCore!(basisCache, paramCache, orb, i-iStart+1)
+        end
+    end
 end
 
-function cachePrimOrbCoreData!(basisCache::PrimOrbCoreCache{T, D}, 
-                               paramCache::DimSpanDataCacheBox{T}, 
-                               orb::FCompOrb{T, D}) where {T, D}
-    ids = map(orb|>splitOrb) do pOrb
-        cachePrimOrbCoreDataCore!(basisCache, paramCache, pOrb)
+function indexCacheOrbData!(orbCache::PrimOrbCoreCache{T, D}, 
+                            paramCache::DimSpanDataCacheBox{T}, 
+                            orb::FrameworkOrb{T, D}) where {T, D}
+    list = (BasisIndexList∘getInnerOrbNum)(orb)
+    updateOrbCache!(orbCache, paramCache, orb, list)
+    list
+end
+
+function indexCacheOrbData!(orbCache::PrimOrbCoreCache{T, D}, 
+                            paramCache::DimSpanDataCacheBox{T}, 
+                            orbs::OrbitalSet{T, D}) where {T, D}
+    list = (BasisIndexList∘map)(getInnerOrbNum, orbs)
+    for orb in orbs
+        updateOrbCache!(orbCache, paramCache, orb, list)
     end
-    orb => getMemory(ids)
+    list
 end
 
 
@@ -331,11 +349,9 @@ function cachePrimCoreIntegrals!(intCache::IntegralCache{T, D},
     checkEmptiness(orbs, :orbs)
     orbCache = intCache.basis
     oldMaxIdx = lastindex(orbCache.list)
-    orbPairList = map(orbs) do orb
-        cachePrimOrbCoreData!(orbCache, paramCache, orb)
-    end
+    orbIdxList = indexCacheOrbData!(orbCache, paramCache, orbs)
     updatePrimCoreIntCache!(intCache, oldMaxIdx+1)
-    orbPairList
+    orbIdxList
 end
 
 function cachePrimCoreIntegrals!(intCache::IntegralCache{T, D}, 
@@ -343,9 +359,9 @@ function cachePrimCoreIntegrals!(intCache::IntegralCache{T, D},
                                  orb::FrameworkOrb{T, D}) where {T, D}
     orbCache = intCache.basis
     oldMaxIdx = lastindex(orbCache.list)
-    orbPair = cachePrimOrbCoreData!(orbCache, paramCache, orb)
+    orbIdxList = indexCacheOrbData!(orbCache, paramCache, orb)
     updatePrimCoreIntCache!(intCache, oldMaxIdx+1)
-    orbPair
+    orbIdxList
 end
 
 
