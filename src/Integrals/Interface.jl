@@ -631,26 +631,6 @@ function decomposeOrb!(paramCache::DimSpanDataCacheBox{T}, orb::FrameworkOrb{T})
     coreDataSet, weight
 end
 
-function decomposeOrbs!(paramCache::DimSpanDataCacheBox{T}, 
-                        (b1, b2)::NTuple{2, FrameworkOrb{T, D}}) where {T, D}
-    b1Config = decomposeOrb!(paramCache, b1)
-    b2Config = b2 === b1 ? b1Config : decomposeOrb!(paramCache, b2)
-    (b1Config, b2Config)
-end
-
-function decomposeOrbs!(paramCache::DimSpanDataCacheBox{T}, 
-                        (b1, b2, b3, b4)::NTuple{4, FrameworkOrb{T, D}}) where {T, D}
-    b1Config = decomposeOrb!(paramCache, b1)
-    b2Config = b2 === b1 ? b1Config : decomposeOrb!(paramCache, b2)
-    b3Config = b3 === b1 ? b1Config : (b3 === b2 ? b2Config : decomposeOrb!(paramCache, b3))
-    b4Config = if b4 === b1
-        b1Config
-    else
-        b4 === b2 ? b2Config : (b4 === b3 ? b3Config : decomposeOrb!(paramCache, b4))
-    end
-    (b1Config, b2Config, b3Config, b4Config)
-end
-
 
 function computeIntegral!(intCache::IntegralCache{T, D}, 
                           normCache::OverlapCache{T, D}, 
@@ -706,22 +686,29 @@ function computeIntegral(::OneBodyIntegral, ::Identity,
                          bfPair::NTuple{2, FrameworkOrb{T, D}}; 
                          paramCache::DimSpanDataCacheBox{T}=DimSpanDataCacheBox(T), 
                          lazyCompute::Bool=false) where {T, D}
+    bf1, bf2 = bfPair
     if lazyCompute
-        normCache = initializeOverlapCache!(paramCache, getMemory(bfPair))
-        computeIntegral!(normCache, normCache, bfPair; paramCache)
+        if bf1 === bf2
+            computeIntegral(OneBodyIntegral(), Identity(), (bf1,); paramCache, lazyCompute)
+        else
+            normCache = initializeOverlapCache!(paramCache, getMemory(bfPair))
+            computeIntegral!(normCache, normCache, bfPair; paramCache)
+        end
     else
-        coreData1, w1 = decomposeOrb!(paramCache, first(bfPair))
-        coreData2, w2 = decomposeOrb!(paramCache,  last(bfPair))
+        coreData1, w1 = decomposeOrb!(paramCache, bf1)
+        coreData2, w2 = decomposeOrb!(paramCache, bf2)
         tensor = computeOneBodyPrimCoreIntTensor(Identity(), (coreData1, coreData2))
         dot(w1, tensor, w2)
     end
 end
 
-computeIntegral(style::MultiBodyIntegral, op::DirectOperator, 
-                orbs::NonEmptyTuple{OrbitalBasis{T, D}}; 
-                paramCache::DimSpanDataCacheBox{T}=DimSpanDataCacheBox(T), 
-                lazyCompute::Bool=false) where {T, D} = 
-computeIntegral(style, op, FrameworkOrb.(orbs); paramCache, lazyCompute)
+function computeIntegral(style::MultiBodyIntegral, op::DirectOperator, 
+                         orbs::NonEmptyTuple{OrbitalBasis{T, D}}; 
+                         paramCache::DimSpanDataCacheBox{T}=DimSpanDataCacheBox(T), 
+                         lazyCompute::Bool=false) where {T, D}
+    fOrbs = lazyTupleMap(FrameworkOrb, orbs)
+    computeIntegral(style, op, fOrbs; paramCache, lazyCompute)
+end
 
 
 function getOverlapN(orb1::OrbitalBasis{T, D}, orb2::OrbitalBasis{T, D}; 
