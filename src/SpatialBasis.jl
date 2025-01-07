@@ -301,6 +301,7 @@ function unpackComposedOrbCore!(f::CompositeOrb{T, D}, paramSet::FlatParamSet,
 end
 
 
+#! Consider paramSet::FilteredFlatParamSet as an input argument.
 struct FrameworkOrb{T, D, B<:EvalComposedOrb{T, D}, P<:TypedParamInput{T}, 
                     A<:FieldParamPointer} <: UnpackedOrb{T, D, B}
     core::B
@@ -357,11 +358,9 @@ getOrbSize(::FPrimOrb) = 1
 getOrbSize(o::FCompOrb) = length(o.core.f.apply.left.f.chain)
 
 
-splitOrb(o::T) where {T<:PrimitiveOrb} = Memory{T}([o])
+splitOrb(o::Union{PrimitiveOrb, FPrimOrb}) = getMemory(o)
 
 splitOrb(o::CompositeOrb) = o.basis
-
-splitOrb(o::T) where {T<:FPrimOrb} = Memory{T}([o])
 
 function splitOrb(o::FCompOrb)
     map(getMemory( 1:getOrbSize(o) )) do i
@@ -405,6 +404,7 @@ function genGaussTypeOrb(center::NonEmptyTuple{ParamOrValue{T}, D},
     PrimitiveOrb(PolyRadialFunc(gf, ijk), center; renormalize)
 end
 
+#!! Change `renormalize` into double-layer specification
 function genGaussTypeOrb(center::NonEmptyTuple{ParamOrValue{T}, D}, 
                          xpns::ParOrValVec{T}, 
                          cons::Union{ParOrValVec{T}, FlattenedParam{T, 1}}, 
