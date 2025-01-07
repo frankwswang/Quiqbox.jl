@@ -358,6 +358,27 @@ getOrbSize(::FPrimOrb) = 1
 getOrbSize(o::FCompOrb) = length(o.core.f.apply.left.f.chain)
 
 
+extractInnerOrb(o::PrimitiveOrb) = itself(o)
+
+extractInnerOrb(o::CompositeOrb, idx::Int) = o.basis[begin+idx-1]
+
+extractInnerOrb(o::PrimitiveOrbCore) = itself(o)
+
+extractInnerOrb(o::ScaledOrbital) = o.f.apply.left
+
+extractInnerOrb(o::FPrimOrb) = o.core
+
+extractInnerOrb(o::FCompOrb, idx::Int) = extractInnerOrb(o.core).f.chain[begin+idx-1].left
+
+function extractInnerOrb(o::Union{PrimitiveOrb, FPrimOrb}, idx::Int)
+    if idx == 1
+        extractInnerOrb(o)
+    else
+        throw(BoundsError(o, idx))
+    end
+end
+
+
 splitOrb(o::Union{PrimitiveOrb, FPrimOrb}) = getMemory(o)
 
 splitOrb(o::CompositeOrb) = o.basis
