@@ -533,8 +533,12 @@ function prepareIntegralConfig!(intCache::IntegralCache{T, D},
                                 paramCache::DimSpanDataCacheBox{T}, 
                                 orbInput::OrbitalInput{T, D}) where {T, D}
     intIdxList = cachePrimCoreIntegrals!(intCache, paramCache, orbInput)
-    normIdxList = cachePrimCoreIntegrals!(normCache, intCache, intIdxList)
-    buildOrbWeightIndexer!(paramCache, normCache, orbInput, normIdxList, intIdxList)
+    if intCache === normCache
+        buildOrbWeightIndexer!(paramCache, intCache, orbInput, intIdxList)
+    else
+        normIdxList = cachePrimCoreIntegrals!(normCache, intCache, intIdxList)
+        buildOrbWeightIndexer!(paramCache, normCache, orbInput, normIdxList, intIdxList)
+    end
 end
 
 
