@@ -123,7 +123,7 @@ const RealOrComplex{T<:Real} = Union{T, Complex{T}}
 const ParamOrValue{T} = Union{ElementalParam{T}, T}
 const ParOrValVec{T} = AbstractVector{<:ParamOrValue{T}}
 
-const NonEmpTplOrAbtArr{T, A<:AbstractArray{T}} = Union{NonEmptyTuple{T}, A}
+const NonEmpTplOrAbtArr{T, N, A<:AbstractArray{<:T, N}} = Union{NonEmptyTuple{T}, A}
 
 const AbtVecOfAbtArr{T} = AbstractVector{<:AbstractArray{T}}
 const JaggedAbtArray{T, N, O} = AbstractArray{<:AbstractArray{T, N}, O}

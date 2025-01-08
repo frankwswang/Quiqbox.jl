@@ -147,7 +147,7 @@ function getField(scope::PointerStack, ptr::PointerStack)
     ChainFilter(scope, ptr)
 end
 
-const InstantPtrCollection = Union{PointerStack, NonEmpTplOrAbtArr{<:ActivePointer}}
+const InstantPtrCollection = Union{PointerStack, NonEmpTplOrAbtArr{ActivePointer}}
 
 getField(obj, ptr::InstantPtrCollection) = evalField(itself, obj, ptr)
 
@@ -194,7 +194,7 @@ function evalFieldCore(f::F, obj, scope::PointerStack,
 end
 
 function evalFieldCore(f::F, obj, scope::PointerStack, 
-                       ptrs::NonEmpTplOrAbtArr{<:ActivePointer}) where {F<:Function}
+                       ptrs::NonEmpTplOrAbtArr{ActivePointer}) where {F<:Function}
     map(ptrs) do ptr
         evalField(f, obj, getField(scope, ptr))
     end
@@ -217,7 +217,7 @@ TypedEmptyDict() = TypedEmptyDict{Union{}, Union{}}()
 
 buildDict(p::Pair{K, T}) where {K, T} = SingleEntryDict(p.first, p.second)
 
-function buildDict(ps::NonEmpTplOrAbtArr{<:Pair}, 
+function buildDict(ps::NonEmpTplOrAbtArr{Pair}, 
                    emptyBuiler::Type{<:FiniteDict{0}}=TypedEmptyDict)
     if isempty(ps)
         emptyBuiler()
