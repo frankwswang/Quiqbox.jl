@@ -349,33 +349,30 @@ const FCompGTO{T, D, B<:EvalCompGTO{T, D}, P<:TypedParamInput{T}, A<:FieldParamP
 unpackFunc(o::FrameworkOrb) = (o.core, o.param, o.pointer)
 
 
-getOrbSize(::PrimitiveOrb) = 1
+getInnerOrb(o::FrameworkOrb) = o.core
 
-getOrbSize(o::CompositeOrb) = length(o.basis)
+getInnerOrb(o::ScaledOrbital) = o.f.apply.left
 
-getOrbSize(::FPrimOrb) = 1
-
-getOrbSize(o::FCompOrb) = length(o.core.f.apply.left.f.chain)
+getInnerOrb(o::PrimitiveOrbCore) = itself(o)
 
 
-extractInnerOrb(o::PrimitiveOrb) = itself(o)
+orbSizeOf(::PrimitiveOrb) = 1
 
-extractInnerOrb(o::CompositeOrb, idx::Int) = o.basis[begin+idx-1]
+orbSizeOf(o::CompositeOrb) = length(o.basis)
 
-extractInnerOrb(o::PrimitiveOrbCore) = itself(o)
+orbSizeOf(::FPrimOrb) = 1
 
-extractInnerOrb(o::ScaledOrbital) = o.f.apply.left
+orbSizeOf(o::FCompOrb) = length((getInnerOrb∘getInnerOrb)(o).f.chain)
 
-extractInnerOrb(o::FPrimOrb) = o.core
 
-extractInnerOrb(o::FCompOrb, idx::Int) = extractInnerOrb(o.core).f.chain[begin+idx-1].left
+viewOrb(o::CompositeOrb, idx::Int) = o.basis[begin+idx-1]
 
-function extractInnerOrb(o::Union{PrimitiveOrb, FPrimOrb}, idx::Int)
-    if idx == 1
-        extractInnerOrb(o)
-    else
-        throw(BoundsError(o, idx))
-    end
+viewOrb(o::FCompOrb, idx::Int) = FrameworkOrb(o, idx)
+
+viewOrb(o::EvalCompOrb, idx::Int) = getInnerOrb(o).f.chain[begin+idx-1]
+
+function viewOrb(o::Union{PrimitiveOrb, FPrimOrb, EvalPrimOrb}, idx::Int)
+    idx == 1 ? itself(o) : throw(BoundsError(o, idx))
 end
 
 
@@ -384,8 +381,8 @@ splitOrb(o::Union{PrimitiveOrb, FPrimOrb}) = getMemory(o)
 splitOrb(o::CompositeOrb) = o.basis
 
 function splitOrb(o::FCompOrb)
-    map(getMemory( 1:getOrbSize(o) )) do i
-        FrameworkOrb(o, i)
+    map(getMemory( 1:orbSizeOf(o) )) do i
+        viewOrb(o, i)
     end
 end
 
