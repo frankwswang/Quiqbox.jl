@@ -256,7 +256,7 @@ end
 
 
 function evalFunc(func::F, input::T) where {F<:Function, T}
-    fCore, pSet = unpackFunc(func)
+    fCore, pSet, _ = unpackFunc(func)
     evalFunc(fCore, pSet, input)
 end
 
