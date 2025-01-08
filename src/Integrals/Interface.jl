@@ -271,40 +271,48 @@ function getPrimOrbCores(orb::FCompOrb)
     end
 end
 
+
 struct BasisIndexList
-    idx::Memory{Int}
-    ptr::Memory{Int}
+    index::Memory{Int}
+    endpoint::Memory{Int}
 
     function BasisIndexList(basisSizes::AbstractVector{Int})
-        idx = Memory{Int}(undef, sum(basisSizes))
-        ptr = Memory{Int}(undef, length(basisSizes)+1)
-        ptr[begin] = firstindex(idx)
-        i = firstindex(ptr)
+        index = Memory{Int}(undef, sum(basisSizes))
+        endpoint = Memory{Int}(undef, length(basisSizes)+1)
+        endpoint[begin] = firstindex(index)
+        i = firstindex(endpoint)
         for s in basisSizes
-            ptr[i+1] = ptr[i] + s
+            endpoint[i+1] = endpoint[i] + s
             i += 1
         end
-        new(idx, ptr)
+        new(index, endpoint)
     end
 
     function BasisIndexList(basisSize::Int)
-        idx = Memory{Int}(undef, basisSize)
-        ptr = Memory{Int}([firstindex(idx), lastindex(idx)+1])
-        new(idx, ptr)
+        index = Memory{Int}(undef, basisSize)
+        endpoint = Memory{Int}([firstindex(index), lastindex(index)+1])
+        new(index, endpoint)
+    end
+
+    function BasisIndexList(idxList::BasisIndexList)
+        new(copy(idxList.index), idxList.endpoint)
     end
 end
 
-
-function genOrbCoreData!(paramCache::DimSpanDataCacheBox{T}, 
-                         oCore::PrimitiveOrbCore{T}) where {T}
-    pVal = cacheParam!(paramCache, orb.param, orb.pointer.scope)
-    (oCore, pVal)
+function getBasisIndexRange(list::BasisIndexList, oneToIdx::Int)
+    endpointList = list.endpoint
+    endpointList[begin+oneToIdx-1] : (endpointList[begin+oneToIdx] - 1)
 end
 
-function updateOrbCacheCore!(basisCache::PrimOrbCoreCache{T, D}, 
-                             paramCache::DimSpanDataCacheBox{T}, 
-                             orb::FrameworkOrb{T, D}, idx::Int) where {T, D}
-    orbData = genOrbCoreData!(paramCache, extractInnerOrb(orb, idx))
+
+function genOrbCoreData!(paramCache::DimSpanDataCacheBox{T}, orb::FPrimOrb{T}) where {T}
+    pVal = cacheParam!(paramCache, orb.param, orb.pointer.scope)
+    ((getInnerOrb∘getInnerOrb)(orb), pVal)
+end
+
+
+function updateOrbCache!(basisCache::PrimOrbCoreCache{T, D}, 
+                             orbData::OrbCoreData{T, D}) where {T, D}
     basis = basisCache.list
     get!(basisCache.dict, ( (markObj∘first)(orbData), last(orbData) )) do
         push!(basis, orbData)
@@ -312,34 +320,43 @@ function updateOrbCacheCore!(basisCache::PrimOrbCoreCache{T, D},
     end
 end
 
-function updateOrbCache!(basisCache::PrimOrbCoreCache{T, D}, 
-                         paramCache::DimSpanDataCacheBox{T}, 
-                         orb::FrameworkOrb{T, D}, list::BasisIndexList) where {T, D}
-    for j in eachindex(list.ptr)
-        iStart = list.ptr[j]
-        iFinal = list.ptr[j+1] - 1
-        for i in iStart:iFinal
-            list.idx[i] = updateOrbCacheCore!(basisCache, paramCache, orb, i-iStart+1)
-        end
-    end
-end
 
 function indexCacheOrbData!(orbCache::PrimOrbCoreCache{T, D}, 
                             paramCache::DimSpanDataCacheBox{T}, 
                             orb::FrameworkOrb{T, D}) where {T, D}
-    list = (BasisIndexList∘getInnerOrbNum)(orb)
-    updateOrbCache!(orbCache, paramCache, orb, list)
+    orbSize = orbSizeOf(orb)
+    list = BasisIndexList(orbSize)
+    for i in 1:orbSize
+        orbData = genOrbCoreData!(paramCache, viewOrb(orb, i))
+        list.index[begin+i-1] = updateOrbCache!(orbCache, orbData)
+    end
     list
 end
 
 function indexCacheOrbData!(orbCache::PrimOrbCoreCache{T, D}, 
                             paramCache::DimSpanDataCacheBox{T}, 
                             orbs::OrbitalSet{T, D}) where {T, D}
-    list = (BasisIndexList∘map)(getInnerOrbNum, orbs)
-    for orb in orbs
-        updateOrbCache!(orbCache, paramCache, orb, list)
+    list = (BasisIndexList∘map)(orbSizeOf, orbs)
+    for (j, orb) in enumerate(orbs)
+        iRange = getBasisIndexRange(list, j)
+        for (n, i) in enumerate(iRange)
+            orbData = genOrbCoreData!(paramCache, viewOrb(orb, n))
+            list.index[i] = updateOrbCache!(orbCache, orbData)
+        end
     end
     list
+end
+
+function indexCacheOrbData!(targetCache::PrimOrbCoreCache{T, D}, 
+                            sourceCache::PrimOrbCoreCache{T, D}, 
+                            sourceList::BasisIndexList) where {T, D}
+    targetList = BasisIndexList(sourceList)
+    primOrbIds = targetList.index
+    for i in eachindex(primOrbIds)
+        orbData = sourceCache.list[sourceList.index[i]]
+        primOrbIds[i] = updateOrbCache!(targetCache, orbData)
+    end
+    targetList
 end
 
 
@@ -364,6 +381,17 @@ function cachePrimCoreIntegrals!(intCache::IntegralCache{T, D},
     orbIdxList
 end
 
+function cachePrimCoreIntegrals!(targetIntCache::IntegralCache{T, D}, 
+                                 sourceIntCache::IntegralCache{T, D}, 
+                                 sourceOrbList::BasisIndexList) where {T, D}
+    targetOrbCache = targetIntCache.basis
+    oldMaxIdx = lastindex(targetOrbCache.list)
+    sourceOrbCache = sourceIntCache.basis
+    targetOrbIdxList = indexCacheOrbData!(targetOrbCache, sourceOrbCache, sourceOrbList)
+    updatePrimCoreIntCache!(targetIntCache, oldMaxIdx+1)
+    targetOrbIdxList
+end
+
 
 function updateIntCacheCore!(op::DirectOperator, idxer::OneBodyCompleteGraphIndexer{T}, 
                              basis::Tuple{OrbCoreDataSeq{T, D}}, 
@@ -381,6 +409,7 @@ function updateIntCacheCore!(op::DirectOperator, idxer::OneBodyCompleteGraphInde
     foreach(p->setIntegralIndexer!(idxer, p), pairs2)
     idxer
 end
+
 
 function updatePrimCoreIntCache!(cache::IntegralCache, startIdx::Int)
     op = cache.operator
@@ -415,127 +444,111 @@ function decodePrimCoreInt(cache::OneBodyCompleteGraphIndexer{T}, ptr::Tuple{Int
     getPrimCoreIntData(cache, ptr) .* coeff1' .* coeff1
 end
 
-function buildOrbWeightInfoCore(orbPtrPair::Pair{<:FPrimOrb{T, D}, Memory{Int}}, 
-                                normCache::OverlapCache{T, D}) where {T, D}
-    orb = orbPtrPair.first
-    ptr = orbPtrPair.second[]
+
+function buildPrimOrbWeight(normCache::OverlapCache{T, D}, orb::EvalPrimOrb{T, D}, 
+                            idx::Int, scalar::T=one(T)) where {T, D}
     if isRenormalized(orb)
-        decodePrimCoreInt(normCache.data, (ptr,)) |> first |> AbsSqrtInv
+        decodePrimCoreInt(normCache.data, (idx,)) |> first |> AbsSqrtInv
     else
         one(T)
-    end
+    end * scalar
 end
 
 
-function buildOrbWeightInfoCore(::Val{true}, weights::AbstractVector{T}, 
-                                orbs::FPrimOrbSet{T, D}, 
-                                ptrs::AbstractVector{Int}, 
-                                normCache::OverlapCache{T, D}) where {T, D}
-    nOrbs = length(orbs)
-    innerOverlapSum = zero(T)
+function buildNormalizedCompOrbWeight(weight::AbstractVector{T}, 
+                                      normCache::OverlapCache{T, D}, orb::FCompOrb{T, D}, 
+                                      idxSeq::AbstractVector{Int}) where {T, D}
     overlapCache = normCache.data
-    pOrbNormCoeffs = map(weights, orbs, ptrs) do w, pOrb, ptr
+    nPrimOrbs = length(weight)
+    innerOverlapSum = zero(T)
+
+    for i in 1:nPrimOrbs
+        ptr = idxSeq[begin+i-1]
         innerCoreDiagOverlap = decodePrimCoreInt(overlapCache, (ptr,)) |> first
-        innerDiagOverlap = w' * w
-        if isRenormalized(pOrb)
-            w *= AbsSqrtInv(innerCoreDiagOverlap)
+        wc = weight[begin+i-1]
+        innerDiagOverlap = wc' * wc
+        if (isRenormalized∘viewOrb)(orb, i)
+            weight[begin+i-1] *= AbsSqrtInv(innerCoreDiagOverlap)
         else
             innerDiagOverlap *= innerCoreDiagOverlap
         end
         innerOverlapSum += innerDiagOverlap
-        w
     end
 
-    innerOverlapSum += mapreduce(+, 1:triMatEleNum(nOrbs-1)) do l
-        n, m = convert1DidxTo2D(nOrbs-1, l)
-        ptrPair = (ptrs[begin+m-1], ptrs[begin+n])
-        coeffPair = (pOrbNormCoeffs[begin+m-1], pOrbNormCoeffs[begin+n])
-        (sum∘decodePrimCoreInt)(overlapCache, ptrPair, coeffPair)
+    innerOverlapSum += mapreduce(+, 1:triMatEleNum(nPrimOrbs-1)) do l
+        n, m = convert1DidxTo2D(nPrimOrbs-1, l)
+        pointerPair = (idxSeq[begin+m-1], idxSeq[begin+n])
+         scalarPair = (weight[begin+m-1], weight[begin+n])
+        (sum∘decodePrimCoreInt)(overlapCache, pointerPair, scalarPair)
     end
-
-    outerNormCoeff = AbsSqrtInv(innerOverlapSum)
-    pOrbNormCoeffs .*= outerNormCoeff
-    pOrbNormCoeffs
+    weight .*= AbsSqrtInv(innerOverlapSum)
 end
 
-function buildOrbWeightInfoCore(::Val{false}, weights::AbstractVector{T}, 
-                                orbs::FPrimOrbSet{T, D}, 
-                                ptrs::AbstractVector{Int}, 
-                                normCache::OverlapCache{T, D}) where {T, D}
-    map(weights, orbs, ptrs) do w, pOrb, ptr
-        w * buildOrbWeightInfoCore(pOrb=>getMemory(ptr), normCache)
+
+function buildOrbWeight!(paramCache::DimSpanDataCacheBox{T}, 
+                         normCache::OverlapCache{T, D}, orb::FrameworkOrb{T, D}, 
+                         idxSeq::AbstractVector{Int}) where {T, D}
+    if orb isa FCompOrb
+        weight = cacheParam!(paramCache, getOrbWeightCore(orb))
+        if isRenormalized(orb)
+            buildNormalizedCompOrbWeight(weight, normCache, orb, idxSeq)
+        else
+            for (i, wc) in enumerate(weight)
+                ptr = idxSeq[begin+i-1]
+                temp = buildPrimOrbWeight(normCache, (getInnerOrb∘viewOrb)(orb, i), ptr, wc)
+                weight[begin+i-1] = temp
+            end
+        end
+    else
+        weight = getMemory(buildPrimOrbWeight(normCache, getInnerOrb(orb), idxSeq[]))
     end
+    weight
 end
 
-function cacheOrbBareWeight!(paramCache::DimSpanDataCacheBox{T}, orb::FCompOrb{T}) where {T}
-    cacheParam!(paramCache, getOrbWeightCore(orb))
+
+function buildOrbWeightIndexerCore!(primOrbPtrs::AbstractVector{Int}, 
+                                    primOrbWeight::AbstractVector{T}) where {T}
+    nPtrs = length(primOrbWeight)
+    list = Memory{Pair{Int, T}}(undef, nPtrs)
+    for i in 1:nPtrs
+        list[begin+i-1] = primOrbPtrs[begin+i-1] => primOrbWeight[begin+i-1]
+    end
+    BasisWeightIndexer(list)
 end
 
-function cacheOrbBareWeight!(::DimSpanDataCacheBox{T}, ::FPrimOrb{T}) where {T}
-    one(T)
-end
 
-function buildOrbWeightInfo!(orbPtrPair::Pair{<:FCompOrb{T, D}, Memory{Int}}, 
-                             normCache::OverlapCache{T, D}, 
-                             paramCache::DimSpanDataCacheBox{T}) where {T, D}
-    orb = orbPtrPair.first
-    normBool = isRenormalized(orb)
-    wVal = cacheOrbBareWeight!(paramCache, orb)
-    pOrbs = splitOrb(orb)
-    ptrs = orbPtrPair.second
-
-    res = buildOrbWeightInfoCore(Val(normBool), wVal, pOrbs, ptrs, normCache)
-    getMemory(res)
-end
-
-#? Maybe a better signature?
-buildOrbWeightInfo!(orbPtrPair::Pair{<:FPrimOrb{T, D}, Memory{Int}}, 
-                    normCache::OverlapCache{T, D}, 
-                    ::DimSpanDataCacheBox{T}) where {T, D} = 
-getMemory(buildOrbWeightInfoCore(orbPtrPair, normCache))
-
-
-function extractOrbWeightData!(normCache::OverlapCache{T, D}, 
-                               paramCache::DimSpanDataCacheBox{T}, 
-                               orb::FrameworkOrb{T, D}) where {T, D}
-    normIdxPair = cachePrimCoreIntegrals!(normCache, paramCache, orb)
-    buildOrbWeightInfo!(normIdxPair, normCache, paramCache)
-end
-
-function extractOrbWeightData!(normCache::OverlapCache{T, D}, 
-                               paramCache::DimSpanDataCacheBox{T}, 
-                               orbs::OrbitalSet{T, D}) where {T, D}
-    map(orbs) do orb
-        extractOrbWeightData!(normCache, paramCache, orb)
+function buildOrbWeightIndexer!(paramCache::DimSpanDataCacheBox{T}, 
+                                normCache::OverlapCache{T, D}, 
+                                orbs::OrbitalSet{T, D}, 
+                                normIdxList::BasisIndexList, 
+                                intIdxList::BasisIndexList=normIdxList) where {T, D}
+    map(enumerate(orbs)) do (i, orb)
+        iRange = getBasisIndexRange(intIdxList, i)
+        intIdxSeq = view(intIdxList.index, iRange)
+        normIdxSeq = view(normIdxList.index, iRange)
+        orbWeight = buildOrbWeight!(paramCache, normCache, orb, normIdxSeq)
+        buildOrbWeightIndexerCore!(intIdxSeq, orbWeight)
     end
 end
 
-
-function prepareIntegralConfigCore(orbPtrs::AbstractVector{Int}, 
-                                   orbWeights::AbstractVector{T}) where {T}
-    map(orbPtrs, orbWeights) do ptr, w
-        ptr => w
-    end |> getMemory |> BasisWeightIndexer
+function buildOrbWeightIndexer!(paramCache::DimSpanDataCacheBox{T}, 
+                                normCache::OverlapCache{T, D}, 
+                                orb::FrameworkOrb{T, D}, 
+                                normIdxList::BasisIndexList, 
+                                intIdxList::BasisIndexList=normIdxList) where {T, D}
+    orbWeight = buildOrbWeight!(paramCache, normCache, orb, normIdxList.index)
+    buildOrbWeightIndexerCore!(intIdxList.index, orbWeight)
 end
+
 
 function prepareIntegralConfig!(intCache::IntegralCache{T, D}, 
                                 normCache::OverlapCache{T, D}, 
                                 paramCache::DimSpanDataCacheBox{T}, 
-                                orbs::OrbitalSet{T, D}) where {T, D}
-    intIdxPairs = cachePrimCoreIntegrals!(intCache, paramCache, orbs)
-    map(orbs, intIdxPairs) do orb, intIdxPair
-        orbWeights = extractOrbWeightData!(normCache, paramCache, orb)
-        prepareIntegralConfigCore(intIdxPair.second, orbWeights)
-    end
-end
-
-function prepareIntegralConfig!(intCache::IntegralCache{T, D}, 
-                                normCache::OverlapCache{T, D}, 
-                                paramCache::DimSpanDataCacheBox{T}, 
-                                orb::FrameworkOrb{T, D}) where {T, D}
-    intIdxPair = cachePrimCoreIntegrals!(intCache, paramCache, orb)
-    orbWeights = extractOrbWeightData!(normCache, paramCache, orb)
-    prepareIntegralConfigCore(intIdxPair.second, orbWeights)
+                                orbInfo::Union{FrameworkOrb{T, D}, OrbitalSet{T, D}}) where 
+                               {T, D}
+    intIdxList = cachePrimCoreIntegrals!(intCache, paramCache, orbInfo)
+    normIdxList = cachePrimCoreIntegrals!(normCache, intCache, intIdxList)
+    buildOrbWeightIndexer!(paramCache, normCache, orbInfo, normIdxList, intIdxList)
 end
 
 
@@ -595,7 +608,7 @@ function buildIntegralTensor(intCache::OneBodyIntCache{T},
     res
 end
 
-
+#!! Optimize construction for a single orb
 function initializeIntegralCache!(::OneBodyIntegral, op::F, 
                                   paramCache::DimSpanDataCacheBox{T}, 
                                   orbs::OrbitalSet{T, D}) where {F<:DirectOperator, T, D}
@@ -640,11 +653,16 @@ computeIntTensor(style::MultiBodyIntegral, op::DirectOperator, orbs::OrbitalBasi
 computeIntTensor(style, op, map(FrameworkOrb, orbs); paramCache)
 
 
+function decomposeOrb!(normCache::OverlapCache{T, D}, paramCache::DimSpanDataCacheBox{T}, 
+                       orb::FrameworkOrb{T, D}) where {T, D}
+    normIdxList = cachePrimCoreIntegrals!(normCache, paramCache, orb)
+    orbWeight = buildOrbWeight!(paramCache, normCache, orb, normIdxList.index)
+    normCache.basis.list[normIdxList.index], orbWeight
+end
+
 function decomposeOrb!(paramCache::DimSpanDataCacheBox{T}, orb::FrameworkOrb{T}) where {T}
     normCache = initializeOverlapCache!(paramCache, getMemory(orb))
-    weight = extractOrbWeightData!(normCache, paramCache, orb)
-    coreDataSet = genOrbCoreData!(paramCache, splitOrb(orb))
-    coreDataSet, weight
+    decomposeOrb!(normCache, paramCache, orb)
 end
 
 
