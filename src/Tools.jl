@@ -1099,11 +1099,17 @@ end
 # obtainElementalVal(::Type{U}, obj::AbtArray0D{<:U}) where {U} = obj[]
 # obtainElementalVal(::Type{U}, obj::AbstractArray{<:U}) where {U} = copy(obj)
 
-getMemory(obj::Memory) = itself(obj)
+getMemory(arr::Memory) = itself(arr)
 
-function getMemory(obj::AbstractArray{T}) where {T}
-    arr = vec(isconcretetype(T) || isempty(obj) ? obj : itself.(obj))
-    Memory{eltype(arr)}(arr)
+function getMemory(arr::AbstractArray{T}) where {T}
+    eleT = if isconcretetype(T) || isempty(arr)
+        T
+    else
+        mapreduce(typejoin, arr, init=Union{}) do ele
+            typeof(ele)
+        end
+    end
+    Memory{eleT}(vec(arr))
 end
 
 function getMemory(obj::NonEmptyTuple{Any})
