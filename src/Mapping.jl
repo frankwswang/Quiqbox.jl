@@ -81,6 +81,8 @@ struct EncodeApply{N, E<:NTuple{N, Function}, F<:Function} <: FunctionComposer
     apply::F
 end
 
+EncodeApply(encode::Function, apply::Function) = EncodeApply((encode,), apply)
+
 (f::EncodeApply)(args...) = f.apply(map(f->f(args...), f.encode)...)
 
 (f::EncodeApply{0})(args...) = f.apply(args...)
@@ -271,9 +273,9 @@ end
 
 #! Possibly adding memoization in the future to generate/use the same param set to avoid 
 #! bloating `Quiqbox.IdentifierCache` and prevent repeated computation.
-unpackFunc(f::Function) = unpackFunc!(f, initializeParamSet(f))
+unpackFunc(f::F) where {F<:Function} = unpackFunc!(f, initializeParamSet(f))
 
-unpackFunc!(f::Function, paramSet::AbstractVector) = 
+unpackFunc!(f::F, paramSet::AbstractVector) where {F<:Function} = 
 unpackFunc!(SelectTrait{ParameterizationStyle}()(f), f, paramSet)
 
 unpackFunc!(::TypedParamFunc, f::Function, paramSet::AbstractVector) = 
