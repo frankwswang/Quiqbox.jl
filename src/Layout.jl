@@ -66,33 +66,6 @@ ChainPointer((prev.chain..., here.chain...), here.type)
 ChainPointer(prev::GeneralFieldName, here::ChainPointer) = 
 ChainPointer((prev, here.chain...), here.type)
 
-struct ChainFilter{L, U, C<:Tuple{Vararg{PointerStack{L, U}}}} <: PointerStack{L, U}
-    chain::C
-
-    ChainFilter(::Tuple{}=()) = new{0, 0, Tuple{}}( () )
-
-    ChainFilter(chain::NonEmptyTuple{PointerStack{L, U}}) where {L, U} = 
-    new{L, U, typeof(chain)}(chain)
-end
-
-const AllPassFilter = ChainFilter{0, 0, Tuple{}}
-
-const SingleFilter{L, U, C<:PointerStack{L, U}} = ChainFilter{L, U, Tuple{C}}
-
-ChainFilter(prev::ChainFilter, here::ChainFilter) = 
-ChainFilter((prev.chain..., here.chain...))
-
-ChainFilter(prev::PointerStack, here::ChainFilter) = 
-ChainFilter((prev, here.chain...))
-
-ChainFilter(prev::ChainFilter, here::PointerStack) = 
-ChainFilter((prev.chain..., here))
-
-ChainFilter(prev::PointerStack, here::PointerStack) = ChainFilter((prev, here))
-
-ChainFilter(obj::ChainFilter) = itself(obj)
-ChainFilter(obj::PointerStack) = ChainFilter((obj,))
-
 
 struct AwaitFilter{P<:PointerStack} <: StaticPointer{P}
     ptr::P
@@ -100,15 +73,13 @@ end
 
 AwaitFilter(ptr::AwaitFilter) = itself(ptr)
 
-struct FilteredObject{T, P<:ChainFilter} <: ViewedObject{T, P}
+struct FilteredObject{T, P<:PointerStack} <: ViewedObject{T, P}
     obj::T
     ptr::P
 end
 
-FilteredObject(obj::FilteredObject, ptr::ChainFilter) = 
-FilteredObject(obj.obj, ChainFilter(obj.ptr, ptr))
-
-FilteredObject(obj, ptr::PointerStack) = FilteredObject(obj, ChainFilter(ptr))
+FilteredObject(obj::FilteredObject, ptr::PointerStack) = 
+FilteredObject(obj.obj, getField(obj.ptr, ptr))
 
 FilteredObject(obj, ptr::AwaitFilter) = FilteredObject(obj, ptr.ptr)
 
@@ -136,17 +107,6 @@ function getField(obj::FilteredObject, ptr::EntryPointer)
     getField(obj.obj, getField(obj.ptr, ptr))
 end
 
-function getField(scope::ChainFilter, ptr::EntryPointer)
-    for i in reverse(scope.chain)
-        ptr = getField(i, ptr)
-    end
-    ptr
-end
-
-function getField(scope::PointerStack, ptr::PointerStack)
-    ChainFilter(scope, ptr)
-end
-
 const InstantPtrCollection = Union{PointerStack, NonEmpTplOrAbtArr{ActivePointer}}
 
 getField(obj, ptr::InstantPtrCollection) = evalField(itself, obj, ptr)
@@ -157,6 +117,14 @@ end
 
 function getField(obj, ptr::AwaitFilter)
     FilteredObject(obj, ptr)
+end
+
+function getField(prev::PointerStack, here::AwaitFilter)
+    AwaitFilter(getField(prev, here.ptr))
+end
+
+function getField(prev::AwaitFilter, here::PointerStack)
+    getField(prev.ptr, here)
 end
 
 getField(obj::Any) = itself(obj)
@@ -170,22 +138,6 @@ end
 
 function evalField(f::F, obj, ptr::InstantPtrCollection) where {F<:Function}
     map(x->evalField(f, obj, x), ptr)
-end
-
-function evalField(f::F, obj, ptr::ChainFilter) where {F<:Function}
-    body..., tip = ptr.chain
-    scope = ChainFilter(body)
-    map(tip) do idx
-        evalFieldCore(f, obj, scope, idx)
-    end
-end
-
-function evalField(f::F, obj, ptr::SingleFilter) where {F<:Function}
-    evalField(f, obj, first(ptr.chain))
-end
-
-function evalField(f::F, obj, ::AllPassFilter) where {F<:Function}
-    f(obj)
 end
 
 function evalFieldCore(f::F, obj, scope::PointerStack, 

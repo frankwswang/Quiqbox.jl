@@ -1677,10 +1677,8 @@ function FlatParamSetFilter(d0::AbstractVector{FlatPSetInnerPtr{T}},
     FlatParamSetFilter(d0, d1)
 end
 
-const ChainFlatParamSetFilter{T, N} = ChainFilter{1, 2, NTuple{N, FlatParamSetFilter{T}}}
-
 const FilteredFlatParamSet{T, N} = 
-      FilteredObject{<:TypedFlatParamSet{T}, ChainFlatParamSetFilter{T, N}}
+      FilteredObject{<:TypedFlatParamSet{T}, FlatParamSetFilter{T}}
 
 const TypedParamInput{T} = Union{TypedFlatParamSet{T}, FilteredFlatParamSet{T}}
 
@@ -1725,8 +1723,7 @@ getindex(obj.d0, last(ptr.chain))
 getField(obj::FlatParamSetFilter, ptr::FlatPSetOuterPtr) = 
 getFlatSetIndexCore(obj, first(ptr.chain))
 
-
-function intersectFilter(prev::FlatParamSetFilter, here::FlatParamSetFilter)
+function getField(prev::FlatParamSetFilter, here::FlatParamSetFilter)
     d0New = map(here.d0) do ptr
         getField(prev, ptr)
     end
@@ -1734,6 +1731,19 @@ function intersectFilter(prev::FlatParamSetFilter, here::FlatParamSetFilter)
         getField(prev, ptr)
     end
     FlatParamSetFilter(d0New, d1New)
+end
+
+function refocus!(here::FlatParamSetFilter, prev::FlatParamSetFilter)
+    for i in eachindex(here.d0)
+        ptr = here.d0[i]
+        here.d0[i] = getField(prev, ptr)
+    end
+
+    for i in eachindex(here.d1)
+        ptr = here.d1[i]
+        here.d1[i] = getField(prev, ptr)
+    end
+    here
 end
 
 
