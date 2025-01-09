@@ -132,6 +132,13 @@ struct PrimOrbParamPtr{T, D, R<:FieldPtrDict{T}} <: ComposedOrbParamPtr{T, D, R}
         bodyPtr = MixedFieldParamPointer(bodyParamPairs, tag)
         new{T, D+1, typeof(bodyPtr.core)}(centerParamPtrs, bodyPtr, scope, tag)
     end
+
+    function PrimOrbParamPtr(ptr::PrimOrbParamPtr{T, D, R}, 
+                             parentScope::FlatParamSetFilter{T}, 
+                             tag::Identifier=ptr.tag) where {T, D, R<:FieldPtrDict{T}}
+        newScope = getField(parentScope, ptr.scope)
+        new{T, D, R}(ptr.center, ptr.body, newScope, tag)
+    end
 end
 
 function unpackComposedOrbCore!(f::PrimitiveOrb{T, D}, paramSet::FlatParamSet, 
@@ -304,7 +311,7 @@ end
 #! Consider paramSet::FilteredFlatParamSet as an input argument.
 #! You cannot. Because `locateParam!` might change upstream (input) paramSet's size by 
 #! pushing new parameters while `FilteredFlatParamSet` cannot change its size.
-struct FrameworkOrb{T, D, B<:EvalComposedOrb{T, D}, P<:TypedParamInput{T}, 
+struct FrameworkOrb{T, D, B<:EvalComposedOrb{T, D}, P<:TypedFlatParamSet{T}, 
                     A<:FieldParamPointer} <: UnpackedOrb{T, D, B}
     core::B
     param::P
@@ -313,8 +320,9 @@ struct FrameworkOrb{T, D, B<:EvalComposedOrb{T, D}, P<:TypedParamInput{T},
     function FrameworkOrb(o::ComposedOrb{T, D}, 
                           paramSet::Union{FlatParamSet{T}, Missing}=missing) where {T, D}
         bl = ismissing(paramSet)
+        id = Identifier(paramSet)
         bl && (paramSet = initializeParamSet(FlatParamSet, T))
-        core, _, ptr = unpackParamFunc!(o, paramSet)
+        core, _, ptr = unpackParamFunc!(o, paramSet, id)
         d0 = paramSet.d0
         d1 = paramSet.d1
         isempty(paramSet.d0) || (d0 = itself.(d0))
@@ -323,29 +331,29 @@ struct FrameworkOrb{T, D, B<:EvalComposedOrb{T, D}, P<:TypedParamInput{T},
         new{T, D, typeof(core), typeof(paramSet), typeof(ptr)}(core, paramSet, ptr)
     end
 
-    function FrameworkOrb(o::FrameworkOrb{T, D, <:EvalCompOrb{T, D}, <:TypedParamInput{T}}, 
-                          idx::Int) where {T, D}
+    function FrameworkOrb(o::FrameworkOrb{T, D, <:EvalCompOrb{T, D}, P}, 
+                          idx::Int) where {T, D, P<:TypedFlatParamSet{T}}
+        oParams = o.param
         oPointer = o.pointer
-        oCore = o.core.f.apply.left
+        oCore = (getInnerOrb∘getInnerOrb)(o)
         subOrb = oCore.f.chain[idx].left
-        subPtr = oPointer.basis[idx]
-        subPar = FilteredObject(o.param, oPointer.scope)
-        new{T, D, typeof(subOrb), typeof(subPar), typeof(subPtr)}(subOrb, subPar, subPtr)
+        subPtr = PrimOrbParamPtr(oPointer.basis[idx], oPointer.scope, oPointer.tag)
+        new{T, D, typeof(subOrb), P, typeof(subPtr)}(subOrb, oParams, subPtr)
     end
 end
 
 FrameworkOrb(o::FrameworkOrb) = itself(o)
 
-const FPrimOrb{T, D, B<:EvalPrimOrb{T, D}, P<:TypedParamInput{T}, A<:FieldParamPointer} = 
+const FPrimOrb{T, D, B<:EvalPrimOrb{T, D}, P<:TypedFlatParamSet{T}, A<:FieldParamPointer} = 
       FrameworkOrb{T, D, B, P, A}
 
-const FCompOrb{T, D, B<:EvalCompOrb{T, D}, P<:TypedParamInput{T}, A<:FieldParamPointer} = 
+const FCompOrb{T, D, B<:EvalCompOrb{T, D}, P<:TypedFlatParamSet{T}, A<:FieldParamPointer} = 
       FrameworkOrb{T, D, B, P, A}
 
-const FPrimGTO{T, D, B<:EvalPrimGTO{T, D}, P<:TypedParamInput{T}, A<:FieldParamPointer} = 
+const FPrimGTO{T, D, B<:EvalPrimGTO{T, D}, P<:TypedFlatParamSet{T}, A<:FieldParamPointer} = 
       FPrimOrb{T, D, B, P, A}
 
-const FCompGTO{T, D, B<:EvalCompGTO{T, D}, P<:TypedParamInput{T}, A<:FieldParamPointer} = 
+const FCompGTO{T, D, B<:EvalCompGTO{T, D}, P<:TypedFlatParamSet{T}, A<:FieldParamPointer} = 
       FCompOrb{T, D, B, P, A}
 
 unpackFunc(o::FrameworkOrb) = (o.core, o.param, o.pointer)
