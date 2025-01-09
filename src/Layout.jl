@@ -124,7 +124,7 @@ function getField(prev::PointerStack, here::AwaitFilter)
 end
 
 function getField(prev::AwaitFilter, here::PointerStack)
-    getField(prev.ptr, here)
+    AwaitFilter(getField(prev.ptr, here))
 end
 
 getField(obj::Any) = itself(obj)
