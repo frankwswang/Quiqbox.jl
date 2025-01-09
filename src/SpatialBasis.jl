@@ -302,6 +302,8 @@ end
 
 
 #! Consider paramSet::FilteredFlatParamSet as an input argument.
+#! You cannot. Because `locateParam!` might change upstream (input) paramSet's size by 
+#! pushing new parameters while `FilteredFlatParamSet` cannot change its size.
 struct FrameworkOrb{T, D, B<:EvalComposedOrb{T, D}, P<:TypedParamInput{T}, 
                     A<:FieldParamPointer} <: UnpackedOrb{T, D, B}
     core::B
