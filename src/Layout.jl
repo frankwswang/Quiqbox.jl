@@ -314,6 +314,46 @@ function ==(id1::Identifier, id2::Identifier)
 end
 
 
+function leftFoldHash(objs::Union{AbstractArray, Tuple}, initHash::UInt)
+    init = hash(sizeOf(objs), initHash)
+    foldl(leftFoldHash, objs; init)
+end
+
+leftFoldHash(initHash::UInt, obj::Any) = hash(obj, initHash)
+
+
+struct ArrayEntryIdentifier{T, N} <: IdentityMarker{T}
+    code::UInt
+    data::AbstractArray{T, N}
+
+    function ArrayEntryIdentifier(input::AbstractArray{T, N}) where {T, N}
+        new{T, N}(leftFoldHash(Val(N), input), input)
+    end
+end
+
+function elementalArrayCompare(obj1::Any, obj2::Any; compareFunction::F=(===)) where 
+                              {F<:Function}
+    compareFunction(obj1, obj2)
+end
+
+function elementalArrayCompare(obj1::AbstractArray{<:Any, N}, obj2::AbstractArray{<:Any, N}; 
+                               compareFunction::F=(===)) where {N, F<:Function}
+    if size(obj1) == size(obj1)
+        all(elementalArrayCompare(i, j; compareFunction) for (i, j) in zip(obj1, obj2))
+    else
+        false
+    end
+end
+
+function ==(marker1::ArrayEntryIdentifier, marker2::ArrayEntryIdentifier)
+    if marker1.code == marker2.code
+        elementalArrayCompare(mark1.data, mark2.data, compareFunction=(===))
+    else
+        false
+    end
+end
+
+
 struct ValueMarker{T} <: IdentityMarker{T}
     code::UInt
     data::T
@@ -326,14 +366,6 @@ function ==(marker1::ValueMarker, marker2::ValueMarker)
         marker1.data == marker2.data
     else
         false
-    end
-end
-
-const IdMarkers = Union{AbstractArray{<:IdentityMarker}, Tuple{Vararg{IdentityMarker}}}
-
-function leftFoldHash(markers::IdMarkers, initHash::UInt)
-    mapfoldl((x, y)->hash(y, x), markers, init=initHash) do ele
-        ele.code
     end
 end
 
@@ -353,7 +385,7 @@ struct FieldMarker{S, N} <: IdentityMarker{S}
         markers = getproperty.(Ref(input), propertySyms) .|> markObj
         inputName = nameof(T)
         data = propertySyms .=> markers
-        new{inputName, length(propertySyms)}(leftFoldHash(markers, hash(inputName)), data)
+        new{inputName, length(propertySyms)}(leftFoldHash(hash(inputName), markers), data)
     end
 end
 
@@ -370,13 +402,9 @@ struct BlockMarker <: IdentityMarker{Union{AbstractArray, Tuple}}
     data::Union{AbstractArray, Tuple}
 
     function BlockMarker(input::Union{AbstractArray, Tuple})
-        containerHash = if input isa Tuple
-            hash(length(input), hash(Tuple))
-        else
-            hash(size(input), hash(AbstractArray))
-        end
-        code = mapfoldr(hash, input, init=containerHash) do ele
-            markObj(ele).code
+        containerHash = hash(input isa Tuple ? Tuple : AbstractArray)
+        code = mapfoldl(leftFoldHash, input, init=containerHash) do ele
+            markObj(ele)
         end
         new(code, input)
     end
