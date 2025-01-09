@@ -319,15 +319,17 @@ struct FrameworkOrb{T, D, B<:EvalComposedOrb{T, D}, P<:TypedFlatParamSet{T},
 
     function FrameworkOrb(o::ComposedOrb{T, D}, 
                           paramSet::Union{FlatParamSet{T}, Missing}=missing) where {T, D}
-        bl = ismissing(paramSet)
         id = Identifier(paramSet)
+        bl = ismissing(paramSet)
         bl && (paramSet = initializeParamSet(FlatParamSet, T))
         core, _, ptr = unpackParamFunc!(o, paramSet, id)
-        d0 = paramSet.d0
-        d1 = paramSet.d1
-        isempty(paramSet.d0) || (d0 = itself.(d0))
-        isempty(paramSet.d1) || (d1 = itself.(d1))
-        bl && (paramSet = FlatParamSet{T}(d0, d1))
+        if bl
+            d0 = paramSet.d0
+            d1 = paramSet.d1
+            isempty(d0) || (d0 = map(itself, d0))
+            isempty(d1) || (d1 = map(itself, d1))
+            paramSet = FlatParamSet{T}(d0, d1)
+        end
         new{T, D, typeof(core), typeof(paramSet), typeof(ptr)}(core, paramSet, ptr)
     end
 
