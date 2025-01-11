@@ -1531,12 +1531,12 @@ end
 pushParam!(fps::FlatParamSet, a::ElementalParam) = push!(fps.d0, a)
 pushParam!(fps::FlatParamSet, a::FlattenedParam) = push!(fps.d1, a)
 
-function iterate(fps::FlatParamSet)
+function iterate(fps::AbstractFlatParamSet)
     i = firstindex(fps)
     (getindex(fps, i), i+1)
 end
 
-function iterate(fps::FlatParamSet, state)
+function iterate(fps::AbstractFlatParamSet, state)
     if state > length(fps)
         nothing
     else
@@ -1545,6 +1545,18 @@ function iterate(fps::FlatParamSet, state)
 end
 
 length(fps::FlatParamSet) = length(fps.d1) + 1
+
+axes(fps::FlatParamSet)	= map(Base.OneTo, size(fps))
+
+function similar(fps::FlatParamSet{T}, ::Type{Union{Vector{P1}, P2}}=eltype(fps), 
+                 shape::Tuple{Int}=size(fps)) where 
+                {T, P1<:ElementalParam{<:T}, P2<:FlattenedParam{<:T}}
+    res = Vector{Union{Vector{P1}, P2}}(undef, shape)
+    res[begin] = Vector{P1}(undef, size(fps.d0))
+    res
+end
+
+similar(fps::FlatParamSet, shape::Tuple{Int}) = similar(fps, eltype(fps), shape)
 
 getproperty(fps::FlatParamSet, field::Symbol) = getfield(fps, field)
 
@@ -1618,6 +1630,18 @@ function iterate(mps::MiscParamSet, state)
 end
 
 length(mps::MiscParamSet) = length(mps.outer) + 1
+
+axes(mps::MiscParamSet)	= map(Base.OneTo, size(mps))
+
+function similar(mps::MiscParamSet{T}, ::Type{Union{S, P}}=eltype(mps), 
+                 shape::Tuple{Int}=size(mps)) where 
+                {T, S<:TypedFlatParamSet{T}, P<:JaggedParam{<:T}}
+    res = Vector{Union{S, P}}(undef, shape)
+    res[begin] = similar(mps.inner, eltype(S))
+    res
+end
+
+similar(mps::MiscParamSet, shape::Tuple{Int}) = similar(mps, eltype(mps), shape)
 
 getproperty(fps::MiscParamSet, field::Symbol) = getfield(fps, field)
 
