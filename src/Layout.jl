@@ -99,11 +99,13 @@ getFieldCore(obj, ::AllPassPointer) = itself(obj)
 
 getFieldCore(obj, ptr::ChainPointer) = foldl(getField, ptr.chain, init=obj)
 
-getField(obj, ptr::Union{EntryPointer, GeneralFieldName}) = getFieldCore(obj, ptr)
+const GeneralEntryPointer = Union{EntryPointer, GeneralFieldName}
+
+getField(obj, ptr::GeneralEntryPointer) = getFieldCore(obj, ptr)
 
 getField(ptr::ChainPointer, idx::GeneralFieldName) = ChainPointer(ptr, ChainPointer(idx))
 
-function getField(obj::FilteredObject, ptr::EntryPointer)
+function getField(obj::FilteredObject, ptr::GeneralEntryPointer)
     getField(obj.obj, getField(obj.ptr, ptr))
 end
 
@@ -132,24 +134,12 @@ getField(obj::Any) = itself(obj)
 getField(obj::FilteredObject) = getField(obj.obj, obj.ptr)
 
 
-function evalField(f::F, obj, ptr::EntryPointer) where {F<:Function}
+function evalField(f::F, obj, ptr::GeneralEntryPointer) where {F<:Function}
     getField(obj, ptr) |> f
 end
 
 function evalField(f::F, obj, ptr::InstantPtrCollection) where {F<:Function}
     map(x->evalField(f, obj, x), ptr)
-end
-
-function evalFieldCore(f::F, obj, scope::PointerStack, 
-                       ptr::ActivePointer) where {F<:Function}
-    evalField(f, obj, getField(scope, ptr))
-end
-
-function evalFieldCore(f::F, obj, scope::PointerStack, 
-                       ptrs::NonEmpTplOrAbtArr{ActivePointer}) where {F<:Function}
-    map(ptrs) do ptr
-        evalField(f, obj, getField(scope, ptr))
-    end
 end
 
 
@@ -314,40 +304,56 @@ function ==(id1::Identifier, id2::Identifier)
 end
 
 
-function leftFoldHash(objs::Union{AbstractArray, Tuple}, initHash::UInt)
+function leftFoldHash(initHash::UInt, objs::Union{AbstractArray, Tuple}; 
+                      marker::F=itself) where {F<:Function}
     init = hash(sizeOf(objs), initHash)
-    foldl(leftFoldHash, objs; init)
+    hashFunc = (x::UInt, y) -> leftFoldHash(x, y; marker)
+    foldl(hashFunc, objs; init)
 end
 
-leftFoldHash(initHash::UInt, obj::Any) = hash(obj, initHash)
+leftFoldHash(initHash::UInt, obj::Any; marker::F=itself) where {F<:Function} = 
+hash(marker(obj), initHash)
 
 
-struct ArrayEntryIdentifier{T, N} <: IdentityMarker{T}
+struct ElementWiseMatcher{F<:Function, T<:AbstractArray} <: IdentityMarker{T}
     code::UInt
-    data::AbstractArray{T, N}
+    marker::F
+    data::T
 
-    function ArrayEntryIdentifier(input::AbstractArray{T, N}) where {T, N}
-        new{T, N}(leftFoldHash(Val(N), input), input)
+    function ElementWiseMatcher(input::T, marker::F=itself) where 
+                               {T<:AbstractArray, F<:Function}
+        new{F, T}(leftFoldHash(hash(nothing), input; marker), marker, input)
     end
 end
 
-function elementalArrayCompare(obj1::Any, obj2::Any; compareFunction::F=(===)) where 
-                              {F<:Function}
-    compareFunction(obj1, obj2)
+function elementWiseMatch(obj1::Any, obj2::Any; marker1::M1=itself, marker2::M2=itself, 
+                          compareFunction::F=(===)) where {M1<:Function, M2<:Function, 
+                                                           F<:Function}
+    compareFunction(marker1(obj1), marker2(obj2))
 end
 
-function elementalArrayCompare(obj1::AbstractArray{<:Any, N}, obj2::AbstractArray{<:Any, N}; 
-                               compareFunction::F=(===)) where {N, F<:Function}
+function elementWiseMatch(obj1::AbstractArray{<:Any, N}, obj2::AbstractArray{<:Any, N}; 
+                          marker1::M1=itself, marker2::M2=itself, 
+                          compareFunction::F=(===)) where {N, M1<:Function, M2<:Function, 
+                                                           F<:Function}
     if size(obj1) == size(obj1)
-        all(elementalArrayCompare(i, j; compareFunction) for (i, j) in zip(obj1, obj2))
+        all( elementWiseMatch(marker1(i), marker2(j); 
+                              compareFunction) for (i, j) in zip(obj1, obj2) )
     else
         false
     end
 end
 
-function ==(marker1::ArrayEntryIdentifier, marker2::ArrayEntryIdentifier)
-    if marker1.code == marker2.code
-        elementalArrayCompare(mark1.data, mark2.data, compareFunction=(===))
+function elementWiseMatch(::AbstractArray, ::AbstractArray; marker1::M1=itself, 
+                          marker2::M2=itself, compareFunction::F=(===)) where 
+                         {M1<:Function, M2<:Function, F<:Function}
+    false
+end
+
+function ==(matcher1::ElementWiseMatcher, matcher2::ElementWiseMatcher)
+    if matcher1.code == matcher2.code
+        elementWiseMatch(matcher1.data, matcher2.data, compareFunction=isequal, 
+                         marker1=matcher1.marker, marker2=matcher2.marker)
     else
         false
     end
