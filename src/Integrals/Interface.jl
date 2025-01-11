@@ -9,7 +9,8 @@ const OrbitalInput{T, D} = Union{FrameworkOrb{T, D}, OrbitalCollection{T, D}}
 const FPrimOrbSet{T, D} = AbstractVector{<:FPrimOrb{T, D}}
 
 const OrbCoreIdxDict{T} = 
-      Dict{Tuple{FieldMarker{:PrimitiveOrbCore, 1}, AbtVecOfAbtArr{T}}, Int}
+      Dict{Tuple{FieldMarker{:PrimitiveOrbCore, 1}, 
+                 ElementWiseMatcher{ ItsType, <:Vector{<:ShapedMemory{T}} }}, Int}
 
 const OrbCoreData{T, D, F<:PrimitiveOrbCore{T, D}, V<:AbtVecOfAbtArr{T}} = Tuple{F, V}
 const OrbCoreDataSeq{T, D, F<:PrimitiveOrbCore{T, D}, V<:AbtVecOfAbtArr{T}, N} = 
@@ -297,11 +298,30 @@ function genOrbCoreData!(paramCache::DimSpanDataCacheBox{T}, orb::FPrimOrb{T}) w
     ((getInnerOrb∘getInnerOrb)(orb), pVal)
 end
 
+function updateOrbCache!(basisCache::PrimOrbCoreCache{T, D}, 
+                         paramCache::DimSpanDataCacheBox{T}, orb::FPrimOrb{T}) where {T, D}
+    basis = basisCache.list
+    idxDict = basisCache.dict
+    orbCore = first(orbData)
+    objCoreMarker = markObj(orbCore)
+    paramSubset = FilteredObject(orb.param, orb.pointer.scope) |> FlatParamSubset
+    marker = (p::Union{ElementalParam{T}, FlattenedParam{T}}) -> cacheParam!(paramCache, p)
+
+    get(idxDict, ( objCoreMarker, ElementWiseMatcher(paramSubset, marker) )) do
+        paramVals = cacheParam!(paramCache, paramSubset)
+        push!(basis, (orbCore, paramVals))
+        idx = lastindex(basis)
+        setindex!(idxDict, idx, ( objCoreMarker, ElementWiseMatcher(paramVals) ))
+        idx
+    end
+end
+
 
 function updateOrbCache!(basisCache::PrimOrbCoreCache{T, D}, 
-                             orbData::OrbCoreData{T, D}) where {T, D}
+                         orbData::OrbCoreData{T, D}) where {T, D}
     basis = basisCache.list
-    get!(basisCache.dict, ( (markObj∘first)(orbData), last(orbData) )) do
+    orbCore, orbPars = orbData
+    get!(basisCache.dict, ( markObj(orbCore), ElementWiseMatcher(orbPars) )) do
         push!(basis, orbData)
         lastindex(basis)
     end
