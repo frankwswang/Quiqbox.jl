@@ -49,6 +49,8 @@ ShapedMemory(::Type{T}, value::T) where {T} = ShapedMemory( fill(value) )
 
 ShapedMemory(arr::ShapedMemory) = ShapedMemory(arr.value, arr.shape)
 
+getMemory(arr::ShapedMemory) = arr.value
+
 
 size(arr::ShapedMemory) = arr.shape
 
@@ -1351,6 +1353,7 @@ end
 
 markParams!(b::AbtArrayOr) = b |> getParams |> markParams!
 
+#!! Change `hbNodesIdSet` to IDSet
 function topoSortCore!(hbNodesIdSet::Set{UInt}, 
                        orderedNodes::Vector{<:JaggedParam{T}}, 
                        haveBranches::Vector{Bool}, connectRoots::Vector{Bool}, 
