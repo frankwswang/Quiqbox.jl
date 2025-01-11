@@ -1719,6 +1719,57 @@ length(fps::FlatParamSetFilter) = length(fps.d1) + 1
 
 getproperty(fps::FlatParamSetFilter, field::Symbol) = getfield(fps, field)
 
+
+struct FlatParamSubset{T, P1<:ElementalParam{<:T}, P2<:FlattenedParam{<:T}
+                       } <: AbstractFlatParamSet{T, ShapedMemory{P1, 1}, P2}
+    core::FilteredObject{FlatParamSet{T, P1, P2}, FlatParamSetFilter{T}}
+end
+
+const GeneralFlatParamSet{T, P1, P2} = 
+      Union{FlatParamSet{T, P1, P2}, FlatParamSubset{T, P1, P2}}
+
+size(fps::FlatParamSubset) = size(fps.core.ptr)
+
+firstindex(::FlatParamSubset) = firstindex(fps.core.ptr)
+
+lastindex(fps::FlatParamSubset) = lastindex(fps.core.ptr)
+
+getindex(fps::FlatParamSubset, i::Int) = getField(fps.core.obj, getindex(fps.core.ptr, i))
+
+getindex(fps::FlatParamSubset, sector::Symbol, i::Int) = 
+getField(fps.core.obj, getindex(fps.core.ptr, sector, i))
+
+function setindex!(fps::FlatParamSubset, val, i::Int)
+    setindex!(fps.core.obj, val, getindex(fps.core.ptr, i))
+end
+
+function setindex!(fps::FlatParamSubset, val, sector::Symbol, i::Int)
+    setindex!(fps.core.obj, val, getindex(fps.core.ptr, sector, i))
+end
+
+pushParam!(::FlatParamSubset, ::Union{ElementalParam, FlattenedParam}) = 
+throw(AssertionError("The size of `FlatParamSubset` cannot be changed."))
+
+length(fps::FlatParamSubset) = length(fps.core.ptr)
+
+axes(fps::FlatParamSubset)	= map(Base.OneTo, size(fps))
+
+function similar(fps::FlatParamSubset{T}, 
+                 ::Type{Union{ShapedMemory{P1, 1}, P2}}=eltype(fps), 
+                 shape::Tuple{Int}=size(fps)) where 
+                {T, P1<:ElementalParam{<:T}, P2<:FlattenedParam{<:T}}
+    res = Memory{Union{ShapedMemory{P1, 1}, P2}}(undef, shape)
+    res[begin] = ShapedMemory{P1}(undef, size(fps.d0))
+    res
+end
+
+similar(fps::FlatParamSubset, shape::Tuple{Int}) = similar(fps, eltype(fps), shape)
+
+getproperty(fps::FlatParamSubset, field::Symbol) = getfield(fps, field)
+
+getField(fps::FlatParamSubset, field) = getField(fps.core, field)
+
+
 #= Additional Method =#
 getField(obj::FlatParamSetFilter, ptr::FlatPSetInnerPtr) = 
 getindex(obj.d0, last(ptr.chain))
@@ -1847,6 +1898,10 @@ function cacheParam!(cache::DimSpanDataCacheBox{T}, param::ParamBox{T}) where {T
     get!(getDimSpanSector(cache, param), Identifier(param)) do
         formatDimSpanMemory(T, obtain(param))
     end
+end
+
+function cacheParam!(cache::DimSpanDataCacheBox{T}, s::FlatParamSubset{T}) where {T}
+    cacheParam!(cache, s.data)
 end
 
 function cacheParam!(cache::DimSpanDataCacheBox{T}, s::TypedParamInput{T}, 
