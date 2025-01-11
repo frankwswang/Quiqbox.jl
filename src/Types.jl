@@ -157,7 +157,7 @@ const AbstractMiscParamSet{T, S<:AbstractFlatParamSet{T}, P<:JaggedParam{<:T}} =
       AbstractVector{Union{S, P}}
 
 const AbstractParamSet{T} = Union{AbstractFlatParamSet{T}, AbstractMiscParamSet{T}}
-const TypedParamSetVec{T} = Union{FlatParamVec{T}, FlatParamVec{T}, ParamBoxTypedArr{T, 1}}
+const TypedParamSetVec{T} = Union{FlatParamVec{T}, ParamBoxTypedArr{T, 1}}
 
 const DirectParamSource{T} = Union{AbstractParamSet{T}, TypedParamSetVec{T}}
 const ViewedParamSource{T, S<:DirectParamSource{T}, P} = ViewedObject{S, P}

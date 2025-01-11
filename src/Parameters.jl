@@ -1669,14 +1669,14 @@ const FlatPSetOuterPtr{T} = IndexPointer{Volume{T}, 1}
 const FlatParamSetIdxPtr{T} = Union{FlatPSetInnerPtr{T}, FlatPSetOuterPtr{T}}
 
 struct FlatParamSetFilter{T} <: PointerStack{1, 2}
-    d0::ShapedMemory{FlatPSetInnerPtr{T}, 1} #! Replace by immutable vector
-    d1::ShapedMemory{FlatPSetOuterPtr{T}, 1} #! Replace by immutable vector
+    d0::ShapedMemory{FlatPSetInnerPtr{T}, 1}
+    d1::Memory{FlatPSetOuterPtr{T}}
 end
 
 function FlatParamSetFilter(d0::AbstractVector{FlatPSetInnerPtr{T}}, 
                             d1::AbstractVector{FlatPSetOuterPtr{T}}) where {T}
     d0 isa ShapedMemory || (d0 = ShapedMemory(d0))
-    d1 isa ShapedMemory || (d1 = ShapedMemory(d1))
+    d1 isa Memory || (d1 = getMemory(d1))
     FlatParamSetFilter(d0, d1)
 end
 
@@ -1892,7 +1892,7 @@ formatDimSpanMemory(::Type{T}, val::T) where {T} = itself(val)
 formatDimSpanMemory(::Type{T}, val::AbstractArray{T}) where {T} = ShapedMemory(val)
 
 formatDimSpanMemory(::Type{T}, val::JaggedAbtArray{T}) where {T} = 
-ShapedMemory(ShapedMemory.(val))
+ShapedMemory(map(ShapedMemory, val))
 
 function cacheParam!(cache::DimSpanDataCacheBox{T}, param::ParamBox{T}) where {T}
     get!(getDimSpanSector(cache, param), Identifier(param)) do
