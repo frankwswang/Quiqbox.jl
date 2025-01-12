@@ -143,6 +143,15 @@ function evalField(f::F, obj, ptr::InstantPtrCollection) where {F<:Function}
 end
 
 
+function mapLayout(op::F, collection::Any) where {F<:Function}
+    map(op, collection)
+end
+
+function mapLayout(op::F, collection::FilteredObject) where {F<:Function}
+    evalField(op, collection.obj, collection.ptr)
+end
+
+
 abstract type FiniteDict{N, K, T} <: EqualityDict{K, T} end
 
 
@@ -484,13 +493,4 @@ end
 
 function compareObj(obj1::T1, obj2::T2) where {T1, T2}
     obj1 === obj2 || markObj(obj1) == markObj(obj2)
-end
-
-
-function mapLayout(op::F, collection::Any) where {F<:Function}
-    map(op, collection)
-end
-
-function mapLayout(op::F, collection::FilteredObject) where {F<:Function}
-    evalField(op, collection.obj, collection.ptr)
 end
