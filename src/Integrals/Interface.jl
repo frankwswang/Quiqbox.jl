@@ -301,11 +301,6 @@ function getBasisIndexRange(list::BasisIndexList, oneToIdx::Int)
 end
 
 
-function genOrbCoreData!(paramCache::DimSpanDataCacheBox{T}, orb::FPrimOrb{T}) where {T}
-    pVal = cacheParam!(paramCache, orb.param, orb.pointer.scope)
-    ((getInnerOrb∘getInnerOrb)(orb), pVal)
-end
-
 function updateOrbCache!(basisCache::PrimOrbCoreCache{T, D}, 
                          paramCache::DimSpanDataCacheBox{T}, orb::FPrimOrb{T}) where {T, D}
     basis = basisCache.list
