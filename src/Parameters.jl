@@ -1548,15 +1548,14 @@ length(fps::FlatParamSet) = length(fps.d1) + 1
 
 axes(fps::FlatParamSet)	= map(Base.OneTo, size(fps))
 
-function similar(fps::FlatParamSet{T}, ::Type{Union{Vector{P1}, P2}}=eltype(fps), 
-                 shape::Tuple{Int}=size(fps)) where 
+function similar(fps::FlatParamSet{T, P1, P2}, shape::Tuple{Int}=size(fps); 
+                 innerShape::Tuple{Int}=size(fps.d0)) where 
                 {T, P1<:ElementalParam{<:T}, P2<:FlattenedParam{<:T}}
+    checkPositivity(shape|>first)
     res = Vector{Union{Vector{P1}, P2}}(undef, shape)
-    res[begin] = Vector{P1}(undef, size(fps.d0))
+    res[begin] = Vector{P1}(undef, innerShape)
     res
 end
-
-similar(fps::FlatParamSet, shape::Tuple{Int}) = similar(fps, eltype(fps), shape)
 
 getproperty(fps::FlatParamSet, field::Symbol) = getfield(fps, field)
 
@@ -1633,15 +1632,14 @@ length(mps::MiscParamSet) = length(mps.outer) + 1
 
 axes(mps::MiscParamSet)	= map(Base.OneTo, size(mps))
 
-function similar(mps::MiscParamSet{T}, ::Type{Union{S, P}}=eltype(mps), 
-                 shape::Tuple{Int}=size(mps)) where 
-                {T, S<:TypedFlatParamSet{T}, P<:JaggedParam{<:T}}
-    res = Vector{Union{S, P}}(undef, shape)
-    res[begin] = similar(mps.inner, eltype(S))
+function similar(mps::MiscParamSet{T, P1, P2, P3}, shape::Tuple{Int}=size(mps); 
+                 innerShape::NTuple{2, Int}=length.( (mps.inner.d0, mps.inner) )) where 
+                {T, P1<:ElementalParam{<:T}, P2<:FlattenedParam{<:T}, P3<:JaggedParam{<:T}}
+    checkPositivity(shape|>first)
+    res = Vector{Union{Vector{Union{ Vector{P1}, P2 }}, P3}}(undef, shape)
+    res[begin] = similar(mps.inner, first(innerShape), innerShape=(last(innerShape),))
     res
 end
-
-similar(mps::MiscParamSet, shape::Tuple{Int}) = similar(mps, eltype(mps), shape)
 
 getproperty(fps::MiscParamSet, field::Symbol) = getfield(fps, field)
 
@@ -1778,16 +1776,14 @@ length(fps::FlatParamSubset) = length(fps.core.ptr)
 
 axes(fps::FlatParamSubset)	= map(Base.OneTo, size(fps))
 
-function similar(fps::FlatParamSubset{T}, 
-                 ::Type{Union{ShapedMemory{P1, 1}, P2}}=eltype(fps), 
-                 shape::Tuple{Int}=size(fps)) where 
+function similar(fps::FlatParamSubset{T, P1, P2}, shape::Tuple{Int}=size(fps); 
+                 innerShape::Tuple{Int}=size(fps.code.d0)) where 
                 {T, P1<:ElementalParam{<:T}, P2<:FlattenedParam{<:T}}
+    checkPositivity(shape|>first)
     res = Memory{Union{ShapedMemory{P1, 1}, P2}}(undef, shape)
-    res[begin] = ShapedMemory{P1}(undef, size(fps.d0))
+    res[begin] = ShapedMemory{P1}(undef, innerShape)
     res
 end
-
-similar(fps::FlatParamSubset, shape::Tuple{Int}) = similar(fps, eltype(fps), shape)
 
 getproperty(fps::FlatParamSubset, field::Symbol) = getfield(fps, field)
 
