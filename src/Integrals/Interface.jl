@@ -8,11 +8,19 @@ const OrbitalCollection{T, D} = NonEmpTplOrAbtArr{FrameworkOrb{T, D}, 1}
 const OrbitalInput{T, D} = Union{FrameworkOrb{T, D}, OrbitalCollection{T, D}}
 const FPrimOrbSet{T, D} = AbstractVector{<:FPrimOrb{T, D}}
 
-const OrbCoreIdxDict{T} = 
-      Dict{Tuple{FieldMarker{:PrimitiveOrbCore, 1}, 
-                 ElementWiseMatcher{ ItsType, <:Vector{<:ShapedMemory{T}} }}, Int}
+const OrbCoreData{T, D, F<:PrimitiveOrbCore{T, D}, V<:Vector{<:ShapedMemory{T}}} = 
+      Tuple{F, V}
 
-const OrbCoreData{T, D, F<:PrimitiveOrbCore{T, D}, V<:AbtVecOfAbtArr{T}} = Tuple{F, V}
+const FlatParamValMatcher{T, V<:AbstractVector{ <:AbstractArray{T} }} = 
+      ElementWiseMatcher{ItsType, V}
+
+const ConfinedParamInput{T} = Union{ShapedMemory{<:ElementalParam{T}, 1}, FlattenedParam{T}}
+
+const OrbCoreKey{T, V<:Vector{<:ShapedMemory{T}}} = 
+      Tuple{FieldMarker{:PrimitiveOrbCore, 1}, FlatParamValMatcher{T, V}}
+
+const OrbCoreIdxDict{T} = Dict{OrbCoreKey{T}, Int}
+
 const OrbCoreDataSeq{T, D, F<:PrimitiveOrbCore{T, D}, V<:AbtVecOfAbtArr{T}, N} = 
       AbstractVector{OrbCoreData{T, D, F, V}}
 
@@ -66,20 +74,20 @@ struct OneBodySymmetricDiffData{T<:Number} <: IntegralData{T, OneBodyIntegral}
 end
 
 
-struct IntegralCache{T, D, F<:DirectOperator, V<:PrimitiveOrbCore{T, D}, 
+struct IntegralCache{T, D, F<:DirectOperator, B<:PrimitiveOrbCore{T, D}, 
                      I<:IntegralData{T}} <: QueryBox{T}
     operator::F
-    basis::PrimOrbCoreCache{T, D, V}
+    basis::PrimOrbCoreCache{T, D, B}
     data::I
 end
 
-const OneBodyIntCache{T, D, F<:DirectOperator, V<:PrimitiveOrbCore{T, D}, 
+const OneBodyIntCache{T, D, F<:DirectOperator, B<:PrimitiveOrbCore{T, D}, 
                       I<:IntegralData{T, OneBodyIntegral}} = 
-      IntegralCache{T, D, F, V, I}
+      IntegralCache{T, D, F, B, I}
 
-const OverlapCache{T, D, V<:PrimitiveOrbCore{T, D}, 
+const OverlapCache{T, D, B<:PrimitiveOrbCore{T, D}, 
                    I<:IntegralData{T, OneBodyIntegral}} = 
-      OneBodyIntCache{T, D, Identity, V, I}
+      OneBodyIntCache{T, D, Identity, B, I}
 
 
 function setIntegralData!(ints::CompleteOneBodyIntegrals{T}, 
@@ -162,7 +170,7 @@ end
 
 function genOneBodyIntDataPairsCore(op::DirectOperator, 
                                     oDataPair::NTuple{2, OrbCoreDataSeq{T}}, 
-                                     oneBasedIdxPair::NTuple{2, Int}) where {T}
+                                    oneBasedIdxPair::NTuple{2, Int}) where {T}
     orbPars1, orbPars2 = map(oDataPair, oneBasedIdxPair) do data, idx
         data[begin+idx-1]
     end
@@ -302,10 +310,10 @@ function updateOrbCache!(basisCache::PrimOrbCoreCache{T, D},
                          paramCache::DimSpanDataCacheBox{T}, orb::FPrimOrb{T}) where {T, D}
     basis = basisCache.list
     idxDict = basisCache.dict
-    orbCore = first(orbData)
+    orbCore = (getInnerOrb∘getInnerOrb)(orb)
     objCoreMarker = markObj(orbCore)
     paramSubset = FilteredObject(orb.param, orb.pointer.scope) |> FlatParamSubset
-    marker = (p::Union{ElementalParam{T}, FlattenedParam{T}}) -> cacheParam!(paramCache, p)
+    marker = (p::ConfinedParamInput{T}) -> cacheParam!(paramCache, p)
 
     get(idxDict, ( objCoreMarker, ElementWiseMatcher(paramSubset, marker) )) do
         paramVals = cacheParam!(paramCache, paramSubset)
@@ -334,8 +342,8 @@ function indexCacheOrbData!(orbCache::PrimOrbCoreCache{T, D},
     orbSize = orbSizeOf(orb)
     list = BasisIndexList(orbSize)
     for i in 1:orbSize
-        orbData = genOrbCoreData!(paramCache, viewOrb(orb, i))
-        list.index[begin+i-1] = updateOrbCache!(orbCache, orbData)
+        idx = updateOrbCache!(orbCache, paramCache, viewOrb(orb, i))
+        list.index[begin+i-1] = idx
     end
     list
 end
@@ -347,8 +355,8 @@ function indexCacheOrbData!(orbCache::PrimOrbCoreCache{T, D},
     for (j, orb) in enumerate(orbs)
         iRange = getBasisIndexRange(list, j)
         for (n, i) in enumerate(iRange)
-            orbData = genOrbCoreData!(paramCache, viewOrb(orb, n))
-            list.index[i] = updateOrbCache!(orbCache, orbData)
+            idx = updateOrbCache!(orbCache, paramCache, viewOrb(orb, n))
+            list.index[i] = idx
         end
     end
     list

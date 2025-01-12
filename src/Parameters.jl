@@ -1752,7 +1752,7 @@ const GeneralFlatParamSet{T, P1, P2} =
 
 size(fps::FlatParamSubset) = size(fps.core.ptr)
 
-firstindex(::FlatParamSubset) = firstindex(fps.core.ptr)
+firstindex(fps::FlatParamSubset) = firstindex(fps.core.ptr)
 
 lastindex(fps::FlatParamSubset) = lastindex(fps.core.ptr)
 
@@ -1774,7 +1774,7 @@ throw(AssertionError("The size of `FlatParamSubset` cannot be changed."))
 
 length(fps::FlatParamSubset) = length(fps.core.ptr)
 
-axes(fps::FlatParamSubset)	= map(Base.OneTo, size(fps))
+axes(fps::FlatParamSubset)= map(Base.OneTo, size(fps))
 
 function similar(fps::FlatParamSubset{T, P1, P2}, shape::Tuple{Int}=size(fps); 
                  innerShape::Tuple{Int}=size(fps.code.d0)) where 
@@ -1787,7 +1787,7 @@ end
 
 getproperty(fps::FlatParamSubset, field::Symbol) = getfield(fps, field)
 
-getField(fps::FlatParamSubset, field) = getField(fps.core, field)
+getField(fps::FlatParamSubset, field::GeneralEntryPointer) = getField(fps.core, field)
 
 
 #= Additional Method =#
@@ -1921,7 +1921,7 @@ function cacheParam!(cache::DimSpanDataCacheBox{T}, param::ParamBox{T}) where {T
 end
 
 function cacheParam!(cache::DimSpanDataCacheBox{T}, s::FlatParamSubset{T}) where {T}
-    cacheParam!(cache, s.data)
+    cacheParam!(cache, s.core)
 end
 
 function cacheParam!(cache::DimSpanDataCacheBox{T}, s::TypedParamInput{T}, 

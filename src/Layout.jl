@@ -191,7 +191,7 @@ function get(d::SingleEntryDict{K}, key::K, default::Any) where {K}
     end
 end
 
-keys(d::SingleEntryDict) = Set( (d.key,) )
+keys(d::SingleEntryDict) = Set(d.key)
 keys(::TypedEmptyDict{K}) where {K} = Set{K}()
 
 values(d::SingleEntryDict) = Set( (d.value,) )
