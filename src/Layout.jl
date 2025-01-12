@@ -189,21 +189,17 @@ isempty(::TypedEmptyDict) = true
 
 length(::FiniteDict{N}) where {N} = N
 
-collect(d::SingleEntryDict) = [d.key => d.value]
-collect(::TypedEmptyDict{K, T}) where {K, T} = Pair{K, T}[]
+collect(d::SingleEntryDict{K, T}) where {K, T} = Memory{Pair{K, T}}([d.key => d.value])
+collect(::TypedEmptyDict{K, T}) where {K, T} = Memory{Pair{K, T}}(undef, 0)
 
 function get(d::SingleEntryDict{K}, key::K, default::Any) where {K}
-    if key == d.key
-        d.value
-    else
-        default
-    end
+    ifelse(key == d.key, d.value, default)
 end
 
-keys(d::SingleEntryDict) = Set(d.key)
+keys(d::SingleEntryDict) = Set((d.key,))
 keys(::TypedEmptyDict{K}) where {K} = Set{K}()
 
-values(d::SingleEntryDict) = Set( (d.value,) )
+values(d::SingleEntryDict) = Set((d.value,))
 values(::TypedEmptyDict{<:Any, T}) where {T} = Set{T}()
 
 function getindex(d::SingleEntryDict{K}, key::K) where {K}
@@ -220,7 +216,7 @@ end
 
 function iterate(d::SingleEntryDict, state::Int)
     if state <= 1
-        (d.key  => d.value, 2)
+        (d.key => d.value, 2)
     else
         nothing
     end
