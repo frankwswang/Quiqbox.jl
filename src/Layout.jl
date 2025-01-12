@@ -393,9 +393,11 @@ struct FieldMarker{S, N} <: IdentityMarker{S}
         if issingletontype(T) || isempty(propertySyms)
             return ValueMarker(input)
         end
-        markers = getproperty.(Ref(input), propertySyms) .|> markObj
+        markers = map(propertySyms) do sym
+            getproperty(input, sym) |> markObj
+        end
         inputName = nameof(T)
-        data = propertySyms .=> markers
+        data = map(=>, propertySyms, markers)
         new{inputName, length(propertySyms)}(leftFoldHash(hash(inputName), markers), data)
     end
 end
@@ -457,11 +459,11 @@ end
 
 function markObj(input::AbstractEqualityDict)
     pairs = collect(input)
-    ks = getfield.(pairs, :first)
+    ks = map(Base.Fix2(getfield, :first), pairs)
     vs = map(pairs) do pair
         markObj(pair.second)
     end
-    newDict = Dict(ks .=> vs)
+    newDict = (Dict∘map)(=>, ks, vs)
     ValueMarker(newDict)
 end
 
