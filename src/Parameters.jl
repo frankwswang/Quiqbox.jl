@@ -49,6 +49,8 @@ ShapedMemory(::Type{T}, value::T) where {T} = ShapedMemory( fill(value) )
 
 ShapedMemory(arr::ShapedMemory) = ShapedMemory(arr.value, arr.shape)
 
+getMemory(arr::ShapedMemory) = arr.value
+
 
 size(arr::ShapedMemory) = arr.shape
 
@@ -1146,9 +1148,9 @@ end
 # const OSpCJParam{T, O} = CachedJParam{T, 0, O}
 
 
-struct ParamMarker{T, N, O, L} <: IdentityMarker{JaggedParam{T, N, O}}
+struct ParamMarker{T, N, O} <: IdentityMarker{JaggedParam{T, N, O}}
     code::UInt
-    data::NTuple{L, IdentityMarker}
+    data::IdentityMarker
     func::IdentityMarker
     meta::Tuple{ValMkrPair{<:Union{T, Nothing}}, ValMkrPair{Int}, ValMkrPair{Symbol}}
 
@@ -1168,32 +1170,42 @@ struct ParamMarker{T, N, O, L} <: IdentityMarker{JaggedParam{T, N, O}}
         func = markObj((P <: ParamFunctor && sl == 0) ? p.lambda : nothing)
         code = hash(func, code)
 
-        data =  makeParamDataMarkers(p)
-        code = leftFoldHash(data, code)
+        data = markParam(p)
+        code = hash(data.code, code)
 
-        new{T, N, O, length(data)}(code, data, func, meta)
+        new{T, N, O}(code, data, func, meta)
     end
 end
 
-function makeParamDataMarkers(p::PrimitiveParam)
-    (Identifier(p.input),)
+function markParam(input::NonEmptyTuple{ParamBox}, refParam::JaggedParam)
+    markObj( markParam.(input, Ref(refParam)) )
 end
 
-function makeParamDataMarkers(p::ParamFunctor)
-    if screenLevelOf(p) > 0
-        (Identifier(p.memory),)
+function markParam(input::ParamBoxUnionArr, ::JaggedParam)
+    markObj(input)
+end
+
+function markParam(param::PrimitiveParam, ::JaggedParam)
+    Identifier(param.input)
+end
+
+function markParam(param::ParamFunctor, refParam::JaggedParam)
+    if screenLevelOf(param) > 0 || param === refParam
+        Identifier(param.memory)
     else
-        markObj.(p.input)
+        markParam(param.input, refParam)
     end
 end
 
-function makeParamDataMarkers(p::ParamNest)
-    (markObj(p.input),)
+function markParam(param::ParamNest, refParam::JaggedParam)
+    markParam(param.input, refParam)
 end
 
-function makeParamDataMarkers(p::KnotParam)
-    markObj.((first(p.input), p.index))
+function markParam(param::KnotParam, refParam::JaggedParam)
+    markObj((markParam(first(param.input), refParam), param.index))
 end
+
+markParam(param::JaggedParam) = markParam(param, param)
 
 markObj(input::JaggedParam) = ParamMarker(input)
 
@@ -1341,6 +1353,7 @@ end
 
 markParams!(b::AbtArrayOr) = b |> getParams |> markParams!
 
+#!! Change `hbNodesIdSet` to IDSet
 function topoSortCore!(hbNodesIdSet::Set{UInt}, 
                        orderedNodes::Vector{<:JaggedParam{T}}, 
                        haveBranches::Vector{Bool}, connectRoots::Vector{Bool}, 
@@ -1518,12 +1531,12 @@ end
 pushParam!(fps::FlatParamSet, a::ElementalParam) = push!(fps.d0, a)
 pushParam!(fps::FlatParamSet, a::FlattenedParam) = push!(fps.d1, a)
 
-function iterate(fps::FlatParamSet)
+function iterate(fps::AbstractFlatParamSet)
     i = firstindex(fps)
     (getindex(fps, i), i+1)
 end
 
-function iterate(fps::FlatParamSet, state)
+function iterate(fps::AbstractFlatParamSet, state)
     if state > length(fps)
         nothing
     else
@@ -1532,6 +1545,17 @@ function iterate(fps::FlatParamSet, state)
 end
 
 length(fps::FlatParamSet) = length(fps.d1) + 1
+
+axes(fps::FlatParamSet)	= map(Base.OneTo, size(fps))
+
+function similar(fps::FlatParamSet{T, P1, P2}, shape::Tuple{Int}=size(fps); 
+                 innerShape::Tuple{Int}=size(fps.d0)) where 
+                {T, P1<:ElementalParam{<:T}, P2<:FlattenedParam{<:T}}
+    checkPositivity(shape|>first)
+    res = Vector{Union{Vector{P1}, P2}}(undef, shape)
+    res[begin] = Vector{P1}(undef, innerShape)
+    res
+end
 
 getproperty(fps::FlatParamSet, field::Symbol) = getfield(fps, field)
 
@@ -1606,6 +1630,17 @@ end
 
 length(mps::MiscParamSet) = length(mps.outer) + 1
 
+axes(mps::MiscParamSet)	= map(Base.OneTo, size(mps))
+
+function similar(mps::MiscParamSet{T, P1, P2, P3}, shape::Tuple{Int}=size(mps); 
+                 innerShape::NTuple{2, Int}=length.( (mps.inner.d0, mps.inner) )) where 
+                {T, P1<:ElementalParam{<:T}, P2<:FlattenedParam{<:T}, P3<:JaggedParam{<:T}}
+    checkPositivity(shape|>first)
+    res = Vector{Union{Vector{Union{ Vector{P1}, P2 }}, P3}}(undef, shape)
+    res[begin] = similar(mps.inner, first(innerShape), innerShape=(last(innerShape),))
+    res
+end
+
 getproperty(fps::MiscParamSet, field::Symbol) = getfield(fps, field)
 
 
@@ -1652,25 +1687,23 @@ MiscParamSet(FlatParamSet(P1[], P2[]), P3[])
 #!  SingleNestParamSet
 #!  DoubleNestParamSet
 const FlatPSetInnerPtr{T} = PointPointer{T, 2, Tuple{FirstIndex, Int}}
-const FlatPSetOuterPtr{T} = IndexPointer{Volume{T}}
+const FlatPSetOuterPtr{T} = IndexPointer{Volume{T}, 1}
 const FlatParamSetIdxPtr{T} = Union{FlatPSetInnerPtr{T}, FlatPSetOuterPtr{T}}
 
 struct FlatParamSetFilter{T} <: PointerStack{1, 2}
-    d0::ShapedMemory{FlatPSetInnerPtr{T}, 1} #! Replace by immutable vector
-    d1::ShapedMemory{FlatPSetOuterPtr{T}, 1} #! Replace by immutable vector
+    d0::ShapedMemory{FlatPSetInnerPtr{T}, 1}
+    d1::Memory{FlatPSetOuterPtr{T}}
 end
 
 function FlatParamSetFilter(d0::AbstractVector{FlatPSetInnerPtr{T}}, 
                             d1::AbstractVector{FlatPSetOuterPtr{T}}) where {T}
     d0 isa ShapedMemory || (d0 = ShapedMemory(d0))
-    d1 isa ShapedMemory || (d1 = ShapedMemory(d1))
+    d1 isa Memory || (d1 = getMemory(d1))
     FlatParamSetFilter(d0, d1)
 end
 
-const ChainFlatParamSetFilter{T, N} = ChainFilter{1, 2, NTuple{N, FlatParamSetFilter{T}}}
-
 const FilteredFlatParamSet{T, N} = 
-      FilteredObject{<:TypedFlatParamSet{T}, ChainFlatParamSetFilter{T, N}}
+      FilteredObject{<:TypedFlatParamSet{T}, FlatParamSetFilter{T}}
 
 const TypedParamInput{T} = Union{TypedFlatParamSet{T}, FilteredFlatParamSet{T}}
 
@@ -1708,6 +1741,55 @@ length(fps::FlatParamSetFilter) = length(fps.d1) + 1
 
 getproperty(fps::FlatParamSetFilter, field::Symbol) = getfield(fps, field)
 
+
+struct FlatParamSubset{T, P1<:ElementalParam{<:T}, P2<:FlattenedParam{<:T}
+                       } <: AbstractFlatParamSet{T, ShapedMemory{P1, 1}, P2}
+    core::FilteredObject{FlatParamSet{T, P1, P2}, FlatParamSetFilter{T}}
+end
+
+const GeneralFlatParamSet{T, P1, P2} = 
+      Union{FlatParamSet{T, P1, P2}, FlatParamSubset{T, P1, P2}}
+
+size(fps::FlatParamSubset) = size(fps.core.ptr)
+
+firstindex(fps::FlatParamSubset) = firstindex(fps.core.ptr)
+
+lastindex(fps::FlatParamSubset) = lastindex(fps.core.ptr)
+
+getindex(fps::FlatParamSubset, i::Int) = getField(fps.core.obj, getindex(fps.core.ptr, i))
+
+getindex(fps::FlatParamSubset, sector::Symbol, i::Int) = 
+getField(fps.core.obj, getindex(fps.core.ptr, sector, i))
+
+function setindex!(fps::FlatParamSubset, val, i::Int)
+    setindex!(fps.core.obj, val, getindex(fps.core.ptr, i))
+end
+
+function setindex!(fps::FlatParamSubset, val, sector::Symbol, i::Int)
+    setindex!(fps.core.obj, val, getindex(fps.core.ptr, sector, i))
+end
+
+pushParam!(::FlatParamSubset, ::Union{ElementalParam, FlattenedParam}) = 
+throw(AssertionError("The size of `FlatParamSubset` cannot be changed."))
+
+length(fps::FlatParamSubset) = length(fps.core.ptr)
+
+axes(fps::FlatParamSubset)= map(Base.OneTo, size(fps))
+
+function similar(fps::FlatParamSubset{T, P1, P2}, shape::Tuple{Int}=size(fps); 
+                 innerShape::Tuple{Int}=size(fps.code.d0)) where 
+                {T, P1<:ElementalParam{<:T}, P2<:FlattenedParam{<:T}}
+    checkPositivity(shape|>first)
+    res = Memory{Union{ShapedMemory{P1, 1}, P2}}(undef, shape)
+    res[begin] = ShapedMemory{P1}(undef, innerShape)
+    res
+end
+
+getproperty(fps::FlatParamSubset, field::Symbol) = getfield(fps, field)
+
+getField(fps::FlatParamSubset, field::GeneralEntryPointer) = getField(fps.core, field)
+
+
 #= Additional Method =#
 getField(obj::FlatParamSetFilter, ptr::FlatPSetInnerPtr) = 
 getindex(obj.d0, last(ptr.chain))
@@ -1715,8 +1797,7 @@ getindex(obj.d0, last(ptr.chain))
 getField(obj::FlatParamSetFilter, ptr::FlatPSetOuterPtr) = 
 getFlatSetIndexCore(obj, first(ptr.chain))
 
-
-function intersectFilter(prev::FlatParamSetFilter, here::FlatParamSetFilter)
+function getField(prev::FlatParamSetFilter, here::FlatParamSetFilter)
     d0New = map(here.d0) do ptr
         getField(prev, ptr)
     end
@@ -1724,6 +1805,19 @@ function intersectFilter(prev::FlatParamSetFilter, here::FlatParamSetFilter)
         getField(prev, ptr)
     end
     FlatParamSetFilter(d0New, d1New)
+end
+
+function refocus!(here::FlatParamSetFilter, prev::FlatParamSetFilter)
+    for i in eachindex(here.d0)
+        ptr = here.d0[i]
+        here.d0[i] = getField(prev, ptr)
+    end
+
+    for i in eachindex(here.d1)
+        ptr = here.d1[i]
+        here.d1[i] = getField(prev, ptr)
+    end
+    here
 end
 
 
@@ -1818,12 +1912,16 @@ formatDimSpanMemory(::Type{T}, val::T) where {T} = itself(val)
 formatDimSpanMemory(::Type{T}, val::AbstractArray{T}) where {T} = ShapedMemory(val)
 
 formatDimSpanMemory(::Type{T}, val::JaggedAbtArray{T}) where {T} = 
-ShapedMemory(ShapedMemory.(val))
+ShapedMemory(map(ShapedMemory, val))
 
 function cacheParam!(cache::DimSpanDataCacheBox{T}, param::ParamBox{T}) where {T}
     get!(getDimSpanSector(cache, param), Identifier(param)) do
         formatDimSpanMemory(T, obtain(param))
     end
+end
+
+function cacheParam!(cache::DimSpanDataCacheBox{T}, s::FlatParamSubset{T}) where {T}
+    cacheParam!(cache, s.core)
 end
 
 function cacheParam!(cache::DimSpanDataCacheBox{T}, s::TypedParamInput{T}, 

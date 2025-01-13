@@ -39,6 +39,8 @@ end
 
 ReturnTyped(::Type{T}) where {T} = ReturnTyped(itself, T)
 
+ReturnTyped(f::ReturnTyped{T}, ::Type{T}) where {T} = itself(f)
+
 (f::ReturnTyped{T, F})(arg...) where {T, F} = convert(T, f.f(arg...))
 
 const Return{T} = ReturnTyped{T, ItsType}
@@ -60,12 +62,44 @@ const StableMul{T} = StableBinary{T, typeof(*)}
 StableBinary(f::Function) = Base.Fix1(StableBinary, f)
 
 
-struct ParamFilterFunc{F<:Function, T<:CompositePointer} <: ParamFuncBuilder{F}
+struct Retrieve{P<:CompositePointer} <: FunctionComposer
+    rule::P
+end
+
+const GetFlavor{T} = Retrieve{IndexPointer{Flavor{T}, 1}}
+
+function (f::Retrieve)(input)
+    getField(input, f.rule)
+end
+
+const Select{P<:EntryPointer} = Retrieve{P}
+
+const Filter{P<:EffectivePtrStack} = Retrieve{P}
+
+struct EncodeApply{N, E<:NTuple{N, Function}, F<:Function} <: FunctionComposer
+    encode::E
+    apply::F
+end
+
+EncodeApply(encode::Function, apply::Function) = EncodeApply((encode,), apply)
+
+(f::EncodeApply)(args...) = f.apply(map(f->f(args...), f.encode)...)
+
+(f::EncodeApply{0})(args...) = f.apply(args...)
+
+
+struct ParamFilterFunc{F<:Function, 
+                       T<:NonEmptyTuple{EffectivePtrStack}} <: ParamFuncBuilder{F}
     apply::F
     scope::T
 end
 
-(f::ParamFilterFunc)(input, param) = f.apply(input, getField(param, f.scope))
+ParamFilterFunc(apply::F, scope::P) where {F<:Function, P<:EffectivePtrStack} = 
+ParamFilterFunc(apply, (scope,))
+
+function (f::ParamFilterFunc)(input, param)
+    f.apply(input, getField.(Ref(param), f.scope)...)
+end
 
 
 struct ParamSelectFunc{F<:Function, T<:Tuple{Vararg{ChainIndexer}}} <: ParamFuncBuilder{F}
@@ -160,6 +194,23 @@ end
 
 (f::Storage)(::Vararg) = f.val
 
+struct Unit{T} <: CompositeFunction end
+
+Unit(::Type{T}) where {T} = Unit{T}()
+
+(f::Unit{T})(::Vararg) where {T} = one(T)
+
+
+struct Power{F<:Function, N} <: CompositeFunction
+    f::F
+
+    Power(f::F, ::Val{N}) where {F<:Function, N} = new{F, N}(f)
+end
+
+Power(f::Function, n::Int) = Power(f, Val(n))
+
+(f::Power{<:Function, N})(arg::Vararg) where {N} = f.f(arg...)^(N::Int)
+
 struct Plus{T} <: CompositeFunction
     val::T
 end
@@ -173,8 +224,41 @@ struct ShiftByArg{T<:Real, D} <: FieldlessFunction end
 (input .- args)
 
 
+struct HermitianContract{T, F1<:ReturnTyped{T}, F2<:ReturnTyped{T}} <: FunctionComposer
+    diagonal::Memory{F1}
+    uppertri::Memory{F2}
+
+    function HermitianContract(dFuncs::Memory{F1}, uFuncs::Memory{F2}) where 
+                              {T, F1<:ReturnTyped{T}, F2<:ReturnTyped{T}}
+        checkLength(uFuncs, :uFuncs, triMatEleNum(length(dFuncs)-1))
+        new{T, F1, F2}(dFuncs, uFuncs)
+    end
+end
+
+function (f::HermitianContract{T})(params::FilteredVecOfArr{T}, 
+                                   vInput::AbstractVector{T}) where {T}
+    res = zero(T)
+    len = length(f.diagonal)
+
+    for i in 1:len
+        c = vInput[begin+i-1]
+        res += f.diagonal[begin+i-1](params) * c' * c
+    end
+
+    for j in 1:length(f.uppertri)
+        n, m = convert1DidxTo2D(len-1, j)
+        c1 = vInput[begin+m-1]
+        c2 = vInput[begin+n]
+        val = f.uppertri[begin+j-1](params) * c1' * c2
+        res += val + val'
+    end
+
+    res
+end
+
+
 function evalFunc(func::F, input::T) where {F<:Function, T}
-    fCore, pSet = unpackFunc(func)
+    fCore, pSet, _ = unpackFunc(func)
     evalFunc(fCore, pSet, input)
 end
 
@@ -189,9 +273,9 @@ end
 
 #! Possibly adding memoization in the future to generate/use the same param set to avoid 
 #! bloating `Quiqbox.IdentifierCache` and prevent repeated computation.
-unpackFunc(f::Function) = unpackFunc!(f, initializeParamSet(f))
+unpackFunc(f::F) where {F<:Function} = unpackFunc!(f, initializeParamSet(f))
 
-unpackFunc!(f::Function, paramSet::AbstractVector) = 
+unpackFunc!(f::F, paramSet::AbstractVector) where {F<:Function} = 
 unpackFunc!(SelectTrait{ParameterizationStyle}()(f), f, paramSet)
 
 unpackFunc!(::TypedParamFunc, f::Function, paramSet::AbstractVector) = 

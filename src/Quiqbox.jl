@@ -29,7 +29,7 @@ include("SpatialBasis.jl")
 # include("Overload.jl")
 
 # include("Integrals/Core.jl")
-include("Integrals/Frameworks/OneBody.jl")
+# include("Integrals/Frameworks/OneBody.jl")
 include("Integrals/Frameworks/Numerical.jl")
 include("Integrals/GaussianOrbitals.jl")
 include("Integrals/Interface.jl")
@@ -41,3 +41,13 @@ include("Behaviors.jl")
 
 include("Initialization.jl")
 end
+
+## Development comment guideline
+#!! Urgent issue
+#!!... Urgent issue that's being implemented/fixed
+#! Non-urgent issue
+#? Consideration for change
+#+ Potential Feature implementation
+
+## Footnote comment template
+#= Additional Method =#

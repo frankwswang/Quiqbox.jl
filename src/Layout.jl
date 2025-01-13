@@ -46,7 +46,7 @@ const AllPassPointer{A<:TensorType} = ChainPointer{A, 0, Tuple{}}
 
 const TypedPointer{T, A<:TensorType{T}} = ChainPointer{A}
 
-const IndexPointer{A<:TensorType} = ChainPointer{A, 1, Tuple{Int}}
+const IndexPointer{A<:TensorType, N} = ChainPointer{A, N, NTuple{N, Int}}
 
 const PointPointer{T, L, C<:NTuple{L, GeneralFieldName}} = ChainPointer{Flavor{T}, L, C}
 
@@ -66,85 +66,50 @@ ChainPointer((prev.chain..., here.chain...), here.type)
 ChainPointer(prev::GeneralFieldName, here::ChainPointer) = 
 ChainPointer((prev, here.chain...), here.type)
 
-struct ChainFilter{L, U, C<:Tuple{Vararg{PointerStack{L, U}}}} <: PointerStack{L, U}
-    chain::C
 
-    ChainFilter(::Tuple{}=()) = new{0, 0, Tuple{}}( () )
-
-    ChainFilter(chain::NonEmptyTuple{PointerStack{L, U}}) where {L, U} = 
-    new{L, U, typeof(chain)}(chain)
-end
-
-const AllPassFilter = ChainFilter{0, 0, Tuple{}}
-
-const SingleFilter{L, U, C<:PointerStack{L, U}} = ChainFilter{L, U, Tuple{C}}
-
-ChainFilter(prev::ChainFilter, here::ChainFilter) = 
-ChainFilter((prev.chain..., here.chain...))
-
-ChainFilter(prev::PointerStack, here::ChainFilter) = 
-ChainFilter((prev, here.chain...))
-
-ChainFilter(prev::ChainFilter, here::PointerStack) = 
-ChainFilter((prev.chain..., here))
-
-ChainFilter(prev::PointerStack, here::PointerStack) = ChainFilter((prev, here))
-
-ChainFilter(obj::ChainFilter) = itself(obj)
-ChainFilter(obj::PointerStack) = ChainFilter((obj,))
-
-
-struct AwaitFilter{P<:PointerStack} <: StaticPointer
+struct AwaitFilter{P<:PointerStack} <: StaticPointer{P}
     ptr::P
 end
 
 AwaitFilter(ptr::AwaitFilter) = itself(ptr)
 
-struct FilteredObject{T, P<:ChainFilter} <: ViewedObject{T, P}
+struct FilteredObject{T, P<:PointerStack} <: ViewedObject{T, P}
     obj::T
     ptr::P
 end
 
-FilteredObject(obj::FilteredObject, ptr::ChainFilter) = 
-FilteredObject(obj.obj, ChainFilter(obj.ptr, ptr))
-
-FilteredObject(obj, ptr::PointerStack) = FilteredObject(obj, ChainFilter(ptr))
+FilteredObject(obj::FilteredObject, ptr::PointerStack) = 
+FilteredObject(obj.obj, getField(obj.ptr, ptr))
 
 FilteredObject(obj, ptr::AwaitFilter) = FilteredObject(obj, ptr.ptr)
 
+const Filtered{T} = Union{T, FilteredObject{T}}
+const FilteredVecOfArr{T} = Filtered{<:AbtVecOfAbtArr{T}}
 
-getFieldCore(obj, ::AllPassPointer) = itself(obj)
-
-getFieldCore(obj, ::FirstIndex) = first(obj)
-
-getFieldCore(obj, entry::Symbol) = getfield(obj, entry)
 
 getFieldCore(obj, entry::Int) = getindex(obj, entry)
 
+getFieldCore(obj, entry::Symbol) = getfield(obj, entry)
+
+getFieldCore(obj, ::FirstIndex) = first(obj)
+
 getFieldCore(obj, ::Nothing) = getindex(obj)
 
-getFieldCore(obj, ptr::ChainPointer) = foldl(getFieldCore, ptr.chain, init=obj)
+getFieldCore(obj, ::AllPassPointer) = itself(obj)
 
-getField(obj, ptr::GeneralFieldName) = getFieldCore(obj, ptr)
+getFieldCore(obj, ptr::ChainPointer) = foldl(getField, ptr.chain, init=obj)
 
-getField(obj, ptr::EntryPointer) = getFieldCore(obj, ptr)
+const GeneralEntryPointer = Union{EntryPointer, GeneralFieldName}
 
-function getField(obj::FilteredObject, ptr::EntryPointer)
-    getFieldCore(obj.obj, getField(obj.ptr, ptr))
+getField(obj, ptr::GeneralEntryPointer) = getFieldCore(obj, ptr)
+
+getField(ptr::ChainPointer, idx::GeneralFieldName) = ChainPointer(ptr, ChainPointer(idx))
+
+function getField(obj::FilteredObject, ptr::GeneralEntryPointer)
+    getField(obj.obj, getField(obj.ptr, ptr))
 end
 
-function getField(scope::ChainFilter, ptr::EntryPointer)
-    for i in reverse(scope.chain)
-        ptr = getField(i, ptr)
-    end
-    ptr
-end
-
-function getField(scope::PointerStack, ptr::PointerStack)
-    ChainFilter(scope, ptr)
-end
-
-const InstantPtrCollection = Union{PointerStack, NonEmpTplOrAbtArr{<:ActivePointer}}
+const InstantPtrCollection = Union{PointerStack, NonEmpTplOrAbtArr{ActivePointer}}
 
 getField(obj, ptr::InstantPtrCollection) = evalField(itself, obj, ptr)
 
@@ -156,12 +121,20 @@ function getField(obj, ptr::AwaitFilter)
     FilteredObject(obj, ptr)
 end
 
+function getField(prev::PointerStack, here::AwaitFilter)
+    AwaitFilter(getField(prev, here.ptr))
+end
+
+function getField(prev::AwaitFilter, here::PointerStack)
+    AwaitFilter(getField(prev.ptr, here))
+end
+
 getField(obj::Any) = itself(obj)
 
 getField(obj::FilteredObject) = getField(obj.obj, obj.ptr)
 
 
-function evalField(f::F, obj, ptr::EntryPointer) where {F<:Function}
+function evalField(f::F, obj, ptr::GeneralEntryPointer) where {F<:Function}
     getField(obj, ptr) |> f
 end
 
@@ -169,32 +142,13 @@ function evalField(f::F, obj, ptr::InstantPtrCollection) where {F<:Function}
     map(x->evalField(f, obj, x), ptr)
 end
 
-function evalField(f::F, obj, ptr::ChainFilter) where {F<:Function}
-    body..., tip = ptr.chain
-    scope = ChainFilter(body)
-    map(tip) do idx
-        evalFieldCore(f, obj, scope, idx)
-    end
+
+function mapLayout(op::F, collection::Any) where {F<:Function}
+    map(op, collection)
 end
 
-function evalField(f::F, obj, ptr::SingleFilter) where {F<:Function}
-    evalField(f, obj, first(ptr.chain))
-end
-
-function evalField(f::F, obj, ::AllPassFilter) where {F<:Function}
-    f(obj)
-end
-
-function evalFieldCore(f::F, obj, scope::PointerStack, 
-                       ptr::ActivePointer) where {F<:Function}
-    evalField(f, obj, getField(scope, ptr))
-end
-
-function evalFieldCore(f::F, obj, scope::PointerStack, 
-                       ptrs::NonEmpTplOrAbtArr{<:ActivePointer}) where {F<:Function}
-    map(ptrs) do ptr
-        evalField(f, obj, getField(scope, ptr))
-    end
+function mapLayout(op::F, collection::FilteredObject) where {F<:Function}
+    evalField(op, collection.obj, collection.ptr)
 end
 
 
@@ -214,7 +168,7 @@ TypedEmptyDict() = TypedEmptyDict{Union{}, Union{}}()
 
 buildDict(p::Pair{K, T}) where {K, T} = SingleEntryDict(p.first, p.second)
 
-function buildDict(ps::NonEmpTplOrAbtArr{<:Pair}, 
+function buildDict(ps::NonEmpTplOrAbtArr{Pair}, 
                    emptyBuiler::Type{<:FiniteDict{0}}=TypedEmptyDict)
     if isempty(ps)
         emptyBuiler()
@@ -235,21 +189,17 @@ isempty(::TypedEmptyDict) = true
 
 length(::FiniteDict{N}) where {N} = N
 
-collect(d::SingleEntryDict) = [d.key => d.value]
-collect(::TypedEmptyDict{K, T}) where {K, T} = Pair{K, T}[]
+collect(d::SingleEntryDict{K, T}) where {K, T} = Memory{Pair{K, T}}([d.key => d.value])
+collect(::TypedEmptyDict{K, T}) where {K, T} = Memory{Pair{K, T}}(undef, 0)
 
 function get(d::SingleEntryDict{K}, key::K, default::Any) where {K}
-    if key == d.key
-        d.value
-    else
-        default
-    end
+    ifelse(key == d.key, d.value, default)
 end
 
-keys(d::SingleEntryDict) = Set( (d.key,) )
+keys(d::SingleEntryDict) = Set((d.key,))
 keys(::TypedEmptyDict{K}) where {K} = Set{K}()
 
-values(d::SingleEntryDict) = Set( (d.value,) )
+values(d::SingleEntryDict) = Set((d.value,))
 values(::TypedEmptyDict{<:Any, T}) where {T} = Set{T}()
 
 function getindex(d::SingleEntryDict{K}, key::K) where {K}
@@ -266,7 +216,7 @@ end
 
 function iterate(d::SingleEntryDict, state::Int)
     if state <= 1
-        (d.key  => d.value, 2)
+        (d.key => d.value, 2)
     else
         nothing
     end
@@ -286,11 +236,19 @@ end
 hash(bb::BlackBox, hashCode::UInt) = hash(objectid(bb.value), hashCode)
 
 
-function canDirectlyStore(::T) where {T}
+function canDirectlyStoreInstanceOf(::Type{T}) where {T}
     isbitstype(T) || isprimitivetype(T) || issingletontype(T)
 end
 
-canDirectlyStore(::Union{String, Type, Symbol}) = true
+canDirectlyStoreInstanceOf(::Type{Symbol}) = true
+
+canDirectlyStoreInstanceOf(::Type{String}) = true
+
+canDirectlyStoreInstanceOf(::Type{<:IdentityMarker}) = true
+
+canDirectlyStore(::T) where {T} = canDirectlyStoreInstanceOf(T)
+
+canDirectlyStore(::Type) = true
 
 const DefaultIdentifierCacheSizeLimit = 500
 
@@ -351,6 +309,62 @@ function ==(id1::Identifier, id2::Identifier)
 end
 
 
+function leftFoldHash(initHash::UInt, objs::Union{AbstractArray, Tuple}; 
+                      marker::F=itself) where {F<:Function}
+    init = hash(sizeOf(objs), initHash)
+    hashFunc = (x::UInt, y) -> leftFoldHash(x, y; marker)
+    foldl(hashFunc, objs; init)
+end
+
+leftFoldHash(initHash::UInt, obj::Any; marker::F=itself) where {F<:Function} = 
+hash(marker(obj), initHash)
+
+
+struct ElementWiseMatcher{F<:Function, T<:AbstractArray} <: IdentityMarker{T}
+    code::UInt
+    marker::F
+    data::T
+
+    function ElementWiseMatcher(input::T, marker::F=itself) where 
+                               {T<:AbstractArray, F<:Function}
+        new{F, T}(leftFoldHash(hash(nothing), input; marker), marker, input)
+    end
+end
+
+function elementWiseMatch(obj1::Any, obj2::Any; marker1::M1=itself, marker2::M2=itself, 
+                          compareFunction::F=(===)) where {M1<:Function, M2<:Function, 
+                                                           F<:Function}
+    compareFunction(marker1(obj1), marker2(obj2))
+end
+
+function elementWiseMatch(obj1::AbstractArray{<:Any, N}, obj2::AbstractArray{<:Any, N}; 
+                          marker1::M1=itself, marker2::M2=itself, 
+                          compareFunction::F=(===)) where {N, M1<:Function, M2<:Function, 
+                                                           F<:Function}
+    if size(obj1) == size(obj1)
+        all( elementWiseMatch(marker1(i), marker2(j); 
+                              compareFunction) for (i, j) in zip(obj1, obj2) )
+    else
+        false
+    end
+end
+
+function elementWiseMatch(::AbstractArray, ::AbstractArray; marker1::M1=itself, 
+                          marker2::M2=itself, compareFunction::F=(===)) where 
+                         {M1<:Function, M2<:Function, F<:Function}
+    false
+end
+
+function ==(matcher1::ElementWiseMatcher, matcher2::ElementWiseMatcher)
+    if matcher1.code == matcher2.code
+        elementWiseMatch(matcher1.data, matcher2.data, compareFunction=isequal, 
+                         marker1=matcher1.marker, marker2=matcher2.marker)
+    else
+        false
+    end
+end
+
+
 struct ValueMarker{T} <: IdentityMarker{T}
     code::UInt
     data::T
@@ -363,14 +377,6 @@ function ==(marker1::ValueMarker, marker2::ValueMarker)
         marker1.data == marker2.data
     else
         false
-    end
-end
-
-const IdMarkers = Union{AbstractArray{<:IdentityMarker}, Tuple{Vararg{IdentityMarker}}}
-
-function leftFoldHash(markers::IdMarkers, initHash::UInt)
-    mapfoldl((x, y)->hash(y, x), markers, init=initHash) do ele
-        ele.code
     end
 end
 
@@ -387,10 +393,12 @@ struct FieldMarker{S, N} <: IdentityMarker{S}
         if issingletontype(T) || isempty(propertySyms)
             return ValueMarker(input)
         end
-        markers = getproperty.(Ref(input), propertySyms) .|> markObj
+        markers = map(propertySyms) do sym
+            getproperty(input, sym) |> markObj
+        end
         inputName = nameof(T)
-        data = propertySyms .=> markers
-        new{inputName, length(propertySyms)}(leftFoldHash(markers, hash(inputName)), data)
+        data = map(=>, propertySyms, markers)
+        new{inputName, length(propertySyms)}(leftFoldHash(hash(inputName), markers), data)
     end
 end
 
@@ -407,13 +415,9 @@ struct BlockMarker <: IdentityMarker{Union{AbstractArray, Tuple}}
     data::Union{AbstractArray, Tuple}
 
     function BlockMarker(input::Union{AbstractArray, Tuple})
-        containerHash = if input isa Tuple
-            hash(length(input), hash(Tuple))
-        else
-            hash(size(input), hash(AbstractArray))
-        end
-        code = mapfoldr(hash, input, init=containerHash) do ele
-            markObj(ele).code
+        containerHash = hash(input isa Tuple ? Tuple : AbstractArray)
+        code = mapfoldl(leftFoldHash, input, init=containerHash) do ele
+            markObj(ele)
         end
         new(code, input)
     end
@@ -441,11 +445,11 @@ end
 
 function isPrimVarCollection(arg::AbstractArray{T}) where {T}
     ET = isconcretetype(T) ? T : eltype( map(itself, arg) )
-    canDirectlyStore(ET)
+    canDirectlyStoreInstanceOf(ET)
 end
 
 function isPrimVarCollection(arg::Tuple)
-    all((canDirectlyStore∘typeof)(i) for i in arg)
+    all(canDirectlyStore(i) for i in arg)
 end
 
 
@@ -455,11 +459,11 @@ end
 
 function markObj(input::AbstractEqualityDict)
     pairs = collect(input)
-    ks = getfield.(pairs, :first)
+    ks = map(Base.Fix2(getfield, :first), pairs)
     vs = map(pairs) do pair
         markObj(pair.second)
     end
-    newDict = Dict(ks .=> vs)
+    newDict = (Dict∘map)(=>, ks, vs)
     ValueMarker(newDict)
 end
 
@@ -479,6 +483,14 @@ end
 
 markObj(marker::IdentityMarker) = itself(marker)
 
+
+function lazyMarkObj!(cache::AbstractDict{BlackBox, <:IdentityMarker}, input)
+    get!(cache, BlackBox(input)) do
+        markObj(input)
+    end
+end
+
+
 ==(pm1::IdentityMarker, pm2::IdentityMarker) = false
 
 function hash(id::IdentityMarker, hashCode::UInt)
@@ -487,13 +499,4 @@ end
 
 function compareObj(obj1::T1, obj2::T2) where {T1, T2}
     obj1 === obj2 || markObj(obj1) == markObj(obj2)
-end
-
-
-function mapLayout(op::F, collection::Any) where {F<:Function}
-    map(op, collection)
-end
-
-function mapLayout(op::F, collection::FilteredObject) where {F<:Function}
-    evalField(op, collection.obj, collection.ptr)
 end

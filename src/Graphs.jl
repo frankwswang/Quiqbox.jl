@@ -161,6 +161,7 @@ struct TemporaryStorage{T} <: QueryBox{Union{Tuple{T, Int}, Tuple{AbstractArray{
     new{T}(IdDict{UInt, Tuple{T, Int}}(), IdDict{UInt, Tuple{AbstractArray{T}, Int}}())
 end
 
+#! See if `FixedSizeStorage` can be replaced by / connected to  FlatParamSet
 struct FixedSizeStorage{T, V<:AbstractArray{T}} <: QueryBox{Union{T, V}}
     d0::Memory{T}
     d1::Memory{V}
@@ -169,8 +170,6 @@ end
 selectStorageSectorSym(::Dim0GNode) = :d0
 selectStorageSectorSym(::DimSGNode) = :d1
 
-#! Adjust ParamSet type from `PrimParamVec` to `PrimParamSet` for safety
-#! Incorporate IndexPointer to replace `selectInPSubset`
 
 selectInPSubset(::Val{0}, ps::AbstractVector) = first(ps)
 selectInPSubset(::Val,    ps::AbstractVector) = itself(ps)
@@ -266,9 +265,10 @@ function compressNodeCore!(tStorage::TemporaryStorage{T},
 end
 
 
-#! Adjust the signature of `PackedFunction{T}`.
+#? Adjust the signature of `FunctionalStruct`, or change it to `TypedEvaluator`.
+#? Unify the format of CompressedNode with other ParamFunc: FrameworkOrb
 struct CompressedNode{T, F<:Function, S<:FixedSizeStorage{T}, 
-                      V<:AbtVecOfAbtArr{T}} <: PackedFunction{T}
+                      V<:AbtVecOfAbtArr{T}} <: FunctionalStruct
     f::F
     storage::S
     param::V

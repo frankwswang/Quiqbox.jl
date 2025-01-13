@@ -787,7 +787,7 @@ function arrayDiffCore!((v1, v2)::NTuple{2, Array{T}}) where {T}
         i += 1
         j = findfirst(isequal(v1[i]), v2)
         if j !== nothing
-            popat!(v1, i) 
+            popat!(v1, i)
             push!(coms, popat!(v2, j))
             i -= 1
             l -= 1
@@ -1099,14 +1099,26 @@ end
 # obtainElementalVal(::Type{U}, obj::AbtArray0D{<:U}) where {U} = obj[]
 # obtainElementalVal(::Type{U}, obj::AbstractArray{<:U}) where {U} = copy(obj)
 
-getMemory(obj::Memory) = itself(obj)
+getMemory(arr::Memory) = itself(arr)
 
-function getMemory(obj::AbstractArray{T}) where {T}
-    arr = vec(isconcretetype(T) || isempty(obj) ? obj : itself.(obj))
-    Memory{eltype(arr)}(arr)
+function getMemory(arr::AbstractArray{T}) where {T}
+    eleT = if isconcretetype(T) || isempty(arr)
+        T
+    else
+        mapreduce(typejoin, arr, init=Union{}) do ele
+            typeof(ele)
+        end
+    end
+    Memory{eleT}(vec(arr))
 end
 
-getMemory(obj::Tuple) = (getMemory∘collect)(obj)
+function getMemory(obj::NonEmptyTuple{Any})
+    mem = Memory{eltype(obj)}(undef, length(obj))
+    mem .= obj
+    mem
+end
+
+getMemory(obj::Any) = getMemory((obj,))
 
 
 function registerObjFrequency(objs::AbstractVector)
@@ -1155,4 +1167,23 @@ function intersectMultisets!(s1::AbstractVector{T1}, s2::AbstractVector{T2};
     else
         intersectMultisetsCore!(transformation, s1, s2)
     end
+end
+
+
+function lazyTupleMap(f::F, (obj1, obj2)::NTuple{2, Any}) where {F}
+    res1 = f(obj1)
+    res2 = obj2 === obj1 ? res1 : f(obj2)
+    (res1, res2)
+end
+
+function lazyTupleMap(f::F, (obj1, obj2, obj3, obj4)::NTuple{4, Any}) where {F}
+    res1 = f(obj1)
+    res2 = obj2 === obj1 ? res1 : f(obj2)
+    res3 = obj3 === obj1 ? res1 : (obj3 === obj2 ? res2 : f(obj3))
+    res3 = if obj4 === obj1
+        res1
+    else
+        obj4 === obj2 ? res2 : (obj4 === obj3 ? res3 : f(obj4))
+    end
+    (res1, res2, res3, res3)
 end
