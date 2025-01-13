@@ -483,6 +483,14 @@ end
 
 markObj(marker::IdentityMarker) = itself(marker)
 
+
+function lazyMarkObj!(cache::AbstractDict{BlackBox, <:IdentityMarker}, input)
+    get!(cache, BlackBox(input)) do
+        markObj(input)
+    end
+end
+
+
 ==(pm1::IdentityMarker, pm2::IdentityMarker) = false
 
 function hash(id::IdentityMarker, hashCode::UInt)
