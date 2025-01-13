@@ -434,37 +434,35 @@ function genGaussTypeOrb(center::NonEmptyTuple{ParamOrValue{T}, D},
     PrimitiveOrb(PolyRadialFunc(gf, ijk), center; renormalize)
 end
 
-#!! Change `renormalize` into double-layer specification
 function genGaussTypeOrb(center::NonEmptyTuple{ParamOrValue{T}, D}, 
                          xpns::ParOrValVec{T}, 
                          cons::Union{ParOrValVec{T}, FlattenedParam{T, 1}}, 
                          ijk::NonEmptyTuple{Int, D}=ntuple(_->0, Val(D+1)); 
-                         renormalize::Bool=false) where {T, D}
-    consLen = if cons isa FlattenedParam
-        len = (first∘outputSizeOf)(cons)
-        len < 2 && 
-        throw(AssertionError("The length of `cons::FlattenedParam` should be at least 2."))
-        len
+                         innerRenormalize::Bool=false, 
+                         outerRenormalize::Bool=false) where {T, D}
+    nPrimOrbs = if cons isa FlattenedParam
+        (first∘outputSizeOf)(cons)
     else
-        cons = genCellEncoder(T, :con).(cons)
+        cons = map(genCellEncoder(T, :con), cons)
         length(cons)
     end
 
-    checkLengthCore(checkEmptiness(xpns, :xpns), :xpns, consLen, 
+    checkLengthCore(checkEmptiness(xpns, :xpns), :xpns, nPrimOrbs, 
                     "the output length of `cons`")
 
-    cenParams = genCellEncoder(T, :cen).(center)
+    cens = map(genCellEncoder(T, :cen), center)
 
-    if consLen == 1
-        genGaussTypeOrb(cenParams, xpns[], cons[], ijk; renormalize)
+    if nPrimOrbs == 1
+        renormalize = innerRenormalize || outerRenormalize
+        genGaussTypeOrb(cens, xpns[], cons[], ijk; renormalize)
     else
-        pgtos = genGaussTypeOrb.(Ref(cenParams), xpns, Ref(ijk); renormalize)
-        CompositeOrb(pgtos, cons; renormalize)
+        primGTOs = map(xpns) do xpn
+            genGaussTypeOrb(cens, xpn, ijk, renormalize=innerRenormalize)
+        end
+        CompositeOrb(primGTOs, cons, renormalize=outerRenormalize)
     end
 end
 
-
-#!! Designed a one(T) like function: SpecVal{T, F} -> F(T)
 
 function buildNormalizer(f::PrimitiveOrbCore{T}) where {T}
     nfInner = (NormalizePrimOrb∘buildNormalizerCore)(f)
