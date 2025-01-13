@@ -19,7 +19,7 @@ end
 
 function composeOneBodyKernel(op::O, ::Type{T}, termL::F1, termR::F2) where 
                              {O<:Function, T, F1<:Function, F2<:Function}
-    PairCombine(StableBinary(*, T), adjoint∘termL, op(termR))
+    PairCombine(StableMul(T), adjoint∘termL, op(termR))
 end
 
 function composeOneBodyKernel(op::O, ::Type{T}, term::F) where {O<:Function, T, F<:Function}

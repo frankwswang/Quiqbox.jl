@@ -59,7 +59,8 @@ end
 const StableAdd{T} = StableBinary{T, typeof(+)}
 const StableMul{T} = StableBinary{T, typeof(*)}
 
-StableBinary(f::Function) = Base.Fix1(StableBinary, f)
+StableAdd(::Type{T}) where {T} = StableBinary(+, T)
+StableMul(::Type{T}) where {T} = StableBinary(*, T)
 
 
 struct Retrieve{P<:CompositePointer} <: FunctionComposer

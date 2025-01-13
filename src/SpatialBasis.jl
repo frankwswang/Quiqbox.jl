@@ -74,7 +74,7 @@ end
 
 function ScaledOrbital(orb::EvalComposedOrb{T}, scalar::Function, 
                        scope::FlatParamSetFilter{T}) where {T}
-    fCoreLocal = PairCombine(StableBinary(*, T), orb, scalar)
+    fCoreLocal = PairCombine(StableMul(T), orb, scalar)
     fCore = ParamFilterFunc(fCoreLocal, AwaitFilter(scope))
     ScaledOrbital(fCore)
 end
@@ -212,7 +212,7 @@ function getEffectiveWeight(o::CompositeOrb{T}, weight::FlattenedParam{T, 1},
                            "`CompositeOrb` with another value is prohibited."))
     len = first(outputSizeOf(o.weight))
     outWeight = indexParam(weight, idx)
-    map(i->CellParam(StableBinary(*, T), indexParam(o.weight, i), outWeight, :w), 1:len)
+    map(i->CellParam(StableMul(T), indexParam(o.weight, i), outWeight, :w), 1:len)
 end
 
 function getEffectiveWeight(o::AbstractVector{<:ComposedOrb{T, D}}, 
@@ -270,7 +270,7 @@ function restrainEvalOrbType(weightedFs::AbstractVector{<:WeightedPF{T, D}}) whe
     fInnerType = (eltype∘map)(f->getField(f, cPtr), fInnerObjs)
     nInnerType = (eltype∘map)(f->getField(f, ChainPointer( (:right, :f) )), fInnerObjs)
     V = compressWeightedPF(fInnerType, nInnerType)
-    ChainReduce(StableBinary(+, T), V(weightedFs))
+    ChainReduce(StableAdd(T), V(weightedFs))
 end
 
 struct CompOrbParamPtr{T, D, R<:FieldPtrDict{T}, 
@@ -297,7 +297,7 @@ function unpackComposedOrbCore!(f::CompositeOrb{T, D}, paramSet::FlatParamSet,
         i += 1
         fInnerCore, _, basisPtr = unpackParamFunc!(b, pSetLocal, paramSetId)
         getWeight = Retrieve(ChainPointer( weightPtr, ChainPointer(i, TensorType(T)) ))
-        weightedPrimOrb = PairCombine(StableBinary(*, T), fInnerCore, OnlyBody(getWeight))
+        weightedPrimOrb = PairCombine(StableMul(T), fInnerCore, OnlyBody(getWeight))
         push!(weightedFields, weightedPrimOrb)
         basisPtr
     end
