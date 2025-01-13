@@ -428,7 +428,7 @@ end
 
 function genGaussTypeOrb(center::NonEmptyTuple{ParamOrValue{T}, D}, 
                          xpn::ParamOrValue{T}, 
-                         ijk::NonEmptyTuple{Int, D}=ntuple(_->0, Val(D)); 
+                         ijk::NonEmptyTuple{Int, D}=ntuple(_->0, Val(D+1)); 
                          renormalize::Bool=false) where {T, D}
     gf = GaussFunc(xpn)
     PrimitiveOrb(PolyRadialFunc(gf, ijk), center; renormalize)
