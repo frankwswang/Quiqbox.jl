@@ -468,18 +468,18 @@ end
 
 
 function buildPrimOrbWeight(normCache::OverlapCache{T, D}, orb::EvalPrimOrb{T, D}, 
-                            idx::Int, scalar::T=one(T)) where {T, D}
+                            idx::Int) where {T, D}
     if isRenormalized(orb)
         decodePrimCoreInt(normCache.data, (idx,)) |> first |> AbsSqrtInv
     else
         one(T)
-    end * scalar
+    end
 end
 
 
-function buildNormalizedCompOrbWeight(weight::AbstractVector{T}, 
-                                      normCache::OverlapCache{T, D}, orb::FCompOrb{T, D}, 
-                                      idxSeq::AbstractVector{Int}) where {T, D}
+function buildNormalizedCompOrbWeight!(weight::AbstractVector{T}, 
+                                       normCache::OverlapCache{T, D}, orb::FCompOrb{T, D}, 
+                                       idxSeq::AbstractVector{Int}) where {T, D}
     overlapCache = normCache.data
     nPrimOrbs = length(weight)
     innerOverlapSum = zero(T)
@@ -510,19 +510,22 @@ end
 function buildOrbWeight!(paramCache::DimSpanDataCacheBox{T}, 
                          normCache::OverlapCache{T, D}, orb::FrameworkOrb{T, D}, 
                          idxSeq::AbstractVector{Int}) where {T, D}
+    nPrimOrbs = orbSizeOf(orb)
+    weight = Memory{T}(undef, nPrimOrbs)
+
     if orb isa FCompOrb
-        weight = cacheParam!(paramCache, getOrbWeightCore(orb))
+        weight .= cacheParam!(paramCache, getOrbWeightCore(orb))
         if isRenormalized(orb)
-            buildNormalizedCompOrbWeight(weight, normCache, orb, idxSeq)
+            buildNormalizedCompOrbWeight!(weight, normCache, orb, idxSeq)
         else
-            for (i, wc) in enumerate(weight)
+            for i in 1:nPrimOrbs
                 ptr = idxSeq[begin+i-1]
-                temp = buildPrimOrbWeight(normCache, (getInnerOrb∘viewOrb)(orb, i), ptr, wc)
-                weight[begin+i-1] = temp
+                temp = buildPrimOrbWeight(normCache, (getInnerOrb∘viewOrb)(orb, i), ptr)
+                weight[begin+i-1] *= temp
             end
         end
     else
-        weight = getMemory(buildPrimOrbWeight(normCache, getInnerOrb(orb), idxSeq[]))
+        weight[] = buildPrimOrbWeight(normCache, getInnerOrb(orb), idxSeq[])
     end
     weight
 end
