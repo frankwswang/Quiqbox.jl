@@ -28,10 +28,9 @@ include("SpatialBasis.jl")
 # include("Matter.jl")
 # include("Overload.jl")
 
-# include("Integrals/Core.jl")
-# include("Integrals/Frameworks/OneBody.jl")
-include("Integrals/Frameworks/Numerical.jl")
-include("Integrals/GaussianOrbitals.jl")
+include("Integrals/Engines/Numerical.jl")
+include("Integrals/Engines/GaussianOrbitals.jl")
+include("Integrals/Framework.jl")
 include("Integrals/Interface.jl")
 
 # include("Integrals/OneBody.jl")
