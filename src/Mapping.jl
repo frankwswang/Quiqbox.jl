@@ -341,11 +341,6 @@ function unpackTypedFunc!(f::ReturnTyped{T}, paramSet::AbstractVector,
 end
 
 
-struct Identity <: DirectOperator end
-
-(::Identity)(f::Function) = itself(f)
-
-
 struct LeftPartial{F<:Function, A<:NonEmptyTuple{Any}} <: FunctionModifier
     f::F
     header::A
