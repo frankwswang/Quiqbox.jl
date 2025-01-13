@@ -41,3 +41,13 @@ include("Behaviors.jl")
 
 include("Initialization.jl")
 end
+
+## Development comment guideline
+#!! Urgent issue
+#!!... Urgent issue that's being implemented/fixed
+#! Non-urgent issue
+#? Consideration for change
+#+ Potential Feature implementation
+
+## Footnote comment template
+#= Additional Method =#
