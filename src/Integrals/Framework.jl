@@ -33,9 +33,9 @@ const OneBodyIdxSymDict = let tempDict=Base.ImmutableDict(true=>:aa)
 end
 
 const TwoBodyIdxSymDict = let
-    valTemp = (:aaaa, :aabb, :abab, :aaxy, :abxx, :abxy)
     keyTemp = ((true,  true,  true), (true,  true, false), (false, false,  true), 
                (true, false, false), (false, true, false), (false, false, false))
+    valTemp = (:aaaa, :aabb, :abab, :aaxy, :abxx, :abxy)
     mapreduce(Base.ImmutableDict, keyTemp, valTemp, 
               init=Base.ImmutableDict{NTuple{3, Bool}, Symbol}()) do key, val
         key=>val
