@@ -1,12 +1,22 @@
 using LinearAlgebra: norm
+using LRUCache
 
-function oddFactorialCore(a::Int) # a * (a-2) * ... * 1
-    factorial(2a) ÷ (2^a * factorial(a))
+const DefaultOddFactorialCacheSizeLimit = 25
+const OddFactorialCache = LRU{Int, BigInt}(maxsize=DefaultOddFactorialCacheSizeLimit)
+
+function oddFactorial(a::Int) # a * (a-2) * ... * 1
+    get!(OddFactorialCache, a) do
+        i = (a > 33 ? BigInt(1) : 1)
+        for j = 1:2:a
+            i *= j
+        end
+        i
+    end
 end
 
 
 function polyGaussFuncSquaredNorm(α::T, degree::Int) where {T<:Real}
-    factor = degree > 0 ? (oddFactorialCore(2degree - 1) / (4α)^degree) : one(T)
+    factor = degree > 0 ? (T(oddFactorial(2degree - 1)) / (4α)^degree) : one(T)
     T(πPowers[:p0d5]) / sqrt(2α) * factor
 end
 
