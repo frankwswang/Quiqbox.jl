@@ -6,7 +6,7 @@ const OddFactorialCache = LRU{Int, BigInt}(maxsize=DefaultOddFactorialCacheSizeL
 
 function oddFactorial(a::Int) # a * (a-2) * ... * 1
     get!(OddFactorialCache, a) do
-        i = (a > 33 ? BigInt(1) : 1)
+        i = BigInt(1)
         for j = 1:2:a
             i *= j
         end
