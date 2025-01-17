@@ -15,14 +15,9 @@ function oddFactorial(a::Int) # a * (a-2) * ... * 1
 end
 
 
-function polyGaussFuncSquaredNorm(α::T, degree::Int) where {T<:Real}
-    factor = degree > 0 ? (T(oddFactorial(2degree - 1)) / (4α)^degree) : one(T)
-    T(πPowers[:p0d5]) / sqrt(2α) * factor
-end
-
-
-function gaussProdCore1(dxLR::T, xpnProdOverSum::T) where {T<:Real}
-    exp(- xpnProdOverSum * dxLR^2)
+function gaussProdCore1(xpnLRsum::T, degree::Int) where {T<:Real}
+    factor = degree > 0 ? (T(oddFactorial(2degree - 1)) / (2xpnLRsum)^degree) : one(T)
+    T(πPowers[:p0d5]) / sqrt(xpnLRsum) * factor
 end
 
 function gaussProdCore2(dxML::T, dxMR::T, lxL::Int, lxR::Int, lx::Int) where {T<:Real}
@@ -45,6 +40,14 @@ function gaussProdCore2(lxL::Int, lxR::Int, lx::Int)
         res += Int(isequal(2lxL, lx+q) * isequal(2lxR, lx-q))
     end
     res
+end
+
+function gaussProdCore3(dxLR::T, xpnProdOverSum::T) where {T<:Real}
+    exp(- xpnProdOverSum * dxLR^2)
+end
+
+function gaussProdCore4(xpnSum::T, dxLR::T, xpnRatio::T) where {T}
+    gaussProdCore1(xpnSum, 0) * gaussProdCore3(dxLR, xpnRatio)
 end
 
 
@@ -79,32 +82,36 @@ function overlapPGTO(data::GaussProductData{T}) where {T}
     cenR = data.rhs.cen
     cenM = data.cen
 
-    xpn = data.xpn
-    xpnRatio = data.lhs.xpn * data.rhs.xpn / xpn
+    xpnS = data.xpn
+    xpnRatio = data.lhs.xpn * data.rhs.xpn / xpnS
 
     angL = data.lhs.ang
     angR = data.rhs.ang
 
     mapreduce(*, cenL, cenR, cenM, angL, angR) do xL, xR, xM, iL, iR
         dxLR = xL - xR
-        jRange = 0:((iL + iR) ÷ 2)
-        if isequal(dxLR, zero(T))
-            mapreduce(+, jRange) do j
-                gaussProdCore2(iL, iR, 2j) * polyGaussFuncSquaredNorm(xpn/2, j)
-            end
+        if iL == iR == 0
+            gaussProdCore4(xpnS, dxLR, xpnRatio)
         else
-            mapreduce(+, jRange) do j
-                xML = xM - xL
-                xMR = xM - xR
-                gaussProdCore2(xML, xMR, iL, iR, 2j) * polyGaussFuncSquaredNorm(xpn/2, j)
-            end * gaussProdCore1(dxLR, xpnRatio)
+            jRange = 0:((iL + iR) ÷ 2)
+            if isequal(dxLR, zero(T))
+                mapreduce(+, jRange) do j
+                    gaussProdCore1(xpnS, j) * gaussProdCore2(iL, iR, 2j)
+                end
+            else
+                mapreduce(+, jRange) do j
+                    xML = xM - xL
+                    xMR = xM - xR
+                    gaussProdCore1(xpnS, j) * gaussProdCore2(xML, xMR, iL, iR, 2j)
+                end * gaussProdCore3(dxLR, xpnRatio)
+            end
         end
     end
 end
 
 function overlapPGTO(xpn::T, ang::NonEmptyTuple{Int}) where {T}
     mapreduce(*, ang) do i
-        polyGaussFuncSquaredNorm(xpn, i)
+        gaussProdCore1(2xpn, i)
     end
 end
 
@@ -151,12 +158,12 @@ end
 
 function (f::OverlapGTOrbPair{T})(pars1::FilteredVecOfArr{T}, 
                                   pars2::FilteredVecOfArr{T}) where {T}
-    c1 = getField(pars1, first(f.cen))
-    x1 = getField(pars1, first(f.xpn))
-    d1 = PrimGaussOrbData(c1, x1, first(f.ang))
-    c2 = getField(pars2,  last(f.cen))
-    x2 = getField(pars2,  last(f.xpn))
-    d2 = PrimGaussOrbData(c2, x2,  last(f.ang))
+    c1 = getField(pars1, f.cen[begin])
+    x1 = getField(pars1, f.xpn[begin])
+    d1 = PrimGaussOrbData(c1, x1, f.ang[begin])
+    c2 = getField(pars2, f.cen[end])
+    x2 = getField(pars2, f.xpn[end])
+    d2 = PrimGaussOrbData(c2, x2,  f.ang[end])
     GaussProductData(d1, d2) |> overlapPGTO
 end
 
