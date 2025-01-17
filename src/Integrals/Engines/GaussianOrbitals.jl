@@ -46,7 +46,7 @@ function gaussProdCore3(dxLR::T, xpnProdOverSum::T) where {T<:Real}
     exp(- xpnProdOverSum * dxLR^2)
 end
 
-function gaussProdCore4(xpnSum::T, dxLR::T, xpnRatio::T) where {T}
+function gaussProdCore4(xpnSum::T, xpnRatio::T, dxLR::T) where {T}
     gaussProdCore1(xpnSum, 0) * gaussProdCore3(dxLR, xpnRatio)
 end
 
@@ -77,6 +77,40 @@ struct GaussProductData{T, D}
 end
 
 
+const DefaultPrimGTOIntCacheSizeLimit = 100
+
+@generated function lazyOverlapPGTO(input::Tuple{T, T, T, T, Int, Int}) where {T}
+    cache = LRU{Tuple{T, T, T, T, Int, Int}, T}(maxsize=DefaultPrimGTOIntCacheSizeLimit)
+    return quote
+        if input[end-1] == input[end] == 0
+            gaussProdCore4(input[begin], input[begin+1], input[begin+3]-input[begin+2])
+        else
+            res = get($cache, input, nothing)
+            if res === nothing
+                res = overlapPGTOcore(input)
+                setindex!($cache, res, input)
+            end
+            res
+        end
+    end
+end
+
+function overlapPGTOcore(input::Tuple{T, T, T, T, Int, Int}) where {T}
+    xpnSum, xpnRatio, xML, xMR, iL, iR = input
+    jRange = 0:((iL + iR) ÷ 2)
+    dxLR = xMR - xML
+
+    if isequal(dxLR, zero(T))
+        mapreduce(+, jRange) do j
+            gaussProdCore1(xpnSum, j) * gaussProdCore2(iL, iR, 2j)
+        end
+    else
+        mapreduce(+, jRange) do j
+            gaussProdCore1(xpnSum, j) * gaussProdCore2(xML, xMR, iL, iR, 2j)
+        end * gaussProdCore3(dxLR, xpnRatio)
+    end
+end
+
 function overlapPGTO(data::GaussProductData{T}) where {T}
     cenL = data.lhs.cen
     cenR = data.rhs.cen
@@ -89,23 +123,7 @@ function overlapPGTO(data::GaussProductData{T}) where {T}
     angR = data.rhs.ang
 
     mapreduce(*, cenL, cenR, cenM, angL, angR) do xL, xR, xM, iL, iR
-        dxLR = xL - xR
-        if iL == iR == 0
-            gaussProdCore4(xpnS, dxLR, xpnRatio)
-        else
-            jRange = 0:((iL + iR) ÷ 2)
-            if isequal(dxLR, zero(T))
-                mapreduce(+, jRange) do j
-                    gaussProdCore1(xpnS, j) * gaussProdCore2(iL, iR, 2j)
-                end
-            else
-                mapreduce(+, jRange) do j
-                    xML = xM - xL
-                    xMR = xM - xR
-                    gaussProdCore1(xpnS, j) * gaussProdCore2(xML, xMR, iL, iR, 2j)
-                end * gaussProdCore3(dxLR, xpnRatio)
-            end
-        end
+        lazyOverlapPGTO((xpnS, xpnRatio, xM-xL, xM-xR, iL, iR))
     end
 end
 
