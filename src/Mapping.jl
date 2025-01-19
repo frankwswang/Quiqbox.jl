@@ -41,7 +41,7 @@ ReturnTyped(::Type{T}) where {T} = ReturnTyped(itself, T)
 
 ReturnTyped(f::ReturnTyped{T}, ::Type{T}) where {T} = itself(f)
 
-(f::ReturnTyped{T, F})(arg...) where {T, F} = convert(T, f.f(arg...))
+(f::ReturnTyped{T, F})(arg...; kws...) where {T, F} = convert(T, f.f(arg...; kws...))
 
 const Return{T} = ReturnTyped{T, ItsType}
 
