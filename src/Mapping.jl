@@ -219,10 +219,12 @@ end
 (f::Plus{T})(arg::T) where {T} = arg + f.val
 
 
-struct ShiftByArg{T<:Real, D} <: FieldlessFunction end
+struct ShiftByArg{T, D} <: FieldlessFunction end
 
-(::ShiftByArg{T, D})(input::NTuple{D, Real}, args::Vararg{T, D}) where {T, D} = 
-(input .- args)
+function (::ShiftByArg{T, D})(input::Union{NTuple{D, T}, AbstractVector{T}}, 
+                              args::Vararg{T, D}) where {T, D}
+    input .- args
+end
 
 
 struct HermitianContract{T, F1<:ReturnTyped{T}, F2<:ReturnTyped{T}} <: FunctionComposer
