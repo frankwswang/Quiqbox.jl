@@ -116,6 +116,9 @@ const PrimATOcore{T, D, B<:EvalPolyGaussProd{T, D}} =
 const PrimGTOcore{T, D, B<:EvalPolyGaussProd{T, D}} = 
       PrimitiveOrbCore{T, D, B}
 
+const TypedPrimGTOcore{T, D, L} = 
+      PrimitiveOrbCore{T, D, EvalPolyRadialFunc{T, D, EvalGaussFunc{T}, L}}
+
 const EvalPrimGTO{T, D, B<:EvalPolyGaussProd{T, D}, F<:EvalOrbNormalizer{T, D}} = 
       EvalPrimOrb{T, D, B, F}
 
