@@ -481,57 +481,70 @@ function buildNormalizer(::Type{T}, ::Val{D}) where {T, D}
     EvalOrbNormalizer(T, Val(D))
 end
 
+
+function getNormalizerCoreTypeUnion(::Type{T}, ::Val{D}, ::Val{N}, ::Type{F}) where 
+                                   {T, D, N, F<:OrbitalIntegrator{T, D}}
+    if isconcretetype(F)
+        VariedNormCore{T, D, N, F}
+    else
+        VariedNormCore{T, D, N, <:F}
+    end
+end
+
 function NormalizeCompOrb(f::CompositeOrbCore{T, D}) where {T, D}
     weightedOrbs = f.f.chain
     nOrbs = length(weightedOrbs)
-    pOrbs = map(x->x.left, weightedOrbs)
+    oCorePtr = ChainPointer((:left, :f, :apply, :left))
+    oScopePtr = ChainPointer((:left, :f, :scope))
 
-    diagFuncs = Memory{ReturnTyped{T}}(undef, nOrbs)
-    pOrbCores = Memory{PrimitiveOrbCore{T, D}}(undef, nOrbs)
-    pOrbScopes = Memory{AwaitFilter{FlatParamSetFilter{T}}}(undef, nOrbs)
     hasUnit = false
     diagFuncCoreType = Union{}
     utriFuncCoreType = Union{}
-    for i in eachindex(pOrbs)
-        o = pOrbs[i]
-        oCore = o.f.apply.left
-        oScope = first(o.f.scope)
-        diagFuncs[i] = if isRenormalized(o)
+
+    diagFuncs = map(weightedOrbs) do weightedOrb
+        if isRenormalized(weightedOrb.left)
             hasUnit = true
             ReturnTyped(Unit(T), T)
         else
+            oCore = getField(weightedOrb, oCorePtr)
+            oSelect = getField(weightedOrb, oScopePtr) |> first |> Retrieve
             nfInner = genOneBodyCoreIntegrator(Identity(), (oCore,))
             diagFuncCoreType = typejoin(diagFuncCoreType, typeof(nfInner))
-            ReturnTyped(EncodeApply((Retrieve(oScope),), nfInner), T)
+            ReturnTyped(EncodeApply((oSelect,), nfInner), T)
         end
-        pOrbCores[i] = oCore
-        pOrbScopes[i] = oScope
     end
 
-    diagFuncType = if isconcretetype(diagFuncCoreType)
-        VariedNormCore{T, D, 1, diagFuncCoreType}
+    if !isconcretetype(eltype(diagFuncs))
+        diagFuncType = getNormalizerCoreTypeUnion(T, D, Val(1), diagFuncCoreType)
+        hasUnit && (diagFuncType = Union{UnitScalarCore{T}, diagFuncType})
+        diagFuncs = Memory{diagFuncType}(diagFuncs)
+    end
+
+    if nOrbs > 1
+        utriFuncNum = nOrbs * (nOrbs-1) ÷ 2
+        utriFuncs = map(1:utriFuncNum) do j
+            n, m = convert1DidxTo2D(nOrbs-1, j)
+            weightedOrb1 = weightedOrbs[begin+m-1]
+            weightedOrb2 = weightedOrbs[begin+n-1]
+            oCore1 = getField(weightedOrb1, oCorePtr)
+            oCore2 = getField(weightedOrb2, oCorePtr)
+            nfInner = genOneBodyCoreIntegrator(Identity(), (oCore1, oCore2))
+            utriFuncCoreType = typejoin(utriFuncCoreType, typeof(nfInner))
+            oSelect1 = getField(weightedOrb1, oScopePtr) |> first |> Retrieve
+            oSelect2 = getField(weightedOrb2, oScopePtr) |> first |> Retrieve
+            ReturnTyped(EncodeApply((oSelect1, oSelect2), nfInner), T)
+        end
+
+        utriFuncType = eltype(utriFuncs)
+        if !isconcretetype(utriFuncType)
+            utriFuncType = getNormalizerCoreTypeUnion(T, D, Val(2), utriFuncCoreType)
+        end
+        utriFuncs = Memory{utriFuncType}(utriFuncs)
     else
-        VariedNormCore{T, D, 1, <:diagFuncCoreType}
+        oCore = getField(weightedOrbs[begin], oCorePtr)
+        utriFuncCoreType = (typeof∘genOneBodyCoreIntegrator)(Identity(), (oCore, oCore))
+        utriFuncs = Memory{VariedNormCore{T, D, 2, utriFuncCoreType}}(undef, 0)
     end
-    hasUnit && (diagFuncType = Union{UnitScalarCore{T}, diagFuncType})
-    diagFuncs = convert(Memory{diagFuncType}, diagFuncs)
-
-    utriFuncs = Memory{ReturnTyped{T}}(undef, nOrbs*(nOrbs-1)÷2)
-    for j in 1:length(utriFuncs)
-        n, m = convert1DidxTo2D(nOrbs-1, j)
-        corePairs = (pOrbCores[begin+m-1], pOrbCores[begin+n-1])
-        nfInner = genOneBodyCoreIntegrator(Identity(), corePairs)
-        utriFuncCoreType = typejoin(utriFuncCoreType, typeof(nfInner))
-        filters = (pOrbScopes[begin+m-1], pOrbScopes[begin+n-1])
-        utriFuncs[begin+j-1] = ReturnTyped(EncodeApply(Retrieve.(filters), nfInner), T)
-    end
-
-    utriFuncType = if isconcretetype(utriFuncCoreType)
-        VariedNormCore{T, D, 2, utriFuncCoreType}
-    else
-        VariedNormCore{T, D, 2, <:utriFuncCoreType}
-    end
-    utriFuncs = convert(Memory{utriFuncType}, utriFuncs)
 
     coreTransform = HermitianContract(diagFuncs, utriFuncs)
     getWeights = map(b->ReturnTyped(b.right.f, T), weightedOrbs)
