@@ -78,30 +78,41 @@ struct GaussProductInfo{T, D}
     end
 end
 
-struct NullCache{T} <: QueryBox{T} end
+
+struct NullCache{T} <: CustomCache{T} end
 
 const TupleOf5T2Int{T} = Tuple{T, T, T, T, Int, Int}
 
-const NullOrT5Int2LCU{T} = Union{NullCache{T}, LRU{TupleOf5T2Int{T}, T}}
+struct ZeroAngMomCache{T} <: CustomCache{T} end
+
+const CoreIntCacheBox{T} = Union{CustomCache{T}, LRU{<:Any, T}}
+
+
+struct OneBodyCoreIntCache{T, D, 
+                           F<:NTuple{D, CoreIntCacheBox{T}}} <: SpatialIntegralCache{T, D}
+    axis::F
+
+    OneBodyCoreIntCache(axis::NonEmptyTuple{CoreIntCacheBox{T}, D}) where {T, D} = 
+    new{T, D+1, typeof(axis)}(axis)
+end
+
+OneBodyCoreIntCache(::Type{T}, ::Val{D}) where {T, D} = 
+OneBodyCoreIntCache(ntuple( _->NullCache{T}(), Val(D) ))
+
 
 function overlapPGTOcore(input::TupleOf5T2Int{T}) where {T}
     xpnSum, xpnRatio, xML, xMR, iL, iR = input
     dxLR = xMR - xML
+    jRange = 0:((iL + iR) ÷ 2)
 
-    if iL == iR == 0
-        gaussProdCore4(xpnSum, xpnRatio, dxLR)
-    else
-        jRange = 0:((iL + iR) ÷ 2)
-
-        if isequal(dxLR, zero(T))
-            mapreduce(+, jRange) do j
-                gaussProdCore1(xpnSum, j) * gaussProdCore2(iL, iR, 2j)
-            end
-        else
-            mapreduce(+, jRange) do j
-                gaussProdCore1(xpnSum, j) * gaussProdCore2(xML, xMR, iL, iR, 2j)
-            end * gaussProdCore3(dxLR, xpnRatio)
+    if isequal(dxLR, zero(T))
+        mapreduce(+, jRange) do j
+            gaussProdCore1(xpnSum, j) * gaussProdCore2(iL, iR, 2j)
         end
+    else
+        mapreduce(+, jRange) do j
+            gaussProdCore1(xpnSum, j) * gaussProdCore2(xML, xMR, iL, iR, 2j)
+        end * gaussProdCore3(dxLR, xpnRatio)
     end
 end
 
@@ -122,8 +133,17 @@ end
 
 lazyOverlapPGTO(::NullCache{T}, input::TupleOf5T2Int{T}) where {T} = overlapPGTOcore(input)
 
-function overlapPGTO!(caches::NTuple{D, NullOrT5Int2LCU{T}}, 
-                      data::GaussProductInfo{T, D}) where {T, D}
+lazyOverlapPGTO(::ZeroAngMomCache{T}, input::TupleOf5T2Int{T}) where {T} = 
+gaussProdCore4(input[begin], input[begin+1], input[begin+3]-input[begin+2])
+
+
+const GTOrbOverlapAxialCache{T} = 
+      Union{NullCache{T}, ZeroAngMomCache{T}, LRU{TupleOf5T2Int{T}, T}}
+
+const GTOrbOverlapCache{T, D} = 
+      OneBodyCoreIntCache{T, D, <:NTuple{D, GTOrbOverlapAxialCache{T}}}
+
+function overlapPGTO!(cache::GTOrbOverlapCache{T, D}, data::GaussProductInfo{T, D}) where {T, D}
     cenL = data.lhs.cen
     cenR = data.rhs.cen
     cenM = data.cen
@@ -134,7 +154,7 @@ function overlapPGTO!(caches::NTuple{D, NullOrT5Int2LCU{T}},
     angL = data.lhs.ang
     angR = data.rhs.ang
 
-    mapreduce(*, caches, cenL, cenR, cenM, angL, angR) do cache, xL, xR, xM, iL, iR
+    mapreduce(*, cache.axis, cenL, cenR, cenM, angL, angR) do cache, xL, xR, xM, iL, iR
         lazyOverlapPGTO(cache, (xpnS, xpnRatio, xM-xL, xM-xR, iL, iR))
     end
 end
@@ -172,51 +192,57 @@ function (f::OverlapGTOrbSelf{T})(pars::FilteredVecOfArr{T}) where {T}
     overlapPGTOcore(xpnVal, f.core.ang)
 end
 
-struct OverlapGTOrbPairCore{T, D} <: OrbitalIntegrator{T, D}
+struct OverlapGTOrbPair{T, D} <: OrbitalIntegrator{T, D}
     lhs::PrimGaussOrbConfig{T, D}
     rhs::PrimGaussOrbConfig{T, D}
 end
 
-struct OverlapGTOrbPair{T, D} <: OrbitalIntegrator{T, D}
-    core::OverlapGTOrbPairCore{T, D}
-    cache::NTuple{D, LRU{TupleOf5T2Int{T}, T}}
-end
 
-function (f::OverlapGTOrbPairCore{T, D})(pars1::FilteredVecOfArr{T}, 
-                                         pars2::FilteredVecOfArr{T}, 
-                                         caches::NTuple{D, NullOrT5Int2LCU{T}}=
-                                         ntuple( _->NullCache{T}(), Val(D) )) where {T, D}
+function (f::OverlapGTOrbPair{T, D})(pars1::FilteredVecOfArr{T}, 
+                                     pars2::FilteredVecOfArr{T}; 
+                                     cache::GTOrbOverlapCache{T, D}=
+                                     OneBodyCoreIntCache(T, Val(D))) where {T, D}
     d1, d2 = map((:lhs, :rhs), (pars1, pars2)) do sym, pars
         sector = getfield(f, sym)
         cen = getField(pars, sector.cen)
         xpn = getField(pars, sector.xpn)
         PrimGaussOrbInfo(cen, xpn, sector.ang)
     end
-    overlapPGTO!(caches, GaussProductInfo(d1, d2))
+    overlapPGTO!(cache, GaussProductInfo(d1, d2))
 end
 
-(f::OverlapGTOrbPair{T})(pars1::FilteredVecOfArr{T}, pars2::FilteredVecOfArr{T}) where {T} = 
-f.core(pars1, pars2, f.cache)
+
+function genGTOrbOverlapFunc((orb,)::Tuple{PrimGTOcore{T, D}}) where {T, D}
+    preparePGTOconfig(orb) |> OverlapGTOrbSelf
+end
+
+
+function genGTOrbOverlapFunc((orb1, orb2)::NTuple{2, TypedPrimGTOcore{T, D}}) where {T, D}
+    OverlapGTOrbPair(preparePGTOconfig(orb1), preparePGTOconfig(orb2))
+end
 
 
 const DefaultPGTOrbOverlapCacheSizeLimit = 128
 
-@generated function genPGTOrbOverlapCache(::Type{T}, ::Val{D}, ::Val{L}) where {T, D, L}
+@generated function getGTOrbOverlapCacheCore(::Type{T}, ::Val{D}, ::Val{L}) where {T, D, L}
     maxsize = DefaultPGTOrbOverlapCacheSizeLimit
     caches = ntuple(_->LRU{TupleOf5T2Int{T}, T}(; maxsize), Val(D))
     return :( $caches )
 end
 
-function genGTOrbOverlapFunc((orb1, orb2)::Tuple{TypedPrimGTOcore{T, D, L1}, 
-                                                 TypedPrimGTOcore{T, D, L2}}) where 
-                            {T, D, L1, L2}
-    caches = genPGTOrbOverlapCache(T, Val(D), Val(L1+L2))
-    core = OverlapGTOrbPairCore(preparePGTOconfig(orb1), preparePGTOconfig(orb2))
-    OverlapGTOrbPair(core, caches)
+@generated function getGTOrbOverlapCacheCore(::Type{T}, ::Val{D}, ::Val{0}) where {T, D}
+    caches = ntuple(_->ZeroAngMomCache{T}(), Val(D))
+    return :( $caches )
 end
 
-function genGTOrbOverlapFunc((orb,)::Tuple{PrimGTOcore{T, D}}) where {T, D}
-    preparePGTOconfig(orb) |> OverlapGTOrbSelf
+function getGTOrbOverlapCache((orb1, orb2)::Tuple{TypedPrimGTOcore{T, D, L1}, 
+                                                  TypedPrimGTOcore{T, D, L2}}) where 
+                             {T, D, L1, L2}
+    getGTOrbOverlapCacheCore(T, Val(D), Val(L1+L2)) |> OneBodyCoreIntCache
+end
+
+function getGTOrbOverlapCache(::Tuple{TypedPrimGTOcore{T}}) where {T}
+    NullCache{T}()
 end
 
 

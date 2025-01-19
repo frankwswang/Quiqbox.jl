@@ -1,8 +1,5 @@
 using LinearAlgebra: dot
 
-const N12Tuple{T} = Union{Tuple{T}, NTuple{2, T}}
-const N24Tuple{T} = Union{NTuple{2, T}, NTuple{4, T}}
-
 const OrbitalBasisSet{T, D} = AbstractVector{<:OrbitalBasis{T, D}}
 const OrbitalCollection{T, D} = NonEmpTplOrAbtArr{FrameworkOrb{T, D}, 1}
 const OrbitalInput{T, D} = Union{FrameworkOrb{T, D}, OrbitalCollection{T, D}}
@@ -116,10 +113,6 @@ function getPrimCoreIntData(cache::CompleteOneBodyIntegrals, idx::Tuple{Int})
 end
 
 
-genOneBodyCoreIntegrator(::Identity, orbs::N12Tuple{PrimGTOcore{T, D}}) where {T, D} = 
-genGTOrbOverlapFunc(orbs)
-
-
 isHermitian(::PrimitiveOrbCore{T, D}, ::DirectOperator, 
             ::PrimitiveOrbCore{T, D}) where {T, D} = 
 false
@@ -129,17 +122,41 @@ isHermitian(::PrimitiveOrbCore{T, D}, ::Identity,
 true
 
 
-function evalOneBodyPrimCoreIntegral(op::DirectOperator, 
-                                     (orb1, pars1)::OrbCoreData{T, D}, 
-                                     (orb2, pars2)::OrbCoreData{T, D}) where {T, D}
-    f = ReturnTyped(genOneBodyCoreIntegrator(op, (orb1, orb2)), T)
-    f(pars1, pars2)
+buildOneBodyCoreIntegrator(op::DirectOperator, 
+                           orbs::N12Tuple{PrimitiveOrbCore{T, D}}) where {T, D} = 
+OneBodyNumIntegrate(op, orbs)
+
+buildOneBodyCoreIntegrator(::Identity, orbs::N12Tuple{PrimGTOcore{T, D}}) where {T, D} = 
+genGTOrbOverlapFunc(orbs)
+
+
+prepareOneBodyCoreIntCache(::Identity, orbs::N12Tuple{PrimGTOcore{T, D}}) where {T, D} = 
+getGTOrbOverlapCache(orbs)
+
+prepareOneBodyCoreIntCache(::Identity, ::N12Tuple{PrimitiveOrbCore{T, D}}) where {T, D} = 
+NullCache{T}()
+
+
+function lazyEvalCoreIntegral(integrator::OrbitalIntegrator{T}, 
+                              paramData::N12Tuple{FilteredVecOfArr{T}}, 
+                              cache::C) where {T, C}
+    integrator(paramData...; cache)::T
 end
 
+function lazyEvalCoreIntegral(integrator::OrbitalIntegrator{T}, 
+                              paramData::N12Tuple{FilteredVecOfArr{T}}, 
+                              ::NullCache{T}) where {T}
+    integrator(paramData...)::T
+end
+
+
 function evalOneBodyPrimCoreIntegral(op::DirectOperator, 
-                                     (orb, pars)::OrbCoreData{T, D}) where {T, D}
-    f = ReturnTyped(genOneBodyCoreIntegrator(op, (orb,)), T)
-    f(pars)
+                                     data::N12Tuple{OrbCoreData{T, D}}) where {T, D}
+    orbData = first.(data)
+    parData =  last.(data)
+    fCore = buildOneBodyCoreIntegrator(op, orbData)
+    cache = prepareOneBodyCoreIntCache(op, orbData)
+    lazyEvalCoreIntegral(fCore, parData, cache)
 end
 
 
@@ -167,7 +184,7 @@ sortTensorIndex(arg::Vararg{Int}) = sortTensorIndex(arg)
 function genOneBodyIntDataPairsCore(op::DirectOperator, 
                                     (oData,)::Tuple{OrbCoreDataSeq{T}}, 
                                     (oneBasedIdx,)::Tuple{Int}) where {T}
-    iiVal = evalOneBodyPrimCoreIntegral(op, oData[begin+oneBasedIdx-1])
+    iiVal = evalOneBodyPrimCoreIntegral(op, (oData[begin+oneBasedIdx-1],))
     (iiVal,)
 end
 
@@ -177,11 +194,11 @@ function genOneBodyIntDataPairsCore(op::DirectOperator,
     orbPars1, orbPars2 = map(oDataPair, oneBasedIdxPair) do data, idx
         data[begin+idx-1]
     end
-    ijVal = evalOneBodyPrimCoreIntegral(op, orbPars1, orbPars2)
+    ijVal = evalOneBodyPrimCoreIntegral(op, (orbPars1, orbPars2))
     jiVal = if isHermitian(first(orbPars1), op, first(orbPars2))
         ijVal'
     else
-        evalOneBodyPrimCoreIntegral(op, orbPars2, orbPars1)
+        evalOneBodyPrimCoreIntegral(op, (orbPars2, orbPars1))
     end
     (ijVal, jiVal)
 end
@@ -263,7 +280,7 @@ function computeOneBodyPrimCoreIntTensor(op::DirectOperator,
     len1, len2 = length.(oDataPair)
     res = ShapedMemory{T}(undef, (len1, len2))
     for j in 1:len2, i in 1:len1
-        ijVal = evalOneBodyPrimCoreIntegral(op, oData1[begin+i-1], oData2[begin+j-1])
+        ijVal = evalOneBodyPrimCoreIntegral(op, (oData1[begin+i-1], oData2[begin+j-1]))
         res[begin+i-1, begin+j-1] = ijVal
     end
     res

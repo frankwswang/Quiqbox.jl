@@ -25,6 +25,8 @@ abstract type FunctionalStruct <: CompositeFunction end # A struct with defined 
 abstract type TypedEvaluator{T, F} <: Evaluator{F} end
 
 abstract type ViewedObject{T, P} <: QueryBox{T} end
+abstract type CustomCache{T} <: QueryBox{T} end
+abstract type SpatialIntegralCache{T, D} <: QueryBox{T} end
 
 abstract type AbstractAmpTensor{T, O} <: JaggedOperator{T, 0, O} end
 abstract type AbstractAmplitude{T} <: JaggedOperator{T, 0, 0} end
@@ -113,6 +115,8 @@ const FlattenedParam{T, N} = Union{InnerSpanParam{T, N}, OuterSpanParam{T, N}}
 
 const AVectorOrNTuple{T, NNMO} = Union{Tuple{T, Vararg{T, NNMO}}, AbstractVector{<:T}}
 const NonEmptyTuple{T, NMO} = Tuple{T, Vararg{T, NMO}}
+const N12Tuple{T} = Union{Tuple{T}, NTuple{2, T}}
+const N24Tuple{T} = Union{NTuple{2, T}, NTuple{4, T}}
 
 const MissingOr{T} = Union{Missing, T}
 const AbtArray0D{T} = AbstractArray{T, 0}
