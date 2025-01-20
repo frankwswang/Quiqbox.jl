@@ -98,16 +98,16 @@ struct ZeroAngMomCache{T} <: CustomCache{T} end
 const CoreIntCacheBox{T} = Union{CustomCache{T}, LRU{<:Any, T}}
 
 
-struct OneBodyCoreIntCache{T, D, 
-                           F<:NTuple{D, CoreIntCacheBox{T}}} <: SpatialIntegralCache{T, D}
+struct OneBodyIntProcessCache{T, D, F<:NTuple{D, CoreIntCacheBox{T}}
+                              } <: IntegralProcessCache{T, D}
     axis::F
 
-    OneBodyCoreIntCache(axis::NonEmptyTuple{CoreIntCacheBox{T}, D}) where {T, D} = 
+    OneBodyIntProcessCache(axis::NonEmptyTuple{CoreIntCacheBox{T}, D}) where {T, D} = 
     new{T, D+1, typeof(axis)}(axis)
 end
 
-OneBodyCoreIntCache(::Type{T}, ::Val{D}) where {T, D} = 
-OneBodyCoreIntCache(ntuple( _->NullCache{T}(), Val(D) ))
+OneBodyIntProcessCache(::Type{T}, ::Val{D}) where {T, D} = 
+OneBodyIntProcessCache(ntuple( _->NullCache{T}(), Val(D) ))
 
 
 function overlapPGTOcore(input::TupleOf5T2Int{T}) where {T}
@@ -151,7 +151,7 @@ const GTOrbOverlapAxialCache{T} =
       Union{NullCache{T}, ZeroAngMomCache{T}, LRU{TupleOf5T2Int{T}, T}}
 
 const GTOrbOverlapCache{T, D} = 
-      OneBodyCoreIntCache{T, D, <:NTuple{D, GTOrbOverlapAxialCache{T}}}
+      OneBodyIntProcessCache{T, D, <:NTuple{D, GTOrbOverlapAxialCache{T}}}
 
 function overlapPGTO(data::GaussProductInfo{T, D}, 
                      cache::GTOrbOverlapCache{T, D}) where {T, D}
@@ -210,7 +210,7 @@ end
 function (f::OverlapGTOrbPair{T, D})(pars1::FilteredVecOfArr{T}, 
                                      pars2::FilteredVecOfArr{T}; 
                                      cache::GTOrbOverlapCache{T, D}=
-                                     OneBodyCoreIntCache(T, Val(D))) where {T, D}
+                                     OneBodyIntProcessCache(T, Val(D))) where {T, D}
     data = GaussProductInfo(f.basis, (pars1, pars2))
     overlapPGTO(data, cache)
 end
@@ -231,21 +231,15 @@ function genPrimGTOrbOverlapCache(::Type{T}, ::Val{D}, ::Val{0}) where {T, D}
     ntuple(_->ZeroAngMomCache{T}(), Val(D))
 end
 
-genGTO1BCoreIntCache(::MonomialMul{T, D, L}, 
+genGTOrbIntCompCache(::MonomialMul{T, D, L}, 
                      ::Tuple{TypedPrimGTOcore{T, D, L1}, TypedPrimGTOcore{T, D, L2}}) where 
                     {T, D, L, L1, L2} = 
-genPrimGTOrbOverlapCache(T, Val(D), Val(L+L1+L2)) |> OneBodyCoreIntCache
+genPrimGTOrbOverlapCache(T, Val(D), Val(L+L1+L2)) |> OneBodyIntProcessCache
 
-genGTO1BCoreIntCache(::Identity, 
+genGTOrbIntCompCache(::Identity, 
                      ::Tuple{TypedPrimGTOcore{T, D, L1}, TypedPrimGTOcore{T, D, L2}}) where 
                     {T, D, L1, L2} = 
-genPrimGTOrbOverlapCache(T, Val(D), Val(L1+L2)) |> OneBodyCoreIntCache
-
-genGTO1BCoreIntCache(::DirectOperator, ::Tuple{TypedPrimGTOcore{T}}) where {T} = 
-NullCache{T}()
-
-genGTO1BCoreIntCache(op::MonomialMul{T}, (orb,)::Tuple{TypedPrimGTOcore{T}}) where {T} = 
-genGTO1BCoreIntCache(op, (orb, orb))
+genPrimGTOrbOverlapCache(T, Val(D), Val(L1+L2)) |> OneBodyIntProcessCache
 
 
 function buildNormalizerCore(o::PrimGTOcore{T, D}) where {T, D}
@@ -323,7 +317,7 @@ end
 function (f::MultiMomentGTOrbPair{T, D})(pars1::FilteredVecOfArr{T}, 
                                          pars2::FilteredVecOfArr{T}; 
                                          cache::GTOrbOverlapCache{T, D}=
-                                         OneBodyCoreIntCache(T, Val(D))) where {T, D}
+                                         OneBodyIntProcessCache(T, Val(D))) where {T, D}
     data = GaussProductInfo(f.basis, (pars1, pars2))
     computeMultiMomentGTO(f.op, data, cache)
 end

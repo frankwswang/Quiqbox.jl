@@ -24,9 +24,10 @@ abstract type FunctionalStruct <: CompositeFunction end # A struct with defined 
 
 abstract type TypedEvaluator{T, F} <: Evaluator{F} end
 
+abstract type SpatialIntegralCache{T, D} <: QueryBox{T} end
+abstract type IntegralData{T, S} <: QueryBox{T} end
 abstract type ViewedObject{T, P} <: QueryBox{T} end
 abstract type CustomCache{T} <: QueryBox{T} end
-abstract type SpatialIntegralCache{T, D} <: QueryBox{T} end
 
 abstract type AbstractAmpTensor{T, O} <: JaggedOperator{T, 0, O} end
 abstract type AbstractAmplitude{T} <: JaggedOperator{T, 0, 0} end
@@ -41,6 +42,8 @@ abstract type JoinedOperator{J} <: FunctionComposer end
 
 abstract type CompositePointer <: ConfigBox end
 abstract type StructuredType <: ConfigBox end
+
+abstract type IntegralProcessCache{T, D} <: SpatialIntegralCache{T, D} end
 
 abstract type ActivePointer <: CompositePointer end
 abstract type StaticPointer{P<:ActivePointer} <: CompositePointer end
