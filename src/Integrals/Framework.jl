@@ -129,6 +129,9 @@ OneBodyNumIntegrate(op, orbs)
 buildOneBodyCoreIntegrator(::Identity, orbs::N12Tuple{PrimGTOcore{T, D}}) where {T, D} = 
 genGTOrbOverlapFunc(orbs)
 
+buildOneBodyCoreIntegrator(op::MonomialMul{T, D}, 
+                           orbs::N12Tuple{PrimGTOcore{T, D}}) where {T, D} = 
+genGTOrbMultiMomentFunc(op, orbs)
 
 
 prepareOneBodyCoreIntCache(op::DirectOperator, 

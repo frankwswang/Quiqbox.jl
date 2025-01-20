@@ -231,17 +231,105 @@ function genPrimGTOrbOverlapCache(::Type{T}, ::Val{D}, ::Val{0}) where {T, D}
     ntuple(_->ZeroAngMomCache{T}(), Val(D))
 end
 
-function getGTOrbOverlapCache((orb1, orb2)::Tuple{TypedPrimGTOcore{T, D, L1}, 
-                                                  TypedPrimGTOcore{T, D, L2}}) where 
-                             {T, D, L1, L2}
-    getGTOrbOverlapCacheCore(T, Val(D), Val(L1+L2)) |> OneBodyCoreIntCache
-end
+genGTO1BCoreIntCache(::MonomialMul{T, D, L}, 
+                     ::Tuple{TypedPrimGTOcore{T, D, L1}, TypedPrimGTOcore{T, D, L2}}) where 
+                    {T, D, L, L1, L2} = 
+genPrimGTOrbOverlapCache(T, Val(D), Val(L+L1+L2)) |> OneBodyCoreIntCache
 
-function getGTOrbOverlapCache(::Tuple{TypedPrimGTOcore{T}}) where {T}
-    NullCache{T}()
-end
+genGTO1BCoreIntCache(::Identity, 
+                     ::Tuple{TypedPrimGTOcore{T, D, L1}, TypedPrimGTOcore{T, D, L2}}) where 
+                    {T, D, L1, L2} = 
+genPrimGTOrbOverlapCache(T, Val(D), Val(L1+L2)) |> OneBodyCoreIntCache
+
+genGTO1BCoreIntCache(::DirectOperator, ::Tuple{TypedPrimGTOcore{T}}) where {T} = 
+NullCache{T}()
+
+genGTO1BCoreIntCache(op::MonomialMul{T}, (orb,)::Tuple{TypedPrimGTOcore{T}}) where {T} = 
+genGTO1BCoreIntCache(op, (orb, orb))
 
 
 function buildNormalizerCore(o::PrimGTOcore{T, D}) where {T, D}
     genGTOrbOverlapFunc((o,))
+end
+
+
+## Multiple Moment ##
+function computeMultiMomentGTO(op::MonomialMul{T, D}, 
+                               data::PrimGaussOrbInfo{T, D}) where {T, D}
+    xpn = data.xpn
+    mapreduce(*, op.center, op.degree.tuple, data.center, data.ang) do xMM, n, x, i
+        dx = x - xMM
+        m = iszero(dx) ? 0 : n
+        mapreduce(+, 0:m) do k
+            l = n - k
+            if isodd(l)
+                zero(T)
+            else
+                binomial(n, k) * dx^k * gaussProdCore1(2xpn, i + (l >> 1))
+            end
+        end
+    end
+end
+
+
+function computeMultiMomentGTO(op::MonomialMul{T, D}, data::GaussProductInfo{T, D}, 
+                               cache::GTOrbOverlapCache{T, D}) where {T, D}
+
+    cenL = data.lhs.cen
+    cenR = data.rhs.cen
+    cenM = data.cen
+
+    xpnS = data.xpn
+    xpnRatio = data.lhs.xpn * data.rhs.xpn / xpnS
+
+    angL = data.lhs.ang
+    angR = data.rhs.ang
+
+    mapreduce(*, cache.axis, op.center, op.degree.tuple, 
+                 cenL, cenR, cenM, angL, angR) do cache, xMM, n, xL, xR, xM, iL, iR
+        dx = xR - xMM #! Consider when xL == xMM
+        m = iszero(dx) ? 0 : n
+        mapreduce(+, 0:m) do k
+            binomial(n, k) * dx^k * 
+            lazyOverlapPGTO(cache, (xpnS, xpnRatio, xM-xL, xM-xR, iL, iR+n-k))
+        end
+    end
+end
+
+computeMultiMomentGTO(::MonomialMul{T, D, 0}, data::GaussProductInfo{T, D}, 
+                      cache::GTOrbOverlapCache{T, D}) where {T, D} = 
+overlapPGTO(data, cache)
+
+
+struct PrimGTOrbMultiMoment{T, D, L, B<:N12Tuple{PrimGaussOrbConfig{T, D}}
+                            } <: OrbitalIntegrator{T, D}
+    op::MonomialMul{T, D, L}
+    basis::B
+end
+
+const MultiMomentGTOrbSelf{T, D, L} = 
+      PrimGTOrbMultiMoment{T, D, L,  Tuple{    PrimGaussOrbConfig{T, D} }}
+const MultiMomentGTOrbPair{T, D, L} = 
+      PrimGTOrbMultiMoment{T, D, L, NTuple{ 2, PrimGaussOrbConfig{T, D} }}
+
+function (f::MultiMomentGTOrbSelf{T})(pars::FilteredVecOfArr{T}) where {T}
+    sector = first(f.basis)
+    cen = getField(pars, sector.cen)
+    xpn = getField(pars, sector.xpn)
+    data = PrimGaussOrbInfo(cen, xpn, sector.ang)
+    computeMultiMomentGTO(f.op, data)
+end
+
+function (f::MultiMomentGTOrbPair{T, D})(pars1::FilteredVecOfArr{T}, 
+                                         pars2::FilteredVecOfArr{T}; 
+                                         cache::GTOrbOverlapCache{T, D}=
+                                         OneBodyCoreIntCache(T, Val(D))) where {T, D}
+    data = GaussProductInfo(f.basis, (pars1, pars2))
+    computeMultiMomentGTO(f.op, data, cache)
+end
+
+
+function genGTOrbMultiMomentFunc(op::MonomialMul{T, D}, 
+                                 orbCoreData::N12Tuple{PrimGTOcore{T, D}}) where {T, D}
+    PrimGTOrbMultiMoment(op, preparePGTOconfig.(orbCoreData))
 end
