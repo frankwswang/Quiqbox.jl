@@ -130,11 +130,16 @@ buildOneBodyCoreIntegrator(::Identity, orbs::N12Tuple{PrimGTOcore{T, D}}) where 
 genGTOrbOverlapFunc(orbs)
 
 
-prepareOneBodyCoreIntCache(::Identity, orbs::N12Tuple{PrimGTOcore{T, D}}) where {T, D} = 
-getGTOrbOverlapCache(orbs)
 
-prepareOneBodyCoreIntCache(::Identity, ::N12Tuple{PrimitiveOrbCore{T, D}}) where {T, D} = 
+prepareOneBodyCoreIntCache(op::DirectOperator, 
+                           orbs::N12Tuple{PrimGTOcore{T, D}}) where {T, D} = 
+genGTO1BCoreIntCache(op, orbs)
+
+prepareOneBodyCoreIntCache(::DirectOperator, 
+                           ::N12Tuple{PrimitiveOrbCore{T, D}}) where {T, D} = 
 NullCache{T}()
+
+# adjustOneBodyCoreIntConfig
 
 
 function lazyEvalCoreIntegral(integrator::OrbitalIntegrator{T}, 
