@@ -59,12 +59,12 @@ function composeIntegralKernel(::OneBodyIntegral, op::O, ::Type{T},
     composeOneBodyKernel(op, T, terms)
 end
 
-function numericalIntegrate(::OneBodyIntegral, op::F, 
+function numericalIntegrate(::OneBodyIntegral{D}, op::F, 
                             orbs::NonEmptyTuple{EvalFieldFunction{T, D}, N}, 
                             pVals::NonEmptyTuple{FilteredVecOfArr{T}, N}) where 
                             {F<:DirectOperator, T, D, N}
     terms = Base.Fix2.(orbs, pVals)
-    integralKernel = composeIntegralKernel(OneBodyIntegral(), op, T, terms)
+    integralKernel = composeIntegralKernel(OneBodyIntegral{D}(), op, T, terms)
     integrand = ConfineInterval(T, integralKernel)
     bound = ntuple(_->one(T), Val(D))
     numericalIntegrateCore(integrand, (.-(bound), bound))
@@ -88,11 +88,11 @@ const OnyBodyPairNumInt{T, D, F<:DirectOperator, P1<:PrimitiveOrbCore{T, D},
                         P2<:PrimitiveOrbCore{T, D}} = 
       OneBodyNumIntegrate{T, D, F, Tuple{P1, P2}}
 
-function (f::OneBodySelfNumInt{T})(pVal::FilteredVecOfArr{T}) where {T}
-    numericalIntegrate(OneBodyIntegral(), f.op, f.basis, (pVal,))
+function (f::OneBodySelfNumInt{T, D})(pVal::FilteredVecOfArr{T}) where {T, D}
+    numericalIntegrate(OneBodyIntegral{D}(), f.op, f.basis, (pVal,))
 end
 
-function (f::OnyBodyPairNumInt{T})(pVal1::FilteredVecOfArr{T}, 
-                                   pVal2::FilteredVecOfArr{T}) where {T}
-    numericalIntegrate(OneBodyIntegral(), f.op, f.basis, (pVal1, pVal2))
+function (f::OnyBodyPairNumInt{T, D})(pVal1::FilteredVecOfArr{T}, 
+                                      pVal2::FilteredVecOfArr{T}) where {T, D}
+    numericalIntegrate(OneBodyIntegral{D}(), f.op, f.basis, (pVal1, pVal2))
 end
