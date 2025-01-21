@@ -81,22 +81,21 @@ end
 
 
 #? Allow .renormalize mutable
-#! Change .center to the first field
 struct PrimitiveOrb{T, D, B<:FieldAmplitude{T, D}, 
                     C<:NTuple{D, ElementalParam{T}}} <: ComposedOrb{T, D, B}
-    body::B
     center::C
+    body::B
     renormalize::Bool
 end
 
 const PrimGTO{T, D, B<:PolyGaussProd{T, D}, C<:NTuple{D, ElementalParam{T}}} = 
       PrimitiveOrb{T, D, B, C}
 
-function PrimitiveOrb(body::B, center::NTuple{D, ParamOrValue{T}}; 
+function PrimitiveOrb(center::NTuple{D, ParamOrValue{T}}, body::B; 
                       renormalize::Bool=false) where {T, D, B<:FieldAmplitude{T, D}}
     length(center)!=D && throw(AssertionError("The length of `center` must match `D=$D`."))
     encoder = genCellEncoder(T, :cen)
-    PrimitiveOrb(body, encoder.(center), renormalize)
+    PrimitiveOrb(encoder.(center), body, renormalize)
 end
 
 PrimitiveOrb(ob::PrimitiveOrb) = itself(ob)
@@ -434,7 +433,7 @@ function genGaussTypeOrb(center::NonEmptyTuple{ParamOrValue{T}, D},
                          ijk::NonEmptyTuple{Int, D}=ntuple(_->0, Val(D+1)); 
                          renormalize::Bool=false) where {T, D}
     gf = GaussFunc(xpn)
-    PrimitiveOrb(PolyRadialFunc(gf, ijk), center; renormalize)
+    PrimitiveOrb(center, PolyRadialFunc(gf, ijk); renormalize)
 end
 
 function genGaussTypeOrb(center::NonEmptyTuple{ParamOrValue{T}, D}, 
