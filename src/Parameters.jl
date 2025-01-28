@@ -915,7 +915,9 @@ function getParamMarker!(pDict::ParamPointerBox{T}, transformer::F,
     mem = transformer(p)
     tUB = getParamDataTypeUB(pDict, p)
     markerType = NodeMarker{tUB}
-    get!(selectParamPointer(pDict, p), p, NodeMarker(mem, tUB))::markerType
+    get!(selectParamPointer(pDict, p), p) do
+        NodeMarker(mem, tUB)
+    end::markerType
 end
 
 function getParamMarker!(pDict::ParamPointerBox{T}, transformer::F, 
@@ -928,7 +930,9 @@ function getParamMarker!(pDict::ParamPointerBox{T}, transformer::F,
         parId[i] = par
     end
     markerType = NodeMarker{Memory{eleT}}
-    get!(selectParamPointer(pDict, p), p, NodeMarker( Memory{eleT}(parId) ))::markerType
+    get!(selectParamPointer(pDict, p), p) do
+        NodeMarker(Memory{eleT}(parId))
+    end::markerType
 end
 
 function recursiveTransformCore1!(generator::F, marker::NodeMarker, 

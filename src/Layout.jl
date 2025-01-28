@@ -255,7 +255,9 @@ const DefaultIdentifierCacheSizeLimit = 500
 const IdentifierCache = LRU{BlackBox, RefVal{Any}}(maxsize=DefaultIdentifierCacheSizeLimit)
 
 function backupIdentifier(ref::BlackBox)
-    LRUCache.get!(IdentifierCache, ref, Ref{Any}(ref.value))
+    LRUCache.get!(IdentifierCache, ref) do
+        Ref{Any}(ref.value)
+    end
     WeakRef(IdentifierCache[ref][])
 end
 
