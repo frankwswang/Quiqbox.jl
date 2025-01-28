@@ -10,7 +10,7 @@ abstract type AbstractMemory{T, N} <: AbstractArray{T, N} end
 
 abstract type ConfigBox <: Box end
 abstract type MarkerBox <: Box end
-abstract type ParamBox{T} <: Box end
+abstract type StateBox{T} <: Box end
 abstract type GraphBox{T} <: Box end
 abstract type QueryBox{T} <: Box end
 
@@ -18,12 +18,10 @@ abstract type Evaluator{F} <: AnnotatedFunction end
 
 # N: Inner dim, size mutable; O: Outer dim, size immutable
 abstract type JaggedOperator{T, N, O} <: CompositeFunction end
+abstract type StatefulFunction{T} <: CompositeFunction end
 abstract type FunctionModifier <: CompositeFunction end # Modify a function
 abstract type FunctionComposer <: CompositeFunction end # Compose only functions together
 abstract type FunctionalStruct <: CompositeFunction end # A struct with defined methods
-
-abstract type StatefulFunction{T} <: CompositeFunction end
-abstract type StatefulVariable{T} <: CompositeFunction end
 
 abstract type TypedEvaluator{T, F} <: Evaluator{F} end
 
@@ -67,13 +65,13 @@ abstract type OrbitalIntegrator{T, D} <: AmplitudeIntegrator{T, D, 1} end
 
 abstract type GraphNode{T, N, O} <: GraphBox{T} end
 
-abstract type JaggedParam{T, N, O} <: ParamBox{T} end
+abstract type ParamBox{T, N, O} <: StateBox{T} end
 
 abstract type IdentityMarker{T} <: MarkerBox end
 abstract type StorageMarker{T} <: MarkerBox end
 
-abstract type CompositeParam{T, N, O} <: JaggedParam{T, N, O} end
-abstract type PrimitiveParam{T, N} <: JaggedParam{T, N, 0} end
+abstract type CompositeParam{T, N, O} <: ParamBox{T, N, O} end
+abstract type PrimitiveParam{T, N} <: ParamBox{T, N, 0} end
 
 abstract type OperationNode{T, N, O, I} <: GraphNode{T, N, O} end
 abstract type ReferenceNode{T, N, O, I} <: GraphNode{T, N, O} end
@@ -114,9 +112,9 @@ const DimIGNode{T, N} = GraphNode{T, N, 0}
 const DimOGNode{T, N} = GraphNode{T, 0, N}
 const DimSGNode{T, N} = Union{DimIGNode{T, N}, DimOGNode{T, N}}
 
-const ElementalParam{T} = JaggedParam{T, 0, 0}
-const InnerSpanParam{T, N} = JaggedParam{T, N, 0}
-const OuterSpanParam{T, O} = JaggedParam{T, 0, O}
+const ElementalParam{T} = ParamBox{T, 0, 0}
+const InnerSpanParam{T, N} = ParamBox{T, N, 0}
+const OuterSpanParam{T, O} = ParamBox{T, 0, O}
 const FlattenedParam{T, N} = Union{InnerSpanParam{T, N}, OuterSpanParam{T, N}}
 
 const AVectorOrNTuple{T, NNMO} = Union{Tuple{T, Vararg{T, NNMO}}, AbstractVector{<:T}}
@@ -143,8 +141,8 @@ const AbtMemory0D{T} = AbstractMemory{T, 0}
 
 const TriTupleUnion{T} = Union{(NTuple{N, T} for N in 1:3)...}
 const TetraTupleUnion{T} = Union{(NTuple{N, T} for N in 1:4)...}
-const ParamInputType{T} = TriTupleUnion{JaggedParam{T}}
-const ParamInput{T, N} = NTuple{N, JaggedParam{T}}
+const ParamInputType{T} = TriTupleUnion{ParamBox{T}}
+const ParamInput{T, N} = NTuple{N, ParamBox{T}}
 
 const EleParamSpanVecTyped{T} = AbstractVector{<:ElementalParam{T}}
 const EleParamSpanVecUnion{T} = AbstractVector{<:ElementalParam{<:T}}
@@ -155,7 +153,7 @@ const PrimParamVec{T} = AbstractVector{<:PrimParamEle{T}}
 const FlatParamEle{T} = Union{EleParamSpanVecTyped{T}, FlattenedParam{T}}
 const FlatParamVec{T} = AbstractVector{<:FlatParamEle{T}}
 
-const MiscParamEle{T} = Union{FlatParamVec{T}, JaggedParam{T}}
+const MiscParamEle{T} = Union{FlatParamVec{T}, ParamBox{T}}
 const MiscParamVec{T} = AbstractVector{<:MiscParamEle{T}}
 
 const ParamBoxTypedArr{T, N} = AbstractArray{<:ParamBox{T}, N}
@@ -163,7 +161,7 @@ const ParamBoxUnionArr{P<:ParamBox, N} = AbstractArray{<:P, N}
 
 const AbstractFlatParamSet{T, V<:EleParamSpanVecUnion{<:T}, P<:FlattenedParam{<:T}} = 
       AbstractVector{Union{V, P}}
-const AbstractMiscParamSet{T, S<:AbstractFlatParamSet{T}, P<:JaggedParam{<:T}} = 
+const AbstractMiscParamSet{T, S<:AbstractFlatParamSet{T}, P<:ParamBox{<:T}} = 
       AbstractVector{Union{S, P}}
 
 const AbstractParamSet{T} = Union{AbstractFlatParamSet{T}, AbstractMiscParamSet{T}}

@@ -24,7 +24,7 @@ TensorType(::ElementalParam{T}) where {T} = Flavor{T}()
 
 TensorType(p::FlattenedParam{T}) where {T} = Volume{T}(outputSizeOf(p))
 
-TensorType(p::JaggedParam{T, N}) where {T, N} = 
+TensorType(p::ParamBox{T, N}) where {T, N} = 
 Volume{AbstractArray{T, N}}(outputSizeOf(p))
 
 
