@@ -65,7 +65,7 @@ struct BatchNode{T, N, O,
     end
 end
 
-struct BuildNode{T, N, O, F<:JaggedOperator{T, N, O}, S<:Union{ItsType, ValShifter{T}}, 
+struct BuildNode{T, N, O, F<:DualSpanFunction{T, N, O}, S<:Union{ItsType, ValShifter{T}}, 
                  I<:NodeChildrenType{T}} <: OperationNode{T, N, O, I}
     operator::F
     shifter::S
@@ -265,10 +265,9 @@ function compressNodeCore!(tStorage::TemporaryStorage{T},
 end
 
 
-#? Adjust the signature of `FunctionalStruct`, or change it to `TypedEvaluator`.
 #? Unify the format of CompressedNode with other ParamFunc: FrameworkOrb
 struct CompressedNode{T, F<:Function, S<:FixedSizeStorage{T}, 
-                      V<:AbtVecOfAbtArr{T}} <: FunctionalStruct
+                      V<:AbtVecOfAbtArr{T}} <: StatefulFunction{T}
     f::F
     storage::S
     param::V

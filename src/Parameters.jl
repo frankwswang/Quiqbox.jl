@@ -138,7 +138,7 @@ function checkReturnType(f::F, ::Type{T}, args::NonEmptyTuple{Any}) where {F, T}
 end
 
 
-struct TypedReduction{T, F<:Function} <: JaggedOperator{T, 0, 0}
+struct TypedReduction{T, F<:Function} <: DualSpanFunction{T, 0, 0}
     f::F
 
     function TypedReduction(f::F, arg, args...) where {F}
@@ -164,7 +164,7 @@ end
 (::TypedReduction{T, ItsType})(arg::T) where {T} = itself(arg)
 
 
-struct StableMorphism{T, F<:Function, N} <: JaggedOperator{T, N, 0}
+struct StableMorphism{T, F<:Function, N} <: DualSpanFunction{T, N, 0}
     f::F
 
     function StableMorphism(f::F, arg, args...) where {F}
@@ -198,7 +198,7 @@ end
 
 FixedShapeLinkAxisType = Union{NonEmptyTuple{Tuple{Symbol, Int}}, Missing}
 
-struct FixedShapeLink{T, F<:Function, N, O} <: JaggedOperator{T, N, O}
+struct FixedShapeLink{T, F<:Function, N, O} <: DualSpanFunction{T, N, O}
     f::F
     axis::NTuple{O, Tuple{Symbol, Int}}
     extent::Int

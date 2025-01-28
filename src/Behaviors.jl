@@ -1,7 +1,7 @@
 (::SelectTrait{ParameterizationStyle})(::F) where {F<:Function} = 
 GenericFunction()
 
-(::SelectTrait{ParameterizationStyle})(::AbstractAmplitude{T}) where {T} = 
+(::SelectTrait{ParameterizationStyle})(::ParamBoxFunction{T}) where {T} = 
 TypedParamFunc{T}()
 
 

@@ -4,7 +4,6 @@ abstract type EqualityDict{K, T} <: AbstractDict{K, T} end
 
 abstract type CompositeFunction <: Function end # composite-type function
 abstract type FieldlessFunction <: Function end # singleton function
-abstract type AnnotatedFunction <: Function end # function annotated with type parameters
 
 abstract type AbstractMemory{T, N} <: AbstractArray{T, N} end
 
@@ -14,32 +13,29 @@ abstract type StateBox{T} <: Box end
 abstract type GraphBox{T} <: Box end
 abstract type QueryBox{T} <: Box end
 
-abstract type Evaluator{F} <: AnnotatedFunction end
-
 # N: Inner dim, size mutable; O: Outer dim, size immutable
-abstract type JaggedOperator{T, N, O} <: CompositeFunction end
+abstract type DualSpanFunction{T, N, O} <: CompositeFunction end
 abstract type StatefulFunction{T} <: CompositeFunction end
-abstract type FunctionModifier <: CompositeFunction end # Modify a function
-abstract type FunctionComposer <: CompositeFunction end # Compose only functions together
-abstract type FunctionalStruct <: CompositeFunction end # A struct with defined methods
-
-abstract type TypedEvaluator{T, F} <: Evaluator{F} end
+abstract type FunctionComposer <: CompositeFunction end
+abstract type Evaluator{F} <: CompositeFunction end
 
 abstract type SpatialProcessCache{T, D} <: QueryBox{T} end
 abstract type IntegralData{T, S} <: QueryBox{T} end
 abstract type ViewedObject{T, P} <: QueryBox{T} end
 abstract type CustomCache{T} <: QueryBox{T} end
 
-abstract type AbstractAmpTensor{T, O} <: JaggedOperator{T, 0, O} end
-abstract type AbstractAmplitude{T} <: JaggedOperator{T, 0, 0} end
+abstract type AmplitudeNormalizer{T, D, N} <: StatefulFunction{T} end
+abstract type AmplitudeIntegrator{T, D, N} <: StatefulFunction{T} end
+abstract type ParamBoxFunction{T} <: StatefulFunction{T} end
 
-abstract type AmplitudeNormalizer{T, D, N} <: FunctionalStruct end
-abstract type AmplitudeIntegrator{T, D, N} <: FunctionalStruct end
+abstract type FunctionModifier <: FunctionComposer end # Modify a function
+abstract type FunctionCombiner <: FunctionComposer end # Combine functions together
+
+abstract type TypedEvaluator{T, F} <: Evaluator{F} end
 
 abstract type DirectOperator <: FunctionModifier end
 
-abstract type ParamFuncBuilder{F} <: FunctionComposer end
-abstract type JoinedOperator{J} <: FunctionComposer end
+abstract type ParamFuncBuilder{F} <: FunctionCombiner end
 
 abstract type CompositePointer <: ConfigBox end
 abstract type StructuredType <: ConfigBox end
@@ -54,14 +50,10 @@ abstract type EntryPointer <: ActivePointer end
 
 abstract type DimensionalEvaluator{T, D, F} <: TypedEvaluator{T, F} end
 
-# M: Particle number
-abstract type SpatialAmpTensor{T, D, M, O} <: AbstractAmpTensor{T, O} end
-
-abstract type SpatialAmplitude{T, D, M} <: AbstractAmplitude{T} end
-
 abstract type OrbitalNormalizer{T, D} <: AmplitudeNormalizer{T, D, 1} end
-
 abstract type OrbitalIntegrator{T, D} <: AmplitudeIntegrator{T, D, 1} end
+# M: Particle number
+abstract type SpatialAmplitude{T, D, M} <: ParamBoxFunction{T} end
 
 abstract type GraphNode{T, N, O} <: GraphBox{T} end
 
@@ -87,8 +79,6 @@ abstract type BaseParam{T, N, I} <: ParamToken{T, N, I} end
 abstract type LinkParam{T, N, I} <: ParamToken{T, N, I} end
 
 abstract type EvalDimensionalFunc{T, D, F} <: DimensionalEvaluator{T, D, F} end
-
-abstract type OrbitalBatch{T, D, F, O} <: SpatialAmpTensor{T, D, 1, O} end
 
 abstract type OrbitalBasis{T, D, F} <: SpatialAmplitude{T, D, 1} end
 abstract type FieldAmplitude{T, D} <: SpatialAmplitude{T, D, 1} end

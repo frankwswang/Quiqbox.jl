@@ -575,16 +575,3 @@ end
 function isRenormalizedCore(::Power{<:Unit})
     false
 end
-
-# struct GaussTypeSubshell{T, D, L, B, O} <: OrbitalBatch{T, D, PolyGaussProd{T, D, L, B}, O}
-#     seed::PolyGaussProd{T, D, L, B}
-#     subshell::NTuple{O, CartSHarmonics{D, L}}
-
-#     function GaussTypeSubshell(center::NonEmptyTuple{ParamOrValue{T}, D}, 
-#                                xpns::ParOrValVec{T}, 
-#                                cons::ParOrValVec{T}, 
-#                                l::Int; 
-#                                renormalize::Bool=false)
-#         l < 0
-#     end
-# end
