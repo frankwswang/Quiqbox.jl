@@ -6,6 +6,9 @@ struct Identity <: DirectOperator end
 struct MonomialMul{T, D, L} <: DirectOperator
     center::NTuple{D, T}
     degree::WeakComp{D, L}
+
+    MonomialMul(center::NonEmptyTuple{T}, degree::WeakComp{D, L}) where {T, D, L} = 
+    new{T, D, L}(center, degree)
 end
 
 MonomialMul(center::NonEmptyTuple{T, D}, degree::NonEmptyTuple{Int, D}) where {T, D} = 
