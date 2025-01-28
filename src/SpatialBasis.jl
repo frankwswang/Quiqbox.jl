@@ -467,13 +467,13 @@ end
 
 
 function buildNormalizer(f::PrimitiveOrbCore{T}) where {T}
-    nfInner = (NormalizePrimOrb∘buildNormalizerCore)(f)
-    EvalOrbNormalizer(nfInner, T)
+    nfCore = (NormalizePrimOrb∘buildNormalizerCore)(f)
+    EvalOrbNormalizer(nfCore, T)
 end
 
 function buildNormalizer(f::CompositeOrbCore{T}) where {T}
-    nfInner = NormalizeCompOrb(f)
-    EvalOrbNormalizer(nfInner, T)
+    nfCore = NormalizeCompOrb(f)
+    EvalOrbNormalizer(nfCore, T)
 end
 
 function buildNormalizer(::Type{T}, ::Val{D}) where {T, D}
@@ -495,6 +495,7 @@ function NormalizeCompOrb(f::CompositeOrbCore{T, D}) where {T, D}
     nOrbs = length(weightedOrbs)
     oCorePtr = ChainPointer((:left, :f, :apply, :left))
     oScopePtr = ChainPointer((:left, :f, :scope))
+    nIntStyle = OneBodyIntegral{D}()
 
     hasUnit = false
     diagFuncCoreType = Union{}
@@ -507,9 +508,9 @@ function NormalizeCompOrb(f::CompositeOrbCore{T, D}) where {T, D}
         else
             oCore = getField(weightedOrb, oCorePtr)
             oSelect = getField(weightedOrb, oScopePtr) |> first |> Retrieve
-            nfInner = buildOneBodyCoreIntegrator(Identity(), (oCore,))
-            diagFuncCoreType = typejoin(diagFuncCoreType, typeof(nfInner))
-            ReturnTyped(EncodeApply((oSelect,), nfInner), T)
+            nfCore = buildCoreIntegrator(nIntStyle, Identity(), (oCore,))
+            diagFuncCoreType = typejoin(diagFuncCoreType, typeof(nfCore))
+            ReturnTyped(EncodeApply((oSelect,), nfCore), T)
         end
     end
 
@@ -527,11 +528,11 @@ function NormalizeCompOrb(f::CompositeOrbCore{T, D}) where {T, D}
             weightedOrb2 = weightedOrbs[begin+n-1]
             oCore1 = getField(weightedOrb1, oCorePtr)
             oCore2 = getField(weightedOrb2, oCorePtr)
-            nfInner = buildOneBodyCoreIntegrator(Identity(), (oCore1, oCore2))
-            utriFuncCoreType = typejoin(utriFuncCoreType, typeof(nfInner))
+            nfCore = buildCoreIntegrator(nIntStyle, Identity(), (oCore1, oCore2))
+            utriFuncCoreType = typejoin(utriFuncCoreType, typeof(nfCore))
             oSelect1 = getField(weightedOrb1, oScopePtr) |> first |> Retrieve
             oSelect2 = getField(weightedOrb2, oScopePtr) |> first |> Retrieve
-            ReturnTyped(EncodeApply((oSelect1, oSelect2), nfInner), T)
+            ReturnTyped(EncodeApply((oSelect1, oSelect2), nfCore), T)
         end
 
         utriFuncType = eltype(utriFuncs)
@@ -541,7 +542,7 @@ function NormalizeCompOrb(f::CompositeOrbCore{T, D}) where {T, D}
         utriFuncs = Memory{utriFuncType}(utriFuncs)
     else
         oCore = getField(weightedOrbs[begin], oCorePtr)
-        utriFuncCoreType = (typeof∘buildOneBodyCoreIntegrator)(Identity(), (oCore, oCore))
+        utriFuncCoreType = (typeof∘buildCoreIntegrator)(OneBodyIntegral{D}(), Identity(), (oCore, oCore))
         utriFuncs = Memory{VariedNormCore{T, D, 2, utriFuncCoreType}}(undef, 0)
     end
 

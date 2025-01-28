@@ -22,9 +22,12 @@ abstract type FunctionModifier <: CompositeFunction end # Modify a function
 abstract type FunctionComposer <: CompositeFunction end # Compose only functions together
 abstract type FunctionalStruct <: CompositeFunction end # A struct with defined methods
 
+abstract type StatefulFunction{T} <: CompositeFunction end
+abstract type StatefulVariable{T} <: CompositeFunction end
+
 abstract type TypedEvaluator{T, F} <: Evaluator{F} end
 
-abstract type SpatialIntegralCache{T, D} <: QueryBox{T} end
+abstract type SpatialProcessCache{T, D} <: QueryBox{T} end
 abstract type IntegralData{T, S} <: QueryBox{T} end
 abstract type ViewedObject{T, P} <: QueryBox{T} end
 abstract type CustomCache{T} <: QueryBox{T} end
@@ -43,7 +46,7 @@ abstract type JoinedOperator{J} <: FunctionComposer end
 abstract type CompositePointer <: ConfigBox end
 abstract type StructuredType <: ConfigBox end
 
-abstract type IntegralProcessCache{T, D} <: SpatialIntegralCache{T, D} end
+abstract type IntegralProcessCache{T, D} <: SpatialProcessCache{T, D} end
 
 abstract type ActivePointer <: CompositePointer end
 abstract type StaticPointer{P<:ActivePointer} <: CompositePointer end

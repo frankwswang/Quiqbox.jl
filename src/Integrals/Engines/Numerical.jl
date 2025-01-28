@@ -72,7 +72,7 @@ end
 
 
 function buildNormalizerCore(o::PrimitiveOrbCore{T, D}) where {T, D}
-    buildOneBodyCoreIntegrator(Identity(), (o,))
+    buildCoreIntegrator(OneBodyIntegral{D}(), Identity(), (o,))
 end
 
 
