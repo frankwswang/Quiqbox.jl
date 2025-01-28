@@ -23,7 +23,7 @@ end
 const GetParamSubset{T} = Retrieve{AwaitFilter{FlatParamSetFilter{T}}}
 
 const VariedNormCore{T, D, N, F<:OrbitalIntegrator{T, D}} = 
-      ReturnTyped{T, <:EncodeApply{N, NTuple{N, GetParamSubset{T}}, F}}
+      ReturnTyped{T, EncodeApply{N, NTuple{N, GetParamSubset{T}}, F}}
 
 const UnitScalarCore{T} = ReturnTyped{T, Unit{T}}
 
@@ -74,29 +74,28 @@ end
 
 function ScaledOrbital(orb::EvalComposedOrb{T}, scalar::Function, 
                        scope::FlatParamSetFilter{T}) where {T}
-    fCoreLocal = PairCombine(StableBinary(*, T), orb, scalar)
+    fCoreLocal = PairCombine(StableMul(T), orb, scalar)
     fCore = ParamFilterFunc(fCoreLocal, AwaitFilter(scope))
     ScaledOrbital(fCore)
 end
 
 
 #? Allow .renormalize mutable
-#! Change .center to the first field
 struct PrimitiveOrb{T, D, B<:FieldAmplitude{T, D}, 
                     C<:NTuple{D, ElementalParam{T}}} <: ComposedOrb{T, D, B}
-    body::B
     center::C
+    body::B
     renormalize::Bool
 end
 
 const PrimGTO{T, D, B<:PolyGaussProd{T, D}, C<:NTuple{D, ElementalParam{T}}} = 
       PrimitiveOrb{T, D, B, C}
 
-function PrimitiveOrb(body::B, center::NTuple{D, ParamOrValue{T}}; 
+function PrimitiveOrb(center::NTuple{D, ParamOrValue{T}}, body::B; 
                       renormalize::Bool=false) where {T, D, B<:FieldAmplitude{T, D}}
     length(center)!=D && throw(AssertionError("The length of `center` must match `D=$D`."))
     encoder = genCellEncoder(T, :cen)
-    PrimitiveOrb(body, encoder.(center), renormalize)
+    PrimitiveOrb(encoder.(center), body, renormalize)
 end
 
 PrimitiveOrb(ob::PrimitiveOrb) = itself(ob)
@@ -115,6 +114,9 @@ const PrimATOcore{T, D, B<:EvalPolyGaussProd{T, D}} =
 
 const PrimGTOcore{T, D, B<:EvalPolyGaussProd{T, D}} = 
       PrimitiveOrbCore{T, D, B}
+
+const TypedPrimGTOcore{T, D, L} = 
+      PrimitiveOrbCore{T, D, EvalPolyRadialFunc{T, D, EvalGaussFunc{T}, L}}
 
 const EvalPrimGTO{T, D, B<:EvalPolyGaussProd{T, D}, F<:EvalOrbNormalizer{T, D}} = 
       EvalPrimOrb{T, D, B, F}
@@ -212,7 +214,7 @@ function getEffectiveWeight(o::CompositeOrb{T}, weight::FlattenedParam{T, 1},
                            "`CompositeOrb` with another value is prohibited."))
     len = first(outputSizeOf(o.weight))
     outWeight = indexParam(weight, idx)
-    map(i->CellParam(StableBinary(*, T), indexParam(o.weight, i), outWeight, :w), 1:len)
+    map(i->CellParam(StableMul(T), indexParam(o.weight, i), outWeight, :w), 1:len)
 end
 
 function getEffectiveWeight(o::AbstractVector{<:ComposedOrb{T, D}}, 
@@ -270,7 +272,7 @@ function restrainEvalOrbType(weightedFs::AbstractVector{<:WeightedPF{T, D}}) whe
     fInnerType = (eltype∘map)(f->getField(f, cPtr), fInnerObjs)
     nInnerType = (eltype∘map)(f->getField(f, ChainPointer( (:right, :f) )), fInnerObjs)
     V = compressWeightedPF(fInnerType, nInnerType)
-    ChainReduce(StableBinary(+, T), V(weightedFs))
+    ChainReduce(StableAdd(T), V(weightedFs))
 end
 
 struct CompOrbParamPtr{T, D, R<:FieldPtrDict{T}, 
@@ -297,7 +299,7 @@ function unpackComposedOrbCore!(f::CompositeOrb{T, D}, paramSet::FlatParamSet,
         i += 1
         fInnerCore, _, basisPtr = unpackParamFunc!(b, pSetLocal, paramSetId)
         getWeight = Retrieve(ChainPointer( weightPtr, ChainPointer(i, TensorType(T)) ))
-        weightedPrimOrb = PairCombine(StableBinary(*, T), fInnerCore, OnlyBody(getWeight))
+        weightedPrimOrb = PairCombine(StableMul(T), fInnerCore, OnlyBody(getWeight))
         push!(weightedFields, weightedPrimOrb)
         basisPtr
     end
@@ -431,7 +433,7 @@ function genGaussTypeOrb(center::NonEmptyTuple{ParamOrValue{T}, D},
                          ijk::NonEmptyTuple{Int, D}=ntuple(_->0, Val(D+1)); 
                          renormalize::Bool=false) where {T, D}
     gf = GaussFunc(xpn)
-    PrimitiveOrb(PolyRadialFunc(gf, ijk), center; renormalize)
+    PrimitiveOrb(center, PolyRadialFunc(gf, ijk); renormalize)
 end
 
 function genGaussTypeOrb(center::NonEmptyTuple{ParamOrValue{T}, D}, 
@@ -465,51 +467,86 @@ end
 
 
 function buildNormalizer(f::PrimitiveOrbCore{T}) where {T}
-    nfInner = (NormalizePrimOrb∘buildNormalizerCore)(f)
-    EvalOrbNormalizer(nfInner, T)
+    nfCore = (NormalizePrimOrb∘buildNormalizerCore)(f)
+    EvalOrbNormalizer(nfCore, T)
 end
 
 function buildNormalizer(f::CompositeOrbCore{T}) where {T}
-    nfInner = NormalizeCompOrb(f)
-    EvalOrbNormalizer(nfInner, T)
+    nfCore = NormalizeCompOrb(f)
+    EvalOrbNormalizer(nfCore, T)
 end
 
 function buildNormalizer(::Type{T}, ::Val{D}) where {T, D}
     EvalOrbNormalizer(T, Val(D))
 end
 
+
+function getNormalizerCoreTypeUnion(::Type{T}, ::Val{D}, ::Val{N}, ::Type{F}) where 
+                                   {T, D, N, F<:OrbitalIntegrator{T, D}}
+    if isconcretetype(F)
+        VariedNormCore{T, D, N, F}
+    else
+        VariedNormCore{T, D, N, <:F}
+    end
+end
+
 function NormalizeCompOrb(f::CompositeOrbCore{T, D}) where {T, D}
     weightedOrbs = f.f.chain
     nOrbs = length(weightedOrbs)
-    pOrbs = map(x->x.left, weightedOrbs)
+    oCorePtr = ChainPointer((:left, :f, :apply, :left))
+    oScopePtr = ChainPointer((:left, :f, :scope))
+    nIntStyle = OneBodyIntegral{D}()
 
-    diagFuncs = Memory{ReturnTyped{T}}(undef, nOrbs)
-    pOrbCores = Memory{PrimitiveOrbCore{T, D}}(undef, nOrbs)
-    pOrbScopes = Memory{AwaitFilter{FlatParamSetFilter{T}}}(undef, nOrbs)
-    for i in eachindex(pOrbs)
-        o = pOrbs[i]
-        oCore = o.f.apply.left
-        oScope = first(o.f.scope)
-        diagFuncs[i] = if isRenormalized(o)
+    hasUnit = false
+    diagFuncCoreType = Union{}
+    utriFuncCoreType = Union{}
+
+    diagFuncs = map(weightedOrbs) do weightedOrb
+        if isRenormalized(weightedOrb.left)
+            hasUnit = true
             ReturnTyped(Unit(T), T)
         else
-            nfInner = genOneBodyCoreIntegrator(Identity(), (oCore,))
-            ReturnTyped(EncodeApply((Retrieve(oScope),), nfInner), T)
+            oCore = getField(weightedOrb, oCorePtr)
+            oSelect = getField(weightedOrb, oScopePtr) |> first |> Retrieve
+            nfCore = buildCoreIntegrator(nIntStyle, Identity(), (oCore,))
+            diagFuncCoreType = typejoin(diagFuncCoreType, typeof(nfCore))
+            ReturnTyped(EncodeApply((oSelect,), nfCore), T)
         end
-        pOrbCores[i] = oCore
-        pOrbScopes[i] = oScope
     end
 
-    utriFuncs = Memory{ReturnTyped{T}}(undef, nOrbs*(nOrbs-1)÷2)
-    for j in 1:length(utriFuncs)
-        n, m = convert1DidxTo2D(nOrbs-1, j)
-        corePairs = (pOrbCores[begin+m-1], pOrbCores[begin+n-1])
-        nfInner = genOneBodyCoreIntegrator(Identity(), corePairs)
-        filters = (pOrbScopes[begin+m-1], pOrbScopes[begin+n-1])
-        utriFuncs[begin+j-1] = ReturnTyped(EncodeApply(Retrieve.(filters), nfInner), T)
+    if !isconcretetype(eltype(diagFuncs))
+        diagFuncType = getNormalizerCoreTypeUnion(T, D, Val(1), diagFuncCoreType)
+        hasUnit && (diagFuncType = Union{UnitScalarCore{T}, diagFuncType})
+        diagFuncs = Memory{diagFuncType}(diagFuncs)
     end
 
-    coreTransform = HermitianContract(map(itself, diagFuncs), map(itself, utriFuncs))
+    if nOrbs > 1
+        utriFuncNum = nOrbs * (nOrbs-1) ÷ 2
+        utriFuncs = map(1:utriFuncNum) do j
+            n, m = convert1DidxTo2D(nOrbs-1, j)
+            weightedOrb1 = weightedOrbs[begin+m-1]
+            weightedOrb2 = weightedOrbs[begin+n-1]
+            oCore1 = getField(weightedOrb1, oCorePtr)
+            oCore2 = getField(weightedOrb2, oCorePtr)
+            nfCore = buildCoreIntegrator(nIntStyle, Identity(), (oCore1, oCore2))
+            utriFuncCoreType = typejoin(utriFuncCoreType, typeof(nfCore))
+            oSelect1 = getField(weightedOrb1, oScopePtr) |> first |> Retrieve
+            oSelect2 = getField(weightedOrb2, oScopePtr) |> first |> Retrieve
+            ReturnTyped(EncodeApply((oSelect1, oSelect2), nfCore), T)
+        end
+
+        utriFuncType = eltype(utriFuncs)
+        if !isconcretetype(utriFuncType)
+            utriFuncType = getNormalizerCoreTypeUnion(T, D, Val(2), utriFuncCoreType)
+        end
+        utriFuncs = Memory{utriFuncType}(utriFuncs)
+    else
+        oCore = getField(weightedOrbs[begin], oCorePtr)
+        utriFuncCoreType = (typeof∘buildCoreIntegrator)(OneBodyIntegral{D}(), Identity(), (oCore, oCore))
+        utriFuncs = Memory{VariedNormCore{T, D, 2, utriFuncCoreType}}(undef, 0)
+    end
+
+    coreTransform = HermitianContract(diagFuncs, utriFuncs)
     getWeights = map(b->ReturnTyped(b.right.f, T), weightedOrbs)
     NormalizeCompOrb(coreTransform, getWeights)
 end

@@ -92,7 +92,7 @@ function unpackParamFuncCore!(f::AxialProdFunc{T, D}, paramSet::FlatParamSet) wh
         fEvalComps[i] = InsertInward(fInner, (OnlyHead∘Retrieve)(ptr))
         map(x->(ChainPointer(anchor, x.first)=>x.second), axialPairs)
     end
-    fEvalCore = Tuple(fEvalComps) |> (ChainReduce∘StableBinary)(*, T)
+    fEvalCore = Tuple(fEvalComps) |> (ChainReduce∘StableMul)(T)
     EvalAxialProdFunc(fEvalCore), paramSet, pairs
 end
 
@@ -122,7 +122,7 @@ function unpackParamFuncCore!(f::PolyRadialFunc{T, D}, paramSet::FlatParamSet) w
     end
     coordEncoder = InsertInward(fInner, OnlyHead(LinearAlgebra.norm))
     angularFunc = (OnlyHead∘ReturnTyped)(f.angular, T)
-    fEvalCore = PairCombine(StableBinary(*, T), coordEncoder, angularFunc)
+    fEvalCore = PairCombine(StableMul(T), coordEncoder, angularFunc)
     EvalPolyRadialFunc(fEvalCore), paramSet, radialPairs
 end
 

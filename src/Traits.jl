@@ -55,8 +55,8 @@ returnUndefinedTraitError(InputStyle, F)
 
 abstract type IntegralStyle <: AnyInterface end
 
-abstract type MultiBodyIntegral <: IntegralStyle end
+abstract type MultiBodyIntegral{D} <: IntegralStyle end
 
-struct OneBodyIntegral <: MultiBodyIntegral end
+struct OneBodyIntegral{D} <: MultiBodyIntegral{D} end
 
-struct TwoBodyIntegral <: MultiBodyIntegral end
+struct TwoBodyIntegral{D} <: MultiBodyIntegral{D} end

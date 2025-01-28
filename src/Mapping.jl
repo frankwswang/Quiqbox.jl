@@ -41,7 +41,7 @@ ReturnTyped(::Type{T}) where {T} = ReturnTyped(itself, T)
 
 ReturnTyped(f::ReturnTyped{T}, ::Type{T}) where {T} = itself(f)
 
-(f::ReturnTyped{T, F})(arg...) where {T, F} = convert(T, f.f(arg...))
+(f::ReturnTyped{T, F})(arg...; kws...) where {T, F} = convert(T, f.f(arg...; kws...))
 
 const Return{T} = ReturnTyped{T, ItsType}
 
@@ -59,7 +59,8 @@ end
 const StableAdd{T} = StableBinary{T, typeof(+)}
 const StableMul{T} = StableBinary{T, typeof(*)}
 
-StableBinary(f::Function) = Base.Fix1(StableBinary, f)
+StableAdd(::Type{T}) where {T} = StableBinary(+, T)
+StableMul(::Type{T}) where {T} = StableBinary(*, T)
 
 
 struct Retrieve{P<:CompositePointer} <: FunctionComposer
@@ -218,10 +219,12 @@ end
 (f::Plus{T})(arg::T) where {T} = arg + f.val
 
 
-struct ShiftByArg{T<:Real, D} <: FieldlessFunction end
+struct ShiftByArg{T, D} <: FieldlessFunction end
 
-(::ShiftByArg{T, D})(input::NTuple{D, Real}, args::Vararg{T, D}) where {T, D} = 
-(input .- args)
+function (::ShiftByArg{T, D})(input::Union{NTuple{D, T}, AbstractVector{T}}, 
+                              args::Vararg{T, D}) where {T, D}
+    input .- args
+end
 
 
 struct HermitianContract{T, F1<:ReturnTyped{T}, F2<:ReturnTyped{T}} <: FunctionComposer
@@ -338,11 +341,6 @@ function unpackTypedFunc!(f::ReturnTyped{T}, paramSet::AbstractVector,
     paramPtr = MixedFieldParamPointer(ptrDict, paramSetId)
     fCore, paramSet, paramPtr
 end
-
-
-struct Identity <: DirectOperator end
-
-(::Identity)(f::Function) = itself(f)
 
 
 struct LeftPartial{F<:Function, A<:NonEmptyTuple{Any}} <: FunctionModifier
