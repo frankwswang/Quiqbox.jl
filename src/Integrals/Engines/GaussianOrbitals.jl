@@ -136,7 +136,8 @@ function overlapPGTOcore(xpn::T, ang::NonEmptyTuple{Int}) where {T}
     end
 end
 
-function lazyOverlapPGTO(cache::LRU{TupleOf5T2Int{T}, T}, input::TupleOf5T2Int{T}) where {T}
+function lazyOverlapPGTO!(cache::LRU{TupleOf5T2Int{T}, T}, 
+                          input::TupleOf5T2Int{T}) where {T}
     res = get(cache, input, nothing) # Fewer allocations than using `get!`
     if res === nothing
         res = overlapPGTOcore(input)
@@ -145,9 +146,9 @@ function lazyOverlapPGTO(cache::LRU{TupleOf5T2Int{T}, T}, input::TupleOf5T2Int{T
     res
 end
 
-lazyOverlapPGTO(::NullCache{T}, input::TupleOf5T2Int{T}) where {T} = overlapPGTOcore(input)
+lazyOverlapPGTO!(::NullCache{T}, input::TupleOf5T2Int{T}) where {T} = overlapPGTOcore(input)
 
-lazyOverlapPGTO(::ZeroAngMomCache{T}, input::TupleOf5T2Int{T}) where {T} = 
+lazyOverlapPGTO!(::ZeroAngMomCache{T}, input::TupleOf5T2Int{T}) where {T} = 
 gaussProdCore4(input[begin], input[begin+1], input[begin+3]-input[begin+2])
 
 
@@ -157,8 +158,8 @@ const GTOrbOverlapAxialCache{T} =
 const GTOrbOverlapCache{T, D} = 
       AxialOneBodyIntCompCache{T, D, <:NTuple{D, GTOrbOverlapAxialCache{T}}}
 
-function overlapPGTO(data::GaussProductInfo{T, D}, 
-                     cache::GTOrbOverlapCache{T, D}) where {T, D}
+function overlapPGTO!(cache::GTOrbOverlapCache{T, D}, data::GaussProductInfo{T, D}, 
+                      ) where {T, D}
     cenL = data.lhs.cen
     cenR = data.rhs.cen
     cenM = data.cen
@@ -170,7 +171,7 @@ function overlapPGTO(data::GaussProductInfo{T, D},
     angR = data.rhs.ang
 
     mapreduce(*, cache.axis, cenL, cenR, cenM, angL, angR) do cache, xL, xR, xM, iL, iR
-        lazyOverlapPGTO(cache, (xpnS, xpnRatio, xM-xL, xM-xR, iL, iR))
+        lazyOverlapPGTO!(cache, (xpnS, xpnRatio, xM-xL, xM-xR, iL, iR))
     end
 end
 
@@ -213,10 +214,10 @@ end
 
 function (f::OverlapGTOrbPair{T, D})(pars1::FilteredVecOfArr{T}, 
                                      pars2::FilteredVecOfArr{T}; 
-                                     cache::GTOrbOverlapCache{T, D}=
+                                     cache!Self::GTOrbOverlapCache{T, D}=
                                      AxialOneBodyIntCompCache(T, Val(D))) where {T, D}
     data = GaussProductInfo(f.basis, (pars1, pars2))
-    overlapPGTO(data, cache)
+    overlapPGTO!(cache!Self, data)
 end
 
 
@@ -227,23 +228,12 @@ end
 
 const DefaultPGTOrbOverlapCacheSizeLimit = 128
 
-# function genPrimGTOrbOverlapCache(::Type{T}, ::Val{D}, ::Val{L}) where {T, D, L}
-#     ntuple(_->LRU{TupleOf5T2Int{T}, T}(maxsize=DefaultPGTOrbOverlapCacheSizeLimit), Val(D))
-# end
-
-# function genPrimGTOrbOverlapCache(::Type{T}, ::Val{D}, ::Val{0}) where {T, D}
-#     ntuple(_->ZeroAngMomCache{T}(), Val(D))
-# end
-
-@generated function genPrimGTOrbOverlapCache(::Type{T}, ::Val{D}, ::Val{L}) where {T, D, L}
-    maxsize = DefaultPGTOrbOverlapCacheSizeLimit
-    caches = ntuple(_->LRU{TupleOf5T2Int{T}, T}(; maxsize), Val(D))
-    return :( $caches )
+function genPrimGTOrbOverlapCache(::Type{T}, ::Val{D}, ::Val{L}) where {T, D, L}
+    ntuple(_->LRU{TupleOf5T2Int{T}, T}(maxsize=DefaultPGTOrbOverlapCacheSizeLimit), Val(D))
 end
 
-@generated function genPrimGTOrbOverlapCache(::Type{T}, ::Val{D}, ::Val{0}) where {T, D}
-    caches = ntuple(_->ZeroAngMomCache{T}(), Val(D))
-    return :( $caches )
+function genPrimGTOrbOverlapCache(::Type{T}, ::Val{D}, ::Val{0}) where {T, D}
+    ntuple(_->ZeroAngMomCache{T}(), Val(D))
 end
 
 genGTOrbIntCompCache(::MonomialMul{T, D, L}, 
@@ -281,8 +271,8 @@ function computeMultiMomentGTO(op::MonomialMul{T, D},
 end
 
 
-function computeMultiMomentGTO(op::MonomialMul{T, D}, data::GaussProductInfo{T, D}, 
-                               cache::GTOrbOverlapCache{T, D}) where {T, D}
+function computeMultiMomentGTO!(op::MonomialMul{T, D}, cache::GTOrbOverlapCache{T, D}, 
+                                data::GaussProductInfo{T, D}) where {T, D}
 
     cenL = data.lhs.cen
     cenR = data.rhs.cen
@@ -300,14 +290,14 @@ function computeMultiMomentGTO(op::MonomialMul{T, D}, data::GaussProductInfo{T, 
         m = iszero(dx) ? 0 : n
         mapreduce(+, 0:m) do k
             binomial(n, k) * dx^k * 
-            lazyOverlapPGTO(cache, (xpnS, xpnRatio, xM-xL, xM-xR, iL, iR+n-k))
+            lazyOverlapPGTO!(cache, (xpnS, xpnRatio, xM-xL, xM-xR, iL, iR+n-k))
         end
     end
 end
 
-computeMultiMomentGTO(::MonomialMul{T, D, 0}, data::GaussProductInfo{T, D}, 
-                      cache::GTOrbOverlapCache{T, D}) where {T, D} = 
-overlapPGTO(data, cache)
+computeMultiMomentGTO!(::MonomialMul{T, D, 0}, cache::GTOrbOverlapCache{T, D}, 
+                       data::GaussProductInfo{T, D}) where {T, D} = 
+overlapPGTO!(cache, data)
 
 
 struct PrimGTOrbMultiMoment{T, D, L, B<:N12Tuple{PrimGaussOrbConfig{T, D}}
@@ -331,10 +321,10 @@ end
 
 function (f::MultiMomentGTOrbPair{T, D})(pars1::FilteredVecOfArr{T}, 
                                          pars2::FilteredVecOfArr{T}; 
-                                         cache::GTOrbOverlapCache{T, D}=
+                                         cache!Self::GTOrbOverlapCache{T, D}=
                                          AxialOneBodyIntCompCache(T, Val(D))) where {T, D}
     data = GaussProductInfo(f.basis, (pars1, pars2))
-    computeMultiMomentGTO(f.op, data, cache)
+    computeMultiMomentGTO!(f.op, cache!Self, data)
 end
 
 

@@ -242,17 +242,22 @@ function (f::DirectComputeOrbCoreIntegral{T, D, S}
     fCore(parData...)
 end
 
+const OrbCoreIntegralComputeCacheTypes{T, D} = Union{
+    OrbCoreIntConfig{T, D, <:MultiBodyIntegral{D}, TetraTupleUnion{PrimGTOcore{T, D}}}
+}
 
-function prepareOneBodyIntCompCache!(f::ReusedComputeOrbCoreIntegral{T, D}, 
-                                     orbs::TetraTupleUnion{PrimGTOcore{T, D}}) where {T, D}
-    # get!(f.cache, typeof( (op, orbs...) )) do
-    genGTOrbIntCompCache(f.operator, orbs)
-    # end
+function prepareOneBodyIntCompCache!(f::ReusedComputeOrbCoreIntegral{T, D, S}, 
+                                     orbs::TetraTupleUnion{PrimitiveOrbCore{T, D}}) where 
+                                    {T, D, S<:MultiBodyIntegral{D}}
+    key = OrbCoreIntConfig(S(), orbs)
+    if key isa OrbCoreIntegralComputeCacheTypes
+        get!(f.cache.dict, key) do
+            genGTOrbIntCompCache(f.operator, orbs)
+        end
+    else
+        nothing
+    end
 end
-
-prepareOneBodyIntCompCache!(::ReusedComputeOrbCoreIntegral{T, D}, 
-                            ::TetraTupleUnion{PrimitiveOrbCore{T, D}}) where {T, D} = 
-nothing
 
 prepareOneBodyIntCompCache!(::ReusedComputeOrbCoreIntegral{T, D, OneBodyIntegral{D}}, 
                             ::Tuple{PrimGTOcore{T, D}}) where {T, D} = 
@@ -263,11 +268,11 @@ function (f::OrbCoreIntegralComputeConfig{T, D, S}
     orbData = first.(data)
     parData =  last.(data)
     fCore = buildCoreIntegrator(S(), f.operator, orbData)
-    intCacheSector = prepareOneBodyIntCompCache!(f, orbData)
-    if intCacheSector === nothing
+    intSectorCache = prepareOneBodyIntCompCache!(f, orbData)
+    if intSectorCache === nothing
         fCore(parData...)
     else
-        fCore(parData..., cache=intCacheSector)
+        fCore(parData..., cache!Self=intSectorCache)
     end
 end
 
