@@ -17,8 +17,8 @@ MonomialMul(center, WeakComp(degree))
 abstract type ConstantOperator end
 abstract type ParamBoxOperator end
 
-function (f::MonomialMul{T, D})(arg::NTuple{D, T}) where {T, D}
-    mapreduce(StableMul(T), arg, f.center, f.degree) do a, c, d
+function (f::MonomialMul{T, D})(arg::Union{NTuple{D, T}, AbstractVector{T}}) where {T, D}
+    mapreduce(StableMul(T), arg, f.center, f.degree.tuple) do a, c, d
         (a - c)^d
     end
 end
