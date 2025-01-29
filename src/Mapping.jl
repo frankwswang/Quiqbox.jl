@@ -63,7 +63,7 @@ StableAdd(::Type{T}) where {T} = StableBinary(+, T)
 StableMul(::Type{T}) where {T} = StableBinary(*, T)
 
 
-struct Retrieve{P<:CompositePointer} <: FunctionComposer
+struct Retrieve{P<:CompositePointer} <: FunctionCombiner
     rule::P
 end
 
@@ -77,7 +77,7 @@ const Select{P<:EntryPointer} = Retrieve{P}
 
 const Filter{P<:EffectivePtrStack} = Retrieve{P}
 
-struct EncodeApply{N, E<:NTuple{N, Function}, F<:Function} <: FunctionComposer
+struct EncodeApply{N, E<:NTuple{N, Function}, F<:Function} <: FunctionCombiner
     encode::E
     apply::F
 end
@@ -133,7 +133,7 @@ end
 (f::OnlyBody)(_, args...) = f.f(args...)
 
 
-struct PairCombine{J<:Function, FL<:Function, FR<:Function} <: JoinedOperator{J}
+struct PairCombine{J<:Function, FL<:Function, FR<:Function} <: FunctionCombiner
     joint::J
     left::FL
     right::FR
@@ -145,7 +145,7 @@ PairCombine(joint::F) where {F<:Function} =
 (f::PairCombine)(arg, args...) = f.joint( f.left(arg, args...), f.right(arg, args...) )
 
 
-struct ChainReduce{J<:Function, C<:LinearMemory{<:Function}} <: JoinedOperator{J}
+struct ChainReduce{J<:Function, C<:LinearMemory{<:Function}} <: FunctionCombiner
     joint::J
     chain::C
 
@@ -181,7 +181,7 @@ mapreduce(o->o(arg, args...), f.joint, f.chain.value)
 # (f::InsertOnward)(arg, args...) = f.dress(f.apply(arg, args...), args...)
 
 
-struct InsertInward{C<:Function, F<:Function} <: FunctionComposer
+struct InsertInward{C<:Function, F<:Function} <: FunctionCombiner
     apply::C
     dress::F
 end
@@ -212,11 +212,12 @@ Power(f::Function, n::Int) = Power(f, Val(n))
 
 (f::Power{<:Function, N})(arg::Vararg) where {N} = f.f(arg...)^(N::Int)
 
-struct Plus{T} <: CompositeFunction
-    val::T
-end
 
-(f::Plus{T})(arg::T) where {T} = arg + f.val
+# struct Plus{T} <: CompositeFunction
+#     val::T
+# end
+
+# (f::Plus{T})(arg::T) where {T} = arg + f.val
 
 
 struct ShiftByArg{T, D} <: FieldlessFunction end
@@ -227,7 +228,7 @@ function (::ShiftByArg{T, D})(input::Union{NTuple{D, T}, AbstractVector{T}},
 end
 
 
-struct HermitianContract{T, F1<:ReturnTyped{T}, F2<:ReturnTyped{T}} <: FunctionComposer
+struct HermitianContract{T, F1<:ReturnTyped{T}, F2<:ReturnTyped{T}} <: FunctionCombiner
     diagonal::Memory{F1}
     uppertri::Memory{F2}
 

@@ -24,7 +24,7 @@ TensorType(::ElementalParam{T}) where {T} = Flavor{T}()
 
 TensorType(p::FlattenedParam{T}) where {T} = Volume{T}(outputSizeOf(p))
 
-TensorType(p::JaggedParam{T, N}) where {T, N} = 
+TensorType(p::ParamBox{T, N}) where {T, N} = 
 Volume{AbstractArray{T, N}}(outputSizeOf(p))
 
 
@@ -255,7 +255,9 @@ const DefaultIdentifierCacheSizeLimit = 500
 const IdentifierCache = LRU{BlackBox, RefVal{Any}}(maxsize=DefaultIdentifierCacheSizeLimit)
 
 function backupIdentifier(ref::BlackBox)
-    LRUCache.get!(IdentifierCache, ref, Ref{Any}(ref.value))
+    LRUCache.get!(IdentifierCache, ref) do
+        Ref{Any}(ref.value)
+    end
     WeakRef(IdentifierCache[ref][])
 end
 
