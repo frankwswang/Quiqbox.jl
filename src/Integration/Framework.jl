@@ -628,11 +628,17 @@ end
 
 
 function decodePrimCoreInt(cache::OneBodyFullCoreIntegrals{T}, ptrPair::NTuple{2, Int}, 
-                           (coeff1, coeff2)::NTuple{2, T}=( one(T), one(T) )) where {T}
+                           (coeff1, coeff2)::NTuple{2, T}) where {T}
     coeffProd = coeff1' * coeff2
-    ptrPairNew = sortTensorIndex(ptrPair)
-    data = getPrimCoreIntData(cache, ptrPairNew)
-    (ptrPairNew == ptrPair ? data : reverse(data)) .* (coeffProd, coeffProd')
+    ptr1, ptr2 = ptrPair
+    res = if ptr1 == ptr2
+        getPrimCoreIntData(cache, (ptr1,))
+    else
+        ptrPairNew = sortTensorIndex(ptrPair)
+        data = getPrimCoreIntData(cache, ptrPairNew)
+        ptrPairNew == ptrPair ? data : reverse(data)
+    end
+    res .* (coeffProd, coeffProd')
 end
 
 function decodePrimCoreInt(cache::OneBodyFullCoreIntegrals{T}, ptr::Tuple{Int}, 
@@ -783,12 +789,7 @@ function buildIntegralEntries(intCache::POrb1BCoreICache{T},
     mapreduce(.+, idxPairRange, init=( zero(T), zero(T) )) do (i, j)
         ptr1, weight1 = list1[i]
         ptr2, weight2 = list2[j]
-        if ptr1 == ptr2
-            temp = (first∘decodePrimCoreInt)(intValCache, (ptr1,), (weight1,))
-            (temp, temp')
-        else
-            decodePrimCoreInt(intValCache, (ptr1, ptr2), (weight1, weight2))
-        end
+        decodePrimCoreInt(intValCache, (ptr1, ptr2), (weight1, weight2))
     end # ([1|O|2], [2|O|1])
 end
 
