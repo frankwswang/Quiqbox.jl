@@ -1,7 +1,7 @@
 # Fornberg's algorithm
 ## [DOI] 10.1090/S0025-5718-1988-0935077-0
 
-function getFiniteDiffWeightsCore(order::Int, dis::AbstractVector{T}) where {T<:Real}
+function computeFiniteDiffWeightsCore(order::Int, dis::AbstractVector{T}) where {T<:Real}
     checkPositivity(order+1)
     nGrid = length(dis)
     if order >= nGrid
@@ -45,11 +45,11 @@ function getFiniteDiffWeightsCore(order::Int, dis::AbstractVector{T}) where {T<:
         c1 = c2
     end
 
-    nm[:, end]
+    getMemory(@view nm[:, end])
 end
 
-function getFiniteDiffWeights(order::Int, dis::AbstractVector{T}) where {T<:Real}
-    res = getFiniteDiffWeightsCore(order, dis)
+function computeFiniteDiffWeights(order::Int, dis::AbstractVector{T}) where {T<:Real}
+    res = computeFiniteDiffWeightsCore(order, dis)
     coeffSum = sum(res)
     # Enforce the sum of the coefficients to be zero so that the finite difference 
     # of a constant function will always be zero.
@@ -59,4 +59,48 @@ function getFiniteDiffWeights(order::Int, dis::AbstractVector{T}) where {T<:Real
     end
 
     res
+end
+
+struct SymmetricIntRange{N} <: ConfigBox
+
+    function SymmetricIntRange(::Val{N}) where {N}
+        checkPositivity(N::Int+1)
+        new{N}()
+    end
+end
+
+(::SymmetricIntRange{N})() where {N} = -N : N
+
+@generated function getFiniteDiffWeightsCore(::Val{M}, ::SymmetricIntRange{N}) where {M, N}
+    points = Memory{Rational{Int}}(SymmetricIntRange(Val(N))())
+    intGradWeights = computeFiniteDiffWeights(M, points)
+    return quote
+        copy($intGradWeights)
+    end
+end
+
+
+@generated function getFiniteDiffWeightsINTERNAL(::Type{T}, ::Val{M}, ::SymmetricIntRange{N}
+                                                 ) where {T<:AbstractFloat, M, N}
+    sRange = SymmetricIntRange(Val(N))
+    weights = getFiniteDiffWeightsCore(Val(M), sRange)
+    accuOrder = 2(N + 1) - isodd(M) - M
+    spacing = 2eps(T)^inv(1 + accuOrder)
+    points = Memory{T}(spacing * sRange())
+    scaledWeights = weights ./ spacing^M
+    return :($points, $scaledWeights)
+end
+
+@generated function getFiniteDiffWeightsINTERNAL(::Type{<:Integer}, ::Val{M}, 
+                                                 ::SymmetricIntRange{N}) where {M, N}
+    sRange = SymmetricIntRange(Val(N))
+    weights = getFiniteDiffWeightsCore(Val(M), sRange)
+    points = Memory{T}(sRange())
+    return :($points, $weights)
+end
+
+function getFiniteDiffWeights(::Type{T}, ::Val{M}, ::SymmetricIntRange{N}) where 
+                             {T<:Real, M, N}
+    points, weights = getFiniteDiffWeightsINTERNAL(T, Val(M), SymmetricIntRange( Val(N) ))
+    copy(points), copy(weights)
 end
