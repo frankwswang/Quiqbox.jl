@@ -28,11 +28,13 @@ include("SpatialBasis.jl")
 # include("Matter.jl")
 # include("Overload.jl")
 
-include("Integrals/Operators.jl")
-include("Integrals/Engines/Numerical.jl")
-include("Integrals/Engines/GaussianOrbitals.jl")
-include("Integrals/Framework.jl")
-include("Integrals/Interface.jl")
+include("Differentiation/finite.jl")
+
+include("Integration/Operators.jl")
+include("Integration/Engines/Numerical.jl")
+include("Integration/Engines/GaussianOrbitals.jl")
+include("Integration/Framework.jl")
+include("Integration/Interface.jl")
 
 # include("Integrals/OneBody.jl")
 # include("Integrals/TwoBody.jl")
