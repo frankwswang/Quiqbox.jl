@@ -353,7 +353,7 @@ end
 function sortTensorIndex((i, j, k, l)::NTuple{4, Int})
     pL = sortTensorIndex((i, j))
     pR = sortTensorIndex((k, l))
-    if i+j > k+l
+    if last(pL) > last(pR)
         (pR, pL)
     else
         (pL, pR)
