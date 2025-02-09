@@ -1000,31 +1000,22 @@ fastIsApprox(x::T1, y::T2=0.0) where {T1, T2} = abs(x - y) < 2(numEps∘promote_
 triMatEleNum(n::Int) = n * (n + 1) ÷ 2
 
 
-function convert1DidxTo2D(n::Int, k::Int) # {for j in 1:n, i=1:j} <=> {for k in 1:n(n+1)/2}
-    bl = iseven(n)
-    nRow = n + bl
-    i, j = fldmod1(k, nRow)
-    if i > j - bl
-        j = n - j + 1
-        i = n - i + 2 - bl
-    else
-        j -= bl
-    end
-    j, i
+# {for j in 1:N, i=1:j} <=> 
+# {for n in 1:N(N+1)/2}
+function convertIndex1DtoTri2D(n::Int)
+    # Using (7 - 0.1) instead of 7 to avoid potential round-off errors.
+    j = (floor(Int, (sqrt(8.0n - 6.9) - 1.0)) >> 1) + 1
+    i = n - j * (j-1) ÷ 2
+    i, j
 end
 
-
-function convert1DidxTo4D(n::Int, m::Int)
-    # Original solution
-    # rangeShifter = 1e-12 # can't be too large or too small
-    # nG = floor(Int, (sqrt(1+8m) + 1)/2 - rangeShifter)
-    nGupper = 0.5*(sqrt(1+8m) + 1)
-    nG = floor(nGupper)
-    nG = Int(nG - (nG==nGupper))
-    l, k = convert1DidxTo2D(n, nG)
-    rsd = m - nG*(nG-1)÷2
-    j, i = convert1DidxTo2D(n, rsd)
-    i, j, k, l
+# {for l in 1:N, k in 1:l, j in 1:l, i in 1:ifelse(l==j, k, j)} <=> 
+# {for n in (M=N(N+1)÷2; M(M+1)÷2)}
+function convertIndex1DtoTri4D(n::Int)
+    p, q = convertIndex1DtoTri2D(n)
+    i, j = convertIndex1DtoTri2D(p)
+    k, l = convertIndex1DtoTri2D(q)
+    (i, j, k, l)
 end
 
 

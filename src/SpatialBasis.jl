@@ -523,7 +523,7 @@ function NormalizeCompOrb(f::CompositeOrbCore{T, D}) where {T, D}
     if nOrbs > 1
         utriFuncNum = nOrbs * (nOrbs-1) ÷ 2
         utriFuncs = map(1:utriFuncNum) do j
-            n, m = convert1DidxTo2D(nOrbs-1, j)
+            m, n = convertIndex1DtoTri2D(j)
             weightedOrb1 = weightedOrbs[begin+m-1]
             weightedOrb2 = weightedOrbs[begin+n-1]
             oCore1 = getField(weightedOrb1, oCorePtr)
