@@ -717,38 +717,6 @@ function groupedSort(v::AbstractVector{T}, sortFunction::F=itself) where {T, F<:
 end
 
 
-function mapPermute(arr, permFunction)
-    ks = [[true, x, i] for (x, i) in zip(arr, eachindex(arr))]
-    arrNew = permFunction(arr)
-    idx = Int[]
-    for ele in arrNew
-        i = findfirst(x -> x[1] == true && hasIdentical(x[2], ele), ks)
-        push!(idx, i)
-        ks[i][1] = false
-    end
-    idx
-end
-
-
-function getFunc(fSym::Symbol, failedResult=missing)
-    try
-        getproperty(Quiqbox, fSym)
-    catch
-        try
-            getproperty(Main, fSym)
-        catch
-            try
-                fSym |> string |> Meta.parse |> eval
-            catch
-                (_) -> failedResult
-            end
-        end
-    end
-end
-
-getFunc(f::Function, _=missing) = itself(f)
-
-
 nameOf(f::CompositeFunction) = typeof(f)
 
 nameOf(f) = nameof(f)
@@ -799,16 +767,6 @@ end
 tupleDiff(t::NonEmptyTuple{T}, ts::NonEmptyTuple{T}...) where {T} = 
 arrayDiffCore!((t, ts...) .|> collect)
 
-
-# function genIndex(index::Int)
-#     index < 0 && throw(DomainError(index, "`index` should be non-negative."))
-#     genIndexCore(index)
-# end
-
-genIndexCore(index) = RefVal{Union{Int, Nothing}}(index)
-genIndex(index::Int) = genIndexCore(index)
-genIndex(::Nothing) = genIndexCore(nothing)
-genIndex() = genIndex(nothing)
 
 deref(a) = getindex(a)
 deref(::Nothing) = nothing
@@ -989,9 +947,6 @@ getValParm(::Type{Val{T}}) where {T} = T
 
 
 fct(a::Real) = factorial(a|>Int)
-
-
-δ(a::Int, b::Int) = Int(a == b)
 
 
 fastIsApprox(x::T1, y::T2=0.0) where {T1, T2} = abs(x - y) < 2(numEps∘promote_type)(T1, T2)
