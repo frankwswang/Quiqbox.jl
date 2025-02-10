@@ -80,12 +80,11 @@ function ScaledOrbital(orb::EvalComposedOrb{T}, scalar::Function,
 end
 
 
-#? Allow .renormalize mutable
-struct PrimitiveOrb{T, D, B<:FieldAmplitude{T, D}, 
-                    C<:NTuple{D, ElementalParam{T}}} <: ComposedOrb{T, D, B}
-    center::C
-    body::B
-    renormalize::Bool
+mutable struct PrimitiveOrb{T, D, B<:FieldAmplitude{T, D}, 
+                            C<:NTuple{D, ElementalParam{T}}} <: ComposedOrb{T, D, B}
+    const center::C
+    const body::B
+    @atomic renormalize::Bool
 end
 
 const PrimGTO{T, D, B<:PolyGaussProd{T, D}, C<:NTuple{D, ElementalParam{T}}} = 
@@ -155,11 +154,11 @@ function unpackComposedOrbCore!(f::PrimitiveOrb{T, D}, paramSet::FlatParamSet,
 end
 
 
-struct CompositeOrb{T, D, B<:FieldAmplitude{T, D}, C<:NTuple{D, ElementalParam{T}}, 
-                    W<:FlattenedParam{T, 1}} <: ComposedOrb{T, D, B}
-    basis::Memory{PrimitiveOrb{T, D, <:B, <:C}}
-    weight::W
-    renormalize::Bool
+mutable struct CompositeOrb{T, D, B<:FieldAmplitude{T, D}, C<:NTuple{D, ElementalParam{T}}, 
+                            W<:FlattenedParam{T, 1}} <: ComposedOrb{T, D, B}
+    const basis::Memory{PrimitiveOrb{T, D, <:B, <:C}}
+    const weight::W
+    @atomic renormalize::Bool
 
     function CompositeOrb(basis::AbstractVector{<:ComposedOrb{T, D}}, 
                           weight::FlattenedParam{T, 1}, 
@@ -419,12 +418,37 @@ end
 
 
 function enforceRenormalize!(b::ComposedOrb)
-    b.renormalize = true
+    @atomic b.renormalize = true
 end
 
 
 function preventRenormalize!(b::ComposedOrb)
-    b.renormalize = false
+    @atomic b.renormalize = false
+end
+
+
+function isRenormalized(orb::ComposedOrb)
+    orb.renormalize
+end
+
+function isRenormalized(orb::FrameworkOrb)
+    isRenormalized(orb.core)
+end
+
+function isRenormalized(orb::Union{EvalPrimOrb, EvalCompOrb})
+    isRenormalizedCore(orb.f.apply.right.f)
+end
+
+function isRenormalizedCore(nf::EvalOrbNormalizer)
+    isRenormalizedCore(nf.f.f)
+end
+
+function isRenormalizedCore(::Union{NormalizePrimOrb, NormalizeCompOrb})
+    true
+end
+
+function isRenormalizedCore(::Power{<:Unit})
+    false
 end
 
 
@@ -544,29 +568,4 @@ function NormalizeCompOrb(f::CompositeOrbCore{T, D}) where {T, D}
     coreTransform = HermitianContract(diagFuncs, utriFuncs)
     getWeights = map(b->ReturnTyped(b.right.f, T), weightedOrbs)
     NormalizeCompOrb(coreTransform, getWeights)
-end
-
-
-function isRenormalized(orb::ComposedOrb)
-    orb.renormalize
-end
-
-function isRenormalized(orb::FrameworkOrb)
-    isRenormalized(orb.core)
-end
-
-function isRenormalized(orb::Union{EvalPrimOrb, EvalCompOrb})
-    isRenormalizedCore(orb.f.apply.right.f)
-end
-
-function isRenormalizedCore(nf::EvalOrbNormalizer)
-    isRenormalizedCore(nf.f.f)
-end
-
-function isRenormalizedCore(::Union{NormalizePrimOrb, NormalizeCompOrb})
-    true
-end
-
-function isRenormalizedCore(::Power{<:Unit})
-    false
 end
