@@ -454,15 +454,10 @@ function genGaussTypeOrb(center::NonEmptyTuple{ParamOrValue{T}, D},
 
     cens = map(genCellEncoder(T, :cen), center)
 
-    if nPrimOrbs == 1
-        renormalize = innerRenormalize || outerRenormalize
-        genGaussTypeOrb(cens, xpns[], cons[], ijk; renormalize)
-    else
-        primGTOs = map(xpns) do xpn
-            genGaussTypeOrb(cens, xpn, ijk, renormalize=innerRenormalize)
-        end
-        CompositeOrb(primGTOs, cons, renormalize=outerRenormalize)
+    primGTOs = map(xpns) do xpn
+        genGaussTypeOrb(cens, xpn, ijk, renormalize=innerRenormalize)
     end
+    CompositeOrb(primGTOs, cons, renormalize=outerRenormalize)
 end
 
 
