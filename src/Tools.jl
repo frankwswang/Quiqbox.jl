@@ -833,14 +833,14 @@ uniCallFunc(f::F, argsOrder::NTuple{N, Int}, args...) where {F<:Function, N} =
 f(getindex.(Ref(args), argsOrder)...)
 
 #! TODO: Find best merge algorithm
-function mergeMultiObjs(::Type{T}, merge2Ofunc::F, os::AbstractArray{<:T}; 
+function mergeMultiObjs(::Type{T}, mergeTwoObjs::F, objs::AbstractArray{<:T}; 
                         kws...) where {T, F<:Function}
-    arr1 = (collect∘vec)(a)
+    arr1 = (collect∘vec)(objs)
     arr2 = T[]
     while length(arr1) >= 1
         i = 1
         while i < length(arr1)
-            temp = merge2Ofunc(arr1[i], arr1[i+1]; kws...)
+            temp = mergeTwoObjs(arr1[i], arr1[i+1]; kws...)
             if eltype(temp) <: T && length(temp) == 1
                 arr1[i] = temp[]
                 popat!(arr1, i+1)
@@ -1035,36 +1035,6 @@ function genParamTypeVector(::Type{PT1}, ::Type{PT2}, idx::Int=1) where {PT1, PT
     T = getTypeParam(PT1, idx)
     ifelse(T===Any, PT2[], PT2{numT}[])
 end
-
-# packElementalVal(::Val{0}, obj::Any) = fill(obj)
-# packElementalVal(::Val{0}, obj::AbtArray0D) = copy(obj)
-# packElementalVal(::Val{N}, obj::AbstractArray{<:Any, N}) where {N} = copy(obj)
-# packElementalVal(::Type{U}, obj::U) where {U} = fill(obj)
-# packElementalVal(::Type{U}, obj::AbstractArray{<:U}) where {U} = copy(obj)
-
-# obtainElementalVal(::Type{U}, obj::AbtArray0D{<:U}) where {U} = obj[]
-# obtainElementalVal(::Type{U}, obj::AbstractArray{<:U}) where {U} = copy(obj)
-
-getMemory(arr::Memory) = itself(arr)
-
-function getMemory(arr::AbstractArray{T}) where {T}
-    eleT = if isconcretetype(T) || isempty(arr)
-        T
-    else
-        mapreduce(typejoin, arr, init=Union{}) do ele
-            typeof(ele)
-        end
-    end
-    Memory{eleT}(vec(arr))
-end
-
-function getMemory(obj::NonEmptyTuple{Any})
-    mem = Memory{eltype(obj)}(undef, length(obj))
-    mem .= obj
-    mem
-end
-
-getMemory(obj::Any) = getMemory((obj,))
 
 
 function registerObjFrequency(objs::AbstractVector)
