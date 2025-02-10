@@ -625,7 +625,7 @@ end
 function indexParam(pb::FlattenedParam{T}, idx::Int, 
                     sym::MissingOr{Symbol}=missing) where {T}
     ismissing(sym) && (sym = Symbol(:_, pb.symbol.name))
-    CellParam(ChainPointer(idx, TensorType(T)), pb, sym)
+    CellParam((Retrieve∘ChainPointer)(idx, TensorType(T)), pb, sym)
 end
 
 function indexParam(pb::ElementalParam, idx::Int, sym::MissingOr{Symbol}=missing)
@@ -642,7 +642,7 @@ function indexParam(pb::ParamBox{T, N}, idx::Int,
                     sym::MissingOr{Symbol}=missing) where {T, N}
     ismissing(sym) && (sym = Symbol(:_, pb.symbol.name))
     type = TensorType(AbstractArray{T, N}, outputSizeOf(pb))
-    GridParam(ChainPointer(idx, type), pb, sym)
+    GridParam((Retrieve∘ChainPointer)(idx, type), pb, sym)
 end
 
 
