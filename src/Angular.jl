@@ -26,7 +26,7 @@ CartSHarmonics(t::NonEmptyTuple{Int}) = (CartSHarmonics∘WeakComp)(t)
 
 function evalCartSHarmonicsCore(::Val{D}, m::WeakComp{D, L}, 
                                 dr::NTuple{D, Real}) where {D, L}
-    prod(abs.(dr) .^ m.tuple)
+    prod(dr .^ m.tuple)
 end
 
 (csh::CartSHarmonics{D, L})(dr::NTuple{D, Real}) where {D, L} = 
