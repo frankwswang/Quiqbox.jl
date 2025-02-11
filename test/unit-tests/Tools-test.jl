@@ -1,7 +1,7 @@
 using Test
 using Quiqbox
 using Quiqbox: getAtolVal, getAtolDigits, roundToMultiOfStep, nearestHalfOf, getNearestMid, 
-               isApprox, tryIncluding, sizeOf, hasBoolRelation, markUnique, getUnique!, 
+               isApprox, tryIncluding, sizeOf, markUnique, getUnique!, 
                itself, themselves, replaceSymbol, groupedSort, nameOf, tupleDiff, fillObj, 
                arrayToTuple, genTupleCoords, uniCallFunc, mergeMultiObjs, isNaN, getBool, 
                skipIndices, isOscillateConverged, lazyCollect, asymSign, numEps, 
@@ -54,35 +54,6 @@ nc = rand(2:5)
 @test sizeOf((rand(nc, nr)...,)) == (nr*nc,)
 
 
-# function hasBoolRelation
-@test  hasBoolRelation(===, 1, 1) == (1 === 1)
-@test !hasBoolRelation(===, [1,2], [1,2])
-@test  hasBoolRelation(===, [1,2], [1,2], decomposeNumberCollection=true)
-@test !hasBoolRelation(===, [1,2], (1,2), decomposeNumberCollection=true)
-@test  hasBoolRelation(===, [1,2], (1,2), decomposeNumberCollection=true, 
-                       ignoreContainer=true)
-@test !hasBoolRelation(===, [1 x->x^2], [1 x->abs(x)])
-@test  hasBoolRelation(===, [1 x->x^2], [1 x->abs(x)], ignoreFunction=true)
-@test hasBoolRelation(==, Int, Int)
-@test hasBoolRelation(<:, Int, Integer)
-
-# function hasEqual
-@test hasEqual([1,2], [1.0, 2.0])
-
-# function hasEqual
-@test !hasIdentical([1,2], [1, 2])
-@test  hasIdentical([1,2], [1, 2], decomposeNumberCollection=true)
-@test !hasIdentical([1,2], [1.0, 2], decomposeNumberCollection=true)
-@test !hasIdentical([fill(1), :two], [fill(1), :two])
-v0 = fill(1)
-@test hasIdentical([v0, :two], [v0, :two])
-
-# function hasApprox
-@test  hasApprox(1, 1+5e-16)
-@test !hasApprox(1, 1+5e-15)
-@test !hasApprox([1,2], [3])
-
-
 # function markUnique
 @test markUnique([1,3,2,2,5]) == ([1,2,3,3,4], [1,3,2,5])
 emptyArr = Int[]
@@ -111,9 +82,12 @@ x1 = rand(10)
 a = [rand(1:5, 2) for i=1:20]
 a2 = groupedSort(a)
 pushfirst!(a2, [[0,0]])
-for i in 2:length(a2)
+for i in firstindex(a2)+1:lastindex(a2)
     if length(a2[i]) > 1
-        @test hasEqual(a2[i]...)
+        h, b... = a2[i]
+        for ele in b
+          @test isequal(h, ele)
+        end
     end
     @test a2[i][1][1] >= a2[i-1][1][1]
 end
@@ -135,6 +109,7 @@ d = (2,4,5,1,3)
 
 
 # function fillObj
+v0 = fill(1)
 @test fillObj(v0) === v0
 @test fill(1) == v0
 
@@ -360,5 +335,44 @@ arr5 = rand(1)
 ele = arr5[]
 res4 = keepOnly!(arr5, 1)
 @test ele == res4
+
+# function intersectMultisets!
+a = [1, 3, 2, 1, 3, 1, 1, 3, 3, 3]
+b = [1, 2, 3, 3, 3, 3, 3, 1, 2, 1]
+
+a2 = copy(a)
+is1 = Quiqbox.intersectMultisets!(a2, a2)
+@test is1 == a
+@test isempty(a2)
+
+a3 = copy(a)
+a4 = copy(a)
+is2 = Quiqbox.intersectMultisets!(a3, a4)
+@test is2 == a
+@test isempty(a3) && isempty(a4)
+
+a5 = copy(a)
+b2 = copy(b)
+is3 = Quiqbox.intersectMultisets!(a5, b2)
+is3t = intersect(a5, b2)
+@test isempty(is3t)
+@test eltype(is3t) == Int
+
+removeEles! = function (ms::AbstractVector{T}, subms::AbstractVector{T}) where {T}
+    for i in subms
+        idx = findfirst(isequal(i), ms)
+        popat!(ms, idx)
+    end
+    ms
+end
+
+@test removeEles!(copy(a), is3) == a5
+@test removeEles!(copy(b), is3) == b2
+
+a6 = copy(a)
+b3 = copy(b)
+is4 = Quiqbox.intersectMultisets!(b3, a6)
+@test is3 != is4
+@test sort(is3) == sort(is4)
 
 end
