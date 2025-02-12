@@ -25,7 +25,7 @@ jobs:
         with:
           version: ${{ matrix.version }}
           arch: ${{ matrix.arch }}
-      - uses: julia-actions/cache@latest
+      - uses: julia-actions/cache@v2
       - uses: julia-actions/julia-buildpkg@latest
       - name: "Code test"
         uses: julia-actions/julia-runtest@latest
