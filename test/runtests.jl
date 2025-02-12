@@ -1,6 +1,9 @@
 using Test
 
 @testset "Quiqbox tests" begin
+
+    println("Number of threads used for testing: ", Threads.nthreads(), "\n")
+
     unit1 = "Utility Components"
     println("Testing $(unit1)...")
     t1 = @elapsed @testset "$(unit1)" begin
@@ -47,4 +50,5 @@ using Test
         include("unit-tests/Integration/Overlap-test.jl")
     end
     println("$(unit6) test finished in $t5 seconds.\n")
+
 end
