@@ -126,7 +126,7 @@ If you use Quiqbox in your research, please cite the following paper:
 [Zenodo-DOI-url]: https://doi.org/10.5281/zenodo.7448313
 
 [arXiv-img]: https://img.shields.io/badge/arXiv-2212.04586-b31b1b.svg
-[arXiv-url]: https://arxiv.org/abs/
+[arXiv-url]: https://arxiv.org/abs/2212.04586
 [JCTC-url]: https://pubs.acs.org/doi/10.1021/acs.jctc.3c00011
 
 [License-img]: https://img.shields.io/badge/License-MIT-yellow.svg
