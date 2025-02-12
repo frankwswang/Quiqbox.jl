@@ -6,15 +6,15 @@
 
 **Quiqbox** is a quantum chemistry and quantum physics software package that starts around Gaussian basis set optimization for electronic structure problems. Quiqbox is written in pure [Julia](https://julialang.org/). This work is supported by the U.S. Department of Energy under Award No. DESC0019374.
 
-| Documentation | Digital Object Identifier | Publication | License |
+| Documentation | Digital Object Identifier | Paper | License |
 | :---: | :---: | :---: | :---: |
-| [![][Doc-l-img]][Doc-latest] | [![][Zenodo-DOI-img]][Zenodo-DOI-url] |[![][JCTC-img]][JCTC-url] | [![License: MIT][License-img]][License-url] |
+| [![][Doc-l-img]][Doc-latest] | [![][Zenodo-DOI-img]][Zenodo-DOI-url] |[![][arXiv-img]][arXiv-url] | [![License: MIT][License-img]][License-url] |
 
 
 
 | Development Status |
 |:---:|
-| [![codecov][codecov-img]][codecov-url] [![CI][GA-CI-img]][GA-CI-url] [![CI-JN][GA-CI-JN-img]][GA-CI-JN-url] [![][New-commits-img]][New-commits-url] |
+| [![codecov][codecov-img]][codecov-url] [![CI][GA-CI-img]][GA-CI-url] [![][New-commits-img]][New-commits-url] |
 
 
 <br />
@@ -96,7 +96,7 @@ Objects defined by Quiqbox that are directly exported to the user have the corre
 
 # Citation
 If you use Quiqbox in your research, please cite the following paper:
-- Wang, W., & Whitfield, J. D. (2023). Basis set generation and optimization in the NISQ era with Quiqbox.jl. *Journal of Chemical Theory and Computation, 19*(22), 8032-8052.
+- [Wang, W., & Whitfield, J. D. (2023). Basis set generation and optimization in the NISQ era with Quiqbox.jl. *Journal of Chemical Theory and Computation, 19*(22), 8032-8052.][JCTC-url]
 
 <br />
 <br />
@@ -109,15 +109,12 @@ If you use Quiqbox in your research, please cite the following paper:
 
 <br />
 
-[Doc-l-img]:   https://img.shields.io/github/v/release/frankwswang/Quiqbox.jl?label=latest%20release
+[Doc-l-img]:   https://img.shields.io/github/v/release/frankwswang/Quiqbox.jl?label=latest%20release&color=seagreen
 [Doc-latest]:  https://frankwswang.github.io/Quiqbox.jl/stable
 [Doc-dev]:  https://frankwswang.github.io/Quiqbox.jl/dev
 
-[GA-CI-img]:   https://github.com/frankwswang/Quiqbox.jl/actions/workflows/CI-JS-latest.yml/badge.svg
-[GA-CI-url]:   https://github.com/frankwswang/Quiqbox.jl/actions/workflows/CI-JS-latest.yml
-
-[GA-CI-JN-img]:https://github.com/frankwswang/Quiqbox.jl/actions/workflows/CI-JN.yml/badge.svg
-[GA-CI-JN-url]:https://github.com/frankwswang/Quiqbox.jl/actions/workflows/CI-JN.yml
+[GA-CI-img]:   https://github.com/frankwswang/Quiqbox.jl/actions/workflows/CI-Rel-Latest.yml/badge.svg
+[GA-CI-url]:   https://github.com/frankwswang/Quiqbox.jl/actions/workflows/CI-Rel-Latest.yml
 
 [codecov-img]: https://codecov.io/gh/frankwswang/Quiqbox.jl/branch/main/graph/badge.svg?token=Z1XOA39DV2
 [codecov-url]: https://codecov.io/gh/frankwswang/Quiqbox.jl
@@ -128,7 +125,8 @@ If you use Quiqbox in your research, please cite the following paper:
 [Zenodo-DOI-img]: https://zenodo.org/badge/DOI/10.5281/zenodo.7448313.svg
 [Zenodo-DOI-url]: https://doi.org/10.5281/zenodo.7448313
 
-[JCTC-img]: https://img.shields.io/badge/JCTC-10.1021/acs.jctc.3c00011-darkgreen.svg
+[arXiv-img]: https://img.shields.io/badge/arXiv-2212.04586-b31b1b.svg
+[arXiv-url]: https://arxiv.org/abs/2212.04586
 [JCTC-url]: https://pubs.acs.org/doi/10.1021/acs.jctc.3c00011
 
 [License-img]: https://img.shields.io/badge/License-MIT-yellow.svg

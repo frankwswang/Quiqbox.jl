@@ -3,6 +3,7 @@ on:
   release:
     - released
   workflow_dispatch:
+    tags: '*'
 jobs:
   test:
     name: Julia ${{ matrix.version }} - ${{ matrix.os }} - ${{ matrix.arch }} - ${{ github.event_name }}
@@ -11,13 +12,19 @@ jobs:
       fail-fast: false
       matrix:
         version:
-          - '1.11'
+          - '1'
         os:
           - ubuntu-latest
           - macOS-latest
           - windows-latest
         arch:
           - x64
+          - aarch64
+        exclude:
+          - os: ubuntu-latest
+            arch: aarch64  # Exclude aarch64 on Ubuntu
+          - os: windows-latest
+            arch: aarch64  # Exclude aarch64 on Windows
     steps:
       - uses: actions/checkout@v4
       - uses: julia-actions/setup-julia@v2
