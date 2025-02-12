@@ -1,9 +1,9 @@
 using Test
 using Quiqbox
 using Quiqbox: checkFname, advancedParse, alignNumSign, numToSups, superscriptNum, 
-               numToSubs, subscriptNum, SpatialCoordType, typeStrNotUnionAll, alignNum
+               numToSubs, subscriptNum,  alignNum
 
-@testset "FileIO.jl tests" begin
+@testset "StringIO.jl tests" begin
 
 # function checkFname
 suffix = rand(100000000:999999999)
@@ -159,10 +159,5 @@ for (d,f) in zip(ds, fs)
 end
 @test numToSups(nothing) == ""
 @test numToSubs(nothing) == ""
-
-
-# function typeStrNotUnionAll
-strT = SpatialCoordType |> string
-@test typeStrNotUnionAll(SpatialCoordType) == strT[1:findlast('w', strT)-2]
 
 end

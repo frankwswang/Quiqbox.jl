@@ -250,7 +250,7 @@ function (f::HermitianContract{T})(params::FilteredVecOfArr{T},
     end
 
     for j in 1:length(f.uppertri)
-        n, m = convert1DidxTo2D(len-1, j)
+        m, n = convertIndex1DtoTri2D(j)
         c1 = vInput[begin+m-1]
         c2 = vInput[begin+n]
         val = f.uppertri[begin+j-1](params) * c1' * c2

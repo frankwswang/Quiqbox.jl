@@ -353,7 +353,7 @@ end
 function sortTensorIndex((i, j, k, l)::NTuple{4, Int})
     pL = sortTensorIndex((i, j))
     pR = sortTensorIndex((k, l))
-    if i+j > k+l
+    if last(pL) > last(pR)
         (pR, pL)
     else
         (pL, pR)
@@ -376,7 +376,7 @@ function genOneBodyIntDataPairs(integrator::CachedComputeOrbCoreIntegral{T, D},
     end
 
     pairs2 = map(1:triMatEleNum(nOrbs-1)) do l
-        n, m = convert1DidxTo2D(nOrbs-1, l)
+        m, n = convertIndex1DtoTri2D(l)
         i, j = ijPair = sortTensorIndex((m, n+1))
         oDataPair = (oDataSeq[begin+i-1], oDataSeq[begin+j-1])
         ijValPair = genCoreIntTuple(integrator, oDataPair)
@@ -429,7 +429,7 @@ function genOneBodyPrimCoreIntTensor(integrator::CachedComputeOrbCoreIntegral{T,
     end
 
     for l in 1:triMatEleNum(nOrbs-1)
-        n, m = convert1DidxTo2D(mBasis-1, l)
+        m, n = convertIndex1DtoTri2D(l)
         oDataPair = (oDataSeq[begin+m-1], oDataSeq[begin+n])
         temp = genCoreIntTuple(integrator, oDataPair)
         setTensorEntries!(res, temp, (m, n+1))
@@ -679,7 +679,7 @@ function buildNormalizedCompOrbWeight!(weight::AbstractVector{T},
     end
 
     innerOverlapSum += mapreduce(+, 1:triMatEleNum(nPrimOrbs-1)) do l
-        n, m = convert1DidxTo2D(nPrimOrbs-1, l)
+        m, n = convertIndex1DtoTri2D(l)
         pointerPair = (idxSeq[begin+m-1], idxSeq[begin+n])
          scalarPair = (weight[begin+m-1], weight[begin+n])
         (sum∘decodePrimCoreInt)(overlapCache, pointerPair, scalarPair)
@@ -773,7 +773,7 @@ function buildIntegralEntries(intCache::POrb1BCoreICache{T},
         (first∘decodePrimCoreInt)(intValCache, (ptr,), (coeff,))
     end
     res = mapreduce(+, 1:triMatEleNum(len-1), init=temp) do l
-        n, m = convert1DidxTo2D(len-1, l)
+        m, n = convertIndex1DtoTri2D(l)
         ptr1, weight1 = idxList[begin+m-1]
         ptr2, weight2 = idxList[begin+n]
         (sum∘decodePrimCoreInt)(intValCache, (ptr1, ptr2), (weight1, weight2))
@@ -805,7 +805,7 @@ function buildIntegralTensor(intCache::POrb1BCoreICache{T},
     end
 
     for l in 1:triMatEleNum(nOrbs-1)
-        n, m = convert1DidxTo2D(nOrbs-1, l)
+        m, n = convertIndex1DtoTri2D(l)
         mBI = intWeights[begin+m-1]
         nBI = intWeights[begin+n]
         temp = buildIntegralEntries(intCache, (mBI, nBI))

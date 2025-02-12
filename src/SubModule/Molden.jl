@@ -2,7 +2,7 @@ module Molden
 
 export makeMoldenFile
 
-import ..Quiqbox: CanOrbital, MatterByHF, sortPermBasis, mergeBasisFuncs, getAtolDigits, 
+import ..Quiqbox: CanOrbital, MatterByHF, sortPermBasis, mergeSubshellsIn, getAtolDigits, 
                   isaFullShellBasisFuncs, checkFname, AtomicNumberList, centerCoordOf, 
                   groupedSort, joinConcentricBFuncStr, alignNumSign, getAtolVal
 
@@ -27,12 +27,12 @@ function makeMoldenFile(mol::MatterByHF{T, 3};
     basis = mol.basis.basis |> collect
     roundAtol = roundDigits<0 ? NaN : exp10(-roundDigits)
     ids = sortPermBasis(basis; roundAtol)
-    basis = mergeBasisFuncs(basis[ids]...; roundAtol)
+    basis = mergeSubshellsIn(basis[ids]...; roundAtol)
     all(isaFullShellBasisFuncs(b) for b in basis) || 
     throw(AssertionError("The basis set stored in `mol.basis.basis` is not supported "*
           "by the Molden format."))
-    all(b.normalizeGTO for b in basis) || 
-    throw(AssertionError("`.normalizeGTO` must be `true` for every `FloatingGTBasisFuncs` "*
+    all(b.normalize for b in basis) || 
+    throw(AssertionError("`.normalize` must be `true` for every `FloatingBasisFuncs` "*
           "inside `mol.basis.basis`."))
     occuC = getindex.(mol.occuC, Ref(ids), :)
     unocC = getindex.(mol.unocC, Ref(ids), :)

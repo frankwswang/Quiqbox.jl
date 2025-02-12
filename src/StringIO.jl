@@ -163,17 +163,6 @@ function inSymbol(sym::Symbol, src::Symbol)
 end
 
 
-function typeStrNotUnionAll(::Type{T}) where {T}
-    strT = string(T)
-    rng = findlast("where", strT)
-    if rng === nothing
-        strT
-    else
-        strT[1:rng[1]-2]
-    end
-end
-
-
 function findFirstEnclosureRange(str::String, startIdx::Int=1, 
                                  bracketPair::NTuple{2, Char}=('{', '}'))
     strLeft = str[startIdx:end]

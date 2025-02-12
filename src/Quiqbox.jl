@@ -2,18 +2,16 @@ module Quiqbox
 
 include("Types.jl")
 include("Traits.jl")
-include("Layout.jl")
+
+include("Lexicons.jl")
+include("../lib/BasisSets/BasisSets.jl")
 
 include("Tools.jl")
-# include("Formulae.jl")
 include("StringIO.jl")
 include("Exception.jl")
 include("ParallelUtils.jl")
 
-include("../lib/BasisSets/BasisSets.jl")
-
-# include("Library.jl")
-include("Lexicons.jl")
+include("Layout.jl")
 include("Parameters.jl")
 include("Mapping.jl")
 include("Graphs.jl")
@@ -28,7 +26,7 @@ include("SpatialBasis.jl")
 # include("Matter.jl")
 # include("Overload.jl")
 
-include("Differentiation/finite.jl")
+include("Differentiation/Finite.jl")
 
 include("Integration/Operators.jl")
 include("Integration/Engines/Numerical.jl")
@@ -41,7 +39,6 @@ include("Integration/Interface.jl")
 
 include("Behaviors.jl")
 
-include("Initialization.jl")
 end
 
 ## Development comment guideline

@@ -1,13 +1,12 @@
 using Test
 using Quiqbox
 using Quiqbox: getAtolVal, getAtolDigits, roundToMultiOfStep, nearestHalfOf, getNearestMid, 
-               isApprox, tryIncluding, sizeOf, hasBoolRelation, flatten, joinTuple, 
-               markUnique, getUnique!, itself, themselves, replaceSymbol, groupedSort, 
-               mapPermute, getFunc, nameOf, tupleDiff, genIndex, fillObj, arrayToTuple, 
-               genTupleCoords, uniCallFunc, mergeMultiObjs, isNaN, getBool, skipIndices, 
-               isOscillateConverged, lazyCollect, asymSign, numEps, genAdaptStepBl, 
-               shiftLastEle!, getValParm, fct, δ, triMatEleNum, convert1DidxTo2D, 
-               convert1DidxTo4D, mapMapReduce, rmsOf, keepOnly!
+               isApprox, tryIncluding, sizeOf, markUnique, getUnique!, 
+               itself, themselves, replaceSymbol, groupedSort, nameOf, tupleDiff, fillObj, 
+               arrayToTuple, genTupleCoords, uniCallFunc, mergeMultiObjs, isNaN, getBool, 
+               skipIndices, isOscillateConverged, lazyCollect, asymSign, numEps, 
+               genAdaptStepBl, shiftLastEle!, getValParm, fct, triMatEleNum, 
+               convertIndex1DtoTri2D, convertIndex1DtoTri4D, mapMapReduce, rmsOf, keepOnly!
 using Suppressor: @capture_out
 using LinearAlgebra: norm
 
@@ -41,7 +40,7 @@ v2 = 1/3
 
 
 # function tryIncluding
-local isIncluded
+isIncluded = true
 errStr = @capture_out begin isIncluded = tryIncluding("someMod") end
 @test isIncluded == false
 pkgDir = @__DIR__
@@ -53,45 +52,6 @@ nr = rand(1:4)
 nc = rand(2:5)
 @test sizeOf(rand(nr, nc)) == (nr, nc)
 @test sizeOf((rand(nc, nr)...,)) == (nr*nc,)
-
-
-# function hasBoolRelation
-@test  hasBoolRelation(===, 1, 1) == (1 === 1)
-@test !hasBoolRelation(===, [1,2], [1,2])
-@test  hasBoolRelation(===, [1,2], [1,2], decomposeNumberCollection=true)
-@test !hasBoolRelation(===, [1,2], (1,2), decomposeNumberCollection=true)
-@test  hasBoolRelation(===, [1,2], (1,2), decomposeNumberCollection=true, 
-                       ignoreContainer=true)
-@test !hasBoolRelation(===, [1 x->x^2], [1 x->abs(x)])
-@test  hasBoolRelation(===, [1 x->x^2], [1 x->abs(x)], ignoreFunction=true)
-@test hasBoolRelation(==, Int, Int)
-@test hasBoolRelation(<:, Int, Integer)
-
-# function hasEqual
-@test hasEqual([1,2], [1.0, 2.0])
-
-# function hasEqual
-@test !hasIdentical([1,2], [1, 2])
-@test  hasIdentical([1,2], [1, 2], decomposeNumberCollection=true)
-@test !hasIdentical([1,2], [1.0, 2], decomposeNumberCollection=true)
-@test !hasIdentical([fill(1), :two], [fill(1), :two])
-v0 = fill(1)
-@test hasIdentical([v0, :two], [v0, :two])
-
-# function hasApprox
-@test  hasApprox(1, 1+5e-16)
-@test !hasApprox(1, 1+5e-15)
-@test !hasApprox([1,2], [3])
-
-
-# function flatten
-@test [(1,2), (3,3,4)] |> flatten == [1,2,3,3,4]
-@test [(1,2), 3, [3,4]] |> flatten == [1,2,3,3,4]
-
-
-# function joinTuple
-@test joinTuple((1,2), (3,4)) == (1,2,3,4)
-@test joinTuple((1,2,3,4)) == (1,2,3,4)
 
 
 # function markUnique
@@ -122,48 +82,21 @@ x1 = rand(10)
 a = [rand(1:5, 2) for i=1:20]
 a2 = groupedSort(a)
 pushfirst!(a2, [[0,0]])
-for i in 2:length(a2)
+for i in firstindex(a2)+1:lastindex(a2)
     if length(a2[i]) > 1
-        @test hasEqual(a2[i]...)
+        h, b... = a2[i]
+        for ele in b
+          @test isequal(h, ele)
+        end
     end
     @test a2[i][1][1] >= a2[i-1][1][1]
 end
 
 
-# function mapPermute
-bl1 = true
-bl2 = true
-bl3 = true
-mapPool = [x->x^2, abs, x->-x]
-for i=1:10
-    arr = rand(50)
-    bs1 = genBasisFunc.([Float64[rand(1:2), rand(1:3), rand(1:3)] for i=1:20], 
-                        [(rand(0.5:0.5:2.5), rand(-0.1:0.2:0.5)) for i=1:20])
-    bs2 = genBasisFunc.([Float64[rand(1:2), rand(1:3), rand(1:3)] for i=1:20], 
-                        [GaussFunc(genExponent(rand(0.5:0.5:2.5), mapPool[rand(1:3)]), 
-                                   genContraction(rand(-0.1:0.2:0.5), mapPool[rand(1:3)])) 
-                         for i=1:20])
-    bl1 *= (sortperm(arr) == mapPermute(arr, sort))
-    bl2 *= hasIdentical(bs1[mapPermute(bs1, sortBasisFuncs)], sortBasisFuncs(bs1))
-    bl3 *= hasIdentical(bs2[mapPermute(bs2, sortBasisFuncs)], sortBasisFuncs(bs2))
-end
-@test bl1
-@test bl2
-@test bl3
-
-
-# function getFunc
-@test getFunc(abs) == abs
-@test getFunc(:abs) == abs
-@test getFunc(:getTwoBodyInts) == Quiqbox.getTwoBodyInts
-@test getFunc(:f1_getFunc)(rand()) isa Missing
-@test getFunc(Symbol("x->x^2"))(3) == 3^2
-
-
 # function nameOf
-pf1 = Quiqbox.PF(abs, *, -1.5)
+pf1 = Quiqbox.Storage(1.5)
 @test nameOf(abs) == :abs
-@test nameOf(pf1) == typeof(pf1) == Quiqbox.PF{typeof(abs), typeof(*), Float64}
+@test nameOf(pf1) == typeof(pf1) == Quiqbox.Storage{Float64}
 
 
 # function tupleDiff
@@ -175,12 +108,8 @@ d = (2,4,5,1,3)
 @test tupleDiff(a,b,c,d) == ([1, 2, 3], [1,2], [2,3], [4,2], [4,5])
 
 
-# function genIndex
-@test genIndex(1) == fill(1)
-@test genIndex() == fill(nothing)
-
-
 # function fillObj
+v0 = fill(1)
 @test fillObj(v0) === v0
 @test fill(1) == v0
 
@@ -205,8 +134,9 @@ c4 = c3 |> Tuple
 
 
 # function mergeMultiObjs
-mergeFunc1 = (x,y; atol) -> ifelse(isapprox(abs(x), abs(y); atol), [abs(x)], abs.([x, y]))
-@test mergeMultiObjs(Int, mergeFunc1, -1, -2, 2, 3, -2, -1, 4, -3, atol=1e-10) == [1,2,3,4]
+mergeFunc1 = (x, y; atol) -> ifelse(isapprox(abs(x), abs(y); atol), [abs(x)], abs.([x, y]))
+arr = [-1, -1 + 1e-11, -2, 2, 3, -2, 4, -3]
+@test mergeMultiObjs(Float64, mergeFunc1, arr, atol=1e-10) == collect(1.0:4.0)
 
 
 # function isNaN
@@ -340,69 +270,46 @@ v = Val(vNum)
 @test getValParm(v) == getValParm(typeof(v)) == vNum
 
 
-# function fct δ
-num = 3.0
-@test fct(num) == factorial(Int(num))
-@test δ(0, δ(1, 2)) == 1
-
-
 # function triMatEleNum
 @test triMatEleNum(6) == 21
 
 
-# function convert1DidxTo2D, convert1DidxTo4D
-iterate1BintsN = function (n::Int)
-    res = Array{NTuple{2, Int}}(undef, n, n)
-    Threads.@threads for k=1:triMatEleNum(n)
-        i, j = convert1DidxTo2D(BN, k)
-        res[i,j] = res[j,i] = (i, j)
-    end
-    res
-end
-
-iterate1Bints0 = function (n::Int)
-    res = Array{NTuple{2, Int}}(undef, n, n)
-    Threads.@threads for i=1:n
-        for j=1:i
-            res[i,j] = res[j,i] = (i,j)
+# function convertIndex1DtoTri2D, convertIndex1DtoTri4D
+test2DIndexing = function (n::Int)
+    m = 0
+    bl = true
+    for j = 1:n, i=1:j
+        m += 1
+        r1 = (i, j)
+        r2 = convertIndex1DtoTri2D(m)
+        if r1 != r2
+            bl *= false
         end
     end
-    res
+    @test bl
+    m
 end
 
-BN = rand(1:100)
-res = (iterate1Bints0(BN) == iterate1BintsN(BN))
-res || println("BN = ", BN)
-@test res
-
-iterate2BintsN = function (n::Int)
-    res = fill([0,0,0,0], n, n, n, n)
-    n1 = n*(n+1)÷2
-    len = n1*(n1+1)÷2
-    for idx in 1:len
-        i,j,k,l = convert1DidxTo4D(n, idx)
-        res[l, k, j, i] = res[k, l, j, i] = res[k, l, i, j] = res[l, k, i, j] = 
-        res[i, j, l, k] = res[j, i, l, k] = res[j, i, k, l] = res[i, j, k, l] = 
-        sort([i, j, k, l])
+test4DIndexing = function (n::Int)
+    m = 0
+    bl = true
+    for l = 1:n, k = 1:l, j = 1:l, i = 1:ifelse(l==j, k, j)
+        m += 1
+        r1 = (i, j, k, l)
+        r2 = convertIndex1DtoTri4D(m)
+        if r1 != r2
+            bl *= false
+        end
     end
-    res
+    @test bl
+    m
 end
 
-iterate2Bints0 = function (n::Int)
-    res = fill([0,0,0,0], n, n, n, n)
-    for l in 1:n, k in 1:l, j in 1:l, i in 1:ifelse(l==j, k, j)
-        res[l, k, j, i] = res[k, l, j, i] = res[k, l, i, j] = res[l, k, i, j] = 
-        res[i, j, l, k] = res[j, i, l, k] = res[j, i, k, l] = res[i, j, k, l] = 
-        sort([i, j, k, l])
-    end
-    res
+for i in (1, 3, 5, 10, 17)
+    j = i * (i + 1) ÷ 2
+    @test test2DIndexing(i) == j
+    @test test4DIndexing(i) == j * (j + 1) ÷ 2
 end
-
-test2Bints = x->( iterate2BintsN(x) == iterate2Bints0(x) )
-
-@test all(test2Bints(i) for i in  1:20)
-@test all(test2Bints(i) for i in 21:40)
-@test all(test2Bints(i) for i in 41:50)
 
 
 # function mapMapReduce
@@ -428,5 +335,44 @@ arr5 = rand(1)
 ele = arr5[]
 res4 = keepOnly!(arr5, 1)
 @test ele == res4
+
+# function intersectMultisets!
+a = [1, 3, 2, 1, 3, 1, 1, 3, 3, 3]
+b = [1, 2, 3, 3, 3, 3, 3, 1, 2, 1]
+
+a2 = copy(a)
+is1 = Quiqbox.intersectMultisets!(a2, a2)
+@test is1 == a
+@test isempty(a2)
+
+a3 = copy(a)
+a4 = copy(a)
+is2 = Quiqbox.intersectMultisets!(a3, a4)
+@test is2 == a
+@test isempty(a3) && isempty(a4)
+
+a5 = copy(a)
+b2 = copy(b)
+is3 = Quiqbox.intersectMultisets!(a5, b2)
+is3t = intersect(a5, b2)
+@test isempty(is3t)
+@test eltype(is3t) == Int
+
+removeEles! = function (ms::AbstractVector{T}, subms::AbstractVector{T}) where {T}
+    for i in subms
+        idx = findfirst(isequal(i), ms)
+        popat!(ms, idx)
+    end
+    ms
+end
+
+@test removeEles!(copy(a), is3) == a5
+@test removeEles!(copy(b), is3) == b2
+
+a6 = copy(a)
+b3 = copy(b)
+is4 = Quiqbox.intersectMultisets!(b3, a6)
+@test is3 != is4
+@test sort(is3) == sort(is4)
 
 end
