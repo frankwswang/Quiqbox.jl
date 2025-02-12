@@ -6,7 +6,7 @@
 
 **Quiqbox** is a quantum chemistry and quantum physics software package that starts around Gaussian basis set optimization for electronic structure problems. Quiqbox is written in pure [Julia](https://julialang.org/). This work is supported by the U.S. Department of Energy under Award No. DESC0019374.
 
-| Documentation | Digital Object Identifier | Paper | License |
+| Documentation | Code Identifier | Paper | License |
 | :---: | :---: | :---: | :---: |
 | [![][Doc-l-img]][Doc-latest] | [![][Zenodo-DOI-img]][Zenodo-DOI-url] |[![][arXiv-img]][arXiv-url] | [![License: MIT][License-img]][License-url] |
 
@@ -113,8 +113,8 @@ If you use Quiqbox in your research, please cite the following paper:
 [Doc-latest]:  https://frankwswang.github.io/Quiqbox.jl/stable
 [Doc-dev]:  https://frankwswang.github.io/Quiqbox.jl/dev
 
-[GA-CI-img]:   https://github.com/frankwswang/Quiqbox.jl/actions/workflows/CI-Rel-Latest.yml/badge.svg
-[GA-CI-url]:   https://github.com/frankwswang/Quiqbox.jl/actions/workflows/CI-Rel-Latest.yml
+[GA-CI-img]:   https://github.com/frankwswang/Quiqbox.jl/actions/workflows/CI-Release.yml/badge.svg
+[GA-CI-url]:   https://github.com/frankwswang/Quiqbox.jl/actions/workflows/CI-Release.yml
 
 [codecov-img]: https://codecov.io/gh/frankwswang/Quiqbox.jl/branch/main/graph/badge.svg?token=Z1XOA39DV2
 [codecov-url]: https://codecov.io/gh/frankwswang/Quiqbox.jl
