@@ -26,7 +26,7 @@ include("SpatialBasis.jl")
 # include("Matter.jl")
 # include("Overload.jl")
 
-include("Differentiation/finite.jl")
+include("Differentiation/Finite.jl")
 
 include("Integration/Operators.jl")
 include("Integration/Engines/Numerical.jl")
@@ -39,7 +39,6 @@ include("Integration/Interface.jl")
 
 include("Behaviors.jl")
 
-include("Initialization.jl")
 end
 
 ## Development comment guideline
