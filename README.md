@@ -6,9 +6,9 @@
 
 **Quiqbox** is a quantum chemistry and quantum physics software package that starts around Gaussian basis set optimization for electronic structure problems. Quiqbox is written in pure [Julia](https://julialang.org/). This work is supported by the U.S. Department of Energy under Award No. DESC0019374.
 
-| Documentation | Digital Object Identifier | Publication | License |
+| Documentation | Digital Object Identifier | Paper | License |
 | :---: | :---: | :---: | :---: |
-| [![][Doc-l-img]][Doc-latest] | [![][Zenodo-DOI-img]][Zenodo-DOI-url] |[![][JCTC-img]][JCTC-url] | [![License: MIT][License-img]][License-url] |
+| [![][Doc-l-img]][Doc-latest] | [![][Zenodo-DOI-img]][Zenodo-DOI-url] |[![][arXiv-img]][arXiv-url] | [![License: MIT][License-img]][License-url] |
 
 
 
@@ -96,7 +96,7 @@ Objects defined by Quiqbox that are directly exported to the user have the corre
 
 # Citation
 If you use Quiqbox in your research, please cite the following paper:
-- Wang, W., & Whitfield, J. D. (2023). Basis set generation and optimization in the NISQ era with Quiqbox.jl. *Journal of Chemical Theory and Computation, 19*(22), 8032-8052.
+- [Wang, W., & Whitfield, J. D. (2023). Basis set generation and optimization in the NISQ era with Quiqbox.jl. *Journal of Chemical Theory and Computation, 19*(22), 8032-8052.][JCTC-url]
 
 <br />
 <br />
@@ -109,7 +109,7 @@ If you use Quiqbox in your research, please cite the following paper:
 
 <br />
 
-[Doc-l-img]:   https://img.shields.io/github/v/release/frankwswang/Quiqbox.jl?label=latest%20release
+[Doc-l-img]:   https://img.shields.io/github/v/release/frankwswang/Quiqbox.jl?label=latest%20release&color=seagreen
 [Doc-latest]:  https://frankwswang.github.io/Quiqbox.jl/stable
 [Doc-dev]:  https://frankwswang.github.io/Quiqbox.jl/dev
 
@@ -125,7 +125,8 @@ If you use Quiqbox in your research, please cite the following paper:
 [Zenodo-DOI-img]: https://zenodo.org/badge/DOI/10.5281/zenodo.7448313.svg
 [Zenodo-DOI-url]: https://doi.org/10.5281/zenodo.7448313
 
-[JCTC-img]: https://img.shields.io/badge/JCTC-10.1021/acs.jctc.3c00011-darkgreen.svg
+[arXiv-img]: https://img.shields.io/badge/arXiv-2212.04586-b31b1b.svg
+[arXiv-url]: https://arxiv.org/abs/
 [JCTC-url]: https://pubs.acs.org/doi/10.1021/acs.jctc.3c00011
 
 [License-img]: https://img.shields.io/badge/License-MIT-yellow.svg
