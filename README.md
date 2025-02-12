@@ -14,7 +14,7 @@
 
 | Development Status |
 |:---:|
-| [![codecov][codecov-img]][codecov-url] [![CI][GA-CI-img]][GA-CI-url] [![CI-JN][GA-CI-JN-img]][GA-CI-JN-url] [![][New-commits-img]][New-commits-url] |
+| [![codecov][codecov-img]][codecov-url] [![CI][GA-CI-img]][GA-CI-url] [![][New-commits-img]][New-commits-url] |
 
 
 <br />
@@ -113,11 +113,8 @@ If you use Quiqbox in your research, please cite the following paper:
 [Doc-latest]:  https://frankwswang.github.io/Quiqbox.jl/stable
 [Doc-dev]:  https://frankwswang.github.io/Quiqbox.jl/dev
 
-[GA-CI-img]:   https://github.com/frankwswang/Quiqbox.jl/actions/workflows/CI-JS-latest.yml/badge.svg
-[GA-CI-url]:   https://github.com/frankwswang/Quiqbox.jl/actions/workflows/CI-JS-latest.yml
-
-[GA-CI-JN-img]:https://github.com/frankwswang/Quiqbox.jl/actions/workflows/CI-JN.yml/badge.svg
-[GA-CI-JN-url]:https://github.com/frankwswang/Quiqbox.jl/actions/workflows/CI-JN.yml
+[GA-CI-img]:   https://github.com/frankwswang/Quiqbox.jl/actions/workflows/CI-Rel-Latest.yml/badge.svg
+[GA-CI-url]:   https://github.com/frankwswang/Quiqbox.jl/actions/workflows/CI-Rel-Latest.yml
 
 [codecov-img]: https://codecov.io/gh/frankwswang/Quiqbox.jl/branch/main/graph/badge.svg?token=Z1XOA39DV2
 [codecov-url]: https://codecov.io/gh/frankwswang/Quiqbox.jl
