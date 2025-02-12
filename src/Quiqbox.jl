@@ -2,18 +2,16 @@ module Quiqbox
 
 include("Types.jl")
 include("Traits.jl")
-include("Layout.jl")
+
+include("Lexicons.jl")
+include("../lib/BasisSets/BasisSets.jl")
 
 include("Tools.jl")
-# include("Formulae.jl")
 include("StringIO.jl")
 include("Exception.jl")
 include("ParallelUtils.jl")
 
-include("../lib/BasisSets/BasisSets.jl")
-
-# include("Library.jl")
-include("Lexicons.jl")
+include("Layout.jl")
 include("Parameters.jl")
 include("Mapping.jl")
 include("Graphs.jl")

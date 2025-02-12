@@ -25,8 +25,6 @@ mutable struct Locker{T}
     @atomic val::T
 end
 
-import Base: getindex
-
 getindex(l::Locker) = l.val
 
 const ValuePointer{T} = Union{AbtArray0D{T}, RefVal{T}}
