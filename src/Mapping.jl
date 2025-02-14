@@ -63,7 +63,7 @@ StableAdd(::Type{T}) where {T} = StableBinary(+, T)
 StableMul(::Type{T}) where {T} = StableBinary(*, T)
 
 
-struct Retrieve{P<:CompositePointer} <: FunctionCombiner
+struct Retrieve{P<:CompositePointer} <: FunctionComposer
     rule::P
 end
 
@@ -110,11 +110,18 @@ end
 
 ParamSelectFunc(f::Function) = ParamSelectFunc(f, ())
 
+const EmptySelectFunc{F<:Function} = ParamSelectFunc{F, Tuple{}}
+
+ParamSelectFunc(f::EmptySelectFunc) = itself(f)
+
+ParamSelectFunc(f::ParamSelectFunc, select::Tuple{Vararg{ChainIndexer}}) = 
+ParamSelectFunc(f.apply, (f.select..., select...))
+
 function (f::ParamSelectFunc)(input, param)
     f.apply(input, getField(param, f.select)...)
 end
 
-(f::ParamSelectFunc{<:Function, Tuple{}})(input, _) = f.apply(input)
+(f::EmptySelectFunc)(input, _) = f.apply(input)
 
 const GetParamFunc{F<:Function, T<:ChainIndexer} = ParamSelectFunc{F, Tuple{T}}
 
