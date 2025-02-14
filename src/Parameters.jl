@@ -24,6 +24,34 @@ function checkReshapingAxis(arr::AbstractArray, shape::Tuple{Vararg{Int}})
     len
 end
 
+struct TruncateReshape{N}
+    shape::NTuple{N, Int}
+    mark::NTuple{N, Symbol}
+    truncate::Bool
+
+    function TruncateReshape(shape::NonEmptyTuple{Int, N}, 
+                             mark::NonEmptyTuple{Int, N}=ntuple( _->:e, Val(N+1) ); 
+                             truncate::Bool=false) where 
+                            {N}
+        checkReshapingAxis(shape)
+        new{N+1}(shape, mark, truncate)
+    end
+
+    function TruncateReshape(refArr::AbstractArray{T, N}, 
+                             mark::NTuple{N, Int}=ntuple( _->:e, Val(N) ); 
+                             truncate::Bool=false) where {T, N}
+        N==0 && throw(AssertionError("The dimension of `refArr` should be at least one."))
+        new{N+1}(size(refArr), mark, truncate)
+    end
+end
+
+function (f::TruncateReshape{N})(arr::AbstractArray) where {N}
+    iFirst = firstindex(arr)
+    extent = prod(f.shape)
+    v = f.truncate ? arr[iFirst:iFirst+extent-1] : arr
+    reshape(v, f.shape)
+end
+
 
 struct ShapedMemory{T, N} <: AbstractMemory{T, N}
     value::Memory{T}
