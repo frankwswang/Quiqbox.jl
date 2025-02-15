@@ -172,12 +172,11 @@ end
 struct TypedReduction{T, F<:Function} <: DualSpanFunction{T, 0, 0}
     f::F
 
-    function TypedReduction(f::F, arg, args...) where {F}
+    function TypedReduction(f::ReturnTyped{T, F}, arg, args...) where {T, F<:Function}
         allArgs = (arg, args...)
-        T = Union{(allArgs.|>checkAbtArrayArg.|>first.|>checkAbtArrayArg.|>first)...}
         excludeAbtArray(T)
-        checkReturnType(f, T, allArgs)
-        new{T, F}(f)
+        checkReturnType(f.f, T, allArgs)
+        new{T, F}(f.f)
     end
 
     function TypedReduction(::Type{T}) where {T}
@@ -186,7 +185,8 @@ struct TypedReduction{T, F<:Function} <: DualSpanFunction{T, 0, 0}
     end
 end
 
-TypedReduction(trf::TypedReduction, arg, args...) = TypedReduction(trf.f, arg, args...)
+TypedReduction(trf::TypedReduction{T}, arg, args...) where {T} = 
+TypedReduction(ReturnTyped(trf.f, T), arg, args...)
 
 function (sf::TypedReduction{T, F})(arg::AbtArr210L{T}, args::AbtArr210L{T}...) where {T, F}
     sf.f(arg, args...)::T
@@ -197,27 +197,35 @@ end
 
 struct StableMorphism{T, F<:Function, N} <: DualSpanFunction{T, N, 0}
     f::F
+    axis::TruncateReshape{N}
 
-    function StableMorphism(f::F, arg, args...) where {F}
+    function StableMorphism(f::ReturnTyped{<:AbstractArray{T}, F}, arg, args...; 
+                            axis::MissingOr{TruncateReshape}=missing, 
+                            truncate::Bool=(ismissing(axis) ? false : axis.truncate)
+                            ) where {T, F<:Function}
         allArgs = (arg, args...)
-        T = Union{(allArgs.|>checkAbtArrayArg.|>first.|>checkAbtArrayArg.|>first)...}
-        excludeAbtArray(T)
-        val = checkReturnType(f, AbstractArray{T}, allArgs)
-        new{T, F, ndims(val)}(f)
+        val = checkReturnType(f.f, AbstractArray{T}, allArgs)
+        N = ndims(val)
+        N==0 && throw(AssertionError("The dimension of `f`'s returned value must be "*
+                                     "larger than zero."))
+        axis = TruncateReshape(ifelse(ismissing(axis), val, axis); truncate)
+        new{T, F, N}(f.f, axis)
     end
 
-    function StableMorphism(::Type{V}) where {N, V<:AbstractArray{<:Any, N}}
-        T = checkAbtArrayArg(V) |> first
-        excludeAbtArray(T)
-        new{T, ItsType, N}(itself)
+    function StableMorphism(arg::V) where {N, T, V<:AbstractArray{T, N}}
+        N==0 && throw(AssertionError("`N` must be larger than zero."))
+        new{T, ItsType, N}(itself, TruncateReshape(arg))
     end
 end
 
-StableMorphism(srf::StableMorphism, arg, args...) = StableMorphism(srf.f, arg, args...)
+StableMorphism(srf::StableMorphism{T, <:Function, N}, arg, args...; 
+               axis::MissingOr{TruncateReshape{N}}=srf.axis) where {T, N} = 
+               StableMorphism(ReturnTyped(srf.f, AbstractArray{T, N}), arg, args...; axis)
 
 function (sf::StableMorphism{T, F, N})(arg::AbtArr210L{T}, args::AbtArr210L{T}...) where 
                                       {T, F, N}
-    sf.f(arg, args...)::AbstractArray{T, N}
+    res = sf.f(arg, args...)::AbstractArray{T}
+    sf.axis(res)
 end
 
 (::StableMorphism{T, ItsType, N})(arg::AbstractArray{T, N}) where {T, N} = itself(arg)
@@ -439,7 +447,7 @@ end
 
 function CellParam(func::Function, input::ParamInputType{T}, symbol::SymOrIndexedSym; 
                    init::Union{ShapedMemory{T, 0}, T, Missing}=missing) where {T}
-    lambda = TypedReduction(func, obtain.(input)...)
+    lambda = TypedReduction(ReturnTyped(func, T), obtain.(input)...)
     CellParam(lambda, input, symbol, init, TUS0, initializeOffset(T))
 end
 
@@ -480,14 +488,15 @@ function checkGridParamArg(::StableMorphism{T, <:ItsTalike, N}, input::I, memory
         throw(AssertionError("The type of `memory` should be a subtype of `$M1`."))
     end
     checkParamInput(input, innerDimMax=(O==0)*N, outerDimMax=(O==N)*N)
-    StableMorphism(AbstractArray{T, N}), ItsType, deepcopy(memory|>ShapedMemory)
+    StableMorphism(memory), ItsType, deepcopy(memory|>ShapedMemory)
 end
 
 function checkGridParamArg(::StableMorphism{T, <:ItsTalike, N}, input::I, ::Missing) where 
                           {T, N, O, I<:ParamBox{T, <:Any, O}}
     checkParamContainerArgType1(I, Tuple{FlattenedParam{T, N}})
     checkParamInput(input, innerDimMax=(O==0)*N, outerDimMax=(O==N)*N)
-    StableMorphism(AbstractArray{T, N}), ItsType, deepcopy(input[1]|>obtain|>ShapedMemory)
+    memory = input[1]|>obtain
+    StableMorphism(memory), ItsType, deepcopy(memory|>ShapedMemory)
 end
 
 function throwGridParamDimErrorMessage()
@@ -527,7 +536,7 @@ end
 
 function GridParam(func::Function, input::ParamInputType{T}, symbol::SymOrIndexedSym; 
                    init::Union{AbstractArray{T}, Missing}=missing) where {T}
-    lambda = StableMorphism(func, obtain.(input)...)
+    lambda = StableMorphism(ReturnTyped(func, AbstractArray{T}), obtain.(input)...)
     GridParam(lambda, input, symbol, init)
 end
 
@@ -550,7 +559,7 @@ GridParam(par::GridParam{T}, symbol::SymOrIndexedSym=symOf(par);
 GridParam(par.lambda, par.input, symbol, init)
 
 GridParam(input::FlattenedParam{T, N}, symbol::SymOrIndexedSym=symOf(input)) where {T, N} = 
-GridParam(StableMorphism(AbstractArray{T, N}), (input,), symbol)
+GridParam(StableMorphism(input|>obtain), (input,), symbol)
 
 GridParam(val::AbstractArray, valSym::SymOrIndexedSym, symbol::SymOrIndexedSym=valSym) = 
 GridParam(TensorVar(val, valSym), symbol)
