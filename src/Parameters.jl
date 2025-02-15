@@ -30,7 +30,7 @@ struct TruncateReshape{N}
     truncate::Bool
 
     function TruncateReshape(shape::NonEmptyTuple{Int, N}, 
-                             mark::NonEmptyTuple{Int, N}=ntuple( _->:e, Val(N+1) ); 
+                             mark::NonEmptyTuple{Symbol, N}=ntuple( _->:e, Val(N+1) ); 
                              truncate::Bool=false) where 
                             {N}
         checkReshapingAxis(shape)
@@ -38,11 +38,14 @@ struct TruncateReshape{N}
     end
 
     function TruncateReshape(refArr::AbstractArray{T, N}, 
-                             mark::NTuple{N, Int}=ntuple( _->:e, Val(N) ); 
+                             mark::NTuple{N, Symbol}=ntuple( _->:e, Val(N) ); 
                              truncate::Bool=false) where {T, N}
         N==0 && throw(AssertionError("The dimension of `refArr` should be at least one."))
-        new{N+1}(size(refArr), mark, truncate)
+        new{N}(size(refArr), mark, truncate)
     end
+
+    TruncateReshape(f::TruncateReshape{N}; truncate::Bool=f.truncate) where {N} = 
+    new{N}(f.shape, f.mark, truncate)
 end
 
 function (f::TruncateReshape{N})(arr::AbstractArray) where {N}
