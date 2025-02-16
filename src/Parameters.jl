@@ -1,5 +1,5 @@
-export TensorVar, CellParam, GridParam, ParamGrid, ParamMesh, setScreenLevel!, 
-       setScreenLevel, symOf, inputOf, obtain, fragment, setVal!, screenLevelOf, 
+export TensorVar, CellParam, GridParam, ParamGrid, setScreenLevel!, 
+       setScreenLevel, symOf, inputOf, obtain, setVal!, screenLevelOf, 
        markParams!, topoSort, getParams, uniqueParams, ShapedMemory, directObtain, 
        memorize!, evalParamSource
 
@@ -144,23 +144,12 @@ const ValShifter{T} = Fix2{typeof(typedAdd), T}
 
 
 exclude0DimData(::Type) = nothing
-exclude0DimData(::Type{<:AbtMemory0D}) = 
-throw(ArgumentError("`$(AbstractMemory{<:Any, 0})` is not allowed as the argument."))
 exclude0DimData(::Type{<:AbtArray0D}) = 
 throw(ArgumentError("`$(AbstractArray{<:Any, 0})` is not allowed as the argument."))
-exclude0DimParam(::Type{<:ElementalParam}) = 
-throw(ArgumentError("`$(ElementalParam)` is not allowed as the argument."))
 
 excludeAbtArray(::Type) = nothing
 excludeAbtArray(::Type{<:AbstractArray}) = 
 throw(ArgumentError("`AbstractArray` is not allowed as an input argument."))
-
-function checkAbtArrayArg(::Type{V}) where {T, N, V<:AbstractArray{T, N}}
-    exclude0DimData(V)
-    (T, N)
-end
-checkAbtArrayArg(::Type{T}) where {T} = (T, 0)
-checkAbtArrayArg(::T) where {T} = checkAbtArrayArg(T)
 
 
 function checkReturnType(f::F, ::Type{T}, args::NonEmptyTuple{Any}) where {F, T}
@@ -229,73 +218,6 @@ function (sf::StableMorphism{T, F, N})(arg::AbtArr210L{T}, args::AbtArr210L{T}..
 end
 
 (::StableMorphism{T, ItsType, N})(arg::AbstractArray{T, N}) where {T, N} = itself(arg)
-
-
-function genSeqAxis(lens::NTuple{N, Int}, sym::Symbol=:e) where {N}
-    Tuple( (Symbol(sym, i), lens[i]) for i in 1:N )
-end
-
-FixedShapeLinkAxisType = Union{NonEmptyTuple{Tuple{Symbol, Int}}, Missing}
-
-struct FixedShapeLink{T, F<:Function, N, O} <: DualSpanFunction{T, N, O}
-    f::F
-    axis::NTuple{O, Tuple{Symbol, Int}}
-    extent::Int
-
-    function FixedShapeLink(f::F, ::Type{V}, arg, args...; 
-                            axis::FixedShapeLinkAxisType=missing) where 
-                           {F<:Function, V<:AbstractArray}
-        T, N = checkAbtArrayArg( eltype(V) )
-        excludeAbtArray(T)
-        allArgs = (arg, args...)
-        allArgs .|> checkAbtArrayArg .|> first .|> checkAbtArrayArg
-        val = checkReturnType(f, AbstractArray{<:T}, allArgs)
-        checkEmptiness(val, :val)
-        if ismissing(axis)
-            axis = genSeqAxis(val|>size)
-        else
-            checkReshapingAxis(val, last.(axis))
-        end
-        O = length(axis)
-        exclude0DimData(AbstractArray{T, O})
-        new{T, F, N, O}(f, axis, prod( last.(axis) ))
-    end
-
-    function FixedShapeLink(arg::V; axis::FixedShapeLinkAxisType=missing) where 
-                           {V<:AbstractArray}
-        checkEmptiness(arg, :arg)
-        T1, O = checkAbtArrayArg(V)
-        T2, N = checkAbtArrayArg(T1)
-        excludeAbtArray(T2)
-        if ismissing(axis)
-            axis = genSeqAxis(arg|>size)
-        else
-            checkReshapingAxis(arg, last.(axis))
-        end
-        new{T2, ItsType, N, O}(itself, axis, prod( last.(axis) ))
-    end
-end
-
-FixedShapeLink(fslf::FixedShapeLink, ::Type{V}, arg, args...) where {V<:AbstractArray} = 
-FixedShapeLink(fslf.f, arg, args...)
-
-callFixedShapeLinkCore(ml::FixedShapeLink{T, <:Any, N, O}, 
-                       arg::AbtArr210L{T}, args::AbtArr210L{T}...) where {T, N, O} = 
-ml.f(arg, args...)::AbstractArray{<:AbstractArray{T, N}, O}
-
-callFixedShapeLinkCore(ml::FixedShapeLink{T, <:Any, 0, O}, 
-                       arg::AbtArr210L{T}, args::AbtArr210L{T}...) where {T, O} = 
-ml.f(arg, args...)::AbstractArray{<:T, O}
-
-function (ml::FixedShapeLink{T})(arg::AbtArr210L{T}, args::AbtArr210L{T}...) where {T}
-    res = callFixedShapeLinkCore(ml, arg, args...)
-    iBegin = firstindex(res)
-    reshape(res[iBegin : (iBegin + ml.extent - 1)], last.(ml.axis))
-end
-
-(::FixedShapeLink{T, ItsType, 0, O})(arg::AbstractArray{T, O}) where {T, O} = itself(arg)
-
-(::FixedShapeLink{T, ItsType, N, O})(arg::JaggedAbtArray{T, N, O}) where {T, N, O} = itself(arg)
 
 
 function checkScreenLevel(sl::Int, levels::NonEmptyTuple{Int})
@@ -594,60 +516,6 @@ function checkParamContainerArgType2(len::Int, extent::Int)
     nothing
 end
 
-function checkParamMeshArg(ml::FixedShapeLink{T, F, N}, input::I, 
-                           memory::Union{Memory{ShapedMemory{T, N}}, Missing}) where 
-                          {T, F, N, I}
-    if ismissing(memory)
-        memory = Memory{ShapedMemory{T, N}}(ShapedMemory.(T, ml.f(obtain.(input)...))|>vec)
-    else
-        checkParamContainerArgType2(length(memory), ml.extent)
-    end
-    checkParamInput(input)
-    ml, F, deepcopy(memory)
-end
-
-struct ParamMesh{T, F<:Function, I<:ParamInputType{T}, N, O} <: ParamLink{T, N, I, O}
-    lambda::FixedShapeLink{T, F, N, O}
-    input::I
-    symbol::IndexedSym
-    memory::Memory{ShapedMemory{T, N}}
-
-    function ParamMesh(lambda::FixedShapeLink{T, F, N, O}, input::I, 
-                       symbol::SymOrIndexedSym, 
-                       memory::Union{Memory{ShapedMemory{T, N}}, Missing}=missing) where 
-                      {T, N, F, O, I<:ParamInputType{T}}
-        lambda, funcType, memory = checkParamMeshArg(lambda, input, memory)
-        new{T, funcType, I, N, O}(lambda, input, IndexedSym(symbol), memory)
-    end
-end
-
-function ParamMesh(func::Function, input::ParamInputType, symbol::SymOrIndexedSym; 
-                   axis::FixedShapeLinkAxisType=missing)
-    inputVal = obtain.(input)
-    out = func(inputVal...)
-    out isa AbstractArray || throw(AssertionError("`func` should output an AbstractArray."))
-    lambda = FixedShapeLink(func, typeof(out), inputVal...; axis)
-    ParamMesh(lambda, input, symbol)
-end
-
-ParamMesh(func::Function, input::ParamBox{T}, symbol::SymOrIndexedSym; 
-          axis::FixedShapeLinkAxisType=missing) where {T} = 
-ParamMesh(func, (input,), symbol; axis)
-
-ParamMesh(func::Function, input1::ParamBox{T}, input2::ParamBox{T}, 
-          symbol::SymOrIndexedSym; 
-          axis::FixedShapeLinkAxisType=missing) where {T} = 
-ParamMesh(func, (input1, input2), symbol; axis)
-
-ParamMesh(func::Function, input1::ParamBox{T}, input2::ParamBox{T}, 
-          input3::ParamBox{T}, symbol::SymOrIndexedSym; 
-          axis::FixedShapeLinkAxisType=missing) where {T} = 
-ParamMesh(func, (input1, input2, input3), symbol; axis)
-
-ParamMesh(input::ParamBox, symbol::SymOrIndexedSym; 
-          axis::FixedShapeLinkAxisType=missing) = 
-ParamMesh(FixedShapeLink(obtain(input); axis), (input,), symbol)
-
 
 function indexParam(pb::ParamGrid{<:Any, N}, idx::Int, 
                     sym::MissingOr{Symbol}=missing) where {N}
@@ -688,36 +556,6 @@ end
 
 genDefaultRefParSym(input::ParamBox) = IndexedSym(:_, input.symbol)
 
-struct KnotParam{T, F, I, N, O} <: LinkParam{T, N, I}
-    input::Tuple{ParamMesh{T, F, I, N, O}}
-    index::Int
-    symbol::IndexedSym
-
-    function KnotParam(input::Tuple{ParamMesh{T, F, I, N, O}}, index::Int, 
-                       symbol::SymOrIndexedSym=genDefaultRefParSym(input|>first)) where 
-                      {T, F, I, N, O}
-        maxIndex = length(first(input).memory)
-        if index < 1 || index > maxIndex
-            throw(DomainError(index, "`index is out of the allowed range: (1, $maxIndex)`"))
-        end
-        new{T, F, I, N, O}(input, index, symbol)
-    end
-end
-
-KnotParam(par::ParamMesh, index::Int, symbol::SymOrIndexedSym=genDefaultRefParSym(par)) = 
-KnotParam((par,), index, symbol)
-
-
-function fragment(pn::ParamMesh{T, F, I, N, O}) where {T, F, I, N, O}
-    res = Array{KnotParam{T, F, I, N, O}}(undef, last.(pn.lambda.axis))
-    for i in eachindex(res)
-        res[i] = KnotParam(pn, i)
-    end
-    res
-end
-
-fragment(pl::ParamGrid) = directObtain(pl.input|>first)
-
 
 getScreenLevelOptions(::Type{<:ParamGrid}) = (0, 2)
 
@@ -749,8 +587,6 @@ function isOffsetEnabled(pb::T) where {T<:CellParam}
 end
 
 screenLevelOf(p::BaseParam{<:Any, 0}) = Int(p.screen)
-
-screenLevelOf(::KnotParam) = 0
 
 screenLevelOf(::ParamToken) = 0
 
@@ -853,8 +689,6 @@ outputSizeOf(p::PrimitiveParam) = size(p.input)
 outputSizeOf(p::ParamFunctor) = size(p.memory)
 
 outputSizeOf(p::ParamGrid) = size(p.input)
-
-outputSizeOf(p::KnotParam) = size(first(p.input).memory[p.index])
 
 
 
@@ -1034,12 +868,12 @@ function obtainCore(inputVal::NTuple{A, AbtArr210L{T}},
     p.lambda(inputVal...)
 end
 
-function obtainCore(inputVal::NTuple{A, AbtArr210L{T}}, 
-                    p::ParamMesh{T, <:Any, <:ParamInput{T, A}}) where {T, A}
-    f = p.lambda
-    valRaw = f.f( inputVal... )
-    Memory{eltype(valRaw)}(valRaw[begin:(begin + f.extent - 1)])
-end
+# function obtainCore(inputVal::NTuple{A, AbtArr210L{T}}, 
+#                     p::ParamMesh{T, <:Any, <:ParamInput{T, A}}) where {T, A}
+#     f = p.lambda
+#     valRaw = f.f( inputVal... )
+#     Memory{eltype(valRaw)}(valRaw[begin:(begin + f.extent - 1)])
+# end
 
 function obtainCore(inputVal::NTuple{A, AbtArr210L{T}}, 
                     p::CellParam{T, <:Any, <:ParamInput{T, A}}) where {T, A}
@@ -1057,22 +891,16 @@ end
 obtainCore(val::Memory{<:AbstractArray{T, N}}, p::ParamGrid{T, N}) where {T, N} = 
 reshape(val, p.input.shape)
 
-obtainCore(val::Memory{<:AbstractArray{T}}, p::KnotParam{T, <:Any, <:Any, 0}) where {T} = 
-getindex(getindex(val), p.index)
-
-obtainCore(val::Memory{<:JaggedAbtArray{T, N}}, p::KnotParam{T, <:Any, <:Any, N}) where {T, N} = 
-getindex(getindex(val), p.index)
-
 const ParamValDict{T} = ParamPointerBox{ T, T, AbstractArray{T}, JaggedAbtArray{T}, 
                                           typeof(obtainCore) }
 
 genParamValDict(::Type{T}, maxRecursion::Int=DefaultMaxParamPointerLevel) where {T} = 
 ParamPointerBox(obtainCore, T, T, AbstractArray{T}, JaggedAbtArray{T}, maxRecursion)
 
-function searchObtain(pDict::ParamValDict{T}, p::ParamMesh{T}) where {T}
-    res = recursiveTransform!(obtainCore, pDict, p)
-    reshape(res, last.(p.lambda.axis)) |> collect
-end
+# function searchObtain(pDict::ParamValDict{T}, p::ParamMesh{T}) where {T}
+#     res = recursiveTransform!(obtainCore, pDict, p)
+#     reshape(res, last.(p.lambda.axis)) |> collect
+# end
 
 searchObtain(pDict::ParamValDict{T}, p::ParamBox{T}) where {T} = 
 recursiveTransform!(obtainCore, pDict, p)
@@ -1241,10 +1069,6 @@ end
 
 function markParam(param::ParamNest, refParam::ParamBox)
     markParam(param.input, refParam)
-end
-
-function markParam(param::KnotParam, refParam::ParamBox)
-    markObj((markParam(first(param.input), refParam), param.index))
 end
 
 markParam(param::ParamBox) = markParam(param, param)
@@ -1605,87 +1429,6 @@ const FlatParamSetMixedVec{T, P1<:ElementalParam{<:T}, P2<:FlattenedParam{<:T},
                            P3<:ParamBox{<:T}} = 
       AbstractMiscParamSet{T, FlatParamSet{T, P1, P2}, P3}
 
-struct MiscParamSet{T, P1<:ElementalParam{<:T}, P2<:FlattenedParam{<:T}, 
-                    P3<:ParamBox{<:T}} <: FlatParamSetMixedVec{T, P1, P2, P3}
-    inner::FlatParamSet{T, P1, P2}
-    outer::Vector{P3}
-end
-
-const TypedMiscParamSet{T, P1<:ElementalParam{T}, P2<:FlattenedParam{T}, 
-                        P3<:ParamBox{T}} = 
-      MiscParamSet{T, P1, P2, P3}
-
-size(mps::MiscParamSet) = size(mps.outer) .+ 1
-
-firstindex(::MiscParamSet) = 1
-
-lastindex(mps::MiscParamSet) = length(mps.outer) + 1
-
-function getindex(mps::MiscParamSet, i::Int)
-    if i == 1
-        mps.inner
-    else
-        getindex(mps.outer, i+firstindex(mps.outer)-2)
-    end
-end
-
-function getindex(mps::MiscParamSet, sector::Symbol, i::Int)
-    getindex(getfield(mps, sector), i)
-end
-
-function getindex(mps::MiscParamSet, sec1::Symbol, sec2::Symbol, i::Int)
-    getindex(getfield(getfield(mps, sec1), sec2), i)
-end
-
-function setindex!(mps::MiscParamSet, val, i::Int)
-    if i == firstindex(mps)
-        mps.inner .= val
-    else
-        setindex!(mps.outer, val, i+firstindex(mps.outer)-2)
-    end
-end
-
-function setindex!(mps::MiscParamSet, val, sector::Symbol, i::Int)
-    setindex!(getfield(mps, sector), val, i)
-end
-
-function setindex!(mps::MiscParamSet, val, sec1::Symbol, sec2::Symbol, i::Int)
-    setindex!(getfield(getfield(mps, sec1), sec2), val, i)
-end
-
-pushParam!(fps::MiscParamSet, a::ElementalParam) = push!(fps.inner.d0, a)
-pushParam!(fps::MiscParamSet, a::FlattenedParam) = push!(fps.inner.d1, a)
-pushParam!(fps::MiscParamSet, a::ParamBox) = push!(fps.outer, a)
-
-function iterate(mps::MiscParamSet)
-    i = firstindex(mps)
-    (getindex(mps, i), i+1)
-end
-
-function iterate(mps::MiscParamSet, state)
-    if state > length(mps)
-        nothing
-    else
-        (getindex(mps, state), state+1)
-    end
-end
-
-length(mps::MiscParamSet) = length(mps.outer) + 1
-
-axes(mps::MiscParamSet)	= map(Base.OneTo, size(mps))
-
-function similar(mps::MiscParamSet{T, P1, P2, P3}, shape::Tuple{Int}=size(mps); 
-                 innerShape::NTuple{2, Int}=length.( (mps.inner.d0, mps.inner) )) where 
-                {T, P1<:ElementalParam{<:T}, P2<:FlattenedParam{<:T}, P3<:ParamBox{<:T}}
-    checkPositivity(shape|>first)
-    res = Vector{Union{Vector{Union{ Vector{P1}, P2 }}, P3}}(undef, shape)
-    res[begin] = similar(mps.inner, first(innerShape), innerShape=(last(innerShape),))
-    res
-end
-
-getproperty(fps::MiscParamSet, field::Symbol) = getfield(fps, field)
-
-
 function initializeParamSet(::Type{FlatParamSet}, ::Type{T}=Any; 
                             d0Type::MissingOr{Type{<:FlattenedParam{<:T}}}=missing, 
                             d1Type::MissingOr{Type{<:FlattenedParam{<:T}}}=missing) where 
@@ -1711,19 +1454,19 @@ initializeParamSet(::GenericFunction) = initializeParamSet(FlatParamSet)
 initializeParamSet(::TypedParamFunc{T}) where {T} = initializeParamSet(FlatParamSet, T)
 
 
-function initializeParamSet(::Type{MiscParamSet}, ::Type{T}=Any; 
-                            d0Type::MissingOr{Type{<:ElementalParam{<:T}}}=missing, 
-                            d1Type::MissingOr{Type{<:FlattenedParam{<:T}}}=missing, 
-                            d2Type::MissingOr{Type{<:ParamBox{<:T}}}=missing) where {T}
-    inner = initializeParamSet(FlatParamSet, T; d0Type, d1Type)
-    if ismissing(d2Type)
-        d2Type = ifelse(isconcretetype(T), ParamBox{T}, ParamBox{<:T})
-    end
-    MiscParamSet(inner, d2Type[])
-end
+# function initializeParamSet(::Type{MiscParamSet}, ::Type{T}=Any; 
+#                             d0Type::MissingOr{Type{<:ElementalParam{<:T}}}=missing, 
+#                             d1Type::MissingOr{Type{<:FlattenedParam{<:T}}}=missing, 
+#                             d2Type::MissingOr{Type{<:ParamBox{<:T}}}=missing) where {T}
+#     inner = initializeParamSet(FlatParamSet, T; d0Type, d1Type)
+#     if ismissing(d2Type)
+#         d2Type = ifelse(isconcretetype(T), ParamBox{T}, ParamBox{<:T})
+#     end
+#     MiscParamSet(inner, d2Type[])
+# end
 
-initializeParamSet(::Type{MiscParamSet{T, P1, P2, P3}}) where {T, P1, P2, P3} = 
-MiscParamSet(FlatParamSet(P1[], P2[]), P3[])
+# initializeParamSet(::Type{MiscParamSet{T, P1, P2, P3}}) where {T, P1, P2, P3} = 
+# MiscParamSet(FlatParamSet(P1[], P2[]), P3[])
 
 
 #!  SingleNestParamSet
@@ -1864,12 +1607,6 @@ end
 
 
 getParamSector(source::FlatParamSet, ::Type{<:ElementalParam}) = 
-( first(source), ChainPointer(FirstIndex()) )
-
-getParamSector(source::MiscParamSet, ::Type{<:ElementalParam}) = 
-( (first∘first)(source), ChainPointer(FirstIndex(), ChainPointer(FirstIndex())) )
-
-getParamSector(source::MiscParamSet, ::Type{<:FlattenedParam}) = 
 ( first(source), ChainPointer(FirstIndex()) )
 
 getParamSector(source::AbstractVector, ::Type{<:ParamBox}) = 

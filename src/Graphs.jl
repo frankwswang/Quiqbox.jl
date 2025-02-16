@@ -95,17 +95,17 @@ const BuildNodeSourceNum{T, A} =
 
 getBuildNodeSourceNum(::BuildNodeSourceNum{<:Any, A}) where {A} = A
 
-struct IndexNode{T, N, I<:BuildNode{T, N}} <: ReferenceNode{T, N, 0, I}
-    source::I
-    index::Int
-    marker::Symbol
-    id::UInt
+# struct IndexNode{T, N, I<:BuildNode{T, N}} <: ReferenceNode{T, N, 0, I}
+#     source::I
+#     index::Int
+#     marker::Symbol
+#     id::UInt
 
-    function IndexNode(node::I, p::KnotParam{T, <:Any, <:Any, N, O}) where 
-                      {T, N, O, I<:BuildNode{T, N, O}}
-        new{T, N, I}(node, p.index, getParSym(p), objectid(p))
-    end
-end
+#     function IndexNode(node::I, p::KnotParam{T, <:Any, <:Any, N, O}) where 
+#                       {T, N, O, I<:BuildNode{T, N, O}}
+#         new{T, N, I}(node, p.index, getParSym(p), objectid(p))
+#     end
+# end
 
 
 genGraphNodeCore(p::PrimitiveParam) = ValueNode(p)
@@ -121,9 +121,9 @@ genGraphNodeCore(::Type{T}, p::CellParam{T}) where {T} = ValueNode(p)
 genGraphNodeCore(val::Memory{<:DimSGNode{T, N}}, p::ParamGrid{T, N}) where {T, N} = 
 BatchNode(ShapedMemory(val, p.input.shape), p)
 
-genGraphNodeCore(val::Memory{<:GraphNode{T, N, O}}, 
-                 p::KnotParam{T, <:Any, <:Any, N, O}) where {T, N, O} = 
-IndexNode(getindex(val), p)
+# genGraphNodeCore(val::Memory{<:GraphNode{T, N, O}}, 
+#                  p::KnotParam{T, <:Any, <:Any, N, O}) where {T, N, O} = 
+# IndexNode(getindex(val), p)
 
 const ComputeNodeDict{T} = ParamPointerBox{ T, Dim0GNode{T}, DimSGNode{T}, 
                                              GraphNode{T}, typeof(genGraphNodeCore) }
@@ -149,9 +149,9 @@ function evaluateNode(gn::BuildNode{T}) where {T}
     gn.operator( map(evaluateNode, gn.source)... ) |> gn.shifter
 end
 
-function evaluateNode(gn::IndexNode{T}) where {T}
-    getindex(evaluateNode(gn.source), gn.index)
-end
+# function evaluateNode(gn::IndexNode{T}) where {T}
+#     getindex(evaluateNode(gn.source), gn.index)
+# end
 
 struct TemporaryStorage{T} <: QueryBox{Union{Tuple{T, Int}, Tuple{AbstractArray{T}, Int}}}
     d0::IdDict{UInt, Tuple{T, Int}}
@@ -254,15 +254,15 @@ function compressBuildNodeCore!(::Val{3}, tStorage::TemporaryStorage{T},
     end
 end
 
-function compressNodeCore!(tStorage::TemporaryStorage{T}, 
-                           paramSet::PrimParamVec{T}, node::IndexNode{T}) where {T}
-    f = compressNodeCore!(tStorage, paramSet, node.source)
-    let g=f, idx=node.index
-        function (storage::FixedSizeStorage{T}, input::AbtVecOfAbtArr{T})
-            getindex(g(storage, input), idx)
-        end
-    end
-end
+# function compressNodeCore!(tStorage::TemporaryStorage{T}, 
+#                            paramSet::PrimParamVec{T}, node::IndexNode{T}) where {T}
+#     f = compressNodeCore!(tStorage, paramSet, node.source)
+#     let g=f, idx=node.index
+#         function (storage::FixedSizeStorage{T}, input::AbtVecOfAbtArr{T})
+#             getindex(g(storage, input), idx)
+#         end
+#     end
+# end
 
 
 #? Unify the format of CompressedNode with other ParamFunc: FrameworkOrb
