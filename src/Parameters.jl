@@ -69,6 +69,10 @@ struct ShapedMemory{T, N} <: AbstractMemory{T, N}
         checkReshapingAxis(shape)
         new{T, N}(Memory{T}(undef, prod(shape)), shape)
     end
+
+    function ShapedMemory(arr::ShapedMemory{T, N}) where {T, N}
+        new{T, N}(arr.value, arr.shape)
+    end
 end
 
 ShapedMemory(value::AbstractArray{T}, shape::Tuple{Vararg{Int}}=size(value)) where {T} = 
@@ -77,8 +81,6 @@ ShapedMemory(getMemory(value), shape)
 ShapedMemory(::Type{T}, value::AbstractArray{T}) where {T} = ShapedMemory(value)
 
 ShapedMemory(::Type{T}, value::T) where {T} = ShapedMemory( fill(value) )
-
-ShapedMemory(arr::ShapedMemory) = ShapedMemory(arr.value, arr.shape)
 
 getMemory(arr::ShapedMemory) = arr.value
 
@@ -112,6 +114,19 @@ end
 similar(arr::ShapedMemory{T}, shape::Tuple{Vararg{Int}}) where {T} = 
 similar(arr, T, shape)
 
+
+function binaryApply(op::F, arr1::ShapedMemory{T1}, arr2::ShapedMemory{T2}) where 
+                 {F<:Function, T1, T2}
+    if arr1.shape != arr2.shape
+        throw(DimensionMismatch("`arr1` has size $(arr1.shape); "*
+                                "`arr2` has size $(arr2.shape)."))
+    end
+    val = Memory{promote_type(T1, T2)}(op(arr1.value, arr2.value))
+    ShapedMemory(val, arr1.shape)
+end
+
++(arr1::ShapedMemory, arr2::ShapedMemory) = binaryApply(+, arr1, arr2)
+-(arr1::ShapedMemory, arr2::ShapedMemory) = binaryApply(-, arr1, arr2)
 
 viewElements(obj::ShapedMemory) = reshape(obj.value, obj.shape)
 viewElements(obj::AbstractArray) = itself(obj)
