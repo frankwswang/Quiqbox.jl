@@ -27,31 +27,37 @@ end
 struct TruncateReshape{N}
     shape::NTuple{N, Int}
     mark::NTuple{N, Symbol}
-    truncate::Bool
+    truncate::TernaryNumber # 0: off, 1: keep leading entires, 2: keep trailing entires
 
     function TruncateReshape(shape::NonEmptyTuple{Int, N}, 
                              mark::NonEmptyTuple{Symbol, N}=ntuple( _->:e, Val(N+1) ); 
-                             truncate::Bool=false) where 
-                            {N}
+                             truncate::Union{Bool, TernaryNumber}=false) where {N}
         checkReshapingAxis(shape)
-        new{N+1}(shape, mark, truncate)
+        new{N+1}(shape, mark, TernaryNumber(truncate|>Int))
     end
 
     function TruncateReshape(refArr::AbstractArray{T, N}, 
                              mark::NTuple{N, Symbol}=ntuple( _->:e, Val(N) ); 
-                             truncate::Bool=false) where {T, N}
+                             truncate::Union{Bool, TernaryNumber}=false) where {T, N}
         N==0 && throw(AssertionError("The dimension of `refArr` should be at least one."))
-        new{N}(size(refArr), mark, truncate)
+        new{N}(size(refArr), mark, TernaryNumber(truncate|>Int))
     end
 
-    TruncateReshape(f::TruncateReshape{N}; truncate::Bool=f.truncate) where {N} = 
-    new{N}(f.shape, f.mark, truncate)
+    TruncateReshape(f::TruncateReshape{N}; 
+                    truncate::Union{Bool, TernaryNumber}=f.truncate) where {N} = 
+    new{N}(f.shape, f.mark, TernaryNumber(truncate|>Int))
 end
 
 function (f::TruncateReshape{N})(arr::AbstractArray) where {N}
-    iFirst = firstindex(arr)
     extent = prod(f.shape)
-    v = f.truncate ? arr[iFirst:iFirst+extent-1] : arr
+    truncate = Int(f.truncate)
+    v = if truncate == 0
+        arr
+    elseif truncate == 1
+        arr[begin:begin+extent-1]
+    else
+        arr[end-extent+1:end]
+    end
     reshape(v, f.shape)
 end
 
@@ -205,8 +211,9 @@ struct StableMorphism{T, F<:Function, N} <: DualSpanFunction{T, N, 0}
 
     function StableMorphism(f::ReturnTyped{<:AbstractArray{T}, F}, arg, args...; 
                             axis::MissingOr{TruncateReshape}=missing, 
-                            truncate::Bool=(ismissing(axis) ? false : axis.truncate)
-                            ) where {T, F<:Function}
+                            truncate::Union{Bool, TernaryNumber}=
+                            (ismissing(axis) ? false : axis.truncate)) where 
+                           {T, F<:Function}
         allArgs = (arg, args...)
         val = checkReturnType(f.f, AbstractArray{T}, allArgs)
         N = ndims(val)
