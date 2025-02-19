@@ -25,15 +25,15 @@ function checkReshapingAxis(arr::AbstractArray, shape::Tuple{Vararg{Int}})
 end
 
 struct TruncateReshape{N}
-    shape::NTuple{N, Int}
+    axis::NTuple{N, Int}
     mark::NTuple{N, Symbol}
     truncate::TernaryNumber # 0: off, 1: keep leading entires, 2: keep trailing entires
 
-    function TruncateReshape(shape::NonEmptyTuple{Int, N}, 
+    function TruncateReshape(axis::NonEmptyTuple{Int, N}, 
                              mark::NonEmptyTuple{Symbol, N}=ntuple( _->:e, Val(N+1) ); 
                              truncate::Union{Bool, TernaryNumber}=false) where {N}
-        checkReshapingAxis(shape)
-        new{N+1}(shape, mark, TernaryNumber(truncate|>Int))
+        checkReshapingAxis(axis)
+        new{N+1}(axis, mark, TernaryNumber(truncate|>Int))
     end
 
     function TruncateReshape(refArr::AbstractArray{T, N}, 
@@ -45,11 +45,11 @@ struct TruncateReshape{N}
 
     TruncateReshape(f::TruncateReshape{N}; 
                     truncate::Union{Bool, TernaryNumber}=f.truncate) where {N} = 
-    new{N}(f.shape, f.mark, TernaryNumber(truncate|>Int))
+    new{N}(f.axis, f.mark, TernaryNumber(truncate|>Int))
 end
 
 function (f::TruncateReshape{N})(arr::AbstractArray) where {N}
-    extent = prod(f.shape)
+    extent = prod(f.axis)
     truncate = Int(f.truncate)
     v = if truncate == 0
         arr
@@ -58,7 +58,7 @@ function (f::TruncateReshape{N})(arr::AbstractArray) where {N}
     else
         arr[end-extent+1:end]
     end
-    reshape(v, f.shape)
+    reshape(v, f.axis)
 end
 
 

@@ -57,9 +57,11 @@ end
 (f::StableBinary{T, F})(argL::T, argR::T) where {T, F} = convert(T, f.f(argL, argR))
 
 const StableAdd{T} = StableBinary{T, typeof(+)}
+const StableSub{T} = StableBinary{T, typeof(-)}
 const StableMul{T} = StableBinary{T, typeof(*)}
 
 StableAdd(::Type{T}) where {T} = StableBinary(+, T)
+StableSub(::Type{T}) where {T} = StableBinary(-, T)
 StableMul(::Type{T}) where {T} = StableBinary(*, T)
 
 
