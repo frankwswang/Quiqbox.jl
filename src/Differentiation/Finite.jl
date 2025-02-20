@@ -2,7 +2,7 @@
 ## [DOI] 10.1090/S0025-5718-1988-0935077-0
 
 function computeFiniteDiffWeightsCore(order::Int, dis::AbstractVector{T}) where {T<:Real}
-    checkPositivity(order+1)
+    checkPositivity(order, true)
     nGrid = length(dis)
     if order >= nGrid
         throw("The order of the derivative (order=$order) must be less than the number "*
@@ -64,7 +64,7 @@ end
 struct SymmetricIntRange{N} <: ConfigBox
 
     function SymmetricIntRange(::Val{N}) where {N}
-        checkPositivity(N::Int+1)
+        checkPositivity(N::Int, true)
         new{N}()
     end
 end

@@ -33,7 +33,8 @@ function checkLength(obj, name::Symbol, len::Int, lenName::Union{Missing, String
     checkLengthCore(length(obj), name, len, lenName)
 end
 
-function checkPositivity(num::Real)
-    num > 0 || throw(AssertionError("`num` should be positive."))
+function checkPositivity(num::Real, allowZero::Bool=false)
+    subStr = ifelse(allowZero, "non-negative", "positive")
+    (num + Int(allowZero)) > 0 || throw(AssertionError("`num` should be $subStr."))
     nothing
 end
