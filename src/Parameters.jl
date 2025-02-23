@@ -555,7 +555,7 @@ end
 function indexParam(pb::FlattenedParam{T}, idx::Int, 
                     sym::MissingOr{Symbol}=missing) where {T}
     ismissing(sym) && (sym = Symbol(:_, pb.symbol.name))
-    CellParam((Retrieve∘ChainPointer)(idx, TensorType(T)), pb, sym)
+    CellParam((Retrieve∘ChainPointer)(idx), pb, sym)
 end
 
 function indexParam(pb::ElementalParam, idx::Int, sym::MissingOr{Symbol}=missing)
@@ -571,8 +571,7 @@ end
 function indexParam(pb::ParamBox{T, N}, idx::Int, 
                     sym::MissingOr{Symbol}=missing) where {T, N}
     ismissing(sym) && (sym = Symbol(:_, pb.symbol.name))
-    type = TensorType(AbstractArray{T, N}, outputSizeOf(pb))
-    GridParam((Retrieve∘ChainPointer)(idx, type), pb, sym)
+    GridParam((Retrieve∘ChainPointer)(idx), pb, sym)
 end
 
 
@@ -1172,7 +1171,7 @@ end
 
 function getFieldParams(source::T) where {T}
     paramPairs = Tuple{ParamBox, ChainPointer}[]
-    getFieldParamsCore!(paramPairs, source, (ChainPointer∘TensorType)(T))
+    getFieldParamsCore!(paramPairs, source, ChainPointer())
     first.(paramPairs), last.(paramPairs)
 end
 
@@ -1199,8 +1198,7 @@ function getFieldParamsCore!(paramPairs::Vector{Tuple{ParamBox, ChainPointer}},
     if searchParam
         for fieldSym in content
             field = getField(source, fieldSym)
-            outputValConstraint = field isa ParamBox ? TensorType(field) : TensorType()
-            anchorNew = ChainPointer(anchor, ChainPointer(fieldSym, outputValConstraint))
+            anchorNew = ChainPointer(anchor, fieldSym)
             getFieldParamsCore!(paramPairs, field, anchorNew)
         end
     end
@@ -1493,31 +1491,30 @@ initializeParamSet(::TypedParamFunc{T}) where {T} = initializeParamSet(FlatParam
 
 #!  SingleNestParamSet
 #!  DoubleNestParamSet
-const FlatPSetInnerPtr{T} = PointPointer{T, 2, Tuple{FirstIndex, Int}}
-const FlatPSetOuterPtr{T} = IndexPointer{Volume{T}, 1}
-const FlatParamSetIdxPtr{T} = Union{FlatPSetInnerPtr{T}, FlatPSetOuterPtr{T}}
+const FlatPSetInnerPtr = ChainIndexer{2, Tuple{FirstIndex, Int}}
+const FlatPSetOuterPtr = ChainIntIdxr{1}
+const FlatParamSetIdxPtr = Union{FlatPSetInnerPtr, FlatPSetOuterPtr}
 
-struct FlatParamSetFilter{T} <: PointerStack{1, 2}
-    d0::ShapedMemory{FlatPSetInnerPtr{T}, 1}
-    d1::Memory{FlatPSetOuterPtr{T}}
+struct FlatParamSetFilter <: PointerStack{1, 2}
+    d0::ShapedMemory{FlatPSetInnerPtr, 1}
+    d1::Memory{FlatPSetOuterPtr}
 end
 
-function FlatParamSetFilter(d0::AbstractVector{FlatPSetInnerPtr{T}}, 
-                            d1::AbstractVector{FlatPSetOuterPtr{T}}) where {T}
+function FlatParamSetFilter(d0::AbstractVector{FlatPSetInnerPtr}, 
+                            d1::AbstractVector{FlatPSetOuterPtr})
     d0 isa ShapedMemory || (d0 = ShapedMemory(d0))
     d1 isa Memory || (d1 = getMemory(d1))
     FlatParamSetFilter(d0, d1)
 end
 
-const FilteredFlatParamSet{T, N} = 
-      FilteredObject{<:TypedFlatParamSet{T}, FlatParamSetFilter{T}}
+const FilteredFlatParamSet{T} = FilteredObject{<:TypedFlatParamSet{T}, FlatParamSetFilter}
 
 const TypedParamInput{T} = Union{TypedFlatParamSet{T}, FilteredFlatParamSet{T}}
 
 function FlatParamSetFilter(pSet::FlatParamSet{T}, d0Ids::AbstractVector{Int}, 
                             d1Ids::AbstractVector{Int}) where {T}
-    d0Ptr = map(d0Idx->ChainPointer((FirstIndex, d0Idx), TensorType(T)), d0Ids)
-    d1Ptr = map(d1Idx->ChainPointer((d1Idx+1,), TensorType(pSet.d1[d1Idx])), d1Ids)
+    d0Ptr = map(d0Idx->ChainPointer((FirstIndex, d0Idx)), d0Ids)
+    d1Ptr = map(d1Idx->ChainPointer(d1Idx+1), d1Ids)
     FlatParamSetFilter(d0Ptr, d1Ptr)
 end
 
@@ -1551,7 +1548,7 @@ getproperty(fps::FlatParamSetFilter, field::Symbol) = getfield(fps, field)
 
 struct FlatParamSubset{T, P1<:ElementalParam{<:T}, P2<:FlattenedParam{<:T}
                        } <: AbstractFlatParamSet{T, ShapedMemory{P1, 1}, P2}
-    core::FilteredObject{FlatParamSet{T, P1, P2}, FlatParamSetFilter{T}}
+    core::FilteredObject{FlatParamSet{T, P1, P2}, FlatParamSetFilter}
 end
 
 const GeneralFlatParamSet{T, P1, P2} = 
@@ -1636,10 +1633,9 @@ getParamSector(source::AbstractVector, ::Type{<:ParamBox}) =
 
 
 function locateParam!(paramSet::AbstractVector, target::P) where {P<:ParamBox}
-    returnType = TensorType(target)
     if isempty(paramSet)
         pushParam!(paramSet, target)
-        ChainPointer(firstindex(paramSet), returnType)
+        ChainPointer(firstindex(paramSet))
     else
         paramSector, anchor = getParamSector(paramSet, P)
         idx = findfirst(x->compareObj(x, target), paramSector)
@@ -1647,12 +1643,12 @@ function locateParam!(paramSet::AbstractVector, target::P) where {P<:ParamBox}
             pushParam!(paramSector, target)
             idx = length(paramSector)
         end
-        ChainPointer(anchor, ChainPointer(idx, returnType))
+        ChainPointer(anchor, idx)
     end
 end
 
 function locateParam!(paramSet::AbstractVector, target::AbstractArray{<:ParamBox{T}, N}; 
-                      emptyReturnEltype::Type{<:TypedPointer{T}}=TypedPointer{T}) where 
+                      emptyReturnEltype::Type{<:ChainPointer}=ChainPointer) where 
                      {T, N}
     if isempty(target)
         Array{emptyReturnEltype}(undef, ntuple(_->0, Val(N)))
@@ -1670,13 +1666,13 @@ locateParam!(paramSet, values(target))
 
 function locateParam!(paramSet::FlatParamSet{T}, target::FlatParamSet{T}) where {T}
     d0ptrs, d1ptrs = map( fieldnames(FlatParamSet), 
-                          (FlatPSetInnerPtr{T}, FlatPSetOuterPtr{T}) ) do n, t
+                          (FlatPSetInnerPtr, FlatPSetOuterPtr) ) do n, t
         locateParam!(getfield(paramSet, n), getfield(target, n), emptyReturnEltype=t)
     end
     d0ptrs = ChainPointer.(Ref(FirstIndex()), d0ptrs)
     if !isempty(d1ptrs)
         offset = 2 - firstindex(paramSet.d1)
-        d1ptrs = map(x->ChainPointer(x.chain .+ offset, x.type), d1ptrs)
+        d1ptrs = map(x->ChainPointer(x.chain .+ offset), d1ptrs)
     end
     FlatParamSetFilter(d0ptrs, d1ptrs)
 end
@@ -1769,24 +1765,24 @@ unpackParamFunc!(f, paramSet)
 unpackFunc!(::GenericFunction, f::Function, paramSet::AbstractVector) = 
 unpackTypedFunc!(f, paramSet)
 
-const FieldPtrPair{T} = Pair{<:ChainPointer, <:FlatParamSetIdxPtr{T}}
-const FieldPtrPairs{T} = AbstractVector{<:FieldPtrPair{T}}
-const FieldPtrDict{T} = AbstractDict{<:ChainPointer, <:FlatParamSetIdxPtr{T}}
-const EmptyFieldPtrDict{T} = TypedEmptyDict{Union{}, FlatPSetInnerPtr{T}}
-const FiniteFieldPtrDict{T, N} = FiniteDict{N, <:ChainPointer, <:FlatParamSetIdxPtr{T}}
+const FieldPtrPair = Pair{<:ChainPointer, <:FlatParamSetIdxPtr}
+const FieldPtrPairs = AbstractVector{<:FieldPtrPair}
+const FieldPtrDict = AbstractDict{<:ChainPointer, <:FlatParamSetIdxPtr}
+const EmptyFieldPtrDict = TypedEmptyDict{Union{}, FlatPSetInnerPtr}
+const FiniteFieldPtrDict{N} = FiniteDict{N, <:ChainPointer, <:FlatParamSetIdxPtr}
 
-const FieldValDict{T} = AbstractDict{<:FlatParamSetIdxPtr{T}, <:Union{T, AbstractArray{T}}}
+const FieldValDict{T} = AbstractDict{<:FlatParamSetIdxPtr, <:Union{T, AbstractArray{T}}}
 const ParamValOrDict{T} = Union{AbtVecOfAbtArr{T}, FieldValDict{T}}
 
 abstract type FieldParamPointer{R} <: Any end
 
-struct MixedFieldParamPointer{T, R<:FieldPtrDict{T}} <: FieldParamPointer{R}
+struct MixedFieldParamPointer{R<:FieldPtrDict} <: FieldParamPointer{R}
     core::R
     tag::Identifier
 end
 
-function MixedFieldParamPointer(paramPairs::FieldPtrPairs{T}, tag::Identifier) where {T}
-    coreDict = buildDict(paramPairs, EmptyFieldPtrDict{T})
+function MixedFieldParamPointer(paramPairs::FieldPtrPairs, tag::Identifier)
+    coreDict = buildDict(paramPairs, EmptyFieldPtrDict)
     MixedFieldParamPointer(coreDict, tag)
 end
 
@@ -1800,7 +1796,7 @@ unpackTypedFunc!(ReturnTyped(f, Any), paramSet, paramSetId)
 function unpackTypedFuncCore!(f::ReturnTyped{T}, paramSet::AbstractVector) where {T}
     params, anchors = getFieldParams(f)
     if isempty(params)
-        ParamSelectFunc(f), paramSet, FieldPtrPair{T}[]
+        ParamSelectFunc(f), paramSet, FieldPtrPair[]
     else
         ids = locateParam!(paramSet, params)
         fDummy = deepcopy(f.f)
@@ -1820,7 +1816,7 @@ end
 function unpackTypedFunc!(f::ReturnTyped{T}, paramSet::AbstractVector, 
                           paramSetId::Identifier=Identifier(paramSet)) where {T}
     fCore, _, paramPairs = unpackTypedFuncCore!(f, paramSet)
-    ptrDict = buildDict(paramPairs, EmptyFieldPtrDict{T})
+    ptrDict = buildDict(paramPairs, EmptyFieldPtrDict)
     paramPtr = MixedFieldParamPointer(ptrDict, paramSetId)
     fCore, paramSet, paramPtr
 end

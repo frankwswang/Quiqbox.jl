@@ -53,11 +53,11 @@ function (f::ComputeGFunc{T})(r::Real, xpnVal::T) where {T}
 end
 
 struct EvalGaussFunc{T} <: EvalFieldAmp{T, 0, GaussFunc}
-    f::GetParamFunc{ComputeGFunc{T}, FlatPSetInnerPtr{T}}
+    f::GetParamFunc{ComputeGFunc{T}, FlatPSetInnerPtr}
 end
 
 function unpackParamFuncCore!(f::GaussFunc{T, P}, paramSet::FlatParamSet) where {T, P}
-    anchor = ChainPointer(:xpn, TensorType(T))
+    anchor = ChainPointer(:xpn)
     parIdx = locateParam!(paramSet, getField(f, anchor))
     fEvalCore = ParamSelectFunc(ComputeGFunc{T}(), (parIdx,))
     EvalGaussFunc(fEvalCore), paramSet, [anchor=>parIdx]
@@ -80,7 +80,7 @@ function AxialProdFunc(b::FieldAmplitude{<:Any, 0}, dim::Int)
 end
 
 struct EvalAxialProdFunc{T, D, F<:EvalFieldAmp{T, 0}} <: EvalFieldAmp{T, D, AxialProdFunc}
-    f::CountedChainReduce{StableMul{T}, InsertInward{F, OnlyHead{ GetFlavor{T} }}, D}
+    f::CountedChainReduce{StableMul{T}, InsertInward{F, OnlyHead{GetIndex}}, D}
 end
 
 function unpackParamFuncCore!(f::AxialProdFunc{T, D}, paramSet::FlatParamSet) where {T, D}
@@ -88,7 +88,7 @@ function unpackParamFuncCore!(f::AxialProdFunc{T, D}, paramSet::FlatParamSet) wh
     pairs = mapfoldl(vcat, 1:D) do i
         anchor = ChainPointer((:axis, i))
         fInner, _, axialPairs = unpackParamFuncCore!(f.axis[i], paramSet)
-        ptr = ChainPointer(i, TensorType(T))
+        ptr = ChainPointer(i)
         fEvalComps[i] = InsertInward(fInner, (OnlyHead∘Retrieve)(ptr))
         map(x->(ChainPointer(anchor, x.first)=>x.second), axialPairs)
     end

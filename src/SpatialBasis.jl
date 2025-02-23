@@ -6,7 +6,7 @@ abstract type UnpackedOrb{T, D, B} <: OrbitalBasis{T, D, B} end
 
 abstract type EvalComposedOrb{T, D, B} <: EvalFieldFunction{T, D, B} end
 
-abstract type ComposedOrbParamPtr{T, D, R} <: FieldParamPointer{R} end
+abstract type ComposedOrbParamPtr{D, R} <: FieldParamPointer{R} end
 
 (f::OrbitalBasis)(x) = evalFunc(f, x)
 
@@ -20,17 +20,17 @@ end
 (f::NormalizePrimOrb{T})(params::FilteredVecOfArr{T}) where {T} = 
 (AbsSqrtInv∘f.core)(params)
 
-const GetParamSubset{T} = Retrieve{AwaitFilter{FlatParamSetFilter{T}}}
+const GetParamSubset = Retrieve{AwaitFilter{FlatParamSetFilter}}
 
 const VariedNormCore{T, D, N, F<:OrbitalIntegrator{T, D}} = 
-      ReturnTyped{T, EncodeApply{N, NTuple{N, GetParamSubset{T}}, F}}
+      ReturnTyped{T, EncodeApply{N, NTuple{N, GetParamSubset}, F}}
 
 const UnitScalarCore{T} = ReturnTyped{T, Unit{T}}
 
 struct NormalizeCompOrb{T, D, F1<:Union{UnitScalarCore{T}, VariedNormCore{T, D, 1}}, 
                         F2<:VariedNormCore{T, D, 2}} <: OrbitalNormalizer{T, D}
     core::HermitianContract{T, F1, F2}
-    weight::Memory{ReturnTyped{ T, Retrieve{IndexPointer{Flavor{T}, 2}} }}
+    weight::Memory{ReturnTyped{ T, Retrieve{ChainIntIdxr{2}} }}
 end
 
 function (f::NormalizeCompOrb{T})(input::FilteredVecOfArr{T}) where {T}
@@ -64,16 +64,15 @@ function unpackParamFunc!(f::ComposedOrb{T, D}, paramSet::FlatParamSet,
 end
 
 
-const ParamSubsetApply{F, T} = 
-      ParamFilterFunc{F, Tuple{ AwaitFilter{FlatParamSetFilter{T}} }}
+const ParamSubsetApply{F} = ParamFilterFunc{F, Tuple{ AwaitFilter{FlatParamSetFilter} }}
 
 struct ScaledOrbital{T, D, C<:EvalComposedOrb{T, D}, 
                      F<:EvalOrbNormalizer{T, D}} <: EvalComposedOrb{T, D, C}
-    f::ParamSubsetApply{PairCombine{StableMul{T}, C, OnlyBody{F}}, T}
+    f::ParamSubsetApply{PairCombine{ StableMul{T}, C, OnlyBody{F} }}
 end
 
 function ScaledOrbital(orb::EvalComposedOrb{T}, scalar::Function, 
-                       scope::FlatParamSetFilter{T}) where {T}
+                       scope::FlatParamSetFilter) where {T}
     fCoreLocal = PairCombine(StableMul(T), orb, scalar)
     fCore = ParamFilterFunc(fCoreLocal, AwaitFilter(scope))
     ScaledOrbital(fCore)
@@ -99,7 +98,7 @@ end
 
 PrimitiveOrb(ob::PrimitiveOrb) = itself(ob)
 
-const OrbShifter{T, D} = ParamSelectFunc{ShiftByArg{T, D}, NTuple{ D, FlatPSetInnerPtr{T} }}
+const OrbShifter{T, D} = ParamSelectFunc{ShiftByArg{T, D}, NTuple{ D, FlatPSetInnerPtr}}
 
 struct PrimitiveOrbCore{T, D, B<:EvalFieldAmp{T, D}} <: EvalComposedOrb{T, D, B}
     f::InsertInward{B, OrbShifter{T, D}}
@@ -120,25 +119,25 @@ const TypedPrimGTOcore{T, D, L} =
 const EvalPrimGTO{T, D, B<:EvalPolyGaussProd{T, D}, F<:EvalOrbNormalizer{T, D}} = 
       EvalPrimOrb{T, D, B, F}
 
-struct PrimOrbParamPtr{T, D, R<:FieldPtrDict{T}} <: ComposedOrbParamPtr{T, D, R}
-    center::NTuple{D, FlatPSetInnerPtr{T}}
-    body::MixedFieldParamPointer{T, R}
-    scope::FlatParamSetFilter{T}
+struct PrimOrbParamPtr{D, R<:FieldPtrDict} <: ComposedOrbParamPtr{D, R}
+    center::NTuple{D, FlatPSetInnerPtr}
+    body::MixedFieldParamPointer{R}
+    scope::FlatParamSetFilter
     tag::Identifier
 
-    function PrimOrbParamPtr(centerParamPtrs::NonEmptyTuple{FlatPSetInnerPtr{T}, D}, 
-                             bodyParamPairs::FieldPtrPairs{T}, 
-                             scope::FlatParamSetFilter{T}, 
-                             tag::Identifier=Identifier(missing)) where {T, D}
+    function PrimOrbParamPtr(centerParamPtrs::NonEmptyTuple{FlatPSetInnerPtr, D}, 
+                             bodyParamPairs::FieldPtrPairs, 
+                             scope::FlatParamSetFilter, 
+                             tag::Identifier=Identifier(missing)) where {D}
         bodyPtr = MixedFieldParamPointer(bodyParamPairs, tag)
-        new{T, D+1, typeof(bodyPtr.core)}(centerParamPtrs, bodyPtr, scope, tag)
+        new{D+1, typeof(bodyPtr.core)}(centerParamPtrs, bodyPtr, scope, tag)
     end
 
-    function PrimOrbParamPtr(ptr::PrimOrbParamPtr{T, D, R}, 
-                             parentScope::FlatParamSetFilter{T}, 
-                             tag::Identifier=ptr.tag) where {T, D, R<:FieldPtrDict{T}}
+    function PrimOrbParamPtr(ptr::PrimOrbParamPtr{D, R}, 
+                             parentScope::FlatParamSetFilter, 
+                             tag::Identifier=ptr.tag) where {D, R<:FieldPtrDict}
         newScope = getField(parentScope, ptr.scope)
-        new{T, D, R}(ptr.center, ptr.body, newScope, tag)
+        new{D, R}(ptr.center, ptr.body, newScope, tag)
     end
 end
 
@@ -232,7 +231,7 @@ end
 CompositeOrb(ob::CompositeOrb) = itself(ob)
 
 const WeightedPF{T, D, U<:EvalPrimOrb{T, D}} = 
-      PairCombine{StableMul{T}, U, OnlyBody{ Retrieve{IndexPointer{Flavor{T}, 2}} }}
+      PairCombine{StableMul{T}, U, OnlyBody{ Retrieve{ChainIntIdxr{2}} }}
 
 function compressWeightedPF(::Type{B}, ::Type{F}) where {T, D, B<:EvalFieldAmp{T, D}, F}
     boolF = isconcretetype(B)
@@ -274,18 +273,18 @@ function restrainEvalOrbType(weightedFs::AbstractVector{<:WeightedPF{T, D}}) whe
     ChainReduce(StableAdd(T), V(weightedFs))
 end
 
-struct CompOrbParamPtr{T, D, R<:FieldPtrDict{T}, 
-                       P<:PrimOrbParamPtr{T, D, <:R}} <: ComposedOrbParamPtr{T, D, R}
+struct CompOrbParamPtr{D, R<:FieldPtrDict, 
+                       P<:PrimOrbParamPtr{D, <:R}} <: ComposedOrbParamPtr{D, R}
     basis::Memory{P}
-    weight::IndexPointer{Volume{T}, 1}
-    scope::FlatParamSetFilter{T}
+    weight::ChainIntIdxr{1}
+    scope::FlatParamSetFilter
     tag::Identifier
 
     CompOrbParamPtr{R}(basis::Memory{P}, weight::ChainPointer, 
-                       scope::FlatParamSetFilter{T}, 
+                       scope::FlatParamSetFilter, 
                        tag::Identifier=Identifier(missing)) where 
-                      {T, D, R<:FieldPtrDict{T}, P<:PrimOrbParamPtr{T, D, <:R}} = 
-    new{T, D, R, P}(basis, weight, scope, tag)
+                      {D, R<:FieldPtrDict, P<:PrimOrbParamPtr{D, <:R}} = 
+    new{D, R, P}(basis, weight, scope, tag)
 end
 
 function unpackComposedOrbCore!(f::CompositeOrb{T, D}, paramSet::FlatParamSet, 
@@ -297,7 +296,7 @@ function unpackComposedOrbCore!(f::CompositeOrb{T, D}, paramSet::FlatParamSet,
     basisPtrs = map(f.basis) do b
         i += 1
         fInnerCore, _, basisPtr = unpackParamFunc!(b, pSetLocal, paramSetId)
-        getWeight = Retrieve(ChainPointer( weightPtr, ChainPointer(i, TensorType(T)) ))
+        getWeight = Retrieve(ChainPointer(weightPtr, i))
         weightedPrimOrb = PairCombine(StableMul(T), fInnerCore, OnlyBody(getWeight))
         push!(weightedFields, weightedPrimOrb)
         basisPtr

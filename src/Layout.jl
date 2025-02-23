@@ -56,39 +56,30 @@ struct FirstIndex <: StructuredType end
 const GeneralFieldName = Union{Int, Symbol, FirstIndex, Nothing}
 
 
-struct ChainPointer{A<:TensorType, L, C<:NTuple{L, GeneralFieldName}} <: EntryPointer
+struct ChainPointer{L, C<:NTuple{L, GeneralFieldName}} <: EntryPointer
     chain::C
-    type::A
 
-    ChainPointer(chain::C, type::A=TensorType()) where 
-                {A<:TensorType, L, C<:NTuple{L, GeneralFieldName}} = 
-    new{A, L, C}(chain, type)
+    ChainPointer(chain::C) where {L, C<:NTuple{L, GeneralFieldName}} = new{L, C}(chain)
 end
 
-const AllPassPointer{A<:TensorType} = ChainPointer{A, 0, Tuple{}}
+const AllPassPointer = ChainPointer{0, Tuple{}}
 
-const TypedPointer{T, A<:TensorType{T}} = ChainPointer{A}
+const ChainIntIdxr{L} = ChainPointer{L, NTuple{L, Int}}
 
-const IndexPointer{A<:TensorType, N} = ChainPointer{A, N, NTuple{N, Int}}
+const ChainIndexer{L, C<:NTuple{L, Union{Int, FirstIndex, Nothing}}} = ChainPointer{L, C}
 
-const PointPointer{T, L, C<:NTuple{L, GeneralFieldName}} = ChainPointer{Flavor{T}, L, C}
+ChainPointer() = ChainPointer(())
 
-const ArrayPointer{T, L, C<:NTuple{L, GeneralFieldName}} = ChainPointer{Volume{T}, L, C}
-
-const ChainIndexer{A<:TensorType, L, C<:NTuple{L, Union{Int, FirstIndex, Nothing}}} = 
-      ChainPointer{A, L, C}
-
-ChainPointer(sourceType::TensorType=TensorType()) = ChainPointer((), sourceType)
-
-ChainPointer(entry::GeneralFieldName, type::TensorType=TensorType()) = 
-ChainPointer((entry,), type)
+ChainPointer(entry::GeneralFieldName) = ChainPointer((entry,))
 
 ChainPointer(prev::ChainPointer, here::ChainPointer) = 
-ChainPointer((prev.chain..., here.chain...), here.type)
+ChainPointer((prev.chain..., here.chain...))
 
 ChainPointer(prev::GeneralFieldName, here::ChainPointer) = 
-ChainPointer((prev, here.chain...), here.type)
+ChainPointer((prev, here.chain...))
 
+ChainPointer(prev::ChainPointer, here::GeneralFieldName) = 
+ChainPointer((prev.chain..., here))
 
 struct AwaitFilter{P<:PointerStack} <: StaticPointer{P}
     ptr::P
