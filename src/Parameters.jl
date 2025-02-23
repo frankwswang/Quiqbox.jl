@@ -530,13 +530,13 @@ end
 ParamGrid(pl::ParamGrid, symbol::IndexedSym=pl.symbol) = ParamGrid(pl.input, symbol)
 
 
-function checkParamContainerArgType2(len::Int, extent::Int)
-    if len != extent
-        throw(DomainError(len, "The length of `memory` should match "*
-                               "`ml::FixedShapeLink`'s specification: $extent."))
-    end
-    nothing
-end
+# function checkParamContainerArgType2(len::Int, extent::Int)
+#     if len != extent
+#         throw(DomainError(len, "The length of `memory` should match "*
+#                                "`ml::FixedShapeLink`'s specification: $extent."))
+#     end
+#     nothing
+# end
 
 
 function indexParam(pb::ParamGrid{<:Any, N}, idx::Int, 
