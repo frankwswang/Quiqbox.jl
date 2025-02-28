@@ -12,6 +12,7 @@ include("Exception.jl")
 include("ParallelUtils.jl")
 
 include("Layout.jl")
+include("Arrays.jl")
 include("Mapping.jl")
 include("Parameters.jl")
 include("Graphs.jl")
