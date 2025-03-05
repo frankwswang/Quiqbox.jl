@@ -217,3 +217,6 @@ function recursiveCompareSize(arr1::AbstractArray, arr2::AbstractArray)
         false
     end
 end
+
+recursiveCompareSize(arr1::AbstractArray{<:Number}, arr2::AbstractArray{<:Number}) = 
+size(arr1) == size(arr2)
