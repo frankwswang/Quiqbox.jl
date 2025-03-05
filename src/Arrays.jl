@@ -199,3 +199,21 @@ iterate(arr::NestedMemory, state) = iterate(arr.value, state)
 length(arr::NestedMemory) = length(arr.value)
 
 axes(arr::NestedMemory)	= map(Base.OneTo, size(arr))
+
+
+recursiveCompareSize(::Any, ::Any) = true
+
+recursiveCompareSize(::AbstractArray, ::Any) = false
+
+recursiveCompareSize(::Any, ::AbstractArray) = false
+
+function recursiveCompareSize(arr1::AbstractArray, arr2::AbstractArray)
+    if size(arr1) == size(arr2)
+        for (ele1, ele2) in zip(arr1, arr2)
+            recursiveCompareSize(ele1, ele2) || (return false)
+        end
+        true
+    else
+        false
+    end
+end
