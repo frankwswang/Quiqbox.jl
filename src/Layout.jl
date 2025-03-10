@@ -1,28 +1,5 @@
 using LRUCache
 
-
-getMemory(arr::Memory) = itself(arr)
-
-function getMemory(arr::AbstractArray{T}) where {T}
-    eleT = if isconcretetype(T) || isempty(arr)
-        T
-    else
-        mapreduce(typejoin, arr, init=Union{}) do ele
-            typeof(ele)
-        end
-    end
-    Memory{eleT}(vec(arr))
-end
-
-function getMemory(obj::NonEmptyTuple{Any})
-    mem = Memory{eltype(obj)}(undef, length(obj))
-    mem .= obj
-    mem
-end
-
-getMemory(obj::Any) = getMemory((obj,))
-
-
 struct Flavor{T} <: StructuredType end
 
 struct Volume{T} <: StructuredType

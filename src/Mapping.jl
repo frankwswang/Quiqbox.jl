@@ -1,34 +1,3 @@
-struct VectorMemory{T, L} <: AbstractMemory{T, 1}
-    value::Memory{T}
-    shape::Val{L}
-
-    function VectorMemory(value::Memory{T}, ::Val{L}) where {T, L}
-        checkLength(value, :value, L)
-        new{T, L}(value, Val(L))
-    end
-end
-
-VectorMemory(input::AbstractArray) = VectorMemory(getMemory(input), Val(length(input)))
-
-VectorMemory(input::NonEmptyTuple{Any, L}) where {L} = 
-VectorMemory(getMemory(input), Val(L+1))
-
-VectorMemory(input::VectorMemory)  = itself(input)
-
-size(::VectorMemory{<:Any, L}) where {L} = (L,)
-
-getindex(arr::VectorMemory, i::Int) = getindex(arr.value, i)
-
-setindex!(arr::VectorMemory, val, i::Int) = setindex!(arr.value, val, i)
-
-iterate(arr::VectorMemory) = iterate(arr.value)
-iterate(arr::VectorMemory, state) = iterate(arr.value, state)
-
-length(::VectorMemory{<:Any, L}) where {L} = L
-
-const LinearMemory{T} = Union{Memory{T}, VectorMemory{T}}
-
-
 struct ReturnTyped{T, F<:Function} <: TypedEvaluator{T, F}
     f::F
 

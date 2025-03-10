@@ -1,4 +1,4 @@
-export ShapedMemory
+export VectorMemory, ShapedMemory
 
 struct NestedLevel{T}
     level::Int
@@ -81,6 +81,65 @@ function (f::TruncateReshape{N})(arr::AbstractArray) where {N}
     end
     reshape(v, f.axis)
 end
+
+
+getMemory(arr::Memory) = itself(arr)
+
+function getMemory(arr::AbstractArray{T}) where {T}
+    eleT = if isconcretetype(T) || isempty(arr)
+        T
+    else
+        mapreduce(typejoin, arr, init=Union{}) do ele
+            typeof(ele)
+        end
+    end
+    Memory{eleT}(vec(arr))
+end
+
+function getMemory(obj::NonEmptyTuple{Any})
+    mem = Memory{eltype(obj)}(undef, length(obj))
+    mem .= obj
+    mem
+end
+
+getMemory(obj::Any) = getMemory((obj,))
+
+
+struct VectorMemory{T, L} <: AbstractMemory{T, 1}
+    value::Memory{T}
+    shape::Val{L}
+
+    function VectorMemory(value::Memory{T}, ::Val{L}) where {T, L}
+        checkLength(value, :value, L)
+        new{T, L}(value, Val(L))
+    end
+
+    function VectorMemory{T}(::UndefInitializer, ::Val{L}) where {T, L}
+        new{T, L}(Memory{T}(undef, L), Val(L))
+    end
+
+    function VectorMemory(arr::VectorMemory{T, L}) where {T, L}
+        new{T, L}(arr.value, arr.shape)
+    end
+end
+
+VectorMemory(input::AbstractArray) = VectorMemory(getMemory(input), Val(length(input)))
+
+VectorMemory(input::NonEmptyTuple{Any, L}) where {L} = 
+VectorMemory(getMemory(input), Val(L+1))
+
+size(::VectorMemory{<:Any, L}) where {L} = (L,)
+
+getindex(arr::VectorMemory, i::Int) = getindex(arr.value, i)
+
+setindex!(arr::VectorMemory, val, i::Int) = setindex!(arr.value, val, i)
+
+iterate(arr::VectorMemory) = iterate(arr.value)
+iterate(arr::VectorMemory, state) = iterate(arr.value, state)
+
+length(::VectorMemory{<:Any, L}) where {L} = L
+
+const LinearMemory{T} = Union{Memory{T}, VectorMemory{T}}
 
 
 struct ShapedMemory{T, N} <: AbstractMemory{T, N}
