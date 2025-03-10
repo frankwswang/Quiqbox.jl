@@ -239,17 +239,43 @@ function (f::HermitianContract{T})(params::FilteredVecOfArr{T},
 end
 
 
-struct LeftPartial{F<:Function, A<:NonEmptyTuple{Any}} <: FunctionModifier
-    f::F
-    header::A
+struct Left end
 
-    function LeftPartial(f::F, arg, args...) where {F<:Function}
-        allArgs = (arg, args...)
-        new{F, typeof(allArgs)}(f, allArgs)
+struct Right end
+
+const Lateral = Union{Left, Right}
+
+
+struct LateralPartial{F<:Function, A<:NonEmptyTuple{Any}, L<:Lateral} <: FunctionModifier
+    f::F
+    arg::A
+    side::L
+
+    function LateralPartial(f::F, args::NonEmptyTuple{Any}, side::L) where 
+                           {F<:Function, L<:Lateral}
+        new{F, typeof(args), L}(f, args, side)
     end
 end
 
-(f::LeftPartial)(arg...) = f.f(f.header..., arg...)
+const LPartial{F<:Function, A<:NonEmptyTuple{Any}} = LateralPartial{F, A, Left }
+const RPartial{F<:Function, A<:NonEmptyTuple{Any}} = LateralPartial{F, A, Right}
 
+(f::LPartial)(arg...) = f.f(f.arg..., arg...)
+(f::RPartial)(arg...) = f.f(arg..., f.arg...)
+
+LPartial(f::Function, args::NonEmptyTuple{Any}) = LateralPartial(f, args, Left() )
+RPartial(f::Function, args::NonEmptyTuple{Any}) = LateralPartial(f, args, Right())
+
+
+struct KeywordPartial{F, A<:NonEmptyTuple{Pair{Symbol, Any}}} <: FunctionModifier
+    f::F
+    arg::A
+
+    function KeywordPartial(f::F, pairs::NonEmptyTuple{Pair{Symbol, Any}}) where {F<:Function}
+        new{F, typeof(pairs)}(f, pairs)
+    end
+end
+
+(f::KeywordPartial)(arg...) = f.f(arg...; f.arg...)
 
 const AbsSqrtInv = inv∘sqrt∘abs
