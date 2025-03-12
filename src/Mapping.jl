@@ -267,12 +267,12 @@ LPartial(f::Function, args::NonEmptyTuple{Any}) = LateralPartial(f, args, Left()
 RPartial(f::Function, args::NonEmptyTuple{Any}) = LateralPartial(f, args, Right())
 
 
-struct KeywordPartial{F, A<:NonEmptyTuple{Pair{Symbol, Any}}} <: FunctionModifier
+struct KeywordPartial{F, A<:NonEmptyTuple{Pair{Symbol, <:Any}}} <: FunctionModifier
     f::F
     arg::A
     replaceable::Bool
 
-    function KeywordPartial(f::F, pairs::NonEmptyTuple{Pair{Symbol, Any}}, 
+    function KeywordPartial(f::F, pairs::NonEmptyTuple{Pair{Symbol, <:Any}}, 
                             replaceable::Bool=true) where {F<:Function}
         new{F, typeof(pairs)}(f, pairs, replaceable)
     end
