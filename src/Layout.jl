@@ -88,7 +88,15 @@ getFieldCore(obj, ::Nothing) = getindex(obj)
 
 getFieldCore(obj, ::AllPassPointer) = itself(obj)
 
-getFieldCore(obj, ptr::ChainPointer) = foldl(getField, ptr.chain, init=obj)
+# The original method might cause wrong gradients for AD libraries that do not support 
+# differentiating through keyword arguments.
+# getFieldCore(obj, ptr::ChainPointer) = foldl(getField, ptr.chain, init=obj)
+function getFieldCore(obj, ptr::ChainPointer)
+    for i in ptr.chain
+        obj = getField(obj, i)
+    end
+    obj
+end
 
 const GeneralEntryPointer = Union{EntryPointer, GeneralFieldName}
 
