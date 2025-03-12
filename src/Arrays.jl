@@ -27,6 +27,18 @@ function getSpanType(l::NestedLevel)
     res
 end
 
+function getSpanType(::Type{<:AbstractArray{T, N}}) where {T, N}
+    innerT = getSpanType(T)
+    if isconcretetype(innerT)
+        AbstractArray{innerT, N}
+    else
+        AbstractArray{<:innerT, N}
+    end
+end
+
+getSpanType(::Type{T}) where {T} = T
+
+
 function checkReshapingAxis(shape::Tuple{Vararg{Int}})
     if any(i < 0 for i in shape)
         throw(AssertionError("All axis sizes should be non-negative."))
