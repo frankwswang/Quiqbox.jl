@@ -17,18 +17,24 @@ end
 
 getNestedLevel(::Type{T}) where {T} = NestedLevel(getNestedLevelCore(T, 0)...)
 
+
 getCoreType(::NestedLevel{T}) where {T} = T
 
-function getSpanType(l::NestedLevel)
+getCoreType(::Type{T}) where {T} = T
+
+getCoreType(::Type{E}) where {T, E<:AbstractArray{T}} = getCoreType(T)
+
+
+function getPackType(l::NestedLevel)
     res = getCoreType(l)
-    for _ in l.level
-        res = AbstractArray{<:res}
+    for _ in 1:l.level
+        res = ifelse(isconcretetype(res), AbstractArray{res}, AbstractArray{<:res})
     end
     res
 end
 
-function getSpanType(::Type{<:AbstractArray{T, N}}) where {T, N}
-    innerT = getSpanType(T)
+function getPackType(::Type{<:AbstractArray{T, N}}) where {T, N}
+    innerT = getPackType(T)
     if isconcretetype(innerT)
         AbstractArray{innerT, N}
     else
@@ -36,7 +42,17 @@ function getSpanType(::Type{<:AbstractArray{T, N}}) where {T, N}
     end
 end
 
-getSpanType(::Type{T}) where {T} = T
+getPackType(::Type{T}) where {T} = T
+
+
+#! Potentially useful in the future
+struct Point{T} <: AbstractMemory{T, 0}
+    value::T
+end
+
+function getNestedLevelCore(::Type{Point{T}}, level::Int) where {T}
+    (T, level)
+end
 
 
 function checkReshapingAxis(shape::Tuple{Vararg{Int}})
@@ -101,9 +117,7 @@ function getMemory(arr::AbstractArray{T}) where {T}
     eleT = if isconcretetype(T) || isempty(arr)
         T
     else
-        mapreduce(typejoin, arr, init=Union{}) do ele
-            typeof(ele)
-        end
+        mapreduce(typeof, typejoin, arr, init=Union{})
     end
     Memory{eleT}(vec(arr))
 end
