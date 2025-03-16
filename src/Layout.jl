@@ -454,6 +454,10 @@ function isPrimVarCollection(arg::Tuple)
 end
 
 
+function markObj(input::Type)
+    ValueMarker(input)
+end
+
 function markObj(input::Union{AbstractArray, Tuple})
     isPrimVarCollection(input) ? ValueMarker(input) : BlockMarker(input)
 end
