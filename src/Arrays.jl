@@ -232,16 +232,18 @@ viewElements(obj::AbstractArray) = itself(obj)
 
 abstract type AbstractNestedMemory{T, E, N} <: AbstractMemory{E, N} end
 
-struct NestedMemory{T, E<:Union{ShapedMemory{T}, AbstractNestedMemory{T}}, 
-                    N} <: AbstractNestedMemory{T, E, N}
-    value::ShapedMemory{E, N}
+const AbstractPack{T} = Union{T, AbstractNestedMemory{T}}
 
-    function NestedMemory(arr::AbstractArray{<:AbstractArray{T}, N}) where {T, N}
-        l = getNestedLevel(arr|>typeof)
+struct NestedMemory{T, E<:AbstractPack{T}, N} <: AbstractNestedMemory{T, E, N}
+    value::ShapedMemory{E, N}
+    level::NestedLevel{T}
+
+    function NestedMemory(arr::AbstractArray{E, N}) where {E, N}
+        level = getNestedLevel(arr|>typeof)
         value = map(arr) do ele
             getNestedMemory(ele)
         end |> ShapedMemory
-        new{getCoreType(l), eltype(value), N}(value)
+        new{getCoreType(level), eltype(value), N}(value, level)
     end
 end
 
@@ -249,10 +251,9 @@ getNestedMemory(obj::Any) = itself(obj)
 
 getNestedMemory(arr::NestedMemory) = itself(arr)
 
-getNestedMemory(arr::AbstractArray{T}) where {T} = ShapedMemory(arr)
+getNestedMemory(arr::AbstractArray) = NestedMemory(arr)
 
-getNestedMemory(arr::AbstractArray{<:AbstractArray{T}}) where {T} = NestedMemory(arr)
-
+const DirectMemory{T, N} = NestedMemory{T, T, N}
 
 size(arr::NestedMemory) = size(arr.value)
 
@@ -270,6 +271,19 @@ iterate(arr::NestedMemory, state) = iterate(arr.value, state)
 length(arr::NestedMemory) = length(arr.value)
 
 axes(arr::NestedMemory)	= map(Base.OneTo, size(arr))
+
+ShapedMemory(arr::NestedMemory) = arr.value
+
+
+getNestType(::Type{T}) where {T} = T
+
+getNestType(::Type{T}) where {T<:NestedMemory} = T
+
+function getNestType(::Type{<:AbstractArray{T, N}}) where {T, N}
+    coreT = getCoreType(T)
+    innerT = getNestType(T)
+    NestedMemory{coreT, innerT, N}
+end
 
 
 recursiveCompareSize(::Any, ::Any) = true
