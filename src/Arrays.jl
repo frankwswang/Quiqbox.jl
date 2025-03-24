@@ -292,13 +292,13 @@ axes(arr::PackedMemory)	= map(Base.OneTo, size(arr))
 ShapedMemory(arr::PackedMemory) = arr.value
 
 
-getPackType(::Type{T}) where {T} = T
+genPackMemoryType(::Type{T}) where {T} = T
 
-getPackType(::Type{T}) where {T<:PackedMemory} = T
+genPackMemoryType(::Type{T}) where {T<:PackedMemory} = T
 
-function getPackType(::Type{<:AbstractArray{T, N}}) where {T, N}
+function genPackMemoryType(::Type{<:AbstractArray{T, N}}) where {T, N}
     coreT = getCoreType(T)
-    innerT = getPackType(T)
+    innerT = genPackMemoryType(T)
     PackedMemory{coreT, innerT, N}
 end
 
