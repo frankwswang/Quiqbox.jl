@@ -244,59 +244,60 @@ viewElements(obj::ShapedMemory) = reshape(obj.value, obj.shape)
 viewElements(obj::AbstractArray) = itself(obj)
 
 
-abstract type AbstractNestedMemory{T, E, N} <: AbstractMemory{E, N} end
+abstract type AbstractPackedMemory{T, E, N} <: AbstractMemory{E, N} end
 
-const AbstractPack{T} = Union{T, AbstractNestedMemory{T}}
+const AbstractPack{T} = Union{T, AbstractPackedMemory{T}}
 
-struct NestedMemory{T, E<:AbstractPack{T}, N} <: AbstractNestedMemory{T, E, N}
+struct PackedMemory{T, E<:AbstractPack{T}, N} <: AbstractPackedMemory{T, E, N}
     value::ShapedMemory{E, N}
     level::NestedLevel{T}
 
-    function NestedMemory(arr::AbstractArray{E, N}) where {E, N}
+    function PackedMemory(arr::AbstractArray{E, N}) where {E, N}
         level = getNestedLevel(arr|>typeof)
         value = map(arr) do ele
-            getNestedMemory(ele)
+            getPackedMemory(ele)
         end |> ShapedMemory
         new{getCoreType(level), eltype(value), N}(value, level)
     end
 end
 
-getNestedMemory(obj::Any) = itself(obj)
+getPackedMemory(obj::Any) = itself(obj)
 
-getNestedMemory(arr::NestedMemory) = itself(arr)
+getPackedMemory(arr::PackedMemory) = itself(arr)
 
-getNestedMemory(arr::AbstractArray) = NestedMemory(arr)
+getPackedMemory(arr::AbstractArray) = PackedMemory(arr)
 
-const DirectMemory{T, N} = NestedMemory{T, T, N}
+const DirectMemory{T, N} = PackedMemory{T, T, N}
+const NestedMemory{T, E<:PackedMemory{T}, N} = PackedMemory{T, E, N}
 
-size(arr::NestedMemory) = size(arr.value)
+size(arr::PackedMemory) = size(arr.value)
 
-firstindex(arr::NestedMemory) = firstindex(arr.value)
+firstindex(arr::PackedMemory) = firstindex(arr.value)
 
-lastindex(arr::NestedMemory) = lastindex(arr.value)
+lastindex(arr::PackedMemory) = lastindex(arr.value)
 
-getindex(arr::NestedMemory, i::Vararg{Int}) = getindex(arr.value, i...)
+getindex(arr::PackedMemory, i::Vararg{Int}) = getindex(arr.value, i...)
 
-setindex!(arr::NestedMemory, val, i::Vararg{Int}) = setindex!(arr.value, val, i...)
+setindex!(arr::PackedMemory, val, i::Vararg{Int}) = setindex!(arr.value, val, i...)
 
-iterate(arr::NestedMemory) = iterate(arr.value)
-iterate(arr::NestedMemory, state) = iterate(arr.value, state)
+iterate(arr::PackedMemory) = iterate(arr.value)
+iterate(arr::PackedMemory, state) = iterate(arr.value, state)
 
-length(arr::NestedMemory) = length(arr.value)
+length(arr::PackedMemory) = length(arr.value)
 
-axes(arr::NestedMemory)	= map(Base.OneTo, size(arr))
+axes(arr::PackedMemory)	= map(Base.OneTo, size(arr))
 
-ShapedMemory(arr::NestedMemory) = arr.value
+ShapedMemory(arr::PackedMemory) = arr.value
 
 
 getNestType(::Type{T}) where {T} = T
 
-getNestType(::Type{T}) where {T<:NestedMemory} = T
+getNestType(::Type{T}) where {T<:PackedMemory} = T
 
 function getNestType(::Type{<:AbstractArray{T, N}}) where {T, N}
     coreT = getCoreType(T)
     innerT = getNestType(T)
-    NestedMemory{coreT, innerT, N}
+    PackedMemory{coreT, innerT, N}
 end
 
 
