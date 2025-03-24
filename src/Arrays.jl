@@ -25,13 +25,15 @@ getCoreType(::Type{T}) where {T} = T
 getCoreType(::Type{E}) where {T, E<:AbstractArray{T}} = getCoreType(T)
 
 
-function getPackType(l::NestedLevel)
-    res = getCoreType(l)
-    for _ in 1:l.level
+function getPackType(coreType::Type{T}, level::Int) where {T}
+    res = coreType
+    for _ in 1:level
         res = ifelse(isconcretetype(res), AbstractArray{res}, AbstractArray{<:res})
     end
     res
 end
+
+getPackType(l::NestedLevel{T}) where {T} = getPackType(T, l.level)
 
 function getPackType(::Type{<:AbstractArray{T, N}}) where {T, N}
     innerT = getPackType(T)
