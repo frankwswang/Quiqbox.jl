@@ -32,6 +32,11 @@ struct FirstIndex <: StructuredType end
 
 struct OneToIndex <: StructuredType
     idx::Int
+
+    function OneToIndex(idx::Int)
+        checkPositivity(idx)
+        new(idx)
+    end
 end
 
 getindex(obj, i::OneToIndex) = getindex(obj, firstindex(obj)+i.idx-1)
