@@ -30,7 +30,13 @@ Volume{AbstractArray{T, N}}(outputSizeOf(p))
 
 struct FirstIndex <: StructuredType end
 
-const GeneralFieldName = Union{Int, Symbol, FirstIndex, Nothing}
+struct OneToIndex <: StructuredType
+    idx::Int
+end
+
+getindex(obj, i::OneToIndex) = getindex(obj, firstindex(obj)+i.idx-1)
+
+const GeneralFieldName = Union{Int, Symbol, FirstIndex, OneToIndex, Nothing}
 
 
 struct ChainPointer{L, C<:NTuple{L, GeneralFieldName}} <: EntryPointer
