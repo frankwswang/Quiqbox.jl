@@ -725,7 +725,7 @@ struct ParamMarker{T} <: IdentityMarker{BoxCoreType{T, ParamBox}}
         data = if P <: PrimitiveParam
             Identifier(param.input)
         elseif switch && sl > 0
-            Identifier(param.offset)
+            Identifier(param)
         else
             checkParamCycle(param)
             markParamInput(param.input)
