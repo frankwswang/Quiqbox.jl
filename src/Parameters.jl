@@ -1,4 +1,4 @@
-export genTensorVar, genMeshParam, genHeapParam, genCellParam, compareParamBox, 
+export genTensorVar, genMeshParam, genHeapParam, genCellParam, compareParamBox, getParams, 
        classifyParams, setVal!, symOf, obtain, screenLevelOf, 
        setScreenLevel!, inputOf, setScreenLevel, sortParams!
 
@@ -773,7 +773,7 @@ function getParams(source)
     map(last, getFieldParams(source))
 end
 
-function getFieldParams(source::T) where {T}
+function getFieldParams(source)
     paramPairs = Pair{ChainedAccess, ParamBox}[]
     getFieldParamsCore!(paramPairs, source, ChainedAccess())
     paramPairs
@@ -883,7 +883,7 @@ function classifyParamsCore(pars::ParamBoxAbtArr)
         for pair in sector
             param = pair.first
             dest = ifelse(pair.second[], dest1, dest2)
-            if dest isa SpanParamVectorTuple
+            if dest isa TypedSpanParamSet
                 level = getNestedLevel(param|>typeof).level
                 container = ifelse(level==0, first, last)(dest)
                 push!(container, param)
@@ -941,31 +941,30 @@ UnitParamEncoder(T, symbol, TernaryNumber(screen))
 
 (f::UnitParamEncoder)(input::UnitParam) = itself(input)
 
-function (f::UnitParamEncoder)(input)
+function (f::UnitParamEncoder{T})(input) where {T}
     p = genCellParam(T(input), f.symbol)
     setScreenLevel!(p, Int(f.screen))
 end
 
 
-const AbstractSpanParamIndexSet{U<:AbstractVector{OneToIndex}, 
-                                G<:AbstractVector{OneToIndex}} = 
-      @NamedTuple{unit::U, grid::G}
+const AbstractSpanSet{U<:AbstractVector, G<:AbstractVector} = @NamedTuple{unit::U, grid::G}
 
-const SpanParamIndexSet = AbstractSpanParamIndexSet{Memory{OneToIndex}, Memory{OneToIndex}}
+const AbstractSpanValueSet{T, U<:AbstractVector{T}, G<:AbtVecOfAbtArr{T}} = 
+      AbstractSpanSet{U, G}
 
+const FixedSpanValueSet{T1, T2<:AbstractArray{T1}} = 
+      AbstractSpanValueSet{T1, Memory{T1}, Memory{T2}}
+
+const AbstractSpanIndexSet{U<:AbstractVector{OneToIndex}, G<:AbstractVector{OneToIndex}} = 
+      AbstractSpanSet{U, G}
+
+const FixedSpanIndexSet = AbstractSpanIndexSet{Memory{OneToIndex}, Memory{OneToIndex}}
 
 const AbstractSpanParamSet{U<:AbstractVector{<:UnitParam}, G<:AbstractVector{<:GridParam}} = 
-      @NamedTuple{unit::U, grid::G}
+      AbstractSpanSet{U, G}
 
-const SpanParamVectorTuple{T1<:UnitParam, T2<:GridParam} = 
+const TypedSpanParamSet{T1<:UnitParam, T2<:GridParam} = 
       AbstractSpanParamSet{Vector{T1}, Vector{T2}}
-
-const AbstractSpanValueSet{T, U<:AbstractVector{T}, 
-                              G<:AbstractVector{ <:AbstractArray{T} }} = 
-      @NamedTuple{unit::U, grid::G}
-
-const SpanValueMemoryTuple{T1, T2<:AbstractArray{T1}} = 
-      AbstractSpanParamSet{Memory{T1}, Memory{T2}}
 
 
 initializeSpanParamSet() = (unit=UnitParam[], grid=GridParam[])
@@ -976,7 +975,7 @@ initializeSpanParamSet(units::AbstractVector{<:UnitParam},
                        grids::AbstractVector{<:GridParam}) = (unit=units, grid=grids)
 
 
-function locateParam!(params::AbstractVector, target::ParamBox)
+function locateParamCore!(params::AbstractVector, target::ParamBox)
     if isempty(params)
         push!(params, target)
         OneToIndex(1)
@@ -987,15 +986,19 @@ function locateParam!(params::AbstractVector, target::ParamBox)
             idx = lastindex(params)
         end
         OneToIndex(idx - firstindex(params) + 1)
-    end |> ChainedAccess
+    end
+end
+
+function locateParam!(params::AbstractVector, target::ParamBox)
+    (ChainedAccess∘locateParamCore!)(params, target)
 end
 
 function locateParam!(paramSet::AbstractSpanParamSet, target::UnitParam)
-    GetIndex{UnitIndex}(locateParam!(paramSet.unit, target))
+    GetIndex{UnitIndex}(locateParamCore!(paramSet.unit, target))
 end
 
 function locateParam!(paramSet::AbstractSpanParamSet, target::GridParam)
-    GetIndex{GridIndex}(locateParam!(paramSet.grid, target))
+    GetIndex{GridIndex}(locateParamCore!(paramSet.grid, target))
 end
 
 const ParamBoxSource = Union{ParamBoxAbtArr, NonEmptyTuple{ParamBox}, AbstractSpanParamSet}
@@ -1006,6 +1009,13 @@ function locateParam!(params::Union{AbstractSpanParamSet, AbstractVector},
         locateParam!(params, param)
     end
 end
+
+function locateParam!(params::AbstractSpanParamSet, subset::AbstractSpanParamSet)
+    unit = map(x->locateParamCore!(params.unit, x), subset.unit)
+    grid = map(x->locateParamCore!(params.grid, x), subset.grid)
+    SpanSetFilter(unit, grid)
+end
+
 
 const MultiSpanData{T} = Union{T, DirectMemory{T}, NestedMemory{T}}
 
@@ -1068,29 +1078,28 @@ unpackFunc!(::GenericFunction, f::Function, paramSet::AbstractSpanParamSet) =
 unpackTypedFunc!(f, paramSet)
 
 
-struct SpanParamFilter <: Filter
-    scope::SpanParamIndexSet
+struct SpanSetFilter <: Filter
+    scope::FixedSpanIndexSet
 end
 
-function SpanParamFilter(scope::AbstractSpanParamIndexSet)
-    SpanParamFilter(map(getMemory, scope))
+function SpanSetFilter(scope::AbstractSpanIndexSet)
+    SpanSetFilter(map(getMemory, scope))
 end
 
-function SpanParamFilter(;unit::AbstractVector{OneToIndex}=OneToIndex[], 
-                          grid::AbstractVector{OneToIndex}=OneToIndex[])
-    SpanParamFilter((;unit, grid))
+function SpanSetFilter(unit::AbstractVector{OneToIndex}, grid::AbstractVector{OneToIndex})
+    SpanSetFilter((;unit, grid))
 end
 
-function getField(paramSet::AbstractSpanParamSet, f::SpanParamFilter)
+function getField(paramSet::AbstractSpanSet, f::SpanSetFilter)
     firstIds = map(firstindex, paramSet)
-    map(paramSet, firstIds, f.scope) do sector, i, ids
-        view(sector, (i - 1) .+ ids)
+    map(paramSet, firstIds, f.scope) do sector, i, oneToIds
+        view(sector, map(x->(x.idx + i - 1), oneToIds))
     end
 end
 
-const EmptyFieldPtrDict = TypedEmptyDict{Union{}, GetOneToIndex}
-const FieldParamPtrDict = AbstractDict{<:ChainedAccess, GetOneToIndex}
-const FieldParamPtrPairs = AbstractVector{<:Pair{<:ChainedAccess, GetOneToIndex}}
+
+const FieldParamPtrDict = AbstractDict{<:ChainedAccess, <:GetIndex}
+const FieldParamPtrPairs = AbstractVector{<:Pair{<:ChainedAccess, <:GetIndex}}
 
 abstract type FieldParamPointer{R} <: Any end
 
@@ -1100,7 +1109,7 @@ struct MixedFieldParamPointer{R<:FieldParamPtrDict} <: FieldParamPointer{R}
 end
 
 function MixedFieldParamPointer(paramPairs::FieldParamPtrPairs, tag::Identifier)
-    coreDict = buildDict(paramPairs, EmptyFieldPtrDict)
+    coreDict = buildDict(paramPairs)
     MixedFieldParamPointer(coreDict, tag)
 end
 
@@ -1164,7 +1173,7 @@ function unpackTypedFuncCore!(f::ReturnTyped{T},
         end
 
         fCore = GenericParamFunc(deepcopy(f.f), getMemory(unitPtrs), getMemory(gridPtrs))
-        f = ParamSelectFunc(ReturnTyped(fCore, T), SpanParamFilter(idTuple))
+        f = ParamSelectFunc(ReturnTyped(fCore, T), SpanSetFilter(idTuple))
         f, paramSet, ptrPairs
     end
 end
@@ -1172,7 +1181,7 @@ end
 function unpackTypedFunc!(f::ReturnTyped, paramSet::AbstractSpanParamSet, 
                           paramSetId::Identifier=Identifier(paramSet))
     fCore, _, paramPairs = unpackTypedFuncCore!(f, paramSet)
-    ptrDict = buildDict(paramPairs, EmptyFieldPtrDict)
+    ptrDict = buildDict(paramPairs)
     paramPtr = MixedFieldParamPointer(ptrDict, paramSetId)
     fCore, paramSet, paramPtr
 end
