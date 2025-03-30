@@ -10,11 +10,15 @@ struct OneToIndex <: StructuredInfo
     end
 end
 
+OneToIndex(idx::OneToIndex) =itself(idx)
+
+
 struct UnitIndex <: StructuredInfo
     idx::OneToIndex
 end
 
 UnitIndex(idx::Int) = UnitIndex(idx|>OneToIndex)
+
 
 struct GridIndex <: StructuredInfo
     idx::OneToIndex
@@ -22,14 +26,11 @@ end
 
 GridIndex(idx::Int) = GridIndex(idx|>OneToIndex)
 
+
 const SpanIndex = Union{UnitIndex, GridIndex}
-
-getField(obj, ptr::UnitIndex) = getField(obj.unit, ptr.idx)
-
-getField(obj, ptr::GridIndex) = getField(obj.grid, ptr.idx)
-
 const GeneralIndex = Union{Int, SpanIndex, OneToIndex}
 const GeneralField = Union{GeneralIndex, Symbol, Nothing}
+
 
 struct ChainedAccess{L, C<:NTuple{L, GeneralField}} <: Access
     chain::C
@@ -38,18 +39,13 @@ struct ChainedAccess{L, C<:NTuple{L, GeneralField}} <: Access
 end
 
 const Pass = ChainedAccess{0, Tuple{}}
-
 const GetIndex{T<:GeneralIndex} = ChainedAccess{1, Tuple{T}}
 const GetOneToIndex = GetIndex{OneToIndex}
 
-GetIndex{T}(idx::Int) where {T<:GeneralIndex} = ChainedAccess(idx|>T)
+GetIndex{T}(idx::Union{Int, OneToIndex}) where {T<:GeneralIndex} = ChainedAccess(idx|>T)
 
 const GetUnitEntry = ChainedAccess{2, Tuple{UnitIndex, OneToIndex}}
 const GetGridEntry = ChainedAccess{2, Tuple{GridIndex, OneToIndex}}
-
-# const ChainedIndexer{L} = ChainedAccess{L, NTuple{L, OneToIndex}}
-
-# const ChainIndexer{L, C<:NTuple{L, Union{Int, Nothing}}} = ChainedAccess{L, C}
 
 ChainedAccess() = ChainedAccess(())
 
@@ -73,6 +69,10 @@ getField(obj, entry::Symbol) = getfield(obj, entry)
 getField(obj, entry::Int) = getindex(obj, entry)
 
 getField(obj, i::OneToIndex) = getindex(obj, firstindex(obj)+i.idx-1)
+
+getField(obj, ptr::UnitIndex) = getField(obj.unit, ptr.idx)
+
+getField(obj, ptr::GridIndex) = getField(obj.grid, ptr.idx)
 
 # The original method might cause wrong gradients for AD libraries that do not support 
 # differentiating through keyword arguments.
