@@ -1,36 +1,7 @@
 using LRUCache
+using Base: issingletontype
 
-struct Flavor{T} <: StructuredType end
-
-struct Volume{T} <: StructuredType
-    axis::NonEmptyTuple{Int}
-
-    Volume{T}(axis::NonEmptyTuple{Int}) where {T} = new{T}(axis)
-end
-
-const TensorType{T} = Union{Flavor{T}, Volume{T}}
-
-TensorType(::Type{T}=Any) where {T} = Flavor{T}()
-
-TensorType(::Type{T}, axis::NonEmptyTuple{Int}) where {T} = Volume{T}(axis)
-
-TensorType(t::TensorType) = itself(t)
-
-TensorType(::AbstractArray{T, 0}) where {T} = Flavor{T}()
-
-TensorType(a::AbstractArray{T}) where {T} = Volume{T}(size(a))
-
-TensorType(::ElementalParam{T}) where {T} = Flavor{T}()
-
-TensorType(p::FlattenedParam{T}) where {T} = Volume{T}(outputSizeOf(p))
-
-TensorType(p::ParamBox{T, N}) where {T, N} = 
-Volume{AbstractArray{T, N}}(outputSizeOf(p))
-
-
-struct FirstIndex <: StructuredType end
-
-struct OneToIndex <: StructuredType
+struct OneToIndex <: StructuredInfo
     idx::Int
 
     function OneToIndex(idx::Int)
@@ -39,127 +10,137 @@ struct OneToIndex <: StructuredType
     end
 end
 
-getindex(obj, i::OneToIndex) = getindex(obj, firstindex(obj)+i.idx-1)
+struct UnitIndex <: StructuredInfo
+    idx::OneToIndex
+end
 
-const GeneralFieldName = Union{Int, Symbol, FirstIndex, OneToIndex, Nothing}
+UnitIndex(idx::Int) = UnitIndex(idx|>OneToIndex)
 
+struct GridIndex <: StructuredInfo
+    idx::OneToIndex
+end
 
-struct ChainPointer{L, C<:NTuple{L, GeneralFieldName}} <: EntryPointer
+GridIndex(idx::Int) = GridIndex(idx|>OneToIndex)
+
+const SpanIndex = Union{UnitIndex, GridIndex}
+
+getField(obj, ptr::UnitIndex) = getField(obj.unit, ptr.idx)
+
+getField(obj, ptr::GridIndex) = getField(obj.grid, ptr.idx)
+
+const GeneralIndex = Union{Int, SpanIndex, OneToIndex}
+const GeneralField = Union{GeneralIndex, Symbol, Nothing}
+
+struct ChainedAccess{L, C<:NTuple{L, GeneralField}} <: Access
     chain::C
 
-    ChainPointer(chain::C) where {L, C<:NTuple{L, GeneralFieldName}} = new{L, C}(chain)
+    ChainedAccess(chain::C) where {L, C<:NTuple{L, GeneralField}} = new{L, C}(chain)
 end
 
-const AllPassPointer = ChainPointer{0, Tuple{}}
+const Pass = ChainedAccess{0, Tuple{}}
 
-const ChainIntIdxr{L} = ChainPointer{L, NTuple{L, Int}}
+const GetIndex{T<:GeneralIndex} = ChainedAccess{1, Tuple{T}}
+const GetOneToIndex = GetIndex{OneToIndex}
 
-const ChainIndexer{L, C<:NTuple{L, Union{Int, FirstIndex, Nothing}}} = ChainPointer{L, C}
+GetIndex{T}(idx::Int) where {T<:GeneralIndex} = ChainedAccess(idx|>T)
 
-ChainPointer() = ChainPointer(())
+const GetUnitEntry = ChainedAccess{2, Tuple{UnitIndex, OneToIndex}}
+const GetGridEntry = ChainedAccess{2, Tuple{GridIndex, OneToIndex}}
 
-ChainPointer(entry::GeneralFieldName) = ChainPointer((entry,))
+# const ChainedIndexer{L} = ChainedAccess{L, NTuple{L, OneToIndex}}
 
-ChainPointer(prev::ChainPointer, here::ChainPointer) = 
-ChainPointer((prev.chain..., here.chain...))
+# const ChainIndexer{L, C<:NTuple{L, Union{Int, Nothing}}} = ChainedAccess{L, C}
 
-ChainPointer(prev::GeneralFieldName, here::ChainPointer) = 
-ChainPointer((prev, here.chain...))
+ChainedAccess() = ChainedAccess(())
 
-ChainPointer(prev::ChainPointer, here::GeneralFieldName) = 
-ChainPointer((prev.chain..., here))
+ChainedAccess(entry::GeneralField) = ChainedAccess((entry,))
 
-struct AwaitFilter{P<:PointerStack} <: StaticPointer{P}
-    ptr::P
-end
+ChainedAccess(prev::ChainedAccess, here::ChainedAccess) = 
+ChainedAccess((prev.chain..., here.chain...))
 
-AwaitFilter(ptr::AwaitFilter) = itself(ptr)
+ChainedAccess(prev::GeneralField, here::ChainedAccess) = 
+ChainedAccess((prev, here.chain...))
 
-struct FilteredObject{T, P<:PointerStack} <: ViewedObject{T, P}
-    obj::T
-    ptr::P
-end
+ChainedAccess(prev::ChainedAccess, here::GeneralField) = 
+ChainedAccess((prev.chain..., here))
 
-FilteredObject(obj::FilteredObject, ptr::PointerStack) = 
-FilteredObject(obj.obj, getField(obj.ptr, ptr))
+getField(obj, ::Nothing) = getindex(obj)
 
-FilteredObject(obj, ptr::AwaitFilter) = FilteredObject(obj, ptr.ptr)
+getField(obj, ::Pass) = itself(obj)
 
-const Filtered{T} = Union{T, FilteredObject{T}}
-const FilteredVecOfArr{T} = Filtered{<:AbtVecOfAbtArr{T}}
+getField(obj, entry::Symbol) = getfield(obj, entry)
 
+getField(obj, entry::Int) = getindex(obj, entry)
 
-getFieldCore(obj, entry::Int) = getindex(obj, entry)
-
-getFieldCore(obj, entry::Symbol) = getfield(obj, entry)
-
-getFieldCore(obj, ::FirstIndex) = first(obj)
-
-getFieldCore(obj, ::Nothing) = getindex(obj)
-
-getFieldCore(obj, ::AllPassPointer) = itself(obj)
+getField(obj, i::OneToIndex) = getindex(obj, firstindex(obj)+i.idx-1)
 
 # The original method might cause wrong gradients for AD libraries that do not support 
 # differentiating through keyword arguments.
-# getFieldCore(obj, ptr::ChainPointer) = foldl(getField, ptr.chain, init=obj)
-function getFieldCore(obj, ptr::ChainPointer)
-    for i in ptr.chain
+# getField(obj, acc::ChainedAccess) = foldl(getField, acc.chain, init=obj)
+function getField(obj, acc::ChainedAccess)
+    for i in acc.chain
         obj = getField(obj, i)
     end
     obj
 end
 
-const GeneralEntryPointer = Union{EntryPointer, GeneralFieldName}
+(f::Fetcher)(obj) = getField(obj, f)
 
-getField(obj, ptr::GeneralEntryPointer) = getFieldCore(obj, ptr)
+# getField(obj, ptr::GeneralEntryPointer) = getFieldCore(obj, ptr)
 
-getField(ptr::ChainPointer, idx::GeneralFieldName) = ChainPointer(ptr, ChainPointer(idx))
+# getField(ptr::ChainedAccess, idx::GeneralField) = ChainedAccess(ptr, ChainedAccess(idx))
 
-function getField(obj::FilteredObject, ptr::GeneralEntryPointer)
-    getField(obj.obj, getField(obj.ptr, ptr))
-end
+# getField(obj, pointer::ShapedAccessor) = pointer(obj)
 
-const InstantPtrCollection = Union{PointerStack, NonEmpTplOrAbtArr{ActivePointer}}
+# function getField(obj::FilteredObject, ptr::GeneralEntryPointer)
+#     getField(obj.obj, getField(obj.ptr, ptr))
+# end
 
-getField(obj, ptr::InstantPtrCollection) = evalField(itself, obj, ptr)
+#!! pack NonEmpTplOrAbtArr{ActivePointer} inside a struct
+# Array{ActivePointer} -> PointerStack
+# Tuple{Vararg{ActivePointer}} -> PointerTuple
 
-function getField(obj::FilteredObject, ptr::PointerStack)
-    FilteredObject(obj, ptr)
-end
+# const InstantPtrCollection = Union{PointerStack, NonEmpTplOrAbtArr{ActivePointer}}
 
-function getField(obj, ptr::AwaitFilter)
-    FilteredObject(obj, ptr)
-end
+# getField(obj, ptr::InstantPtrCollection) = evalField(itself, obj, ptr)
 
-function getField(prev::PointerStack, here::AwaitFilter)
-    AwaitFilter(getField(prev, here.ptr))
-end
+# function getField(obj::FilteredObject, ptr::PointerStack)
+#     FilteredObject(obj, ptr)
+# end
 
-function getField(prev::AwaitFilter, here::PointerStack)
-    AwaitFilter(getField(prev.ptr, here))
-end
+# function getField(obj, ptr::AwaitFilter)
+#     FilteredObject(obj, ptr)
+# end
 
-getField(obj::Any) = itself(obj)
+# function getField(prev::PointerStack, here::AwaitFilter)
+#     AwaitFilter(getField(prev, here.ptr))
+# end
 
-getField(obj::FilteredObject) = getField(obj.obj, obj.ptr)
+# function getField(prev::AwaitFilter, here::PointerStack)
+#     AwaitFilter(getField(prev.ptr, here))
+# end
 
+# getField(obj::Any) = itself(obj)
 
-function evalField(f::F, obj, ptr::GeneralEntryPointer) where {F<:Function}
-    getField(obj, ptr) |> f
-end
-
-function evalField(f::F, obj, ptr::InstantPtrCollection) where {F<:Function}
-    map(x->evalField(f, obj, x), ptr)
-end
+# getField(obj::FilteredObject) = getField(obj.obj, obj.ptr)
 
 
-function mapLayout(op::F, collection::Any) where {F<:Function}
-    map(op, collection)
-end
+# function evalField(f::F, obj, ptr::GeneralEntryPointer) where {F<:Function}
+#     getField(obj, ptr) |> f
+# end
 
-function mapLayout(op::F, collection::FilteredObject) where {F<:Function}
-    evalField(op, collection.obj, collection.ptr)
-end
+# function evalField(f::F, obj, ptr::InstantPtrCollection) where {F<:Function}
+#     map(x->evalField(f, obj, x), ptr)
+# end
+
+
+# function mapLayout(op::F, collection::Any) where {F<:Function}
+#     map(op, collection)
+# end
+
+# function mapLayout(op::F, collection::FilteredObject) where {F<:Function}
+#     evalField(op, collection.obj, collection.ptr)
+# end
 
 
 abstract type FiniteDict{N, K, T} <: EqualityDict{K, T} end
@@ -332,49 +313,49 @@ leftFoldHash(initHash::UInt, obj::Any; marker::F=itself) where {F<:Function} =
 hash(marker(obj), initHash)
 
 
-struct ElementWiseMatcher{F<:Function, T<:AbstractArray} <: IdentityMarker{T}
-    code::UInt
-    marker::F
-    data::T
+# struct ElementWiseMatcher{F<:Function, T<:AbstractArray} <: IdentityMarker{T}
+#     code::UInt
+#     marker::F
+#     data::T
 
-    function ElementWiseMatcher(input::T, marker::F=itself) where 
-                               {T<:AbstractArray, F<:Function}
-        new{F, T}(leftFoldHash(hash(nothing), input; marker), marker, input)
-    end
-end
+#     function ElementWiseMatcher(input::T, marker::F=itself) where 
+#                                {T<:AbstractArray, F<:Function}
+#         new{F, T}(leftFoldHash(hash(nothing), input; marker), marker, input)
+#     end
+# end
 
-function elementWiseMatch(obj1::Any, obj2::Any; marker1::M1=itself, marker2::M2=itself, 
-                          compareFunction::F=(===)) where {M1<:Function, M2<:Function, 
-                                                           F<:Function}
-    compareFunction(marker1(obj1), marker2(obj2))
-end
+# function elementWiseMatch(obj1::Any, obj2::Any; marker1::M1=itself, marker2::M2=itself, 
+#                           compareFunction::F=(===)) where {M1<:Function, M2<:Function, 
+#                                                            F<:Function}
+#     compareFunction(marker1(obj1), marker2(obj2))
+# end
 
-function elementWiseMatch(obj1::AbstractArray{<:Any, N}, obj2::AbstractArray{<:Any, N}; 
-                          marker1::M1=itself, marker2::M2=itself, 
-                          compareFunction::F=(===)) where {N, M1<:Function, M2<:Function, 
-                                                           F<:Function}
-    if size(obj1) == size(obj1)
-        all( elementWiseMatch(marker1(i), marker2(j); 
-                              compareFunction) for (i, j) in zip(obj1, obj2) )
-    else
-        false
-    end
-end
+# function elementWiseMatch(obj1::AbstractArray{<:Any, N}, obj2::AbstractArray{<:Any, N}; 
+#                           marker1::M1=itself, marker2::M2=itself, 
+#                           compareFunction::F=(===)) where {N, M1<:Function, M2<:Function, 
+#                                                            F<:Function}
+#     if size(obj1) == size(obj1)
+#         all( elementWiseMatch(marker1(i), marker2(j); 
+#                               compareFunction) for (i, j) in zip(obj1, obj2) )
+#     else
+#         false
+#     end
+# end
 
-function elementWiseMatch(::AbstractArray, ::AbstractArray; marker1::M1=itself, 
-                          marker2::M2=itself, compareFunction::F=(===)) where 
-                         {M1<:Function, M2<:Function, F<:Function}
-    false
-end
+# function elementWiseMatch(::AbstractArray, ::AbstractArray; marker1::M1=itself, 
+#                           marker2::M2=itself, compareFunction::F=(===)) where 
+#                          {M1<:Function, M2<:Function, F<:Function}
+#     false
+# end
 
-function ==(matcher1::ElementWiseMatcher, matcher2::ElementWiseMatcher)
-    if matcher1.code == matcher2.code
-        elementWiseMatch(matcher1.data, matcher2.data, compareFunction=isequal, 
-                         marker1=matcher1.marker, marker2=matcher2.marker)
-    else
-        false
-    end
-end
+# function ==(matcher1::ElementWiseMatcher, matcher2::ElementWiseMatcher)
+#     if matcher1.code == matcher2.code
+#         elementWiseMatch(matcher1.data, matcher2.data, compareFunction=isequal, 
+#                          marker1=matcher1.marker, marker2=matcher2.marker)
+#     else
+#         false
+#     end
+# end
 
 
 struct ValueMarker{T} <: IdentityMarker{T}
