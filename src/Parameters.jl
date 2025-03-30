@@ -1,116 +1,46 @@
-export TensorVar, CellParam, GridParam, ParamGrid, setScreenLevel!, 
-       setScreenLevel, symOf, inputOf, obtain, setVal!, screenLevelOf, 
-       markParams!, topoSort, getParams, uniqueParams, directObtain, 
-       memorize!, evalParamSource
+export genTensorVar, genMeshParam, genHeapParam, genCellParam, compareParamBox, 
+       classifyParams, setVal!, symOf, obtain, screenLevelOf, 
+       setScreenLevel!, inputOf, setScreenLevel, sortParams!
 
-using Base: Fix2, Threads.Atomic, issingletontype
-using Test: @inferred
+const SymOrIndexedSym = Union{Symbol, IndexedSym}
 
+struct Primitive end
+struct Composite end
+const StateType = Union{Primitive, Composite}
 
-directObtain(obj::AbstractArray) = itself.( viewElements(obj) )
-directObtain(obj::Any) = itself(obj)
+const Span{T} = Union{T, DirectMemory{T}}
+const Pack{T} = Union{T, PackedMemory{T}}
 
+abstract type ParamBox{T, E<:Pack{T}, S<:StateType} <: StateBox{E} end
 
-const BasicBinaryOpTargets = Union{Number, Bool}
+const PrimitiveParam{T, E<:Pack{T}} = ParamBox{T, E, Primitive}
+const CompositeParam{T, E<:Pack{T}} = ParamBox{T, E, Composite}
 
-typedAdd(a::T, b::T) where {T<:BasicBinaryOpTargets} = a + b
-typedAdd(a::NonEmptyTuple{T, N}, b::NonEmptyTuple{T, N}) where {T, N} = typedAdd.(a, b)
-
-typedSub(a::T, b::T) where {T<:BasicBinaryOpTargets} = a - b
-typedSub(a::NonEmptyTuple{T, N}, b::NonEmptyTuple{T, N}) where {T, N} = typedSub.(a, b)
-
-function checkTypedOpMethods(::Type{T}) where {T}
-    hasmethod(typedAdd, NTuple{2, T}) && hasmethod(typedSub, NTuple{2, T})
-end
-
-function checkTypedOpMethods(::Type{NonEmptyTuple{T, N}}) where {T, N}
-    hasmethod(typedAdd, NTuple{2, T}) && hasmethod(typedSub, NTuple{2, T})
-end
-
-genValShifter(::Type, val::Nothing) = itself
-genValShifter(::Type{T}, val::T) where {T} = Fix2(typedAdd, val)
-genValShifter(::Type{Nothing}, ::Nothing) = 
-throw(ArgumentError("`genValShifter` does not support generating shifter for `Nothing`."))
-const ValShifter{T} = Fix2{typeof(typedAdd), T}
+const UnitParam{T, S<:StateType} = ParamBox{T, T, S}
+const SpanParam{T, E<:Span{T}, S<:StateType} = ParamBox{T, E, S}
+const GridParam{T, N, S<:StateType} = SpanParam{T, DirectMemory{T, N}, S}
+const NestParam{T, E<:Pack{T}, N, S<:StateType} = ParamBox{T, PackedMemory{T, E, N}, S}
 
 
-exclude0DimData(::Type) = nothing
-exclude0DimData(::Type{<:AbtArray0D}) = 
-throw(ArgumentError("`$(AbstractArray{<:Any, 0})` is not allowed as the argument."))
+const TensorVar{T, E<:Span{T}} = PrimitiveParam{T, E}
+abstract type CellParam{T, E<:Pack{T}} <: CompositeParam{T, E} end
+abstract type MeshParam{T, E<:Pack{T}, N} <: NestParam{T, E, N, Composite} end
+abstract type HeapParam{T, E<:Pack{T}, N} <: NestParam{T, E, N, Composite} end
 
-excludeAbtArray(::Type) = nothing
-excludeAbtArray(::Type{<:AbstractArray}) = 
-throw(ArgumentError("`AbstractArray` is not allowed as an input argument."))
+const TensorialParam{T, S<:StateType} = Union{UnitParam{T, S}, GridParam{T, <:Any, S}}
+const AdaptableParam{T, E<:Pack{T}} = Union{CellParam{T, E}, MeshParam{T, E}}
+const ReducibleParam{T, E<:Pack{T}, S<:StateType} = 
+      Union{ParamBox{T, E, S}, NestParam{T, E, <:Any, S}}
 
+const NestFixedParIn{T, E<:Pack{T}} = TriTupleUnion{ParamBox{T, E}}
+const CoreFixedParIn{T, E<:Pack{T}} = TriTupleUnion{ReducibleParam{T, E}}
 
-function checkReturnType(f::F, ::Type{T}, args::NonEmptyTuple{Any}) where {F, T}
-    @inferred T f(args...)
-    f(args...)
-end
+const ParamBoxAbtArr{P<:ParamBox, N} = AbstractArray{P, N}
 
+const UnitOrVal{T} = Union{UnitParam{T}, T}
+const UnitOrValVec{T} = AbstractVector{<:UnitOrVal{T}}
 
-struct TypedReduction{T, F<:Function} <: DualSpanFunction{T, 0, 0}
-    f::F
-
-    function TypedReduction(f::ReturnTyped{T, F}, arg, args...) where {T, F<:Function}
-        allArgs = (arg, args...)
-        excludeAbtArray(T)
-        checkReturnType(f.f, T, allArgs)
-        new{T, F}(f.f)
-    end
-
-    function TypedReduction(::Type{T}) where {T}
-        excludeAbtArray(T)
-        new{T, ItsType}(itself)
-    end
-end
-
-TypedReduction(trf::TypedReduction{T}, arg, args...) where {T} = 
-TypedReduction(ReturnTyped(trf.f, T), arg, args...)
-
-function (sf::TypedReduction{T, F})(arg::AbtArr210L{T}, args::AbtArr210L{T}...) where {T, F}
-    sf.f(arg, args...)::T
-end
-
-(::TypedReduction{T, ItsType})(arg::T) where {T} = itself(arg)
-
-
-struct StableMorphism{T, F<:Function, N} <: DualSpanFunction{T, N, 0}
-    f::F
-    axis::TruncateReshape{N}
-
-    function StableMorphism(f::ReturnTyped{<:AbstractArray{T}, F}, arg, args...; 
-                            axis::MissingOr{TruncateReshape}=missing, 
-                            truncate::Union{Bool, TernaryNumber}=
-                            (ismissing(axis) ? false : axis.truncate)) where 
-                           {T, F<:Function}
-        allArgs = (arg, args...)
-        val = checkReturnType(f.f, AbstractArray{T}, allArgs)
-        N = ndims(val)
-        N==0 && throw(AssertionError("The dimension of `f`'s returned value must be "*
-                                     "larger than zero."))
-        axis = TruncateReshape(ifelse(ismissing(axis), val, axis); truncate)
-        new{T, F, N}(f.f, axis)
-    end
-
-    function StableMorphism(arg::V) where {N, T, V<:AbstractArray{T, N}}
-        N==0 && throw(AssertionError("`N` must be larger than zero."))
-        new{T, ItsType, N}(itself, TruncateReshape(arg))
-    end
-end
-
-StableMorphism(srf::StableMorphism{T, <:Function, N}, arg, args...; 
-               axis::MissingOr{TruncateReshape{N}}=srf.axis) where {T, N} = 
-               StableMorphism(ReturnTyped(srf.f, AbstractArray{T, N}), arg, args...; axis)
-
-function (sf::StableMorphism{T, F, N})(arg::AbtArr210L{T}, args::AbtArr210L{T}...) where 
-                                      {T, F, N}
-    res = sf.f(arg, args...)::AbstractArray{T}
-    sf.axis(res)
-end
-
-(::StableMorphism{T, ItsType, N})(arg::AbstractArray{T, N}) where {T, N} = itself(arg)
-
+isOffsetEnabled(::ParamBox) = false
 
 function checkScreenLevel(sl::Int, levels::NonEmptyTuple{Int})
     if !(sl in levels)
@@ -122,446 +52,374 @@ end
 checkScreenLevel(s::TernaryNumber, levels::NonEmptyTuple{Int}) = 
 checkScreenLevel(Int(s), levels)
 
+# Screen level of primitive ParamBox should always be 1 since it can always be used as input 
+# for composite ParamBox.
+getScreenLevelOptions(::Type{<:PrimitiveParam}) = (1,)
+
+screenLevelOf(p::PrimitiveParam) = 1
+
 function checkPrimParamElementalType(::Type{T}) where {T}
-    if !(isbitstype(T) || issingletontype(T))
-        throw(DomainError(T, "The (elemental) type of `input`, when used as an argument, "*
-                             "should make at least one of these functions return `true`:\n"*
-                             "`$isbitstype`, `$issingletontype`."))
+    if !canDirectlyStoreInstanceOf(T)
+        throw(AssertionError("`T::Type{$T}` should have let $canDirectlyStoreInstanceOf "*
+                             "return `true`."))
     end
     nothing
 end
 
-function checkPrimParamElementalType(::Type{<:Union{Nothing, Missing}})
-    throw(DomainError(T, "The (elemental) type of `input` cannot be `$Missing` or "*
-                         "`$Nothing`"))
+function checkPrimParamElementalType(::Type{T}) where 
+                                    {T<:Union{Nothing, Missing, IdentityMarker}}
+    throw(AssertionError("`T::Type{$T}` is not supported"))
 end
 
-const SymOrIndexedSym = Union{Symbol, IndexedSym}
 
+mutable struct UnitVar{T} <: TensorVar{T, T}
+    @atomic input::T
+    const symbol::IndexedSym
 
-genTernaryNumber(num::Int) = TernaryNumber(num)
-genTernaryNumber(num::TernaryNumber) = itself(num)
-
-struct TensorVar{T, N} <: PrimitiveParam{T, N}
-    input::ShapedMemory{T, N}
-    symbol::IndexedSym
-    screen::TernaryNumber
-
-    function TensorVar(input::AbstractArray{T, N}, symbol::SymOrIndexedSym, 
-                       screen::Union{TernaryNumber, Int}=TPS1) where {T, N}
+    function UnitVar(input::T, symbol::SymOrIndexedSym) where {T}
         checkPrimParamElementalType(T)
-        checkScreenLevel(screen, getScreenLevelOptions(PrimitiveParam))
-        input = ShapedMemory(input|>deepcopy)
-        new{T, N}(input, IndexedSym(symbol), genTernaryNumber(screen))
+        new{T}(input, IndexedSym(symbol))
     end
 end
 
-TensorVar(input::T, symbol::SymOrIndexedSym, 
-          screen::Union{TernaryNumber, Int}=TPS1) where {T} = 
-TensorVar(fill(input), symbol, screen)
-
-
-function checkParamInput(input::ParamInputType; 
-                         innerDimMin::Int=0, innerDimMax::Int=64, 
-                         outerDimMin::Int=0, outerDimMax::Int=64)
-    hasVariable = false
-    innerDimMinMax = (innerDimMin, innerDimMax)
-    outerDimMinMax = (outerDimMin, outerDimMax)
-    for x in input
-        hasVariable = checkParamInputCore(hasVariable, x, (innerDimMinMax, outerDimMinMax))
-    end
-    if !hasVariable
-        throw(ArgumentError("`input` must contain as least one non-constant parameter."))
-    end
-    nothing
-end
-
-function checkParamInputCore(hasVariable::Bool, par::P, 
-                             doubleDimMinMax::NTuple{2, NTuple{2, Int}}) where 
-                            {T, N, O, P<:ParamBox{T, N, O}}
-    for (dim, str, minMax) in zip((N, O), ("inner", "outer"), doubleDimMinMax)
-        if !(minMax[begin] <= dim <= minMax[end])
-            throw(DomainError(dim, "The input `par`'s $str dimension falls outside the "*
-                                   "permitted range: $minMax."))
-        end
-    end
-    hasVariable || (screenLevelOf(par) < 2) && (hasVariable = true)
-    hasVariable
-end
-
-function checkParamContainerArgType1(I::Type, R::Type)
-    if !(I <: R)
-        throw(ArgumentError("`$I` is not supported as argument `input` when `lambda` "*
-                            "functions like an identity morphism."))
-    end
-    nothing
-end
-
-function checkCellParamArg(::TypedReduction{T, <:ItsTalike}, input::I, shifter::S, 
-                           memory::Union{ShapedMemory{T, 0}, T, Missing}) where {T, I, S}
-    checkParamContainerArgType1(I, Tuple{ElementalParam{T}})
-    checkParamInput(input, innerDimMax=0, outerDimMax=0)
-    if ismissing(memory)
-        memory = ShapedMemory( fill(input[1]|>obtain|>shifter) )
-    elseif memory isa T
-        memory = ShapedMemory( fill(memory) )
-    end
-    TypedReduction(T), ItsType, deepcopy(memory)
-end
-
-function checkCellParamArg(f::TypedReduction{T, F}, input::I, shifter::S, 
-                           memory::Union{ShapedMemory{T, 0}, T, Missing}) where {T, F, I, S}
-    checkParamInput(input)
-    if ismissing(memory)
-        memory = ShapedMemory( fill(f(obtain.(input)...)|>shifter) )
-    elseif memory isa T
-        memory = ShapedMemory( fill(memory) )
-    end
-    f, F, deepcopy(memory)
-end
-
-initializeOffset(::Type) = nothing
-initializeOffset(::Type{T}) where {T<:Number} = zero(T)
-
-mutable struct CellParam{T, F<:Function, I<:ParamInputType{T}} <: BaseParam{T, 0, I}
-    const lambda::TypedReduction{T, F}
-    const input::I
-    const symbol::IndexedSym
-    @atomic memory::ShapedMemory{T, 0}
-    @atomic screen::TernaryNumber
-    @atomic offset::T
-
-    function CellParam(lambda::TypedReduction{T, F}, input::I, 
-                       symbol::SymOrIndexedSym, 
-                       memory::Union{ShapedMemory{T, 0}, T, Missing}=missing, 
-                       screen::Union{TernaryNumber, Int}=TUS0, 
-                       offset::Union{T, Nothing}=initializeOffset(T)) where 
-                      {T, F, I<:ParamInputType{T}}
-        levels = getScreenLevelOptions(BaseParam{T, 0})
-        screen = genTernaryNumber(screen)
-        sl = checkScreenLevel(screen, levels)
-        shifter = genValShifter(T, offset)
-        lambda, funcType, memory = checkCellParamArg(lambda, input, shifter, memory)
-        symbol = IndexedSym(symbol)
-        if levels == (0,)
-            new{T, funcType, I}(lambda, input, symbol, memory, screen)
-        else
-            if offset===nothing
-                offset = if sl > 0
-                    directObtain(memory)
-                else
-                    memVal = directObtain(memory)
-                    typedSub(memVal, memVal)
-                end
-            end
-            new{T, funcType, I}(lambda, input, symbol, memory, screen, offset)
-        end
-    end
-end
-
-function CellParam(func::Function, input::ParamInputType{T}, symbol::SymOrIndexedSym; 
-                   init::Union{ShapedMemory{T, 0}, T, Missing}=missing) where {T}
-    lambda = TypedReduction(ReturnTyped(func, T), obtain.(input)...)
-    CellParam(lambda, input, symbol, init, TUS0, initializeOffset(T))
-end
-
-CellParam(func::Function, input::ParamBox{T}, symbol::SymOrIndexedSym; 
-          init::Union{ShapedMemory{T, 0}, T, Missing}=missing) where {T} = 
-CellParam(func, (input,), symbol; init)
-
-CellParam(func::Function, input1::ParamBox{T}, input2::ParamBox{T}, 
-          symbol::SymOrIndexedSym; 
-          init::Union{ShapedMemory{T, 0}, T, Missing}=missing) where {T} = 
-CellParam(func, (input1, input2), symbol; init)
-
-CellParam(func::Function, input1::ParamBox{T}, input2::ParamBox{T}, 
-          input3::ParamBox{T}, symbol::SymOrIndexedSym; 
-          init::Union{ShapedMemory{T, 0}, T, Missing}=missing) where {T} = 
-CellParam(func, (input1, input2, input3), symbol; init)
-
-function CellParam(par::CellParam{T}, symbol::SymOrIndexedSym=symOf(par); 
-                   init::Union{ShapedMemory{T, 0}, T, Missing}=par.memory) where {T}
-    offset = isOffsetEnabled(par) ? par.offset : nothing
-    CellParam(par.lambda, par.input, symbol, init, par.screen, offset)
-end
-
-CellParam(input::ElementalParam{T}, symbol::SymOrIndexedSym=symOf(input)) where {T} = 
-CellParam(TypedReduction(T), (input,), symbol)
-
-CellParam(var, varSym::SymOrIndexedSym, symbol::SymOrIndexedSym=varSym) = 
-CellParam(TensorVar(var, varSym), symbol)
-
-const ItselfCParam{T} = CellParam{T, ItsType, Tuple{TensorVar{T, 0}}}
-
-
-function checkGridParamArg(::StableMorphism{T, <:ItsTalike, N}, input::I, memory::M) where 
-                          {T, N, O, I<:ParamBox{T, <:Any, O}, M<:AbstractArray{T, N}}
-    checkParamContainerArgType1(I, Tuple{FlattenedParam{T, N}})
-    MI = typeof(input[1])
-    if !(M <: MI)
-        throw(AssertionError("The type of `memory` should be a subtype of `$M1`."))
-    end
-    checkParamInput(input, innerDimMax=(O==0)*N, outerDimMax=(O==N)*N)
-    StableMorphism(memory), ItsType, deepcopy(memory|>ShapedMemory)
-end
-
-function checkGridParamArg(::StableMorphism{T, <:ItsTalike, N}, input::I, ::Missing) where 
-                          {T, N, O, I<:ParamBox{T, <:Any, O}}
-    checkParamContainerArgType1(I, Tuple{FlattenedParam{T, N}})
-    checkParamInput(input, innerDimMax=(O==0)*N, outerDimMax=(O==N)*N)
-    memory = input[1]|>obtain
-    StableMorphism(memory), ItsType, deepcopy(memory|>ShapedMemory)
-end
-
-function throwGridParamDimErrorMessage()
-    throw(ArgumentError("Returned array should have dimension `N` larger than 0. Use "*
-                        "`$CellParam` for returning scalar-type output."))
-end
-
-function checkGridParamArg(f::StableMorphism{T, F, N}, input::I, memory::M) where 
-                           {T, F, N, I, M<:AbstractArray{T, N}}
-    N < 1 && throwGridParamDimErrorMessage()
-    checkParamInput(input)
-    checkReturnType(f, M, obtain.(input))
-    f, F, deepcopy(memory|>ShapedMemory)
-end
-
-function checkGridParamArg(f::StableMorphism{T, F, N}, input::I, ::Missing) where 
-                           {T, F, N, I}
-    N < 1 && throwGridParamDimErrorMessage()
-    checkParamInput(input)
-    f, F, deepcopy( f(obtain.(input)...)|>ShapedMemory )
-end
-
-mutable struct GridParam{T, F<:Function, I<:ParamInputType{T}, N} <: BaseParam{T, N, I}
-    const lambda::StableMorphism{T, F, N}
-    const input::I
-    const symbol::IndexedSym
-    @atomic memory::ShapedMemory{T, N}
-
-    function GridParam(lambda::StableMorphism{T, F, N}, input::I, 
-                       symbol::SymOrIndexedSym, 
-                       memory::Union{AbstractArray{T, N}, Missing}=missing) where 
-                      {T, F, N, I<:ParamInputType{T}}
-        lambda, funcType, memory = checkGridParamArg(lambda, input, memory)
-        new{T, funcType, I, N}(lambda, input, IndexedSym(symbol), memory)
-    end
-end
-
-function GridParam(func::Function, input::ParamInputType{T}, symbol::SymOrIndexedSym; 
-                   init::Union{AbstractArray{T}, Missing}=missing) where {T}
-    lambda = StableMorphism(ReturnTyped(func, AbstractArray{T}), obtain.(input)...)
-    GridParam(lambda, input, symbol, init)
-end
-
-GridParam(func::Function, input::ParamBox{T}, symbol::SymOrIndexedSym; 
-          init::Union{AbstractArray{T}, Missing}=missing) where {T} = 
-GridParam(func, (input,), symbol; init)
-
-GridParam(func::Function, input1::ParamBox{T}, input2::ParamBox{T}, 
-          symbol::SymOrIndexedSym; 
-          init::Union{AbstractArray{T}, Missing}=missing) where {T} = 
-GridParam(func, (input1, input2), symbol; init)
-
-GridParam(func::Function, input1::ParamBox{T}, input2::ParamBox{T}, 
-          input3::ParamBox{T}, symbol::SymOrIndexedSym; 
-          init::Union{AbstractArray{T}, Missing}=missing) where {T} = 
-GridParam(func, (input1, input2, input3), symbol; init)
-
-GridParam(par::GridParam{T}, symbol::SymOrIndexedSym=symOf(par); 
-          init::Union{AbstractArray{T}, Missing}=par.memory) where {T} = 
-GridParam(par.lambda, par.input, symbol, init)
-
-GridParam(input::FlattenedParam{T, N}, symbol::SymOrIndexedSym=symOf(input)) where {T, N} = 
-GridParam(StableMorphism(input|>obtain), (input,), symbol)
-
-GridParam(val::AbstractArray, valSym::SymOrIndexedSym, symbol::SymOrIndexedSym=valSym) = 
-GridParam(TensorVar(val, valSym), symbol)
-
-
-struct ParamGrid{T, N, I<:FlattenedParam{T, N}, O} <: ParamNest{T, N, I, O}
-    input::ShapedMemory{I, O}
+struct GridVar{T, N} <: TensorVar{T, DirectMemory{T, N}}
+    input::DirectMemory{T, N}
     symbol::IndexedSym
 
-    function ParamGrid(input::ShapedMemory{I, O}, symbol::SymOrIndexedSym) where 
-                      {T, N, I<:FlattenedParam{T, N}, O}
-        exclude0DimData(input|>typeof)
+    function GridVar(input::AbstractArray{T, N}, symbol::SymOrIndexedSym) where {T, N}
+        N < 1 && throw(AssertionError("`N` must be larger than zero."))
+        checkPrimParamElementalType(T)
+        input = decoupledCopy(input)
+        new{T, N}(input, IndexedSym(symbol))
+    end
+end
+
+genTensorVar(input::Any, symbol::SymOrIndexedSym) = UnitVar(input, symbol)
+
+genTensorVar(input::AbstractArray, symbol::SymOrIndexedSym) = GridVar(input, symbol)
+
+genTensorVar(input::AbtArray0D, symbol::SymOrIndexedSym) = 
+genTensorVar(first(input), symbol)
+
+
+getScreenLevelOptions(::Type{<:HeapParam}) = (0,)
+
+screenLevelOf(p::HeapParam) = 0
+
+struct ShapedParam{T, E<:Pack{T}, N, P<:ParamBox{T, E}} <: HeapParam{T, E, N}
+    input::ShapedMemory{P, N}
+    symbol::IndexedSym
+
+    function ShapedParam(input::ShapedMemory{P, N}, symbol::SymOrIndexedSym) where 
+                        {T, E, P<:ParamBox{T, E}, N}
+        N < 1 && throw(AssertionError("`N` must be larger than zero."))
         checkEmptiness(input.value, :input)
-        new{T, N, I, O}(input, IndexedSym(symbol))
+        new{T, E, N, P}(copy(input), IndexedSym(symbol))
     end
 end
 
-function ParamGrid(input::AbstractArray{I, O}, symbol::SymOrIndexedSym) where 
-                  {T, N, I<:FlattenedParam{T, N}, O}
-    exclude0DimData(input|>typeof)
-    ParamGrid(ShapedMemory(input), symbol)
+genHeapParam(input::AbstractArray{<:ParamBox{T, E}}, 
+             symbol::SymOrIndexedSym) where {T, E<:Pack{T}} = 
+ShapedParam(ShapedMemory(input), symbol)
+
+genHeapParam(input::AbstractArray{<:ParamBox, 0}, ::SymOrIndexedSym) = first(input)
+
+genHeapParam(input::ShapedParam, symbol::IndexedSym=input.symbol) = 
+ShapedParam(input.input, symbol)
+
+
+abstract type TypedTensorFunc{T, N} <: CompositeFunction end
+
+struct TypedReduce{T, F<:Function} <: TypedTensorFunc{T, 0}
+    f::F
+    type::Type{T}
 end
 
-ParamGrid(pl::ParamGrid, symbol::IndexedSym=pl.symbol) = ParamGrid(pl.input, symbol)
+TypedReduce(f::TypedReduce, ::Type{T}) where {T} = TypedReduce(f.f, T)
+
+TypedReduce(::Type{T}) where {T} = TypedReduce(itself, T)
+
+(f::TypedReduce{T})(arg, args...) where {T} = f.f(arg, args...)::T
+
+(f::TypedReduce{<:AbstractArray{T, N}})(arg, args...) where {T, N} = 
+f.f(arg, args...)::getPackType(AbstractArray{T, N})
 
 
-# function checkParamContainerArgType2(len::Int, extent::Int)
-#     if len != extent
-#         throw(DomainError(len, "The length of `memory` should match "*
-#                                "`ml::FixedShapeLink`'s specification: $extent."))
-#     end
-#     nothing
-# end
+struct TypedExpand{T, N, F<:Function} <: TypedTensorFunc{T, N}
+    f::F
+    type::Type{T}
+    shape::TruncateReshape{N}
+
+    function TypedExpand(f::Function, ::Type{T}, args::NonEmptyTuple{Any}, 
+                         shape::MissingOr{TruncateReshape}=missing; 
+                         truncate::Union{Bool, TernaryNumber}=
+                         (ismissing(shape) ? false : shape.truncate)) where {T}
+        shapeTemp = if ismissing(shape)
+            if f isa TypedExpand
+                f.shape
+            else
+                ReturnTyped(f, getPackType(AbstractArray{T}))(args...) |> size
+            end
+        else
+            shape
+        end
+        shapeFinal = TruncateReshape(shapeTemp; truncate)
+
+        fCore = (f isa TypedExpand) ? f.f : f
+
+        ## Already checked by `TruncateReshape`
+        # N = length(shapeFinal.axis)
+        # N==0 && throw(AssertionError("The dimension of `f`'s returned value must be "*
+        #                              "larger than zero."))
+        # prod(shapeFinal.axis) == 0 && throw(AssertionError("The returned value of `f` "*
+        #                                                    "must not be empty."))
+
+        new{T, length(shapeFinal.axis), typeof(fCore)}(fCore, T, shapeFinal)
+    end
+
+    function TypedExpand(f::Function, args::NonEmptyTuple{Any})
+        output = ReturnTyped(f, AbstractArray)(args...)
+        shape = TruncateReshape(output|>size)
+        type = eltype(output) |> genPackMemoryType
+        fCore = (f isa TypedExpand) ? f.f : f
+
+        new{type, length(shape.axis), typeof(fCore)}(fCore, type, shape)
+    end
+
+    function TypedExpand(f::TypedExpand{T, N, F}, 
+                         shape::TruncateReshape{N}=f.shape) where {T, N, F<:Function}
+        new{T, N, F}(f.f, T, shape)
+    end
+end
+
+function TypedExpand(arr::AbstractArray{T, N}, 
+                     shape::TruncateReshape{N}=TruncateReshape(arr)) where {T, N}
+    TypedExpand(T, shape)
+end
+
+function (f::TypedExpand{T, N})(arg, args...) where {T, N}
+    res = f.f(arg, args...)::getPackType(AbstractArray{T, N})
+    f.shape(res)
+end
 
 
-function indexParam(pb::ParamGrid{<:Any, N}, idx::Int, 
-                    sym::MissingOr{Symbol}=missing) where {N}
-    entry = pb.input[idx]
-    if ismissing(sym) || sym==symOf(entry)
-        entry
-    elseif iszero(N)
-        CellParam(entry, sym)
+#= Additional Method =#
+import Quiqbox: getNestedLevelCore
+function getNestedLevelCore(::Type{<:ParamBox{<:Any, E}}, level::Int) where {E<:Pack}
+    getNestedLevelCore(E, level)
+end
+
+
+function checkParamOffsetMethods(::Type{T}) where {T}
+    (hasmethod(unitAdd, NTuple{2, T}) && hasmethod(unitSub, NTuple{2, T})) || 
+    (hasmethod(+, NTuple{2, T}) && hasmethod(-, NTuple{2, T}))
+end
+
+
+function getScreenLevelOptionsCore(::Type{E}) where {E}
+    Tuple(0:(checkParamOffsetMethods(E) * 2))
+end
+
+function getScreenLevelOptionsCore(::Type{E}) where {E<:AbstractArray}
+    nl = getNestedLevel(E)
+    if nl.level > 1
+        (0,)
     else
-        GridParam(entry, sym)
+        Tuple(0:(checkParamOffsetMethods(nl|>getCoreType) * 2))
     end
 end
 
 
-function indexParam(pb::FlattenedParam{T}, idx::Int, 
-                    sym::MissingOr{Symbol}=missing) where {T}
-    ismissing(sym) && (sym = Symbol(:_, pb.symbol.name))
-    CellParam((Retrieve∘ChainPointer)(idx), pb, sym)
+getScreenLevelOptions(::Type{<:CellParam{T, E}}) where {T, E<:Pack{T}} = 
+getScreenLevelOptionsCore(E)
+
+getScreenLevelOptions(::Type{<:MeshParam{T, E}}) where {T, E<:Pack{T}} = 
+getScreenLevelOptionsCore(PackedMemory{T, E})
+
+screenLevelOf(p::AdaptableParam) = Int(p.screen)
+
+
+function unitAdd(a::NonEmptyTuple{Number, N}, b::NonEmptyTuple{Number, N}) where {N}
+    map(a, b) do i, j
+        typeof(i)(i + j)
+    end
 end
 
-function indexParam(pb::ElementalParam, idx::Int, sym::MissingOr{Symbol}=missing)
-    if idx != 1
-        throw(BoundsError(pb, idx))
-    elseif ismissing(sym) || sym == symOf(res)
-        pb
+function unitSub(a::NonEmptyTuple{Number, N}, b::NonEmptyTuple{Number, N}) where {N}
+    map(a, b) do i, j
+        typeof(i)(i - j)
+    end
+end
+
+unitOpMatch(::typeof(+)) = unitAdd
+
+unitOpMatch(::typeof(-)) = unitSub
+
+function unitOp(f::F, a::T1, b::T2) where {F<:Union{typeof(+), typeof(-)}, T1, T2}
+    fSpecialize = unitOpMatch(f)
+    if hasmethod(fSpecialize, Tuple{T1, T2})
+        fSpecialize(a, b)
     else
-        CellParam(pb, sym)
+        f(a, b) |> T1
     end
 end
 
-function indexParam(pb::ParamBox{T, N}, idx::Int, 
-                    sym::MissingOr{Symbol}=missing) where {T, N}
-    ismissing(sym) && (sym = Symbol(:_, pb.symbol.name))
-    GridParam((Retrieve∘ChainPointer)(idx), pb, sym)
-end
-
-
-genDefaultRefParSym(input::ParamBox) = IndexedSym(:_, input.symbol)
-
-
-getScreenLevelOptions(::Type{<:ParamGrid}) = (0, 2)
-
-getScreenLevelOptions(::Type{<:LinkParam}) = (0,)
-
-getScreenLevelOptions(::Type{<:BaseParam{T, 0}}) where {T} = 
-Tuple(0:(checkTypedOpMethods(T) * 2))
-
-getScreenLevelOptions(::Type{<:ParamToken}) = (0,)
-
-getScreenLevelOptions(::Type{<:ParamBatch}) = (0,)
-
-getScreenLevelOptions(::Type{<:PrimitiveParam}) = (1, 2)
-
-getScreenLevelOptions(::Type{<:ParamBox}) = (0, 1, 2)
-
-getScreenLevelOptions(::T) where {T<:ParamBox} = getScreenLevelOptions(T)
-
-function isScreenLevelChangeable(::Type{T}) where {T<:ParamBox}
-    minLevel, maxLevel = extrema( getScreenLevelOptions(T) )
-    (maxLevel - minLevel) > 0
-end
-
-isOffsetEnabled(::ParamBox) = false
-
-function isOffsetEnabled(pb::T) where {T<:CellParam}
-    isScreenLevelChangeable(T) && maximum( getScreenLevelOptions(T) ) > 0 && 
-    isdefined(pb, :offset) # Only for safety
-end
-
-screenLevelOf(p::BaseParam{<:Any, 0}) = Int(p.screen)
-
-screenLevelOf(::ParamToken) = 0
-
-screenLevelOf(::ParamBatch) = 0
-
-screenLevelOf(p::PrimitiveParam) = Int(p.screen)
-
-screenLevelOf(p::ParamGrid) = ifelse(all(l==2 for l in screenLevelOf.(p.input.value)), 2, 0)
-
-
-function setScreenLevelCore!(p::ParamBox, level::Int)
-    @atomic p.screen = TernaryNumber(level)
-end
-
-function setScreenLevel!(p::T, level::Int) where {T<:CellParam}
-    checkScreenLevel(level, getScreenLevelOptions(T))
-    levelOld = screenLevelOf(p)
-    if levelOld == level
-    elseif levelOld == 0
-        @atomic p.offset = obtain(p)
-    elseif level == 0
-        newVal = p.lambda((obtain(arg) for arg in p.input)...)
-        @atomic p.offset = typedSub(p.offset, newVal)
+function unitOp(f::F, a::AbstractArray{<:Any, N}, b::AbstractArray{<:Any, N}) where 
+               {F<:Union{typeof(+), typeof(-)}, N}
+    res = similar(a)
+    foreach(eachindex(res), a, b) do n, i, j
+        res[n] = unitOp(f, i, j)
     end
-    setScreenLevelCore!(p, level)
-    p
+    res
 end
 
-setScreenLevel(p::CellParam, level::Int) = 
-setScreenLevel!(CellParam(p), level)
 
-setScreenLevel(p::TensorVar, level::Int) = 
-TensorVar(p.input, p.symbol, TernaryNumber(level))
+function decoupledCopy(arr::AbstractArray)
+    map(decoupledCopy, arr) |> PackedMemory
+end
+
+function decoupledCopy(obj::T) where {T}
+    if canDirectlyStoreInstanceOf(T)
+        obj
+    else
+        deepcopy(obj)
+    end
+end
 
 
-function swapParamMem!(p::ParamLink{T, N}, 
-                       memNew::AbstractArray{ShapedMemory{T, N}}) where {T, N}
-    checkLength(memNew, :memNew, length(p.memory), "`length(p.memory)`")
-    res = lock( ReentrantLock() ) do
-        map(enumerate(memNew)) do (i, innerMemNew)
-            memOld = directObtain(p.memory[i])
-            p.memory[i] = innerMemNew
-            memOld
+getTensorOutputTypeBound(::TypedReduce{E}) where {E} = E
+getTensorOutputTypeBound(::TypedExpand{E}) where {E} = AbstractArray{E}
+
+getTensorOutputShape(f::TypedExpand, ::Any) = f.shape.axis
+getTensorOutputShape(::TypedReduce{E}, input) where {E} = ()
+getTensorOutputShape(f::TypedReduce{E}, input) where {E<:AbstractArray} = 
+getTensorOutputShape(f.f, input)
+getTensorOutputShape(f::Function, input) = size(f(obtain.(input)...))
+
+function formatOffset(lambda::TypedTensorFunc{<:Pack}, ::Missing, input)
+    outType = getTensorOutputTypeBound(lambda)
+    if getScreenLevelOptionsCore(outType) == (0,)
+        ()
+    else
+        val = if outType <: Number
+            zero(outType)
+        elseif outType <: AbstractArray{<:Number}
+            shape = getTensorOutputShape(lambda, input)
+            PackedMemory(zeros(eltype(outType), shape))
+        else
+            buffer = lambda(obtain.(input)...)
+            res = unitOp(-, buffer, buffer)
+            res isa AbstractArray ? PackedMemory(res) : res
+        end
+        (val,)
+    end
+end
+
+function formatOffset(lambda::TypedTensorFunc{<:Pack}, offset, input)
+    outType = getTensorOutputTypeBound(lambda)
+    if getScreenLevelOptionsCore(outType) == (0,)
+        ()
+    else
+        val = if outType <: AbstractArray
+            nl = getNestedLevel(outType)
+            if nl != getNestedLevel(offset|>typeof)
+                cT = getCoreType(nl)
+                throw(AssertionError("The nested level and the core type of `offset` "*
+                                     "should be `$(nl.level)` and `$cT`, respectively."))
+            end
+
+            if eltype(outType) <: Number
+                size(offset) == getTensorOutputShape(lambda, input)
+            else
+                buffer = lambda(obtain.(input)...)
+                recursiveCompareSize(buffer, offset)
+            end || throw(DimensionMismatch("The shape of `offset` does not match that "*
+                                            "of `lambda`'s returned value."))
+            PackedMemory(offset)
+        else
+            convert(outType, offset)
+        end
+        (val,)
+    end
+end
+
+
+getCellOutputLevel(::CoreFixedParIn{T, E}) where {T, E<:Pack{T}} = getNestedLevel(E).level
+
+function getCellOutputLevel(input::NestFixedParIn{T, E}) where {T, E<:PackedMemory{T}}
+    type = all(p isa CellParam for p in input) ? E : eltype(E)
+    getNestedLevel(type).level
+end
+
+# ([[x]], [x]) -> [x]; ([x], [x]) -> x; (cell, cell) -> cell
+function formatTensorFunc(f::Function, ::Type{TypedReduce}, 
+                          input::CoreFixedParIn{T, E}) where {T, E<:Pack{T}}
+    lambda = if f isa TypedReduce{<:Pack}
+        f
+    else
+        type = f(obtain.(input)...) |> typeof |> genPackMemoryType
+        TypedReduce(f, type)
+    end
+    level = getCellOutputLevel(input)
+    if getNestedLevel(lambda.type).level != level
+        throw("The nested level of `f`'s output should be `$level`.")
+    end
+    lambda
+end
+# ([[x]], [x]) -> [[x]]; ([x], [x]) -> [[x]]; 
+function formatTensorFunc(f::Function, ::Type{TypedExpand}, 
+                          input::CoreFixedParIn{T, E}) where {T, E<:Pack{T}}
+    lambda = f isa TypedExpand{<:Pack} ? f : TypedExpand(f, obtain.(input))
+    level = getNestedLevel(E).level
+    if getNestedLevel(lambda.type).level != level
+        throw("The nested level of `f`'s output should be `$(level+1)`.")
+    end
+    lambda
+end
+
+
+mutable struct ReduceParam{T, E<:Pack{T}, F<:Function, I<:CoreFixedParIn} <: CellParam{T, E}
+    const lambda::TypedReduce{E, F}
+    const input::I
+    const symbol::IndexedSym
+    @atomic screen::TernaryNumber
+    @atomic offset::E
+
+    function ReduceParam(lambda::TypedReduce{E, F}, input::I, 
+                         symbol::SymOrIndexedSym, screen::TernaryNumber=TUS0, 
+                         offset::Union{E, Missing}=missing) where 
+                        {T, E<:Pack{T}, F, I<:CoreFixedParIn}
+        sym = IndexedSym(symbol)
+        offsetTuple = formatOffset(lambda, offset, input)
+        if isempty(offsetTuple)
+            new{T, E, F, I}(lambda, input, sym, screen)
+        else
+            new{T, E, F, I}(lambda, input, sym, screen, first(offsetTuple))
         end
     end
-    reshape(res, last.(p.lambda.axis))
 end
 
-function swapParamMem!(p::ParamLink{T, N}, memNew::ShapedMemory{T, N}, 
-                       index::Int) where {T, N}
-    memOld = directObtain(p.memory[index])
-    lock( ReentrantLock() ) do; p.memory[index] = memNew end
-    memOld
+function genCellParam(func::Function, input::CoreFixedParIn, symbol::SymOrIndexedSym)
+    lambda = formatTensorFunc(func, TypedReduce, input)
+    ReduceParam(lambda, input, symbol, TUS0, missing)
 end
 
-function swapParamMem!(p::LinkParam{T, N}, memNew::ShapedMemory{T, N}) where {T, N}
-    swapParamMem!(p.input, memNew, p.index)
+function genCellParam(par::ReduceParam, symbol::SymOrIndexedSym=symOf(par))
+    offset = isOffsetEnabled(par) ? par.offset : missing
+    ReduceParam(par.lambda, par.input, symbol, par.screen, offset)
 end
 
-function swapParamMem!(p::BaseParam{T, N}, memNew::ShapedMemory{T, N}) where {T, N}
-    memOld = directObtain(p.memory)
-    @atomic p.memory = memNew
-    memOld
+function genCellParam(input::UnitParam{T}, symbol::SymOrIndexedSym=symOf(input)) where {T}
+    ReduceParam(TypedReduce(T), (input,), symbol)
 end
 
-memorize!(p::ParamLink{T, N}, memNew::JaggedAbtArray{T, N}) where {T, N} = 
-swapParamMem!(p, map(ShapedMemory, memNew))
+function genCellParam(input::ParamBox{T, E}, symbol::SymOrIndexedSym=symOf(input)) where 
+                     {T, E<:PackedMemory{T}}
+    ReduceParam(TypedReduce(E), (input,), symbol)
+end
 
-memorize!(p::ParamLink{T, 0}, memNew::AbstractArray{T}) where {T} = 
-swapParamMem!(p, map(ShapedMemory∘fill, memNew))
-
-memorize!(p::LinkParam{T, N}, memNew::AbstractArray{T, N}) where {T, N} = 
-swapParamMem!(p, ShapedMemory(memNew))
-
-memorize!(p::LinkParam{T, 0}, memNew::T) where {T} = 
-swapParamMem!(p, (ShapedMemory∘fill)(memNew))
-
-memorize!(p::BaseParam{T, N}, memNew::AbstractArray{T, N}) where {T, N} = 
-swapParamMem!(p, ShapedMemory(memNew))
-
-memorize!(p::BaseParam{T, 0}, memNew::T) where {T} = 
-swapParamMem!(p, (ShapedMemory∘fill)(memNew))
-
-memorize!(p::ParamFunctor) = memorize!(p, obtain(p))
+genCellParam(var, varSym::SymOrIndexedSym, symbol::SymOrIndexedSym=varSym) = 
+genCellParam(genTensorVar(var, varSym), symbol)
 
 
 indexedSymOf(p::ParamBox) = p.symbol
@@ -570,405 +428,331 @@ symOf(p::ParamBox) = indexedSymOf(p).name
 
 inputOf(p::ParamBox) = p.input
 
-isDependentParam(p::ParamBox) = (screenLevelOf(p) < 1)
 
-isPrimitiveParam(p::ParamBox) = (screenLevelOf(p) == 1)
+mutable struct ExpandParam{T, E<:Pack{T}, N, F<:Function, I<:CoreFixedParIn
+                           } <: MeshParam{T, E, N}
+    const lambda::TypedExpand{E, N, F}
+    const input::I
+    const symbol::IndexedSym
+    @atomic screen::TernaryNumber
+    @atomic offset::PackedMemory{T, E, N}
 
-#? Maybe a more general type signature?
-outputSizeOf(p::PrimitiveParam) = size(p.input)
-
-outputSizeOf(p::ParamFunctor) = size(p.memory)
-
-outputSizeOf(p::ParamGrid) = size(p.input)
-
-
-
-mutable struct NodeMarker{T} <: StorageMarker{T}
-    visited::Bool
-    data::T
-
-    NodeMarker(init::T, ::Type{U}=T) where {T, U} = new{U}(false, init)
-end
-
-const ParamDict0D{T, V} = IdDict{ElementalParam{T}, NodeMarker{V}}
-const ParamDictSD{T, V} = IdDict{FlattenedParam{T}, NodeMarker{V}}
-const ParamDictDD{T, V} = IdDict{ParamBox{T}, NodeMarker{V}}
-
-const ParamInputSource{T} = Memory{<:ParamBox{T}}
-const ParamDictId{T} = IdDict{ParamBox{T}, NodeMarker{<:ParamInputSource{T}}}
-
-const DefaultMaxParamPointerLevel = 10
-
-struct ParamPointerBox{T, V0, V1, V2, F<:Function} <: QueryBox{NodeMarker}
-    d0::ParamDict0D{T, V0}
-    d1::ParamDictSD{T, V1}
-    d2::ParamDictDD{T, V2}
-    id::ParamDictId{T}
-    generator::F
-    maxRecursion::Int
-
-    ParamPointerBox(f::F, ::Type{T}, ::Type{V0}, ::Type{V1}, ::Type{V2}, 
-                     maxRecursion::Int=DefaultMaxParamPointerLevel) where 
-                    {F, T, V0, V1, V2} = 
-    new{T, V0, V1, V2, F}( ParamDict0D{T, V0}(), ParamDictSD{T, V1}(), 
-                           ParamDictDD{T, V2}(), ParamDictId{T}(), f, maxRecursion )
-end
-
-selectParamPointer(d::ParamPointerBox{T}, ::ElementalParam{T}) where {T} = d.d0
-selectParamPointer(d::ParamPointerBox{T}, ::FlattenedParam{T}) where {T} = d.d1
-selectParamPointer(d::ParamPointerBox{T}, ::ParamBox{T}) where {T} = d.d2
-selectParamPointer(d::ParamPointerBox{T}, ::ParamPointer{T}) where {T} = d.id
-
-getParamDataTypeUB(::ParamPointerBox{T, V0, <:Any, <:Any}, 
-                   ::ElementalParam{T}) where {T, V0} = V0
-getParamDataTypeUB(::ParamPointerBox{T, <:Any, V1, <:Any}, 
-                   ::FlattenedParam{T}) where {T, V1} = V1
-getParamDataTypeUB(::ParamPointerBox{T, <:Any, <:Any, V2}, 
-                   ::ParamBox{T}) where {T, V2} = V2
-
-function checkGetDataRecNum(counter::Int, maxRec::Int)
-    if counter > maxRec
-        throw( ErrorException("The recursive calling times passed the limit: $maxRec.") )
-    end
-    nothing
-end
-
-function getDataCore1(counter::Int, d::ParamPointerBox{T}, p::ParamBox{T}, 
-                      failFlag) where {T}
-    counter += 1
-    checkGetDataRecNum(counter, d.maxRecursion)
-    res = get(selectParamPointer(d, p), p, failFlag)
-    res===failFlag ? failFlag : res.data
-end
-
-function getDataCore1(counter::Int, d::ParamPointerBox{T}, p::ParamPointer{T}, 
-                      failFlag) where {T}
-    counter += 1
-    checkGetDataRecNum(counter, d.maxRecursion)
-    res = get(d.id, p, failFlag)
-    res===failFlag ? failFlag : d.generator(getDataCore2(counter, d, res.data, failFlag), p)
-end
-
-function getDataCore2(counter::Int, d::ParamPointerBox{T, V0, V1, V2}, 
-                      s::ParamInputSource{T}, failFlag) where {T, V0, V1, V2}
-    container = Memory{Any}(undef, length(s))
-    flag = true
-    eleTset = Set{Type}()
-    for i in eachindex(s)
-        res = getDataCore1(counter, d, s[i], failFlag)
-        if res === failFlag
-            flag = false
-            break
+    function ExpandParam(lambda::TypedExpand{E, N, F}, input::I, 
+                         symbol::SymOrIndexedSym, screen::TernaryNumber=TUS0, 
+                         offset::Union{PackedMemory{T, E, N}, Missing}=missing
+                         ) where {T, E<:Pack{T}, N, F, I<:CoreFixedParIn}
+        sym = IndexedSym(symbol)
+        offsetTuple = formatOffset(lambda, offset, input)
+        if isempty(offsetTuple)
+            new{T, E, N, F, I}(lambda, input, sym, screen)
         else
-            container[i] = res
-            push!(eleTset, typeof(res))
+            new{T, E, N, F, I}(lambda, input, sym, screen, first(offsetTuple))
         end
     end
-    flag ? ( Memory{Union{eleTset...}}(container)::Memory{<:Union{V0, V1, V2}} ) : failFlag
 end
 
-function getData(d::ParamPointerBox{T}, p::ParamBox{T}, default; 
-                 failFlag=nothing) where {T}
-    res = getDataCore1(0, d, p, failFlag)
-    res===failFlag ? default : res
+function genMeshParam(func::Function, input::CoreFixedParIn, symbol::SymOrIndexedSym)
+    lambda = formatTensorFunc(func, TypedExpand, input)
+    ExpandParam(lambda, input, IndexedSym(symbol), TUS0, missing)
 end
 
-function getParamMarker!(pDict::ParamPointerBox{T}, transformer::F, 
-                         p::ParamBox{T}) where {T, F}
-    mem = transformer(p)
-    tUB = getParamDataTypeUB(pDict, p)
-    markerType = NodeMarker{tUB}
-    get!(selectParamPointer(pDict, p), p) do
-        NodeMarker(mem, tUB)
-    end::markerType
+function genMeshParam(par::ExpandParam, symbol::SymOrIndexedSym=symOf(par))
+    offset = isOffsetEnabled(par) ? par.offset : missing
+    ExpandParam(par.lambda, par.input, IndexedSym(symbol), par.screen, offset)
 end
 
-function getParamMarker!(pDict::ParamPointerBox{T}, transformer::F, 
-                         p::ParamPointer{T}) where {T, F}
-    input = p.input
-    eleT = eltype(input)
-    parId = Memory{eleT}(undef, length(input))
-    for (i, par) in enumerate(input)
-        recursiveTransform!(transformer, pDict, par)
-        parId[i] = par
-    end
-    markerType = NodeMarker{Memory{eleT}}
-    get!(selectParamPointer(pDict, p), p) do
-        NodeMarker(Memory{eleT}(parId))
-    end::markerType
+function isScreenLevelChangeable(::Type{T}) where {T<:ParamBox}
+    minLevel, maxLevel = extrema( getScreenLevelOptions(T) )
+    (maxLevel - minLevel) > 0
 end
 
-function recursiveTransformCore1!(generator::F, marker::NodeMarker, 
-                                  p::ParamBox) where {F<:Function}
-    # Depth-first search by recursive calling
-    if !marker.visited
-        marker.visited = true
-        marker.data = generator(p)
+function isOffsetEnabled(pb::T) where {T<:AdaptableParam}
+    isScreenLevelChangeable(T) && maximum( getScreenLevelOptions(T) ) > 0 && 
+    isdefined(pb, :offset) # Only for safety
+end
+
+
+function indexParam(pb::ShapedParam, idx::Int, sym::MissingOr{Symbol}=missing; 
+                    offset::Int=0)
+    entry = pb.input[idx+offset]
+    if ismissing(sym) || sym==symOf(entry)
+        entry
+    elseif entry isa MeshParam
+        genMeshParam(entry, sym)
     else
-        marker.data
+        genCellParam(entry, sym)
     end
 end
 
-function recursiveTransformCore2!(generator::F, marker::NodeMarker, p::ParamPointer{T}, 
-                                  pDict::ParamPointerBox{T}) where {F<:Function, T}
-    val = map(marker.data) do par
-        res = getData(pDict, par, nothing)
-        res === nothing && throw(ErrorException("Could note locate the value for $par."))
-        res
+function indexParam(pb::AdaptableParam, idx::Int, sym::MissingOr{Symbol}=missing; 
+                    offset::Int=0)
+    idx += offset
+    ismissing(sym) && (sym = Symbol(symOf(pb), idx))
+    CellParam(ChainedAccess(idx), pb, sym)
+end
+
+function indexParam(pb::UnitParam, idx::Int, sym::MissingOr{Symbol}=missing; 
+                    offset::Int=0)
+    idx += offset
+    if idx != 1
+        throw(BoundsError(pb, idx))
+    elseif ismissing(sym) || sym == symOf(res)
+        pb
+    else
+        genCellParam(pb, sym)
     end
-    generator(val, p)
 end
 
-function recursiveTransform!(transformer::F, pDict::ParamPointerBox{T}, 
-                             p::PrimitiveParam{T, N}) where {F, T, N}
-    marker = getParamMarker!(pDict, transformer, p)
-    recursiveTransformCore1!(transformer, marker, p)
-    marker.data
+
+# level 0: λ(input) + offset
+# level 1: itself(offset)
+# level 2: offset
+function setScreenLevel!(p::P, level::Int) where {P<:AdaptableParam}
+    checkScreenLevel(level, getScreenLevelOptions(P))
+    levelOld = screenLevelOf(p)
+    if levelOld == level
+    elseif levelOld == 0
+        @atomic p.offset = obtain(p)
+    elseif level == 0
+        newVal = p.lambda((obtain(arg) for arg in p.input)...)
+        @atomic p.offset = unitOp(-, p.offset, newVal)
+    end
+    @atomic p.screen = TernaryNumber(level)
+    p
 end
 
-function recursiveTransform!(transformer::F, pDict::ParamPointerBox{T}, 
-                             p::ParamBox{T}) where {F, T}
-    marker = getParamMarker!(pDict, transformer, p)
 
-    recursiveTransformCore1!(marker, p) do par
-        sl = checkScreenLevel(screenLevelOf(par), getScreenLevelOptions(par|>typeof))
-        res = if sl == 0
-            map(ele->recursiveTransform!(transformer, pDict, ele), par.input)
-        else
-            T
+setScreenLevel(p::CellParam, level::Int) = 
+setScreenLevel!(genCellParam(p), level)
+
+setScreenLevel(p::MeshParam, level::Int) = 
+setScreenLevel!(genMeshParam(p), level)
+
+
+isDependentParam(p::ParamBox) = (screenLevelOf(p)  < 1)
+isPrimitiveInput(p::ParamBox) = (screenLevelOf(p) == 1)
+isFrozenVariable(p::ParamBox) = (screenLevelOf(p) == 2)
+
+
+getOutputSize(p::ShapedParam) = size(p.input)
+
+getOutputSize(p::PrimitiveParam) = size(p.input)
+
+function getOutputSize(p::AdaptableParam)
+    if p.offset isa AbstractArray
+        size(p.offset)
+    else
+        ()
+    end
+end
+
+
+getOutputType(::P) where {P<:ParamBox} = getOutputType(P)
+
+getOutputType(::Type{<:ParamBox}) = Any
+
+getOutputType(::Type{<:ParamBox{T, E}}) where {T, E<:Pack{T}} = getPackType(E)
+
+getOutputType(::Type{<:PrimitiveParam{T, E}}) where {T, E<:Pack{T}} = E
+
+function getOutputType(::Type{<:HeapParam{T, E, N}}) where {T, E<:Pack{T}, N}
+    innerType = getPackType(E)
+    if isconcretetype(innerType)
+        ShapedMemory{innerType, N}
+    else
+        ShapedMemory{<:innerType, N}
+    end
+end
+
+
+function hasCycleCore!(::Set{BlackBox}, ::Set{BlackBox}, 
+                       edge::Pair{<:PrimitiveParam, <:Union{Nothing, ParamBox}}, 
+                       ::Bool, finalizer::F=itself) where {F<:Function}
+    finalizer(edge)
+    (false, edge.first)
+end
+
+function hasCycleCore!(localTrace::Set{BlackBox}, history::Set{BlackBox}, 
+                       edge::Pair{<:CompositeParam, <:Union{Nothing, ParamBox}}, 
+                       strictMode::Bool, finalizer::F=itself) where {F<:Function}
+    here = edge.first
+
+    if strictMode || screenLevelOf(here) == 0
+        key = BlackBox(here)
+        if key in localTrace
+            return (true, here)
         end
-        transformer(res, par)
+
+        if !(key in history)
+            push!(localTrace, key)
+
+            for p in here.input
+                res = hasCycleCore!(localTrace, history, p=>here, strictMode, finalizer)
+                if first(res)
+                    return res
+                end
+            end
+
+            pop!(localTrace, key)
+            push!(history, key)
+        end
     end
 
-    marker.data
+    finalizer(edge)
+    (false, here)
 end
 
-function recursiveTransform!(transformer::F, pDict::ParamPointerBox{T}, 
-                             p::ParamPointer{T}) where {F, T}
-    marker = getParamMarker!(pDict, transformer, p)
-    recursiveTransformCore2!(transformer, marker, p, pDict)
+function hasCycle(param::ParamBox; strictMode::Bool=true, finalizer::Function=itself, 
+                  catcher::Array{ParamBox, 0}=Array{ParamBox, 0}( undef, () ))
+    localTrace = Set{BlackBox}()
+    parHistory = Set{BlackBox}()
+    bl, lastP = hasCycleCore!(localTrace, parHistory, param=>nothing, strictMode, finalizer)
+    catcher[] = lastP
+    bl
 end
 
 
-obtainCore(p::PrimitiveParam) = directObtain(p.input)
-obtainCore(p::BaseParam) = directObtain(p.memory)
-obtainCore(p::ParamLink) = reshape(map(directObtain, p.memory), last.(p.lambda.axis))
-
-function obtainCore(inputVal::NTuple{A, AbtArr210L{T}}, 
-                    p::BaseParam{T, <:Any, <:ParamInput{T, A}}) where {T, A}
-    p.lambda(inputVal...)
+function obtainCore!(cache::LRU{BlackBox, <:Any}, param::PrimitiveParam)
+    input = param.input
+    get!(cache, BlackBox(param), decoupledCopy(input))::typeof(input)
 end
 
-# function obtainCore(inputVal::NTuple{A, AbtArr210L{T}}, 
-#                     p::ParamMesh{T, <:Any, <:ParamInput{T, A}}) where {T, A}
-#     f = p.lambda
-#     valRaw = f.f( inputVal... )
-#     Memory{eltype(valRaw)}(valRaw[begin:(begin + f.extent - 1)])
-# end
-
-function obtainCore(inputVal::NTuple{A, AbtArr210L{T}}, 
-                    p::CellParam{T, <:Any, <:ParamInput{T, A}}) where {T, A}
-    screenLevelOf(p)==0 || throw(AssertionError("The screen level of `p` should be 0."))
-    shiftVal = genValShifter(T, (isOffsetEnabled(p) ? p.offset : nothing))
-    p.lambda(inputVal...) |> shiftVal
+function obtainCore!(cache::LRU{BlackBox, <:Any}, param::ShapedParam)
+    map(param.input) do p
+        obtainCore!(cache, p)
+    end::getOutputType(param)
 end
 
-obtainCore(::Type{T}, p::CellParam{T}) where {T} = p.offset
-
-function obtainCore(val::Memory{T}, p::ParamGrid{T, 0}) where {T}
-    reshape(val, p.input.shape)
+function obtainCore!(cache::LRU{BlackBox, <:Any}, param::AdaptableParam)
+    key = BlackBox(param)
+    get!(cache, key) do
+        if screenLevelOf(param) > 0
+            decoupledCopy(param.offset)
+        else
+            inVal = (obtainCore!(cache, p) for p in param.input)
+            body = param.lambda(inVal...)
+            isOffsetEnabled(param) ? unitOp(+, body, param.offset) : body
+        end
+    end::getOutputType(param)
 end
 
-obtainCore(val::Memory{<:AbstractArray{T, N}}, p::ParamGrid{T, N}) where {T, N} = 
-reshape(val, p.input.shape)
-
-const ParamValDict{T} = ParamPointerBox{ T, T, AbstractArray{T}, JaggedAbtArray{T}, 
-                                          typeof(obtainCore) }
-
-genParamValDict(::Type{T}, maxRecursion::Int=DefaultMaxParamPointerLevel) where {T} = 
-ParamPointerBox(obtainCore, T, T, AbstractArray{T}, JaggedAbtArray{T}, maxRecursion)
-
-# function searchObtain(pDict::ParamValDict{T}, p::ParamMesh{T}) where {T}
-#     res = recursiveTransform!(obtainCore, pDict, p)
-#     reshape(res, last.(p.lambda.axis)) |> collect
-# end
-
-searchObtain(pDict::ParamValDict{T}, p::ParamBox{T}) where {T} = 
-recursiveTransform!(obtainCore, pDict, p)
-
-obtainINTERNALcore(p::ParamBox{T}, maxRecursion::Int) where {T} = 
-searchObtain(genParamValDict(T, maxRecursion), p)
-
-obtainINTERNALcore(ps::AbstractArray{<:ParamBox{T}}, maxRecursion::Int) where {T} = 
-map(p->obtainINTERNAL(p, maxRecursion), ps)
-
-obtainINTERNAL(p::PrimitiveParam, ::Int) = obtainCore(p)
-
-function obtainINTERNAL(p::BaseParam{T, 0}, maxRecursion::Int) where {T}
-    isDependentParam(p) ? obtainINTERNALcore(p, maxRecursion) : obtainCore(T, p)
+function checkParamCycle(param::ParamBox; strictMode=false, finalizer::Function=itself)
+    catcher = Array{ParamBox, 0}(undef, ())
+    if hasCycle(param; strictMode, finalizer, catcher)
+        throw(AssertionError("`param`:\n    $param\n\n"*"has a reachable cycle at:\n    "*
+                             "$(catcher[])"))
+    end
 end
 
-function obtainINTERNAL(p::CompositeParam{T}, maxRecursion::Int) where {T}
-    obtainINTERNALcore(p, maxRecursion)
+function obtain(param::CompositeParam)
+    checkParamCycle(param)
+    cache = LRU{BlackBox, Any}(maxsize=100)
+    obtainCore!(cache, param)
 end
 
-function obtainINTERNAL(p::ParamNest{T}, maxRecursion::Int) where {T}
-    if any(isDependentParam, p.input)
-        obtainINTERNALcore(p, maxRecursion)
+obtain(param::PrimitiveParam) = decoupledCopy(param.input)
+
+function obtain(params::ParamBoxAbtArr)
+    if isempty(params)
+        getOutputType(params|>eltype)[]
     else
-        obtainINTERNALcore(p.input, maxRecursion)
+        cache = LRU{BlackBox, Any}(maxsize=min( 500, 100length(params) ))
+        map(params) do param
+            checkParamCycle(param)
+            obtainCore!(cache, param)
+        end
     end
 end
-
-function obtainINTERNAL(ps::AbstractArray{<:PrimitiveParam{T}}, ::Int) where {T}
-    obtainINTERNALcore(ps, 0)
-end
-
-function obtainINTERNAL(ps::AbstractArray{<:ParamBox{T}}, maxRecursion::Int) where {T}
-    if any(isDependentParam, ps)
-        pValDict = genParamValDict(T, maxRecursion)
-        map(p->searchObtain(pValDict, p), ps)
-    else
-        obtainINTERNALcore(ps, maxRecursion)
-    end
-end
-
-function obtainINTERNAL(p::AbtArrayOr{<:ParamBox}, maxRecursion::Int)
-    map(i->obtainINTERNAL(i, maxRecursion), p)
-end
-
-obtain(p::ParamBox; maxRecursion::Int=DefaultMaxParamPointerLevel) = 
-obtainINTERNAL(p, maxRecursion)
-
-obtain(p::ParamBoxUnionArr{ParamBox{T}}; 
-       maxRecursion::Int=DefaultMaxParamPointerLevel) where {T} = 
-obtainINTERNAL(p, maxRecursion)
-
-obtain(p::ParamBoxUnionArr; maxRecursion::Int=DefaultMaxParamPointerLevel) = 
-obtainINTERNAL(itself.(p), maxRecursion)
-
-################################
 
 (pn::ParamBox)() = obtain(pn)
 
-function setVal!(par::PrimitiveParam{T, N}, val::AbstractArray{T, N}) where {T, N}
-    if Int(par.screen) == 1
-        safelySetVal!(par.input.value, val)
-    else
-        throw(ArgumentError("`par` is a constant parameter that should not be modified."))
-    end
+
+# function setVal!(par::UnitParam{<:Any, Primitive}, val)
+#     if Int(par.screen) != 1
+#         throw(ArgumentError("`par` is a constant parameter that should not be modified."))
+#     end
+#     @atomic par.input = val
+# end
+
+# function setVal!(par::GridParam{<:Any, Primitive}, val)
+#     if Int(par.screen) != 1
+#         throw(ArgumentError("`par` is a constant parameter that should not be modified."))
+#     end
+#     @atomic par.input = val
+# end
+
+function setVal!(par::PrimitiveParam, val)
+    @atomic par.input = val
 end
 
-setVal!(par::PrimitiveParam{T, 0}, val::T) where {T} = setVal!(par, fill(val))
-
-function setVal!(par::CellParam{T}, val::T) where {T}
-    isPrimitiveParam(par) || 
-    throw(ArgumentError("`par` must behave like a primitive parameter."))
+function setVal!(par::AdaptableParam, val)
+    if !isPrimitiveInput(par)
+        throw(AssertionError("`isPrimitiveInput(par)` must return `true`."))
+    end
     @atomic par.offset = val
 end
 
-# import Base: iterate, size, length, eltype, broadcastable
-# length(::FixedSizeParam{<:Any, N}) where {N} = N
-# eltype(np::FixedSizeParam) = eltype(np.input)
 
-# iterate(::FixedSizeParam{<:Any, 1}, args...) = iterate(1, args...)
-# size(::FixedSizeParam{<:Any, 1}, args...) = size(1, args...)
-# broadcastable(np::FixedSizeParam{<:Any, 1}) = Ref(np)
+struct BoxCoreType{T, B<:Box} <: StructuredType end
 
-# iterate(np::FixedSizeParam, args...) = iterate(np.input, args...)
-# size(np::FixedSizeParam, args...) = size(np.input, args...)
-# broadcastable(np::FixedSizeParam) = Base.broadcastable(np.input)
-
-
-# struct CachedJParam{T, N, O, P<:ParamBox{T, N, O}, 
-#                     E<:Union{T, AbstractArray{T, N}}} <: QueryBox{P}
-#     source::P
-#     cache::ShapedMemory{E, O}
-
-#     function CachedJParam(source::P) where {T, N, O, P<:ParamBox{T, N, O}}
-#         output = obtain(source)
-#         new{T, N, O, P, eltype(output)}(source, ShapedMemory(output))
-#     end
-# end
-
-# CachedJParam(param::CachedJParam) = CachedJParam(param.param)
-
-# function extract!(cp::CachedJParam{T}; returnCache::Bool=false, 
-#                   updateCache::Bool=true) where {T}
-#     if returnCache
-#         res = cp.cache
-#     else
-#         res = obtain(cp.param)
-#         updateCache && (box.cache .= res)
-#     end
-#     res
-# end
-
-# const EleCJParam{T} = CachedJParam{T, 0, 0}
-# const ISpCJParam{T, N} = CachedJParam{T, N, 0}
-# const OSpCJParam{T, O} = CachedJParam{T, 0, O}
-
-
-struct ParamMarker{T, N, O} <: IdentityMarker{ParamBox{T, N, O}}
+struct ParamMarker{T} <: IdentityMarker{BoxCoreType{T, ParamBox}}
     code::UInt
+    type::NestedLevel{T}
     data::IdentityMarker
     func::IdentityMarker
-    meta::Tuple{ValMkrPair{<:Union{T, Nothing}}, ValMkrPair{Int}, ValMkrPair{Symbol}}
+    meta::Tuple{ValMkrPair, ValMkrPair{Int}, ValMkrPair{Symbol}}
 
-    function ParamMarker(p::P) where {T, N, O, P<:ParamBox{T, N, O}}
-        offset = :offset => markObj(isOffsetEnabled(p) ? p.offset : nothing)
-        code = offset.second.code
+    function ParamMarker(param::P) where {P<:ParamBox}
+        type = getNestedLevel(P)
+        code = hash(type)
 
-        sl = screenLevelOf(p)
+        switch = isOffsetEnabled(param)
+        offset = :offset => markObj(switch ? param.offset : nothing)
+        code = hash(offset.second.code, code)
+
+        sl = screenLevelOf(param)
         screen = :screen => markObj(sl)
         code = hash(screen.second, code)
 
-        sym = :symbol => markObj(p.symbol.name)
+        sym = :symbol => (markObj∘symOf)(param)
         code = hash(sym.second, code)
 
         meta = (offset, screen, sym)
 
-        func = markObj((P <: ParamFunctor && sl == 0) ? p.lambda : nothing)
+        func = markObj((P <: AdaptableParam && sl == 0) ? param.lambda : nothing)
         code = hash(func, code)
 
-        data = markParam(p)
+        data = if P <: PrimitiveParam
+            Identifier(param.input)
+        elseif switch && sl > 0
+            Identifier(param.offset)
+        else
+            checkParamCycle(param)
+            markParamInput(param.input)
+        end
         code = hash(data.code, code)
 
-        new{T, N, O}(code, data, func, meta)
+        new{getCoreType(type)}(code, type, data, func, meta)
     end
 end
 
-function markParam(input::NonEmptyTuple{ParamBox}, refParam::ParamBox)
-    markObj( markParam.(input, Ref(refParam)) )
+function markParamInput(input::NonEmptyTuple{ParamBox})
+    markObj( ParamMarker.(input) )
 end
 
-function markParam(input::ParamBoxUnionArr, ::ParamBox)
+function markParamInput(input::ParamBoxAbtArr)
     markObj(input)
 end
 
-function markParam(param::PrimitiveParam, ::ParamBox)
-    Identifier(param.input)
-end
-
-function markParam(param::ParamFunctor, refParam::ParamBox)
-    if screenLevelOf(param) > 0 || param === refParam
-        Identifier(param.memory)
-    else
-        markParam(param.input, refParam)
-    end
-end
-
-function markParam(param::ParamNest, refParam::ParamBox)
-    markParam(param.input, refParam)
-end
-
-markParam(param::ParamBox) = markParam(param, param)
-
+#= Additional Method =#
 markObj(input::ParamBox) = ParamMarker(input)
 
 function ==(marker1::T, marker2::T) where {T<:ParamMarker}
     if marker1.code == marker2.code
-        marker1.data == marker2.data
+        marker1.type == marker2.type && 
+        marker1.data == marker2.data && 
+        marker1.func == marker2.func && 
+        marker1.meta == marker2.meta
     else
         false
     end
@@ -977,714 +761,416 @@ end
 
 compareParamBox(p1::T, p2::T) where {T<:PrimitiveParam} = p1 === p2
 
-function compareParamBox(p1::ParamBox{T, N, O}, 
-                         p2::ParamBox{T, N, O}) where {T, N, O}
+function compareParamBox(p1::ParamBox{T, E, S}, p2::ParamBox{T, E, S}) where 
+                        {T, E<:Pack{T}, S<:StateType}
     p1 === p2 || ParamMarker(p1) == ParamMarker(p2)
 end
 
 compareParamBox(::ParamBox, ::ParamBox) = false
 
-# operateBy(op::F, pn1::CellParam, num::Real) where {F<:Function} = 
-# CellParam(OFC(itself, op, num), pn1, pn1.symbol)
 
-# operateBy(op::F, num::Real, pn1::CellParam) where {F<:Function} = 
-# CellParam(OCF(itself, op, num), pn1, pn1.symbol)
-
-# operateBy(op::CommutativeBinaryNumOps, num::Real, pn1::CellParam) = 
-# operateBy(op, pn1::CellParam, num::Real)
-
-# reformulate(::typeof(+), pn1::CellParam) = itself(pn1)
-# reformulate(::typeof(-), pn1::CellParam{T}) where {T} = reformulate(*, T(-1), pn1)
-
-# repeatedlyApply(::typeof(+), pn::CellParam{T}, times::Int) where {T} = 
-# reformulate(*, pn, T(times))
-
-# repeatedlyApply(::typeof(-), pn::CellParam{T}, times::Int) where {T} = 
-# reformulate(-, operateBy(*, pn, T(times)))
-
-# repeatedlyApply(::typeof(*), pn::CellParam{T}, times::Int) where {T} = 
-# reformulate(^, pn, T(times))
-
-# function reformulate(op::F, pn1::CellParam{T}, pn2::CellParam{T}) where 
-#                     {F<:Union{typeof(+), typeof(*)}, T<:Real}
-#     if symFromIndexSym(pn1.symbol) > symFromIndexSym(pn2.symbol)
-#         pn2, pn1 = pn1, pn2
-#     end
-#     if compareParamBox(pn1, pn2)
-#         repeatedlyApply(op, pn1, 2)
-#     else
-#         operateByCore(op, pn1, pn2)
-#     end
-# end
-
-
-# addCellParam(pn1::CellParam{T}, pn2::CellParam{T}) where {T<:Real} = operateBy(+, pn1, pn2)
-
-# mulCellParam(pn1::CellParam{T}, pn2::CellParam{T}) where {T<:Real} = operateBy(*, pn1, pn2)
-# mulCellParam(pn::CellParam{T}, coeff::T) where {T} = operateBy(*, pn, coeff)
-# mulCellParam(coeff::T, pn::CellParam{T}) where {T} = mulCellParam(pn, coeff)
-
-
-# function sortParamContainers(::Type{C}, f::F, field::Symbol, roundAtol::T) where 
-#                             {T, C<:ParamFunction{T}, F}
-#     let roundAtol=roundAtol, f=f, field=field
-#         function (container::C)
-#             ele = getproperty(container, field)
-#             ( roundToMultiOfStep(f(container), nearestHalfOf(roundAtol)), 
-#               symFromIndexSym(ele.symbol), ParamMarker(ele) )
-#         end
-#     end
-# end
 function getParams(source)
-    (first∘getFieldParams)(source)
+    map(last, getFieldParams(source))
 end
 
 function getFieldParams(source::T) where {T}
-    paramPairs = Tuple{ParamBox, ChainPointer}[]
-    getFieldParamsCore!(paramPairs, source, ChainPointer())
-    first.(paramPairs), last.(paramPairs)
+    paramPairs = Pair{ChainedAccess, ParamBox}[]
+    getFieldParamsCore!(paramPairs, source, ChainedAccess())
+    paramPairs
 end
 
-function getFieldParamsCore!(paramPairs::Vector{Tuple{ParamBox, ChainPointer}}, 
-                             source::ParamBox, anchor::ChainPointer)
-    push!(paramPairs, (source, anchor))
+function getFieldParamsCore!(paramPairs::AbstractVector{Pair{ChainedAccess, ParamBox}}, 
+                             source::ParamBox, anchor::ChainedAccess)
+    push!(paramPairs, anchor=>source)
     nothing
 end
 
-function getFieldParamsCore!(paramPairs::Vector{Tuple{ParamBox, ChainPointer}}, 
-                             source::T, anchor::ChainPointer) where {T}
+function getFieldParamsCore!(paramPairs::AbstractVector{Pair{ChainedAccess, ParamBox}}, 
+                             source::T, anchor::ChainedAccess) where {T}
     searchParam = false
     if source isa Union{Tuple, AbstractArray}
         if isempty(source)
             return nothing
         else
             searchParam = true
-            content = eachindex(source)
+            fields = eachindex(source)
         end
-    elseif isstructtype(T) && !( Base.issingletontype(T) )
+    elseif isstructtype(T) && !(Base.issingletontype(T))
         searchParam = true
-        content = fieldnames(T)
+        fields = fieldnames(T)
     end
     if searchParam
-        for fieldSym in content
+        for fieldSym in fields
             field = getField(source, fieldSym)
-            anchorNew = ChainPointer(anchor, fieldSym)
+            anchorNew = ChainedAccess(anchor, fieldSym)
             getFieldParamsCore!(paramPairs, field, anchorNew)
         end
     end
     nothing
 end
 
-uniqueParams(ps::AbstractArray{<:ParamBox}) = 
-markUnique(ps, compareFunction=compareParamBox)[end]
+uniqueParams(ps::ParamBoxAbtArr) = markUnique(ps, compareFunction=compareParamBox)[end]
 
-
-function markParamsCore!(indexDict::IdDict{Symbol, Int}, leafPars)
-    for i in leafPars
-        sym = i.symbol.name
-        get!(indexDict, sym, 0)
-        i.symbol.index = (indexDict[sym] += 1)
-    end
+struct ReduceShift{T, F} <: TypedTensorFunc{T, 0}
+    apply::TypedReduce{T, F}
+    shift::T
 end
 
-function markParams!(pars::AbstractVector{<:ParamBox{T}}) where {T}
-    nodes, marks1, marks2 = topoSort(pars)
-    leafPars = nodes[.!marks1 .*   marks2]
-    rootPars = nodes[  marks1 .* .!marks2]
-    selfPars = nodes[.!marks1 .* .!marks2]
-    parIdxDict = IdDict{Symbol, Int}()
+(f::ReduceShift)(args...) = unitOp(+, f.apply(args...), f.shift)
 
-    par0Dids = findall(x->(x isa ElementalParam{T}), leafPars)
-    leafParsFormated = if isempty(par0Dids)
-        markParamsCore!(parIdxDict, leafPars)
-        convert(Vector{PrimParamEle{T}}, leafPars)
+struct ExpandShift{T, N, F} <: TypedTensorFunc{T, N}
+    apply::TypedExpand{T, N, F}
+    shift::ShapedMemory{T, N}
+end
+
+(f::ExpandShift)(args...) = unitOp(+, f.apply(args...), f.shift)
+
+extractTransformCore(::ReduceParam) = ReduceShift
+extractTransformCore(::ExpandParam) = ExpandShift
+
+function extractTransform(pb::AdaptableParam)
+    fCore = if isOffsetEnabled(pb)
+        extractTransformCore(pb)(pb.lambda, pb.offset)
     else
-        leafP0Ds = ElementalParam{T}[splice!(leafPars, par0Dids)...]
-        markParamsCore!(parIdxDict, leafP0Ds)
-        markParamsCore!(parIdxDict, leafPars)
-        PrimParamEle{T}[leafP0Ds, leafPars...]
+        pb.lambda
     end
-    (leafParsFormated, rootPars, selfPars) # inputParam, outputParam, selfParam
+    ReturnTyped(fCore, getOutputType(pb))
 end
 
-markParams!(b::AbtArrayOr) = b |> getParams |> markParams!
+function extractTransform(pb::ShapedParam)
+    ReturnTyped(itself, getOutputType(pb))
+end
 
-#!! Change `hbNodesIdSet` to IDSet
-function topoSortCore!(hbNodesIdSet::Set{UInt}, 
-                       orderedNodes::Vector{<:ParamBox{T}}, 
-                       haveBranches::Vector{Bool}, connectRoots::Vector{Bool}, 
-                       node::ParamBox{T}, recursive::Bool=false) where {T}
-    sl = checkScreenLevel(screenLevelOf(node), getScreenLevelOptions(node))
+struct ParamBoxClassifier <: StatefulFunction{ParamBox}
+    holder::Vector{Pair{ <:ParamBox, Array{Bool, 0} }}
+    linker::Vector{Pair{ <:ParamBox, Array{Bool, 0} }}
+    history::IdDict{ParamBox, Int}
 
-    if sl in (0, 1)
-        idx = findfirst(Fix2(compareParamBox, node), orderedNodes)
-        if idx === nothing
-            hasBranch = ifelse(sl == 0, true, false)
-            if hasBranch
-                id = objectid(node)
-                isRegisteredSubRoot = (id in hbNodesIdSet)
-                if !isRegisteredSubRoot
-                    push!(hbNodesIdSet, objectid(node))
-                    for child in node.input
-                        topoSortCore!(hbNodesIdSet, orderedNodes, haveBranches, 
-                                      connectRoots, child, true)
-                    end
-                end
-            end
-            push!(orderedNodes, node)
-            push!(haveBranches, hasBranch)
-            push!(connectRoots, recursive)
-        else
-            connectRoots[idx] = recursive
-        end
+    function ParamBoxClassifier()
+        new(Pair{<:ParamBox, Array{Bool, 0}}[], Pair{<:ParamBox, Array{Bool, 0}}[], 
+            IdDict{ParamBox, Int}())
     end
+end
+
+function (f::ParamBoxClassifier)(edge::Pair{<:ParamBox, <:Union{Nothing, ParamBox}})
+    here, next = edge
+    sector = ifelse(isDependentParam(here), f.linker, f.holder)
+    hasDescendent = (next !== nothing)
+    idx = get!(f.history, here) do
+        push!(sector, here=>fill(false))
+        lastindex(sector)
+    end
+    sector[idx].second[] = hasDescendent
     nothing
 end
 
-function topoSortINTERNAL(nodes::AbstractVector{<:ParamBox{T}}) where {T}
-    orderedNodes = ParamBox{T}[]
-    haveBranches = Bool[]
-    connectRoots = Bool[]
-    hbNodesIdSet = Set{UInt}()
-    for node in nodes
-        topoSortCore!(hbNodesIdSet, orderedNodes, haveBranches, connectRoots, node)
+
+function classifyParamsCore(pars::ParamBoxAbtArr)
+    pars = unique(BlackBox, pars)
+    finalizer = ParamBoxClassifier()
+
+    foreach(pars) do par
+        checkParamCycle(par; finalizer)
     end
-    orderedNodes, haveBranches, connectRoots
-end
 
-function topoSort(nodes::AbstractVector{<:ParamBox{T}}) where {T}
-    uniqueParams(nodes) |> topoSortINTERNAL
-end
+    source = initializeSpanParamSet()
+    hidden = ParamBox[]
+    output = ParamBox[]
+    direct = ParamBox[]
 
-topoSort(node::CellParam{T}) where {T} = topoSortINTERNAL([node])
-
-
-# # Sever the connection of a node to other nodes
-# sever(pv::TensorVar) = TensorVar(obtain(pv), pv.symbol)
-
-# sever(obj::Any) = deepcopy(obj)
-
-# sever(obj::Union{Tuple, AbstractArray}) = sever.(obj)
-
-# function sever(pf::T) where {T<:ParamFunction}
-#     severedFields = map(field->(sever∘getproperty)(pf, field), fieldnames(pf))
-#     T(severedFields...)
-# end
-
-# struct ParamBoxCacheBox{T, P<:ParamBox{T}} <: QueryBox{Union{P, ShapedMemory{T}}}
-#     param::Dict{Symbol, P}
-#     cache::Dict{Symbol, ShapedMemory{T}}
-
-#     function ParamBoxCacheBox(par::AbstractArray{P}, sym::AbstractArray{Symbol}) where 
-#                              {T, P<:ParamBox{T}}
-#         if size(par) != size(sym)
-#             throw(AssertionError("`par` and `sym` should have the same length"))
-#         end
-#         val = ShapedMemory.(T, obtain.(par))
-#         new{T, P}(Dict(sym .=> par), Dict(sym .=> val))
-#     end
-# end
-
-# function extract(box::ParamBoxCacheBox{T}, sym::Symbol; 
-#                  returnCache::Bool=false, updateCache::Bool=true) where {T}
-#     if returnCache
-#         res = itself.(box.cache[sym])
-#     else
-#         res = obtain(box.param[sym])
-#         updateCache && (box.cache[sym] = res)
-#     end
-#     res
-# end
-
-#####
-
-
-function genCellEncoder(::Type{T}, sym::Symbol; defaultScreenLevel::Int=1) where {T}
-    function (input::ParamOrValue{T})
-        if input isa ElementalParam{T}
-            input
-        else
-            p = CellParam(T(input), sym)
-            setScreenLevel!(p, defaultScreenLevel)
-            p
+    for (dest1, dest2, sector) in ( (source, direct, finalizer.holder), 
+                                    (hidden, output, finalizer.linker) )
+        for pair in sector
+            param = pair.first
+            dest = ifelse(pair.second[], dest1, dest2)
+            if dest isa SpanParamVectorTuple
+                level = getNestedLevel(param|>typeof).level
+                container = ifelse(level==0, first, last)(dest)
+                push!(container, param)
+            else
+                push!(dest, param)
+            end
         end
     end
+
+    (source=source, hidden=hidden, output=output, direct=direct)
+end
+
+classifyParams(params::ParamBoxAbtArr) = classifyParamsCore(params)
+
+classifyParams(source::Any) = classifyParamsCore(source|>getParams)
+
+
+function markParam!(param::ParamBox, 
+                    indexDict::AbstractDict{Symbol, Int}=Dict{Symbol, Int}())
+    sym = symOf(param)
+    get!(indexDict, sym, 0)
+    param.symbol.index = (indexDict[sym] += 1)
+    nothing
+end
+
+function sortParams!(params::AbstractVector{<:ParamBox}; indexing::Bool=true)
+    encoder = function (x::ParamBox)
+        nl = getNestedLevel(x|>typeof)
+        (screenLevelOf(x), nl.level, symbolFrom(x.symbol), objectid(x))
+    end
+
+    sort!(params, by=encoder)
+
+    if indexing
+        parIdxDict = Dict{Symbol, Int}()
+        for par in params
+            markParam!(par, parIdxDict)
+        end
+    end
+    params
 end
 
 
-evalParamSource(s::ParamBox) = obtain(s)
+struct UnitParamEncoder{T}
+    symbol::Symbol
+    screen::TernaryNumber
 
-evalParamSource(s::ParamBoxUnionArr{<:ParamBox, 1}) = obtain(s)
-
-evalParamSource(s::GeneralParamInput{T, <:FlatParamVec{T}}) where {T} = mapLayout(obtain, s)
-
-evalParamSource(s::GeneralParamInput) = mapLayout(evalParamSource, s)
-
-
-# FlatParamVec: [[d0...], d1...]          # Used for  input-param set
-
-# MiscParamVec: [[[d0...], d1...], d2...] # Used for output-param set
-
-pushParam!(arr::AbstractArray, param::ParamBox) = push!(arr, param)
-
-
-#? Possibly rename the field names in Flat/MiscParamSet?
-## (Also applied for TemporaryStorage, FixedSizeStorage, ParamPointerBox)
-#? Allow AbstractParamSet to be empty if all sections are empty?
-struct FlatParamSet{T, P1<:ElementalParam{<:T}, 
-                    P2<:FlattenedParam{<:T}} <: AbstractFlatParamSet{T, Vector{P1}, P2}
-    d0::Vector{P1}
-    d1::Vector{P2}
-
-    FlatParamSet{T}(d0::Vector{P1}, d1::Vector{P2}) where 
-                   {T, P1<:ElementalParam{<:T}, P2<:FlattenedParam{<:T}} = 
-    new{T, P1, P2}(d0, d1)
+    function UnitParamEncoder(::Type{T}, symbol::Symbol, screen::TernaryNumber) where {T}
+        new{T}(symbol, screen)
+    end
 end
 
-const TypedFlatParamSet{T, P1<:ElementalParam{T}, P2<:FlattenedParam{T}} = 
-      FlatParamSet{T, P1, P2}
+UnitParamEncoder(::Type{T}, symbol::Symbol, screen::Int=1) where {T} = 
+UnitParamEncoder(T, symbol, TernaryNumber(screen))
 
-const PrimitiveParamSet{T, P1<:ElementalParam{T}, P2<:InnerSpanParam{T}} = 
-      TypedFlatParamSet{T, P1, P2}
+(f::UnitParamEncoder)(input::UnitParam) = itself(input)
 
-size(fps::FlatParamSet) = size(fps.d1) .+ 1
+function (f::UnitParamEncoder)(input)
+    p = genCellParam(T(input), f.symbol)
+    setScreenLevel!(p, Int(f.screen))
+end
 
-firstindex(::FlatParamSet) = 1
 
-lastindex(fps::FlatParamSet) = length(fps.d1) + 1
+const AbstractSpanParamIndexSet{U<:AbstractVector{OneToIndex}, 
+                                G<:AbstractVector{OneToIndex}} = 
+      @NamedTuple{unit::U, grid::G}
 
-getFlatSetIndexCore(target, i::Int) = 
-getindex(target.d1, i+firstindex(target.d1)-2)
+const SpanParamIndexSet = AbstractSpanParamIndexSet{Memory{OneToIndex}, Memory{OneToIndex}}
 
-function getFlatSetIndex(target, i::Int)
-    if i == 1
-        target.d0
+
+const AbstractSpanParamSet{U<:AbstractVector{<:UnitParam}, G<:AbstractVector{<:GridParam}} = 
+      @NamedTuple{unit::U, grid::G}
+
+const SpanParamVectorTuple{T1<:UnitParam, T2<:GridParam} = 
+      AbstractSpanParamSet{Vector{T1}, Vector{T2}}
+
+const AbstractSpanValueSet{T, U<:AbstractVector{T}, 
+                              G<:AbstractVector{ <:AbstractArray{T} }} = 
+      @NamedTuple{unit::U, grid::G}
+
+const SpanValueMemoryTuple{T1, T2<:AbstractArray{T1}} = 
+      AbstractSpanParamSet{Memory{T1}, Memory{T2}}
+
+
+initializeSpanParamSet() = (unit=UnitParam[], grid=GridParam[])
+
+initializeSpanParamSet(::Type{T}) where {T} = (unit=UnitParam{T}[], grid=GridParam{T}[])
+
+initializeSpanParamSet(units::AbstractVector{<:UnitParam}, 
+                       grids::AbstractVector{<:GridParam}) = (unit=units, grid=grids)
+
+
+function locateParam!(params::AbstractVector, target::ParamBox)
+    if isempty(params)
+        push!(params, target)
+        OneToIndex(1)
     else
-        getFlatSetIndexCore(target, i)
-    end
-end
-
-function getFlatSetIndex(target, sector::Symbol, i::Int)
-    getindex(getfield(target, sector), i)
-end
-
-getindex(fps::FlatParamSet, i::Int) = getFlatSetIndex(fps, i)
-
-getindex(fps::FlatParamSet, sector::Symbol, i::Int) = getFlatSetIndex(fps, sector, i)
-
-function setindex!(fps::FlatParamSet, val, i::Int)
-    if i == firstindex(fps)
-        fps.d0 .= val
-    else
-        setindex!(fps.d1, val, i+firstindex(fps.d1)-2)
-    end
-end
-
-function setindex!(fps::FlatParamSet, val, sector::Symbol, i::Int)
-    setindex!(getfield(fps, sector), val, i)
-end
-
-pushParam!(fps::FlatParamSet, a::ElementalParam) = push!(fps.d0, a)
-pushParam!(fps::FlatParamSet, a::FlattenedParam) = push!(fps.d1, a)
-
-function iterate(fps::AbstractFlatParamSet)
-    i = firstindex(fps)
-    (getindex(fps, i), i+1)
-end
-
-function iterate(fps::AbstractFlatParamSet, state)
-    if state > length(fps)
-        nothing
-    else
-        (getindex(fps, state), state+1)
-    end
-end
-
-length(fps::FlatParamSet) = length(fps.d1) + 1
-
-axes(fps::FlatParamSet)	= map(Base.OneTo, size(fps))
-
-function similar(fps::FlatParamSet{T, P1, P2}, shape::Tuple{Int}=size(fps); 
-                 innerShape::Tuple{Int}=size(fps.d0)) where 
-                {T, P1<:ElementalParam{<:T}, P2<:FlattenedParam{<:T}}
-    checkPositivity(shape|>first)
-    res = Vector{Union{Vector{P1}, P2}}(undef, shape)
-    res[begin] = Vector{P1}(undef, innerShape)
-    res
-end
-
-getproperty(fps::FlatParamSet, field::Symbol) = getfield(fps, field)
-
-const FlatParamSetMixedVec{T, P1<:ElementalParam{<:T}, P2<:FlattenedParam{<:T}, 
-                           P3<:ParamBox{<:T}} = 
-      AbstractMiscParamSet{T, FlatParamSet{T, P1, P2}, P3}
-
-function initializeParamSet(::Type{FlatParamSet}, ::Type{T}=Any; 
-                            d0Type::MissingOr{Type{<:FlattenedParam{<:T}}}=missing, 
-                            d1Type::MissingOr{Type{<:FlattenedParam{<:T}}}=missing) where 
-                           {T}
-    bl = isconcretetype(T)
-    if ismissing(d0Type)
-        d0Type = ifelse(bl, ElementalParam{T}, ElementalParam{<:T})
-    end
-    if ismissing(d1Type)
-        d1Type = ifelse(bl, FlattenedParam{T}, FlattenedParam{<:T})
-    end
-    FlatParamSet{T}(d0Type[], d1Type[])
-end
-
-initializeParamSet(::Type{FlatParamSet{T, P1, P2}}) where {T, P1, P2} = 
-FlatParamSet(P1[], P2[])
-
-initializeParamSet(f::Function) = 
-initializeParamSet(SelectTrait{ParameterizationStyle}()(f))
-
-initializeParamSet(::GenericFunction) = initializeParamSet(FlatParamSet)
-
-initializeParamSet(::TypedParamFunc{T}) where {T} = initializeParamSet(FlatParamSet, T)
-
-
-# function initializeParamSet(::Type{MiscParamSet}, ::Type{T}=Any; 
-#                             d0Type::MissingOr{Type{<:ElementalParam{<:T}}}=missing, 
-#                             d1Type::MissingOr{Type{<:FlattenedParam{<:T}}}=missing, 
-#                             d2Type::MissingOr{Type{<:ParamBox{<:T}}}=missing) where {T}
-#     inner = initializeParamSet(FlatParamSet, T; d0Type, d1Type)
-#     if ismissing(d2Type)
-#         d2Type = ifelse(isconcretetype(T), ParamBox{T}, ParamBox{<:T})
-#     end
-#     MiscParamSet(inner, d2Type[])
-# end
-
-# initializeParamSet(::Type{MiscParamSet{T, P1, P2, P3}}) where {T, P1, P2, P3} = 
-# MiscParamSet(FlatParamSet(P1[], P2[]), P3[])
-
-
-#!  SingleNestParamSet
-#!  DoubleNestParamSet
-const FlatPSetInnerPtr = ChainIndexer{2, Tuple{FirstIndex, Int}}
-const FlatPSetOuterPtr = ChainIntIdxr{1}
-const FlatParamSetIdxPtr = Union{FlatPSetInnerPtr, FlatPSetOuterPtr}
-
-struct FlatParamSetFilter <: PointerStack{1, 2}
-    d0::ShapedMemory{FlatPSetInnerPtr, 1}
-    d1::Memory{FlatPSetOuterPtr}
-end
-
-function FlatParamSetFilter(d0::AbstractVector{FlatPSetInnerPtr}, 
-                            d1::AbstractVector{FlatPSetOuterPtr})
-    d0 isa ShapedMemory || (d0 = ShapedMemory(d0))
-    d1 isa Memory || (d1 = getMemory(d1))
-    FlatParamSetFilter(d0, d1)
-end
-
-const FilteredFlatParamSet{T} = FilteredObject{<:TypedFlatParamSet{T}, FlatParamSetFilter}
-
-const TypedParamInput{T} = Union{TypedFlatParamSet{T}, FilteredFlatParamSet{T}}
-
-function FlatParamSetFilter(pSet::FlatParamSet{T}, d0Ids::AbstractVector{Int}, 
-                            d1Ids::AbstractVector{Int}) where {T}
-    d0Ptr = map(d0Idx->ChainPointer((FirstIndex, d0Idx)), d0Ids)
-    d1Ptr = map(d1Idx->ChainPointer(d1Idx+1), d1Ids)
-    FlatParamSetFilter(d0Ptr, d1Ptr)
-end
-
-size(fps::FlatParamSetFilter) = size(fps.d1) .+ 1
-
-firstindex(::FlatParamSetFilter) = 1
-
-lastindex(fps::FlatParamSetFilter) = length(fps.d1) + 1
-
-getindex(fps::FlatParamSetFilter, i::Int) = getFlatSetIndex(fps, i)
-
-getindex(fps::FlatParamSetFilter, sector::Symbol, i::Int) = getFlatSetIndex(fps, sector, i)
-
-function iterate(fps::FlatParamSetFilter)
-    i = firstindex(fps)
-    (getindex(fps, i), i+1)
-end
-
-function iterate(fps::FlatParamSetFilter, state)
-    if state > length(fps)
-        nothing
-    else
-        (getindex(fps, state), state+1)
-    end
-end
-
-length(fps::FlatParamSetFilter) = length(fps.d1) + 1
-
-getproperty(fps::FlatParamSetFilter, field::Symbol) = getfield(fps, field)
-
-
-struct FlatParamSubset{T, P1<:ElementalParam{<:T}, P2<:FlattenedParam{<:T}
-                       } <: AbstractFlatParamSet{T, ShapedMemory{P1, 1}, P2}
-    core::FilteredObject{FlatParamSet{T, P1, P2}, FlatParamSetFilter}
-end
-
-const GeneralFlatParamSet{T, P1, P2} = 
-      Union{FlatParamSet{T, P1, P2}, FlatParamSubset{T, P1, P2}}
-
-size(fps::FlatParamSubset) = size(fps.core.ptr)
-
-firstindex(fps::FlatParamSubset) = firstindex(fps.core.ptr)
-
-lastindex(fps::FlatParamSubset) = lastindex(fps.core.ptr)
-
-getindex(fps::FlatParamSubset, i::Int) = getField(fps.core.obj, getindex(fps.core.ptr, i))
-
-getindex(fps::FlatParamSubset, sector::Symbol, i::Int) = 
-getField(fps.core.obj, getindex(fps.core.ptr, sector, i))
-
-function setindex!(fps::FlatParamSubset, val, i::Int)
-    setindex!(fps.core.obj, val, getindex(fps.core.ptr, i))
-end
-
-function setindex!(fps::FlatParamSubset, val, sector::Symbol, i::Int)
-    setindex!(fps.core.obj, val, getindex(fps.core.ptr, sector, i))
-end
-
-pushParam!(::FlatParamSubset, ::Union{ElementalParam, FlattenedParam}) = 
-throw(AssertionError("The size of `FlatParamSubset` cannot be changed."))
-
-length(fps::FlatParamSubset) = length(fps.core.ptr)
-
-axes(fps::FlatParamSubset)= map(Base.OneTo, size(fps))
-
-function similar(fps::FlatParamSubset{T, P1, P2}, shape::Tuple{Int}=size(fps); 
-                 innerShape::Tuple{Int}=size(fps.code.d0)) where 
-                {T, P1<:ElementalParam{<:T}, P2<:FlattenedParam{<:T}}
-    checkPositivity(shape|>first)
-    res = Memory{Union{ShapedMemory{P1, 1}, P2}}(undef, shape)
-    res[begin] = ShapedMemory{P1}(undef, innerShape)
-    res
-end
-
-getproperty(fps::FlatParamSubset, field::Symbol) = getfield(fps, field)
-
-getField(fps::FlatParamSubset, field::GeneralEntryPointer) = getField(fps.core, field)
-
-
-#= Additional Method =#
-getField(obj::FlatParamSetFilter, ptr::FlatPSetInnerPtr) = 
-getindex(obj.d0, last(ptr.chain))
-
-getField(obj::FlatParamSetFilter, ptr::FlatPSetOuterPtr) = 
-getFlatSetIndexCore(obj, first(ptr.chain))
-
-function getField(prev::FlatParamSetFilter, here::FlatParamSetFilter)
-    d0New = map(here.d0) do ptr
-        getField(prev, ptr)
-    end
-    d1New = map(here.d1) do ptr
-        getField(prev, ptr)
-    end
-    FlatParamSetFilter(d0New, d1New)
-end
-
-function refocus!(here::FlatParamSetFilter, prev::FlatParamSetFilter)
-    for i in eachindex(here.d0)
-        ptr = here.d0[i]
-        here.d0[i] = getField(prev, ptr)
-    end
-
-    for i in eachindex(here.d1)
-        ptr = here.d1[i]
-        here.d1[i] = getField(prev, ptr)
-    end
-    here
-end
-
-
-getParamSector(source::FlatParamSet, ::Type{<:ElementalParam}) = 
-( first(source), ChainPointer(FirstIndex()) )
-
-getParamSector(source::AbstractVector, ::Type{<:ParamBox}) = 
-( itself(source), ChainPointer() )
-
-
-function locateParam!(paramSet::AbstractVector, target::P) where {P<:ParamBox}
-    if isempty(paramSet)
-        pushParam!(paramSet, target)
-        ChainPointer(firstindex(paramSet))
-    else
-        paramSector, anchor = getParamSector(paramSet, P)
-        idx = findfirst(x->compareObj(x, target), paramSector)
+        idx = findfirst(x->compareObj(x, target), params)
         if idx === nothing
-            pushParam!(paramSector, target)
-            idx = length(paramSector)
+            push!(params, target)
+            idx = lastindex(params)
         end
-        ChainPointer(anchor, idx)
+        OneToIndex(idx - firstindex(params) + 1)
+    end |> ChainedAccess
+end
+
+function locateParam!(paramSet::AbstractSpanParamSet, target::UnitParam)
+    GetIndex{UnitIndex}(locateParam!(paramSet.unit, target))
+end
+
+function locateParam!(paramSet::AbstractSpanParamSet, target::GridParam)
+    GetIndex{GridIndex}(locateParam!(paramSet.grid, target))
+end
+
+const ParamBoxSource = Union{ParamBoxAbtArr, NonEmptyTuple{ParamBox}, AbstractSpanParamSet}
+
+function locateParam!(params::Union{AbstractSpanParamSet, AbstractVector}, 
+                      subset::ParamBoxSource)
+    map(subset) do param
+        locateParam!(params, param)
     end
 end
 
-function locateParam!(paramSet::AbstractVector, target::AbstractArray{<:ParamBox{T}, N}; 
-                      emptyReturnEltype::Type{<:ChainPointer}=ChainPointer) where 
-                     {T, N}
-    if isempty(target)
-        Array{emptyReturnEltype}(undef, ntuple(_->0, Val(N)))
-    else
-        map(x->locateParam!(paramSet, x), target)
+const MultiSpanData{T} = Union{T, DirectMemory{T}, NestedMemory{T}}
+
+struct MultiSpanDataCacheBox{T} <: QueryBox{MultiSpanData{T}}
+    unit::Dict{Identifier, T}
+    grid::Dict{Identifier, DirectMemory{T}}
+    nest::Dict{Identifier, NestedMemory{T}}
+end
+
+getSpanDataSector(cache::MultiSpanDataCacheBox{T1}, 
+                  ::UnitParam{T2}) where {T1, T2<:T1} = cache.unit
+
+getSpanDataSector(cache::MultiSpanDataCacheBox{T1}, 
+                  ::GridParam{T2}) where {T1, T2<:T1} = cache.grid
+
+getSpanDataSector(cache::MultiSpanDataCacheBox{T1}, 
+                  ::NestParam{T2}) where {T1, T2<:T1} = cache.nest
+
+formatSpanData(::Type{T}, val) where {T} = T(val)
+
+function formatSpanData(::Type{T}, val::AbstractArray) where {T}
+    res = getPackedMemory(val)
+    res::getPackType(T, getNestedLevel(res).level)
+end
+
+function cacheParam!(cache::MultiSpanDataCacheBox{T}, param::ParamBox{<:T}) where {T}
+    get!(getSpanDataSector(cache, param), Identifier(param)) do
+        formatSpanData(T, obtain(param))
     end
 end
 
-function locateParam!(paramSet::AbstractVector, target::NonEmptyTuple{ParamBox})
-    locateParam!.(Ref(paramSet), target)
-end
-
-locateParam!(paramSet::AbstractVector, target::NamedTuple) = 
-locateParam!(paramSet, values(target))
-
-function locateParam!(paramSet::FlatParamSet{T}, target::FlatParamSet{T}) where {T}
-    d0ptrs, d1ptrs = map( fieldnames(FlatParamSet), 
-                          (FlatPSetInnerPtr, FlatPSetOuterPtr) ) do n, t
-        locateParam!(getfield(paramSet, n), getfield(target, n), emptyReturnEltype=t)
-    end
-    d0ptrs = ChainPointer.(Ref(FirstIndex()), d0ptrs)
-    if !isempty(d1ptrs)
-        offset = 2 - firstindex(paramSet.d1)
-        d1ptrs = map(x->ChainPointer(x.chain .+ offset), d1ptrs)
-    end
-    FlatParamSetFilter(d0ptrs, d1ptrs)
-end
-
-function locateParam!(paramSet::AbstractVector, target::FlatParamSet{T}) where {T}
-    d0ptrs, d1ptrs = map(fieldnames(FlatParamSet)) do n
-        locateParam!.(Ref(paramSet), getfield(target, n))
-    end
-    FlatParamSetFilter(d0ptrs, d1ptrs)
-end
-
-
-const DimensionalSpanMemory{T} = Union{T, ShapedMemory{T}, ShapedMemory{ShapedMemory{T}}}
-
-struct DimSpanDataCacheBox{T} <: QueryBox{DimensionalSpanMemory{T}}
-    d0::Dict{Identifier, T}
-    d1::Dict{Identifier, ShapedMemory{T}}
-    d2::Dict{Identifier, ShapedMemory{ShapedMemory{T}}}
-end
-
-DimSpanDataCacheBox(::Type{T}) where {T} = 
-DimSpanDataCacheBox( Dict{Identifier, T}(), 
-                     Dict{Identifier, ShapedMemory{T}}(), 
-                     Dict{Identifier, ShapedMemory{ShapedMemory{T}}}() )
-
-getDimSpanSector(cache::DimSpanDataCacheBox{T}, ::ElementalParam{T}) where {T} = cache.d0
-
-getDimSpanSector(cache::DimSpanDataCacheBox{T}, ::FlattenedParam{T}) where {T} = cache.d1
-
-getDimSpanSector(cache::DimSpanDataCacheBox{T}, ::ParamBox{T}) where {T} = cache.d2
-
-formatDimSpanMemory(::Type{T}, val::T) where {T} = itself(val)
-
-formatDimSpanMemory(::Type{T}, val::AbstractArray{T}) where {T} = ShapedMemory(val)
-
-formatDimSpanMemory(::Type{T}, val::JaggedAbtArray{T}) where {T} = 
-ShapedMemory(map(ShapedMemory, val))
-
-function cacheParam!(cache::DimSpanDataCacheBox{T}, param::ParamBox{T}) where {T}
-    get!(getDimSpanSector(cache, param), Identifier(param)) do
-        formatDimSpanMemory(T, obtain(param))
-    end
-end
-
-function cacheParam!(cache::DimSpanDataCacheBox{T}, s::FlatParamSubset{T}) where {T}
-    cacheParam!(cache, s.core)
-end
-
-function cacheParam!(cache::DimSpanDataCacheBox{T}, s::TypedParamInput{T}, 
-                     ptr::CompositePointer) where {T}
-    evalField(s, ptr) do par
-        cacheParam!(cache, par)
-    end
-end
-
-function cacheParam!(cache::DimSpanDataCacheBox{T}, 
-                     s::GeneralParamInput{T, <:TypedParamSetVec{T}}) where {T}
-    mapLayout(s) do p
-        cacheParam!(cache, p)
+function cacheParam!(cache::MultiSpanDataCacheBox, params::ParamBoxSource)
+    map(params) do param
+        cacheParam!(cache, param)
     end
 end
 
 
 # Methods for parameterized functions
-
 function evalFunc(func::F, input::T) where {F<:Function, T}
     fCore, pSet, _ = unpackFunc(func)
     evalFunc(fCore, pSet, input)
 end
 
-function evalFunc(fCore::F, pSet::Union{DirectParamSource, TypedParamInput}, 
-                  input::T) where {F<:Function, T}
-    fCore(input, evalParamSource(pSet))
-end
-
-function evalFunc(fCore::F, pVals::AbtVecOfAbtArr, input::T) where {F<:Function, T}
-    fCore(input, pVals)
+function evalFunc(fCore::F, pSet, input::T) where {F<:Function, T}
+    fCore(input, map(obtain, pSet))
 end
 
 #! Possibly adding memoization in the future to generate/use the same param set to avoid 
 #! bloating `Quiqbox.IdentifierCache` and prevent repeated computation.
-unpackFunc(f::F) where {F<:Function} = unpackFunc!(f, initializeParamSet(f))
+unpackFunc(f::F) where {F<:Function} = unpackFunc!(f, initializeSpanParamSet())
 
-unpackFunc!(f::F, paramSet::AbstractVector) where {F<:Function} = 
+unpackFunc!(f::F, paramSet::AbstractSpanParamSet) where {F<:Function} = 
 unpackFunc!(SelectTrait{ParameterizationStyle}()(f), f, paramSet)
 
-unpackFunc!(::TypedParamFunc, f::Function, paramSet::AbstractVector) = 
+unpackFunc!(::TypedParamFunc, f::Function, paramSet::AbstractSpanParamSet) = 
 unpackParamFunc!(f, paramSet)
 
-unpackFunc!(::GenericFunction, f::Function, paramSet::AbstractVector) = 
+unpackFunc!(::GenericFunction, f::Function, paramSet::AbstractSpanParamSet) = 
 unpackTypedFunc!(f, paramSet)
 
-const FieldPtrPair = Pair{<:ChainPointer, <:FlatParamSetIdxPtr}
-const FieldPtrPairs = AbstractVector{<:FieldPtrPair}
-const FieldPtrDict = AbstractDict{<:ChainPointer, <:FlatParamSetIdxPtr}
-const EmptyFieldPtrDict = TypedEmptyDict{Union{}, FlatPSetInnerPtr}
-const FiniteFieldPtrDict{N} = FiniteDict{N, <:ChainPointer, <:FlatParamSetIdxPtr}
 
-const FieldValDict{T} = AbstractDict{<:FlatParamSetIdxPtr, <:Union{T, AbstractArray{T}}}
-const ParamValOrDict{T} = Union{AbtVecOfAbtArr{T}, FieldValDict{T}}
+struct SpanParamFilter <: Filter
+    scope::SpanParamIndexSet
+end
+
+function SpanParamFilter(scope::AbstractSpanParamIndexSet)
+    SpanParamFilter(map(getMemory, scope))
+end
+
+function SpanParamFilter(;unit::AbstractVector{OneToIndex}=OneToIndex[], 
+                          grid::AbstractVector{OneToIndex}=OneToIndex[])
+    SpanParamFilter((;unit, grid))
+end
+
+function getField(paramSet::AbstractSpanParamSet, f::SpanParamFilter)
+    firstIds = map(firstindex, paramSet)
+    map(paramSet, firstIds, f.scope) do sector, i, ids
+        view(sector, (i - 1) .+ ids)
+    end
+end
+
+const EmptyFieldPtrDict = TypedEmptyDict{Union{}, GetOneToIndex}
+const FieldParamPtrDict = AbstractDict{<:ChainedAccess, GetOneToIndex}
+const FieldParamPtrPairs = AbstractVector{<:Pair{<:ChainedAccess, GetOneToIndex}}
 
 abstract type FieldParamPointer{R} <: Any end
 
-struct MixedFieldParamPointer{R<:FieldPtrDict} <: FieldParamPointer{R}
+struct MixedFieldParamPointer{R<:FieldParamPtrDict} <: FieldParamPointer{R}
     core::R
     tag::Identifier
 end
 
-function MixedFieldParamPointer(paramPairs::FieldPtrPairs, tag::Identifier)
+function MixedFieldParamPointer(paramPairs::FieldParamPtrPairs, tag::Identifier)
     coreDict = buildDict(paramPairs, EmptyFieldPtrDict)
     MixedFieldParamPointer(coreDict, tag)
 end
 
 
 # `f` should only take one input.
-unpackTypedFunc!(f::Function, paramSet::AbstractVector, 
+unpackTypedFunc!(f::Function, paramSet::AbstractSpanParamSet, 
                  paramSetId::Identifier=Identifier(paramSet)) = 
 unpackTypedFunc!(ReturnTyped(f, Any), paramSet, paramSetId)
 
+struct GenericParamFunc{F<:Function, C1<:ChainedAccess, C2<:ChainedAccess}
+    core::F
+    unit::Memory{C1}
+    grid::Memory{C2}
+end
 
-function unpackTypedFuncCore!(f::ReturnTyped{T}, paramSet::AbstractVector) where {T}
-    params, anchors = getFieldParams(f)
+function (f::GenericParamFunc)(input, valSet::AbstractSpanValueSet)
+    unitPars = map(x->getfield(f.core, x), f.unit)::Memory{<:UnitParam}
+    gridPars = map(x->getfield(f.core, x), f.grid)::Memory{<:GridParam}
+
+    foreach(unitPars, valSet.unit) do p, v
+        setVal!(p, v)
+    end
+
+    foreach(gridPars, valSet.grid) do p, v
+        setVal!(p, v)
+    end
+
+    f.core(input)
+end
+
+function unpackTypedFuncCore!(f::ReturnTyped{T}, 
+                              paramSet::AbstractSpanParamSet) where {T}
+    params, anchors = getFieldParams(f.f)
+
     if isempty(params)
         ParamSelectFunc(f), paramSet, FieldPtrPair[]
     else
-        ids = locateParam!(paramSet, params)
-        fDummy = deepcopy(f.f)
-        paramDoubles = getParams(fDummy)
-        foreach(p->setScreenLevel!(p, 1), paramDoubles)
-        evalCore = function (x, pVals::Vararg)
-            for (p, v) in zip(paramDoubles, pVals)
-                setVal!(p, v)
+        paramPtrDict = IdDict(params .=> anchors)
+        source, _, _, direct = classifyParamsCore(params)
+        input = filter!(isPrimitiveInput, vcat(source, direct))
+        units = UnitParam[]
+        filter!(input) do x
+            if x isa UnitParam
+                push!(units, x)
+                true
+            else
+                false
             end
-            fDummy(x)
         end
-        paramPairs = getMemory(ChainPointer(:apply, anchors) .=> ids)
-        ParamSelectFunc(ReturnTyped(evalCore, T), ids), paramSet, paramPairs
+
+        unitIds = locateParam!(paramSet.unit, units)
+        gridIds = locateParam!(paramSet.grid, input)
+        idTuple = (unit=unitIds, grid=gridIds)
+
+        unitPtrs = map(x->getindex(paramPtrDict, x), units)
+        gridPtrs = map(x->getindex(paramPtrDict, x), input)
+        ptrTuple = (unit=unitPtrs, grid=gridPtrs)
+
+        ptrPairs = map(ptrTuple, idTuple) do p, i
+            ChainedAccess((:apply, :f, :core), p) => i
+        end
+
+        fCore = GenericParamFunc(deepcopy(f.f), getMemory(unitPtrs), getMemory(gridPtrs))
+        f = ParamSelectFunc(ReturnTyped(fCore, T), SpanParamFilter(idTuple))
+        f, paramSet, ptrPairs
     end
 end
 
-function unpackTypedFunc!(f::ReturnTyped{T}, paramSet::AbstractVector, 
-                          paramSetId::Identifier=Identifier(paramSet)) where {T}
+function unpackTypedFunc!(f::ReturnTyped, paramSet::AbstractSpanParamSet, 
+                          paramSetId::Identifier=Identifier(paramSet))
     fCore, _, paramPairs = unpackTypedFuncCore!(f, paramSet)
     ptrDict = buildDict(paramPairs, EmptyFieldPtrDict)
     paramPtr = MixedFieldParamPointer(ptrDict, paramSetId)
