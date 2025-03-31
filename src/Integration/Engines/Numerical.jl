@@ -1,5 +1,7 @@
 using HCubature
 
+#! Use QuadGK.jl if the basis is AxialProdFunc
+
 struct ConfineInterval{T, F<:ReturnTyped{T}} <: FunctionModifier
     f::F
 
@@ -61,7 +63,7 @@ end
 
 function numericalIntegrate(::OneBodyIntegral{D}, op::F, 
                             orbs::NonEmptyTuple{EvalFieldFunction{T, D}, N}, 
-                            pVals::NonEmptyTuple{FilteredVecOfArr{T}, N}) where 
+                            pVals::NonEmptyTuple{AbstractSpanValueSet, N}) where 
                             {F<:DirectOperator, T, D, N}
     terms = Base.Fix2.(orbs, pVals)
     integralKernel = composeIntegralKernel(OneBodyIntegral{D}(), op, T, terms)
@@ -88,11 +90,11 @@ const OnyBodyPairNumInt{T, D, F<:DirectOperator, P1<:PrimitiveOrbCore{T, D},
                         P2<:PrimitiveOrbCore{T, D}} = 
       OneBodyNumIntegrate{T, D, F, Tuple{P1, P2}}
 
-function (f::OneBodySelfNumInt{T, D})(pVal::FilteredVecOfArr{T}) where {T, D}
+function (f::OneBodySelfNumInt{T, D})(pVal::AbstractSpanValueSet) where {T, D}
     numericalIntegrate(OneBodyIntegral{D}(), f.op, f.basis, (pVal,))
 end
 
-function (f::OnyBodyPairNumInt{T, D})(pVal1::FilteredVecOfArr{T}, 
-                                      pVal2::FilteredVecOfArr{T}) where {T, D}
+function (f::OnyBodyPairNumInt{T, D})(pVal1::AbstractSpanValueSet, 
+                                      pVal2::AbstractSpanValueSet) where {T, D}
     numericalIntegrate(OneBodyIntegral{D}(), f.op, f.basis, (pVal1, pVal2))
 end

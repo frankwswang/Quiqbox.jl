@@ -269,4 +269,18 @@ function (f::KeywordPartial)(arg...; kws...)
     end
 end
 
+
 const AbsSqrtInv = inv∘sqrt∘abs
+
+
+function typedMap(op::F, obj::AbstractArray, ::Type{T}=Union{}) where {F<:Function, T}
+    if isempty(obj)
+        similar(obj, T)
+    else
+        map(op, obj)
+    end
+end
+
+function typedMap(op::F, obj::Union{Tuple, NamedTuple}, ::Type=Union{}) where {F<:Function}
+    map(op, obj)
+end

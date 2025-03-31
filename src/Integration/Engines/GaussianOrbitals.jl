@@ -61,8 +61,7 @@ struct PrimGaussOrbInfo{T, D}
     new{T, D+1}(cen, xpn, ang)
 end
 
-const PrimGaussOrbConfig{T, D} = PrimGaussOrbInfo{FlatPSetInnerPtr{T}, D}
-
+const PrimGaussOrbConfig{D} = PrimGaussOrbInfo{GetIndex{UnitIndex}, D}
 
 struct GaussProductInfo{T, D}
     lhs::PrimGaussOrbInfo{T, D}
@@ -78,10 +77,10 @@ struct GaussProductInfo{T, D}
     end
 end
 
-function GaussProductInfo(configs::NTuple{2, PrimGaussOrbConfig{T, D}}, 
-                          parsPair::NTuple{2, FilteredVecOfArr{T}}) where {T, D}
+function GaussProductInfo(configs::NTuple{2, PrimGaussOrbConfig{D}}, 
+                          parsPair::NTuple{2, AbstractSpanValueSet}) where {D}
     d1, d2 = map(configs, parsPair) do sector, pars
-        cen = getField(pars, sector.cen)
+        cen = map(i->getField(pars, i), sector.cen)
         xpn = getField(pars, sector.xpn)
         PrimGaussOrbInfo(cen, xpn, sector.ang)
     end
@@ -198,22 +197,23 @@ function preparePGTOconfig(orb::PrimGTOcore)
     PrimGaussOrbInfo(cenIds, xpnIdx, ang)
 end
 
-struct PrimGTOrbOverlap{T, D, B<:N12Tuple{PrimGaussOrbConfig{T, D}}
+struct PrimGTOrbOverlap{T, D, B<:N12Tuple{PrimGaussOrbConfig{D}}
                         } <: OrbitalIntegrator{T, D}
+    type::Type{T}
     basis::B
 end
 
-const OverlapGTOrbSelf{T, D} = PrimGTOrbOverlap{T, D,  Tuple{    PrimGaussOrbConfig{T, D} }}
-const OverlapGTOrbPair{T, D} = PrimGTOrbOverlap{T, D, NTuple{ 2, PrimGaussOrbConfig{T, D} }}
+const OverlapGTOrbSelf{T, D} = PrimGTOrbOverlap{T, D,  Tuple{    PrimGaussOrbConfig{D} }}
+const OverlapGTOrbPair{T, D} = PrimGTOrbOverlap{T, D, NTuple{ 2, PrimGaussOrbConfig{D} }}
 
-function (f::OverlapGTOrbSelf{T})(pars::FilteredVecOfArr{T}) where {T}
+function (f::OverlapGTOrbSelf)(pars::AbstractSpanValueSet)
     sector = first(f.basis)
     xpnVal = getField(pars, sector.xpn)
     overlapPGTOcore(xpnVal, sector.ang)
 end
 
-function (f::OverlapGTOrbPair{T, D})(pars1::FilteredVecOfArr{T}, 
-                                     pars2::FilteredVecOfArr{T}; 
+function (f::OverlapGTOrbPair{T, D})(pars1::AbstractSpanValueSet, 
+                                     pars2::AbstractSpanValueSet; 
                                      cache!Self::GTOrbOverlapCache{T, D}=
                                      AxialOneBodyIntCompCache(T, Val(D))) where {T, D}
     data = GaussProductInfo(f.basis, (pars1, pars2))
@@ -222,7 +222,7 @@ end
 
 
 function genGTOrbOverlapFunc(orbCoreData::N12Tuple{PrimGTOcore{T, D}}) where {T, D}
-    PrimGTOrbOverlap(preparePGTOconfig.(orbCoreData))
+    PrimGTOrbOverlap(T, preparePGTOconfig.(orbCoreData))
 end
 
 
@@ -300,27 +300,27 @@ computeMultiMomentGTO!(::MonomialMul{T, D, 0}, cache::GTOrbOverlapCache{T, D},
 overlapPGTO!(cache, data)
 
 
-struct PrimGTOrbMultiMoment{T, D, L, B<:N12Tuple{PrimGaussOrbConfig{T, D}}
+struct PrimGTOrbMultiMoment{T, D, L, B<:N12Tuple{PrimGaussOrbConfig{D}}
                             } <: OrbitalIntegrator{T, D}
     op::MonomialMul{T, D, L}
     basis::B
 end
 
 const MultiMomentGTOrbSelf{T, D, L} = 
-      PrimGTOrbMultiMoment{T, D, L,  Tuple{    PrimGaussOrbConfig{T, D} }}
+      PrimGTOrbMultiMoment{T, D, L,  Tuple{    PrimGaussOrbConfig{D} }}
 const MultiMomentGTOrbPair{T, D, L} = 
-      PrimGTOrbMultiMoment{T, D, L, NTuple{ 2, PrimGaussOrbConfig{T, D} }}
+      PrimGTOrbMultiMoment{T, D, L, NTuple{ 2, PrimGaussOrbConfig{D} }}
 
-function (f::MultiMomentGTOrbSelf{T})(pars::FilteredVecOfArr{T}) where {T}
+function (f::MultiMomentGTOrbSelf)(pars::AbstractSpanValueSet)
     sector = first(f.basis)
-    cen = getField(pars, sector.cen)
+    cen = map(i->getField(pars, i), sector.cen)
     xpn = getField(pars, sector.xpn)
     data = PrimGaussOrbInfo(cen, xpn, sector.ang)
     computeMultiMomentGTO(f.op, data)
 end
 
-function (f::MultiMomentGTOrbPair{T, D})(pars1::FilteredVecOfArr{T}, 
-                                         pars2::FilteredVecOfArr{T}; 
+function (f::MultiMomentGTOrbPair{T, D})(pars1::AbstractSpanValueSet, 
+                                         pars2::AbstractSpanValueSet; 
                                          cache!Self::GTOrbOverlapCache{T, D}=
                                          AxialOneBodyIntCompCache(T, Val(D))) where {T, D}
     data = GaussProductInfo(f.basis, (pars1, pars2))
@@ -331,4 +331,10 @@ end
 function genGTOrbMultiMomentFunc(op::MonomialMul{T, D}, 
                                  orbCoreData::N12Tuple{PrimGTOcore{T, D}}) where {T, D}
     PrimGTOrbMultiMoment(op, preparePGTOconfig.(orbCoreData))
+end
+
+
+
+function computeKineticEnergyOnGTO(data1, data2)
+    
 end

@@ -654,7 +654,7 @@ obtain(param::PrimitiveParam) = decoupledCopy(param.input)
 
 function obtain(params::ParamBoxAbtArr)
     if isempty(params)
-        getOutputType(params|>eltype)[]
+        Union{}[]
     else
         cache = LRU{BlackBox, Any}(maxsize=min( 500, 100length(params) ))
         map(params) do param
@@ -935,11 +935,10 @@ end
 
 const AbstractSpanSet{U<:AbstractVector, G<:AbstractVector} = @NamedTuple{unit::U, grid::G}
 
-const AbstractSpanValueSet{T, U<:AbstractVector{T}, G<:AbtVecOfAbtArr{T}} = 
-      AbstractSpanSet{U, G}
+const AbstractSpanValueSet{U<:AbstractVector, G<:AbtVecOfAbtArr} = AbstractSpanSet{U, G}
 
 const FixedSpanValueSet{T1, T2<:AbstractArray{T1}} = 
-      AbstractSpanValueSet{T1, Memory{T1}, Memory{T2}}
+      AbstractSpanValueSet{Memory{T1}, Memory{T2}}
 
 const AbstractSpanIndexSet{U<:AbstractVector{OneToIndex}, G<:AbstractVector{OneToIndex}} = 
       AbstractSpanSet{U, G}
@@ -987,18 +986,18 @@ function locateParam!(paramSet::AbstractSpanParamSet, target::GridParam)
     GetIndex{GridIndex}(locateParamCore!(paramSet.grid, target))
 end
 
-const ParamBoxSource = Union{ParamBoxAbtArr, NonEmptyTuple{ParamBox}, AbstractSpanParamSet}
+const ParamBoxSource = Union{ParamBoxAbtArr, Tuple{Vararg{ParamBox}}, AbstractSpanParamSet}
 
 function locateParam!(params::Union{AbstractSpanParamSet, AbstractVector}, 
                       subset::ParamBoxSource)
-    map(subset) do param
+    typedMap(subset, GetIndex) do param
         locateParam!(params, param)
     end
 end
 
 function locateParam!(params::AbstractSpanParamSet, subset::AbstractSpanParamSet)
-    unit = map(x->locateParamCore!(params.unit, x), subset.unit)
-    grid = map(x->locateParamCore!(params.grid, x), subset.grid)
+    unit = typedMap(x->locateParamCore!(params.unit, x), subset.unit, OneToIndex)
+    grid = typedMap(x->locateParamCore!(params.grid, x), subset.grid, OneToIndex)
     SpanSetFilter(unit, grid)
 end
 
@@ -1011,6 +1010,12 @@ struct MultiSpanDataCacheBox{T} <: QueryBox{MultiSpanData{T}}
     nest::Dict{Identifier, NestedMemory{T}}
 end
 
+MultiSpanDataCacheBox(::Type{T}) where {T} = 
+MultiSpanDataCacheBox(Dict{Identifier, T}(), 
+                      Dict{Identifier, DirectMemory{T}}(), 
+                      Dict{Identifier, NestedMemory{T}}())
+
+
 getSpanDataSector(cache::MultiSpanDataCacheBox{T1}, 
                   ::UnitParam{T2}) where {T1, T2<:T1} = cache.unit
 
@@ -1020,12 +1025,14 @@ getSpanDataSector(cache::MultiSpanDataCacheBox{T1},
 getSpanDataSector(cache::MultiSpanDataCacheBox{T1}, 
                   ::NestParam{T2}) where {T1, T2<:T1} = cache.nest
 
+
 formatSpanData(::Type{T}, val) where {T} = T(val)
 
 function formatSpanData(::Type{T}, val::AbstractArray) where {T}
     res = getPackedMemory(val)
-    res::getPackType(T, getNestedLevel(res).level)
+    res::getPackType(T, getNestedLevel(res|>typeof).level)
 end
+
 
 function cacheParam!(cache::MultiSpanDataCacheBox{T}, param::ParamBox{<:T}) where {T}
     get!(getSpanDataSector(cache, param), Identifier(param)) do
@@ -1033,20 +1040,30 @@ function cacheParam!(cache::MultiSpanDataCacheBox{T}, param::ParamBox{<:T}) wher
     end
 end
 
+# getParamCacheType(::Type{<:UnitParam{T}}) where {T} = T
+# getParamCacheType(::Type{<:GridParam{T}}) where {T} = DirectMemory{T}
+# getParamCacheType(::Type{<:NestParam{T}}) where {T} = NestedMemory{T}
+# getParamCacheType(::Type{<:ParamBox{T} }) where {T} = Union{T, PackedMemory{T}}
+
+# getParamCacheType(::Type{<:ParamBox }) = Any
+# getParamCacheType(::Type{<:GridParam}) = DirectMemory
+# getParamCacheType(::Type{<:NestParam}) = NestedMemory
+
 function cacheParam!(cache::MultiSpanDataCacheBox, params::ParamBoxSource)
-    map(params) do param
+    # defaultEltype = params isa AbstractArray ? getParamCacheType(params|>eltype) : Union{}
+    typedMap(params) do param
         cacheParam!(cache, param)
     end
 end
 
 
 # Methods for parameterized functions
-function evalFunc(func::F, input::T) where {F<:Function, T}
+function evalFunc(func::F, input) where {F<:Function}
     fCore, pSet, _ = unpackFunc(func)
     evalFunc(fCore, pSet, input)
 end
 
-function evalFunc(fCore::F, pSet, input::T) where {F<:Function, T}
+function evalFunc(fCore::F, pSet, input) where {F<:Function}
     fCore(input, map(obtain, pSet))
 end
 
@@ -1079,7 +1096,11 @@ end
 function getField(paramSet::AbstractSpanSet, sFilter::SpanSetFilter)
     firstIds = map(firstindex, paramSet)
     map(paramSet, firstIds, sFilter.scope) do sector, i, oneToIds
+        # if isempty(oneToIds)
+        #     Memory{Union{}}(undef, 0)
+        # else
         view(sector, map(x->(x.idx + i - 1), oneToIds))
+        # end
     end
 end
 
@@ -1139,12 +1160,13 @@ end
 
 function unpackTypedFuncCore!(f::ReturnTyped{T}, 
                               paramSet::AbstractSpanParamSet) where {T}
-    params, anchors = getFieldParams(f.f)
+    paramPairs = getFieldParams(f.f)
 
-    if isempty(params)
-        ParamSelectFunc(f), paramSet, FieldPtrPair[]
+    if isempty(paramPairs)
+        ParamSelectFunc(f), paramSet, Union{}[]
     else
-        paramPtrDict = IdDict(params .=> anchors)
+        params = map(first, paramPairs)
+        paramPtrDict = IdDict(paramPairs)
         source, _, _, direct = classifyParamsCore(params)
         input = filter!(isPrimitiveInput, vcat(source, direct))
         units = UnitParam[]
