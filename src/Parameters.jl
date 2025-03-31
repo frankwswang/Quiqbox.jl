@@ -343,15 +343,15 @@ function formatOffset(lambda::TypedTensorFunc{<:Pack}, offset, input)
     end
 end
 
-
-getCellOutputLevel(::CoreFixedParIn{T, E}) where {T, E<:Pack{T}} = getNestedLevel(E).level
-
-function getCellOutputLevel(input::NestFixedParIn{T, E}) where {T, E<:PackedMemory{T}}
-    type = all(p isa CellParam for p in input) ? E : eltype(E)
-    getNestedLevel(type).level
+# ([[x]], [x]) -> {[x]}, (x, x) -> {x}
+getCellOutputLevels(::CoreFixedParIn{T, E}) where {T, E<:Pack{T}} = 
+Set(getNestedLevel(E).level)
+# ([x], [x]) -> {x, [x]}
+function getCellOutputLevels(::NestFixedParIn{T, E}) where {T, E<:PackedMemory{T}}
+    level = getNestedLevel(E).level
+    Set((level, level-1))
 end
 
-# ([[x]], [x]) -> [x]; ([x], [x]) -> x; (cell, cell) -> cell
 function formatTensorFunc(f::Function, ::Type{TypedReduce}, 
                           input::CoreFixedParIn{T, E}) where {T, E<:Pack{T}}
     lambda = if f isa TypedReduce{<:Pack}
@@ -360,9 +360,11 @@ function formatTensorFunc(f::Function, ::Type{TypedReduce},
         type = f(obtain.(input)...) |> typeof |> genPackMemoryType
         TypedReduce(f, type)
     end
-    level = getCellOutputLevel(input)
-    if getNestedLevel(lambda.type).level != level
-        throw("The nested level of `f`'s output should be `$level`.")
+    targetLevels = getCellOutputLevels(input)
+    actualLevel = getNestedLevel(lambda.type).level
+    if !(actualLevel in targetLevels)
+        throw("The nested level of `f`'s output is $actualLevel "*
+              "which should have been within `$targetLevels`.")
     end
     lambda
 end
@@ -370,9 +372,11 @@ end
 function formatTensorFunc(f::Function, ::Type{TypedExpand}, 
                           input::CoreFixedParIn{T, E}) where {T, E<:Pack{T}}
     lambda = f isa TypedExpand{<:Pack} ? f : TypedExpand(f, obtain.(input))
-    level = getNestedLevel(E).level
-    if getNestedLevel(lambda.type).level != level
-        throw("The nested level of `f`'s output should be `$(level+1)`.")
+    targetEleLevel = getNestedLevel(E).level
+    actualEleLevel = getNestedLevel(lambda.type).level
+    if actualEleLevel != targetEleLevel
+        throw("The nested level of `f`'s output is $actualEleLevel"*
+              "which should have been `$(targetEleLevel+1)`.")
     end
     lambda
 end

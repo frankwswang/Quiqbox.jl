@@ -1,7 +1,7 @@
 using Test
 using Quiqbox
 using LinearAlgebra
-using Quiqbox: TypedReduce, TypedExpand, getCellOutputLevel, UnitParam, GridParam
+using Quiqbox: TypedReduce, TypedExpand, getCellOutputLevels, UnitParam, GridParam
 
 @testset "Parameters.jl" begin
 
@@ -50,19 +50,19 @@ p3 = genHeapParam([p1, p1], :c)
 p4 = genHeapParam([p2, p2], :d)
 p5 = genCellParam(p2, :e)
 p6 = genCellParam(p4, :e)
-@test getCellOutputLevel((p1, p1)) == 0
-@test getCellOutputLevel((p1, p2)) == 0
-@test getCellOutputLevel((p2, p2)) == 0
-@test getCellOutputLevel((p1, p3)) == 0
-@test getCellOutputLevel((p2, p3)) == 0
-@test getCellOutputLevel((p3, p3)) == 0
+@test getCellOutputLevels((p1, p1)) == Set(0)
+@test getCellOutputLevels((p1, p2)) == Set(0)
+@test getCellOutputLevels((p2, p2)) == Set((0, 1))
+@test getCellOutputLevels((p1, p3)) == Set(0)
+@test getCellOutputLevels((p2, p3)) == Set((0, 1))
+@test getCellOutputLevels((p3, p3)) == Set((0, 1))
 @test !((p1, p4) isa Quiqbox.CoreFixedParIn)
-@test getCellOutputLevel((p2, p4)) == 1
-@test getCellOutputLevel((p3, p4)) == 1
-@test getCellOutputLevel((p4, p4)) == 1
-@test getCellOutputLevel((p5, p5)) == 1
-@test getCellOutputLevel((p5, p6)) == 1
-@test getCellOutputLevel((p6, p6)) == 2
+@test getCellOutputLevels((p2, p4)) == Set(1)
+@test getCellOutputLevels((p3, p4)) == Set(1)
+@test getCellOutputLevels((p4, p4)) == Set((1, 2))
+@test getCellOutputLevels((p5, p5)) == Set((0, 1))
+@test getCellOutputLevels((p5, p6)) == Set(1)
+@test getCellOutputLevels((p6, p6)) == Set((1, 2))
 
 v1Val = 0.5
 v1 = genTensorVar(v1Val, :α)
@@ -305,11 +305,10 @@ inSet5,  _, outSet5,  isoSet5  = classifyParams(apRef1)
 @test inSet5r.grid[] === inSet5.grid[]
 
 f3 = x -> x.^2 * ( exp.(x) )'
-@test try genCellParam(f3, (pVec1,), :sq); catch; true end
-ap1 = genCellParam(f3, (apRef1,), :sq)
+ap1_1 = genCellParam(f3, (pVec1,), :sq)
+ap1_2 = genCellParam(f3, (apRef1,), :sq)
 @test try genMeshParam(f3, (pVec1,), :sq); catch; true end
-ap1Val = obtain(ap1)
-@test ap1Val == f3(pVec1Val)
+@test obtain(ap1_1) == obtain(ap1_2) == f3(pVec1Val)
 
 pg1Input = [a1 a2; c1 d1]
 
