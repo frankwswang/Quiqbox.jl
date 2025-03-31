@@ -14,7 +14,7 @@ gf1_3d = Quiqbox.AxialProdFunc((gf1, gf1, gf1))
       Quiqbox.TypedParamFunc{Float64}()
 
 gf1_3dCore, par_gf1, par_gf1_Pointer = Quiqbox.unpackFunc(gf1_3d)
-@test par_gf1 isa Quiqbox.TypedFlatParamSet
+@test par_gf1 isa Quiqbox.TypedSpanParamSet
 
 cen1 = (0.0, 0.0, 0.0)
 ijk1 = (0, 1, 1)
@@ -27,7 +27,7 @@ pgto1f = FrameworkOrb(pgto1)
 pgto1core, par_pgto1, ptr_pgto1 = Quiqbox.unpackFunc(pgto1);
 @test pgto1 isa Quiqbox.PrimGTO
 @test pgto1core isa Quiqbox.EvalPrimGTO
-par_pgto1Val = Quiqbox.evalParamSource(par_pgto1)
+par_pgto1Val = map(obtain, par_pgto1)
 
 ijk2 = (1, 1, 2)
 pgto2 = genGaussTypeOrb(cen1, Quiqbox.flatVectorize(par_pgto1)[end], ijk2)
@@ -55,6 +55,8 @@ ao2 = FrameworkOrb(cgto1)
 @test ao2(coord2) == cgto1(coord2)
 
 xpns1 = [1.2, 2.2, 3.1]
+pgf = genGaussTypeOrb(cen1, xpns1[1], ijk1)
+@test !compareParamBox(pgf.center[1], pgf.center[2])
 cons1 = [1.0, 0.2, 0.1]
 cgto2 = genGaussTypeOrb(cen1, xpns1, cons1, ijk1)
 @test cgto2 isa Quiqbox.CompGTO
@@ -63,8 +65,8 @@ cgto2a = FrameworkOrb(cgto2)
 typeof(cgto2core) == typeof(cgto2a.core)
 par_cgto2 == cgto2a.param
 @test cgto2a.core isa Quiqbox.EvalCompGTO
-cgto2_pVal = [[cen1..., xpns1...], cons1]
-@test evalParamSource(par_cgto2) == cgto2_pVal
+cgto2_pVal = (unit=[cen1..., xpns1...], grid=[cons1])
+@test map(obtain, par_cgto2) == cgto2_pVal
 
 compute_cgto = function (dr, xpn, con, ijk)
     prod(dr .^ ijk) * exp(-xpn*norm(dr)^2) * con
@@ -139,14 +141,14 @@ cgf2fCores = getfield.(cgf2fComps, :core)
 @test markObj(cgf2fComps) == markObj([cgf2f1, cgf2f2])
 @test typeof.(cgf2fCores) == typeof.(pgfs_2_cores)
 
-mk1 = markObj(cgf2fCores[1].f.scope)
-mk2 = markObj(pgfs_2_cores[1].f.scope)
+mk1 = markObj(cgf2fCores[1].f.select)
+mk2 = markObj(pgfs_2_cores[1].f.select)
 @test mk1 == mk2
 @test markObj(cgf2fCores[1]) == markObj(pgfs_2_cores[1])
 @test markObj(cgf2fCores[1].f) == markObj(pgfs_2_cores[1].f)
 @test markObj(cgf2fCores[1].f.apply) == markObj(pgfs_2_cores[1].f.apply)
 @test typeof(markObj(cgf2fCores[1].f.apply)) == Quiqbox.FieldMarker{:PairCombine, 3}
-typeof(cgf2fCores[1].f.scope) == typeof(pgfs_2_cores[1].f.scope)
+typeof(cgf2fCores[1].f.select) == typeof(pgfs_2_cores[1].f.select)
 
 mkr1 = markObj(cgf2fComps[1]);
 mkr1c = markObj(cgf2fComps[1].core);
@@ -154,8 +156,8 @@ mkr1p = markObj(cgf2fComps[1].pointer);
 @test !Quiqbox.compareObj(cgf2fComps[1], pgf1_2)
 @test Quiqbox.compareObj(cgf2fCores[1], pgfs_2_cores[1])
 
-ptr1 = first(cgf2fCores[1].f.scope).ptr
-ptr2 = last(pgfs_2_cores[1].f.scope).ptr
-@test all(ptr1 .== ptr2)
+ptr1 = first(cgf2fCores[1].f.select)
+ptr2 = last(pgfs_2_cores[1].f.select)
+@test mapreduce(==, *, ptr1.scope, ptr2.scope)
 
 end

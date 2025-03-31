@@ -667,20 +667,6 @@ end
 (pn::ParamBox)() = obtain(pn)
 
 
-# function setVal!(par::UnitParam{<:Any, Primitive}, val)
-#     if Int(par.screen) != 1
-#         throw(ArgumentError("`par` is a constant parameter that should not be modified."))
-#     end
-#     @atomic par.input = val
-# end
-
-# function setVal!(par::GridParam{<:Any, Primitive}, val)
-#     if Int(par.screen) != 1
-#         throw(ArgumentError("`par` is a constant parameter that should not be modified."))
-#     end
-#     @atomic par.input = val
-# end
-
 function setVal!(par::PrimitiveParam, val)
     @atomic par.input = val
 end
@@ -1090,11 +1076,22 @@ function SpanSetFilter(unit::AbstractVector{OneToIndex}, grid::AbstractVector{On
     SpanSetFilter((;unit, grid))
 end
 
-function getField(paramSet::AbstractSpanSet, f::SpanSetFilter)
+function getField(paramSet::AbstractSpanSet, sFilter::SpanSetFilter)
     firstIds = map(firstindex, paramSet)
-    map(paramSet, firstIds, f.scope) do sector, i, oneToIds
+    map(paramSet, firstIds, sFilter.scope) do sector, i, oneToIds
         view(sector, map(x->(x.idx + i - 1), oneToIds))
     end
+end
+
+function getField(sFilterPrev::SpanSetFilter, sFilterHere::SpanSetFilter)
+    unit = map(sFilterHere.scope.unit) do idx
+        getField(sFilterPrev.scope.unit, idx)
+    end
+
+    grid = map(sFilterHere.scope.grid) do idx
+        getField(sFilterPrev.scope.grid, idx)
+    end
+    SpanSetFilter((;unit, grid))
 end
 
 
