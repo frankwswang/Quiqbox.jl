@@ -19,9 +19,9 @@ using Quiqbox
 
 @test Quiqbox.EvalCompGTO <: Quiqbox.EvalCompOrb
 
-@test Quiqbox.FPrimGTO <: Quiqbox.FrameworkOrb
+@test Quiqbox.FPrimGTO <: Quiqbox.ComponentOrb
 
-@test Quiqbox.FCompGTO <: Quiqbox.FrameworkOrb
+@test Quiqbox.FCompGTO <: Quiqbox.ComponentOrb
 
 @test Quiqbox.FixedSpanIndexSet <: Quiqbox.AbstractSpanIndexSet
 

@@ -1,4 +1,4 @@
-export PrimitiveOrb, CompositeOrb, FrameworkOrb, genGaussTypeOrb
+export PrimitiveOrb, CompositeOrb, ComponentOrb, genGaussTypeOrb
 
 abstract type ComposedOrb{T, D, B} <: OrbitalBasis{T, D, B} end
 
@@ -310,13 +310,13 @@ end
 #! Consider paramSet::FilteredFlatParamSet as an input argument.
 #! You cannot. Because `locateParam!` might change upstream (input) paramSet's size by 
 #! pushing new parameters while `FilteredFlatParamSet` cannot change its size.
-struct FrameworkOrb{T, D, B<:EvalComposedOrb{T, D}, P<:AbstractSpanParamSet, 
+struct ComponentOrb{T, D, B<:EvalComposedOrb{T, D}, P<:AbstractSpanParamSet, 
                     A<:FieldParamPointer} <: UnpackedOrb{T, D, B}
     core::B
     param::P
     pointer::A
 
-    function FrameworkOrb(o::ComposedOrb{T, D}, 
+    function ComponentOrb(o::ComposedOrb{T, D}, 
                           paramSet::MissingOr{AbstractSpanParamSet}=missing) where {T, D}
         id = Identifier(paramSet)
         bl = ismissing(paramSet)
@@ -326,7 +326,7 @@ struct FrameworkOrb{T, D, B<:EvalComposedOrb{T, D}, P<:AbstractSpanParamSet,
         new{T, D, typeof(core), typeof(paramSet), typeof(ptr)}(core, paramSet, ptr)
     end
 
-    function FrameworkOrb(o::FrameworkOrb{T, D, <:EvalCompOrb{T, D}, P}, 
+    function ComponentOrb(o::ComponentOrb{T, D, <:EvalCompOrb{T, D}, P}, 
                           idx::Int) where {T, D, P<:AbstractSpanParamSet}
         oParams = o.param
         oPointer = o.pointer
@@ -337,13 +337,13 @@ struct FrameworkOrb{T, D, B<:EvalComposedOrb{T, D}, P<:AbstractSpanParamSet,
     end
 end
 
-FrameworkOrb(o::FrameworkOrb) = itself(o)
+ComponentOrb(o::ComponentOrb) = itself(o)
 
 const FPrimOrb{T, D, B<:EvalPrimOrb{T, D}, P<:AbstractSpanParamSet, A<:FieldParamPointer} = 
-      FrameworkOrb{T, D, B, P, A}
+      ComponentOrb{T, D, B, P, A}
 
 const FCompOrb{T, D, B<:EvalCompOrb{T, D}, P<:AbstractSpanParamSet, A<:FieldParamPointer} = 
-      FrameworkOrb{T, D, B, P, A}
+      ComponentOrb{T, D, B, P, A}
 
 const FPrimGTO{T, D, B<:EvalPrimGTO{T, D}, P<:AbstractSpanParamSet, A<:FieldParamPointer} = 
       FPrimOrb{T, D, B, P, A}
@@ -351,10 +351,10 @@ const FPrimGTO{T, D, B<:EvalPrimGTO{T, D}, P<:AbstractSpanParamSet, A<:FieldPara
 const FCompGTO{T, D, B<:EvalCompGTO{T, D}, P<:AbstractSpanParamSet, A<:FieldParamPointer} = 
       FCompOrb{T, D, B, P, A}
 
-unpackFunc(o::FrameworkOrb) = (o.core, o.param, o.pointer)
+unpackFunc(o::ComponentOrb) = (o.core, o.param, o.pointer)
 
 
-getInnerOrb(o::FrameworkOrb) = o.core
+getInnerOrb(o::ComponentOrb) = o.core
 
 getInnerOrb(o::ScaledOrbital) = o.f.apply.left
 
@@ -372,7 +372,7 @@ orbSizeOf(o::FCompOrb) = length((getInnerOrb∘getInnerOrb)(o).f.chain)
 
 viewOrb(o::CompositeOrb, idx::Int) = o.basis[begin+idx-1]
 
-viewOrb(o::FCompOrb, idx::Int) = FrameworkOrb(o, idx)
+viewOrb(o::FCompOrb, idx::Int) = ComponentOrb(o, idx)
 
 viewOrb(o::EvalCompOrb, idx::Int) = getInnerOrb(o).f.chain[begin+idx-1]
 
@@ -423,7 +423,7 @@ function isRenormalized(orb::ComposedOrb)
     orb.renormalize
 end
 
-function isRenormalized(orb::FrameworkOrb)
+function isRenormalized(orb::ComponentOrb)
     isRenormalized(orb.core)
 end
 

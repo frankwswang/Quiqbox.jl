@@ -23,7 +23,7 @@ s2_t = [overlap(i, j) for i in bs2, j in bs2]
 
 pgf1 =  genGaussTypeOrb((0.1, -0.2, -0.3), 1.5, (1, 0, 0))
 pgf1n = genGaussTypeOrb((0.1, -0.2, -0.3), 1.5, (1, 0, 0), renormalize=true)
-pgf1f = FrameworkOrb(pgf1)
+pgf1f = ComponentOrb(pgf1)
 pgf1_val1 = pgf1n((0., 0., 0.)) * sqrt(overlap(pgf1, pgf1))
 @test pgf1((0., 0., 0.)) ≈ pgf1.body((-0.1, 0.2, 0.3)) ≈ pgf1_val1
 
@@ -32,15 +32,15 @@ s1 = overlap(pgf1, pgf1n)
 @test overlap(pgf1, pgf1) ≈ s1^2
 @test overlap(pgf1n, pgf1n) ≈ 1
 
-pgf1_c = FrameworkOrb(pgf1)
-pgf1n_c = FrameworkOrb(pgf1n)
+pgf1_c = ComponentOrb(pgf1)
+pgf1n_c = ComponentOrb(pgf1n)
 @test overlap(pgf1n_c, pgf1n_c) ≈ 1
 
 cen1 = (1.1, 0.5, 1.1)
 cons1 = [1.5, -0.3]
 xpns1 = [1.2, 0.6]
 cgf1 = genGaussTypeOrb(cen1, xpns1, cons1, (1, 0, 0))
-cgf1c = FrameworkOrb(cgf1)
+cgf1c = ComponentOrb(cgf1)
 cgf1c.core.f.apply.left.f.chain[1].left isa Quiqbox.EvalPrimGTO
 stf1Core = x->exp(-abs(x))
 stf1 = Quiqbox.FieldFunc(stf1Core, Float64)

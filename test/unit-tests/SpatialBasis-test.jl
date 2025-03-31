@@ -19,7 +19,7 @@ gf1_3dCore, par_gf1, par_gf1_Pointer = Quiqbox.unpackFunc(gf1_3d)
 cen1 = (0.0, 0.0, 0.0)
 ijk1 = (0, 1, 1)
 pgto1 = genGaussTypeOrb(cen1, 1.2, ijk1)
-pgto1f = FrameworkOrb(pgto1)
+pgto1f = ComponentOrb(pgto1)
 @test (pgto1f |> getInnerOrb |> getInnerOrb) isa Quiqbox.PrimitiveOrbCore
 
 @test Quiqbox.SelectTrait{Quiqbox.ParameterizationStyle}()(pgto1) == 
@@ -44,12 +44,12 @@ cgto1core, par_cgto1, _ = Quiqbox.unpackFunc(cgto1);
 @test cgto1 isa Quiqbox.CompGTO
 @test cgto1core isa Quiqbox.EvalCompGTO
 
-ao1 = FrameworkOrb(pgto1)
+ao1 = ComponentOrb(pgto1)
 @test ao1.core isa Quiqbox.EvalPrimGTO
 @test ao1 isa Quiqbox.FPrimGTO
 
 coord2 = (0.2, 1.1, 2.1)
-ao2 = FrameworkOrb(cgto1)
+ao2 = ComponentOrb(cgto1)
 @test ao2.core isa Quiqbox.EvalCompGTO
 @test ao2 isa Quiqbox.FCompGTO
 @test ao2(coord2) == cgto1(coord2)
@@ -61,7 +61,7 @@ cons1 = [1.0, 0.2, 0.1]
 cgto2 = genGaussTypeOrb(cen1, xpns1, cons1, ijk1)
 @test cgto2 isa Quiqbox.CompGTO
 cgto2core, par_cgto2, pointer_cgto2 = Quiqbox.unpackFunc(cgto2);
-cgto2a = FrameworkOrb(cgto2)
+cgto2a = ComponentOrb(cgto2)
 typeof(cgto2core) == typeof(cgto2a.core)
 par_cgto2 == cgto2a.param
 @test cgto2a.core isa Quiqbox.EvalCompGTO
@@ -74,14 +74,14 @@ end
 cgto2_val1 = compute_cgto.(Ref(coord2 .- cen1), xpns1, cons1, Ref(ijk1))
 @test cgto2a.core(coord2, cgto2_pVal) == cgto2(coord2) ≈ sum(cgto2_val1)
 
-pgto1_a = FrameworkOrb(pgto1)
+pgto1_a = ComponentOrb(pgto1)
 coord1 = (0.0, 1.0, 2.0)
 @test pgto1_a(coord1) == pgto1(coord1)
 
 cgto3 = CompositeOrb([pgto1, cgto2, pgto2], [2.1, 2.2, 0.3])
 @test cgto3 isa Quiqbox.CompGTO
 cgto3core, par_cgto3, _ = Quiqbox.unpackFunc(cgto3);
-cgto3a = FrameworkOrb(cgto3)
+cgto3a = ComponentOrb(cgto3)
 
 typeof(cgto3core) == typeof(cgto3a.core)
 par_cgto3 == cgto3a.param
@@ -93,7 +93,7 @@ cons2 = [1.5, -0.3]
 ijk3 = (1, 0, 0)
 cgf1 = genGaussTypeOrb(cen2, xpns2, cons2, ijk3)
 cgf1s = Quiqbox.splitOrb(cgf1)
-cgf1f = FrameworkOrb(cgf1)
+cgf1f = ComponentOrb(cgf1)
 bs1 = Quiqbox.splitOrb(cgf1)
 bs1f = Quiqbox.splitOrb(cgf1f)
 pgf1 = Quiqbox.viewOrb(cgf1, 1)
@@ -101,7 +101,7 @@ pgf1 = Quiqbox.viewOrb(cgf1, 1)
 @test pgf1 === PrimitiveOrb(pgf1) === Quiqbox.viewOrb(pgf1, 1)
 @test pgf1 === bs1[1]
 
-pgf1f = FrameworkOrb(pgf1)
+pgf1f = ComponentOrb(pgf1)
 @test pgf1f === Quiqbox.viewOrb(pgf1f, 1)
 pgf1i = getInnerOrb(pgf1f)
 @test pgf1i isa Quiqbox.ScaledOrbital
@@ -126,12 +126,12 @@ cen3 = (1.0, 1.5, 1.1)
 xpns3 = [1.2, 0.6]
 cons3 = [1.5, -0.3]
 cgf2 = genGaussTypeOrb(cen3, xpns3, cons3, (1, 0, 0))
-cgf2f = FrameworkOrb(cgf2)
-cgf2f1 = FrameworkOrb(cgf2f, 1)
-cgf2f2 = FrameworkOrb(cgf2f, 2)
+cgf2f = ComponentOrb(cgf2)
+cgf2f1 = ComponentOrb(cgf2f, 1)
+cgf2f2 = ComponentOrb(cgf2f, 2)
 cgf2fComps = Quiqbox.splitOrb(cgf2f)
-pgf1_2 = FrameworkOrb(cgf2.basis[1])
-pgf2_2 = FrameworkOrb(cgf2.basis[2])
+pgf1_2 = ComponentOrb(cgf2.basis[1])
+pgf2_2 = ComponentOrb(cgf2.basis[2])
 pgfs_2_cores = [pgf1_2.core, pgf2_2.core]
 cgf2fCores = getfield.(cgf2fComps, :core)
 @test cgf2fComps[1].core == cgf2f1.core

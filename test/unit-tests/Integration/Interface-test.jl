@@ -16,7 +16,7 @@ cons2 = [1.0,  0.8]
 cgf1 = genGaussTypeOrb(cen1, xpns1, cons1, (1, 0, 0))
 cgf2 = genGaussTypeOrb(cen2, xpns2, cons2, (1, 0, 0))
 
-cgf1f = FrameworkOrb(cgf1)
+cgf1f = ComponentOrb(cgf1)
 bs1 = Quiqbox.splitOrb(cgf1f)
 pCache = Quiqbox.MultiSpanDataCacheBox(Float64)
 normCache = Quiqbox.initializeOverlapCache!(pCache, bs1)
@@ -31,7 +31,7 @@ s1_2 = Quiqbox.buildIntegralTensor(normCache, idxers)
 @test s1_2 == s1
 
 
-bs2 = Quiqbox.FrameworkOrb.([cgf1, cgf2])
+bs2 = Quiqbox.ComponentOrb.([cgf1, cgf2])
 cgf1n = genGaussTypeOrb(cen1, xpns1, cons1, (1, 0, 0), 
                         innerRenormalize=true, outerRenormalize=true)
 cgf2n = genGaussTypeOrb(cen2, xpns2, cons2, (1, 0, 0), 
@@ -43,7 +43,7 @@ ovlp1_3 = Quiqbox.overlap(cgf1f, cgf1f, lazyCompute=true)
 @test ovlp1_2 ≈ ovlp1_3
 
 s2 = [0.2844258928014478 0.2894349248354434; 0.2894349248354434 2.0052505884348175]
-cgf2f = FrameworkOrb(cgf2)
+cgf2f = ComponentOrb(cgf2)
 @test Quiqbox.overlap(cgf1f, cgf2f) ≈ s2[2]
 @test Quiqbox.overlaps([cgf1f, cgf2f]) ≈ s2
 @test Quiqbox.overlap(cgf1f, cgf2f) ≈ 
@@ -56,7 +56,7 @@ Quiqbox.multipoleMoment(mmCen, mmDeg, cgf1f, cgf2f)
       Quiqbox.overlap(cgf1f, cgf2f)
 
 cgf3 = genGaussTypeOrb(cen1, xpns1, cons1, (3, 0, 0))
-cgf3f = Quiqbox.FrameworkOrb(cgf3)
+cgf3f = Quiqbox.ComponentOrb(cgf3)
 @test Quiqbox.multipoleMoment(cen1, (2, 0, 0), cgf2f, cgf1f) == 
 Quiqbox.overlap(cgf2f, cgf3f)
 @test Quiqbox.multipoleMoment(cen1, (2, 0, 0), cgf1f, cgf2f) ≈

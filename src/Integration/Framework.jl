@@ -1,8 +1,8 @@
 using LinearAlgebra: dot
 
 const OrbitalBasisSet{T, D} = AbstractVector{<:OrbitalBasis{T, D}}
-const OrbitalCollection{T, D} = NonEmpTplOrAbtArr{FrameworkOrb{T, D}, 1}
-const OrbitalInput{T, D} = Union{FrameworkOrb{T, D}, OrbitalCollection{T, D}}
+const OrbitalCollection{T, D} = NonEmpTplOrAbtArr{ComponentOrb{T, D}, 1}
+const OrbitalInput{T, D} = Union{ComponentOrb{T, D}, OrbitalCollection{T, D}}
 const FPrimOrbSet{T, D} = AbstractVector{<:FPrimOrb{T, D}}
 
 const OrbCoreData{T, D, F<:PrimitiveOrbCore{T, D}, V<:DirectMemory{T}} = 
@@ -509,7 +509,7 @@ end
 function indexCacheOrbData!(orbCache::PrimOrbCoreCache{T, D}, 
                             paramCache::MultiSpanDataCacheBox{T}, 
                             orbMarkerCache::OrbCoreMarkerDict, 
-                            orb::FrameworkOrb{T, D}) where {T, D}
+                            orb::ComponentOrb{T, D}) where {T, D}
     orbSize = orbSizeOf(orb)
     list = BasisIndexList(orbSize)
     for i in 1:orbSize
@@ -551,7 +551,7 @@ end
 function cachePrimCoreIntegrals!(intCache::PrimOrbCoreIntegralCache{T, D}, 
                                  paramCache::MultiSpanDataCacheBox{T}, 
                                  orbMarkerCache::OrbCoreMarkerDict, 
-                                 orbData::Union{OrbitalCollection{T, D}, FrameworkOrb{T, D}}
+                                 orbData::Union{OrbitalCollection{T, D}, ComponentOrb{T, D}}
                                  ) where {T, D}
     orbCache = intCache.basis
     oldMaxIdx = lastindex(orbCache.list)
@@ -676,7 +676,7 @@ end
 
 
 function buildOrbWeight!(paramCache::MultiSpanDataCacheBox{T}, 
-                         normCache::OverlapCoreCache{T, D}, orb::FrameworkOrb{T, D}, 
+                         normCache::OverlapCoreCache{T, D}, orb::ComponentOrb{T, D}, 
                          idxSeq::AbstractVector{Int}) where {T, D}
     nPrimOrbs = orbSizeOf(orb)
     weight = Memory{T}(undef, nPrimOrbs)
@@ -727,7 +727,7 @@ end
 
 function buildIndexedOrbWeights!(paramCache::MultiSpanDataCacheBox{T}, 
                                  normCache::OverlapCoreCache{T, D}, 
-                                 orb::FrameworkOrb{T, D}, 
+                                 orb::ComponentOrb{T, D}, 
                                  normIdxList::BasisIndexList, 
                                  intIdxList::BasisIndexList=normIdxList) where {T, D}
     orbWeight = buildOrbWeight!(paramCache, normCache, orb, normIdxList.index)
@@ -845,7 +845,7 @@ end
 
 function computeIntTensor!(intCache::PrimOrbCoreIntegralCache{T, D}, 
                            normCache::OverlapCoreCache{T, D}, 
-                           basisSet::AbstractVector{<:FrameworkOrb{T, D}}; 
+                           basisSet::AbstractVector{<:ComponentOrb{T, D}}; 
                            paramCache::MultiSpanDataCacheBox{T}=MultiSpanDataCacheBox(T), 
                            basisMarkerCache::OrbCoreMarkerDict=OrbCoreMarkerDict()) where 
                           {T, D}
@@ -855,7 +855,7 @@ end
 
 
 function computeIntTensor(::OneBodyIntegral{D}, op::F, 
-                          basisSet::AbstractVector{<:FrameworkOrb{T, D}}; 
+                          basisSet::AbstractVector{<:ComponentOrb{T, D}}; 
                           paramCache::MultiSpanDataCacheBox{T}=MultiSpanDataCacheBox(T), 
                           basisMarkerCache::OrbCoreMarkerDict=OrbCoreMarkerDict()) where 
                          {F<:DirectOperator, T, D}
@@ -866,10 +866,10 @@ end
 computeIntTensor(style::MultiBodyIntegral, op::DirectOperator, orbs::OrbitalBasisSet{T}; 
                  paramCache::MultiSpanDataCacheBox{T}=MultiSpanDataCacheBox(T), 
                  basisMarkerCache::OrbCoreMarkerDict=OrbCoreMarkerDict()) where {T} = 
-computeIntTensor(style, op, map(FrameworkOrb, orbs); paramCache, basisMarkerCache)
+computeIntTensor(style, op, map(ComponentOrb, orbs); paramCache, basisMarkerCache)
 
 
-function decomposeOrb!(normCache::OverlapCoreCache{T, D}, orb::FrameworkOrb{T, D}; 
+function decomposeOrb!(normCache::OverlapCoreCache{T, D}, orb::ComponentOrb{T, D}; 
                        paramCache::MultiSpanDataCacheBox{T}=MultiSpanDataCacheBox(T), 
                        markerCache::OrbCoreMarkerDict=OrbCoreMarkerDict()) where {T, D}
     normIdxList = cachePrimCoreIntegrals!(normCache, paramCache, markerCache, orb)
@@ -877,7 +877,7 @@ function decomposeOrb!(normCache::OverlapCoreCache{T, D}, orb::FrameworkOrb{T, D
     normCache.basis.list[normIdxList.index], orbWeight
 end
 
-function decomposeOrb(orb::FrameworkOrb{T}; 
+function decomposeOrb(orb::ComponentOrb{T}; 
                       paramCache::MultiSpanDataCacheBox{T}=MultiSpanDataCacheBox(T), 
                       markerCache::OrbCoreMarkerDict=OrbCoreMarkerDict()) where {T}
     normCache = initializeOverlapCache!(paramCache, orb)
@@ -887,7 +887,7 @@ end
 
 function computeIntegral!(intCache::PrimOrbCoreIntegralCache{T, D}, 
                           normCache::OverlapCoreCache{T, D}, 
-                          bfs::NonEmptyTuple{FrameworkOrb{T, D}}; 
+                          bfs::NonEmptyTuple{ComponentOrb{T, D}}; 
                           paramCache::MultiSpanDataCacheBox{T}, 
                           basisMarkerCache::OrbCoreMarkerDict=OrbCoreMarkerDict()) where 
                          {T, D}
@@ -897,7 +897,7 @@ end
 
 
 function computeIntegral(::OneBodyIntegral{D}, op::DirectOperator, 
-                         (bf1,)::Tuple{FrameworkOrb{T, D}}; 
+                         (bf1,)::Tuple{ComponentOrb{T, D}}; 
                          paramCache::MultiSpanDataCacheBox{T}=MultiSpanDataCacheBox(T), 
                          basisMarkerCache::OrbCoreMarkerDict=OrbCoreMarkerDict(), 
                          lazyCompute::Bool=false) where {T, D}
@@ -913,7 +913,7 @@ function computeIntegral(::OneBodyIntegral{D}, op::DirectOperator,
 end
 
 function computeIntegral(::OneBodyIntegral{D}, op::DirectOperator, 
-                         (bf1, bf2)::NTuple{2, FrameworkOrb{T, D}}; 
+                         (bf1, bf2)::NTuple{2, ComponentOrb{T, D}}; 
                          paramCache::MultiSpanDataCacheBox{T}=MultiSpanDataCacheBox(T), 
                          basisMarkerCache::OrbCoreMarkerDict=OrbCoreMarkerDict(), 
                          lazyCompute::Bool=false) where {T, D}
@@ -942,7 +942,7 @@ function computeIntegral(::OneBodyIntegral{D}, op::DirectOperator,
 end
 
 function computeIntegral(::OneBodyIntegral{D}, ::Identity, 
-                         bfPair::NTuple{2, FrameworkOrb{T, D}}; 
+                         bfPair::NTuple{2, ComponentOrb{T, D}}; 
                          paramCache::MultiSpanDataCacheBox{T}=MultiSpanDataCacheBox(T), 
                          basisMarkerCache::OrbCoreMarkerDict=OrbCoreMarkerDict(), 
                          lazyCompute::Bool=false) where {T, D}
@@ -971,6 +971,6 @@ function computeIntegral(style::MultiBodyIntegral, op::DirectOperator,
                          paramCache::MultiSpanDataCacheBox{T}=MultiSpanDataCacheBox(T), 
                          basisMarkerCache::OrbCoreMarkerDict=OrbCoreMarkerDict(), 
                          lazyCompute::Bool=false) where {T, D}
-    fOrbs = lazyTupleMap(FrameworkOrb, orbs)
+    fOrbs = lazyTupleMap(ComponentOrb, orbs)
     computeIntegral(style, op, fOrbs; paramCache, basisMarkerCache, lazyCompute)
 end
