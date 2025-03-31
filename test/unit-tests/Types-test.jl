@@ -23,4 +23,8 @@ using Quiqbox
 
 @test Quiqbox.FCompGTO <: Quiqbox.FrameworkOrb
 
+@test Quiqbox.FixedSpanIndexSet <: Quiqbox.AbstractSpanIndexSet
+
+@test Quiqbox.TypedSpanParamSet <: Quiqbox.AbstractSpanParamSet
+
 end

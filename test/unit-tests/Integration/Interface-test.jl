@@ -18,7 +18,7 @@ cgf2 = genGaussTypeOrb(cen2, xpns2, cons2, (1, 0, 0))
 
 cgf1f = FrameworkOrb(cgf1)
 bs1 = Quiqbox.splitOrb(cgf1f)
-pCache = Quiqbox.DimSpanDataCacheBox(Float64)
+pCache = Quiqbox.MultiSpanDataCacheBox(Float64)
 normCache = Quiqbox.initializeOverlapCache!(pCache, bs1)
 
 s1 = Quiqbox.overlaps(bs1)

@@ -70,9 +70,9 @@ getField(obj, entry::Int) = getindex(obj, entry)
 
 getField(obj, i::OneToIndex) = getindex(obj, firstindex(obj)+i.idx-1)
 
-getField(obj, ptr::UnitIndex) = getField(obj.unit, ptr.idx)
+getField(obj, i::UnitIndex) = getField(obj.unit, i.idx)
 
-getField(obj, ptr::GridIndex) = getField(obj.grid, ptr.idx)
+getField(obj, i::GridIndex) = getField(obj.grid, i.idx)
 
 # The original method might cause wrong gradients for AD libraries that do not support 
 # differentiating through keyword arguments.
@@ -85,62 +85,6 @@ function getField(obj, acc::ChainedAccess)
 end
 
 (f::Fetcher)(obj) = getField(obj, f)
-
-# getField(obj, ptr::GeneralEntryPointer) = getFieldCore(obj, ptr)
-
-# getField(ptr::ChainedAccess, idx::GeneralField) = ChainedAccess(ptr, ChainedAccess(idx))
-
-# getField(obj, pointer::ShapedAccessor) = pointer(obj)
-
-# function getField(obj::FilteredObject, ptr::GeneralEntryPointer)
-#     getField(obj.obj, getField(obj.ptr, ptr))
-# end
-
-#!! pack NonEmpTplOrAbtArr{ActivePointer} inside a struct
-# Array{ActivePointer} -> PointerStack
-# Tuple{Vararg{ActivePointer}} -> PointerTuple
-
-# const InstantPtrCollection = Union{PointerStack, NonEmpTplOrAbtArr{ActivePointer}}
-
-# getField(obj, ptr::InstantPtrCollection) = evalField(itself, obj, ptr)
-
-# function getField(obj::FilteredObject, ptr::PointerStack)
-#     FilteredObject(obj, ptr)
-# end
-
-# function getField(obj, ptr::AwaitFilter)
-#     FilteredObject(obj, ptr)
-# end
-
-# function getField(prev::PointerStack, here::AwaitFilter)
-#     AwaitFilter(getField(prev, here.ptr))
-# end
-
-# function getField(prev::AwaitFilter, here::PointerStack)
-#     AwaitFilter(getField(prev.ptr, here))
-# end
-
-# getField(obj::Any) = itself(obj)
-
-# getField(obj::FilteredObject) = getField(obj.obj, obj.ptr)
-
-
-# function evalField(f::F, obj, ptr::GeneralEntryPointer) where {F<:Function}
-#     getField(obj, ptr) |> f
-# end
-
-# function evalField(f::F, obj, ptr::InstantPtrCollection) where {F<:Function}
-#     map(x->evalField(f, obj, x), ptr)
-# end
-
-
-# function mapLayout(op::F, collection::Any) where {F<:Function}
-#     map(op, collection)
-# end
-
-# function mapLayout(op::F, collection::FilteredObject) where {F<:Function}
-#     evalField(op, collection.obj, collection.ptr)
-# end
 
 
 abstract type FiniteDict{N, K, T} <: EqualityDict{K, T} end
@@ -311,51 +255,6 @@ end
 
 leftFoldHash(initHash::UInt, obj::Any; marker::F=itself) where {F<:Function} = 
 hash(marker(obj), initHash)
-
-
-# struct ElementWiseMatcher{F<:Function, T<:AbstractArray} <: IdentityMarker{T}
-#     code::UInt
-#     marker::F
-#     data::T
-
-#     function ElementWiseMatcher(input::T, marker::F=itself) where 
-#                                {T<:AbstractArray, F<:Function}
-#         new{F, T}(leftFoldHash(hash(nothing), input; marker), marker, input)
-#     end
-# end
-
-# function elementWiseMatch(obj1::Any, obj2::Any; marker1::M1=itself, marker2::M2=itself, 
-#                           compareFunction::F=(===)) where {M1<:Function, M2<:Function, 
-#                                                            F<:Function}
-#     compareFunction(marker1(obj1), marker2(obj2))
-# end
-
-# function elementWiseMatch(obj1::AbstractArray{<:Any, N}, obj2::AbstractArray{<:Any, N}; 
-#                           marker1::M1=itself, marker2::M2=itself, 
-#                           compareFunction::F=(===)) where {N, M1<:Function, M2<:Function, 
-#                                                            F<:Function}
-#     if size(obj1) == size(obj1)
-#         all( elementWiseMatch(marker1(i), marker2(j); 
-#                               compareFunction) for (i, j) in zip(obj1, obj2) )
-#     else
-#         false
-#     end
-# end
-
-# function elementWiseMatch(::AbstractArray, ::AbstractArray; marker1::M1=itself, 
-#                           marker2::M2=itself, compareFunction::F=(===)) where 
-#                          {M1<:Function, M2<:Function, F<:Function}
-#     false
-# end
-
-# function ==(matcher1::ElementWiseMatcher, matcher2::ElementWiseMatcher)
-#     if matcher1.code == matcher2.code
-#         elementWiseMatch(matcher1.data, matcher2.data, compareFunction=isequal, 
-#                          marker1=matcher1.marker, marker2=matcher2.marker)
-#     else
-#         false
-#     end
-# end
 
 
 struct ValueMarker{T} <: IdentityMarker{T}

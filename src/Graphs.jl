@@ -303,14 +303,10 @@ function selectVertexEvalGenerator(trait::VertexTrait)
 end
 
 function genUnitVertexEvaluator(::ParamGraphCore, idx::Int)
-    # localIdx = firstindex(b.unit) + idx - 1
-    # (Retrieve∘ChainedAccess)((:unit, localIdx))
     GetIndex{UnitIndex}(idx)
 end
 
 function genGridVertexEvaluator(::ParamGraphCore, idx::Int)
-    # localIdx = firstindex(b.grid) + idx - 1
-    # (Retrieve∘ChainedAccess)((:grid, localIdx))
     GetIndex{GridIndex}(idx)
 end
 
