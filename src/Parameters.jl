@@ -476,9 +476,8 @@ function isOffsetEnabled(pb::T) where {T<:AdaptableParam}
 end
 
 
-function indexParam(pb::ShapedParam, idx::Int, sym::MissingOr{Symbol}=missing; 
-                    offset::Int=0)
-    entry = pb.input[idx+offset]
+function indexParam(pb::ShapedParam, oneToIdx::Int, sym::MissingOr{Symbol}=missing)
+    entry = pb.input[begin+oneToIdx-1]
     if ismissing(sym) || sym==symOf(entry)
         entry
     elseif entry isa MeshParam
@@ -488,18 +487,14 @@ function indexParam(pb::ShapedParam, idx::Int, sym::MissingOr{Symbol}=missing;
     end
 end
 
-function indexParam(pb::AdaptableParam, idx::Int, sym::MissingOr{Symbol}=missing; 
-                    offset::Int=0)
-    idx += offset
-    ismissing(sym) && (sym = Symbol(symOf(pb), idx))
-    CellParam(ChainedAccess(idx), pb, sym)
+function indexParam(pb::AdaptableParam, oneToIdx::Int, sym::MissingOr{Symbol}=missing)
+    ismissing(sym) && (sym = Symbol(symOf(pb), oneToIdx))
+    genCellParam(GetOneToIndex(oneToIdx), (pb,), sym)
 end
 
-function indexParam(pb::UnitParam, idx::Int, sym::MissingOr{Symbol}=missing; 
-                    offset::Int=0)
-    idx += offset
-    if idx != 1
-        throw(BoundsError(pb, idx))
+function indexParam(pb::UnitParam, oneToIdx::Int, sym::MissingOr{Symbol}=missing)
+    if oneToIdx != 1
+        throw(BoundsError(pb, oneToIdx))
     elseif ismissing(sym) || sym == symOf(res)
         pb
     else
