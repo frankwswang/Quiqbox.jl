@@ -1,34 +1,3 @@
-struct VectorMemory{T, L} <: AbstractMemory{T, 1}
-    value::Memory{T}
-    shape::Val{L}
-
-    function VectorMemory(value::Memory{T}, ::Val{L}) where {T, L}
-        checkLength(value, :value, L)
-        new{T, L}(value, Val(L))
-    end
-end
-
-VectorMemory(input::AbstractArray) = VectorMemory(getMemory(input), Val(length(input)))
-
-VectorMemory(input::NonEmptyTuple{Any, L}) where {L} = 
-VectorMemory(getMemory(input), Val(L+1))
-
-VectorMemory(input::VectorMemory)  = itself(input)
-
-size(::VectorMemory{<:Any, L}) where {L} = (L,)
-
-getindex(arr::VectorMemory, i::Int) = getindex(arr.value, i)
-
-setindex!(arr::VectorMemory, val, i::Int) = setindex!(arr.value, val, i)
-
-iterate(arr::VectorMemory) = iterate(arr.value)
-iterate(arr::VectorMemory, state) = iterate(arr.value, state)
-
-length(::VectorMemory{<:Any, L}) where {L} = L
-
-const LinearMemory{T} = Union{Memory{T}, VectorMemory{T}}
-
-
 struct ReturnTyped{T, F<:Function} <: TypedEvaluator{T, F}
     f::F
 
@@ -57,25 +26,13 @@ end
 (f::StableBinary{T, F})(argL::T, argR::T) where {T, F} = convert(T, f.f(argL, argR))
 
 const StableAdd{T} = StableBinary{T, typeof(+)}
+const StableSub{T} = StableBinary{T, typeof(-)}
 const StableMul{T} = StableBinary{T, typeof(*)}
 
 StableAdd(::Type{T}) where {T} = StableBinary(+, T)
+StableSub(::Type{T}) where {T} = StableBinary(-, T)
 StableMul(::Type{T}) where {T} = StableBinary(*, T)
 
-
-struct Retrieve{P<:CompositePointer} <: FunctionCombiner
-    rule::P
-end
-
-const GetFlavor{T} = Retrieve{IndexPointer{Flavor{T}, 1}}
-
-function (f::Retrieve)(input)
-    getField(input, f.rule)
-end
-
-const Select{P<:EntryPointer} = Retrieve{P}
-
-const Filter{P<:EffectivePtrStack} = Retrieve{P}
 
 struct EncodeApply{N, E<:NTuple{N, Function}, F<:Function} <: FunctionCombiner
     encode::E
@@ -89,34 +46,29 @@ EncodeApply(encode::Function, apply::Function) = EncodeApply((encode,), apply)
 (f::EncodeApply{0})(args...) = f.apply(args...)
 
 
-struct ParamFilterFunc{F<:Function, 
-                       T<:NonEmptyTuple{EffectivePtrStack}} <: ParamFuncBuilder{F}
-    apply::F
-    scope::T
-end
-
-ParamFilterFunc(apply::F, scope::P) where {F<:Function, P<:EffectivePtrStack} = 
-ParamFilterFunc(apply, (scope,))
-
-function (f::ParamFilterFunc)(input, param)
-    f.apply(input, getField.(Ref(param), f.scope)...)
-end
-
-
-struct ParamSelectFunc{F<:Function, T<:Tuple{Vararg{ChainIndexer}}} <: ParamFuncBuilder{F}
+struct ParamSelectFunc{F<:Function, T<:Tuple{ Vararg{Fetcher} }} <: ParamFuncBuilder{F}
     apply::F
     select::T
 end
 
+ParamSelectFunc(f::Function, select::Fetcher) = ParamSelectFunc(f, (select,))
+
 ParamSelectFunc(f::Function) = ParamSelectFunc(f, ())
 
+const EmptySelectFunc{F<:Function} = ParamSelectFunc{F, Tuple{}}
+
+ParamSelectFunc(f::EmptySelectFunc) = itself(f)
+
+ParamSelectFunc(f::ParamSelectFunc, select::Tuple{Vararg{Fetcher}}) = 
+ParamSelectFunc(f.apply, (f.select..., select...))
+
 function (f::ParamSelectFunc)(input, param)
-    f.apply(input, getField(param, f.select)...)
+    f.apply(input, getField.(Ref(param), f.select)...)
 end
 
-(f::ParamSelectFunc{<:Function, Tuple{}})(input, _) = f.apply(input)
+(f::EmptySelectFunc)(input, _) = f.apply(input)
 
-const GetParamFunc{F<:Function, T<:ChainIndexer} = ParamSelectFunc{F, Tuple{T}}
+const GetParamFunc{F<:Function, T<:Fetcher} = ParamSelectFunc{F, Tuple{T}}
 
 
 struct OnlyHead{F<:Function} <: FunctionModifier
@@ -173,12 +125,29 @@ mapreduce(o->o(arg, args...), f.joint, f.chain.value)
 (f::ChainReduce)(arg, args...) = mapreduce(o->o(arg, args...), f.joint, f.chain)
 
 
-# struct InsertOnward{C<:Function, F<:Function}
-#     apply::C
-#     dress::F
-# end
+struct ChainExpand{F<:Function, 
+                   C<:Union{AbstractMemory{<:Function}, NonEmptyTuple{Function}}
+                   } <: FunctionCombiner
+    chain::C
+    finalizer::F
 
-# (f::InsertOnward)(arg, args...) = f.dress(f.apply(arg, args...), args...)
+    function ChainExpand(chain::C, finalizer::F=itself) where 
+                        {C<:AbstractMemory{<:Function}, F<:Function}
+        checkEmptiness(chain, :chain)
+        new{F, C}(chain, finalizer)
+    end
+
+    function ChainExpand(chain::C, finalizer::F=itself) where 
+                        {C<:NonEmptyTuple{Function}, F<:Function}
+        checkEmptiness(chain, :chain)
+        new{F, C}(chain, finalizer)
+    end
+end
+
+ChainExpand(chain::AbstractArray{<:Function}, finalizer::Function=itself) = 
+ChainExpand(ShapedMemory(chain), finalizer)
+
+(f::ChainExpand)(arg, args...) = f.finalizer(map(o->o(arg, args...), f.chain))
 
 
 struct InsertInward{C<:Function, F<:Function} <: FunctionCombiner
@@ -213,13 +182,6 @@ Power(f::Function, n::Int) = Power(f, Val(n))
 (f::Power{<:Function, N})(arg::Vararg) where {N} = f.f(arg...)^(N::Int)
 
 
-# struct Plus{T} <: CompositeFunction
-#     val::T
-# end
-
-# (f::Plus{T})(arg::T) where {T} = arg + f.val
-
-
 struct ShiftByArg{T, D} <: FieldlessFunction end
 
 function (::ShiftByArg{T, D})(input::Union{NTuple{D, T}, AbstractVector{T}}, 
@@ -239,21 +201,20 @@ struct HermitianContract{T, F1<:ReturnTyped{T}, F2<:ReturnTyped{T}} <: FunctionC
     end
 end
 
-function (f::HermitianContract{T})(params::FilteredVecOfArr{T}, 
-                                   vInput::AbstractVector{T}) where {T}
+function (f::HermitianContract{T})(input, weights::AbstractVector{T}) where {T}
     res = zero(T)
     len = length(f.diagonal)
 
     for i in 1:len
-        c = vInput[begin+i-1]
-        res += f.diagonal[begin+i-1](params) * c' * c
+        c = weights[begin+i-1]
+        res += f.diagonal[begin+i-1](input) * c' * c
     end
 
     for j in 1:length(f.uppertri)
         m, n = convertIndex1DtoTri2D(j)
-        c1 = vInput[begin+m-1]
-        c2 = vInput[begin+n]
-        val = f.uppertri[begin+j-1](params) * c1' * c2
+        c1 = weights[begin+m-1]
+        c2 = weights[begin+n]
+        val = f.uppertri[begin+j-1](input) * c1' * c2
         res += val + val'
     end
 
@@ -261,100 +222,65 @@ function (f::HermitianContract{T})(params::FilteredVecOfArr{T},
 end
 
 
-function evalFunc(func::F, input::T) where {F<:Function, T}
-    fCore, pSet, _ = unpackFunc(func)
-    evalFunc(fCore, pSet, input)
-end
+struct Left end
 
-function evalFunc(fCore::F, pSet::Union{DirectParamSource, TypedParamInput}, 
-                  input::T) where {F<:Function, T}
-    fCore(input, evalParamSource(pSet))
-end
+struct Right end
 
-function evalFunc(fCore::F, pVals::AbtVecOfAbtArr, input::T) where {F<:Function, T}
-    fCore(input, pVals)
-end
-
-#! Possibly adding memoization in the future to generate/use the same param set to avoid 
-#! bloating `Quiqbox.IdentifierCache` and prevent repeated computation.
-unpackFunc(f::F) where {F<:Function} = unpackFunc!(f, initializeParamSet(f))
-
-unpackFunc!(f::F, paramSet::AbstractVector) where {F<:Function} = 
-unpackFunc!(SelectTrait{ParameterizationStyle}()(f), f, paramSet)
-
-unpackFunc!(::TypedParamFunc, f::Function, paramSet::AbstractVector) = 
-unpackParamFunc!(f, paramSet)
-
-unpackFunc!(::GenericFunction, f::Function, paramSet::AbstractVector) = 
-unpackTypedFunc!(f, paramSet)
-
-const FieldPtrPair{T} = Pair{<:ChainPointer, <:FlatParamSetIdxPtr{T}}
-const FieldPtrPairs{T} = AbstractVector{<:FieldPtrPair{T}}
-const FieldPtrDict{T} = AbstractDict{<:ChainPointer, <:FlatParamSetIdxPtr{T}}
-const EmptyFieldPtrDict{T} = TypedEmptyDict{Union{}, FlatPSetInnerPtr{T}}
-const FiniteFieldPtrDict{T, N} = FiniteDict{N, <:ChainPointer, <:FlatParamSetIdxPtr{T}}
-
-const FieldValDict{T} = AbstractDict{<:FlatParamSetIdxPtr{T}, <:Union{T, AbstractArray{T}}}
-const ParamValOrDict{T} = Union{AbtVecOfAbtArr{T}, FieldValDict{T}}
-
-abstract type FieldParamPointer{R} <: Any end
-
-struct MixedFieldParamPointer{T, R<:FieldPtrDict{T}} <: FieldParamPointer{R}
-    core::R
-    tag::Identifier
-end
-
-function MixedFieldParamPointer(paramPairs::FieldPtrPairs{T}, tag::Identifier) where {T}
-    coreDict = buildDict(paramPairs, EmptyFieldPtrDict{T})
-    MixedFieldParamPointer(coreDict, tag)
-end
+const Lateral = Union{Left, Right}
 
 
-# `f` should only take one input.
-unpackTypedFunc!(f::Function, paramSet::AbstractVector, 
-                 paramSetId::Identifier=Identifier(paramSet)) = 
-unpackTypedFunc!(ReturnTyped(f, Any), paramSet, paramSetId)
-
-function unpackTypedFuncCore!(f::ReturnTyped{T}, paramSet::AbstractVector) where {T}
-    params, anchors = getFieldParams(f)
-    if isempty(params)
-        ParamSelectFunc(f), paramSet, FieldPtrPair{T}[]
-    else
-        ids = locateParam!(paramSet, params)
-        fDummy = deepcopy(f.f)
-        paramDoubles = getFieldParams(fDummy)
-        foreach(p->setScreenLevel!(p.source, 1), paramDoubles)
-        evalCore = function (x, pVals::Vararg)
-            for (p, v) in zip(paramDoubles, pVals)
-                setVal!(p, v)
-            end
-            fDummy(x)
-        end
-        paramPairs = getMemory(ChainPointer(:apply, anchors) .=> ids)
-        ParamSelectFunc(ReturnTyped(evalCore, T), ids), paramSet, paramPairs
-    end
-end
-
-function unpackTypedFunc!(f::ReturnTyped{T}, paramSet::AbstractVector, 
-                          paramSetId::Identifier=Identifier(paramSet)) where {T}
-    fCore, _, paramPairs = unpackTypedFuncCore!(f, paramSet)
-    ptrDict = buildDict(paramPairs, EmptyFieldPtrDict{T})
-    paramPtr = MixedFieldParamPointer(ptrDict, paramSetId)
-    fCore, paramSet, paramPtr
-end
-
-
-struct LeftPartial{F<:Function, A<:NonEmptyTuple{Any}} <: FunctionModifier
+struct LateralPartial{F<:Function, A<:NonEmptyTuple{Any}, L<:Lateral} <: FunctionModifier
     f::F
-    header::A
+    arg::A
+    side::L
 
-    function LeftPartial(f::F, arg, args...) where {F<:Function}
-        allArgs = (arg, args...)
-        new{F, typeof(allArgs)}(f, allArgs)
+    function LateralPartial(f::F, args::NonEmptyTuple{Any}, side::L) where 
+                           {F<:Function, L<:Lateral}
+        new{F, typeof(args), L}(f, args, side)
     end
 end
 
-(f::LeftPartial)(arg...) = f.f(f.header..., arg...)
+const LPartial{F<:Function, A<:NonEmptyTuple{Any}} = LateralPartial{F, A, Left }
+const RPartial{F<:Function, A<:NonEmptyTuple{Any}} = LateralPartial{F, A, Right}
+
+(f::LPartial)(arg...; kws...) = f.f(f.arg..., arg...; kws...)
+(f::RPartial)(arg...; kws...) = f.f(arg..., f.arg...; kws...)
+
+LPartial(f::Function, args::NonEmptyTuple{Any}) = LateralPartial(f, args, Left() )
+RPartial(f::Function, args::NonEmptyTuple{Any}) = LateralPartial(f, args, Right())
+
+
+struct KeywordPartial{F, A<:NonEmptyTuple{Pair{Symbol, <:Any}}} <: FunctionModifier
+    f::F
+    arg::A
+    replaceable::Bool
+
+    function KeywordPartial(f::F, pairs::NonEmptyTuple{Pair{Symbol, <:Any}}, 
+                            replaceable::Bool=true) where {F<:Function}
+        new{F, typeof(pairs)}(f, pairs, replaceable)
+    end
+end
+
+function (f::KeywordPartial)(arg...; kws...)
+    if f.replaceable
+        f.f(arg...; f.arg..., kws...)
+    else
+        f.f(arg...; kws..., f.arg...)
+    end
+end
 
 
 const AbsSqrtInv = inv∘sqrt∘abs
+
+
+function typedMap(op::F, obj::AbstractArray, ::Type{T}=Union{}) where {F<:Function, T}
+    if isempty(obj)
+        similar(obj, T)
+    else
+        map(op, obj)
+    end
+end
+
+function typedMap(op::F, obj::Union{Tuple, NamedTuple}, ::Type=Union{}) where {F<:Function}
+    map(op, obj)
+end

@@ -1,354 +1,425 @@
-export genGraphNode, evaluateNode, compressNode
+export ParamGraph, evaluateGraph, compressParam
 
-using Base: Fix1
+struct Directed end
+struct Undirected end
 
-const NodeChildrenType{T} = TriTupleUnion{GraphNode{T}}
-const getParSym = symbolFrom∘indexedSymOf
+const Orientation = Union{Directed, Undirected}
 
-function genConstFunc(::Type{T1}, val::T2) where {T1, T2}
-    let res = val
-        function (::T1)
-            res
-        end
-    end
-end
+struct Static end
+struct Dynamic end
 
+const Mutability = Union{Static, Dynamic}
 
-struct ValueNode{T, N, O} <: ContainerNode{T, N, O}
-    value::ShapedMemory{ShapedMemory{T, N}, O}
-    frozen::Bool
+abstract type AbstractGraph{M<:Mutability, O<:Orientation} end
+
+abstract type ComputationGraph{M<:Mutability} <: AbstractGraph{M, Directed} end
+
+abstract type TransformedGraph{M<:Mutability} <: AbstractGraph{M, Directed} end
+
+abstract type GraphVertex end
+
+abstract type TypedVertex{T} <: GraphVertex end
+
+abstract type AccessVertex{T} <: TypedVertex{T} end
+
+abstract type ActionVertex{T} <: TypedVertex{T} end
+
+struct UnitVertex{T} <: AccessVertex{T}
+    value::T
+    active::Bool
     marker::Symbol
-    id::UInt
-
-    function ValueNode(p::BaseParam{T, N}) where {T, N}
-        sl = screenLevelOf(p)
-        if sl == 0
-            valRaw = obtainCore(p)
-            frozen = false
-        else
-            valRaw = obtain(p)
-            frozen = Bool(sl-1)
-        end
-        new{T, N, 0}( (ShapedMemory∘fill∘ShapedMemory)(T, valRaw), frozen, 
-                      getParSym(p), objectid(p) )
-    end
-
-    function ValueNode(p::ParamLink{T, N, <:Any, O}) where {T, N, O}
-        sl = screenLevelOf(p)
-        if sl == 0
-            valRaw = obtainCore(p)
-            frozen = false
-        else
-            valRaw = obtain(p)
-            frozen = Bool(sl-1)
-        end
-        new{T, N, O}( ShapedMemory( map(x->ShapedMemory(T, x), valRaw) ), frozen, 
-                      getParSym(p), objectid(p) )
-    end
-
-    function ValueNode(p::PrimitiveParam{T, N}) where {T, N}
-        frozen = (screenLevelOf(p) == 2)
-        val = (ShapedMemory∘fill∘ShapedMemory)(T, obtain(p))
-        new{T, N, 0}(val, frozen, getParSym(p), objectid(p))
-    end
 end
 
-struct BatchNode{T, N, O, 
-                 I<:ShapedMemory{<:DimSGNode{T, N}, O}} <: ReferenceNode{T, N, O, I}
-    source::I
+struct GridVertex{T, N} <: AccessVertex{ShapedMemory{T, N}}
+    value::ShapedMemory{T, N}
+    active::Bool
     marker::Symbol
-    id::UInt
-
-    function BatchNode(source::I, p::ParamGrid{T, N}) where 
-                      {T, N, O, I<:AbstractArray{<:DimSGNode{T, N}, O}}
-        new{T, N, O, I}(ShapedMemory(source), getParSym(p), objectid(p))
-    end
 end
 
-struct BuildNode{T, N, O, F<:DualSpanFunction{T, N, O}, S<:Union{ItsType, ValShifter{T}}, 
-                 I<:NodeChildrenType{T}} <: OperationNode{T, N, O, I}
-    operator::F
-    shifter::S
-    source::I
-    marker::Symbol
-    id::UInt
+const TensorVertex{T} = Union{UnitVertex{T}, GridVertex{T}}
 
-    function BuildNode(children::I, p::BaseParam{T, N}) where 
-                      {T, N, I<:NodeChildrenType{T}}
-        operator = p.lambda
-        includeOffset = hasfield(typeof(p), :offset) && isOffsetEnabled(p)
-        shifter = genValShifter(T, includeOffset ? p.offset : nothing)
-        new{T, N, 0, typeof(operator), typeof(shifter), I}(operator, shifter, children, 
-                                                           getParSym(p), objectid(p))
-    end
-
-    function BuildNode(children::I, p::ParamLink{T, N, <:Any, O}) where 
-                      {T, N, O, I<:NodeChildrenType{T}}
-        operator = p.lambda
-        new{T, N, O, typeof(operator), ItsType, I}(operator, itself, children, 
-                                              getParSym(p), objectid(p))
-    end
+function genTensorVertex(val::T, active::Bool, marker::Symbol) where {T}
+    UnitVertex(val, active, marker)
 end
 
-const BuildNodeSourceNum{T, A} = 
-      BuildNode{T, <:Any, <:Any, <:Any, <:Any, <:NTuple{A, GraphNode{T}}}
-
-getBuildNodeSourceNum(::BuildNodeSourceNum{<:Any, A}) where {A} = A
-
-struct IndexNode{T, N, I<:BuildNode{T, N}} <: ReferenceNode{T, N, 0, I}
-    source::I
-    index::Int
-    marker::Symbol
-    id::UInt
-
-    function IndexNode(node::I, p::KnotParam{T, <:Any, <:Any, N, O}) where 
-                      {T, N, O, I<:BuildNode{T, N, O}}
-        new{T, N, I}(node, p.index, getParSym(p), objectid(p))
-    end
+function genTensorVertex(val::AbstractArray{T}, active::Bool, marker::Symbol) where {T}
+    GridVertex(ShapedMemory(val), active, marker)
 end
 
+# HalfEdge: Edge that does not hold complete information unless it's attached to a vertex.
+abstract type HalfEdge{O<:Orientation} end
 
-genGraphNodeCore(p::PrimitiveParam) = ValueNode(p)
-genGraphNodeCore(p::ParamFunctor) = ValueNode(p)
+abstract type VertexReceptor <: HalfEdge{Directed} end
 
-function genGraphNodeCore(source::NTuple{A, GraphNode{T}}, 
-                          p::ParamFunctor{T, <:Any, <:ParamInput{T, A}}) where {T, A}
-    BuildNode(source, p)
+@enum VertexEffect::Int8 begin
+    UnstableVertex = 0
+    VertexAsAccess = 1
+    VertexAsAction = 2
 end
 
-genGraphNodeCore(::Type{T}, p::CellParam{T}) where {T} = ValueNode(p)
-
-genGraphNodeCore(val::Memory{<:DimSGNode{T, N}}, p::ParamGrid{T, N}) where {T, N} = 
-BatchNode(ShapedMemory(val, p.input.shape), p)
-
-genGraphNodeCore(val::Memory{<:GraphNode{T, N, O}}, 
-                 p::KnotParam{T, <:Any, <:Any, N, O}) where {T, N, O} = 
-IndexNode(getindex(val), p)
-
-const ComputeNodeDict{T} = ParamPointerBox{ T, Dim0GNode{T}, DimSGNode{T}, 
-                                             GraphNode{T}, typeof(genGraphNodeCore) }
-
-genGraphNodeDict(::Type{T}, maxRecursion::Int=DefaultMaxParamPointerLevel) where {T} = 
-ParamPointerBox(genGraphNodeCore, T, Dim0GNode{T}, DimSGNode{T}, GraphNode{T}, 
-                 maxRecursion)
-
-function genGraphNode(p::CompositeParam{T}; 
-                      maxRecursion::Int=DefaultMaxParamPointerLevel) where {T}
-    gNodeDict = genGraphNodeDict(T, maxRecursion)
-    recursiveTransform!(genGraphNodeCore, gNodeDict, p)
+@enum VertexOutput::Int8 begin
+    VertexToUnit = 0
+    VertexToGrid = 1
+    VertexToNest = 2
+    VertexToWhat = 3
 end
 
-genGraphNode(p::PrimitiveParam) = genGraphNodeCore(p)
-
-
-evaluateNode(gn::ValueNode{T}) where {T} = directObtain.(gn.value)
-
-evaluateNode(gn::BatchNode{T}) where {T} = map(evaluateNode, gn.source)
-
-function evaluateNode(gn::BuildNode{T}) where {T}
-    gn.operator( map(evaluateNode, gn.source)... ) |> gn.shifter
-end
-
-function evaluateNode(gn::IndexNode{T}) where {T}
-    getindex(evaluateNode(gn.source), gn.index)
-end
-
-struct TemporaryStorage{T} <: QueryBox{Union{Tuple{T, Int}, Tuple{AbstractArray{T}, Int}}}
-    d0::IdDict{UInt, Tuple{T, Int}}
-    d1::IdDict{UInt, Tuple{AbstractArray{T}, Int}}
-
-    TemporaryStorage(::Type{T}) where {T} = 
-    new{T}(IdDict{UInt, Tuple{T, Int}}(), IdDict{UInt, Tuple{AbstractArray{T}, Int}}())
-end
-
-#! See if `FixedSizeStorage` can be replaced by / connected to  FlatParamSet
-struct FixedSizeStorage{T, V<:AbstractArray{T}} <: QueryBox{Union{T, V}}
-    d0::Memory{T}
-    d1::Memory{V}
-end
-
-selectStorageSectorSym(::Dim0GNode) = :d0
-selectStorageSectorSym(::DimSGNode) = :d1
-
-
-selectInPSubset(::Val{0}, ps::AbstractVector) = first(ps)
-selectInPSubset(::Val,    ps::AbstractVector) = itself(ps)
-
-function genGetVal!(tempStorage::TemporaryStorage{T}, gn::ValueNode{T}) where {T}
-    id = gn.id
-    sectorSym = selectStorageSectorSym(gn)
-    sector = getproperty(tempStorage, sectorSym)
-    data = get(sector, id, nothing)
-    if data === nothing
-        idx = length(sector) + 1
-        setindex!(sector, (evaluateNode(gn), idx), id)
+getVertexOutputLevel(::UnitVar) = VertexToUnit
+getVertexOutputLevel(::GridVar) = VertexToGrid
+function getVertexOutputLevel(::P) where {P<:CompositeParam}
+    level = getNestedLevel(P).level
+    if level == 0
+        VertexToUnit
+    elseif level == 1
+        VertexToGrid
     else
-        idx = last(data)
-    end
-    function (storage::FixedSizeStorage{T}, ::AbtVecOfAbtArr{T})
-        getindex(getproperty(storage, sectorSym), idx)
+        VertexToNest
     end
 end
 
-function genGetVal!(::Type{T}, ::Val{N}, idx::Int) where {T, N}
-    function (::FixedSizeStorage{T}, input::AbtVecOfAbtArr{T})
-        getindex(selectInPSubset(Val(N), input), idx)
+struct VertexTrait
+    effect::VertexEffect
+    output::VertexOutput
+
+    VertexTrait() = new(UnstableVertex, VertexToWhat)
+    VertexTrait(effect::VertexEffect, output::VertexOutput) = new(effect, output)
+end
+
+struct TupleReceptor{N} <: VertexReceptor
+    trait::VectorMemory{VertexTrait, N}
+    index::VectorMemory{Int, N}
+
+    function TupleReceptor(nInput::Int, defaultTrait::VertexTrait=VertexTrait())
+        checkPositivity(nInput)
+        trait = VectorMemory(fill(defaultTrait, nInput))
+        index = VectorMemory(fill(0, nInput))
+        new{nInput}(trait, index)
     end
 end
 
-function compressNodeCore!(tStorage::TemporaryStorage{T}, 
-                           paramSet::PrimParamVec{T}, gn::ValueNode{T, N, 0}) where {T, N}
-    varIdx = if gn.frozen
-        nothing
+struct ArrayReceptor{N} <: VertexReceptor
+    trait::ShapedMemory{VertexTrait, N}
+    index::ShapedMemory{Int, N}
+
+    function ArrayReceptor(sInput::NTuple{N, Int}, 
+                           defaultTrait::VertexTrait=VertexTrait()) where {N}
+        trait = ShapedMemory(fill(defaultTrait, sInput))
+        index = ShapedMemory(fill(0, sInput))
+        new{N}(trait, index)
+    end
+end
+
+const CallVertexReceptor{N} = Union{TupleReceptor{N}, ArrayReceptor{N}}
+
+struct CallVertex{T, I<:CallVertexReceptor, F<:Function} <: ActionVertex{T}
+    apply::ReturnTyped{T, F}
+    marker::Symbol
+    receptor::I # Could potentially have repeated input indices
+end
+
+const ParamBoxVertexDict = IdDict{ParamBox, Pair{VertexTrait, Int}}
+
+function updateVertexReceptor!(receptor::CallVertexReceptor, param::CompositeParam, 
+                               dict::ParamBoxVertexDict)
+    tIds = receptor.trait
+    iIds = receptor.index
+    for (i, j, p) in zip(eachindex(tIds), eachindex(iIds), param.input)
+        trait, index = dict[p]
+        tIds[i] = trait
+        iIds[j] = index
+    end
+    nothing
+end
+
+function initializeReceptor(param::AdaptableParam, 
+                            reference::Union{Nothing, ParamBoxVertexDict}=nothing)
+    receptor = TupleReceptor(length(param.input))
+    reference === nothing || updateVertexReceptor!(receptor, param, reference)
+    receptor
+end
+
+function initializeReceptor(param::ShapedParam, 
+                            reference::Union{Nothing, ParamBoxVertexDict}=nothing)
+    receptor = ArrayReceptor(size(param.input))
+    reference === nothing || updateVertexReceptor!(receptor, param, reference)
+    receptor
+end
+
+function genParamVertex(param::CompositeParam, 
+                        reference::Union{Nothing, ParamBoxVertexDict}=nothing)
+    sl = screenLevelOf(param)
+    sym = symbolFrom(param.symbol)
+    if sl > 0
+        genTensorVertex(param.offset, sl<2, sym)
     else
-        findfirst(par->objectid(par)==gn.id, selectInPSubset(Val(N), paramSet))
+        apply = extractTransform(param)
+        receptor = initializeReceptor(param, reference)
+        CallVertex(apply, sym, receptor)
     end
-    varIdx===nothing ? genGetVal!(tStorage, gn) : genGetVal!(T, Val(N), varIdx)
 end
 
-function compressNodeCore!(tStorage::TemporaryStorage{T}, 
-                           paramSet::PrimParamVec{T}, node::BatchNode{T}) where {T}
-    fs=map(x->compressNodeCore!(tStorage, paramSet, x), node.source)
-    let gs=fs, iterRanges=Iterators.product(axes(fs)...)
-        function (storage::FixedSizeStorage{T}, input::AbtVecOfAbtArr{T})
-            map( enumerate(iterRanges) ) do (i, _)
-                gs[i](storage, input)
+function genParamVertex(param::PrimitiveParam)
+    genTensorVertex(param.input, screenLevelOf(param)<2, symbolFrom(param.symbol))
+end
+
+function formVertexSectors(unitInput::AbstractVector{<:ParamBox}, 
+                           gridInput::AbstractVector{<:ParamBox}, 
+                           callNodes::AbstractVector{<:ParamBox})
+    dict = ParamBoxVertexDict()
+    effects = (VertexAsAccess, VertexAsAccess, VertexAsAction)
+    counters = (fill(0), fill(0), fill(0))
+
+    s = map(effects, counters, (unitInput, gridInput, callNodes)) do effect, counter, pars
+        map(pars) do par
+            idx = (counter[] += 1)
+            dict[par] = VertexTrait(effect, getVertexOutputLevel(par))=>idx
+            if effect == VertexAsAction
+                genParamVertex(par, dict)
+            else
+                genParamVertex(par)
             end
         end
     end
+    s, dict
 end
 
-function compressNodeCore!(tStorage::TemporaryStorage{T}, 
-                           paramSet::PrimParamVec{T}, node::BuildNode{T}) where {T}
-    sourceNum = getBuildNodeSourceNum(node)
-    compressBuildNodeCore!(Val(sourceNum), tStorage, paramSet, node)
-end
 
-function compressBuildNodeCore!(::Val{1}, tStorage::TemporaryStorage{T}, 
-                                paramSet::PrimParamVec{T}, node::BuildNode{T}) where {T}
-    f = compressNodeCore!(tStorage, paramSet, node.source[1])
-    let g=f, op=node.operator, sh=node.shifter
-        function (storage::FixedSizeStorage{T}, input::AbtVecOfAbtArr{T})
-            op( g(storage, input) ) |> sh
+struct ParamGraph{T, S1<:UnitVertex, S2<:GridVertex, H<:CallVertex, 
+                  V<:CallVertex{T}} <: TransformedGraph{Static}
+    origin::@NamedTuple{unit::Memory{UnitParam}, grid::Memory{GridParam}}
+    source::@NamedTuple{unit::Memory{S1}, grid::Memory{S2}}
+    hidden::Memory{H}
+    output::V
+
+    function ParamGraph(pb::ParamBox; indexing!Arg::Bool=false)
+        (inUPars, inGPars), midPars, outPars, _ = classifyParams(pb)
+        if isempty(inUPars) && isempty(inGPars)
+            throw(AssertionError("`pb` should have at least one input source."))
         end
-    end
-end
 
-function compressBuildNodeCore!(::Val{2}, tStorage::TemporaryStorage{T}, 
-                                paramSet::PrimParamVec{T}, node::BuildNode{T}) where {T}
-    fL, fR = compressNodeCore!.(Ref(tStorage), Ref(paramSet), node.source)
-    let gL=fL, gR=fR, op=node.operator, sh=node.shifter
-        function (storage::FixedSizeStorage{T}, input::AbtVecOfAbtArr{T})
-            op( gL(storage, input), gR(storage, input) ) |> sh
-        end
-    end
-end
+        sortParams!(inUPars, indexing=indexing!Arg)
+        sortParams!(inGPars, indexing=indexing!Arg)
+        origin = (unit=Memory{UnitParam}(inUPars), grid=Memory{GridParam}(inGPars))
 
-function compressBuildNodeCore!(::Val{3}, tStorage::TemporaryStorage{T}, 
-                                paramSet::PrimParamVec{T}, node::BuildNode{T}) where {T}
-    fL, fC, fR = compressNodeCore!.(Ref(tStorage), Ref(paramSet), node.source)
-    let gL=fL, gC=fC, gR=fR, op=node.operator, sh=node.shifter
-        function (storage::FixedSizeStorage{T}, input::AbtVecOfAbtArr{T})
-            op( gL(storage, input), gC(storage, input), gR(storage, input) ) |> sh
-        end
-    end
-end
+        sectors, mapper = formVertexSectors(inUPars, inGPars, midPars)
 
-function compressNodeCore!(tStorage::TemporaryStorage{T}, 
-                           paramSet::PrimParamVec{T}, node::IndexNode{T}) where {T}
-    f = compressNodeCore!(tStorage, paramSet, node.source)
-    let g=f, idx=node.index
-        function (storage::FixedSizeStorage{T}, input::AbtVecOfAbtArr{T})
-            getindex(g(storage, input), idx)
+        unitSource, gridSource, hidden = map(sectors) do sector
+            isempty(sector) ? Memory{Union{}}(undef, 0) : getMemory(sector)
         end
+        source = (unit=unitSource, grid=gridSource)
+
+        outPar = outPars[]
+        output = genParamVertex(outPar, mapper)
+
+        new{getOutputType(outPar), eltype(unitSource), eltype(gridSource), eltype(hidden), 
+            typeof(output)}(origin, source, hidden, output)
     end
 end
 
 
-#? Unify the format of CompressedNode with other ParamFunc: FrameworkOrb
-struct CompressedNode{T, F<:Function, S<:FixedSizeStorage{T}, 
-                      V<:AbtVecOfAbtArr{T}} <: StatefulFunction{T}
-    f::F
-    storage::S
-    param::V
+isNodeActive(node::TensorVertex) = node.active
+getNodeValue(node::TensorVertex) = node.value
+
+getSourceInfo(vertex::TensorVertex) = (vertex.marker, vertex.active)=>vertex.value
+
+const SourceNodeInfo{T} = Tuple{Symbol, Bool, T}
+
+const ParamGraphCore{V1<:UnitVertex, V2<:GridVertex, V3<:CallVertex} = 
+      @NamedTuple{unit::Memory{V1}, grid::Memory{V2}, call::Memory{V3}}
+
+const GraphCore = Union{ParamGraphCore}
+
+struct TranspiledGraph{T, B<:GraphCore, F<:Function} <: ComputationGraph{Static}
+    attribute::B
+    evaluator::ReturnTyped{T, F}
 end
 
-(gnf::CompressedNode)() = gnf(gnf.storage, gnf.param)
+function TranspiledGraph(graph::ParamGraph)
+    unitSource, gridSource = graph.source
+    body = (unit=unitSource, grid=gridSource, call=graph.hidden)
+    f = genCallVertexEvaluator(body, graph.output)
+    TranspiledGraph(body, f)
+end
 
-(gnf::CompressedNode{T})(ps::AbtVecOfAbtArr{T}) where {T} = gnf(gnf.storage, ps)
+const TranspiledParamGraph{T, B<:ParamGraphCore, F} = TranspiledGraph{T, B, F}
 
-(gnf::CompressedNode)(s::FixedSizeStorage{T}, ps::AbtVecOfAbtArr{T}) where {T} = gnf.f(s, ps)
+(f::TranspiledGraph)() = f.evaluator(f.attribute)
 
-# function (gnf::CompressedNode{T})(ps::PrimParamVec{T}; checkParamSet::Bool=true) where {T}
-#     if checkParamSet
-#         bl, errorMsg = isGraphParamSet(paramSet)
-#         bl || throw( AssertionError(errorMsg) )
-#     end
-#     gnf( obtain.(ps) )
-# end
+function prepareSourceInfo(nodes::AbstractVector{<:TensorVertex}, ::Nothing)
+    getfield.(nodes, :value)
+end
 
-
-function compressNodeINTERNAL(node::GraphNode{T}, paramSet::PrimParamVec{T}) where {T}
-    tStorage = TemporaryStorage(T)
-    f = compressNodeCore!(tStorage, paramSet, node)
-    sectors = map( getproperty.(Ref(tStorage), fieldnames(TemporaryStorage)) ) do data
-        pairs = values(data)
-        vals = first.(pairs)
-        eleTypeUB = pairs |> eltype |> fieldtypes |> first
-        eleType = typeintersect(eltype(vals), eleTypeUB)
-        sector = Memory{eleType}(undef, length(data))
-        for (idx, val) in zip(last.(pairs), vals)
-            sector[idx] = val
+function prepareSourceInfo(nodes::AbstractVector{<:TensorVertex}, input::AbstractVector)
+    i = firstindex(input)
+    map(nodes) do node
+        if node.active
+            val = input[i]
+            i += 1
+            val
+        else
+            node.value
         end
-        sector
     end
-    CompressedNode(f, FixedSizeStorage(sectors...), obtain.(paramSet))
 end
 
-function compressNode(node::GraphNode{T}, paramSet::PrimParamVec{T}) where {T}
-    bl, errorMsg = isGraphParamSet(paramSet)
-    bl || throw( AssertionError(errorMsg) )
-    compressNodeINTERNAL(node, paramSet)
+const UnitOrGridInput = Tuple{Union{Nothing, AbstractVector}, 
+                              Union{Nothing, AbstractVector{<:AbstractArray} }}
+
+function evaluateGraphCore(tpg::TranspiledParamGraph, (uInput, gInput)::UnitOrGridInput)
+    unit, grid, call = tpg.attribute
+    unitVals = prepareSourceInfo(unit, uInput)
+    gridVals = prepareSourceInfo(grid, gInput)
+    tpg.evaluator((unit=unitVals, grid=gridVals, call=call))
 end
 
+function evaluateGraph(graph::ParamGraph, inputPair::UnitOrGridInput)
+    tpg = TranspiledGraph(graph)
+    evaluateGraphCore(tpg, inputPair)
+end
 
-const ParamSetErrorMessage1 = "Input argument does not meet the type requirement of being "*
-                              "a parameter set: $(PrimParamVec)"
+const NamedUGInput{T1<:AbstractVector, T2<:AbstractVector{<:AbstractArray}} = 
+      @NamedTuple{unit::T1, grid::T2}
 
-const ParamSetErrorMessage2 = "All `$ElementalParam` must be inside a non-zero dimensional"*
-                              " `AbstractArray` as the first element of `paramSet`."
+evaluateGraph(graph::ParamGraph, 
+              inputPair::NamedUGInput=map(x->getNodeValue.(x), graph.source)) = 
+evaluateGraph(graph, values(inputPair))
 
-const ParamSetErrorMessage3 = "The screen level of every input parameter (inspected by "*
-                              "`$screenLevelOf`) must all be 1."
-
-isGraphParamSet(::AbstractVector) = (false, ParamSetErrorMessage1)
-
-function isGraphParamSet(paramSet::PrimParamVec{T}) where {T}
-    isInSet = true
-    errorMsg = ""
-    for i in eachindex(paramSet)
-        p = paramSet[i]
-
-        bl1 = i == firstindex(paramSet)
-        bl2 = p isa AbstractArray{<:ElementalParam{T}} && ndims(p) > 0
-        bl3 = (p isa InnerSpanParam && !(p isa ElementalParam))
-        if !( ( !bl1 && bl3 ) || ( bl1 && (bl2 || bl3) ) )
-            isInSet = false
-            errorMsg = ParamSetErrorMessage2
-            break
+function selectVertexEvalGenerator(trait::VertexTrait)
+    effectType = trait.effect
+    outputType = trait.output
+    if effectType == VertexAsAccess
+        if outputType == VertexToUnit
+            genUnitVertexEvaluator
+        elseif outputType == VertexToGrid
+            genGridVertexEvaluator
+        else
+            throw(AssertionError("`VertexToNest` is unsupported."))
         end
-
-        bl2 || (p = [p])
-
-        for pp in p
-            sl = screenLevelOf(pp)
-            if sl != 1
-                isInSet = false
-                errorMsg = ParamSetErrorMessage3
-                break
-            end
-        end
-        isInSet || break
+    elseif effectType == VertexAsAction
+        genCallVertexEvaluator
+    else
+        throw(AssertionError("`UnstableVertex` is not supported."))
     end
-    isInSet, errorMsg
+end
+
+function genUnitVertexEvaluator(::ParamGraphCore, idx::Int)
+    GetIndex{UnitIndex}(idx)
+end
+
+function genGridVertexEvaluator(::ParamGraphCore, idx::Int)
+    GetIndex{GridIndex}(idx)
+end
+
+function genCallVertexEvaluatorCore(::TupleReceptor, fs::AbstractArray{<:Function}, 
+                                    apply::ReturnTyped{T}) where {T}
+    ReturnTyped(ChainExpand(Tuple(fs), splat(apply.f)), T)
+end
+
+function genCallVertexEvaluatorCore(::ArrayReceptor, fs::AbstractArray{<:Function}, 
+                                    apply::ReturnTyped{T}) where {T}
+    ReturnTyped(ChainExpand(fs, apply.f), T)
+end
+
+function genCallVertexEvaluator(compactPG::ParamGraphCore, 
+                                vertex::CallVertex{T}) where {T}
+    receptor = vertex.receptor
+    fs = map(receptor.trait, receptor.index) do t, i
+        selectVertexEvalGenerator(t)(compactPG, i)
+    end
+    genCallVertexEvaluatorCore(receptor, fs, vertex.apply)
+end
+
+function genCallVertexEvaluator(compactPG::ParamGraphCore, i::Int)
+    vertex = compactPG.call[begin+i-1]
+    genCallVertexEvaluator(compactPG, vertex)
+end
+
+struct TensorInputEncoder{S1<:Symbol, S2<:Pair{ Symbol, <:NonEmptyTuple{Int} }}
+    unit::Memory{S1}
+    grid::Memory{S2}
+
+    function TensorInputEncoder(unitSource::Memory{<:UnitVertex}, 
+                                gridSource::Memory{<:GridVertex})
+        unitInfo = if isempty(unitSource)
+            Memory{Union{}}(undef, 0)
+        else
+            map(x->x.marker, filter(isNodeActive, unitSource))
+        end
+        gridInfo = if isempty(gridSource)
+            Memory{Union{}}(undef, 0)
+        else
+            map(x->x.marker=>(size∘getNodeValue)(x), filter(isNodeActive, gridSource))
+        end
+        new{eltype(unitInfo), eltype(gridInfo)}(unitInfo, gridInfo)
+    end
+end
+
+const UnitInputEncoder = TensorInputEncoder{Symbol, Union{}}
+const GridInputEncoder{G<:Pair{ Symbol, <:NonEmptyTuple{Int} }} = 
+                       TensorInputEncoder{Union{}, G}
+
+function encodeUnitInput(unit::Memory{Symbol}, flattenedInput::AbstractVector)
+    nUnit = length(unit)
+    flattenedInput[begin:begin+nUnit-1]
+end
+
+function encodeGridInput(grid::Memory{<:Pair{ Symbol, <:NonEmptyTuple{Int} }}, 
+                         flattenedInput::AbstractVector)
+    idx = firstindex(flattenedInput)
+    map(grid) do ele
+        val = reshape(flattenedInput[idx], ele.second)
+        idx += 1
+        val
+    end
+end
+
+(f::UnitInputEncoder)(flattenedInput::AbstractVector) = 
+(encodeUnitInput(f.unit, flattenedInput), nothing)
+
+(f::GridInputEncoder)(flattenedInput::AbstractVector) = 
+(nothing, encodeGridInput(f.grid, flattenedInput))
+
+
+function (f::TensorInputEncoder)(flattenedInput::AbstractVector)
+    unitInput = encodeUnitInput(f.unit, flattenedInput)
+    nUnit = length(f.unit)
+    gridInput = encodeGridInput(f.unit, (@view flattenedInput[begin+nUnit:end]))
+    unitInput, gridInput
+end
+
+const UnitAndGridInput{T, V<:AbstractArray} = Tuple{AbstractVector{T}, AbstractVector{V}}
+
+function (f::TensorInputEncoder)((unitInput, gridInput)::UnitAndGridInput)
+    unitInput = unitInput[begin:begin+length(f.unit)-1]
+    gridInput = map(enumerate(f.grid)) do (i, grid)
+        reshape(gridInput[begin+i-1], grid.second)
+    end
+
+    unitInput, gridInput
+end
+
+(f::TensorInputEncoder)() = (nothing, nothing)
+
+(f::TensorInputEncoder)(args::NamedTuple) = f(args|>values)
+
+abstract type GraphEvaluator{G} <: Evaluator{typeof(evaluateGraphCore)} end
+
+const ComputableParamGraph{G<:TranspiledGraph} = 
+      LPartial{typeof(evaluateGraphCore), Tuple{G}}
+
+struct EvalParamGraph{T, G<:TranspiledGraph{T}, E<:TensorInputEncoder} <: GraphEvaluator{G}
+    f::Base.ComposedFunction{ComputableParamGraph{G}, E}
+end
+
+(f::EvalParamGraph)() = f.f()
+(f::EvalParamGraph)(flattenInput) = f.f(flattenInput)
+(f::EvalParamGraph)(unitInput, gridInput) = f.f(unitInput, gridInput)
+
+
+function compressParam(pb::ParamBox)
+    graph = ParamGraph(pb)
+    transpiledGraph = TranspiledGraph(graph)
+    encoder = TensorInputEncoder(graph.source...)
+    cgc = LPartial(evaluateGraphCore, (transpiledGraph,))
+    EvalParamGraph(cgc∘encoder), graph.origin
 end

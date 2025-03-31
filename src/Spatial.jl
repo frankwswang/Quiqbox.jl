@@ -12,7 +12,7 @@ abstract type EvalFieldAmp{T, D, F} <: EvalFieldFunction{T, D, F} end
 f.f(formatInput(SelectTrait{InputStyle}()(f), input), param)
 
 
-function unpackParamFunc!(f::FieldAmplitude{T}, paramSet::FlatParamSet, 
+function unpackParamFunc!(f::FieldAmplitude{T}, paramSet::AbstractSpanParamSet, 
                           paramSetId::Identifier=Identifier(paramSet)) where {T}
     fCore, _, paramPairs = unpackParamFuncCore!(f, paramSet)
     paramPtr = MixedFieldParamPointer(paramPairs, paramSetId)
@@ -33,17 +33,17 @@ struct EvalFieldFunc{T, F<:ParamSelectFunc{<:ReturnTyped{T}}
     f::F
 end
 
-function unpackParamFuncCore!(f::FieldFunc{T}, paramSet::FlatParamSet) where {T}
+function unpackParamFuncCore!(f::FieldFunc{T}, paramSet::AbstractSpanParamSet) where {T}
     fEvalCore, _, pairs = unpackTypedFuncCore!(f.f, paramSet)
     EvalFieldFunc(fEvalCore), paramSet, pairs
 end
 
 
-struct GaussFunc{T<:Real, P<:ElementalParam{T}} <: FieldAmplitude{T, 0}
+struct GaussFunc{T<:Real, P<:UnitParam{T}} <: FieldAmplitude{T, 0}
     xpn::P
 end
 
-GaussFunc(xpn::T) where {T<:Real} = (GaussFunc∘genCellEncoder(T, :xpn))(xpn)
+GaussFunc(xpn::T) where {T<:Real} = (GaussFunc∘UnitParamEncoder(T, :xpn, 1))(xpn)
 
 
 struct ComputeGFunc{T} <: FieldlessFunction end
@@ -53,11 +53,12 @@ function (f::ComputeGFunc{T})(r::Real, xpnVal::T) where {T}
 end
 
 struct EvalGaussFunc{T} <: EvalFieldAmp{T, 0, GaussFunc}
-    f::GetParamFunc{ComputeGFunc{T}, FlatPSetInnerPtr{T}}
+    f::GetParamFunc{ComputeGFunc{T}, GetIndex{UnitIndex}}
 end
 
-function unpackParamFuncCore!(f::GaussFunc{T, P}, paramSet::FlatParamSet) where {T, P}
-    anchor = ChainPointer(:xpn, TensorType(T))
+function unpackParamFuncCore!(f::GaussFunc{T, P}, 
+                              paramSet::AbstractSpanParamSet) where {T, P}
+    anchor = ChainedAccess(:xpn)
     parIdx = locateParam!(paramSet, getField(f, anchor))
     fEvalCore = ParamSelectFunc(ComputeGFunc{T}(), (parIdx,))
     EvalGaussFunc(fEvalCore), paramSet, [anchor=>parIdx]
@@ -80,17 +81,17 @@ function AxialProdFunc(b::FieldAmplitude{<:Any, 0}, dim::Int)
 end
 
 struct EvalAxialProdFunc{T, D, F<:EvalFieldAmp{T, 0}} <: EvalFieldAmp{T, D, AxialProdFunc}
-    f::CountedChainReduce{StableMul{T}, InsertInward{F, OnlyHead{ GetFlavor{T} }}, D}
+    f::CountedChainReduce{StableMul{T}, InsertInward{F, OnlyHead{GetOneToIndex}}, D}
 end
 
-function unpackParamFuncCore!(f::AxialProdFunc{T, D}, paramSet::FlatParamSet) where {T, D}
+function unpackParamFuncCore!(f::AxialProdFunc{T, D}, 
+                              paramSet::AbstractSpanParamSet) where {T, D}
     fEvalComps = Memory{Function}(undef, D)
     pairs = mapfoldl(vcat, 1:D) do i
-        anchor = ChainPointer((:axis, i))
+        anchor = ChainedAccess((:axis, i))
         fInner, _, axialPairs = unpackParamFuncCore!(f.axis[i], paramSet)
-        ptr = ChainPointer(i, TensorType(T))
-        fEvalComps[i] = InsertInward(fInner, (OnlyHead∘Retrieve)(ptr))
-        map(x->(ChainPointer(anchor, x.first)=>x.second), axialPairs)
+        fEvalComps[i] = InsertInward(fInner, (OnlyHead∘GetOneToIndex)(i))
+        map(x->(ChainedAccess(anchor, x.first)=>x.second), axialPairs)
     end
     fEvalCore = Tuple(fEvalComps) |> (ChainReduce∘StableMul)(T)
     EvalAxialProdFunc(fEvalCore), paramSet, pairs
@@ -114,11 +115,12 @@ struct EvalPolyRadialFunc{T, D, F<:EvalFieldAmp{T, 0},
     f::PairCombine{StableMul{T}, MagnitudeConverter{F}, TypedAngularFunc{T, D, L}}
 end
 
-function unpackParamFuncCore!(f::PolyRadialFunc{T, D}, paramSet::FlatParamSet) where {T, D}
+function unpackParamFuncCore!(f::PolyRadialFunc{T, D}, 
+                              paramSet::AbstractSpanParamSet) where {T, D}
     fInner, _, radialPairs = unpackParamFuncCore!(f.radial, paramSet)
     if !isempty(radialPairs)
-        anchor = ChainPointer(:radial)
-        radialPairs = map(x->(ChainPointer(anchor, x.first)=>x.second), radialPairs)
+        anchor = ChainedAccess(:radial)
+        radialPairs = map(x->(ChainedAccess(anchor, x.first)=>x.second), radialPairs)
     end
     coordEncoder = InsertInward(fInner, OnlyHead(LinearAlgebra.norm))
     angularFunc = (OnlyHead∘ReturnTyped)(f.angular, T)

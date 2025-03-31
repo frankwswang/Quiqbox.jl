@@ -386,7 +386,6 @@ function isOscillateConverged(seq::AbstractVector{<:Real},
         target = convergeToMax ? valleys[argmax(valleys)] : valleys[argmin(valleys)]
     end
     b = std(valleys) <= stdThreshold && norm(target - seq[end]) <= tarThreshold
-    # b || @show ("Scalar", std(valleys), norm(target - seq[end]))
     b, std(tailEles)
 end
 
@@ -402,7 +401,6 @@ function isOscillateConverged(seq::AbstractVector{<:Array{<:Real}},
     lastDiff = lastPortionDiff[end]
     valleyIds = sortperm(lastPortionDiff)[begin : end÷2+1]
     b = lastDiff <= tarThreshold && all(i <= stdThreshold for i in std(tailEles[valleyIds]))
-    # b || @show ("Vector", std(tailEles[valleyIds]), lastDiff)
     b, std(tailEles)
 end
 

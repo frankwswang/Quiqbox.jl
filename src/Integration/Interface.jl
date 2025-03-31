@@ -1,5 +1,7 @@
+export overlap, overlaps, multipoleMoment, multipoleMoments
+
 function overlap(orb1::OrbitalBasis{T, D}, orb2::OrbitalBasis{T, D}; 
-                 paramCache::DimSpanDataCacheBox{T}=DimSpanDataCacheBox(T), 
+                 paramCache::MultiSpanDataCacheBox{T}=MultiSpanDataCacheBox(T), 
                  lazyCompute::Bool=false) where {T, D}
     if orb1 === orb2 && isRenormalized(orb1)
         one(T)
@@ -10,13 +12,13 @@ function overlap(orb1::OrbitalBasis{T, D}, orb2::OrbitalBasis{T, D};
 end
 
 overlaps(basisSet::OrbitalBasisSet{T, D}; 
-         paramCache::DimSpanDataCacheBox{T}=DimSpanDataCacheBox(T)) where {T, D} = 
+         paramCache::MultiSpanDataCacheBox{T}=MultiSpanDataCacheBox(T)) where {T, D} = 
 computeIntTensor(OneBodyIntegral{D}(), Identity(), basisSet; paramCache)
 
 
 function multipoleMoment(center::NTuple{D, Real}, degrees::NTuple{D, Int}, 
                          orb1::OrbitalBasis{T, D}, orb2::OrbitalBasis{T, D}; 
-                         paramCache::DimSpanDataCacheBox{T}=DimSpanDataCacheBox(T), 
+                         paramCache::MultiSpanDataCacheBox{T}=MultiSpanDataCacheBox(T), 
                          lazyCompute::Bool=false) where {T, D}
     mmOp = MonomialMul(T.(center), degrees)
     orbData = orb1 === orb2 ? (orb1,) : (orb1, orb2)
@@ -25,8 +27,8 @@ end
 
 function multipoleMoments(center::NTuple{D, Real}, degrees::NTuple{D, Int}, 
                           basisSet::OrbitalBasisSet{T, D}; 
-                          paramCache::DimSpanDataCacheBox{T}=
-                          DimSpanDataCacheBox(T)) where {T, D}
+                          paramCache::MultiSpanDataCacheBox{T}=
+                          MultiSpanDataCacheBox(T)) where {T, D}
     mmOp = MonomialMul(T.(center), degrees)
     computeIntTensor(OneBodyIntegral{D}(), mmOp, basisSet; paramCache)
 end

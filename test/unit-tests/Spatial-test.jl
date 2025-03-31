@@ -4,9 +4,9 @@ using LinearAlgebra
 
 @testset "Spatial.jl" begin
 
-xpn1 = CellParam(1.5, :xpn)
-xpn2 = CellParam(2.5, :xpn)
-xpn3 = CellParam(0.5, :xpn)
+xpn1 = genCellParam(1.5, :xpn)
+xpn2 = genCellParam(2.5, :xpn)
+xpn3 = genCellParam(0.5, :xpn)
 
 xpns = [xpn1, xpn2, xpn3]
 
@@ -19,7 +19,7 @@ gf1, gf2, gf3 = gfs1 = Quiqbox.GaussFunc.(xpns)
 gf1_core, gf1_par = Quiqbox.unpackFunc(gf1)
 fixedPoint = 1.1
 gf1Ofpar = Base.Fix1(gf1_core, 1.1)
-gf1_parVal = evalParamSource(gf1_par)
+gf1_parVal =map(obtain, gf1_par)
 @test -0.1970338691521383 ≈ gf1(fixedPoint) * (-fixedPoint^2)
 
 f1 = x -> exp(-xpn1() * x^2)
