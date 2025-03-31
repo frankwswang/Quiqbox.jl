@@ -34,20 +34,6 @@ StableSub(::Type{T}) where {T} = StableBinary(-, T)
 StableMul(::Type{T}) where {T} = StableBinary(*, T)
 
 
-struct Retrieve{P<:CompositePointer} <: FunctionComposer
-    rule::P
-end
-
-const GetIndex = Retrieve{ChainIntIdxr{1}}
-
-function (f::Retrieve)(input)
-    getField(input, f.rule)
-end
-
-const Select{P<:EntryPointer} = Retrieve{P}
-
-const Filter{P<:EffectivePtrStack} = Retrieve{P}
-
 struct EncodeApply{N, E<:NTuple{N, Function}, F<:Function} <: FunctionCombiner
     encode::E
     apply::F
@@ -60,24 +46,12 @@ EncodeApply(encode::Function, apply::Function) = EncodeApply((encode,), apply)
 (f::EncodeApply{0})(args...) = f.apply(args...)
 
 
-struct ParamFilterFunc{F<:Function, 
-                       T<:NonEmptyTuple{EffectivePtrStack}} <: ParamFuncBuilder{F}
-    apply::F
-    scope::T
-end
-
-ParamFilterFunc(apply::F, scope::P) where {F<:Function, P<:EffectivePtrStack} = 
-ParamFilterFunc(apply, (scope,))
-
-function (f::ParamFilterFunc)(input, param)
-    f.apply(input, getField.(Ref(param), f.scope)...)
-end
-
-
-struct ParamSelectFunc{F<:Function, T<:Tuple{Vararg{ChainIndexer}}} <: ParamFuncBuilder{F}
+struct ParamSelectFunc{F<:Function, T<:Tuple{ Vararg{Fetcher} }} <: ParamFuncBuilder{F}
     apply::F
     select::T
 end
+
+ParamSelectFunc(f::Function, select::Fetcher) = ParamSelectFunc(f, (select,))
 
 ParamSelectFunc(f::Function) = ParamSelectFunc(f, ())
 
@@ -85,16 +59,16 @@ const EmptySelectFunc{F<:Function} = ParamSelectFunc{F, Tuple{}}
 
 ParamSelectFunc(f::EmptySelectFunc) = itself(f)
 
-ParamSelectFunc(f::ParamSelectFunc, select::Tuple{Vararg{ChainIndexer}}) = 
+ParamSelectFunc(f::ParamSelectFunc, select::Tuple{Vararg{Fetcher}}) = 
 ParamSelectFunc(f.apply, (f.select..., select...))
 
 function (f::ParamSelectFunc)(input, param)
-    f.apply(input, getField(param, f.select)...)
+    f.apply(input, getField.(Ref(param), f.select)...)
 end
 
 (f::EmptySelectFunc)(input, _) = f.apply(input)
 
-const GetParamFunc{F<:Function, T<:ChainIndexer} = ParamSelectFunc{F, Tuple{T}}
+const GetParamFunc{F<:Function, T<:Fetcher} = ParamSelectFunc{F, Tuple{T}}
 
 
 struct OnlyHead{F<:Function} <: FunctionModifier
@@ -151,12 +125,29 @@ mapreduce(o->o(arg, args...), f.joint, f.chain.value)
 (f::ChainReduce)(arg, args...) = mapreduce(o->o(arg, args...), f.joint, f.chain)
 
 
-# struct InsertOnward{C<:Function, F<:Function}
-#     apply::C
-#     dress::F
-# end
+struct ChainExpand{F<:Function, 
+                   C<:Union{AbstractMemory{<:Function}, NonEmptyTuple{Function}}
+                   } <: FunctionCombiner
+    chain::C
+    finalizer::F
 
-# (f::InsertOnward)(arg, args...) = f.dress(f.apply(arg, args...), args...)
+    function ChainExpand(chain::C, finalizer::F=itself) where 
+                        {C<:AbstractMemory{<:Function}, F<:Function}
+        checkEmptiness(chain, :chain)
+        new{F, C}(chain, finalizer)
+    end
+
+    function ChainExpand(chain::C, finalizer::F=itself) where 
+                        {C<:NonEmptyTuple{Function}, F<:Function}
+        checkEmptiness(chain, :chain)
+        new{F, C}(chain, finalizer)
+    end
+end
+
+ChainExpand(chain::AbstractArray{<:Function}, finalizer::Function=itself) = 
+ChainExpand(ShapedMemory(chain), finalizer)
+
+(f::ChainExpand)(arg, args...) = f.finalizer(map(o->o(arg, args...), f.chain))
 
 
 struct InsertInward{C<:Function, F<:Function} <: FunctionCombiner
@@ -191,13 +182,6 @@ Power(f::Function, n::Int) = Power(f, Val(n))
 (f::Power{<:Function, N})(arg::Vararg) where {N} = f.f(arg...)^(N::Int)
 
 
-# struct Plus{T} <: CompositeFunction
-#     val::T
-# end
-
-# (f::Plus{T})(arg::T) where {T} = arg + f.val
-
-
 struct ShiftByArg{T, D} <: FieldlessFunction end
 
 function (::ShiftByArg{T, D})(input::Union{NTuple{D, T}, AbstractVector{T}}, 
@@ -217,21 +201,20 @@ struct HermitianContract{T, F1<:ReturnTyped{T}, F2<:ReturnTyped{T}} <: FunctionC
     end
 end
 
-function (f::HermitianContract{T})(params::FilteredVecOfArr{T}, 
-                                   vInput::AbstractVector{T}) where {T}
+function (f::HermitianContract{T})(input, weights::AbstractVector{T}) where {T}
     res = zero(T)
     len = length(f.diagonal)
 
     for i in 1:len
-        c = vInput[begin+i-1]
-        res += f.diagonal[begin+i-1](params) * c' * c
+        c = weights[begin+i-1]
+        res += f.diagonal[begin+i-1](input) * c' * c
     end
 
     for j in 1:length(f.uppertri)
         m, n = convertIndex1DtoTri2D(j)
-        c1 = vInput[begin+m-1]
-        c2 = vInput[begin+n]
-        val = f.uppertri[begin+j-1](params) * c1' * c2
+        c1 = weights[begin+m-1]
+        c2 = weights[begin+n]
+        val = f.uppertri[begin+j-1](input) * c1' * c2
         res += val + val'
     end
 
