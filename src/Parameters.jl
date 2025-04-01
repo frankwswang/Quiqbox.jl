@@ -1090,6 +1090,10 @@ struct SpanSetFilter <: Filter
     scope::FixedSpanIndexSet
 end
 
+function SpanSetFilter()
+    SpanSetFilter(( unit=Memory{OneToIndex}(undef, 0), grid=Memory{OneToIndex}(undef, 0) ))
+end
+
 function SpanSetFilter(scope::AbstractSpanIndexSet)
     SpanSetFilter(map(getMemory, scope))
 end
@@ -1101,11 +1105,7 @@ end
 function getField(paramSet::AbstractSpanSet, sFilter::SpanSetFilter)
     firstIds = map(firstindex, paramSet)
     map(paramSet, firstIds, sFilter.scope) do sector, i, oneToIds
-        # if isempty(oneToIds)
-        #     Memory{Union{}}(undef, 0)
-        # else
         view(sector, map(x->(x.idx + i - 1), oneToIds))
-        # end
     end
 end
 
