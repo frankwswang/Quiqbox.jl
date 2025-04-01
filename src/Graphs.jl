@@ -326,11 +326,11 @@ function genCallVertexEvaluator(compactPG::ParamGraphCore, i::Int)
     genCallVertexEvaluator(compactPG, vertex)
 end
 
-struct TensorInputEncoder{S1<:Symbol, S2<:Pair{ Symbol, <:NonEmptyTuple{Int} }}
+struct SpanInputFormatter{S1<:Symbol, S2<:Pair{ Symbol, <:NonEmptyTuple{Int} }} <: Filter
     unit::Memory{S1}
     grid::Memory{S2}
 
-    function TensorInputEncoder(unitSource::Memory{<:UnitVertex}, 
+    function SpanInputFormatter(unitSource::Memory{<:UnitVertex}, 
                                 gridSource::Memory{<:GridVertex})
         unitInfo = if isempty(unitSource)
             Memory{Union{}}(undef, 0)
@@ -346,60 +346,56 @@ struct TensorInputEncoder{S1<:Symbol, S2<:Pair{ Symbol, <:NonEmptyTuple{Int} }}
     end
 end
 
-const UnitInputEncoder = TensorInputEncoder{Symbol, Union{}}
-const GridInputEncoder{G<:Pair{ Symbol, <:NonEmptyTuple{Int} }} = 
-                       TensorInputEncoder{Union{}, G}
+const UnitInputFormatter = SpanInputFormatter{Symbol, Union{}}
+const GridInputFormatter{G<:Pair{ Symbol, <:NonEmptyTuple{Int} }} = 
+                         SpanInputFormatter{Union{}, G}
 
-function encodeUnitInput(unit::Memory{Symbol}, flattenedInput::AbstractVector)
+function formatUnitInput(unit::Memory{Symbol}, flattenedInput::AbstractVector)
     nUnit = length(unit)
     flattenedInput[begin:begin+nUnit-1]
 end
 
-function encodeGridInput(grid::Memory{<:Pair{ Symbol, <:NonEmptyTuple{Int} }}, 
-                         flattenedInput::AbstractVector)
+function formatGridInput(grid::Memory{<:Pair{ Symbol, <:NonEmptyTuple{Int} }}, 
+                          flattenedInput::AbstractVector)
     idx = firstindex(flattenedInput)
     map(grid) do ele
         val = reshape(flattenedInput[idx], ele.second)
-        idx += 1
+        idx += prod(ele.second)
         val
     end
 end
 
-(f::UnitInputEncoder)(flattenedInput::AbstractVector) = 
-(encodeUnitInput(f.unit, flattenedInput), nothing)
+getField(flattenedInput::AbstractVector, encoder::UnitInputFormatter) = 
+(unit=formatUnitInput(encoder.unit, flattenedInput), grid=nothing)
 
-(f::GridInputEncoder)(flattenedInput::AbstractVector) = 
-(nothing, encodeGridInput(f.grid, flattenedInput))
+getField(flattenedInput::AbstractVector, encoder::GridInputFormatter) = 
+(unit=nothing, grid=formatGridInput(encoder.grid, flattenedInput))
 
-
-function (f::TensorInputEncoder)(flattenedInput::AbstractVector)
-    unitInput = encodeUnitInput(f.unit, flattenedInput)
-    nUnit = length(f.unit)
-    gridInput = encodeGridInput(f.unit, (@view flattenedInput[begin+nUnit:end]))
-    unitInput, gridInput
+function getField(flattenedInput::AbstractVector, encoder::SpanInputFormatter)
+    unitInput = formatUnitInput(encoder.unit, flattenedInput)
+    nUnit = length(encoder.unit)
+    gridInput = formatGridInput(encoder.unit, (@view flattenedInput[begin+nUnit:end]))
+    (unit=unitInput, grid=gridInput)
 end
 
-const UnitAndGridInput{T, V<:AbstractArray} = Tuple{AbstractVector{T}, AbstractVector{V}}
+getField(spanInput::OptionalSpanValueSet, ::SpanInputFormatter) = itself(spanInput)
 
-function (f::TensorInputEncoder)((unitInput, gridInput)::UnitAndGridInput)
-    unitInput = unitInput[begin:begin+length(f.unit)-1]
-    gridInput = map(enumerate(f.grid)) do (i, grid)
-        reshape(gridInput[begin+i-1], grid.second)
-    end
+getField(::OptionalSpanValueSet{<:NothingOr{AbstractVector}, <:AbtVecOfAbtArr}, 
+         ::UnitInputFormatter) = 
+throw(AssertionError("`$UnitInputFormatter` disallows grid-type input."))
 
-    unitInput, gridInput
-end
+getField(::OptionalSpanValueSet{<:AbstractVector, <:NothingOr{AbtVecOfAbtArr}}, 
+         ::GridInputFormatter) = 
+throw(AssertionError("`$GridInputFormatter` disallows unit-type input."))
 
-(f::TensorInputEncoder)() = (nothing, nothing)
-
-(f::TensorInputEncoder)(args::NamedTuple) = f(args|>values)
+(f::SpanInputFormatter)() = (nothing, nothing)
 
 abstract type GraphEvaluator{G} <: Evaluator{typeof(evaluateGraphCore)} end
 
 const ComputableParamGraph{G<:TranspiledGraph} = 
       LPartial{typeof(evaluateGraphCore), Tuple{G}}
 
-struct EvalParamGraph{T, G<:TranspiledGraph{T}, E<:TensorInputEncoder} <: GraphEvaluator{G}
+struct EvalParamGraph{T, G<:TranspiledGraph{T}, E<:SpanInputFormatter} <: GraphEvaluator{G}
     f::Base.ComposedFunction{ComputableParamGraph{G}, E}
 end
 
@@ -411,7 +407,7 @@ end
 function compressParam(pb::ParamBox)
     graph = ParamGraph(pb)
     transpiledGraph = TranspiledGraph(graph)
-    encoder = TensorInputEncoder(graph.source...)
+    encoder = SpanInputFormatter(graph.source...)
     cgc = LPartial(evaluateGraphCore, (transpiledGraph,))
     EvalParamGraph(cgc∘encoder), graph.origin
 end
