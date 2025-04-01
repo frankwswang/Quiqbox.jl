@@ -1,5 +1,5 @@
-export genTensorVar, genMeshParam, genHeapParam, genCellParam, compareParamBox, getParams, 
-       classifyParams, setVal!, symOf, obtain, screenLevelOf, 
+export genTensorVar, genMeshParam, genHeapParam, genCellParam, compareParamBox, uniqueParams, 
+       dissectParam, setVal!, symOf, obtain, screenLevelOf, 
        setScreenLevel!, inputOf, setScreenLevel, sortParams!
 
 const SymOrIndexedSym = Union{Symbol, IndexedSym}
@@ -850,8 +850,7 @@ function (f::ParamBoxClassifier)(edge::Pair{<:ParamBox, <:Union{Nothing, ParamBo
 end
 
 
-function classifyParamsCore(pars::ParamBoxAbtArr)
-    pars = unique(BlackBox, pars)
+function dissectParamCore(pars::ParamBoxAbtArr)
     finalizer = ParamBoxClassifier()
 
     foreach(pars) do par
@@ -881,9 +880,9 @@ function classifyParamsCore(pars::ParamBoxAbtArr)
     (source=source, hidden=hidden, output=output, direct=direct)
 end
 
-classifyParams(params::ParamBoxAbtArr) = classifyParamsCore(params)
-
-classifyParams(source::Any) = classifyParamsCore(source|>getParams)
+dissectParam(params::ParamBoxAbtArr) = (dissectParamCore∘unique)(BlackBox, params)
+dissectParam(source::Any) = (dissectParamCore∘uniqueParams)(source, onlyPrimitive=false)
+dissectParam(source::ParamBox) = dissectParamCore(source|>fill)
 
 
 function markParam!(param::ParamBox, 

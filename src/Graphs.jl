@@ -192,7 +192,7 @@ struct ParamGraph{T, S1<:UnitVertex, S2<:GridVertex, H<:CallVertex,
     output::V
 
     function ParamGraph(pb::ParamBox; indexing!Arg::Bool=false)
-        (inUPars, inGPars), midPars, outPars, _ = classifyParams(pb)
+        (inUPars, inGPars), midPars, outPars, _ = dissectParam(pb)
         if isempty(inUPars) && isempty(inGPars)
             throw(AssertionError("`pb` should have at least one input source."))
         end
