@@ -754,8 +754,15 @@ end
 compareParamBox(::ParamBox, ::ParamBox) = false
 
 
-function getParams(source)
-    map(last, getFieldParams(source))
+function uniqueParams(source::ParamBoxAbtArr; onlyPrimitive::Bool=true)
+    unique!(BlackBox, source)
+    onlyPrimitive && filter!(isPrimitiveInput, source)
+    source
+end
+
+function uniqueParams(source; onlyPrimitive::Bool=true)
+    res = map(last, getFieldParams(source))
+    uniqueParams(res; onlyPrimitive)
 end
 
 function getFieldParams(source)
