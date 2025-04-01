@@ -79,6 +79,7 @@ const N12Tuple{T} = Union{Tuple{T}, NTuple{2, T}}
 const N24Tuple{T} = Union{NTuple{2, T}, NTuple{4, T}}
 
 const MissingOr{T} = Union{Missing, T}
+const NothingOr{T} = Union{Nothing, T}
 const AbtArray0D{T} = AbstractArray{T, 0}
 
 const RefVal = Base.RefValue
