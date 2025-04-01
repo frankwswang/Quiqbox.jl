@@ -262,27 +262,19 @@ function prepareSourceInfo(nodes::AbstractVector{<:TensorVertex}, input::Abstrac
     end
 end
 
-const UnitOrGridInput = Tuple{Union{Nothing, AbstractVector}, 
-                              Union{Nothing, AbstractVector{<:AbstractArray} }}
-
-function evaluateGraphCore(tpg::TranspiledParamGraph, (uInput, gInput)::UnitOrGridInput)
+function evaluateGraphCore(tpg::TranspiledParamGraph, input::OptionalSpanValueSet)
     unit, grid, call = tpg.attribute
-    unitVals = prepareSourceInfo(unit, uInput)
-    gridVals = prepareSourceInfo(grid, gInput)
+    unitVals = prepareSourceInfo(unit, input.unit)
+    gridVals = prepareSourceInfo(grid, input.grid)
     tpg.evaluator((unit=unitVals, grid=gridVals, call=call))
 end
 
-function evaluateGraph(graph::ParamGraph, inputPair::UnitOrGridInput)
+function evaluateGraph(graph::ParamGraph, 
+                       input::OptionalSpanValueSet=map(x->getNodeValue.(x), graph.source))
     tpg = TranspiledGraph(graph)
-    evaluateGraphCore(tpg, inputPair)
+    evaluateGraphCore(tpg, input)
 end
 
-const NamedUGInput{T1<:AbstractVector, T2<:AbstractVector{<:AbstractArray}} = 
-      @NamedTuple{unit::T1, grid::T2}
-
-evaluateGraph(graph::ParamGraph, 
-              inputPair::NamedUGInput=map(x->getNodeValue.(x), graph.source)) = 
-evaluateGraph(graph, values(inputPair))
 
 function selectVertexEvalGenerator(trait::VertexTrait)
     effectType = trait.effect
