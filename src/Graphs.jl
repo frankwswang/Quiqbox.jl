@@ -132,21 +132,21 @@ function updateVertexReceptor!(receptor::CallVertexReceptor, param::CompositePar
 end
 
 function initializeReceptor(param::AdaptableParam, 
-                            reference::Union{Nothing, ParamBoxVertexDict}=nothing)
+                            reference::NothingOr{ParamBoxVertexDict}=nothing)
     receptor = TupleReceptor(length(param.input))
     reference === nothing || updateVertexReceptor!(receptor, param, reference)
     receptor
 end
 
 function initializeReceptor(param::ShapedParam, 
-                            reference::Union{Nothing, ParamBoxVertexDict}=nothing)
+                            reference::NothingOr{ParamBoxVertexDict}=nothing)
     receptor = ArrayReceptor(size(param.input))
     reference === nothing || updateVertexReceptor!(receptor, param, reference)
     receptor
 end
 
 function genParamVertex(param::CompositeParam, 
-                        reference::Union{Nothing, ParamBoxVertexDict}=nothing)
+                        reference::NothingOr{ParamBoxVertexDict}=nothing)
     sl = screenLevelOf(param)
     sym = symbolFrom(param.symbol)
     if sl > 0
@@ -186,8 +186,8 @@ end
 
 struct ParamGraph{T, S1<:UnitVertex, S2<:GridVertex, H<:CallVertex, 
                   V<:CallVertex{T}} <: TransformedGraph{Static}
-    origin::@NamedTuple{unit::Memory{UnitParam}, grid::Memory{GridParam}}
-    source::@NamedTuple{unit::Memory{S1}, grid::Memory{S2}}
+    origin::AbstractSpanSet{Memory{UnitParam}, Memory{GridParam}}
+    source::AbstractSpanSet{Memory{S1},        Memory{S2}       }
     hidden::Memory{H}
     output::V
 
@@ -326,7 +326,7 @@ function genCallVertexEvaluator(compactPG::ParamGraphCore, i::Int)
     genCallVertexEvaluator(compactPG, vertex)
 end
 
-struct SpanInputFormatter{S1<:Symbol, S2<:Pair{ Symbol, <:NonEmptyTuple{Int} }} <: Filter
+struct SpanInputFormatter{S1<:Symbol, S2<:Pair{ Symbol, <:NonEmptyTuple{Int} }} <: Mapper
     unit::Memory{S1}
     grid::Memory{S2}
 
