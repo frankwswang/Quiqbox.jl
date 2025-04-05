@@ -38,3 +38,11 @@ function checkPositivity(num::Real, allowZero::Bool=false)
     (num + Int(allowZero)) > 0 || throw(AssertionError("`num` should be $subStr."))
     nothing
 end
+
+function checkArgQuantity(f::Function, num::Int)
+    checkPositivity(num, true)
+    hasmethod(f, NTuple{num, T} where {T<:Union{}}) || 
+    throw(ArgumentError("$f\ndoes not support having $num input argument" * 
+                        "$(ifelse(num > 1, "s", ""))."))
+    nothing
+end
