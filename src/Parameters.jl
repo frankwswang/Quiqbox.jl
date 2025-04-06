@@ -892,6 +892,21 @@ dissectParam(source::Any) = (dissectParamCore∘uniqueParams)(source, onlyPrimit
 dissectParam(source::ParamBox) = dissectParamCore(source|>fill)
 
 
+function getSourceParamSet(source; onlyVariable::Bool=true, includeSink::Bool=true)
+    source, _, _, direct = dissectParam(source)
+
+    if includeSink
+        for par in direct
+            push!(getfield(source, par isa UnitParam ? :unit : :grid), par)
+        end
+    end
+
+    onlyVariable && foreach(sector->filter!(isPrimitiveInput, sector), source)
+
+    source
+end
+
+
 function markParam!(param::ParamBox, 
                     indexDict::AbstractDict{Symbol, Int}=Dict{Symbol, Int}())
     sym = symOf(param)
