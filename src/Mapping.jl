@@ -310,14 +310,13 @@ end
 struct InputLimiter{N, F<:Function} <: FunctionModifier
     f::F
 
-    function InputLimiter(f::F, numberOfInput::Int) where {F<:Function}
-        checkPositivity(numberOfInput)
+    function InputLimiter(f::F, ::Val{N}) where {F<:Function, N}
+        checkPositivity(N::Int)
         new{numberOfInput, F}(f)
     end
 end
 
-InputLimiter(f::InputLimiter, numberOfInput::Int) = 
-InputLimiter(f.f, numberOfInput)
+InputLimiter(f::InputLimiter, ::Val{N}) where {N} = InputLimiter(f.f, Val(N))
 
 (f::InputLimiter{N})(arg::Vararg{Any, N}) where {N} = f.f(arg...)
 
@@ -362,21 +361,21 @@ end
 
 
 const EncodeParamApply{F<:Function, N, E<:NTuple{ N, OnlyBody{<:Encoder} }} = 
-      NamedMapEncode{InputLimiter{F, 2}, N, E}
+      NamedMapEncode{InputLimiter{2, F}, N, E}
 
 const EncoderSet{S, E<:Tuple{ Vararg{Encoder} }} = NamedTuple{S, E}
 
 EncodeParamApply(apply::Function, select::EncoderSet{S}) where {S} = 
-NamedMapEncode(OnlyBody.(select|>values), S, InputLimiter(apply, 2))
+NamedMapEncode(OnlyBody.(select|>values), S, InputLimiter( apply, Val(2) ))
 
 EncodeParamApply(apply::Function, select::Pair{Symbol, Encoder}) = 
-EncodeParamApply(InputLimiter(apply, 2), NamedTuple( (select,) ))
+EncodeParamApply(InputLimiter(apply, Val(2)), NamedTuple( (select,) ))
 
 EncodeParamApply(apply::Function, select::Encoder) = 
-EncodeParamApply(InputLimiter(apply, 2), (;select))
+EncodeParamApply(InputLimiter(apply, Val(2)), (;select))
 
 EncodeParamApply(apply::Function) = 
-EncodeParamApply(InputLimiter(apply, 2), ())
+EncodeParamApply(InputLimiter(apply, Val(2)), ())
 
 EncodeParamApply(f::EncodeParamApply, select::EncoderSet) = 
 EncodeParamApply(f.apply, (; zip(f.symbol, f.encode)..., select...))
@@ -385,22 +384,6 @@ const GetParamApply{F<:Function, T<:Encoder} = EncodeParamApply{F, 1, Tuple{ Onl
 
 struct Lucent end
 struct Opaque end
-
-struct ParamFreeFunc{F<:Function} <: AbstractParamFunc
-    f::F
-
-    function ParamFreeFunc(f::F) where {F<:Function}
-        if !(Base.issingletontype(F) || isParamBoxFree(f))
-            throw(AssertionError("`f` should not contain any `$ParamBox`."))
-        end
-        checkArgQuantity(f, 1)
-        new{F}(f)
-    end
-end
-
-ParamFreeFunc(f::ParamFreeFunc) = itself(f)
-
-(f::ParamFreeFunc)(input, ::AbstractSpanValueSet) = f.f(input)
 
 
 struct Deref{F<:Function} <: FunctionModifier
@@ -428,75 +411,9 @@ ReturnTyped(TupleHeader(f.f, Val(N)), T)
 
 (f::TupleHeader)() = f.f()
 (f::TupleHeader{0})(head, body...) = f.f(head, body...)
+(f::TupleHeader{0})(::Tuple{}, body...) = f.f((), body...)
 (f::TupleHeader{N})(head::NTuple{N, Any}, body...) where {N} = f.f(head, body...)
 
-const ParamTupleEncoder{T<:AbstractParamFunc, D, F<:Function} = 
-      ReturnTyped{T, TupleHeader{D, F}}
-
-ParamTupleEncoder(f::Function, ::Type{T}, ::Val{D}) where {T, D} = 
-ReturnTyped(TupleHeader(f, Val(D)), T)
-
-const ParamFuncSequence = Union{ NonEmptyTuple{AbstractParamFunc}, 
-                                 LinearMemory{<:AbstractParamFunc} }
-
-
-struct ParamCombiner{J<:Function, C<:ParamFuncSequence} <: AbstractParamFunc
-    binder::ParamFreeFunc{J}
-    encode::C
-
-    function ParamCombiner(binder::J, encode::C) where 
-                          {J, C<:NonEmptyTuple{ParamFuncSequence}}
-        new{J, C}(ParamFreeFunc(binder), encode)
-    end
-
-    function ParamCombiner(binder::J, encode::C) where 
-                          {J, C<:LinearMemory{<:ParamFuncSequence}}
-        checkEmptiness(encode, :encode)
-        new{J, C}(ParamFreeFunc(binder), encode)
-    end
-end
-
-ParamCombiner(binder::Function, encode::AbstractVector{<:ParamFuncSequence}) = 
-ParamCombiner(binder, getMemory(encode))
-
-(f::ParamCombiner)(input, params::AbstractSpanValueSet) = 
-mapreduce(o->o(input, params), f.binder, f.encode)
-
-const ParamExtender{C<:LinearMemory{<:AbstractParamFunc}} = ParamCombiner{typeof(vcat), C}
-
-(f::ParamExtender)(input, params::AbstractSpanValueSet) = 
-map(o->o(input, params), f.encode)
-
-
-struct ParamPipeline{C<:ParamFuncSequence} <: AbstractParamFunc
-    encode::C
-
-    function ParamPipeline(encode::C) where {C<:NonEmptyTuple{ParamFuncSequence}}
-        new{C}(encode)
-    end
-
-    function ParamPipeline(encode::C) where {C<:LinearMemory{<:ParamFuncSequence}}
-        checkEmptiness(encode, :encode)
-        new{C}(encode)
-    end
-end
-
-ParamPipeline(binder::Function, encode::AbstractVector{<:ParamFuncSequence}) = 
-ParamPipeline(binder, getMemory(encode))
-
-function (f::ParamPipeline)(input, params::AbstractSpanValueSet)
-    for o in f.encode
-        input = o(input, params)
-    end
-    input
-end
-
-
-getOpacity(::AbstractParamFunc) = Opaque()
-
-getOpacity(::ParamFreeFunc) = Lucent()
-
-getOpacity(::ParamBindFunc) = Opaque()
 
 getOpacity(::F) where {F<:Function} = ifelse(Base.issingletontype(F), Lucent(), Opaque())
 
