@@ -23,6 +23,13 @@ function unpackFunc!(f::FieldAmplitude{T, D}, paramSet::AbstractSpanParamSet,
     EvalFieldFunc{T, D}(fCore, scope), paramSet
 end
 
+function unpackFunc(f::FieldAmplitude{T, D}) where {T, D}
+    fCore, paramSet = unpackFieldFunc(f)
+    idxFilter = SpanSetFilter(map(length, paramSet)...)
+    scope = TaggedSpanSetFilter(idxFilter, Identifier(paramSet))
+    EvalFieldFunc{T, D}(fCore, scope), paramSet
+end
+
 
 struct WrappedField{T<:Number, D, F<:Function} <: FieldAmplitude{T, D}
     f::ParamTupleEncoder{T, D, F}
