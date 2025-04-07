@@ -2,17 +2,19 @@ export FieldFunc, GaussFunc, AxialProdFunc, PolyRadialFunc
 
 using LinearAlgebra
 
-struct EvalFieldFunc{T<:Number, D, F<:AbstractParamFunc} <: EvalDimensionalFunc{T, D, F}
+struct FieldParamFunc{T<:Number, D, F<:AbstractParamFunc} <: AbstractParamFunc
     f::GetParamApply{ParamTupleEncoder{T, D, F}, TaggedSpanSetFilter}
 
-    function EvalFieldFunc{T, D}(f::F, scope::TaggedSpanSetFilter) where 
-                                {T, D, F<:AbstractParamFunc}
+    function FieldParamFunc{T, D}(f::F, scope::TaggedSpanSetFilter) where 
+                                 {T, D, F<:AbstractParamFunc}
         new{T, D, F}(EncodeParamApply(ParamTupleEncoder(f, T, Val(D)), scope))
     end
 end
 
-(f::EvalFieldFunc{T, D})(input::NTuple{D, Real}, param::AbstractSpanValueSet) where {T, D} = 
-f.f(input, param)
+function (f::FieldParamFunc{T, D})(input::NTuple{D, Real}, 
+                                   params::AbstractSpanValueSet) where {T, D}
+    f.f(input, params)
+end
 
 
 function unpackFunc!(f::FieldAmplitude{T, D}, paramSet::AbstractSpanParamSet, 
@@ -20,14 +22,14 @@ function unpackFunc!(f::FieldAmplitude{T, D}, paramSet::AbstractSpanParamSet,
     fCore, localParamSet = unpackFieldFunc(f)
     idxFilter = locateParam!(paramSet, localParamSet)
     scope = TaggedSpanSetFilter(idxFilter, paramSetId)
-    EvalFieldFunc{T, D}(fCore, scope), paramSet
+    FieldParamFunc{T, D}(fCore, scope), paramSet
 end
 
 function unpackFunc(f::FieldAmplitude{T, D}) where {T, D}
     fCore, paramSet = unpackFieldFunc(f)
     idxFilter = SpanSetFilter(map(length, paramSet)...)
     scope = TaggedSpanSetFilter(idxFilter, Identifier(paramSet))
-    EvalFieldFunc{T, D}(fCore, scope), paramSet
+    FieldParamFunc{T, D}(fCore, scope), paramSet
 end
 
 
@@ -143,7 +145,7 @@ const AxialProdFunc{T<:Number, D, B<:NTuple{D, FieldAmplitude{T, 0}}} =
 AxialProdFunc(compos::NonEmptyTuple{FieldAmplitude{T, 0}}) where {T} = 
 (CurriedField∘AxialProdFuncBuilder)(compos)
 
-const AxialFuncCore{T, F<:EvalFieldFunc{T, 0}} = 
+const AxialFuncCore{T, F<:FieldParamFunc{T, 0}} = 
       ParamPipeline{Tuple{ParamFreeFunc{GetIndex{OneToIndex}}, F}}
 
 const EvalAxialProdFunc{T<:Number, D, C<:NTuple{ D, AxialFuncCore{T} }} = 
@@ -182,7 +184,7 @@ function PolyRadialFunc(radial::FieldAmplitude{T, 0}, angular::NonEmptyTuple{Int
 end
 
 function unpackFieldFunc(f::PolyRadialFunc{T, P}) where {T, P}
-    radialCore, paramSet = unpackFieldFunc(f.config.radial)
+    radialCore, paramSet = unpackFieldFunc(f.core.radial)
     binaryOp = StableMul(promote_type(T, Real))
     radial = ParamPipeline((ParamFreeFunc(LinearAlgebra.norm), radialCore))
     ParamCombiner(binaryOp, (ParamFreeFunc(f.angular), radial)), paramSet
