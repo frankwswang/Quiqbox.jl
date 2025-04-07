@@ -31,8 +31,13 @@ const SpanIndex = Union{UnitIndex, GridIndex}
 const GeneralIndex = Union{Int, SpanIndex, OneToIndex}
 const GeneralField = Union{GeneralIndex, Symbol, Nothing}
 
+# struct ChainedEncode{L, C<:NTuple{L, Encoder}} <: Encoder
+#     chain::C
 
-struct ChainedAccess{L, C<:NTuple{L, GeneralField}} <: Access
+#     ChainedEncode(chain::C) where {L, C<:NonEmptyTuple{Encoder, L}} = new{L+1, C}(chain)
+# end
+
+struct ChainedAccess{L, C<:NTuple{L, GeneralField}} <: Getter
     chain::C
 
     ChainedAccess(chain::C) where {L, C<:NTuple{L, GeneralField}} = new{L, C}(chain)
@@ -44,7 +49,6 @@ const GetOneToIndex = GetIndex{OneToIndex}
 
 GetIndex{T}(idx::Union{Int, OneToIndex}) where {T<:GeneralIndex} = ChainedAccess(idx|>T)
 
-const GetUnitEntry = ChainedAccess{2, Tuple{UnitIndex, OneToIndex}}
 const GetGridEntry = ChainedAccess{2, Tuple{GridIndex, OneToIndex}}
 
 ChainedAccess() = ChainedAccess(())
@@ -84,7 +88,7 @@ function getField(obj, acc::ChainedAccess)
     obj
 end
 
-(f::Fetcher)(obj) = getField(obj, f)
+(f::Encoder)(obj) = getField(obj, f)
 
 
 abstract type FiniteDict{N, K, T} <: EqualityDict{K, T} end

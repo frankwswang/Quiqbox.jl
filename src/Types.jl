@@ -18,9 +18,9 @@ abstract type DualSpanFunction{T, N, O} <: CompositeFunction end
 abstract type StatefulFunction{T} <: CompositeFunction end
 abstract type FunctionComposer <: CompositeFunction end
 abstract type Evaluator{F} <: CompositeFunction end
-abstract type Access <: CompositeFunction end
-abstract type Filter <: CompositeFunction end
-const Fetcher = Union{Access, Filter}
+abstract type Mapper <: CompositeFunction end
+abstract type Getter <: CompositeFunction end
+const Encoder = Union{Getter, Mapper}
 
 abstract type SpatialProcessCache{T, D} <: QueryBox{T} end
 abstract type IntegralData{T, S} <: QueryBox{T} end
@@ -42,6 +42,8 @@ abstract type ParamFuncBuilder{F} <: FunctionCombiner end
 
 abstract type StructuredInfo <: ConfigBox end
 abstract type StructuredType <: ConfigBox end
+
+abstract type FieldParamPointer <: StructuredInfo end
 
 abstract type IntegralProcessCache{T, D} <: SpatialProcessCache{T, D} end
 

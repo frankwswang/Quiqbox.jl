@@ -771,6 +771,10 @@ function getFieldParams(source)
     paramPairs
 end
 
+function isParamBoxFree(source::T) where {T}
+    Base.issingletontype(T) || (getFieldParams(source) |> isempty)
+end
+
 function getFieldParamsCore!(paramPairs::AbstractVector{Pair{ChainedAccess, ParamBox}}, 
                              source::ParamBox, anchor::ChainedAccess)
     push!(paramPairs, anchor=>source)
@@ -1139,91 +1143,76 @@ function getField(sFilterPrev::SpanSetFilter, sFilterHere::SpanSetFilter)
 end
 
 
-const FieldParamPtrDict = AbstractDict{<:ChainedAccess, <:GetIndex}
-const FieldParamPtrPairs = AbstractVector{<:Pair{<:ChainedAccess, <:GetIndex}}
+# const ParamPointerDict = AbstractDict{<:ChainedAccess, <:GetIndex}
+# const ParamPointerPairs = AbstractVector{<:Pair{<:ChainedAccess, <:GetIndex}}
+# const FieldParamPairSet{P1<:ParamPointerPairs, P2<:ParamPointerPairs} = 
+#       AbstractSpanSet{P1, P2}
 
-abstract type FieldParamPointer{R} <: Any end
+# #! DirectFieldParamPointer
+# struct MixedFieldParamPointer{R1<:ParamPointerDict, R2<:ParamPointerDict
+#                               } <: FieldParamPointer
+#     unit::R1
+#     grid::R2
+#     tag::Identifier
+# end
 
-struct MixedFieldParamPointer{R<:FieldParamPtrDict} <: FieldParamPointer{R}
-    core::R
+# function MixedFieldParamPointer(paramPairs::FieldParamPairSet, tag::Identifier)
+#     coreDict = map(buildDict, paramPairs)
+#     MixedFieldParamPointer(coreDict.unit, coreDict.grid, tag)
+# end
+
+
+struct TaggedSpanSetFilter <: Mapper
+    scope::SpanSetFilter
     tag::Identifier
 end
 
-function MixedFieldParamPointer(paramPairs::FieldParamPtrPairs, tag::Identifier)
-    coreDict = buildDict(paramPairs)
-    MixedFieldParamPointer(coreDict, tag)
-end
+#= Additional Method =#
+getField(obj, tsFilter::TaggedSpanSetFilter) = getField(obj, tsFilter.scope)
 
 
-# `f` should only take one input.
-unpackTypedFunc!(f::Function, paramSet::AbstractSpanParamSet, 
-                 paramSetId::Identifier=Identifier(paramSet)) = 
-unpackTypedFunc!(ReturnTyped(f, Any), paramSet, paramSetId)
+struct AbstractParamFunc <: CompositeFunction end
 
-struct GenericParamFunc{F<:Function, C1<:ChainedAccess, C2<:ChainedAccess}
+struct ParamBindFunc{F<:Function, C1<:UnitParam, C2<:GridParam} <: AbstractParamFunc
     core::F
     unit::Memory{C1}
     grid::Memory{C2}
 end
 
-function (f::GenericParamFunc)(input, valSet::AbstractSpanValueSet)
-    unitPars = map(x->getfield(f.core, x), f.unit)::Memory{<:UnitParam}
-    gridPars = map(x->getfield(f.core, x), f.grid)::Memory{<:GridParam}
-
-    foreach(unitPars, valSet.unit) do p, v
-        setVal!(p, v)
-    end
-
-    foreach(gridPars, valSet.grid) do p, v
-        setVal!(p, v)
+function (f::ParamBindFunc)(input, valSet::AbstractSpanValueSet)
+    for field in (:unit, :grid)
+        foreach(getfield(f, field), getfield(valSet, field)) do p, v
+            setVal!(p, v)
+        end
     end
 
     f.core(input)
 end
 
-function unpackTypedFuncCore!(f::ReturnTyped{T}, 
-                              paramSet::AbstractSpanParamSet) where {T}
-    paramPairs = getFieldParams(f.f)
 
-    if isempty(paramPairs)
-        ParamSelectFunc(f), paramSet, Union{}[]
-    else
-        params = map(first, paramPairs)
-        paramPtrDict = IdDict(paramPairs)
-        source, _, _, direct = classifyParamsCore(params)
-        input = filter!(isPrimitiveInput, vcat(source, direct))
-        units = UnitParam[]
-        filter!(input) do x
-            if x isa UnitParam
-                push!(units, x)
-                true
-            else
-                false
-            end
+# f(input) => fCore(input, param)
+function unpackFunc(f::Function)
+    checkArgQuantity(f, 1)
+
+    if !isLucent(f)
+        f = deepcopy(f)
+        source = getSourceParamSet(f)
+
+        if !(isempty(source.unit) && isempty(source.grid))
+            unitPars, gridPars = map(getMemory, source)
+            fCore = ParamBindFunc(f, unitPars, gridPars)
+            paramSet = initializeSpanParamSet(unitPars, gridPars)
+            return (fCore, paramSet)
         end
-
-        unitIds = locateParam!(paramSet.unit, units)
-        gridIds = locateParam!(paramSet.grid, input)
-        idTuple = (unit=unitIds, grid=gridIds)
-
-        unitPtrs = map(x->getindex(paramPtrDict, x), units)
-        gridPtrs = map(x->getindex(paramPtrDict, x), input)
-        ptrTuple = (unit=unitPtrs, grid=gridPtrs)
-
-        ptrPairs = map(ptrTuple, idTuple) do p, i
-            ChainedAccess((:apply, :f, :core), p) => i
-        end
-
-        fCore = GenericParamFunc(deepcopy(f.f), getMemory(unitPtrs), getMemory(gridPtrs))
-        f = ParamSelectFunc(ReturnTyped(fCore, T), SpanSetFilter(idTuple))
-        f, paramSet, ptrPairs
     end
+
+    ParamFreeFunc(f), initializeSpanParamSet(Union{})
 end
 
-function unpackTypedFunc!(f::ReturnTyped, paramSet::AbstractSpanParamSet, 
-                          paramSetId::Identifier=Identifier(paramSet))
-    fCore, _, paramPairs = unpackTypedFuncCore!(f, paramSet)
-    ptrDict = buildDict(paramPairs)
-    paramPtr = MixedFieldParamPointer(ptrDict, paramSetId)
-    fCore, paramSet, paramPtr
+function unpackFunc!(f::Function, paramSet::AbstractSpanParamSet, 
+                     paramSetId::Identifier=Identifier(paramSet))
+    fCore, localParamSet = unpackFunc(f)
+    idxFilter = locateParam!(paramSet, localParamSet)
+    scope = TaggedSpanSetFilter(idxFilter, paramSetId)
+    EncodeParamApply(fCore, scope), paramSet
 end

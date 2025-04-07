@@ -46,12 +46,12 @@ EncodeApply(encode::Function, apply::Function) = EncodeApply((encode,), apply)
 (f::EncodeApply{0})(args...) = f.apply(args...)
 
 
-struct ParamSelectFunc{F<:Function, T<:Tuple{ Vararg{Fetcher} }} <: ParamFuncBuilder{F}
+struct ParamSelectFunc{F<:Function, T<:Tuple{ Vararg{Encoder} }} <: ParamFuncBuilder{F}
     apply::F
     select::T
 end
 
-ParamSelectFunc(f::Function, select::Fetcher) = ParamSelectFunc(f, (select,))
+ParamSelectFunc(f::Function, select::Encoder) = ParamSelectFunc(f, (select,))
 
 ParamSelectFunc(f::Function) = ParamSelectFunc(f, ())
 
@@ -59,7 +59,7 @@ const EmptySelectFunc{F<:Function} = ParamSelectFunc{F, Tuple{}}
 
 ParamSelectFunc(f::EmptySelectFunc) = itself(f)
 
-ParamSelectFunc(f::ParamSelectFunc, select::Tuple{Vararg{Fetcher}}) = 
+ParamSelectFunc(f::ParamSelectFunc, select::Tuple{Vararg{Encoder}}) = 
 ParamSelectFunc(f.apply, (f.select..., select...))
 
 function (f::ParamSelectFunc)(input, param)
@@ -68,7 +68,7 @@ end
 
 (f::EmptySelectFunc)(input, _) = f.apply(input)
 
-const GetParamFunc{F<:Function, T<:Fetcher} = ParamSelectFunc{F, Tuple{T}}
+const GetParamFunc{F<:Function, T<:Encoder} = ParamSelectFunc{F, Tuple{T}}
 
 
 struct OnlyHead{F<:Function} <: FunctionModifier
@@ -284,3 +284,220 @@ end
 function typedMap(op::F, obj::Union{Tuple, NamedTuple}, ::Type=Union{}) where {F<:Function}
     map(op, obj)
 end
+
+
+# struct Bifurcator{F<:Function, FL<:Function, FR<:Function} <: FunctionCombiner
+#     finalizer::F
+#     left::FL
+#     right::FR
+# end
+
+# Bifurcator(finalizer::F) where {F<:Function} = 
+# (left::Function, right::Function) -> Bifurcator(finalizer, left, right)
+
+# (f::Bifurcator)(arg, args...) = f.finalizer(f.left(arg, args...), f.right(arg, args...))
+
+# struct EntryEncoder{F<:Function} <: CompositeFunction
+#     core::F
+#     link::ChainedAccess
+
+#     EntryEncoder(core::F, link::ChainedAccess) where {F<:Function} = new{F}(core, link)
+# end
+
+# (f::EntryEncoder)(args...) = f.core(args...)
+
+
+struct InputLimiter{N, F<:Function} <: FunctionModifier
+    f::F
+
+    function InputLimiter(f::F, numberOfInput::Int) where {F<:Function}
+        checkPositivity(numberOfInput)
+        new{numberOfInput, F}(f)
+    end
+end
+
+InputLimiter(f::InputLimiter, numberOfInput::Int) = 
+InputLimiter(f.f, numberOfInput)
+
+(f::InputLimiter{N})(arg::Vararg{Any, N}) where {N} = f.f(arg...)
+
+
+struct NamedMapEncode{F<:Function, N, E<:NTuple{N, Function}} <: Mapper
+    encode::E
+    symbol::NTuple{N, Symbol}
+    finalizer::F
+
+    NamedMapEncode(encode::E, syms::NTuple{N, Symbol}) where {N, E<:NTuple{N, Function}} = 
+    new{N, E, ItsType}(finalizer, encode, syms)
+
+    NamedMapEncode(finalizer::F, encode::E, syms::NTuple{N, Symbol}) where 
+                  {N, E<:NTuple{N, Function}, F<:Function} = 
+    new{N, E, F}(finalizer, encode, syms)
+end
+
+NamedMapEncode(finalizer::Function, encode::Function, sym::Symbol) = 
+NamedMapEncode(finalizer, (encode,), (sym,))
+
+NamedMapEncode(encode::Function, sym::Symbol) = 
+NamedMapEncode((encode,), (sym,))
+
+NamedMapEncode(finalizer::Function, 
+               encodePairs::NamedTuple{S, <:Tuple{ Vararg{Function} }}) where {S} = 
+NamedMapEncode(finalizer, values(encodePairs), S)
+
+NamedMapEncode(encodePairs::NamedTuple{S, <:Tuple{ Vararg{Function} }}) where {S} = 
+NamedMapEncode(values(encodePairs), S)
+
+NamedMapEncode(f::Function=itself) = NamedMapEncode(f, (), ())
+
+const EmptyMapEncode{F<:Function} = NamedMapEncode{F, 0, Tuple{}}
+
+function (f::NamedMapEncode)(arg, args...)
+    map(f.encode) do encoder
+        encoder(arg, args...)
+    end |> NamedTuple{f.symbol} |> f.finalizer
+end
+
+(f::EmptyMapEncode)(arg, args...) = f.finalizer(arg, args...)
+
+
+const EncodeParamApply{F<:Function, N, E<:NTuple{ N, OnlyBody{<:Encoder} }} = 
+      NamedMapEncode{InputLimiter{F, 2}, N, E}
+
+const EncoderSet{S, E<:Tuple{ Vararg{Encoder} }} = NamedTuple{S, E}
+
+EncodeParamApply(apply::Function, select::EncoderSet{S}) where {S} = 
+NamedMapEncode(OnlyBody.(select|>values), S, InputLimiter(apply, 2))
+
+EncodeParamApply(apply::Function, select::Pair{Symbol, Encoder}) = 
+EncodeParamApply(InputLimiter(apply, 2), NamedTuple( (select,) ))
+
+EncodeParamApply(apply::Function, select::Encoder) = 
+EncodeParamApply(InputLimiter(apply, 2), (;select))
+
+EncodeParamApply(apply::Function) = 
+EncodeParamApply(InputLimiter(apply, 2), ())
+
+EncodeParamApply(f::EncodeParamApply, select::EncoderSet) = 
+EncodeParamApply(f.apply, (; zip(f.symbol, f.encode)..., select...))
+
+const GetParamApply{F<:Function, T<:Encoder} = EncodeParamApply{F, 1, Tuple{ OnlyBody{T} }}
+
+struct Lucent end
+struct Opaque end
+
+struct ParamFreeFunc{F<:Function} <: AbstractParamFunc
+    f::F
+
+    function ParamFreeFunc(f::F) where {F<:Function}
+        if !(Base.issingletontype(F) || isParamBoxFree(f))
+            throw(AssertionError("`f` should not contain any `$ParamBox`."))
+        end
+        checkArgQuantity(f, 1)
+        new{F}(f)
+    end
+end
+
+ParamFreeFunc(f::ParamFreeFunc) = itself(f)
+
+(f::ParamFreeFunc)(input, ::AbstractSpanValueSet) = f.f(input)
+
+
+struct Deref{F<:Function} <: FunctionModifier
+    f::F
+end
+
+(f::Deref)(arg::AbstractArray{<:Any, 0}) = f.f(arg[])
+(f::Deref)(arg::Tuple{Any}) = f.f(arg|>first)
+(f::Deref)(arg::NamedTuple{<:Any, <:Tuple{Any}}) = f.f(arg|>first)
+
+
+struct TupleHeader{N, F<:Function} <: FunctionModifier
+    f::F
+
+    function TupleHeader(f::F, ::Val{N}) where {F<:Function, N}
+        checkPositivity(N::Int, true)
+        new{N, F}(f)
+    end
+end
+
+TupleHeader(f::TupleHeader, ::Val{N}) where {N} = TupleHeader(f.f, Val(N))
+
+TupleHeader(f::ReturnTyped{T}, ::Val{N}) where {T, N} = 
+ReturnTyped(TupleHeader(f.f, Val(N)), T)
+
+(f::TupleHeader)() = f.f()
+(f::TupleHeader{0})(head, body...) = f.f(head, body...)
+(f::TupleHeader{N})(head::NTuple{N, Any}, body...) where {N} = f.f(head, body...)
+
+const ParamTupleEncoder{T<:AbstractParamFunc, D, F<:Function} = 
+      ReturnTyped{T, TupleHeader{D, F}}
+
+ParamTupleEncoder(f::Function, ::Type{T}, ::Val{D}) where {T, D} = 
+ReturnTyped(TupleHeader(f, Val(D)), T)
+
+const ParamFuncSequence = Union{ NonEmptyTuple{AbstractParamFunc}, 
+                                 LinearMemory{<:AbstractParamFunc} }
+
+
+struct ParamCombiner{J<:Function, C<:ParamFuncSequence} <: AbstractParamFunc
+    binder::ParamFreeFunc{J}
+    encode::C
+
+    function ParamCombiner(binder::J, encode::C) where 
+                          {J, C<:NonEmptyTuple{ParamFuncSequence}}
+        new{J, C}(ParamFreeFunc(binder), encode)
+    end
+
+    function ParamCombiner(binder::J, encode::C) where 
+                          {J, C<:LinearMemory{<:ParamFuncSequence}}
+        checkEmptiness(encode, :encode)
+        new{J, C}(ParamFreeFunc(binder), encode)
+    end
+end
+
+ParamCombiner(binder::Function, encode::AbstractVector{<:ParamFuncSequence}) = 
+ParamCombiner(binder, getMemory(encode))
+
+(f::ParamCombiner)(input, params::AbstractSpanValueSet) = 
+mapreduce(o->o(input, params), f.binder, f.encode)
+
+const ParamExtender{C<:LinearMemory{<:AbstractParamFunc}} = ParamCombiner{typeof(vcat), C}
+
+(f::ParamExtender)(input, params::AbstractSpanValueSet) = 
+map(o->o(input, params), f.encode)
+
+
+struct ParamPipeline{C<:ParamFuncSequence} <: AbstractParamFunc
+    encode::C
+
+    function ParamPipeline(encode::C) where {C<:NonEmptyTuple{ParamFuncSequence}}
+        new{C}(encode)
+    end
+
+    function ParamPipeline(encode::C) where {C<:LinearMemory{<:ParamFuncSequence}}
+        checkEmptiness(encode, :encode)
+        new{C}(encode)
+    end
+end
+
+ParamPipeline(binder::Function, encode::AbstractVector{<:ParamFuncSequence}) = 
+ParamPipeline(binder, getMemory(encode))
+
+function (f::ParamPipeline)(input, params::AbstractSpanValueSet)
+    for o in f.encode
+        input = o(input, params)
+    end
+    input
+end
+
+
+getOpacity(::AbstractParamFunc) = Opaque()
+
+getOpacity(::ParamFreeFunc) = Lucent()
+
+getOpacity(::ParamBindFunc) = Opaque()
+
+getOpacity(::F) where {F<:Function} = ifelse(Base.issingletontype(F), Lucent(), Opaque())
+
+isLucent(f::Function) = (getOpacity(f) isa Lucent)
