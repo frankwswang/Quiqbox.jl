@@ -178,7 +178,7 @@ function unpackFieldFunc(f::PolyRadialFunc{T, P}) where {T, P}
     radialCore, paramSet = unpackFieldFunc(f.config.radial)
     binaryOp = StableMul(promote_type(T, Real))
     radial = ParamPipeline((ParamFreeFunc(LinearAlgebra.norm), radialCore))
-    ParamCombiner(binaryOp, radial, ParamFreeFunc(f.angular)), paramSet
+    ParamCombiner(binaryOp, (ParamFreeFunc(f.angular), radial)), paramSet
 end
 
 
