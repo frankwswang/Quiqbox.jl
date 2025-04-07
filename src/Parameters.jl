@@ -1116,6 +1116,12 @@ function SpanSetFilter()
     SpanSetFilter(( unit=Memory{OneToIndex}(undef, 0), grid=Memory{OneToIndex}(undef, 0) ))
 end
 
+function SpanSetFilter(unitLen::Int, gridLen::Int)
+    unitIds = map(OneToIndex, Base.OneTo(unitLen))
+    gridIds = map(OneToIndex, Base.OneTo(gridLen))
+    SpanSetFilter(( unit=Memory{OneToIndex}(unitIds), grid=Memory{OneToIndex}(gridIds) ))
+end
+
 function SpanSetFilter(scope::AbstractSpanIndexSet)
     SpanSetFilter(map(getMemory, scope))
 end
