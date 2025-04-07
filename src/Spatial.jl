@@ -3,7 +3,7 @@ export FieldFunc, GaussFunc, AxialProdFunc, PolyRadialFunc
 using LinearAlgebra
 
 struct FieldParamFunc{T<:Number, D, F<:AbstractParamFunc} <: AbstractParamFunc
-    f::GetParamApply{ParamTupleEncoder{T, D, F}, TaggedSpanSetFilter}
+    core::GetParamApply{ParamTupleEncoder{T, D, F}, TaggedSpanSetFilter}
 
     function FieldParamFunc{T, D}(f::F, scope::TaggedSpanSetFilter) where 
                                  {T, D, F<:AbstractParamFunc}
@@ -11,10 +11,15 @@ struct FieldParamFunc{T<:Number, D, F<:AbstractParamFunc} <: AbstractParamFunc
     end
 end
 
-function (f::FieldParamFunc{T, D})(input::NTuple{D, Real}, 
-                                   params::AbstractSpanValueSet) where {T, D}
-    f.f(input, params)
-end
+(f::FieldParamFunc)(input, params::AbstractSpanValueSet) = f.core(input, params)
+
+
+getFieldConstraint(::FieldAmplitude{T, 0}) where {T} = Real
+getFieldConstraint(::FieldAmplitude{T, D}) where {T, D} = NTuple{D, Real}
+
+function evalFieldAmplitude end
+
+(f::FieldAmplitude)(input) = evalFieldAmplitude(f, input)
 
 
 function unpackFunc!(f::FieldAmplitude{T, D}, paramSet::AbstractSpanParamSet, 
@@ -34,18 +39,21 @@ end
 
 
 struct WrappedField{T<:Number, D, F<:Function} <: FieldAmplitude{T, D}
-    f::ParamTupleEncoder{T, D, F}
+    core::ParamTupleEncoder{T, D, F}
 
     function WrappedField(f::F, ::Type{T}, ::Val{D}) where {F, T, D}
         new{T, D, F}( ParamTupleEncoder(f, T, Bal(D)) )
     end
 end
 
-(f::WrappedField)(input) = f.f(input)
+evalFieldAmplitude(f::WrappedField, input, 
+                   cache!Self::MultiSpanDataCacheBox=MultiSpanDataCacheBox(Number)) = 
+f.core(input::getFieldConstraint(f))
+
 
 #! Potential Optimization: Add a method for a `WrappedField` that wraps a lucent ParamFunc.
 function unpackFieldFunc(f::WrappedField{T}) where {T}
-    unpackFuncCore!(f.f.f.f)
+    unpackFuncCore!(f.core.f.f)
 end
 
 
@@ -83,6 +91,8 @@ ParamExecutor(finalizer::Function) = ParamExecutor(finalizer, (), (), ())
 
 abstract type FieldAmpBuilder{T<:Number, D} <: StatefulFunction end
 
+isCacheFieldBuilder(::FieldAmpBuilder) = false
+
 const NamedParamTuple{S, N, P<:NTuple{N, ParamBox}} = NamedTuple{S, P}
 
 struct CurriedField{T<:Number, D, F<:FieldAmpBuilder{T, D}, P<:NamedParamTuple
@@ -99,8 +109,12 @@ end
 
 const EncodedField{T, D, F<:FieldAmpBuilder{T, D}} = CurriedField{T, D, F, @NamedTuple{}}
 
-(f::CurriedField)(input) = f.core(input, map(obtain, f.param))
-(f::EncodedField)(input) = f.core(input)
+function evalFieldAmplitude(f::CurriedField, input; 
+                            cache!Self::MultiSpanDataCacheBox=MultiSpanDataCacheBox(Number))
+    parValArg = f isa EncodedField ? () : (cacheParam!(cache!Self, f.param),)
+    cacheArg = isCacheFieldBuilder(f.core) ? (:cache!Self=>cache!Self,) : ()
+    f.core(input::getFieldConstraint(f), parValArg...; cacheArg...)
+end
 
 
 struct GaussFuncBuilder{T<:Real} <: FieldAmpBuilder{T, 0} end
@@ -133,11 +147,16 @@ struct AxialProdFuncBuilder{T, D, B<:NTuple{D, FieldAmplitude{T, 0}}
     axis::B
 end
 
-function (f::AxialProdFuncBuilder{T, D})(input::NTuple{D, Real}) where {T<:Real}
+function (f::AxialProdFuncBuilder{T, D})(input::NTuple{D, Real}; 
+                                         cache!Self::MultiSpanDataCacheBox=
+                                                     MultiSpanDataCacheBox(Number)
+                                         ) where {T<:Real}
     mapreduce(StableMul(T), f.axis) do fAxial
-        fAxial(input)
+        evalFieldAmplitude(fAxial, input; cache!Self)
     end
 end
+
+isCacheFieldBuilder(::AxialProdFuncBuilder) = true
 
 const AxialProdFunc{T<:Number, D, B<:NTuple{D, FieldAmplitude{T, 0}}} = 
       EncodedField{T, D, AxialProdFuncBuilder{T, D, B}}
