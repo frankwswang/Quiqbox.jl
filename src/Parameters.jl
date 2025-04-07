@@ -1177,7 +1177,24 @@ end
 getField(obj, tsFilter::TaggedSpanSetFilter) = getField(obj, tsFilter.scope)
 
 
-struct AbstractParamFunc <: CompositeFunction end
+abstract type AbstractParamFunc <: CompositeFunction end
+
+struct ParamFreeFunc{F<:Function} <: AbstractParamFunc
+    f::F
+
+    function ParamFreeFunc(f::F) where {F<:Function}
+        if !(Base.issingletontype(F) || isParamBoxFree(f))
+            throw(AssertionError("`f` should not contain any `$ParamBox`."))
+        end
+        checkArgQuantity(f, 1)
+        new{F}(f)
+    end
+end
+
+ParamFreeFunc(f::ParamFreeFunc) = itself(f)
+
+(f::ParamFreeFunc)(input, ::AbstractSpanValueSet) = f.f(input)
+
 
 struct ParamBindFunc{F<:Function, C1<:UnitParam, C2<:GridParam} <: AbstractParamFunc
     core::F
@@ -1194,6 +1211,70 @@ function (f::ParamBindFunc)(input, valSet::AbstractSpanValueSet)
 
     f.core(input)
 end
+
+
+const ParamTupleEncoder{T<:AbstractParamFunc, D, F<:Function} = 
+      ReturnTyped{T, TupleHeader{D, F}}
+
+
+const ParamFuncSequence = Union{ NonEmptyTuple{AbstractParamFunc}, 
+                                 LinearMemory{<:AbstractParamFunc} }
+
+struct ParamCombiner{J<:Function, C<:ParamFuncSequence} <: AbstractParamFunc
+    binder::ParamFreeFunc{J}
+    encode::C
+
+    function ParamCombiner(binder::J, encode::C) where 
+                          {J<:Function, C<:NonEmptyTuple{ParamFuncSequence}}
+        new{J, C}(ParamFreeFunc(binder), encode)
+    end
+
+    function ParamCombiner(binder::J, encode::C) where 
+                          {J<:Function, C<:LinearMemory{<:ParamFuncSequence}}
+        checkEmptiness(encode, :encode)
+        new{J, C}(ParamFreeFunc(binder), encode)
+    end
+end
+
+ParamCombiner(binder::Function, encode::AbstractVector{<:ParamFuncSequence}) = 
+ParamCombiner(binder, getMemory(encode))
+
+(f::ParamCombiner)(input, params::AbstractSpanValueSet) = 
+mapreduce(o->o(input, params), f.binder, f.encode)
+
+const ParamExtender{C<:LinearMemory{<:AbstractParamFunc}} = ParamCombiner{typeof(vcat), C}
+
+(f::ParamExtender)(input, params::AbstractSpanValueSet) = 
+map(o->o(input, params), f.encode)
+
+
+struct ParamPipeline{C<:ParamFuncSequence} <: AbstractParamFunc
+    encode::C
+
+    function ParamPipeline(encode::C) where {C<:NonEmptyTuple{ParamFuncSequence}}
+        new{C}(encode)
+    end
+
+    function ParamPipeline(encode::C) where {C<:LinearMemory{<:ParamFuncSequence}}
+        checkEmptiness(encode, :encode)
+        new{C}(encode)
+    end
+end
+
+ParamPipeline(binder::Function, encode::AbstractVector{<:ParamFuncSequence}) = 
+ParamPipeline(binder, getMemory(encode))
+
+function (f::ParamPipeline)(input, params::AbstractSpanValueSet)
+    for o in f.encode
+        input = o(input, params)
+    end
+    input
+end
+
+#= Additional Method =#
+getOpacity(::ParamFreeFunc) = Lucent()
+
+getOpacity(::ParamBindFunc) = Opaque()
 
 
 # f(input) => fCore(input, param)
