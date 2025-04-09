@@ -510,8 +510,8 @@ end
 # level 0: λ(input) + offset
 # level 1: itself(offset)
 # level 2: offset
-function setScreenLevel!(p::P, level::Int) where {P<:AdaptableParam}
-    checkScreenLevel(level, getScreenLevelOptions(P))
+function setScreenLevel!(p::AdaptableParam, level::Int)
+    checkScreenLevel(level, getScreenLevelOptions(p|>typeof))
     levelOld = screenLevelOf(p)
     if levelOld == level
     elseif levelOld == 0
@@ -575,14 +575,14 @@ end
 
 
 function hasCycleCore!(::Set{BlackBox}, ::Set{BlackBox}, 
-                       edge::Pair{<:PrimitiveParam, <:Union{Nothing, ParamBox}}, 
+                       edge::Pair{<:PrimitiveParam, <:NothingOr{ParamBox}}, 
                        ::Bool, finalizer::F=itself) where {F<:Function}
     finalizer(edge)
     (false, edge.first)
 end
 
 function hasCycleCore!(localTrace::Set{BlackBox}, history::Set{BlackBox}, 
-                       edge::Pair{<:CompositeParam, <:Union{Nothing, ParamBox}}, 
+                       edge::Pair{<:CompositeParam, <:NothingOr{ParamBox}}, 
                        strictMode::Bool, finalizer::F=itself) where {F<:Function}
     here = edge.first
 
@@ -818,7 +818,6 @@ function getFieldParamsCore!(paramPairs::AbstractVector{Pair{ChainedAccess, Para
     nothing
 end
 
-uniqueParams(ps::ParamBoxAbtArr) = markUnique(ps, compareFunction=compareParamBox)[end]
 
 struct ReduceShift{T, F} <: TypedTensorFunc{T, 0}
     apply::TypedReduce{T, F}
@@ -861,7 +860,7 @@ struct ParamBoxClassifier <: StatefulFunction{ParamBox}
     end
 end
 
-function (f::ParamBoxClassifier)(edge::Pair{<:ParamBox, <:Union{Nothing, ParamBox}})
+function (f::ParamBoxClassifier)(edge::Pair{<:ParamBox, <:NothingOr{ParamBox}})
     here, next = edge
     sector = ifelse(isDependentParam(here), f.linker, f.holder)
     hasDescendent = (next !== nothing)
@@ -1121,7 +1120,7 @@ unpackFunc!(::GenericFunction, f::Function, paramSet::AbstractSpanParamSet) =
 unpackTypedFunc!(f, paramSet)
 
 
-struct SpanSetFilter <: Filter
+struct SpanSetFilter <: Mapper
     scope::FixedSpanIndexSet
 end
 
