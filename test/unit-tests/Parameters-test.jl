@@ -114,6 +114,9 @@ a2in, _, a2out, a2self = dissectParam(a2)
 @test a2.offset == a1Val == a1.offset + v1Val
 
 v1ValNew = 0.9
+setScreenLevel!(v1, 2)
+@test try setVal!(v1, v1ValNew) catch; true end
+setScreenLevel!(v1, 1)
 setVal!(v1, v1ValNew)
 @test obtain(v1) == v1ValNew
 @atomic a1.offset = 0.0

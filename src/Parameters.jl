@@ -52,11 +52,10 @@ end
 checkScreenLevel(s::TernaryNumber, levels::NonEmptyTuple{Int}) = 
 checkScreenLevel(Int(s), levels)
 
-# Screen level of primitive ParamBox should always be 1 since it can always be used as input 
-# for composite ParamBox.
-getScreenLevelOptions(::Type{<:PrimitiveParam}) = (1,)
 
-screenLevelOf(p::PrimitiveParam) = 1
+getScreenLevelOptions(::Type{<:PrimitiveParam}) = (1, 2)
+
+screenLevelOf(p::PrimitiveParam) = (p.screen + 1)
 
 function checkPrimParamElementalType(::Type{T}) where {T}
     if !canDirectlyStoreInstanceOf(T)
@@ -75,31 +74,36 @@ end
 mutable struct UnitVar{T} <: TensorVar{T, T}
     @atomic input::T
     const symbol::IndexedSym
+    @atomic screen::Bool
 
-    function UnitVar(input::T, symbol::SymOrIndexedSym) where {T}
+    function UnitVar(input::T, symbol::SymOrIndexedSym, screen::Bool=false) where {T}
         checkPrimParamElementalType(T)
-        new{T}(input, IndexedSym(symbol))
+        new{T}(input, IndexedSym(symbol), screen)
     end
 end
 
-struct GridVar{T, N} <: TensorVar{T, DirectMemory{T, N}}
-    input::DirectMemory{T, N}
-    symbol::IndexedSym
+mutable struct GridVar{T, N} <: TensorVar{T, DirectMemory{T, N}}
+    const input::DirectMemory{T, N}
+    const symbol::IndexedSym
+    @atomic screen::Bool
 
-    function GridVar(input::AbstractArray{T, N}, symbol::SymOrIndexedSym) where {T, N}
+    function GridVar(input::AbstractArray{T, N}, symbol::SymOrIndexedSym, 
+                     screen::Bool=false) where {T, N}
         N < 1 && throw(AssertionError("`N` must be larger than zero."))
         checkPrimParamElementalType(T)
         input = decoupledCopy(input)
-        new{T, N}(input, IndexedSym(symbol))
+        new{T, N}(input, IndexedSym(symbol), screen)
     end
 end
 
-genTensorVar(input::Any, symbol::SymOrIndexedSym) = UnitVar(input, symbol)
+genTensorVar(input::Any, symbol::SymOrIndexedSym, screen::Bool=false) = 
+UnitVar(input, symbol, screen)
 
-genTensorVar(input::AbstractArray, symbol::SymOrIndexedSym) = GridVar(input, symbol)
+genTensorVar(input::AbstractArray, symbol::SymOrIndexedSym, screen::Bool=false) = 
+GridVar(input, symbol, screen)
 
-genTensorVar(input::AbtArray0D, symbol::SymOrIndexedSym) = 
-genTensorVar(first(input), symbol)
+genTensorVar(input::AbtArray0D, symbol::SymOrIndexedSym, screen::Bool=false) = 
+genTensorVar(first(input), symbol, screen)
 
 
 getScreenLevelOptions(::Type{<:HeapParam}) = (0,)
@@ -520,6 +524,12 @@ function setScreenLevel!(p::P, level::Int) where {P<:AdaptableParam}
     p
 end
 
+function setScreenLevel!(p::TensorVar, level::Int)
+    checkScreenLevel(level, getScreenLevelOptions(p|>typeof))
+    @atomic p.screen = Bool(level-1)
+    p
+end
+
 
 setScreenLevel(p::CellParam, level::Int) = 
 setScreenLevel!(genCellParam(p), level)
@@ -667,6 +677,9 @@ end
 
 
 function setVal!(par::PrimitiveParam, val)
+    if !isPrimitiveInput(par)
+        throw(AssertionError("`isPrimitiveInput(par)` must return `true`."))
+    end
     @atomic par.input = val
 end
 
