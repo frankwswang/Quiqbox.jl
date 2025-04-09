@@ -1,6 +1,6 @@
 export genTensorVar, genMeshParam, genHeapParam, genCellParam, compareParamBox, uniqueParams, 
-       dissectParam, setVal!, symOf, obtain, screenLevelOf, 
-       setScreenLevel!, inputOf, setScreenLevel, sortParams!
+       dissectParam, setVal!, symOf, obtain, screenLevelOf, setScreenLevel!, inputOf, 
+       sortParams!
 
 const SymOrIndexedSym = Union{Symbol, IndexedSym}
 
@@ -529,13 +529,6 @@ function setScreenLevel!(p::TensorVar, level::Int)
     @atomic p.screen = Bool(level-1)
     p
 end
-
-
-setScreenLevel(p::CellParam, level::Int) = 
-setScreenLevel!(genCellParam(p), level)
-
-setScreenLevel(p::MeshParam, level::Int) = 
-setScreenLevel!(genMeshParam(p), level)
 
 
 isDependentParam(p::ParamBox) = (screenLevelOf(p)  < 1)

@@ -102,7 +102,7 @@ a1Val = v1Val + a1Offset
 @test obtain(a1) == a1Val
 @test obtain(first(a1|>inputOf)) == v1Val
 
-a2 = setScreenLevel(a1, 1)
+a2 = setScreenLevel!(genCellParam(a1), 1)
 @test a2() == a1()
 @test screenLevelOf(a2) == 1
 @test a1.input == a2.input
@@ -189,8 +189,8 @@ b1Val = f1_bias( obtain(v12) )
 @test screenLevelOf(b1) == 0
 @test all(inputOf(b1)[1] === v12)
 
-b2 = setScreenLevel(b1, 1)
-b3 = setScreenLevel(b1, 2)
+b2 = setScreenLevel(genCellParam(b1), 1)
+b3 = setScreenLevel(genCellParam(b1), 2)
 @test b1() == b2() == b3()
 @test b1Val == b2() == b3()
 @test screenLevelOf(b2) == 1
@@ -277,7 +277,7 @@ f3 = (x, y, z)->log(x^2 + y[1]) * (y[2] - sqrt(norm(exp.(z))))
 f3_t = (xv, z)->log(xv[1]^2 + xv[2]) * (xv[3] - sqrt(norm(exp.(z))))
 v2a2 = genHeapParam([v2, a2], :v2a2)
 d1 = genCellParam(f3, (a1, v2a2, m1), :d)
-d2 = setScreenLevel(d1, 1)
+d2 = setScreenLevel!(genCellParam(d1), 1)
 d1_val = d1()
 @test d1_val == d2() == f3(a1(), [v2(), a2()], m1())
 inSet2, midSet2, outSet2, isoSet2 = dissectParam(d1)
