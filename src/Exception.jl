@@ -15,8 +15,11 @@ function checkCollectionMinLen(data, dataSym::Symbol, minLen::Int)
     dataLen == minLen
 end
 
-function checkEmptiness(obj, name::Symbol)
-    isempty(obj) && throw(AssertionError("`$name` must not be empty."))
+function checkEmptiness(obj, name::Symbol; reverseCheck::Bool=false)
+    str = reverseCheck ? "" : " not"
+    if ifelse(reverseCheck, !, itself)(obj|>isempty)
+        throw(AssertionError("`$name` must$str be empty."))
+    end
     length(obj)
 end
 
