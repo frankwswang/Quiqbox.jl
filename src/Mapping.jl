@@ -1,4 +1,4 @@
-struct ReturnTyped{T, F<:Function} <: TypedEvaluator{T, F}
+struct ReturnTyped{T, F<:Function} <: TypedEvaluator{T}
     f::F
 
     function ReturnTyped(f::F, ::Type{T}) where {F<:Function, T}
@@ -15,7 +15,7 @@ ReturnTyped(f::ReturnTyped{T}, ::Type{T}) where {T} = itself(f)
 const Return{T} = ReturnTyped{T, ItsType}
 
 
-struct StableBinary{T, F<:Function} <: TypedEvaluator{T, F}
+struct StableBinary{T, F<:Function} <: TypedEvaluator{T}
     f::F
 
     function StableBinary(f::F, ::Type{T}) where {F<:Function, T}

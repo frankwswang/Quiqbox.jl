@@ -322,3 +322,6 @@ end
 
 recursiveCompareSize(arr1::AbstractArray{<:Number}, arr2::AbstractArray{<:Number}) = 
 size(arr1) == size(arr2)
+
+
+genBottomMemory() = Memory{Union{}}(undef, 0)

@@ -17,7 +17,7 @@ abstract type QueryBox{T} <: Box end
 abstract type DualSpanFunction{T, N, O} <: CompositeFunction end
 abstract type StatefulFunction{T} <: CompositeFunction end
 abstract type FunctionComposer <: CompositeFunction end
-abstract type Evaluator{F} <: CompositeFunction end
+abstract type Evaluator <: CompositeFunction end
 abstract type Mapper <: CompositeFunction end
 abstract type Getter <: CompositeFunction end
 const Encoder = Union{Getter, Mapper}
@@ -34,7 +34,7 @@ abstract type ParamBoxFunction{T} <: StatefulFunction{T} end
 abstract type FunctionModifier <: FunctionComposer end # Modify a function
 abstract type FunctionCombiner <: FunctionComposer end # Combine functions together
 
-abstract type TypedEvaluator{T, F} <: Evaluator{F} end
+abstract type TypedEvaluator{T} <: Evaluator end
 
 abstract type DirectOperator <: FunctionModifier end
 
@@ -47,7 +47,7 @@ abstract type FieldParamPointer <: StructuredInfo end
 
 abstract type IntegralProcessCache{T, D} <: SpatialProcessCache{T, D} end
 
-abstract type DimensionalEvaluator{T, D, F} <: TypedEvaluator{T, F} end
+abstract type DimensionalEvaluator{T, D, F} <: TypedEvaluator{T} end
 
 abstract type OrbitalNormalizer{T, D} <: AmplitudeNormalizer{T, D, 1} end
 abstract type OrbitalIntegrator{T, D} <: AmplitudeIntegrator{T, D, 1} end
@@ -88,6 +88,8 @@ const RefVal = Base.RefValue
 
 const NonEmpTplOrAbtArr{T, N, A<:AbstractArray{<:T, N}} = Union{NonEmptyTuple{T}, A}
 
+const AbtBottomArray{N} = AbstractArray{Union{}, N}
+const AbtBottomVector = AbtBottomArray{1}
 const AbtVecOfAbtArr{T} = AbstractVector{<:AbstractArray{T}}
 const JaggedAbtArray{T, N, O} = AbstractArray{<:AbstractArray{T, N}, O}
 const AbtArrayOr{T} = Union{T, AbstractArray{T}}

@@ -189,8 +189,8 @@ b1Val = f1_bias( obtain(v12) )
 @test screenLevelOf(b1) == 0
 @test all(inputOf(b1)[1] === v12)
 
-b2 = setScreenLevel(genCellParam(b1), 1)
-b3 = setScreenLevel(genCellParam(b1), 2)
+b2 = setScreenLevel!(genCellParam(b1), 1)
+b3 = setScreenLevel!(genCellParam(b1), 2)
 @test b1() == b2() == b3()
 @test b1Val == b2() == b3()
 @test screenLevelOf(b2) == 1
@@ -218,9 +218,9 @@ inSet1_t = [v1, v2, b2, b3]
 c1Val = f2_t(obtain.(inSet1_t))
 @test obtain(pars_f2) == obtain.([a1, v2, b1, b2, b3])
 @test f2(obtain(pars_f2)) == c1Val == c1() == 42.96591869214117
-gn_c1 = ParamGraph(c1)
+gn_c1 = genParamGraph(c1) |> transpileGraph
 c1_input1 = [b2, v1, v2] .|> obtain
-c1Val_2 = evaluateGraph(gn_c1, (c1_input1, nothing))
+c1Val_2 = evaluateGraph(gn_c1, (unit=c1_input1, grid=nothing))
 gnf_c1, inPars = compressParam(c1)
 @test gnf_c1(c1_input1) == c1() == c1Val_2 == 42.96591869214117
 
@@ -230,9 +230,9 @@ l1 = genCellParam(x->x^2, (k1,), :l)
 l2 = genCellParam(x->2x, (k2,), :l)
 l3 = genCellParam(+, (l1, l2), :l)
 @test l3() == 1.1^2 + 3.2 * 2
-g_l1 = ParamGraph(l1)
-g_l3 = ParamGraph(l3)
-g_l3_val = evaluateGraph(g_l3, ([k1(), k2()], nothing))
+g_l1 = genParamGraph(l1) |> transpileGraph
+g_l3 = genParamGraph(l3) |> transpileGraph
+g_l3_val = evaluateGraph(g_l3, (unit=[k1(), k2()], grid=nothing))
 gf_l3, inPars_l3 = compressParam(l3)
 @test all(map((x, y)->obtain(x)==y, inPars_l3, ([k1(), k2()], [])))
 @test gf_l3([1.1, 3.2]) == 7.61
@@ -269,7 +269,7 @@ inSet_e2, midSet_e2, outSet_e2, isoSet_e2 = dissectParam(e2)
 @test all(inSet_e2.grid .=== [m1, m2])
 @test outSet_e2[] == e2
 @test isempty(isoSet_e2)
-gn_e1 = ParamGraph(e1)
+gn_e1 = genParamGraph(e1) |> transpileGraph
 pVals_e1 = obtain.(inSet_e2.grid)
 gnf_e1, _ = compressParam(e1)
 @test evaluateGraph(gn_e1) == gnf_e1(pVals_e1) == 5.82827525296409
@@ -285,13 +285,13 @@ inSet2, midSet2, outSet2, isoSet2 = dissectParam(d1)
 @test all(inSet2.grid .=== [m1])
 @test outSet2[] === d1
 @test isempty(isoSet2)
-gn_d1 = ParamGraph(d1)
+gn_d1 = genParamGraph(d1) |> transpileGraph
 pVals2_2 = (obtain(inSet2.unit), obtain(inSet2.grid))
 gnf_d1, d1_inPars = compressParam(d1)
 @test IdSet{UnitParam}(first(d1_inPars)) == IdSet{UnitParam}(inSet2.unit)
 @test IdSet{GridParam}(last(d1_inPars)) == IdSet{GridParam}(inSet2.grid)
 inVals2 = map(obtain, d1_inPars)
-@test evaluateGraph(gn_d1, values(inVals2)) == gnf_d1(inVals2) == gnf_d1() == d1()
+@test evaluateGraph(gn_d1, inVals2) == gnf_d1(inVals2) == d1()
 
 pVec1 = genHeapParam([c1, d1, a2], :c1d1a2)
 apRef1 = genCellParam(pVec1, :ref)
@@ -349,7 +349,7 @@ pm1Val = obtain(pm1)
 inSet_pm1, _, outSet_pm1, isoSet_pm1 = dissectParam(pm1)
 @test inSet_pm1.grid == [k1, k2]
 inSetVal_pm1 = obtain.(inSet_pm1.unit)
-gn_pm1 = ParamGraph(pm1)
+gn_pm1 = genParamGraph(pm1) |> transpileGraph
 gnf_pm1, inPars_pm1 = compressParam(pm1)
 @test pm1Val == evaluateGraph(gn_pm1) == gnf_pm1(map(obtain, inPars_pm1))
 
@@ -362,7 +362,7 @@ pm2Val = obtain(pm2)
 
 inSet_pm2, _, outSet_pm2, isoSet_pm2 = dissectParam(pm2)
 inSetVal_pm2 = map(obtain, inSet_pm2)
-gn_pm2 = ParamGraph(pm2)
+gn_pm2 = genParamGraph(pm2) |> transpileGraph
 gnf_pm2, inPars_pm2 = compressParam(pm2)
 @test evaluateGraph(gn_pm2) == gnf_pm2(map(obtain, inPars_pm2)) == pm2()
 

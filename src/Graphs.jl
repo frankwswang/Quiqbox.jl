@@ -1,4 +1,5 @@
-export ParamGraph, evaluateGraph, compressParam
+export ValueParamGraph, LayerParamGraph, genParamGraph, transpileGraph, evaluateGraph, 
+       compressParam
 
 struct Directed end
 struct Undirected end
@@ -6,15 +7,15 @@ struct Undirected end
 const Orientation = Union{Directed, Undirected}
 
 struct Static end
-struct Dynamic end
+struct Active end
 
-const Mutability = Union{Static, Dynamic}
+const Activity = Union{Static, Active}
 
-abstract type AbstractGraph{M<:Mutability, O<:Orientation} end
+abstract type AbstractGraph{O<:Orientation} end
 
-abstract type ComputationGraph{M<:Mutability} <: AbstractGraph{M, Directed} end
+abstract type ComputationGraph{T} <: AbstractGraph{Directed} end
 
-abstract type TransformedGraph{M<:Mutability} <: AbstractGraph{M, Directed} end
+abstract type TransformedGraph{O<:Orientation} <: AbstractGraph{Orientation} end
 
 abstract type GraphVertex end
 
@@ -23,6 +24,7 @@ abstract type TypedVertex{T} <: GraphVertex end
 abstract type AccessVertex{T} <: TypedVertex{T} end
 
 abstract type ActionVertex{T} <: TypedVertex{T} end
+
 
 struct UnitVertex{T} <: AccessVertex{T}
     value::T
@@ -45,6 +47,7 @@ end
 function genTensorVertex(val::AbstractArray{T}, active::Bool, marker::Symbol) where {T}
     GridVertex(ShapedMemory(val), active, marker)
 end
+
 
 # HalfEdge: Edge that does not hold complete information unless it's attached to a vertex.
 abstract type HalfEdge{O<:Orientation} end
@@ -77,6 +80,7 @@ function getVertexOutputLevel(::P) where {P<:CompositeParam}
     end
 end
 
+
 struct VertexTrait
     effect::VertexEffect
     output::VertexOutput
@@ -84,6 +88,7 @@ struct VertexTrait
     VertexTrait() = new(UnstableVertex, VertexToWhat)
     VertexTrait(effect::VertexEffect, output::VertexOutput) = new(effect, output)
 end
+
 
 struct TupleReceptor{N} <: VertexReceptor
     trait::VectorMemory{VertexTrait, N}
@@ -111,6 +116,7 @@ end
 
 const CallVertexReceptor{N} = Union{TupleReceptor{N}, ArrayReceptor{N}}
 
+
 struct CallVertex{T, I<:CallVertexReceptor, F<:Function} <: ActionVertex{T}
     apply::ReturnTyped{T, F}
     marker::Symbol
@@ -118,6 +124,7 @@ struct CallVertex{T, I<:CallVertexReceptor, F<:Function} <: ActionVertex{T}
 end
 
 const ParamBoxVertexDict = IdDict{ParamBox, Pair{VertexTrait, Int}}
+
 
 function updateVertexReceptor!(receptor::CallVertexReceptor, param::CompositeParam, 
                                dict::ParamBoxVertexDict)
@@ -130,6 +137,7 @@ function updateVertexReceptor!(receptor::CallVertexReceptor, param::CompositePar
     end
     nothing
 end
+
 
 function initializeReceptor(param::AdaptableParam, 
                             reference::NothingOr{ParamBoxVertexDict}=nothing)
@@ -144,6 +152,7 @@ function initializeReceptor(param::ShapedParam,
     reference === nothing || updateVertexReceptor!(receptor, param, reference)
     receptor
 end
+
 
 function genParamVertex(param::CompositeParam, 
                         reference::NothingOr{ParamBoxVertexDict}=nothing)
@@ -161,6 +170,7 @@ end
 function genParamVertex(param::PrimitiveParam)
     genTensorVertex(param.input, screenLevelOf(param)<2, symbolFrom(param.symbol))
 end
+
 
 function formVertexSectors(unitInput::AbstractVector{<:ParamBox}, 
                            gridInput::AbstractVector{<:ParamBox}, 
@@ -184,21 +194,33 @@ function formVertexSectors(unitInput::AbstractVector{<:ParamBox},
 end
 
 
-struct ParamGraph{T, S1<:UnitVertex, S2<:GridVertex, H<:CallVertex, 
-                  V<:CallVertex{T}} <: TransformedGraph{Static}
+struct ValueParamGraph{T, V<:TensorVertex{T}} <: TransformedGraph{Directed}
+    origin::SpanParam{T}
+    source::V
+
+    function ValueParamGraph(pb::SpanParam{T}) where {T}
+        sl = screenLevelOf(pb)
+        sl == 0 && throw(AssertionError("The screen level of `pb` must larger than 0."))
+        vertex = genTensorVertex(obtain(pb), sl==1, symbolFrom(param.symbol))
+        new{T, typeof(vertex)}(pb, vertex)
+    end
+end
+
+struct LayerParamGraph{T, S1<:UnitVertex, S2<:GridVertex, H<:CallVertex, 
+                       V<:CallVertex{T}} <: TransformedGraph{Directed}
     origin::AbstractSpanSet{Memory{UnitParam}, Memory{GridParam}}
     source::AbstractSpanSet{Memory{S1},        Memory{S2}       }
     hidden::Memory{H}
     output::V
 
-    function ParamGraph(pb::ParamBox; indexing!Arg::Bool=false)
+    function LayerParamGraph(pb::ParamBox)
         (inUPars, inGPars), midPars, outPars, _ = dissectParam(pb)
         if isempty(inUPars) && isempty(inGPars)
             throw(AssertionError("`pb` should have at least one input source."))
         end
 
-        sortParams!(inUPars, indexing=indexing!Arg)
-        sortParams!(inGPars, indexing=indexing!Arg)
+        sortParams!(inUPars, indexing=false)
+        sortParams!(inGPars, indexing=false)
         origin = (unit=Memory{UnitParam}(inUPars), grid=Memory{GridParam}(inGPars))
 
         sectors, mapper = formVertexSectors(inUPars, inGPars, midPars)
@@ -216,63 +238,181 @@ struct ParamGraph{T, S1<:UnitVertex, S2<:GridVertex, H<:CallVertex,
     end
 end
 
-
-isNodeActive(node::TensorVertex) = node.active
-getNodeValue(node::TensorVertex) = node.value
-
-getSourceInfo(vertex::TensorVertex) = (vertex.marker, vertex.active)=>vertex.value
-
-const SourceNodeInfo{T} = Tuple{Symbol, Bool, T}
-
-const ParamGraphCore{V1<:UnitVertex, V2<:GridVertex, V3<:CallVertex} = 
-      @NamedTuple{unit::Memory{V1}, grid::Memory{V2}, call::Memory{V3}}
-
-const GraphCore = Union{ParamGraphCore}
-
-struct TranspiledGraph{T, B<:GraphCore, F<:Function} <: ComputationGraph{Static}
-    attribute::B
-    evaluator::ReturnTyped{T, F}
-end
-
-function TranspiledGraph(graph::ParamGraph)
-    unitSource, gridSource = graph.source
-    body = (unit=unitSource, grid=gridSource, call=graph.hidden)
-    f = genCallVertexEvaluator(body, graph.output)
-    TranspiledGraph(body, f)
-end
-
-const TranspiledParamGraph{T, B<:ParamGraphCore, F} = TranspiledGraph{T, B, F}
-
-(f::TranspiledGraph)() = f.evaluator(f.attribute)
-
-function prepareSourceInfo(nodes::AbstractVector{<:TensorVertex}, ::Nothing)
-    getfield.(nodes, :value)
-end
-
-function prepareSourceInfo(nodes::AbstractVector{<:TensorVertex}, input::AbstractVector)
-    i = firstindex(input)
-    map(nodes) do node
-        if node.active
-            val = input[i]
-            i += 1
-            val
-        else
-            node.value
-        end
+function genParamGraph(pb::ParamBox)
+    sl = screenLevelOf(pb)
+    if sl == 0
+        LayerParamGraph(pb)
+    else
+        ValueParamGraph(pb)
     end
 end
 
-function evaluateGraphCore(tpg::TranspiledParamGraph, input::OptionalSpanValueSet)
-    unit, grid, call = tpg.attribute
-    unitVals = prepareSourceInfo(unit, input.unit)
-    gridVals = prepareSourceInfo(grid, input.grid)
-    tpg.evaluator((unit=unitVals, grid=gridVals, call=call))
+const ParamGraph{T} = Union{ValueParamGraph{T}, LayerParamGraph{T}}
+
+
+isNodeActive(node::TensorVertex) = node.active
+
+getNodeValue(node::TensorVertex) = node.value
+
+
+function evaluateGraph end
+
+(f::ComputationGraph{T})() where {T} = evaluateGraph(f)::T
+(f::ComputationGraph{T})(input::OptionalSpanValueSet) where {T} = evaluateGraph(f, input)::T
+
+
+struct UnitValueGraph{T, M<:Activity} <: ComputationGraph{T}
+    node::UnitVertex{T}
+
+    function ValueGraph(vertex::UnitVertex{T}) where {T}
+        new{T, ifelse(vertex.active, Active, Static)}(vertex)
+    end
 end
 
-function evaluateGraph(graph::ParamGraph, 
-                       input::OptionalSpanValueSet=map(x->getNodeValue.(x), graph.source))
-    tpg = TranspiledGraph(graph)
-    evaluateGraphCore(tpg, input)
+struct GridValueGraph{T, N, M<:Activity} <: ComputationGraph{ShapedMemory{T, N}}
+    node::GridVertex{T, N}
+
+    function ValueGraph(vertex::GridVertex{T, N}) where {T, N}
+        new{T, N, ifelse(vertex.active, Active, Static)}(vertex)
+    end
+end
+
+const ValueGraph{T, M<:Activity} = Union{UnitValueGraph{T, M}, GridValueGraph{T, <:Any, M}}
+const StaticValueGraph{T} = ValueGraph{T, Static}
+const ActiveValueGraph{T} = ValueGraph{T, Active}
+
+evaluateGraph(f::ValueGraph) = getNodeValue(f.node)
+
+evaluateGraph(f::StaticValueGraph, ::OptionalVoidValueSet) = evaluateGraph(f)
+
+getParamInputType(::UnitValueGraph) = UnitInput()
+getParamInputType(::GridValueGraph) = GridInput()
+
+function evaluateGraph(f::ActiveValueGraph, input::OptionalGridValueSet)
+    sector = constrainSpanValueSet(getParamInputType(f), input)
+    content = getfield(input, sector)
+    content === nothing ? evaluateGraph(f) : getindex(content)
+end
+
+
+const LayerGraphCore{VU<:UnitVertex, VG<:GridVertex, VC<:CallVertex} = 
+      @NamedTuple{unit::Memory{VU}, grid::Memory{VG}, call::Memory{VC}}
+
+const UnitLayerGraphCore{VU<:UnitVertex, VC<:CallVertex} = LayerGraphCore{VU, Union{}, VC}
+
+const GridLayerGraphCore{VG<:GridVertex, VC<:CallVertex} = LayerGraphCore{Union{}, VG, VC}
+
+const VoidLayerGraphCore{VC<:CallVertex} = LayerGraphCore{Union{}, Union{}, VC}
+
+struct LayerGraph{T, B<:LayerGraphCore, F<:Function} <: ComputationGraph{T}
+    attribute::B
+    evaluator::ReturnTyped{T, F}
+
+    function LayerGraph(attribute::B, evaluator::ReturnTyped{T, F}) where 
+                       {T, B<:LayerGraphCore, F<:Function}
+        attribute = map(attribute) do x
+            ifelse(isempty(x), genBottomMemory(), x)
+        end
+
+        if isempty(attribute.unit) && isempty(attribute.grid)
+            throw(AssertionError("`attribute.unit` and `attribute.grid` must not be "*
+                                 "both empty."))
+        end
+
+        new{T, B, F}(attribute, evaluator)
+    end
+end
+
+const UnitLayerGraph{T, B<:UnitLayerGraphCore, F<:Function} = LayerGraph{T, B, F}
+
+const GridLayerGraph{T, B<:GridLayerGraphCore, F<:Function} = LayerGraph{T, B, F}
+
+const VoidLayerGraph{T, B<:VoidLayerGraphCore, F<:Function} = LayerGraph{T, B, F}
+
+getParamInputType(::LayerGraph) = SpanInput()
+
+getParamInputType(::UnitLayerGraph) = UnitInput()
+
+getParamInputType(::GridLayerGraph) = GridInput()
+
+getParamInputType(::VoidLayerGraph) = 
+throw(AssertionError("`$VoidLayerGraph` is not a valid construction of `$LayerGraph`."))
+
+
+function transpileGraph(graph::ValueParamGraph)
+    ValueGraph(graph.source)
+end
+
+function transpileGraph(graph::LayerParamGraph)
+    unitSource, gridSource = graph.source
+    body = (unit=unitSource, grid=gridSource, call=graph.hidden)
+    f = genCallVertexEvaluator(body, graph.output)
+    LayerGraph(body, f)
+end
+
+
+struct TensorSourceMerger{T1, T2<:ShapedMemory} <: StatefulFunction{Union{T1, T2}}
+    unit::Tuple{Memory{Pair{Bool, OneToIndex}}, Memory{T1}}
+    grid::Tuple{Memory{Pair{Bool, OneToIndex}}, Memory{T2}}
+
+    function TensorSourceMerger(data::LayerGraphCore)
+        unit, grid = map((:unit, :grid)) do field
+            genTensorSourceMergerCore(getfield(data, field))
+        end
+
+        new{eltype(unit|>last), eltype(grid|>last)}(unit, grid)
+    end
+end
+
+function genTensorSourceMergerCore(sector::AbstractVector{<:TensorVertex})
+    if isempty(sector)
+        (Memory{Bool}(undef, 0), Memory{Union{}}(undef, 0))
+    else
+        keys = Pair{Bool, OneToIndex}[]
+        idx = 0
+        vals = map(enumerate(sector)) do (cacheIdx, vertex)
+            ele = if isNodeActive(vertex)
+                 true => OneToIndex(idx += 1)
+            else
+                false => OneToIndex(cacheIdx)
+            end
+            push!(keys, ele)
+            getNodeValue(vertex)
+        end |> getMemory
+        (getMemory(keys), vals)
+    end
+end
+
+function (f::TensorSourceMerger)(input::OptionalSpanValueSet)
+    sectorNames = (:unit, :grid)
+    map(sectorNames) do field
+        inputVal = getfield(input, field)
+        pairs, cache = getfield(f, field)
+        if isnothing(inputVal)
+            cache
+        else
+            map(pairs) do pair
+                getField(ifelse(pair.first, inputVal, cache), pair.second)
+            end
+        end
+    end |> NamedTuple{sectorNames}
+end
+
+
+function evaluateGraph(f::LayerGraph)
+    unit, grid, call = f.attribute
+    unit, grid = map((unit, grid)) do field
+        isempty(field) ? field : map(getNodeValue, field)
+    end
+    f.evaluator((;unit, grid, call))
+end
+
+function evaluateGraph(tpg::LayerGraph, input::OptionalSpanValueSet)
+    constrainSpanValueSet(getParamInputType(tpg), input)
+    _, _, call = tpg.attribute
+    merger = TensorSourceMerger(tpg.attribute)
+    unit, grid = merger(input)
+    tpg.evaluator.f((;unit, grid, call))
 end
 
 
@@ -294,11 +434,11 @@ function selectVertexEvalGenerator(trait::VertexTrait)
     end
 end
 
-function genUnitVertexEvaluator(::ParamGraphCore, idx::Int)
+function genUnitVertexEvaluator(::LayerGraphCore, idx::Int)
     GetIndex{UnitIndex}(idx)
 end
 
-function genGridVertexEvaluator(::ParamGraphCore, idx::Int)
+function genGridVertexEvaluator(::LayerGraphCore, idx::Int)
     GetIndex{GridIndex}(idx)
 end
 
@@ -312,7 +452,7 @@ function genCallVertexEvaluatorCore(::ArrayReceptor, fs::AbstractArray{<:Functio
     ReturnTyped(ChainExpand(fs, apply.f), T)
 end
 
-function genCallVertexEvaluator(compactPG::ParamGraphCore, 
+function genCallVertexEvaluator(compactPG::LayerGraphCore, 
                                 vertex::CallVertex{T}) where {T}
     receptor = vertex.receptor
     fs = map(receptor.trait, receptor.index) do t, i
@@ -321,7 +461,7 @@ function genCallVertexEvaluator(compactPG::ParamGraphCore,
     genCallVertexEvaluatorCore(receptor, fs, vertex.apply)
 end
 
-function genCallVertexEvaluator(compactPG::ParamGraphCore, i::Int)
+function genCallVertexEvaluator(compactPG::LayerGraphCore, i::Int)
     vertex = compactPG.call[begin+i-1]
     genCallVertexEvaluator(compactPG, vertex)
 end
@@ -344,8 +484,32 @@ struct SpanInputFormatter{S1<:Symbol, S2<:Pair{ Symbol, <:NonEmptyTuple{Int} }} 
         end
         new{eltype(unitInfo), eltype(gridInfo)}(unitInfo, gridInfo)
     end
+
+    function SpanInputFormatter(unit::UnitVertex)
+        unitInfo = isNodeActive(unit) ? getMemory(unit.marker|>fill) : genBottomMemory()
+        new{eltype(unitInfo), Union{}}(unit, genBottomMemory())
+    end
+
+    function SpanInputFormatter(grid::GridVertex{T, N}) where {T, N}
+        gridInfo = if isNodeActive(grid)
+            getMemory(grid.marker=>(size∘getNodeValue)(grid) |> fill)
+        else
+            genBottomMemory()
+        end
+        new{Union{}, eltype(gridInfo)}(genBottomMemory(), gridInfo)
+    end
 end
 
+function SpanInputFormatter(graph::LayerGraph)
+    unit, grid, _ = graph.attribute
+    SpanInputFormatter(unit, grid)
+end
+
+function SpanInputFormatter(graph::ValueGraph)
+    SpanInputFormatter(graph.node)
+end
+
+const VoidInputFormatter = SpanInputFormatter{Union{}, Union{}}
 const UnitInputFormatter = SpanInputFormatter{Symbol, Union{}}
 const GridInputFormatter{G<:Pair{ Symbol, <:NonEmptyTuple{Int} }} = 
                          SpanInputFormatter{Union{}, G}
@@ -365,6 +529,10 @@ function formatGridInput(grid::Memory{<:Pair{ Symbol, <:NonEmptyTuple{Int} }},
     end
 end
 
+function getField(::AbstractVector, ::VoidInputFormatter)
+    (unit=nothing, grid=nothing)
+end
+
 getField(flattenedInput::AbstractVector, encoder::UnitInputFormatter) = 
 (unit=formatUnitInput(encoder.unit, flattenedInput), grid=nothing)
 
@@ -378,36 +546,52 @@ function getField(flattenedInput::AbstractVector, encoder::SpanInputFormatter)
     (unit=unitInput, grid=gridInput)
 end
 
-getField(spanInput::OptionalSpanValueSet, ::SpanInputFormatter) = itself(spanInput)
+getParamInputType(::UnitInputFormatter) = UnitInput()
+getParamInputType(::GridInputFormatter) = GridInput()
+getParamInputType(::SpanInputFormatter) = SpanInput()
+getParamInputType(::VoidInputFormatter) = VoidInput()
 
-getField(::OptionalSpanValueSet{<:NothingOr{AbstractVector}, <:AbtVecOfAbtArr}, 
-         ::UnitInputFormatter) = 
-throw(AssertionError("`$UnitInputFormatter` disallows grid-type input."))
-
-getField(::OptionalSpanValueSet{<:AbstractVector, <:NothingOr{AbtVecOfAbtArr}}, 
-         ::GridInputFormatter) = 
-throw(AssertionError("`$GridInputFormatter` disallows unit-type input."))
-
-(f::SpanInputFormatter)() = (nothing, nothing)
-
-abstract type GraphEvaluator{G} <: Evaluator{typeof(evaluateGraphCore)} end
-
-const ComputableParamGraph{G<:TranspiledGraph} = 
-      LPartial{typeof(evaluateGraphCore), Tuple{G}}
-
-struct EvalParamGraph{T, G<:TranspiledGraph{T}, E<:SpanInputFormatter} <: GraphEvaluator{G}
-    f::Base.ComposedFunction{ComputableParamGraph{G}, E}
+function getField(spanInput::OptionalSpanValueSet, input::SpanInputFormatter)
+    constrainSpanValueSet(getParamInputType(input), spanInput)
+    spanInput
 end
 
-(f::EvalParamGraph)() = f.f()
-(f::EvalParamGraph)(flattenInput) = f.f(flattenInput)
-(f::EvalParamGraph)(unitInput, gridInput) = f.f(unitInput, gridInput)
+(f::SpanInputFormatter)() = (unit=nothing, grid=nothing)
 
 
-function compressParam(pb::ParamBox)
-    graph = ParamGraph(pb)
-    transpiledGraph = TranspiledGraph(graph)
-    encoder = SpanInputFormatter(graph.source...)
-    cgc = LPartial(evaluateGraphCore, (transpiledGraph,))
-    EvalParamGraph(cgc∘encoder), graph.origin
+abstract type GraphEvaluator{G} <: Evaluator end
+
+
+const EvalLayerGraphCore{T, G<:ComputationGraph{T}} = 
+      LPartial{typeof(evaluateGraph), Tuple{G}}
+
+struct ComputeGraph{T, G<:ComputationGraph{T}, E<:SpanInputFormatter} <: GraphEvaluator{G}
+    f::Base.ComposedFunction{EvalLayerGraphCore{T, G}, E}
+
+    function ComputeGraph(graph::G, encoder::E) where 
+                         {T, G<:ComputationGraph{T}, E<:SpanInputFormatter}
+        f = LPartial(evaluateGraph, (graph,)) ∘ encoder
+        new{T, G, E}(f)
+    end
+end
+
+const ValueInput = Union{OptionalSpanValueSet, AbstractVector}
+
+(f::ComputeGraph{T})() where {T} = f.f()::T
+(f::ComputeGraph{T})(input::ValueInput) where {T} = f.f(input)::T
+
+
+function compressGraph(graph::LayerGraph)
+    encoder = SpanInputFormatter(graph)
+    ComputeGraph(graph, encoder)
+end
+
+function compressGraph(graph::TransformedGraph)
+    transpiledGraph = transpileGraph(graph)
+    compressGraph(transpiledGraph)
+end
+
+function compressParam(param::ParamBox)
+    paramGraph = genParamGraph(param)
+    compressGraph(paramGraph), paramGraph.origin
 end

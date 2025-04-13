@@ -969,6 +969,15 @@ const AbstractSpanValueSet{U<:AbstractVector, G<:AbtVecOfAbtArr} = AbstractSpanS
 const OptionalSpanValueSet{U<:NothingOr{AbstractVector}, G<:NothingOr{AbtVecOfAbtArr}} = 
       @NamedTuple{unit::U, grid::G}
 
+const OptionalUnitValueSet{U<:NothingOr{AbstractVector}, G<:NothingOr{AbtBottomVector}} = 
+      @NamedTuple{unit::U, grid::G}
+
+const OptionalGridValueSet{U<:NothingOr{AbtBottomVector}, G<:NothingOr{AbtVecOfAbtArr}} = 
+      @NamedTuple{unit::U, grid::G}
+
+const OptionalVoidValueSet{U<:NothingOr{AbtBottomVector}, G<:NothingOr{AbtBottomVector}} = 
+      @NamedTuple{unit::U, grid::G}
+
 const FixedSpanValueSet{T1, T2<:AbstractArray{T1}} = 
       AbstractSpanValueSet{Memory{T1}, Memory{T2}}
 
@@ -982,6 +991,23 @@ const AbstractSpanParamSet{U<:AbstractVector{<:UnitParam}, G<:AbstractVector{<:G
 
 const TypedSpanParamSet{T1<:UnitParam, T2<:GridParam} = 
       AbstractSpanParamSet{Vector{T1}, Vector{T2}}
+
+struct UnitInput end
+struct GridInput end
+struct SpanInput end
+struct VoidInput end
+
+getInputSymbol(::Type{UnitInput}) = :unit
+getInputSymbol(::Type{GridInput}) = :grid
+getInputSymbol(::Type{SpanInput}) = :span
+getInputSymbol(::Type{VoidInput}) = :void
+
+constrainSpanValueSet(::UnitInput, ::OptionalUnitValueSet) = getInputSymbol(UnitInput)
+constrainSpanValueSet(::GridInput, ::OptionalGridValueSet) = getInputSymbol(GridInput)
+constrainSpanValueSet(::SpanInput, ::OptionalSpanValueSet) = getInputSymbol(SpanInput)
+constrainSpanValueSet(::VoidInput, ::OptionalVoidValueSet) = getInputSymbol(VoidInput)
+
+function getParamInputType end
 
 
 initializeSpanParamSet() = (unit=UnitParam[], grid=GridParam[])
@@ -1183,6 +1209,8 @@ getField(obj, tsFilter::TaggedSpanSetFilter) = getField(obj, tsFilter.scope)
 
 
 abstract type AbstractParamFunc <: CompositeFunction end
+
+getParamInputType(::AbstractParamFunc) = SpanInput()
 
 struct ParamFreeFunc{F<:Function} <: AbstractParamFunc
     f::F
