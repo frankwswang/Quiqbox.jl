@@ -1124,13 +1124,20 @@ function evalFunc(func::F, input) where {F<:Function}
     evalFunc(fCore, pSet, input)
 end
 
-function evalFunc(fCore::F, pSet, input) where {F<:Function}
-    fCore(input, map(obtain, pSet))
-end
 
-#! Possibly adding memoization in the future to generate/use the same param set to avoid 
-#! bloating `Quiqbox.IdentifierCache` and prevent repeated computation.
-unpackFunc(f::F) where {F<:Function} = unpackFunc!(f, initializeSpanParamSet())
+# # Methods for parameterized functions
+# function evalFunc(func::F, input) where {F<:Function}
+#     fCore, pSet, _ = unpackFunc(func)
+#     evalFunc(fCore, pSet, input)
+# end
+
+# function evalFunc(fCore::F, pSet, input) where {F<:Function}
+#     fCore(input, map(obtain, pSet))
+# end
+
+# #! Possibly adding memoization in the future to generate/use the same param set to avoid 
+# #! bloating `Quiqbox.IdentifierCache` and prevent repeated computation.
+# unpackFunc(f::F) where {F<:Function} = unpackFunc!(f, initializeSpanParamSet())
 
 unpackFunc!(f::F, paramSet::AbstractSpanParamSet) where {F<:Function} = 
 unpackFunc!(SelectTrait{ParameterizationStyle}()(f), f, paramSet)
