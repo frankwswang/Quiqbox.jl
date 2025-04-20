@@ -365,7 +365,6 @@ ParamFreeFunc(f::ParamFreeFunc) = itself(f)
 struct Lucent end
 struct Opaque end
 
-
 struct Deref{F<:Function} <: FunctionModifier
     f::F
 end
@@ -386,15 +385,49 @@ end
 
 TupleHeader(f::TupleHeader, ::Val{N}) where {N} = TupleHeader(f.f, Val(N))
 
-TupleHeader(f::ReturnTyped{T}, ::Val{N}) where {T, N} = 
-ReturnTyped(TupleHeader(f.f, Val(N)), T)
+TupleHeader(::Val{N}) where {N} = TupleHeader(itself, Val(N))
 
-(f::TupleHeader)() = f.f()
-(f::TupleHeader{0})(head, body...) = f.f(head, body...)
-(f::TupleHeader{0})(::Tuple{}, body...) = f.f((), body...)
-(f::TupleHeader{N})(head::NTuple{N, Any}, body...) where {N} = f.f(head, body...)
+(f::TupleHeader{N})(head, body...) where {N} = 
+f.f(formatInput(TupleInput{Any, N}(), head), body...)
+
+const TypedTupleFunc{T, D, F<:Function} = ReturnTyped{T, TupleHeader{D, F}}
+
+TypedTupleFunc(f::Function, ::Type{T}, ::Val{D}) where {T, D} = 
+ReturnTyped(TupleHeader(f, Val(D)), T)
+
+TypedTupleFunc(f::ReturnTyped, ::Type{T}, ::Val{D}) where {T, D} = 
+ReturnTyped(TupleHeader(f.f, Val(D)), T)
 
 
-getOpacity(::F) where {F<:Function} = ifelse(Base.issingletontype(F), Lucent(), Opaque())
+"""
 
-isLucent(f::Function) = (getOpacity(f) isa Lucent)
+    getOpacity(f::Function) -> Union{Lucent, Opaque}
+
+If a return value is a `Lucent`, that means `f` either does not contain any `ParamBox`, or 
+has a specialized `unpackFunc` method that separates its embedded `ParamBox`.
+"""
+function getOpacity(f::Function)
+    (Base.issingletontype(f|>typeof) || isParamBoxFree(f)) ? Lucent() : Opaque()
+end
+
+getOpacity(::ParamFreeFunc) = Lucent()
+
+
+struct GetRange <: Mapper
+    start::Int
+    final::Int
+    step::Int
+
+    function GetRange(start::Int, final::Int, step::Int=1)
+        checkPositivity(start)
+        checkPositivity(final)
+        checkPositivity(step|>abs)
+        new(start, final, step)
+    end
+end
+
+function (f::GetRange)(obj)
+    map(obj, f.start:f.step:f.final) do i
+        getField(obj, OneToIndex(i))
+    end
+end
