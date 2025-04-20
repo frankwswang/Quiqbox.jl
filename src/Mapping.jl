@@ -33,6 +33,12 @@ StableAdd(::Type{T}) where {T} = StableBinary(+, T)
 StableSub(::Type{T}) where {T} = StableBinary(-, T)
 StableMul(::Type{T}) where {T} = StableBinary(*, T)
 
+struct StableContract{T} <: TypedEvaluator{T} end
+
+function (::StableContract{T})(a, b) where {T}
+    mapreduce(StableMul(T), StableAdd(T), a, b)
+end
+
 
 struct EncodeApply{N, E<:NTuple{N, Function}, F<:Function} <: FunctionCombiner
     encode::E
