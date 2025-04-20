@@ -346,28 +346,21 @@ function getField(obj, f::NamedMapper)
 end
 
 
+struct ParamFreeFunc{F<:Function} <: CompositeFunction
+    core::F
 
-const EncodeParamApply{F<:Function, N, E<:NTuple{ N, OnlyBody{<:Encoder} }} = 
-      NamedMapEncode{InputLimiter{2, F}, N, E}
+    function ParamFreeFunc(f::F) where {F<:Function}
+        if !isParamBoxFree(f)
+            throw(AssertionError("`f` should not contain any `$ParamBox`."))
+        end
+        new{F}(f)
+    end
+end
 
-const EncoderSet{S, E<:Tuple{ Vararg{Encoder} }} = NamedTuple{S, E}
+ParamFreeFunc(f::ParamFreeFunc) = itself(f)
 
-EncodeParamApply(apply::Function, select::EncoderSet{S}) where {S} = 
-NamedMapEncode(OnlyBody.(select|>values), S, InputLimiter( apply, Val(2) ))
+(f::ParamFreeFunc)(args...) = f.core(args...)
 
-EncodeParamApply(apply::Function, select::Pair{Symbol, Encoder}) = 
-EncodeParamApply(InputLimiter(apply, Val(2)), NamedTuple( (select,) ))
-
-EncodeParamApply(apply::Function, select::Encoder) = 
-EncodeParamApply(InputLimiter(apply, Val(2)), (;select))
-
-EncodeParamApply(apply::Function) = 
-EncodeParamApply(InputLimiter(apply, Val(2)), ())
-
-EncodeParamApply(f::EncodeParamApply, select::EncoderSet) = 
-EncodeParamApply(f.apply, (; zip(f.symbol, f.encode)..., select...))
-
-const GetParamApply{F<:Function, T<:Encoder} = EncodeParamApply{F, 1, Tuple{ OnlyBody{T} }}
 
 struct Lucent end
 struct Opaque end

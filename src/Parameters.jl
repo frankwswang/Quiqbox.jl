@@ -1198,11 +1198,15 @@ end
 #     MixedFieldParamPointer(coreDict.unit, coreDict.grid, tag)
 # end
 
+const NamedFilter = Union{SpanSetFilter, NamedMapper}
 
-struct TaggedSpanSetFilter <: Mapper
-    scope::SpanSetFilter
+struct TaggedSpanSetFilter{F<:NamedFilter} <: Mapper
+    scope::F
     tag::Identifier
 end
+
+TaggedSpanSetFilter(scope::NamedFilter, paramSet::AbstractSpanParamSet) = 
+TaggedSpanSetFilter(scope, Identifier(paramSet))
 
 #= Additional Method =#
 getField(obj, tsFilter::TaggedSpanSetFilter) = getField(obj, tsFilter.scope)
@@ -1210,23 +1214,42 @@ getField(obj, tsFilter::TaggedSpanSetFilter) = getField(obj, tsFilter.scope)
 
 abstract type AbstractParamFunc <: CompositeFunction end
 
+const TypedParamFunc{T, F<:AbstractParamFunc} = ReturnTyped{T, F}
+
 getParamInputType(::AbstractParamFunc) = SpanInput()
 
-struct ParamFreeFunc{F<:Function} <: AbstractParamFunc
-    f::F
 
-    function ParamFreeFunc(f::F) where {F<:Function}
-        if !(Base.issingletontype(F) || isParamBoxFree(f))
-            throw(AssertionError("`f` should not contain any `$ParamBox`."))
-        end
-        checkArgQuantity(f, 1)
+struct InputConverter{F<:Function} <: AbstractParamFunc
+    core::ParamFreeFunc{F}
+
+    function InputConverter(f::ParamFreeFunc{F}) where {F<:Function}
+        checkArgQuantity(f.core, 1)
         new{F}(f)
     end
 end
 
-ParamFreeFunc(f::ParamFreeFunc) = itself(f)
+InputConverter(f::Function) = (InputConverter∘ParamFreeFunc)(f)
 
-(f::ParamFreeFunc)(input, ::AbstractSpanValueSet) = f.f(input)
+(f::InputConverter)(input, ::AbstractSpanValueSet) = f.core(input)
+
+InputConverter(f::InputConverter) = itself(f)
+
+
+struct ParamFormatter{F<:NamedFilter} <: AbstractParamFunc
+    core::ParamFreeFunc{TaggedSpanSetFilter{F}}
+
+    function ParamFormatter(f::ParamFreeFunc{TaggedSpanSetFilter{F}}) where 
+                           {F<:NamedFilter}
+        checkArgQuantity(f.core, 1)
+        new{F}(f)
+    end
+end
+
+ParamFormatter(f::TaggedSpanSetFilter) = (ParamFormatter∘ParamFreeFunc)(f)
+
+(f::ParamFormatter)(::Any, params::AbstractSpanValueSet) = f.core(params)
+
+ParamFormatter(f::ParamFormatter) = itself(f)
 
 
 struct ParamBindFunc{F<:Function, C1<:UnitParam, C2<:GridParam} <: AbstractParamFunc
@@ -1246,30 +1269,28 @@ function (f::ParamBindFunc)(input, valSet::AbstractSpanValueSet)
 end
 
 
-const ParamTupleEncoder{T<:AbstractParamFunc, D, F<:Function} = 
-      ReturnTyped{T, TupleHeader{D, F}}
-
-
 const ParamFuncSequence = Union{ NonEmptyTuple{AbstractParamFunc}, 
                                  LinearMemory{<:AbstractParamFunc} }
 
-struct ParamCombiner{J<:Function, C<:ParamFuncSequence} <: AbstractParamFunc
-    binder::ParamFreeFunc{J}
+struct ParamCombiner{B<:Function, C<:ParamFuncSequence} <: AbstractParamFunc
+    binder::B
     encode::C
 
-    function ParamCombiner(binder::J, encode::C) where 
-                          {J<:Function, C<:NonEmptyTuple{ParamFuncSequence}}
-        new{J, C}(ParamFreeFunc(binder), encode)
+    function ParamCombiner(binder::B, encode::C) where 
+                          {B<:Function, C<:NonEmptyTuple{AbstractParamFunc}}
+        checkArgQuantity(binder, 2)
+        new{B, C}(binder, encode)
     end
 
-    function ParamCombiner(binder::J, encode::C) where 
-                          {J<:Function, C<:LinearMemory{<:ParamFuncSequence}}
+    function ParamCombiner(binder::B, encode::C) where 
+                          {B<:Function, C<:LinearMemory{<:AbstractParamFunc}}
+        checkArgQuantity(binder, 2)
         checkEmptiness(encode, :encode)
-        new{J, C}(ParamFreeFunc(binder), encode)
+        new{B, C}(binder, encode)
     end
 end
 
-ParamCombiner(binder::Function, encode::AbstractVector{<:ParamFuncSequence}) = 
+ParamCombiner(binder::Function, encode::AbstractVector{<:AbstractParamFunc}) = 
 ParamCombiner(binder, getMemory(encode))
 
 (f::ParamCombiner)(input, params::AbstractSpanValueSet) = 
@@ -1281,20 +1302,35 @@ const ParamExtender{C<:LinearMemory{<:AbstractParamFunc}} = ParamCombiner{typeof
 map(o->o(input, params), f.encode)
 
 
+const EncodeParamApply{B<:Function, C<:Function, F<:NamedFilter} = 
+      ParamCombiner{B, Tuple{ InputConverter{C}, ParamFormatter{F} }}
+
+const FilterParamApply{B<:Function} = EncodeParamApply{B, ItsType, SpanSetFilter}
+
+function EncodeParamApply(binder::Function, converter::Function, 
+                          formatter::TaggedSpanSetFilter)
+    ParamCombiner(binder, ( InputConverter(converter), ParamFormatter(formatter) ))
+end
+
+function EncodeParamApply(binder::Function, formatter::TaggedSpanSetFilter)
+    EncodeParamApply(binder, itself, formatter)
+end
+
+
 struct ParamPipeline{C<:ParamFuncSequence} <: AbstractParamFunc
     encode::C
 
-    function ParamPipeline(encode::C) where {C<:NonEmptyTuple{ParamFuncSequence}}
+    function ParamPipeline(encode::C) where {C<:NonEmptyTuple{AbstractParamFunc}}
         new{C}(encode)
     end
 
-    function ParamPipeline(encode::C) where {C<:LinearMemory{<:ParamFuncSequence}}
+    function ParamPipeline(encode::C) where {C<:LinearMemory{<:AbstractParamFunc}}
         checkEmptiness(encode, :encode)
         new{C}(encode)
     end
 end
 
-ParamPipeline(binder::Function, encode::AbstractVector{<:ParamFuncSequence}) = 
+ParamPipeline(binder::Function, encode::AbstractVector{<:AbstractParamFunc}) = 
 ParamPipeline(binder, getMemory(encode))
 
 function (f::ParamPipeline)(input, params::AbstractSpanValueSet)
@@ -1305,8 +1341,6 @@ function (f::ParamPipeline)(input, params::AbstractSpanValueSet)
 end
 
 #= Additional Method =#
-getOpacity(::ParamFreeFunc) = Lucent()
-
 getOpacity(::ParamBindFunc) = Opaque()
 
 
