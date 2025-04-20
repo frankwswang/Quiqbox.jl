@@ -70,8 +70,8 @@ struct EncodedField{T<:Number, D, F<:Function, E<:Function} <: FieldAmplitude{T,
 
         if F <: FieldAmplitude
             t = returnTypeOf(core.f)
-            (t <: T) || throw(AssertionError("Cannot convert the output type of `f.f` "*
-                                             "from `$t` to $T."))
+            promote_type(t, T) <: T || 
+            throw(AssertionError("Cannot convert the output of `f.f` from `$t` to $T."))
         else
             checkArgQuantity(core.f, 1)
         end
