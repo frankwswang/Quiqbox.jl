@@ -13,9 +13,9 @@ function returnUndefinedTraitError(::Type{TR}, ::Type{T}) where {TR<:AnyInterfac
 end
 
 
-abstract type PropertyStyle <: AnyInterface end
+abstract type FunctionStyle <: AnyInterface end
 
-abstract type Differentiability <: PropertyStyle end
+abstract type Differentiability <: FunctionStyle end
 
 struct CanDiff <: Differentiability end
 
@@ -25,33 +25,35 @@ struct NonDiff <: Differentiability end
 returnUndefinedTraitError(Differentiability, T)
 
 
-abstract type FunctionStyle <: AnyInterface end
-
-abstract type ParameterizationStyle <: FunctionStyle end
-
-struct TypedParamFunc{T} <: ParameterizationStyle end
-
-struct GenericFunction <: ParameterizationStyle end
-
-(::SelectTrait{ParameterizationStyle})(::T) where {T} = 
-returnUndefinedTraitError(ParameterizationStyle, T)
-
-
 abstract type InputStyle <: FunctionStyle end
 
 struct AnyInput <: InputStyle end
 
-struct TupleInput{N} <: InputStyle end
-
-struct ScalarInput <: InputStyle end
-
-struct VectorInput <: InputStyle end
+struct TupleInput{T, N} <: InputStyle end
 
 (::SelectTrait{InputStyle})(::F) where {F<:Function} = 
-SelectTrait{InputStyle}()(F)
-
-(::SelectTrait{InputStyle})(::Type{F}) where {F<:Function} = 
 returnUndefinedTraitError(InputStyle, F)
+
+
+formatInput(::AnyInput, x::Any) = itself(x)
+
+function formatInput(::TupleInput{T, 1}, x::Any) where {T}
+    (x isa T) || throw(ArgumentError("`x` must be a `$T`."))
+    (x,)
+end
+
+function formatInput(::TupleInput{T, 1}, x::Tuple) where {T}
+    (x isa Tuple{T}) || throw(ArgumentError("`x` must be a `Tuple{$T}`."))
+    x
+end
+
+function formatInput(::TupleInput{T, N}, x::Tuple) where {T, N}
+    (x isa NTuple{N, T}) || throw(ArgumentError("`x` must be a `NTuple{$N, $T}`."))
+    x
+end
+
+formatInput(f::Function, x) = formatInput(SelectTrait{InputStyle}()(f), x)
+
 
 abstract type IntegralStyle <: AnyInterface end
 
