@@ -760,16 +760,19 @@ end
 compareParamBox(::ParamBox, ::ParamBox) = false
 
 
-function uniqueParams(source::ParamBoxAbtArr; onlyPrimitive::Bool=true)
+function uniqueParamsCore!(source::ParamBoxAbtArr)
     unique!(BlackBox, source)
-    onlyPrimitive && filter!(isPrimitiveInput, source)
     source
 end
 
-function uniqueParams(source; onlyPrimitive::Bool=true)
-    res = map(last, getFieldParams(source))
-    uniqueParams(res; onlyPrimitive)
+function uniqueParams(source::ParamBoxAbtArr)
+    uniqueParamsCore!(source)
 end
+
+function uniqueParams(source)
+    map(last, getFieldParams(source)) |> uniqueParamsCore!
+end
+
 
 function getFieldParams(source)
     paramPairs = Pair{ChainedAccess, ParamBox}[]
@@ -777,8 +780,8 @@ function getFieldParams(source)
     paramPairs
 end
 
-function isParamBoxFree(source::T) where {T}
-    Base.issingletontype(T) || (getFieldParams(source) |> isempty)
+function isParamBoxFree(source)
+    canDirectlyStore(source) || (getFieldParams(source) |> isempty)
 end
 
 function getFieldParamsCore!(paramPairs::AbstractVector{Pair{ChainedAccess, ParamBox}}, 
@@ -797,7 +800,7 @@ function getFieldParamsCore!(paramPairs::AbstractVector{Pair{ChainedAccess, Para
             searchParam = true
             fields = eachindex(source)
         end
-    elseif isstructtype(T) && !(Base.issingletontype(T))
+    elseif isstructtype(T) && !canDirectlyStore(source)
         searchParam = true
         fields = fieldnames(T)
     end
