@@ -1,25 +1,41 @@
-export WrappedField, GaussFunc, AxialProdFunc, PolyRadialFunc
+export EncodedField, GaussFunc, AxialProduct, PolyRadialFunc
 
 using LinearAlgebra
 
-struct FieldParamFunc{T<:Number, D, F<:AbstractParamFunc} <: AbstractParamFunc
-    core::GetParamApply{ParamTupleEncoder{T, D, F}, TaggedSpanSetFilter}
+(::SelectTrait{InputStyle})(::FieldAmplitude{<:Any, N}) where {N} = TupleInput{Real, N}()
 
-    function FieldParamFunc{T, D}(f::F, scope::TaggedSpanSetFilter) where 
+
+dimOf(::FieldAmplitude{<:Any, N}) where {N} = N
+
+returnTypeOf(::FieldAmplitude{T}) where {T} = T
+
+
+needFieldAmpEvalCache(::FieldAmplitude) = true
+
+function evalFieldAmplitude(f::FieldAmplitude, input; 
+                            cache!Self::MultiSpanDataCacheBox=MultiSpanDataCacheBox(Number))
+    formattedInput = formatInput(f, input)
+    if needFieldAmpEvalCache(f)
+        evalFieldAmplitudeCore(f, formattedInput, cache!Self)
+    else
+        evalFieldAmplitudeCore(f, formattedInput)
+    end
+end
+
+(f::FieldAmplitude)(input) = evalFieldAmplitude(f, input)
+
+
+struct FieldParamFunc{T<:Number, D, F<:AbstractParamFunc} <: AbstractParamFunc
+    core::TypedParamFunc{T, FilterParamApply{ TupleHeader{D, F} }}
+
+    function FieldParamFunc{T, D}(f::TupleHeader{D, F}, scope::TaggedSpanSetFilter) where 
                                  {T, D, F<:AbstractParamFunc}
-        new{T, D, F}(EncodeParamApply(ReturnTyped(f, T), scope))
+        inner = EncodeParamApply(TupleHeader(f, Val(D)), scope)
+        new{T, D, F}(ReturnTyped(inner, T))
     end
 end
 
 (f::FieldParamFunc)(input, params::AbstractSpanValueSet) = f.core(input, params)
-
-
-getFieldConstraint(::FieldAmplitude{T, 0}) where {T} = Real
-getFieldConstraint(::FieldAmplitude{T, D}) where {T, D} = NTuple{D, Real}
-
-function evalFieldAmplitude end
-
-(f::FieldAmplitude)(input) = evalFieldAmplitude(f, input)
 
 
 function unpackFunc!(f::FieldAmplitude{T, D}, paramSet::AbstractSpanParamSet, 
@@ -27,7 +43,7 @@ function unpackFunc!(f::FieldAmplitude{T, D}, paramSet::AbstractSpanParamSet,
     fCore, localParamSet = unpackFieldFunc(f)
     idxFilter = locateParam!(paramSet, localParamSet)
     scope = TaggedSpanSetFilter(idxFilter, paramSetId)
-    FieldParamFunc{T, D}(fCore, scope), paramSet
+    FieldParamFunc{T, D}(fCore, scope)
 end
 
 function unpackFunc(f::FieldAmplitude{T, D}) where {T, D}
@@ -38,200 +54,247 @@ function unpackFunc(f::FieldAmplitude{T, D}) where {T, D}
 end
 
 
-struct WrappedField{T<:Number, D, F<:Function} <: FieldAmplitude{T, D}
-    core::ParamTupleEncoder{T, D, F}
+struct EncodedField{T<:Number, D, F<:Function, E<:Function} <: FieldAmplitude{T, D}
+    core::ReturnTyped{T, F}
+    encode::TupleHeader{D, E}
 
-    function WrappedField(f::F, ::Type{T}, ::Val{D}) where {F, T, D}
-        new{T, D, F}( ParamTupleEncoder(f, T, Bal(D)) )
-    end
-end
-
-evalFieldAmplitude(f::WrappedField, input, 
-                   cache!Self::MultiSpanDataCacheBox=MultiSpanDataCacheBox(Number)) = 
-f.core(input::getFieldConstraint(f))
-
-#! Potential Optimization: Add a method for a `WrappedField` that wraps a lucent ParamFunc.
-function unpackFieldFunc(f::WrappedField{<:Number, D}) where {D}
-    fCore, paramSet = unpackFuncCore!(f.core.f.f)
-    TupleHeader(fCore, Val(D)), paramSet
-end
-
-
-const ParamGraphEncoder{F<:EvalParamGraph} = 
-      NamedMapEncode{Deref{F}, 1, Tuple{SpanSetFilter}}
-
-function ParamGraphEncoder(f::EvalParamGraph, sFilter::SpanSetFilter, sym::Symbol)
-    NamedMapEncode(Deref(f), sFilter, sym)
-end
-
-
-struct ParamExecutor{F<:Function, N, E<:NTuple{N, ParamGraphEncoder}} <: AbstractParamFunc
-    apply::EncodeParamApply{F, N, E}
-
-    function ParamExecutor(finalizer::F, 
-                              paramMappers::NTuple{N, EvalParamGraph}, 
-                              inputFilters::NTuple{N, SpanSetFilter}, 
-                              paramSymbols::NTuple{N, Symbol}) where {F<:Function, N}
-        paramEncoders = map(paramMappers, inputFilters, paramSymbols) do m, f, s
-            NamedMapEncode(m, f, s)
+    function EncodedField(core::ReturnTyped{T, F}, encode::TupleHeader{D, E}) where 
+                         {T<:Number, F<:Function, D, E<:Function}
+        if E <: FieldAmplitude
+            d = dimOf(encode.f)
+            (d == D) || throw(AssertionError("Cannot wrap a $d-dimensional field in $D "*
+                                             "dimension."))
+        else
+            checkArgQuantity(encode.f, 1)
         end
-        apply = EncodeParamApply(finalizer, paramEncoders, paramSymbols)
-        new{F, N, typeof(paramEncoders)}(apply)
+
+        if F <: FieldAmplitude
+            t = returnTypeOf(core.f)
+            (t <: T) || throw(AssertionError("Cannot convert the output type of `f.f` "*
+                                             "from `$t` to $T."))
+        else
+            checkArgQuantity(core.f, 1)
+        end
+
+        new{T, D, F, E}(core, encode)
     end
 end
 
-ParamExecutor(finalizer::Function, paramMapper::EvalParamGraph, 
-              inputFilter::SpanSetFilter, paramSymbol::Symbol) = 
-ParamExecutor(finalizer, (paramMapper,), (inputFilter,), (paramSymbol,))
+function EncodedField(core::ReturnTyped{T, F}, ::Val{D}) where {T, D, F<:Function}
+    EncodedField(core, TupleHeader( Val(D) ))
+end
 
-ParamExecutor(finalizer::Function) = ParamExecutor(finalizer, (), (), ())
+function EncodedField(core::FieldAmplitude{T}, dimInfo) where {T}
+    EncodedField(ReturnTyped(core, T), dimInfo)
+end
 
-(f::ParamExecutor)(input, params::AbstractSpanValueSet) = f.apply(input, params)
+needFieldAmpEvalCache(::EncodedField) = true
+
+function evalFieldAmplitudeCore(f::EncodedField{T, D, F, E}, input, 
+                                cache!Self::MultiSpanDataCacheBox) where 
+                               {T<:Number, D, F<:Function, E<:Function}
+    val = formatInput(TupleInput{Real, D}(), input)
+    for (caller, type) in zip((f.encode, f.core), (E, F))
+        val = if type <: FieldAmplitude
+            evalFieldAmplitude(caller.f, val; cache!Self)
+        else
+            caller(val)
+        end
+    end
+    convert(T, val)
+end
+
+function unpackFieldFunc(f::EncodedField{<:Number, D}) where {D}
+    paramSet = initializeSpanParamSet()
+    fCore = unpackFunc!(f.core, paramSet, Identifier(nothing))
+    fEncode = unpackFunc!(f.encode, paramSet, Identifier(nothing))
+    TupleHeader(ParamPipeline((fEncode, fCore)), Val(D)), paramSet
+end
 
 
-abstract type FieldAmpBuilder{T<:Number, D} <: CompositeFunction end
+const WrappedField{T, D, F<:Function} = EncodedField{T, D, F, ItsType}
 
-isCacheFieldBuilder(::FieldAmpBuilder) = false
 
-const NamedParamTuple{S, N, P<:NTuple{N, ParamBox}} = NamedTuple{S, P}
+const RadialField{T, D, F<:FieldAmplitude{T, 1}} = 
+      EncodedField{T, D, F, typeof(LinearAlgebra.norm)}
 
-struct CurriedField{T<:Number, D, F<:FieldAmpBuilder{T, D}, P<:NamedParamTuple
-                    } <: FieldAmplitude{T, D}
-    core::F
+RadialField{T, D}(radial::FieldAmplitude{T, 1}) where {T, D} = 
+EncodedField(radial, TupleHeader( LinearAlgebra.norm, Val(D) ))
+
+RadialField(radial::FieldAmplitude{T, 1}, ::Val{D}) where {T, D} = 
+RadialField{T, D}(radial)
+
+
+struct CurriedField{T<:Number, D, F<:Function, P<:NamedParamTuple} <: FieldAmplitude{T, D}
+    core::TypedTupleFunc{T, D, ParamFreeFunc{F}}
     param::P
 
-    function CurriedField(core::F, params::NamedTuple{S, P}=NamedTuple()) where {T, D, 
-                          F<:FieldAmpBuilder{T, D}, S, P<:NamedParamTuple}
-        isLucent(core) || throw("`core` must be a lucent function.")
+    function CurriedField(core::TypedTupleFunc{T, D, ParamFreeFunc{F}}, 
+                          params::P=NamedTuple()) where 
+                         {T<:Number, D, F<:Function, P<:NamedParamTuple}
+        checkArgQuantity(core.f.f.core, ifelse(isempty(params), 1, 2))
         new{T, D, F, P}(core, params)
     end
 end
 
-const EncodedField{T, D, F<:FieldAmpBuilder{T, D}} = CurriedField{T, D, F, @NamedTuple{}}
 
-function evalFieldAmplitude(f::CurriedField, input; 
-                            cache!Self::MultiSpanDataCacheBox=MultiSpanDataCacheBox(Number))
-    parValArg = f isa EncodedField ? () : (cacheParam!(cache!Self, f.param),)
-    cacheArg = isCacheFieldBuilder(f.core) ? (:cache!Self=>cache!Self,) : ()
-    f.core(input::getFieldConstraint(f), parValArg...; cacheArg...)
+const NullaryField{T<:Number, D, F<:Function} = CurriedField{T, D, F, @NamedTuple{}}
+
+needFieldAmpEvalCache(::NullaryField) = false
+
+function evalFieldAmplitudeCore(f::NullaryField, input)
+    f.core(formatInput(f, input))
+end
+
+function unpackFieldFunc(f::NullaryField{<:Number, D}) where {D}
+    TupleHeader(InputConverter(f.core.f.f), Val(D)), initializeSpanParamSet(nothing)
+end
+
+
+needFieldAmpEvalCache(::CurriedField) = true
+
+function evalFieldAmplitudeCore(f::CurriedField, input, cache!Self::MultiSpanDataCacheBox)
+    paramVals = cacheParam!(cache!Self, f.param)
+    f.core(formatInput(f, input), paramVals)
 end
 
 function unpackFieldFunc(f::CurriedField{<:Number, D}) where {D}
-    fCore, paramSet = unpackFieldFuncCore(f)
-    TupleHeader(fCore, Val(D)), paramSet
+    params = f.param
+
+    paramEncoder = if length(params) == 1
+        sym, par = (first∘pairs)(params)
+        encoder, paramSet = compressParam(par)
+        NamedMapper(encoder, sym)
+    else
+        paramSet = initializeSpanParamSet()
+        map(params) do param
+            encoder, inputSet = compressParam(param)
+            inputFilter = locateParam!(paramSet, inputSet)
+            encoder ∘ inputFilter
+        end |> NamedMapper
+    end
+    tagFilter = TaggedSpanSetFilter(paramEncoder, Identifier(nothing))
+    TupleHeader(EncodeParamApply(f.core.f.f, tagFilter), Val(D)), paramSet
 end
 
 
-struct GaussFuncBuilder{T<:Real} <: FieldAmpBuilder{T, 0} end
-
-function (::GaussFuncBuilder{T})(input::Real, params::@NamedTuple{xpn::T}) where {T<:Real}
+function computeGaussFunc((input,)::Tuple{Real}, 
+                          params::@NamedTuple{xpn::T}) where {T<:Real}
     exp(-params.xpn * input * input)
 end
 
 const GaussFunc{T<:Real, P<:UnitParam{T}} = 
-      CurriedField{T, 0, GaussFuncBuilder{T}, @NamedTuple{xpn::P}}
+      CurriedField{T, 1, typeof(computeGaussFunc), @NamedTuple{xpn::P}}
 
 function GaussFunc(xpn::UnitOrVal{T}) where {T<:Real}
-    CurriedField(GaussFuncBuilder{T}(), (xpn=UnitParamEncoder(T, :xpn, 1)(xpn),))
+    core = TypedTupleFunc(ParamFreeFunc(computeGaussFunc), T, Val(1))
+    CurriedField(core, (xpn=UnitParamEncoder(T, :xpn, 1)(xpn),))
 end
 
-const GaussFuncCore{T<:Function, F<:EvalParamGraph} = 
-      ParamExecutor{GaussFuncBuilder{T}, 1, Tuple{ ParamGraphEncoder{F} }}
-
-function unpackFieldFuncCore(f::GaussFunc{T, P}) where {T, P}
-    xpnCore, inputSet = compressParam(f.param.xpn)
-    paramSet = initializeSpanParamSet(T)
-    idxFilter = locateParam!(paramSet, inputSet)
-    fCore = ParamExecutor(GaussFuncBuilder{T}(), xpnCore, idxFilter, :xpn)
-    fCore::GaussFuncCore{T}, paramSet
-end
+const GaussFuncCore{T<:Real, F<:ComputeGraph{T}} = 
+      TupleHeader{1, EncodeParamApply{ typeof(computeGaussFunc), ItsType, 
+                                          MonoNMapper{Base.ComposedFunction{F}} }}
 
 
-struct AxialProdFuncBuilder{T, D, B<:NTuple{D, FieldAmplitude{T, 0}}
-                            } <: FieldAmpBuilder{T, D}
-    axis::B
+struct ProductField{T, D, B<:NonEmptyTuple{ FieldAmplitude{T} }} <: FieldAmplitude{T, D}
+    basis::B
 
-    function AxialProdFuncBuilder(axes::NonEmptyTuple{FieldAmplitude{T, 0}, D}) where {T, D}
-        new{T, D+1, typeof(axes)}(axes)
+    function ProductField(bases::B) where {T, B<:NonEmptyTuple{ FieldAmplitude{T} }}
+        new{T, mapreduce(dimOf, +, bases), B}(bases)
     end
 end
 
-function (f::AxialProdFuncBuilder{T, D})(input::NTuple{D, Real}; 
-                                         cache!Self::MultiSpanDataCacheBox=
-                                                     MultiSpanDataCacheBox(Number)
-                                         ) where {T<:Real, D}
-    mapreduce(StableMul(T), f.axis) do fAxial
-        evalFieldAmplitude(fAxial, input; cache!Self)
+ProductField(basis::Tuple{FieldAmplitude}) = first(basis)
+
+function evalFieldAmplitude(f::ProductField{T}, input; 
+                            cache!Self::MultiSpanDataCacheBox=MultiSpanDataCacheBox(Number), 
+                            ) where {T}
+    idx = firstindex(input)
+    mapreduce(StableMul(T), f.basis) do basis
+        iStart = idx
+        idx += dimOf(basis)
+        evalFieldAmplitude(basis, input[iStart:idx-1]; cache!Self)
     end
 end
 
-isCacheFieldBuilder(::AxialProdFuncBuilder) = true
+function unpackFieldFunc(f::ProductField{T, D}) where {T<:Number, D}
+    paramSet = initializeSpanParamSet()
 
-const AxialProdFunc{T<:Number, D, B<:NTuple{D, FieldAmplitude{T, 0}}} = 
-      EncodedField{T, D, AxialProdFuncBuilder{T, D, B}}
-
-AxialProdFunc(compos::NonEmptyTuple{FieldAmplitude{T, 0}}) where {T} = 
-(CurriedField∘AxialProdFuncBuilder)(compos)
-
-const AxialFuncCore{T, F<:FieldParamFunc{T, 0}} = 
-      ParamPipeline{Tuple{ParamFreeFunc{GetIndex{OneToIndex}}, F}}
-
-const AxialProdFuncCore{T<:Number, D, C<:NTuple{ D, AxialFuncCore{T} }} = 
-      ParamCombiner{StableMul{T}, C}
-
-function unpackFieldFuncCore(f::AxialProdFunc{T, D}) where {T, D}
-    paramSet = initializeSpanParamSet(T)
-
-    idx = 0
-    fAxialCores = map(f.axis) do fAxial
-        idx += 1
-        fAxialCore = unpackFunc!(fAxial, paramSet, Identifier(nothing)) |> first
-        ParamPipeline((ParamFreeFunc(GetIndex{OnrToIndex}(idx)), fAxialCore))
+    idx = 1
+    basisCores = map(f.basis) do basis
+        iStart = idx
+        basisDim = dimOf(basis)
+        idx += basisDim
+        getSubIdx = basisDim==1 ? GetIndex{OneToIndex}(idx-1) : GetRange(iStart, idx-1)
+        basisCore = unpackFunc!(basis, paramSet, Identifier(nothing))
+        ParamPipeline((InputConverter(getSubIdx), basisCore))
     end
 
-    ParamCombiner(StableMul(T), fAxialCores)::AxialProdFuncCore{T, D}, paramSet
+    TupleHeader(ParamCombiner(StableMul(T), basisCores), Val(D)), paramSet
 end
 
 
-struct PolyRadialFuncBuilder{T<:Number, D, B<:FieldAmplitude{T, 0}, 
-                             L} <: FieldAmpBuilder{T, D}
-    radial::B
-    angular::CartSHarmonics{D, L}
+const AxialProduct{T<:Number, D, B<:NTuple{D, FieldAmplitude{T, 1}}} = ProductField{T, D, B}
+
+AxialProduct(bases::NonEmptyTuple{FieldAmplitude{T, 1}}) where {T} = ProductField(bases)
+
+function AxialProduct(basis::FieldAmplitude{T, 1}, dim::Int) where {T}
+    checkPositivity(dim)
+    ProductField(ntuple(_->basis, dim))
 end
 
-function (f::PolyRadialFuncBuilder{T, D})(input::NTuple{D, Real}) where {T<:Number, D}
-    f.radial(LinearAlgebra.norm(input)) * f.angular(input)
+
+struct CoupledField{T, D, L<:FieldAmplitude{T, D}, R<:FieldAmplitude{T, D}, 
+                    F<:Function} <: FieldAmplitude{T, D}
+    pair::Tuple{L, R}
+    coupler::ParamFreeFunc{F}
+
+    function CoupledField(pair::Tuple{L, R}, coupler::Function) where 
+                         {T, D, L<:FieldAmplitude{T, D}, R<:FieldAmplitude{T, D}}
+        checkArgQuantity(coupler, 2)
+        coupler = ParamFreeFunc(coupler)
+        new{T, D, L, R, typeof(coupler.core)}(pair, coupler)
+    end
 end
 
-const PolyRadialFunc{T, D, B<:FieldAmplitude{T, 0}, L} = 
-      EncodedField{T, D, PolyRadialFuncBuilder{T, D, B, L}}
-
-function PolyRadialFunc(radial::FieldAmplitude{T, 0}, angular::NonEmptyTuple{Int}) where {T}
-    builder = PolyRadialFuncBuilder(radial, CartSHarmonics(angular))
-    CurriedField(builder)
+function evalFieldAmplitude(f::CoupledField, input; 
+                            cache!Self::MultiSpanDataCacheBox=MultiSpanDataCacheBox(Number))
+    map(f.pair) do basis
+        evalFieldAmplitude(basis, input; cache!Self)
+    end |> Base.Splat(f.coupler)
 end
 
-const RadialFuncCore{F<:AbstractParamFunc} = 
-      ParamPipeline{Tuple{ ParamFreeFunc{typeof(LinearAlgebra.norm)}, TupleHeader{0, F} }}
-
-const PolyRadialFuncCore{T<:Number, D, L, F<:AbstractParamFunc} = 
-      ParamCombiner{StableMul{T}, 
-                    Tuple{ RadialFuncCore{F}, ParamFreeFunc{CartSHarmonics{D, L}} }}
-
-function unpackFieldFuncCore(f::PolyRadialFunc{T, D}) where {T, D}
-    radialCore, paramSet = unpackFieldFunc(f.core.radial)
-    binaryOp = StableMul(promote_type(T, Real))
-    radial = ParamPipeline((ParamFreeFunc(LinearAlgebra.norm), radialCore))
-    fCore = ParamCombiner(binaryOp, ( radial, ParamFreeFunc(f.angular) ))
-    fCore::PolyRadialFuncCore{T, D}, paramSet
+function unpackFieldFunc(f::CoupledField{<:Number, D}) where {D}
+    fL, fR = f.pair
+    paramSet = initializeSpanParamSet()
+    fCoreL = unpackFunc!(fL, paramSet, Identifier(nothing))
+    fCoreR = unpackFunc!(fR, paramSet, Identifier(nothing))
+    TupleHeader(ParamCombiner(f.coupler, (fCoreL, fCoreR)), Val(D)), paramSet
 end
+
+
+const PolyRadialFunc{T, D, B<:RadialField{T, D}, L} = 
+      CoupledField{T, D, B, NullaryField{T, D, CartSHarmonics{D, L}}, StableMul{T}}
+
+function PolyRadialFunc(radial::FieldAmplitude{T, 1}, 
+                        angular::NonEmptyTuple{Int, D}) where {T, D}
+    DimType = Val(D + 1)
+    radialCore = RadialField(radial, DimType)
+    polyCore = TypedTupleFunc((ParamFreeFunc∘CartSHarmonics)(angular), T, DimType)
+    CoupledField((radialCore, CurriedField(polyCore)), StableMul(T))
+end
+
+const PolyRadialFuncCore{T<:Number, D, L, F<:Function} = 
+      TupleHeader{D, ParamCombiner{ StableMul{T}, 
+                                       Tuple{F, TupleHeader{ D, 
+                                                                CartSHarmonics{D, L} }} }}
 
 
 const PolyGaussProd{T, D, L} = PolyRadialFunc{T, D, <:GaussFunc{T}, L}
 
-const EvalGaussFunc{T, C<:GaussFuncCore{T}} = FieldParamFunc{T, 0, C}
+const EvalGaussFunc{T, C<:GaussFuncCore{T}} = FieldParamFunc{T, 1, C}
 
-const EvalPolyRadialFunc{T, D, L, C<:AbstractParamFunc} = 
+const EvalPolyRadialFunc{T, D, L, C} = 
       FieldParamFunc{T, D, PolyRadialFuncCore{T, D, L, C}}
 
 const EvalPolyGaussProd{T, D, L, C<:GaussFuncCore{T}} = EvalPolyRadialFunc{T, D, L, C}
