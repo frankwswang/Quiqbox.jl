@@ -321,43 +321,30 @@ InputLimiter(f::InputLimiter, ::Val{N}) where {N} = InputLimiter(f.f, Val(N))
 (f::InputLimiter{N})(arg::Vararg{Any, N}) where {N} = f.f(arg...)
 
 
-struct NamedMapEncode{F<:Function, N, E<:NTuple{N, Function}} <: Mapper
+struct NamedMapper{N, E<:NTuple{N, Function}} <: Mapper
     encode::E
     symbol::NTuple{N, Symbol}
-    finalizer::F
 
-    NamedMapEncode(encode::E, syms::NTuple{N, Symbol}) where {N, E<:NTuple{N, Function}} = 
-    new{N, E, ItsType}(finalizer, encode, syms)
-
-    NamedMapEncode(finalizer::F, encode::E, syms::NTuple{N, Symbol}) where 
-                  {N, E<:NTuple{N, Function}, F<:Function} = 
-    new{N, E, F}(finalizer, encode, syms)
+    NamedMapper(encode::E, syms::NTuple{N, Symbol}) where {N, E<:NTuple{N, Function}} = 
+    new{N, E}(encode, syms)
 end
 
-NamedMapEncode(finalizer::Function, encode::Function, sym::Symbol) = 
-NamedMapEncode(finalizer, (encode,), (sym,))
+NamedMapper(encode::Function, sym::Symbol) = 
+NamedMapper((encode,), (sym,))
 
-NamedMapEncode(encode::Function, sym::Symbol) = 
-NamedMapEncode((encode,), (sym,))
+NamedMapper(encodePairs::NamedTuple{S, <:Tuple{ Vararg{Function} }}) where {S} = 
+NamedMapper(values(encodePairs), S)
 
-NamedMapEncode(finalizer::Function, 
-               encodePairs::NamedTuple{S, <:Tuple{ Vararg{Function} }}) where {S} = 
-NamedMapEncode(finalizer, values(encodePairs), S)
+NamedMapper() = NamedMapper((), ())
 
-NamedMapEncode(encodePairs::NamedTuple{S, <:Tuple{ Vararg{Function} }}) where {S} = 
-NamedMapEncode(values(encodePairs), S)
+const MonoNMapper{F<:Function} = NamedMapper{1, Tuple{F}}
 
-NamedMapEncode(f::Function=itself) = NamedMapEncode(f, (), ())
-
-const EmptyMapEncode{F<:Function} = NamedMapEncode{F, 0, Tuple{}}
-
-function (f::NamedMapEncode)(arg, args...)
+function getField(obj, f::NamedMapper)
     map(f.encode) do encoder
-        encoder(arg, args...)
-    end |> NamedTuple{f.symbol} |> f.finalizer
+        encoder(obj)
+    end |> NamedTuple{f.symbol}
 end
 
-(f::EmptyMapEncode)(arg, args...) = f.finalizer(arg, args...)
 
 
 const EncodeParamApply{F<:Function, N, E<:NTuple{ N, OnlyBody{<:Encoder} }} = 
