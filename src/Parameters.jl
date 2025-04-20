@@ -1346,12 +1346,26 @@ end
 #= Additional Method =#
 getOpacity(::ParamBindFunc) = Opaque()
 
+function getOpacity(f::F) where {F<:AbstractParamFunc}
+    if !Base.issingletontype(F)
+        fields = fieldnames(T)
+        for fieldSym in fields
+            field = getField(f, fieldSym)
+            if getOpacity(field) isa Opaque
+                return Opaque()
+            end
+        end
+    end
+
+    Lucent()
+end
+
 
 # f(input) => fCore(input, param)
 function unpackFunc(f::Function)
     checkArgQuantity(f, 1)
 
-    if !isLucent(f)
+    if !(getOpacity(f) isa Lucent)
         f = deepcopy(f)
         source = getSourceParamSet(f)
 
@@ -1363,13 +1377,13 @@ function unpackFunc(f::Function)
         end
     end
 
-    ParamFreeFunc(f), initializeSpanParamSet(Union{})
+    InputConverter(f), initializeSpanParamSet(Union{})
 end
 
 function unpackFunc!(f::Function, paramSet::AbstractSpanParamSet, 
                      paramSetId::Identifier=Identifier(paramSet))
     fCore, localParamSet = unpackFunc(f)
     idxFilter = locateParam!(paramSet, localParamSet)
-    scope = TaggedSpanSetFilter(idxFilter, paramSetId)
-    EncodeParamApply(fCore, scope), paramSet
+    tagFilter = TaggedSpanSetFilter(idxFilter, paramSetId)
+    EncodeParamApply(fCore, tagFilter)
 end
