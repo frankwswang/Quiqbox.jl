@@ -900,7 +900,7 @@ function dissectParamCore(pars::ParamBoxAbtArr)
 end
 
 dissectParam(params::ParamBoxAbtArr) = (dissectParamCore∘unique)(BlackBox, params)
-dissectParam(source::Any) = (dissectParamCore∘uniqueParams)(source, onlyPrimitive=false)
+dissectParam(source::Any) = (dissectParamCore∘uniqueParams)(source)
 dissectParam(source::ParamBox) = dissectParamCore(source|>fill)
 
 
@@ -1017,6 +1017,8 @@ initializeSpanParamSet() = (unit=UnitParam[], grid=GridParam[])
 
 initializeSpanParamSet(::Type{T}) where {T} = (unit=UnitParam{T}[], grid=GridParam{T}[])
 
+initializeSpanParamSet(::Nothing) = (unit=genBottomMemory(), grid=genBottomMemory())
+
 initializeSpanParamSet(units::AbstractVector{<:UnitParam}, 
                        grids::AbstractVector{<:GridParam}) = (unit=units, grid=grids)
 
@@ -1117,36 +1119,11 @@ function cacheParam!(cache::MultiSpanDataCacheBox, params::ParamBoxSource)
     end
 end
 
+const NamedParamTuple{S, N, P<:NTuple{N, ParamBox}} = NamedTuple{S, P}
 
-# Methods for parameterized functions
-function evalFunc(func::F, input) where {F<:Function}
-    fCore, pSet, _ = unpackFunc(func)
-    evalFunc(fCore, pSet, input)
+function cacheParam!(cache::MultiSpanDataCacheBox, params::NamedParamTuple)
+    cacheParam!(cache, values(params)) |> NamedTuple{params|>keys}
 end
-
-
-# # Methods for parameterized functions
-# function evalFunc(func::F, input) where {F<:Function}
-#     fCore, pSet, _ = unpackFunc(func)
-#     evalFunc(fCore, pSet, input)
-# end
-
-# function evalFunc(fCore::F, pSet, input) where {F<:Function}
-#     fCore(input, map(obtain, pSet))
-# end
-
-# #! Possibly adding memoization in the future to generate/use the same param set to avoid 
-# #! bloating `Quiqbox.IdentifierCache` and prevent repeated computation.
-# unpackFunc(f::F) where {F<:Function} = unpackFunc!(f, initializeSpanParamSet())
-
-unpackFunc!(f::F, paramSet::AbstractSpanParamSet) where {F<:Function} = 
-unpackFunc!(SelectTrait{ParameterizationStyle}()(f), f, paramSet)
-
-unpackFunc!(::TypedParamFunc, f::Function, paramSet::AbstractSpanParamSet) = 
-unpackParamFunc!(f, paramSet)
-
-unpackFunc!(::GenericFunction, f::Function, paramSet::AbstractSpanParamSet) = 
-unpackTypedFunc!(f, paramSet)
 
 
 struct SpanSetFilter <: Mapper
