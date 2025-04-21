@@ -567,6 +567,9 @@ function getOutputType(::Type{<:HeapParam{T, E, N}}) where {T, E<:Pack{T}, N}
 end
 
 const ParamEgalBox = EgalBox{ParamBox}
+const UnitParamEgalBox = EgalBox{UnitParam}
+const GridParamEgalBox = EgalBox{GridParam}
+const NestParamEgalBox = EgalBox{NestParam}
 
 function hasCycleCore!(::Set{ParamEgalBox}, ::Set{ParamEgalBox}, 
                        edge::Pair{<:PrimitiveParam, <:NothingOr{ParamBox}}, 
@@ -1074,28 +1077,38 @@ function locateParam!(params::AbstractSpanParamSet, subset::AbstractSpanParamSet
 end
 
 
-const MultiSpanData{T} = Union{T, DirectMemory{T}, NestedMemory{T}}
+const MultiSpanData{T} = Union{T, DirectMemory{<:T}, NestedMemory{<:T}}
 
-struct MultiSpanDataCacheBox{T} <: QueryBox{MultiSpanData{T}}
-    unit::Dict{Identifier, T}
-    grid::Dict{Identifier, DirectMemory{T}}
-    nest::Dict{Identifier, NestedMemory{T}}
+struct MultiSpanDataCacheBox{T, G<:DirectMemory{<:T}, N<:NestedMemory{<:T}
+                             } <: QueryBox{MultiSpanData{T}}
+    unit::LRU{UnitParamEgalBox, T}
+    grid::LRU{GridParamEgalBox, G}
+    nest::LRU{NestParamEgalBox, N}
+
+    function MultiSpanDataCacheBox(::Type{T}=Any; maxSize::Int=100) where {T}
+        maxsize = maxSize
+        unitSec = LRU{Identifier, T}(; maxsize)
+        G, N = if isconcretetype(T)
+            DirectMemory{T},   NestedMemory{T}
+        else
+            DirectMemory{<:T}, NestedMemory{<:T}
+        end
+        new{T, G, N}(unitSec, LRU{Identifier, G}(; maxsize), LRU{Identifier, N}(; maxsize))
+    end
 end
 
-MultiSpanDataCacheBox(::Type{T}=Any) where {T} = 
-MultiSpanDataCacheBox(Dict{Identifier, T}(), 
-                      Dict{Identifier, DirectMemory{T}}(), 
-                      Dict{Identifier, NestedMemory{T}}())
 
+getSpanDataSectorKey(cache::MultiSpanDataCacheBox{T1}, param::UnitParam{T2}) where 
+                    {T1, T2<:T1} = 
+(cache.unit, UnitParamEgalBox(param))
 
-getSpanDataSector(cache::MultiSpanDataCacheBox{T1}, 
-                  ::UnitParam{T2}) where {T1, T2<:T1} = cache.unit
+getSpanDataSectorKey(cache::MultiSpanDataCacheBox{T1}, param::GridParam{T2}) where 
+                    {T1, T2<:T1} = 
+(cache.grid, GridParamEgalBox(param))
 
-getSpanDataSector(cache::MultiSpanDataCacheBox{T1}, 
-                  ::GridParam{T2}) where {T1, T2<:T1} = cache.grid
-
-getSpanDataSector(cache::MultiSpanDataCacheBox{T1}, 
-                  ::NestParam{T2}) where {T1, T2<:T1} = cache.nest
+getSpanDataSectorKey(cache::MultiSpanDataCacheBox{T1}, param::NestParam{T2}) where 
+                    {T1, T2<:T1} = 
+(cache.nest, BestParamEgalBox(param))
 
 
 formatSpanData(::Type{T}, val) where {T} = T(val)
@@ -1107,7 +1120,7 @@ end
 
 
 function cacheParam!(cache::MultiSpanDataCacheBox{T}, param::ParamBox{<:T}) where {T}
-    get!(getSpanDataSector(cache, param), Identifier(param)) do
+    get!(getSpanDataSectorKey(cache, param)...) do
         formatSpanData(T, obtain(param))
     end::getOutputType(param)
 end
