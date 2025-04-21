@@ -166,13 +166,15 @@ iterate(::TypedEmptyDict, state::Int) = nothing
 iterate(d::FiniteDict) = iterate(d, 1)
 
 
-struct BlackBox <: QueryBox{Any}
-    value::Any
+struct EgalBox{T} <: QueryBox{T}
+    value::T
 end
 
-==(bb1::BlackBox, bb2::BlackBox) = (bb1.value === bb2.value)
+const BlackBox = EgalBox{Any}
 
-hash(bb::BlackBox, hashCode::UInt) = hash(objectid(bb.value), hashCode)
+==(bb1::EgalBox, bb2::EgalBox) = (bb1.value === bb2.value)
+
+hash(bb::EgalBox, hashCode::UInt) = hash(objectid(bb.value), hashCode)
 
 
 function canDirectlyStoreInstanceOf(::Type{T}) where {T}
