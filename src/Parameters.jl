@@ -566,21 +566,22 @@ function getOutputType(::Type{<:HeapParam{T, E, N}}) where {T, E<:Pack{T}, N}
     end
 end
 
+const ParamEgalBox = EgalBox{ParamBox}
 
-function hasCycleCore!(::Set{BlackBox}, ::Set{BlackBox}, 
+function hasCycleCore!(::Set{ParamEgalBox}, ::Set{ParamEgalBox}, 
                        edge::Pair{<:PrimitiveParam, <:NothingOr{ParamBox}}, 
                        ::Bool, finalizer::F=itself) where {F<:Function}
     finalizer(edge)
     (false, edge.first)
 end
 
-function hasCycleCore!(localTrace::Set{BlackBox}, history::Set{BlackBox}, 
+function hasCycleCore!(localTrace::Set{ParamEgalBox}, history::Set{ParamEgalBox}, 
                        edge::Pair{<:CompositeParam, <:NothingOr{ParamBox}}, 
                        strictMode::Bool, finalizer::F=itself) where {F<:Function}
     here = edge.first
 
     if strictMode || screenLevelOf(here) == 0
-        key = BlackBox(here)
+        key = ParamEgalBox(here)
         if key in localTrace
             return (true, here)
         end
@@ -606,27 +607,27 @@ end
 
 function hasCycle(param::ParamBox; strictMode::Bool=true, finalizer::Function=itself, 
                   catcher::Array{ParamBox, 0}=Array{ParamBox, 0}( undef, () ))
-    localTrace = Set{BlackBox}()
-    parHistory = Set{BlackBox}()
+    localTrace = Set{ParamEgalBox}()
+    parHistory = Set{ParamEgalBox}()
     bl, lastP = hasCycleCore!(localTrace, parHistory, param=>nothing, strictMode, finalizer)
     catcher[] = lastP
     bl
 end
 
 
-function obtainCore!(cache::LRU{BlackBox, <:Any}, param::PrimitiveParam)
+function obtainCore!(cache::LRU{ParamEgalBox}, param::PrimitiveParam)
     input = param.input
-    get!(cache, BlackBox(param), decoupledCopy(input))::typeof(input)
+    get!(cache, ParamEgalBox(param), decoupledCopy(input))::typeof(input)
 end
 
-function obtainCore!(cache::LRU{BlackBox, <:Any}, param::ShapedParam)
+function obtainCore!(cache::LRU{ParamEgalBox}, param::ShapedParam)
     map(param.input) do p
         obtainCore!(cache, p)
     end::getOutputType(param)
 end
 
-function obtainCore!(cache::LRU{BlackBox, <:Any}, param::AdaptableParam)
-    key = BlackBox(param)
+function obtainCore!(cache::LRU{ParamEgalBox}, param::AdaptableParam)
+    key = ParamEgalBox(param)
     get!(cache, key) do
         if screenLevelOf(param) > 0
             decoupledCopy(param.offset)
@@ -648,7 +649,7 @@ end
 
 function obtain(param::CompositeParam)
     checkParamCycle(param)
-    cache = LRU{BlackBox, Any}(maxsize=100)
+    cache = LRU{ParamEgalBox, Any}(maxsize=100)
     obtainCore!(cache, param)
 end
 
@@ -658,7 +659,7 @@ function obtain(params::ParamBoxAbtArr)
     if isempty(params)
         Union{}[]
     else
-        cache = LRU{BlackBox, Any}(maxsize=min( 500, 100length(params) ))
+        cache = LRU{ParamEgalBox, Any}(maxsize=min( 500, 100length(params) ))
         map(params) do param
             checkParamCycle(param)
             obtainCore!(cache, param)
@@ -761,7 +762,7 @@ compareParamBox(::ParamBox, ::ParamBox) = false
 
 
 function uniqueParamsCore!(source::ParamBoxAbtArr)
-    unique!(BlackBox, source)
+    unique!(ParamEgalBox, source)
     source
 end
 
@@ -899,7 +900,7 @@ function dissectParamCore(pars::ParamBoxAbtArr)
     (source=source, hidden=hidden, output=output, direct=direct)
 end
 
-dissectParam(params::ParamBoxAbtArr) = (dissectParamCore∘unique)(BlackBox, params)
+dissectParam(params::ParamBoxAbtArr) = (dissectParamCore∘unique)(ParamEgalBox, params)
 dissectParam(source::Any) = (dissectParamCore∘uniqueParams)(source)
 dissectParam(source::ParamBox) = dissectParamCore(source|>fill)
 
@@ -995,6 +996,9 @@ const AbstractSpanParamSet{U<:AbstractVector{<:UnitParam}, G<:AbstractVector{<:G
 const TypedSpanParamSet{T1<:UnitParam, T2<:GridParam} = 
       AbstractSpanParamSet{Vector{T1}, Vector{T2}}
 
+const FixedSpanParamSet{T1<:UnitParam, T2<:GridParam} = 
+      AbstractSpanParamSet{Memory{T1}, Memory{T2}}
+
 struct UnitInput end
 struct GridInput end
 struct SpanInput end
@@ -1049,7 +1053,12 @@ function locateParam!(paramSet::AbstractSpanParamSet, target::GridParam)
     GetIndex{GridIndex}(locateParamCore!(paramSet.grid, target))
 end
 
-const ParamBoxSource = Union{ParamBoxAbtArr, Tuple{Vararg{ParamBox}}, AbstractSpanParamSet}
+const NamedParamTuple{S, N, P<:NTuple{N, ParamBox}} = NamedTuple{S, P}
+
+const SpanParamNamedTuple{S, N, P<:NTuple{N, SpanParam}} = NamedParamTuple{S, N, P}
+
+const ParamBoxSource = Union{ParamBoxAbtArr, Tuple{Vararg{ParamBox}}, NamedParamTuple, 
+                             AbstractSpanParamSet}
 
 function locateParam!(params::Union{AbstractSpanParamSet, AbstractVector}, 
                       subset::ParamBoxSource)
@@ -1119,11 +1128,9 @@ function cacheParam!(cache::MultiSpanDataCacheBox, params::ParamBoxSource)
     end
 end
 
-const NamedParamTuple{S, N, P<:NTuple{N, ParamBox}} = NamedTuple{S, P}
-
-function cacheParam!(cache::MultiSpanDataCacheBox, params::NamedParamTuple)
-    cacheParam!(cache, values(params)) |> NamedTuple{params|>keys}
-end
+# function cacheParam!(cache::MultiSpanDataCacheBox, params::NamedParamTuple)
+#     cacheParam!(cache, values(params)) |> NamedTuple{params|>keys}
+# end
 
 
 struct SpanSetFilter <: Mapper
@@ -1148,6 +1155,7 @@ function SpanSetFilter(unit::AbstractVector{OneToIndex}, grid::AbstractVector{On
     SpanSetFilter((;unit, grid))
 end
 
+#= Additional Method =#
 function getField(paramSet::AbstractSpanSet, sFilter::SpanSetFilter)
     firstIds = map(firstindex, paramSet)
     map(paramSet, firstIds, sFilter.scope) do sector, i, oneToIds
@@ -1266,9 +1274,9 @@ ParamCombiner(binder, getMemory(encode))
 (f::ParamCombiner)(input, params::AbstractSpanValueSet) = 
 mapreduce(o->o(input, params), f.binder, f.encode)
 
-const ParamExtender{C<:LinearMemory{<:AbstractParamFunc}} = ParamCombiner{typeof(vcat), C}
+const ParamApplyExtend{C<:ParamFuncSequence} = ParamCombiner{typeof(vcat), C}
 
-(f::ParamExtender)(input, params::AbstractSpanValueSet) = 
+(f::ParamApplyExtend)(input, params::AbstractSpanValueSet) = 
 map(o->o(input, params), f.encode)
 
 
@@ -1285,9 +1293,6 @@ end
 function EncodeParamApply(binder::Function, formatter::TaggedSpanSetFilter)
     EncodeParamApply(binder, itself, formatter)
 end
-
-const StableParamMul{T, FL<:AbstractParamFunc, FR<:AbstractParamFunc} = 
-      ParamCombiner{StableMul{T}, Tuple{FL, FR}}
 
 
 struct ParamPipeline{C<:ParamFuncSequence} <: AbstractParamFunc
