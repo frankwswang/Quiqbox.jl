@@ -1073,7 +1073,7 @@ struct MultiSpanDataCacheBox{T} <: QueryBox{MultiSpanData{T}}
     nest::Dict{Identifier, NestedMemory{T}}
 end
 
-MultiSpanDataCacheBox(::Type{T}) where {T} = 
+MultiSpanDataCacheBox(::Type{T}=Any) where {T} = 
 MultiSpanDataCacheBox(Dict{Identifier, T}(), 
                       Dict{Identifier, DirectMemory{T}}(), 
                       Dict{Identifier, NestedMemory{T}}())
@@ -1100,7 +1100,7 @@ end
 function cacheParam!(cache::MultiSpanDataCacheBox{T}, param::ParamBox{<:T}) where {T}
     get!(getSpanDataSector(cache, param), Identifier(param)) do
         formatSpanData(T, obtain(param))
-    end
+    end::getOutputType(param)
 end
 
 # getParamCacheType(::Type{<:UnitParam{T}}) where {T} = T
@@ -1167,24 +1167,6 @@ function getField(sFilterPrev::SpanSetFilter, sFilterHere::SpanSetFilter)
 end
 
 
-# const ParamPointerDict = AbstractDict{<:ChainedAccess, <:GetIndex}
-# const ParamPointerPairs = AbstractVector{<:Pair{<:ChainedAccess, <:GetIndex}}
-# const FieldParamPairSet{P1<:ParamPointerPairs, P2<:ParamPointerPairs} = 
-#       AbstractSpanSet{P1, P2}
-
-# #! DirectFieldParamPointer
-# struct MixedFieldParamPointer{R1<:ParamPointerDict, R2<:ParamPointerDict
-#                               } <: FieldParamPointer
-#     unit::R1
-#     grid::R2
-#     tag::Identifier
-# end
-
-# function MixedFieldParamPointer(paramPairs::FieldParamPairSet, tag::Identifier)
-#     coreDict = map(buildDict, paramPairs)
-#     MixedFieldParamPointer(coreDict.unit, coreDict.grid, tag)
-# end
-
 const NamedFilter = Union{SpanSetFilter, NamedMapper}
 
 struct TaggedSpanSetFilter{F<:NamedFilter} <: Mapper
@@ -1200,6 +1182,7 @@ getField(obj, tsFilter::TaggedSpanSetFilter) = getField(obj, tsFilter.scope)
 
 
 abstract type AbstractParamFunc <: CompositeFunction end
+
 
 const TypedParamFunc{T, F<:AbstractParamFunc} = ReturnTyped{T, F}
 
@@ -1302,6 +1285,9 @@ end
 function EncodeParamApply(binder::Function, formatter::TaggedSpanSetFilter)
     EncodeParamApply(binder, itself, formatter)
 end
+
+const StableParamMul{T, FL<:AbstractParamFunc, FR<:AbstractParamFunc} = 
+      ParamCombiner{StableMul{T}, Tuple{FL, FR}}
 
 
 struct ParamPipeline{C<:ParamFuncSequence} <: AbstractParamFunc
