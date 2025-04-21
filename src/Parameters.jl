@@ -1357,3 +1357,17 @@ function unpackFunc!(f::Function, paramSet::AbstractSpanParamSet,
     tagFilter = TaggedSpanSetFilter(idxFilter, paramSetId)
     EncodeParamApply(fCore, tagFilter)
 end
+
+
+const FilterComputeGraph{G<:ComputeGraph} = Base.ComposedFunction{G, SpanSetFilter}
+
+const ParamMapper{N, E<:NTuple{N, FilterComputeGraph}} = NamedMapper{N, E}
+
+function ParamMapper(params::NamedParamTuple; paramSet!Self=initializeSpanParamSet())
+    mapper = map(params) do param
+        encoder, inputSet = compressParam(param)
+        inputFilter = locateParam!(paramSet!Self, inputSet)
+        encoder ∘ inputFilter
+    end |> NamedMapper
+    mapper, paramSet!Self
+end

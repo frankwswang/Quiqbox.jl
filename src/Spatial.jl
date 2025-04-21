@@ -172,7 +172,7 @@ function unpackFieldFunc(f::CurriedField{<:Number, D}) where {D}
         encoder, paramSet = compressParam(par)
         NamedMapper(encoder, sym)
     else
-        encoder, paramSet = compressParams(params)
+        encoder, paramSet = ParamMapper(params)
         encoder
     end
     tagFilter = TaggedSpanSetFilter(paramEncoder, Identifier(nothing))

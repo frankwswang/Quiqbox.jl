@@ -595,13 +595,3 @@ function compressParam(param::ParamBox)
     paramGraph = genParamGraph(param)
     compressGraph(paramGraph), paramGraph.origin
 end
-
-function compressParams(params::NamedParamTuple)
-    paramSet = initializeSpanParamSet()
-    mapper = map(params) do param
-        encoder, inputSet = compressParam(param)
-        inputFilter = locateParam!(paramSet, inputSet)
-        encoder ∘ inputFilter
-    end |> NamedMapper
-    mapper, paramSet
-end
