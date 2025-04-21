@@ -2,18 +2,24 @@ export EncodedField, GaussFunc, AxialProduct, PolyRadialFunc
 
 using LinearAlgebra
 
-(::SelectTrait{InputStyle})(::FieldAmplitude{<:Any, N}) where {N} = TupleInput{Real, N}()
+(::SelectTrait{InputStyle})(::FieldAmplitude{<:Any, D}) where {D} = TupleInput{Real, D}()
 
 
-dimOf(::FieldAmplitude{<:Any, N}) where {N} = N
+getOutputType(::FieldAmplitude{T}) where {T} = T
 
-returnTypeOf(::FieldAmplitude{T}) where {T} = T
+
+getDimension(::FieldAmplitude{<:Any, D}) where {D} = D
+
+
+initializeFieldCache(::FieldAmplitude) = MultiSpanDataCacheBox(Any)
+
+initializeFieldCache(::GaussFunc{T}) where {T} = MultiSpanDataCacheBox(T)
 
 
 needFieldAmpEvalCache(::FieldAmplitude) = true
 
 function evalFieldAmplitude(f::FieldAmplitude, input; 
-                            cache!Self::MultiSpanDataCacheBox=MultiSpanDataCacheBox(Number))
+                            cache!Self::MultiSpanDataCacheBox=initializeFieldCache(f))
     formattedInput = formatInput(f, input)
     if needFieldAmpEvalCache(f)
         evalFieldAmplitudeCore(f, formattedInput, cache!Self)
@@ -22,7 +28,7 @@ function evalFieldAmplitude(f::FieldAmplitude, input;
     end
 end
 
-(f::FieldAmplitude)(input) = evalFieldAmplitude(f, input)
+(f::FieldAmplitude)(input) = evalFieldAmplitude(f, formatInput(f, input))
 
 
 struct FieldParamFunc{T<:Number, D, F<:AbstractParamFunc} <: AbstractParamFunc
@@ -61,7 +67,7 @@ struct EncodedField{T<:Number, D, F<:Function, E<:Function} <: FieldAmplitude{T,
     function EncodedField(core::ReturnTyped{T, F}, encode::TupleHeader{D, E}) where 
                          {T<:Number, F<:Function, D, E<:Function}
         if E <: FieldAmplitude
-            d = dimOf(encode.f)
+            d = getDimension(encode.f)
             (d == D) || throw(AssertionError("Cannot wrap a $d-dimensional field in $D "*
                                              "dimension."))
         else
@@ -69,7 +75,7 @@ struct EncodedField{T<:Number, D, F<:Function, E<:Function} <: FieldAmplitude{T,
         end
 
         if F <: FieldAmplitude
-            t = returnTypeOf(core.f)
+            t = getOutputType(core.f)
             promote_type(t, T) <: T || 
             throw(AssertionError("Cannot convert the output of `f.f` from `$t` to $T."))
         else
@@ -200,19 +206,19 @@ struct ProductField{T, D, B<:NonEmptyTuple{ FieldAmplitude{T} }} <: FieldAmplitu
     basis::B
 
     function ProductField(bases::B) where {T, B<:NonEmptyTuple{ FieldAmplitude{T} }}
-        new{T, mapreduce(dimOf, +, bases), B}(bases)
+        new{T, mapreduce(getDimension, +, bases), B}(bases)
     end
 end
 
 ProductField(basis::Tuple{FieldAmplitude}) = first(basis)
 
 function evalFieldAmplitude(f::ProductField{T}, input; 
-                            cache!Self::MultiSpanDataCacheBox=MultiSpanDataCacheBox(Number), 
+                            cache!Self::MultiSpanDataCacheBox=initializeFieldCache(f), 
                             ) where {T}
     idx = firstindex(input)
     mapreduce(StableMul(T), f.basis) do basis
         iStart = idx
-        idx += dimOf(basis)
+        idx += getDimension(basis)
         evalFieldAmplitude(basis, input[iStart:idx-1]; cache!Self)
     end
 end
@@ -223,7 +229,7 @@ function unpackFieldFunc(f::ProductField{T, D}) where {T<:Number, D}
     idx = 1
     basisCores = map(f.basis) do basis
         iStart = idx
-        basisDim = dimOf(basis)
+        basisDim = getDimension(basis)
         idx += basisDim
         getSubIdx = basisDim==1 ? GetIndex{OneToIndex}(idx-1) : GetRange(iStart, idx-1)
         basisCore = unpackFunc!(basis, paramSet, Identifier(nothing))
@@ -258,7 +264,7 @@ struct CoupledField{T, D, L<:FieldAmplitude{T, D}, R<:FieldAmplitude{T, D},
 end
 
 function evalFieldAmplitude(f::CoupledField, input; 
-                            cache!Self::MultiSpanDataCacheBox=MultiSpanDataCacheBox(Number))
+                            cache!Self::MultiSpanDataCacheBox=initializeFieldCache(f))
     map(f.pair) do basis
         evalFieldAmplitude(basis, input; cache!Self)
     end |> Base.Splat(f.coupler)
@@ -273,8 +279,10 @@ function unpackFieldFunc(f::CoupledField{<:Number, D}) where {D}
 end
 
 
-const PolyRadialFunc{T, D, B<:RadialField{T, D}, L} = 
-      CoupledField{T, D, B, NullaryField{T, D, CartSHarmonics{D, L}}, StableMul{T}}
+const CartAngMomFunc{T, D, L} = NullaryField{T, D, CartSHarmonics{D, L}}
+
+const PolyRadialFunc{T, D, F<:FieldAmplitude{T, 1}, L} = 
+      CoupledField{T, D, RadialField{T, D, F}, CartAngMomFunc{T, D, L}, StableMul{T}}
 
 function PolyRadialFunc(radial::FieldAmplitude{T, 1}, 
                         angular::NonEmptyTuple{Int, D}) where {T, D}
@@ -284,17 +292,4 @@ function PolyRadialFunc(radial::FieldAmplitude{T, 1},
     CoupledField((radialCore, CurriedField(polyCore)), StableMul(T))
 end
 
-const PolyRadialFuncCore{T<:Number, D, L, F<:Function} = 
-      TupleHeader{D, ParamCombiner{ StableMul{T}, 
-                                       Tuple{F, TupleHeader{ D, 
-                                                                CartSHarmonics{D, L} }} }}
-
-
-const PolyGaussProd{T, D, L} = PolyRadialFunc{T, D, <:GaussFunc{T}, L}
-
-const EvalGaussFunc{T, C<:GaussFuncCore{T}} = FieldParamFunc{T, 1, C}
-
-const EvalPolyRadialFunc{T, D, L, C} = 
-      FieldParamFunc{T, D, PolyRadialFuncCore{T, D, L, C}}
-
-const EvalPolyGaussProd{T, D, L, C<:GaussFuncCore{T}} = EvalPolyRadialFunc{T, D, L, C}
+const PolyGaussFunc{T, D, L, F<:GaussFunc{T}} = PolyRadialFunc{T, D, F, L}
