@@ -172,12 +172,8 @@ function unpackFieldFunc(f::CurriedField{<:Number, D}) where {D}
         encoder, paramSet = compressParam(par)
         NamedMapper(encoder, sym)
     else
-        paramSet = initializeSpanParamSet()
-        map(params) do param
-            encoder, inputSet = compressParam(param)
-            inputFilter = locateParam!(paramSet, inputSet)
-            encoder ∘ inputFilter
-        end |> NamedMapper
+        encoder, paramSet = compressParams(params)
+        encoder
     end
     tagFilter = TaggedSpanSetFilter(paramEncoder, Identifier(nothing))
     TupleHeader(EncodeParamApply(f.core.f.f, tagFilter), Val(D)), paramSet
