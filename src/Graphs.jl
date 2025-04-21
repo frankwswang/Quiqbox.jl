@@ -213,10 +213,10 @@ struct LayerParamGraph{T, S1<:UnitVertex, S2<:GridVertex, H<:CallVertex,
     hidden::Memory{H}
     output::V
 
-    function LayerParamGraph(pb::ParamBox)
-        (inUPars, inGPars), midPars, outPars, _ = dissectParam(pb)
+    function LayerParamGraph(param::ParamBox)
+        (inUPars, inGPars), midPars, outPars, _ = dissectParam(param)
         if isempty(inUPars) && isempty(inGPars)
-            throw(AssertionError("`pb` should have at least one input source."))
+            throw(AssertionError("`param` should have at least one input source."))
         end
 
         sortParams!(inUPars, indexing=false)
@@ -238,12 +238,12 @@ struct LayerParamGraph{T, S1<:UnitVertex, S2<:GridVertex, H<:CallVertex,
     end
 end
 
-function genParamGraph(pb::ParamBox)
-    sl = screenLevelOf(pb)
+function genParamGraph(param::ParamBox)
+    sl = screenLevelOf(param)
     if sl == 0
-        LayerParamGraph(pb)
+        LayerParamGraph(param)
     else
-        ValueParamGraph(pb)
+        ValueParamGraph(param)
     end
 end
 
@@ -497,7 +497,7 @@ struct SpanInputFormatter{S1<:Symbol, S2<:Pair{ Symbol, <:NonEmptyTuple{Int} }} 
 
     function SpanInputFormatter(grid::GridVertex{T, N}) where {T, N}
         gridInfo = if isNodeActive(grid)
-            getMemory(grid.marker=>(size∘getNodeValue)(grid) |> fill)
+            getMemory(grid.marker => (size∘getNodeValue)(grid))
         else
             genBottomMemory()
         end
@@ -599,4 +599,18 @@ end
 function compressParam(param::ParamBox)
     paramGraph = genParamGraph(param)
     compressGraph(paramGraph), paramGraph.origin
+end
+
+
+const FilterComputeGraph{G<:ComputeGraph} = Base.ComposedFunction{G, SpanSetFilter}
+
+const ParamMapper{N, E<:NTuple{N, FilterComputeGraph}} = NamedMapper{N, E}
+
+function ParamMapper(params::NamedParamTuple; paramSet!Self=initializeSpanParamSet())
+    mapper = map(params) do param
+        encoder, inputSet = compressParam(param)
+        inputFilter = locateParam!(paramSet!Self, inputSet)
+        encoder ∘ inputFilter
+    end |> NamedMapper
+    mapper, paramSet!Self
 end
