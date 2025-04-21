@@ -198,11 +198,11 @@ struct ValueParamGraph{T, V<:TensorVertex{T}} <: TransformedGraph{Directed}
     origin::SpanParam{T}
     source::V
 
-    function ValueParamGraph(pb::SpanParam{T}) where {T}
-        sl = screenLevelOf(pb)
-        sl == 0 && throw(AssertionError("The screen level of `pb` must larger than 0."))
-        vertex = genTensorVertex(obtain(pb), sl==1, symbolFrom(param.symbol))
-        new{T, typeof(vertex)}(pb, vertex)
+    function ValueParamGraph(param::SpanParam{T}) where {T}
+        sl = screenLevelOf(param)
+        sl == 0 && throw(AssertionError("The screen level of `param` must larger than 0."))
+        vertex = genTensorVertex(obtain(param), sl==1, symbolFrom(param.symbol))
+        new{T, typeof(vertex)}(param, vertex)
     end
 end
 
