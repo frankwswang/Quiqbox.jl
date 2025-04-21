@@ -70,6 +70,9 @@ v1 = genTensorVar(v1Val, :α)
 v2Val = 1.1
 v2 = genTensorVar(v2Val, :β)
 @test obtain(v2) === v2.input === v2()
+v1_f, s1 = compressParam(v1)
+@test s1 === v1
+@test v1_f((unit=nothing, grid=nothing)) === v1_f() === obtain(v1) === v1Val
 
 a1 = genCellParam(v1, :a)
 a1_2 = genCellParam(itself, (v1,), :a1)

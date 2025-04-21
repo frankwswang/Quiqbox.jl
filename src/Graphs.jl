@@ -264,7 +264,7 @@ function evaluateGraph end
 struct UnitValueGraph{T, M<:Activity} <: ComputationGraph{T}
     node::UnitVertex{T}
 
-    function ValueGraph(vertex::UnitVertex{T}) where {T}
+    function UnitValueGraph(vertex::UnitVertex{T}) where {T}
         new{T, ifelse(vertex.active, Active, Static)}(vertex)
     end
 end
@@ -272,14 +272,19 @@ end
 struct GridValueGraph{T, N, M<:Activity} <: ComputationGraph{ShapedMemory{T, N}}
     node::GridVertex{T, N}
 
-    function ValueGraph(vertex::GridVertex{T, N}) where {T, N}
+    function GridValueGraph(vertex::GridVertex{T, N}) where {T, N}
         new{T, N, ifelse(vertex.active, Active, Static)}(vertex)
     end
 end
 
 const ValueGraph{T, M<:Activity} = Union{UnitValueGraph{T, M}, GridValueGraph{T, <:Any, M}}
+
+ValueGraph(vertex::UnitVertex) = UnitValueGraph(vertex)
+ValueGraph(vertex::GridVertex) = GridValueGraph(vertex)
+
 const StaticValueGraph{T} = ValueGraph{T, Static}
 const ActiveValueGraph{T} = ValueGraph{T, Active}
+
 
 evaluateGraph(f::ValueGraph) = getNodeValue(f.node)
 
@@ -486,8 +491,8 @@ struct SpanInputFormatter{S1<:Symbol, S2<:Pair{ Symbol, <:NonEmptyTuple{Int} }} 
     end
 
     function SpanInputFormatter(unit::UnitVertex)
-        unitInfo = isNodeActive(unit) ? getMemory(unit.marker|>fill) : genBottomMemory()
-        new{eltype(unitInfo), Union{}}(unit, genBottomMemory())
+        unitInfo = isNodeActive(unit) ? getMemory(unit.marker) : genBottomMemory()
+        new{eltype(unitInfo), Union{}}(unitInfo, genBottomMemory())
     end
 
     function SpanInputFormatter(grid::GridVertex{T, N}) where {T, N}
@@ -581,7 +586,7 @@ const ValueInput = Union{OptionalSpanValueSet, AbstractVector}
 (f::ComputeGraph{T})(input::ValueInput) where {T} = f.f(input)::T
 
 
-function compressGraph(graph::LayerGraph)
+function compressGraph(graph::ComputationGraph)
     encoder = SpanInputFormatter(graph)
     ComputeGraph(graph, encoder)
 end
