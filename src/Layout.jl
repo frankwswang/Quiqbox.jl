@@ -386,8 +386,8 @@ end
 markObj(marker::IdentityMarker) = itself(marker)
 
 
-function lazyMarkObj!(cache::AbstractDict{BlackBox, <:IdentityMarker}, input)
-    get!(cache, BlackBox(input)) do
+function lazyMarkObj!(cache::AbstractDict{EgalBox{T}, <:IdentityMarker}, input) where {T}
+    get!(cache, EgalBox{T}(input)) do
         markObj(input)
     end
 end
