@@ -614,3 +614,6 @@ function ParamMapper(params::NamedParamTuple; paramSet!Self=initializeSpanParamS
     end |> NamedMapper
     mapper, paramSet!Self
 end
+
+
+const EncodeParamApply{B<:Function, F<:ParamMapper} = DualApplyCombine{B, ItsType, F}

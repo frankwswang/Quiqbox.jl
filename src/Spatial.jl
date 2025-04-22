@@ -180,6 +180,12 @@ end
 const GaussFunc{T<:Real, P<:UnitParam{T}} = 
       CurriedField{T, 1, typeof(computeGaussFunc), @NamedTuple{xpn::P}}
 
+const ComputeGaussFunc = typeof(computeGaussFunc)
+
+const GaussFieldCore{F<:ParamMapper} = EncodeParamApply{ParamFreeFunc{ComputeGaussFunc}, F}
+
+const GaussFieldFunc{T, D, F} = FieldParamFunc{T, D, GaussFieldCore{F}}
+
 function GaussFunc(xpn::UnitOrVal{T}) where {T<:Real}
     core = TypedTupleFunc(ParamFreeFunc(computeGaussFunc), T, Val(1))
     CurriedField(core, (xpn=UnitParamEncoder(T, :xpn, 1)(xpn),))
