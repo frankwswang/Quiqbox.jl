@@ -1293,18 +1293,18 @@ const ParamApplyExtend{C<:ParamFuncSequence} = ParamCombiner{typeof(vcat), C}
 map(o->o(input, params), f.encode)
 
 
-const EncodeParamApply{B<:Function, C<:Function, F<:NamedFilter} = 
+const DualApplyCombine{B<:Function, C<:Function, F<:NamedFilter} = 
       ParamCombiner{B, Tuple{ InputConverter{C}, ParamFormatter{F} }}
 
-const FilterParamApply{B<:Function} = EncodeParamApply{B, ItsType, SpanSetFilter}
+const FilterParamApply{B<:Function} = DualApplyCombine{B, ItsType, SpanSetFilter}
 
-function EncodeParamApply(binder::Function, converter::Function, 
+function DualApplyCombine(binder::Function, converter::Function, 
                           formatter::TaggedSpanSetFilter)
     ParamCombiner(binder, ( InputConverter(converter), ParamFormatter(formatter) ))
 end
 
-function EncodeParamApply(binder::Function, formatter::TaggedSpanSetFilter)
-    EncodeParamApply(binder, itself, formatter)
+function DualApplyCombine(binder::Function, formatter::TaggedSpanSetFilter)
+    DualApplyCombine(binder, itself, formatter)
 end
 
 
@@ -1373,5 +1373,5 @@ function unpackFunc!(f::Function, paramSet::AbstractSpanParamSet,
     fCore, localParamSet = unpackFunc(f)
     idxFilter = locateParam!(paramSet, localParamSet)
     tagFilter = TaggedSpanSetFilter(idxFilter, paramSetId)
-    EncodeParamApply(fCore, tagFilter)
+    DualApplyCombine(fCore, tagFilter)
 end
