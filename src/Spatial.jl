@@ -32,11 +32,11 @@ end
 
 
 struct FieldParamFunc{T<:Number, D, F<:AbstractParamFunc} <: AbstractParamFunc
-    core::TypedParamFunc{T, FilterParamApply{ TupleHeader{D, F} }}
+    core::TypedParamFunc{T, ParamFilterApply{ TupleHeader{D, F} }}
 
     function FieldParamFunc{T, D}(f::TupleHeader{D, F}, scope::TaggedSpanSetFilter) where 
                                  {T, D, F<:AbstractParamFunc}
-        inner = DualApplyCombine(TupleHeader(f, Val(D)), scope)
+        inner = ContextParamFunc(TupleHeader(f, Val(D)), scope)
         new{T, D, F}(ReturnTyped(inner, T))
     end
 end
@@ -168,7 +168,7 @@ function unpackFieldFunc(f::CurriedField{<:Number, D}) where {D}
     params = f.param
     paramMapper, paramSet = ParamMapper(params)
     tagFilter = TaggedSpanSetFilter(paramMapper, Identifier(params))
-    TupleHeader(DualApplyCombine(f.core.f.f, tagFilter), Val(D)), paramSet
+    TupleHeader(ContextParamFunc(f.core.f.f, tagFilter), Val(D)), paramSet
 end
 
 

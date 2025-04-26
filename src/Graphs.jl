@@ -616,4 +616,4 @@ function ParamMapper(params::NamedParamTuple; paramSet!Self=initializeSpanParamS
 end
 
 
-const EncodeParamApply{B<:Function, F<:ParamMapper} = DualApplyCombine{B, ItsType, F}
+const EncodeParamApply{B<:Function, F<:ParamMapper} = ContextParamFunc{B, ItsType, F}

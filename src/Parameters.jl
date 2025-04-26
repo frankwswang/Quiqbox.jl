@@ -1293,18 +1293,18 @@ const ParamApplyExtend{C<:ParamFuncSequence} = ParamCombiner{typeof(vcat), C}
 map(o->o(input, params), f.encode)
 
 
-const DualApplyCombine{B<:Function, C<:Function, F<:NamedFilter} = 
+const ContextParamFunc{B<:Function, C<:Function, F<:NamedFilter} = 
       ParamCombiner{B, Tuple{ InputConverter{C}, ParamFormatter{F} }}
 
-const FilterParamApply{B<:Function} = DualApplyCombine{B, ItsType, SpanSetFilter}
+const ParamFilterApply{B<:Function} = ContextParamFunc{B, ItsType, SpanSetFilter}
 
-function DualApplyCombine(binder::Function, converter::Function, 
+function ContextParamFunc(binder::Function, converter::Function, 
                           formatter::TaggedSpanSetFilter)
     ParamCombiner(binder, ( InputConverter(converter), ParamFormatter(formatter) ))
 end
 
-function DualApplyCombine(binder::Function, formatter::TaggedSpanSetFilter)
-    DualApplyCombine(binder, itself, formatter)
+function ContextParamFunc(binder::Function, formatter::TaggedSpanSetFilter)
+    ContextParamFunc(binder, itself, formatter)
 end
 
 
