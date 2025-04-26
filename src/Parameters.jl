@@ -1371,7 +1371,11 @@ end
 function unpackFunc!(f::Function, paramSet::AbstractSpanParamSet, 
                      paramSetId::Identifier=Identifier(paramSet))
     fCore, localParamSet = unpackFunc(f)
-    idxFilter = locateParam!(paramSet, localParamSet)
-    tagFilter = TaggedSpanSetFilter(idxFilter, paramSetId)
-    DualApplyCombine(fCore, tagFilter)
+    if fCore isa InputConverter
+        fCore
+    else
+        idxFilter = locateParam!(paramSet, localParamSet)
+        tagFilter = TaggedSpanSetFilter(idxFilter, paramSetId)
+        ContextParamFunc(fCore, tagFilter)
+    end
 end
