@@ -1087,13 +1087,14 @@ struct MultiSpanDataCacheBox{T, G<:DirectMemory{<:T}, N<:NestedMemory{<:T}
 
     function MultiSpanDataCacheBox(::Type{T}=Any; maxSize::Int=100) where {T}
         maxsize = maxSize
-        unitSec = LRU{Identifier, T}(; maxsize)
         G, N = if isconcretetype(T)
             DirectMemory{T},   NestedMemory{T}
         else
             DirectMemory{<:T}, NestedMemory{<:T}
         end
-        new{T, G, N}(unitSec, LRU{Identifier, G}(; maxsize), LRU{Identifier, N}(; maxsize))
+        new{T, G, N}(LRU{UnitParamEgalBox, T}(; maxsize), 
+                     LRU{GridParamEgalBox, G}(; maxsize), 
+                     LRU{NestParamEgalBox, N}(; maxsize))
     end
 end
 
@@ -1111,7 +1112,7 @@ getSpanDataSectorKey(cache::MultiSpanDataCacheBox{T1}, param::NestParam{T2}) whe
 (cache.nest, BestParamEgalBox(param))
 
 
-formatSpanData(::Type{T}, val) where {T} = T(val)
+formatSpanData(::Type{T}, val) where {T} = convert(T, val)
 
 function formatSpanData(::Type{T}, val::AbstractArray) where {T}
     res = getPackedMemory(val)
@@ -1125,25 +1126,11 @@ function cacheParam!(cache::MultiSpanDataCacheBox{T}, param::ParamBox{<:T}) wher
     end::getOutputType(param)
 end
 
-# getParamCacheType(::Type{<:UnitParam{T}}) where {T} = T
-# getParamCacheType(::Type{<:GridParam{T}}) where {T} = DirectMemory{T}
-# getParamCacheType(::Type{<:NestParam{T}}) where {T} = NestedMemory{T}
-# getParamCacheType(::Type{<:ParamBox{T} }) where {T} = Union{T, PackedMemory{T}}
-
-# getParamCacheType(::Type{<:ParamBox }) = Any
-# getParamCacheType(::Type{<:GridParam}) = DirectMemory
-# getParamCacheType(::Type{<:NestParam}) = NestedMemory
-
 function cacheParam!(cache::MultiSpanDataCacheBox, params::ParamBoxSource)
-    # defaultEltype = params isa AbstractArray ? getParamCacheType(params|>eltype) : Union{}
     typedMap(params) do param
         cacheParam!(cache, param)
     end
 end
-
-# function cacheParam!(cache::MultiSpanDataCacheBox, params::NamedParamTuple)
-#     cacheParam!(cache, values(params)) |> NamedTuple{params|>keys}
-# end
 
 
 struct SpanSetFilter <: Mapper
@@ -1307,6 +1294,12 @@ function ContextParamFunc(binder::Function, formatter::TaggedSpanSetFilter)
     ContextParamFunc(binder, itself, formatter)
 end
 
+
+const BiParamFuncApply{T, J<:Function, FL<:AbstractParamFunc, FR<:AbstractParamFunc} = 
+      ParamCombiner{ParamFreeFunc{StableBinary{T, J}}, Tuple{FL, FR}}
+
+const BiParamFuncProd{T, FL<:AbstractParamFunc, FR<:AbstractParamFunc} = 
+      BiParamFuncApply{T, typeof(*), FL, FR}
 
 struct ParamPipeline{C<:ParamFuncSequence} <: AbstractParamFunc
     encode::C

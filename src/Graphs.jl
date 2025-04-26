@@ -606,7 +606,9 @@ const FilterComputeGraph{G<:ComputeGraph} = Base.ComposedFunction{G, SpanSetFilt
 
 const ParamMapper{N, E<:NTuple{N, FilterComputeGraph}} = NamedMapper{N, E}
 
-function ParamMapper(params::NamedParamTuple; paramSet!Self=initializeSpanParamSet())
+function genParamMapper(params::NamedParamTuple; 
+                        paramSet!Self::AbstractSpanParamSet=initializeSpanParamSet())
+    checkEmptiness(params, :params)
     mapper = map(params) do param
         encoder, inputSet = compressParam(param)
         inputFilter = locateParam!(paramSet!Self, inputSet)

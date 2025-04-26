@@ -8,18 +8,13 @@ using LinearAlgebra
 getOutputType(::FieldAmplitude{T}) where {T} = T
 
 
-getDimension(::FieldAmplitude{<:Any, D}) where {D} = D
-
-
-initializeFieldCache(::FieldAmplitude) = MultiSpanDataCacheBox(Any)
-
-initializeFieldCache(::GaussFunc{T}) where {T} = MultiSpanDataCacheBox(T)
+getDimension(::SpatialAmplitude{D, M}) where {D, M} = Int(D*M)
 
 
 needFieldAmpEvalCache(::FieldAmplitude) = true
 
 function evalFieldAmplitude(f::FieldAmplitude, input; 
-                            cache!Self::MultiSpanDataCacheBox=initializeFieldCache(f))
+                            cache!Self::MultiSpanDataCacheBox=MultiSpanDataCacheBox())
     formattedInput = formatInput(f, input)
     if needFieldAmpEvalCache(f)
         evalFieldAmplitudeCore(f, formattedInput, cache!Self)
@@ -120,9 +115,17 @@ end
 
 const WrappedField{T, D, F<:Function} = EncodedField{T, D, F, ItsType}
 
+const EncodedFieldFunc{T, D, E<:AbstractParamFunc, F<:AbstractParamFunc} = 
+      FieldParamFunc{T, D, ParamPipeline{ Tuple{E, F} }}
+
 
 const RadialField{T, D, F<:FieldAmplitude{T, 1}} = 
       EncodedField{T, D, F, typeof(LinearAlgebra.norm)}
+
+const RadialFieldCore{D} = InputConverter{TupleHeader{D, typeof(LinearAlgebra.norm)}}
+
+const RadialFieldFunc{T, D, F<:AbstractParamFunc} = 
+      EncodedFieldFunc{T, D, RadialFieldCore{D}, F}
 
 RadialField{T, D}(radial::FieldAmplitude{T, 1}) where {T, D} = 
 EncodedField(radial, TupleHeader( LinearAlgebra.norm, Val(D) ))
@@ -166,7 +169,7 @@ end
 
 function unpackFieldFunc(f::CurriedField{<:Number, D}) where {D}
     params = f.param
-    paramMapper, paramSet = ParamMapper(params)
+    paramMapper, paramSet = genParamMapper(params)
     tagFilter = TaggedSpanSetFilter(paramMapper, Identifier(params))
     TupleHeader(ContextParamFunc(f.core.f.f, tagFilter), Val(D)), paramSet
 end
@@ -184,16 +187,12 @@ const ComputeGaussFunc = typeof(computeGaussFunc)
 
 const GaussFieldCore{F<:ParamMapper} = EncodeParamApply{ParamFreeFunc{ComputeGaussFunc}, F}
 
-const GaussFieldFunc{T, D, F} = FieldParamFunc{T, D, GaussFieldCore{F}}
+const GaussFieldFunc{T, D, F<:ParamMapper} = FieldParamFunc{T, D, GaussFieldCore{F}}
 
 function GaussFunc(xpn::UnitOrVal{T}) where {T<:Real}
     core = TypedTupleFunc(ParamFreeFunc(computeGaussFunc), T, Val(1))
     CurriedField(core, (xpn=UnitParamEncoder(T, :xpn, 1)(xpn),))
 end
-
-const GaussFuncCore{T<:Real, F<:ComputeGraph{T}} = 
-      TupleHeader{1, EncodeParamApply{ typeof(computeGaussFunc), ItsType, 
-                                          MonoNMapper{Base.ComposedFunction{F}} }}
 
 
 struct ProductField{T, D, B<:NonEmptyTuple{ FieldAmplitude{T} }} <: FieldAmplitude{T, D}
@@ -207,7 +206,7 @@ end
 ProductField(basis::Tuple{FieldAmplitude}) = first(basis)
 
 function evalFieldAmplitude(f::ProductField{T}, input; 
-                            cache!Self::MultiSpanDataCacheBox=initializeFieldCache(f), 
+                            cache!Self::MultiSpanDataCacheBox=MultiSpanDataCacheBox(), 
                             ) where {T}
     idx = firstindex(input)
     mapreduce(StableMul(T), f.basis) do basis
@@ -258,7 +257,7 @@ struct CoupledField{T, D, L<:FieldAmplitude{T, D}, R<:FieldAmplitude{T, D},
 end
 
 function evalFieldAmplitude(f::CoupledField, input; 
-                            cache!Self::MultiSpanDataCacheBox=initializeFieldCache(f))
+                            cache!Self::MultiSpanDataCacheBox=MultiSpanDataCacheBox())
     map(f.pair) do basis
         evalFieldAmplitude(basis, input; cache!Self)
     end |> Base.Splat(f.coupler)
@@ -287,3 +286,12 @@ function PolyRadialFunc(radial::FieldAmplitude{T, 1},
 end
 
 const PolyGaussFunc{T, D, L, F<:GaussFunc{T}} = PolyRadialFunc{T, D, F, L}
+
+const PolyRadialFieldCore{T, D, L, F<:FieldParamFunc{T, D}} = 
+      BiParamFuncProd{T, F, FieldParamFunc{ T, D, InputConverter{CartSHarmonics{D, L}} }}
+
+const PolyRadialFieldFunc{T, D, L, F<:FieldParamFunc{T, D}} = 
+      FieldParamFunc{T, D, PolyRadialFieldCore{T, D, L, F}}
+
+const PolyGaussFieldFunc{T, D, L, F} = 
+      PolyRadialFieldFunc{T, D, L, RadialFieldFunc{T, D, F}}
