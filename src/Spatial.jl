@@ -107,8 +107,8 @@ end
 
 function unpackFieldFunc(f::EncodedField{<:Number, D}) where {D}
     paramSet = initializeSpanParamSet()
-    fCore = unpackFunc!(f.core, paramSet, Identifier(nothing))
-    fEncode = unpackFunc!(f.encode, paramSet, Identifier(nothing))
+    fCore = unpackFunc!(f.core.f, paramSet, Identifier(nothing))
+    fEncode = unpackFunc!(f.encode.f, paramSet, Identifier(nothing))
     TupleHeader(ParamPipeline((fEncode, fCore)), Val(D)), paramSet
 end
 
@@ -122,10 +122,10 @@ const EncodedFieldFunc{T, D, E<:AbstractParamFunc, F<:AbstractParamFunc} =
 const RadialField{T, D, F<:FieldAmplitude{T, 1}} = 
       EncodedField{T, D, F, typeof(LinearAlgebra.norm)}
 
-const RadialFieldCore{D} = InputConverter{TupleHeader{D, typeof(LinearAlgebra.norm)}}
+const RadialFieldCore = InputConverter{typeof(LinearAlgebra.norm)}
 
 const RadialFieldFunc{T, D, F<:AbstractParamFunc} = 
-      EncodedFieldFunc{T, D, RadialFieldCore{D}, F}
+      EncodedFieldFunc{T, D, RadialFieldCore, F}
 
 RadialField{T, D}(radial::FieldAmplitude{T, 1}) where {T, D} = 
 EncodedField(radial, TupleHeader( LinearAlgebra.norm, Val(D) ))
@@ -187,7 +187,7 @@ const ComputeGaussFunc = typeof(computeGaussFunc)
 
 const GaussFieldCore{F<:ParamMapper} = EncodeParamApply{ParamFreeFunc{ComputeGaussFunc}, F}
 
-const GaussFieldFunc{T, D, F<:ParamMapper} = FieldParamFunc{T, D, GaussFieldCore{F}}
+const GaussFieldFunc{T, F<:ParamMapper} = FieldParamFunc{T, 1, GaussFieldCore{F}}
 
 function GaussFunc(xpn::UnitOrVal{T}) where {T<:Real}
     core = TypedTupleFunc(ParamFreeFunc(computeGaussFunc), T, Val(1))
@@ -287,11 +287,15 @@ end
 
 const PolyGaussFunc{T, D, L, F<:GaussFunc{T}} = PolyRadialFunc{T, D, F, L}
 
-const PolyRadialFieldCore{T, D, L, F<:FieldParamFunc{T, D}} = 
-      BiParamFuncProd{T, F, FieldParamFunc{ T, D, InputConverter{CartSHarmonics{D, L}} }}
+const PolyRadialFieldCore{T, D, L, F<:AbstractParamFunc} = 
+      BiParamFuncProd{T, RadialFieldFunc{T, D, F}, 
+                         FieldParamFunc{ T, D, InputConverter{CartSHarmonics{D, L}} }}
 
-const PolyRadialFieldFunc{T, D, L, F<:FieldParamFunc{T, D}} = 
-      FieldParamFunc{T, D, PolyRadialFieldCore{T, D, L, F}}
+const PolyGaussFieldCore{T, D, L, F<:ParamMapper} = 
+      PolyRadialFieldCore{T, D, L, GaussFieldFunc{T, F}}
 
-const PolyGaussFieldFunc{T, D, L, F} = 
-      PolyRadialFieldFunc{T, D, L, RadialFieldFunc{T, D, F}}
+const PolyRadialFieldFunc{T, D, L, F<:PolyRadialFieldCore{T, D, L}} = 
+      FieldParamFunc{T, D, F}
+
+const PolyGaussFieldFunc{T, D, L, F<:PolyGaussFieldCore{T, D, L}} = 
+      PolyRadialFieldFunc{T, D, L, F}
