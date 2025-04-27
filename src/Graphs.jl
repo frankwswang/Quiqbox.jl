@@ -293,7 +293,7 @@ evaluateGraph(f::StaticValueGraph, ::OptionalVoidValueSet) = evaluateGraph(f)
 getParamInputType(::UnitValueGraph) = UnitInput()
 getParamInputType(::GridValueGraph) = GridInput()
 
-function evaluateGraph(f::ActiveValueGraph, input::OptionalGridValueSet)
+function evaluateGraph(f::ActiveValueGraph, input::OptionalSpanValueSet)
     sector = constrainSpanValueSet(getParamInputType(f), input)
     content = getfield(input, sector)
     content === nothing ? evaluateGraph(f) : getindex(content)
@@ -525,7 +525,7 @@ function formatUnitInput(unit::Memory{Symbol}, flattenedInput::AbstractVector)
 end
 
 function formatGridInput(grid::Memory{<:Pair{ Symbol, <:NonEmptyTuple{Int} }}, 
-                          flattenedInput::AbstractVector)
+                         flattenedInput::AbstractVector)
     idx = firstindex(flattenedInput)
     map(grid) do ele
         val = reshape(flattenedInput[idx], ele.second)
@@ -598,7 +598,17 @@ end
 
 function compressParam(param::ParamBox)
     paramGraph = genParamGraph(param)
-    compressGraph(paramGraph), paramGraph.origin
+    sl = screenLevelOf(param)
+    inputSet = if sl == 2
+        initializeSpanParamSet(nothing)
+    elseif sl == 1
+        initializeSpanParamSet(paramGraph.origin)
+    elseif sl == 0
+        paramGraph.origin
+    else
+        throw(AssertionError("The screen level of `param`: $sl is not supported."))
+    end
+    compressGraph(paramGraph), inputSet
 end
 
 

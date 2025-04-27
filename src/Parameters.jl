@@ -1002,6 +1002,8 @@ const TypedSpanParamSet{T1<:UnitParam, T2<:GridParam} =
 const FixedSpanParamSet{T1<:UnitParam, T2<:GridParam} = 
       AbstractSpanParamSet{Memory{T1}, Memory{T2}}
 
+const FixedEmptySpanSet = AbstractSpanParamSet{BottomMemory, BottomMemory}
+
 struct UnitInput end
 struct GridInput end
 struct SpanInput end
@@ -1028,6 +1030,10 @@ initializeSpanParamSet(::Nothing) = (unit=genBottomMemory(), grid=genBottomMemor
 
 initializeSpanParamSet(units::AbstractVector{<:UnitParam}, 
                        grids::AbstractVector{<:GridParam}) = (unit=units, grid=grids)
+
+initializeSpanParamSet(unit::UnitParam) = (unit=getMemory(unit), grid=genBottomMemory())
+
+initializeSpanParamSet(grid::GridParam) = (unit=genBottomMemory(), grid=getMemory(grid))
 
 
 function locateParamCore!(params::AbstractVector, target::ParamBox)
@@ -1159,7 +1165,11 @@ end
 function getField(paramSet::AbstractSpanSet, sFilter::SpanSetFilter)
     firstIds = map(firstindex, paramSet)
     map(paramSet, firstIds, sFilter.scope) do sector, i, oneToIds
-        view(sector, map(x->(x.idx + i - 1), oneToIds))
+        if isempty(oneToIds)
+            genBottomMemory()
+        else
+            view(sector, map(x->(x.idx + i - 1), oneToIds))
+        end
     end
 end
 
