@@ -3,12 +3,12 @@ struct Identity <: DirectOperator end
 (::Identity)(f::Function) = itself(f)
 
 
-struct MonomialMul{T, D, L} <: DirectOperator
+struct MonomialMul{T, D} <: DirectOperator
     center::NTuple{D, T}
-    degree::WeakComp{D, L}
+    degree::WeakComp{D}
 
-    MonomialMul(center::NonEmptyTuple{T}, degree::WeakComp{D, L}) where {T, D, L} = 
-    new{T, D, L}(center, degree)
+    MonomialMul(center::NonEmptyTuple{T}, degree::WeakComp{D}) where {T, D} = 
+    new{T, D}(center, degree)
 end
 
 MonomialMul(center::NonEmptyTuple{T, D}, degree::NonEmptyTuple{Int, D}) where {T, D} = 
@@ -26,8 +26,3 @@ end
 function (f::MonomialMul{T, D})(target::F) where {T, D, F<:Function}
     PairCombine(StableMul(T), f, target)
 end
-
-
-# function transform!(::DimSpanDataCacheBox{T}, ::Identity, orb::FrameworkOrb{T}) where {T}
-#     itself(orb)
-# end
