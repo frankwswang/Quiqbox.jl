@@ -31,12 +31,6 @@ const SpanIndex = Union{UnitIndex, GridIndex}
 const GeneralIndex = Union{Int, SpanIndex, OneToIndex}
 const GeneralField = Union{GeneralIndex, Symbol, Nothing}
 
-# struct ChainedEncode{L, C<:NTuple{L, Encoder}} <: Encoder
-#     chain::C
-
-#     ChainedEncode(chain::C) where {L, C<:NonEmptyTuple{Encoder, L}} = new{L+1, C}(chain)
-# end
-
 struct ChainedAccess{L, C<:NTuple{L, GeneralField}} <: Getter
     chain::C
 
@@ -402,3 +396,6 @@ end
 function compareObj(obj1::T1, obj2::T2) where {T1, T2}
     obj1 === obj2 || markObj(obj1) == markObj(obj2)
 end
+
+
+struct NullCache{T} <: CustomCache{T} end

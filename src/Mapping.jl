@@ -26,30 +26,18 @@ end
 (f::StableBinary{T, F})(argL::T, argR::T) where {T, F} = convert(T, f.f(argL, argR))
 
 const StableAdd{T} = StableBinary{T, typeof(+)}
-const StableSub{T} = StableBinary{T, typeof(-)}
 const StableMul{T} = StableBinary{T, typeof(*)}
+const ElementalSub{T} = StableBinary{T, typeof(.-)}
 
 StableAdd(::Type{T}) where {T} = StableBinary(+, T)
-StableSub(::Type{T}) where {T} = StableBinary(-, T)
 StableMul(::Type{T}) where {T} = StableBinary(*, T)
+ElementalSub(::Type{T}) where {T} = StableBinary(.-, T)
 
 struct StableContract{T} <: TypedEvaluator{T} end
 
 function (::StableContract{T})(a, b) where {T}
     mapreduce(StableMul(T), StableAdd(T), a, b)
 end
-
-
-struct EncodeApply{N, E<:NTuple{N, Function}, F<:Function} <: FunctionCombiner
-    encode::E
-    apply::F
-end
-
-EncodeApply(encode::Function, apply::Function) = EncodeApply((encode,), apply)
-
-(f::EncodeApply)(args...) = f.apply(map(f->f(args...), f.encode)...)
-
-(f::EncodeApply{0})(args...) = f.apply(args...)
 
 
 struct ParamSelectFunc{F<:Function, T<:Tuple{ Vararg{Encoder} }} <: ParamFuncBuilder{F}

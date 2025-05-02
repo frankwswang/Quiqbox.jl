@@ -15,6 +15,7 @@ abstract type QueryBox{T} <: Box end
 
 # N: Inner dim, size mutable; O: Outer dim, size immutable
 abstract type DualSpanFunction{T, N, O} <: CompositeFunction end
+abstract type SpatialAmplitude{D, M} <: CompositeFunction end # M: Particle number
 abstract type StatefulFunction{T} <: CompositeFunction end
 abstract type FunctionComposer <: CompositeFunction end
 abstract type Evaluator <: CompositeFunction end
@@ -49,18 +50,15 @@ abstract type IntegralProcessCache{T, D} <: SpatialProcessCache{T, D} end
 
 abstract type DimensionalEvaluator{T, D, F} <: TypedEvaluator{T} end
 
-abstract type OrbitalNormalizer{T, D} <: AmplitudeNormalizer{T, D, 1} end
 abstract type OrbitalIntegrator{T, D} <: AmplitudeIntegrator{T, D, 1} end
-# M: Particle number
-abstract type SpatialAmplitude{T, D, M} <: ParamBoxFunction{T} end
 
 abstract type IdentityMarker{T} <: MarkerBox end
 abstract type StorageMarker{T} <: MarkerBox end
 
 abstract type EvalDimensionalFunc{T, D, F} <: DimensionalEvaluator{T, D, F} end
 
-abstract type OrbitalBasis{T, D, F} <: SpatialAmplitude{T, D, 1} end
-abstract type FieldAmplitude{T, D} <: SpatialAmplitude{T, D, 1} end
+abstract type OrbitalBasis{T, D, F} <: SpatialAmplitude{D, 1} end
+abstract type FieldAmplitude{T, D} <: SpatialAmplitude{D, 1} end
 
 # abstract type ManyParticleState{T} <: Any end
 
@@ -103,6 +101,7 @@ const MissSymInt = MissingOr{Union{Symbol, Int}}
 
 const AbstractEqualityDict = Union{EqualityDict, Dict}
 
+const BoolVal = Union{Val{true}, Val{false}}
 
 import Base: size, firstindex, lastindex, getindex, setindex!, iterate, length, similar
 
