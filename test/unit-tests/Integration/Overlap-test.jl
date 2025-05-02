@@ -1,6 +1,7 @@
 using Test
 using Quiqbox
 using Quiqbox: overlap, overlaps
+using LinearAlgebra: norm
 
 @testset "Overlap-Based Features" begin
 
@@ -23,7 +24,6 @@ s2_t = [overlap(i, j) for i in bs2, j in bs2]
 
 pgf1 =  genGaussTypeOrb((0.1, -0.2, -0.3), 1.5, (1, 0, 0))
 pgf1n = genGaussTypeOrb((0.1, -0.2, -0.3), 1.5, (1, 0, 0), renormalize=true)
-pgf1f = ComponentOrb(pgf1)
 pgf1_val1 = pgf1n((0., 0., 0.)) * sqrt(overlap(pgf1, pgf1))
 @test pgf1((0., 0., 0.)) ≈ pgf1.body((-0.1, 0.2, 0.3)) ≈ pgf1_val1
 
@@ -31,27 +31,27 @@ s1 = overlap(pgf1, pgf1n)
 @test overlap(pgf1n, pgf1) ≈ s1
 @test overlap(pgf1, pgf1) ≈ s1^2
 @test overlap(pgf1n, pgf1n) ≈ 1
-
-pgf1_c = ComponentOrb(pgf1)
-pgf1n_c = ComponentOrb(pgf1n)
-@test overlap(pgf1n_c, pgf1n_c) ≈ 1
+pgf1n_c = deepcopy(pgf1n)
+@test overlap(pgf1n, pgf1n_c) ≈ 1
 
 cen1 = (1.1, 0.5, 1.1)
 cons1 = [1.5, -0.3]
 xpns1 = [1.2, 0.6]
 cgf1 = genGaussTypeOrb(cen1, xpns1, cons1, (1, 0, 0))
-cgf1c = ComponentOrb(cgf1)
-cgf1c.core.f.apply.left.f.chain[1].left isa Quiqbox.EvalPrimGTO
-stf1Core = x->exp(-abs(x))
-stf1 = Quiqbox.FieldFunc(stf1Core, Float64)
-sto1 = Quiqbox.PolyRadialFunc(stf1, Quiqbox.CartSHarmonics((1, 1, 0)))
+stf1Core = Quiqbox.ReturnTyped(x->exp(-norm(x)), Float64)
+stf1 = Quiqbox.EncodedField(stf1Core, Val(1))
+sto1 = Quiqbox.PolyRadialFunc(stf1, (1, 1, 0))
 stoBasis1 = Quiqbox.PrimitiveOrb((1.0, 2.0, 3.0), sto1; renormalize=false)
 @test overlap(stoBasis1, stoBasis1) ≈ 4.7123889802878764
 
+sto2 = Quiqbox.PolyRadialFunc(stf1, (2,))
+stoBasis2 = Quiqbox.PrimitiveOrb((1.0,), sto2; renormalize=false)
+overlap(stoBasis2, stoBasis2)
+
 stoBasis1n = Quiqbox.PrimitiveOrb((1.0, 2.0, 3.0), sto1; renormalize=true)
-stoBasis1n_c, stoBasis1n_s, stoBasis1n_p = Quiqbox.unpackFunc(stoBasis1n);
+stoBasis1n_c, stoBasis1n_s = Quiqbox.unpackFunc(stoBasis1n);
 overlap(stoBasis1n, stoBasis1n) ≈ 1
-s2 = sqrt(overlap(stoBasis1, stoBasis1))
+s2 = sqrt(overlap(stoBasis1, stoBasis1)) # 2.170803763600724
 @test overlap(stoBasis1n, stoBasis1) ≈ overlap(stoBasis1, stoBasis1n) ≈ s2
 @test overlap(stoBasis1n, stoBasis1, lazyCompute=true) ≈ 
       overlap(stoBasis1, stoBasis1n, lazyCompute=true) ≈ 
@@ -78,6 +78,7 @@ s4 = overlap(cgf2n1, cgf2n3)
 @test overlap(cgf2n2, cgf2n2) ≈ 1
 @test overlap(cgf2n3, cgf2n3) ≈ 1
 @test !(overlap(cgf2n2, cgf2n3) ≈ 1)
+Quiqbox.decomposeOrbData(cgf2n2|>genOrbitalData)
 
 consH = [0.1543289673, 0.5353281423, 0.4446345422]
 bfH = genGaussTypeOrb((0., 0., 0.), [3.425250914, 0.6239137298, 0.1688554040], 
