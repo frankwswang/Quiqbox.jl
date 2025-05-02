@@ -560,9 +560,9 @@ getOutputType(::Type{<:PrimitiveParam{T, E}}) where {T, E<:Pack{T}} = E
 function getOutputType(::Type{<:HeapParam{T, E, N}}) where {T, E<:Pack{T}, N}
     innerType = getPackType(E)
     if isconcretetype(innerType)
-        ShapedMemory{innerType, N}
+        AbstractArray{innerType, N}
     else
-        ShapedMemory{<:innerType, N}
+        AbstractArray{<:innerType, N}
     end
 end
 
@@ -652,8 +652,12 @@ end
 
 function obtain(param::CompositeParam)
     checkParamCycle(param)
-    cache = LRU{ParamEgalBox, Any}(maxsize=100)
-    obtainCore!(cache, param)
+    if param isa AdaptableParam && screenLevelOf(param) > 0
+        decoupledCopy(param.offset)
+    else
+        cache = LRU{ParamEgalBox, Any}(maxsize=100)
+        obtainCore!(cache, param)
+    end
 end
 
 obtain(param::PrimitiveParam) = decoupledCopy(param.input)
