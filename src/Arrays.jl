@@ -112,7 +112,7 @@ function (f::TruncateReshape{N})(arr::AbstractArray) where {N}
     reshape(v, f.axis)
 end
 
-
+#!! Need to specify when it should make a shallow copy, e.g. when input is a custom memory.
 getMemory(arr::Memory) = itself(arr)
 
 function getMemory(arr::AbstractArray{T}) where {T}
@@ -322,3 +322,23 @@ end
 
 recursiveCompareSize(arr1::AbstractArray{<:Number}, arr2::AbstractArray{<:Number}) = 
 size(arr1) == size(arr2)
+
+
+const BottomMemory = Memory{Union{}}
+
+genBottomMemory() = BottomMemory(undef, 0)
+
+
+getMinimalEleType(obj::Any) = typeof(obj)
+
+function getMinimalEleType(collection::AbstractArray{T}) where {T}
+    if Base.isconcretetype(T)
+        T
+    elseif isempty(collection)
+        Union{}
+    else
+        mapreduce(typeof, typejoin, collection)
+    end
+end
+
+getMinimalEleType(collection::Tuple) = mapreduce(typeof, typejoin, collection, init=Union{})

@@ -1,4 +1,4 @@
-struct ReturnTyped{T, F<:Function} <: TypedEvaluator{T, F}
+struct ReturnTyped{T, F<:Function} <: TypedEvaluator{T}
     f::F
 
     function ReturnTyped(f::F, ::Type{T}) where {F<:Function, T}
@@ -15,7 +15,7 @@ ReturnTyped(f::ReturnTyped{T}, ::Type{T}) where {T} = itself(f)
 const Return{T} = ReturnTyped{T, ItsType}
 
 
-struct StableBinary{T, F<:Function} <: TypedEvaluator{T, F}
+struct StableBinary{T, F<:Function} <: TypedEvaluator{T}
     f::F
 
     function StableBinary(f::F, ::Type{T}) where {F<:Function, T}
@@ -26,32 +26,26 @@ end
 (f::StableBinary{T, F})(argL::T, argR::T) where {T, F} = convert(T, f.f(argL, argR))
 
 const StableAdd{T} = StableBinary{T, typeof(+)}
-const StableSub{T} = StableBinary{T, typeof(-)}
 const StableMul{T} = StableBinary{T, typeof(*)}
+const ElementalSub{T} = StableBinary{T, typeof(.-)}
 
 StableAdd(::Type{T}) where {T} = StableBinary(+, T)
-StableSub(::Type{T}) where {T} = StableBinary(-, T)
 StableMul(::Type{T}) where {T} = StableBinary(*, T)
+ElementalSub(::Type{T}) where {T} = StableBinary(.-, T)
 
+struct StableContract{T} <: TypedEvaluator{T} end
 
-struct EncodeApply{N, E<:NTuple{N, Function}, F<:Function} <: FunctionCombiner
-    encode::E
-    apply::F
+function (::StableContract{T})(a, b) where {T}
+    mapreduce(StableMul(T), StableAdd(T), a, b)
 end
 
-EncodeApply(encode::Function, apply::Function) = EncodeApply((encode,), apply)
 
-(f::EncodeApply)(args...) = f.apply(map(f->f(args...), f.encode)...)
-
-(f::EncodeApply{0})(args...) = f.apply(args...)
-
-
-struct ParamSelectFunc{F<:Function, T<:Tuple{ Vararg{Fetcher} }} <: ParamFuncBuilder{F}
+struct ParamSelectFunc{F<:Function, T<:Tuple{ Vararg{Encoder} }} <: ParamFuncBuilder{F}
     apply::F
     select::T
 end
 
-ParamSelectFunc(f::Function, select::Fetcher) = ParamSelectFunc(f, (select,))
+ParamSelectFunc(f::Function, select::Encoder) = ParamSelectFunc(f, (select,))
 
 ParamSelectFunc(f::Function) = ParamSelectFunc(f, ())
 
@@ -59,7 +53,7 @@ const EmptySelectFunc{F<:Function} = ParamSelectFunc{F, Tuple{}}
 
 ParamSelectFunc(f::EmptySelectFunc) = itself(f)
 
-ParamSelectFunc(f::ParamSelectFunc, select::Tuple{Vararg{Fetcher}}) = 
+ParamSelectFunc(f::ParamSelectFunc, select::Tuple{Vararg{Encoder}}) = 
 ParamSelectFunc(f.apply, (f.select..., select...))
 
 function (f::ParamSelectFunc)(input, param)
@@ -68,7 +62,7 @@ end
 
 (f::EmptySelectFunc)(input, _) = f.apply(input)
 
-const GetParamFunc{F<:Function, T<:Fetcher} = ParamSelectFunc{F, Tuple{T}}
+const GetParamFunc{F<:Function, T<:Encoder} = ParamSelectFunc{F, Tuple{T}}
 
 
 struct OnlyHead{F<:Function} <: FunctionModifier
@@ -283,4 +277,151 @@ end
 
 function typedMap(op::F, obj::Union{Tuple, NamedTuple}, ::Type=Union{}) where {F<:Function}
     map(op, obj)
+end
+
+
+# struct Bifurcator{F<:Function, FL<:Function, FR<:Function} <: FunctionCombiner
+#     finalizer::F
+#     left::FL
+#     right::FR
+# end
+
+# Bifurcator(finalizer::F) where {F<:Function} = 
+# (left::Function, right::Function) -> Bifurcator(finalizer, left, right)
+
+# (f::Bifurcator)(arg, args...) = f.finalizer(f.left(arg, args...), f.right(arg, args...))
+
+# struct EntryEncoder{F<:Function} <: CompositeFunction
+#     core::F
+#     link::ChainedAccess
+
+#     EntryEncoder(core::F, link::ChainedAccess) where {F<:Function} = new{F}(core, link)
+# end
+
+# (f::EntryEncoder)(args...) = f.core(args...)
+
+
+struct InputLimiter{N, F<:Function} <: FunctionModifier
+    f::F
+
+    function InputLimiter(f::F, ::Val{N}) where {F<:Function, N}
+        checkPositivity(N::Int)
+        new{numberOfInput, F}(f)
+    end
+end
+
+InputLimiter(f::InputLimiter, ::Val{N}) where {N} = InputLimiter(f.f, Val(N))
+
+(f::InputLimiter{N})(arg::Vararg{Any, N}) where {N} = f.f(arg...)
+
+
+struct NamedMapper{N, E<:NTuple{N, Function}} <: Mapper
+    encode::E
+    symbol::NTuple{N, Symbol}
+
+    NamedMapper(encode::E, syms::NTuple{N, Symbol}) where {N, E<:NTuple{N, Function}} = 
+    new{N, E}(encode, syms)
+end
+
+NamedMapper(encode::Function, sym::Symbol) = 
+NamedMapper((encode,), (sym,))
+
+NamedMapper(encodePairs::NamedTuple{S, <:Tuple{ Vararg{Function} }}) where {S} = 
+NamedMapper(values(encodePairs), S)
+
+NamedMapper() = NamedMapper((), ())
+
+const MonoNMapper{F<:Function} = NamedMapper{1, Tuple{F}}
+
+function getField(obj, f::NamedMapper)
+    map(f.encode) do encoder
+        encoder(obj)
+    end |> NamedTuple{f.symbol}
+end
+
+
+struct ParamFreeFunc{F<:Function} <: CompositeFunction
+    core::F
+
+    function ParamFreeFunc(f::F) where {F<:Function}
+        if !isParamBoxFree(f)
+            throw(AssertionError("`f` should not contain any `$ParamBox`."))
+        end
+        new{F}(f)
+    end
+end
+
+ParamFreeFunc(f::ParamFreeFunc) = itself(f)
+
+(f::ParamFreeFunc)(args...) = f.core(args...)
+
+
+struct Lucent end
+struct Opaque end
+
+struct Deref{F<:Function} <: FunctionModifier
+    f::F
+end
+
+(f::Deref)(arg::AbstractArray{<:Any, 0}) = f.f(arg[])
+(f::Deref)(arg::Tuple{Any}) = f.f(arg|>first)
+(f::Deref)(arg::NamedTuple{<:Any, <:Tuple{Any}}) = f.f(arg|>first)
+
+
+struct TupleHeader{N, F<:Function} <: FunctionModifier
+    f::F
+
+    function TupleHeader(f::F, ::Val{N}) where {F<:Function, N}
+        checkPositivity(N::Int, true)
+        new{N, F}(f)
+    end
+end
+
+TupleHeader(f::TupleHeader, ::Val{N}) where {N} = TupleHeader(f.f, Val(N))
+
+TupleHeader(::Val{N}) where {N} = TupleHeader(itself, Val(N))
+
+(f::TupleHeader{N})(head, body...) where {N} = 
+f.f(formatInput(TupleInput{Any, N}(), head), body...)
+
+const TypedTupleFunc{T, D, F<:Function} = ReturnTyped{T, TupleHeader{D, F}}
+
+TypedTupleFunc(f::Function, ::Type{T}, ::Val{D}) where {T, D} = 
+ReturnTyped(TupleHeader(f, Val(D)), T)
+
+TypedTupleFunc(f::ReturnTyped, ::Type{T}, ::Val{D}) where {T, D} = 
+ReturnTyped(TupleHeader(f.f, Val(D)), T)
+
+
+"""
+
+    getOpacity(f::Function) -> Union{Lucent, Opaque}
+
+If a return value is a `Lucent`, that means `f` either does not contain any `ParamBox`, or 
+has a specialized `unpackFunc` method that separates its embedded `ParamBox`.
+"""
+function getOpacity(f::Function)
+    (Base.issingletontype(f|>typeof) || isParamBoxFree(f)) ? Lucent() : Opaque()
+end
+
+getOpacity(::ParamFreeFunc) = Lucent()
+
+
+struct GetRange <: Mapper
+    start::Int
+    final::Int
+    step::Int
+
+    function GetRange(start::Int, final::Int, step::Int=1)
+        checkPositivity(start)
+        checkPositivity(final)
+        checkPositivity(step|>abs)
+        new(start, final, step)
+    end
+end
+
+function (f::GetRange)(obj)
+    map(obj, f.start:f.step:f.final) do i
+        getField(obj, OneToIndex(i))
+    end
 end

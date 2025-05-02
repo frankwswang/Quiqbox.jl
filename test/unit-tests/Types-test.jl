@@ -5,23 +5,31 @@ using Quiqbox
 
 @test Quiqbox.PrimGTO <: Quiqbox.PrimitiveOrb
 
-@test Quiqbox.EvalPrimOrb <: Quiqbox.ScaledOrbital
+@test Quiqbox.WrappedField <: Quiqbox.EncodedField
 
-@test Quiqbox.PrimGTOcore <: Quiqbox.PrimitiveOrbCore
+@test Quiqbox.EncodedFieldFunc <: Quiqbox.FieldParamFunc
 
-@test Quiqbox.EvalPrimGTO <: Quiqbox.EvalPrimOrb
+@test Quiqbox.RadialField <: Quiqbox.EncodedField
 
-@test Quiqbox.CompGTO <: Quiqbox.CompositeOrb
+@test Quiqbox.RadialFieldFunc <: Quiqbox.FieldParamFunc
 
-@test Quiqbox.WeightedPF <: Quiqbox.PairCombine
+@test Quiqbox.NullaryField <: Quiqbox.CurriedField
 
-@test Quiqbox.EvalCompOrb <: Quiqbox.ScaledOrbital
+@test Quiqbox.GaussFunc <: Quiqbox.CurriedField
 
-@test Quiqbox.EvalCompGTO <: Quiqbox.EvalCompOrb
+@test Quiqbox.GaussFieldFunc <: Quiqbox.FieldParamFunc
 
-@test Quiqbox.FPrimGTO <: Quiqbox.FrameworkOrb
+@test Quiqbox.AxialProduct{<:Number, 1} <: Quiqbox.ProductField
 
-@test Quiqbox.FCompGTO <: Quiqbox.FrameworkOrb
+@test Quiqbox.CartAngMomFunc <: Quiqbox.NullaryField
+
+@test Quiqbox.PolyRadialFunc <: Quiqbox.CoupledField
+
+@test Quiqbox.PolyGaussFunc <: Quiqbox.PolyRadialFunc
+
+@test Quiqbox.PolyRadialFieldFunc <: Quiqbox.FieldParamFunc
+
+@test Quiqbox.PolyGaussFieldFunc <: Quiqbox.PolyRadialFieldFunc
 
 @test Quiqbox.FixedSpanIndexSet <: Quiqbox.AbstractSpanIndexSet
 

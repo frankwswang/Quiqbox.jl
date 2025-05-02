@@ -1,26 +1,19 @@
 using LinearAlgebra: dot
 
+const OrbitalDataSet{T, D} = AbstractVector{<:OrbitalData{T, D}}
+
 const OrbitalBasisSet{T, D} = AbstractVector{<:OrbitalBasis{T, D}}
-const OrbitalCollection{T, D} = NonEmpTplOrAbtArr{FrameworkOrb{T, D}, 1}
-const OrbitalInput{T, D} = Union{FrameworkOrb{T, D}, OrbitalCollection{T, D}}
-const FPrimOrbSet{T, D} = AbstractVector{<:FPrimOrb{T, D}}
 
-const OrbCoreData{T, D, F<:PrimitiveOrbCore{T, D}, V<:DirectMemory{T}} = 
-      Tuple{F, FixedSpanValueSet{T, V}}
+const OrbCoreMarker = FieldMarker{:FieldParamFunc, 1}
 
-# const FlatParamValMatcher{T, V<:AbstractVector{ <:AbstractArray{T} }} = 
-#       ElementWiseMatcher{ItsType, V}
+const OrbCoreMarkerDict{T, D} = Dict{EgalBox{FieldParamFunc{T, D}}, OrbCoreMarker}
 
-const OrbCoreMarker = FieldMarker{:PrimitiveOrbCore, 1}
+const OrbCoreKey{D, C<:Real, P<:AbstractSpanValueSet} = 
+      Tuple{NTuple{D, C}, P, OrbCoreMarker}
 
-const OrbCoreKey{T} = Tuple{OrbCoreMarker, FixedSpanValueSet{T}}
+const OrbCoreIdxDict{D} = Dict{OrbCoreKey{D}, Int}
 
-const OrbCoreMarkerDict = Dict{BlackBox, OrbCoreMarker}
-
-const OrbCoreIdxDict{T} = Dict{OrbCoreKey{T}, Int}
-
-const OrbCoreDataSeq{T, D, F<:PrimitiveOrbCore{T, D}, V<:AbstractArray{T}, N} = 
-      AbstractVector{OrbCoreData{T, D, F, V}}
+const OrbCoreDataSeq{T, D} = AbstractVector{<:PrimOrbData{T, D}}
 
 const OneBodyIdxSymDict = let tempDict=Base.ImmutableDict(true=>:aa)
     Base.ImmutableDict(tempDict, false=>:ab)
@@ -36,19 +29,20 @@ const TwoBodyIdxSymDict = let
     end
 end
 
-const GeneralTensorIdxSymDict =  let tempDict=Base.ImmutableDict(2=>:ij)
-    Base.ImmutableDict(tempDict, 4=>:ijkl)
+# const GeneralTensorIdxSymDict =  let tempDict=Base.ImmutableDict(2=>:ij)
+#     Base.ImmutableDict(tempDict, 4=>:ijkl)
+# end
+
+#!? Consider replacing it with LRU-based cache to control memory consumption
+struct PrimOrbDataCache{T, D, P<:PrimOrbData{T, D}}
+    dict::OrbCoreIdxDict{D}
+    list::Vector{P}
+
+    function PrimOrbDataCache(::Type{T}, ::Val{D}, ::Type{P}=PrimOrbData{T, D}) where 
+                    {T, D, P<:PrimOrbData{T, D}}
+    new{T, D, P}(OrbCoreIdxDict{D}(), P[])
+    end
 end
-
-
-struct PrimOrbCoreCache{T, D, F<:PrimitiveOrbCore{T, D}}
-    dict::OrbCoreIdxDict{T}
-    list::Vector{OrbCoreData{ T, D, F, DirectMemory{T} }}
-end
-
-PrimOrbCoreCache(::Type{T}, ::Val{D}, ::Type{F}=PrimitiveOrbCore{T, D}) where 
-                {T, D, F<:PrimitiveOrbCore{T, D}} = 
-PrimOrbCoreCache(OrbCoreIdxDict{T}(), OrbCoreData{ T, D, F, DirectMemory{T} }[])
 
 
 struct IndexedWeights{T} <: QueryBox{T}
@@ -64,26 +58,22 @@ struct OneBodyFullCoreIntegrals{T<:Number, D} <: IntegralData{T, OneBodyIntegral
     new{T, D}(Dict{ Tuple{Int},  Tuple{T}}(), Dict{NTuple{2, Int}, NTuple{2, T}}())
 end
 
-# struct OneBodySymmetricDiffData{T<:Number} <: IntegralData{T, OneBodyIntegral}
-#     ab::Dict{NTuple{2, Int}, T}
-# end
-
 
 struct PrimOrbCoreIntegralCache{T, D, S<:MultiBodyIntegral{D}, F<:DirectOperator, 
-                                I<:IntegralData{T, S}, B<:PrimitiveOrbCore{T, D}
+                                I<:IntegralData{T, S}, P<:PrimOrbData{T, D}
                                 } <: SpatialProcessCache{T, D}
     operator::F
     data::I
-    basis::PrimOrbCoreCache{T, D, B}
+    basis::PrimOrbDataCache{T, D, P}
 end
 
 const POrb1BCoreICache{T, D, F<:DirectOperator, I<:IntegralData{T, OneBodyIntegral{D}}, 
-                       B<:PrimitiveOrbCore{T, D}} = 
-      PrimOrbCoreIntegralCache{T, D, OneBodyIntegral{D}, F, I, B}
+                       P<:PrimOrbData{T, D}} = 
+      PrimOrbCoreIntegralCache{T, D, OneBodyIntegral{D}, F, I, P}
 
 const OverlapCoreCache{T, D, I<:IntegralData{T, OneBodyIntegral{D}}, 
-                       B<:PrimitiveOrbCore{T, D}} = 
-      POrb1BCoreICache{T, D, Identity, I, B}
+                       P<:PrimOrbData{T, D}} = 
+      POrb1BCoreICache{T, D, Identity, I, P}
 
 
 function setIntegralData!(ints::OneBodyFullCoreIntegrals{T}, 
@@ -110,233 +100,171 @@ end
 
 struct Bar <: Any end
 
-const OrbCoreIntLayoutAllOrbs{T, D, N} = NonEmptyTuple{PrimitiveOrbCore{T, D}, N}
-const OrbCoreIntLayoutOrbBar1{T, D} = 
-      Tuple{PrimitiveOrbCore{T, D}, Bar, PrimitiveOrbCore{T, D}}
-const OrbCoreIntLayoutOrbBar2{T, D} = 
-      Tuple{PrimitiveOrbCore{T, D}, PrimitiveOrbCore{T, D}, Bar}
-const OrbCoreIntLayoutOrbBar3{T, D} = 
-      Tuple{PrimitiveOrbCore{T, D}, Bar, PrimitiveOrbCore{T, D}, PrimitiveOrbCore{T, D}}
-const OrbCoreIntLayoutOrbBar4{T, D} = 
-      Tuple{PrimitiveOrbCore{T, D}, PrimitiveOrbCore{T, D}, Bar, PrimitiveOrbCore{T, D}}
+const OrbCoreIntLayoutAllOrbs{T, D, N, O<:PrimOrbData{T, D}} = NonEmptyTuple{O, N}
+const OrbCoreIntLayoutOrbBar1{T, D, O<:PrimOrbData{T, D}} = Tuple{O, Bar, O}
+const OrbCoreIntLayoutOrbBar2{T, D, O<:PrimOrbData{T, D}} = Tuple{O, O, Bar}
+const OrbCoreIntLayoutOrbBar3{T, D, O<:PrimOrbData{T, D}} = Tuple{O, Bar, O, O}
+const OrbCoreIntLayoutOrbBar4{T, D, O<:PrimOrbData{T, D}} = Tuple{O, O, Bar, O}
 
-const OneBodyOrbCoreIntLayout{T, D} = Union{
-    OrbCoreIntLayoutAllOrbs{T, D, 0}, OrbCoreIntLayoutAllOrbs{T, D, 1}
+const OneBodyOrbCoreIntLayout{T, D, O<:PrimOrbData{T, D}} = Union{
+    OrbCoreIntLayoutAllOrbs{T, D, 0, O}, OrbCoreIntLayoutAllOrbs{T, D, 1, O}
 }
 
-const TwoBodyOrbCoreIntLayout{T, D} = Union{
-    OrbCoreIntLayoutAllOrbs{T, D, 0}, OrbCoreIntLayoutAllOrbs{T, D, 3}, 
-    OrbCoreIntLayoutOrbBar1{T, D},    OrbCoreIntLayoutOrbBar2{T, D}, 
-    OrbCoreIntLayoutOrbBar3{T, D},    OrbCoreIntLayoutOrbBar4{T, D}, 
+const TwoBodyOrbCoreIntLayout{T, D, O<:PrimOrbData{T, D}} = Union{
+    OrbCoreIntLayoutAllOrbs{T, D, 0, O}, OrbCoreIntLayoutAllOrbs{T, D, 3, O}, 
+    OrbCoreIntLayoutOrbBar1{T, D, O},    OrbCoreIntLayoutOrbBar2{T, D, O}, 
+    OrbCoreIntLayoutOrbBar3{T, D, O},    OrbCoreIntLayoutOrbBar4{T, D, O}, 
 }
 
-const OrbCoreIntLayout{T, D} = 
-      Union{OneBodyOrbCoreIntLayout{T, D}, TwoBodyOrbCoreIntLayout{T, D}}
+const OrbCoreIntLayout{T, D, O<:PrimOrbData{T, D}} = 
+      Union{OneBodyOrbCoreIntLayout{T, D, O}, TwoBodyOrbCoreIntLayout{T, D, O}}
 
+const OneBodyOrbCoreIntLayoutUnion{T, D} = OneBodyOrbCoreIntLayout{T, D, PrimOrbData{T, D}}
+const TwoBodyOrbCoreIntLayoutUnion{T, D} = TwoBodyOrbCoreIntLayout{T, D, PrimOrbData{T, D}}
+const OrbCoreIntLayoutUnion{T, D} = OrbCoreIntLayout{T, D, PrimOrbData{T, D}}
+const GaussTypeOrbIntLayout{T, D} = OrbCoreIntLayout{T, D, PrimGTOData{T, D}}
+
+
+formatOrbCoreIntConfig(::P) where {P<:OrbCoreIntLayoutUnion} = P
+
+function formatOrbCoreIntConfig(config::GaussTypeOrbIntLayout{T, D}) where {T, D}
+    fieldTypes = map(config) do x
+        x isa Bar ? Bar : PrimGTOData{T, D}
+    end
+    Tuple{fieldTypes...}
+end
 
 struct OrbCoreIntConfig{T, D, S<:MultiBodyIntegral{D}, 
-                        P<:OrbCoreIntLayout{T, D}} <: StructuredType
+                        P<:OrbCoreIntLayoutUnion{T, D}} <: StructuredType
 
-    function OrbCoreIntConfig(::OneBodyIntegral{D}, ::P) where 
-                             {D, T, P<:OneBodyOrbCoreIntLayout{T, D}}
-        new{T, D, OneBodyIntegral{D}, P}()
+    function OrbCoreIntConfig(::OneBodyIntegral{D}, 
+                              layout::OneBodyOrbCoreIntLayoutUnion{T, D}) where {D, T}
+        new{T, D, OneBodyIntegral{D}, formatOrbCoreIntConfig(layout)}()
     end
 
-    function OrbCoreIntConfig(::TwoBodyIntegral{D}, ::P) where 
-                             {D, T, P<:TwoBodyOrbCoreIntLayout{T, D}}
-        new{T, D, TwoBodyIntegral{D}, P}()
+    function OrbCoreIntConfig(::TwoBodyIntegral{D}, 
+                              layout::TwoBodyOrbCoreIntLayoutUnion{T, D}) where {D, T}
+        new{T, D, TwoBodyIntegral{D}, formatOrbCoreIntConfig(layout)}()
     end
 end
 
-const OneBodyOrbCoreIntConfig{T, D, P<:OneBodyOrbCoreIntLayout{T, D}} = 
-      OrbCoreIntConfig{T, D, OneBodyIntegral{D}, P}
 
-const TwoBodyOrbCoreIntConfig{T, D, P<:TwoBodyOrbCoreIntLayout{T, D}} = 
-      OrbCoreIntConfig{T, D, TwoBodyIntegral{D}, P}
+struct OrbIntCompCache{T, D, S<:MultiBodyIntegral{D}} <: CustomCache{T}
+    dict::LRU{OrbCoreIntConfig{T, D, S}, CustomCache{T}}
 
-
-abstract type OrbIntegralCompCacheBox{T, D, S<:MultiBodyIntegral{D}} <: QueryBox{T} end
-
-
-struct OrbIntCompCacheBox{T, D, S<:MultiBodyIntegral{D}} <: OrbIntegralCompCacheBox{T, D, S}
-    dict::Dict{OrbCoreIntConfig{T, D, S}, OrbIntegralComputeCache{T, D, S}}
-
-    function OrbIntCompCacheBox(::S, ::Type{T}) where {D, S<:MultiBodyIntegral{D}, T}
-        dict = Dict{OrbCoreIntConfig{T, D, S}, OrbIntegralComputeCache{T, D, S}}()
+    function OrbIntCompCache(::S, ::Type{T}) where {D, S<:MultiBodyIntegral{D}, T}
+        dict = LRU{OrbCoreIntConfig{T, D, S}, CustomCache{T}}(maxsize=20)
         new{T, D, S}(dict)
     end
 end
 
+struct OrbIntNullCache{T, D, S<:MultiBodyIntegral{D}} <: CustomCache{T}
 
-struct OrbIntNullCacheBox{T, D, S<:MultiBodyIntegral{D}} <: OrbIntegralCompCacheBox{T, D, S}
-
-    OrbIntCompCacheBox(::S, ::Type{T}) where {D, S<:MultiBodyIntegral{D}, T} = 
-    new{T, D, S}()
+    OrbIntCompCache(::S, ::Type{T}) where {D, S<:MultiBodyIntegral{D}, T} = new{T, D, S}()
 end
 
 
-abstract type CachedComputeSpatialIntegral{T, D} <: StatefulFunction{T} end
+const OrbCoreIntegralCacheBox{T, D, S<:MultiBodyIntegral{D}} = 
+      Union{OrbIntCompCache{T, D, S}, OrbIntNullCache{T, D, S}}
 
-
-struct CachedComputeOrbCoreIntegral{T, D, F<:DirectOperator, 
-                                    C<:OrbIntegralCompCacheBox{T, D}
-                                    } <: CachedComputeSpatialIntegral{T, D}
+struct CachedOrbCoreIntegrator{T, D, F<:DirectOperator, 
+                               C<:OrbCoreIntegralCacheBox{T, D}} <: ConfigBox
     operator::F
     cache::C
 
-    function CachedComputeOrbCoreIntegral(::Val{true},  ::S, operator::F, ::Type{T}) where 
-                                         {F<:DirectOperator, T, D, S<:MultiBodyIntegral{D}}
-        new{T, D, F, OrbIntCompCacheBox{T, D, S}}(operator, OrbIntCompCacheBox(S(), T))
+    function CachedOrbCoreIntegrator(::Val{true},  ::S, operator::F, ::Type{T}) where 
+                                    {F<:DirectOperator, T, D, S<:MultiBodyIntegral{D}}
+        new{T, D, F, OrbIntCompCache{T, D, S}}(operator, OrbIntCompCache(S(), T))
     end
 
-    function CachedComputeOrbCoreIntegral(::Val{false}, ::S, operator::F, ::Type{T}) where 
-                                         {F<:DirectOperator, T, D, S<:MultiBodyIntegral{D}}
-        new{T, D, F, OrbIntNullCacheBox{T, D, S}}(operator, OrbIntNullCacheBox(S(), T))
-    end
-end
-
-const OrbCoreIntegralComputeConfig{T, D, S<:MultiBodyIntegral{D}, F<:DirectOperator, 
-                                   C<:OrbIntegralCompCacheBox{T, D, S}} = 
-      CachedComputeOrbCoreIntegral{T, D, F, C}
-
-const Orb1BCCIntComputeConfigUnion{T, D, F<:DirectOperator} = 
-      OrbCoreIntegralComputeConfig{T, D, OneBodyIntegral{D}, F}
-
-const Orb2BCCIntComputeConfigUnion{T, D, F<:DirectOperator} = 
-      OrbCoreIntegralComputeConfig{T, D, TwoBodyIntegral{D}, F}
-
-const DirectComputeOrbCoreIntegral{T, D, S<:MultiBodyIntegral{D}, F<:DirectOperator, 
-                                   C<:OrbIntNullCacheBox{T, D, S}} = 
-      CachedComputeOrbCoreIntegral{T, D, F, C}
-
-const ReusedComputeOrbCoreIntegral{T, D, S<:MultiBodyIntegral{D}, F<:DirectOperator, 
-                                   C<:OrbIntCompCacheBox{T, D, S}} = 
-      CachedComputeOrbCoreIntegral{T, D, F, C}
-
-
-function buildCoreIntegrator(::OneBodyIntegral{D}, op::DirectOperator, 
-                             orbs::N12Tuple{PrimitiveOrbCore{T, D}}
-                             ) where {T, D}
-    OneBodyNumIntegrate(op, orbs)
-end
-
-function buildCoreIntegrator(::OneBodyIntegral{D}, ::Identity, 
-                             orbs::N12Tuple{PrimGTOcore{T, D}}) where {T, D}
-    genGTOrbOverlapFunc(orbs)
-end
-
-function buildCoreIntegrator(::OneBodyIntegral{D}, op::MonomialMul{T, D}, 
-                             orbs::N12Tuple{PrimGTOcore{T, D}}) where {T, D}
-    genGTOrbMultiMomentFunc(op, orbs)
-end
-
-
-function (f::DirectComputeOrbCoreIntegral{T, D, S}
-          )(data::N12Tuple{OrbCoreData{T, D}}) where {T, D, S<:MultiBodyIntegral{D}}
-    orbData = first.(data)
-    parData =  last.(data)
-    fCore = buildCoreIntegrator(S(), f.operator, orbData)
-    fCore(parData...)
-end
-
-const OrbCoreIntegralComputeCacheTypes{T, D} = Union{
-    OrbCoreIntConfig{T, D, <:MultiBodyIntegral{D}, TetraTupleUnion{PrimGTOcore{T, D}}}
-}
-
-function prepareOneBodyIntCompCache!(f::ReusedComputeOrbCoreIntegral{T, D, S}, 
-                                     orbs::TetraTupleUnion{PrimitiveOrbCore{T, D}}) where 
-                                    {T, D, S<:MultiBodyIntegral{D}}
-    key = OrbCoreIntConfig(S(), orbs)
-    if key isa OrbCoreIntegralComputeCacheTypes
-        get!(f.cache.dict, key) do
-            genGTOrbIntCompCache(f.operator, orbs)
-        end
-    else
-        nothing
+    function CachedOrbCoreIntegrator(::Val{false}, ::S, operator::F, ::Type{T}) where 
+                                    {F<:DirectOperator, T, D, S<:MultiBodyIntegral{D}}
+        new{T, D, F, OrbIntNullCache{T, D, S}}(operator, OrbIntNullCache(S(), T))
     end
 end
 
-prepareOneBodyIntCompCache!(::ReusedComputeOrbCoreIntegral{T, D, OneBodyIntegral{D}}, 
-                            ::Tuple{PrimGTOcore{T, D}}) where {T, D} = 
-nothing
+const DirectOrbCoreIntegrator{T, D, S<:MultiBodyIntegral{D}, F<:DirectOperator} = 
+      CachedOrbCoreIntegrator{T, D, F, OrbIntNullCache{T, D, S}}
 
-function (f::OrbCoreIntegralComputeConfig{T, D, S}
-          )(data::TetraTupleUnion{OrbCoreData{T, D}}) where {T, D, S<:MultiBodyIntegral{D}}
-    orbData = first.(data)
-    parData =  last.(data)
-    fCore = buildCoreIntegrator(S(), f.operator, orbData)
-    intSectorCache = prepareOneBodyIntCompCache!(f, orbData)
-    if intSectorCache === nothing
-        fCore(parData...)
-    else
-        fCore(parData..., cache!Self=intSectorCache)
+const ReusedOrbCoreIntegrator{T, D, S<:MultiBodyIntegral{D}, F<:DirectOperator} = 
+      CachedOrbCoreIntegrator{T, D, F, OrbIntCompCache{T, D, S}}
+
+const OrbCoreIntegratorConfig{T, D, S<:MultiBodyIntegral{D}, F<:DirectOperator, 
+                              C<:OrbCoreIntegralCacheBox{T, D, S}} = 
+      CachedOrbCoreIntegrator{T, D, F, C}
+
+const OrbCoreOneBodyIntegrator{T, D} = OrbCoreIntegratorConfig{T, D, OneBodyIntegral{D}}
+
+
+# getAnalyticIntegralCache(::Union{Identity, MonomialMul{T, D}}, ::Tuple{PrimGTOData{T, D}}
+#                          ) where {T, D} = 
+# NullCache{T}()
+
+getAnalyticIntegralCache(::Union{Identity, MonomialMul{T, D}}, 
+                         ::NTuple{2, PrimGTOData{T, D}}) where {T, D} = 
+AxialGaussTypeOverlapCache(T, ntuple( _->Val(true), Val(D) ))
+
+getAnalyticIntegralCache(::DirectOperator, layout::OrbCoreIntLayoutUnion{T}) where {T} = 
+NullCache{T}()
+
+
+function prepareAnalyticIntCache!(f::ReusedOrbCoreIntegrator{T, D, S}, 
+                                  data::OrbCoreIntLayoutUnion{T, D}) where 
+                                 {T, D, S<:MultiBodyIntegral{D}}
+    key = OrbCoreIntConfig(S(), data)
+    get!(f.cache.dict, key) do
+        getAnalyticIntegralCache(f.operator, data)
     end
+end
+
+prepareAnalyticIntCache!(::DirectOrbCoreIntegrator{T, D, S}, 
+                         ::OrbCoreIntLayoutUnion{T, D}) where 
+                        {T, D, S<:MultiBodyIntegral{D}} = 
+NullCache{T}()
+
+
+function applyIntegralMethod(f::OrbCoreIntegratorConfig{T, D, S}, 
+                             orbsData::OrbCoreIntLayoutUnion{T, D}) where 
+                            {T, D, S<:MultiBodyIntegral{D}}
+    getNumericalIntegral(S(), f.operator, orbsData)
+end
+
+function applyIntegralMethod(f::OrbCoreIntegratorConfig{T, D, S}, 
+                             orbsData::GaussTypeOrbIntLayout{T, D}) where 
+                            {T, D, S<:MultiBodyIntegral{D}}
+    IntLayoutCache = prepareAnalyticIntCache!(f, orbsData)
+    getAnalyticIntegral!(S(), IntLayoutCache, f.operator, orbsData)
 end
 
 
 # One-Body (i|O|j) hermiticity across O
-getHermiticity(::PrimitiveOrbCore{T, D}, ::DirectOperator, 
-               ::PrimitiveOrbCore{T, D}) where {T, D} = 
+getHermiticity(::PrimOrbData{T, D}, ::DirectOperator, ::PrimOrbData{T, D}) where {T, D} = 
 false
 
-getHermiticity(::PrimitiveOrbCore{T, D}, ::Identity, 
-               ::PrimitiveOrbCore{T, D}) where {T, D} = 
+getHermiticity(::PrimOrbData{T, D}, ::Identity, ::PrimOrbData{T, D}) where {T, D} = 
 true
 
 # Two-Body (ii|O|jj) (ii|O|jk) (ij|O|kk) (ij|O|kl) hermiticity across O
-getHermiticity(::N12Tuple{PrimitiveOrbCore{T, D}}, ::Identity, 
-               ::N12Tuple{PrimitiveOrbCore{T, D}}) where {T, D} = 
+getHermiticity(::N12Tuple{PrimOrbData{T, D}}, ::Identity, 
+               ::N12Tuple{PrimOrbData{T, D}}) where {T, D} = 
 true
 
 
-function genCoreIntTuple(integrator::Orb1BCCIntComputeConfigUnion{T, D}, 
-                         oDataTuple::Tuple{OrbCoreData{T, D}}) where {T, D}
-    (integrator(oDataTuple),)
+function genCoreIntTuple(integrator::OrbCoreOneBodyIntegrator{T, D}, 
+                         oDataTuple::Tuple{PrimOrbData{T, D}}) where {T, D}
+    (applyIntegralMethod(integrator, oDataTuple),)
 end
 
-function genCoreIntTuple(integrator::Orb1BCCIntComputeConfigUnion{T, D}, 
-                         oDataTuple::NTuple{2, OrbCoreData{T, D}}) where {T, D}
-    d1, d2 = oDataTuple
-    ijVal = integrator(oDataTuple)
-    jiVal = if getHermiticity(first(d1), integrator.operator, first(d2))
+function genCoreIntTuple(integrator::OrbCoreOneBodyIntegrator{T, D}, 
+                         oDataTuple::NTuple{2, PrimOrbData{T, D}}) where {T, D}
+    ijVal = applyIntegralMethod(integrator, oDataTuple)
+    jiVal = if getHermiticity(first(oDataTuple), integrator.operator, last(oDataTuple))
         ijVal'
     else
-        integrator(oDataTuple|>reverse)
+        applyIntegralMethod(integrator, reverse(oDataTuple))
     end
     (ijVal, jiVal)
 end
-
-# function genCoreIntTuple(integrator::Orb2BCCIntComputeConfigUnion{T, D}, 
-#                          oDataTuple::Tuple{OrbCoreDataSeq{T, D}}, 
-#                          oneBasedIds::Tuple{Int}) where {T, D}
-# end
-
-# function genCoreIntTuple(integrator::Orb2BCCIntComputeConfigUnion{T, D}, 
-#                          oDataTuple::Tuple{OrbCoreDataSeq{T, D}, Bar, OrbCoreDataSeq{T, D}}, 
-#                          oneBasedIds::NTuple{2, Int}) where {T, D}
-# end
-
-# function genCoreIntTuple(integrator::Orb2BCCIntComputeConfigUnion{T, D}, 
-#                          oDataTuple::Tuple{OrbCoreDataSeq{T, D}, OrbCoreDataSeq{T, D}, Bar}, 
-#                          oneBasedIds::NTuple{2, Int}) where {T, D}
-# end
-
-# function genCoreIntTuple(integrator::Orb2BCCIntComputeConfigUnion{T, D}, 
-#                          oDataTuple::Tuple{OrbCoreDataSeq{T, D}, Bar, OrbCoreDataSeq{T, D}, 
-#                                            OrbCoreDataSeq{T, D}}, 
-#                          oneBasedIds::NTuple{3, Int}) where {T, D}
-# end
-
-# function genCoreIntTuple(integrator::Orb2BCCIntComputeConfigUnion{T, D}, 
-#                          oDataTuple::Tuple{OrbCoreDataSeq{T, D}, OrbCoreDataSeq{T, D}, Bar, 
-#                                            OrbCoreDataSeq{T, D}}, 
-#                          oneBasedIds::NTuple{3, Int}) where {T, D}
-# end
-
-# function genCoreIntTuple(integrator::Orb2BCCIntComputeConfigUnion{T, D}, 
-#                          oDataTuple::NTuple{4, OrbCoreDataSeq{T, D}}, 
-#                          oneBasedIds::NTuple{4, Int}) where {T, D}
-# end
 
 
 function sortTensorIndex((i, j)::NTuple{2, Int})
@@ -360,7 +288,7 @@ end
 sortTensorIndex(arg::Vararg{Int}) = sortTensorIndex(arg)
 
 
-function genOneBodyIntDataPairs(integrator::CachedComputeOrbCoreIntegral{T, D}, 
+function genOneBodyIntDataPairs(integrator::CachedOrbCoreIntegrator{T, D}, 
                                 (oDataSeq,)::Tuple{OrbCoreDataSeq{T, D}}, 
                                 (indexOffset,)::Tuple{Int}=(0,)) where {T, D}
     nOrbs = length(oDataSeq)
@@ -383,7 +311,7 @@ function genOneBodyIntDataPairs(integrator::CachedComputeOrbCoreIntegral{T, D},
     pairs1, pairs2
 end
 
-function genOneBodyIntDataPairs(integrator::CachedComputeOrbCoreIntegral{T, D}, 
+function genOneBodyIntDataPairs(integrator::CachedOrbCoreIntegrator{T, D}, 
                                 oDataSeqPair::NTuple{2, OrbCoreDataSeq{T, D}}, 
                                 indexOffsets::NTuple{2, Int}) where {T, D}
     mnOrbs = length.(oDataSeqPair)
@@ -415,7 +343,7 @@ function setTensorEntries!(tensor::AbstractMatrix{T}, valPair::NTuple{2, T},
 end
 
 
-function genOneBodyPrimCoreIntTensor(integrator::CachedComputeOrbCoreIntegral{T, D}, 
+function genOneBodyPrimCoreIntTensor(integrator::CachedOrbCoreIntegrator{T, D}, 
                                      (oDataSeq,)::Tuple{OrbCoreDataSeq{T, D}}) where {T, D}
     nOrbs = length(oDataSeq)
     res = ShapedMemory{T}(undef, (nOrbs, nOrbs))
@@ -434,7 +362,7 @@ function genOneBodyPrimCoreIntTensor(integrator::CachedComputeOrbCoreIntegral{T,
     res
 end
 
-function genOneBodyPrimCoreIntTensor(integrator::CachedComputeOrbCoreIntegral{T, D}, 
+function genOneBodyPrimCoreIntTensor(integrator::CachedOrbCoreIntegrator{T, D}, 
                                      oDataSeqPair::NTuple{2, OrbCoreDataSeq{T, D}}) where 
                                     {T, D}
     oData1, oData2 = oDataSeqPair
@@ -442,7 +370,7 @@ function genOneBodyPrimCoreIntTensor(integrator::CachedComputeOrbCoreIntegral{T,
     res = ShapedMemory{T}(undef, (len1, len2))
     for j in 1:len2, i in 1:len1
         oDataPair = (oData1[begin+i-1], oData2[begin+j-1])
-        ijVal = integrator(oDataPair)
+        ijVal = applyIntegralMethod(integrator, oDataPair)
         res[begin+i-1, begin+j-1] = ijVal
     end
     res
@@ -483,60 +411,70 @@ function getBasisIndexRange(list::BasisIndexList, oneToIdx::Int)
 end
 
 
-function updateOrbCache!(orbCache::PrimOrbCoreCache{T, D}, 
-                         paramCache::MultiSpanDataCacheBox{T}, 
-                         orbMarkerCache::OrbCoreMarkerDict, 
-                         orb::FPrimOrb{T}) where {T, D}
-    orbCore = (getInnerOrb∘getInnerOrb)(orb)
-    paramSubset = getField(orb.param, orb.pointer.scope)
-    orbData = (orbCore, cacheParam!(paramCache, paramSubset))
-    updateOrbCache!(orbCache, orbMarkerCache, orbData)
+function genOrbCoreKey!(cache::OrbCoreMarkerDict{T, D}, 
+                        data::PrimOrbData{T, D}) where {T, D}
+    marker = lazyMarkObj!(cache, data.body.first)
+    (data.center, data.body.second, marker)
 end
 
-function updateOrbCache!(orbCache::PrimOrbCoreCache{T, D}, 
-                         orbMarkerCache::OrbCoreMarkerDict, 
-                         orbData::OrbCoreData{T, D}) where {T, D}
+
+function updateOrbCache!(orbCache::PrimOrbDataCache{T, D}, 
+                         orbMarkerCache::OrbCoreMarkerDict{T, D}, 
+                         orbData::PrimOrbData{T, D}) where {T, D}
     basis = orbCache.list
-    orbCore, orbPars = orbData
-    objCoreMarker = lazyMarkObj!(orbMarkerCache, orbCore)
-    get!(orbCache.dict, (objCoreMarker, orbPars)) do
+    get!(orbCache.dict, genOrbCoreKey!(orbMarkerCache, orbData)) do
         push!(basis, orbData)
         lastindex(basis)
     end
 end
 
 
-function indexCacheOrbData!(orbCache::PrimOrbCoreCache{T, D}, 
-                            paramCache::MultiSpanDataCacheBox{T}, 
-                            orbMarkerCache::OrbCoreMarkerDict, 
-                            orb::FrameworkOrb{T, D}) where {T, D}
-    orbSize = orbSizeOf(orb)
+function indexCacheOrbData!(orbCache::PrimOrbDataCache{T, D}, 
+                            orbMarkerCache::OrbCoreMarkerDict{T, D}, 
+                            orbData::PrimOrbData{T, D}) where {T, D}
+    list = BasisIndexList(1)
+    list.index[] = updateOrbCache!(orbCache, orbMarkerCache, orbData)
+    list
+end
+
+function indexCacheOrbData!(orbCache::PrimOrbDataCache{T, D}, 
+                            orbMarkerCache::OrbCoreMarkerDict{T, D}, 
+                            orbData::CompOrbData{T, D}) where {T, D}
+    orbSize = length(orbData.basis)
     list = BasisIndexList(orbSize)
-    for i in 1:orbSize
-        idx = updateOrbCache!(orbCache, paramCache, orbMarkerCache, viewOrb(orb, i))
+    for (i, data) in enumerate(orbData.basis)
+        idx = updateOrbCache!(orbCache, orbMarkerCache, data)
         list.index[begin+i-1] = idx
     end
     list
 end
 
-function indexCacheOrbData!(orbCache::PrimOrbCoreCache{T, D}, 
-                            paramCache::MultiSpanDataCacheBox{T}, 
-                            orbMarkerCache::OrbCoreMarkerDict, 
-                            orbs::OrbitalCollection{T, D}) where {T, D}
-    list = (BasisIndexList∘map)(orbSizeOf, orbs)
-    for (j, orb) in enumerate(orbs)
+getOrbDataSize(orbData::PrimOrbData) = 1
+
+getOrbDataSize(orbData::CompOrbData) = length(orbData.basis)
+
+getSubOrbData(orbData::PrimOrbData, ::Int) = itself(orbData)
+
+getSubOrbData(orbData::CompOrbData, i::Int) = orbData.basis[begin+i-1]
+
+function indexCacheOrbData!(orbCache::PrimOrbDataCache{T, D}, 
+                            orbMarkerCache::OrbCoreMarkerDict{T, D}, 
+                            orbsData::OrbitalDataCollection{T, D}) where {T, D}
+    list = (BasisIndexList∘map)(getOrbDataSize, orbsData)
+    for (j, orbData) in enumerate(orbsData)
         iRange = getBasisIndexRange(list, j)
         for (n, i) in enumerate(iRange)
-            idx = updateOrbCache!(orbCache, paramCache, orbMarkerCache, viewOrb(orb, n))
+            primOrbData = getSubOrbData(orbData, n)
+            idx = updateOrbCache!(orbCache, orbMarkerCache, primOrbData)
             list.index[i] = idx
         end
     end
     list
 end
 
-function indexCacheOrbData!(targetCache::PrimOrbCoreCache{T, D}, 
-                            sourceCache::PrimOrbCoreCache{T, D}, 
-                            orbMarkerCache::OrbCoreMarkerDict, 
+function indexCacheOrbData!(targetCache::PrimOrbDataCache{T, D}, 
+                            sourceCache::PrimOrbDataCache{T, D}, 
+                            orbMarkerCache::OrbCoreMarkerDict{T, D}, 
                             sourceList::BasisIndexList) where {T, D}
     targetList = BasisIndexList(sourceList)
     primOrbIds = targetList.index
@@ -549,21 +487,19 @@ end
 
 
 function cachePrimCoreIntegrals!(intCache::PrimOrbCoreIntegralCache{T, D}, 
-                                 paramCache::MultiSpanDataCacheBox{T}, 
-                                 orbMarkerCache::OrbCoreMarkerDict, 
-                                 orbData::Union{OrbitalCollection{T, D}, FrameworkOrb{T, D}}
-                                 ) where {T, D}
+                                 orbMarkerCache::OrbCoreMarkerDict{T, D}, 
+                                 orbData::OrbitalDataInput{T, D}) where {T, D}
     orbCache = intCache.basis
     oldMaxIdx = lastindex(orbCache.list)
-    orbIdxList = indexCacheOrbData!(orbCache, paramCache, orbMarkerCache, orbData)
+    orbIdxList = indexCacheOrbData!(orbCache, orbMarkerCache, orbData)
     updatePrimCoreIntCache!(intCache, oldMaxIdx+1)
     orbIdxList
 end
 
 function cachePrimCoreIntegrals!(targetIntCache::C, sourceIntCache::C, 
-                                 orbMarkerCache::OrbCoreMarkerDict, 
+                                 orbMarkerCache::OrbCoreMarkerDict{T, D}, 
                                  sourceOrbList::BasisIndexList) where 
-                                {C<:PrimOrbCoreIntegralCache}
+                                {T, D, C<:PrimOrbCoreIntegralCache{T, D}}
     tOrbCache = targetIntCache.basis
     oldMaxIdx = lastindex(tOrbCache.list)
     sOrbCache = sourceIntCache.basis
@@ -573,7 +509,7 @@ function cachePrimCoreIntegrals!(targetIntCache::C, sourceIntCache::C,
 end
 
 
-function updateIntCacheCore!(integrator::CachedComputeOrbCoreIntegral{T, D}, 
+function updateIntCacheCore!(integrator::CachedOrbCoreIntegrator{T, D}, 
                              ints::OneBodyFullCoreIntegrals{T, D}, 
                              basis::Tuple{OrbCoreDataSeq{T, D}}, 
                              offset::Tuple{Int}) where {T, D}
@@ -583,7 +519,7 @@ function updateIntCacheCore!(integrator::CachedComputeOrbCoreIntegral{T, D},
     ints
 end
 
-function updateIntCacheCore!(integrator::CachedComputeOrbCoreIntegral{T, D}, 
+function updateIntCacheCore!(integrator::CachedOrbCoreIntegrator{T, D}, 
                              ints::OneBodyFullCoreIntegrals{T, D}, 
                              basis::NTuple{2, OrbCoreDataSeq{T, D}}, 
                              offset::NTuple{2, Int}) where {T, D}
@@ -598,7 +534,7 @@ function updatePrimCoreIntCache!(cache::PrimOrbCoreIntegralCache{T, D, S},
     basis = cache.basis.list
     ints = cache.data
     firstIdx = firstindex(basis)
-    integrator = CachedComputeOrbCoreIntegral(Val(true), S(), cache.operator, T)
+    integrator = CachedOrbCoreIntegrator(Val(true), S(), cache.operator, T)
 
     if startIdx == firstIdx
         updateIntCacheCore!(integrator, ints, (basis,), (0,))
@@ -634,9 +570,9 @@ function decodePrimCoreInt(cache::OneBodyFullCoreIntegrals{T}, ptr::Tuple{Int},
 end
 
 
-function buildPrimOrbWeight(normCache::OverlapCoreCache{T, D}, orb::EvalPrimOrb{T, D}, 
+function buildPrimOrbWeight(normCache::OverlapCoreCache{T, D}, data::PrimOrbData{T, D}, 
                             idx::Int) where {T, D}
-    if isRenormalized(orb)
+    if data.renormalize
         decodePrimCoreInt(normCache.data, (idx,)) |> first |> AbsSqrtInv
     else
         one(T)
@@ -646,10 +582,10 @@ end
 
 function buildNormalizedCompOrbWeight!(weight::AbstractVector{T}, 
                                        normCache::OverlapCoreCache{T, D}, 
-                                       orb::FCompOrb{T, D}, 
+                                       data::CompOrbData{T, D}, 
                                        idxSeq::AbstractVector{Int}) where {T, D}
     overlapCache = normCache.data
-    nPrimOrbs = length(weight)
+    nPrimOrbs = getOrbDataSize(data)
     innerOverlapSum = zero(T)
 
     for i in 1:nPrimOrbs
@@ -657,7 +593,7 @@ function buildNormalizedCompOrbWeight!(weight::AbstractVector{T},
         innerCoreDiagOverlap = decodePrimCoreInt(overlapCache, (ptr,)) |> first
         wc = weight[begin+i-1]
         innerDiagOverlap = wc' * wc
-        if (isRenormalized∘viewOrb)(orb, i)
+        if data.basis[begin+i-1].renormalize
             weight[begin+i-1] *= AbsSqrtInv(innerCoreDiagOverlap)
         else
             innerDiagOverlap *= innerCoreDiagOverlap
@@ -675,25 +611,25 @@ function buildNormalizedCompOrbWeight!(weight::AbstractVector{T},
 end
 
 
-function buildOrbWeight!(paramCache::MultiSpanDataCacheBox{T}, 
-                         normCache::OverlapCoreCache{T, D}, orb::FrameworkOrb{T, D}, 
+function buildOrbWeight!(normCache::OverlapCoreCache{T, D}, orbData::PrimOrbData{T, D}, 
                          idxSeq::AbstractVector{Int}) where {T, D}
-    nPrimOrbs = orbSizeOf(orb)
-    weight = Memory{T}(undef, nPrimOrbs)
+    weight = Memory{T}(undef, 1)
+    weight[] = buildPrimOrbWeight(normCache, orbData, idxSeq[])
+    weight
+end
 
-    if orb isa FCompOrb
-        weight .= cacheParam!(paramCache, getOrbWeightCore(orb))
-        if isRenormalized(orb)
-            buildNormalizedCompOrbWeight!(weight, normCache, orb, idxSeq)
-        else
-            for i in 1:nPrimOrbs
-                ptr = idxSeq[begin+i-1]
-                temp = buildPrimOrbWeight(normCache, (getInnerOrb∘viewOrb)(orb, i), ptr)
-                weight[begin+i-1] *= temp
-            end
-        end
+function buildOrbWeight!(normCache::OverlapCoreCache{T, D}, orbData::CompOrbData{T, D}, 
+                         idxSeq::AbstractVector{Int}) where {T, D}
+    nPrimOrbs = getOrbDataSize(orbData)
+    weight = Memory{T}(orbData.weight)
+    if orbData.renormalize
+        buildNormalizedCompOrbWeight!(weight, normCache, orbData, idxSeq)
     else
-        weight[] = buildPrimOrbWeight(normCache, getInnerOrb(orb), idxSeq[])
+        for (i, data) in enumerate(orbData.basis)
+            ptr = idxSeq[begin+i-1]
+            temp = buildPrimOrbWeight(normCache, data, ptr)
+            weight[begin+i-1] *= temp
+        end
     end
     weight
 end
@@ -710,42 +646,39 @@ function buildIndexedOrbWeightsCore!(primOrbPtrs::AbstractVector{Int},
 end
 
 
-function buildIndexedOrbWeights!(paramCache::MultiSpanDataCacheBox{T}, 
-                                 normCache::OverlapCoreCache{T, D}, 
-                                 orbs::OrbitalCollection{T, D}, 
+function buildIndexedOrbWeights!(normCache::OverlapCoreCache{T, D}, 
+                                 data::OrbitalDataCollection{T, D}, 
                                  normIdxList::BasisIndexList, 
                                  intIdxList::BasisIndexList=normIdxList) where {T, D}
     i = 0
-    map(orbs) do orb
+    map(data) do ele
         iRange = getBasisIndexRange(intIdxList, (i+=1))
         intIdxSeq = view(intIdxList.index, iRange)
         normIdxSeq = view(normIdxList.index, iRange)
-        orbWeight = buildOrbWeight!(paramCache, normCache, orb, normIdxSeq)
+        orbWeight = buildOrbWeight!(normCache, ele, normIdxSeq)
         buildIndexedOrbWeightsCore!(intIdxSeq, orbWeight)
     end
 end
 
-function buildIndexedOrbWeights!(paramCache::MultiSpanDataCacheBox{T}, 
-                                 normCache::OverlapCoreCache{T, D}, 
-                                 orb::FrameworkOrb{T, D}, 
+function buildIndexedOrbWeights!(normCache::OverlapCoreCache{T, D}, 
+                                 orbData::OrbitalData{T, D}, 
                                  normIdxList::BasisIndexList, 
                                  intIdxList::BasisIndexList=normIdxList) where {T, D}
-    orbWeight = buildOrbWeight!(paramCache, normCache, orb, normIdxList.index)
+    orbWeight = buildOrbWeight!(normCache, orbData, normIdxList.index)
     buildIndexedOrbWeightsCore!(intIdxList.index, orbWeight)
 end
 
 
 function prepareIntegralConfig!(intCache::PrimOrbCoreIntegralCache{T, D}, 
                                 normCache::OverlapCoreCache{T, D}, 
-                                paramCache::MultiSpanDataCacheBox{T}, 
-                                orbMarkerCache::OrbCoreMarkerDict, 
-                                orbInput::OrbitalInput{T, D}) where {T, D}
-    iIdxList = cachePrimCoreIntegrals!(intCache, paramCache, orbMarkerCache, orbInput)
+                                orbMarkerCache::OrbCoreMarkerDict{T, D}, 
+                                input::OrbitalDataInput{T, D}) where {T, D}
+    iIdxList = cachePrimCoreIntegrals!(intCache, orbMarkerCache, input)
     if intCache === normCache
-        buildIndexedOrbWeights!(paramCache, intCache, orbInput, iIdxList)
+        buildIndexedOrbWeights!(intCache, input, iIdxList)
     else
         nIdxList = cachePrimCoreIntegrals!(normCache, intCache, orbMarkerCache, iIdxList)
-        buildIndexedOrbWeights!(paramCache, normCache, orbInput, nIdxList, iIdxList)
+        buildIndexedOrbWeights!(normCache, input, nIdxList, iIdxList)
     end
 end
 
@@ -801,130 +734,91 @@ function buildIntegralTensor(intCache::POrb1BCoreICache{T},
     res
 end
 
-
-function getPrimOrbCoreTypeUnion(orb::FPrimOrb)
-    (typeof∘getInnerOrb∘getInnerOrb)(orb)
-end
-
-function getPrimOrbCoreTypeUnion(orb::FCompOrb)
-    mapreduce(typejoin, 1:orbSizeOf(orb), init=Union{}) do i
-        viewOrb(orb, i) |> getPrimOrbCoreTypeUnion
-    end
-end
-
-function getPrimOrbCoreTypeUnion(orbs::OrbitalCollection)
-    orbs isa AbstractVector && checkEmptiness(orbs, :orbs)
-    mapreduce(typejoin, orbs, init=Union{}) do orb
-        getPrimOrbCoreTypeUnion(orb)
-    end
-end
-
-
-function initializeIntegralCache!(::OneBodyIntegral{D}, op::DirectOperator, 
-                                  paramCache::MultiSpanDataCacheBox{T}, 
-                                  orbInput::OrbitalInput{T, D}) where {T, D}
-    coreType = getPrimOrbCoreTypeUnion(orbInput)
-    orbCache = PrimOrbCoreCache(T, Val(D), coreType)
+function initializeIntegralCache(::OneBodyIntegral{D}, op::DirectOperator, 
+                                 input::OrbitalDataInput{T, D}) where {T, D}
+    orbCache = PrimOrbDataCache(T, Val(D), getPrimOrbDataTypeUnion(input))
     PrimOrbCoreIntegralCache(op, OneBodyFullCoreIntegrals(T, Val(D)), orbCache)
 end
 
-function initializeOverlapCache!(paramCache::MultiSpanDataCacheBox{T}, 
-                                 orbInput::OrbitalInput{T, D}) where {T, D}
-    initializeIntegralCache!(OneBodyIntegral{D}(), Identity(), paramCache, orbInput)
+function initializeOverlapCache(input::OrbitalDataInput{T, D}) where {T, D}
+    initializeIntegralCache(OneBodyIntegral{D}(), Identity(), input)
 end
 
 
-function initializeOneBodyCachePair!(op::F, paramCache::MultiSpanDataCacheBox{T}, 
-                                     orbInput::OrbitalInput{T, D}) where 
-                                    {F<:DirectOperator, T, D}
-    intCache = initializeIntegralCache!(OneBodyIntegral{D}(), op, paramCache, orbInput)
-    normCache = F <: Identity ? intCache : initializeOverlapCache!(paramCache, orbInput)
+function initializeOneBodyCachePair(op::F, input::OrbitalDataInput{T, D}) where 
+                                   {F<:DirectOperator, T, D}
+    intCache = initializeIntegralCache(OneBodyIntegral{D}(), op, input)
+    normCache = F <: Identity ? intCache : initializeOverlapCache(input)
     intCache, normCache
 end
 
 
 function computeIntTensor!(intCache::PrimOrbCoreIntegralCache{T, D}, 
                            normCache::OverlapCoreCache{T, D}, 
-                           basisSet::AbstractVector{<:FrameworkOrb{T, D}}; 
-                           paramCache::MultiSpanDataCacheBox{T}=MultiSpanDataCacheBox(T), 
-                           basisMarkerCache::OrbCoreMarkerDict=OrbCoreMarkerDict()) where 
-                          {T, D}
-    ws = prepareIntegralConfig!(intCache, normCache, paramCache, basisMarkerCache, basisSet)
+                           dataSet::OrbitalDataSet{T, D}; 
+                           markerCache::OrbCoreMarkerDict{T, D}=OrbCoreMarkerDict{T, D}()
+                           ) where {T, D}
+    ws = prepareIntegralConfig!(intCache, normCache, markerCache, dataSet)
     buildIntegralTensor(intCache, ws)
 end
 
 
-function computeIntTensor(::OneBodyIntegral{D}, op::F, 
-                          basisSet::AbstractVector{<:FrameworkOrb{T, D}}; 
-                          paramCache::MultiSpanDataCacheBox{T}=MultiSpanDataCacheBox(T), 
-                          basisMarkerCache::OrbCoreMarkerDict=OrbCoreMarkerDict()) where 
-                         {F<:DirectOperator, T, D}
-    intCache, normCache = initializeOneBodyCachePair!(op, paramCache, basisSet)
-    computeIntTensor!(intCache, normCache, basisSet; paramCache, basisMarkerCache)
+function computeIntTensor(::OneBodyIntegral{D}, op::DirectOperator, 
+                          dataSet::OrbitalDataSet{T, D}; 
+                          markerCache::OrbCoreMarkerDict{T, D}=OrbCoreMarkerDict{T, D}()
+                          ) where {T, D}
+    intCache, normCache = initializeOneBodyCachePair(op, dataSet)
+    computeIntTensor!(intCache, normCache, dataSet; markerCache)
 end
 
-computeIntTensor(style::MultiBodyIntegral, op::DirectOperator, orbs::OrbitalBasisSet{T}; 
-                 paramCache::MultiSpanDataCacheBox{T}=MultiSpanDataCacheBox(T), 
-                 basisMarkerCache::OrbCoreMarkerDict=OrbCoreMarkerDict()) where {T} = 
-computeIntTensor(style, op, map(FrameworkOrb, orbs); paramCache, basisMarkerCache)
-
-
-function decomposeOrb!(normCache::OverlapCoreCache{T, D}, orb::FrameworkOrb{T, D}; 
-                       paramCache::MultiSpanDataCacheBox{T}=MultiSpanDataCacheBox(T), 
-                       markerCache::OrbCoreMarkerDict=OrbCoreMarkerDict()) where {T, D}
-    normIdxList = cachePrimCoreIntegrals!(normCache, paramCache, markerCache, orb)
-    orbWeight = buildOrbWeight!(paramCache, normCache, orb, normIdxList.index)
-    normCache.basis.list[normIdxList.index], orbWeight
-end
-
-function decomposeOrb(orb::FrameworkOrb{T}; 
-                      paramCache::MultiSpanDataCacheBox{T}=MultiSpanDataCacheBox(T), 
-                      markerCache::OrbCoreMarkerDict=OrbCoreMarkerDict()) where {T}
-    normCache = initializeOverlapCache!(paramCache, orb)
-    decomposeOrb!(normCache, orb; paramCache, markerCache)
+function computeIntTensor(style::MultiBodyIntegral{D}, op::DirectOperator, 
+                          orbs::OrbitalBasisSet{T, D}; 
+                          cache!Self::MultiSpanDataCacheBox=MultiSpanDataCacheBox(), 
+                          markerCache::OrbCoreMarkerDict{T, D}=OrbCoreMarkerDict{T, D}()
+                          ) where {T, D}
+    paramSet = initializeSpanParamSet()
+    orbsData =  genOrbitalData!(paramSet, orbs; cache!Self)
+    computeIntTensor(style, op, orbsData; markerCache)
 end
 
 
 function computeIntegral!(intCache::PrimOrbCoreIntegralCache{T, D}, 
                           normCache::OverlapCoreCache{T, D}, 
-                          bfs::NonEmptyTuple{FrameworkOrb{T, D}}; 
-                          paramCache::MultiSpanDataCacheBox{T}, 
-                          basisMarkerCache::OrbCoreMarkerDict=OrbCoreMarkerDict()) where 
-                         {T, D}
-    ws = prepareIntegralConfig!(intCache, normCache, paramCache, basisMarkerCache, bfs)
+                          data::NonEmptyTuple{OrbitalData{T, D}}; 
+                          markerCache::OrbCoreMarkerDict{T, D}=OrbCoreMarkerDict{T, D}()
+                          ) where {T, D}
+    ws = prepareIntegralConfig!(intCache, normCache, markerCache, data)
     buildIntegralEntries(intCache, ws) |> first
 end
 
 
 function computeIntegral(::OneBodyIntegral{D}, op::DirectOperator, 
-                         (bf1,)::Tuple{FrameworkOrb{T, D}}; 
-                         paramCache::MultiSpanDataCacheBox{T}=MultiSpanDataCacheBox(T), 
-                         basisMarkerCache::OrbCoreMarkerDict=OrbCoreMarkerDict(), 
+                         (d1,)::Tuple{OrbitalData{T, D}}; 
+                         markerCache::OrbCoreMarkerDict{T, D}=OrbCoreMarkerDict{T, D}(), 
                          lazyCompute::Bool=false) where {T, D}
     if lazyCompute
-        iCache, nCache = initializeOneBodyCachePair!(op, paramCache, bf1)
-        computeIntegral!(iCache, nCache, (bf1,); paramCache, basisMarkerCache)
+        iCache, nCache = initializeOneBodyCachePair(op, d1)
+        computeIntegral!(iCache, nCache, (d1,); markerCache)
     else
-        coreData, w = decomposeOrb(bf1; paramCache, markerCache=basisMarkerCache)
-        integrator = CachedComputeOrbCoreIntegral(Val(true), OneBodyIntegral{D}(), op, T)
+        coreData, w = decomposeOrbData(d1; markerCache)
+        integrator = CachedOrbCoreIntegrator(Val(true), OneBodyIntegral{D}(), op, T)
         tensor = genOneBodyPrimCoreIntTensor(integrator, (coreData,))
         dot(w, tensor, w)
     end
 end
 
 function computeIntegral(::OneBodyIntegral{D}, op::DirectOperator, 
-                         (bf1, bf2)::NTuple{2, FrameworkOrb{T, D}}; 
-                         paramCache::MultiSpanDataCacheBox{T}=MultiSpanDataCacheBox(T), 
-                         basisMarkerCache::OrbCoreMarkerDict=OrbCoreMarkerDict(), 
+                         (d1, d2)::NTuple{2, OrbitalData{T, D}}; 
+                         markerCache::OrbCoreMarkerDict{T, D}=OrbCoreMarkerDict{T, D}(), 
                          lazyCompute::Bool=false) where {T, D}
-    oData1, w1 = decomposeOrb(bf1; paramCache, markerCache=basisMarkerCache)
-    oData2, w2 = decomposeOrb(bf2; paramCache, markerCache=basisMarkerCache)
-    integrator = CachedComputeOrbCoreIntegral(Val(true), OneBodyIntegral{D}(), op, T)
+    oData1, w1 = decomposeOrbData(d1; markerCache)
+    oData2, w2 = decomposeOrbData(d2; markerCache)
+    integrator = CachedOrbCoreIntegrator(Val(true), OneBodyIntegral{D}(), op, T)
 
     tensor = if lazyCompute
         oData1 = Vector(oData1)
         oData2 = Vector(oData2)
-        transformation = (b::PrimitiveOrbCore{T, D})->lazyMarkObj!(basisMarkerCache, b)
+        transformation = (b::PrimOrbData{T, D})->lazyMarkObj!(markerCache, b)
         coreDataM = intersectMultisets!(oData1, oData2; transformation)
         block4 = genOneBodyPrimCoreIntTensor(integrator, (oData1, oData2))
         if isempty(coreDataM)
@@ -941,26 +835,41 @@ function computeIntegral(::OneBodyIntegral{D}, op::DirectOperator,
     dot(w1, tensor, w2)
 end
 
+
+function decomposeOrbData!(normCache::OverlapCoreCache{T, D}, orbData::OrbitalData{T, D}; 
+                           markerCache::OrbCoreMarkerDict{T, D}=OrbCoreMarkerDict{T, D}()
+                           ) where {T, D}
+    normIdxList = cachePrimCoreIntegrals!(normCache, markerCache, orbData)
+    orbWeight = buildOrbWeight!(normCache, orbData, normIdxList.index)
+    normCache.basis.list[normIdxList.index], orbWeight
+end
+
+function decomposeOrbData(orbData::OrbitalData{T, D}; 
+                          markerCache::OrbCoreMarkerDict{T, D}=OrbCoreMarkerDict{T, D}()
+                          ) where {T, D}
+    normCache = initializeOverlapCache(orbData)
+    decomposeOrbData!(normCache, orbData; markerCache)
+end
+
+
 function computeIntegral(::OneBodyIntegral{D}, ::Identity, 
-                         bfPair::NTuple{2, FrameworkOrb{T, D}}; 
-                         paramCache::MultiSpanDataCacheBox{T}=MultiSpanDataCacheBox(T), 
-                         basisMarkerCache::OrbCoreMarkerDict=OrbCoreMarkerDict(), 
+                         orbDataPair::NTuple{2, OrbitalData{T, D}}; 
+                         markerCache::OrbCoreMarkerDict{T, D}=OrbCoreMarkerDict{T, D}(), 
                          lazyCompute::Bool=false) where {T, D}
     op = Identity()
-    bf1, bf2 = bfPair
+    d1, d2 = orbDataPair
 
     if lazyCompute
-        if bf1 === bf2
-            computeIntegral(OneBodyIntegral{D}(), op, (bf1,); paramCache, 
-                            basisMarkerCache, lazyCompute)
+        if d1 === d2
+            computeIntegral(OneBodyIntegral{D}(), op, (d1,); markerCache, lazyCompute)
         else
-            normCache = initializeOverlapCache!(paramCache, bfPair)
-            computeIntegral!(normCache, normCache, bfPair; paramCache, basisMarkerCache)
+            normCache = initializeOverlapCache(orbDataPair)
+            computeIntegral!(normCache, normCache, orbDataPair; markerCache)
         end
     else
-        oData1, w1 = decomposeOrb(bf1; paramCache, markerCache=basisMarkerCache)
-        oData2, w2 = decomposeOrb(bf2; paramCache, markerCache=basisMarkerCache)
-        integrator = CachedComputeOrbCoreIntegral(Val(true), OneBodyIntegral{D}(), op, T)
+        oData1, w1 = decomposeOrbData(d1; markerCache)
+        oData2, w2 = decomposeOrbData(d2; markerCache)
+        integrator = CachedOrbCoreIntegrator(Val(true), OneBodyIntegral{D}(), op, T)
         tensor = genOneBodyPrimCoreIntTensor(integrator, (oData1, oData2))
         dot(w1, tensor, w2)
     end
@@ -968,9 +877,9 @@ end
 
 function computeIntegral(style::MultiBodyIntegral, op::DirectOperator, 
                          orbs::NonEmptyTuple{OrbitalBasis{T, D}}; 
-                         paramCache::MultiSpanDataCacheBox{T}=MultiSpanDataCacheBox(T), 
-                         basisMarkerCache::OrbCoreMarkerDict=OrbCoreMarkerDict(), 
+                         cache!Self::MultiSpanDataCacheBox=MultiSpanDataCacheBox(), 
                          lazyCompute::Bool=false) where {T, D}
-    fOrbs = lazyTupleMap(FrameworkOrb, orbs)
-    computeIntegral(style, op, fOrbs; paramCache, basisMarkerCache, lazyCompute)
+    paramSet = initializeSpanParamSet()
+    orbsData = genOrbitalData!(paramSet, orbs; cache!Self)
+    computeIntegral(style, op, orbsData; lazyCompute)
 end

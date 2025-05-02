@@ -51,17 +51,17 @@ function gaussProdCore4(xpnSum::T, xpnRatio::T, dxLR::T) where {T<:Real}
 end
 
 
-struct PrimGaussOrbInfo{T, D}
+struct PrimGaussOrbInfo{T<:Real, D}
     cen::NTuple{D, T}
     xpn::T
     ang::NTuple{D, Int}
 
-    PrimGaussOrbInfo(cen::NonEmptyTuple{T, D}, xpn::T, 
-                     ang::NonEmptyTuple{Int, D}) where {T, D} = 
-    new{T, D+1}(cen, xpn, ang)
+    function PrimGaussOrbInfo(cen::NonEmptyTuple{Real, D}, xpn::Real, 
+                              ang::NonEmptyTuple{Int, D}) where {D}
+        cen..., xpn = promote(cen..., xpn)
+        new{typeof(xpn), D+1}(cen, xpn, ang)
+    end
 end
-
-const PrimGaussOrbConfig{D} = PrimGaussOrbInfo{GetIndex{UnitIndex}, D}
 
 struct GaussProductInfo{T, D}
     lhs::PrimGaussOrbInfo{T, D}
@@ -77,55 +77,26 @@ struct GaussProductInfo{T, D}
     end
 end
 
-function GaussProductInfo(configs::NTuple{2, PrimGaussOrbConfig{D}}, 
-                          parsPair::NTuple{2, AbstractSpanValueSet}) where {D}
-    d1, d2 = map(configs, parsPair) do sector, pars
-        cen = map(i->getField(pars, i), sector.cen)
-        xpn = getField(pars, sector.xpn)
-        PrimGaussOrbInfo(cen, xpn, sector.ang)
-    end
-    GaussProductInfo(d1, d2)
-end
-
-
-struct NullCache{T} <: CustomCache{T} end
 
 const TupleOf5T2Int{T} = Tuple{T, T, T, T, Int, Int}
-
-struct ZeroAngMomCache{T} <: CustomCache{T} end
-
-const CoreIntCacheBox{T} = Union{CustomCache{T}, LRU{<:Any, T}}
-
-abstract type OrbIntegralComputeCache{T, D, S<:MultiBodyIntegral{D}
-                                      } <: IntegralProcessCache{T, D} end
-
-const Orb1BIntegralComputeCache{T, D} = OrbIntegralComputeCache{T, D, OneBodyIntegral{D}}
-
-struct AxialOneBodyIntCompCache{T, D, F<:NTuple{D, CoreIntCacheBox{T}}
-                                } <: Orb1BIntegralComputeCache{T, D}
-    axis::F
-
-    AxialOneBodyIntCompCache(axis::NonEmptyTuple{CoreIntCacheBox{T}, D}) where {T, D} = 
-    new{T, D+1, typeof(axis)}(axis)
-end
-
-AxialOneBodyIntCompCache(::Type{T}, ::Val{D}) where {T, D} = 
-AxialOneBodyIntCompCache(ntuple( _->NullCache{T}(), Val(D) ))
-
 
 function overlapPGTOcore(input::TupleOf5T2Int{T}) where {T}
     xpnSum, xpnRatio, xML, xMR, iL, iR = input
     dxLR = xMR - xML
-    jRange = 0:((iL + iR) ÷ 2)
-
-    if isequal(dxLR, zero(T))
-        mapreduce(+, jRange) do j
-            gaussProdCore1(xpnSum, j) * gaussProdCore2(iL, iR, 2j)
-        end
+    if iL == iR == 0
+        gaussProdCore4(xpnSum, xpnRatio, dxLR)
     else
-        mapreduce(+, jRange) do j
-            gaussProdCore1(xpnSum, j) * gaussProdCore2(xML, xMR, iL, iR, 2j)
-        end * gaussProdCore3(dxLR, xpnRatio)
+        jRange = 0:((iL + iR) ÷ 2)
+
+        if isequal(dxLR, zero(T))
+            mapreduce(+, jRange) do j
+                gaussProdCore1(xpnSum, j) * gaussProdCore2(iL, iR, 2j)
+            end
+        else
+            mapreduce(+, jRange) do j
+                gaussProdCore1(xpnSum, j) * gaussProdCore2(xML, xMR, iL, iR, 2j)
+            end * gaussProdCore3(dxLR, xpnRatio)
+        end
     end
 end
 
@@ -145,20 +116,29 @@ function lazyOverlapPGTO!(cache::LRU{TupleOf5T2Int{T}, T},
     res
 end
 
-lazyOverlapPGTO!(::NullCache{T}, input::TupleOf5T2Int{T}) where {T} = overlapPGTOcore(input)
-
-lazyOverlapPGTO!(::ZeroAngMomCache{T}, input::TupleOf5T2Int{T}) where {T} = 
-gaussProdCore4(input[begin], input[begin+1], input[begin+3]-input[begin+2])
+lazyOverlapPGTO!(::Missing, input::TupleOf5T2Int) = overlapPGTOcore(input)
 
 
-const GTOrbOverlapAxialCache{T} = 
-      Union{NullCache{T}, ZeroAngMomCache{T}, LRU{TupleOf5T2Int{T}, T}}
+struct AxialGaussTypeOverlapCache{T, D, C<:NTuple{D, MissingOr{ LRU{TupleOf5T2Int{T}, T} }}
+                                  } <: CustomCache{T}
+    axis::C
 
-const GTOrbOverlapCache{T, D} = 
-      AxialOneBodyIntCompCache{T, D, <:NTuple{D, GTOrbOverlapAxialCache{T}}}
+    function AxialGaussTypeOverlapCache(::Type{T}, ::Val{D}) where {T, D}
+        axis = ntuple(_->missing, Val(D::Int))
+        new{T, D, NTuple{D, Missing}}(axis)
+    end
 
-function overlapPGTO!(cache::GTOrbOverlapCache{T, D}, data::GaussProductInfo{T, D}, 
-                      ) where {T, D}
+    function AxialGaussTypeOverlapCache(::Type{T}, config::NTuple{D, BoolVal}) where {T, D}
+        axialCache = map(config) do axialConfig
+            getValData(axialConfig) ? LRU{TupleOf5T2Int{T}, T}(maxsize=128) : missing
+        end
+        new{T, D, typeof(axialCache)}(axialCache)
+    end
+end
+
+
+function overlapPGTO!(cache::AxialGaussTypeOverlapCache{T, D}, 
+                      data::GaussProductInfo{T, D}) where {T, D}
     cenL = data.lhs.cen
     cenR = data.rhs.cen
     cenM = data.cen
@@ -169,86 +149,37 @@ function overlapPGTO!(cache::GTOrbOverlapCache{T, D}, data::GaussProductInfo{T, 
     angL = data.lhs.ang
     angR = data.rhs.ang
 
-    mapreduce(*, cache.axis, cenL, cenR, cenM, angL, angR) do cache, xL, xR, xM, iL, iR
-        lazyOverlapPGTO!(cache, (xpnS, xpnRatio, xM-xL, xM-xR, iL, iR))
+    mapreduce(*, cache.axis, cenL, cenR, cenM, angL, angR) do AxialCache, xL, xR, xM, iL, iR
+        lazyOverlapPGTO!(AxialCache, (xpnS, xpnRatio, xM-xL, xM-xR, iL, iR))
     end
 end
 
 
-function getAngMomentum(orb::PrimATOcore)
-    angFunc = orb.f.apply.f.right.f
-    angFunc.f.m
-end
-
-function getExponentPtr(orb::PrimGTOcore)
-    gFunc = orb.f.apply.f.left.apply
-    gFunc.f.select[begin]
-end
-
-function getCenCoordPtr(orb::PrimitiveOrbCore)
-    orb.f.dress.select
+function prepareOrbitalInfo(orbData::PrimGTOData{T, D}) where {T<:Real, D}
+    fCore, paramSet = orbData.body
+    gtf = fCore.core.f
+    paramFilter = last(gtf.encode).core.core
+    cen = convert(NTuple{D, T}, orbData.center)
+    pgf = last(first(gtf.binder.f.encode).core.f.binder.f.encode)
+    xpn = last(pgf.core.f.binder.f.encode).core(paramSet|>paramFilter).xpn
+    ang = last(gtf.binder.f.encode).core.f.binder.f.core.core.m.tuple
+    PrimGaussOrbInfo(cen, xpn, ang)
 end
 
 
-function preparePGTOconfig(orb::PrimGTOcore)
-    cenIds = getCenCoordPtr(orb)
-    xpnIdx = getExponentPtr(orb)
-    ang = getAngMomentum(orb).tuple
-    PrimGaussOrbInfo(cenIds, xpnIdx, ang)
+function computeGTOrbOverlap(data::Tuple{PrimGTOData})
+    formattedData = prepareOrbitalInfo(data|>first)
+    overlapPGTOcore(formattedData.xpn, formattedData.ang)
 end
 
-struct PrimGTOrbOverlap{T, D, B<:N12Tuple{PrimGaussOrbConfig{D}}
-                        } <: OrbitalIntegrator{T, D}
-    type::Type{T}
-    basis::B
-end
-
-const OverlapGTOrbSelf{T, D} = PrimGTOrbOverlap{T, D,  Tuple{    PrimGaussOrbConfig{D} }}
-const OverlapGTOrbPair{T, D} = PrimGTOrbOverlap{T, D, NTuple{ 2, PrimGaussOrbConfig{D} }}
-
-function (f::OverlapGTOrbSelf)(pars::AbstractSpanValueSet)
-    sector = first(f.basis)
-    xpnVal = getField(pars, sector.xpn)
-    overlapPGTOcore(xpnVal, sector.ang)
-end
-
-function (f::OverlapGTOrbPair{T, D})(pars1::AbstractSpanValueSet, 
-                                     pars2::AbstractSpanValueSet; 
-                                     cache!Self::GTOrbOverlapCache{T, D}=
-                                     AxialOneBodyIntCompCache(T, Val(D))) where {T, D}
-    data = GaussProductInfo(f.basis, (pars1, pars2))
-    overlapPGTO!(cache!Self, data)
-end
-
-
-function genGTOrbOverlapFunc(orbCoreData::N12Tuple{PrimGTOcore{T, D}}) where {T, D}
-    PrimGTOrbOverlap(T, preparePGTOconfig.(orbCoreData))
-end
-
-
-const DefaultPGTOrbOverlapCacheSizeLimit = 128
-
-function genPrimGTOrbOverlapCache(::Type{T}, ::Val{D}, ::Val{L}) where {T, D, L}
-    ntuple(_->LRU{TupleOf5T2Int{T}, T}(maxsize=DefaultPGTOrbOverlapCacheSizeLimit), Val(D))
-end
-
-function genPrimGTOrbOverlapCache(::Type{T}, ::Val{D}, ::Val{0}) where {T, D}
-    ntuple(_->ZeroAngMomCache{T}(), Val(D))
-end
-
-genGTOrbIntCompCache(::MonomialMul{T, D, L}, 
-                     ::Tuple{TypedPrimGTOcore{T, D, L1}, TypedPrimGTOcore{T, D, L2}}) where 
-                    {T, D, L, L1, L2} = 
-genPrimGTOrbOverlapCache(T, Val(D), Val(L+L1+L2)) |> AxialOneBodyIntCompCache
-
-genGTOrbIntCompCache(::Identity, 
-                     ::Tuple{TypedPrimGTOcore{T, D, L1}, TypedPrimGTOcore{T, D, L2}}) where 
-                    {T, D, L1, L2} = 
-genPrimGTOrbOverlapCache(T, Val(D), Val(L1+L2)) |> AxialOneBodyIntCompCache
-
-
-function buildNormalizerCore(o::PrimGTOcore{T, D}) where {T, D}
-    genGTOrbOverlapFunc((o,))
+function computeGTOrbOverlap(data::NTuple{2, PrimGTOData{T, D}}; 
+                             cache!Self::AxialGaussTypeOverlapCache{T, D}=
+                                         AxialGaussTypeOverlapCache(T, Val(D))
+                             ) where {T, D}
+    formattedData = map(data) do sector
+        prepareOrbitalInfo(sector)
+    end |> Base.Splat(GaussProductInfo)
+    overlapPGTO!(cache!Self, formattedData)
 end
 
 
@@ -271,70 +202,70 @@ function computeMultiMomentGTO(op::MonomialMul{T, D},
 end
 
 
-function computeMultiMomentGTO!(op::MonomialMul{T, D}, cache::GTOrbOverlapCache{T, D}, 
+function computeMultiMomentGTO!(op::MonomialMul{T, D}, 
+                                cache::AxialGaussTypeOverlapCache{T, D}, 
                                 data::GaussProductInfo{T, D}) where {T, D}
+    if op.degree.total == 0
+        overlapPGTO!(cache, data)
+    else
+        cenL = data.lhs.cen
+        cenR = data.rhs.cen
+        cenM = data.cen
 
-    cenL = data.lhs.cen
-    cenR = data.rhs.cen
-    cenM = data.cen
+        xpnS = data.xpn
+        xpnRatio = data.lhs.xpn * data.rhs.xpn / xpnS
 
-    xpnS = data.xpn
-    xpnRatio = data.lhs.xpn * data.rhs.xpn / xpnS
+        angL = data.lhs.ang
+        angR = data.rhs.ang
 
-    angL = data.lhs.ang
-    angR = data.rhs.ang
-
-    mapreduce(*, cache.axis, op.center, op.degree.tuple, 
-                 cenL, cenR, cenM, angL, angR) do cache, xMM, n, xL, xR, xM, iL, iR
-        dx = xR - xMM #! Consider when xL == xMM
-        m = iszero(dx) ? 0 : n
-        mapreduce(+, 0:m) do k
-            binomial(n, k) * dx^k * 
-            lazyOverlapPGTO!(cache, (xpnS, xpnRatio, xM-xL, xM-xR, iL, iR+n-k))
+        mapreduce(*, cache.axis, op.center, op.degree.tuple, 
+                    cenL, cenR, cenM, angL, angR) do AxialCache, xMM, n, xL, xR, xM, iL, iR
+            dx = xR - xMM #! Consider when xL == xMM
+            m = iszero(dx) ? 0 : n
+            mapreduce(+, 0:m) do k
+                binomial(n, k) * dx^k * 
+                lazyOverlapPGTO!(AxialCache, (xpnS, xpnRatio, xM-xL, xM-xR, iL, iR+n-k))
+            end
         end
     end
 end
 
-computeMultiMomentGTO!(::MonomialMul{T, D, 0}, cache::GTOrbOverlapCache{T, D}, 
-                       data::GaussProductInfo{T, D}) where {T, D} = 
-overlapPGTO!(cache, data)
 
-
-struct PrimGTOrbMultiMoment{T, D, L, B<:N12Tuple{PrimGaussOrbConfig{D}}
-                            } <: OrbitalIntegrator{T, D}
-    op::MonomialMul{T, D, L}
-    basis::B
+function computeGTOrbMultiMom(op::MonomialMul{T, D}, data::Tuple{PrimGTOData{T, D}}
+                              ) where {T, D}
+    formattedData = prepareOrbitalInfo(data|>first)
+    computeMultiMomentGTO(op, formattedData)
 end
 
-const MultiMomentGTOrbSelf{T, D, L} = 
-      PrimGTOrbMultiMoment{T, D, L,  Tuple{    PrimGaussOrbConfig{D} }}
-const MultiMomentGTOrbPair{T, D, L} = 
-      PrimGTOrbMultiMoment{T, D, L, NTuple{ 2, PrimGaussOrbConfig{D} }}
-
-function (f::MultiMomentGTOrbSelf)(pars::AbstractSpanValueSet)
-    sector = first(f.basis)
-    cen = map(i->getField(pars, i), sector.cen)
-    xpn = getField(pars, sector.xpn)
-    data = PrimGaussOrbInfo(cen, xpn, sector.ang)
-    computeMultiMomentGTO(f.op, data)
+function computeGTOrbMultiMom(op::MonomialMul{T, D}, data::NTuple{2, PrimGTOData{T, D}}; 
+                              cache!Self::AxialGaussTypeOverlapCache{T, D}=
+                                          AxialGaussTypeOverlapCache(T, Val(D))
+                              ) where {T, D}
+    formattedData = map(data) do sector
+        prepareOrbitalInfo(sector)
+    end |> Base.Splat(GaussProductInfo)
+    computeMultiMomentGTO!(op, cache!Self, formattedData)
 end
 
-function (f::MultiMomentGTOrbPair{T, D})(pars1::AbstractSpanValueSet, 
-                                         pars2::AbstractSpanValueSet; 
-                                         cache!Self::GTOrbOverlapCache{T, D}=
-                                         AxialOneBodyIntCompCache(T, Val(D))) where {T, D}
-    data = GaussProductInfo(f.basis, (pars1, pars2))
-    computeMultiMomentGTO!(f.op, cache!Self, data)
+function getGaussTypeOrbIntegrator(::OneBodyIntegral, ::Identity)
+    computeGTOrbOverlap
+end
+
+function getGaussTypeOrbIntegrator(::OneBodyIntegral{D}, op::MonomialMul{T, D}) where {T, D}
+    LPartial(computeGTOrbMultiMom, (op,))
 end
 
 
-function genGTOrbMultiMomentFunc(op::MonomialMul{T, D}, 
-                                 orbCoreData::N12Tuple{PrimGTOcore{T, D}}) where {T, D}
-    PrimGTOrbMultiMoment(op, preparePGTOconfig.(orbCoreData))
-end
+const GaussTypeOrbIntCache{T} = Union{NullCache{T}, AxialGaussTypeOverlapCache{T}}
 
-
-
-function computeKineticEnergyOnGTO(data1, data2)
-    
+function getAnalyticIntegral!(::S, cache::GaussTypeOrbIntCache{T}, op::DirectOperator, 
+                              data::N12Tuple{PrimGTOData{T, D}}) where 
+                             {D, S<:MultiBodyIntegral{D}, T}
+    integrator = getGaussTypeOrbIntegrator(S(), op)
+    if length(data) > 1
+        cache!Self = (cache isa NullCache) ? AxialGaussTypeOverlapCache(T, Val(D)) : cache
+        integrator(data; cache!Self)
+    else
+        integrator(data)
+    end
 end

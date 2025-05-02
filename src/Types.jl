@@ -15,12 +15,13 @@ abstract type QueryBox{T} <: Box end
 
 # N: Inner dim, size mutable; O: Outer dim, size immutable
 abstract type DualSpanFunction{T, N, O} <: CompositeFunction end
+abstract type SpatialAmplitude{D, M} <: CompositeFunction end # M: Particle number
 abstract type StatefulFunction{T} <: CompositeFunction end
 abstract type FunctionComposer <: CompositeFunction end
-abstract type Evaluator{F} <: CompositeFunction end
-abstract type Access <: CompositeFunction end
-abstract type Filter <: CompositeFunction end
-const Fetcher = Union{Access, Filter}
+abstract type Evaluator <: CompositeFunction end
+abstract type Mapper <: CompositeFunction end
+abstract type Getter <: CompositeFunction end
+const Encoder = Union{Getter, Mapper}
 
 abstract type SpatialProcessCache{T, D} <: QueryBox{T} end
 abstract type IntegralData{T, S} <: QueryBox{T} end
@@ -34,7 +35,7 @@ abstract type ParamBoxFunction{T} <: StatefulFunction{T} end
 abstract type FunctionModifier <: FunctionComposer end # Modify a function
 abstract type FunctionCombiner <: FunctionComposer end # Combine functions together
 
-abstract type TypedEvaluator{T, F} <: Evaluator{F} end
+abstract type TypedEvaluator{T} <: Evaluator end
 
 abstract type DirectOperator <: FunctionModifier end
 
@@ -43,22 +44,21 @@ abstract type ParamFuncBuilder{F} <: FunctionCombiner end
 abstract type StructuredInfo <: ConfigBox end
 abstract type StructuredType <: ConfigBox end
 
+abstract type FieldParamPointer <: StructuredInfo end
+
 abstract type IntegralProcessCache{T, D} <: SpatialProcessCache{T, D} end
 
-abstract type DimensionalEvaluator{T, D, F} <: TypedEvaluator{T, F} end
+abstract type DimensionalEvaluator{T, D, F} <: TypedEvaluator{T} end
 
-abstract type OrbitalNormalizer{T, D} <: AmplitudeNormalizer{T, D, 1} end
 abstract type OrbitalIntegrator{T, D} <: AmplitudeIntegrator{T, D, 1} end
-# M: Particle number
-abstract type SpatialAmplitude{T, D, M} <: ParamBoxFunction{T} end
 
 abstract type IdentityMarker{T} <: MarkerBox end
 abstract type StorageMarker{T} <: MarkerBox end
 
 abstract type EvalDimensionalFunc{T, D, F} <: DimensionalEvaluator{T, D, F} end
 
-abstract type OrbitalBasis{T, D, F} <: SpatialAmplitude{T, D, 1} end
-abstract type FieldAmplitude{T, D} <: SpatialAmplitude{T, D, 1} end
+abstract type OrbitalBasis{T, D, F} <: SpatialAmplitude{D, 1} end
+abstract type FieldAmplitude{T, D} <: SpatialAmplitude{D, 1} end
 
 # abstract type ManyParticleState{T} <: Any end
 
@@ -79,12 +79,15 @@ const N12Tuple{T} = Union{Tuple{T}, NTuple{2, T}}
 const N24Tuple{T} = Union{NTuple{2, T}, NTuple{4, T}}
 
 const MissingOr{T} = Union{Missing, T}
+const NothingOr{T} = Union{Nothing, T}
 const AbtArray0D{T} = AbstractArray{T, 0}
 
 const RefVal = Base.RefValue
 
 const NonEmpTplOrAbtArr{T, N, A<:AbstractArray{<:T, N}} = Union{NonEmptyTuple{T}, A}
 
+const AbtBottomArray{N} = AbstractArray{Union{}, N}
+const AbtBottomVector = AbtBottomArray{1}
 const AbtVecOfAbtArr{T} = AbstractVector{<:AbstractArray{T}}
 const JaggedAbtArray{T, N, O} = AbstractArray{<:AbstractArray{T, N}, O}
 const AbtArrayOr{T} = Union{T, AbstractArray{T}}
@@ -98,6 +101,7 @@ const MissSymInt = MissingOr{Union{Symbol, Int}}
 
 const AbstractEqualityDict = Union{EqualityDict, Dict}
 
+const BoolVal = Union{Val{true}, Val{false}}
 
 import Base: size, firstindex, lastindex, getindex, setindex!, iterate, length, similar
 

@@ -31,8 +31,7 @@ const SpanIndex = Union{UnitIndex, GridIndex}
 const GeneralIndex = Union{Int, SpanIndex, OneToIndex}
 const GeneralField = Union{GeneralIndex, Symbol, Nothing}
 
-
-struct ChainedAccess{L, C<:NTuple{L, GeneralField}} <: Access
+struct ChainedAccess{L, C<:NTuple{L, GeneralField}} <: Getter
     chain::C
 
     ChainedAccess(chain::C) where {L, C<:NTuple{L, GeneralField}} = new{L, C}(chain)
@@ -44,7 +43,6 @@ const GetOneToIndex = GetIndex{OneToIndex}
 
 GetIndex{T}(idx::Union{Int, OneToIndex}) where {T<:GeneralIndex} = ChainedAccess(idx|>T)
 
-const GetUnitEntry = ChainedAccess{2, Tuple{UnitIndex, OneToIndex}}
 const GetGridEntry = ChainedAccess{2, Tuple{GridIndex, OneToIndex}}
 
 ChainedAccess() = ChainedAccess(())
@@ -84,7 +82,7 @@ function getField(obj, acc::ChainedAccess)
     obj
 end
 
-(f::Fetcher)(obj) = getField(obj, f)
+(f::Encoder)(obj) = getField(obj, f)
 
 
 abstract type FiniteDict{N, K, T} <: EqualityDict{K, T} end
@@ -162,13 +160,15 @@ iterate(::TypedEmptyDict, state::Int) = nothing
 iterate(d::FiniteDict) = iterate(d, 1)
 
 
-struct BlackBox <: QueryBox{Any}
-    value::Any
+struct EgalBox{T} <: QueryBox{T}
+    value::T
 end
 
-==(bb1::BlackBox, bb2::BlackBox) = (bb1.value === bb2.value)
+const BlackBox = EgalBox{Any}
 
-hash(bb::BlackBox, hashCode::UInt) = hash(objectid(bb.value), hashCode)
+==(bb1::EgalBox, bb2::EgalBox) = (bb1.value === bb2.value)
+
+hash(bb::EgalBox, hashCode::UInt) = hash(objectid(bb.value), hashCode)
 
 
 function canDirectlyStoreInstanceOf(::Type{T}) where {T}
@@ -380,8 +380,8 @@ end
 markObj(marker::IdentityMarker) = itself(marker)
 
 
-function lazyMarkObj!(cache::AbstractDict{BlackBox, <:IdentityMarker}, input)
-    get!(cache, BlackBox(input)) do
+function lazyMarkObj!(cache::AbstractDict{EgalBox{T}, <:IdentityMarker}, input) where {T}
+    get!(cache, EgalBox{T}(input)) do
         markObj(input)
     end
 end
@@ -396,3 +396,6 @@ end
 function compareObj(obj1::T1, obj2::T2) where {T1, T2}
     obj1 === obj2 || markObj(obj1) == markObj(obj2)
 end
+
+
+struct NullCache{T} <: CustomCache{T} end

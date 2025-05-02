@@ -1,7 +1,7 @@
 using Test
 using Quiqbox
 using LinearAlgebra
-using Quiqbox: TypedReduce, TypedExpand, getCellOutputLevel, UnitParam, GridParam
+using Quiqbox: TypedReduce, TypedExpand, getCellOutputLevels, UnitParam, GridParam
 
 @testset "Parameters.jl" begin
 
@@ -50,19 +50,19 @@ p3 = genHeapParam([p1, p1], :c)
 p4 = genHeapParam([p2, p2], :d)
 p5 = genCellParam(p2, :e)
 p6 = genCellParam(p4, :e)
-@test getCellOutputLevel((p1, p1)) == 0
-@test getCellOutputLevel((p1, p2)) == 0
-@test getCellOutputLevel((p2, p2)) == 0
-@test getCellOutputLevel((p1, p3)) == 0
-@test getCellOutputLevel((p2, p3)) == 0
-@test getCellOutputLevel((p3, p3)) == 0
+@test getCellOutputLevels((p1, p1)) == Set(0)
+@test getCellOutputLevels((p1, p2)) == Set(0)
+@test getCellOutputLevels((p2, p2)) == Set((0, 1))
+@test getCellOutputLevels((p1, p3)) == Set(0)
+@test getCellOutputLevels((p2, p3)) == Set((0, 1))
+@test getCellOutputLevels((p3, p3)) == Set((0, 1))
 @test !((p1, p4) isa Quiqbox.CoreFixedParIn)
-@test getCellOutputLevel((p2, p4)) == 1
-@test getCellOutputLevel((p3, p4)) == 1
-@test getCellOutputLevel((p4, p4)) == 1
-@test getCellOutputLevel((p5, p5)) == 1
-@test getCellOutputLevel((p5, p6)) == 1
-@test getCellOutputLevel((p6, p6)) == 2
+@test getCellOutputLevels((p2, p4)) == Set(1)
+@test getCellOutputLevels((p3, p4)) == Set(1)
+@test getCellOutputLevels((p4, p4)) == Set((1, 2))
+@test getCellOutputLevels((p5, p5)) == Set((0, 1))
+@test getCellOutputLevels((p5, p6)) == Set(1)
+@test getCellOutputLevels((p6, p6)) == Set((1, 2))
 
 v1Val = 0.5
 v1 = genTensorVar(v1Val, :α)
@@ -70,6 +70,10 @@ v1 = genTensorVar(v1Val, :α)
 v2Val = 1.1
 v2 = genTensorVar(v2Val, :β)
 @test obtain(v2) === v2.input === v2()
+v1_f, s1 = compressParam(v1)
+@test s1.unit[] === v1
+@test s1 == Quiqbox.initializeSpanParamSet(v1)
+@test v1_f((unit=nothing, grid=nothing)) === v1_f() === obtain(v1) === v1Val
 
 a1 = genCellParam(v1, :a)
 a1_2 = genCellParam(itself, (v1,), :a1)
@@ -87,13 +91,13 @@ a1_2 = genCellParam(itself, (v1,), :a1)
 @test compareParamBox(a1, genCellParam(v1, :a))
 @test !compareParamBox(a1, let p = genCellParam(v1, :a); setScreenLevel!(p, 1) end)
 
-a1in, a1mid, a1out, a1self = classifyParams(a1)
+a1in, a1mid, a1out, a1self = dissectParam(a1)
 @test isempty(a1mid)
 @test isempty(a1self)
 @test first(a1in)[] === a1in.unit[] === v1
 @test a1out[] === a1
 @test a1.input isa Tuple{Quiqbox.TensorVar{Float64}}
-@test (first∘first∘classifyParams)(a1)[] === first(a1.input)
+@test (first∘first∘dissectParam)(a1)[] === first(a1.input)
 @test a1.offset == 0
 a1Offset = 0.25
 @atomic a1.offset = a1Offset
@@ -102,18 +106,21 @@ a1Val = v1Val + a1Offset
 @test obtain(a1) == a1Val
 @test obtain(first(a1|>inputOf)) == v1Val
 
-a2 = setScreenLevel(a1, 1)
+a2 = setScreenLevel!(genCellParam(a1), 1)
 @test a2() == a1()
 @test screenLevelOf(a2) == 1
 @test a1.input == a2.input
 @test obtain(inputOf(a2)[1]) != obtain(a2)
-a2in, _, a2out, a2self = classifyParams(a2)
+a2in, _, a2out, a2self = dissectParam(a2)
 @test all(isempty(i) for i in a2in) && isempty(a2out)
 @test collect(a2self)[] === a2
 @test obtain(a2) == a2.offset
 @test a2.offset == a1Val == a1.offset + v1Val
 
 v1ValNew = 0.9
+setScreenLevel!(v1, 2)
+@test try setVal!(v1, v1ValNew) catch; true end
+setScreenLevel!(v1, 1)
 setVal!(v1, v1ValNew)
 @test obtain(v1) == v1ValNew
 @atomic a1.offset = 0.0
@@ -186,8 +193,8 @@ b1Val = f1_bias( obtain(v12) )
 @test screenLevelOf(b1) == 0
 @test all(inputOf(b1)[1] === v12)
 
-b2 = setScreenLevel(b1, 1)
-b3 = setScreenLevel(b1, 2)
+b2 = setScreenLevel!(genCellParam(b1), 1)
+b3 = setScreenLevel!(genCellParam(b1), 2)
 @test b1() == b2() == b3()
 @test b1Val == b2() == b3()
 @test screenLevelOf(b2) == 1
@@ -199,7 +206,7 @@ f2(x) = 2x[1] * exp(x[1] + x[5]) - x[2]/(1 + (x[3] - x[4])^2)
 pars_f2 = genHeapParam([a1, v2, b1, b2, b3], :pars_f2)
 
 c1 = genCellParam(f2, (pars_f2,), :c)
-inSet1, midSet1, outSet1, isoSet1 = classifyParams(c1)
+inSet1, midSet1, outSet1, isoSet1 = dissectParam(c1)
 @test isempty(isoSet1)
 @test outSet1[] === c1
 @test isempty(inSet1.grid)
@@ -215,9 +222,9 @@ inSet1_t = [v1, v2, b2, b3]
 c1Val = f2_t(obtain.(inSet1_t))
 @test obtain(pars_f2) == obtain.([a1, v2, b1, b2, b3])
 @test f2(obtain(pars_f2)) == c1Val == c1() == 42.96591869214117
-gn_c1 = ParamGraph(c1)
+gn_c1 = genParamGraph(c1) |> transpileGraph
 c1_input1 = [b2, v1, v2] .|> obtain
-c1Val_2 = evaluateGraph(gn_c1, (c1_input1, nothing))
+c1Val_2 = evaluateGraph(gn_c1, (unit=c1_input1, grid=nothing))
 gnf_c1, inPars = compressParam(c1)
 @test gnf_c1(c1_input1) == c1() == c1Val_2 == 42.96591869214117
 
@@ -227,9 +234,9 @@ l1 = genCellParam(x->x^2, (k1,), :l)
 l2 = genCellParam(x->2x, (k2,), :l)
 l3 = genCellParam(+, (l1, l2), :l)
 @test l3() == 1.1^2 + 3.2 * 2
-g_l1 = ParamGraph(l1)
-g_l3 = ParamGraph(l3)
-g_l3_val = evaluateGraph(g_l3, ([k1(), k2()], nothing))
+g_l1 = genParamGraph(l1) |> transpileGraph
+g_l3 = genParamGraph(l3) |> transpileGraph
+g_l3_val = evaluateGraph(g_l3, (unit=[k1(), k2()], grid=nothing))
 gf_l3, inPars_l3 = compressParam(l3)
 @test all(map((x, y)->obtain(x)==y, inPars_l3, ([k1(), k2()], [])))
 @test gf_l3([1.1, 3.2]) == 7.61
@@ -261,12 +268,12 @@ m2 = genTensorVar(m2Val, :m)
 g2 = ((x::AbstractMatrix{T}, y::AbstractMatrix{T}) where {T}) -> norm(x * y)::T
 e2 = genCellParam(g2, (m1, m2), :e)
 @test obtain(e2) == g2(m1Val, m2Val)
-inSet_e2, midSet_e2, outSet_e2, isoSet_e2 = classifyParams(e2)
+inSet_e2, midSet_e2, outSet_e2, isoSet_e2 = dissectParam(e2)
 @test isempty(inSet_e2.unit)
 @test all(inSet_e2.grid .=== [m1, m2])
 @test outSet_e2[] == e2
 @test isempty(isoSet_e2)
-gn_e1 = ParamGraph(e1)
+gn_e1 = genParamGraph(e1) |> transpileGraph
 pVals_e1 = obtain.(inSet_e2.grid)
 gnf_e1, _ = compressParam(e1)
 @test evaluateGraph(gn_e1) == gnf_e1(pVals_e1) == 5.82827525296409
@@ -274,29 +281,29 @@ f3 = (x, y, z)->log(x^2 + y[1]) * (y[2] - sqrt(norm(exp.(z))))
 f3_t = (xv, z)->log(xv[1]^2 + xv[2]) * (xv[3] - sqrt(norm(exp.(z))))
 v2a2 = genHeapParam([v2, a2], :v2a2)
 d1 = genCellParam(f3, (a1, v2a2, m1), :d)
-d2 = setScreenLevel(d1, 1)
+d2 = setScreenLevel!(genCellParam(d1), 1)
 d1_val = d1()
 @test d1_val == d2() == f3(a1(), [v2(), a2()], m1())
-inSet2, midSet2, outSet2, isoSet2 = classifyParams(d1)
+inSet2, midSet2, outSet2, isoSet2 = dissectParam(d1)
 @test all(inSet2.unit .=== [v1, v2, a2])
 @test all(inSet2.grid .=== [m1])
 @test outSet2[] === d1
 @test isempty(isoSet2)
-gn_d1 = ParamGraph(d1)
+gn_d1 = genParamGraph(d1) |> transpileGraph
 pVals2_2 = (obtain(inSet2.unit), obtain(inSet2.grid))
 gnf_d1, d1_inPars = compressParam(d1)
 @test IdSet{UnitParam}(first(d1_inPars)) == IdSet{UnitParam}(inSet2.unit)
 @test IdSet{GridParam}(last(d1_inPars)) == IdSet{GridParam}(inSet2.grid)
 inVals2 = map(obtain, d1_inPars)
-@test evaluateGraph(gn_d1, values(inVals2)) == gnf_d1(inVals2) == gnf_d1() == d1()
+@test evaluateGraph(gn_d1, inVals2) == gnf_d1(inVals2) == d1()
 
 pVec1 = genHeapParam([c1, d1, a2], :c1d1a2)
 apRef1 = genCellParam(pVec1, :ref)
 pVec1Val = obtain(pVec1)
 @test obtain(apRef1) == pVec1Val == [42.96591869214117, -1.1243289206151053, 0.75]
 
-inSet5r, _, outSet5r, isoSet5r = classifyParams(pVec1.input)
-inSet5,  _, outSet5,  isoSet5  = classifyParams(apRef1)
+inSet5r, _, outSet5r, isoSet5r = dissectParam(pVec1.input)
+inSet5,  _, outSet5,  isoSet5  = dissectParam(apRef1)
 
 @test isempty(isoSet5)
 @test all(outSet5r .=== [c1, d1])
@@ -305,11 +312,10 @@ inSet5,  _, outSet5,  isoSet5  = classifyParams(apRef1)
 @test inSet5r.grid[] === inSet5.grid[]
 
 f3 = x -> x.^2 * ( exp.(x) )'
-@test try genCellParam(f3, (pVec1,), :sq); catch; true end
-ap1 = genCellParam(f3, (apRef1,), :sq)
+ap1_1 = genCellParam(f3, (pVec1,), :sq)
+ap1_2 = genCellParam(f3, (apRef1,), :sq)
 @test try genMeshParam(f3, (pVec1,), :sq); catch; true end
-ap1Val = obtain(ap1)
-@test ap1Val == f3(pVec1Val)
+@test obtain(ap1_1) == obtain(ap1_2) == f3(pVec1Val)
 
 pg1Input = [a1 a2; c1 d1]
 
@@ -344,10 +350,10 @@ pm1Val = obtain(pm1)
 
 @test  pm1Val == obtain(pm1) == f4(k1(), k2())
 
-inSet_pm1, _, outSet_pm1, isoSet_pm1 = classifyParams(pm1)
+inSet_pm1, _, outSet_pm1, isoSet_pm1 = dissectParam(pm1)
 @test inSet_pm1.grid == [k1, k2]
 inSetVal_pm1 = obtain.(inSet_pm1.unit)
-gn_pm1 = ParamGraph(pm1)
+gn_pm1 = genParamGraph(pm1) |> transpileGraph
 gnf_pm1, inPars_pm1 = compressParam(pm1)
 @test pm1Val == evaluateGraph(gn_pm1) == gnf_pm1(map(obtain, inPars_pm1))
 
@@ -358,9 +364,9 @@ f5 = (l, c) -> map(norm, f4(l, c))
 pm2 = genCellParam(f5, genCellParam.((k1, k2)), :pn)
 pm2Val = obtain(pm2)
 
-inSet_pm2, _, outSet_pm2, isoSet_pm2 = classifyParams(pm2)
+inSet_pm2, _, outSet_pm2, isoSet_pm2 = dissectParam(pm2)
 inSetVal_pm2 = map(obtain, inSet_pm2)
-gn_pm2 = ParamGraph(pm2)
+gn_pm2 = genParamGraph(pm2) |> transpileGraph
 gnf_pm2, inPars_pm2 = compressParam(pm2)
 @test evaluateGraph(gn_pm2) == gnf_pm2(map(obtain, inPars_pm2)) == pm2()
 

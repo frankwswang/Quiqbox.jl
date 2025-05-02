@@ -38,8 +38,6 @@ include("Integration/Interface.jl")
 # include("Integrals/OneBody.jl")
 # include("Integrals/TwoBody.jl")
 
-include("Behaviors.jl")
-
 end
 
 ## Development comment guideline

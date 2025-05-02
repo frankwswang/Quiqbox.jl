@@ -1,17 +1,80 @@
 using HCubature
+using LinearAlgebra: dot
 
-#! Use QuadGK.jl if the basis is AxialProdFunc
+struct OrbitalFunc{D, F<:DirectOperator, C<:OrbitalData{<:Number, D}
+                   } <: SpatialAmplitude{D, 1}
+    action::F
+    config::C
 
-struct ConfineInterval{T, F<:ReturnTyped{T}} <: FunctionModifier
-    f::F
-
-    ConfineInterval(f::F) where {T, F<:ReturnTyped{T}} = new{T, F}(f)
+    function OrbitalFunc(action::F, config::C) where {D, C<:OrbitalData{<:Number, D}, 
+                                                      F<:DirectOperator}
+        new{D, F, C}(action, config)
+    end
 end
 
-ConfineInterval(::Type{T}, f::Function) where {T} = ConfineInterval(ReturnTyped(f, T))
+OrbitalFunc(config) = OrbitalFunc(Identity(), config)
 
-function (f::ConfineInterval{T})(x::AbstractVector{T}) where {T}
-    val = f.f(x ./ (one(T) .- x.^2))
+function (f::OrbitalFunc{D})(coord::NTuple{D, Real}) where {D}
+    f.action(Base.Fix1(evalOrbitalConfig, f.config))(coord)
+end
+
+function evalOrbitalConfig(config::PrimOrbData{T, D}, coord::NTuple{D, Real}) where {T, D}
+    input = coord .- config.center
+    fCore, params = config.body
+    fCore.core.f(input, params)
+end
+
+
+struct OrbitalInnerProd{D, P<:N12Tuple{ SpatialAmplitude{D, 1} }} <: SpatialAmplitude{D, 1}
+    term::P
+end
+
+(::SelectTrait{InputStyle})(::OrbitalInnerProd{D}) where {D} = CoordInput{D}()
+
+const SelfOrbInnerProd{D, F<:SpatialAmplitude{D, 1}} = OrbitalInnerProd{D, Tuple{F}}
+
+function (f::SelfOrbInnerProd{D})(coord::NTuple{D, Real}) where {D}
+    val = first(f.term)(coord)
+    val' * val
+end
+
+function (f::OrbitalInnerProd{D})(coord::NTuple{D, Real}) where {D}
+    fL, fR = f.term
+    valL = fL(coord)
+    valR = fR(coord)
+    valL' * valR
+end
+
+
+struct DoubleOrbProduct{D, F1<:OrbitalInnerProd{D}, F2<:OrbitalInnerProd{D}, 
+                        C<:DirectOperator} <: SpatialAmplitude{D, 2}
+    one::F1
+    two::F2
+    coupler::C
+end
+
+(::SelectTrait{InputStyle})(::DoubleOrbProduct{D}) where {D} = CoordInput{2D}()
+
+function (f::DoubleOrbProduct{D})(coord1::NTuple{D, Real}, 
+                                  coord2::NTuple{D, Real}) where {D}
+    f.coupler(f.one, f.two)(coord1, coord2)
+end
+
+function (f::DoubleOrbProduct{D})(coord::NTuple{DD, Real}) where {D, DD}
+    f.coupler(f.one, f.two)(coord[begin:begin+D-1], coord[begin+D:end])
+end
+
+
+struct ConfinedInfIntegrand{T, L, F<:Function} <: FunctionModifier
+    core::F
+
+    function ConfinedInfIntegrand(f::F, ::Type{T}) where {F<:Function, T}
+        new{T, getDimension(f), F}(f)
+    end
+end
+
+function (f::ConfinedInfIntegrand{T})(x) where {T}
+    val = f.core( formatInput(f.core, x ./ (one(T) .- x .* x)) )
     mapreduce(*, x) do t
         tSquare = t * t
         (1 + tSquare) / (1 - tSquare)^2
@@ -19,82 +82,69 @@ function (f::ConfineInterval{T})(x::AbstractVector{T}) where {T}
 end
 
 
-struct ModSquaredMap{T, F<:ReturnTyped{T}} <: FunctionModifier
-    f::F
-
-    ModSquaredMap(f::F) where {T, F<:ReturnTyped{T}} = new{T, F}(f)
-end
-
-ModSquaredMap(::Type{T}, f::Function) where {T} = ModSquaredMap(ReturnTyped(f, T))
-
-function (f::ModSquaredMap{T})(input::AbstractVector{T}) where {T}
-    val = f.f(input)
-    val' * val
+struct HCubatureConfig{T} <: ConfigBox
+    maxEvalNum::Int
+                                                # 1000 per one of six dimensions
+    function HCubatureConfig(::Type{T}, maxEvalNum::Int=1000_000_000_000_000_000
+                             ) where {T}
+        checkPositivity(maxEvalNum)
+        new{T}(maxEvalNum)
+    end
 end
 
 
-function numericalIntegrateCore(integrand::ConfineInterval{T}, 
-                                interval::NTuple{2, NonEmptyTuple{T, D}}) where {T, D}
-    fullRes = hcubature(integrand, first(interval), last(interval), maxevals=typemax(Int))
+function getIntegratorConfig(::Type{T}, ::SpatialAmplitude) where {T}
+    HCubatureConfig(T)
+end
+
+function getConfinedInterval(::ConfinedInfIntegrand{T, L}) where {T, L}
+    bound = ntuple(_->one(T), Val(L))
+    (.-(bound), bound)
+end
+
+
+function genIntegrant(::OneBodyIntegral{D}, op::Identity, 
+                      (data,)::Tuple{PrimOrbData{T, D}}) where {T, D}
+    orbFunc = OrbitalFunc(op, data)
+    OrbitalInnerProd((orbFunc,))
+end
+
+function genIntegrant(::OneBodyIntegral{D}, op::DirectOperator, 
+                      (dataL, dataR)::NTuple{2, PrimOrbData{T, D}}) where {T, D}
+    orbFuncL = OrbitalFunc(dataL)
+    orbFuncR = OrbitalFunc(op, dataR)
+    OrbitalInnerProd((orbFuncL, orbFuncR))
+end
+
+
+function genIntegrantSubspaces(intStyle::MultiBodyIntegral{D}, op::DirectOperator, 
+                               data::NonEmptyTuple{PrimOrbData{T, D}}) where {T, D}
+    tuple(genIntegrant(intStyle, op, data))
+end
+
+
+function boundIntegralReturnType(::DirectOperator, 
+                                 ::NonEmptyTuple{PrimOrbData{T, D}}) where {T, D}
+    Number
+end
+
+
+function getNumericalIntegral(::OneBodyIntegral{D}, op::F, data::N12Tuple{PrimOrbData{T, D}}
+                              ) where {F<:DirectOperator, T, D}
+    spaces = genIntegrantSubspaces(OneBodyIntegral{D}(), op, data)
+    mapreduce(*, spaces) do kernel
+        getNumericalIntegral(kernel, T)
+    end::boundIntegralReturnType(op, data)
+end
+
+function getNumericalIntegral(integrand::SpatialAmplitude, ::Type{T}) where {T<:Number}
+    config = getIntegratorConfig(extractRealNumberType(T), integrand)
+    convert(T, numericalIntegrateCore(config, integrand))
+end
+
+function numericalIntegrateCore(config::HCubatureConfig{T}, integrand::Function) where {T}
+    formattedInt = ConfinedInfIntegrand(integrand, T)
+    interval = getConfinedInterval(formattedInt)
+    fullRes = hcubature(formattedInt, interval..., maxevals=config.maxEvalNum)
     first(fullRes)
-end
-
-
-function composeOneBodyKernel(op::O, ::Type{T}, (termL, termR)::Tuple{F1, F2}) where 
-                             {O<:Function, T, F1<:Function, F2<:Function}
-    PairCombine(StableMul(T), adjoint∘termL, op(termR))
-end
-
-function composeOneBodyKernel(op::O, ::Type{T}, (term,)::Tuple{F}) where 
-                             {O<:Function, T, F<:Function}
-    composeOneBodyKernel(op, T, (term, term))
-end
-
-function composeOneBodyKernel(::Identity, ::Type{T}, (term,)::Tuple{F}) where 
-                             {T, F<:Function}
-    ModSquaredMap(T, term)
-end
-
-
-function composeIntegralKernel(::OneBodyIntegral, op::O, ::Type{T}, 
-                               terms::N12Tuple{Function}) where {O<:Function, T}
-    composeOneBodyKernel(op, T, terms)
-end
-
-function numericalIntegrate(::OneBodyIntegral{D}, op::F, 
-                            orbs::NonEmptyTuple{EvalFieldFunction{T, D}, N}, 
-                            pVals::NonEmptyTuple{AbstractSpanValueSet, N}) where 
-                            {F<:DirectOperator, T, D, N}
-    terms = Base.Fix2.(orbs, pVals)
-    integralKernel = composeIntegralKernel(OneBodyIntegral{D}(), op, T, terms)
-    integrand = ConfineInterval(T, integralKernel)
-    bound = ntuple(_->one(T), Val(D))
-    numericalIntegrateCore(integrand, (.-(bound), bound))
-end
-
-
-function buildNormalizerCore(o::PrimitiveOrbCore{T, D}) where {T, D}
-    buildCoreIntegrator(OneBodyIntegral{D}(), Identity(), (o,))
-end
-
-
-struct OneBodyNumIntegrate{T, D, F<:DirectOperator, 
-                           P<:N12Tuple{PrimitiveOrbCore{T, D}}} <: OrbitalIntegrator{T, D}
-    op::F
-    basis::P
-end
-
-const OneBodySelfNumInt{T, D, F<:DirectOperator, P<:PrimitiveOrbCore{T, D}} = 
-      OneBodyNumIntegrate{T, D, F, Tuple{P}}
-const OnyBodyPairNumInt{T, D, F<:DirectOperator, P1<:PrimitiveOrbCore{T, D}, 
-                        P2<:PrimitiveOrbCore{T, D}} = 
-      OneBodyNumIntegrate{T, D, F, Tuple{P1, P2}}
-
-function (f::OneBodySelfNumInt{T, D})(pVal::AbstractSpanValueSet) where {T, D}
-    numericalIntegrate(OneBodyIntegral{D}(), f.op, f.basis, (pVal,))
-end
-
-function (f::OnyBodyPairNumInt{T, D})(pVal1::AbstractSpanValueSet, 
-                                      pVal2::AbstractSpanValueSet) where {T, D}
-    numericalIntegrate(OneBodyIntegral{D}(), f.op, f.basis, (pVal1, pVal2))
 end
