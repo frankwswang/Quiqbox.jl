@@ -113,19 +113,17 @@ function unpackFieldFunc(f::EncodedField{<:Number, D}) where {D}
 end
 
 
-const WrappedField{T, D, F<:Function} = EncodedField{T, D, F, ItsType}
+const WrappedField{T<:Number, D, F<:Function} = EncodedField{T, D, F, ItsType}
 
-const EncodedFieldFunc{T, D, E<:AbstractParamFunc, F<:AbstractParamFunc} = 
+const EncodedFieldFunc{T<:Number, D, E<:AbstractParamFunc, F<:AbstractParamFunc} = 
       FieldParamFunc{T, D, ParamPipeline{ Tuple{E, F} }}
 
 
-const RadialField{T, D, F<:FieldAmplitude{T, 1}} = 
+const RadialField{T<:Number, D, F<:FieldAmplitude{T, 1}} = 
       EncodedField{T, D, F, typeof(LinearAlgebra.norm)}
 
-const RadialFieldCore = InputConverter{typeof(LinearAlgebra.norm)}
-
-const RadialFieldFunc{T, D, F<:AbstractParamFunc} = 
-      EncodedFieldFunc{T, D, RadialFieldCore, F}
+const RadialFieldFunc{T<:Number, D, F<:AbstractParamFunc} = 
+      EncodedFieldFunc{T, D, InputConverter{typeof(LinearAlgebra.norm)}, F}
 
 RadialField{T, D}(radial::FieldAmplitude{T, 1}) where {T, D} = 
 EncodedField(radial, TupleHeader( LinearAlgebra.norm, Val(D) ))
@@ -170,7 +168,7 @@ end
 function unpackFieldFunc(f::CurriedField{<:Number, D}) where {D}
     params = f.param
     paramMapper, paramSet = genParamMapper(params)
-    tagFilter = TaggedSpanSetFilter(paramMapper, Identifier(params))
+    tagFilter = TaggedSpanSetFilter(paramMapper, Identifier(nothing))
     TupleHeader(ContextParamFunc(f.core.f.f, tagFilter), Val(D)), paramSet
 end
 
@@ -187,7 +185,7 @@ const ComputeGaussFunc = typeof(computeGaussFunc)
 
 const GaussFieldCore{F<:ParamMapper} = EncodeParamApply{ParamFreeFunc{ComputeGaussFunc}, F}
 
-const GaussFieldFunc{T, F<:ParamMapper} = FieldParamFunc{T, 1, GaussFieldCore{F}}
+const GaussFieldFunc{T<:Real, F<:ParamMapper} = FieldParamFunc{T, 1, GaussFieldCore{F}}
 
 function GaussFunc(xpn::UnitOrVal{T}) where {T<:Real}
     core = TypedTupleFunc(ParamFreeFunc(computeGaussFunc), T, Val(1))
@@ -195,7 +193,8 @@ function GaussFunc(xpn::UnitOrVal{T}) where {T<:Real}
 end
 
 
-struct ProductField{T, D, B<:NonEmptyTuple{ FieldAmplitude{T} }} <: FieldAmplitude{T, D}
+struct ProductField{T<:Number, D, B<:NonEmptyTuple{FieldAmplitude{T}}
+                    } <: FieldAmplitude{T, D}
     basis::B
 
     function ProductField(bases::B) where {T, B<:NonEmptyTuple{ FieldAmplitude{T} }}
@@ -243,7 +242,7 @@ function AxialProduct(basis::FieldAmplitude{T, 1}, dim::Int) where {T}
 end
 
 
-struct CoupledField{T, D, L<:FieldAmplitude{T, D}, R<:FieldAmplitude{T, D}, 
+struct CoupledField{T<:Number, D, L<:FieldAmplitude{T, D}, R<:FieldAmplitude{T, D}, 
                     F<:Function} <: FieldAmplitude{T, D}
     pair::Tuple{L, R}
     coupler::ParamFreeFunc{F}
@@ -272,10 +271,10 @@ function unpackFieldFunc(f::CoupledField{<:Number, D}) where {D}
 end
 
 
-const CartAngMomFunc{T, D, L} = NullaryField{T, D, CartSHarmonics{D, L}}
+const CartAngMomFunc{T<:Number, D} = NullaryField{T, D, CartSHarmonics{D}}
 
-const PolyRadialFunc{T, D, F<:FieldAmplitude{T, 1}, L} = 
-      CoupledField{T, D, RadialField{T, D, F}, CartAngMomFunc{T, D, L}, StableMul{T}}
+const PolyRadialFunc{T<:Number, D, F<:FieldAmplitude{T, 1}} = 
+      CoupledField{T, D, RadialField{T, D, F}, CartAngMomFunc{T, D}, StableMul{T}}
 
 function PolyRadialFunc(radial::FieldAmplitude{T, 1}, 
                         angular::NonEmptyTuple{Int, D}) where {T, D}
@@ -285,17 +284,51 @@ function PolyRadialFunc(radial::FieldAmplitude{T, 1},
     CoupledField((radialCore, CurriedField(polyCore)), StableMul(T))
 end
 
-const PolyGaussFunc{T, D, L, F<:GaussFunc{T}} = PolyRadialFunc{T, D, F, L}
+const PolyGaussFunc{T<:Real, D, F<:GaussFunc{T}} = PolyRadialFunc{T, D, F}
 
-const PolyRadialFieldCore{T, D, L, F<:AbstractParamFunc} = 
+const PolyRadialFieldCore{T<:Number, D, F<:AbstractParamFunc} = 
       BiParamFuncProd{T, RadialFieldFunc{T, D, F}, 
-                         FieldParamFunc{ T, D, InputConverter{CartSHarmonics{D, L}} }}
+                         FieldParamFunc{ T, D, InputConverter{CartSHarmonics{D}} }}
 
-const PolyGaussFieldCore{T, D, L, F<:ParamMapper} = 
-      PolyRadialFieldCore{T, D, L, GaussFieldFunc{T, F}}
+const PolyGaussFieldCore{T<:Real, D, F<:ParamMapper} = 
+      PolyRadialFieldCore{T, D, GaussFieldFunc{T, F}}
 
-const PolyRadialFieldFunc{T, D, L, F<:PolyRadialFieldCore{T, D, L}} = 
+const PolyRadialFieldFunc{T<:Number, D, F<:PolyRadialFieldCore{T, D}} = 
       FieldParamFunc{T, D, F}
 
-const PolyGaussFieldFunc{T, D, L, F<:PolyGaussFieldCore{T, D, L}} = 
-      PolyRadialFieldFunc{T, D, L, F}
+const PolyGaussFieldFunc{T<:Real, D, F<:PolyGaussFieldCore{T, D}} = 
+      PolyRadialFieldFunc{T, D, F}
+
+
+strictTypeJoin(TL::Type, TR::Type) = typejoin(TL, TR)
+
+function strictTypeJoin(::Type{EncodedField{TL, D, FL, EL}}, 
+                        ::Type{EncodedField{TR, D, FR, ER}}) where 
+                       {D, TL<:Number, FL<:Function, EL<:Function, 
+                           TR<:Number, FR<:Function, ER<:Function}
+    EncodedField{strictTypeJoin(TL, TR), D, strictTypeJoin(FL, FR), strictTypeJoin(EL, ER)}
+end
+
+function strictTypeJoin(::Type{CurriedField{TL, D, FL, PL}}, 
+                        ::Type{CurriedField{TR, D, FR, PR}}) where 
+                       {D, TL<:Number, FL<:Function, PL<:NamedParamTuple, 
+                           TR<:Number, FR<:Function, PR<:NamedParamTuple}
+    CurriedField{strictTypeJoin(TL, TR), D, strictTypeJoin(FL, FR), strictTypeJoin(EL, ER)}
+end
+
+function strictTypeJoin(::Type{ProductField{TL, D, BL}}, 
+                        ::Type{ProductField{TR, D, BR}}) where 
+                       {D, TL<:Number, BL<:NonEmptyTuple{ FieldAmplitude{TL} }, 
+                           TR<:Number, BR<:NonEmptyTuple{ FieldAmplitude{TR} }}
+    ProductField{strictTypeJoin(TL, TR), D, strictTypeJoin(BL, BR)}
+end
+
+function strictTypeJoin(::Type{CoupledField{TL, D, LL, RL, FL}}, 
+                        ::Type{CoupledField{TR, D, LR, RR, FR}}) where 
+                       {D, TL<:Number, LL<:FieldAmplitude{TL, D}, 
+                           RL<:FieldAmplitude{TL, D}, FL<:Function, 
+                           TR<:Number, LR<:FieldAmplitude{TR, D}, 
+                           RR<:FieldAmplitude{TR, D}, FR<:Function}
+    CoupledField{strictTypeJoin(TL, TR), D, strictTypeJoin(LL, LR), 
+                 strictTypeJoin(RL, RR), strictTypeJoin(FL, FR)}
+end
