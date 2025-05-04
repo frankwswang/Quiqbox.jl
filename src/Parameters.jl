@@ -1166,24 +1166,32 @@ function SpanSetFilter(unit::AbstractVector{OneToIndex}, grid::AbstractVector{On
 end
 
 #= Additional Method =#
-function getField(paramSet::AbstractSpanSet, sFilter::SpanSetFilter)
+function getField(paramSet::AbstractSpanSet, sFilter::SpanSetFilter, 
+                  finalizer::F=itself) where {F<:Function}
     firstIds = map(firstindex, paramSet)
     map(paramSet, firstIds, sFilter.scope) do sector, i, oneToIds
         if isempty(oneToIds)
             genBottomMemory()
         else
-            view(sector, map(x->(x.idx + i - 1), oneToIds))
+            if finalizer isa ItsType
+                view(sector, map(x->(x.idx + i - 1), oneToIds))
+            else
+                map(oneToIds) do x
+                   getindex(sector, (x.idx + i - 1)) |> finalizer
+                end
+            end
         end
     end
 end
 
-function getField(sFilterPrev::SpanSetFilter, sFilterHere::SpanSetFilter)
+function getField(sFilterPrev::SpanSetFilter, sFilterHere::SpanSetFilter, 
+                  finalizer::F=itself) where {F<:Function}
     unit = map(sFilterHere.scope.unit) do idx
-        getField(sFilterPrev.scope.unit, idx)
+        getField(sFilterPrev.scope.unit, idx) |> finalizer
     end
 
     grid = map(sFilterHere.scope.grid) do idx
-        getField(sFilterPrev.scope.grid, idx)
+        getField(sFilterPrev.scope.grid, idx) |> finalizer
     end
     SpanSetFilter((;unit, grid))
 end
@@ -1200,7 +1208,8 @@ TaggedSpanSetFilter(scope::NamedFilter, paramSet::AbstractSpanParamSet) =
 TaggedSpanSetFilter(scope, Identifier(paramSet))
 
 #= Additional Method =#
-getField(obj, tsFilter::TaggedSpanSetFilter) = getField(obj, tsFilter.scope)
+getField(obj, tsFilter::TaggedSpanSetFilter, finalizer::F=itself) where {F<:Function} = 
+getField(obj, tsFilter.scope, finalizer)
 
 
 abstract type AbstractParamFunc <: CompositeFunction end
