@@ -333,10 +333,10 @@ NamedMapper() = NamedMapper((), ())
 
 const MonoNMapper{F<:Function} = NamedMapper{1, Tuple{F}}
 
-function getField(obj, f::NamedMapper)
+function getField(obj, f::NamedMapper, finalizer::F=itself) where {F<:Function}
     map(f.encode) do encoder
         encoder(obj)
-    end |> NamedTuple{f.symbol}
+    end |> NamedTuple{f.symbol} |> finalizer
 end
 
 
