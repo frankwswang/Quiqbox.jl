@@ -449,12 +449,12 @@ end
 
 function genCallVertexEvaluatorCore(::TupleReceptor, fs::AbstractArray{<:Function}, 
                                     apply::ReturnTyped{T}) where {T}
-    ReturnTyped(ChainExpand(Tuple(fs), splat(apply.f)), T)
+    ReturnTyped(splat(apply.f) ∘ ChainMapper(fs|>Tuple), T)
 end
 
 function genCallVertexEvaluatorCore(::ArrayReceptor, fs::AbstractArray{<:Function}, 
                                     apply::ReturnTyped{T}) where {T}
-    ReturnTyped(ChainExpand(fs, apply.f), T)
+    ReturnTyped(apply.f ∘ ChainMapper(fs), T)
 end
 
 function genCallVertexEvaluator(compactPG::LayerGraphCore, 
@@ -614,7 +614,7 @@ end
 
 const FilterComputeGraph{G<:ComputeGraph} = Base.ComposedFunction{G, SpanSetFilter}
 
-const ParamMapper{N, E<:NTuple{N, FilterComputeGraph}} = NamedMapper{N, E}
+const ParamMapper{N, S, E<:NamedTuple{ S, NTuple{N, FilterComputeGraph} }} = ChainMapper{E}
 
 function genParamMapper(params::NamedParamTuple; 
                         paramSet!Self::AbstractSpanParamSet=initializeSpanParamSet())
@@ -623,7 +623,7 @@ function genParamMapper(params::NamedParamTuple;
         encoder, inputSet = compressParam(param)
         inputFilter = locateParam!(paramSet!Self, inputSet)
         encoder ∘ inputFilter
-    end |> NamedMapper
+    end |> ChainMapper
     mapper, paramSet!Self
 end
 

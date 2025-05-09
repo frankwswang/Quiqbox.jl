@@ -1194,7 +1194,7 @@ function getField(sFilterPrev::SpanSetFilter, sFilterHere::SpanSetFilter,
 end
 
 
-const NamedFilter = Union{SpanSetFilter, NamedMapper}
+const NamedFilter = Union{SpanSetFilter, ChainMapper}
 
 struct TaggedSpanSetFilter{F<:NamedFilter} <: Mapper
     scope::F

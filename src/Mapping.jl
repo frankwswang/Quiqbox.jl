@@ -119,31 +119,6 @@ mapreduce(o->o(arg, args...), f.joint, f.chain.value)
 (f::ChainReduce)(arg, args...) = mapreduce(o->o(arg, args...), f.joint, f.chain)
 
 
-struct ChainExpand{F<:Function, 
-                   C<:Union{AbstractMemory{<:Function}, NonEmptyTuple{Function}}
-                   } <: FunctionCombiner
-    chain::C
-    finalizer::F
-
-    function ChainExpand(chain::C, finalizer::F=itself) where 
-                        {C<:AbstractMemory{<:Function}, F<:Function}
-        checkEmptiness(chain, :chain)
-        new{F, C}(chain, finalizer)
-    end
-
-    function ChainExpand(chain::C, finalizer::F=itself) where 
-                        {C<:NonEmptyTuple{Function}, F<:Function}
-        checkEmptiness(chain, :chain)
-        new{F, C}(chain, finalizer)
-    end
-end
-
-ChainExpand(chain::AbstractArray{<:Function}, finalizer::Function=itself) = 
-ChainExpand(ShapedMemory(chain), finalizer)
-
-(f::ChainExpand)(arg, args...) = f.finalizer(map(o->o(arg, args...), f.chain))
-
-
 struct InsertInward{C<:Function, F<:Function} <: FunctionCombiner
     apply::C
     dress::F
@@ -315,28 +290,25 @@ InputLimiter(f::InputLimiter, ::Val{N}) where {N} = InputLimiter(f.f, Val(N))
 (f::InputLimiter{N})(arg::Vararg{Any, N}) where {N} = f.f(arg...)
 
 
-struct NamedMapper{N, E<:NTuple{N, Function}} <: Mapper
-    encode::E
-    symbol::NTuple{N, Symbol}
+struct ChainMapper{F<:FunctionChainUnion} <: Mapper
+    chain::F
 
-    NamedMapper(encode::E, syms::NTuple{N, Symbol}) where {N, E<:NTuple{N, Function}} = 
-    new{N, E}(encode, syms)
+    function ChainMapper(chain::F) where {F<:AbstractMemory{<:Function}}
+        checkEmptiness(chain, :chain)
+        new{F}(chain)
+    end
+
+    function ChainMapper(chain::F) where {F<:GeneralTupleUnion{ NonEmptyTuple{Function} }}
+        new{F}(chain)
+    end
 end
 
-NamedMapper(encode::Function, sym::Symbol) = 
-NamedMapper((encode,), (sym,))
+ChainMapper(chain::AbstractArray{<:Function}) = ChainMapper(chain|>ShapedMemory)
 
-NamedMapper(encodePairs::NamedTuple{S, <:Tuple{ Vararg{Function} }}) where {S} = 
-NamedMapper(values(encodePairs), S)
-
-NamedMapper() = NamedMapper((), ())
-
-const MonoNMapper{F<:Function} = NamedMapper{1, Tuple{F}}
-
-function getField(obj, f::NamedMapper, finalizer::F=itself) where {F<:Function}
-    map(f.encode) do encoder
-        encoder(obj)
-    end |> NamedTuple{f.symbol} |> finalizer
+function getField(obj, f::ChainMapper, finalizer::F=itself) where {F<:Function}
+    map(f.chain) do mapper
+        mapper(obj)
+    end |> finalizer
 end
 
 
