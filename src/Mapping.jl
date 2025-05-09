@@ -441,3 +441,22 @@ function (f::GetRange)(obj)
         getField(obj, OneToIndex(i))
     end
 end
+
+
+struct FloatingMonomial{T<:Real, D} <: CompositeFunction
+    center::NTuple{D, T}
+    degree::WeakComp{D}
+
+    FloatingMonomial(center::NonEmptyTuple{T}, degree::WeakComp{D}) where {T, D} = 
+    new{T, D}(center, degree)
+end
+
+FloatingMonomial(center::NonEmptyTuple{T, D}, degree::NonEmptyTuple{Int, D}) where {T, D} = 
+FloatingMonomial(center, WeakComp(degree))
+
+function (f::FloatingMonomial{T, D})(coord::Union{NTuple{D, T}, AbstractVector{T}}
+                                     ) where {T<:Real, D}
+    mapreduce(StableMul(T), enumerate(f.center), f.degree.tuple) do (i, cen), pwr
+        (coord[begin+i-1] - cen)^pwr
+    end
+end
