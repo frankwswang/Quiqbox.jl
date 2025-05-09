@@ -74,6 +74,7 @@ const AVectorOrNTuple{T, NNMO} = Union{Tuple{T, Vararg{T, NNMO}}, AbstractVector
 const NonEmptyTuple{T, NMO} = Tuple{T, Vararg{T, NMO}}
 const N12Tuple{T} = Union{Tuple{T}, NTuple{2, T}}
 const N24Tuple{T} = Union{NTuple{2, T}, NTuple{4, T}}
+const GeneralTupleUnion{T<:Tuple} = Union{T, NamedTuple{<:Any, <:T}}
 
 const MissingOr{T} = Union{Missing, T}
 const NothingOr{T} = Union{Nothing, T}
@@ -99,6 +100,9 @@ const TetraTupleUnion{T} = Union{(NTuple{N, T} for N in 1:4)...}
 const MissSymInt = MissingOr{Union{Symbol, Int}}
 
 const AbstractEqualityDict = Union{EqualityDict, Dict}
+
+const FunctionChainUnion = Union{AbstractMemory{<:Function},
+                                 GeneralTupleUnion{ NonEmptyTuple{Function} }}
 
 const BoolVal = Union{Val{true}, Val{false}}
 

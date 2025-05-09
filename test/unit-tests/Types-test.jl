@@ -19,7 +19,7 @@ using Quiqbox
 
 @test Quiqbox.GaussFieldFunc <: Quiqbox.FieldParamFunc
 
-@test Quiqbox.AxialProduct{<:Number, 1} <: Quiqbox.ProductField
+@test Quiqbox.AxialProduct{<:Quiqbox.RealOrComplex, 1} <: Quiqbox.ProductField
 
 @test Quiqbox.CartAngMomFunc <: Quiqbox.NullaryField
 
@@ -34,5 +34,9 @@ using Quiqbox
 @test Quiqbox.FixedSpanIndexSet <: Quiqbox.AbstractSpanIndexSet
 
 @test Quiqbox.TypedSpanParamSet <: Quiqbox.AbstractSpanParamSet
+
+@test Quiqbox.PrimGTOData <: Quiqbox.PrimOrbData
+
+@test Quiqbox.ParamMapper <: Quiqbox.ChainMapper
 
 end

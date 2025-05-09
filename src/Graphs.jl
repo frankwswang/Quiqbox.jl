@@ -614,7 +614,8 @@ end
 
 const FilterComputeGraph{G<:ComputeGraph} = Base.ComposedFunction{G, SpanSetFilter}
 
-const ParamMapper{N, S, E<:NamedTuple{ S, NTuple{N, FilterComputeGraph} }} = ChainMapper{E}
+const ParamMapper{S, F<:NamedTuple{ S, <:NonEmptyTuple{FilterComputeGraph} }} = 
+      ChainMapper{F}
 
 function genParamMapper(params::NamedParamTuple; 
                         paramSet!Self::AbstractSpanParamSet=initializeSpanParamSet())
