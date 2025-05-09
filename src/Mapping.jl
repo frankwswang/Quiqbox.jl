@@ -393,6 +393,22 @@ TypedTupleFunc(f::ReturnTyped, ::Type{T}, ::Val{D}) where {T, D} =
 ReturnTyped(TupleHeader(f.f, Val(D)), T)
 
 
+struct SelectHeader{N, K, F<:Function} <: FunctionModifier
+    f::F
+
+    function SelectHeader{N, K}(f::F) where {N, K, F<:Function}
+        checkPositivity(K, true)
+        N < K && throw(AssertionError("N must be no less than K=$K."))
+        new{N::Int, K::Int, F}(f)
+    end
+end
+
+(f::SelectHeader{N, K})(arg::Vararg{Any, N}) where {N, K} = f.f(arg[begin+K-1])
+
+(f::SelectHeader{N, 0})(::Vararg{Any, N}) where {N} = f.f()
+
+
+
 """
 
     getOpacity(f::Function) -> Union{Lucent, Opaque}
