@@ -65,16 +65,12 @@ struct EncodedField{T<:RealOrComplex, D, F<:Function, E<:Function} <: FieldAmpli
             d = getDimension(encode.f)
             (d == D) || throw(AssertionError("Cannot wrap a $d-dimensional field in $D "*
                                              "dimension."))
-        else
-            checkArgQuantity(encode.f, 1)
         end
 
         if F <: FieldAmplitude
             t = getOutputType(core.f)
             promote_type(t, T) <: T || 
             throw(AssertionError("Cannot convert the output of `f.f` from `$t` to $T."))
-        else
-            checkArgQuantity(core.f, 1)
         end
 
         new{T, D, F, E}(core, encode)
@@ -139,7 +135,6 @@ struct CurriedField{T<:RealOrComplex, D, F<:Function, P<:NamedParamTuple} <: Fie
     function CurriedField(core::TypedTupleFunc{T, D, ParamFreeFunc{F}}, 
                           params::P=NamedTuple()) where 
                          {T<:RealOrComplex, D, F<:Function, P<:NamedParamTuple}
-        checkArgQuantity(core.f.f.core, ifelse(isempty(params), 1, 2))
         new{T, D, F, P}(core, params)
     end
 end
@@ -249,7 +244,6 @@ struct CoupledField{T<:RealOrComplex, D, L<:FieldAmplitude{T, D}, R<:FieldAmplit
 
     function CoupledField(pair::Tuple{L, R}, coupler::Function) where 
                          {T, D, L<:FieldAmplitude{T, D}, R<:FieldAmplitude{T, D}}
-        checkArgQuantity(coupler, 2)
         coupler = ParamFreeFunc(coupler)
         new{T, D, L, R, typeof(coupler.core)}(pair, coupler)
     end

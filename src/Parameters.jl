@@ -1219,11 +1219,6 @@ getParamInputType(::AbstractParamFunc) = SpanInput()
 
 struct InputConverter{F<:Function} <: AbstractParamFunc
     core::ParamFreeFunc{F}
-
-    function InputConverter(f::ParamFreeFunc{F}) where {F<:Function}
-        checkArgQuantity(f.core, 1)
-        new{F}(f)
-    end
 end
 
 InputConverter(f::Function) = (InputConverter∘ParamFreeFunc)(f)
@@ -1235,12 +1230,6 @@ InputConverter(f::InputConverter) = itself(f)
 
 struct ParamFormatter{F<:NamedFilter} <: AbstractParamFunc
     core::ParamFreeFunc{TaggedSpanSetFilter{F}}
-
-    function ParamFormatter(f::ParamFreeFunc{TaggedSpanSetFilter{F}}) where 
-                           {F<:NamedFilter}
-        checkArgQuantity(f.core, 1)
-        new{F}(f)
-    end
 end
 
 ParamFormatter(f::TaggedSpanSetFilter) = (ParamFormatter∘ParamFreeFunc)(f)
@@ -1276,13 +1265,11 @@ struct ParamCombiner{B<:Function, C<:ParamFuncSequence} <: AbstractParamFunc
 
     function ParamCombiner(binder::B, encode::C) where 
                           {B<:Function, C<:NonEmptyTuple{AbstractParamFunc}}
-        checkArgQuantity(binder, 2)
         new{B, C}(binder, encode)
     end
 
     function ParamCombiner(binder::B, encode::C) where 
                           {B<:Function, C<:LinearMemory{<:AbstractParamFunc}}
-        checkArgQuantity(binder, 2)
         checkEmptiness(encode, :encode)
         new{B, C}(binder, encode)
     end
@@ -1364,8 +1351,6 @@ end
 
 # f(input) => fCore(input, param)
 function unpackFunc(f::Function)
-    checkArgQuantity(f, 1)
-
     if !(getOpacity(f) isa Lucent)
         f = deepcopy(f)
         source = getSourceParamSet(f)
