@@ -989,9 +989,6 @@ const OptionalGridValueSet{U<:NothingOr{AbtBottomVector}, G<:NothingOr{AbtVecOfA
 const OptionalVoidValueSet{U<:NothingOr{AbtBottomVector}, G<:NothingOr{AbtBottomVector}} = 
       @NamedTuple{unit::U, grid::G}
 
-const FixedSpanValueSet{T1, T2<:AbstractArray{T1}} = 
-      AbstractSpanValueSet{Memory{T1}, Memory{T2}}
-
 const AbstractSpanIndexSet{U<:AbstractVector{OneToIndex}, G<:AbstractVector{OneToIndex}} = 
       AbstractSpanSet{U, G}
 
