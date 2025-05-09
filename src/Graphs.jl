@@ -614,16 +614,21 @@ end
 
 const FilterComputeGraph{G<:ComputeGraph} = Base.ComposedFunction{G, SpanSetFilter}
 
-const ParamMapper{S, F<:NamedTuple{ S, <:NonEmptyTuple{FilterComputeGraph} }} = 
-      ChainMapper{F}
+const ParamEncoderChain = NonEmptyTuple{Union{GetIndex{<:SpanIndex}, FilterComputeGraph}}
+
+const ParamMapper{S, F<:NamedTuple{S, <:ParamEncoderChain}} = ChainMapper{F}
 
 function genParamMapper(params::NamedParamTuple; 
                         paramSet!Self::AbstractSpanParamSet=initializeSpanParamSet())
     checkEmptiness(params, :params)
     mapper = map(params) do param
-        encoder, inputSet = compressParam(param)
-        inputFilter = locateParam!(paramSet!Self, inputSet)
-        encoder ∘ inputFilter
+        if screenLevelOf(param) == 1
+            locateParam!(paramSet!Self, param)
+        else
+            encoder, inputSet = compressParam(param)
+            inputFilter = locateParam!(paramSet!Self, inputSet)
+            encoder ∘ inputFilter
+        end
     end |> ChainMapper
     mapper, paramSet!Self
 end
