@@ -337,8 +337,9 @@ function getMinimalEleType(collection::AbstractArray{T}) where {T}
     elseif isempty(collection)
         Union{}
     else
-        mapreduce(typeof, typejoin, collection)
+        mapreduce(typeof, strictTypeJoin, collection)
     end
 end
 
-getMinimalEleType(collection::Tuple) = mapreduce(typeof, typejoin, collection, init=Union{})
+getMinimalEleType(collection::Tuple) = 
+mapreduce(typeof, strictTypeJoin, collection, init=Union{})
