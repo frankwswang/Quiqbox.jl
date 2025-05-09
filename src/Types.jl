@@ -15,7 +15,7 @@ abstract type QueryBox{T} <: Box end
 
 # N: Inner dim, size mutable; O: Outer dim, size immutable
 abstract type DualSpanFunction{T, N, O} <: CompositeFunction end
-abstract type SpatialAmplitude{D, M} <: CompositeFunction end # M: Particle number
+abstract type SpatialFunction{D, N} <: CompositeFunction end # N: Particle number
 abstract type StatefulFunction{T} <: CompositeFunction end
 abstract type FunctionComposer <: CompositeFunction end
 abstract type Evaluator <: CompositeFunction end
@@ -23,9 +23,7 @@ abstract type Mapper <: CompositeFunction end
 abstract type Getter <: CompositeFunction end
 const Encoder = Union{Getter, Mapper}
 
-abstract type SpatialProcessCache{T, D} <: QueryBox{T} end
-abstract type IntegralData{T, S} <: QueryBox{T} end
-abstract type ViewedObject{T, P} <: QueryBox{T} end
+abstract type IntegralData{T} <: QueryBox{T} end
 abstract type CustomCache{T} <: QueryBox{T} end
 
 abstract type AmplitudeNormalizer{T, D, N} <: StatefulFunction{T} end
@@ -37,7 +35,7 @@ abstract type FunctionCombiner <: FunctionComposer end # Combine functions toget
 
 abstract type TypedEvaluator{T} <: Evaluator end
 
-abstract type DirectOperator <: FunctionModifier end
+abstract type DirectOperator{N} <: FunctionModifier end # N: Number of input functions
 
 abstract type ParamFuncBuilder{F} <: FunctionCombiner end
 
@@ -45,8 +43,6 @@ abstract type StructuredInfo <: ConfigBox end
 abstract type StructuredType <: ConfigBox end
 
 abstract type FieldParamPointer <: StructuredInfo end
-
-abstract type IntegralProcessCache{T, D} <: SpatialProcessCache{T, D} end
 
 abstract type DimensionalEvaluator{T, D, F} <: TypedEvaluator{T} end
 
@@ -57,8 +53,8 @@ abstract type StorageMarker{T} <: MarkerBox end
 
 abstract type EvalDimensionalFunc{T, D, F} <: DimensionalEvaluator{T, D, F} end
 
-abstract type OrbitalBasis{T, D, F} <: SpatialAmplitude{D, 1} end
-abstract type FieldAmplitude{T, D} <: SpatialAmplitude{D, 1} end
+abstract type OrbitalBasis{T, D, F} <: SpatialFunction{D, 1} end
+abstract type FieldAmplitude{T, D} <: SpatialFunction{D, 1} end
 
 # abstract type ManyParticleState{T} <: Any end
 
@@ -72,6 +68,7 @@ abstract type FieldAmplitude{T, D} <: SpatialAmplitude{D, 1} end
     TPS2 = 2
 end
 
+const RealOrComplex{T<:Real} = Union{Complex{T}, T}
 
 const AVectorOrNTuple{T, NNMO} = Union{Tuple{T, Vararg{T, NNMO}}, AbstractVector{<:T}}
 const NonEmptyTuple{T, NMO} = Tuple{T, Vararg{T, NMO}}
@@ -81,6 +78,8 @@ const N24Tuple{T} = Union{NTuple{2, T}, NTuple{4, T}}
 const MissingOr{T} = Union{Missing, T}
 const NothingOr{T} = Union{Nothing, T}
 const AbtArray0D{T} = AbstractArray{T, 0}
+
+const TypedIdxerMemory{T} = Memory{Pair{Int, T}}
 
 const RefVal = Base.RefValue
 

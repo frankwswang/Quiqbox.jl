@@ -8,7 +8,7 @@ using LinearAlgebra
 getOutputType(::FieldAmplitude{T}) where {T} = T
 
 
-getDimension(::SpatialAmplitude{D, M}) where {D, M} = Int(D*M)
+getDimension(::SpatialFunction{D, M}) where {D, M} = Int(D*M)
 
 
 needFieldAmpEvalCache(::FieldAmplitude) = true
@@ -26,7 +26,7 @@ end
 (f::FieldAmplitude)(input) = evalFieldAmplitude(f, formatInput(f, input))
 
 
-struct FieldParamFunc{T<:Number, D, F<:AbstractParamFunc} <: AbstractParamFunc
+struct FieldParamFunc{T<:RealOrComplex, D, F<:AbstractParamFunc} <: AbstractParamFunc
     core::TypedParamFunc{T, ParamFilterApply{ TupleHeader{D, F} }}
 
     function FieldParamFunc{T, D}(f::TupleHeader{D, F}, scope::TaggedSpanSetFilter) where 
@@ -55,12 +55,12 @@ function unpackFunc(f::FieldAmplitude{T, D}) where {T, D}
 end
 
 
-struct EncodedField{T<:Number, D, F<:Function, E<:Function} <: FieldAmplitude{T, D}
+struct EncodedField{T<:RealOrComplex, D, F<:Function, E<:Function} <: FieldAmplitude{T, D}
     core::ReturnTyped{T, F}
     encode::TupleHeader{D, E}
 
     function EncodedField(core::ReturnTyped{T, F}, encode::TupleHeader{D, E}) where 
-                         {T<:Number, F<:Function, D, E<:Function}
+                         {T<:RealOrComplex, F<:Function, D, E<:Function}
         if E <: FieldAmplitude
             d = getDimension(encode.f)
             (d == D) || throw(AssertionError("Cannot wrap a $d-dimensional field in $D "*
@@ -93,7 +93,7 @@ needFieldAmpEvalCache(::EncodedField) = true
 
 function evalFieldAmplitudeCore(f::EncodedField{T, D, F, E}, input, 
                                 cache!Self::MultiSpanDataCacheBox) where 
-                               {T<:Number, D, F<:Function, E<:Function}
+                               {T<:RealOrComplex, D, F<:Function, E<:Function}
     val = formatInput(TupleInput{Real, D}(), input)
     for (caller, type) in zip((f.encode, f.core), (E, F))
         val = if type <: FieldAmplitude
@@ -105,7 +105,7 @@ function evalFieldAmplitudeCore(f::EncodedField{T, D, F, E}, input,
     convert(T, val)
 end
 
-function unpackFieldFunc(f::EncodedField{<:Number, D}) where {D}
+function unpackFieldFunc(f::EncodedField{<:RealOrComplex, D}) where {D}
     paramSet = initializeSpanParamSet()
     fCore = unpackFunc!(f.core.f, paramSet, Identifier(nothing))
     fEncode = unpackFunc!(f.encode.f, paramSet, Identifier(nothing))
@@ -113,16 +113,16 @@ function unpackFieldFunc(f::EncodedField{<:Number, D}) where {D}
 end
 
 
-const WrappedField{T<:Number, D, F<:Function} = EncodedField{T, D, F, ItsType}
+const WrappedField{T<:RealOrComplex, D, F<:Function} = EncodedField{T, D, F, ItsType}
 
-const EncodedFieldFunc{T<:Number, D, E<:AbstractParamFunc, F<:AbstractParamFunc} = 
+const EncodedFieldFunc{T<:RealOrComplex, D, E<:AbstractParamFunc, F<:AbstractParamFunc} = 
       FieldParamFunc{T, D, ParamPipeline{ Tuple{E, F} }}
 
 
-const RadialField{T<:Number, D, F<:FieldAmplitude{T, 1}} = 
+const RadialField{T<:RealOrComplex, D, F<:FieldAmplitude{T, 1}} = 
       EncodedField{T, D, F, typeof(LinearAlgebra.norm)}
 
-const RadialFieldFunc{T<:Number, D, F<:AbstractParamFunc} = 
+const RadialFieldFunc{T<:RealOrComplex, D, F<:AbstractParamFunc} = 
       EncodedFieldFunc{T, D, InputConverter{typeof(LinearAlgebra.norm)}, F}
 
 RadialField{T, D}(radial::FieldAmplitude{T, 1}) where {T, D} = 
@@ -132,20 +132,20 @@ RadialField(radial::FieldAmplitude{T, 1}, ::Val{D}) where {T, D} =
 RadialField{T, D}(radial)
 
 
-struct CurriedField{T<:Number, D, F<:Function, P<:NamedParamTuple} <: FieldAmplitude{T, D}
+struct CurriedField{T<:RealOrComplex, D, F<:Function, P<:NamedParamTuple} <: FieldAmplitude{T, D}
     core::TypedTupleFunc{T, D, ParamFreeFunc{F}}
     param::P
 
     function CurriedField(core::TypedTupleFunc{T, D, ParamFreeFunc{F}}, 
                           params::P=NamedTuple()) where 
-                         {T<:Number, D, F<:Function, P<:NamedParamTuple}
+                         {T<:RealOrComplex, D, F<:Function, P<:NamedParamTuple}
         checkArgQuantity(core.f.f.core, ifelse(isempty(params), 1, 2))
         new{T, D, F, P}(core, params)
     end
 end
 
 
-const NullaryField{T<:Number, D, F<:Function} = CurriedField{T, D, F, @NamedTuple{}}
+const NullaryField{T<:RealOrComplex, D, F<:Function} = CurriedField{T, D, F, @NamedTuple{}}
 
 needFieldAmpEvalCache(::NullaryField) = false
 
@@ -153,7 +153,7 @@ function evalFieldAmplitudeCore(f::NullaryField, input)
     f.core(formatInput(f, input))
 end
 
-function unpackFieldFunc(f::NullaryField{<:Number, D}) where {D}
+function unpackFieldFunc(f::NullaryField{<:RealOrComplex, D}) where {D}
     TupleHeader(InputConverter(f.core.f.f), Val(D)), initializeSpanParamSet(nothing)
 end
 
@@ -165,7 +165,7 @@ function evalFieldAmplitudeCore(f::CurriedField, input, cache!Self::MultiSpanDat
     f.core(formatInput(f, input), paramVals)
 end
 
-function unpackFieldFunc(f::CurriedField{<:Number, D}) where {D}
+function unpackFieldFunc(f::CurriedField{<:RealOrComplex, D}) where {D}
     params = f.param
     paramMapper, paramSet = genParamMapper(params)
     tagFilter = TaggedSpanSetFilter(paramMapper, Identifier(nothing))
@@ -193,7 +193,7 @@ function GaussFunc(xpn::UnitOrVal{T}) where {T<:Real}
 end
 
 
-struct ProductField{T<:Number, D, B<:NonEmptyTuple{FieldAmplitude{T}}
+struct ProductField{T<:RealOrComplex, D, B<:NonEmptyTuple{FieldAmplitude{T}}
                     } <: FieldAmplitude{T, D}
     basis::B
 
@@ -215,7 +215,7 @@ function evalFieldAmplitude(f::ProductField{T}, input;
     end
 end
 
-function unpackFieldFunc(f::ProductField{T, D}) where {T<:Number, D}
+function unpackFieldFunc(f::ProductField{T, D}) where {T<:RealOrComplex, D}
     paramSet = initializeSpanParamSet()
 
     idx = 1
@@ -232,7 +232,7 @@ function unpackFieldFunc(f::ProductField{T, D}) where {T<:Number, D}
 end
 
 
-const AxialProduct{T<:Number, D, B<:NTuple{D, FieldAmplitude{T, 1}}} = ProductField{T, D, B}
+const AxialProduct{T<:RealOrComplex, D, B<:NTuple{D, FieldAmplitude{T, 1}}} = ProductField{T, D, B}
 
 AxialProduct(bases::NonEmptyTuple{FieldAmplitude{T, 1}}) where {T} = ProductField(bases)
 
@@ -242,7 +242,7 @@ function AxialProduct(basis::FieldAmplitude{T, 1}, dim::Int) where {T}
 end
 
 
-struct CoupledField{T<:Number, D, L<:FieldAmplitude{T, D}, R<:FieldAmplitude{T, D}, 
+struct CoupledField{T<:RealOrComplex, D, L<:FieldAmplitude{T, D}, R<:FieldAmplitude{T, D}, 
                     F<:Function} <: FieldAmplitude{T, D}
     pair::Tuple{L, R}
     coupler::ParamFreeFunc{F}
@@ -262,7 +262,7 @@ function evalFieldAmplitude(f::CoupledField, input;
     end |> Base.Splat(f.coupler)
 end
 
-function unpackFieldFunc(f::CoupledField{<:Number, D}) where {D}
+function unpackFieldFunc(f::CoupledField{<:RealOrComplex, D}) where {D}
     fL, fR = f.pair
     paramSet = initializeSpanParamSet()
     fCoreL = unpackFunc!(fL, paramSet, Identifier(nothing))
@@ -271,9 +271,9 @@ function unpackFieldFunc(f::CoupledField{<:Number, D}) where {D}
 end
 
 
-const CartAngMomFunc{T<:Number, D} = NullaryField{T, D, CartSHarmonics{D}}
+const CartAngMomFunc{T<:RealOrComplex, D} = NullaryField{T, D, CartSHarmonics{D}}
 
-const PolyRadialFunc{T<:Number, D, F<:FieldAmplitude{T, 1}} = 
+const PolyRadialFunc{T<:RealOrComplex, D, F<:FieldAmplitude{T, 1}} = 
       CoupledField{T, D, RadialField{T, D, F}, CartAngMomFunc{T, D}, StableMul{T}}
 
 function PolyRadialFunc(radial::FieldAmplitude{T, 1}, 
@@ -286,14 +286,14 @@ end
 
 const PolyGaussFunc{T<:Real, D, F<:GaussFunc{T}} = PolyRadialFunc{T, D, F}
 
-const PolyRadialFieldCore{T<:Number, D, F<:AbstractParamFunc} = 
+const PolyRadialFieldCore{T<:RealOrComplex, D, F<:AbstractParamFunc} = 
       BiParamFuncProd{T, RadialFieldFunc{T, D, F}, 
                          FieldParamFunc{ T, D, InputConverter{CartSHarmonics{D}} }}
 
 const PolyGaussFieldCore{T<:Real, D, F<:ParamMapper} = 
       PolyRadialFieldCore{T, D, GaussFieldFunc{T, F}}
 
-const PolyRadialFieldFunc{T<:Number, D, F<:PolyRadialFieldCore{T, D}} = 
+const PolyRadialFieldFunc{T<:RealOrComplex, D, F<:PolyRadialFieldCore{T, D}} = 
       FieldParamFunc{T, D, F}
 
 const PolyGaussFieldFunc{T<:Real, D, F<:PolyGaussFieldCore{T, D}} = 
@@ -302,33 +302,67 @@ const PolyGaussFieldFunc{T<:Real, D, F<:PolyGaussFieldCore{T, D}} =
 
 strictTypeJoin(TL::Type, TR::Type) = typejoin(TL, TR)
 
+strictTypeJoin(::Type{T}, ::Type{Complex{T}}) where {T<:Real} = RealOrComplex{T}
+
 function strictTypeJoin(::Type{EncodedField{TL, D, FL, EL}}, 
                         ::Type{EncodedField{TR, D, FR, ER}}) where 
-                       {D, TL<:Number, FL<:Function, EL<:Function, 
-                           TR<:Number, FR<:Function, ER<:Function}
-    EncodedField{strictTypeJoin(TL, TR), D, strictTypeJoin(FL, FR), strictTypeJoin(EL, ER)}
+                       {D, TL<:RealOrComplex, FL<:Function, EL<:Function, 
+                           TR<:RealOrComplex, FR<:Function, ER<:Function}
+    p = (;T=strictTypeJoin(TL, TR), D, F=strictTypeJoin(FL, FR), E=strictTypeJoin(EL, ER))
+    genParametricType(EncodedField, p)
 end
 
 function strictTypeJoin(::Type{CurriedField{TL, D, FL, PL}}, 
                         ::Type{CurriedField{TR, D, FR, PR}}) where 
-                       {D, TL<:Number, FL<:Function, PL<:NamedParamTuple, 
-                           TR<:Number, FR<:Function, PR<:NamedParamTuple}
-    CurriedField{strictTypeJoin(TL, TR), D, strictTypeJoin(FL, FR), strictTypeJoin(EL, ER)}
+                       {D, TL<:RealOrComplex, FL<:Function, PL<:NamedParamTuple, 
+                           TR<:RealOrComplex, FR<:Function, PR<:NamedParamTuple}
+    p = (;T=strictTypeJoin(TL, TR), D, F=strictTypeJoin(FL, FR), P=strictTypeJoin(PL, PR))
+    genParametricType(CurriedField, p)
 end
 
 function strictTypeJoin(::Type{ProductField{TL, D, BL}}, 
                         ::Type{ProductField{TR, D, BR}}) where 
-                       {D, TL<:Number, BL<:NonEmptyTuple{ FieldAmplitude{TL} }, 
-                           TR<:Number, BR<:NonEmptyTuple{ FieldAmplitude{TR} }}
-    ProductField{strictTypeJoin(TL, TR), D, strictTypeJoin(BL, BR)}
+                       {D, TL<:RealOrComplex, BL<:NonEmptyTuple{ FieldAmplitude{TL} }, 
+                           TR<:RealOrComplex, BR<:NonEmptyTuple{ FieldAmplitude{TR} }}
+    p = (;T=strictTypeJoin(TL, TR), D, B=strictTypeJoin(BL, BR))
+    typeintersect(genParametricType(ProductField, p), ProductField)
 end
 
 function strictTypeJoin(::Type{CoupledField{TL, D, LL, RL, FL}}, 
                         ::Type{CoupledField{TR, D, LR, RR, FR}}) where 
-                       {D, TL<:Number, LL<:FieldAmplitude{TL, D}, 
+                       {D, TL<:RealOrComplex, LL<:FieldAmplitude{TL, D}, 
                            RL<:FieldAmplitude{TL, D}, FL<:Function, 
-                           TR<:Number, LR<:FieldAmplitude{TR, D}, 
+                           TR<:RealOrComplex, LR<:FieldAmplitude{TR, D}, 
                            RR<:FieldAmplitude{TR, D}, FR<:Function}
-    CoupledField{strictTypeJoin(TL, TR), D, strictTypeJoin(LL, LR), 
-                 strictTypeJoin(RL, RR), strictTypeJoin(FL, FR)}
+    p = (;T=strictTypeJoin(TL, TR), D, L=strictTypeJoin(LL, LR), R=strictTypeJoin(RL, RR), 
+          F=strictTypeJoin(FL, FR))
+    typeintersect(genParametricType(CoupledField, p), CoupledField)
 end
+
+
+struct FloatingField{T<:Real, D, C<:RealOrComplex{T}, F<:AbstractParamFunc, 
+                     P<:OptionalSpanValueSet} <: FieldAmplitude{C, D}
+    center::NTuple{D, T}
+    core::TypedTupleFunc{C, D, F}
+    param::P
+
+    function FloatingField(center::NonEmptyTuple{Real}, f::FieldParamFunc{C, D, F}, 
+                           paramSet::AbstractSpanParamSet) where 
+                          {C<:RealOrComplex, D, F<:AbstractParamFunc}
+        T = extractRealNumberType(C)
+        base = f.core.f
+        core = ReturnTyped(base.binder, T)
+        paramValSet = map(last(base.encode).core.core(paramSet)) do ele
+            isempty(ele) ? genBottomMemory() : getMemory(map(obtain, ele))
+        end
+        P = typeof(paramValSet)
+        new{T, D, C, F, P}(convert(NTuple{D, T}, center), core, paramValSet)
+    end
+end
+
+function (f::FloatingField{<:RealOrComplex, D})(coord::NTuple{D, Real}) where {D}
+    f.core(coord .- f.center, f.param)
+end
+
+const FloatingPolyGaussField{T<:Real, D, F<:PolyGaussFieldCore{T, D}} = 
+      FloatingField{T, D, T, F}
