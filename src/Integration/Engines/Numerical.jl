@@ -157,12 +157,14 @@ end
 
 
 struct HCubatureConfig{T<:Real} <: ConfigBox
+    tolerance::T
     maxEvalNum::Int
-                                                # 1000 per one of six dimensions
-    function HCubatureConfig(::Type{T}, maxEvalNum::Int=1000_000_000_000_000_000
-                             ) where {T<:Real}
-        checkPositivity(maxEvalNum)
-        new{T}(maxEvalNum)
+
+    function HCubatureConfig(::Type{T}, tolerance::T=zero(T); 
+                             maxEvalNum::Int=1000_000_000_000_000_000) where {T<:Real}
+        checkPositivity(tolerance, true)
+        checkPositivity(maxEvalNum) # 1000 per one of six dimensions
+        new{T}(tolerance, maxEvalNum)
     end
 end
 
@@ -170,6 +172,8 @@ function numericalIntegrateCore(config::HCubatureConfig{T},
                                 integrand::Function) where {T<:Real}
     formattedInt = ConfinedInfIntegrand(integrand, T)
     interval = getConfinedInterval(formattedInt)
-    fullRes = hcubature(formattedInt, interval..., maxevals=config.maxEvalNum)
+    atol = config.tolerance
+    rtol = ifelse(iszero(atol), 10eps(T), zero(T))
+    fullRes = hcubature(formattedInt, interval...; rtol, atol, maxevals=config.maxEvalNum)
     first(fullRes)
 end
