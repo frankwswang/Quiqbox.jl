@@ -94,7 +94,7 @@ InputLimiter(f::InputLimiter, ::Val{N}) where {N} = InputLimiter(f.f, Val(N))
 (f::InputLimiter{N})(arg::Vararg{Any, N}) where {N} = f.f(arg...)
 
 
-struct ChainMapper{F<:FunctionChainUnion} <: Mapper
+struct ChainMapper{F<:FunctionChainUnion{Function}} <: Mapper
     chain::F
 
     function ChainMapper(chain::F) where {F<:AbstractMemory{<:Function}}

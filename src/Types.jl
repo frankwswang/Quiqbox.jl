@@ -73,8 +73,9 @@ const TriTupleUnion{T} = Union{(NTuple{N, T} for N in 1:3)...}
 
 const AbstractEqualityDict = Union{EqualityDict, Dict}
 
-const FunctionChainUnion = Union{AbstractMemory{<:Function},
-                                 GeneralTupleUnion{ NonEmptyTuple{Function} }}
+const FunctionChainUnion{F<:Function} = Union{
+    AbstractMemory{<:F}, GeneralTupleUnion{NonEmptyTuple{F}}
+}
 
 const BoolVal = Union{Val{true}, Val{false}}
 

@@ -1266,20 +1266,19 @@ function (f::ParamBindFunc)(input, valSet::AbstractSpanValueSet)
 end
 
 
-const ParamFuncSequence = Union{ NonEmptyTuple{AbstractParamFunc}, 
-                                 LinearMemory{<:AbstractParamFunc} }
+const ParamFunctionChain = FunctionChainUnion{AbstractParamFunc}
 
-struct ParamCombiner{B<:Function, C<:ParamFuncSequence} <: AbstractParamFunc
+struct ParamCombiner{B<:Function, C<:ParamFunctionChain} <: AbstractParamFunc
     binder::B
     encode::C
 
-    function ParamCombiner(binder::B, encode::C) where 
-                          {B<:Function, C<:NonEmptyTuple{AbstractParamFunc}}
+    function ParamCombiner(binder::B, encode::C) where {B<:Function, 
+                           C<:GeneralTupleUnion{ NonEmptyTuple{AbstractParamFunc} }}
         new{B, C}(binder, encode)
     end
 
     function ParamCombiner(binder::B, encode::C) where 
-                          {B<:Function, C<:LinearMemory{<:AbstractParamFunc}}
+                          {B<:Function, C<:AbstractMemory{<:AbstractParamFunc}}
         checkEmptiness(encode, :encode)
         new{B, C}(binder, encode)
     end
@@ -1291,7 +1290,7 @@ ParamCombiner(binder, getMemory(encode))
 (f::ParamCombiner)(input, params::AbstractSpanValueSet) = 
 mapreduce(o->o(input, params), f.binder, f.encode)
 
-const ParamApplyExtend{C<:ParamFuncSequence} = ParamCombiner{typeof(vcat), C}
+const ParamApplyExtend{C<:ParamFunctionChain} = ParamCombiner{typeof(vcat), C}
 
 (f::ParamApplyExtend)(input, params::AbstractSpanValueSet) = 
 map(o->o(input, params), f.encode)
@@ -1318,7 +1317,7 @@ const BiParamFuncApply{T, J<:Function, FL<:AbstractParamFunc, FR<:AbstractParamF
 const BiParamFuncProd{T, FL<:AbstractParamFunc, FR<:AbstractParamFunc} = 
       BiParamFuncApply{T, typeof(*), FL, FR}
 
-struct ParamPipeline{C<:ParamFuncSequence} <: AbstractParamFunc
+struct ParamPipeline{C<:ParamFunctionChain} <: AbstractParamFunc
     encode::C
 
     function ParamPipeline(encode::C) where {C<:NonEmptyTuple{AbstractParamFunc}}
