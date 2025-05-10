@@ -5,7 +5,7 @@ abstract type EqualityDict{K, T} <: AbstractDict{K, T} end
 
 abstract type CompositeFunction <: Function end # composite-type function
 
-abstract type AbstractMemory{T, N} <: AbstractArray{T, N} end
+abstract type CustomMemory{T, N} <: AbstractArray{T, N} end
 
 abstract type ConfigBox <: Box end
 abstract type MarkerBox <: Box end
@@ -44,40 +44,44 @@ abstract type FieldAmplitude{T, D} <: ParticleFunction{D, 1} end
 
 # abstract type FermionicState{T, 1} <: SpinfulState{T, 1} end
 
+
 @enum TernaryNumber::Int8 begin
     TUS0 = 0
     TPS1 = 1
     TPS2 = 2
 end
 
-const RealOrComplex{T<:Real} = Union{Complex{T}, T}
 
-const AVectorOrNTuple{T, NNMO} = Union{Tuple{T, Vararg{T, NNMO}}, AbstractVector{<:T}}
-const NonEmptyTuple{T, NMO} = Tuple{T, Vararg{T, NMO}}
 const N12Tuple{T} = Union{Tuple{T}, NTuple{2, T}}
+const NonEmptyTuple{T, NMO} = Tuple{T, Vararg{T, NMO}}
+const TriTupleUnion{T} = Union{(NTuple{N, T} for N in 1:3)...}
 const GeneralTupleUnion{T<:Tuple} = Union{T, NamedTuple{<:Any, <:T}}
 
-const MissingOr{T} = Union{Missing, T}
-const NothingOr{T} = Union{Nothing, T}
 const AbtArray0D{T} = AbstractArray{T, 0}
-
-const TypedIdxerMemory{T} = Memory{Pair{Int, T}}
-
-const RefVal = Base.RefValue
-
-const NonEmpTplOrAbtArr{T, N, A<:AbstractArray{<:T, N}} = Union{NonEmptyTuple{T}, A}
-const AbtBottomArray{N} = AbstractArray{Union{}, N}
-const AbtBottomVector = AbtBottomArray{1}
+const AbtBottomVector = AbstractArray{Union{}, 1}
+const AbstractMemory{T} = Union{CustomMemory{T}, Memory{T}}
 const AbtVecOfAbtArr{T} = AbstractVector{<:AbstractArray{T}}
-const TriTupleUnion{T} = Union{(NTuple{N, T} for N in 1:3)...}
+
+const GeneralCollection = Union{AbstractArray, Tuple, NamedTuple}
+
 
 const AbstractEqualityDict = Union{EqualityDict, Dict}
 
-const FunctionChainUnion{F<:Function} = Union{
-    AbstractMemory{<:F}, GeneralTupleUnion{NonEmptyTuple{F}}
-}
+const RealOrComplex{T<:Real} = Union{Complex{T}, T}
+
+const MissingOr{T} = Union{Missing, T}
+const NothingOr{T} = Union{Nothing, T}
 
 const BoolVal = Union{Val{true}, Val{false}}
+
+const FunctionChainUnion{F<:Function} = Union{
+    CustomMemory{<:F}, GeneralTupleUnion{NonEmptyTuple{F}}
+}
+
+
+const RefVal = Base.RefValue
+const TypedIdxerMemory{T} = Memory{Pair{Int, T}}
+
 
 import Base: size, firstindex, lastindex, getindex, setindex!, iterate, length, similar
 
