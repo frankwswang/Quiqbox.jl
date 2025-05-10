@@ -101,7 +101,7 @@ TypedEmptyDict() = TypedEmptyDict{Union{}, Union{}}()
 
 buildDict(p::Pair{K, T}) where {K, T} = SingleEntryDict(p.first, p.second)
 
-function buildDict(ps::NonEmpTplOrAbtArr{Pair}, 
+function buildDict(ps::Union{Tuple{Vararg{Pair}}, AbstractVector{<:Pair}}, 
                    emptyBuiler::Type{<:FiniteDict{0}}=TypedEmptyDict)
     if isempty(ps)
         emptyBuiler()

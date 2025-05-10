@@ -71,7 +71,7 @@ mutable struct CompositeOrb{T<:Real, D, C<:RealOrComplex{T}, B<:PrimitiveOrb{T, 
         nPrim = (first∘getOutputSize)(weight)
         checkLengthCore(checkEmptiness(basis, :basis), :basis, nPrim, 
                         "the output length of `weight`")
-        formattedBasis = map(itself, basis)
+        formattedBasis = genMemory(basis)
         basisType = getPrimitiveOrbType(formattedBasis)
         bOutType = getOutputType(basisType)
         if !(bOutType <: C)
@@ -89,13 +89,13 @@ const ComposedOrb{T<:Real, D, C<:RealOrComplex{T}} =
 
 function CompositeOrb(basis::AbstractVector{<:PrimitiveOrb{T, D}}, 
                       weight::GridParam{T, 1}; renormalize::Bool=false) where {T<:Real, D}
-    CompositeOrb(getMemory(basis), weight, renormalize)
+    CompositeOrb(extractMemory(basis), weight, renormalize)
 end
 
 function CompositeOrb(basis::AbstractVector{<:OrbitalBasis{<:RealOrComplex{T}, D}}, 
                       weight::GridParam{C, 1}; renormalize::Bool=false) where 
                      {T<:Real, C<:RealOrComplex{T}, D}
-    formattedBasis = getMemory(basis)
+    formattedBasis = genMemory(basis)
     if !(eltype(formattedBasis) <: PrimitiveOrb)
         weight = mapreduce(vcat, enumerate(formattedBasis)) do (idx, basis)
             getEffectiveWeight(basis, weight, idx)
@@ -105,7 +105,7 @@ function CompositeOrb(basis::AbstractVector{<:OrbitalBasis{<:RealOrComplex{T}, D
     CompositeOrb(formattedBasis, weight, renormalize)
 end
 
-splitOrb(o::PrimitiveOrb) = getMemory(o)
+splitOrb(o::PrimitiveOrb) = genMemory(o)
 
 splitOrb(o::CompositeOrb) = copy(o.basis)
 
@@ -268,7 +268,7 @@ function genOrbitalDataCore!(fieldCache::FieldParamFuncCache{T, D},
         genOrbitalDataCore!(fieldCache, paramCache, paramSet, basis)
     end
     weightData = cacheParam!(paramCache, orb.weight)
-    CompOrbData(basisData, getMemory(weightData), orb.renormalize)
+    CompOrbData(basisData, extractMemory(weightData), orb.renormalize)
 end
 
 const OrbBasisVec{T<:Real, D} = AbstractVector{<:OrbitalBasis{<:RealOrComplex{T}, D}}

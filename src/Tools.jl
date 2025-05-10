@@ -268,7 +268,7 @@ function markUnique((a, b)::NTuple{2, Any}; compareFunction::F=isequal) where {F
 end
 
 function markUniqueCore!(compareFunc::F, compressedSeq::AbstractVector, 
-                         sequence::NonEmpTplOrAbtArr) where {F<:Function}
+                         sequence::GeneralCollection) where {F<:Function}
     map(sequence) do ele
         j = firstindex(compressedSeq)
         isNew = true

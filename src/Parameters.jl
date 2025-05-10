@@ -1034,9 +1034,9 @@ initializeSpanParamSet(::Nothing) = genFixedVoidSpanSet()
 initializeSpanParamSet(units::AbstractVector{<:UnitParam}, 
                        grids::AbstractVector{<:GridParam}) = (unit=units, grid=grids)
 
-initializeSpanParamSet(unit::UnitParam) = (unit=getMemory(unit), grid=genBottomMemory())
+initializeSpanParamSet(unit::UnitParam) = (unit=genMemory(unit), grid=genBottomMemory())
 
-initializeSpanParamSet(grid::GridParam) = (unit=genBottomMemory(), grid=getMemory(grid))
+initializeSpanParamSet(grid::GridParam) = (unit=genBottomMemory(), grid=genMemory(grid))
 
 
 function locateParamCore!(params::AbstractVector, target::ParamBox)
@@ -1280,14 +1280,14 @@ struct ParamCombiner{B<:Function, C<:ParamFunctionChain} <: AbstractParamFunc
     end
 
     function ParamCombiner(binder::B, encode::C) where 
-                          {B<:Function, C<:AbstractMemory{<:AbstractParamFunc}}
+                          {B<:Function, C<:CustomMemory{<:AbstractParamFunc}}
         checkEmptiness(encode, :encode)
         new{B, C}(binder, encode)
     end
 end
 
 ParamCombiner(binder::Function, encode::AbstractVector{<:AbstractParamFunc}) = 
-ParamCombiner(binder, getMemory(encode))
+ParamCombiner(binder, genMemory(encode))
 
 (f::ParamCombiner)(input, params::AbstractSpanValueSet) = 
 mapreduce(o->o(input, params), f.binder, f.encode)
@@ -1324,18 +1324,19 @@ end
 struct ParamPipeline{C<:ParamFunctionChain} <: AbstractParamFunc
     encode::C
 
-    function ParamPipeline(encode::C) where {C<:NonEmptyTuple{AbstractParamFunc}}
+    function ParamPipeline(encode::C) where 
+                          {C<:GeneralTupleUnion{ NonEmptyTuple{AbstractParamFunc} }}
         new{C}(encode)
     end
 
-    function ParamPipeline(encode::C) where {C<:LinearMemory{<:AbstractParamFunc}}
+    function ParamPipeline(encode::C) where {C<:CustomMemory{<:AbstractParamFunc}}
         checkEmptiness(encode, :encode)
         new{C}(encode)
     end
 end
 
 ParamPipeline(binder::Function, encode::AbstractVector{<:AbstractParamFunc}) = 
-ParamPipeline(binder, getMemory(encode))
+ParamPipeline(binder, genMemory(encode))
 
 function (f::ParamPipeline)(input, params::AbstractSpanValueSet)
     for o in f.encode
@@ -1372,7 +1373,7 @@ function unpackFunc(f::Function)
         source = getSourceParamSet(f)
 
         if !(isempty(source.unit) && isempty(source.grid))
-            unitPars, gridPars = map(getMemory, source)
+            unitPars, gridPars = map(extractMemory, source)
             fCore = ParamBindFunc(f, unitPars, gridPars)
             paramSet = initializeSpanParamSet(unitPars, gridPars)
             fCore, paramSet

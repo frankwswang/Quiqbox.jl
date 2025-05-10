@@ -226,7 +226,7 @@ struct LayerParamGraph{T, S1<:UnitVertex, S2<:GridVertex, H<:CallVertex,
         sectors, mapper = formVertexSectors(inUPars, inGPars, midPars)
 
         unitSource, gridSource, hidden = map(sectors) do sector
-            isempty(sector) ? Memory{Union{}}(undef, 0) : getMemory(sector)
+            isempty(sector) ? Memory{Union{}}(undef, 0) : genMemory(sector)
         end
         source = (unit=unitSource, grid=gridSource)
 
@@ -375,7 +375,9 @@ function genTensorSourceMergerCore(sector::AbstractVector{<:TensorVertex})
     else
         keys = Pair{Bool, OneToIndex}[]
         idx = 0
-        vals = map(enumerate(sector)) do (cacheIdx, vertex)
+        cacheIdx = 0
+        vals = map(sector) do vertex
+            cacheIdx += 1
             ele = if isNodeActive(vertex)
                  true => OneToIndex(idx += 1)
             else
@@ -383,8 +385,8 @@ function genTensorSourceMergerCore(sector::AbstractVector{<:TensorVertex})
             end
             push!(keys, ele)
             getNodeValue(vertex)
-        end |> getMemory
-        (getMemory(keys), vals)
+        end
+        (extractMemory(keys), extractMemory(vals))
     end
 end
 
@@ -491,13 +493,13 @@ struct SpanInputFormatter{S1<:Symbol, S2<:Pair{ Symbol, <:NonEmptyTuple{Int} }} 
     end
 
     function SpanInputFormatter(unit::UnitVertex)
-        unitInfo = isNodeActive(unit) ? getMemory(unit.marker) : genBottomMemory()
+        unitInfo = isNodeActive(unit) ? genMemory(unit.marker) : genBottomMemory()
         new{eltype(unitInfo), Union{}}(unitInfo, genBottomMemory())
     end
 
     function SpanInputFormatter(grid::GridVertex{T, N}) where {T, N}
         gridInfo = if isNodeActive(grid)
-            getMemory(grid.marker => (size∘getNodeValue)(grid))
+            genMemory(grid.marker => (size∘getNodeValue)(grid))
         else
             genBottomMemory()
         end

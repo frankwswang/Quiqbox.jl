@@ -45,7 +45,7 @@ function computeFiniteDiffWeightsCore(order::Int, dis::AbstractVector{T}) where 
         c1 = c2
     end
 
-    getMemory(@view nm[:, end])
+    genMemory(@view nm[:, end])
 end
 
 function computeFiniteDiffWeights(order::Int, dis::AbstractVector{T}) where {T<:Real}

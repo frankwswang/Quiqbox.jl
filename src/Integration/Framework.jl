@@ -394,7 +394,7 @@ struct BasisIndexList <: QueryBox{Int}
     index::Memory{Int}
     endpoint::Memory{Int}
 
-    function BasisIndexList(basisSizes::NonEmpTplOrAbtArr{Int, 1})
+    function BasisIndexList(basisSizes::Union{Tuple{Vararg{Int}}, AbstractVector{Int}})
         checkEmptiness(basisSizes, :basisSizes)
         index = Memory{Int}(undef, sum(basisSizes))
         endpoint = Memory{Int}(undef, length(basisSizes)+1)

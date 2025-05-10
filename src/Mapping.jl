@@ -97,7 +97,7 @@ InputLimiter(f::InputLimiter, ::Val{N}) where {N} = InputLimiter(f.f, Val(N))
 struct ChainMapper{F<:FunctionChainUnion{Function}} <: Mapper
     chain::F
 
-    function ChainMapper(chain::F) where {F<:AbstractMemory{<:Function}}
+    function ChainMapper(chain::F) where {F<:CustomMemory{<:Function}}
         checkEmptiness(chain, :chain)
         new{F}(chain)
     end
