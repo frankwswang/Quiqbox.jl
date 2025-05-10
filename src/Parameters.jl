@@ -1301,8 +1301,6 @@ map(o->o(input, params), f.encode)
 const ContextParamFunc{B<:Function, C<:Function, F<:NamedFilter} = 
       ParamCombiner{B, Tuple{ InputConverter{C}, ParamFormatter{F} }}
 
-const ParamFilterApply{B<:Function, E<:SpanSetFilter} = ContextParamFunc{B, ItsType, E}
-
 function ContextParamFunc(binder::Function, converter::Function, 
                           formatter::TaggedSpanSetFilter)
     ParamCombiner(binder, ( InputConverter(converter), ParamFormatter(formatter) ))
@@ -1310,6 +1308,16 @@ end
 
 function ContextParamFunc(binder::Function, formatter::TaggedSpanSetFilter)
     ContextParamFunc(binder, itself, formatter)
+end
+
+
+const ParamFilterApply{B<:Function, E<:SpanSetFilter} = ContextParamFunc{B, ItsType, E}
+
+# Specialized method due to the lack of compiler optimization
+const ParamFreeApply{B<:Function} = ParamFilterApply{B, VoidSetFilter}
+
+function (f::ParamFreeApply)(input, ::AbstractSpanValueSet)
+    f.binder(input, genFixedVoidSpanSet())
 end
 
 
