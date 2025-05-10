@@ -612,7 +612,7 @@ function compressParam(param::ParamBox)
 end
 
 
-const FilterComputeGraph{G<:ComputeGraph} = Base.ComposedFunction{G, SpanSetFilter}
+const FilterComputeGraph{G<:ComputeGraph, S<:SpanSetFilter} = Base.ComposedFunction{G, S}
 
 const ParamEncoderChain = NonEmptyTuple{Union{GetIndex{<:SpanIndex}, FilterComputeGraph}}
 

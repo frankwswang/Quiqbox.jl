@@ -8,7 +8,7 @@ end
 
 ReturnTyped(::Type{T}) where {T} = ReturnTyped(itself, T)
 
-ReturnTyped(f::ReturnTyped{T}, ::Type{T}) where {T} = itself(f)
+ReturnTyped(f::ReturnTyped{TO}, ::Type{TN}) where {TO, TN} = ReturnTyped(f.f, T)
 
 (f::ReturnTyped{T, F})(arg...; kws...) where {T, F} = convert(T, f.f(arg...; kws...))
 
