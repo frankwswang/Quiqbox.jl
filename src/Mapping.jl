@@ -389,7 +389,7 @@ If a return value is a `Lucent`, that means `f` either does not contain any `Par
 has a specialized `unpackFunc` method that separates its embedded `ParamBox`.
 """
 function getOpacity(f::Function)
-    (Base.issingletontype(f|>typeof) || isParamBoxFree(f)) ? Lucent() : Opaque()
+    isParamBoxFree(f) ? Lucent() : Opaque()
 end
 
 getOpacity(::ParamFreeFunc) = Lucent()
