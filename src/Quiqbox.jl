@@ -1,7 +1,7 @@
 module Quiqbox
 
 include("Types.jl")
-include("Traits.jl")
+include("Dispatch.jl")
 
 include("Lexicons.jl")
 include("../lib/BasisSets/BasisSets.jl")

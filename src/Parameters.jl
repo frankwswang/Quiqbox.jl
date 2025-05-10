@@ -1005,7 +1005,7 @@ const TypedSpanParamSet{T1<:UnitParam, T2<:GridParam} =
 const FixedSpanParamSet{T1<:UnitParam, T2<:GridParam} = 
       AbstractSpanParamSet{Memory{T1}, Memory{T2}}
 
-genFixedEmptySpanSet() = (unit=genBottomMemory(), grid=genBottomMemory())
+genFixedVoidSpanSet() = (unit=genBottomMemory(), grid=genBottomMemory())
 
 struct UnitInput end
 struct GridInput end
@@ -1029,7 +1029,7 @@ initializeSpanParamSet() = (unit=UnitParam[], grid=GridParam[])
 
 initializeSpanParamSet(::Type{T}) where {T} = (unit=UnitParam{T}[], grid=GridParam{T}[])
 
-initializeSpanParamSet(::Nothing) = genFixedEmptySpanSet()
+initializeSpanParamSet(::Nothing) = genFixedVoidSpanSet()
 
 initializeSpanParamSet(units::AbstractVector{<:UnitParam}, 
                        grids::AbstractVector{<:GridParam}) = (unit=units, grid=grids)
@@ -1152,7 +1152,7 @@ struct SpanSetFilter{U<:OneToIndex, G<:OneToIndex} <: Mapper
         new{(values∘map)(eltype, scope)...}(scope)
     end
 
-    SpanSetFilter() = new{Union{}, Union{}}(genFixedEmptySpanSet())
+    SpanSetFilter() = new{Union{}, Union{}}(genFixedVoidSpanSet())
 end
 
 SpanSetFilter(unit::AbstractVector{<:OneToIndex}, grid::AbstractVector{<:OneToIndex}) = 
@@ -1194,7 +1194,7 @@ function getField(obj::AbstractSpanSet, sFilter::SpanSetFilter,
     (; unit, grid)
 end
 
-getField(::AbstractSpanSet, ::VoidSetFilter) = genFixedEmptySpanSet()
+getField(::AbstractSpanSet, ::VoidSetFilter) = genFixedVoidSpanSet()
 
 function getField(sFilterPrev::SpanSetFilter, sFilterHere::SpanSetFilter)
     getField(sFilterPrev.scope, sFilterHere) |> SpanSetFilter
@@ -1320,12 +1320,6 @@ function (f::ParamFreeApply)(input, ::AbstractSpanValueSet)
     f.binder(input, genFixedVoidSpanSet())
 end
 
-
-const BiParamFuncApply{T, J<:Function, FL<:AbstractParamFunc, FR<:AbstractParamFunc} = 
-      ParamCombiner{ParamFreeFunc{StableBinary{T, J}}, Tuple{FL, FR}}
-
-const BiParamFuncProd{T, FL<:AbstractParamFunc, FR<:AbstractParamFunc} = 
-      BiParamFuncApply{T, typeof(*), FL, FR}
 
 struct ParamPipeline{C<:ParamFunctionChain} <: AbstractParamFunc
     encode::C

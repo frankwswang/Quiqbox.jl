@@ -94,12 +94,6 @@ for i in firstindex(a2)+1:lastindex(a2)
 end
 
 
-# function nameOf
-pf1 = Quiqbox.Storage(1.5)
-@test nameOf(abs) == :abs
-@test nameOf(pf1) == typeof(pf1) == Quiqbox.Storage{Float64}
-
-
 # function tupleDiff
 a = (1,1,2,2,3)
 b = (3,2,2,1,3)

@@ -62,3 +62,8 @@ abstract type MultiBodyIntegral{D} <: IntegralStyle end
 struct OneBodyIntegral{D} <: MultiBodyIntegral{D} end
 
 struct TwoBodyIntegral{D} <: MultiBodyIntegral{D} end
+
+
+strictTypeJoin(TL::Type, TR::Type) = typejoin(TL, TR)
+
+strictTypeJoin(::Type{T}, ::Type{Complex{T}}) where {T<:Real} = RealOrComplex{T}

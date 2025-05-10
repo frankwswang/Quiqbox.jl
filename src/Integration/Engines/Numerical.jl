@@ -8,7 +8,8 @@ struct SesquiFieldProd{T<:Real, D, O<:Multiplier,
     dresser::O
 
     function SesquiFieldProd(fields::N12Tuple{FieldAmplitude{<:RealOrComplex{T}, D}}, 
-                             dresser::O=genOverlapSampler()) where {T<:Real, D, O<:Multiplier}
+                             dresser::O=genOverlapSampler()) where 
+                            {T<:Real, D, O<:Multiplier}
         new{T, D, O, typeof(fields)}(fields, dresser)
     end
 end
