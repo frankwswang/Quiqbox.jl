@@ -77,12 +77,17 @@ struct EncodedField{T<:RealOrComplex, D, F<:Function, E<:Function} <: FieldAmpli
     end
 end
 
-function EncodedField(core::ReturnTyped{T, F}, ::Val{D}) where {T, D, F<:Function}
+function EncodedField(core::ReturnTyped{T, F}, ::Val{D}) where 
+                     {T<:RealOrComplex, D, F<:Function}
     EncodedField(core, TupleHeader( Val(D) ))
 end
 
-function EncodedField(core::FieldAmplitude{T}, dimInfo) where {T}
+function EncodedField(core::FieldAmplitude{T}, dimInfo) where {T<:RealOrComplex}
     EncodedField(ReturnTyped(core, T), dimInfo)
+end
+
+function EncodedField(core::Tuple{Function, T}, dimInfo) where {T<:RealOrComplex}
+    EncodedField(ReturnTyped(first(core), T), dimInfo)
 end
 
 needFieldAmpEvalCache(::EncodedField) = true
@@ -104,8 +109,12 @@ end
 function unpackFieldFunc(f::EncodedField{<:RealOrComplex, D}) where {D}
     paramSet = initializeSpanParamSet()
     fCore = unpackFunc!(f.core.f, paramSet, Identifier(nothing))
-    fEncode = unpackFunc!(f.encode.f, paramSet, Identifier(nothing))
-    TupleHeader(ParamPipeline((fEncode, fCore)), Val(D)), paramSet
+    if fCore isa InputConverter
+        TupleHeader(fCore, Val(D)), initializeSpanParamSet(nothing)
+    else
+        fEncode = unpackFunc!(f.encode.f, paramSet, Identifier(nothing))
+        TupleHeader(ParamPipeline((fEncode, fCore)), Val(D)), paramSet
+    end
 end
 
 
