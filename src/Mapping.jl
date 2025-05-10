@@ -306,9 +306,9 @@ end
 ChainMapper(chain::AbstractArray{<:Function}) = ChainMapper(chain|>ShapedMemory)
 
 function getField(obj, f::ChainMapper, finalizer::F=itself) where {F<:Function}
-    map(f.chain) do mapper
-        mapper(obj)
-    end |> finalizer
+    typedMap(f.chain) do mapper
+        mapper(obj) |> finalizer
+    end
 end
 
 

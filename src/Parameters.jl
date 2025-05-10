@@ -989,10 +989,12 @@ const OptionalGridValueSet{U<:NothingOr{AbtBottomVector}, G<:NothingOr{AbtVecOfA
 const OptionalVoidValueSet{U<:NothingOr{AbtBottomVector}, G<:NothingOr{AbtBottomVector}} = 
       @NamedTuple{unit::U, grid::G}
 
-const AbstractSpanIndexSet{U<:AbstractVector{OneToIndex}, G<:AbstractVector{OneToIndex}} = 
+const AbstractSpanIndexSet{U<:AbstractVector{<:OneToIndex}, 
+                           G<:AbstractVector{<:OneToIndex}} = 
       AbstractSpanSet{U, G}
 
-const FixedSpanIndexSet = AbstractSpanIndexSet{Memory{OneToIndex}, Memory{OneToIndex}}
+const FixedSpanIndexSet{U<:OneToIndex, G<:OneToIndex} = 
+      AbstractSpanIndexSet{Memory{U}, Memory{G}}
 
 const AbstractSpanParamSet{U<:AbstractVector{<:UnitParam}, G<:AbstractVector{<:GridParam}} = 
       AbstractSpanSet{U, G}
@@ -1140,57 +1142,62 @@ function cacheParam!(cache::MultiSpanDataCacheBox, params::ParamBoxSource)
 end
 
 
-struct SpanSetFilter <: Mapper
-    scope::FixedSpanIndexSet
+struct SpanSetFilter{U<:OneToIndex, G<:OneToIndex} <: Mapper
+    scope::FixedSpanIndexSet{U, G}
+
+    function SpanSetFilter(scope::AbstractSpanIndexSet)
+        scope = map(scope) do sector
+            isempty(sector) ? genBottomMemory() : Memory{OneToIndex}(sector)
+        end
+        new{(values∘map)(eltype, scope)...}(scope)
+    end
+
+    function SpanSetFilter()
+        new{Union{}, Union{}}(( unit=genBottomMemory(), grid=genBottomMemory() ))
+    end
 end
 
-function SpanSetFilter()
-    SpanSetFilter(( unit=Memory{OneToIndex}(undef, 0), grid=Memory{OneToIndex}(undef, 0) ))
-end
+SpanSetFilter(unit::AbstractVector{<:OneToIndex}, grid::AbstractVector{<:OneToIndex}) = 
+SpanSetFilter((;unit, grid))
 
 function SpanSetFilter(unitLen::Int, gridLen::Int)
-    unitIds = map(OneToIndex, Base.OneTo(unitLen))
-    gridIds = map(OneToIndex, Base.OneTo(gridLen))
-    SpanSetFilter(( unit=Memory{OneToIndex}(unitIds), grid=Memory{OneToIndex}(gridIds) ))
+    builder = x->OneToIndex(x)
+    unit = typedMap(builder, Base.OneTo(unitLen))
+    grid = typedMap(builder, Base.OneTo(gridLen))
+    SpanSetFilter(unit, grid)
 end
 
-function SpanSetFilter(scope::AbstractSpanIndexSet)
-    SpanSetFilter(map(getMemory, scope))
-end
+const VoidSetFilter = SpanSetFilter{Union{}, Union{}}
 
-function SpanSetFilter(unit::AbstractVector{OneToIndex}, grid::AbstractVector{OneToIndex})
-    SpanSetFilter((;unit, grid))
-end
+const UnitSetFilter = SpanSetFilter{OneToIndex, Union{}}
 
-#= Additional Method =#
-function getField(paramSet::AbstractSpanSet, sFilter::SpanSetFilter, 
-                  finalizer::F=itself) where {F<:Function}
-    firstIds = map(firstindex, paramSet)
-    map(paramSet, firstIds, sFilter.scope) do sector, i, oneToIds
-        if isempty(oneToIds)
-            genBottomMemory()
-        else
-            if finalizer isa ItsType
-                view(sector, map(x->(x.idx + i - 1), oneToIds))
-            else
-                map(oneToIds) do x
-                   getindex(sector, (x.idx + i - 1)) |> finalizer
-                end
-            end
+const GridSetFilter = SpanSetFilter{Union{}, OneToIndex}
+
+function getSector(::Val{S}, target::AbstractSpanSet, oneToIds::Memory{T}, 
+                   finalizer::F=itself) where {S, T<:OneToIndex, F<:Function}
+    sector = getfield(target, S)
+    iStart = firstindex(sector)
+    if T <: Union{}
+        genBottomMemory()
+    elseif finalizer isa ItsType
+        view(sector, map(x->(x.idx + iStart - 1), oneToIds))
+    else
+        map(oneToIds) do x
+            getindex(sector, (x.idx + iStart - 1)) |> finalizer
         end
     end
 end
 
-function getField(sFilterPrev::SpanSetFilter, sFilterHere::SpanSetFilter, 
+#= Additional Method =#
+function getField(obj::AbstractSpanSet, sFilter::SpanSetFilter, 
                   finalizer::F=itself) where {F<:Function}
-    unit = map(sFilterHere.scope.unit) do idx
-        getField(sFilterPrev.scope.unit, idx) |> finalizer
-    end
+    unit = getSector(Val(:unit), obj, sFilter.scope.unit, finalizer)
+    grid = getSector(Val(:grid), obj, sFilter.scope.grid, finalizer)
+    (; unit, grid)
+end
 
-    grid = map(sFilterHere.scope.grid) do idx
-        getField(sFilterPrev.scope.grid, idx) |> finalizer
-    end
-    SpanSetFilter((;unit, grid))
+function getField(sFilterPrev::SpanSetFilter, sFilterHere::VoidSetFilter)
+    getField(sFilterPrev.scope, sFilterHere) |> SpanSetFilter
 end
 
 
@@ -1204,8 +1211,11 @@ end
 TaggedSpanSetFilter(scope::NamedFilter, paramSet::AbstractSpanParamSet) = 
 TaggedSpanSetFilter(scope, Identifier(paramSet))
 
+TaggedSpanSetFilter() = TaggedSpanSetFilter(SpanSetFilter(), Identifier(nothing))
+
 #= Additional Method =#
-getField(obj, tsFilter::TaggedSpanSetFilter, finalizer::F=itself) where {F<:Function} = 
+getField(obj::AbstractSpanSet, tsFilter::TaggedSpanSetFilter, 
+         finalizer::F=itself) where {F<:Function} = 
 getField(obj, tsFilter.scope, finalizer)
 
 
@@ -1290,7 +1300,7 @@ map(o->o(input, params), f.encode)
 const ContextParamFunc{B<:Function, C<:Function, F<:NamedFilter} = 
       ParamCombiner{B, Tuple{ InputConverter{C}, ParamFormatter{F} }}
 
-const ParamFilterApply{B<:Function} = ContextParamFunc{B, ItsType, SpanSetFilter}
+const ParamFilterApply{B<:Function, E<:SpanSetFilter} = ContextParamFunc{B, ItsType, E}
 
 function ContextParamFunc(binder::Function, converter::Function, 
                           formatter::TaggedSpanSetFilter)

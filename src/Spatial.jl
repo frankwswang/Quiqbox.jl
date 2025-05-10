@@ -26,15 +26,23 @@ end
 (f::FieldAmplitude)(input) = evalFieldAmplitude(f, formatInput(f, input))
 
 
-struct FieldParamFunc{T<:RealOrComplex, D, F<:AbstractParamFunc} <: AbstractParamFunc
-    core::TypedParamFunc{T, ParamFilterApply{ TupleHeader{D, F} }}
+struct FieldParamFunc{T<:RealOrComplex, D, F<:AbstractParamFunc, S<:SpanSetFilter
+                      } <: AbstractParamFunc
+    core::TypedParamFunc{T, ParamFilterApply{TupleHeader{D, F}, S}}
 
-    function FieldParamFunc{T, D}(f::TupleHeader{D, F}, scope::TaggedSpanSetFilter) where 
-                                 {T, D, F<:AbstractParamFunc}
+    function FieldParamFunc{T, D}(f::TupleHeader{D, F}, scope::TaggedSpanSetFilter{S}
+                                  ) where {T, D, F<:AbstractParamFunc, S<:SpanSetFilter}
+        if F <: InputConverter && !(S <: VoidSetFilter)
+            throw(AssertionError("The `scope` corresponding to `F<:InputConverter` must "*
+                                 "be `$(TaggedSpanSetFilter{VoidSetFilter})`."))
+        end
         inner = ContextParamFunc(TupleHeader(f, Val(D)), scope)
-        new{T, D, F}(ReturnTyped(inner, T))
+        new{T, D, F, S}(ReturnTyped(inner, T))
     end
 end
+
+const NullaryFieldFunc{T<:RealOrComplex, D, F<:AbstractParamFunc} = 
+      FieldParamFunc{T, D, F, VoidSetFilter}
 
 (f::FieldParamFunc)(input, params::AbstractSpanValueSet) = f.core(input, params)
 
@@ -109,26 +117,23 @@ end
 function unpackFieldFunc(f::EncodedField{<:RealOrComplex, D}) where {D}
     paramSet = initializeSpanParamSet()
     fCore = unpackFunc!(f.core.f, paramSet, Identifier(nothing))
-    if fCore isa InputConverter
-        TupleHeader(fCore, Val(D)), initializeSpanParamSet(nothing)
-    else
-        fEncode = unpackFunc!(f.encode.f, paramSet, Identifier(nothing))
-        TupleHeader(ParamPipeline((fEncode, fCore)), Val(D)), paramSet
-    end
+    fEncode = unpackFunc!(f.encode.f, paramSet, Identifier(nothing))
+    TupleHeader(ParamPipeline((fEncode, fCore)), Val(D)), paramSet
 end
 
 
 const WrappedField{T<:RealOrComplex, D, F<:Function} = EncodedField{T, D, F, ItsType}
 
-const EncodedFieldFunc{T<:RealOrComplex, D, E<:AbstractParamFunc, F<:AbstractParamFunc} = 
-      FieldParamFunc{T, D, ParamPipeline{ Tuple{E, F} }}
+const EncodedFieldFunc{T<:RealOrComplex, D, E<:AbstractParamFunc, F<:AbstractParamFunc, 
+                       S<:SpanSetFilter} = 
+      FieldParamFunc{T, D, ParamPipeline{Tuple{E, F}}, S}
 
 
 const RadialField{T<:RealOrComplex, D, F<:FieldAmplitude{T, 1}} = 
       EncodedField{T, D, F, typeof(LinearAlgebra.norm)}
 
-const RadialFieldFunc{T<:RealOrComplex, D, F<:AbstractParamFunc} = 
-      EncodedFieldFunc{T, D, InputConverter{typeof(LinearAlgebra.norm)}, F}
+const RadialFieldFunc{T<:RealOrComplex, D, F<:AbstractParamFunc, S<:SpanSetFilter} = 
+      EncodedFieldFunc{T, D, InputConverter{typeof(LinearAlgebra.norm)}, F, S}
 
 RadialField{T, D}(radial::FieldAmplitude{T, 1}) where {T, D} = 
 EncodedField(radial, TupleHeader( LinearAlgebra.norm, Val(D) ))
@@ -148,7 +153,7 @@ struct CurriedField{T<:RealOrComplex, D, F<:Function, P<:NamedParamTuple} <: Fie
     end
 end
 
-
+# If `param` is empty, `.core` should not take `param` as its second argument.
 const NullaryField{T<:RealOrComplex, D, F<:Function} = CurriedField{T, D, F, @NamedTuple{}}
 
 needFieldAmpEvalCache(::NullaryField) = false
@@ -189,7 +194,8 @@ const ComputeGaussFunc = typeof(computeGaussFunc)
 
 const GaussFieldCore{F<:ParamMapper} = EncodeParamApply{ParamFreeFunc{ComputeGaussFunc}, F}
 
-const GaussFieldFunc{T<:Real, F<:ParamMapper} = FieldParamFunc{T, 1, GaussFieldCore{F}}
+const GaussFieldFunc{T<:Real, F<:ParamMapper, S<:SpanSetFilter} = 
+      FieldParamFunc{T, 1, GaussFieldCore{F}, S}
 
 function GaussFunc(xpn::UnitOrVal{T}) where {T<:Real}
     core = TypedTupleFunc(ParamFreeFunc(computeGaussFunc), T, Val(1))
@@ -289,18 +295,19 @@ end
 
 const PolyGaussFunc{T<:Real, D, F<:GaussFunc{T}} = PolyRadialFunc{T, D, F}
 
-const PolyRadialFieldCore{T<:RealOrComplex, D, F<:AbstractParamFunc} = 
-      BiParamFuncProd{T, RadialFieldFunc{T, D, F}, 
-                         FieldParamFunc{ T, D, InputConverter{CartSHarmonics{D}} }}
+const PolyRadialFieldCore{T<:RealOrComplex, D, F<:AbstractParamFunc, S<:SpanSetFilter} = 
+      BiParamFuncProd{T, RadialFieldFunc{T, D, F, S}, 
+                      NullaryFieldFunc{ T, D, InputConverter{CartSHarmonics{D}} }}
 
-const PolyGaussFieldCore{T<:Real, D, F<:ParamMapper} = 
-      PolyRadialFieldCore{T, D, GaussFieldFunc{T, F}}
+const PolyGaussFieldCore{T<:Real, D, F<:ParamMapper, S<:SpanSetFilter} = 
+      PolyRadialFieldCore{T, D, GaussFieldFunc{T, F, S}, S}
 
-const PolyRadialFieldFunc{T<:RealOrComplex, D, F<:PolyRadialFieldCore{T, D}} = 
-      FieldParamFunc{T, D, F}
+const PolyRadialFieldFunc{T<:RealOrComplex, D, F<:PolyRadialFieldCore{T, D}, 
+                          S<:SpanSetFilter} = 
+      FieldParamFunc{T, D, F, S}
 
-const PolyGaussFieldFunc{T<:Real, D, F<:PolyGaussFieldCore{T, D}} = 
-      PolyRadialFieldFunc{T, D, F}
+const PolyGaussFieldFunc{T<:Real, D, F<:PolyGaussFieldCore{T, D}, S<:SpanSetFilter} = 
+      PolyRadialFieldFunc{T, D, F, S}
 
 
 strictTypeJoin(TL::Type, TR::Type) = typejoin(TL, TR)
@@ -355,11 +362,8 @@ struct FloatingField{T<:Real, D, C<:RealOrComplex{T}, F<:AbstractParamFunc,
         T = extractRealNumberType(C)
         base = f.core.f
         core = ReturnTyped(base.binder, T)
-        paramValSet = map(last(base.encode).core.core(paramSet)) do ele
-            isempty(ele) ? genBottomMemory() : getMemory(map(obtain, ele))
-        end
-        P = typeof(paramValSet)
-        new{T, D, C, F, P}(convert(NTuple{D, T}, center), core, paramValSet)
+        pValSet = getField(paramSet, last(base.encode).core.core, obtain)
+        new{T, D, C, F, typeof(pValSet)}(convert(NTuple{D, T}, center), core, pValSet)
     end
 end
 
