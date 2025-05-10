@@ -1351,7 +1351,10 @@ end
 
 # f(input) => fCore(input, param)
 function unpackFunc(f::Function)
-    if !(getOpacity(f) isa Lucent)
+    if isParamBoxFree(f)
+        canDirectlyStore(f) || (f = deepcopy(f))
+        InputConverter(f), initializeSpanParamSet(Union{})
+    else
         f = deepcopy(f)
         source = getSourceParamSet(f)
 
@@ -1359,11 +1362,9 @@ function unpackFunc(f::Function)
             unitPars, gridPars = map(getMemory, source)
             fCore = ParamBindFunc(f, unitPars, gridPars)
             paramSet = initializeSpanParamSet(unitPars, gridPars)
-            return (fCore, paramSet)
+            fCore, paramSet
         end
     end
-
-    InputConverter(f), initializeSpanParamSet(Union{})
 end
 
 function unpackFunc!(f::Function, paramSet::AbstractSpanParamSet, 
