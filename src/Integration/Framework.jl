@@ -590,7 +590,7 @@ end
 function buildPrimOrbWeight(normCache::OverlapCoreCache{T, D, C}, data::PrimOrbData{T, D}, 
                             idx::Int) where {T<:Real, D, C<:RealOrComplex{T}}
     if data.renormalize
-        convert(C, decodePrimCoreInt(normCache.data, (idx,)) |> first |> AbsSqrtInv)
+        convert(C, decodePrimCoreInt(normCache.data, (idx,)) |> first |> absSqrtInv)
     else
         one(C)
     end
@@ -612,7 +612,7 @@ function buildNormalizedCompOrbWeight!(weight::AbstractVector{C},
         wc = weight[begin+i-1]
         innerDiagOverlap = wc' * wc
         if data.basis[begin+i-1].renormalize
-            weight[begin+i-1] *= AbsSqrtInv(innerCoreDiagOverlap)
+            weight[begin+i-1] *= absSqrtInv(innerCoreDiagOverlap)
         else
             innerDiagOverlap *= innerCoreDiagOverlap
         end
@@ -625,7 +625,7 @@ function buildNormalizedCompOrbWeight!(weight::AbstractVector{C},
          scalarPair = (weight[begin+m-1], weight[begin+n])
         (sum∘decodePrimCoreInt)(overlapCache, pointerPair, scalarPair)
     end
-    weight .*= AbsSqrtInv(innerOverlapSum)
+    weight .*= absSqrtInv(innerOverlapSum)
 end
 
 

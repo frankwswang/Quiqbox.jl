@@ -8,7 +8,7 @@ using LinearAlgebra
 getOutputType(::FieldAmplitude{T}) where {T} = T
 
 
-getDimension(::SpatialFunction{D, M}) where {D, M} = Int(D*M)
+getDimension(::ParticleFunction{D, M}) where {D, M} = Int(D*M)
 
 
 needFieldAmpEvalCache(::FieldAmplitude) = true

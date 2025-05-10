@@ -1,11 +1,3 @@
-abstract type TraitAction{I} <: FieldlessFunction end
-
-abstract type AnyInterface <: Any end
-
-abstract type AnyTrait <: Any end
-
-abstract type Trait{I<:AnyInterface} <: AnyTrait end
-
 struct SelectTrait{I<:AnyInterface} <: TraitAction{I} end
 
 function returnUndefinedTraitError(::Type{TR}, ::Type{T}) where {TR<:AnyInterface, T}

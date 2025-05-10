@@ -14,6 +14,7 @@ include("ParallelUtils.jl")
 include("Layout.jl")
 include("Arrays.jl")
 include("Mapping.jl")
+include("Operators.jl")
 include("Parameters.jl")
 include("Graphs.jl")
 
@@ -29,10 +30,10 @@ include("SpatialBasis.jl")
 
 include("Differentiation/Finite.jl")
 
-include("Integration/Operators.jl")
+include("Integration/Samplers.jl")
+include("Integration/Framework.jl")
 include("Integration/Engines/Numerical.jl")
 include("Integration/Engines/GaussianOrbitals.jl")
-include("Integration/Framework.jl")
 include("Integration/Interface.jl")
 
 # include("Integrals/OneBody.jl")

@@ -564,9 +564,6 @@ end
 (f::SpanInputFormatter)() = (unit=nothing, grid=nothing)
 
 
-abstract type GraphEvaluator{G} <: Evaluator end
-
-
 const EvalLayerGraphCore{T, G<:ComputationGraph{T}} = 
       LPartial{typeof(evaluateGraph), Tuple{G}}
 

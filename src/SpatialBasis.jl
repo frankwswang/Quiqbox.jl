@@ -177,7 +177,7 @@ function getNormFactor(orb::ComposedOrb{T}) where {T}
     if isRenormalized(orb)
         constructor = getfield(Quiqbox, nameof(orb))
         orbInner = constructor(orb, renormalize=false)
-        convert(T, overlap(orbInner, orbInner)|>AbsSqrtInv)
+        convert(T, overlap(orbInner, orbInner)|>absSqrtInv)
     else
         one(T)
     end
@@ -241,8 +241,9 @@ function getOrbOutputTypeUnion(arr::OrbDataCollection{T, D}) where {T<:Real, D}
 end
 
 
-const FieldParamFuncCache{T<:Real, D} = 
-      LRU{EgalBox{FieldAmplitude{<:RealOrComplex{T}, D}}, FieldParamFunc{<:RealOrComplex{T}, D}}
+const FieldParamFuncCache{T<:Real, D} = LRU{
+    EgalBox{FieldAmplitude{<:RealOrComplex{T}, D}}, FieldParamFunc{<:RealOrComplex{T}, D}
+}
 
 function FieldParamFuncCache(::Type{T}, ::Val{D}) where {T<:Real, D}
     FieldParamFuncCache{T, D}(maxsize=200)

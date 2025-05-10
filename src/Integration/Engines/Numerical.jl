@@ -3,7 +3,7 @@ using LinearAlgebra: dot
 
 struct SesquiFieldProd{T<:Real, D, O<:Multiplier, 
                        F<:N12Tuple{FieldAmplitude{<:RealOrComplex{T}, D}}
-                       } <: SpatialFunction{D, 1}
+                       } <: ParticleFunction{D, 1}
     layout::F
     dresser::O
 
@@ -41,7 +41,7 @@ end
 
 struct DoubleFieldProd{T<:Real, D, O<:DualTermOperator, 
                        F<:N12Tuple{SesquiFieldProd{<:RealOrComplex{T}, D}}
-                       } <: SpatialFunction{D, 2}
+                       } <: ParticleFunction{D, 2}
     layout::F
     coupler::O
 end
@@ -119,11 +119,11 @@ function genIntegralSectors(intStyle::MultiBodyIntegral{D}, op::DirectOperator,
 end
 
 
-function getIntegratorConfig(::Type{T}, ::SpatialFunction) where {T<:Real}
+function getIntegratorConfig(::Type{T}, ::ParticleFunction) where {T<:Real}
     HCubatureConfig(T)
 end
 
-#!!! Need to distinguish operator that act on a single function and multiple functions
+
 function getNumericalIntegral(intStyle::MultiBodyIntegral{D}, op::DirectOperator, 
                               layout::OrbCoreIntLayoutUnion{T, D}) where {T<:Real, D}
     sectors = genIntegralSectors(intStyle, op, layout)
@@ -134,7 +134,7 @@ function getNumericalIntegral(intStyle::MultiBodyIntegral{D}, op::DirectOperator
 end
 
 
-struct ConfinedInfIntegrand{T<:Real, L, F<:Function} <: FunctionModifier
+struct ConfinedInfIntegrand{T<:Real, L, F<:Function} <: Modifier
     core::F
 
     function ConfinedInfIntegrand(f::F, ::Type{T}) where {F<:Function, T<:Real}
@@ -173,7 +173,7 @@ function numericalIntegrateCore(config::HCubatureConfig{T},
     formattedInt = ConfinedInfIntegrand(integrand, T)
     interval = getConfinedInterval(formattedInt)
     atol = config.tolerance
-    rtol = ifelse(iszero(atol), 10eps(T), zero(T))
+    rtol = ifelse(iszero(atol), sqrt(eps(T)), zero(T))
     fullRes = hcubature(formattedInt, interval...; rtol, atol, maxevals=config.maxEvalNum)
     first(fullRes)
 end

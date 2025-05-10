@@ -1,3 +1,5 @@
+export ReturnTyped, PairCombine
+
 struct ReturnTyped{T, F<:Function} <: TypedEvaluator{T}
     f::F
 
@@ -33,163 +35,6 @@ StableAdd(::Type{T}) where {T} = StableBinary(+, T)
 StableMul(::Type{T}) where {T} = StableBinary(*, T)
 ElementalSub(::Type{T}) where {T} = StableBinary(.-, T)
 
-struct StableContract{T} <: TypedEvaluator{T} end
-
-function (::StableContract{T})(a, b) where {T}
-    mapreduce(StableMul(T), StableAdd(T), a, b)
-end
-
-
-struct ParamSelectFunc{F<:Function, T<:Tuple{ Vararg{Encoder} }} <: ParamFuncBuilder{F}
-    apply::F
-    select::T
-end
-
-ParamSelectFunc(f::Function, select::Encoder) = ParamSelectFunc(f, (select,))
-
-ParamSelectFunc(f::Function) = ParamSelectFunc(f, ())
-
-const EmptySelectFunc{F<:Function} = ParamSelectFunc{F, Tuple{}}
-
-ParamSelectFunc(f::EmptySelectFunc) = itself(f)
-
-ParamSelectFunc(f::ParamSelectFunc, select::Tuple{Vararg{Encoder}}) = 
-ParamSelectFunc(f.apply, (f.select..., select...))
-
-function (f::ParamSelectFunc)(input, param)
-    f.apply(input, getField.(Ref(param), f.select)...)
-end
-
-(f::EmptySelectFunc)(input, _) = f.apply(input)
-
-const GetParamFunc{F<:Function, T<:Encoder} = ParamSelectFunc{F, Tuple{T}}
-
-
-struct OnlyHead{F<:Function} <: FunctionModifier
-    f::F
-end
-
-(f::OnlyHead)(arg1, ::Vararg) = f.f(arg1)
-
-
-struct OnlyBody{F<:Function} <: FunctionModifier
-    f::F
-end
-
-(f::OnlyBody)(_, args...) = f.f(args...)
-
-
-struct PairCombine{J<:Function, FL<:Function, FR<:Function} <: FunctionCombiner
-    joint::J
-    left::FL
-    right::FR
-end
-
-PairCombine(joint::F) where {F<:Function} = 
-(left::Function, right::Function) -> PairCombine(joint, left, right)
-
-(f::PairCombine)(arg, args...) = f.joint( f.left(arg, args...), f.right(arg, args...) )
-
-
-struct ChainReduce{J<:Function, C<:LinearMemory{<:Function}} <: FunctionCombiner
-    joint::J
-    chain::C
-
-    function ChainReduce(joint::J, chain::C) where {J, C<:VectorMemory{<:Function}}
-        checkEmptiness(chain, :chain)
-        new{J, C}(joint, chain)
-    end
-
-    function ChainReduce(joint::J, chain::C) where {J, C<:AbstractVector{<:Function}}
-        checkEmptiness(chain, :chain)
-        new{J, C}(joint, getMemory(chain))
-    end
-end
-
-ChainReduce(joint::Function, chain::NonEmptyTuple{Function}) = 
-ChainReduce(joint, VectorMemory(chain))
-
-ChainReduce(joint::F) where {F<:Function} = Base.Fix1(ChainReduce, joint)
-
-const CountedChainReduce{J, P, N} = ChainReduce{J, VectorMemory{P, N}}
-
-(f::CountedChainReduce)(arg, args...) = 
-mapreduce(o->o(arg, args...), f.joint, f.chain.value)
-
-(f::ChainReduce)(arg, args...) = mapreduce(o->o(arg, args...), f.joint, f.chain)
-
-
-struct InsertInward{C<:Function, F<:Function} <: FunctionCombiner
-    apply::C
-    dress::F
-end
-
-(f::InsertInward)(arg, args...) = f.apply(f.dress(arg, args...), args...)
-
-
-struct Storage{T} <: CompositeFunction
-    val::T
-end
-
-(f::Storage)(::Vararg) = f.val
-
-struct Unit{T} <: CompositeFunction end
-
-Unit(::Type{T}) where {T} = Unit{T}()
-
-(f::Unit{T})(::Vararg) where {T} = one(T)
-
-
-struct Power{F<:Function, N} <: CompositeFunction
-    f::F
-
-    Power(f::F, ::Val{N}) where {F<:Function, N} = new{F, N}(f)
-end
-
-Power(f::Function, n::Int) = Power(f, Val(n))
-
-(f::Power{<:Function, N})(arg::Vararg) where {N} = f.f(arg...)^(N::Int)
-
-
-struct ShiftByArg{T, D} <: FieldlessFunction end
-
-function (::ShiftByArg{T, D})(input::Union{NTuple{D, T}, AbstractVector{T}}, 
-                              args::Vararg{T, D}) where {T, D}
-    input .- args
-end
-
-
-struct HermitianContract{T, F1<:ReturnTyped{T}, F2<:ReturnTyped{T}} <: FunctionCombiner
-    diagonal::Memory{F1}
-    uppertri::Memory{F2}
-
-    function HermitianContract(dFuncs::Memory{F1}, uFuncs::Memory{F2}) where 
-                              {T, F1<:ReturnTyped{T}, F2<:ReturnTyped{T}}
-        checkLength(uFuncs, :uFuncs, triMatEleNum(length(dFuncs)-1))
-        new{T, F1, F2}(dFuncs, uFuncs)
-    end
-end
-
-function (f::HermitianContract{T})(input, weights::AbstractVector{T}) where {T}
-    res = zero(T)
-    len = length(f.diagonal)
-
-    for i in 1:len
-        c = weights[begin+i-1]
-        res += f.diagonal[begin+i-1](input) * c' * c
-    end
-
-    for j in 1:length(f.uppertri)
-        m, n = convertIndex1DtoTri2D(j)
-        c1 = weights[begin+m-1]
-        c2 = weights[begin+n]
-        val = f.uppertri[begin+j-1](input) * c1' * c2
-        res += val + val'
-    end
-
-    res
-end
-
 
 struct Left end
 
@@ -198,7 +43,7 @@ struct Right end
 const Lateral = Union{Left, Right}
 
 
-struct LateralPartial{F<:Function, A<:NonEmptyTuple{Any}, L<:Lateral} <: FunctionModifier
+struct LateralPartial{F<:Function, A<:NonEmptyTuple{Any}, L<:Lateral} <: Modifier
     f::F
     arg::A
     side::L
@@ -219,27 +64,7 @@ LPartial(f::Function, args::NonEmptyTuple{Any}) = LateralPartial(f, args, Left()
 RPartial(f::Function, args::NonEmptyTuple{Any}) = LateralPartial(f, args, Right())
 
 
-struct KeywordPartial{F, A<:NonEmptyTuple{Pair{Symbol, <:Any}}} <: FunctionModifier
-    f::F
-    arg::A
-    replaceable::Bool
-
-    function KeywordPartial(f::F, pairs::NonEmptyTuple{Pair{Symbol, <:Any}}, 
-                            replaceable::Bool=true) where {F<:Function}
-        new{F, typeof(pairs)}(f, pairs, replaceable)
-    end
-end
-
-function (f::KeywordPartial)(arg...; kws...)
-    if f.replaceable
-        f.f(arg...; f.arg..., kws...)
-    else
-        f.f(arg...; kws..., f.arg...)
-    end
-end
-
-
-const AbsSqrtInv = inv∘sqrt∘abs
+const absSqrtInv = inv ∘ sqrt ∘ abs
 
 
 function typedMap(op::F, obj::AbstractArray, ::Type{T}=Union{}) where {F<:Function, T}
@@ -255,28 +80,7 @@ function typedMap(op::F, obj::Union{Tuple, NamedTuple}, ::Type=Union{}) where {F
 end
 
 
-# struct Bifurcator{F<:Function, FL<:Function, FR<:Function} <: FunctionCombiner
-#     finalizer::F
-#     left::FL
-#     right::FR
-# end
-
-# Bifurcator(finalizer::F) where {F<:Function} = 
-# (left::Function, right::Function) -> Bifurcator(finalizer, left, right)
-
-# (f::Bifurcator)(arg, args...) = f.finalizer(f.left(arg, args...), f.right(arg, args...))
-
-# struct EntryEncoder{F<:Function} <: CompositeFunction
-#     core::F
-#     link::ChainedAccess
-
-#     EntryEncoder(core::F, link::ChainedAccess) where {F<:Function} = new{F}(core, link)
-# end
-
-# (f::EntryEncoder)(args...) = f.core(args...)
-
-
-struct InputLimiter{N, F<:Function} <: FunctionModifier
+struct InputLimiter{N, F<:Function} <: Modifier
     f::F
 
     function InputLimiter(f::F, ::Val{N}) where {F<:Function, N}
@@ -312,6 +116,21 @@ function getField(obj, f::ChainMapper, finalizer::F=itself) where {F<:Function}
 end
 
 
+struct PairCombine{J<:Function, FL<:Function, FR<:Function} <: CompositeFunction
+    joint::J
+    left::FL
+    right::FR
+end
+
+function PairCombine(joint::F) where {F<:Function}
+    function buildPairCombine(left::Function, right::Function)
+        PairCombine(joint, left, right)
+    end
+end
+
+(f::PairCombine)(arg::Vararg) = f.joint( f.left(arg...), f.right(arg...) )
+
+
 struct ParamFreeFunc{F<:Function} <: CompositeFunction
     core::F
 
@@ -331,7 +150,7 @@ ParamFreeFunc(f::ParamFreeFunc) = itself(f)
 struct Lucent end
 struct Opaque end
 
-struct Deref{F<:Function} <: FunctionModifier
+struct Deref{F<:Function} <: Modifier
     f::F
 end
 
@@ -340,7 +159,7 @@ end
 (f::Deref)(arg::NamedTuple{<:Any, <:Tuple{Any}}) = f.f(arg|>first)
 
 
-struct TupleHeader{N, F<:Function} <: FunctionModifier
+struct TupleHeader{N, F<:Function} <: Modifier
     f::F
 
     function TupleHeader(f::F, ::Val{N}) where {F<:Function, N}
@@ -365,7 +184,7 @@ TypedTupleFunc(f::ReturnTyped, ::Type{T}, ::Val{D}) where {T, D} =
 ReturnTyped(TupleHeader(f.f, Val(D)), T)
 
 
-struct SelectHeader{N, K, F<:Function} <: FunctionModifier
+struct SelectHeader{N, K, F<:Function} <: Modifier
     f::F
 
     function SelectHeader{N, K}(f::F) where {N, K, F<:Function}
