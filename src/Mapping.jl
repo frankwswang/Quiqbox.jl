@@ -1,4 +1,4 @@
-export ReturnTyped, PairCombine
+export ReturnTyped, PairCoupler
 
 struct ReturnTyped{T, F<:Function} <: TypedEvaluator{T}
     f::F
@@ -116,19 +116,19 @@ function getField(obj, f::ChainMapper, finalizer::F=itself) where {F<:Function}
 end
 
 
-struct PairCombine{J<:Function, FL<:Function, FR<:Function} <: CompositeFunction
+struct PairCoupler{J<:Function, FL<:Function, FR<:Function} <: CompositeFunction
     joint::J
     left::FL
     right::FR
 end
 
-function PairCombine(joint::F) where {F<:Function}
+function PairCoupler(joint::F) where {F<:Function}
     function buildPairCombine(left::Function, right::Function)
-        PairCombine(joint, left, right)
+        PairCoupler(joint, left, right)
     end
 end
 
-(f::PairCombine)(arg::Vararg) = f.joint( f.left(arg...), f.right(arg...) )
+(f::PairCoupler)(arg::Vararg) = f.joint(f.left(arg...), f.right(arg...))
 
 
 struct ParamFreeFunc{F<:Function} <: CompositeFunction

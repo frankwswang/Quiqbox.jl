@@ -38,7 +38,7 @@ end
 
 function modifyFunction(op::Associate, term::Function)
     fL, fR = op.position isa Left ? (op.term, term) : (term, op.term)
-    PairCombine(op.combiner, fL, fR)
+    PairCoupler(op.combiner, fL, fR)
 end
 
 
@@ -52,7 +52,7 @@ const Multiplier{OL<:MonoTermOperator, OR<:MonoTermOperator} =
 
 function modifyFunction(op::Correlate, termPair::Vararg{Function, 2})
     fL, fR = termPair .|> op.dresser
-    PairCombine(op.combiner, fL, fR)
+    PairCoupler(op.combiner, fL, fR)
 end
 
 
@@ -66,10 +66,10 @@ function modifyFunction(op::Sandwich, termL::Function, termR::Function)
     jL, jR = op.combiner
 
     if op.associativity isa Left
-        fL = PairCombine(jL, SelectHeader{2, 1}(termL), op.core)
-        PairCombine(jR, fL, SelectHeader{2, 2}(termR))
+        fL = PairCoupler(jL, SelectHeader{2, 1}(termL), op.core)
+        PairCoupler(jR, fL, SelectHeader{2, 2}(termR))
     else
-        fR = PairCombine(jR, op.core, SelectHeader{2, 2}(termR))
-        PairCombine(jL, SelectHeader{2, 1}(termL), fR)
+        fR = PairCoupler(jR, op.core, SelectHeader{2, 2}(termR))
+        PairCoupler(jL, SelectHeader{2, 1}(termL), fR)
     end
 end
