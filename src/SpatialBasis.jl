@@ -27,8 +27,6 @@ end
 PrimitiveOrb(o::PrimitiveOrb; renormalize::Bool=o.renormalize) = 
 PrimitiveOrb(o.center, o.body, renormalize)
 
-getOutputType(::B) where {B<:PrimitiveOrb} = getOutputType(B)
-
 getOutputType(::Type{<:PrimitiveOrb{T, D, C}}) where {T<:Real, D, C<:RealOrComplex{T}} = C
 
 
@@ -142,6 +140,8 @@ end
 
 CompositeOrb(o::CompositeOrb; renormalize::Bool=o.renormalize) = 
 CompositeOrb(o.basis, o.weight, renormalize)
+
+getOutputType(::Type{<:CompositeOrb{T, D, C}}) where {T<:Real, D, C<:RealOrComplex{T}} = C
 
 
 function evalOrbital(orb::CompositeOrb{T, D, C}, input; 

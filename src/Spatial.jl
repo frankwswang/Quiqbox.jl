@@ -5,9 +5,6 @@ using LinearAlgebra: norm as generalNorm
 (::SelectTrait{InputStyle})(::FieldAmplitude{<:Any, D}) where {D} = EuclideanInput{D}()
 
 
-getOutputType(::FieldAmplitude{C}) where {C<:RealOrComplex} = C
-
-
 getDimension(::ParticleFunction{D, M}) where {D, M} = Int(D*M)
 
 
@@ -43,6 +40,8 @@ struct FieldParamFunc{C<:RealOrComplex, D, F<:AbstractParamFunc, S<:SpanSetFilte
 end
 
 (f::FieldParamFunc)(input, params::AbstractSpanValueSet) = f.core(input, params)
+
+getOutputType(::Type{<:FieldParamFunc{C}}) where {C<:RealOrComplex} = C
 
 const NullaryFieldFunc{C<:RealOrComplex, D, F<:AbstractParamFunc} = 
       FieldParamFunc{C, D, F, VoidSetFilter}
@@ -100,6 +99,8 @@ function EncodedField(core::Tuple{Function, C}, dimInfo) where {C<:RealOrComplex
     EncodedField(ReturnTyped(first(core), C), dimInfo)
 end
 
+getOutputType(::Type{<:EncodedField{C}}) where {C<:RealOrComplex} = C
+
 needFieldAmpEvalCache(::EncodedField) = true
 
 function evalFieldAmplitudeCore(f::EncodedField{C, D, F, E}, input, 
@@ -155,6 +156,8 @@ struct CurriedField{C<:RealOrComplex, D, F<:Function, P<:NamedParamTuple
         new{C, D, F, P}(core, params)
     end
 end
+
+getOutputType(::Type{<:CurriedField{C}}) where {C<:RealOrComplex} = C
 
 # If `param` is empty, `.core` should not take `param` as its second argument.
 const NullaryField{C<:RealOrComplex, D, F<:Function} = CurriedField{C, D, F, @NamedTuple{}}
@@ -218,6 +221,8 @@ end
 
 ProductField(basis::Tuple{FieldAmplitude}) = first(basis)
 
+getOutputType(::Type{<:ProductField{C}}) where {C<:RealOrComplex} = C
+
 function evalFieldAmplitude(f::ProductField{C}, input; 
                             cache!Self::MultiSpanDataCacheBox=MultiSpanDataCacheBox(), 
                             ) where {C<:RealOrComplex}
@@ -270,6 +275,8 @@ struct CoupledField{C<:RealOrComplex, D, L<:FieldAmplitude{C, D}, R<:FieldAmplit
         new{C, D, L, R, typeof(coupler.f)}(pair, coupler)
     end
 end
+
+getOutputType(::Type{<:CoupledField{C}}) where {C<:RealOrComplex} = C
 
 function evalFieldAmplitude(f::CoupledField, input; 
                             cache!Self::MultiSpanDataCacheBox=MultiSpanDataCacheBox())
@@ -374,6 +381,8 @@ struct FloatingField{T<:Real, D, C<:RealOrComplex{T}, F<:AbstractParamFunc,
         new{T, D, C, F, typeof(pValSet)}(convert(NTuple{D, T}, center), core, pValSet)
     end
 end
+
+getOutputType(::Type{<:FloatingField{T, D, C}}) where {T, D, C<:RealOrComplex{T}} = C
 
 function (f::FloatingField{<:RealOrComplex, D})(coord::NTuple{D, Real}) where {D}
     f.core(coord .- f.center, f.param)
