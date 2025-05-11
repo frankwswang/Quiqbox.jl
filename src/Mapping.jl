@@ -29,12 +29,10 @@ end
 (f::StableBinary{T})(argL::T, argR::T) where {T} = convert(T, f.f(argL, argR))
 
 const StableAdd{T} = StableBinary{T, typeof(+)}
-const StableMul{T} = StableBinary{T, typeof(*)}
-const ElementalSub{T} = StableBinary{T, typeof(.-)}
-
 StableAdd(::Type{T}) where {T} = StableBinary(+, T)
+
+const StableMul{T} = StableBinary{T, typeof(*)}
 StableMul(::Type{T}) where {T} = StableBinary(*, T)
-ElementalSub(::Type{T}) where {T} = StableBinary(.-, T)
 
 
 struct Left end
