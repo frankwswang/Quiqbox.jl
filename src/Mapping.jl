@@ -146,7 +146,7 @@ end
 
 ParamFreeFunc(f::ParamFreeFunc) = itself(f)
 
-(f::ParamFreeFunc{F})(args...) where {F<:Function} = f.core(args...)
+@inline (f::ParamFreeFunc{F})(args...) where {F<:Function} = f.core(args...)
 
 
 struct Lucent end
