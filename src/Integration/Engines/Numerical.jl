@@ -146,7 +146,12 @@ struct ConfinedInfIntegrand{T<:Real, L, F<:Function} <: Modifier
     end
 end
 
-function (f::ConfinedInfIntegrand{T})(x) where {T<:Real}
+
+(f::ConfinedInfIntegrand)(x) = evalConfinedInfIntegrand(f, x)
+
+function evalConfinedInfIntegrand(f::ConfinedInfIntegrand{T, L, F}, 
+                                  x::Union{NTuple{L, T}, AbstractVector{T}}) where 
+                                 {T<:Real, L, F<:Function}
     val = f.core(x ./ (one(T) .- x .* x))
     mapreduce(*, x) do t
         tSquare = t * t
