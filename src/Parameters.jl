@@ -143,9 +143,9 @@ TypedReduce(f::TypedReduce, ::Type{T}) where {T} = TypedReduce(f.f, T)
 
 TypedReduce(::Type{T}) where {T} = TypedReduce(itself, T)
 
-(f::TypedReduce{T})(arg, args...) where {T} = f.f(arg, args...)::T
+(f::TypedReduce{T, F})(arg, args...) where {T, F<:Function} = f.f(arg, args...)::T
 
-(f::TypedReduce{<:AbstractArray{T, N}})(arg, args...) where {T, N} = 
+(f::TypedReduce{<:AbstractArray{T, N}, F})(arg, args...) where {T, N, F<:Function} = 
 f.f(arg, args...)::getPackType(AbstractArray{T, N})
 
 
@@ -201,7 +201,7 @@ function TypedExpand(arr::AbstractArray{T, N},
     TypedExpand(T, shape)
 end
 
-function (f::TypedExpand{T, N})(arg, args...) where {T, N}
+function (f::TypedExpand{T, N, F})(arg, args...) where {T, N, F<:Function}
     res = f.f(arg, args...)::getPackType(AbstractArray{T, N})
     f.shape(res)
 end
@@ -355,7 +355,7 @@ function getCellOutputLevels(::NestFixedParIn{T, E}) where {T, E<:PackedMemory{T
     level = getNestedLevel(E).level
     Set((level, level-1))
 end
-
+#! Consider efficient construction for when `f` is a `ReturnTyped`.
 function formatTensorFunc(f::Function, ::Type{TypedReduce}, 
                           input::CoreFixedParIn{T, E}) where {T, E<:Pack{T}}
     lambda = if f isa TypedReduce{<:Pack}
@@ -823,14 +823,14 @@ function getFieldParamsCore!(paramPairs::AbstractVector{Pair{ChainedAccess, Para
 end
 
 
-struct ReduceShift{T, F} <: TypedTensorFunc{T, 0}
+struct ReduceShift{T, F<:Function} <: TypedTensorFunc{T, 0}
     apply::TypedReduce{T, F}
     shift::T
 end
 
 (f::ReduceShift)(args...) = unitOp(+, f.apply(args...), f.shift)
 
-struct ExpandShift{T, N, F} <: TypedTensorFunc{T, N}
+struct ExpandShift{T, N, F<:Function} <: TypedTensorFunc{T, N}
     apply::TypedExpand{T, N, F}
     shift::ShapedMemory{T, N}
 end
@@ -1257,7 +1257,7 @@ struct ParamBindFunc{F<:Function, C1<:UnitParam, C2<:GridParam} <: AbstractParam
     grid::Memory{C2}
 end
 
-function (f::ParamBindFunc)(input, valSet::AbstractSpanValueSet)
+function (f::ParamBindFunc{F})(input, valSet::AbstractSpanValueSet) where {F<:Function}
     for field in (:unit, :grid)
         foreach(getfield(f, field), getfield(valSet, field)) do p, v
             setVal!(p, v)
@@ -1270,36 +1270,31 @@ end
 
 const ParamFunctionChain = FunctionChainUnion{AbstractParamFunc}
 
-struct ParamCombiner{B<:Function, C<:ParamFunctionChain} <: AbstractParamFunc
+struct ParamCombiner{B<:Function, E<:ParamFunctionChain} <: AbstractParamFunc
     binder::B
-    encode::C
+    encode::E
 
-    function ParamCombiner(binder::B, encode::C) where {B<:Function, 
-                           C<:GeneralTupleUnion{ NonEmptyTuple{AbstractParamFunc} }}
-        new{B, C}(binder, encode)
+    function ParamCombiner(binder::B, encode::E) where {B<:Function, 
+                           E<:GeneralTupleUnion{ NonEmptyTuple{AbstractParamFunc} }}
+        new{B, E}(binder, encode)
     end
 
-    function ParamCombiner(binder::B, encode::C) where 
-                          {B<:Function, C<:CustomMemory{<:AbstractParamFunc}}
+    function ParamCombiner(binder::B, encode::E) where 
+                          {B<:Function, E<:CustomMemory{<:AbstractParamFunc}}
         checkEmptiness(encode, :encode)
-        new{B, C}(binder, encode)
+        new{B, E}(binder, encode)
     end
 end
 
 ParamCombiner(binder::Function, encode::AbstractVector{<:AbstractParamFunc}) = 
 ParamCombiner(binder, genMemory(encode))
 
-(f::ParamCombiner)(input, params::AbstractSpanValueSet) = 
+(f::ParamCombiner{B})(input, params::AbstractSpanValueSet) where {B<:Function} = 
 mapreduce(o->o(input, params), f.binder, f.encode)
 
-const ParamApplyExtend{C<:ParamFunctionChain} = ParamCombiner{typeof(vcat), C}
 
-(f::ParamApplyExtend)(input, params::AbstractSpanValueSet) = 
-map(o->o(input, params), f.encode)
-
-
-const ContextParamFunc{B<:Function, C<:Function, F<:NamedFilter} = 
-      ParamCombiner{B, Tuple{ InputConverter{C}, ParamFormatter{F} }}
+const ContextParamFunc{B<:Function, E<:Function, F<:NamedFilter} = 
+      ParamCombiner{B, Tuple{ InputConverter{E}, ParamFormatter{F} }}
 
 function ContextParamFunc(binder::Function, converter::Function, 
                           formatter::TaggedSpanSetFilter)
@@ -1316,29 +1311,30 @@ const ParamFilterApply{B<:Function, E<:SpanSetFilter} = ContextParamFunc{B, ItsT
 # Specialized method due to the lack of compiler optimization
 const ParamFreeApply{B<:Function} = ParamFilterApply{B, VoidSetFilter}
 
-function (f::ParamFreeApply)(input, ::AbstractSpanValueSet)
+function (f::ParamFreeApply{B})(input, ::AbstractSpanValueSet) where {B<:Function}
     f.binder(input, genFixedVoidSpanSet())
 end
 
 
-struct ParamPipeline{C<:ParamFunctionChain} <: AbstractParamFunc
-    encode::C
+struct ParamPipeline{E<:ParamFunctionChain} <: AbstractParamFunc
+    encode::E
 
-    function ParamPipeline(encode::C) where 
-                          {C<:GeneralTupleUnion{ NonEmptyTuple{AbstractParamFunc} }}
-        new{C}(encode)
+    function ParamPipeline(encode::E) where 
+                          {E<:GeneralTupleUnion{ NonEmptyTuple{AbstractParamFunc} }}
+        new{E}(encode)
     end
 
-    function ParamPipeline(encode::C) where {C<:CustomMemory{<:AbstractParamFunc}}
+    function ParamPipeline(encode::E) where {E<:CustomMemory{<:AbstractParamFunc}}
         checkEmptiness(encode, :encode)
-        new{C}(encode)
+        new{E}(encode)
     end
 end
 
 ParamPipeline(binder::Function, encode::AbstractVector{<:AbstractParamFunc}) = 
 ParamPipeline(binder, genMemory(encode))
 
-function (f::ParamPipeline)(input, params::AbstractSpanValueSet)
+function (f::ParamPipeline{E})(input, params::AbstractSpanValueSet) where 
+                              {E<:ParamFunctionChain}
     for o in f.encode
         input = o(input, params)
     end
@@ -1346,9 +1342,10 @@ function (f::ParamPipeline)(input, params::AbstractSpanValueSet)
 end
 
 # Specialized method due to the lack of compiler optimization
-const InputPipeline{C<:FunctionChainUnion{InputConverter}} = ParamPipeline{C}
+const InputPipeline{E<:FunctionChainUnion{InputConverter}} = ParamPipeline{E}
 
-function (f::InputPipeline)(input, ::AbstractSpanValueSet)
+function (f::InputPipeline{E})(input, ::AbstractSpanValueSet) where 
+                              {E<:FunctionChainUnion{InputConverter}}
     ∘(getfield.(f.encode, :core)...)(input)
 end
 
