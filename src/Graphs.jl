@@ -584,6 +584,8 @@ const ValueInput = Union{OptionalSpanValueSet, AbstractVector}
 (f::ComputeGraph{T})() where {T} = f.f()::T
 (f::ComputeGraph{T})(input::ValueInput) where {T} = f.f(input)::T
 
+getOutputType(::Type{<:ComputeGraph{T}}) where {T} = T
+
 
 function compressGraph(graph::ComputationGraph)
     encoder = SpanInputFormatter(graph)

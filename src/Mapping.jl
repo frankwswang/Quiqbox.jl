@@ -1,5 +1,27 @@
 export ReturnTyped, PairCoupler
 
+getOutputType(::F) where {F<:Function} = getOutputType(F)
+
+getOutputType(::Type{<:Function}) = Any
+
+
+struct ApplyConvert{T, F<:Function} <: TypedEvaluator{T}
+    f::F
+
+    function ApplyConvert(f::F, ::Type{T}) where {F<:Function, T}
+        new{T, F}(f)
+    end
+end
+
+ApplyConvert(::Type{T}) where {T} = ApplyConvert(itself, T)
+
+ApplyConvert(f::ApplyConvert{TO}, ::Type{TN}) where {TO, TN} = ApplyConvert(f.f, TN)
+
+(f::ApplyConvert{T, F})(arg::Vararg) where {T, F<:Function} = convert(T, f.f(arg...))
+
+getOutputType(::Type{<:ApplyConvert{T}}) where {T} = T
+
+
 struct ReturnTyped{T, F<:Function} <: TypedEvaluator{T}
     f::F
 
@@ -8,15 +30,22 @@ struct ReturnTyped{T, F<:Function} <: TypedEvaluator{T}
     end
 end
 
-ReturnTyped(::Type{T}) where {T} = ReturnTyped(itself, T)
+ReturnTyped(f::ReturnTyped{TO}, ::Type{TN}) where {TO, TN} = ReturnTyped(f.f, TN)
 
-ReturnTyped(f::ReturnTyped{TO}, ::Type{TN}) where {TO, TN} = ReturnTyped(f.f, T)
+@inline function (f::ReturnTyped{T})(arg::Vararg) where {T}
+    caller = getLazyConverter(f.f, T)
+    caller(arg...)
+end
 
+@generated function getLazyConverter(f::Function, ::Type{T}) where {T}
+    if getOutputType(f) <: T
+        return :(f)
+    else
+        return :(ApplyConvert(f, $T))
+    end
+end
 
-(f::ReturnTyped{T})(arg::Vararg) where {T} = evalConvert(f.f, T, arg)
-
-evalConvert(f::F, ::Type{T}, args::A) where {F<:Function, T, A<:Tuple} = 
-splat(f)(args)
+getOutputType(::Type{<:ReturnTyped{T}}) where {T} = T
 
 
 struct StableBinary{T, F<:Function} <: TypedEvaluator{T}
@@ -27,7 +56,12 @@ struct StableBinary{T, F<:Function} <: TypedEvaluator{T}
     end
 end
 
-(f::StableBinary{T})(argL::T, argR::T) where {T} = convert(T, f.f(argL, argR))
+function (f::StableBinary{T, F})(argL::T, argR::T) where {T, F<:Function}
+    op = getLazyConverter(f.f, T)
+    op(argL, argR)
+end
+
+getOutputType(::Type{<:StableBinary{T}}) where {T} = T
 
 const StableAdd{T} = StableBinary{T, typeof(+)}
 StableAdd(::Type{T}) where {T} = StableBinary(+, T)
@@ -65,6 +99,8 @@ f.f(arg..., f.arg...; kws...)
 LPartial(f::Function, args::NonEmptyTuple{Any}) = LateralPartial(f, args, Left() )
 RPartial(f::Function, args::NonEmptyTuple{Any}) = LateralPartial(f, args, Right())
 
+getOutputType(::Type{<:LateralPartial{F}}) where {F<:Function} = getOutputType(F)
+
 
 const absSqrtInv = inv ∘ sqrt ∘ abs
 
@@ -94,6 +130,8 @@ end
 InputLimiter(f::InputLimiter, ::Val{N}) where {N} = InputLimiter(f.f, Val(N))
 
 (f::InputLimiter{N, F})(arg::Vararg{Any, N}) where {N, F<:Function} = f.f(arg...)
+
+getOutputType(::Type{InputLimiter{<:Any, F}}) where {F<:Function} = getOutputType(F)
 
 
 struct ChainMapper{F<:FunctionChainUnion{Function}} <: Mapper
@@ -133,9 +171,11 @@ end
 (f::PairCoupler{J, FL, FR})(arg::Vararg) where {J<:Function, FL<:Function, FR<:Function} = 
 f.joint(f.left(arg...), f.right(arg...))
 
+getOutputType(::Type{<:PairCoupler{J}}) where {J<:Function} = getOutputType(J)
+
 
 struct ParamFreeFunc{F<:Function} <: CompositeFunction
-    core::F
+    f::F
 
     function ParamFreeFunc(f::F) where {F<:Function}
         if !isParamBoxFree(f)
@@ -147,7 +187,9 @@ end
 
 ParamFreeFunc(f::ParamFreeFunc) = itself(f)
 
-@inline (f::ParamFreeFunc{F})(args...) where {F<:Function} = f.core(args...)
+@inline (f::ParamFreeFunc{F})(args...) where {F<:Function} = f.f(args...)
+
+getOutputType(::Type{ParamFreeFunc{F}}) where {F<:Function} = getOutputType(F)
 
 
 struct Lucent end
@@ -169,6 +211,8 @@ EuclideanHeader(::Val{N}) where {N} = EuclideanHeader(itself, Val(N))
 
 (f::EuclideanHeader{N, F})(head::T, body::Vararg) where {N, F<:Function, T} = 
 f.f(formatInput(EuclideanInput{N}(), head), body...)
+
+getOutputType(::Type{EuclideanHeader{<:Any, F}}) where {F<:Function} = getOutputType(F)
 
 const TypedTupleFunc{T, D, F<:Function} = ReturnTyped{T, EuclideanHeader{D, F}}
 
@@ -193,6 +237,8 @@ end
 f.f(arg[begin+K-1])
 
 (f::SelectHeader{N, 0, F})(::Vararg{Any, N}) where {N, F<:Function} = f.f()
+
+getOutputType(::Type{SelectHeader{<:Any, <:Any, F}}) where {F<:Function} = getOutputType(F)
 
 
 

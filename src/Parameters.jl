@@ -143,10 +143,13 @@ TypedReduce(f::TypedReduce, ::Type{T}) where {T} = TypedReduce(f.f, T)
 
 TypedReduce(::Type{T}) where {T} = TypedReduce(itself, T)
 
-(f::TypedReduce{T, F})(arg, args...) where {T, F<:Function} = f.f(arg, args...)::T
+(f::TypedReduce)(arg, args...) = f.f(arg, args...)::getOutputType(f)
 
-(f::TypedReduce{<:AbstractArray{T, N}, F})(arg, args...) where {T, N, F<:Function} = 
-f.f(arg, args...)::getPackType(AbstractArray{T, N})
+getOutputType(::Type{TypedReduce{T, F}}) where {T, F<:Function} = 
+typeintersect(getOutputType(F), T)
+
+getOutputType(::Type{<:TypedReduce{<:AbstractArray{T, N}, F}}) where {T, N, F<:Function} = 
+typeintersect(getOutputType(F), getPackType(AbstractArray{T, N}))
 
 
 struct TypedExpand{T, N, F<:Function} <: TypedTensorFunc{T, N}
@@ -201,9 +204,18 @@ function TypedExpand(arr::AbstractArray{T, N},
     TypedExpand(T, shape)
 end
 
-function (f::TypedExpand{T, N, F})(arg, args...) where {T, N, F<:Function}
-    res = f.f(arg, args...)::getPackType(AbstractArray{T, N})
+function (f::TypedExpand{T, N})(arg, args...) where {T, N}
+    res = f.f(arg, args...)::getOutputType(f)
     f.shape(res)
+end
+
+function getOutputType(::Type{TypedExpand{T, N, F}}) where {T, N, F<:Function}
+    type = getOutputType(F)
+    if isconcretetype(type) && type <: AbstractArray{T, N}
+        type
+    else
+        getPackType(AbstractArray{T, N})
+    end
 end
 
 
@@ -1239,6 +1251,8 @@ InputConverter(f::Function) = (InputConverter∘ParamFreeFunc)(f)
 
 InputConverter(f::InputConverter) = itself(f)
 
+getOutputType(::Type{InputConverter{F}}) where {F<:Function} = getOutputType(F)
+
 
 struct ParamFormatter{F<:NamedFilter} <: AbstractParamFunc
     core::ParamFreeFunc{TaggedSpanSetFilter{F}}
@@ -1249,6 +1263,8 @@ ParamFormatter(f::TaggedSpanSetFilter) = (ParamFormatter∘ParamFreeFunc)(f)
 (f::ParamFormatter)(::Any, params::AbstractSpanValueSet) = f.core(params)
 
 ParamFormatter(f::ParamFormatter) = itself(f)
+
+getOutputType(::Type{ParamFormatter{F}}) where {F} = getOutputType(F)
 
 
 struct ParamBindFunc{F<:Function, C1<:UnitParam, C2<:GridParam} <: AbstractParamFunc
@@ -1266,6 +1282,8 @@ function (f::ParamBindFunc{F})(input, valSet::AbstractSpanValueSet) where {F<:Fu
 
     f.core(input)
 end
+
+getOutputType(::Type{<:ParamBindFunc{F}}) where {F<:Function} = getOutputType(F)
 
 
 const ParamFunctionChain = FunctionChainUnion{AbstractParamFunc}
@@ -1294,6 +1312,8 @@ function (f::ParamCombiner{B})(input, params::AbstractSpanValueSet) where {B<:Fu
         encoder(input, params)
     end
 end
+
+getOutputType(f::Type{<:ParamCombiner{B}}) where {B<:Function} = getOutputType(B)
 
 
 const ContextParamFunc{B<:Function, E<:Function, F<:NamedFilter} = 
@@ -1343,6 +1363,12 @@ function (f::ParamPipeline{E})(input, params::AbstractSpanValueSet) where
     end
     input
 end
+
+function getOutputType(::Type{<:ParamPipeline{E}}) where 
+                      {E<:GeneralTupleUnion{ NonEmptyTuple{AbstractParamFunc} }}
+    getOutputType(E|>fieldtypes|>last)
+end
+
 
 # Specialized method due to the lack of compiler optimization
 const InputPipeline{E<:FunctionChainUnion{InputConverter}} = ParamPipeline{E}

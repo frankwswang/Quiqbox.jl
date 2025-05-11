@@ -267,7 +267,7 @@ struct CoupledField{C<:RealOrComplex, D, L<:FieldAmplitude{C, D}, R<:FieldAmplit
                          {C<:RealOrComplex, D, L<:FieldAmplitude{C, D}, 
                           R<:FieldAmplitude{C, D}}
         coupler = ParamFreeFunc(coupler)
-        new{C, D, L, R, typeof(coupler.core)}(pair, coupler)
+        new{C, D, L, R, typeof(coupler.f)}(pair, coupler)
     end
 end
 
@@ -289,6 +289,9 @@ end
 
 const CartAngMomFunc{C<:RealOrComplex, D} = NullaryField{C, D, CartSHarmonics{D}}
 
+const CartAngMomFieldFunc{C<:RealOrComplex, D} =
+      NullaryFieldFunc{C, D, InputConverter{ CartSHarmonics{D} }}
+
 const PolyRadialFunc{C<:RealOrComplex, D, F<:FieldAmplitude{C, 1}} = 
       CoupledField{C, D, RadialField{C, D, F}, CartAngMomFunc{C, D}, StableMul{C}}
 
@@ -304,8 +307,7 @@ const PolyGaussFunc{T<:Real, D, F<:GaussFunc{T}} = PolyRadialFunc{T, D, F}
 
 const PolyRadialFieldCore{C<:RealOrComplex, D, F<:AbstractParamFunc, S<:SpanSetFilter} = 
       ParamCombiner{ParamFreeFunc{StableMul{C}}, 
-                    Tuple{ RadialFieldFunc{C, D, F, S}, 
-                           NullaryFieldFunc{C, D, InputConverter{ CartSHarmonics{D} }} }}
+                    Tuple{ RadialFieldFunc{C, D, F, S}, CartAngMomFieldFunc{C, D} }}
 
 const PolyGaussFieldCore{T<:Real, D, F<:ParamMapper, S<:SpanSetFilter} = 
       PolyRadialFieldCore{T, D, GaussFieldFunc{T, F, S}, S}
@@ -367,7 +369,8 @@ struct FloatingField{T<:Real, D, C<:RealOrComplex{T}, F<:AbstractParamFunc,
         T = extractRealNumberType(C)
         base = f.core.f
         core = ReturnTyped(base.binder, T)
-        pValSet = getField(paramSet, last(base.encode).core.core, obtain)
+        paramFormatter = last(base.encode)
+        pValSet = getField(paramSet, paramFormatter.core.f, obtain)
         new{T, D, C, F, typeof(pValSet)}(convert(NTuple{D, T}, center), core, pValSet)
     end
 end
