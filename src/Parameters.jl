@@ -1289,8 +1289,11 @@ end
 ParamCombiner(binder::Function, encode::AbstractVector{<:AbstractParamFunc}) = 
 ParamCombiner(binder, genMemory(encode))
 
-(f::ParamCombiner{B})(input, params::AbstractSpanValueSet) where {B<:Function} = 
-mapreduce(o->o(input, params), f.binder, f.encode)
+function (f::ParamCombiner{B})(input, params::AbstractSpanValueSet) where {B<:Function}
+    mapreduce(f.binder, f.encode) do encoder
+        encoder(input, params)
+    end
+end
 
 
 const ContextParamFunc{B<:Function, E<:Function, F<:NamedFilter} = 
