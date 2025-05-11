@@ -1345,6 +1345,14 @@ function (f::ParamPipeline)(input, params::AbstractSpanValueSet)
     input
 end
 
+# Specialized method due to the lack of compiler optimization
+const InputPipeline{C<:FunctionChainUnion{InputConverter}} = ParamPipeline{C}
+
+function (f::InputPipeline)(input, ::AbstractSpanValueSet)
+    ∘(getfield.(f.encode, :core)...)(input)
+end
+
+
 #= Additional Method =#
 getOpacity(::ParamBindFunc) = Opaque()
 
