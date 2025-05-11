@@ -12,7 +12,8 @@ ReturnTyped(::Type{T}) where {T} = ReturnTyped(itself, T)
 
 ReturnTyped(f::ReturnTyped{TO}, ::Type{TN}) where {TO, TN} = ReturnTyped(f.f, T)
 
-(f::ReturnTyped{T})(arg...; kws...) where {T} = convert(T, f.f(arg...; kws...))
+(f::ReturnTyped{T, F})(arg...; kws...) where {T, F<:Function} = 
+convert(T, f.f(arg...; kws...))
 
 const Return{T} = ReturnTyped{T, ItsType}
 
@@ -57,8 +58,10 @@ end
 const LPartial{F<:Function, A<:NonEmptyTuple{Any}} = LateralPartial{F, A, Left }
 const RPartial{F<:Function, A<:NonEmptyTuple{Any}} = LateralPartial{F, A, Right}
 
-(f::LPartial)(arg...; kws...) = f.f(f.arg..., arg...; kws...)
-(f::RPartial)(arg...; kws...) = f.f(arg..., f.arg...; kws...)
+(f::LPartial{F, A})(arg...; kws...) where {F<:Function, A<:NonEmptyTuple{Any}} = 
+f.f(f.arg..., arg...; kws...)
+(f::RPartial{F, A})(arg...; kws...) where {F<:Function, A<:NonEmptyTuple{Any}} = 
+f.f(arg..., f.arg...; kws...)
 
 LPartial(f::Function, args::NonEmptyTuple{Any}) = LateralPartial(f, args, Left() )
 RPartial(f::Function, args::NonEmptyTuple{Any}) = LateralPartial(f, args, Right())
@@ -91,7 +94,7 @@ end
 
 InputLimiter(f::InputLimiter, ::Val{N}) where {N} = InputLimiter(f.f, Val(N))
 
-(f::InputLimiter{N})(arg::Vararg{Any, N}) where {N} = f.f(arg...)
+(f::InputLimiter{N, F})(arg::Vararg{Any, N}) where {N, F<:Function} = f.f(arg...)
 
 
 struct ChainMapper{F<:FunctionChainUnion{Function}} <: Mapper
@@ -128,7 +131,8 @@ function PairCoupler(joint::F) where {F<:Function}
     end
 end
 
-(f::PairCoupler)(arg::Vararg) = f.joint(f.left(arg...), f.right(arg...))
+(f::PairCoupler{J, FL, FR})(arg::Vararg) where {J<:Function, FL<:Function, FR<:Function} = 
+f.joint(f.left(arg...), f.right(arg...))
 
 
 struct ParamFreeFunc{F<:Function} <: CompositeFunction
@@ -144,7 +148,7 @@ end
 
 ParamFreeFunc(f::ParamFreeFunc) = itself(f)
 
-(f::ParamFreeFunc)(args...) = f.core(args...)
+(f::ParamFreeFunc{F})(args...) where {F<:Function} = f.core(args...)
 
 
 struct Lucent end
@@ -164,7 +168,7 @@ EuclideanHeader(f::EuclideanHeader, ::Val{N}) where {N} = EuclideanHeader(f.f, V
 
 EuclideanHeader(::Val{N}) where {N} = EuclideanHeader(itself, Val(N))
 
-(f::EuclideanHeader{N})(head::T, body::Vararg) where {N, T} = 
+(f::EuclideanHeader{N, F})(head::T, body::Vararg) where {N, F<:Function, T} = 
 f.f(formatInput(EuclideanInput{N}(), head), body...)
 
 const TypedTupleFunc{T, D, F<:Function} = ReturnTyped{T, EuclideanHeader{D, F}}
@@ -186,9 +190,10 @@ struct SelectHeader{N, K, F<:Function} <: Modifier
     end
 end
 
-(f::SelectHeader{N, K})(arg::Vararg{Any, N}) where {N, K} = f.f(arg[begin+K-1])
+(f::SelectHeader{N, K, F})(arg::Vararg{Any, N}) where {N, K, F<:Function} = 
+f.f(arg[begin+K-1])
 
-(f::SelectHeader{N, 0})(::Vararg{Any, N}) where {N} = f.f()
+(f::SelectHeader{N, 0, F})(::Vararg{Any, N}) where {N, F<:Function} = f.f()
 
 
 
