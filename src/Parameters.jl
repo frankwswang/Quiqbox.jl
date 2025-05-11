@@ -1264,7 +1264,7 @@ ParamFormatter(f::TaggedSpanSetFilter) = (ParamFormatter∘ParamFreeFunc)(f)
 
 ParamFormatter(f::ParamFormatter) = itself(f)
 
-getOutputType(::Type{ParamFormatter{F}}) where {F} = getOutputType(F)
+getOutputType(::Type{ParamFormatter{F}}) where {F<:NamedFilter} = getOutputType(F)
 
 
 struct ParamBindFunc{F<:Function, C1<:UnitParam, C2<:GridParam} <: AbstractParamFunc
@@ -1313,7 +1313,7 @@ function (f::ParamCombiner{B})(input, params::AbstractSpanValueSet) where {B<:Fu
     end
 end
 
-getOutputType(f::Type{<:ParamCombiner{B}}) where {B<:Function} = getOutputType(B)
+getOutputType(::Type{<:ParamCombiner{B}}) where {B<:Function} = getOutputType(B)
 
 
 const ContextParamFunc{B<:Function, E<:Function, F<:NamedFilter} = 

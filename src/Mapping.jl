@@ -131,7 +131,7 @@ InputLimiter(f::InputLimiter, ::Val{N}) where {N} = InputLimiter(f.f, Val(N))
 
 (f::InputLimiter{N, F})(arg::Vararg{Any, N}) where {N, F<:Function} = f.f(arg...)
 
-getOutputType(::Type{InputLimiter{<:Any, F}}) where {F<:Function} = getOutputType(F)
+getOutputType(::Type{<:InputLimiter{<:Any, F}}) where {F<:Function} = getOutputType(F)
 
 
 struct ChainMapper{F<:FunctionChainUnion{Function}} <: Mapper
@@ -212,7 +212,7 @@ EuclideanHeader(::Val{N}) where {N} = EuclideanHeader(itself, Val(N))
 (f::EuclideanHeader{N, F})(head::T, body::Vararg) where {N, F<:Function, T} = 
 f.f(formatInput(EuclideanInput{N}(), head), body...)
 
-getOutputType(::Type{EuclideanHeader{<:Any, F}}) where {F<:Function} = getOutputType(F)
+getOutputType(::Type{<:EuclideanHeader{<:Any, F}}) where {F<:Function} = getOutputType(F)
 
 const TypedTupleFunc{T, D, F<:Function} = ReturnTyped{T, EuclideanHeader{D, F}}
 
@@ -238,7 +238,8 @@ f.f(arg[begin+K-1])
 
 (f::SelectHeader{N, 0, F})(::Vararg{Any, N}) where {N, F<:Function} = f.f()
 
-getOutputType(::Type{SelectHeader{<:Any, <:Any, F}}) where {F<:Function} = getOutputType(F)
+getOutputType(::Type{<:SelectHeader{<:Any, <:Any, F}}) where {F<:Function} = 
+getOutputType(F)
 
 
 
