@@ -12,7 +12,7 @@ ReturnTyped(::Type{T}) where {T} = ReturnTyped(itself, T)
 
 ReturnTyped(f::ReturnTyped{TO}, ::Type{TN}) where {TO, TN} = ReturnTyped(f.f, T)
 
-(f::ReturnTyped{T, F})(arg...; kws...) where {T, F} = convert(T, f.f(arg...; kws...))
+(f::ReturnTyped{T})(arg...; kws...) where {T} = convert(T, f.f(arg...; kws...))
 
 const Return{T} = ReturnTyped{T, ItsType}
 
@@ -25,7 +25,7 @@ struct StableBinary{T, F<:Function} <: TypedEvaluator{T}
     end
 end
 
-(f::StableBinary{T, F})(argL::T, argR::T) where {T, F} = convert(T, f.f(argL, argR))
+(f::StableBinary{T})(argL::T, argR::T) where {T} = convert(T, f.f(argL, argR))
 
 const StableAdd{T} = StableBinary{T, typeof(+)}
 const StableMul{T} = StableBinary{T, typeof(*)}
@@ -237,9 +237,13 @@ end
 FloatingMonomial(center::NonEmptyTuple{T, D}, degree::NonEmptyTuple{Int, D}) where {T, D} = 
 FloatingMonomial(center, WeakComp(degree))
 
-function (f::FloatingMonomial{T, D})(coord::Union{NTuple{D, T}, AbstractVector{T}}
-                                     ) where {T<:Real, D}
-    mapreduce(StableMul(T), enumerate(f.center), f.degree.tuple) do (i, cen), pwr
-        (coord[begin+i-1] - cen)^pwr
+function evalFloatingMonomial(f::FloatingMonomial{<:Real, D}, 
+                              coord::NTuple{D, Real}) where {D}
+    mapreduce(*, coord, f.center, f.degree.tuple) do c1, c2, pwr
+        (c1 - c2)^pwr
     end
 end
+
+(::SelectTrait{InputStyle})(::FloatingMonomial{<:Real, D}) where {D} = EuclideanInput{D}()
+
+(f::FloatingMonomial)(coord) = evalFloatingMonomial(f, formatInput(f, coord))
