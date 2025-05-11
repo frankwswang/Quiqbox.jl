@@ -32,14 +32,9 @@ function evalSesquiFieldProd(f::SelfModeOverlap{<:Real, D},
     conj(val) * val
 end
 
-function evalSesquiFieldProd(f::SesquiFieldProd{<:Real, D}, 
-                             coord::NTuple{D, Real}) where {D}
-    fields = if length(f.layout) == 1
-        field, = f.layout
-        (field, field)
-    else
-        f.layout
-    end
+function evalSesquiFieldProd(f::SesquiFieldProd{<:Real, D, O}, coord::NTuple{D, Real}
+                             ) where {D, O<:Multiplier}
+    fields = ifelse(length(f.layout)==1, ntuple(_->first(f.layout), Val(2)), f.layout)
     f.dresser(fields...)(coord)
 end
 
@@ -98,14 +93,15 @@ end
 
 (f::DoubleFieldProd)(coord) = evalDoubleFieldProd(f, formatInput(f, coord))
 
-function evalDoubleFieldProd(f::DoubleFieldProd{<:Real, D}, 
-                             coord1::NTuple{D, Real}, coord2::NTuple{D, Real}) where {D}
+function evalDoubleFieldProd(f::DoubleFieldProd{<:Real, D, O}, 
+                             coord1::NTuple{D, Real}, coord2::NTuple{D, Real}) where 
+                            {D, O<:DualTermOperator}
     lp, rp = f.layout
     f.coupler(lp, rp)(coord1, coord2)
 end
 
 function evalDoubleFieldProd(f::DoubleFieldProd{<:Real, D}, 
-                             coord::NTuple{DD, Real}) where {D, DD}
+                             coord::NonEmptyTuple{Real}) where {D}
     evalDoubleFieldProd(f, coord[begin:begin+D-1], coord[begin+D:end])
 end
 
