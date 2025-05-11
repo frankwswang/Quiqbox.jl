@@ -18,18 +18,22 @@ SesquiFieldProd(data::N12Tuple{PrimOrbData{T, D}}, dresser::O=genOverlapSampler(
                 ) where {T<:Real, D, O<:Multiplier} = 
 SesquiFieldProd(getfield.(data, :core), dresser)
 
-(::SelectTrait{InputStyle})(::SesquiFieldProd{<:Real, D}) where {D} = CoordInput{D}()
+(::SelectTrait{InputStyle})(::SesquiFieldProd{<:Real, D}) where {D} = EuclideanInput{D}()
+
+(f::SesquiFieldProd)(coord) = evalSesquiFieldProd(f, formatInput(f, coord))
 
 const SelfModeOverlap{T<:Real, D, F<:FieldAmplitude{<:RealOrComplex{T}, D}} = 
       SesquiFieldProd{T, D, OverlapSampler, Tuple{F}}
 
-function (f::SelfModeOverlap{<:Real, D})(coord::NTuple{D, Real}) where {D}
+function evalSesquiFieldProd(f::SelfModeOverlap{<:Real, D}, 
+                             coord::NTuple{D, Real}) where {D}
     field, = f.layout
     val = field(coord)
     conj(val) * val
 end
 
-function (f::SesquiFieldProd{<:Real, D})(coord::NTuple{D, Real}) where {D}
+function evalSesquiFieldProd(f::SesquiFieldProd{<:Real, D}, 
+                             coord::NTuple{D, Real}) where {D}
     fields = if length(f.layout) == 1
         field, = f.layout
         (field, field)
@@ -90,16 +94,19 @@ function DoubleFieldProd(layout::OrbBarLayout6{PrimOrbData{T, D}},
 end
 
 
-(::SelectTrait{InputStyle})(::DoubleFieldProd{<:Real, D}) where {D} = CoordInput{2D}()
+(::SelectTrait{InputStyle})(::DoubleFieldProd{<:Real, D}) where {D} = EuclideanInput{2D}()
 
-function (f::DoubleFieldProd{<:Real, D})(coord1::NTuple{D, Real}, 
-                                         coord2::NTuple{D, Real}) where {D}
+(f::DoubleFieldProd)(coord) = evalDoubleFieldProd(f, formatInput(f, coord))
+
+function evalDoubleFieldProd(f::DoubleFieldProd{<:Real, D}, 
+                             coord1::NTuple{D, Real}, coord2::NTuple{D, Real}) where {D}
     lp, rp = f.layout
     f.coupler(lp, rp)(coord1, coord2)
 end
 
-function (f::DoubleFieldProd{<:Real, D})(coord::NTuple{DD, Real}) where {D, DD}
-    f(coord[begin:begin+D-1], coord[begin+D:end])
+function evalDoubleFieldProd(f::DoubleFieldProd{<:Real, D}, 
+                             coord::NTuple{DD, Real}) where {D, DD}
+    evalDoubleFieldProd(f, coord[begin:begin+D-1], coord[begin+D:end])
 end
 
 
@@ -144,7 +151,7 @@ struct ConfinedInfIntegrand{T<:Real, L, F<:Function} <: Modifier
 end
 
 function (f::ConfinedInfIntegrand{T})(x) where {T<:Real}
-    val = f.core( formatInput(f.core, x ./ (one(T) .- x .* x)) )
+    val = f.core(x ./ (one(T) .- x .* x))
     mapreduce(*, x) do t
         tSquare = t * t
         (1 + tSquare) / (1 - tSquare)^2

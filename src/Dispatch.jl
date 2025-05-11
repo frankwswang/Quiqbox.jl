@@ -21,34 +21,15 @@ abstract type InputStyle <: FunctionStyle end
 
 struct AnyInput <: InputStyle end
 
-struct TupleInput{T, N} <: InputStyle end
-
-(::SelectTrait{InputStyle})(::F) where {F<:Function} = AnyInput()
-
-struct CoordInput{N} <: InputStyle end
+struct EuclideanInput{N} <: InputStyle end
 
 formatInput(::AnyInput, x::Any) = itself(x)
 
-function formatInput(::TupleInput{T, 1}, x::Any) where {T}
-    (x isa T) || throw(ArgumentError("`x` must be a `$T`."))
-    (x,)
-end
+formatInput(::EuclideanInput{1}, x::Real) = (x,)
 
-function formatInput(::TupleInput{T, 1}, x::Tuple) where {T}
-    (x isa Tuple{T}) || throw(ArgumentError("`x` must be a `Tuple{$T}`."))
-    x
-end
+formatInput(::EuclideanInput{N}, x::NTuple{N, Real}) where {N} = itself(x)
 
-function formatInput(::TupleInput{T, N}, x::Tuple) where {T, N}
-    (x isa NTuple{N, T}) || throw(ArgumentError("`x` must be a `NTuple{$N, $T}`."))
-    x
-end
-
-function formatInput(::CoordInput{N}, x::NTuple{N, Number}) where {N}
-    itself(x)
-end
-
-function formatInput(::CoordInput{N}, x::AbstractVector{<:Number}) where {N}
+function formatInput(::EuclideanInput{N}, x::AbstractVector{<:Real}) where {N}
     ntuple(i->x[begin+i-1], N)
 end
 

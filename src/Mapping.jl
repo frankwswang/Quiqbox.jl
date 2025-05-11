@@ -159,29 +159,29 @@ end
 (f::Deref)(arg::NamedTuple{<:Any, <:Tuple{Any}}) = f.f(arg|>first)
 
 
-struct TupleHeader{N, F<:Function} <: Modifier
+struct EuclideanHeader{N, F<:Function} <: Modifier
     f::F
 
-    function TupleHeader(f::F, ::Val{N}) where {F<:Function, N}
+    function EuclideanHeader(f::F, ::Val{N}) where {F<:Function, N}
         checkPositivity(N::Int, true)
         new{N, F}(f)
     end
 end
 
-TupleHeader(f::TupleHeader, ::Val{N}) where {N} = TupleHeader(f.f, Val(N))
+EuclideanHeader(f::EuclideanHeader, ::Val{N}) where {N} = EuclideanHeader(f.f, Val(N))
 
-TupleHeader(::Val{N}) where {N} = TupleHeader(itself, Val(N))
+EuclideanHeader(::Val{N}) where {N} = EuclideanHeader(itself, Val(N))
 
-(f::TupleHeader{N})(head, body...) where {N} = 
-f.f(formatInput(TupleInput{Any, N}(), head), body...)
+(f::EuclideanHeader{N})(head::T, body::Vararg) where {N, T} = 
+f.f(formatInput(EuclideanInput{N}(), head), body...)
 
-const TypedTupleFunc{T, D, F<:Function} = ReturnTyped{T, TupleHeader{D, F}}
+const TypedTupleFunc{T, D, F<:Function} = ReturnTyped{T, EuclideanHeader{D, F}}
 
 TypedTupleFunc(f::Function, ::Type{T}, ::Val{D}) where {T, D} = 
-ReturnTyped(TupleHeader(f, Val(D)), T)
+ReturnTyped(EuclideanHeader(f, Val(D)), T)
 
 TypedTupleFunc(f::ReturnTyped, ::Type{T}, ::Val{D}) where {T, D} = 
-ReturnTyped(TupleHeader(f.f, Val(D)), T)
+ReturnTyped(EuclideanHeader(f.f, Val(D)), T)
 
 
 struct SelectHeader{N, K, F<:Function} <: Modifier
