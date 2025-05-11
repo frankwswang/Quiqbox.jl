@@ -1,6 +1,6 @@
 export EncodedField, GaussFunc, AxialProduct, PolyRadialFunc
 
-using LinearAlgebra
+using LinearAlgebra: norm as generalNorm
 
 (::SelectTrait{InputStyle})(::FieldAmplitude{<:Any, D}) where {D} = EuclideanInput{D}()
 
@@ -132,13 +132,13 @@ const EncodedFieldFunc{C<:RealOrComplex, D, E<:AbstractParamFunc, F<:AbstractPar
 
 
 const RadialField{C<:RealOrComplex, D, F<:FieldAmplitude{C, 1}} = 
-      EncodedField{C, D, F, typeof(LinearAlgebra.norm)}
+      EncodedField{C, D, F, typeof(generalNorm)}
 
 const RadialFieldFunc{C<:RealOrComplex, D, F<:AbstractParamFunc, S<:SpanSetFilter} = 
-      EncodedFieldFunc{C, D, InputConverter{typeof(LinearAlgebra.norm)}, F, S}
+      EncodedFieldFunc{C, D, InputConverter{typeof(generalNorm)}, F, S}
 
 RadialField{C, D}(radial::FieldAmplitude{C, 1}) where {C<:RealOrComplex, D} = 
-EncodedField(radial, EuclideanHeader( LinearAlgebra.norm, Val(D) ))
+EncodedField(radial, EuclideanHeader( generalNorm, Val(D) ))
 
 RadialField(radial::FieldAmplitude{C, 1}, ::Val{D}) where {C<:RealOrComplex, D} = 
 RadialField{C, D}(radial)

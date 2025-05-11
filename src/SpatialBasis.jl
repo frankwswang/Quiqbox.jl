@@ -115,20 +115,20 @@ function viewOrb(o::PrimitiveOrb, onrToIdx::Int)
     onrToIdx == 1 ? itself(o) : throw(BoundsError(o, onrToIdx))
 end
 
-function getEffectiveWeight(::PrimitiveOrb, weight::GridParam{T, 1}, idx::Int) where 
-                           {T<:RealOrComplex}
+function getEffectiveWeight(::PrimitiveOrb{T}, weight::GridParam{C, 1}, idx::Int) where 
+                           {T<:Real, C<:RealOrComplex{T}}
     indexParam(weight, idx) |> fill
 end
 
-function getEffectiveWeight(o::CompositeOrb, weight::GridParam{T, 1}, idx::Int) where 
-                           {T<:RealOrComplex}
+function getEffectiveWeight(o::CompositeOrb{T}, weight::GridParam{C, 1}, idx::Int) where 
+                           {T<:Real, C<:RealOrComplex{T}}
     o.renormalize && throw(AssertionError("Merging the weight from a renormalized "*
                            "`CompositeOrb` with another value is prohibited."))
     len = first(getOutputSize(o.weight))
     outerWeight = indexParam(weight, idx)
     map(1:len) do i
         innerWight = indexParam(o.weight, i)
-        genCellParam(StableMul(T), (innerWight, outerWeight), :w)
+        genCellParam(StableMul(C), (innerWight, outerWeight), :w)
     end
 end
 
