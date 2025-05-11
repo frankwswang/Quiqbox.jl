@@ -12,10 +12,11 @@ ReturnTyped(::Type{T}) where {T} = ReturnTyped(itself, T)
 
 ReturnTyped(f::ReturnTyped{TO}, ::Type{TN}) where {TO, TN} = ReturnTyped(f.f, T)
 
-(f::ReturnTyped{T, F})(arg...; kws...) where {T, F<:Function} = 
-convert(T, f.f(arg...; kws...))
 
-const Return{T} = ReturnTyped{T, ItsType}
+(f::ReturnTyped{T})(arg::Vararg) where {T} = evalConvert(f.f, T, arg)
+
+evalConvert(f::F, ::Type{T}, args::A) where {F<:Function, T, A<:Tuple} = 
+splat(f)(args)
 
 
 struct StableBinary{T, F<:Function} <: TypedEvaluator{T}

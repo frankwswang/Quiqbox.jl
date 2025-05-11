@@ -153,7 +153,7 @@ function evalConfinedInfIntegrand(f::ConfinedInfIntegrand{T, L, F},
                                   x::Union{NTuple{L, T}, AbstractVector{T}}) where 
                                  {T<:Real, L, F<:Function}
     val = f.core(x ./ (one(T) .- x .* x))
-    mapreduce(*, x) do t
+    mapreduce(*, x, init=one(T)) do t
         tSquare = t * t
         (1 + tSquare) / (1 - tSquare)^2
     end * val
