@@ -172,20 +172,15 @@ function overlapPGTO!(cache::GaussTypeOrbIntCache{T},
 end
 
 
-# function prepareOrbitalInfoCore(orbData::FloatingPolyGaussField)
-#     gtf = orbData.core.core.f
-#     paramFilter = last(gtf.encode).core.core
-#     pgf = last(first(gtf.binder.f.encode).core.f.binder.f.encode)
-#     xpn = last(pgf.core.f.binder.f.encode).core(f.param|>paramFilter).xpn
-#     ang = last(gtf.binder.f.encode).core.f.binder.f.core.core.m.tuple
-#     PrimGaussOrbInfo(orbData.center, xpn, ang)
-# end
-
 function prepareOrbitalInfoCore(field::FloatingPolyGaussField)
-    gtf = field.core.f.f
-    pgf = last(first(gtf.encode).core.f.binder.f.encode)
-    xpn = last(pgf.core.f.binder.f.encode).core(field.param).xpn
-    ang = last(gtf.encode).core.f.binder.f.core.core.m.tuple
+    gtf = field.core.f.f # PolyGaussFieldCore
+    grf = first(gtf.encode) # RadialFieldFunc
+    pgf = last(grf.core.f.binder.f.encode) # GaussFieldFunc
+    xpnFormatter = last(pgf.core.f.binder.f.encode) # ParamFormatter
+    xpn = xpnFormatter.core(field.param).xpn
+    angMomField = last(gtf.encode) # CartAngMomFieldFunc
+    amfCore = angMomField.core.f.binder.f.core.f # CartSHarmonics
+    ang = amfCore.m.tuple
     PrimGaussOrbInfo(field.center, xpn, ang)
 end
 

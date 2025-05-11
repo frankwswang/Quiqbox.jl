@@ -173,9 +173,9 @@ f.joint(f.left(arg...), f.right(arg...))
 
 getOutputType(::Type{<:PairCoupler{J}}) where {J<:Function} = getOutputType(J)
 
-#! Change the field name from `core` to `f` for consistency.
+
 struct ParamFreeFunc{F<:Function} <: CompositeFunction
-    core::F
+    f::F
 
     function ParamFreeFunc(f::F) where {F<:Function}
         if !isParamBoxFree(f)
@@ -187,7 +187,7 @@ end
 
 ParamFreeFunc(f::ParamFreeFunc) = itself(f)
 
-@inline (f::ParamFreeFunc{F})(args...) where {F<:Function} = f.core(args...)
+@inline (f::ParamFreeFunc{F})(args...) where {F<:Function} = f.f(args...)
 
 getOutputType(::Type{ParamFreeFunc{F}}) where {F<:Function} = getOutputType(F)
 
