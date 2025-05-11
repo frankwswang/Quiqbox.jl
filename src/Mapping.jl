@@ -150,14 +150,6 @@ ParamFreeFunc(f::ParamFreeFunc) = itself(f)
 struct Lucent end
 struct Opaque end
 
-struct Deref{F<:Function} <: Modifier
-    f::F
-end
-
-(f::Deref)(arg::AbstractArray{<:Any, 0}) = f.f(arg[])
-(f::Deref)(arg::Tuple{Any}) = f.f(arg|>first)
-(f::Deref)(arg::NamedTuple{<:Any, <:Tuple{Any}}) = f.f(arg|>first)
-
 
 struct EuclideanHeader{N, F<:Function} <: Modifier
     f::F
