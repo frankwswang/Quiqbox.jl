@@ -48,7 +48,7 @@ getPackType(::Type{T}) where {T} = T
 
 
 #! Potentially useful in the future
-struct Point{T} <: AbstractMemory{T, 0}
+struct Point{T} <: CustomMemory{T, 0}
     value::T
 end
 
@@ -112,28 +112,8 @@ function (f::TruncateReshape{N})(arr::AbstractArray) where {N}
     reshape(v, f.axis)
 end
 
-#!! Need to specify when it should make a shallow copy, e.g. when input is a custom memory.
-getMemory(arr::Memory) = itself(arr)
 
-function getMemory(arr::AbstractArray{T}) where {T}
-    eleT = if isconcretetype(T) || isempty(arr)
-        T
-    else
-        mapreduce(typeof, typejoin, arr, init=Union{})
-    end
-    Memory{eleT}(vec(arr))
-end
-
-function getMemory(obj::NonEmptyTuple{Any})
-    mem = Memory{eltype(obj)}(undef, length(obj))
-    mem .= obj
-    mem
-end
-
-getMemory(obj::Any) = getMemory((obj,))
-
-
-struct VectorMemory{T, L} <: AbstractMemory{T, 1}
+struct VectorMemory{T, L} <: CustomMemory{T, 1}
     value::Memory{T}
     shape::Val{L}
 
@@ -151,10 +131,8 @@ struct VectorMemory{T, L} <: AbstractMemory{T, 1}
     end
 end
 
-VectorMemory(input::AbstractArray) = VectorMemory(getMemory(input), Val(length(input)))
-
-VectorMemory(input::NonEmptyTuple{Any, L}) where {L} = 
-VectorMemory(getMemory(input), Val(L+1))
+VectorMemory(input::GeneralCollection) = 
+VectorMemory(extractMemory(input), Val(input|>length))
 
 size(::VectorMemory{<:Any, L}) where {L} = (L,)
 
@@ -170,7 +148,7 @@ length(::VectorMemory{<:Any, L}) where {L} = L
 const LinearMemory{T} = Union{Memory{T}, VectorMemory{T}}
 
 
-struct ShapedMemory{T, N} <: AbstractMemory{T, N}
+struct ShapedMemory{T, N} <: CustomMemory{T, N}
     value::Memory{T}
     shape::NTuple{N, Int}
 
@@ -190,13 +168,11 @@ struct ShapedMemory{T, N} <: AbstractMemory{T, N}
 end
 
 ShapedMemory(value::AbstractArray{T}, shape::Tuple{Vararg{Int}}=size(value)) where {T} = 
-ShapedMemory(getMemory(value), shape)
+ShapedMemory(extractMemory(value), shape)
 
 ShapedMemory(::Type{T}, value::AbstractArray{T}) where {T} = ShapedMemory(value)
 
 ShapedMemory(::Type{T}, value::T) where {T} = ShapedMemory( fill(value) )
-
-getMemory(arr::ShapedMemory) = arr.value
 
 
 size(arr::ShapedMemory) = arr.shape
@@ -246,7 +222,7 @@ viewElements(obj::ShapedMemory) = reshape(obj.value, obj.shape)
 viewElements(obj::AbstractArray) = itself(obj)
 
 
-abstract type AbstractPackedMemory{T, E, N} <: AbstractMemory{E, N} end
+abstract type AbstractPackedMemory{T, E, N} <: CustomMemory{E, N} end
 
 const AbstractPack{T} = Union{T, AbstractPackedMemory{T}}
 
@@ -337,8 +313,70 @@ function getMinimalEleType(collection::AbstractArray{T}) where {T}
     elseif isempty(collection)
         Union{}
     else
-        mapreduce(typeof, typejoin, collection)
+        mapreduce(typeof, strictTypeJoin, collection)
     end
 end
 
-getMinimalEleType(collection::Tuple) = mapreduce(typeof, typejoin, collection, init=Union{})
+getMinimalEleType(collection::Tuple) = 
+mapreduce(typeof, strictTypeJoin, collection, init=Union{})
+
+
+struct WeakComp{N} # Weak composition of an integer
+    tuple::NTuple{N, Int}
+    total::Int
+
+    function WeakComp(t::NonEmptyTuple{Int, M}) where {M}
+        if any(i < 0 for i in t)
+            throw(DomainError(t, "The element(s) of `t` should all be non-negative."))
+        end
+        new{M+1}(t, sum(t))
+    end
+end
+
+
+"""
+
+    extractMemory(obj::$GeneralCollection) -> Memory
+
+Extract the `Memory` inside `obj::$AbstractMemory` (without copying if possible). If `obj` 
+is not a `$AbstractMemory` a `AbstractArray`, `Tuple`, or `NamedTuple`, its entires will be 
+filled into a newly constructed `Memory`.
+"""
+extractMemory(arr::Memory) = itself(arr)
+
+extractMemory(arr::PackedMemory) = arr.value.value
+
+extractMemory(arr::CustomMemory) = arr.value::Memory
+
+function extractMemory(arr::AbstractArray{T}) where {T}
+    eleT = if isconcretetype(T) || isempty(arr)
+        T
+    else
+        mapreduce(typeof, strictTypeJoin, arr, init=Union{})
+    end
+    Memory{eleT}(vec(arr))
+end
+
+function extractMemory(obj::Tuple)
+    mem = Memory{eltype(obj)}(undef, length(obj))
+    mem .= obj
+    mem
+end
+
+extractMemory(obj::NamedTuple) = extractMemory(obj|>values)
+
+
+"""
+
+    genMemory(obj) -> Memory
+
+Generate a `Memory` filled with the entires from `obj::AbstractArray`. If `obj` is not an 
+`AbstractArray`, it will be encapsulated in a one-element `Memory`.
+"""
+genMemory(arr::AbstractArray) = Memory{getMinimalEleType(arr)}(arr)
+
+function genMemory(obj::T) where {T}
+    mem = Memory{T}(undef, 1)
+    mem[] = obj
+    mem
+end

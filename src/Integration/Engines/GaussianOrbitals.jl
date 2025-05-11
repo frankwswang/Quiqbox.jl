@@ -51,7 +51,7 @@ function gaussProdCore4(xpnSum::T, xpnRatio::T, dxLR::T) where {T<:Real}
 end
 
 
-struct PrimGaussOrbInfo{T<:Real, D}
+struct PrimGaussOrbInfo{T<:Real, D} <: QueryBox{T}
     cen::NTuple{D, T}
     xpn::T
     ang::NTuple{D, Int}
@@ -63,7 +63,7 @@ struct PrimGaussOrbInfo{T<:Real, D}
     end
 end
 
-struct GaussProductInfo{T, D}
+struct GaussProductInfo{T<:Real, D} <: QueryBox{T}
     lhs::PrimGaussOrbInfo{T, D}
     rhs::PrimGaussOrbInfo{T, D}
     cen::NTuple{D, T}
@@ -80,7 +80,7 @@ end
 
 const TupleOf5T2Int{T} = Tuple{T, T, T, T, Int, Int}
 
-function overlapPGTOcore(input::TupleOf5T2Int{T}) where {T}
+function overlapPGTOcore(input::TupleOf5T2Int{T}) where {T<:Real}
     xpnSum, xpnRatio, xML, xMR, iL, iR = input
     dxLR = xMR - xML
     if iL == iR == 0
@@ -100,14 +100,15 @@ function overlapPGTOcore(input::TupleOf5T2Int{T}) where {T}
     end
 end
 
-function overlapPGTOcore(xpn::T, ang::NonEmptyTuple{Int}) where {T}
+function overlapPGTOcore(xpn::T, ang::NonEmptyTuple{Int}) where {T<:Real}
     mapreduce(*, ang) do i
         gaussProdCore1(2xpn, i)
     end
 end
 
+
 function lazyOverlapPGTO!(cache::LRU{TupleOf5T2Int{T}, T}, 
-                          input::TupleOf5T2Int{T}) where {T}
+                          input::TupleOf5T2Int{T}) where {T<:Real}
     res = get(cache, input, nothing) # Fewer allocations than using `get!`
     if res === nothing
         res = overlapPGTOcore(input)
@@ -116,29 +117,42 @@ function lazyOverlapPGTO!(cache::LRU{TupleOf5T2Int{T}, T},
     res
 end
 
-lazyOverlapPGTO!(::Missing, input::TupleOf5T2Int) = overlapPGTOcore(input)
+lazyOverlapPGTO!(::NullCache{T}, input::TupleOf5T2Int{T}) where {T<:Real} = 
+overlapPGTOcore(input)
 
 
-struct AxialGaussTypeOverlapCache{T, D, C<:NTuple{D, MissingOr{ LRU{TupleOf5T2Int{T}, T} }}
+const PrimGaussOrbInfoCache{T<:Real, D} = 
+      LRU{EgalBox{FloatingPolyGaussField{T, D}}, PrimGaussOrbInfo{T, D}}
+
+struct AxialGaussTypeOverlapCache{T<:Real, D, 
+                                  M<:NTuple{D, MissingOr{ LRU{TupleOf5T2Int{T}, T} }}
                                   } <: CustomCache{T}
-    axis::C
+    axis::M
+    encode::PrimGaussOrbInfoCache{T, D}
 
     function AxialGaussTypeOverlapCache(::Type{T}, ::Val{D}) where {T, D}
         axis = ntuple(_->missing, Val(D::Int))
-        new{T, D, NTuple{D, Missing}}(axis)
+        new{T, D, NTuple{D, Missing}}(axis, PrimGaussOrbInfoCache{T, D}(maxsize=128))
     end
 
     function AxialGaussTypeOverlapCache(::Type{T}, config::NTuple{D, BoolVal}) where {T, D}
         axialCache = map(config) do axialConfig
             getValData(axialConfig) ? LRU{TupleOf5T2Int{T}, T}(maxsize=128) : missing
         end
-        new{T, D, typeof(axialCache)}(axialCache)
+        new{T, D, typeof(axialCache)}(axialCache, PrimGaussOrbInfoCache{T, D}(maxsize=128))
     end
 end
 
+const GaussTypeOrbIntCache{T<:Real} = Union{NullCache{T}, AxialGaussTypeOverlapCache{T}}
 
-function overlapPGTO!(cache::AxialGaussTypeOverlapCache{T, D}, 
-                      data::GaussProductInfo{T, D}) where {T, D}
+
+accessAxialCache(cache::AxialGaussTypeOverlapCache, i::Int) = cache.axis[begin+i-1]
+
+accessAxialCache(cache::NullCache, ::Int) = cache
+
+
+function overlapPGTO!(cache::GaussTypeOrbIntCache{T}, 
+                      data::GaussProductInfo{T, D}) where {T<:Real, D}
     cenL = data.lhs.cen
     cenR = data.rhs.cen
     cenM = data.cen
@@ -149,45 +163,69 @@ function overlapPGTO!(cache::AxialGaussTypeOverlapCache{T, D},
     angL = data.lhs.ang
     angR = data.rhs.ang
 
-    mapreduce(*, cache.axis, cenL, cenR, cenM, angL, angR) do AxialCache, xL, xR, xM, iL, iR
-        lazyOverlapPGTO!(AxialCache, (xpnS, xpnRatio, xM-xL, xM-xR, iL, iR))
+    i = 0
+
+    mapreduce(*, cenL, cenR, cenM, angL, angR) do xL, xR, xM, iL, iR
+        axialCache = accessAxialCache(cache, (i += 1))
+        lazyOverlapPGTO!(axialCache, (xpnS, xpnRatio, xM-xL, xM-xR, iL, iR))
     end
 end
 
 
-function prepareOrbitalInfo(orbData::PrimGTOData{T, D}) where {T<:Real, D}
-    fCore, paramSet = orbData.body
-    gtf = fCore.core.f
-    paramFilter = last(gtf.encode).core.core
-    cen = convert(NTuple{D, T}, orbData.center)
-    pgf = last(first(gtf.binder.f.encode).core.f.binder.f.encode)
-    xpn = last(pgf.core.f.binder.f.encode).core(paramSet|>paramFilter).xpn
-    ang = last(gtf.binder.f.encode).core.f.binder.f.core.core.m.tuple
-    PrimGaussOrbInfo(cen, xpn, ang)
+# function prepareOrbitalInfoCore(orbData::FloatingPolyGaussField)
+#     gtf = orbData.core.core.f
+#     paramFilter = last(gtf.encode).core.core
+#     pgf = last(first(gtf.binder.f.encode).core.f.binder.f.encode)
+#     xpn = last(pgf.core.f.binder.f.encode).core(f.param|>paramFilter).xpn
+#     ang = last(gtf.binder.f.encode).core.f.binder.f.core.core.m.tuple
+#     PrimGaussOrbInfo(orbData.center, xpn, ang)
+# end
+
+function prepareOrbitalInfoCore(field::FloatingPolyGaussField)
+    gtf = field.core.f.f
+    pgf = last(first(gtf.encode).core.f.binder.f.encode)
+    xpn = last(pgf.core.f.binder.f.encode).core(field.param).xpn
+    ang = last(gtf.encode).core.f.binder.f.core.core.m.tuple
+    PrimGaussOrbInfo(field.center, xpn, ang)
+end
+
+function prepareOrbitalInfo!(cache::AxialGaussTypeOverlapCache{T, D}, 
+                             orbData::FloatingPolyGaussField{T, D}) where {T<:Real, D}
+    get!(cache.encode, EgalBox{FloatingPolyGaussField{T, D}}(orbData)) do
+        prepareOrbitalInfoCore(orbData)
+    end
+end
+
+function prepareOrbitalInfo!(::NullCache{T}, 
+                             orbData::FloatingPolyGaussField{T, D}) where {T<:Real, D}
+    prepareOrbitalInfoCore(orbData)
 end
 
 
-function computeGTOrbOverlap(data::Tuple{PrimGTOData})
-    formattedData = prepareOrbitalInfo(data|>first)
+function computeGTOrbOverlap((data,)::Tuple{FloatingPolyGaussField{T, D}}; 
+                             cache!Self::GaussTypeOrbIntCache{T}=
+                                         AxialGaussTypeOverlapCache(T, Val(D))
+                             ) where {T<:Real, D}
+    formattedData = prepareOrbitalInfo!(cache!Self, data)
     overlapPGTOcore(formattedData.xpn, formattedData.ang)
 end
 
-function computeGTOrbOverlap(data::NTuple{2, PrimGTOData{T, D}}; 
-                             cache!Self::AxialGaussTypeOverlapCache{T, D}=
+function computeGTOrbOverlap(data::NTuple{2, FloatingPolyGaussField{T, D}}; 
+                             cache!Self::GaussTypeOrbIntCache{T}=
                                          AxialGaussTypeOverlapCache(T, Val(D))
-                             ) where {T, D}
+                             ) where {T<:Real, D}
     formattedData = map(data) do sector
-        prepareOrbitalInfo(sector)
+        prepareOrbitalInfo!(cache!Self, sector)
     end |> Base.Splat(GaussProductInfo)
     overlapPGTO!(cache!Self, formattedData)
 end
 
 
 ## Multiple Moment ##
-function computeMultiMomentGTO(op::MonomialMul{T, D}, 
-                               data::PrimGaussOrbInfo{T, D}) where {T, D}
+function computeMultiMomentGTO(fm::FloatingMonomial{T, D}, 
+                               data::PrimGaussOrbInfo{T, D}) where {T<:Real, D}
     xpn = data.xpn
-    mapreduce(*, op.center, op.degree.tuple, data.center, data.ang) do xMM, n, x, i
+    mapreduce(*, fm.center, fm.degree.tuple, data.center, data.ang) do xMM, n, x, i
         dx = x - xMM
         m = iszero(dx) ? 0 : n
         mapreduce(+, 0:m) do k
@@ -202,10 +240,9 @@ function computeMultiMomentGTO(op::MonomialMul{T, D},
 end
 
 
-function computeMultiMomentGTO!(op::MonomialMul{T, D}, 
-                                cache::AxialGaussTypeOverlapCache{T, D}, 
-                                data::GaussProductInfo{T, D}) where {T, D}
-    if op.degree.total == 0
+function computeMultiMomentGTO!(fm::FloatingMonomial{T, D}, cache::GaussTypeOrbIntCache{T}, 
+                                data::GaussProductInfo{T, D}) where {T<:Real, D}
+    if fm.degree.total == 0
         overlapPGTO!(cache, data)
     else
         cenL = data.lhs.cen
@@ -218,54 +255,65 @@ function computeMultiMomentGTO!(op::MonomialMul{T, D},
         angL = data.lhs.ang
         angR = data.rhs.ang
 
-        mapreduce(*, cache.axis, op.center, op.degree.tuple, 
-                    cenL, cenR, cenM, angL, angR) do AxialCache, xMM, n, xL, xR, xM, iL, iR
+        i = 0
+
+        mapreduce(*, fm.center, fm.degree.tuple, 
+                     cenL, cenR, cenM, angL, angR) do xMM, n, xL, xR, xM, iL, iR
             dx = xR - xMM #! Consider when xL == xMM
             m = iszero(dx) ? 0 : n
+            axialCache = accessAxialCache(cache, (i += 1))
             mapreduce(+, 0:m) do k
                 binomial(n, k) * dx^k * 
-                lazyOverlapPGTO!(AxialCache, (xpnS, xpnRatio, xM-xL, xM-xR, iL, iR+n-k))
+                lazyOverlapPGTO!(axialCache, (xpnS, xpnRatio, xM-xL, xM-xR, iL, iR+n-k))
             end
         end
     end
 end
 
 
-function computeGTOrbMultiMom(op::MonomialMul{T, D}, data::Tuple{PrimGTOData{T, D}}
-                              ) where {T, D}
-    formattedData = prepareOrbitalInfo(data|>first)
-    computeMultiMomentGTO(op, formattedData)
-end
-
-function computeGTOrbMultiMom(op::MonomialMul{T, D}, data::NTuple{2, PrimGTOData{T, D}}; 
-                              cache!Self::AxialGaussTypeOverlapCache{T, D}=
+function computeGTOrbMultiMom(op::MultipoleMomentSampler{T, D}, 
+                              (data,)::Tuple{FloatingPolyGaussField{T, D}};
+                              cache!Self::GaussTypeOrbIntCache{T}=
                                           AxialGaussTypeOverlapCache(T, Val(D))
-                              ) where {T, D}
-    formattedData = map(data) do sector
-        prepareOrbitalInfo(sector)
-    end |> Base.Splat(GaussProductInfo)
-    computeMultiMomentGTO!(op, cache!Self, formattedData)
+                              ) where {T<:Real, D}
+    formattedData = prepareOrbitalInfo!(cache!Self, data)
+    computeMultiMomentGTO(last(op.dresser).term, formattedData)
 end
 
-function getGaussTypeOrbIntegrator(::OneBodyIntegral, ::Identity)
+function computeGTOrbMultiMom(op::MultipoleMomentSampler{T, D}, 
+                              data::NTuple{2, FloatingPolyGaussField{T, D}}; 
+                              cache!Self::GaussTypeOrbIntCache{T}=
+                                          AxialGaussTypeOverlapCache(T, Val(D))
+                              ) where {T<:Real, D}
+    formattedData = map(data) do sector
+        prepareOrbitalInfo!(cache!Self, sector)
+    end |> Base.Splat(GaussProductInfo)
+    computeMultiMomentGTO!(last(op.dresser).term, cache!Self, formattedData)
+end
+
+
+function getGaussTypeOrbIntegrator(::OneBodyIntegral, ::OverlapSampler)
     computeGTOrbOverlap
 end
 
-function getGaussTypeOrbIntegrator(::OneBodyIntegral{D}, op::MonomialMul{T, D}) where {T, D}
+function getGaussTypeOrbIntegrator(::OneBodyIntegral{D}, op::MultipoleMomentSampler{T, D}
+                                   ) where {T<:Real, D}
     LPartial(computeGTOrbMultiMom, (op,))
 end
 
 
-const GaussTypeOrbIntCache{T} = Union{NullCache{T}, AxialGaussTypeOverlapCache{T}}
-
-function getAnalyticIntegral!(::S, cache::GaussTypeOrbIntCache{T}, op::DirectOperator, 
-                              data::N12Tuple{PrimGTOData{T, D}}) where 
-                             {D, S<:MultiBodyIntegral{D}, T}
+function getAnalyticIntegral!(::S, cache!Self::GaussTypeOrbIntCache{T}, op::DirectOperator, 
+                              data::OneBodyOrbIntLayout{PrimGTOData{T, D}}) where 
+                             {D, S<:MultiBodyIntegral{D}, T<:Real}
+    fields = getfield.(data, :core)
     integrator = getGaussTypeOrbIntegrator(S(), op)
-    if length(data) > 1
-        cache!Self = (cache isa NullCache) ? AxialGaussTypeOverlapCache(T, Val(D)) : cache
-        integrator(data; cache!Self)
-    else
-        integrator(data)
-    end
+    integrator(fields; cache!Self)
+end
+
+
+#= Additional Method =#
+function getAnalyticIntegralCache(::Union{OverlapSampler, MultipoleMomentSampler{T, D}}, 
+                                  ::OneBodyOrbIntLayout{PrimGTOData{T, D}}
+                                  ) where {T<:Real, D}
+    AxialGaussTypeOverlapCache(T, ntuple( _->Val(true), Val(D) ))
 end

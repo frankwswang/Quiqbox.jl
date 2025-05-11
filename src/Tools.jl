@@ -268,7 +268,7 @@ function markUnique((a, b)::NTuple{2, Any}; compareFunction::F=isequal) where {F
 end
 
 function markUniqueCore!(compareFunc::F, compressedSeq::AbstractVector, 
-                         sequence::NonEmpTplOrAbtArr) where {F<:Function}
+                         sequence::GeneralCollection) where {F<:Function}
     map(sequence) do ele
         j = firstindex(compressedSeq)
         isNew = true
@@ -818,3 +818,28 @@ extractRealNumberType(::Type{Complex{T}}) where {T<:Real} = T
 
 
 getValData(::Val{T}) where {T} = T
+
+
+function genParametricType(base::UnionAll, typeVars::Tuple)
+    type = base{typeVars...}
+    for var in reverse(typeVars)
+        type = if var isa TypeVar
+            UnionAll(var, type)
+        else
+            type
+        end
+    end
+    type
+end
+
+function genParametricType(base::UnionAll, typePars::NamedTuple)
+    typeVars = map(keys(typePars), values(typePars)) do k, v
+        if v isa Type && !isconcretetype(v)
+            TypeVar(k, v)
+        else
+            v
+        end
+    end
+
+    genParametricType(base, typeVars)
+end

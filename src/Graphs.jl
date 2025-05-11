@@ -226,7 +226,7 @@ struct LayerParamGraph{T, S1<:UnitVertex, S2<:GridVertex, H<:CallVertex,
         sectors, mapper = formVertexSectors(inUPars, inGPars, midPars)
 
         unitSource, gridSource, hidden = map(sectors) do sector
-            isempty(sector) ? Memory{Union{}}(undef, 0) : getMemory(sector)
+            isempty(sector) ? Memory{Union{}}(undef, 0) : genMemory(sector)
         end
         source = (unit=unitSource, grid=gridSource)
 
@@ -375,7 +375,9 @@ function genTensorSourceMergerCore(sector::AbstractVector{<:TensorVertex})
     else
         keys = Pair{Bool, OneToIndex}[]
         idx = 0
-        vals = map(enumerate(sector)) do (cacheIdx, vertex)
+        cacheIdx = 0
+        vals = map(sector) do vertex
+            cacheIdx += 1
             ele = if isNodeActive(vertex)
                  true => OneToIndex(idx += 1)
             else
@@ -383,8 +385,8 @@ function genTensorSourceMergerCore(sector::AbstractVector{<:TensorVertex})
             end
             push!(keys, ele)
             getNodeValue(vertex)
-        end |> getMemory
-        (getMemory(keys), vals)
+        end
+        (extractMemory(keys), extractMemory(vals))
     end
 end
 
@@ -449,12 +451,12 @@ end
 
 function genCallVertexEvaluatorCore(::TupleReceptor, fs::AbstractArray{<:Function}, 
                                     apply::ReturnTyped{T}) where {T}
-    ReturnTyped(ChainExpand(Tuple(fs), splat(apply.f)), T)
+    ReturnTyped(splat(apply.f) ∘ ChainMapper(fs|>Tuple), T)
 end
 
 function genCallVertexEvaluatorCore(::ArrayReceptor, fs::AbstractArray{<:Function}, 
                                     apply::ReturnTyped{T}) where {T}
-    ReturnTyped(ChainExpand(fs, apply.f), T)
+    ReturnTyped(apply.f ∘ ChainMapper(fs), T)
 end
 
 function genCallVertexEvaluator(compactPG::LayerGraphCore, 
@@ -491,13 +493,13 @@ struct SpanInputFormatter{S1<:Symbol, S2<:Pair{ Symbol, <:NonEmptyTuple{Int} }} 
     end
 
     function SpanInputFormatter(unit::UnitVertex)
-        unitInfo = isNodeActive(unit) ? getMemory(unit.marker) : genBottomMemory()
+        unitInfo = isNodeActive(unit) ? genMemory(unit.marker) : genBottomMemory()
         new{eltype(unitInfo), Union{}}(unitInfo, genBottomMemory())
     end
 
     function SpanInputFormatter(grid::GridVertex{T, N}) where {T, N}
         gridInfo = if isNodeActive(grid)
-            getMemory(grid.marker => (size∘getNodeValue)(grid))
+            genMemory(grid.marker => (size∘getNodeValue)(grid))
         else
             genBottomMemory()
         end
@@ -564,9 +566,6 @@ end
 (f::SpanInputFormatter)() = (unit=nothing, grid=nothing)
 
 
-abstract type GraphEvaluator{G} <: Evaluator end
-
-
 const EvalLayerGraphCore{T, G<:ComputationGraph{T}} = 
       LPartial{typeof(evaluateGraph), Tuple{G}}
 
@@ -612,18 +611,24 @@ function compressParam(param::ParamBox)
 end
 
 
-const FilterComputeGraph{G<:ComputeGraph} = Base.ComposedFunction{G, SpanSetFilter}
+const FilterComputeGraph{G<:ComputeGraph, S<:SpanSetFilter} = Base.ComposedFunction{G, S}
 
-const ParamMapper{N, E<:NTuple{N, FilterComputeGraph}} = NamedMapper{N, E}
+const ParamEncoderChain = NonEmptyTuple{Union{GetIndex{<:SpanIndex}, FilterComputeGraph}}
+
+const ParamMapper{S, F<:NamedTuple{S, <:ParamEncoderChain}} = ChainMapper{F}
 
 function genParamMapper(params::NamedParamTuple; 
                         paramSet!Self::AbstractSpanParamSet=initializeSpanParamSet())
     checkEmptiness(params, :params)
     mapper = map(params) do param
-        encoder, inputSet = compressParam(param)
-        inputFilter = locateParam!(paramSet!Self, inputSet)
-        encoder ∘ inputFilter
-    end |> NamedMapper
+        if screenLevelOf(param) == 1
+            locateParam!(paramSet!Self, param)
+        else
+            encoder, inputSet = compressParam(param)
+            inputFilter = locateParam!(paramSet!Self, inputSet)
+            encoder ∘ inputFilter
+        end
+    end |> ChainMapper
     mapper, paramSet!Self
 end
 

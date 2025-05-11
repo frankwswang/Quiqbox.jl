@@ -3,19 +3,6 @@ abstract type SphericalHarmonics{D} <: CompositeFunction end
 abstract type RealSolidHarmonics{D} <: SphericalHarmonics{D} end
 
 
-struct WeakComp{N} # Weak composition of an integer
-    tuple::NTuple{N, Int}
-    total::Int
-
-    function WeakComp(t::NonEmptyTuple{Int, M}) where {M}
-        if any(i < 0 for i in t)
-            throw(DomainError(t, "The element(s) of `t` should all be non-negative."))
-        end
-        new{M+1}(t, sum(t))
-    end
-end
-
-
 struct CartSHarmonics{D} <: RealSolidHarmonics{D}
     m::WeakComp{D}
 

@@ -143,9 +143,9 @@ TypedReduce(f::TypedReduce, ::Type{T}) where {T} = TypedReduce(f.f, T)
 
 TypedReduce(::Type{T}) where {T} = TypedReduce(itself, T)
 
-(f::TypedReduce{T})(arg, args...) where {T} = f.f(arg, args...)::T
+(f::TypedReduce{T, F})(arg, args...) where {T, F<:Function} = f.f(arg, args...)::T
 
-(f::TypedReduce{<:AbstractArray{T, N}})(arg, args...) where {T, N} = 
+(f::TypedReduce{<:AbstractArray{T, N}, F})(arg, args...) where {T, N, F<:Function} = 
 f.f(arg, args...)::getPackType(AbstractArray{T, N})
 
 
@@ -201,7 +201,7 @@ function TypedExpand(arr::AbstractArray{T, N},
     TypedExpand(T, shape)
 end
 
-function (f::TypedExpand{T, N})(arg, args...) where {T, N}
+function (f::TypedExpand{T, N, F})(arg, args...) where {T, N, F<:Function}
     res = f.f(arg, args...)::getPackType(AbstractArray{T, N})
     f.shape(res)
 end
@@ -355,7 +355,7 @@ function getCellOutputLevels(::NestFixedParIn{T, E}) where {T, E<:PackedMemory{T
     level = getNestedLevel(E).level
     Set((level, level-1))
 end
-
+#! Consider efficient construction for when `f` is a `ReturnTyped`.
 function formatTensorFunc(f::Function, ::Type{TypedReduce}, 
                           input::CoreFixedParIn{T, E}) where {T, E<:Pack{T}}
     lambda = if f isa TypedReduce{<:Pack}
@@ -823,14 +823,14 @@ function getFieldParamsCore!(paramPairs::AbstractVector{Pair{ChainedAccess, Para
 end
 
 
-struct ReduceShift{T, F} <: TypedTensorFunc{T, 0}
+struct ReduceShift{T, F<:Function} <: TypedTensorFunc{T, 0}
     apply::TypedReduce{T, F}
     shift::T
 end
 
 (f::ReduceShift)(args...) = unitOp(+, f.apply(args...), f.shift)
 
-struct ExpandShift{T, N, F} <: TypedTensorFunc{T, N}
+struct ExpandShift{T, N, F<:Function} <: TypedTensorFunc{T, N}
     apply::TypedExpand{T, N, F}
     shift::ShapedMemory{T, N}
 end
@@ -989,13 +989,12 @@ const OptionalGridValueSet{U<:NothingOr{AbtBottomVector}, G<:NothingOr{AbtVecOfA
 const OptionalVoidValueSet{U<:NothingOr{AbtBottomVector}, G<:NothingOr{AbtBottomVector}} = 
       @NamedTuple{unit::U, grid::G}
 
-const FixedSpanValueSet{T1, T2<:AbstractArray{T1}} = 
-      AbstractSpanValueSet{Memory{T1}, Memory{T2}}
-
-const AbstractSpanIndexSet{U<:AbstractVector{OneToIndex}, G<:AbstractVector{OneToIndex}} = 
+const AbstractSpanIndexSet{U<:AbstractVector{<:OneToIndex}, 
+                           G<:AbstractVector{<:OneToIndex}} = 
       AbstractSpanSet{U, G}
 
-const FixedSpanIndexSet = AbstractSpanIndexSet{Memory{OneToIndex}, Memory{OneToIndex}}
+const FixedSpanIndexSet{U<:OneToIndex, G<:OneToIndex} = 
+      AbstractSpanIndexSet{Memory{U}, Memory{G}}
 
 const AbstractSpanParamSet{U<:AbstractVector{<:UnitParam}, G<:AbstractVector{<:GridParam}} = 
       AbstractSpanSet{U, G}
@@ -1006,7 +1005,7 @@ const TypedSpanParamSet{T1<:UnitParam, T2<:GridParam} =
 const FixedSpanParamSet{T1<:UnitParam, T2<:GridParam} = 
       AbstractSpanParamSet{Memory{T1}, Memory{T2}}
 
-const FixedEmptySpanSet = AbstractSpanParamSet{BottomMemory, BottomMemory}
+genFixedVoidSpanSet() = (unit=genBottomMemory(), grid=genBottomMemory())
 
 struct UnitInput end
 struct GridInput end
@@ -1030,14 +1029,14 @@ initializeSpanParamSet() = (unit=UnitParam[], grid=GridParam[])
 
 initializeSpanParamSet(::Type{T}) where {T} = (unit=UnitParam{T}[], grid=GridParam{T}[])
 
-initializeSpanParamSet(::Nothing) = (unit=genBottomMemory(), grid=genBottomMemory())
+initializeSpanParamSet(::Nothing) = genFixedVoidSpanSet()
 
 initializeSpanParamSet(units::AbstractVector{<:UnitParam}, 
                        grids::AbstractVector{<:GridParam}) = (unit=units, grid=grids)
 
-initializeSpanParamSet(unit::UnitParam) = (unit=getMemory(unit), grid=genBottomMemory())
+initializeSpanParamSet(unit::UnitParam) = (unit=genMemory(unit), grid=genBottomMemory())
 
-initializeSpanParamSet(grid::GridParam) = (unit=genBottomMemory(), grid=getMemory(grid))
+initializeSpanParamSet(grid::GridParam) = (unit=genBottomMemory(), grid=genMemory(grid))
 
 
 function locateParamCore!(params::AbstractVector, target::ParamBox)
@@ -1143,53 +1142,68 @@ function cacheParam!(cache::MultiSpanDataCacheBox, params::ParamBoxSource)
 end
 
 
-struct SpanSetFilter <: Mapper
-    scope::FixedSpanIndexSet
+struct SpanSetFilter{U<:OneToIndex, G<:OneToIndex} <: Mapper
+    scope::FixedSpanIndexSet{U, G}
+
+    function SpanSetFilter(scope::AbstractSpanIndexSet)
+        scope = map(scope) do sector
+            isempty(sector) ? genBottomMemory() : Memory{OneToIndex}(sector)
+        end
+        new{(values∘map)(eltype, scope)...}(scope)
+    end
+
+    SpanSetFilter() = new{Union{}, Union{}}(genFixedVoidSpanSet())
 end
 
-function SpanSetFilter()
-    SpanSetFilter(( unit=Memory{OneToIndex}(undef, 0), grid=Memory{OneToIndex}(undef, 0) ))
-end
+SpanSetFilter(unit::AbstractVector{<:OneToIndex}, grid::AbstractVector{<:OneToIndex}) = 
+SpanSetFilter((;unit, grid))
 
 function SpanSetFilter(unitLen::Int, gridLen::Int)
-    unitIds = map(OneToIndex, Base.OneTo(unitLen))
-    gridIds = map(OneToIndex, Base.OneTo(gridLen))
-    SpanSetFilter(( unit=Memory{OneToIndex}(unitIds), grid=Memory{OneToIndex}(gridIds) ))
+    builder = x->OneToIndex(x)
+    unit = typedMap(builder, Base.OneTo(unitLen))
+    grid = typedMap(builder, Base.OneTo(gridLen))
+    SpanSetFilter(unit, grid)
 end
 
-function SpanSetFilter(scope::AbstractSpanIndexSet)
-    SpanSetFilter(map(getMemory, scope))
-end
+const VoidSetFilter = SpanSetFilter{Union{}, Union{}}
 
-function SpanSetFilter(unit::AbstractVector{OneToIndex}, grid::AbstractVector{OneToIndex})
-    SpanSetFilter((;unit, grid))
-end
+const UnitSetFilter = SpanSetFilter{OneToIndex, Union{}}
 
-#= Additional Method =#
-function getField(paramSet::AbstractSpanSet, sFilter::SpanSetFilter)
-    firstIds = map(firstindex, paramSet)
-    map(paramSet, firstIds, sFilter.scope) do sector, i, oneToIds
-        if isempty(oneToIds)
-            genBottomMemory()
-        else
-            view(sector, map(x->(x.idx + i - 1), oneToIds))
+const GridSetFilter = SpanSetFilter{Union{}, OneToIndex}
+
+function getSector(::Val{S}, target::AbstractSpanSet, oneToIds::Memory{T}, 
+                   finalizer::F=itself) where {S, T<:OneToIndex, F<:Function}
+    sector = getfield(target, S)
+    iStart = firstindex(sector)
+    if T <: Union{}
+        genBottomMemory()
+    elseif finalizer isa ItsType
+        view(sector, map(x->(x.idx + iStart - 1), oneToIds))
+    else
+        map(oneToIds) do x
+            getindex(sector, (x.idx + iStart - 1)) |> finalizer
         end
     end
 end
 
-function getField(sFilterPrev::SpanSetFilter, sFilterHere::SpanSetFilter)
-    unit = map(sFilterHere.scope.unit) do idx
-        getField(sFilterPrev.scope.unit, idx)
-    end
-
-    grid = map(sFilterHere.scope.grid) do idx
-        getField(sFilterPrev.scope.grid, idx)
-    end
-    SpanSetFilter((;unit, grid))
+#= Additional Method =#
+function getField(obj::AbstractSpanSet, sFilter::SpanSetFilter, 
+                  finalizer::F=itself) where {F<:Function}
+    unit = getSector(Val(:unit), obj, sFilter.scope.unit, finalizer)
+    grid = getSector(Val(:grid), obj, sFilter.scope.grid, finalizer)
+    (; unit, grid)
 end
 
+getField(::AbstractSpanSet, ::VoidSetFilter) = genFixedVoidSpanSet()
 
-const NamedFilter = Union{SpanSetFilter, NamedMapper}
+function getField(sFilterPrev::SpanSetFilter, sFilterHere::SpanSetFilter)
+    getField(sFilterPrev.scope, sFilterHere) |> SpanSetFilter
+end
+
+getField(::SpanSetFilter, ::VoidSetFilter) = SpanSetFilter()
+
+
+const NamedFilter = Union{SpanSetFilter, ChainMapper}
 
 struct TaggedSpanSetFilter{F<:NamedFilter} <: Mapper
     scope::F
@@ -1199,8 +1213,12 @@ end
 TaggedSpanSetFilter(scope::NamedFilter, paramSet::AbstractSpanParamSet) = 
 TaggedSpanSetFilter(scope, Identifier(paramSet))
 
+TaggedSpanSetFilter() = TaggedSpanSetFilter(SpanSetFilter(), Identifier(nothing))
+
 #= Additional Method =#
-getField(obj, tsFilter::TaggedSpanSetFilter) = getField(obj, tsFilter.scope)
+getField(obj::AbstractSpanSet, tsFilter::TaggedSpanSetFilter, 
+         finalizer::F=itself) where {F<:Function} = 
+getField(obj, tsFilter.scope, finalizer)
 
 
 abstract type AbstractParamFunc <: CompositeFunction end
@@ -1213,11 +1231,6 @@ getParamInputType(::AbstractParamFunc) = SpanInput()
 
 struct InputConverter{F<:Function} <: AbstractParamFunc
     core::ParamFreeFunc{F}
-
-    function InputConverter(f::ParamFreeFunc{F}) where {F<:Function}
-        checkArgQuantity(f.core, 1)
-        new{F}(f)
-    end
 end
 
 InputConverter(f::Function) = (InputConverter∘ParamFreeFunc)(f)
@@ -1229,12 +1242,6 @@ InputConverter(f::InputConverter) = itself(f)
 
 struct ParamFormatter{F<:NamedFilter} <: AbstractParamFunc
     core::ParamFreeFunc{TaggedSpanSetFilter{F}}
-
-    function ParamFormatter(f::ParamFreeFunc{TaggedSpanSetFilter{F}}) where 
-                           {F<:NamedFilter}
-        checkArgQuantity(f.core, 1)
-        new{F}(f)
-    end
 end
 
 ParamFormatter(f::TaggedSpanSetFilter) = (ParamFormatter∘ParamFreeFunc)(f)
@@ -1250,7 +1257,7 @@ struct ParamBindFunc{F<:Function, C1<:UnitParam, C2<:GridParam} <: AbstractParam
     grid::Memory{C2}
 end
 
-function (f::ParamBindFunc)(input, valSet::AbstractSpanValueSet)
+function (f::ParamBindFunc{F})(input, valSet::AbstractSpanValueSet) where {F<:Function}
     for field in (:unit, :grid)
         foreach(getfield(f, field), getfield(valSet, field)) do p, v
             setVal!(p, v)
@@ -1261,43 +1268,36 @@ function (f::ParamBindFunc)(input, valSet::AbstractSpanValueSet)
 end
 
 
-const ParamFuncSequence = Union{ NonEmptyTuple{AbstractParamFunc}, 
-                                 LinearMemory{<:AbstractParamFunc} }
+const ParamFunctionChain = FunctionChainUnion{AbstractParamFunc}
 
-struct ParamCombiner{B<:Function, C<:ParamFuncSequence} <: AbstractParamFunc
+struct ParamCombiner{B<:Function, E<:ParamFunctionChain} <: AbstractParamFunc
     binder::B
-    encode::C
+    encode::E
 
-    function ParamCombiner(binder::B, encode::C) where 
-                          {B<:Function, C<:NonEmptyTuple{AbstractParamFunc}}
-        checkArgQuantity(binder, 2)
-        new{B, C}(binder, encode)
+    function ParamCombiner(binder::B, encode::E) where {B<:Function, 
+                           E<:GeneralTupleUnion{ NonEmptyTuple{AbstractParamFunc} }}
+        new{B, E}(binder, encode)
     end
 
-    function ParamCombiner(binder::B, encode::C) where 
-                          {B<:Function, C<:LinearMemory{<:AbstractParamFunc}}
-        checkArgQuantity(binder, 2)
+    function ParamCombiner(binder::B, encode::E) where 
+                          {B<:Function, E<:CustomMemory{<:AbstractParamFunc}}
         checkEmptiness(encode, :encode)
-        new{B, C}(binder, encode)
+        new{B, E}(binder, encode)
     end
 end
 
 ParamCombiner(binder::Function, encode::AbstractVector{<:AbstractParamFunc}) = 
-ParamCombiner(binder, getMemory(encode))
+ParamCombiner(binder, genMemory(encode))
 
-(f::ParamCombiner)(input, params::AbstractSpanValueSet) = 
-mapreduce(o->o(input, params), f.binder, f.encode)
-
-const ParamApplyExtend{C<:ParamFuncSequence} = ParamCombiner{typeof(vcat), C}
-
-(f::ParamApplyExtend)(input, params::AbstractSpanValueSet) = 
-map(o->o(input, params), f.encode)
+function (f::ParamCombiner{B})(input, params::AbstractSpanValueSet) where {B<:Function}
+    mapreduce(f.binder, f.encode) do encoder
+        encoder(input, params)
+    end
+end
 
 
-const ContextParamFunc{B<:Function, C<:Function, F<:NamedFilter} = 
-      ParamCombiner{B, Tuple{ InputConverter{C}, ParamFormatter{F} }}
-
-const ParamFilterApply{B<:Function} = ContextParamFunc{B, ItsType, SpanSetFilter}
+const ContextParamFunc{B<:Function, E<:Function, F<:NamedFilter} = 
+      ParamCombiner{B, Tuple{ InputConverter{E}, ParamFormatter{F} }}
 
 function ContextParamFunc(binder::Function, converter::Function, 
                           formatter::TaggedSpanSetFilter)
@@ -1309,34 +1309,49 @@ function ContextParamFunc(binder::Function, formatter::TaggedSpanSetFilter)
 end
 
 
-const BiParamFuncApply{T, J<:Function, FL<:AbstractParamFunc, FR<:AbstractParamFunc} = 
-      ParamCombiner{ParamFreeFunc{StableBinary{T, J}}, Tuple{FL, FR}}
+const ParamFilterApply{B<:Function, E<:SpanSetFilter} = ContextParamFunc{B, ItsType, E}
 
-const BiParamFuncProd{T, FL<:AbstractParamFunc, FR<:AbstractParamFunc} = 
-      BiParamFuncApply{T, typeof(*), FL, FR}
+# Specialized method due to the lack of compiler optimization
+const ParamFreeApply{B<:Function} = ParamFilterApply{B, VoidSetFilter}
 
-struct ParamPipeline{C<:ParamFuncSequence} <: AbstractParamFunc
-    encode::C
+function (f::ParamFreeApply{B})(input, ::AbstractSpanValueSet) where {B<:Function}
+    f.binder(input, genFixedVoidSpanSet())
+end
 
-    function ParamPipeline(encode::C) where {C<:NonEmptyTuple{AbstractParamFunc}}
-        new{C}(encode)
+
+struct ParamPipeline{E<:ParamFunctionChain} <: AbstractParamFunc
+    encode::E
+
+    function ParamPipeline(encode::E) where 
+                          {E<:GeneralTupleUnion{ NonEmptyTuple{AbstractParamFunc} }}
+        new{E}(encode)
     end
 
-    function ParamPipeline(encode::C) where {C<:LinearMemory{<:AbstractParamFunc}}
+    function ParamPipeline(encode::E) where {E<:CustomMemory{<:AbstractParamFunc}}
         checkEmptiness(encode, :encode)
-        new{C}(encode)
+        new{E}(encode)
     end
 end
 
 ParamPipeline(binder::Function, encode::AbstractVector{<:AbstractParamFunc}) = 
-ParamPipeline(binder, getMemory(encode))
+ParamPipeline(binder, genMemory(encode))
 
-function (f::ParamPipeline)(input, params::AbstractSpanValueSet)
+function (f::ParamPipeline{E})(input, params::AbstractSpanValueSet) where 
+                              {E<:ParamFunctionChain}
     for o in f.encode
         input = o(input, params)
     end
     input
 end
+
+# Specialized method due to the lack of compiler optimization
+const InputPipeline{E<:FunctionChainUnion{InputConverter}} = ParamPipeline{E}
+
+function (f::InputPipeline{E})(input, ::AbstractSpanValueSet) where 
+                              {E<:FunctionChainUnion{InputConverter}}
+    ∘(getfield.(f.encode, :core)...)(input)
+end
+
 
 #= Additional Method =#
 getOpacity(::ParamBindFunc) = Opaque()
@@ -1358,21 +1373,20 @@ end
 
 # f(input) => fCore(input, param)
 function unpackFunc(f::Function)
-    checkArgQuantity(f, 1)
-
-    if !(getOpacity(f) isa Lucent)
+    if isParamBoxFree(f)
+        canDirectlyStore(f) || (f = deepcopy(f))
+        InputConverter(f), initializeSpanParamSet(Union{})
+    else
         f = deepcopy(f)
         source = getSourceParamSet(f)
 
         if !(isempty(source.unit) && isempty(source.grid))
-            unitPars, gridPars = map(getMemory, source)
+            unitPars, gridPars = map(extractMemory, source)
             fCore = ParamBindFunc(f, unitPars, gridPars)
             paramSet = initializeSpanParamSet(unitPars, gridPars)
-            return (fCore, paramSet)
+            fCore, paramSet
         end
     end
-
-    InputConverter(f), initializeSpanParamSet(Union{})
 end
 
 function unpackFunc!(f::Function, paramSet::AbstractSpanParamSet, 

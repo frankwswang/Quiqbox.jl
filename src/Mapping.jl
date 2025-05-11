@@ -1,3 +1,5 @@
+export ReturnTyped, PairCoupler
+
 struct ReturnTyped{T, F<:Function} <: TypedEvaluator{T}
     f::F
 
@@ -8,11 +10,13 @@ end
 
 ReturnTyped(::Type{T}) where {T} = ReturnTyped(itself, T)
 
-ReturnTyped(f::ReturnTyped{T}, ::Type{T}) where {T} = itself(f)
+ReturnTyped(f::ReturnTyped{TO}, ::Type{TN}) where {TO, TN} = ReturnTyped(f.f, T)
 
-(f::ReturnTyped{T, F})(arg...; kws...) where {T, F} = convert(T, f.f(arg...; kws...))
 
-const Return{T} = ReturnTyped{T, ItsType}
+(f::ReturnTyped{T})(arg::Vararg) where {T} = evalConvert(f.f, T, arg)
+
+evalConvert(f::F, ::Type{T}, args::A) where {F<:Function, T, A<:Tuple} = 
+splat(f)(args)
 
 
 struct StableBinary{T, F<:Function} <: TypedEvaluator{T}
@@ -23,197 +27,13 @@ struct StableBinary{T, F<:Function} <: TypedEvaluator{T}
     end
 end
 
-(f::StableBinary{T, F})(argL::T, argR::T) where {T, F} = convert(T, f.f(argL, argR))
+(f::StableBinary{T})(argL::T, argR::T) where {T} = convert(T, f.f(argL, argR))
 
 const StableAdd{T} = StableBinary{T, typeof(+)}
-const StableMul{T} = StableBinary{T, typeof(*)}
-const ElementalSub{T} = StableBinary{T, typeof(.-)}
-
 StableAdd(::Type{T}) where {T} = StableBinary(+, T)
+
+const StableMul{T} = StableBinary{T, typeof(*)}
 StableMul(::Type{T}) where {T} = StableBinary(*, T)
-ElementalSub(::Type{T}) where {T} = StableBinary(.-, T)
-
-struct StableContract{T} <: TypedEvaluator{T} end
-
-function (::StableContract{T})(a, b) where {T}
-    mapreduce(StableMul(T), StableAdd(T), a, b)
-end
-
-
-struct ParamSelectFunc{F<:Function, T<:Tuple{ Vararg{Encoder} }} <: ParamFuncBuilder{F}
-    apply::F
-    select::T
-end
-
-ParamSelectFunc(f::Function, select::Encoder) = ParamSelectFunc(f, (select,))
-
-ParamSelectFunc(f::Function) = ParamSelectFunc(f, ())
-
-const EmptySelectFunc{F<:Function} = ParamSelectFunc{F, Tuple{}}
-
-ParamSelectFunc(f::EmptySelectFunc) = itself(f)
-
-ParamSelectFunc(f::ParamSelectFunc, select::Tuple{Vararg{Encoder}}) = 
-ParamSelectFunc(f.apply, (f.select..., select...))
-
-function (f::ParamSelectFunc)(input, param)
-    f.apply(input, getField.(Ref(param), f.select)...)
-end
-
-(f::EmptySelectFunc)(input, _) = f.apply(input)
-
-const GetParamFunc{F<:Function, T<:Encoder} = ParamSelectFunc{F, Tuple{T}}
-
-
-struct OnlyHead{F<:Function} <: FunctionModifier
-    f::F
-end
-
-(f::OnlyHead)(arg1, ::Vararg) = f.f(arg1)
-
-
-struct OnlyBody{F<:Function} <: FunctionModifier
-    f::F
-end
-
-(f::OnlyBody)(_, args...) = f.f(args...)
-
-
-struct PairCombine{J<:Function, FL<:Function, FR<:Function} <: FunctionCombiner
-    joint::J
-    left::FL
-    right::FR
-end
-
-PairCombine(joint::F) where {F<:Function} = 
-(left::Function, right::Function) -> PairCombine(joint, left, right)
-
-(f::PairCombine)(arg, args...) = f.joint( f.left(arg, args...), f.right(arg, args...) )
-
-
-struct ChainReduce{J<:Function, C<:LinearMemory{<:Function}} <: FunctionCombiner
-    joint::J
-    chain::C
-
-    function ChainReduce(joint::J, chain::C) where {J, C<:VectorMemory{<:Function}}
-        checkEmptiness(chain, :chain)
-        new{J, C}(joint, chain)
-    end
-
-    function ChainReduce(joint::J, chain::C) where {J, C<:AbstractVector{<:Function}}
-        checkEmptiness(chain, :chain)
-        new{J, C}(joint, getMemory(chain))
-    end
-end
-
-ChainReduce(joint::Function, chain::NonEmptyTuple{Function}) = 
-ChainReduce(joint, VectorMemory(chain))
-
-ChainReduce(joint::F) where {F<:Function} = Base.Fix1(ChainReduce, joint)
-
-const CountedChainReduce{J, P, N} = ChainReduce{J, VectorMemory{P, N}}
-
-(f::CountedChainReduce)(arg, args...) = 
-mapreduce(o->o(arg, args...), f.joint, f.chain.value)
-
-(f::ChainReduce)(arg, args...) = mapreduce(o->o(arg, args...), f.joint, f.chain)
-
-
-struct ChainExpand{F<:Function, 
-                   C<:Union{AbstractMemory{<:Function}, NonEmptyTuple{Function}}
-                   } <: FunctionCombiner
-    chain::C
-    finalizer::F
-
-    function ChainExpand(chain::C, finalizer::F=itself) where 
-                        {C<:AbstractMemory{<:Function}, F<:Function}
-        checkEmptiness(chain, :chain)
-        new{F, C}(chain, finalizer)
-    end
-
-    function ChainExpand(chain::C, finalizer::F=itself) where 
-                        {C<:NonEmptyTuple{Function}, F<:Function}
-        checkEmptiness(chain, :chain)
-        new{F, C}(chain, finalizer)
-    end
-end
-
-ChainExpand(chain::AbstractArray{<:Function}, finalizer::Function=itself) = 
-ChainExpand(ShapedMemory(chain), finalizer)
-
-(f::ChainExpand)(arg, args...) = f.finalizer(map(o->o(arg, args...), f.chain))
-
-
-struct InsertInward{C<:Function, F<:Function} <: FunctionCombiner
-    apply::C
-    dress::F
-end
-
-(f::InsertInward)(arg, args...) = f.apply(f.dress(arg, args...), args...)
-
-
-struct Storage{T} <: CompositeFunction
-    val::T
-end
-
-(f::Storage)(::Vararg) = f.val
-
-struct Unit{T} <: CompositeFunction end
-
-Unit(::Type{T}) where {T} = Unit{T}()
-
-(f::Unit{T})(::Vararg) where {T} = one(T)
-
-
-struct Power{F<:Function, N} <: CompositeFunction
-    f::F
-
-    Power(f::F, ::Val{N}) where {F<:Function, N} = new{F, N}(f)
-end
-
-Power(f::Function, n::Int) = Power(f, Val(n))
-
-(f::Power{<:Function, N})(arg::Vararg) where {N} = f.f(arg...)^(N::Int)
-
-
-struct ShiftByArg{T, D} <: FieldlessFunction end
-
-function (::ShiftByArg{T, D})(input::Union{NTuple{D, T}, AbstractVector{T}}, 
-                              args::Vararg{T, D}) where {T, D}
-    input .- args
-end
-
-
-struct HermitianContract{T, F1<:ReturnTyped{T}, F2<:ReturnTyped{T}} <: FunctionCombiner
-    diagonal::Memory{F1}
-    uppertri::Memory{F2}
-
-    function HermitianContract(dFuncs::Memory{F1}, uFuncs::Memory{F2}) where 
-                              {T, F1<:ReturnTyped{T}, F2<:ReturnTyped{T}}
-        checkLength(uFuncs, :uFuncs, triMatEleNum(length(dFuncs)-1))
-        new{T, F1, F2}(dFuncs, uFuncs)
-    end
-end
-
-function (f::HermitianContract{T})(input, weights::AbstractVector{T}) where {T}
-    res = zero(T)
-    len = length(f.diagonal)
-
-    for i in 1:len
-        c = weights[begin+i-1]
-        res += f.diagonal[begin+i-1](input) * c' * c
-    end
-
-    for j in 1:length(f.uppertri)
-        m, n = convertIndex1DtoTri2D(j)
-        c1 = weights[begin+m-1]
-        c2 = weights[begin+n]
-        val = f.uppertri[begin+j-1](input) * c1' * c2
-        res += val + val'
-    end
-
-    res
-end
 
 
 struct Left end
@@ -223,7 +43,7 @@ struct Right end
 const Lateral = Union{Left, Right}
 
 
-struct LateralPartial{F<:Function, A<:NonEmptyTuple{Any}, L<:Lateral} <: FunctionModifier
+struct LateralPartial{F<:Function, A<:NonEmptyTuple{Any}, L<:Lateral} <: Modifier
     f::F
     arg::A
     side::L
@@ -237,34 +57,16 @@ end
 const LPartial{F<:Function, A<:NonEmptyTuple{Any}} = LateralPartial{F, A, Left }
 const RPartial{F<:Function, A<:NonEmptyTuple{Any}} = LateralPartial{F, A, Right}
 
-(f::LPartial)(arg...; kws...) = f.f(f.arg..., arg...; kws...)
-(f::RPartial)(arg...; kws...) = f.f(arg..., f.arg...; kws...)
+(f::LPartial{F, A})(arg...; kws...) where {F<:Function, A<:NonEmptyTuple{Any}} = 
+f.f(f.arg..., arg...; kws...)
+(f::RPartial{F, A})(arg...; kws...) where {F<:Function, A<:NonEmptyTuple{Any}} = 
+f.f(arg..., f.arg...; kws...)
 
 LPartial(f::Function, args::NonEmptyTuple{Any}) = LateralPartial(f, args, Left() )
 RPartial(f::Function, args::NonEmptyTuple{Any}) = LateralPartial(f, args, Right())
 
 
-struct KeywordPartial{F, A<:NonEmptyTuple{Pair{Symbol, <:Any}}} <: FunctionModifier
-    f::F
-    arg::A
-    replaceable::Bool
-
-    function KeywordPartial(f::F, pairs::NonEmptyTuple{Pair{Symbol, <:Any}}, 
-                            replaceable::Bool=true) where {F<:Function}
-        new{F, typeof(pairs)}(f, pairs, replaceable)
-    end
-end
-
-function (f::KeywordPartial)(arg...; kws...)
-    if f.replaceable
-        f.f(arg...; f.arg..., kws...)
-    else
-        f.f(arg...; kws..., f.arg...)
-    end
-end
-
-
-const AbsSqrtInv = inv∘sqrt∘abs
+const absSqrtInv = inv ∘ sqrt ∘ abs
 
 
 function typedMap(op::F, obj::AbstractArray, ::Type{T}=Union{}) where {F<:Function, T}
@@ -280,28 +82,7 @@ function typedMap(op::F, obj::Union{Tuple, NamedTuple}, ::Type=Union{}) where {F
 end
 
 
-# struct Bifurcator{F<:Function, FL<:Function, FR<:Function} <: FunctionCombiner
-#     finalizer::F
-#     left::FL
-#     right::FR
-# end
-
-# Bifurcator(finalizer::F) where {F<:Function} = 
-# (left::Function, right::Function) -> Bifurcator(finalizer, left, right)
-
-# (f::Bifurcator)(arg, args...) = f.finalizer(f.left(arg, args...), f.right(arg, args...))
-
-# struct EntryEncoder{F<:Function} <: CompositeFunction
-#     core::F
-#     link::ChainedAccess
-
-#     EntryEncoder(core::F, link::ChainedAccess) where {F<:Function} = new{F}(core, link)
-# end
-
-# (f::EntryEncoder)(args...) = f.core(args...)
-
-
-struct InputLimiter{N, F<:Function} <: FunctionModifier
+struct InputLimiter{N, F<:Function} <: Modifier
     f::F
 
     function InputLimiter(f::F, ::Val{N}) where {F<:Function, N}
@@ -312,32 +93,45 @@ end
 
 InputLimiter(f::InputLimiter, ::Val{N}) where {N} = InputLimiter(f.f, Val(N))
 
-(f::InputLimiter{N})(arg::Vararg{Any, N}) where {N} = f.f(arg...)
+(f::InputLimiter{N, F})(arg::Vararg{Any, N}) where {N, F<:Function} = f.f(arg...)
 
 
-struct NamedMapper{N, E<:NTuple{N, Function}} <: Mapper
-    encode::E
-    symbol::NTuple{N, Symbol}
+struct ChainMapper{F<:FunctionChainUnion{Function}} <: Mapper
+    chain::F
 
-    NamedMapper(encode::E, syms::NTuple{N, Symbol}) where {N, E<:NTuple{N, Function}} = 
-    new{N, E}(encode, syms)
+    function ChainMapper(chain::F) where {F<:CustomMemory{<:Function}}
+        checkEmptiness(chain, :chain)
+        new{F}(chain)
+    end
+
+    function ChainMapper(chain::F) where {F<:GeneralTupleUnion{ NonEmptyTuple{Function} }}
+        new{F}(chain)
+    end
 end
 
-NamedMapper(encode::Function, sym::Symbol) = 
-NamedMapper((encode,), (sym,))
+ChainMapper(chain::AbstractArray{<:Function}) = ChainMapper(chain|>ShapedMemory)
 
-NamedMapper(encodePairs::NamedTuple{S, <:Tuple{ Vararg{Function} }}) where {S} = 
-NamedMapper(values(encodePairs), S)
-
-NamedMapper() = NamedMapper((), ())
-
-const MonoNMapper{F<:Function} = NamedMapper{1, Tuple{F}}
-
-function getField(obj, f::NamedMapper)
-    map(f.encode) do encoder
-        encoder(obj)
-    end |> NamedTuple{f.symbol}
+function getField(obj, f::ChainMapper, finalizer::F=itself) where {F<:Function}
+    typedMap(f.chain) do mapper
+        mapper(obj) |> finalizer
+    end
 end
+
+
+struct PairCoupler{J<:Function, FL<:Function, FR<:Function} <: CompositeFunction
+    joint::J
+    left::FL
+    right::FR
+end
+
+function PairCoupler(joint::F) where {F<:Function}
+    function buildPairCombine(left::Function, right::Function)
+        PairCoupler(joint, left, right)
+    end
+end
+
+(f::PairCoupler{J, FL, FR})(arg::Vararg) where {J<:Function, FL<:Function, FR<:Function} = 
+f.joint(f.left(arg...), f.right(arg...))
 
 
 struct ParamFreeFunc{F<:Function} <: CompositeFunction
@@ -353,44 +147,53 @@ end
 
 ParamFreeFunc(f::ParamFreeFunc) = itself(f)
 
-(f::ParamFreeFunc)(args...) = f.core(args...)
+@inline (f::ParamFreeFunc{F})(args...) where {F<:Function} = f.core(args...)
 
 
 struct Lucent end
 struct Opaque end
 
-struct Deref{F<:Function} <: FunctionModifier
-    f::F
-end
 
-(f::Deref)(arg::AbstractArray{<:Any, 0}) = f.f(arg[])
-(f::Deref)(arg::Tuple{Any}) = f.f(arg|>first)
-(f::Deref)(arg::NamedTuple{<:Any, <:Tuple{Any}}) = f.f(arg|>first)
-
-
-struct TupleHeader{N, F<:Function} <: FunctionModifier
+struct EuclideanHeader{N, F<:Function} <: Modifier
     f::F
 
-    function TupleHeader(f::F, ::Val{N}) where {F<:Function, N}
+    function EuclideanHeader(f::F, ::Val{N}) where {F<:Function, N}
         checkPositivity(N::Int, true)
         new{N, F}(f)
     end
 end
 
-TupleHeader(f::TupleHeader, ::Val{N}) where {N} = TupleHeader(f.f, Val(N))
+EuclideanHeader(f::EuclideanHeader, ::Val{N}) where {N} = EuclideanHeader(f.f, Val(N))
 
-TupleHeader(::Val{N}) where {N} = TupleHeader(itself, Val(N))
+EuclideanHeader(::Val{N}) where {N} = EuclideanHeader(itself, Val(N))
 
-(f::TupleHeader{N})(head, body...) where {N} = 
-f.f(formatInput(TupleInput{Any, N}(), head), body...)
+(f::EuclideanHeader{N, F})(head::T, body::Vararg) where {N, F<:Function, T} = 
+f.f(formatInput(EuclideanInput{N}(), head), body...)
 
-const TypedTupleFunc{T, D, F<:Function} = ReturnTyped{T, TupleHeader{D, F}}
+const TypedTupleFunc{T, D, F<:Function} = ReturnTyped{T, EuclideanHeader{D, F}}
 
 TypedTupleFunc(f::Function, ::Type{T}, ::Val{D}) where {T, D} = 
-ReturnTyped(TupleHeader(f, Val(D)), T)
+ReturnTyped(EuclideanHeader(f, Val(D)), T)
 
 TypedTupleFunc(f::ReturnTyped, ::Type{T}, ::Val{D}) where {T, D} = 
-ReturnTyped(TupleHeader(f.f, Val(D)), T)
+ReturnTyped(EuclideanHeader(f.f, Val(D)), T)
+
+
+struct SelectHeader{N, K, F<:Function} <: Modifier
+    f::F
+
+    function SelectHeader{N, K}(f::F) where {N, K, F<:Function}
+        checkPositivity(K, true)
+        N < K && throw(AssertionError("N must be no less than K=$K."))
+        new{N::Int, K::Int, F}(f)
+    end
+end
+
+(f::SelectHeader{N, K, F})(arg::Vararg{Any, N}) where {N, K, F<:Function} = 
+f.f(arg[begin+K-1])
+
+(f::SelectHeader{N, 0, F})(::Vararg{Any, N}) where {N, F<:Function} = f.f()
+
 
 
 """
@@ -401,7 +204,7 @@ If a return value is a `Lucent`, that means `f` either does not contain any `Par
 has a specialized `unpackFunc` method that separates its embedded `ParamBox`.
 """
 function getOpacity(f::Function)
-    (Base.issingletontype(f|>typeof) || isParamBoxFree(f)) ? Lucent() : Opaque()
+    isParamBoxFree(f) ? Lucent() : Opaque()
 end
 
 getOpacity(::ParamFreeFunc) = Lucent()
@@ -425,3 +228,26 @@ function (f::GetRange)(obj)
         getField(obj, OneToIndex(i))
     end
 end
+
+
+struct FloatingMonomial{T<:Real, D} <: CompositeFunction
+    center::NTuple{D, T}
+    degree::WeakComp{D}
+
+    FloatingMonomial(center::NonEmptyTuple{T}, degree::WeakComp{D}) where {T, D} = 
+    new{T, D}(center, degree)
+end
+
+FloatingMonomial(center::NonEmptyTuple{T, D}, degree::NonEmptyTuple{Int, D}) where {T, D} = 
+FloatingMonomial(center, WeakComp(degree))
+
+function evalFloatingMonomial(f::FloatingMonomial{<:Real, D}, 
+                              coord::NTuple{D, Real}) where {D}
+    mapreduce(*, coord, f.center, f.degree.tuple) do c1, c2, pwr
+        (c1 - c2)^pwr
+    end
+end
+
+(::SelectTrait{InputStyle})(::FloatingMonomial{<:Real, D}) where {D} = EuclideanInput{D}()
+
+(f::FloatingMonomial)(coord) = evalFloatingMonomial(f, formatInput(f, coord))

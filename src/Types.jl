@@ -1,11 +1,11 @@
 abstract type Box <: Any end
+abstract type AnyInterface <: Any end
 
 abstract type EqualityDict{K, T} <: AbstractDict{K, T} end
 
 abstract type CompositeFunction <: Function end # composite-type function
-abstract type FieldlessFunction <: Function end # singleton function
 
-abstract type AbstractMemory{T, N} <: AbstractArray{T, N} end
+abstract type CustomMemory{T, N} <: AbstractArray{T, N} end
 
 abstract type ConfigBox <: Box end
 abstract type MarkerBox <: Box end
@@ -14,57 +14,36 @@ abstract type GraphBox{T} <: Box end
 abstract type QueryBox{T} <: Box end
 
 # N: Inner dim, size mutable; O: Outer dim, size immutable
-abstract type DualSpanFunction{T, N, O} <: CompositeFunction end
-abstract type SpatialAmplitude{D, M} <: CompositeFunction end # M: Particle number
+abstract type ParticleFunction{D, N} <: CompositeFunction end # N: Particle number
 abstract type StatefulFunction{T} <: CompositeFunction end
-abstract type FunctionComposer <: CompositeFunction end
-abstract type Evaluator <: CompositeFunction end
+abstract type GraphEvaluator{G} <: CompositeFunction end
+abstract type TypedEvaluator{T} <: CompositeFunction end
+abstract type TraitAction{I} <: CompositeFunction end
+abstract type Modifier <: CompositeFunction end
 abstract type Mapper <: CompositeFunction end
 abstract type Getter <: CompositeFunction end
 const Encoder = Union{Getter, Mapper}
 
-abstract type SpatialProcessCache{T, D} <: QueryBox{T} end
-abstract type IntegralData{T, S} <: QueryBox{T} end
-abstract type ViewedObject{T, P} <: QueryBox{T} end
+abstract type IntegralData{T} <: QueryBox{T} end
 abstract type CustomCache{T} <: QueryBox{T} end
 
-abstract type AmplitudeNormalizer{T, D, N} <: StatefulFunction{T} end
-abstract type AmplitudeIntegrator{T, D, N} <: StatefulFunction{T} end
-abstract type ParamBoxFunction{T} <: StatefulFunction{T} end
-
-abstract type FunctionModifier <: FunctionComposer end # Modify a function
-abstract type FunctionCombiner <: FunctionComposer end # Combine functions together
-
-abstract type TypedEvaluator{T} <: Evaluator end
-
-abstract type DirectOperator <: FunctionModifier end
-
-abstract type ParamFuncBuilder{F} <: FunctionCombiner end
+abstract type DirectOperator{N} <: Modifier end # N: Number of input functions
 
 abstract type StructuredInfo <: ConfigBox end
 abstract type StructuredType <: ConfigBox end
 
-abstract type FieldParamPointer <: StructuredInfo end
-
-abstract type IntegralProcessCache{T, D} <: SpatialProcessCache{T, D} end
-
-abstract type DimensionalEvaluator{T, D, F} <: TypedEvaluator{T} end
-
-abstract type OrbitalIntegrator{T, D} <: AmplitudeIntegrator{T, D, 1} end
-
 abstract type IdentityMarker{T} <: MarkerBox end
 abstract type StorageMarker{T} <: MarkerBox end
 
-abstract type EvalDimensionalFunc{T, D, F} <: DimensionalEvaluator{T, D, F} end
-
-abstract type OrbitalBasis{T, D, F} <: SpatialAmplitude{D, 1} end
-abstract type FieldAmplitude{T, D} <: SpatialAmplitude{D, 1} end
+abstract type OrbitalBasis{T, D, F} <: ParticleFunction{D, 1} end
+abstract type FieldAmplitude{T, D} <: ParticleFunction{D, 1} end
 
 # abstract type ManyParticleState{T} <: Any end
 
 # abstract type SpinfulState{T, N} <: ManyParticleState{T} end
 
 # abstract type FermionicState{T, 1} <: SpinfulState{T, 1} end
+
 
 @enum TernaryNumber::Int8 begin
     TUS0 = 0
@@ -73,35 +52,36 @@ abstract type FieldAmplitude{T, D} <: SpatialAmplitude{D, 1} end
 end
 
 
-const AVectorOrNTuple{T, NNMO} = Union{Tuple{T, Vararg{T, NNMO}}, AbstractVector{<:T}}
-const NonEmptyTuple{T, NMO} = Tuple{T, Vararg{T, NMO}}
 const N12Tuple{T} = Union{Tuple{T}, NTuple{2, T}}
-const N24Tuple{T} = Union{NTuple{2, T}, NTuple{4, T}}
-
-const MissingOr{T} = Union{Missing, T}
-const NothingOr{T} = Union{Nothing, T}
-const AbtArray0D{T} = AbstractArray{T, 0}
-
-const RefVal = Base.RefValue
-
-const NonEmpTplOrAbtArr{T, N, A<:AbstractArray{<:T, N}} = Union{NonEmptyTuple{T}, A}
-
-const AbtBottomArray{N} = AbstractArray{Union{}, N}
-const AbtBottomVector = AbtBottomArray{1}
-const AbtVecOfAbtArr{T} = AbstractVector{<:AbstractArray{T}}
-const JaggedAbtArray{T, N, O} = AbstractArray{<:AbstractArray{T, N}, O}
-const AbtArrayOr{T} = Union{T, AbstractArray{T}}
-const AbtArr210L{T} = Union{T, AbstractArray{T}, JaggedAbtArray{T}}
-const AbtMemory0D{T} = AbstractMemory{T, 0}
-
+const NonEmptyTuple{T, NMO} = Tuple{T, Vararg{T, NMO}}
 const TriTupleUnion{T} = Union{(NTuple{N, T} for N in 1:3)...}
-const TetraTupleUnion{T} = Union{(NTuple{N, T} for N in 1:4)...}
+const GeneralTupleUnion{T<:Tuple} = Union{T, NamedTuple{<:Any, <:T}}
 
-const MissSymInt = MissingOr{Union{Symbol, Int}}
+const AbtArray0D{T} = AbstractArray{T, 0}
+const AbtBottomVector = AbstractArray{Union{}, 1}
+const AbstractMemory{T} = Union{CustomMemory{T}, Memory{T}}
+const AbtVecOfAbtArr{T} = AbstractVector{<:AbstractArray{T}}
+
+const GeneralCollection = Union{AbstractArray, Tuple, NamedTuple}
+
 
 const AbstractEqualityDict = Union{EqualityDict, Dict}
 
+const RealOrComplex{T<:Real} = Union{Complex{T}, T}
+
+const MissingOr{T} = Union{Missing, T}
+const NothingOr{T} = Union{Nothing, T}
+
 const BoolVal = Union{Val{true}, Val{false}}
+
+const FunctionChainUnion{F<:Function} = Union{
+    CustomMemory{<:F}, GeneralTupleUnion{NonEmptyTuple{F}}
+}
+
+
+const RefVal = Base.RefValue
+const TypedIdxerMemory{T} = Memory{Pair{Int, T}}
+
 
 import Base: size, firstindex, lastindex, getindex, setindex!, iterate, length, similar
 
