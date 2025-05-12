@@ -277,7 +277,7 @@ function (f::GetRange)(obj)
 end
 
 
-struct FloatingMonomial{T<:Real, D} <: CompositeFunction
+struct FloatingMonomial{T<:Real, D} <: TypedEvaluator{T}
     center::NTuple{D, T}
     degree::WeakComp{D}
 
@@ -288,13 +288,17 @@ end
 FloatingMonomial(center::NonEmptyTuple{T, D}, degree::NonEmptyTuple{Int, D}) where {T, D} = 
 FloatingMonomial(center, WeakComp(degree))
 
-function evalFloatingMonomial(f::FloatingMonomial{<:Real, D}, 
-                              coord::NTuple{D, Real}) where {D}
-    mapreduce(*, coord, f.center, f.degree.tuple) do c1, c2, pwr
+function evalFloatingMonomial(f::FloatingMonomial{T, D}, 
+                              coord::NTuple{D, Real}) where {T<:Real, D}
+    res = mapreduce(*, coord, f.center, f.degree.tuple) do c1, c2, pwr
         (c1 - c2)^pwr
     end
+
+    convert(T, res)
 end
 
 (::SelectTrait{InputStyle})(::FloatingMonomial{<:Real, D}) where {D} = EuclideanInput{D}()
 
 (f::FloatingMonomial)(coord) = evalFloatingMonomial(f, formatInput(f, coord))
+
+getOutputType(::Type{<:FloatingMonomial{T}}) where {T<:Real} = T
