@@ -133,4 +133,18 @@ bs2 = [bfHt, bfLi1t]
  0.05069055715296341 0.286576219938369 0.17637125216187333; 
  0.01889142761833038 0.17637125216187333 0.19769987611740347]
 
+# Complex orbital testing
+cen3 = (1.0, 2.0, 3.0)
+xpns3 = [2.0, 1.0]
+complexWeights = [0.5im, 0.7 - 0.2im]
+rcgto1 = genGaussTypeOrb(cen3, xpns3, [1.0, 1.0])
+rcgto1_pos = Quiqbox.splitOrb(rcgto1)
+ccgto1 = CompositeOrb(rcgto1_pos, complexWeights)
+ccgto1_2 = genGaussTypeOrb(cen3, xpns3, complexWeights)
+complexOvlp1 = complexWeights' * overlaps(rcgto1_pos) * complexWeights
+@test overlap(ccgto1, ccgto1) == overlap(ccgto1_2, ccgto1_2) ≈ complexOvlp1
+@test overlap(ccgto1, ccgto1_2) == overlap(ccgto1_2, ccgto1) ≈ complexOvlp1
+complexOvlp2 = complexWeights' * overlaps(rcgto1_pos) * ones(2)
+@test complexOvlp2 ≈ overlap(ccgto1, rcgto1) ≈ overlap(rcgto1, ccgto1)'
+
 end
