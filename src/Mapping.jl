@@ -32,7 +32,7 @@ end
 
 ReturnTyped(f::ReturnTyped{TO}, ::Type{TN}) where {TO, TN} = ReturnTyped(f.f, TN)
 
-@inline function (f::ReturnTyped{T})(arg::Vararg) where {T}
+function (f::ReturnTyped{T, F})(arg::Vararg) where {T, F<:Function}
     caller = getLazyConverter(f.f, T)
     caller(arg...)
 end
