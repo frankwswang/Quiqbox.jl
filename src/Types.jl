@@ -16,6 +16,7 @@ abstract type QueryBox{T} <: Box end
 # N: Inner dim, size mutable; O: Outer dim, size immutable
 abstract type ParticleFunction{D, N} <: CompositeFunction end # N: Particle number
 abstract type StatefulFunction{T} <: CompositeFunction end
+abstract type AbstractParamFunc <: CompositeFunction end
 abstract type GraphEvaluator{G} <: CompositeFunction end
 abstract type TypedEvaluator{T} <: CompositeFunction end
 abstract type TraitAction{I} <: CompositeFunction end

@@ -1232,8 +1232,7 @@ getField(obj::AbstractSpanSet, tsFilter::TaggedSpanSetFilter,
          finalizer::F=itself) where {F<:Function} = 
 getField(obj, tsFilter.scope, finalizer)
 
-
-abstract type AbstractParamFunc <: CompositeFunction end
+getOutputType(::Type{TaggedSpanSetFilter{F}}) where {F<:NamedFilter} = getOutputType(F)
 
 
 const TypedParamFunc{T, F<:AbstractParamFunc} = ReturnTyped{T, F}

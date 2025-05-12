@@ -153,6 +153,20 @@ function getField(obj, f::ChainMapper, finalizer::F=itself) where {F<:Function}
     end
 end
 
+function getOutputType(::Type{ChainMapper{F}}) where {F<:NonEmptyTuple{Function}}
+    Tuple{getOutputType.(fieldtypes(F))...}
+end
+
+function getOutputType(::Type{ChainMapper{ NamedTuple{S, F} }}) where 
+                      {S, F<:NonEmptyTuple{Function}}
+    NamedTuple{S, Tuple{getOutputType.(fieldtypes(F))...}}
+end
+
+function getOutputType(::Type{<:ChainMapper{ <:CustomMemory{F, N} }}) where {F<:Function, N}
+    type = getOutputType(F)
+    genParametricType(CustomMemory, (;F=type, N))
+end
+
 
 struct PairCoupler{J<:Function, FL<:Function, FR<:Function} <: CompositeFunction
     joint::J
