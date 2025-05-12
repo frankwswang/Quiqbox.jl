@@ -1086,14 +1086,14 @@ const ParamBoxSource = Union{ParamBoxAbtArr, Tuple{Vararg{ParamBox}}, NamedParam
 
 function locateParam!(params::Union{AbstractSpanParamSet, AbstractVector}, 
                       subset::ParamBoxSource)
-    typedMap(subset, GetIndex) do param
+    modestTypingMap(subset, GetIndex) do param
         locateParam!(params, param)
     end
 end
 
 function locateParam!(params::AbstractSpanParamSet, subset::AbstractSpanParamSet)
-    unit = typedMap(x->locateParamCore!(params.unit, x), subset.unit, OneToIndex)
-    grid = typedMap(x->locateParamCore!(params.grid, x), subset.grid, OneToIndex)
+    unit = modestTypingMap(x->locateParamCore!(params.unit, x), subset.unit)
+    grid = modestTypingMap(x->locateParamCore!(params.grid, x), subset.grid)
     SpanSetFilter(unit, grid)
 end
 
@@ -1148,7 +1148,7 @@ function cacheParam!(cache::MultiSpanDataCacheBox{T}, param::ParamBox{<:T}) wher
 end
 
 function cacheParam!(cache::MultiSpanDataCacheBox, params::ParamBoxSource)
-    typedMap(params) do param
+    modestTypingMap(params) do param
         cacheParam!(cache, param)
     end
 end
@@ -1172,8 +1172,8 @@ SpanSetFilter((;unit, grid))
 
 function SpanSetFilter(unitLen::Int, gridLen::Int)
     builder = x->OneToIndex(x)
-    unit = typedMap(builder, Base.OneTo(unitLen))
-    grid = typedMap(builder, Base.OneTo(gridLen))
+    unit = modestTypingMap(builder, Base.OneTo(unitLen))
+    grid = modestTypingMap(builder, Base.OneTo(gridLen))
     SpanSetFilter(unit, grid)
 end
 

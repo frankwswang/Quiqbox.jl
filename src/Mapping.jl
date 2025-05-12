@@ -105,17 +105,15 @@ getOutputType(::Type{<:LateralPartial{F}}) where {F<:Function} = getOutputType(F
 const absSqrtInv = inv ∘ sqrt ∘ abs
 
 
-function typedMap(op::F, obj::AbstractArray, ::Type{T}=Union{}) where {F<:Function, T}
+function modestTypingMap(op::F, obj::AbstractArray) where {F<:Function}
     if isempty(obj)
-        similar(obj, T)
+        similar(obj, Union{})
     else
         map(op, obj)
     end
 end
 
-function typedMap(op::F, obj::Union{Tuple, NamedTuple}, ::Type=Union{}) where {F<:Function}
-    map(op, obj)
-end
+modestTypingMap(op::F, obj::Union{Tuple, NamedTuple}) where {F<:Function} = map(op, obj)
 
 
 struct InputLimiter{N, F<:Function} <: Modifier
@@ -150,7 +148,7 @@ end
 ChainMapper(chain::AbstractArray{<:Function}) = ChainMapper(chain|>ShapedMemory)
 
 function getField(obj, f::ChainMapper, finalizer::F=itself) where {F<:Function}
-    typedMap(f.chain) do mapper
+    modestTypingMap(f.chain) do mapper
         mapper(obj) |> finalizer
     end
 end
