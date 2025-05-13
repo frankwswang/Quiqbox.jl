@@ -800,7 +800,17 @@ function getFieldParams(source)
     paramPairs
 end
 
-function isParamBoxFree(source)
+
+"""
+
+    noStoredParam(source) -> Bool
+
+Detect if `source` has no reachable `$ParamBox` by reflection-type functions, `getfield`and 
+`getindex`. It returns `true` if `getFieldParams(source)` returns an empty collection. It 
+is still possible for `noStoredParam` to return `true` if `source` is a generic 
+function that indirectly references global variables being/storing `$ParamBox`.
+"""
+function noStoredParam(source)
     canDirectlyStore(source) || (getFieldParams(source) |> isempty)
 end
 
@@ -833,6 +843,43 @@ function getFieldParamsCore!(paramPairs::AbstractVector{Pair{ChainedAccess, Para
     end
     nothing
 end
+
+
+"""
+
+    ParamFreeFunc{F<:Function} <: CompositeFunction
+
+A direct wrapper `struct` for `f::F` that does not have reachable `$ParamBox` through 
+reflection functions.
+
+≡≡≡ Field(s) ≡≡≡
+
+`f::F`: Stored function. `$noStoredParam(f)` must return `true` when it is used to 
+construct a instance of `ParamFreeFunc{F}`.
+
+≡≡≡ Initialization Method(s) ≡≡≡
+
+    ParamFreeFunc(f::F) where {F<:Function} -> ParamFreeFunc{T}
+"""
+struct ParamFreeFunc{F<:Function} <: CompositeFunction
+    f::F
+
+    function ParamFreeFunc(f::F) where {F<:Function}
+        if !noStoredParam(f)
+            throw(AssertionError("`f` should not contain any reachable `$ParamBox`."))
+        end
+        new{F}(f)
+    end
+end
+
+ParamFreeFunc(f::ParamFreeFunc) = itself(f)
+
+@inline (f::ParamFreeFunc{F})(args...) where {F<:Function} = f.f(args...)
+
+getOutputType(::Type{ParamFreeFunc{F}}) where {F<:Function} = getOutputType(F)
+
+#= Additional Method =#
+noStoredParam(::ParamFreeFunc) = true
 
 
 struct ReduceShift{T, F<:Function} <: TypedTensorFunc{T, 0}
@@ -1086,14 +1133,14 @@ const ParamBoxSource = Union{ParamBoxAbtArr, Tuple{Vararg{ParamBox}}, NamedParam
 
 function locateParam!(params::Union{AbstractSpanParamSet, AbstractVector}, 
                       subset::ParamBoxSource)
-    typedMap(subset, GetIndex) do param
+    modestTypingMap(subset, GetIndex) do param
         locateParam!(params, param)
     end
 end
 
 function locateParam!(params::AbstractSpanParamSet, subset::AbstractSpanParamSet)
-    unit = typedMap(x->locateParamCore!(params.unit, x), subset.unit, OneToIndex)
-    grid = typedMap(x->locateParamCore!(params.grid, x), subset.grid, OneToIndex)
+    unit = modestTypingMap(x->locateParamCore!(params.unit, x), subset.unit)
+    grid = modestTypingMap(x->locateParamCore!(params.grid, x), subset.grid)
     SpanSetFilter(unit, grid)
 end
 
@@ -1148,7 +1195,7 @@ function cacheParam!(cache::MultiSpanDataCacheBox{T}, param::ParamBox{<:T}) wher
 end
 
 function cacheParam!(cache::MultiSpanDataCacheBox, params::ParamBoxSource)
-    typedMap(params) do param
+    modestTypingMap(params) do param
         cacheParam!(cache, param)
     end
 end
@@ -1172,8 +1219,8 @@ SpanSetFilter((;unit, grid))
 
 function SpanSetFilter(unitLen::Int, gridLen::Int)
     builder = x->OneToIndex(x)
-    unit = typedMap(builder, Base.OneTo(unitLen))
-    grid = typedMap(builder, Base.OneTo(gridLen))
+    unit = modestTypingMap(builder, Base.OneTo(unitLen))
+    grid = modestTypingMap(builder, Base.OneTo(gridLen))
     SpanSetFilter(unit, grid)
 end
 
@@ -1232,8 +1279,7 @@ getField(obj::AbstractSpanSet, tsFilter::TaggedSpanSetFilter,
          finalizer::F=itself) where {F<:Function} = 
 getField(obj, tsFilter.scope, finalizer)
 
-
-abstract type AbstractParamFunc <: CompositeFunction end
+getOutputType(::Type{TaggedSpanSetFilter{F}}) where {F<:NamedFilter} = getOutputType(F)
 
 
 const TypedParamFunc{T, F<:AbstractParamFunc} = ReturnTyped{T, F}
@@ -1379,36 +1425,17 @@ function (f::InputPipeline{E})(input, ::AbstractSpanValueSet) where
 end
 
 
-#= Additional Method =#
-getOpacity(::ParamBindFunc) = Opaque()
-
-function getOpacity(f::F) where {F<:AbstractParamFunc}
-    if !Base.issingletontype(F)
-        fields = fieldnames(T)
-        for fieldSym in fields
-            field = getField(f, fieldSym)
-            if getOpacity(field) isa Opaque
-                return Opaque()
-            end
-        end
-    end
-
-    Lucent()
-end
-
-
 # f(input) => fCore(input, param)
 function unpackFunc(f::Function)
-    if isParamBoxFree(f)
-        canDirectlyStore(f) || (f = deepcopy(f))
-        InputConverter(f), initializeSpanParamSet(Union{})
+    fLocal = deepcopy(f)
+    if noStoredParam(fLocal)
+        InputConverter(fLocal), initializeSpanParamSet(Union{})
     else
-        f = deepcopy(f)
-        source = getSourceParamSet(f)
+        source = getSourceParamSet(fLocal)
 
         if !(isempty(source.unit) && isempty(source.grid))
             unitPars, gridPars = map(extractMemory, source)
-            fCore = ParamBindFunc(f, unitPars, gridPars)
+            fCore = ParamBindFunc(fLocal, unitPars, gridPars)
             paramSet = initializeSpanParamSet(unitPars, gridPars)
             fCore, paramSet
         end

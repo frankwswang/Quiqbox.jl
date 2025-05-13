@@ -30,6 +30,7 @@ struct FieldParamFunc{C<:RealOrComplex, D, F<:AbstractParamFunc, S<:SpanSetFilte
     function FieldParamFunc{C, D}(f::EuclideanHeader{D, F}, scope::TaggedSpanSetFilter{S}
                                   ) where {C<:RealOrComplex, D, F<:AbstractParamFunc, 
                                            S<:SpanSetFilter}
+        checkPositivity(D)
         if F <: InputConverter && !(S <: VoidSetFilter)
             throw(AssertionError("The `scope` corresponding to `F<:InputConverter` must "*
                                  "be `$(TaggedSpanSetFilter{VoidSetFilter})`."))
@@ -70,18 +71,17 @@ struct EncodedField{C<:RealOrComplex, D, F<:Function, E<:Function} <: FieldAmpli
 
     function EncodedField(core::ReturnTyped{C, F}, encode::EuclideanHeader{D, E}) where 
                          {C<:RealOrComplex, F<:Function, D, E<:Function}
+        checkPositivity(D)
         if E <: FieldAmplitude
             d = getDimension(encode.f)
             (d == D) || throw(AssertionError("Cannot wrap a $d-dimensional field in $D "*
                                              "dimension."))
         end
-
         if F <: FieldAmplitude
             t = getOutputType(core.f)
             promote_type(t, C) <: C || 
             throw(AssertionError("Cannot convert the output of `f.f` from `$t` to $C."))
         end
-
         new{C, D, F, E}(core, encode)
     end
 end
@@ -153,8 +153,16 @@ struct CurriedField{C<:RealOrComplex, D, F<:Function, P<:NamedParamTuple
     function CurriedField(core::TypedTupleFunc{C, D, ParamFreeFunc{F}}, 
                           params::P=NamedTuple()) where 
                          {C<:RealOrComplex, D, F<:Function, P<:NamedParamTuple}
+        checkPositivity(D)
         new{C, D, F, P}(core, params)
     end
+end
+
+function CurriedField(core::Function, ::Type{C}, ::Val{D}, 
+                      params::NamedParamTuple=NamedTuple()) where {C<:RealOrComplex, D}
+    checkPositivity(D::Int)
+    typedCore = TypedTupleFunc(ParamFreeFunc(core), C, Val(D))
+    CurriedField(typedCore, params)
 end
 
 getOutputType(::Type{<:CurriedField{C}}) where {C<:RealOrComplex} = C
@@ -215,7 +223,9 @@ struct ProductField{C<:RealOrComplex, D, B<:NonEmptyTuple{FieldAmplitude{C}}
 
     function ProductField(bases::B) where 
                          {C<:RealOrComplex, B<:NonEmptyTuple{ FieldAmplitude{C} }}
-        new{C, mapreduce(getDimension, +, bases), B}(bases)
+        dim = mapreduce(getDimension, +, bases)
+        checkPositivity(dim)
+        new{C, dim, B}(bases)
     end
 end
 
@@ -271,6 +281,7 @@ struct CoupledField{C<:RealOrComplex, D, L<:FieldAmplitude{C, D}, R<:FieldAmplit
     function CoupledField(pair::Tuple{L, R}, coupler::Function) where 
                          {C<:RealOrComplex, D, L<:FieldAmplitude{C, D}, 
                           R<:FieldAmplitude{C, D}}
+        checkPositivity(D::Int)
         coupler = ParamFreeFunc(coupler)
         new{C, D, L, R, typeof(coupler.f)}(pair, coupler)
     end

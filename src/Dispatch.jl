@@ -47,4 +47,5 @@ struct TwoBodyIntegral{D} <: MultiBodyIntegral{D} end
 
 strictTypeJoin(TL::Type, TR::Type) = typejoin(TL, TR)
 
-strictTypeJoin(::Type{T}, ::Type{Complex{T}}) where {T<:Real} = RealOrComplex{T}
+strictTypeJoin(::Type{TL}, ::Type{TR}) where {TL<:RealOrComplex, TR<:RealOrComplex} = 
+promote_type(TL, TR)

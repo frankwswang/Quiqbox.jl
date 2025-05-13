@@ -58,7 +58,7 @@ function getPrimitiveOrbType(orbs::AbstractArray{B}) where
     end
 end
 
-mutable struct CompositeOrb{T<:Real, D, C<:RealOrComplex{T}, B<:PrimitiveOrb{T, D, <:C}, 
+mutable struct CompositeOrb{T<:Real, D, C<:RealOrComplex{T}, B<:PrimitiveOrb{T, D}, 
                             W<:GridParam{C, 1}} <: OrbitalBasis{C, D, B}
     const basis::Memory{B}
     const weight::W
@@ -71,10 +71,6 @@ mutable struct CompositeOrb{T<:Real, D, C<:RealOrComplex{T}, B<:PrimitiveOrb{T, 
                         "the output length of `weight`")
         formattedBasis = genMemory(basis)
         basisType = getPrimitiveOrbType(formattedBasis)
-        bOutType = getOutputType(basisType)
-        if !(bOutType <: C)
-            throw("The elemental output type of orbital weights must be `$bOutType`.")
-        end
         new{T, D, C, basisType, W}(formattedBasis, weight, renormalize)
     end
 end
@@ -118,8 +114,8 @@ function getEffectiveWeight(::PrimitiveOrb{T}, weight::GridParam{C, 1}, idx::Int
     indexParam(weight, idx) |> fill
 end
 
-function getEffectiveWeight(o::CompositeOrb{T}, weight::GridParam{C, 1}, idx::Int) where 
-                           {T<:Real, C<:RealOrComplex{T}}
+function getEffectiveWeight(o::CompositeOrb{T, D, C}, weight::GridParam{C, 1}, 
+                            idx::Int) where {T<:Real, D, C<:RealOrComplex{T}}
     o.renormalize && throw(AssertionError("Merging the weight from a renormalized "*
                            "`CompositeOrb` with another value is prohibited."))
     len = first(getOutputSize(o.weight))
@@ -133,7 +129,7 @@ end
 function CompositeOrb(basis::AbstractVector{<:OrbitalBasis{<:RealOrComplex{T}, D}}, 
                       weight::UnitOrValVec{C}; renormalize::Bool=false) where 
                      {T<:Real, C<:RealOrComplex{T}, D}
-    encoder = UnitParamEncoder(T, :w, 1)
+    encoder = UnitParamEncoder(C, :w, 1)
     weightParams = genHeapParam(map(encoder, weight), :wBlock)
     CompositeOrb(basis, weightParams; renormalize)
 end
@@ -147,14 +143,13 @@ getOutputType(::Type{<:CompositeOrb{T, D, C}}) where {T<:Real, D, C<:RealOrCompl
 function evalOrbital(orb::CompositeOrb{T, D, C}, input; 
                      cache!Self::MultiSpanDataCacheBox=MultiSpanDataCacheBox()) where 
                     {T<:Real, D, C<:RealOrComplex{T}}
-    multiplier = StableMul(C)
     weightVal = cacheParam!(cache!Self, orb.weight)
 
-    body = mapreduce(StableAdd(C), orb.basis, weightVal) do basis, w
-        multiplier(evalOrbital(basis, input; cache!Self), w)
+    bodyVal = mapreduce(StableAdd(C), orb.basis, weightVal) do basis, w
+        evalOrbital(basis, input; cache!Self) * w
     end
 
-    multiplier(body, getNormFactor(orb))
+    StableMul(C)(convert(C, bodyVal), getNormFactor(orb))
 end
 
 
@@ -173,13 +168,13 @@ function disableRenormalize!(b::ComposedOrb)
 end
 
 
-function getNormFactor(orb::ComposedOrb{T}) where {T}
+function getNormFactor(orb::ComposedOrb{T, D, C}) where {T<:Real, D, C<:RealOrComplex{T}}
     if isRenormalized(orb)
         constructor = getfield(Quiqbox, nameof(orb))
         orbInner = constructor(orb, renormalize=false)
-        convert(T, overlap(orbInner, orbInner)|>absSqrtInv)
+        convert(C, overlap(orbInner, orbInner)|>absSqrtInv)
     else
-        one(T)
+        one(C)
     end
 end
 
@@ -191,7 +186,7 @@ end
 
 const PrimGTOData{T<:Real, D, F<:FloatingPolyGaussField{T, D}} = PrimOrbData{T, D, T, F}
 
-struct CompOrbData{T<:Real, D, C<:RealOrComplex{T}, B<:PrimOrbData{T, D, <:C}} <: ConfigBox
+struct CompOrbData{T<:Real, D, C<:RealOrComplex{T}, B<:PrimOrbData{T, D}} <: ConfigBox
     basis::Memory{B}
     weight::Memory{C}
     renormalize::Bool
@@ -233,10 +228,10 @@ getOrbOutputTypeUnion(::T) where {T<:OrbitalData} = getOrbOutputTypeUnion(T)
 
 function getOrbOutputTypeUnion(arr::OrbDataCollection{T, D}) where {T<:Real, D}
     eleType = eltype(arr)
-    if isempty(arr) || isconcretetype(eleType)
+    if isconcretetype(eleType) || isempty(arr)
         getOrbOutputTypeUnion(eleType)
     else
-        reduce(strictTypeJoin, arr)
+        mapreduce(getOrbOutputTypeUnion, strictTypeJoin, arr)
     end
 end
 
@@ -309,14 +304,14 @@ end
 
 function genGaussTypeOrb(center::NonEmptyTuple{UnitOrVal{T}, D}, 
                          xpns::UnitOrValVec{T}, 
-                         cons::Union{UnitOrValVec{T}, GridParam{T, 1}}, 
+                         cons::Union{UnitOrValVec{C}, GridParam{C, 1}}, 
                          ijk::NonEmptyTuple{Int, D}=ntuple(_->0, Val(D+1)); 
-                         innerRenormalize::Bool=false, 
-                         outerRenormalize::Bool=false) where {T<:Real, D}
+                         innerRenormalize::Bool=false, outerRenormalize::Bool=false) where 
+                        {T<:Real, C<:RealOrComplex{T}, D}
     nPrimOrbs = if cons isa GridParam
         (first∘getOutputSize)(cons)
     else
-        cons = map(UnitParamEncoder(T, :con, 1), cons)
+        cons = map(UnitParamEncoder(C, :con, 1), cons)
         length(cons)
     end
 

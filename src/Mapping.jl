@@ -32,7 +32,7 @@ end
 
 ReturnTyped(f::ReturnTyped{TO}, ::Type{TN}) where {TO, TN} = ReturnTyped(f.f, TN)
 
-@inline function (f::ReturnTyped{T})(arg::Vararg) where {T}
+function (f::ReturnTyped{T, F})(arg::Vararg) where {T, F<:Function}
     caller = getLazyConverter(f.f, T)
     caller(arg...)
 end
@@ -105,17 +105,15 @@ getOutputType(::Type{<:LateralPartial{F}}) where {F<:Function} = getOutputType(F
 const absSqrtInv = inv ∘ sqrt ∘ abs
 
 
-function typedMap(op::F, obj::AbstractArray, ::Type{T}=Union{}) where {F<:Function, T}
+function modestTypingMap(op::F, obj::AbstractArray) where {F<:Function}
     if isempty(obj)
-        similar(obj, T)
+        similar(obj, Union{})
     else
         map(op, obj)
     end
 end
 
-function typedMap(op::F, obj::Union{Tuple, NamedTuple}, ::Type=Union{}) where {F<:Function}
-    map(op, obj)
-end
+modestTypingMap(op::F, obj::Union{Tuple, NamedTuple}) where {F<:Function} = map(op, obj)
 
 
 struct InputLimiter{N, F<:Function} <: Modifier
@@ -150,9 +148,23 @@ end
 ChainMapper(chain::AbstractArray{<:Function}) = ChainMapper(chain|>ShapedMemory)
 
 function getField(obj, f::ChainMapper, finalizer::F=itself) where {F<:Function}
-    typedMap(f.chain) do mapper
+    modestTypingMap(f.chain) do mapper
         mapper(obj) |> finalizer
     end
+end
+
+function getOutputType(::Type{ChainMapper{F}}) where {F<:NonEmptyTuple{Function}}
+    Tuple{getOutputType.(fieldtypes(F))...}
+end
+
+function getOutputType(::Type{ChainMapper{ NamedTuple{S, F} }}) where 
+                      {S, F<:NonEmptyTuple{Function}}
+    NamedTuple{S, Tuple{getOutputType.(fieldtypes(F))...}}
+end
+
+function getOutputType(::Type{<:ChainMapper{ <:CustomMemory{F, N} }}) where {F<:Function, N}
+    type = getOutputType(F)
+    genParametricType(CustomMemory, (;F=type, N))
 end
 
 
@@ -172,28 +184,6 @@ end
 f.joint(f.left(arg...), f.right(arg...))
 
 getOutputType(::Type{<:PairCoupler{J}}) where {J<:Function} = getOutputType(J)
-
-
-struct ParamFreeFunc{F<:Function} <: CompositeFunction
-    f::F
-
-    function ParamFreeFunc(f::F) where {F<:Function}
-        if !isParamBoxFree(f)
-            throw(AssertionError("`f` should not contain any `$ParamBox`."))
-        end
-        new{F}(f)
-    end
-end
-
-ParamFreeFunc(f::ParamFreeFunc) = itself(f)
-
-@inline (f::ParamFreeFunc{F})(args...) where {F<:Function} = f.f(args...)
-
-getOutputType(::Type{ParamFreeFunc{F}}) where {F<:Function} = getOutputType(F)
-
-
-struct Lucent end
-struct Opaque end
 
 
 struct EuclideanHeader{N, F<:Function} <: Modifier
@@ -242,21 +232,6 @@ getOutputType(::Type{<:SelectHeader{<:Any, <:Any, F}}) where {F<:Function} =
 getOutputType(F)
 
 
-
-"""
-
-    getOpacity(f::Function) -> Union{Lucent, Opaque}
-
-If a return value is a `Lucent`, that means `f` either does not contain any `ParamBox`, or 
-has a specialized `unpackFunc` method that separates its embedded `ParamBox`.
-"""
-function getOpacity(f::Function)
-    isParamBoxFree(f) ? Lucent() : Opaque()
-end
-
-getOpacity(::ParamFreeFunc) = Lucent()
-
-
 struct GetRange <: Mapper
     start::Int
     final::Int
@@ -277,7 +252,7 @@ function (f::GetRange)(obj)
 end
 
 
-struct FloatingMonomial{T<:Real, D} <: CompositeFunction
+struct FloatingMonomial{T<:Real, D} <: TypedEvaluator{T}
     center::NTuple{D, T}
     degree::WeakComp{D}
 
@@ -288,13 +263,17 @@ end
 FloatingMonomial(center::NonEmptyTuple{T, D}, degree::NonEmptyTuple{Int, D}) where {T, D} = 
 FloatingMonomial(center, WeakComp(degree))
 
-function evalFloatingMonomial(f::FloatingMonomial{<:Real, D}, 
-                              coord::NTuple{D, Real}) where {D}
-    mapreduce(*, coord, f.center, f.degree.tuple) do c1, c2, pwr
+function evalFloatingMonomial(f::FloatingMonomial{T, D}, 
+                              coord::NTuple{D, Real}) where {T<:Real, D}
+    res = mapreduce(*, coord, f.center, f.degree.tuple) do c1, c2, pwr
         (c1 - c2)^pwr
     end
+
+    convert(T, res)
 end
 
 (::SelectTrait{InputStyle})(::FloatingMonomial{<:Real, D}) where {D} = EuclideanInput{D}()
 
 (f::FloatingMonomial)(coord) = evalFloatingMonomial(f, formatInput(f, coord))
+
+getOutputType(::Type{<:FloatingMonomial{T}}) where {T<:Real} = T
