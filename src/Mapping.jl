@@ -15,7 +15,7 @@ end
 
 ApplyConvert(::Type{T}) where {T} = ApplyConvert(itself, T)
 
-ApplyConvert(f::ApplyConvert{TO}, ::Type{TN}) where {TO, TN} = ApplyConvert(f.f, TN)
+ApplyConvert(f::ApplyConvert, ::Type{T}) where {T} = ApplyConvert(f.f, T)
 
 (f::ApplyConvert{T, F})(arg::Vararg) where {T, F<:Function} = convert(T, f.f(arg...))
 
@@ -55,6 +55,8 @@ struct StableBinary{T, F<:Function} <: TypedEvaluator{T}
         new{T, F}(f)
     end
 end
+
+StableBinary(f::StableBinary, ::Type{T}) where {T} = StableBinary(f.f, T)
 
 function (f::StableBinary{T, F})(argL::T, argR::T) where {T, F<:Function}
     op = getLazyConverter(f.f, T)
