@@ -236,21 +236,6 @@ getOutputType(::Type{<:SelectHeader{<:Any, <:Any, F}}) where {F<:Function} =
 getOutputType(F)
 
 
-
-"""
-
-    getOpacity(f::Function) -> Union{Lucent, Opaque}
-
-If a return value is a `Lucent`, that means `f` either does not contain any `ParamBox`, or 
-has a specialized `unpackFunc` method that separates its embedded `ParamBox`.
-"""
-function getOpacity(f::Function)
-    isParamBoxFree(f) ? Lucent() : Opaque()
-end
-
-getOpacity(::ParamFreeFunc) = Lucent()
-
-
 struct GetRange <: Mapper
     start::Int
     final::Int
