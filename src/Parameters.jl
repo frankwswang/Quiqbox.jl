@@ -803,14 +803,14 @@ end
 
 """
 
-    noReflectiveParam(source) -> Bool
+    noStoredParam(source) -> Bool
 
 Detect if `source` has no reachable `$ParamBox` by reflection-type functions, `getfield`and 
 `getindex`. It returns `true` if `getFieldParams(source)` returns an empty collection. It 
-is still possible for `noReflectiveParam` to return `true` if `source` is a generic 
+is still possible for `noStoredParam` to return `true` if `source` is a generic 
 function that indirectly references global variables being/storing `$ParamBox`.
 """
-function noReflectiveParam(source)
+function noStoredParam(source)
     canDirectlyStore(source) || (getFieldParams(source) |> isempty)
 end
 
@@ -854,7 +854,7 @@ reflection functions.
 
 ≡≡≡ Field(s) ≡≡≡
 
-`f::F`: Stored function. `$noReflectiveParam(f)` must return `true` when it is used to 
+`f::F`: Stored function. `$noStoredParam(f)` must return `true` when it is used to 
 construct a instance of `ParamFreeFunc{F}`.
 
 ≡≡≡ Initialization Method(s) ≡≡≡
@@ -865,7 +865,7 @@ struct ParamFreeFunc{F<:Function} <: CompositeFunction
     f::F
 
     function ParamFreeFunc(f::F) where {F<:Function}
-        if !noReflectiveParam(f)
+        if !noStoredParam(f)
             throw(AssertionError("`f` should not contain any reachable `$ParamBox`."))
         end
         new{F}(f)
@@ -879,7 +879,7 @@ ParamFreeFunc(f::ParamFreeFunc) = itself(f)
 getOutputType(::Type{ParamFreeFunc{F}}) where {F<:Function} = getOutputType(F)
 
 #= Additional Method =#
-noReflectiveParam(::ParamFreeFunc) = true
+noStoredParam(::ParamFreeFunc) = true
 
 
 struct ReduceShift{T, F<:Function} <: TypedTensorFunc{T, 0}
@@ -1428,7 +1428,7 @@ end
 # f(input) => fCore(input, param)
 function unpackFunc(f::Function)
     fLocal = deepcopy(f)
-    if noReflectiveParam(fLocal)
+    if noStoredParam(fLocal)
         InputConverter(fLocal), initializeSpanParamSet(Union{})
     else
         source = getSourceParamSet(fLocal)
