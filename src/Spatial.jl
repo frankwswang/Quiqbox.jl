@@ -311,7 +311,7 @@ const CartAngMomFieldFunc{C<:RealOrComplex, D} =
       NullaryFieldFunc{C, D, InputConverter{ CartSHarmonics{D} }}
 
 const PolyRadialFunc{C<:RealOrComplex, D, F<:FieldAmplitude{C, 1}} = 
-      CoupledField{C, D, RadialField{C, D, F}, CartAngMomFunc{C, D}, StableMul{C}}
+      CoupledField{C, D, RadialField{C, D, F}, CartAngMomFunc{C, D}, typeof(*)}
 
 function PolyRadialFunc(radial::FieldAmplitude{C, 1}, 
                         angular::NonEmptyTuple{Int, D}) where {C<:RealOrComplex, D}
