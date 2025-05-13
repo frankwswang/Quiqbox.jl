@@ -393,5 +393,11 @@ m1 = genCellParam(v1, :m)
 m2 = genMeshParam(x->[x, x+1], (c2,), :m)
 @test obtain(m2) == [1.1, 2.1]
 
+# indexParam
+xMat = genTensorVar(rand(3,3), :x)
+xEle = Quiqbox.indexParam(xMat, 5, :xpn5)
+f_xEle, ps_xEle = Quiqbox.genParamMapper((pb=xEle,))
+ps_xEle == Quiqbox.initializeSpanParamSet(xMat)
+f_xEle(map(obtain, ps_xEle)) == (pb=xMat.input[5],) == (pb=obtain(xEle),)
 
 end

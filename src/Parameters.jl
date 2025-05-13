@@ -493,6 +493,7 @@ end
 
 
 function indexParam(pb::ShapedParam, oneToIdx::Int, sym::MissingOr{Symbol}=missing)
+    checkPositivity(oneToIdx)
     entry = pb.input[begin+oneToIdx-1]
     if ismissing(sym) || sym==symOf(entry)
         entry
@@ -503,7 +504,11 @@ function indexParam(pb::ShapedParam, oneToIdx::Int, sym::MissingOr{Symbol}=missi
     end
 end
 
-function indexParam(pb::AdaptableParam, oneToIdx::Int, sym::MissingOr{Symbol}=missing)
+function indexParam(pb::SpanParam, oneToIdx::Int, sym::MissingOr{Symbol}=missing)
+    checkPositivity(oneToIdx)
+    if oneToIdx > (getOutputSize(pb) |> prod)
+        throw(BoundsError(pb, oneToIdx))
+    end
     ismissing(sym) && (sym = Symbol(symOf(pb), oneToIdx))
     genCellParam(GetOneToIndex(oneToIdx), (pb,), sym)
 end
