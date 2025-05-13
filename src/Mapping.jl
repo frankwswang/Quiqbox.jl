@@ -186,10 +186,6 @@ f.joint(f.left(arg...), f.right(arg...))
 getOutputType(::Type{<:PairCoupler{J}}) where {J<:Function} = getOutputType(J)
 
 
-struct Lucent end
-struct Opaque end
-
-
 struct EuclideanHeader{N, F<:Function} <: Modifier
     f::F
 
