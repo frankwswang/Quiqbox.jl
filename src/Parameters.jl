@@ -878,6 +878,9 @@ ParamFreeFunc(f::ParamFreeFunc) = itself(f)
 
 getOutputType(::Type{ParamFreeFunc{F}}) where {F<:Function} = getOutputType(F)
 
+#= Additional Method =#
+noReflectiveParam(::ParamFreeFunc) = true
+
 
 struct ReduceShift{T, F<:Function} <: TypedTensorFunc{T, 0}
     apply::TypedReduce{T, F}
