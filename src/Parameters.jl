@@ -800,7 +800,17 @@ function getFieldParams(source)
     paramPairs
 end
 
-function isParamBoxFree(source)
+
+"""
+
+    noReflectiveParam(source) -> Bool
+
+Detect if `source` has no reachable `$ParamBox` by reflection-type functions, `getfield`and 
+`getindex`. It returns `true` if `getFieldParams(source)` returns an empty collection. It 
+is still possible for `noReflectiveParam` to return `true` if `source` is a generic 
+function that indirectly references global variables being/storing `$ParamBox`.
+"""
+function noReflectiveParam(source)
     canDirectlyStore(source) || (getFieldParams(source) |> isempty)
 end
 
@@ -833,6 +843,40 @@ function getFieldParamsCore!(paramPairs::AbstractVector{Pair{ChainedAccess, Para
     end
     nothing
 end
+
+
+"""
+
+    ParamFreeFunc{F<:Function} <: CompositeFunction
+
+A direct wrapper `struct` for `f::F` that does not have reachable `$ParamBox` through 
+reflection functions.
+
+≡≡≡ Field(s) ≡≡≡
+
+`f::F`: Stored function. `$noReflectiveParam(f)` must return `true` when it is used to 
+construct a instance of `ParamFreeFunc{F}`.
+
+≡≡≡ Initialization Method(s) ≡≡≡
+
+    ParamFreeFunc(f::F) where {F<:Function} -> ParamFreeFunc{T}
+"""
+struct ParamFreeFunc{F<:Function} <: CompositeFunction
+    f::F
+
+    function ParamFreeFunc(f::F) where {F<:Function}
+        if !noReflectiveParam(f)
+            throw(AssertionError("`f` should not contain any reachable `$ParamBox`."))
+        end
+        new{F}(f)
+    end
+end
+
+ParamFreeFunc(f::ParamFreeFunc) = itself(f)
+
+@inline (f::ParamFreeFunc{F})(args...) where {F<:Function} = f.f(args...)
+
+getOutputType(::Type{ParamFreeFunc{F}}) where {F<:Function} = getOutputType(F)
 
 
 struct ReduceShift{T, F<:Function} <: TypedTensorFunc{T, 0}
@@ -1398,16 +1442,15 @@ end
 
 # f(input) => fCore(input, param)
 function unpackFunc(f::Function)
-    if isParamBoxFree(f)
-        canDirectlyStore(f) || (f = deepcopy(f))
-        InputConverter(f), initializeSpanParamSet(Union{})
+    fLocal = deepcopy(f)
+    if noReflectiveParam(fLocal)
+        InputConverter(fLocal), initializeSpanParamSet(Union{})
     else
-        f = deepcopy(f)
-        source = getSourceParamSet(f)
+        source = getSourceParamSet(fLocal)
 
         if !(isempty(source.unit) && isempty(source.grid))
             unitPars, gridPars = map(extractMemory, source)
-            fCore = ParamBindFunc(f, unitPars, gridPars)
+            fCore = ParamBindFunc(fLocal, unitPars, gridPars)
             paramSet = initializeSpanParamSet(unitPars, gridPars)
             fCore, paramSet
         end

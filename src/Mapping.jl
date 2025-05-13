@@ -186,24 +186,6 @@ f.joint(f.left(arg...), f.right(arg...))
 getOutputType(::Type{<:PairCoupler{J}}) where {J<:Function} = getOutputType(J)
 
 
-struct ParamFreeFunc{F<:Function} <: CompositeFunction
-    f::F
-
-    function ParamFreeFunc(f::F) where {F<:Function}
-        if !isParamBoxFree(f)
-            throw(AssertionError("`f` should not contain any `$ParamBox`."))
-        end
-        new{F}(f)
-    end
-end
-
-ParamFreeFunc(f::ParamFreeFunc) = itself(f)
-
-@inline (f::ParamFreeFunc{F})(args...) where {F<:Function} = f.f(args...)
-
-getOutputType(::Type{ParamFreeFunc{F}}) where {F<:Function} = getOutputType(F)
-
-
 struct Lucent end
 struct Opaque end
 
