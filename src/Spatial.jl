@@ -95,8 +95,8 @@ function EncodedField(core::FieldAmplitude{C}, dimInfo) where {C<:RealOrComplex}
     EncodedField(ReturnTyped(core, C), dimInfo)
 end
 
-function EncodedField(core::Tuple{Function, C}, dimInfo) where {C<:RealOrComplex}
-    EncodedField(ReturnTyped(first(core), C), dimInfo)
+function EncodedField(core::Function, ::Type{C}, dimInfo) where {C<:RealOrComplex}
+    EncodedField(ReturnTyped(core, C), dimInfo)
 end
 
 getOutputType(::Type{<:EncodedField{C}}) where {C<:RealOrComplex} = C
@@ -276,14 +276,14 @@ end
 struct CoupledField{C<:RealOrComplex, D, L<:FieldAmplitude{C, D}, R<:FieldAmplitude{C, D}, 
                     F<:Function} <: FieldAmplitude{C, D}
     pair::Tuple{L, R}
-    coupler::ParamFreeFunc{F}
+    coupler::ParamFreeFunc{StableBinary{C, F}}
 
     function CoupledField(pair::Tuple{L, R}, coupler::Function) where 
                          {C<:RealOrComplex, D, L<:FieldAmplitude{C, D}, 
                           R<:FieldAmplitude{C, D}}
         checkPositivity(D::Int)
-        coupler = ParamFreeFunc(coupler)
-        new{C, D, L, R, typeof(coupler.f)}(pair, coupler)
+        coupler = ParamFreeFunc(StableBinary(coupler, C))
+        new{C, D, L, R, typeof(coupler.f.f)}(pair, coupler)
     end
 end
 
@@ -311,7 +311,7 @@ const CartAngMomFieldFunc{C<:RealOrComplex, D} =
       NullaryFieldFunc{C, D, InputConverter{ CartSHarmonics{D} }}
 
 const PolyRadialFunc{C<:RealOrComplex, D, F<:FieldAmplitude{C, 1}} = 
-      CoupledField{C, D, RadialField{C, D, F}, CartAngMomFunc{C, D}, StableMul{C}}
+      CoupledField{C, D, RadialField{C, D, F}, CartAngMomFunc{C, D}, typeof(*)}
 
 function PolyRadialFunc(radial::FieldAmplitude{C, 1}, 
                         angular::NonEmptyTuple{Int, D}) where {C<:RealOrComplex, D}
