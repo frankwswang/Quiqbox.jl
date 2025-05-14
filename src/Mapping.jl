@@ -48,22 +48,27 @@ end
 getOutputType(::Type{<:ReturnTyped{T}}) where {T} = T
 
 
-struct StableBinary{T, F<:Function} <: TypedEvaluator{T}
+struct TypedBinary{T, F<:Function, TL, TR} <: TypedEvaluator{T}
     f::F
 
-    function StableBinary(f::F, ::Type{T}) where {F<:Function, T}
-        new{T, F}(f)
+    function TypedBinary(f::ReturnTyped{T, F}, ::Type{TL}, ::Type{TR}) where 
+                        {F<:Function, T, TL, TR}
+        new{T, F, TL, TR}(f.f)
     end
 end
 
-StableBinary(f::StableBinary, ::Type{T}) where {T} = StableBinary(f.f, T)
-
-function (f::StableBinary{T, F})(argL::T, argR::T) where {T, F<:Function}
+function (f::TypedBinary{T, F, TL, TR})(argL::TL, argR::TR) where {T, F<:Function, TL, TR}
     op = getLazyConverter(f.f, T)
     op(argL, argR)
 end
 
-getOutputType(::Type{<:StableBinary{T}}) where {T} = T
+const StableBinary{T, F<:Function} = TypedBinary{T, F, T, T}
+
+StableBinary(f::Function, ::Type{T}) where {T} = TypedBinary(ReturnTyped(f, T), T, T)
+
+StableBinary(f::TypedBinary, ::Type{T}) where {T} = StableBinary(f.f, T)
+
+getOutputType(::Type{<:TypedBinary{T}}) where {T} = T
 
 const StableAdd{T} = StableBinary{T, typeof(+)}
 StableAdd(::Type{T}) where {T} = StableBinary(+, T)
