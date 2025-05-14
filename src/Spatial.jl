@@ -36,7 +36,7 @@ struct FieldParamFunc{C<:RealOrComplex, D, F<:AbstractParamFunc, S<:SpanSetFilte
                                  "be `$(TaggedSpanSetFilter{VoidSetFilter})`."))
         end
         inner = ContextParamFunc(EuclideanHeader(f, Val(D)), scope)
-        new{C, D, F, S}(ReturnTyped(inner, C))
+        new{C, D, F, S}(TypedReturn(inner, C))
     end
 end
 
@@ -66,10 +66,10 @@ end
 
 
 struct EncodedField{C<:RealOrComplex, D, F<:Function, E<:Function} <: FieldAmplitude{C, D}
-    core::ReturnTyped{C, F}
+    core::TypedReturn{C, F}
     encode::EuclideanHeader{D, E}
 
-    function EncodedField(core::ReturnTyped{C, F}, encode::EuclideanHeader{D, E}) where 
+    function EncodedField(core::TypedReturn{C, F}, encode::EuclideanHeader{D, E}) where 
                          {C<:RealOrComplex, F<:Function, D, E<:Function}
         checkPositivity(D)
         if E <: FieldAmplitude
@@ -86,17 +86,17 @@ struct EncodedField{C<:RealOrComplex, D, F<:Function, E<:Function} <: FieldAmpli
     end
 end
 
-function EncodedField(core::ReturnTyped{C, F}, ::Val{D}) where 
+function EncodedField(core::TypedReturn{C, F}, ::Val{D}) where 
                      {C<:RealOrComplex, D, F<:Function}
     EncodedField(core, EuclideanHeader( Val(D) ))
 end
 
 function EncodedField(core::FieldAmplitude{C}, dimInfo) where {C<:RealOrComplex}
-    EncodedField(ReturnTyped(core, C), dimInfo)
+    EncodedField(TypedReturn(core, C), dimInfo)
 end
 
 function EncodedField(core::Function, ::Type{C}, dimInfo) where {C<:RealOrComplex}
-    EncodedField(ReturnTyped(core, C), dimInfo)
+    EncodedField(TypedReturn(core, C), dimInfo)
 end
 
 getOutputType(::Type{<:EncodedField{C}}) where {C<:RealOrComplex} = C
@@ -386,7 +386,7 @@ struct FloatingField{T<:Real, D, C<:RealOrComplex{T}, F<:AbstractParamFunc,
                           {C<:RealOrComplex, D, F<:AbstractParamFunc}
         T = extractRealNumberType(C)
         base = f.core.f
-        core = ReturnTyped(base.binder, T)
+        core = TypedReturn(base.binder, T)
         paramFormatter = last(base.encode)
         pValSet = getField(paramSet, paramFormatter.core.f, obtain)
         new{T, D, C, F, typeof(pValSet)}(convert(NTuple{D, T}, center), core, pValSet)

@@ -1,4 +1,4 @@
-export ReturnTyped, PairCoupler
+export TypedReturn, PairCoupler
 
 getOutputType(::F) where {F<:Function} = getOutputType(F)
 
@@ -22,17 +22,17 @@ ApplyConvert(f::ApplyConvert, ::Type{T}) where {T} = ApplyConvert(f.f, T)
 getOutputType(::Type{<:ApplyConvert{T}}) where {T} = T
 
 
-struct ReturnTyped{T, F<:Function} <: TypedEvaluator{T}
+struct TypedReturn{T, F<:Function} <: TypedEvaluator{T}
     f::F
 
-    function ReturnTyped(f::F, ::Type{T}) where {F<:Function, T}
+    function TypedReturn(f::F, ::Type{T}) where {F<:Function, T}
         new{T, F}(f)
     end
 end
 
-ReturnTyped(f::ReturnTyped{TO}, ::Type{TN}) where {TO, TN} = ReturnTyped(f.f, TN)
+TypedReturn(f::TypedReturn{TO}, ::Type{TN}) where {TO, TN} = TypedReturn(f.f, TN)
 
-function (f::ReturnTyped{T, F})(arg::Vararg) where {T, F<:Function}
+function (f::TypedReturn{T, F})(arg::Vararg) where {T, F<:Function}
     caller = getLazyConverter(f.f, T)
     caller(arg...)
 end
@@ -45,13 +45,13 @@ end
     end
 end
 
-getOutputType(::Type{<:ReturnTyped{T}}) where {T} = T
+getOutputType(::Type{<:TypedReturn{T}}) where {T} = T
 
 
 struct TypedBinary{T, F<:Function, TL, TR} <: TypedEvaluator{T}
     f::F
 
-    function TypedBinary(f::ReturnTyped{T, F}, ::Type{TL}, ::Type{TR}) where 
+    function TypedBinary(f::TypedReturn{T, F}, ::Type{TL}, ::Type{TR}) where 
                         {F<:Function, T, TL, TR}
         new{T, F, TL, TR}(f.f)
     end
@@ -64,7 +64,7 @@ end
 
 const StableBinary{T, F<:Function} = TypedBinary{T, F, T, T}
 
-StableBinary(f::Function, ::Type{T}) where {T} = TypedBinary(ReturnTyped(f, T), T, T)
+StableBinary(f::Function, ::Type{T}) where {T} = TypedBinary(TypedReturn(f, T), T, T)
 
 StableBinary(f::TypedBinary, ::Type{T}) where {T} = StableBinary(f.f, T)
 
@@ -211,13 +211,13 @@ f.f(formatInput(EuclideanInput{N}(), head), body...)
 
 getOutputType(::Type{<:EuclideanHeader{<:Any, F}}) where {F<:Function} = getOutputType(F)
 
-const TypedTupleFunc{T, D, F<:Function} = ReturnTyped{T, EuclideanHeader{D, F}}
+const TypedTupleFunc{T, D, F<:Function} = TypedReturn{T, EuclideanHeader{D, F}}
 
 TypedTupleFunc(f::Function, ::Type{T}, ::Val{D}) where {T, D} = 
-ReturnTyped(EuclideanHeader(f, Val(D)), T)
+TypedReturn(EuclideanHeader(f, Val(D)), T)
 
-TypedTupleFunc(f::ReturnTyped, ::Type{T}, ::Val{D}) where {T, D} = 
-ReturnTyped(EuclideanHeader(f.f, Val(D)), T)
+TypedTupleFunc(f::TypedReturn, ::Type{T}, ::Val{D}) where {T, D} = 
+TypedReturn(EuclideanHeader(f.f, Val(D)), T)
 
 
 struct SelectHeader{N, K, F<:Function} <: Modifier

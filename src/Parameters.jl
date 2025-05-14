@@ -165,7 +165,7 @@ struct TypedExpand{T, N, F<:Function} <: TypedTensorFunc{T, N}
             if f isa TypedExpand
                 f.shape
             else
-                ReturnTyped(f, getPackType(AbstractArray{T}))(args...) |> size
+                TypedReturn(f, getPackType(AbstractArray{T}))(args...) |> size
             end
         else
             shape
@@ -185,7 +185,7 @@ struct TypedExpand{T, N, F<:Function} <: TypedTensorFunc{T, N}
     end
 
     function TypedExpand(f::Function, args::NonEmptyTuple{Any})
-        output = ReturnTyped(f, AbstractArray)(args...)
+        output = TypedReturn(f, AbstractArray)(args...)
         shape = TruncateReshape(output|>size)
         type = eltype(output) |> genPackMemoryType
         fCore = (f isa TypedExpand) ? f.f : f
@@ -367,7 +367,7 @@ function getCellOutputLevels(::NestFixedParIn{T, E}) where {T, E<:PackedMemory{T
     level = getNestedLevel(E).level
     Set((level, level-1))
 end
-#! Consider efficient construction for when `f` is a `ReturnTyped`.
+#! Consider efficient construction for when `f` is a `TypedReturn`.
 function formatTensorFunc(f::Function, ::Type{TypedReduce}, 
                           input::CoreFixedParIn{T, E}) where {T, E<:Pack{T}}
     lambda = if f isa TypedReduce{<:Pack}
@@ -910,11 +910,11 @@ function extractTransform(pb::AdaptableParam)
     else
         pb.lambda
     end
-    ReturnTyped(fCore, getOutputType(pb))
+    TypedReturn(fCore, getOutputType(pb))
 end
 
 function extractTransform(pb::ShapedParam)
-    ReturnTyped(itself, getOutputType(pb))
+    TypedReturn(itself, getOutputType(pb))
 end
 
 struct ParamBoxClassifier <: StatefulFunction{ParamBox}
@@ -1287,7 +1287,7 @@ getField(obj, tsFilter.scope, finalizer)
 getOutputType(::Type{TaggedSpanSetFilter{F}}) where {F<:NamedFilter} = getOutputType(F)
 
 
-const TypedParamFunc{T, F<:AbstractParamFunc} = ReturnTyped{T, F}
+const TypedParamFunc{T, F<:AbstractParamFunc} = TypedReturn{T, F}
 
 getParamInputType(::AbstractParamFunc) = SpanInput()
 

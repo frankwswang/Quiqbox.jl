@@ -1,7 +1,7 @@
 using LinearAlgebra: dot
 
 const OrbCoreMarker{T<:Real, D} = Union{
-    FieldMarker{:ReturnTyped, 1}, 
+    FieldMarker{:TypedReturn, 1}, 
     ValueMarker{TypedTupleFunc{C, D, F}} where {C<:RealOrComplex{T}, F<:AbstractParamFunc}
 }
 
