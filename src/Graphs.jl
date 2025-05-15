@@ -356,56 +356,6 @@ function transpileGraph(graph::LayerParamGraph)
 end
 
 
-struct TensorSourceMerger{T1, T2<:ShapedMemory} <: StatefulFunction{Union{T1, T2}}
-    unit::Tuple{Memory{Pair{Bool, OneToIndex}}, Memory{T1}}
-    grid::Tuple{Memory{Pair{Bool, OneToIndex}}, Memory{T2}}
-
-    function TensorSourceMerger(data::LayerGraphCore)
-        unit, grid = map((:unit, :grid)) do field
-            genTensorSourceMergerCore(getfield(data, field))
-        end
-
-        new{eltype(unit|>last), eltype(grid|>last)}(unit, grid)
-    end
-end
-
-function genTensorSourceMergerCore(sector::AbstractVector{<:TensorVertex})
-    if isempty(sector)
-        (Memory{Bool}(undef, 0), Memory{Union{}}(undef, 0))
-    else
-        keys = Pair{Bool, OneToIndex}[]
-        idx = 0
-        cacheIdx = 0
-        vals = map(sector) do vertex
-            cacheIdx += 1
-            ele = if isNodeActive(vertex)
-                 true => OneToIndex(idx += 1)
-            else
-                false => OneToIndex(cacheIdx)
-            end
-            push!(keys, ele)
-            getNodeValue(vertex)
-        end
-        (extractMemory(keys), extractMemory(vals))
-    end
-end
-
-function (f::TensorSourceMerger)(input::OptionalSpanValueSet)
-    sectorNames = (:unit, :grid)
-    map(sectorNames) do field
-        inputVal = getfield(input, field)
-        pairs, cache = getfield(f, field)
-        if isnothing(inputVal)
-            cache
-        else
-            map(pairs) do pair
-                getField(ifelse(pair.first, inputVal, cache), pair.second)
-            end
-        end
-    end |> NamedTuple{sectorNames}
-end
-
-
 function evaluateGraph(f::LayerGraph)
     unit, grid, call = f.attribute
     unit, grid = map((unit, grid)) do field
@@ -414,12 +364,28 @@ function evaluateGraph(f::LayerGraph)
     f.evaluator((;unit, grid, call))
 end
 
+function mixTensorInput(nodes::Memory{<:TensorVertex}, ::Nothing)
+    modestTypingMap(getNodeValue, nodes)
+end
+
+function mixTensorInput(nodes::Memory{<:TensorVertex}, input::AbstractVector)
+    i = 1
+    modestTypingMap(nodes) do node
+        if isNodeActive(node)
+            value, i = iterate(input, i)
+            value
+        else
+            getNodeValue(node)
+        end
+    end
+end
+
 function evaluateGraph(tpg::LayerGraph, input::OptionalSpanValueSet)
     constrainSpanValueSet(getParamInputType(tpg), input)
-    _, _, call = tpg.attribute
-    merger = TensorSourceMerger(tpg.attribute)
-    unit, grid = merger(input)
-    tpg.evaluator.f((;unit, grid, call))
+    units, grids, call = tpg.attribute
+    unit = mixTensorInput(units, input.unit)
+    grid = mixTensorInput(grids, input.grid)
+    tpg.evaluator((;unit, grid, call))
 end
 
 
@@ -566,23 +532,23 @@ end
 (f::SpanInputFormatter)() = (unit=nothing, grid=nothing)
 
 
-const EvalLayerGraphCore{T, G<:ComputationGraph{T}} = 
-      LPartial{typeof(evaluateGraph), Tuple{G}}
+struct ComputeGraph{T, G<:ComputationGraph{T}, F<:SpanInputFormatter} <: GraphEvaluator{G}
+    formatter::F
+    evaluator::LPartial{typeof(evaluateGraph), Tuple{G}}
 
-struct ComputeGraph{T, G<:ComputationGraph{T}, E<:SpanInputFormatter} <: GraphEvaluator{G}
-    f::Base.ComposedFunction{EvalLayerGraphCore{T, G}, E}
-
-    function ComputeGraph(graph::G, encoder::E) where 
-                         {T, G<:ComputationGraph{T}, E<:SpanInputFormatter}
-        f = LPartial(evaluateGraph, (graph,)) ∘ encoder
-        new{T, G, E}(f)
+    function ComputeGraph(graph::G, formatter::F) where 
+                         {T, G<:ComputationGraph{T}, F<:SpanInputFormatter}
+        new{T, G, F}(formatter, LPartial( evaluateGraph, (graph,) ))
     end
 end
 
-const ValueInput = Union{OptionalSpanValueSet, AbstractVector}
+function (f::ComputeGraph)()
+    f.formatter() |> f.evaluator
+end
 
-(f::ComputeGraph{T})() where {T} = f.f()::T
-(f::ComputeGraph{T})(input::ValueInput) where {T} = f.f(input)::T
+function (f::ComputeGraph)(input::Union{OptionalSpanValueSet, AbstractVector})
+    f.formatter(input) |> f.evaluator
+end
 
 getOutputType(::Type{<:ComputeGraph{T}}) where {T} = T
 
