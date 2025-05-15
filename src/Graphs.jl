@@ -118,7 +118,7 @@ const CallVertexReceptor{N} = Union{TupleReceptor{N}, ArrayReceptor{N}}
 
 
 struct CallVertex{T, I<:CallVertexReceptor, F<:Function} <: ActionVertex{T}
-    apply::ReturnTyped{T, F}
+    apply::TypedReturn{T, F}
     marker::Symbol
     receptor::I # Could potentially have repeated input indices
 end
@@ -311,9 +311,9 @@ const VoidLayerGraphCore{VC<:CallVertex} = LayerGraphCore{Union{}, Union{}, VC}
 
 struct LayerGraph{T, B<:LayerGraphCore, F<:Function} <: ComputationGraph{T}
     attribute::B
-    evaluator::ReturnTyped{T, F}
+    evaluator::TypedReturn{T, F}
 
-    function LayerGraph(attribute::B, evaluator::ReturnTyped{T, F}) where 
+    function LayerGraph(attribute::B, evaluator::TypedReturn{T, F}) where 
                        {T, B<:LayerGraphCore, F<:Function}
         attribute = map(attribute) do x
             ifelse(isempty(x), genBottomMemory(), x)
@@ -450,13 +450,13 @@ function genGridVertexEvaluator(::LayerGraphCore, idx::Int)
 end
 
 function genCallVertexEvaluatorCore(::TupleReceptor, fs::AbstractArray{<:Function}, 
-                                    apply::ReturnTyped{T}) where {T}
-    ReturnTyped(splat(apply.f) ∘ ChainMapper(fs|>Tuple), T)
+                                    apply::TypedReturn{T}) where {T}
+    TypedReturn(splat(apply.f) ∘ ChainMapper(fs|>Tuple), T)
 end
 
 function genCallVertexEvaluatorCore(::ArrayReceptor, fs::AbstractArray{<:Function}, 
-                                    apply::ReturnTyped{T}) where {T}
-    ReturnTyped(apply.f ∘ ChainMapper(fs), T)
+                                    apply::TypedReturn{T}) where {T}
+    TypedReturn(apply.f ∘ ChainMapper(fs), T)
 end
 
 function genCallVertexEvaluator(compactPG::LayerGraphCore, 

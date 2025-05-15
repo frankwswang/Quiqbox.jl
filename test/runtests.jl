@@ -23,6 +23,7 @@ using Test
     unit3 = "Parameterization System"
     println("Testing $(unit3)...")
     t3 = @elapsed @testset "$(unit3)" begin
+        include("unit-tests/Mapping-test.jl")
         include("unit-tests/Parameters-test.jl")
     end
     println("$(unit3) test finished in $t3 seconds.\n")

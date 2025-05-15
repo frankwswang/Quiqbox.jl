@@ -1,4 +1,4 @@
-export ReturnTyped, PairCoupler
+export TypedReturn, PairCoupler
 
 getOutputType(::F) where {F<:Function} = getOutputType(F)
 
@@ -22,17 +22,18 @@ ApplyConvert(f::ApplyConvert, ::Type{T}) where {T} = ApplyConvert(f.f, T)
 getOutputType(::Type{<:ApplyConvert{T}}) where {T} = T
 
 
-struct ReturnTyped{T, F<:Function} <: TypedEvaluator{T}
+struct TypedReturn{T, F<:Function} <: TypedEvaluator{T}
     f::F
 
-    function ReturnTyped(f::F, ::Type{T}) where {F<:Function, T}
+    function TypedReturn(f::F, ::Type{T}) where {F<:Function, T}
+        checkBottomType(T)
         new{T, F}(f)
     end
 end
 
-ReturnTyped(f::ReturnTyped{TO}, ::Type{TN}) where {TO, TN} = ReturnTyped(f.f, TN)
+TypedReturn(f::TypedReturn{TO}, ::Type{TN}) where {TO, TN} = TypedReturn(f.f, TN)
 
-function (f::ReturnTyped{T, F})(arg::Vararg) where {T, F<:Function}
+function (f::TypedReturn{T, F})(arg::Vararg) where {T, F<:Function}
     caller = getLazyConverter(f.f, T)
     caller(arg...)
 end
@@ -45,25 +46,32 @@ end
     end
 end
 
-getOutputType(::Type{<:ReturnTyped{T}}) where {T} = T
+getOutputType(::Type{<:TypedReturn{T}}) where {T} = T
 
 
-struct StableBinary{T, F<:Function} <: TypedEvaluator{T}
+struct TypedBinary{T, F<:Function, TL, TR} <: TypedEvaluator{T}
     f::F
 
-    function StableBinary(f::F, ::Type{T}) where {F<:Function, T}
-        new{T, F}(f)
+    function TypedBinary(f::TypedReturn{T, F}, ::Type{TL}, ::Type{TR}) where 
+                        {F<:Function, T, TL, TR}
+        checkBottomType(TL)
+        checkBottomType(TR)
+        new{T, F, TL, TR}(f.f)
     end
 end
 
-StableBinary(f::StableBinary, ::Type{T}) where {T} = StableBinary(f.f, T)
-
-function (f::StableBinary{T, F})(argL::T, argR::T) where {T, F<:Function}
+function (f::TypedBinary{T, F, TL, TR})(argL::TL, argR::TR) where {T, F<:Function, TL, TR}
     op = getLazyConverter(f.f, T)
     op(argL, argR)
 end
 
-getOutputType(::Type{<:StableBinary{T}}) where {T} = T
+const StableBinary{T, F<:Function} = TypedBinary{T, F, T, T}
+
+StableBinary(f::Function, ::Type{T}) where {T} = TypedBinary(TypedReturn(f, T), T, T)
+
+StableBinary(f::TypedBinary, ::Type{T}) where {T} = StableBinary(f.f, T)
+
+getOutputType(::Type{<:TypedBinary{T}}) where {T} = T
 
 const StableAdd{T} = StableBinary{T, typeof(+)}
 StableAdd(::Type{T}) where {T} = StableBinary(+, T)
@@ -170,22 +178,56 @@ function getOutputType(::Type{<:ChainMapper{ <:CustomMemory{F, N} }}) where {F<:
 end
 
 
-struct PairCoupler{J<:Function, FL<:Function, FR<:Function} <: CompositeFunction
+inferBinaryOpOutputType(::ArithmeticOperator, ::Type{T}, 
+                        ::Type{T}) where {T<:RealOrComplex} = 
+T
+
+inferBinaryOpOutputType(::ArithmeticOperator, ::Type{T}, 
+                        ::Type{Complex{T}}) where {T<:Real} = 
+Complex{T}
+
+inferBinaryOpOutputType(::ArithmeticOperator, ::Type{Complex{T}}, 
+                        ::Type{T}) where {T<:Real} = 
+Complex{T}
+
+inferBinaryOpOutputType(::typeof(^), ::Type{T}, ::Integer) where {T<:Real} = 
+T
+
+inferBinaryOpOutputType(::Function, ::Type, ::Type) = Any
+
+inferBinaryOpOutputType(::TypedReturn{T}, ::Type, ::Type) where {T} = T
+
+
+function genTypedCoupler(coupler::F, encoderL::FL, encoderR::FR) where {F, FL, FR}
+    argTypeL = getOutputType(encoderL)
+    argTypeR = getOutputType(encoderR)
+    inferredType = inferBinaryOpOutputType(coupler, argTypeL, argTypeR)
+    returnType = typeintersect(getOutputType(F), inferredType)
+    TypedBinary(TypedReturn(coupler, returnType), argTypeL, argTypeR)
+end
+
+genTypedCoupler(coupler::TypedBinary, ::Function, ::Function) = itself(coupler)
+
+
+struct PairCoupler{T, J<:TypedBinary{T}, FL<:Function, FR<:Function} <: TypedEvaluator{T}
     joint::J
     left::FL
     right::FR
-end
 
-function PairCoupler(joint::F) where {F<:Function}
-    function buildPairCombine(left::Function, right::Function)
-        PairCoupler(joint, left, right)
+    function PairCoupler(joint::F, left::FL, right::FR) where 
+                        {F<:Function, FL<:Function, FR<:Function}
+        formattedJoint = genTypedCoupler(joint, left, right)
+        T = getOutputType(formattedJoint)
+        J = typeof(formattedJoint)
+        new{T, J, FL, FR}(formattedJoint, left, right)
     end
 end
 
-(f::PairCoupler{J, FL, FR})(arg::Vararg) where {J<:Function, FL<:Function, FR<:Function} = 
-f.joint(f.left(arg...), f.right(arg...))
+function (f::PairCoupler{T, J})(arg::Vararg) where {T, J<:TypedBinary{T}}
+    f.joint(f.left(arg...), f.right(arg...))
+end
 
-getOutputType(::Type{<:PairCoupler{J}}) where {J<:Function} = getOutputType(J)
+getOutputType(::Type{<:PairCoupler{T}}) where {T} = T
 
 
 struct EuclideanHeader{N, F<:Function} <: Modifier
@@ -206,13 +248,13 @@ f.f(formatInput(EuclideanInput{N}(), head), body...)
 
 getOutputType(::Type{<:EuclideanHeader{<:Any, F}}) where {F<:Function} = getOutputType(F)
 
-const TypedTupleFunc{T, D, F<:Function} = ReturnTyped{T, EuclideanHeader{D, F}}
+const TypedTupleFunc{T, D, F<:Function} = TypedReturn{T, EuclideanHeader{D, F}}
 
 TypedTupleFunc(f::Function, ::Type{T}, ::Val{D}) where {T, D} = 
-ReturnTyped(EuclideanHeader(f, Val(D)), T)
+TypedReturn(EuclideanHeader(f, Val(D)), T)
 
-TypedTupleFunc(f::ReturnTyped, ::Type{T}, ::Val{D}) where {T, D} = 
-ReturnTyped(EuclideanHeader(f.f, Val(D)), T)
+TypedTupleFunc(f::TypedReturn, ::Type{T}, ::Val{D}) where {T, D} = 
+TypedReturn(EuclideanHeader(f.f, Val(D)), T)
 
 
 struct SelectHeader{N, K, F<:Function} <: Modifier

@@ -41,3 +41,8 @@ function checkPositivity(num::Real, allowZero::Bool=false)
     (num + Int(allowZero)) > 0 || throw(AssertionError("`num` should be $subStr."))
     nothing
 end
+
+function checkBottomType(::Type{T}) where {T}
+    T <: Union{} && throw(AssertionError("`T` must not be `Union{}`."))
+    nothing
+end

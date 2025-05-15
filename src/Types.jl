@@ -83,6 +83,8 @@ const FunctionChainUnion{F<:Function} = Union{
 const RefVal = Base.RefValue
 const TypedIdxerMemory{T} = Memory{Pair{Int, T}}
 
+const ArithmeticOperator = Union{typeof(+), typeof(-), typeof(*), typeof(/)}
+
 
 import Base: size, firstindex, lastindex, getindex, setindex!, iterate, length, similar
 
