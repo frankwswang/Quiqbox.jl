@@ -282,11 +282,11 @@ end
 
 function unitOp(f::F, a::AbstractArray{<:Any, N}, b::AbstractArray{<:Any, N}) where 
                {F<:Union{typeof(+), typeof(-)}, N}
-    res = similar(a)
-    foreach(eachindex(res), a, b) do n, i, j
-        res[n] = unitOp(f, i, j)
+    idx = firstindex(b) - 1
+    map(a) do ele
+        idx += 1
+        unitOp(f, ele, b[idx])
     end
-    res
 end
 
 
@@ -391,7 +391,7 @@ function formatTensorFunc(f::Function, ::Type{TypedExpand},
     targetEleLevel = getNestedLevel(E).level
     actualEleLevel = getNestedLevel(lambda.type).level
     if actualEleLevel != targetEleLevel
-        throw("The nested level of `f`'s output is $actualEleLevel"*
+        throw("The nested level of `f`'s output is $actualEleLevel "*
               "which should have been `$(targetEleLevel+1)`.")
     end
     lambda
