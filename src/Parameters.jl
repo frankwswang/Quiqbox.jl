@@ -1295,12 +1295,16 @@ getField(obj, tsFilter.scope, finalizer)
 getOutputType(::Type{TaggedSpanSetFilter{F}}) where {F<:NamedFilter} = getOutputType(F)
 
 
-function (f::AbstractParamFunc)(input, params::OptionalSpanValueSet)
-    paramSet = map(params) do sector
+function formatSpanValueSet(params::OptionalSpanValueSet)
+    map(params) do sector
         ifelse(sector === nothing, genBottomMemory(), sector)
     end
-    f(input, paramSet)
 end
+
+formatSpanValueSet(params::AbstractSpanValueSet) = itself(params)
+
+(f::AbstractParamFunc)(input, params::OptionalSpanValueSet) = 
+f(input, formatSpanValueSet(params))
 
 
 const TypedParamFunc{T, F<:AbstractParamFunc} = TypedReturn{T, F}
@@ -1372,10 +1376,14 @@ end
 ParamCombiner(binder::Function, encode::AbstractVector{<:AbstractParamFunc}) = 
 ParamCombiner(binder, genMemory(encode))
 
-function (f::ParamCombiner{B})(input, params::AbstractSpanValueSet) where {B<:Function}
-    mapreduce(f.binder, f.encode) do encoder
-        encoder(input, params)
+function (f::ParamCombiner{B, E})(input::T, params::AbstractSpanValueSet) where 
+                                 {T, B<:Function, E<:ParamFunctionChain}
+    fHead, fTail... = f.encode
+    res = fHead(input, params)
+    for fBody in fTail
+        res = f.binder(res, fBody(input, params))
     end
+    res
 end
 
 getOutputType(::Type{<:ParamCombiner{B}}) where {B<:Function} = getOutputType(B)
