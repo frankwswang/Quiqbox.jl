@@ -694,11 +694,15 @@ end
 (pn::ParamBox)() = obtain(pn)
 
 
-function setVal!(par::PrimitiveParam, val)
+function setVal!(par::TensorVar, val)
     if !isPrimitiveInput(par)
         throw(AssertionError("`isPrimitiveInput(par)` must return `true`."))
     end
-    @atomic par.input = val
+    if par isa UnitVar
+        @atomic par.input = val
+    else
+        safelySetVal!(par.input, val)
+    end
 end
 
 function setVal!(par::AdaptableParam, val)
