@@ -1380,8 +1380,8 @@ function (f::ParamCombiner{B, E})(input::T, params::AbstractSpanValueSet) where
                                  {T, B<:Function, E<:ParamFunctionChain}
     fHead, fTail... = f.encode
     res = fHead(input, params)
-    for fBody in fTail
-        res = f.binder(res, fBody(input, params))
+    for fPart in fTail
+        res = f.binder(res, fPart(input, params))
     end
     res
 end
@@ -1424,24 +1424,17 @@ ParamPipeline(binder, genMemory(encode))
 
 function (f::ParamPipeline{E})(input, params::AbstractSpanValueSet) where 
                               {E<:ParamFunctionChain}
-    for o in f.encode
-        input = o(input, params)
+    fHead, fTail... = f.encode
+    res = fHead(input, params)
+    for fPart in fTail
+        res = fPart(res, params)
     end
-    input
+    res
 end
 
 function getOutputType(::Type{<:ParamPipeline{E}}) where 
                       {E<:GeneralTupleUnion{ NonEmptyTuple{AbstractParamFunc} }}
     getOutputType(E|>fieldtypes|>last)
-end
-
-
-# Specialized method due to the lack of compiler optimization
-const InputPipeline{E<:FunctionChainUnion{InputConverter}} = ParamPipeline{E}
-
-function (f::InputPipeline{E})(input, ::AbstractSpanValueSet) where 
-                              {E<:FunctionChainUnion{InputConverter}}
-    ∘(getfield.(f.encode, :core)...)(input)
 end
 
 
