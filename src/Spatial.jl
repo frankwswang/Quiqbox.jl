@@ -40,7 +40,14 @@ struct FieldParamFunc{C<:RealOrComplex, D, F<:AbstractParamFunc, S<:SpanSetFilte
     end
 end
 
-(f::FieldParamFunc)(input, params::AbstractSpanValueSet) = f.core(input, params)
+function evalFieldParamFunc(f::FieldParamFunc{C, D, F, S}, input::T, 
+                            params::AbstractSpanValueSet) where 
+                           {T, C<:RealOrComplex, D, F<:AbstractParamFunc, S<:SpanSetFilter}
+    f.core(input, params)
+end
+
+(f::FieldParamFunc)(input, params::AbstractSpanValueSet) = 
+evalFieldParamFunc(f, input, params)
 
 getOutputType(::Type{<:FieldParamFunc{C}}) where {C<:RealOrComplex} = C
 
