@@ -873,7 +873,7 @@ end
 
 ParamFreeFunc(f::ParamFreeFunc) = itself(f)
 
-@inline (f::ParamFreeFunc{F})(args...) where {F<:Function} = f.f(args...)
+(f::ParamFreeFunc{F})(args...) where {F<:Function} = f.f(args...)
 
 getOutputType(::Type{ParamFreeFunc{F}}) where {F<:Function} = getOutputType(F)
 
