@@ -86,7 +86,8 @@ const TypedIdxerMemory{T} = Memory{Pair{Int, T}}
 const ArithmeticOperator = Union{typeof(+), typeof(-), typeof(*), typeof(/)}
 
 
-import Base: size, firstindex, lastindex, getindex, setindex!, iterate, length, similar
+import Base: size, firstindex, lastindex, getindex, setindex!, iterate, length, similar, 
+             zero
 
 import Base: isempty, collect, get, keys, values, getproperty, ==, hash
 

@@ -47,14 +47,14 @@ end
 getPackType(::Type{T}) where {T} = T
 
 
-#! Potentially useful in the future
-struct Point{T} <: CustomMemory{T, 0}
-    value::T
-end
+# #! Potentially useful in the future
+# struct Point{T} <: CustomMemory{T, 0}
+#     value::T
+# end
 
-function getNestedLevelCore(::Type{Point{T}}, level::Int) where {T}
-    (T, level)
-end
+# function getNestedLevelCore(::Type{Point{T}}, level::Int) where {T}
+#     (T, level)
+# end
 
 
 function checkReshapingAxis(shape::Tuple{Vararg{Int}})
@@ -145,6 +145,8 @@ iterate(arr::VectorMemory, state) = iterate(arr.value, state)
 
 length(::VectorMemory{<:Any, L}) where {L} = L
 
+zero(arr::VectorMemory{T, L}) where {T, L} = VectorMemory(zero(arr.value), Val(L))
+
 const LinearMemory{T} = Union{Memory{T}, VectorMemory{T}}
 
 
@@ -203,6 +205,8 @@ end
 
 similar(arr::ShapedMemory{T}, shape::Tuple{Vararg{Int}}) where {T} = 
 similar(arr, T, shape)
+
+zero(arr::ShapedMemory{T, N}) where {T, N} = ShapedMemory(zero(arr.value), arr.shape)
 
 
 function binaryApply(op::F, arr1::ShapedMemory{T1}, arr2::ShapedMemory{T2}) where 
@@ -266,6 +270,8 @@ length(arr::PackedMemory) = length(arr.value)
 axes(arr::PackedMemory)	= map(Base.OneTo, size(arr))
 
 ShapedMemory(arr::PackedMemory) = arr.value
+
+zero(arr::DirectMemory{T, N}) where {T, N} = PackedMemory(zero(arr.value))
 
 
 genPackMemoryType(::Type{T}) where {T} = T
