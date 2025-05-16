@@ -143,13 +143,15 @@ TypedReduce(f::TypedReduce, ::Type{T}) where {T} = TypedReduce(f.f, T)
 
 TypedReduce(::Type{T}) where {T} = TypedReduce(itself, T)
 
-(f::TypedReduce)(arg, args...) = f.f(arg, args...)::getOutputType(f)
+function (f::TypedReduce{T})(arg, args...) where {T}
+    getLazyConverter(f.f, getPackType(T))(arg, args...)
+end
 
-getOutputType(::Type{TypedReduce{T, F}}) where {T, F<:Function} = 
-typeintersect(getOutputType(F), T)
-
-getOutputType(::Type{<:TypedReduce{<:AbstractArray{T, N}, F}}) where {T, N, F<:Function} = 
-typeintersect(getOutputType(F), getPackType(AbstractArray{T, N}))
+function getOutputType(::Type{TypedReduce{T, F}}) where {T, F<:Function}
+    type = getOutputType(F)
+    typeBound = getPackType(T)
+    ifelse(type <: typeBound, type, typeBound)
+end
 
 
 struct TypedExpand{T, N, F<:Function} <: TypedTensorFunc{T, N}
@@ -165,7 +167,7 @@ struct TypedExpand{T, N, F<:Function} <: TypedTensorFunc{T, N}
             if f isa TypedExpand
                 f.shape
             else
-                TypedReturn(f, getPackType(AbstractArray{T}))(args...) |> size
+                f(args...)::getPackType(AbstractArray{T}) |> size
             end
         else
             shape
@@ -174,18 +176,11 @@ struct TypedExpand{T, N, F<:Function} <: TypedTensorFunc{T, N}
 
         fCore = (f isa TypedExpand) ? f.f : f
 
-        ## Already checked by `TruncateReshape`
-        # N = length(shapeFinal.axis)
-        # N==0 && throw(AssertionError("The dimension of `f`'s returned value must be "*
-        #                              "larger than zero."))
-        # prod(shapeFinal.axis) == 0 && throw(AssertionError("The returned value of `f` "*
-        #                                                    "must not be empty."))
-
         new{T, length(shapeFinal.axis), typeof(fCore)}(fCore, T, shapeFinal)
     end
 
     function TypedExpand(f::Function, args::NonEmptyTuple{Any})
-        output = TypedReturn(f, AbstractArray)(args...)
+        output = f(args...)::AbstractArray
         shape = TruncateReshape(output|>size)
         type = eltype(output) |> genPackMemoryType
         fCore = (f isa TypedExpand) ? f.f : f
@@ -205,22 +200,17 @@ function TypedExpand(arr::AbstractArray{T, N},
 end
 
 function (f::TypedExpand{T, N})(arg, args...) where {T, N}
-    res = f.f(arg, args...)::getOutputType(f)
-    f.shape(res)
+    rawRes = getLazyConverter(f.f, getPackType(AbstractArray{T, N}))(arg, args...)
+    f.shape(rawRes)
 end
 
 function getOutputType(::Type{TypedExpand{T, N, F}}) where {T, N, F<:Function}
     type = getOutputType(F)
-    if isconcretetype(type) && type <: AbstractArray{T, N}
-        type
-    else
-        getPackType(AbstractArray{T, N})
-    end
+    typeBound = getPackType(AbstractArray{T, N})
+    ifelse(type <: typeBound, type, typeBound)
 end
 
-
 #= Additional Method =#
-import Quiqbox: getNestedLevelCore
 function getNestedLevelCore(::Type{<:ParamBox{<:Any, E}}, level::Int) where {E<:Pack}
     getNestedLevelCore(E, level)
 end
@@ -282,11 +272,11 @@ end
 
 function unitOp(f::F, a::AbstractArray{<:Any, N}, b::AbstractArray{<:Any, N}) where 
                {F<:Union{typeof(+), typeof(-)}, N}
-    res = similar(a)
-    foreach(eachindex(res), a, b) do n, i, j
-        res[n] = unitOp(f, i, j)
+    idx = firstindex(b) - 1
+    map(a) do ele
+        idx += 1
+        unitOp(f, ele, b[idx])
     end
-    res
 end
 
 
@@ -391,7 +381,7 @@ function formatTensorFunc(f::Function, ::Type{TypedExpand},
     targetEleLevel = getNestedLevel(E).level
     actualEleLevel = getNestedLevel(lambda.type).level
     if actualEleLevel != targetEleLevel
-        throw("The nested level of `f`'s output is $actualEleLevel"*
+        throw("The nested level of `f`'s output is $actualEleLevel "*
               "which should have been `$(targetEleLevel+1)`.")
     end
     lambda
@@ -694,11 +684,15 @@ end
 (pn::ParamBox)() = obtain(pn)
 
 
-function setVal!(par::PrimitiveParam, val)
+function setVal!(par::TensorVar, val)
     if !isPrimitiveInput(par)
         throw(AssertionError("`isPrimitiveInput(par)` must return `true`."))
     end
-    @atomic par.input = val
+    if par isa UnitVar
+        @atomic par.input = val
+    else
+        safelySetVal!(par.input, val)
+    end
 end
 
 function setVal!(par::AdaptableParam, val)
@@ -1037,39 +1031,49 @@ function (f::UnitParamEncoder{T})(input) where {T}
 end
 
 
-const AbstractSpanSet{U<:AbstractVector, G<:AbstractVector} = @NamedTuple{unit::U, grid::G}
+const OptionalSpanSet{U<:NothingOr{AbstractVector}, G<:NothingOr{AbstractVector}} = 
+      @NamedTuple{unit::U, grid::G}
 
-const AbstractSpanValueSet{U<:AbstractVector, G<:AbtVecOfAbtArr} = AbstractSpanSet{U, G}
+const AbstractSpanValueSet{U<:AbstractVector, G<:AbtVecOfAbtArr} = OptionalSpanSet{U, G}
 
 const OptionalSpanValueSet{U<:NothingOr{AbstractVector}, G<:NothingOr{AbtVecOfAbtArr}} = 
-      @NamedTuple{unit::U, grid::G}
+      OptionalSpanSet{U, G}
 
 const OptionalUnitValueSet{U<:NothingOr{AbstractVector}, G<:NothingOr{AbtBottomVector}} = 
-      @NamedTuple{unit::U, grid::G}
+      OptionalSpanSet{U, G}
 
 const OptionalGridValueSet{U<:NothingOr{AbtBottomVector}, G<:NothingOr{AbtVecOfAbtArr}} = 
-      @NamedTuple{unit::U, grid::G}
+      OptionalSpanSet{U, G}
 
 const OptionalVoidValueSet{U<:NothingOr{AbtBottomVector}, G<:NothingOr{AbtBottomVector}} = 
-      @NamedTuple{unit::U, grid::G}
+      OptionalSpanSet{U, G}
 
 const AbstractSpanIndexSet{U<:AbstractVector{<:OneToIndex}, 
                            G<:AbstractVector{<:OneToIndex}} = 
-      AbstractSpanSet{U, G}
+      OptionalSpanSet{U, G}
 
 const FixedSpanIndexSet{U<:OneToIndex, G<:OneToIndex} = 
       AbstractSpanIndexSet{Memory{U}, Memory{G}}
 
+const OptionalSpanParamSet{U<:NothingOr{ AbstractVector{<:UnitParam} }, 
+                           G<:NothingOr{ AbstractVector{<:GridParam} }} = 
+      OptionalSpanSet{U, G}
+
 const AbstractSpanParamSet{U<:AbstractVector{<:UnitParam}, G<:AbstractVector{<:GridParam}} = 
-      AbstractSpanSet{U, G}
+      OptionalSpanParamSet{U, G}
 
 const TypedSpanParamSet{T1<:UnitParam, T2<:GridParam} = 
       AbstractSpanParamSet{Vector{T1}, Vector{T2}}
 
-const FixedSpanParamSet{T1<:UnitParam, T2<:GridParam} = 
-      AbstractSpanParamSet{Memory{T1}, Memory{T2}}
-
 genFixedVoidSpanSet() = (unit=genBottomMemory(), grid=genBottomMemory())
+
+#= Additional Method =#
+function obtain(paramSet::AbstractSpanParamSet)
+    map(paramSet) do sector
+        isempty(sector) ? nothing : obtain(sector)
+    end
+end
+
 
 struct UnitInput end
 struct GridInput end
@@ -1086,21 +1090,23 @@ constrainSpanValueSet(::GridInput, ::OptionalGridValueSet) = getInputSymbol(Grid
 constrainSpanValueSet(::SpanInput, ::OptionalSpanValueSet) = getInputSymbol(SpanInput)
 constrainSpanValueSet(::VoidInput, ::OptionalVoidValueSet) = getInputSymbol(VoidInput)
 
-function getParamInputType end
+getParamInputType(::AbstractParamFunc) = SpanInput()
 
 
-initializeSpanParamSet() = (unit=UnitParam[], grid=GridParam[])
-
-initializeSpanParamSet(::Type{T}) where {T} = (unit=UnitParam{T}[], grid=GridParam{T}[])
+function initializeSpanParamSet(::Type{T}=Any) where {T}
+    upType = genParametricType(UnitParam, (;T))
+    gpType = genParametricType(GridParam, (;T))
+    (unit=upType[], grid=gpType[])
+end
 
 initializeSpanParamSet(::Nothing) = genFixedVoidSpanSet()
-
-initializeSpanParamSet(units::AbstractVector{<:UnitParam}, 
-                       grids::AbstractVector{<:GridParam}) = (unit=units, grid=grids)
 
 initializeSpanParamSet(unit::UnitParam) = (unit=genMemory(unit), grid=genBottomMemory())
 
 initializeSpanParamSet(grid::GridParam) = (unit=genBottomMemory(), grid=genMemory(grid))
+
+initializeSpanParamSet(units::AbstractVector{<:UnitParam}, 
+                       grids::AbstractVector{<:GridParam}) = (unit=units, grid=grids)
 
 
 function locateParamCore!(params::AbstractVector, target::ParamBox)
@@ -1235,30 +1241,32 @@ const UnitSetFilter = SpanSetFilter{OneToIndex, Union{}}
 
 const GridSetFilter = SpanSetFilter{Union{}, OneToIndex}
 
-function getSector(::Val{S}, target::AbstractSpanSet, oneToIds::Memory{T}, 
+function getSector(::Val{S}, target::OptionalSpanSet, oneToIds::Memory{T}, 
                    finalizer::F=itself) where {S, T<:OneToIndex, F<:Function}
     sector = getfield(target, S)
-    iStart = firstindex(sector)
-    if T <: Union{}
+    if T <: Union{} || sector === nothing
         genBottomMemory()
-    elseif finalizer isa ItsType
-        view(sector, map(x->(x.idx + iStart - 1), oneToIds))
     else
-        map(oneToIds) do x
-            getindex(sector, (x.idx + iStart - 1)) |> finalizer
+        iStart = firstindex(sector)
+        if finalizer isa ItsType
+            view(sector, map(x->(x.idx + iStart - 1), oneToIds))
+        else
+            map(oneToIds) do x
+                getindex(sector, (x.idx + iStart - 1)) |> finalizer
+            end
         end
     end
 end
 
 #= Additional Method =#
-function getField(obj::AbstractSpanSet, sFilter::SpanSetFilter, 
+function getField(obj::OptionalSpanSet, sFilter::SpanSetFilter, 
                   finalizer::F=itself) where {F<:Function}
     unit = getSector(Val(:unit), obj, sFilter.scope.unit, finalizer)
     grid = getSector(Val(:grid), obj, sFilter.scope.grid, finalizer)
     (; unit, grid)
 end
 
-getField(::AbstractSpanSet, ::VoidSetFilter) = genFixedVoidSpanSet()
+getField(::OptionalSpanSet, ::VoidSetFilter) = genFixedVoidSpanSet()
 
 function getField(sFilterPrev::SpanSetFilter, sFilterHere::SpanSetFilter)
     getField(sFilterPrev.scope, sFilterHere) |> SpanSetFilter
@@ -1280,16 +1288,22 @@ TaggedSpanSetFilter(scope, Identifier(paramSet))
 TaggedSpanSetFilter() = TaggedSpanSetFilter(SpanSetFilter(), Identifier(nothing))
 
 #= Additional Method =#
-getField(obj::AbstractSpanSet, tsFilter::TaggedSpanSetFilter, 
+getField(obj::OptionalSpanSet, tsFilter::TaggedSpanSetFilter, 
          finalizer::F=itself) where {F<:Function} = 
 getField(obj, tsFilter.scope, finalizer)
 
 getOutputType(::Type{TaggedSpanSetFilter{F}}) where {F<:NamedFilter} = getOutputType(F)
 
 
-const TypedParamFunc{T, F<:AbstractParamFunc} = TypedReturn{T, F}
+function (f::AbstractParamFunc)(input, params::OptionalSpanValueSet)
+    paramSet = map(params) do sector
+        ifelse(sector === nothing, genBottomMemory(), sector)
+    end
+    f(input, paramSet)
+end
 
-getParamInputType(::AbstractParamFunc) = SpanInput()
+
+const TypedParamFunc{T, F<:AbstractParamFunc} = TypedReturn{T, F}
 
 
 struct InputConverter{F<:Function} <: AbstractParamFunc
@@ -1434,7 +1448,7 @@ end
 function unpackFunc(f::Function)
     fLocal = deepcopy(f)
     if noStoredParam(fLocal)
-        InputConverter(fLocal), initializeSpanParamSet(Union{})
+        InputConverter(fLocal), initializeSpanParamSet(nothing)
     else
         source = getSourceParamSet(fLocal)
 

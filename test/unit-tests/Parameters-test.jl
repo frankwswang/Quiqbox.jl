@@ -294,7 +294,7 @@ pVals2_2 = (obtain(inSet2.unit), obtain(inSet2.grid))
 gnf_d1, d1_inPars = compressParam(d1)
 @test IdSet{UnitParam}(first(d1_inPars)) == IdSet{UnitParam}(inSet2.unit)
 @test IdSet{GridParam}(last(d1_inPars)) == IdSet{GridParam}(inSet2.grid)
-inVals2 = map(obtain, d1_inPars)
+inVals2 = obtain(d1_inPars)
 @test evaluateGraph(gn_d1, inVals2) == gnf_d1(inVals2) == d1()
 
 pVec1 = genHeapParam([c1, d1, a2], :c1d1a2)
@@ -365,10 +365,10 @@ pm2 = genCellParam(f5, genCellParam.((k1, k2)), :pn)
 pm2Val = obtain(pm2)
 
 inSet_pm2, _, outSet_pm2, isoSet_pm2 = dissectParam(pm2)
-inSetVal_pm2 = map(obtain, inSet_pm2)
+inSetVal_pm2 = obtain(inSet_pm2)
 gn_pm2 = genParamGraph(pm2) |> transpileGraph
 gnf_pm2, inPars_pm2 = compressParam(pm2)
-@test evaluateGraph(gn_pm2) == gnf_pm2(map(obtain, inPars_pm2)) == pm2()
+@test evaluateGraph(gn_pm2) == gnf_pm2(obtain(inPars_pm2)) == pm2()
 
 x1 = genTensorVar(1.0, :x)
 x2 = genTensorVar(1.1, :x)
@@ -398,6 +398,6 @@ xMat = genTensorVar(rand(3,3), :x)
 xEle = Quiqbox.indexParam(xMat, 5, :xpn5)
 f_xEle, ps_xEle = Quiqbox.genParamMapper((pb=xEle,))
 ps_xEle == Quiqbox.initializeSpanParamSet(xMat)
-f_xEle(map(obtain, ps_xEle)) == (pb=xMat.input[5],) == (pb=obtain(xEle),)
+f_xEle(obtain(ps_xEle)) == (pb=xMat.input[5],) == (pb=obtain(xEle),)
 
 end

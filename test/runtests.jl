@@ -9,6 +9,7 @@ using Test
     t1 = @elapsed @testset "$(unit1)" begin
         include("unit-tests/Tools-test.jl")
         include("unit-tests/StringIO-test.jl")
+        include("unit-tests/Collection-test.jl")
     end
     println("$(unit1) test finished in $t1 seconds.\n")
 

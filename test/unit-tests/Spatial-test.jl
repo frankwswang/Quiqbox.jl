@@ -29,7 +29,7 @@ g1 = x -> mapreduce((f, i)->f(i), *, (f1, f2, f3), x)
 gfs1Prod = AxialProduct(gfs1 |> Tuple)
 gfs1Prod_core, gfs1Prod_par = Quiqbox.unpackFunc(gfs1Prod)
 pt = (1.1, 2.0, -3.0)
-@test g1(pt) == gfs1Prod(pt) ≈ gfs1Prod_core(pt, map(obtain, gfs1Prod_par))
+@test g1(pt) == gfs1Prod(pt) ≈ gfs1Prod_core(pt, obtain(gfs1Prod_par))
 
 gf4 = GaussFunc(1.0)
 gf4_val1 = 0.36787944117144233
@@ -39,7 +39,7 @@ for a_x in 0:3
     pgf = Quiqbox.PolyRadialFunc(gf4, ang)
     k = (0.1, -0.3, 0.5)
     pgf_core, pgf_par = Quiqbox.unpackFunc(pgf)
-    @test pgf(k) == gf4(k|>norm) * prod(k .^ ang) ≈ pgf_core(k, map(obtain, pgf_par))
+    @test pgf(k) == gf4(k|>norm) * prod(k .^ ang) ≈ pgf_core(k, obtain(pgf_par))
     @test pgf((-1., 0., 0.)) == (-1)^isodd(a_x) * gf4_val1
     @test pgf(( 0., 0., 0.)) == iszero(a_x)
     @test pgf(( 1., 0., 0.)) == gf4_val1
