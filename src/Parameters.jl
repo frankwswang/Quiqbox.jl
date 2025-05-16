@@ -1372,10 +1372,14 @@ end
 ParamCombiner(binder::Function, encode::AbstractVector{<:AbstractParamFunc}) = 
 ParamCombiner(binder, genMemory(encode))
 
-function (f::ParamCombiner{B})(input, params::AbstractSpanValueSet) where {B<:Function}
-    mapreduce(f.binder, f.encode) do encoder
-        encoder(input, params)
+function (f::ParamCombiner{B, E})(input::T, params::AbstractSpanValueSet) where 
+                                 {T, B<:Function, E<:ParamFunctionChain}
+    fHead, fTail... = f.encode
+    res = fHead(input, params)
+    for fBody in fTail
+        res = f.binder(res, fBody(input, params))
     end
+    res
 end
 
 getOutputType(::Type{<:ParamCombiner{B}}) where {B<:Function} = getOutputType(B)
