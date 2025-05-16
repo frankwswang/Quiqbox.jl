@@ -21,7 +21,7 @@ pgto1Data = genOrbitalData(pgto1)
 pgto1core, par_pgto1 = Quiqbox.unpackFunc(pgto1);
 @test pgto1 isa Quiqbox.PrimGTO
 @test pgto1core isa Quiqbox.ParamBindFunc
-par_pgto1Val = map(obtain, par_pgto1)
+par_pgto1Val = obtain(par_pgto1)
 @test pgto1core((1.1, 1.0, -0.3), par_pgto1Val) == pgto1((1.1, 1.0, -0.3))
 
 ijk2 = (1, 1, 2)

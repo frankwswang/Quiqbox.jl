@@ -208,8 +208,8 @@ end
 
 struct LayerParamGraph{T, S1<:UnitVertex, S2<:GridVertex, H<:CallVertex, 
                        V<:CallVertex{T}} <: TransformedGraph{Directed}
-    origin::AbstractSpanSet{Memory{UnitParam}, Memory{GridParam}}
-    source::AbstractSpanSet{Memory{S1},        Memory{S2}       }
+    origin::OptionalSpanSet{Memory{UnitParam}, Memory{GridParam}}
+    source::OptionalSpanSet{Memory{S1},        Memory{S2}       }
     hidden::Memory{H}
     output::V
 
@@ -524,8 +524,8 @@ getParamInputType(::GridInputFormatter) = GridInput()
 getParamInputType(::SpanInputFormatter) = SpanInput()
 getParamInputType(::VoidInputFormatter) = VoidInput()
 
-function getField(spanInput::OptionalSpanValueSet, input::SpanInputFormatter)
-    constrainSpanValueSet(getParamInputType(input), spanInput)
+function getField(spanInput::OptionalSpanValueSet, formatter::SpanInputFormatter)
+    constrainSpanValueSet(getParamInputType(formatter), spanInput)
     spanInput
 end
 
