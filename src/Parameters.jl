@@ -1295,12 +1295,16 @@ getField(obj, tsFilter.scope, finalizer)
 getOutputType(::Type{TaggedSpanSetFilter{F}}) where {F<:NamedFilter} = getOutputType(F)
 
 
-function (f::AbstractParamFunc)(input, params::OptionalSpanValueSet)
-    paramSet = map(params) do sector
+function formatSpanValueSet(params::OptionalSpanValueSet)
+    map(params) do sector
         ifelse(sector === nothing, genBottomMemory(), sector)
     end
-    f(input, paramSet)
 end
+
+formatSpanValueSet(params::AbstractSpanValueSet) = itself(params)
+
+(f::AbstractParamFunc)(input, params::OptionalSpanValueSet) = 
+f(input, formatSpanValueSet(params))
 
 
 const TypedParamFunc{T, F<:AbstractParamFunc} = TypedReturn{T, F}
