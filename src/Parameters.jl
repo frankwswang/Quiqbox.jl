@@ -1404,13 +1404,6 @@ end
 
 const ParamFilterApply{B<:Function, E<:SpanSetFilter} = ContextParamFunc{B, ItsType, E}
 
-# Specialized method due to the lack of compiler optimization
-const ParamFreeApply{B<:Function} = ParamFilterApply{B, VoidSetFilter}
-
-function (f::ParamFreeApply{B})(input, ::AbstractSpanValueSet) where {B<:Function}
-    f.binder(input, genFixedVoidSpanSet())
-end
-
 
 struct ParamPipeline{E<:ParamFunctionChain} <: AbstractParamFunc
     encode::E
