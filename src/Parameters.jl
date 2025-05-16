@@ -143,13 +143,15 @@ TypedReduce(f::TypedReduce, ::Type{T}) where {T} = TypedReduce(f.f, T)
 
 TypedReduce(::Type{T}) where {T} = TypedReduce(itself, T)
 
-(f::TypedReduce)(arg, args...) = f.f(arg, args...)::getOutputType(f)
+function (f::TypedReduce{T})(arg, args...) where {T}
+    getLazyConverter(f.f, getPackType(T))(arg, args...)
+end
 
-getOutputType(::Type{TypedReduce{T, F}}) where {T, F<:Function} = 
-typeintersect(getOutputType(F), T)
-
-getOutputType(::Type{<:TypedReduce{<:AbstractArray{T, N}, F}}) where {T, N, F<:Function} = 
-typeintersect(getOutputType(F), getPackType(AbstractArray{T, N}))
+function getOutputType(::Type{TypedReduce{T, F}}) where {T, F<:Function}
+    type = getOutputType(F)
+    typeBound = getPackType(T)
+    ifelse(type <: typeBound, type, typeBound)
+end
 
 
 struct TypedExpand{T, N, F<:Function} <: TypedTensorFunc{T, N}
@@ -165,7 +167,7 @@ struct TypedExpand{T, N, F<:Function} <: TypedTensorFunc{T, N}
             if f isa TypedExpand
                 f.shape
             else
-                TypedReturn(f, getPackType(AbstractArray{T}))(args...) |> size
+                f(args...)::getPackType(AbstractArray{T}) |> size
             end
         else
             shape
@@ -174,18 +176,11 @@ struct TypedExpand{T, N, F<:Function} <: TypedTensorFunc{T, N}
 
         fCore = (f isa TypedExpand) ? f.f : f
 
-        ## Already checked by `TruncateReshape`
-        # N = length(shapeFinal.axis)
-        # N==0 && throw(AssertionError("The dimension of `f`'s returned value must be "*
-        #                              "larger than zero."))
-        # prod(shapeFinal.axis) == 0 && throw(AssertionError("The returned value of `f` "*
-        #                                                    "must not be empty."))
-
         new{T, length(shapeFinal.axis), typeof(fCore)}(fCore, T, shapeFinal)
     end
 
     function TypedExpand(f::Function, args::NonEmptyTuple{Any})
-        output = TypedReturn(f, AbstractArray)(args...)
+        output = f(args...)::AbstractArray
         shape = TruncateReshape(output|>size)
         type = eltype(output) |> genPackMemoryType
         fCore = (f isa TypedExpand) ? f.f : f
@@ -205,22 +200,17 @@ function TypedExpand(arr::AbstractArray{T, N},
 end
 
 function (f::TypedExpand{T, N})(arg, args...) where {T, N}
-    res = f.f(arg, args...)::getOutputType(f)
-    f.shape(res)
+    rawRes = getLazyConverter(f.f, getPackType(AbstractArray{T, N}))(arg, args...)
+    f.shape(rawRes)
 end
 
 function getOutputType(::Type{TypedExpand{T, N, F}}) where {T, N, F<:Function}
     type = getOutputType(F)
-    if isconcretetype(type) && type <: AbstractArray{T, N}
-        type
-    else
-        getPackType(AbstractArray{T, N})
-    end
+    typeBound = getPackType(AbstractArray{T, N})
+    ifelse(type <: typeBound, type, typeBound)
 end
 
-
 #= Additional Method =#
-import Quiqbox: getNestedLevelCore
 function getNestedLevelCore(::Type{<:ParamBox{<:Any, E}}, level::Int) where {E<:Pack}
     getNestedLevelCore(E, level)
 end
