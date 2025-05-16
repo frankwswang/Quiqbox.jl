@@ -47,16 +47,6 @@ end
 getPackType(::Type{T}) where {T} = T
 
 
-# #! Potentially useful in the future
-# struct Point{T} <: CustomMemory{T, 0}
-#     value::T
-# end
-
-# function getNestedLevelCore(::Type{Point{T}}, level::Int) where {T}
-#     (T, level)
-# end
-
-
 function checkReshapingAxis(shape::Tuple{Vararg{Int}})
     if any(i < 0 for i in shape)
         throw(AssertionError("All axis sizes should be non-negative."))
