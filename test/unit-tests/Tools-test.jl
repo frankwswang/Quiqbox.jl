@@ -1,13 +1,12 @@
 using Test
 using Quiqbox
 using Quiqbox: getAtolVal, getAtolDigits, roundToMultiOfStep, nearestHalfOf, getNearestMid, 
-               isApprox, tryIncluding, sizeOf, markUnique, getUnique!, 
+               isApprox, sizeOf, markUnique, getUnique!, 
                itself, themselves, replaceSymbol, groupedSort, nameOf, tupleDiff, fillObj, 
                arrayToTuple, genTupleCoords, uniCallFunc, mergeMultiObjs, isNaN, getBool, 
                skipIndices, isOscillateConverged, lazyCollect, asymSign, numEps, 
                genAdaptStepBl, shiftLastEle!, getValParm, fct, triMatEleNum, 
                convertIndex1DtoTri2D, convertIndex1DtoTri4D, mapMapReduce, rmsOf, keepOnly!
-using Suppressor: @capture_out
 using LinearAlgebra: norm
 using Random
 
@@ -38,14 +37,6 @@ v1 = 1/3 + 1e-16
 v2 = 1/3
 @test isApprox(v1, v2)
 @test !isApprox(v1, v2, atol=NaN)
-
-
-# function tryIncluding
-isIncluded = true
-errStr = @capture_out begin isIncluded = tryIncluding("someMod") end
-@test isIncluded == false
-pkgDir = @__DIR__
-@test length(errStr) > length(@capture_out tryIncluding("someMod", subModulePath=""))
 
 
 #function sizeOf

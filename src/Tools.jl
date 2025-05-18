@@ -83,25 +83,6 @@ function isApprox(x::T, y::T; atol=0) where {T}
 end
 
 
-# Function for submodule loading and integrity checking.
-function tryIncluding(subModuleName::String; subModulePath=(@__DIR__)[:]*"/SubModule")
-    try
-        include(subModulePath*"/"*subModuleName*".jl")
-        return true
-    catch err
-        warning = """
-        Submodule `$(subModuleName)` failed loading and won't be useable:
-
-            $(err)
-
-        `///magenta///However, this does not affect the functionality of the main module.`
-        """
-        printStyledInfo(warning, title="WARNING:\n", titleColor=:light_yellow)
-        return false
-    end
-end
-
-
 sizeOf(arr::AbstractArray) = size(arr)
 
 sizeOf(tpl::Tuple) = (length(tpl),)
@@ -282,18 +263,19 @@ end
 
 function markUniqueCore!(compareFunc::F, compressedSeq::AbstractVector, 
                          sequence::GeneralCollection) where {F<:Function}
+    iFirst = firstindex(compressedSeq)
     map(sequence) do ele
-        j = firstindex(compressedSeq)
+        i = iFirst
         isNew = true
-        while j <= lastindex(compressedSeq)
-            if compareFunc(compressedSeq[j], ele)
+        while i <= lastindex(compressedSeq)
+            if compareFunc(compressedSeq[i], ele)
                 isNew = false
                 break
             end
-            j += 1
+            i += 1
         end
         isNew && push!(compressedSeq, ele)
-        j
+        i
     end
 end
 
