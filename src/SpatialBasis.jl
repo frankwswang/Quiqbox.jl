@@ -172,7 +172,8 @@ function getNormFactor(orb::ComposedOrb{T, D, C}) where {T<:Real, D, C<:RealOrCo
     if isRenormalized(orb)
         constructor = getfield(Quiqbox, nameof(orb))
         orbInner = constructor(orb, renormalize=false)
-        convert(C, overlap(orbInner, orbInner)|>absSqrtInv)
+        overlapVal = computeIntegral(OneBodyIntegral{D}(), genOverlapSampler(), (orbInner,))
+        convert(C, absSqrtInv(overlapVal))
     else
         one(C)
     end
@@ -272,15 +273,29 @@ const OrbBasisTpl{T<:Real, D} = NonEmptyTuple{OrbitalBasis{<:RealOrComplex{T}, D
 
 const OrbBasisCollection{T<:Real, D} = Union{OrbBasisVec{T, D}, OrbBasisTpl{T, D}}
 
-const OrbBasisSource{T<:Real, D} = Union{ComposedOrb{T, D}, OrbBasisCollection{T, D}}
+const OrbBasisSource{T<:Real, D} = 
+      Union{OrbitalBasis{<:RealOrComplex{T}, D}, OrbBasisCollection{T, D}}
 
 function genOrbitalDataCore!(fieldCache::FieldParamFuncCache{T, D}, 
                              paramCache::MultiSpanDataCacheBox, 
                              paramSet::AbstractSpanParamSet, 
                              orbs::OrbBasisCollection{T, D}) where {T<:Real, D}
     checkEmptiness(orbs, :orbs)
-    fMap = orbs isa Tuple ? lazyTupleMap : map
-    fMap(orbs) do orb
+    ids, uniqueOrbs = markUnique(orbs, compareFunction=(===))
+    data = map(uniqueOrbs) do orb
+        genOrbitalDataCore!(fieldCache, paramCache, paramSet, orb)
+    end
+    map(ids) do idx
+        data[begin+idx-1]
+    end
+end
+
+function genOrbitalDataCore!(fieldCache::FieldParamFuncCache{T, D}, 
+                             paramCache::MultiSpanDataCacheBox, 
+                             paramSet::AbstractSpanParamSet, 
+                             orbs::N24Tuple{OrbitalBasis{<:RealOrComplex{T}, D}}) where 
+                            {T<:Real, D}
+    lazyTupleMap(orbs) do orb
         genOrbitalDataCore!(fieldCache, paramCache, paramSet, orb)
     end
 end
