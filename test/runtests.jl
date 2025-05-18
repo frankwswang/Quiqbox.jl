@@ -53,9 +53,10 @@ using Test
     end
     println("$(unit6) test finished in $t6 seconds.\n")
 
-    unit7 = "Aqua.jl"
-    println("Running $(unit7) Test...")
+    unit7 = "Code Quality"
+    println("Testing $(unit7)")
     t7 = @elapsed @testset "$(unit7)" begin
+        include("quality-tests/Performance-test.jl")
         include("quality-tests/Aqua-test.jl")
     end
     println("$(unit7) test finished in $t7 seconds.\n")
