@@ -250,8 +250,7 @@ function markUnique(arr::AbstractArray{T}; compareFunction::F=isequal) where
     elseif len == 1
         markList = similar(arr, Int)
         markList[] = firstindex(arr)
-        cmprList[] = first(arr)
-        markList, cmprList
+        markList, [first(arr)]
     else
         sizehint!(cmprList, len)
         markList = markUniqueCore!(compareFunction, cmprList, arr)
@@ -265,8 +264,7 @@ function markUnique(tpl::Tuple{Vararg{Any, N}}; compareFunction::F=isequal) wher
     if N == 0
         (), cmprList
     elseif N == 1
-        cmprList[] = first(tpl)
-        (firstindex(tpl),), cmprList
+        (firstindex(tpl),), [first(tpl)]
     else
         sizehint!(cmprList, N)
         markList = markUniqueCore!(compareFunction, cmprList, tpl)

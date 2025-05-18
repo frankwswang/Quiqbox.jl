@@ -62,6 +62,11 @@ res1, res2 = markUnique(emptyArr)
 res1 == emptyArr == res2
 @test markUnique((1,3,2,2,5)) == ((1,2,3,3,4), [1,3,2,5])
 @test markUnique(()) == ((), Union{}[])
+@test markUnique((3,)) == ((1,), [3])
+markList, cmprList = markUnique(Memory{Int}([3]))
+@test markList isa Memory{Int}
+@test cmprList isa Vector{Int}
+@test (markList, cmprList) == (Memory{Int}([1]), [3])
 
 
 # function getUnique!
