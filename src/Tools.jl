@@ -244,26 +244,41 @@ end
 function markUnique(arr::AbstractArray{T}; compareFunction::F=isequal) where 
                    {T, F<:Function}
     cmprList = T[]
-    isempty(arr) && (return arr, cmprList)
-    sizehint!(cmprList, length(arr))
-    markList = markUniqueCore!(compareFunction, cmprList, arr)
-    markList, cmprList
+    len = length(arr)
+    if len == 0
+        similar(arr, Int), cmprList
+    elseif len == 1
+        markList = similar(arr, Int)
+        markList[] = firstindex(arr)
+        cmprList[] = first(arr)
+        markList, cmprList
+    else
+        sizehint!(cmprList, len)
+        markList = markUniqueCore!(compareFunction, cmprList, arr)
+        markList, cmprList
+    end
 end
 
 function markUnique(tpl::Tuple{Vararg{Any, N}}; compareFunction::F=isequal) where 
                    {N, F<:Function}
-    isempty(tpl) && (return tpl, ())
-    cmprList = eltype(tpl)[]
-    sizehint!(cmprList, N)
-    markList = markUniqueCore!(compareFunction, cmprList, tpl)
-    markList, Tuple(cmprList)
+    cmprList = getMinimalEleType(tpl)[]
+    if N == 0
+        (), cmprList
+    elseif N == 1
+        cmprList[] = first(tpl)
+        (firstindex(tpl),), cmprList
+    else
+        sizehint!(cmprList, N)
+        markList = markUniqueCore!(compareFunction, cmprList, tpl)
+        markList, cmprList
+    end
 end
 
 function markUnique((a, b)::NTuple{2, Any}; compareFunction::F=isequal) where {F<:Function}
     if compareFunction(a, b)
-        (1, 1), (a,)
+        (1, 1), [a]
     else
-        (1, 2), (a, b)
+        (1, 2), [a, b]
     end
 end
 

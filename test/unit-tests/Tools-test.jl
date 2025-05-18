@@ -59,7 +59,9 @@ nc = rand(2:5)
 @test markUnique([1,3,2,2,5]) == ([1,2,3,3,4], [1,3,2,5])
 emptyArr = Int[]
 res1, res2 = markUnique(emptyArr)
-res1 === emptyArr == res2
+res1 == emptyArr == res2
+@test markUnique((1,3,2,2,5)) == ((1,2,3,3,4), [1,3,2,5])
+@test markUnique(()) == ((), Union{}[])
 
 
 # function getUnique!
