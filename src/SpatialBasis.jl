@@ -242,13 +242,37 @@ function getOrbOutputTypeUnion(orbsData::OrbDataCollection{T, D}) where {T<:Real
 end
 
 
-const FieldParamFuncCache{T<:Real, D} = LRU{
-    EgalBox{FieldAmplitude{<:RealOrComplex{T}, D}}, FieldParamFunc{<:RealOrComplex{T}, D}
-}
+const FieldParamFuncCacheCore{C<:RealOrComplex, D} = 
+LRU{EgalBox{FieldAmplitude{C, D}}, FieldParamFunc{C, D}}
 
-function FieldParamFuncCache(::Type{T}, ::Val{D}) where {T<:Real, D}
-    FieldParamFuncCache{T, D}(maxsize=200)
+struct FieldParamFuncCache{T<:Real, D} <: QueryBox{Union{ FieldParamFunc{T, D}, 
+                                                          FieldParamFunc{Complex{T}, D} }}
+    real::FieldParamFuncCacheCore{T, D}
+    complex::FieldParamFuncCacheCore{Complex{T}, D}
+
+    function FieldParamFuncCache(::Type{T}, ::Val{D}, maxSize::Int=200) where {T<:Real, D}
+        rSector = FieldParamFuncCacheCore{T, D}(maxsize=maxSize)
+        cSector = FieldParamFuncCacheCore{Complex{T}, D}(maxsize=maxSize)
+        new{T, D}(rSector, cSector)
+    end
 end
+
+function getCachedFieldFunc!(cache::FieldParamFuncCache{T, D}, 
+                             orb::PrimitiveOrb{T, D, T}, 
+                             paramSet::AbstractSpanParamSet) where {T<:Real, D}
+    get!(cache.real, EgalBox{FieldAmplitude{T, D}}(orb.body)) do
+        unpackFunc!(orb.body, paramSet)::FieldParamFunc{T, D}
+    end
+end
+
+function getCachedFieldFunc!(cache::FieldParamFuncCache{T, D}, 
+                             orb::PrimitiveOrb{T, D, Complex{T}}, 
+                             paramSet::AbstractSpanParamSet) where {T<:Real, D}
+    get!(cache.complex, EgalBox{FieldAmplitude{Complex{T}, D}}(orb.body)) do
+        unpackFunc!(orb.body, paramSet)::FieldParamFunc{Complex{T}, D}
+    end
+end
+
 
 function genOrbitalDataCore!(fieldCache::FieldParamFuncCache{T, D}, 
                              paramCache::MultiSpanDataCacheBox, 
@@ -256,9 +280,7 @@ function genOrbitalDataCore!(fieldCache::FieldParamFuncCache{T, D},
                              orb::PrimitiveOrb{T, D, C}) where 
                             {T<:Real, D, C<:RealOrComplex{T}}
     centerData = cacheParam!(paramCache, orb.center)
-    bodyCore = get!(fieldCache, EgalBox{FieldAmplitude{<:RealOrComplex{T}, D}}(orb.body)) do
-        unpackFunc!(orb.body, paramSet)
-    end::FieldParamFunc{C, D}
+    bodyCore = getCachedFieldFunc!(fieldCache, orb, paramSet)
     PrimOrbData(FloatingField(centerData, bodyCore, paramSet), orb.renormalize)
 end
 

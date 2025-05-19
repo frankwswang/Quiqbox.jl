@@ -2,15 +2,15 @@ using BenchmarkTools # `using Pkg; Pkg.add("BenchmarkTools")` to install Benchma
 using Quiqbox
 
 # Benchmark Structure
-const BenchmarkSuite = BenchmarkGroup()
+const SUITE = BenchmarkGroup()
 const BasisEvalBSuite = BenchmarkGroup(["Direct", "Renormalized"])
 const IntegrationBSuite = BenchmarkGroup(["Analytical", "Numerical"])
 const CachedCompBSuite = BenchmarkGroup(["Direct", "Lazy"])
 
-BenchmarkSuite["Basis"]["Orbital"] = BasisEvalBSuite
-BenchmarkSuite["Integration"]["Orbital"] = IntegrationBSuite
-const OrbEvalBSuite = BenchmarkSuite["Basis"]["Orbital"]
-const OrbInteBSuite = BenchmarkSuite["Integration"]["Orbital"]
+SUITE["Basis"]["Orbital"] = BasisEvalBSuite
+SUITE["Integration"]["Orbital"] = IntegrationBSuite
+const OrbEvalBSuite = SUITE["Basis"]["Orbital"]
+const OrbInteBSuite = SUITE["Integration"]["Orbital"]
 
 OrbInteBSuite["Overlap"] = CachedCompBSuite
 const OrbOvlpBSuite = OrbInteBSuite["Overlap"]
@@ -85,4 +85,4 @@ OrbOvlpBSuite["Lazy"]["PSTO_Self_DN"] =
 
 
 # Finalized Benchmarkable Suite
-BenchmarkSuite # `BenchmarkTools.run(BenchmarkSuite)` to manually invoke benchmarking.
+SUITE # `BenchmarkTools.run(SUITE)` to manually invoke benchmarking.
