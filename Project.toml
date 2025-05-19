@@ -21,7 +21,6 @@ Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 
 [compat]
 Aqua = "0.8"
-BenchmarkTools = "1"
 # Combinatorics = "1"
 Documenter = "1"
 # DoubleFloats = "^1.2"
@@ -45,7 +44,6 @@ libcint_jll = "5"
 
 [extras]
 Aqua = "4c88cf16-eb10-579e-8560-4a9242c79595"
-BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
 Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
@@ -55,4 +53,4 @@ Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 libcint_jll = "574b78ca-bebd-517c-801d-4735c93a9686"
 
 [targets]
-test = ["Aqua", "Documenter", "Random", "Test", "Printf", "BenchmarkTools"]
+test = ["Aqua", "Documenter", "Random", "Test"]
