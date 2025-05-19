@@ -925,12 +925,3 @@ function computeIntegral(style::MultiBodyIntegral, op::DirectOperator,
     orbsData = genOrbitalData(orbs; cache!Self)
     computeIntegral(style, op, orbsData; lazyCompute)
 end
-
-function computeIntegral(style::MultiBodyIntegral, op::DirectOperator, 
-                         @specialize(orbs::O); 
-                         cache!Self::MultiSpanDataCacheBox=MultiSpanDataCacheBox(), 
-                         lazyCompute::Bool=false) where 
-                        {T<:Real, D, O<:N24Tuple{OrbitalBasis{ <:RealOrComplex{T}, D} }}
-    orbsData = genOrbitalData(orbs; cache!Self)
-    computeIntegral(style, op, orbsData; lazyCompute)
-end

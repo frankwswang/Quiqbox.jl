@@ -45,13 +45,7 @@ struct OneBodyIntegral{D} <: MultiBodyIntegral{D} end
 struct TwoBodyIntegral{D} <: MultiBodyIntegral{D} end
 
 
-strictTypeJoin(::Type{T}, ::Type{T}) where {T<:RealOrComplex} = T
-
-strictTypeJoin(::Type{Union{}}, ::Type{T}) where {T<:RealOrComplex} = T
-
-strictTypeJoin(::Type{T}, ::Type{Union{}}) where {T<:RealOrComplex} = T
+strictTypeJoin(TL::Type, TR::Type) = typejoin(TL, TR)
 
 strictTypeJoin(::Type{TL}, ::Type{TR}) where {TL<:RealOrComplex, TR<:RealOrComplex} = 
 promote_type(TL, TR)
-
-strictTypeJoin(TL::Type, TR::Type) = typejoin(TL, TR)
