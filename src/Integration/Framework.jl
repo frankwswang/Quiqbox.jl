@@ -124,10 +124,10 @@ const OneBodyOrbCoreIntLayoutUnion{T<:Real, D} = OneBodyOrbIntLayout{PrimOrbData
 const TwoBodyOrbCoreIntLayoutUnion{T<:Real, D} = TwoBodyOrbIntLayout{PrimOrbData{T, D}}
 
 #= Additional Method =#
-function getOrbOutputTypeUnion(layout::OrbCoreIntLayoutUnion{T, D}) where {T<:Real, D}
-    mapreduce(promote_type, layout) do ele
-        ele isa Bar ? T : getOrbOutputTypeUnion(ele)
-    end
+function getOrbOutputTypeUnion(layout::TwoBodyOrbCoreIntLayoutUnion{T}) where {T<:Real}
+    mapreduce(strictTypeJoin, layout) do ele
+        ele isa Bar ? Union{} : getOrbOutputTypeUnion(ele)
+    end::Union{Type{Complex{T}}, Type{T}}
 end
 
 function formatOrbCoreIntConfig(config::OrbCoreIntLayoutUnion{T, D}) where {T<:Real, D}
@@ -158,13 +158,13 @@ end
 
 
 struct OrbIntCompCache{T<:Real, D, C<:RealOrComplex{T}, S<:MultiBodyIntegral{D}, 
-                       M<:CustomCache{<:Union{T, C}}, } <: CustomCache{C}
+                       M<:Union{ CustomCache{T}, CustomCache{C} }} <: CustomCache{C}
     dict::LRU{OrbCoreIntConfig{T, D, S}, M}
 
     function OrbIntCompCache(::S, ::Type{C}, 
                              ::Type{M}=Union{CustomCache{T}, CustomCache{C}}) where 
                             {D, S<:MultiBodyIntegral{D}, T<:Real, C<:RealOrComplex{T}, 
-                             M<:CustomCache{ <:Union{T, C} }}
+                             M<:Union{ CustomCache{T}, CustomCache{C} }}
         dict = LRU{OrbCoreIntConfig{T, D, S}, M}(maxsize=20)
         new{T, D, C, S, M}(dict)
     end
