@@ -158,13 +158,19 @@ end
 
 
 struct OrbIntCompCache{T<:Real, D, C<:RealOrComplex{T}, S<:MultiBodyIntegral{D}, 
-                       M<:CustomCache{<:Union{T, C}}, } <: CustomCache{C}
+                       M<:CustomCache{ <:Union{T, C} }} <: CustomCache{C}
     dict::LRU{OrbCoreIntConfig{T, D, S}, M}
 
-    function OrbIntCompCache(::S, ::Type{C}, 
-                             ::Type{M}=Union{CustomCache{T}, CustomCache{C}}) where 
-                            {D, S<:MultiBodyIntegral{D}, T<:Real, C<:RealOrComplex{T}, 
-                             M<:CustomCache{ <:Union{T, C} }}
+    function OrbIntCompCache(::S, ::Type{T}, ::Type{M}=CustomCache{T}, 
+                             ) where {D, S<:MultiBodyIntegral{D}, T<:Real, 
+                                      M<:CustomCache{T}}
+        dict = LRU{OrbCoreIntConfig{T, D, S}, M}(maxsize=20)
+        new{T, D, T, S, M}(dict)
+    end
+
+    function OrbIntCompCache(::S, ::Type{C}, ::Type{M}=CustomCache{<:RealOrComplex{T}}
+                             ) where {D, S<:MultiBodyIntegral{D}, T<:Real, 
+                                      C<:Complex{T}, M<:CustomCache{ <:RealOrComplex{T} }}
         dict = LRU{OrbCoreIntConfig{T, D, S}, M}(maxsize=20)
         new{T, D, C, S, M}(dict)
     end
