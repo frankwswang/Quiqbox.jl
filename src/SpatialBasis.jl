@@ -227,13 +227,18 @@ getOrbOutputTypeUnion(::Type{<:OrbitalData{T, D, C}}) where {T, D, C<:RealOrComp
 
 getOrbOutputTypeUnion(::T) where {T<:OrbitalData} = getOrbOutputTypeUnion(T)
 
-function getOrbOutputTypeUnion(arr::OrbDataCollection{T, D}) where {T<:Real, D}
-    eleType = eltype(arr)
-    if isconcretetype(eleType) || isempty(arr)
-        getOrbOutputTypeUnion(eleType)
+getOrbOutputTypeUnion(::AbstractVector{<:OrbitalData{T, D, C}}) where 
+                     {T<:Real, D, C<:RealOrComplex{T}} = C
+
+getOrbOutputTypeUnion(::NonEmptyTuple{OrbitalData{T, D, C}}) where 
+                     {T<:Real, D, C<:RealOrComplex{T}} = C
+
+function getOrbOutputTypeUnion(orbsData::OrbDataCollection{T, D}) where {T<:Real, D}
+    if isempty(orbsData)
+        getOrbOutputTypeUnion(orbsData|>eltype)
     else
-        mapreduce(getOrbOutputTypeUnion, strictTypeJoin, arr)
-    end
+        mapreduce(getOrbOutputTypeUnion, strictTypeJoin, orbsData)
+    end::Union{Type{Complex{T}}, Type{T}}
 end
 
 
@@ -248,11 +253,12 @@ end
 function genOrbitalDataCore!(fieldCache::FieldParamFuncCache{T, D}, 
                              paramCache::MultiSpanDataCacheBox, 
                              paramSet::AbstractSpanParamSet, 
-                             orb::PrimitiveOrb{T, D}) where {T<:Real, D}
-    centerData = promote(cacheParam!(paramCache, orb.center)...)
+                             orb::PrimitiveOrb{T, D, C}) where 
+                            {T<:Real, D, C<:RealOrComplex{T}}
+    centerData = cacheParam!(paramCache, orb.center)
     bodyCore = get!(fieldCache, EgalBox{FieldAmplitude{<:RealOrComplex{T}, D}}(orb.body)) do
         unpackFunc!(orb.body, paramSet)
-    end
+    end::FieldParamFunc{C, D}
     PrimOrbData(FloatingField(centerData, bodyCore, paramSet), orb.renormalize)
 end
 

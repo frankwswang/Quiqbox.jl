@@ -124,10 +124,10 @@ const OneBodyOrbCoreIntLayoutUnion{T<:Real, D} = OneBodyOrbIntLayout{PrimOrbData
 const TwoBodyOrbCoreIntLayoutUnion{T<:Real, D} = TwoBodyOrbIntLayout{PrimOrbData{T, D}}
 
 #= Additional Method =#
-function getOrbOutputTypeUnion(layout::OrbCoreIntLayoutUnion{T, D}) where {T<:Real, D}
-    mapreduce(promote_type, layout) do ele
-        ele isa Bar ? T : getOrbOutputTypeUnion(ele)
-    end
+function getOrbOutputTypeUnion(layout::TwoBodyOrbCoreIntLayoutUnion{T}) where {T<:Real}
+    mapreduce(strictTypeJoin, layout) do ele
+        ele isa Bar ? Union{} : getOrbOutputTypeUnion(ele)
+    end::Union{Type{Complex{T}}, Type{T}}
 end
 
 function formatOrbCoreIntConfig(config::OrbCoreIntLayoutUnion{T, D}) where {T<:Real, D}
@@ -928,6 +928,15 @@ function computeIntegral(style::MultiBodyIntegral, op::DirectOperator,
                          orbs::NonEmptyTuple{OrbitalBasis{<:RealOrComplex{T}, D}}; 
                          cache!Self::MultiSpanDataCacheBox=MultiSpanDataCacheBox(), 
                          lazyCompute::Bool=false) where {T<:Real, D}
+    orbsData = genOrbitalData(orbs; cache!Self)
+    computeIntegral(style, op, orbsData; lazyCompute)
+end
+
+function computeIntegral(style::MultiBodyIntegral, op::DirectOperator, 
+                         @specialize(orbs::O); 
+                         cache!Self::MultiSpanDataCacheBox=MultiSpanDataCacheBox(), 
+                         lazyCompute::Bool=false) where 
+                        {T<:Real, D, O<:N24Tuple{OrbitalBasis{ <:RealOrComplex{T}, D} }}
     orbsData = genOrbitalData(orbs; cache!Self)
     computeIntegral(style, op, orbsData; lazyCompute)
 end
