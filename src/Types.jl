@@ -53,7 +53,8 @@ abstract type FieldAmplitude{T, D} <: ParticleFunction{D, 1} end
 end
 
 
-const N12Tuple{T} = Union{Tuple{T}, NTuple{2, T}}
+const N12Tuple{T} = Union{    Tuple{T}, NTuple{2, T}}
+const N24Tuple{T} = Union{NTuple{2, T}, NTuple{4, T}}
 const NonEmptyTuple{T, NMO} = Tuple{T, Vararg{T, NMO}}
 const TriTupleUnion{T} = Union{(NTuple{N, T} for N in 1:3)...}
 const GeneralTupleUnion{T<:Tuple} = Union{T, NamedTuple{<:Any, <:T}}

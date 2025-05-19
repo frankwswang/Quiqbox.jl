@@ -83,25 +83,6 @@ function isApprox(x::T, y::T; atol=0) where {T}
 end
 
 
-# Function for submodule loading and integrity checking.
-function tryIncluding(subModuleName::String; subModulePath=(@__DIR__)[:]*"/SubModule")
-    try
-        include(subModulePath*"/"*subModuleName*".jl")
-        return true
-    catch err
-        warning = """
-        Submodule `$(subModuleName)` failed loading and won't be useable:
-
-            $(err)
-
-        `///magenta///However, this does not affect the functionality of the main module.`
-        """
-        printStyledInfo(warning, title="WARNING:\n", titleColor=:light_yellow)
-        return false
-    end
-end
-
-
 sizeOf(arr::AbstractArray) = size(arr)
 
 sizeOf(tpl::Tuple) = (length(tpl),)
@@ -244,43 +225,57 @@ end
 function markUnique(arr::AbstractArray{T}; compareFunction::F=isequal) where 
                    {T, F<:Function}
     cmprList = T[]
-    isempty(arr) && (return arr, cmprList)
-    sizehint!(cmprList, length(arr))
-    markList = markUniqueCore!(compareFunction, cmprList, arr)
-    markList, cmprList
+    len = length(arr)
+    if len == 0
+        similar(arr, Int), cmprList
+    elseif len == 1
+        markList = similar(arr, Int)
+        markList[] = firstindex(arr)
+        markList, [first(arr)]
+    else
+        sizehint!(cmprList, len)
+        markList = markUniqueCore!(compareFunction, cmprList, arr)
+        markList, cmprList
+    end
 end
 
 function markUnique(tpl::Tuple{Vararg{Any, N}}; compareFunction::F=isequal) where 
                    {N, F<:Function}
-    isempty(tpl) && (return tpl, ())
-    cmprList = eltype(tpl)[]
-    sizehint!(cmprList, N)
-    markList = markUniqueCore!(compareFunction, cmprList, tpl)
-    markList, Tuple(cmprList)
+    cmprList = getMinimalEleType(tpl)[]
+    if N == 0
+        (), cmprList
+    elseif N == 1
+        (firstindex(tpl),), [first(tpl)]
+    else
+        sizehint!(cmprList, N)
+        markList = markUniqueCore!(compareFunction, cmprList, tpl)
+        markList, cmprList
+    end
 end
 
 function markUnique((a, b)::NTuple{2, Any}; compareFunction::F=isequal) where {F<:Function}
     if compareFunction(a, b)
-        (1, 1), (a,)
+        (1, 1), [a]
     else
-        (1, 2), (a, b)
+        (1, 2), [a, b]
     end
 end
 
 function markUniqueCore!(compareFunc::F, compressedSeq::AbstractVector, 
                          sequence::GeneralCollection) where {F<:Function}
+    iFirst = firstindex(compressedSeq)
     map(sequence) do ele
-        j = firstindex(compressedSeq)
+        i = iFirst
         isNew = true
-        while j <= lastindex(compressedSeq)
-            if compareFunc(compressedSeq[j], ele)
+        while i <= lastindex(compressedSeq)
+            if compareFunc(compressedSeq[i], ele)
                 isNew = false
                 break
             end
-            j += 1
+            i += 1
         end
         isNew && push!(compressedSeq, ele)
-        j
+        i
     end
 end
 

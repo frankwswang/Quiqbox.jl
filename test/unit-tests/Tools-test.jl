@@ -1,13 +1,12 @@
 using Test
 using Quiqbox
 using Quiqbox: getAtolVal, getAtolDigits, roundToMultiOfStep, nearestHalfOf, getNearestMid, 
-               isApprox, tryIncluding, sizeOf, markUnique, getUnique!, 
+               isApprox, sizeOf, markUnique, getUnique!, 
                itself, themselves, replaceSymbol, groupedSort, nameOf, tupleDiff, fillObj, 
                arrayToTuple, genTupleCoords, uniCallFunc, mergeMultiObjs, isNaN, getBool, 
                skipIndices, isOscillateConverged, lazyCollect, asymSign, numEps, 
                genAdaptStepBl, shiftLastEle!, getValParm, fct, triMatEleNum, 
                convertIndex1DtoTri2D, convertIndex1DtoTri4D, mapMapReduce, rmsOf, keepOnly!
-using Suppressor: @capture_out
 using LinearAlgebra: norm
 using Random
 
@@ -40,14 +39,6 @@ v2 = 1/3
 @test !isApprox(v1, v2, atol=NaN)
 
 
-# function tryIncluding
-isIncluded = true
-errStr = @capture_out begin isIncluded = tryIncluding("someMod") end
-@test isIncluded == false
-pkgDir = @__DIR__
-@test length(errStr) > length(@capture_out tryIncluding("someMod", subModulePath=""))
-
-
 #function sizeOf
 nr = rand(1:4)
 nc = rand(2:5)
@@ -59,7 +50,14 @@ nc = rand(2:5)
 @test markUnique([1,3,2,2,5]) == ([1,2,3,3,4], [1,3,2,5])
 emptyArr = Int[]
 res1, res2 = markUnique(emptyArr)
-res1 === emptyArr == res2
+res1 == emptyArr == res2
+@test markUnique((1,3,2,2,5)) == ((1,2,3,3,4), [1,3,2,5])
+@test markUnique(()) == ((), Union{}[])
+@test markUnique((3,)) == ((1,), [3])
+markList, cmprList = markUnique(Memory{Int}([3]))
+@test markList isa Memory{Int}
+@test cmprList isa Vector{Int}
+@test (markList, cmprList) == (Memory{Int}([1]), [3])
 
 
 # function getUnique!
