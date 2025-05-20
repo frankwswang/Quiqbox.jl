@@ -230,31 +230,31 @@ end
 getOutputType(::Type{<:PairCoupler{T}}) where {T} = T
 
 
-struct EuclideanHeader{N, F<:Function} <: Modifier
+struct CartesianHeader{N, F<:Function} <: Modifier
     f::F
 
-    function EuclideanHeader(f::F, ::Val{N}) where {F<:Function, N}
+    function CartesianHeader(f::F, ::Val{N}) where {F<:Function, N}
         checkPositivity(N::Int, true)
         new{N, F}(f)
     end
 end
 
-EuclideanHeader(f::EuclideanHeader, ::Val{N}) where {N} = EuclideanHeader(f.f, Val(N))
+CartesianHeader(f::CartesianHeader, ::Val{N}) where {N} = CartesianHeader(f.f, Val(N))
 
-EuclideanHeader(::Val{N}) where {N} = EuclideanHeader(itself, Val(N))
+CartesianHeader(::Val{N}) where {N} = CartesianHeader(itself, Val(N))
 
-(f::EuclideanHeader{N, F})(head::T, body::Vararg) where {N, F<:Function, T} = 
-f.f(formatInput(EuclideanInput{N}(), head), body...)
+(f::CartesianHeader{N, F})(head::T, body::Vararg) where {N, F<:Function, T} = 
+f.f(formatInput(CartesianInput{N}(), head), body...)
 
-getOutputType(::Type{<:EuclideanHeader{<:Any, F}}) where {F<:Function} = getOutputType(F)
+getOutputType(::Type{<:CartesianHeader{<:Any, F}}) where {F<:Function} = getOutputType(F)
 
-const TypedTupleFunc{T, D, F<:Function} = TypedReturn{T, EuclideanHeader{D, F}}
+const TypedTupleFunc{T, D, F<:Function} = TypedReturn{T, CartesianHeader{D, F}}
 
 TypedTupleFunc(f::Function, ::Type{T}, ::Val{D}) where {T, D} = 
-TypedReturn(EuclideanHeader(f, Val(D)), T)
+TypedReturn(CartesianHeader(f, Val(D)), T)
 
 TypedTupleFunc(f::TypedReturn, ::Type{T}, ::Val{D}) where {T, D} = 
-TypedReturn(EuclideanHeader(f.f, Val(D)), T)
+TypedReturn(CartesianHeader(f.f, Val(D)), T)
 
 
 struct SelectHeader{N, K, F<:Function} <: Modifier
@@ -316,7 +316,7 @@ function evalFloatingMonomial(f::FloatingMonomial{T, D},
     convert(T, res)
 end
 
-(::SelectTrait{InputStyle})(::FloatingMonomial{<:Real, D}) where {D} = EuclideanInput{D}()
+(::SelectTrait{InputStyle})(::FloatingMonomial{<:Real, D}) where {D} = CartesianInput{D}()
 
 (f::FloatingMonomial)(coord) = evalFloatingMonomial(f, formatInput(f, coord))
 

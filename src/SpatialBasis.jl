@@ -1,7 +1,7 @@
 export PrimitiveOrb, CompositeOrb, genGaussTypeOrb, genOrbitalData
 
 (::SelectTrait{InputStyle})(::OrbitalBasis{C, D}) where {C<:RealOrComplex, D} = 
-EuclideanInput{D}()
+CartesianInput{D}()
 
 
 (f::OrbitalBasis)(input) = evalOrbital(f, formatInput(f, input))
