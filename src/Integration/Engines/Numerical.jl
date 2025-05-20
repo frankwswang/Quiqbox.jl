@@ -18,7 +18,7 @@ SesquiFieldProd(data::N12Tuple{PrimOrbData{T, D}}, dresser::O=genOverlapSampler(
                 ) where {T<:Real, D, O<:Multiplier} = 
 SesquiFieldProd(getfield.(data, :core), dresser)
 
-(::SelectTrait{InputStyle})(::SesquiFieldProd{<:Real, D}) where {D} = EuclideanInput{D}()
+(::SelectTrait{InputStyle})(::SesquiFieldProd{<:Real, D}) where {D} = CartesianInput{D}()
 
 (f::SesquiFieldProd)(coord) = evalSesquiFieldProd(f, formatInput(f, coord))
 
@@ -89,7 +89,7 @@ function DoubleFieldProd(layout::OrbBarLayout6{PrimOrbData{T, D}},
 end
 
 
-(::SelectTrait{InputStyle})(::DoubleFieldProd{<:Real, D}) where {D} = EuclideanInput{2D}()
+(::SelectTrait{InputStyle})(::DoubleFieldProd{<:Real, D}) where {D} = CartesianInput{2D}()
 
 (f::DoubleFieldProd)(coord) = evalDoubleFieldProd(f, formatInput(f, coord))
 

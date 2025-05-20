@@ -2,7 +2,7 @@ export EncodedField, GaussFunc, AxialProduct, PolyRadialFunc
 
 using LinearAlgebra: norm as generalNorm
 
-(::SelectTrait{InputStyle})(::FieldAmplitude{<:Any, D}) where {D} = EuclideanInput{D}()
+(::SelectTrait{InputStyle})(::FieldAmplitude{<:Any, D}) where {D} = CartesianInput{D}()
 
 
 getDimension(::ParticleFunction{D, M}) where {D, M} = Int(D*M)
@@ -25,9 +25,9 @@ end
 
 struct FieldParamFunc{C<:RealOrComplex, D, F<:AbstractParamFunc, S<:SpanSetFilter
                       } <: AbstractParamFunc
-    core::TypedParamFunc{C, ParamFilterApply{EuclideanHeader{D, F}, S}}
+    core::TypedParamFunc{C, ParamFilterApply{CartesianHeader{D, F}, S}}
 
-    function FieldParamFunc{C, D}(f::EuclideanHeader{D, F}, scope::TaggedSpanSetFilter{S}
+    function FieldParamFunc{C, D}(f::CartesianHeader{D, F}, scope::TaggedSpanSetFilter{S}
                                   ) where {C<:RealOrComplex, D, F<:AbstractParamFunc, 
                                            S<:SpanSetFilter}
         checkPositivity(D)
@@ -35,7 +35,7 @@ struct FieldParamFunc{C<:RealOrComplex, D, F<:AbstractParamFunc, S<:SpanSetFilte
             throw(AssertionError("The `scope` corresponding to `F<:InputConverter` must "*
                                  "be `$(TaggedSpanSetFilter{VoidSetFilter})`."))
         end
-        inner = ContextParamFunc(EuclideanHeader(f, Val(D)), scope)
+        inner = ContextParamFunc(CartesianHeader(f, Val(D)), scope)
         new{C, D, F, S}(TypedReturn(inner, C))
     end
 end
@@ -74,9 +74,9 @@ end
 
 struct EncodedField{C<:RealOrComplex, D, F<:Function, E<:Function} <: FieldAmplitude{C, D}
     core::TypedReturn{C, F}
-    encode::EuclideanHeader{D, E}
+    encode::CartesianHeader{D, E}
 
-    function EncodedField(core::TypedReturn{C, F}, encode::EuclideanHeader{D, E}) where 
+    function EncodedField(core::TypedReturn{C, F}, encode::CartesianHeader{D, E}) where 
                          {C<:RealOrComplex, F<:Function, D, E<:Function}
         checkPositivity(D)
         if E <: FieldAmplitude
@@ -95,7 +95,7 @@ end
 
 function EncodedField(core::TypedReturn{C, F}, ::Val{D}) where 
                      {C<:RealOrComplex, D, F<:Function}
-    EncodedField(core, EuclideanHeader( Val(D) ))
+    EncodedField(core, CartesianHeader( Val(D) ))
 end
 
 function EncodedField(core::FieldAmplitude{C}, dimInfo) where {C<:RealOrComplex}
@@ -113,7 +113,7 @@ needFieldAmpEvalCache(::EncodedField) = true
 function evalFieldAmplitudeCore(f::EncodedField{C, D, F, E}, input, 
                                 cache!Self::MultiSpanDataCacheBox) where 
                                {C<:RealOrComplex, D, F<:Function, E<:Function}
-    val = formatInput(EuclideanInput{D}(), input)
+    val = formatInput(CartesianInput{D}(), input)
     for (caller, type) in zip((f.encode, f.core), (E, F))
         val = if type <: FieldAmplitude
             evalFieldAmplitude(caller.f, val; cache!Self)
@@ -128,7 +128,7 @@ function unpackFieldFunc(f::EncodedField{<:RealOrComplex, D}) where {D}
     paramSet = initializeSpanParamSet()
     fCore = unpackFunc!(f.core.f, paramSet, Identifier(nothing))
     fEncode = unpackFunc!(f.encode.f, paramSet, Identifier(nothing))
-    EuclideanHeader(ParamPipeline((fEncode, fCore)), Val(D)), paramSet
+    CartesianHeader(ParamPipeline((fEncode, fCore)), Val(D)), paramSet
 end
 
 
@@ -146,7 +146,7 @@ const RadialFieldFunc{C<:RealOrComplex, D, F<:AbstractParamFunc, S<:SpanSetFilte
       EncodedFieldFunc{C, D, InputConverter{typeof(generalNorm)}, F, S}
 
 RadialField{C, D}(radial::FieldAmplitude{C, 1}) where {C<:RealOrComplex, D} = 
-EncodedField(radial, EuclideanHeader( generalNorm, Val(D) ))
+EncodedField(radial, CartesianHeader( generalNorm, Val(D) ))
 
 RadialField(radial::FieldAmplitude{C, 1}, ::Val{D}) where {C<:RealOrComplex, D} = 
 RadialField{C, D}(radial)
@@ -184,7 +184,7 @@ function evalFieldAmplitudeCore(f::NullaryField, input)
 end
 
 function unpackFieldFunc(f::NullaryField{<:RealOrComplex, D}) where {D}
-    EuclideanHeader(InputConverter(f.core.f.f), Val(D)), initializeSpanParamSet(nothing)
+    CartesianHeader(InputConverter(f.core.f.f), Val(D)), initializeSpanParamSet(nothing)
 end
 
 
@@ -199,7 +199,7 @@ function unpackFieldFunc(f::CurriedField{<:RealOrComplex, D}) where {D}
     params = f.param
     paramMapper, paramSet = genParamMapper(params)
     tagFilter = TaggedSpanSetFilter(paramMapper, Identifier(nothing))
-    EuclideanHeader(ContextParamFunc(f.core.f.f, tagFilter), Val(D)), paramSet
+    CartesianHeader(ContextParamFunc(f.core.f.f, tagFilter), Val(D)), paramSet
 end
 
 
@@ -264,7 +264,7 @@ function unpackFieldFunc(f::ProductField{C, D}) where {C<:RealOrComplex, D}
         ParamPipeline((InputConverter(getSubIdx), basisCore))
     end
 
-    EuclideanHeader(ParamCombiner(StableMul(C), basisCores), Val(D)), paramSet
+    CartesianHeader(ParamCombiner(StableMul(C), basisCores), Val(D)), paramSet
 end
 
 
@@ -308,7 +308,7 @@ function unpackFieldFunc(f::CoupledField{<:RealOrComplex, D}) where {D}
     paramSet = initializeSpanParamSet()
     fCoreL = unpackFunc!(fL, paramSet, Identifier(nothing))
     fCoreR = unpackFunc!(fR, paramSet, Identifier(nothing))
-    EuclideanHeader(ParamCombiner(f.coupler, (fCoreL, fCoreR)), Val(D)), paramSet
+    CartesianHeader(ParamCombiner(f.coupler, (fCoreL, fCoreR)), Val(D)), paramSet
 end
 
 

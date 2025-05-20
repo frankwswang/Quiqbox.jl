@@ -21,15 +21,15 @@ abstract type InputStyle <: FunctionStyle end
 
 struct AnyInput <: InputStyle end
 
-struct EuclideanInput{N} <: InputStyle end
+struct CartesianInput{N} <: InputStyle end
 
 formatInput(::AnyInput, x::Any) = itself(x)
 
-formatInput(::EuclideanInput{1}, x::Real) = (x,)
+formatInput(::CartesianInput{1}, x::Real) = (x,)
 
-formatInput(::EuclideanInput{N}, x::NTuple{N, Real}) where {N} = itself(x)
+formatInput(::CartesianInput{N}, x::NTuple{N, Real}) where {N} = itself(x)
 
-function formatInput(::EuclideanInput{N}, x::AbstractVector{<:Real}) where {N}
+function formatInput(::CartesianInput{N}, x::AbstractVector{<:Real}) where {N}
     ntuple(i->x[begin+i-1], N)
 end
 
