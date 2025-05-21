@@ -321,3 +321,37 @@ end
 (f::FloatingMonomial)(coord) = evalFloatingMonomial(f, formatInput(f, coord))
 
 getOutputType(::Type{<:FloatingMonomial{T}}) where {T<:Real} = T
+
+
+struct Storage{T} <: TypedEvaluator{T}
+    value::T
+end
+
+(f::Storage{T})(::Vararg) where {T} = f.value
+
+getOutputType(::Type{Storage{T}}) where {T} = T
+
+
+struct BinaryReduce{T, J<:TypedBinary{T}, F<:StableBinary{T}} <: TypedEvaluator{T}
+    coupler::J
+    reducer::F
+end
+
+function BinaryReduce(coupler::J, reducer::Function) where {T, J<:TypedBinary{T}}
+    BinaryReduce(coupler, StableBinary(reducer, T))
+end
+
+function (f::BinaryReduce{T, J, F})(left::LinearSequence, right::LinearSequence) where 
+                                   {T, J<:TypedBinary{T}, F<:StableBinary{T}}
+    mapreduce(f.reducer, left, right) do l, r
+        f.coupler(l, r)
+    end
+end
+
+const Contract{T<:Number, EL<:Number, ER<:Number, J<:TypedBinary{T, typeof(*), EL, ER}} = 
+      BinaryReduce{T, J, StableBinary{T, typeof(+)}}
+
+Contract(::Type{T}, ::Type{EL}, ::Type{ER}) where {T<:Number, EL<:Number, ER<:Number} = 
+BinaryReduce(TypedBinary(TypedReturn(*, T), EL, ER), StableBinary(+, T))
+
+getOutputType(::Type{<:BinaryReduce{T}}) where {T} = T
