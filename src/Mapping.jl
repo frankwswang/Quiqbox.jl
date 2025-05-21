@@ -210,21 +210,21 @@ genTypedCoupler(coupler::TypedBinary, ::Function, ::Function) = itself(coupler)
 
 
 struct PairCoupler{T, J<:TypedBinary{T}, FL<:Function, FR<:Function} <: TypedEvaluator{T}
-    joint::J
+    coupler::J
     left::FL
     right::FR
 
-    function PairCoupler(joint::F, left::FL, right::FR) where 
+    function PairCoupler(coupler::F, left::FL, right::FR) where 
                         {F<:Function, FL<:Function, FR<:Function}
-        formattedJoint = genTypedCoupler(joint, left, right)
-        T = getOutputType(formattedJoint)
-        J = typeof(formattedJoint)
-        new{T, J, FL, FR}(formattedJoint, left, right)
+        formattedCoupler = genTypedCoupler(coupler, left, right)
+        T = getOutputType(formattedCoupler)
+        J = typeof(formattedCoupler)
+        new{T, J, FL, FR}(formattedCoupler, left, right)
     end
 end
 
 function (f::PairCoupler{T, J})(arg::Vararg) where {T, J<:TypedBinary{T}}
-    f.joint(f.left(arg...), f.right(arg...))
+    f.coupler(f.left(arg...), f.right(arg...))
 end
 
 getOutputType(::Type{<:PairCoupler{T}}) where {T} = T
