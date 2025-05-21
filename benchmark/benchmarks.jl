@@ -90,6 +90,7 @@ OrbOvlpBSuite["Lazy"]["PSTO_Self_DD"] =
 OrbOvlpBSuite["Lazy"]["PSTO_Self_DN"] = 
 @benchmarkable overlap($psto1, $psto1n, lazyCompute=true) evals=1
 
+# Differentiation-Function Benchmark Group
 DiffFuncBSuite["Numerical"]["df_fd1_tpl"] = @benchmarkable ($df_fd1)($coord2)   evals=1
 DiffFuncBSuite["Numerical"]["df_fd1_arr"] = @benchmarkable ($df_fd1)($coord2_2) evals=1
 
