@@ -125,10 +125,10 @@ end
 #M: Order of derivative
 #N: Order of finite difference accuracy
 struct AxialFiniteDiff{C<:RealOrComplex, D, M, N, F<:Function}
-    f::TypedTupleFunc{C, D, F}
+    f::TypedCarteFunc{C, D, F}
     axis::OneToIndex
 
-    function AxialFiniteDiff(f::TypedTupleFunc{C, D, F}, ::Val{M}, axis::Int, 
+    function AxialFiniteDiff(f::TypedCarteFunc{C, D, F}, ::Val{M}, axis::Int, 
                              ::Val{N}=Val(4)) where {C<:RealOrComplex, D, M, F, N}
         checkPositivity(N::Int)
         iseven(N) || throw(AssertionError("`N` must be an even number."))

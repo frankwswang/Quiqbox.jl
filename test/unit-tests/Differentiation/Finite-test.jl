@@ -54,7 +54,7 @@ fdVal1 = sum(ws .* f1.(ps .+ 0.5))
 @test getFiniteDiffAccuOrder(4, 9) == 6
 
 
-f = Quiqbox.TypedTupleFunc(x->x[1]^2 + x[2]*x[1] + x[3]^3/x[1], Float64, Val(3))
+f = Quiqbox.TypedCarteFunc(x->x[1]^2 + x[2]*x[1] + x[3]^3/x[1], Float64, Val(3))
 df_fd1 = Quiqbox.AxialFiniteDiff(f, Val(1), 1)
 df_sd1 = x->(2x[1] + x[2] - x[3]^3/x[1]^2)
 testCoord = (1.1, 2.1, -3.2)

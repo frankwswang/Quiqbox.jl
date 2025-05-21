@@ -49,7 +49,7 @@ pstoCore = Quiqbox.PolyRadialFunc(stf1D, (1, 1, 0))
 psto1 = Quiqbox.PrimitiveOrb((1.0, 2.0, 3.0), pstoCore, renormalize=false)
 psto1n = Quiqbox.PrimitiveOrb((1.0, 2.0, 3.0), pstoCore, renormalize=true)
 
-func1 = Quiqbox.TypedTupleFunc(x->x[1]^2 + x[2]*x[1] + x[3]^3/x[1], Float64, Val(3))
+func1 = Quiqbox.TypedCarteFunc(x->x[1]^2 + x[2]*x[1] + x[3]^3/x[1], Float64, Val(3))
 df_fd1 = Quiqbox.AxialFiniteDiff(func1, Val(1), 1)
 
 # Benchmark Groups

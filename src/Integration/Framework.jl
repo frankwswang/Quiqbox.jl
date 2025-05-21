@@ -2,11 +2,11 @@ using LinearAlgebra: dot
 
 const OrbCoreMarker{T<:Real, D} = Union{
     FieldMarker{:TypedReturn, 1}, 
-    ValueMarker{TypedTupleFunc{C, D, F}} where {C<:RealOrComplex{T}, F<:AbstractParamFunc}
+    ValueMarker{TypedCarteFunc{C, D, F}} where {C<:RealOrComplex{T}, F<:AbstractParamFunc}
 }
 
 const OrbCoreMarkerDict{T<:Real, D} = 
-      Dict{EgalBox{TypedTupleFunc{<:RealOrComplex{T}, D}}, OrbCoreMarker{T, D}}
+      Dict{EgalBox{TypedCarteFunc{<:RealOrComplex{T}, D}}, OrbCoreMarker{T, D}}
 
 const OrbCoreKey{T<:Real, D, M<:OrbCoreMarker{T, D}, P<:AbstractSpanValueSet} = 
       Tuple{NTuple{D, T}, M, P}

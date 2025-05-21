@@ -248,12 +248,12 @@ f.f(formatInput(CartesianInput{N}(), head), body...)
 
 getOutputType(::Type{<:CartesianHeader{<:Any, F}}) where {F<:Function} = getOutputType(F)
 
-const TypedTupleFunc{T, D, F<:Function} = TypedReturn{T, CartesianHeader{D, F}}
+const TypedCarteFunc{T, D, F<:Function} = TypedReturn{T, CartesianHeader{D, F}}
 
-TypedTupleFunc(f::Function, ::Type{T}, ::Val{D}) where {T, D} = 
+TypedCarteFunc(f::Function, ::Type{T}, ::Val{D}) where {T, D} = 
 TypedReturn(CartesianHeader(f, Val(D)), T)
 
-TypedTupleFunc(f::TypedReturn, ::Type{T}, ::Val{D}) where {T, D} = 
+TypedCarteFunc(f::TypedReturn, ::Type{T}, ::Val{D}) where {T, D} = 
 TypedReturn(CartesianHeader(f.f, Val(D)), T)
 
 
