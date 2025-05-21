@@ -1,7 +1,18 @@
 # Fornberg's algorithm
 ## [DOI] 10.1090/S0025-5718-1988-0935077-0
 
-function computeFiniteDiffWeightsCore(order::Int, dis::AbstractVector{T}) where {T<:Real}
+struct SymmetricIntRange{S} <: ConfigBox
+
+    function SymmetricIntRange(::Val{S}) where {S}
+        checkPositivity(S::Int, true)
+        new{S}()
+    end
+end
+
+(::SymmetricIntRange{S})() where {S} = -S : S
+
+
+function computeFiniteDiffWeights(order::Int, dis::AbstractVector{T}) where {T<:Real}
     checkPositivity(order, true)
     nGrid = length(dis)
     if order >= nGrid
@@ -45,35 +56,24 @@ function computeFiniteDiffWeightsCore(order::Int, dis::AbstractVector{T}) where 
         c1 = c2
     end
 
-    genMemory(@view nm[:, end])
-end
-
-function computeFiniteDiffWeights(order::Int, dis::AbstractVector{T}) where {T<:Real}
-    res = computeFiniteDiffWeightsCore(order, dis)
+    res = @view nm[:, end]
     coeffSum = sum(res)
-    # Enforce the sum of the coefficients to be zero so that the finite difference 
-    # of a constant function will always be zero.
-    if order>0 && !iszero(coeffSum)
+    if order > 0 && !iszero(coeffSum)
         _, idx = findmin(abs, dis)
         res[begin+idx-firstindex(dis)] -= coeffSum
     end
 
-    res
+    genMemory(res)
 end
 
-struct SymmetricIntRange{S} <: ConfigBox
-
-    function SymmetricIntRange(::Val{S}) where {S}
-        checkPositivity(S::Int, true)
-        new{S}()
-    end
+function computeFiniteDiffWeights(::Val{M}, ::SymmetricIntRange{S}) where {M, S}
+    dis = Memory{Rational{Int}}(SymmetricIntRange(Val(S))())
+    computeFiniteDiffWeights(M, dis)
 end
 
-(::SymmetricIntRange{S})() where {S} = -S : S
 
 @generated function getFiniteDiffWeightsCore(::Val{M}, ::SymmetricIntRange{S}) where {M, S}
-    points = Memory{Rational{Int}}(SymmetricIntRange(Val(S))())
-    intGradWeights = computeFiniteDiffWeights(M, points)
+    intGradWeights = computeFiniteDiffWeights(Val(M), SymmetricIntRange( Val(S) ))
     return quote
         copy($intGradWeights)
     end
