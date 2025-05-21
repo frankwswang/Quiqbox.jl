@@ -66,6 +66,8 @@ const AbtVecOfAbtArr{T} = AbstractVector{<:AbstractArray{T}}
 
 const GeneralCollection = Union{AbstractArray, Tuple, NamedTuple}
 
+const NumberSequence{T<:Number} = Union{AbstractVector{T}, NonEmptyTuple{T}}
+
 
 const AbstractEqualityDict = Union{EqualityDict, Dict}
 

@@ -5,8 +5,8 @@ function computeFiniteDiffWeightsCore(order::Int, dis::AbstractVector{T}) where 
     checkPositivity(order, true)
     nGrid = length(dis)
     if order >= nGrid
-        throw("The order of the derivative (order=$order) must be less than the number "*
-              "of the interpolation points: $(nGrid).")
+        throw(AssertionError("The number of the interpolation points `nGrid=$nGrid` "*
+                             "must be larger than the order of derivative `order=$order`."))
     end
 
     c1 = one(T)
@@ -61,18 +61,18 @@ function computeFiniteDiffWeights(order::Int, dis::AbstractVector{T}) where {T<:
     res
 end
 
-struct SymmetricIntRange{N} <: ConfigBox
+struct SymmetricIntRange{S} <: ConfigBox
 
-    function SymmetricIntRange(::Val{N}) where {N}
-        checkPositivity(N::Int, true)
-        new{N}()
+    function SymmetricIntRange(::Val{S}) where {S}
+        checkPositivity(S::Int, true)
+        new{S}()
     end
 end
 
-(::SymmetricIntRange{N})() where {N} = -N : N
+(::SymmetricIntRange{S})() where {S} = -S : S
 
-@generated function getFiniteDiffWeightsCore(::Val{M}, ::SymmetricIntRange{N}) where {M, N}
-    points = Memory{Rational{Int}}(SymmetricIntRange(Val(N))())
+@generated function getFiniteDiffWeightsCore(::Val{M}, ::SymmetricIntRange{S}) where {M, S}
+    points = Memory{Rational{Int}}(SymmetricIntRange(Val(S))())
     intGradWeights = computeFiniteDiffWeights(M, points)
     return quote
         copy($intGradWeights)
@@ -80,11 +80,27 @@ end
 end
 
 
-@generated function getFiniteDiffWeightsINTERNAL(::Type{T}, ::Val{M}, ::SymmetricIntRange{N}
-                                                 ) where {T<:AbstractFloat, M, N}
-    sRange = SymmetricIntRange(Val(N))
+function getInterpolationNumber(diffOrder::Int, accuOrder::Int)
+    checkPositivity(diffOrder)
+    checkPositivity(accuOrder)
+    iseven(accuOrder) || throw(AssertionError("`accuOrder` must be an even number."))
+    accuOrder + diffOrder + isodd(diffOrder) - 1
+end
+
+
+function getFiniteDiffAccuOrder(diffOrder::Int, interpNum::Int)
+    checkPositivity(diffOrder)
+    checkPositivity(interpNum)
+    isodd(interpNum) || throw(AssertionError("`interpNum` must be an even number."))
+    interpNum + 1 - isodd(diffOrder) - diffOrder
+end
+
+
+@generated function getFiniteDiffWeightsINTERNAL(::Type{T}, ::Val{M}, ::SymmetricIntRange{S}
+                                                 ) where {T<:AbstractFloat, M, S}
+    sRange = SymmetricIntRange(Val(S))
     weights = getFiniteDiffWeightsCore(Val(M), sRange)
-    accuOrder = 2(N + 1) - isodd(M) - M
+    accuOrder = getFiniteDiffAccuOrder(M, 2S+1)
     spacing = 2eps(T)^inv(1 + accuOrder)
     points = Memory{T}(spacing * sRange())
     scaledWeights = weights ./ spacing^M
@@ -92,15 +108,40 @@ end
 end
 
 @generated function getFiniteDiffWeightsINTERNAL(::Type{<:Integer}, ::Val{M}, 
-                                                 ::SymmetricIntRange{N}) where {M, N}
-    sRange = SymmetricIntRange(Val(N))
+                                                 ::SymmetricIntRange{S}) where {M, S}
+    sRange = SymmetricIntRange(Val(S))
     weights = getFiniteDiffWeightsCore(Val(M), sRange)
     points = Memory{T}(sRange())
     return :($points, $weights)
 end
 
-function getFiniteDiffWeights(::Type{T}, ::Val{M}, ::SymmetricIntRange{N}) where 
-                             {T<:Real, M, N}
-    points, weights = getFiniteDiffWeightsINTERNAL(T, Val(M), SymmetricIntRange( Val(N) ))
+function getFiniteDiffWeights(::Type{T}, ::Val{M}, ::SymmetricIntRange{S}) where 
+                             {T<:Real, M, S}
+    points, weights = getFiniteDiffWeightsINTERNAL(T, Val(M), SymmetricIntRange( Val(S) ))
     copy(points), copy(weights)
+end
+
+
+#M: Order of derivative
+#N: Order of finite difference accuracy
+struct AxialFiniteDiff{C<:RealOrComplex, D, M, N, F<:Function}
+    f::TypedTupleFunc{C, D, F}
+    axis::OneToIndex
+
+    function AxialFiniteDiff(f::TypedTupleFunc{C, D, F}, ::Val{M}, axis::Int, 
+                             ::Val{N}=Val(4)) where {C<:RealOrComplex, D, M, F, N}
+        checkPositivity(N::Int)
+        iseven(N) || throw(AssertionError("`N` must be an even number."))
+        new{C, D, M::Int, N, F}(f, OneToIndex(axis))
+    end
+end
+
+function (f::AxialFiniteDiff{C, D, M, N})(coord::NumberSequence{<:Real}) where 
+                                         {T<:Real, C<:RealOrComplex{T}, D, M, N}
+    gridRange = SymmetricIntRange(Val(getInterpolationNumber(M, N) ÷ 2))
+    points, weights = getFiniteDiffWeightsINTERNAL(T, Val(M), gridRange)
+    mapreduce(StableAdd(C), points, weights) do point, weight
+        shiftedCoord = indexedPerturb(+, coord, f.axis=>point)
+        convert(C, weight) * f.f(shiftedCoord)
+    end
 end

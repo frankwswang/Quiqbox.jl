@@ -376,3 +376,14 @@ function genMemory(obj::T) where {T}
     mem[] = obj
     mem
 end
+
+
+function indexedPerturb(op::F, a::GeneralCollection, idxVal::Pair{OneToIndex, T}) where 
+                       {F<:Function, T}
+    oneToIdx, val = idxVal
+    i = 0
+    map(a) do ele
+        i += 1
+        ifelse(i==oneToIdx.idx, op(ele, val), ele)
+    end
+end
