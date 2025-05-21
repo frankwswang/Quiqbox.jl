@@ -378,12 +378,25 @@ function genMemory(obj::T) where {T}
 end
 
 
-function indexedPerturb(op::F, a::GeneralCollection, idxVal::Pair{OneToIndex, T}) where 
+function indexedPerturb(op::F, source::Tuple, idxVal::Pair{OneToIndex, T}) where 
                        {F<:Function, T}
     oneToIdx, val = idxVal
-    i = 0
-    map(a) do ele
-        i += 1
-        ifelse(i==oneToIdx.idx, op(ele, val), ele)
+    ntuple(source|>length) do i
+        i == oneToIdx.idx ? op(source[begin+i-1], val) : source[begin+i-1]
     end
+end
+
+function indexedPerturb(op::F, source::AbstractArray, idxVal::Pair{OneToIndex, T}) where 
+                       {F<:Function, T}
+    res = copy(source)
+
+    oneToIdx, val = idxVal
+    idx = oneToIdx.idx
+    firstIdx = firstindex(source)
+    if firstIdx <= idx <= lastindex(source)
+        localIdx = firstIdx + idx - 1
+        res[localIdx] = op(source[localIdx], val)
+    end
+
+    res
 end
