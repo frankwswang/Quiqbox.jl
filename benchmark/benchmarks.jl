@@ -49,8 +49,11 @@ pstoCore = Quiqbox.PolyRadialFunc(stf1D, (1, 1, 0))
 psto1 = Quiqbox.PrimitiveOrb((1.0, 2.0, 3.0), pstoCore, renormalize=false)
 psto1n = Quiqbox.PrimitiveOrb((1.0, 2.0, 3.0), pstoCore, renormalize=true)
 
-func1 = Quiqbox.TypedCarteFunc(x->x[1]^2 + x[2]*x[1] + x[3]^3/x[1], Float64, Val(3))
-df_fd1 = Quiqbox.AxialFiniteDiff(func1, Val(1), 1)
+func1Core = x->x[1]^2 + x[2]*exp(x[1]) + x[3]^3/log(1.1 + x[1]^2)
+func1 = Quiqbox.TypedCarteFunc(func1Core, Float64, Val(3))
+df1_fd1 = Quiqbox.AxialFiniteDiff(func1, Val(1), 1)
+df1_fd2 = Quiqbox.AxialFiniteDiff(func1, Val(2), 1)
+df1_fd3 = Quiqbox.AxialFiniteDiff(func1, Val(3), 1)
 
 # Benchmark Groups
 ## Orbital-Evaluation Benchmark Group
@@ -91,8 +94,10 @@ OrbOvlpBSuite["Lazy"]["PSTO_Self_DN"] =
 @benchmarkable overlap($psto1, $psto1n, lazyCompute=true) evals=1
 
 # Differentiation-Function Benchmark Group
-DiffFuncBSuite["Numerical"]["df_fd1_tpl"] = @benchmarkable ($df_fd1)($coord2)   evals=1
-DiffFuncBSuite["Numerical"]["df_fd1_arr"] = @benchmarkable ($df_fd1)($coord2_2) evals=1
+DiffFuncBSuite["Numerical"]["df_fd1_tpl"] = @benchmarkable ($df1_fd1)($coord2)   evals=1
+DiffFuncBSuite["Numerical"]["df_fd1_arr"] = @benchmarkable ($df1_fd1)($coord2_2) evals=1
+DiffFuncBSuite["Numerical"]["df_fd2_tpl"] = @benchmarkable ($df1_fd2)($coord2)   evals=1
+DiffFuncBSuite["Numerical"]["df_fd3_tpl"] = @benchmarkable ($df1_fd3)($coord2)   evals=1
 
 
 # Finalized Benchmarkable Suite
