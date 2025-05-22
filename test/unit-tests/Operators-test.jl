@@ -30,12 +30,12 @@ f_typed = Quiqbox.TypedCarteFunc(f, Float64, Val(3))
 
 ∇v = Quiqbox.DiagonalDiff(Val(1), (1.0, 1.0, 1.0))
 ∇vf = ∇v(f_typed)
-@test isapprox(∇vf(coord1), (sum∘g_sd)(coord1), atol=1e-9)
-@test all(isapprox.(∇vf.right(coord1), g_sd(coord1), atol=1e-9))
+@test isapprox(∇vf(coord1), (sum∘g_sd)(coord1), atol=1e-12)
+@test all(isapprox.(∇vf.right(coord1), g_sd(coord1), atol=1e-12))
 
 Δ = Quiqbox.DiagonalDiff(Val(2), (1.0, 1.0, 1.0))
 Δf = Δ(f_typed)
-@test isapprox(Δf(coord1), (sum∘l_sd)(coord1), atol=5e-7)
-@test all(isapprox.(Δf.right(coord1), l_sd(coord1), atol=5e-7))
+@test isapprox(Δf(coord1), (sum∘l_sd)(coord1), atol=5e-9)
+@test all(isapprox.(Δf.right(coord1), l_sd(coord1), atol=5e-9))
 
 end

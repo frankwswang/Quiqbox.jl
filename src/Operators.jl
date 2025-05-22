@@ -76,13 +76,17 @@ function modifyFunction(op::Sandwich, termL::Function, termR::Function)
 end
 
 
+# `N` must be even number to set the accuracy order for the finite difference acting on a 
+# target function. When `N` is set to `0`, a preset order will be assigned with respect to 
+# the form of the target function adaptively on the fly.
 struct DiagonalDiff{C<:RealOrComplex, D, M, N} <: MonoTermOperator
     direction::NTuple{D, C}
 
-    function DiagonalDiff(::Val{M}, direction::NonEmptyTuple{C}, 
-                             ::Val{N}=Val(4)) where {M, C<:RealOrComplex, N}
-        checkPositivity(M::Int, true)
-        checkPositivity(M::Int, true)
+    function DiagonalDiff(::Val{M}, direction::NonEmptyTuple{C}, ::Val{N}=Val(0)) where 
+                         {M, C<:RealOrComplex, N}
+        checkPositivity(M::Int)
+        checkPositivity(N::Int, true)
+        iseven(N) || throw(AssertionError("`N` must be an even number."))
         new{C, length(direction), M, N::Int}(direction)
     end
 end
@@ -90,11 +94,14 @@ end
 function modifyFunction(op::DiagonalDiff{C1, D, M, N}, term::TypedCarteFunc{C2, D}) where 
                        {T<:Real, C1<:RealOrComplex{T}, C2<:RealOrComplex{T}, D, M, N}
     C = ifelse(C1==C2==T, T, Complex{T})
+    order = ifelse(N==0, getFiniteDiffApproxOrder(term.f.f), N)
     mapper = ntuple(Val(D)) do i
-        AxialFiniteDiff(TypedReturn(term, C), Val(M), i, Val(N))
+        AxialFiniteDiff(TypedReturn(term, C), Val(M), i, Val(order))
     end |> ChainMapper
     PairCoupler(Contract(C, C1, C2), Storage(op.direction), mapper)
 end
+
+getFiniteDiffApproxOrder(::Function) = 6
 
 
 #! Future development for computation of Hessian
