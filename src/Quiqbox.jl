@@ -39,6 +39,8 @@ include("Integration/Interface.jl")
 # include("Integrals/OneBody.jl")
 # include("Integrals/TwoBody.jl")
 
+include("Precompilation.jl")
+
 end
 
 ## Development comment guideline
