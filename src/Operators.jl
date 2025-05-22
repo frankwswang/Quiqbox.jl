@@ -74,3 +74,30 @@ function modifyFunction(op::Sandwich, termL::Function, termR::Function)
         PairCoupler(jL, SelectHeader{2, 1}(termL), fR)
     end
 end
+
+
+struct DiagonalDiff{C<:RealOrComplex, D, M, N} <: MonoTermOperator
+    direction::NTuple{D, C}
+
+    function DiagonalDiff(::Val{M}, direction::NonEmptyTuple{C}, 
+                             ::Val{N}=Val(4)) where {M, C<:RealOrComplex, N}
+        checkPositivity(M::Int, true)
+        checkPositivity(M::Int, true)
+        new{C, length(direction), M, N::Int}(direction)
+    end
+end
+
+function modifyFunction(op::DiagonalDiff{C1, D, M, N}, term::TypedCarteFunc{C2, D}) where 
+                       {T<:Real, C1<:RealOrComplex{T}, C2<:RealOrComplex{T}, D, M, N}
+    C = ifelse(C1==C2==T, T, Complex{T})
+    mapper = ntuple(Val(D)) do i
+        AxialFiniteDiff(TypedReturn(term, C), Val(M), i, Val(N))
+    end |> ChainMapper
+    PairCoupler(Contract(C, C1, C2), Storage(op.direction), mapper)
+end
+
+
+#! Future development for computation of Hessian
+# struct MixedPartialDiff{D} <: MonoTermOperator
+#     degree::WeakComp{D}
+# end

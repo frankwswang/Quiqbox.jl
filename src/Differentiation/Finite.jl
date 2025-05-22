@@ -124,7 +124,7 @@ end
 
 #M: Order of derivative
 #N: Order of finite difference accuracy
-struct AxialFiniteDiff{C<:RealOrComplex, D, M, N, F<:Function}
+struct AxialFiniteDiff{C<:RealOrComplex, D, M, N, F<:Function} <: TypedEvaluator{C}
     f::TypedCarteFunc{C, D, F}
     axis::OneToIndex
 
@@ -145,3 +145,5 @@ function (f::AxialFiniteDiff{C, D, M, N})(coord::NumberSequence{<:Real}) where
         convert(C, weight) * f.f(shiftedCoord)
     end
 end
+
+getOutputType(::Type{<:AxialFiniteDiff{C}}) where {C<:RealOrComplex} = C
