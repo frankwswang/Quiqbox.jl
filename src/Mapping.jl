@@ -210,21 +210,21 @@ genTypedCoupler(coupler::TypedBinary, ::Function, ::Function) = itself(coupler)
 
 
 struct PairCoupler{T, J<:TypedBinary{T}, FL<:Function, FR<:Function} <: TypedEvaluator{T}
-    joint::J
+    coupler::J
     left::FL
     right::FR
 
-    function PairCoupler(joint::F, left::FL, right::FR) where 
+    function PairCoupler(coupler::F, left::FL, right::FR) where 
                         {F<:Function, FL<:Function, FR<:Function}
-        formattedJoint = genTypedCoupler(joint, left, right)
-        T = getOutputType(formattedJoint)
-        J = typeof(formattedJoint)
-        new{T, J, FL, FR}(formattedJoint, left, right)
+        formattedCoupler = genTypedCoupler(coupler, left, right)
+        T = getOutputType(formattedCoupler)
+        J = typeof(formattedCoupler)
+        new{T, J, FL, FR}(formattedCoupler, left, right)
     end
 end
 
 function (f::PairCoupler{T, J})(arg::Vararg) where {T, J<:TypedBinary{T}}
-    f.joint(f.left(arg...), f.right(arg...))
+    f.coupler(f.left(arg...), f.right(arg...))
 end
 
 getOutputType(::Type{<:PairCoupler{T}}) where {T} = T
@@ -248,12 +248,12 @@ f.f(formatInput(CartesianInput{N}(), head), body...)
 
 getOutputType(::Type{<:CartesianHeader{<:Any, F}}) where {F<:Function} = getOutputType(F)
 
-const TypedTupleFunc{T, D, F<:Function} = TypedReturn{T, CartesianHeader{D, F}}
+const TypedCarteFunc{T, D, F<:Function} = TypedReturn{T, CartesianHeader{D, F}}
 
-TypedTupleFunc(f::Function, ::Type{T}, ::Val{D}) where {T, D} = 
+TypedCarteFunc(f::Function, ::Type{T}, ::Val{D}) where {T, D} = 
 TypedReturn(CartesianHeader(f, Val(D)), T)
 
-TypedTupleFunc(f::TypedReturn, ::Type{T}, ::Val{D}) where {T, D} = 
+TypedCarteFunc(f::TypedReturn, ::Type{T}, ::Val{D}) where {T, D} = 
 TypedReturn(CartesianHeader(f.f, Val(D)), T)
 
 
@@ -321,3 +321,37 @@ end
 (f::FloatingMonomial)(coord) = evalFloatingMonomial(f, formatInput(f, coord))
 
 getOutputType(::Type{<:FloatingMonomial{T}}) where {T<:Real} = T
+
+
+struct Storage{T} <: TypedEvaluator{T}
+    value::T
+end
+
+(f::Storage{T})(::Vararg) where {T} = f.value
+
+getOutputType(::Type{Storage{T}}) where {T} = T
+
+
+struct BinaryReduce{T, J<:TypedBinary{T}, F<:StableBinary{T}} <: TypedEvaluator{T}
+    coupler::J
+    reducer::F
+end
+
+function BinaryReduce(coupler::J, reducer::Function) where {T, J<:TypedBinary{T}}
+    BinaryReduce(coupler, StableBinary(reducer, T))
+end
+
+function (f::BinaryReduce{T, J, F})(left::LinearSequence, right::LinearSequence) where 
+                                   {T, J<:TypedBinary{T}, F<:StableBinary{T}}
+    mapreduce(f.reducer, left, right) do l, r
+        f.coupler(l, r)
+    end
+end
+
+const Contract{T<:Number, EL<:Number, ER<:Number, J<:TypedBinary{T, typeof(*), EL, ER}} = 
+      BinaryReduce{T, J, StableBinary{T, typeof(+)}}
+
+Contract(::Type{T}, ::Type{EL}, ::Type{ER}) where {T<:Number, EL<:Number, ER<:Number} = 
+BinaryReduce(TypedBinary(TypedReturn(*, T), EL, ER), StableBinary(+, T))
+
+getOutputType(::Type{<:BinaryReduce{T}}) where {T} = T

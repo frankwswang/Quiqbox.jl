@@ -154,10 +154,10 @@ RadialField{C, D}(radial)
 
 struct CurriedField{C<:RealOrComplex, D, F<:Function, P<:NamedParamTuple
                     } <: FieldAmplitude{C, D}
-    core::TypedTupleFunc{C, D, ParamFreeFunc{F}}
+    core::TypedCarteFunc{C, D, ParamFreeFunc{F}}
     param::P
 
-    function CurriedField(core::TypedTupleFunc{C, D, ParamFreeFunc{F}}, 
+    function CurriedField(core::TypedCarteFunc{C, D, ParamFreeFunc{F}}, 
                           params::P=NamedTuple()) where 
                          {C<:RealOrComplex, D, F<:Function, P<:NamedParamTuple}
         checkPositivity(D)
@@ -168,7 +168,7 @@ end
 function CurriedField(core::Function, ::Type{C}, ::Val{D}, 
                       params::NamedParamTuple=NamedTuple()) where {C<:RealOrComplex, D}
     checkPositivity(D::Int)
-    typedCore = TypedTupleFunc(ParamFreeFunc(core), C, Val(D))
+    typedCore = TypedCarteFunc(ParamFreeFunc(core), C, Val(D))
     CurriedField(typedCore, params)
 end
 
@@ -219,7 +219,7 @@ const GaussFieldFunc{T<:Real, F<:ParamMapper, S<:SpanSetFilter} =
       FieldParamFunc{T, 1, GaussFieldCore{F}, S}
 
 function GaussFunc(xpn::UnitOrVal{T}) where {T<:Real}
-    core = TypedTupleFunc(ParamFreeFunc(computeGaussFunc), T, Val(1))
+    core = TypedCarteFunc(ParamFreeFunc(computeGaussFunc), T, Val(1))
     CurriedField(core, (xpn=UnitParamEncoder(T, :xpn, 1)(xpn),))
 end
 
@@ -324,7 +324,7 @@ function PolyRadialFunc(radial::FieldAmplitude{C, 1},
                         angular::NonEmptyTuple{Int, D}) where {C<:RealOrComplex, D}
     DimType = Val(D + 1)
     radialCore = RadialField(radial, DimType)
-    polyCore = TypedTupleFunc((ParamFreeFunc∘CartSHarmonics)(angular), C, DimType)
+    polyCore = TypedCarteFunc((ParamFreeFunc∘CartSHarmonics)(angular), C, DimType)
     CoupledField((radialCore, CurriedField(polyCore)), StableMul(C))
 end
 
@@ -385,7 +385,7 @@ end
 struct FloatingField{T<:Real, D, C<:RealOrComplex{T}, F<:AbstractParamFunc, 
                      P<:OptionalSpanValueSet} <: FieldAmplitude{C, D}
     center::NTuple{D, T}
-    core::TypedTupleFunc{C, D, F}
+    core::TypedCarteFunc{C, D, F}
     param::P
 
     function FloatingField(center::NonEmptyTuple{Real}, f::FieldParamFunc{C, D, F}, 
