@@ -5,6 +5,11 @@ using Quiqbox: getOutputType, TypedBinary, StableBinary, PairCoupler, Storage,
 
 @testset "Mapping.jl" begin
 
+# function trySimplify
+sf1 = trySimplify(TypedReturn(abs, Float64))
+sf2 = trySimplify(abs)
+@test sf1 === sf2 === abs
+
 # function TypedReturn
 returnF64 = TypedReturn(identity, Float64)
 @test getOutputType(returnF64) == Float64

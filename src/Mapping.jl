@@ -5,6 +5,19 @@ getOutputType(::F) where {F<:Function} = getOutputType(F)
 getOutputType(::Type{<:Function}) = Any
 
 
+"""
+
+    trySimplify(f::Function) -> Function
+
+Returns a potentially simplified function that returns the same results (characterized by 
+`$isequal`) as the original `f`, given any valid input arguments `args...` that do 
+not throw errors: 
+
+    isequal(trySimplify(f)(args...), f(args...)) == true
+"""
+trySimplify(f::Function) = f
+
+
 struct ApplyConvert{T, F<:Function} <: TypedEvaluator{T}
     f::F
 
@@ -20,6 +33,8 @@ ApplyConvert(f::ApplyConvert, ::Type{T}) where {T} = ApplyConvert(f.f, T)
 (f::ApplyConvert{T, F})(arg::Vararg) where {T, F<:Function} = convert(T, f.f(arg...))
 
 getOutputType(::Type{<:ApplyConvert{T}}) where {T} = T
+
+trySimplify(f::ApplyConvert) = trySimplify(f.f)
 
 
 struct TypedReturn{T, F<:Function} <: TypedEvaluator{T}
@@ -48,6 +63,8 @@ end
 
 getOutputType(::Type{<:TypedReturn{T}}) where {T} = T
 
+trySimplify(f::TypedReturn) = trySimplify(f.f)
+
 
 struct TypedBinary{T, F<:Function, TL, TR} <: TypedEvaluator{T}
     f::F
@@ -72,6 +89,8 @@ StableBinary(f::Function, ::Type{T}) where {T} = TypedBinary(TypedReturn(f, T), 
 StableBinary(f::TypedBinary, ::Type{T}) where {T} = StableBinary(f.f, T)
 
 getOutputType(::Type{<:TypedBinary{T}}) where {T} = T
+
+trySimplify(f::TypedBinary) = trySimplify(f.f)
 
 const StableAdd{T} = StableBinary{T, typeof(+)}
 StableAdd(::Type{T}) where {T} = StableBinary(+, T)
