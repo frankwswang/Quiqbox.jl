@@ -140,10 +140,12 @@ function (f::AxialFiniteDiff{C, D, M, N})(coord::NumberSequence{<:Real}) where
                                          {T<:Real, C<:RealOrComplex{T}, D, M, N}
     gridRange = SymmetricIntRange(Val(getInterpolationNumber(M, N) ÷ 2))
     points, weights = getFiniteDiffWeightsINTERNAL(T, Val(M), gridRange)
-    mapreduce(StableAdd(C), points, weights) do point, weight
+    res = zero(C)
+    for (point, weight) in zip(points, weights)
         shiftedCoord = indexedPerturb(+, coord, f.axis=>point)
-        convert(C, weight) * f.f(shiftedCoord)
+        res = StableAdd(C)(res, convert(C, weight) * f.f(shiftedCoord))
     end
+    res
 end
 
 getOutputType(::Type{<:AxialFiniteDiff{C}}) where {C<:RealOrComplex} = C
