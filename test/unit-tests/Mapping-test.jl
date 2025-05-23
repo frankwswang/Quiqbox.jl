@@ -28,7 +28,7 @@ addF64 = PairCoupler(+, returnF64, returnF64)
 
 # function Storage
 mat = rand(3, 3)
-sf = Storage(mat)
+sf = Storage(mat, :mat)
 @test sf() === sf(addF64) === mat
 @test getOutputType(sf) == Matrix{Float64}
 
