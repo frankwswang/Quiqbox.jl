@@ -365,17 +365,25 @@ function evaluateGraph(f::LayerGraph)
 end
 
 function mixTensorInput(nodes::Memory{<:TensorVertex}, ::Nothing)
-    modestTypingMap(getNodeValue, nodes)
+    if eltype(nodes) <: Union{}
+        genBottomMemory()
+    else
+        map(getNodeValue, nodes)
+    end
 end
 
 function mixTensorInput(nodes::Memory{<:TensorVertex}, input::AbstractVector)
     i = 1
-    modestTypingMap(nodes) do node
-        if isNodeActive(node)
-            value, i = iterate(input, i)
-            value
-        else
-            getNodeValue(node)
+    if eltype(nodes) <: Union{} || isempty(nodes)
+        genBottomMemory()
+    else
+        map(nodes) do node
+            if isNodeActive(node)
+                value, i = iterate(input, i)
+                value
+            else
+                getNodeValue(node)
+            end
         end
     end
 end
