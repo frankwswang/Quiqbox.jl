@@ -8,6 +8,8 @@ struct OneToIndex <: StructuredInfo
         checkPositivity(idx)
         new(idx)
     end
+
+    OneToIndex() = new(1)
 end
 
 OneToIndex(idx::OneToIndex) =itself(idx)
