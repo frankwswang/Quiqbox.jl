@@ -1,9 +1,5 @@
 export TypedReturn, PairCoupler
 
-getOutputType(::F) where {F<:Function} = getOutputType(F)
-
-getOutputType(::Type{<:Function}) = Any
-
 
 """
 
