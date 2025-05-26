@@ -8,7 +8,7 @@ const OrbCoreMarker{T<:Real, D} = Union{
 const OrbCoreMarkerDict{T<:Real, D} = 
       Dict{EgalBox{TypedCarteFunc{<:RealOrComplex{T}, D}}, OrbCoreMarker{T, D}}
 
-const OrbCoreKey{T<:Real, D, M<:OrbCoreMarker{T, D}, P<:AbstractSpanValueSet} = 
+const OrbCoreKey{T<:Real, D, M<:OrbCoreMarker{T, D}, P<:OptSpanValueSet} = 
       Tuple{NTuple{D, T}, M, P}
 
 const OrbCoreIdxDict{T<:Real, D} = Dict{OrbCoreKey{T, D}, Int}

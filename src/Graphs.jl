@@ -369,7 +369,7 @@ function functionalize(graph::SpanValueGraph)
         genVertexCaller(vertex)
     end
     inputStyle = ifelse(vertex isa UnitVertex, UnitInput, GridInput)
-    ParamEvaluator(f, inputStyle())
+    SpanEvaluator(f, inputStyle())
 end
 
 function functionalize(graph::SpanLayerGraph)
@@ -378,7 +378,7 @@ function functionalize(graph::SpanLayerGraph)
         res = filter(x->isVertexActive(x), sector)
         isempty(res) ? nothing : res
     end |> getInputSetType
-    ParamEvaluator(fCore, inputStyle())
+    SpanEvaluator(fCore, inputStyle())
 end
 
 
@@ -394,7 +394,7 @@ end
 
 struct ParamGraphCaller{T, A, S<:FixedSpanParamSet, F<:Function} <: GraphEvaluator{T}
     source::S
-    evaluate::ParamEvaluator{T, A, F}
+    evaluate::SpanEvaluator{T, A, F}
 
     function ParamGraphCaller(param::ParamBox)
         graph, source = transpileParam(param)
@@ -411,13 +411,19 @@ function evalParamGraphCaller(f::F, input::OptSpanValueSet) where {F<:ParamGraph
     f.evaluate(formattedInput)
 end
 
-(f::ParamGraphCaller)(input::OptSpanValueSet=initializeSpanParamSet(nothing)) = 
+const ParamGraphMonoCaller{T, A<:Union{MonoPackInput, HalfSpanInput}, S<:FixedSpanParamSet, 
+                           F<:Function} = 
+      ParamGraphCaller{T, A, S, F}
+
+(f::ParamGraphMonoCaller)(sector::AbstractVector) = f.evaluate(sector)
+
+(f::ParamGraphCaller)(input::OptSpanValueSet=initializeFixedSpanSet(nothing)) = 
 evalParamGraphCaller(f, input)
 
 getOutputType(::Type{<:ParamGraphCaller{T}}) where {T} = T
 
 
-const FilterEvalParam{F<:ParamEvaluator, S<:SpanSetFilter} = Base.ComposedFunction{F, S}
+const FilterEvalParam{F<:SpanEvaluator, S<:SpanSetFilter} = Base.ComposedFunction{F, S}
 
 const ParamMapper{S, F<:NamedTuple{ S, <:NonEmptyTuple{FilterEvalParam} }} = 
       ChainMapper{F}

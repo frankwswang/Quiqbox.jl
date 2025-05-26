@@ -80,7 +80,7 @@ s1v = obtain(s1)
 @test try v1_f((unit=nothing, grid=nothing)); catch; true end
 @test v1_f(s1v) === obtain(v1) === v1Val
 @test v1_f2((unit=nothing, grid=nothing)) === v1_f2(s1v) === v1_f2()
-
+@test v1_f([1.0]) == v1_f2([1.0]) == 1.0 != v1()
 a1 = genCellParam(v1, :a)
 a1_2 = genCellParam(itself, (v1,), :a1)
 @test a1.lambda == a1_2.lambda
@@ -235,10 +235,10 @@ c1_input1 = [b2, v1, v2] .|> obtain
 @test c1_input1 == map(x->broadcast(Quiqbox.getVertexValue, x), gn_c1.source).unit[1:3]
 
 gnf_c1 = functionalize(gn_c1)
-@test Quiqbox.getInputSetType(gnf_c1) == Quiqbox.PairInput{Quiqbox.UnitInput, Nothing}
+@test Quiqbox.getInputSetType(gnf_c1) == Quiqbox.SpanInput{Quiqbox.UnitInput, Nothing}
 c1Val_2 = gnf_c1((unit=c1_input1, grid=Quiqbox.genBottomMemory()))
 gnf_c1_2 = ParamGraphCaller(c1)
-@test c1Val_2 == gnf_c1_2((unit=c1_input1, grid=nothing))
+@test c1Val_2 == gnf_c1_2(c1_input1) == gnf_c1_2((unit=c1_input1, grid=nothing))
 @test gnf_c1_2() == c1() == c1Val_2 == 42.96591869214117
 
 k1 = genTensorVar(1.1, :k1)
@@ -255,8 +255,8 @@ g_l3_val = evaluateGraph(g_l3)
 gf_l3 = ParamGraphCaller(l3)
 @test g_l3_val == gf_l3(g_l3inVal)
 @test all(map((x, y)->obtain(x)==y, g_l3_inSet, ([k1(), k2()], [])))
-@test gf_l3((unit=[1.1, 3.2], grid=nothing)) == 7.61
-@test gf_l3((unit=[3.2, 1.1], grid=nothing)) ≈ 12.44
+@test gf_l3([1.1, 3.2]) == gf_l3((unit=[1.1, 3.2], grid=nothing)) == 7.61
+@test gf_l3([3.2, 1.1]) ≈ 12.44
 
 # Test infinite loop avoidance during recursive function calls
 v1a1 = genHeapParam([v1, a1], :va)
@@ -295,9 +295,9 @@ inVal_e1 = obtain(inSet_e1)
 @test inVal_e1.unit === nothing && inVal_e1.grid[] == m1Val
 pVals_e1_ext = obtain.(inSet_e2.grid)
 gnf_e1 = functionalize(gn_e1)
-@test evaluateGraph(gn_e1) == 5.82827525296409
-@test gnf_e1((unit=nothing, grid=pVals_e1_ext)) == gnf_e1(inVal_e1) == 5.82827525296409
-
+@test evaluateGraph(gn_e1) == gnf_e1(inVal_e1) == 5.82827525296409
+@test gnf_e1((unit=nothing, grid=pVals_e1_ext)) == 5.82827525296409
+@test gnf_e1(pVals_e1_ext) == gnf_e1(inVal_e1.grid) == 5.82827525296409
 f3 = (x, y, z)->log(x^2 + y[1]) * (y[2] - sqrt(norm(exp.(z))))
 f3_t = (xv, z)->log(xv[1]^2 + xv[2]) * (xv[3] - sqrt(norm(exp.(z))))
 v2a2 = genHeapParam([v2, a2], :v2a2)
@@ -378,7 +378,7 @@ inSetVal_pm1 = obtain.(inSet_pm1.unit)
 gn_pm1, inSet_pm1 = transpileParam(pm1)
 gnf_pm1 = functionalize(gn_pm1)
 inVal_pm1 = obtain(inSet_pm1)
-@test pm1Val == evaluateGraph(gn_pm1) == gnf_pm1(inVal_pm1)
+@test pm1Val == evaluateGraph(gn_pm1) == gnf_pm1(inVal_pm1) == gnf_pm1(inVal_pm1.grid)
 
 val_pm1_1 = obtain(pm1)
 @test all(size.(val_pm1_1).== Ref( (1, 3) ))
@@ -395,8 +395,8 @@ inVal_pm2 = obtain(gnf_pm2.source)
 @test inVal_pm2 == map(x->(x!==nothing ? sort(x) : x), inSetVal_pm2) == obtain(inSet_pm2)
 gnf_pm2core = functionalize(gn_pm2)
 @test gnf_pm2.evaluate == gnf_pm2core
-@test evaluateGraph(gn_pm2) == gnf_pm2(inVal_pm2) == pm2() == gnf_pm2core(inVal_pm2)
-
+@test evaluateGraph(gn_pm2) == gnf_pm2(inVal_pm2) == pm2() == pm2Val
+@test gnf_pm2core(inVal_pm2) == gnf_pm2(inVal_pm2.grid) == pm2Val
 x1 = genTensorVar(1.0, :x)
 x2 = genTensorVar(1.1, :x)
 x3 = genTensorVar(1.2, :x)

@@ -184,7 +184,7 @@ function evalFieldAmplitudeCore(f::NullaryField, input)
 end
 
 function unpackFieldFunc(f::NullaryField{<:RealOrComplex, D}) where {D}
-    CartesianHeader(InputConverter(f.core.f.f), Val(D)), initializeSpanParamSet(Union{})
+    CartesianHeader(InputConverter(f.core.f.f), Val(D)), initializeFixedSpanSet()
 end
 
 
