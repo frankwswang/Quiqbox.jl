@@ -352,9 +352,9 @@ function genVertexCaller(graph::SpanLayerGraph, vertex::CallVertex{T}) where {T}
     end
 
     fCore = if receptor isa TupleReceptor
-        splat(vertex.apply) ∘ ChainMapper(encoders|>Tuple)
+        ComposedApply(ChainMapper(encoders|>Tuple), splat(vertex.apply))
     else
-        vertex.apply ∘ ChainMapper(encoders)
+        ComposedApply(ChainMapper(encoders), vertex.apply)
     end
 
     TypedReturn(fCore, T)
@@ -423,7 +423,7 @@ evalParamGraphCaller(f, input)
 getOutputType(::Type{<:ParamGraphCaller{T}}) where {T} = T
 
 
-const FilterEvalParam{F<:SpanEvaluator, S<:SpanSetFilter} = Base.ComposedFunction{F, S}
+const FilterEvalParam{F<:SpanEvaluator, S<:SpanSetFilter} = ComposedApply{F, S}
 
 const ParamMapper{S, F<:NamedTuple{ S, <:NonEmptyTuple{FilterEvalParam} }} = 
       ChainMapper{F}
@@ -434,7 +434,7 @@ function genParamMapper(params::NamedParamTuple;
     mapper = map(params) do param
         evaluator = ParamGraphCaller(param)
         inputFilter = locateParam!(paramSet!Self, evaluator.source)
-        evaluator.evaluate ∘ inputFilter
+        ComposedApply(inputFilter, evaluator.evaluate)
     end |> ChainMapper
     mapper, paramSet!Self
 end

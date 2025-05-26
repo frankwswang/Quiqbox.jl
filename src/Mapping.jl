@@ -365,3 +365,19 @@ Contract(::Type{T}, ::Type{EL}, ::Type{ER}) where {T<:Number, EL<:Number, ER<:Nu
 BinaryReduce(TypedBinary(TypedReturn(*, T), EL, ER), StableBinary(+, T))
 
 getOutputType(::Type{<:BinaryReduce{T}}) where {T} = T
+
+
+struct ComposedApply{FO, FI} <: CompositeFunction
+    inner::FI
+    outer::FO
+
+    ComposedApply(inner::FI, outer::FO) where {FI<:Function, FO<:Function} = 
+    new{FO, FI}(inner, outer)
+end
+
+function (f::ComposedApply{FO, FI})(args::Vararg) where {FI<:Function, FO<:Function}
+    innerRes = splat(f.inner)(args)
+    f.outer(innerRes)
+end
+
+getOutputType(::Type{<:ComposedApply{FO}}) where {FO<:Function} = getOutputType(FO)
