@@ -375,7 +375,7 @@ end
 function functionalize(graph::SpanLayerGraph)
     fCore = genVertexCaller(graph, graph.output)
     inputStyle = map(graph.source) do sector
-        res = filter(x->isVertexActive(x), sector)
+        res = filter(isVertexActive, sector)
         isempty(res) ? nothing : res
     end |> getInputSetType
     SpanEvaluator(fCore, inputStyle())

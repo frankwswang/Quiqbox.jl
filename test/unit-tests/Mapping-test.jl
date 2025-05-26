@@ -1,6 +1,6 @@
 using Test
 using Quiqbox
-using Quiqbox: getOutputType, TypedBinary, StableBinary, PairCoupler, Storage, 
+using Quiqbox: trySimplify, getOutputType, TypedBinary, StableBinary, PairCoupler, Storage, 
                BinaryReduce, Contract
 
 @testset "Mapping.jl" begin
