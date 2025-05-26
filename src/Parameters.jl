@@ -1286,10 +1286,9 @@ const UnitSetFilter = SpanSetFilter{OneToIndex, Union{}}
 
 const GridSetFilter = SpanSetFilter{Union{}, OneToIndex}
 
-function getSector(::Val{S}, target::OptionalSpanSet, oneToIds::Memory{T}, 
-                   finalizer::F=itself) where {S, T<:OneToIndex, F<:Function}
-    sector = getfield(target, S)
-    if T <: Union{} || sector === nothing || isempty(sector)
+function getSector(sector::NothingOr{AbstractVector}, oneToIds::Memory{T}, 
+                   finalizer::F=itself) where {T<:OneToIndex, F<:Function}
+    if sector === nothing || T <: Union{} || isempty(sector)
         genBottomMemory()
     else
         iStart = firstindex(sector)
@@ -1304,11 +1303,11 @@ function getSector(::Val{S}, target::OptionalSpanSet, oneToIds::Memory{T},
 end
 
 #= Additional Method =#
-function getField(obj::OptionalSpanSet, sFilter::SpanSetFilter, 
+function getField(target::OptionalSpanSet, sFilter::SpanSetFilter, 
                   finalizer::F=itself) where {F<:Function}
-    unit = getSector(Val(:unit), obj, sFilter.scope.unit, finalizer)
-    grid = getSector(Val(:grid), obj, sFilter.scope.grid, finalizer)
-    (; unit, grid)
+    map(target, (unit=:unit, grid=:grid)) do sector, sym
+        getSector(sector, getfield(sFilter.scope, sym), finalizer)
+    end
 end
 
 getField(::OptionalSpanSet, ::VoidSetFilter) = genFixedVoidSpanSet()
