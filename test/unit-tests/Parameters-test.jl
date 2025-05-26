@@ -70,10 +70,16 @@ v1 = genTensorVar(v1Val, :α)
 v2Val = 1.1
 v2 = genTensorVar(v2Val, :β)
 @test obtain(v2) === v2.input === v2()
-v1_f, s1 = compressParam(v1)
+v1_g, s1 = transpileParam(v1)
 @test s1.unit[] === v1
 @test s1 == Quiqbox.initializeSpanParamSet(v1)
-@test v1_f((unit=nothing, grid=nothing)) === v1_f() === obtain(v1) === v1Val
+@test s1.unit === first(s1) && s1.grid === last(s1)
+v1_f = functionalize(v1_g)
+v1_f2 = ParamGraphCaller(v1)
+s1v = obtain(s1)
+@test try v1_f((unit=nothing, grid=nothing)); catch; true end
+@test v1_f(s1v) === obtain(v1) === v1Val
+@test v1_f2((unit=nothing, grid=nothing)) === v1_f2(s1v) === v1_f2()
 
 a1 = genCellParam(v1, :a)
 a1_2 = genCellParam(itself, (v1,), :a1)
@@ -222,11 +228,18 @@ inSet1_t = [v1, v2, b2, b3]
 c1Val = f2_t(obtain.(inSet1_t))
 @test obtain(pars_f2) == obtain.([a1, v2, b1, b2, b3])
 @test f2(obtain(pars_f2)) == c1Val == c1() == 42.96591869214117
-gn_c1 = genParamGraph(c1) |> transpileGraph
+gn_c1, c1_inSet = transpileParam(c1)
 c1_input1 = [b2, v1, v2] .|> obtain
-c1Val_2 = evaluateGraph(gn_c1, (unit=c1_input1, grid=nothing))
-gnf_c1, inPars = compressParam(c1)
-@test gnf_c1(c1_input1) == c1() == c1Val_2 == 42.96591869214117
+@test c1_input1 == obtain(c1_inSet.unit)
+@test c1_inSet.grid == Quiqbox.genBottomMemory()
+@test c1_input1 == map(x->broadcast(Quiqbox.getVertexValue, x), gn_c1.source).unit[1:3]
+
+gnf_c1 = functionalize(gn_c1)
+@test Quiqbox.getInputSetType(gnf_c1) == Quiqbox.PairInput{Quiqbox.UnitInput, Nothing}
+c1Val_2 = gnf_c1((unit=c1_input1, grid=Quiqbox.genBottomMemory()))
+gnf_c1_2 = ParamGraphCaller(c1)
+@test c1Val_2 == gnf_c1_2((unit=c1_input1, grid=nothing))
+@test gnf_c1_2() == c1() == c1Val_2 == 42.96591869214117
 
 k1 = genTensorVar(1.1, :k1)
 k2 = genTensorVar(3.2, :k2)
@@ -234,13 +247,16 @@ l1 = genCellParam(x->x^2, (k1,), :l)
 l2 = genCellParam(x->2x, (k2,), :l)
 l3 = genCellParam(+, (l1, l2), :l)
 @test l3() == 1.1^2 + 3.2 * 2
-g_l1 = genParamGraph(l1) |> transpileGraph
-g_l3 = genParamGraph(l3) |> transpileGraph
-g_l3_val = evaluateGraph(g_l3, (unit=[k1(), k2()], grid=nothing))
-gf_l3, inPars_l3 = compressParam(l3)
-@test all(map((x, y)->obtain(x)==y, inPars_l3, ([k1(), k2()], [])))
-@test gf_l3([1.1, 3.2]) == 7.61
-@test gf_l3([3.2, 1.1]) ≈ 12.44
+g_l1, g_l1_inSet = transpileParam(l1)
+g_l3, g_l3_inSet = transpileParam(l3)
+g_l3inVal = (unit=[k1(), k2()], grid=nothing)
+@test obtain(g_l3_inSet) == g_l3inVal
+g_l3_val = evaluateGraph(g_l3)
+gf_l3 = ParamGraphCaller(l3)
+@test g_l3_val == gf_l3(g_l3inVal)
+@test all(map((x, y)->obtain(x)==y, g_l3_inSet, ([k1(), k2()], [])))
+@test gf_l3((unit=[1.1, 3.2], grid=nothing)) == 7.61
+@test gf_l3((unit=[3.2, 1.1], grid=nothing)) ≈ 12.44
 
 # Test infinite loop avoidance during recursive function calls
 v1a1 = genHeapParam([v1, a1], :va)
@@ -273,10 +289,15 @@ inSet_e2, midSet_e2, outSet_e2, isoSet_e2 = dissectParam(e2)
 @test all(inSet_e2.grid .=== [m1, m2])
 @test outSet_e2[] == e2
 @test isempty(isoSet_e2)
-gn_e1 = genParamGraph(e1) |> transpileGraph
-pVals_e1 = obtain.(inSet_e2.grid)
-gnf_e1, _ = compressParam(e1)
-@test evaluateGraph(gn_e1) == gnf_e1(pVals_e1) == 5.82827525296409
+
+gn_e1, inSet_e1 = transpileParam(e1)
+inVal_e1 = obtain(inSet_e1)
+@test inVal_e1.unit === nothing && inVal_e1.grid[] == m1Val
+pVals_e1_ext = obtain.(inSet_e2.grid)
+gnf_e1 = functionalize(gn_e1)
+@test evaluateGraph(gn_e1) == 5.82827525296409
+@test gnf_e1((unit=nothing, grid=pVals_e1_ext)) == gnf_e1(inVal_e1) == 5.82827525296409
+
 f3 = (x, y, z)->log(x^2 + y[1]) * (y[2] - sqrt(norm(exp.(z))))
 f3_t = (xv, z)->log(xv[1]^2 + xv[2]) * (xv[3] - sqrt(norm(exp.(z))))
 v2a2 = genHeapParam([v2, a2], :v2a2)
@@ -289,13 +310,13 @@ inSet2, midSet2, outSet2, isoSet2 = dissectParam(d1)
 @test all(inSet2.grid .=== [m1])
 @test outSet2[] === d1
 @test isempty(isoSet2)
-gn_d1 = genParamGraph(d1) |> transpileGraph
-pVals2_2 = (obtain(inSet2.unit), obtain(inSet2.grid))
-gnf_d1, d1_inPars = compressParam(d1)
-@test IdSet{UnitParam}(first(d1_inPars)) == IdSet{UnitParam}(inSet2.unit)
-@test IdSet{GridParam}(last(d1_inPars)) == IdSet{GridParam}(inSet2.grid)
-inVals2 = obtain(d1_inPars)
-@test evaluateGraph(gn_d1, inVals2) == gnf_d1(inVals2) == d1()
+
+gn_d1, inSet_d1 = transpileParam(d1)
+@test IdSet{UnitParam}(inSet_d1.unit) == IdSet{UnitParam}(inSet2.unit)
+@test IdSet{GridParam}(inSet_d1.grid) == IdSet{GridParam}(inSet2.grid)
+gnf_d1 = functionalize(gn_d1)
+inVal_d1 = obtain(inSet_d1)
+@test evaluateGraph(gn_d1) == gnf_d1(inVal_d1) == d1()
 
 pVec1 = genHeapParam([c1, d1, a2], :c1d1a2)
 apRef1 = genCellParam(pVec1, :ref)
@@ -353,9 +374,11 @@ pm1Val = obtain(pm1)
 inSet_pm1, _, outSet_pm1, isoSet_pm1 = dissectParam(pm1)
 @test inSet_pm1.grid == [k1, k2]
 inSetVal_pm1 = obtain.(inSet_pm1.unit)
-gn_pm1 = genParamGraph(pm1) |> transpileGraph
-gnf_pm1, inPars_pm1 = compressParam(pm1)
-@test pm1Val == evaluateGraph(gn_pm1) == gnf_pm1(map(obtain, inPars_pm1))
+
+gn_pm1, inSet_pm1 = transpileParam(pm1)
+gnf_pm1 = functionalize(gn_pm1)
+inVal_pm1 = obtain(inSet_pm1)
+@test pm1Val == evaluateGraph(gn_pm1) == gnf_pm1(inVal_pm1)
 
 val_pm1_1 = obtain(pm1)
 @test all(size.(val_pm1_1).== Ref( (1, 3) ))
@@ -364,11 +387,15 @@ f5 = (l, c) -> map(norm, f4(l, c))
 pm2 = genCellParam(f5, genCellParam.((k1, k2)), :pn)
 pm2Val = obtain(pm2)
 
-inSet_pm2, _, outSet_pm2, isoSet_pm2 = dissectParam(pm2)
-inSetVal_pm2 = obtain(inSet_pm2)
-gn_pm2 = genParamGraph(pm2) |> transpileGraph
-gnf_pm2, inPars_pm2 = compressParam(pm2)
-@test evaluateGraph(gn_pm2) == gnf_pm2(obtain(inPars_pm2)) == pm2()
+inSet_pm2_1, _, outSet_pm2, isoSet_pm2 = dissectParam(pm2)
+inSetVal_pm2 = obtain(inSet_pm2_1)
+gn_pm2, inSet_pm2 = transpileParam(pm2)
+gnf_pm2 = ParamGraphCaller(pm2)
+inVal_pm2 = obtain(gnf_pm2.source)
+@test inVal_pm2 == map(x->(x!==nothing ? sort(x) : x), inSetVal_pm2) == obtain(inSet_pm2)
+gnf_pm2core = functionalize(gn_pm2)
+@test gnf_pm2.evaluate == gnf_pm2core
+@test evaluateGraph(gn_pm2) == gnf_pm2(inVal_pm2) == pm2() == gnf_pm2core(inVal_pm2)
 
 x1 = genTensorVar(1.0, :x)
 x2 = genTensorVar(1.1, :x)

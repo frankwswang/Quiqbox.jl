@@ -41,12 +41,12 @@ struct FieldParamFunc{C<:RealOrComplex, D, F<:AbstractParamFunc, S<:SpanSetFilte
 end
 
 function evalFieldParamFunc(f::FieldParamFunc{C, D, F, S}, input::T, 
-                            params::AbstractSpanValueSet) where 
+                            params::OptSpanValueSet) where 
                            {T, C<:RealOrComplex, D, F<:AbstractParamFunc, S<:SpanSetFilter}
     f.core(input, params)
 end
 
-(f::FieldParamFunc)(input, params::AbstractSpanValueSet) = 
+(f::FieldParamFunc)(input, params::OptSpanValueSet) = 
 evalFieldParamFunc(f, input, params)
 
 getOutputType(::Type{<:FieldParamFunc{C}}) where {C<:RealOrComplex} = C
@@ -55,7 +55,7 @@ const NullaryFieldFunc{C<:RealOrComplex, D, F<:AbstractParamFunc} =
       FieldParamFunc{C, D, F, VoidSetFilter}
 
 
-function unpackFunc!(f::FieldAmplitude{C, D}, paramSet::AbstractSpanParamSet, 
+function unpackFunc!(f::FieldAmplitude{C, D}, paramSet::OptSpanParamSet, 
                      paramSetId::Identifier=Identifier(paramSet)) where 
                     {C<:RealOrComplex, D}
     fCore, localParamSet = unpackFieldFunc(f)
@@ -184,7 +184,7 @@ function evalFieldAmplitudeCore(f::NullaryField, input)
 end
 
 function unpackFieldFunc(f::NullaryField{<:RealOrComplex, D}) where {D}
-    CartesianHeader(InputConverter(f.core.f.f), Val(D)), initializeSpanParamSet(nothing)
+    CartesianHeader(InputConverter(f.core.f.f), Val(D)), initializeSpanParamSet(Union{})
 end
 
 
@@ -383,13 +383,13 @@ end
 
 
 struct FloatingField{T<:Real, D, C<:RealOrComplex{T}, F<:AbstractParamFunc, 
-                     P<:OptionalSpanValueSet} <: FieldAmplitude{C, D}
+                     P<:OptSpanValueSet} <: FieldAmplitude{C, D}
     center::NTuple{D, T}
     core::TypedCarteFunc{C, D, F}
     param::P
 
     function FloatingField(center::NonEmptyTuple{Real}, f::FieldParamFunc{C, D, F}, 
-                           paramSet::AbstractSpanParamSet) where 
+                           paramSet::OptSpanParamSet) where 
                           {C<:RealOrComplex, D, F<:AbstractParamFunc}
         T = extractRealNumberType(C)
         base = f.core.f

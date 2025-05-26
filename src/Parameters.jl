@@ -993,13 +993,15 @@ function markParam!(param::ParamBox,
     nothing
 end
 
-function sortParams!(params::AbstractVector{<:ParamBox}; indexing::Bool=true)
-    encoder = function (x::ParamBox)
-        nl = getNestedLevel(x|>typeof)
-        (screenLevelOf(x), nl.level, symbolFrom(x.symbol), objectid(x))
-    end
 
-    sort!(params, by=encoder)
+function getParamOrderLabel(x::ParamBox)
+    nl = getNestedLevel(x|>typeof)
+    (screenLevelOf(x), nl.level, symbolFrom(x.symbol), objectid(x))
+end
+
+function sortParams!(params::AbstractVector{<:ParamBox}; 
+                     indexing::Bool=true, by::F=getParamOrderLabel) where {F<:Function}
+    sort!(params; by)
 
     if indexing
         parIdxDict = Dict{Symbol, Int}()
@@ -1034,63 +1036,89 @@ end
 const OptionalSpanSet{U<:NothingOr{AbstractVector}, G<:NothingOr{AbstractVector}} = 
       @NamedTuple{unit::U, grid::G}
 
-const AbstractSpanValueSet{U<:AbstractVector, G<:AbtVecOfAbtArr} = OptionalSpanSet{U, G}
-
-const OptionalSpanValueSet{U<:NothingOr{AbstractVector}, G<:NothingOr{AbtVecOfAbtArr}} = 
+const OptSpanValueSet{U<:NothingOr{AbstractVector}, G<:NothingOr{AbtVecOfAbtArr}} = 
       OptionalSpanSet{U, G}
 
-const OptionalUnitValueSet{U<:NothingOr{AbstractVector}, G<:NothingOr{AbtBottomVector}} = 
+const OptSpanParamSet{U<:NothingOr{ AbstractVector{<:UnitParam} }, 
+                      G<:NothingOr{ AbstractVector{<:GridParam} }} = 
       OptionalSpanSet{U, G}
 
-const OptionalGridValueSet{U<:NothingOr{AbtBottomVector}, G<:NothingOr{AbtVecOfAbtArr}} = 
+const TypedVoidSet{U<:NothingOr{AbtBottomVector}, G<:NothingOr{AbtBottomVector}} = 
       OptionalSpanSet{U, G}
 
-const OptionalVoidValueSet{U<:NothingOr{AbtBottomVector}, G<:NothingOr{AbtBottomVector}} = 
-      OptionalSpanSet{U, G}
+const TypedUnitSet{U<:AbstractVector} = OptionalSpanSet{U, <:NothingOr{AbtBottomVector}}
 
-const AbstractSpanIndexSet{U<:AbstractVector{<:OneToIndex}, 
-                           G<:AbstractVector{<:OneToIndex}} = 
-      OptionalSpanSet{U, G}
+const TypedGridSet{G<:AbstractVector} = OptionalSpanSet{<:NothingOr{AbtBottomVector}, G}
 
-const FixedSpanIndexSet{U<:OneToIndex, G<:OneToIndex} = 
-      AbstractSpanIndexSet{Memory{U}, Memory{G}}
+const TypedSpanSet{U<:AbstractVector, G<:AbstractVector} = OptionalSpanSet{U, G}
 
-const OptionalSpanParamSet{U<:NothingOr{ AbstractVector{<:UnitParam} }, 
-                           G<:NothingOr{ AbstractVector{<:GridParam} }} = 
-      OptionalSpanSet{U, G}
+const TypedUnitParamSet{U<:AbstractVector{<:UnitParam}} = TypedUnitSet{U}
 
-const AbstractSpanParamSet{U<:AbstractVector{<:UnitParam}, G<:AbstractVector{<:GridParam}} = 
-      OptionalSpanParamSet{U, G}
+const TypedGridParamSet{G<:AbstractVector{<:GridParam}} = TypedGridSet{G}
 
-const TypedSpanParamSet{T1<:UnitParam, T2<:GridParam} = 
-      AbstractSpanParamSet{Vector{T1}, Vector{T2}}
+const TypedSpanParamSet{U<:AbstractVector{<:UnitParam}, G<:AbstractVector{<:GridParam}} = 
+      TypedSpanSet{U, G}
+
+const FixedSpanParamSet{UP<:UnitParam, GP<:GridParam} = 
+      TypedSpanParamSet{Memory{UP}, Memory{GP}}
 
 genFixedVoidSpanSet() = (unit=genBottomMemory(), grid=genBottomMemory())
 
 #= Additional Method =#
-function obtain(paramSet::AbstractSpanParamSet)
+function obtain(paramSet::OptSpanParamSet)
     map(paramSet) do sector
-        isempty(sector) ? nothing : obtain(sector)
+        (sector === nothing || isempty(sector)) ? nothing : obtain(sector)
     end
 end
 
 
 struct UnitInput end
 struct GridInput end
-struct SpanInput end
-struct VoidInput end
+struct PairInput{U<:NothingOr{UnitInput}, G<:NothingOr{GridInput}} end
+const HalfInput = Union{UnitInput, GridInput}
+const VoidInput = PairInput{Nothing, Nothing}
+const SpanInput = PairInput{UnitInput, GridInput}
+const MiscInput = Union{HalfInput, PairInput}
 
-getInputSymbol(::Type{UnitInput}) = :unit
-getInputSymbol(::Type{GridInput}) = :grid
-getInputSymbol(::Type{SpanInput}) = :span
-getInputSymbol(::Type{VoidInput}) = :void
+getInputSector(::Type{UnitInput}) = :unit
+getInputSector(::Type{GridInput}) = :grid
+getInputSector(::Type{<:PairInput}) = ChainedAccess()
 
-constrainSpanValueSet(::UnitInput, ::OptionalUnitValueSet) = getInputSymbol(UnitInput)
-constrainSpanValueSet(::GridInput, ::OptionalGridValueSet) = getInputSymbol(GridInput)
-constrainSpanValueSet(::SpanInput, ::OptionalSpanValueSet) = getInputSymbol(SpanInput)
-constrainSpanValueSet(::VoidInput, ::OptionalVoidValueSet) = getInputSymbol(VoidInput)
+restrictSpanSet(::UnitInput, ::TypedUnitSet) = getInputSector(UnitInput)
+restrictSpanSet(::GridInput, ::TypedGridSet) = getInputSector(GridInput)
+restrictSpanSet(::SpanInput, ::TypedSpanSet) = getInputSector(SpanInput)
+restrictSpanSet(::VoidInput, ::TypedVoidSet) = getInputSector(VoidInput)
+restrictSpanSet(::PairInput{UnitInput, Nothing}, ::TypedUnitSet) = getInputSector(PairInput)
+restrictSpanSet(::PairInput{Nothing, GridInput}, ::TypedGridSet) = getInputSector(PairInput)
 
-getParamInputType(::AbstractParamFunc) = SpanInput()
+getInputSetType(::TypedSpanSet) = SpanInput
+getInputSetType(::TypedVoidSet) = VoidInput
+getInputSetType(::TypedUnitSet) = PairInput{UnitInput, Nothing}
+getInputSetType(::TypedGridSet) = PairInput{Nothing, GridInput}
+
+struct ParamEvaluator{T, A<:MiscInput, F<:Function} <: TypedEvaluator{T}
+    core::TypedReturn{T, ParamFreeFunc{F}}
+
+    function ParamEvaluator(f::TypedReturn{T}, ::A) where {T, A<:MiscInput}
+        new{T, A, typeof(f.f)}(TypedReturn(ParamFreeFunc(f.f), T))
+    end
+
+    function ParamEvaluator(f::ParamEvaluator{T, <:MiscInput, F}, ::A) where 
+                           {T, F<:Function, A<:MiscInput}
+        new{T, A, F}(f.core)
+    end
+end
+
+
+getInputSetType(::ParamEvaluator{T, A}) where {T, A<:MiscInput} = A
+
+function (f::ParamEvaluator)(input::OptSpanValueSet)
+    sector = restrictSpanSet(getInputSetType(f)(), input)
+    formattedInput = getField(input, sector)
+    f.core(formattedInput)
+end
+
+getOutputType(::Type{<:ParamEvaluator{T}}) where {T} = T
 
 
 function initializeSpanParamSet(::Type{T}=Any) where {T}
@@ -1099,7 +1127,9 @@ function initializeSpanParamSet(::Type{T}=Any) where {T}
     (unit=upType[], grid=gpType[])
 end
 
-initializeSpanParamSet(::Nothing) = genFixedVoidSpanSet()
+initializeSpanParamSet(::Type{Union{}}) = genFixedVoidSpanSet()
+
+initializeSpanParamSet(::Nothing) = (unit=nothing, grid=nothing)
 
 initializeSpanParamSet(unit::UnitParam) = (unit=genMemory(unit), grid=genBottomMemory())
 
@@ -1127,11 +1157,11 @@ function locateParam!(params::AbstractVector, target::ParamBox)
     (ChainedAccess∘locateParamCore!)(params, target)
 end
 
-function locateParam!(paramSet::AbstractSpanParamSet, target::UnitParam)
+function locateParam!(paramSet::TypedUnitParamSet, target::UnitParam)
     GetIndex{UnitIndex}(locateParamCore!(paramSet.unit, target))
 end
 
-function locateParam!(paramSet::AbstractSpanParamSet, target::GridParam)
+function locateParam!(paramSet::TypedGridParamSet, target::GridParam)
     GetIndex{GridIndex}(locateParamCore!(paramSet.grid, target))
 end
 
@@ -1140,19 +1170,28 @@ const NamedParamTuple{S, N, P<:NTuple{N, ParamBox}} = NamedTuple{S, P}
 const SpanParamNamedTuple{S, N, P<:NTuple{N, SpanParam}} = NamedParamTuple{S, N, P}
 
 const ParamBoxSource = Union{ParamBoxAbtArr, Tuple{Vararg{ParamBox}}, NamedParamTuple, 
-                             AbstractSpanParamSet}
+                             OptSpanParamSet}
 
-function locateParam!(params::Union{AbstractSpanParamSet, AbstractVector}, 
+function locateParam!(params::Union{OptSpanParamSet, AbstractVector}, 
                       subset::ParamBoxSource)
-    modestTypingMap(subset, GetIndex) do param
-        locateParam!(params, param)
+    if subset isa AbstractArray && isempty(subset)
+        similar(subset, Union{})
+    else
+        map(subset) do param
+            locateParam!(params, param)
+        end
     end
 end
 
-function locateParam!(params::AbstractSpanParamSet, subset::AbstractSpanParamSet)
-    unit = modestTypingMap(x->locateParamCore!(params.unit, x), subset.unit)
-    grid = modestTypingMap(x->locateParamCore!(params.grid, x), subset.grid)
-    SpanSetFilter(unit, grid)
+function locateParam!(params::OptSpanParamSet, subset::OptSpanParamSet)
+    units, grids = map(params, subset) do prev, here
+        if here === nothing || isempty(here)
+            genBottomMemory()
+        else
+            map(x->locateParamCore!(prev, x), here)
+        end
+    end
+    SpanSetFilter(units, grids)
 end
 
 
@@ -1206,16 +1245,23 @@ function cacheParam!(cache::MultiSpanDataCacheBox{T}, param::ParamBox{<:T}) wher
 end
 
 function cacheParam!(cache::MultiSpanDataCacheBox, params::ParamBoxSource)
-    modestTypingMap(params) do param
-        cacheParam!(cache, param)
+    if params isa AbstractArray && isempty(params)
+        similar(params, Union{})
+    else
+        map(params) do param
+            cacheParam!(cache, param)
+        end
     end
 end
 
 
-struct SpanSetFilter{U<:OneToIndex, G<:OneToIndex} <: Mapper
-    scope::FixedSpanIndexSet{U, G}
+const SpanIndexSet{U<:AbstractVector{<:OneToIndex}, G<:AbstractVector{<:OneToIndex}} = 
+      TypedSpanSet{U, G}
 
-    function SpanSetFilter(scope::AbstractSpanIndexSet)
+struct SpanSetFilter{U<:OneToIndex, G<:OneToIndex} <: Mapper
+    scope::OptionalSpanSet{Memory{U}, Memory{G}}
+
+    function SpanSetFilter(scope::SpanIndexSet)
         scope = map(scope) do sector
             isempty(sector) ? genBottomMemory() : Memory{OneToIndex}(sector)
         end
@@ -1229,9 +1275,8 @@ SpanSetFilter(unit::AbstractVector{<:OneToIndex}, grid::AbstractVector{<:OneToIn
 SpanSetFilter((;unit, grid))
 
 function SpanSetFilter(unitLen::Int, gridLen::Int)
-    builder = x->OneToIndex(x)
-    unit = modestTypingMap(builder, Base.OneTo(unitLen))
-    grid = modestTypingMap(builder, Base.OneTo(gridLen))
+    unit = OneToIndex.(1:unitLen)
+    grid = OneToIndex.(1:gridLen)
     SpanSetFilter(unit, grid)
 end
 
@@ -1244,7 +1289,7 @@ const GridSetFilter = SpanSetFilter{Union{}, OneToIndex}
 function getSector(::Val{S}, target::OptionalSpanSet, oneToIds::Memory{T}, 
                    finalizer::F=itself) where {S, T<:OneToIndex, F<:Function}
     sector = getfield(target, S)
-    if T <: Union{} || sector === nothing
+    if T <: Union{} || sector === nothing || isempty(sector)
         genBottomMemory()
     else
         iStart = firstindex(sector)
@@ -1282,7 +1327,7 @@ struct TaggedSpanSetFilter{F<:NamedFilter} <: Mapper
     tag::Identifier
 end
 
-TaggedSpanSetFilter(scope::NamedFilter, paramSet::AbstractSpanParamSet) = 
+TaggedSpanSetFilter(scope::NamedFilter, paramSet::OptSpanParamSet) = 
 TaggedSpanSetFilter(scope, Identifier(paramSet))
 
 TaggedSpanSetFilter() = TaggedSpanSetFilter(SpanSetFilter(), Identifier(nothing))
@@ -1295,16 +1340,14 @@ getField(obj, tsFilter.scope, finalizer)
 getOutputType(::Type{TaggedSpanSetFilter{F}}) where {F<:NamedFilter} = getOutputType(F)
 
 
-function formatSpanValueSet(params::OptionalSpanValueSet)
-    map(params) do sector
-        ifelse(sector === nothing, genBottomMemory(), sector)
-    end
-end
+# function formatSpanValueSet(params::OptSpanValueSet)
+#     map(params) do sector
+#         ifelse(sector === nothing, genBottomMemory(), sector)
+#     end
+# end
 
-formatSpanValueSet(params::AbstractSpanValueSet) = itself(params)
-
-(f::AbstractParamFunc)(input, params::OptionalSpanValueSet) = 
-f(input, formatSpanValueSet(params))
+# (f::AbstractParamFunc)(input, params::OptSpanValueSet) = 
+# f(input, formatSpanValueSet(params))
 
 
 const TypedParamFunc{T, F<:AbstractParamFunc} = TypedReturn{T, F}
@@ -1316,7 +1359,7 @@ end
 
 InputConverter(f::Function) = (InputConverter∘ParamFreeFunc)(f)
 
-(f::InputConverter)(input, ::AbstractSpanValueSet) = f.core(input)
+(f::InputConverter)(input, ::OptSpanValueSet) = f.core(input)
 
 InputConverter(f::InputConverter) = itself(f)
 
@@ -1329,7 +1372,7 @@ end
 
 ParamFormatter(f::TaggedSpanSetFilter) = (ParamFormatter∘ParamFreeFunc)(f)
 
-(f::ParamFormatter)(::Any, params::AbstractSpanValueSet) = f.core(params)
+(f::ParamFormatter)(::Any, params::OptSpanValueSet) = f.core(params)
 
 ParamFormatter(f::ParamFormatter) = itself(f)
 
@@ -1342,9 +1385,9 @@ struct ParamBindFunc{F<:Function, C1<:UnitParam, C2<:GridParam} <: AbstractParam
     grid::Memory{C2}
 end
 
-function (f::ParamBindFunc{F})(input, valSet::AbstractSpanValueSet) where {F<:Function}
+function (f::ParamBindFunc{F})(input, params::OptSpanValueSet) where {F<:Function}
     for field in (:unit, :grid)
-        foreach(getfield(f, field), getfield(valSet, field)) do p, v
+        foreach(getfield(f, field), getfield(params, field)) do p, v
             setVal!(p, v)
         end
     end
@@ -1376,7 +1419,7 @@ end
 ParamCombiner(binder::Function, encode::AbstractVector{<:AbstractParamFunc}) = 
 ParamCombiner(binder, genMemory(encode))
 
-function (f::ParamCombiner{B, E})(input::T, params::AbstractSpanValueSet) where 
+function (f::ParamCombiner{B, E})(input::T, params::OptSpanValueSet) where 
                                  {T, B<:Function, E<:ParamFunctionChain}
     fHead, fTail... = f.encode
     res = fHead(input, params)
@@ -1422,7 +1465,7 @@ end
 ParamPipeline(binder::Function, encode::AbstractVector{<:AbstractParamFunc}) = 
 ParamPipeline(binder, genMemory(encode))
 
-function (f::ParamPipeline{E})(input, params::AbstractSpanValueSet) where 
+function (f::ParamPipeline{E})(input, params::OptSpanValueSet) where 
                               {E<:ParamFunctionChain}
     fHead, fTail... = f.encode
     res = fHead(input, params)
@@ -1442,7 +1485,7 @@ end
 function unpackFunc(f::Function)
     fLocal = deepcopy(f)
     if noStoredParam(fLocal)
-        InputConverter(fLocal), initializeSpanParamSet(nothing)
+        InputConverter(fLocal), initializeSpanParamSet(Union{})
     else
         source = getSourceParamSet(fLocal)
 
@@ -1455,7 +1498,7 @@ function unpackFunc(f::Function)
     end
 end
 
-function unpackFunc!(f::Function, paramSet::AbstractSpanParamSet, 
+function unpackFunc!(f::Function, paramSet::OptSpanParamSet, 
                      paramSetId::Identifier=Identifier(paramSet))
     fCore, localParamSet = unpackFunc(f)
     if fCore isa InputConverter

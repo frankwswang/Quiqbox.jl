@@ -259,7 +259,7 @@ end
 
 function getCachedFieldFunc!(cache::FieldParamFuncCache{T, D}, 
                              orb::PrimitiveOrb{T, D, T}, 
-                             paramSet::AbstractSpanParamSet) where {T<:Real, D}
+                             paramSet::OptSpanParamSet) where {T<:Real, D}
     get!(cache.real, EgalBox{FieldAmplitude{T, D}}(orb.body)) do
         unpackFunc!(orb.body, paramSet)::FieldParamFunc{T, D}
     end
@@ -267,7 +267,7 @@ end
 
 function getCachedFieldFunc!(cache::FieldParamFuncCache{T, D}, 
                              orb::PrimitiveOrb{T, D, Complex{T}}, 
-                             paramSet::AbstractSpanParamSet) where {T<:Real, D}
+                             paramSet::OptSpanParamSet) where {T<:Real, D}
     get!(cache.complex, EgalBox{FieldAmplitude{Complex{T}, D}}(orb.body)) do
         unpackFunc!(orb.body, paramSet)::FieldParamFunc{Complex{T}, D}
     end
@@ -276,7 +276,7 @@ end
 
 function genOrbitalDataCore!(fieldCache::FieldParamFuncCache{T, D}, 
                              paramCache::MultiSpanDataCacheBox, 
-                             paramSet::AbstractSpanParamSet, 
+                             paramSet::OptSpanParamSet, 
                              orb::PrimitiveOrb{T, D, C}) where 
                             {T<:Real, D, C<:RealOrComplex{T}}
     centerData = cacheParam!(paramCache, orb.center)
@@ -286,7 +286,7 @@ end
 
 function genOrbitalDataCore!(fieldCache::FieldParamFuncCache{T, D}, 
                              paramCache::MultiSpanDataCacheBox, 
-                             paramSet::AbstractSpanParamSet, 
+                             paramSet::OptSpanParamSet, 
                              orb::CompositeOrb{T, D}) where {T<:Real, D}
     basisData = map(orb.basis) do basis
         genOrbitalDataCore!(fieldCache, paramCache, paramSet, basis)
@@ -306,7 +306,7 @@ const OrbBasisSource{T<:Real, D} =
 
 function genOrbitalDataCore!(fieldCache::FieldParamFuncCache{T, D}, 
                              paramCache::MultiSpanDataCacheBox, 
-                             paramSet::AbstractSpanParamSet, 
+                             paramSet::OptSpanParamSet, 
                              orbs::OrbBasisCollection{T, D}) where {T<:Real, D}
     checkEmptiness(orbs, :orbs)
     ids, uniqueOrbs = markUnique(orbs, compareFunction=(===))
@@ -320,7 +320,7 @@ end
 
 function genOrbitalDataCore!(fieldCache::FieldParamFuncCache{T, D}, 
                              paramCache::MultiSpanDataCacheBox, 
-                             paramSet::AbstractSpanParamSet, 
+                             paramSet::OptSpanParamSet, 
                              orbs::N24Tuple{OrbitalBasis{<:RealOrComplex{T}, D}}) where 
                             {T<:Real, D}
     lazyTupleMap(orbs) do orb

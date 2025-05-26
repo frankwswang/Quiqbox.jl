@@ -31,9 +31,15 @@ using Quiqbox
 
 @test Quiqbox.PolyGaussFieldFunc <: Quiqbox.PolyRadialFieldFunc
 
-@test Quiqbox.FixedSpanIndexSet <: Quiqbox.AbstractSpanIndexSet
+@test Quiqbox.OptSpanValueSet <: Quiqbox.OptionalSpanSet
 
-@test Quiqbox.TypedSpanParamSet <: Quiqbox.AbstractSpanParamSet
+@test Quiqbox.TypedVoidSet <: Quiqbox.OptSpanValueSet
+
+@test Quiqbox.OptSpanParamSet <: Quiqbox.OptionalSpanSet
+
+@test Quiqbox.TypedSpanParamSet <: Quiqbox.OptSpanParamSet
+
+@test Quiqbox.FixedSpanParamSet <: Quiqbox.TypedSpanParamSet
 
 @test Quiqbox.PrimGTOData <: Quiqbox.PrimOrbData
 
