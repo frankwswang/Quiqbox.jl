@@ -30,7 +30,7 @@ GridIndex(idx::Int) = GridIndex(idx|>OneToIndex)
 
 
 const SpanIndex = Union{UnitIndex, GridIndex}
-const GeneralIndex = Union{Int, SpanIndex, OneToIndex}
+const GeneralIndex = Union{Int, SpanIndex, OneToIndex, Base.CartesianIndex}
 const GeneralField = Union{GeneralIndex, Symbol, Nothing}
 
 struct ChainedAccess{L, C<:NTuple{L, GeneralField}} <: Getter
@@ -67,6 +67,8 @@ getField(obj, ::Pass) = itself(obj)
 getField(obj, entry::Symbol) = getfield(obj, entry)
 
 getField(obj, entry::Int) = getindex(obj, entry)
+
+getField(obj, i::Base.CartesianIndex) = getindex(obj, i)
 
 getField(obj, i::OneToIndex) = getindex(obj, firstindex(obj)+i.idx-1)
 
