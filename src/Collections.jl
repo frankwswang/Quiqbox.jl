@@ -400,3 +400,8 @@ function indexedPerturb(op::F, source::AbstractArray, idxVal::Pair{OneToIndex, T
 
     res
 end
+
+
+tightenCollection(::Nothing) = genBottomMemory()
+
+tightenCollection(arr::AbstractVector) = isempty(arr) ? genBottomMemory() : genMemory(arr)
