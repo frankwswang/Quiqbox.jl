@@ -256,15 +256,6 @@ const GridLayerGraph{T, V<:CallVertex{T}, G<:GridVertex, H<:CallVertex} =
       SpanLayerGraph{T, V, Union{}, G, H}
 
 
-function genParamSortActivityCounter(::Type{T}) where {T<:ParamBox}
-    counter = fill(0)
-    f = function countAndLabel(param::T)
-        screenLevelOf(param) == 2 && (counter[] += 1)
-        getParamOrderLabel(param)
-    end
-    f, counter
-end
-
 function transpileParam(param::ParamBox, reindexInput!::Bool=false)
     sl = screenLevelOf(param)
 
@@ -279,18 +270,18 @@ function transpileParam(param::ParamBox, reindexInput!::Bool=false)
         end
 
         # Inactive (screen level: 2) params should be pushed to the end
-        counters = map(inputSetRaw, (unit=UnitParam, grid=GridParam)) do params, type
-            by, counter = genParamSortActivityCounter(type)
-            sortParams!(params; indexing=reindexInput!, by)
-            counter
+        indices = map(inputSetRaw) do sector
+            sortParams!(sector; indexing=reindexInput!)
+            findfirst(x->screenLevelOf(x)==2, sector)
         end
 
-        inputSet = map(inputSetRaw, counters) do sector, counter
-            nInactive = counter[]
-            if nInactive == length(sector)
+        inputSet = map(inputSetRaw, indices) do sector, idx
+            if idx === nothing
+                genMemory(sector)
+            elseif idx == firstindex(sector)
                 genBottomMemory()
             else
-                genMemory(@view sector[begin:end-nInactive])
+                genMemory(@view sector[begin:idx-1])
             end
         end
 

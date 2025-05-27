@@ -228,11 +228,24 @@ inSet1_t = [v1, v2, b2, b3]
 c1Val = f2_t(obtain.(inSet1_t))
 @test obtain(pars_f2) == obtain.([a1, v2, b1, b2, b3])
 @test f2(obtain(pars_f2)) == c1Val == c1() == 42.96591869214117
-gn_c1, c1_inSet = transpileParam(c1)
-c1_input1 = [b2, v1, v2] .|> obtain
-@test c1_input1 == obtain(c1_inSet.unit)
-@test c1_inSet.grid == Quiqbox.genBottomMemory()
+inSet_c1_raw = dissectParam(c1)[begin]
+@test inSet_c1_raw.unit == inSet1_t
+gn_c1, inSet_c1 = transpileParam(c1)
+@test all([b2, v1, v2] .=== inSet_c1.unit)
+c1_input1 = obtain(inSet_c1).unit
+@test inSet_c1.grid == Quiqbox.genBottomMemory()
 @test c1_input1 == map(x->broadcast(Quiqbox.getVertexValue, x), gn_c1.source).unit[1:3]
+
+cm1 = genTensorVar(collect(1:5), :cm, true)
+cm2 = genTensorVar(collect(6:10), :cm, true)
+cm3 = genTensorVar(collect(11:15), :cm, true)
+cm4 = genTensorVar(collect(16:20), :cm, false)
+cm5 = genCellParam(+, (cm1, cm2), :cm)
+cm6 = genCellParam(+, (cm3, cm4), :cm)
+cm7 = genCellParam((x, y)->sum(x.*y), (cm5, cm6), :cm)
+@test cm7() == sum(collect(7:2:15) .* collect(27:2:35))
+g_cm7, inSet_cm7 = transpileParam(cm7)
+@test inSet_cm7.grid[] === cm4
 
 gnf_c1 = functionalize(gn_c1)
 @test Quiqbox.getInputSetType(gnf_c1) == Quiqbox.SpanInput{Quiqbox.UnitInput, Nothing}
