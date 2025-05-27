@@ -8,12 +8,13 @@ using LinearAlgebra: norm as generalNorm
 getDimension(::ParticleFunction{D, M}) where {D, M} = Int(D*M)
 
 
-needFieldAmpEvalCache(::FieldAmplitude) = true
+needFieldAmpEvalCache(::FieldAmplitude) = false
 
 function evalFieldAmplitude(f::FieldAmplitude, input; 
-                            cache!Self::MultiSpanDataCacheBox=MultiSpanDataCacheBox())
+                            cache!Self::MissingOr{MultiSpanDataCacheBox}=missing)
     formattedInput = formatInput(f, input)
     if needFieldAmpEvalCache(f)
+        ismissing(cache!Self) && (cache!Self = MultiSpanDataCacheBox())
         evalFieldAmplitudeCore(f, formattedInput, cache!Self)
     else
         evalFieldAmplitudeCore(f, formattedInput)
@@ -402,8 +403,10 @@ end
 
 getOutputType(::Type{<:FloatingField{T, D, C}}) where {T, D, C<:RealOrComplex{T}} = C
 
-function (f::FloatingField{<:RealOrComplex, D})(coord::NTuple{D, Real}) where {D}
-    f.core(coord .- f.center, f.param)
+needFieldAmpEvalCache(::FloatingField) = false
+
+function evalFieldAmplitudeCore(f::FloatingField, input)
+    f.core(formatInput(f, input) .- f.center, f.param)
 end
 
 const FloatingPolyGaussField{T<:Real, D, F<:PolyGaussFieldCore{T, D}} = 
