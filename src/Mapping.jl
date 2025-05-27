@@ -130,22 +130,6 @@ getOutputType(::Type{<:LateralPartial{F}}) where {F<:Function} = getOutputType(F
 const absSqrtInv = inv ∘ sqrt ∘ abs
 
 
-struct InputLimiter{N, F<:Function} <: Modifier
-    f::F
-
-    function InputLimiter(f::F, ::Val{N}) where {F<:Function, N}
-        checkPositivity(N::Int)
-        new{numberOfInput, F}(f)
-    end
-end
-
-InputLimiter(f::InputLimiter, ::Val{N}) where {N} = InputLimiter(f.f, Val(N))
-
-(f::InputLimiter{N, F})(arg::Vararg{Any, N}) where {N, F<:Function} = f.f(arg...)
-
-getOutputType(::Type{<:InputLimiter{<:Any, F}}) where {F<:Function} = getOutputType(F)
-
-
 struct ChainMapper{F<:FunctionChainUnion{Function}} <: Mapper
     chain::F
 
