@@ -130,22 +130,23 @@ getOutputType(::Type{<:LateralPartial{F}}) where {F<:Function} = getOutputType(F
 const absSqrtInv = inv ∘ sqrt ∘ abs
 
 
-struct ChainMapper{F<:FunctionChainUnion{Function}} <: Mapper
-    chain::F
+struct ChainMapper{E<:FunctionChainUnion{Function}} <: Mapper
+    chain::E
 
-    function ChainMapper(chain::F) where {F<:CustomMemory{<:Function}}
+    function ChainMapper(chain::E) where {E<:CustomMemory{<:Function}}
         checkEmptiness(chain, :chain)
-        new{F}(chain)
+        new{E}(chain)
     end
 
-    function ChainMapper(chain::F) where {F<:GeneralTupleUnion{ NonEmptyTuple{Function} }}
-        new{F}(chain)
+    function ChainMapper(chain::E) where {E<:GeneralTupleUnion{ NonEmptyTuple{Function} }}
+        new{E}(chain)
     end
 end
 
 ChainMapper(chain::AbstractArray{<:Function}) = ChainMapper(chain|>ShapedMemory)
 
-function getField(obj, f::ChainMapper, finalizer::F=itself) where {F<:Function}
+function getField(obj, f::ChainMapper{E}, finalizer::F=itself) where 
+                 {E<:FunctionChainUnion{Function}, F<:Function}
     fChain = f.chain
     if fChain isa AbstractArray && isempty(fChain)
         similar(fChain, Union{})
@@ -358,7 +359,7 @@ struct ComposedApply{FO, FI} <: CompositeFunction
     ComposedApply(inner::FI, outer::FO) where {FI<:Function, FO<:Function} = 
     new{FO, FI}(inner, outer)
 end
-
+# Should not be decomposed further to `fCore(f, args)` to avoid additional allocations.
 function (f::ComposedApply{FO, FI})(args::Vararg) where {FI<:Function, FO<:Function}
     innerRes = splat(f.inner)(args)
     f.outer(innerRes)

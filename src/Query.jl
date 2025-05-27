@@ -76,10 +76,7 @@ getField(obj, i::UnitIndex) = getField(obj.unit, i.idx)
 
 getField(obj, i::GridIndex) = getField(obj.grid, i.idx)
 
-# The original method might cause wrong gradients for AD libraries that do not support 
-# differentiating through keyword arguments.
-# getField(obj, acc::ChainedAccess) = foldl(getField, acc.chain, init=obj)
-function getField(obj, acc::ChainedAccess)
+function getField(obj, acc::ChainedAccess{L, C}) where {L, C<:NTuple{L, GeneralField}}
     for i in acc.chain
         obj = getField(obj, i)
     end
