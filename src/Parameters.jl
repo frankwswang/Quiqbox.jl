@@ -1324,21 +1324,27 @@ const UnitSetFilter = SpanSetFilter{OneToIndex, Union{}}
 
 const GridSetFilter = SpanSetFilter{Union{}, OneToIndex}
 
-function getSector(sector::NothingOr{AbstractVector}, oneToIds::Memory{T}, 
+function getSector(sector::AbstractVector, oneToIds::Memory{T}, 
                    finalizer::F=itself) where {T<:OneToIndex, F<:Function}
-    if sector === nothing || T <: Union{} || isempty(sector)
+    if T <: Union{}
         genBottomMemory()
     else
-        iStart = firstindex(sector)
         if finalizer isa ItsType
-            view(sector, map(x->(x.idx + iStart - 1), oneToIds))
+            idxShifter = let iStart=firstindex(sector)
+                (x::OneToIndex)->(x.idx + iStart - 1)
+            end
+            view(sector, map(idxShifter, oneToIds))
         else
             map(oneToIds) do x
-                getindex(sector, (x.idx + iStart - 1)) |> finalizer
+                getField(sector, x) |> finalizer
             end
         end
     end
 end
+
+getSector(::Nothing, ::Memory{Union{}}, ::Function=itself) = genBottomMemory()
+
+getSector(::AbtBottomVector, ::Memory{Union{}}, ::Function=itself) = genBottomMemory()
 
 #= Additional Method =#
 function getField(target::OptionalSpanSet, sFilter::SpanSetFilter, 
