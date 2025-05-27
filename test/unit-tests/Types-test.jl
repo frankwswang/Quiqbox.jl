@@ -3,6 +3,12 @@ using Quiqbox
 
 @testset "Types.jl" begin
 
+@test Quiqbox.NestParam <: Quiqbox.ParamBox
+
+@test Quiqbox.ReducibleParam <: Quiqbox.ParamBox
+
+@test Quiqbox.NestFixedParIn{Float64} <: Quiqbox.CoreFixedParIn{Float64}
+
 @test Quiqbox.PrimGTO <: Quiqbox.PrimitiveOrb
 
 @test Quiqbox.WrappedField <: Quiqbox.EncodedField

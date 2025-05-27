@@ -42,12 +42,8 @@ const UnitOrValVec{T} = AbstractVector{<:UnitOrVal{T}}
 
 isOffsetEnabled(::ParamBox) = false
 
-function checkScreenLevel(sl::Int, levels::NonEmptyTuple{Int})
-    if !(sl in levels)
-        throw(DomainError(sl, "This screen level ($(TernaryNumber(sl))) is not allowed."))
-    end
-    sl
-end
+checkScreenLevel(sl::Int, levels::NonEmptyTuple{Int}) = 
+checkIntLevelMismatch(sl, levels, "screen")
 
 checkScreenLevel(s::TernaryNumber, levels::NonEmptyTuple{Int}) = 
 checkScreenLevel(Int(s), levels)
@@ -225,7 +221,7 @@ end
 function getScreenLevelOptionsCore(::Type{E}) where {E}
     Tuple(0:(checkParamOffsetMethods(E) * 2))
 end
-
+# ParamBoxes with nested data cannot have screen level higher than 0
 function getScreenLevelOptionsCore(::Type{E}) where {E<:AbstractArray}
     nl = getNestedLevel(E)
     if nl.level > 1
@@ -296,13 +292,19 @@ end
 getTensorOutputTypeBound(::TypedReduce{E}) where {E} = E
 getTensorOutputTypeBound(::TypedExpand{E}) where {E} = AbstractArray{E}
 
-getTensorOutputShape(f::TypedExpand, ::Any) = f.shape.axis
-getTensorOutputShape(::TypedReduce{E}, input) where {E} = ()
-getTensorOutputShape(f::TypedReduce{E}, input) where {E<:AbstractArray} = 
-getTensorOutputShape(f.f, input)
-getTensorOutputShape(f::Function, input) = size(f(obtain.(input)...))
+getTensorOutputShape(f::TypedExpand,    ::CoreFixedParIn) = f.shape.axis
+getTensorOutputShape( ::TypedReduce{E}, ::CoreFixedParIn) where {E} = ()
+function getTensorOutputShape(f::TypedReduce{E}, input::CoreFixedParIn) where 
+                             {E<:AbstractArray}
+    fCore = f.f
+    if fCore isa Union{TypedExpand, TypedReduce}
+        getTensorOutputShape(fCore, input)
+    else
+        size(f(obtain.(input)...))
+    end
+end
 
-function formatOffset(lambda::TypedTensorFunc{<:Pack}, ::Missing, input)
+function formatOffset(lambda::TypedTensorFunc{<:Pack}, ::Missing, input::CoreFixedParIn)
     outType = getTensorOutputTypeBound(lambda)
     if getScreenLevelOptionsCore(outType) == (0,)
         ()
@@ -321,7 +323,7 @@ function formatOffset(lambda::TypedTensorFunc{<:Pack}, ::Missing, input)
     end
 end
 
-function formatOffset(lambda::TypedTensorFunc{<:Pack}, offset, input)
+function formatOffset(lambda::TypedTensorFunc{<:Pack}, offset, input::CoreFixedParIn)
     outType = getTensorOutputTypeBound(lambda)
     if getScreenLevelOptionsCore(outType) == (0,)
         ()
@@ -349,42 +351,50 @@ function formatOffset(lambda::TypedTensorFunc{<:Pack}, offset, input)
     end
 end
 
-# ([[x]], [x]) -> {[x]}, (x, x) -> {x}
-getCellOutputLevels(::CoreFixedParIn{T, E}) where {T, E<:Pack{T}} = 
-Set(getNestedLevel(E).level)
+
+function formatTensorFunc(f::Function, ::Type{TypedReduce}, input::CoreFixedParIn)
+    if f isa TypedReduce{<:Pack}
+        f
+    else
+        type = getOutputType(f)
+        if !isconcretetype(type)
+            type = typeof(f(obtain.(input)...))
+        end
+        TypedReduce(f, genPackMemoryType(type))
+    end
+end
+
+function formatTensorFunc(f::Function, ::Type{TypedExpand}, input::CoreFixedParIn)
+    if f isa TypedExpand{<:Pack}
+        f
+    else
+        TypedExpand(f, obtain.(input))
+    end
+end
+
+
+# ([[x]], [x]) -> {[x]}; (x, x) -> {x}
+function getCellOutputLevels(::CoreFixedParIn{T, E}) where {T, E<:Pack{T}}
+    (getNestedLevel(E).level,)
+end
 # ([x], [x]) -> {x, [x]}
 function getCellOutputLevels(::NestFixedParIn{T, E}) where {T, E<:PackedMemory{T}}
     level = getNestedLevel(E).level
-    Set((level, level-1))
+    (level-1, level)
 end
-#! Consider efficient construction for when `f` is a `TypedReturn`.
-function formatTensorFunc(f::Function, ::Type{TypedReduce}, 
-                          input::CoreFixedParIn{T, E}) where {T, E<:Pack{T}}
-    lambda = if f isa TypedReduce{<:Pack}
-        f
-    else
-        type = f(obtain.(input)...) |> typeof |> genPackMemoryType
-        TypedReduce(f, type)
-    end
-    targetLevels = getCellOutputLevels(input)
+
+function checkReduceParamLevel(lambda::TypedReduce{<:Pack}, input::CoreFixedParIn)
+    targetLevelRange = getCellOutputLevels(input)
     actualLevel = getNestedLevel(lambda.type).level
-    if !(actualLevel in targetLevels)
-        throw("The nested level of `f`'s output is $actualLevel "*
-              "which should have been within `$targetLevels`.")
-    end
-    lambda
+    checkIntLevelMismatch(actualLevel, targetLevelRange, "reduce-output nested")
 end
-# ([[x]], [x]) -> [[x]]; ([x], [x]) -> [[x]]; 
-function formatTensorFunc(f::Function, ::Type{TypedExpand}, 
-                          input::CoreFixedParIn{T, E}) where {T, E<:Pack{T}}
-    lambda = f isa TypedExpand{<:Pack} ? f : TypedExpand(f, obtain.(input))
+
+# ([[x]], [x]) -> {[[x]]}; ([x], [x]) -> {[[x]]}
+function checkExpandParamLevel(lambda::TypedExpand{<:Pack}, ::CoreFixedParIn{T, E}) where 
+                              {T, E<:Pack{T}}
     targetEleLevel = getNestedLevel(E).level
     actualEleLevel = getNestedLevel(lambda.type).level
-    if actualEleLevel != targetEleLevel
-        throw("The nested level of `f`'s output is $actualEleLevel "*
-              "which should have been `$(targetEleLevel+1)`.")
-    end
-    lambda
+    checkIntLevelMismatch(actualEleLevel+1, (targetEleLevel+1,), "expand-output nested")
 end
 
 
@@ -400,6 +410,7 @@ mutable struct ReduceParam{T, E<:Pack{T}, F<:Function, I<:CoreFixedParIn} <: Cel
                          offset::Union{E, Missing}=missing) where 
                         {T, E<:Pack{T}, F, I<:CoreFixedParIn}
         sym = IndexedSym(symbol)
+        checkReduceParamLevel(lambda, input)
         offsetTuple = formatOffset(lambda, offset, input)
         if isempty(offsetTuple)
             new{T, E, F, I}(lambda, input, sym, screen)
@@ -452,6 +463,7 @@ mutable struct ExpandParam{T, E<:Pack{T}, N, F<:Function, I<:CoreFixedParIn
                          offset::Union{PackedMemory{T, E, N}, Missing}=missing
                          ) where {T, E<:Pack{T}, N, F, I<:CoreFixedParIn}
         sym = IndexedSym(symbol)
+        checkExpandParamLevel(lambda, input)
         offsetTuple = formatOffset(lambda, offset, input)
         if isempty(offsetTuple)
             new{T, E, N, F, I}(lambda, input, sym, screen)
