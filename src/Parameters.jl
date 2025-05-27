@@ -1536,3 +1536,57 @@ function unpackFunc!(f::Function, paramSet::OptSpanParamSet,
         ContextParamFunc(fCore, tagFilter)
     end
 end
+
+
+function genParamFinisher(param::ReduceParam, screen::TernaryNumber=param.screen; 
+                          deepCopyLambda::Bool=false)
+    offsetPreset = isOffsetEnabled(param) ? param.offset : missing
+    let offset=offsetPreset, f=(deepCopyLambda ? deepcopy(param.lambda) : param.lambda)
+        function finishReduceParam(input::CoreFixedParIn)
+            ReduceParam(f, input, param.symbol, screen, offset)
+        end
+    end
+end
+
+function genParamFinisher(param::ExpandParam, screen::TernaryNumber=param.screen; 
+                          deepCopyLambda::Bool=false)
+    offsetPreset = isOffsetEnabled(param) ? param.offset : missing
+    let offset=offsetPreset, f=(deepCopyLambda ? deepcopy(param.lambda) : param.lambda)
+        function finishExpandParam(input::CoreFixedParIn)
+            ExpandParam(f, input, param.symbol, screen, offset)
+        end
+    end
+end
+
+
+"""
+
+    sever(param::ParamBox, screenSource::Bool=false) -> ParamBox
+
+Eliminate the severable connection(s) in `param`. For `param::SpanParam`, it returns a 
+`PrimitiveParam` with an output value same as `obtain(param)` when it is called; for any 
+`param` being nested `ParamBox`, it recursively severs every upstream `ParamBox` inside 
+`param` that is a `SpanParam`. When `screenSource` is set to source, every `PrimitiveParam` 
+inside (or is) the returned the `ParamBox` will have `.screen` set to `true`.
+"""
+function sever(param::SpanParam, screenSource::Bool=false)
+    val = obtain(param)
+    genTensorVar(val, symOf(param), screenSource)
+end
+
+sever(param::ParamBox, screenSource::Bool=false) = severCore(param, screenSource)
+
+function severCore(param::ShapedParam, screenSource::Bool)
+    severedInput = map(param.input) do ele
+        sever(ele, screenSource)
+    end
+    ShapedParam(severedInput, param.symbol)
+end
+
+function severCore(param::AdaptableParam, screenSource::Bool)
+    severedInput = map(param.input) do ele
+        sever(ele, screenSource)
+    end
+    finisher = genParamFinisher(param, deepCopyLambda=true)
+    finisher(severedInput)
+end
