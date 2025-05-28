@@ -28,4 +28,9 @@ ke1_t = overlap(sto1, symKE_sto1)
 @test ke1 ≈ 0.7363107784289
 @test isapprox(ke1, ke1_t, atol=1e-12)
 
+ke1mat = eKinetics([sto1])
+@test size(ke1mat) == (1, 1)
+@test ke1mat[] == ke1
+@test unique(eKinetics([sto1, sto1]))[] == ke1
+
 end

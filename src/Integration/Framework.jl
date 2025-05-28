@@ -32,7 +32,7 @@ end
 #     Base.ImmutableDict(tempDict, 4=>:ijkl)
 # end
 
-#!? Consider replacing it with LRU-based cache to control memory consumption
+#? Consider replacing it with LRU-based cache to control memory consumption
 struct PrimOrbDataCache{T<:Real, D, P<:PrimOrbData{T, D}}
     dict::OrbCoreIdxDict{T, D}
     list::Vector{P}
@@ -263,7 +263,7 @@ function applyIntegralMethod(f::OrbCoreIntegratorConfig{T, D, C, S},
 end
 
 
-# One-Body (i|O|j) hermiticity across O
+#> One-Body (i|O|j) hermiticity across O
 getHermiticity(::PrimOrbData{T, D}, ::DirectOperator, 
                ::PrimOrbData{T, D}) where {T<:Real, D} = 
 false
@@ -272,7 +272,7 @@ getHermiticity(::PrimOrbData{T, D}, ::OverlapSampler,
                ::PrimOrbData{T, D}) where {T<:Real, D} = 
 true
 
-# Two-Body (ii|O|jj) (ii|O|jk) (ij|O|kk) (ij|O|kl) hermiticity across O
+#> Two-Body (ii|O|jj) (ii|O|jk) (ij|O|kk) (ij|O|kl) hermiticity across O
 getHermiticity(::N12Tuple{PrimOrbData{T, D}}, ::OverlapSampler, 
                ::N12Tuple{PrimOrbData{T, D}}) where {T<:Real, D} = 
 true
@@ -409,7 +409,7 @@ function genOneBodyPrimCoreIntTensor(integrator::CachedOrbCoreIntegrator{T, D},
     res
 end
 
-
+#? Try simplify the indexing complexity by incorporating `OneToIndex`
 struct BasisIndexList <: QueryBox{Int}
     index::Memory{Int}
     endpoint::Memory{Int}
@@ -520,6 +520,7 @@ function indexCacheOrbData!(targetCache::PrimOrbDataCache{T, D},
 end
 
 
+#> Compute and cache `PrimOrbData` and core integrals
 function cachePrimCoreIntegrals!(intCache::PrimOrbCoreIntegralCache{T, D}, 
                                  orbMarkerCache::OrbCoreMarkerDict{T, D}, 
                                  orbData::OrbDataSource{T, D}) where {T<:Real, D}
@@ -529,11 +530,11 @@ function cachePrimCoreIntegrals!(intCache::PrimOrbCoreIntegralCache{T, D},
     updatePrimCoreIntCache!(intCache, oldMaxIdx+1)
     orbIdxList
 end
-
-function cachePrimCoreIntegrals!(targetIntCache::M, sourceIntCache::M, 
+#> First try loading existing `PrimOrbData` from `sourceIntCache` to `targetIntCache`
+function cachePrimCoreIntegrals!(targetIntCache::PrimOrbCoreIntegralCache{T, D}, 
+                                 sourceIntCache::PrimOrbCoreIntegralCache{T, D}, 
                                  orbMarkerCache::OrbCoreMarkerDict{T, D}, 
-                                 sourceOrbList::BasisIndexList) where 
-                                {T<:Real, D, M<:PrimOrbCoreIntegralCache{T, D}}
+                                 sourceOrbList::BasisIndexList) where {T<:Real, D}
     tOrbCache = targetIntCache.basis
     oldMaxIdx = lastindex(tOrbCache.list)
     sOrbCache = sourceIntCache.basis
