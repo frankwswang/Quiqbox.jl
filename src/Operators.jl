@@ -91,14 +91,22 @@ struct DiagonalDiff{C<:RealOrComplex, D, M, N} <: MonoTermOperator
     end
 end
 
-function modifyFunction(op::DiagonalDiff{C1, D, M, N}, term::TypedCarteFunc{C2, D}) where 
-                       {T<:Real, C1<:RealOrComplex{T}, C2<:RealOrComplex{T}, D, M, N}
+const GeneralFieldAmplitude{C<:RealOrComplex, D} = 
+      Union{TypedReturn{C, <:ParticleFunction{D, 1}}, FieldAmplitude{C, D}}
+
+const AbstractTypedCarteFunc{C<:RealOrComplex, D} = 
+      Union{TypedCarteFunc{C, D}, GeneralFieldAmplitude{C, D}}
+
+function modifyFunction(op::DiagonalDiff{C1, D, M, N}, term::AbstractTypedCarteFunc{C2, D}
+                        ) where {T<:Real, C1<:RealOrComplex{T}, C2<:RealOrComplex{T}, D, M, 
+                                 N}
     C = ifelse(C1==C2==T, T, Complex{T})
-    order = ifelse(N==0, getFiniteDiffApproxOrder(term.f.f), N)
+    formattedTerm = TypedCarteFunc(term, C, Val(D))
+    order = ifelse(N==0, getFiniteDiffApproxOrder(term), N)
     mapper = ntuple(Val(D)) do i
-        AxialFiniteDiff(TypedReturn(term, C), Val(M), i, Val(order))
+        AxialFiniteDiff(formattedTerm, Val(M), i, Val(order))
     end |> ChainMapper
-    PairCoupler(Contract(C, C1, C2), Storage(op.direction), mapper)
+    PairCoupler(Contract(C, C1, C2), Storage(op.direction, :diffDirection), mapper)
 end
 
 getFiniteDiffApproxOrder(::Function) = 6
