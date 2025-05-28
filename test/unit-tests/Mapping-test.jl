@@ -1,9 +1,14 @@
 using Test
 using Quiqbox
-using Quiqbox: getOutputType, TypedBinary, StableBinary, PairCoupler, Storage, 
+using Quiqbox: trySimplify, getOutputType, TypedBinary, StableBinary, PairCoupler, Storage, 
                BinaryReduce, Contract
 
 @testset "Mapping.jl" begin
+
+# function trySimplify
+sf1 = trySimplify(TypedReturn(abs, Float64))
+sf2 = trySimplify(abs)
+@test sf1 === sf2 === abs
 
 # function TypedReturn
 returnF64 = TypedReturn(identity, Float64)
@@ -23,7 +28,7 @@ addF64 = PairCoupler(+, returnF64, returnF64)
 
 # function Storage
 mat = rand(3, 3)
-sf = Storage(mat)
+sf = Storage(mat, :mat)
 @test sf() === sf(addF64) === mat
 @test getOutputType(sf) == Matrix{Float64}
 

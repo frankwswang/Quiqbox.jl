@@ -45,10 +45,10 @@ end
 
 ## Development comment guideline
 #!! Urgent issue
-#!!... Urgent issue that's being implemented/fixed
 #! Non-urgent issue
 #? Consideration for change
-#+ Potential Feature implementation
+#+ Potential feature implementation
+#> Code mechanism explanation
 
 ## Footnote comment template
 #= Additional Method =#

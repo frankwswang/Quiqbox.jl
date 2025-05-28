@@ -8,6 +8,8 @@ struct OneToIndex <: StructuredInfo
         checkPositivity(idx)
         new(idx)
     end
+
+    OneToIndex() = new(1)
 end
 
 OneToIndex(idx::OneToIndex) =itself(idx)
@@ -28,7 +30,7 @@ GridIndex(idx::Int) = GridIndex(idx|>OneToIndex)
 
 
 const SpanIndex = Union{UnitIndex, GridIndex}
-const GeneralIndex = Union{Int, SpanIndex, OneToIndex}
+const GeneralIndex = Union{Int, SpanIndex, OneToIndex, Base.CartesianIndex}
 const GeneralField = Union{GeneralIndex, Symbol, Nothing}
 
 struct ChainedAccess{L, C<:NTuple{L, GeneralField}} <: Getter
@@ -66,16 +68,15 @@ getField(obj, entry::Symbol) = getfield(obj, entry)
 
 getField(obj, entry::Int) = getindex(obj, entry)
 
+getField(obj, i::Base.CartesianIndex) = getindex(obj, i)
+
 getField(obj, i::OneToIndex) = getindex(obj, firstindex(obj)+i.idx-1)
 
 getField(obj, i::UnitIndex) = getField(obj.unit, i.idx)
 
 getField(obj, i::GridIndex) = getField(obj.grid, i.idx)
 
-# The original method might cause wrong gradients for AD libraries that do not support 
-# differentiating through keyword arguments.
-# getField(obj, acc::ChainedAccess) = foldl(getField, acc.chain, init=obj)
-function getField(obj, acc::ChainedAccess)
+function getField(obj, acc::ChainedAccess{L, C}) where {L, C<:NTuple{L, GeneralField}}
     for i in acc.chain
         obj = getField(obj, i)
     end

@@ -80,7 +80,7 @@ const NothingOr{T} = Union{Nothing, T}
 const BoolVal = Union{Val{true}, Val{false}}
 
 const FunctionChainUnion{F<:Function} = Union{
-    CustomMemory{<:F}, GeneralTupleUnion{NonEmptyTuple{F}}
+    AbstractMemory{<:F}, GeneralTupleUnion{NonEmptyTuple{F}}
 }
 
 

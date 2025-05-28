@@ -51,6 +51,7 @@ using Test
     t6 = @elapsed @testset "$(unit6)" begin
         include("unit-tests/Integration/Interface-test.jl")
         include("unit-tests/Integration/Overlap-test.jl")
+        include("unit-tests/Integration/Kinetic-test.jl")
     end
     println("$(unit6) test finished in $t6 seconds.\n")
 

@@ -49,3 +49,21 @@ strictTypeJoin(TL::Type, TR::Type) = typejoin(TL, TR)
 
 strictTypeJoin(::Type{TL}, ::Type{TR}) where {TL<:RealOrComplex, TR<:RealOrComplex} = 
 promote_type(TL, TR)
+
+
+"""
+
+    getOutputType(target::Function) -> Type
+
+Infer the output type of `target`.
+"""
+getOutputType(::F) where {F<:Function} = getOutputType(F)
+
+getOutputType(::Type{<:Function}) = Any
+
+getOutputType(::Type{<:Base.ComposedFunction{F}}) where {F<:Function} = getOutputType(F)
+
+getOutputType(::Type{Base.Splat{F}}) where {F<:Function} = getOutputType(F)
+
+getOutputType(::Type{Union{}}) = 
+throw(AssertionError("`Union{}` is not a valid input argument."))

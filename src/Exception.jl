@@ -46,3 +46,24 @@ function checkBottomType(::Type{T}) where {T}
     T <: Union{} && throw(AssertionError("`T` must not be `Union{}`."))
     nothing
 end
+
+
+function checkIntLevelMismatch(actualLevel::Int, targetLevelSet::NonEmptyTuple{Int}, 
+                               levelPrefix::AbstractString="")
+    if length(targetLevelSet) == 1
+        targetLevel = first(targetLevelSet)
+        errorFlag = (actualLevel != targetLevel)
+        errorStr = "`$targetLevel`."
+    else
+        errorFlag = !(actualLevel in targetLevelSet)
+        errorStr = "within `$targetLevelSet`."
+    end
+
+    if errorFlag
+        levelStr = ifelse(length(levelPrefix)==0, "level", "$levelPrefix level")
+        throw(AssertionError("The $levelStr is $actualLevel, which should have been " * 
+                             errorStr))
+    end
+
+    actualLevel
+end

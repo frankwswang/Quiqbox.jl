@@ -1,8 +1,17 @@
 export TypedReturn, PairCoupler
 
-getOutputType(::F) where {F<:Function} = getOutputType(F)
 
-getOutputType(::Type{<:Function}) = Any
+"""
+
+    trySimplify(f::Function) -> Function
+
+Returns a potentially simplified function that returns the same results (characterized by 
+`$isequal`) as the original `f`, given any valid input arguments `args...` that do 
+not throw errors: 
+
+    isequal(trySimplify(f)(args...), f(args...)) == true
+"""
+trySimplify(f::Function) = f
 
 
 struct ApplyConvert{T, F<:Function} <: TypedEvaluator{T}
@@ -20,6 +29,8 @@ ApplyConvert(f::ApplyConvert, ::Type{T}) where {T} = ApplyConvert(f.f, T)
 (f::ApplyConvert{T, F})(arg::Vararg) where {T, F<:Function} = convert(T, f.f(arg...))
 
 getOutputType(::Type{<:ApplyConvert{T}}) where {T} = T
+
+trySimplify(f::ApplyConvert) = trySimplify(f.f)
 
 
 struct TypedReturn{T, F<:Function} <: TypedEvaluator{T}
@@ -48,6 +59,8 @@ end
 
 getOutputType(::Type{<:TypedReturn{T}}) where {T} = T
 
+trySimplify(f::TypedReturn) = trySimplify(f.f)
+
 
 struct TypedBinary{T, F<:Function, TL, TR} <: TypedEvaluator{T}
     f::F
@@ -72,6 +85,8 @@ StableBinary(f::Function, ::Type{T}) where {T} = TypedBinary(TypedReturn(f, T), 
 StableBinary(f::TypedBinary, ::Type{T}) where {T} = StableBinary(f.f, T)
 
 getOutputType(::Type{<:TypedBinary{T}}) where {T} = T
+
+trySimplify(f::TypedBinary) = trySimplify(f.f)
 
 const StableAdd{T} = StableBinary{T, typeof(+)}
 StableAdd(::Type{T}) where {T} = StableBinary(+, T)
@@ -115,51 +130,30 @@ getOutputType(::Type{<:LateralPartial{F}}) where {F<:Function} = getOutputType(F
 const absSqrtInv = inv ∘ sqrt ∘ abs
 
 
-function modestTypingMap(op::F, obj::AbstractArray) where {F<:Function}
-    if isempty(obj)
-        similar(obj, Union{})
-    else
-        map(op, obj)
-    end
-end
+struct ChainMapper{E<:FunctionChainUnion{Function}} <: Mapper
+    chain::E
 
-modestTypingMap(op::F, obj::Union{Tuple, NamedTuple}) where {F<:Function} = map(op, obj)
-
-
-struct InputLimiter{N, F<:Function} <: Modifier
-    f::F
-
-    function InputLimiter(f::F, ::Val{N}) where {F<:Function, N}
-        checkPositivity(N::Int)
-        new{numberOfInput, F}(f)
-    end
-end
-
-InputLimiter(f::InputLimiter, ::Val{N}) where {N} = InputLimiter(f.f, Val(N))
-
-(f::InputLimiter{N, F})(arg::Vararg{Any, N}) where {N, F<:Function} = f.f(arg...)
-
-getOutputType(::Type{<:InputLimiter{<:Any, F}}) where {F<:Function} = getOutputType(F)
-
-
-struct ChainMapper{F<:FunctionChainUnion{Function}} <: Mapper
-    chain::F
-
-    function ChainMapper(chain::F) where {F<:CustomMemory{<:Function}}
+    function ChainMapper(chain::E) where {E<:CustomMemory{<:Function}}
         checkEmptiness(chain, :chain)
-        new{F}(chain)
+        new{E}(chain)
     end
 
-    function ChainMapper(chain::F) where {F<:GeneralTupleUnion{ NonEmptyTuple{Function} }}
-        new{F}(chain)
+    function ChainMapper(chain::E) where {E<:GeneralTupleUnion{ NonEmptyTuple{Function} }}
+        new{E}(chain)
     end
 end
 
 ChainMapper(chain::AbstractArray{<:Function}) = ChainMapper(chain|>ShapedMemory)
 
-function getField(obj, f::ChainMapper, finalizer::F=itself) where {F<:Function}
-    modestTypingMap(f.chain) do mapper
-        mapper(obj) |> finalizer
+function getField(obj, f::ChainMapper{E}, finalizer::F=itself) where 
+                 {E<:FunctionChainUnion{Function}, F<:Function}
+    fChain = f.chain
+    if fChain isa AbstractArray && isempty(fChain)
+        similar(fChain, Union{})
+    else
+        map(fChain) do mapper
+            mapper(obj) |> finalizer
+        end
     end
 end
 
@@ -325,6 +319,7 @@ getOutputType(::Type{<:FloatingMonomial{T}}) where {T<:Real} = T
 
 struct Storage{T} <: TypedEvaluator{T}
     value::T
+    marker::Symbol
 end
 
 (f::Storage{T})(::Vararg) where {T} = f.value
@@ -355,3 +350,19 @@ Contract(::Type{T}, ::Type{EL}, ::Type{ER}) where {T<:Number, EL<:Number, ER<:Nu
 BinaryReduce(TypedBinary(TypedReturn(*, T), EL, ER), StableBinary(+, T))
 
 getOutputType(::Type{<:BinaryReduce{T}}) where {T} = T
+
+
+struct ComposedApply{FO, FI} <: CompositeFunction
+    inner::FI
+    outer::FO
+
+    ComposedApply(inner::FI, outer::FO) where {FI<:Function, FO<:Function} = 
+    new{FO, FI}(inner, outer)
+end
+# Should not be decomposed further to `fCore(f, args)` to avoid additional allocations.
+function (f::ComposedApply{FO, FI})(args::Vararg) where {FI<:Function, FO<:Function}
+    innerRes = splat(f.inner)(args)
+    f.outer(innerRes)
+end
+
+getOutputType(::Type{<:ComposedApply{FO}}) where {FO<:Function} = getOutputType(FO)

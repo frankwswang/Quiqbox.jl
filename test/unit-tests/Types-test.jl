@@ -3,6 +3,12 @@ using Quiqbox
 
 @testset "Types.jl" begin
 
+@test Quiqbox.NestParam <: Quiqbox.ParamBox
+
+@test Quiqbox.ReducibleParam <: Quiqbox.ParamBox
+
+@test Quiqbox.NestFixedParIn{Float64} <: Quiqbox.CoreFixedParIn{Float64}
+
 @test Quiqbox.PrimGTO <: Quiqbox.PrimitiveOrb
 
 @test Quiqbox.WrappedField <: Quiqbox.EncodedField
@@ -31,9 +37,15 @@ using Quiqbox
 
 @test Quiqbox.PolyGaussFieldFunc <: Quiqbox.PolyRadialFieldFunc
 
-@test Quiqbox.FixedSpanIndexSet <: Quiqbox.AbstractSpanIndexSet
+@test Quiqbox.OptSpanValueSet <: Quiqbox.OptionalSpanSet
 
-@test Quiqbox.TypedSpanParamSet <: Quiqbox.AbstractSpanParamSet
+@test Quiqbox.TypedVoidSet <: Quiqbox.OptSpanValueSet
+
+@test Quiqbox.OptSpanParamSet <: Quiqbox.OptionalSpanSet
+
+@test Quiqbox.TypedSpanParamSet <: Quiqbox.OptSpanParamSet
+
+@test Quiqbox.FixedSpanParamSet <: Quiqbox.TypedSpanParamSet
 
 @test Quiqbox.PrimGTOData <: Quiqbox.PrimOrbData
 

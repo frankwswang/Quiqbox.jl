@@ -1,18 +1,24 @@
-const OverlapSampler = Multiplier{ComplexConj, Identity}
+const OneBodySampler{O<:MonoTermOperator} = Multiplier{ComplexConj, O}
+
+const OverlapSampler = OneBodySampler{Identity}
+
+function genOneBodySampler(rightOp::MonoTermOperator)::OneBodySampler
+    Correlate(*, (ComplexConj(), rightOp))
+end
 
 function genOverlapSampler()::OverlapSampler
     rightOp = genIdentity()
-    Correlate(*, (ComplexConj(), rightOp))
+    genOneBodySampler(rightOp)
 end
 
 
 const MonomialMul{T<:Real, D} = Associate{Left, typeof(*), FloatingMonomial{T, D}}
 
-const MultipoleMomentSampler{T<:Real, D} = Multiplier{ComplexConj, MonomialMul{T, D}}
+const MultipoleMomentSampler{T<:Real, D} = OneBodySampler{MonomialMul{T, D}}
 
 function genMultipoleMomentSampler(fm::FloatingMonomial)::MultipoleMomentSampler
     rightOp = Associate(Left(), *, fm)
-    Correlate(*, (ComplexConj(), rightOp))
+    genOneBodySampler(rightOp)
 end
 
 
@@ -26,4 +32,32 @@ const CoulombRepulsionSampler =
 
 function genCoulombRepulsionSampler()
     Sandwich(Left(), (*, *), inverseDistance)
+end
+
+struct KineticEnergySampler{T<:Real, D, N} <: MonoTermOperator
+    core::OneBodySampler{DiagonalDiff{T, D, 2, N}}
+
+    function KineticEnergySampler{T, D}(::Val{N}) where {T<:Real, D, N}
+        checkPositivity(D::Int)
+        rightOp = DiagonalDiff(Val(2), ntuple(_->(-one(T)/2), Val(D)), Val(N))
+        new{T, D, N::Int}(rightOp|>genOneBodySampler)
+    end
+end
+
+
+"""
+
+    genKineticEnergySampler(::Type{T}, ::Val{D}, ::Val{N}=Val(0)) where {T<:Real} -> 
+    KineticEnergySampler{T<:Real, D, N}
+
+`T` is the data type for the precision of the operator. `D` is the dimension of the target 
+basis function. `N` must be even number to set the accuracy order for the finite difference 
+approximation of the kinetic energy operator in case no analytical form of its action on a 
+target basis function. When `N` is set to `0`, a preset order will be assigned with respect 
+to the form of the target basis function adaptively on the fly.
+"""
+function genKineticEnergySampler(::Type{T}, ::Val{D}, ::Val{N}=Val(0)) where {T<:Real, D, N}
+    checkPositivity(N::Int, true)
+    iseven(N) || throw(AssertionError("`N` must be an even number."))
+    KineticEnergySampler{T, D}(Val(N))
 end
