@@ -16,7 +16,7 @@ ijk1 = (0, 1, 1)
 pgto1 = genGaussTypeOrb(cen1, 1.2, ijk1)
 pgto1Data = genOrbitalData(pgto1)
 @test pgto1Data isa Quiqbox.PrimOrbData
-@test pgto1Data isa Quiqbox.PrimGTOData
+@test pgto1Data isa Quiqbox.PGTOrbData
 
 pgto1core, par_pgto1 = Quiqbox.unpackFunc(pgto1);
 @test pgto1 isa Quiqbox.PrimGTO

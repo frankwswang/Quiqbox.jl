@@ -185,7 +185,7 @@ struct PrimOrbData{T<:Real, D, C<:RealOrComplex{T}, F<:FloatingField{T, D, C}} <
     renormalize::Bool
 end
 
-const PrimGTOData{T<:Real, D, F<:FloatingPolyGaussField{T, D}} = PrimOrbData{T, D, T, F}
+const PGTOrbData{T<:Real, D, F<:FloatingPolyGaussField{T, D}} = PrimOrbData{T, D, T, F}
 
 struct CompOrbData{T<:Real, D, C<:RealOrComplex{T}, B<:PrimOrbData{T, D}} <: ConfigBox
     basis::Memory{B}

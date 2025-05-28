@@ -47,7 +47,7 @@ using Quiqbox
 
 @test Quiqbox.FixedSpanParamSet <: Quiqbox.TypedSpanParamSet
 
-@test Quiqbox.PrimGTOData <: Quiqbox.PrimOrbData
+@test Quiqbox.PGTOrbData <: Quiqbox.PrimOrbData
 
 @test Quiqbox.ParamMapper <: Quiqbox.ChainMapper
 
