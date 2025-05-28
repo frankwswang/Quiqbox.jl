@@ -118,7 +118,7 @@ const OrbCoreIntegralLayout{O<:PrimOrbData} = Union{OneBodyOrbIntLayout{O},
                                                     TwoBodyOrbIntLayout{O}}
 
 const OrbCoreIntLayoutUnion{T<:Real, D} = OrbCoreIntegralLayout{PrimOrbData{T, D}}
-const GaussTypeOrbIntLayout{T<:Real, D} = OrbCoreIntegralLayout{PrimGTOData{T, D}}
+const GaussTypeOrbIntLayout{T<:Real, D} = OrbCoreIntegralLayout{PGTOrbData{T, D}}
 
 const OneBodyOrbCoreIntLayoutUnion{T<:Real, D} = OneBodyOrbIntLayout{PrimOrbData{T, D}}
 const TwoBodyOrbCoreIntLayoutUnion{T<:Real, D} = TwoBodyOrbIntLayout{PrimOrbData{T, D}}
@@ -138,7 +138,7 @@ end
 
 function formatOrbCoreIntConfig(config::GaussTypeOrbIntLayout{T, D}) where {T<:Real, D}
     map(config) do x
-        ifelse(x isa Bar, Bar, PrimGTOData{T, D}) |> TypeBox
+        ifelse(x isa Bar, Bar, PGTOrbData{T, D}) |> TypeBox
     end
 end
 
@@ -259,7 +259,7 @@ function applyIntegralMethod(f::OrbCoreIntegratorConfig{T, D, C, S, F},
                              orbsData::GaussTypeOrbIntLayout{T, D}) where 
                             {T<:Real, D, C<:RealOrComplex{T}, S<:MultiBodyIntegral{D}, 
                              F<:DirectOperator}
-    if F <: GaussTypeAnalyticIntegralSampler{T, D}
+    if F <: AnalyticGaussIntegralSampler{T, D}
         IntLayoutCache = prepareAnalyticIntCache!(f, orbsData)
         getAnalyticIntegral!(S(), IntLayoutCache, f.operator, orbsData)
     else
