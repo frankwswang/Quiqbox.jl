@@ -3,6 +3,8 @@ using LRUCache
 
 const DefaultOddFactorialCacheSizeLimit = 25
 const OddFactorialCache = LRU{Int, BigInt}(maxsize=DefaultOddFactorialCacheSizeLimit)
+const GaussTypeAnalyticIntegralSampler{T, D} = 
+      Union{OverlapSampler, MultipoleMomentSampler{T, D}}
 
 function oddFactorial(a::Int) # a * (a-2) * ... * 1
     get!(OddFactorialCache, a) do
@@ -285,6 +287,11 @@ function computeGTOrbMultiMom(op::MultipoleMomentSampler{T, D},
     end |> Base.Splat(GaussProductInfo)
     computeMultiMomentGTO!(last(op.dresser).term, cache!Self, formattedData)
 end
+
+
+## Positional Differentiation ##
+
+
 
 
 function getGaussTypeOrbIntegrator(::OneBodyIntegral, ::OverlapSampler)
