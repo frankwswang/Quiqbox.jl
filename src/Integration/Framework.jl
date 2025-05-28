@@ -255,11 +255,16 @@ function applyIntegralMethod(f::OrbCoreIntegratorConfig{T, D, C, S},
     getNumericalIntegral(S(), f.operator, orbsData)
 end
 
-function applyIntegralMethod(f::OrbCoreIntegratorConfig{T, D, C, S}, 
+function applyIntegralMethod(f::OrbCoreIntegratorConfig{T, D, C, S, F}, 
                              orbsData::GaussTypeOrbIntLayout{T, D}) where 
-                            {T<:Real, D, C<:RealOrComplex{T}, S<:MultiBodyIntegral{D}}
-    IntLayoutCache = prepareAnalyticIntCache!(f, orbsData)
-    getAnalyticIntegral!(S(), IntLayoutCache, f.operator, orbsData)
+                            {T<:Real, D, C<:RealOrComplex{T}, S<:MultiBodyIntegral{D}, 
+                             F<:DirectOperator}
+    if F <: GaussTypeAnalyticIntegralSampler{T, D}
+        IntLayoutCache = prepareAnalyticIntCache!(f, orbsData)
+        getAnalyticIntegral!(S(), IntLayoutCache, f.operator, orbsData)
+    else
+        getNumericalIntegral(S(), f.operator, orbsData)
+    end
 end
 
 
