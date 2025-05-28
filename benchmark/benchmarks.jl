@@ -34,6 +34,7 @@ cons2 = [1.0,  0.8]
 
 ang1 = (1, 0, 0)
 
+
 cgto1  = genGaussTypeOrb(cen1, xpns1, cons1, ang1)
 cgto1n = genGaussTypeOrb(cen1, xpns1, cons1, ang1, innerRenormalize=true, 
                                                   outerRenormalize=true)
@@ -43,17 +44,44 @@ pgto1n = PrimitiveOrb(pgto1, renormalize=true)
 cgto2 = genGaussTypeOrb(cen2, xpns2, cons2, ang1)
 pgto2 = first(cgto2.basis)
 
+
 stf1DCore = (x::Tuple{Real})->exp(-(x|>first))
-stf1D = Quiqbox.EncodedField(TypedReturn(stf1DCore, Float64), Val(1))
-pstoCore = Quiqbox.PolyRadialFunc(stf1D, (1, 1, 0))
-psto1 = Quiqbox.PrimitiveOrb((1.0, 2.0, 3.0), pstoCore, renormalize=false)
-psto1n = Quiqbox.PrimitiveOrb((1.0, 2.0, 3.0), pstoCore, renormalize=true)
+
+stf1D = Quiqbox.EncodedField(stf1DCore, Float64, Val(1))
+pstf1 = Quiqbox.PolyRadialFunc(stf1D, (1, 1, 0))
+psto1 = Quiqbox.PrimitiveOrb((1.0, 2.0, 3.0), pstf1, renormalize=false)
+psto1n = Quiqbox.PrimitiveOrb((1.0, 2.0, 3.0), pstf1, renormalize=true)
+stf1Dc = Quiqbox.CurriedField(stf1DCore, Float64, Val(1))
+pstf1c = Quiqbox.PolyRadialFunc(stf1Dc, (1, 1, 0))
+psto1c = Quiqbox.PrimitiveOrb((1.0, 2.0, 3.0), pstf1c, renormalize=false)
+
+
+function gaussianFunc((r,)::Tuple{Real}, params::@NamedTuple{xpn::T}) where {T<:Real}
+    exp(-params.xpn * T(r)^2)
+end
+
+function genGaussian(cen::NTuple{D, T}, xpns::AbstractVector{T}, 
+                     ang::NTuple{D, Int}) where {D, T<:Real}
+    center = genCellParam.(cen, (:x, :y, :z)[begin:begin+D-1])
+    map(xpns) do xpn
+        xpnPar = genCellParam(xpn, :xpn)
+        radioFunc = Quiqbox.CurriedField(gaussianFunc, Float64, Val(1), (xpn=xpnPar,))
+        fieldFunc = PolyRadialFunc(radioFunc, ang)
+        PrimitiveOrb(center, fieldFunc)
+    end
+end
+
+pgtos_gto1c = genGaussian(cen1, xpns1, ang1)
+cgto1c = CompositeOrb(pgtos_gto1c, cons1)
+
 
 func1Core = x->x[1]^2 + x[2]*exp(x[1]) + x[3]^3/log(1.1 + x[1]^2)
+
 func1 = Quiqbox.TypedCarteFunc(func1Core, Float64, Val(3))
 df1_fd1 = Quiqbox.AxialFiniteDiff(func1, Val(1), 1)
 df1_fd2 = Quiqbox.AxialFiniteDiff(func1, Val(2), 1)
 df1_fd3 = Quiqbox.AxialFiniteDiff(func1, Val(3), 1)
+
 
 # Benchmark Groups
 ## Orbital-Evaluation Benchmark Group
@@ -92,6 +120,14 @@ OrbOvlpBSuite["Lazy"]["PSTO_Self_DD"] =
 @benchmarkable overlap($psto1, $psto1,  lazyCompute=true) evals=1
 OrbOvlpBSuite["Lazy"]["PSTO_Self_DN"] = 
 @benchmarkable overlap($psto1, $psto1n, lazyCompute=true) evals=1
+
+# `CurriedField`-Based Orbital Benchmark Group
+OrbEvalBSuite["Direct"]["PSTOc"] = @benchmarkable ($psto1c)($coord1) evals=1
+OrbEvalBSuite["Direct"]["CGTOc"] = @benchmarkable ($cgto1c)($coord1) evals=1
+OrbOvlpBSuite["Direct"]["PSTOc_self_DD"] = @benchmarkable overlap($psto1c, $psto1c) evals=1
+OrbOvlpBSuite["Direct"]["PSTOc_PSTO_DD"] = @benchmarkable overlap($psto1c, $psto1)  evals=1
+OrbOvlpBSuite["Direct"]["CGTOc_self_DD"] = @benchmarkable overlap($cgto1c, $cgto1c) evals=1
+OrbOvlpBSuite["Direct"]["CGTOc_CGTO_DD"] = @benchmarkable overlap($cgto1c, $cgto1)  evals=1
 
 # Differentiation-Function Benchmark Group
 DiffFuncBSuite["Numerical"]["df_fd1_tpl"] = @benchmarkable ($df1_fd1)($coord2)   evals=1
