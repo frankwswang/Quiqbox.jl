@@ -61,3 +61,8 @@ function genKineticEnergySampler(::Type{T}, ::Val{D}, ::Val{N}=Val(0)) where {T<
     iseven(N) || throw(AssertionError("`N` must be an even number."))
     KineticEnergySampler{T, D}(Val(N))
 end
+
+
+const ReturnTypedSampler{T} = Union{MonomialMul{T}, MultipoleMomentSampler{T}}
+
+const StableTypedSampler = Union{OneBodySampler, CoulombRepulsionSampler}
