@@ -260,17 +260,34 @@ function computePGTOrbMultipoleMoment!(fm::FloatingMonomial{T, D},
         angR = data.rhs.ang
 
         i = 0
+        res = one(T)
 
-        mapreduce(*, fm.center, fm.degree.tuple, 
-                     cenL, cenR, cenM, angL, angR) do xMM, n, xL, xR, xM, iL, iR
-            dx = xR - xMM #! Consider when xL == xMM
-            m = iszero(dx) ? 0 : n
+        for (xMM, n, xL, xR, xM, iL, iR) in zip(fm.center, fm.degree.tuple, 
+                                                cenL, cenR, cenM, angL, angR)
             axialCache = accessAxialCache(cache, (i += 1))
-            mapreduce(+, 0:m) do k
-                data = (xpnS, xpnRatio, xM-xL, xM-xR, iL, iR+n-k)
-                binomial(n, k) * dx^k * computeAxialPGTOrbOverlap!(axialCache, data)
+
+            dx = xR - xMM
+            m = if iszero(dx)
+                0
+            elseif isequal(xL, xMM)
+                xL, xR = xR, xL
+                iL, iR = iR, iL
+                0
+            else
+                n
             end
+
+            temp = zero(T)
+
+            for k in 0:m
+                data = (xpnS, xpnRatio, xM-xL, xM-xR, iL, iR+n-k)
+                temp += binomial(n, k) * dx^k * computeAxialPGTOrbOverlap!(axialCache, data)
+            end
+
+            res *= temp
         end
+
+        res
     end
 end
 
