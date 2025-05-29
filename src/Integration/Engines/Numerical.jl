@@ -18,6 +18,13 @@ SesquiFieldProd(data::N12Tuple{PrimOrbData{T, D}}, dresser::O=genOverlapSampler(
                 ) where {T<:Real, D, O<:Multiplier} = 
 SesquiFieldProd(getfield.(data, :core), dresser)
 
+getOutputType(::Type{<:SesquiFieldProd{T, D, <:StableTypedSampler}}) where {T<:Real, D} = 
+T
+
+getOutputType(::Type{<:SesquiFieldProd{T, D, O}}) where 
+             {T<:Real, D, C<:RealOrComplex{T}, O<:ReturnTypedSampler{C}} = 
+strictTypeJoin(T, C)
+
 (::SelectTrait{InputStyle})(::SesquiFieldProd{<:Real, D}) where {D} = CartesianInput{D}()
 
 (f::SesquiFieldProd)(coord) = evalSesquiFieldProd(f, formatInput(f, coord))
@@ -88,6 +95,13 @@ function DoubleFieldProd(layout::OrbBarLayout6{PrimOrbData{T, D}},
     DoubleFieldProd((sfProdL, sfProdR), coupler)
 end
 
+getOutputType(::Type{<:DoubleFieldProd{T, D, <:StableTypedSampler}}) where {T<:Real, D} = 
+T
+
+getOutputType(::Type{<:DoubleFieldProd{T, D, O}}) where 
+             {T<:Real, D, C<:RealOrComplex{T}, O<:ReturnTypedSampler{C}} = 
+strictTypeJoin(T, C)
+
 
 (::SelectTrait{InputStyle})(::DoubleFieldProd{<:Real, D}) where {D} = CartesianInput{2D}()
 
@@ -131,10 +145,12 @@ end
 function getNumericalIntegral(intStyle::MultiBodyIntegral{D}, op::DirectOperator, 
                               layout::OrbCoreIntLayoutUnion{T, D}) where {T<:Real, D}
     sectors = genIntegralSectors(intStyle, op, layout)
-    mapreduce(*, sectors) do kernel
+    res = one(T)
+    for kernel in sectors
         config = getIntegratorConfig(getOrbOutputTypeUnion(layout), kernel)
-        numericalIntegrateCore(config, kernel)
-    end::RealOrComplex{T}
+        res *= numericalIntegrateCore(config, kernel)
+    end
+    res::RealOrComplex{T}
 end
 
 
@@ -152,11 +168,12 @@ end
 function evalConfinedInfIntegrand(f::ConfinedInfIntegrand{T, L, F}, 
                                   x::Union{NTuple{L, T}, AbstractVector{T}}) where 
                                  {T<:Real, L, F<:Function}
-    val = f.core(x ./ (one(T) .- x .* x))
-    mapreduce(*, x, init=one(T)) do t
+    res = one(T)
+    for t in x
         tSquare = t * t
-        (1 + tSquare) / (1 - tSquare)^2
-    end * val
+        res *= (1 + tSquare) / (1 - tSquare)^2
+    end
+    res * f.core(x ./ (one(T) .- x .* x))
 end
 
 function getConfinedInterval(::ConfinedInfIntegrand{T, L}) where {T<:Real, L}
