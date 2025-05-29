@@ -120,7 +120,7 @@ accessAxialCache(cache::NullCache, ::Int) = cache
 
 
 #>-- Gaussian-based orbital info extraction --<#
-function prepareOrbitalInfoCore(field::FloatingPolyGaussField)
+function prepareOrbitalInfoCore(field::FloatingPolyGaussField{T, D}) where {T<:Real, D}
     gtf = field.core.f.f                            #> `PolyGaussFieldCore`
     grf = first(gtf.encode)                         #> `RadialFieldFunc`
     pgf = last(grf.core.f.binder.f.encode)          #> `GaussFieldFunc`
@@ -155,19 +155,21 @@ end
 
 #> Overlap for concentric axial PGTO pair
 function computeAxialPGTOrbOverlap(xpnSum::T, iL::Int, iR::Int) where {T<:Real}
-    jRange = 0:((iL + iR) ÷ 2)
-    mapreduce(+, jRange) do j
-        computeGaussProd(iL, iR, 2j) * computePGTOrbOverlapAxialFactor(xpnSum, j)
+    res = zero(T)
+    for j in 0:((iL + iR) ÷ 2)
+        res += computeGaussProd(iL, iR, 2j) * computePGTOrbOverlapAxialFactor(xpnSum, j)
     end
+    res
 end
 #> Overlap for arbitrary axial PGTO pair
 function computeAxialPGTOrbOverlap(xpnSum::T, xpnRatio::T, xML::T, xMR::T, 
                                    iL::Int, iR::Int) where {T<:Real}
-    jRange = 0:((iL + iR) ÷ 2)
-    mapreduce(+, jRange) do j
-        computeGaussProd(xML, xMR, iL, iR, 2j) * 
-        computePGTOrbOverlapAxialFactor(xpnSum, j)
-    end * computePGTOrbOverlapMixedFactor(xMR - xML, xpnRatio)
+    res = zero(T)
+    for j in 0:((iL + iR) ÷ 2)
+        res += computeGaussProd(xML, xMR, iL, iR, 2j) * 
+               computePGTOrbOverlapAxialFactor(xpnSum, j)
+    end
+    res * computePGTOrbOverlapMixedFactor(xMR - xML, xpnRatio)
 end
 #> Adaptive axial-PGTO overlap computation
 function computeAxialPGTOrbOverlap(input::T4Int2Tuple{T}) where {T<:Real}
@@ -198,9 +200,11 @@ computeAxialPGTOrbOverlap(input)
 
 #> Internal overlap computation
 function computePGTOrbSelfOverlap(xpn::T, ang::NonEmptyTuple{Int}) where {T<:Real}
-    mapreduce(*, ang) do i
-        computePGTOrbOverlapAxialFactor(2xpn, i)
+    res = one(T)
+    for i in ang
+        res *= computePGTOrbOverlapAxialFactor(2xpn, i)
     end
+    res
 end
 
 function computePGTOrbOverlap!(cache::OptAxialGaussOverlapCache{T}, 
@@ -216,11 +220,14 @@ function computePGTOrbOverlap!(cache::OptAxialGaussOverlapCache{T},
     angR = data.rhs.ang
 
     i = 0
-
-    mapreduce(*, cenL, cenR, cenM, angL, angR) do xL, xR, xM, iL, iR
+    res = one(T)
+    for (xL, xR, xM, iL, iR) in zip(cenL, cenR, cenM, angL, angR)
         axialCache = accessAxialCache(cache, (i += 1))
-        computeAxialPGTOrbOverlap!(axialCache, (xpnS, xpnRatio, xM-xL, xM-xR, iL, iR))
+        data = (xpnS, xpnRatio, xM-xL, xM-xR, iL, iR)
+        res *= computeAxialPGTOrbOverlap!(axialCache, data)
     end
+
+    res
 end
 
 
@@ -229,18 +236,23 @@ end
 function computePGTOrbMultipoleMoment(fm::FloatingMonomial{T, D}, 
                                       data::PrimGaussTypeOrbInfo{T, D}) where {T<:Real, D}
     xpn = data.xpn
-    mapreduce(*, fm.center, fm.degree.tuple, data.center, data.ang) do xMM, n, x, i
+    res = one(T)
+    for (xMM, n, x, i) in zip(fm.center, fm.degree.tuple, data.center, data.ang)
         dx = x - xMM
         m = iszero(dx) ? 0 : n
-        mapreduce(+, 0:m) do k
+
+        temp = zero(T)
+        for k in 0:m
             l = n - k
-            if isodd(l)
-                zero(T)
-            else
-                binomial(n, k) * dx^k * computePGTOrbOverlapAxialFactor(2xpn, i + (l >> 1))
+            if iseven(l)
+                factor = binomial(n, k) * dx^k
+                temp += factor * computePGTOrbOverlapAxialFactor(2xpn, i + (l >> 1))
             end
         end
+
+        res *= temp
     end
+    res
 end
 
 function computePGTOrbMultipoleMoment!(fm::FloatingMonomial{T, D}, 
@@ -261,11 +273,9 @@ function computePGTOrbMultipoleMoment!(fm::FloatingMonomial{T, D},
 
         i = 0
         res = one(T)
-
         for (xMM, n, xL, xR, xM, iL, iR) in zip(fm.center, fm.degree.tuple, 
                                                 cenL, cenR, cenM, angL, angR)
             axialCache = accessAxialCache(cache, (i += 1))
-
             dx = xR - xMM
             m = if iszero(dx)
                 0
@@ -278,7 +288,6 @@ function computePGTOrbMultipoleMoment!(fm::FloatingMonomial{T, D},
             end
 
             temp = zero(T)
-
             for k in 0:m
                 data = (xpnS, xpnRatio, xM-xL, xM-xR, iL, iR+n-k)
                 temp += binomial(n, k) * dx^k * computeAxialPGTOrbOverlap!(axialCache, data)
@@ -286,7 +295,6 @@ function computePGTOrbMultipoleMoment!(fm::FloatingMonomial{T, D},
 
             res *= temp
         end
-
         res
     end
 end
