@@ -418,3 +418,9 @@ function setIndex(tpl::NTuple{N, Any}, val::T, idx::Int,
 
     ntuple(f, Val(N))
 end
+
+
+function rightCircShift(tpl::NonEmptyTuple)
+    body..., tail = tpl
+    (tail, body...)
+end
