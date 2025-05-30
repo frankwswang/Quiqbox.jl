@@ -34,8 +34,10 @@ function genCoulombRepulsionSampler()
     Sandwich(Left(), (*, *), inverseDistance)
 end
 
+const DiagDirectionalDiffSampler{T, D, M, N} = OneBodySampler{DiagonalDiff{T, D, M, N}}
+
 struct KineticEnergySampler{T<:Real, D, N} <: MonoTermOperator
-    core::OneBodySampler{DiagonalDiff{T, D, 2, N}}
+    core::DiagDirectionalDiffSampler{T, D, 2, N}
 
     function KineticEnergySampler{T, D}(::Val{N}) where {T<:Real, D, N}
         checkPositivity(D::Int)
@@ -63,6 +65,7 @@ function genKineticEnergySampler(::Type{T}, ::Val{D}, ::Val{N}=Val(0)) where {T<
 end
 
 
-const ReturnTypedSampler{T} = Union{MonomialMul{T}, MultipoleMomentSampler{T}}
+const ReturnTypedSampler{T} = Union{MonomialMul{T}, MultipoleMomentSampler{T}, 
+                                    DiagDirectionalDiffSampler{T}}
 
 const StableTypedSampler = Union{OneBodySampler, CoulombRepulsionSampler}
