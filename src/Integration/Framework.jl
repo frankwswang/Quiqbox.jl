@@ -867,7 +867,8 @@ function computeIntegral(::OneBodyIntegral{D}, op::DirectOperator,
     tensor = if lazyCompute
         oData1 = Vector(oData1)
         oData2 = Vector(oData2)
-        transformation = (b::PrimOrbData{T, D})->lazyMarkObj!(markerCache, b)
+        #> Find the shared `PrimOrbData` (excluding the renormalization information)
+        transformation = (b::PrimOrbData{T, D})->genOrbCoreKey!(markerCache, b)
         coreDataM = intersectMultisets!(oData1, oData2; transformation)
         block4 = genOneBodyPrimCoreIntTensor(integrator, (oData1, oData2))
         if isempty(coreDataM)

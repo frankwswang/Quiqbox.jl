@@ -237,7 +237,7 @@ function computePGTOrbMultipoleMoment(fm::FloatingMonomial{T, D},
                                       data::PrimGaussTypeOrbInfo{T, D}) where {T<:Real, D}
     xpn = data.xpn
     res = one(T)
-    for (xMM, n, x, i) in zip(fm.center, fm.degree.tuple, data.center, data.ang)
+    for (xMM, n, x, i) in zip(fm.center, fm.degree.tuple, data.cen, data.ang)
         dx = x - xMM
         m = iszero(dx) ? 0 : n
 

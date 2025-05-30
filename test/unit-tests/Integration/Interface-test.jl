@@ -54,5 +54,7 @@ Quiqbox.multipoleMoment(mmCen, mmDeg, cgf1, cgf2)
 cgf3 = genGaussTypeOrb(cen1, xpns1, cons1, (3, 0, 0))
 @test Quiqbox.multipoleMoment(cen1, (2, 0, 0), cgf2, cgf1) == Quiqbox.overlap(cgf2, cgf3)
 @test Quiqbox.multipoleMoment(cen1, (2, 0, 0), cgf1, cgf2) ≈ Quiqbox.overlap(cgf2, cgf3)
+@test multipoleMoment((1.0, 0.0, 0.0), (2, 2, 2), cgf1, cgf1) == 
+multipoleMoment((1.0, 0.0, 0.0), (2, 2, 2), cgf1, cgf1, lazyCompute=true)
 
 end
