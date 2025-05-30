@@ -405,3 +405,16 @@ end
 tightenCollection(::Nothing) = genBottomMemory()
 
 tightenCollection(arr::AbstractVector) = isempty(arr) ? genBottomMemory() : genMemory(arr)
+
+
+function setIndex(tpl::NTuple{N, Any}, val::T, idx::Int, 
+                  modifier::F=SelectHeader{2, 2}(itself)) where {N, T, F<:Function}
+    f = let offset=(firstindex(tpl) - 1), valNew=modifier(tpl[idx], val)
+        function (j::Int)
+            jIdx = j + offset
+            isequal(idx, jIdx) ? valNew : tpl[jIdx]
+        end
+    end
+
+    ntuple(f, Val(N))
+end
