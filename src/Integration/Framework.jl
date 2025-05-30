@@ -277,6 +277,14 @@ getHermiticity(::PrimOrbData{T, D}, ::OverlapSampler,
                ::PrimOrbData{T, D}) where {T<:Real, D} = 
 true
 
+getHermiticity(::PrimOrbData{T, D}, ::MultipoleMomentSampler, 
+               ::PrimOrbData{T, D}) where {T<:Real, D} = 
+true
+
+getHermiticity(::PGTOrbData{T, D}, ::DiagDirectionalDiffSampler, 
+               ::PGTOrbData{T, D}) where {T<:Real, D} = 
+true
+
 #> Two-Body (ii|O|jj) (ii|O|jk) (ij|O|kk) (ij|O|kl) hermiticity across O
 getHermiticity(::N12Tuple{PrimOrbData{T, D}}, ::OverlapSampler, 
                ::N12Tuple{PrimOrbData{T, D}}) where {T<:Real, D} = 
@@ -867,7 +875,8 @@ function computeIntegral(::OneBodyIntegral{D}, op::DirectOperator,
     tensor = if lazyCompute
         oData1 = Vector(oData1)
         oData2 = Vector(oData2)
-        transformation = (b::PrimOrbData{T, D})->lazyMarkObj!(markerCache, b)
+        #> Find the shared `PrimOrbData` (excluding the renormalization information)
+        transformation = (b::PrimOrbData{T, D})->genOrbCoreKey!(markerCache, b)
         coreDataM = intersectMultisets!(oData1, oData2; transformation)
         block4 = genOneBodyPrimCoreIntTensor(integrator, (oData1, oData2))
         if isempty(coreDataM)
