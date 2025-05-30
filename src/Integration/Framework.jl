@@ -277,6 +277,14 @@ getHermiticity(::PrimOrbData{T, D}, ::OverlapSampler,
                ::PrimOrbData{T, D}) where {T<:Real, D} = 
 true
 
+getHermiticity(::PrimOrbData{T, D}, ::MultipoleMomentSampler, 
+               ::PrimOrbData{T, D}) where {T<:Real, D} = 
+true
+
+getHermiticity(::PGTOrbData{T, D}, ::DiagDirectionalDiffSampler, 
+               ::PGTOrbData{T, D}) where {T<:Real, D} = 
+true
+
 #> Two-Body (ii|O|jj) (ii|O|jk) (ij|O|kk) (ij|O|kl) hermiticity across O
 getHermiticity(::N12Tuple{PrimOrbData{T, D}}, ::OverlapSampler, 
                ::N12Tuple{PrimOrbData{T, D}}) where {T<:Real, D} = 
