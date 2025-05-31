@@ -103,6 +103,39 @@ function (f::TruncateReshape{N})(arr::AbstractArray) where {N}
 end
 
 
+struct MemoryLinker{T, A<:AbstractArray{T}} <: AbstractArray{T, 1}
+    value::A
+    scope::Memory{OneToIndex}
+
+    function MemoryLinker(value::A, scope::AbstractArray{OneToIndex}) where 
+                         {T, A<:AbstractArray{T}}
+        new{T, A}(value, extractMemory(scope))
+    end
+end
+
+size(arr::MemoryLinker) = size(arr.scope)
+
+getindex(arr::MemoryLinker, i::Int) = getField(arr.value, getindex(arr.scope, i))
+
+function setindex!(arr::MemoryLinker, val, i::Int)
+    idxInner = firstindex(arr.value) + getindex(arr.scope, i).idx - 1
+    setindex!(arr.value, val, idxInner)
+end
+
+iterate(arr::MemoryLinker) = iterate(arr, firstindex(arr.scope))
+function iterate(arr::MemoryLinker, state)
+    res = iterate(arr.scope, state)
+    if res === nothing
+        nothing
+    else
+        indexer, state = res
+        getField(arr.value, indexer), state
+    end
+end
+
+length(arr::MemoryLinker) = length(arr.scope)
+
+
 struct VectorMemory{T, L} <: CustomMemory{T, 1}
     value::Memory{T}
     shape::Val{L}
