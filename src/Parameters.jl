@@ -1324,34 +1324,37 @@ const UnitSetFilter = SpanSetFilter{OneToIndex, Union{}}
 
 const GridSetFilter = SpanSetFilter{Union{}, OneToIndex}
 
-function getSector(sector::AbstractVector, oneToIds::Memory{T}, 
-                   finalizer::F=itself) where {T<:OneToIndex, F<:Function}
-    if T <: Union{}
-        genBottomMemory()
-    else
-        if finalizer isa ItsType
-            idxShifter = let iStart=firstindex(sector)
-                (x::OneToIndex)->(x.idx + iStart - 1)
-            end
-            view(sector, map(idxShifter, oneToIds))
-        else
-            map(oneToIds) do x
-                getField(sector, x) |> finalizer
-            end
-        end
+
+getSector(sector::AbstractVector, oneToIds::Memory{OneToIndex}) = 
+MemoryLinker(sector, oneToIds)
+
+getSector(::NothingOr{AbstractVector}, ::Memory{Union{}}) = 
+genBottomMemory()
+
+function mapSector(sector::AbstractVector, oneToIds::Memory{OneToIndex}, 
+                   finalizer::F) where {F<:Function}
+    map(oneToIds) do x
+        getField(sector, x) |> finalizer
     end
 end
 
-getSector(::Nothing, ::Memory{Union{}}, ::Function=itself) = genBottomMemory()
-
-getSector(::AbtBottomVector, ::Memory{Union{}}, ::Function=itself) = genBottomMemory()
+mapSector(::NothingOr{AbstractVector}, ::Memory{Union{}}, ::Function) = 
+genBottomMemory()
 
 #= Additional Method =#
-function getField(target::OptionalSpanSet, sFilter::SpanSetFilter, 
-                  finalizer::F=itself) where {F<:Function}
-    map(target, (unit=:unit, grid=:grid)) do sector, sym
-        getSector(sector, getfield(sFilter.scope, sym), finalizer)
+function getField(target::OptionalSpanSet, sFilter::SpanSetFilter)
+    getter = let coreFilter=sFilter.scope
+        (sector, sym) -> getSector(sector, getfield(coreFilter, sym))
     end
+    map(getter, target, (unit=:unit, grid=:grid))
+end
+
+function getField(target::OptionalSpanSet, sFilter::SpanSetFilter, 
+                  finalizer::F) where {F<:Function}
+    mapper = let coreFilter=sFilter.scope, f=finalizer
+        (sector, sym) -> mapSector(sector, getfield(coreFilter, sym), f)
+    end
+    map(mapper, target, (unit=:unit, grid=:grid))
 end
 
 getField(::OptionalSpanSet, ::VoidSetFilter) = initializeFixedSpanSet()
