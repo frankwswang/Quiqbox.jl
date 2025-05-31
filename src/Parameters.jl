@@ -1163,10 +1163,10 @@ f.core(initializeFixedSpanSet(nothing))
 getOutputType(::Type{<:SpanEvaluator{T}}) where {T} = T
 
 
-function initializeSpanParamSet(::Type{T}=Any) where {T}
+@generated function initializeSpanParamSet(::Type{T}=Any) where {T}
     upType = genParametricType(UnitParam, (;T))
     gpType = genParametricType(GridParam, (;T))
-    (unit=upType[], grid=gpType[])
+    return :( (unit=($upType)[], grid=($gpType)[]) )
 end
 
 initializeSpanParamSet(unit::UnitParam) = (unit=genMemory(unit), grid=genBottomMemory())
