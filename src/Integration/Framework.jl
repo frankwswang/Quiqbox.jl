@@ -248,18 +248,16 @@ prepareAnalyticIntCache!(::DirectOrbCoreIntegrator{T, D, C}, ::OrbCoreIntLayoutU
                          ) where {T<:Real, D, C<:RealOrComplex{T}} = 
 getAnalyticIntNullCache(layout)
 
+getAnalyticIntegralSamplerUnion(::Type{L}) where 
+                               {T<:Real, D, L<:GaussTypeOrbIntLayout{T, D}} = 
+AnalyticGaussIntegralSampler{T, D}
 
-function applyIntegralMethod(f::OrbCoreIntegratorConfig{T, D, C, S}, 
-                             orbsData::OrbCoreIntLayoutUnion{T, D}) where 
-                            {T<:Real, D, C<:RealOrComplex{T}, S<:MultiBodyIntegral{D}}
-    getNumericalIntegral(S(), f.operator, orbsData)
-end
+getAnalyticIntegralSamplerUnion(::Type{<:OrbCoreIntLayoutUnion}) = Union{}
 
-function applyIntegralMethod(f::OrbCoreIntegratorConfig{T, D, C, S, F}, 
-                             orbsData::GaussTypeOrbIntLayout{T, D}) where 
+function applyIntegralMethod(f::OrbCoreIntegratorConfig{T, D, C, S, F}, orbsData::L) where 
                             {T<:Real, D, C<:RealOrComplex{T}, S<:MultiBodyIntegral{D}, 
-                             F<:DirectOperator}
-    if F <: AnalyticGaussIntegralSampler{T, D}
+                             F<:DirectOperator, L<:OrbCoreIntLayoutUnion{T, D}}
+    if F <: getAnalyticIntegralSamplerUnion(L)
         IntLayoutCache = prepareAnalyticIntCache!(f, orbsData)
         getAnalyticIntegral!(S(), IntLayoutCache, f.operator, orbsData)
     else

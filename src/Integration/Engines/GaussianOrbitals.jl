@@ -487,10 +487,9 @@ getGaussProdBasedIntegrator(::OneBodyIntegral{D}, op::DiagDirectionalDiffSampler
 LPartial(evaluateDiagDirectionalDiff, (op,))
 
 
-function getAnalyticIntegral!(::S, cache!Self::OptAxialGaussOverlapCache{T}, 
-                              op::DirectOperator, 
+function getAnalyticIntegral!(::S, cache!Self::OptAxialGaussOverlapCache{T}, op::F, 
                               data::OneBodyOrbIntLayout{PGTOrbData{T, D}}) where 
-                             {D, S<:MultiBodyIntegral{D}, T<:Real}
+                             {T<:Real, F<:DirectOperator, D, S<:MultiBodyIntegral{D}}
     fields = getfield.(data, :core)
     integrator = getGaussProdBasedIntegrator(S(), op)
     integrator(fields; cache!Self)

@@ -293,7 +293,7 @@ struct FieldMarker{S, N} <: IdentityMarker{S}
         fieldSyms = fieldnames(T)
         issingletontype(T) && (return ValueMarker(input))
         markers = map(fieldSyms) do sym
-            getfield(input, sym) |> markObj
+            markObj(getfield(input, sym))
         end
         inputName = nameof(T)
         data = map(=>, fieldSyms, markers)
