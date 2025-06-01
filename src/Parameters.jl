@@ -483,9 +483,10 @@ function genMeshParam(par::ExpandParam, symbol::SymOrIndexedSym=symOf(par))
     ExpandParam(par.lambda, par.input, IndexedSym(symbol), par.screen, offset)
 end
 
-function isScreenLevelChangeable(::Type{T}) where {T<:ParamBox}
+@generated function isScreenLevelChangeable(::Type{T}) where {T<:ParamBox}
     minLevel, maxLevel = extrema( getScreenLevelOptions(T) )
-    (maxLevel - minLevel) > 0
+    res = (maxLevel - minLevel) > 0
+    return :($res)
 end
 
 function isOffsetEnabled(pb::T) where {T<:AdaptableParam}
@@ -821,7 +822,7 @@ Detect if `source` has no reachable `$ParamBox` by reflection-type functions, `g
 is still possible for `noStoredParam` to return `true` if `source` is a generic 
 function that indirectly references global variables being/storing `$ParamBox`.
 """
-function noStoredParam(source)
+function noStoredParam(source::T) where {T}
     canDirectlyStore(source) || (getFieldParams(source) |> isempty)
 end
 
@@ -1163,10 +1164,10 @@ f.core(initializeFixedSpanSet(nothing))
 getOutputType(::Type{<:SpanEvaluator{T}}) where {T} = T
 
 
-function initializeSpanParamSet(::Type{T}=Any) where {T}
+@generated function initializeSpanParamSet(::Type{T}=Any) where {T}
     upType = genParametricType(UnitParam, (;T))
     gpType = genParametricType(GridParam, (;T))
-    (unit=upType[], grid=gpType[])
+    return :( (unit=($upType)[], grid=($gpType)[]) )
 end
 
 initializeSpanParamSet(unit::UnitParam) = (unit=genMemory(unit), grid=genBottomMemory())
@@ -1393,7 +1394,7 @@ struct InputConverter{F<:Function} <: AbstractParamFunc
     core::ParamFreeFunc{F}
 end
 
-InputConverter(f::Function) = (InputConverter∘ParamFreeFunc)(f)
+InputConverter(f::F) where {F<:Function} = InputConverter(f|>ParamFreeFunc)
 
 (f::InputConverter)(input, ::OptSpanValueSet) = f.core(input)
 
@@ -1406,7 +1407,8 @@ struct ParamFormatter{F<:NamedFilter} <: AbstractParamFunc
     core::ParamFreeFunc{TaggedSpanSetFilter{F}}
 end
 
-ParamFormatter(f::TaggedSpanSetFilter) = (ParamFormatter∘ParamFreeFunc)(f)
+ParamFormatter(f::TaggedSpanSetFilter{F}) where {F<:NamedFilter} = 
+ParamFormatter(f|>ParamFreeFunc)
 
 (f::ParamFormatter)(::Any, params::OptSpanValueSet) = f.core(params)
 

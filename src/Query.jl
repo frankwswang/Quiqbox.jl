@@ -12,8 +12,7 @@ struct OneToIndex <: StructuredInfo
     OneToIndex() = new(1)
 end
 
-OneToIndex(idx::OneToIndex) =itself(idx)
-
+OneToIndex(idx::OneToIndex) = itself(idx)
 
 struct UnitIndex <: StructuredInfo
     idx::OneToIndex
@@ -70,7 +69,7 @@ getField(obj, entry::Int) = getindex(obj, entry)
 
 getField(obj, i::Base.CartesianIndex) = getindex(obj, i)
 
-getField(obj, i::OneToIndex) = getindex(obj, firstindex(obj)+i.idx-1)
+getField(obj, i::OneToIndex) = getindex(obj, firstindex(obj)::Int + i.idx - 1)
 
 getField(obj, i::UnitIndex) = getField(obj.unit, i.idx)
 
@@ -291,16 +290,14 @@ struct FieldMarker{S, N} <: IdentityMarker{S}
     data::NTuple{N, IdMarkerPair}
 
     function FieldMarker(input::T) where {T}
-        propertySyms = propertynames(input)
-        if issingletontype(T) || isempty(propertySyms)
-            return ValueMarker(input)
-        end
-        markers = map(propertySyms) do sym
-            getproperty(input, sym) |> markObj
+        fieldSyms = fieldnames(T)
+        issingletontype(T) && (return ValueMarker(input))
+        markers = map(fieldSyms) do sym
+            markObj(getfield(input, sym))
         end
         inputName = nameof(T)
-        data = map(=>, propertySyms, markers)
-        new{inputName, length(propertySyms)}(leftFoldHash(hash(inputName), markers), data)
+        data = map(=>, fieldSyms, markers)
+        new{inputName, length(fieldSyms)}(leftFoldHash(hash(inputName), markers), data)
     end
 end
 
@@ -378,10 +375,10 @@ function markObj(input::AbstractDict)
 end
 
 function markObj(input::T) where {T}
-    if isstructtype(T) && !issingletontype(T)
-        FieldMarker(input)
-    elseif canDirectlyStore(input)
+    if canDirectlyStore(input)
         ValueMarker(input)
+    elseif isstructtype(T) && !issingletontype(T)
+        FieldMarker(input)
     else
         Identifier(input)
     end

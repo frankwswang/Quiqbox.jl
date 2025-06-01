@@ -56,16 +56,16 @@ const NullaryFieldFunc{C<:RealOrComplex, D, F<:AbstractParamFunc} =
       FieldParamFunc{C, D, F, VoidSetFilter}
 
 
-function unpackFunc!(f::FieldAmplitude{C, D}, paramSet::OptSpanParamSet, 
+function unpackFunc!(f::F, paramSet::OptSpanParamSet, 
                      paramSetId::Identifier=Identifier(paramSet)) where 
-                    {C<:RealOrComplex, D}
+                    {C<:RealOrComplex, D, F<:FieldAmplitude{C, D}}
     fCore, localParamSet = unpackFieldFunc(f)
     idxFilter = locateParam!(paramSet, localParamSet)
     scope = TaggedSpanSetFilter(idxFilter, paramSetId)
     FieldParamFunc{C, D}(fCore, scope)
 end
 
-function unpackFunc(f::FieldAmplitude{C, D}) where {C<:RealOrComplex, D}
+function unpackFunc(f::F) where {C<:RealOrComplex, D, F<:FieldAmplitude{C, D}}
     fCore, paramSet = unpackFieldFunc(f)
     idxFilter = SpanSetFilter(map(length, paramSet)...)
     scope = TaggedSpanSetFilter(idxFilter, Identifier(paramSet))
@@ -125,7 +125,7 @@ function evalFieldAmplitudeCore(f::EncodedField{C, D, F, E}, input,
     convert(C, val)
 end
 
-function unpackFieldFunc(f::EncodedField{<:RealOrComplex, D}) where {D}
+function unpackFieldFunc(f::F) where {D, F<:EncodedField{<:RealOrComplex, D}}
     paramSet = initializeSpanParamSet()
     fCore = unpackFunc!(f.core.f, paramSet, Identifier(nothing))
     fEncode = unpackFunc!(f.encode.f, paramSet, Identifier(nothing))
@@ -196,7 +196,7 @@ function evalFieldAmplitudeCore(f::CurriedField, input, cache!Self::MultiSpanDat
     f.core(formatInput(f, input), paramVals)
 end
 
-function unpackFieldFunc(f::CurriedField{<:RealOrComplex, D}) where {D}
+function unpackFieldFunc(f::F) where {D, F<:CurriedField{<:RealOrComplex, D}}
     params = f.param
     paramMapper, paramSet = genParamMapper(params)
     tagFilter = TaggedSpanSetFilter(paramMapper, Identifier(nothing))
@@ -252,7 +252,7 @@ function evalFieldAmplitude(f::ProductField{C}, input;
     end
 end
 
-function unpackFieldFunc(f::ProductField{C, D}) where {C<:RealOrComplex, D}
+function unpackFieldFunc(f::F) where {C<:RealOrComplex, D, F<:ProductField{C, D}}
     paramSet = initializeSpanParamSet()
 
     idx = 1
@@ -304,7 +304,7 @@ function evalFieldAmplitude(f::CoupledField, input;
     end |> Base.Splat(f.coupler)
 end
 
-function unpackFieldFunc(f::CoupledField{<:RealOrComplex, D}) where {D}
+function unpackFieldFunc(f::F) where {D, F<:CoupledField{<:RealOrComplex, D}}
     fL, fR = f.pair
     paramSet = initializeSpanParamSet()
     fCoreL = unpackFunc!(fL, paramSet, Identifier(nothing))

@@ -242,34 +242,61 @@ function getOrbOutputTypeUnion(orbsData::OrbDataCollection{T, D}) where {T<:Real
 end
 
 
-const FieldParamFuncCacheCore{C<:RealOrComplex, D} = 
-LRU{EgalBox{FieldAmplitude{C, D}}, FieldParamFunc{C, D}}
+const MixedFieldParamFuncCacheCore{C<:RealOrComplex, D} = 
+      LRU{EgalBox{FieldAmplitude{C, D}}, FieldParamFunc{C, D}}
 
-struct FieldParamFuncCache{T<:Real, D} <: QueryBox{Union{ FieldParamFunc{T, D}, 
-                                                          FieldParamFunc{Complex{T}, D} }}
-    real::FieldParamFuncCacheCore{T, D}
-    complex::FieldParamFuncCacheCore{Complex{T}, D}
+struct MixedFieldParamFuncCache{T<:Real, D} <: QueryBox{Union{ FieldParamFunc{T, D}, 
+                                                        FieldParamFunc{Complex{T}, D} }}
+    real::MixedFieldParamFuncCacheCore{T, D}
+    complex::MixedFieldParamFuncCacheCore{Complex{T}, D}
+end
 
-    function FieldParamFuncCache(::Type{T}, ::Val{D}, maxSize::Int=200) where {T<:Real, D}
-        rSector = FieldParamFuncCacheCore{T, D}(maxsize=maxSize)
-        cSector = FieldParamFuncCacheCore{Complex{T}, D}(maxsize=maxSize)
-        new{T, D}(rSector, cSector)
+const TypedFieldParamFuncCache{T<:Real, D, C<:RealOrComplex{T}, F<:FieldAmplitude{C, D}} = 
+      LRU{EgalBox{F}, FieldParamFunc{C, D}}
+
+const FieldParamFuncCache{T<:Real, D} = 
+      Union{MixedFieldParamFuncCache{T, D}, TypedFieldParamFuncCache{T, D}}
+
+getBasisInnerType(::Type{F}) where {C<:RealOrComplex, D, B, F<:OrbitalBasis{C, D, B}} = 
+(B <: OrbitalBasis ? getBasisInnerType(B) : B)
+
+function genFieldParamFuncCache(::Type{F}, maxSize::Int=200) where 
+                               {T<:Real, D, F<:OrbitalBasis{<:RealOrComplex{T}, D}}
+    checkPositivity(maxSize)
+    if isconcretetype(F)
+        fieldType = getBasisInnerType(F)
+        valueType = getOutputType(fieldType)
+        TypedFieldParamFuncCache{T, D, valueType, fieldType}(maxsize=maxSize)
+    else
+        rSector = MixedFieldParamFuncCacheCore{T, D}(maxsize=maxSize)
+        cSector = MixedFieldParamFuncCacheCore{Complex{T}, D}(maxsize=maxSize)
+        MixedFieldParamFuncCache(rSector, cSector)
     end
 end
 
-function getCachedFieldFunc!(cache::FieldParamFuncCache{T, D}, 
+
+function getCachedFieldFunc!(cache::MixedFieldParamFuncCache{T, D}, 
                              orb::PrimitiveOrb{T, D, T}, 
                              paramSet::OptSpanParamSet) where {T<:Real, D}
     get!(cache.real, EgalBox{FieldAmplitude{T, D}}(orb.body)) do
-        unpackFunc!(orb.body, paramSet)::FieldParamFunc{T, D}
+        unpackFunc!(orb.body, paramSet)
     end
 end
 
-function getCachedFieldFunc!(cache::FieldParamFuncCache{T, D}, 
+function getCachedFieldFunc!(cache::MixedFieldParamFuncCache{T, D}, 
                              orb::PrimitiveOrb{T, D, Complex{T}}, 
                              paramSet::OptSpanParamSet) where {T<:Real, D}
     get!(cache.complex, EgalBox{FieldAmplitude{Complex{T}, D}}(orb.body)) do
-        unpackFunc!(orb.body, paramSet)::FieldParamFunc{Complex{T}, D}
+        unpackFunc!(orb.body, paramSet)
+    end
+end
+
+function getCachedFieldFunc!(cache::TypedFieldParamFuncCache{T, D, C, F}, 
+                             orb::PrimitiveOrb{T, D, C, F}, 
+                             paramSet::OptSpanParamSet) where 
+                            {T<:Real, D, C<:RealOrComplex{T}, F<:FieldAmplitude{C, D}}
+    get!(cache, EgalBox{F}(orb.body)) do
+        unpackFunc!(orb.body, paramSet)
     end
 end
 
@@ -309,12 +336,8 @@ function genOrbitalDataCore!(fieldCache::FieldParamFuncCache{T, D},
                              paramSet::OptSpanParamSet, 
                              orbs::OrbBasisCollection{T, D}) where {T<:Real, D}
     checkEmptiness(orbs, :orbs)
-    ids, uniqueOrbs = markUnique(orbs, compareFunction=(===))
-    data = map(uniqueOrbs) do orb
+    map(orbs) do orb
         genOrbitalDataCore!(fieldCache, paramCache, paramSet, orb)
-    end
-    map(ids) do idx
-        data[begin+idx-1]
     end
 end
 
@@ -328,12 +351,20 @@ function genOrbitalDataCore!(fieldCache::FieldParamFuncCache{T, D},
     end
 end
 
-function genOrbitalData(orbSource::OrbBasisSource{T, D}; 
-                        cache!Self::MultiSpanDataCacheBox=MultiSpanDataCacheBox()
-                        ) where {T<:Real, D}
+function genOrbitalData(orbBases::B; 
+                        cache!Self::MultiSpanDataCacheBox=MultiSpanDataCacheBox()) where 
+                       {T<:Real, D, B<:OrbBasisCollection{T, D}}
     paramSet = initializeSpanParamSet()
-    coreCache = FieldParamFuncCache(T, Val(D))
-    genOrbitalDataCore!(coreCache, cache!Self, paramSet, orbSource)
+    coreCache = genFieldParamFuncCache(B|>eltype)
+    genOrbitalDataCore!(coreCache, cache!Self, paramSet, orbBases)
+end
+
+function genOrbitalData(orbBasis::F; 
+                        cache!Self::MultiSpanDataCacheBox=MultiSpanDataCacheBox()) where 
+                       {F<:OrbitalBasis}
+    paramSet = initializeSpanParamSet()
+    coreCache = genFieldParamFuncCache(F)
+    genOrbitalDataCore!(coreCache, cache!Self, paramSet, orbBasis)
 end
 
 
