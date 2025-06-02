@@ -1,9 +1,6 @@
 using LinearAlgebra: norm
 using LRUCache
 
-const DefaultOddFactorialCacheSizeLimit = 25
-const OddFactorialCache = LRU{Int, BigInt}(maxsize=DefaultOddFactorialCacheSizeLimit)
-
 #>-- Basic data structure --<#
 struct PrimGaussTypeOrbInfo{T<:Real, D} <: QueryBox{T}
     cen::NTuple{D, T}
@@ -109,7 +106,7 @@ end
 #>-- Cartesian PGTO overlap computation --<#
 #> Reusable axial factor
 function computePGTOrbOverlapAxialFactor(xpnLRsum::T, degree::Int) where {T<:Real}
-    factor = degree > 0 ? (T(oddFactorial(2degree - 1)) / (2xpnLRsum)^degree) : one(T)
+    factor = degree > 0 ? oddFactorial(2degree - 1, inv(2xpnLRsum)) : one(T)
     T(πPowers[:p0d5]) / sqrt(xpnLRsum) * factor
 end
 #> Reusable mixed factor

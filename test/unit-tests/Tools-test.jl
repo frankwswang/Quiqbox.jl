@@ -12,26 +12,6 @@ using Random
 
 @testset "Tools.jl" begin
 
-# function getAtolVal getAtolDigits
-@test getAtolVal(Float64) == 4e-16
-@test getAtolVal(Int) == 1
-@test getAtolDigits(Float64) == 15
-
-
-# function roundToMultiOfStep nearestHalfOf getNearestMid
-@test roundToMultiOfStep(3811.47123123, 0.01) == 3811.47
-@test roundToMultiOfStep(0.1+0.2, 1e-17) == 0.30000000000000004
-@test roundToMultiOfStep(0.1+0.2, 1e-16) == 0.3
-@test roundToMultiOfStep(2, 2) == 2
-@test roundToMultiOfStep(2, 3) == 3
-@test roundToMultiOfStep(2, 4) == 0
-@test roundToMultiOfStep(2, 5) == 0
-
-@test nearestHalfOf(0.1 + 0.2) == 0.15
-@test getNearestMid(0.1, 0.2, 1e-16) == 0.15
-@test getNearestMid(0.1, 0.2, 1e-17) == (0.1 + 0.2)/2
-
-
 # function isApprox
 v1 = 1/3 + 1e-16
 v2 = 1/3

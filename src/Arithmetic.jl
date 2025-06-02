@@ -70,14 +70,40 @@ getNearestMid(num1::T, num2::T, atol::T) where {T} =
 num1==num2 ? num1 : roundToMultiOfStep((num1+num2)/2, atol)
 
 
-function oddFactorial(a::Int) # a * (a-2) * ... * 1
-    get!(OddFactorialCache, a) do
-        i = BigInt(1)
-        for j = 1:2:a
-            i *= j
-        end
-        i
+function unsafeOddFactorial(a::T) where {T<:Integer}
+    res = one(T)
+    for i in 1:2:a
+        res *= i
     end
+    res
+end
+
+const DefaultOddFactorialCacheSizeLimit = 50
+const OddFactorialCache = LRU{Int, BigInt}(maxsize=DefaultOddFactorialCacheSizeLimit)
+
+function oddFactorialBigInt(a::Int) # a * (a-2) * ... * 1
+    res = get(OddFactorialCache, a, nothing)
+    if res === nothing
+        res = unsafeOddFactorial(a|>big)
+        OddFactorialCache[a] = res
+    end
+    res
+end
+
+function oddFactorial(a::Int, ::Type{T}=Int128) where {T<:Real}
+    if a < 55 # Bound for result to be within typemax(Int128)
+        unsafeOddFactorial(a|>Int128)
+    else
+        oddFactorialBigInt(a)
+    end |> T
+end
+
+function oddFactorial(a::Int, coeff::T) where {T<:AbstractFloat}
+    res = one(T)
+    for i in 1:2:a
+        res *= i * coeff
+    end
+    res
 end
 
 
