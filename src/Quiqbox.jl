@@ -19,6 +19,8 @@ include("Parameters.jl")
 include("Graphs.jl")
 
 include("Angular.jl")
+include("Arithmetic.jl")
+
 include("Spatial.jl")
 include("SpatialBasis.jl")
 # include("HartreeFock.jl")
