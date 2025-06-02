@@ -619,8 +619,8 @@ function keepOnly!(a::AbstractArray, idx::Int)
     a[] = e
 end
 
-
-function betterSum(x) # Improved Kahan–Babuška algorithm fro array summation
+#> Improved Kahan–Babuška algorithm for array summation
+function betterSum(x::AbstractArray{<:Number})
     xFirxt = first(x)
     s = xFirxt .- xFirxt
     c = xFirxt .- xFirxt

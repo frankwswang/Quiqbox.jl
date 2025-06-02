@@ -30,36 +30,45 @@ using Test
     end
     println("$(unit3) test finished in $t3 seconds.\n")
 
-    unit4 = "Basis-Construction System"
+    unit4 = "Numerical-Computation System"
     println("Testing $(unit4)...")
     t4 = @elapsed @testset "$(unit4)" begin
+        include("unit-tests/Angular-test.jl")
+        include("unit-tests/Arithmetic-test.jl")
+    end
+    println("$(unit4) test finished in $t4 seconds.\n")
+
+    unit5 = "Basis-Construction System"
+    println("Testing $(unit5)...")
+    t5 = @elapsed @testset "$(unit5)" begin
         include("unit-tests/Angular-test.jl")
         include("unit-tests/Spatial-test.jl")
         include("unit-tests/SpatialBasis-test.jl")
     end
-    println("$(unit4) test finished in $t4 seconds.\n")
-
-    unit5 = "Differentiation System"
-    println("Testing $(unit5)...")
-    t5 = @elapsed @testset "$(unit5)" begin
-        include("unit-tests/Differentiation/Finite-test.jl")
-    end
     println("$(unit5) test finished in $t5 seconds.\n")
 
-    unit6 = "Integration System"
+    unit6 = "Differentiation System"
     println("Testing $(unit6)...")
     t6 = @elapsed @testset "$(unit6)" begin
+        include("unit-tests/Differentiation/Finite-test.jl")
+    end
+    println("$(unit6) test finished in $t6 seconds.\n")
+
+    unit7 = "Integration System"
+    println("Testing $(unit7)...")
+    t7 = @elapsed @testset "$(unit7)" begin
+        include("unit-tests/Integration/BoysFunction-test.jl")
         include("unit-tests/Integration/Interface-test.jl")
         include("unit-tests/Integration/Overlap-test.jl")
         include("unit-tests/Integration/Kinetic-test.jl")
     end
-    println("$(unit6) test finished in $t6 seconds.\n")
+    println("$(unit7) test finished in $t7 seconds.\n")
 
-    unit7 = "Code Quality"
-    println("Testing $(unit7)...")
-    t7 = @elapsed @testset "$(unit7)" begin
+    unit8 = "Code Quality"
+    println("Testing $(unit8)...")
+    t8 = @elapsed @testset "$(unit8)" begin
         include("quality-tests/Aqua-test.jl")
     end
-    println("$(unit7) test finished in $t7 seconds.\n")
+    println("$(unit8) test finished in $t8 seconds.\n")
 
 end
