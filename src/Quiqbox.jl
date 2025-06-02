@@ -35,6 +35,7 @@ include("Differentiation/Finite.jl")
 include("Integration/Samplers.jl")
 include("Integration/Framework.jl")
 include("Integration/Engines/Numerical.jl")
+include("Integration/Engines/BoysFunction.jl")
 include("Integration/Engines/GaussianOrbitals.jl")
 include("Integration/Interface.jl")
 
