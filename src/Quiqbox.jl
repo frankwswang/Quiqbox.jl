@@ -19,6 +19,8 @@ include("Parameters.jl")
 include("Graphs.jl")
 
 include("Angular.jl")
+include("Arithmetic.jl")
+
 include("Spatial.jl")
 include("SpatialBasis.jl")
 # include("HartreeFock.jl")
@@ -33,6 +35,7 @@ include("Differentiation/Finite.jl")
 include("Integration/Samplers.jl")
 include("Integration/Framework.jl")
 include("Integration/Engines/Numerical.jl")
+include("Integration/Engines/BoysFunction.jl")
 include("Integration/Engines/GaussianOrbitals.jl")
 include("Integration/Interface.jl")
 

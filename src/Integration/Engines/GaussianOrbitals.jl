@@ -1,55 +1,6 @@
 using LinearAlgebra: norm
 using LRUCache
 
-const DefaultOddFactorialCacheSizeLimit = 25
-const OddFactorialCache = LRU{Int, BigInt}(maxsize=DefaultOddFactorialCacheSizeLimit)
-
-#>-- Basic math formula --<#
-function oddFactorial(a::Int) # a * (a-2) * ... * 1
-    get!(OddFactorialCache, a) do
-        i = BigInt(1)
-        for j = 1:2:a
-            i *= j
-        end
-        i
-    end
-end
-
-
-function computeGaussProd(dxML::T, dxMR::T, lxL::Int, lxR::Int, lx::Int) where {T<:Real}
-    lb = max(-lx,  lx - 2lxR)
-    ub = min( lx, 2lxL - lx )
-    res = zero(T)
-    for q in lb:2:ub
-        i = (lx + q) >> 1
-        j = (lx - q) >> 1
-        res += binomial(lxL, i) * binomial(lxR, j) * dxML^(lxL - i) * dxMR^(lxR - j)
-    end
-    res
-end
-
-function computeGaussProd(lxL::Int, lxR::Int, lx::Int)
-    lb = max(-lx,  lx - 2lxR)
-    ub = min( lx, 2lxL - lx )
-    res = zero(Int)
-    for q in lb:2:ub
-        res += Int(isequal(2lxL, lx+q) * isequal(2lxR, lx-q))
-    end
-    res
-end
-
-
-function computePGTOrbOverlapAxialFactor(xpnLRsum::T, degree::Int) where {T<:Real}
-    factor = degree > 0 ? (T(oddFactorial(2degree - 1)) / (2xpnLRsum)^degree) : one(T)
-    T(πPowers[:p0d5]) / sqrt(xpnLRsum) * factor
-end
-
-function computePGTOrbOverlapMixedFactor(dxLR::T, xpnProdOverSum::T) where {T<:Real}
-    exp(- xpnProdOverSum * dxLR^2)
-end
-
-
-
 #>-- Basic data structure --<#
 struct PrimGaussTypeOrbInfo{T<:Real, D} <: QueryBox{T}
     cen::NTuple{D, T}
@@ -153,6 +104,16 @@ end
 
 
 #>-- Cartesian PGTO overlap computation --<#
+#> Reusable axial factor
+function computePGTOrbOverlapAxialFactor(xpnLRsum::T, degree::Int) where {T<:Real}
+    factor = degree > 0 ? oddFactorial(2degree - 1, inv(2xpnLRsum)) : one(T)
+    T(πPowers[:p0d5]) / sqrt(xpnLRsum) * factor
+end
+#> Reusable mixed factor
+function computePGTOrbOverlapMixedFactor(dxLR::T, xpnProdOverSum::T) where {T<:Real}
+    exp(- xpnProdOverSum * dxLR^2)
+end
+
 #> Overlap for 1D Gaussian-function pair
 function computeGaussFuncOverlap(xpnSum::T, xpnPOS::T, dxLR::T) where {T<:Real}
     computePGTOrbOverlapAxialFactor(xpnSum, 0) * 
