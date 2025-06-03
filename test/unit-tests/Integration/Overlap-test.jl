@@ -4,6 +4,17 @@ using Quiqbox: overlap, overlaps
 using LinearAlgebra: norm
 
 @testset "Overlap-Based Features" begin
+xpnL, xpnR = (1.0, 1.5)
+cenL, cenR = (2.0, 3.1)
+angL, angR = (2,   4  )
+gfL   = genGaussTypeOrb((cenL,), xpnL, (angL,)  )
+gfLm1 = genGaussTypeOrb((cenL,), xpnL, (angL-1,))
+gfLp1 = genGaussTypeOrb((cenL,), xpnL, (angL+1,))
+gfR   = genGaussTypeOrb((cenR,), xpnR, (angR,)  )
+gfRm1 = genGaussTypeOrb((cenR,), xpnR, (angR-1,))
+gfRp1 = genGaussTypeOrb((cenR,), xpnR, (angR+1,))
+@test +2xpnL * overlap(gfLp1, gfR) - angL * overlap(gfLm1, gfR) ≈
+      -2xpnR * overlap(gfL, gfRp1) + angR * overlap(gfL, gfRm1)
 
 pf1 = genGaussTypeOrb((0.5, 0.3, 0.4), 0.9)
 pf1c = genGaussTypeOrb((0.5, 0.3, 0.4), 0.9)
