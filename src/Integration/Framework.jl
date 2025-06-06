@@ -145,7 +145,7 @@ struct OrbCoreIntConfig{T<:Real, D, S<:MultiBodyIntegral{D}, L} <: StructuredTyp
 
     function OrbCoreIntConfig(layout::OrbCoreIntLayoutUnion{T, D}) where {T<:Real, D}
         IntStyle = getOrbCoreIntStyle(layout)
-        config = formatCoreIntOrbType.(layout)
+        config = map(formatCoreIntOrbType, layout)
         new{T, D, IntStyle{D}, length(config)::Int}(config)
     end
 end
