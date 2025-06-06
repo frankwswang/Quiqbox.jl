@@ -175,7 +175,10 @@ struct TypeBox{T} <: QueryBox{Type{T}}
     value::Type{T}
 end
 
-==(::TypeBox{T1}, ::EgalBox{T2}) where {T1, T2} = (T1 <: T2) && (T2 <: T1)
+TypeBox(::Type{Union{}}) = 
+throw(AssertionError("`TypeBox` cannot be instantiated with `Union{}`."))
+
+==(::TypeBox{T1}, ::TypeBox{T2}) where {T1, T2} = (T1 <: T2) && (T2 <: T1)
 
 hash(::TypeBox{T}, hashCode::UInt) where {T} = hash(objectid(T), hashCode)
 

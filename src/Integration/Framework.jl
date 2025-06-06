@@ -101,21 +101,23 @@ end
 
 struct Bar <: Any end
 
-const OneBodyOrbIntLayout{O<:PrimOrbData} = Union{Tuple{O}, Tuple{O, O}}
+const PrimOrbDataOrType{T<:PrimOrbData} = Union{T, TypeBox{T}}
 
-const OrbBarLayout1{O<:PrimOrbData} = Tuple{Bar, O}
-const OrbBarLayout2{O<:PrimOrbData} = Tuple{O, Bar, O}
-const OrbBarLayout3{O<:PrimOrbData} = Tuple{O, O, Bar}
-const OrbBarLayout4{O<:PrimOrbData} = Tuple{O, Bar, O, O}
-const OrbBarLayout5{O<:PrimOrbData} = Tuple{O, O, Bar, O}
-const OrbBarLayout6{O<:PrimOrbData} = Tuple{O, O, Bar, O, O}
+const OneBodyOrbIntLayout{O<:PrimOrbDataOrType} = Union{Tuple{O}, Tuple{O, O}}
 
-const TwoBodyOrbIntLayout{O<:PrimOrbData} = Union{OrbBarLayout1{O}, OrbBarLayout2{O}, 
-                                                  OrbBarLayout3{O}, OrbBarLayout4{O}, 
-                                                  OrbBarLayout5{O}, OrbBarLayout6{O}}
+const OrbBarLayout1{O<:PrimOrbDataOrType} = Tuple{O, Bar}
+const OrbBarLayout2{O<:PrimOrbDataOrType} = Tuple{O, Bar, O}
+const OrbBarLayout3{O<:PrimOrbDataOrType} = Tuple{O, O, Bar}
+const OrbBarLayout4{O<:PrimOrbDataOrType} = Tuple{O, Bar, O, O}
+const OrbBarLayout5{O<:PrimOrbDataOrType} = Tuple{O, O, Bar, O}
+const OrbBarLayout6{O<:PrimOrbDataOrType} = Tuple{O, O, Bar, O, O}
 
-const OrbCoreIntegralLayout{O<:PrimOrbData} = Union{OneBodyOrbIntLayout{O}, 
-                                                    TwoBodyOrbIntLayout{O}}
+const TwoBodyOrbIntLayout{O<:PrimOrbDataOrType} = Union{OrbBarLayout1{O}, OrbBarLayout2{O}, 
+                                                        OrbBarLayout3{O}, OrbBarLayout4{O}, 
+                                                        OrbBarLayout5{O}, OrbBarLayout6{O}}
+
+const OrbCoreIntegralLayout{O<:PrimOrbDataOrType} = 
+      Union{OneBodyOrbIntLayout{O}, TwoBodyOrbIntLayout{O}}
 
 const OrbCoreIntLayoutUnion{T<:Real, D} = OrbCoreIntegralLayout{PrimOrbData{T, D}}
 const GaussTypeOrbIntLayout{T<:Real, D} = OrbCoreIntegralLayout{PGTOrbData{T, D}}
@@ -130,28 +132,20 @@ function getOrbOutputTypeUnion(layout::TwoBodyOrbCoreIntLayoutUnion{T}) where {T
     end::Union{Type{Complex{T}}, Type{T}}
 end
 
-function formatOrbCoreIntConfig(config::OrbCoreIntLayoutUnion{T, D}) where {T<:Real, D}
-    map(config) do x
-        ifelse(x isa Bar, Bar, PrimOrbData{T, D}) |> TypeBox
-    end
-end
-
-function formatOrbCoreIntConfig(config::GaussTypeOrbIntLayout{T, D}) where {T<:Real, D}
-    map(config) do x
-        ifelse(x isa Bar, Bar, PGTOrbData{T, D}) |> TypeBox
-    end
-end
-
 
 getOrbCoreIntStyle(::OneBodyOrbCoreIntLayoutUnion) = OneBodyIntegral
 getOrbCoreIntStyle(::TwoBodyOrbCoreIntLayoutUnion) = TwoBodyIntegral
 
+formatCoreIntOrbType(::Bar) = Bar()
+formatCoreIntOrbType(::PGTOrbData{T, D}) where {T<:Real, D} = TypeBox(PGTOrbData{T, D})
+formatCoreIntOrbType(::PrimOrbData{T, D}) where {T<:Real, D} = TypeBox(PrimOrbData{T, D})
+
 struct OrbCoreIntConfig{T<:Real, D, S<:MultiBodyIntegral{D}, L} <: StructuredType
-    config::NTuple{L, Union{ TypeBox{Bar}, TypeBox{<:PrimOrbData{T, D}} }}
+    config::NTuple{L, Union{TypeBox{<:PrimOrbData{T, D}}, Bar}}
 
     function OrbCoreIntConfig(layout::OrbCoreIntLayoutUnion{T, D}) where {T<:Real, D}
         IntStyle = getOrbCoreIntStyle(layout)
-        config = formatOrbCoreIntConfig(layout)
+        config = formatCoreIntOrbType.(layout)
         new{T, D, IntStyle{D}, length(config)::Int}(config)
     end
 end
@@ -225,15 +219,7 @@ getIntegralOutputType(::MultiBodyCoreIntegrals{C}) where {C<:RealOrComplex} = C
 getIntegralOutputType(::IntegralData{C}) where {C<:RealOrComplex} = C
 
 
-function getAnalyticIntegralCache(::DirectOperator, 
-                                  layout::OrbCoreIntLayoutUnion{T}) where {T<:Real}
-    getAnalyticIntNullCache(layout)
-end
-
-function getAnalyticIntNullCache(layout::OrbCoreIntLayoutUnion{T}) where {T<:Real}
-    NullCache{getOrbOutputTypeUnion(layout)}()
-end
-
+getAnalyticIntegralCache(::DirectOperator, ::OrbCoreIntLayoutUnion) = nothing
 
 function prepareAnalyticIntCache!(f::ReusedOrbCoreIntegrator{T, D, C}, 
                                   data::OrbCoreIntLayoutUnion{T, D}) where 
@@ -246,22 +232,18 @@ end
 
 prepareAnalyticIntCache!(::DirectOrbCoreIntegrator{T, D, C}, ::OrbCoreIntLayoutUnion{T, D}
                          ) where {T<:Real, D, C<:RealOrComplex{T}} = 
-getAnalyticIntNullCache(layout)
-
-getAnalyticIntegralSamplerUnion(::Type{L}) where 
-                               {T<:Real, D, L<:GaussTypeOrbIntLayout{T, D}} = 
-AnalyticGaussIntegralSampler{T, D}
-
-getAnalyticIntegralSamplerUnion(::Type{<:OrbCoreIntLayoutUnion}) = Union{}
+NullCache{C}()
 
 function applyIntegralMethod(f::OrbCoreIntegratorConfig{T, D, C, S, F}, orbsData::L) where 
                             {T<:Real, D, C<:RealOrComplex{T}, S<:MultiBodyIntegral{D}, 
                              F<:DirectOperator, L<:OrbCoreIntLayoutUnion{T, D}}
-    if F <: getAnalyticIntegralSamplerUnion(L)
-        IntLayoutCache = prepareAnalyticIntCache!(f, orbsData)
-        getAnalyticIntegral!(S(), IntLayoutCache, f.operator, orbsData)
+    cacheTypeBound = NothingOr{Union{ CustomCache{T}, CustomCache{C} }}
+    cache = getAnalyticIntegralCache(f.operator, orbsData)::cacheTypeBound
+    if cache === nothing
+        getNumericalIntegral(f.operator, orbsData)
     else
-        getNumericalIntegral(S(), f.operator, orbsData)
+        IntLayoutCache = prepareAnalyticIntCache!(f, orbsData)
+        getAnalyticIntegral!(IntLayoutCache, f.operator, orbsData)
     end
 end
 
