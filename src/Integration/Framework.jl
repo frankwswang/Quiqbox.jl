@@ -123,7 +123,6 @@ const OneBodyOrbCoreIntLayoutUnion{T<:Real, D} = OneBodyOrbIntLayout{PrimOrbData
 const TwoBodyOrbCoreIntLayoutUnion{T<:Real, D} = TwoBodyOrbIntLayout{PrimOrbData{T, D}}
 const OrbCoreIntLayoutUnion{T<:Real, D} = 
       Union{OneBodyOrbCoreIntLayoutUnion{T, D}, OneBodyOrbCoreIntLayoutUnion{T, D}}
-const GaussTypeOrbIntLayout{T<:Real, D} = OrbCoreIntegralLayout{PGTOrbData{T, D}}
 
 const OneBodyOrbCoreIntTypeLayout{T<:Real, D} = 
       OneBodyOrbIntLayout{TypeBox{ <:PrimOrbData{T, D} }}
@@ -147,12 +146,12 @@ getOrbCoreIntStyle(::OneBodyOrbCoreIntLayoutUnion) = OneBodyIntegral
 getOrbCoreIntStyle(::TwoBodyOrbCoreIntLayoutUnion) = TwoBodyIntegral
 
 struct OrbCoreIntConfig{T<:Real, D, S<:MultiBodyIntegral{D}, L} <: StructuredType
-    config::NTuple{L, Union{Bar, TypeBox{<:PrimOrbData{T, D}} }}
+    layout::NTuple{L, Union{Bar, TypeBox{<:PrimOrbData{T, D}} }}
 
     function OrbCoreIntConfig(layout::OrbCoreIntLayoutUnion{T, D}) where {T<:Real, D}
         IntStyle = getOrbCoreIntStyle(layout)
-        config = formatOrbLayoutType.(layout)
-        new{T, D, IntStyle{D}, length(config)::Int}(config)
+        layout = formatOrbLayoutType.(layout)
+        new{T, D, IntStyle{D}, length(layout)::Int}(layout)
     end
 end
 
@@ -230,7 +229,7 @@ function prepareAnalyticIntCache!(f::ReusedOrbCoreIntegrator{T, D, C, S, F},
                                  {T<:Real, D, C<:RealOrComplex{T}, S<:MultiBodyIntegral{D}, 
                                   F<:DirectOperator}
     get!(f.cache.dict, config) do
-        genAnalyticIntegralCache(TypeBox(F), config.config)
+        genAnalyticIntegralCache(TypeBox(F), config.layout)
     end
 end
 
@@ -247,12 +246,19 @@ function selectIntegralMethod(f::OrbCoreIntegratorConfig{T, D, C, S, F},
                               config::OrbCoreIntConfig{T, D, S}) where 
                              {T<:Real, D, C<:RealOrComplex{T}, S<:MultiBodyIntegral{D}, 
                               F<:DirectOperator}
-    if supportAnalyticIntegral(TypeBox(F), config.config)
+    if supportAnalyticIntegral(TypeBox(F), config.layout)
         cache = prepareAnalyticIntCache!(f, config)
         genAnalyticIntegrator!(S(), cache, f.operator)
     else
         LPartial(getNumericalIntegral, (S(), f.operator))
     end
+end
+
+function applyIntegralMethod(f::CachedOrbCoreIntegrator{T, D}, 
+                             data::OrbCoreIntLayoutUnion{T, D}) where {T<:Real, D}
+    config = OrbCoreIntConfig(data)
+    fCore = selectIntegralMethod(f, config)
+    fCore(data)
 end
 
 
@@ -281,8 +287,7 @@ true
 
 function genCoreIntTuple(integrator::OrbCoreOneBodyIntConfig{T, D}, 
                          oDataTuple::Tuple{PrimOrbData{T, D}}) where {T<:Real, D}
-    layoutConfig = OrbCoreIntConfig(oDataTuple)
-    integralRes = selectIntegralMethod(integrator, layoutConfig)(oDataTuple)
+    integralRes = applyIntegralMethod(integrator, oDataTuple)
     orbSetType = getIntegralOutputType(integrator)
     (convert(orbSetType, integralRes),)
 end
@@ -407,8 +412,7 @@ function genOneBodyPrimCoreIntTensor(integrator::CachedOrbCoreIntegrator{T, D},
     res = ShapedMemory{T}(undef, (len1, len2))
     for j in 1:len2, i in 1:len1
         oDataPair = (oData1[begin+i-1], oData2[begin+j-1])
-        layoutConfig = OrbCoreIntConfig(oDataPair)
-        ijVal = selectIntegralMethod(integrator, layoutConfig)(oDataPair)
+        ijVal = applyIntegralMethod(integrator, oDataPair)
         res[begin+i-1, begin+j-1] = ijVal
     end
     res
