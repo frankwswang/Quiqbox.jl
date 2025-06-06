@@ -139,18 +139,9 @@ function getOrbOutputTypeUnion(layout::TwoBodyOrbCoreIntLayoutUnion{T}) where {T
     end::Union{Type{Complex{T}}, Type{T}}
 end
 
-function formatOrbCoreIntConfig(config::OrbCoreIntLayoutUnion{T, D}) where {T<:Real, D}
-    map(config) do x
-        ifelse(x isa Bar, Bar, TypeBox(PrimOrbData{T, D}))
-    end
-end
-
-function formatOrbCoreIntConfig(config::GaussTypeOrbIntLayout{T, D}) where {T<:Real, D}
-    map(config) do x
-        ifelse(x isa Bar, Bar, TypeBox(PGTOrbData{T, D}))
-    end
-end
-
+formatOrbLayoutType(::Bar) = Bar()
+formatOrbLayoutType(::PGTOrbData{T, D}) where {T<:Real, D} = TypeBox(PGTOrbData{T, D})
+formatOrbLayoutType(::PrimOrbData{T, D}) where {T<:Real, D} = TypeBox(PrimOrbData{T, D})
 
 getOrbCoreIntStyle(::OneBodyOrbCoreIntLayoutUnion) = OneBodyIntegral
 getOrbCoreIntStyle(::TwoBodyOrbCoreIntLayoutUnion) = TwoBodyIntegral
@@ -160,7 +151,7 @@ struct OrbCoreIntConfig{T<:Real, D, S<:MultiBodyIntegral{D}, L} <: StructuredTyp
 
     function OrbCoreIntConfig(layout::OrbCoreIntLayoutUnion{T, D}) where {T<:Real, D}
         IntStyle = getOrbCoreIntStyle(layout)
-        config = formatOrbCoreIntConfig(layout)
+        config = formatOrbLayoutType.(layout)
         new{T, D, IntStyle{D}, length(config)::Int}(config)
     end
 end
