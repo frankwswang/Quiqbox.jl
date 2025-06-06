@@ -237,8 +237,7 @@ NullCache{C}()
 function applyIntegralMethod(f::OrbCoreIntegratorConfig{T, D, C, S, F}, orbsData::L) where 
                             {T<:Real, D, C<:RealOrComplex{T}, S<:MultiBodyIntegral{D}, 
                              F<:DirectOperator, L<:OrbCoreIntLayoutUnion{T, D}}
-    cacheTypeBound = NothingOr{Union{ CustomCache{T}, CustomCache{C} }}
-    cache = getAnalyticIntegralCache(f.operator, orbsData)::cacheTypeBound
+    cache = getAnalyticIntegralCache(f.operator, orbsData)
     if cache === nothing
         getNumericalIntegral(f.operator, orbsData)
     else
