@@ -437,29 +437,43 @@ end
 
 
 #>-- Interface with the composite integration framework --<#
-getGaussBasedOneBodyIntegrator(::OverlapSampler) = evaluateOverlap
+getGaussBasedOneBodyIntegrator(::OneBodyIntegral, ::OverlapSampler) = evaluateOverlap
 
-getGaussBasedOneBodyIntegrator(op::MultipoleMomentSampler{T, D}) where {T<:Real, D} = 
+getGaussBasedOneBodyIntegrator(::OneBodyIntegral{D}, 
+                               op::MultipoleMomentSampler{T, D}) where {T<:Real, D} = 
 LPartial(evaluateMultipoleMoment, (op,))
 
-getGaussBasedOneBodyIntegrator(op::DiagDirectionalDiffSampler{T, D}) where {T<:Real, D} = 
+getGaussBasedOneBodyIntegrator(::OneBodyIntegral{D}, 
+                               op::DiagDirectionalDiffSampler{T, D}) where {T<:Real, D} = 
 LPartial(evaluateDiagDirectionalDiff, (op,))
 
-const AxialGaussOverlapCachedPGTOrbSampler{T<:Real, D} = Union{
+const AxialGaussOverlapCachedSampler{T<:Real, D} = Union{
     OverlapSampler, 
     MultipoleMomentSampler{T, D}, 
     DiagDirectionalDiffSampler{T, D}
 }
 
 #= Additional Method =#
-getAnalyticIntegralCache(::AxialGaussOverlapCachedPGTOrbSampler{T, D}, 
-                         ::OneBodyOrbIntLayout{PGTOrbData{T, D}}) where {T<:Real, D} = 
+genAnalyticIntegralCache(::TypeBox{F}, ::OneBodyOrbIntLayout{TypeBox{ <:PGTOrbData{T, D} }}
+                         ) where {T<:Real, D, F<:AxialGaussOverlapCachedSampler{T, D}} = 
 AxialGaussOverlapCache(FloatingPolyGaussField{T, D}, ntuple( _->Val(true), Val(D) ))
 
-function getAnalyticIntegral!(cache!Self::OptAxialGaussOverlapCache{T}, op::F, 
-                              data::OneBodyOrbIntLayout{PGTOrbData{T, D}}) where 
-                             {T<:Real, F<:DirectOperator, D}
-    fields = getfield.(data, :core)
-    integrator = getGaussBasedOneBodyIntegrator(op)
-    integrator(fields; cache!Self)
+function genAnalyticIntegrator!(::S, cache::AxialGaussOverlapCache{T, D}, op::F) where 
+                               {D, S<:MultiBodyIntegral{D}, T<:Real, F<:DirectOperator}
+    let integrator = getGaussBasedOneBodyIntegrator(S(), op), cache!Self=cache
+        function axialGaussIntegrate(data::OneBodyOrbIntLayout{PGTOrbData{T, D}})
+            fields = getfield.(data, :core)
+            integrator(fields; cache!Self)
+        end
+    end
+end
+
+function genAnalyticIntegrator!(::S, ::NullCache{T}, op::F) where 
+                               {D, S<:MultiBodyIntegral{D}, T<:Real, F<:DirectOperator}
+    let integrator = getGaussBasedOneBodyIntegrator(S(), op)
+        function axialGaussIntegrate(data::OneBodyOrbIntLayout{PGTOrbData{T, D}}) where {D}
+            fields = getfield.(data, :core)
+            integrator(fields)
+        end
+    end
 end

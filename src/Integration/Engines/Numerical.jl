@@ -120,20 +120,20 @@ function evalDoubleFieldProd(f::DoubleFieldProd{<:Real, D},
 end
 
 
-function genIntegrant(op::Multiplier, 
+function genIntegrant(::OneBodyIntegral{D}, op::Multiplier, 
                       layout::OneBodyOrbCoreIntLayoutUnion{T, D}) where {T<:Real, D}
     SesquiFieldProd(layout, op)
 end
 
-function genIntegrant(op::DualTermOperator, 
+function genIntegrant(::TwoBodyIntegral{D}, op::DualTermOperator, 
                       layout::TwoBodyOrbCoreIntLayoutUnion{T, D}) where {T<:Real, D}
     DoubleFieldProd(layout, op)
 end
 
 
-function genIntegralSectors(op::DirectOperator, 
+function genIntegralSectors(intStyle::MultiBodyIntegral{D}, op::DirectOperator, 
                             layout::OrbCoreIntLayoutUnion{T, D}) where {T<:Real, D}
-    tuple(genIntegrant(op, layout))
+    tuple(genIntegrant(intStyle, op, layout))
 end
 
 
@@ -142,9 +142,9 @@ function getIntegratorConfig(::Type{T}, ::ParticleFunction) where {T<:Real}
 end
 
 
-function getNumericalIntegral(op::DirectOperator, 
+function getNumericalIntegral(intStyle::MultiBodyIntegral{D}, op::DirectOperator, 
                               layout::OrbCoreIntLayoutUnion{T, D}) where {T<:Real, D}
-    sectors = genIntegralSectors(op, layout)
+    sectors = genIntegralSectors(intStyle, op, layout)
     res = one(T)
     for kernel in sectors
         config = getIntegratorConfig(getOrbOutputTypeUnion(layout), kernel)
