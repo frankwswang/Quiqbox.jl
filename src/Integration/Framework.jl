@@ -139,9 +139,8 @@ function getOrbOutputTypeUnion(layout::TwoBodyOrbCoreIntLayoutUnion{T}) where {T
 end
 
 formatOrbLayoutType(::Bar) = Bar()
-function formatOrbLayoutType(data::PrimOrbData{T, D}) where {T<:Real, D}
-    ifelse(data isa PGTOrbData{T, D}, PGTOrbData{T, D}, PrimOrbData{T, D}) |> TypeBox
-end
+formatOrbLayoutType(::PGTOrbData{T, D}) where {T<:Real, D} = TypeBox(PGTOrbData{T, D})
+formatOrbLayoutType(::PrimOrbData{T, D}) where {T<:Real, D} = TypeBox(PrimOrbData{T, D})
 
 struct OrbCoreIntConfig{T<:Real, D, S<:MultiBodyIntegral{D}, L} <: StructuredType
     layout::NTuple{L, Union{Bar, TypeBox{<:PrimOrbData{T, D}} }}
