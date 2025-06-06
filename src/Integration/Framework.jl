@@ -142,16 +142,17 @@ formatOrbLayoutType(::Bar) = Bar()
 formatOrbLayoutType(::PGTOrbData{T, D}) where {T<:Real, D} = TypeBox(PGTOrbData{T, D})
 formatOrbLayoutType(::PrimOrbData{T, D}) where {T<:Real, D} = TypeBox(PrimOrbData{T, D})
 
-getOrbCoreIntStyle(::OneBodyOrbCoreIntLayoutUnion) = OneBodyIntegral
-getOrbCoreIntStyle(::TwoBodyOrbCoreIntLayoutUnion) = TwoBodyIntegral
-
 struct OrbCoreIntConfig{T<:Real, D, S<:MultiBodyIntegral{D}, L} <: StructuredType
     layout::NTuple{L, Union{Bar, TypeBox{<:PrimOrbData{T, D}} }}
 
-    function OrbCoreIntConfig(layout::OrbCoreIntLayoutUnion{T, D}) where {T<:Real, D}
-        IntStyle = getOrbCoreIntStyle(layout)
-        layout = formatOrbLayoutType.(layout)
-        new{T, D, IntStyle{D}, length(layout)::Int}(layout)
+    function OrbCoreIntConfig(layout::OneBodyOrbCoreIntLayoutUnion{T, D}) where {T<:Real, D}
+        typeLayout = map(formatOrbLayoutType, layout)
+        new{T, D, OneBodyIntegral{D}, length(layout)::Int}(typeLayout)
+    end
+
+    function OrbCoreIntConfig(layout::TwoBodyOrbCoreIntLayoutUnion{T, D}) where {T<:Real, D}
+        typeLayout = map(formatOrbLayoutType, layout)
+        new{T, D, TwoBodyIntegral{D}, length(layout)::Int}(typeLayout)
     end
 end
 
