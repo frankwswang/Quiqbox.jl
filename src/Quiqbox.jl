@@ -13,6 +13,7 @@ include("ParallelUtils.jl")
 
 include("Query.jl")
 include("Collections.jl")
+include("Iteration.jl")
 include("Mapping.jl")
 include("Operators.jl")
 include("Parameters.jl")

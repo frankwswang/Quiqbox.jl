@@ -4,8 +4,8 @@ using Base: issingletontype
 struct OneToIndex <: StructuredInfo
     idx::Int
 
-    function OneToIndex(idx::Int)
-        checkPositivity(idx)
+    function OneToIndex(idx::Int, ::V=Val(true)) where {V<:BoolVal}
+        getValData(V) && checkPositivity(idx)
         new(idx)
     end
 
@@ -13,6 +13,21 @@ struct OneToIndex <: StructuredInfo
 end
 
 OneToIndex(idx::OneToIndex) = itself(idx)
+
++(idx::OneToIndex, i::Integer) = OneToIndex(idx.idx + i)
++(i::Integer, idx::OneToIndex) = OneToIndex(idx.idx + i)
+-(idx::OneToIndex, i::Integer) = OneToIndex(idx.idx - i)
+
+Int(idx::OneToIndex) = getfield(idx, :idx)
+
+
+function shiftIndex(arr::GeneralCollection, oneToIdx::Int)
+    linearIdxStart = (Int∘getLinearFirstIndex)(arr)
+    linearIdxStart + oneToIdx - 1
+end
+
+shiftIndex(arr::GeneralCollection, i::OneToIndex) = shiftIndex(arr, i.idx)
+
 
 struct UnitIndex <: StructuredInfo
     idx::OneToIndex
@@ -28,8 +43,9 @@ end
 GridIndex(idx::Int) = GridIndex(idx|>OneToIndex)
 
 
+const OneToInt = Union{Int, OneToIndex}
 const SpanIndex = Union{UnitIndex, GridIndex}
-const GeneralIndex = Union{Int, SpanIndex, OneToIndex, Base.CartesianIndex}
+const GeneralIndex = Union{OneToInt, SpanIndex, Base.CartesianIndex}
 const GeneralField = Union{GeneralIndex, Symbol, Nothing}
 
 struct ChainedAccess{L, C<:NTuple{L, GeneralField}} <: Getter
@@ -69,7 +85,7 @@ getField(obj, entry::Int) = getindex(obj, entry)
 
 getField(obj, i::Base.CartesianIndex) = getindex(obj, i)
 
-getField(obj, i::OneToIndex) = getindex(obj, firstindex(obj)::Int + i.idx - 1)
+getField(obj::GeneralCollection, i::OneToIndex) = getindex(obj, shiftIndex(obj, i))
 
 getField(obj, i::UnitIndex) = getField(obj.unit, i.idx)
 
@@ -173,6 +189,8 @@ hash(bb::EgalBox, hashCode::UInt) = hash(objectid(bb.value), hashCode)
 
 struct TypeBox{T} <: QueryBox{Type{T}}
     value::Type{T}
+
+    TypeBox(::Type{T}) where {T} = new{T::Type}()
 end
 
 TypeBox(::Type{Union{}}) = 
