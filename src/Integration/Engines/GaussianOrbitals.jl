@@ -459,20 +459,22 @@ genAnalyticIntegralCache(::TypeBox{F}, ::OneBodyOrbIntLayout{TypeBox{ <:PGTOrbDa
 AxialGaussOverlapCache(FloatingPolyGaussField{T, D}, ntuple( _->Val(true), Val(D) ))
 
 function genAnalyticIntegrator!(::S, cache::AxialGaussOverlapCache{T, D}, op::F) where 
-                               {D, S<:MultiBodyIntegral{D}, T<:Real, F<:DirectOperator}
+                               {D, N, S<:MultiBodyIntegral{N, D}, T<:Real, 
+                                F<:DirectOperator}
     let integrator = getGaussBasedOneBodyIntegrator(S(), op), cache!Self=cache
         function axialGaussIntegrate(data::OneBodyOrbIntLayout{PGTOrbData{T, D}})
-            fields = getfield.(data, :core)
+            fields = getfield.(unpackPairwiseLayout(data), :core)
             integrator(fields; cache!Self)
         end
     end
 end
 
-function genAnalyticIntegrator!(::S, ::NullCache{T}, op::F) where 
-                               {D, S<:MultiBodyIntegral{D}, T<:Real, F<:DirectOperator}
+function genAnalyticIntegrator!(::S, ::NullCache{C}, op::F) where 
+                               {D, N, S<:MultiBodyIntegral{N, D}, T<:Real, 
+                                C<:RealOrComplex{T}, F<:DirectOperator}
     let integrator = getGaussBasedOneBodyIntegrator(S(), op)
         function axialGaussIntegrate(data::OneBodyOrbIntLayout{PGTOrbData{T, D}}) where {D}
-            fields = getfield.(data, :core)
+            fields = getfield.(unpackPairwiseLayout(data), :core)
             integrator(fields)
         end
     end

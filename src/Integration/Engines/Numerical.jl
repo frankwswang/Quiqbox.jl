@@ -14,9 +14,11 @@ struct SesquiFieldProd{T<:Real, D, O<:Multiplier,
     end
 end
 
-SesquiFieldProd(data::N12Tuple{PrimOrbData{T, D}}, dresser::O=genOverlapSampler()
-                ) where {T<:Real, D, O<:Multiplier} = 
-SesquiFieldProd(getfield.(data, :core), dresser)
+function SesquiFieldProd(layout::OneBodyOrbCoreIntLayoutUnion, 
+                         dresser::Multiplier=genOverlapSampler())
+    fields = unpackPairwiseLayout(layout)
+    SesquiFieldProd(getfield.(fields, :core), dresser)
+end
 
 getOutputType(::Type{<:SesquiFieldProd{T, D, <:StableTypedSampler}}) where {T<:Real, D} = 
 T
@@ -47,51 +49,16 @@ end
 
 
 struct DoubleFieldProd{T<:Real, D, O<:DualTermOperator, 
-                       F<:N12Tuple{SesquiFieldProd{<:RealOrComplex{T}, D}}
-                       } <: ParticleFunction{D, 2}
-    layout::F
+                       L<:SesquiFieldProd{<:RealOrComplex{T}, D}, 
+                       R<:SesquiFieldProd{<:RealOrComplex{T}, D}} <: ParticleFunction{D, 2}
+    layout::Tuple{L, R}
     coupler::O
 end
 
-function DoubleFieldProd(layout::OrbBarLayout1{PrimOrbData{T, D}}, 
-                         coupler::DualTermOperator) where {T<:Real, D}
-    sfProd = SesquiFieldProd(layout)
-    DoubleFieldProd((sfProd,), coupler)
-end
-
-function DoubleFieldProd(layout::OrbBarLayout2{PrimOrbData{T, D}}, 
-                         coupler::DualTermOperator) where {T<:Real, D}
-    sfProdL = SesquiFieldProd((first(layout),))
-    sfProdR = SesquiFieldProd((last(layout),))
-    DoubleFieldProd((sfProdL, sfProdR), coupler)
-end
-
-function DoubleFieldProd(layout::OrbBarLayout3{PrimOrbData{T, D}}, 
-                         coupler::DualTermOperator) where {T<:Real, D}
-    pair..., _ = layout
-    sfProd = SesquiFieldProd(pair)
-    DoubleFieldProd((sfProd,), coupler)
-end
-
-function DoubleFieldProd(layout::OrbBarLayout4{PrimOrbData{T, D}}, 
-                         coupler::DualTermOperator) where {T<:Real, D}
-    sfProdL = SesquiFieldProd((first(layout),))
-    sfProdR = SesquiFieldProd((layout[end-1], layout[end]))
-    DoubleFieldProd((sfProdL, sfProdR), coupler)
-end
-
-function DoubleFieldProd(layout::OrbBarLayout5{PrimOrbData{T, D}}, 
-                         coupler::DualTermOperator) where {T<:Real, D}
-    sfProdL = SesquiFieldProd((layout[begin], layout[begin+1]))
-    sfProdR = SesquiFieldProd((last(layout),))
-    DoubleFieldProd((sfProdL, sfProdR), coupler)
-end
-
-function DoubleFieldProd(layout::OrbBarLayout6{PrimOrbData{T, D}}, 
-                         coupler::DualTermOperator) where {T<:Real, D}
-    a, b, c, d = layout
-    sfProdL = SesquiFieldProd((a, b))
-    sfProdR = SesquiFieldProd((c, d))
+function DoubleFieldProd((pairL, pairR)::TwoBodyOrbCoreIntLayoutUnion, 
+                         coupler::DualTermOperator)
+    sfProdL = SesquiFieldProd(pairL)
+    sfProdR = SesquiFieldProd(pairR)
     DoubleFieldProd((sfProdL, sfProdR), coupler)
 end
 
@@ -120,20 +87,20 @@ function evalDoubleFieldProd(f::DoubleFieldProd{<:Real, D},
 end
 
 
-function genIntegrant(::OneBodyIntegral{D}, op::Multiplier, 
+function genIntegrant(op::Multiplier, 
                       layout::OneBodyOrbCoreIntLayoutUnion{T, D}) where {T<:Real, D}
     SesquiFieldProd(layout, op)
 end
 
-function genIntegrant(::TwoBodyIntegral{D}, op::DualTermOperator, 
+function genIntegrant(op::DualTermOperator, 
                       layout::TwoBodyOrbCoreIntLayoutUnion{T, D}) where {T<:Real, D}
     DoubleFieldProd(layout, op)
 end
 
 
-function genIntegralSectors(intStyle::MultiBodyIntegral{D}, op::DirectOperator, 
-                            layout::OrbCoreIntLayoutUnion{T, D}) where {T<:Real, D}
-    tuple(genIntegrant(intStyle, op, layout))
+function genIntegralSectors(op::DirectOperator, layout::OrbCoreIntLayoutUnion{T, D}) where 
+                           {T<:Real, D}
+    tuple(genIntegrant(op, layout))
 end
 
 
@@ -142,15 +109,16 @@ function getIntegratorConfig(::Type{T}, ::ParticleFunction) where {T<:Real}
 end
 
 
-function getNumericalIntegral(intStyle::MultiBodyIntegral{D}, op::DirectOperator, 
-                              layout::OrbCoreIntLayoutUnion{T, D}) where {T<:Real, D}
-    sectors = genIntegralSectors(intStyle, op, layout)
-    res = one(T)
+function getNumericalIntegral(::Type{C}, op::DirectOperator, 
+                              layout::OrbCoreIntLayoutUnion{T, D}) where 
+                             {T<:Real, C<:RealOrComplex{T}, D}
+    sectors = genIntegralSectors(op, layout)
+    res = one(C)
     for kernel in sectors
-        config = getIntegratorConfig(getOrbOutputTypeUnion(layout), kernel)
+        config = getIntegratorConfig(T, kernel)
         res *= numericalIntegrateCore(config, kernel)
     end
-    res::RealOrComplex{T}
+    convert(C, res)
 end
 
 

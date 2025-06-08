@@ -38,11 +38,9 @@ formatInput(f::Function, x) = formatInput(SelectTrait{InputStyle}()(f), x)
 
 abstract type IntegralStyle <: AnyInterface end
 
-abstract type MultiBodyIntegral{D} <: IntegralStyle end
-
-struct OneBodyIntegral{D} <: MultiBodyIntegral{D} end
-
-struct TwoBodyIntegral{D} <: MultiBodyIntegral{D} end
+struct MultiBodyIntegral{N, D} <: IntegralStyle end
+const OneBodyIntegral{D} = MultiBodyIntegral{1, D}
+const TwoBodyIntegral{D} = MultiBodyIntegral{2, D}
 
 
 strictTypeJoin(TL::Type, TR::Type) = typejoin(TL, TR)
@@ -67,3 +65,15 @@ getOutputType(::Type{Base.Splat{F}}) where {F<:Function} = getOutputType(F)
 
 getOutputType(::Type{Union{}}) = 
 throw(AssertionError("`Union{}` is not a valid input argument."))
+
+
+const True  = Val(true )
+
+const False = Val(false)
+
+const BoolVal = Union{Val{true}, Val{false}}
+
+
+getValData(::Val{T}) where {T} = T
+
+getValData(::Type{Val{T}}) where {T} = T

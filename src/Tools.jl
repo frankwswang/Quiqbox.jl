@@ -741,9 +741,6 @@ extractRealNumberType(::Type{T}) where {T<:Real} = T
 extractRealNumberType(::Type{Complex{T}}) where {T<:Real} = T
 
 
-getValData(::Val{T}) where {T} = T
-
-
 function genParametricType(base::UnionAll, typeVars::Tuple)
     type = base{typeVars...}
     for var in reverse(typeVars)
