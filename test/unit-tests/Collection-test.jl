@@ -1,43 +1,127 @@
 using Test
 using Quiqbox
-using Quiqbox: PackedMemory, indexedPerturb, OneToIndex, setIndex, rightCircShift, 
-               MemoryLinker
+using Quiqbox: PackedMemory, indexedPerturb, OneToIndex, setIndex, MemoryLinker, 
+               getNestedLevel
 
-@testset "Collection.jl" begin
+@testset "Collections.jl" begin
 
 vecMem1 = VectorMemory(rand(3))
+@test eltype(vecMem1) == Float64
+@test ndims(vecMem1) == 1
+@test firstindex(vecMem1) == firstindex(vecMem1, 1) == 1
+@test lastindex(vecMem1) == lastindex(vecMem1, 1) == length(vecMem1)
+@test size(vecMem1) == (length(vecMem1),) == size(vecMem1|>LinearIndices) == (3,)
+@test axes(vecMem1) == (eachindex(vecMem1),) == (Base.OneTo(3),)
+@test iterate(vecMem1) == (first(vecMem1), 2)
+for (ele, m, n) in zip(vecMem1, LinearIndices(vecMem1), eachindex(vecMem1))
+    @test m==n && vecMem1[m] == ele
+end
 @test zero(vecMem1) == zeros(3)
 
-shpMem1 = ShapedMemory(rand(3, 3))
-@test zero(shpMem1) == zeros(3, 3)
 
-pckMem1 = PackedMemory(rand(3, 3))
-@test zero(shpMem1) == zeros(3, 3)
-@test PackedMemory(shpMem1|>zero) == zeros(3, 3)
+shpMem1 = ShapedMemory(rand(2, 3, 1))
+@test eltype(shpMem1) == Float64
+@test ndims(shpMem1) == 3
+foreach(((), 1, 2, 3)) do i
+    @test firstindex(shpMem1, i...) == 1
+end
+foreach(((), 1, 2, 3), (length(shpMem1), 2, 3, 1)) do i, j
+    @test lastindex(shpMem1, i...) == j
+end
+@test size(shpMem1) == size(shpMem1|>LinearIndices) == (2, 3, 1)
+@test axes(shpMem1) == (Base.OneTo(2), Base.OneTo(3), Base.OneTo(1))
+@test eachindex(shpMem1) == Base.OneTo(6)
+@test iterate(shpMem1) == (first(shpMem1), 2)
+for (ele, m, n) in zip(shpMem1, LinearIndices(shpMem1), eachindex(shpMem1))
+    @test m==n && shpMem1[m] == ele
+end
+@test zero(shpMem1) == zeros(2, 3, 1)
+shpMem2 = ShapedMemory([1 2])
+shpMem3 = similar(shpMem2, (2,))
+shpMem4 = similar(shpMem2, Float64, (2,))
+@test size(shpMem3) == size(shpMem4) == (2,)
+@test shpMem3 isa ShapedMemory{Int, 1}
+@test shpMem4 isa ShapedMemory{Float64, 1}
+shpMem3 .= 1
+shpMem4 .= [-1.0, 2.0]
+shpMem5 = shpMem3 + shpMem4
+shpMem6 = shpMem3 - shpMem4
+@test shpMem5 == [0.0, 3.0]
+@test shpMem6 == [2.0,-1.0]
+@test typeof(shpMem5) == typeof(shpMem6) == ShapedMemory{Float64, 1}
+
+pckMem1 = PackedMemory(shpMem1)
+@test getNestedLevel(pckMem1|>typeof).level == 1
+@test pckMem1 == shpMem1
+@test pckMem1 !== shpMem1
+pckMem2 = PackedMemory(pckMem1)
+@test getNestedLevel(pckMem2|>typeof).level == 1
+@test pckMem2 == pckMem1
+@test pckMem2 !== pckMem1
+mat1 = rand(3, 2)
+pckMem3 = PackedMemory(reshape( [pckMem1, mat1], (1, 2) ))
+@test getNestedLevel(pckMem3|>typeof).level == 2
+@test pckMem3[begin] === pckMem1  #> Only preserve `PackedMemory`
+@test pckMem3[end] == mat1
+@test pckMem3[end] !== mat1
+pckMem4 = PackedMemory([mat1, mat1])
+@test all(pckMem4 .== Ref(mat1))
+@test !any(pckMem4 .=== Ref(mat1))
+@test try PackedMemory([mat1, pckMem3]) catch; true end
+
+@test eltype(pckMem1) == eltype(pckMem2) == Float64
+@test typeof(pckMem1) <: eltype(pckMem3)
+@test pckMem4 isa PackedMemory{Float64, PackedMemory{Float64, Float64, 2}, 1}
+@test ndims(pckMem3) == 2
+foreach(((), 1, 2)) do i
+    @test firstindex(pckMem3, i...) == 1
+end
+foreach(((), 1, 2), (length(pckMem3), 1, 2)) do i, j
+    @test lastindex(pckMem3, i...) == j
+end
+@test size(pckMem3) == size(pckMem3|>LinearIndices) == (1, 2)
+@test axes(pckMem3) == (Base.OneTo(1), Base.OneTo(2))
+@test eachindex(pckMem3) == Base.OneTo(2)
+@test iterate(pckMem3) == (first(pckMem3), 2)
+for (ele, m, n) in zip(pckMem3, LinearIndices(pckMem3), eachindex(pckMem3))
+    @test m==n && pckMem3[m] == ele
+end
+@test zero(pckMem1) == zero(shpMem1)
+@test zero(pckMem3) == PackedMemory(pckMem3.value .|> zero)
+
 
 tpl1 = (1.1, 3, 4)
 indexedPerturb(+, tpl1, OneToIndex(2)=>0.3) == (1.1, 3.3, 4)
 arr1 = [1.1, 3, 4]
 indexedPerturb(÷, arr1, OneToIndex(3)=>2) == [1.1, 3, 2]
 
+
 tpl2 = (3, 2, 1.1)
 @test setIndex(tpl2, 1, 3) == (3, 2, 1)
 tpl3 = setIndex(tpl2, -0.1, 3, +)
 @test (3, 2, 1.0) === tpl3 !== (3, 2, 1)
 
-tpl4 = Tuple(1:4)
-@test rightCircShift(tpl4) == (4, 1, 2, 3)
-@test (rightCircShift∘rightCircShift)(tpl4) == (3, 4, 1, 2)
 
-mat1 = rand(3,4)
+mat2 = rand(3,4)
 ids1 = Memory{Int}([9, 6, 12, 2, 11, 10, 3, 5, 1, 4])
 ids1_o = map(OneToIndex, ids1)
-mat1_ml = MemoryLinker(mat1, ids1_o)
-mat1_sub = mat1[ids1]
-@test mat1_ml == mat1_sub
-mat1_ml .+= 1
-@test mat1_ml == (mat1_sub .+ 1)
+mat2_ml = MemoryLinker(mat2, ids1_o)
+mat2_sub = mat2[ids1]
+@test mat2_ml == mat2_sub
+mat2_ml .+= 1
+@test mat2_ml == (mat2_sub .+ 1)
 ids1_o[1] = OneToIndex(1)
-@test mat1_ml[1] == first(mat1) != mat1[begin+ids1[1]-1]
+@test mat2_ml[1] == first(mat2) != mat2[begin+ids1[1]-1]
+
+@test eltype(mat2_ml) == Float64
+@test ndims(mat2_ml) == 1
+@test firstindex(mat2_ml) == firstindex(mat2_ml, 1) == 1
+@test lastindex(mat2_ml) == lastindex(mat2_ml, 1) == length(mat2_ml)
+@test size(mat2_ml) == (length(mat2_ml),) == size(mat2_ml|>LinearIndices) == (length(ids1),)
+@test axes(mat2_ml) == (eachindex(mat2_ml),) == (Base.OneTo(10),)
+@test iterate(mat2_ml) == (first(mat2_ml), 2)
+for (ele, m, n) in zip(mat2_ml, LinearIndices(mat2_ml), eachindex(mat2_ml))
+    @test m==n && mat2_ml[m] == ele
+end
 
 end

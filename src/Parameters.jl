@@ -1272,7 +1272,7 @@ getSpanDataSectorKey(cache::MultiSpanDataCacheBox{T1}, param::NestParam{T2}) whe
 formatSpanData(::Type{T}, val) where {T} = convert(T, val)
 
 function formatSpanData(::Type{T}, val::AbstractArray) where {T}
-    res = getPackedMemory(val)
+    res = extractPackedMemory(val)
     res::getPackType(T, getNestedLevel(res|>typeof).level)
 end
 
