@@ -134,13 +134,12 @@ const TwoBodyOrbCoreIntLayoutUnion{T<:Real, D} = TwoBodyOrbIntLayout{PrimOrbData
 const OrbCoreIntLayoutUnion{T<:Real, D} = 
       Union{OneBodyOrbCoreIntLayoutUnion{T, D}, OneBodyOrbCoreIntLayoutUnion{T, D}}
 
-const OneBodyOrbCoreIntTypeLayout{T<:Real, D} = 
-      OneBodyOrbIntLayout{TypeBox{ <:PrimOrbData{T, D} }}
-const TwoBodyOrbCoreIntTypeLayout{T<:Real, D} = 
-      TwoBodyOrbIntLayout{TypeBox{ <:PrimOrbData{T, D} }}
-const OrbCoreIntTypeLayout{T<:Real, D} = 
-      Union{OneBodyOrbCoreIntTypeLayout{T, D}, TwoBodyOrbCoreIntTypeLayout{T, D}}
+const OneBodyOrbCoreIntTypeLayout{O<:PrimOrbData} = OneBodyOrbIntLayout{TypeBox{<:O}}
+const TwoBodyOrbCoreIntTypeLayout{O<:PrimOrbData} = TwoBodyOrbIntLayout{TypeBox{<:O}}
+const OrbCoreIntTypeLayout{O<:PrimOrbData} = Union{OneBodyOrbCoreIntTypeLayout{O}, 
+                                                   TwoBodyOrbCoreIntTypeLayout{O}}
 
+const OneBodyGTOrbIntLayout{T<:Real, D} = OneBodyOrbCoreIntTypeLayout{PGTOrbData{T, D}}
 
 formatOrbLayoutType(::Count{N}) where {N} = Count{N}()
 formatOrbLayoutType(::PGTOrbData{T, D}) where {T<:Real, D} = TypeBox(PGTOrbData{T, D})
@@ -243,11 +242,7 @@ getHermiticity(::OverlapSampler, ::OrbCoreIntTypeLayout) = true
 
 getHermiticity(::MultipoleMomentSampler, ::OrbCoreIntTypeLayout) = true
 
-function getHermiticity(::DiagDirectionalDiffSampler, 
-               ::OneBodyOrbCoreIntTypeLayout{PGTOrbData{T, D}}) where {T<:Real, D}
-    @show 1
-    true
-end
+getHermiticity(::DiagDirectionalDiffSampler, ::OneBodyGTOrbIntLayout) = true
 
 
 function genCoreIntTuple(integrator::CachedOrbCoreIntegrator{T, D, C, 1}, 
