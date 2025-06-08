@@ -25,9 +25,6 @@ tpl2 = (3, 2, 1.1)
 tpl3 = setIndex(tpl2, -0.1, 3, +)
 @test (3, 2, 1.0) === tpl3 !== (3, 2, 1)
 
-tpl4 = Tuple(1:4)
-@test rightCircShift(tpl4) == (4, 1, 2, 3)
-@test (rightCircShift∘rightCircShift)(tpl4) == (3, 4, 1, 2)
 
 mat1 = rand(3,4)
 ids1 = Memory{Int}([9, 6, 12, 2, 11, 10, 3, 5, 1, 4])

@@ -17,6 +17,12 @@ function sortTensorIndex((i, j, k, l)::NTuple{4, Int})
 end
 
 
+function rightCircShift(tpl::NonEmptyTuple)
+    body..., tail = tpl
+    (tail, body...)
+end
+
+
 function getLinearFirstIndex(arr::AbstractArray)
     LinearIndices(arr) |> first
 end
