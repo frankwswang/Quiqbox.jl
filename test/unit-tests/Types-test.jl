@@ -51,4 +51,6 @@ using Quiqbox
 
 @test Quiqbox.ParamMapper <: Quiqbox.ChainMapper
 
+@test Quiqbox.OneBodyIntegralPGTOLayout <: Quiqbox.CoreIntegralOrbTypeLayout
+
 end

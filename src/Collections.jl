@@ -163,6 +163,8 @@ getindex(arr::VectorMemory, i::Int) = getindex(arr.value, i)
 
 setindex!(arr::VectorMemory, val, i::Int) = setindex!(arr.value, val, i)
 
+setindex!(arr::VectorMemory{T, 1}, val) where {T} = setindex!(arr.value, val)
+
 iterate(arr::VectorMemory) = iterate(arr.value)
 iterate(arr::VectorMemory, state) = iterate(arr.value, state)
 
@@ -201,7 +203,8 @@ ShapedMemory(::Type{T}, value::T) where {T} = ShapedMemory( fill(value) )
 
 
 size(arr::ShapedMemory) = arr.shape
-
+#!! Should only implement `IndexStyle` and test `firstindex`, `lastindex`
+#!! `IndexStyle` should be `IndexLinear` for potential performance improvement
 firstindex(arr::ShapedMemory) = firstindex(arr.value)
 
 lastindex(arr::ShapedMemory) = lastindex(arr.value)
@@ -349,7 +352,7 @@ end
 getMinimalEleType(collection::Tuple) = 
 mapreduce(typeof, strictTypeJoin, collection, init=Union{})
 
-
+#! Change `.tuple` to another name
 struct WeakComp{N} # Weak composition of an integer
     tuple::NTuple{N, Int}
     total::Int
@@ -457,3 +460,26 @@ function rightCircShift(tpl::NonEmptyTuple)
     body..., tail = tpl
     (tail, body...)
 end
+
+
+const PairAA{O} = Tuple{One, O}
+const PairAB{O} = Tuple{O,   O}
+const PairXY{O} = Union{PairAA{O}, PairAB{O}}
+
+const MonoPairAA{O} = Tuple{PairAA{O}}
+const MonoPairAB{O} = Tuple{PairAB{O}}
+
+formatPairwiseLayout(::One, obj)::MonoPairAA{Any} = ((One(), obj),)
+formatPairwiseLayout(::One, objL, objR)::MonoPairAB{Any} = ((objL, objR),)
+
+unpackPairwiseLayout((innerPair,)::MonoPairAA{Any}) = tuple(innerPair |> last)
+unpackPairwiseLayout((innerPair,)::MonoPairAB{Any}) = innerPair
+
+const DualPairAABB{O} = Tuple{PairAA{O}, PairAA{O}} #> Including AAAA
+const DualPairABCC{O} = Tuple{PairAB{O}, PairAA{O}}
+const DualPairAABC{O} = Tuple{PairAA{O}, PairAB{O}}
+const DualPairABCD{O} = Tuple{PairAB{O}, PairAB{O}} #> Including ABAB
+
+const MonoPair{O} = Union{MonoPairAA{O}, MonoPairAB{O}}
+const DualPair{O} = Union{DualPairAABB{O}, DualPairABCC{O}, 
+                          DualPairAABC{O}, DualPairABCD{O}}

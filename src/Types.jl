@@ -77,22 +77,21 @@ const RealOrComplex{T<:Real} = Union{Complex{T}, T}
 const MissingOr{T} = Union{Missing, T}
 const NothingOr{T} = Union{Nothing, T}
 
-const BoolVal = Union{Val{true}, Val{false}}
-
 const FunctionChainUnion{F<:Function} = Union{
     AbstractMemory{<:F}, GeneralTupleUnion{NonEmptyTuple{F}}
 }
 
 
 const RefVal = Base.RefValue
-const TypedIdxerMemory{T} = Memory{Pair{Int, T}}
 
 const ArithmeticOperator = Union{typeof(+), typeof(-), typeof(*), typeof(/)}
 
 
 import Base: size, firstindex, lastindex, getindex, setindex!, iterate, length, similar, 
-             zero
+             zero, checkindex
 
 import Base: isempty, collect, get, keys, values, ==, hash
 
 import Base: +, -
+
+import Base: Int
