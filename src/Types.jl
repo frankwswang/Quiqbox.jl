@@ -87,11 +87,10 @@ const RefVal = Base.RefValue
 const ArithmeticOperator = Union{typeof(+), typeof(-), typeof(*), typeof(/)}
 
 
-import Base: size, firstindex, lastindex, getindex, setindex!, iterate, length, similar, 
-             zero, checkindex
+import Base: iterate, size, getindex, setindex!, IndexStyle, zero, similar
 
-import Base: isempty, collect, get, keys, values, ==, hash
+import Base: get, keys, values, hash, isempty, collect, length
 
-import Base: +, -
+import Base: +, -, ==
 
 import Base: Int

@@ -11,8 +11,8 @@ end
 
 getNestedLevelCore(::Type{T}, level::Int) where {T} = (T, level)
 
-function getNestedLevelCore(::Type{<:AbstractArray{T}}, level::Int) where {T}
-    getNestedLevelCore(T, level+1)
+function getNestedLevelCore(::Type{T}, level::Int) where {T<:AbstractArray}
+    getNestedLevelCore(eltype(T), level+1)
 end
 
 getNestedLevel(::Type{T}) where {T} = NestedLevel(getNestedLevelCore(T, 0)...)
@@ -112,16 +112,7 @@ struct MemoryLinker{T, A<:AbstractArray{T}} <: AbstractArray{T, 1}
         new{T, A}(value, extractMemory(scope))
     end
 end
-
-size(arr::MemoryLinker) = size(arr.scope)
-
-getindex(arr::MemoryLinker, i::Int) = getField(arr.value, getindex(arr.scope, i))
-
-function setindex!(arr::MemoryLinker, val, i::Int)
-    idxInner = firstindex(arr.value) + getindex(arr.scope, i).idx - 1
-    setindex!(arr.value, val, idxInner)
-end
-
+#> Iteration interface
 iterate(arr::MemoryLinker) = iterate(arr, firstindex(arr.scope))
 function iterate(arr::MemoryLinker, state)
     res = iterate(arr.scope, state)
@@ -132,8 +123,14 @@ function iterate(arr::MemoryLinker, state)
         getField(arr.value, indexer), state
     end
 end
-
-length(arr::MemoryLinker) = length(arr.scope)
+#> Abstract-array (and indexing) interface
+size(arr::MemoryLinker) = size(arr.scope)
+getindex(arr::MemoryLinker, i::Int) = getField(arr.value, getindex(arr.scope, i))
+function setindex!(arr::MemoryLinker, val, i::Int)
+    idxInner = firstindex(arr.value) + getindex(arr.scope, i).idx - 1
+    setindex!(arr.value, val, idxInner)
+end
+IndexStyle(::MemoryLinker) = IndexLinear()
 
 
 struct VectorMemory{T, L} <: CustomMemory{T, 1}
@@ -142,34 +139,29 @@ struct VectorMemory{T, L} <: CustomMemory{T, 1}
 
     function VectorMemory(value::Memory{T}, ::Val{L}) where {T, L}
         checkLength(value, :value, L)
-        new{T, L}(value, Val(L))
+        new{T, L::Int}(value, Val(L))
     end
 
     function VectorMemory{T}(::UndefInitializer, ::Val{L}) where {T, L}
-        new{T, L}(Memory{T}(undef, L), Val(L))
+        new{T, L::Int}(Memory{T}(undef, L), Val(L))
     end
 
     function VectorMemory(arr::VectorMemory{T, L}) where {T, L}
-        new{T, L}(arr.value, arr.shape)
+        new{T, L::Int}(arr.value, arr.shape)
     end
 end
 
 VectorMemory(input::GeneralCollection) = 
 VectorMemory(extractMemory(input), Val(input|>length))
-
-size(::VectorMemory{<:Any, L}) where {L} = (L,)
-
-getindex(arr::VectorMemory, i::Int) = getindex(arr.value, i)
-
-setindex!(arr::VectorMemory, val, i::Int) = setindex!(arr.value, val, i)
-
-setindex!(arr::VectorMemory{T, 1}, val) where {T} = setindex!(arr.value, val)
-
+#> Iteration interface
 iterate(arr::VectorMemory) = iterate(arr.value)
 iterate(arr::VectorMemory, state) = iterate(arr.value, state)
-
-length(::VectorMemory{<:Any, L}) where {L} = L
-
+#> Abstract-array (and indexing) interface
+size(::VectorMemory{<:Any, L}) where {L} = (L,)
+getindex(arr::VectorMemory, i::Int) = getindex(arr.value, i)
+setindex!(arr::VectorMemory, val, i::Int) = setindex!(arr.value, val, i)
+IndexStyle(::VectorMemory) = IndexLinear()
+#> Optional interface (better performance than the default implementation)
 zero(arr::VectorMemory{T, L}) where {T, L} = VectorMemory(zero(arr.value), Val(L))
 
 const LinearMemory{T} = Union{Memory{T}, VectorMemory{T}}
@@ -200,44 +192,24 @@ ShapedMemory(extractMemory(value), shape)
 ShapedMemory(::Type{T}, value::AbstractArray{T}) where {T} = ShapedMemory(value)
 
 ShapedMemory(::Type{T}, value::T) where {T} = ShapedMemory( fill(value) )
-
-
-size(arr::ShapedMemory) = arr.shape
-#!! Should only implement `IndexStyle` and test `firstindex`, `lastindex`
-#!! `IndexStyle` should be `IndexLinear` for potential performance improvement
-firstindex(arr::ShapedMemory) = firstindex(arr.value)
-
-lastindex(arr::ShapedMemory) = lastindex(arr.value)
-
-getindex(arr::ShapedMemory, i::Int) = getindex(arr.value, i)
-getindex(arr::ShapedMemory{<:Any, N}, i::Vararg{Int, N}) where {N} = 
-getindex(reshape(arr.value, arr.shape), i...)
-
-setindex!(arr::ShapedMemory, val, i::Int) = setindex!(arr.value, val, i)
-setindex!(arr::ShapedMemory{<:Any, N}, val, i::Vararg{Int, N}) where {N} = 
-setindex!(reshape(arr.value, arr.shape), val, i...)
-
+#> Iteration interface
 iterate(arr::ShapedMemory) = iterate(arr.value)
 iterate(arr::ShapedMemory, state) = iterate(arr.value, state)
-
-length(arr::ShapedMemory) = length(arr.value)
-
-axes(arr::ShapedMemory)	= map(Base.OneTo, size(arr))
-
+#> Abstract-array (and indexing) interface
+size(arr::ShapedMemory) = arr.shape
+getindex(arr::ShapedMemory, i::Int) = getindex(arr.value, i)
+setindex!(arr::ShapedMemory, val, i::Int) = setindex!(arr.value, val, i)
+IndexStyle(::ShapedMemory) = IndexLinear()
+#> Optional interface
 function similar(arr::ShapedMemory, ::Type{T}=eltype(arr), 
                  shape::Tuple{Vararg{Int}}=size(arr)) where {T}
     ShapedMemory(similar(arr.value, T, prod(shape)), shape)
 end
 
-similar(arr::ShapedMemory{T}, shape::Tuple{Vararg{Int}}) where {T} = 
-similar(arr, T, shape)
-
-zero(arr::ShapedMemory{T, N}) where {T, N} = ShapedMemory(zero(arr.value), arr.shape)
-
 
 function binaryApply(op::F, arr1::ShapedMemory{T1}, arr2::ShapedMemory{T2}) where 
-                 {F<:Function, T1, T2}
-    if arr1.shape != arr2.shape
+                    {F<:Function, T1, T2}
+    if size(arr1) != size(arr2)
         throw(DimensionMismatch("`arr1` has size $(arr1.shape); "*
                                 "`arr2` has size $(arr2.shape)."))
     end
@@ -247,9 +219,6 @@ end
 
 +(arr1::ShapedMemory, arr2::ShapedMemory) = binaryApply(+, arr1, arr2)
 -(arr1::ShapedMemory, arr2::ShapedMemory) = binaryApply(-, arr1, arr2)
-
-viewElements(obj::ShapedMemory) = reshape(obj.value, obj.shape)
-viewElements(obj::AbstractArray) = itself(obj)
 
 
 abstract type AbstractPackedMemory{T, E, N} <: CustomMemory{E, N} end
@@ -261,43 +230,46 @@ struct PackedMemory{T, E<:AbstractPack{T}, N} <: AbstractPackedMemory{T, E, N}
     level::NestedLevel{T}
 
     function PackedMemory(arr::AbstractArray{E, N}) where {E, N}
-        level = getNestedLevel(arr|>typeof)
-        value = map(arr) do ele
-            getPackedMemory(ele)
+        formattedValue = map(arr) do ele
+            extractPackedMemory(ele)
         end |> ShapedMemory
-        new{getCoreType(level), eltype(value), N}(value, level)
+        nucType, eleType, shellLevel = checkPackedMemoryElement(formattedValue)
+        new{nucType, eleType, N}(formattedValue, shellLevel)
     end
 end
 
-getPackedMemory(obj::Any) = itself(obj)
+function checkPackedMemoryElement(::T) where {T<:ShapedMemory}
+    shellLevel = getNestedLevel(T)
+    nucType = getCoreType(shellLevel)
+    eleType = eltype(T)
+    isAllowedEle = if shellLevel.level == 1
+        TypeBox(nucType) == TypeBox(eleType)
+    else
+        eleType <: PackedMemory{nucType}
+    end
+    isAllowedEle || throw(AssertionError("Illegal type-parameter combination (T, E): "*
+                                         "($nucType, $eleType)."))
+    nucType, eleType, shellLevel
+end
+#> Only preserve `PackedMemory` and non-`AbstractArray` objects
+extractPackedMemory(obj::Any) = itself(obj)
 
-getPackedMemory(arr::PackedMemory) = itself(arr)
+extractPackedMemory(arr::PackedMemory) = itself(arr)
 
-getPackedMemory(arr::AbstractArray) = PackedMemory(arr)
+extractPackedMemory(arr::AbstractArray) = PackedMemory(arr)
 
 const DirectMemory{T, N} = PackedMemory{T, T, N}
 const NestedMemory{T, E<:PackedMemory{T}, N} = PackedMemory{T, E, N}
-
-size(arr::PackedMemory) = size(arr.value)
-
-firstindex(arr::PackedMemory) = firstindex(arr.value)
-
-lastindex(arr::PackedMemory) = lastindex(arr.value)
-
-getindex(arr::PackedMemory, i::Vararg{Int}) = getindex(arr.value, i...)
-
-setindex!(arr::PackedMemory, val, i::Vararg{Int}) = setindex!(arr.value, val, i...)
-
+#> Iteration interface
 iterate(arr::PackedMemory) = iterate(arr.value)
 iterate(arr::PackedMemory, state) = iterate(arr.value, state)
-
-length(arr::PackedMemory) = length(arr.value)
-
-axes(arr::PackedMemory)	= map(Base.OneTo, size(arr))
-
+#> Abstract-array (and indexing) interface
+size(arr::PackedMemory) = size(arr.value)
+getindex(arr::PackedMemory, i::Int) = getindex(arr.value, i)
+setindex!(arr::PackedMemory, val, i::Int) = setindex!(arr.value, val, i)
+IndexStyle(::PackedMemory) = IndexLinear()
+#> Additional interface
 ShapedMemory(arr::PackedMemory) = arr.value
-
-zero(arr::DirectMemory{T, N}) where {T, N} = PackedMemory(zero(arr.value))
 
 
 genPackMemoryType(::Type{T}) where {T} = T
@@ -453,12 +425,6 @@ function setIndex(tpl::NTuple{N, Any}, val::T, idx::Int,
     end
 
     ntuple(f, Val(N))
-end
-
-
-function rightCircShift(tpl::NonEmptyTuple)
-    body..., tail = tpl
-    (tail, body...)
 end
 
 
