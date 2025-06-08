@@ -463,7 +463,7 @@ function genAnalyticIntegrator!(::S, cache::AxialGaussOverlapCache{T, D}, op::F)
                                {D, N, S<:MultiBodyIntegral{N, D}, T<:Real, 
                                 F<:DirectOperator}
     let integrator = getGaussBasedOneBodyIntegrator(S(), op), cache!Self=cache
-        function axialGaussIntegrate(data::OneBodyOrbIntLayout{PGTOrbData{T, D}})
+        function axialGaussIntegrate(data::NTuple{N, PairXY{ PGTOrbData{T, D} }})
             fields = getfield.(unpackPairwiseLayout(data), :core)
             integrator(fields; cache!Self)
         end
@@ -474,7 +474,7 @@ function genAnalyticIntegrator!(::S, ::NullCache{C}, op::F) where
                                {D, N, S<:MultiBodyIntegral{N, D}, T<:Real, 
                                 C<:RealOrComplex{T}, F<:DirectOperator}
     let integrator = getGaussBasedOneBodyIntegrator(S(), op)
-        function axialGaussIntegrate(data::OneBodyOrbIntLayout{PGTOrbData{T, D}}) where {D}
+        function axialGaussIntegrate(data::NTuple{N, PairXY{ PGTOrbData{T, D} }})
             fields = getfield.(unpackPairwiseLayout(data), :core)
             integrator(fields)
         end

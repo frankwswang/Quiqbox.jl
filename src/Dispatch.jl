@@ -67,11 +67,11 @@ getOutputType(::Type{Union{}}) =
 throw(AssertionError("`Union{}` is not a valid input argument."))
 
 
-const True  = Val(true )
+const True  = Val{true}
 
-const False = Val(false)
+const False = Val{false}
 
-const BoolVal = Union{Val{true}, Val{false}}
+const BoolVal = Union{True, False}
 
 
 getValData(::Val{T}) where {T} = T

@@ -4,7 +4,7 @@ using Base: issingletontype
 struct OneToIndex <: StructuredInfo
     idx::Int
 
-    function OneToIndex(idx::Int, ::V=Val(true)) where {V<:BoolVal}
+    function OneToIndex(idx::Int, ::V=True()) where {V<:BoolVal}
         getValData(V) && checkPositivity(idx)
         new(idx)
     end
