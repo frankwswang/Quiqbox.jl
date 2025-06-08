@@ -51,6 +51,6 @@ using Quiqbox
 
 @test Quiqbox.ParamMapper <: Quiqbox.ChainMapper
 
-@test Quiqbox.OneBodyOrbIntLayout <: Tuple{Quiqbox.PairXY{<:Quiqbox.PrimOrbDataOrType}}
+@test Quiqbox.OneBodyIntegralPGTOLayout <: Quiqbox.CoreIntegralOrbTypeLayout
 
 end

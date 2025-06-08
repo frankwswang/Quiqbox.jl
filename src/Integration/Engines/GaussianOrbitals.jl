@@ -454,7 +454,7 @@ const AxialGaussOverlapCachedSampler{T<:Real, D} = Union{
 }
 
 #= Additional Method =#
-function genAnalyticIntegralCache(::TypeBox{F}, ::OneBodyGTOrbIntLayout{T, D}) where 
+function genAnalyticIntegralCache(::TypeBox{F}, ::OneBodyIntegralPGTOLayout{T, D}) where 
                                  {T<:Real, D, F<:AxialGaussOverlapCachedSampler{T, D}}
     AxialGaussOverlapCache(FloatingPolyGaussField{T, D}, ntuple( _->Val(true), Val(D) ))
 end

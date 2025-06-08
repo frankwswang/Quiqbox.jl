@@ -37,3 +37,15 @@ function checkAxialIndexStep(arr::AbstractArray, dim::MissingOr{Int}=missing)
 
     nothing
 end
+
+
+struct Count{N} <: StructuredType
+
+    function Count{N}() where {N}
+        checkPositivity(N::Int, true)
+        new{N}()
+    end
+end
+
+const Nil = Count{0}
+const One = Count{1}

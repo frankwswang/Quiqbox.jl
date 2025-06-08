@@ -14,8 +14,8 @@ struct SesquiFieldProd{T<:Real, D, O<:Multiplier,
     end
 end
 
-function SesquiFieldProd(layout::OneBodyOrbCoreIntLayoutUnion, 
-                         dresser::Multiplier=genOverlapSampler())
+function SesquiFieldProd(layout::MonoPair{PrimOrbData{T, D}}, 
+                         dresser::Multiplier=genOverlapSampler()) where {T<:Real, D}
     fields = unpackPairwiseLayout(layout)
     SesquiFieldProd(getfield.(fields, :core), dresser)
 end
@@ -55,8 +55,8 @@ struct DoubleFieldProd{T<:Real, D, O<:DualTermOperator,
     coupler::O
 end
 
-function DoubleFieldProd((pairL, pairR)::TwoBodyOrbCoreIntLayoutUnion, 
-                         coupler::DualTermOperator)
+function DoubleFieldProd((pairL, pairR)::DualPair{PrimOrbData{T, D}}, 
+                         coupler::DualTermOperator) where {T, D}
     sfProdL = SesquiFieldProd(pairL)
     sfProdR = SesquiFieldProd(pairR)
     DoubleFieldProd((sfProdL, sfProdR), coupler)
@@ -88,18 +88,17 @@ end
 
 
 function genIntegrant(op::Multiplier, 
-                      layout::OneBodyOrbCoreIntLayoutUnion{T, D}) where {T<:Real, D}
+                      layout::MonoPair{PrimOrbData{T, D}}) where {T<:Real, D}
     SesquiFieldProd(layout, op)
 end
 
 function genIntegrant(op::DualTermOperator, 
-                      layout::TwoBodyOrbCoreIntLayoutUnion{T, D}) where {T<:Real, D}
+                      layout::DualPair{PrimOrbData{T, D}}) where {T<:Real, D}
     DoubleFieldProd(layout, op)
 end
 
 
-function genIntegralSectors(op::DirectOperator, layout::OrbCoreIntLayoutUnion{T, D}) where 
-                           {T<:Real, D}
+function genIntegralSectors(op::DirectOperator, layout::CoreIntegralOrbDataLayout)
     tuple(genIntegrant(op, layout))
 end
 
@@ -110,7 +109,7 @@ end
 
 
 function getNumericalIntegral(::Type{C}, op::DirectOperator, 
-                              layout::OrbCoreIntLayoutUnion{T, D}) where 
+                              layout::CoreIntegralOrbDataLayout{T, D}) where 
                              {T<:Real, C<:RealOrComplex{T}, D}
     sectors = genIntegralSectors(op, layout)
     res = one(C)

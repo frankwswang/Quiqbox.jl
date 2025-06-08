@@ -460,3 +460,26 @@ function rightCircShift(tpl::NonEmptyTuple)
     body..., tail = tpl
     (tail, body...)
 end
+
+
+const PairAA{O} = Tuple{One, O}
+const PairAB{O} = Tuple{O,   O}
+const PairXY{O} = Union{PairAA{O}, PairAB{O}}
+
+const MonoPairAA{O} = Tuple{PairAA{O}}
+const MonoPairAB{O} = Tuple{PairAB{O}}
+
+formatPairwiseLayout(::One, obj)::MonoPairAA{Any} = ((One(), obj),)
+formatPairwiseLayout(::One, objL, objR)::MonoPairAB{Any} = ((objL, objR),)
+
+unpackPairwiseLayout((innerPair,)::MonoPairAA{Any}) = tuple(innerPair |> last)
+unpackPairwiseLayout((innerPair,)::MonoPairAB{Any}) = innerPair
+
+const DualPairAABB{O} = Tuple{PairAA{O}, PairAA{O}} #> Including AAAA
+const DualPairABCC{O} = Tuple{PairAB{O}, PairAA{O}}
+const DualPairAABC{O} = Tuple{PairAA{O}, PairAB{O}}
+const DualPairABCD{O} = Tuple{PairAB{O}, PairAB{O}} #> Including ABAB
+
+const MonoPair{O} = Union{MonoPairAA{O}, MonoPairAB{O}}
+const DualPair{O} = Union{DualPairAABB{O}, DualPairABCC{O}, 
+                          DualPairAABC{O}, DualPairABCD{O}}

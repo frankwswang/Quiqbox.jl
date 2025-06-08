@@ -91,55 +91,14 @@ function getPrimCoreIntData(cache::OneBodyFullCoreIntegrals,
 end
 
 
-struct Count{N} <: StructuredType
+const CoreIntegralOrbDataLayout{T<:Real, D} = Union{
+    MonoPair{PrimOrbData{T, D}}, DualPair{PrimOrbData{T, D}}
+}
+const CoreIntegralOrbTypeLayout{T<:Real, D} = Union{
+    MonoPair{TypeBox{ <:PrimOrbData{T, D} }}, DualPair{TypeBox{ <:PrimOrbData{T, D} }}
+}
+const OneBodyIntegralPGTOLayout{T<:Real, D} = MonoPair{TypeBox{ <:PGTOrbData{T, D} }}
 
-    function Count{N}() where {N}
-        checkPositivity(N::Int, true)
-        new{N}()
-    end
-end
-
-const Nil = Count{0}
-const One = Count{1}
-
-const PairAA{O} = Tuple{One, O}
-const PairAB{O} = Tuple{O,   O}
-const PairXY{O} = Union{PairAA{O}, PairAB{O}}
-
-const MonoPairAA{O} = Tuple{PairAA{O}}
-const MonoPairAB{O} = Tuple{PairAB{O}}
-
-formatPairwiseLayout(::One, obj)::MonoPairAA{Any} = ((One(), obj),)
-formatPairwiseLayout(::One, objL, objR)::MonoPairAB{Any} = ((objL, objR),)
-
-unpackPairwiseLayout((innerPair,)::MonoPairAA{Any}) = tuple(innerPair |> last)
-unpackPairwiseLayout((innerPair,)::MonoPairAB{Any}) = innerPair
-
-const DualPairAABB{O} = Tuple{PairAA{O}, PairAA{O}} #> Consider AAAA in core methods
-const DualPairABCC{O} = Tuple{PairAB{O}, PairAA{O}}
-const DualPairAABC{O} = Tuple{PairAA{O}, PairAB{O}}
-const DualPairABCD{O} = Tuple{PairAB{O}, PairAB{O}} #> Consider ABAB in core methods
-
-const PrimOrbDataOrType{T<:PrimOrbData} = Union{T, TypeBox{T}}
-
-const OneBodyOrbIntLayout{O<:PrimOrbDataOrType} = Union{MonoPairAA{O}, MonoPairAB{O}}
-const TwoBodyOrbIntLayout{O<:PrimOrbDataOrType} = Union{DualPairAABB{O}, DualPairABCC{O},
-                                                        DualPairAABC{O}, DualPairABCD{O}}
-
-const OrbCoreIntegralLayout{O<:PrimOrbDataOrType} = 
-      Union{OneBodyOrbIntLayout{O}, TwoBodyOrbIntLayout{O}}
-
-const OneBodyOrbCoreIntLayoutUnion{T<:Real, D} = OneBodyOrbIntLayout{PrimOrbData{T, D}}
-const TwoBodyOrbCoreIntLayoutUnion{T<:Real, D} = TwoBodyOrbIntLayout{PrimOrbData{T, D}}
-const OrbCoreIntLayoutUnion{T<:Real, D} = 
-      Union{OneBodyOrbCoreIntLayoutUnion{T, D}, OneBodyOrbCoreIntLayoutUnion{T, D}}
-
-const OneBodyOrbCoreIntTypeLayout{O<:PrimOrbData} = OneBodyOrbIntLayout{TypeBox{<:O}}
-const TwoBodyOrbCoreIntTypeLayout{O<:PrimOrbData} = TwoBodyOrbIntLayout{TypeBox{<:O}}
-const OrbCoreIntTypeLayout{O<:PrimOrbData} = Union{OneBodyOrbCoreIntTypeLayout{O}, 
-                                                   TwoBodyOrbCoreIntTypeLayout{O}}
-
-const OneBodyGTOrbIntLayout{T<:Real, D} = OneBodyOrbCoreIntTypeLayout{PGTOrbData{T, D}}
 
 formatOrbLayoutType(::Count{N}) where {N} = Count{N}()
 formatOrbLayoutType(::PGTOrbData{T, D}) where {T<:Real, D} = TypeBox(PGTOrbData{T, D})
@@ -148,7 +107,7 @@ formatOrbLayoutType(::PrimOrbData{T, D}) where {T<:Real, D} = TypeBox(PrimOrbDat
 struct OrbCoreIntConfig{T, D, N} <: StructuredType
     layout::NTuple{N, PairXY{ TypeBox{<:PrimOrbData{T, D}} }}
 
-    function OrbCoreIntConfig(layout::OrbCoreIntLayoutUnion{T, D}) where {T<:Real, D}
+    function OrbCoreIntConfig(layout::CoreIntegralOrbDataLayout{T, D}) where {T<:Real, D}
         typeLayout = map(layout) do pair
             map(formatOrbLayoutType, pair)
         end
@@ -210,7 +169,7 @@ prepareAnalyticIntCache!(::DirectOrbCoreIntegrator{T, D, C}, ::OrbCoreIntConfig{
                         {T<:Real, D, C<:RealOrComplex{T}} = 
 NullCache{C}()
 
-genAnalyticIntegralCache(::TypeBox{<:DirectOperator}, ::OrbCoreIntTypeLayout) = nothing
+genAnalyticIntegralCache(::TypeBox{<:DirectOperator}, ::CoreIntegralOrbTypeLayout) = nothing
 
 function selectIntegralMethod(f::CachedOrbCoreIntegrator{T, D, C, N, F}, 
                               config::OrbCoreIntConfig{T, D, N}) where 
@@ -224,7 +183,7 @@ function selectIntegralMethod(f::CachedOrbCoreIntegrator{T, D, C, N, F},
 end
 
 function applyIntegralMethod(f::CachedOrbCoreIntegrator{T, D, C, N}, 
-                             data::OrbCoreIntLayoutUnion{T, D}) where 
+                             data::CoreIntegralOrbDataLayout{T, D}) where 
                             {T<:Real, D, C<:RealOrComplex{T}, N}
     config = OrbCoreIntConfig(data)
     fCore = selectIntegralMethod(f, config)
@@ -233,13 +192,13 @@ end
 
 
 #> One-Body (i|O|j) and two-body (ij|O|kl) hermiticity across O
-getHermiticity(::DirectOperator, ::OrbCoreIntTypeLayout) = false
+getHermiticity(::DirectOperator, ::CoreIntegralOrbTypeLayout) = false
 
-getHermiticity(::OverlapSampler, ::OrbCoreIntTypeLayout) = true
+getHermiticity(::OverlapSampler, ::CoreIntegralOrbTypeLayout) = true
 
-getHermiticity(::MultipoleMomentSampler, ::OrbCoreIntTypeLayout) = true
+getHermiticity(::MultipoleMomentSampler, ::CoreIntegralOrbTypeLayout) = true
 
-getHermiticity(::DiagDirectionalDiffSampler, ::OneBodyGTOrbIntLayout) = true
+getHermiticity(::DiagDirectionalDiffSampler, ::OneBodyIntegralPGTOLayout) = true
 
 
 function genCoreIntTuple(integrator::CachedOrbCoreIntegrator{T, D, C, 1}, 
