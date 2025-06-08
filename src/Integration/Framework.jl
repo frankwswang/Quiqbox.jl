@@ -210,19 +210,16 @@ prepareAnalyticIntCache!(::DirectOrbCoreIntegrator{T, D, C}, ::OrbCoreIntConfig{
                         {T<:Real, D, C<:RealOrComplex{T}} = 
 NullCache{C}()
 
-function supportAnalyticIntegral(::TypeBox{F}, ::L) where 
-                                {F<:DirectOperator, L<:OrbCoreIntTypeLayout}
-    hasmethod(genAnalyticIntegralCache, (TypeBox{F}, L)) ? true : false
-end
+genAnalyticIntegralCache(::TypeBox{<:DirectOperator}, ::OrbCoreIntTypeLayout) = nothing
 
 function selectIntegralMethod(f::CachedOrbCoreIntegrator{T, D, C, N, F}, 
                               config::OrbCoreIntConfig{T, D, N}) where 
                              {T<:Real, D, C<:RealOrComplex{T}, N, F<:DirectOperator}
-    if supportAnalyticIntegral(TypeBox(F), config.layout)
+    if genAnalyticIntegralCache(TypeBox(F), config.layout) === nothing
+        LPartial(getNumericalIntegral, (C, f.operator))
+    else
         cache = prepareAnalyticIntCache!(f, config)
         genAnalyticIntegrator!(MultiBodyIntegral{N, D}(), cache, f.operator)
-    else
-        LPartial(getNumericalIntegral, (C, f.operator))
     end
 end
 
