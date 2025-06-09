@@ -440,4 +440,11 @@ f_xEle, ps_xEle = Quiqbox.genParamMapper((pb=xEle,))
 ps_xEle == Quiqbox.initializeSpanParamSet(xMat)
 f_xEle(obtain(ps_xEle)) == (pb=xMat.input[5],) == (pb=obtain(xEle),)
 
+xpn1 = genCellParam(1.1, :xpn)
+setScreenLevel!(xpn1, 2)
+gf1 = Quiqbox.GaussFunc(xpn1)
+fCore, pSet = Quiqbox.unpackFunc(sqrt ∘ gf1)
+fCore isa Quiqbox.InputConverter
+pSet isa Quiqbox.OptSpanParamSet
+
 end

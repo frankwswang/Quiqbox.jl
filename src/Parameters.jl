@@ -1523,7 +1523,8 @@ end
 function unpackFunc(f::Function)
     fLocal = deepcopy(f)
     if noStoredParam(fLocal)
-        InputConverter(fLocal), initializeFixedSpanSet()
+        fCore = InputConverter(fLocal)
+        paramSet = initializeFixedSpanSet()
     else
         source = getSourceParamSet(fLocal)
 
@@ -1531,9 +1532,9 @@ function unpackFunc(f::Function)
             unitPars, gridPars = map(extractMemory, source)
             fCore = ParamBindFunc(fLocal, unitPars, gridPars)
             paramSet = initializeSpanParamSet(unitPars, gridPars)
-            fCore, paramSet
         end
     end
+    fCore, paramSet
 end
 
 function unpackFunc!(f::Function, paramSet::OptSpanParamSet, 
