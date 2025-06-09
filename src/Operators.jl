@@ -36,7 +36,6 @@ struct Associate{A<:Lateral, J<:Function, F<:Function} <: MonoTermOperator
     term::F
 end
 
-
 function modifyFunction(op::Associate, term::Function)
     fL, fR = op.position isa Left ? (op.term, term) : (term, op.term)
     PairCoupler(op.coupler, fL, fR)
@@ -54,7 +53,7 @@ const Multiplier{OL<:MonoTermOperator, OR<:MonoTermOperator} =
 function modifyFunction(op::Correlate, termPair::Vararg{Function, 2})
     fL, fR = termPair .|> op.dresser
     PairCoupler(op.coupler, fL, fR)
-end
+end #! Optimize the composition when coupler is Multiplier and fL === fR
 
 
 struct Sandwich{A<:Lateral, J<:NTuple{2, Function}, F<:Function} <: DualTermOperator
@@ -110,6 +109,18 @@ function modifyFunction(op::DiagonalDiff{C1, D, M, N}, term::AbstractTypedCarteF
 end
 
 getFiniteDiffApproxOrder(::Function) = 6
+
+
+struct TypedOperator{T, F<:DirectOperator}
+    core::F
+    type::Type{T}
+end
+
+TypedOperator(op::TypedOperator, ::Type{T}) where {T} = TypedOperator(op.core, T)
+
+function modifyFunction(op::TypedOperator{T}, term::Function) where {T}
+    TypedReturn(modifyFunction(op.core, term), T)
+end
 
 
 #! Future development for computation of Hessian
