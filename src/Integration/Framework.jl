@@ -91,139 +91,102 @@ function getPrimCoreIntData(cache::OneBodyFullCoreIntegrals,
 end
 
 
-const CoreIntegralOrbDataLayout{T<:Real, D} = Union{
-    MonoPair{PrimOrbData{T, D}}, DualPair{PrimOrbData{T, D}}
-}
-const CoreIntegralOrbTypeLayout{T<:Real, D} = Union{
-    MonoPair{TypeBox{ <:PrimOrbData{T, D} }}, DualPair{TypeBox{ <:PrimOrbData{T, D} }}
-}
-const OneBodyIntegralPGTOLayout{T<:Real, D} = MonoPair{TypeBox{ <:PGTOrbData{T, D} }}
+const CoreIntegralOrbDataLayout{T<:Real, D} = DualN12Tuple{PrimOrbData{T, D}}
 
 
-formatOrbLayoutType(::Count{N}) where {N} = Count{N}()
-formatOrbLayoutType(::PGTOrbData{T, D}) where {T<:Real, D} = TypeBox(PGTOrbData{T, D})
-formatOrbLayoutType(::PrimOrbData{T, D}) where {T<:Real, D} = TypeBox(PrimOrbData{T, D})
+@enum OrbitalCategory::Int8 begin
+    PrimGaussTypeOrb
+    ArbitraryTypeOrb
+end
 
-struct OrbCoreIntConfig{T, D, N} <: StructuredType
-    layout::NTuple{N, PairXY{ TypeBox{<:PrimOrbData{T, D}} }}
+getOrbitalCategory(::PGTOrbData) = PrimGaussTypeOrb
+getOrbitalCategory(::PrimOrbData) = ArbitraryTypeOrb
 
-    function OrbCoreIntConfig(layout::CoreIntegralOrbDataLayout{T, D}) where {T<:Real, D}
-        typeLayout = map(layout) do pair
-            map(formatOrbLayoutType, pair)
-        end
-        new{T, D, length(layout)}(typeLayout)
+function genOrbCategoryLayout(data::CoreIntegralOrbDataLayout)
+    map(data) do pair
+        map(getOrbitalCategory, pair)
     end
 end
 
 
-struct MultiBodyNullCache{T<:Real, D, C<:RealOrComplex{T}, N} <: CustomCache{C}
+const OrbIntLayoutInfo{N} = 
+      Tuple{TypeBox{<:DirectOperator}, NTuple{N, NTuple{2, OrbitalCategory}}}
 
-    MultiBodyNullCache(::S, ::Type{C}) where {N, D, S<:MultiBodyIntegral{N, D}, T<:Real, 
-                                              C<:RealOrComplex{T}} = 
-    new{T, D, C, N}()
-end
+const OrbIntLayoutCache{T, C<:RealOrComplex{T}, N, M<:Union{CustomCache{T}, CustomCache{C}}
+                        } = LRU{OrbIntLayoutInfo{N}, M}
 
-const MultiBodyCompCache{T, D, C<:RealOrComplex{T}, N, 
-                         M<:Union{ CustomCache{T}, CustomCache{C} }} = 
-      LRU{OrbCoreIntConfig{T, D, N}, M}
-
-const OrbCoreIntegralCache{T<:Real, D, C<:RealOrComplex{T}, N} = Union{
-    MultiBodyCompCache{T, D, C, N}, MultiBodyNullCache{T, D, C, N}
-}
-
-struct CachedOrbCoreIntegrator{T<:Real, D, C<:RealOrComplex{T}, N, F<:DirectOperator, 
-                               M<:OrbCoreIntegralCache{T, D, C, N}} <: ConfigBox
+struct OrbitalCoreIntegralConfig{T<:Real, D, C<:RealOrComplex{T}, N, F<:DirectOperator, 
+                                 M<:Union{NullCache{C}, OrbIntLayoutCache{T, C, N}},
+                                 E<:MissingOr{ EstimatorConfig{T} }} <: ConfigBox
     operator::F
     cache::M
+    estimator::E
 
-    function CachedOrbCoreIntegrator(::Val{L}, ::S, operator::F, ::Type{C}) where 
+    function OrbitalCoreIntegralConfig(::Val{L}, ::S, operator::F, ::Type{C}, 
+                                     config::E=missing) where 
                                     {L, N, D, S<:MultiBodyIntegral{N, D}, 
-                                     F<:DirectOperator, T<:Real, C<:RealOrComplex{T}}
+                                     F<:DirectOperator, T<:Real, C<:RealOrComplex{T}, 
+                                     E<:MissingOr{ EstimatorConfig{T} }}
         cache = if L
             valueTypeBound = Union{CustomCache{T}, CustomCache{C}}
-            LRU{OrbCoreIntConfig{T, D, N}, valueTypeBound}(maxsize=20)
+            LRU{OrbIntLayoutInfo{N}, valueTypeBound}(maxsize=20)
         else
             MultiBodyNullCache(S(), C)
         end
-        new{T, D, C, N, F, typeof(cache)}(operator, cache)
+        new{T, D, C, N, F, typeof(cache), E}(operator, cache, config)
     end
 end
 
-const DirectOrbCoreIntegrator{T<:Real, D, C<:RealOrComplex{T}, N, F<:DirectOperator} = 
-      CachedOrbCoreIntegrator{T, D, C, N, F, MultiBodyNullCache{T, D, C, N}}
 
-const ReusedOrbCoreIntegrator{T<:Real, D, C<:RealOrComplex{T}, N, F<:DirectOperator, 
-                              M<:CustomCache{<:Union{T, C}}} = 
-      CachedOrbCoreIntegrator{T, D, C, N, F, MultiBodyCompCache{T, D, C, N, M}}
-
-
-function prepareAnalyticIntCache!(f::ReusedOrbCoreIntegrator{T, D, C, N, F}, 
-                                  config::OrbCoreIntConfig{T, D, N}) where 
-                                 {T<:Real, D, C<:RealOrComplex{T}, N, F<:DirectOperator}
-    get!(f.cache, config) do
-        genAnalyticIntegralCache(TypeBox(F), config.layout)
-    end
+function evaluateIntegral!(config::OrbitalCoreIntegralConfig{T, D, C, N, F}, 
+                           pairwiseData::NTuple{N, N12Tuple{ PrimOrbData{T, D} }}) where 
+                         {T, C<:RealOrComplex{T}, D, N, F<:DirectOperator}
+    evaluateIntegralCore(config, pairwiseData)
 end
 
-prepareAnalyticIntCache!(::DirectOrbCoreIntegrator{T, D, C}, ::OrbCoreIntConfig{T, D}) where 
-                        {T<:Real, D, C<:RealOrComplex{T}} = 
-NullCache{C}()
-
-genAnalyticIntegralCache(::TypeBox{<:DirectOperator}, ::CoreIntegralOrbTypeLayout) = nothing
-
-function selectIntegralMethod(f::CachedOrbCoreIntegrator{T, D, C, N, F}, 
-                              config::OrbCoreIntConfig{T, D, N}) where 
-                             {T<:Real, D, C<:RealOrComplex{T}, N, F<:DirectOperator}
-    if genAnalyticIntegralCache(TypeBox(F), config.layout) === nothing
-        LPartial(getNumericalIntegral, (C, f.operator))
-    else
-        cache = prepareAnalyticIntCache!(f, config)
-        genAnalyticIntegrator!(MultiBodyIntegral{N, D}(), cache, f.operator)
-    end
-end
-
-function applyIntegralMethod(f::CachedOrbCoreIntegrator{T, D, C, N}, 
-                             data::CoreIntegralOrbDataLayout{T, D}) where 
-                            {T<:Real, D, C<:RealOrComplex{T}, N}
-    config = OrbCoreIntConfig(data)
-    fCore = selectIntegralMethod(f, config)
-    fCore(data)
+function evaluateIntegralCore(config::OrbitalCoreIntegralConfig{T, D, C, N, F}, 
+                              pairwiseData::NTuple{N, N12Tuple{ PrimOrbData{T, D} }}) where 
+                             {T, C<:RealOrComplex{T}, D, N, F<:DirectOperator}
+    formattedOp = TypedOperator(config.operator, C)
+    estimateOrbIntegral(config.estimator, formattedOp, pairwiseData)::C
 end
 
 
 #> One-Body (i|O|j) and two-body (ij|O|kl) hermiticity across O
-getHermiticity(::DirectOperator, ::CoreIntegralOrbTypeLayout) = false
+getHermiticity(::DirectOperator, ::DualN12Tuple{OrbitalCategory}) = false
 
-getHermiticity(::OverlapSampler, ::CoreIntegralOrbTypeLayout) = true
+getHermiticity(::OverlapSampler, ::DualN12Tuple{OrbitalCategory}) = true
 
-getHermiticity(::MultipoleMomentSampler, ::CoreIntegralOrbTypeLayout) = true
+getHermiticity(::MultipoleMomentSampler, ::DualN12Tuple{OrbitalCategory}) = true
 
-getHermiticity(::DiagDirectionalDiffSampler, ::OneBodyIntegralPGTOLayout) = true
+function getHermiticity(::DiagDirectionalDiffSampler, layout::N12Tuple{OrbitalCategory})
+    all(layout) do c
+        c == PrimGaussTypeOrb
+    end
+end
 
 
-function genCoreIntTuple(integrator::CachedOrbCoreIntegrator{T, D, C, 1}, 
-                         dataLayout::MonoPairAA{PrimOrbData{T, D}}) where 
+function genCoreIntTuple(config::OrbitalCoreIntegralConfig{T, D, C, 1}, 
+                         pairData::Tuple{PrimOrbData{T, D}}) where 
                         {T<:Real, D, C<:RealOrComplex{T}}
-    integralRes = applyIntegralMethod(integrator, dataLayout)
+    integralRes = evaluateIntegral!(config, (pairData,))
     (convert(C, integralRes),)
 end
 
-function genCoreIntTuple(integrator::CachedOrbCoreIntegrator{T, D, C, 1}, 
-                         dataLayout::MonoPairAB{PrimOrbData{T, D}}) where 
+function genCoreIntTuple(config::OrbitalCoreIntegralConfig{T, D, C, 1}, 
+                         pairData::NTuple{2, PrimOrbData{T, D}}) where 
                         {T<:Real, D, C<:RealOrComplex{T}}
-    layoutConfig = OrbCoreIntConfig(dataLayout)
-    f = selectIntegralMethod(integrator, layoutConfig)
-    ijVal = f(dataLayout)
-    jiVal = if getHermiticity(integrator.operator, layoutConfig.layout)
+    ijVal = evaluateIntegral!(config, (pairData,))
+    jiVal = if getHermiticity(config.operator, genOrbCategoryLayout(pairData|>tuple))
         conj(ijVal)
     else
-        f(reverse(dataLayout))
+        evaluateIntegral!(config, (reverse(pairData),))
     end
     (convert(C, ijVal), convert(C, jiVal))
 end
 
 
-function genOneBodyIntDataPairs(integrator::CachedOrbCoreIntegrator{T, D, C}, 
+function genOneBodyIntDataPairs(config::OrbitalCoreIntegralConfig{T, D, C}, 
                                 (oDataSeq,)::Tuple{PrimOrbDataVec{T, D}}, 
                                 (offset,)::Tuple{Int}=(0,)) where 
                                {T<:Real, D, C<:RealOrComplex{T}}
@@ -231,7 +194,7 @@ function genOneBodyIntDataPairs(integrator::CachedOrbCoreIntegrator{T, D, C},
 
     pairs1 = Memory{Pair{ Tuple{OneToIndex}, Tuple{C} }}(undef, nOrbs)
     for (i, oData) in enumerate(oDataSeq)
-        iiVal = genCoreIntTuple(integrator, formatPairwiseLayout(One(), oData))
+        iiVal = genCoreIntTuple(config, (oData,))
         pairs1[begin+i-1] = (OneToIndex(i + offset, False()),) => iiVal
     end
 
@@ -240,15 +203,14 @@ function genOneBodyIntDataPairs(integrator::CachedOrbCoreIntegrator{T, D, C},
     for l in 1:nTri
         m, n = convertIndex1DtoTri2D(l)
         i, j = ijPair = sortTensorIndex((m, n+1))
-        oDataPair = formatPairwiseLayout(One(), oDataSeq[begin+i-1], oDataSeq[begin+j-1])
-        ijValPair = genCoreIntTuple(integrator, oDataPair)
+        ijValPair = genCoreIntTuple(config, (oDataSeq[begin+i-1], oDataSeq[begin+j-1]))
         pairs2[begin+l-1] = OneToIndex.(ijPair .+ offset, False()) => ijValPair
     end
 
     pairs1, pairs2
 end
 
-function genOneBodyIntDataPairs(integrator::CachedOrbCoreIntegrator{T, D}, 
+function genOneBodyIntDataPairs(config::OrbitalCoreIntegralConfig{T, D}, 
                                 oDataSeqPair::NTuple{2, PrimOrbDataVec{T, D}}, 
                                 offsets::NTuple{2, Int}) where {T<:Real, D}
     seqL, seqR = oDataSeqPair
@@ -263,8 +225,7 @@ function genOneBodyIntDataPairs(integrator::CachedOrbCoreIntegrator{T, D},
         idxPairOld = ijIdx .+ offsets
         idxPairNew = sortTensorIndex(idxPairOld)
         m, n = ifelse(idxPairNew==idxPairOld, ijIdx, reverse(ijIdx))
-        oDataPair = formatPairwiseLayout(One(), seqL[begin+m-1], seqR[begin+n-1])
-        ijValPair = genCoreIntTuple(integrator, oDataPair)
+        ijValPair = genCoreIntTuple(config, (seqL[begin+m-1], seqR[begin+n-1]))
         pairs[k] = OneToIndex.(idxPairNew, False()) => ijValPair
     end
 
@@ -286,7 +247,7 @@ function setTensorEntries!(tensor::AbstractMatrix{C}, valPair::NTuple{2, C},
 end
 
 
-function genOneBodyPrimCoreIntTensor(integrator::CachedOrbCoreIntegrator{T, D, C}, 
+function genOneBodyPrimCoreIntTensor(config::OrbitalCoreIntegralConfig{T, D, C}, 
                                      (oDataSeq,)::Tuple{PrimOrbDataVec{T, D}}
                                      ) where {T<:Real, D, C<:RealOrComplex{T}}
     nOrbs = length(oDataSeq)
@@ -294,20 +255,19 @@ function genOneBodyPrimCoreIntTensor(integrator::CachedOrbCoreIntegrator{T, D, C
     checkAxialIndexStep(res)
 
     for i in 1:nOrbs
-        temp = genCoreIntTuple(integrator, formatPairwiseLayout(One(), oDataSeq[begin+i-1]))
+        temp = genCoreIntTuple(config, (oDataSeq[begin+i-1],))
         setTensorEntries!(res, temp, (i,))
     end
 
     for l in 1:triMatEleNum(nOrbs-1)
         m, n = convertIndex1DtoTri2D(l)
-        oDataPair = formatPairwiseLayout(One(), oDataSeq[begin+m-1], oDataSeq[begin+n])
-        temp = genCoreIntTuple(integrator, oDataPair)
+        temp = genCoreIntTuple(config, (oDataSeq[begin+m-1], oDataSeq[begin+n]))
         setTensorEntries!(res, temp, (m, n+1))
     end
     res
 end
 
-function genOneBodyPrimCoreIntTensor(integrator::CachedOrbCoreIntegrator{T, D}, 
+function genOneBodyPrimCoreIntTensor(config::OrbitalCoreIntegralConfig{T, D}, 
                                      oDataSeqPair::NTuple{2, PrimOrbDataVec{T, D}}
                                      ) where {T<:Real, D}
     oData1, oData2 = oDataSeqPair
@@ -316,8 +276,7 @@ function genOneBodyPrimCoreIntTensor(integrator::CachedOrbCoreIntegrator{T, D},
     checkAxialIndexStep(res)
 
     for j in 1:len2, i in 1:len1
-        oDataPair = formatPairwiseLayout(One(), oData1[begin+i-1], oData2[begin+j-1])
-        ijVal = applyIntegralMethod(integrator, oDataPair)
+        ijVal = evaluateIntegral!(config, ((oData1[begin+i-1], oData2[begin+j-1]),))
         res[begin+i-1, begin+j-1] = ijVal
     end
 
@@ -465,21 +424,21 @@ function cachePrimCoreIntegrals!(targetIntCache::PrimOrbCoreIntegralCache{T, D},
 end
 
 
-function updateIntCacheCore!(integrator::CachedOrbCoreIntegrator{T, D, C, 1}, 
+function updateIntCacheCore!(config::OrbitalCoreIntegralConfig{T, D, C, 1}, 
                              ints::OneBodyCoreIntegrals{C}, 
                              basis::Tuple{PrimOrbDataVec{T, D}}, 
                              offset::Tuple{Int}) where {T<:Real, D, C<:RealOrComplex{T}}
-    pairs1, pairs2 = genOneBodyIntDataPairs(integrator, basis, offset)
+    pairs1, pairs2 = genOneBodyIntDataPairs(config, basis, offset)
     foreach(p->setPrimCoreIntData!(ints, p), pairs1)
     foreach(p->setPrimCoreIntData!(ints, p), pairs2)
     ints
 end
 
-function updateIntCacheCore!(integrator::CachedOrbCoreIntegrator{T, D, C, 1}, 
+function updateIntCacheCore!(config::OrbitalCoreIntegralConfig{T, D, C, 1}, 
                              ints::OneBodyCoreIntegrals{C}, 
                              basis::NTuple{2, PrimOrbDataVec{T, D}}, 
                              offset::NTuple{2, Int}) where {T<:Real, D, C<:RealOrComplex{T}}
-    pairs2 = genOneBodyIntDataPairs(integrator, basis, offset)
+    pairs2 = genOneBodyIntDataPairs(config, basis, offset)
     foreach(p->setPrimCoreIntData!(ints, p), pairs2)
     ints
 end
@@ -491,19 +450,19 @@ function updatePrimCoreIntCache!(cache::PrimOrbCoreIntegralCache{T, D, C},
     ints = cache.data
     basis = cache.basis.list
     intStyle = getIntegralStyle(cache)
-    integrator = CachedOrbCoreIntegrator(Val(true), intStyle, cache.operator, C)
+    config = OrbitalCoreIntegralConfig(Val(true), intStyle, cache.operator, C)
 
     startNum = Int(startIdx)
     offset = startNum - 1
 
     if offset == 0
-        updateIntCacheCore!(integrator, ints, (basis,), (0,))
+        updateIntCacheCore!(config, ints, (basis,), (0,))
     elseif offset < length(basis)
         idxStart = firstindex(basis) + offset
         oldBasis = @view basis[begin:(idxStart-1)]
         newBasis = @view basis[idxStart:      end]
-        updateIntCacheCore!(integrator, ints, (newBasis,), (offset,))
-        updateIntCacheCore!(integrator, ints, (oldBasis, newBasis,), (0, offset))
+        updateIntCacheCore!(config, ints, (newBasis,), (offset,))
+        updateIntCacheCore!(config, ints, (oldBasis, newBasis,), (0, offset))
     end
 
     cache
@@ -781,8 +740,8 @@ function computeIntegral(::OneBodyIntegral{D}, op::DirectOperator,
         computeIntegral!(iCache, nCache, (d1,); markerCache)
     else
         coreData, w = decomposeOrbData(d1; markerCache)
-        integrator = CachedOrbCoreIntegrator(Val(true), OneBodyIntegral{D}(), op, C)
-        tensor = genOneBodyPrimCoreIntTensor(integrator, (coreData,))
+        config = OrbitalCoreIntegralConfig(Val(true), OneBodyIntegral{D}(), op, C)
+        tensor = genOneBodyPrimCoreIntTensor(config, (coreData,))
         dot(w, tensor, w)
     end
 end
@@ -794,7 +753,7 @@ function computeIntegral(::OneBodyIntegral{D}, op::DirectOperator,
     oPairType = getOrbOutputTypeUnion((d1, d2))
     oData1, w1 = decomposeOrbData(d1; markerCache)
     oData2, w2 = decomposeOrbData(d2; markerCache)
-    integrator = CachedOrbCoreIntegrator(Val(true), OneBodyIntegral{D}(), op, oPairType)
+    config = OrbitalCoreIntegralConfig(Val(true), OneBodyIntegral{D}(), op, oPairType)
 
     tensor = if lazyCompute
         oData1 = Vector(oData1)
@@ -802,17 +761,17 @@ function computeIntegral(::OneBodyIntegral{D}, op::DirectOperator,
         #> Find the shared `PrimOrbData` (excluding the renormalization information)
         transformation = (b::PrimOrbData{T, D})->genOrbCoreKey!(markerCache, b)
         coreDataM = intersectMultisets!(oData1, oData2; transformation)
-        block4 = genOneBodyPrimCoreIntTensor(integrator, (oData1, oData2))
+        block4 = genOneBodyPrimCoreIntTensor(config, (oData1, oData2))
         if isempty(coreDataM)
             block4
         else
-            block1 = genOneBodyPrimCoreIntTensor(integrator, (coreDataM,))
-            block2 = genOneBodyPrimCoreIntTensor(integrator, (oData1, coreDataM))
-            block3 = genOneBodyPrimCoreIntTensor(integrator, (coreDataM, oData2))
+            block1 = genOneBodyPrimCoreIntTensor(config, (coreDataM,))
+            block2 = genOneBodyPrimCoreIntTensor(config, (oData1, coreDataM))
+            block3 = genOneBodyPrimCoreIntTensor(config, (coreDataM, oData2))
             hvcat((2, 2), block1, block3, block2, block4)
         end
     else
-        genOneBodyPrimCoreIntTensor(integrator, (oData1, oData2))
+        genOneBodyPrimCoreIntTensor(config, (oData1, oData2))
     end
     dot(w1, tensor, w2)
 end
@@ -851,8 +810,8 @@ function computeIntegral(::OneBodyIntegral{D}, op::OverlapSampler,
         oPairType = getOrbOutputTypeUnion((d1, d2))
         oData1, w1 = decomposeOrbData(d1; markerCache)
         oData2, w2 = decomposeOrbData(d2; markerCache)
-        integrator = CachedOrbCoreIntegrator(Val(true), OneBodyIntegral{D}(), op, oPairType)
-        tensor = genOneBodyPrimCoreIntTensor(integrator, (oData1, oData2))
+        config = OrbitalCoreIntegralConfig(Val(true), OneBodyIntegral{D}(), op, oPairType)
+        tensor = genOneBodyPrimCoreIntTensor(config, (oData1, oData2))
         dot(w1, tensor, w2)
     end
 end

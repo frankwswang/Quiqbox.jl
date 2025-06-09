@@ -381,42 +381,44 @@ end
 
 #>-- Core integral-evaluation function --<#
 #> Overlap
-function evaluateOverlap((data,)::Tuple{FloatingPolyGaussField{T, D}}; 
-                         cache!Self::OptAxialGaussOverlapCache{T}=NullCache{T}()
-                         ) where {T<:Real, D}
+function computePGTOrbIntegral(::OverlapSampler, 
+                               (data,)::Tuple{FloatingPolyGaussField{T, D}}, 
+                               cache!Self::OptAxialGaussOverlapCache{T}=NullCache{T}()
+                               ) where {T<:Real, D}
     formattedData = prepareOrbitalInfo!(cache!Self, data)
     computePGTOrbOverlap(formattedData)
 end
 
-function evaluateOverlap(data::NTuple{2, FloatingPolyGaussField{T, D}}; 
-                         cache!Self::OptAxialGaussOverlapCache{T}=NullCache{T}()
-                         ) where {T<:Real, D}
+function computePGTOrbIntegral(::OverlapSampler, 
+                               data::NTuple{2, FloatingPolyGaussField{T, D}}, 
+                               cache!Self::OptAxialGaussOverlapCache{T}=NullCache{T}()
+                               ) where {T<:Real, D}
     formattedData = prepareOrbitalInfo!(cache!Self, data)
     computePGTOrbOverlap!(cache!Self, formattedData)
 end
 
 #> Multipole moment
-function evaluateMultipoleMoment(op::MultipoleMomentSampler{T, D}, 
-                                 (data,)::Tuple{FloatingPolyGaussField{T, D}};
-                                 cache!Self::OptAxialGaussOverlapCache{T}=NullCache{T}()
-                                 ) where {T<:Real, D}
+function computePGTOrbIntegral(op::MultipoleMomentSampler{T, D}, 
+                               (data,)::Tuple{FloatingPolyGaussField{T, D}}, 
+                               cache!Self::OptAxialGaussOverlapCache{T}=NullCache{T}()
+                               ) where {T<:Real, D}
     formattedData = prepareOrbitalInfo!(cache!Self, data)
     computePGTOrbMultipoleMoment(last(op.dresser).term, formattedData)
 end
 
-function evaluateMultipoleMoment(op::MultipoleMomentSampler{T, D}, 
-                                 data::NTuple{2, FloatingPolyGaussField{T, D}}; 
-                                 cache!Self::OptAxialGaussOverlapCache{T}=NullCache{T}()
-                                 ) where {T<:Real, D}
+function computePGTOrbIntegral(op::MultipoleMomentSampler{T, D}, 
+                               data::NTuple{2, FloatingPolyGaussField{T, D}}, 
+                               cache!Self::OptAxialGaussOverlapCache{T}=NullCache{T}()
+                               ) where {T<:Real, D}
     formattedData = prepareOrbitalInfo!(cache!Self, data)
     computePGTOrbMultipoleMoment!(last(op.dresser).term, cache!Self, formattedData)
 end
 
 #> Diagonal-directional differentiation (∑ᵢ(cᵢ ⋅ ∂ᵐ/∂xᵢᵐ))
-function evaluateDiagDirectionalDiff(op::DiagDirectionalDiffSampler{T, D, M}, 
-                                     (data,)::Tuple{FloatingPolyGaussField{T, D}};
-                                     cache!Self::OptAxialGaussOverlapCache{T}=NullCache{T}()
-                                     ) where {T<:Real, D, M}
+function computePGTOrbIntegral(op::DiagDirectionalDiffSampler{T, D, M}, 
+                               (data,)::Tuple{FloatingPolyGaussField{T, D}}, 
+                               cache!Self::OptAxialGaussOverlapCache{T}=NullCache{T}()
+                               ) where {T<:Real, D, M}
     formattedData = prepareOrbitalInfo!(cache!Self, data)
     diffVec = computePGTOrbCoordDiff(ntuple(_->M, Val(D)), formattedData)
     direction = last(op.dresser).direction
@@ -424,10 +426,10 @@ function evaluateDiagDirectionalDiff(op::DiagDirectionalDiffSampler{T, D, M},
 end
 
 
-function evaluateDiagDirectionalDiff(op::DiagDirectionalDiffSampler{T, D, M}, 
-                                     data::NTuple{2, FloatingPolyGaussField{T, D}}; 
-                                     cache!Self::OptAxialGaussOverlapCache{T}=NullCache{T}()
-                                     ) where {T<:Real, D, M}
+function computePGTOrbIntegral(op::DiagDirectionalDiffSampler{T, D, M}, 
+                               data::NTuple{2, FloatingPolyGaussField{T, D}}, 
+                               cache!Self::OptAxialGaussOverlapCache{T}=NullCache{T}()
+                               ) where {T<:Real, D, M}
     formattedData = prepareOrbitalInfo!(cache!Self, data)
     diffVec = computePGTOrbCoordDiff!(ntuple(_->M, Val(D)), cache!Self, formattedData)
     direction = last(op.dresser).direction
@@ -437,46 +439,48 @@ end
 
 
 #>-- Interface with the composite integration framework --<#
-getGaussBasedOneBodyIntegrator(::OneBodyIntegral, ::OverlapSampler) = evaluateOverlap
-
-getGaussBasedOneBodyIntegrator(::OneBodyIntegral{D}, 
-                               op::MultipoleMomentSampler{T, D}) where {T<:Real, D} = 
-LPartial(evaluateMultipoleMoment, (op,))
-
-getGaussBasedOneBodyIntegrator(::OneBodyIntegral{D}, 
-                               op::DiagDirectionalDiffSampler{T, D}) where {T<:Real, D} = 
-LPartial(evaluateDiagDirectionalDiff, (op,))
-
-const AxialGaussOverlapCachedSampler{T<:Real, D} = Union{
+const AxialGaussOverlapBasedSampler{T<:Real, D} = Union{
     OverlapSampler, 
     MultipoleMomentSampler{T, D}, 
     DiagDirectionalDiffSampler{T, D}
 }
 
-#= Additional Method =#
-function genAnalyticIntegralCache(::TypeBox{F}, ::OneBodyIntegralPGTOLayout{T, D}) where 
-                                 {T<:Real, D, F<:AxialGaussOverlapCachedSampler{T, D}}
+function getGaussBasedIntegrationCache(::Type{F}, ::Type{T}, ::Val{D}) where 
+                                      {T<:Real, D, F<:AxialGaussOverlapBasedSampler{T, D}}
     AxialGaussOverlapCache(FloatingPolyGaussField{T, D}, ntuple( _->Val(true), Val(D) ))
 end
 
-function genAnalyticIntegrator!(::S, cache::AxialGaussOverlapCache{T, D}, op::F) where 
-                               {D, N, S<:MultiBodyIntegral{N, D}, T<:Real, 
-                                F<:DirectOperator}
-    let integrator = getGaussBasedOneBodyIntegrator(S(), op), cache!Self=cache
-        function axialGaussIntegrate(data::NTuple{N, PairXY{ PGTOrbData{T, D} }})
-            fields = getfield.(unpackPairwiseLayout(data), :core)
-            integrator(fields; cache!Self)
-        end
-    end
-end
+supportGaussBasedIntegration(::Type{T}, ::Val{D}, 
+                             ::AxialGaussOverlapBasedSampler{T, D}) where {T<:Real, D} = 
+true
 
-function genAnalyticIntegrator!(::S, ::NullCache{C}, op::F) where 
-                               {D, N, S<:MultiBodyIntegral{N, D}, T<:Real, 
-                                C<:RealOrComplex{T}, F<:DirectOperator}
-    let integrator = getGaussBasedOneBodyIntegrator(S(), op)
-        function axialGaussIntegrate(data::NTuple{N, PairXY{ PGTOrbData{T, D} }})
-            fields = getfield.(unpackPairwiseLayout(data), :core)
-            integrator(fields)
+supportGaussBasedIntegration(::Type{T}, ::Val{3}, 
+                             ::CoulombRepulsionSampler) where {T<:Real} = 
+true
+
+supportGaussBasedIntegration(::Type{T}, ::Val{D}, ::DirectOperator) where {T<:Real, D} = 
+false
+
+#= Additional Method =#
+function evaluateIntegral!(integrator::OrbitalCoreIntegralConfig{T, D, C, N, F}, 
+                           pairwiseData::NTuple{N, N12Tuple{ PGTOrbData{T, D} }}) where 
+                          {T, C<:RealOrComplex{T}, D, N, F<:DirectOperator}
+    op = integrator.operator
+    cacheDict = integrator.cache
+    if supportGaussBasedIntegration(T, Val(D), op)
+        innerData = map(x->getfield.(x, :core), pairwiseData)
+        res = if cacheDict isa NullCache
+            computePGTOrbIntegral(op, innerData...)
+        else
+            orbLayout = ntuple(_->(PrimGaussTypeOrb, PrimGaussTypeOrb), Val(N))
+            key = (TypeBox(F), orbLayout)::OrbIntLayoutInfo{N}
+            cache = get!(cacheDict, key) do
+                getGaussBasedIntegrationCache(F, T, Val(D))
+            end
+            computePGTOrbIntegral(op, innerData..., cache)
         end
+        convert(C, res)
+    else
+        evaluateIntegralCore(integrator, pairwiseData)
     end
 end

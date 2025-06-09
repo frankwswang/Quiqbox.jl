@@ -14,12 +14,6 @@ struct SesquiFieldProd{T<:Real, D, O<:Multiplier,
     end
 end
 
-function SesquiFieldProd(layout::MonoPair{PrimOrbData{T, D}}, 
-                         dresser::Multiplier=genOverlapSampler()) where {T<:Real, D}
-    fields = unpackPairwiseLayout(layout)
-    SesquiFieldProd(getfield.(fields, :core), dresser)
-end
-
 getOutputType(::Type{<:SesquiFieldProd{T, D, <:StableTypedSampler}}) where {T<:Real, D} = 
 T
 
@@ -55,7 +49,8 @@ struct DoubleFieldProd{T<:Real, D, O<:DualTermOperator,
     coupler::O
 end
 
-function DoubleFieldProd((pairL, pairR)::DualPair{PrimOrbData{T, D}}, 
+function DoubleFieldProd(pairL::N12Tuple{PrimOrbData{T, D}}, 
+                         pairR::N12Tuple{PrimOrbData{T, D}}, 
                          coupler::DualTermOperator) where {T, D}
     sfProdL = SesquiFieldProd(pairL)
     sfProdR = SesquiFieldProd(pairR)
@@ -88,13 +83,13 @@ end
 
 
 function genIntegrant(op::Multiplier, 
-                      layout::MonoPair{PrimOrbData{T, D}}) where {T<:Real, D}
-    SesquiFieldProd(layout, op)
+                      (pair,)::Tuple{N12Tuple{ PrimOrbData{T, D} }}) where {T<:Real, D}
+    SesquiFieldProd(getfield.(pair, :core), op)
 end
 
 function genIntegrant(op::DualTermOperator, 
-                      layout::DualPair{PrimOrbData{T, D}}) where {T<:Real, D}
-    DoubleFieldProd(layout, op)
+                      (pL, pR)::NTuple{2, N12Tuple{ PrimOrbData{T, D} }}) where {T<:Real, D}
+    DoubleFieldProd(getfield.(pL, :core), getfield.(pR, :core), op)
 end
 
 
@@ -108,14 +103,15 @@ function getIntegratorConfig(::Type{T}, ::ParticleFunction) where {T<:Real}
 end
 
 
-function getNumericalIntegral(::Type{C}, op::DirectOperator, 
-                              layout::CoreIntegralOrbDataLayout{T, D}) where 
-                             {T<:Real, C<:RealOrComplex{T}, D}
-    sectors = genIntegralSectors(op, layout)
+function estimateOrbIntegral(config::MissingOr{EstimatorConfig{T}}, 
+                             op::TypedOperator{C}, layout::CoreIntegralOrbDataLayout{T, D}
+                             ) where {T<:Real, C<:RealOrComplex{T}, D}
+    sectors = genIntegralSectors(op.core, layout)
+    noGlobalConfig = ismissing(config)
     res = one(C)
     for kernel in sectors
-        config = getIntegratorConfig(T, kernel)
-        res *= numericalIntegrateCore(config, kernel)
+        configLocal = noGlobalConfig ? getIntegratorConfig(T, kernel) : config
+        res *= numericalIntegrateCore(configLocal, kernel)
     end
     convert(C, res)
 end
@@ -149,7 +145,7 @@ function getConfinedInterval(::ConfinedInfIntegrand{T, L}) where {T<:Real, L}
 end
 
 
-struct HCubatureConfig{T<:Real} <: ConfigBox
+struct HCubatureConfig{T<:Real} <: EstimatorConfig{T}
     tolerance::T
     maxEvalNum::Int
 

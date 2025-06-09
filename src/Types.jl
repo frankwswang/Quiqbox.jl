@@ -30,6 +30,7 @@ abstract type CustomCache{T} <: QueryBox{T} end
 
 abstract type DirectOperator{N} <: Modifier end # N: Number of input functions
 
+abstract type EstimatorConfig{T} <: ConfigBox end
 abstract type StructuredInfo <: ConfigBox end
 abstract type StructuredType <: ConfigBox end
 
@@ -58,6 +59,7 @@ const N24Tuple{T} = Union{NTuple{2, T}, NTuple{4, T}}
 const NonEmptyTuple{T, NMO} = Tuple{T, Vararg{T, NMO}}
 const TriTupleUnion{T} = Union{(NTuple{N, T} for N in 1:3)...}
 const GeneralTupleUnion{T<:Tuple} = Union{T, NamedTuple{<:Any, <:T}}
+const DualN12Tuple{T} = N12Tuple{N12Tuple{T}}
 
 const AbtArray0D{T} = AbstractArray{T, 0}
 const AbtBottomVector = AbstractArray{Union{}, 1}
