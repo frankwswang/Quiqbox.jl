@@ -1525,14 +1525,11 @@ function unpackFunc(f::Function)
     if noStoredParam(fLocal)
         fCore = InputConverter(fLocal)
         paramSet = initializeFixedSpanSet()
-    else
+    else #! ParamFreeFunc is not compatible with functions that only contain constant params
         source = getSourceParamSet(fLocal)
-
-        if !(isempty(source.unit) && isempty(source.grid))
-            unitPars, gridPars = map(extractMemory, source)
-            fCore = ParamBindFunc(fLocal, unitPars, gridPars)
-            paramSet = initializeSpanParamSet(unitPars, gridPars)
-        end
+        unitPars, gridPars = map(extractMemory, source)
+        fCore = ParamBindFunc(fLocal, unitPars, gridPars)
+        paramSet = initializeSpanParamSet(unitPars, gridPars)
     end
     fCore, paramSet
 end
