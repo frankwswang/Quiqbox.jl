@@ -7,7 +7,7 @@ include("Lexicons.jl")
 include("../lib/BasisSets/BasisSets.jl")
 
 include("Tools.jl")
-include("StringIO.jl")
+include("Strings.jl")
 include("Exception.jl")
 include("ParallelUtils.jl")
 
