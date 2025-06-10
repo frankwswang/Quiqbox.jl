@@ -21,12 +21,20 @@ OneToIndex(idx::OneToIndex) = itself(idx)
 Int(idx::OneToIndex) = getfield(idx, :idx)
 
 
-function shiftIndex(arr::GeneralCollection, oneToIdx::Int)
-    linearIdxStart = (Int∘getLinearFirstIndex)(arr)
-    linearIdxStart + oneToIdx - 1
+function shiftLinearIndex(arr::AbstractArray, oneToIdx::Int)
+    LinearIndices(arr)[begin + oneToIdx - 1]
 end
 
-shiftIndex(arr::GeneralCollection, i::OneToIndex) = shiftIndex(arr, i.idx)
+function shiftLinearIndex(arr::Union{Tuple, NamedTuple}, oneToIdx::Int)
+    eachindex(arr)[begin + oneToIdx - 1]
+end
+
+function shiftLinearIndex(arr::GeneralCollection, uRange::UnitRange{Int})
+    offset = shiftLinearIndex(arr, 1) - 1
+    (first(uRange) + offset) : (last(uRange) + offset)
+end
+
+shiftLinearIndex(arr::GeneralCollection, i::OneToIndex) = shiftLinearIndex(arr, i.idx)
 
 
 struct UnitIndex <: StructuredInfo
@@ -85,7 +93,7 @@ getField(obj, entry::Int) = getindex(obj, entry)
 
 getField(obj, i::Base.CartesianIndex) = getindex(obj, i)
 
-getField(obj::GeneralCollection, i::OneToIndex) = getindex(obj, shiftIndex(obj, i))
+getField(obj::GeneralCollection, i::OneToIndex) = getindex(obj, shiftLinearIndex(obj, i))
 
 getField(obj, i::UnitIndex) = getField(obj.unit, i.idx)
 

@@ -257,10 +257,9 @@ function unpackFieldFunc(f::F) where {C<:RealOrComplex, D, F<:ProductField{C, D}
 
     idx = 1
     basisCores = map(f.basis) do basis
-        iStart = idx
         basisDim = getDimension(basis)
+        getSubIdx = ViewOneToRange(idx, Count{basisDim}())
         idx += basisDim
-        getSubIdx = basisDim==1 ? GetIndex{OneToIndex}(idx-1) : GetRange(iStart, idx-1)
         basisCore = unpackFunc!(basis, paramSet, Identifier(nothing))
         ParamPipeline((InputConverter(getSubIdx), basisCore))
     end

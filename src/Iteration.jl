@@ -23,15 +23,6 @@ function rightCircShift(tpl::NonEmptyTuple)
 end
 
 
-function getLinearFirstIndex(arr::AbstractArray)
-    LinearIndices(arr) |> first
-end
-
-function getLinearFirstIndex(tpl::GeneralTupleUnion)
-    firstindex(tpl)
-end
-
-
 function checkAxialIndexStep(arr::AbstractArray, dim::MissingOr{Int}=missing)
     axialIdxRanges = ismissing(dim) ? axes(arr) : (axes(arr, dim),)
 

@@ -3,20 +3,15 @@ using Quiqbox
 
 # Benchmark Structure
 const SUITE = BenchmarkGroup()
-const CachedCompBSuite = BenchmarkGroup(["Direct", "Lazy"])
-const BasisEvalBSuite = BenchmarkGroup(["Direct", "Renormalized"])
-const IntegrationBSuite = BenchmarkGroup(["Analytical", "Numerical"])
-const DifferentiationBSuite = BenchmarkGroup(["Analytical", "Automatic", "Numerical"])
+const OrbOvlpBSuite = BenchmarkGroup(["Direct", "Lazy"])
+const OrbEvalBSuite = BenchmarkGroup(["Direct", "Renormalized"])
+const OrbInteBSuite = BenchmarkGroup(["Analytic", "Numerical"])
+const DiffFuncBSuite = BenchmarkGroup(["Symbolic", "Automatic", "Numerical"])
 
-SUITE["Basis"]["Orbital"] = BasisEvalBSuite
-const OrbEvalBSuite = SUITE["Basis"]["Orbital"]
-SUITE["Integration"]["Orbital"] = IntegrationBSuite
-const OrbInteBSuite = SUITE["Integration"]["Orbital"]
-SUITE["CompositeFunction"]["Differentiation"] = DifferentiationBSuite
-const DiffFuncBSuite = SUITE["CompositeFunction"]["Differentiation"]
-
-OrbInteBSuite["Overlap"] = CachedCompBSuite
-const OrbOvlpBSuite = OrbInteBSuite["Overlap"]
+OrbInteBSuite["Overlap"] = OrbOvlpBSuite
+SUITE["Basis"]["Orbital"] = OrbEvalBSuite
+SUITE["Integration"]["Orbital"] = OrbInteBSuite
+SUITE["CompositeFunction"]["Differentiation"] = DiffFuncBSuite
 
 
 # Benchmark Objects
@@ -25,6 +20,8 @@ cen2 = (1.0, 1.5, 1.1)
 coord1 = (2.1, 3.1, 3.4)
 coord2 = (1.1, 2.1, -3.2)
 coord2_2 = [1.1, 2.1, -3.2]
+coord3 = (0.5,)
+coord4 = (1.1, -2.1)
 
 cons1 = [1.5, -0.3]
 xpns1 = [1.2,  0.6]
@@ -44,6 +41,7 @@ pgto1n = PrimitiveOrb(pgto1, renormalize=true)
 cgto2 = genGaussTypeOrb(cen2, xpns2, cons2, ang1)
 pgto2 = first(cgto2.basis)
 
+cgto3 = genGaussTypeOrb(cen1[begin:begin+1], xpns2, cons1, ang1[end-1:end])
 
 stf1DCore = (x::Tuple{Real})->exp(-(x|>first))
 
@@ -81,6 +79,13 @@ func1 = Quiqbox.TypedCarteFunc(func1Core, Float64, Val(3))
 df1_fd1 = Quiqbox.AxialFiniteDiff(func1, Val(1), 1)
 df1_fd2 = Quiqbox.AxialFiniteDiff(func1, Val(2), 1)
 df1_fd3 = Quiqbox.AxialFiniteDiff(func1, Val(3), 1)
+
+
+gf1D = Quiqbox.GaussFunc(xpns1[begin])
+gfOrb = Quiqbox.PrimitiveOrb((1.0,), gf1D, renormalize=false)
+
+ap2D = Quiqbox.AxialProduct((stf1D, gf1D))
+apOrb = Quiqbox.PrimitiveOrb((1.0, 2.0), ap2D, renormalize=false)
 
 
 # Benchmark Groups
@@ -124,10 +129,12 @@ OrbOvlpBSuite["Lazy"]["PSTO_Self_DN"] =
 # `CurriedField`-Based Orbital Benchmark Group
 OrbEvalBSuite["Direct"]["PSTOc"] = @benchmarkable ($psto1c)($coord1) evals=1
 OrbEvalBSuite["Direct"]["CGTOc"] = @benchmarkable ($cgto1c)($coord1) evals=1
+OrbEvalBSuite["Direct"]["GFOrb"] = @benchmarkable ($gfOrb )($coord3) evals=1
 OrbOvlpBSuite["Direct"]["PSTOc_self_DD"] = @benchmarkable overlap($psto1c, $psto1c) evals=1
 OrbOvlpBSuite["Direct"]["PSTOc_PSTO_DD"] = @benchmarkable overlap($psto1c, $psto1)  evals=1
 OrbOvlpBSuite["Direct"]["CGTOc_self_DD"] = @benchmarkable overlap($cgto1c, $cgto1c) evals=1
 OrbOvlpBSuite["Direct"]["CGTOc_CGTO_DD"] = @benchmarkable overlap($cgto1c, $cgto1)  evals=1
+OrbOvlpBSuite["Direct"]["GFOrb_self_DD"] = @benchmarkable overlap($gfOrb,  $gfOrb)  evals=1
 
 # Differentiation-Function Benchmark Group
 DiffFuncBSuite["Numerical"]["df_fd1_tpl"] = @benchmarkable ($df1_fd1)($coord2)   evals=1
@@ -135,6 +142,10 @@ DiffFuncBSuite["Numerical"]["df_fd1_arr"] = @benchmarkable ($df1_fd1)($coord2_2)
 DiffFuncBSuite["Numerical"]["df_fd2_tpl"] = @benchmarkable ($df1_fd2)($coord2)   evals=1
 DiffFuncBSuite["Numerical"]["df_fd3_tpl"] = @benchmarkable ($df1_fd3)($coord2)   evals=1
 
+# `ProductField`-Based Orbital Benchmark Group
+OrbEvalBSuite["Numerical"]["APOrb"] = @benchmarkable ($apOrb )($coord4) evals=1
+OrbOvlpBSuite["Numerical"]["APOrb_self_DD"] = @benchmarkable overlap($apOrb, $apOrb) evals=1
+OrbOvlpBSuite["Numerical"]["APOrb_CGTO_DD"] = @benchmarkable overlap($apOrb, $cgto3) evals=1
 
 # Finalized Benchmarkable Suite
 SUITE # `BenchmarkTools.run(SUITE)` to manually invoke benchmarking.

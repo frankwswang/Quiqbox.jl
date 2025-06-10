@@ -317,7 +317,7 @@ end
 
 function getBasisIndexRange(list::BasisIndexList, idx::OneToIndex)
     endpointList = list.endpoint
-    i = shiftIndex(endpointList, idx)
+    i = shiftLinearIndex(endpointList, idx)
     (endpointList[i], (endpointList[i+1] - 1))
 end
 
@@ -380,7 +380,7 @@ function indexCacheOrbData!(orbCache::PrimOrbDataCache{T, D},
         for (n, i) in enumerate(oneToStart.idx : oneToFinal.idx)
             primOrbData = getSubOrbData(orbData, OneToIndex( n, False() ))
             oneToIdx = updateOrbCache!(orbCache, orbMarkerCache, primOrbData)
-            listIndices[shiftIndex(listIndices, i)] = oneToIdx
+            listIndices[shiftLinearIndex(listIndices, i)] = oneToIdx
         end
     end
     list
@@ -580,8 +580,8 @@ function buildIndexedOrbWeights!(normCache::OverlapCoreCache{T, D},
     map(data) do ele
         oneToStart, oneToFinal = getBasisIndexRange(intIdxList, OneToIndex( i+=1, False() ))
         oneToRange = oneToStart.idx : oneToFinal.idx
-         iIdxRange = getLinearFirstIndex( intIdxList.index) .+ oneToRange .- 1
-         nIdxRange = getLinearFirstIndex(normIdxList.index) .+ oneToRange .- 1
+         iIdxRange = shiftLinearIndex( intIdxList.index, oneToRange)
+         nIdxRange = shiftLinearIndex(normIdxList.index, oneToRange)
          intIdxSeq = view( intIdxList.index, iIdxRange)
         normIdxSeq = view(normIdxList.index, nIdxRange)
         orbWeight = buildOrbWeight!(normCache, ele, normIdxSeq)
