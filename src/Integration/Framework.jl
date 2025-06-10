@@ -580,8 +580,8 @@ function buildIndexedOrbWeights!(normCache::OverlapCoreCache{T, D},
     map(data) do ele
         oneToStart, oneToFinal = getBasisIndexRange(intIdxList, OneToIndex( i+=1, False() ))
         oneToRange = oneToStart.idx : oneToFinal.idx
-         iIdxRange = shiftLinearIndex(intIdxList.index, oneToRange)
-         nIdxRange = shiftLinearIndex(intIdxList.index, oneToRange)
+         iIdxRange = shiftLinearIndex( intIdxList.index, oneToRange)
+         nIdxRange = shiftLinearIndex(normIdxList.index, oneToRange)
          intIdxSeq = view( intIdxList.index, iIdxRange)
         normIdxSeq = view(normIdxList.index, nIdxRange)
         orbWeight = buildOrbWeight!(normCache, ele, normIdxSeq)
