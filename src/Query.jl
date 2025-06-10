@@ -30,7 +30,8 @@ function shiftLinearIndex(arr::Union{Tuple, NamedTuple}, oneToIdx::Int)
 end
 
 function shiftLinearIndex(arr::GeneralCollection, uRange::UnitRange{Int})
-    shiftLinearIndex(arr, first(uRange)) : shiftLinearIndex(arr, last(uRange))
+    offset = shiftLinearIndex(arr, 1) - 1
+    (first(uRange) + offset) : (last(uRange) + offset)
 end
 
 shiftLinearIndex(arr::GeneralCollection, i::OneToIndex) = shiftLinearIndex(arr, i.idx)

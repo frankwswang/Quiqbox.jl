@@ -270,23 +270,25 @@ getOutputType(::Type{<:SelectHeader{<:Any, <:Any, F}}) where {F<:Function} =
 getOutputType(F)
 
 
-struct GetRange <: Mapper
-    start::Int
-    final::Int
-    step::Int
+struct ViewOneToRange{N} <: Mapper #> N: range size
+    start::Int #> One-based starting index
 
-    function GetRange(start::Int, final::Int, step::Int=1)
+    function ViewOneToRange(start::Int, ::Count{N}=Count{1}()) where {N}
         checkPositivity(start)
-        checkPositivity(final)
-        checkPositivity(step|>abs)
-        new(start, final, step)
+        new{N}(start)
     end
 end
 
-function (f::GetRange)(obj)
-    map(obj, f.start:f.step:f.final) do i
-        getField(obj, OneToIndex(i))
+function (f::ViewOneToRange{N})(obj::Tuple) where {N}
+    iStart = shiftLinearIndex(obj, f.start)
+    ntuple(Val(N)) do i
+        obj[iStart + i - 1]
     end
+end
+
+function (f::ViewOneToRange{N})(obj::AbstractArray) where {N}
+    start = f.start
+    view(obj, shiftLinearIndex( obj, start:(start+N-1) ))
 end
 
 
