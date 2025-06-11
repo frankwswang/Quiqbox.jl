@@ -77,3 +77,8 @@ const BoolVal = Union{True, False}
 getValData(::Val{T}) where {T} = T
 
 getValData(::Type{Val{T}}) where {T} = T
+
+
+function getMethodNum(f::Function)
+    (length ∘ methods)(f)
+end

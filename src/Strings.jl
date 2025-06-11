@@ -28,14 +28,18 @@ end
 
 function numToSups(num::Int)
     str = string(num)
-    [superscriptNum[i] for i in str] |> prod
+    mapreduce(*, str) do char
+        superscriptNum[char]
+    end
 end
 
 numToSups(::Nothing) = ""
 
 function numToSubs(num::Int)
     str = string(num)
-    [subscriptNum[i] for i in str] |> prod
+    mapreduce(*, str) do char
+        subscriptNum[char]
+    end
 end
 
 numToSubs(::Nothing) = ""
