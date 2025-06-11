@@ -23,8 +23,8 @@ function checkFname(Fname::String; showWarning::Bool=true)
 end
 
 
-function getObjModulePrefix(objName::Symbol)
-    Base.isexported(Quiqbox, objName) ? "" : string(nameof(Quiqbox), ".")
+function getObjNameStr(objName::Symbol, objAlias::AbstractString=string(objName))
+    (Base.isexported(Quiqbox, objName) ? "" : string(nameof(Quiqbox), ".")) * objAlias
 end
 
 function enableCompatShowFormat(::B, io::IO) where {B<:BoolVal}
@@ -48,14 +48,24 @@ Base.show(io::IO, ::MIME"text/plain", p::ParamBox) = showParamBox(False(), io, p
 function showParamBox(::B, io::IO, p::ParamBox) where {B<:BoolVal}
     pType = typeof(p)
     pName = nameof(pType)
+    pSymbol = indexedSymOf(p)
     aliasStr = getTypeAliasStr(p)
-    if enableCompatShowFormat(B(), io)
+    outerType = get(io, :typeinfo, Any)
+    if pType <: outerType <: ParamBox
+        if outerType == pType
+            show(io, MIME("text/plain"), pSymbol)
+        else
+            print(io, "(")
+            show(io, MIME("text/plain"), pSymbol)
+            print(io, "::", getObjNameStr(pName), ")")
+        end
+    elseif enableCompatShowFormat(B(), io)
         print(io, aliasStr)
-        print(io, "(...)")
+        print(io, "(…)")
     else
         print(io, "(")
-        show(io, MIME("text/plain"), indexedSymOf(p))
-        print(io, "::", getObjModulePrefix(pName), pName, ")")
+        show(io, MIME("text/plain"), pSymbol)
+        print(io, "::", getObjNameStr(pName), ")")
         level = screenLevelOf(p)
         relationStr = (level==0 ? " ==> " : (level==1 ? " <=> " : " <== "))
         print(io, relationStr, "(")
@@ -81,14 +91,7 @@ function showCompositeFunc(::B, io::IO, f::CompositeFunction) where {B<:BoolVal}
     if enableCompatShowFormat(B(), io)
         print(io,  "(::", aliasStr, ")")
     else
-        superTypeSym = nameof(f |> typeof)
-        superTypeStr = string(superTypeSym)
-        nameStr = if startswith(aliasStr, superTypeStr)
-            ""
-        else
-            " <: " * getObjModulePrefix(superTypeSym) * superTypeStr
-        end
-        typeStr = string("(::", aliasStr, nameStr, ")")
+        typeStr = string("(::", aliasStr, ")")
         methodStr = string("(", nMethod, " method", (nMethod > 1 ? "s" : ""), ")")
         print(io,  typeStr, " ", methodStr)
     end
@@ -96,8 +99,10 @@ end
 
 
 function getTypeAliasStr(obj)
-    if hasmethod(getTypeAliasStrCore, (typeof(obj),))
-        getObjModulePrefix(nameof(obj)) * getTypeAliasStrCore(obj)
+    objType = typeof(obj)
+    if hasmethod(getTypeAliasStrCore, (objType,))
+        objName = objType <: Function ? nameof(obj) : nameof(objType)
+        getObjNameStr(objName, getTypeAliasStrCore(obj))
     else
         string(obj|>typeof)
     end
@@ -106,3 +111,14 @@ end
 getTypeAliasStrCore(::StableAdd{T}) where {T} = string("StableAdd{$T}")
 
 getTypeAliasStrCore(::StableMul{T}) where {T} = string("StableMul{$T}")
+
+function getTypeAliasStrCore(::ScreenParam{T, E, P}) where {T, E<:Pack{T}, P<:ParamBox{T}}
+    tailStr = P <: PrimitiveParam ? string(P) : "…"
+    string("ScreenParam", "{", T, ", ", E, ", " , tailStr, "}")
+end
+
+getTypeAliasStrCore(::ReduceParam{T, E}) where {T, E<:Pack{T}} = 
+string("ReduceParam", "{", T, ", ", E, ", ", "…}")
+
+getTypeAliasStrCore(::ExpandParam{T, E, N}) where {T, E<:Pack{T}, N} = 
+string("ExpandParam", "{", T, ", ", E, ", ", N, ", ", "…}")
