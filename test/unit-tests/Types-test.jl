@@ -7,6 +7,8 @@ using Quiqbox
 
 @test Quiqbox.ReducibleParam <: Quiqbox.ParamBox
 
+@test Quiqbox.ScreenParam <: Quiqbox.ReduceParam
+
 @test Quiqbox.NestFixedParIn{Float64} <: Quiqbox.CoreFixedParIn{Float64}
 
 @test Quiqbox.PrimGTO <: Quiqbox.PrimitiveOrb

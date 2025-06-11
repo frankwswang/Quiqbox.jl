@@ -96,3 +96,5 @@ import Base: get, keys, values, hash, isempty, collect, length
 import Base: +, -, ==
 
 import Base: Int
+
+import Base: show

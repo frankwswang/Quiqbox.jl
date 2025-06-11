@@ -7,7 +7,7 @@ include("Lexicons.jl")
 include("../lib/BasisSets/BasisSets.jl")
 
 include("Tools.jl")
-include("StringIO.jl")
+include("Strings.jl")
 include("Exception.jl")
 include("ParallelUtils.jl")
 
@@ -42,6 +42,8 @@ include("Integration/Interface.jl")
 
 # include("Integrals/OneBody.jl")
 # include("Integrals/TwoBody.jl")
+
+include("IO.jl")
 
 include("Precompilation.jl")
 
