@@ -31,7 +31,8 @@ const TensorialParam{T, S<:StateType} = Union{UnitParam{T, S}, GridParam{T, <:An
 const AdaptableParam{T, E<:Pack{T}} = Union{CellParam{T, E}, MeshParam{T, E}}
 const ReducibleParam{T, E<:Pack{T}, S<:StateType} = 
       Union{ParamBox{T, E, S}, NestParam{T, E, <:Any, S}}
-
+#!! Need to check if `ReducibleParam` can be removed since ParamBox == ReducibleParam
+#!! but Quiqbox.NestFixedParIn != Quiqbox.CoreFixedParIn
 const NestFixedParIn{T, E<:Pack{T}} = TriTupleUnion{ParamBox{T, E}}
 const CoreFixedParIn{T, E<:Pack{T}} = TriTupleUnion{ReducibleParam{T, E}}
 
@@ -419,6 +420,8 @@ mutable struct ReduceParam{T, E<:Pack{T}, F<:Function, I<:CoreFixedParIn} <: Cel
         end
     end
 end
+
+const ScreenParam{T, E<:Pack{T}, P<:ParamBox{T}} = ReduceParam{T, E, ItsType, Tuple{P}}
 
 function genCellParam(func::Function, input::CoreFixedParIn, symbol::SymOrIndexedSym)
     lambda = formatTensorFunc(func, TypedReduce, input)
