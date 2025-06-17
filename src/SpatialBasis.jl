@@ -242,17 +242,18 @@ function getOrbOutputTypeUnion(orbsData::OrbDataCollection{T, D}) where {T<:Real
 end
 
 
-const MixedFieldParamFuncCacheCore{C<:RealOrComplex, D} = 
-      LRU{EgalBox{FieldAmplitude{C, D}}, FieldParamFunc{C, D}}
+const MixedFieldParamFuncCacheCore{T, D, C<:RealOrComplex{T}} = 
+      LRU{EgalBox{FieldAmplitude{C, D}}, FieldParamFunc{T, D, C}}
 
-struct MixedFieldParamFuncCache{T<:Real, D} <: QueryBox{Union{ FieldParamFunc{T, D}, 
-                                                        FieldParamFunc{Complex{T}, D} }}
-    real::MixedFieldParamFuncCacheCore{T, D}
-    complex::MixedFieldParamFuncCacheCore{Complex{T}, D}
+struct MixedFieldParamFuncCache{T<:Real, D
+                                } <: QueryBox{Union{ FieldParamFunc{T, D, T}, 
+                                                     FieldParamFunc{T, D, Complex{T}} }}
+    real::MixedFieldParamFuncCacheCore{T, D, T}
+    complex::MixedFieldParamFuncCacheCore{T, D, Complex{T}}
 end
 
 const TypedFieldParamFuncCache{T<:Real, D, C<:RealOrComplex{T}, F<:FieldAmplitude{C, D}} = 
-      LRU{EgalBox{F}, FieldParamFunc{C, D}}
+      LRU{EgalBox{F}, FieldParamFunc{T, D, C}}
 
 const FieldParamFuncCache{T<:Real, D} = 
       Union{MixedFieldParamFuncCache{T, D}, TypedFieldParamFuncCache{T, D}}
@@ -268,8 +269,8 @@ function genFieldParamFuncCache(::Type{F}, maxSize::Int=200) where
         valueType = getOutputType(fieldType)
         TypedFieldParamFuncCache{T, D, valueType, fieldType}(maxsize=maxSize)
     else
-        rSector = MixedFieldParamFuncCacheCore{T, D}(maxsize=maxSize)
-        cSector = MixedFieldParamFuncCacheCore{Complex{T}, D}(maxsize=maxSize)
+        rSector = MixedFieldParamFuncCacheCore{T, D, T}(maxsize=maxSize)
+        cSector = MixedFieldParamFuncCacheCore{T, D, Complex{T}}(maxsize=maxSize)
         MixedFieldParamFuncCache(rSector, cSector)
     end
 end

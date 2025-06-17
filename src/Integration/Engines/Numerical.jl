@@ -94,7 +94,7 @@ end
 
 
 function genIntegralSectors(op::DirectOperator, layout::CoreIntegralOrbDataLayout)
-    tuple(genIntegrant(op, layout))
+    *, tuple(genIntegrant(op, layout))
 end
 
 
@@ -106,12 +106,12 @@ end
 function estimateOrbIntegral(config::MissingOr{EstimatorConfig{T}}, 
                              op::TypedOperator{C}, layout::CoreIntegralOrbDataLayout{T, D}
                              ) where {T<:Real, C<:RealOrComplex{T}, D}
-    sectors = genIntegralSectors(op.core, layout)
+    combiner, sectors = genIntegralSectors(op.core, layout)
     noGlobalConfig = ismissing(config)
     res = one(C)
     for kernel in sectors
         configLocal = noGlobalConfig ? getIntegratorConfig(T, kernel) : config
-        res *= numericalIntegrateCore(configLocal, kernel)
+        res = combiner(res, numericalIntegrateCore(configLocal, kernel))
     end
     convert(C, res)
 end

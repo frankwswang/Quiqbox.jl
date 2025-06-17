@@ -1390,9 +1390,6 @@ getField(obj, tsFilter.scope, finalizer)
 getOutputType(::Type{TaggedSpanSetFilter{F}}) where {F<:NamedFilter} = getOutputType(F)
 
 
-const TypedParamFunc{T, F<:AbstractParamFunc} = TypedReturn{T, F}
-
-
 struct InputConverter{F<:Function} <: AbstractParamFunc
     core::ParamFreeFunc{F}
 end

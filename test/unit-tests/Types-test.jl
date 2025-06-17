@@ -29,7 +29,7 @@ using Quiqbox
 
 @test Quiqbox.AxialProduct{<:Quiqbox.RealOrComplex, 1} <: Quiqbox.ProductField
 
-@test Quiqbox.CartAngMomFunc <: Quiqbox.NullaryField
+@test Quiqbox.CartAngMomentum <: Quiqbox.NullaryField
 
 @test Quiqbox.PolyRadialFunc <: Quiqbox.CoupledField
 
