@@ -58,7 +58,7 @@ getOutputType(::Type{<:FieldParamFunc{T, D, C}}) where {T, D, C<:RealOrComplex{T
 const NullaryFieldFunc{T, D, C<:RealOrComplex{T}, F<:AbstractParamFunc} = 
       FieldParamFunc{T, D, C, F, VoidSetFilter}
 
-function getFieldFuncCorePair(f::FieldParamFunc)
+@inline function getFieldFuncCorePair(f::FieldParamFunc)
     core = f.core.f
     core.binder => last(core.encode)
 end
