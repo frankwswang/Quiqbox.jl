@@ -1483,9 +1483,6 @@ function ContextParamFunc(binder::Function, formatter::TaggedSpanSetFilter)
 end
 
 
-const ParamFilterApply{B<:Function, E<:SpanSetFilter} = ContextParamFunc{B, ItsType, E}
-
-
 struct ParamPipeline{E<:ParamFunctionChain} <: AbstractParamFunc
     encode::E
 
