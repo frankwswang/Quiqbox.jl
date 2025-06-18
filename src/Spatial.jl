@@ -58,11 +58,6 @@ getOutputType(::Type{<:FieldParamFunc{T, D, C}}) where {T, D, C<:RealOrComplex{T
 const NullaryFieldFunc{T, D, C<:RealOrComplex{T}, F<:AbstractParamFunc} = 
       FieldParamFunc{T, D, C, F, VoidSetFilter}
 
-@inline function getFieldFuncCorePair(f::FieldParamFunc)
-    core = f.core.f
-    core.binder => last(core.encode)
-end
-
 
 function unpackFunc!(f::F, paramSet::OptSpanParamSet, 
                      paramSetId::Identifier=Identifier(paramSet)) where 
@@ -400,9 +395,9 @@ struct FloatingField{T<:Real, D, C<:RealOrComplex{T}, F<:AbstractParamFunc,
     function FloatingField(center::NonEmptyTuple{Real}, f::FieldParamFunc{T, D, C, F}, 
                            paramSet::OptSpanParamSet) where 
                           {T, C<:RealOrComplex{T}, D, F<:AbstractParamFunc}
-        fCore, fParam = getFieldFuncCorePair(f)
-        core = TypedCarteFunc(fCore, C, Val(D))
-        pValSet = getField(paramSet, fParam.core.f, obtain)
+        fInner = f.core.f
+        core = TypedCarteFunc(fInner.binder, C, Val(D))
+        pValSet = getField(paramSet, last(fInner.encode).core.f, obtain)
         new{T, D, C, F, typeof(pValSet)}(convert(NTuple{D, T}, center), core, pValSet)
     end
 end
