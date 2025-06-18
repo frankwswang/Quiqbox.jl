@@ -24,52 +24,55 @@ end
 (f::FieldAmplitude)(input) = evalFieldAmplitude(f, formatInput(f, input))
 
 
-struct FieldParamFunc{C<:RealOrComplex, D, F<:AbstractParamFunc, S<:SpanSetFilter
-                      } <: AbstractParamFunc
-    core::TypedParamFunc{C, ParamFilterApply{CartesianHeader{D, F}, S}}
+struct FieldParamFunc{T, D, C<:RealOrComplex{T}, F<:AbstractParamFunc, S<:SpanSetFilter
+                      } <: TypedParamFunc{C}
+    core::TypedReturn{C, ContextParamFunc{F, CartesianFormatter{T, D}, S}}
 
-    function FieldParamFunc{C, D}(f::CartesianHeader{D, F}, scope::TaggedSpanSetFilter{S}
-                                  ) where {C<:RealOrComplex, D, F<:AbstractParamFunc, 
-                                           S<:SpanSetFilter}
+    function FieldParamFunc{T, D, C}(f::F, scope::TaggedSpanSetFilter{S}) where 
+                                    {T, C<:RealOrComplex{T}, D, F<:AbstractParamFunc, 
+                                     S<:SpanSetFilter}
         checkPositivity(D)
         if F <: InputConverter && !(S <: VoidSetFilter)
             throw(AssertionError("The `scope` corresponding to `F<:InputConverter` must "*
                                  "be `$(TaggedSpanSetFilter{VoidSetFilter})`."))
         end
-        inner = ContextParamFunc(CartesianHeader(f, Val(D)), scope)
-        new{C, D, F, S}(TypedReturn(inner, C))
+        inner = ContextParamFunc(f, CartesianFormatter(T, Count{D}()), scope)
+        new{T, D, C, F, S}(TypedReturn(inner, C))
     end
 end
 
-function evalFieldParamFunc(f::FieldParamFunc{C, D, F, S}, input::T, 
-                            params::OptSpanValueSet) where 
-                           {T, C<:RealOrComplex, D, F<:AbstractParamFunc, S<:SpanSetFilter}
+FieldParamFunc(f::TypedCarteFunc{C, D, <:AbstractParamFunc}, 
+               scope::TaggedSpanSetFilter{<:SpanSetFilter}) where 
+              {T, C<:RealOrComplex{T}, D} = 
+FieldParamFunc{T, D, C}(f.f.f, scope)
+
+function evalFieldParamFunc(f::FieldParamFunc{T, D, C, F}, input, params::OptSpanValueSet
+                            ) where {T, C<:RealOrComplex{T}, D, F<:AbstractParamFunc}
     f.core(input, params)
 end
 
-(f::FieldParamFunc)(input, params::OptSpanValueSet) = 
-evalFieldParamFunc(f, input, params)
+(f::FieldParamFunc)(input, params::OptSpanValueSet) = evalFieldParamFunc(f, input, params)
 
-getOutputType(::Type{<:FieldParamFunc{C}}) where {C<:RealOrComplex} = C
+getOutputType(::Type{<:FieldParamFunc{T, D, C}}) where {T, D, C<:RealOrComplex{T}} = C
 
-const NullaryFieldFunc{C<:RealOrComplex, D, F<:AbstractParamFunc} = 
-      FieldParamFunc{C, D, F, VoidSetFilter}
+const NullaryFieldFunc{T, D, C<:RealOrComplex{T}, F<:AbstractParamFunc} = 
+      FieldParamFunc{T, D, C, F, VoidSetFilter}
 
 
 function unpackFunc!(f::F, paramSet::OptSpanParamSet, 
                      paramSetId::Identifier=Identifier(paramSet)) where 
-                    {C<:RealOrComplex, D, F<:FieldAmplitude{C, D}}
+                    {T, C<:RealOrComplex{T}, D, F<:FieldAmplitude{C, D}}
     fCore, localParamSet = unpackFieldFunc(f)
     idxFilter = locateParam!(paramSet, localParamSet)
     scope = TaggedSpanSetFilter(idxFilter, paramSetId)
-    FieldParamFunc{C, D}(fCore, scope)
+    FieldParamFunc(fCore, scope)
 end
 
-function unpackFunc(f::F) where {C<:RealOrComplex, D, F<:FieldAmplitude{C, D}}
+function unpackFunc(f::F) where {T, C<:RealOrComplex{T}, D, F<:FieldAmplitude{C, D}}
     fCore, paramSet = unpackFieldFunc(f)
     idxFilter = SpanSetFilter(map(length, paramSet)...)
     scope = TaggedSpanSetFilter(idxFilter, Identifier(paramSet))
-    FieldParamFunc{C, D}(fCore, scope), paramSet
+    FieldParamFunc(fCore, scope), paramSet
 end
 
 
@@ -125,26 +128,26 @@ function evalFieldAmplitudeCore(f::EncodedField{C, D, F, E}, input,
     convert(C, val)
 end
 
-function unpackFieldFunc(f::F) where {D, F<:EncodedField{<:RealOrComplex, D}}
+function unpackFieldFunc(f::F) where {D, C<:RealOrComplex, F<:EncodedField{C, D}}
     paramSet = initializeSpanParamSet()
     fCore = unpackFunc!(f.core.f, paramSet, Identifier(nothing))
     fEncode = unpackFunc!(f.encode.f, paramSet, Identifier(nothing))
-    CartesianHeader(ParamPipeline((fEncode, fCore)), Val(D)), paramSet
+    TypedCarteFunc(ParamPipeline((fEncode, fCore)), C, Val(D)), paramSet
 end
 
 
 const WrappedField{C<:RealOrComplex, D, F<:Function} = EncodedField{C, D, F, ItsType}
 
-const EncodedFieldFunc{C<:RealOrComplex, D, E<:AbstractParamFunc, F<:AbstractParamFunc, 
-                       S<:SpanSetFilter} = 
-      FieldParamFunc{C, D, ParamPipeline{Tuple{E, F}}, S}
+const EncodedFieldFunc{T, D, C<:RealOrComplex{T}, E<:AbstractParamFunc, 
+                       F<:AbstractParamFunc, S<:SpanSetFilter} = 
+      FieldParamFunc{T, D, C, ParamPipeline{Tuple{E, F}}, S}
 
 
 const RadialField{C<:RealOrComplex, D, F<:FieldAmplitude{C, 1}} = 
       EncodedField{C, D, F, typeof(generalNorm)}
 
-const RadialFieldFunc{C<:RealOrComplex, D, F<:AbstractParamFunc, S<:SpanSetFilter} = 
-      EncodedFieldFunc{C, D, InputConverter{typeof(generalNorm)}, F, S}
+const RadialFieldFunc{T, D, C<:RealOrComplex{T}, F<:AbstractParamFunc, S<:SpanSetFilter} = 
+      EncodedFieldFunc{T, D, C, InputConverter{typeof(generalNorm)}, F, S}
 
 RadialField{C, D}(radial::FieldAmplitude{C, 1}) where {C<:RealOrComplex, D} = 
 EncodedField(radial, CartesianHeader( generalNorm, Val(D) ))
@@ -184,8 +187,8 @@ function evalFieldAmplitudeCore(f::NullaryField, input)
     f.core(formatInput(f, input))
 end
 
-function unpackFieldFunc(f::NullaryField{<:RealOrComplex, D}) where {D}
-    CartesianHeader(InputConverter(f.core.f.f), Val(D)), initializeFixedSpanSet()
+function unpackFieldFunc(f::NullaryField{C, D}) where {C<:RealOrComplex, D}
+    TypedCarteFunc(InputConverter(f.core.f.f), C, Val(D)), initializeFixedSpanSet()
 end
 
 
@@ -196,11 +199,11 @@ function evalFieldAmplitudeCore(f::CurriedField, input, cache!Self::MultiSpanDat
     f.core(formatInput(f, input), paramVals)
 end
 
-function unpackFieldFunc(f::F) where {D, F<:CurriedField{<:RealOrComplex, D}}
+function unpackFieldFunc(f::F) where {C<:RealOrComplex, D, F<:CurriedField{C, D}}
     params = f.param
     paramMapper, paramSet = genParamMapper(params)
     tagFilter = TaggedSpanSetFilter(paramMapper, Identifier(nothing))
-    CartesianHeader(ContextParamFunc(f.core.f.f, tagFilter), Val(D)), paramSet
+    TypedCarteFunc(ContextParamFunc(f.core.f.f, tagFilter), C, Val(D)), paramSet
 end
 
 
@@ -217,7 +220,7 @@ const ComputeGaussFunc = typeof(computeGaussFunc)
 const GaussFieldCore{F<:ParamMapper} = EncodeParamApply{ParamFreeFunc{ComputeGaussFunc}, F}
 
 const GaussFieldFunc{T<:Real, F<:ParamMapper, S<:SpanSetFilter} = 
-      FieldParamFunc{T, 1, GaussFieldCore{F}, S}
+      FieldParamFunc{T, 1, T, GaussFieldCore{F}, S}
 
 function GaussFunc(xpn::UnitOrVal{T}) where {T<:Real}
     core = TypedCarteFunc(ParamFreeFunc(computeGaussFunc), T, Val(1))
@@ -264,7 +267,7 @@ function unpackFieldFunc(f::F) where {C<:RealOrComplex, D, F<:ProductField{C, D}
         ParamPipeline((InputConverter(getSubIdx), basisCore))
     end
 
-    CartesianHeader(ParamCombiner(StableMul(C), basisCores), Val(D)), paramSet
+    TypedCarteFunc(ParamCombiner(StableMul(C), basisCores), C, Val(D)), paramSet
 end
 
 
@@ -303,22 +306,22 @@ function evalFieldAmplitude(f::CoupledField, input;
     end |> Base.Splat(f.coupler)
 end
 
-function unpackFieldFunc(f::F) where {D, F<:CoupledField{<:RealOrComplex, D}}
+function unpackFieldFunc(f::F) where {D, C<:RealOrComplex, F<:CoupledField{C, D}}
     fL, fR = f.pair
     paramSet = initializeSpanParamSet()
     fCoreL = unpackFunc!(fL, paramSet, Identifier(nothing))
     fCoreR = unpackFunc!(fR, paramSet, Identifier(nothing))
-    CartesianHeader(ParamCombiner(f.coupler, (fCoreL, fCoreR)), Val(D)), paramSet
+    TypedCarteFunc(ParamCombiner(f.coupler, (fCoreL, fCoreR)), C, Val(D)), paramSet
 end
 
 
-const CartAngMomFunc{C<:RealOrComplex, D} = NullaryField{C, D, CartSHarmonics{D}}
+const CartAngMomentum{C<:RealOrComplex, D} = NullaryField{C, D, CartSHarmonics{D}}
 
-const CartAngMomFieldFunc{C<:RealOrComplex, D} =
-      NullaryFieldFunc{C, D, InputConverter{ CartSHarmonics{D} }}
+const CartAngMomentumFunc{T, D, C<:RealOrComplex{T}} =
+      NullaryFieldFunc{T, D, C, InputConverter{ CartSHarmonics{D} }}
 
 const PolyRadialFunc{C<:RealOrComplex, D, F<:FieldAmplitude{C, 1}} = 
-      CoupledField{C, D, RadialField{C, D, F}, CartAngMomFunc{C, D}, typeof(*)}
+      CoupledField{C, D, RadialField{C, D, F}, CartAngMomentum{C, D}, typeof(*)}
 
 function PolyRadialFunc(radial::FieldAmplitude{C, 1}, 
                         angular::NonEmptyTuple{Int, D}) where {C<:RealOrComplex, D}
@@ -330,19 +333,20 @@ end
 
 const PolyGaussFunc{T<:Real, D, F<:GaussFunc{T}} = PolyRadialFunc{T, D, F}
 
-const PolyRadialFieldCore{C<:RealOrComplex, D, F<:AbstractParamFunc, S<:SpanSetFilter} = 
+const PolyRadialFieldCore{T, D, C<:RealOrComplex{T}, F<:AbstractParamFunc, 
+                          S<:SpanSetFilter} = 
       ParamCombiner{ParamFreeFunc{StableMul{C}}, 
-                    Tuple{ RadialFieldFunc{C, D, F, S}, CartAngMomFieldFunc{C, D} }}
+                    Tuple{ RadialFieldFunc{T, D, C, F, S}, CartAngMomentumFunc{T, D, C} }}
 
 const PolyGaussFieldCore{T<:Real, D, F<:ParamMapper, S<:SpanSetFilter} = 
-      PolyRadialFieldCore{T, D, GaussFieldFunc{T, F, S}, S}
+      PolyRadialFieldCore{T, D, T, GaussFieldFunc{T, F, S}, S}
 
-const PolyRadialFieldFunc{C<:RealOrComplex, D, F<:PolyRadialFieldCore{C, D}, 
+const PolyRadialFieldFunc{T, D, C<:RealOrComplex{T}, F<:PolyRadialFieldCore{T, D, C}, 
                           S<:SpanSetFilter} = 
-      FieldParamFunc{C, D, F, S}
+      FieldParamFunc{T, D, C, F, S}
 
 const PolyGaussFieldFunc{T<:Real, D, F<:PolyGaussFieldCore{T, D}, S<:SpanSetFilter} = 
-      PolyRadialFieldFunc{T, D, F, S}
+      PolyRadialFieldFunc{T, D, T, F, S}
 
 
 #= Additional Method =#
@@ -388,14 +392,12 @@ struct FloatingField{T<:Real, D, C<:RealOrComplex{T}, F<:AbstractParamFunc,
     core::TypedCarteFunc{C, D, F}
     param::P
 
-    function FloatingField(center::NonEmptyTuple{Real}, f::FieldParamFunc{C, D, F}, 
+    function FloatingField(center::NonEmptyTuple{Real}, f::FieldParamFunc{T, D, C, F}, 
                            paramSet::OptSpanParamSet) where 
-                          {C<:RealOrComplex, D, F<:AbstractParamFunc}
-        T = extractRealNumberType(C)
-        base = f.core.f
-        core = TypedReturn(base.binder, T)
-        paramFormatter = last(base.encode)
-        pValSet = getField(paramSet, paramFormatter.core.f, obtain)
+                          {T, C<:RealOrComplex{T}, D, F<:AbstractParamFunc}
+        fInner = f.core.f
+        core = TypedCarteFunc(fInner.binder, C, Val(D))
+        pValSet = getField(paramSet, last(fInner.encode).core.f, obtain)
         new{T, D, C, F, typeof(pValSet)}(convert(NTuple{D, T}, center), core, pValSet)
     end
 end

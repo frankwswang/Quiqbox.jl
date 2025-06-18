@@ -1390,9 +1390,6 @@ getField(obj, tsFilter.scope, finalizer)
 getOutputType(::Type{TaggedSpanSetFilter{F}}) where {F<:NamedFilter} = getOutputType(F)
 
 
-const TypedParamFunc{T, F<:AbstractParamFunc} = TypedReturn{T, F}
-
-
 struct InputConverter{F<:Function} <: AbstractParamFunc
     core::ParamFreeFunc{F}
 end
@@ -1484,9 +1481,6 @@ end
 function ContextParamFunc(binder::Function, formatter::TaggedSpanSetFilter)
     ContextParamFunc(binder, itself, formatter)
 end
-
-
-const ParamFilterApply{B<:Function, E<:SpanSetFilter} = ContextParamFunc{B, ItsType, E}
 
 
 struct ParamPipeline{E<:ParamFunctionChain} <: AbstractParamFunc

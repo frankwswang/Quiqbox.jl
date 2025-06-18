@@ -23,14 +23,16 @@ struct AnyInput <: InputStyle end
 
 struct CartesianInput{N} <: InputStyle end
 
-formatInput(::AnyInput, x::Any) = itself(x)
+formatInput(::AnyInput, input::Any) = itself(input)
 
-formatInput(::CartesianInput{1}, x::Real) = (x,)
+formatInput(::CartesianInput{1}, input::Real) = (input,)
 
-formatInput(::CartesianInput{N}, x::NTuple{N, Real}) where {N} = itself(x)
+formatInput(::CartesianInput{N}, input::NTuple{N, Real}) where {N} = itself(input)
 
-function formatInput(::CartesianInput{N}, x::AbstractVector{<:Real}) where {N}
-    ntuple(i->x[begin+i-1], N)
+function formatInput(::CartesianInput{N}, input::AbstractVector{<:Real}) where {N}
+    ntuple(Val(N)) do i
+        input[shiftLinearIndex(input, i)]
+    end
 end
 
 formatInput(f::Function, x) = formatInput(SelectTrait{InputStyle}()(f), x)

@@ -734,13 +734,6 @@ function lazyTupleMap(f::F, (obj1, obj2, obj3, obj4)::NTuple{4, Any}) where {F}
 end
 
 
-extractRealNumberType(::Type{<:Number}) = Float64
-
-extractRealNumberType(::Type{T}) where {T<:Real} = T
-
-extractRealNumberType(::Type{Complex{T}}) where {T<:Real} = T
-
-
 function genParametricType(base::UnionAll, typeVars::Tuple)
     type = base{typeVars...}
     for var in reverse(typeVars)

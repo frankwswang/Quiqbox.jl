@@ -44,9 +44,13 @@ end
 
 TypedReturn(f::TypedReturn{TO}, ::Type{TN}) where {TO, TN} = TypedReturn(f.f, TN)
 
-function (f::TypedReturn{T, F})(arg::Vararg) where {T, F<:Function}
+const Typed{T} = TypedReturn{T, ItsType}
+
+Typed(::Type{T}) where {T} = TypedReturn(itself, T)::Typed{T}
+
+function (f::TypedReturn{T, F})(args::Vararg) where {T, F<:Function}
     caller = getLazyConverter(f.f, T)
-    caller(arg...)
+    caller(args...)
 end
 
 @generated function getLazyConverter(f::Function, ::Type{T}) where {T}
@@ -249,6 +253,14 @@ TypedReturn(CartesianHeader(f, Val(D)), T)
 
 TypedCarteFunc(f::TypedReturn, ::Type{T}, ::Val{D}) where {T, D} = 
 TypedReturn(CartesianHeader(f.f, Val(D)), T)
+
+const CartesianFormatter{T<:Real, N} = CartesianHeader{N, Typed{ NTuple{N, T} }}
+
+function CartesianFormatter(::Type{T}, ::Count{N})::CartesianFormatter{T, N} where 
+                           {T<:Real, N}
+    checkPositivity(N)
+    CartesianHeader(Typed(NTuple{N, T}), Val(N))
+end
 
 
 struct SelectHeader{N, K, F<:Function} <: Modifier

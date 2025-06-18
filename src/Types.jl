@@ -37,6 +37,8 @@ abstract type StructuredType <: ConfigBox end
 abstract type IdentityMarker{T} <: MarkerBox end
 abstract type StorageMarker{T} <: MarkerBox end
 
+abstract type TypedParamFunc{T} <: AbstractParamFunc end
+
 abstract type OrbitalBasis{T, D, F} <: ParticleFunction{D, 1} end
 abstract type FieldAmplitude{T, D} <: ParticleFunction{D, 1} end
 
