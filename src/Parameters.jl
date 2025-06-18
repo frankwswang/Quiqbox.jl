@@ -673,12 +673,15 @@ function checkParamCycle(param::ParamBox; strictMode=false, finalizer::Function=
     end
 end
 
+genParamEgalCache(maxSize::Int=100, ::Type{T}=Any) where {T} = 
+LRU{ParamEgalBox, T}(maxsize=maxSize)
+
 function obtain(param::CompositeParam)
     checkParamCycle(param)
     if param isa AdaptableParam && screenLevelOf(param) > 0
         decoupledCopy(param.offset)
     else
-        cache = LRU{ParamEgalBox, Any}(maxsize=100)
+        cache = genParamEgalCache()
         obtainCore!(cache, param)
     end
 end
