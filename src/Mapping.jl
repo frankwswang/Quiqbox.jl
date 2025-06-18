@@ -48,10 +48,12 @@ const Typed{T} = TypedReturn{T, ItsType}
 
 Typed(::Type{T}) where {T} = TypedReturn(itself, T)::Typed{T}
 
-function (f::TypedReturn{T, F})(arg::Vararg) where {T, F<:Function}
+function (f::TypedReturn{T, F})(arg::A, args::Vararg) where {T, A, F<:Function}
     caller = getLazyConverter(f.f, T)
-    caller(arg...)
+    caller(arg, args...)
 end
+
+(f::TypedReturn{T})() where {T} = getLazyConverter(f.f, T)()
 
 @generated function getLazyConverter(f::Function, ::Type{T}) where {T}
     if getOutputType(f) <: T
