@@ -1,6 +1,6 @@
 export genTensorVar, genMeshParam, genHeapParam, genCellParam, compareParamBox, uniqueParams, 
        dissectParam, setVal!, symOf, obtain, screenLevelOf, setScreenLevel!, inputOf, 
-       sortParams!
+       sortParams!, initializeSpanParamSet
 
 const SymOrIndexedSym = Union{Symbol, IndexedSym}
 
@@ -36,12 +36,20 @@ const ReducibleParam{T, E<:Pack{T}, S<:StateType} =
 const NestFixedParIn{T, E<:Pack{T}} = TriTupleUnion{ParamBox{T, E}}
 const CoreFixedParIn{T, E<:Pack{T}} = TriTupleUnion{ReducibleParam{T, E}}
 
-const ParamBoxAbtArr{P<:ParamBox, N} = AbstractArray{P, N}
-
 const UnitOrVal{T} = Union{UnitParam{T}, T}
 const UnitOrValVec{T} = AbstractVector{<:UnitOrVal{T}}
 
+const ParamBoxAbtArr{P<:ParamBox, N} = AbstractArray{P, N}
+const NamedParamTuple{S, N, P<:NTuple{N, ParamBox}} = NamedTuple{S, P}
+const NamedSpanParamTuple{S, N, P<:NTuple{N, SpanParam}} = NamedParamTuple{S, N, P}
+const DirectParamSource = Union{ParamBoxAbtArr, Tuple{Vararg{ParamBox}}, NamedParamTuple}
+
 isOffsetEnabled(::ParamBox) = false
+
+# function checkScreenLevel(p::ParamBox)
+#     checkScreenLevel(screenLevelOf(p)::Int, getScreenLevelOptions(p|>typeof))
+#     nothing
+# end
 
 checkScreenLevel(sl::Int, levels::NonEmptyTuple{Int}) = 
 checkIntLevelMismatch(sl, levels, "screen")
@@ -88,7 +96,7 @@ mutable struct GridVar{T, N} <: TensorVar{T, DirectMemory{T, N}}
                      screen::Bool=false) where {T, N}
         N < 1 && throw(AssertionError("`N` must be larger than zero."))
         checkPrimParamElementalType(T)
-        input = decoupledCopy(input)
+        input = PackedMemory(input)
         new{T, N}(input, IndexedSym(symbol), screen)
     end
 end
@@ -273,19 +281,6 @@ function unitOp(f::F, a::AbstractArray{<:Any, N}, b::AbstractArray{<:Any, N}) wh
     map(a) do ele
         idx += 1
         unitOp(f, ele, b[idx])
-    end
-end
-
-
-function decoupledCopy(arr::AbstractArray)
-    map(decoupledCopy, arr) |> PackedMemory
-end
-
-function decoupledCopy(obj::T) where {T}
-    if canDirectlyStoreInstanceOf(T)
-        obj
-    else
-        deepcopy(obj)
     end
 end
 
@@ -641,18 +636,36 @@ function hasCycle(param::ParamBox; strictMode::Bool=true, finalizer::Function=it
 end
 
 
-function obtainCore!(cache::LRU{ParamEgalBox}, param::PrimitiveParam)
-    input = param.input
-    get!(cache, ParamEgalBox(param), decoupledCopy(input))::typeof(input)
+const ParamDataCache{T} = LRU{ParamEgalBox, T}
+
+initializeParamDataCache(maxSize::Int=100, ::Type{T}=Any) where {T} = 
+ParamDataCache{T}(maxsize=maxSize)
+
+
+function cacheParamCore!(cache::ParamDataCache, param::ParamBox, 
+                         evaluator::F=Base.Fix1(obtainCore!, cache)) where {F<:Function}
+    get!(cache, ParamEgalBox(param)) do
+        evaluator(param)
+    end::getOutputType(param)
 end
 
-function obtainCore!(cache::LRU{ParamEgalBox}, param::ShapedParam)
+function cacheParam!(cache::ParamDataCache, param::ParamBox)
+    cacheParamCore!(cache, param) |> decoupledCopy
+end
+
+
+function obtainCore!(cache::ParamDataCache, param::PrimitiveParam)
+    input = param.input
+    cacheParamCore!(cache, param, Storage(input))::typeof(input)
+end
+
+function obtainCore!(cache::ParamDataCache, param::ShapedParam)
     map(param.input) do p
         obtainCore!(cache, p)
     end::getOutputType(param)
 end
 
-function obtainCore!(cache::LRU{ParamEgalBox}, param::AdaptableParam)
+function obtainCore!(cache::ParamDataCache, param::AdaptableParam)
     key = ParamEgalBox(param)
     get!(cache, key) do
         if screenLevelOf(param) > 0
@@ -676,23 +689,25 @@ end
 function obtain(param::CompositeParam)
     checkParamCycle(param)
     if param isa AdaptableParam && screenLevelOf(param) > 0
-        decoupledCopy(param.offset)
+        param.offset
     else
-        cache = LRU{ParamEgalBox, Any}(maxsize=100)
+        cache = initializeParamDataCache()
         obtainCore!(cache, param)
-    end
+    end |> decoupledCopy
 end
 
 obtain(param::PrimitiveParam) = decoupledCopy(param.input)
 
 function obtain(params::ParamBoxAbtArr)
     if isempty(params)
-        Union{}[]
+        similar(params, Union{})
     else
-        cache = LRU{ParamEgalBox, Any}(maxsize=min( 500, 100length(params) ))
+        eleParamType = eltype(params)
+        outputType = eleParamType <: PrimitiveParam ? getOutputType(eleParamType) : Any
+        cache = initializeParamDataCache(min( 500, 100length(params) ), outputType)
         map(params) do param
             checkParamCycle(param)
-            obtainCore!(cache, param)
+            obtainCore!(cache, param) |> decoupledCopy
         end
     end
 end
@@ -1078,6 +1093,8 @@ const TypedSpanParamSet{U<:AbstractVector{<:UnitParam}, G<:AbstractVector{<:Grid
 const FixedSpanParamSet{UP<:UnitParam, GP<:GridParam} = 
       TypedSpanParamSet{Memory{UP}, Memory{GP}}
 
+const ParamBoxSource = Union{DirectParamSource, OptSpanParamSet}
+
 
 initializeFixedSpanSet(::Nothing) = (unit=nothing, grid=nothing)
 
@@ -1088,6 +1105,17 @@ initializeFixedSpanSet() = (unit=genBottomMemory(), grid=genBottomMemory())
 function obtain(paramSet::OptSpanParamSet)
     map(paramSet) do sector
         (sector === nothing || isempty(sector)) ? nothing : obtain(sector)
+    end
+end
+
+#= Additional Method =#
+function cacheParam!(cache::ParamDataCache, params::ParamBoxSource)
+    if params isa ParamBoxAbtArr && isempty(params)
+        similar(params, Union{})
+    else
+        map(params) do param
+            cacheParam!(cache, param)
+        end
     end
 end
 
@@ -1207,13 +1235,6 @@ function locateParam!(paramSet::TypedGridParamSet, target::GridParam)
     GetIndex{GridIndex}(locateParamCore!(paramSet.grid, target))
 end
 
-const NamedParamTuple{S, N, P<:NTuple{N, ParamBox}} = NamedTuple{S, P}
-
-const SpanParamNamedTuple{S, N, P<:NTuple{N, SpanParam}} = NamedParamTuple{S, N, P}
-
-const ParamBoxSource = Union{ParamBoxAbtArr, Tuple{Vararg{ParamBox}}, NamedParamTuple, 
-                             OptSpanParamSet}
-
 function locateParam!(params::Union{OptSpanParamSet, AbstractVector}, 
                       subset::ParamBoxSource)
     if subset isa AbstractArray && isempty(subset)
@@ -1234,66 +1255,6 @@ function locateParam!(params::OptSpanParamSet, subset::OptSpanParamSet)
         end
     end
     SpanSetFilter(units, grids)
-end
-
-
-const MultiSpanData{T} = Union{T, DirectMemory{<:T}, NestedMemory{<:T}}
-
-struct MultiSpanDataCacheBox{T, G<:DirectMemory{<:T}, N<:NestedMemory{<:T}
-                             } <: QueryBox{MultiSpanData{T}}
-    unit::LRU{UnitParamEgalBox, T}
-    grid::LRU{GridParamEgalBox, G}
-    nest::LRU{NestParamEgalBox, N}
-
-    function MultiSpanDataCacheBox(::Type{T}=Any; maxSize::Int=100) where {T}
-        maxsize = maxSize
-        G, N = if isconcretetype(T)
-            DirectMemory{T},   NestedMemory{T}
-        else
-            DirectMemory{<:T}, NestedMemory{<:T}
-        end
-        new{T, G, N}(LRU{UnitParamEgalBox, T}(; maxsize), 
-                     LRU{GridParamEgalBox, G}(; maxsize), 
-                     LRU{NestParamEgalBox, N}(; maxsize))
-    end
-end
-
-
-getSpanDataSectorKey(cache::MultiSpanDataCacheBox{T1}, param::UnitParam{T2}) where 
-                    {T1, T2<:T1} = 
-(cache.unit, UnitParamEgalBox(param))
-
-getSpanDataSectorKey(cache::MultiSpanDataCacheBox{T1}, param::GridParam{T2}) where 
-                    {T1, T2<:T1} = 
-(cache.grid, GridParamEgalBox(param))
-
-getSpanDataSectorKey(cache::MultiSpanDataCacheBox{T1}, param::NestParam{T2}) where 
-                    {T1, T2<:T1} = 
-(cache.nest, BestParamEgalBox(param))
-
-
-formatSpanData(::Type{T}, val) where {T} = convert(T, val)
-
-function formatSpanData(::Type{T}, val::AbstractArray) where {T}
-    res = extractPackedMemory(val)
-    res::getPackType(T, getNestedLevel(res|>typeof).level)
-end
-
-
-function cacheParam!(cache::MultiSpanDataCacheBox{T}, param::ParamBox{<:T}) where {T}
-    get!(getSpanDataSectorKey(cache, param)...) do
-        formatSpanData(T, obtain(param))
-    end::getOutputType(param)
-end
-
-function cacheParam!(cache::MultiSpanDataCacheBox, params::ParamBoxSource)
-    if params isa AbstractArray && isempty(params)
-        similar(params, Union{})
-    else
-        map(params) do param
-            cacheParam!(cache, param)
-        end
-    end
 end
 
 
@@ -1327,6 +1288,8 @@ const VoidSetFilter = SpanSetFilter{Union{}, Union{}}
 const UnitSetFilter = SpanSetFilter{OneToIndex, Union{}}
 
 const GridSetFilter = SpanSetFilter{Union{}, OneToIndex}
+
+const FullSetFilter = SpanSetFilter{OneToIndex, OneToIndex}
 
 
 getSector(sector::AbstractVector, oneToIds::Memory{OneToIndex}) = 
@@ -1370,24 +1333,25 @@ end
 getField(::SpanSetFilter, ::VoidSetFilter) = SpanSetFilter()
 
 
-const NamedFilter = Union{SpanSetFilter, ChainMapper}
+const ParamFilter = Union{SpanSetFilter, ChainMapper}
 
-struct TaggedSpanSetFilter{F<:NamedFilter} <: Mapper
+struct TaggedSpanSetFilter{F<:ParamFilter} <: Mapper
     scope::F
     tag::Identifier
 end
 
-TaggedSpanSetFilter(scope::NamedFilter, paramSet::OptSpanParamSet) = 
+TaggedSpanSetFilter(scope::ParamFilter, paramSet::OptSpanParamSet) = 
 TaggedSpanSetFilter(scope, Identifier(paramSet))
 
-TaggedSpanSetFilter() = TaggedSpanSetFilter(SpanSetFilter(), Identifier(nothing))
+TaggedSpanSetFilter(scope::ParamFilter) = 
+TaggedSpanSetFilter(scope, Identifier(nothing))
 
 #= Additional Method =#
 getField(obj::OptionalSpanSet, tsFilter::TaggedSpanSetFilter, 
          finalizer::F=itself) where {F<:Function} = 
 getField(obj, tsFilter.scope, finalizer)
 
-getOutputType(::Type{TaggedSpanSetFilter{F}}) where {F<:NamedFilter} = getOutputType(F)
+getOutputType(::Type{TaggedSpanSetFilter{F}}) where {F<:ParamFilter} = getOutputType(F)
 
 
 struct InputConverter{F<:Function} <: AbstractParamFunc
@@ -1403,18 +1367,18 @@ InputConverter(f::InputConverter) = itself(f)
 getOutputType(::Type{InputConverter{F}}) where {F<:Function} = getOutputType(F)
 
 
-struct ParamFormatter{F<:NamedFilter} <: AbstractParamFunc
+struct ParamFormatter{F<:ParamFilter} <: AbstractParamFunc
     core::ParamFreeFunc{TaggedSpanSetFilter{F}}
 end
 
-ParamFormatter(f::TaggedSpanSetFilter{F}) where {F<:NamedFilter} = 
+ParamFormatter(f::TaggedSpanSetFilter{F}) where {F<:ParamFilter} = 
 ParamFormatter(f|>ParamFreeFunc)
 
 (f::ParamFormatter)(::Any, params::OptSpanValueSet) = f.core(params)
 
 ParamFormatter(f::ParamFormatter) = itself(f)
 
-getOutputType(::Type{ParamFormatter{F}}) where {F<:NamedFilter} = getOutputType(F)
+getOutputType(::Type{ParamFormatter{F}}) where {F<:ParamFilter} = getOutputType(F)
 
 
 struct ParamBindFunc{F<:Function, C1<:UnitParam, C2<:GridParam} <: AbstractParamFunc
@@ -1470,7 +1434,7 @@ end
 getOutputType(::Type{<:ParamCombiner{B}}) where {B<:Function} = getOutputType(B)
 
 
-const ContextParamFunc{B<:Function, E<:Function, F<:NamedFilter} = 
+const ContextParamFunc{B<:Function, E<:Function, F<:ParamFilter} = 
       ParamCombiner{B, Tuple{ InputConverter{E}, ParamFormatter{F} }}
 
 function ContextParamFunc(binder::Function, converter::Function, 
@@ -1497,8 +1461,8 @@ struct ParamPipeline{E<:ParamFunctionChain} <: AbstractParamFunc
     end
 end
 
-ParamPipeline(binder::Function, encode::AbstractVector{<:AbstractParamFunc}) = 
-ParamPipeline(binder, genMemory(encode))
+ParamPipeline(encode::AbstractVector{<:AbstractParamFunc}) = 
+ParamPipeline(genMemory(encode))
 
 function (f::ParamPipeline{E})(input, params::OptSpanValueSet) where 
                               {E<:ParamFunctionChain}
@@ -1572,7 +1536,7 @@ end
 Eliminate the severable connection(s) in `param`. For `param::SpanParam`, it returns a 
 `PrimitiveParam` with an output value same as `obtain(param)` when it is called; for any 
 `param` being nested `ParamBox`, it recursively severs every upstream `ParamBox` inside 
-`param` that is a `SpanParam`. When `screenSource` is set to source, every `PrimitiveParam` 
+`param` that is a `SpanParam`. When `screenSource` is set to `true`, every `PrimitiveParam` 
 inside (or is) the returned the `ParamBox` will have `.screen` set to `true`.
 """
 function sever(param::SpanParam, screenSource::Bool=false)

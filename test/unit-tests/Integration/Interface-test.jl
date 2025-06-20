@@ -17,7 +17,6 @@ cgf1 = genGaussTypeOrb(cen1, xpns1, cons1, (1, 0, 0))
 cgf2 = genGaussTypeOrb(cen2, xpns2, cons2, (1, 0, 0))
 
 bs1 = cgf1.basis
-pCache = Quiqbox.MultiSpanDataCacheBox(Float64)
 cgf1compData = Quiqbox.genOrbitalData(cgf1.basis)
 normCache = Quiqbox.initializeOverlapCache(cgf1compData)
 

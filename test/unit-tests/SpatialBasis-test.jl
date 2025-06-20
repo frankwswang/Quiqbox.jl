@@ -31,7 +31,7 @@ cgto1 = CompositeOrb([pgto1, pgto2], [1.1, 1.2])
 @test cgto1((0., 0., 1.0)) |> iszero
 pt1 = (1.2, 1.1, -1.0)
 @test cgto1(pt1) == 1.1pgto1(pt1) + 1.2pgto2(pt1) == 
-                    1.1pgto1.body(pt1 .- cen1) + 1.2pgto2.body(pt1 .- cen1)
+                    1.1pgto1.field.core(pt1 .- cen1) + 1.2pgto2.field.core(pt1 .- cen1)
 cgto1n = CompositeOrb([pgto1, pgto2], [1.1, 1.2], renormalize=true)
 @test cgto1n(pt1) != cgto1(pt1)
 
@@ -45,7 +45,7 @@ cgto1Data = genOrbitalData(cgto1)
 
 xpns1 = [1.2, 2.2, 3.1]
 pgf = genGaussTypeOrb(cen1, xpns1[1], ijk1)
-@test !compareParamBox(pgf.center[1], pgf.center[2])
+@test !compareParamBox(pgf.field.center[1], pgf.field.center[2])
 cons1 = [1.0, 0.2, 0.1]
 cgto2 = genGaussTypeOrb(cen1, xpns1, cons1, ijk1)
 @test cgto2 isa Quiqbox.CompGTO
@@ -71,8 +71,7 @@ pgf1 = Quiqbox.viewOrb(cgf1, 1)
 @test pgf1 isa Quiqbox.PrimitiveOrb
 @test pgf1 === Quiqbox.viewOrb(pgf1, 1)
 pgf1_rc = PrimitiveOrb(pgf1)
-@test pgf1.center === pgf1_rc.center && pgf1.body === pgf1_rc.body && 
-      pgf1.renormalize === pgf1_rc.renormalize
+@test pgf1.field === pgf1_rc.field && pgf1.renormalize === pgf1_rc.renormalize
 @test pgf1 != pgf1_rc
 
 bf1 = genGaussTypeOrb((0., 0., 0.), 1.5)

@@ -98,6 +98,12 @@ StableAdd(::Type{T}) where {T} = StableBinary(+, T)
 const StableMul{T} = StableBinary{T, typeof(*)}
 StableMul(::Type{T}) where {T} = StableBinary(*, T)
 
+const StableTupleSub{T<:Tuple} = StableBinary{T, typeof(.-)}
+
+function StableTupleSub(::Type{T}, ::Count{N})::StableTupleSub{NTuple{N, T}} where {T, N}
+    StableBinary(.-, NTuple{N, T})
+end
+
 
 struct Left end
 
@@ -232,7 +238,7 @@ struct CartesianHeader{N, F<:Function} <: Modifier
     f::F
 
     function CartesianHeader(f::F, ::Val{N}) where {F<:Function, N}
-        checkPositivity(N::Int, true)
+        checkPositivity(N::Int)
         new{N, F}(f)
     end
 end
@@ -254,12 +260,11 @@ TypedReturn(CartesianHeader(f, Val(D)), T)
 TypedCarteFunc(f::TypedReturn, ::Type{T}, ::Val{D}) where {T, D} = 
 TypedReturn(CartesianHeader(f.f, Val(D)), T)
 
-const CartesianFormatter{T<:Real, N} = CartesianHeader{N, Typed{ NTuple{N, T} }}
+const CartesianFormatter{N, R<:NTuple{N, Real}} = CartesianHeader{N, Typed{R}}
 
-function CartesianFormatter(::Type{T}, ::Count{N})::CartesianFormatter{T, N} where 
-                           {T<:Real, N}
+function CartesianFormatter(::Type{T}, ::Count{N}) where {T<:Real, N}
     checkPositivity(N)
-    CartesianHeader(Typed(NTuple{N, T}), Val(N))
+    CartesianHeader(Typed(NTuple{N, T}), Val(N))::CartesianFormatter{N, NTuple{N, T}}
 end
 
 
@@ -334,6 +339,8 @@ getOutputType(::Type{<:FloatingMonomial{T}}) where {T<:Real} = T
 struct Storage{T} <: TypedEvaluator{T}
     value::T
     marker::Symbol
+
+    Storage(value::T, marker::Symbol=:missing) where {T} = new{T}(value, marker)
 end
 
 (f::Storage{T})(::Vararg) where {T} = f.value

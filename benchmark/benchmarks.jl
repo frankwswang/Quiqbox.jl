@@ -49,7 +49,7 @@ stf1D = Quiqbox.EncodedField(stf1DCore, Float64, Val(1))
 pstf1 = Quiqbox.PolyRadialFunc(stf1D, (1, 1, 0))
 psto1 = Quiqbox.PrimitiveOrb((1.0, 2.0, 3.0), pstf1, renormalize=false)
 psto1n = Quiqbox.PrimitiveOrb((1.0, 2.0, 3.0), pstf1, renormalize=true)
-stf1Dc = Quiqbox.CurriedField(stf1DCore, Float64, Val(1))
+stf1Dc = Quiqbox.ModularField(stf1DCore, Float64, Val(1))
 pstf1c = Quiqbox.PolyRadialFunc(stf1Dc, (1, 1, 0))
 psto1c = Quiqbox.PrimitiveOrb((1.0, 2.0, 3.0), pstf1c, renormalize=false)
 
@@ -63,7 +63,7 @@ function genGaussian(cen::NTuple{D, T}, xpns::AbstractVector{T},
     center = genCellParam.(cen, (:x, :y, :z)[begin:begin+D-1])
     map(xpns) do xpn
         xpnPar = genCellParam(xpn, :xpn)
-        radioFunc = Quiqbox.CurriedField(gaussianFunc, Float64, Val(1), (xpn=xpnPar,))
+        radioFunc = Quiqbox.ModularField(gaussianFunc, Float64, Val(1), (xpn=xpnPar,))
         fieldFunc = PolyRadialFunc(radioFunc, ang)
         PrimitiveOrb(center, fieldFunc)
     end
@@ -126,7 +126,7 @@ OrbOvlpBSuite["Lazy"]["PSTO_Self_DD"] =
 OrbOvlpBSuite["Lazy"]["PSTO_Self_DN"] = 
 @benchmarkable overlap($psto1, $psto1n, lazyCompute=true) evals=1
 
-# `CurriedField`-Based Orbital Benchmark Group
+# `ModularField`-Based Orbital Benchmark Group
 OrbEvalBSuite["Direct"]["PSTOc"] = @benchmarkable ($psto1c)($coord1) evals=1
 OrbEvalBSuite["Direct"]["CGTOc"] = @benchmarkable ($cgto1c)($coord1) evals=1
 OrbEvalBSuite["Direct"]["GFOrb"] = @benchmarkable ($gfOrb )($coord3) evals=1

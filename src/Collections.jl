@@ -386,6 +386,26 @@ function genMemory(obj::T) where {T}
 end
 
 
+"""
+
+    decoupledCopy(obj::AbstractArray) -> AbstractArray
+
+Recursively copy `obj` and decouple the correlations among its elements.
+"""
+function decoupledCopy(arr::AbstractArray)
+    map(decoupledCopy, arr)
+end
+
+function decoupledCopy(obj::T)::T where {T}
+    if canDirectlyStoreInstanceOf(T)
+        obj
+    else
+        deepcopy(obj)
+    end
+end
+
+
+
 function indexedPerturb(op::F, source::Tuple, idxVal::Pair{OneToIndex, T}) where 
                        {F<:Function, T}
     oneToIdx, val = idxVal
