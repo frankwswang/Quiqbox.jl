@@ -49,7 +49,6 @@ function showParamBox(::B, io::IO, p::ParamBox) where {B<:BoolVal}
     pType = typeof(p)
     pName = nameof(pType)
     pSymbol = indexedSymOf(p)
-    aliasStr = getTypeAliasStr(p)
     outerType = get(io, :typeinfo, Any)
     if pType <: outerType <: ParamBox
         if outerType == pType
@@ -60,8 +59,7 @@ function showParamBox(::B, io::IO, p::ParamBox) where {B<:BoolVal}
             print(io, "::", getObjNameStr(pName), ")")
         end
     elseif enableCompatShowFormat(B(), io)
-        print(io, aliasStr)
-        print(io, "(…)")
+        print(io, pType, "(…)")
     else
         print(io, "(")
         show(io, MIME("text/plain"), pSymbol)
@@ -86,39 +84,68 @@ Base.show(io::IO, ::MIME"text/plain", f::CompositeFunction) =
 showCompositeFunc(False(), io, f)
 
 function showCompositeFunc(::B, io::IO, f::CompositeFunction) where {B<:BoolVal}
-    nMethod = getMethodNum(f)
-    aliasStr = getTypeAliasStr(f)
-    if enableCompatShowFormat(B(), io)
-        print(io,  "(::", aliasStr, ")")
-    else
-        typeStr = string("(::", aliasStr, ")")
+    print(io,  "(::", typeof(f), ")")
+    if !enableCompatShowFormat(B(), io)
+        nMethod = getMethodNum(f)
         methodStr = string("(", nMethod, " method", (nMethod > 1 ? "s" : ""), ")")
-        print(io,  typeStr, " ", methodStr)
+        print(io,  " ", methodStr)
     end
 end
 
 
-function getTypeAliasStr(obj)
-    objType = typeof(obj)
-    if hasmethod(getTypeAliasStrCore, (objType,))
-        objName = objType <: Function ? nameof(obj) : nameof(objType)
-        getObjNameStr(objName, getTypeAliasStrCore(obj))
-    else
-        string(obj|>typeof)
-    end
-end
+show(io::IO, ::Type{GetIndex{T}}) where {T} = 
+print(io, getObjNameStr(nameof(GetIndex), "GetIndex{$T}"))
 
-getTypeAliasStrCore(::StableAdd{T}) where {T} = string("StableAdd{$T}")
+show(io::IO, ::Type{Typed{T}}) where {T} = 
+print(io, getObjNameStr(nameof(Typed), "Typed{$T}"))
 
-getTypeAliasStrCore(::StableMul{T}) where {T} = string("StableMul{$T}")
+show(io::IO, ::Type{StableAdd{T}}) where {T} = 
+print(io, getObjNameStr(nameof(StableAdd), "StableAdd{$T}"))
 
-function getTypeAliasStrCore(::ScreenParam{T, E, P}) where {T, E<:Pack{T}, P<:ParamBox{T}}
+show(io::IO, ::Type{StableMul{T}}) where {T} = 
+print(io, getObjNameStr(nameof(StableMul), "StableMul{$T}"))
+
+show(io::IO, ::Type{StableTupleSub{T}}) where {T<:Tuple} = 
+print(io, getObjNameStr(nameof(StableTupleSub), "StableTupleSub{$T}"))
+
+show(io::IO, ::Type{TypedCarteFunc{T, D, F}}) where {T, D, F} = 
+print(io, getObjNameStr(nameof(TypedCarteFunc), "TypedCarteFunc{$T, $D, $F}"))
+
+show(io::IO, ::Type{CartesianFormatter{N, R}}) where {N, R<:NTuple{N, Real}} = 
+print(io, getObjNameStr(nameof(CartesianFormatter), "CartesianFormatter{$N, $R}"))
+
+show(io::IO, ::Type{VoidSetFilter}) = 
+print(io, getObjNameStr(nameof(VoidSetFilter), "VoidSetFilter"))
+
+show(io::IO, ::Type{UnitSetFilter}) = 
+print(io, getObjNameStr(nameof(UnitSetFilter), "UnitSetFilter"))
+
+show(io::IO, ::Type{GridSetFilter}) = 
+print(io, getObjNameStr(nameof(GridSetFilter), "GridSetFilter"))
+
+show(io::IO, ::Type{FullSetFilter}) = 
+print(io, getObjNameStr(nameof(FullSetFilter), "FullSetFilter"))
+
+function show(io::IO, ::Type{ScreenParam{T, E, P}}) where 
+             {T, E<:Pack{T}, P<:ParamBox{T}}
     tailStr = P <: PrimitiveParam ? string(P) : "…"
-    string("ScreenParam", "{", T, ", ", E, ", " , tailStr, "}")
+    typeStr = string("ScreenParam", "{", T, ", ", E, ", " , tailStr, "}")
+    print(io, typeStr)
 end
 
-getTypeAliasStrCore(::ReduceParam{T, E}) where {T, E<:Pack{T}} = 
-string("ReduceParam", "{", T, ", ", E, ", ", "…}")
+function show(io::IO, ::Type{<:ReduceParam{T, E}}) where 
+             {T, E<:Pack{T}}
+    typeStr = string("ReduceParam", "{", T, ", ", E, ", ", "…}")
+    print(io, typeStr)
+end
 
-getTypeAliasStrCore(::ExpandParam{T, E, N}) where {T, E<:Pack{T}, N} = 
-string("ExpandParam", "{", T, ", ", E, ", ", N, ", ", "…}")
+function show(io::IO, ::Type{<:ExpandParam{T, E, N}}) where 
+             {T, E<:Pack{T}, N}
+    typeStr = string("ExpandParam", "{", T, ", ", E, ", ", N, ", ", "…}")
+    print(io, typeStr)
+end
+
+function show(io::IO, ::Type{ContextParamFunc{B, E, F}}) where 
+             {B<:Function, E<:Function, F<:ParamFilter}
+    print(io, string("ContextParamFunc", "{", B, ", ", E, ", ", F, "}"))
+end
