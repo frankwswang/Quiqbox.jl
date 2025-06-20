@@ -36,7 +36,8 @@ s2_t = [overlap(i, j) for i in bs2, j in bs2]
 pgf1 =  genGaussTypeOrb((0.1, -0.2, -0.3), 1.5, (1, 0, 0))
 pgf1n = genGaussTypeOrb((0.1, -0.2, -0.3), 1.5, (1, 0, 0), renormalize=true)
 pgf1_val1 = pgf1n((0., 0., 0.)) * sqrt(overlap(pgf1, pgf1))
-@test pgf1((0., 0., 0.)) ≈ pgf1.body((-0.1, 0.2, 0.3)) ≈ pgf1_val1
+@test pgf1((0., 0., 0.)) === pgf1.field((0., 0., 0.))
+@test pgf1.field.core((-0.1, 0.2, 0.3)) ≈ pgf1_val1 ≈ pgf1((0., 0., 0.))
 
 s1 = overlap(pgf1, pgf1n)
 @test overlap(pgf1n, pgf1) ≈ s1
@@ -55,6 +56,34 @@ sto1 = Quiqbox.PolyRadialFunc(stf1, (1, 1, 0))
 @test Quiqbox.unpackFunc(sto1)[begin] isa Quiqbox.PolyRadialFieldFunc
 stoBasis1 = Quiqbox.PrimitiveOrb((1.0, 2.0, 3.0), sto1; renormalize=false)
 @test overlap(stoBasis1, stoBasis1) ≈ 4.7123889802878764
+# @profview overlap(stoBasis1, stoBasis1)
+
+# using BenchmarkTools
+# @benchmark overlap($stoBasis1, $stoBasis1)
+
+# julia> @benchmark overlap($stoBasis1, $stoBasis1)
+# BenchmarkTools.Trial: 4 samples with 1 evaluation per sample.
+#  Range (min … max):  1.299 s …   1.336 s  ┊ GC (min … max): 0.27% … 2.29%
+#  Time  (median):     1.313 s              ┊ GC (median):    0.53%
+#  Time  (mean ± σ):   1.315 s ± 15.546 ms  ┊ GC (mean ± σ):  0.91% ± 0.94%
+
+#   █                █         █                            █
+#   █▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁█▁▁▁▁▁▁▁▁▁█▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁█ ▁
+#   1.3 s          Histogram: frequency by time        1.34 s <
+
+#  Memory estimate: 107.77 MiB, allocs estimate: 791.
+
+# julia>   @benchmark overlap($stoBasis1, $stoBasis1) # 20250609
+# BenchmarkTools.Trial: 4 samples with 1 evaluation per sample.
+#  Range (min … max):  1.275 s …   1.317 s  ┊ GC (min … max): 0.25% … 2.18%
+#  Time  (median):     1.285 s              ┊ GC (median):    0.50%
+#  Time  (mean ± σ):   1.291 s ± 19.100 ms  ┊ GC (mean ± σ):  0.86% ± 0.89%
+
+#   █   █                 █                                 █  
+#   █▁▁▁█▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁█▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁█ ▁
+#   1.28 s         Histogram: frequency by time        1.32 s <
+
+#  Memory estimate: 107.76 MiB, allocs estimate: 417.
 
 sto2 = Quiqbox.PolyRadialFunc(stf1, (2,))
 stoBasis2 = Quiqbox.PrimitiveOrb((1.0,), sto2; renormalize=false)

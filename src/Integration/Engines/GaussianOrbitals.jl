@@ -70,15 +70,17 @@ accessAxialCache(cache::NullCache, ::Int) = cache
 
 #>-- Gaussian-based orbital info extraction --<#
 function prepareOrbitalInfoCore(field::FloatingPolyGaussField{T, D}) where {T<:Real, D}
-    gtf = field.core.f.f                          #> `PolyGaussFieldCore`
+    params = field.data
+    fCenter, gtf = field.core.f.f.encode          #> `PolyGaussFieldCore` (gtf)
+    center = last(fCenter.encode).core(params)
     grf = first(gtf.encode)                       #> `RadialFieldFunc`
     pgf = last(grf.core.f.binder.encode)          #> `GaussFieldFunc`
     xpnFormatter = last(pgf.core.f.binder.encode) #> `ParamFormatter`
-    xpn = xpnFormatter.core(field.param).xpn
+    xpn = xpnFormatter.core(params).xpn
     angMomField = last(gtf.encode)                #> `CartAngMomentumFunc`
     amfCore = angMomField.core.f.binder.core.f    #> `CartSHarmonics`
     ang = amfCore.m.tuple
-    PrimGaussTypeOrbInfo(field.center, xpn, ang)
+    PrimGaussTypeOrbInfo(center, xpn, ang)
 end
 
 function prepareOrbitalInfo!(cache::AxialGaussOverlapCache{T, D}, 

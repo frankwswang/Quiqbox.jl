@@ -98,6 +98,12 @@ StableAdd(::Type{T}) where {T} = StableBinary(+, T)
 const StableMul{T} = StableBinary{T, typeof(*)}
 StableMul(::Type{T}) where {T} = StableBinary(*, T)
 
+const StableTupleShift{T, N} = StableBinary{NTuple{N, T}, typeof(.-)}
+
+function StableTupleShift(::Type{T}, ::Count{D})::StableTupleShift{T, D} where {T, D}
+    StableBinary(.-, NTuple{D, T})
+end
+
 
 struct Left end
 

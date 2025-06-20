@@ -1,17 +1,5 @@
 using LinearAlgebra: dot
 
-const OrbCoreMarker{T<:Real, D} = Union{
-    FieldMarker{:TypedReturn, 1}, 
-    ValueMarker{TypedCarteFunc{C, D, F}} where {C<:RealOrComplex{T}, F<:AbstractParamFunc}
-}
-
-const OrbCoreMarkerDict{T<:Real, D} = 
-      Dict{EgalBox{TypedCarteFunc{<:RealOrComplex{T}, D}}, OrbCoreMarker{T, D}}
-
-const OrbCoreKey{T<:Real, D, M<:OrbCoreMarker{T, D}, P<:OptSpanValueSet} = 
-      Tuple{NTuple{D, T}, M, P}
-
-
 const OneBodyIdxSymDict = let tempDict=Base.ImmutableDict(false=>:aa)
     Base.ImmutableDict(tempDict, true=>:ab)
 end
@@ -32,11 +20,11 @@ end
 
 #? Consider replacing it with LRU-based cache to control memory consumption
 struct PrimOrbDataCache{T<:Real, D, P<:PrimOrbData{T, D}}
-    dict::Dict{OrbCoreKey{T, D}, OneToIndex}
+    dict::Dict{FieldMarker{:StashedField, 2}, OneToIndex}
     list::Vector{P}
     function PrimOrbDataCache(::Type{T}, ::Val{D}, ::Type{P}=PrimOrbData{T, D}) where 
                              {T<:Real, D, P<:PrimOrbData{T, D}}
-    new{T, D, P}(Dict{OrbCoreKey{T, D}, OneToIndex}(), P[])
+    new{T, D, P}(Dict{FieldMarker{:StashedField, 2}, OneToIndex}(), P[])
     end
 end
 
@@ -322,12 +310,14 @@ function getBasisIndexRange(list::BasisIndexList, idx::OneToIndex)
 end
 
 
+const OrbCoreMarkerDict{T<:Real, D} = 
+      Dict{EgalBox{Quiqbox.StashedField{T, D}}, FieldMarker{:StashedField, 2}}
+
 function genOrbCoreKey!(cache::OrbCoreMarkerDict{T, D}, 
                         data::PrimOrbData{T, D}) where {T<:Real, D}
     innerField = data.core
-    marker = lazyMarkObj!(cache, innerField.core)
-    (innerField.center, marker, innerField.param)
-end
+    lazyMarkObj!(cache, innerField)
+end #? Replace `PrimOrbData` with `StashedField`?
 
 
 function updateOrbCache!(orbCache::PrimOrbDataCache{T, D}, 
@@ -713,7 +703,7 @@ end
 
 function computeIntTensor(style::MultiBodyIntegral{N, D}, op::DirectOperator, 
                           orbs::OrbBasisVec{T, D}; 
-                          cache!Self::MultiSpanDataCacheBox=MultiSpanDataCacheBox(), 
+                          cache!Self::ParamDataCache=initializeParamDataCache(), 
                           markerCache::OrbCoreMarkerDict{T, D}=OrbCoreMarkerDict{T, D}()
                           ) where {T<:Real, N, D}
     orbsData = genOrbitalData(orbs; cache!Self)
@@ -818,7 +808,7 @@ end
 
 function computeIntegral(style::MultiBodyIntegral{N, D}, op::DirectOperator, 
                          orbs::NonEmptyTuple{OrbitalBasis{<:RealOrComplex{T}, D}}; 
-                         cache!Self::MultiSpanDataCacheBox=MultiSpanDataCacheBox(), 
+                         cache!Self::ParamDataCache=initializeParamDataCache(), 
                          lazyCompute::Bool=false) where {N, T<:Real, D}
     orbsData = genOrbitalData(orbs; cache!Self)
     computeIntegral(style, op, orbsData; lazyCompute)

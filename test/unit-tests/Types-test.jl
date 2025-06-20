@@ -21,9 +21,9 @@ using Quiqbox
 
 @test Quiqbox.RadialFieldFunc <: Quiqbox.FieldParamFunc
 
-@test Quiqbox.NullaryField <: Quiqbox.CurriedField
+@test Quiqbox.NullaryField <: Quiqbox.ModularField
 
-@test Quiqbox.GaussFunc <: Quiqbox.CurriedField
+@test Quiqbox.GaussFunc <: Quiqbox.ModularField
 
 @test Quiqbox.GaussFieldFunc <: Quiqbox.FieldParamFunc
 
@@ -52,5 +52,7 @@ using Quiqbox
 @test Quiqbox.PGTOrbData <: Quiqbox.PrimOrbData
 
 @test Quiqbox.ParamMapper <: Quiqbox.ChainMapper
+
+@test Quiqbox.NamedParamMapper <: Quiqbox.ParamMapper
 
 end

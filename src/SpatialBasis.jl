@@ -7,25 +7,21 @@ CartesianInput{D}()
 (f::OrbitalBasis)(input) = evalOrbital(f, formatInput(f, input))
 
 
-mutable struct PrimitiveOrb{T<:Real, D, C<:RealOrComplex{T}, F<:FieldAmplitude{C, D}, 
-                            R<:NTuple{ D, UnitParam{T} }} <: OrbitalBasis{C, D, F}
-    const center::R
-    const body::F
+mutable struct PrimitiveOrb{T<:Real, D, C<:RealOrComplex{T}, F<:ShiftedField{T, D, C}
+                            } <: OrbitalBasis{C, D, F}
+    const field::F
     @atomic renormalize::Bool
 end
 
-const PrimGTO{T<:Real, D, F<:PolyGaussFunc{T, D}, R<:NTuple{ D, UnitParam{T} }} = 
-      PrimitiveOrb{T, D, T, F, R}
+const PrimGTO{T<:Real, D, F<:ShiftedPolyGaussField{T, D}} = PrimitiveOrb{T, D, T, F}
 
-function PrimitiveOrb(center::NonEmptyTuple{UnitOrVal{T}}, body::FieldAmplitude{C, D}; 
+function PrimitiveOrb(center::NTuple{D, UnitOrVal{T}}, body::FieldAmplitude{C, D}; 
                       renormalize::Bool=false) where {T<:Real, C<:RealOrComplex{T}, D}
-    length(center)!=D && throw(AssertionError("The length of `center` must match `D=$D`."))
-    encoder = UnitParamEncoder(T, :cen, 1)
-    PrimitiveOrb(encoder.(center), body, renormalize)
+    PrimitiveOrb(ShiftedField(center, body), renormalize)
 end
 
 PrimitiveOrb(o::PrimitiveOrb; renormalize::Bool=o.renormalize) = 
-PrimitiveOrb(o.center, o.body, renormalize)
+PrimitiveOrb(o.field, renormalize)
 
 getOutputType(::Type{<:PrimitiveOrb{T, D, C}}) where {T<:Real, D, C<:RealOrComplex{T}} = C
 
@@ -33,8 +29,8 @@ getOutputType(::Type{<:PrimitiveOrb{T, D, C}}) where {T<:Real, D, C<:RealOrCompl
 function evalOrbital(orb::PrimitiveOrb{T, D, C}, input; 
                      cache!Self::MultiSpanDataCacheBox=MultiSpanDataCacheBox()) where 
                     {T<:Real, D, C<:RealOrComplex{T}}
-    encodedInput = formatInput(orb, input) .- cacheParam!(cache!Self, orb.center)
-    StableMul(C)(evalFieldAmplitude(orb.body, encodedInput; cache!Self), getNormFactor(orb))
+    coreValue = evalFieldAmplitude(orb.field, formatInput(orb, input); cache!Self)
+    StableMul(C)(coreValue, getNormFactor(orb))
 end
 
 
@@ -44,16 +40,14 @@ function getPrimitiveOrbType(orbs::AbstractArray{B}) where
         B
     else
         C = Union{}
-        bodyType = Union{}
-        centerType = Union{}
+        fieldType = Union{}
 
         for orb in orbs
-            C = strictTypeJoin(C, getOutputType(orb.body))
-            bodyType = strictTypeJoin(bodyType, typeof(orb.body))
-            centerType = strictTypeJoin(centerType, typeof(orb.center))
+            C = strictTypeJoin(C, getOutputType(orb))
+            fieldType = strictTypeJoin(fieldType, typeof(orb.field))
         end
 
-        pseudoType = genParametricType(PrimitiveOrb, (;T, D, C, B=bodyType, R=centerType))
+        pseudoType = genParametricType(PrimitiveOrb, (;T, D, C, F=fieldType))
         typeintersect(PrimitiveOrb, pseudoType)
     end
 end
@@ -180,12 +174,14 @@ function getNormFactor(orb::ComposedOrb{T, D, C}) where {T<:Real, D, C<:RealOrCo
 end
 
 
-struct PrimOrbData{T<:Real, D, C<:RealOrComplex{T}, F<:FloatingField{T, D, C}} <: ConfigBox
-    core::F
+struct PrimOrbData{T<:Real, D, C<:RealOrComplex{T}, F<:AbstractParamFunc, 
+                   R<:FieldCenterShifter{T, D}, S<:OptSpanValueSet} <: ConfigBox
+    core::StashedField{C, D, ShiftedFieldFuncCore{T, D, F, R}, S}
     renormalize::Bool
 end
 
-const PGTOrbData{T<:Real, D, F<:FloatingPolyGaussField{T, D}} = PrimOrbData{T, D, T, F}
+const PGTOrbData{T<:Real, D, F<:PolyGaussFieldCore{T, D}, R<:FieldCenterShifter{T, D}} = 
+      PrimOrbData{T, D, T, F, R}
 
 struct CompOrbData{T<:Real, D, C<:RealOrComplex{T}, B<:PrimOrbData{T, D}} <: ConfigBox
     basis::Memory{B}
@@ -243,7 +239,7 @@ end
 
 
 const MixedFieldParamFuncCacheCore{T, D, C<:RealOrComplex{T}} = 
-      LRU{EgalBox{FieldAmplitude{C, D}}, FieldParamFunc{T, D, C}}
+      LRU{EgalBox{ShiftedField{T, D, C}}, ShiftedFieldFunc{T, D, C}}
 
 struct MixedFieldParamFuncCache{T<:Real, D
                                 } <: QueryBox{Union{ FieldParamFunc{T, D, T}, 
@@ -252,8 +248,8 @@ struct MixedFieldParamFuncCache{T<:Real, D
     complex::MixedFieldParamFuncCacheCore{T, D, Complex{T}}
 end
 
-const TypedFieldParamFuncCache{T<:Real, D, C<:RealOrComplex{T}, F<:FieldAmplitude{C, D}} = 
-      LRU{EgalBox{F}, FieldParamFunc{T, D, C}}
+const TypedFieldParamFuncCache{T<:Real, D, C<:RealOrComplex{T}, F<:ShiftedField{T, D, C}} = 
+      LRU{EgalBox{F}, ShiftedFieldFunc{T, D, C}}
 
 const FieldParamFuncCache{T<:Real, D} = 
       Union{MixedFieldParamFuncCache{T, D}, TypedFieldParamFuncCache{T, D}}
@@ -276,44 +272,42 @@ function genFieldParamFuncCache(::Type{F}, maxSize::Int=200) where
 end
 
 
-function getCachedFieldFunc!(cache::MixedFieldParamFuncCache{T, D}, 
-                             orb::PrimitiveOrb{T, D, T}, 
-                             paramSet::OptSpanParamSet) where {T<:Real, D}
-    get!(cache.real, EgalBox{FieldAmplitude{T, D}}(orb.body)) do
-        unpackFunc!(orb.body, paramSet)
-    end
-end
 
-function getCachedFieldFunc!(cache::MixedFieldParamFuncCache{T, D}, 
-                             orb::PrimitiveOrb{T, D, Complex{T}}, 
-                             paramSet::OptSpanParamSet) where {T<:Real, D}
-    get!(cache.complex, EgalBox{FieldAmplitude{Complex{T}, D}}(orb.body)) do
-        unpackFunc!(orb.body, paramSet)
+function genCachedFieldFunc!(fieldCache::MixedFieldParamFuncCache{T, D}, 
+                             paramCache::ParamDataCache, 
+                             orb::PrimitiveOrb{T, D, C}, 
+                             paramSet::OptSpanParamSet) where {T<:Real, D, 
+                             C<:RealOrComplex{T}}
+    sector = C <: Real ? :real : :complex
+    f = get!(getfield(fieldCache, sector), EgalBox{ShiftedField{T, D, C}}(orb.field)) do
+        unpackFunc!(orb.field, paramSet)
     end
-end
+    StashedField(f, paramSet)
+end #!! Incorporate `genCachedFieldFunc!` into `unpackFunc`
 
-function getCachedFieldFunc!(cache::TypedFieldParamFuncCache{T, D, C, F}, 
+function genCachedFieldFunc!(fieldCache::TypedFieldParamFuncCache{T, D, C, F}, 
+                             paramCache::ParamDataCache, 
                              orb::PrimitiveOrb{T, D, C, F}, 
                              paramSet::OptSpanParamSet) where 
-                            {T<:Real, D, C<:RealOrComplex{T}, F<:FieldAmplitude{C, D}}
-    get!(cache, EgalBox{F}(orb.body)) do
-        unpackFunc!(orb.body, paramSet)
+                            {T<:Real, D, C<:RealOrComplex{T}, F<:ShiftedField{T, D, C}}
+    f = get!(fieldCache, EgalBox{F}(orb.field)) do
+        unpackFunc!(orb.field, paramSet)
     end
+    StashedField(f, paramSet)
 end
 
 
 function genOrbitalDataCore!(fieldCache::FieldParamFuncCache{T, D}, 
-                             paramCache::MultiSpanDataCacheBox, 
+                             paramCache::ParamDataCache, 
                              paramSet::OptSpanParamSet, 
                              orb::PrimitiveOrb{T, D, C}) where 
                             {T<:Real, D, C<:RealOrComplex{T}}
-    centerData = cacheParam!(paramCache, orb.center)
-    bodyCore = getCachedFieldFunc!(fieldCache, orb, paramSet)
-    PrimOrbData(FloatingField(centerData, bodyCore, paramSet), orb.renormalize)
+    coreField = genCachedFieldFunc!(fieldCache, paramCache, orb, paramSet)
+    PrimOrbData(coreField, orb.renormalize)
 end
 
 function genOrbitalDataCore!(fieldCache::FieldParamFuncCache{T, D}, 
-                             paramCache::MultiSpanDataCacheBox, 
+                             paramCache::ParamDataCache, 
                              paramSet::OptSpanParamSet, 
                              orb::CompositeOrb{T, D}) where {T<:Real, D}
     basisData = map(orb.basis) do basis
@@ -333,7 +327,7 @@ const OrbBasisSource{T<:Real, D} =
       Union{OrbitalBasis{<:RealOrComplex{T}, D}, OrbBasisCollection{T, D}}
 
 function genOrbitalDataCore!(fieldCache::FieldParamFuncCache{T, D}, 
-                             paramCache::MultiSpanDataCacheBox, 
+                             paramCache::ParamDataCache, 
                              paramSet::OptSpanParamSet, 
                              orbs::OrbBasisCollection{T, D}) where {T<:Real, D}
     checkEmptiness(orbs, :orbs)
@@ -343,7 +337,7 @@ function genOrbitalDataCore!(fieldCache::FieldParamFuncCache{T, D},
 end
 
 function genOrbitalDataCore!(fieldCache::FieldParamFuncCache{T, D}, 
-                             paramCache::MultiSpanDataCacheBox, 
+                             paramCache::ParamDataCache, 
                              paramSet::OptSpanParamSet, 
                              orbs::N24Tuple{OrbitalBasis{<:RealOrComplex{T}, D}}) where 
                             {T<:Real, D}
@@ -353,7 +347,7 @@ function genOrbitalDataCore!(fieldCache::FieldParamFuncCache{T, D},
 end
 
 function genOrbitalData(orbBases::B; 
-                        cache!Self::MultiSpanDataCacheBox=MultiSpanDataCacheBox()) where 
+                        cache!Self::ParamDataCache=initializeParamDataCache()) where 
                        {T<:Real, D, B<:OrbBasisCollection{T, D}}
     paramSet = initializeSpanParamSet()
     coreCache = genFieldParamFuncCache(B|>eltype)
@@ -361,7 +355,7 @@ function genOrbitalData(orbBases::B;
 end
 
 function genOrbitalData(orbBasis::F; 
-                        cache!Self::MultiSpanDataCacheBox=MultiSpanDataCacheBox()) where 
+                        cache!Self::ParamDataCache=initializeParamDataCache()) where 
                        {F<:OrbitalBasis}
     paramSet = initializeSpanParamSet()
     coreCache = genFieldParamFuncCache(F)

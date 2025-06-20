@@ -5,7 +5,7 @@ using Quiqbox
 
 cen_sto1 = (1.1, 2.2)
 
-stf1Core = Quiqbox.CurriedField(x->exp(-first(x)), Float64, Val(1))
+stf1Core = Quiqbox.ModularField(x->exp(-first(x)), Float64, Val(1))
 stf1 = Quiqbox.PolyRadialFunc(stf1Core, (1, 1))
 sto1 = PrimitiveOrb(cen_sto1, stf1; renormalize=false)
 ke1 = eKinetic(sto1, sto1)
@@ -21,7 +21,7 @@ genSymKE_sto1Core = function (cen::NTuple{2, Float64})
     end
 end
 symKE_stf1Core = genSymKE_sto1Core(cen_sto1)
-symKE_stf1 = Quiqbox.CurriedField(symKE_stf1Core, Float64, Val(2))
+symKE_stf1 = Quiqbox.ModularField(symKE_stf1Core, Float64, Val(2))
 symKE_sto1 = PrimitiveOrb((0., 0.), symKE_stf1; renormalize=false)
 ke1_t = overlap(sto1, symKE_sto1)
 

@@ -44,5 +44,7 @@ struct Count{N} <: StructuredType
     end
 end
 
+Count(N::Int) = Count{N}()
+
 const Nil = Count{0}
 const One = Count{1}

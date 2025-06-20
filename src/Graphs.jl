@@ -255,7 +255,7 @@ const UnitLayerGraph{T, V<:CallVertex{T}, U<:UnitVertex, H<:CallVertex} =
 const GridLayerGraph{T, V<:CallVertex{T}, G<:GridVertex, H<:CallVertex} = 
       SpanLayerGraph{T, V, Union{}, G, H}
 
-
+#? Allow multiple param input
 function transpileParam(param::ParamBox, reindexInput!::Bool=false)
     sl = screenLevelOf(param)
 
@@ -416,10 +416,12 @@ getOutputType(::Type{<:ParamGraphCaller{T}}) where {T} = T
 
 const FilterEvalParam{F<:SpanEvaluator, S<:SpanSetFilter} = ComposedApply{F, S}
 
-const ParamMapper{S, F<:NamedTuple{ S, <:NonEmptyTuple{FilterEvalParam} }} = 
-      ChainMapper{F}
+const ParamMapper{F<:FunctionChainUnion{FilterEvalParam}} = ChainMapper{F}
 
-function genParamMapper(params::NamedParamTuple; 
+const NamedParamMapper{S, F<:NamedTuple{ S, <:NonEmptyTuple{FilterEvalParam} }} = 
+      ParamMapper{F}
+
+function genParamMapper(params::DirectParamSource; 
                         paramSet!Self::OptSpanParamSet=initializeSpanParamSet())
     checkEmptiness(params, :params)
     mapper = map(params) do param
@@ -429,6 +431,3 @@ function genParamMapper(params::NamedParamTuple;
     end |> ChainMapper
     mapper, paramSet!Self
 end
-
-
-const EncodeParamApply{B<:Function, F<:ParamMapper} = ContextParamFunc{B, ItsType, F}
