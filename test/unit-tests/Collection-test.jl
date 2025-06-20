@@ -1,7 +1,7 @@
 using Test
 using Quiqbox
 using Quiqbox: PackedMemory, indexedPerturb, OneToIndex, setIndex, MemoryLinker, 
-               getNestedLevel
+               getNestedLevel, decoupledCopy
 
 @testset "Collections.jl" begin
 
@@ -123,5 +123,13 @@ ids1_o[1] = OneToIndex(1)
 for (ele, m, n) in zip(mat2_ml, LinearIndices(mat2_ml), eachindex(mat2_ml))
     @test m==n && mat2_ml[m] == ele
 end
+
+v1 = [1]
+v2 = [v1 for _ in 1:3]
+v2[1][] = 2
+v2_2 = decoupledCopy(v2)
+v2_2[2][] = 3
+@test v2_2 == [[2], [3], [2]]
+@test !any(v2_2 .=== Ref(v1))
 
 end

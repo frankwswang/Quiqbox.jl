@@ -36,10 +36,12 @@ const ReducibleParam{T, E<:Pack{T}, S<:StateType} =
 const NestFixedParIn{T, E<:Pack{T}} = TriTupleUnion{ParamBox{T, E}}
 const CoreFixedParIn{T, E<:Pack{T}} = TriTupleUnion{ReducibleParam{T, E}}
 
-const ParamBoxAbtArr{P<:ParamBox, N} = AbstractArray{P, N}
-
 const UnitOrVal{T} = Union{UnitParam{T}, T}
 const UnitOrValVec{T} = AbstractVector{<:UnitOrVal{T}}
+
+const ParamBoxAbtArr{P<:ParamBox, N} = AbstractArray{P, N}
+const NamedParamTuple{S, N, P<:NTuple{N, ParamBox}} = NamedTuple{S, P}
+const DirectParamSource = Union{ParamBoxAbtArr, Tuple{Vararg{ParamBox}}, NamedParamTuple}
 
 isOffsetEnabled(::ParamBox) = false
 
@@ -93,7 +95,7 @@ mutable struct GridVar{T, N} <: TensorVar{T, DirectMemory{T, N}}
                      screen::Bool=false) where {T, N}
         N < 1 && throw(AssertionError("`N` must be larger than zero."))
         checkPrimParamElementalType(T)
-        input = decoupledCopy(input)
+        input = PackedMemory(input)
         new{T, N}(input, IndexedSym(symbol), screen)
     end
 end
@@ -278,19 +280,6 @@ function unitOp(f::F, a::AbstractArray{<:Any, N}, b::AbstractArray{<:Any, N}) wh
     map(a) do ele
         idx += 1
         unitOp(f, ele, b[idx])
-    end
-end
-
-
-function decoupledCopy(arr::AbstractArray)
-    map(decoupledCopy, arr) |> PackedMemory
-end
-
-function decoupledCopy(obj::T) where {T}
-    if canDirectlyStoreInstanceOf(T)
-        obj
-    else
-        deepcopy(obj)
     end
 end
 
@@ -646,18 +635,36 @@ function hasCycle(param::ParamBox; strictMode::Bool=true, finalizer::Function=it
 end
 
 
-function obtainCore!(cache::LRU{ParamEgalBox}, param::PrimitiveParam)
-    input = param.input
-    get!(cache, ParamEgalBox(param), decoupledCopy(input))::typeof(input)
+const ParamDataCache{T} = LRU{ParamEgalBox, T}
+
+initializeParamDataCache(maxSize::Int=100, ::Type{T}=Any) where {T} = 
+ParamDataCache{T}(maxsize=maxSize)
+
+
+function cacheParamCore!(cache::ParamDataCache, param::ParamBox, 
+                         evaluator::F=Base.Fix1(obtainCore!, cache)) where {F<:Function}
+    get!(cache, ParamEgalBox(param)) do
+        evaluator(param)
+    end::getOutputType(param)
 end
 
-function obtainCore!(cache::LRU{ParamEgalBox}, param::ShapedParam)
+function cacheParam!(cache::ParamDataCache, param::ParamBox)
+    cacheParamCore!(cache, param) |> decoupledCopy
+end
+
+
+function obtainCore!(cache::ParamDataCache, param::PrimitiveParam)
+    input = param.input
+    cacheParamCore!(cache, param, Storage(input))::typeof(input)
+end
+
+function obtainCore!(cache::ParamDataCache, param::ShapedParam)
     map(param.input) do p
         obtainCore!(cache, p)
     end::getOutputType(param)
 end
 
-function obtainCore!(cache::LRU{ParamEgalBox}, param::AdaptableParam)
+function obtainCore!(cache::ParamDataCache, param::AdaptableParam)
     key = ParamEgalBox(param)
     get!(cache, key) do
         if screenLevelOf(param) > 0
@@ -678,37 +685,28 @@ function checkParamCycle(param::ParamBox; strictMode=false, finalizer::Function=
     end
 end
 
-const ParamDataCache{T} = LRU{ParamEgalBox, T}
-
-initializeParamDataCache(maxSize::Int=100, ::Type{T}=Any) where {T} = 
-ParamDataCache{T}(maxsize=maxSize)
-
-function cacheParam!(cache::ParamDataCache{T}, param::ParamBox{<:T}) where {T}
-    get!(cache, ParamEgalBox(param)) do
-        obtainCore!(cache, param)
-    end::getOutputType(param)
-end #!! Connect to `obtain`
-
 function obtain(param::CompositeParam)
     checkParamCycle(param)
     if param isa AdaptableParam && screenLevelOf(param) > 0
-        decoupledCopy(param.offset)
+        param.offset
     else
         cache = initializeParamDataCache()
         obtainCore!(cache, param)
-    end
+    end |> decoupledCopy
 end
 
 obtain(param::PrimitiveParam) = decoupledCopy(param.input)
 
 function obtain(params::ParamBoxAbtArr)
     if isempty(params)
-        Union{}[]
+        similar(params, Union{})
     else
-        cache = LRU{ParamEgalBox, Any}(maxsize=min( 500, 100length(params) ))
+        eleParamType = eltype(params)
+        outputType = eleParamType <: PrimitiveParam ? getOutputType(eleParamType) : Any
+        cache = initializeParamDataCache(min( 500, 100length(params) ), outputType)
         map(params) do param
             checkParamCycle(param)
-            obtainCore!(cache, param)
+            obtainCore!(cache, param) |> decoupledCopy
         end
     end
 end
@@ -1094,6 +1092,8 @@ const TypedSpanParamSet{U<:AbstractVector{<:UnitParam}, G<:AbstractVector{<:Grid
 const FixedSpanParamSet{UP<:UnitParam, GP<:GridParam} = 
       TypedSpanParamSet{Memory{UP}, Memory{GP}}
 
+const ParamBoxSource = Union{DirectParamSource, OptSpanParamSet}
+
 
 initializeFixedSpanSet(::Nothing) = (unit=nothing, grid=nothing)
 
@@ -1104,6 +1104,17 @@ initializeFixedSpanSet() = (unit=genBottomMemory(), grid=genBottomMemory())
 function obtain(paramSet::OptSpanParamSet)
     map(paramSet) do sector
         (sector === nothing || isempty(sector)) ? nothing : obtain(sector)
+    end
+end
+
+#= Additional Method =#
+function cacheParam!(cache::ParamDataCache, params::ParamBoxSource)
+    if params isa ParamBoxAbtArr && isempty(params)
+        similar(params, Union{})
+    else
+        map(params) do param
+            cacheParam!(cache, param)
+        end
     end
 end
 
@@ -1222,14 +1233,6 @@ end
 function locateParam!(paramSet::TypedGridParamSet, target::GridParam)
     GetIndex{GridIndex}(locateParamCore!(paramSet.grid, target))
 end
-
-const NamedParamTuple{S, N, P<:NTuple{N, ParamBox}} = NamedTuple{S, P}
-
-const SpanParamNamedTuple{S, N, P<:NTuple{N, SpanParam}} = NamedParamTuple{S, N, P}
-
-const DirectParamSource = Union{ParamBoxAbtArr, Tuple{Vararg{ParamBox}}, NamedParamTuple}
-
-const ParamBoxSource = Union{DirectParamSource, OptSpanParamSet}
 
 function locateParam!(params::Union{OptSpanParamSet, AbstractVector}, 
                       subset::ParamBoxSource)

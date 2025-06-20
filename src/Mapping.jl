@@ -339,6 +339,8 @@ getOutputType(::Type{<:FloatingMonomial{T}}) where {T<:Real} = T
 struct Storage{T} <: TypedEvaluator{T}
     value::T
     marker::Symbol
+
+    Storage(value::T, marker::Symbol=:missing) where {T} = new{T}(value, marker)
 end
 
 (f::Storage{T})(::Vararg) where {T} = f.value
