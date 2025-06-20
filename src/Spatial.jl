@@ -11,10 +11,10 @@ getDimension(::ParticleFunction{D, M}) where {D, M} = Int(D*M)
 needFieldAmpEvalCache(::FieldAmplitude) = false
 
 function evalFieldAmplitude(f::FieldAmplitude, input; 
-                            cache!Self::MissingOr{MultiSpanDataCacheBox}=missing)
+                            cache!Self::MissingOr{ParamDataCache}=missing)
     formattedInput = formatInput(f, input)
     if needFieldAmpEvalCache(f)
-        ismissing(cache!Self) && (cache!Self = MultiSpanDataCacheBox())
+        ismissing(cache!Self) && (cache!Self = initializeParamDataCache())
         evalFieldAmplitudeCore(f, formattedInput, cache!Self)
     else
         evalFieldAmplitudeCore(f, formattedInput)
@@ -147,7 +147,7 @@ getOutputType(::Type{<:EncodedField{C}}) where {C<:RealOrComplex} = C
 needFieldAmpEvalCache(::EncodedField) = true
 
 function evalFieldAmplitudeCore(f::EncodedField{C, D, F, E}, input, 
-                                cache!Self::MultiSpanDataCacheBox) where 
+                                cache!Self::ParamDataCache) where 
                                {C<:RealOrComplex, D, F<:Function, E<:Function}
     val = formatInput(CartesianInput{D}(), input)
     for (caller, type) in zip((f.encode, f.core), (E, F))
@@ -188,21 +188,21 @@ RadialField(radial::FieldAmplitude{C, 1}, ::Val{D}) where {C<:RealOrComplex, D} 
 RadialField{C, D}(radial)
 
 
-struct ModularField{C<:RealOrComplex, D, F<:Function, P<:NamedParamTuple
+struct ModularField{C<:RealOrComplex, D, F<:Function, P<:NamedSpanParamTuple
                     } <: FieldAmplitude{C, D}
     core::TypedCarteFunc{C, D, ParamFreeFunc{F}}
     param::P
 
     function ModularField(core::TypedCarteFunc{C, D, ParamFreeFunc{F}}, 
                           params::P=NamedTuple()) where 
-                         {C<:RealOrComplex, D, F<:Function, P<:NamedParamTuple}
+                         {C<:RealOrComplex, D, F<:Function, P<:NamedSpanParamTuple}
         checkPositivity(D)
         new{C, D, F, P}(core, params)
     end
 end
 
 function ModularField(core::Function, ::Type{C}, ::Val{D}, 
-                      params::NamedParamTuple=NamedTuple()) where {C<:RealOrComplex, D}
+                      params::NamedSpanParamTuple=NamedTuple()) where {C<:RealOrComplex, D}
     checkPositivity(D::Int)
     typedCore = TypedCarteFunc(ParamFreeFunc(core), C, Val(D))
     ModularField(typedCore, params)
@@ -226,7 +226,7 @@ end
 
 needFieldAmpEvalCache(::ModularField) = true
 
-function evalFieldAmplitudeCore(f::ModularField, input, cache!Self::MultiSpanDataCacheBox)
+function evalFieldAmplitudeCore(f::ModularField, input, cache!Self::ParamDataCache)
     paramVals = cacheParam!(cache!Self, f.param)
     f.core(formatInput(f, input), paramVals)
 end
@@ -278,7 +278,7 @@ ProductField(basis::Tuple{FieldAmplitude}) = first(basis)
 getOutputType(::Type{<:ProductField{C}}) where {C<:RealOrComplex} = C
 
 function evalFieldAmplitude(f::ProductField{C}, input; 
-                            cache!Self::MultiSpanDataCacheBox=MultiSpanDataCacheBox(), 
+                            cache!Self::ParamDataCache=initializeParamDataCache(), 
                             ) where {C<:RealOrComplex}
     idx = firstindex(input)
     mapreduce(StableMul(C), f.basis) do basis
@@ -333,7 +333,7 @@ end
 getOutputType(::Type{<:CoupledField{C}}) where {C<:RealOrComplex} = C
 
 function evalFieldAmplitude(f::CoupledField, input; 
-                            cache!Self::MultiSpanDataCacheBox=MultiSpanDataCacheBox())
+                            cache!Self::ParamDataCache=initializeParamDataCache())
     map(f.pair) do basis
         evalFieldAmplitude(basis, input; cache!Self)
     end |> Base.Splat(f.coupler)
@@ -400,7 +400,7 @@ getOutputType(::Type{<:ShiftedField{T, D, C}}) where {T, D, C<:RealOrComplex{T}}
 needFieldAmpEvalCache(::ShiftedField) = true
 
 function evalFieldAmplitudeCore(f::ShiftedField{T, D}, input, 
-                                cache!Self::MultiSpanDataCacheBox) where {T<:Real, D}
+                                cache!Self::ParamDataCache) where {T<:Real, D}
     centerCoord = cacheParam!(cache!Self, f.center)
     shiftedCoord = StableTupleSub(T, Count(D))(formatInput(f, input), centerCoord)
     f.core(shiftedCoord)
@@ -452,8 +452,8 @@ end
 
 function strictTypeJoin(::Type{ModularField{CL, D, FL, PL}}, 
                         ::Type{ModularField{CR, D, FR, PR}}) where 
-                       {D, CL<:RealOrComplex, FL<:Function, PL<:NamedParamTuple, 
-                           CR<:RealOrComplex, FR<:Function, PR<:NamedParamTuple}
+                       {D, CL<:RealOrComplex, FL<:Function, PL<:NamedSpanParamTuple, 
+                           CR<:RealOrComplex, FR<:Function, PR<:NamedSpanParamTuple}
     p = (;C=strictTypeJoin(CL, CR), D, F=strictTypeJoin(FL, FR), P=strictTypeJoin(PL, PR))
     genParametricType(ModularField, p)
 end

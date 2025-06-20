@@ -27,7 +27,7 @@ getOutputType(::Type{<:PrimitiveOrb{T, D, C}}) where {T<:Real, D, C<:RealOrCompl
 
 
 function evalOrbital(orb::PrimitiveOrb{T, D, C}, input; 
-                     cache!Self::MultiSpanDataCacheBox=MultiSpanDataCacheBox()) where 
+                     cache!Self::ParamDataCache=initializeParamDataCache()) where 
                     {T<:Real, D, C<:RealOrComplex{T}}
     coreValue = evalFieldAmplitude(orb.field, formatInput(orb, input); cache!Self)
     StableMul(C)(coreValue, getNormFactor(orb))
@@ -135,7 +135,7 @@ getOutputType(::Type{<:CompositeOrb{T, D, C}}) where {T<:Real, D, C<:RealOrCompl
 
 
 function evalOrbital(orb::CompositeOrb{T, D, C}, input; 
-                     cache!Self::MultiSpanDataCacheBox=MultiSpanDataCacheBox()) where 
+                     cache!Self::ParamDataCache=initializeParamDataCache()) where 
                     {T<:Real, D, C<:RealOrComplex{T}}
     weightVal = cacheParam!(cache!Self, orb.weight)
 

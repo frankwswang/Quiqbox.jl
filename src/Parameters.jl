@@ -41,6 +41,7 @@ const UnitOrValVec{T} = AbstractVector{<:UnitOrVal{T}}
 
 const ParamBoxAbtArr{P<:ParamBox, N} = AbstractArray{P, N}
 const NamedParamTuple{S, N, P<:NTuple{N, ParamBox}} = NamedTuple{S, P}
+const NamedSpanParamTuple{S, N, P<:NTuple{N, SpanParam}} = NamedParamTuple{S, N, P}
 const DirectParamSource = Union{ParamBoxAbtArr, Tuple{Vararg{ParamBox}}, NamedParamTuple}
 
 isOffsetEnabled(::ParamBox) = false
@@ -1254,66 +1255,6 @@ function locateParam!(params::OptSpanParamSet, subset::OptSpanParamSet)
         end
     end
     SpanSetFilter(units, grids)
-end
-
-
-const MultiSpanData{T} = Union{T, DirectMemory{<:T}, NestedMemory{<:T}}
-
-struct MultiSpanDataCacheBox{T, G<:DirectMemory{<:T}, N<:NestedMemory{<:T}
-                             } <: QueryBox{MultiSpanData{T}}
-    unit::LRU{UnitParamEgalBox, T}
-    grid::LRU{GridParamEgalBox, G}
-    nest::LRU{NestParamEgalBox, N}
-
-    function MultiSpanDataCacheBox(::Type{T}=Any; maxSize::Int=100) where {T}
-        maxsize = maxSize
-        G, N = if isconcretetype(T)
-            DirectMemory{T},   NestedMemory{T}
-        else
-            DirectMemory{<:T}, NestedMemory{<:T}
-        end
-        new{T, G, N}(LRU{UnitParamEgalBox, T}(; maxsize), 
-                     LRU{GridParamEgalBox, G}(; maxsize), 
-                     LRU{NestParamEgalBox, N}(; maxsize))
-    end
-end
-
-
-getSpanDataSectorKey(cache::MultiSpanDataCacheBox{T1}, param::UnitParam{T2}) where 
-                    {T1, T2<:T1} = 
-(cache.unit, UnitParamEgalBox(param))
-
-getSpanDataSectorKey(cache::MultiSpanDataCacheBox{T1}, param::GridParam{T2}) where 
-                    {T1, T2<:T1} = 
-(cache.grid, GridParamEgalBox(param))
-
-getSpanDataSectorKey(cache::MultiSpanDataCacheBox{T1}, param::NestParam{T2}) where 
-                    {T1, T2<:T1} = 
-(cache.nest, BestParamEgalBox(param))
-
-
-formatSpanData(::Type{T}, val) where {T} = convert(T, val)
-
-function formatSpanData(::Type{T}, val::AbstractArray) where {T}
-    res = extractPackedMemory(val)
-    res::getPackType(T, getNestedLevel(res|>typeof).level)
-end
-
-
-function cacheParam!(cache::MultiSpanDataCacheBox{T}, param::ParamBox{<:T}) where {T}
-    get!(getSpanDataSectorKey(cache, param)...) do
-        formatSpanData(T, obtain(param))
-    end::getOutputType(param)
-end
-
-function cacheParam!(cache::MultiSpanDataCacheBox, params::ParamBoxSource)
-    if params isa AbstractArray && isempty(params)
-        similar(params, Union{})
-    else
-        map(params) do param
-            cacheParam!(cache, param)
-        end
-    end
 end
 
 
