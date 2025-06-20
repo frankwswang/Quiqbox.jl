@@ -282,7 +282,7 @@ function genCachedFieldFunc!(fieldCache::MixedFieldParamFuncCache{T, D},
     f = get!(getfield(fieldCache, sector), EgalBox{ShiftedField{T, D, C}}(orb.field)) do
         unpackFunc!(orb.field, paramSet)
     end
-    StashedField(f, paramSet)
+    StashedField(f, paramSet, paramCache)
 end #!! Incorporate `genCachedFieldFunc!` into `unpackFunc`
 
 function genCachedFieldFunc!(fieldCache::TypedFieldParamFuncCache{T, D, C, F}, 
@@ -293,7 +293,7 @@ function genCachedFieldFunc!(fieldCache::TypedFieldParamFuncCache{T, D, C, F},
     f = get!(fieldCache, EgalBox{F}(orb.field)) do
         unpackFunc!(orb.field, paramSet)
     end
-    StashedField(f, paramSet)
+    StashedField(f, paramSet, paramCache)
 end
 
 
