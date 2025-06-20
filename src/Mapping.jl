@@ -98,10 +98,10 @@ StableAdd(::Type{T}) where {T} = StableBinary(+, T)
 const StableMul{T} = StableBinary{T, typeof(*)}
 StableMul(::Type{T}) where {T} = StableBinary(*, T)
 
-const StableTupleShift{T, N} = StableBinary{NTuple{N, T}, typeof(.-)}
+const StableTupleSub{T<:Tuple} = StableBinary{T, typeof(.-)}
 
-function StableTupleShift(::Type{T}, ::Count{D})::StableTupleShift{T, D} where {T, D}
-    StableBinary(.-, NTuple{D, T})
+function StableTupleSub(::Type{T}, ::Count{N})::StableTupleSub{NTuple{N, T}} where {T, N}
+    StableBinary(.-, NTuple{N, T})
 end
 
 

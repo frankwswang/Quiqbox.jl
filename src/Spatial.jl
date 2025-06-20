@@ -402,7 +402,7 @@ needFieldAmpEvalCache(::ShiftedField) = true
 function evalFieldAmplitudeCore(f::ShiftedField{T, D}, input, 
                                 cache!Self::MultiSpanDataCacheBox) where {T<:Real, D}
     centerCoord = cacheParam!(cache!Self, f.center)
-    shiftedCoord = StableTupleShift(T, Count(D))(formatInput(f, input), centerCoord)
+    shiftedCoord = StableTupleSub(T, Count(D))(formatInput(f, input), centerCoord)
     f.core(shiftedCoord)
 end
 
@@ -410,7 +410,7 @@ function unpackFieldFunc(f::F) where {T, C<:RealOrComplex{T}, D, F<:ShiftedField
     fInner, paramSet = unpackFieldFunc(f.core)
     fCore = fInner.f.f
     mapper, _ = genParamMapper(f.center, paramSet!Self=paramSet)
-    shiftCore = StableTupleShift(T, Count(D))
+    shiftCore = StableTupleSub(T, Count(D))
     encoder = TaggedSpanSetFilter(mapper)
     shifter = ContextParamFunc(shiftCore, CartesianFormatter(T, Count(D)), encoder)
     TypedCarteFunc(ParamPipeline((shifter, fCore)), T, Val(D)), paramSet
@@ -418,7 +418,7 @@ end
 
 # const FieldCenterShifter{T<:Real, D, M<:ChainMapper{ <:NTuple{D, Function} }} = 
 const FieldCenterShifter{T<:Real, D, M<:ChainMapper{ <:NTuple{D, Function} }} = 
-      ContextParamFunc{StableTupleShift{T, D}, CartesianFormatter{D, NTuple{D, T}}, M}
+      ContextParamFunc{StableTupleSub{NTuple{D, T}}, CartesianFormatter{D, NTuple{D, T}}, M}
 
 const ShiftedFieldFuncCore{T<:Real, D, F<:AbstractParamFunc, R<:FieldCenterShifter{T, D}} = 
       ParamPipeline{Tuple{R, F}}
