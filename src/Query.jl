@@ -310,6 +310,26 @@ function ==(marker1::ValueMarker, marker2::ValueMarker)
     end
 end
 
+
+struct BottomArrayMarker{N} <: IdentityMarker{AbstractArray{Union{}, N}}
+    code::UInt
+    data::NTuple{N, Int}
+
+    function BottomArrayMarker(input::AbstractArray{Union{}, N}) where {N}
+        shape = size(input)
+        new{N}(hash(shape), shape)
+    end
+end
+
+function ==(marker1::BottomArrayMarker, marker2::BottomArrayMarker)
+    if marker1.code == marker2.code
+        marker1.data == marker2.data
+    else
+        false
+    end
+end
+
+
 const IdMarkerPair{M<:IdentityMarker} = Pair{Symbol, M}
 
 const ValMkrPair{T} = IdMarkerPair{ValueMarker{T}}
@@ -386,7 +406,11 @@ function markObj(input::Type)
 end
 
 function markObj(input::Union{AbstractArray, Tuple})
-    isPrimVarCollection(input) ? ValueMarker(input) : BlockMarker(input)
+    if input isa AbstractArray && eltype(input) == Union{}
+        BottomArrayMarker(input)
+    else
+        isPrimVarCollection(input) ? ValueMarker(input) : BlockMarker(input)
+    end
 end
 
 function markObj(input::AbstractEqualityDict)
