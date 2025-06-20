@@ -238,7 +238,7 @@ struct CartesianHeader{N, F<:Function} <: Modifier
     f::F
 
     function CartesianHeader(f::F, ::Val{N}) where {F<:Function, N}
-        checkPositivity(N::Int, true)
+        checkPositivity(N::Int)
         new{N, F}(f)
     end
 end
@@ -260,12 +260,11 @@ TypedReturn(CartesianHeader(f, Val(D)), T)
 TypedCarteFunc(f::TypedReturn, ::Type{T}, ::Val{D}) where {T, D} = 
 TypedReturn(CartesianHeader(f.f, Val(D)), T)
 
-const CartesianFormatter{T<:Real, N} = CartesianHeader{N, Typed{ NTuple{N, T} }}
+const CartesianFormatter{N, R<:NTuple{N, Real}} = CartesianHeader{N, Typed{R}}
 
-function CartesianFormatter(::Type{T}, ::Count{N})::CartesianFormatter{T, N} where 
-                           {T<:Real, N}
+function CartesianFormatter(::Type{T}, ::Count{N}) where {T<:Real, N}
     checkPositivity(N)
-    CartesianHeader(Typed(NTuple{N, T}), Val(N))
+    CartesianHeader(Typed(NTuple{N, T}), Val(N))::CartesianFormatter{N, NTuple{N, T}}
 end
 
 

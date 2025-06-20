@@ -26,7 +26,7 @@ end
 
 struct FieldParamFunc{T, D, C<:RealOrComplex{T}, F<:AbstractParamFunc, S<:SpanSetFilter
                       } <: TypedParamFunc{C}
-    core::TypedReturn{C, ContextParamFunc{F, CartesianFormatter{T, D}, S}}
+    core::TypedReturn{C, ContextParamFunc{F, CartesianFormatter{D, NTuple{D, T}}, S}}
 
     function FieldParamFunc{T, D, C}(f::F, scope::TaggedSpanSetFilter{S}) where 
                                     {T, C<:RealOrComplex{T}, D, F<:AbstractParamFunc, 
@@ -418,7 +418,7 @@ end
 
 # const FieldCenterShifter{T<:Real, D, M<:ChainMapper{ <:NTuple{D, Function} }} = 
 const FieldCenterShifter{T<:Real, D, M<:ChainMapper{ <:NTuple{D, Function} }} = 
-      ContextParamFunc{StableTupleShift{T, D}, CartesianFormatter{T, D}, M}
+      ContextParamFunc{StableTupleShift{T, D}, CartesianFormatter{D, NTuple{D, T}}, M}
 
 const ShiftedFieldFuncCore{T<:Real, D, F<:AbstractParamFunc, R<:FieldCenterShifter{T, D}} = 
       ParamPipeline{Tuple{R, F}}
