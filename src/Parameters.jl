@@ -1126,77 +1126,57 @@ end
 
 struct UnitInput end
 struct GridInput end
+struct SpanInput end
+struct VoidInput end
 const MonoPackInput = Union{UnitInput, GridInput}
+const OptSpanInput = Union{MonoPackInput, SpanInput, VoidInput}
 
-struct SpanInput{U<:NothingOr{UnitInput}, G<:NothingOr{GridInput}} end
-const VoidSpanInput = SpanInput{Nothing, Nothing}
-const HalfSpanInput = Union{SpanInput{UnitInput, Nothing}, SpanInput{Nothing, GridInput}}
-const FullSpanInput = SpanInput{UnitInput, GridInput}
+restrictSpanSet(::UnitInput, s::TypedUnitSet) = (unit=s.unit,)
+restrictSpanSet(::GridInput, s::TypedGridSet) = (grid=s.grid,)
+restrictSpanSet(::SpanInput, s::TypedSpanSet) = itself(s)
+restrictSpanSet(::VoidInput, s::TypedVoidSet) = initializeFixedSpanSet(nothing)
 
-const PrimPackInput = Union{MonoPackInput, SpanInput}
+getInputSetType(::TypedUnitSet) = UnitInput
+getInputSetType(::TypedGridSet) = GridInput
+getInputSetType(::TypedSpanSet) = SpanInput
+getInputSetType(::TypedVoidSet) = VoidInput
 
-getInputSector(::Type{UnitInput}) = :unit
-getInputSector(::Type{GridInput}) = :grid
-getInputSector(::Type{<:SpanInput}) = ChainedAccess()
-
-restrictSpanSet(::UnitInput, ::TypedUnitSet) = getInputSector(UnitInput)
-restrictSpanSet(::GridInput, ::TypedGridSet) = getInputSector(GridInput)
-restrictSpanSet(::FullSpanInput, ::TypedSpanSet) = getInputSector(FullSpanInput)
-restrictSpanSet(::VoidSpanInput, ::TypedVoidSet) = getInputSector(VoidSpanInput)
-restrictSpanSet(::SpanInput{UnitInput, Nothing}, ::TypedUnitSet) = getInputSector(SpanInput)
-restrictSpanSet(::SpanInput{Nothing, GridInput}, ::TypedGridSet) = getInputSector(SpanInput)
-
-getInputSetType(::TypedSpanSet) = FullSpanInput
-getInputSetType(::TypedVoidSet) = VoidSpanInput
-getInputSetType(::TypedUnitSet) = SpanInput{UnitInput, Nothing}
-getInputSetType(::TypedGridSet) = SpanInput{Nothing, GridInput}
-
-
-struct SpanEvaluator{T, A<:PrimPackInput, F<:Function} <: TypedEvaluator{T}
+struct SpanSetCaller{T, A<:OptSpanInput, F<:Function} <: TypedEvaluator{T}
     core::TypedReturn{T, ParamFreeFunc{F}}
 
-    function SpanEvaluator(f::TypedReturn{T}, ::A) where {T, A<:PrimPackInput}
-        new{T, A, typeof(f.f)}(TypedReturn(ParamFreeFunc(f.f), T))
+    function SpanSetCaller(f::TypedReturn{T}, ::A) where {T, A<:OptSpanInput}
+        fInner = f.f
+        new{T, A, typeof(fInner)}(TypedReturn(ParamFreeFunc(fInner), T))
     end
 
-    function SpanEvaluator(f::SpanEvaluator{T, <:PrimPackInput, F}, ::A) where 
-                           {T, F<:Function, A<:PrimPackInput}
-        new{T, A, F}(f.core)
+    function SpanSetCaller(f::SpanSetCaller{T}, ::A) where {T, A<:OptSpanInput}
+        fCore = f.core
+        new{T, A, typeof(fCore.f.f)}(fCore)
     end
 end
 
-getInputSetType(::SpanEvaluator{T, A}) where {T, A<:PrimPackInput} = A
+getInputSetType(::SpanSetCaller{T, A}) where {T, A<:OptSpanInput} = A
 
-function evaluateSpanInput(f::SpanEvaluator{T, <:MonoPackInput, F}, 
-                           sector::AbstractVector) where {T, F<:Function}
-    f.core(sector)
+function evaluateSpanInput(f::SpanSetCaller{T, UnitInput}, sector::AbstractVector) where {T}
+    f.core((unit=sector,))
 end
 
-function evaluateSpanInput(f::SpanEvaluator{T, SpanInput{UnitInput, Nothing}, F}, 
-                           unitSector::AbstractVector) where {T, F<:Function}
-    formattedInput = (unit=unitSector, grid=nothing)
+function evaluateSpanInput(f::SpanSetCaller{T, GridInput}, sector::AbstractVector) where {T}
+    f.core((grid=sector,))
+end
+
+function evaluateSpanInput(f::SpanSetCaller, inputSet::OptSpanValueSet)
+    formattedInput = restrictSpanSet(getInputSetType(f)(), inputSet)
     f.core(formattedInput)
 end
 
-function evaluateSpanInput(f::SpanEvaluator{T, SpanInput{Nothing, GridInput}, F}, 
-                           gridSector::AbstractVector) where {T, F<:Function}
-    formattedInput = (unit=nothing, grid=gridSector)
-    f.core(formattedInput)
-end
-
-function evaluateSpanInput(f::F, inputSet::OptionalSpanSet) where {F<:SpanEvaluator}
-    sector = restrictSpanSet(getInputSetType(f)(), inputSet)
-    formattedInput = getField(inputSet, sector)
-    f.core(formattedInput)
-end
-
-(f::SpanEvaluator)(input::Union{AbstractVector, OptionalSpanSet}) = 
+(f::SpanSetCaller)(input::Union{AbstractVector, OptSpanValueSet}) = 
 evaluateSpanInput(f, input)
 
-(f::SpanEvaluator{T, VoidSpanInput, F})() where {T, F<:Function} = 
-f.core(initializeFixedSpanSet(nothing))
+(f::SpanSetCaller{T, VoidInput})() where {T} = 
+evaluateSpanInput(f, initializeFixedSpanSet(nothing))
 
-getOutputType(::Type{<:SpanEvaluator{T}}) where {T} = T
+getOutputType(::Type{<:SpanSetCaller{T}}) where {T} = T
 
 
 @generated function initializeSpanParamSet(::Type{T}=Any) where {T}
