@@ -1,15 +1,34 @@
 using Test
 using Quiqbox
+using Quiqbox: DirectMemory, PackedMemory
 
 @testset "Types.jl" begin
 
-@test Quiqbox.NestParam <: Quiqbox.ParamBox
+@test Quiqbox.UnitParam <: Quiqbox.SpanParam
+@test Quiqbox.GridParam <: Quiqbox.SpanParam
 
-@test Quiqbox.ReducibleParam <: Quiqbox.ParamBox
+@test Quiqbox.SpanParam <: Quiqbox.ParamBox
 
-@test Quiqbox.ScreenParam <: Quiqbox.ReduceParam
+@test   Quiqbox.NestParam <: Quiqbox.ParamBox
+@test !(Quiqbox.SpanParam <: Quiqbox.NestParam)
 
-@test Quiqbox.NestFixedParIn{Float64} <: Quiqbox.CoreFixedParIn{Float64}
+@test   Quiqbox.GridParam{Int} <: Quiqbox.NestParam{Int, Int}
+@test !(Quiqbox.GridParam{Int} <: Quiqbox.NestParam{Int, <:PackedMemory{Int}})
+
+for E in (Int, DirectMemory{Int, 1}, PackedMemory{Int, DirectMemory{Int, 1}, 1})
+    @test   Quiqbox.Span{E} <: Quiqbox.Pack{E}
+    @test !(Quiqbox.Pack{E} <: Quiqbox.Span{E})
+    @test   Quiqbox.ParamBox{Int, E} <: Quiqbox.ReducibleParam{Int, E}
+    @test !(Quiqbox.ReducibleParam{Int, E} <: Quiqbox.ParamBox{Int, E})
+    @test   Quiqbox.NestFixedParIn{Int, E} <: Quiqbox.CoreFixedParIn{Int, E}
+    @test !(Quiqbox.CoreFixedParIn{Int, E} <: Quiqbox.NestFixedParIn{Int, E})
+end
+
+@test   Quiqbox.ScreenParam <: Quiqbox.ReduceParam
+@test !(Quiqbox.ReduceParam <: Quiqbox.ScreenParam)
+
+@test   Quiqbox.NestFixedParIn <: Quiqbox.CoreFixedParIn
+@test !(Quiqbox.CoreFixedParIn <: Quiqbox.NestFixedParIn)
 
 @test Quiqbox.PrimGTO <: Quiqbox.PrimitiveOrb
 
