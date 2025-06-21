@@ -1316,26 +1316,20 @@ end
 
 getField(::SpanSetFilter, ::VoidSetFilter) = SpanSetFilter()
 
-
-const ParamFilter = Union{SpanSetFilter, ChainMapper}
-
-struct TaggedSpanSetFilter{F<:ParamFilter} <: Mapper
+struct TaggedSpanSetFilter{F<:SpanSetFilter} <: Mapper
     scope::F
     tag::Identifier
 end
 
-TaggedSpanSetFilter(scope::ParamFilter, paramSet::OptSpanParamSet) = 
+TaggedSpanSetFilter(scope::SpanSetFilter, paramSet::OptSpanParamSet) = 
 TaggedSpanSetFilter(scope, Identifier(paramSet))
-
-TaggedSpanSetFilter(scope::ParamFilter) = 
-TaggedSpanSetFilter(scope, Identifier(nothing))
 
 #= Additional Method =#
 getField(obj::OptionalSpanSet, tsFilter::TaggedSpanSetFilter, 
          finalizer::F=itself) where {F<:Function} = 
 getField(obj, tsFilter.scope, finalizer)
 
-getOutputType(::Type{TaggedSpanSetFilter{F}}) where {F<:ParamFilter} = getOutputType(F)
+getOutputType(::Type{TaggedSpanSetFilter{F}}) where {F<:SpanSetFilter} = getOutputType(F)
 
 
 struct InputConverter{F<:Function} <: AbstractParamFunc
@@ -1351,18 +1345,17 @@ InputConverter(f::InputConverter) = itself(f)
 getOutputType(::Type{InputConverter{F}}) where {F<:Function} = getOutputType(F)
 
 
-struct ParamFormatter{F<:ParamFilter} <: AbstractParamFunc
-    core::ParamFreeFunc{TaggedSpanSetFilter{F}}
+struct ParamFormatter{F<:Function} <: AbstractParamFunc
+    core::ParamFreeFunc{F}
 end
 
-ParamFormatter(f::TaggedSpanSetFilter{F}) where {F<:ParamFilter} = 
-ParamFormatter(f|>ParamFreeFunc)
+ParamFormatter(f::F) where {F<:Function} = ParamFormatter(f|>ParamFreeFunc)
 
 (f::ParamFormatter)(::Any, params::OptSpanValueSet) = f.core(params)
 
 ParamFormatter(f::ParamFormatter) = itself(f)
 
-getOutputType(::Type{ParamFormatter{F}}) where {F<:ParamFilter} = getOutputType(F)
+getOutputType(::Type{ParamFormatter{F}}) where {F<:Function} = getOutputType(F)
 
 
 struct ParamBindFunc{F<:Function, PU<:UnitParam, PG<:GridParam} <: AbstractParamFunc
@@ -1448,15 +1441,14 @@ end
 getOutputType(::Type{<:ParamCombiner{B}}) where {B<:Function} = getOutputType(B)
 
 
-const ContextParamFunc{B<:Function, E<:Function, F<:ParamFilter} = 
+const ContextParamFunc{B<:Function, E<:Function, F<:Function} = 
       ParamCombiner{B, Tuple{ InputConverter{E}, ParamFormatter{F} }}
 
-function ContextParamFunc(binder::Function, converter::Function, 
-                          formatter::TaggedSpanSetFilter)
+function ContextParamFunc(binder::Function, converter::Function, formatter::Function)
     ParamCombiner(binder, ( InputConverter(converter), ParamFormatter(formatter) ))
 end
 
-function ContextParamFunc(binder::Function, formatter::TaggedSpanSetFilter)
+function ContextParamFunc(binder::Function, formatter::Function)
     ContextParamFunc(binder, itself, formatter)
 end
 

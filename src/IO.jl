@@ -146,6 +146,6 @@ function show(io::IO, ::Type{<:ExpandParam{T, E, N}}) where
 end
 
 function show(io::IO, ::Type{ContextParamFunc{B, E, F}}) where 
-             {B<:Function, E<:Function, F<:ParamFilter}
+             {B<:Function, E<:Function, F<:Function}
     print(io, string("ContextParamFunc", "{", B, ", ", E, ", ", F, "}"))
 end

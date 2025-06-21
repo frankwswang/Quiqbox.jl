@@ -26,7 +26,8 @@ end
 
 struct FieldParamFunc{T, D, C<:RealOrComplex{T}, F<:AbstractParamFunc, S<:SpanSetFilter
                       } <: TypedParamFunc{C}
-    core::TypedReturn{C, ContextParamFunc{F, CartesianFormatter{D, NTuple{D, T}}, S}}
+    core::TypedReturn{C, ContextParamFunc{ F, CartesianFormatter{D, NTuple{D, T}}, 
+                                           TaggedSpanSetFilter{S} }}
 
     function FieldParamFunc{T, D, C}(f::F, scope::TaggedSpanSetFilter{S}) where 
                                     {T, C<:RealOrComplex{T}, D, F<:AbstractParamFunc, 
@@ -234,8 +235,7 @@ end
 function unpackFieldFunc(f::F) where {C<:RealOrComplex, D, F<:ModularField{C, D}}
     params = f.param
     paramMapper, paramSet = genParamMapper(params)
-    tagFilter = TaggedSpanSetFilter(paramMapper)
-    TypedCarteFunc(ContextParamFunc(f.core.f.f, tagFilter), C, Val(D)), paramSet
+    TypedCarteFunc(ContextParamFunc(f.core.f.f, paramMapper), C, Val(D)), paramSet
 end
 
 
@@ -411,8 +411,7 @@ function unpackFieldFunc(f::F) where {T, C<:RealOrComplex{T}, D, F<:ShiftedField
     fCore = fInner.f.f
     mapper, _ = genParamMapper(f.center, paramSet!Self=paramSet)
     shiftCore = StableTupleSub(T, Count(D))
-    encoder = TaggedSpanSetFilter(mapper)
-    shifter = ContextParamFunc(shiftCore, CartesianFormatter(T, Count(D)), encoder)
+    shifter = ContextParamFunc(shiftCore, CartesianFormatter(T, Count(D)), mapper)
     TypedCarteFunc(ParamPipeline((shifter, fCore)), T, Val(D)), paramSet
 end
 
