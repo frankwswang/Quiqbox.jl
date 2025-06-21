@@ -192,7 +192,9 @@ const BlackBox = EgalBox{Any}
 
 ==(bb1::EgalBox, bb2::EgalBox) = (bb1.value === bb2.value)
 
-hash(bb::EgalBox, hashCode::UInt) = hash(objectid(bb.value), hashCode)
+function hash(bb::EgalBox, hashCode::UInt)
+    hash(objectid(bb.value), hash(typeof(bb), hashCode))
+end
 
 
 struct TypeBox{T} <: QueryBox{Type{T}}
@@ -206,7 +208,9 @@ throw(AssertionError("`TypeBox` cannot be instantiated with `Union{}`."))
 
 ==(::TypeBox{T1}, ::TypeBox{T2}) where {T1, T2} = (T1 <: T2) && (T2 <: T1)
 
-hash(::TypeBox{T}, hashCode::UInt) where {T} = hash(objectid(T), hashCode)
+function hash(::TypeBox{T}, hashCode::UInt) where {T}
+    hash(hash(T), hash(TypeBox, hashCode))
+end
 
 
 function canDirectlyStoreInstanceOf(::Type{T}) where {T}

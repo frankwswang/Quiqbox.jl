@@ -969,7 +969,7 @@ end
 function dissectParamCore(pars::ParamBoxAbtArr)
     finalizer = ParamBoxClassifier()
 
-    foreach(pars) do par
+    for par in pars
         checkParamCycle(par; finalizer)
     end
 
@@ -1010,7 +1010,11 @@ function getSourceParamSet(source; onlyVariable::Bool=true, includeSink::Bool=tr
         end
     end
 
-    onlyVariable && foreach(sector->filter!(isPrimitiveInput, sector), source)
+    if onlyVariable
+        for sector in source
+            filter!(isPrimitiveInput, sector)
+        end
+    end
 
     source
 end
@@ -1381,17 +1385,47 @@ ParamFormatter(f::ParamFormatter) = itself(f)
 getOutputType(::Type{ParamFormatter{F}}) where {F<:ParamFilter} = getOutputType(F)
 
 
-struct ParamBindFunc{F<:Function, C1<:UnitParam, C2<:GridParam} <: AbstractParamFunc
+struct ParamBindFunc{F<:Function, PU<:UnitParam, PG<:GridParam} <: AbstractParamFunc
     core::F
-    unit::Memory{C1}
-    grid::Memory{C2}
+    unit::Memory{PU}
+    grid::Memory{PG}
+
+    function ParamBindFunc(core::F, units::AbstractVector{<:UnitParam}, 
+                                    grids::AbstractVector{<:GridParam}) where {F<:Function}
+        unitMem = genMemory(units)
+        gridMem = genMemory(grids)
+
+        new{F, eltype(unitMem), eltype(gridMem)}(core, unitMem, gridMem)
+    end
 end
 
-function (f::ParamBindFunc{F})(input, params::OptSpanValueSet) where {F<:Function}
-    for field in (:unit, :grid)
-        foreach(getfield(f, field), getfield(params, field)) do p, v
-            setVal!(p, v)
-        end
+const UnitParamBindFunc{F, PU} = ParamBindFunc{F, PU, Union{}}
+
+const GridParamBindFunc{F, PG} = ParamBindFunc{F, Union{}, PG}
+
+const VoidParamBindFunc{F} = ParamBindFunc{F, Union{}, Union{}}
+
+function (f::UnitParamBindFunc)(input, params::OptSpanValueSet)
+    for (p, v) in zip(f.unit, params.unit)
+        setVal!(p, v)
+    end
+
+    f.core(input)
+end
+
+function (f::GridParamBindFunc)(input, params::OptSpanValueSet)
+    for (p, v) in zip(f.grid, params.grid)
+        setVal!(p, v)
+    end
+
+    f.core(input)
+end
+
+(f::VoidParamBindFunc)(input, ::OptSpanValueSet) = f.core(input)
+
+function (f::ParamBindFunc)(input, params::OptSpanValueSet)
+    for field in (:unit, :grid), (p, v) in zip(getfield(f, field), getfield(params, field))
+        setVal!(p, v)
     end
 
     f.core(input)
@@ -1486,9 +1520,9 @@ function unpackFunc(f::Function)
     if noStoredParam(fLocal)
         fCore = InputConverter(fLocal)
         paramSet = initializeFixedSpanSet()
-    else #! ParamFreeFunc is not compatible with functions that only contain constant params
-        source = getSourceParamSet(fLocal)
-        unitPars, gridPars = map(extractMemory, source)
+    else
+        source = getSourceParamSet(fLocal) #> `onlyVariable == true && includeSink == true`
+        unitPars, gridPars = source
         fCore = ParamBindFunc(fLocal, unitPars, gridPars)
         paramSet = initializeSpanParamSet(unitPars, gridPars)
     end
