@@ -969,7 +969,7 @@ end
 function dissectParamCore(pars::ParamBoxAbtArr)
     finalizer = ParamBoxClassifier()
 
-    foreach(pars) do par
+    for par in pars
         checkParamCycle(par; finalizer)
     end
 
@@ -1010,7 +1010,11 @@ function getSourceParamSet(source; onlyVariable::Bool=true, includeSink::Bool=tr
         end
     end
 
-    onlyVariable && foreach(sector->filter!(isPrimitiveInput, sector), source)
+    if onlyVariable
+        for sector in source
+            filter!(isPrimitiveInput, sector)
+        end
+    end
 
     source
 end
