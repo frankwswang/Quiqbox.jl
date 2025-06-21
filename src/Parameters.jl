@@ -416,7 +416,7 @@ mutable struct ReduceParam{T, E<:Pack{T}, F<:Function, I<:CoreFixedParIn} <: Cel
     end
 end
 
-const ScreenParam{T, E<:Pack{T}, P<:ParamBox{T}} = ReduceParam{T, E, ItsType, Tuple{P}}
+const ScreenParam{T, E<:Pack{T}, P<:ParamBox{T, E}} = ReduceParam{T, E, ItsType, Tuple{P}}
 
 function genCellParam(func::Function, input::CoreFixedParIn, symbol::SymOrIndexedSym)
     lambda = formatTensorFunc(func, TypedReduce, input)
