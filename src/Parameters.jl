@@ -9,11 +9,11 @@ struct Composite end
 const StateType = Union{Primitive, Composite}
 
 const Span{T} = Union{T, DirectMemory{T}}
-const Pack{T} = Union{T, PackedMemory{T}}
+const Pack{T} = Union{T, PackedMemory{T}} #> `Span{T} <: Pack{T}` for every `T`
 
 abstract type ParamBox{T, E<:Pack{T}, S<:StateType} <: StateBox{E} end
 
-const PrimitiveParam{T, E<:Pack{T}} = ParamBox{T, E, Primitive}
+const PrimitiveParam{T, E<:Span{T}} = ParamBox{T, E, Primitive}
 const CompositeParam{T, E<:Pack{T}} = ParamBox{T, E, Composite}
 
 const UnitParam{T, S<:StateType} = ParamBox{T, T, S}
@@ -21,8 +21,6 @@ const SpanParam{T, E<:Span{T}, S<:StateType} = ParamBox{T, E, S}
 const GridParam{T, N, S<:StateType} = SpanParam{T, DirectMemory{T, N}, S}
 const NestParam{T, E<:Pack{T}, N, S<:StateType} = ParamBox{T, PackedMemory{T, E, N}, S}
 
-
-const TensorVar{T, E<:Span{T}} = PrimitiveParam{T, E}
 abstract type CellParam{T, E<:Pack{T}} <: CompositeParam{T, E} end
 abstract type MeshParam{T, E<:Pack{T}, N} <: NestParam{T, E, N, Composite} end
 abstract type HeapParam{T, E<:Pack{T}, N} <: NestParam{T, E, N, Composite} end
@@ -31,9 +29,9 @@ const TensorialParam{T, S<:StateType} = Union{UnitParam{T, S}, GridParam{T, <:An
 const AdaptableParam{T, E<:Pack{T}} = Union{CellParam{T, E}, MeshParam{T, E}}
 const ReducibleParam{T, E<:Pack{T}, S<:StateType} = 
       Union{ParamBox{T, E, S}, NestParam{T, E, <:Any, S}}
-#!! Need to check if `ReducibleParam` can be removed since ParamBox == ReducibleParam
-#!! but Quiqbox.NestFixedParIn != Quiqbox.CoreFixedParIn
+#> Tuple of `ParamBox` with the same nested level
 const NestFixedParIn{T, E<:Pack{T}} = TriTupleUnion{ParamBox{T, E}}
+#> Tuple of `ParamBox` with nested level differences no more than 1
 const CoreFixedParIn{T, E<:Pack{T}} = TriTupleUnion{ReducibleParam{T, E}}
 
 const UnitOrVal{T} = Union{UnitParam{T}, T}
@@ -76,7 +74,7 @@ function checkPrimParamElementalType(::Type{T}) where
 end
 
 
-mutable struct UnitVar{T} <: TensorVar{T, T}
+mutable struct UnitVar{T} <: PrimitiveParam{T, T}
     @atomic input::T
     const symbol::IndexedSym
     @atomic screen::Bool
@@ -87,7 +85,7 @@ mutable struct UnitVar{T} <: TensorVar{T, T}
     end
 end
 
-mutable struct GridVar{T, N} <: TensorVar{T, DirectMemory{T, N}}
+mutable struct GridVar{T, N} <: PrimitiveParam{T, DirectMemory{T, N}}
     const input::DirectMemory{T, N}
     const symbol::IndexedSym
     @atomic screen::Bool
@@ -100,6 +98,8 @@ mutable struct GridVar{T, N} <: TensorVar{T, DirectMemory{T, N}}
         new{T, N}(input, IndexedSym(symbol), screen)
     end
 end
+
+const TensorVar{T} = Union{UnitVar{T}, GridVar{T}}
 
 genTensorVar(input::Any, symbol::SymOrIndexedSym, screen::Bool=false) = 
 UnitVar(input, symbol, screen)
