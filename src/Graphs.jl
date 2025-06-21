@@ -42,7 +42,7 @@ struct GridVertex{T, N} <: AccessVertex{ShapedMemory{T, N}}
     marker::Symbol
 end
 
-getOutputType(::Type{GridVertex{T, N}}) where {T, N} = getPackType(ShapedMemory{T, N})
+getOutputType(::Type{GridVertex{T, N}}) where {T, N} = ShapedMemory{T, N}
 
 const TensorVertex{T} = Union{UnitVertex{T}, GridVertex{T}}
 
@@ -323,13 +323,12 @@ end
 
 function genVertexCaller(vertex::TensorVertex)
     value = getVertexValue(vertex)
-    TypedReturn(SelectHeader{1, 0}(Storage(value, vertex.marker)), getOutputType(vertex))
+    SelectHeader{1, 0}(Storage(value, vertex.marker))
 end
 
 function genVertexCaller(idx::OneToIndex, vertex::TensorVertex)
     if isVertexActive(vertex)
-        fCore = GetIndex{ifelse(vertex isa UnitVertex, UnitIndex, GridIndex)}(idx)
-        TypedReturn(fCore, getPackType(vertex|>getOutputType))
+        GetIndex{ifelse(vertex isa UnitVertex, UnitIndex, GridIndex)}(idx)
     else
         genVertexCaller(vertex)
     end
@@ -342,53 +341,51 @@ function genVertexCaller(graph::SpanLayerGraph, vertex::CallVertex{T}) where {T}
         genVertexCaller(ifelse(prevVertex isa TensorVertex, inputIndex, graph), prevVertex)
     end
 
-    fCore = if receptor isa TupleReceptor
+    if receptor isa TupleReceptor
         ComposedApply(ChainMapper(encoders|>Tuple), splat(vertex.apply))
     else
         ComposedApply(ChainMapper(encoders), vertex.apply)
     end
-
-    TypedReturn(fCore, T)
 end
 
 
 function functionalize(graph::SpanValueGraph)
     vertex = graph.source
     isUnit = vertex isa UnitVertex
+    inputStyle = ifelse(isUnit, UnitInput, GridInput)()
 
-    f = if isVertexActive(vertex)
-        fCore = GetIndex{ifelse(isUnit, UnitIndex, GridIndex)}(1)
-        TypedReturn(fCore, getPackType(vertex|>getOutputType))
+    fCore = if isVertexActive(vertex)
+        GetIndex{ifelse(isUnit, UnitIndex, GridIndex)}(1)
     else
         genVertexCaller(vertex)
     end
 
-    SpanSetCaller(f, ifelse(isUnit, UnitInput, GridInput)())
+    SpanSetCaller(TypedReturn(fCore, getOutputType(vertex)), inputStyle)
 end
 
-function functionalize(graph::UnitLayerGraph)
+function functionalize(graph::UnitLayerGraph{T}) where {T}
     fCore = genVertexCaller(graph, graph.output)
-    SpanSetCaller(fCore, UnitInput())
+    SpanSetCaller(TypedReturn(fCore, T), UnitInput())
 end
 
-function functionalize(graph::GridLayerGraph)
+function functionalize(graph::GridLayerGraph{T}) where {T}
     fCore = genVertexCaller(graph, graph.output)
-    SpanSetCaller(fCore, GridInput())
+    SpanSetCaller(TypedReturn(fCore, T), GridInput())
 end
 
-function functionalize(graph::SpanLayerGraph)
+function functionalize(graph::SpanLayerGraph{T}) where {T}
     fCore = genVertexCaller(graph, graph.output)
-    SpanSetCaller(fCore, SpanInput())
+    SpanSetCaller(TypedReturn(fCore, T), SpanInput())
 end
 
 
 evaluateGraph(g::SpanValueGraph) = getVertexValue(g.source)
 
-function evaluateGraph(g::SpanLayerGraph)
+function evaluateGraph(g::SpanLayerGraph{T}) where {T}
     inVals = map(g.source) do sector
         eltype(sector) <: Union{} ? sector : map(getVertexValue, sector)
     end
-    genVertexCaller(g, g.output)(inVals)
+    convert(T, genVertexCaller(g, g.output)(inVals))
 end
 
 
