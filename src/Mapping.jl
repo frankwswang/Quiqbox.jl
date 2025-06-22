@@ -294,6 +294,20 @@ getOutputType(::Type{<:SelectHeader{<:Any, <:Any, F}}) where {F<:Function} =
 getOutputType(F)
 
 
+struct TupleSplitHeader{N, F<:Function} <: Modifier
+    f::F
+
+    function TupleSplitHeader{N}(f::F) where {N, F<:Function}
+        checkPositivity(N, true)
+        new{Int(N), F}(f)
+    end
+end
+
+(f::TupleSplitHeader{N})(args::NTuple{N, Any}) where {N} = f.f(args...)
+
+(f::TupleSplitHeader{1})((arg,)::Tuple{T}) where {T} = f.f(arg)
+
+
 struct GetEntry{A<:AbstractAccessor} <: Mapper
     entry::A
 end
