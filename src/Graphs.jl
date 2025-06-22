@@ -435,14 +435,14 @@ function genParamMapper(params::DirectParamSource;
                         paramSet!Self::OptSpanParamSet=initializeSpanParamSet())
     checkEmptiness(params, :params)
     mapper = map(params) do param
-        # if screenLevelOf(param) == 1
-        #     paramIndexer = locateParam!(paramSet!Self, param)
-        #     TypedReturn(GetEntry(paramIndexer), getOutputType(param))
-        # else
+        if screenLevelOf(param) == 1
+            paramIndexer = locateParam!(paramSet!Self, param)
+            TypedReturn(GetEntry(paramIndexer), getOutputType(param))
+        else
             evaluator = ParamGraphCaller(param)
             inputFilter = locateParam!(paramSet!Self, evaluator.source)
             ComposedApply(GetEntry(inputFilter), evaluator.evaluate)
-        # end
+        end
     end |> ChainMapper
     mapper, paramSet!Self
 end
