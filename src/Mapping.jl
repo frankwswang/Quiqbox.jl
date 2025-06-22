@@ -112,29 +112,34 @@ struct Right end
 const Lateral = Union{Left, Right}
 
 
-struct LateralPartial{F<:Function, A<:NonEmptyTuple{Any}, L<:Lateral} <: Modifier
+struct LateralPartial{A<:NonEmptyTuple{Any}, L<:Lateral, F<:Function} <: Modifier
     f::F
     arg::A
     side::L
 
     function LateralPartial(f::F, args::NonEmptyTuple{Any}, side::L) where 
                            {F<:Function, L<:Lateral}
-        new{F, typeof(args), L}(f, args, side)
+        new{typeof(args), L, F}(f, args, side)
     end
 end
 
-const LPartial{F<:Function, A<:NonEmptyTuple{Any}} = LateralPartial{F, A, Left }
-const RPartial{F<:Function, A<:NonEmptyTuple{Any}} = LateralPartial{F, A, Right}
+const LPartial{A<:NonEmptyTuple{Any}, F<:Function} = LateralPartial{A, Left,  F}
+const RPartial{A<:NonEmptyTuple{Any}, F<:Function} = LateralPartial{A, Right, F}
 
-(f::LPartial{F, A})(arg...; kws...) where {F<:Function, A<:NonEmptyTuple{Any}} = 
-f.f(f.arg..., arg...; kws...)
-(f::RPartial{F, A})(arg...; kws...) where {F<:Function, A<:NonEmptyTuple{Any}} = 
-f.f(arg..., f.arg...; kws...)
+(f::LPartial{A})(arg::Vararg{Any, N}) where {N, A<:NonEmptyTuple{Any}} = 
+f.f(f.arg..., arg...)
+(f::RPartial{A})(arg::Vararg{Any, N}) where {N, A<:NonEmptyTuple{Any}} = 
+f.f(arg..., f.arg...)
+
+(f::LPartial{A})(arg) where {A<:NonEmptyTuple{Any}} = f.f(f.arg..., arg)
+(f::RPartial{A})(arg) where {A<:NonEmptyTuple{Any}} = f.f(arg, f.arg...)
 
 LPartial(f::Function, args::NonEmptyTuple{Any}) = LateralPartial(f, args, Left() )
 RPartial(f::Function, args::NonEmptyTuple{Any}) = LateralPartial(f, args, Right())
 
-getOutputType(::Type{<:LateralPartial{F}}) where {F<:Function} = getOutputType(F)
+getOutputType(::Type{LateralPartial{A, L, F}}) where 
+             {A<:NonEmptyTuple{Any}, L<:Lateral, F<:Function} = 
+getOutputType(F)
 
 
 const absSqrtInv = inv ∘ sqrt ∘ abs
