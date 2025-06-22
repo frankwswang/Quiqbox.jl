@@ -131,9 +131,6 @@ f.f(f.arg..., arg...)
 (f::RPartial{A})(arg::Vararg{Any, N}) where {N, A<:NonEmptyTuple{Any}} = 
 f.f(arg..., f.arg...)
 
-(f::LPartial{A})(arg) where {A<:NonEmptyTuple{Any}} = f.f(f.arg..., arg)
-(f::RPartial{A})(arg) where {A<:NonEmptyTuple{Any}} = f.f(arg, f.arg...)
-
 LPartial(f::Function, args::NonEmptyTuple{Any}) = LateralPartial(f, args, Left() )
 RPartial(f::Function, args::NonEmptyTuple{Any}) = LateralPartial(f, args, Right())
 
@@ -277,7 +274,7 @@ struct SelectHeader{N, K, F<:Function} <: Modifier
     function SelectHeader{N, K}(f::F) where {N, K, F<:Function}
         checkPositivity(K, true)
         N < K && throw(AssertionError("N must be no less than K=$K."))
-        new{N::Int, K::Int, F}(f)
+        new{Int(N), Int(K), F}(f)
     end
 end
 
@@ -292,6 +289,20 @@ f.f(arg[begin+K-1])
 
 getOutputType(::Type{<:SelectHeader{<:Any, <:Any, F}}) where {F<:Function} = 
 getOutputType(F)
+
+
+struct TupleSplitHeader{N, F<:Function} <: Modifier
+    f::F
+
+    function TupleSplitHeader{N}(f::F) where {N, F<:Function}
+        checkPositivity(N, true)
+        new{Int(N), F}(f)
+    end
+end
+
+(f::TupleSplitHeader{N})(args::NTuple{N, Any}) where {N} = f.f(args...)
+
+(f::TupleSplitHeader{1})((arg,)::Tuple{T}) where {T} = f.f(arg)
 
 
 struct GetEntry{A<:AbstractAccessor} <: Mapper
@@ -405,17 +416,20 @@ BinaryReduce(TypedBinary(TypedReturn(*, T), EL, ER), StableBinary(+, T))
 getOutputType(::Type{<:BinaryReduce{T}}) where {T} = T
 
 
-struct ComposedApply{FO, FI} <: CompositeFunction
+struct ComposedApply{N, FO, FI} <: CompositeFunction
     inner::FI
     outer::FO
 
-    ComposedApply(inner::FI, outer::FO) where {FI<:Function, FO<:Function} = 
-    new{FO, FI}(inner, outer)
+    function ComposedApply(inner::FI, outer::FO, ::Count{N}=One()) where 
+                          {N, FI<:Function, FO<:Function}
+        new{N, FO, FI}(inner, outer)
+    end
 end
-# Should not be decomposed further to `fCore(f, args)` to avoid additional allocations.
-function (f::ComposedApply{FO, FI})(args::Vararg) where {FI<:Function, FO<:Function}
-    innerRes = splat(f.inner)(args)
+#> Should not be decomposed further to `fCore(f, args)` to avoid additional allocations.
+#> Need not be specialized w.r.t. specific `N` to avoid additional allocations.
+function (f::ComposedApply{N})(args::Vararg{Any, N}) where {N}
+    innerRes = f.inner(args...)
     f.outer(innerRes)
 end
 
-getOutputType(::Type{<:ComposedApply{FO}}) where {FO<:Function} = getOutputType(FO)
+getOutputType(::Type{<:ComposedApply{N, FO}}) where {N, FO<:Function} = getOutputType(FO)

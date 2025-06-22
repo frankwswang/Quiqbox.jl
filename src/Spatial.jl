@@ -205,7 +205,7 @@ end
 
 function ModularField(core::Function, ::Type{C}, ::Count{D}, 
                       params::NamedSpanParamTuple=NamedTuple()) where {C<:RealOrComplex, D}
-    checkPositivity(D::Int)
+    checkPositivity(D)
     typedCore = TypedCarteFunc(ParamFreeFunc(core), C, Count(D))
     ModularField(typedCore, params)
 end
@@ -311,9 +311,9 @@ const AxialProduct{C<:RealOrComplex, D, B<:NTuple{D, FieldAmplitude{C, 1}}} =
 AxialProduct(bases::NonEmptyTuple{FieldAmplitude{C, 1}}) where {C<:RealOrComplex} = 
 ProductField(bases)
 
-function AxialProduct(basis::FieldAmplitude{C, 1}, dim::Int) where {C<:RealOrComplex}
-    checkPositivity(dim)
-    ProductField(ntuple(_->basis, dim))
+function AxialProduct(basis::FieldAmplitude{C, 1}, ::Count{D}) where {C<:RealOrComplex, D}
+    checkPositivity(D)
+    ProductField(ntuple( _->basis, Val(D) ))
 end
 
 
@@ -325,7 +325,7 @@ struct CoupledField{C<:RealOrComplex, D, L<:FieldAmplitude{C, D}, R<:FieldAmplit
     function CoupledField(pair::Tuple{L, R}, coupler::Function) where 
                          {C<:RealOrComplex, D, L<:FieldAmplitude{C, D}, 
                           R<:FieldAmplitude{C, D}}
-        checkPositivity(D::Int)
+        checkPositivity(D)
         coupler = ParamFreeFunc(StableBinary(coupler, C))
         new{C, D, L, R, typeof(coupler.f.f)}(pair, coupler)
     end
