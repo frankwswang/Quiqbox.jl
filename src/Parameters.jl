@@ -1211,12 +1211,22 @@ function locateParam!(params::AbstractVector, target::ParamBox)
     (ChainedAccess∘locateParamCore!)(params, target)
 end
 
-function locateParam!(paramSet::TypedUnitParamSet, target::UnitParam)
-    GetIndex{UnitIndex}(locateParamCore!(paramSet.unit, target))
+function locateParam!(paramSet::OptSpanParamSet, target::UnitParam)
+    sector = paramSet.unit
+    if sector === nothing || (eltype(sector) <: Union{})
+        throw(AssertionError("`paramSet.unit` must be an extendable `AbstractVector`."))
+    else
+        GetIndex{UnitIndex}(locateParamCore!(sector, target))
+    end
 end
 
-function locateParam!(paramSet::TypedGridParamSet, target::GridParam)
-    GetIndex{GridIndex}(locateParamCore!(paramSet.grid, target))
+function locateParam!(paramSet::OptSpanParamSet, target::GridParam)
+    sector = paramSet.grid
+    if sector === nothing || (eltype(sector) <: Union{})
+        throw(AssertionError("`paramSet.grid` must be an extendable `AbstractVector`."))
+    else
+        GetIndex{GridIndex}(locateParamCore!(sector, target))
+    end
 end
 
 function locateParam!(params::Union{OptSpanParamSet, AbstractVector}, 
