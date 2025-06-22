@@ -820,13 +820,13 @@ function uniqueParams(source::ParamBoxAbtArr)
 end
 
 function uniqueParams(source)
-    map(last, getFieldParams(source)) |> uniqueParamsCore!
+    map(last, getInnerParams(source)) |> uniqueParamsCore!
 end
 
 
-function getFieldParams(source)
+function getInnerParams(source)
     paramPairs = Pair{ChainedAccess, ParamBox}[]
-    getFieldParamsCore!(paramPairs, source, ChainedAccess())
+    getInnerParamsCore!(paramPairs, source, ChainedAccess())
     paramPairs
 end
 
@@ -836,21 +836,21 @@ end
     noStoredParam(source) -> Bool
 
 Detect if `source` has no reachable `$ParamBox` by reflection-type functions, `getfield`and 
-`getindex`. It returns `true` if `getFieldParams(source)` returns an empty collection. It 
+`getindex`. It returns `true` if `getInnerParams(source)` returns an empty collection. It 
 is still possible for `noStoredParam` to return `true` if `source` is a generic 
 function that indirectly references global variables being/storing `$ParamBox`.
 """
 function noStoredParam(source::T) where {T}
-    canDirectlyStore(source) || (getFieldParams(source) |> isempty)
+    canDirectlyStore(source) || (getInnerParams(source) |> isempty)
 end
 
-function getFieldParamsCore!(paramPairs::AbstractVector{Pair{ChainedAccess, ParamBox}}, 
+function getInnerParamsCore!(paramPairs::AbstractVector{Pair{ChainedAccess, ParamBox}}, 
                              source::ParamBox, anchor::ChainedAccess)
     push!(paramPairs, anchor=>source)
     nothing
 end
 
-function getFieldParamsCore!(paramPairs::AbstractVector{Pair{ChainedAccess, ParamBox}}, 
+function getInnerParamsCore!(paramPairs::AbstractVector{Pair{ChainedAccess, ParamBox}}, 
                              source::T, anchor::ChainedAccess) where {T}
     searchParam = false
     if source isa Union{Tuple, AbstractArray}
@@ -868,7 +868,7 @@ function getFieldParamsCore!(paramPairs::AbstractVector{Pair{ChainedAccess, Para
         for fieldSym in fields
             field = getEntry(source, fieldSym)
             anchorNew = ChainedAccess(anchor, fieldSym)
-            getFieldParamsCore!(paramPairs, field, anchorNew)
+            getInnerParamsCore!(paramPairs, field, anchorNew)
         end
     end
     nothing
