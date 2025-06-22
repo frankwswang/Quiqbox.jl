@@ -131,9 +131,6 @@ f.f(f.arg..., arg...)
 (f::RPartial{A})(arg::Vararg{Any, N}) where {N, A<:NonEmptyTuple{Any}} = 
 f.f(arg..., f.arg...)
 
-(f::LPartial{A})(arg) where {A<:NonEmptyTuple{Any}} = f.f(f.arg..., arg)
-(f::RPartial{A})(arg) where {A<:NonEmptyTuple{Any}} = f.f(arg, f.arg...)
-
 LPartial(f::Function, args::NonEmptyTuple{Any}) = LateralPartial(f, args, Left() )
 RPartial(f::Function, args::NonEmptyTuple{Any}) = LateralPartial(f, args, Right())
 
