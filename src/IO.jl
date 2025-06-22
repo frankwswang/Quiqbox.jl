@@ -93,11 +93,17 @@ function showCompositeFunc(::B, io::IO, f::CompositeFunction) where {B<:BoolVal}
 end
 
 
-show(io::IO, ::Type{GetIndex{T}}) where {T} = 
-print(io, getObjNameStr(nameof(GetIndex), "GetIndex{$T}"))
+show(io::IO, ::Type{GetEntry{T}}) where {T<:AbstractAccessor} = 
+print(io, getObjNameStr(nameof(GetEntry), "GetEntry{$T}"))
 
-show(io::IO, ::Type{Typed{T}}) where {T} = 
-print(io, getObjNameStr(nameof(Typed), "Typed{$T}"))
+show(io::IO, ::Type{GetAxisEntry}) = 
+print(io, getObjNameStr(nameof(GetAxisEntry), "GetAxisEntry"))
+
+show(io::IO, ::Type{GetUnitEntry}) = 
+print(io, getObjNameStr(nameof(GetUnitEntry), "GetUnitEntry"))
+
+show(io::IO, ::Type{GetGridEntry}) = 
+print(io, getObjNameStr(nameof(GetGridEntry), "GetGridEntry"))
 
 show(io::IO, ::Type{StableAdd{T}}) where {T} = 
 print(io, getObjNameStr(nameof(StableAdd), "StableAdd{$T}"))
@@ -125,25 +131,6 @@ print(io, getObjNameStr(nameof(GridSetFilter), "GridSetFilter"))
 
 show(io::IO, ::Type{FullSetFilter}) = 
 print(io, getObjNameStr(nameof(FullSetFilter), "FullSetFilter"))
-
-function show(io::IO, ::Type{ScreenParam{T, E, P}}) where 
-             {T, E<:Pack{T}, P<:ParamBox{T}}
-    tailStr = P <: PrimitiveParam ? string(P) : "…"
-    typeStr = string("ScreenParam", "{", T, ", ", E, ", " , tailStr, "}")
-    print(io, typeStr)
-end
-
-function show(io::IO, ::Type{<:ReduceParam{T, E}}) where 
-             {T, E<:Pack{T}}
-    typeStr = string("ReduceParam", "{", T, ", ", E, ", ", "…}")
-    print(io, typeStr)
-end
-
-function show(io::IO, ::Type{<:ExpandParam{T, E, N}}) where 
-             {T, E<:Pack{T}, N}
-    typeStr = string("ExpandParam", "{", T, ", ", E, ", ", N, ", ", "…}")
-    print(io, typeStr)
-end
 
 function show(io::IO, ::Type{ContextParamFunc{B, E, F}}) where 
              {B<:Function, E<:Function, F<:Function}
