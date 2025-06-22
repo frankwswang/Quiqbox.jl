@@ -180,8 +180,9 @@ struct PrimOrbData{T<:Real, D, C<:RealOrComplex{T}, F<:AbstractParamFunc,
     renormalize::Bool
 end
 
-const PGTOrbData{T<:Real, D, F<:PolyGaussFieldCore{T, D}, R<:FieldCenterShifter{T, D}} = 
-      PrimOrbData{T, D, T, F, R}
+const PGTOrbData{T<:Real, D, F<:PolyGaussFieldCore{T, D}, R<:FieldCenterShifter{T, D}, 
+                 S<:OptSpanValueSet} = 
+      PrimOrbData{T, D, T, F, R, S}
 
 struct CompOrbData{T<:Real, D, C<:RealOrComplex{T}, B<:PrimOrbData{T, D}} <: ConfigBox
     basis::Memory{B}
