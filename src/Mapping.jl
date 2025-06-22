@@ -429,13 +429,9 @@ struct ComposedApply{N, FO, FI} <: CompositeFunction
     end
 end
 #> Should not be decomposed further to `fCore(f, args)` to avoid additional allocations.
+#> Need not be specialized w.r.t. specific `N` to avoid additional allocations.
 function (f::ComposedApply{N})(args::Vararg{Any, N}) where {N}
     innerRes = f.inner(args...)
-    f.outer(innerRes)
-end
-#> Must explicitly expose `FO` and `FI` to reduce allocations through specializations.
-function (f::ComposedApply{1, FO, FI})(arg) where {FO<:Function, FI<:Function}
-    innerRes = f.inner(arg)
     f.outer(innerRes)
 end
 
