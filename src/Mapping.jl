@@ -267,7 +267,6 @@ TypedReturn(CartesianHeader(f.f, Count(D)), T)
 const CartesianFormatter{N, R<:NTuple{N, Real}} = CartesianHeader{N, Typed{R}}
 
 function CartesianFormatter(::Type{T}, ::Count{N}) where {T<:Real, N}
-    checkPositivity(N)
     CartesianHeader(Typed(NTuple{N, T}), Count(N))::CartesianFormatter{N, NTuple{N, T}}
 end
 
@@ -323,7 +322,7 @@ const GetTypedGrid{T} = TypedReturn{T, GetGridEntry}
 struct ViewOneToRange{N} <: Mapper #> N: range size
     start::Int #> One-based starting index
 
-    function ViewOneToRange(start::Int, ::Count{N}=Count{1}()) where {N}
+    function ViewOneToRange(start::Int, ::Count{N}=One()) where {N}
         checkPositivity(start)
         new{N}(start)
     end

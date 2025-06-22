@@ -45,18 +45,11 @@ cgto3 = genGaussTypeOrb(cen1[begin:begin+1], xpns2, cons1, ang1[end-1:end])
 
 stf1DCore = (x::Tuple{Real})->exp(-(x|>first))
 
-const Quantifier = try
-    Quiqbox.EncodedField(stf1DCore, Float64, Val(1))
-    Val
-catch
-    Quiqbox.Count
-end
-
-stf1D = Quiqbox.EncodedField(stf1DCore, Float64, Quantifier(1))
+stf1D = Quiqbox.EncodedField(stf1DCore, Float64, Count(1))
 pstf1 = Quiqbox.PolyRadialFunc(stf1D, (1, 1, 0))
 psto1 = Quiqbox.PrimitiveOrb((1.0, 2.0, 3.0), pstf1, renormalize=false)
 psto1n = Quiqbox.PrimitiveOrb((1.0, 2.0, 3.0), pstf1, renormalize=true)
-stf1Dc = Quiqbox.ModularField(stf1DCore, Float64, Quantifier(1))
+stf1Dc = Quiqbox.ModularField(stf1DCore, Float64, Count(1))
 pstf1c = Quiqbox.PolyRadialFunc(stf1Dc, (1, 1, 0))
 psto1c = Quiqbox.PrimitiveOrb((1.0, 2.0, 3.0), pstf1c, renormalize=false)
 
@@ -70,7 +63,7 @@ function genGaussian(cen::NTuple{D, T}, xpns::AbstractVector{T},
     center = genCellParam.(cen, (:x, :y, :z)[begin:begin+D-1])
     map(xpns) do xpn
         xpnPar = genCellParam(xpn, :xpn)
-        radioFunc = Quiqbox.ModularField(gaussianFunc, Float64, Quantifier(1), (xpn=xpnPar,))
+        radioFunc = Quiqbox.ModularField(gaussianFunc, Float64, Count(1), (xpn=xpnPar,))
         fieldFunc = PolyRadialFunc(radioFunc, ang)
         PrimitiveOrb(center, fieldFunc)
     end
@@ -82,10 +75,10 @@ cgto1c = CompositeOrb(pgtos_gto1c, cons1)
 
 func1Core = x->x[1]^2 + x[2]*exp(x[1]) + x[3]^3/log(1.1 + x[1]^2)
 
-func1 = Quiqbox.TypedCarteFunc(func1Core, Float64, Quantifier(3))
-df1_fd1 = Quiqbox.AxialFiniteDiff(func1, Quantifier(1), 1)
-df1_fd2 = Quiqbox.AxialFiniteDiff(func1, Quantifier(2), 1)
-df1_fd3 = Quiqbox.AxialFiniteDiff(func1, Quantifier(3), 1)
+func1 = Quiqbox.TypedCarteFunc(func1Core, Float64, Count(3))
+df1_fd1 = Quiqbox.AxialFiniteDiff(func1, Count(1), 1)
+df1_fd2 = Quiqbox.AxialFiniteDiff(func1, Count(2), 1)
+df1_fd3 = Quiqbox.AxialFiniteDiff(func1, Count(3), 1)
 
 
 gf1D = Quiqbox.GaussFunc(xpns1[begin])
