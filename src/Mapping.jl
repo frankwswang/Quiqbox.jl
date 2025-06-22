@@ -277,7 +277,7 @@ struct SelectHeader{N, K, F<:Function} <: Modifier
     function SelectHeader{N, K}(f::F) where {N, K, F<:Function}
         checkPositivity(K, true)
         N < K && throw(AssertionError("N must be no less than K=$K."))
-        new{N::Int, K::Int, F}(f)
+        new{Int(N), Int(K), F}(f)
     end
 end
 

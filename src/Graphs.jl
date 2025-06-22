@@ -101,15 +101,15 @@ struct VertexTrait
 end
 
 
-struct TupleReceptor{N} <: VertexReceptor
-    trait::VectorMemory{VertexTrait, N}
-    index::VectorMemory{OneToIndex, N}
+struct TupleReceptor{L} <: VertexReceptor
+    trait::VectorMemory{VertexTrait, L}
+    index::VectorMemory{OneToIndex, L}
 
-    function TupleReceptor(nInput::Int, defaultTrait::VertexTrait=VertexTrait())
-        checkPositivity(nInput)
-        trait = VectorMemory(fill(defaultTrait, nInput))
-        index = VectorMemory(fill(OneToIndex(), nInput))
-        new{nInput}(trait, index)
+    function TupleReceptor(::Count{L}, defaultTrait::VertexTrait=VertexTrait()) where {L}
+        checkPositivity(L) #> `L` should generally be small to avoid compiler overhead
+        trait = VectorMemory(fill(defaultTrait, L))
+        index = VectorMemory(fill(OneToIndex(), L))
+        new{L}(trait, index)
     end
 end
 
@@ -128,10 +128,10 @@ end
 const CallVertexReceptor = Union{TupleReceptor, ArrayReceptor}
 
 
-struct CallVertex{T, I<:CallVertexReceptor, F<:Function} <: ActionVertex{T}
+struct CallVertex{T, R<:CallVertexReceptor, F<:Function} <: ActionVertex{T}
     apply::TypedReturn{T, F}
     marker::Symbol
-    receptor::I # Could potentially have repeated input indices
+    receptor::R #> Could potentially have repeated input indices
 end
 
 getOutputType(::Type{<:CallVertex{T}}) where {T} = T
@@ -154,7 +154,7 @@ end
 
 function initializeReceptor(param::AdaptableParam, 
                             reference::NothingOr{ParamBoxVertexDict}=nothing)
-    receptor = TupleReceptor(length(param.input))
+    receptor = TupleReceptor((Count∘length)(param.input))
     reference === nothing || updateVertexReceptor!(receptor, param, reference)
     receptor
 end
