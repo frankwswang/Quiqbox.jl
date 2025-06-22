@@ -387,3 +387,8 @@ function (f::ComposedApply{FO, FI})(args::Vararg) where {FI<:Function, FO<:Funct
 end
 
 getOutputType(::Type{<:ComposedApply{FO}}) where {FO<:Function} = getOutputType(FO)
+
+
+const GetTypedUnit{T} = TypedReturn{T, GetIndex{UnitIndex}}
+
+const GetTypedGrid{T} = TypedReturn{T, GetIndex{GridIndex}}

@@ -424,18 +424,25 @@ getOutputType(::Type{<:ParamGraphCaller{T}}) where {T} = T
 
 const FilterEvalParam{F<:SpanSetCaller, S<:SpanSetFilter} = ComposedApply{F, S}
 
-const ParamMapper{F<:FunctionChainUnion{FilterEvalParam}} = ChainMapper{F}
+const ParamMapperCore = Union{FilterEvalParam, GetTypedUnit, GetTypedGrid}
 
-const NamedParamMapper{S, F<:NamedTuple{ S, <:NonEmptyTuple{FilterEvalParam} }} = 
+const ParamMapper{F<:FunctionChainUnion{ParamMapperCore}} = ChainMapper{F}
+
+const NamedParamMapper{S, F<:NamedTuple{ S, <:NonEmptyTuple{ParamMapperCore} }} = 
       ParamMapper{F}
 
 function genParamMapper(params::DirectParamSource; 
                         paramSet!Self::OptSpanParamSet=initializeSpanParamSet())
     checkEmptiness(params, :params)
     mapper = map(params) do param
-        evaluator = ParamGraphCaller(param)
-        inputFilter = locateParam!(paramSet!Self, evaluator.source)
-        ComposedApply(inputFilter, evaluator.evaluate)
+        if screenLevelOf(param) == 1
+            paramGetter = locateParam!(paramSet!Self, param)
+            TypedReturn(paramGetter, getOutputType(param))
+        else
+            evaluator = ParamGraphCaller(param)
+            inputFilter = locateParam!(paramSet!Self, evaluator.source)
+            ComposedApply(inputFilter, evaluator.evaluate)
+        end
     end |> ChainMapper
     mapper, paramSet!Self
 end
