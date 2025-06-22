@@ -306,14 +306,14 @@ function selectUpstreamVertex(graph::SpanLayerGraph, trait::VertexTrait, index::
 
     if effectType == VertexAsAccess
         if outputType == VertexToUnit
-            vertex = getField(graph.source.unit, index)
+            vertex = getEntry(graph.source.unit, index)
         elseif outputType == VertexToGrid
-            vertex = getField(graph.source.grid, index)
+            vertex = getEntry(graph.source.grid, index)
         else
             throw(AssertionError("`VertexToNest` is unsupported."))
         end
     elseif effectType == VertexAsAction
-        vertex = getField(graph.hidden, index)
+        vertex = getEntry(graph.hidden, index)
     else
         throw(AssertionError("`UnstableVertex` is not supported."))
     end
@@ -328,7 +328,7 @@ end
 
 function genVertexCaller(idx::OneToIndex, vertex::TensorVertex)
     if isVertexActive(vertex)
-        GetIndex{ifelse(vertex isa UnitVertex, UnitIndex, GridIndex)}(idx)
+        ifelse(vertex isa UnitVertex, GetUnitEntry, GetGridEntry)(idx)
     else
         genVertexCaller(vertex)
     end
@@ -355,7 +355,7 @@ function functionalize(graph::SpanValueGraph)
     inputStyle = ifelse(isUnit, UnitInput, GridInput)()
 
     fCore = if isVertexActive(vertex)
-        GetIndex{ifelse(isUnit, UnitIndex, GridIndex)}(1)
+        ifelse(isUnit, GetUnitEntry, GetGridEntry)(OneToIndex())
     else
         genVertexCaller(vertex)
     end
@@ -422,7 +422,7 @@ evalParamGraphCaller(f, input)
 getOutputType(::Type{<:ParamGraphCaller{T}}) where {T} = T
 
 
-const FilterEvalParam{F<:SpanSetCaller, S<:SpanSetFilter} = ComposedApply{F, S}
+const FilterEvalParam{F<:SpanSetCaller, S<:SpanSetFilter} = ComposedApply{F, GetEntry{S}}
 
 const ParamMapperCore = Union{FilterEvalParam, GetTypedUnit, GetTypedGrid}
 
@@ -435,14 +435,14 @@ function genParamMapper(params::DirectParamSource;
                         paramSet!Self::OptSpanParamSet=initializeSpanParamSet())
     checkEmptiness(params, :params)
     mapper = map(params) do param
-        if screenLevelOf(param) == 1
-            paramGetter = locateParam!(paramSet!Self, param)
-            TypedReturn(paramGetter, getOutputType(param))
-        else
+        # if screenLevelOf(param) == 1
+        #     paramIndexer = locateParam!(paramSet!Self, param)
+        #     TypedReturn(GetEntry(paramIndexer), getOutputType(param))
+        # else
             evaluator = ParamGraphCaller(param)
             inputFilter = locateParam!(paramSet!Self, evaluator.source)
-            ComposedApply(inputFilter, evaluator.evaluate)
-        end
+            ComposedApply(GetEntry(inputFilter), evaluator.evaluate)
+        # end
     end |> ChainMapper
     mapper, paramSet!Self
 end

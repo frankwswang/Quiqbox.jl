@@ -160,14 +160,13 @@ end
 
 ChainMapper(chain::AbstractArray{<:Function}) = ChainMapper(chain|>ShapedMemory)
 
-function getField(obj, f::ChainMapper{E}, finalizer::F=itself) where 
-                 {E<:FunctionChainUnion{Function}, F<:Function}
+function (f::ChainMapper{E})(obj) where {E<:FunctionChainUnion{Function}}
     fChain = f.chain
     if fChain isa AbstractArray && isempty(fChain)
         similar(fChain, Union{})
     else
         map(fChain) do mapper
-            mapper(obj) |> finalizer
+            mapper(obj)
         end
     end
 end
@@ -296,6 +295,31 @@ getOutputType(::Type{<:SelectHeader{<:Any, <:Any, F}}) where {F<:Function} =
 getOutputType(F)
 
 
+struct GetEntry{A<:AbstractAccessor} <: Mapper
+    entry::A
+end
+
+(f::GetEntry{A})(obj) where {A<:AbstractAccessor} = getEntry(obj, f.entry)
+
+function GetEntry(accessors::Tuple{Vararg{AbstractAccessor}})::GetEntry
+    GetEntry(ChainedAccess(accessors))
+end
+
+const GetAxisEntry = GetEntry{OneToIndex}
+
+const GetUnitEntry = GetEntry{ChainedAccess{ Tuple{ UnitSector, OneToIndex} }}
+
+GetUnitEntry(index::OneToIndex) = GetEntry((UnitSector(), index))
+
+const GetGridEntry = GetEntry{ChainedAccess{ Tuple{ GridSector, OneToIndex} }}
+
+GetGridEntry(index::OneToIndex) = GetEntry((GridSector(), index))
+
+const GetTypedUnit{T} = TypedReturn{T, GetUnitEntry}
+
+const GetTypedGrid{T} = TypedReturn{T, GetGridEntry}
+
+
 struct ViewOneToRange{N} <: Mapper #> N: range size
     start::Int #> One-based starting index
 
@@ -396,8 +420,3 @@ function (f::ComposedApply{FO, FI})(args::Vararg) where {FI<:Function, FO<:Funct
 end
 
 getOutputType(::Type{<:ComposedApply{FO}}) where {FO<:Function} = getOutputType(FO)
-
-
-const GetTypedUnit{T} = TypedReturn{T, GetIndex{UnitIndex}}
-
-const GetTypedGrid{T} = TypedReturn{T, GetIndex{GridIndex}}

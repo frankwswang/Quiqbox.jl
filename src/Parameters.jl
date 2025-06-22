@@ -511,7 +511,7 @@ function indexParam(pb::SpanParam, oneToIdx::Int, sym::MissingOr{Symbol}=missing
         throw(BoundsError(pb, oneToIdx))
     end
     ismissing(sym) && (sym = Symbol(symOf(pb), oneToIdx))
-    genCellParam(GetOneToIndex(oneToIdx), (pb,), sym)
+    genCellParam(GetEntry(oneToIdx), (pb,), sym)
 end
 
 function indexParam(pb::UnitParam, oneToIdx::Int, sym::MissingOr{Symbol}=missing)
@@ -866,7 +866,7 @@ function getFieldParamsCore!(paramPairs::AbstractVector{Pair{ChainedAccess, Para
     end
     if searchParam
         for fieldSym in fields
-            field = getField(source, fieldSym)
+            field = getEntry(source, fieldSym)
             anchorNew = ChainedAccess(anchor, fieldSym)
             getFieldParamsCore!(paramPairs, field, anchorNew)
         end
@@ -1196,7 +1196,7 @@ initializeSpanParamSet(units::AbstractVector{<:UnitParam},
 function locateParamCore!(params::AbstractVector, target::ParamBox)
     if isempty(params)
         push!(params, target)
-        OneToIndex(1)
+        OneToIndex()
     else
         idx = findfirst(x->compareObj(x, target), params)
         if idx === nothing
@@ -1215,18 +1215,16 @@ function locateParam!(paramSet::OptSpanParamSet, target::UnitParam)
     sector = paramSet.unit
     if sector === nothing || (eltype(sector) <: Union{})
         throw(AssertionError("`paramSet.unit` must be an extendable `AbstractVector`."))
-    else
-        GetIndex{UnitIndex}(locateParamCore!(sector, target))
     end
+    ChainedAccess(( UnitSector(), locateParamCore!(sector, target) ))
 end
 
 function locateParam!(paramSet::OptSpanParamSet, target::GridParam)
     sector = paramSet.grid
     if sector === nothing || (eltype(sector) <: Union{})
         throw(AssertionError("`paramSet.grid` must be an extendable `AbstractVector`."))
-    else
-        GetIndex{GridIndex}(locateParamCore!(sector, target))
     end
+    ChainedAccess(( GridSector(), locateParamCore!(sector, target) ))
 end
 
 function locateParam!(params::Union{OptSpanParamSet, AbstractVector}, 
@@ -1255,7 +1253,7 @@ end
 const SpanIndexSet{U<:AbstractVector{<:OneToIndex}, G<:AbstractVector{<:OneToIndex}} = 
       TypedSpanSet{U, G}
 
-struct SpanSetFilter{U<:OneToIndex, G<:OneToIndex} <: Mapper
+struct SpanSetFilter{U<:OneToIndex, G<:OneToIndex} <: CustomAccessor
     scope::OptionalSpanSet{Memory{U}, Memory{G}}
 
     function SpanSetFilter(scope::SpanIndexSet)
@@ -1295,7 +1293,7 @@ genBottomMemory()
 function mapSector(sector::AbstractVector, oneToIds::Memory{OneToIndex}, 
                    finalizer::F) where {F<:Function}
     map(oneToIds) do x
-        getField(sector, x) |> finalizer
+        getEntry(sector, x) |> finalizer
     end
 end
 
@@ -1303,14 +1301,14 @@ mapSector(::NothingOr{AbstractVector}, ::Memory{Union{}}, ::Function) =
 genBottomMemory()
 
 #= Additional Method =#
-function getField(target::OptionalSpanSet, sFilter::SpanSetFilter)
+function getEntry(target::OptionalSpanSet, sFilter::SpanSetFilter)
     getter = let coreFilter=sFilter.scope
         (sector, sym) -> getSector(sector, getfield(coreFilter, sym))
     end
     map(getter, target, (unit=:unit, grid=:grid))
 end
 
-function getField(target::OptionalSpanSet, sFilter::SpanSetFilter, 
+function getEntry(target::OptionalSpanSet, sFilter::SpanSetFilter, 
                   finalizer::F) where {F<:Function}
     mapper = let coreFilter=sFilter.scope, f=finalizer
         (sector, sym) -> mapSector(sector, getfield(coreFilter, sym), f)
@@ -1318,15 +1316,15 @@ function getField(target::OptionalSpanSet, sFilter::SpanSetFilter,
     map(mapper, target, (unit=:unit, grid=:grid))
 end
 
-getField(::OptionalSpanSet, ::VoidSetFilter) = initializeFixedSpanSet()
+getEntry(::OptionalSpanSet, ::VoidSetFilter) = initializeFixedSpanSet()
 
-function getField(sFilterPrev::SpanSetFilter, sFilterHere::SpanSetFilter)
-    getField(sFilterPrev.scope, sFilterHere) |> SpanSetFilter
+function getEntry(sFilterPrev::SpanSetFilter, sFilterHere::SpanSetFilter)
+    getEntry(sFilterPrev.scope, sFilterHere) |> SpanSetFilter
 end
 
-getField(::SpanSetFilter, ::VoidSetFilter) = SpanSetFilter()
+getEntry(::SpanSetFilter, ::VoidSetFilter) = SpanSetFilter()
 
-struct TaggedSpanSetFilter{F<:SpanSetFilter} <: Mapper
+struct TaggedSpanSetFilter{F<:SpanSetFilter} <: CustomAccessor
     scope::F
     tag::Identifier
 end
@@ -1335,9 +1333,12 @@ TaggedSpanSetFilter(scope::SpanSetFilter, paramSet::OptSpanParamSet) =
 TaggedSpanSetFilter(scope, Identifier(paramSet))
 
 #= Additional Method =#
-getField(obj::OptionalSpanSet, tsFilter::TaggedSpanSetFilter, 
-         finalizer::F=itself) where {F<:Function} = 
-getField(obj, tsFilter.scope, finalizer)
+getEntry(obj::OptionalSpanSet, tsFilter::TaggedSpanSetFilter) = 
+getEntry(obj, tsFilter.scope)
+
+getEntry(obj::OptionalSpanSet, tsFilter::TaggedSpanSetFilter, 
+         finalizer::F) where {F<:Function} = 
+getEntry(obj, tsFilter.scope, finalizer)
 
 getOutputType(::Type{TaggedSpanSetFilter{F}}) where {F<:SpanSetFilter} = getOutputType(F)
 
@@ -1519,7 +1520,7 @@ function unpackFunc!(f::Function, paramSet::OptSpanParamSet,
     else
         idxFilter = locateParam!(paramSet, localParamSet)
         tagFilter = TaggedSpanSetFilter(idxFilter, paramSetId)
-        ContextParamFunc(fCore, tagFilter)
+        ContextParamFunc(fCore, GetEntry(tagFilter))
     end
 end
 

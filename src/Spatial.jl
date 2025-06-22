@@ -27,7 +27,7 @@ end
 struct FieldParamFunc{T, D, C<:RealOrComplex{T}, F<:AbstractParamFunc, S<:SpanSetFilter
                       } <: TypedParamFunc{C}
     core::TypedReturn{C, ContextParamFunc{ F, CartesianFormatter{D, NTuple{D, T}}, 
-                                           TaggedSpanSetFilter{S} }}
+                                           GetEntry{TaggedSpanSetFilter{S}} }}
 
     function FieldParamFunc{T, D, C}(f::F, scope::TaggedSpanSetFilter{S}) where 
                                     {T, C<:RealOrComplex{T}, D, F<:AbstractParamFunc, 
@@ -37,7 +37,7 @@ struct FieldParamFunc{T, D, C<:RealOrComplex{T}, F<:AbstractParamFunc, S<:SpanSe
             throw(AssertionError("The `scope` corresponding to `F<:InputConverter` must "*
                                  "be `$(TaggedSpanSetFilter{VoidSetFilter})`."))
         end
-        inner = ContextParamFunc(f, CartesianFormatter(T, Count(D)), scope)
+        inner = ContextParamFunc(f, CartesianFormatter(T, Count(D)), GetEntry(scope))
         new{T, D, C, F, S}(TypedReturn(inner, C))
     end
 end
@@ -72,7 +72,7 @@ struct StashedField{C<:RealOrComplex, D, F<:AbstractParamFunc,
         core = TypedCarteFunc(fInner.binder, C, Val(D))
         encoder = last(fInner.encode)
         obtainInner = Base.Fix1(obtainCore!, cache!Self)
-        paramData = getField(paramSet, encoder.core.f, obtainInner)
+        paramData = getEntry(paramSet, encoder.core.f.entry, obtainInner)
         new{C, D, typeof(fInner.binder), typeof(paramData)}(core, paramData)
     end
 end
