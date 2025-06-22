@@ -433,7 +433,10 @@ function (f::ComposedApply{N})(args::Vararg{Any, N}) where {N}
     innerRes = f.inner(args...)
     f.outer(innerRes)
 end
-
-(f::ComposedApply{1})(args) = (args |> f.inner |> f.outer)
+#> Must explicitly expose `FO` and `FI` to reduce allocations through specializations.
+function (f::ComposedApply{1, FO, FI})(arg) where {FO<:Function, FI<:Function}
+    innerRes = f.inner(arg)
+    f.outer(innerRes)
+end
 
 getOutputType(::Type{<:ComposedApply{N, FO}}) where {N, FO<:Function} = getOutputType(FO)
