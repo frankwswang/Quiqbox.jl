@@ -1,7 +1,7 @@
 using LRUCache
 using Base: issingletontype
 
-struct OneToIndex <: StructuredInfo
+struct OneToIndex <: CustomAccessor
     idx::Int
 
     function OneToIndex(idx::Int, ::V=True()) where {V<:BoolVal}
@@ -36,77 +36,62 @@ end
 
 shiftLinearIndex(arr::GeneralCollection, i::OneToIndex) = shiftLinearIndex(arr, i.idx)
 
+struct PointEntry <: CustomAccessor end #> For getindex(obj) implementation
 
-struct UnitIndex <: StructuredInfo
-    idx::OneToIndex
-end
+struct UnitSector <: CustomAccessor end
+struct GridSector <: CustomAccessor end
+const SpanSector = Union{UnitSector, GridSector}
 
-UnitIndex(idx::Int) = UnitIndex(idx|>OneToIndex)
+const LinearAccessor = Union{PointEntry, Int, OneToIndex}
+const SimpleAccessor = Union{LinearAccessor, Base.CartesianIndex, SpanSector, Symbol}
+const AbstractAccessor = Union{SimpleAccessor, CustomAccessor}
 
-
-struct GridIndex <: StructuredInfo
-    idx::OneToIndex
-end
-
-GridIndex(idx::Int) = GridIndex(idx|>OneToIndex)
-
-
-const OneToInt = Union{Int, OneToIndex}
-const SpanIndex = Union{UnitIndex, GridIndex}
-const GeneralIndex = Union{OneToInt, SpanIndex, Base.CartesianIndex}
-const GeneralField = Union{GeneralIndex, Symbol, Nothing}
-
-struct ChainedAccess{L, C<:NTuple{L, GeneralField}} <: Getter
+struct ChainedAccess{C<:Tuple{ Vararg{SimpleAccessor} }} <: CustomAccessor
     chain::C
-
-    ChainedAccess(chain::C) where {L, C<:NTuple{L, GeneralField}} = new{L, C}(chain)
 end
 
-const Pass = ChainedAccess{0, Tuple{}}
-const GetIndex{T<:GeneralIndex} = ChainedAccess{1, Tuple{T}}
-const GetOneToIndex = GetIndex{OneToIndex}
-
-GetIndex{T}(idx::Union{Int, OneToIndex}) where {T<:GeneralIndex} = ChainedAccess(idx|>T)
-
-const GetGridEntry = ChainedAccess{2, Tuple{GridIndex, OneToIndex}}
+const DirectAccess{T<:SimpleAccessor} = ChainedAccess{Tuple{T}}
+const AllPassAccess = ChainedAccess{Tuple{}}
 
 ChainedAccess() = ChainedAccess(())
 
-ChainedAccess(entry::GeneralField) = ChainedAccess((entry,))
+ChainedAccess(entry::SimpleAccessor) = ChainedAccess((entry,))
 
 ChainedAccess(prev::ChainedAccess, here::ChainedAccess) = 
 ChainedAccess((prev.chain..., here.chain...))
 
-ChainedAccess(prev::GeneralField, here::ChainedAccess) = 
+ChainedAccess(prev::SimpleAccessor, here::ChainedAccess) = 
 ChainedAccess((prev, here.chain...))
 
-ChainedAccess(prev::ChainedAccess, here::GeneralField) = 
+ChainedAccess(prev::ChainedAccess, here::SimpleAccessor) = 
 ChainedAccess((prev.chain..., here))
 
-getField(obj, ::Nothing) = getindex(obj)
 
-getField(obj, ::Pass) = itself(obj)
+getEntry(obj, ::PointEntry) = getindex(obj)
 
-getField(obj, entry::Symbol) = getfield(obj, entry)
+getEntry(obj, entry::Int) = getindex(obj, entry)
 
-getField(obj, entry::Int) = getindex(obj, entry)
+getEntry(obj::GeneralCollection, i::OneToIndex) = getindex(obj, shiftLinearIndex(obj, i))
 
-getField(obj, i::Base.CartesianIndex) = getindex(obj, i)
+getEntry(obj, i::Base.CartesianIndex) = getindex(obj, i)
 
-getField(obj::GeneralCollection, i::OneToIndex) = getindex(obj, shiftLinearIndex(obj, i))
+getEntry(obj, ::UnitSector) = obj.unit
 
-getField(obj, i::UnitIndex) = getField(obj.unit, i.idx)
+getEntry(obj, ::GridSector) = obj.grid
 
-getField(obj, i::GridIndex) = getField(obj.grid, i.idx)
+getEntry(obj, entry::Symbol) = getfield(obj, entry)
 
-function getField(obj, acc::ChainedAccess{L, C}) where {L, C<:NTuple{L, GeneralField}}
-    for i in acc.chain
-        obj = getField(obj, i)
-    end
-    obj
+getEntry(obj, ::AllPassAccess) = itself(obj)
+
+function getEntry(obj, acc::DirectAccess)
+    getEntry(obj, first(acc.chain))
 end
 
-(f::Encoder)(obj) = getField(obj, f)
+function getEntry(obj, acc::ChainedAccess)
+    head, body = acc.chain
+    temp = getEntry(obj, head)
+    getEntry(temp, ChainedAccess(body))
+end
 
 
 abstract type FiniteDict{N, K, T} <: EqualityDict{K, T} end

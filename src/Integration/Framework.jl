@@ -358,7 +358,7 @@ getOrbDataSize(orbData::CompOrbData) = length(orbData.basis)
 
 getSubOrbData(orbData::PrimOrbData, ::OneToIndex) = itself(orbData)
 
-getSubOrbData(orbData::CompOrbData, i::OneToIndex) = getField(orbData.basis, i)
+getSubOrbData(orbData::CompOrbData, i::OneToIndex) = getEntry(orbData.basis, i)
 
 function indexCacheOrbData!(orbCache::PrimOrbDataCache{T, D}, 
                             orbMarkerCache::OrbCoreMarkerDict{T, D}, 
@@ -383,7 +383,7 @@ function indexCacheOrbData!(targetCache::PrimOrbDataCache{T, D},
     targetList = BasisIndexList(sourceList) #> targetList is a copy of sourceList
     primOrbIds = targetList.index
     for i in eachindex(primOrbIds)
-        orbData = getField(sourceCache.list, sourceList.index[i])
+        orbData = getEntry(sourceCache.list, sourceList.index[i])
         primOrbIds[i] = updateOrbCache!(targetCache, orbMarkerCache, orbData)
     end
     targetList
@@ -772,7 +772,7 @@ function decomposeOrbData!(normCache::OverlapCoreCache{T, D}, orbData::OrbitalDa
                            ) where {T<:Real, D}
     normIdxList = cachePrimCoreIntegrals!(normCache, markerCache, orbData)
     orbWeight = buildOrbWeight!(normCache, orbData, normIdxList.index)
-    map(i->getField(normCache.basis.list, i), normIdxList.index), orbWeight
+    map(i->getEntry(normCache.basis.list, i), normIdxList.index), orbWeight
 end
 
 function decomposeOrbData(orbData::OrbitalData{T, D}; 

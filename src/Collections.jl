@@ -120,12 +120,12 @@ function iterate(arr::MemoryLinker, state)
         nothing
     else
         indexer, state = res
-        getField(arr.value, indexer), state
+        getEntry(arr.value, indexer), state
     end
 end
 #> Abstract-array (and indexing) interface
 size(arr::MemoryLinker) = size(arr.scope)
-getindex(arr::MemoryLinker, i::Int) = getField(arr.value, getindex(arr.scope, i))
+getindex(arr::MemoryLinker, i::Int) = getEntry(arr.value, getindex(arr.scope, i))
 function setindex!(arr::MemoryLinker, val, i::Int)
     idxInner = firstindex(arr.value) + getindex(arr.scope, i).idx - 1
     setindex!(arr.value, val, idxInner)

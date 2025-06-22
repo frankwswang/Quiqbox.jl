@@ -42,7 +42,7 @@ struct GridVertex{T, N} <: AccessVertex{ShapedMemory{T, N}}
     marker::Symbol
 end
 
-getOutputType(::Type{GridVertex{T, N}}) where {T, N} = getPackType(ShapedMemory{T, N})
+getOutputType(::Type{GridVertex{T, N}}) where {T, N} = ShapedMemory{T, N}
 
 const TensorVertex{T} = Union{UnitVertex{T}, GridVertex{T}}
 
@@ -238,7 +238,7 @@ const TensorVertexSet{U<:AbstractVector{<:UnitVertex}, G<:AbstractVector{<:GridV
 
 struct SpanLayerGraph{T, V<:CallVertex{T}, U<:UnitVertex, G<:GridVertex, H<:CallVertex, 
                       } <: ComputationGraph{T}
-    source::OptSpanValueSet{Memory{U}, Memory{G}}
+    source::TensorVertexSet{Memory{U}, Memory{G}}
     hidden::Memory{H}
     output::V
 
@@ -255,9 +255,9 @@ const UnitLayerGraph{T, V<:CallVertex{T}, U<:UnitVertex, H<:CallVertex} =
 const GridLayerGraph{T, V<:CallVertex{T}, G<:GridVertex, H<:CallVertex} = 
       SpanLayerGraph{T, V, Union{}, G, H}
 
-#? Allow multiple param input
+
 function transpileParam(param::ParamBox, reindexInput!::Bool=false)
-    sl = screenLevelOf(param)
+    sl = screenLevelOf(param)::Int
 
     if sl < 0 || sl > 2
         throw(AssertionError("The screen level of `param`: $sl is not supported."))
@@ -269,7 +269,7 @@ function transpileParam(param::ParamBox, reindexInput!::Bool=false)
             throw(AssertionError("`param` should have at least one input source."))
         end
 
-        # Inactive (screen level: 2) params should be pushed to the end
+        #> Inactive (screen level: 2) params should be pushed to the end
         indices = map(inputSetRaw) do sector
             sortParams!(sector; indexing=reindexInput!)
             findfirst(x->screenLevelOf(x)==2, sector)
@@ -296,7 +296,7 @@ function transpileParam(param::ParamBox, reindexInput!::Bool=false)
         graph = genTensorVertex(obtain(param), isActive, paramSym) |> SpanValueGraph
     end
 
-    graph, inputSet
+    graph, inputSet::FixedSpanParamSet #> `inputSet` only contains active `TensorVertex`
 end
 
 
@@ -306,14 +306,14 @@ function selectUpstreamVertex(graph::SpanLayerGraph, trait::VertexTrait, index::
 
     if effectType == VertexAsAccess
         if outputType == VertexToUnit
-            vertex = getField(graph.source.unit, index)
+            vertex = getEntry(graph.source.unit, index)
         elseif outputType == VertexToGrid
-            vertex = getField(graph.source.grid, index)
+            vertex = getEntry(graph.source.grid, index)
         else
             throw(AssertionError("`VertexToNest` is unsupported."))
         end
     elseif effectType == VertexAsAction
-        vertex = getField(graph.hidden, index)
+        vertex = getEntry(graph.hidden, index)
     else
         throw(AssertionError("`UnstableVertex` is not supported."))
     end
@@ -323,13 +323,12 @@ end
 
 function genVertexCaller(vertex::TensorVertex)
     value = getVertexValue(vertex)
-    TypedReturn(SelectHeader{1, 0}(Storage(value, vertex.marker)), getOutputType(vertex))
+    SelectHeader{1, 0}(Storage(value, vertex.marker))
 end
 
 function genVertexCaller(idx::OneToIndex, vertex::TensorVertex)
     if isVertexActive(vertex)
-        fCore = GetIndex{ifelse(vertex isa UnitVertex, UnitIndex, GridIndex)}(idx)
-        TypedReturn(fCore, getPackType(vertex|>getOutputType))
+        ifelse(vertex isa UnitVertex, GetUnitEntry, GetGridEntry)(idx)
     else
         genVertexCaller(vertex)
     end
@@ -342,50 +341,58 @@ function genVertexCaller(graph::SpanLayerGraph, vertex::CallVertex{T}) where {T}
         genVertexCaller(ifelse(prevVertex isa TensorVertex, inputIndex, graph), prevVertex)
     end
 
-    fCore = if receptor isa TupleReceptor
+    if receptor isa TupleReceptor
         ComposedApply(ChainMapper(encoders|>Tuple), splat(vertex.apply))
     else
         ComposedApply(ChainMapper(encoders), vertex.apply)
     end
-
-    TypedReturn(fCore, T)
 end
 
 
 function functionalize(graph::SpanValueGraph)
     vertex = graph.source
-    f = if isVertexActive(vertex)
-        TypedReturn(ChainedAccess((nothing,)), getPackType(vertex|>getOutputType))
+    isUnit = vertex isa UnitVertex
+    inputStyle = ifelse(isUnit, UnitInput, GridInput)()
+
+    fCore = if isVertexActive(vertex)
+        ifelse(isUnit, GetUnitEntry, GetGridEntry)(OneToIndex())
     else
         genVertexCaller(vertex)
     end
-    inputStyle = ifelse(vertex isa UnitVertex, UnitInput, GridInput)
-    SpanEvaluator(f, inputStyle())
+
+    SpanSetCaller(TypedReturn(fCore, getOutputType(vertex)), inputStyle)
 end
 
-function functionalize(graph::SpanLayerGraph)
+function functionalize(graph::UnitLayerGraph{T}) where {T}
     fCore = genVertexCaller(graph, graph.output)
-    inputStyle = map(graph.source) do sector
-        res = filter(isVertexActive, sector)
-        isempty(res) ? nothing : res
-    end |> getInputSetType
-    SpanEvaluator(fCore, inputStyle())
+    SpanSetCaller(TypedReturn(fCore, T), UnitInput())
+end
+
+function functionalize(graph::GridLayerGraph{T}) where {T}
+    fCore = genVertexCaller(graph, graph.output)
+    SpanSetCaller(TypedReturn(fCore, T), GridInput())
+end
+
+function functionalize(graph::SpanLayerGraph{T}) where {T}
+    fCore = genVertexCaller(graph, graph.output)
+    SpanSetCaller(TypedReturn(fCore, T), SpanInput())
 end
 
 
 evaluateGraph(g::SpanValueGraph) = getVertexValue(g.source)
 
-function evaluateGraph(g::SpanLayerGraph)
+function evaluateGraph(g::SpanLayerGraph{T}) where {T}
     inVals = map(g.source) do sector
         eltype(sector) <: Union{} ? sector : map(getVertexValue, sector)
     end
-    genVertexCaller(g, g.output)(inVals)
+    convert(T, genVertexCaller(g, g.output)(inVals))
 end
 
 
-struct ParamGraphCaller{T, A, S<:FixedSpanParamSet, F<:Function} <: GraphEvaluator{T}
+struct ParamGraphCaller{T, A<:OptSpanInput, S<:FixedSpanParamSet, F<:Function
+                        } <: GraphEvaluator{T}
     source::S
-    evaluate::SpanEvaluator{T, A, F}
+    evaluate::SpanSetCaller{T, A, F}
 
     function ParamGraphCaller(param::ParamBox)
         graph, source = transpileParam(param)
@@ -396,38 +403,46 @@ struct ParamGraphCaller{T, A, S<:FixedSpanParamSet, F<:Function} <: GraphEvaluat
 end
 
 function evalParamGraphCaller(f::F, input::OptSpanValueSet) where {F<:ParamGraphCaller}
-    formattedInput = map(input, f.source) do inVals, params
-        (inVals === nothing && params !== nothing) ? obtain(params) : inVals
+    formattedInput = map(input, f.source) do inVals, inPars
+        (inVals === nothing && !(eltype(inPars) <: Union{})) ? obtain(inPars) : inVals
     end
     f.evaluate(formattedInput)
 end
 
-const ParamGraphMonoCaller{T, A<:Union{MonoPackInput, HalfSpanInput}, S<:FixedSpanParamSet, 
-                           F<:Function} = 
+const ParamGraphMonoCaller{T, A<:MonoPackInput, S<:FixedSpanParamSet, F<:Function} = 
       ParamGraphCaller{T, A, S, F}
 
-(f::ParamGraphMonoCaller)(sector::AbstractVector) = f.evaluate(sector)
+function evalParamGraphCaller(f::ParamGraphMonoCaller, input::AbstractVector)
+    f.evaluate(input)
+end
 
-(f::ParamGraphCaller)(input::OptSpanValueSet=initializeFixedSpanSet(nothing)) = 
+(f::ParamGraphCaller)(input=initializeFixedSpanSet(nothing)) = 
 evalParamGraphCaller(f, input)
 
 getOutputType(::Type{<:ParamGraphCaller{T}}) where {T} = T
 
 
-const FilterEvalParam{F<:SpanEvaluator, S<:SpanSetFilter} = ComposedApply{F, S}
+const FilterEvalParam{F<:SpanSetCaller, S<:SpanSetFilter} = ComposedApply{F, GetEntry{S}}
 
-const ParamMapper{F<:FunctionChainUnion{FilterEvalParam}} = ChainMapper{F}
+const ParamMapperCore = Union{FilterEvalParam, GetTypedUnit, GetTypedGrid}
 
-const NamedParamMapper{S, F<:NamedTuple{ S, <:NonEmptyTuple{FilterEvalParam} }} = 
+const ParamMapper{F<:FunctionChainUnion{ParamMapperCore}} = ChainMapper{F}
+
+const NamedParamMapper{S, F<:NamedTuple{ S, <:NonEmptyTuple{ParamMapperCore} }} = 
       ParamMapper{F}
 
 function genParamMapper(params::DirectParamSource; 
                         paramSet!Self::OptSpanParamSet=initializeSpanParamSet())
     checkEmptiness(params, :params)
     mapper = map(params) do param
-        evaluator = ParamGraphCaller(param)
-        inputFilter = locateParam!(paramSet!Self, evaluator.source)
-        ComposedApply(inputFilter, evaluator.evaluate)
+        if screenLevelOf(param) == 1
+            paramIndexer = locateParam!(paramSet!Self, param)
+            TypedReturn(GetEntry(paramIndexer), getOutputType(param))
+        else
+            evaluator = ParamGraphCaller(param)
+            inputFilter = locateParam!(paramSet!Self, evaluator.source)
+            ComposedApply(GetEntry(inputFilter), evaluator.evaluate)
+        end
     end |> ChainMapper
     mapper, paramSet!Self
 end

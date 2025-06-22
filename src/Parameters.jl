@@ -511,7 +511,7 @@ function indexParam(pb::SpanParam, oneToIdx::Int, sym::MissingOr{Symbol}=missing
         throw(BoundsError(pb, oneToIdx))
     end
     ismissing(sym) && (sym = Symbol(symOf(pb), oneToIdx))
-    genCellParam(GetOneToIndex(oneToIdx), (pb,), sym)
+    genCellParam(GetEntry(oneToIdx), (pb,), sym)
 end
 
 function indexParam(pb::UnitParam, oneToIdx::Int, sym::MissingOr{Symbol}=missing)
@@ -820,13 +820,13 @@ function uniqueParams(source::ParamBoxAbtArr)
 end
 
 function uniqueParams(source)
-    map(last, getFieldParams(source)) |> uniqueParamsCore!
+    map(last, getInnerParams(source)) |> uniqueParamsCore!
 end
 
 
-function getFieldParams(source)
+function getInnerParams(source)
     paramPairs = Pair{ChainedAccess, ParamBox}[]
-    getFieldParamsCore!(paramPairs, source, ChainedAccess())
+    getInnerParamsCore!(paramPairs, source, ChainedAccess())
     paramPairs
 end
 
@@ -836,21 +836,21 @@ end
     noStoredParam(source) -> Bool
 
 Detect if `source` has no reachable `$ParamBox` by reflection-type functions, `getfield`and 
-`getindex`. It returns `true` if `getFieldParams(source)` returns an empty collection. It 
+`getindex`. It returns `true` if `getInnerParams(source)` returns an empty collection. It 
 is still possible for `noStoredParam` to return `true` if `source` is a generic 
 function that indirectly references global variables being/storing `$ParamBox`.
 """
 function noStoredParam(source::T) where {T}
-    canDirectlyStore(source) || (getFieldParams(source) |> isempty)
+    canDirectlyStore(source) || (getInnerParams(source) |> isempty)
 end
 
-function getFieldParamsCore!(paramPairs::AbstractVector{Pair{ChainedAccess, ParamBox}}, 
+function getInnerParamsCore!(paramPairs::AbstractVector{Pair{ChainedAccess, ParamBox}}, 
                              source::ParamBox, anchor::ChainedAccess)
     push!(paramPairs, anchor=>source)
     nothing
 end
 
-function getFieldParamsCore!(paramPairs::AbstractVector{Pair{ChainedAccess, ParamBox}}, 
+function getInnerParamsCore!(paramPairs::AbstractVector{Pair{ChainedAccess, ParamBox}}, 
                              source::T, anchor::ChainedAccess) where {T}
     searchParam = false
     if source isa Union{Tuple, AbstractArray}
@@ -866,9 +866,9 @@ function getFieldParamsCore!(paramPairs::AbstractVector{Pair{ChainedAccess, Para
     end
     if searchParam
         for fieldSym in fields
-            field = getField(source, fieldSym)
+            field = getEntry(source, fieldSym)
             anchorNew = ChainedAccess(anchor, fieldSym)
-            getFieldParamsCore!(paramPairs, field, anchorNew)
+            getInnerParamsCore!(paramPairs, field, anchorNew)
         end
     end
     nothing
@@ -1126,77 +1126,57 @@ end
 
 struct UnitInput end
 struct GridInput end
+struct SpanInput end
+struct VoidInput end
 const MonoPackInput = Union{UnitInput, GridInput}
+const OptSpanInput = Union{MonoPackInput, SpanInput, VoidInput}
 
-struct SpanInput{U<:NothingOr{UnitInput}, G<:NothingOr{GridInput}} end
-const VoidSpanInput = SpanInput{Nothing, Nothing}
-const HalfSpanInput = Union{SpanInput{UnitInput, Nothing}, SpanInput{Nothing, GridInput}}
-const FullSpanInput = SpanInput{UnitInput, GridInput}
+restrictSpanSet(::UnitInput, s::TypedUnitSet) = (unit=s.unit,)
+restrictSpanSet(::GridInput, s::TypedGridSet) = (grid=s.grid,)
+restrictSpanSet(::SpanInput, s::TypedSpanSet) = itself(s)
+restrictSpanSet(::VoidInput, s::TypedVoidSet) = initializeFixedSpanSet(nothing)
 
-const PrimPackInput = Union{MonoPackInput, SpanInput}
+getInputSetType(::TypedUnitSet) = UnitInput
+getInputSetType(::TypedGridSet) = GridInput
+getInputSetType(::TypedSpanSet) = SpanInput
+getInputSetType(::TypedVoidSet) = VoidInput
 
-getInputSector(::Type{UnitInput}) = :unit
-getInputSector(::Type{GridInput}) = :grid
-getInputSector(::Type{<:SpanInput}) = ChainedAccess()
-
-restrictSpanSet(::UnitInput, ::TypedUnitSet) = getInputSector(UnitInput)
-restrictSpanSet(::GridInput, ::TypedGridSet) = getInputSector(GridInput)
-restrictSpanSet(::FullSpanInput, ::TypedSpanSet) = getInputSector(FullSpanInput)
-restrictSpanSet(::VoidSpanInput, ::TypedVoidSet) = getInputSector(VoidSpanInput)
-restrictSpanSet(::SpanInput{UnitInput, Nothing}, ::TypedUnitSet) = getInputSector(SpanInput)
-restrictSpanSet(::SpanInput{Nothing, GridInput}, ::TypedGridSet) = getInputSector(SpanInput)
-
-getInputSetType(::TypedSpanSet) = FullSpanInput
-getInputSetType(::TypedVoidSet) = VoidSpanInput
-getInputSetType(::TypedUnitSet) = SpanInput{UnitInput, Nothing}
-getInputSetType(::TypedGridSet) = SpanInput{Nothing, GridInput}
-
-
-struct SpanEvaluator{T, A<:PrimPackInput, F<:Function} <: TypedEvaluator{T}
+struct SpanSetCaller{T, A<:OptSpanInput, F<:Function} <: TypedEvaluator{T}
     core::TypedReturn{T, ParamFreeFunc{F}}
 
-    function SpanEvaluator(f::TypedReturn{T}, ::A) where {T, A<:PrimPackInput}
-        new{T, A, typeof(f.f)}(TypedReturn(ParamFreeFunc(f.f), T))
+    function SpanSetCaller(f::TypedReturn{T}, ::A) where {T, A<:OptSpanInput}
+        fInner = f.f
+        new{T, A, typeof(fInner)}(TypedReturn(ParamFreeFunc(fInner), T))
     end
 
-    function SpanEvaluator(f::SpanEvaluator{T, <:PrimPackInput, F}, ::A) where 
-                           {T, F<:Function, A<:PrimPackInput}
-        new{T, A, F}(f.core)
+    function SpanSetCaller(f::SpanSetCaller{T}, ::A) where {T, A<:OptSpanInput}
+        fCore = f.core
+        new{T, A, typeof(fCore.f.f)}(fCore)
     end
 end
 
-getInputSetType(::SpanEvaluator{T, A}) where {T, A<:PrimPackInput} = A
+getInputSetType(::SpanSetCaller{T, A}) where {T, A<:OptSpanInput} = A
 
-function evaluateSpanInput(f::SpanEvaluator{T, <:MonoPackInput, F}, 
-                           sector::AbstractVector) where {T, F<:Function}
-    f.core(sector)
+function evaluateSpanInput(f::SpanSetCaller{T, UnitInput}, sector::AbstractVector) where {T}
+    f.core((unit=sector,))
 end
 
-function evaluateSpanInput(f::SpanEvaluator{T, SpanInput{UnitInput, Nothing}, F}, 
-                           unitSector::AbstractVector) where {T, F<:Function}
-    formattedInput = (unit=unitSector, grid=nothing)
+function evaluateSpanInput(f::SpanSetCaller{T, GridInput}, sector::AbstractVector) where {T}
+    f.core((grid=sector,))
+end
+
+function evaluateSpanInput(f::SpanSetCaller, inputSet::OptSpanValueSet)
+    formattedInput = restrictSpanSet(getInputSetType(f)(), inputSet)
     f.core(formattedInput)
 end
 
-function evaluateSpanInput(f::SpanEvaluator{T, SpanInput{Nothing, GridInput}, F}, 
-                           gridSector::AbstractVector) where {T, F<:Function}
-    formattedInput = (unit=nothing, grid=gridSector)
-    f.core(formattedInput)
-end
-
-function evaluateSpanInput(f::F, inputSet::OptionalSpanSet) where {F<:SpanEvaluator}
-    sector = restrictSpanSet(getInputSetType(f)(), inputSet)
-    formattedInput = getField(inputSet, sector)
-    f.core(formattedInput)
-end
-
-(f::SpanEvaluator)(input::Union{AbstractVector, OptionalSpanSet}) = 
+(f::SpanSetCaller)(input::Union{AbstractVector, OptSpanValueSet}) = 
 evaluateSpanInput(f, input)
 
-(f::SpanEvaluator{T, VoidSpanInput, F})() where {T, F<:Function} = 
-f.core(initializeFixedSpanSet(nothing))
+(f::SpanSetCaller{T, VoidInput})() where {T} = 
+evaluateSpanInput(f, initializeFixedSpanSet(nothing))
 
-getOutputType(::Type{<:SpanEvaluator{T}}) where {T} = T
+getOutputType(::Type{<:SpanSetCaller{T}}) where {T} = T
 
 
 @generated function initializeSpanParamSet(::Type{T}=Any) where {T}
@@ -1216,7 +1196,7 @@ initializeSpanParamSet(units::AbstractVector{<:UnitParam},
 function locateParamCore!(params::AbstractVector, target::ParamBox)
     if isempty(params)
         push!(params, target)
-        OneToIndex(1)
+        OneToIndex()
     else
         idx = findfirst(x->compareObj(x, target), params)
         if idx === nothing
@@ -1231,12 +1211,20 @@ function locateParam!(params::AbstractVector, target::ParamBox)
     (ChainedAccess∘locateParamCore!)(params, target)
 end
 
-function locateParam!(paramSet::TypedUnitParamSet, target::UnitParam)
-    GetIndex{UnitIndex}(locateParamCore!(paramSet.unit, target))
+function locateParam!(paramSet::OptSpanParamSet, target::UnitParam)
+    sector = paramSet.unit
+    if sector === nothing || (eltype(sector) <: Union{})
+        throw(AssertionError("`paramSet.unit` must be an extendable `AbstractVector`."))
+    end
+    ChainedAccess(( UnitSector(), locateParamCore!(sector, target) ))
 end
 
-function locateParam!(paramSet::TypedGridParamSet, target::GridParam)
-    GetIndex{GridIndex}(locateParamCore!(paramSet.grid, target))
+function locateParam!(paramSet::OptSpanParamSet, target::GridParam)
+    sector = paramSet.grid
+    if sector === nothing || (eltype(sector) <: Union{})
+        throw(AssertionError("`paramSet.grid` must be an extendable `AbstractVector`."))
+    end
+    ChainedAccess(( GridSector(), locateParamCore!(sector, target) ))
 end
 
 function locateParam!(params::Union{OptSpanParamSet, AbstractVector}, 
@@ -1265,7 +1253,7 @@ end
 const SpanIndexSet{U<:AbstractVector{<:OneToIndex}, G<:AbstractVector{<:OneToIndex}} = 
       TypedSpanSet{U, G}
 
-struct SpanSetFilter{U<:OneToIndex, G<:OneToIndex} <: Mapper
+struct SpanSetFilter{U<:OneToIndex, G<:OneToIndex} <: CustomAccessor
     scope::OptionalSpanSet{Memory{U}, Memory{G}}
 
     function SpanSetFilter(scope::SpanIndexSet)
@@ -1305,7 +1293,7 @@ genBottomMemory()
 function mapSector(sector::AbstractVector, oneToIds::Memory{OneToIndex}, 
                    finalizer::F) where {F<:Function}
     map(oneToIds) do x
-        getField(sector, x) |> finalizer
+        getEntry(sector, x) |> finalizer
     end
 end
 
@@ -1313,14 +1301,14 @@ mapSector(::NothingOr{AbstractVector}, ::Memory{Union{}}, ::Function) =
 genBottomMemory()
 
 #= Additional Method =#
-function getField(target::OptionalSpanSet, sFilter::SpanSetFilter)
+function getEntry(target::OptionalSpanSet, sFilter::SpanSetFilter)
     getter = let coreFilter=sFilter.scope
         (sector, sym) -> getSector(sector, getfield(coreFilter, sym))
     end
     map(getter, target, (unit=:unit, grid=:grid))
 end
 
-function getField(target::OptionalSpanSet, sFilter::SpanSetFilter, 
+function getEntry(target::OptionalSpanSet, sFilter::SpanSetFilter, 
                   finalizer::F) where {F<:Function}
     mapper = let coreFilter=sFilter.scope, f=finalizer
         (sector, sym) -> mapSector(sector, getfield(coreFilter, sym), f)
@@ -1328,34 +1316,31 @@ function getField(target::OptionalSpanSet, sFilter::SpanSetFilter,
     map(mapper, target, (unit=:unit, grid=:grid))
 end
 
-getField(::OptionalSpanSet, ::VoidSetFilter) = initializeFixedSpanSet()
+getEntry(::OptionalSpanSet, ::VoidSetFilter) = initializeFixedSpanSet()
 
-function getField(sFilterPrev::SpanSetFilter, sFilterHere::SpanSetFilter)
-    getField(sFilterPrev.scope, sFilterHere) |> SpanSetFilter
+function getEntry(sFilterPrev::SpanSetFilter, sFilterHere::SpanSetFilter)
+    getEntry(sFilterPrev.scope, sFilterHere) |> SpanSetFilter
 end
 
-getField(::SpanSetFilter, ::VoidSetFilter) = SpanSetFilter()
+getEntry(::SpanSetFilter, ::VoidSetFilter) = SpanSetFilter()
 
-
-const ParamFilter = Union{SpanSetFilter, ChainMapper}
-
-struct TaggedSpanSetFilter{F<:ParamFilter} <: Mapper
+struct TaggedSpanSetFilter{F<:SpanSetFilter} <: CustomAccessor
     scope::F
     tag::Identifier
 end
 
-TaggedSpanSetFilter(scope::ParamFilter, paramSet::OptSpanParamSet) = 
+TaggedSpanSetFilter(scope::SpanSetFilter, paramSet::OptSpanParamSet) = 
 TaggedSpanSetFilter(scope, Identifier(paramSet))
 
-TaggedSpanSetFilter(scope::ParamFilter) = 
-TaggedSpanSetFilter(scope, Identifier(nothing))
-
 #= Additional Method =#
-getField(obj::OptionalSpanSet, tsFilter::TaggedSpanSetFilter, 
-         finalizer::F=itself) where {F<:Function} = 
-getField(obj, tsFilter.scope, finalizer)
+getEntry(obj::OptionalSpanSet, tsFilter::TaggedSpanSetFilter) = 
+getEntry(obj, tsFilter.scope)
 
-getOutputType(::Type{TaggedSpanSetFilter{F}}) where {F<:ParamFilter} = getOutputType(F)
+getEntry(obj::OptionalSpanSet, tsFilter::TaggedSpanSetFilter, 
+         finalizer::F) where {F<:Function} = 
+getEntry(obj, tsFilter.scope, finalizer)
+
+getOutputType(::Type{TaggedSpanSetFilter{F}}) where {F<:SpanSetFilter} = getOutputType(F)
 
 
 struct InputConverter{F<:Function} <: AbstractParamFunc
@@ -1371,18 +1356,17 @@ InputConverter(f::InputConverter) = itself(f)
 getOutputType(::Type{InputConverter{F}}) where {F<:Function} = getOutputType(F)
 
 
-struct ParamFormatter{F<:ParamFilter} <: AbstractParamFunc
-    core::ParamFreeFunc{TaggedSpanSetFilter{F}}
+struct ParamFormatter{F<:Function} <: AbstractParamFunc
+    core::ParamFreeFunc{F}
 end
 
-ParamFormatter(f::TaggedSpanSetFilter{F}) where {F<:ParamFilter} = 
-ParamFormatter(f|>ParamFreeFunc)
+ParamFormatter(f::F) where {F<:Function} = ParamFormatter(f|>ParamFreeFunc)
 
 (f::ParamFormatter)(::Any, params::OptSpanValueSet) = f.core(params)
 
 ParamFormatter(f::ParamFormatter) = itself(f)
 
-getOutputType(::Type{ParamFormatter{F}}) where {F<:ParamFilter} = getOutputType(F)
+getOutputType(::Type{ParamFormatter{F}}) where {F<:Function} = getOutputType(F)
 
 
 struct ParamBindFunc{F<:Function, PU<:UnitParam, PG<:GridParam} <: AbstractParamFunc
@@ -1468,15 +1452,14 @@ end
 getOutputType(::Type{<:ParamCombiner{B}}) where {B<:Function} = getOutputType(B)
 
 
-const ContextParamFunc{B<:Function, E<:Function, F<:ParamFilter} = 
+const ContextParamFunc{B<:Function, E<:Function, F<:Function} = 
       ParamCombiner{B, Tuple{ InputConverter{E}, ParamFormatter{F} }}
 
-function ContextParamFunc(binder::Function, converter::Function, 
-                          formatter::TaggedSpanSetFilter)
+function ContextParamFunc(binder::Function, converter::Function, formatter::Function)
     ParamCombiner(binder, ( InputConverter(converter), ParamFormatter(formatter) ))
 end
 
-function ContextParamFunc(binder::Function, formatter::TaggedSpanSetFilter)
+function ContextParamFunc(binder::Function, formatter::Function)
     ContextParamFunc(binder, itself, formatter)
 end
 
@@ -1537,7 +1520,7 @@ function unpackFunc!(f::Function, paramSet::OptSpanParamSet,
     else
         idxFilter = locateParam!(paramSet, localParamSet)
         tagFilter = TaggedSpanSetFilter(idxFilter, paramSetId)
-        ContextParamFunc(fCore, tagFilter)
+        ContextParamFunc(fCore, GetEntry(tagFilter))
     end
 end
 

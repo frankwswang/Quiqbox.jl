@@ -22,8 +22,6 @@ abstract type TypedEvaluator{T} <: CompositeFunction end
 abstract type TraitAction{I} <: CompositeFunction end
 abstract type Modifier <: CompositeFunction end
 abstract type Mapper <: CompositeFunction end
-abstract type Getter <: CompositeFunction end
-const Encoder = Union{Getter, Mapper}
 
 abstract type IntegralData{T} <: QueryBox{T} end
 abstract type CustomCache{T} <: QueryBox{T} end
@@ -31,7 +29,7 @@ abstract type CustomCache{T} <: QueryBox{T} end
 abstract type DirectOperator{N} <: Modifier end # N: Number of input functions
 
 abstract type EstimatorConfig{T} <: ConfigBox end
-abstract type StructuredInfo <: ConfigBox end
+abstract type CustomAccessor <: ConfigBox end
 abstract type StructuredType <: ConfigBox end
 
 abstract type IdentityMarker{T} <: MarkerBox end

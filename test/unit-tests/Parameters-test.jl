@@ -248,7 +248,7 @@ g_cm7, inSet_cm7 = transpileParam(cm7)
 @test inSet_cm7.grid[] === cm4
 
 gnf_c1 = functionalize(gn_c1)
-@test Quiqbox.getInputSetType(gnf_c1) == Quiqbox.SpanInput{Quiqbox.UnitInput, Nothing}
+@test Quiqbox.getInputSetType(gnf_c1) == Quiqbox.UnitInput
 c1Val_2 = gnf_c1((unit=c1_input1, grid=Quiqbox.genBottomMemory()))
 gnf_c1_2 = ParamGraphCaller(c1)
 @test c1Val_2 == gnf_c1_2(c1_input1) == gnf_c1_2((unit=c1_input1, grid=nothing))

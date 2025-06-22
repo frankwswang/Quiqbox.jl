@@ -112,29 +112,34 @@ struct Right end
 const Lateral = Union{Left, Right}
 
 
-struct LateralPartial{F<:Function, A<:NonEmptyTuple{Any}, L<:Lateral} <: Modifier
+struct LateralPartial{A<:NonEmptyTuple{Any}, L<:Lateral, F<:Function} <: Modifier
     f::F
     arg::A
     side::L
 
     function LateralPartial(f::F, args::NonEmptyTuple{Any}, side::L) where 
                            {F<:Function, L<:Lateral}
-        new{F, typeof(args), L}(f, args, side)
+        new{typeof(args), L, F}(f, args, side)
     end
 end
 
-const LPartial{F<:Function, A<:NonEmptyTuple{Any}} = LateralPartial{F, A, Left }
-const RPartial{F<:Function, A<:NonEmptyTuple{Any}} = LateralPartial{F, A, Right}
+const LPartial{A<:NonEmptyTuple{Any}, F<:Function} = LateralPartial{A, Left,  F}
+const RPartial{A<:NonEmptyTuple{Any}, F<:Function} = LateralPartial{A, Right, F}
 
-(f::LPartial{F, A})(arg...; kws...) where {F<:Function, A<:NonEmptyTuple{Any}} = 
-f.f(f.arg..., arg...; kws...)
-(f::RPartial{F, A})(arg...; kws...) where {F<:Function, A<:NonEmptyTuple{Any}} = 
-f.f(arg..., f.arg...; kws...)
+(f::LPartial{A})(arg::Vararg{Any, N}) where {N, A<:NonEmptyTuple{Any}} = 
+f.f(f.arg..., arg...)
+(f::RPartial{A})(arg::Vararg{Any, N}) where {N, A<:NonEmptyTuple{Any}} = 
+f.f(arg..., f.arg...)
+
+(f::LPartial{A})(arg) where {A<:NonEmptyTuple{Any}} = f.f(f.arg..., arg)
+(f::RPartial{A})(arg) where {A<:NonEmptyTuple{Any}} = f.f(arg, f.arg...)
 
 LPartial(f::Function, args::NonEmptyTuple{Any}) = LateralPartial(f, args, Left() )
 RPartial(f::Function, args::NonEmptyTuple{Any}) = LateralPartial(f, args, Right())
 
-getOutputType(::Type{<:LateralPartial{F}}) where {F<:Function} = getOutputType(F)
+getOutputType(::Type{LateralPartial{A, L, F}}) where 
+             {A<:NonEmptyTuple{Any}, L<:Lateral, F<:Function} = 
+getOutputType(F)
 
 
 const absSqrtInv = inv ∘ sqrt ∘ abs
@@ -155,14 +160,13 @@ end
 
 ChainMapper(chain::AbstractArray{<:Function}) = ChainMapper(chain|>ShapedMemory)
 
-function getField(obj, f::ChainMapper{E}, finalizer::F=itself) where 
-                 {E<:FunctionChainUnion{Function}, F<:Function}
+function (f::ChainMapper{E})(obj) where {E<:FunctionChainUnion{Function}}
     fChain = f.chain
     if fChain isa AbstractArray && isempty(fChain)
         similar(fChain, Union{})
     else
         map(fChain) do mapper
-            mapper(obj) |> finalizer
+            mapper(obj)
         end
     end
 end
@@ -278,13 +282,42 @@ struct SelectHeader{N, K, F<:Function} <: Modifier
     end
 end
 
-(f::SelectHeader{N, K, F})(arg::Vararg{Any, N}) where {N, K, F<:Function} = 
-f.f(arg[begin+K-1])
+const SingleHeader{F<:Function} = SelectHeader{1, 1, F}
+
+(f::SingleHeader)(arg) = f.f(arg)
 
 (f::SelectHeader{N, 0, F})(::Vararg{Any, N}) where {N, F<:Function} = f.f()
 
+(f::SelectHeader{N, K, F})(arg::Vararg{Any, N}) where {N, K, F<:Function} = 
+f.f(arg[begin+K-1])
+
 getOutputType(::Type{<:SelectHeader{<:Any, <:Any, F}}) where {F<:Function} = 
 getOutputType(F)
+
+
+struct GetEntry{A<:AbstractAccessor} <: Mapper
+    entry::A
+end
+
+(f::GetEntry{A})(obj) where {A<:AbstractAccessor} = getEntry(obj, f.entry)
+
+function GetEntry(accessors::Tuple{Vararg{AbstractAccessor}})::GetEntry
+    GetEntry(ChainedAccess(accessors))
+end
+
+const GetAxisEntry = GetEntry{OneToIndex}
+
+const GetUnitEntry = GetEntry{ChainedAccess{ Tuple{ UnitSector, OneToIndex} }}
+
+GetUnitEntry(index::OneToIndex) = GetEntry((UnitSector(), index))
+
+const GetGridEntry = GetEntry{ChainedAccess{ Tuple{ GridSector, OneToIndex} }}
+
+GetGridEntry(index::OneToIndex) = GetEntry((GridSector(), index))
+
+const GetTypedUnit{T} = TypedReturn{T, GetUnitEntry}
+
+const GetTypedGrid{T} = TypedReturn{T, GetGridEntry}
 
 
 struct ViewOneToRange{N} <: Mapper #> N: range size
