@@ -283,10 +283,14 @@ struct SelectHeader{N, K, F<:Function} <: Modifier
     end
 end
 
-(f::SelectHeader{N, K, F})(arg::Vararg{Any, N}) where {N, K, F<:Function} = 
-f.f(arg[begin+K-1])
+const SingleHeader{F<:Function} = SelectHeader{1, 1, F}
+
+(f::SingleHeader)(arg) = f.f(arg)
 
 (f::SelectHeader{N, 0, F})(::Vararg{Any, N}) where {N, F<:Function} = f.f()
+
+(f::SelectHeader{N, K, F})(arg::Vararg{Any, N}) where {N, K, F<:Function} = 
+f.f(arg[begin+K-1])
 
 getOutputType(::Type{<:SelectHeader{<:Any, <:Any, F}}) where {F<:Function} = 
 getOutputType(F)
