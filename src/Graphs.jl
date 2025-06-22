@@ -125,7 +125,7 @@ struct ArrayReceptor{N} <: VertexReceptor
     end
 end
 
-const CallVertexReceptor{N} = Union{TupleReceptor{N}, ArrayReceptor{N}}
+const CallVertexReceptor = Union{TupleReceptor, ArrayReceptor}
 
 
 struct CallVertex{T, I<:CallVertexReceptor, F<:Function} <: ActionVertex{T}
@@ -422,7 +422,7 @@ evalParamGraphCaller(f, input)
 getOutputType(::Type{<:ParamGraphCaller{T}}) where {T} = T
 
 
-const FilterEvalParam{F<:SpanSetCaller, S<:SpanSetFilter} = ComposedApply{F, GetEntry{S}}
+const FilterEvalParam{F<:SpanSetCaller, S<:SpanSetFilter} = ComposedApply{1, F, GetEntry{S}}
 
 const ParamMapperCore = Union{FilterEvalParam, GetTypedUnit, GetTypedGrid}
 
