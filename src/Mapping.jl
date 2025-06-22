@@ -405,17 +405,21 @@ BinaryReduce(TypedBinary(TypedReturn(*, T), EL, ER), StableBinary(+, T))
 getOutputType(::Type{<:BinaryReduce{T}}) where {T} = T
 
 
-struct ComposedApply{FO, FI} <: CompositeFunction
+struct ComposedApply{N, FO, FI} <: CompositeFunction
     inner::FI
     outer::FO
 
-    ComposedApply(inner::FI, outer::FO) where {FI<:Function, FO<:Function} = 
-    new{FO, FI}(inner, outer)
+    function ComposedApply(inner::FI, outer::FO, ::Count{N}=One()) where 
+                          {N, FI<:Function, FO<:Function}
+        new{N, FO, FI}(inner, outer)
+    end
 end
-# Should not be decomposed further to `fCore(f, args)` to avoid additional allocations.
-function (f::ComposedApply{FO, FI})(args::Vararg) where {FI<:Function, FO<:Function}
-    innerRes = splat(f.inner)(args)
+#> Should not be decomposed further to `fCore(f, args)` to avoid additional allocations.
+function (f::ComposedApply{N})(args::Vararg{Any, N}) where {N}
+    innerRes = f.inner(args...)
     f.outer(innerRes)
 end
 
-getOutputType(::Type{<:ComposedApply{FO}}) where {FO<:Function} = getOutputType(FO)
+(f::ComposedApply{1})(args) = (args |> f.inner |> f.outer)
+
+getOutputType(::Type{<:ComposedApply{N, FO}}) where {N, FO<:Function} = getOutputType(FO)
