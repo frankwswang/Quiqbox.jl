@@ -342,7 +342,8 @@ function genVertexCaller(graph::SpanLayerGraph, vertex::CallVertex{T}) where {T}
     end
 
     if receptor isa TupleReceptor
-        ComposedApply(ChainMapper(encoders|>Tuple), splat(vertex.apply))
+        nInput = length(receptor.trait)
+        ComposedApply(ChainMapper(encoders|>Tuple), TupleSplitHeader{nInput}(vertex.apply))
     else
         ComposedApply(ChainMapper(encoders), vertex.apply)
     end
