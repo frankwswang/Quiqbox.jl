@@ -241,34 +241,34 @@ getOutputType(::Type{<:PairCoupler{T}}) where {T} = T
 struct CartesianHeader{N, F<:Function} <: Modifier
     f::F
 
-    function CartesianHeader(f::F, ::Val{N}) where {F<:Function, N}
-        checkPositivity(N::Int)
+    function CartesianHeader(f::F, ::Count{N}) where {F<:Function, N}
+        checkPositivity(N)
         new{N, F}(f)
     end
 end
 
-CartesianHeader(f::CartesianHeader, ::Val{N}) where {N} = CartesianHeader(f.f, Val(N))
+CartesianHeader(f::CartesianHeader, ::Count{N}) where {N} = CartesianHeader(f.f, Count(N))
 
-CartesianHeader(::Val{N}) where {N} = CartesianHeader(itself, Val(N))
+CartesianHeader(::Count{N}) where {N} = CartesianHeader(itself, Count(N))
 
-(f::CartesianHeader{N, F})(head::T, body::Vararg) where {N, F<:Function, T} = 
+(f::CartesianHeader{N})(head, body::Vararg) where {N} = 
 f.f(formatInput(CartesianInput{N}(), head), body...)
 
 getOutputType(::Type{<:CartesianHeader{<:Any, F}}) where {F<:Function} = getOutputType(F)
 
 const TypedCarteFunc{T, D, F<:Function} = TypedReturn{T, CartesianHeader{D, F}}
 
-TypedCarteFunc(f::Function, ::Type{T}, ::Val{D}) where {T, D} = 
-TypedReturn(CartesianHeader(f, Val(D)), T)
+TypedCarteFunc(f::Function, ::Type{T}, ::Count{D}) where {T, D} = 
+TypedReturn(CartesianHeader(f, Count(D)), T)
 
-TypedCarteFunc(f::TypedReturn, ::Type{T}, ::Val{D}) where {T, D} = 
-TypedReturn(CartesianHeader(f.f, Val(D)), T)
+TypedCarteFunc(f::TypedReturn, ::Type{T}, ::Count{D}) where {T, D} = 
+TypedReturn(CartesianHeader(f.f, Count(D)), T)
 
 const CartesianFormatter{N, R<:NTuple{N, Real}} = CartesianHeader{N, Typed{R}}
 
 function CartesianFormatter(::Type{T}, ::Count{N}) where {T<:Real, N}
     checkPositivity(N)
-    CartesianHeader(Typed(NTuple{N, T}), Val(N))::CartesianFormatter{N, NTuple{N, T}}
+    CartesianHeader(Typed(NTuple{N, T}), Count(N))::CartesianFormatter{N, NTuple{N, T}}
 end
 
 

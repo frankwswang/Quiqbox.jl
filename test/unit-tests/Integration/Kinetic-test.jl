@@ -5,7 +5,7 @@ using Quiqbox
 
 cen_sto1 = (1.1, 2.2)
 
-stf1Core = Quiqbox.ModularField(x->exp(-first(x)), Float64, Val(1))
+stf1Core = Quiqbox.ModularField(x->exp(-first(x)), Float64, Count(1))
 stf1 = Quiqbox.PolyRadialFunc(stf1Core, (1, 1))
 sto1 = PrimitiveOrb(cen_sto1, stf1; renormalize=false)
 ke1 = eKinetic(sto1, sto1)
@@ -21,7 +21,7 @@ genSymKE_sto1Core = function (cen::NTuple{2, Float64})
     end
 end
 symKE_stf1Core = genSymKE_sto1Core(cen_sto1)
-symKE_stf1 = Quiqbox.ModularField(symKE_stf1Core, Float64, Val(2))
+symKE_stf1 = Quiqbox.ModularField(symKE_stf1Core, Float64, Count(2))
 symKE_sto1 = PrimitiveOrb((0., 0.), symKE_stf1; renormalize=false)
 ke1_t = overlap(sto1, symKE_sto1)
 
@@ -35,7 +35,7 @@ ke1mat = eKinetics([sto1])
 
 pgf1 = genGaussTypeOrb((0.1, 0.2, 0.3), 2.0, (1, 0, 0))
 @test eKinetic(pgf1, pgf1) ≈ eKinetic(pgf1, pgf1, lazyCompute=true) ≈ 0.4350256247524772
-pgf1_masked = PrimitiveOrb((0., 0., 0.), Quiqbox.EncodedField( pgf1, Float64, Val(3) ))
+pgf1_masked = PrimitiveOrb((0., 0., 0.), Quiqbox.EncodedField( pgf1, Float64, Count(3) ))
 @test eKinetic(pgf1_masked, pgf1) ≈ eKinetic(pgf1, pgf1) ≈ 0.43502562475512524
 @test eKinetic(pgf1, pgf1, lazyCompute=true) ≈ 0.43502562475512524
 

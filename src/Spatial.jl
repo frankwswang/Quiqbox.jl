@@ -69,7 +69,7 @@ struct StashedField{C<:RealOrComplex, D, F<:AbstractParamFunc,
                           cache!Self::ParamDataCache=initializeParamDataCache()) where 
                          {T, D, C<:RealOrComplex{T}}
         fInner = f.core.f
-        core = TypedCarteFunc(fInner.binder, C, Val(D))
+        core = TypedCarteFunc(fInner.binder, C, Count(D))
         encoder = last(fInner.encode)
         obtainInner = Base.Fix1(obtainCore!, cache!Self)
         paramData = getEntry(paramSet, encoder.core.f.entry, obtainInner)
@@ -88,7 +88,7 @@ function evalFieldAmplitudeCore(f::StashedField, input)
 end
 
 function unpackFieldFunc(f::F) where {D, C<:RealOrComplex, F<:StashedField{C, D}}
-    TypedCarteFunc(RPartial(f.core.f.f, f.data), C, Val(D)), initializeSpanParamSet()
+    TypedCarteFunc(RPartial(f.core.f.f, f.data), C, Count(D)), initializeSpanParamSet()
 end
 
 
@@ -130,9 +130,9 @@ struct EncodedField{C<:RealOrComplex, D, F<:Function, E<:Function} <: FieldAmpli
     end
 end
 
-function EncodedField(core::TypedReturn{C, F}, ::Val{D}) where 
+function EncodedField(core::TypedReturn{C, F}, ::Count{D}) where 
                      {C<:RealOrComplex, D, F<:Function}
-    EncodedField(core, CartesianHeader( Val(D) ))
+    EncodedField(core, CartesianHeader( Count(D) ))
 end
 
 function EncodedField(core::FieldAmplitude{C}, dimInfo) where {C<:RealOrComplex}
@@ -165,7 +165,7 @@ function unpackFieldFunc(f::F) where {D, C<:RealOrComplex, F<:EncodedField{C, D}
     paramSet = initializeSpanParamSet()
     fCore = unpackFunc!(f.core.f, paramSet, Identifier(nothing))
     fEncode = unpackFunc!(f.encode.f, paramSet, Identifier(nothing))
-    TypedCarteFunc(ParamPipeline((fEncode, fCore)), C, Val(D)), paramSet
+    TypedCarteFunc(ParamPipeline((fEncode, fCore)), C, Count(D)), paramSet
 end
 
 
@@ -179,13 +179,14 @@ const EncodedFieldFunc{T<:Real, D, C<:RealOrComplex{T}, E<:AbstractParamFunc,
 const RadialField{C<:RealOrComplex, D, F<:FieldAmplitude{C, 1}} = 
       EncodedField{C, D, F, typeof(generalNorm)}
 
-const RadialFieldFunc{T<:Real, D, C<:RealOrComplex{T}, F<:AbstractParamFunc, S<:SpanSetFilter} = 
+const RadialFieldFunc{T<:Real, D, C<:RealOrComplex{T}, F<:AbstractParamFunc, 
+                      S<:SpanSetFilter} = 
       EncodedFieldFunc{T, D, C, InputConverter{typeof(generalNorm)}, F, S}
 
 RadialField{C, D}(radial::FieldAmplitude{C, 1}) where {C<:RealOrComplex, D} = 
-EncodedField(radial, CartesianHeader( generalNorm, Val(D) ))
+EncodedField(radial, CartesianHeader( generalNorm, Count(D) ))
 
-RadialField(radial::FieldAmplitude{C, 1}, ::Val{D}) where {C<:RealOrComplex, D} = 
+RadialField(radial::FieldAmplitude{C, 1}, ::Count{D}) where {C<:RealOrComplex, D} = 
 RadialField{C, D}(radial)
 
 
@@ -202,10 +203,10 @@ struct ModularField{C<:RealOrComplex, D, F<:Function, P<:NamedSpanParamTuple
     end
 end
 
-function ModularField(core::Function, ::Type{C}, ::Val{D}, 
+function ModularField(core::Function, ::Type{C}, ::Count{D}, 
                       params::NamedSpanParamTuple=NamedTuple()) where {C<:RealOrComplex, D}
     checkPositivity(D::Int)
-    typedCore = TypedCarteFunc(ParamFreeFunc(core), C, Val(D))
+    typedCore = TypedCarteFunc(ParamFreeFunc(core), C, Count(D))
     ModularField(typedCore, params)
 end
 
@@ -221,7 +222,7 @@ function evalFieldAmplitudeCore(f::NullaryField, input)
 end
 
 function unpackFieldFunc(f::NullaryField{C, D}) where {C<:RealOrComplex, D}
-    TypedCarteFunc(InputConverter(f.core.f.f), C, Val(D)), initializeSpanParamSet()
+    TypedCarteFunc(InputConverter(f.core.f.f), C, Count(D)), initializeSpanParamSet()
 end
 
 
@@ -235,7 +236,7 @@ end
 function unpackFieldFunc(f::F) where {C<:RealOrComplex, D, F<:ModularField{C, D}}
     params = f.param
     paramMapper, paramSet = genParamMapper(params)
-    TypedCarteFunc(ContextParamFunc(f.core.f.f, paramMapper), C, Val(D)), paramSet
+    TypedCarteFunc(ContextParamFunc(f.core.f.f, paramMapper), C, Count(D)), paramSet
 end
 
 
@@ -256,7 +257,7 @@ const GaussFieldFunc{T<:Real, F<:NamedParamMapper, S<:SpanSetFilter} =
       FieldParamFunc{T, 1, T, GaussFieldCore{F}, S}
 
 function GaussFunc(xpn::UnitOrVal{T}) where {T<:Real}
-    core = TypedCarteFunc(ParamFreeFunc(computeGaussFunc), T, Val(1))
+    core = TypedCarteFunc(ParamFreeFunc(computeGaussFunc), T, Count(1))
     ModularField(core, (xpn=UnitParamEncoder(T, :xpn, 1)(xpn),))
 end
 
@@ -300,7 +301,7 @@ function unpackFieldFunc(f::F) where {C<:RealOrComplex, D, F<:ProductField{C, D}
         ParamPipeline((InputConverter(getSubIdx), basisCore))
     end
 
-    TypedCarteFunc(ParamCombiner(StableMul(C), basisCores), C, Val(D)), paramSet
+    TypedCarteFunc(ParamCombiner(StableMul(C), basisCores), C, Count(D)), paramSet
 end
 
 
@@ -344,7 +345,7 @@ function unpackFieldFunc(f::F) where {D, C<:RealOrComplex, F<:CoupledField{C, D}
     paramSet = initializeSpanParamSet()
     fCoreL = unpackFunc!(fL, paramSet, Identifier(nothing))
     fCoreR = unpackFunc!(fR, paramSet, Identifier(nothing))
-    TypedCarteFunc(ParamCombiner(f.coupler, (fCoreL, fCoreR)), C, Val(D)), paramSet
+    TypedCarteFunc(ParamCombiner(f.coupler, (fCoreL, fCoreR)), C, Count(D)), paramSet
 end
 
 
@@ -358,7 +359,7 @@ const PolyRadialFunc{C<:RealOrComplex, D, F<:FieldAmplitude{C, 1}} =
 
 function PolyRadialFunc(radial::FieldAmplitude{C, 1}, 
                         angular::NonEmptyTuple{Int, D}) where {C<:RealOrComplex, D}
-    DimType = Val(D + 1)
+    DimType = Count(D + 1)
     radialCore = RadialField(radial, DimType)
     polyCore = TypedCarteFunc((ParamFreeFunc∘CartSHarmonics)(angular), C, DimType)
     CoupledField((radialCore, ModularField(polyCore)), StableMul(C))
@@ -412,7 +413,7 @@ function unpackFieldFunc(f::F) where {T, C<:RealOrComplex{T}, D, F<:ShiftedField
     mapper, _ = genParamMapper(f.center, paramSet!Self=paramSet)
     shiftCore = StableTupleSub(T, Count(D))
     shifter = ContextParamFunc(shiftCore, CartesianFormatter(T, Count(D)), mapper)
-    TypedCarteFunc(ParamPipeline((shifter, fCore)), T, Val(D)), paramSet
+    TypedCarteFunc(ParamPipeline((shifter, fCore)), T, Count(D)), paramSet
 end
 
 # const FieldCenterShifter{T<:Real, D, M<:ChainMapper{ <:NTuple{D, Function} }} = 

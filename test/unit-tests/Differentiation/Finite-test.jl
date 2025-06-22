@@ -20,10 +20,10 @@ for (i, r) in zip(orders, fdCoeffRef1)
     @test Quiqbox.computeFiniteDiffWeights(i, grid1) ≈ r
 end
 
-@test try SymmetricIntRange(Val(-1))  catch; true end
-@test try SymmetricIntRange(Val(1.1)) catch; true end
-@test SymmetricIntRange(Val(0))() == 0:0
-@test SymmetricIntRange(Val(3))() == -3:3
+@test try SymmetricIntRange(Count(-1))  catch; true end
+@test try SymmetricIntRange(Count(1.1)) catch; true end
+@test SymmetricIntRange(Count(0))() == 0:0
+@test SymmetricIntRange(Count(3))() == -3:3
 
 
 grid2 = [-3//1, -2//1, -1//1, 0, 1//1, 2//1, 3//1]
@@ -38,8 +38,8 @@ end
 xpn_df_test1 = 0.0123456789
 f1 = x->exp(-xpn_df_test1 * x^2)
 d1 = x->exp(-xpn_df_test1 * x^2) * (-2xpn_df_test1*x)
-derivativeOrder = Val(1)
-nFiniteDiffGRad = SymmetricIntRange(Val(5))
+derivativeOrder = Count(1)
+nFiniteDiffGRad = SymmetricIntRange(Count(5))
 ps, ws = Quiqbox.getFiniteDiffWeights(Float64, derivativeOrder, nFiniteDiffGRad)
 fdVal1 = sum(ws .* f1.(ps .+ 0.5))
 @test abs(fdVal1 - d1(0.5)) < 10eps(Float64)
@@ -54,12 +54,12 @@ fdVal1 = sum(ws .* f1.(ps .+ 0.5))
 @test getFiniteDiffAccuOrder(4, 9) == 6
 
 
-f = Quiqbox.TypedCarteFunc(x->x[1]^2 + x[2]*x[1] + x[3]^3/x[1], Float64, Val(3))
-df_fd1 = Quiqbox.AxialFiniteDiff(f, Val(1), 1)
+f = Quiqbox.TypedCarteFunc(x->x[1]^2 + x[2]*x[1] + x[3]^3/x[1], Float64, Count(3))
+df_fd1 = Quiqbox.AxialFiniteDiff(f, Count(1), 1)
 df_sd1 = x->(2x[1] + x[2] - x[3]^3/x[1]^2)
 testCoord = (1.1, 2.1, -3.2)
 @test isapprox(df_fd1(testCoord), df_sd1(testCoord), atol=1e-9)
-df_fd2 = Quiqbox.AxialFiniteDiff(f, Val(2), 1)
+df_fd2 = Quiqbox.AxialFiniteDiff(f, Count(2), 1)
 df_sd2 = x->(2 + 2x[3]^3/x[1]^3)
 @test isapprox(df_fd2(testCoord), df_sd2(testCoord), atol=1e-9)
 

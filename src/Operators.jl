@@ -81,12 +81,11 @@ end
 struct DiagonalDiff{C<:RealOrComplex, D, M, N} <: MonoTermOperator
     direction::NTuple{D, C}
 
-    function DiagonalDiff(::Val{M}, direction::NonEmptyTuple{C}, ::Val{N}=Val(0)) where 
+    function DiagonalDiff(::Count{M}, direction::NonEmptyTuple{C}, ::Count{N}=Nil()) where 
                          {M, C<:RealOrComplex, N}
-        checkPositivity(M::Int)
-        checkPositivity(N::Int, true)
+        checkPositivity(M)
         iseven(N) || throw(AssertionError("`N` must be an even number."))
-        new{C, length(direction), M, N::Int}(direction)
+        new{C, length(direction), M, N}(direction)
     end
 end
 
@@ -100,10 +99,10 @@ function modifyFunction(op::DiagonalDiff{C1, D, M, N}, term::AbstractTypedCarteF
                         ) where {T<:Real, C1<:RealOrComplex{T}, C2<:RealOrComplex{T}, D, M, 
                                  N}
     C = ifelse(C1==C2==T, T, Complex{T})
-    formattedTerm = TypedCarteFunc(term, C, Val(D))
-    order = ifelse(N==0, getFiniteDiffApproxOrder(term), N)
+    formattedTerm = TypedCarteFunc(term, C, Count(D))
+    order = Count(ifelse(N==0, getFiniteDiffApproxOrder(term), N))
     mapper = ntuple(Val(D)) do i
-        AxialFiniteDiff(formattedTerm, Val(M), i, Val(order))
+        AxialFiniteDiff(formattedTerm, Count(M), i, order)
     end |> ChainMapper
     PairCoupler(Contract(C, C1, C2), Storage(op.direction, :diffDirection), mapper)
 end

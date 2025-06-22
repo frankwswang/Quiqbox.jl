@@ -1,3 +1,5 @@
+export Count
+
 function sortTensorIndex((i, j)::NTuple{2, Int})
     if i > j
         (j, i)
@@ -44,7 +46,15 @@ struct Count{N} <: StructuredType
     end
 end
 
-Count(N::Int) = Count{N}()
+Count(N::Integer) = Count{Int(N)}()
 
 const Nil = Count{0}
 const One = Count{1}
+
+
+struct SymmetricIntRange{S} <: ConfigBox
+
+    SymmetricIntRange(::Count{S}) where {S} = new{S}()
+end
+
+(::SymmetricIntRange{S})() where {S} = -Int(S) : Int(S)

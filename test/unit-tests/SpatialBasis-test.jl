@@ -85,7 +85,7 @@ Quiqbox.disableRenormalize!(bf1)
 @test !Quiqbox.isRenormalized(bf1)
 
 stf1Core = Quiqbox.TypedReturn(x->exp(-norm(x)), Float64)
-stf1 = Quiqbox.EncodedField(stf1Core, Val(1))
+stf1 = Quiqbox.EncodedField(stf1Core, Count(1))
 sto1 = Quiqbox.PolyRadialFunc(stf1, (1, 1, 0))
 sto1((1.1, 0.2, 1.2))
 

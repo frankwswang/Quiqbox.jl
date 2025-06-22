@@ -1,17 +1,5 @@
 # Fornberg's algorithm
 ## [DOI] 10.1090/S0025-5718-1988-0935077-0
-
-struct SymmetricIntRange{S} <: ConfigBox
-
-    function SymmetricIntRange(::Val{S}) where {S}
-        checkPositivity(S::Int, true)
-        new{S}()
-    end
-end
-
-(::SymmetricIntRange{S})() where {S} = -S : S
-
-
 function computeFiniteDiffWeights(order::Int, dis::AbstractVector{T}) where {T<:Real}
     checkPositivity(order, true)
     nGrid = length(dis)
@@ -66,14 +54,15 @@ function computeFiniteDiffWeights(order::Int, dis::AbstractVector{T}) where {T<:
     genMemory(res)
 end
 
-function computeFiniteDiffWeights(::Val{M}, ::SymmetricIntRange{S}) where {M, S}
-    dis = Memory{Rational{Int}}(SymmetricIntRange(Val(S))())
+function computeFiniteDiffWeights(::Count{M}, sRange::SymmetricIntRange{S}) where {M, S}
+    dis = Memory{Rational{Int}}(sRange())
     computeFiniteDiffWeights(M, dis)
 end
 
 
-@generated function getFiniteDiffWeightsCore(::Val{M}, ::SymmetricIntRange{S}) where {M, S}
-    intGradWeights = computeFiniteDiffWeights(Val(M), SymmetricIntRange( Val(S) ))
+@generated function getFiniteDiffWeightsCore(::Count{M}, ::SymmetricIntRange{S}
+                                             ) where {M, S}
+    intGradWeights = computeFiniteDiffWeights(Count(M), SymmetricIntRange( Count(S) ))
     return quote
         copy($intGradWeights)
     end
@@ -96,10 +85,11 @@ function getFiniteDiffAccuOrder(diffOrder::Int, interpNum::Int)
 end
 
 
-@generated function getFiniteDiffWeightsINTERNAL(::Type{T}, ::Val{M}, ::SymmetricIntRange{S}
+@generated function getFiniteDiffWeightsINTERNAL(::Type{T}, ::Count{M}, 
+                                                 ::SymmetricIntRange{S}
                                                  ) where {T<:AbstractFloat, M, S}
-    sRange = SymmetricIntRange(Val(S))
-    weights = getFiniteDiffWeightsCore(Val(M), sRange)
+    sRange = SymmetricIntRange(Count(S))
+    weights = getFiniteDiffWeightsCore(Count(M), sRange)
     accuOrder = getFiniteDiffAccuOrder(M, 2S+1)
     spacing = 2eps(T)^inv(1 + accuOrder)
     points = Memory{T}(spacing * sRange())
@@ -107,17 +97,17 @@ end
     return :($points, $scaledWeights)
 end
 
-@generated function getFiniteDiffWeightsINTERNAL(::Type{<:Integer}, ::Val{M}, 
+@generated function getFiniteDiffWeightsINTERNAL(::Type{<:Integer}, ::Count{M}, 
                                                  ::SymmetricIntRange{S}) where {M, S}
-    sRange = SymmetricIntRange(Val(S))
-    weights = getFiniteDiffWeightsCore(Val(M), sRange)
+    sRange = SymmetricIntRange(Count(S))
+    weights = getFiniteDiffWeightsCore(Count(M), sRange)
     points = Memory{T}(sRange())
     return :($points, $weights)
 end
 
-function getFiniteDiffWeights(::Type{T}, ::Val{M}, ::SymmetricIntRange{S}) where 
+function getFiniteDiffWeights(::Type{T}, ::Count{M}, ::SymmetricIntRange{S}) where 
                              {T<:Real, M, S}
-    points, weights = getFiniteDiffWeightsINTERNAL(T, Val(M), SymmetricIntRange( Val(S) ))
+    points, weights = getFiniteDiffWeightsINTERNAL(T, Count(M), SymmetricIntRange( Count(S) ))
     copy(points), copy(weights)
 end
 
@@ -128,18 +118,18 @@ struct AxialFiniteDiff{C<:RealOrComplex, D, M, N, F<:Function} <: TypedEvaluator
     f::TypedCarteFunc{C, D, F}
     axis::OneToIndex
 
-    function AxialFiniteDiff(f::TypedCarteFunc{C, D, F}, ::Val{M}, axis::Int, 
-                             ::Val{N}=Val(4)) where {C<:RealOrComplex, D, M, F, N}
-        checkPositivity(N::Int)
+    function AxialFiniteDiff(f::TypedCarteFunc{C, D, F}, ::Count{M}, axis::Int, 
+                             ::Count{N}=Count(4)) where {C<:RealOrComplex, D, M, F, N}
+        checkPositivity(N)
         iseven(N) || throw(AssertionError("`N` must be an even number."))
-        new{C, D, M::Int, N, F}(f, OneToIndex(axis))
+        new{C, D, M, N, F}(f, OneToIndex(axis))
     end
 end
 
 function (f::AxialFiniteDiff{C, D, M, N})(coord::NumberSequence{<:Real}) where 
                                          {T<:Real, C<:RealOrComplex{T}, D, M, N}
-    gridRange = SymmetricIntRange(Val(getInterpolationNumber(M, N) ÷ 2))
-    points, weights = getFiniteDiffWeightsINTERNAL(T, Val(M), gridRange)
+    gridRange = SymmetricIntRange(Count(getInterpolationNumber(M, N) ÷ 2))
+    points, weights = getFiniteDiffWeightsINTERNAL(T, Count(M), gridRange)
     res = zero(C)
     for (point, weight) in zip(points, weights)
         shiftedCoord = indexedPerturb(+, coord, f.axis=>point)
