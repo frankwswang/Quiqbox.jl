@@ -26,14 +26,14 @@ l_sd = function (tpl::NTuple{3, Real})
 end
 
 coord1 = (1.1, 2.2, 3.3)
-f_typed = Quiqbox.TypedCarteFunc(f, Float64, Val(3))
+f_typed = Quiqbox.TypedCarteFunc(f, Float64, Count(3))
 
-∇v = Quiqbox.DiagonalDiff(Val(1), (1.0, 1.0, 1.0))
+∇v = Quiqbox.DiagonalDiff(Count(1), (1.0, 1.0, 1.0))
 ∇vf = ∇v(f_typed)
 @test isapprox(∇vf(coord1), (sum∘g_sd)(coord1), atol=1e-12)
 @test all(isapprox.(∇vf.right(coord1), g_sd(coord1), atol=1e-12))
 
-Δ = Quiqbox.DiagonalDiff(Val(2), (1.0, 1.0, 1.0))
+Δ = Quiqbox.DiagonalDiff(Count(2), (1.0, 1.0, 1.0))
 Δf = Δ(f_typed)
 @test isapprox(Δf(coord1), (sum∘l_sd)(coord1), atol=5e-9)
 @test all(isapprox.(Δf.right(coord1), l_sd(coord1), atol=5e-9))

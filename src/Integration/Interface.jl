@@ -38,7 +38,7 @@ end
 
 
 function eKinetic(orb1::OrbitalBasis{C1, D}, orb2::OrbitalBasis{C2, D}, 
-                  operator::KineticEnergySampler{T, D}=genKineticEnergySampler(T, Val(D)); 
+                  operator::KineticEnergySampler{T, D}=genKineticEnergySampler(T, Count(D)); 
                   cache!Self::MissingOr{ParamDataCache}=missing, 
                   lazyCompute::Bool=false) where 
                  {T<:Real, C1<:RealOrComplex{T}, C2<:RealOrComplex{T}, D}
@@ -48,6 +48,6 @@ function eKinetic(orb1::OrbitalBasis{C1, D}, orb2::OrbitalBasis{C2, D},
 end
 
 eKinetics(basisSet::OrbBasisVec{T, D}, 
-          operator::KineticEnergySampler{T, D}=genKineticEnergySampler(T, Val(D)); 
+          operator::KineticEnergySampler{T, D}=genKineticEnergySampler(T, Count(D)); 
           cache!Self::ParamDataCache=initializeParamDataCache()) where {T<:Real, D} = 
 computeIntTensor(OneBodyIntegral{D}(), operator.core, basisSet; cache!Self)

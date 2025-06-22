@@ -51,7 +51,7 @@ cons1 = [1.5, -0.3]
 xpns1 = [1.2, 0.6]
 cgf1 = genGaussTypeOrb(cen1, xpns1, cons1, (1, 0, 0))
 stf1Core = Quiqbox.TypedReturn(x->exp(-norm(x)), Float64)
-stf1 = Quiqbox.EncodedField(stf1Core, Val(1))
+stf1 = Quiqbox.EncodedField(stf1Core, Count(1))
 sto1 = Quiqbox.PolyRadialFunc(stf1, (1, 1, 0))
 @test Quiqbox.unpackFunc(sto1)[begin] isa Quiqbox.PolyRadialFieldFunc
 stoBasis1 = Quiqbox.PrimitiveOrb((1.0, 2.0, 3.0), sto1; renormalize=false)
