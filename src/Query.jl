@@ -99,11 +99,17 @@ getField(obj, i::UnitIndex) = getField(obj.unit, i.idx)
 
 getField(obj, i::GridIndex) = getField(obj.grid, i.idx)
 
-function getField(obj, acc::ChainedAccess{L, C}) where {L, C<:NTuple{L, GeneralField}}
-    for i in acc.chain
-        obj = getField(obj, i)
-    end
-    obj
+# function getField(obj, acc::ChainedAccess{L, C}) where {L, C<:NTuple{L, GeneralField}}
+#     for i in acc.chain
+#         obj = getField(obj, i)
+#     end
+#     obj
+# end
+
+function getField(obj, acc::ChainedAccess)
+    head, body = acc.chain
+    temp = getField(obj, head)
+    getField(temp, ChainedAccess(body))
 end
 
 (f::Encoder)(obj) = getField(obj, f)
