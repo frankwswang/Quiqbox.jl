@@ -416,7 +416,7 @@ BinaryReduce(TypedBinary(TypedReturn(*, T), EL, ER), StableBinary(+, T))
 getOutputType(::Type{<:BinaryReduce{T}}) where {T} = T
 
 
-struct ComposedApply{N, FO, FI} <: CompositeFunction
+struct ComposedApply{N, FO<:Function, FI<:Function} <: CompositeFunction
     inner::FI
     outer::FO
 
