@@ -69,16 +69,16 @@ getOutputType(::Type{Union{}}) =
 throw(AssertionError("`Union{}` is not a valid input argument."))
 
 
-const True  = Val{true}
+Base.broadcastable(o::ValueType) = Ref(o)
 
-const False = Val{false}
+struct True  <: ValueType end
+struct False <: ValueType end
+const Boolean = Union{True, False}
 
-const BoolVal = Union{True, False}
+getTypeValue(::Type{True }) = true
+getTypeValue(::Type{False}) = false
 
-
-getValData(::Val{T}) where {T} = T
-
-getValData(::Type{Val{T}}) where {T} = T
+getTypeValue(::V) where {V<:ValueType} = getTypeValue(V)
 
 
 function getMethodNum(f::Function)

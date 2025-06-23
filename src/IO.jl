@@ -27,8 +27,8 @@ function getObjNameStr(objName::Symbol, objAlias::AbstractString=string(objName)
     (Base.isexported(Quiqbox, objName) ? "" : string(nameof(Quiqbox), ".")) * objAlias
 end
 
-function enableCompatShowFormat(::B, io::IO) where {B<:BoolVal}
-    get(io, :compact, false)::Bool || getValData(B)
+function enableCompatShowFormat(::B, io::IO) where {B<:Boolean}
+    get(io, :compact, false)::Bool || getTypeValue(B)
 end
 
 
@@ -45,7 +45,7 @@ Base.show(io::IO, p::ParamBox) = showParamBox(True(), io, p)
 
 Base.show(io::IO, ::MIME"text/plain", p::ParamBox) = showParamBox(False(), io, p)
 
-function showParamBox(::B, io::IO, p::ParamBox) where {B<:BoolVal}
+function showParamBox(::B, io::IO, p::ParamBox) where {B<:Boolean}
     pType = typeof(p)
     pName = nameof(pType)
     pSymbol = indexedSymOf(p)
@@ -83,7 +83,7 @@ showCompositeFunc(True(), io, f)
 Base.show(io::IO, ::MIME"text/plain", f::CompositeFunction) = 
 showCompositeFunc(False(), io, f)
 
-function showCompositeFunc(::B, io::IO, f::CompositeFunction) where {B<:BoolVal}
+function showCompositeFunc(::B, io::IO, f::CompositeFunction) where {B<:Boolean}
     print(io,  "(::", typeof(f), ")")
     if !enableCompatShowFormat(B(), io)
         nMethod = getMethodNum(f)

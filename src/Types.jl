@@ -35,6 +35,8 @@ abstract type StructuredType <: ConfigBox end
 abstract type IdentityMarker{T} <: MarkerBox end
 abstract type StorageMarker{T} <: MarkerBox end
 
+abstract type ValueType <: StructuredType end
+
 abstract type TypedParamFunc{T} <: AbstractParamFunc end
 
 abstract type OrbitalBasis{T, D, F} <: ParticleFunction{D, 1} end
@@ -92,6 +94,8 @@ const ArithmeticOperator = Union{typeof(+), typeof(-), typeof(*), typeof(/)}
 import Base: iterate, size, getindex, setindex!, IndexStyle, zero, similar
 
 import Base: get, keys, values, hash, isempty, collect, length
+
+import Base: broadcastable
 
 import Base: +, -, ==
 

@@ -43,18 +43,18 @@ struct AxialGaussOverlapCache{T<:Real, D, M<:NTuple{D, MissingOr{ LRU{T4Int2Tupl
     axis::M
     encode::GaussProdBasedOrbCache{T, D, F}
 
-    function AxialGaussOverlapCache(::Type{F}, config::NTuple{D, BoolVal}, 
+    function AxialGaussOverlapCache(::Type{F}, configs::NTuple{D, Boolean}, 
                                     axialMaxSize::Int=128) where 
                                    {T<:Real, D, F<:GaussProdBasedOrb{T, D}}
-        axialCache = map(config) do axialConfig
-            getValData(axialConfig) ? LRU{T4Int2Tuple{T}, T}(maxsize=axialMaxSize) : missing
+        axialCache = map(configs) do config
+            getTypeValue(config) ? LRU{T4Int2Tuple{T}, T}(maxsize=axialMaxSize) : missing
         end
         orbCache = GaussProdBasedOrbCache{T, D, F}(maxsize=axialMaxSize)
         new{T, D, typeof(axialCache), F}(axialCache, orbCache)
     end
 end
 
-AxialGaussOverlapCache(::Type{F}, ::NTuple{D, Val{false}}, ::Int=128) where 
+AxialGaussOverlapCache(::Type{F}, ::NTuple{D, False}, ::Int=128) where 
                       {T<:Real, D, F<:GaussProdBasedOrb{T, D}} = 
 NullCache{T}()
 
@@ -449,7 +449,7 @@ const AxialGaussOverlapBasedSampler{T<:Real, D} = Union{
 
 function getGaussBasedIntegrationCache(::Type{F}, ::Type{T}, ::Val{D}) where 
                                       {T<:Real, D, F<:AxialGaussOverlapBasedSampler{T, D}}
-    AxialGaussOverlapCache(FloatingPolyGaussField{T, D}, ntuple( _->Val(true), Val(D) ))
+    AxialGaussOverlapCache(FloatingPolyGaussField{T, D}, ntuple( _->True(), Val(D) ))
 end
 
 supportGaussBasedIntegration(::Type{T}, ::Val{D}, 
