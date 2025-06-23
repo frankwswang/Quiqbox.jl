@@ -87,22 +87,25 @@ function evalFieldAmplitudeCore(f::StashedField, input)
     f.core(formatInput(f, input), f.data)
 end
 
-function unpackFieldFunc(f::F) where {D, C<:RealOrComplex, F<:StashedField{C, D}}
+function unpackFieldFunc(f::F, ::Boolean=False()) where 
+                        {D, C<:RealOrComplex, F<:StashedField{C, D}}
     TypedCarteFunc(RPartial(f.core.f.f, f.data), C, Count(D)), initializeSpanParamSet()
 end
 
-
-function unpackFunc!(f::F, paramSet::OptSpanParamSet, 
+#> `trySevering` is the unique argument for unpacking `FieldAmplitude`, which when set to 
+#> `true`, will let `unpackFunc!` and `unpackFunc` sever the explicit parameters.
+function unpackFunc!(f::F, paramSet::OptSpanParamSet, trySevering::Boolean=False(); 
                      paramSetId::Identifier=Identifier(paramSet)) where 
                     {T, C<:RealOrComplex{T}, D, F<:FieldAmplitude{C, D}}
-    fCore, localParamSet = unpackFieldFunc(f)
+    fCore, localParamSet = unpackFieldFunc(f, trySevering)
     idxFilter = locateParam!(paramSet, localParamSet)
     scope = TaggedSpanSetFilter(idxFilter, paramSetId)
     FieldParamFunc(fCore, scope)
 end
 
-function unpackFunc(f::F) where {T, C<:RealOrComplex{T}, D, F<:FieldAmplitude{C, D}}
-    fCore, paramSet = unpackFieldFunc(f)
+function unpackFunc(f::F, trySevering::Boolean=False()) where 
+                   {T, C<:RealOrComplex{T}, D, F<:FieldAmplitude{C, D}}
+    fCore, paramSet = unpackFieldFunc(f, trySevering)
     idxFilter = SpanSetFilter(map(length, paramSet)...)
     scope = TaggedSpanSetFilter(idxFilter, paramSet)
     FieldParamFunc(fCore, scope), paramSet
@@ -161,10 +164,11 @@ function evalFieldAmplitudeCore(f::EncodedField{C, D, F, E}, input,
     convert(C, val)
 end
 
-function unpackFieldFunc(f::F) where {D, C<:RealOrComplex, F<:EncodedField{C, D}}
+function unpackFieldFunc(f::F, ::Boolean=False()) where 
+                        {D, C<:RealOrComplex, F<:EncodedField{C, D}}
     paramSet = initializeSpanParamSet()
-    fCore = unpackFunc!(f.core.f, paramSet, Identifier(nothing))
-    fEncode = unpackFunc!(f.encode.f, paramSet, Identifier(nothing))
+    fCore = unpackFunc!(f.core.f, paramSet, paramSetId=Identifier())
+    fEncode = unpackFunc!(f.encode.f, paramSet, paramSetId=Identifier())
     TypedCarteFunc(ParamPipeline((fEncode, fCore)), C, Count(D)), paramSet
 end
 
@@ -221,7 +225,8 @@ function evalFieldAmplitudeCore(f::NullaryField, input)
     f.core(formatInput(f, input))
 end
 
-function unpackFieldFunc(f::NullaryField{C, D}) where {C<:RealOrComplex, D}
+function unpackFieldFunc(f::NullaryField{C, D}, ::Boolean=False()) where 
+                        {C<:RealOrComplex, D}
     TypedCarteFunc(InputConverter(f.core.f.f), C, Count(D)), initializeSpanParamSet()
 end
 
@@ -233,8 +238,13 @@ function evalFieldAmplitudeCore(f::ModularField, input, cache!Self::ParamDataCac
     f.core(formatInput(f, input), paramVals)
 end
 
-function unpackFieldFunc(f::F) where {C<:RealOrComplex, D, F<:ModularField{C, D}}
-    params = f.param
+function unpackFieldFunc(f::F, trySevering::Boolean=False()) where 
+                        {C<:RealOrComplex, D, F<:ModularField{C, D}}
+    params = if getTypeValue(trySevering)
+        map(p->sever(p, isFrozenVariable(p)), f.param)
+    else
+        f.param
+    end
     paramMapper, paramSet = genParamMapper(params)
     TypedCarteFunc(ContextParamFunc(f.core.f.f, paramMapper), C, Count(D)), paramSet
 end
@@ -289,7 +299,8 @@ function evalFieldAmplitude(f::ProductField{C}, input;
     end
 end
 
-function unpackFieldFunc(f::F) where {C<:RealOrComplex, D, F<:ProductField{C, D}}
+function unpackFieldFunc(f::F, trySevering::Boolean=False()) where 
+                        {C<:RealOrComplex, D, F<:ProductField{C, D}}
     paramSet = initializeSpanParamSet()
 
     idx = 1
@@ -297,7 +308,7 @@ function unpackFieldFunc(f::F) where {C<:RealOrComplex, D, F<:ProductField{C, D}
         basisDim = getDimension(basis)
         getSubIdx = ViewOneToRange(idx, Count{basisDim}())
         idx += basisDim
-        basisCore = unpackFunc!(basis, paramSet, Identifier(nothing))
+        basisCore = unpackFunc!(basis, paramSet, trySevering, paramSetId=Identifier())
         ParamPipeline((InputConverter(getSubIdx), basisCore))
     end
 
@@ -340,11 +351,12 @@ function evalFieldAmplitude(f::CoupledField, input;
     end |> Base.Splat(f.coupler)
 end
 
-function unpackFieldFunc(f::F) where {D, C<:RealOrComplex, F<:CoupledField{C, D}}
+function unpackFieldFunc(f::F, trySevering::Boolean=False()) where 
+                        {D, C<:RealOrComplex, F<:CoupledField{C, D}}
     fL, fR = f.pair
     paramSet = initializeSpanParamSet()
-    fCoreL = unpackFunc!(fL, paramSet, Identifier(nothing))
-    fCoreR = unpackFunc!(fR, paramSet, Identifier(nothing))
+    fCoreL = unpackFunc!(fL, paramSet, trySevering, paramSetId=Identifier())
+    fCoreR = unpackFunc!(fR, paramSet, trySevering, paramSetId=Identifier())
     TypedCarteFunc(ParamCombiner(f.coupler, (fCoreL, fCoreR)), C, Count(D)), paramSet
 end
 
@@ -407,13 +419,18 @@ function evalFieldAmplitudeCore(f::ShiftedField{T, D}, input,
     f.core(shiftedCoord)
 end
 
-function unpackFieldFunc(f::F) where {T, C<:RealOrComplex{T}, D, F<:ShiftedField{C, D}}
-    fInner, paramSet = unpackFieldFunc(f.core)
-    fCore = fInner.f.f
-    mapper, _ = genParamMapper(f.center, paramSet!Self=paramSet)
+function unpackFieldFunc(f::F, trySevering::Boolean=False()) where 
+                        {T, C<:RealOrComplex{T}, D, F<:ShiftedField{C, D}}
+    fInner, paramSet = unpackFieldFunc(f.core, trySevering)
+    cenParams = if getTypeValue(trySevering)
+        map(p->sever(p, isFrozenVariable(p)), f.center)
+    else
+        f.center
+    end
+    mapper, _ = genParamMapper(cenParams, paramSet!Self=paramSet)
     shiftCore = StableTupleSub(T, Count(D))
     shifter = ContextParamFunc(shiftCore, CartesianFormatter(T, Count(D)), mapper)
-    TypedCarteFunc(ParamPipeline((shifter, fCore)), T, Count(D)), paramSet
+    TypedCarteFunc(ParamPipeline((shifter, fInner.f.f)), T, Count(D)), paramSet
 end
 
 # const FieldCenterShifter{T<:Real, D, M<:ChainMapper{ <:NTuple{D, Function} }} = 

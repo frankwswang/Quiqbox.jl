@@ -246,7 +246,7 @@ struct Identifier <: IdentityMarker{Any}
     code::UInt
     link::Union{WeakRef, BlackBox}
 
-    function Identifier(obj::Any)
+    function Identifier(obj::Any=nothing)
         link = if canDirectlyStore(obj)
             BlackBox(obj)
         else
