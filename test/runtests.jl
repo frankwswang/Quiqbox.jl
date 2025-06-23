@@ -28,6 +28,7 @@ using Test
         include("unit-tests/Mapping-test.jl")
         include("unit-tests/Operators-test.jl")
         include("unit-tests/Parameters-test.jl")
+        include("unit-tests/Graphs-test.jl")
     end
     println("$(unit3) test finished in $t3 seconds.\n")
 
