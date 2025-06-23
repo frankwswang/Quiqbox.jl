@@ -42,12 +42,9 @@ const NamedParamTuple{S, N, P<:NTuple{N, ParamBox}} = NamedTuple{S, P}
 const NamedSpanParamTuple{S, N, P<:NTuple{N, SpanParam}} = NamedParamTuple{S, N, P}
 const DirectParamSource = Union{ParamBoxAbtArr, Tuple{Vararg{ParamBox}}, NamedParamTuple}
 
+
 isOffsetEnabled(::ParamBox) = false
 
-# function checkScreenLevel(p::ParamBox)
-#     checkScreenLevel(screenLevelOf(p)::Int, getScreenLevelOptions(p|>typeof))
-#     nothing
-# end
 
 checkScreenLevel(sl::Int, levels::NonEmptyTuple{Int}) = 
 checkIntLevelMismatch(sl, levels, "screen")
@@ -74,10 +71,11 @@ function checkPrimParamElementalType(::Type{T}) where
 end
 
 
+#? Expose `.screen` to type signature?
 mutable struct UnitVar{T} <: PrimitiveParam{T, T}
     @atomic input::T
     const symbol::IndexedSym
-    @atomic screen::Bool
+    const screen::Bool
 
     function UnitVar(input::T, symbol::SymOrIndexedSym, screen::Bool=false) where {T}
         checkPrimParamElementalType(T)
@@ -85,10 +83,10 @@ mutable struct UnitVar{T} <: PrimitiveParam{T, T}
     end
 end
 
-mutable struct GridVar{T, N} <: PrimitiveParam{T, DirectMemory{T, N}}
-    const input::DirectMemory{T, N}
-    const symbol::IndexedSym
-    @atomic screen::Bool
+struct GridVar{T, N} <: PrimitiveParam{T, DirectMemory{T, N}}
+    input::DirectMemory{T, N}
+    symbol::IndexedSym
+    screen::Bool
 
     function GridVar(input::AbstractArray{T, N}, symbol::SymOrIndexedSym, 
                      screen::Bool=false) where {T, N}
@@ -98,7 +96,7 @@ mutable struct GridVar{T, N} <: PrimitiveParam{T, DirectMemory{T, N}}
         new{T, N}(input, IndexedSym(symbol), screen)
     end
 end
-
+#> One should mask a `TensorVar` with a `ReduceParam` for adaptive screen levels
 const TensorVar{T} = Union{UnitVar{T}, GridVar{T}}
 
 genTensorVar(input::Any, symbol::SymOrIndexedSym, screen::Bool=false) = 
@@ -539,12 +537,6 @@ function setScreenLevel!(p::AdaptableParam, level::Int)
         @atomic p.offset = unitOp(-, p.offset, newVal)
     end
     @atomic p.screen = TernaryNumber(level)
-    p
-end
-
-function setScreenLevel!(p::TensorVar, level::Int)
-    checkScreenLevel(level, getScreenLevelOptions(p|>typeof))
-    @atomic p.screen = Bool(level-1)
     p
 end
 
