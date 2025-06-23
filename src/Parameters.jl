@@ -1185,6 +1185,8 @@ getOutputType(::Type{<:SpanSetCaller{T}}) where {T} = T
     return :( (unit=($upType)[], grid=($gpType)[]) )
 end
 
+initializeSpanParamSet(::Nothing) = initializeFixedSpanSet(nothing)
+
 initializeSpanParamSet(unit::UnitParam) = (unit=genMemory(unit), grid=genBottomMemory())
 
 initializeSpanParamSet(grid::GridParam) = (unit=genBottomMemory(), grid=genMemory(grid))
