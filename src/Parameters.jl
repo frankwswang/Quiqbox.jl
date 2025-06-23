@@ -1506,7 +1506,7 @@ function unpackFunc(f::Function)
     fCore, paramSet
 end
 
-function unpackFunc!(f::Function, paramSet::OptSpanParamSet, 
+function unpackFunc!(f::Function, paramSet::OptSpanParamSet; 
                      paramSetId::Identifier=Identifier(paramSet))
     fCore, localParamSet = unpackFunc(f)
     if fCore isa InputConverter
@@ -1544,11 +1544,11 @@ end
 
     sever(param::ParamBox, screenSource::Bool=false) -> ParamBox
 
-Eliminate the severable connection(s) in `param`. For `param::SpanParam`, it returns a 
-`PrimitiveParam` with an output value same as `obtain(param)` when it is called; for any 
-`param` being nested `ParamBox`, it recursively severs every upstream `ParamBox` inside 
-`param` that is a `SpanParam`. When `screenSource` is set to `true`, every `PrimitiveParam` 
-inside (or is) the returned the `ParamBox` will have `.screen` set to `true`.
+Returns a copy of `param` with severable connection(s) eliminated. For `param::SpanParam`, 
+`sever` returns a `PrimitiveParam` of which the output value is the same as `param` when 
+called by `obtain`; for any `param` being nested `ParamBox`, it recursively severs every 
+`ParamBox` inside `param` that is a `SpanParam`. `screenSource` determines whether the 
+returned (or ints inside) `ParamBox` will be screened.
 """
 function sever(param::SpanParam, screenSource::Bool=false)
     val = obtain(param)
