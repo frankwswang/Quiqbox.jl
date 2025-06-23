@@ -287,11 +287,9 @@ function transpileParam(param::ParamBox, reindexInput!::Bool=false)
 
         (unit, grid, hidden), mapper = formVertexSectors(inUPars, inGPars, midPars)
         graph = SpanLayerGraph((;unit, grid), hidden, genParamVertex(outPars[], mapper))
-    else
+    else #> `sl in (1, 2)`
         isActive = sl == 1
-
-        inputSet = initializeSpanParamSet(isActive ? param : Union{})
-
+        inputSet = isActive ? initializeSpanParamSet(param) : initializeFixedSpanSet()
         paramSym = symbolFrom(param.symbol)
         graph = genTensorVertex(obtain(param), isActive, paramSym) |> SpanValueGraph
     end
@@ -353,9 +351,11 @@ end
 function functionalize(graph::SpanValueGraph)
     vertex = graph.source
     isUnit = vertex isa UnitVertex
-    inputStyle = ifelse(isUnit, UnitInput, GridInput)()
+    isActive = isVertexActive(vertex)
 
-    fCore = if isVertexActive(vertex)
+    inputStyle = ifelse(isActive, (isUnit ? UnitInput : GridInput), VoidInput)()
+
+    fCore = if isActive
         ifelse(isUnit, GetUnitEntry, GetGridEntry)(OneToIndex())
     else
         genVertexCaller(vertex)
