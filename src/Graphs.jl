@@ -29,7 +29,7 @@ getOutputType(::T) where {T<:TypedVertex} = getOutputType(T)
 
 
 struct UnitVertex{T} <: AccessVertex{T}
-    value::T
+    value::AtomicUnit{T}
     active::Bool
     marker::Symbol
 end
@@ -37,7 +37,7 @@ end
 getOutputType(::Type{UnitVertex{T}}) where {T} = T
 
 struct GridVertex{T, N} <: AccessVertex{ShapedMemory{T, N}}
-    value::ShapedMemory{T, N}
+    value::AtomicGrid{ShapedMemory{T, N}}
     active::Bool
     marker::Symbol
 end
@@ -46,18 +46,10 @@ getOutputType(::Type{GridVertex{T, N}}) where {T, N} = ShapedMemory{T, N}
 
 const TensorVertex{T} = Union{UnitVertex{T}, GridVertex{T}}
 
-function genTensorVertex(val::T, active::Bool, marker::Symbol) where {T}
-    UnitVertex(val, active, marker)
-end
-
-function genTensorVertex(val::AbstractArray{T}, active::Bool, marker::Symbol) where {T}
-    GridVertex(ShapedMemory(val), active, marker)
-end
-
 
 isVertexActive(vertex::TensorVertex) = vertex.active
 
-getVertexValue(vertex::TensorVertex) = vertex.value
+getVertexValue(vertex::TensorVertex) = getindex(vertex.value)
 
 
 # HalfEdge: Edge that does not hold complete information unless it's attached to a vertex.
@@ -167,12 +159,18 @@ function initializeReceptor(param::ShapedParam,
 end
 
 
+genParamVertexCore(val::AtomicUnit, active::Bool, marker::Symbol) = 
+UnitVertex(val, active, marker)
+
+genParamVertexCore(val::AtomicGrid{<:DirectMemory}, active::Bool, marker::Symbol) = 
+GridVertex(AtomicGrid(val.value.value), active, marker)
+
 function genParamVertex(param::CompositeParam, 
                         reference::NothingOr{ParamBoxVertexDict}=nothing)
     sl = screenLevelOf(param)
-    sym = symbolFrom(param.symbol)
+    sym = symOf(param)
     if sl > 0
-        genTensorVertex(param.offset, sl<2, sym)
+        genParamVertexCore(param.offset, sl<2, sym)
     else
         apply = extractTransform(param)
         receptor = initializeReceptor(param, reference)
@@ -181,7 +179,7 @@ function genParamVertex(param::CompositeParam,
 end
 
 function genParamVertex(param::PrimitiveParam)
-    genTensorVertex(param.input, screenLevelOf(param)<2, symbolFrom(param.symbol))
+    genParamVertexCore(param.data, screenLevelOf(param)<2, symOf(param))
 end
 
 
@@ -290,8 +288,7 @@ function transpileParam(param::ParamBox, reindexInput!::Bool=false)
     else #> `sl in (1, 2)`
         isActive = sl == 1
         inputSet = isActive ? initializeSpanParamSet(param) : initializeFixedSpanSet()
-        paramSym = symbolFrom(param.symbol)
-        graph = genTensorVertex(obtain(param), isActive, paramSym) |> SpanValueGraph
+        graph = genParamVertex(param) |> SpanValueGraph
     end
 
     graph, inputSet::FixedSpanParamSet #> `inputSet` only contains active `TensorVertex`

@@ -71,20 +71,19 @@ function checkPrimParamElementalType(::Type{T}) where
 end
 
 
-#? Expose `.screen` to type signature?
-mutable struct UnitVar{T} <: PrimitiveParam{T, T}
-    @atomic input::T
-    const symbol::IndexedSym
-    const screen::Bool
+struct UnitVar{T} <: PrimitiveParam{T, T}
+    data::AtomicUnit{T}
+    symbol::IndexedSym
+    screen::Bool
 
     function UnitVar(input::T, symbol::SymOrIndexedSym, screen::Bool=false) where {T}
         checkPrimParamElementalType(T)
-        new{T}(input, IndexedSym(symbol), screen)
+        new{T}(AtomicUnit(input), IndexedSym(symbol), screen)
     end
 end
 
 struct GridVar{T, N} <: PrimitiveParam{T, DirectMemory{T, N}}
-    input::DirectMemory{T, N}
+    data::AtomicGrid{DirectMemory{T, N}}
     symbol::IndexedSym
     screen::Bool
 
@@ -92,8 +91,8 @@ struct GridVar{T, N} <: PrimitiveParam{T, DirectMemory{T, N}}
                      screen::Bool=false) where {T, N}
         N < 1 && throw(AssertionError("`N` must be larger than zero."))
         checkPrimParamElementalType(T)
-        input = PackedMemory(input)
-        new{T, N}(input, IndexedSym(symbol), screen)
+        input = PackedMemory(input) #> This performs a shallow copy
+        new{T, N}(AtomicGrid(input), IndexedSym(symbol), screen)
     end
 end
 #> One should mask a `TensorVar` with a `ReduceParam` for adaptive screen levels
@@ -297,7 +296,7 @@ function getTensorOutputShape(f::TypedReduce{E}, input::CoreFixedParIn) where
         size(f(obtain.(input)...))
     end
 end
-
+#! Simplify this
 function formatOffset(lambda::TypedTensorFunc{<:Pack}, ::Missing, input::CoreFixedParIn)
     outType = getTensorOutputTypeBound(lambda)
     if getScreenLevelOptionsCore(outType) == (0,)
@@ -334,6 +333,7 @@ function formatOffset(lambda::TypedTensorFunc{<:Pack}, offset, input::CoreFixedP
                 size(offset) == getTensorOutputShape(lambda, input)
             else
                 buffer = lambda(obtain.(input)...)
+                #! Might not need `recursiveCompareSize` since nested array is disallowed
                 recursiveCompareSize(buffer, offset)
             end || throw(DimensionMismatch("The shape of `offset` does not match that "*
                                             "of `lambda`'s returned value."))
@@ -397,7 +397,7 @@ mutable struct ReduceParam{T, E<:Pack{T}, F<:Function, I<:CoreFixedParIn} <: Cel
     const input::I
     const symbol::IndexedSym
     @atomic screen::TernaryNumber
-    @atomic offset::E
+    const offset::AtomicUnit{E}
 
     function ReduceParam(lambda::TypedReduce{E, F}, input::I, 
                          symbol::SymOrIndexedSym, screen::TernaryNumber=TUS0, 
@@ -409,7 +409,8 @@ mutable struct ReduceParam{T, E<:Pack{T}, F<:Function, I<:CoreFixedParIn} <: Cel
         if isempty(offsetTuple)
             new{T, E, F, I}(lambda, input, sym, screen)
         else
-            new{T, E, F, I}(lambda, input, sym, screen, first(offsetTuple))
+            offsetBlock = AtomicUnit(offsetTuple|>first)
+            new{T, E, F, I}(lambda, input, sym, screen, offsetBlock)
         end
     end
 end
@@ -422,7 +423,7 @@ function genCellParam(func::Function, input::CoreFixedParIn, symbol::SymOrIndexe
 end
 
 function genCellParam(par::ReduceParam, symbol::SymOrIndexedSym=symOf(par))
-    offset = isOffsetEnabled(par) ? par.offset : missing
+    offset = isOffsetEnabled(par) ? copy(par.offset[]) : missing
     ReduceParam(par.lambda, par.input, symbol, par.screen, offset)
 end
 
@@ -439,11 +440,11 @@ genCellParam(var, varSym::SymOrIndexedSym, symbol::SymOrIndexedSym=varSym) =
 genCellParam(genTensorVar(var, varSym), symbol)
 
 
-indexedSymOf(p::ParamBox) = p.symbol
+indexedSymOf(p::ParamBox) = p.symbol #! -> `markerOf`
 
-symOf(p::ParamBox) = indexedSymOf(p).name
+symOf(p::ParamBox) = indexedSymOf(p).name #! -> `symbolOf`
 
-inputOf(p::ParamBox) = p.input
+inputOf(p::CompositeParam) = p.input
 
 
 mutable struct ExpandParam{T, E<:Pack{T}, N, F<:Function, I<:CoreFixedParIn
@@ -452,7 +453,7 @@ mutable struct ExpandParam{T, E<:Pack{T}, N, F<:Function, I<:CoreFixedParIn
     const input::I
     const symbol::IndexedSym
     @atomic screen::TernaryNumber
-    @atomic offset::PackedMemory{T, E, N}
+    const offset::AtomicGrid{PackedMemory{T, E, N}}
 
     function ExpandParam(lambda::TypedExpand{E, N, F}, input::I, 
                          symbol::SymOrIndexedSym, screen::TernaryNumber=TUS0, 
@@ -464,7 +465,8 @@ mutable struct ExpandParam{T, E<:Pack{T}, N, F<:Function, I<:CoreFixedParIn
         if isempty(offsetTuple)
             new{T, E, N, F, I}(lambda, input, sym, screen)
         else
-            new{T, E, N, F, I}(lambda, input, sym, screen, first(offsetTuple))
+            offsetBlock = AtomicGrid(offsetTuple|>first)
+            new{T, E, N, F, I}(lambda, input, sym, screen, offsetBlock)
         end
     end
 end
@@ -475,7 +477,7 @@ function genMeshParam(func::Function, input::CoreFixedParIn, symbol::SymOrIndexe
 end
 
 function genMeshParam(par::ExpandParam, symbol::SymOrIndexedSym=symOf(par))
-    offset = isOffsetEnabled(par) ? par.offset : missing
+    offset = isOffsetEnabled(par) ? par.offset : missing #!!!
     ExpandParam(par.lambda, par.input, IndexedSym(symbol), par.screen, offset)
 end
 
@@ -531,10 +533,10 @@ function setScreenLevel!(p::AdaptableParam, level::Int)
     levelOld = screenLevelOf(p)
     if levelOld == level
     elseif levelOld == 0
-        @atomic p.offset = obtain(p)
+        safelySetVal!(p.offset, obtain(p))
     elseif level == 0
         newVal = p.lambda((obtain(arg) for arg in p.input)...)
-        @atomic p.offset = unitOp(-, p.offset, newVal)
+        safelySetVal!(p.offset, unitOp(-, p.offset[], newVal))
     end
     @atomic p.screen = TernaryNumber(level)
     p
@@ -548,11 +550,12 @@ isFrozenVariable(p::ParamBox) = (screenLevelOf(p) == 2)
 
 getOutputSize(p::ShapedParam) = size(p.input)
 
-getOutputSize(p::PrimitiveParam) = size(p.input)
+getOutputSize(p::PrimitiveParam) = size(p.data[])
 
 function getOutputSize(p::AdaptableParam)
-    if p.offset isa AbstractArray
-        size(p.offset)
+    offsetVal = p.offset[]
+    if offsetVal isa AbstractArray
+        size(offsetVal)
     else
         ()
     end
@@ -647,8 +650,8 @@ end
 
 
 function obtainCore!(cache::ParamDataCache, param::PrimitiveParam)
-    input = param.input
-    cacheParamCore!(cache, param, Storage(input))::typeof(input)
+    value = param.data[]
+    cacheParamCore!(cache, param, Storage(value))::typeof(value)
 end
 
 function obtainCore!(cache::ParamDataCache, param::ShapedParam)
@@ -661,11 +664,11 @@ function obtainCore!(cache::ParamDataCache, param::AdaptableParam)
     key = ParamEgalBox(param)
     get!(cache, key) do
         if screenLevelOf(param) > 0
-            decoupledCopy(param.offset)
+            decoupledCopy(param.offset[])
         else
             inVal = (obtainCore!(cache, p) for p in param.input)
             body = param.lambda(inVal...)
-            isOffsetEnabled(param) ? unitOp(+, body, param.offset) : body
+            isOffsetEnabled(param) ? unitOp(+, body, param.offset[]) : body
         end
     end::getOutputType(param)
 end
@@ -681,14 +684,14 @@ end
 function obtain(param::CompositeParam)
     checkParamCycle(param)
     if param isa AdaptableParam && screenLevelOf(param) > 0
-        param.offset
+        param.offset[]
     else
         cache = initializeParamDataCache()
         obtainCore!(cache, param)
     end |> decoupledCopy
 end
 
-obtain(param::PrimitiveParam) = decoupledCopy(param.input)
+obtain(param::PrimitiveParam) = decoupledCopy(param.data[])
 
 function obtain(params::ParamBoxAbtArr)
     if isempty(params)
@@ -711,18 +714,14 @@ function setVal!(par::TensorVar, val)
     if !isPrimitiveInput(par)
         throw(AssertionError("`isPrimitiveInput(par)` must return `true`."))
     end
-    if par isa UnitVar
-        @atomic par.input = val
-    else
-        safelySetVal!(par.input, val)
-    end
+    safelySetVal!(par.data, val)
 end
 
 function setVal!(par::AdaptableParam, val)
     if !isPrimitiveInput(par)
         throw(AssertionError("`isPrimitiveInput(par)` must return `true`."))
     end
-    @atomic par.offset = val
+    safelySetVal!(par.offset, val)
 end
 
 
@@ -739,15 +738,15 @@ struct ParamMarker{T} <: IdentityMarker{BoxCoreType{T, ParamBox}}
         type = getNestedLevel(P)
         code = hash(type)
 
+        sl = screenLevelOf(param)
         switch = isOffsetEnabled(param)
-        offset = :offset => markObj(switch ? param.offset : nothing)
+        offset = :offset => markObj((sl == 0 && switch) ? param.offset[] : nothing)
         code = hash(offset.second.code, code)
 
-        sl = screenLevelOf(param)
         screen = :screen => markObj(sl)
         code = hash(screen.second, code)
 
-        sym = :symbol => (markObj∘symOf)(param)
+        sym = :symbol => markObj(sl > 0 ? symOf(param) : nameof(P))
         code = hash(sym.second, code)
 
         meta = (offset, screen, sym)
@@ -756,9 +755,9 @@ struct ParamMarker{T} <: IdentityMarker{BoxCoreType{T, ParamBox}}
         code = hash(func, code)
 
         data = if P <: PrimitiveParam
-            Identifier(param.input)
-        elseif switch && sl > 0
-            Identifier(param)
+            Identifier(param.data)
+        elseif sl > 0
+            Identifier(param.offset)
         else
             checkParamCycle(param)
             markParamInput(param.input)
@@ -828,7 +827,7 @@ end
     noStoredParam(source) -> Bool
 
 Detect if `source` has no reachable `$ParamBox` by reflection-type functions, `getfield`and 
-`getindex`. It returns `true` if `getInnerParams(source)` returns an empty collection. It 
+`getindex`. It returns `true` if `uniqueParams(source)` returns an empty collection. It 
 is still possible for `noStoredParam` to return `true` if `source` is a generic 
 function that indirectly references global variables being/storing `$ParamBox`.
 """
@@ -923,7 +922,7 @@ extractTransformCore(::ExpandParam) = ExpandShift
 
 function extractTransform(pb::AdaptableParam)
     fCore = if isOffsetEnabled(pb)
-        extractTransformCore(pb)(pb.lambda, pb.offset)
+        extractTransformCore(pb)(pb.lambda, pb.offset[])
     else
         pb.lambda
     end
@@ -1521,7 +1520,7 @@ end
 
 function genParamFinisher(param::ReduceParam, screen::TernaryNumber=param.screen; 
                           deepCopyLambda::Bool=false)
-    offsetPreset = isOffsetEnabled(param) ? param.offset : missing
+    offsetPreset = isOffsetEnabled(param) ? param.offset[] : missing
     let offset=offsetPreset, f=(deepCopyLambda ? deepcopy(param.lambda) : param.lambda)
         function finishReduceParam(input::CoreFixedParIn)
             ReduceParam(f, input, param.symbol, screen, offset)
@@ -1531,7 +1530,7 @@ end
 
 function genParamFinisher(param::ExpandParam, screen::TernaryNumber=param.screen; 
                           deepCopyLambda::Bool=false)
-    offsetPreset = isOffsetEnabled(param) ? param.offset : missing
+    offsetPreset = isOffsetEnabled(param) ? param.offset[] : missing
     let offset=offsetPreset, f=(deepCopyLambda ? deepcopy(param.lambda) : param.lambda)
         function finishExpandParam(input::CoreFixedParIn)
             ExpandParam(f, input, param.symbol, screen, offset)
