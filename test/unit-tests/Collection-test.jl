@@ -21,6 +21,7 @@ vecMem1c = copy(vecMem1)
 @test vecMem1c == vecMem1 && typeof(vecMem1c) == typeof(vecMem1)
 vecMem1c[1] += 1
 @test vecMem1c != vecMem1
+@test typeof(vecMem1c|>decoupledCopy) == typeof(vecMem1c)
 
 
 shpMem1 = ShapedMemory(rand(2, 3, 1))
@@ -57,6 +58,7 @@ shpMem1c = copy(shpMem1)
 @test shpMem1c == shpMem1 && typeof(shpMem1c) == typeof(shpMem1)
 shpMem1c[1] += 1
 @test shpMem1c != shpMem1
+@test typeof(shpMem1c|>decoupledCopy) == typeof(shpMem1c)
 
 pckMem1 = PackedMemory(shpMem1)
 @test getNestedLevel(pckMem1|>typeof).level == 1
@@ -88,6 +90,7 @@ pckMem1c = copy(pckMem1)
 @test pckMem1c == pckMem1 && typeof(pckMem1c) == typeof(pckMem1)
 pckMem1c[1] += 1
 @test pckMem1c != pckMem1
+@test typeof(pckMem1c|>decoupledCopy) == typeof(pckMem1c)
 
 @test eltype(pckMem1) == eltype(pckMem2) == Float64
 @test typeof(pckMem1) <: eltype(pckMem3)

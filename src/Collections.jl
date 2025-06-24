@@ -287,8 +287,9 @@ IndexStyle(::PackedMemory) = IndexLinear()
 #> Additional interface
 ShapedMemory(arr::PackedMemory) = arr.value
 #>> Necessary for `copy` to return the same container type
-function similar(arr::DirectMemory{T}, shape::Tuple{Vararg{Int}}=size(arr)) where {T}
-    PackedMemory{T}(undef, shape)
+function similar(arr::DirectMemory{T1}, ::Type{T2}=eltype(arr), 
+                 shape::Tuple{Vararg{Int}}=size(arr)) where {T1, T2<:T1}
+    PackedMemory{T2}(undef, shape)
 end
 
 
