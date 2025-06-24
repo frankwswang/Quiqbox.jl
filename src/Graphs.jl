@@ -316,9 +316,10 @@ function selectUpstreamVertex(graph::SpanLayerGraph, trait::VertexTrait, index::
     vertex
 end
 
+#> Vertex caller that effectively returns a pre-stored value no longer reference its source
 function genVertexCaller(vertex::TensorVertex)
     value = getVertexValue(vertex)
-    SelectHeader{1, 0}(Storage(value, vertex.marker))
+    SelectHeader{1, 0}(Storage( copy(value), (nameof∘typeof)(vertex) ))
 end
 
 function genVertexCaller(idx::OneToIndex, vertex::TensorVertex)
