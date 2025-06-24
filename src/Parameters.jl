@@ -1015,14 +1015,14 @@ function markParam!(param::ParamBox,
                     indexDict::AbstractDict{Symbol, Int}=Dict{Symbol, Int}())
     sym = symbolOf(param)
     get!(indexDict, sym, 0)
-    param.marker.index = (indexDict[sym] += 1)
+    @atomic markerOf(param).index = (indexDict[sym] += 1)
     nothing
 end
 
 
 function getParamOrderLabel(x::ParamBox)
     nl = getNestedLevel(x|>typeof)
-    (screenLevelOf(x), nl.level, symbolFrom(x.marker), objectid(x))
+    (screenLevelOf(x), nl.level, x.marker.name, x.marker.index, objectid(x))
 end
 
 function sortParams!(params::AbstractVector{<:ParamBox}; 

@@ -1,5 +1,3 @@
-export symbolFrom
-
 using Printf: @sprintf
 
 const superscriptNum = Dict(['0'=>'⁰', '1'=>'¹', '2'=>'²', '3'=>'³', '4'=>'⁴', '5'=>'⁵', 
@@ -246,9 +244,14 @@ end
 
 mutable struct IndexedSym
     const name::Symbol
-    index::MissingOr{Int}
+    @atomic index::Int
 
-    IndexedSym(name::Symbol, index::MissingOr{Int}=missing) = new(name, index)
+    function IndexedSym(name::Symbol, index::Int)
+        checkPositivity(index, true)
+        new(name, index)
+    end
+
+    IndexedSym(name::Symbol) = new(name, 0)
 end
 
 IndexedSym(idxSym::IndexedSym) = IndexedSym(idxSym.name, idxSym.index)
@@ -258,12 +261,3 @@ IndexedSym(Symbol(idxSym.name, sym), idxSym.index)
 
 IndexedSym(sym::Symbol, idxSym::IndexedSym) = 
 IndexedSym(Symbol(sym, idxSym.name), idxSym.index)
-
-function symbolFrom(is::IndexedSym)
-    idx = is.index
-    if ismissing(idx)
-        is.name
-    else
-        Symbol(is.name, '_', idx)
-    end
-end
