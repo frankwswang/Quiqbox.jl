@@ -36,12 +36,8 @@ end
 getPackType(l::NestedLevel{T}) where {T} = getPackType(T, l.level)
 
 function getPackType(::Type{<:AbstractArray{T, N}}) where {T, N}
-    innerT = getPackType(T)
-    if isconcretetype(innerT)
-        AbstractArray{innerT, N}
-    else
-        AbstractArray{<:innerT, N}
-    end
+    innerType = getPackType(T)
+    genParametricType(AbstractArray, (;T=innerType, N))
 end
 
 getPackType(::Type{T}) where {T} = T
