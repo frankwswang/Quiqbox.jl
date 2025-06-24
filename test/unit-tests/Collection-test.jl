@@ -62,12 +62,19 @@ pckMem1 = PackedMemory(shpMem1)
 @test getNestedLevel(pckMem1|>typeof).level == 1
 @test pckMem1 == shpMem1
 @test pckMem1 !== shpMem1
+pckMem1_2 = PackedMemory{Float64}(undef, size(pckMem1))
+pckMem1_2 .= pckMem1
+@test pckMem1_2 == pckMem1
+@test typeof(pckMem1_2) == typeof(pckMem1)
+@test getNestedLevel(pckMem1_2|>typeof).level == 1
+try PackedMemory{Vector{Int}}(undef, (1,)) catch err; err isa AssertionError end
 pckMem2 = PackedMemory(pckMem1)
 @test getNestedLevel(pckMem2|>typeof).level == 1
 @test pckMem2 == pckMem1
 @test pckMem2 !== pckMem1
 mat1 = rand(3, 2)
 pckMem3 = PackedMemory(reshape( [pckMem1, mat1], (1, 2) ))
+@test copy(pckMem3) isa Array
 @test getNestedLevel(pckMem3|>typeof).level == 2
 @test pckMem3[begin] === pckMem1  #> Only preserve `PackedMemory`
 @test pckMem3[end] == mat1

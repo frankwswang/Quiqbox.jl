@@ -242,6 +242,16 @@ struct PackedMemory{T, E<:AbstractPack{T}, N} <: AbstractPackedMemory{T, E, N}
         nucType, eleType, shellLevel = checkPackedMemoryElement(formattedValue)
         new{nucType, eleType, N}(formattedValue, shellLevel)
     end
+
+    function PackedMemory{T}(::UndefInitializer, shape::NTuple{N, Int}) where {T, N}
+        intersection = typeintersect(T, AbstractArray)
+        if !(intersection <: Union{}) && intersection <: AbstractArray
+            throw(AssertionError("`T=$T` should not contain any (non-`Union{}`) subtypes "*
+                                 "of `AbstractArray.`"))
+        end
+        value = ShapedMemory{T}(undef, shape)
+        new{T, T, N}(value, getNestedLevel(ShapedMemory{T, N}))
+    end
 end
 
 function checkPackedMemoryElement(::T) where {T<:ShapedMemory}
@@ -277,9 +287,8 @@ IndexStyle(::PackedMemory) = IndexLinear()
 #> Additional interface
 ShapedMemory(arr::PackedMemory) = arr.value
 #>> Necessary for `copy` to return the same container type
-function similar(arr::DirectMemory, ::Type{T}=eltype(arr), 
-                 shape::Tuple{Vararg{Int}}=size(arr)) where {T}
-    PackedMemory(similar(arr.value, T, shape))
+function similar(arr::DirectMemory{T}, shape::Tuple{Vararg{Int}}=size(arr)) where {T}
+    PackedMemory{T}(undef, shape)
 end
 
 
