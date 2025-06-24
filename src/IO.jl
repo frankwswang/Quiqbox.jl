@@ -37,7 +37,7 @@ Base.show(io::IO, ::MIME"text/plain", s::IndexedSym) = showIndexedSym(io, s)
 
 function showIndexedSym(io::IO, s::IndexedSym)
     idx = s.index
-    print(io, s.name, ( ismissing(idx) ? "" : numToSubs(idx) ))
+    print(io, "#", s.name, ( iszero(idx) ? "" : "{$idx}" ))
 end
 
 
@@ -63,14 +63,17 @@ function showParamBox(::B, io::IO, p::ParamBox) where {B<:Boolean}
     else
         print(io, "(")
         show(io, MIME("text/plain"), pSymbol)
-        print(io, " :: ", getObjNameStr(pName), ")")
+        print(io, " ::", getObjNameStr(pName), ")")
         level = screenLevelOf(p)
         relationStr = (level==0 ? " ==> " : (level==1 ? " <=> " : " <== "))
         print(io, relationStr, "(")
         if level > 0
-            show(IOContext(io, :compact=>true), obtain(p))
+            output = obtain(p)
+            formattedOutput = (output isa AbstractArray) ? vec(output) : output
+            show(IOContext(io, :compact=>true), formattedOutput)
+            print(io, " ::", typeof(output))
         else
-            print(io, " :: ", getOutputType(p))
+            print(io, "::", getOutputType(p))
         end
         print(io, ")")
     end
@@ -136,3 +139,6 @@ function show(io::IO, ::Type{ContextParamFunc{B, E, F}}) where
              {B<:Function, E<:Function, F<:Function}
     print(io, string("ContextParamFunc", "{", B, ", ", E, ", ", F, "}"))
 end
+
+show(io::IO, ::Type{DirectMemory{T, N}}) where {T, N} = 
+print(io, getObjNameStr(nameof(DirectMemory), "DirectMemory{$T, $N}"))
