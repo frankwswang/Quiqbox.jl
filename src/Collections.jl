@@ -163,6 +163,11 @@ setindex!(arr::VectorMemory, val, i::Int) = setindex!(arr.value, val, i)
 IndexStyle(::VectorMemory) = IndexLinear()
 #> Optional interface (better performance than the default implementation)
 zero(arr::VectorMemory{T, L}) where {T, L} = VectorMemory(zero(arr.value), Val(L))
+#>> Necessary for `copy` to return the same container type
+function similar(arr::VectorMemory, ::Type{T}=eltype(arr), 
+                 (len,)::Tuple{Int}=size(arr)) where {T}
+    VectorMemory(similar(arr.value, T, len), Val(len))
+end
 
 const LinearMemory{T} = Union{Memory{T}, VectorMemory{T}}
 
@@ -201,6 +206,7 @@ getindex(arr::ShapedMemory, i::Int) = getindex(arr.value, i)
 setindex!(arr::ShapedMemory, val, i::Int) = setindex!(arr.value, val, i)
 IndexStyle(::ShapedMemory) = IndexLinear()
 #> Optional interface
+#>> Necessary for `copy` to return the same container type
 function similar(arr::ShapedMemory, ::Type{T}=eltype(arr), 
                  shape::Tuple{Vararg{Int}}=size(arr)) where {T}
     ShapedMemory(similar(arr.value, T, prod(shape)), shape)
@@ -270,6 +276,11 @@ setindex!(arr::PackedMemory, val, i::Int) = setindex!(arr.value, val, i)
 IndexStyle(::PackedMemory) = IndexLinear()
 #> Additional interface
 ShapedMemory(arr::PackedMemory) = arr.value
+#>> Necessary for `copy` to return the same container type
+function similar(arr::DirectMemory, ::Type{T}=eltype(arr), 
+                 shape::Tuple{Vararg{Int}}=size(arr)) where {T}
+    PackedMemory(similar(arr.value, T, shape))
+end
 
 
 genPackMemoryType(::Type{T}) where {T} = T
