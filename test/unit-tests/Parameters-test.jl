@@ -71,7 +71,7 @@ p6 = genCellParam(p4, :e)
 
 v1Val = 0.5
 v1 = genTensorVar(v1Val, :α)
-@test symOf(v1) == :α
+@test symbolOf(v1) == :α
 v2Val = 1.1
 v2 = genTensorVar(v2Val, :β)
 @test obtain(v2) === v2.data[] === v2()
@@ -90,8 +90,8 @@ a1 = genCellParam(v1, :a)
 a1_2 = genCellParam(itself, (v1,), :a1)
 @test a1.lambda == a1_2.lambda
 @test a1.offset[] === zero(Float64)
-@test symOf(a1) == :a
-@test symOf(a1_2) == :a1
+@test symbolOf(a1) == :a
+@test symbolOf(a1_2) == :a1
 @test a1() == v1Val
 @test obtain(a1) == v1Val
 @test screenLevelOf(a1) == 0
@@ -129,7 +129,7 @@ a2in, _, a2out, a2self = dissectParam(a2)
 @test a2.offset[] == a1Val == a1.offset[] + v1Val
 
 v1ValNew = 0.9
-v1_2 = genTensorVar(v1(), symOf(v1), true)
+v1_2 = genTensorVar(v1(), symbolOf(v1), true)
 @test try setVal!(v1_2, v1ValNew) catch; true end
 setVal!(v1, v1ValNew)
 @test obtain(v1) == v1ValNew
@@ -361,8 +361,8 @@ pg1 = genHeapParam(pg1Input, :pl)
 
 @test obtain(pg1) == obtain.(pg1.input) == obtain.(pg1Input)
 @test compareParamBox(genHeapParam(pg1), pg1)
-pg1_2 = genHeapParam(copy(pg1Input), pg1.symbol)
-pg1_3 = genHeapParam(pg1Input, pg1.symbol)
+pg1_2 = genHeapParam(copy(pg1Input), Quiqbox.markerOf(pg1))
+pg1_3 = genHeapParam(pg1Input, Quiqbox.markerOf(pg1))
 pg1_4 = genHeapParam(pg1)
 @test compareParamBox(pg1_2, pg1)
 @test compareParamBox(pg1_3, pg1)

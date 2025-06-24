@@ -1,6 +1,6 @@
-export genTensorVar, genMeshParam, genHeapParam, genCellParam, compareParamBox, uniqueParams, 
-       dissectParam, setVal!, symOf, obtain, screenLevelOf, setScreenLevel!, inputOf, 
-       sortParams!, initializeSpanParamSet
+export genTensorVar, genMeshParam, genHeapParam, genCellParam, compareParamBox, 
+       uniqueParams, dissectParam, setVal!, symbolOf, obtain, screenLevelOf, 
+       setScreenLevel!, inputOf, sortParams!, initializeSpanParamSet
 
 const SymOrIndexedSym = Union{Symbol, IndexedSym}
 
@@ -73,39 +73,39 @@ end
 
 struct UnitVar{T} <: PrimitiveParam{T, T}
     data::AtomicUnit{T}
-    symbol::IndexedSym
+    marker::IndexedSym
     screen::Bool
 
-    function UnitVar(input::T, symbol::SymOrIndexedSym, screen::Bool=false) where {T}
+    function UnitVar(input::T, marker::SymOrIndexedSym, screen::Bool=false) where {T}
         checkPrimParamElementalType(T)
-        new{T}(AtomicUnit(input), IndexedSym(symbol), screen)
+        new{T}(AtomicUnit(input), IndexedSym(marker), screen)
     end
 end
 
 struct GridVar{T, N} <: PrimitiveParam{T, DirectMemory{T, N}}
     data::AtomicGrid{DirectMemory{T, N}}
-    symbol::IndexedSym
+    marker::IndexedSym
     screen::Bool
 
-    function GridVar(input::AbstractArray{T, N}, symbol::SymOrIndexedSym, 
+    function GridVar(input::AbstractArray{T, N}, marker::SymOrIndexedSym, 
                      screen::Bool=false) where {T, N}
         N < 1 && throw(AssertionError("`N` must be larger than zero."))
         checkPrimParamElementalType(T)
         input = PackedMemory(input) #> This performs a shallow copy
-        new{T, N}(AtomicGrid(input), IndexedSym(symbol), screen)
+        new{T, N}(AtomicGrid(input), IndexedSym(marker), screen)
     end
 end
 #> One should mask a `TensorVar` with a `ReduceParam` for adaptive screen levels
 const TensorVar{T} = Union{UnitVar{T}, GridVar{T}}
 
-genTensorVar(input::Any, symbol::SymOrIndexedSym, screen::Bool=false) = 
-UnitVar(input, symbol, screen)
+genTensorVar(input::Any, marker::SymOrIndexedSym, screen::Bool=false) = 
+UnitVar(input, marker, screen)
 
-genTensorVar(input::AbstractArray, symbol::SymOrIndexedSym, screen::Bool=false) = 
-GridVar(input, symbol, screen)
+genTensorVar(input::AbstractArray, marker::SymOrIndexedSym, screen::Bool=false) = 
+GridVar(input, marker, screen)
 
-genTensorVar(input::AbtArray0D, symbol::SymOrIndexedSym, screen::Bool=false) = 
-genTensorVar(first(input), symbol, screen)
+genTensorVar(input::AbtArray0D, marker::SymOrIndexedSym, screen::Bool=false) = 
+genTensorVar(first(input), marker, screen)
 
 
 getScreenLevelOptions(::Type{<:HeapParam}) = (0,)
@@ -114,24 +114,24 @@ screenLevelOf(p::HeapParam) = 0
 
 struct ShapedParam{T, E<:Pack{T}, N, P<:ParamBox{T, E}} <: HeapParam{T, E, N}
     input::ShapedMemory{P, N}
-    symbol::IndexedSym
+    marker::IndexedSym
 
-    function ShapedParam(input::ShapedMemory{P, N}, symbol::SymOrIndexedSym) where 
+    function ShapedParam(input::ShapedMemory{P, N}, marker::SymOrIndexedSym) where 
                         {T, E, P<:ParamBox{T, E}, N}
         N < 1 && throw(AssertionError("`N` must be larger than zero."))
         checkEmptiness(input.value, :input)
-        new{T, E, N, P}(copy(input), IndexedSym(symbol))
+        new{T, E, N, P}(copy(input), IndexedSym(marker))
     end
 end
 
 genHeapParam(input::AbstractArray{<:ParamBox{T, E}}, 
-             symbol::SymOrIndexedSym) where {T, E<:Pack{T}} = 
-ShapedParam(ShapedMemory(input), symbol)
+             marker::SymOrIndexedSym) where {T, E<:Pack{T}} = 
+ShapedParam(ShapedMemory(input), marker)
 
 genHeapParam(input::AbstractArray{<:ParamBox, 0}, ::SymOrIndexedSym) = first(input)
 
-genHeapParam(input::ShapedParam, symbol::IndexedSym=input.symbol) = 
-ShapedParam(input.input, symbol)
+genHeapParam(input::ShapedParam, marker::IndexedSym=input.marker) = 
+ShapedParam(input.input, marker)
 
 
 abstract type TypedTensorFunc{T, N} <: CompositeFunction end
@@ -395,15 +395,15 @@ end
 mutable struct ReduceParam{T, E<:Pack{T}, F<:Function, I<:CoreFixedParIn} <: CellParam{T, E}
     const lambda::TypedReduce{E, F}
     const input::I
-    const symbol::IndexedSym
+    const marker::IndexedSym
     @atomic screen::TernaryNumber
     const offset::AtomicUnit{E}
 
     function ReduceParam(lambda::TypedReduce{E, F}, input::I, 
-                         symbol::SymOrIndexedSym, screen::TernaryNumber=TUS0, 
+                         marker::SymOrIndexedSym, screen::TernaryNumber=TUS0, 
                          offset::Union{E, Missing}=missing) where 
                         {T, E<:Pack{T}, F, I<:CoreFixedParIn}
-        sym = IndexedSym(symbol)
+        sym = IndexedSym(marker)
         checkReduceParamLevel(lambda, input)
         offsetTuple = formatOffset(lambda, offset, input)
         if isempty(offsetTuple)
@@ -417,32 +417,32 @@ end
 
 const ScreenParam{T, E<:Pack{T}, P<:ParamBox{T, E}} = ReduceParam{T, E, ItsType, Tuple{P}}
 
-function genCellParam(func::Function, input::CoreFixedParIn, symbol::SymOrIndexedSym)
+function genCellParam(func::Function, input::CoreFixedParIn, marker::SymOrIndexedSym)
     lambda = formatTensorFunc(func, TypedReduce, input)
-    ReduceParam(lambda, input, symbol, TUS0, missing)
+    ReduceParam(lambda, input, marker, TUS0, missing)
 end
 
-function genCellParam(par::ReduceParam, symbol::SymOrIndexedSym=symOf(par))
+function genCellParam(par::ReduceParam, marker::SymOrIndexedSym=symbolOf(par))
     offset = isOffsetEnabled(par) ? copy(par.offset[]) : missing
-    ReduceParam(par.lambda, par.input, symbol, par.screen, offset)
+    ReduceParam(par.lambda, par.input, marker, par.screen, offset)
 end
 
-function genCellParam(input::UnitParam{T}, symbol::SymOrIndexedSym=symOf(input)) where {T}
-    ReduceParam(TypedReduce(T), (input,), symbol)
+function genCellParam(input::UnitParam{T}, marker::SymOrIndexedSym=symbolOf(input)) where {T}
+    ReduceParam(TypedReduce(T), (input,), marker)
 end
 
-function genCellParam(input::ParamBox{T, E}, symbol::SymOrIndexedSym=symOf(input)) where 
+function genCellParam(input::ParamBox{T, E}, marker::SymOrIndexedSym=symbolOf(input)) where 
                      {T, E<:PackedMemory{T}}
-    ReduceParam(TypedReduce(E), (input,), symbol)
+    ReduceParam(TypedReduce(E), (input,), marker)
 end
 
-genCellParam(var, varSym::SymOrIndexedSym, symbol::SymOrIndexedSym=varSym) = 
-genCellParam(genTensorVar(var, varSym), symbol)
+genCellParam(var, varSym::SymOrIndexedSym, marker::SymOrIndexedSym=varSym) = 
+genCellParam(genTensorVar(var, varSym), marker)
 
 
-indexedSymOf(p::ParamBox) = p.symbol #! -> `markerOf`
+markerOf(p::ParamBox) = p.marker
 
-symOf(p::ParamBox) = indexedSymOf(p).name #! -> `symbolOf`
+symbolOf(p::ParamBox) = markerOf(p).name
 
 inputOf(p::CompositeParam) = p.input
 
@@ -451,15 +451,15 @@ mutable struct ExpandParam{T, E<:Pack{T}, N, F<:Function, I<:CoreFixedParIn
                            } <: MeshParam{T, E, N}
     const lambda::TypedExpand{E, N, F}
     const input::I
-    const symbol::IndexedSym
+    const marker::IndexedSym
     @atomic screen::TernaryNumber
     const offset::AtomicGrid{PackedMemory{T, E, N}}
 
     function ExpandParam(lambda::TypedExpand{E, N, F}, input::I, 
-                         symbol::SymOrIndexedSym, screen::TernaryNumber=TUS0, 
+                         marker::SymOrIndexedSym, screen::TernaryNumber=TUS0, 
                          offset::Union{PackedMemory{T, E, N}, Missing}=missing
                          ) where {T, E<:Pack{T}, N, F, I<:CoreFixedParIn}
-        sym = IndexedSym(symbol)
+        sym = IndexedSym(marker)
         checkExpandParamLevel(lambda, input)
         offsetTuple = formatOffset(lambda, offset, input)
         if isempty(offsetTuple)
@@ -471,14 +471,14 @@ mutable struct ExpandParam{T, E<:Pack{T}, N, F<:Function, I<:CoreFixedParIn
     end
 end
 
-function genMeshParam(func::Function, input::CoreFixedParIn, symbol::SymOrIndexedSym)
+function genMeshParam(func::Function, input::CoreFixedParIn, marker::SymOrIndexedSym)
     lambda = formatTensorFunc(func, TypedExpand, input)
-    ExpandParam(lambda, input, IndexedSym(symbol), TUS0, missing)
+    ExpandParam(lambda, input, IndexedSym(marker), TUS0, missing)
 end
 
-function genMeshParam(par::ExpandParam, symbol::SymOrIndexedSym=symOf(par))
+function genMeshParam(par::ExpandParam, marker::SymOrIndexedSym=symbolOf(par))
     offset = isOffsetEnabled(par) ? par.offset : missing #!!!
-    ExpandParam(par.lambda, par.input, IndexedSym(symbol), par.screen, offset)
+    ExpandParam(par.lambda, par.input, IndexedSym(marker), par.screen, offset)
 end
 
 @generated function isScreenLevelChangeable(::Type{T}) where {T<:ParamBox}
@@ -496,7 +496,7 @@ end
 function indexParam(pb::ShapedParam, oneToIdx::Int, sym::MissingOr{Symbol}=missing)
     checkPositivity(oneToIdx)
     entry = pb.input[begin+oneToIdx-1]
-    if ismissing(sym) || sym==symOf(entry)
+    if ismissing(sym) || sym==symbolOf(entry)
         entry
     elseif entry isa MeshParam
         genMeshParam(entry, sym)
@@ -510,14 +510,14 @@ function indexParam(pb::SpanParam, oneToIdx::Int, sym::MissingOr{Symbol}=missing
     if oneToIdx > (getOutputSize(pb) |> prod)
         throw(BoundsError(pb, oneToIdx))
     end
-    ismissing(sym) && (sym = Symbol(symOf(pb), oneToIdx))
+    ismissing(sym) && (sym = Symbol(symbolOf(pb), oneToIdx))
     genCellParam(GetEntry(oneToIdx), (pb,), sym)
 end
 
 function indexParam(pb::UnitParam, oneToIdx::Int, sym::MissingOr{Symbol}=missing)
     if oneToIdx != 1
         throw(BoundsError(pb, oneToIdx))
-    elseif ismissing(sym) || sym == symOf(res)
+    elseif ismissing(sym) || sym == symbolOf(res)
         pb
     else
         genCellParam(pb, sym)
@@ -746,7 +746,7 @@ struct ParamMarker{T} <: IdentityMarker{BoxCoreType{T, ParamBox}}
         screen = :screen => markObj(sl)
         code = hash(screen.second, code)
 
-        sym = :symbol => markObj(sl > 0 ? symOf(param) : nameof(P))
+        sym = :marker => markObj(sl > 0 ? symbolOf(param) : nameof(P))
         code = hash(sym.second, code)
 
         meta = (offset, screen, sym)
@@ -1013,16 +1013,16 @@ end
 
 function markParam!(param::ParamBox, 
                     indexDict::AbstractDict{Symbol, Int}=Dict{Symbol, Int}())
-    sym = symOf(param)
+    sym = symbolOf(param)
     get!(indexDict, sym, 0)
-    param.symbol.index = (indexDict[sym] += 1)
+    param.marker.index = (indexDict[sym] += 1)
     nothing
 end
 
 
 function getParamOrderLabel(x::ParamBox)
     nl = getNestedLevel(x|>typeof)
-    (screenLevelOf(x), nl.level, symbolFrom(x.symbol), objectid(x))
+    (screenLevelOf(x), nl.level, symbolFrom(x.marker), objectid(x))
 end
 
 function sortParams!(params::AbstractVector{<:ParamBox}; 
@@ -1054,7 +1054,7 @@ UnitParamEncoder(T, symbol, TernaryNumber(screen))
 (f::UnitParamEncoder)(input::UnitParam) = itself(input)
 
 function (f::UnitParamEncoder{T})(input) where {T}
-    p = genCellParam(T(input), f.symbol)
+    p = genCellParam(convert(T, input), f.symbol)
     setScreenLevel!(p, Int(f.screen))
 end
 
@@ -1523,7 +1523,7 @@ function genParamFinisher(param::ReduceParam, screen::TernaryNumber=param.screen
     offsetPreset = isOffsetEnabled(param) ? param.offset[] : missing
     let offset=offsetPreset, f=(deepCopyLambda ? deepcopy(param.lambda) : param.lambda)
         function finishReduceParam(input::CoreFixedParIn)
-            ReduceParam(f, input, param.symbol, screen, offset)
+            ReduceParam(f, input, param.marker, screen, offset)
         end
     end
 end
@@ -1533,7 +1533,7 @@ function genParamFinisher(param::ExpandParam, screen::TernaryNumber=param.screen
     offsetPreset = isOffsetEnabled(param) ? param.offset[] : missing
     let offset=offsetPreset, f=(deepCopyLambda ? deepcopy(param.lambda) : param.lambda)
         function finishExpandParam(input::CoreFixedParIn)
-            ExpandParam(f, input, param.symbol, screen, offset)
+            ExpandParam(f, input, param.marker, screen, offset)
         end
     end
 end
@@ -1551,7 +1551,7 @@ returned (or ints inside) `ParamBox` will be screened.
 """
 function sever(param::SpanParam, screenSource::Bool=false)
     val = obtain(param)
-    genTensorVar(val, symOf(param), screenSource)
+    genTensorVar(val, symbolOf(param), screenSource)
 end
 
 sever(param::ParamBox, screenSource::Bool=false) = severCore(param, screenSource)
@@ -1560,7 +1560,7 @@ function severCore(param::ShapedParam, screenSource::Bool)
     severedInput = map(param.input) do ele
         sever(ele, screenSource)
     end
-    ShapedParam(severedInput, param.symbol)
+    ShapedParam(severedInput, param.marker)
 end
 
 function severCore(param::AdaptableParam, screenSource::Bool)

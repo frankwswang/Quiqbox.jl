@@ -168,7 +168,7 @@ GridVertex(AtomicGrid(val.value.value), active, marker)
 function genParamVertex(param::CompositeParam, 
                         reference::NothingOr{ParamBoxVertexDict}=nothing)
     sl = screenLevelOf(param)
-    sym = symOf(param)
+    sym = symbolOf(param)
     if sl > 0
         genParamVertexCore(param.offset, sl<2, sym)
     else
@@ -179,7 +179,7 @@ function genParamVertex(param::CompositeParam,
 end
 
 function genParamVertex(param::PrimitiveParam)
-    genParamVertexCore(param.data, screenLevelOf(param)<2, symOf(param))
+    genParamVertexCore(param.data, screenLevelOf(param)<2, symbolOf(param))
 end
 
 

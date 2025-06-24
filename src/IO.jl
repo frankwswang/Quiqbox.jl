@@ -48,7 +48,7 @@ Base.show(io::IO, ::MIME"text/plain", p::ParamBox) = showParamBox(False(), io, p
 function showParamBox(::B, io::IO, p::ParamBox) where {B<:Boolean}
     pType = typeof(p)
     pName = nameof(pType)
-    pSymbol = indexedSymOf(p)
+    pSymbol = markerOf(p)
     outerType = get(io, :typeinfo, Any)
     if pType <: outerType <: ParamBox
         if outerType == pType
@@ -56,21 +56,21 @@ function showParamBox(::B, io::IO, p::ParamBox) where {B<:Boolean}
         else
             print(io, "(")
             show(io, MIME("text/plain"), pSymbol)
-            print(io, "::", getObjNameStr(pName), ")")
+            print(io, " :: ", getObjNameStr(pName), ")")
         end
     elseif enableCompatShowFormat(B(), io)
         print(io, pType, "(…)")
     else
         print(io, "(")
         show(io, MIME("text/plain"), pSymbol)
-        print(io, "::", getObjNameStr(pName), ")")
+        print(io, " :: ", getObjNameStr(pName), ")")
         level = screenLevelOf(p)
         relationStr = (level==0 ? " ==> " : (level==1 ? " <=> " : " <== "))
         print(io, relationStr, "(")
         if level > 0
             show(IOContext(io, :compact=>true), obtain(p))
         else
-            print(io, "::", getOutputType(p))
+            print(io, " :: ", getOutputType(p))
         end
         print(io, ")")
     end
