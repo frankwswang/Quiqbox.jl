@@ -5,6 +5,11 @@ using Quiqbox: TypedReduce, TypedExpand, getCellOutputLevels, UnitParam, GridPar
 
 @testset "Parameters.jl" begin
 
+pv1 = genTensorVar(1, :a)
+pv2 = genTensorVar(1, :a)
+@test Quiqbox.ParamMarker(pv1) != Quiqbox.ParamMarker(pv2)
+@test !Quiqbox.compareParamBox(pv1, pv2)
+
 absTyped1 = TypedReduce(abs, Float64)
 tf_data1 = -1.1
 @test absTyped1(tf_data1) == abs(tf_data1)
@@ -69,7 +74,7 @@ v1 = genTensorVar(v1Val, :α)
 @test symOf(v1) == :α
 v2Val = 1.1
 v2 = genTensorVar(v2Val, :β)
-@test obtain(v2) === v2.input === v2()
+@test obtain(v2) === v2.data[] === v2()
 v1_g, s1 = transpileParam(v1)
 @test s1.unit[] === v1
 @test s1 == Quiqbox.initializeSpanParamSet(v1)
@@ -84,7 +89,7 @@ s1v = obtain(s1)
 a1 = genCellParam(v1, :a)
 a1_2 = genCellParam(itself, (v1,), :a1)
 @test a1.lambda == a1_2.lambda
-@test a1.offset === zero(Float64)
+@test a1.offset[] === zero(Float64)
 @test symOf(a1) == :a
 @test symOf(a1_2) == :a1
 @test a1() == v1Val
@@ -104,9 +109,9 @@ a1in, a1mid, a1out, a1self = dissectParam(a1)
 @test a1out[] === a1
 @test a1.input isa Tuple{Quiqbox.TensorVar{Float64}}
 @test (first∘first∘dissectParam)(a1)[] === first(a1.input)
-@test a1.offset == 0
+@test a1.offset[] == 0
 a1Offset = 0.25
-@atomic a1.offset = a1Offset
+a1.offset[] = a1Offset
 a1Val = v1Val + a1Offset
 @test a1() == a1Val
 @test obtain(a1) == a1Val
@@ -120,26 +125,26 @@ a2 = setScreenLevel!(genCellParam(a1), 1)
 a2in, _, a2out, a2self = dissectParam(a2)
 @test all(isempty(i) for i in a2in) && isempty(a2out)
 @test collect(a2self)[] === a2
-@test obtain(a2) == a2.offset
-@test a2.offset == a1Val == a1.offset + v1Val
+@test obtain(a2) == a2.offset[]
+@test a2.offset[] == a1Val == a1.offset[] + v1Val
 
 v1ValNew = 0.9
 v1_2 = genTensorVar(v1(), symOf(v1), true)
 @test try setVal!(v1_2, v1ValNew) catch; true end
 setVal!(v1, v1ValNew)
 @test obtain(v1) == v1ValNew
-@atomic a1.offset = 0.0
+a1.offset[] = 0.0
 @test obtain(a1) == v1ValNew
-@test a2.offset == obtain(a2) == v1Val + a1Offset
+@test a2.offset[] == obtain(a2) == v1Val + a1Offset
 @test obtain(inputOf(a2)[1]) == v1ValNew
 @test obtain(a2) == a1Val
 setScreenLevel!(a2, 0)
 @test a1.input[1] === a2.input[1]
 @test obtain(a2) == a1Val
-@test a2.offset == a1Val - a1() == a2() - v1ValNew
+@test a2.offset[] == a1Val - a1() == a2() - v1ValNew
 setScreenLevel!(a2, 1)
 @test a1.input[1] === a2.input[1]
-@test obtain(a2) == a1Val == a2.offset
+@test obtain(a2) == a1Val == a2.offset[]
 @test obtain(inputOf(a2)[1]) == v1ValNew
 
 t1Val = (1.1, 2.2, 3.3)
@@ -148,15 +153,15 @@ map1 = x->x.^2
 a3 = genCellParam(map1, (t1,), :T1)
 a3Val = obtain(a3)
 @test a3Val == map1(t1Val)
-@test a3.offset == (0.0, 0.0, 0.0)
+@test a3.offset[] == (0.0, 0.0, 0.0)
 setScreenLevel!(a3, 2)
-@test a3.offset == a3Val
-@test a3.offset == a3Val == obtain(a3)
+@test a3.offset[] == a3Val
+@test a3.offset[] == a3Val == obtain(a3)
 setScreenLevel!(a3, 1)
-@test a3.offset == a3Val
-@test a3.offset == a3Val == obtain(a3)
+@test a3.offset[] == a3Val
+@test a3.offset[] == a3Val == obtain(a3)
 setScreenLevel!(a3, 0)
-@test a3.offset == (0.0, 0.0, 0.0)
+@test a3.offset[] == (0.0, 0.0, 0.0)
 
 struct myS{T}
     a::T
@@ -188,9 +193,9 @@ n1_3 = genCellParam(x->map(y->y.^2, x), (n1_2,), :N)
 f1 = x->x[1]*x[2]^3+1.0
 v12 = genHeapParam([v1, v2], :v12)
 b1 = genCellParam(f1, (v12,), :b)
-@test b1.offset == 0
+@test b1.offset[] == 0
 b1Offset = 0.1
-@atomic b1.offset = b1Offset
+b1.offset[] = b1Offset
 f1_bias = (x)->(f1(x) + b1Offset)
 b1Val = f1_bias( obtain(v12) )
 @test b1() == b1Val
@@ -204,8 +209,8 @@ b3 = setScreenLevel!(genCellParam(b1), 2)
 @test b1Val == b2() == b3()
 @test screenLevelOf(b2) == 1
 @test screenLevelOf(b3) == 2
-@test b2.offset == obtain(b2)
-@test b3.offset == obtain(b3)
+@test b2.offset[] == obtain(b2)
+@test b3.offset[] == obtain(b3)
 
 f2(x) = 2x[1] * exp(x[1] + x[5]) - x[2]/(1 + (x[3] - x[4])^2)
 pars_f2 = genHeapParam([a1, v2, b1, b2, b3], :pars_f2)
@@ -437,13 +442,13 @@ xMat = genTensorVar(rand(3,3), :x)
 xEle = Quiqbox.indexParam(xMat, 5, :xpn5)
 f_xEle, ps_xEle = Quiqbox.genParamMapper((pb=xEle,))
 ps_xEle == Quiqbox.initializeSpanParamSet(xMat)
-f_xEle(obtain(ps_xEle)) == (pb=xMat.input[5],) == (pb=obtain(xEle),)
+f_xEle(obtain(ps_xEle)) == (pb=xMat.data[][5],) == (pb=obtain(xEle),)
 
 xpn1 = genCellParam(1.1, :xpn)
 setScreenLevel!(xpn1, 2)
 gf1 = Quiqbox.GaussFunc(xpn1)
 fCore, pSet = Quiqbox.unpackFunc(sqrt ∘ gf1)
-fCore isa Quiqbox.InputConverter
-pSet isa Quiqbox.OptSpanParamSet
+@test fCore isa Quiqbox.VoidParamBindFunc
+@test pSet isa Quiqbox.OptSpanParamSet
 
 end

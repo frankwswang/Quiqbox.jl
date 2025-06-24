@@ -17,6 +17,10 @@ for (ele, m, n) in zip(vecMem1, LinearIndices(vecMem1), eachindex(vecMem1))
     @test m==n && vecMem1[m] == ele
 end
 @test zero(vecMem1) == zeros(3)
+vecMem1c = copy(vecMem1)
+@test vecMem1c == vecMem1 && typeof(vecMem1c) == typeof(vecMem1)
+vecMem1c[1] += 1
+@test vecMem1c != vecMem1
 
 
 shpMem1 = ShapedMemory(rand(2, 3, 1))
@@ -49,6 +53,10 @@ shpMem6 = shpMem3 - shpMem4
 @test shpMem5 == [0.0, 3.0]
 @test shpMem6 == [2.0,-1.0]
 @test typeof(shpMem5) == typeof(shpMem6) == ShapedMemory{Float64, 1}
+shpMem1c = copy(shpMem1)
+@test shpMem1c == shpMem1 && typeof(shpMem1c) == typeof(shpMem1)
+shpMem1c[1] += 1
+@test shpMem1c != shpMem1
 
 pckMem1 = PackedMemory(shpMem1)
 @test getNestedLevel(pckMem1|>typeof).level == 1
@@ -68,6 +76,11 @@ pckMem4 = PackedMemory([mat1, mat1])
 @test all(pckMem4 .== Ref(mat1))
 @test !any(pckMem4 .=== Ref(mat1))
 @test try PackedMemory([mat1, pckMem3]) catch; true end
+pckMem1 isa Quiqbox.DirectMemory{Float64, ndims(shpMem1)}
+pckMem1c = copy(pckMem1)
+@test pckMem1c == pckMem1 && typeof(pckMem1c) == typeof(pckMem1)
+pckMem1c[1] += 1
+@test pckMem1c != pckMem1
 
 @test eltype(pckMem1) == eltype(pckMem2) == Float64
 @test typeof(pckMem1) <: eltype(pckMem3)

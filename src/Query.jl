@@ -448,3 +448,51 @@ end
 
 
 struct NullCache{T} <: CustomCache{T} end
+
+
+mutable struct AtomicUnit{T} <: QueryBox{T}
+    @atomic value::T
+
+    function AtomicUnit(input::T) where {T}
+        new{T}(input)
+    end
+end
+
+struct AtomicGrid{E<:AbstractMemory} <: QueryBox{E}
+    value::E
+end
+
+
+const AtomicLocker{T} = Union{AtomicUnit{T}, AtomicGrid{T}}
+
+==(ab1::AtomicLocker, ab2::AtomicLocker) = (ab1.value == ab2.value)
+
+function hash(ab::AtomicLocker, hashCode::UInt)
+    hash(objectid(ab.value), hash(typeof(ab), hashCode))
+end
+
+getindex(l::AtomicLocker) = l.value
+
+
+atomicEval(obj) = itself(obj)
+
+atomicEval(box::AtomicLocker) = box[]
+
+
+function safelySetVal!(box::AtomicUnit, val)
+    @atomic box.value = val
+end
+
+function safelySetVal!(box::AtomicGrid, val)
+    safelySetVal!(box.value, val)
+end
+
+function safelySetVal!(box::AbstractArray, val)
+    lk = ReentrantLock()
+    lock(lk) do
+        box .= val
+    end
+    box
+end
+
+setindex!(al::AtomicLocker, val) = safelySetVal!(al, val)

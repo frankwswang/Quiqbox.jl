@@ -1,5 +1,6 @@
 using Test
 using Quiqbox
+using Quiqbox: GridVertex, genVertexCaller
 
 @testset "Graphs.jl" begin
 
@@ -15,5 +16,18 @@ f = ParamGraphCaller(v1)
 
 @test f(initializeSpanParamSet(nothing)) == v1()
 @test f(( unit=nothing, grid=Quiqbox.genBottomMemory() )) == v1()
+
+gv1 = GridVertex(Quiqbox.AtomicGrid([1, 2] |> ShapedMemory), true, :a)
+gv2 = GridVertex(Quiqbox.AtomicGrid([1, 2] |> ShapedMemory), true, :a)
+gv3 = GridVertex(Quiqbox.AtomicGrid([1, 2] |> ShapedMemory), true, :b)
+
+@test gv1 != gv2
+@test Quiqbox.markObj(gv1) == Quiqbox.markObj(gv2)
+@test gv1 != gv3
+@test Quiqbox.markObj(gv1) != Quiqbox.markObj(gv3)
+gv1f = genVertexCaller(gv1)
+gv2f = genVertexCaller(gv2)
+gv3f = genVertexCaller(gv3)
+@test Quiqbox.markObj(gv1f) == Quiqbox.markObj(gv2f) == Quiqbox.markObj(gv3f)
 
 end
