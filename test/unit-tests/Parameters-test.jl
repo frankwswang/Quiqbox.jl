@@ -1,7 +1,8 @@
 using Test
 using Quiqbox
 using LinearAlgebra
-using Quiqbox: TypedReduce, TypedExpand, getCellOutputLevels, UnitParam, GridParam
+using Quiqbox: TypedReduce, TypedExpand, getScreenLevelOptionsCore, getCellOutputLevels, 
+               UnitParam, GridParam
 
 @testset "Parameters.jl" begin
 
@@ -9,6 +10,10 @@ pv1 = genTensorVar(1, :a)
 pv2 = genTensorVar(1, :a)
 @test Quiqbox.ParamMarker(pv1) != Quiqbox.ParamMarker(pv2)
 @test !Quiqbox.compareParamBox(pv1, pv2)
+pvs = [pv1, pv2]
+@test getfield.(Quiqbox.markerOf.(pvs), :index) == [0, 0]
+sortParams!(pvs)
+@test getfield.(Quiqbox.markerOf.(pvs), :index) == [1, 2]
 
 absTyped1 = TypedReduce(abs, Float64)
 tf_data1 = -1.1
@@ -48,6 +53,13 @@ evenExpandTyped1 = TypedExpand(evenExpand, Float64, (1.1,))
 @test evenExpandTyped1(-1.2) == evenExpand(-1.2)
 evenExpandTyped2 = TypedExpand(evenExpandTyped1)
 @test evenExpandTyped2 === evenExpandTyped1
+
+@test getScreenLevelOptionsCore(Array) == (0,)
+@test getScreenLevelOptionsCore(Tuple{Int}) == (0, 1, 2)
+dMemType = Quiqbox.DirectMemory{Int, 2}
+@test getScreenLevelOptionsCore(dMemType) == (0, 1, 2)
+@test getScreenLevelOptionsCore(Quiqbox.DirectMemory{Tuple{Int}, 1}) == (0, 1, 2)
+@test getScreenLevelOptionsCore(Quiqbox.PackedMemory{Int, dMemType}) == (0,)
 
 p1 = genTensorVar(1, :a)
 p2 = genTensorVar([2], :b)

@@ -67,7 +67,7 @@ end
 
 function checkPrimParamElementalType(::Type{T}) where 
                                     {T<:Union{Nothing, Missing, IdentityMarker}}
-    throw(AssertionError("`T::Type{$T}` is not supported"))
+    throw(AssertionError("`T::Type{$T}` is not supported."))
 end
 
 
@@ -227,7 +227,7 @@ end
 function getScreenLevelOptionsCore(::Type{E}) where {E}
     Tuple(0:(checkParamOffsetMethods(E) * 2))
 end
-# ParamBoxes with nested data cannot have screen level higher than 0
+#> ParamBoxes with nested data (nested level > 1) cannot have screen level higher than 0
 function getScreenLevelOptionsCore(::Type{E}) where {E<:AbstractArray}
     nl = getNestedLevel(E)
     if nl.level > 1
@@ -296,7 +296,7 @@ function getTensorOutputShape(f::TypedReduce{E}, input::CoreFixedParIn) where
         size(f(obtain.(input)...))
     end
 end
-#! Simplify this
+
 function formatOffset(lambda::TypedTensorFunc{<:Pack}, ::Missing, input::CoreFixedParIn)
     outType = getTensorOutputTypeBound(lambda)
     if getScreenLevelOptionsCore(outType) == (0,)
@@ -305,8 +305,10 @@ function formatOffset(lambda::TypedTensorFunc{<:Pack}, ::Missing, input::CoreFix
         val = if outType <: Number
             zero(outType)
         elseif outType <: AbstractArray{<:Number}
-            shape = getTensorOutputShape(lambda, input)
-            PackedMemory(zeros(eltype(outType), shape))
+            eleType = eltype(outType)
+            res = PackedMemory{eleType}(undef, getTensorOutputShape(lambda, input))
+            res .= zero(eleType)
+            res
         else
             buffer = lambda(obtain.(input)...)
             res = unitOp(-, buffer, buffer)
@@ -323,21 +325,19 @@ function formatOffset(lambda::TypedTensorFunc{<:Pack}, offset, input::CoreFixedP
     else
         val = if outType <: AbstractArray
             nl = getNestedLevel(outType)
+
             if nl != getNestedLevel(offset|>typeof)
                 cT = getCoreType(nl)
                 throw(AssertionError("The nested level and the core type of `offset` "*
                                      "should be `$(nl.level)` and `$cT`, respectively."))
             end
 
-            if eltype(outType) <: Number
-                size(offset) == getTensorOutputShape(lambda, input)
-            else
-                buffer = lambda(obtain.(input)...)
-                #! Might not need `recursiveCompareSize` since nested array is disallowed
-                recursiveCompareSize(buffer, offset)
-            end || throw(DimensionMismatch("The shape of `offset` does not match that "*
-                                            "of `lambda`'s returned value."))
-            PackedMemory(offset)
+            if size(offset) != getTensorOutputShape(lambda, input)
+                throw(DimensionMismatch("The shape of `offset` does not match that of "*
+                                        "`lambda`'s returned value."))
+            end
+
+            PackedMemory(offset) #> This performs a shallow copy
         else
             convert(outType, offset)
         end
