@@ -570,13 +570,10 @@ getOutputType(::Type{<:ParamBox{T, E}}) where {T, E<:Pack{T}} = getPackType(E)
 
 getOutputType(::Type{<:PrimitiveParam{T, E}}) where {T, E<:Pack{T}} = E
 
-function getOutputType(::Type{<:HeapParam{T, E, N}}) where {T, E<:Pack{T}, N}
-    innerType = getPackType(E)
-    if isconcretetype(innerType)
-        AbstractArray{innerType, N}
-    else
-        AbstractArray{<:innerType, N}
-    end
+function getOutputType(::Type{<:ShapedParam{T, E, N, P}}) where 
+                      {T, E<:Pack{T}, N, P<:ParamBox{T, E}}
+    innerType = getOutputType(P)
+    genParametricType(ShapedMemory, (;T=innerType, N))
 end
 
 const ParamEgalBox = EgalBox{ParamBox}
@@ -691,7 +688,7 @@ function obtain(param::CompositeParam)
     end |> decoupledCopy
 end
 
-obtain(param::PrimitiveParam) = decoupledCopy(param.data[])
+obtain(param::PrimitiveParam) = decoupledCopy(param.data[])::getOutputType(param)
 
 function obtain(params::ParamBoxAbtArr)
     if isempty(params)

@@ -2,7 +2,7 @@ using Test
 using Quiqbox
 using LinearAlgebra
 using Quiqbox: TypedReduce, TypedExpand, getScreenLevelOptionsCore, getCellOutputLevels, 
-               UnitParam, GridParam
+               UnitParam, GridParam, getOutputType
 
 @testset "Parameters.jl" begin
 
@@ -430,10 +430,15 @@ x1 = genTensorVar(1.0, :x)
 x2 = genTensorVar(1.1, :x)
 x3 = genTensorVar(1.2, :x)
 v1 = genHeapParam([x1, x2, x3], :v)
+@test v1() isa getOutputType(v1)
 v2 = genTensorVar([2.0], :v)
+@test v2() isa getOutputType(v2)
 v3 = genHeapParam([v1, v2], :v)
+@test v3() isa getOutputType(v3)
 v4 = genHeapParam([v3], :v)
+@test v4() isa getOutputType(v4)
 v5 = genHeapParam([v4], :v)
+@test v5() isa getOutputType(v5)
 c1 = genCellParam(x1, :c)
 c1 |> obtain
 c2 = genCellParam(1.1, :c)
