@@ -31,6 +31,8 @@ mat = rand(3, 3)
 sf = Storage(mat, :mat)
 @test sf() === sf(addF64) === mat
 @test getOutputType(sf) == Matrix{Float64}
+@test Quiqbox.markObj(Quiqbox.Storage([1])) == 
+      Quiqbox.markObj(Quiqbox.Storage([1]|>Quiqbox.genMemory))
 
 # `BinaryReduce`
 br1 = BinaryReduce(tb1, *)

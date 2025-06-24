@@ -158,7 +158,7 @@ function initializeReceptor(param::ShapedParam,
     receptor
 end
 
-
+#> `genParamVertex` will reference rather than copy the core data from the input `ParamBox`
 genParamVertexCore(val::AtomicUnit, active::Bool, marker::Symbol) = 
 UnitVertex(val, active, marker)
 
