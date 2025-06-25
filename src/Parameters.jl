@@ -55,7 +55,7 @@ checkScreenLevel(Int(s), levels)
 
 getScreenLevelOptions(::Type{<:PrimitiveParam}) = (1, 2)
 
-screenLevelOf(p::PrimitiveParam) = Int(p.screen + 1)
+screenLevelOf(p::PrimitiveParam) = (p.screen + 1)
 
 function checkPrimParamElementalType(::Type{T}) where {T}
     if !canDirectlyStoreInstanceOf(T)
@@ -244,7 +244,7 @@ getScreenLevelOptionsCore(E)
 getScreenLevelOptions(::Type{<:MeshParam{T, E}}) where {T, E<:Pack{T}} = 
 getScreenLevelOptionsCore(PackedMemory{T, E})
 
-screenLevelOf(p::AdaptableParam) = Int(p.screen[])
+screenLevelOf(p::AdaptableParam) = Int(p.screen)
 
 
 function unitAdd(a::NonEmptyTuple{Number, N}, b::NonEmptyTuple{Number, N}) where {N}
@@ -392,12 +392,12 @@ function checkExpandParamLevel(lambda::TypedExpand{<:Pack}, ::CoreFixedParIn{T, 
 end
 
 
-struct ReduceParam{T, E<:Pack{T}, F<:Function, I<:CoreFixedParIn} <: CellParam{T, E}
-    lambda::TypedReduce{E, F}
-    input::I
-    marker::IndexedSym
-    screen::AtomicUnit{TernaryNumber}
-    offset::AtomicUnit{E}
+mutable struct ReduceParam{T, E<:Pack{T}, F<:Function, I<:CoreFixedParIn} <: CellParam{T, E}
+    const lambda::TypedReduce{E, F}
+    const input::I
+    const marker::IndexedSym
+    @atomic screen::TernaryNumber
+    const offset::AtomicUnit{E}
 
     function ReduceParam(lambda::TypedReduce{E, F}, input::I, 
                          marker::SymOrIndexedSym, screen::TernaryNumber=TUS0, 
@@ -407,10 +407,10 @@ struct ReduceParam{T, E<:Pack{T}, F<:Function, I<:CoreFixedParIn} <: CellParam{T
         checkReduceParamLevel(lambda, input)
         offsetTuple = formatOffset(lambda, offset, input)
         if isempty(offsetTuple)
-            new{T, E, F, I}(lambda, input, sym, AtomicUnit(screen))
+            new{T, E, F, I}(lambda, input, sym, screen)
         else
             offsetBlock = AtomicUnit(offsetTuple|>first)
-            new{T, E, F, I}(lambda, input, sym, AtomicUnit(screen), offsetBlock)
+            new{T, E, F, I}(lambda, input, sym, screen, offsetBlock)
         end
     end
 end
@@ -424,7 +424,7 @@ end
 
 function genCellParam(par::ReduceParam, marker::SymOrIndexedSym=symbolOf(par))
     offset = isOffsetEnabled(par) ? copy(par.offset[]) : missing
-    ReduceParam(par.lambda, par.input, marker, par.screen[], offset)
+    ReduceParam(par.lambda, par.input, marker, par.screen, offset)
 end
 
 function genCellParam(input::UnitParam{T}, marker::SymOrIndexedSym=symbolOf(input)) where {T}
@@ -447,12 +447,13 @@ symbolOf(p::ParamBox) = markerOf(p).name
 inputOf(p::CompositeParam) = p.input
 
 
-struct ExpandParam{T, E<:Pack{T}, N, F<:Function, I<:CoreFixedParIn} <: MeshParam{T, E, N}
-    lambda::TypedExpand{E, N, F}
-    input::I
-    marker::IndexedSym
-    screen::AtomicUnit{TernaryNumber}
-    offset::AtomicGrid{PackedMemory{T, E, N}}
+mutable struct ExpandParam{T, E<:Pack{T}, N, F<:Function, I<:CoreFixedParIn
+                           } <: MeshParam{T, E, N}
+    const lambda::TypedExpand{E, N, F}
+    const input::I
+    const marker::IndexedSym
+    @atomic screen::TernaryNumber
+    const offset::AtomicGrid{PackedMemory{T, E, N}}
 
     function ExpandParam(lambda::TypedExpand{E, N, F}, input::I, 
                          marker::SymOrIndexedSym, screen::TernaryNumber=TUS0, 
@@ -462,10 +463,10 @@ struct ExpandParam{T, E<:Pack{T}, N, F<:Function, I<:CoreFixedParIn} <: MeshPara
         checkExpandParamLevel(lambda, input)
         offsetTuple = formatOffset(lambda, offset, input)
         if isempty(offsetTuple)
-            new{T, E, N, F, I}(lambda, input, sym, AtomicUnit(screen))
+            new{T, E, N, F, I}(lambda, input, sym, screen)
         else
             offsetBlock = AtomicGrid(offsetTuple|>first)
-            new{T, E, N, F, I}(lambda, input, sym, AtomicUnit(screen), offsetBlock)
+            new{T, E, N, F, I}(lambda, input, sym, screen, offsetBlock)
         end
     end
 end
@@ -477,7 +478,7 @@ end
 
 function genMeshParam(par::ExpandParam, marker::SymOrIndexedSym=symbolOf(par))
     offset = isOffsetEnabled(par) ? par.offset[] : missing
-    ExpandParam(par.lambda, par.input, IndexedSym(marker), par.screen[], offset)
+    ExpandParam(par.lambda, par.input, IndexedSym(marker), par.screen, offset)
 end
 
 @generated function isScreenLevelChangeable(::Type{T}) where {T<:ParamBox}
@@ -537,7 +538,7 @@ function setScreenLevel!(p::AdaptableParam, level::Int)
         newVal = p.lambda((obtain(arg) for arg in p.input)...)
         safelySetVal!(p.offset, unitOp(-, p.offset[], newVal))
     end
-    p.screen[] = TernaryNumber(level)
+    @atomic p.screen = TernaryNumber(level)
     p
 end
 
@@ -1514,7 +1515,7 @@ function unpackFunc!(f::Function, paramSet::OptSpanParamSet;
 end
 
 
-function genParamFinisher(param::ReduceParam, screen::TernaryNumber=param.screen[]; 
+function genParamFinisher(param::ReduceParam, screen::TernaryNumber=param.screen; 
                           deepCopyLambda::Bool=false)
     offsetPreset = isOffsetEnabled(param) ? param.offset[] : missing
     let offset=offsetPreset, f=(deepCopyLambda ? deepcopy(param.lambda) : param.lambda)
@@ -1524,7 +1525,7 @@ function genParamFinisher(param::ReduceParam, screen::TernaryNumber=param.screen
     end
 end
 
-function genParamFinisher(param::ExpandParam, screen::TernaryNumber=param.screen[]; 
+function genParamFinisher(param::ExpandParam, screen::TernaryNumber=param.screen; 
                           deepCopyLambda::Bool=false)
     offsetPreset = isOffsetEnabled(param) ? param.offset[] : missing
     let offset=offsetPreset, f=(deepCopyLambda ? deepcopy(param.lambda) : param.lambda)
