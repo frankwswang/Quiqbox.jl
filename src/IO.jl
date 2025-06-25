@@ -24,7 +24,13 @@ end
 
 
 function getObjNameStr(objName::Symbol, objAlias::AbstractString=string(objName))
-    (Base.isexported(Quiqbox, objName) ? "" : string(nameof(Quiqbox), ".")) * objAlias
+    addPrefix = if isdefined(Quiqbox, objName)
+        isequal((parentmodule∘getfield)(Quiqbox, objName), Quiqbox) && 
+                Base.isexported(Quiqbox, objName)
+    else
+        false
+    end
+    (addPrefix ? string(nameof(Quiqbox), ".") : "") * objAlias
 end
 
 function enableCompatShowFormat(::B, io::IO) where {B<:Boolean}
