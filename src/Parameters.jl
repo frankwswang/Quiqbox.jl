@@ -477,7 +477,7 @@ function genMeshParam(func::Function, input::CoreFixedParIn, marker::SymOrIndexe
 end
 
 function genMeshParam(par::ExpandParam, marker::SymOrIndexedSym=symbolOf(par))
-    offset = isOffsetEnabled(par) ? par.offset : missing #!!!
+    offset = isOffsetEnabled(par) ? par.offset[] : missing
     ExpandParam(par.lambda, par.input, IndexedSym(marker), par.screen, offset)
 end
 
