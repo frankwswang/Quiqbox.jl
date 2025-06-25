@@ -440,7 +440,8 @@ function genParamMapper(params::DirectParamSource,
     checkEmptiness(params, :params)
     mapper = map(params) do param
         # if !getTypeValue(activeTranspilation) && isActiveSpanParam(param)
-        if !getTypeValue(activeTranspilation) && screenLevelOf(param) == 1
+        # if !getTypeValue(activeTranspilation) && screenLevelOf(param) == 1
+        if screenLevelOf(param) == 1
             paramIndexer = locateParam!(paramSet!Self, param)
             TypedReturn(GetEntry(paramIndexer), getOutputType(param))
         else
