@@ -75,6 +75,10 @@ struct True  <: ValueType end
 struct False <: ValueType end
 const Boolean = Union{True, False}
 
+negate(::True) = False()
+negate(::False) = True()
+
+
 getTypeValue(::Type{True }) = true
 getTypeValue(::Type{False}) = false
 

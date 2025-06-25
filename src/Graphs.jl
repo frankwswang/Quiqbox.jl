@@ -430,11 +430,16 @@ const ParamMapper{F<:FunctionChainUnion{ParamMapperCore}} = ChainMapper{F}
 const NamedParamMapper{S, F<:NamedTuple{ S, <:NonEmptyTuple{ParamMapperCore} }} = 
       ParamMapper{F}
 
-function genParamMapper(params::DirectParamSource; 
+function isActiveSpanParam(param::ParamBox)
+    (param isa SpanParam) && (screenLevelOf(param) < 2)
+end
+
+function genParamMapper(params::DirectParamSource, 
+                        activeTranspilation::Boolean=True(); 
                         paramSet!Self::OptSpanParamSet=initializeSpanParamSet())
     checkEmptiness(params, :params)
     mapper = map(params) do param
-        if screenLevelOf(param) == 1
+        if !getTypeValue(activeTranspilation) && isActiveSpanParam(param)
             paramIndexer = locateParam!(paramSet!Self, param)
             TypedReturn(GetEntry(paramIndexer), getOutputType(param))
         else
