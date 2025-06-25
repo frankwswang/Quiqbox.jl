@@ -71,6 +71,7 @@ function checkPrimParamElementalType(::Type{T}) where
 end
 
 
+#> `mutable struct` with `const` fields does not provide noticeable performance boost
 struct UnitVar{T} <: PrimitiveParam{T, T}
     data::AtomicUnit{T}
     marker::IndexedSym
@@ -82,6 +83,7 @@ struct UnitVar{T} <: PrimitiveParam{T, T}
     end
 end
 
+#> `mutable struct` with `const` fields does not provide noticeable performance boost
 struct GridVar{T, N} <: PrimitiveParam{T, DirectMemory{T, N}}
     data::AtomicGrid{DirectMemory{T, N}}
     marker::IndexedSym
