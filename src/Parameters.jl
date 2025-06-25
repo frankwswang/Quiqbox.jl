@@ -71,10 +71,10 @@ function checkPrimParamElementalType(::Type{T}) where
 end
 
 
-mutable struct UnitVar{T} <: PrimitiveParam{T, T}
-    const data::AtomicUnit{T}
-    const marker::IndexedSym
-    const screen::Bool
+struct UnitVar{T} <: PrimitiveParam{T, T}
+    data::AtomicUnit{T}
+    marker::IndexedSym
+    screen::Bool
 
     function UnitVar(input::T, marker::SymOrIndexedSym, screen::Bool=false) where {T}
         checkPrimParamElementalType(T)
@@ -82,10 +82,10 @@ mutable struct UnitVar{T} <: PrimitiveParam{T, T}
     end
 end
 
-mutable struct GridVar{T, N} <: PrimitiveParam{T, DirectMemory{T, N}}
-    const data::AtomicGrid{DirectMemory{T, N}}
-    const marker::IndexedSym
-    const screen::Bool
+struct GridVar{T, N} <: PrimitiveParam{T, DirectMemory{T, N}}
+    data::AtomicGrid{DirectMemory{T, N}}
+    marker::IndexedSym
+    screen::Bool
 
     function GridVar(input::AbstractArray{T, N}, marker::SymOrIndexedSym, 
                      screen::Bool=false) where {T, N}
