@@ -71,6 +71,7 @@ function checkPrimParamElementalType(::Type{T}) where
 end
 
 
+#> `mutable struct` with `const` fields does not provide noticeable performance boost
 struct UnitVar{T} <: PrimitiveParam{T, T}
     data::AtomicUnit{T}
     marker::IndexedSym
@@ -82,6 +83,7 @@ struct UnitVar{T} <: PrimitiveParam{T, T}
     end
 end
 
+#> `mutable struct` with `const` fields does not provide noticeable performance boost
 struct GridVar{T, N} <: PrimitiveParam{T, DirectMemory{T, N}}
     data::AtomicGrid{DirectMemory{T, N}}
     marker::IndexedSym
@@ -392,6 +394,7 @@ function checkExpandParamLevel(lambda::TypedExpand{<:Pack}, ::CoreFixedParIn{T, 
 end
 
 
+#> `mutable struct` with `const` fields provides better performance
 mutable struct ReduceParam{T, E<:Pack{T}, F<:Function, I<:CoreFixedParIn} <: CellParam{T, E}
     const lambda::TypedReduce{E, F}
     const input::I
@@ -447,6 +450,7 @@ symbolOf(p::ParamBox) = markerOf(p).name
 inputOf(p::CompositeParam) = p.input
 
 
+#> `mutable struct` with `const` fields provides better performance
 mutable struct ExpandParam{T, E<:Pack{T}, N, F<:Function, I<:CoreFixedParIn
                            } <: MeshParam{T, E, N}
     const lambda::TypedExpand{E, N, F}
