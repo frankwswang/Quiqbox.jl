@@ -29,7 +29,7 @@ function precompileField(field::FieldAmplitude{C, D}, ::Val{B}=Val(false)) where
         compBasisDD(centerInput)
         compBasisND(centerInput)
         compBasisNN(centerInput)
-        genOrbitalData(compBasisDD)
+        genOrbitalData(compBasisDD, True())
     end
 
     nothing
