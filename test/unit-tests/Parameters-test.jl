@@ -1,7 +1,8 @@
 using Test
 using Quiqbox
 using LinearAlgebra
-using Quiqbox: TypedReduce, TypedExpand, getCellOutputLevels, UnitParam, GridParam
+using Quiqbox: TypedReduce, TypedExpand, getScreenLevelOptionsCore, getCellOutputLevels, 
+               UnitParam, GridParam, getOutputType
 
 @testset "Parameters.jl" begin
 
@@ -9,6 +10,10 @@ pv1 = genTensorVar(1, :a)
 pv2 = genTensorVar(1, :a)
 @test Quiqbox.ParamMarker(pv1) != Quiqbox.ParamMarker(pv2)
 @test !Quiqbox.compareParamBox(pv1, pv2)
+pvs = [pv1, pv2]
+@test getfield.(Quiqbox.markerOf.(pvs), :index) == [0, 0]
+sortParams!(pvs)
+@test getfield.(Quiqbox.markerOf.(pvs), :index) == [1, 2]
 
 absTyped1 = TypedReduce(abs, Float64)
 tf_data1 = -1.1
@@ -49,6 +54,13 @@ evenExpandTyped1 = TypedExpand(evenExpand, Float64, (1.1,))
 evenExpandTyped2 = TypedExpand(evenExpandTyped1)
 @test evenExpandTyped2 === evenExpandTyped1
 
+@test getScreenLevelOptionsCore(Array) == (0,)
+@test getScreenLevelOptionsCore(Tuple{Int}) == (0, 1, 2)
+dMemType = Quiqbox.DirectMemory{Int, 2}
+@test getScreenLevelOptionsCore(dMemType) == (0, 1, 2)
+@test getScreenLevelOptionsCore(Quiqbox.DirectMemory{Tuple{Int}, 1}) == (0, 1, 2)
+@test getScreenLevelOptionsCore(Quiqbox.PackedMemory{Int, dMemType}) == (0,)
+
 p1 = genTensorVar(1, :a)
 p2 = genTensorVar([2], :b)
 p3 = genHeapParam([p1, p1], :c)
@@ -71,7 +83,7 @@ p6 = genCellParam(p4, :e)
 
 v1Val = 0.5
 v1 = genTensorVar(v1Val, :α)
-@test symOf(v1) == :α
+@test symbolOf(v1) == :α
 v2Val = 1.1
 v2 = genTensorVar(v2Val, :β)
 @test obtain(v2) === v2.data[] === v2()
@@ -90,8 +102,8 @@ a1 = genCellParam(v1, :a)
 a1_2 = genCellParam(itself, (v1,), :a1)
 @test a1.lambda == a1_2.lambda
 @test a1.offset[] === zero(Float64)
-@test symOf(a1) == :a
-@test symOf(a1_2) == :a1
+@test symbolOf(a1) == :a
+@test symbolOf(a1_2) == :a1
 @test a1() == v1Val
 @test obtain(a1) == v1Val
 @test screenLevelOf(a1) == 0
@@ -129,7 +141,7 @@ a2in, _, a2out, a2self = dissectParam(a2)
 @test a2.offset[] == a1Val == a1.offset[] + v1Val
 
 v1ValNew = 0.9
-v1_2 = genTensorVar(v1(), symOf(v1), true)
+v1_2 = genTensorVar(v1(), symbolOf(v1), true)
 @test try setVal!(v1_2, v1ValNew) catch; true end
 setVal!(v1, v1ValNew)
 @test obtain(v1) == v1ValNew
@@ -355,14 +367,23 @@ ap1_2 = genCellParam(f3, (apRef1,), :sq)
 @test try genMeshParam(f3, (pVec1,), :sq); catch; true end
 @test obtain(ap1_1) == obtain(ap1_2) == f3(pVec1Val)
 
+f4 = (x, y) -> x^2 * ( exp.(y) )'
+mp1 = genMeshParam(f4, (v1, pVec1), :mp1)
+@test mp1() == f4(v1(), pVec1())
+mp1_2 = genMeshParam(mp1, :mp1)
+setScreenLevel!(mp1_2, 1)
+@test mp1_2() == mp1()
+setVal!(mp1_2, -mp1_2())
+@test mp1_2() + mp1() == zero(mp1())
+
 pg1Input = [a1 a2; c1 d1]
 
 pg1 = genHeapParam(pg1Input, :pl)
 
 @test obtain(pg1) == obtain.(pg1.input) == obtain.(pg1Input)
 @test compareParamBox(genHeapParam(pg1), pg1)
-pg1_2 = genHeapParam(copy(pg1Input), pg1.symbol)
-pg1_3 = genHeapParam(pg1Input, pg1.symbol)
+pg1_2 = genHeapParam(copy(pg1Input), Quiqbox.markerOf(pg1))
+pg1_3 = genHeapParam(pg1Input, Quiqbox.markerOf(pg1))
 pg1_4 = genHeapParam(pg1)
 @test compareParamBox(pg1_2, pg1)
 @test compareParamBox(pg1_3, pg1)
@@ -378,15 +399,13 @@ makeGrid(l, cen, ns) = begin
     end
 end
 
-f4 = (l, c) -> makeGrid(l, c, [1.,2.,3.])
+f5 = (l, c) -> makeGrid(l, c, [1.,2.,3.])
 k1 = genTensorVar([1.0], :l)
 k2 = genTensorVar([0., 0., 0.], :c)
-pm1 = genMeshParam(f4, (k1, k2), :pn)
-@test try genCellParam(f4, (k1, k2), :pn); catch; true end
-
+pm1 = genMeshParam(f5, (k1, k2), :pn)
+@test try genCellParam(f5, (k1, k2), :pn); catch; true end
 pm1Val = obtain(pm1)
-
-@test  pm1Val == obtain(pm1) == f4(k1(), k2())
+@test  pm1Val == obtain(pm1) == f5(k1(), k2())
 
 inSet_pm1, _, outSet_pm1, isoSet_pm1 = dissectParam(pm1)
 @test inSet_pm1.grid == [k1, k2]
@@ -400,8 +419,8 @@ inVal_pm1 = obtain(inSet_pm1)
 val_pm1_1 = obtain(pm1)
 @test all(size.(val_pm1_1).== Ref( (1, 3) ))
 
-f5 = (l, c) -> map(norm, f4(l, c))
-pm2 = genCellParam(f5, genCellParam.((k1, k2)), :pn)
+f6 = (l, c) -> map(norm, f5(l, c))
+pm2 = genCellParam(f6, genCellParam.((k1, k2)), :pn)
 pm2Val = obtain(pm2)
 
 inSet_pm2_1, _, outSet_pm2, isoSet_pm2 = dissectParam(pm2)
@@ -418,10 +437,15 @@ x1 = genTensorVar(1.0, :x)
 x2 = genTensorVar(1.1, :x)
 x3 = genTensorVar(1.2, :x)
 v1 = genHeapParam([x1, x2, x3], :v)
+@test v1() isa getOutputType(v1)
 v2 = genTensorVar([2.0], :v)
+@test v2() isa getOutputType(v2)
 v3 = genHeapParam([v1, v2], :v)
+@test v3() isa getOutputType(v3)
 v4 = genHeapParam([v3], :v)
+@test v4() isa getOutputType(v4)
 v5 = genHeapParam([v4], :v)
+@test v5() isa getOutputType(v5)
 c1 = genCellParam(x1, :c)
 c1 |> obtain
 c2 = genCellParam(1.1, :c)
