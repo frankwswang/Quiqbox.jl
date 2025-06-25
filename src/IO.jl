@@ -23,7 +23,7 @@ function checkFname(Fname::String; showWarning::Bool=true)
 end
 
 
-function getObjNameStr(objName::Symbol, objAlias::AbstractString=string(objName))
+function getOwnedObjNameStr(objName::Symbol, objAlias::AbstractString=string(objName))
     addPrefix = if isdefined(Quiqbox, objName)
         isequal((parentmodule∘getfield)(Quiqbox, objName), Quiqbox) && 
                 Base.isexported(Quiqbox, objName)
@@ -62,27 +62,38 @@ function showParamBox(::B, io::IO, p::ParamBox) where {B<:Boolean}
         else
             print(io, "(")
             show(io, MIME("text/plain"), pSymbol)
-            print(io, " :: ", getObjNameStr(pName), ")")
+            print(io, " :: ", getOwnedObjNameStr(pName), ")")
         end
     elseif enableCompatShowFormat(B(), io)
-        print(io, pType, "(…)")
+        customShow(io, pType)
+        print(io, "(…)")
     else
         print(io, "(")
         show(io, MIME("text/plain"), pSymbol)
-        print(io, " ::", getObjNameStr(pName), ")")
+        print(io, " ::", getOwnedObjNameStr(pName), ")")
         level = screenLevelOf(p)
         relationStr = (level==0 ? " ==> " : (level==1 ? " <=> " : " <== "))
         print(io, relationStr, "(")
-        if level > 0
+        outputType = if level > 0
             output = obtain(p)
             formattedOutput = (output isa AbstractArray) ? vec(output) : output
             show(IOContext(io, :compact=>true), formattedOutput)
-            print(io, " ::", typeof(output))
+            print(io, " ::")
+            typeof(output)
         else
-            print(io, "::", getOutputType(p))
+            print(io, "::")
+            getOutputType(p)
         end
+        customShow(io, outputType)
         print(io, ")")
     end
+end
+
+
+function show(io::IO, ::TypeBox{T}) where {T}
+    print(io, getOwnedObjNameStr(nameof(T), "TypeBox{"))
+    customShow(io, T)
+    print(io, "}")
 end
 
 
@@ -93,7 +104,9 @@ Base.show(io::IO, ::MIME"text/plain", f::CompositeFunction) =
 showCompositeFunc(False(), io, f)
 
 function showCompositeFunc(::B, io::IO, f::CompositeFunction) where {B<:Boolean}
-    print(io,  "(::", typeof(f), ")")
+    print(io,  "(::")
+    customShow(io, typeof(f))
+    print(io,  ")")
     if !enableCompatShowFormat(B(), io)
         nMethod = getMethodNum(f)
         methodStr = string("(", nMethod, " method", (nMethod > 1 ? "s" : ""), ")")
@@ -102,49 +115,110 @@ function showCompositeFunc(::B, io::IO, f::CompositeFunction) where {B<:Boolean}
 end
 
 
-show(io::IO, ::Type{GetEntry{T}}) where {T<:AbstractAccessor} = 
-print(io, getObjNameStr(nameof(GetEntry), "GetEntry{$T}"))
+Base.show(io::IO, ::Type{GetAxisEntry}) = 
+print(io, getOwnedObjNameStr(nameof(GetAxisEntry), "GetAxisEntry"))
 
-show(io::IO, ::Type{GetAxisEntry}) = 
-print(io, getObjNameStr(nameof(GetAxisEntry), "GetAxisEntry"))
+Base.show(io::IO, ::Type{GetUnitEntry}) = 
+print(io, getOwnedObjNameStr(nameof(GetUnitEntry), "GetUnitEntry"))
 
-show(io::IO, ::Type{GetUnitEntry}) = 
-print(io, getObjNameStr(nameof(GetUnitEntry), "GetUnitEntry"))
+Base.show(io::IO, ::Type{GetGridEntry}) = 
+print(io, getOwnedObjNameStr(nameof(GetGridEntry), "GetGridEntry"))
 
-show(io::IO, ::Type{GetGridEntry}) = 
-print(io, getObjNameStr(nameof(GetGridEntry), "GetGridEntry"))
+Base.show(io::IO, ::Type{VoidSetFilter}) = 
+print(io, getOwnedObjNameStr(nameof(VoidSetFilter), "VoidSetFilter"))
 
-show(io::IO, ::Type{StableAdd{T}}) where {T} = 
-print(io, getObjNameStr(nameof(StableAdd), "StableAdd{$T}"))
+Base.show(io::IO, ::Type{UnitSetFilter}) = 
+print(io, getOwnedObjNameStr(nameof(UnitSetFilter), "UnitSetFilter"))
 
-show(io::IO, ::Type{StableMul{T}}) where {T} = 
-print(io, getObjNameStr(nameof(StableMul), "StableMul{$T}"))
+Base.show(io::IO, ::Type{GridSetFilter}) = 
+print(io, getOwnedObjNameStr(nameof(GridSetFilter), "GridSetFilter"))
 
-show(io::IO, ::Type{StableTupleSub{T}}) where {T<:Tuple} = 
-print(io, getObjNameStr(nameof(StableTupleSub), "StableTupleSub{$T}"))
+Base.show(io::IO, ::Type{FullSetFilter}) = 
+print(io, getOwnedObjNameStr(nameof(FullSetFilter), "FullSetFilter"))
 
-show(io::IO, ::Type{TypedCarteFunc{T, D, F}}) where {T, D, F} = 
-print(io, getObjNameStr(nameof(TypedCarteFunc), "TypedCarteFunc{$T, $D, $F}"))
-
-show(io::IO, ::Type{CartesianFormatter{N, R}}) where {N, R<:NTuple{N, Real}} = 
-print(io, getObjNameStr(nameof(CartesianFormatter), "CartesianFormatter{$N, $R}"))
-
-show(io::IO, ::Type{VoidSetFilter}) = 
-print(io, getObjNameStr(nameof(VoidSetFilter), "VoidSetFilter"))
-
-show(io::IO, ::Type{UnitSetFilter}) = 
-print(io, getObjNameStr(nameof(UnitSetFilter), "UnitSetFilter"))
-
-show(io::IO, ::Type{GridSetFilter}) = 
-print(io, getObjNameStr(nameof(GridSetFilter), "GridSetFilter"))
-
-show(io::IO, ::Type{FullSetFilter}) = 
-print(io, getObjNameStr(nameof(FullSetFilter), "FullSetFilter"))
-
-function show(io::IO, ::Type{ContextParamFunc{B, E, F}}) where 
-             {B<:Function, E<:Function, F<:Function}
-    print(io, string("ContextParamFunc", "{", B, ", ", E, ", ", F, "}"))
+#>> Cannot directly overload `show` of parameterized `Type` because type parameters 
+#>> are not individually dispatched on. Otherwise, it is possible for unbound type 
+#>> parameters in `Type{T}` where `T` is a `UnionAll` leak into the function body.
+function customShow(io::IO, typeInfo) #> `typeInfo` can be a non-`Type` type parameter
+    if (typeInfo isa Type) && isconcretetype(typeInfo)
+        print(io, getOwnedObjNameStr(nameof(typeInfo), ""))
+        customShowCore(io, typeInfo)
+    else
+        show(io, typeInfo)
+    end
 end
 
-show(io::IO, ::Type{DirectMemory{T, N}}) where {T, N} = 
-print(io, getObjNameStr(nameof(DirectMemory), "DirectMemory{$T, $N}"))
+customShowCore(io::IO, type::Type) = show(io, type)
+
+function customShowCore(io::IO, ::Type{StableAdd{T}}) where {T}
+    print(io, "StableAdd{")
+    customShow(io, T)
+    print(io, "}")
+end
+
+function customShowCore(io::IO, ::Type{StableMul{T}}) where {T}
+    print(io, "StableMul{")
+    customShow(io, T)
+    print(io, "}")
+end
+
+function customShowCore(io::IO, ::Type{StableTupleSub{T}}) where {T<:Tuple}
+    print(io, "StableTupleSub{")
+    customShow(io, T)
+    print(io, "}")
+end
+
+function customShowCore(io::IO, ::Type{Typed{T}}) where {T}
+    print(io, "Typed{")
+    customShow(io, T)
+    print(io, "}")
+end
+
+function customShowCore(io::IO, ::Type{TypedCarteFunc{T, D, F}}) where {T, D, F<:Function}
+    print(io, "TypedCarteFunc{")
+    customShow(io, T)
+    print(io, ", ")
+    customShow(io, D)
+    print(io, ", ")
+    customShow(io, F)
+    print(io, "}")
+end
+
+function customShowCore(io::IO, ::Type{ContextParamFunc{B, E, F}}) where 
+                       {B<:Function, E<:Function, F<:Function}
+    print(io, "ContextParamFunc{")
+    customShow(io, B)
+    print(io, ", ")
+    customShow(io, E)
+    print(io, ", ")
+    customShow(io, F)
+    print(io, "}")
+end
+
+function customShowCore(io::IO, ::Type{CartesianFormatter{N, R}}) where 
+                       {N, R<:NTuple{N, Real}}
+    print(io, "CartesianFormatter{")
+    customShow(io, N)
+    print(io, ", ")
+    customShow(io, R)
+    print(io, "}")
+end
+
+function customShowCore(io::IO, ::Type{DirectMemory{T, N}}) where {T, N}
+    print(io, "DirectMemory{")
+    customShow(io, T)
+    print(io, ", ")
+    customShow(io, N)
+    print(io, "}")
+end
+
+function customShowCore(io::IO, ::Type{NestedMemory{T, E, N}}) where 
+                       {T, E<:PackedMemory{T}, N}
+    print(io, "NestedMemory{")
+    customShow(io, T)
+    print(io, ", ")
+    customShow(io, E)
+    print(io, ", ")
+    customShow(io, N)
+    print(io, "}")
+end
