@@ -166,12 +166,17 @@ function evalFieldAmplitudeCore(f::EncodedField{C, D, F, E}, input,
     convert(C, val)
 end
 
-function unpackFieldFunc(f::F, ::Boolean=False()) where 
+function unpackFieldFunc(f::F, directUnpack::Boolean=False()) where 
                         {D, C<:RealOrComplex, F<:EncodedField{C, D}}
     paramSet = initializeSpanParamSet()
-    fCore = unpackFunc!(f.core.f, paramSet, paramSetId=Identifier())
-    fEncode = unpackFunc!(f.encode.f, paramSet, paramSetId=Identifier())
-    TypedCarteFunc(ParamPipeline((fEncode, fCore)), C, Count(D)), paramSet
+    innerFuncPair = map((f.encode.f, f.core.f)) do fCore
+        if fCore isa FieldAmplitude
+            unpackFunc!(fCore, paramSet, directUnpack, paramSetId=Identifier())
+        else
+            unpackFunc!(fCore, paramSet, paramSetId=Identifier())
+        end
+    end
+    TypedCarteFunc(ParamPipeline(innerFuncPair), C, Count(D)), paramSet
 end
 
 
