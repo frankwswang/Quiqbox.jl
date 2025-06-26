@@ -75,8 +75,6 @@ isParamIndependent(::DirectOperator) = False()
 
 isParamIndependent(::OverlapSampler) = True()
 
-isParamIndependent(::MonomialMul) = True()
-
 isParamIndependent(::MultipoleMomentSampler) = True()
 
 isParamIndependent(::DiagDirectionalDiffSampler) = True()
