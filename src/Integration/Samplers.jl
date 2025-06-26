@@ -69,3 +69,14 @@ const ReturnTypedSampler{T} = Union{MonomialMul{T}, MultipoleMomentSampler{T},
                                     DiagDirectionalDiffSampler{T}}
 
 const StableTypedSampler = Union{OneBodySampler, CoulombRepulsionSampler}
+
+
+isParamIndependent(::DirectOperator) = False()
+
+isParamIndependent(::OverlapSampler) = True()
+
+isParamIndependent(::MultipoleMomentSampler) = True()
+
+isParamIndependent(::DiagDirectionalDiffSampler) = True()
+
+isParamIndependent(::CoulombRepulsionSampler) = True()

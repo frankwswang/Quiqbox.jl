@@ -277,11 +277,11 @@ end
 function genCachedFieldFunc!(fieldCache::MixedFieldParamFuncCache{T, D}, 
                              paramCache::ParamDataCache, 
                              orb::PrimitiveOrb{T, D, C}, 
-                             paramSet::OptSpanParamSet) where {T<:Real, D, 
-                             C<:RealOrComplex{T}}
+                             paramSet::OptSpanParamSet, directUnpack::Boolean) where 
+                            {T<:Real, D, C<:RealOrComplex{T}}
     sector = C <: Real ? :real : :complex
     f = get!(getfield(fieldCache, sector), EgalBox{ShiftedField{T, D, C}}(orb.field)) do
-        unpackFunc!(orb.field, paramSet)
+        unpackFunc!(orb.field, paramSet, directUnpack)
     end
     StashedField(f, paramSet, paramCache)
 end #!! Incorporate `genCachedFieldFunc!` into `unpackFunc`
@@ -289,10 +289,10 @@ end #!! Incorporate `genCachedFieldFunc!` into `unpackFunc`
 function genCachedFieldFunc!(fieldCache::TypedFieldParamFuncCache{T, D, C, F}, 
                              paramCache::ParamDataCache, 
                              orb::PrimitiveOrb{T, D, C, F}, 
-                             paramSet::OptSpanParamSet) where 
+                             paramSet::OptSpanParamSet, directUnpack::Boolean) where 
                             {T<:Real, D, C<:RealOrComplex{T}, F<:ShiftedField{T, D, C}}
     f = get!(fieldCache, EgalBox{F}(orb.field)) do
-        unpackFunc!(orb.field, paramSet)
+        unpackFunc!(orb.field, paramSet, directUnpack)
     end
     StashedField(f, paramSet, paramCache)
 end
@@ -301,18 +301,20 @@ end
 function genOrbitalDataCore!(fieldCache::FieldParamFuncCache{T, D}, 
                              paramCache::ParamDataCache, 
                              paramSet::OptSpanParamSet, 
-                             orb::PrimitiveOrb{T, D, C}) where 
+                             orb::PrimitiveOrb{T, D, C}, 
+                             directUnpack::Boolean) where 
                             {T<:Real, D, C<:RealOrComplex{T}}
-    coreField = genCachedFieldFunc!(fieldCache, paramCache, orb, paramSet)
+    coreField = genCachedFieldFunc!(fieldCache, paramCache, orb, paramSet, directUnpack)
     PrimOrbData(coreField, orb.renormalize)
 end
 
 function genOrbitalDataCore!(fieldCache::FieldParamFuncCache{T, D}, 
                              paramCache::ParamDataCache, 
                              paramSet::OptSpanParamSet, 
-                             orb::CompositeOrb{T, D}) where {T<:Real, D}
+                             orb::CompositeOrb{T, D}, 
+                             directUnpack::Boolean) where {T<:Real, D}
     basisData = map(orb.basis) do basis
-        genOrbitalDataCore!(fieldCache, paramCache, paramSet, basis)
+        genOrbitalDataCore!(fieldCache, paramCache, paramSet, basis, directUnpack)
     end
     weightData = cacheParam!(paramCache, orb.weight)
     CompOrbData(basisData, extractMemory(weightData), orb.renormalize)
@@ -330,37 +332,39 @@ const OrbBasisSource{T<:Real, D} =
 function genOrbitalDataCore!(fieldCache::FieldParamFuncCache{T, D}, 
                              paramCache::ParamDataCache, 
                              paramSet::OptSpanParamSet, 
-                             orbs::OrbBasisCollection{T, D}) where {T<:Real, D}
+                             orbs::OrbBasisCollection{T, D}, 
+                             directUnpack::Boolean) where {T<:Real, D}
     checkEmptiness(orbs, :orbs)
     map(orbs) do orb
-        genOrbitalDataCore!(fieldCache, paramCache, paramSet, orb)
+        genOrbitalDataCore!(fieldCache, paramCache, paramSet, orb, directUnpack)
     end
 end
 
 function genOrbitalDataCore!(fieldCache::FieldParamFuncCache{T, D}, 
                              paramCache::ParamDataCache, 
                              paramSet::OptSpanParamSet, 
-                             orbs::N24Tuple{OrbitalBasis{<:RealOrComplex{T}, D}}) where 
+                             orbs::N24Tuple{OrbitalBasis{<:RealOrComplex{T}, D}}, 
+                             directUnpack::Boolean) where 
                             {T<:Real, D}
     lazyTupleMap(orbs) do orb
-        genOrbitalDataCore!(fieldCache, paramCache, paramSet, orb)
+        genOrbitalDataCore!(fieldCache, paramCache, paramSet, orb, directUnpack)
     end
 end
 
-function genOrbitalData(orbBases::B; 
+function genOrbitalData(orbBases::B, directUnpack::Boolean=False(); 
                         cache!Self::ParamDataCache=initializeParamDataCache()) where 
                        {T<:Real, D, B<:OrbBasisCollection{T, D}}
     paramSet = initializeSpanParamSet()
     coreCache = genFieldParamFuncCache(B|>eltype)
-    genOrbitalDataCore!(coreCache, cache!Self, paramSet, orbBases)
+    genOrbitalDataCore!(coreCache, cache!Self, paramSet, orbBases, directUnpack)
 end
 
-function genOrbitalData(orbBasis::F; 
+function genOrbitalData(orbBasis::F, directUnpack::Boolean=False(); 
                         cache!Self::ParamDataCache=initializeParamDataCache()) where 
                        {F<:OrbitalBasis}
     paramSet = initializeSpanParamSet()
     coreCache = genFieldParamFuncCache(F)
-    genOrbitalDataCore!(coreCache, cache!Self, paramSet, orbBasis)
+    genOrbitalDataCore!(coreCache, cache!Self, paramSet, orbBasis, directUnpack)
 end
 
 

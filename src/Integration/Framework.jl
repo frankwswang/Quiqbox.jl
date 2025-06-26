@@ -706,7 +706,7 @@ function computeIntTensor(style::MultiBodyIntegral{N, D}, op::DirectOperator,
                           cache!Self::ParamDataCache=initializeParamDataCache(), 
                           markerCache::OrbCoreMarkerDict{T, D}=OrbCoreMarkerDict{T, D}()
                           ) where {T<:Real, N, D}
-    orbsData = genOrbitalData(orbs; cache!Self)
+    orbsData = genOrbitalData(orbs, isParamIndependent(op); cache!Self)
     computeIntTensor(style, op, orbsData; markerCache)
 end
 
@@ -810,6 +810,6 @@ function computeIntegral(style::MultiBodyIntegral{N, D}, op::DirectOperator,
                          orbs::NonEmptyTuple{OrbitalBasis{<:RealOrComplex{T}, D}}; 
                          cache!Self::ParamDataCache=initializeParamDataCache(), 
                          lazyCompute::Bool=false) where {N, T<:Real, D}
-    orbsData = genOrbitalData(orbs; cache!Self)
+    orbsData = genOrbitalData(orbs, isParamIndependent(op); cache!Self)
     computeIntegral(style, op, orbsData; lazyCompute)
 end
