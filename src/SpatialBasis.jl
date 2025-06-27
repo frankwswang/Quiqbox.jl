@@ -176,7 +176,7 @@ end
 
 struct PrimOrbData{T<:Real, D, C<:RealOrComplex{T}, F<:AbstractParamFunc, 
                    R<:FieldCenterShifter{T, D}, S<:OptSpanValueSet} <: ConfigBox
-    core::StashedField{C, D, ShiftedFieldFuncCore{T, D, F, R}, S}
+    core::StashedShiftedField{T, D, C, F, R, S}
     renormalize::Bool
 end
 

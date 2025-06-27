@@ -311,7 +311,7 @@ end
 
 
 const OrbCoreMarkerDict{T<:Real, D} = 
-      Dict{EgalBox{Quiqbox.StashedField{T, D}}, FieldMarker{:StashedField, 2}}
+      Dict{EgalBox{StashedField{T, D}}, FieldMarker{:StashedField, 2}}
 
 function genOrbCoreKey!(cache::OrbCoreMarkerDict{T, D}, 
                         data::PrimOrbData{T, D}) where {T<:Real, D}
