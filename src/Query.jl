@@ -94,79 +94,30 @@ function getEntry(obj, acc::ChainedAccess)
 end
 
 
-abstract type FiniteDict{N, K, T} <: EqualityDict{K, T} end
-
-
-struct SingleEntryDict{K, T} <: FiniteDict{1, K, T}
-    key::K
-    value::T
-end
-
-
-struct TypedEmptyDict{K, T} <: FiniteDict{0, K, T} end
+struct TypedEmptyDict{K, T} <: EqualityDict{K, T} end
 
 TypedEmptyDict() = TypedEmptyDict{Union{}, Union{}}()
 
-
-buildDict(p::Pair{K, T}) where {K, T} = SingleEntryDict(p.first, p.second)
-
-function buildDict(ps::Union{Tuple{Vararg{Pair}}, AbstractVector{<:Pair}}, 
-                   emptyBuiler::Type{<:FiniteDict{0}}=TypedEmptyDict)
-    if isempty(ps)
-        emptyBuiler()
-    elseif length(ps) == 1
-        buildDict(ps|>first)
-    else
-        Dict(ps)
-    end
-end
-
-buildDict(::Tuple{}, emptyBuiler::Type{<:FiniteDict{0}}=TypedEmptyDict) = emptyBuiler()
-
-buildDict(emptyBuiler::Type{<:FiniteDict{0}}=TypedEmptyDict) = buildDict((), emptyBuiler)
-
-
-isempty(::SingleEntryDict) = false
 isempty(::TypedEmptyDict) = true
 
-length(::FiniteDict{N}) where {N} = N
+length(::TypedEmptyDict) = 0
 
-collect(d::SingleEntryDict{K, T}) where {K, T} = Memory{Pair{K, T}}([d.key => d.value])
 collect(::TypedEmptyDict{K, T}) where {K, T} = Memory{Pair{K, T}}(undef, 0)
 
-function get(d::SingleEntryDict{K}, key::K, default::Any) where {K}
-    ifelse(key == d.key, d.value, default)
-end
+get(::TypedEmptyDict{K}, ::K, default::Any) where {K} = itself(default)
 
-keys(d::SingleEntryDict) = Set((d.key,))
+get!(::TypedEmptyDict{K, V}, ::K, default::V) where {K, V} = itself(default)
+
 keys(::TypedEmptyDict{K}) where {K} = Set{K}()
 
-values(d::SingleEntryDict) = Set((d.value,))
 values(::TypedEmptyDict{<:Any, T}) where {T} = Set{T}()
-
-function getindex(d::SingleEntryDict{K}, key::K) where {K}
-    if key == d.key
-        d.value
-    else
-        throw(KeyError(key))
-    end
-end
 
 function getindex(::T, key) where {T<:TypedEmptyDict}
     throw(AssertionError("This dictionary (`::$T`) is meant to be empty."))
 end
-
-function iterate(d::SingleEntryDict, state::Int)
-    if state <= 1
-        (d.key => d.value, 2)
-    else
-        nothing
-    end
-end
-
 iterate(::TypedEmptyDict, state::Int) = nothing
 
-iterate(d::FiniteDict) = iterate(d, 1)
+iterate(d::TypedEmptyDict) = iterate(d, 1)
 
 
 struct EgalBox{T} <: QueryBox{T}

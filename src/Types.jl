@@ -93,7 +93,7 @@ const ArithmeticOperator = Union{typeof(+), typeof(-), typeof(*), typeof(/)}
 
 import Base: iterate, size, getindex, setindex!, IndexStyle, zero, similar
 
-import Base: get, keys, values, hash, isempty, collect, length
+import Base: get, get!, keys, values, hash, isempty, collect, length
 
 import Base: broadcastable
 
