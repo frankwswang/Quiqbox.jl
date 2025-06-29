@@ -94,29 +94,27 @@ function getEntry(obj, acc::ChainedAccess)
 end
 
 
-struct TypedEmptyDict{K, T} <: EqualityDict{K, T} end
+struct TypedEmptyDict{K, V} <: EqualityDict{K, V} end
 
 TypedEmptyDict() = TypedEmptyDict{Union{}, Union{}}()
 
-isempty(::TypedEmptyDict) = true
-
 length(::TypedEmptyDict) = 0
 
-collect(::TypedEmptyDict{K, T}) where {K, T} = Memory{Pair{K, T}}(undef, 0)
+collect(::TypedEmptyDict{K, V}) where {K, V} = Memory{Pair{K, V}}(undef, 0)
+
+haskey(::TypedEmptyDict{K}, ::K) where {K} = false
 
 get(::TypedEmptyDict{K}, ::K, default::Any) where {K} = itself(default)
 
 get!(::TypedEmptyDict{K, V}, ::K, default::V) where {K, V} = itself(default)
 
-keys(::TypedEmptyDict{K}) where {K} = Set{K}()
-
-values(::TypedEmptyDict{<:Any, T}) where {T} = Set{T}()
+setindex!(d::TypedEmptyDict{K, V}, ::V, ::K) where {K, V} = itself(d)
 
 function getindex(::T, key) where {T<:TypedEmptyDict}
     throw(AssertionError("This dictionary (`::$T`) is meant to be empty."))
 end
-iterate(::TypedEmptyDict, state::Int) = nothing
 
+iterate(::TypedEmptyDict, ::Int) = nothing
 iterate(d::TypedEmptyDict) = iterate(d, 1)
 
 

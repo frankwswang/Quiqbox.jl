@@ -1,7 +1,7 @@
 abstract type Box <: Any end
 abstract type AnyInterface <: Any end
 
-abstract type EqualityDict{K, T} <: AbstractDict{K, T} end
+abstract type EqualityDict{K, V} <: AbstractDict{K, V} end
 
 abstract type CompositeFunction <: Function end # composite-type function
 
@@ -93,7 +93,7 @@ const ArithmeticOperator = Union{typeof(+), typeof(-), typeof(*), typeof(/)}
 
 import Base: iterate, size, getindex, setindex!, IndexStyle, zero, similar
 
-import Base: get, get!, keys, values, hash, isempty, collect, length
+import Base: get, get!, haskey, hash, collect, length
 
 import Base: broadcastable
 
