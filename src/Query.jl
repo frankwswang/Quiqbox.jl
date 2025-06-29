@@ -118,6 +118,78 @@ iterate(::TypedEmptyDict, ::Int) = nothing
 iterate(d::TypedEmptyDict) = iterate(d, 1)
 
 
+struct IndexDict{K, T} <: EqualityDict{K, T}
+    indexer::Dict{K, OneToIndex}
+    storage::Vector{Pair{K, T}}
+
+    function IndexDict{K, T}() where {K, T}
+        (K <: OneToIndex) && throw(ArgumentError("K::Type{$K} cannot be `OneToIndex`."))
+        new{K, T}(Dict{K, OneToIndex}(), Pair{K, T}[])
+    end
+end
+
+length(d::IndexDict) = length(d.storage)
+
+collect(d::IndexDict) = copy(d.storage)
+
+function haskey(d::IndexDict{K}, key::K) where {K}
+    haskey(d.indexer, key)
+end
+
+function get(d::IndexDict{K, V}, key::K, default::V) where {K, V}
+    res = get(d.indexer, key, nothing)
+    res === nothing ? default : getEntry(d.storage, res).second
+end
+
+function get!(d::IndexDict{K, V}, key::K, default::V) where {K, V}
+    index = get(d.indexer, key, nothing)
+    if index === nothing
+        d.indexer[key] = OneToIndex(length(d.storage) + 1)
+        push!(d.storage, key=>default)
+        default
+    else
+        getEntry(d.storage, index).second
+    end
+end
+
+function getindex(d::IndexDict{K}, accessor) where {K}
+    index = if accessor isa OneToIndex
+        accessor
+    else
+        keyType = typeof(accessor)
+        (keyType <: K) || throw(AssertionError("accessor::$keyType is not a valid key."))
+        getindex(d.indexer, accessor)
+    end
+    getEntry(d.storage, index).second
+end
+
+function setindex!(d::IndexDict{K, V}, value::V, accessor) where {K, V}
+    pairs = d.storage
+
+    if accessor isa OneToIndex
+        localIndex = shiftLinearIndex(values, accessor)
+        key, _ = getindex(pairs, localIndex)
+        setindex!(pairs, key=>value, localIndex)
+    else
+        index = if haskey(d.indexer, accessor)
+            localIndex = shiftLinearIndex(pairs, getindex(d.indexer, accessor))
+            setindex!(pairs, accessor=>value, localIndex)
+        else
+            push!(pairs, accessor=>value)
+            (OneToIndex∘length)(pairs)
+        end
+        setindex!(d.indexer, index, accessor)
+    end
+
+    d
+end
+
+iterate(d::IndexDict, state::Int) = iterate(d.storage, state)
+iterate(d::IndexDict) = iterate(d.storage)
+
+indexKey(d::IndexDict, index::OneToIndex) = getindex(d.storage, index).first
+
+
 struct EgalBox{T} <: QueryBox{T}
     value::T
 end
