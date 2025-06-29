@@ -109,7 +109,15 @@ struct MemoryLinker{T, A<:AbstractArray{T}} <: AbstractArray{T, 1}
     end
 end
 #> Iteration interface
-iterate(arr::MemoryLinker) = iterate(arr, firstindex(arr.scope))
+function iterate(arr::MemoryLinker)
+    res = iterate(arr.scope)
+    if res === nothing
+        nothing
+    else
+        indexer, state = res
+        getEntry(arr.value, indexer), state
+    end
+end
 function iterate(arr::MemoryLinker, state)
     res = iterate(arr.scope, state)
     if res === nothing
