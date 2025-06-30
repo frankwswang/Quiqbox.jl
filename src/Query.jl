@@ -66,6 +66,8 @@ ChainedAccess((prev, here.chain...))
 ChainedAccess(prev::ChainedAccess, here::SimpleAccessor) = 
 ChainedAccess((prev.chain..., here))
 
+Base.broadcastable(c::ChainedAccess) = Ref(c)
+
 
 getEntry(obj, ::PointEntry) = getindex(obj)
 
@@ -79,7 +81,7 @@ getEntry(obj, ::UnitSector) = obj.unit
 
 getEntry(obj, ::GridSector) = obj.grid
 
-getEntry(obj, entry::Symbol) = getfield(obj, entry)
+getEntry(obj, entry::Symbol) = getproperty(obj, entry)
 
 getEntry(obj, ::AllPassAccess) = itself(obj)
 
