@@ -521,3 +521,43 @@ function safelySetVal!(box::AbstractArray, val)
 end
 
 setindex!(al::AtomicLocker, val) = safelySetVal!(al, val)
+
+
+struct MemoryPair{L, R} <: QueryBox{Pair{L, R}}
+    left::Memory{L}
+    right::Memory{R}
+
+    function MemoryPair(left::AbstractVector{L}, right::AbstractVector{R}) where {L, R}
+        if length(left) != length(right)
+            throw(AssertionError("`left` and `right` should have the same length."))
+        end
+
+        lData = extractMemory(left)
+        rData = extractMemory(right)
+        new{eltype(lData), eltype(rData)}(lData, rData)
+    end
+end
+
+function iterate(mp::MemoryPair)
+    res = iterate(zip(mp.left, mp.right))
+    if res === nothing
+        nothing
+    else
+        (l, r), state = res
+        (l=>r), state
+    end
+end
+
+function iterate(mp::MemoryPair, state)
+    res = iterate(zip(mp.left, mp.right), state)
+    if res === nothing
+        nothing
+    else
+        (l, r), state = res
+        (l=>r), state
+    end
+end
+
+length(mp::MemoryPair) = length(mp.left)
+
+eltype(::MemoryPair{L, R}) where {L, R} = Pair{L, R}

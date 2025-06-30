@@ -1,6 +1,6 @@
 using Test
 using Quiqbox
-using Quiqbox: markObj
+using Quiqbox: markObj, MemoryPair
 
 @testset "Query.jl" begin
 
@@ -30,5 +30,16 @@ d3_2 = Quiqbox.Dict{Symbol, Float64}()
 @test d3_1 == d3_1
 @test d3_1 == d3_2
 @test markObj(d3_1) == markObj(d3_2)
+
+a = rand(100)
+b = rand(101)
+c = rand(100)
+try MemoryPair(a, b) catch; true end
+mp1 = MemoryPair(a, c)
+bl = true
+for ((i, j), pair) in zip(zip(a, c), mp1)
+    bl *= ((i => j) === pair)
+end
+@test bl
 
 end
