@@ -186,10 +186,12 @@ function setindex!(d::IndexDict{K, V}, value::V, accessor) where {K, V}
     d
 end
 
-iterate(d::IndexDict, state::Int) = iterate(d.storage, state)
+iterate(d::IndexDict, state) = iterate(d.storage, state)
 iterate(d::IndexDict) = iterate(d.storage)
 
 indexKey(d::IndexDict, index::OneToIndex) = getindex(d.storage, index).first
+
+keyIndex(d::IndexDict{K}, key::K) where {K} = getindex(d.indexer, key)
 
 
 struct EgalBox{T} <: QueryBox{T}
