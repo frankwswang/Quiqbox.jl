@@ -1,8 +1,14 @@
 using Test
 using Quiqbox
-using Quiqbox: markObj, MemoryPair
+using Quiqbox: OneToIndex, markObj, MemoryPair
 
 @testset "Query.jl" begin
+
+@test OneToIndex() == OneToIndex(2) - 1
+idxBox = [i for i in OneToIndex(2)]
+@test idxBox == [OneToIndex(2)]
+@test eltype(idxBox) == OneToIndex
+@test OneToIndex(OneToIndex(), Count(2)) .+ [1, -1] == OneToIndex.([4, 2])
 
 m1 = rand(3, 3)
 m1m = Quiqbox.ShapedMemory(m1)

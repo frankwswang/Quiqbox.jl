@@ -18,6 +18,17 @@ end
 
 OneToIndex(idx::OneToIndex) = itself(idx)
 
+Base.broadcastable(c::OneToIndex) = Ref(c)
+
+iterate(idx::OneToIndex) = (idx, Count(2))
+
+iterate(::OneToIndex, ::Count{2}) = nothing
+
+length(::OneToIndex) = 1
+
+eltype(::OneToIndex) = OneToIndex
+
+
 +(idx::OneToIndex, i::Integer) = OneToIndex(idx.idx + i)
 +(i::Integer, idx::OneToIndex) = OneToIndex(idx.idx + i)
 -(idx::OneToIndex, i::Integer) = OneToIndex(idx.idx - i)
