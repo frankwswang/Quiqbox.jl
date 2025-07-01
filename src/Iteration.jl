@@ -38,23 +38,43 @@ function checkAxialIndexStep(arr::AbstractArray, dim::MissingOr{Int}=missing)
 end
 
 
-struct Count{N} <: StructuredType
-
-    function Count{N}() where {N}
-        checkPositivity(N::Int, true)
-        new{N}()
-    end
-end
-
-Count(N::Integer) = Count{Int(N)}()
-
-const Nil = Count{0}
-const One = Count{1}
-
-
-struct SymmetricIntRange{S} <: ConfigBox
+struct SymmetricIntRange{S} <: CustomRange
 
     SymmetricIntRange(::Count{S}) where {S} = new{S}()
 end
 
 (::SymmetricIntRange{S})() where {S} = -Int(S) : Int(S)
+
+
+struct OneToRange <: CustomRange
+    endpoint::Int
+
+    function OneToRange(endpoint::Int)
+        checkPositivity(endpoint, true)
+        new(endpoint)
+    end
+
+    function OneToRange(idx::OneToIndex)
+        new(idx.idx)
+    end
+end
+
+function iterate(otr::OneToRange)
+    if otr.endpoint == 0
+        nothing
+    else
+        OneToIndex(), OneToIndex(2)
+    end
+end
+
+function iterate(otr::OneToRange, state::OneToIndex)
+    if state.idx > otr.endpoint
+        nothing
+    else
+        state, OneToIndex(state, Count(1))
+    end
+end
+
+length(otr::OneToRange) = otr.endpoint
+
+eltype(::OneToRange) = OneToIndex

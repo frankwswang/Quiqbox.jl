@@ -4,9 +4,13 @@ using Base: issingletontype
 struct OneToIndex <: CustomAccessor
     idx::Int
 
-    function OneToIndex(idx::Int, ::V=True()) where {V<:Boolean}
+    function OneToIndex(idx::Int, ::V=True()) where {V<:Boolean} #! Remove second argument
         getTypeValue(V) && checkPositivity(idx)
         new(idx)
+    end
+
+    function OneToIndex(idx::OneToIndex, ::Count{N}) where {N}
+        new(idx.idx + N)
     end
 
     OneToIndex() = new(1)

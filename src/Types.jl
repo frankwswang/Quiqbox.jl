@@ -31,6 +31,7 @@ abstract type DirectOperator{N} <: Modifier end # N: Number of input functions
 abstract type EstimatorConfig{T} <: ConfigBox end
 abstract type CustomAccessor <: ConfigBox end
 abstract type StructuredType <: ConfigBox end
+abstract type CustomRange <: ConfigBox end
 
 abstract type IdentityMarker{T} <: MarkerBox end
 abstract type StorageMarker{T} <: MarkerBox end
