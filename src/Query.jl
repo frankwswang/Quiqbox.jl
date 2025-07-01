@@ -25,21 +25,6 @@ OneToIndex(idx::OneToIndex) = itself(idx)
 Int(idx::OneToIndex) = getfield(idx, :idx)
 
 
-function shiftLinearIndex(arr::AbstractArray, oneToIdx::Int)
-    LinearIndices(arr)[begin + oneToIdx - 1]
-end
-
-function shiftLinearIndex(arr::Union{Tuple, NamedTuple}, oneToIdx::Int)
-    eachindex(arr)[begin + oneToIdx - 1]
-end
-
-function shiftLinearIndex(arr::GeneralCollection, uRange::UnitRange{Int})
-    offset = shiftLinearIndex(arr, 1) - 1
-    (first(uRange) + offset) : (last(uRange) + offset)
-end
-
-shiftLinearIndex(arr::GeneralCollection, i::OneToIndex) = shiftLinearIndex(arr, i.idx)
-
 struct PointEntry <: CustomAccessor end #> For getindex(obj) implementation
 
 struct UnitSector <: CustomAccessor end
