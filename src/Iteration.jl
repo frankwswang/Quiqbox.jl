@@ -1,5 +1,3 @@
-export Count
-
 function sortTensorIndex((i, j)::NTuple{2, Int})
     if i > j
         (j, i)

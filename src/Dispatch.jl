@@ -1,3 +1,5 @@
+export Count
+
 struct SelectTrait{I<:AnyInterface} <: TraitAction{I} end
 
 function returnUndefinedTraitError(::Type{TR}, ::Type{T}) where {TR<:AnyInterface, T}
@@ -88,3 +90,17 @@ getTypeValue(::V) where {V<:ValueType} = getTypeValue(V)
 function getMethodNum(f::Function)
     (length ∘ methods)(f)
 end
+
+
+struct Count{N} <: StructuredType
+
+    function Count{N}() where {N}
+        checkPositivity(N::Int, true)
+        new{N}()
+    end
+end
+
+Count(N::Integer) = Count{Int(N)}()
+
+const Nil = Count{0}
+const One = Count{1}
