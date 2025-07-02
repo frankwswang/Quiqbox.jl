@@ -111,6 +111,8 @@ get(::TypedEmptyDict{K}, ::K, default::Any) where {K} = itself(default)
 
 get!(::TypedEmptyDict{K, V}, ::K, default::V) where {K, V} = itself(default)
 
+get!(f::Function, ::TypedEmptyDict{K}, ::K) where {K} = f()
+
 setindex!(d::TypedEmptyDict{K, V}, ::V, ::K) where {K, V} = itself(d)
 
 function getindex(::T, key) where {T<:TypedEmptyDict}
