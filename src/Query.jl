@@ -32,6 +32,7 @@ eltype(::OneToIndex) = OneToIndex
 +(idx::OneToIndex, i::Integer) = OneToIndex(idx.idx + i)
 +(i::Integer, idx::OneToIndex) = OneToIndex(idx.idx + i)
 -(idx::OneToIndex, i::Integer) = OneToIndex(idx.idx - i)
+isless(idxL::OneToIndex, idxR::OneToIndex) = isless(idxL.idx, idxR.idx)
 
 Int(idx::OneToIndex) = getfield(idx, :idx)
 

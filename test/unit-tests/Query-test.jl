@@ -9,6 +9,11 @@ idxBox = [i for i in OneToIndex(2)]
 @test idxBox == [OneToIndex(2)]
 @test eltype(idxBox) == OneToIndex
 @test OneToIndex(OneToIndex(), Count(2)) .+ [1, -1] == OneToIndex.([4, 2])
+@test OneToIndex() < OneToIndex(2)
+@test OneToIndex(2) > OneToIndex()
+@test OneToIndex() <= OneToIndex()
+@test OneToIndex() >= OneToIndex()
+@test OneToIndex() == OneToIndex() === OneToIndex(1)
 
 m1 = rand(3, 3)
 m1m = Quiqbox.ShapedMemory(m1)

@@ -98,7 +98,7 @@ import Base: get, get!, haskey, hash, collect, length, eltype
 
 import Base: broadcastable
 
-import Base: +, -, ==
+import Base: +, -, ==, isless
 
 import Base: Int
 
