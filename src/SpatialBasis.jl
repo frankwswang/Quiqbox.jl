@@ -346,7 +346,7 @@ function genOrbitalDataCore!(fieldCache::FieldParamFuncCache{T, D},
                              orbs::N24Tuple{OrbitalBasis{<:RealOrComplex{T}, D}}, 
                              directUnpack::Boolean) where 
                             {T<:Real, D}
-    lazyTupleMap(orbs) do orb
+    lazyMap(orbs) do orb
         genOrbitalDataCore!(fieldCache, paramCache, paramSet, orb, directUnpack)
     end
 end
