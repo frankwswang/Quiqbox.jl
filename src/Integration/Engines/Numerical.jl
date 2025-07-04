@@ -26,10 +26,12 @@ strictTypeJoin(T, C)
 
 (f::SesquiFieldProd)(coord) = evalSesquiFieldProd(f, formatInput(f, coord))
 
-function evalSesquiFieldProd(f::SesquiFieldProd{T, D, OverlapSampler, NTuple{2, F}}, 
-                             coord::NTuple{D, Real}) where 
-                            {T<:Real, D, F<:FieldAmplitude{<:RealOrComplex{T}, D}}
-    fieldL, fieldR == f.layout
+const DiagFieldProd{T<:Real, D, O<:Multiplier, F<:FieldAmplitude{<:RealOrComplex{T}, D}} = 
+      SesquiFieldProd{T, D, O, F, F}
+
+function evalSesquiFieldProd(f::DiagFieldProd{T, D, OverlapSampler}, coord::NTuple{D, Real}
+                             ) where {T<:Real, D}
+    fieldL, fieldR = f.layout
     valR = fieldR(coord)
     valL = conj(f.symmetric ? valR : fieldL(coord))
     valL * valR
