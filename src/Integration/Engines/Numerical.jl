@@ -1,16 +1,17 @@
 using HCubature
 using LinearAlgebra: dot
 
-struct SesquiFieldProd{T<:Real, D, O<:Multiplier, 
-                       F<:N12Tuple{FieldAmplitude{<:RealOrComplex{T}, D}}
-                       } <: ParticleFunction{D, 1}
-    layout::F
+struct SesquiFieldProd{T<:Real, D, O<:Multiplier, FL<:FieldAmplitude{<:RealOrComplex{T}, D}, 
+                       FR<:FieldAmplitude{<:RealOrComplex{T}, D}} <: ParticleFunction{D, 1}
+    layout::Tuple{FL, FR}
     dresser::O
+    symmetric::Bool
 
-    function SesquiFieldProd(fields::N12Tuple{FieldAmplitude{<:RealOrComplex{T}, D}}, 
+    function SesquiFieldProd(fields::NTuple{2, FieldAmplitude{<:RealOrComplex{T}, D}}, 
                              dresser::O=genOverlapSampler()) where 
                             {T<:Real, D, O<:Multiplier}
-        new{T, D, O, typeof(fields)}(fields, dresser)
+        fieldL, fieldR = fields
+        new{T, D, O, typeof(fieldL), typeof(fieldR)}(fields, dresser, fieldL===fieldR)
     end
 end
 
@@ -25,21 +26,18 @@ strictTypeJoin(T, C)
 
 (f::SesquiFieldProd)(coord) = evalSesquiFieldProd(f, formatInput(f, coord))
 
-const SelfModeOverlap{T<:Real, D, F<:FieldAmplitude{<:RealOrComplex{T}, D}} = 
-      SesquiFieldProd{T, D, OverlapSampler, Tuple{F}}
-
-function evalSesquiFieldProd(f::SelfModeOverlap{<:Real, D}, 
-                             coord::NTuple{D, Real}) where {D}
-    field, = f.layout
-    val = field(coord)
-    conj(val) * val
+function evalSesquiFieldProd(f::SesquiFieldProd{T, D, OverlapSampler, NTuple{2, F}}, 
+                             coord::NTuple{D, Real}) where 
+                            {T<:Real, D, F<:FieldAmplitude{<:RealOrComplex{T}, D}}
+    fieldL, fieldR == f.layout
+    valR = fieldR(coord)
+    valL = conj(f.symmetric ? valR : fieldL(coord))
+    valL * valR
 end
 
-function evalSesquiFieldProd(f::SesquiFieldProd{<:Real, D, O}, coord::NTuple{D, Real}
-                             ) where {D, O<:Multiplier}
-    fields = ifelse(length(f.layout)==1, ntuple(_->first(f.layout), Val(2)), f.layout)
-    f.dresser(fields...)(coord)
-end
+evalSesquiFieldProd(f::SesquiFieldProd{<:Real, D, O}, 
+                    coord::NTuple{D, Real}) where {D, O<:Multiplier} = 
+f.dresser(f.layout...)(coord)
 
 
 struct DoubleFieldProd{T<:Real, D, O<:DualTermOperator, 
@@ -83,17 +81,20 @@ end
 
 
 function genIntegrant(op::Multiplier, 
-                      (pair,)::Tuple{N12Tuple{ PrimOrbData{T, D} }}) where {T<:Real, D}
+                      (pair,)::Tuple{ NTuple{ 2, PrimOrbData{T, D} }}) where {T<:Real, D}
     SesquiFieldProd(getfield.(pair, :core), op)
 end
 
 function genIntegrant(op::DualTermOperator, 
-                      (pL, pR)::NTuple{2, N12Tuple{ PrimOrbData{T, D} }}) where {T<:Real, D}
+                      (pL, pR)::NTuple{2, NTuple{ 2, PrimOrbData{T, D} }}
+                      ) where {T<:Real, D}
     DoubleFieldProd(getfield.(pL, :core), getfield.(pR, :core), op)
 end
 
 
-function genIntegralSectors(op::DirectOperator, layout::CoreIntegralOrbDataLayout)
+function genIntegralSectors(op::DirectOperator, 
+                            layout::N12Tuple{NTuple{ 2, PrimOrbData{T, D} }}
+                            ) where {T<:Real, D}
     *, tuple(genIntegrant(op, layout))
 end
 
@@ -104,7 +105,8 @@ end
 
 
 function estimateOrbIntegral(config::MissingOr{EstimatorConfig{T}}, 
-                             op::TypedOperator{C}, layout::CoreIntegralOrbDataLayout{T, D}
+                             op::TypedOperator{C}, 
+                             layout::N12Tuple{NTuple{ 2, PrimOrbData{T, D} }}
                              ) where {T<:Real, C<:RealOrComplex{T}, D}
     combiner, sectors = genIntegralSectors(op.core, layout)
     noGlobalConfig = ismissing(config)

@@ -127,14 +127,8 @@ end
 
 
 function evaluateIntegral!(config::OrbitalCoreIntegralConfig{T, D, C, N, F}, 
-                           pairwiseData::NTuple{N, N12Tuple{ PrimOrbData{T, D} }}) where 
-                         {T, C<:RealOrComplex{T}, D, N, F<:DirectOperator}
-    evaluateIntegralCore(config, pairwiseData)
-end
-
-function evaluateIntegralCore(config::OrbitalCoreIntegralConfig{T, D, C, N, F}, 
-                              pairwiseData::NTuple{N, N12Tuple{ PrimOrbData{T, D} }}) where 
-                             {T, C<:RealOrComplex{T}, D, N, F<:DirectOperator}
+                           pairwiseData::NTuple{N, NTuple{ 2, PrimOrbData{T, D} }}) where 
+                          {T, C<:RealOrComplex{T}, D, N, F<:DirectOperator}
     formattedOp = TypedOperator(config.operator, C)
     estimateOrbIntegral(config.estimator, formattedOp, pairwiseData)::C
 end
@@ -155,9 +149,9 @@ end
 
 
 function genCoreIntTuple(config::OrbitalCoreIntegralConfig{T, D, C, 1}, 
-                         pairData::Tuple{PrimOrbData{T, D}}) where 
+                         (data,)::Tuple{PrimOrbData{T, D}}) where 
                         {T<:Real, D, C<:RealOrComplex{T}}
-    integralRes = evaluateIntegral!(config, (pairData,))
+    integralRes = evaluateIntegral!(config, ((data, data),))
     (convert(C, integralRes),)
 end
 
