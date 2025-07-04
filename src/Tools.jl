@@ -715,13 +715,13 @@ function intersectMultisets!(s1::AbstractVector{T1}, s2::AbstractVector{T2};
 end
 
 
-function lazyTupleMap(f::F, (obj1, obj2)::NTuple{2, Any}) where {F<:Function}
+function lazyMap(f::F, (obj1, obj2)::NTuple{2, Any}) where {F<:Function}
     res1 = f(obj1)
     res2 = obj2 === obj1 ? res1 : f(obj2)
     (res1, res2)
 end
 
-function lazyTupleMap(f::F, (obj1, obj2, obj3, obj4)::NTuple{4, Any}) where {F<:Function}
+function lazyMap(f::F, (obj1, obj2, obj3, obj4)::NTuple{4, Any}) where {F<:Function}
     res1 = f(obj1)
     res2 = obj2 === obj1 ? res1 : f(obj2)
     res3 = obj3 === obj1 ? res1 : (obj3 === obj2 ? res2 : f(obj3))
@@ -732,6 +732,8 @@ function lazyTupleMap(f::F, (obj1, obj2, obj3, obj4)::NTuple{4, Any}) where {F<:
     end
     (res1, res2, res3, res3)
 end
+
+lazyMap(f::Function, arg, args...) = map(f, arg, args...)
 
 
 function genParametricType(base::UnionAll, typeVars::Tuple)

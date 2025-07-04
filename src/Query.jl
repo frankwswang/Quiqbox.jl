@@ -4,9 +4,13 @@ using Base: issingletontype
 struct OneToIndex <: CustomAccessor
     idx::Int
 
-    function OneToIndex(idx::Int, ::V=True()) where {V<:Boolean}
+    function OneToIndex(idx::Int, ::V=True()) where {V<:Boolean} #! Remove second argument
         getTypeValue(V) && checkPositivity(idx)
         new(idx)
+    end
+
+    function OneToIndex(idx::OneToIndex, ::Count{N}) where {N}
+        new(idx.idx + N)
     end
 
     OneToIndex() = new(1)
@@ -14,27 +18,24 @@ end
 
 OneToIndex(idx::OneToIndex) = itself(idx)
 
+Base.broadcastable(c::OneToIndex) = Ref(c)
+
+iterate(idx::OneToIndex) = (idx, Count(2))
+
+iterate(::OneToIndex, ::Count{2}) = nothing
+
+length(::OneToIndex) = 1
+
+eltype(::OneToIndex) = OneToIndex
+
+
 +(idx::OneToIndex, i::Integer) = OneToIndex(idx.idx + i)
 +(i::Integer, idx::OneToIndex) = OneToIndex(idx.idx + i)
 -(idx::OneToIndex, i::Integer) = OneToIndex(idx.idx - i)
+isless(idxL::OneToIndex, idxR::OneToIndex) = isless(idxL.idx, idxR.idx)
 
 Int(idx::OneToIndex) = getfield(idx, :idx)
 
-
-function shiftLinearIndex(arr::AbstractArray, oneToIdx::Int)
-    LinearIndices(arr)[begin + oneToIdx - 1]
-end
-
-function shiftLinearIndex(arr::Union{Tuple, NamedTuple}, oneToIdx::Int)
-    eachindex(arr)[begin + oneToIdx - 1]
-end
-
-function shiftLinearIndex(arr::GeneralCollection, uRange::UnitRange{Int})
-    offset = shiftLinearIndex(arr, 1) - 1
-    (first(uRange) + offset) : (last(uRange) + offset)
-end
-
-shiftLinearIndex(arr::GeneralCollection, i::OneToIndex) = shiftLinearIndex(arr, i.idx)
 
 struct PointEntry <: CustomAccessor end #> For getindex(obj) implementation
 
@@ -66,6 +67,8 @@ ChainedAccess((prev, here.chain...))
 ChainedAccess(prev::ChainedAccess, here::SimpleAccessor) = 
 ChainedAccess((prev.chain..., here))
 
+Base.broadcastable(c::ChainedAccess) = Ref(c)
+
 
 getEntry(obj, ::PointEntry) = getindex(obj)
 
@@ -79,7 +82,7 @@ getEntry(obj, ::UnitSector) = obj.unit
 
 getEntry(obj, ::GridSector) = obj.grid
 
-getEntry(obj, entry::Symbol) = getfield(obj, entry)
+getEntry(obj, entry::Symbol) = getproperty(obj, entry)
 
 getEntry(obj, ::AllPassAccess) = itself(obj)
 
@@ -94,79 +97,104 @@ function getEntry(obj, acc::ChainedAccess)
 end
 
 
-abstract type FiniteDict{N, K, T} <: EqualityDict{K, T} end
-
-
-struct SingleEntryDict{K, T} <: FiniteDict{1, K, T}
-    key::K
-    value::T
-end
-
-
-struct TypedEmptyDict{K, T} <: FiniteDict{0, K, T} end
+struct TypedEmptyDict{K, V} <: EqualityDict{K, V} end
 
 TypedEmptyDict() = TypedEmptyDict{Union{}, Union{}}()
 
+length(::TypedEmptyDict) = 0
 
-buildDict(p::Pair{K, T}) where {K, T} = SingleEntryDict(p.first, p.second)
+collect(::TypedEmptyDict{K, V}) where {K, V} = Memory{Pair{K, V}}(undef, 0)
 
-function buildDict(ps::Union{Tuple{Vararg{Pair}}, AbstractVector{<:Pair}}, 
-                   emptyBuiler::Type{<:FiniteDict{0}}=TypedEmptyDict)
-    if isempty(ps)
-        emptyBuiler()
-    elseif length(ps) == 1
-        buildDict(ps|>first)
-    else
-        Dict(ps)
-    end
-end
+haskey(::TypedEmptyDict{K}, ::K) where {K} = false
 
-buildDict(::Tuple{}, emptyBuiler::Type{<:FiniteDict{0}}=TypedEmptyDict) = emptyBuiler()
+get(::TypedEmptyDict{K}, ::K, default::Any) where {K} = itself(default)
 
-buildDict(emptyBuiler::Type{<:FiniteDict{0}}=TypedEmptyDict) = buildDict((), emptyBuiler)
+get!(::TypedEmptyDict{K, V}, ::K, default::V) where {K, V} = itself(default)
 
+get!(f::Function, ::TypedEmptyDict{K}, ::K) where {K} = f()
 
-isempty(::SingleEntryDict) = false
-isempty(::TypedEmptyDict) = true
-
-length(::FiniteDict{N}) where {N} = N
-
-collect(d::SingleEntryDict{K, T}) where {K, T} = Memory{Pair{K, T}}([d.key => d.value])
-collect(::TypedEmptyDict{K, T}) where {K, T} = Memory{Pair{K, T}}(undef, 0)
-
-function get(d::SingleEntryDict{K}, key::K, default::Any) where {K}
-    ifelse(key == d.key, d.value, default)
-end
-
-keys(d::SingleEntryDict) = Set((d.key,))
-keys(::TypedEmptyDict{K}) where {K} = Set{K}()
-
-values(d::SingleEntryDict) = Set((d.value,))
-values(::TypedEmptyDict{<:Any, T}) where {T} = Set{T}()
-
-function getindex(d::SingleEntryDict{K}, key::K) where {K}
-    if key == d.key
-        d.value
-    else
-        throw(KeyError(key))
-    end
-end
+setindex!(d::TypedEmptyDict{K, V}, ::V, ::K) where {K, V} = itself(d)
 
 function getindex(::T, key) where {T<:TypedEmptyDict}
     throw(AssertionError("This dictionary (`::$T`) is meant to be empty."))
 end
 
-function iterate(d::SingleEntryDict, state::Int)
-    if state <= 1
-        (d.key => d.value, 2)
-    else
-        nothing
+iterate(::TypedEmptyDict, ::Int) = nothing
+iterate(d::TypedEmptyDict) = iterate(d, 1)
+
+
+struct IndexDict{K, T} <: EqualityDict{K, T}
+    indexer::Dict{K, OneToIndex}
+    storage::Vector{Pair{K, T}}
+
+    function IndexDict{K, T}() where {K, T}
+        (K <: OneToIndex) && throw(ArgumentError("K::Type{$K} cannot be `OneToIndex`."))
+        new{K, T}(Dict{K, OneToIndex}(), Pair{K, T}[])
     end
 end
 
-iterate(::TypedEmptyDict, state::Int) = nothing
+length(d::IndexDict) = length(d.storage)
 
-iterate(d::FiniteDict) = iterate(d, 1)
+collect(d::IndexDict) = copy(d.storage)
+
+function haskey(d::IndexDict{K}, key::K) where {K}
+    haskey(d.indexer, key)
+end
+
+function get(d::IndexDict{K, V}, key::K, default::V) where {K, V}
+    res = get(d.indexer, key, nothing)
+    res === nothing ? default : getEntry(d.storage, res).second
+end
+
+function get!(d::IndexDict{K, V}, key::K, default::V) where {K, V}
+    index = get(d.indexer, key, nothing)
+    if index === nothing
+        d.indexer[key] = OneToIndex(length(d.storage) + 1)
+        push!(d.storage, key=>default)
+        default
+    else
+        getEntry(d.storage, index).second
+    end
+end
+
+function getindex(d::IndexDict{K}, accessor) where {K}
+    index = if accessor isa OneToIndex
+        accessor
+    else
+        keyType = typeof(accessor)
+        (keyType <: K) || throw(AssertionError("accessor::$keyType is not a valid key."))
+        getindex(d.indexer, accessor)
+    end
+    getEntry(d.storage, index).second
+end
+
+function setindex!(d::IndexDict{K, V}, value::V, accessor) where {K, V}
+    pairs = d.storage
+
+    if accessor isa OneToIndex
+        localIndex = shiftLinearIndex(values, accessor)
+        key, _ = getindex(pairs, localIndex)
+        setindex!(pairs, key=>value, localIndex)
+    else
+        index = if haskey(d.indexer, accessor)
+            localIndex = shiftLinearIndex(pairs, getindex(d.indexer, accessor))
+            setindex!(pairs, accessor=>value, localIndex)
+        else
+            push!(pairs, accessor=>value)
+            (OneToIndex∘length)(pairs)
+        end
+        setindex!(d.indexer, index, accessor)
+    end
+
+    d
+end
+
+iterate(d::IndexDict, state) = iterate(d.storage, state)
+iterate(d::IndexDict) = iterate(d.storage)
+
+indexKey(d::IndexDict, index::OneToIndex) = getindex(d.storage, index).first
+
+keyIndex(d::IndexDict{K}, key::K) where {K} = getindex(d.indexer, key)
 
 
 struct EgalBox{T} <: QueryBox{T}
@@ -496,3 +524,43 @@ function safelySetVal!(box::AbstractArray, val)
 end
 
 setindex!(al::AtomicLocker, val) = safelySetVal!(al, val)
+
+
+struct MemoryPair{L, R} <: QueryBox{Pair{L, R}}
+    left::Memory{L}
+    right::Memory{R}
+
+    function MemoryPair(left::AbstractVector{L}, right::AbstractVector{R}) where {L, R}
+        if length(left) != length(right)
+            throw(AssertionError("`left` and `right` should have the same length."))
+        end
+
+        lData = extractMemory(left)
+        rData = extractMemory(right)
+        new{eltype(lData), eltype(rData)}(lData, rData)
+    end
+end
+
+function iterate(mp::MemoryPair)
+    res = iterate(zip(mp.left, mp.right))
+    if res === nothing
+        nothing
+    else
+        (l, r), state = res
+        (l=>r), state
+    end
+end
+
+function iterate(mp::MemoryPair, state)
+    res = iterate(zip(mp.left, mp.right), state)
+    if res === nothing
+        nothing
+    else
+        (l, r), state = res
+        (l=>r), state
+    end
+end
+
+length(mp::MemoryPair) = length(mp.left)
+
+eltype(::MemoryPair{L, R}) where {L, R} = Pair{L, R}

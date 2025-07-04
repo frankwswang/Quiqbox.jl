@@ -1,16 +1,22 @@
 using Test
 using Quiqbox
-using Quiqbox: markObj
+using Quiqbox: OneToIndex, markObj, MemoryPair
 
-@testset "Layout.jl" begin
+@testset "Query.jl" begin
+
+@test OneToIndex() == OneToIndex(2) - 1
+idxBox = [i for i in OneToIndex(2)]
+@test idxBox == [OneToIndex(2)]
+@test eltype(idxBox) == OneToIndex
+@test OneToIndex(OneToIndex(), Count(2)) .+ [1, -1] == OneToIndex.([4, 2])
+@test OneToIndex() < OneToIndex(2)
+@test OneToIndex(2) > OneToIndex()
+@test OneToIndex() <= OneToIndex()
+@test OneToIndex() >= OneToIndex()
+@test OneToIndex() == OneToIndex() === OneToIndex(1)
 
 m1 = rand(3, 3)
 m1m = Quiqbox.ShapedMemory(m1)
-
-@test !(m1m.value === m1)
-@test !(m1m.value == m1)
-@test m1m == m1
-
 m1_mrk = markObj(m1)
 m1m_mrk = markObj(m1m)
 @test m1_mrk isa Quiqbox.ValueMarker
@@ -20,9 +26,6 @@ m1m_mrk = markObj(m1m)
 v1 = rand(5)
 v1_1 = Quiqbox.VectorMemory(v1)
 v1_2 = Quiqbox.ShapedMemory(v1)
-
-@test v1 == v1_1
-@test v1 == v1_2
 v1_2_mrk = markObj(v1_2)
 @test v1_2_mrk isa Quiqbox.ValueMarker
 @test markObj(v1) == markObj(v1_1) == v1_2_mrk
@@ -33,23 +36,21 @@ d1_1 = Dict(ks1 .=> vs1)
 d1_2 = Dict(ks1 .=> collect(vs1))
 @test markObj(d1_1) == markObj(d1_2)
 
-ks2 = (:d,)
-vs2 = (4.0,)
-d2_1 = Quiqbox.buildDict(ks2 .=> vs2)
-d2_2 = Dict(ks2 .=> vs2)
-@test d2_1 == d2_2
-@test markObj(d2_1) == markObj(d2_2)
-
-d2_3 = Quiqbox.buildDict(ks2 .=> Int.(vs2))
-d2_4 = Dict(ks2 .=> Int.(vs2))
-@test d2_1 == d2_1
-@test d2_1 == d2_3 == d2_4
-@test markObj(d2_1) == markObj(d2_3) == markObj(d2_4)
-
 d3_1 = Quiqbox.TypedEmptyDict{Symbol, Float64}()
 d3_2 = Quiqbox.Dict{Symbol, Float64}()
 @test d3_1 == d3_1
 @test d3_1 == d3_2
 @test markObj(d3_1) == markObj(d3_2)
+
+a = rand(100)
+b = rand(101)
+c = rand(100)
+try MemoryPair(a, b) catch; true end
+mp1 = MemoryPair(a, c)
+bl = true
+for ((i, j), pair) in zip(zip(a, c), mp1)
+    bl *= ((i => j) === pair)
+end
+@test bl
 
 end

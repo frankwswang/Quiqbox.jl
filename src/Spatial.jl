@@ -60,7 +60,7 @@ const NullaryFieldFunc{T<:Real, D, C<:RealOrComplex{T}, F<:AbstractParamFunc} =
       FieldParamFunc{T, D, C, F, VoidSetFilter}
 
 
-struct StashedField{C<:RealOrComplex, D, F<:AbstractParamFunc, 
+struct StashedField{T, D, C<:RealOrComplex{T}, F<:AbstractParamFunc, 
                     V<:OptSpanValueSet} <: FieldAmplitude{C, D}
     core::TypedCarteFunc{C, D, F}
     data::V
@@ -73,13 +73,13 @@ struct StashedField{C<:RealOrComplex, D, F<:AbstractParamFunc,
         encoder = last(fInner.encode)
         obtainInner = Base.Fix1(obtainCore!, cache!Self)
         paramData = getEntry(paramSet, encoder.core.f.entry, obtainInner)
-        new{C, D, typeof(fInner.binder), typeof(paramData)}(core, paramData)
+        new{T, D, C, typeof(fInner.binder), typeof(paramData)}(core, paramData)
     end
 end
 
 (f::StashedField)(input) = f.core(input, f.data)
 
-getOutputType(::Type{<:StashedField{C}}) where {C<:RealOrComplex} = C
+getOutputType(::Type{<:StashedField{T, D, C}}) where {T<:Real, D, C<:RealOrComplex{T}} = C
 
 needFieldAmpEvalCache(::StashedField) = false
 
@@ -88,7 +88,7 @@ function evalFieldAmplitudeCore(f::StashedField, input)
 end
 
 function unpackFieldFunc(f::F, ::Boolean=False()) where 
-                        {D, C<:RealOrComplex, F<:StashedField{C, D}}
+                        {T, C<:RealOrComplex{T}, D, F<:StashedField{T, D, C}}
     TypedCarteFunc(RPartial(f.core.f.f, f.data), C, Count(D)), initializeSpanParamSet()
 end
 
@@ -430,7 +430,6 @@ function unpackFieldFunc(f::F, directUnpack::Boolean=False()) where
     TypedCarteFunc(ParamPipeline((shifter, fInner.f.f)), T, Count(D)), paramSet
 end
 
-# const FieldCenterShifter{T<:Real, D, M<:ChainMapper{ <:NTuple{D, Function} }} = 
 const FieldCenterShifter{T<:Real, D, M<:ChainMapper{ <:NTuple{D, Function} }} = 
       ContextParamFunc{StableTupleSub{NTuple{D, T}}, CartesianFormatter{D, NTuple{D, T}}, M}
 
@@ -445,14 +444,13 @@ const ShiftedPolyGaussField{T<:Real, D, F<:PolyGaussFunc{T, D},
                             R<:NTuple{ D, UnitParam{T} }} = 
       ShiftedField{T, D, T, F, R}
 
-const StashedShiftedFieldFunc{T<:Real, D, C<:RealOrComplex{T}, F<:AbstractParamFunc, 
+const StashedShiftedField{T<:Real, D, C<:RealOrComplex{T}, F<:AbstractParamFunc, 
                               R<:FieldCenterShifter{T, D}, V<:OptSpanValueSet} = 
-      StashedField{C, D, ShiftedFieldFuncCore{T, D, F, R}, V}
+      StashedField{T, D, C, ShiftedFieldFuncCore{T, D, F, R}, V}
 
 const FloatingPolyGaussField{T<:Real, D, F<:PolyGaussFieldCore{T, D}, 
                              R<:FieldCenterShifter{T, D}, V<:OptSpanValueSet} = 
-      StashedShiftedFieldFunc{T, D, T, F, R, V}
-
+      StashedShiftedField{T, D, T, F, R, V}
 
 
 #= Additional Method =#

@@ -109,7 +109,15 @@ struct MemoryLinker{T, A<:AbstractArray{T}} <: AbstractArray{T, 1}
     end
 end
 #> Iteration interface
-iterate(arr::MemoryLinker) = iterate(arr, firstindex(arr.scope))
+function iterate(arr::MemoryLinker)
+    res = iterate(arr.scope)
+    if res === nothing
+        nothing
+    else
+        indexer, state = res
+        getEntry(arr.value, indexer), state
+    end
+end
 function iterate(arr::MemoryLinker, state)
     res = iterate(arr.scope, state)
     if res === nothing
@@ -192,7 +200,11 @@ ShapedMemory(extractMemory(value), shape)
 
 ShapedMemory(::Type{T}, value::AbstractArray{T}) where {T} = ShapedMemory(value)
 
-ShapedMemory(::Type{T}, value::T) where {T} = ShapedMemory( fill(value) )
+function ShapedMemory(::Type{T}, value::T) where {T}
+    res = ShapedMemory{T}(undef, ())
+    res[] = value
+    res
+end
 #> Iteration interface
 iterate(arr::ShapedMemory) = iterate(arr.value)
 iterate(arr::ShapedMemory, state) = iterate(arr.value, state)

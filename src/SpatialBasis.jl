@@ -176,7 +176,7 @@ end
 
 struct PrimOrbData{T<:Real, D, C<:RealOrComplex{T}, F<:AbstractParamFunc, 
                    R<:FieldCenterShifter{T, D}, S<:OptSpanValueSet} <: ConfigBox
-    core::StashedField{C, D, ShiftedFieldFuncCore{T, D, F, R}, S}
+    core::StashedShiftedField{T, D, C, F, R, S}
     renormalize::Bool
 end
 
@@ -346,7 +346,7 @@ function genOrbitalDataCore!(fieldCache::FieldParamFuncCache{T, D},
                              orbs::N24Tuple{OrbitalBasis{<:RealOrComplex{T}, D}}, 
                              directUnpack::Boolean) where 
                             {T<:Real, D}
-    lazyTupleMap(orbs) do orb
+    lazyMap(orbs) do orb
         genOrbitalDataCore!(fieldCache, paramCache, paramSet, orb, directUnpack)
     end
 end

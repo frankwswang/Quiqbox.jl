@@ -1,7 +1,7 @@
 abstract type Box <: Any end
 abstract type AnyInterface <: Any end
 
-abstract type EqualityDict{K, T} <: AbstractDict{K, T} end
+abstract type EqualityDict{K, V} <: AbstractDict{K, V} end
 
 abstract type CompositeFunction <: Function end # composite-type function
 
@@ -31,6 +31,7 @@ abstract type DirectOperator{N} <: Modifier end # N: Number of input functions
 abstract type EstimatorConfig{T} <: ConfigBox end
 abstract type CustomAccessor <: ConfigBox end
 abstract type StructuredType <: ConfigBox end
+abstract type CustomRange <: ConfigBox end
 
 abstract type IdentityMarker{T} <: MarkerBox end
 abstract type StorageMarker{T} <: MarkerBox end
@@ -93,11 +94,11 @@ const ArithmeticOperator = Union{typeof(+), typeof(-), typeof(*), typeof(/)}
 
 import Base: iterate, size, getindex, setindex!, IndexStyle, zero, similar
 
-import Base: get, keys, values, hash, isempty, collect, length
+import Base: get, get!, haskey, hash, collect, length, eltype
 
 import Base: broadcastable
 
-import Base: +, -, ==
+import Base: +, -, ==, isless
 
 import Base: Int
 

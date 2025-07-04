@@ -59,6 +59,12 @@ shpMem1c = copy(shpMem1)
 shpMem1c[1] += 1
 @test shpMem1c != shpMem1
 @test typeof(shpMem1c|>decoupledCopy) == typeof(shpMem1c)
+shpMem7 = ShapedMemory(Float64, 1.0)
+@test eltype(shpMem7) == Float64
+@test length(shpMem7) == 1
+@test size(shpMem7) == ()
+shpMem7[] = 2
+@test shpMem7[] === 2.0
 
 pckMem1 = PackedMemory(shpMem1)
 @test getNestedLevel(pckMem1|>typeof).level == 1
