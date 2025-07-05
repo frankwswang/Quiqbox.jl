@@ -129,6 +129,12 @@ end
 function evaluateIntegral!(config::OrbitalCoreIntegralConfig{T, D, C, N, F}, 
                            pairwiseData::NTuple{N, NTuple{ 2, PrimOrbData{T, D} }}) where 
                           {T, C<:RealOrComplex{T}, D, N, F<:DirectOperator}
+    evaluateIntegralCore(config, pairwiseData)
+end
+
+function evaluateIntegralCore(config::OrbitalCoreIntegralConfig{T, D, C, N, F}, 
+                              pairwiseData::NTuple{N, NTuple{ 2, PrimOrbData{T, D} }}) where 
+                             {T, C<:RealOrComplex{T}, D, N, F<:DirectOperator}
     formattedOp = TypedOperator(config.operator, C)
     estimateOrbIntegral(config.estimator, formattedOp, pairwiseData)::C
 end
