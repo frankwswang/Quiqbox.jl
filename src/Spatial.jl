@@ -169,14 +169,14 @@ end
 function unpackFieldFunc(f::F, directUnpack::Boolean=False()) where 
                         {D, C<:RealOrComplex, F<:EncodedField{C, D}}
     paramSet = initializeSpanParamSet()
-    innerFuncPair = map((f.encode.f, f.core.f)) do fCore
+    encoder, coreFunc = map((f.encode.f, f.core.f)) do fCore
         if fCore isa FieldAmplitude
             unpackFunc!(fCore, paramSet, directUnpack, paramSetId=Identifier())
         else
             unpackFunc!(fCore, paramSet, paramSetId=Identifier())
         end
     end
-    TypedCarteFunc(ParamPipeline(innerFuncPair), C, Count(D)), paramSet
+    TypedCarteFunc(ParamPipeFunc(encoder, coreFunc), C, Count(D)), paramSet
 end
 
 
@@ -184,7 +184,7 @@ const WrappedField{C<:RealOrComplex, D, F<:Function} = EncodedField{C, D, F, Its
 
 const EncodedFieldFunc{T<:Real, D, C<:RealOrComplex{T}, E<:AbstractParamFunc, 
                        F<:AbstractParamFunc, S<:SpanSetFilter} = 
-      FieldParamFunc{T, D, C, ParamPipeline{Tuple{E, F}}, S}
+      FieldParamFunc{T, D, C, ParamPipeFunc{F, E}, S}
 
 
 const RadialField{C<:RealOrComplex, D, F<:FieldAmplitude{C, 1}} = 
@@ -311,7 +311,7 @@ function unpackFieldFunc(f::F, directUnpack::Boolean=False()) where
         getSubIdx = ViewOneToRange(idx, Count{basisDim}())
         idx += basisDim
         basisCore = unpackFunc!(basis, paramSet, directUnpack, paramSetId=Identifier())
-        ParamPipeline((InputConverter(getSubIdx), basisCore))
+        ParamPipeFunc(InputConverter(getSubIdx), basisCore)
     end
 
     TypedCarteFunc(ParamCombiner(StableMul(C), basisCores), C, Count(D)), paramSet
@@ -427,14 +427,14 @@ function unpackFieldFunc(f::F, directUnpack::Boolean=False()) where
     mapper, _ = genParamMapper(f.center, negate(directUnpack), paramSet!Self=paramSet)
     shiftCore = StableTupleSub(T, Count(D))
     shifter = ContextParamFunc(shiftCore, CartesianFormatter(T, Count(D)), mapper)
-    TypedCarteFunc(ParamPipeline((shifter, fInner.f.f)), T, Count(D)), paramSet
+    TypedCarteFunc(ParamPipeFunc(shifter, fInner.f.f), T, Count(D)), paramSet
 end
 
 const FieldCenterShifter{T<:Real, D, M<:ChainMapper{ <:NTuple{D, Function} }} = 
       ContextParamFunc{StableTupleSub{NTuple{D, T}}, CartesianFormatter{D, NTuple{D, T}}, M}
 
 const ShiftedFieldFuncCore{T<:Real, D, F<:AbstractParamFunc, R<:FieldCenterShifter{T, D}} = 
-      ParamPipeline{Tuple{R, F}}
+      ParamPipeFunc{F, R}
 
 const ShiftedFieldFunc{T<:Real, D, C<:RealOrComplex{T}, F<:ShiftedFieldFuncCore{T, D}, 
                        S<:SpanSetFilter} = 
@@ -444,13 +444,13 @@ const ShiftedPolyGaussField{T<:Real, D, F<:PolyGaussFunc{T, D},
                             R<:NTuple{ D, UnitParam{T} }} = 
       ShiftedField{T, D, T, F, R}
 
-const StashedShiftedField{T<:Real, D, C<:RealOrComplex{T}, F<:AbstractParamFunc, 
-                              R<:FieldCenterShifter{T, D}, V<:OptSpanValueSet} = 
-      StashedField{T, D, C, ShiftedFieldFuncCore{T, D, F, R}, V}
+const StashedShiftedField{T<:Real, D, C<:RealOrComplex{T}, F<:ShiftedFieldFuncCore{T, D}, 
+                          V<:OptSpanValueSet} = 
+      StashedField{T, D, C, F, V}
 
 const FloatingPolyGaussField{T<:Real, D, F<:PolyGaussFieldCore{T, D}, 
                              R<:FieldCenterShifter{T, D}, V<:OptSpanValueSet} = 
-      StashedShiftedField{T, D, T, F, R, V}
+      StashedShiftedField{T, D, T, F, V}
 
 
 #= Additional Method =#
