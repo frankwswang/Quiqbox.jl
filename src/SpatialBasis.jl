@@ -1,4 +1,4 @@
-export PrimitiveOrb, CompositeOrb, genGaussTypeOrb, genOrbitalData
+export PrimitiveOrb, CompositeOrb, genGaussTypeOrb
 
 (::SelectTrait{InputStyle})(::OrbitalBasis{C, D}) where {C<:RealOrComplex, D} = 
 CartesianInput{D}()
@@ -166,205 +166,11 @@ function getNormFactor(orb::ComposedOrb{T, D, C}) where {T<:Real, D, C<:RealOrCo
     if isRenormalized(orb)
         constructor = getfield(Quiqbox, nameof(orb))
         orbInner = constructor(orb, renormalize=false)
-        overlapVal = computeIntegral(OneBodyIntegral{D}(), genOverlapSampler(), (orbInner,))
+        overlapVal = computeLayoutIntegral(genOverlapSampler(), (orbInner, orbInner))
         convert(C, absSqrtInv(overlapVal))
     else
         one(C)
     end
-end
-
-
-struct PrimOrbData{T<:Real, D, C<:RealOrComplex{T}, F<:AbstractParamFunc, 
-                   R<:FieldCenterShifter{T, D}, S<:OptSpanValueSet} <: ConfigBox
-    core::StashedShiftedField{T, D, C, F, R, S}
-    renormalize::Bool
-end
-
-const PGTOrbData{T<:Real, D, F<:PolyGaussFieldCore{T, D}, R<:FieldCenterShifter{T, D}, 
-                 S<:OptSpanValueSet} = 
-      PrimOrbData{T, D, T, F, R, S}
-
-struct CompOrbData{T<:Real, D, C<:RealOrComplex{T}, B<:PrimOrbData{T, D}} <: ConfigBox
-    basis::Memory{B}
-    weight::Memory{C}
-    renormalize::Bool
-end
-
-const OrbitalData{T<:Real, D, C<:RealOrComplex{T}} = 
-      Union{PrimOrbData{T, D, C}, CompOrbData{T, D, C}}
-
-
-const PrimOrbDataVec{T<:Real, D} = AbstractVector{<:PrimOrbData{T, D}}
-
-const OrbDataVec{T<:Real, D} = AbstractVector{<:OrbitalData{T, D}}
-
-const OrbDataTpl{T<:Real, D} = NonEmptyTuple{OrbitalData{T, D}}
-
-const OrbDataCollection{T<:Real, D} = Union{OrbDataVec{T, D}, OrbDataTpl{T, D}}
-
-const OrbDataSource{T<:Real, D} = Union{OrbitalData{T, D}, OrbDataCollection{T, D}}
-
-
-getPrimOrbDataTypeUnion(::T) where {T<:PrimOrbData} = T
-
-function getPrimOrbDataTypeUnion(data::CompOrbData{T, D}) where {T<:Real, D}
-    typeintersect(getMinimalEleType(data.basis), PrimOrbData{T, D})
-end
-
-function getPrimOrbDataTypeUnion(data::OrbDataCollection{T, D}) where {T<:Real, D}
-    checkEmptiness(data, :data)
-    res = mapreduce(strictTypeJoin, data) do ele
-        getPrimOrbDataTypeUnion(ele)
-    end
-    typeintersect(res, PrimOrbData{T, D})
-end
-
-
-getOrbOutputTypeUnion(::Type{<:OrbitalData{T, D, C}}) where {T, D, C<:RealOrComplex{T}} = C
-
-getOrbOutputTypeUnion(::T) where {T<:OrbitalData} = getOrbOutputTypeUnion(T)
-
-getOrbOutputTypeUnion(::AbstractVector{<:OrbitalData{T, D, C}}) where 
-                     {T<:Real, D, C<:RealOrComplex{T}} = C
-
-getOrbOutputTypeUnion(::NonEmptyTuple{OrbitalData{T, D, C}}) where 
-                     {T<:Real, D, C<:RealOrComplex{T}} = C
-
-function getOrbOutputTypeUnion(orbsData::OrbDataCollection{T, D}) where {T<:Real, D}
-    if isempty(orbsData)
-        getOrbOutputTypeUnion(orbsData|>eltype)
-    else
-        mapreduce(getOrbOutputTypeUnion, strictTypeJoin, orbsData)
-    end::Union{Type{Complex{T}}, Type{T}}
-end
-
-
-const MixedFieldParamFuncCacheCore{T, D, C<:RealOrComplex{T}} = 
-      LRU{EgalBox{ShiftedField{T, D, C}}, ShiftedFieldFunc{T, D, C}}
-
-struct MixedFieldParamFuncCache{T<:Real, D
-                                } <: QueryBox{Union{ FieldParamFunc{T, D, T}, 
-                                                     FieldParamFunc{T, D, Complex{T}} }}
-    real::MixedFieldParamFuncCacheCore{T, D, T}
-    complex::MixedFieldParamFuncCacheCore{T, D, Complex{T}}
-end
-
-const TypedFieldParamFuncCache{T<:Real, D, C<:RealOrComplex{T}, F<:ShiftedField{T, D, C}} = 
-      LRU{EgalBox{F}, ShiftedFieldFunc{T, D, C}}
-
-const FieldParamFuncCache{T<:Real, D} = 
-      Union{MixedFieldParamFuncCache{T, D}, TypedFieldParamFuncCache{T, D}}
-
-getBasisInnerType(::Type{F}) where {C<:RealOrComplex, D, B, F<:OrbitalBasis{C, D, B}} = 
-(B <: OrbitalBasis ? getBasisInnerType(B) : B)
-
-function genFieldParamFuncCache(::Type{F}, maxSize::Int=200) where 
-                               {T<:Real, D, F<:OrbitalBasis{<:RealOrComplex{T}, D}}
-    checkPositivity(maxSize)
-    if isconcretetype(F)
-        fieldType = getBasisInnerType(F)
-        valueType = getOutputType(fieldType)
-        TypedFieldParamFuncCache{T, D, valueType, fieldType}(maxsize=maxSize)
-    else
-        rSector = MixedFieldParamFuncCacheCore{T, D, T}(maxsize=maxSize)
-        cSector = MixedFieldParamFuncCacheCore{T, D, Complex{T}}(maxsize=maxSize)
-        MixedFieldParamFuncCache(rSector, cSector)
-    end
-end
-
-
-
-function genCachedFieldFunc!(fieldCache::MixedFieldParamFuncCache{T, D}, 
-                             paramCache::ParamDataCache, 
-                             orb::PrimitiveOrb{T, D, C}, 
-                             paramSet::OptSpanParamSet, directUnpack::Boolean) where 
-                            {T<:Real, D, C<:RealOrComplex{T}}
-    sector = C <: Real ? :real : :complex
-    f = get!(getfield(fieldCache, sector), EgalBox{ShiftedField{T, D, C}}(orb.field)) do
-        unpackFunc!(orb.field, paramSet, directUnpack)
-    end
-    StashedField(f, paramSet, paramCache)
-end #!! Incorporate `genCachedFieldFunc!` into `unpackFunc`
-
-function genCachedFieldFunc!(fieldCache::TypedFieldParamFuncCache{T, D, C, F}, 
-                             paramCache::ParamDataCache, 
-                             orb::PrimitiveOrb{T, D, C, F}, 
-                             paramSet::OptSpanParamSet, directUnpack::Boolean) where 
-                            {T<:Real, D, C<:RealOrComplex{T}, F<:ShiftedField{T, D, C}}
-    f = get!(fieldCache, EgalBox{F}(orb.field)) do
-        unpackFunc!(orb.field, paramSet, directUnpack)
-    end
-    StashedField(f, paramSet, paramCache)
-end
-
-
-function genOrbitalDataCore!(fieldCache::FieldParamFuncCache{T, D}, 
-                             paramCache::ParamDataCache, 
-                             paramSet::OptSpanParamSet, 
-                             orb::PrimitiveOrb{T, D, C}, 
-                             directUnpack::Boolean) where 
-                            {T<:Real, D, C<:RealOrComplex{T}}
-    coreField = genCachedFieldFunc!(fieldCache, paramCache, orb, paramSet, directUnpack)
-    PrimOrbData(coreField, orb.renormalize)
-end
-
-function genOrbitalDataCore!(fieldCache::FieldParamFuncCache{T, D}, 
-                             paramCache::ParamDataCache, 
-                             paramSet::OptSpanParamSet, 
-                             orb::CompositeOrb{T, D}, 
-                             directUnpack::Boolean) where {T<:Real, D}
-    basisData = map(orb.basis) do basis
-        genOrbitalDataCore!(fieldCache, paramCache, paramSet, basis, directUnpack)
-    end
-    weightData = cacheParam!(paramCache, orb.weight)
-    CompOrbData(basisData, extractMemory(weightData), orb.renormalize)
-end
-
-const OrbBasisVec{T<:Real, D} = AbstractVector{<:OrbitalBasis{<:RealOrComplex{T}, D}}
-
-const OrbBasisTpl{T<:Real, D} = NonEmptyTuple{OrbitalBasis{<:RealOrComplex{T}, D}}
-
-const OrbBasisCollection{T<:Real, D} = Union{OrbBasisVec{T, D}, OrbBasisTpl{T, D}}
-
-const OrbBasisSource{T<:Real, D} = 
-      Union{OrbitalBasis{<:RealOrComplex{T}, D}, OrbBasisCollection{T, D}}
-
-function genOrbitalDataCore!(fieldCache::FieldParamFuncCache{T, D}, 
-                             paramCache::ParamDataCache, 
-                             paramSet::OptSpanParamSet, 
-                             orbs::OrbBasisCollection{T, D}, 
-                             directUnpack::Boolean) where {T<:Real, D}
-    checkEmptiness(orbs, :orbs)
-    map(orbs) do orb
-        genOrbitalDataCore!(fieldCache, paramCache, paramSet, orb, directUnpack)
-    end
-end
-
-function genOrbitalDataCore!(fieldCache::FieldParamFuncCache{T, D}, 
-                             paramCache::ParamDataCache, 
-                             paramSet::OptSpanParamSet, 
-                             orbs::N24Tuple{OrbitalBasis{<:RealOrComplex{T}, D}}, 
-                             directUnpack::Boolean) where 
-                            {T<:Real, D}
-    lazyMap(orbs) do orb
-        genOrbitalDataCore!(fieldCache, paramCache, paramSet, orb, directUnpack)
-    end
-end
-
-function genOrbitalData(orbBases::B, directUnpack::Boolean=False(); 
-                        cache!Self::ParamDataCache=initializeParamDataCache()) where 
-                       {T<:Real, D, B<:OrbBasisCollection{T, D}}
-    paramSet = initializeSpanParamSet()
-    coreCache = genFieldParamFuncCache(B|>eltype)
-    genOrbitalDataCore!(coreCache, cache!Self, paramSet, orbBases, directUnpack)
-end
-
-function genOrbitalData(orbBasis::F, directUnpack::Boolean=False(); 
-                        cache!Self::ParamDataCache=initializeParamDataCache()) where 
-                       {F<:OrbitalBasis}
-    paramSet = initializeSpanParamSet()
-    coreCache = genFieldParamFuncCache(F)
-    genOrbitalDataCore!(coreCache, cache!Self, paramSet, orbBasis, directUnpack)
 end
 
 
@@ -399,3 +205,152 @@ function genGaussTypeOrb(center::NonEmptyTuple{UnitOrVal{T}, D},
     end
     CompositeOrb(primGTOs, cons, renormalize=outerRenormalize)
 end
+
+
+const OrbBasisVector{T<:Real, D} = AbstractVector{<:OrbitalBasis{<:RealOrComplex{T}, D}}
+
+const OrbBasisLayout{T<:Real, D} = N24Tuple{OrbitalBasis{<:RealOrComplex{T}, D}}
+
+const OrbBasisCluster{T<:Real, D} = Union{OrbBasisVector{T, D}, OrbBasisLayout{T, D}}
+
+
+function getOutputType(orbitals::OrbBasisCluster{T, D}) where {T<:Real, D}
+    checkEmptiness(orbitals, :orbitals)
+    orbType = eltype(orbitals)
+    if isconcretetype(orbType)
+        getOutputType(orbType)
+    else
+        mapreduce(getOutputType, strictTypeJoin, orbitals)
+    end::Type{<:RealOrComplex{T}}
+end
+
+
+struct PrimOrbPointer{D, C<:RealOrComplex} <: CustomAccessor
+    inner::OneToIndex
+    renormalize::Bool
+end
+
+struct CompOrbPointer{D, C<:RealOrComplex} <: CustomAccessor
+    inner::MemoryPair{PrimOrbPointer{D, C}, C}
+    renormalize::Bool
+end
+
+const OrbitalPointer{D, C<:RealOrComplex} = 
+      Union{PrimOrbPointer{D, C}, CompOrbPointer{D, C}}
+
+getOutputType(::OrbitalPointer{D, C}) where {D, C<:RealOrComplex} = C
+
+strictTypeJoin(::Type{CompOrbPointer{D, C}}, ::Type{PrimOrbPointer{D, C}}) where 
+              {D, C<:RealOrComplex}= 
+OrbitalPointer{D, C}
+
+strictTypeJoin(::Type{PrimOrbPointer{D, C}}, ::Type{CompOrbPointer{D, C}}) where 
+              {D, C<:RealOrComplex}= 
+OrbitalPointer{D, C}
+
+const ShiftedFieldConfigDict{T, D, F<:StashedShiftedField{T, D}} = 
+      IndexDict{FieldMarker{:StashedField, 2}, F}
+
+const ShiftedFieldMarkerDict{T<:Real, D} = 
+      Dict{EgalBox{ShiftedField{T, D}}, FieldMarker{:StashedField, 2}}
+
+
+function genOrbitalPointer!(::Type{C}, 
+                            configDict::ShiftedFieldConfigDict{T, D}, 
+                            markerDict::ShiftedFieldMarkerDict{T, D}, 
+                            orbital::PrimitiveOrb{T, D}, 
+                            directUnpack::Boolean, 
+                            paramSet::OptSpanParamSet, 
+                            paramCache::ParamDataCache) where 
+                           {T<:Real, D, C<:RealOrComplex{T}}
+    field = orbital.field
+    tracker = EgalBox{ShiftedField{T, D}}(field)
+
+    marker = if haskey(markerDict, tracker)
+        markerDict[tracker]
+    else
+        fieldFunc = unpackFunc!(field, paramSet, directUnpack)
+        fieldCore = StashedField(fieldFunc, paramSet, paramCache)
+        marker = markObj(fieldCore)
+        setindex!(markerDict, marker, tracker)
+        get!(configDict, marker, fieldCore)
+        marker
+    end
+
+    PrimOrbPointer{D, C}(keyIndex(configDict, marker), orbital.renormalize)
+end
+
+
+function genOrbitalPointer!(::Type{C}, 
+                            configDict::ShiftedFieldConfigDict{T, D}, 
+                            markerDict::ShiftedFieldMarkerDict{T, D}, 
+                            orbital::CompositeOrb{T, D}, 
+                            directUnpack::Boolean, 
+                            paramSet::OptSpanParamSet, 
+                            paramCache::ParamDataCache) where 
+                           {T<:Real, D, C<:RealOrComplex{T}}
+    weightValue = convert(Memory{C}, cacheParam!(paramCache, orbital.weight))
+    primOrbPtrs = map(orbital.basis) do o
+        genOrbitalPointer!(C, configDict, markerDict, o, directUnpack, paramSet, paramCache)
+    end
+    CompOrbPointer{D, C}(MemoryPair(primOrbPtrs, weightValue), orbital.renormalize)
+end
+
+
+function initializeOrbitalConfigDict(::Type{T}, ::Count{D}, 
+                                     ::Type{F}=StashedShiftedField{T, D}) where 
+                                    {T, D, F<:StashedShiftedField{T, D}}
+    ShiftedFieldConfigDict{T, D, F}()
+end
+
+function cacheOrbitalData!(configDict::ShiftedFieldConfigDict{T, D}, 
+                           orbitals::OrbBasisCluster{T, D}, directUnpack::Boolean, 
+                           cache!Self::ParamDataCache=initializeParamDataCache()) where 
+                          {T<:Real, D}
+    checkEmptiness(orbitals, :orbitals)
+    paramSet = initializeSpanParamSet()
+    outputType = getOutputType(orbitals)
+    markerDict = ShiftedFieldMarkerDict{T, D}()
+    lazyMap(orbitals) do orb
+        genOrbitalPointer!(outputType, configDict, markerDict, orb, 
+                           directUnpack, paramSet, cache!Self)
+    end
+end
+
+const OrbPointerCollection{D, C<:RealOrComplex} = 
+      Union{Memory{ <:OrbitalPointer{D, C} }, N24Tuple{ OrbitalPointer{D, C} }}
+
+struct MultiOrbitalData{T, D, C<:RealOrComplex{T}, F<:StashedShiftedField{T, D}, 
+                        P<:OrbPointerCollection{D, C}} <: QueryBox{F}
+    config::Memory{F}
+    format::P
+
+    function MultiOrbitalData(orbitals::OrbBasisCluster{T, D}, 
+                              directUnpack::Boolean=False(); 
+                              cache!Self::ParamDataCache=initializeParamDataCache()) where 
+                             {T<:Real, D}
+        configDict = initializeOrbitalConfigDict(T, Count(D))
+        orbPointers = cacheOrbitalData!(configDict, orbitals, directUnpack, cache!Self)
+        format = orbitals isa AbstractVector ? genMemory(orbPointers) : orbPointers
+        config = genMemory(last.(configDict.storage))
+        new{T, D, getOutputType(orbitals), eltype(config), typeof(format)}(config, format)
+    end
+end
+
+const OrbitalVectorData{T, D, C<:RealOrComplex{T}, F<:StashedShiftedField{T, D}, 
+                        R<:OrbitalPointer{D, C}} = 
+      MultiOrbitalData{T, D, C, F, Memory{R}}
+
+const OrbitalLayoutData{T, D, C<:RealOrComplex{T}, F<:StashedShiftedField{T, D}, 
+                        P<:N24Tuple{ OrbitalPointer{D, C} }} = 
+      MultiOrbitalData{T, D, C, F, P}
+
+const OrbitalPairData{T, D, C<:RealOrComplex{T}, F<:StashedShiftedField{T, D}, 
+                      P<:NTuple{ 2, OrbitalPointer{D, C} }} = 
+      OrbitalLayoutData{T, D, C, F, P}
+
+const OrbitalQuadData{T, D, C<:RealOrComplex{T}, F<:StashedShiftedField{T, D}, 
+                      P<:NTuple{ 4, OrbitalPointer{D, C} }} = 
+      OrbitalLayoutData{T, D, C, F, P}
+
+getOutputType(::MultiOrbitalData{T, D, C}) where {T<:Real, D, C<:RealOrComplex{T}} = C

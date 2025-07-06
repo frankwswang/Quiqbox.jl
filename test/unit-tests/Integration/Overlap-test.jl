@@ -4,6 +4,7 @@ using Quiqbox: overlap, overlaps
 using LinearAlgebra: norm
 
 @testset "Overlap-Based Features" begin
+
 xpnL, xpnR = (1.0, 1.5)
 cenL, cenR = (2.0, 3.1)
 angL, angR = (2,   4  )
@@ -56,34 +57,6 @@ sto1 = Quiqbox.PolyRadialFunc(stf1, (1, 1, 0))
 @test Quiqbox.unpackFunc(sto1)[begin] isa Quiqbox.PolyRadialFieldFunc
 stoBasis1 = Quiqbox.PrimitiveOrb((1.0, 2.0, 3.0), sto1; renormalize=false)
 @test overlap(stoBasis1, stoBasis1) ≈ 4.7123889802878764
-# @profview overlap(stoBasis1, stoBasis1)
-
-# using BenchmarkTools
-# @benchmark overlap($stoBasis1, $stoBasis1)
-
-# julia> @benchmark overlap($stoBasis1, $stoBasis1)
-# BenchmarkTools.Trial: 4 samples with 1 evaluation per sample.
-#  Range (min … max):  1.299 s …   1.336 s  ┊ GC (min … max): 0.27% … 2.29%
-#  Time  (median):     1.313 s              ┊ GC (median):    0.53%
-#  Time  (mean ± σ):   1.315 s ± 15.546 ms  ┊ GC (mean ± σ):  0.91% ± 0.94%
-
-#   █                █         █                            █
-#   █▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁█▁▁▁▁▁▁▁▁▁█▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁█ ▁
-#   1.3 s          Histogram: frequency by time        1.34 s <
-
-#  Memory estimate: 107.77 MiB, allocs estimate: 791.
-
-# julia>   @benchmark overlap($stoBasis1, $stoBasis1) # 20250609
-# BenchmarkTools.Trial: 4 samples with 1 evaluation per sample.
-#  Range (min … max):  1.275 s …   1.317 s  ┊ GC (min … max): 0.25% … 2.18%
-#  Time  (median):     1.285 s              ┊ GC (median):    0.50%
-#  Time  (mean ± σ):   1.291 s ± 19.100 ms  ┊ GC (mean ± σ):  0.86% ± 0.89%
-
-#   █   █                 █                                 █  
-#   █▁▁▁█▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁█▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁█ ▁
-#   1.28 s         Histogram: frequency by time        1.32 s <
-
-#  Memory estimate: 107.76 MiB, allocs estimate: 417.
 
 sto2 = Quiqbox.PolyRadialFunc(stf1, (2,))
 stoBasis2 = Quiqbox.PrimitiveOrb((1.0,), sto2; renormalize=false)
@@ -94,9 +67,9 @@ stoBasis1n_c, stoBasis1n_s = Quiqbox.unpackFunc(stoBasis1n);
 overlap(stoBasis1n, stoBasis1n) ≈ 1
 s2 = sqrt(overlap(stoBasis1, stoBasis1)) # 2.170803763600724
 @test overlap(stoBasis1n, stoBasis1) ≈ overlap(stoBasis1, stoBasis1n) ≈ s2
-@test overlap(stoBasis1n, stoBasis1, lazyCompute=true) ≈ 
-      overlap(stoBasis1, stoBasis1n, lazyCompute=true) ≈ 
-      sqrt(overlap(stoBasis1, stoBasis1, lazyCompute=true)) ≈ s2
+@test overlap(stoBasis1n, stoBasis1, lazyCompute=Quiqbox.False()) ≈ 
+      overlap(stoBasis1, stoBasis1n, lazyCompute=Quiqbox.False()) ≈ 
+      sqrt(overlap( stoBasis1, stoBasis1, lazyCompute=Quiqbox.False() )) ≈ s2
 
 cen2 = (1.0, 1.5, 1.1)
 xpns2 = [1.5, 0.6]
@@ -119,7 +92,6 @@ s4 = overlap(cgf2n1, cgf2n3)
 @test overlap(cgf2n2, cgf2n2) ≈ 1
 @test overlap(cgf2n3, cgf2n3) ≈ 1
 @test !(overlap(cgf2n2, cgf2n3) ≈ 1)
-Quiqbox.decomposeOrbData(cgf2n2|>genOrbitalData)
 
 consH = [0.1543289673, 0.5353281423, 0.4446345422]
 bfH = genGaussTypeOrb((0., 0., 0.), [3.425250914, 0.6239137298, 0.1688554040], 
@@ -153,8 +125,8 @@ bsLiH = [bfH, bfLi1, bfLi2, bfLi3, bfLi4, bfLi5]
 @test all(Quiqbox.isRenormalized(o) for o in Quiqbox.splitOrb(bsLiH[1]))
 
 @test overlap(bsLiH[1], bsLiH[1]) ≈ 1
-@test overlap(bsLiH[1], bsLiH[1], lazyCompute=true) ≈ 1
-@test overlap(bsLiH[1], deepcopy(bsLiH[1]), lazyCompute=true) ≈ 1
+@test overlap(bsLiH[1], bsLiH[1], lazyCompute=Quiqbox.False()) ≈ 1
+@test overlap(bsLiH[1], deepcopy(bsLiH[1]), lazyCompute=Quiqbox.False()) ≈ 1
 
 gfHs = Quiqbox.splitOrb(bfH_t)
 s_gfHs = [0.3105569331128749 0.6834026444177144 0.8172189509285114; 

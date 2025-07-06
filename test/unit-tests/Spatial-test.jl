@@ -45,4 +45,8 @@ for a_x in 0:3
     @test pgf(( 1., 0., 0.)) == gf4_val1
 end
 
+pgto1 = genGaussTypeOrb((0., 1., 0.), 2.5, (1, 1, 0))
+pgto1Core, paramSet = Quiqbox.unpackFunc(pgto1.field)
+Quiqbox.StashedField(pgto1Core, paramSet) isa Quiqbox.FloatingPolyGaussField
+
 end

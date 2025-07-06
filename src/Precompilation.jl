@@ -16,7 +16,6 @@ function precompileField(field::FieldAmplitude{C, D}, ::Val{B}=Val(false)) where
 
         primBasisMD(centerInput)
         primBasisMN(centerInput)
-        genOrbitalData(primBasisMD)
 
         primBasesD = [primBasisMD, primBasisPD]
         primBasesN = [primBasisMN, primBasisPN]
@@ -29,7 +28,6 @@ function precompileField(field::FieldAmplitude{C, D}, ::Val{B}=Val(false)) where
         compBasisDD(centerInput)
         compBasisND(centerInput)
         compBasisNN(centerInput)
-        genOrbitalData(compBasisDD, True())
     end
 
     nothing

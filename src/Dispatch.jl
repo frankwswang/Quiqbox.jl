@@ -42,9 +42,9 @@ formatInput(f::Function, x) = formatInput(SelectTrait{InputStyle}()(f), x)
 
 abstract type IntegralStyle <: AnyInterface end
 
-struct MultiBodyIntegral{N, D} <: IntegralStyle end
-const OneBodyIntegral{D} = MultiBodyIntegral{1, D}
-const TwoBodyIntegral{D} = MultiBodyIntegral{2, D}
+struct MultiBodyIntegral{D, C, N} <: IntegralStyle end
+const OneBodyIntegral{D, C} = MultiBodyIntegral{D, C, 1}
+const TwoBodyIntegral{D, C} = MultiBodyIntegral{D, C, 2}
 
 
 strictTypeJoin(TL::Type, TR::Type) = typejoin(TL, TR)
