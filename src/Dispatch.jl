@@ -77,6 +77,8 @@ struct True  <: ValueType end
 struct False <: ValueType end
 const Boolean = Union{True, False}
 
+toBoolean(bl::Bool) = ifelse(bl, True(), False())
+
 negate(::True) = False()
 negate(::False) = True()
 
