@@ -1,13 +1,14 @@
 export overlap, overlaps, multipoleMoment, multipoleMoments, eKinetic, eKinetics
 
 function overlap(orb1::OrbitalBasis{C1, D}, orb2::OrbitalBasis{C2, D}; 
-                 cache!Self::ParamDataCache=initializeParamDataCache(), 
+                 cache!Self::MissingOr{ParamDataCache}=missing, 
                  estimatorConfig::OptEstimatorConfig{T}=missing, 
                  lazyCompute::AbstractBool=True()) where 
                 {T<:Real, C1<:RealOrComplex{T}, C2<:RealOrComplex{T}, D}
     if orb1 === orb2 && isRenormalized(orb1)
         one(T)
     else
+        ismissing(cache!Self) && (cache!Self = initializeParamDataCache())
         lazyCompute = toBoolean(lazyCompute)
         computeLayoutIntegral(genOverlapSampler(), (orb1, orb2); 
                               cache!Self, estimatorConfig, lazyCompute)
