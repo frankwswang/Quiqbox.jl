@@ -49,8 +49,8 @@ struct DoubleFieldProd{T<:Real, D, O<:DualTermOperator,
     coupler::O
 end
 
-function DoubleFieldProd(pairL::N12Tuple{PrimOrbData{T, D}}, 
-                         pairR::N12Tuple{PrimOrbData{T, D}}, 
+function DoubleFieldProd(pairL::NTuple{2, FieldAmplitude{<:RealOrComplex{T}, D}}, 
+                         pairR::NTuple{2, FieldAmplitude{<:RealOrComplex{T}, D}}, 
                          coupler::DualTermOperator) where {T, D}
     sfProdL = SesquiFieldProd(pairL)
     sfProdR = SesquiFieldProd(pairR)
@@ -83,19 +83,20 @@ end
 
 
 function genIntegrant(op::Multiplier, 
-                      (pair,)::Tuple{ NTuple{ 2, PrimOrbData{T, D} }}) where {T<:Real, D}
-    SesquiFieldProd(getfield.(pair, :core), op)
+                      (pair,)::Tuple{NTuple{ 2, StashedShiftedField{T, D} }}
+                      ) where {T<:Real, D}
+    SesquiFieldProd(pair, op)
 end
 
 function genIntegrant(op::DualTermOperator, 
-                      (pL, pR)::NTuple{2, NTuple{ 2, PrimOrbData{T, D} }}
+                      (pL, pR)::NTuple{2, NTuple{ 2, StashedShiftedField{T, D} }}
                       ) where {T<:Real, D}
-    DoubleFieldProd(getfield.(pL, :core), getfield.(pR, :core), op)
+    DoubleFieldProd(pL, pR, op)
 end
 
 
 function genIntegralSectors(op::DirectOperator, 
-                            layout::N12Tuple{NTuple{ 2, PrimOrbData{T, D} }}
+                            layout::N12N2Tuple{StashedShiftedField{T, D}}
                             ) where {T<:Real, D}
     *, tuple(genIntegrant(op, layout))
 end
@@ -108,7 +109,7 @@ end
 
 function estimateOrbIntegral(config::MissingOr{EstimatorConfig{T}}, 
                              op::TypedOperator{C}, 
-                             layout::N12Tuple{NTuple{ 2, PrimOrbData{T, D} }}
+                             layout::N12N2Tuple{StashedShiftedField{T, D}}
                              ) where {T<:Real, C<:RealOrComplex{T}, D}
     combiner, sectors = genIntegralSectors(op.core, layout)
     noGlobalConfig = ismissing(config)

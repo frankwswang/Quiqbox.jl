@@ -78,13 +78,14 @@ accessAxialCache(cache::NullCache, ::Int) = cache
 #>-- Gaussian-based orbital info extraction --<#
 function prepareOrbitalInfoCore(field::FloatingPolyGaussField{T, D}) where {T<:Real, D}
     params = field.data
-    fCenter, gtf = field.core.f.f.encode          #> `PolyGaussFieldCore` (gtf)
+    shiftedField = field.core.f.f                 #> `ShiftedFieldFuncCore`
+    fCenter = shiftedField.inner                  #> `FieldCenterShifter`
+    gtf = shiftedField.outer                      #> `PolyGaussFieldCore`
     center = last(fCenter.encode).core(params)
-    grf = first(gtf.encode)                       #> `RadialFieldFunc`
-    pgf = last(grf.core.f.binder.encode)          #> `GaussFieldFunc`
+    grf, angMomField = gtf.encode                 #> `RadialFieldFunc` (grf)
+    pgf = grf.core.f.binder.outer                 #> `GaussFieldFunc`
     xpnFormatter = last(pgf.core.f.binder.encode) #> `ParamFormatter`
     xpn = xpnFormatter.core(params).xpn
-    angMomField = last(gtf.encode)                #> `CartAngMomentumFunc`
     amfCore = angMomField.core.f.binder.core.f    #> `CartSHarmonics`
     ang = amfCore.m.tuple
     PrimGaussTypeOrbInfo(center, xpn, ang)
@@ -290,7 +291,7 @@ function shiftRightAngularNum(data::T4Int2Tuple{T}, shift::Int) where {T}
 end
 #> Coordinate differentiation for arbitrary axial PGTO pair
 function computeAxialPGTOrbCoordDiff!(degree::Int, 
-                                      cache::LRU{T4Int2Tuple{T}, T}, 
+                                      cache::Union{LRU{T4Int2Tuple{T}, T}, NullCache{T}}, 
                                       input::T4Int2Tuple{T}) where {T<:Real}
     xpnL, xpnR, xML, xMR, iL, iR = input
 
@@ -454,25 +455,24 @@ supportGaussBasedIntegration(::Type{T}, ::Val{D}, ::DirectOperator) where {T<:Re
 false
 
 #= Additional Method =#
-function evaluateIntegral!(integrator::OrbitalCoreIntegralConfig{T, D, C, N, F}, 
-                           pairwiseData::NTuple{N, NTuple{ 2, PGTOrbData{T, D} }}) where 
-                          {T, C<:RealOrComplex{T}, D, N, F<:DirectOperator}
-    op = integrator.operator
-    cacheDict = integrator.cache
+function evaluateIntegral!(config::OrbitalIntegrationConfig{T, D, C, N, F}, 
+                           layout::NTuple{N, NTuple{ 2, FloatingPolyGaussField{T, D} }}
+                           ) where {T, C<:RealOrComplex{T}, D, N, F<:DirectOperator}
+    op = config.operator
+    cacheDict = config.cache
     if supportGaussBasedIntegration(T, Val(D), op)
-        innerData = map(x->getfield.(x, :core), pairwiseData)
         res = if cacheDict isa NullCache
-            computePGTOrbIntegral(op, innerData...)
+            computePGTOrbIntegral(op, layout...)
         else
-            orbLayout = ntuple(_->(PrimGaussTypeOrb, PrimGaussTypeOrb), Val(N))
+            orbLayout = ntuple(Storage((PrimGaussTypeOrb, PrimGaussTypeOrb)), Val(N))
             key = (TypeBox(F), orbLayout)::OrbIntLayoutInfo{N}
             cache = get!(cacheDict, key) do
                 getGaussBasedIntegrationCache(F, T, Val(D))
             end
-            computePGTOrbIntegral(op, innerData..., cache)
+            computePGTOrbIntegral(op, layout..., cache)
         end
         convert(C, res)
     else
-        evaluateIntegralCore(integrator, pairwiseData)
+        evaluateIntegralCore(config, layout)
     end
 end

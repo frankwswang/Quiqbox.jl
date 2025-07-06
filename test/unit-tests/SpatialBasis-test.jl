@@ -14,10 +14,6 @@ gf1_3dCore, par_gf1 = Quiqbox.unpackFunc(gf1_3d)
 cen1 = (0.0, 0.0, 0.0)
 ijk1 = (0, 1, 1)
 pgto1 = genGaussTypeOrb(cen1, 1.2, ijk1)
-pgto1Data = genOrbitalData(pgto1)
-@test pgto1Data isa Quiqbox.PrimOrbData
-@test pgto1Data isa Quiqbox.PGTOrbData
-
 pgto1core, par_pgto1 = Quiqbox.unpackFunc(pgto1);
 @test pgto1 isa Quiqbox.PrimGTO
 @test pgto1core isa Quiqbox.ParamBindFunc
@@ -39,10 +35,6 @@ cgto1core, par_cgto1 = Quiqbox.unpackFunc(cgto1);
 @test cgto1 isa Quiqbox.CompGTO
 @test cgto1core isa Quiqbox.ParamBindFunc
 
-coord2 = (0.2, 1.1, 2.1)
-cgto1Data = genOrbitalData(cgto1)
-@test cgto1Data isa Quiqbox.CompOrbData
-
 xpns1 = [1.2, 2.2, 3.1]
 pgf = genGaussTypeOrb(cen1, xpns1[1], ijk1)
 @test !compareParamBox(pgf.field.center[1], pgf.field.center[2])
@@ -51,6 +43,7 @@ cgto2 = genGaussTypeOrb(cen1, xpns1, cons1, ijk1)
 @test cgto2 isa Quiqbox.CompGTO
 cgto2core, par_cgto2 = Quiqbox.unpackFunc(cgto2);
 
+coord2 = (0.2, 1.1, 2.1)
 compute_cgto = function (dr, xpn, con, ijk)
     prod(dr .^ ijk) * exp(-xpn*norm(dr)^2) * con
 end

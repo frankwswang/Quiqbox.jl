@@ -1457,38 +1457,18 @@ function ContextParamFunc(binder::Function, formatter::Function)
     ContextParamFunc(binder, itself, formatter)
 end
 
-
-struct ParamPipeline{E<:ParamFunctionChain} <: AbstractParamFunc
-    encode::E
-
-    function ParamPipeline(encode::E) where 
-                          {E<:GeneralTupleUnion{ NonEmptyTuple{AbstractParamFunc} }}
-        new{E}(encode)
-    end
-
-    function ParamPipeline(encode::E) where {E<:CustomMemory{<:AbstractParamFunc}}
-        checkEmptiness(encode, :encode)
-        new{E}(encode)
-    end
+struct ParamPipeFunc{FO<:AbstractParamFunc, FI<:AbstractParamFunc} <: AbstractParamFunc
+    inner::FI
+    outer::FO
 end
 
-ParamPipeline(encode::AbstractVector{<:AbstractParamFunc}) = 
-ParamPipeline(genMemory(encode))
-
-function (f::ParamPipeline{E})(input, params::OptSpanValueSet) where 
-                              {E<:ParamFunctionChain}
-    fHead, fTail... = f.encode
-    res = fHead(input, params)
-    for fPart in fTail
-        res = fPart(res, params)
-    end
-    res
+function (f::ParamPipeFunc)(input, params::OptSpanValueSet)
+    innerInput = f.inner(input, params)
+    f.outer(innerInput, params)
 end
 
-function getOutputType(::Type{<:ParamPipeline{E}}) where 
-                      {E<:GeneralTupleUnion{ NonEmptyTuple{AbstractParamFunc} }}
-    getOutputType(E|>fieldtypes|>last)
-end
+getOutputType(::Type{<:ParamPipeFunc{FO}}) where {FO<:AbstractParamFunc} = 
+getOutputType(FO)
 
 
 # f(input) => fCore(input, param)

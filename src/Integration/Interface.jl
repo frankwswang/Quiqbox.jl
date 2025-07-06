@@ -2,52 +2,68 @@ export overlap, overlaps, multipoleMoment, multipoleMoments, eKinetic, eKinetics
 
 function overlap(orb1::OrbitalBasis{C1, D}, orb2::OrbitalBasis{C2, D}; 
                  cache!Self::MissingOr{ParamDataCache}=missing, 
-                 lazyCompute::Bool=false) where {T<:Real, C1<:RealOrComplex{T}, 
-                                                 C2<:RealOrComplex{T}, D}
+                 estimatorConfig::OptEstimatorConfig{T}=missing, 
+                 lazyCompute::AbstractBool=True()) where 
+                {T<:Real, C1<:RealOrComplex{T}, C2<:RealOrComplex{T}, D}
     if orb1 === orb2 && isRenormalized(orb1)
         one(T)
     else
         ismissing(cache!Self) && (cache!Self = initializeParamDataCache())
-        computeIntegral(OneBodyIntegral{D}(), genOverlapSampler(), (orb1, orb2); 
-                        cache!Self, lazyCompute)
+        lazyCompute = toBoolean(lazyCompute)
+        computeLayoutIntegral(genOverlapSampler(), (orb1, orb2); 
+                              cache!Self, estimatorConfig, lazyCompute)
     end
 end
 
-function overlaps(basisSet::OrbBasisVec{<:Real, D}; 
-                  cache!Self::ParamDataCache=initializeParamDataCache()) where {D}
-    computeIntTensor(OneBodyIntegral{D}(), genOverlapSampler(), basisSet; cache!Self)
+function overlaps(basisSet::OrbBasisVector{T, D}; 
+                  cache!Self::ParamDataCache=initializeParamDataCache(), 
+                  estimatorConfig::OptEstimatorConfig{T}=missing, 
+                  lazyCompute::AbstractBool=True()) where {T<:Real, D}
+    computeVectorIntegral(OneBodyIntegral{D, T}(), genOverlapSampler(), basisSet; 
+                          cache!Self, estimatorConfig, lazyCompute)
 end
 
 
 function multipoleMoment(center::NTuple{D, Real}, degrees::NTuple{D, Int}, 
                          orb1::OrbitalBasis{C1, D}, orb2::OrbitalBasis{C2, D}; 
                          cache!Self::ParamDataCache=initializeParamDataCache(), 
-                         lazyCompute::Bool=false) where {T<:Real, C1<:RealOrComplex{T}, 
-                                                         C2<:RealOrComplex{T}, D}
+                         estimatorConfig::OptEstimatorConfig{T}=missing, 
+                         lazyCompute::AbstractBool=True()) where 
+                        {T<:Real, C1<:RealOrComplex{T}, C2<:RealOrComplex{T}, D}
+    lazyCompute = toBoolean(lazyCompute)
     mmOp = (genMultipoleMomentSampler∘FloatingMonomial)(T.(center), degrees)
-    computeIntegral(OneBodyIntegral{D}(), mmOp, (orb1, orb2); cache!Self, lazyCompute)
+    computeLayoutIntegral(mmOp, (orb1, orb2); cache!Self, estimatorConfig, lazyCompute)
 end
 
 function multipoleMoments(center::NTuple{D, Real}, degrees::NTuple{D, Int}, 
-                          basisSet::OrbBasisVec{<:Real, D}; 
-                          cache!Self::ParamDataCache=initializeParamDataCache()
-                          ) where {D}
+                          basisSet::OrbBasisVector{T, D}; 
+                          cache!Self::ParamDataCache=initializeParamDataCache(), 
+                          estimatorConfig::OptEstimatorConfig{T}=missing, 
+                          lazyCompute::AbstractBool=True()) where {T<:Real, D}
+    lazyCompute = toBoolean(lazyCompute)
     mmOp = (genMultipoleMomentSampler∘FloatingMonomial)(T.(center), degrees)
-    computeIntTensor(OneBodyIntegral{D}(), mmOp, basisSet; cache!Self)
+    computeVectorIntegral(OneBodyIntegral{D, T}(), mmOp, basisSet; 
+                          cache!Self, estimatorConfig, lazyCompute)
 end
 
 
 function eKinetic(orb1::OrbitalBasis{C1, D}, orb2::OrbitalBasis{C2, D}, 
-                  operator::KineticEnergySampler{T, D}=genKineticEnergySampler(T, Count(D)); 
-                  cache!Self::MissingOr{ParamDataCache}=missing, 
-                  lazyCompute::Bool=false) where 
+                  config::KineticEnergySampler{T, D}=genKineticEnergySampler(T, Count(D)); 
+                  cache!Self::ParamDataCache=initializeParamDataCache(), 
+                  estimatorConfig::OptEstimatorConfig{T}=missing, 
+                  lazyCompute::AbstractBool=True()) where 
                  {T<:Real, C1<:RealOrComplex{T}, C2<:RealOrComplex{T}, D}
-    ismissing(cache!Self) && (cache!Self = initializeParamDataCache())
-    computeIntegral(OneBodyIntegral{D}(), operator.core, (orb1, orb2); 
-                    cache!Self, lazyCompute)
+    lazyCompute = toBoolean(lazyCompute)
+    computeLayoutIntegral(config.core, (orb1, orb2); 
+                          cache!Self, estimatorConfig, lazyCompute)
 end
 
-eKinetics(basisSet::OrbBasisVec{T, D}, 
-          operator::KineticEnergySampler{T, D}=genKineticEnergySampler(T, Count(D)); 
-          cache!Self::ParamDataCache=initializeParamDataCache()) where {T<:Real, D} = 
-computeIntTensor(OneBodyIntegral{D}(), operator.core, basisSet; cache!Self)
+function eKinetics(basisSet::OrbBasisVector{T, D}, 
+                   config::KineticEnergySampler{T, D}=genKineticEnergySampler(T, Count(D)); 
+                   cache!Self::ParamDataCache=initializeParamDataCache(), 
+                   estimatorConfig::OptEstimatorConfig{T}=missing, 
+                   lazyCompute::AbstractBool=True()) where {T<:Real, D}
+    lazyCompute = toBoolean(lazyCompute)
+    computeVectorIntegral(OneBodyIntegral{D, T}(), config.core, basisSet; 
+                          cache!Self, estimatorConfig, lazyCompute)
+end

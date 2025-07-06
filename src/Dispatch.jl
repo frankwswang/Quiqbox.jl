@@ -42,9 +42,9 @@ formatInput(f::Function, x) = formatInput(SelectTrait{InputStyle}()(f), x)
 
 abstract type IntegralStyle <: AnyInterface end
 
-struct MultiBodyIntegral{N, D} <: IntegralStyle end
-const OneBodyIntegral{D} = MultiBodyIntegral{1, D}
-const TwoBodyIntegral{D} = MultiBodyIntegral{2, D}
+struct MultiBodyIntegral{D, C, N} <: IntegralStyle end
+const OneBodyIntegral{D, C} = MultiBodyIntegral{D, C, 1}
+const TwoBodyIntegral{D, C} = MultiBodyIntegral{D, C, 2}
 
 
 strictTypeJoin(TL::Type, TR::Type) = typejoin(TL, TR)
@@ -76,6 +76,10 @@ Base.broadcastable(o::ValueType) = Ref(o)
 struct True  <: ValueType end
 struct False <: ValueType end
 const Boolean = Union{True, False}
+const AbstractBool = Union{Boolean, Bool}
+
+toBoolean(bl::Bool) = ifelse(bl, True(), False())
+toBoolean(bl::Boolean) = itself(bl)
 
 negate(::True) = False()
 negate(::False) = True()
