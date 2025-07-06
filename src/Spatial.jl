@@ -60,7 +60,7 @@ const NullaryFieldFunc{T<:Real, D, C<:RealOrComplex{T}, F<:AbstractParamFunc} =
       FieldParamFunc{T, D, C, F, VoidSetFilter}
 
 
-struct StashedField{T, D, C<:RealOrComplex{T}, F<:AbstractParamFunc, 
+struct StashedField{T<:Real, D, C<:RealOrComplex{T}, F<:AbstractParamFunc, 
                     V<:OptSpanValueSet} <: FieldAmplitude{C, D}
     core::TypedCarteFunc{C, D, F}
     data::V
@@ -498,4 +498,15 @@ function strictTypeJoin(::Type{ShiftedField{TL, D, CL, FL, RL}},
     p = (;T=strictTypeJoin(TL, TR), D, C=strictTypeJoin(CL, CR), F=strictTypeJoin(FL, FR), 
           R=strictTypeJoin(RL, RR))
     typeintersect(genParametricType(ShiftedField, p), ShiftedField)
+end
+
+function strictTypeJoin(::Type{StashedField{TL, D, CL, FL, VL}}, 
+                        ::Type{StashedField{TR, D, CR, FR, VR}}) where 
+                       {D, TL<:Real, CL<:RealOrComplex{TL}, FL<:AbstractParamFunc, 
+                           VL<:OptSpanValueSet, 
+                           TR<:Real, CR<:RealOrComplex{TL}, FR<:AbstractParamFunc, 
+                           VR<:OptSpanValueSet}
+    p = (;T=strictTypeJoin(TL, TR), D, C=strictTypeJoin(CL, CR), F=strictTypeJoin(FL, FR), 
+          V=strictTypeJoin(VL, VR))
+    typeintersect(genParametricType(StashedField, p), StashedField)
 end
