@@ -69,11 +69,11 @@ s2 = sqrt(overlap(stoBasis1, stoBasis1)) # 2.170803763600724
 @test overlap(stoBasis1n, stoBasis1) ≈ overlap(stoBasis1, stoBasis1n) ≈ s2
 @test overlap(stoBasis1n, stoBasis1, lazyCompute=Quiqbox.False()) ≈ 
       overlap(stoBasis1, stoBasis1n, lazyCompute=Quiqbox.False()) ≈ 
-      sqrt(overlap( stoBasis1, stoBasis1, lazyCompute=Quiqbox.False() )) ≈ s2
+      sqrt(overlap(stoBasis1, stoBasis1, lazyCompute=false)) ≈ s2
 
 cen2 = (1.0, 1.5, 1.1)
 xpns2 = [1.5, 0.6]
-cons2 = [1.0,  0.8]
+cons2 = [1.0, 0.8]
 cgf2 = genGaussTypeOrb(cen2, xpns2, cons2, (1, 0, 0))
 cgf2n1 = genGaussTypeOrb(cen2, xpns2, cons2, (1, 0, 0), innerRenormalize=true, 
                          outerRenormalize=false)
@@ -125,8 +125,8 @@ bsLiH = [bfH, bfLi1, bfLi2, bfLi3, bfLi4, bfLi5]
 @test all(Quiqbox.isRenormalized(o) for o in Quiqbox.splitOrb(bsLiH[1]))
 
 @test overlap(bsLiH[1], bsLiH[1]) ≈ 1
-@test overlap(bsLiH[1], bsLiH[1], lazyCompute=Quiqbox.False()) ≈ 1
-@test overlap(bsLiH[1], deepcopy(bsLiH[1]), lazyCompute=Quiqbox.False()) ≈ 1
+@test overlap(bsLiH[1], bsLiH[1], lazyCompute=false) ≈ 1
+@test overlap(bsLiH[1], deepcopy(bsLiH[1]), lazyCompute=false) ≈ 1
 
 gfHs = Quiqbox.splitOrb(bfH_t)
 s_gfHs = [0.3105569331128749 0.6834026444177144 0.8172189509285114; 

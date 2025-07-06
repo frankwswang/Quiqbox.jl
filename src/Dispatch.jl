@@ -76,8 +76,10 @@ Base.broadcastable(o::ValueType) = Ref(o)
 struct True  <: ValueType end
 struct False <: ValueType end
 const Boolean = Union{True, False}
+const AbstractBool = Union{Boolean, Bool}
 
 toBoolean(bl::Bool) = ifelse(bl, True(), False())
+toBoolean(bl::Boolean) = itself(bl)
 
 negate(::True) = False()
 negate(::False) = True()

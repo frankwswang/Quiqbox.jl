@@ -41,7 +41,6 @@ pgf1_masked = PrimitiveOrb((0., 0., 0.), Quiqbox.EncodedField( pgf1, Float64, Co
 @test eKinetic(pgf1, pgf1, lazyCompute=Quiqbox.False()) ≈ 0.43502562475512524
 
 cgf1 = genGaussTypeOrb((1.1, 0.5, 1.1), [1.2, 0.6], [1.5, -0.3], (1, 2, 2))
-@test eKinetic(cgf1, cgf1) ≈ eKinetic(cgf1, cgf1, lazyCompute=Quiqbox.False()) ≈ 
-      0.06737210531634309
+@test eKinetic(cgf1, cgf1) ≈ eKinetic(cgf1, cgf1, lazyCompute=false) ≈ 0.06737210531634309
 
 end
