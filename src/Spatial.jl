@@ -448,8 +448,9 @@ const StashedShiftedField{T<:Real, D, C<:RealOrComplex{T}, F<:ShiftedFieldFuncCo
                           V<:OptSpanValueSet} = 
       StashedField{T, D, C, F, V}
 
-const FloatingPolyGaussField{T<:Real, D, F<:PolyGaussFieldCore{T, D}, 
-                             R<:FieldCenterShifter{T, D}, V<:OptSpanValueSet} = 
+const FloatingPolyGaussField{T<:Real, D, 
+                             F<:ShiftedFieldFuncCore{T, D, <:PolyGaussFieldCore{T, D}}, 
+                             V<:OptSpanValueSet} = 
       StashedShiftedField{T, D, T, F, V}
 
 
