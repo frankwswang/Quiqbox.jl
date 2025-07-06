@@ -4,8 +4,8 @@ using Base: issingletontype
 struct OneToIndex <: CustomAccessor
     idx::Int
 
-    function OneToIndex(idx::Int, ::V=True()) where {V<:Boolean} #! Remove second argument
-        getTypeValue(V) && checkPositivity(idx)
+    function OneToIndex(idx::Int)
+        checkPositivity(idx)
         new(idx)
     end
 
