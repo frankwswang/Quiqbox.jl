@@ -12,7 +12,7 @@ end
 
 ang = (3,2,5)
 point = (0.3, 0.5, -0.6)
-CartSHarmonics(ang)(point) == prod(point .^ WeakComp(ang).tuple)
+CartSHarmonics(ang)(point) == prod(point .^ WeakComp(ang).value)
 
 testCG = function (j1::Real, m1::Real, j2::Real, m2::Real, j3::Real; 
                    refVals::NTuple{2, Real}=(0, 0))

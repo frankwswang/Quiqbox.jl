@@ -353,9 +353,9 @@ end
 getMinimalEleType(collection::Tuple) = 
 mapreduce(typeof, strictTypeJoin, collection, init=Union{})
 
-#! Change `.tuple` to another name
+
 struct WeakComp{N} # Weak composition of an integer
-    tuple::NTuple{N, Int}
+    value::NTuple{N, Int}
     total::Int
 
     function WeakComp(t::NonEmptyTuple{Int, M}) where {M}

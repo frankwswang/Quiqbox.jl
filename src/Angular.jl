@@ -12,7 +12,7 @@ struct CartSHarmonics{D} <: RealSolidHarmonics{D}
 end
 
 function (csh::CartSHarmonics{D})(dr::NTuple{D, Real}) where {D}
-    prod(dr .^ csh.m.tuple)
+    prod(dr .^ csh.m.value)
 end
 
 struct PureSHarmonics{D} <: RealSolidHarmonics{D}
