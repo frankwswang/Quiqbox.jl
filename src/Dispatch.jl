@@ -85,10 +85,9 @@ negate(::True) = False()
 negate(::False) = True()
 
 
-getTypeValue(::Type{True }) = true
-getTypeValue(::Type{False}) = false
-
-getTypeValue(::V) where {V<:ValueType} = getTypeValue(V)
+evalTypedData(::Type{True }) = true
+evalTypedData(::Type{False}) = false
+evalTypedData(::V) where {V<:ValueType} = evalTypedData(V)
 
 
 function getMethodNum(f::Function)

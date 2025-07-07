@@ -5,10 +5,6 @@ struct Undirected end
 
 const Orientation = Union{Directed, Undirected}
 
-struct Static end
-struct Active end
-
-const Activity = Union{Static, Active}
 
 abstract type AbstractGraph{O<:Orientation} end
 
@@ -438,7 +434,7 @@ function genParamMapper(params::DirectParamSource,
                         activeTranspilation::Boolean=True(); 
                         paramSet!Self::OptSpanParamSet=initializeSpanParamSet())
     checkEmptiness(params, :params)
-    mayBypass = !getTypeValue(activeTranspilation)
+    mayBypass = !evalTypedData(activeTranspilation)
 
     mapper = map(params) do param
         if mayBypass && isActiveSpanParam(param)

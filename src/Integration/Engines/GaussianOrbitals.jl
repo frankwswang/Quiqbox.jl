@@ -52,7 +52,7 @@ struct AxialGaussOverlapCache{T<:Real, D, M<:NTuple{D, OptionalLRU{T4Int2Tuple{T
     function AxialGaussOverlapCache(::Type{T}, configs::NTuple{D, Boolean}, 
                                     axialMaxSize::Int=128) where {T<:Real, D}
         axialCache = map(configs) do config
-            if getTypeValue(config); LRU{T4Int2Tuple{T}, T}(maxsize=axialMaxSize) else
+            if evalTypedData(config); LRU{T4Int2Tuple{T}, T}(maxsize=axialMaxSize) else
                EmptyDict{T4Int2Tuple{T}, T}() end
         end
         new{T, D, typeof(axialCache)}(axialCache)
@@ -78,7 +78,7 @@ function prepareOrbitalInfoCore(field::FloatingPolyGaussField{T, D}) where {T<:R
     xpnFormatter = last(pgf.core.f.binder.encode) #> `ParamFormatter`
     xpn = xpnFormatter.core(params).xpn
     amfCore = angMomField.core.f.binder.core.f    #> `CartSHarmonics`
-    ang = amfCore.m.tuple
+    ang = amfCore.m.value
     PrimGaussTypeOrbInfo(center, xpn, ang)
 end
 
@@ -205,7 +205,7 @@ function computePGTOrbMultipoleMoment(fm::FloatingMonomial{T, D},
                                       data::PrimGaussTypeOrbInfo{T, D}) where {T<:Real, D}
     xpn = data.xpn
     res = one(T)
-    for (xMM, n, x, i) in zip(fm.center, fm.degree.tuple, data.cen, data.ang)
+    for (xMM, n, x, i) in zip(fm.center, fm.degree.value, data.cen, data.ang)
         dx = x - xMM
         m = iszero(dx) ? 0 : n
 
@@ -240,7 +240,7 @@ function computePGTOrbMultipoleMoment!(cache::AxialGaussOverlapCache{T},
         xpnPOS = data.lhs.xpn * data.rhs.xpn / xpnSum
 
         res = one(T)
-        for (xMM, n, xL, xR, xM, iL, iR, sector) in zip(fm.center, fm.degree.tuple, 
+        for (xMM, n, xL, xR, xM, iL, iR, sector) in zip(fm.center, fm.degree.value, 
                                                         cenL, cenR, cenM, angL, angR, 
                                                         cache.axis)
             dx = xR - xMM

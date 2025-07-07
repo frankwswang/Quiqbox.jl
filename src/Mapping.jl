@@ -365,7 +365,7 @@ FloatingMonomial(center, WeakComp(degree))
 
 function evalFloatingMonomial(f::FloatingMonomial{T, D}, 
                               coord::NTuple{D, Real}) where {T<:Real, D}
-    res = mapreduce(*, coord, f.center, f.degree.tuple) do c1, c2, pwr
+    res = mapreduce(*, coord, f.center, f.degree.value) do c1, c2, pwr
         (c1 - c2)^pwr
     end
 

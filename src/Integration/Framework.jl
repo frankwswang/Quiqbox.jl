@@ -27,7 +27,7 @@ struct OrbitalIntegrationConfig{T<:Real, D, C<:RealOrComplex{T}, N, F<:DirectOpe
                                       ) where {D, T<:Real, C<:RealOrComplex{T}, N, 
                                                S<:MultiBodyIntegral{D, C, N}, 
                                                F<:DirectOperator, E<:OptEstimatorConfig{T}}
-        cache = if getTypeValue(caching)
+        cache = if evalTypedData(caching)
             valueTypeBound = Union{OptionalCache{T}, OptionalCache{C}}
             LRU{OrbIntLayoutInfo{N}, valueTypeBound}(maxsize=20)
         else
@@ -152,7 +152,7 @@ function initializeOrbNormalization(inteInfo::OrbitalIntegralInfo{T, D, C, N},
     op = genOverlapSampler()
     style = OneBodyIntegral{D, C}()
 
-    if getTypeValue(caching)
+    if evalTypedData(caching)
         normConfig = if isOverlap && !(inteMethod.cache isa EmptyDict); inteMethod else
                         OrbitalIntegrationConfig(style, op, True(), estConfig) end
         normMemory = if isOverlap && !(inteMemory isa FauxIntegralValCache); inteMemory else
@@ -163,11 +163,6 @@ function initializeOrbNormalization(inteInfo::OrbitalIntegralInfo{T, D, C, N},
     end
     OrbitalIntegralInfo(normConfig, normMemory, basisData)
 end
-
-
-const N1N2Tuple{T} = NTuple{1, NTuple{2, T}}
-const N2N2Tuple{T} = NTuple{2, NTuple{2, T}}
-const N12N2Tuple{T} = N12Tuple{NTuple{2, T}} #! test Union{N1N2Tuple{T}, N2N2Tuple{T}} == N12N2Tuple{T}
 
 
 getOrbitalCategory(::TypeBox{<:FloatingPolyGaussField}) = PrimGaussTypeOrb
@@ -185,16 +180,6 @@ end
 const SesquiOrbCore{T<:Real, D} = N1N2Tuple{StashedShiftedField{T, D}}
 const OneBodyOrbCorePair{T<:Real, D} = Pair{<:SesquiOrbCore{T, D}, N1N2Tuple{OneToIndex}}
 
-@enum OctalNumber::Int8 begin
-    OUS0 = 0 # (false, false, false)
-    OPS1 = 1 # (true,  false, false)
-    OPS2 = 2 # (false, true,  false)
-    OPS3 = 3 # (true,  true,  false)
-    OPS4 = 4 # (false, false, true )
-    OPS5 = 5 # (true,  false, true )
-    OPS6 = 6 # (false, true,  true )
-    OPS7 = 7 # (true,  true,  true )
-end
 
 toSingleBool(num::OctalNumber) = Bool(num)
 
@@ -214,7 +199,7 @@ function toOctalNumber(val::NTuple{3, Bool})
 end
 
 
-
+#>> Operator-orbital layout symmetry
 #> One-Body (i|O|j) symmetry across O: (i|O|j)' == (j|O|i) when i != j
 getIntegralOpOrbSymmetry(::DirectOperator, ::N1N2Tuple{OrbitalCategory}) = false
 getIntegralOpOrbSymmetry(::OverlapSampler, ::N1N2Tuple{OrbitalCategory}) = true
@@ -229,9 +214,7 @@ end
 getIntegralOpOrbSymmetry(::DirectOperator, ::N2N2Tuple{OrbitalCategory}) = 
 (false, false, false)
 
-#!> Can pass in index symmetry based on outer tensor structure, but internally also can 
-#!> also do index-symmetry computation based on the input `OneToIndex`
-
+#>> Index layout symmetry
 getIntegralIndexSymmetry((part,)::N1N2Tuple{OneToIndex}) = first(part) == last(part)
 function getIntegralIndexSymmetry((partL, partR)::N2N2Tuple{OneToIndex})
     idxL1, idxR1 = partL
