@@ -27,7 +27,7 @@ struct OrbitalIntegrationConfig{T<:Real, D, C<:RealOrComplex{T}, N, F<:DirectOpe
                                       ) where {D, T<:Real, C<:RealOrComplex{T}, N, 
                                                S<:MultiBodyIntegral{D, C, N}, 
                                                F<:DirectOperator, E<:OptEstimatorConfig{T}}
-        cache = if getTypeValue(caching)
+        cache = if evalTypedData(caching)
             valueTypeBound = Union{OptionalCache{T}, OptionalCache{C}}
             LRU{OrbIntLayoutInfo{N}, valueTypeBound}(maxsize=20)
         else
@@ -152,7 +152,7 @@ function initializeOrbNormalization(inteInfo::OrbitalIntegralInfo{T, D, C, N},
     op = genOverlapSampler()
     style = OneBodyIntegral{D, C}()
 
-    if getTypeValue(caching)
+    if evalTypedData(caching)
         normConfig = if isOverlap && !(inteMethod.cache isa EmptyDict); inteMethod else
                         OrbitalIntegrationConfig(style, op, True(), estConfig) end
         normMemory = if isOverlap && !(inteMemory isa FauxIntegralValCache); inteMemory else

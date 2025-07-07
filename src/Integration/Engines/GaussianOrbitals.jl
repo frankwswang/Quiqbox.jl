@@ -52,7 +52,7 @@ struct AxialGaussOverlapCache{T<:Real, D, M<:NTuple{D, OptionalLRU{T4Int2Tuple{T
     function AxialGaussOverlapCache(::Type{T}, configs::NTuple{D, Boolean}, 
                                     axialMaxSize::Int=128) where {T<:Real, D}
         axialCache = map(configs) do config
-            if getTypeValue(config); LRU{T4Int2Tuple{T}, T}(maxsize=axialMaxSize) else
+            if evalTypedData(config); LRU{T4Int2Tuple{T}, T}(maxsize=axialMaxSize) else
                EmptyDict{T4Int2Tuple{T}, T}() end
         end
         new{T, D, typeof(axialCache)}(axialCache)

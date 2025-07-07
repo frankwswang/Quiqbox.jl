@@ -34,7 +34,7 @@ function getOwnedObjNameStr(objName::Symbol, objAlias::AbstractString=string(obj
 end
 
 function enableCompatShowFormat(::B, io::IO) where {B<:Boolean}
-    get(io, :compact, false)::Bool || getTypeValue(B)
+    get(io, :compact, false)::Bool || evalTypedData(B)
 end
 
 
