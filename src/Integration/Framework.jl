@@ -199,7 +199,7 @@ function toOctalNumber(val::NTuple{3, Bool})
 end
 
 
-
+#>> Operator-orbital layout symmetry
 #> One-Body (i|O|j) symmetry across O: (i|O|j)' == (j|O|i) when i != j
 getIntegralOpOrbSymmetry(::DirectOperator, ::N1N2Tuple{OrbitalCategory}) = false
 getIntegralOpOrbSymmetry(::OverlapSampler, ::N1N2Tuple{OrbitalCategory}) = true
@@ -214,9 +214,7 @@ end
 getIntegralOpOrbSymmetry(::DirectOperator, ::N2N2Tuple{OrbitalCategory}) = 
 (false, false, false)
 
-#!> Can pass in index symmetry based on outer tensor structure, but internally also can 
-#!> also do index-symmetry computation based on the input `OneToIndex`
-
+#>> Index layout symmetry
 getIntegralIndexSymmetry((part,)::N1N2Tuple{OneToIndex}) = first(part) == last(part)
 function getIntegralIndexSymmetry((partL, partR)::N2N2Tuple{OneToIndex})
     idxL1, idxR1 = partL
