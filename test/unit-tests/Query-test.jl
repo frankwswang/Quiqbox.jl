@@ -36,7 +36,7 @@ d1_1 = Dict(ks1 .=> vs1)
 d1_2 = Dict(ks1 .=> collect(vs1))
 @test markObj(d1_1) == markObj(d1_2)
 
-d3_1 = Quiqbox.TypedEmptyDict{Symbol, Float64}()
+d3_1 = Quiqbox.EmptyDict{Symbol, Float64}()
 d3_2 = Quiqbox.Dict{Symbol, Float64}()
 @test d3_1 == d3_1
 @test d3_1 == d3_2
