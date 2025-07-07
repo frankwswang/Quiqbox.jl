@@ -103,7 +103,7 @@ end
 #> Reusable axial factor
 function computePGTOrbOverlapAxialFactor(xpnLRsum::T, degree::Int) where {T<:Real}
     factor = degree > 0 ? oddFactorial(2degree - 1, inv(2xpnLRsum)) : one(T)
-    T(πPowers[:p0d5]) / sqrt(xpnLRsum) * factor
+    T(PowersOfPi[:p0d5]) / sqrt(xpnLRsum) * factor
 end
 #> Reusable mixed factor
 function computePGTOrbOverlapMixedFactor(dxLR::T, xpnProdOverSum::T) where {T<:Real}

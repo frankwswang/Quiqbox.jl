@@ -54,7 +54,7 @@ function computeBoysOrder0(x::T) where {T<:AbstractFloat}
         one(T)
     else
         xRoot = sqrt(x)
-        T(πPowers[:p0d5]) * erf(xRoot) / (2xRoot)
+        T(PowersOfPi[:p0d5]) * erf(xRoot) / (2xRoot)
     end
 end
 
