@@ -5,10 +5,6 @@ struct Undirected end
 
 const Orientation = Union{Directed, Undirected}
 
-struct Static end
-struct Active end
-
-const Activity = Union{Static, Active}
 
 abstract type AbstractGraph{O<:Orientation} end
 
