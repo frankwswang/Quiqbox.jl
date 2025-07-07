@@ -4,8 +4,8 @@ using Base: issingletontype
 struct OneToIndex <: CustomAccessor
     idx::Int
 
-    function OneToIndex(idx::Int, ::V=True()) where {V<:Boolean} #! Remove second argument
-        getTypeValue(V) && checkPositivity(idx)
+    function OneToIndex(idx::Int)
+        checkPositivity(idx)
         new(idx)
     end
 
@@ -97,30 +97,35 @@ function getEntry(obj, acc::ChainedAccess)
 end
 
 
-struct TypedEmptyDict{K, V} <: EqualityDict{K, V} end
+struct EmptyDict{K, V} <: EqualityDict{K, V} end
 
-TypedEmptyDict() = TypedEmptyDict{Union{}, Union{}}()
+EmptyDict() = EmptyDict{Union{}, Union{}}()
 
-length(::TypedEmptyDict) = 0
+length(::EmptyDict) = 0
 
-collect(::TypedEmptyDict{K, V}) where {K, V} = Memory{Pair{K, V}}(undef, 0)
+collect(::EmptyDict{K, V}) where {K, V} = Memory{Pair{K, V}}(undef, 0)
 
-haskey(::TypedEmptyDict{K}, ::K) where {K} = false
+haskey(::EmptyDict{K}, ::K) where {K} = false
 
-get(::TypedEmptyDict{K}, ::K, default::Any) where {K} = itself(default)
+get(::EmptyDict{K}, ::K, default::Any) where {K} = itself(default)
 
-get!(::TypedEmptyDict{K, V}, ::K, default::V) where {K, V} = itself(default)
+get!(::EmptyDict{K, V}, ::K, default::V) where {K, V} = itself(default)
 
-get!(f::Function, ::TypedEmptyDict{K}, ::K) where {K} = f()
+get!(f::Function, ::EmptyDict{K}, ::K) where {K} = f()
 
-setindex!(d::TypedEmptyDict{K, V}, ::V, ::K) where {K, V} = itself(d)
+setindex!(d::EmptyDict{K, V}, ::V, ::K) where {K, V} = itself(d)
 
-function getindex(::T, key) where {T<:TypedEmptyDict}
+function getindex(::T, key) where {T<:EmptyDict}
     throw(AssertionError("This dictionary (`::$T`) is meant to be empty."))
 end
 
-iterate(::TypedEmptyDict, ::Int) = nothing
-iterate(d::TypedEmptyDict) = iterate(d, 1)
+iterate(::EmptyDict, ::Int) = nothing
+iterate(d::EmptyDict) = iterate(d, 1)
+
+const OptQueryCache{K, V} = Union{EmptyDict{K, V}, QueryCache{K, V}}
+const OptionalCache{V} = OptQueryCache{<:Any, V}
+
+const OptionalLRU{K, V} = Union{EmptyDict{K, V}, LRU{K, V}}
 
 
 struct IndexDict{K, T} <: EqualityDict{K, T}
@@ -473,9 +478,6 @@ end
 function compareObj(obj1::T1, obj2::T2) where {T1, T2}
     obj1 === obj2 || markObj(obj1) == markObj(obj2)
 end
-
-
-struct NullCache{T} <: CustomCache{T} end
 
 
 mutable struct AtomicUnit{T} <: QueryBox{T}

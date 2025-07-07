@@ -24,7 +24,7 @@ abstract type Modifier <: CompositeFunction end
 abstract type Mapper <: CompositeFunction end
 
 abstract type IntegralData{T} <: QueryBox{T} end
-abstract type CustomCache{T} <: QueryBox{T} end
+abstract type QueryCache{K, T} <: QueryBox{T} end
 
 abstract type DirectOperator{N} <: Modifier end # N: Number of input functions
 

@@ -45,33 +45,24 @@ const GaussProdBasedOrbCache{T<:Real, D, F<:GaussProdBasedOrb{T, D}} =
 
 const T4Int2Tuple{T} = Tuple{T, T, T, T, Int, Int}
 
-struct AxialGaussOverlapCache{T<:Real, D, M<:NTuple{D, MissingOr{ LRU{T4Int2Tuple{T}, T} }}, 
-                              F<:GaussProdBasedOrb{T, D}} <: CustomCache{T}
+struct AxialGaussOverlapCache{T<:Real, D, M<:NTuple{D, OptionalLRU{T4Int2Tuple{T}, T}}, 
+                              } <: QueryCache{T4Int2Tuple{T}, T}
     axis::M
-    encode::GaussProdBasedOrbCache{T, D, F}
 
-    function AxialGaussOverlapCache(::Type{F}, configs::NTuple{D, Boolean}, 
-                                    axialMaxSize::Int=128) where 
-                                   {T<:Real, D, F<:GaussProdBasedOrb{T, D}}
+    function AxialGaussOverlapCache(::Type{T}, configs::NTuple{D, Boolean}, 
+                                    axialMaxSize::Int=128) where {T<:Real, D}
         axialCache = map(configs) do config
-            getTypeValue(config) ? LRU{T4Int2Tuple{T}, T}(maxsize=axialMaxSize) : missing
+            if getTypeValue(config); LRU{T4Int2Tuple{T}, T}(maxsize=axialMaxSize) else
+               EmptyDict{T4Int2Tuple{T}, T}() end
         end
-        orbCache = GaussProdBasedOrbCache{T, D, F}(maxsize=axialMaxSize)
-        new{T, D, typeof(axialCache), F}(axialCache, orbCache)
+        new{T, D, typeof(axialCache)}(axialCache)
     end
 end
 
-AxialGaussOverlapCache(::Type{F}, ::NTuple{D, False}, ::Int=128) where 
-                      {T<:Real, D, F<:GaussProdBasedOrb{T, D}} = 
-NullCache{T}()
-
-
-const OptAxialGaussOverlapCache{T<:Real} = 
-      Union{NullCache{T}, AxialGaussOverlapCache{T}}
-
-accessAxialCache(cache::AxialGaussOverlapCache, i::Int) = cache.axis[begin+i-1]
-
-accessAxialCache(cache::NullCache, ::Int) = cache
+function AxialGaussOverlapCache(::Type{T}, ::Count{D}) where {T<:Real, D}
+    checkPositivity(D)
+    AxialGaussOverlapCache(T, ntuple( _->False(), Val(D) ))
+end
 
 
 
@@ -91,24 +82,19 @@ function prepareOrbitalInfoCore(field::FloatingPolyGaussField{T, D}) where {T<:R
     PrimGaussTypeOrbInfo(center, xpn, ang)
 end
 
-function prepareOrbitalInfo!(cache::AxialGaussOverlapCache{T, D}, 
-                             orbData::FloatingPolyGaussField{T, D}) where {T<:Real, D}
-    get!(cache.encode, EgalBox{FloatingPolyGaussField{T, D}}(orbData)) do
+function prepareOrbitalInfo((data,)::N1N2Tuple{FloatingPolyGaussField{T, D}}) where 
+                           {T<:Real, D}
+    lazyMap(data) do orbData
+        prepareOrbitalInfoCore(orbData)
+    end |> GaussProductInfo
+end
+
+function prepareOrbitalInfo((data1, data2)::N2N2Tuple{FloatingPolyGaussField{T, D}}) where 
+                           {T<:Real, D}
+    i, j, k, l = lazyMap((data1..., data2...)) do orbData
         prepareOrbitalInfoCore(orbData)
     end
-end
-
-function prepareOrbitalInfo!(::NullCache{T}, 
-                             orbData::FloatingPolyGaussField{T, D}) where {T<:Real, D}
-    prepareOrbitalInfoCore(orbData)
-end
-
-function prepareOrbitalInfo!(cache::OptAxialGaussOverlapCache{T}, 
-                             orbsData::N24Tuple{FloatingPolyGaussField{T, D}}) where 
-                            {T<:Real, D}
-    lazyMap(orbsData) do orbData
-        prepareOrbitalInfo!(cache, orbData)
-    end |> GaussProductInfo
+    GaussProductInfo((i, j)), GaussProductInfo((k, l))
 end
 
 
@@ -172,8 +158,10 @@ function computeAxialPGTOrbOverlap!(cache::LRU{T4Int2Tuple{T}, T},
     res
 end
 
-computeAxialPGTOrbOverlap!(::NullCache{T}, input::T4Int2Tuple{T}) where {T<:Real} = 
-computeAxialPGTOrbOverlap(input)
+function computeAxialPGTOrbOverlap!(::EmptyDict{T4Int2Tuple{T}, T}, 
+                                    input::T4Int2Tuple{T}) where {T<:Real}
+    computeAxialPGTOrbOverlap(input)
+end
 
 #> Internal overlap computation
 function computePGTOrbOverlap(data::PrimGaussTypeOrbInfo{T}) where {T<:Real}
@@ -187,7 +175,7 @@ function computePGTOrbOverlap(data::PrimGaussTypeOrbInfo{T}) where {T<:Real}
     res
 end
 
-function computePGTOrbOverlap!(cache::OptAxialGaussOverlapCache{T}, 
+function computePGTOrbOverlap!(cache::AxialGaussOverlapCache{T}, 
                                data::GaussProductInfo{T, D}) where {T<:Real, D}
     if data.symmetric
         computePGTOrbOverlap(data.lhs)
@@ -200,12 +188,10 @@ function computePGTOrbOverlap!(cache::OptAxialGaussOverlapCache{T},
         xpnSum = data.xpn
         xpnPOS = data.lhs.xpn * data.rhs.xpn / xpnSum
 
-        i = 0
         res = one(T)
-        for (xL, xR, xM, iL, iR) in zip(cenL, cenR, cenM, angL, angR)
-            axialCache = accessAxialCache(cache, (i += 1))
+        for (xL, xR, xM, iL, iR, sector) in zip(cenL, cenR, cenM, angL, angR, cache.axis)
             data = (xpnSum, xpnPOS, xM-xL, xM-xR, iL, iR)
-            res *= computeAxialPGTOrbOverlap!(axialCache, data)
+            res *= computeAxialPGTOrbOverlap!(sector, data)
         end
 
         res
@@ -237,7 +223,7 @@ function computePGTOrbMultipoleMoment(fm::FloatingMonomial{T, D},
     res
 end
 
-function computePGTOrbMultipoleMoment!(cache::OptAxialGaussOverlapCache{T}, 
+function computePGTOrbMultipoleMoment!(cache::AxialGaussOverlapCache{T}, 
                                        fm::FloatingMonomial{T, D}, 
                                        data::GaussProductInfo{T, D}) where {T<:Real, D}
     if fm.degree.total == 0
@@ -253,11 +239,10 @@ function computePGTOrbMultipoleMoment!(cache::OptAxialGaussOverlapCache{T},
         xpnSum = data.xpn
         xpnPOS = data.lhs.xpn * data.rhs.xpn / xpnSum
 
-        i = 0
         res = one(T)
-        for (xMM, n, xL, xR, xM, iL, iR) in zip(fm.center, fm.degree.tuple, 
-                                                cenL, cenR, cenM, angL, angR)
-            axialCache = accessAxialCache(cache, (i += 1))
+        for (xMM, n, xL, xR, xM, iL, iR, sector) in zip(fm.center, fm.degree.tuple, 
+                                                        cenL, cenR, cenM, angL, angR, 
+                                                        cache.axis)
             dx = xR - xMM
             m = if iszero(dx)
                 0
@@ -272,7 +257,7 @@ function computePGTOrbMultipoleMoment!(cache::OptAxialGaussOverlapCache{T},
             temp = zero(T)
             for k in 0:m
                 data = (xpnSum, xpnPOS, xM-xL, xM-xR, iL, iR+n-k)
-                temp += binomial(n, k) * dx^k * computeAxialPGTOrbOverlap!(axialCache, data)
+                temp += binomial(n, k) * dx^k * computeAxialPGTOrbOverlap!(sector, data)
             end
 
             res *= temp
@@ -291,7 +276,7 @@ function shiftRightAngularNum(data::T4Int2Tuple{T}, shift::Int) where {T}
 end
 #> Coordinate differentiation for arbitrary axial PGTO pair
 function computeAxialPGTOrbCoordDiff!(degree::Int, 
-                                      cache::Union{LRU{T4Int2Tuple{T}, T}, NullCache{T}}, 
+                                      cache::OptionalLRU{T4Int2Tuple{T}, T}, 
                                       input::T4Int2Tuple{T}) where {T<:Real}
     xpnL, xpnR, xML, xMR, iL, iR = input
 
@@ -353,7 +338,7 @@ function computePGTOrbCoordDiff(degrees::NTuple{D, Int},
     res
 end
 
-function computePGTOrbCoordDiff!(cache::OptAxialGaussOverlapCache{T}, 
+function computePGTOrbCoordDiff!(cache::AxialGaussOverlapCache{T}, 
                                  degrees::NTuple{D, Int}, 
                                  data::GaussProductInfo{T, D}, 
                                  axialWise::Bool=false) where {T<:Real, D}
@@ -375,18 +360,18 @@ function computePGTOrbCoordDiff!(cache::OptAxialGaussOverlapCache{T},
         axialNums = ntuple(itself, Val(D))
         res = ntuple(_->one(T), Val(D))
         idxOffset = firstindex(res) - 1
-        for (degree, xL, xR, xM, iL, iR) in zip(degrees, cenL, cenR, cenM, angL, angR)
+        for (degree, xL, xR, xM, iL, iR, sector) in zip(degrees, cenL, cenR, cenM, 
+                                                        angL, angR, cache.axis)
             iHead, iBody... = axialNums
             axialNums = rightCircShift(axialNums)
-            axialCache = accessAxialCache(cache, iHead)
 
             posDiffData = (xpnL, xpnR, xM-xL, xM-xR, iL, iR)
-            tempPosDiffRes = computeAxialPGTOrbCoordDiff!(degree, axialCache, posDiffData)
+            tempPosDiffRes = computeAxialPGTOrbCoordDiff!(degree, sector, posDiffData)
             res = setIndex(res, tempPosDiffRes, iHead+idxOffset, *)
 
             if !axialWise
                 overlapData = (xpnSum, xpnPOS, xM-xL, xM-xR, iL, iR)
-                tempOverlapRes = computeAxialPGTOrbOverlap!(axialCache, overlapData)
+                tempOverlapRes = computeAxialPGTOrbOverlap!(sector, overlapData)
 
                 for i in iBody
                     res = setIndex(res, tempOverlapRes, i+idxOffset, *)
@@ -402,28 +387,31 @@ end
 #>-- Core integral-evaluation function --<#
 #> Overlap
 function computePGTOrbIntegral(::OverlapSampler, 
-                               data::NTuple{2, FloatingPolyGaussField{T, D}}, 
-                               cache!Self::OptAxialGaussOverlapCache{T}=NullCache{T}()
+                               layout::N1N2Tuple{FloatingPolyGaussField{T, D}}, 
+                               cache!Self::AxialGaussOverlapCache{T}=
+                                           AxialGaussOverlapCache(T, Count(D))
                                ) where {T<:Real, D}
-    formattedData = prepareOrbitalInfo!(cache!Self, data)
+    formattedData = prepareOrbitalInfo(layout)
     computePGTOrbOverlap!(cache!Self, formattedData)
 end
 
 #> Multipole moment
 function computePGTOrbIntegral(op::MultipoleMomentSampler{T, D}, 
-                               data::NTuple{2, FloatingPolyGaussField{T, D}}, 
-                               cache!Self::OptAxialGaussOverlapCache{T}=NullCache{T}()
+                               layout::N1N2Tuple{FloatingPolyGaussField{T, D}}, 
+                               cache!Self::AxialGaussOverlapCache{T}=
+                                           AxialGaussOverlapCache(T, Count(D))
                                ) where {T<:Real, D}
-    formattedData = prepareOrbitalInfo!(cache!Self, data)
+    formattedData = prepareOrbitalInfo(layout)
     computePGTOrbMultipoleMoment!(cache!Self, last(op.dresser).term, formattedData)
 end
 
 #> Diagonal-directional differentiation (∑ᵢ(cᵢ ⋅ ∂ᵐ/∂xᵢᵐ))
 function computePGTOrbIntegral(op::DiagDirectionalDiffSampler{T, D, M}, 
-                               data::NTuple{2, FloatingPolyGaussField{T, D}}, 
-                               cache!Self::OptAxialGaussOverlapCache{T}=NullCache{T}()
+                               layout::N1N2Tuple{FloatingPolyGaussField{T, D}}, 
+                               cache!Self::AxialGaussOverlapCache{T}=
+                                           AxialGaussOverlapCache(T, Count(D))
                                ) where {T<:Real, D, M}
-    formattedData = prepareOrbitalInfo!(cache!Self, data)
+    formattedData = prepareOrbitalInfo(layout)
     diffVec = computePGTOrbCoordDiff!(cache!Self, ntuple(_->M, Val(D)), formattedData)
     direction = last(op.dresser).direction
     mapreduce(StableMul(T), StableAdd(T), direction, diffVec)
@@ -432,47 +420,30 @@ end
 
 
 #>-- Interface with the composite integration framework --<#
-const AxialGaussOverlapBasedSampler{T<:Real, D} = Union{
+const AxialGaussOverlapSampler{T<:Real, D} = Union{
     OverlapSampler, 
     MultipoleMomentSampler{T, D}, 
     DiagDirectionalDiffSampler{T, D}
 }
 
-function getGaussBasedIntegrationCache(::Type{F}, ::Type{T}, ::Val{D}) where 
-                                      {T<:Real, D, F<:AxialGaussOverlapBasedSampler{T, D}}
-    AxialGaussOverlapCache(FloatingPolyGaussField{T, D}, ntuple( _->True(), Val(D) ))
+#= Additional Method =#
+function prepareInteComponent!(config::OrbitalIntegrationConfig{T, D, C, N, F}, 
+                               ::NTuple{N, NTuple{ 2, FloatingPolyGaussField{T, D} }}
+                               ) where {T<:Real, D, C<:RealOrComplex{T}, N, 
+                                        F<:AxialGaussOverlapSampler{T, D}}
+    if config.cache isa EmptyDict
+        AxialGaussOverlapCache(T, Count(D))
+    else
+        key = (TypeBox(F), ntuple( _->(PrimGaussTypeOrb, PrimGaussTypeOrb), Val(N) ))
+        get!(config.cache, key) do
+            AxialGaussOverlapCache(T, ntuple( _->True(), Val(D) ))
+        end
+    end::AxialGaussOverlapCache{T, D}
 end
 
-supportGaussBasedIntegration(::Type{T}, ::Val{D}, 
-                             ::AxialGaussOverlapBasedSampler{T, D}) where {T<:Real, D} = 
-true
-
-supportGaussBasedIntegration(::Type{T}, ::Val{3}, 
-                             ::CoulombRepulsionSampler) where {T<:Real} = 
-true
-
-supportGaussBasedIntegration(::Type{T}, ::Val{D}, ::DirectOperator) where {T<:Real, D} = 
-false
-
-#= Additional Method =#
-function evaluateIntegral!(config::OrbitalIntegrationConfig{T, D, C, N, F}, 
-                           layout::NTuple{N, NTuple{ 2, FloatingPolyGaussField{T, D} }}
-                           ) where {T, C<:RealOrComplex{T}, D, N, F<:DirectOperator}
-    op = config.operator
-    cacheDict = config.cache
-    if supportGaussBasedIntegration(T, Val(D), op)
-        res = if cacheDict isa NullCache
-            computePGTOrbIntegral(op, layout...)
-        else
-            orbLayout = ntuple(Storage((PrimGaussTypeOrb, PrimGaussTypeOrb)), Val(N))
-            key = (TypeBox(F), orbLayout)::OrbIntLayoutInfo{N}
-            cache = get!(cacheDict, key) do
-                getGaussBasedIntegrationCache(F, T, Val(D))
-            end
-            computePGTOrbIntegral(op, layout..., cache)
-        end
-        convert(C, res)
-    else
-        evaluateIntegralCore(config, layout)
-    end
+function evaluateIntegralCore!(formattedOp::TypedOperator{C}, 
+                               cache::AxialGaussOverlapCache{T, D}, 
+                               layout::N12N2Tuple{FloatingPolyGaussField{T, D}}, 
+                               ) where {T, C<:RealOrComplex{T}, D}
+    convert(C, computePGTOrbIntegral(formattedOp.core, layout, cache))
 end

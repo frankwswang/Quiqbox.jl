@@ -7,11 +7,11 @@ const OrbIntLayoutInfo{N} =
       Tuple{TypeBox{<:DirectOperator}, NTuple{N, NTuple{2, OrbitalCategory}}}
 
 const OrbIntLayoutCache{T<:Real, C<:RealOrComplex{T}, N, 
-                        M<:Union{CustomCache{T}, CustomCache{C}}} = 
+                        M<:Union{OptionalCache{T}, OptionalCache{C}}} = 
       LRU{OrbIntLayoutInfo{N}, M}
 
 const OptOrbIntLayoutCache{T<:Real, C<:RealOrComplex{T}, N} = 
-      Union{NullCache{C}, OrbIntLayoutCache{T, C, N}}
+      Union{EmptyDict{OrbIntLayoutInfo{N}, C}, OrbIntLayoutCache{T, C, N}}
 
 const OptEstimatorConfig{T} = MissingOr{EstimatorConfig{T}}
 
@@ -28,10 +28,10 @@ struct OrbitalIntegrationConfig{T<:Real, D, C<:RealOrComplex{T}, N, F<:DirectOpe
                                                S<:MultiBodyIntegral{D, C, N}, 
                                                F<:DirectOperator, E<:OptEstimatorConfig{T}}
         cache = if getTypeValue(caching)
-            valueTypeBound = Union{CustomCache{T}, CustomCache{C}}
+            valueTypeBound = Union{OptionalCache{T}, OptionalCache{C}}
             LRU{OrbIntLayoutInfo{N}, valueTypeBound}(maxsize=20)
         else
-            NullCache{C}()
+            EmptyDict{OrbIntLayoutInfo{N}, C}()
         end
         new{T, D, C, N, F, typeof(cache), E}(operator, cache, config)
     end
@@ -81,10 +81,10 @@ struct TwoBodyIntegralValCache{C<:RealOrComplex} <: QueryBox{C}
 end
 
 
-const FauxIntegralValCache{C<:RealOrComplex} = TypedEmptyDict{Tuple{Vararg{OneToIndex}}, C}
+const FauxIntegralValCache{C<:RealOrComplex} = EmptyDict{Tuple{Vararg{OneToIndex}}, C}
 
 genFauxIntegralValCache(::Type{C}) where {C<:RealOrComplex} = 
-TypedEmptyDict{Tuple{Vararg{OneToIndex}}, C}()
+EmptyDict{Tuple{Vararg{OneToIndex}}, C}()
 
 const OneBodyInteValCacheUnion{C<:RealOrComplex} = Union{
     OneBodyIntegralValCache{C}, 
@@ -153,7 +153,7 @@ function initializeOrbNormalization(inteInfo::OrbitalIntegralInfo{T, D, C, N},
     style = OneBodyIntegral{D, C}()
 
     if getTypeValue(caching)
-        normConfig = if isOverlap && !(inteMethod.cache isa NullCache); inteMethod else
+        normConfig = if isOverlap && !(inteMethod.cache isa EmptyDict); inteMethod else
                         OrbitalIntegrationConfig(style, op, True(), estConfig) end
         normMemory = if isOverlap && !(inteMemory isa FauxIntegralValCache); inteMemory else
                         OneBodyIntegralValCache(style) end
@@ -328,8 +328,8 @@ function getIntegralValue!(cache::OneBodyInteValCacheUnion{C},
                           {T<:Real, D, C<:RealOrComplex{T}}
     fieldLayout, indexLayout = pair
     (key, sector), indexSymmetry = prepareInteValCache(cache, indexLayout)
-    fieldLayoutCategory = genOrbCategoryLayout(fieldLayout)
-    layoutSymmetry = getIntegralOpOrbSymmetry(method.operator, fieldLayoutCategory)
+    categoryLayout = genOrbCategoryLayout(fieldLayout)
+    layoutSymmetry = getIntegralOpOrbSymmetry(method.operator, categoryLayout)
     permuteControl = .!(indexSymmetry) .&& layoutSymmetry
     orderedKey, needToConjugate = formatIntegralCacheKey(key, permuteControl)
     res = get!(sector, orderedKey) do
@@ -342,16 +342,22 @@ end
 
 
 function evaluateIntegral!(config::OrbitalIntegrationConfig{T, D, C, N, F}, 
-                           layout::NTuple{N, NTuple{ 2, StashedShiftedField{T, D} }}
+                           layout::NTuple{N, NTuple{ 2, StashedShiftedField{T, D} }}, 
                            ) where {T, C<:RealOrComplex{T}, D, N, F<:DirectOperator}
-    evaluateIntegralCore(config, layout)
+    component = prepareInteComponent!(config, layout)
+    evaluateIntegralCore!(TypedOperator(config.operator, C), component, layout)
 end
-
-function evaluateIntegralCore(config::OrbitalIntegrationConfig{T, D, C, N, F}, 
-                              layout::NTuple{N, NTuple{ 2, StashedShiftedField{T, D} }}
-                              ) where {T, C<:RealOrComplex{T}, D, N, F<:DirectOperator}
-    formattedOp = TypedOperator(config.operator, C)
-    estimateOrbIntegral(config.estimator, formattedOp, layout)::C
+#> Adaptive integration interface 1
+function prepareInteComponent!(config::OrbitalIntegrationConfig{T, D}, 
+                               ::N12N2Tuple{StashedShiftedField{T, D}}) where {T<:Real, D}
+    config.estimator
+end
+#> Adaptive integration interface 2
+function evaluateIntegralCore!(formattedOp::TypedOperator{C}, 
+                               config::OptEstimatorConfig{T}, 
+                               layout::N12N2Tuple{StashedShiftedField{T, D}}) where 
+                              {T, C<:RealOrComplex{T}, D}
+    estimateOrbIntegral(config, formattedOp, layout)::C
 end
 
 
