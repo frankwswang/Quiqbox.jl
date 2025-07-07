@@ -4,6 +4,8 @@ using Quiqbox: DirectMemory, PackedMemory
 
 @testset "Types.jl" begin
 
+@test Union{Quiqbox.N1N2Tuple{Real}, Quiqbox.N2N2Tuple{Real}} == Quiqbox.N12N2Tuple{Real}
+
 @test Quiqbox.UnitParam <: Quiqbox.SpanParam
 @test Quiqbox.GridParam <: Quiqbox.SpanParam
 

@@ -57,12 +57,26 @@ abstract type FieldAmplitude{T, D} <: ParticleFunction{D, 1} end
 end
 
 
-const N12Tuple{T} = Union{    Tuple{T}, NTuple{2, T}}
+@enum OctalNumber::Int8 begin
+    OUS0 = 0 # (false, false, false)
+    OPS1 = 1 # (true,  false, false)
+    OPS2 = 2 # (false, true,  false)
+    OPS3 = 3 # (true,  true,  false)
+    OPS4 = 4 # (false, false, true )
+    OPS5 = 5 # (true,  false, true )
+    OPS6 = 6 # (false, true,  true )
+    OPS7 = 7 # (true,  true,  true )
+end
+
+
+const N12Tuple{T} = Union{NTuple{1, T}, NTuple{2, T}}
 const N24Tuple{T} = Union{NTuple{2, T}, NTuple{4, T}}
+const N1N2Tuple{T} = NTuple{1, NTuple{2, T}}
+const N2N2Tuple{T} = NTuple{2, NTuple{2, T}}
+const N12N2Tuple{T} = N12Tuple{NTuple{2, T}}
 const NonEmptyTuple{T, NMO} = Tuple{T, Vararg{T, NMO}}
 const TriTupleUnion{T} = Union{(NTuple{N, T} for N in 1:3)...}
 const GeneralTupleUnion{T<:Tuple} = Union{T, NamedTuple{<:Any, <:T}}
-const DualN12Tuple{T} = N12Tuple{N12Tuple{T}}
 
 const AbtArray0D{T} = AbstractArray{T, 0}
 const AbtBottomVector = AbstractArray{Union{}, 1}
