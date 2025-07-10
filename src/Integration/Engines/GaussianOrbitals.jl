@@ -103,7 +103,7 @@ end
 #> Reusable axial factor
 function computePGTOrbOverlapAxialFactor(xpnLRsum::T, degree::Int) where {T<:Real}
     factor = degree > 0 ? oddFactorial(2degree - 1, inv(2xpnLRsum)) : one(T)
-    T(πPowers[:p0d5]) / sqrt(xpnLRsum) * factor
+    T(PowersOfPi[:p0d5]) / sqrt(xpnLRsum) * factor
 end
 #> Reusable mixed factor
 function computePGTOrbOverlapMixedFactor(dxLR::T, xpnProdOverSum::T) where {T<:Real}
@@ -380,6 +380,118 @@ function computePGTOrbCoordDiff!(cache::AxialGaussOverlapCache{T},
         end
         res
     end
+end
+
+
+
+#>-- Cartesian-3D PGTO One-Body Coulomb-field computation based on Obara-Saika scheme --<#
+function computePGTOrbMixedFactorProd(xpnPOS::T, cenL::NTuple{N, T}, cenR::NTuple{N, T}
+                                      ) where {T<:Real, N}
+    mapreduce(*, cenL, cenR) do xL, xR
+        computePGTOrbOverlapMixedFactor(xL-xR, xpnPOS)
+    end
+end
+#> notation iNxnPy: (iL-x, n+y)
+#>> (iL,   n, iR)                 #>> iN0nP0
+#>> (iL-1, n, iR) (iL-1, n+1, iR) #>> iN1nP0 iN1nP1
+#>> (iL-2, n, iR) (iL-2, n+1, iR) #>> iN2nP0 iN2nP1
+function vertRec(xpnSum::T, iL::Int, xML::T, xMC::T, 
+                 (iN1nP0, iN1nP1, iN2nP0, iN2nP1)::NTuple{4, T}) where {T<:Real}
+    xML * iN1nP0 - xMC * iN1nP1 + (iL-1) * (iN2nP0 - iN2nP1) * inv(2xpnSum)
+end
+function horiRec(xLR::T, iN0nP0::T, iN1nP0::T) where {T<:Real}
+    iN0nP0 + xLR * iN1nP0 # [(iL, n, iR-1), (iL-1, n, iR-1)] -> (iL-1, n, iR)
+end
+#>> n -> n - (iL + iR)
+#>> (0, 0, jL, jR, kL, kR) -> (iL+iR, 0, jL, jR, kL, kR)
+function verticalFill!(horiBuffer::AbstractVector{T}, 
+                       xpnSum::T, xML::T, xMC::T, nMax::Int) where {T<:Real}
+    for n in 1:nMax
+        here = zero(T)
+        buffer = (horiBuffer[end-n], horiBuffer[end-n+1], zero(T), zero(T))
+
+        for iSum in 1:n
+            iN1nP0, iN1nP1, _, _ = buffer
+            here = vertRec(xpnSum, iSum, xML, xMC, buffer)
+            iSum < n && (buffer = (here, horiBuffer[end-n+iSum+1], iN1nP0, iN1nP1))
+            horiBuffer[end-n+iSum] = here
+        end
+    end
+
+    @view horiBuffer[end-nMax : end]
+end
+
+
+function verticalPush!(segmentNext::AbstractVector{T}, segmentHere::AbstractVector{T}, 
+                       xpnSum::T, xML::T, xMC::T, iSum::Int) where {T<:Real}
+    # @assert iSum+1 == length(segmentNext) == length(segmentHere)
+    buffer = (segmentNext[begin], segmentHere[begin], zero(T), zero(T))
+
+    for i in 1:iSum
+        here = vertRec(xpnSum, i, xML, xMC, buffer)
+        segmentNext[begin+i] = here
+        if i < iSum
+            a, b, _, _ = buffer
+            buffer = (here, segmentHere[begin+i], a, b)
+        end
+    end
+
+    segmentNext
+end
+#>> (iL+iR, n, 0) -> (iL, n, iR)
+function angularShift!(vertBuffer::AbstractVector{T}, xLR::T, iR::Int) where {T<:Real}
+    segment = @view vertBuffer[end-iR:end]
+
+    for y in 1:iR, x in 1:(iR + 1 - y)
+        segment[begin+x-1] = horiRec(xLR, segment[begin+x], segment[begin+x-1])
+    end
+
+    first(segment)
+end
+
+function computePGTOrbPointCoulombField(pointCharge::Pair{Int, NTuple{3, T}}, 
+                                        data::GaussProductInfo{T, D}) where {T<:Real, D}
+    charge, cenC = pointCharge
+    cenL = data.lhs.cen
+    cenR = data.rhs.cen
+    cenM = data.cen
+    drMC = cenM .- cenC
+    angL = data.lhs.ang
+    angR = data.rhs.ang
+    angAxialSum = angL .+ angR
+    ijkSum = sum(angAxialSum)
+    xpnSum = data.xpn
+    xpnPOS = data.lhs.xpn * data.rhs.xpn / xpnSum
+
+    prefactor = computePGTOrbMixedFactorProd(xpnPOS, cenL, cenR) / xpnSum
+    factor = -charge * 2T(PowersOfPi[:p1d0]) * prefactor
+
+    horiBuffer = computeBoysSequence(xpnSum * mapreduce(x->x*x, +, drMC), ijkSum)
+    vertBuffer = copy(horiBuffer)
+    nUpper = ijkSum
+
+    for (nMax, iR, xL, xR, xM, xMC) in zip(angAxialSum, angR, cenL, cenR, cenM, drMC)
+        xML = xM - xL
+        xLR = xL - xR
+
+        nShiftBound = nUpper - nMax
+        vertSegHere = verticalFill!(horiBuffer, xpnSum, xML, xMC, nMax)
+
+        for shiftMin in 1:nShiftBound
+            shiftMax = shiftMin + nMax
+            vertSegNext = @view vertBuffer[end-shiftMax : end-shiftMin]
+            verticalPush!(vertSegNext, vertSegHere, xpnSum, xML, xMC, nMax)
+            horiBuffer[end-shiftMin+1] = angularShift!(vertSegHere, xLR, iR)
+            vertSegHere = @view horiBuffer[end-shiftMax : end-shiftMin]
+            vertSegHere .= vertSegNext
+        end
+
+        horiBuffer[end-nShiftBound] = angularShift!(vertSegHere, xLR, iR)
+        vertBuffer .= horiBuffer
+        nUpper -= nMax
+    end
+
+    factor * last(horiBuffer)
 end
 
 
