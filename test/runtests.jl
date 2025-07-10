@@ -64,6 +64,7 @@ using Test
         include("unit-tests/Integration/Interface-test.jl")
         include("unit-tests/Integration/Overlap-test.jl")
         include("unit-tests/Integration/Kinetic-test.jl")
+        include("unit-tests/Integration/Coulomb-test.jl")
     end
     println("$(unit7) test finished in $t7 seconds.\n")
 
