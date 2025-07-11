@@ -395,24 +395,26 @@ end
 #>> (iL,   n, iR)                 #>> iN0nP0
 #>> (iL-1, n, iR) (iL-1, n+1, iR) #>> iN1nP0 iN1nP1
 #>> (iL-2, n, iR) (iL-2, n+1, iR) #>> iN2nP0 iN2nP1
-function vertRec(xpnSum::T, iL::Int, xML::T, xMC::T, 
-                 (iN1nP0, iN1nP1, iN2nP0, iN2nP1)::NTuple{4, T}) where {T<:Real}
-    xML * iN1nP0 - xMC * iN1nP1 + (iL-1) * (iN2nP0 - iN2nP1) * inv(2xpnSum)
+function vertRec((iN1nP0, iN1nP1, iN2nP0, iN2nP1)::NTuple{4, T}, 
+                 xpnSum::T, iL::Int, xML::T, xMC::T, factor::T=one(T)) where {T<:Real}
+    part1 = xML * iN1nP0 - factor * xMC * iN1nP1
+    part2 = (iL-1) * (iN2nP0 - factor * iN2nP1) * inv(2xpnSum)
+    part1 + part2
 end
 function horiRec(xLR::T, iN0nP0::T, iN1nP0::T) where {T<:Real}
     iN0nP0 + xLR * iN1nP0 # [(iL, n, iR-1), (iL-1, n, iR-1)] -> (iL-1, n, iR)
 end
 #>> n -> n - (iL + iR)
 #>> (0, 0, jL, jR, kL, kR) -> (iL+iR, 0, jL, jR, kL, kR)
-function verticalFill!(horiBuffer::AbstractVector{T}, 
-                       xpnSum::T, xML::T, xMC::T, nMax::Int) where {T<:Real}
+function verticalFill!(horiBuffer::AbstractVector{T}, xpnSum::T, xML::T, xMC::T, nMax::Int, 
+                       factor::T=one(T)) where {T<:Real}
     for n in 1:nMax
         here = zero(T)
         buffer = (horiBuffer[end-n], horiBuffer[end-n+1], zero(T), zero(T))
 
         for iSum in 1:n
             iN1nP0, iN1nP1, _, _ = buffer
-            here = vertRec(xpnSum, iSum, xML, xMC, buffer)
+            here = vertRec(buffer, xpnSum, iSum, xML, xMC, factor)
             iSum < n && (buffer = (here, horiBuffer[end-n+iSum+1], iN1nP0, iN1nP1))
             horiBuffer[end-n+iSum] = here
         end
@@ -428,7 +430,7 @@ function verticalPush!(segmentNext::AbstractVector{T}, segmentHere::AbstractVect
     buffer = (segmentNext[begin], segmentHere[begin], zero(T), zero(T))
 
     for i in 1:iSum
-        here = vertRec(xpnSum, i, xML, xMC, buffer)
+        here = vertRec(buffer, xpnSum, i, xML, xMC)
         segmentNext[begin+i] = here
         if i < iSum
             a, b, _, _ = buffer
