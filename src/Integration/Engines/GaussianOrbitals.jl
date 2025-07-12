@@ -395,24 +395,26 @@ end
 #>> (iL,   n, iR)                 #>> iN0nP0
 #>> (iL-1, n, iR) (iL-1, n+1, iR) #>> iN1nP0 iN1nP1
 #>> (iL-2, n, iR) (iL-2, n+1, iR) #>> iN2nP0 iN2nP1
-function vertRec(xpnSum::T, iL::Int, xML::T, xMC::T, 
-                 (iN1nP0, iN1nP1, iN2nP0, iN2nP1)::NTuple{4, T}) where {T<:Real}
-    xML * iN1nP0 - xMC * iN1nP1 + (iL-1) * (iN2nP0 - iN2nP1) * inv(2xpnSum)
+function vertRec((iN1nP0, iN1nP1, iN2nP0, iN2nP1)::NTuple{4, T}, 
+                 xpnSum::T, iL::Int, xML::T, xMC::T, factor::T=one(T)) where {T<:Real}
+    part1 = xML * iN1nP0 - factor * xMC * iN1nP1
+    part2 = (iL-1) * (iN2nP0 - factor * iN2nP1) * inv(2xpnSum)
+    part1 + part2
 end
 function horiRec(xLR::T, iN0nP0::T, iN1nP0::T) where {T<:Real}
     iN0nP0 + xLR * iN1nP0 # [(iL, n, iR-1), (iL-1, n, iR-1)] -> (iL-1, n, iR)
 end
 #>> n -> n - (iL + iR)
 #>> (0, 0, jL, jR, kL, kR) -> (iL+iR, 0, jL, jR, kL, kR)
-function verticalFill!(horiBuffer::AbstractVector{T}, 
-                       xpnSum::T, xML::T, xMC::T, nMax::Int) where {T<:Real}
+function verticalFill!(horiBuffer::AbstractVector{T}, xpnSum::T, xML::T, xMC::T, nMax::Int, 
+                       factor::T=one(T)) where {T<:Real}
     for n in 1:nMax
         here = zero(T)
         buffer = (horiBuffer[end-n], horiBuffer[end-n+1], zero(T), zero(T))
 
         for iSum in 1:n
             iN1nP0, iN1nP1, _, _ = buffer
-            here = vertRec(xpnSum, iSum, xML, xMC, buffer)
+            here = vertRec(buffer, xpnSum, iSum, xML, xMC, factor)
             iSum < n && (buffer = (here, horiBuffer[end-n+iSum+1], iN1nP0, iN1nP1))
             horiBuffer[end-n+iSum] = here
         end
@@ -423,12 +425,13 @@ end
 
 
 function verticalPush!(segmentNext::AbstractVector{T}, segmentHere::AbstractVector{T}, 
-                       xpnSum::T, xML::T, xMC::T, iSum::Int) where {T<:Real}
+                       xpnSum::T, xML::T, xMC::T, iSum::Int, factor::T=one(T)
+                       ) where {T<:Real}
     # @assert iSum+1 == length(segmentNext) == length(segmentHere)
     buffer = (segmentNext[begin], segmentHere[begin], zero(T), zero(T))
 
     for i in 1:iSum
-        here = vertRec(xpnSum, i, xML, xMC, buffer)
+        here = vertRec(buffer, xpnSum, i, xML, xMC, factor)
         segmentNext[begin+i] = here
         if i < iSum
             a, b, _, _ = buffer
@@ -489,6 +492,136 @@ function computePGTOrbPointCoulombField(pointCharge::Pair{Int, NTuple{3, T}},
         horiBuffer[end-nShiftBound] = angularShift!(vertSegHere, xLR, iR)
         vertBuffer .= horiBuffer
         nUpper -= nMax
+    end
+
+    factor * last(horiBuffer)
+end
+
+
+
+#>-- Cartesian-3D PGTO One-Body Coulomb-field computation based on Obara-Saika scheme --<#
+#>> [(iL,0|oL-2,0), (iL+1,0|oL-1,0), (iL,0|oL-1,0), (iL-1,0|oL-1,0)] -> (iL,0|oL,0)
+#>>              (iL, oL-2)               <Head>         iN1oN2
+#>> (iL-1, oL-1) (iL, oL-1) (iL+1, oL-1)  <Body>  iN2oN1 iN1oN1 iP0oN1
+#>>              (iL, oL  )               <Here>         iN1oP0
+function modeTransfer((iN1oN2, iP0oN1, iN1oN1, iN2oN1)::NTuple{4, T}, xLRPair::NTuple{2, T}, 
+                      xpnSums::NTuple{2, T}, xpnPair::NTuple{2, T}, angPair::NTuple{2, Int}, 
+                      ) where {T<:Real}
+    i, o = angPair
+    xLR1, xLR2 = xLRPair
+    xpnR1, xpnR2 = xpnPair
+    xpnSum1, xpnSum2 = xpnSums
+    part1 = (i*iN2oN1 + (o - 1)*iN1oN2) / (2xpnSum2)
+    part2 = ((xpnR1*xLR1 + xpnR2*xLR2)*iN1oN1 + xpnSum1*iP0oN1) / xpnSum2
+    part1 - part2
+end
+
+function angularShift!(holder::AbstractMatrix{T}, source::AbstractVector{T}, 
+                       xLRPair::NTuple{2, T}, xpnSums::NTuple{2, T}, xpnPair::NTuple{2, T}, 
+                       oMax::Int) where {T<:Real}
+    angSpace = length(source)
+    # @assert 0 <= oMax < angSpace
+    # @assert all((oMax+1, angSpace) .<= size(holder))
+    activeHolder = @view holder[begin:begin+oMax, begin:begin+angSpace-1]
+    activeHolder[begin, :] .= source
+
+    for o in 1:oMax
+        n = angSpace - o - 1
+        iP0oN1 = activeHolder[begin+o-1, begin+n+1]
+        iN1oN1 = activeHolder[begin+o-1, begin+n  ]
+        iN2oN1 = n > 0 ? activeHolder[begin+o-1, begin+n-1] : zero(T)
+        iN1oN2 = o > 1 ? activeHolder[begin+o-2, begin+n  ] : zero(T)
+
+        for i in n:-1:0
+            buffer = (iN1oN2, iP0oN1, iN1oN1, iN2oN1)
+            iN1oP0 = modeTransfer(buffer, xLRPair, xpnSums, xpnPair, (i, o))
+            activeHolder[begin+o, begin+i] = iN1oP0
+            iP0oN1 = iN1oN1
+            iN1oN1 = iN2oN1
+            iN2oN1 = i > 1 ? activeHolder[begin+o-1, begin+i-2] : zero(T)
+            iN1oN2 = (i > 0 && o > 1) ? activeHolder[begin+o-2, begin+i-1] : zero(T)
+        end
+    end
+
+    @view activeHolder[:, begin:begin+angSpace-oMax-1]
+end
+
+function orbitalShift!(buffer::AbstractMatrix{T}, vertSegment::AbstractVector{T}, 
+                       xpnSums::NTuple{2, T}, xpnPair::NTuple{2, T}, 
+                       xLRPair::NTuple{2, T}, (iR, oR)::NTuple{2, Int}, oMax::Int
+                       ) where {T<:Real}
+    xLR1, xLR2 = xLRPair
+    activeBuffer = angularShift!(buffer, vertSegment, xLRPair, xpnSums, xpnPair, oMax)
+    for (n, slot) in zip(eachindex(vertSegment), eachcol(activeBuffer))
+        vertSegment[n] = angularShift!(slot, xLR2, oR)
+    end
+    angRshifted = @view vertSegment[begin : end-oMax]
+    # @assert length(angRshifted) == size(activeBuffer, 2)
+    angularShift!(angRshifted, xLR1, iR)
+end
+
+function computePGTOrbTwoBodyRepulsion(data1::GaussProductInfo{T, D}, 
+                                       data2::GaussProductInfo{T, D}) where {T<:Real, D}
+    cenL1 = data1.lhs.cen
+    cenR1 = data1.rhs.cen
+    cenM1 = data1.cen
+    angL1 = data1.lhs.ang
+    angR1 = data1.rhs.ang
+    xpnR1 = data1.rhs.xpn
+    xpnSum1 = data1.xpn
+    xpnPOS1 = data1.lhs.xpn * xpnR1 / xpnSum1
+    ijKAxialSum = angL1 .+ angR1
+
+    cenL2 = data2.lhs.cen
+    cenR2 = data2.rhs.cen
+    cenM2 = data2.cen
+    angL2 = data2.lhs.ang
+    angR2 = data2.rhs.ang
+    xpnR2 = data2.rhs.xpn
+    xpnSum2 = data2.xpn
+    xpnPOS2 = data2.lhs.xpn * xpnR2 / xpnSum2
+    opqAxialSum = angL2 .+ angR2
+
+    angAxialSum = ijKAxialSum .+ opqAxialSum
+    angSum = sum(angAxialSum)
+    drM1M2 = cenM1 .- cenM2
+    xpnPOS = xpnSum1 * xpnSum2 / (xpnSum1 + xpnSum2)
+    xpnFactor = xpnPOS / xpnSum1
+    xpnSumPair = (xpnSum1, xpnSum2)
+    xpnRPair = (xpnR1, xpnR2)
+
+    prefactor1 = computePGTOrbMixedFactorProd(xpnPOS1, cenL1, cenR1) / xpnSum1
+    prefactor2 = computePGTOrbMixedFactorProd(xpnPOS2, cenL2, cenR2) / xpnSum2
+    factor = 2T(PowersOfPi[:p2d5]) * prefactor1 * prefactor2 / sqrt(xpnSum1 + xpnSum2)
+
+    horiBuffer = computeBoysSequence(xpnPOS * mapreduce(x->x*x, +, drM1M2), angSum)
+    vertBuffer = copy(horiBuffer)
+    modeBuffer = ShapedMemory{T}(undef, (maximum(opqAxialSum)+1, maximum(angAxialSum)+1))
+    nUpper = angSum
+
+    for (ioMax, oMax, iR, xL1, xR1, oR, xL2, xR2, xM1, xM1M2) in zip(angAxialSum, 
+         opqAxialSum, angR1, cenL1, cenR1, angR2, cenL2, cenR2, cenM1, drM1M2)
+        xML1 = xM1 - xL1
+        angRPair = (iR, oR)
+        xLRPair = (xL1 - xR1, xL2 - xR2)
+
+        nShiftBound = nUpper - ioMax
+        vertSegHere = verticalFill!(horiBuffer, xpnSum1, xML1, xM1M2, ioMax, xpnFactor)
+
+        for shiftMin in 1:nShiftBound
+            shiftMax = shiftMin + ioMax
+            vertSegNext = @view vertBuffer[end-shiftMax : end-shiftMin]
+            verticalPush!(vertSegNext, vertSegHere, xpnSum1, xML1, xM1M2, ioMax, xpnFactor)
+            horiBuffer[end-shiftMin+1] = orbitalShift!(modeBuffer, vertSegHere, xpnSumPair, 
+                                                       xpnRPair, xLRPair, angRPair, oMax)
+            vertSegHere = @view horiBuffer[end-shiftMax : end-shiftMin]
+            vertSegHere .= vertSegNext
+        end
+
+        horiBuffer[end-nShiftBound] = orbitalShift!(modeBuffer, vertSegHere, xpnSumPair, 
+                                                    xpnRPair, xLRPair, angRPair, oMax)
+        vertBuffer .= horiBuffer
+        nUpper -= ioMax
     end
 
     factor * last(horiBuffer)
