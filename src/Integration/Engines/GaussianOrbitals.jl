@@ -425,12 +425,13 @@ end
 
 
 function verticalPush!(segmentNext::AbstractVector{T}, segmentHere::AbstractVector{T}, 
-                       xpnSum::T, xML::T, xMC::T, iSum::Int) where {T<:Real}
+                       xpnSum::T, xML::T, xMC::T, iSum::Int, factor::T=one(T)
+                       ) where {T<:Real}
     # @assert iSum+1 == length(segmentNext) == length(segmentHere)
     buffer = (segmentNext[begin], segmentHere[begin], zero(T), zero(T))
 
     for i in 1:iSum
-        here = vertRec(buffer, xpnSum, i, xML, xMC)
+        here = vertRec(buffer, xpnSum, i, xML, xMC, factor)
         segmentNext[begin+i] = here
         if i < iSum
             a, b, _, _ = buffer
