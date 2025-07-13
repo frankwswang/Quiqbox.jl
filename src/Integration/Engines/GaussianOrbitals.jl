@@ -393,12 +393,11 @@ end
 #> [b]M[y]: b - y
 
 #>- One-Body Coulomb-integral computation -<#
-function computePGTOrbMixedFactorProd(cenL::NTuple{N, T}, cenR::NTuple{N, T}, xpnPOS::T
-                                      ) where {T<:Real, N}
-    mapreduce(*, cenL, cenR) do xL, xR
-        computePGTOrbOverlapMixedFactor(xL-xR, xpnPOS)
+function computePGTOrbMixedFactorProd(drLR::NTuple{N, T}, xpnPOS::T) where {T<:Real, N}
+    mapreduce(*, drLR) do xLR
+        computePGTOrbOverlapMixedFactor(xLR, xpnPOS)
     end
-end #! Merge `cenL` and `cenR` to `drLR`
+end
 #>> (n, (iL,   0))                  #>> [here]
 #>> (n, (iL-1, 0)) (n+1, (iL-1, 0)) #>> nP0iM1 nP1iM1
 #>> (n, (iL-2, 0)) (n+1, (iL-2, 0)) #>> nP0iM2 nP1iM2
@@ -476,6 +475,7 @@ function computePGTOrbPointCoulombField(pointCharge::Pair{Int, NTuple{3, T}},
     cenL = data.lhs.cen
     cenR = data.rhs.cen
     cenM = data.cen
+    drLR = cenL .- cenR
     drMC = cenM .- cenC
     angL = data.lhs.ang
     angR = data.rhs.ang
@@ -484,17 +484,15 @@ function computePGTOrbPointCoulombField(pointCharge::Pair{Int, NTuple{3, T}},
     xpnSum = data.xpn
     xpnPOS = data.lhs.xpn * data.rhs.xpn / xpnSum
 
-    prefactor = computePGTOrbMixedFactorProd(cenL, cenR, xpnPOS) / xpnSum
+    prefactor = computePGTOrbMixedFactorProd(drLR, xpnPOS) / xpnSum
     factor = -charge * 2T(PowersOfPi[:p1d0]) * prefactor
 
     horiBuffer = computeBoysSequence(xpnSum * mapreduce(x->x*x, +, drMC), angSum)
     vertBuffer = copy(horiBuffer)
     nUpper = angSum
 
-    for (iSum, xL, xR, iR, xM, xMC) in zip(angTpl, cenL, cenR, angR, cenM, drMC)
+    for (iSum, xL, iR, xM, xLR, xMC) in zip(angTpl, cenL, angR, cenM, drLR, drMC)
         xML = xM - xL
-        xLR = xL - xR
-
         nShiftBound = nUpper - iSum
         vertSegHere = verticalFill!(horiBuffer, iSum, xML, xMC, xpnSum)
 
@@ -590,6 +588,7 @@ function computePGTOrbTwoBodyRepulsion(data1::GaussProductInfo{T, D},
     cenL1 = data1.lhs.cen
     cenR1 = data1.rhs.cen
     cenM1 = data1.cen
+    drLR1 = cenL1 .- cenR1
     angL1 = data1.lhs.ang
     angR1 = data1.rhs.ang
     ijkTpl = angL1 .+ angR1
@@ -600,6 +599,7 @@ function computePGTOrbTwoBodyRepulsion(data1::GaussProductInfo{T, D},
     cenL2 = data2.lhs.cen
     cenR2 = data2.rhs.cen
     cenM2 = data2.cen
+    drLR2 = cenL2 .- cenR2
     angL2 = data2.lhs.ang
     angR2 = data2.rhs.ang
     opqTpl = angL2 .+ angR2
@@ -615,8 +615,8 @@ function computePGTOrbTwoBodyRepulsion(data1::GaussProductInfo{T, D},
     xpnSumPOS = prod(xpnSum12) / sum(xpnSum12)
     xpnFactor = xpnSumPOS / xpnSum1
 
-    prefactor1 = computePGTOrbMixedFactorProd(cenL1, cenR1, xpnPOS1) / xpnSum1
-    prefactor2 = computePGTOrbMixedFactorProd(cenL2, cenR2, xpnPOS2) / xpnSum2
+    prefactor1 = computePGTOrbMixedFactorProd(drLR1, xpnPOS1) / xpnSum1
+    prefactor2 = computePGTOrbMixedFactorProd(drLR2, xpnPOS2) / xpnSum2
     factor = 2T(PowersOfPi[:p2d5]) * prefactor1 * prefactor2 / sqrt(xpnSum1 + xpnSum2)
 
     horiBuffer = computeBoysSequence(xpnSumPOS * mapreduce(x->x*x, +, drM1M2), angSum)
@@ -624,12 +624,11 @@ function computePGTOrbTwoBodyRepulsion(data1::GaussProductInfo{T, D},
     modeBuffer = ShapedMemory{T}(undef, (maximum(opqTpl)+1, maximum(angTpl)+1))
     nUpper = angSum
 
-    for (ioSum, oSum, xL1, xR1, iR, xL2, xR2, oR, xM1, xM1M2) in zip(angTpl, opqTpl, 
-         cenL1, cenR1, angR1, cenL2, cenR2, angR2, cenM1, drM1M2)
+    for (ioSum, oSum, xL1, iR, oR, xM1, xLR1, xLR2, xM1M2) in zip(angTpl, opqTpl, 
+         cenL1, angR1, angR2, cenM1, drLR1, drLR2, drM1M2)
         ioR = (iR, oR)
         xML1 = xM1 - xL1
-        xLR12 = (xL1 - xR1, xL2 - xR2)
-
+        xLR12 = (xLR1, xLR2)
         nShiftBound = nUpper - ioSum
         vertSegHere = verticalFill!(horiBuffer, ioSum, xML1, xM1M2, xpnSum1, xpnFactor)
 
