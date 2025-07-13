@@ -400,18 +400,18 @@ function computePGTOrbMixedFactorProd(cenL::NTuple{N, T}, cenR::NTuple{N, T}, xp
     end
 end #! Merge `cenL` and `cenR` to `drLR`
 #>> (n, (iL,   0))                  #>> [here]
-#>> (n, (iL-1, 0)) (n+1, (iL-1, 0)) #>> nP0iN1 nP1iN1
-#>> (n, (iL-2, 0)) (n+1, (iL-2, 0)) #>> nP0iN2 nP1iN2
-function vertTransfer((nP0iN1, nP1iN1, nP0iN2, nP1iN2)::NTuple{4, T}, 
+#>> (n, (iL-1, 0)) (n+1, (iL-1, 0)) #>> nP0iM1 nP1iM1
+#>> (n, (iL-2, 0)) (n+1, (iL-2, 0)) #>> nP0iM2 nP1iM2
+function vertTransfer((nP0iM1, nP1iM1, nP0iM2, nP1iM2)::NTuple{4, T}, 
                       iL::Int, xML::T, xMC::T, xpnSum::T, factor::T=one(T)) where {T<:Real}
-    part1 = xML * nP0iN1 - factor * xMC * nP1iN1
-    part2 = (iL-1) * (nP0iN2 - factor * nP1iN2) * inv(2xpnSum)
+    part1 = xML * nP0iM1 - factor * xMC * nP1iM1
+    part2 = (iL-1) * (nP0iM2 - factor * nP1iM2) * inv(2xpnSum)
     part1 + part2
 end
-#>> (n, (iL,   iR-1)) (n, (iL-1, iR)) #>> nP0iN0 [here]
-#>> (n, (iL-1, iR-1))                 #>> nP0iN1
-function horiTransfer((nP0iN0, nP0iN1)::NTuple{2, T}, xLR::T) where {T<:Real}
-    nP0iN0 + xLR * nP0iN1
+#>> (n, (iL,   iR-1)) (n, (iL-1, iR)) #>> nP0iM0 [here]
+#>> (n, (iL-1, iR-1))                 #>> nP0iM1
+function horiTransfer((nP0iM0, nP0iM1)::NTuple{2, T}, xLR::T) where {T<:Real}
+    nP0iM0 + xLR * nP0iM1
 end
 #>> <prev>           <here>
 #>> (n+iSum, (0, 0)) (n, (iSum, 0))
@@ -424,9 +424,9 @@ function verticalFill!(horiBuffer::AbstractVector{T}, iSum::Int, xML::T, xMC::T,
         buffer = (horiBuffer[end-n], horiBuffer[end-n+1], zero(T), zero(T))
 
         for iMax in 1:n
-            nP0iN1, nP1iN1, _, _ = buffer
+            nP0iM1, nP1iM1, _, _ = buffer
             here = vertTransfer(buffer, iMax, xML, xMC, xpnSum, factor)
-            iMax < n && (buffer = (here, horiBuffer[end-n+iMax+1], nP0iN1, nP1iN1))
+            iMax < n && (buffer = (here, horiBuffer[end-n+iMax+1], nP0iM1, nP1iM1))
             horiBuffer[end-n+iMax] = here
         end
     end
@@ -517,17 +517,17 @@ end
 
 
 #>- Two-Body Coulomb-integral computation -<#
-#>>                   (iL, 0|oL-2, 0)                    <head>         iP0oN2
-#>> (iL-1, 0|oL-1, 0) (iL, 0|oL-1, 0) (iL+1, 0|oL-1, 0)  <body>  iN1oN1 iP0oN1 iP1oN1
+#>>                   (iL, 0|oL-2, 0)                    <head>         iP0oM2
+#>> (iL-1, 0|oL-1, 0) (iL, 0|oL-1, 0) (iL+1, 0|oL-1, 0)  <body>  iM1oM1 iP0oM1 iP1oM1
 #>>                   (iL, 0|oL,   0)                                   [here]
-function modeTransfer((iP0oN2, iP1oN1, iP0oN1, iN1oN1)::NTuple{4, T}, 
+function modeTransfer((iP0oM2, iP1oM1, iP0oM1, iM1oM1)::NTuple{4, T}, 
                       (i, o)::NTuple{2, Int}, xpnR12::NTuple{2, T}, 
                        xLR12::NTuple{2, T}, xpnSum12::NTuple{2, T}) where {T<:Real}
     xLR1, xLR2 = xLR12
     xpnR1, xpnR2 = xpnR12
     xpnSum1, xpnSum2 = xpnSum12
-    part1 = (i*iN1oN1 + (o - 1)*iP0oN2) / (2xpnSum2)
-    part2 = ((xpnR1*xLR1 + xpnR2*xLR2)*iP0oN1 + xpnSum1*iP1oN1) / xpnSum2
+    part1 = (i*iM1oM1 + (o - 1)*iP0oM2) / (2xpnSum2)
+    part2 = ((xpnR1*xLR1 + xpnR2*xLR2)*iP0oM1 + xpnSum1*iP1oM1) / xpnSum2
     part1 - part2
 end
 #>> (0, 0|oSum, 0) ... (iSum, 0|oSum, 0)                         <here>
@@ -545,19 +545,19 @@ function angularCross!(holder::AbstractMatrix{T}, data::AbstractVector{T}, oSum:
 
     for o in 1:oSum
         n = angSpace - o - 1
-        iP1oN1 = activeHolder[begin+o-1, begin+n+1]
-        iP0oN1 = activeHolder[begin+o-1, begin+n  ]
-        iN1oN1 = n > 0 ? activeHolder[begin+o-1, begin+n-1] : zero(T)
-        iP0oN2 = o > 1 ? activeHolder[begin+o-2, begin+n  ] : zero(T)
+        iP1oM1 = activeHolder[begin+o-1, begin+n+1]
+        iP0oM1 = activeHolder[begin+o-1, begin+n  ]
+        iM1oM1 = n > 0 ? activeHolder[begin+o-1, begin+n-1] : zero(T)
+        iP0oM2 = o > 1 ? activeHolder[begin+o-2, begin+n  ] : zero(T)
 
         for i in n:-1:0
-            buffer = (iP0oN2, iP1oN1, iP0oN1, iN1oN1)
+            buffer = (iP0oM2, iP1oM1, iP0oM1, iM1oM1)
             iP0oP0 = modeTransfer(buffer, (i, o), xpnR12, xLR12, xpnSum12)
             activeHolder[begin+o, begin+i] = iP0oP0
-            iP1oN1 = iP0oN1
-            iP0oN1 = iN1oN1
-            iN1oN1 = i > 1 ? activeHolder[begin+o-1, begin+i-2] : zero(T)
-            iP0oN2 = (i > 0 && o > 1) ? activeHolder[begin+o-2, begin+i-1] : zero(T)
+            iP1oM1 = iP0oM1
+            iP0oM1 = iM1oM1
+            iM1oM1 = i > 1 ? activeHolder[begin+o-1, begin+i-2] : zero(T)
+            iP0oM2 = (i > 0 && o > 1) ? activeHolder[begin+o-2, begin+i-1] : zero(T)
         end
     end
 
