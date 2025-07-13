@@ -141,7 +141,7 @@ function computeAxialPGTOrbOverlap(input::T4Int2Tuple{T}) where {T<:Real}
 end
 
 #> Cache-based axial-PGTO overlap computation
-function computeAxialPGTOrbOverlap!(cache::LRU{T4Int2Tuple{T}, T}, 
+function computeAxialPGTOrbOverlap!(cache::OptionalLRU{T4Int2Tuple{T}, T}, 
                                     input::T4Int2Tuple{T}) where {T<:Real}
     res = get(cache, input, nothing) # Fewer allocations than using `get!`
     if res === nothing
@@ -149,11 +149,6 @@ function computeAxialPGTOrbOverlap!(cache::LRU{T4Int2Tuple{T}, T},
         setindex!(cache, res, input)
     end
     res
-end
-
-function computeAxialPGTOrbOverlap!(::EmptyDict{T4Int2Tuple{T}, T}, 
-                                    input::T4Int2Tuple{T}) where {T<:Real}
-    computeAxialPGTOrbOverlap(input)
 end
 
 #> Internal overlap computation
