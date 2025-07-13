@@ -35,13 +35,6 @@ struct GaussProductInfo{T<:Real, D} <: QueryBox{T}
     end
 end
 
-#> Union of orbital types that can utilize `AxialGaussOverlapCache`
-const GaussProdBasedOrb{T<:Real, D} = Union{
-    FloatingPolyGaussField{T, D}
-}
-
-const GaussProdBasedOrbCache{T<:Real, D, F<:GaussProdBasedOrb{T, D}} = 
-      LRU{EgalBox{F}, PrimGaussTypeOrbInfo{T, D}}
 
 const T4Int2Tuple{T} = Tuple{T, T, T, T, Int, Int}
 
@@ -469,14 +462,13 @@ function angularShift!(holder::AbstractVector{T}, iR::Int, xLR::T) where {T<:Rea
     first(segment)
 end
 
-function computePGTOrbPointCoulombField(pointCharge::Pair{Int, NTuple{3, T}}, 
-                                        data::GaussProductInfo{T, D}) where {T<:Real, D}
-    charge, cenC = pointCharge
+function computePGTOrbOneBodyRepulsion(pointCoord::NTuple{3, T}, 
+                                       data::GaussProductInfo{T, 3}) where {T<:Real}
     cenL = data.lhs.cen
     cenR = data.rhs.cen
     cenM = data.cen
     drLR = cenL .- cenR
-    drMC = cenM .- cenC
+    drMC = cenM .- pointCoord
     angL = data.lhs.ang
     angR = data.rhs.ang
     angTpl = angL .+ angR
@@ -485,7 +477,7 @@ function computePGTOrbPointCoulombField(pointCharge::Pair{Int, NTuple{3, T}},
     xpnPOS = data.lhs.xpn * data.rhs.xpn / xpnSum
 
     prefactor = computePGTOrbMixedFactorProd(drLR, xpnPOS) / xpnSum
-    factor = -charge * 2T(PowersOfPi[:p1d0]) * prefactor
+    factor = 2T(PowersOfPi[:p1d0]) * prefactor
 
     horiBuffer = computeBoysSequence(xpnSum * mapreduce(x->x*x, +, drMC), angSum)
     vertBuffer = copy(horiBuffer)
@@ -583,8 +575,8 @@ function orbitalShift!(buffer::AbstractMatrix{T}, data::AbstractVector{T}, oSum:
     angularShift!(angRshifted, iR, xLR1)
 end
 
-function computePGTOrbTwoBodyRepulsion(data1::GaussProductInfo{T, D}, 
-                                       data2::GaussProductInfo{T, D}) where {T<:Real, D}
+function computePGTOrbTwoBodyRepulsion(data1::GaussProductInfo{T, 3}, 
+                                       data2::GaussProductInfo{T, 3}) where {T<:Real}
     cenL1 = data1.lhs.cen
     cenR1 = data1.rhs.cen
     cenM1 = data1.cen

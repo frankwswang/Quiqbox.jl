@@ -1,6 +1,6 @@
 using Test
 using Quiqbox
-using Quiqbox: PrimGaussTypeOrbInfo, GaussProductInfo, computePGTOrbPointCoulombField, 
+using Quiqbox: PrimGaussTypeOrbInfo, GaussProductInfo, computePGTOrbOneBodyRepulsion, 
                computePGTOrbTwoBodyRepulsion
 
 @testset "Coulomb-Interaction-Based Features" begin
@@ -11,8 +11,6 @@ gtoData3 = PrimGaussTypeOrbInfo((0.1, 0.2, 0.3), 2.0, (0, 0, 0))
 gtoData4 = PrimGaussTypeOrbInfo((0.3, 0.1, 0.5), 2.0, (0, 0, 0))
 gtoData5 = PrimGaussTypeOrbInfo((0.3, 0.1, 0.5), 2.0, (2, 0, 0))
 gtoData6 = PrimGaussTypeOrbInfo((0.1, 0.2, 0.3), 2.0, (2, 0, 0))
-gtoData7 = PrimGaussTypeOrbInfo((0.9, 0.6, 0.1), 2.5, (1, 1, 0))
-gtoData8 = PrimGaussTypeOrbInfo((0.6, 0.7, 0.8), 3.0, (3, 1, 2))
 
 gtoProd11 = GaussProductInfo((gtoData1, gtoData1))
 gtoProd12 = GaussProductInfo((gtoData1, gtoData2))
@@ -25,16 +23,19 @@ gtoProd36 = GaussProductInfo((gtoData3, gtoData6))
 gtoProd44 = GaussProductInfo((gtoData4, gtoData4))
 gtoProd63 = GaussProductInfo((gtoData6, gtoData3))
 
-nucInfo1 = 1 => (0., 0., 0.)
+nucCoord = (0., 0., 0.)
 
-@test computePGTOrbPointCoulombField(nucInfo1, gtoProd12) ≈ -0.00021406291700540685
-@test computePGTOrbPointCoulombField(nucInfo1, gtoProd11) ≈ -0.00016035624620095473
-@test computePGTOrbPointCoulombField(nucInfo1, gtoProd33) ≈ -1.3209276479060006
-@test computePGTOrbPointCoulombField(nucInfo1, gtoProd34) ≈ -1.102953813735257
-@test computePGTOrbPointCoulombField(nucInfo1, gtoProd35) ≈ -0.1305787950084035
-@test computePGTOrbPointCoulombField(nucInfo1, gtoProd63) ==
-      computePGTOrbPointCoulombField(nucInfo1, gtoProd36) ≈ -0.11995218441914622
+@test computePGTOrbOneBodyRepulsion(nucCoord, gtoProd12) ≈ 0.00021406291700540685
+@test computePGTOrbOneBodyRepulsion(nucCoord, gtoProd11) ≈ 0.00016035624620095473
+@test computePGTOrbOneBodyRepulsion(nucCoord, gtoProd33) ≈ 1.3209276479060006
+@test computePGTOrbOneBodyRepulsion(nucCoord, gtoProd34) ≈ 1.102953813735257
+@test computePGTOrbOneBodyRepulsion(nucCoord, gtoProd35) ≈ 0.1305787950084035
+@test computePGTOrbOneBodyRepulsion(nucCoord, gtoProd63) ==
+      computePGTOrbOneBodyRepulsion(nucCoord, gtoProd36) ≈ 0.11995218441914622
 
+
+gtoData7 = PrimGaussTypeOrbInfo((0.9, 0.6, 0.1), 2.5, (1, 1, 0))
+gtoData8 = PrimGaussTypeOrbInfo((0.6, 0.7, 0.8), 3.0, (3, 1, 2))
 
 gtoProd14 = GaussProductInfo((gtoData1, gtoData4))
 gtoProd41 = GaussProductInfo((gtoData4, gtoData1))
