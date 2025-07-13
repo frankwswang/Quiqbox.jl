@@ -416,21 +416,21 @@ end
 #>> (n+iSum, (0, 0)) (n, (iSum, 0))
 #>> ...              ...
 #>> (n,      (0, 0)) (n, (0,    0))
-function verticalFill!(horiBuffer::AbstractVector{T}, iSum::Int, xML::T, xMC::T, xpnSum::T, 
+function verticalFill!(holder::AbstractVector{T}, iSum::Int, xML::T, xMC::T, xpnSum::T, 
                        factor::T=one(T)) where {T<:Real}
     for n in 1:iSum
         here = zero(T)
-        buffer = (horiBuffer[end-n], horiBuffer[end-n+1], zero(T), zero(T))
+        buffer = (holder[end-n], holder[end-n+1], zero(T), zero(T))
 
         for iMax in 1:n
             nP0iM1, nP1iM1, _, _ = buffer
             here = vertTransfer(buffer, iMax, xML, xMC, xpnSum, factor)
-            iMax < n && (buffer = (here, horiBuffer[end-n+iMax+1], nP0iM1, nP1iM1))
-            horiBuffer[end-n+iMax] = here
+            iMax < n && (buffer = (here, holder[end-n+iMax+1], nP0iM1, nP1iM1))
+            holder[end-n+iMax] = here
         end
     end
 
-    @view horiBuffer[end-iSum : end]
+    @view holder[end-iSum : end]
 end
 #>> <here>         <data>
 #>> (n, (iSum, 0)) (n+1, (iSum, 0))
