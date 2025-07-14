@@ -600,8 +600,9 @@ function orbitalShift!(buffer::AbstractMatrix{T}, data::AbstractVector{T}, oSum:
     angularShift!(angRshifted, iR, xLR1)
 end
 
-function computePGTOrbTwoBodyRepulsion(data1::GaussProductInfo{T, 3}, 
-                                       data2::GaussProductInfo{T, 3}) where {T<:Real}
+function computePGTOrbTwoBodyRepulsion!(cache::GaussCoulombFieldCache{T, 3}, 
+                                        data1::GaussProductInfo{T, 3}, 
+                                        data2::GaussProductInfo{T, 3}) where {T<:Real}
     cenL1 = data1.lhs.cen
     cenR1 = data1.rhs.cen
     cenM1 = data1.cen
@@ -636,7 +637,8 @@ function computePGTOrbTwoBodyRepulsion(data1::GaussProductInfo{T, 3},
     prefactor2 = computePGTOrbMixedFactorProd(drLR2, xpnPOS2) / xpnSum2
     factor = 2T(PowersOfPi[:p2d5]) * prefactor1 * prefactor2 / sqrt(xpnSum1 + xpnSum2)
 
-    horiBuffer = computeBoysSequence(xpnSumPOS * mapreduce(x->x*x, +, drM1M2), angSum)
+    initConfig = (xpnSumPOS * mapreduce(x->x*x, +, drM1M2), angSum)
+    horiBuffer = getInitialBuffer!(cache.initial, initConfig)
     vertBuffer = copy(horiBuffer)
     modeBuffer = ShapedMemory{T}(undef, (maximum(opqTpl)+1, maximum(angTpl)+1))
     nUpper = angSum

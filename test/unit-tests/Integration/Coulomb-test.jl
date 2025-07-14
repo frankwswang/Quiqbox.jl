@@ -1,7 +1,7 @@
 using Test
 using Quiqbox
 using Quiqbox: PrimGaussTypeOrbInfo, GaussProductInfo, GaussCoulombFieldCache, 
-               computePGTOrbOneBodyRepulsion!, computePGTOrbTwoBodyRepulsion
+               computePGTOrbOneBodyRepulsion!, computePGTOrbTwoBodyRepulsion!
 
 @testset "Coulomb-Interaction-Based Features" begin
 
@@ -52,26 +52,31 @@ gtoProd41 = GaussProductInfo((gtoData4, gtoData1))
 gtoProd78 = GaussProductInfo((gtoData7, gtoData8))
 gtoProd87 = GaussProductInfo((gtoData8, gtoData7))
 
-@test computePGTOrbTwoBodyRepulsion(gtoProd11, gtoProd22) ≈ 
-      computePGTOrbTwoBodyRepulsion(gtoProd22, gtoProd11) ≈ 
+@test computePGTOrbTwoBodyRepulsion!(sizedCache, gtoProd11, gtoProd22) ==
+      computePGTOrbTwoBodyRepulsion!(emptyCache, gtoProd11, gtoProd22) ≈ 
+      computePGTOrbTwoBodyRepulsion!(emptyCache, gtoProd22, gtoProd11) ≈ 
       1.7675350484831864e-6
 
-@test computePGTOrbTwoBodyRepulsion(gtoProd12, gtoProd12) ≈ 
-      computePGTOrbTwoBodyRepulsion(gtoProd12, gtoProd21) ≈ 
-      computePGTOrbTwoBodyRepulsion(gtoProd21, gtoProd21) ≈ 
+@test computePGTOrbTwoBodyRepulsion!(sizedCache, gtoProd12, gtoProd12) == 
+      computePGTOrbTwoBodyRepulsion!(emptyCache, gtoProd12, gtoProd12) ≈ 
+      computePGTOrbTwoBodyRepulsion!(emptyCache, gtoProd12, gtoProd21) ≈ 
+      computePGTOrbTwoBodyRepulsion!(emptyCache, gtoProd21, gtoProd21) ≈ 
       6.267963629018787e-8
 
-@test computePGTOrbTwoBodyRepulsion(gtoProd33, gtoProd44) ≈ 
-      computePGTOrbTwoBodyRepulsion(gtoProd44, gtoProd33) ≈ 
+@test computePGTOrbTwoBodyRepulsion!(sizedCache, gtoProd33, gtoProd44) == 
+      computePGTOrbTwoBodyRepulsion!(emptyCache, gtoProd33, gtoProd44) ≈ 
+      computePGTOrbTwoBodyRepulsion!(emptyCache, gtoProd44, gtoProd33) ≈ 
       0.7291219052871128
 
-@test computePGTOrbTwoBodyRepulsion(gtoProd14, gtoProd78) ≈ 
-      computePGTOrbTwoBodyRepulsion(gtoProd41, gtoProd78) ≈ 
-      computePGTOrbTwoBodyRepulsion(gtoProd41, gtoProd87) ≈ 
-      computePGTOrbTwoBodyRepulsion(gtoProd14, gtoProd87) ≈ 
-      computePGTOrbTwoBodyRepulsion(gtoProd78, gtoProd14) ≈ 
-      computePGTOrbTwoBodyRepulsion(gtoProd87, gtoProd14) ≈ 
-      computePGTOrbTwoBodyRepulsion(gtoProd87, gtoProd41) ≈ 
-      computePGTOrbTwoBodyRepulsion(gtoProd78, gtoProd41) ≈ -2.4175946692430508e-9
+@test computePGTOrbTwoBodyRepulsion!(sizedCache, gtoProd14, gtoProd78) == 
+      computePGTOrbTwoBodyRepulsion!(emptyCache, gtoProd14, gtoProd78) ≈ 
+      computePGTOrbTwoBodyRepulsion!(emptyCache, gtoProd41, gtoProd78) ≈ 
+      computePGTOrbTwoBodyRepulsion!(emptyCache, gtoProd41, gtoProd87) ≈ 
+      computePGTOrbTwoBodyRepulsion!(emptyCache, gtoProd14, gtoProd87) ≈ 
+      computePGTOrbTwoBodyRepulsion!(emptyCache, gtoProd78, gtoProd14) ≈ 
+      computePGTOrbTwoBodyRepulsion!(emptyCache, gtoProd87, gtoProd14) ≈ 
+      computePGTOrbTwoBodyRepulsion!(emptyCache, gtoProd87, gtoProd41) ≈ 
+      computePGTOrbTwoBodyRepulsion!(emptyCache, gtoProd78, gtoProd41) ≈ 
+      -2.4175946692430508e-9
 
 end
