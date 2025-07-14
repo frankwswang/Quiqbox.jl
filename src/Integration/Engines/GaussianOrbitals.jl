@@ -459,8 +459,34 @@ function angularShift!(holder::AbstractVector{T}, iR::Int, xLR::T) where {T<:Rea
     first(segment)
 end
 
-function computePGTOrbOneBodyRepulsion(pointCoord::NTuple{3, T}, 
-                                       data::GaussProductInfo{T, 3}) where {T<:Real}
+struct GaussCoulombFieldCache{T<:Real, D, M<:OptionalLRU{Tuple{T, Int}, Memory{T}}
+                              } <: QueryCache{Tuple{T, Int}, T}
+    initial::M #> For `computeBoysSequence`` when D==3
+
+    function GaussCoulombFieldCache(::Type{T}, ::Count{D}, config::Boolean=False(), 
+                                    axialMaxSize::Int=128) where {T<:Real, D}
+        checkPositivity(D)
+        flag = evalTypedData(config)
+        iCache = if flag; LRU{Tuple{T, Int}, Memory{T}}(maxsize=axialMaxSize) else
+                    EmptyDict{Tuple{T, Int}, Memory{T}}() end
+
+        new{T, D, typeof(iCache)}(iCache)
+    end
+end
+
+function getInitialBuffer!(cache::OptionalLRU{Tuple{T, Int}, Memory{T}}, 
+                           input::Tuple{T, Int}) where {T<:Real}
+    res = get(cache, input, nothing)
+    if res === nothing
+        res = computeBoysSequence(first(input), last(input))
+        setindex!(cache, res, input)
+    end
+    cache isa EmptyDict ? res : copy(res)
+end
+
+function computePGTOrbOneBodyRepulsion!(cache::GaussCoulombFieldCache{T, 3}, 
+                                        pointCoord::NTuple{3, T}, 
+                                        data::GaussProductInfo{T, 3}) where {T<:Real}
     cenL = data.lhs.cen
     cenR = data.rhs.cen
     cenM = data.cen
@@ -476,7 +502,8 @@ function computePGTOrbOneBodyRepulsion(pointCoord::NTuple{3, T},
     prefactor = computePGTOrbMixedFactorProd(drLR, xpnPOS) / xpnSum
     factor = 2T(PowersOfPi[:p1d0]) * prefactor
 
-    horiBuffer = computeBoysSequence(xpnSum * mapreduce(x->x*x, +, drMC), angSum)
+    initConfig = (xpnSum * mapreduce(x->x*x, +, drMC), angSum)
+    horiBuffer = getInitialBuffer!(cache.initial, initConfig)
     vertBuffer = copy(horiBuffer)
     nUpper = angSum
 

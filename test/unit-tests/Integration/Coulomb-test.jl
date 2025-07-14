@@ -1,7 +1,7 @@
 using Test
 using Quiqbox
-using Quiqbox: PrimGaussTypeOrbInfo, GaussProductInfo, computePGTOrbOneBodyRepulsion, 
-               computePGTOrbTwoBodyRepulsion
+using Quiqbox: PrimGaussTypeOrbInfo, GaussProductInfo, GaussCoulombFieldCache, 
+               computePGTOrbOneBodyRepulsion!, computePGTOrbTwoBodyRepulsion
 
 @testset "Coulomb-Interaction-Based Features" begin
 
@@ -23,15 +23,25 @@ gtoProd36 = GaussProductInfo((gtoData3, gtoData6))
 gtoProd44 = GaussProductInfo((gtoData4, gtoData4))
 gtoProd63 = GaussProductInfo((gtoData6, gtoData3))
 
-nucCoord = (0., 0., 0.)
+coord = (0., 0., 0.)
 
-@test computePGTOrbOneBodyRepulsion(nucCoord, gtoProd12) ≈ 0.00021406291700540685
-@test computePGTOrbOneBodyRepulsion(nucCoord, gtoProd11) ≈ 0.00016035624620095473
-@test computePGTOrbOneBodyRepulsion(nucCoord, gtoProd33) ≈ 1.3209276479060006
-@test computePGTOrbOneBodyRepulsion(nucCoord, gtoProd34) ≈ 1.102953813735257
-@test computePGTOrbOneBodyRepulsion(nucCoord, gtoProd35) ≈ 0.1305787950084035
-@test computePGTOrbOneBodyRepulsion(nucCoord, gtoProd63) ==
-      computePGTOrbOneBodyRepulsion(nucCoord, gtoProd36) ≈ 0.11995218441914622
+emptyCache = GaussCoulombFieldCache(Float64, Count(3))
+sizedCache = GaussCoulombFieldCache(Float64, Count(3), Quiqbox.True())
+
+@test computePGTOrbOneBodyRepulsion!(emptyCache, coord, gtoProd12) == 
+      computePGTOrbOneBodyRepulsion!(sizedCache, coord, gtoProd12) ≈ 0.00021406291700540685
+@test computePGTOrbOneBodyRepulsion!(emptyCache, coord, gtoProd11) == 
+      computePGTOrbOneBodyRepulsion!(sizedCache, coord, gtoProd11) ≈ 0.00016035624620095473
+@test computePGTOrbOneBodyRepulsion!(emptyCache, coord, gtoProd33) == 
+      computePGTOrbOneBodyRepulsion!(sizedCache, coord, gtoProd33) ≈ 1.3209276479060006
+@test computePGTOrbOneBodyRepulsion!(emptyCache, coord, gtoProd34) == 
+      computePGTOrbOneBodyRepulsion!(sizedCache, coord, gtoProd34) ≈ 1.102953813735257
+@test computePGTOrbOneBodyRepulsion!(emptyCache, coord, gtoProd35) == 
+      computePGTOrbOneBodyRepulsion!(sizedCache, coord, gtoProd35) ≈ 0.1305787950084035
+@test computePGTOrbOneBodyRepulsion!(emptyCache, coord, gtoProd63) == 
+      computePGTOrbOneBodyRepulsion!(sizedCache, coord, gtoProd63) == 
+      computePGTOrbOneBodyRepulsion!(emptyCache, coord, gtoProd36) == 
+      computePGTOrbOneBodyRepulsion!(sizedCache, coord, gtoProd36) ≈ 0.11995218441914622
 
 
 gtoData7 = PrimGaussTypeOrbInfo((0.9, 0.6, 0.1), 2.5, (1, 1, 0))
