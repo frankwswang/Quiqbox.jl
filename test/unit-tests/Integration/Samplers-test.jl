@@ -1,5 +1,5 @@
 using Test
-using Quiqbox: genCoulombPointFieldSampler
+using Quiqbox: genCoulombPointFieldSampler, genCoulombInteractionSampler
 
 @testset "Samplers.jl" begin
     point = (1.0, 2.0, 3.0)
@@ -9,4 +9,8 @@ using Quiqbox: genCoulombPointFieldSampler
     f1 = op1(getNorm, getNorm)
     coord = (1.1, -0.4, 2.0)
     @test f1(coord) == getNorm(coord)^2 / getNorm(coord .- point) * prod(charges)
+
+    op2 = genCoulombInteractionSampler()
+    f2 = op2(getNorm, getNorm)
+    @test f2(point, coord) == getNorm(point) * (inv∘getNorm)(point .- coord) * getNorm(coord)
 end
