@@ -59,6 +59,7 @@ using Test
     unit7 = "Integration System"
     println("Testing $(unit7)...")
     t7 = @elapsed @testset "$(unit7)" begin
+        include("unit-tests/Integration/Samplers-test.jl")
         include("unit-tests/Integration/BoysFunction-test.jl")
         include("unit-tests/Integration/Framework-test.jl")
         include("unit-tests/Integration/Interface-test.jl")

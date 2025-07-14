@@ -27,10 +27,27 @@ function inverseDistance(coord1::NonEmptyTuple{Real, D},
     (coord1 .- coord2) |> LinearAlgebra.norm |> inv
 end
 
-const CoulombRepulsionSampler = 
+
+const PointInverseDistance{T<:Real, D} = RPartial{NTuple{D, T}, typeof(inverseDistance)}
+
+const CoulombPointField{T<:Real, D} = 
+      PairCoupler{StableMul{T}, Storage{T}, PointInverseDistance{T, D}}
+
+const CoulombPointFieldSampler{T<:Real, D} = 
+      OneBodySampler{Associate{ Left, typeof(*), CoulombPointField{T, D} }}
+
+function genCoulombPointFieldSampler(chargePair::NTuple{2, T}, pointCoord::NTuple{D, T}) where 
+                                    {T<:Real, D}
+    pid = RPartial(inverseDistance, (pointCoord,))
+    cpf = PairCoupler(StableMul(T), Storage(prod(chargePair), :chargePair), pid)
+    genOneBodySampler(Associate(Left(), *, cpf))
+end
+
+
+const CoulombInteractionSampler = 
       Sandwich{Left, NTuple{2, typeof(*)}, typeof(inverseDistance)}
 
-function genCoulombRepulsionSampler()
+function genCoulombInteractionSampler()
     Sandwich(Left(), (*, *), inverseDistance)
 end
 
@@ -65,10 +82,12 @@ function genKineticEnergySampler(::Type{T}, ::Count{D}, ::Count{N}=Nil()
 end
 
 
-const ReturnTypedSampler{T} = Union{MonomialMul{T}, MultipoleMomentSampler{T}, 
-                                    DiagDirectionalDiffSampler{T}}
+const ReturnTypedSampler{T} = Union{
+    MonomialMul{T}, MultipoleMomentSampler{T}, DiagDirectionalDiffSampler{T}, 
+    CoulombPointFieldSampler{T}
+}
 
-const StableTypedSampler = Union{OneBodySampler, CoulombRepulsionSampler}
+const StableTypedSampler = Union{OneBodySampler, CoulombInteractionSampler}
 
 
 isParamIndependent(::DirectOperator) = False()
@@ -79,4 +98,6 @@ isParamIndependent(::MultipoleMomentSampler) = True()
 
 isParamIndependent(::DiagDirectionalDiffSampler) = True()
 
-isParamIndependent(::CoulombRepulsionSampler) = True()
+isParamIndependent(::CoulombPointFieldSampler) = True()
+
+isParamIndependent(::CoulombInteractionSampler) = True()
