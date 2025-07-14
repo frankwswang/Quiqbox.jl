@@ -404,8 +404,10 @@ end
 #>> (n+iSum, (0, 0)) (n, (iSum, 0))
 #>> ...              ...
 #>> (n,      (0, 0)) (n, (0,    0))
-function verticalFill!(holder::AbstractVector{T}, iSum::Int, xML::T, xMC::T, xpnSum::T, 
+function verticalFill!(holder::AbstractVector{T}, xML::T, xMC::T, xpnSum::T, 
                        factor::T=one(T)) where {T<:Real}
+    iSum = length(holder) - 1
+
     for n in 1:iSum
         here = zero(T)
         buffer = (holder[end-n], holder[end-n+1], zero(T), zero(T))
@@ -418,16 +420,16 @@ function verticalFill!(holder::AbstractVector{T}, iSum::Int, xML::T, xMC::T, xpn
         end
     end
 
-    @view holder[end-iSum : end]
+    holder
 end
 #>> <here>         <data>
 #>> (n, (iSum, 0)) (n+1, (iSum, 0))
 #>> ...            ...
 #>> (n, (0,    0)) (n+1, (0,    0))
 function verticalPush!(holder::AbstractVector{T}, data::AbstractVector{T}, 
-                       iSum::Int, xML::T, xMC::T, xpnSum::T, factor::T=one(T)
-                       ) where {T<:Real}
-    # @assert iSum+1 == length(holder) == length(data)
+                       xML::T, xMC::T, xpnSum::T, factor::T=one(T)) where {T<:Real}
+    # @assert length(holder) == length(data)
+    iSum = length(holder) - 1
     buffer = (holder[begin], data[begin], zero(T), zero(T))
 
     for i in 1:iSum
@@ -481,12 +483,13 @@ function computePGTOrbOneBodyRepulsion(pointCoord::NTuple{3, T},
     for (iSum, xL, iR, xM, xLR, xMC) in zip(angTpl, cenL, angR, cenM, drLR, drMC)
         xML = xM - xL
         nShiftBound = nUpper - iSum
-        vertSegHere = verticalFill!(horiBuffer, iSum, xML, xMC, xpnSum)
+        tangentBuffer = @view horiBuffer[end-iSum : end]
+        vertSegHere = verticalFill!(tangentBuffer, xML, xMC, xpnSum)
 
         for shiftMin in 1:nShiftBound
             shiftMax = shiftMin + iSum
             vertSegNext = @view vertBuffer[end-shiftMax : end-shiftMin]
-            verticalPush!(vertSegNext, vertSegHere, iSum, xML, xMC, xpnSum)
+            verticalPush!(vertSegNext, vertSegHere, xML, xMC, xpnSum)
             horiBuffer[end-shiftMin+1] = angularShift!(vertSegHere, iR, xLR)
             vertSegHere = @view horiBuffer[end-shiftMax : end-shiftMin]
             vertSegHere .= vertSegNext
@@ -617,12 +620,13 @@ function computePGTOrbTwoBodyRepulsion(data1::GaussProductInfo{T, 3},
         xML1 = xM1 - xL1
         xLR12 = (xLR1, xLR2)
         nShiftBound = nUpper - ioSum
-        vertSegHere = verticalFill!(horiBuffer, ioSum, xML1, xM1M2, xpnSum1, xpnFactor)
+        tangentBuffer = @view horiBuffer[end-ioSum : end]
+        vertSegHere = verticalFill!(tangentBuffer, xML1, xM1M2, xpnSum1, xpnFactor)
 
         for shiftMin in 1:nShiftBound
             shiftMax = shiftMin + ioSum
             vertSegNext = @view vertBuffer[end-shiftMax : end-shiftMin]
-            verticalPush!(vertSegNext, vertSegHere, ioSum, xML1, xM1M2, xpnSum1, xpnFactor)
+            verticalPush!(vertSegNext, vertSegHere, xML1, xM1M2, xpnSum1, xpnFactor)
             horiBuffer[end-shiftMin+1] = orbitalShift!(modeBuffer, vertSegHere, oSum, ioR, 
                                                        xpnR12, xLR12, xpnSum12)
             vertSegHere = @view horiBuffer[end-shiftMax : end-shiftMin]
