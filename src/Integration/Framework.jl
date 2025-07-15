@@ -91,7 +91,8 @@ const OneBodyInteValCacheUnion{C<:RealOrComplex} = Union{
     FauxIntegralValCache{C}
 }
 
-const TwoBodyInteValCacheUnion{C<:RealOrComplex} = Union{ 
+const TwoBodyInteValCacheUnion{C<:RealOrComplex} = Union{
+    TwoBodyIntegralValCache{C}, 
     FauxIntegralValCache{C}
 }
 
@@ -119,6 +120,11 @@ const OrbitalOverlapInfo{T<:Real, D, C<:RealOrComplex{T}, M<:OrbitalOverlapConfi
                          V<:OneBodyInteValCacheUnion{C}, P<:MultiOrbitalData{T, D}} = 
       OneBodyOrbIntegralInfo{T, D, C, OverlapSampler, M, V, P}
 
+const TwoBodyOrbIntegralInfo{T<:Real, D, C<:RealOrComplex{T}, F<:DirectOperator, 
+                             M<:OrbitalIntegrationConfig{T, D, C, 2, F}, 
+                             V<:TwoBodyInteValCacheUnion{C}, P<:MultiOrbitalData{T, D}} = 
+      OrbitalIntegralInfo{T, D, C, 2, F, M, V, P}
+
 const OrbitalLayoutInteInfo{T<:Real, D, C<:RealOrComplex{T}, N, F<:DirectOperator, 
                             M<:OrbitalIntegrationConfig{T, D, C, N, F}, 
                             V<:MultiBodyIntegralValCache{C}, P<:OrbitalLayoutData{T, D}} = 
@@ -130,13 +136,19 @@ const OrbitalVectorInteInfo{T<:Real, D, C<:RealOrComplex{T}, N, F<:DirectOperato
       OrbitalIntegralInfo{T, D, C, N, F, M, V, P}
 
 
-function initializeOrbIntegral(::OneBodyIntegral{D, C}, op::DirectOperator, 
+function initializeOrbIntegral(::MultiBodyIntegral{D, C, N}, op::DirectOperator, 
                                data::MultiOrbitalData{T, D, C}, caching::Boolean, 
                                estimatorConfig::OptEstimatorConfig{T}=missing) where 
-                              {T<:Real, D, C<:RealOrComplex{T}}
-    inteStyle = OneBodyIntegral{D, C}()
+                              {D, T<:Real, C<:RealOrComplex{T}, N}
+    inteStyle = MultiBodyIntegral{D, C, N}()
     methodConfig = OrbitalIntegrationConfig(inteStyle, op, caching, estimatorConfig)
-    resultConfig = OneBodyIntegralValCache(inteStyle)
+    if N==1
+        resultConfig = OneBodyIntegralValCache(inteStyle)
+    elseif N==2
+        resultConfig = TwoBodyIntegralValCache(inteStyle)
+    else
+        throw(AssertionError("$(MultiBodyIntegral{D, C, N}) is not supported."))
+    end
     OrbitalIntegralInfo(methodConfig, resultConfig, data)
 end
 
@@ -177,8 +189,9 @@ function genOrbCategoryLayout(data::N12N2Tuple{StashedShiftedField{T, D}}
     end
 end
 
-const SesquiOrbCore{T<:Real, D} = N1N2Tuple{StashedShiftedField{T, D}}
-const OneBodyOrbCorePair{T<:Real, D} = Pair{<:SesquiOrbCore{T, D}, N1N2Tuple{OneToIndex}}
+const MultiBodyOrbCorePair{T<:Real, D, N} = 
+      Pair{ <:NTuple{N, NTuple{ 2, StashedShiftedField{T, D} }}, 
+              NTuple{N, NTuple{ 2, OneToIndex                }} }
 
 
 toSingleBool(num::OctalNumber) = Bool(num)
@@ -309,10 +322,10 @@ function formatIntegralCacheKey(key::NTuple{4, OneToIndex}, permuteControl::NTup
 end
 #> `indexSymmetry` should be index based symmetry -> to simplify layout
 #> `layoutSymmetry` should be operator--orbital based symmetry -> to reuse result
-function getIntegralValue!(cache::OneBodyInteValCacheUnion{C}, 
-                           method::OrbitalIntegrationConfig{T, D, C}, 
-                           pair::OneBodyOrbCorePair{T, D}) where 
-                          {T<:Real, D, C<:RealOrComplex{T}}
+function getIntegralValue!(cache::MultiBodyIntegralValCache{C}, 
+                           method::OrbitalIntegrationConfig{T, D, C, N}, 
+                           pair::MultiBodyOrbCorePair{T, D, N}) where 
+                          {T<:Real, D, C<:RealOrComplex{T}, N}
     fieldLayout, indexLayout = pair
     (key, sector), indexSymmetry = prepareInteValCache(cache, indexLayout)
     categoryLayout = genOrbCategoryLayout(fieldLayout)
@@ -325,7 +338,6 @@ function getIntegralValue!(cache::OneBodyInteValCacheUnion{C},
     end::C
     needToConjugate ? conj(res) : res
 end
-
 
 
 function evaluateIntegral!(config::OrbitalIntegrationConfig{T, D, C, N, F}, 
@@ -349,9 +361,12 @@ end
 
 
 function formatOrbCorePair(configSource::AbstractVector{<:StashedShiftedField{T, D}}, 
-                           indexer::N1N2Tuple{OneToIndex}) where {T<:Real, D}
-    fields = getEntry.(Ref(configSource), first(indexer))
-    tuple(fields) => indexer
+                           indexer::N12N2Tuple{OneToIndex}) where {T<:Real, D}
+    fields = map(indexer) do pair
+        idxL, idxR = pair
+        (getEntry(configSource, idxL), getEntry(configSource, idxR))
+    end
+    fields => indexer
 end
 
 
@@ -421,6 +436,42 @@ function getOrbLayoutIntegralCore!(inteInfo::OneBodyOrbIntegralInfo{T, D, C},
 end
 
 
+function getOrbLayoutIntegralCore!(inteInfo::TwoBodyOrbIntegralInfo{T, D, C}, 
+                                   ptrLayout::OrbDataPtrQuadLayout{D, C}) where 
+                                  {T<:Real, D, C<:RealOrComplex{T}}
+    method = inteInfo.method
+    config = inteInfo.basis.config
+    memory = inteInfo.memory
+    ptrL1, ptrR1, ptrL2, ptrR2 = ptrLayout
+
+    res = zero(C)
+
+    for eleR2 in ptrR2.inner
+        idxR2, weightR2 = getOrbDataPair(C, eleR2)
+
+        for eleL2 in ptrL2.inner
+            idxL2, weightL2 = getOrbDataPair(C, eleL2)
+            weightProd2 = conj(weightL2) * weightR2
+
+            for eleR1 in ptrR1.inner
+                idxR1, weightR1 = getOrbDataPair(C, eleR1)
+
+                for eleL1 in ptrL1.inner
+                    idxL1, weightL1 = getOrbDataPair(C, eleL1)
+                    weightProd = conj(weightL1) * weightR1 * weightProd2
+                    formattedIndex = ((idxL1, idxR1), (idxL2, idxR2))
+                    orbCorePair = formatOrbCorePair(config, formattedIndex)
+                    ijklVal = getIntegralValue!(memory, method, orbCorePair) * weightProd
+                    res += ijklVal
+                end
+            end
+        end
+    end
+
+    res::C
+end
+
+
 function getOrbInteTensorSymmetry(::MultiBodyIntegral{D, C, N}, op::DirectOperator, 
                                   type::TypeBox{<:StashedShiftedField{T, D, C}}) where 
                                  {D, T, C<:RealOrComplex{T}, N}
@@ -468,6 +519,67 @@ function getOrbVectorIntegralCore!(inteInfo::OneBodyOrbIntegralInfo{T, D, C},
         idxRange = OneToRange(len)
         for j in idxRange, i in idxRange
             evalSetInteTensorEntry!(tensor, inteInfo, ptrVector, (i, j))
+        end
+    end
+
+    tensor
+end
+
+
+function getOrbVectorIntegralCore!(inteInfo::TwoBodyOrbIntegralInfo{T, D, C}, 
+                                   ptrVector::OrbDataPtrVector{D, C}
+                                   ) where {T<:Real, D, C<:RealOrComplex{T}}
+    len = length(ptrVector)
+    op = inteInfo.method.operator
+    style = TwoBodyIntegral{D, C}()
+    tensor = ShapedMemory{C}(undef, (len, len, len, len))
+    typeInfo = (TypeBox∘eltype)(inteInfo.basis.config)
+    symL, symR, symO = getOrbInteTensorSymmetry(style, op, typeInfo)
+
+    if symL && symR && symO
+        for n in 1:symmetric4DArrEleNum(len)
+            i, j, k, l = ijklIdx = OneToIndex.(n|>convertIndex1DtoTri4D)
+            sym1, sym2, sym3 = getIntegralIndexSymmetry(( (i, j), (k, l) ))
+            sym12 = sym1 && sym2
+
+            ijklVal = evalSetInteTensorEntry!(tensor, inteInfo, ptrVector, ijklIdx)
+            ijklValConj = conj(ijklVal)
+
+            sym1  || setInteTensorEntry!(tensor, ijklValConj, (j, i, k, l))
+            sym2  || setInteTensorEntry!(tensor, ijklValConj, (i, j, l, k))
+            sym12 || setInteTensorEntry!(tensor, ijklVal,     (j, i, l, k))
+            sym3  || setInteTensorEntry!(tensor, ijklVal,     (k, l, i, j))
+            sym3 && sym1  || setInteTensorEntry!(tensor, ijklValConj, (k, l, j, i))
+            sym3 && sym2  || setInteTensorEntry!(tensor, ijklValConj, (l, k, i, j))
+            sym3 && sym12 || setInteTensorEntry!(tensor, ijklVal,     (l, k, j, i))
+        end
+    elseif symL && symR && !symO
+        for n in 1:symmetric2DArrEleNum(len)
+            k, l = OneToIndex.(n|>convertIndex1DtoTri2D)
+            sym2 = k == l
+
+            for m in 1:symmetric2DArrEleNum(len)
+                i, j = OneToIndex.(m|>convertIndex1DtoTri2D)
+                sym1 = i == j
+
+                ijklVal = evalSetInteTensorEntry!(tensor, inteInfo, ptrVector, (i, j, k, l))
+                ijklValConj = conj(ijklVal)
+
+                sym1 || setInteTensorEntry!(tensor, ijklValConj, (j, i, k, l))
+                sym2 || setInteTensorEntry!(tensor, ijklValConj, (i, j, l, k))
+                sym1 && sym2 || setInteTensorEntry!(tensor, ijklVal,  (j, i, l, k))
+            end
+        end
+    elseif symO
+        idxRange = OneToRange(len)
+        for l in idxRange, k in idxRange, j in OneToRange(l), i in OneToRange(k)
+            ijklVal = evalSetInteTensorEntry!(tensor, inteInfo, ptrVector, (i, j, k, l))
+            (i==k && j==l) || setInteTensorEntry!(tensor, ijklVal, (i, j, l, k))
+        end
+    else #> It is possible but not necessary to add more branches
+        idxRange = OneToRange(len)
+        for l in idxRange, k in idxRange, j in idxRange, i in idxRange
+            evalSetInteTensorEntry!(tensor, inteInfo, ptrVector, (i, j, k, l))
         end
     end
 
@@ -571,7 +683,7 @@ function computeLayoutIntegral(op::DirectOperator, orbs::OrbBasisLayout{T, D};
                                estimatorConfig::OptEstimatorConfig{T}=missing, 
                                lazyCompute::Boolean=True()) where {T<:Real, D}
     orbsData = MultiOrbitalData(orbs, isParamIndependent(op); cache!Self)
-    style = OneBodyIntegral{D, getOutputType(orbsData)}()
+    style = MultiBodyIntegral{D, getOutputType(orbsData), length(orbs)÷2}()
     inteInfo = initializeOrbIntegral(style, op, orbsData, lazyCompute, estimatorConfig)
     evalIntegralInfo!(inteInfo, lazyCompute)
 end
