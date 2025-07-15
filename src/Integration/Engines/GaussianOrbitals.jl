@@ -706,13 +706,47 @@ function computePGTOrbIntegral(op::DiagDirectionalDiffSampler{T, D, M},
     mapreduce(StableMul(T), StableAdd(T), direction, diffVec)
 end
 
+#> One-body Coulomb integral
+function computePGTOrbIntegral(op::CoulombMultiPointSampler{T, 3}, 
+                               layout::N1N2Tuple{FloatingPolyGaussField{T, 3}}, 
+                               cache!Self::GaussCoulombFieldCache{T, 3}=
+                                           GaussCoulombFieldCache(T, Count(3))
+                               ) where {T<:Real}
+    orbInfo = prepareOrbitalInfo(layout)
+    opCore = last(op.dresser)
+    res = zero(T)
+    for (charge, coord) in opCore.source
+        res += charge * computePGTOrbOneBodyRepulsion!(cache!Self, coord, orbInfo)
+    end
+    res * opCore.charge
+end
+
+#> Two-body Coulomb integral
+function computePGTOrbIntegral(::CoulombInteractionSampler, 
+                               layout::N2N2Tuple{FloatingPolyGaussField{T, 3}}, 
+                               cache!Self::GaussCoulombFieldCache{T, 3}=
+                                           GaussCoulombFieldCache(T, Count(3))
+                               ) where {T<:Real}
+    orb1Info, orb2Info = prepareOrbitalInfo(layout)
+    computePGTOrbTwoBodyRepulsion!(cache!Self, orb1Info, orb2Info)
+end
 
 
 #>-- Interface with the composite integration framework --<#
+const GaussBasedIntegralCache{T<:Real, D} = Union{
+    AxialGaussOverlapCache{T, D}, 
+    GaussCoulombFieldCache{T, D}
+}
+
 const AxialGaussOverlapSampler{T<:Real, D} = Union{
     OverlapSampler, 
     MultipoleMomentSampler{T, D}, 
     DiagDirectionalDiffSampler{T, D}
+}
+
+const GaussCoulombFieldSampler{T<:Real} = Union{
+    CoulombMultiPointSampler{T, 3}, 
+    CoulombInteractionSampler
 }
 
 #= Additional Method =#
@@ -730,8 +764,22 @@ function prepareInteComponent!(config::OrbitalIntegrationConfig{T, D, C, N, F},
     end::AxialGaussOverlapCache{T, D}
 end
 
+function prepareInteComponent!(config::OrbitalIntegrationConfig{T, 3, C, N, F}, 
+                               ::NTuple{N, NTuple{ 2, FloatingPolyGaussField{T, 3} }}
+                               ) where {T<:Real, C<:RealOrComplex{T}, N, 
+                                        F<:GaussCoulombFieldSampler{T}}
+    if config.cache isa EmptyDict
+        GaussCoulombFieldCache(T, Count(3), False())
+    else
+        key = (TypeBox(F), ntuple( _->(PrimGaussTypeOrb, PrimGaussTypeOrb), Val(N) ))
+        get!(config.cache, key) do
+            GaussCoulombFieldCache(T, Count(3), True())
+        end
+    end::GaussCoulombFieldCache{T, 3}
+end
+
 function evaluateIntegralCore!(formattedOp::TypedOperator{C}, 
-                               cache::AxialGaussOverlapCache{T, D}, 
+                               cache::GaussBasedIntegralCache{T, D}, 
                                layout::N12N2Tuple{FloatingPolyGaussField{T, D}}, 
                                ) where {T, C<:RealOrComplex{T}, D}
     convert(C, computePGTOrbIntegral(formattedOp.core, layout, cache))
