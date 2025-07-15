@@ -28,19 +28,37 @@ function inverseDistance(coord1::NonEmptyTuple{Real, D},
 end
 
 
-const PointInverseDistance{T<:Real, D} = RPartial{NTuple{D, T}, typeof(inverseDistance)}
+struct CoulombMultiPointPotential{T<:Real, D} <: MonoTermOperator
+    source::MemoryPair{T, NTuple{D, T}}
+    charge::T
 
-const CoulombPointField{T<:Real, D} = 
-      PairCoupler{StableMul{T}, Storage{T}, PointInverseDistance{T, D}}
+    function CoulombMultiPointPotential(sourceCharges::AbstractVector{T}, 
+                                        sourceCoords::AbstractVector{NonEmptyTuple{T, D}}, 
+                                        testCharge::T) where {T<:Real, D}
+        checkEmptiness(sourceCharges, :sourceCharges)
+        new{T, D+1}(MemoryPair(sourceCharges, sourceCoords), testCharge)
+    end
+end
 
-const CoulombPointFieldSampler{T<:Real, D} = 
-      OneBodySampler{Associate{ Left, typeof(*), CoulombPointField{T, D} }}
+function modifyFunction(op::CoulombMultiPointPotential{T, D}, 
+                        f::AbstractTypedCarteFunc{C, D}) where 
+                       {T<:Real, C<:RealOrComplex{T}, D}
+    function CoulombPointPotentialAccumulator(input::NTuple{D, T})
+        res = zero(strictTypeJoin(T, C))
+        for (charge, coord) in op.source
+            res += inverseDistance(input, coord) * f(input) * charge
+        end
+        res * op.charge
+    end
+end
 
-function genCoulombPointFieldSampler(chargePair::NTuple{2, T}, pointCoord::NTuple{D, T}) where 
-                                    {T<:Real, D}
-    pid = RPartial(inverseDistance, (pointCoord,))
-    cpf = PairCoupler(StableMul(T), Storage(prod(chargePair), :chargePair), pid)
-    genOneBodySampler(Associate(Left(), *, cpf))
+const CoulombMultiPointSampler{T<:Real, D} = OneBodySampler{CoulombMultiPointPotential{T, D}}
+
+function genCoulombMultiPointSampler(sourceCharges::AbstractVector{T}, 
+                                     sourceCoords::AbstractVector{NonEmptyTuple{T, D}}, 
+                                     testCharge::T=-one(T)) where {T<:Real, D}
+    coreOp = CoulombMultiPointPotential(sourceCharges, sourceCoords, testCharge)
+    genOneBodySampler(coreOp)
 end
 
 
@@ -53,7 +71,7 @@ end
 
 const DiagDirectionalDiffSampler{T, D, M, N} = OneBodySampler{DiagonalDiff{T, D, M, N}}
 
-struct KineticEnergySampler{T<:Real, D, N} <: MonoTermOperator
+struct KineticEnergySampler{T<:Real, D, N} <: DualTermOperator
     core::DiagDirectionalDiffSampler{T, D, 2, N}
 
     function KineticEnergySampler{T, D}(::Count{N}) where {T<:Real, D, N}
@@ -84,7 +102,7 @@ end
 
 const ReturnTypedSampler{T} = Union{
     MonomialMul{T}, MultipoleMomentSampler{T}, DiagDirectionalDiffSampler{T}, 
-    CoulombPointFieldSampler{T}
+    CoulombMultiPointSampler{T}
 }
 
 const StableTypedSampler = Union{OneBodySampler, CoulombInteractionSampler}
@@ -98,6 +116,6 @@ isParamIndependent(::MultipoleMomentSampler) = True()
 
 isParamIndependent(::DiagDirectionalDiffSampler) = True()
 
-isParamIndependent(::CoulombPointFieldSampler) = True()
+isParamIndependent(::CoulombMultiPointSampler) = True()
 
 isParamIndependent(::CoulombInteractionSampler) = True()
