@@ -703,12 +703,12 @@ function lazyMap(f::F, (obj1, obj2, obj3, obj4)::NTuple{4, Any}) where {F<:Funct
     res1 = f(obj1)
     res2 = obj2 === obj1 ? res1 : f(obj2)
     res3 = obj3 === obj1 ? res1 : (obj3 === obj2 ? res2 : f(obj3))
-    res3 = if obj4 === obj1
+    res4 = if obj4 === obj1
         res1
     else
         obj4 === obj2 ? res2 : (obj4 === obj3 ? res3 : f(obj4))
     end
-    (res1, res2, res3, res3)
+    (res1, res2, res3, res4)
 end
 
 lazyMap(f::Function, arg, args...) = map(f, arg, args...)

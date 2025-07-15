@@ -1,12 +1,11 @@
 using Test
 using Quiqbox
 using Quiqbox: getAtolVal, getAtolDigits, roundToMultiOfStep, nearestHalfOf, getNearestMid, 
-               isApprox, sizeOf, markUnique, getUnique!, 
-               itself, themselves, replaceSymbol, groupedSort, nameOf, tupleDiff, fillObj, 
-               arrayToTuple, genTupleCoords, uniCallFunc, mergeMultiObjs, isNaN, getBool, 
-               skipIndices, isOscillateConverged, lazyCollect, asymSign, numEps, 
-               genAdaptStepBl, shiftLastEle!, getValParm, fct, mapMapReduce, rmsOf, 
-               keepOnly!
+               isApprox, sizeOf, markUnique, getUnique!, itself, themselves, replaceSymbol, 
+               groupedSort, nameOf, tupleDiff, fillObj, arrayToTuple, genTupleCoords, 
+               uniCallFunc, mergeMultiObjs, isNaN, getBool, skipIndices, 
+               isOscillateConverged, lazyCollect, asymSign, numEps, genAdaptStepBl, 
+               shiftLastEle!, getValParm, fct, mapMapReduce, rmsOf, keepOnly!, lazyMap
 using LinearAlgebra: norm
 using Random
 
@@ -306,5 +305,23 @@ b3 = copy(b)
 is4 = Quiqbox.intersectMultisets!(b3, a6)
 @test is3 != is4
 @test sort(is3) == sort(is4)
+
+
+@test lazyMap(abs, (1, -1)) == (1, 1)
+@test lazyMap(abs, (1,  1)) == (1, 1)
+@test lazyMap(abs, (1, -2)) == (1, 2)
+
+@test lazyMap(abs, (-1, -2, -3, -4)) == (1, 2, 3, 4)
+@test lazyMap(abs, (-1, -1, -3, -4)) == (1, 1, 3, 4)
+@test lazyMap(abs, (-1, -2, -1, -4)) == (1, 2, 1, 4)
+@test lazyMap(abs, (-1, -2, -3, -1)) == (1, 2, 3, 1)
+@test lazyMap(abs, (-1, -2, -2, -4)) == (1, 2, 2, 4)
+@test lazyMap(abs, (-1, -2, -3, -2)) == (1, 2, 3, 2)
+@test lazyMap(abs, (-1, -2, -3, -3)) == (1, 2, 3, 3)
+@test lazyMap(abs, (-1, -2, -2, -2)) == (1, 2, 2, 2)
+@test lazyMap(abs, (-2, -1, -2, -2)) == (2, 1, 2, 2)
+@test lazyMap(abs, (-2, -2, -1, -2)) == (2, 2, 1, 2)
+@test lazyMap(abs, (-2, -2, -2, -1)) == (2, 2, 2, 1)
+@test lazyMap(abs, (-1, -1, -1, -1)) == (1, 1, 1, 1)
 
 end
