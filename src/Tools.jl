@@ -581,28 +581,6 @@ fct(a::Real) = factorial(a|>Int)
 fastIsApprox(x::T1, y::T2=0.0) where {T1, T2} = abs(x - y) < 2(numEps∘promote_type)(T1, T2)
 
 
-triMatEleNum(n::Int) = n * (n + 1) ÷ 2
-
-
-# {for j in 1:N, i=1:j} <=> 
-# {for n in 1:N(N+1)/2}
-function convertIndex1DtoTri2D(n::Int)
-    # Using (7 - 0.1) instead of 7 to avoid potential round-off errors.
-    j = (floor(Int, (sqrt(8.0n - 6.9) - 1.0)) >> 1) + 1
-    i = n - j * (j-1) ÷ 2
-    i, j
-end
-
-# {for l in 1:N, k in 1:l, j in 1:l, i in 1:ifelse(l==j, k, j)} <=> 
-# {for n in (M=N(N+1)÷2; M(M+1)÷2)}
-function convertIndex1DtoTri4D(n::Int)
-    p, q = convertIndex1DtoTri2D(n)
-    i, j = convertIndex1DtoTri2D(p)
-    k, l = convertIndex1DtoTri2D(q)
-    (i, j, k, l)
-end
-
-
 mapMapReduce(tp::NTuple{N}, fs::NTuple{N, Function}, op::F=*) where {N, F} = 
 reduce(op, map((x, y)->y(x), tp, fs))
 
