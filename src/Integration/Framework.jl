@@ -112,11 +112,11 @@ end
 
 const OneBodyOrbIntegralInfo{T<:Real, D, C<:RealOrComplex{T}, F<:DirectOperator, 
                              M<:OrbitalIntegrationConfig{T, D, C, 1, F}, 
-                             V<:MultiBodyIntegralValCache{C}, P<:MultiOrbitalData{T, D}} = 
+                             V<:OneBodyInteValCacheUnion{C}, P<:MultiOrbitalData{T, D}} = 
       OrbitalIntegralInfo{T, D, C, 1, F, M, V, P}
 
 const OrbitalOverlapInfo{T<:Real, D, C<:RealOrComplex{T}, M<:OrbitalOverlapConfig{T, D, C}, 
-                         V<:MultiBodyIntegralValCache{C}, P<:MultiOrbitalData{T, D}} = 
+                         V<:OneBodyInteValCacheUnion{C}, P<:MultiOrbitalData{T, D}} = 
       OneBodyOrbIntegralInfo{T, D, C, OverlapSampler, M, V, P}
 
 const OrbitalLayoutInteInfo{T<:Real, D, C<:RealOrComplex{T}, N, F<:DirectOperator, 
@@ -427,8 +427,19 @@ end
 
 function setInteTensorEntry!(tensor::AbstractArray{C, N}, val::C, 
                              idxTuple::NTuple{N, OneToIndex}) where {C<:RealOrComplex, N}
-    i, j = shiftAxialIndex(tensor, idxTuple)
-    tensor[i, j] = val
+    ids = shiftAxialIndex(tensor, idxTuple)
+    tensor[ids...] = val
+end
+
+function evalSetInteTensorEntry!(tensor::AbstractArray{C, N}, 
+                                 inteInfo::OrbitalIntegralInfo{T, D, C}, 
+                                 ptrVector::OrbDataPtrVector{D, C}, 
+                                 idxTpl::NTuple{N, OneToIndex}) where 
+                                {T<:Real, D, C<:RealOrComplex{T}, N}
+    ptrTpl = getEntry.(Ref(ptrVector), idxTpl)
+    val = getOrbLayoutIntegralCore!(inteInfo, ptrTpl)
+    setInteTensorEntry!(tensor, val, idxTpl)
+    val
 end
 
 function getOrbVectorIntegralCore!(inteInfo::OneBodyOrbIntegralInfo{T, D, C}, 
@@ -438,19 +449,24 @@ function getOrbVectorIntegralCore!(inteInfo::OneBodyOrbIntegralInfo{T, D, C},
     op = inteInfo.method.operator
     style = OneBodyIntegral{D, C}()
     tensor = ShapedMemory{C}(undef, (len, len))
-    symmetry = getOrbInteTensorSymmetry(style, op, (TypeBox∘eltype)(inteInfo.basis.config))
+    typeInfo = (TypeBox∘eltype)(inteInfo.basis.config)
+    symmetry = getOrbInteTensorSymmetry(style, op, typeInfo)
 
-    for n in 1:triMatEleNum(len)
-        ijIdx = OneToIndex.(n|>convertIndex1DtoTri2D)
-        ijPtr = getEntry.(Ref(ptrVector), ijIdx)
-        ijVal = getOrbLayoutIntegralCore!(inteInfo, ijPtr)
-        setInteTensorEntry!(tensor, ijVal, ijIdx)
-        if first(ijIdx) != last(ijIdx)
-            jiVal = if symmetry; conj(ijVal) else
-                       getOrbLayoutIntegralCore!(inteInfo, reverse(ijPtr)) end
-            setInteTensorEntry!(tensor, jiVal, reverse(ijIdx))
+    if symmetry
+        for n in 1:symmetric2DArrEleNum(len)
+            ijIdx = OneToIndex.(n|>convertIndex1DtoTri2D)
+            ijVal = evalSetInteTensorEntry!(tensor, inteInfo, ptrVector, ijIdx)
+            if !getIntegralIndexSymmetry(ijIdx|>tuple)
+                setInteTensorEntry!(tensor, conj(ijVal), reverse(ijIdx))
+            end
+        end
+    else
+        idxRange = OneToRange(len)
+        for j in idxRange, i in idxRange
+            evalSetInteTensorEntry!(tensor, inteInfo, ptrVector, (i, j))
         end
     end
+
     tensor
 end
 
@@ -481,7 +497,7 @@ function getOrbCoreOverlap!(info::OrbitalOverlapInfo{T, D, C}, pointer::CompOrbP
         weightNew
     end
 
-    for n in 1:triMatEleNum(length(pointer.inner) - 1)
+    for n in 1:symmetric2DArrEleNum(length(pointer.inner) - 1)
         i, j = convertIndex1DtoTri2D(n)
         idxPair = OneToIndex.((i, j+1))
         weightL, weightR = getEntry.(Ref(normalizedWeights), idxPair)
