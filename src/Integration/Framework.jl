@@ -208,11 +208,15 @@ function getIntegralOpOrbSymmetry(::DiagDirectionalDiffSampler,
                                   layout::N1N2Tuple{OrbitalCategory})
     all(layout|>first) do c; (c == PrimGaussTypeOrb) end
 end
+getIntegralOpOrbSymmetry(::CoulombMultiPointSampler, ::N1N2Tuple{OrbitalCategory}) = true
 #> Two-body (ij|O|kl) symmetry between ij: (ij|O|kl)' == (ji|O|kl) when  i != j
 #> Two-body (ij|O|kl) symmetry between kl: (ij|O|kl)' == (ij|O|lk) when  k != l
 #> Two-body (ij|O|kl) symmetry across O:   (ij|O|kl)  == (kl|O|ij) when ij != kl
 getIntegralOpOrbSymmetry(::DirectOperator, ::N2N2Tuple{OrbitalCategory}) = 
 (false, false, false)
+
+getIntegralOpOrbSymmetry(::CoulombInteractionSampler, ::N2N2Tuple{OrbitalCategory}) = 
+(true, true, true)
 
 #>> Index layout symmetry
 getIntegralIndexSymmetry((part,)::N1N2Tuple{OneToIndex}) = first(part) == last(part)
