@@ -1,3 +1,26 @@
+symmetric2DArrEleNum(n::Int) = n * (n + 1) ÷ 2
+symmetric4DArrEleNum(n::Int) = symmetric2DArrEleNum(symmetric2DArrEleNum(n))
+
+
+# {for j in 1:N, i=1:j} <=> 
+# {for n in 1:N(N+1)/2}
+function convertIndex1DtoTri2D(n::Int)
+    # Using (7 - 0.1) instead of 7 to avoid potential round-off errors.
+    j = (floor(Int, (sqrt(8.0n - 6.9) - 1.0)) >> 1) + 1
+    i = n - j * (j-1) ÷ 2
+    i, j
+end
+
+# {for l in 1:N, k in 1:l, j in 1:l, i in 1:ifelse(l==j, k, j)} <=> 
+# {for n in (M=N(N+1)÷2; M(M+1)÷2)}
+function convertIndex1DtoTri4D(n::Int)
+    p, q = convertIndex1DtoTri2D(n)
+    i, j = convertIndex1DtoTri2D(p)
+    k, l = convertIndex1DtoTri2D(q)
+    (i, j, k, l)
+end
+
+
 function sortTensorIndex((i, j)::NTuple{2, Int})
     if i > j
         (j, i)
