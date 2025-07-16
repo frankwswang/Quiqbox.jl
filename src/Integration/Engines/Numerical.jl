@@ -15,11 +15,11 @@ struct SesquiFieldProd{T<:Real, D, O<:Multiplier, FL<:FieldAmplitude{<:RealOrCom
     end
 end
 
-getOutputType(::Type{<:SesquiFieldProd{T, D, <:StableTypedSampler}}) where {T<:Real, D} = 
+getOutputType(::Type{<:SesquiFieldProd{T, D, <:BottomTypedSampler}}) where {T<:Real, D} = 
 T
 
 getOutputType(::Type{<:SesquiFieldProd{T, D, O}}) where 
-             {T<:Real, D, C<:RealOrComplex{T}, O<:ReturnTypedSampler{C}} = 
+             {T<:Real, D, C<:RealOrComplex{T}, O<:TypedSampler{C, D}} = 
 strictTypeJoin(T, C)
 
 (::SelectTrait{InputStyle})(::SesquiFieldProd{<:Real, D}) where {D} = CartesianInput{D}()
@@ -57,11 +57,11 @@ function DoubleFieldProd(pairL::NTuple{2, FieldAmplitude{<:RealOrComplex{T}, D}}
     DoubleFieldProd((sfProdL, sfProdR), coupler)
 end
 
-getOutputType(::Type{<:DoubleFieldProd{T, D, <:StableTypedSampler}}) where {T<:Real, D} = 
+getOutputType(::Type{<:DoubleFieldProd{T, D, <:BottomTypedSampler}}) where {T<:Real, D} = 
 T
 
 getOutputType(::Type{<:DoubleFieldProd{T, D, O}}) where 
-             {T<:Real, D, C<:RealOrComplex{T}, O<:ReturnTypedSampler{C}} = 
+             {T<:Real, D, C<:RealOrComplex{T}, O<:TypedSampler{C, D}} = 
 strictTypeJoin(T, C)
 
 
