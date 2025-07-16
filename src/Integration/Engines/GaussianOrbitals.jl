@@ -373,6 +373,8 @@ end
 
 
 #>--- Cartesian-3D PGTO Coulomb-field computation based on Obara-Saika scheme ---<#
+#>-- Reference --<#
+#> [DOI] 10.1002/9781119019572
 #>-- Notation convention --<#
 #> Electron-pair angular-momentum labels:
 #> Electron 1: (iL, jL, kL | iR, jR, kR); Electron 2: (oL, pL, qL | oR, pR, qR)
