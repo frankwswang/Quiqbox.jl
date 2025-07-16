@@ -433,3 +433,36 @@ function (f::ComposedApply{N})(args::Vararg{Any, N}) where {N}
 end
 
 getOutputType(::Type{<:ComposedApply{N, FO}}) where {N, FO<:Function} = getOutputType(FO)
+
+
+#>> [DOI] 10.1063/5.0180092
+struct GaussApproxInverse{T<:Real} <: TypedEvaluator{T}
+    coeff::MemoryPair{T, T}
+
+    function GaussApproxInverse(::Type{T}, nPoint::Int=75; 
+                                a::T=T(0.01), s::T=T(0.16)) where {T<:Real}
+        checkPositivity(nPoint)
+        checkPositivity(a)
+        checkPositivity(s)
+
+        xpns = Memory{T}(undef, nPoint)
+        cons = Memory{T}(undef, nPoint)
+
+        for (u, i) in enumerate(eachindex(xpns))
+            t = a * sinh((u - (inv∘T)(2)) * s)
+            tSquared = t * t
+            xpns[i] = tSquared
+            cons[i] = 2(s*sqrt(tSquared + a*a)) / T(PowersOfPi[:p0d5])
+        end
+
+        new{T}(MemoryPair(xpns, cons))
+    end
+end
+
+function (f::GaussApproxInverse{T})(var::T) where {T<:Real}
+    res = zero(T)
+    for (xpn, con) in f.coeff
+        res += con * exp(-xpn * var * var)
+    end
+    res
+end

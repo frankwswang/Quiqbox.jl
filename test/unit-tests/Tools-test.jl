@@ -1,12 +1,11 @@
 using Test
 using Quiqbox
 using Quiqbox: getAtolVal, getAtolDigits, roundToMultiOfStep, nearestHalfOf, getNearestMid, 
-               isApprox, sizeOf, markUnique, getUnique!, 
-               itself, themselves, replaceSymbol, groupedSort, nameOf, tupleDiff, fillObj, 
-               arrayToTuple, genTupleCoords, uniCallFunc, mergeMultiObjs, isNaN, getBool, 
-               skipIndices, isOscillateConverged, lazyCollect, asymSign, numEps, 
-               genAdaptStepBl, shiftLastEle!, getValParm, fct, triMatEleNum, 
-               convertIndex1DtoTri2D, convertIndex1DtoTri4D, mapMapReduce, rmsOf, keepOnly!
+               isApprox, sizeOf, markUnique, getUnique!, itself, themselves, replaceSymbol, 
+               groupedSort, nameOf, tupleDiff, fillObj, arrayToTuple, genTupleCoords, 
+               uniCallFunc, mergeMultiObjs, isNaN, getBool, skipIndices, 
+               isOscillateConverged, lazyCollect, asymSign, numEps, genAdaptStepBl, 
+               shiftLastEle!, getValParm, fct, mapMapReduce, rmsOf, keepOnly!, lazyMap
 using LinearAlgebra: norm
 using Random
 
@@ -244,48 +243,6 @@ v = Val(vNum)
 @test getValParm(v) == getValParm(typeof(v)) == vNum
 
 
-# function triMatEleNum
-@test triMatEleNum(6) == 21
-
-
-# function convertIndex1DtoTri2D, convertIndex1DtoTri4D
-test2DIndexing = function (n::Int)
-    m = 0
-    bl = true
-    for j = 1:n, i=1:j
-        m += 1
-        r1 = (i, j)
-        r2 = convertIndex1DtoTri2D(m)
-        if r1 != r2
-            bl *= false
-        end
-    end
-    @test bl
-    m
-end
-
-test4DIndexing = function (n::Int)
-    m = 0
-    bl = true
-    for l = 1:n, k = 1:l, j = 1:l, i = 1:ifelse(l==j, k, j)
-        m += 1
-        r1 = (i, j, k, l)
-        r2 = convertIndex1DtoTri4D(m)
-        if r1 != r2
-            bl *= false
-        end
-    end
-    @test bl
-    m
-end
-
-for i in (1, 3, 5, 10, 17)
-    j = i * (i + 1) ÷ 2
-    @test test2DIndexing(i) == j
-    @test test4DIndexing(i) == j * (j + 1) ÷ 2
-end
-
-
 # function mapMapReduce
 tp = (1, 2, -3)
 f1 = x->x^2
@@ -348,5 +305,23 @@ b3 = copy(b)
 is4 = Quiqbox.intersectMultisets!(b3, a6)
 @test is3 != is4
 @test sort(is3) == sort(is4)
+
+
+@test lazyMap(abs, (1, -1)) == (1, 1)
+@test lazyMap(abs, (1,  1)) == (1, 1)
+@test lazyMap(abs, (1, -2)) == (1, 2)
+
+@test lazyMap(abs, (-1, -2, -3, -4)) == (1, 2, 3, 4)
+@test lazyMap(abs, (-1, -1, -3, -4)) == (1, 1, 3, 4)
+@test lazyMap(abs, (-1, -2, -1, -4)) == (1, 2, 1, 4)
+@test lazyMap(abs, (-1, -2, -3, -1)) == (1, 2, 3, 1)
+@test lazyMap(abs, (-1, -2, -2, -4)) == (1, 2, 2, 4)
+@test lazyMap(abs, (-1, -2, -3, -2)) == (1, 2, 3, 2)
+@test lazyMap(abs, (-1, -2, -3, -3)) == (1, 2, 3, 3)
+@test lazyMap(abs, (-1, -2, -2, -2)) == (1, 2, 2, 2)
+@test lazyMap(abs, (-2, -1, -2, -2)) == (2, 1, 2, 2)
+@test lazyMap(abs, (-2, -2, -1, -2)) == (2, 2, 1, 2)
+@test lazyMap(abs, (-2, -2, -2, -1)) == (2, 2, 2, 1)
+@test lazyMap(abs, (-1, -1, -1, -1)) == (1, 1, 1, 1)
 
 end
