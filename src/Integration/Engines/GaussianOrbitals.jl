@@ -722,7 +722,7 @@ function computePGTOrbIntegral(op::CoulombMultiPointSampler{T, 3},
 end
 
 #> Two-body Coulomb integral
-function computePGTOrbIntegral(::CoulombInteractionSampler, 
+function computePGTOrbIntegral(::CoulombInteractionSampler{T, 3}, 
                                layout::N2N2Tuple{FloatingPolyGaussField{T, 3}}, 
                                cache!Self::GaussCoulombFieldCache{T, 3}=
                                            GaussCoulombFieldCache(T, Count(3))
@@ -746,7 +746,7 @@ const AxialGaussOverlapSampler{T<:Real, D} = Union{
 
 const GaussCoulombFieldSampler{T<:Real} = Union{
     CoulombMultiPointSampler{T, 3}, 
-    CoulombInteractionSampler
+    CoulombInteractionSampler{T, 3}
 }
 
 #= Additional Method =#

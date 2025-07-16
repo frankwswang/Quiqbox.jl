@@ -22,13 +22,8 @@ function genMultipoleMomentSampler(fm::FloatingMonomial)::MultipoleMomentSampler
 end
 
 
-function inverseDistance(coord1::NonEmptyTuple{Real, D}, 
-                         coord2::NonEmptyTuple{Real, D}) where {D}
-    (coord1 .- coord2) |> LinearAlgebra.norm |> inv
-end
-
-
 struct CoulombMultiPointPotential{T<:Real, D} <: MonoTermOperator
+    approx::GaussApproxInverse{T}
     source::MemoryPair{T, NTuple{D, T}}
     charge::T
 
@@ -36,7 +31,8 @@ struct CoulombMultiPointPotential{T<:Real, D} <: MonoTermOperator
                                         sourceCoords::AbstractVector{NonEmptyTuple{T, D}}, 
                                         testCharge::T) where {T<:Real, D}
         checkEmptiness(sourceCharges, :sourceCharges)
-        new{T, D+1}(MemoryPair(sourceCharges, sourceCoords), testCharge)
+        approxField = GaussApproxInverse(T)
+        new{T, D+1}(approxField, MemoryPair(sourceCharges, sourceCoords), testCharge)
     end
 end
 
@@ -45,10 +41,11 @@ function modifyFunction(op::CoulombMultiPointPotential{T, D},
                        {T<:Real, C<:RealOrComplex{T}, D}
     function CoulombPointPotentialAccumulator(input::NTuple{D, T})
         res = zero(strictTypeJoin(T, C))
+        factor = f(input) * op.charge
         for (charge, coord) in op.source
-            res += inverseDistance(input, coord) * f(input) * charge
+            res += op.approx(norm(coord .- input)) * factor * charge
         end
-        res * op.charge
+        res
     end
 end
 
@@ -61,13 +58,21 @@ function genCoulombMultiPointSampler(sourceCharges::AbstractVector{T},
     genOneBodySampler(coreOp)
 end
 
+const CoulombInteractionSamplerCore{T<:Real, D} = 
+      ComposedApply{2, GaussApproxInverse{T}, ComposedApply{ 2, typeof(LinearAlgebra.norm), 
+                                                             StableTupleSub{NTuple{D, T}} }}
 
-const CoulombInteractionSampler = 
-      Sandwich{Left, NTuple{2, typeof(*)}, typeof(inverseDistance)}
+const CoulombInteractionSampler{T<:Real, D} = 
+      Sandwich{Left, NTuple{2, typeof(*)}, CoulombInteractionSamplerCore{T, D}}
 
-function genCoulombInteractionSampler()
-    Sandwich(Left(), (*, *), inverseDistance)
+function genCoulombInteractionSampler(::Type{T}, ::Count{D}) where {T, D}
+    checkPositivity(D)
+    encoder = ComposedApply(StableTupleSub(T, Count(D)), LinearAlgebra.norm, Count(2))
+    f = ComposedApply(encoder, GaussApproxInverse(T), Count(2))
+    Sandwich(Left(), (*, *), f)
 end
+
+
 
 const DiagDirectionalDiffSampler{T, D, M, N} = OneBodySampler{DiagonalDiff{T, D, M, N}}
 
