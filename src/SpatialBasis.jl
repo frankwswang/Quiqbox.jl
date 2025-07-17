@@ -317,11 +317,47 @@ function cacheOrbitalData!(configDict::ShiftedFieldConfigDict{T, D},
     end
 end
 
-const OrbPointerCollection{D, C<:RealOrComplex} = 
-      Union{Memory{ <:OrbitalPointer{D, C} }, N24Tuple{ OrbitalPointer{D, C} }}
 
-struct MultiOrbitalData{T, D, C<:RealOrComplex{T}, F<:StashedShiftedField{T, D}, 
-                        P<:OrbPointerCollection{D, C}} <: QueryBox{F}
+struct OrbCorePointer{D, C<:RealOrComplex}
+    inner::MemoryPair{OneToIndex, C}
+
+    function OrbCorePointer(::Count{D}, inner::MemoryPair{OneToIndex, C}) where 
+                           {D, C<:RealOrComplex}
+        new{D, C}(inner)
+    end
+end
+
+function OrbCorePointer(pointer::PrimOrbPointer{D, C}, weight::C
+                        ) where {D, C<:RealOrComplex}
+    innerPair = MemoryPair(genMemory(pointer.inner), genMemory(weight))
+    OrbCorePointer(Count(D), innerPair)
+end
+
+function OrbCorePointer(pointer::CompOrbPointer{D, C}, weight::AbstractArray{C, 1}
+                        ) where {D, C<:RealOrComplex}
+    innerPair = MemoryPair(map(x->x.inner, pointer.inner.left), extractMemory(weight))
+    OrbCorePointer(Count(D), innerPair)
+end
+
+
+const OrbPairLayoutFormat{D, C} = 
+      Union{NTuple{2, OrbitalPointer{D, C}}, NTuple{ 2, OrbCorePointer{D, C} }}
+
+const OrbQuadLayoutFormat{D, C} = 
+      Union{NTuple{4, OrbitalPointer{D, C}}, NTuple{ 4, OrbCorePointer{D, C} }}
+
+const OrbitalLayoutFormat{D, C} = 
+      Union{OrbPairLayoutFormat{D, C}, OrbQuadLayoutFormat{D, C}}
+
+const OrbitalVectorFormat{D, C} = 
+      Union{Memory{<:OrbitalPointer{D, C}}, Memory{ OrbCorePointer{D, C} }}
+
+const OrbFormatCollection{D, C<:RealOrComplex} = 
+      Union{OrbitalLayoutFormat{D, C}, OrbitalVectorFormat{D, C}}
+
+
+struct MultiOrbitalData{T<:Real, D, C<:RealOrComplex{T}, F<:StashedShiftedField{T, D}, 
+                        P<:OrbFormatCollection{D, C}} <: QueryBox{F}
     config::Memory{F}
     format::P
 
@@ -335,22 +371,21 @@ struct MultiOrbitalData{T, D, C<:RealOrComplex{T}, F<:StashedShiftedField{T, D},
         config = genMemory(last.(configDict.storage))
         new{T, D, getOutputType(orbitals), eltype(config), typeof(format)}(config, format)
     end
+
+    function MultiOrbitalData(data::MultiOrbitalData{T, D, C}, 
+                              format::OrbFormatCollection{D, C}) where 
+                             {T<:Real, D, C<:RealOrComplex{T}}
+        config = data.config
+        new{T, D, C, eltype(config), typeof(format)}(config, format)
+    end
 end
 
-const OrbitalVectorData{T, D, C<:RealOrComplex{T}, F<:StashedShiftedField{T, D}, 
-                        R<:OrbitalPointer{D, C}} = 
-      MultiOrbitalData{T, D, C, F, Memory{R}}
-
-const OrbitalLayoutData{T, D, C<:RealOrComplex{T}, F<:StashedShiftedField{T, D}, 
-                        P<:N24Tuple{ OrbitalPointer{D, C} }} = 
+const OrbitalLayoutData{T<:Real, D, C<:RealOrComplex{T}, F<:StashedShiftedField{T, D}, 
+                        P<:OrbitalLayoutFormat{D, C}} = 
       MultiOrbitalData{T, D, C, F, P}
 
-const OrbitalPairData{T, D, C<:RealOrComplex{T}, F<:StashedShiftedField{T, D}, 
-                      P<:NTuple{ 2, OrbitalPointer{D, C} }} = 
-      OrbitalLayoutData{T, D, C, F, P}
-
-const OrbitalQuadData{T, D, C<:RealOrComplex{T}, F<:StashedShiftedField{T, D}, 
-                      P<:NTuple{ 4, OrbitalPointer{D, C} }} = 
-      OrbitalLayoutData{T, D, C, F, P}
+const OrbitalVectorData{T<:Real, D, C<:RealOrComplex{T}, F<:StashedShiftedField{T, D}, 
+                        P<:OrbitalVectorFormat{D, C}} = 
+      MultiOrbitalData{T, D, C, F, P}
 
 getOutputType(::MultiOrbitalData{T, D, C}) where {T<:Real, D, C<:RealOrComplex{T}} = C
