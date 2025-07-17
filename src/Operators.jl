@@ -50,7 +50,7 @@ end
 const Multiplier{OL<:MonoTermOperator, OR<:MonoTermOperator} = 
       Correlate{typeof(*), Tuple{OL, OR}}
 
-Multiplier(opPair::NTuple{2, MonoTermOperator}) = Correlate(*, opPair)::Multiplier
+Multiplier(opPair::Vararg{MonoTermOperator, 2}) = Correlate(*, opPair)::Multiplier
 
 function modifyFunction(op::Correlate, termPair::Vararg{Function, 2})
     fL, fR = termPair .|> op.dresser
