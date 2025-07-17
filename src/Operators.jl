@@ -50,10 +50,30 @@ end
 const Multiplier{OL<:MonoTermOperator, OR<:MonoTermOperator} = 
       Correlate{typeof(*), Tuple{OL, OR}}
 
+Multiplier(opPair::Vararg{MonoTermOperator, 2}) = Correlate(*, opPair)::Multiplier
+
 function modifyFunction(op::Correlate, termPair::Vararg{Function, 2})
     fL, fR = termPair .|> op.dresser
     PairCoupler(op.coupler, fL, fR)
 end #! Optimize the composition when coupler is Multiplier and fL === fR
+
+
+struct PairBundle{N, J<:Function, F<:NTuple{ 2, DirectOperator{N} }} <: DirectOperator{N}
+    bundler::J
+    dresser::F
+end
+
+const Summator{N, F<:NTuple{ 2, DirectOperator{N} }} = PairBundle{N, typeof(+), F}
+
+Summator(op1::DirectOperator{N}, op2::DirectOperator{N}) where {N} = 
+PairBundle(+, (op1, op2))::Summator{N}
+
+function modifyFunction(op::PairBundle{N}, terms::Vararg{Function, N}) where {N}
+    oL, oR = op.dresser
+    fL = oL(terms...)
+    fR = oR(terms...)
+    PairCoupler(op.bundler, fL, fR)
+end
 
 
 struct Sandwich{A<:Lateral, J<:NTuple{2, Function}, F<:Function} <: DualTermOperator

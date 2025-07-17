@@ -1,6 +1,6 @@
 using Test
 using Quiqbox
-using Quiqbox: DiagonalDiff
+using Quiqbox: DiagonalDiff, Summator, MultiMonoApply, ComplexConj, genIdentity
 
 @testset "Operators.jl" begin
 
@@ -37,5 +37,9 @@ f_typed = Quiqbox.TypedCarteFunc(f, Float64, Count(3))
 Δf = Δ(f_typed)
 @test isapprox(Δf(coord1), (sum∘l_sd)(coord1), atol=5e-9)
 @test all(isapprox.(Δf.right(coord1), l_sd(coord1), atol=5e-9))
+
+op = Summator(MultiMonoApply(ComplexConj()|>tuple), genIdentity())
+f = op(x->x^3)
+@test f(1 - im) == let x=(1 - im)^3; conj(x) + x end
 
 end

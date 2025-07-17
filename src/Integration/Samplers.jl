@@ -3,7 +3,7 @@ const OneBodySampler{O<:MonoTermOperator} = Multiplier{ComplexConj, O}
 const OverlapSampler = OneBodySampler{Identity}
 
 function genOneBodySampler(rightOp::MonoTermOperator)::OneBodySampler
-    Correlate(*, (ComplexConj(), rightOp))
+    Multiplier(ComplexConj(), rightOp)
 end
 
 function genOverlapSampler()::OverlapSampler
@@ -105,12 +105,12 @@ function genKineticEnergySampler(::Type{T}, ::Count{D}, ::Count{N}=Nil()
 end
 
 
-const ReturnTypedSampler{T} = Union{
-    MonomialMul{T}, MultipoleMomentSampler{T}, DiagDirectionalDiffSampler{T}, 
-    CoulombMultiPointSampler{T}
+const TypedSampler{T, D} = Union{
+    MonomialMul{T, D}, MultipoleMomentSampler{T, D}, DiagDirectionalDiffSampler{T, D}, 
+    CoulombMultiPointSampler{T, D}, CoulombInteractionSampler{T, D}
 }
 
-const StableTypedSampler = Union{OneBodySampler, CoulombInteractionSampler}
+const BottomTypedSampler = Union{OverlapSampler}
 
 
 isParamIndependent(::DirectOperator) = False()
