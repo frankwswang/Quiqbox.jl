@@ -58,6 +58,24 @@ function modifyFunction(op::Correlate, termPair::Vararg{Function, 2})
 end #! Optimize the composition when coupler is Multiplier and fL === fR
 
 
+struct PairBundle{N, J<:Function, F<:NTuple{ 2, DirectOperator{N} }} <: DirectOperator{N}
+    bundler::J
+    dresser::F
+end
+
+const Summator{N, F<:NTuple{ 2, DirectOperator{N} }} = PairBundle{N, typeof(+), F}
+
+Summator(opPair::Vararg{DirectOperator{N}, 2}) where {N} = PairBundle(+, opPair)::Summator
+
+
+function modifyFunction(op::PairBundle{N}, terms::Vararg{Function, N}) where {N}
+    oL, oR = op.dresser
+    fL = oL(terms...)
+    fR = oR(terms...)
+    PairCoupler(op.bundler, fL, fR)
+end
+
+
 struct Sandwich{A<:Lateral, J<:NTuple{2, Function}, F<:Function} <: DualTermOperator
     associativity::A
     coupler::J
