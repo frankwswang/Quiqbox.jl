@@ -111,7 +111,7 @@ abstract type FieldIntegralInfo{D, C, N} <: ConfigBox end
 
 struct OrbitalIntegralInfo{T<:Real, D, C<:RealOrComplex{T}, N, F<:DirectOperator, 
                            M<:OrbitalIntegrationConfig{T, D, C, N, F}, 
-                           V<:MultiBodyIntegralValCache{C}, P<:MultiOrbitalData{T, D}
+                           V<:MultiBodyIntegralValCache{C}, P<:MultiOrbitalData{T, D, C}
                            } <: FieldIntegralInfo{D, C, N}
     method::M
     memory::V
@@ -120,16 +120,16 @@ end
 
 const OneBodyOrbIntegralInfo{T<:Real, D, C<:RealOrComplex{T}, F<:DirectOperator, 
                              M<:OrbitalIntegrationConfig{T, D, C, 1, F}, 
-                             V<:OneBodyInteValCacheUnion{C}, P<:MultiOrbitalData{T, D}} = 
+                             V<:OneBodyInteValCacheUnion{C}, P<:MultiOrbitalData{T, D, C}} = 
       OrbitalIntegralInfo{T, D, C, 1, F, M, V, P}
 
 const OrbitalOverlapInfo{T<:Real, D, C<:RealOrComplex{T}, M<:OrbitalOverlapConfig{T, D, C}, 
-                         V<:OneBodyInteValCacheUnion{C}, P<:MultiOrbitalData{T, D}} = 
+                         V<:OneBodyInteValCacheUnion{C}, P<:MultiOrbitalData{T, D, C}} = 
       OneBodyOrbIntegralInfo{T, D, C, OverlapSampler, M, V, P}
 
 const TwoBodyOrbIntegralInfo{T<:Real, D, C<:RealOrComplex{T}, F<:DirectOperator, 
                              M<:OrbitalIntegrationConfig{T, D, C, 2, F}, 
-                             V<:TwoBodyInteValCacheUnion{C}, P<:MultiOrbitalData{T, D}} = 
+                             V<:TwoBodyInteValCacheUnion{C}, P<:MultiOrbitalData{T, D, C}} = 
       OrbitalIntegralInfo{T, D, C, 2, F, M, V, P}
 
 const OrbitalLayoutInteInfo{T<:Real, D, C<:RealOrComplex{T}, N, F<:DirectOperator, 
@@ -168,6 +168,16 @@ function reformatOrbIntegral(info::OrbitalIntegralInfo{T, D, C, N},
     cacheConfig = if method.operator isa F; defaultCache else
                      defaultCache isa EmptyDict ? False() : True() end
     initializeOrbIntegral(inteStyle, op, info.basis, cacheConfig, method.estimator)
+end
+
+function reformatOrbIntegral(info::OrbitalIntegralInfo{T, D, C, N}, 
+                             ptrFormat::OrbFormatCollection{D, C}) where 
+                            {T, D, C<:RealOrComplex{T}, N}
+    if ptrFormat isa Tuple && !(length(ptrFormat) == 2N)
+        throw(AssertionError("The format of orbital pointers does not match `info`."))
+    end
+    newBasis = MultiOrbitalData(info.basis, ptrFormat)
+    OrbitalIntegralInfo(info.method, info.memory, newBasis)
 end
 
 function initializeOrbNormalization(inteInfo::OrbitalIntegralInfo{T, D, C, N}, 
@@ -388,46 +398,25 @@ function formatOrbCorePair(configSource::AbstractVector{<:StashedShiftedField{T,
 end
 
 
-struct OrbCorePointer{D, C<:RealOrComplex}
-    inner::MemoryPair{OneToIndex, C}
-
-    function OrbCorePointer(::Count{D}, inner::MemoryPair{OneToIndex, C}) where 
-                           {D, C<:RealOrComplex}
-        new{D, C}(inner)
-    end
-end
-
-function OrbCorePointer(pointer::PrimOrbPointer{D, C}, weight::C
-                        ) where {D, C<:RealOrComplex}
-    innerPair = MemoryPair(genMemory(pointer.inner), genMemory(weight))
-    OrbCorePointer(Count(D), innerPair)
-end
-
-function OrbCorePointer(pointer::CompOrbPointer{D, C}, weight::AbstractArray{C, 1}
-                        ) where {D, C<:RealOrComplex}
-    innerPair = MemoryPair(map(x->x.inner, pointer.inner.left), extractMemory(weight))
-    OrbCorePointer(Count(D), innerPair)
-end
-
-
 getOrbDataPair(::Type{C}, idx::OneToIndex) where {C<:RealOrComplex} = (idx => one(C))
+
 getOrbDataPair(::Type{C}, pair::Pair{OneToIndex, C}) where {C<:RealOrComplex} = itself(pair)
 
-const OrbDataPtrPairLayout{D, C<:RealOrComplex} = Union{
-    NTuple{2, PrimOrbPointer{D, C}}, NTuple{2, OrbCorePointer{D, C}}
-}
 
-const OrbDataPtrQuadLayout{D, C<:RealOrComplex} = Union{
-    NTuple{4, PrimOrbPointer{D, C}}, NTuple{4, OrbCorePointer{D, C}}
-}
+const OrbDataPtrPairLayout{D, C<:RealOrComplex} = 
+      Union{NTuple{2, PrimOrbPointer{D, C}}, NTuple{ 2, OrbCorePointer{D, C} }}
 
-const OrbDataPtrLayout{D, C<:RealOrComplex} = Union{
-    OrbDataPtrPairLayout{D, C}, OrbDataPtrQuadLayout{D, C}
-}
+const OrbDataPtrQuadLayout{D, C<:RealOrComplex} = 
+      Union{NTuple{4, PrimOrbPointer{D, C}}, NTuple{ 4, OrbCorePointer{D, C} }}
 
-const OrbDataPtrVector{D, C<:RealOrComplex} = Union{
-    AbstractVector{<:PrimOrbPointer{D, C}}, AbstractVector{OrbCorePointer{D, C}}
-}
+const OrbDataPtrLayout{D, C<:RealOrComplex} = 
+      Union{OrbDataPtrPairLayout{D, C}, OrbDataPtrQuadLayout{D, C}}
+
+const OrbDataPtrVector{D, C<:RealOrComplex} = 
+      Union{AbstractVector{<:PrimOrbPointer{D, C}}, AbstractVector{ OrbCorePointer{D, C} }}
+
+const OrbCorePtrCollection{D, C<:RealOrComplex} = 
+      Union{Memory{ OrbCorePointer{D, C} }, N24Tuple{ OrbCorePointer{D, C} }}
 
 
 function getOrbLayoutIntegralCore!(inteInfo::OneBodyOrbIntegralInfo{T, D, C}, 
@@ -676,49 +665,61 @@ function buildOrbCoreWeight!(normInfo::OrbitalOverlapInfo{T, D, C},
     weight
 end
 
-function genOrbCorePointers(inteInfo::OrbitalIntegralInfo, lazyNormalize::Boolean)
-    normInfo = initializeOrbNormalization(inteInfo, lazyNormalize)
-    lazyMap(inteInfo.basis.format) do pointer
-        weightHolder = buildOrbCoreWeight!(normInfo, pointer)
-        OrbCorePointer(pointer, weightHolder)
+function getOrbCorePointers(inteInfo::OrbitalIntegralInfo, lazyNormalize::Boolean)
+    basisData = inteInfo.basis
+    if basisData.format isa OrbCorePtrCollection
+        basisData.config
+    else
+        normInfo = initializeOrbNormalization(inteInfo, lazyNormalize)
+        lazyMap(basisData.format) do pointer
+            weightHolder = buildOrbCoreWeight!(normInfo, pointer)
+            OrbCorePointer(pointer, weightHolder)
+        end
     end
 end
 
 
-function evalOrbIntegralInfo!(inteInfo::OrbitalLayoutInteInfo{T, D, C}, 
-                              weightInfo::OrbDataPtrLayout{D, C}) where 
+function checkOrbIntegralInfo(inteInfo::OrbitalIntegralInfo)
+    weightInfo = inteInfo.basis.format
+    if !(weightInfo isa OrbCorePtrCollection)
+        throw(AssertionError("The basis pointers inside `inteInfo` (at `.basis.config`) "*
+                             "must all be $OrbCorePointer."))
+    end
+    weightInfo
+end
+
+function evalOrbIntegralInfo!(inteInfo::OrbitalLayoutInteInfo{T, D, C}) where 
                              {T<:Real, D, C<:RealOrComplex{T}}
+    weightInfo = checkOrbIntegralInfo(inteInfo)
     getOrbLayoutIntegralCore!(inteInfo, weightInfo)
 end
 
-function evalOrbIntegralInfo!(inteInfo::OrbitalVectorInteInfo{T, D, C}, 
-                              weightInfo::OrbDataPtrVector{D, C}) where 
+function evalOrbIntegralInfo!(inteInfo::OrbitalVectorInteInfo{T, D, C}) where 
                              {T<:Real, D, C<:RealOrComplex{T}}
+    weightInfo = checkOrbIntegralInfo(inteInfo)
     getOrbVectorIntegralCore!(inteInfo, weightInfo)
 end
 
-function evalOrbIntegralInfo!(op::F, inteInfo::OrbitalLayoutInteInfo{T, D, C}, 
-                              weightInfo::OrbDataPtrLayout{D, C}) where 
+function evalOrbIntegralInfo!(op::F, inteInfo::OrbitalLayoutInteInfo{T, D, C}) where 
                              {T<:Real, D, C<:RealOrComplex{T}, F<:DirectOperator}
     if F <: Summator
         op1, op2 = op.dresser
-        res1 = evalOrbIntegralInfo!(op1, inteInfo, weightInfo)
-        res2 = evalOrbIntegralInfo!(op2, inteInfo, weightInfo)
+        res1 = evalOrbIntegralInfo!(op1, inteInfo)
+        res2 = evalOrbIntegralInfo!(op2, inteInfo)
         op.bundler(res1, res2)
     else
         finalInfo = reformatOrbIntegral(inteInfo, op)
-        evalOrbIntegralInfo!(finalInfo, weightInfo)
+        evalOrbIntegralInfo!(finalInfo)
     end
 end
 
-function evalOrbIntegralInfo!(op::F, inteInfo::OrbitalVectorInteInfo{T, D, C}, 
-                              weightInfo::OrbDataPtrVector{D, C}) where 
+function evalOrbIntegralInfo!(op::F, inteInfo::OrbitalVectorInteInfo{T, D, C}) where 
                              {T<:Real, D, C<:RealOrComplex{T}, F<:DirectOperator}
     if F <: Summator
         op1, op2 = op.dresser
         bundler = op.bundler
-        res1 = evalOrbIntegralInfo!(op1, inteInfo, weightInfo)
-        res2 = evalOrbIntegralInfo!(op2, inteInfo, weightInfo)
+        res1 = evalOrbIntegralInfo!(op1, inteInfo)
+        res2 = evalOrbIntegralInfo!(op2, inteInfo)
         for (i, j) in zip(eachindex(res1), eachindex(res2))
             val = res1[i]
             res1[i] = bundler(val, res2[j])
@@ -726,7 +727,7 @@ function evalOrbIntegralInfo!(op::F, inteInfo::OrbitalVectorInteInfo{T, D, C},
         res1
     else
         finalInfo = reformatOrbIntegral(inteInfo, op)
-        evalOrbIntegralInfo!(finalInfo, weightInfo)
+        evalOrbIntegralInfo!(finalInfo)
     end
 end
 
@@ -737,9 +738,10 @@ function computeOrbDataIntegral(style::MultiBodyIntegral{D, C}, op::F,
                                 estimatorConfig::OptEstimatorConfig{T}=missing) where 
                                {T<:Real, C<:RealOrComplex{T}, D, F<:Summator}
     opStart = first(op.dresser)
-    info = initializeOrbIntegral(style, opStart, data, lazyCompute, estimatorConfig)
-    weightInfo = genOrbCorePointers(info, lazyCompute)
-    evalOrbIntegralInfo!(op, info, weightInfo)
+    initInfo = initializeOrbIntegral(style, opStart, data, lazyCompute, estimatorConfig)
+    weightInfo = getOrbCorePointers(initInfo, lazyCompute)
+    coreInfo = reformatOrbIntegral(initInfo, weightInfo)
+    evalOrbIntegralInfo!(op, coreInfo)
 end
 
 function computeOrbDataIntegral(style::MultiBodyIntegral{D, C}, op::DirectOperator, 
@@ -747,9 +749,10 @@ function computeOrbDataIntegral(style::MultiBodyIntegral{D, C}, op::DirectOperat
                                 lazyCompute::Boolean=True(), 
                                 estimatorConfig::OptEstimatorConfig{T}=missing) where 
                                {T<:Real, C<:RealOrComplex{T}, D}
-    info = initializeOrbIntegral(style, op, data, lazyCompute, estimatorConfig)
-    weightInfo = genOrbCorePointers(info, lazyCompute)
-    evalOrbIntegralInfo!(info, weightInfo)
+    initInfo = initializeOrbIntegral(style, op, data, lazyCompute, estimatorConfig)
+    weightInfo = getOrbCorePointers(initInfo, lazyCompute)
+    coreInfo = reformatOrbIntegral(initInfo, weightInfo)
+    evalOrbIntegralInfo!(coreInfo)
 end
 
 
