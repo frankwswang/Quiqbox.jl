@@ -65,8 +65,8 @@ end
 
 const Summator{N, F<:NTuple{ 2, DirectOperator{N} }} = PairBundle{N, typeof(+), F}
 
-Summator(opPair::Vararg{DirectOperator{N}, 2}) where {N} = PairBundle(+, opPair)::Summator
-
+Summator(op1::DirectOperator{N}, op2::DirectOperator{N}) where {N} = 
+PairBundle(+, (op1, op2))::Summator{N}
 
 function modifyFunction(op::PairBundle{N}, terms::Vararg{Function, N}) where {N}
     oL, oR = op.dresser
