@@ -166,7 +166,7 @@ function getNormFactor(orb::ComposedOrb{T, D, C}) where {T<:Real, D, C<:RealOrCo
     if isRenormalized(orb)
         constructor = getfield(Quiqbox, nameof(orb))
         orbInner = constructor(orb, renormalize=false)
-        overlapVal = computeLayoutIntegral(genOverlapSampler(), (orbInner, orbInner))
+        overlapVal = computeOrbLayoutIntegral(genOverlapSampler(), (orbInner, orbInner))
         convert(C, absSqrtInv(overlapVal))
     else
         one(C)
