@@ -3,7 +3,7 @@ const OneBodySampler{O<:MonoTermOperator} = Multiplier{ComplexConj, O}
 const OverlapSampler = OneBodySampler{Identity}
 
 function genOneBodySampler(rightOp::MonoTermOperator)::OneBodySampler
-    Correlate(*, (ComplexConj(), rightOp))
+    Multiplier((ComplexConj(), rightOp))
 end
 
 function genOverlapSampler()::OverlapSampler
