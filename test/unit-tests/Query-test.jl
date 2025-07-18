@@ -24,7 +24,7 @@ m1m_mrk = markObj(m1m)
 @test m1_mrk == m1m_mrk
 
 v1 = rand(5)
-v1_1 = Quiqbox.VectorMemory(v1)
+v1_1 = Quiqbox.LinearMemory(v1)
 v1_2 = Quiqbox.ShapedMemory(v1)
 v1_2_mrk = markObj(v1_2)
 @test v1_2_mrk isa Quiqbox.ValueMarker

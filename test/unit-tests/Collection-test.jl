@@ -5,7 +5,7 @@ using Quiqbox: PackedMemory, indexedPerturb, OneToIndex, setIndex, MemoryLinker,
 
 @testset "Collections.jl" begin
 
-vecMem1 = VectorMemory(rand(3))
+vecMem1 = LinearMemory(rand(3))
 @test eltype(vecMem1) == Float64
 @test ndims(vecMem1) == 1
 @test firstindex(vecMem1) == firstindex(vecMem1, 1) == 1

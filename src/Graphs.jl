@@ -90,13 +90,13 @@ end
 
 
 struct TupleReceptor{L} <: VertexReceptor
-    trait::VectorMemory{VertexTrait, L}
-    index::VectorMemory{OneToIndex, L}
+    trait::LinearMemory{VertexTrait, L}
+    index::LinearMemory{OneToIndex, L}
 
     function TupleReceptor(::Count{L}, defaultTrait::VertexTrait=VertexTrait()) where {L}
         checkPositivity(L) #> `L` should generally be small to avoid compiler overhead
-        trait = VectorMemory(fill(defaultTrait, L))
-        index = VectorMemory(fill(OneToIndex(), L))
+        trait = LinearMemory(fill(defaultTrait, L))
+        index = LinearMemory(fill(OneToIndex(), L))
         new{L}(trait, index)
     end
 end
