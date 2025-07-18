@@ -1,4 +1,4 @@
-export LinearMemory, ShapedMemory
+export LinearMemory, ShapedMemory, VectorMemory, MatrixMemory
 
 struct NestedLevel{T}
     level::Int
@@ -192,6 +192,9 @@ struct ShapedMemory{T, N} <: CustomMemory{T, N}
         new{T, N}(arr.value, arr.shape)
     end
 end
+
+const VectorMemory{T} = ShapedMemory{T, 1}
+const MatrixMemory{T} = ShapedMemory{T, 2}
 
 ShapedMemory(value::AbstractArray{T}, shape::Tuple{Vararg{Int}}=size(value)) where {T} = 
 ShapedMemory(extractMemory(value), shape)
