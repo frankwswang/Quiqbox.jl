@@ -514,7 +514,7 @@ function getOrbVectorIntegralCore!(inteInfo::OneBodyOrbIntegralInfo{T, D, C},
     len = length(ptrVector)
     op = inteInfo.method.operator
     style = OneBodyIntegral{D, C}()
-    tensor = ShapedMemory{C}(undef, (len, len))
+    tensor = Array{C}(undef, (len, len))
     typeInfo = (TypeBox∘eltype)(inteInfo.basis.config)
     symmetry = getOrbInteTensorSymmetry(style, op, typeInfo)
 
@@ -543,7 +543,7 @@ function getOrbVectorIntegralCore!(inteInfo::TwoBodyOrbIntegralInfo{T, D, C},
     len = length(ptrVector)
     op = inteInfo.method.operator
     style = TwoBodyIntegral{D, C}()
-    tensor = ShapedMemory{C}(undef, (len, len, len, len))
+    tensor = Array{C}(undef, (len, len, len, len))
     typeInfo = (TypeBox∘eltype)(inteInfo.basis.config)
     symL, symR, symO = getOrbInteTensorSymmetry(style, op, typeInfo)
 
