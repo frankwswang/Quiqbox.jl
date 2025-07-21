@@ -84,7 +84,7 @@ struct KineticEnergySampler{T<:Real, D, N} <: DualTermOperator
         rightOp = DiagonalDiff(Count(2), ntuple(_->(-one(T)/2), Val(D)), Count(N))
         new{T, D, N}(rightOp|>genOneBodySampler)
     end
-end
+end #! Need to add a `modifyFunction` method to be a valid `DirectOperator`
 
 
 """
@@ -105,10 +105,36 @@ function genKineticEnergySampler(::Type{T}, ::Count{D}, ::Count{N}=Nil()
 end
 
 
+function genCoreHamiltonianSampler(nucs::AbstractVector{Symbol}, 
+                                   nucCoords::AbstractVector{NonEmptyTuple{T, D}}, 
+                                   kineticSampler::KineticEnergySampler{T}=
+                                   genKineticEnergySampler(T, Count(D+1))
+                                   ) where {T<:Real, D}
+    if getDimension(kineticSampler.core) != D+1
+        throw(AssertionError("The dimension of `kineticSampler` does not match that of "*
+                             "`nucCoords`"))
+    end
+    neOp = genCoulombMultiPointSampler(map(T∘getCharge, nucs), nucCoords)
+    Summator(kineticSampler.core, neOp)
+end
+
+function genCoreHamiltonianSampler(nucInfo::NuclearCluster{T, D}, 
+                                   kineticSampler::KineticEnergySampler{T, D}=
+                                   genKineticEnergySampler(T, Count(D))
+                                   ) where {T<:Real, D}
+    layout = nucInfo.layout
+    nucs = layout.left
+    nucCoords = layout.right
+    genCoreHamiltonianSampler(nucs, nucCoords, kineticSampler)
+end
+
+
 const TypedSampler{T, D} = Union{
     MonomialMul{T, D}, MultipoleMomentSampler{T, D}, DiagDirectionalDiffSampler{T, D}, 
     CoulombMultiPointSampler{T, D}, CoulombInteractionSampler{T, D}
 }
+
+getDimension(::TypedSampler{T, D}) where {T, D} = D
 
 const BottomTypedSampler = Union{OverlapSampler}
 

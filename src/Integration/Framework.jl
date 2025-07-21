@@ -741,18 +741,18 @@ function computeOrbDataIntegral(style::MultiBodyIntegral{D, C}, op::F,
     initInfo = initializeOrbIntegral(style, opStart, data, lazyCompute, estimatorConfig)
     weightInfo = getOrbCorePointers(initInfo, lazyCompute)
     coreInfo = reformatOrbIntegral(initInfo, weightInfo)
-    evalOrbIntegralInfo!(op, coreInfo)
+    coreInfo => evalOrbIntegralInfo!(op, coreInfo)
 end
 
-function computeOrbDataIntegral(style::MultiBodyIntegral{D, C}, op::DirectOperator, 
+function computeOrbDataIntegral(style::MultiBodyIntegral{D, C}, op::F, 
                                 data::MultiOrbitalData{T, D, C}; 
                                 lazyCompute::Boolean=True(), 
                                 estimatorConfig::OptEstimatorConfig{T}=missing) where 
-                               {T<:Real, C<:RealOrComplex{T}, D}
+                               {T<:Real, C<:RealOrComplex{T}, D, F<:DirectOperator}
     initInfo = initializeOrbIntegral(style, op, data, lazyCompute, estimatorConfig)
     weightInfo = getOrbCorePointers(initInfo, lazyCompute)
     coreInfo = reformatOrbIntegral(initInfo, weightInfo)
-    evalOrbIntegralInfo!(coreInfo)
+    coreInfo => evalOrbIntegralInfo!(coreInfo)
 end
 
 
@@ -763,7 +763,7 @@ function computeOrbLayoutIntegral(op::DirectOperator, orbs::OrbBasisLayout{T, D}
                                   ) where {T<:Real, D}
     orbsData = MultiOrbitalData(orbs, isParamIndependent(op); cache!Self)
     style = MultiBodyIntegral{D, getOutputType(orbsData), length(orbs)÷2}()
-    computeOrbDataIntegral(style, op, orbsData; estimatorConfig, lazyCompute)
+    computeOrbDataIntegral(style, op, orbsData; estimatorConfig, lazyCompute).second
 end
 
 
@@ -775,5 +775,5 @@ function computeOrbVectorIntegral(::MultiBodyIntegral{D, T, N}, op::DirectOperat
                                   ) where {T<:Real, D, N}
     orbsData = MultiOrbitalData(orbs, isParamIndependent(op); cache!Self)
     style = MultiBodyIntegral{D, getOutputType(orbsData), N}()
-    computeOrbDataIntegral(style, op, orbsData; estimatorConfig, lazyCompute)
+    computeOrbDataIntegral(style, op, orbsData; estimatorConfig, lazyCompute).second
 end
