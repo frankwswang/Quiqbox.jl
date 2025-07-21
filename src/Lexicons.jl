@@ -11,15 +11,3 @@ const AtomElementNames = Memory{Symbol}([:H,  :He, :Li, :Be, :B,  :C,  :N,  :O, 
                                          :Na, :Mg, :Al, :Si, :P,  :S,  :Cl, :Ar, :K,  :Ca])
 
 const NuclearChargeDict = Dict{Symbol, Int}(AtomElementNames .=> 1:length(AtomElementNames))
-
-"""
-
-    getCharge(nuc::Union{Tuple{Vararg{Symbol}}, AbstractVector{Symbol}}) -> Int
-
-Return the total electric charge (in 𝑒) of the input nucleus/nuclei.
-"""
-getCharge(nuc::Symbol) = NuclearChargeDict[nuc]::Int
-
-function getCharge(nuc::Union{Tuple{Vararg{Symbol}}, AbstractVector{Symbol}})
-    mapreduce(getCharge, nuc, init=zero(Int))
-end
