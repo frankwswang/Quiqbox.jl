@@ -1,4 +1,4 @@
-export PrimitiveOrb, CompositeOrb, genGaussTypeOrb
+export PrimitiveOrb, CompositeOrb, genGaussTypeOrb, genGaussTypeOrbSeq
 
 (::SelectTrait{InputStyle})(::OrbitalBasis{C, D}) where {C<:RealOrComplex, D} = 
 CartesianInput{D}()
@@ -389,3 +389,83 @@ const OrbitalVectorData{T<:Real, D, C<:RealOrComplex{T}, F<:StashedShiftedField{
       MultiOrbitalData{T, D, C, F, P}
 
 getOutputType(::MultiOrbitalData{T, D, C}) where {T<:Real, D, C<:RealOrComplex{T}} = C
+
+const OrbBasisData{T<:Real, D} = Union{MultiOrbitalData{T, D}, OrbBasisVector{T, D}}
+
+
+function get3DimPGTOrbNormFactor(xpn::T, carteAng::NTuple{3, Int}) where {T<:Real}
+    for i in carteAng; checkPositivity(i, true) end
+    i, j, k = carteAng
+    angSum = sum(carteAng)
+    xpnPart = xpn^(T(2angSum + 3)*T(0.25))
+    angPart = T(PowersOfPi[:n0d75]) * (exp2∘T)(1.5angSum + 0.75) * 
+              T(sqrt( factorial(i) * factorial(j) * factorial(k) / 
+                      (factorial(2i) * factorial(2j) * factorial(2k)) ))
+    xpnPart * angPart
+end
+
+function genGaussTypeOrbSeq(center::NTuple{3, UnitOrVal{T}}, 
+                            content::AbstractString; unlinkCenter::Bool=false, 
+                            innerRenormalize::Bool=false, outerRenormalize::Bool=false
+                            ) where {T<:Real}
+    cenEncoder = let cenParams=map(UnitParamEncoder(T, :cen, 1), center)
+        unlinkCenter ? ()->deepcopy(cenParams) : ()->cenParams
+    end
+    formattedContent = replaceSciNotation(content)
+    data = map((@view formattedContent[begin : end-1]) |> IOBuffer |> readlines) do line
+        advancedParse.(T, split(line))
+    end
+    idxScope = findall(x -> eltype(x)!=T && length(x)>2 && x[begin]!="X", data)
+    bfs = CompGTO{T, 3}[] #! Can be replaced by a more type-specific container
+
+    for j in idxScope
+        oInfo = data[j]
+        nPGTOrb = Int(oInfo[begin + 1])
+        coeffPairs = @view data[j+1 : j+nPGTOrb]
+        xpns = first.(coeffPairs)
+        subshellStr = first(oInfo)
+        angNums = subshellStr == "SP" ? (0, 1) : (AngularSubShellDict[subshellStr],)
+
+        for (i, angNum) in enumerate(angNums)
+            for ijk in SubshellXYZs[begin+angNum]
+                cons = map(xpns, coeffPairs) do xpn, segment
+                    getEntry(segment, OneToIndex(1+i)) * get3DimPGTOrbNormFactor(xpn, ijk)
+                end
+                push!(bfs, genGaussTypeOrb(cenEncoder(), xpns, cons, ijk; 
+                                           innerRenormalize, outerRenormalize))
+            end
+        end
+    end
+
+    bfs
+end
+
+
+function genGaussTypeOrbSeq(center::NTuple{3, UnitOrVal{T}}, 
+                            atm::Symbol, basisKey::String; unlinkCenter::Bool=false, 
+                            innerRenormalize::Bool=false, outerRenormalize::Bool=false
+                            ) where {T<:Real}
+    hasBasis = true
+    basisSetFamily = get(AtomicGTOrbSetDict, basisKey, nothing)
+    basisStr = if basisSetFamily === nothing
+        hasBasis = false
+        ""
+    else
+        atmCharge = get(NuclearChargeDict, atm, nothing)
+        if atmCharge === nothing || atmCharge > length(basisSetFamily)
+            hasBasis = false
+            ""
+        else
+            res = getEntry(basisSetFamily, atmCharge)
+            if res === nothing
+                hasBasis = false
+                ""
+            else
+                res
+            end
+        end
+    end
+    hasBasis || throw(DomainError((atm, basisKey), 
+                      "Quiqbox does not have this basis-set configuration pre-stored."))
+    genGaussTypeOrbSeq(center, basisStr; unlinkCenter, innerRenormalize, outerRenormalize)
+end

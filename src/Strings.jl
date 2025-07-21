@@ -16,7 +16,7 @@ function advancedParse(::Type{T}, content::AbstractString,
     res
 end
 
-
+#! Check this function
 function adaptiveParse(::Type{T}, content::AbstractString) where {T<:AbstractFloat}
     res = tryparse(T, content)
     res === nothing && (res = tryparse(Complex{T}, content))
@@ -261,3 +261,10 @@ IndexedSym(Symbol(idxSym.name, sym), idxSym.index)
 
 IndexedSym(sym::Symbol, idxSym::IndexedSym) = 
 IndexedSym(Symbol(sym, idxSym.name), idxSym.index)
+
+
+const SciNotationMarker = r"D(?=[\+\-])"
+
+function replaceSciNotation(txt::AbstractString, rule::Regex=SciNotationMarker)
+    replace(txt, rule => "e")
+end
