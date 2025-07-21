@@ -1,5 +1,8 @@
 export overlap, overlaps, multipoleMoment, multipoleMoments, eKinetic, eKinetics, 
-       neAttraction, neAttractions, coreHamiltonian, eeInteraction, eeInteractions
+       neAttraction, neAttractions, coreHamiltonian, eeInteraction, eeInteractions, 
+       changeOrbitalBasis
+
+using TensorOperations: @tensor as @TOtensor
 
 function overlap(orbL::OrbitalBasis{CL, D}, orbR::OrbitalBasis{CR, D}; 
                  lazyCompute::AbstractBool=True(), 
@@ -138,3 +141,45 @@ function eeInteractions(basisSet::OrbBasisVector{T, D};
     computeOrbVectorIntegral(TwoBodyIntegral{D, T}(), eeOp, basisSet; 
                              lazyCompute, estimatorConfig, cache!Self)
 end
+
+
+"""
+
+    changeOrbitalBasis(DbodyInt::AbstractArray{T, D}, C::AbstractMatrix{T}) where {T} -> 
+    AbstractArray{T, D}
+
+Change the orbital basis of the input one-body / two-body integrals `DbodyInt` based on the 
+orbital coefficient matrix `C`.
+"""
+changeOrbitalBasis(oneBodyInt::AbstractMatrix{T}, C::AbstractMatrix{T}) where {T} = 
+@TOtensor ij[i,j] := oneBodyInt[a,b] * C[a,i] * C[b,j]
+
+changeOrbitalBasis(twoBodyInt::AbstractArray{T, 4}, C::AbstractMatrix{T}) where {T} = 
+@TOtensor ijkl[i,j,k,l] := twoBodyInt[a,b,c,d] * C[a,i] * C[b,j] * C[c,k] * C[d,l]
+
+function getJᵅᵝ(twoBodyInt::AbstractArray{T, 4}, 
+                (C1, C2)::NTuple{2, AbstractMatrix{T}}) where {T}
+    m = axes(C1, 2)
+    n = axes(C2, 2)
+    map(Iterators.product(m, n)) do idx
+        C1c = view(C1, :, idx[begin])
+        C2c = view(C2, :, idx[end])
+        @TOtensor twoBodyInt[a,b,c,d] * C1c[a] * C1c[b] * C2c[c] * C2c[d]
+    end
+end
+
+"""
+
+    changeOrbitalBasis(twoBodyInt::AbstractArray{T, 4}, 
+                 C1::AbstractMatrix{T}, C2::AbstractMatrix{T}) where {T} -> 
+    AbstractArray{T, 4}
+
+Change the orbital basis of the input two-body integrals `twoBodyInt` based on two orbital 
+coefficient matrices `C1` and `C2` for different spin configurations (e.g., the 
+unrestricted case). The output is a 3-element `Tuple` of which the first 2 elements are the 
+spatial integrals of each spin configurations respectively, while the last element is the 
+Coulomb interactions between orbitals with different spins.
+"""
+changeOrbitalBasis(twoBodyInt::AbstractArray{T, 4}, 
+                   C::Vararg{AbstractMatrix{T}, 2}) where {T} = 
+(changeOrbitalBasis.(Ref(twoBodyInt), C)..., getJᵅᵝ(twoBodyInt, C))
