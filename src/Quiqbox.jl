@@ -3,8 +3,8 @@ module Quiqbox
 include("Types.jl")
 include("Dispatch.jl")
 
-include("Lexicons.jl")
 include("../lib/BasisSets/BasisSets.jl")
+include("Lexicons.jl")
 
 include("Tools.jl")
 include("Strings.jl")
@@ -18,18 +18,13 @@ include("Mapping.jl")
 include("Operators.jl")
 include("Parameters.jl")
 include("Graphs.jl")
-
-include("Angular.jl")
 include("Arithmetic.jl")
 
-include("Spatial.jl")
-include("SpatialBasis.jl")
-# include("HartreeFock.jl")
-# include("Differentiation.jl")
-# include("Box.jl")
-# include("Optimization.jl")
-# include("Matter.jl")
-# include("Overload.jl")
+include("Angular.jl")
+include("Particles.jl")
+
+include("Spatial.jl")      #!? Rename to "Fields.jl"
+include("SpatialBasis.jl") #! Rename to "Orbitals.jl"
 
 include("Differentiation/Finite.jl")
 

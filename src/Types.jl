@@ -110,6 +110,8 @@ import Base: iterate, size, getindex, setindex!, IndexStyle, zero, similar
 
 import Base: get, get!, haskey, hash, collect, length, eltype
 
+import Base: eachindex, firstindex, lastindex
+
 import Base: broadcastable
 
 import Base: +, -, ==, isless

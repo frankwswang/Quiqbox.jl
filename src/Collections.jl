@@ -1,4 +1,4 @@
-export VectorMemory, ShapedMemory
+export LinearMemory, ShapedMemory, VectorMemory, MatrixMemory
 
 struct NestedLevel{T}
     level::Int
@@ -137,43 +137,41 @@ end
 IndexStyle(::MemoryLinker) = IndexLinear()
 
 
-struct VectorMemory{T, L} <: CustomMemory{T, 1}
+struct LinearMemory{T, L} <: CustomMemory{T, 1}
     value::Memory{T}
     shape::Val{L}
 
-    function VectorMemory(value::Memory{T}, ::Val{L}) where {T, L}
+    function LinearMemory(value::Memory{T}, ::Val{L}) where {T, L}
         checkLength(value, :value, L)
         new{T, L::Int}(value, Val(L))
     end
 
-    function VectorMemory{T}(::UndefInitializer, ::Val{L}) where {T, L}
+    function LinearMemory{T}(::UndefInitializer, ::Val{L}) where {T, L}
         new{T, L::Int}(Memory{T}(undef, L), Val(L))
     end
 
-    function VectorMemory(arr::VectorMemory{T, L}) where {T, L}
+    function LinearMemory(arr::LinearMemory{T, L}) where {T, L}
         new{T, L::Int}(arr.value, arr.shape)
     end
 end
 
-VectorMemory(input::GeneralCollection) = 
-VectorMemory(extractMemory(input), Val(input|>length))
+LinearMemory(input::GeneralCollection) = 
+LinearMemory(extractMemory(input), Val(input|>length))
 #> Iteration interface
-iterate(arr::VectorMemory) = iterate(arr.value)
-iterate(arr::VectorMemory, state) = iterate(arr.value, state)
+iterate(arr::LinearMemory) = iterate(arr.value)
+iterate(arr::LinearMemory, state) = iterate(arr.value, state)
 #> Abstract-array (and indexing) interface
-size(::VectorMemory{<:Any, L}) where {L} = (L,)
-getindex(arr::VectorMemory, i::Int) = getindex(arr.value, i)
-setindex!(arr::VectorMemory, val, i::Int) = setindex!(arr.value, val, i)
-IndexStyle(::VectorMemory) = IndexLinear()
+size(::LinearMemory{<:Any, L}) where {L} = (L,)
+getindex(arr::LinearMemory, i::Int) = getindex(arr.value, i)
+setindex!(arr::LinearMemory, val, i::Int) = setindex!(arr.value, val, i)
+IndexStyle(::LinearMemory) = IndexLinear()
 #> Optional interface (better performance than the default implementation)
-zero(arr::VectorMemory{T, L}) where {T, L} = VectorMemory(zero(arr.value), Val(L))
+zero(arr::LinearMemory{T, L}) where {T, L} = LinearMemory(zero(arr.value), Val(L))
 #>> Necessary for `copy` to return the same container type
-function similar(arr::VectorMemory, ::Type{T}=eltype(arr), 
+function similar(arr::LinearMemory, ::Type{T}=eltype(arr), 
                  (len,)::Tuple{Int}=size(arr)) where {T}
-    VectorMemory(similar(arr.value, T, len), Val(len))
+    LinearMemory(similar(arr.value, T, len), Val(len))
 end
-
-const LinearMemory{T} = Union{Memory{T}, VectorMemory{T}}
 
 
 struct ShapedMemory{T, N} <: CustomMemory{T, N}
@@ -194,6 +192,9 @@ struct ShapedMemory{T, N} <: CustomMemory{T, N}
         new{T, N}(arr.value, arr.shape)
     end
 end
+
+const VectorMemory{T} = ShapedMemory{T, 1}
+const MatrixMemory{T} = ShapedMemory{T, 2}
 
 ShapedMemory(value::AbstractArray{T}, shape::Tuple{Vararg{Int}}=size(value)) where {T} = 
 ShapedMemory(extractMemory(value), shape)

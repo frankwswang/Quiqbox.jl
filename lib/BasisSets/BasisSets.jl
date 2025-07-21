@@ -1,8 +1,8 @@
 # Data collected from https://www.basissetexchange.org.
 # The texts are based on the Gaussian Format.
 # If element does not support certain basis set. Fill the entry with `nothing`.
-const BasisSetNames = 
-[
+const AtomicGTOrbSetNames::Memory{String} = 
+Memory{String}([
 "STO-2G", 
 "STO-3G", 
 "STO-6G", 
@@ -11,13 +11,13 @@ const BasisSetNames =
 "cc-pVDZ", 
 "cc-pVTZ", 
 "cc-pVQZ"
-]
+])
 
 
-const BasisFuncTexts = 
-[
+const AtomicGTOrbSetTexts::Memory{Memory{ NothingOr{String} }} = 
+Memory{Memory{ NothingOr{String} }}([
 #STO-2G
-[
+Memory{NothingOr{String}}([
 """
 H     0
 S    2   1.00
@@ -248,9 +248,9 @@ SP   2   1.00
       0.9247531480D-01       0.1510754134D+01       0.8946431268D+00
 ****
 """
-],
+]),
 #STO-3G
-[
+Memory{NothingOr{String}}([
 """
 H     0
 S    3   1.00
@@ -531,9 +531,9 @@ SP   3   1.00
       0.7429520696D-01       0.1131034442D+01       0.5498949471D+00
 ****
 """
-],
+]),
 #STO-6G
-[
+Memory{NothingOr{String}}([
 """
 H     0
 S    6   1.00
@@ -964,9 +964,9 @@ SP   6   1.00
       0.5196181158D-01       0.3406258162D+00       0.1221817127D+00
 ****
 """
-],
+]),
 #3-21G
-[
+Memory{NothingOr{String}}([
 """
 H     0
 S    2   1.00
@@ -1267,9 +1267,9 @@ SP   1   1.00
       0.2389701170D-01       0.1000000000D+01       0.1000000000D+01
 ****
 """
-],
+]),
 #6-31G
-[
+Memory{NothingOr{String}}([
 """
 H     0
 S    3   1.00
@@ -1692,9 +1692,9 @@ D    1   1.00
       0.2008780000D+00       1.0000000
 ****
 """
-],
+]),
 #cc-pVDZ
-[
+Memory{NothingOr{String}}([
 """
 H     0
 S    4   1.00
@@ -2650,9 +2650,9 @@ D    1   1.00
       5.370000D-02           1.000000D+00
 ****
 """
-],
+]),
 #cc-pVTZ
-[
+Memory{NothingOr{String}}([
 """
 H     0
 S    1   1.00
@@ -3916,9 +3916,9 @@ F    1   1.00
       1.509000D-01           1.0000000
 ****
 """
-],
+]),
 #cc-pVQZ
-[
+Memory{NothingOr{String}}([
 """
 H     0
 S    1   1.00
@@ -5483,5 +5483,5 @@ G    1   1.00
       1.466000D-01           1.0000000
 ****
 """
-]
-]
+])
+])

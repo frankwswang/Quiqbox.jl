@@ -35,15 +35,15 @@ using Test
     unit4 = "Numerical-Computation System"
     println("Testing $(unit4)...")
     t4 = @elapsed @testset "$(unit4)" begin
-        include("unit-tests/Angular-test.jl")
         include("unit-tests/Arithmetic-test.jl")
+        include("unit-tests/Angular-test.jl")
+        include("unit-tests/Particles-test.jl")
     end
     println("$(unit4) test finished in $t4 seconds.\n")
 
     unit5 = "Basis-Construction System"
     println("Testing $(unit5)...")
     t5 = @elapsed @testset "$(unit5)" begin
-        include("unit-tests/Angular-test.jl")
         include("unit-tests/Spatial-test.jl")
         include("unit-tests/SpatialBasis-test.jl")
     end

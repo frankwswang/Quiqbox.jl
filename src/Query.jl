@@ -566,3 +566,18 @@ end
 length(mp::MemoryPair) = length(mp.left)
 
 eltype(::MemoryPair{L, R}) where {L, R} = Pair{L, R}
+
+getindex(mp::MemoryPair, index::Int) = mp.left[index] => mp.right[index]
+
+function setindex!(mp::MemoryPair{L, R}, val::Pair{<:L, <:R}, index::Int) where {L, R}
+    l, r = val
+    mp.left[begin+index-1] = l
+    mp.right[begin+index-1] = r
+    mp
+end
+
+firstindex(::MemoryPair) = 1
+
+lastindex(mp::MemoryPair) = length(mp)
+
+eachindex(mp::MemoryPair) = firstindex(mp):lastindex(mp)

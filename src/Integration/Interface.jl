@@ -109,8 +109,7 @@ function coreHamiltonian(nucs::AbstractVector{Symbol},
                          cache!Self::ParamDataCache=initializeParamDataCache()) where 
                         {T<:Real, D}
     lazyCompute = toBoolean(lazyCompute)
-    neOp = genCoulombMultiPointSampler(map(T∘getCharge, nucs), nucCoords)
-    coreHop = Summator(kineticOperator.core, neOp)
+    coreHop = genCoreHamiltonianSampler(nucs, nucCoords, kineticOperator)
     computeOrbVectorIntegral(OneBodyIntegral{D, T}(), coreHop, basisSet; 
                              lazyCompute, estimatorConfig, cache!Self)
 end
