@@ -5,7 +5,7 @@ using Quiqbox: getAtolVal, getAtolDigits, roundToMultiOfStep, nearestHalfOf, get
                groupedSort, nameOf, tupleDiff, fillObj, arrayToTuple, genTupleCoords, 
                uniCallFunc, mergeMultiObjs, isNaN, getBool, skipIndices, 
                isOscillateConverged, lazyCollect, asymSign, numEps, genAdaptStepBl, 
-               shiftLastEle!, getValParm, fct, mapMapReduce, rmsOf, keepOnly!, lazyMap
+               shiftLastEle!, fct, mapMapReduce, rmsOf, keepOnly!, lazyMap
 using LinearAlgebra: norm
 using Random
 
@@ -235,12 +235,6 @@ residuum =  vect - vectBackup
 @test all(residuum[1:4] .== 0)
 @test isapprox(residuum[end], signedShift, atol=2e-15)
 @test abs(s) >= (abs∘sum)(vectBackup)
-
-
-# function getValParm
-vNum = rand()
-v = Val(vNum)
-@test getValParm(v) == getValParm(typeof(v)) == vNum
 
 
 # function mapMapReduce
