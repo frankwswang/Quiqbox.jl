@@ -37,6 +37,7 @@ using Test
     t4 = @elapsed @testset "$(unit4)" begin
         include("unit-tests/Arithmetic-test.jl")
         include("unit-tests/Angular-test.jl")
+        include("unit-tests/Particles-test.jl")
     end
     println("$(unit4) test finished in $t4 seconds.\n")
 
