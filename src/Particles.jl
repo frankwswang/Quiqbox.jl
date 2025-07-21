@@ -1,4 +1,4 @@
-export NuclearCluster
+export NuclearCluster, getCharge
 
 struct NuclearCluster{T<:Real, D} <: QueryBox{Pair{ Symbol, NTuple{D, T} }}
     layout::MemoryPair{Symbol, NTuple{D, T}}
@@ -56,7 +56,7 @@ Return the total electric charge (in 𝑒) of the input nucleus/nuclei.
 getCharge(nuc::Symbol) = NuclearChargeDict[nuc]::Int
 
 function getCharge(nuc::Union{Tuple{Vararg{Symbol}}, AbstractVector{Symbol}})
-    mapreduce(getCharge, nuc, init=zero(Int))
+    mapreduce(getCharge, +, nuc, init=zero(Int))
 end
 
 function getCharge(nucInfo::NuclearCluster)
