@@ -28,6 +28,13 @@ function precompileField(field::FieldAmplitude{C, D}, ::Val{B}=Val(false)) where
         compBasisDD(centerInput)
         compBasisND(centerInput)
         compBasisNN(centerInput)
+
+        if D==3
+            bs = [primBasisMD, primBasisPD, primBasisMN, primBasisPN]
+            coreHamiltonian([:H], [(0., 0., 0.)], bs)
+            eeInteractions(bs)
+            overlaps(bs)
+        end
     end
 
     nothing
