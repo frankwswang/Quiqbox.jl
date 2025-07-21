@@ -666,12 +666,12 @@ function buildOrbCoreWeight!(normInfo::OrbitalOverlapInfo{T, D, C},
 end
 
 function getOrbCorePointers(inteInfo::OrbitalIntegralInfo, lazyNormalize::Boolean)
-    basisData = inteInfo.basis
-    if basisData.format isa OrbCorePtrCollection
-        basisData.config
+    ptrs = inteInfo.basis.format
+    if ptrs isa OrbCorePtrCollection
+        ptrs
     else
         normInfo = initializeOrbNormalization(inteInfo, lazyNormalize)
-        lazyMap(basisData.format) do pointer
+        lazyMap(ptrs) do pointer
             weightHolder = buildOrbCoreWeight!(normInfo, pointer)
             OrbCorePointer(pointer, weightHolder)
         end
