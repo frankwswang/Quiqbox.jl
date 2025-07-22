@@ -23,8 +23,8 @@ include("Arithmetic.jl")
 include("Angular.jl")
 include("Particles.jl")
 
-include("Spatial.jl")      #!? Rename to "Fields.jl"
-include("SpatialBasis.jl") #! Rename to "Orbitals.jl"
+include("FieldFunctions.jl")
+include("OrbitalBases.jl")
 
 include("Differentiation/Finite.jl")
 
@@ -36,8 +36,6 @@ include("Integration/Engines/GaussianOrbitals.jl")
 include("Integration/Interface.jl")
 
 include("HartreeFock.jl")
-# include("Differentiation.jl")
-# include("Optimization.jl")
 
 include("IO.jl")
 
