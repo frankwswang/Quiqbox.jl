@@ -874,7 +874,7 @@ end
 A direct wrapper `struct` for `f::F` that does not have reachable `$ParamBox` through 
 reflection functions.
 
-≡≡≡ Field(s) ≡≡≡
+≡≡≡ Property/Properties ≡≡≡
 
 `f::F`: Stored function. `$noStoredParam(f)` must return `true` when it is used to 
 construct a instance of `ParamFreeFunc{F}`.
