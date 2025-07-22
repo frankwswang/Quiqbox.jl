@@ -19,7 +19,7 @@ function compr2Arrays1(arr1::T, arr2::T, errT::Real=1e-12, factor::Real=1) where
     end
 end
 
-function compr2Arrays2(cprTuple::NamedTuple{<:Any, <:NTuple{2}}, 
+function compr2Arrays2(cprTuple::NamedTuple{<:Any, <:NTuple{ 2, AbstractArray{<:Number} }}, 
                        cutoffIdx::Int, atol::Real, atol2::Real=10*atol1, 
                        idxDirecFunc::Function=(>))
     arr1, arr2 = cprTuple

@@ -207,7 +207,7 @@ end
 
 
 function genTimeStr(ns::Real, ratioTons::Real=1; 
-                    autoUnit::Bool=true, roundDigits::Int=TimerDigits)
+                    autoUnit::Bool=true, roundDigits::Int=6)
     t = ratioTons / 1e9 * ns
     unit = "second"
     if !autoUnit || 1e-2 <= t <=60

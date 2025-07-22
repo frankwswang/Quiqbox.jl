@@ -132,3 +132,19 @@ function prepareSpinConfiguration(nucInfo::NuclearCluster{T, D},
 
     OccupationState((spinUpCount, spinDnCount))
 end
+
+
+function nuclearRepulsion(nuc::LinearSequence{Symbol}, 
+                          nucCoords::LinearSequence{NonEmptyTuple{T, D}}
+                          ) where {T<:Real, D}
+    res = T(0)
+    for i in eachindex(nuc), j = (i+1):lastindex(nuc)
+        res += getCharge(nuc[i]) * getCharge(nuc[j]) / norm(nucCoords[i] .- nucCoords[j])
+    end
+    res
+end
+
+function nuclearRepulsion(nucInfo::NuclearCluster)
+    layout = nucInfo.layout
+    nuclearRepulsion(layout.left, layout.right)
+end

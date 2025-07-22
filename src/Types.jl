@@ -43,6 +43,8 @@ abstract type TypedParamFunc{T} <: AbstractParamFunc end
 abstract type OrbitalBasis{T, D, F} <: ParticleFunction{D, 1} end
 abstract type FieldAmplitude{T, D} <: ParticleFunction{D, 1} end
 
+abstract type SymbolType <: ValueType end
+
 # abstract type ManyParticleState{T} <: Any end
 
 # abstract type SpinfulState{T, N} <: ManyParticleState{T} end

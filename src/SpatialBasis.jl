@@ -403,11 +403,10 @@ function get3DimPGTOrbNormFactor(xpn::T, carteAng::NTuple{3, Int}) where {T<:Rea
                       (factorial(2i) * factorial(2j) * factorial(2k)) ))
     xpnPart * angPart
 end
-
-function genGaussTypeOrbSeq(center::NTuple{3, UnitOrVal{T}}, 
-                            content::AbstractString; unlinkCenter::Bool=false, 
-                            innerRenormalize::Bool=false, outerRenormalize::Bool=false
-                            ) where {T<:Real}
+#! T in NTuple{3, UnitOrVal{T}} could be unbound. E.g., (1, 1.0, 2.0)
+function genGaussTypeOrbSeq(center::NTuple{3, UnitOrVal{T}}, content::AbstractString; 
+                            innerRenormalize::Bool=false, outerRenormalize::Bool=false, 
+                            unlinkCenter::Bool=false) where {T<:Real}
     cenEncoder = let cenParams=map(UnitParamEncoder(T, :cen, 1), center)
         unlinkCenter ? ()->deepcopy(cenParams) : ()->cenParams
     end
@@ -440,11 +439,9 @@ function genGaussTypeOrbSeq(center::NTuple{3, UnitOrVal{T}},
     bfs
 end
 
-
-function genGaussTypeOrbSeq(center::NTuple{3, UnitOrVal{T}}, 
-                            atm::Symbol, basisKey::String; unlinkCenter::Bool=false, 
-                            innerRenormalize::Bool=false, outerRenormalize::Bool=false
-                            ) where {T<:Real}
+function genGaussTypeOrbSeq(center::NTuple{3, UnitOrVal{T}}, atm::Symbol, basisKey::String; 
+                            innerRenormalize::Bool=false, outerRenormalize::Bool=false, 
+                            unlinkCenter::Bool=false) where {T<:Real}
     hasBasis = true
     basisSetFamily = get(AtomicGTOrbSetDict, basisKey, nothing)
     basisStr = if basisSetFamily === nothing

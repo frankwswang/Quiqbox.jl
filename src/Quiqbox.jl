@@ -35,8 +35,9 @@ include("Integration/Engines/BoysFunction.jl")
 include("Integration/Engines/GaussianOrbitals.jl")
 include("Integration/Interface.jl")
 
-# include("Integrals/OneBody.jl")
-# include("Integrals/TwoBody.jl")
+include("HartreeFock.jl")
+# include("Differentiation.jl")
+# include("Optimization.jl")
 
 include("IO.jl")
 
