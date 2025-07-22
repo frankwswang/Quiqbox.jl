@@ -363,7 +363,7 @@ mutable struct HFinterrelatedVars{R<:Real, T<:RealOrComplex{R}} <: StateBox{T}
 end
 
 
-struct HFtempVars{R<:Real, T<:RealOrComplex{R}, HFT<:HartreeFockType} <: StateBox{T}
+struct HFtempInfo{R<:Real, T<:RealOrComplex{R}, HFT<:HartreeFockType} <: StateBox{T}
     N::Int
     Cs::Vector{Matrix{T}} #! Change container from `Vector` to `LRU`
     Ds::Vector{Matrix{T}}
@@ -371,11 +371,11 @@ struct HFtempVars{R<:Real, T<:RealOrComplex{R}, HFT<:HartreeFockType} <: StateBo
     Es::Vector{R}
     shared::HFinterrelatedVars{R, T}
 
-    HFtempVars(::HFT, Nˢ::Int, C::Matrix{T}, D::Matrix{T}, F::Matrix{T}, E::R) where 
+    HFtempInfo(::HFT, Nˢ::Int, C::Matrix{T}, D::Matrix{T}, F::Matrix{T}, E::R) where 
               {HFT<:HartreeFockType, R<:Real, T<:RealOrComplex{R}} = 
     new{R, T, HFT}(Nˢ, [C], [D], [F], [E], HFinterrelatedVars{R, T}())
 
-    HFtempVars(::HFT, Nˢ::Int, Cs::Vector{Matrix{T}}, Ds::Vector{Matrix{T}}, 
+    HFtempInfo(::HFT, Nˢ::Int, Cs::Vector{Matrix{T}}, Ds::Vector{Matrix{T}}, 
                Fs::Vector{Matrix{T}}, Es::Vector{R}, Dtots::Vector{Matrix{T}}, 
                Etots::Vector{R}) where {HFT<:HartreeFockType, R, T<:RealOrComplex{R}} = 
     new{R, T, HFT}(Nˢ, Cs, Ds, Fs, Es, HFinterrelatedVars(Dtots, Etots))
@@ -383,13 +383,13 @@ end
 
 const HFTVVfields = (:Cs, :Ds, :Fs, :Es)
 
-function getHFTVforUpdate1(tVars::HFtempVars)
+function getHFTVforUpdate1(tVars::HFtempInfo)
     getproperty.(Ref(tVars), HFTVVfields)
 end
 
 const HFIVfields = (:Dtots, :Etots)
 
-function getHFTVforUpdate2(tVars::HFtempVars)
+function getHFTVforUpdate2(tVars::HFtempInfo)
     getproperty.(Ref(tVars.shared), HFIVfields)
 end
 
@@ -401,13 +401,13 @@ function updateHFTVcore!(varMaxLen::Int, var::Vector{T}, res::T,
     push!(var, res)
 end
 
-const HFtempVarsCore{R, T<:RealOrComplex{R}} = Tuple{
+const HFtempInfoCore{R, T<:RealOrComplex{R}} = Tuple{
     AbstractMatrix{T}, AbstractMatrix{T}, AbstractMatrix{T}, R, #> .Cs, .Ds, .Fs, .Es
     AbstractMatrix{T}, R                                        #> :Dtots, :Etots
 }
 
-function updateHFtempVars!(maxLen::Int, αβVars::NonEmptyTuple{HFtempVars{R, T, HFT}, N}, 
-                           ress::NonEmptyTuple{HFtempVarsCore{R, T}, N}) where 
+function updateHFtempInfo!(maxLen::Int, αβVars::NonEmptyTuple{HFtempInfo{R, T, HFT}, N}, 
+                           ress::NonEmptyTuple{HFtempInfoCore{R, T}, N}) where 
                           {R, T<:RealOrComplex{R}, HFT, N}
     for (tVars, res) in zip(αβVars, ress)
         fs = getHFTVforUpdate1(tVars)
@@ -422,7 +422,7 @@ function updateHFtempVars!(maxLen::Int, αβVars::NonEmptyTuple{HFtempVars{R, T,
     end
 end
 
-function popHFtempVars!(αβVars::N12Tuple{HFtempVars{R, T, HFT}}, counts::Int=1) where 
+function popHFtempInfo!(αβVars::N12Tuple{HFtempInfo{R, T, HFT}}, counts::Int=1) where 
                        {R<:Real, T<:RealOrComplex{R}, HFT<:HartreeFockType}
     for tVars in αβVars
         fs = getHFTVforUpdate1(tVars)
@@ -439,8 +439,8 @@ function popHFtempVars!(αβVars::N12Tuple{HFtempVars{R, T, HFT}}, counts::Int=1
     end
 end
 
-function clearHFtempVars!(saveTrace::NTuple{4, Bool}, 
-                          αβVars::N12Tuple{HFtempVars{R, T, HFT}}
+function clearHFtempInfo!(saveTrace::NTuple{4, Bool}, 
+                          αβVars::N12Tuple{HFtempInfo{R, T, HFT}}
                           ) where {R<:Real, T<:RealOrComplex{R}, HFT<:HartreeFockType}
     for tVars in αβVars
         fs = getHFTVforUpdate1(tVars)
@@ -479,12 +479,12 @@ function initializeSCF(::HFT, config::ElecHamiltonianConfig{T},
     D = getD.(C, spinConfig)
     F = getF(Hcore, HeeI, D)
     E = getE.(Ref(Hcore), F, D)
-    res = HFtempVars.(HFT(), spinConfig, C, D, F, E)
+    res = HFtempInfo.(HFT(), spinConfig, C, D, F, E)
     sharedFields = getproperty.(res, :shared)
     for (field, val) in zip(HFIVfields, fill.(get2SpinQuantity.((D, E)), 1))
         setproperty!.(sharedFields, field, Ref(val))
     end
-    res::NTuple{nSector, HFtempVars{R, T, HFT}}
+    res::NTuple{nSector, HFtempInfo{R, T, HFT}}
 end
 
 
@@ -694,7 +694,7 @@ end
 
 """
 
-    HFfinalVars{R<:Real, D, T<:RealOrComplex{R}, HFT, HFTS, B<:MultiOrbitalData{R, D, T}
+    HFfinalInfo{R<:Real, D, T<:RealOrComplex{R}, HFT, HFTS, B<:MultiOrbitalData{R, D, T}
                 } <: StateBox{T}
 
 The container of the final values after a Hartree–Fock SCF procedure. `HFTS` specifies the 
@@ -724,16 +724,16 @@ approximation.
 `occu::NTuple{HFTS, $MemoryPair{ T, NTuple{2, Bool} }}`: The spin occupations of distinct 
 canonical (spatial) orbitals and their corresponding orbital energies.
 
-`memory::NTuple{HFTS, $HFtempVars{R, T, HFT}}`: the intermediate values stored during the 
+`memory::NTuple{HFTS, $HFtempInfo{R, T, HFT}}`: the intermediate values stored during the 
 Hartree–Fock SCF (self-consistent field) interactions. (**NOTE:** The interface of 
-`$HFtempVars` is internal and subject to **BREAKING CHANGES**.)
+`$HFtempInfo` is internal and subject to **BREAKING CHANGES**.)
 
 `converged::Union{Bool, Missing}`: Whether the SCF iteration is converged in the end. 
 When convergence detection is off (see [`SCFconfig`](@ref)), it is set to `missing`.
 
 `basis::B`: The orbital basis-set data used for the Hartree–Fock SCF computation.
 """
-struct HFfinalVars{R<:Real, D, T<:RealOrComplex{R}, HFT, HFTS, B<:MultiOrbitalData{R, D, T}
+struct HFfinalInfo{R<:Real, D, T<:RealOrComplex{R}, HFT, HFTS, B<:MultiOrbitalData{R, D, T}
                    } <: StateBox{T}
     system::ElectronicSysConfig{R, D}
     energy::NTuple{2, R}
@@ -741,18 +741,18 @@ struct HFfinalVars{R<:Real, D, T<:RealOrComplex{R}, HFT, HFTS, B<:MultiOrbitalDa
     density::NTuple{HFTS, MatrixMemory{T}}
     fock::NTuple{HFTS, MatrixMemory{T}}
     occu::NTuple{HFTS, MemoryPair{ R, NTuple{2, Bool} }}
-    memory::NTuple{HFTS, HFtempVars{R, T, HFT}}
+    memory::NTuple{HFTS, HFtempInfo{R, T, HFT}}
     converged::Union{Bool, Missing}
     basis::B
 
-    function HFfinalVars(vars::N12Tuple{HFtempVars{R, T, HFT}}, 
+    function HFfinalInfo(vars::N12Tuple{HFtempInfo{R, T, HFT}}, 
                          systemInfo::ElectronicSysConfig, 
                          basisData::MultiOrbitalData{R, D, T}, 
                          matOrth::AbstractMatrix{T}, 
                          converged::Union{Bool, Missing}) where 
                         {R<:Real, T<:RealOrComplex{R}, HFT<:HartreeFockType, D}
         enE = vars[begin].shared.Etots[end]
-        nnE = nuclearRepulsion(systemInfo.geometry)
+        nnE = nucRepulsion(systemInfo.geometry)
         sectorNum = getproperty.(vars, :N)
         matC = (ShapedMemory∘last).(getproperty.(vars, :Cs))
         matD = (ShapedMemory∘last).(getproperty.(vars, :Ds))
@@ -791,9 +791,9 @@ when its performance becomes unstable or poor.
 
 `saveTrace::NTuple{4, Bool}`: Determine whether saving (by pushing) the intermediate 
 information from all the iterations steps to the field `.temp` of the output 
-[`HFfinalVars`](@ref) of `runHartreeFock`. The types of relevant information are:
+[`HFfinalInfo`](@ref) of `runHartreeFock`. The types of relevant information are:
 
-| Sequence | Information | Corresponding field in [`HFtempVars`](@ref) |
+| Sequence | Information | Corresponding field in [`HFtempInfo`](@ref) |
 |  :---:   |    :---:    |                   :---:                     |
 | 1 | orbital coefficient matrix/matrices      | `.Cs`                       |
 | 2 | density matrix/matrices                  | `.Ds`, `.shared.Dtots`      |
@@ -857,7 +857,7 @@ end
                    config::MissingOr{HFconfig{R}}=missing; 
                    printInfo::Bool=true, infoLevel::Int=defaultHFinfoL) where 
                   {R<:Real, D, T<:RealOrComplex{R}} -> 
-    HFfinalVars{R, D, T}
+    HFfinalInfo{R, D, T}
 
 """
 function runHartreeFock(nucInfo::NuclearCluster{R, D}, basis::OrbBasisData{R, D}, 
@@ -939,7 +939,7 @@ function runHartreeFock(systemInfo::ElectronicSysConfig{R, D}, basis::OrbBasisDa
                                          config.maxStep, config.earlyStop, 
                                          config.saveTrace, printInfo, infoLevel)
     matOrth = hamilConfig.orthonormalization
-    resHolder = HFfinalVars(vars, systemInfo, basisData, matOrth, converged)
+    resHolder = HFfinalInfo(vars, systemInfo, basisData, matOrth, converged)
 
     roundDigits = min(CONSTVAR_defaultHFinfoDigits, getAtolDigits(R))
     if printInfo
@@ -1057,7 +1057,7 @@ function runHartreeFockCore(configCore::Pair{HFT, <:SCFconfig{<:Real, L, MS}},
             i += 1
             n += 1
 
-            updateHFtempVars!(len, vars, HFcore())
+            updateHFtempInfo!(len, vars, HFcore())
 
             push!(ΔEs, Etots[end] - Etots[end-1])
             if endM || printInfo
@@ -1134,12 +1134,12 @@ function runHartreeFockCore(configCore::Pair{HFT, <:SCFconfig{<:Real, L, MS}},
                 "RMS(FDS-SDF) → ", alignNum(δFrms[end], 0; roundDigits), ", ", 
                 "RMS(ΔD) → ", alignNum(ΔDrms[end], 0; roundDigits), ".\n")
     end
-    clearHFtempVars!(saveTrace, vars)
+    clearHFtempInfo!(saveTrace, vars)
     detectConvergence || (converged = missing)
     vars, converged
 end
 
-function getErrorNrms(vars::N12Tuple{HFtempVars{R, T, HFT}}, 
+function getErrorNrms(vars::N12Tuple{HFtempInfo{R, T, HFT}}, 
                       S::AbstractMatrix{T}) where {R<:Real, T<:RealOrComplex{R}, HFT}
     mapreduce(+, vars) do tVar
         D = tVar.Ds[end]
@@ -1149,7 +1149,7 @@ function getErrorNrms(vars::N12Tuple{HFtempVars{R, T, HFT}},
 end
 
 function terminateSCF!(vars, counts, method::Symbol, printInfo)
-    popHFtempVars!(vars, counts)
+    popHFtempInfo!(vars, counts)
     printInfo && println("Early termination of ", method, " due to its poor performance.")
 end
 
@@ -1162,7 +1162,7 @@ function directDiag(Nˢ::Int, X::AbstractMatrix{T}, F::AbstractMatrix{T},
     (1 - dampStrength)*Dnew + dampStrength*D
 end
 
-function initializeHFcore(::Val{:DD}, αβVars::N12Tuple{HFtempVars{R, T, HFT}}, 
+function initializeHFcore(::Val{:DD}, αβVars::N12Tuple{HFtempInfo{R, T, HFT}}, 
                           config::ElecHamiltonianConfig{T}; 
                           dampStrength::R=R(defaultDS)) where 
                          {R<:Real, T<:RealOrComplex{R}, HFT<:HartreeFockType}
@@ -1244,7 +1244,7 @@ end
 
 const DIIStype = Union{Val{:DIIS}, Val{:ADIIS}, Val{:EDIIS}}
 
-function initializeHFcore(::M, αβVars::N12Tuple{HFtempVars{R, T, HFT}}, 
+function initializeHFcore(::M, αβVars::N12Tuple{HFtempInfo{R, T, HFT}}, 
                           config::ElecHamiltonianConfig{T}; 
                           resetThreshold::Real=1000getAtolVal(T), 
                           DIISsize::Int=defaultDIISsize, 

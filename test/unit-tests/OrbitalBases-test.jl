@@ -3,7 +3,7 @@ using Quiqbox
 using Quiqbox: markObj
 using LinearAlgebra
 
-@testset "SpatialBasis.jl" begin
+@testset "OrbitalBases.jl" begin
 
 gf1 = GaussFunc(1.1)
 gf1_3d = Quiqbox.ProductField((gf1, gf1, gf1))

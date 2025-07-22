@@ -2,7 +2,7 @@ using Test
 using Quiqbox
 using LinearAlgebra
 
-@testset "Spatial.jl" begin
+@testset "FieldFunctions.jl" begin
 
 xpn1 = genCellParam(1.5, :xpn)
 xpn2 = genCellParam(2.5, :xpn)
@@ -26,7 +26,7 @@ f1 = x -> exp(-xpn1() * x^2)
 f2 = x -> exp(-xpn2() * x^2)
 f3 = x -> exp(-xpn3() * x^2)
 g1 = x -> mapreduce((f, i)->f(i), *, (f1, f2, f3), x)
-gfs1Prod = AxialProduct(gfs1 |> Tuple)
+gfs1Prod = AxialProdField(gfs1 |> Tuple)
 gfs1Prod_core, gfs1Prod_par = Quiqbox.unpackFunc(gfs1Prod)
 pt = (1.1, 2.0, -3.0)
 @test g1(pt) == gfs1Prod(pt) ≈ gfs1Prod_core(pt, obtain(gfs1Prod_par))

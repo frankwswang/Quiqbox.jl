@@ -1,19 +1,9 @@
 using Test
 using Quiqbox
-using Quiqbox: checkFname, advancedParse, alignNumSign, numToSups, superscriptNum, 
-               numToSubs, subscriptNum,  alignNum
+using Quiqbox: advancedParse, alignNum, alignNumSign, numToSups, superscriptNum, numToSubs, 
+               subscriptNum
 
-@testset "StringIO.jl tests" begin
-
-# function checkFname
-suffix = rand(100000000:999999999)
-testFname = "__test__"*string(suffix)
-@test testFname == checkFname(testFname)
-open(testFname, "w") do io end
-nFname = checkFname(testFname, showWarning=false)
-@test nFname == testFname*"_N"
-rm(testFname)
-
+@testset "Strings.jl tests" begin
 
 # function advancedParse (with adaptiveParse)
 @test advancedParse(Float64, "1") === 1.0

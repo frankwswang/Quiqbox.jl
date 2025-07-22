@@ -92,7 +92,7 @@ gfo1D1 = Quiqbox.PrimitiveOrb((first(coord3),), gf1D1, renormalize=false)
 gf1D2 = Quiqbox.GaussFunc(xpns1[end])
 gfo1D2 = Quiqbox.PrimitiveOrb(( last(coord3),), gf1D2, renormalize=false)
 
-ap2D = Quiqbox.AxialProduct((stf1D, gf1D1))
+ap2D = Quiqbox.AxialProdField((stf1D, gf1D1))
 apOrb = Quiqbox.PrimitiveOrb((1.0, 2.0), ap2D, renormalize=false)
 
 
@@ -153,14 +153,14 @@ OvlpInteSuite["APOrb_CGTO_DD"]["Cached"] = @benchmarkable overlap($apOrb, $cgto3
 
 #>> Orbital-Coulomb Benchmark Group
 ClmbInteSuite["NucAttr"]["CGTO"]["Cached"] = 
-@benchmarkable neAttraction(nucs1, [coord4, coord5],  cgto1, cgto2) evals=1
+@benchmarkable nucAttraction(nucs1, [coord4, coord5],  cgto1, cgto2) evals=1
 ClmbInteSuite["NucAttr"]["CGTOc"]["Cached"] = 
-@benchmarkable neAttraction(nucs1, [coord4, coord5], cgto1c, cgto2) evals=1
+@benchmarkable nucAttraction(nucs1, [coord4, coord5], cgto1c, cgto2) evals=1
 
 ClmbInteSuite["ElectRI"]["CGTO"]["Cached"] = 
-@benchmarkable eeInteraction(cgto1,   cgto1,  cgto2,  cgto2) evals=1
+@benchmarkable elecRepulsion(cgto1,   cgto1,  cgto2,  cgto2) evals=1
 ClmbInteSuite["ElectRI"]["GFO1D"]["Cached"] = 
-@benchmarkable eeInteraction(gfo1D1, gfo1D1, gfo1D2, gfo1D2) evals=1
+@benchmarkable elecRepulsion(gfo1D1, gfo1D1, gfo1D2, gfo1D2) evals=1
 
 #>> Differentiation-Function Benchmark Group
 DiffFuncBSuite["df1"]["Numerical"] = @benchmarkable ($df1_fd1)($coord2)
