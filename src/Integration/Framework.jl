@@ -741,7 +741,8 @@ function computeOrbDataIntegral(style::MultiBodyIntegral{D, C}, op::F,
     initInfo = initializeOrbIntegral(style, opStart, data, lazyCompute, estimatorConfig)
     weightInfo = getOrbCorePointers(initInfo, lazyCompute)
     coreInfo = reformatOrbIntegral(initInfo, weightInfo)
-    coreInfo => evalOrbIntegralInfo!(op, coreInfo)
+    infoData = evalOrbIntegralInfo!(op, coreInfo)
+    coreInfo => infoData
 end
 
 function computeOrbDataIntegral(style::MultiBodyIntegral{D, C}, op::F, 
@@ -752,7 +753,8 @@ function computeOrbDataIntegral(style::MultiBodyIntegral{D, C}, op::F,
     initInfo = initializeOrbIntegral(style, op, data, lazyCompute, estimatorConfig)
     weightInfo = getOrbCorePointers(initInfo, lazyCompute)
     coreInfo = reformatOrbIntegral(initInfo, weightInfo)
-    coreInfo => evalOrbIntegralInfo!(coreInfo)
+    infoData = evalOrbIntegralInfo!(coreInfo)
+    coreInfo => infoData
 end
 
 
