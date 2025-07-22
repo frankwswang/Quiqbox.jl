@@ -1,4 +1,5 @@
 using Test
+using Documenter
 
 @testset "Quiqbox tests" begin
 
@@ -81,6 +82,7 @@ using Test
     println("Testing $(unit9)...")
     t9 = @elapsed @testset "$(unit9)" begin
         include("quality-tests/Aqua-test.jl")
+        doctest(Quiqbox)
     end
     println("$(unit9) test finished in $t9 seconds.\n")
 

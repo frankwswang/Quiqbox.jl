@@ -20,7 +20,7 @@
 **NOTE:** Each operating system (OS) platform is only tested on the x86-64 architecture. The support of those systems on different architectures (such as macOS on ARM architecture) is not guaranteed.
 
 ### Julia (64-bit) compatibility
-Quiqbox will always try to support the [latest stable release](https://julialang.org/downloads/#current_stable_release) of 64-bit Julia as soon as possible. On the other hand, backward compatibility with previous versions is not guaranteed but can be checked [here](https://github.com/frankwswang/Quiqbox.jl/actions/workflows/CI-JS-older.yml).
+Quiqbox will always try to support the [latest stable release](https://julialang.org/downloads/#current_stable_release) of 64-bit Julia as soon as possible. On the other hand, backward compatibility with previous versions is not guaranteed but can be checked [here](https://github.com/frankwswang/Quiqbox.jl/actions/workflows/CI-Backward.yml).
 
 ### Installation in Julia [REPL](https://docs.julialang.org/en/v1/manual/getting-started/)
 
@@ -47,6 +47,6 @@ For more basic usage of the programming language behind Quiqbox, Julia, please r
 
 ## Manual Contents
 ```@contents
-Pages = ["basis.md", "SCF.md", "optimization.md"]
-Depth = 3
+Pages = ["SCF.md"]
+Depth = 2
 ```

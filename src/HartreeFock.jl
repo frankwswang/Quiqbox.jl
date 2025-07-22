@@ -510,9 +510,10 @@ const Doc_SCFconfig_SecConv1 = "root mean square of the error matrix defined in 
 
 const Doc_SCFconfig_SecConv2 = "root mean square of the change of the density matrix"
 
-const Doc_SCFconfig_eg1 = "SCFconfig{Float64, 2, Tuple{Val{:ADIIS}, Val{:DIIS}}}(method, "*
-                          "interval=(0.001, 1.0e-8), methodConfig, secondaryConvRatio, "*
-                          "oscillateThreshold)"
+const Doc_SCFconfig_eg1 = "SCFconfig{Float64, 3, Tuple{Val{:DD}, Val{:ADIIS}, Val{:DIIS}}}"*
+                          "((Val{:DD}(), Val{:ADIIS}(), Val{:DIIS}()), (0.005, 0.0001, "*
+                          "1.0e-8), (Pair{Symbol}[], Pair{Symbol}[], Pair{Symbol}[]), "*
+                          "(1000.0, 1000.0), 1.0e-5)"
 
 const SCFKeywordArgDict = AbstractDict{Int, <:AbstractVector{ <:Pair{Symbol} }}
 
@@ -848,6 +849,8 @@ function HFconfig(::Type{T}, type::HFT=RCHartreeFock();
 end
 
 
+const ElectronSpinConfig = Union{NTuple{2, Int}, OccupationState{2}}
+
 """
 
     runHartreeFock(nucInfo::$NuclearCluster{R, D}, basis::$OrbBasisData{R, D}, 
@@ -893,8 +896,6 @@ function runHartreeFock(nucInfo::NuclearCluster{R, D}, basis::OrbBasisData{R, D}
     spinInfo = prepareSpinConfiguration(nucInfo)
     runHartreeFock(spinInfo=>nucInfo, basis, config; printInfo, infoLevel)
 end
-
-const ElectronSpinConfig = Union{NTuple{2, Int}, OccupationState{2}}
 
 function runHartreeFock(systemInfo::Pair{<:ElectronSpinConfig, NuclearCluster{R, D}}, 
                         basis::OrbBasisData{R, D}, config::MissingOr{HFconfig{R}}=missing; 

@@ -19,20 +19,15 @@ To run a Hartree–Fock method, the lines of code required in Quiqbox are as sim
     using Quiqbox
 ```
 ```@repl 2
-nuc = ["H", "H"];
+nuc = [:H, :H];
 
-nucCoords = [[-0.7, 0.0, 0.0], [0.7, 0.0, 0.0]];
+nucCoords = [(-0.7, 0.0, 0.0), (0.7, 0.0, 0.0)];
 
-bs = genBasisFunc.(nucCoords, "STO-3G", nuc) |> flatten;
+bs = reduce(vcat, genGaussTypeOrbSeq.(nucCoords, nuc, "STO-3G"));
 
-resRHF = runHF(bs, nuc, nucCoords)
+resRHF = runHartreeFock(NuclearCluster(nuc, nucCoords), bs);
 
-@show resRHF.Ehf resRHF.C resRHF.Eo resRHF.occu;
-```
-
-After the SCF procedure, one can also store the result in a `MatterByHF` for further data processing such as generating a [Molden](@ref) file.
-```@repl 2
-mol = MatterByHF(resRHF); 
+@show resRHF.energy resRHF.coeff resRHF.occu;
 ```
 
 ### Flexible core functions
@@ -42,8 +37,6 @@ If the user wants to fine-tune the SCF iteration to achieve better performance, 
 [`HFconfig`](@ref)
 
 [`SCFconfig`](@ref)
-
-[`runHFcore`](@ref)
 
 ## Stand-alone integral functions
 
@@ -55,20 +48,18 @@ Quiqbox also provides efficient native functions for one-electron and two-electr
 
 [`overlaps`](@ref)
 
-[`eKinetic`](@ref)
+[`elecKinetic`](@ref)
 
-[`eKinetics`](@ref)
+[`elecKinetics`](@ref)
 
-[`neAttraction`](@ref)
+[`nucAttraction`](@ref)
 
-[`neAttractions`](@ref)
+[`nucAttractions`](@ref)
 
-[`coreHij`](@ref)
-
-[`coreH`](@ref)
+[`coreHamiltonian`](@ref)
 
 ### Two-electron functions
 
-[`eeInteraction`](@ref)
+[`elecRepulsion`](@ref)
 
-[`eeInteractions`](@ref)
+[`elecRepulsions`](@ref)
