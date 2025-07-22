@@ -1,28 +1,28 @@
 # Quiqbox.jl
 
-[Quiqbox](https://github.com/frankwswang/Quiqbox.jl) is a quantum chemistry and quantum physics software package that starts around Gaussian basis set optimization for electronic structure problems. Quiqbox is written in pure [Julia](https://julialang.org/). This work is supported by the U.S. Department of Energy under Award No. DESC0019374.
+[Quiqbox](https://github.com/frankwswang/Quiqbox.jl) is a quantum chemistry and quantum physics software package that starts around Gaussian basis set optimization for electronic structure problems. Quiqbox is written in pure [Julia](https://julialang.org/).
 
 ## Features
 
-* Native 1-electron and 2-electron integral functions.
-* Floating and fixed-position contracted Gaussian-type orbital (CGTO).
-* Mixed-contracted GTO (linear combination of GTOs with mixed centers or orbital angular momentum) as a basis function.
-* Restricted (closed-shell) and unrestricted (open-shell) Hartree–Fock methods (RHF & UHF).
-* Variational optimization of basis sets based on automatic differentiation (AD) and symbolic differentiation (SD).
+* Support constructing floating and fixed-position contracted orbitals.
+* Support constructing mixed-contracted Gaussian-type orbitals and building hybrid basis sets.
+* Provide native one-electron and two-electron integral functions.
+* Provide restricted (closed-shell) and unrestricted (open-shell) Hartree–Fock methods (RHF & UHF).
+* Provide dynamic computation-graph based function generation and variational optimization.
 
 ## Setup
 
-### OS (64-bit) support
-* Generic Linux
-* macOS
-* Windows
+### OS and hardware platform support
 
-**NOTE:** Each operating system (OS) platform is only tested on the x86-64 architecture. The support of those systems on different architectures (such as macOS on ARM architecture) is not guaranteed.
+* Windows (x86-64)
+* Generic Linux (x86-64)
+* macOS (x86-64 and Apple silicon)
 
 ### Julia (64-bit) compatibility
-Quiqbox will always try to support the [latest stable release](https://julialang.org/downloads/#current_stable_release) of 64-bit Julia as soon as possible. On the other hand, backward compatibility with previous versions is not guaranteed but can be checked [here](https://github.com/frankwswang/Quiqbox.jl/actions/workflows/CI-Backward.yml).
 
-### Installation in Julia [REPL](https://docs.julialang.org/en/v1/manual/getting-started/)
+Currently, Quiqbox tries to support the [latest stable release](https://julialang.org/downloads/#current_stable_release) of 64-bit Julia as soon as possible. Backward compatibility with previous versions is not guaranteed but can be checked [here](https://github.com/frankwswang/Quiqbox.jl/actions/workflows/CI-Backward.yml).
+
+### Installation in Julia [REPL](https://docs.julialang.org/en/v1/stdlib/REPL/)
 
 Type `]` in the default [Julian mode](https://docs.julialang.org/en/v1/stdlib/REPL/#The-Julian-mode) to switch to the [Pkg mode](https://docs.julialang.org/en/v1/stdlib/REPL/#Pkg-mode):
 
@@ -44,9 +44,17 @@ julia> using Quiqbox
 
 For more basic usage of the programming language behind Quiqbox, Julia, please refer to [the official documentation](https://docs.julialang.org/).
 
+## Citation
 
-## Manual Contents
+If you use Quiqbox in your research, please cite the following paper:
+
+- [Wang, W., & Whitfield, J. D. (2023). Basis set generation and optimization in the NISQ era with Quiqbox.jl. *Journal of Chemical Theory and Computation, 19*(22), 8032-8052.][JCTC-url]
+
+## Documentation Contents
+
 ```@contents
 Pages = ["SCF.md"]
 Depth = 2
 ```
+
+[JCTC-url]: https://pubs.acs.org/doi/10.1021/acs.jctc.3c00011
