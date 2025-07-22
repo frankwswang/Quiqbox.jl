@@ -2,7 +2,7 @@ using Test
 using Quiqbox
 using LinearAlgebra
 
-@testset "Spatial.jl" begin
+@testset "FieldFunctions.jl" begin
 
 xpn1 = genCellParam(1.5, :xpn)
 xpn2 = genCellParam(2.5, :xpn)

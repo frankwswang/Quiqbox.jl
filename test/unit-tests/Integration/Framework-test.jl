@@ -3,7 +3,7 @@ using Quiqbox
 using Quiqbox: MultiOrbitalData, PrimOrbPointer, CompOrbPointer, OneToIndex, MemoryPair, 
                markObj, buildOrbCoreWeight!, absSqrtInv
 
-@testset "Types.jl" begin
+@testset "Framework.jl" begin
 
 pgto1 = genGaussTypeOrb((0.0, 0.0, 1.0), 2.0, (1, 1, 0), renormalize=true )
 pgto2 = genGaussTypeOrb((0.0, 1.0, 0.0), 3.0, (0, 0, 0), renormalize=true )

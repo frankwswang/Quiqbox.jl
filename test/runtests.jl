@@ -7,10 +7,11 @@ using Test
     unit1 = "Utility Components"
     println("Testing $(unit1)...")
     t1 = @elapsed @testset "$(unit1)" begin
+        include("unit-tests/IO-test.jl")
         include("unit-tests/Tools-test.jl")
-        include("unit-tests/StringIO-test.jl")
+        include("unit-tests/Strings-test.jl")
         include("unit-tests/Iteration-test.jl")
-        include("unit-tests/Collection-test.jl")
+        include("unit-tests/Collections-test.jl")
     end
     println("$(unit1) test finished in $t1 seconds.\n")
 
@@ -44,8 +45,8 @@ using Test
     unit5 = "Basis-Construction System"
     println("Testing $(unit5)...")
     t5 = @elapsed @testset "$(unit5)" begin
-        include("unit-tests/Spatial-test.jl")
-        include("unit-tests/SpatialBasis-test.jl")
+        include("unit-tests/FieldFunctions-test.jl")
+        include("unit-tests/OrbitalBases-test.jl")
     end
     println("$(unit5) test finished in $t5 seconds.\n")
 
