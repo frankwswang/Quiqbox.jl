@@ -69,11 +69,18 @@ using Test
     end
     println("$(unit7) test finished in $t7 seconds.\n")
 
-    unit8 = "Code Quality"
+    unit8 = "Ab Initio Computation System"
     println("Testing $(unit8)...")
     t8 = @elapsed @testset "$(unit8)" begin
-        include("quality-tests/Aqua-test.jl")
+        include("unit-tests/HartreeFock-test.jl")
     end
     println("$(unit8) test finished in $t8 seconds.\n")
+
+    unit9 = "Code Quality"
+    println("Testing $(unit9)...")
+    t9 = @elapsed @testset "$(unit9)" begin
+        include("quality-tests/Aqua-test.jl")
+    end
+    println("$(unit9) test finished in $t9 seconds.\n")
 
 end

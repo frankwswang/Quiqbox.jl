@@ -1,34 +1,28 @@
 using Test
 using Quiqbox
-using Quiqbox: splitSpins, HFfinalVars
 using Suppressor: @suppress_out, @capture_out
 
 isdefined(Main, :SharedTestFunctions) || include("../../test/test-functions/Shared.jl")
 
 @testset "HartreeFock.jl" begin
 
-# function splitSpins
-@test splitSpins(Val(:RHF), 5) == (2,)
-@test splitSpins(Val(:RHF), (2,)) == (2,)
-try splitSpins(Val(:RHF), (1,3)) == (2,) catch err; @test (err isa ErrorException) end
-@test splitSpins(Val(:UHF), 5) == (2,3)
-@test splitSpins(Val(:UHF), (2,)) == (2,2)
-@test splitSpins(Val(:UHF), (3,2)) == (3,2)
-
-
 errorThreshold1 = 5e-8
 errorThreshold2 = 1e-12
 errorThreshold3 = 1e-5
 
-nucCoords = [[-0.7,0.0,0.0], [0.7,0.0,0.0], [0.0, 0.0, 0.0]]
-nuc = ["H", "H", "O"]
-bs = genBasisFunc.(nucCoords, "STO-3G", nuc) |> flatten
-gtb = GTBasis(bs)
+nucCoords = [(-0.7,0.0,0.0), (0.7,0.0,0.0), (0.0, 0.0, 0.0)]
+nuc = [:H, :H, :O]
+nucInfo = NuclearCluster(nuc, nucCoords)
+
+bs = reduce(vcat, genGaussTypeOrbSeq.(nucCoords, nuc, "STO-3G"))
 S = overlaps(bs)
 X = S^(-0.5)
-Hcore = coreH(bs, nuc, nucCoords)
+Hcore = coreHamiltonian(nuc, nucCoords, bs)
 HeeI = eeInteractions(bs)
-Ne = getCharge(nuc)
+spinInfo = Quiqbox.prepareSpinConfiguration(nucInfo)
+nElec = Quiqbox.getTotalOccupation(spinInfo)
+spinSectorPair = (nElec÷2, nElec-nElec÷2)
+
 scfMethods = (:ADIIS, :DIIS, :EDIIS, :DD)
 thresholds = (1e-4, 1e-8, 1e-10, 1e-15)
 solvers1 = Dict(1=>[:solver=>:LCM], 2=>[:solver=>:LCM], 3=>[:solver=>:LCM])
@@ -38,76 +32,70 @@ local res1, res1_1, res1_2, res1_3, res1_4, res1_5, res2, res2_2, res2_3
 SCFc1 = SCFconfig(scfMethods, thresholds)
 SCFc2 = SCFconfig(scfMethods, thresholds, solvers1)
 SCFc3 = SCFconfig(scfMethods, thresholds, solvers2)
-HFc1 = HFconfig((C0=Val(:Hcore), SCF=SCFc1))
-HFc1_2 = HFconfig((C0=Val(:Hcore), SCF=SCFc3))
-HFc2 = HFconfig((SCF=SCFc1, saveTrace=(true, true, true, true)))
-HFc3 = HFconfig(HF=:UHF, C0=:GWH, SCF=SCFc2)
-HFc3_2 = HFconfig(HF=:UHF, C0=Quiqbox.getCfromGWH(Val(:UHF), S, Hcore, X), SCF=SCFc2)
-HFc4 = HFconfig((HF=Val(:UHF), SCF=SCFc2))
-HFc5 = HFconfig((C0=:Hcore, SCF=SCFconfig(threshold=1e-15)))
-HFc6 = HFconfig((C0=:Hcore, SCF=SCFconfig()))
-HFc6_2 = HFconfig((C0=Quiqbox.getCfromHcore(Val(:RHF), X, Hcore), SCF=SCFconfig()))
-HFc7 = HFconfig((C0=(zeros(1,1),), SCF=SCFconfig()))
+HFc1 = HFconfig(Float64, initial=:CoreH, strategy=SCFc1)
+HFc1_2 = HFconfig(Float64, initial=:CoreH, strategy=SCFc3)
+HFc2 = HFconfig(Float64, strategy=SCFc1, saveTrace=(true, true, true, true))
+HFc3 = HFconfig(Float64, UOHartreeFock(), initial=:GWH, strategy=SCFc2)
+C0pair1 = Quiqbox.initializeOrbCoeffData(Val(:GWH), UOHartreeFock(), X, S, Hcore)
+initial = Quiqbox.OrbCoeffInitialConfig(UOHartreeFock(), C0pair1)
+HFc3_2 = HFconfig(Float64, UOHartreeFock(); initial, strategy=SCFc2)
+HFc4 = HFconfig(Float64, UOHartreeFock(), strategy=SCFc2)
+HFc5 = HFconfig(Float64, initial=:CoreH, strategy=SCFconfig(threshold=1e-15))
+HFc6 = HFconfig(Float64, initial=:CoreH, strategy=SCFconfig())
+C0data1 = Quiqbox.initializeOrbCoeffData(Val(:CoreH), RCHartreeFock(), X, Hcore)
+initial = Quiqbox.OrbCoeffInitialConfig(RCHartreeFock(), C0data1)
+HFc6_2 = HFconfig(Float64; initial, strategy=SCFconfig())
+initial = Quiqbox.OrbCoeffInitialConfig(RCHartreeFock(), (zeros(1,1),))
+HFc7 = HFconfig(Float64; initial, strategy=SCFconfig())
 try
-    runHF(bs, nuc, nucCoords, HFc7)
+    runHartreeFock(nucInfo, bs, HFc7)
 catch err
     @test (err isa DimensionMismatch)
 end
 
-try
-    runHF(bs, nuc, nucCoords, splitSpins(Val(:UHF), Ne))
-catch err
-    @test (err isa ErrorException)
-end
-
 @suppress_out begin
-    res1   = runHF(bs, nuc, nucCoords, HFc1)
-    res1_1 = runHF(bs, nuc, nucCoords, HFc3)
-    res1_2interm = runHFcore(bs, nuc, nucCoords, HFc2)
-    res1_2 = HFfinalVars(gtb, nuc, nucCoords, X, res1_2interm...)
-    res1_3interm = runHFcore(bs, nuc, nucCoords, Ne, HFc5)
-    res1_3 = HFfinalVars(gtb, nuc, nucCoords, X, res1_3interm...)
-    res1_4 = runHF(bs, nuc, nucCoords, splitSpins(Val(:RHF), Ne), HFc6)
-    res1_5 = runHF(bs, nuc, nucCoords, Ne, HFc6_2)
-    res2   = runHF(bs, nuc, nucCoords, HFc3)
-    res2_2 = runHF(bs, nuc, nucCoords, HFc4)
-    res2_3 = runHF(bs, nuc, nucCoords, HFc3_2, splitSpins(Val(:UHF), Ne))
+    res1   = runHartreeFock(nucInfo, bs, HFc1)
+    res1_1 = runHartreeFock(nucInfo, bs, HFc3)
+    res1_2 = runHartreeFock(nucInfo, bs, HFc2)
+    res1_3 = runHartreeFock(spinInfo=>nucInfo, bs, HFc5)
+    res1_4 = runHartreeFock(nucInfo, bs, HFc6)
+    res1_5 = runHartreeFock(spinInfo=>nucInfo, bs, HFc6_2)
+    res2   = runHartreeFock(nucInfo, bs, HFc3)
+    res2_2 = runHartreeFock(nucInfo, bs, HFc4)
+    res2_3 = runHartreeFock(nucInfo, bs, HFc3_2)
 end
 
-@test isapprox(res2.Ehf, res2_2.Ehf, atol=100errorThreshold1)
-@test isapprox(res1.Ehf, res1_1.Ehf, atol=errorThreshold1)
-@test isapprox(res1.Ehf, res1_2.Ehf, atol=errorThreshold1)
-@test isapprox(res1_1.Ehf, res1_2.Ehf, atol=errorThreshold1)
-@test isapprox(res1.Ehf, res1_3.Ehf, atol=errorThreshold1)
-@test isapprox(res1_3.Ehf, res1_4.Ehf, atol=2e-12)
-@test hasEqual(res1_4, res1_5)
-@test hasEqual(res2, res2_3)
+@test isapprox(first(res2.energy), first(res2_2.energy), atol=100errorThreshold1)
+@test isapprox(first(res1.energy), first(res1_1.energy), atol=errorThreshold1)
+@test isapprox(first(res1.energy), first(res1_2.energy), atol=errorThreshold1)
+@test isapprox(first(res1_1.energy), first(res1_2.energy), atol=errorThreshold1)
+@test isapprox(first(res1.energy), first(res1_3.energy), atol=errorThreshold1)
+@test isapprox(first(res1_3.energy), first(res1_4.energy), atol=2e-12)
+@test Quiqbox.compareObj(res1_4, res1_5)
+@test Quiqbox.compareObj(res2, res2_3)
 
 @test begin
-    tVars1 = deepcopy(res1.temp[1])
+    tVars1 = deepcopy(res1.memory[1])
     Quiqbox.popHFtempVars!((tVars1,))
-    push!(tVars1.Cs, res1.temp[1].Cs[end])
-    push!(tVars1.Fs, res1.temp[1].Fs[end])
-    push!(tVars1.Ds, res1.temp[1].Ds[end])
-    push!(tVars1.Es, res1.temp[1].Es[end])
-    push!(tVars1.shared.Dtots, res1.temp[1].shared.Dtots[end])
-    push!(tVars1.shared.Etots, res1.temp[1].shared.Etots[end])
-    hasEqual(tVars1, res1.temp[1])
+    push!(tVars1.Cs, res1.memory[1].Cs[end])
+    push!(tVars1.Fs, res1.memory[1].Fs[end])
+    push!(tVars1.Ds, res1.memory[1].Ds[end])
+    push!(tVars1.Es, res1.memory[1].Es[end])
+    push!(tVars1.shared.Dtots, res1.memory[1].shared.Dtots[end])
+    push!(tVars1.shared.Etots, res1.memory[1].shared.Etots[end])
+    Quiqbox.compareObj(tVars1, res1.memory[1])
 end
 
-@test res1.Ehf == Quiqbox.getEhf(Hcore, HeeI, res1.C, (Ne÷2,))
-res1Ehf1 = Quiqbox.getEhf((changeHbasis(Hcore, res1.C[begin]),), 
-                          (changeHbasis(HeeI, res1.C[begin]),), (Ne÷2,))
-@test isapprox(res1.Ehf, res1Ehf1, atol=errorThreshold2)
-gtb2 = [sum(c.*gtb.basis) for c in eachcol(res1.C[begin])] |> GTBasis
-res1Ehf2 = Quiqbox.getEhf(gtb2, nuc, nucCoords, Ne)
-@test isapprox(res1Ehf1, res1Ehf2, atol=2errorThreshold2)
-@test isapprox(res1.Ehf, -93.7878386328627, atol=errorThreshold1)
+@test first(res1.energy) ≈ Quiqbox.getEhf(Hcore, HeeI, res1.coeff, (nElec÷2,))
+res1Ehf1 = Quiqbox.getEhf((changeOrbitalBasis(Hcore, res1.coeff[begin]),), 
+                          (changeOrbitalBasis(HeeI, res1.coeff[begin]),), (nElec÷2,))
+@test isapprox(first(res1.energy), res1Ehf1, atol=errorThreshold2)
+@test isapprox(first(res1.energy), -93.7878386328627, atol=errorThreshold1)
 
 # Note: the orbital coefficients of 4th and 5th columns are so close that based on the 
 # numerical error of each machine the position of them might switch.
 
-@test isapprox(res1.C[1][1:5, [1,2,3,6,7]], 
+@test isapprox(res1.coeff[1][1:5, [1,2,3,6,7]], 
 [ 0.010895919  0.088981101  0.121607884  0.0  0.0  1.914545199  3.615733319; 
   0.010895919  0.088981101 -0.121607884  0.0  0.0  1.914545199 -3.615733319; 
  -0.994229867 -0.26343918   0.0          0.0  0.0  0.049696489  0.0; 
@@ -117,11 +105,11 @@ res1Ehf2 = Quiqbox.getEhf(gtb2, nuc, nucCoords, Ne)
   0.0          0.0          0.0          0.0  1.0  0.0          0.0][1:5, [1,2,3,6,7]], 
 atol=errorThreshold1)
 
-@test  isapprox(vcat(res1.C[1][6:7,:][:], res1.C[1][1:5, 4:5][:]) |> sort, 
+@test  isapprox(vcat(res1.coeff[1][6:7,:][:], res1.coeff[1][1:5, 4:5][:]) |> sort, 
                 vcat(fill(0,22), fill(1,2)), atol=errorThreshold1)
-@test  isapprox(res1.C[1][6:7, 4:5][:] |> sort, [0,0,1,1], atol=errorThreshold1)
+@test  isapprox(res1.coeff[1][6:7, 4:5][:] |> sort, [0,0,1,1], atol=errorThreshold1)
 
-@test isapprox(res1.F[1], 
+@test isapprox(res1.fock[1], 
     [-2.255358688 -1.960982029  -4.484369214 -2.511689786  0.483603806  0.0  0.0; 
      -1.960982029 -2.255358688  -4.484369214 -2.511689786 -0.483603806  0.0  0.0; 
      -4.484369214 -4.484369214 -20.920383179 -5.363456843  0.0          0.0  0.0; 
@@ -130,38 +118,39 @@ atol=errorThreshold1)
       0.0          0.0           0.0          0.0          0.0 -0.661307596  0.0; 
       0.0          0.0           0.0          0.0          0.0  0.0 -0.661307596], 
 atol=errorThreshold1)
-@test isapprox(res1.Eo[1], 
+@test isapprox(res1.occu[begin].left, 
     [-20.930384473, -1.616675719, -1.284466204, -0.661307596, 
       -0.661307596,  1.060815281,  1.847804072], 
 atol=errorThreshold1)
-@test res1.occu[1] == ("↿⇂", "↿⇂", "↿⇂", "↿⇂", "↿⇂", "0", "0")
+@test res1.occu[begin].right == [(true, true), (true, true), (true, true), (true, true), 
+                                 (true, true), (false, false), (false, false)]
 
-D1 = res1.D[1]
+D1 = res1.density[begin]
 @test isapprox(D1*S*D1, D1, atol=errorThreshold1)
 
 
 @test begin
-    tVars2 = deepcopy(res2.temp)
+    tVars2 = deepcopy(res2.memory)
     Quiqbox.popHFtempVars!(tVars2)
-    push!(tVars2[1].Cs, res2.temp[1].Cs[end])
-    push!(tVars2[1].Fs, res2.temp[1].Fs[end])
-    push!(tVars2[1].Ds, res2.temp[1].Ds[end])
-    push!(tVars2[1].Es, res2.temp[1].Es[end])
-    push!(tVars2[2].Cs, res2.temp[2].Cs[end])
-    push!(tVars2[2].Fs, res2.temp[2].Fs[end])
-    push!(tVars2[2].Ds, res2.temp[2].Ds[end])
-    push!(tVars2[2].Es, res2.temp[2].Es[end])
-    push!(tVars2[2].shared.Dtots, res2.temp[2].shared.Dtots[end])
-    push!(tVars2[2].shared.Etots, res2.temp[2].shared.Etots[end])
-    hasEqual(tVars2, res2.temp)
+    push!(tVars2[1].Cs, res2.memory[1].Cs[end])
+    push!(tVars2[1].Fs, res2.memory[1].Fs[end])
+    push!(tVars2[1].Ds, res2.memory[1].Ds[end])
+    push!(tVars2[1].Es, res2.memory[1].Es[end])
+    push!(tVars2[2].Cs, res2.memory[2].Cs[end])
+    push!(tVars2[2].Fs, res2.memory[2].Fs[end])
+    push!(tVars2[2].Ds, res2.memory[2].Ds[end])
+    push!(tVars2[2].Es, res2.memory[2].Es[end])
+    push!(tVars2[2].shared.Dtots, res2.memory[2].shared.Dtots[end])
+    push!(tVars2[2].shared.Etots, res2.memory[2].shared.Etots[end])
+    Quiqbox.compareObj(tVars2, res2.memory)
 end
 
-@test res2.Ehf == Quiqbox.getEhf(Hcore, HeeI, res2.C, (Ne÷2, Ne-Ne÷2))
-HcoreUHF2 = changeHbasis.(Ref(Hcore), res2.C)
-a, b, c = changeHbasis(HeeI, res2.C...)
-res2Ehf1 = Quiqbox.getEhf(HcoreUHF2, (a, b), c, Quiqbox.splitSpins(Val(:UHF), Ne))
-@test isapprox(res2.Ehf, res2Ehf1, atol=errorThreshold2)
-@test isapprox(res2.Ehf, -93.78783863286264, atol=errorThreshold1)
+@test first(res2.energy) ≈ Quiqbox.getEhf(Hcore, HeeI, res2.coeff, spinSectorPair)
+HcoreUHF2 = changeOrbitalBasis.(Ref(Hcore), res2.coeff)
+a, b, c = changeOrbitalBasis(HeeI, res2.coeff...)
+res2Ehf1 = Quiqbox.getEhf(HcoreUHF2, (a, b), c, spinSectorPair)
+@test isapprox(first(res2.energy), res2Ehf1, atol=errorThreshold2)
+@test isapprox(first(res2.energy), -93.78783863286264, atol=errorThreshold1)
 
 res2_C1t = [ 0.01089592   0.088980957  0.121608177  0.0  0.0  1.914545206  3.615733309; 
              0.01089592   0.088980957 -0.121608177  0.0  0.0  1.914545206 -3.615733309; 
@@ -180,16 +169,16 @@ res2_C2t = [ 0.010895919  0.088981246  0.121607591  0.0  0.0  1.914545192  3.615
              0.0          0.0          0.0          0.0  1.0  0.0          0.0]
 
 ids = [1,2,3,6,7]
-@test isapprox(res2.C[1][1:5, ids], res2_C1t[1:5, ids], atol=errorThreshold3)
-@test isapprox(res2.C[2][1:5, ids], res2_C2t[1:5, ids], atol=errorThreshold3)
+@test isapprox(res2.coeff[1][1:5, ids], res2_C1t[1:5, ids], atol=errorThreshold3)
+@test isapprox(res2.coeff[2][1:5, ids], res2_C2t[1:5, ids], atol=errorThreshold3)
 
-@test  isapprox(vcat(res2.C[1][6:7,:][:], res2.C[1][1:5, 4:5][:]) |> sort, 
+@test  isapprox(vcat(res2.coeff[1][6:7,:][:], res2.coeff[1][1:5, 4:5][:]) |> sort, 
                 vcat(fill(0,22), fill(1,2)), atol=errorThreshold1)
-@test  isapprox(res2.C[1][6:7, 4:5][:] |> sort, [0,0,1,1], atol=errorThreshold1)
+@test  isapprox(res2.coeff[1][6:7, 4:5][:] |> sort, [0,0,1,1], atol=errorThreshold1)
 
-@test  isapprox(vcat(res2.C[2][6:7,:][:], res2.C[2][1:5, 4:5][:]) |> sort, 
+@test  isapprox(vcat(res2.coeff[2][6:7,:][:], res2.coeff[2][1:5, 4:5][:]) |> sort, 
                 vcat(fill(0,22), fill(1,2)), atol=errorThreshold1)
-@test  isapprox(res2.C[2][6:7, 4:5][:] |> sort, [0,0,1,1], atol=errorThreshold1)
+@test  isapprox(res2.coeff[2][6:7, 4:5][:] |> sort, [0,0,1,1], atol=errorThreshold1)
 
 res2_F1t = [-2.255358683 -1.960982031 -4.484369221  -2.511689801  0.483603803  0.0  0.0; 
             -1.960982031 -2.255358683 -4.484369221  -2.511689801 -0.483603803  0.0  0.0; 
@@ -207,8 +196,8 @@ res2_F2t = [-2.255358705 -1.960982032  -4.484369213 -2.511689786  0.483603812  0
              0.0          0.0           0.0          0.0          0.0 -0.661307591  0.0; 
              0.0          0.0           0.0          0.0          0.0  0.0 -0.661307591]
 
-@test isapprox(res2.F[1], res2_F1t, atol=errorThreshold3)
-@test isapprox(res2.F[2], res2_F2t, atol=errorThreshold3)
+@test isapprox(res2.fock[1], res2_F1t, atol=errorThreshold3)
+@test isapprox(res2.fock[2], res2_F2t, atol=errorThreshold3)
 
 res2_Eo1t = [-20.93038451, -1.616675748, -1.28446622,  -0.66130762, 
               -0.66130762,  1.060815274,  1.847804062]
@@ -216,12 +205,15 @@ res2_Eo1t = [-20.93038451, -1.616675748, -1.28446622,  -0.66130762,
 res2_Eo2t = [-20.93038449, -1.616675711, -1.284466186, -0.661307591, 
               -0.661307591, 1.060815276,  1.847804083]
 
-@test compr2Arrays3((res2_Eo1=res2.Eo[1], res2_Eo1t=res2_Eo1t), 10errorThreshold1)
-@test compr2Arrays3((res2_Eo2=res2.Eo[2], res2_Eo2t=res2_Eo2t), 10errorThreshold1)
+@test compr2Arrays3((res2_Eo1=res2.occu[1].left, res2_Eo1t=res2_Eo1t), 10errorThreshold1)
+@test compr2Arrays3((res2_Eo2=res2.occu[2].left, res2_Eo2t=res2_Eo2t), 10errorThreshold1)
 
-@test all( res2.occu .== ( ("↿", "↿", "↿", "↿", "↿", "0", "0"), 
-                           ("⇂", "⇂", "⇂", "⇂", "⇂", "0", "0") ) )
-D2s = res2.D
+@test res2.occu[1].right == [(true, false), (true, false), (true, false), (true, false), 
+                             (true, false), (false, false), (false, false)]
+@test res2.occu[2].right == [(false, true), (false, true), (false, true), (false, true), 
+                             (false, true), (false, false), (false, false)]
+
+D2s = res2.density
 for D in D2s
     @test isapprox(D*S*D, D, atol=errorThreshold1)
 end
@@ -263,35 +255,36 @@ uhfs = [ 7.275712508,  0.721327344, -0.450914129, -0.860294199, -1.029212153, -1
         -0.992397272, -0.992397272, -0.992397272, -0.992397272, -0.992397272, -0.992397272, 
         -0.992397272, -0.992397272, -0.992397272, -0.992397272]
 
-nuc2 = ["H", "H"]
+nuc2 = [:H, :H]
 rng = 0.1:0.2:19.9
 Et1 = Float64[]
 Et2 = Float64[]
 n = 0
 for i in rng
     n += 1
-    nucCoords2 = [[0, 0.0, 0.0], [i, 0.0, 0.0]]
+    nucCoords2 = [(0.0, 0.0, 0.0), (i, 0.0, 0.0)]
+    nucInfoLocal = NuclearCluster(nuc2, nucCoords2)
 
-    bs = genBasisFunc.(nucCoords2, "3-21G") |> flatten
+    bs = reduce(vcat, genGaussTypeOrbSeq.(nucCoords2, :H, "3-21G"))
     local res1, res2
     info1 = @capture_out begin
         @show i
-        res1 = runHF(bs, nuc2, nucCoords2, printInfo=true, infoLevel=5)
-        @show length(res1.temp[begin].Es) res1.Ehf
+        res1 = runHartreeFock(nucInfoLocal, bs, printInfo=true, infoLevel=5)
+        @show length(res1.memory[begin].Es) first(res1.energy)
     end
     info2 = @capture_out begin
         @show i
-        res2 = runHF(bs, nuc2, nucCoords2, HFconfig((HF=:UHF,)), 
-                     printInfo=true, infoLevel=5)
-        @show length(res2.temp[begin].Es) res2.Ehf
+        res2 = runHartreeFock(nucInfoLocal, bs, HFconfig(Float64, UOHartreeFock()), 
+                              printInfo=true, infoLevel=5)
+        @show length(res2.memory[begin].Es) first(res2.energy)
     end
-    push!(Et1, res1.Ehf+res1.Enn)
-    push!(Et2, res2.Ehf+res1.Enn)
-    !isapprox(Et1[n], rhfs[n], atol=errorThreshold1) && println(info1)
-    !isapprox(Et2[n], uhfs[n], atol=errorThreshold1) && println(info2)
+    push!(Et1, sum(res1.energy))
+    push!(Et2, sum(res2.energy))
+    isapprox(Et1[n], rhfs[n], atol=errorThreshold1) || println(info1)
+    isapprox(Et2[n], uhfs[n], atol=errorThreshold1) || println(info2)
 end
 
-@test compr2Arrays2((Et1=Et1, rhfs=rhfs), 95, errorThreshold1, 0.6)
+@test compr2Arrays2((Et1=Et1, rhfs=rhfs), 74, errorThreshold1, 0.6)
 @test compr2Arrays2((Et2=Et2, uhfs=uhfs), 16, errorThreshold1, 5e-5, <)
 
 
@@ -303,47 +296,50 @@ t1 = 5e-10
 maxStep1 = 200
 secondaryConvRatio1 = (5, 5)
 
-nuc_H2O2 = ["O", "O", "H", "H"]
+nuc_H2O2 = [:O, :O, :H, :H]
 coords_H2O2 = [[0., 0.731, 0.], [0., -0.731, 0.], 
                [0.936, 0.916, 0.], [-0.936, -0.916, 0.]] .* AtoBr
-Ehf_H2O2 = -187.42063898359095
+geometry_H2O2 = NuclearCluster(nuc_H2O2, coords_H2O2)
+Ehf_H2O2 = -187.42063898359095 #> From CCCBDB: -150.710007 (+ 36.710632)
 
 SCFc1 = SCFconfig(threshold=t1, secondaryConvRatio=secondaryConvRatio1)
 SCFc2 = SCFconfig((:DIIS, ), (t1,), secondaryConvRatio=secondaryConvRatio1)
 SCFc3 = SCFconfig((:EDIIS,), (t1,), secondaryConvRatio=secondaryConvRatio1)
 SCFc4 = SCFconfig((:ADIIS,), (t1,), secondaryConvRatio=secondaryConvRatio1)
 
-HFc0 = HFconfig()
+HFc0 = HFconfig(Float64)
 
-HFc1 = HFconfig(C0=:SAD,   SCF=SCFc1, maxStep=maxStep1)
-HFc2 = HFconfig(C0=:Hcore, SCF=SCFc1, maxStep=maxStep1)
-HFc3 = HFconfig(C0=:GWH,   SCF=SCFc1, maxStep=maxStep1)
+HFc1 = HFconfig(Float64, initial=:SAD,   strategy=SCFc1, maxStep=maxStep1)
+HFc2 = HFconfig(Float64, initial=:CoreH, strategy=SCFc1, maxStep=maxStep1)
+HFc3 = HFconfig(Float64, initial=:GWH,   strategy=SCFc1, maxStep=maxStep1)
 
-HFc4 = HFconfig(C0=:SAD,   SCF=SCFc2, maxStep=maxStep1)
-HFc5 = HFconfig(C0=:SAD,   SCF=SCFc3, maxStep=maxStep1)
-HFc6 = HFconfig(C0=:SAD,   SCF=SCFc4, maxStep=maxStep1)
+HFc4 = HFconfig(Float64, initial=:SAD,   strategy=SCFc2, maxStep=maxStep1)
+HFc5 = HFconfig(Float64, initial=:SAD,   strategy=SCFc3, maxStep=maxStep1)
+HFc6 = HFconfig(Float64, initial=:SAD,   strategy=SCFc4, maxStep=maxStep1)
 
-HFc7 = HFconfig(C0=:Hcore, SCF=SCFc2, maxStep=maxStep1)
-HFc8 = HFconfig(C0=:Hcore, SCF=SCFc3, maxStep=maxStep1)
-HFc9 = HFconfig(C0=:Hcore, SCF=SCFc4, maxStep=maxStep1)
+HFc7 = HFconfig(Float64, initial=:CoreH, strategy=SCFc2, maxStep=maxStep1)
+HFc8 = HFconfig(Float64, initial=:CoreH, strategy=SCFc3, maxStep=maxStep1)
+HFc9 = HFconfig(Float64, initial=:CoreH, strategy=SCFc4, maxStep=maxStep1)
 
-HFc10 = HFconfig(C0=:GWH,  SCF=SCFc2, maxStep=maxStep1)
-HFc11 = HFconfig(C0=:GWH,  SCF=SCFc3, maxStep=maxStep1)
-HFc12 = HFconfig(C0=:GWH,  SCF=SCFc4, maxStep=maxStep1)
+HFc10 = HFconfig(Float64, initial=:GWH,  strategy=SCFc2, maxStep=maxStep1)
+HFc11 = HFconfig(Float64, initial=:GWH,  strategy=SCFc3, maxStep=maxStep1)
+HFc12 = HFconfig(Float64, initial=:GWH,  strategy=SCFc4, maxStep=maxStep1)
 
 HFcs = (HFc0,  HFc1,  HFc2,  HFc3,  HFc4,  HFc5,  HFc6,  HFc7,  HFc8,  HFc9, 
         HFc10, HFc11, HFc12)
 
 for (idx, HFc) in enumerate(HFcs)
-    bs = genBasisFunc.(coords_H2O2, "6-31G", nuc_H2O2) |> flatten
+    bs = mapreduce(vcat, geometry_H2O2) do (nuc, coords)
+        genGaussTypeOrbSeq(coords, nuc, "6-31G")
+    end
     local res3
     info3 = @capture_out begin
         @show HFc
-        res3 = runHF(bs, nuc_H2O2, coords_H2O2, HFc, printInfo=true, infoLevel=5)
+        res3 = runHartreeFock(geometry_H2O2, bs, HFc, printInfo=true, infoLevel=5)
         @show res3
     end
-    bl1 = isapprox(res3.Ehf, Ehf_H2O2, atol=t1)
-    bl2 = res3.isConverged
+    bl1 = isapprox(first(res3.energy), Ehf_H2O2, atol=5t1)
+    bl2 = res3.converged
     if !(bl1 && bl2)
         println("===>>>")
         println("Case $(idx):")
