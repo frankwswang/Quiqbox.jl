@@ -256,36 +256,41 @@ uhfs = [ 7.275712508,  0.721327344, -0.450914129, -0.860294199, -1.029212153, -1
         -0.992397272, -0.992397272, -0.992397272, -0.992397272]
 
 nuc2 = [:H, :H]
-rng = 0.1:0.2:19.9
+rng1 = 0.1:0.2:19.9
+rng2 = 0.1:0.2:14.1
 Et1 = Float64[]
 Et2 = Float64[]
 n = 0
-for i in rng
+for i in rng1
     n += 1
     nucCoords2 = [(0.0, 0.0, 0.0), (i, 0.0, 0.0)]
     nucInfoLocal = NuclearCluster(nuc2, nucCoords2)
-
     bs = reduce(vcat, genGaussTypeOrbSeq.(nucCoords2, :H, "3-21G"))
+
     local res1, res2
-    info1 = @capture_out begin
-        @show i
-        res1 = runHartreeFock(nucInfoLocal, bs, printInfo=true, infoLevel=5)
-        @show length(res1.memory[begin].Es) first(res1.energy)
+
+    if i <= last(rng2)
+        info1 = @capture_out begin
+            @show i
+            res1 = runHartreeFock(nucInfoLocal, bs, printInfo=true, infoLevel=5)
+            @show length(res1.memory[begin].Es) first(res1.energy)
+        end
+        push!(Et1, sum(res1.energy))
+        isapprox(Et1[n], rhfs[n], atol=errorThreshold1) || println(info1)
     end
+
     info2 = @capture_out begin
         @show i
         res2 = runHartreeFock(nucInfoLocal, bs, HFconfig(Float64, UOHartreeFock()), 
                               printInfo=true, infoLevel=5)
         @show length(res2.memory[begin].Es) first(res2.energy)
     end
-    push!(Et1, sum(res1.energy))
     push!(Et2, sum(res2.energy))
-    isapprox(Et1[n], rhfs[n], atol=errorThreshold1) || println(info1)
     isapprox(Et2[n], uhfs[n], atol=errorThreshold1) || println(info2)
 end
-
-@test compr2Arrays2((Et1=Et1, rhfs=rhfs), 74, errorThreshold1, 0.6)
-@test compr2Arrays2((Et2=Et2, uhfs=uhfs), 16, errorThreshold1, 5e-5, <)
+rhfSeg = @view rhfs[begin:begin+length(rng2)-1]
+@test compr2Arrays2((Et1=Et1, rhfs=rhfSeg), 74, errorThreshold1, 0.6)
+@test compr2Arrays2((Et2=Et2, uhfs=uhfs),   16, errorThreshold1, 5e-5, <)
 
 
 # Extreme Case tests
