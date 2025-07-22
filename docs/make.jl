@@ -8,17 +8,11 @@ makedocs(
     pages=[
         "Home"=>"index.md"
         "Manual"=>[
-            "basis.md"
             "SCF.md"
-            "optimization.md"
         ]
         "Base"=>[
             "coreFunction.md"
             "coreType.md"
-            "toolFunction.md"
-        ]
-        "Submodule"=>[
-            "molden.md"
         ]
         "Index"=>"list.md"
     ]

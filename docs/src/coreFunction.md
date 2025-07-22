@@ -2,8 +2,7 @@
 
 ```@autodocs
 Modules = [Quiqbox]
-Pages   = ["Library.jl", "Mapping.jl", "Parameters.jl", "Basis.jl", "HartreeFock.jl", 
-           "Differentiation.jl", "Box.jl", "Optimization.jl", "Matter.jl", 
-           "Integrals/OneBody.jl", "Integrals/TwoBody.jl", "Integrals/Core.jl"]
+Pages   = ["Parameters.jl", "OrbitalBases.jl", "HartreeFock.jl", "Particles.jl", 
+           "Integration/Interface.jl"]
 Order   = [:function]
 ```

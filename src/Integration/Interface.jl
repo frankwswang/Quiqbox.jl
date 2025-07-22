@@ -151,7 +151,7 @@ end
     AbstractArray{T, D}
 
 Change the orbital basis of the input one-body / two-body integrals `DbodyInt` based on the 
-orbital coefficient matrix `C`.
+orbital coefficient matrix.
 """
 changeOrbitalBasis(oneBodyInt::AbstractMatrix{T}, C::AbstractMatrix{T}) where {T} = 
 @TOtensor ij[i,j] := oneBodyInt[a,b] * C[a,i] * C[b,j]

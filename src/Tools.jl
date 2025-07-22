@@ -73,11 +73,13 @@ end
 
 """
 
-    flatVectorizeCore(a::Union{AbstractArray, Tuple, NamedTuple}) -> AbstractVector
+    flatVectorize(a::Union{AbstractArray, Tuple, NamedTuple}) -> AbstractVector
 
 ≡≡≡ Example(s) ≡≡≡
 
 ```jldoctest; setup = :(push!(LOAD_PATH, "../../src/"); using Quiqbox)
+julia> using Quiqbox: flatVectorize
+
 julia> flatVectorize([:one, 2, ([3, [:four, (five=5, six=6)]], "7"), "8", (9.0, 10)])
 10-element Vector{Any}:
    :one

@@ -1,4 +1,5 @@
 export SCFconfig, HFconfig, runHartreeFock, RCHartreeFock, UOHartreeFock
+public HFfinalInfo
 #!! Need to standardize the format for global values, types (aliases), and type parameters
 using LinearAlgebra: dot, Hermitian, \, det, I, ishermitian, diag, norm
 using Base: OneTo
@@ -12,7 +13,7 @@ const defaultDS = 0.75
 const defaultDIISsize = 15
 const defaultDIISsolver = :LBFGS
 const SADHFmaxStep = 50
-const defaultHFinfoL = 2
+const defaultHFinfoLevel = 2
 const defaultHFmaxStep = 200
 const defaultHFsaveTrace = (false, false, false, true) # C, D, F, E
 const DEtotIndices = [2, 4]
@@ -509,24 +510,25 @@ const Doc_SCFconfig_SecConv1 = "root mean square of the error matrix defined in 
 
 const Doc_SCFconfig_SecConv2 = "root mean square of the change of the density matrix"
 
-const Doc_SCFconfig_eg1 = "SCFconfig{Float64, 2, Tuple{Val{:ADIIS}, Val{:DIIS}}}(method, "*
-                          "interval=(0.001, 1.0e-8), methodConfig, secondaryConvRatio, "*
-                          "oscillateThreshold)"
+const Doc_SCFconfig_eg1 = "SCFconfig{Float64, 3, Tuple{Val{:DD}, Val{:ADIIS}, Val{:DIIS}}}"*
+                          "((Val{:DD}(), Val{:ADIIS}(), Val{:DIIS}()), (0.005, 0.0001, "*
+                          "1.0e-8), (Pair{Symbol}[], Pair{Symbol}[], Pair{Symbol}[]), "*
+                          "(1000.0, 1000.0), 1.0e-5)"
 
 const SCFKeywordArgDict = AbstractDict{Int, <:AbstractVector{ <:Pair{Symbol} }}
 
 """
 
-    SCFconfig{T<:Real, L, MS<:NTuple{L, Val}} <: ValueContainer{T}
+    SCFconfig{T<:Real, L, MS<:NTuple{L, Val}} <: $ConfigBox
 
-The `struct` for self-consistent field (SCF) iteration configurations.
+The conatiner to configure the self-consistent field (SCF) iteration strategy for 
+Hartree–Fock computation.
 
-≡≡≡ Property Data ≡≡≡
+≡≡≡ Property/Properties ≡≡≡
 
-`method::MS`: The applied convergence methods. They can be specified as the elements inside 
-an `NTuple{L, Symbol}`, which is then input to the constructor of `SCFconfig` as the 
-positional argument `methods`. The available configuration(s) corresponding to each method 
-in terms of keyword arguments are:
+`method::MS`: The applied convergence methods. The parameters `S::Symbol` in each `Val{S}` 
+specifies a SCF ietration method. The available methods their corresponding supported 
+keyword arguments are:
 
 | Convergence Method(s) | Configuration(s) | Keyword(s) | Range(s)/Option(s) | Default(s) |
 | :----                 | :---:            | :---:      | :---:              |      ----: |
@@ -537,7 +539,7 @@ $(Doc_SCFconfig_OneRowTable)
 DIIS-based method's subspace and reset the second-to-latest residual vector as the first 
 reference. The reset is executed when the latest computed energy increases an amount above 
 the threshold compared to the second-to-latest computed energy. In default, the threshold 
-is always slightly larger than the machine epsilon of the numerical data type for the SCF 
+is slightly larger than the machine epsilon of the numerical data type applied to the SCF 
 computation.
 
 ### Convergence Methods
@@ -555,8 +557,8 @@ computation.
 last threshold will be the convergence threshold for the SCF procedure. When the last 
 threshold is set to `NaN`, there will be no convergence detection.
 
-`methodConfig::NTuple{L, Vector{<:Pair}}`: The additional keywords arguments for each 
-method stored as `Tuple`s of `Pair`s.
+`methodConfig::NTuple{L, Memory{ <:Pair{Symbol} }}`: The additional keywords arguments for 
+each method stored as `Tuple`s of `Pair`s.
 
 `secondaryConvRatio::NTuple{2, T}`: The ratios of the secondary convergence criteria to the 
 primary convergence indicator, i.e., the change of the energy (ΔE):
@@ -571,24 +573,25 @@ primary convergence indicator, i.e., the change of the energy (ΔE):
 ≡≡≡ Initialization Method(s) ≡≡≡
 
     SCFconfig(methods::NTuple{L, Symbol}, intervals::NTuple{L, T}, 
-              config::Dict{Int, <:AbstractVector{<:Pair}}=Dict(1=>Pair[]); 
-              secondaryConvRatio::Union{T, NTuple{2, T}}=$(defaultSecConvRatio), 
-              oscillateThreshold::T=$(defaultOscThreshold)) where {L, T<:AbstractFloat} -> 
+              config::$SCFKeywordArgDict=$EmptyDict{Int, Vector{ Pair{Symbol} }}(); 
+              secondaryConvRatio::Union{Real, NTuple{2, Real}}=
+              T.($defaultSecConvRatio), oscillateThreshold::Real=
+              T($defaultOscThreshold)) where {L, T<:AbstractFloat} -> 
     SCFconfig{T, L}
 
 `methods` and `intervals` are the convergence methods to be applied and their stopping 
 (or skipping) thresholds respectively. `config` specifies additional keyword argument(s) 
-for each methods by a `Pair` of which the key `i::Int` is for `i`th method and the pointed 
-`AbstractVector{<:Pair}` is the pairs of keyword arguments and their values respectively. 
-If `secondaryConvRatio` is `AbstractFloat`, it will be assigned as the value for all the 
-secondary convergence ratios.
+for each methods by a `Pair{Symbol}` of which the key `i::Int` is for `i`th method and the 
+pointed `AbstractVector{<:Pair}` is the pairs of keyword arguments and their values 
+respectively. If `secondaryConvRatio` is `AbstractFloat`, it will be assigned as the value 
+for all the secondary convergence ratios.
 
     SCFconfig(;threshold::AbstractFloat=$(defaultSCFconfigArgs[end][end]), 
-               secondaryConvRatio::Union{Real, NTuple{2, Real}}=$(defaultSecConvRatio), 
-               oscillateThreshold::Real=defaultOscThreshold) -> 
+              secondaryConvRatio::Union{Real, NTuple{2, Real}}=$defaultSecConvRatio, 
+              oscillateThreshold::Real=$defaultOscThreshold) -> 
     SCFconfig{$(defaultSCFconfigArgs[end]|>eltype), $(defaultSCFconfigArgs[begin]|>length)}
 
-`threshold` will update the stopping threshold of the default SCF configuration with a new 
+`threshold` will replace the stopping threshold of the default SCF configuration with a new 
 value.
 
 ≡≡≡ Example(s) ≡≡≡
@@ -623,11 +626,11 @@ struct SCFconfig{T<:Real, L, MS<:NTuple{L, Val}} <: ConfigBox
     end
 end
 
-SCFconfig(;threshold::AbstractFloat=defaultSCFconfigArgs[begin+1][end], 
+SCFconfig(;threshold::AbstractFloat=defaultSCFconfigArgs[end][end], 
           secondaryConvRatio::Union{Real, NTuple{2, Real}}=defaultSecConvRatio, 
           oscillateThreshold::Real=defaultOscThreshold) = 
 SCFconfig( defaultSCFconfigArgs[begin], 
-          (defaultSCFconfigArgs[begin+1][begin:end-1]..., Float64(threshold)); 
+          (defaultSCFconfigArgs[end][begin:end-1]..., Float64(threshold)); 
            secondaryConvRatio, oscillateThreshold )
 
 function getSCFcacheSizes(scfConfig::SCFconfig)
@@ -694,24 +697,21 @@ end
 
 """
 
-    HFfinalInfo{R<:Real, D, T<:RealOrComplex{R}, HFT, HFTS, B<:MultiOrbitalData{R, D, T}
-                } <: StateBox{T}
+    HFfinalInfo{R<:Real, D, T<:$RealOrComplex{R}, HFT<:$HartreeFockType, HFTS, 
+                B<:$MultiOrbitalData{R, D, T}} <: StateBox{T}
 
 The container of the final values after a Hartree–Fock SCF procedure. `HFTS` specifies the 
 number of distinct data sectors corresponding to the specified spin configurations. For 
 restricted closed-shell Hartree–Fock (RHF), `HFTS` is `1`.
 
-≡≡≡ Property Data ≡≡≡
-`@NamedTuple{spin::$OccupationState{2}, $NuclearCluster{R, T}}`: The spin and nuclear 
-configurations of the target system. `.spin` specifies numbers of electrons in two 
-orthonormal spin configurations (e.g., spin-up vs. spin-down). For any property data 
-(`::P`) enclosed in `NTuple{HFTS, P}` and `HFTS==2`, each element correspond to the respect 
-spin configuration.
+≡≡≡ Property/Properties ≡≡≡
+`@NamedTuple{spin::$OccupationState{2}, geometry::$NuclearCluster{R, T}}`: The spin and 
+nuclear-geometry configurations of the target system. `.spin` specifies numbers of 
+electrons in two orthonormal spin configurations (e.g., spin-up vs. spin-down). For any 
+property data (`::P`) enclosed in `NTuple{HFTS, P}` and `HFTS==2`, each element correspond 
+to one spin configuration.
 
-`geometry::NuclearCluster{R, D}`: The nuclear configurations (elements and locations)of the 
-target system.
-
-`energy::NTuple{2, T}`: The electronic and nuclear (repulsion potential) parts of the 
+`energy::NTuple{2, R}`: The electronic and nuclear (repulsion potential) parts of the 
 target system's ground-state energy under the Hartree–Fock and the Born–Oppenheimer 
 approximation.
 
@@ -721,10 +721,10 @@ approximation.
 
 `fock::NTuple{HFTS, $MatrixMemory{T}}`: Distinct Fock matrix/matrices.
 
-`occu::NTuple{HFTS, $MemoryPair{ T, NTuple{2, Bool} }}`: The spin occupations of distinct 
+`occu::NTuple{HFTS, $MemoryPair{ R, NTuple{2, Bool} }}`: The spin occupations of distinct 
 canonical (spatial) orbitals and their corresponding orbital energies.
 
-`memory::NTuple{HFTS, $HFtempInfo{R, T, HFT}}`: the intermediate values stored during the 
+`memory::NTuple{HFTS, $HFtempInfo{R, T, HFT}}`: the intermediate data stored during the 
 Hartree–Fock SCF (self-consistent field) interactions. (**NOTE:** The interface of 
 `$HFtempInfo` is internal and subject to **BREAKING CHANGES**.)
 
@@ -733,8 +733,8 @@ When convergence detection is off (see [`SCFconfig`](@ref)), it is set to `missi
 
 `basis::B`: The orbital basis-set data used for the Hartree–Fock SCF computation.
 """
-struct HFfinalInfo{R<:Real, D, T<:RealOrComplex{R}, HFT, HFTS, B<:MultiOrbitalData{R, D, T}
-                   } <: StateBox{T}
+struct HFfinalInfo{R<:Real, D, T<:RealOrComplex{R}, HFT<:HartreeFockType, HFTS, 
+                   B<:MultiOrbitalData{R, D, T}} <: StateBox{T}
     system::ElectronicSysConfig{R, D}
     energy::NTuple{2, R}
     coeff::NTuple{HFTS, MatrixMemory{T}}
@@ -766,23 +766,23 @@ end
 
 """
 
-    HFconfig{T1, HFT, F, T2, L, MS} <: ConfigBox
+    HFconfig{R<:Real, T<:$RealOrComplex{R}, HFT<:$HartreeFockType, 
+             CM<:$OrbCoeffInitialConfig{T, HFT}, SCFM<:$SCFconfig, S} <: $ConfigBox
 
-The container of Hartree–Fock method configuration.
+The container of a Hartree–Fock method's configuration.
 
-≡≡≡ Property Data ≡≡≡
+≡≡≡ Property/Properties ≡≡≡
 
-`HF::HFT`: Hartree–Fock method type. Available values of `HF` are 
-$CONSTVAR_HartreeFockTypes.
+`type::HFT`: Hartree–Fock method type. Available types are $CONSTVAR_HartreeFockTypes 
+$(getHartreeFockName.( map(x->x(), CONSTVAR_HartreeFockTypes) )).
 
-`C0::OrbCoeffInitialConfig{T1, HFT, F}`: Initial guess of the orbital coefficient matrix/matrices C of the 
-canonical orbitals. When `C0` is as an argument of `HFconfig`'s constructor, it can be set 
+`initial::CM`: Initial guess of the orbital coefficient matrix/matrices of the canonical 
+orbitals. When `initial` is as an argument of `HFconfig`'s constructor, it can be set 
 to `sym::Symbol` where available values of `sym` are 
-`$(CONSTVAR_OrbCoeffInitializationMethods.|>evalTypedData)`; it can also be a `Tuple` of 
-prepared orbital coefficient matrix/matrices for the corresponding Hartree–Fock method type.
+`$(CONSTVAR_OrbCoeffInitializationMethods.|>evalTypedData)`.
 
-`SCF::SCFconfig{T2, L, MS}`: SCF iteration configuration. For more information please refer 
-to [`SCFconfig`](@ref).
+`strategy::SCFM`: SCF iteration strategy. For more information please refer to 
+[`SCFconfig`](@ref).
 
 `maxStep::Int`: Maximum iteration steps allowed regardless if the iteration converges.
 
@@ -793,7 +793,7 @@ when its performance becomes unstable or poor.
 information from all the iterations steps to the field `.temp` of the output 
 [`HFfinalInfo`](@ref) of `runHartreeFock`. The types of relevant information are:
 
-| Sequence | Information | Corresponding field in [`HFtempInfo`](@ref) |
+| Sequence | Information | Corresponding field in `HFtempInfo` (subject to **CHANGES**) |
 |  :---:   |    :---:    |                   :---:                     |
 | 1 | orbital coefficient matrix/matrices      | `.Cs`                       |
 | 2 | density matrix/matrices                  | `.Ds`, `.shared.Dtots`      |
@@ -803,19 +803,17 @@ information from all the iterations steps to the field `.temp` of the output
 ≡≡≡ Initialization Method(s) ≡≡≡
 
     HFconfig(::Type{T}, type::HFT=$RCHartreeFock(); 
-             initial::OrbCoeffInitialConfig{T, HFT}=$OrbCoeffInitialConfig(type, T), 
-             strategy::SCFM=$SCFconfig(), orthonormalization::Symbol=:Symmetric, 
+             initial::Union{$OrbCoeffInitialConfig{T}, Symbol}=:SAD, 
+             strategy::$SCFconfig=SCFconfig(), 
              maxStep::Int=$defaultHFmaxStep, earlyStop::Bool=true, 
              saveTrace::NTuple{4, Bool}=$defaultHFsaveTrace) where 
-             {T<:$RealOrComplex, HFT<:$HartreeFockType} -> 
-    HFconfig
+            {R, T<:RealOrComplex{R}, HFT<:$HartreeFockType} -> 
+    HFconfig{R, T, HFT}
 
 ≡≡≡ Initialization Example(s) ≡≡≡
 
 ```jldoctest; setup = :(push!(LOAD_PATH, "../../src/"); using Quiqbox)
-julia> HFconfig();
-
-julia> HFconfig(HF=:UHF);
+julia> HFconfig(Float64, UOHartreeFock());
 ```
 """
 mutable struct HFconfig{R<:Real, T<:RealOrComplex{R}, HFT<:HartreeFockType, 
@@ -824,7 +822,7 @@ mutable struct HFconfig{R<:Real, T<:RealOrComplex{R}, HFT<:HartreeFockType,
     type::HFT
     initial::CM
     strategy::SCFM
-    orthonormalization::Val{S}
+    orthonormalization::Val{S} #! Need to be able to use it in the future
     maxStep::Int
     earlyStop::Bool
     saveTrace::NTuple{4, Bool}
@@ -851,28 +849,57 @@ function HFconfig(::Type{T}, type::HFT=RCHartreeFock();
 end
 
 
+const ElectronSpinConfig = Union{NTuple{2, Int}, OccupationState{2}}
+
 """
 
-    runHartreeFock(nucInfo::NuclearCluster{R, D}, basis::OrbBasisData{R, D, T}, 
-                   config::MissingOr{HFconfig{R}}=missing; 
-                   printInfo::Bool=true, infoLevel::Int=defaultHFinfoL) where 
-                  {R<:Real, D, T<:RealOrComplex{R}} -> 
-    HFfinalInfo{R, D, T}
+    runHartreeFock(nucInfo::$NuclearCluster{R, D}, basis::$OrbBasisData{R, D}, 
+                   config::MissingOr{$HFconfig{R}}=missing; 
+                   printInfo::Bool=true, infoLevel::Int=$defaultHFinfoLevel) where 
+                  {R<:Real, D} -> 
+    HFfinalInfo{R, D}
 
+    runHartreeFock(systemInfo::Pair{<:$ElectronSpinConfig, $NuclearCluster{R, D}}, 
+                   basis::$OrbBasisData{R, D}, config::MissingOr{$HFconfig{R}}=missing; 
+                   printInfo::Bool=true, infoLevel::Int=$defaultHFinfoLevel) where 
+                  {R<:Real, D} -> 
+    HFfinalInfo{R, D}
+
+Main function to run a Hartree–Fock method in Quiqbox. The returned result and relevant 
+information is stored in a [`Quiqbox.HFfinalVars`](@ref).
+
+≡≡≡ Positional argument(s) ≡≡≡
+`nucInfo::NuclearCluster{R, D}`: the nuclear geometry of the system. When `nucInfo` is the 
+first argument the spin configuration is automatically set such that the target system is 
+charge neutral and maximizing pairing electron spins.
+
+`systemInfoPair{<:$ElectronSpinConfig, $NuclearCluster{R, D}}`: A `Pair` information used 
+to specify both the spin and nuclear-geometry configuration of the target system.
+
+`basis::$OrbBasisData{R, D}`: The orbital basis-set configuration.
+
+`config::HFconfig`: The Configuration of the Hartree–Fock method. For more information 
+please refer to [`HFconfig`](@ref).
+
+≡≡≡ Keyword argument(s) ≡≡≡
+
+`printInfo::Bool`: Whether print out the information of iteration steps and result.
+
+`infoLevel::Int`: Printed info's level of details when `printInfo=true`. The higher 
+(the absolute value of) `infoLevel` is, more intermediate steps will be printed. Once 
+`infoLevel` achieve `$FullHFStepLevel`, every step will be printed.
 """
 function runHartreeFock(nucInfo::NuclearCluster{R, D}, basis::OrbBasisData{R, D}, 
                         config::MissingOr{HFconfig{R}}=missing; 
-                        printInfo::Bool=true, infoLevel::Int=defaultHFinfoL) where 
+                        printInfo::Bool=true, infoLevel::Int=defaultHFinfoLevel) where 
                        {R<:Real, D}
     spinInfo = prepareSpinConfiguration(nucInfo)
     runHartreeFock(spinInfo=>nucInfo, basis, config; printInfo, infoLevel)
 end
 
-const ElectronSpinConfig = Union{NTuple{2, Int}, OccupationState{2}}
-
 function runHartreeFock(systemInfo::Pair{<:ElectronSpinConfig, NuclearCluster{R, D}}, 
                         basis::OrbBasisData{R, D}, config::MissingOr{HFconfig{R}}=missing; 
-                        printInfo::Bool=true, infoLevel::Int=defaultHFinfoL) where 
+                        printInfo::Bool=true, infoLevel::Int=defaultHFinfoLevel) where 
                        {R<:Real, D}
     spinInfo, nucInfo = systemInfo
     spinInfo isa Tuple && (spinInfo = OccupationState(spinInfo))
@@ -883,7 +910,7 @@ end
 
 function runHartreeFock(systemInfo::ElectronicSysConfig{R, D}, basis::OrbBasisData{R, D}, 
                         config::MissingOr{HFconfig{R}}=missing; 
-                        printInfo::Bool=false, infoLevel::Int=defaultHFinfoL) where 
+                        printInfo::Bool=false, infoLevel::Int=defaultHFinfoLevel) where 
                        {R<:Real, D}
     basisData = basis isa AbstractVector ? MultiOrbitalData(basis, True()) : basis
     outType = getOutputType(basisData)
@@ -965,7 +992,7 @@ function runHartreeFockCore(configCore::Pair{HFT, <:SCFconfig{<:Real, L, MS}},
                             earlyStop::Bool, 
                             saveTrace::NTuple{4, Bool}, 
                             printInfo::Bool=false, 
-                            infoLevel::Int=defaultHFinfoL) where 
+                            infoLevel::Int=defaultHFinfoLevel) where 
                            {HFT<:HartreeFockType, R<:Real, T<:RealOrComplex{R}, L, MS}
     scfConfig = configCore.second
     timerBool = printInfo && infoLevel > 2
