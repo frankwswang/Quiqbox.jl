@@ -1,4 +1,4 @@
-export EncodedField, GaussFunc, AxialProduct, PolyRadialFunc
+export EncodedField, GaussFunc, AxialProdField, PolyRadialFunc
 
 using LinearAlgebra: norm as generalNorm
 
@@ -318,13 +318,13 @@ function unpackFieldFunc(f::F, directUnpack::Boolean=False()) where
 end
 
 
-const AxialProduct{C<:RealOrComplex, D, B<:NTuple{D, FieldAmplitude{C, 1}}} = 
+const AxialProdField{C<:RealOrComplex, D, B<:NTuple{D, FieldAmplitude{C, 1}}} = 
       ProductField{C, D, B}
 
-AxialProduct(bases::NonEmptyTuple{FieldAmplitude{C, 1}}) where {C<:RealOrComplex} = 
+AxialProdField(bases::NonEmptyTuple{FieldAmplitude{C, 1}}) where {C<:RealOrComplex} = 
 ProductField(bases)
 
-function AxialProduct(basis::FieldAmplitude{C, 1}, ::Count{D}) where {C<:RealOrComplex, D}
+function AxialProdField(basis::FieldAmplitude{C, 1}, ::Count{D}) where {C<:RealOrComplex, D}
     checkPositivity(D)
     ProductField(ntuple( _->basis, Val(D) ))
 end

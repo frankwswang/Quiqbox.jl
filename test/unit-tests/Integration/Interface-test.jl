@@ -51,7 +51,7 @@ cgf3 = genGaussTypeOrb(cen1, xpns1, cons1, (3, 0, 0))
 nucs1 = [:H, :Li]
 coords1 = [(-0.7, 0., 0.), (0.7, 0., 0.)]
 
-@test neAttractions(nucs1, coords1, bfs1) + eKinetics(bfs1) == 
+@test nucAttractions(nucs1, coords1, bfs1) + elecKinetics(bfs1) == 
       coreHamiltonian(nucs1, coords1, bfs1)
 
 end

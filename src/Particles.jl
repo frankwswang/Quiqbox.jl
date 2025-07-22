@@ -134,7 +134,7 @@ function prepareSpinConfiguration(nucInfo::NuclearCluster{T, D},
 end
 
 
-function nuclearRepulsion(nuc::LinearSequence{Symbol}, 
+function nucRepulsion(nuc::LinearSequence{Symbol}, 
                           nucCoords::LinearSequence{NonEmptyTuple{T, D}}
                           ) where {T<:Real, D}
     res = T(0)
@@ -144,7 +144,7 @@ function nuclearRepulsion(nuc::LinearSequence{Symbol},
     res
 end
 
-function nuclearRepulsion(nucInfo::NuclearCluster)
+function nucRepulsion(nucInfo::NuclearCluster)
     layout = nucInfo.layout
-    nuclearRepulsion(layout.left, layout.right)
+    nucRepulsion(layout.left, layout.right)
 end

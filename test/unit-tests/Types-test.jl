@@ -48,7 +48,7 @@ end
 
 @test Quiqbox.GaussFieldFunc <: Quiqbox.FieldParamFunc
 
-@test Quiqbox.AxialProduct{<:Quiqbox.RealOrComplex, 1} <: Quiqbox.ProductField
+@test Quiqbox.AxialProdField{<:Quiqbox.RealOrComplex, 1} <: Quiqbox.ProductField
 
 @test Quiqbox.CartAngMomentum <: Quiqbox.NullaryField
 

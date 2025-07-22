@@ -18,7 +18,7 @@ bs = reduce(vcat, genGaussTypeOrbSeq.(nucCoords, nuc, "STO-3G"))
 S = overlaps(bs)
 X = S^(-0.5)
 Hcore = coreHamiltonian(nuc, nucCoords, bs)
-HeeI = eeInteractions(bs)
+HeeI = elecRepulsions(bs)
 spinInfo = Quiqbox.prepareSpinConfiguration(nucInfo)
 nElec = Quiqbox.getTotalOccupation(spinInfo)
 spinSectorPair = (nElec÷2, nElec-nElec÷2)
@@ -76,7 +76,7 @@ end
 
 @test begin
     tVars1 = deepcopy(res1.memory[1])
-    Quiqbox.popHFtempVars!((tVars1,))
+    Quiqbox.popHFtempInfo!((tVars1,))
     push!(tVars1.Cs, res1.memory[1].Cs[end])
     push!(tVars1.Fs, res1.memory[1].Fs[end])
     push!(tVars1.Ds, res1.memory[1].Ds[end])
@@ -131,7 +131,7 @@ D1 = res1.density[begin]
 
 @test begin
     tVars2 = deepcopy(res2.memory)
-    Quiqbox.popHFtempVars!(tVars2)
+    Quiqbox.popHFtempInfo!(tVars2)
     push!(tVars2[1].Cs, res2.memory[1].Cs[end])
     push!(tVars2[1].Fs, res2.memory[1].Fs[end])
     push!(tVars2[1].Ds, res2.memory[1].Ds[end])

@@ -89,26 +89,26 @@ bf5 = genGaussTypeOrb((0.6, 0.7, 0.8), 3.0, (3, 1, 2))
 
 nucs1 = [:He, :H]
 coords1 = [(0., 0., 0.), (0., 0., 0.)]
-V1 = neAttractions(nucs1, coords1, [bf1, bf2])
-@test V1[2] == V1[3] == neAttraction(nucs1, coords1, bf1, bf2) == 
+V1 = nucAttractions(nucs1, coords1, [bf1, bf2])
+@test V1[2] == V1[3] == nucAttraction(nucs1, coords1, bf1, bf2) == 
       -3computePGTOrbOneBodyRepulsion!(emptyCache, coord, gtoProd12)
-@test V1[1] == neAttraction(nucs1, coords1, bf1, bf1) == 
+@test V1[1] == nucAttraction(nucs1, coords1, bf1, bf1) == 
       -3computePGTOrbOneBodyRepulsion!(emptyCache, coord, gtoProd11)
-@test V1[4] == neAttraction(nucs1, coords1, bf2, bf2) == 
+@test V1[4] == nucAttraction(nucs1, coords1, bf2, bf2) == 
       -3computePGTOrbOneBodyRepulsion!(emptyCache, coord, gtoProd22)
 
-ERI1 = eeInteractions([bf1, bf3, bf4, bf5])
+ERI1 = elecRepulsions([bf1, bf3, bf4, bf5])
 @test ERI1[1, 2, 3, 4] == 
-      eeInteraction(bf1, bf3, bf4, bf5) ≈ 
-      eeInteraction(bf1, bf3, bf5, bf4) ≈ 
-      eeInteraction(bf3, bf1, bf5, bf4) ≈ 
-      eeInteraction(bf3, bf1, bf4, bf5) ≈ 
-      eeInteraction(bf4, bf5, bf1, bf3) ≈ 
-      eeInteraction(bf4, bf5, bf3, bf1) ≈ 
-      eeInteraction(bf5, bf4, bf3, bf1) ≈ 
-      eeInteraction(bf5, bf4, bf1, bf3) ≈ 
+      elecRepulsion(bf1, bf3, bf4, bf5) ≈ 
+      elecRepulsion(bf1, bf3, bf5, bf4) ≈ 
+      elecRepulsion(bf3, bf1, bf5, bf4) ≈ 
+      elecRepulsion(bf3, bf1, bf4, bf5) ≈ 
+      elecRepulsion(bf4, bf5, bf1, bf3) ≈ 
+      elecRepulsion(bf4, bf5, bf3, bf1) ≈ 
+      elecRepulsion(bf5, bf4, bf3, bf1) ≈ 
+      elecRepulsion(bf5, bf4, bf1, bf3) ≈ 
       computePGTOrbTwoBodyRepulsion!(emptyCache, gtoProd14, gtoProd78)
-@test ERI1[1] == eeInteraction(bf1, bf1, bf1, bf1) == 
+@test ERI1[1] == elecRepulsion(bf1, bf1, bf1, bf1) == 
       computePGTOrbTwoBodyRepulsion!(emptyCache, gtoProd11, gtoProd11)
 
 
@@ -133,7 +133,7 @@ bsLiH = [bfH, bfLi1, bfLi2, bfLi3, bfLi4, bfLi5]
 nucs2 = [:H, :Li]
 coords2 = [(0., 0., 0.), (1.4, 0., 0.)]
 
-V2 = neAttractions(nucs2, coords2, bsLiH)
+V2 = nucAttractions(nucs2, coords2, bsLiH)
 @test all(vec(V2) .≈ [-3.1880952107948826, -1.9932525008344286, -1.4155676040098832, 
                        1.2630060649812684, 0.0, 0.0, -1.9932525008344286, -8.6953599854861, 
                       -1.1279531550756718, 0.05959228438098337, 0.0, 0.0, 
@@ -142,7 +142,7 @@ V2 = neAttractions(nucs2, coords2, bsLiH)
                        0.05959228438098337, 0.1297201051017447, -1.637219301724801, 0.0, 
                        0.0, 0.0, 0.0, 0.0, 0.0, -1.546580055447794, 0.0, 0.0, 0.0, 0.0, 
                        0.0, 0.0, -1.546580055447794])
-ERI2 = eeInteractions(bsLiH)
+ERI2 = elecRepulsions(bsLiH)
 for n in 1:Quiqbox.symmetric4DArrEleNum(bsLiH|>length)
     i, j, k, l = Quiqbox.convertIndex1DtoTri4D(n)
     @test ERI2[i, j, k, l] == ERI2[i, j, l, k] == ERI2[j, i, l, k] == ERI2[j, i, k, l] == 
@@ -155,30 +155,30 @@ gtf1 = Quiqbox.EncodedField(gtfCore1, Count(1))
 gto1 = Quiqbox.PolyRadialFunc(gtf1, (1, 1, 0))
 bf2t = Quiqbox.PrimitiveOrb((0.1, 0.2, 0.3), gto1)
 
-V3 = neAttractions(nucs2, coords2, [bf2t, bfH])
-@test all(isapprox.(neAttractions(nucs2, coords2, [bf2, bfH]), V3, atol=5e-8))
-@test neAttraction(nucs2, coords2, bf2t, bfH) ≈ neAttraction(nucs2, coords2, bfH, bf2t)
+V3 = nucAttractions(nucs2, coords2, [bf2t, bfH])
+@test all(isapprox.(nucAttractions(nucs2, coords2, [bf2, bfH]), V3, atol=5e-8))
+@test nucAttraction(nucs2, coords2, bf2t, bfH) ≈ nucAttraction(nucs2, coords2, bfH, bf2t)
 
 bf1D1 = Quiqbox.PrimitiveOrb((0.3,), gtf1)
 bf1D2 = genGaussTypeOrb((0.2,), [2.0, 1.5], [1.1, 2.2], (2,))
-ERI3 = eeInteractions([bf1D1, bf1D2])
+ERI3 = elecRepulsions([bf1D1, bf1D2])
 
 @test ERI3[1, 2, 1, 2] ≈ 
-      eeInteraction(bf1D1, bf1D2, bf1D1, bf1D2) ≈ 
-      eeInteraction(bf1D1, bf1D2, bf1D2, bf1D1) ≈ 
-      eeInteraction(bf1D2, bf1D1, bf1D1, bf1D2) ≈ 
-      eeInteraction(bf1D2, bf1D1, bf1D2, bf1D1)
+      elecRepulsion(bf1D1, bf1D2, bf1D1, bf1D2) ≈ 
+      elecRepulsion(bf1D1, bf1D2, bf1D2, bf1D1) ≈ 
+      elecRepulsion(bf1D2, bf1D1, bf1D1, bf1D2) ≈ 
+      elecRepulsion(bf1D2, bf1D1, bf1D2, bf1D1)
 
 @test ERI3[1, 1, 1, 2] ≈ 
-      eeInteraction(bf1D1, bf1D1, bf1D1, bf1D2) ≈ 
-      eeInteraction(bf1D1, bf1D1, bf1D2, bf1D1) ≈ 
-      eeInteraction(bf1D1, bf1D2, bf1D1, bf1D1) ≈ 
-      eeInteraction(bf1D2, bf1D1, bf1D1, bf1D1)
+      elecRepulsion(bf1D1, bf1D1, bf1D1, bf1D2) ≈ 
+      elecRepulsion(bf1D1, bf1D1, bf1D2, bf1D1) ≈ 
+      elecRepulsion(bf1D1, bf1D2, bf1D1, bf1D1) ≈ 
+      elecRepulsion(bf1D2, bf1D1, bf1D1, bf1D1)
 
 @test ERI3[2, 2, 2, 1] ≈
-      eeInteraction(bf1D2, bf1D2, bf1D2, bf1D1) ≈ 
-      eeInteraction(bf1D2, bf1D2, bf1D1, bf1D2) ≈ 
-      eeInteraction(bf1D2, bf1D1, bf1D2, bf1D2) ≈ 
-      eeInteraction(bf1D1, bf1D2, bf1D2, bf1D2)
+      elecRepulsion(bf1D2, bf1D2, bf1D2, bf1D1) ≈ 
+      elecRepulsion(bf1D2, bf1D2, bf1D1, bf1D2) ≈ 
+      elecRepulsion(bf1D2, bf1D1, bf1D2, bf1D2) ≈ 
+      elecRepulsion(bf1D1, bf1D2, bf1D2, bf1D2)
 
 end
