@@ -913,7 +913,7 @@ end
 
 struct ExpandShift{T, N, F<:Function} <: TypedTensorFunc{T, N}
     apply::TypedExpand{T, N, F}
-    shift::ShapedMemory{T, N}
+    shift::DirectMemory{T, N}
 end
 
 (f::ExpandShift)(args...) = unitOp(+, f.apply(args...), f.shift)
