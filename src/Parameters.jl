@@ -711,16 +711,16 @@ end
 (pn::ParamBox)() = obtain(pn)
 
 
-function setVal!(par::TensorVar, val)
-    if !isPrimitiveInput(par)
-        throw(AssertionError("`isPrimitiveInput(par)` must return `true`."))
+function setVal!(par::TensorVar, val, modifyFrozenVariable::Bool=false)
+    if !(modifyFrozenVariable && isFrozenVariable(par)) && !isPrimitiveInput(par)
+        throw(AssertionError("Cannot assign a new value directly to `par`."))
     end
     safelySetVal!(par.data, val)
 end
 
-function setVal!(par::AdaptableParam, val)
-    if !isPrimitiveInput(par)
-        throw(AssertionError("`isPrimitiveInput(par)` must return `true`."))
+function setVal!(par::AdaptableParam, val, modifyFrozenVariable::Bool=false)
+    if !(modifyFrozenVariable && isFrozenVariable(par)) && !isPrimitiveInput(par)
+        throw(AssertionError("Cannot assign a new value directly to `par`."))
     end
     safelySetVal!(par.offset, val)
 end
