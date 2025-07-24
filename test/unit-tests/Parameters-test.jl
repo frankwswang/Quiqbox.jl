@@ -406,6 +406,8 @@ pm1 = genMeshParam(f5, (k1, k2), :pn)
 @test try genCellParam(f5, (k1, k2), :pn); catch; true end
 pm1Val = obtain(pm1)
 @test  pm1Val == obtain(pm1) == f5(k1(), k2())
+@test !isdefined(pm1, :offset)
+Quiqbox.ParamMarker(pm1) #> Check if `ParamMarker` can be property instantiated
 
 inSet_pm1, _, outSet_pm1, isoSet_pm1 = dissectParam(pm1)
 @test inSet_pm1.grid == [k1, k2]
