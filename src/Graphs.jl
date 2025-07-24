@@ -312,10 +312,11 @@ function selectUpstreamVertex(graph::SpanLayerGraph, trait::VertexTrait, index::
     vertex
 end
 
-#> Vertex caller that effectively returns a pre-stored value no longer reference its source
+#> Vertex caller that effectively returns a pre-stored value will still reference its source
+#> if the source is a container-type data like `AbstractArray`
 function genVertexCaller(vertex::TensorVertex)
     value = getVertexValue(vertex)
-    SelectHeader{1, 0}(Storage( copy(value), (nameof∘typeof)(vertex) ))
+    SelectHeader{1, 0}(Storage( value, (nameof∘typeof)(vertex) ))
 end
 
 function genVertexCaller(idx::OneToIndex, vertex::TensorVertex)
