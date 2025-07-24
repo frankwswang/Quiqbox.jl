@@ -711,16 +711,16 @@ end
 (pn::ParamBox)() = obtain(pn)
 
 
-function setVal!(par::TensorVar, val)
-    if !isPrimitiveInput(par)
-        throw(AssertionError("`isPrimitiveInput(par)` must return `true`."))
+function setVal!(par::TensorVar, val, modifyFrozenVariable::Bool=false)
+    if !(modifyFrozenVariable && isFrozenVariable(par)) && !isPrimitiveInput(par)
+        throw(AssertionError("Cannot assign a new value directly to `par`."))
     end
     safelySetVal!(par.data, val)
 end
 
-function setVal!(par::AdaptableParam, val)
-    if !isPrimitiveInput(par)
-        throw(AssertionError("`isPrimitiveInput(par)` must return `true`."))
+function setVal!(par::AdaptableParam, val, modifyFrozenVariable::Bool=false)
+    if !(modifyFrozenVariable && isFrozenVariable(par)) && !isPrimitiveInput(par)
+        throw(AssertionError("Cannot assign a new value directly to `par`."))
     end
     safelySetVal!(par.offset, val)
 end
@@ -913,7 +913,7 @@ end
 
 struct ExpandShift{T, N, F<:Function} <: TypedTensorFunc{T, N}
     apply::TypedExpand{T, N, F}
-    shift::ShapedMemory{T, N}
+    shift::DirectMemory{T, N}
 end
 
 (f::ExpandShift)(args...) = unitOp(+, f.apply(args...), f.shift)

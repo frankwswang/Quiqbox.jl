@@ -1,6 +1,6 @@
 using Test
 using Quiqbox
-using Quiqbox: OneToIndex, markObj, MemoryPair
+using Quiqbox: OneToIndex, markObj, MemoryPair, AtomicUnit, AtomicGrid, Identifier
 
 @testset "Query.jl" begin
 
@@ -52,5 +52,17 @@ for ((i, j), pair) in zip(zip(a, c), mp1)
     bl *= ((i => j) === pair)
 end
 @test bl
+
+u1 = AtomicUnit(1)
+u2 = AtomicUnit(1)
+@test u1 == u2 && u1 !== u2
+@test Identifier(u1) != Identifier(u2)
+@test markObj(u1) == markObj(u2)
+
+g1 = AtomicGrid( Quiqbox.genMemory([1])   )
+g2 = AtomicGrid( Quiqbox.genMemory([1.0]) )
+@test g1 == g2 && g1 !== g2
+@test Identifier(g1) != Identifier(g2)
+@test markObj(g1) == markObj(g2)
 
 end
