@@ -63,7 +63,8 @@ struct PairBundle{N, J<:Function, F<:NTuple{ 2, DirectOperator{N} }} <: DirectOp
     dresser::F
 end
 
-const Summator{N, F<:NTuple{ 2, DirectOperator{N} }} = PairBundle{N, typeof(+), F}
+const Summator{N, FL<:DirectOperator{N}, FR<:DirectOperator{N}} = 
+      PairBundle{N, typeof(+), Tuple{FL, FR}}
 
 Summator(op1::DirectOperator{N}, op2::DirectOperator{N}) where {N} = 
 PairBundle(+, (op1, op2))::Summator{N}
