@@ -28,9 +28,12 @@ end
 
 @test   Quiqbox.ScreenParam <: Quiqbox.ReduceParam
 @test !(Quiqbox.ReduceParam <: Quiqbox.ScreenParam)
+@test   Quiqbox.DirectParam <: Quiqbox.ScreenParam
 
 @test   Quiqbox.NestFixedParIn <: Quiqbox.CoreFixedParIn
 @test !(Quiqbox.CoreFixedParIn <: Quiqbox.NestFixedParIn)
+
+@test Quiqbox.DirectParamArr <: Quiqbox.ParamBoxAbtArr
 
 @test Quiqbox.PrimGTO <: Quiqbox.PrimitiveOrb
 
