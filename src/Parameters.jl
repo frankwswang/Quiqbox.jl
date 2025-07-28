@@ -960,35 +960,99 @@ end
 
 const DirectParamArr{P<:DirectParam, N} = AbstractArray{P, N}
 
+function dissectParamCore(pars::ParamBoxAbtArr{P}) where {T, P<:TensorVar{T}}
+    source = initializeSpanParamSet(T)
+    hidden = genBottomMemory()
+    output = genBottomMemory()
+    direct = genMemory(pars)
+
+    (source=source, hidden=hidden, output=output, direct=direct)
+end
+
+function dissectParamCore(pars::ParamBoxAbtArr{P}) where {T, P<:DirectParam{T}}
+    register = IdSet{ParamBox{T}}()
+    source = initializeSpanParamSet(T)
+    nParamMax = length(pars)
+    output = Memory{P}(undef, nParamMax)
+    direct = Memory{P}(undef, nParamMax)
+
+    nOutput = 0
+    nDirect = 0
+
+    for param in pars
+        if !(param in register)
+            push!(register, param)
+            if screenLevelOf(param) == 0
+                nOutput += 1
+                output[begin+nOutput-1] = param
+                parInput, = param.input
+                if !(parInput in register)
+                    push!(register, parInput)
+                    level = getNestedLevel(parInput|>typeof).level
+                    container = ifelse(level==0, first, last)(source)
+                    push!(container, parInput)
+                end
+            else
+                nDirect += 1
+                direct[begin+nDirect-1] = param
+            end
+        end
+    end
+
+    outputFinal = output[begin : begin+nOutput-1]
+    directFinal = direct[begin : begin+nDirect-1]
+    (source=source, hidden=genBottomMemory(), output=outputFinal, direct=directFinal)
+end
+
+function dissectParamCore(pars::ParamBoxAbtArr{P}) where {T, P<:ParamBox{T}}
+    dissectTypedParams(T, pars)
+end
 
 function dissectParamCore(pars::ParamBoxAbtArr)
+    dissectTypedParams(Any, pars)
+end
+
+function dissectTypedParams(::Type{T}, pars::ParamBoxAbtArr{P}) where {T, P<:ParamBox{<:T}}
     finalizer = ParamBoxClassifier()
 
     for par in pars
         checkParamCycle(par; finalizer)
     end
 
-    source = initializeSpanParamSet()
-    hidden = ParamBox[]
-    output = ParamBox[]
-    direct = ParamBox[]
+    source = initializeSpanParamSet(T)
+    paramType = genParametricType(ParamBox, (;T))
+    hidden = paramType[]
+    nMax = length(pars)
+    output = Memory{P}(undef, nMax)
+    direct = Memory{P}(undef, nMax)
 
-    for (dest1, dest2, sector) in ( (source, direct, finalizer.holder), 
-                                    (hidden, output, finalizer.linker) )
+    nDirect, nOutput = map(( (source, direct, finalizer.holder), 
+                             (hidden, output, finalizer.linker) )) do (dest1, dest2, sector)
+        counter = 0
+
         for pair in sector
             param = pair.first
-            dest = ifelse(pair.second[], dest1, dest2)
+            isUpstream = pair.second[]
+            dest = ifelse(isUpstream, dest1, dest2)
             if dest isa TypedSpanParamSet
                 level = getNestedLevel(param|>typeof).level
                 container = ifelse(level==0, first, last)(dest)
                 push!(container, param)
+            elseif !isUpstream
+                counter += 1
+                dest[begin+counter-1] = param
             else
                 push!(dest, param)
             end
         end
+
+        counter
     end
 
-    (source=source, hidden=hidden, output=output, direct=direct)
+    hiddenFinal = Memory{paramType}(hidden)
+    outputFinal = output[begin : begin+nOutput-1]
+    directFinal = direct[begin : begin+nDirect-1]
+    (source=source, hidden=hiddenFinal, output=outputFinal, direct=directFinal)
 end
 
 dissectParam(params::ParamBoxAbtArr) = (dissectParamCore∘unique)(ParamEgalBox, params)
