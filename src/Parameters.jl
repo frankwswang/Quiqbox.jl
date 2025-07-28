@@ -419,7 +419,7 @@ mutable struct ReduceParam{T, E<:Pack{T}, F<:Function, I<:CoreFixedParIn} <: Cel
 end
 
 const ScreenParam{T, E<:Pack{T}, P<:ParamBox{T, E}} = ReduceParam{T, E, ItsType, Tuple{P}}
-const DirectParam{T, E<:Span{T}, P<:PrimitiveParam{T, E}} = ScreenParam{T, E, P}
+const SimpleParam{T, E<:Span{T}, P<:PrimitiveParam{T, E}} = ScreenParam{T, E, P}
 
 function genCellParam(func::Function, input::CoreFixedParIn, marker::SymOrIndexedSym)
     lambda = formatTensorFunc(func, TypedReduce, input)
@@ -956,8 +956,6 @@ function (f::ParamBoxClassifier{P})(edge::Pair{<:P, <:NothingOr{P}}) where {P<:P
     nothing
 end
 
-const DirectParamArr{P<:DirectParam, N} = AbstractArray{P, N}
-
 function dissectParamCore(pars::ParamBoxAbtArr{P}) where {T, P<:TensorVar{T}}
     source = initializeSpanParamSet(T)
     hidden = genBottomMemory()
@@ -967,7 +965,7 @@ function dissectParamCore(pars::ParamBoxAbtArr{P}) where {T, P<:TensorVar{T}}
     (source=source, hidden=hidden, output=output, direct=direct)
 end
 
-function dissectParamCore(pars::ParamBoxAbtArr{P}) where {T, P<:DirectParam{T}}
+function dissectParamCore(pars::ParamBoxAbtArr{P}) where {T, P<:SimpleParam{T}}
     register = IdSet{ParamBox{T}}()
     source = initializeSpanParamSet(T)
     nParamMax = length(pars)
