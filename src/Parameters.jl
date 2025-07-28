@@ -588,14 +588,14 @@ const NestParamEgalBox = EgalBox{NestParam}
 
 function hasCycleCore!(::Set{ParamEgalBox}, ::Set{ParamEgalBox}, 
                        edge::Pair{<:PrimitiveParam, <:NothingOr{ParamBox}}, 
-                       ::Bool, finalizer::F=itself) where {F<:Function}
+                       ::Bool, finalizer::F=itself) where {F}
     finalizer(edge)
     (false, edge.first)
 end
 
 function hasCycleCore!(localTrace::Set{ParamEgalBox}, history::Set{ParamEgalBox}, 
                        edge::Pair{<:CompositeParam, <:NothingOr{ParamBox}}, 
-                       strictMode::Bool, finalizer::F=itself) where {F<:Function}
+                       strictMode::Bool, finalizer::F=itself) where {F}
     here = edge.first
 
     if strictMode || screenLevelOf(here) == 0
@@ -623,8 +623,8 @@ function hasCycleCore!(localTrace::Set{ParamEgalBox}, history::Set{ParamEgalBox}
     (false, here)
 end
 
-function hasCycle(param::ParamBox; strictMode::Bool=true, finalizer::Function=itself, 
-                  catcher::Array{ParamBox, 0}=Array{ParamBox, 0}( undef, () ))
+function hasCycle(param::ParamBox, finalizer::F=itself; strictMode::Bool=true, 
+                  catcher::Array{ParamBox, 0}=Array{ParamBox, 0}( undef, () )) where {F}
     localTrace = Set{ParamEgalBox}()
     parHistory = Set{ParamEgalBox}()
     bl, lastP = hasCycleCore!(localTrace, parHistory, param=>nothing, strictMode, finalizer)
@@ -675,9 +675,9 @@ function obtainCore!(cache::ParamDataCache, param::AdaptableParam)
     end::getOutputType(param)
 end
 
-function checkParamCycle(param::ParamBox; strictMode=false, finalizer::Function=itself)
+function checkParamCycle(param::ParamBox, finalizer::F=itself; strictMode=false) where {F}
     catcher = Array{ParamBox, 0}(undef, ())
-    if hasCycle(param; strictMode, finalizer, catcher)
+    if hasCycle(param, finalizer; strictMode, catcher)
         throw(AssertionError("`param`:\n    $param\n\n"*"has a reachable cycle at:\n    "*
                              "$(catcher[])"))
     end
@@ -935,18 +935,16 @@ function extractTransform(pb::ShapedParam)
     TypedReturn(itself, getOutputType(pb))
 end
 
-struct ParamBoxClassifier <: StatefulFunction{ParamBox}
-    holder::Vector{Pair{ <:ParamBox, Array{Bool, 0} }}
-    linker::Vector{Pair{ <:ParamBox, Array{Bool, 0} }}
-    history::IdDict{ParamBox, Int}
+struct ParamBoxClassifier{P<:ParamBox} <: QueryBox{Pair{P, Array{Bool, 0} }}
+    holder::Vector{Pair{P, Array{Bool, 0} }}
+    linker::Vector{Pair{P, Array{Bool, 0} }}
+    history::IdDict{P, Int}
 
-    function ParamBoxClassifier()
-        new(Pair{<:ParamBox, Array{Bool, 0}}[], Pair{<:ParamBox, Array{Bool, 0}}[], 
-            IdDict{ParamBox, Int}())
-    end
+    ParamBoxClassifier(::Type{P}) where {P<:ParamBox} = 
+    new{P}(Pair{P, Array{Bool, 0}}[], Pair{P, Array{Bool, 0}}[], IdDict{P, Int}())
 end
 
-function (f::ParamBoxClassifier)(edge::Pair{<:ParamBox, <:NothingOr{ParamBox}})
+function (f::ParamBoxClassifier{P})(edge::Pair{<:P, <:NothingOr{P}}) where {P<:ParamBox}
     here, next = edge
     sector = ifelse(isDependentParam(here), f.linker, f.holder)
     hasDescendent = (next !== nothing)
@@ -1013,14 +1011,14 @@ function dissectParamCore(pars::ParamBoxAbtArr)
 end
 
 function dissectTypedParams(::Type{T}, pars::ParamBoxAbtArr{P}) where {T, P<:ParamBox{<:T}}
-    finalizer = ParamBoxClassifier()
+    paramType = genParametricType(ParamBox, (;T))
+    finalizer = ParamBoxClassifier(paramType)
 
     for par in pars
-        checkParamCycle(par; finalizer)
+        checkParamCycle(par, finalizer)
     end
 
     source = initializeSpanParamSet(T)
-    paramType = genParametricType(ParamBox, (;T))
     hidden = paramType[]
     nMax = length(pars)
     output = Memory{P}(undef, nMax)
