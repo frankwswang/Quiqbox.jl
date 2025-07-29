@@ -1306,7 +1306,7 @@ struct SpanSetFilter{U<:OneToIndex, G<:OneToIndex} <: CustomAccessor
 
     function SpanSetFilter(scope::SpanIndexSet)
         scope = map(scope) do sector
-            isempty(sector) ? genBottomMemory() : Memory{OneToIndex}(sector)
+            Memory{isempty(sector) ? Union{} : OneToIndex}(sector)
         end
         new{(values∘map)(eltype, scope)...}(scope)
     end
