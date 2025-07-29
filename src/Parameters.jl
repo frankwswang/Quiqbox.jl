@@ -1503,7 +1503,8 @@ getOutputType(::Type{<:ParamCombiner{B}}) where {B<:Function} = getOutputType(B)
 const ContextParamFunc{B<:Function, E<:Function, F<:Function} = 
       ParamCombiner{B, Tuple{ InputConverter{E}, ParamFormatter{F} }}
 
-function ContextParamFunc(binder::Function, converter::Function, formatter::Function)
+function ContextParamFunc(binder::B, converter::E, formatter::F) where 
+                         {B<:Function, E<:Function, F<:Function}
     ParamCombiner(binder, ( InputConverter(converter), ParamFormatter(formatter) ))
 end
 
