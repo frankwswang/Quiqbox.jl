@@ -1000,24 +1000,15 @@ function dissectParamCore(pars::ParamBoxAbtArr{P}) where {T, P<:SimpleParam{T}}
     (source=source, hidden=genBottomMemory(), output=outputFinal, direct=directFinal)
 end
 
-function dissectParamCore(pars::ParamBoxAbtArr{P}) where {T, P<:ParamBox{T}}
-    dissectTypedParams(T, pars)
-end
-
-function dissectParamCore(pars::ParamBoxAbtArr)
-    dissectTypedParams(Any, pars)
-end
-
-function dissectTypedParams(::Type{T}, pars::ParamBoxAbtArr{P}) where {T, P<:ParamBox{<:T}}
-    paramType = genParametricType(ParamBox, (;T))
-    finalizer = ParamBoxClassifier(paramType)
+function dissectParamCore(pars::ParamBoxAbtArr{P}) where {P<:ParamBox}
+    finalizer = ParamBoxClassifier(ParamBox)
 
     for par in pars
         checkParamCycle(par, finalizer)
     end
 
-    source = initializeSpanParamSet(T)
-    hidden = paramType[]
+    source = initializeSpanParamSet()
+    hidden = ParamBox[]
     nMax = length(pars)
     output = Memory{P}(undef, nMax)
     direct = Memory{P}(undef, nMax)
@@ -1045,7 +1036,7 @@ function dissectTypedParams(::Type{T}, pars::ParamBoxAbtArr{P}) where {T, P<:Par
         counter
     end
 
-    hiddenFinal = Memory{paramType}(hidden)
+    hiddenFinal = Memory{ParamBox}(hidden)
     outputFinal = output[begin : begin+nOutput-1]
     directFinal = direct[begin : begin+nDirect-1]
     (source=source, hidden=hiddenFinal, output=outputFinal, direct=directFinal)
