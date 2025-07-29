@@ -348,7 +348,7 @@ function getMinimalEleType(collection::AbstractArray{T}) where {T}
         Union{}
     else
         mapreduce(typeof, strictTypeJoin, collection)
-    end
+    end::Type{<:T}
 end
 
 getMinimalEleType(collection::Tuple) = 
@@ -407,7 +407,7 @@ extractMemory(obj::NamedTuple) = extractMemory(obj|>values)
 Generate a `Memory` filled with the entires from `obj::AbstractArray`. If `obj` is not an 
 `AbstractArray`, it will be encapsulated in a one-element `Memory`.
 """
-genMemory(arr::AbstractArray) = Memory{getMinimalEleType(arr)}(arr)
+genMemory(arr::AbstractArray) = Memory{getMinimalEleType(arr)}(arr|>vec)
 
 function genMemory(obj::T) where {T}
     mem = Memory{T}(undef, 1)

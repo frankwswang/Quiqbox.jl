@@ -419,6 +419,7 @@ mutable struct ReduceParam{T, E<:Pack{T}, F<:Function, I<:CoreFixedParIn} <: Cel
 end
 
 const ScreenParam{T, E<:Pack{T}, P<:ParamBox{T, E}} = ReduceParam{T, E, ItsType, Tuple{P}}
+const SimpleParam{T, E<:Span{T}, P<:PrimitiveParam{T, E}} = ScreenParam{T, E, P}
 
 function genCellParam(func::Function, input::CoreFixedParIn, marker::SymOrIndexedSym)
     lambda = formatTensorFunc(func, TypedReduce, input)
@@ -587,14 +588,14 @@ const NestParamEgalBox = EgalBox{NestParam}
 
 function hasCycleCore!(::Set{ParamEgalBox}, ::Set{ParamEgalBox}, 
                        edge::Pair{<:PrimitiveParam, <:NothingOr{ParamBox}}, 
-                       ::Bool, finalizer::F=itself) where {F<:Function}
+                       ::Bool, finalizer::F=itself) where {F}
     finalizer(edge)
     (false, edge.first)
 end
 
 function hasCycleCore!(localTrace::Set{ParamEgalBox}, history::Set{ParamEgalBox}, 
                        edge::Pair{<:CompositeParam, <:NothingOr{ParamBox}}, 
-                       strictMode::Bool, finalizer::F=itself) where {F<:Function}
+                       strictMode::Bool, finalizer::F=itself) where {F}
     here = edge.first
 
     if strictMode || screenLevelOf(here) == 0
@@ -622,8 +623,8 @@ function hasCycleCore!(localTrace::Set{ParamEgalBox}, history::Set{ParamEgalBox}
     (false, here)
 end
 
-function hasCycle(param::ParamBox; strictMode::Bool=true, finalizer::Function=itself, 
-                  catcher::Array{ParamBox, 0}=Array{ParamBox, 0}( undef, () ))
+function hasCycle(param::ParamBox, finalizer::F=itself; strictMode::Bool=true, 
+                  catcher::Array{ParamBox, 0}=Array{ParamBox, 0}( undef, () )) where {F}
     localTrace = Set{ParamEgalBox}()
     parHistory = Set{ParamEgalBox}()
     bl, lastP = hasCycleCore!(localTrace, parHistory, param=>nothing, strictMode, finalizer)
@@ -674,9 +675,9 @@ function obtainCore!(cache::ParamDataCache, param::AdaptableParam)
     end::getOutputType(param)
 end
 
-function checkParamCycle(param::ParamBox; strictMode=false, finalizer::Function=itself)
+function checkParamCycle(param::ParamBox, finalizer::F=itself; strictMode=false) where {F}
     catcher = Array{ParamBox, 0}(undef, ())
-    if hasCycle(param; strictMode, finalizer, catcher)
+    if hasCycle(param, finalizer; strictMode, catcher)
         throw(AssertionError("`param`:\n    $param\n\n"*"has a reachable cycle at:\n    "*
                              "$(catcher[])"))
     end
@@ -934,18 +935,16 @@ function extractTransform(pb::ShapedParam)
     TypedReturn(itself, getOutputType(pb))
 end
 
-struct ParamBoxClassifier <: StatefulFunction{ParamBox}
-    holder::Vector{Pair{ <:ParamBox, Array{Bool, 0} }}
-    linker::Vector{Pair{ <:ParamBox, Array{Bool, 0} }}
-    history::IdDict{ParamBox, Int}
+struct ParamBoxClassifier{P<:ParamBox} <: QueryBox{Pair{P, Array{Bool, 0} }}
+    holder::Vector{Pair{P, Array{Bool, 0} }}
+    linker::Vector{Pair{P, Array{Bool, 0} }}
+    history::IdDict{P, Int}
 
-    function ParamBoxClassifier()
-        new(Pair{<:ParamBox, Array{Bool, 0}}[], Pair{<:ParamBox, Array{Bool, 0}}[], 
-            IdDict{ParamBox, Int}())
-    end
+    ParamBoxClassifier(::Type{P}) where {P<:ParamBox} = 
+    new{P}(Pair{P, Array{Bool, 0}}[], Pair{P, Array{Bool, 0}}[], IdDict{P, Int}())
 end
 
-function (f::ParamBoxClassifier)(edge::Pair{<:ParamBox, <:NothingOr{ParamBox}})
+function (f::ParamBoxClassifier{P})(edge::Pair{<:P, <:NothingOr{P}}) where {P<:ParamBox}
     here, next = edge
     sector = ifelse(isDependentParam(here), f.linker, f.holder)
     hasDescendent = (next !== nothing)
@@ -957,35 +956,90 @@ function (f::ParamBoxClassifier)(edge::Pair{<:ParamBox, <:NothingOr{ParamBox}})
     nothing
 end
 
+function dissectParamCore(pars::ParamBoxAbtArr{P}) where {T, P<:TensorVar{T}}
+    source = initializeSpanParamSet(T)
+    hidden = genBottomMemory()
+    output = genBottomMemory()
+    direct = genMemory(pars)
 
-function dissectParamCore(pars::ParamBoxAbtArr)
-    finalizer = ParamBoxClassifier()
+    (source=source, hidden=hidden, output=output, direct=direct)
+end
 
-    for par in pars
-        checkParamCycle(par; finalizer)
-    end
+function dissectParamCore(pars::ParamBoxAbtArr{P}) where {T, P<:SimpleParam{T}}
+    register = IdSet{ParamBox{T}}()
+    source = initializeSpanParamSet(T)
+    nParamMax = length(pars)
+    output = Memory{P}(undef, nParamMax)
+    direct = Memory{P}(undef, nParamMax)
 
-    source = initializeSpanParamSet()
-    hidden = ParamBox[]
-    output = ParamBox[]
-    direct = ParamBox[]
+    nOutput = 0
+    nDirect = 0
 
-    for (dest1, dest2, sector) in ( (source, direct, finalizer.holder), 
-                                    (hidden, output, finalizer.linker) )
-        for pair in sector
-            param = pair.first
-            dest = ifelse(pair.second[], dest1, dest2)
-            if dest isa TypedSpanParamSet
-                level = getNestedLevel(param|>typeof).level
-                container = ifelse(level==0, first, last)(dest)
-                push!(container, param)
+    for param in pars
+        if !(param in register)
+            push!(register, param)
+            if screenLevelOf(param) == 0
+                nOutput += 1
+                output[begin+nOutput-1] = param
+                parInput, = param.input
+                if !(parInput in register)
+                    push!(register, parInput)
+                    level = getNestedLevel(parInput|>typeof).level
+                    container = ifelse(level==0, first, last)(source)
+                    push!(container, parInput)
+                end
             else
-                push!(dest, param)
+                nDirect += 1
+                direct[begin+nDirect-1] = param
             end
         end
     end
 
-    (source=source, hidden=hidden, output=output, direct=direct)
+    outputFinal = output[begin : begin+nOutput-1]
+    directFinal = direct[begin : begin+nDirect-1]
+    (source=source, hidden=genBottomMemory(), output=outputFinal, direct=directFinal)
+end
+
+function dissectParamCore(pars::ParamBoxAbtArr{P}) where {P<:ParamBox}
+    finalizer = ParamBoxClassifier(ParamBox)
+
+    for par in pars
+        checkParamCycle(par, finalizer)
+    end
+
+    source = initializeSpanParamSet()
+    hidden = ParamBox[]
+    nMax = length(pars)
+    output = Memory{P}(undef, nMax)
+    direct = Memory{P}(undef, nMax)
+
+    nDirect, nOutput = map(( (source, direct, finalizer.holder), 
+                             (hidden, output, finalizer.linker) )) do (dest1, dest2, sector)
+        counter = 0
+
+        for pair in sector
+            param = pair.first
+            isUpstream = pair.second[]
+            dest = ifelse(isUpstream, dest1, dest2)
+            if dest isa TypedSpanParamSet
+                level = getNestedLevel(param|>typeof).level
+                container = ifelse(level==0, first, last)(dest)
+                push!(container, param)
+            elseif !isUpstream
+                counter += 1
+                dest[begin+counter-1] = param
+            else
+                push!(dest, param)
+            end
+        end
+
+        counter
+    end
+
+    hiddenFinal = Memory{ParamBox}(hidden)
+    outputFinal = output[begin : begin+nOutput-1]
+    directFinal = direct[begin : begin+nDirect-1]
+    (source=source, hidden=hiddenFinal, output=outputFinal, direct=directFinal)
 end
 
 dissectParam(params::ParamBoxAbtArr) = (dissectParamCore∘unique)(ParamEgalBox, params)
@@ -1252,7 +1306,7 @@ struct SpanSetFilter{U<:OneToIndex, G<:OneToIndex} <: CustomAccessor
 
     function SpanSetFilter(scope::SpanIndexSet)
         scope = map(scope) do sector
-            isempty(sector) ? genBottomMemory() : Memory{OneToIndex}(sector)
+            Memory{isempty(sector) ? Union{} : OneToIndex}(sector)
         end
         new{(values∘map)(eltype, scope)...}(scope)
     end
@@ -1449,7 +1503,8 @@ getOutputType(::Type{<:ParamCombiner{B}}) where {B<:Function} = getOutputType(B)
 const ContextParamFunc{B<:Function, E<:Function, F<:Function} = 
       ParamCombiner{B, Tuple{ InputConverter{E}, ParamFormatter{F} }}
 
-function ContextParamFunc(binder::Function, converter::Function, formatter::Function)
+function ContextParamFunc(binder::B, converter::E, formatter::F) where 
+                         {B<:Function, E<:Function, F<:Function}
     ParamCombiner(binder, ( InputConverter(converter), ParamFormatter(formatter) ))
 end
 

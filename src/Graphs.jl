@@ -435,10 +435,8 @@ function genParamMapper(params::DirectParamSource,
                         activeTranspilation::Boolean=True(); 
                         paramSet!Self::OptSpanParamSet=initializeSpanParamSet())
     checkEmptiness(params, :params)
-    mayBypass = !evalTypedData(activeTranspilation)
-
     mapper = map(params) do param
-        if mayBypass && isActiveSpanParam(param)
+        if !evalTypedData(activeTranspilation) && isActiveSpanParam(param)
             paramIndexer = locateParam!(paramSet!Self, param)
             TypedReturn(GetEntry(paramIndexer), getOutputType(param))
         else

@@ -31,9 +31,11 @@ function precompileField(field::FieldAmplitude{C, D}, ::Val{B}=Val(false)) where
 
         if D==3
             bs = [primBasisMD, primBasisPD, primBasisMN, primBasisPN]
-            coreHamiltonian([:H], [(0., 0., 0.)], bs)
+            nucInfo = NuclearCluster([:H], [(0., 0., 0.)])
+            coreHamiltonian(nucInfo.layout.left, nucInfo.layout.right, bs)
             elecRepulsions(bs)
             overlaps(bs)
+            runHartreeFock(nucInfo, bs, printInfo=false)
         end
     end
 
