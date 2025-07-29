@@ -1094,7 +1094,7 @@ function sortParams!(params::AbstractVector{<:ParamBox};
 end
 
 
-struct UnitParamEncoder{T}
+struct UnitParamEncoder{T} <: CallableObject
     symbol::Symbol
     screen::TernaryNumber
 
@@ -1110,6 +1110,25 @@ UnitParamEncoder(T, symbol, TernaryNumber(screen))
 
 function (f::UnitParamEncoder{T})(input) where {T}
     p = genCellParam(convert(T, input), f.symbol)
+    setScreenLevel!(p, Int(f.screen))
+end
+
+struct GridParamEncoder{T} <: CallableObject
+    symbol::Symbol
+    screen::TernaryNumber
+
+    function GridParamEncoder(::Type{T}, symbol::Symbol, screen::TernaryNumber) where {T}
+        new{T}(symbol, screen)
+    end
+end
+
+GridParamEncoder(::Type{T}, symbol::Symbol, screen::Int=1) where {T} = 
+GridParamEncoder(T, symbol, TernaryNumber(screen))
+
+(f::GridParamEncoder)(input::UnitParam) = itself(input)
+
+function (f::GridParamEncoder{T})(input::AbstractVector) where {T}
+    p = genCellParam(convert(AbstractVector{T}, input), f.symbol)
     setScreenLevel!(p, Int(f.screen))
 end
 

@@ -1,5 +1,6 @@
 abstract type Box <: Any end
 abstract type AnyInterface <: Any end
+abstract type CallableObject <: Any end
 
 abstract type EqualityDict{K, V} <: AbstractDict{K, V} end
 

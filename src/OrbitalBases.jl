@@ -191,8 +191,9 @@ function genGaussTypeOrb(center::NonEmptyTuple{UnitOrVal{T}, D},
     nPrimOrbs = if cons isa GridParam
         (first∘getOutputSize)(cons)
     else
-        cons = map(UnitParamEncoder(C, :con, 1), cons)
-        length(cons)
+        len = length(cons)
+        cons = GridParamEncoder(C, :con, 1)(cons)
+        len
     end
 
     checkLengthCore(checkEmptiness(xpns, :xpns), :xpns, nPrimOrbs, 
