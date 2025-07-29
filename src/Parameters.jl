@@ -1094,7 +1094,7 @@ function sortParams!(params::AbstractVector{<:ParamBox};
 end
 
 
-struct UnitParamEncoder{T} <: Mapper
+struct UnitParamEncoder{T} <: CallableObject
     symbol::Symbol
     screen::TernaryNumber
 
@@ -1113,7 +1113,7 @@ function (f::UnitParamEncoder{T})(input) where {T}
     setScreenLevel!(p, Int(f.screen))
 end
 
-struct GridParamEncoder{T} <: Mapper
+struct GridParamEncoder{T} <: CallableObject
     symbol::Symbol
     screen::TernaryNumber
 
