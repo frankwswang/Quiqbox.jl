@@ -67,3 +67,11 @@ function checkIntLevelMismatch(actualLevel::Int, targetLevelSet::NonEmptyTuple{I
 
     actualLevel
 end
+
+
+function checkBottomArray(arr::AbstractArray)
+    if eltype(arr) <:Union{} && !isempty(arr)
+        throw(AssertionError("`arr` must be empty if its element type is `Union{}`."))
+    end
+    nothing
+end

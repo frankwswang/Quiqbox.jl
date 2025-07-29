@@ -158,13 +158,8 @@ end
 ChainMapper(chain::AbstractArray{<:Function}) = ChainMapper(chain|>ShapedMemory)
 
 function (f::ChainMapper{E})(obj) where {E<:FunctionChainUnion{Function}}
-    fChain = f.chain
-    if fChain isa AbstractArray && isempty(fChain)
-        similar(fChain, Union{})
-    else
-        map(fChain) do mapper
-            mapper(obj)
-        end
+    map(f.chain) do mapper #> f.chain should not be empty
+        mapper(obj)
     end
 end
 
