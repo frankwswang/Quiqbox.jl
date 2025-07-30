@@ -418,7 +418,7 @@ evalParamGraphCaller(f, input)
 getOutputType(::Type{<:ParamGraphCaller{T}}) where {T} = T
 
 
-const FilterEvalParam{F<:SpanSetCaller, S<:SpanSetFilter} = ComposedApply{1, F, GetEntry{S}}
+const FilterEvalParam{F<:SpanSetCaller} = ComposedApply{1, F, GetEntry{SpanSetFilter}}
 
 const ParamMapperCore = Union{FilterEvalParam, GetTypedUnit, GetTypedGrid}
 
@@ -435,7 +435,7 @@ function genParamMapper(params::DirectParamSource,
                         activeTranspilation::Boolean=True(); 
                         paramSet!Self::OptSpanParamSet=initializeSpanParamSet())
     checkEmptiness(params, :params)
-    mapper = map(params) do param
+    mapper = map(params) do param #! Improve the type stability
         if !evalTypedData(activeTranspilation) && isActiveSpanParam(param)
             paramIndexer = locateParam!(paramSet!Self, param)
             TypedReturn(GetEntry(paramIndexer), getOutputType(param))

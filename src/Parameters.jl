@@ -1333,17 +1333,17 @@ end
 const SpanIndexSet{U<:AbstractVector{<:OneToIndex}, G<:AbstractVector{<:OneToIndex}} = 
       TypedSpanSet{U, G}
 
-struct SpanSetFilter{U<:OneToIndex, G<:OneToIndex} <: CustomAccessor
-    scope::OptionalSpanSet{Memory{U}, Memory{G}}
+struct SpanSetFilter <: CustomAccessor
+    scope::SpanIndexSet{Memory{OneToIndex}, Memory{OneToIndex}}
 
     function SpanSetFilter(scope::SpanIndexSet)
         scope = map(scope) do sector
-            Memory{isVoidCollection(sector) ? Union{} : OneToIndex}(sector)
+            Memory{OneToIndex}(isVoidCollection(sector) ? genBottomMemory() : sector)
         end
-        new{eltype(scope.unit), eltype(scope.grid)}(scope)
+        new(scope)
     end
 
-    SpanSetFilter() = new{Union{}, Union{}}(initializeFixedSpanSet())
+    SpanSetFilter() = new(map( Memory{OneToIndex}, initializeFixedSpanSet() ))
 end
 
 SpanSetFilter(unit::AbstractVector{<:OneToIndex}, grid::AbstractVector{<:OneToIndex}) = 
@@ -1355,30 +1355,31 @@ function SpanSetFilter(unitLen::Int, gridLen::Int)
     SpanSetFilter(unit, grid)
 end
 
-const VoidSetFilter = SpanSetFilter{Union{}, Union{}}
-
-const UnitSetFilter = SpanSetFilter{OneToIndex, Union{}}
-
-const GridSetFilter = SpanSetFilter{Union{}, OneToIndex}
-
-const FullSetFilter = SpanSetFilter{OneToIndex, OneToIndex}
-
 
 getSector(sector::AbstractVector, oneToIds::Memory{OneToIndex}) = 
 MemoryLinker(sector, oneToIds)
 
-getSector(::NothingOr{AbstractVector}, ::Memory{Union{}}) = 
-genBottomMemory()
+function getSector(::Nothing, oneToIds::Memory{OneToIndex})
+    isempty(oneToIds) || throw(AssertionError("Indexing a void collection is illegal."))
+    MemoryLinker(genBottomMemory(), oneToIds)
+end
 
-function mapSector(sector::AbstractVector, oneToIds::Memory{OneToIndex}, 
-                   finalizer::F) where {F<:Function}
-    map(oneToIds) do x
-        getEntry(sector, x) |> finalizer
+
+function mapSector(sector::AbstractVector, oneToIds::Memory{OneToIndex}, finalizer::F
+                   ) where {F<:Function}
+    if isempty(oneToIds)
+        genBottomMemory()
+    else
+        map(oneToIds) do x
+            getEntry(sector, x) |> finalizer
+        end
     end
 end
 
-mapSector(::NothingOr{AbstractVector}, ::Memory{Union{}}, ::Function) = 
-genBottomMemory()
+function mapSector(::Nothing, oneToIds::Memory{OneToIndex}, ::Function)
+    isempty(oneToIds) || throw(AssertionError("Indexing a void collection is illegal."))
+    genBottomMemory()
+end
 
 #= Additional Method =#
 function getEntry(target::OptionalSpanSet, sFilter::SpanSetFilter)
@@ -1396,16 +1397,13 @@ function getEntry(target::OptionalSpanSet, sFilter::SpanSetFilter,
     map(mapper, target, (unit=:unit, grid=:grid))
 end
 
-getEntry(::OptionalSpanSet, ::VoidSetFilter) = initializeFixedSpanSet()
-
 function getEntry(sFilterPrev::SpanSetFilter, sFilterHere::SpanSetFilter)
     getEntry(sFilterPrev.scope, sFilterHere) |> SpanSetFilter
 end
 
-getEntry(::SpanSetFilter, ::VoidSetFilter) = SpanSetFilter()
 
-struct TaggedSpanSetFilter{F<:SpanSetFilter} <: CustomAccessor
-    scope::F
+struct TaggedSpanSetFilter <: CustomAccessor
+    scope::SpanSetFilter
     tag::Identifier
 end
 
@@ -1419,8 +1417,6 @@ getEntry(obj, tsFilter.scope)
 getEntry(obj::OptionalSpanSet, tsFilter::TaggedSpanSetFilter, 
          finalizer::F) where {F<:Function} = 
 getEntry(obj, tsFilter.scope, finalizer)
-
-getOutputType(::Type{TaggedSpanSetFilter{F}}) where {F<:SpanSetFilter} = getOutputType(F)
 
 
 struct InputConverter{F<:Function} <: AbstractParamFunc
