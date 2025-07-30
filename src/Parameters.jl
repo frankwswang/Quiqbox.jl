@@ -1549,7 +1549,8 @@ struct ParamPipeFunc{FO<:AbstractParamFunc, FI<:AbstractParamFunc} <: AbstractPa
     outer::FO
 end
 
-function (f::ParamPipeFunc)(input, params::OptSpanValueSet)
+function (f::ParamPipeFunc{FO, FI})(input, params::OptSpanValueSet) where 
+                                   {FO<:AbstractParamFunc, FI<:AbstractParamFunc}
     innerInput = f.inner(input, params)
     f.outer(innerInput, params)
 end
