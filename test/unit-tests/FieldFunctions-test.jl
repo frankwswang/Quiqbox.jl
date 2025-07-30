@@ -55,9 +55,9 @@ shiftedField = field.core.f.f
 fCenter = shiftedField.inner
 @test fCenter isa Quiqbox.FieldCenterShifter
 gtf = shiftedField.outer
-@test gtf isa Quiqbox.PolyGaussFieldFunc
+@test gtf isa Quiqbox.PolyGaussFieldCore
 @test last(fCenter.encode).core(params) == (0., 1., 0.)
-grf, angMomField = gtf.core.f.binder.encode
+grf, angMomField = gtf.encode
 @test grf isa Quiqbox.RadialFieldFunc
 pgf = grf.core.f.binder.outer
 @test pgf isa Quiqbox.GaussFieldFunc

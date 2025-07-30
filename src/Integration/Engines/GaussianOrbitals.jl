@@ -64,9 +64,9 @@ function prepareOrbitalInfoCore(field::FloatingPolyGaussField{T, D}) where {T<:R
     params = field.data
     shiftedField = field.core.f.f                 #> `ShiftedFieldFuncCore`
     fCenter = shiftedField.inner                  #> `FieldCenterShifter`
-    gtf = shiftedField.outer                      #> `PolyGaussFieldFunc`
+    gtf = shiftedField.outer                      #> `PolyGaussFieldCore`
     center = last(fCenter.encode).core(params)
-    grf, angMomField = gtf.core.f.binder.encode   #> `grf::RadialFieldFunc`
+    grf, angMomField = gtf.encode                 #> `grf::RadialFieldFunc`
     pgf = grf.core.f.binder.outer                 #> `GaussFieldFunc`
     xpnFormatter = last(pgf.core.f.binder.encode) #> `ParamFormatter`
     xpn = xpnFormatter.core(params).xpn

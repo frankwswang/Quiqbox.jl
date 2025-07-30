@@ -1052,16 +1052,16 @@ function getSourceParamSet(source, directUnpack::Boolean=False();
                            onlyVariable::Bool=true, includeSink::Bool=true)
     source, _, output, direct = dissectParam(source)
 
-    # if evalTypedData(directUnpack)
-    #     foreach(empty!, source)
-    #     for par in output
-    #         if par isa UnitParam
-    #             push!(source.unit, par)
-    #         elseif par isa GridParam
-    #             push!(source.grid, par)
-    #         end
-    #     end
-    # end
+    if evalTypedData(directUnpack)
+        foreach(empty!, source)
+        for par in output
+            if par isa UnitParam
+                push!(source.unit, par)
+            elseif par isa GridParam
+                push!(source.grid, par)
+            end
+        end
+    end
 
     if includeSink
         for par in direct
@@ -1549,22 +1549,13 @@ struct ParamPipeFunc{FO<:AbstractParamFunc, FI<:AbstractParamFunc} <: AbstractPa
     outer::FO
 end
 
-function (f::ParamPipeFunc{FO, FI})(input, params::OptSpanValueSet) where 
-                                   {FO<:AbstractParamFunc, FI<:AbstractParamFunc}
+function (f::ParamPipeFunc)(input, params::OptSpanValueSet)
     innerInput = f.inner(input, params)
     f.outer(innerInput, params)
 end
 
 getOutputType(::Type{<:ParamPipeFunc{FO}}) where {FO<:AbstractParamFunc} = 
 getOutputType(FO)
-
-function strictTypeJoin(::Type{ParamPipeFunc{FOL, FIL}}, 
-                        ::Type{ParamPipeFunc{FOR, FIR}}) where 
-                       {FOL<:AbstractParamFunc, FIL<:AbstractParamFunc, 
-                        FOR<:AbstractParamFunc, FIR<:AbstractParamFunc}
-    p = (;FO=strictTypeJoin(FOL, FOR), FI=strictTypeJoin(FIL, FIR))
-    typeintersect(genParametricType(ParamPipeFunc, p), ParamPipeFunc)
-end
 
 
 # f(input) => fCore(input, param)
