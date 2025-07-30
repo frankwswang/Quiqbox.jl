@@ -26,7 +26,7 @@ end
 function getOwnedObjNameStr(objName::Symbol, objAlias::AbstractString=string(objName))
     addPrefix = if isdefined(Quiqbox, objName)
         isequal((parentmodule∘getfield)(Quiqbox, objName), Quiqbox) && 
-                Base.isexported(Quiqbox, objName)
+                !Base.isexported(Quiqbox, objName)
     else
         false
     end
