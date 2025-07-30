@@ -1052,16 +1052,16 @@ function getSourceParamSet(source, directUnpack::Boolean=False();
                            onlyVariable::Bool=true, includeSink::Bool=true)
     source, _, output, direct = dissectParam(source)
 
-    if evalTypedData(directUnpack)
-        foreach(empty!, source)
-        for par in output
-            if par isa UnitParam
-                push!(source.unit, par)
-            elseif par isa GridParam
-                push!(source.grid, par)
-            end
-        end
-    end
+    # if evalTypedData(directUnpack)
+    #     foreach(empty!, source)
+    #     for par in output
+    #         if par isa UnitParam
+    #             push!(source.unit, par)
+    #         elseif par isa GridParam
+    #             push!(source.grid, par)
+    #         end
+    #     end
+    # end
 
     if includeSink
         for par in direct
