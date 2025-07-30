@@ -47,6 +47,23 @@ end
 
 pgto1 = genGaussTypeOrb((0., 1., 0.), 2.5, (1, 1, 0))
 pgto1Core, paramSet = Quiqbox.unpackFunc(pgto1.field)
-Quiqbox.StashedField(pgto1Core, paramSet) isa Quiqbox.FloatingPolyGaussField
+field = Quiqbox.StashedField(pgto1Core, paramSet)
+field isa Quiqbox.FloatingPolyGaussField
+params = field.data
+shiftedField = field.core.f.f
+@test shiftedField isa Quiqbox.ShiftedFieldFuncCore
+fCenter = shiftedField.inner
+@test fCenter isa Quiqbox.FieldCenterShifter
+gtf = shiftedField.outer
+@test gtf isa Quiqbox.PolyGaussFieldFunc
+@test last(fCenter.encode).core(params) == (0., 1., 0.)
+grf, angMomField = gtf.core.f.binder.encode
+@test grf isa Quiqbox.RadialFieldFunc
+pgf = grf.core.f.binder.outer
+@test pgf isa Quiqbox.GaussFieldFunc
+xpnFormatter = last(pgf.core.f.binder.encode)
+@test xpnFormatter isa Quiqbox.ParamFormatter
+@test xpnFormatter.core(params).xpn == 2.5
+@test angMomField.core.f.binder.core.f isa Quiqbox.CartSHarmonics
 
 end

@@ -1048,12 +1048,24 @@ dissectParam(source::Any) = (dissectParamCore∘uniqueParams)(source)
 dissectParam(source::ParamBox) = dissectParamCore(source|>fill)
 
 
-function getSourceParamSet(source; onlyVariable::Bool=true, includeSink::Bool=true)
-    source, _, _, direct = dissectParam(source)
+function getSourceParamSet(source, directUnpack::Boolean=False(); 
+                           onlyVariable::Bool=true, includeSink::Bool=true)
+    source, _, output, direct = dissectParam(source)
+
+    if evalTypedData(directUnpack)
+        foreach(empty!, source)
+        for par in output
+            if par isa UnitParam
+                push!(source.unit, par)
+            elseif par isa GridParam
+                push!(source.grid, par)
+            end
+        end
+    end
 
     if includeSink
         for par in direct
-            push!(getfield(source, par isa UnitParam ? :unit : :grid), par)
+            push!((par isa UnitParam ? source.unit : source.grid), par)
         end
     end
 
@@ -1545,15 +1557,23 @@ end
 getOutputType(::Type{<:ParamPipeFunc{FO}}) where {FO<:AbstractParamFunc} = 
 getOutputType(FO)
 
+function strictTypeJoin(::Type{ParamPipeFunc{FOL, FIL}}, 
+                        ::Type{ParamPipeFunc{FOR, FIR}}) where 
+                       {FOL<:AbstractParamFunc, FIL<:AbstractParamFunc, 
+                        FOR<:AbstractParamFunc, FIR<:AbstractParamFunc}
+    p = (;FO=strictTypeJoin(FOL, FOR), FI=strictTypeJoin(FIL, FIR))
+    typeintersect(genParametricType(ParamPipeFunc, p), ParamPipeFunc)
+end
+
 
 # f(input) => fCore(input, param)
-function unpackFunc(f::Function)
+function unpackFunc(f::Function, directUnpack::Boolean=False())
     fLocal = deepcopy(f)
     if noStoredParam(fLocal)
         fCore = InputConverter(fLocal)
         paramSet = initializeFixedSpanSet()
     else
-        source = getSourceParamSet(fLocal) #> `onlyVariable == true && includeSink == true`
+        source = getSourceParamSet(fLocal, directUnpack)
         unitPars, gridPars = source
         fCore = ParamBindFunc(fLocal, unitPars, gridPars)
         paramSet = initializeSpanParamSet(unitPars, gridPars)
@@ -1561,9 +1581,9 @@ function unpackFunc(f::Function)
     fCore, paramSet
 end
 
-function unpackFunc!(f::Function, paramSet::OptSpanParamSet; 
+function unpackFunc!(f::Function, paramSet::OptSpanParamSet, directUnpack::Boolean=False(); 
                      paramSetId::Identifier=Identifier(paramSet))
-    fCore, localParamSet = unpackFunc(f)
+    fCore, localParamSet = unpackFunc(f, directUnpack)
     if fCore isa InputConverter
         fCore
     else
