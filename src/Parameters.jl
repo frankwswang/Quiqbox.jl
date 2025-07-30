@@ -696,7 +696,8 @@ end
 obtain(param::PrimitiveParam) = decoupledCopy(param.data[])::getOutputType(param)
 
 function obtain(params::ParamBoxAbtArr)
-    if isempty(params)
+    checkBottomArray(params)
+    if isVoidCollection(params)
         similar(params, Union{})
     else
         eleParamType = eltype(params)
@@ -847,7 +848,7 @@ function getInnerParamsCore!(paramPairs::AbstractVector{Pair{ChainedAccess, Para
                              source::T, anchor::ChainedAccess) where {T}
     searchParam = false
     if source isa Union{Tuple, AbstractArray}
-        if isempty(source)
+        if isVoidCollection(source)
             return nothing
         else
             searchParam = true
@@ -1047,12 +1048,24 @@ dissectParam(source::Any) = (dissectParamCore∘uniqueParams)(source)
 dissectParam(source::ParamBox) = dissectParamCore(source|>fill)
 
 
-function getSourceParamSet(source; onlyVariable::Bool=true, includeSink::Bool=true)
-    source, _, _, direct = dissectParam(source)
+function getSourceParamSet(source, directUnpack::Boolean=False(); 
+                           onlyVariable::Bool=true, includeSink::Bool=true)
+    source, _, output, direct = dissectParam(source)
+
+    if evalTypedData(directUnpack)
+        foreach(empty!, source)
+        for par in output
+            if par isa UnitParam
+                push!(source.unit, par)
+            elseif par isa GridParam
+                push!(source.grid, par)
+            end
+        end
+    end
 
     if includeSink
         for par in direct
-            push!(getfield(source, par isa UnitParam ? :unit : :grid), par)
+            push!((par isa UnitParam ? source.unit : source.grid), par)
         end
     end
 
@@ -1173,13 +1186,13 @@ initializeFixedSpanSet() = (unit=genBottomMemory(), grid=genBottomMemory())
 #= Additional Method =#
 function obtain(paramSet::OptSpanParamSet)
     map(paramSet) do sector
-        (sector === nothing || isempty(sector)) ? nothing : obtain(sector)
+        (sector === nothing || isVoidCollection(sector)) ? nothing : obtain(sector)
     end
 end
 
 #= Additional Method =#
-function cacheParam!(cache::ParamDataCache, params::ParamBoxSource)
-    if params isa ParamBoxAbtArr && isempty(params)
+function cacheParam!(cache::ParamDataCache, params::DirectParamSource)
+    if params isa ParamBoxAbtArr && isVoidCollection(params)
         similar(params, Union{})
     else
         map(params) do param
@@ -1275,7 +1288,7 @@ function locateParamCore!(params::AbstractVector, target::ParamBox)
 end
 
 function locateParam!(params::AbstractVector, target::ParamBox)
-    (ChainedAccess∘locateParamCore!)(params, target)
+    locateParamCore!(params, target) |> ChainedAccess
 end
 
 function locateParam!(paramSet::OptSpanParamSet, target::UnitParam)
@@ -1294,21 +1307,21 @@ function locateParam!(paramSet::OptSpanParamSet, target::GridParam)
     ChainedAccess(( GridSector(), locateParamCore!(sector, target) ))
 end
 
-function locateParam!(params::Union{OptSpanParamSet, AbstractVector}, 
-                      subset::ParamBoxSource)
-    if subset isa AbstractArray && isempty(subset)
-        similar(subset, Union{})
-    else
-        map(subset) do param
-            locateParam!(params, param)
+function locateParam!(params::AbstractVector, subset::OptSpanParamSet)
+    units, grids = map(subset) do here
+        if here === nothing || isVoidCollection(here)
+            similar(here, Union{})
+        else
+            map(x->locateParamCore!(params, x), here)
         end
     end
+    SpanSetFilter(units, grids)
 end
 
 function locateParam!(params::OptSpanParamSet, subset::OptSpanParamSet)
     units, grids = map(params, subset) do prev, here
-        if here === nothing || isempty(here)
-            genBottomMemory()
+        if here === nothing || isVoidCollection(here)
+            similar(here, Union{})
         else
             map(x->locateParamCore!(prev, x), here)
         end
@@ -1325,9 +1338,9 @@ struct SpanSetFilter{U<:OneToIndex, G<:OneToIndex} <: CustomAccessor
 
     function SpanSetFilter(scope::SpanIndexSet)
         scope = map(scope) do sector
-            Memory{isempty(sector) ? Union{} : OneToIndex}(sector)
+            Memory{isVoidCollection(sector) ? Union{} : OneToIndex}(sector)
         end
-        new{(values∘map)(eltype, scope)...}(scope)
+        new{eltype(scope.unit), eltype(scope.grid)}(scope)
     end
 
     SpanSetFilter() = new{Union{}, Union{}}(initializeFixedSpanSet())
@@ -1546,13 +1559,13 @@ getOutputType(FO)
 
 
 # f(input) => fCore(input, param)
-function unpackFunc(f::Function)
+function unpackFunc(f::Function, directUnpack::Boolean=False())
     fLocal = deepcopy(f)
     if noStoredParam(fLocal)
         fCore = InputConverter(fLocal)
         paramSet = initializeFixedSpanSet()
     else
-        source = getSourceParamSet(fLocal) #> `onlyVariable == true && includeSink == true`
+        source = getSourceParamSet(fLocal, directUnpack)
         unitPars, gridPars = source
         fCore = ParamBindFunc(fLocal, unitPars, gridPars)
         paramSet = initializeSpanParamSet(unitPars, gridPars)
@@ -1560,9 +1573,9 @@ function unpackFunc(f::Function)
     fCore, paramSet
 end
 
-function unpackFunc!(f::Function, paramSet::OptSpanParamSet; 
+function unpackFunc!(f::Function, paramSet::OptSpanParamSet, directUnpack::Boolean=False(); 
                      paramSetId::Identifier=Identifier(paramSet))
-    fCore, localParamSet = unpackFunc(f)
+    fCore, localParamSet = unpackFunc(f, directUnpack)
     if fCore isa InputConverter
         fCore
     else

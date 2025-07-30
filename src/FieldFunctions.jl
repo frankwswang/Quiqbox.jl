@@ -87,9 +87,16 @@ function evalFieldAmplitudeCore(f::StashedField, input)
     f.core(formatInput(f, input), f.data)
 end
 
-function unpackFieldFunc(f::F, ::Boolean=False()) where 
-                        {T, C<:RealOrComplex{T}, D, F<:StashedField{T, D, C}}
-    TypedCarteFunc(RPartial(f.core.f.f, f.data), C, Count(D)), initializeSpanParamSet()
+function unpackFieldFunc!(f::F, ::Pair{<:OptSpanParamSet, Identifier}, ::Boolean=False()
+                          ) where {T, C<:RealOrComplex{T}, D, F<:StashedField{T, D, C}}
+    TypedCarteFunc(RPartial(f.core.f.f, f.data), C, Count(D))
+end
+
+function initializeFieldParamInfo(::FieldAmplitude, 
+                                  paramSetId::MissingOr{Identifier}=missing)
+    paramSet = initializeSpanParamSet()
+    ismissing(paramSetId) && (paramSetId = Identifier(paramSet))
+    paramSet => paramSetId
 end
 
 #>> `directUnpack` is a unique argument for unpacking `FieldAmplitude`. When it is set to 
@@ -99,15 +106,18 @@ end
 function unpackFunc!(f::F, paramSet::OptSpanParamSet, directUnpack::Boolean=False(); 
                      paramSetId::Identifier=Identifier(paramSet)) where 
                     {T, C<:RealOrComplex{T}, D, F<:FieldAmplitude{C, D}}
-    fCore, localParamSet = unpackFieldFunc(f, directUnpack)
-    idxFilter = locateParam!(paramSet, localParamSet)
+    localParamInfo = initializeFieldParamInfo(f, Identifier())
+    fCore = unpackFieldFunc!(f, localParamInfo, directUnpack)
+    idxFilter = locateParam!(paramSet, localParamInfo.first)
     scope = TaggedSpanSetFilter(idxFilter, paramSetId)
     FieldParamFunc(fCore, scope)
 end
 
 function unpackFunc(f::F, directUnpack::Boolean=False()) where 
                    {T, C<:RealOrComplex{T}, D, F<:FieldAmplitude{C, D}}
-    fCore, paramSet = unpackFieldFunc(f, directUnpack)
+    paramInfo = initializeFieldParamInfo(f)
+    paramSet = paramInfo.first
+    fCore = unpackFieldFunc!(f, paramInfo, directUnpack)
     idxFilter = SpanSetFilter(map(length, paramSet)...)
     scope = TaggedSpanSetFilter(idxFilter, paramSet)
     FieldParamFunc(fCore, scope), paramSet
@@ -166,17 +176,13 @@ function evalFieldAmplitudeCore(f::EncodedField{C, D, F, E}, input,
     convert(C, val)
 end
 
-function unpackFieldFunc(f::F, directUnpack::Boolean=False()) where 
-                        {D, C<:RealOrComplex, F<:EncodedField{C, D}}
-    paramSet = initializeSpanParamSet()
-    encoder, coreFunc = map((f.encode.f, f.core.f)) do fCore
-        if fCore isa FieldAmplitude
-            unpackFunc!(fCore, paramSet, directUnpack, paramSetId=Identifier())
-        else
-            unpackFunc!(fCore, paramSet, paramSetId=Identifier())
-        end
-    end
-    TypedCarteFunc(ParamPipeFunc(encoder, coreFunc), C, Count(D)), paramSet
+function unpackFieldFunc!(f::F, paramInfo::Pair{<:OptSpanParamSet, Identifier}, 
+                          directUnpack::Boolean=False()) where 
+                         {D, C<:RealOrComplex, F<:EncodedField{C, D}}
+    paramSet, paramSetId = paramInfo
+     encoder = unpackFunc!(f.encode.f, paramSet, directUnpack; paramSetId)
+    coreFunc = unpackFunc!(f.core.f,   paramSet, directUnpack; paramSetId)
+    TypedCarteFunc(ParamPipeFunc(encoder, coreFunc), C, Count(D))
 end
 
 
@@ -232,9 +238,9 @@ function evalFieldAmplitudeCore(f::NullaryField, input)
     f.core(formatInput(f, input))
 end
 
-function unpackFieldFunc(f::NullaryField{C, D}, ::Boolean=False()) where 
-                        {C<:RealOrComplex, D}
-    TypedCarteFunc(InputConverter(f.core.f.f), C, Count(D)), initializeSpanParamSet()
+function unpackFieldFunc!(f::NullaryField{C, D}, ::Pair{<:OptSpanParamSet, Identifier}, 
+                          ::Boolean=False()) where {C<:RealOrComplex, D}
+    TypedCarteFunc(InputConverter(f.core.f.f), C, Count(D))
 end
 
 
@@ -245,10 +251,12 @@ function evalFieldAmplitudeCore(f::ModularField, input, cache!Self::ParamDataCac
     f.core(formatInput(f, input), paramVals)
 end
 
-function unpackFieldFunc(f::F, directUnpack::Boolean=False()) where 
-                        {C<:RealOrComplex, D, F<:ModularField{C, D}}
-    paramMapper, paramSet = genParamMapper(f.param, negate(directUnpack))
-    TypedCarteFunc(ContextParamFunc(f.core.f.f, paramMapper), C, Count(D)), paramSet
+function unpackFieldFunc!(f::F, paramInfo::Pair{<:OptSpanParamSet, Identifier}, 
+                          directUnpack::Boolean=False()) where 
+                         {C<:RealOrComplex, D, F<:ModularField{C, D}}
+    paramSet = paramInfo.first
+    paramMapper, _ = genParamMapper(f.param, negate(directUnpack), paramSet!Self=paramSet)
+    TypedCarteFunc(ContextParamFunc(f.core.f.f, paramMapper), C, Count(D))
 end
 
 
@@ -301,20 +309,21 @@ function evalFieldAmplitude(f::ProductField{C}, input;
     end
 end
 
-function unpackFieldFunc(f::F, directUnpack::Boolean=False()) where 
-                        {C<:RealOrComplex, D, F<:ProductField{C, D}}
-    paramSet = initializeSpanParamSet()
+function unpackFieldFunc!(f::F, paramInfo::Pair{<:OptSpanParamSet, Identifier}, 
+                          directUnpack::Boolean=False()) where 
+                         {C<:RealOrComplex, D, F<:ProductField{C, D}}
+    paramSet, paramSetId = paramInfo
 
     idx = 1
     basisCores = map(f.basis) do basis
         basisDim = getDimension(basis)
         getSubIdx = ViewOneToRange(idx, Count{basisDim}())
         idx += basisDim
-        basisCore = unpackFunc!(basis, paramSet, directUnpack, paramSetId=Identifier())
+        basisCore = unpackFunc!(basis, paramSet, directUnpack; paramSetId)
         ParamPipeFunc(InputConverter(getSubIdx), basisCore)
     end
 
-    TypedCarteFunc(ParamCombiner(StableMul(C), basisCores), C, Count(D)), paramSet
+    TypedCarteFunc(ParamCombiner(StableMul(C), basisCores), C, Count(D))
 end
 
 
@@ -353,13 +362,14 @@ function evalFieldAmplitude(f::CoupledField, input;
     end |> Base.Splat(f.coupler)
 end
 
-function unpackFieldFunc(f::F, directUnpack::Boolean=False()) where 
+function unpackFieldFunc!(f::F, paramInfo::Pair{<:OptSpanParamSet, Identifier}, 
+                          directUnpack::Boolean=False()) where 
                         {D, C<:RealOrComplex, F<:CoupledField{C, D}}
     fL, fR = f.pair
-    paramSet = initializeSpanParamSet()
-    fCoreL = unpackFunc!(fL, paramSet, directUnpack, paramSetId=Identifier())
-    fCoreR = unpackFunc!(fR, paramSet, directUnpack, paramSetId=Identifier())
-    TypedCarteFunc(ParamCombiner(f.coupler, (fCoreL, fCoreR)), C, Count(D)), paramSet
+    paramSet, paramSetId = paramInfo
+    fCoreL = unpackFunc!(fL, paramSet, directUnpack; paramSetId)
+    fCoreR = unpackFunc!(fR, paramSet, directUnpack; paramSetId)
+    TypedCarteFunc(ParamCombiner(f.coupler, (fCoreL, fCoreR)), C, Count(D))
 end
 
 
@@ -421,13 +431,15 @@ function evalFieldAmplitudeCore(f::ShiftedField{T, D}, input,
     f.core(shiftedCoord)
 end
 
-function unpackFieldFunc(f::F, directUnpack::Boolean=False()) where 
-                        {T, C<:RealOrComplex{T}, D, F<:ShiftedField{C, D}}
-    fInner, paramSet = unpackFieldFunc(f.core, directUnpack)
+function unpackFieldFunc!(f::F, paramInfo::Pair{<:OptSpanParamSet, Identifier}, 
+                          directUnpack::Boolean=False()) where 
+                         {T, C<:RealOrComplex{T}, D, F<:ShiftedField{C, D}}
+    paramSet = paramInfo.first
+    fInner = unpackFieldFunc!(f.core, paramInfo, directUnpack)
     mapper, _ = genParamMapper(f.center, negate(directUnpack), paramSet!Self=paramSet)
     shiftCore = StableTupleSub(T, Count(D))
     shifter = ContextParamFunc(shiftCore, CartesianFormatter(T, Count(D)), mapper)
-    TypedCarteFunc(ParamPipeFunc(shifter, fInner.f.f), T, Count(D)), paramSet
+    TypedCarteFunc(ParamPipeFunc(shifter, fInner.f.f), T, Count(D))
 end
 
 const FieldCenterShifter{T<:Real, D, M<:ChainMapper{ <:NTuple{D, Function} }} = 

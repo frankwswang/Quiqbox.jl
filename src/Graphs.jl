@@ -187,7 +187,7 @@ function formVertexSectors(unitInput::AbstractVector{<:ParamBox},
     counters = (fill(0), fill(0), fill(0))
 
     s = map(effects, counters, (unitInput, gridInput, callNodes)) do effect, counter, pars
-        if isempty(pars)
+        if isVoidCollection(pars)
             genBottomMemory()
         else
             map(pars) do par
@@ -259,7 +259,7 @@ function transpileParam(param::ParamBox, reindexInput!::Bool=false)
         inputSetRaw, midPars, outPars, _ = dissectParam(param)
 
         inUPars, inGPars = inputSetRaw
-        if isempty(inUPars) && isempty(inGPars)
+        if isVoidCollection(inUPars) && isVoidCollection(inGPars)
             throw(AssertionError("`param` should have at least one input source."))
         end
 

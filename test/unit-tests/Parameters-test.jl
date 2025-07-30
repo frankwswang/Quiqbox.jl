@@ -100,6 +100,9 @@ s1v = obtain(s1)
 @test v1_f([1.0]) == v1_f2([1.0]) == 1.0 != v1()
 a1 = genCellParam(v1, :a)
 a1_2 = genCellParam(itself, (v1,), :a1)
+@test a1 != a1_2
+@test Quiqbox.markObj(a1) == Quiqbox.markObj(a1_2)
+@test compareParamBox(a1, a1_2)
 @test a1.lambda == a1_2.lambda
 @test a1.offset[] === zero(Float64)
 @test symbolOf(a1) == :a

@@ -339,12 +339,21 @@ const BottomMemory = Memory{Union{}}
 genBottomMemory() = BottomMemory(undef, 0)
 
 
+isVoidCollection(::Any) = false
+
+isVoidCollection(::AbstractArray{Union{}}) = true
+
+isVoidCollection(arr::AbstractArray) = isempty(arr)
+
+isVoidCollection(arr::GeneralTupleUnion) = isempty(arr)
+
+
 getMinimalEleType(obj::Any) = typeof(obj)
 
 function getMinimalEleType(collection::AbstractArray{T}) where {T}
     if Base.isconcretetype(T)
         T
-    elseif isempty(collection)
+    elseif isVoidCollection(collection)
         Union{}
     else
         mapreduce(typeof, strictTypeJoin, collection)
@@ -383,7 +392,7 @@ extractMemory(arr::PackedMemory) = arr.value.value
 extractMemory(arr::CustomMemory) = arr.value::Memory
 
 function extractMemory(arr::AbstractArray{T}) where {T}
-    eleT = if isconcretetype(T) || isempty(arr)
+    eleT = if isconcretetype(T) || isVoidCollection(arr)
         T
     else
         mapreduce(typeof, strictTypeJoin, arr, init=Union{})
@@ -462,7 +471,7 @@ end
 
 tightenCollection(::Nothing) = genBottomMemory()
 
-tightenCollection(arr::AbstractVector) = isempty(arr) ? genBottomMemory() : genMemory(arr)
+tightenCollection(arr::AbstractVector) = genMemory(arr)
 
 
 function setIndex(tpl::NTuple{N, Any}, val::T, idx::Int, 
