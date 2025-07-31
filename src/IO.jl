@@ -124,6 +124,18 @@ print(io, getOwnedObjNameStr(nameof(GetUnitEntry), "GetUnitEntry"))
 Base.show(io::IO, ::Type{GetGridEntry}) = 
 print(io, getOwnedObjNameStr(nameof(GetGridEntry), "GetGridEntry"))
 
+Base.show(io::IO, ::Type{VoidSetFilter}) = 
+print(io, getOwnedObjNameStr(nameof(VoidSetFilter), "VoidSetFilter"))
+
+Base.show(io::IO, ::Type{UnitSetFilter}) = 
+print(io, getOwnedObjNameStr(nameof(UnitSetFilter), "UnitSetFilter"))
+
+Base.show(io::IO, ::Type{GridSetFilter}) = 
+print(io, getOwnedObjNameStr(nameof(GridSetFilter), "GridSetFilter"))
+
+Base.show(io::IO, ::Type{FullSetFilter}) = 
+print(io, getOwnedObjNameStr(nameof(FullSetFilter), "FullSetFilter"))
+
 #>> Cannot directly overload `show` of parameterized `Type` because type parameters 
 #>> are not individually dispatched on. Otherwise, it is possible for unbound type 
 #>> parameters in `Type{T}` where `T` is a `UnionAll` leak into the function body.

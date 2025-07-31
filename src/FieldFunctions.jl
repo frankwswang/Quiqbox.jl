@@ -24,24 +24,27 @@ end
 (f::FieldAmplitude)(input) = evalFieldAmplitude(f, formatInput(f, input))
 
 
-struct FieldParamFunc{T, D, C<:RealOrComplex{T}, F<:AbstractParamFunc} <: TypedParamFunc{C}
+struct FieldParamFunc{T, D, C<:RealOrComplex{T}, F<:AbstractParamFunc, S<:SpanSetFilter
+                      } <: TypedParamFunc{C}
     core::TypedReturn{C, ContextParamFunc{ F, CartesianFormatter{D, NTuple{D, T}}, 
-                                           GetEntry{TaggedSpanSetFilter} }}
+                                           GetEntry{TaggedSpanSetFilter{S}} }}
 
-    function FieldParamFunc{T, D, C}(f::F, scope::TaggedSpanSetFilter) where 
-                                    {T, C<:RealOrComplex{T}, D, F<:AbstractParamFunc}
+    function FieldParamFunc{T, D, C}(f::F, scope::TaggedSpanSetFilter{S}) where 
+                                    {T, C<:RealOrComplex{T}, D, F<:AbstractParamFunc, 
+                                     S<:SpanSetFilter}
         checkPositivity(D)
-        if F <: InputConverter && !all(isempty(sector) for sector in scope.scope.scope)
+        if F <: InputConverter && !(S <: VoidSetFilter)
             throw(AssertionError("The `scope` corresponding to `F<:InputConverter` must "*
-                                 "be empty`."))
+                                 "be `$(TaggedSpanSetFilter{VoidSetFilter})`."))
         end
         inner = ContextParamFunc(f, CartesianFormatter(T, Count(D)), GetEntry(scope))
-        new{T, D, C, F}(TypedReturn(inner, C))
+        new{T, D, C, F, S}(TypedReturn(inner, C))
     end
 end
 
-FieldParamFunc(f::TypedCarteFunc{C, D, <:AbstractParamFunc}, scope::TaggedSpanSetFilter
-               ) where {T, C<:RealOrComplex{T}, D} = 
+FieldParamFunc(f::TypedCarteFunc{C, D, <:AbstractParamFunc}, 
+               scope::TaggedSpanSetFilter{<:SpanSetFilter}) where 
+              {T, C<:RealOrComplex{T}, D} = 
 FieldParamFunc{T, D, C}(f.f.f, scope)
 
 function evalFieldParamFunc(f::FieldParamFunc{T, D, C, F}, input, params::OptSpanValueSet
@@ -54,7 +57,7 @@ end
 getOutputType(::Type{<:FieldParamFunc{T, D, C}}) where {T, D, C<:RealOrComplex{T}} = C
 
 const NullaryFieldFunc{T<:Real, D, C<:RealOrComplex{T}, F<:AbstractParamFunc} = 
-      FieldParamFunc{T, D, C, F}
+      FieldParamFunc{T, D, C, F, VoidSetFilter}
 
 
 struct StashedField{T<:Real, D, C<:RealOrComplex{T}, F<:AbstractParamFunc, 
@@ -186,15 +189,16 @@ end
 const WrappedField{C<:RealOrComplex, D, F<:Function} = EncodedField{C, D, F, ItsType}
 
 const EncodedFieldFunc{T<:Real, D, C<:RealOrComplex{T}, E<:AbstractParamFunc, 
-                       F<:AbstractParamFunc} = 
-      FieldParamFunc{T, D, C, ParamPipeFunc{F, E}}
+                       F<:AbstractParamFunc, S<:SpanSetFilter} = 
+      FieldParamFunc{T, D, C, ParamPipeFunc{F, E}, S}
 
 
 const RadialField{C<:RealOrComplex, D, F<:FieldAmplitude{C, 1}} = 
       EncodedField{C, D, F, typeof(generalNorm)}
 
-const RadialFieldFunc{T<:Real, D, C<:RealOrComplex{T}, F<:AbstractParamFunc} = 
-      EncodedFieldFunc{T, D, C, InputConverter{typeof(generalNorm)}, F}
+const RadialFieldFunc{T<:Real, D, C<:RealOrComplex{T}, F<:AbstractParamFunc, 
+                      S<:SpanSetFilter} = 
+      EncodedFieldFunc{T, D, C, InputConverter{typeof(generalNorm)}, F, S}
 
 RadialField{C, D}(radial::FieldAmplitude{C, 1}) where {C<:RealOrComplex, D} = 
 EncodedField(radial, CartesianHeader( generalNorm, Count(D) ))
@@ -269,8 +273,8 @@ const ComputeGaussFunc = typeof(computeGaussFunc)
 const GaussFieldCore{F<:NamedParamMapper} = 
       ContextParamFunc{ParamFreeFunc{ComputeGaussFunc}, ItsType, F}
 
-const GaussFieldFunc{T<:Real, F<:NamedParamMapper} = 
-      FieldParamFunc{T, 1, T, GaussFieldCore{F}}
+const GaussFieldFunc{T<:Real, F<:NamedParamMapper, S<:SpanSetFilter} = 
+      FieldParamFunc{T, 1, T, GaussFieldCore{F}, S}
 
 function GaussFunc(xpn::UnitOrVal{T}) where {T<:Real}
     core = TypedCarteFunc(ParamFreeFunc(computeGaussFunc), T, Count(1))
@@ -387,19 +391,20 @@ end
 
 const PolyGaussFunc{T<:Real, D, F<:GaussFunc{T}} = PolyRadialFunc{T, D, F}
 
-const PolyRadialFieldCore{T<:Real, D, C<:RealOrComplex{T}, F<:AbstractParamFunc} = 
+const PolyRadialFieldCore{T<:Real, D, C<:RealOrComplex{T}, F<:AbstractParamFunc, 
+                          S<:SpanSetFilter} = 
       ParamCombiner{ParamFreeFunc{StableMul{C}}, 
-                    Tuple{ RadialFieldFunc{T, D, C, F}, CartAngMomentumFunc{T, D, C} }}
+                    Tuple{ RadialFieldFunc{T, D, C, F, S}, CartAngMomentumFunc{T, D, C} }}
 
-const PolyGaussFieldCore{T<:Real, D, F<:NamedParamMapper} = 
-      PolyRadialFieldCore{T, D, T, GaussFieldFunc{T, F}}
+const PolyGaussFieldCore{T<:Real, D, F<:NamedParamMapper, S<:SpanSetFilter} = 
+      PolyRadialFieldCore{T, D, T, GaussFieldFunc{T, F, S}, S}
 
-const PolyRadialFieldFunc{T<:Real, D, C<:RealOrComplex{T}, 
-                          F<:PolyRadialFieldCore{T, D, C}} = 
-      FieldParamFunc{T, D, C, F}
+const PolyRadialFieldFunc{T<:Real, D, C<:RealOrComplex{T}, F<:PolyRadialFieldCore{T, D, C}, 
+                          S<:SpanSetFilter} = 
+      FieldParamFunc{T, D, C, F, S}
 
-const PolyGaussFieldFunc{T<:Real, D, F<:PolyGaussFieldCore{T, D}} = 
-      PolyRadialFieldFunc{T, D, T, F}
+const PolyGaussFieldFunc{T<:Real, D, F<:PolyGaussFieldCore{T, D}, S<:SpanSetFilter} = 
+      PolyRadialFieldFunc{T, D, T, F, S}
 
 
 struct ShiftedField{T, D, C<:RealOrComplex{T}, F<:FieldAmplitude{C, D}, 
@@ -443,8 +448,9 @@ const FieldCenterShifter{T<:Real, D, M<:ChainMapper{ <:NTuple{D, Function} }} =
 const ShiftedFieldFuncCore{T<:Real, D, F<:AbstractParamFunc, R<:FieldCenterShifter{T, D}} = 
       ParamPipeFunc{F, R}
 
-const ShiftedFieldFunc{T<:Real, D, C<:RealOrComplex{T}, F<:ShiftedFieldFuncCore{T, D}} = 
-      FieldParamFunc{T, D, C, F}
+const ShiftedFieldFunc{T<:Real, D, C<:RealOrComplex{T}, F<:ShiftedFieldFuncCore{T, D}, 
+                       S<:SpanSetFilter} = 
+      FieldParamFunc{T, D, C, F, S}
 
 const ShiftedPolyGaussField{T<:Real, D, F<:PolyGaussFunc{T, D}, 
                             R<:NTuple{ D, UnitParam{T} }} = 
