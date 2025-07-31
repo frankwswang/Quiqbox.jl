@@ -35,7 +35,7 @@ const defaultOscThreshold = 5e-6
 
 function getOrthonormalization(::Val{:Symmetric}, matOverlap::AbstractMatrix{T}) where 
                               {R<:Real, T<:RealOrComplex{R}}
-    Hermitian(matOverlap)^(-R(1//2))
+    Hermitian(matOverlap) |> sqrt |> inv
 end
 
 precompile(getOrthonormalization, (Matrix{Float64},))

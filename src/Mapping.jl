@@ -304,9 +304,9 @@ struct GetEntry{A<:AbstractAccessor} <: Mapper
     entry::A
 end
 
-(f::GetEntry{A})(obj) where {A<:AbstractAccessor} = getEntry(obj, f.entry)
+(f::GetEntry)(obj) = getEntry(obj, f.entry)
 
-function GetEntry(accessors::Tuple{Vararg{AbstractAccessor}})::GetEntry
+function GetEntry(accessors::Tuple{Vararg{SimpleAccessor}})
     GetEntry(ChainedAccess(accessors))
 end
 
