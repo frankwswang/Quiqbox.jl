@@ -91,7 +91,7 @@ function getEntry(obj, acc::DirectAccess)
 end
 
 function getEntry(obj, acc::ChainedAccess)
-    head, body = acc.chain
+    head, body... = acc.chain
     temp = getEntry(obj, head)
     getEntry(temp, ChainedAccess(body))
 end

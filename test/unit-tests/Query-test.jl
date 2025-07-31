@@ -1,6 +1,7 @@
 using Test
 using Quiqbox
-using Quiqbox: OneToIndex, markObj, MemoryPair, AtomicUnit, AtomicGrid, Identifier
+using Quiqbox: OneToIndex, ChainedAccess, markObj, MemoryPair, AtomicUnit, AtomicGrid, 
+               Identifier
 
 @testset "Query.jl" begin
 
@@ -14,6 +15,10 @@ idxBox = [i for i in OneToIndex(2)]
 @test OneToIndex() <= OneToIndex()
 @test OneToIndex() >= OneToIndex()
 @test OneToIndex() == OneToIndex() === OneToIndex(1)
+
+indexer = ChainedAccess(( OneToIndex(2), OneToIndex(1), OneToIndex(4) ))
+source = [[1], [[2, 3, 4, 5], 6]]
+@test Quiqbox.getEntry(source, indexer) == source[2][1][4]
 
 m1 = rand(3, 3)
 m1m = Quiqbox.ShapedMemory(m1)
