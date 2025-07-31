@@ -1382,18 +1382,12 @@ genBottomMemory()
 
 #= Additional Method =#
 function getEntry(target::OptionalSpanSet, sFilter::SpanSetFilter)
-    getter = let coreFilter=sFilter.scope
-        (sector, sym) -> getSector(sector, getfield(coreFilter, sym))
-    end
-    map(getter, target, (unit=:unit, grid=:grid))
+    map(getSector, target, sFilter.scope)
 end
 
-function getEntry(target::OptionalSpanSet, sFilter::SpanSetFilter, 
-                  finalizer::F) where {F<:Function}
-    mapper = let coreFilter=sFilter.scope, f=finalizer
-        (sector, sym) -> mapSector(sector, getfield(coreFilter, sym), f)
-    end
-    map(mapper, target, (unit=:unit, grid=:grid))
+function getEntry(target::OptionalSpanSet, sFilter::SpanSetFilter, finalizer::F) where 
+                 {F<:Function}
+    map(RPartial(mapSector, (finalizer,)), target, sFilter.scope)
 end
 
 getEntry(::OptionalSpanSet, ::VoidSetFilter) = initializeFixedSpanSet()
