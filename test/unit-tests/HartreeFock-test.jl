@@ -16,7 +16,7 @@ nucInfo = NuclearCluster(nuc, nucCoords)
 
 bs = reduce(vcat, genGaussTypeOrbSeq.(nucCoords, nuc, "STO-3G"))
 S = overlaps(bs)
-X = S^(-0.5)
+X = Quiqbox.getOrthonormalization(Val(:Symmetric), S)
 Hcore = coreHamiltonian(nuc, nucCoords, bs)
 HeeI = elecRepulsions(bs)
 spinInfo = Quiqbox.prepareSpinConfiguration(nucInfo)
