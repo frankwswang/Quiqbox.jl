@@ -165,15 +165,12 @@ needFieldAmpEvalCache(::EncodedField) = true
 function evalFieldAmplitudeCore(f::EncodedField{C, D, F, E}, input, 
                                 cache!Self::ParamDataCache) where 
                                {C<:RealOrComplex, D, F<:Function, E<:Function}
-    val = formatInput(CartesianInput{D}(), input)
-    for (caller, type) in zip((f.encode, f.core), (E, F))
-        val = if type <: FieldAmplitude
-            evalFieldAmplitude(caller.f, val; cache!Self)
-        else
-            caller(val)
-        end
-    end
-    convert(C, val)
+    val1 = formatInput(CartesianInput{D}(), input)
+    val2 = if E <: FieldAmplitude; evalFieldAmplitude(f.encode.f, val1; cache!Self) else
+              f.encode(val1) end
+    val3 = if F <: FieldAmplitude; evalFieldAmplitude(f.core.f, val2; cache!Self) else
+              f.core(val2) end
+    convert(C, val3)
 end
 
 function unpackFieldFunc!(f::F, paramInfo::Pair{<:OptSpanParamSet, Identifier}, 
@@ -247,7 +244,7 @@ end
 needFieldAmpEvalCache(::ModularField) = true
 
 function evalFieldAmplitudeCore(f::ModularField, input, cache!Self::ParamDataCache)
-    paramVals = cacheParam!(cache!Self, f.param)
+    paramVals = obtainCore!(cache!Self, f.param)
     f.core(formatInput(f, input), paramVals)
 end
 
@@ -355,11 +352,14 @@ end
 
 getOutputType(::Type{<:CoupledField{C}}) where {C<:RealOrComplex} = C
 
-function evalFieldAmplitude(f::CoupledField, input; 
-                            cache!Self::ParamDataCache=initializeParamDataCache())
-    map(f.pair) do basis
-        evalFieldAmplitude(basis, input; cache!Self)
-    end |> Base.Splat(f.coupler)
+function evalFieldAmplitude(f::CoupledField{C, D, L, R, F}, input; 
+                            cache!Self::ParamDataCache=initializeParamDataCache()) where 
+                            {C<:RealOrComplex, D, L<:FieldAmplitude{C, D}, 
+                             R<:FieldAmplitude{C, D}, F<:Function}
+    fPartL, fPartR = f.pair
+    resL = evalFieldAmplitude(fPartL, input; cache!Self)
+    resR = evalFieldAmplitude(fPartR, input; cache!Self)
+    f.coupler.f(resL, resR)
 end
 
 function unpackFieldFunc!(f::F, paramInfo::Pair{<:OptSpanParamSet, Identifier}, 
@@ -426,9 +426,9 @@ needFieldAmpEvalCache(::ShiftedField) = true
 
 function evalFieldAmplitudeCore(f::ShiftedField{T, D}, input, 
                                 cache!Self::ParamDataCache) where {T<:Real, D}
-    centerCoord = cacheParam!(cache!Self, f.center)
+    centerCoord = obtainCore!(cache!Self, f.center)
     shiftedCoord = StableTupleSub(T, Count(D))(formatInput(f, input), centerCoord)
-    f.core(shiftedCoord)
+    evalFieldAmplitude(f.core, shiftedCoord; cache!Self)
 end
 
 function unpackFieldFunc!(f::F, paramInfo::Pair{<:OptSpanParamSet, Identifier}, 
