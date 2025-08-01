@@ -137,7 +137,7 @@ getOutputType(::Type{<:CompositeOrb{T, D, C}}) where {T<:Real, D, C<:RealOrCompl
 function evalOrbital(orb::CompositeOrb{T, D, C}, input; 
                      cache!Self::ParamDataCache=initializeParamDataCache()) where 
                     {T<:Real, D, C<:RealOrComplex{T}}
-    weightVal = cacheParam!(cache!Self, orb.weight)
+    weightVal = obtainCore!(cache!Self, orb.weight)
 
     bodyVal = mapreduce(StableAdd(C), orb.basis, weightVal) do basis, w
         evalOrbital(basis, input; cache!Self) * w
@@ -290,7 +290,7 @@ function genOrbitalPointer!(::Type{C},
                             paramSet::OptSpanParamSet, 
                             paramCache::ParamDataCache) where 
                            {T<:Real, D, C<:RealOrComplex{T}}
-    weightValue = convert(Memory{C}, cacheParam!(paramCache, orbital.weight))
+    weightValue = Memory{C}(obtainCore!(paramCache, orbital.weight))
     primOrbPtrs = map(orbital.basis) do o
         genOrbitalPointer!(C, configDict, markerDict, o, directUnpack, paramSet, paramCache)
     end
