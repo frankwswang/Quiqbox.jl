@@ -220,23 +220,19 @@ function getNestedLevelCore(::Type{<:ParamBox{<:Any, E}}, level::Int) where {E<:
 end
 
 
-function checkParamOffsetMethods(::Type{T}) where {T}
-    (hasmethod(unitAdd, NTuple{2, T}) && hasmethod(unitSub, NTuple{2, T})) || 
-    (hasmethod(+, NTuple{2, T}) && hasmethod(-, NTuple{2, T}))
+function getScreenLevelOptionsCore(::Type{E}) where {E}
+    flag = (hasmethod(+, NTuple{2, E}) && hasmethod(-, NTuple{2, E}))
+    Tuple(0 : (flag * 2))
 end
 
-
-function getScreenLevelOptionsCore(::Type{E}) where {E}
-    Tuple(0:(checkParamOffsetMethods(E) * 2))
+function getScreenLevelOptionsCore(::Type{E}) where {T, E<:NonEmptyTuple{T}}
+    flag = (hasmethod(+, NTuple{2, T}) && hasmethod(-, NTuple{2, T}))
+    Tuple(0 : (flag * 2))
 end
 #> ParamBoxes with nested data (nested level > 1) cannot have screen level higher than 0
 function getScreenLevelOptionsCore(::Type{E}) where {E<:AbstractArray}
     nl = getNestedLevel(E)
-    if nl.level > 1
-        (0,)
-    else
-        Tuple(0:(checkParamOffsetMethods(nl|>getCoreType) * 2))
-    end
+    nl.level > 1 ? (0,) : getScreenLevelOptionsCore(eltype(E))
 end
 
 
@@ -247,41 +243,6 @@ getScreenLevelOptions(::Type{<:MeshParam{T, E}}) where {T, E<:Pack{T}} =
 getScreenLevelOptionsCore(PackedMemory{T, E})
 
 screenLevelOf(p::AdaptableParam) = Int(p.screen)
-
-
-function unitAdd(a::NonEmptyTuple{Number, N}, b::NonEmptyTuple{Number, N}) where {N}
-    map(a, b) do i, j
-        typeof(i)(i + j)
-    end
-end
-
-function unitSub(a::NonEmptyTuple{Number, N}, b::NonEmptyTuple{Number, N}) where {N}
-    map(a, b) do i, j
-        typeof(i)(i - j)
-    end
-end
-
-unitOpMatch(::typeof(+)) = unitAdd
-
-unitOpMatch(::typeof(-)) = unitSub
-
-function unitOp(f::F, a::T1, b::T2) where {F<:Union{typeof(+), typeof(-)}, T1, T2}
-    fSpecialize = unitOpMatch(f)
-    if hasmethod(fSpecialize, Tuple{T1, T2})
-        fSpecialize(a, b)
-    else
-        f(a, b) |> T1
-    end
-end
-
-function unitOp(f::F, a::AbstractArray{<:Any, N}, b::AbstractArray{<:Any, N}) where 
-               {F<:Union{typeof(+), typeof(-)}, N}
-    idx = firstindex(b) - 1
-    map(a) do ele
-        idx += 1
-        unitOp(f, ele, b[idx])
-    end
-end
 
 
 getTensorOutputTypeBound(::TypedReduce{E}) where {E} = E
@@ -313,7 +274,7 @@ function formatOffset(lambda::TypedTensorFunc{<:Pack}, ::Missing, input::CoreFix
             res
         else
             buffer = lambda(obtain.(input)...)
-            res = unitOp(-, buffer, buffer)
+            res = genStableBinaryOp(-, getPackType(outType))(buffer, buffer)
             res isa AbstractArray ? PackedMemory(res) : res
         end
         (val,)
@@ -492,9 +453,10 @@ end
     return :($res)
 end
 
-function isOffsetEnabled(pb::T) where {T<:AdaptableParam}
-    isScreenLevelChangeable(T) && maximum( getScreenLevelOptions(T) ) > 0 && 
-    isdefined(pb, :offset) # Only for safety
+@generated function isOffsetEnabled(::T) where {T<:AdaptableParam}
+    res = isScreenLevelChangeable(T) && maximum( getScreenLevelOptions(T) ) > 0 && 
+          hasfield(T, :offset) #> Only for safety
+    return :($res)
 end
 
 
@@ -530,18 +492,19 @@ function indexParam(pb::UnitParam, oneToIdx::Int, sym::MissingOr{Symbol}=missing
 end
 
 
-# level 0: λ(input) + offset
-# level 1: itself(offset)
-# level 2: offset
+#> level 0: λ(input) + offset
+#> level 1: itself(offset)
+#> level 2: offset
 function setScreenLevel!(p::AdaptableParam, level::Int)
     checkScreenLevel(level, getScreenLevelOptions(p|>typeof))
+    outType = getOutputType(p)
     levelOld = screenLevelOf(p)
     if levelOld == level
     elseif levelOld == 0
         safelySetVal!(p.offset, obtain(p))
     elseif level == 0
         newVal = p.lambda((obtain(arg) for arg in p.input)...)
-        safelySetVal!(p.offset, unitOp(-, p.offset[], newVal))
+        safelySetVal!(p.offset, genStableBinaryOp(-, outType)(p.offset[], newVal))
     end
     @atomic p.screen = TernaryNumber(level)
     p
@@ -643,18 +606,24 @@ function obtainCore!(cache::OptParamDataCache, param::ShapedParam)
     end::getOutputType(param)
 end
 
-function obtainCore!(cache::OptParamDataCache, param::AdaptableParam)
-    key = ParamEgalBox(param)
-    get!(cache, key) do
-        if screenLevelOf(param) > 0
-            param.offset[]
-        else
-            inVal = (obtainCore!(cache, p) for p in param.input)
+function obtainCore!(cache::OptParamDataCache, param::P) where {P<:AdaptableParam}
+    outType = getOutputType(P)
+    unitOp = genStableBinaryOp(+, outType)
+    if screenLevelOf(param) > 0
+        param.offset[]
+    else
+        get!(cache, ParamEgalBox(param)) do
+            inVal = map(LPartial(obtainCore!, (cache,)), param.input)
             body = param.lambda(inVal...)
-            isOffsetEnabled(param) ? unitOp(+, body, param.offset[]) : body
-        end
-    end::getOutputType(param)
+            if isOffsetEnabled(param)
+                unitOp(body, param.offset[])
+            else
+                body
+            end
+        end::outType
+    end
 end
+
 #> Special method for internal use
 function obtainCore!(cache::OptParamDataCache, params::DirectParamSource)
     if params isa ParamBoxAbtArr && isVoidCollection(params)
@@ -703,8 +672,8 @@ function obtain(params::ParamBoxAbtArr, decouple::Boolean=True())
         similar(params, Union{})
     else
         eleParamType = eltype(params)
-        outputType = eleParamType <: PrimitiveParam ? getOutputType(eleParamType) : Any
-        cache = initializeParamDataCache(min( 500, 100length(params) ), outputType)
+        outType = eleParamType <: PrimitiveParam ? getOutputType(eleParamType) : Any
+        cache = initializeParamDataCache(min( 500, 100length(params) ), outType)
         map(params) do param
             checkParamCycle(param)
             obtainCore!(cache, param) |> finalizer
@@ -913,14 +882,18 @@ struct ReduceShift{T, F<:Function} <: TypedTensorFunc{T, 0}
     shift::T
 end
 
-(f::ReduceShift)(args...) = unitOp(+, f.apply(args...), f.shift)
+function (f::ReduceShift{T})(args...) where {T}
+    genStableBinaryOp(+, T)(f.apply(args...), f.shift)
+end
 
 struct ExpandShift{T, N, F<:Function} <: TypedTensorFunc{T, N}
     apply::TypedExpand{T, N, F}
     shift::DirectMemory{T, N}
 end
 
-(f::ExpandShift)(args...) = unitOp(+, f.apply(args...), f.shift)
+function (f::ExpandShift{T, N})(args...) where {T, N}
+    genStableBinaryOp(+, AbstractArray{T, N})(f.apply(args...), f.shift)
+end
 
 extractTransformCore(::ReduceParam) = ReduceShift
 extractTransformCore(::ExpandParam) = ExpandShift

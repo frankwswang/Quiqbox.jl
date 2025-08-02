@@ -509,8 +509,13 @@ atomicEval(obj) = itself(obj)
 atomicEval(box::AtomicLocker) = box[]
 
 
-function safelySetVal!(box::AtomicUnit, val)
+function safelySetVal!(box::AtomicUnit{T}, val::T) where {T}
     @atomic box.value = val
+end
+
+function safelySetVal!(box::AtomicUnit{<:AbstractVector{T}}, 
+                       val::AbstractVector{T}) where {T}
+    safelySetVal!(box.value, val)
 end
 
 function safelySetVal!(box::AtomicGrid, val)
