@@ -633,46 +633,37 @@ function hasCycle(param::ParamBox, finalizer::F=itself; strictMode::Bool=true,
 end
 
 
-const ParamDataCache{T} = LRU{ParamEgalBox, T}
+const OptParamDataCache{T} = OptionalLRU{ParamEgalBox, T}
 
-initializeParamDataCache(maxSize::Int=100, ::Type{T}=Any) where {T} = 
-ParamDataCache{T}(maxsize=maxSize)
+obtainCore!(::OptParamDataCache, param::PrimitiveParam) = param.data[]
 
-
-function cacheParamCore!(cache::ParamDataCache, param::ParamBox, 
-                         evaluator::F=Base.Fix1(obtainCore!, cache)) where {F<:Function}
-    get!(cache, ParamEgalBox(param)) do
-        evaluator(param)
-    end::getOutputType(param)
-end
-
-function cacheParam!(cache::ParamDataCache, param::ParamBox)
-    cacheParamCore!(cache, param) |> decoupledCopy
-end
-
-
-function obtainCore!(cache::ParamDataCache, param::PrimitiveParam)
-    value = param.data[]
-    cacheParamCore!(cache, param, Storage(value))::typeof(value)
-end
-
-function obtainCore!(cache::ParamDataCache, param::ShapedParam)
+function obtainCore!(cache::OptParamDataCache, param::ShapedParam)
     map(param.input) do p
         obtainCore!(cache, p)
     end::getOutputType(param)
 end
 
-function obtainCore!(cache::ParamDataCache, param::AdaptableParam)
+function obtainCore!(cache::OptParamDataCache, param::AdaptableParam)
     key = ParamEgalBox(param)
     get!(cache, key) do
         if screenLevelOf(param) > 0
-            decoupledCopy(param.offset[])
+            param.offset[]
         else
             inVal = (obtainCore!(cache, p) for p in param.input)
             body = param.lambda(inVal...)
             isOffsetEnabled(param) ? unitOp(+, body, param.offset[]) : body
         end
     end::getOutputType(param)
+end
+#> Special method for internal use
+function obtainCore!(cache::OptParamDataCache, params::DirectParamSource)
+    if params isa ParamBoxAbtArr && isVoidCollection(params)
+        similar(params, Union{})
+    else
+        map(params) do param
+            obtainCore!(cache, param)
+        end
+    end
 end
 
 function checkParamCycle(param::ParamBox, finalizer::F=itself; strictMode=false) where {F}
@@ -683,20 +674,31 @@ function checkParamCycle(param::ParamBox, finalizer::F=itself; strictMode=false)
     end
 end
 
-function obtain(param::CompositeParam)
+initializeParamDataCache(maxSize::Int=100, ::Type{T}=Any) where {T} = 
+LRU{ParamEgalBox, T}(maxsize=maxSize)::OptParamDataCache{T}
+
+initializeParamDataCache(::Nothing) = EmptyDict{ParamEgalBox, Any}()
+
+function obtain(param::CompositeParam, decouple::Boolean=True())
     checkParamCycle(param)
-    if param isa AdaptableParam && screenLevelOf(param) > 0
+    output = if param isa AdaptableParam && screenLevelOf(param) > 0
         param.offset[]
     else
         cache = initializeParamDataCache()
         obtainCore!(cache, param)
-    end |> decoupledCopy
+    end
+    evalTypedData(decouple) ? decoupledCopy(output) : output
 end
 
-obtain(param::PrimitiveParam) = decoupledCopy(param.data[])::getOutputType(param)
+function obtain(param::PrimitiveParam, decouple::Boolean=True())
+    output = param.data[]
+    (evalTypedData(decouple) ? decoupledCopy(output) : output)::getOutputType(param)
+end
 
-function obtain(params::ParamBoxAbtArr)
+function obtain(params::ParamBoxAbtArr, decouple::Boolean=True())
     checkBottomArray(params)
+    finalizer = ifelse(evalTypedData(decouple), decoupledCopy, itself)
+
     if isVoidCollection(params)
         similar(params, Union{})
     else
@@ -705,7 +707,7 @@ function obtain(params::ParamBoxAbtArr)
         cache = initializeParamDataCache(min( 500, 100length(params) ), outputType)
         map(params) do param
             checkParamCycle(param)
-            obtainCore!(cache, param) |> decoupledCopy
+            obtainCore!(cache, param) |> finalizer
         end
     end
 end
@@ -898,7 +900,7 @@ end
 
 ParamFreeFunc(f::ParamFreeFunc) = itself(f)
 
-(f::ParamFreeFunc{F})(args...) where {F<:Function} = f.f(args...)
+(f::ParamFreeFunc{F})(args::Vararg{Any, N}) where {F<:Function, N} = f.f(args...)
 
 getOutputType(::Type{ParamFreeFunc{F}}) where {F<:Function} = getOutputType(F)
 
@@ -1184,19 +1186,12 @@ initializeFixedSpanSet() = (unit=genBottomMemory(), grid=genBottomMemory())
 
 
 #= Additional Method =#
-function obtain(paramSet::OptSpanParamSet)
+function obtain(paramSet::OptSpanParamSet, decouple::Boolean=True())
     map(paramSet) do sector
-        (sector === nothing || isVoidCollection(sector)) ? nothing : obtain(sector)
-    end
-end
-
-#= Additional Method =#
-function cacheParam!(cache::ParamDataCache, params::DirectParamSource)
-    if params isa ParamBoxAbtArr && isVoidCollection(params)
-        similar(params, Union{})
-    else
-        map(params) do param
-            cacheParam!(cache, param)
+        if sector === nothing || isVoidCollection(sector)
+            nothing
+        else
+            obtain(sector, decouple)
         end
     end
 end
@@ -1612,7 +1607,7 @@ called by `obtain`; for any `param` being nested `ParamBox`, it recursively seve
 returned (or ints inside) `ParamBox` will be screened.
 """
 function sever(param::SpanParam, screenSource::Bool=false)
-    val = obtain(param)
+    val = obtain(param, False())
     genTensorVar(val, symbolOf(param), screenSource)
 end
 
