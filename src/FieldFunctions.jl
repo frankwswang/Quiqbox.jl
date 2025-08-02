@@ -11,10 +11,9 @@ getDimension(::ParticleFunction{D, M}) where {D, M} = Int(D*M)
 needFieldAmpEvalCache(::FieldAmplitude) = false
 
 function evalFieldAmplitude(f::FieldAmplitude, input; 
-                            cache!Self::MissingOr{OptParamDataCache}=missing)
+                            cache!Self::OptParamDataCache=initializeParamDataCache())
     formattedInput = formatInput(f, input)
     if needFieldAmpEvalCache(f)
-        ismissing(cache!Self) && (cache!Self = initializeParamDataCache())
         evalFieldAmplitudeCore(f, formattedInput, cache!Self)
     else
         evalFieldAmplitudeCore(f, formattedInput)
