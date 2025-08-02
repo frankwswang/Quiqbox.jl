@@ -11,7 +11,7 @@ getDimension(::ParticleFunction{D, M}) where {D, M} = Int(D*M)
 needFieldAmpEvalCache(::FieldAmplitude) = false
 
 function evalFieldAmplitude(f::FieldAmplitude, input; 
-                            cache!Self::MissingOr{ParamDataCache}=missing)
+                            cache!Self::MissingOr{OptParamDataCache}=missing)
     formattedInput = formatInput(f, input)
     if needFieldAmpEvalCache(f)
         ismissing(cache!Self) && (cache!Self = initializeParamDataCache())
@@ -66,7 +66,7 @@ struct StashedField{T<:Real, D, C<:RealOrComplex{T}, F<:AbstractParamFunc,
     data::V
 
     function StashedField(f::FieldParamFunc{T, D, C}, paramSet::OptSpanParamSet, 
-                          cache!Self::ParamDataCache=initializeParamDataCache()) where 
+                          cache!Self::OptParamDataCache=initializeParamDataCache()) where 
                          {T, D, C<:RealOrComplex{T}}
         fInner = f.core.f
         core = TypedCarteFunc(fInner.binder, C, Count(D))
@@ -163,17 +163,14 @@ getOutputType(::Type{<:EncodedField{C}}) where {C<:RealOrComplex} = C
 needFieldAmpEvalCache(::EncodedField) = true
 
 function evalFieldAmplitudeCore(f::EncodedField{C, D, F, E}, input, 
-                                cache!Self::ParamDataCache) where 
+                                cache!Self::OptParamDataCache) where 
                                {C<:RealOrComplex, D, F<:Function, E<:Function}
-    val = formatInput(CartesianInput{D}(), input)
-    for (caller, type) in zip((f.encode, f.core), (E, F))
-        val = if type <: FieldAmplitude
-            evalFieldAmplitude(caller.f, val; cache!Self)
-        else
-            caller(val)
-        end
-    end
-    convert(C, val)
+    val1 = formatInput(CartesianInput{D}(), input)
+    val2 = if E <: FieldAmplitude; evalFieldAmplitude(f.encode.f, val1; cache!Self) else
+              f.encode(val1) end
+    val3 = if F <: FieldAmplitude; evalFieldAmplitude(f.core.f, val2; cache!Self) else
+              f.core(val2) end
+    convert(C, val3)
 end
 
 function unpackFieldFunc!(f::F, paramInfo::Pair{<:OptSpanParamSet, Identifier}, 
@@ -246,8 +243,8 @@ end
 
 needFieldAmpEvalCache(::ModularField) = true
 
-function evalFieldAmplitudeCore(f::ModularField, input, cache!Self::ParamDataCache)
-    paramVals = cacheParam!(cache!Self, f.param)
+function evalFieldAmplitudeCore(f::ModularField, input, cache!Self::OptParamDataCache)
+    paramVals = obtainCore!(cache!Self, f.param)
     f.core(formatInput(f, input), paramVals)
 end
 
@@ -299,7 +296,7 @@ ProductField(basis::Tuple{FieldAmplitude}) = first(basis)
 getOutputType(::Type{<:ProductField{C}}) where {C<:RealOrComplex} = C
 
 function evalFieldAmplitude(f::ProductField{C}, input; 
-                            cache!Self::ParamDataCache=initializeParamDataCache(), 
+                            cache!Self::OptParamDataCache=initializeParamDataCache(), 
                             ) where {C<:RealOrComplex}
     idx = firstindex(input)
     mapreduce(StableMul(C), f.basis) do basis
@@ -355,11 +352,14 @@ end
 
 getOutputType(::Type{<:CoupledField{C}}) where {C<:RealOrComplex} = C
 
-function evalFieldAmplitude(f::CoupledField, input; 
-                            cache!Self::ParamDataCache=initializeParamDataCache())
-    map(f.pair) do basis
-        evalFieldAmplitude(basis, input; cache!Self)
-    end |> Base.Splat(f.coupler)
+function evalFieldAmplitude(f::CoupledField{C, D, L, R, F}, input; 
+                            cache!Self::OptParamDataCache=initializeParamDataCache()) where 
+                            {C<:RealOrComplex, D, L<:FieldAmplitude{C, D}, 
+                             R<:FieldAmplitude{C, D}, F<:Function}
+    fPartL, fPartR = f.pair
+    resL = evalFieldAmplitude(fPartL, input; cache!Self)
+    resR = evalFieldAmplitude(fPartR, input; cache!Self)
+    f.coupler.f(resL, resR)
 end
 
 function unpackFieldFunc!(f::F, paramInfo::Pair{<:OptSpanParamSet, Identifier}, 
@@ -425,10 +425,10 @@ getOutputType(::Type{<:ShiftedField{T, D, C}}) where {T, D, C<:RealOrComplex{T}}
 needFieldAmpEvalCache(::ShiftedField) = true
 
 function evalFieldAmplitudeCore(f::ShiftedField{T, D}, input, 
-                                cache!Self::ParamDataCache) where {T<:Real, D}
-    centerCoord = cacheParam!(cache!Self, f.center)
+                                cache!Self::OptParamDataCache) where {T<:Real, D}
+    centerCoord = obtainCore!(cache!Self, f.center)
     shiftedCoord = StableTupleSub(T, Count(D))(formatInput(f, input), centerCoord)
-    f.core(shiftedCoord)
+    evalFieldAmplitude(f.core, shiftedCoord; cache!Self)
 end
 
 function unpackFieldFunc!(f::F, paramInfo::Pair{<:OptSpanParamSet, Identifier}, 

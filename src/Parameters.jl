@@ -220,23 +220,19 @@ function getNestedLevelCore(::Type{<:ParamBox{<:Any, E}}, level::Int) where {E<:
 end
 
 
-function checkParamOffsetMethods(::Type{T}) where {T}
-    (hasmethod(unitAdd, NTuple{2, T}) && hasmethod(unitSub, NTuple{2, T})) || 
-    (hasmethod(+, NTuple{2, T}) && hasmethod(-, NTuple{2, T}))
+function getScreenLevelOptionsCore(::Type{E}) where {E}
+    flag = (hasmethod(+, NTuple{2, E}) && hasmethod(-, NTuple{2, E}))
+    Tuple(0 : (flag * 2))
 end
 
-
-function getScreenLevelOptionsCore(::Type{E}) where {E}
-    Tuple(0:(checkParamOffsetMethods(E) * 2))
+function getScreenLevelOptionsCore(::Type{E}) where {T, E<:NonEmptyTuple{T}}
+    flag = (hasmethod(+, NTuple{2, T}) && hasmethod(-, NTuple{2, T}))
+    Tuple(0 : (flag * 2))
 end
 #> ParamBoxes with nested data (nested level > 1) cannot have screen level higher than 0
 function getScreenLevelOptionsCore(::Type{E}) where {E<:AbstractArray}
     nl = getNestedLevel(E)
-    if nl.level > 1
-        (0,)
-    else
-        Tuple(0:(checkParamOffsetMethods(nl|>getCoreType) * 2))
-    end
+    nl.level > 1 ? (0,) : getScreenLevelOptionsCore(eltype(E))
 end
 
 
@@ -247,41 +243,6 @@ getScreenLevelOptions(::Type{<:MeshParam{T, E}}) where {T, E<:Pack{T}} =
 getScreenLevelOptionsCore(PackedMemory{T, E})
 
 screenLevelOf(p::AdaptableParam) = Int(p.screen)
-
-
-function unitAdd(a::NonEmptyTuple{Number, N}, b::NonEmptyTuple{Number, N}) where {N}
-    map(a, b) do i, j
-        typeof(i)(i + j)
-    end
-end
-
-function unitSub(a::NonEmptyTuple{Number, N}, b::NonEmptyTuple{Number, N}) where {N}
-    map(a, b) do i, j
-        typeof(i)(i - j)
-    end
-end
-
-unitOpMatch(::typeof(+)) = unitAdd
-
-unitOpMatch(::typeof(-)) = unitSub
-
-function unitOp(f::F, a::T1, b::T2) where {F<:Union{typeof(+), typeof(-)}, T1, T2}
-    fSpecialize = unitOpMatch(f)
-    if hasmethod(fSpecialize, Tuple{T1, T2})
-        fSpecialize(a, b)
-    else
-        f(a, b) |> T1
-    end
-end
-
-function unitOp(f::F, a::AbstractArray{<:Any, N}, b::AbstractArray{<:Any, N}) where 
-               {F<:Union{typeof(+), typeof(-)}, N}
-    idx = firstindex(b) - 1
-    map(a) do ele
-        idx += 1
-        unitOp(f, ele, b[idx])
-    end
-end
 
 
 getTensorOutputTypeBound(::TypedReduce{E}) where {E} = E
@@ -313,7 +274,7 @@ function formatOffset(lambda::TypedTensorFunc{<:Pack}, ::Missing, input::CoreFix
             res
         else
             buffer = lambda(obtain.(input)...)
-            res = unitOp(-, buffer, buffer)
+            res = genStableBinaryOp(-, getPackType(outType))(buffer, buffer)
             res isa AbstractArray ? PackedMemory(res) : res
         end
         (val,)
@@ -492,9 +453,10 @@ end
     return :($res)
 end
 
-function isOffsetEnabled(pb::T) where {T<:AdaptableParam}
-    isScreenLevelChangeable(T) && maximum( getScreenLevelOptions(T) ) > 0 && 
-    isdefined(pb, :offset) # Only for safety
+@generated function isOffsetEnabled(::T) where {T<:AdaptableParam}
+    res = isScreenLevelChangeable(T) && maximum( getScreenLevelOptions(T) ) > 0 && 
+          hasfield(T, :offset) #> Only for safety
+    return :($res)
 end
 
 
@@ -530,18 +492,19 @@ function indexParam(pb::UnitParam, oneToIdx::Int, sym::MissingOr{Symbol}=missing
 end
 
 
-# level 0: λ(input) + offset
-# level 1: itself(offset)
-# level 2: offset
+#> level 0: λ(input) + offset
+#> level 1: itself(offset)
+#> level 2: offset
 function setScreenLevel!(p::AdaptableParam, level::Int)
     checkScreenLevel(level, getScreenLevelOptions(p|>typeof))
+    outType = getOutputType(p)
     levelOld = screenLevelOf(p)
     if levelOld == level
     elseif levelOld == 0
         safelySetVal!(p.offset, obtain(p))
     elseif level == 0
         newVal = p.lambda((obtain(arg) for arg in p.input)...)
-        safelySetVal!(p.offset, unitOp(-, p.offset[], newVal))
+        safelySetVal!(p.offset, genStableBinaryOp(-, outType)(p.offset[], newVal))
     end
     @atomic p.screen = TernaryNumber(level)
     p
@@ -633,46 +596,43 @@ function hasCycle(param::ParamBox, finalizer::F=itself; strictMode::Bool=true,
 end
 
 
-const ParamDataCache{T} = LRU{ParamEgalBox, T}
+const OptParamDataCache{T} = OptionalLRU{ParamEgalBox, T}
 
-initializeParamDataCache(maxSize::Int=100, ::Type{T}=Any) where {T} = 
-ParamDataCache{T}(maxsize=maxSize)
+obtainCore!(::OptParamDataCache, param::PrimitiveParam) = param.data[]
 
-
-function cacheParamCore!(cache::ParamDataCache, param::ParamBox, 
-                         evaluator::F=Base.Fix1(obtainCore!, cache)) where {F<:Function}
-    get!(cache, ParamEgalBox(param)) do
-        evaluator(param)
-    end::getOutputType(param)
-end
-
-function cacheParam!(cache::ParamDataCache, param::ParamBox)
-    cacheParamCore!(cache, param) |> decoupledCopy
-end
-
-
-function obtainCore!(cache::ParamDataCache, param::PrimitiveParam)
-    value = param.data[]
-    cacheParamCore!(cache, param, Storage(value))::typeof(value)
-end
-
-function obtainCore!(cache::ParamDataCache, param::ShapedParam)
+function obtainCore!(cache::OptParamDataCache, param::ShapedParam)
     map(param.input) do p
         obtainCore!(cache, p)
     end::getOutputType(param)
 end
 
-function obtainCore!(cache::ParamDataCache, param::AdaptableParam)
-    key = ParamEgalBox(param)
-    get!(cache, key) do
-        if screenLevelOf(param) > 0
-            decoupledCopy(param.offset[])
-        else
-            inVal = (obtainCore!(cache, p) for p in param.input)
+function obtainCore!(cache::OptParamDataCache, param::P) where {P<:AdaptableParam}
+    outType = getOutputType(P)
+    unitOp = genStableBinaryOp(+, outType)
+    if screenLevelOf(param) > 0
+        param.offset[]
+    else
+        get!(cache, ParamEgalBox(param)) do
+            inVal = map(LPartial(obtainCore!, (cache,)), param.input)
             body = param.lambda(inVal...)
-            isOffsetEnabled(param) ? unitOp(+, body, param.offset[]) : body
+            if isOffsetEnabled(param)
+                unitOp(body, param.offset[])
+            else
+                body
+            end
+        end::outType
+    end
+end
+
+#> Special method for internal use
+function obtainCore!(cache::OptParamDataCache, params::DirectParamSource)
+    if params isa ParamBoxAbtArr && isVoidCollection(params)
+        similar(params, Union{})
+    else
+        map(params) do param
+            obtainCore!(cache, param)
         end
-    end::getOutputType(param)
+    end
 end
 
 function checkParamCycle(param::ParamBox, finalizer::F=itself; strictMode=false) where {F}
@@ -683,29 +643,40 @@ function checkParamCycle(param::ParamBox, finalizer::F=itself; strictMode=false)
     end
 end
 
-function obtain(param::CompositeParam)
+initializeParamDataCache(maxSize::Int=100, ::Type{T}=Any) where {T} = 
+LRU{ParamEgalBox, T}(maxsize=maxSize)::OptParamDataCache{T}
+
+initializeParamDataCache(::Nothing) = EmptyDict{ParamEgalBox, Any}()
+
+function obtain(param::CompositeParam, decouple::Boolean=True())
     checkParamCycle(param)
-    if param isa AdaptableParam && screenLevelOf(param) > 0
+    output = if param isa AdaptableParam && screenLevelOf(param) > 0
         param.offset[]
     else
         cache = initializeParamDataCache()
         obtainCore!(cache, param)
-    end |> decoupledCopy
+    end
+    evalTypedData(decouple) ? decoupledCopy(output) : output
 end
 
-obtain(param::PrimitiveParam) = decoupledCopy(param.data[])::getOutputType(param)
+function obtain(param::PrimitiveParam, decouple::Boolean=True())
+    output = param.data[]
+    (evalTypedData(decouple) ? decoupledCopy(output) : output)::getOutputType(param)
+end
 
-function obtain(params::ParamBoxAbtArr)
+function obtain(params::ParamBoxAbtArr, decouple::Boolean=True())
     checkBottomArray(params)
+    finalizer = ifelse(evalTypedData(decouple), decoupledCopy, itself)
+
     if isVoidCollection(params)
         similar(params, Union{})
     else
         eleParamType = eltype(params)
-        outputType = eleParamType <: PrimitiveParam ? getOutputType(eleParamType) : Any
-        cache = initializeParamDataCache(min( 500, 100length(params) ), outputType)
+        outType = eleParamType <: PrimitiveParam ? getOutputType(eleParamType) : Any
+        cache = initializeParamDataCache(min( 500, 100length(params) ), outType)
         map(params) do param
             checkParamCycle(param)
-            obtainCore!(cache, param) |> decoupledCopy
+            obtainCore!(cache, param) |> finalizer
         end
     end
 end
@@ -898,7 +869,7 @@ end
 
 ParamFreeFunc(f::ParamFreeFunc) = itself(f)
 
-(f::ParamFreeFunc{F})(args...) where {F<:Function} = f.f(args...)
+(f::ParamFreeFunc{F})(args::Vararg{Any, N}) where {F<:Function, N} = f.f(args...)
 
 getOutputType(::Type{ParamFreeFunc{F}}) where {F<:Function} = getOutputType(F)
 
@@ -911,14 +882,18 @@ struct ReduceShift{T, F<:Function} <: TypedTensorFunc{T, 0}
     shift::T
 end
 
-(f::ReduceShift)(args...) = unitOp(+, f.apply(args...), f.shift)
+function (f::ReduceShift{T})(args...) where {T}
+    genStableBinaryOp(+, T)(f.apply(args...), f.shift)
+end
 
 struct ExpandShift{T, N, F<:Function} <: TypedTensorFunc{T, N}
     apply::TypedExpand{T, N, F}
     shift::DirectMemory{T, N}
 end
 
-(f::ExpandShift)(args...) = unitOp(+, f.apply(args...), f.shift)
+function (f::ExpandShift{T, N})(args...) where {T, N}
+    genStableBinaryOp(+, AbstractArray{T, N})(f.apply(args...), f.shift)
+end
 
 extractTransformCore(::ReduceParam) = ReduceShift
 extractTransformCore(::ExpandParam) = ExpandShift
@@ -1184,19 +1159,12 @@ initializeFixedSpanSet() = (unit=genBottomMemory(), grid=genBottomMemory())
 
 
 #= Additional Method =#
-function obtain(paramSet::OptSpanParamSet)
+function obtain(paramSet::OptSpanParamSet, decouple::Boolean=True())
     map(paramSet) do sector
-        (sector === nothing || isVoidCollection(sector)) ? nothing : obtain(sector)
-    end
-end
-
-#= Additional Method =#
-function cacheParam!(cache::ParamDataCache, params::DirectParamSource)
-    if params isa ParamBoxAbtArr && isVoidCollection(params)
-        similar(params, Union{})
-    else
-        map(params) do param
-            cacheParam!(cache, param)
+        if sector === nothing || isVoidCollection(sector)
+            nothing
+        else
+            obtain(sector, decouple)
         end
     end
 end
@@ -1612,7 +1580,7 @@ called by `obtain`; for any `param` being nested `ParamBox`, it recursively seve
 returned (or ints inside) `ParamBox` will be screened.
 """
 function sever(param::SpanParam, screenSource::Bool=false)
-    val = obtain(param)
+    val = obtain(param, False())
     genTensorVar(val, symbolOf(param), screenSource)
 end
 

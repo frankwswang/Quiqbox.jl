@@ -186,7 +186,7 @@ ms1 = genTensorVar(ms_t1Val, :ms)
 map1_2 = x->myS.(getproperty.(x, :a) .^ 2)
 a3_2 = genCellParam(map1_2, (ms1,), :MS)
 @test getproperty.(obtain(a3_2), :a) == a3Val
-@test Quiqbox.checkParamOffsetMethods(typeof(ms_t1Val)) == false
+@test Quiqbox.getScreenLevelOptionsCore(typeof(ms_t1Val)) == (0,)
 @test try setScreenLevel!(a3_2, 2); false catch; true end
 
 t2Val = -1 .* t1Val

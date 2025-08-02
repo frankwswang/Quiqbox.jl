@@ -27,7 +27,7 @@ getOutputType(::Type{<:PrimitiveOrb{T, D, C}}) where {T<:Real, D, C<:RealOrCompl
 
 
 function evalOrbital(orb::PrimitiveOrb{T, D, C}, input; 
-                     cache!Self::ParamDataCache=initializeParamDataCache()) where 
+                     cache!Self::OptParamDataCache=initializeParamDataCache()) where 
                     {T<:Real, D, C<:RealOrComplex{T}}
     coreValue = evalFieldAmplitude(orb.field, formatInput(orb, input); cache!Self)
     StableMul(C)(coreValue, getNormFactor(orb))
@@ -121,6 +121,13 @@ function getEffectiveWeight(o::CompositeOrb{T, D, C}, weight::GridParam{C, 1},
 end
 
 function CompositeOrb(basis::AbstractVector{<:OrbitalBasis{<:RealOrComplex{T}, D}}, 
+                      weight::AbstractVector{C}; renormalize::Bool=false) where 
+                     {T<:Real, C<:RealOrComplex{T}, D}
+    weightParam = GridParamEncoder(C, :wBlock, 1)(weight)
+    CompositeOrb(basis, weightParam; renormalize)
+end
+
+function CompositeOrb(basis::AbstractVector{<:OrbitalBasis{<:RealOrComplex{T}, D}}, 
                       weight::UnitOrValVec{C}; renormalize::Bool=false) where 
                      {T<:Real, C<:RealOrComplex{T}, D}
     encoder = UnitParamEncoder(C, :w, 1)
@@ -135,12 +142,16 @@ getOutputType(::Type{<:CompositeOrb{T, D, C}}) where {T<:Real, D, C<:RealOrCompl
 
 
 function evalOrbital(orb::CompositeOrb{T, D, C}, input; 
-                     cache!Self::ParamDataCache=initializeParamDataCache()) where 
+                     cache!Self::OptParamDataCache=initializeParamDataCache()) where 
                     {T<:Real, D, C<:RealOrComplex{T}}
-    weightVal = cacheParam!(cache!Self, orb.weight)
+    weightVal = obtainCore!(cache!Self, orb.weight)
 
-    bodyVal = mapreduce(StableAdd(C), orb.basis, weightVal) do basis, w
-        evalOrbital(basis, input; cache!Self) * w
+    bodyVal = zero(C)
+    multiplier = TypedBinary(TypedReturn(*, C), RealOrComplex{T}, C)
+
+    for (basis, w) in zip(orb.basis, weightVal)
+        res = evalOrbital(basis, input; cache!Self)
+        bodyVal += multiplier(res, w)
     end
 
     StableMul(C)(convert(C, bodyVal), getNormFactor(orb))
@@ -188,23 +199,27 @@ function genGaussTypeOrb(center::NonEmptyTuple{UnitOrVal{T}, D},
                          ijk::NonEmptyTuple{Int, D}=ntuple(_->0, Val(D+1)); 
                          innerRenormalize::Bool=false, outerRenormalize::Bool=false) where 
                         {T<:Real, C<:RealOrComplex{T}, D}
-    nPrimOrbs = if cons isa GridParam
-        (first∘getOutputSize)(cons)
+    if cons isa GridParam
+        conParam = cons
+        nPrimOrbs = (first∘getOutputSize)(cons)
     else
-        len = length(cons)
-        cons = GridParamEncoder(C, :con, 1)(cons)
-        len
+        conParam = if cons isa AbstractVector{C}
+            GridParamEncoder(C, :con, 1)(cons)
+        else
+            map(UnitParamEncoder(C, :con, 1), cons)
+        end
+        nPrimOrbs = length(cons)
     end
 
     checkLengthCore(checkEmptiness(xpns, :xpns), :xpns, nPrimOrbs, 
                     "the output length of `cons`")
 
-    cens = map(UnitParamEncoder(T, :cen, 1), center)
+    cenParam = map(UnitParamEncoder(T, :cen, 1), center)
 
     primGTOs = map(xpns) do xpn
-        genGaussTypeOrb(cens, xpn, ijk, renormalize=innerRenormalize)
+        genGaussTypeOrb(cenParam, xpn, ijk, renormalize=innerRenormalize)
     end
-    CompositeOrb(primGTOs, cons, renormalize=outerRenormalize)
+    CompositeOrb(primGTOs, conParam, renormalize=outerRenormalize)
 end
 
 
@@ -262,7 +277,7 @@ function genOrbitalPointer!(::Type{C},
                             orbital::PrimitiveOrb{T, D}, 
                             directUnpack::Boolean, 
                             paramSet::OptSpanParamSet, 
-                            paramCache::ParamDataCache) where 
+                            paramCache::OptParamDataCache) where 
                            {T<:Real, D, C<:RealOrComplex{T}}
     field = orbital.field
     tracker = EgalBox{ShiftedField{T, D}}(field)
@@ -288,9 +303,9 @@ function genOrbitalPointer!(::Type{C},
                             orbital::CompositeOrb{T, D}, 
                             directUnpack::Boolean, 
                             paramSet::OptSpanParamSet, 
-                            paramCache::ParamDataCache) where 
+                            paramCache::OptParamDataCache) where 
                            {T<:Real, D, C<:RealOrComplex{T}}
-    weightValue = convert(Memory{C}, cacheParam!(paramCache, orbital.weight))
+    weightValue = Memory{C}(obtainCore!(paramCache, orbital.weight))
     primOrbPtrs = map(orbital.basis) do o
         genOrbitalPointer!(C, configDict, markerDict, o, directUnpack, paramSet, paramCache)
     end
@@ -306,7 +321,7 @@ end
 
 function cacheOrbitalData!(configDict::ShiftedFieldConfigDict{T, D}, 
                            orbitals::OrbBasisCluster{T, D}, directUnpack::Boolean, 
-                           cache!Self::ParamDataCache=initializeParamDataCache()) where 
+                           cache!Self::OptParamDataCache=initializeParamDataCache()) where 
                           {T<:Real, D}
     checkEmptiness(orbitals, :orbitals)
     paramSet = initializeSpanParamSet()
@@ -364,8 +379,8 @@ struct MultiOrbitalData{T<:Real, D, C<:RealOrComplex{T}, F<:StashedShiftedField{
 
     function MultiOrbitalData(orbitals::OrbBasisCluster{T, D}, 
                               directUnpack::Boolean=False(); 
-                              cache!Self::ParamDataCache=initializeParamDataCache()) where 
-                             {T<:Real, D}
+                              cache!Self::OptParamDataCache=initializeParamDataCache()
+                              ) where {T<:Real, D}
         configDict = initializeOrbitalConfigDict(T, Count(D))
         orbPointers = cacheOrbitalData!(configDict, orbitals, directUnpack, cache!Self)
         format = orbitals isa AbstractVector ? genMemory(orbPointers) : orbPointers

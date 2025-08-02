@@ -92,6 +92,8 @@ getOutputType(::Type{<:TypedBinary{T}}) where {T} = T
 
 trySimplify(f::TypedBinary) = trySimplify(f.f)
 
+const BasicDirectOp = Union{typeof(+), typeof(-), typeof(*)}
+
 const StableAdd{T} = StableBinary{T, typeof(+)}
 StableAdd(::Type{T}) where {T} = StableBinary(+, T)
 
@@ -99,9 +101,20 @@ const StableMul{T} = StableBinary{T, typeof(*)}
 StableMul(::Type{T}) where {T} = StableBinary(*, T)
 
 const StableTupleSub{T<:Tuple} = StableBinary{T, typeof(.-)}
-
 function StableTupleSub(::Type{T}, ::Count{N})::StableTupleSub{NTuple{N, T}} where {T, N}
     StableBinary(.-, NTuple{N, T})
+end
+
+function genStableBinaryOp(op::F, ::Type{T}) where {T, F<:BasicDirectOp}
+    StableBinary(op, T)
+end
+
+function genStableBinaryOp(op::F, ::Type{T}) where {T<:NonEmptyTuple{Any}, F<:BasicDirectOp}
+    StableBinary(Base.Broadcast.BroadcastFunction(op), T)
+end
+
+function genStableBinaryOp(op::F, ::Type{T}) where {T<:AbstractArray, F<:BasicDirectOp}
+    Base.Broadcast.BroadcastFunction(genStableBinaryOp( op, eltype(T) ))
 end
 
 
