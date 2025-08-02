@@ -761,7 +761,7 @@ end
 function computeOrbLayoutIntegral(op::DirectOperator, orbs::OrbBasisLayout{T, D}; 
                                   lazyCompute::Boolean=True(), 
                                   estimatorConfig::OptEstimatorConfig{T}=missing, 
-                                  cache!Self::ParamDataCache=initializeParamDataCache()
+                                  cache!Self::OptParamDataCache=initializeParamDataCache()
                                   ) where {T<:Real, D}
     orbsData = MultiOrbitalData(orbs, isParamIndependent(op); cache!Self)
     style = MultiBodyIntegral{D, getOutputType(orbsData), length(orbs)÷2}()
@@ -773,7 +773,7 @@ function computeOrbVectorIntegral(::MultiBodyIntegral{D, T, N}, op::DirectOperat
                                   orbs::OrbBasisVector{T, D}; 
                                   lazyCompute::Boolean=True(), 
                                   estimatorConfig::OptEstimatorConfig{T}=missing, 
-                                  cache!Self::ParamDataCache=initializeParamDataCache()
+                                  cache!Self::OptParamDataCache=initializeParamDataCache()
                                   ) where {T<:Real, D, N}
     orbsData = MultiOrbitalData(orbs, isParamIndependent(op); cache!Self)
     style = MultiBodyIntegral{D, getOutputType(orbsData), N}()

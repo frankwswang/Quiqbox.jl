@@ -7,7 +7,7 @@ using TensorOperations: @tensor as @TOtensor
 function overlap(orbL::OrbitalBasis{CL, D}, orbR::OrbitalBasis{CR, D}; 
                  lazyCompute::AbstractBool=True(), 
                  estimatorConfig::OptEstimatorConfig{T}=missing, 
-                 cache!Self::MissingOr{ParamDataCache}=missing) where 
+                 cache!Self::MissingOr{OptParamDataCache}=missing) where 
                 {T<:Real, CL<:RealOrComplex{T}, CR<:RealOrComplex{T}, D}
     if orbL === orbR && isRenormalized(orbL)
         one(T)
@@ -22,7 +22,8 @@ end
 function overlaps(basisSet::OrbBasisVector{T, D}; 
                   lazyCompute::AbstractBool=True(), 
                   estimatorConfig::OptEstimatorConfig{T}=missing, 
-                  cache!Self::ParamDataCache=initializeParamDataCache()) where {T<:Real, D}
+                  cache!Self::OptParamDataCache=initializeParamDataCache()) where 
+                 {T<:Real, D}
     lazyCompute = toBoolean(lazyCompute)
     computeOrbVectorIntegral(OneBodyIntegral{D, T}(), genOverlapSampler(), basisSet; 
                              lazyCompute, estimatorConfig, cache!Self)
@@ -33,7 +34,7 @@ function multipoleMoment(center::NTuple{D, Real}, degrees::NTuple{D, Int},
                          orbL::OrbitalBasis{CL, D}, orbR::OrbitalBasis{CR, D}; 
                          lazyCompute::AbstractBool=True(), 
                          estimatorConfig::OptEstimatorConfig{T}=missing, 
-                         cache!Self::ParamDataCache=initializeParamDataCache()) where 
+                         cache!Self::OptParamDataCache=initializeParamDataCache()) where 
                         {T<:Real, CL<:RealOrComplex{T}, CR<:RealOrComplex{T}, D}
     lazyCompute = toBoolean(lazyCompute)
     mmOp = (genMultipoleMomentSampler∘FloatingMonomial)(T.(center), degrees)
@@ -44,7 +45,7 @@ function multipoleMoments(center::NTuple{D, Real}, degrees::NTuple{D, Int},
                           basisSet::OrbBasisVector{T, D}; 
                           lazyCompute::AbstractBool=True(), 
                           estimatorConfig::OptEstimatorConfig{T}=missing, 
-                          cache!Self::ParamDataCache=initializeParamDataCache()) where 
+                          cache!Self::OptParamDataCache=initializeParamDataCache()) where 
                          {T<:Real, D}
     lazyCompute = toBoolean(lazyCompute)
     mmOp = (genMultipoleMomentSampler∘FloatingMonomial)(T.(center), degrees)
@@ -58,7 +59,7 @@ function elecKinetic(orbL::OrbitalBasis{CL, D}, orbR::OrbitalBasis{CR, D},
                              genKineticEnergySampler(T, Count(D)); 
                      lazyCompute::AbstractBool=True(), 
                      estimatorConfig::OptEstimatorConfig{T}=missing, 
-                     cache!Self::ParamDataCache=initializeParamDataCache()) where 
+                     cache!Self::OptParamDataCache=initializeParamDataCache()) where 
                     {T<:Real, CL<:RealOrComplex{T}, CR<:RealOrComplex{T}, D}
     lazyCompute = toBoolean(lazyCompute)
     computeOrbLayoutIntegral(config.core, (orbL, orbR); 
@@ -70,7 +71,7 @@ function elecKinetics(basisSet::OrbBasisVector{T, D},
                               genKineticEnergySampler(T, Count(D)); 
                       lazyCompute::AbstractBool=True(), 
                       estimatorConfig::OptEstimatorConfig{T}=missing, 
-                      cache!Self::ParamDataCache=initializeParamDataCache()) where 
+                      cache!Self::OptParamDataCache=initializeParamDataCache()) where 
                      {T<:Real, D}
     lazyCompute = toBoolean(lazyCompute)
     computeOrbVectorIntegral(OneBodyIntegral{D, T}(), config.core, basisSet; 
@@ -83,7 +84,7 @@ function nucAttraction(nucs::AbstractVector{Symbol},
                       orbL::OrbitalBasis{CL, D}, orbR::OrbitalBasis{CR, D}; 
                       lazyCompute::AbstractBool=True(), 
                       estimatorConfig::OptEstimatorConfig{T}=missing, 
-                      cache!Self::ParamDataCache=initializeParamDataCache()) where 
+                      cache!Self::OptParamDataCache=initializeParamDataCache()) where 
                      {T<:Real, CL<:RealOrComplex{T}, CR<:RealOrComplex{T}, D}
     lazyCompute = toBoolean(lazyCompute)
     neOp = genCoulombMultiPointSampler(map(T∘getCharge, nucs), nucCoords)
@@ -95,7 +96,7 @@ function nucAttractions(nucs::AbstractVector{Symbol},
                        basisSet::OrbBasisVector{T, D}; 
                        lazyCompute::AbstractBool=True(), 
                        estimatorConfig::OptEstimatorConfig{T}=missing, 
-                       cache!Self::ParamDataCache=initializeParamDataCache()) where 
+                       cache!Self::OptParamDataCache=initializeParamDataCache()) where 
                       {T<:Real, D}
     lazyCompute = toBoolean(lazyCompute)
     neOp = genCoulombMultiPointSampler(map(T∘getCharge, nucs), nucCoords)
@@ -111,7 +112,7 @@ function coreHamiltonian(nucs::AbstractVector{Symbol},
                                           genKineticEnergySampler(T, Count(D)), 
                          lazyCompute::AbstractBool=True(), 
                          estimatorConfig::OptEstimatorConfig{T}=missing, 
-                         cache!Self::ParamDataCache=initializeParamDataCache()) where 
+                         cache!Self::OptParamDataCache=initializeParamDataCache()) where 
                         {T<:Real, D}
     lazyCompute = toBoolean(lazyCompute)
     coreHop = genCoreHamiltonianSampler(nucs, nucCoords, kineticOperator)
@@ -124,7 +125,7 @@ function elecRepulsion(orbL1::OrbitalBasis{CL1, D}, orbR1::OrbitalBasis{CR1, D},
                        orbL2::OrbitalBasis{CL2, D}, orbR2::OrbitalBasis{CR2, D}; 
                        lazyCompute::AbstractBool=True(), 
                        estimatorConfig::OptEstimatorConfig{T}=missing, 
-                       cache!Self::ParamDataCache=initializeParamDataCache()) where 
+                       cache!Self::OptParamDataCache=initializeParamDataCache()) where 
                       {T<:Real, CL1<:RealOrComplex{T}, CR1<:RealOrComplex{T}, 
                                 CL2<:RealOrComplex{T}, CR2<:RealOrComplex{T}, D}
     lazyCompute = toBoolean(lazyCompute)
@@ -136,7 +137,7 @@ end
 function elecRepulsions(basisSet::OrbBasisVector{T, D}; 
                         lazyCompute::AbstractBool=True(), 
                         estimatorConfig::OptEstimatorConfig{T}=missing, 
-                        cache!Self::ParamDataCache=initializeParamDataCache()) where 
+                        cache!Self::OptParamDataCache=initializeParamDataCache()) where 
                        {T<:Real, D}
     lazyCompute = toBoolean(lazyCompute)
     eeOp = genCoulombInteractionSampler(T, Count(D))

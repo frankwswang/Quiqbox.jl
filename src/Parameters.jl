@@ -633,21 +633,17 @@ function hasCycle(param::ParamBox, finalizer::F=itself; strictMode::Bool=true,
 end
 
 
-const ParamDataCache{T} = LRU{ParamEgalBox, T}
+const OptParamDataCache{T} = OptionalLRU{ParamEgalBox, T}
 
-initializeParamDataCache(maxSize::Int=100, ::Type{T}=Any) where {T} = 
-ParamDataCache{T}(maxsize=maxSize)
+obtainCore!(::OptParamDataCache, param::PrimitiveParam) = param.data[]
 
-
-obtainCore!(::ParamDataCache, param::PrimitiveParam) = param.data[]
-
-function obtainCore!(cache::ParamDataCache, param::ShapedParam)
+function obtainCore!(cache::OptParamDataCache, param::ShapedParam)
     map(param.input) do p
         obtainCore!(cache, p)
     end::getOutputType(param)
 end
 
-function obtainCore!(cache::ParamDataCache, param::AdaptableParam)
+function obtainCore!(cache::OptParamDataCache, param::AdaptableParam)
     key = ParamEgalBox(param)
     get!(cache, key) do
         if screenLevelOf(param) > 0
@@ -660,7 +656,7 @@ function obtainCore!(cache::ParamDataCache, param::AdaptableParam)
     end::getOutputType(param)
 end
 #> Special method for internal use
-function obtainCore!(cache::ParamDataCache, params::DirectParamSource)
+function obtainCore!(cache::OptParamDataCache, params::DirectParamSource)
     if params isa ParamBoxAbtArr && isVoidCollection(params)
         similar(params, Union{})
     else
@@ -677,6 +673,11 @@ function checkParamCycle(param::ParamBox, finalizer::F=itself; strictMode=false)
                              "$(catcher[])"))
     end
 end
+
+initializeParamDataCache(maxSize::Int=100, ::Type{T}=Any) where {T} = 
+LRU{ParamEgalBox, T}(maxsize=maxSize)::OptParamDataCache{T}
+
+initializeParamDataCache(::Nothing) = EmptyDict{ParamEgalBox, Any}()
 
 function obtain(param::CompositeParam, decouple::Boolean=True())
     checkParamCycle(param)
