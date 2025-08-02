@@ -121,6 +121,13 @@ function getEffectiveWeight(o::CompositeOrb{T, D, C}, weight::GridParam{C, 1},
 end
 
 function CompositeOrb(basis::AbstractVector{<:OrbitalBasis{<:RealOrComplex{T}, D}}, 
+                      weight::AbstractVector{C}; renormalize::Bool=false) where 
+                     {T<:Real, C<:RealOrComplex{T}, D}
+    weightParam = GridParamEncoder(C, :wBlock, 1)(weight)
+    CompositeOrb(basis, weightParam; renormalize)
+end
+
+function CompositeOrb(basis::AbstractVector{<:OrbitalBasis{<:RealOrComplex{T}, D}}, 
                       weight::UnitOrValVec{C}; renormalize::Bool=false) where 
                      {T<:Real, C<:RealOrComplex{T}, D}
     encoder = UnitParamEncoder(C, :w, 1)
@@ -139,8 +146,12 @@ function evalOrbital(orb::CompositeOrb{T, D, C}, input;
                     {T<:Real, D, C<:RealOrComplex{T}}
     weightVal = obtainCore!(cache!Self, orb.weight)
 
-    bodyVal = mapreduce(StableAdd(C), orb.basis, weightVal) do basis, w
-        evalOrbital(basis, input; cache!Self) * w
+    bodyVal = zero(C)
+    multiplier = TypedBinary(TypedReturn(*, C), RealOrComplex{T}, C)
+
+    for (basis, w) in zip(orb.basis, weightVal)
+        res = evalOrbital(basis, input; cache!Self)
+        bodyVal += multiplier(res, w)
     end
 
     StableMul(C)(convert(C, bodyVal), getNormFactor(orb))
@@ -188,23 +199,27 @@ function genGaussTypeOrb(center::NonEmptyTuple{UnitOrVal{T}, D},
                          ijk::NonEmptyTuple{Int, D}=ntuple(_->0, Val(D+1)); 
                          innerRenormalize::Bool=false, outerRenormalize::Bool=false) where 
                         {T<:Real, C<:RealOrComplex{T}, D}
-    nPrimOrbs = if cons isa GridParam
-        (first∘getOutputSize)(cons)
+    if cons isa GridParam
+        conParam = cons
+        nPrimOrbs = (first∘getOutputSize)(cons)
     else
-        len = length(cons)
-        cons = GridParamEncoder(C, :con, 1)(cons)
-        len
+        conParam = if cons isa AbstractVector{C}
+            GridParamEncoder(C, :con, 1)(cons)
+        else
+            map(UnitParamEncoder(C, :con, 1), cons)
+        end
+        nPrimOrbs = length(cons)
     end
 
     checkLengthCore(checkEmptiness(xpns, :xpns), :xpns, nPrimOrbs, 
                     "the output length of `cons`")
 
-    cens = map(UnitParamEncoder(T, :cen, 1), center)
+    cenParam = map(UnitParamEncoder(T, :cen, 1), center)
 
     primGTOs = map(xpns) do xpn
-        genGaussTypeOrb(cens, xpn, ijk, renormalize=innerRenormalize)
+        genGaussTypeOrb(cenParam, xpn, ijk, renormalize=innerRenormalize)
     end
-    CompositeOrb(primGTOs, cons, renormalize=outerRenormalize)
+    CompositeOrb(primGTOs, conParam, renormalize=outerRenormalize)
 end
 
 
