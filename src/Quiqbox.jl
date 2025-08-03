@@ -46,9 +46,9 @@ end
 ## Development comment guideline
 #!! Urgent issue
 #! Non-urgent issue
-#? Consideration for change
-#+ Potential feature implementation
+#? Consideration for change or new implementation
 #> Code mechanism explanation
+#- Code method reference
 
 ## Footnote comment template
 #= Additional Method =#
