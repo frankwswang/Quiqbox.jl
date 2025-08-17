@@ -1,5 +1,3 @@
-using LinearAlgebra
-
 const MonoTermOperator = DirectOperator{1}
 const DualTermOperator = DirectOperator{2}
 

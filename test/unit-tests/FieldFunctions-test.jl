@@ -1,6 +1,6 @@
 using Test
 using Quiqbox
-using LinearAlgebra
+using LinearAlgebra: norm
 
 @testset "FieldFunctions.jl" begin
 

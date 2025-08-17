@@ -1,7 +1,7 @@
 export SCFconfig, HFconfig, runHartreeFock, RCHartreeFock, UOHartreeFock
 public HFfinalInfo
 #!! Need to standardize the format for global values, types (aliases), and type parameters
-using LinearAlgebra: dot, Hermitian, \, det, I, ishermitian, diag, norm
+using LinearAlgebra: dot, Hermitian, \, det, I, ishermitian, diag, norm, eigen
 using Base: OneTo
 using Combinatorics: powerset
 using SPGBox: spgbox!

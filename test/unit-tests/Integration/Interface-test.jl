@@ -1,6 +1,6 @@
 using Test
 using Quiqbox
-using LinearAlgebra
+using LinearAlgebra: dot
 
 @testset "Interface.jl" begin
 
