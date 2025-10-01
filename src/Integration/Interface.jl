@@ -7,12 +7,11 @@ using TensorOperations: @tensor as @TOtensor
 function overlap(orbL::OrbitalBasis{CL, D}, orbR::OrbitalBasis{CR, D}; 
                  lazyCompute::AbstractBool=True(), 
                  estimatorConfig::OptEstimatorConfig{T}=missing, 
-                 cache!Self::MissingOr{OptParamDataCache}=missing) where 
+                 cache!Self::OptParamDataCache=initializeParamDataCache()) where 
                 {T<:Real, CL<:RealOrComplex{T}, CR<:RealOrComplex{T}, D}
     if orbL === orbR && isRenormalized(orbL)
         one(T)
     else
-        ismissing(cache!Self) && (cache!Self = initializeParamDataCache())
         lazyCompute = toBoolean(lazyCompute)
         computeOrbLayoutIntegral(genOverlapSampler(), (orbL, orbR); 
                                  lazyCompute, estimatorConfig, cache!Self)

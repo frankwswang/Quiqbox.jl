@@ -1,6 +1,6 @@
 using Test
 using Quiqbox
-using LinearAlgebra
+using LinearAlgebra: norm
 using Quiqbox: TypedReduce, TypedExpand, getScreenLevelOptionsCore, getCellOutputLevels, 
                UnitParam, GridParam, getOutputType
 

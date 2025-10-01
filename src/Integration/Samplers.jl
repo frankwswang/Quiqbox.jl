@@ -1,3 +1,5 @@
+using LinearAlgebra: norm
+
 const OneBodySampler{O<:MonoTermOperator} = Multiplier{ComplexConj, O}
 
 const OverlapSampler = OneBodySampler{Identity}
@@ -59,7 +61,7 @@ function genCoulombMultiPointSampler(sourceCharges::AbstractVector{T},
 end
 
 const CoulombInteractionSamplerCore{T<:Real, D} = 
-      ComposedApply{2, GaussApproxInverse{T}, ComposedApply{ 2, typeof(LinearAlgebra.norm), 
+      ComposedApply{2, GaussApproxInverse{T}, ComposedApply{ 2, typeof(norm), 
                                                              StableTupleSub{NTuple{D, T}} }}
 
 const CoulombInteractionSampler{T<:Real, D} = 
@@ -67,7 +69,7 @@ const CoulombInteractionSampler{T<:Real, D} =
 
 function genCoulombInteractionSampler(::Type{T}, ::Count{D}) where {T, D}
     checkPositivity(D)
-    encoder = ComposedApply(StableTupleSub(T, Count(D)), LinearAlgebra.norm, Count(2))
+    encoder = ComposedApply(StableTupleSub(T, Count(D)), norm, Count(2))
     f = ComposedApply(encoder, GaussApproxInverse(T), Count(2))
     Sandwich(Left(), (*, *), f)
 end

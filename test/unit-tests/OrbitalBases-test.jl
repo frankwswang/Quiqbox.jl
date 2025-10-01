@@ -1,7 +1,7 @@
 using Test
 using Quiqbox
 using Quiqbox: markObj
-using LinearAlgebra
+using LinearAlgebra: norm, dot
 
 @testset "OrbitalBases.jl" begin
 

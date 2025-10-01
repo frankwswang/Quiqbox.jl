@@ -61,7 +61,7 @@ function checkReshapingAxis(arr::AbstractArray, shape::Tuple{Vararg{Int}})
     len
 end
 
-struct TruncateReshape{N}
+struct TruncateReshape{N} <: CallableObject
     axis::NTuple{N, Int}
     mark::NTuple{N, Symbol}
     truncate::TernaryNumber # 0: off, 1: keep leading entires, 2: keep trailing entires
