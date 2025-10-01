@@ -1019,15 +1019,14 @@ function runHartreeFockCore(configCore::Pair{HFT, <:SCFconfig{<:Real, L, MS}},
     maxMemoryLens = map(getSCFcacheSizes(scfConfig)) do cacheSize
         max(HFinterMatStoreSizes..., cacheSize)
     end
-    i = 0
+    i::Int = 0
 
     if printInfo
         roundDigits = setNumDigits(R, ΔEendThreshold)
         titles = ("Step", "E (Ha)", "ΔE (Ha)", "RMS(FDS-SDF)", "RMS(ΔD)")
         colPFs = (  lpad, cropStrR,  cropStrR,       cropStrR,  cropStrR)
-        colSps = (max(ndigits(maxStep), (length∘string)(HFT), length(titles[begin])), 
-                  roundDigits + (ndigits∘floor)(Int, Etots[]) + 2, 
-                  roundDigits + 3)
+        colSps = (ndigits(maxStep), roundDigits+(ndigits∘floor)(Int, Etots[])+2, 
+                  roundDigits+3)
         colSls = (1, 2, 3, 3, 3)
         titleStr = ""
         titleRng = 1 : (3 + 2*(infoLevel > 1))
@@ -1063,8 +1062,8 @@ function runHartreeFockCore(configCore::Pair{HFT, <:SCFconfig{<:Real, L, MS}},
         flucThreshold = max(10breakPoint, 1.5e-3) # ≈3.8kJ/mol (0.95 chemical accuracy)
         symHFcore = evalTypedData(MType)
         converged = false
-        endM = l==L
-        n = 0
+        endM::Bool = l==L
+        n::Int = 0
 
         if printInfo && infoLevel > 1
             print('|', repeat('–', first(colSps)+1), "<$l>–", ("[:$symHFcore"))
@@ -1096,7 +1095,8 @@ function runHartreeFockCore(configCore::Pair{HFT, <:SCFconfig{<:Real, L, MS}},
             δFrmsᵢ = δFrms[end]
             ΔEᵢabs = abs(ΔEᵢ)
 
-            if printInfo && infoLevel > 0 && (adaptStepBl(i) || i == maxStep)
+            if printInfo && infoLevel > 0 && 
+               (adaptStepBl(i) || i == maxStep || (n == 1 && infoLevel > 1))
                 print( "| ", colPFs[1]("$i", colSps[1]), 
                       " | ", colPFs[2](alignNumSign(Etots[end]; roundDigits), colSps[2]), 
                       " | ", colPFs[3](alignNumSign(ΔEᵢ; roundDigits), colSps[3]) )
