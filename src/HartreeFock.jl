@@ -1025,9 +1025,8 @@ function runHartreeFockCore(configCore::Pair{HFT, <:SCFconfig{<:Real, L, MS}},
         roundDigits = setNumDigits(R, ΔEendThreshold)
         titles = ("Step", "E (Ha)", "ΔE (Ha)", "RMS(FDS-SDF)", "RMS(ΔD)")
         colPFs = (  lpad, cropStrR,  cropStrR,       cropStrR,  cropStrR)
-        colSps = (max(ndigits(maxStep), (length∘string)(HFT), length(titles[begin])), 
-                  roundDigits + (ndigits∘floor)(Int, Etots[]) + 2, 
-                  roundDigits + 3)
+        colSps = (ndigits(maxStep), roundDigits+(ndigits∘floor)(Int, Etots[])+2, 
+                  roundDigits+3)
         colSls = (1, 2, 3, 3, 3)
         titleStr = ""
         titleRng = 1 : (3 + 2*(infoLevel > 1))
