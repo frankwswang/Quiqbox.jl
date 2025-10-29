@@ -74,7 +74,7 @@ function breakCoeffSymmetry(::UOHartreeFock, spinSec1OrbCoeff::AbstractMatrix{T}
         mat = ifelse(isodd(counter), spinSec1OrbCoeff, spinSec2OrbCoeff)
         col = @view mat[:, iCol]
         val, idx = findmax(abs, col)
-        if (val - one(T)) < sqrt(T |> numEps)
+        if abs(val - one(T)) < sqrt(T |> numEps)
             col[idx] *= -one(T)
         else
             col[idx] = zero(T)
