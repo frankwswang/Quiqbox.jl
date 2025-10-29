@@ -1,7 +1,7 @@
 export SCFconfig, HFconfig, runHartreeFock, RCHartreeFock, UOHartreeFock
 public HFfinalInfo
 #!! Need to standardize the format for global values, types (aliases), and type parameters
-using LinearAlgebra: dot, Hermitian, \, det, I, ishermitian, diag, norm, eigen
+using LinearAlgebra: dot, Hermitian, \, det, I, ishermitian, diag, norm, eigen, normalize!
 using Base: OneTo
 using Combinatorics: powerset
 using SPGBox: spgbox!
@@ -67,9 +67,16 @@ getHartreeFockName(::UOHartreeFock) = "Unrestricted open-shell (UHF)"
 
 function breakCoeffSymmetry(::UOHartreeFock, spinSec1OrbCoeff::AbstractMatrix{T}) where {T}
     spinSec2OrbCoeff = copy(spinSec1OrbCoeff)
-    l = min(size(spinSec2OrbCoeff, 1), 2)
-    spinSec2OrbCoeff[begin:begin+l-1, begin:begin+l-1] .= 0 #> Breaking spin symmetry
-    #> spinSec2OrbCoeff[l, :] .= 0 # Alternative solution
+
+    counter::Int = 0
+    for iCol in axes(spinSec1OrbCoeff, 1)
+        counter += 1
+        mat = ifelse(isodd(counter), spinSec1OrbCoeff, spinSec2OrbCoeff)
+        col = @view mat[:, iCol]
+        col[findmax(abs, col)|>last] = zero(T)
+        normalize!(col)
+    end
+
     (spinSec1OrbCoeff, spinSec2OrbCoeff)
 end
 
