@@ -751,11 +751,11 @@ number of distinct data sectors corresponding to the specified spin configuratio
 restricted closed-shell Hartree–Fock (RHF), `HFTS` is `1`.
 
 ≡≡≡ Property/Properties ≡≡≡
-`@NamedTuple{spin::$OccupationState{2}, geometry::$NuclearCluster{R, T}}`: The spin and 
-nuclear-geometry configurations of the target system. `.spin` specifies numbers of 
-electrons in two orthonormal spin configurations (e.g., spin-up vs. spin-down). For any 
-property data (`::P`) enclosed in `NTuple{HFTS, P}` and `HFTS==2`, each element correspond 
-to one spin configuration.
+
+`system::@NamedTuple{spin::$OccupationState{2}, geometry::$NuclearCluster{R, D}}`: The 
+specification of the target system. Its property `.spin::`[`OccupationState`](@ref) 
+specifies numbers of electrons in two orthonormal spin configurations (e.g., spin-up vs. 
+spin-down); `.geometry::`[`NuclearCluster`](@ref) specifies the nuclear geometry.
 
 `energy::NTuple{2, R}`: The electronic and nuclear (repulsion potential) parts of the 
 target system's ground-state energy under the Hartree–Fock and the Born–Oppenheimer 
