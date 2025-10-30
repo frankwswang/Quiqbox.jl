@@ -119,18 +119,54 @@ lastindex(::OccupationState{N}) where {N} = N
 getTotalOccupation(state::OccupationState) = (Int∘sum)(state.layout)
 
 
-function prepareSpinConfiguration(nucInfo::NuclearCluster{T, D}, 
-                                  spinUpCount::MissingOr{Int}=missing) where {T<:Real, D}
-    totalCharge = getCharge(nucInfo)
-    spinDnCount = if ismissing(spinUpCount)
-        spinUpCount = totalCharge ÷ 2
-        totalCharge - spinUpCount
+function prepareSpinConfiguration(nuc::Union{Symbol, NuclearCluster}, 
+                                  difference::MissingOr{Int}=missing; offset::Int=0)
+    totalOccu = getCharge(nuc) + offset
+    prepareSpinConfigurationCore(totalOccu, difference)
+end
+
+function prepareSpinConfigurationCore(totalOccu::Int, 
+                                      difference::MissingOr{Int}=missing)
+    checkPositivity(totalOccu)
+
+    occuPair = if ismissing(difference)
+        nBeta  = totalOccu ÷ 2
+        nAlpha = totalOccu - nBeta
+        (nAlpha, nBeta)
     else
-        checkPositivity(spinUpCount, true)
-        max(0, totalCharge - spinUpCount)
+        if abs(difference) > totalOccu || iseven(difference) != iseven(totalOccu)
+            throw(AssertionError("`difference=$difference` results in illegal spin "*
+                                 "occupations."))
+        end
+        nAlpha = (totalOccu + difference) ÷ 2
+        nBeta  = (totalOccu - difference) ÷ 2
+        (nAlpha, nBeta)
     end
 
-    OccupationState((spinUpCount, spinDnCount))
+    OccupationState(occuPair)
+end
+
+function swapSpinSector!(state::OccupationState{2})
+    nAlpha, nBeta = state.layout
+    state.layout[begin] = nBeta
+    state.layout[ end ] = nAlpha
+    state
+end
+
+getOccuDifference(state::OccupationState{2}) = first(state.layout) - last(state.layout)
+
+function splitSpinConfiguration(nucInfo::NuclearCluster)
+    spinDifference::Int = 0
+    atomicOccuStates = Memory{NuclearCluster{2}}(undef, length(nucInfo))
+
+    for (i, pair) in zip(eachindex(atomicOccuStates), nucInfo)
+        atomicOccuState = OccupationState(pair.first)
+        spinDifference > 0 && swapSpinSector!(atomicOccuState)
+        spinDifference += getOccuDifference(atomicOccuState)
+        atomicOccuStates[i] = atomicOccuState
+    end
+
+    atomicOccuStates #! Need to test summing over each each section returns same result as `prepareSpinConfiguration(nucInfo)`
 end
 
 
