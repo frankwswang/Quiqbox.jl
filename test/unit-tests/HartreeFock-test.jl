@@ -2,13 +2,12 @@ using Test
 using Quiqbox
 using Suppressor: @suppress_out, @capture_out
 
-isdefined(Main, :SharedTestFunctions) || include("../../test/test-functions/Shared.jl")
-
 @testset "HartreeFock.jl" begin
 
 errorThreshold1 = 5e-8
 errorThreshold2 = 1e-12
 errorThreshold3 = 1e-5
+comparator = (x, y) -> isapprox(x, y, atol=10errorThreshold1)
 
 nucCoords = [(-0.7,0.0,0.0), (0.7,0.0,0.0), (0.0, 0.0, 0.0)]
 nuc = [:H, :H, :O]
@@ -205,8 +204,8 @@ res2_Eo1t = [-20.93038451, -1.616675748, -1.28446622,  -0.66130762,
 res2_Eo2t = [-20.93038449, -1.616675711, -1.284466186, -0.661307591, 
               -0.661307591, 1.060815276,  1.847804083]
 
-@test compr2Arrays3((res2_Eo1=res2.occu[1].left, res2_Eo1t=res2_Eo1t), 10errorThreshold1)
-@test compr2Arrays3((res2_Eo2=res2.occu[2].left, res2_Eo2t=res2_Eo2t), 10errorThreshold1)
+@test all(comparator(i, j) for (i, j) in zip(res2.occu[1].left, res2_Eo1t))
+@test all(comparator(i, j) for (i, j) in zip(res2.occu[2].left, res2_Eo2t))
 
 @test res2.occu[1].right == [(true, false), (true, false), (true, false), (true, false), 
                              (true, false), (false, false), (false, false)]
@@ -256,41 +255,38 @@ uhfs = [ 7.275712508,  0.721327344, -0.450914129, -0.860294199, -1.029212153, -1
         -0.992397272, -0.992397272, -0.992397272, -0.992397272]
 
 nuc2 = [:H, :H]
-rng1 = 0.1:0.2:19.9
-rng2 = 0.1:0.2:14.1
-Et1 = Float64[]
-Et2 = Float64[]
-n = 0
-for i in rng1
-    n += 1
-    nucCoords2 = [(0.0, 0.0, 0.0), (i, 0.0, 0.0)]
-    nucInfoLocal = NuclearCluster(nuc2, nucCoords2)
-    bs = reduce(vcat, genGaussTypeOrbSeq.(nucCoords2, :H, "3-21G"))
+bondLenRange = 0.1:0.2:19.9
+Erefs = (rhfs, uhfs)
+HFtypes = (RCHartreeFock(), UOHartreeFock())
 
-    local res1, res2
+for guess in (:CoreH, :SAD)
+    Et1, Et2 = Ets = (Float64[], Float64[])
+    n = 0
+    for len in bondLenRange
+        n += 1
+        nucCoords2 = [(0.0, 0.0, 0.0), (len, 0.0, 0.0)]
+        nucInfoLocal = NuclearCluster(nuc2, nucCoords2)
+        bs = reduce(vcat, genGaussTypeOrbSeq.(nucCoords2, :H, "3-21G"))
 
-    if i <= last(rng2)
-        info1 = @capture_out begin
-            @show i
-            res1 = runHartreeFock(nucInfoLocal, bs, printInfo=true, infoLevel=5)
-            @show length(res1.memory[begin].Es) first(res1.energy)
+        for (HFT, Et, Eref) in zip(HFtypes, Ets, Erefs)
+            config = HFconfig(Float64, HFT, initial=guess)
+            info = @capture_out begin
+                res = runHartreeFock(nucInfoLocal, bs, config, printInfo=true, infoLevel=5)
+                push!(Et, sum(res.energy))
+            end
+            if !isapprox(Et[n], Eref[n], atol=errorThreshold1)
+                println("=====")
+                println("Large discrepancy detected at len=$len: $(Et[n]-Eref[n])")
+                println("Detailed info:\n")
+                println(info)
+                println("=====\n")
+            end
         end
-        push!(Et1, sum(res1.energy))
-        isapprox(Et1[n], rhfs[n], atol=errorThreshold1) || println(info1)
     end
 
-    info2 = @capture_out begin
-        @show i
-        res2 = runHartreeFock(nucInfoLocal, bs, HFconfig(Float64, UOHartreeFock()), 
-                              printInfo=true, infoLevel=5)
-        @show length(res2.memory[begin].Es) first(res2.energy)
-    end
-    push!(Et2, sum(res2.energy))
-    isapprox(Et2[n], uhfs[n], atol=errorThreshold1) || println(info2)
+    @test all(comparator(i, j) for (i, j) in zip(Et1, rhfs))
+    @test all(comparator(i, j) for (i, j) in zip(Et2, uhfs))
 end
-rhfSeg = @view rhfs[begin:begin+length(rng2)-1]
-@test compr2Arrays2((Et1=Et1, rhfs=rhfSeg), 74, errorThreshold1, 0.6)
-@test compr2Arrays2((Et2=Et2, uhfs=uhfs),   16, errorThreshold1, 5e-5, <)
 
 
 # Extreme Case tests

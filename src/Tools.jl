@@ -585,7 +585,8 @@ reduce(op, map((x, y)->y(x), tp, fs))
 mapMapReduce(tp::NTuple{N}, f::F1, op::F2=*) where {N, F1, F2} = reduce(op, map(f, tp))
 
 
-rmsOf(arr::AbstractArray) = norm(arr) / (sqrt∘length)(arr)
+rmsOf(arr::AbstractArray{C}) where {T<:Real, C<:RealOrComplex{T}} = 
+norm(arr) / T(arr|>length|>sqrt)
 
 
 function keepOnly!(a::AbstractArray, idx::Int)
