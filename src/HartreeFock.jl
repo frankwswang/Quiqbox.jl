@@ -41,7 +41,7 @@ end
 precompile(getOrthonormalization, (Matrix{Float64},))
 
 function solveFockMatrix(X::AbstractMatrix{T}, Fˢ::AbstractMatrix{T}, 
-                         stabilizeSign::Bool=true) where {R, T<:RealOrComplex{R}}
+                         stabilizeSign::Bool=true) where {R<:Real, T<:RealOrComplex{R}}
     eigenVals, matCx = eigen((X' * Fˢ * X) |> Hermitian)
     matC = X * matCx
 
@@ -65,33 +65,65 @@ getHartreeFockName(::RCHartreeFock) = "Restricted closed-shell (RHF)"
 getHartreeFockName(::UOHartreeFock) = "Unrestricted open-shell (UHF)"
 
 
-function breakCoeffSymmetry(::UOHartreeFock, spinSec1OrbCoeff::AbstractMatrix{T}) where {T}
-    spinSec2OrbCoeff = copy(spinSec1OrbCoeff)
+function breakCoeffSymmetryCore(matOrth::AbstractMatrix{T}, 
+                                orbCoeffTuple::NTuple{2, AbstractMatrix{T}}) where 
+                               {R<:Real, T<:RealOrComplex{R}}
+    spinSec1OrbCoeff, spinSec2OrbCoeff = orbCoeffTuple
+    size1 = size(spinSec1OrbCoeff)
+    size2 = size(spinSec2OrbCoeff)
+    inverseMap = inv(matOrth |> Hermitian)
+    orbC1n = inverseMap * spinSec1OrbCoeff
+    orbC2n = inverseMap * spinSec2OrbCoeff
+    if size1 != size2
+        throw(DimensionMismatch("`size(spinSec1OrbCoeff) = $size1` and "*
+                                "`size(spinSec2OrbCoeff) = $size2` should be equal."))
+    end
 
     counter::Int = 0
-    for iCol in axes(spinSec1OrbCoeff, 2)
+    for (col1, col2) in zip(eachcol(orbC1n), eachcol(orbC2n))
         counter += 1
-        mat = ifelse(isodd(counter), spinSec1OrbCoeff, spinSec2OrbCoeff)
-        col = @view mat[:, iCol]
-        val, idx = findmax(abs, col)
-        if abs(val - one(T)) < sqrt(T |> numEps)
-            col[idx] *= -one(T)
+        col = ifelse(isodd(counter), col1, col2)
+        mag, idx = findmax(abs, col)
+        val = col[idx]
+        if abs(mag - one(T)) < sqrt(T|>numEps)
+            col[idx] *= -val
         else
             col[idx] = zero(T)
             normalize!(col)
         end
     end
 
-    (spinSec1OrbCoeff, spinSec2OrbCoeff)
+    (matOrth * orbC1n, matOrth * orbC2n)
 end
 
-breakCoeffSymmetry(::RCHartreeFock, spinSec1OrbCoeff::AbstractMatrix{T}) where {T} = 
-(spinSec1OrbCoeff,)
+breakCoeffSymmetry(::UOHartreeFock, matOrth::AbstractMatrix{T}, 
+                   (spinSec1OrbCoeff,)::Tuple{AbstractMatrix{T}}) where 
+                  {R<:Real, T<:RealOrComplex{R}} = 
+breakCoeffSymmetryCore(matOrth, (spinSec1OrbCoeff, spinSec1OrbCoeff))
+
+function breakCoeffSymmetry(::UOHartreeFock, matOrth::AbstractMatrix{T}, 
+                            orbCoeffTuple::NTuple{2, AbstractMatrix{T}}) where 
+                           {R<:Real, T<:RealOrComplex{R}}
+    inverseMap = inv(matOrth |> Hermitian)
+    diff = rmsOf(inverseMap * ( first(orbCoeffTuple) - last(orbCoeffTuple) ))
+    if diff < (one(R) / 10) #! Make it adjustable in the future
+        # println("Initiate additional symmetry breaking...")
+        breakCoeffSymmetryCore(matOrth, orbCoeffTuple)
+    else
+        # println("Skip additional symmetry breaking: $diff")
+        orbCoeffTuple
+    end
+end
+
+breakCoeffSymmetry(::RCHartreeFock, ::AbstractMatrix{T}, 
+                   orbCoeffTuple::Tuple{AbstractMatrix{T}}) where 
+                  {R<:Real, T<:RealOrComplex{R}} = 
+itself(orbCoeffTuple)
 
 function breakCoeffSymmetry(::RCHartreeFock, matOrth::AbstractMatrix{T}, 
                             matOneBody::AbstractMatrix{T}, matTwoBody::AbstractArray{T, 4}, 
                             densityPair::NTuple{2, AbstractMatrix{T}}) where 
-                           {T<:RealOrComplex}
+                           {R<:Real, T<:RealOrComplex{R}}
     spinSec1Density = sum(densityPair) ./ 2
     getC.( Ref(matOrth), getF(matOneBody, matTwoBody, (spinSec1Density,)) )
 end
@@ -99,8 +131,9 @@ end
 function breakCoeffSymmetry(::UOHartreeFock, matOrth::AbstractMatrix{T}, 
                             matOneBody::AbstractMatrix{T}, matTwoBody::AbstractArray{T, 4}, 
                             densityPair::NTuple{2, AbstractMatrix{T}}) where 
-                           {T<:RealOrComplex}
-    getC.( Ref(matOrth), getF(matOneBody, matTwoBody, densityPair) )
+                           {R<:Real, T<:RealOrComplex{R}}
+    orbCoeffTuple = getC.( Ref(matOrth), getF(matOneBody, matTwoBody, densityPair) )
+    breakCoeffSymmetry(UOHartreeFock(), matOrth, orbCoeffTuple)
 end
 
 
@@ -182,7 +215,7 @@ function initializeOrbCoeffData(::Val{:CoreH}, ::HFT, matOrth::AbstractMatrix{T}
                                 matOneBody::AbstractMatrix{T}) where 
                                {HFT<:HartreeFockType, T<:RealOrComplex}
     spinSec1OrbCoeff = getC(matOrth, matOneBody)
-    breakCoeffSymmetry(HFT(), spinSec1OrbCoeff)
+    breakCoeffSymmetry(HFT(), matOrth, (spinSec1OrbCoeff,))
 end
 
 function initializeOrbCoeffData(::Val{:GWH}, ::HFT, info::FullElecHamilInfo) where 
@@ -210,7 +243,7 @@ function initializeOrbCoeffData(::Val{:GWH}, ::HFT, matOrth::AbstractMatrix{T},
     end
 
     spinSec1OrbCoeff = getC(matOrth, newOneBody)
-    breakCoeffSymmetry(HFT(), spinSec1OrbCoeff)
+    breakCoeffSymmetry(HFT(), matOrth, (spinSec1OrbCoeff,))
 end
 
 function initializeOrbCoeffData(::Val{:SAD}, ::HFT, info::FullElecHamilInfo) where 
@@ -372,7 +405,7 @@ mutable struct HFinterrelatedVars{R<:Real, T<:RealOrComplex{R}} <: StateBox{T}
         new{R, T}(Dts, Ets)
     end
 
-    HFinterrelatedVars{R, T}() where {R, T<:RealOrComplex{R}} = new{R, T}()
+    HFinterrelatedVars{R, T}() where {R<:Real, T<:RealOrComplex{R}} = new{R, T}()
 end
 
 
@@ -390,7 +423,8 @@ struct HFtempInfo{R<:Real, T<:RealOrComplex{R}, HFT<:HartreeFockType} <: StateBo
 
     HFtempInfo(::HFT, Nˢ::Int, Cs::Vector{Matrix{T}}, Ds::Vector{Matrix{T}}, 
                Fs::Vector{Matrix{T}}, Es::Vector{R}, Dtots::Vector{Matrix{T}}, 
-               Etots::Vector{R}) where {HFT<:HartreeFockType, R, T<:RealOrComplex{R}} = 
+               Etots::Vector{R}) where 
+              {HFT<:HartreeFockType, R<:Real, T<:RealOrComplex{R}} = 
     new{R, T, HFT}(Nˢ, Cs, Ds, Fs, Es, HFinterrelatedVars(Dtots, Etots))
 end
 
@@ -414,14 +448,14 @@ function updateHFTVcore!(varMaxLen::Int, var::Vector{T}, res::T,
     push!(var, res)
 end
 
-const HFtempInfoCore{R, T<:RealOrComplex{R}} = Tuple{
+const HFtempInfoCore{R<:Real, T<:RealOrComplex{R}} = Tuple{
     AbstractMatrix{T}, AbstractMatrix{T}, AbstractMatrix{T}, R, #> .Cs, .Ds, .Fs, .Es
     AbstractMatrix{T}, R                                        #> :Dtots, :Etots
 }
 
 function updateHFtempInfo!(maxLen::Int, αβVars::NonEmptyTuple{HFtempInfo{R, T, HFT}, N}, 
                            ress::NonEmptyTuple{HFtempInfoCore{R, T}, N}) where 
-                          {R, T<:RealOrComplex{R}, HFT, N}
+                          {R<:Real, T<:RealOrComplex{R}, HFT, N}
     for (tVars, res) in zip(αβVars, ress)
         fs = getHFTVforUpdate1(tVars)
         for (f, r, truncateBl) in zip(fs, res, 
@@ -819,7 +853,7 @@ information from all the iterations steps to the field `.temp` of the output
              strategy::$SCFconfig=SCFconfig(), 
              maxStep::Int=$defaultHFmaxStep, earlyStop::Bool=true, 
              saveTrace::NTuple{4, Bool}=$defaultHFsaveTrace) where 
-            {R, T<:RealOrComplex{R}, HFT<:$HartreeFockType} -> 
+            {R<:Real, T<:RealOrComplex{R}, HFT<:$HartreeFockType} -> 
     HFconfig{R, T, HFT}
 
 ≡≡≡ Initialization Example(s) ≡≡≡
