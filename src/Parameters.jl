@@ -1094,7 +1094,12 @@ end
 UnitParamEncoder(::Type{T}, symbol::Symbol, screen::Int=1) where {T} = 
 UnitParamEncoder(T, symbol, TernaryNumber(screen))
 
-(f::UnitParamEncoder)(input::UnitParam) = itself(input)
+function (f::UnitParamEncoder{T1})(input::UnitParam{T2}) where {T1, T2}
+    if !(T2 <: T1)
+        throw(ArgumentError("The internal type of `input` $T2 must be a subtype of $T1."))
+    end
+    itself(input)
+end
 
 function (f::UnitParamEncoder{T})(input) where {T}
     p = genCellParam(convert(T, input), f.symbol)
@@ -1113,7 +1118,12 @@ end
 GridParamEncoder(::Type{T}, symbol::Symbol, screen::Int=1) where {T} = 
 GridParamEncoder(T, symbol, TernaryNumber(screen))
 
-(f::GridParamEncoder)(input::UnitParam) = itself(input)
+function (f::GridParamEncoder{T1})(input::GridParam{T2}) where {T1, T2}
+    if !(T2 <: T1)
+        throw(ArgumentError("The internal type of `input` $T2 must be a subtype of $T1."))
+    end
+    itself(input)
+end
 
 function (f::GridParamEncoder{T})(input::AbstractVector) where {T}
     p = genCellParam(convert(AbstractVector{T}, input), f.symbol)

@@ -15,7 +15,7 @@ end
 
 const PrimGTO{T<:Real, D, F<:ShiftedPolyGaussField{T, D}} = PrimitiveOrb{T, D, T, F}
 
-function PrimitiveOrb(center::NTuple{D, UnitOrVal{T}}, body::FieldAmplitude{C, D}; 
+function PrimitiveOrb(center::NTuple{D, UnitOrVal{<:Real}}, body::FieldAmplitude{C, D}; 
                       renormalize::Bool=false) where {T<:Real, C<:RealOrComplex{T}, D}
     PrimitiveOrb(ShiftedField(center, body), renormalize)
 end
@@ -185,15 +185,14 @@ function getNormFactor(orb::ComposedOrb{T, D, C}) where {T<:Real, D, C<:RealOrCo
 end
 
 
-function genGaussTypeOrb(center::NonEmptyTuple{UnitOrVal{T}, D}, 
-                         xpn::UnitOrVal{T}, 
+function genGaussTypeOrb(center::NonEmptyTuple{UnitOrVal{<:Real}, D}, xpn::UnitOrVal{T}, 
                          ijk::NonEmptyTuple{Int, D}=ntuple(_->0, Val(D+1)); 
                          renormalize::Bool=false) where {T<:Real, D}
     gf = GaussFunc(xpn)
     PrimitiveOrb(center, PolyRadialFunc(gf, ijk); renormalize)
 end
 
-function genGaussTypeOrb(center::NonEmptyTuple{UnitOrVal{T}, D}, 
+function genGaussTypeOrb(center::NonEmptyTuple{UnitOrVal{<:Real}, D}, 
                          xpns::UnitOrValVec{T}, 
                          cons::Union{UnitOrValVec{C}, GridParam{C, 1}}, 
                          ijk::NonEmptyTuple{Int, D}=ntuple(_->0, Val(D+1)); 
@@ -419,10 +418,16 @@ function get3DimPGTOrbNormFactor(xpn::T, carteAng::NTuple{3, Int}) where {T<:Rea
                       (factorial(2i) * factorial(2j) * factorial(2k)) ))
     xpnPart * angPart
 end
-#! T in NTuple{3, UnitOrVal{T}} could be unbound. E.g., (1, 1.0, 2.0)
-function genGaussTypeOrbSeq(center::NTuple{3, UnitOrVal{T}}, content::AbstractString; 
+
+function genGaussTypeOrbSeq(center::NTuple{3, UnitOrVal{<:Real}}, content::AbstractString; 
                             innerRenormalize::Bool=false, outerRenormalize::Bool=false, 
-                            unlinkCenter::Bool=false) where {T<:Real}
+                            unlinkCenter::Bool=false)
+    Ts = map(x->(x isa UnitParam ? getOutputType(x) : typeof(x)), center)
+    T = reduce(typejoin, Ts)
+    if !isconcretetype(T)
+        throw(AssertionError("The elemental data type of `center`: $Ts must be uniform."))
+    end
+
     cenEncoder = let cenParams=map(UnitParamEncoder(T, :cen, 1), center)
         unlinkCenter ? ()->deepcopy(cenParams) : ()->cenParams
     end
@@ -455,9 +460,15 @@ function genGaussTypeOrbSeq(center::NTuple{3, UnitOrVal{T}}, content::AbstractSt
     bfs
 end
 
-function genGaussTypeOrbSeq(center::NTuple{3, UnitOrVal{T}}, atm::Symbol, basisKey::String; 
-                            innerRenormalize::Bool=false, outerRenormalize::Bool=false, 
-                            unlinkCenter::Bool=false) where {T<:Real}
+function genGaussTypeOrbSeq(center::NTuple{3, UnitOrVal{<:Real}}, atm::Symbol, 
+                            basisKey::String; innerRenormalize::Bool=false, 
+                            outerRenormalize::Bool=false, unlinkCenter::Bool=false)
+    Ts = map(x->(x isa UnitParam ? getOutputType(x) : typeof(x)), center)
+    T = reduce(typejoin, Ts)
+    if !isconcretetype(T)
+        throw(AssertionError("The elemental data type of `center`: $Ts must be uniform."))
+    end
+
     hasBasis = true
     basisSetFamily = get(AtomicGTOrbSetDict, basisKey, nothing)
     basisStr = if basisSetFamily === nothing
