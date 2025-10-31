@@ -164,10 +164,26 @@ end
                                     CR<:$CONST_typeStrOfRealOrComplex, D} ->
     $CONST_typeStrOfRealOrComplex
 
+    nucAttraction(nucInfo::$NuclearCluster{T, D}, 
+                  orbL::$OrbitalBasis{CL, D}, orbR::$OrbitalBasis{CR, D}; 
+                  lazyCompute::Bool=true
+                  ) where {T<:Real, CL<:$CONST_typeStrOfRealOrComplex, 
+                                    CR<:$CONST_typeStrOfRealOrComplex, D} ->
+    $CONST_typeStrOfRealOrComplex
+
 Compute the nuclear-attraction integral between two orbital basis functions `orbL` and 
-`orbR` given the nuclear species `nucs` and their coordinates `nucCoords`. If `lazyCompute` 
-is set to `true`, the integral will be computed in a lazy manner to avoid repetitive 
-primitive integration.
+`orbR`. If `lazyCompute` is set to `true`, the integral will be computed in a lazy manner 
+to avoid repetitive primitive integration.
+
+≡≡≡ Positional argument(s) ≡≡≡
+
+`nucs::AbstractVector{Symbol}`: A list of nuclear species.
+
+`nucCoords::AbstractVector{NTuple{D, T}}`: The list of Cartesian nuclear coordinates in 
+the order respective to `nucs`.
+
+`nucInfo::NuclearCluster{T, D}`: A container storing the nuclear species and their 
+respective coordinates.
 """
 function nucAttraction(nucs::AbstractVector{Symbol}, 
                        nucCoords::AbstractVector{NTuple{D, T}}, 
@@ -181,6 +197,16 @@ function nucAttraction(nucs::AbstractVector{Symbol},
     computeOrbLayoutIntegral(neOp, (orbL, orbR); lazyCompute, estimatorConfig, cache!Self)
 end
 
+nucAttraction(nucInfo::NuclearCluster{T, D}, 
+              orbL::OrbitalBasis{CL, D}, orbR::OrbitalBasis{CR, D}; 
+              lazyCompute::AbstractBool=True(), 
+              estimatorConfig::OptEstimatorConfig{T}=missing, 
+              cache!Self::OptParamDataCache=initializeParamDataCache()) where 
+             {T<:Real, CL<:RealOrComplex{T}, CR<:RealOrComplex{T}, D} = 
+nucAttraction(nucInfo.layout.left, nucInfo.layout.right, orbL, orbR; 
+              lazyCompute, estimatorConfig, cache!Self)
+
+
 """
 
     nucAttractions(nucs::AbstractVector{Symbol}, nucCoords::AbstractVector{NTuple{D, T}}, 
@@ -189,10 +215,25 @@ end
                    ) where {T<:Real, D} -> 
     AbstractMatrix{<:$CONST_typeStrOfRealOrComplex}
 
+    nucAttractions(nucInfo::NuclearCluster{T, D}, 
+                   basisSet::$CONST_typeStrOfOrbBasisVector; 
+                   lazyCompute::Bool=true
+                   ) where {T<:Real, D} -> 
+    AbstractMatrix{<:$CONST_typeStrOfRealOrComplex}
+
 Compute the nuclear-attraction integrals for all pairs of orbital basis functions in 
-`basisSet` given the nuclear species `nucs` and their coordinates`nucCoords`. If 
-`lazyCompute` is set to `true`, the integrals will be computed in a lazy manner to avoid 
-repetitive primitive integration.
+`basisSet`. If `lazyCompute` is set to `true`, the integrals will be computed in a lazy 
+manner to avoid repetitive primitive integration.
+
+≡≡≡ Positional argument(s) ≡≡≡
+
+`nucs::AbstractVector{Symbol}`: A list of nuclear species.
+
+`nucCoords::AbstractVector{NTuple{D, T}}`: The list of Cartesian nuclear coordinates in 
+the order respective to `nucs`.
+
+`nucInfo::NuclearCluster{T, D}`: A container storing the nuclear species and their 
+respective coordinates.
 """
 function nucAttractions(nucs::AbstractVector{Symbol}, 
                         nucCoords::AbstractVector{NTuple{D, T}}, 
@@ -207,6 +248,15 @@ function nucAttractions(nucs::AbstractVector{Symbol},
                              lazyCompute, estimatorConfig, cache!Self)
 end
 
+nucAttractions(nucInfo::NuclearCluster{T, D},
+               basisSet::OrbBasisVector{T, D}; 
+               lazyCompute::AbstractBool=True(), 
+               estimatorConfig::OptEstimatorConfig{T}=missing, 
+               cache!Self::OptParamDataCache=initializeParamDataCache()) where 
+              {T<:Real, D} = 
+nucAttractions(nucInfo.layout.left, nucInfo.layout.right, basisSet; 
+               lazyCompute, estimatorConfig, cache!Self)
+
 
 """
 
@@ -216,17 +266,32 @@ end
                     ) where {T<:Real, D} -> 
     AbstractMatrix{<:$CONST_typeStrOfRealOrComplex}
 
+    coreHamiltonian(nucInfo::NuclearCluster{T, D}, 
+                    basisSet::$CONST_typeStrOfOrbBasisVector; 
+                    lazyCompute::Bool=true
+                    ) where {T<:Real, D} -> 
+    AbstractMatrix{<:$CONST_typeStrOfRealOrComplex}
+
 Compute the core-Hamiltonian integrals for all pairs of orbital basis functions in 
 `basisSet`, which is the matrix addition of the electronic kinetic-energy integrals and the 
-nuclear-electron attraction integrals, given the nuclear species `nucs` and their 
-coordinates `nucCoords`. If `lazyCompute` is set to `true`, the integrals will be computed 
-in a lazy manner to avoid repetitive primitive integration.
+nuclear-electron attraction integrals. If `lazyCompute` is set to `true`, the integrals 
+will be computed in a lazy manner to avoid repetitive primitive integration.
+
+≡≡≡ Positional argument(s) ≡≡≡
+
+`nucs::AbstractVector{Symbol}`: A list of nuclear species.
+
+`nucCoords::AbstractVector{NTuple{D, T}}`: The list of Cartesian nuclear coordinates in 
+the order respective to `nucs`.
+
+`nucInfo::NuclearCluster{T, D}`: A container storing the nuclear species and their 
+respective coordinates.
 """
 function coreHamiltonian(nucs::AbstractVector{Symbol}, 
                          nucCoords::AbstractVector{NTuple{D, T}}, 
                          basisSet::OrbBasisVector{T, D}, 
                          kineticOperator::KineticEnergySampler{T, D}=
-                                          genKineticEnergySampler(T, Count(D)), 
+                                          genKineticEnergySampler(T, Count(D)); 
                          lazyCompute::AbstractBool=True(), 
                          estimatorConfig::OptEstimatorConfig{T}=missing, 
                          cache!Self::OptParamDataCache=initializeParamDataCache()) where 
@@ -236,6 +301,17 @@ function coreHamiltonian(nucs::AbstractVector{Symbol},
     computeOrbVectorIntegral(OneBodyIntegral{D, T}(), coreHop, basisSet; 
                              lazyCompute, estimatorConfig, cache!Self)
 end
+
+coreHamiltonian(nucInfo::NuclearCluster{T, D}, 
+                basisSet::OrbBasisVector{T, D}, 
+                kineticOperator::KineticEnergySampler{T, D}=
+                                 genKineticEnergySampler(T, Count(D)); 
+                lazyCompute::AbstractBool=True(), 
+                estimatorConfig::OptEstimatorConfig{T}=missing, 
+                cache!Self::OptParamDataCache=initializeParamDataCache()) where 
+               {T<:Real, D} = 
+coreHamiltonian(nucInfo.layout.left, nucInfo.layout.right, basisSet, kineticOperator; 
+                lazyCompute, estimatorConfig, cache!Self)
 
 
 """
