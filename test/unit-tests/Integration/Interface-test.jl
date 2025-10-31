@@ -50,8 +50,11 @@ cgf3 = genGaussTypeOrb(cen1, xpns1, cons1, (3, 0, 0))
 
 nucs1 = [:H, :Li]
 coords1 = [(-0.7, 0., 0.), (0.7, 0., 0.)]
-
-@test nucAttractions(nucs1, coords1, bfs1) + elecKinetics(bfs1) == 
-      coreHamiltonian(nucs1, coords1, bfs1)
+nucInfo1 = NuclearCluster(nucs1, coords1)
+coreH = coreHamiltonian(nucs1, coords1, bfs1)
+eKE = elecKinetics(bfs1)
+@test nucAttractions(nucs1, coords1, bfs1) + eKE == coreH
+@test nucAttractions(nucInfo1, bfs1) + eKE == coreH == coreHamiltonian(nucInfo1, bfs1)
+@test [nucAttraction(nucInfo1, bf1, bf2) for bf1 in bfs1, bf2 in bfs1] ≈ coreH - eKE
 
 end

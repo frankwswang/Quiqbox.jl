@@ -158,31 +158,14 @@ function findFirstEnclosureRange(str::String, startIdx::Int=1,
 end
 
 
-function ShortenStrClip(str::String, clip::AbstractString)
-    clip = string(clip)
-    tempSym = "#tempSym#"
-    while (ids1 = findfirst(clip, str); ids1 !== nothing)
-        ids2 = findFirstEnclosureRange(str, ids1[end])
-        idxL = lastindex(str)
-        ids2L = ids2[end]
-        tail = if str[thisind(str, min(idxL, ids2L+1)):thisind(str, min(idxL, ids2L+7))] == 
-                  " where "
-            tailStartIdx = if str[ids2L+8] == '{'
-                findFirstEnclosureRange(str, ids2L+7)[end] + 1
-            else
-                id1, id2 = findnext.((',', '}'), str, ids2L+7)
-                id1 === nothing && (id1 = idxL)
-                id2 === nothing && (id2 = idxL)
-                min(id1, id2)
-            end
-            str[tailStartIdx:end]
-        else
-            str[ids2L+1:end]
-        end
-        abbrev = ifelse(str[nextind(str, ids1[end])] == '{', "{…}", "")
-        str = str[begin:prevind(str, ids1[begin])] * tempSym * abbrev * tail
+function shortUnionAllString(type::UnionAll)
+    str = string(type)
+    idx = findlast(" where ", str)
+    if idx === nothing
+        str
+    else
+        str[begin:first(idx)-1]
     end
-    replace(str, tempSym=>clip)
 end
 
 

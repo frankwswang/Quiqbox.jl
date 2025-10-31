@@ -411,7 +411,7 @@ struct ShiftedField{T, D, C<:RealOrComplex{T}, F<:FieldAmplitude{C, D},
     center::R
     core::F
 
-    function ShiftedField(center::NTuple{D, UnitOrVal{T}}, core::FieldAmplitude{C, D}
+    function ShiftedField(center::NTuple{D, UnitOrVal{<:Real}}, core::FieldAmplitude{C, D}
                           ) where {T<:Real, C<:RealOrComplex{T}, D}
         encoder = UnitParamEncoder(T, :cen, 1)
         centerParams = encoder.(center)

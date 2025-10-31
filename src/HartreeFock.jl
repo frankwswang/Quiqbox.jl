@@ -7,6 +7,8 @@ using Combinatorics: powerset
 using SPGBox: spgbox!
 using LBFGSB: lbfgsb
 
+const CONST_typeStrV2OfRealOrComplex = replace(CONST_typeStrOfRealOrComplex, 'T'=>'R')
+
 const CONSTVAR_defaultHFinfoDigits = 10
 const FullHFStepLevel = 5
 const defaultDS = 0.75
@@ -640,7 +642,8 @@ for all the secondary convergence ratios.
 `threshold` will replace the stopping threshold of the default SCF configuration with a new 
 value.
 
-≡≡≡ Example(s) ≡≡≡
+≡≡≡ Initialization Example(s) ≡≡≡
+
 ```jldoctest; setup = :(push!(LOAD_PATH, "../../src/"); using Quiqbox)
 julia> SCFconfig((:DD, :ADIIS, :DIIS), (1e-4, 1e-12, 1e-13), Dict(2=>[:solver=>:LCM]));
 
@@ -697,7 +700,8 @@ function getSCFcacheSizes(scfConfig::SCFconfig)
 end
 
 
-function getOrbitalOccupations(::RCHartreeFock, X::AbstractMatrix{T}, (spinSec1N,)::Tuple{Int}, 
+function getOrbitalOccupations(::RCHartreeFock, X::AbstractMatrix{T}, 
+                               (spinSec1N,)::Tuple{Int}, 
                                (spinSec1F,)::Tuple{AbstractMatrix{T}}) where 
                               {R<:Real, T<:RealOrComplex{R}}
     nMode = size(X, 1)
@@ -743,19 +747,19 @@ end
 
 """
 
-    HFfinalInfo{R<:Real, D, T<:$RealOrComplex{R}, HFT<:$HartreeFockType, HFTS, 
-                B<:$MultiOrbitalData{R, D, T}} <: StateBox{T}
+    HFfinalInfo{R<:Real, D, T<:$CONST_typeStrV2OfRealOrComplex, HFT<:$HartreeFockType, 
+                HFTS, B<:$MultiOrbitalData{R, D, T}} <: StateBox{T}
 
 The container of the final values after a Hartree–Fock SCF procedure. `HFTS` specifies the 
 number of distinct data sectors corresponding to the specified spin configurations. For 
 restricted closed-shell Hartree–Fock (RHF), `HFTS` is `1`.
 
 ≡≡≡ Property/Properties ≡≡≡
-`@NamedTuple{spin::$OccupationState{2}, geometry::$NuclearCluster{R, T}}`: The spin and 
-nuclear-geometry configurations of the target system. `.spin` specifies numbers of 
-electrons in two orthonormal spin configurations (e.g., spin-up vs. spin-down). For any 
-property data (`::P`) enclosed in `NTuple{HFTS, P}` and `HFTS==2`, each element correspond 
-to one spin configuration.
+
+`system::@NamedTuple{spin::$OccupationState{2}, geometry::$NuclearCluster{R, D}}`: The 
+specification of the target system. Its property `.spin::`[`OccupationState`](@ref) 
+specifies numbers of electrons in two orthonormal spin configurations (e.g., spin-up vs. 
+spin-down); `.geometry::`[`NuclearCluster`](@ref) specifies the nuclear geometry.
 
 `energy::NTuple{2, R}`: The electronic and nuclear (repulsion potential) parts of the 
 target system's ground-state energy under the Hartree–Fock and the Born–Oppenheimer 
@@ -812,7 +816,7 @@ end
 
 """
 
-    HFconfig{R<:Real, T<:$RealOrComplex{R}, HFT<:$HartreeFockType, 
+    HFconfig{R<:Real, T<:$CONST_typeStrV2OfRealOrComplex, HFT<:$HartreeFockType, 
              CM<:$OrbCoeffInitialConfig{T, HFT}, SCFM<:$SCFconfig, S} <: $ConfigBox
 
 The container of a Hartree–Fock method's configuration.
@@ -897,16 +901,19 @@ end
 
 const ElectronSpinConfig = Union{NTuple{2, Int}, OccupationState{2}}
 
+const CONST_typeStrV2OfOrbBasisVector = replace(CONST_typeStrOfOrbBasisVector, 'T'=>'R')
+
 """
 
-    runHartreeFock(nucInfo::$NuclearCluster{R, D}, basis::$OrbBasisData{R, D}, 
+    runHartreeFock(nucInfo::$NuclearCluster{R, D}, basis::$CONST_typeStrV2OfOrbBasisVector, 
                    config::MissingOr{$HFconfig{R}}=missing; 
                    printInfo::Bool=true, infoLevel::Int=$defaultHFinfoLevel) where 
                   {R<:Real, D} -> 
     HFfinalInfo{R, D}
 
     runHartreeFock(systemInfo::Pair{<:$ElectronSpinConfig, $NuclearCluster{R, D}}, 
-                   basis::$OrbBasisData{R, D}, config::MissingOr{$HFconfig{R}}=missing; 
+                   basis::$CONST_typeStrV2OfOrbBasisVector, 
+                   config::MissingOr{$HFconfig{R}}=missing; 
                    printInfo::Bool=true, infoLevel::Int=$defaultHFinfoLevel) where 
                   {R<:Real, D} -> 
     HFfinalInfo{R, D}
@@ -915,6 +922,7 @@ Main function to run a Hartree–Fock method in Quiqbox. The returned result and
 information is stored in a [`Quiqbox.HFfinalVars`](@ref).
 
 ≡≡≡ Positional argument(s) ≡≡≡
+
 `nucInfo::NuclearCluster{R, D}`: the nuclear geometry of the system. When `nucInfo` is the 
 first argument the spin configuration is automatically set such that the target system is 
 charge neutral and maximizing pairing electron spins.
@@ -922,7 +930,7 @@ charge neutral and maximizing pairing electron spins.
 `systemInfoPair{<:$ElectronSpinConfig, $NuclearCluster{R, D}}`: A `Pair` information used 
 to specify both the spin and nuclear-geometry configuration of the target system.
 
-`basis::$OrbBasisData{R, D}`: The orbital basis-set configuration.
+`basis::$CONST_typeStrV2OfOrbBasisVector`: The input orbital basis set.
 
 `config::HFconfig`: The Configuration of the Hartree–Fock method. For more information 
 please refer to [`HFconfig`](@ref).
@@ -933,7 +941,7 @@ please refer to [`HFconfig`](@ref).
 
 `infoLevel::Int`: Printed info's level of details when `printInfo=true`. The higher 
 (the absolute value of) `infoLevel` is, more intermediate steps will be printed. Once 
-`infoLevel` achieve `$FullHFStepLevel`, every step will be printed.
+`infoLevel` reaches `$FullHFStepLevel`, every step will be printed.
 """
 function runHartreeFock(nucInfo::NuclearCluster{R, D}, basis::OrbBasisData{R, D}, 
                         config::MissingOr{HFconfig{R}}=missing; 

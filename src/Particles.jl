@@ -1,5 +1,21 @@
-export NuclearCluster, getCharge
+export NuclearCluster, getCharge, OccupationState
 
+"""
+
+    NuclearCluster{T, D} <: $QueryBox{Pair{ Symbol, NTuple{D, T} }}
+
+A container for storing information about a cluster of nuclei, including their
+symbols and respective Cartesian coordinates (of dimension `D`).
+
+≡≡≡ Initialization Method(s) ≡≡≡
+
+    NuclearCluster(nucSyms::AbstractVector{Symbol}, nucCoords::$AbstractRealCoordVector;
+                   pairwiseSort::Bool=true) -> NuclearCluster
+
+`nucSyms` specifies the symbols of the nuclei, while `nucCoords` provides their Cartesian 
+coordinates. `pairwiseSort` determines whether to sort the nuclei based on their atomic 
+numbers and coordinates.
+"""
 struct NuclearCluster{T<:Real, D} <: QueryBox{Pair{ Symbol, NTuple{D, T} }}
     layout::MemoryPair{Symbol, NTuple{D, T}}
 
@@ -9,10 +25,6 @@ struct NuclearCluster{T<:Real, D} <: QueryBox{Pair{ Symbol, NTuple{D, T} }}
         new{T, D+1}(layout)
     end
 end
-
-const AbstractRealCoordVector{T<:Real} = Union{
-    AbstractVector{<:AbstractVector{T}}, (AbstractVector{NonEmptyTuple{T, D}} where {D})
-}
 
 function NuclearCluster(nucSyms::AbstractVector{Symbol}, 
                         nucCoords::AbstractRealCoordVector{T}, 
@@ -66,6 +78,18 @@ function getCharge(nucInfo::NuclearCluster)
 end
 
 
+"""
+
+    OccupationState{N} <: $StateBox{UInt}
+
+A container for storing the occupation numbers (non-negative integers) of multiple modes.
+
+≡≡≡ Initialization Method(s) ≡≡≡
+
+    OccupationState(layout::$(LinearSequence|>shortUnionAllString)) where {T<:Integer} -> 
+    OccupationState
+
+"""
 struct OccupationState{N} <: StateBox{UInt}
     layout::LinearMemory{UInt, N}
 
@@ -119,18 +143,54 @@ lastindex(::OccupationState{N}) where {N} = N
 getTotalOccupation(state::OccupationState) = (Int∘sum)(state.layout)
 
 
-function prepareSpinConfiguration(nucInfo::NuclearCluster{T, D}, 
-                                  spinUpCount::MissingOr{Int}=missing) where {T<:Real, D}
-    totalCharge = getCharge(nucInfo)
-    spinDnCount = if ismissing(spinUpCount)
-        spinUpCount = totalCharge ÷ 2
-        totalCharge - spinUpCount
+function prepareSpinConfiguration(nuc::Union{Symbol, NuclearCluster}, 
+                                  difference::MissingOr{Int}=missing; offset::Int=0)
+    totalOccu = getCharge(nuc) + offset
+    prepareSpinConfigurationCore(totalOccu, difference)
+end
+
+function prepareSpinConfigurationCore(totalOccu::Int, 
+                                      difference::MissingOr{Int}=missing)
+    checkPositivity(totalOccu)
+
+    occuPair = if ismissing(difference)
+        nBeta  = totalOccu ÷ 2
+        nAlpha = totalOccu - nBeta
+        (nAlpha, nBeta)
     else
-        checkPositivity(spinUpCount, true)
-        max(0, totalCharge - spinUpCount)
+        if abs(difference) > totalOccu || iseven(difference) != iseven(totalOccu)
+            throw(AssertionError("`difference=$difference` results in illegal spin "*
+                                 "occupations."))
+        end
+        nAlpha = (totalOccu + difference) ÷ 2
+        nBeta  = (totalOccu - difference) ÷ 2
+        (nAlpha, nBeta)
     end
 
-    OccupationState((spinUpCount, spinDnCount))
+    OccupationState(occuPair)
+end
+
+function swapSpinSector!(state::OccupationState{2})
+    nAlpha, nBeta = state.layout
+    state.layout[begin] = nBeta
+    state.layout[ end ] = nAlpha
+    state
+end
+
+getOccuDifference(state::OccupationState{2}) = first(state.layout) - last(state.layout)
+
+function splitSpinConfiguration(nucInfo::NuclearCluster)
+    spinDifference::Int = 0
+    atomicOccuStates = Memory{NuclearCluster{2}}(undef, length(nucInfo))
+
+    for (i, pair) in zip(eachindex(atomicOccuStates), nucInfo)
+        atomicOccuState = OccupationState(pair.first)
+        spinDifference > 0 && swapSpinSector!(atomicOccuState)
+        spinDifference += getOccuDifference(atomicOccuState)
+        atomicOccuStates[i] = atomicOccuState
+    end
+
+    atomicOccuStates #! Need to test summing over each each section returns same result as `prepareSpinConfiguration(nucInfo)`
 end
 
 
