@@ -4,8 +4,6 @@ export overlap, overlaps, multipoleMoment, multipoleMoments, elecKinetic, elecKi
 
 using TensorOperations: @tensor as @TOtensor
 
-const CONST_typeStrOfRealOrComplex = shortUnionAllString(RealOrComplex)
-
 const CONST_typeStrOfOrbBasisVector = shortUnionAllString(OrbBasisVector)
 
 """

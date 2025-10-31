@@ -1,5 +1,7 @@
 export PrimitiveOrb, CompositeOrb, genGaussTypeOrb, genGaussTypeOrbSeq
 
+const CONST_typeStrOfRealOrComplex = shortUnionAllString(RealOrComplex)
+
 (::SelectTrait{InputStyle})(::OrbitalBasis{C, D}) where {C<:RealOrComplex, D} = 
 CartesianInput{D}()
 
@@ -206,7 +208,7 @@ end
     genGaussTypeOrb(center::NTuple{D, T}, xpns::AbstractVector{T}, cons::AbstractVector{C}, 
                     ijk::NonEmptyTuple{Int, D}=ntuple(_->0, Val(D)); 
                     innerRenormalize::Bool=false, outerRenormalize::Bool=false) where 
-                   {T<:Real, C<:RealOrComplex{T}, D} -> 
+                   {T<:Real, C<:$CONST_typeStrOfRealOrComplex, D} -> 
     $CompositeOrb{T, D, C}
 
 Generate a `D`-dimensional contracted Gaussian-type orbital (GTO) with Cartesian angular 
