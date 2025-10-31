@@ -919,7 +919,7 @@ const CONST_typeStrV2OfOrbBasisVector = replace(CONST_typeStrOfOrbBasisVector, '
     HFfinalInfo{R, D}
 
 Main function to run a Hartree–Fock method in Quiqbox. The returned result and relevant 
-information is stored in a [`Quiqbox.HFfinalVars`](@ref).
+information is stored in a [`Quiqbox.HFfinalInfo`](@ref).
 
 ≡≡≡ Positional argument(s) ≡≡≡
 
