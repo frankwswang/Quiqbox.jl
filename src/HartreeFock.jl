@@ -857,7 +857,7 @@ information from all the iterations steps to the field `.temp` of the output
              strategy::$SCFconfig=SCFconfig(), 
              maxStep::Int=$defaultHFmaxStep, earlyStop::Bool=true, 
              saveTrace::NTuple{4, Bool}=$defaultHFsaveTrace) where 
-            {R<:Real, T<:RealOrComplex{R}, HFT<:$HartreeFockType} -> 
+            {R<:Real, T<:$CONST_typeStrV2OfRealOrComplex, HFT<:$HartreeFockType} -> 
     HFconfig{R, T, HFT}
 
 ≡≡≡ Initialization Example(s) ≡≡≡
