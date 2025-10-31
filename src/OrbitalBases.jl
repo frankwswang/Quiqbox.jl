@@ -184,7 +184,16 @@ function getNormFactor(orb::ComposedOrb{T, D, C}) where {T<:Real, D, C<:RealOrCo
     end
 end
 
+"""
 
+    genGaussTypeOrb(center::NTuple{D, T}, xpn::T, ijk::NTuple{D, Int}=ntuple(_->0, Val(D)); 
+                    renormalize::Bool=false) where {T<:Real, D} -> 
+    $PrimitiveOrb{T, D, T}
+
+Generate a `D`-dimensional primitive Gaussian-type orbital (GTO) located at `center` with 
+exponent coefficients specified by `xpn` and Cartesian angular momentum specified by `ijk`. 
+`renormalize` determines whether the generated orbital should be renormalized.
+"""
 function genGaussTypeOrb(center::NonEmptyTuple{UnitOrVal{<:Real}, D}, xpn::UnitOrVal{T}, 
                          ijk::NonEmptyTuple{Int, D}=ntuple(_->0, Val(D+1)); 
                          renormalize::Bool=false) where {T<:Real, D}
@@ -192,6 +201,20 @@ function genGaussTypeOrb(center::NonEmptyTuple{UnitOrVal{<:Real}, D}, xpn::UnitO
     PrimitiveOrb(center, PolyRadialFunc(gf, ijk); renormalize)
 end
 
+"""
+
+    genGaussTypeOrb(center::NTuple{D, T}, xpns::AbstractVector{T}, cons::AbstractVector{C}, 
+                    ijk::NonEmptyTuple{Int, D}=ntuple(_->0, Val(D)); 
+                    innerRenormalize::Bool=false, outerRenormalize::Bool=false) where 
+                   {T<:Real, C<:RealOrComplex{T}, D} -> 
+    $CompositeOrb{T, D, C}
+
+Generate a `D`-dimensional contracted Gaussian-type orbital (GTO) with Cartesian angular 
+momentum specified by `ijk`, as a linear combination of con-centric primitive GTOs located 
+at `center`, with exponent coefficients specified by `xpns` and contraction coefficients 
+specified by `cons`. `innerRenormalize` and `outerRenormalize` determine whether the 
+primitive GTOs and the contracted GTO should be renormalized, respectively.
+"""
 function genGaussTypeOrb(center::NonEmptyTuple{UnitOrVal{<:Real}, D}, 
                          xpns::UnitOrValVec{T}, 
                          cons::Union{UnitOrValVec{C}, GridParam{C, 1}}, 
@@ -419,6 +442,21 @@ function get3DimPGTOrbNormFactor(xpn::T, carteAng::NTuple{3, Int}) where {T<:Rea
     xpnPart * angPart
 end
 
+
+"""
+
+    genGaussTypeOrbSeq(center::NTuple{3, T}, content::AbstractString; 
+                       innerRenormalize::Bool=false, outerRenormalize::Bool=false, 
+                       unlinkCenter::Bool=false) where {T<:Real} -> 
+    Vector{<:$CompositeOrb{T, 3, T}}
+
+Generate a sequence of Gaussian-type orbitals (GTOs) located at `center` based on the
+basis set information provided in `content`, which should the text of an atomic Gaussian 
+basis set in the Gaussian (software) format. `innerRenormalize` and `outerRenormalize` 
+determine whether the primitive GTOs and the contracted GTOs should be renormalized, 
+respectively. `unlinkCenter` determines whether the center parameters of the generated GTOs 
+should be unlinked from each other.
+"""
 function genGaussTypeOrbSeq(center::NTuple{3, UnitOrVal{<:Real}}, content::AbstractString; 
                             innerRenormalize::Bool=false, outerRenormalize::Bool=false, 
                             unlinkCenter::Bool=false)
@@ -460,6 +498,24 @@ function genGaussTypeOrbSeq(center::NTuple{3, UnitOrVal{<:Real}}, content::Abstr
     bfs
 end
 
+"""
+
+    genGaussTypeOrbSeq(center::NTuple{3, UnitOrVal{T}}, atm::Symbol, basisKey::String; 
+                       innerRenormalize::Bool=false, outerRenormalize::Bool=false, 
+                       unlinkCenter::Bool=false) where {T<:Real} -> 
+    Vector{<:$CompositeOrb{T, 3, T}}
+
+Generate a sequence of Gaussian-type orbitals (GTOs) located at `center` based on the input 
+atomic basis set specified by the atomic symbol `atm` and the basis-set name `basisKey`. 
+
+* Atomic symbol options: `$AtomElementNames`.
+
+* Basis-set name options: `$AtomicGTOrbSetNames`.
+
+`innerRenormalize` and `outerRenormalize` determine whether the primitive GTOs and the 
+contracted GTOs should be renormalized, respectively. `unlinkCenter` determines whether the 
+center parameters of the generated GTOs should be unlinked from each other.
+"""
 function genGaussTypeOrbSeq(center::NTuple{3, UnitOrVal{<:Real}}, atm::Symbol, 
                             basisKey::String; innerRenormalize::Bool=false, 
                             outerRenormalize::Bool=false, unlinkCenter::Bool=false)

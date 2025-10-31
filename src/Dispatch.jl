@@ -97,6 +97,19 @@ function getMethodNum(f::Function)
 end
 
 
+"""
+
+    struct Count{N} <: $StructuredType
+
+A singlet structure whose type parameter `N` is a non-negative integer representing a 
+countable quantity.
+
+≡≡≡ Initialization Method(s) ≡≡≡
+
+    Count{N}() where {N} -> Count{N}
+
+    Count(N::Integer) -> Count{N}
+"""
 struct Count{N} <: StructuredType
 
     function Count{N}() where {N}

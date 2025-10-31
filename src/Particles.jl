@@ -1,5 +1,21 @@
-export NuclearCluster, getCharge
+export NuclearCluster, getCharge, OccupationState
 
+"""
+
+    NuclearCluster{T, D} <: $QueryBox{Pair{ Symbol, NTuple{D, T} }}
+
+A container for storing information about a cluster of nuclei, including their
+symbols and respective Cartesian coordinates (of dimension `D`).
+
+≡≡≡ Initialization Method(s) ≡≡≡
+
+    NuclearCluster(nucSyms::AbstractVector{Symbol}, nucCoords::$AbstractRealCoordVector;
+                   pairwiseSort::Bool=true) -> NuclearCluster
+
+`nucSyms` specifies the symbols of the nuclei, while `nucCoords` provides their Cartesian 
+coordinates. `pairwiseSort` determines whether to sort the nuclei based on their atomic 
+numbers and coordinates.
+"""
 struct NuclearCluster{T<:Real, D} <: QueryBox{Pair{ Symbol, NTuple{D, T} }}
     layout::MemoryPair{Symbol, NTuple{D, T}}
 
@@ -9,10 +25,6 @@ struct NuclearCluster{T<:Real, D} <: QueryBox{Pair{ Symbol, NTuple{D, T} }}
         new{T, D+1}(layout)
     end
 end
-
-const AbstractRealCoordVector{T<:Real} = Union{
-    AbstractVector{<:AbstractVector{T}}, (AbstractVector{NonEmptyTuple{T, D}} where {D})
-}
 
 function NuclearCluster(nucSyms::AbstractVector{Symbol}, 
                         nucCoords::AbstractRealCoordVector{T}, 
@@ -66,6 +78,18 @@ function getCharge(nucInfo::NuclearCluster)
 end
 
 
+"""
+
+    OccupationState{N} <: $StateBox{UInt}
+
+A container for storing the occupation numbers (non-negative integers) of multiple modes.
+
+≡≡≡ Initialization Method(s) ≡≡≡
+
+    OccupationState(layout::$(LinearSequence|>shortUnionAllString)) where {T<:Integer} -> 
+    OccupationState
+
+"""
 struct OccupationState{N} <: StateBox{UInt}
     layout::LinearMemory{UInt, N}
 

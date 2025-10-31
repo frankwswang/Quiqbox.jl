@@ -102,6 +102,10 @@ const FunctionChainUnion{F<:Function} = Union{
     AbstractMemory{<:F}, GeneralTupleUnion{NonEmptyTuple{F}}
 }
 
+const AbstractRealCoordVector{T<:Real} = Union{
+    AbstractVector{<:AbstractVector{T}}, (AbstractVector{NonEmptyTuple{T, D}} where {D})
+}
+
 
 const RefVal = Base.RefValue
 
