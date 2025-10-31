@@ -700,7 +700,8 @@ function getSCFcacheSizes(scfConfig::SCFconfig)
 end
 
 
-function getOrbitalOccupations(::RCHartreeFock, X::AbstractMatrix{T}, (spinSec1N,)::Tuple{Int}, 
+function getOrbitalOccupations(::RCHartreeFock, X::AbstractMatrix{T}, 
+                               (spinSec1N,)::Tuple{Int}, 
                                (spinSec1F,)::Tuple{AbstractMatrix{T}}) where 
                               {R<:Real, T<:RealOrComplex{R}}
     nMode = size(X, 1)
@@ -911,7 +912,8 @@ const CONST_typeStrV2OfOrbBasisVector = replace(CONST_typeStrOfOrbBasisVector, '
     HFfinalInfo{R, D}
 
     runHartreeFock(systemInfo::Pair{<:$ElectronSpinConfig, $NuclearCluster{R, D}}, 
-                   basis::$CONST_typeStrV2OfOrbBasisVector, config::MissingOr{$HFconfig{R}}=missing; 
+                   basis::$CONST_typeStrV2OfOrbBasisVector, 
+                   config::MissingOr{$HFconfig{R}}=missing; 
                    printInfo::Bool=true, infoLevel::Int=$defaultHFinfoLevel) where 
                   {R<:Real, D} -> 
     HFfinalInfo{R, D}
