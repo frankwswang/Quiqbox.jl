@@ -110,4 +110,11 @@ ovlps1t = [1.0000000000228146, 0.17721451646431652, 0.0, 0.0, 0.0, 0.14067377864
            0.0, 0.0, 0.0, 0.5885933639439289, 0.0, 0.0, 0.0, 1.0]
 @test ovlps1 ≈ ovlps1t && all(ovlps1 .≈ ovlps1t)
 
+sto1 = genGaussTypeOrbSeq((1., 1., 0.), :O, "STO-3G")
+sto1_str = Quiqbox.AtomicGTOrbSetDict["STO-3G"][Quiqbox.NuclearChargeDict[:O]]
+sto1t = genGaussTypeOrbSeq((1., 1., 0.), sto1_str)
+@test isapprox(norm(overlaps(sto1) - overlaps(sto1t)), 0, atol=1e-9)
+try genGaussTypeOrbSeq((1., 1., 0), sto1_str) catch err; err isa AssertionError end
+try genGaussTypeOrbSeq((1., 1., 0), :H, "STO-3G") catch err; err isa AssertionError end
+
 end
