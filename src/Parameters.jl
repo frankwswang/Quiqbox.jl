@@ -1581,7 +1581,7 @@ end
 
 """
 
-    sever(param::ParamBox, screenSource::Bool=false) -> ParamBox
+    sever(param::$ParamBox, screenSource::Bool=false) -> ParamBox
 
 Returns a copy of `param` with severable connection(s) eliminated. For `param::SpanParam`, 
 `sever` returns a `PrimitiveParam` of which the output value is the same as `param` when 
