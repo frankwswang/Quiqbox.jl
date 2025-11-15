@@ -48,7 +48,7 @@ For more basic usage of the programming language behind Quiqbox, Julia, please r
 
 If you use Quiqbox in your research, please cite the following paper:
 
-- [Wang, W., & Whitfield, J. D. (2023). Basis set generation and optimization in the NISQ era with Quiqbox.jl. *Journal of Chemical Theory and Computation, 19*(22), 8032-8052.][JCTC-url]
+- Wang, W., & Whitfield, J. D. (2023). Basis set generation and optimization in the NISQ era with Quiqbox.jl. [*Journal of Chemical Theory and Computation, 19*(22), 8032-8052.](https://pubs.acs.org/doi/10.1021/acs.jctc.3c00011)
 
 ## Documentation Contents
 
@@ -56,5 +56,3 @@ If you use Quiqbox in your research, please cite the following paper:
 Pages = ["SCF.md"]
 Depth = 2
 ```
-
-[JCTC-url]: https://pubs.acs.org/doi/10.1021/acs.jctc.3c00011
