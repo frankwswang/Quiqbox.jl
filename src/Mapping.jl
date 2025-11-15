@@ -118,6 +118,22 @@ function genStableBinaryOp(op::F, ::Type{T}) where {T<:AbstractArray, F<:BasicDi
 end
 
 
+struct ClosedBinary{F<:Function} <: Modifier
+    f::F
+end
+
+(f::ClosedBinary{F})(argL::T1, argR::T1, ::Type{C}=T1) where {F<:Function, T1, C} = 
+f.f(argL, argR)::C
+
+(f::ClosedBinary{F})(argL::T1, argR::T1, ::Type{C}=Union{AbstractArray{T}, T}) where 
+                    {F<:Function, T, T1<:AbstractArray{T}, C} = 
+f.f(argL, argR)::C
+
+(f::ClosedBinary{F})(argL::T1, argR::T2, ::Type{C}=Union{AbstractArray{T}, T}) where 
+                    {F<:Function, T, T1<:AbstractArray{T}, T2<:AbstractArray{T}, C} = 
+f.f(argL, argR)::C
+
+
 struct Left end
 
 struct Right end

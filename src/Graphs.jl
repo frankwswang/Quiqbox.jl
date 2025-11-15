@@ -161,6 +161,24 @@ UnitVertex(val, active, marker)
 genParamVertexCore(val::AtomicGrid{<:DirectMemory}, active::Bool, marker::Symbol) = 
 GridVertex(AtomicGrid(val.value.value), active, marker)
 
+
+function extractTransformCore(pb::Union{ReduceParam, ExpandParam})
+    inner = pb.lambda
+    op = pb isa ReduceParam ? (+) : (.+)
+    outer = LPartial(ClosedBinary(op), (pb.offset[],))
+    ComposedApply(inner, outer, Count(pb.input|>length))
+end
+
+function extractTransform(pb::AdaptableParam)
+    fCore = isOffsetEnabled(pb) ? extractTransformCore(pb) : pb.lambda
+    TypedReturn(fCore, getOutputType(pb))
+end
+
+function extractTransform(pb::ShapedParam)
+    TypedReturn(itself, getOutputType(pb))
+end
+
+
 function genParamVertex(param::CompositeParam, 
                         reference::NothingOr{ParamBoxVertexDict}=nothing)
     sl = screenLevelOf(param)
