@@ -877,40 +877,6 @@ getOutputType(::Type{ParamFreeFunc{F}}) where {F<:Function} = getOutputType(F)
 noStoredParam(::ParamFreeFunc) = true
 
 
-struct ReduceShift{T, F<:Function} <: TypedTensorFunc{T, 0}
-    apply::TypedReduce{T, F}
-    shift::T
-end
-
-function (f::ReduceShift{T})(args...) where {T}
-    genStableBinaryOp(+, T)(f.apply(args...), f.shift)
-end
-
-struct ExpandShift{T, N, F<:Function} <: TypedTensorFunc{T, N}
-    apply::TypedExpand{T, N, F}
-    shift::DirectMemory{T, N}
-end
-
-function (f::ExpandShift{T, N})(args...) where {T, N}
-    genStableBinaryOp(+, AbstractArray{T, N})(f.apply(args...), f.shift)
-end
-
-extractTransformCore(::ReduceParam) = ReduceShift
-extractTransformCore(::ExpandParam) = ExpandShift
-
-function extractTransform(pb::AdaptableParam)
-    fCore = if isOffsetEnabled(pb)
-        extractTransformCore(pb)(pb.lambda, pb.offset[])
-    else
-        pb.lambda
-    end
-    TypedReturn(fCore, getOutputType(pb))
-end
-
-function extractTransform(pb::ShapedParam)
-    TypedReturn(itself, getOutputType(pb))
-end
-
 struct ParamBoxClassifier{P<:ParamBox} <: QueryBox{Pair{P, Array{Bool, 0} }}
     holder::Vector{Pair{P, Array{Bool, 0} }}
     linker::Vector{Pair{P, Array{Bool, 0} }}
@@ -1581,7 +1547,7 @@ end
 
 """
 
-    sever(param::ParamBox, screenSource::Bool=false) -> ParamBox
+    sever(param::$ParamBox, screenSource::Bool=false) -> ParamBox
 
 Returns a copy of `param` with severable connection(s) eliminated. For `param::SpanParam`, 
 `sever` returns a `PrimitiveParam` of which the output value is the same as `param` when 
