@@ -49,8 +49,8 @@ const OrbitalOverlapConfig{T<:Real, D, C<:RealOrComplex{T},
       OrbitalIntegrationConfig{T, D, C, 1, OverlapSampler, M, E}
 
 struct OneBodyIntegralValCache{C<:RealOrComplex} <: QueryBox{C}
-    aa::LRU{ Tuple{   OneToIndex}, C}
-    ab::LRU{NTuple{2, OneToIndex}, C}
+    aa::LRU{N1N2Tuple{OneToIndex}, C}
+    ab::LRU{N1N2Tuple{OneToIndex}, C}
     dimension::Int
     threshold::Int
 
@@ -58,18 +58,18 @@ struct OneBodyIntegralValCache{C<:RealOrComplex} <: QueryBox{C}
                                      threshold::Int=1024) where {D, C<:RealOrComplex}
         checkPositivity(threshold)
         maxPairNum = threshold * (threshold - 1)
-        aaSector = LRU{ Tuple{   OneToIndex}, C}(maxsize=threshold )
-        abSector = LRU{NTuple{2, OneToIndex}, C}(maxsize=maxPairNum)
+        aaSector = LRU{N1N2Tuple{OneToIndex}, C}(maxsize=threshold )
+        abSector = LRU{N1N2Tuple{OneToIndex}, C}(maxsize=maxPairNum)
         new{C}(aaSector, abSector, Int(D), threshold)
     end
 end
 
 
 struct TwoBodyIntegralValCache{C<:RealOrComplex} <: QueryBox{C}
-    aaaa::LRU{ Tuple{   OneToIndex}, C}
-    aabb::LRU{NTuple{2, OneToIndex}, C}
-    half::LRU{NTuple{4, OneToIndex}, C} # aaxy or xyaa
-    misc::LRU{NTuple{4, OneToIndex}, C} # abxy
+    aaaa::LRU{N2N2Tuple{OneToIndex}, C}
+    aabb::LRU{N2N2Tuple{OneToIndex}, C}
+    half::LRU{N2N2Tuple{OneToIndex}, C} # aaxy or xyaa
+    misc::LRU{N2N2Tuple{OneToIndex}, C} # abxy
     dimension::Int
     threshold::Int
 
@@ -79,28 +79,28 @@ struct TwoBodyIntegralValCache{C<:RealOrComplex} <: QueryBox{C}
         threshold2 = threshold * (threshold - 1)
         threshold3 = threshold * threshold2 * 2
         threshold4 = threshold^4 - threshold - threshold2 - threshold3
-        aaaaSector = LRU{ Tuple{   OneToIndex}, C}(maxsize=threshold )
-        aabbSector = LRU{NTuple{2, OneToIndex}, C}(maxsize=threshold2)
-        halfSector = LRU{NTuple{4, OneToIndex}, C}(maxsize=threshold3)
-        miscSector = LRU{NTuple{4, OneToIndex}, C}(maxsize=threshold4)
+        aaaaSector = LRU{N2N2Tuple{OneToIndex}, C}(maxsize=threshold )
+        aabbSector = LRU{N2N2Tuple{OneToIndex}, C}(maxsize=threshold2)
+        halfSector = LRU{N2N2Tuple{OneToIndex}, C}(maxsize=threshold3)
+        miscSector = LRU{N2N2Tuple{OneToIndex}, C}(maxsize=threshold4)
         new{C}(aaaaSector, aabbSector, halfSector, miscSector, Int(D), threshold)
     end
 end
 
+const FauxIntegralValCache{N, C<:RealOrComplex} = 
+      EmptyDict{NTuple{N, NTuple{2, OneToIndex}}, C}
 
-const FauxIntegralValCache{C<:RealOrComplex} = EmptyDict{Tuple{Vararg{OneToIndex}}, C}
-
-genFauxIntegralValCache(::Type{C}) where {C<:RealOrComplex} = 
-EmptyDict{Tuple{Vararg{OneToIndex}}, C}()
+genFauxIntegralValCache(::Count{N}, ::Type{C}) where {N, C<:RealOrComplex} = 
+EmptyDict{NTuple{N, NTuple{2, OneToIndex}}, C}()::FauxIntegralValCache{N, C}
 
 const OneBodyInteValCacheUnion{C<:RealOrComplex} = Union{
     OneBodyIntegralValCache{C}, 
-    FauxIntegralValCache{C}
+    FauxIntegralValCache{1, C}
 }
 
 const TwoBodyInteValCacheUnion{C<:RealOrComplex} = Union{
     TwoBodyIntegralValCache{C}, 
-    FauxIntegralValCache{C}
+    FauxIntegralValCache{2, C}
 }
 
 const MultiBodyIntegralValCache{C<:RealOrComplex} = Union{
@@ -116,6 +116,18 @@ struct OrbitalIntegralInfo{T<:Real, D, C<:RealOrComplex{T}, N, F<:DirectOperator
     method::M
     memory::V
     basis::P
+
+    OrbitalIntegralInfo(method::M, memory::V, basis::P) where {T<:Real, D, 
+                        C<:RealOrComplex{T}, F<:DirectOperator, 
+                        M<:OrbitalIntegrationConfig{T, D, C, 1, F}, 
+                        V<:OneBodyInteValCacheUnion{C}, P<:MultiOrbitalData{T, D, C}} = 
+    new{T, D, C, 1, F, M, V, P}(method, memory, basis)
+
+    OrbitalIntegralInfo(method::M, memory::V, basis::P) where {T<:Real, D, 
+                        C<:RealOrComplex{T}, F<:DirectOperator, 
+                        M<:OrbitalIntegrationConfig{T, D, C, 2, F}, 
+                        V<:TwoBodyInteValCacheUnion{C}, P<:MultiOrbitalData{T, D, C}} = 
+    new{T, D, C, 2, F, M, V, P}(method, memory, basis)
 end
 
 const OneBodyOrbIntegralInfo{T<:Real, D, C<:RealOrComplex{T}, F<:DirectOperator, 
@@ -199,7 +211,7 @@ function initializeOrbNormalization(inteInfo::OrbitalIntegralInfo{T, D, C, N},
                         OneBodyIntegralValCache(style) end
     else
         normConfig = OrbitalIntegrationConfig(style, op, False(), estConfig)
-        normMemory = genFauxIntegralValCache(C)
+        normMemory = genFauxIntegralValCache(Count(N), C)
     end
     OrbitalIntegralInfo(normConfig, normMemory, basisData)
 end
@@ -267,89 +279,75 @@ function getIntegralIndexSymmetry((partL, partR)::N2N2Tuple{OneToIndex})
     (idxL1==idxR1, idxL2==idxR2, partL==partR)
 end
 
-function prepareInteValCache(cache::FauxIntegralValCache, layout::N1N2Tuple{OneToIndex})
-    first(layout)=>cache, getIntegralIndexSymmetry(layout)
-end
 
-function prepareInteValCache(cache::FauxIntegralValCache, layout::N2N2Tuple{OneToIndex})
-    partL, partR = layout
-    (partL..., partR...)=>cache, getIntegralIndexSymmetry(layout)
+function prepareInteValCache(cache::FauxIntegralValCache{1}, layout::N1N2Tuple{OneToIndex})
+    layout=>cache, getIntegralIndexSymmetry(layout)
 end
 
 function prepareInteValCache(cache::OneBodyIntegralValCache, layout::N1N2Tuple{OneToIndex})
-    idxL, idxR = first(layout)
     indexSymmetry = getIntegralIndexSymmetry(layout)
-    keySectorPair = indexSymmetry ? (idxL,)=>cache.aa : (idxL, idxR)=>cache.ab
+    keySectorPair = layout => ifelse(indexSymmetry, cache.aa, cache.ab)
     keySectorPair, indexSymmetry
+end
+
+function prepareInteValCache(cache::FauxIntegralValCache{2}, layout::N2N2Tuple{OneToIndex})
+    layout=>cache, getIntegralIndexSymmetry(layout)
 end
 
 function prepareInteValCache(cache::TwoBodyIntegralValCache, layout::N2N2Tuple{OneToIndex})
-    (idxL1, idxR1), (idxL2, idxR2) = layout
     symmetryL, symmetryR, _ = indexSymmetry = getIntegralIndexSymmetry(layout)
 
-    keySectorPair = if all(indexSymmetry)
-        (idxL1,                    )=>cache.aaaa
+    keySector = if all(indexSymmetry)
+        cache.aaaa
     elseif symmetryL && symmetryR
-        (idxL1, idxL2              )=>cache.aabb
+        cache.aabb
     elseif symmetryL
-        (idxL1, idxR1, idxL2, idxR2)=>cache.half #> aaxy
+        cache.half #> aaxy
     elseif symmetryR
-        (idxL1, idxR1, idxL2, idxR2)=>cache.half #> xyaa
+        cache.half #> xyaa
     else
-        (idxL1, idxR1, idxL2, idxR2)=>cache.misc #> abxy
+        cache.misc #> abxy
     end
 
-    keySectorPair, indexSymmetry
+    (layout => keySector), indexSymmetry
 end
 
-#> aa, aaaa
-function formatIntegralCacheKey(key::Tuple{OneToIndex}, ::Union{Bool, NTuple{3, Bool}})
-    key => false # orderedKey => needToConjugate
-end
 #> ab
-function formatIntegralCacheKey(key::NTuple{2, OneToIndex}, permuteControl::Bool)
-    i, j = key
-    if permuteControl && i > j
-        (j, i) => true
+function formatIntegralCacheKey(key::N1N2Tuple{OneToIndex}, permuteControl::Bool)
+    (i, j), = key
+    if i > j && permuteControl
+        ((j, i),) => true
     else
         key => false
     end
 end
-#> aabb
-function formatIntegralCacheKey(key::NTuple{2, OneToIndex}, permuteControl::NTuple{3, Bool})
-    i, j = key
-    if last(permuteControl) && (i > j)
-        (j, i) => false
-    else
-        key => false
-    end
-end
-#> aaxy, xyaa, abxy
-function formatIntegralCacheKey(key::NTuple{4, OneToIndex}, permuteControl::NTuple{3, Bool})
+
+#> abcd
+function formatIntegralCacheKey(key::N2N2Tuple{OneToIndex}, permuteControl::NTuple{3, Bool})
     needToConjugate = false
     permuteL, permuteR, permuteLR = permuteControl
 
-    i, j, k, l = key
-    if permuteL && i > j
-        key = (j, i, k, l)
+    (i, j), partR = key
+    if i > j && permuteL
+        key = ((j, i), partR)
         needToConjugate = !needToConjugate
     end
 
-    i, j, k, l = key
-    if permuteR && k > l
-        key = (i, j, l, k)
+    partL, (k, l) = key
+    if k > l && permuteR
+        key = (partL, (l, k))
         needToConjugate = !needToConjugate
     end
 
-    i, j, k, l = key
-    if permuteLR && (i, j) > (k, l)
-        key = (k, l, i, j)
+    partL, partR = key
+    if partL > partR && permuteLR
+        key = (partR, partL)
     end
 
     key => needToConjugate
 end
-#> `indexSymmetry` should be index based symmetry -> to simplify layout
-#> `layoutSymmetry` should be operator--orbital based symmetry -> to reuse result
+#> `indexSymmetry` should be index based symmetry -> find correct layout sector
+#> `layoutSymmetry` should be operator--orbital based symmetry -> reuse integral result
 function getIntegralValue!(cache::MultiBodyIntegralValCache{C}, 
                            method::OrbitalIntegrationConfig{T, D, C, N}, 
                            pair::MultiBodyOrbCorePair{T, D, N}) where 
@@ -359,8 +357,9 @@ function getIntegralValue!(cache::MultiBodyIntegralValCache{C},
     categoryLayout = genOrbCategoryLayout(fieldLayout)
     layoutSymmetry = getIntegralOpOrbSymmetry(method.operator, categoryLayout)
     permuteControl = .!(indexSymmetry) .&& layoutSymmetry
-    orderedKey, needToConjugate = formatIntegralCacheKey(key, permuteControl)
-    res = get!(sector, orderedKey) do
+    orderedIdsKey, needToConjugate = formatIntegralCacheKey(key, permuteControl)
+
+    res = get!(sector, orderedIdsKey) do
         inteVal = evaluateIntegral!(method, fieldLayout)
         needToConjugate ? conj(inteVal) : inteVal
     end::C
