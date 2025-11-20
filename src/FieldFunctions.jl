@@ -264,6 +264,8 @@ end
 const GaussFunc{T<:Real, P<:UnitParam{T}} = 
       ModularField{T, 1, typeof(computeGaussFunc), @NamedTuple{xpn::P}}
 
+const SimpleGaussFunc{T<:Real} = GaussFunc{T, SimpleUnitPar{T}}
+
 const ComputeGaussFunc = typeof(computeGaussFunc)
 
 const GaussFieldCore{F<:NamedParamMapper} = 
@@ -389,6 +391,8 @@ function PolyRadialFunc(radial::FieldAmplitude{C, 1},
 end
 
 const PolyGaussFunc{T<:Real, D, F<:GaussFunc{T}} = PolyRadialFunc{T, D, F}
+
+const SimplePolyGaussFunc{T<:Real, D} = PolyRadialFunc{T, D, SimpleGaussFunc{T}}
 
 const PolyRadialFieldCore{T<:Real, D, C<:RealOrComplex{T}, F<:AbstractParamFunc, 
                           S<:SpanSetFilter} = 
