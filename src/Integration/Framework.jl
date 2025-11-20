@@ -359,10 +359,13 @@ function getIntegralValue!(cache::MultiBodyIntegralValCache{C},
     permuteControl = .!(indexSymmetry) .&& layoutSymmetry
     orderedIdsKey, needToConjugate = formatIntegralCacheKey(key, permuteControl)
 
-    res = get!(sector, orderedIdsKey) do
-        inteVal = evaluateIntegral!(method, fieldLayout)
-        needToConjugate ? conj(inteVal) : inteVal
-    end::C
+    res = get(sector, orderedIdsKey, nothing)::NothingOr{C}
+    if res === nothing
+        inteVal = evaluateIntegral!(method, fieldLayout)::C
+        res = needToConjugate ? conj(inteVal) : inteVal
+        setindex!(sector, res, orderedIdsKey)
+    end #> Fewer allocations than using `get!`
+
     needToConjugate ? conj(res) : res
 end
 
