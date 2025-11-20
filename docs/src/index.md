@@ -20,7 +20,7 @@
 
 ### Julia (64-bit) compatibility
 
-Currently, Quiqbox tries to support the [latest stable release](https://julialang.org/downloads/#current_stable_release) of 64-bit Julia as soon as possible. Backward compatibility with previous versions is not guaranteed but can be checked [here](https://github.com/frankwswang/Quiqbox.jl/actions/workflows/CI-Backward.yml).
+Quiqbox aims to support the [**current stable release** of 64-bit Julia](https://julialang.org/downloads/#current_stable_release) as soon as possible. The latest compatibility tests can be found [here](https://github.com/frankwswang/Quiqbox.jl/actions/workflows/CI-Release.yml). Backward compatibility with previous Julia releases is not guaranteed but can also be checked [here](https://github.com/frankwswang/Quiqbox.jl/actions/workflows/CI-Backward.yml).
 
 ### Installation in Julia [REPL](https://docs.julialang.org/en/v1/stdlib/REPL/)
 
@@ -48,7 +48,7 @@ For more basic usage of the programming language behind Quiqbox, Julia, please r
 
 If you use Quiqbox in your research, please cite the following paper:
 
-- [Wang, W., & Whitfield, J. D. (2023). Basis set generation and optimization in the NISQ era with Quiqbox.jl. *Journal of Chemical Theory and Computation, 19*(22), 8032-8052.][JCTC-url]
+- Wang, W., & Whitfield, J. D. (2023). Basis set generation and optimization in the NISQ era with Quiqbox.jl. [*Journal of Chemical Theory and Computation, 19*(22), 8032-8052.](https://pubs.acs.org/doi/10.1021/acs.jctc.3c00011)
 
 ## Documentation Contents
 
@@ -56,5 +56,3 @@ If you use Quiqbox in your research, please cite the following paper:
 Pages = ["SCF.md"]
 Depth = 2
 ```
-
-[JCTC-url]: https://pubs.acs.org/doi/10.1021/acs.jctc.3c00011

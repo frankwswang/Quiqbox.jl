@@ -20,6 +20,8 @@ SUITE["CompositeFunction"]["Differentiation"] = DiffFuncBSuite
 #> Benchmark Objects
   cen1 = (1.1,  0.5,  1.1)
   cen2 = (1.0,  1.5,  1.1)
+  cen3 = (0.0,  0.0, -1.0)
+  cen4 = (0.0,  0.0,  1.0)
 coord1 = (2.1,  3.1,  3.4)
 coord2 = (1.1,  2.1, -3.2)
 coord3 = (1.1, -2.1)
@@ -35,6 +37,7 @@ cons2 = [1.0,  0.8]
 ang1 = (1, 0, 0)
 
 nucs1 = [:H, :Li]
+nucs2 = [:N, :N]
 
 
 cgto1  = genGaussTypeOrb(cen1, xpns1, cons1, ang1)
@@ -57,6 +60,10 @@ psto1n = Quiqbox.PrimitiveOrb((1.0, 2.0, 3.0), pstf1, renormalize=true)
 stf1Dc = Quiqbox.ModularField(stf1DCore, Float64, Count(1))
 pstf1c = Quiqbox.PolyRadialFunc(stf1Dc, (1, 1, 0))
 psto1c = Quiqbox.PrimitiveOrb((1.0, 2.0, 3.0), pstf1c, renormalize=false)
+
+bSet1 = mapreduce(vcat, nucs2, [cen3, cen4]) do atm, coord
+    genGaussTypeOrbSeq(coord, atm, "cc-pVTZ")
+end
 
 
 function gaussianFunc((r,)::Tuple{Real}, params::@NamedTuple{xpn::T}) where {T<:Real}
@@ -125,6 +132,7 @@ OvlpInteSuite["PSTO_PGTO_DD"]["Cached"] = @benchmarkable overlap($psto1,  $pgto1
 OvlpInteSuite["PSTO_Self_DD"]["Cached"] = @benchmarkable overlap($psto1,  $psto1 ) evals=1
 OvlpInteSuite["PSTO_Self_DN"]["Cached"] = @benchmarkable overlap($psto1,  $psto1n) evals=1
 OvlpInteSuite["PSTO_Self_NN"]["Cached"] = @benchmarkable overlap($psto1n, $psto1n) evals=1
+OvlpInteSuite["cc-pVTZ"     ]["Cached"] = @benchmarkable overlaps(bSet1) evals=1
 
 OvlpInteSuite["PGTO_self_DD"]["Direct"] = 
 @benchmarkable overlap($pgto1, $pgto1,  lazyCompute=false) evals=1
@@ -151,16 +159,29 @@ OvlpInteSuite["APOrb_self_DD"]["Cached"] = @benchmarkable overlap($apOrb, $apOrb
 OvlpInteSuite["APOrb_CGTO_DD"]["Cached"] = @benchmarkable overlap($apOrb, $cgto3) evals=1
 
 
+#>> Orbital-Kinetic Benchmark Group
+ClmbInteSuite["Kinetic"]["CGTO"]["Cached"] = 
+@benchmarkable elecKinetic(cgto1, cgto2) evals=1
+ClmbInteSuite["Kinetic"]["CGTOc"]["Cached"] = 
+@benchmarkable elecKinetic(cgto1c, cgto2) evals=1
+ClmbInteSuite["Kinetic"]["cc-pVTZ"]["Cached"] = 
+@benchmarkable elecKinetics(bSet1) evals=1
+
+
 #>> Orbital-Coulomb Benchmark Group
 ClmbInteSuite["NucAttr"]["CGTO"]["Cached"] = 
 @benchmarkable nucAttraction(nucs1, [coord4, coord5],  cgto1, cgto2) evals=1
 ClmbInteSuite["NucAttr"]["CGTOc"]["Cached"] = 
 @benchmarkable nucAttraction(nucs1, [coord4, coord5], cgto1c, cgto2) evals=1
+ClmbInteSuite["NucAttr"]["cc-pVTZ"]["Cached"] = 
+@benchmarkable nucAttractions(nucs2, [cen3, cen4], bSet1) evals=1
 
 ClmbInteSuite["ElectRI"]["CGTO"]["Cached"] = 
 @benchmarkable elecRepulsion(cgto1,   cgto1,  cgto2,  cgto2) evals=1
 ClmbInteSuite["ElectRI"]["GFO1D"]["Cached"] = 
 @benchmarkable elecRepulsion(gfo1D1, gfo1D1, gfo1D2, gfo1D2) evals=1
+ClmbInteSuite["ElectRI"]["cc-pVTZ"]["Cached"] = 
+@benchmarkable elecRepulsions(bSet1) evals=1
 
 #>> Differentiation-Function Benchmark Group
 DiffFuncBSuite["df1"]["Numerical"] = @benchmarkable ($df1_fd1)($coord2)
