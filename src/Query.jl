@@ -146,7 +146,7 @@ function haskey(d::IndexDict{K}, key::K) where {K}
     haskey(d.indexer, key)
 end
 
-function get(d::IndexDict{K, V}, key::K, default::V) where {K, V}
+function get(d::IndexDict{K}, key::K, default) where {K}
     res = get(d.indexer, key, nothing)
     res === nothing ? default : getEntry(d.storage, res).second
 end
