@@ -456,8 +456,8 @@ Generate a sequence of Gaussian-type orbitals (GTOs) located at `center` based o
 basis set information provided in `content`, which should the text of an atomic Gaussian 
 basis set in the Gaussian (software) format. `innerRenormalize` and `outerRenormalize` 
 determine whether the primitive GTOs and the contracted GTOs should be renormalized, 
-respectively. `unlinkCenter` determines whether the center parameters of the generated GTOs 
-should be unlinked from each other.
+respectively. `unlinkCenter` determines whether the center parameters of the generated 
+contracted GTOs from separate subshells should be unlinked from each other.
 """
 function genGaussTypeOrbSeq(center::NTuple{3, UnitOrVal{<:Real}}, content::AbstractString; 
                             innerRenormalize::Bool=false, outerRenormalize::Bool=false, 
@@ -468,15 +468,15 @@ function genGaussTypeOrbSeq(center::NTuple{3, UnitOrVal{<:Real}}, content::Abstr
         throw(AssertionError("The elemental data type of `center`: $Ts must be uniform."))
     end
 
-    cenEncoder = let cenParams=map(UnitParamEncoder(T, :cen, 1), center)
-        unlinkCenter ? ()->deepcopy(cenParams) : ()->cenParams
-    end
+    cenParams = map(UnitParamEncoder(T, :cen, 1), center)
     formattedContent = replaceSciNotation(content)
     data = map((@view formattedContent[begin : end-1]) |> IOBuffer |> readlines) do line
         advancedParse.(T, split(line))
     end
     idxScope = findall(x -> eltype(x)!=T && length(x)>2 && x[begin]!="X", data)
-    bfs = CompGTO{T, 3}[] #! Can be replaced by a more type-specific container
+    R = Tuple{(ifelse(c isa Real, SimpleUnitPar{T}, typeof(c)) for c in center)...}
+    F = ShiftedPolyGaussField{T, 3, SimplePolyGaussFunc{T, 3}, R}
+    bfs = CompGTO{T, 3, PrimitiveOrb{T, 3, T, F}, SimpleGirdPar{T, 1}}[]
 
     for j in idxScope
         oInfo = data[j]
@@ -484,6 +484,7 @@ function genGaussTypeOrbSeq(center::NTuple{3, UnitOrVal{<:Real}}, content::Abstr
         coeffPairs = @view data[j+1 : j+nPGTOrb]
         xpns = first.(coeffPairs)
         subshellStr = first(oInfo)
+        cenParamsLocal = unlinkCenter ? deepcopy(cenParams) : cenParams
         angNums = subshellStr == "SP" ? (0, 1) : (AngularSubShellDict[subshellStr],)
 
         for (i, angNum) in enumerate(angNums)
@@ -491,7 +492,7 @@ function genGaussTypeOrbSeq(center::NTuple{3, UnitOrVal{<:Real}}, content::Abstr
                 cons = map(xpns, coeffPairs) do xpn, segment
                     getEntry(segment, OneToIndex(1+i)) * get3DimPGTOrbNormFactor(xpn, ijk)
                 end
-                push!(bfs, genGaussTypeOrb(cenEncoder(), xpns, cons, ijk; 
+                push!(bfs, genGaussTypeOrb(cenParamsLocal, xpns, cons, ijk; 
                                            innerRenormalize, outerRenormalize))
             end
         end
