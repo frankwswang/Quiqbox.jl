@@ -288,73 +288,118 @@ strictTypeJoin(::Type{PrimOrbPointer{D, C}}, ::Type{CompOrbPointer{D, C}}) where
               {D, C<:RealOrComplex}= 
 OrbitalPointer{D, C}
 
-const ShiftedFieldConfigDict{T, D, F<:StashedShiftedField{T, D}} = 
-      IndexDict{FieldMarker{:StashedField, 2}, F}
 
-const ShiftedFieldMarkerDict{T<:Real, D} = 
-      Dict{EgalBox{ShiftedField{T, D}}, FieldMarker{:StashedField, 2}}
+const StashedFieldPointerDict{T<:Real, D} = 
+      EncodedDict{StashedShiftedField{T, D}, OneToIndex, FieldMarker{:StashedField, 2}, 
+                 typeof(markObj)}
 
+struct FieldIndexBox{T, D} <: QueryBox{OneToIndex}
+    direct::Dict{EgalBox{ShiftedField{T, D}}, OneToIndex}
+    latent::StashedFieldPointerDict{T, D}
 
-function genOrbitalPointer!(::Type{C}, 
-                            configDict::ShiftedFieldConfigDict{T, D}, 
-                            markerDict::ShiftedFieldMarkerDict{T, D}, 
-                            orbital::PrimitiveOrb{T, D}, 
-                            directUnpack::Boolean, 
-                            paramSet::OptSpanParamSet, 
-                            paramCache::OptParamDataCache) where 
-                           {T<:Real, D, C<:RealOrComplex{T}}
-    field = orbital.field
+    function FieldIndexBox{T, D}(maxSize::Int=100) where {T, D}
+        directDict = Dict{EgalBox{ShiftedField{T, D}}, OneToIndex}()
+        latentDict = EncodedDict{StashedShiftedField{T, D}, OneToIndex}(
+            (markObj => TypeBox(FieldMarker{:StashedField, 2})), maxSize
+        )
+        new{T, D}(directDict, latentDict)
+    end
+end
+
+mutable struct FieldPoolConfig{T<:Real, D, B<:Boolean, P<:OptSpanParamSet, 
+                               M<:OptParamDataCache} <: ConfigBox
+    const field::FieldIndexBox{T, D}
+    const depth::B
+    const param::P
+    const cache::M
+    count::Int
+
+    function FieldPoolConfig(field::FieldIndexBox{T, D}, depth::B, param::P, paramCache::M
+                             ) where {T<:Real, D, B<:Boolean, P<:OptSpanParamSet, 
+                                      M<:OptParamDataCache}
+        fieldMarkerDict = field.latent.value
+        initCount = isempty(fieldMarkerDict) ? 0 : maximum(fieldMarkerDict|>values).idx
+        new{T, D, B, P, M}(field, depth, param, paramCache, initCount)
+    end
+end
+
+function indexGetOrbCore!(config::FieldPoolConfig{T, D}, field::ShiftedField{T, D}
+                          ) where {T, D}
     tracker = EgalBox{ShiftedField{T, D}}(field)
+    ptrIdxDict = config.field.latent
+    trackerDict = config.field.direct
 
-    marker = if haskey(markerDict, tracker)
-        markerDict[tracker]
-    else
-        fieldFunc = unpackFunc!(field, paramSet, directUnpack)
-        fieldCore = StashedField(fieldFunc, paramSet, paramCache)
-        marker = markObj(fieldCore)
-        setindex!(markerDict, marker, tracker)
-        get!(configDict, marker, fieldCore)
-        marker
+    stashedFieldNew = missing
+    idx = get(trackerDict, tracker, nothing)
+
+    if idx === nothing
+        paramSet = config.param
+        fieldFunc = unpackFunc!(field, paramSet, config.depth)
+        fieldCore = StashedField(fieldFunc, paramSet, config.cache)
+        idx = get(ptrIdxDict, fieldCore, nothing)
+        if idx === nothing
+            idx = OneToIndex(config.count += 1)
+            stashedFieldNew = fieldCore
+            setindex!(ptrIdxDict, idx, fieldCore)
+        end
+        setindex!(trackerDict, idx, tracker)
     end
 
-    PrimOrbPointer{D, C}(keyIndex(configDict, marker), orbital.renormalize)
+    if idx.idx > config.count
+        throw(AssertionError("The value of `counter` is lower than the quantity of "*
+                             "generated pointers."))
+    end
+
+    (idx::OneToIndex) => (stashedFieldNew::MissingOr{StashedShiftedField{T, D}})
 end
 
+const PrimOrbPtrSrcPair{T<:Real, D, C<:RealOrComplex{T}, F<:StashedShiftedField{T, D}} = 
+      Pair{PrimOrbPointer{D, C}, Memory{F}}
 
-function genOrbitalPointer!(::Type{C}, 
-                            configDict::ShiftedFieldConfigDict{T, D}, 
-                            markerDict::ShiftedFieldMarkerDict{T, D}, 
-                            orbital::CompositeOrb{T, D}, 
-                            directUnpack::Boolean, 
-                            paramSet::OptSpanParamSet, 
-                            paramCache::OptParamDataCache) where 
-                           {T<:Real, D, C<:RealOrComplex{T}}
+function prepareOrbitalPointer!(::Type{C}, config::FieldPoolConfig{T, D}, 
+                                orbital::PrimitiveOrb{T, D}) where 
+                               {T<:Real, D, C<:RealOrComplex{T}}
+    field = orbital.field
+    idx, fieldRes = indexGetOrbCore!(config, field)
+    pointer = PrimOrbPointer{D, C}(idx, orbital.renormalize)
+    stashedFields = ismissing(fieldRes) ? genBottomMemory() : genMemory(fieldRes)
+    (pointer => stashedFields)::PrimOrbPtrSrcPair{T, D, C}
+end
+
+const CompOrbPtrSrcPair{T<:Real, D, C<:RealOrComplex{T}, F<:StashedShiftedField{T, D}} = 
+      Pair{CompOrbPointer{D, C}, Memory{F}}
+
+function prepareOrbitalPointer!(::Type{C}, config::FieldPoolConfig{T, D}, 
+                                orbital::CompositeOrb{T, D}) where 
+                               {T<:Real, D, C<:RealOrComplex{T}}
+    paramCache = config.cache
     weightValue = Memory{C}(obtainCore!(paramCache, orbital.weight))
-    primOrbPtrs = map(orbital.basis) do o
-        genOrbitalPointer!(C, configDict, markerDict, o, directUnpack, paramSet, paramCache)
+    pairs = map(orbital.basis) do primOrb
+        prepareOrbitalPointer!(C, config, primOrb)::PrimOrbPtrSrcPair{T, D, C}
     end
-    CompOrbPointer{D, C}(MemoryPair(primOrbPtrs, weightValue), orbital.renormalize)
+    weightedPtrs = MemoryPair(map(first, pairs), weightValue)
+    pointer = CompOrbPointer{D, C}(weightedPtrs, orbital.renormalize)
+    stashedFields = mapreduce(last, strictVerticalCat, pairs, init=genBottomMemory())
+    (pointer => stashedFields)::CompOrbPtrSrcPair{T, D, C}
 end
 
+const OrbitalPtrSrcPair{T<:Real, D, C<:RealOrComplex{T}} = 
+      Union{PrimOrbPtrSrcPair{T, D, C}, CompOrbPtrSrcPair{T, D, C}}
 
-function initializeOrbitalConfigDict(::Type{T}, ::Count{D}, 
-                                     ::Type{F}=StashedShiftedField{T, D}) where 
-                                    {T, D, F<:StashedShiftedField{T, D}}
-    ShiftedFieldConfigDict{T, D, F}()
-end
-
-function cacheOrbitalData!(configDict::ShiftedFieldConfigDict{T, D}, 
+function cacheOrbitalData!(::Type{C}, 
                            orbitals::OrbBasisCluster{T, D}, directUnpack::Boolean, 
-                           cache!Self::OptParamDataCache=initializeParamDataCache()) where 
-                          {T<:Real, D}
+                           cache!Self::OptParamDataCache=initializeParamDataCache(); 
+                           maxSize::Int=100) where {T<:Real, D, C<:RealOrComplex{T}}
     checkEmptiness(orbitals, :orbitals)
     paramSet = initializeSpanParamSet()
-    outputType = getOutputType(orbitals)
-    markerDict = ShiftedFieldMarkerDict{T, D}()
-    lazyMap(orbitals) do orb
-        genOrbitalPointer!(outputType, configDict, markerDict, orb, 
-                           directUnpack, paramSet, cache!Self)
+    idxBox = FieldIndexBox{T, D}(maxSize)
+    pairs = let config=FieldPoolConfig(idxBox, directUnpack, paramSet, cache!Self)
+        map(orbitals) do orb
+            prepareOrbitalPointer!(C, config, orb)::OrbitalPtrSrcPair{T, D, C}
+        end
     end
+    stashedFields = mapreduce(last, strictVerticalCat, pairs)
+    map(first, pairs) => (stashedFields::Memory{<:StashedShiftedField{T, D}})
 end
 
 
@@ -405,11 +450,10 @@ struct MultiOrbitalData{T<:Real, D, C<:RealOrComplex{T}, F<:StashedShiftedField{
                               directUnpack::Boolean=False(); 
                               cache!Self::OptParamDataCache=initializeParamDataCache()
                               ) where {T<:Real, D}
-        configDict = initializeOrbitalConfigDict(T, Count(D))
-        orbPointers = cacheOrbitalData!(configDict, orbitals, directUnpack, cache!Self)
-        format = orbitals isa AbstractVector ? genMemory(orbPointers) : orbPointers
-        config = genMemory(last.(configDict.storage))
-        new{T, D, getOutputType(orbitals), eltype(config), typeof(format)}(config, format)
+        outputType = getOutputType(orbitals)
+        format, config = cacheOrbitalData!(outputType, orbitals, directUnpack, cache!Self)
+        orbitals isa AbstractVector && (format = genMemory(format))
+        new{T, D, outputType, eltype(config), typeof(format)}(config, format)
     end
 
     function MultiOrbitalData(data::MultiOrbitalData{T, D, C}, 

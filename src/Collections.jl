@@ -485,3 +485,19 @@ function setIndex(tpl::NTuple{N, Any}, val::T, idx::Int,
 
     ntuple(f, Val(N))
 end
+
+
+@generated function strictVerticalCat(a::AbstractVector{T1}, 
+                                      b::AbstractVector{T2}) where {T1, T2}
+    if T1 == T2 && isconcretetype(T1)
+        :( vcat(a, b) )
+    else
+        jointT = strictTypeJoin(T1, T2)
+        quote
+            res = vcat(a, b)
+            container = similar(res, $jointT, size(res))
+            container .= res
+            container
+        end
+    end
+end

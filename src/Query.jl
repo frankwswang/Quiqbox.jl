@@ -97,6 +97,40 @@ function getEntry(obj, acc::ChainedAccess)
 end
 
 
+struct EgalBox{T} <: QueryBox{T}
+    value::T
+end
+
+const BlackBox = EgalBox{Any}
+
+==(bb1::EgalBox, bb2::EgalBox) = (bb1.value === bb2.value)
+
+function hash(bb::EgalBox, hashCode::UInt)
+    hash(objectid(bb.value), hash(typeof(bb), hashCode))
+end
+
+
+struct TypeBox{T} <: QueryBox{Type{T}}
+    value::Type{T}
+
+    TypeBox(::Type{T}) where {T} = new{T::Type}()
+end
+
+TypeBox(::Type{Union{}}) = 
+throw(AssertionError("`TypeBox` cannot be instantiated with `Union{}` as it may trigger "*
+                     "access to undefined reference."))
+
+==(::TypeBox{T1}, ::TypeBox{T2}) where {T1, T2} = (T1 <: T2) && (T2 <: T1)
+
+function hash(::TypeBox{T}, hashCode::UInt) where {T}
+    hash(hash(T), hash(TypeBox, hashCode))
+end
+
+#= Additional Method =#
+strictTypeJoin(::TypeBox{T1}, ::TypeBox{T2}) where {T1, T2} = 
+(TypeBox∘strictTypeJoin)(T1, T2)
+
+
 struct EmptyDict{K, V} <: EqualityDict{K, V} end
 
 EmptyDict() = EmptyDict{Union{}, Union{}}()
@@ -128,12 +162,76 @@ const OptionalCache{V} = OptQueryCache{<:Any, V}
 const OptionalLRU{K, V} = Union{EmptyDict{K, V}, LRU{K, V}}
 
 
+struct EncodedDict{K, V, M, F} <: EqualityDict{K, V}
+    encoder::F
+    cache::LRU{EgalBox{K}, M}
+    value::Dict{M, V}
+
+    function EncodedDict{K, V}(config::Pair{F, TypeBox{M}}, maxSize::Int=100
+                               ) where {K, V, F, M}
+        cacheDict = LRU{EgalBox{K}, M}(maxsize=maxSize)
+        valueDict = Dict{M, V}()
+        new{K, V, M, F}(config.first, cacheDict, valueDict)
+    end
+end
+
+length(d::EncodedDict) = length(d.value)
+
+collect(d::EncodedDict) = collect(d.value)
+
+function getEncodedKey(d::EncodedDict{K, V, M, F}, key::K, store!EncodedKey::Bool=false
+                       ) where {K, V, M, F}
+    cacheDict = d.cache
+    cacheKey = EgalBox{K}(key)
+    if haskey(cacheDict, cacheKey)
+        getindex(cacheDict, cacheKey)
+    else
+        encodedKey = d.encoder(key)::M
+        store!EncodedKey && setindex!(cacheDict, encodedKey, cacheKey)
+        encodedKey
+    end
+end
+
+function haskey(d::EncodedDict{K, V, M}, key::K) where {K, V, M}
+    encodedKey = getEncodedKey(d, key)
+    haskey(d.value, encodedKey)
+end
+
+function get(d::EncodedDict{K}, key::K, default; update!Cache::Bool=true) where {K}
+    encodedKey = getEncodedKey(d, key, update!Cache)
+    get(d.value, encodedKey, default)
+end
+
+function get!(d::EncodedDict{K, V}, key::K, default::V; 
+              update!Cache::Bool=true) where {K, V}
+    encodedKey = getEncodedKey(d, key, update!Cache)
+    valueDict = d.value
+    if haskey(valueDict, encodedKey)
+        getindex(valueDict, encodedKey)
+    else
+        setindex!(valueDict, default, encodedKey)
+        default
+    end
+end
+
+function getindex(d::EncodedDict{K}, key::K) where {K}
+    encodedKey = getEncodedKey(d, key, false).first
+    getindex(d.value, encodedKey)
+end
+
+function setindex!(d::EncodedDict{K, V}, value::V, key::K) where {K, V}
+    encodedKey = getEncodedKey(d, key, true)
+    setindex!(d.value, value, encodedKey)
+end
+
+#!!! iterate and collect, should M be the key?
+
 struct IndexDict{K, T} <: EqualityDict{K, T}
     indexer::Dict{K, OneToIndex}
     storage::Vector{Pair{K, T}}
 
     function IndexDict{K, T}() where {K, T}
-        (K <: OneToIndex) && throw(ArgumentError("K::Type{$K} cannot be `OneToIndex`."))
+        (K <: OneToIndex) && throw(ArgumentError("`K::Type{$K}` cannot be `OneToIndex`."))
         new{K, T}(Dict{K, OneToIndex}(), Pair{K, T}[])
     end
 end
@@ -200,35 +298,6 @@ iterate(d::IndexDict) = iterate(d.storage)
 indexKey(d::IndexDict, index::OneToIndex) = getindex(d.storage, index).first
 
 keyIndex(d::IndexDict{K}, key::K) where {K} = getindex(d.indexer, key)
-
-
-struct EgalBox{T} <: QueryBox{T}
-    value::T
-end
-
-const BlackBox = EgalBox{Any}
-
-==(bb1::EgalBox, bb2::EgalBox) = (bb1.value === bb2.value)
-
-function hash(bb::EgalBox, hashCode::UInt)
-    hash(objectid(bb.value), hash(typeof(bb), hashCode))
-end
-
-
-struct TypeBox{T} <: QueryBox{Type{T}}
-    value::Type{T}
-
-    TypeBox(::Type{T}) where {T} = new{T::Type}()
-end
-
-TypeBox(::Type{Union{}}) = 
-throw(AssertionError("`TypeBox` cannot be instantiated with `Union{}`."))
-
-==(::TypeBox{T1}, ::TypeBox{T2}) where {T1, T2} = (T1 <: T2) && (T2 <: T1)
-
-function hash(::TypeBox{T}, hashCode::UInt) where {T}
-    hash(hash(T), hash(TypeBox, hashCode))
-end
 
 
 function canDirectlyStoreInstanceOf(::Type{T}) where {T}
