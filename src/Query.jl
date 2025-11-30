@@ -223,7 +223,6 @@ function setindex!(d::EncodedDict{K, V}, value::V, key::K) where {K, V}
     encodedKey = getEncodedKey(d, key, true)
     setindex!(d.value, value, encodedKey)
 end
-
 #!!! iterate and collect, should M be the key?
 
 struct IndexDict{K, T} <: EqualityDict{K, T}
@@ -641,14 +640,20 @@ length(mp::MemoryPair) = length(mp.left)
 
 eltype(::MemoryPair{L, R}) where {L, R} = Pair{L, R}
 
-getindex(mp::MemoryPair, index::Int) = mp.left[index] => mp.right[index]
+getindex(mp::MemoryPair, oneToIdx::Int) = 
+mp.left[begin+oneToIdx-1] => mp.right[begin+oneToIdx-1]
 
-function setindex!(mp::MemoryPair{L, R}, val::Pair{<:L, <:R}, index::Int) where {L, R}
+getindex(mp::MemoryPair, idx::OneToIndex) = getindex(mp, idx.idx)
+
+function setindex!(mp::MemoryPair{L, R}, val::Pair{<:L, <:R}, oneToIdx::Int) where {L, R}
     l, r = val
-    mp.left[begin+index-1] = l
-    mp.right[begin+index-1] = r
+    mp.left[begin+oneToIdx-1] = l
+    mp.right[begin+oneToIdx-1] = r
     mp
 end
+
+setindex!(mp::MemoryPair{L, R}, val::Pair{<:L, <:R}, idx::OneToIndex) where {L, R} = 
+setindex!(mp, val, idx.idx)
 
 firstindex(::MemoryPair) = 1
 

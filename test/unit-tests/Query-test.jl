@@ -57,6 +57,8 @@ for ((i, j), pair) in zip(zip(a, c), mp1)
     bl *= ((i => j) === pair)
 end
 @test bl
+mp2 = MemoryPair(collect(1:3), collect(2:2:6))
+@test mp2[2] == mp2[OneToIndex(2)] == (2 => 4)
 
 u1 = AtomicUnit(1)
 u2 = AtomicUnit(1)
