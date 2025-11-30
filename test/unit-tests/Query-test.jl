@@ -1,7 +1,7 @@
 using Test
 using Quiqbox
 using Quiqbox: OneToIndex, ChainedAccess, markObj, MemoryPair, AtomicUnit, AtomicGrid, 
-               Identifier
+               Identifier, MemorySplitter
 
 @testset "Query.jl" begin
 
@@ -71,5 +71,20 @@ g2 = AtomicGrid( Quiqbox.genMemory([1.0]) )
 @test g1 == g2 && g1 !== g2
 @test Identifier(g1) != Identifier(g2)
 @test markObj(g1) == markObj(g2)
+
+v2 = Memory{Bool}([true, true, false, true, false])
+ms1 = MemorySplitter((Quiqbox.TypeBox(Int), Quiqbox.TypeBox(Float64)), v2)
+ms1.sector.left .= 1:5
+ms1.sector.right .= 0.0:1.5:6.0
+v2Ref = Real[1, 2, 3.0, 4, 6.0]
+@test all(i === j for (i, j) in zip(v2Ref, ms1))
+@test all(i==0 for i in sum(ms1 .- v2Ref))
+@test length(ms1) == 5
+@test [ms1[i] for i in eachindex(ms1)] == v2Ref
+@test eltype(ms1) == Union{Int, Float64}
+@test firstindex(ms1) == 1
+@test lastindex(ms1) == 5
+ms1[end] = 5
+@test all(ms1 .== 1:5)
 
 end

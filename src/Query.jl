@@ -660,3 +660,60 @@ firstindex(::MemoryPair) = 1
 lastindex(mp::MemoryPair) = length(mp)
 
 eachindex(mp::MemoryPair) = firstindex(mp):lastindex(mp)
+
+
+struct MemorySplitter{L, R} <: QueryBox{Union{L, R}}
+    sector::MemoryPair{L, R}
+    switch::Memory{Bool} #> true => .sector.left
+
+    function MemorySplitter(::Tuple{TypeBox{L}, TypeBox{R}}, switches::Memory{Bool}
+                          ) where {L, R}
+        len = length(switches)
+        sectorPair = MemoryPair(Memory{L}(undef, len), Memory{R}(undef, len))
+        new{L, R}(sectorPair, switches)
+    end
+end
+
+function iterate(splitter::MemorySplitter, state::OneToIndex=OneToIndex())
+    switches = splitter.switch
+    sectorPair = splitter.sector
+    if length(splitter) < state.idx
+        nothing
+    else
+        switch = getEntry(switches, state)
+        sector = ifelse(switch, sectorPair.left, sectorPair.right)
+        getEntry(sector, state), OneToIndex(state, Count(1))
+    end
+end
+
+length(splitter::MemorySplitter) = length(splitter.switch)
+
+eltype(::MemorySplitter{L, R}) where {L, R} = Union{L, R}
+
+function getindex(splitter::MemorySplitter, oneToIdx::Int)
+    switch = splitter.switch[begin+oneToIdx-1]
+    sectorPair = splitter.sector
+    sector = ifelse(switch, sectorPair.left, sectorPair.right)
+    sector[begin+oneToIdx-1]
+end
+
+getindex(splitter::MemorySplitter, idx::OneToIndex) = getindex(splitter, idx.idx)
+
+function setindex!(splitter::MemorySplitter{L}, val::T, 
+                   oneToIdx::Int, inLeftSector::Bool=(T <: L)) where {L, T}
+    splitter.switch[begin+oneToIdx-1] = inLeftSector
+    sectorPair = splitter.sector
+    sector = ifelse(inLeftSector, sectorPair.left, sectorPair.right)
+    sector[begin+oneToIdx-1] = val
+    splitter
+end
+
+setindex!(splitter::MemorySplitter{L}, val::T, idx::OneToIndex, 
+          inSecNil::Bool=(T <: L)) where {L, T} = 
+setindex!(splitter, val, idx.idx, inSecNil)
+
+firstindex(::MemorySplitter) = 1
+
+lastindex(mp::MemorySplitter) = length(mp)
+
+eachindex(mp::MemorySplitter) = firstindex(mp):lastindex(mp)
