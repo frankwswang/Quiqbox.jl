@@ -85,9 +85,8 @@ negate(::True) = False()
 negate(::False) = True()
 
 
-evalTypedData(::Type{T}) where {T<:Boolean} = (T <: True)
-evalTypedData(::Type{False}) = false
 evalTypedData(::V) where {V<:ValueType} = evalTypedData(V)
+evalTypedData(::Type{T}) where {T<:Boolean} = (T <: True)
 evalTypedData(::Type{Val{T}}) where {T} = T
 evalTypedData(::Val{T}) where {T} = T
 
