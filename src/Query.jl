@@ -666,22 +666,21 @@ struct MemorySplitter{L, R} <: QueryBox{Union{L, R}}
     sector::MemoryPair{L, R}
     switch::Memory{Bool} #> true => .sector.left
 
-    function MemorySplitter(::Tuple{TypeBox{L}, TypeBox{R}}, switches::Memory{Bool}
-                          ) where {L, R}
-        len = length(switches)
-        sectorPair = MemoryPair(Memory{L}(undef, len), Memory{R}(undef, len))
-        new{L, R}(sectorPair, switches)
+    function MemorySplitter(sectors::MemoryPair{L, R}, 
+                            switches::AbstractVector{Bool}=genMemory(true, length(sectors))
+                            ) where {L, R}
+        new{L, R}(sectors, extractMemory(switches))
     end
 end
 
 function iterate(splitter::MemorySplitter, state::OneToIndex=OneToIndex())
     switches = splitter.switch
-    sectorPair = splitter.sector
+    sectors = splitter.sector
     if length(splitter) < state.idx
         nothing
     else
         switch = getEntry(switches, state)
-        sector = ifelse(switch, sectorPair.left, sectorPair.right)
+        sector = ifelse(switch, sectors.left, sectors.right)
         getEntry(sector, state), OneToIndex(state, Count(1))
     end
 end

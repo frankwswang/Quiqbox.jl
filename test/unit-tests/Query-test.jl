@@ -73,7 +73,7 @@ g2 = AtomicGrid( Quiqbox.genMemory([1.0]) )
 @test markObj(g1) == markObj(g2)
 
 v2 = Memory{Bool}([true, true, false, true, false])
-ms1 = MemorySplitter((Quiqbox.TypeBox(Int), Quiqbox.TypeBox(Float64)), v2)
+ms1 = MemorySplitter(MemoryPair(rand(Int, 5), rand(Float64, 5)), v2)
 ms1.sector.left .= 1:5
 ms1.sector.right .= 0.0:1.5:6.0
 v2Ref = Real[1, 2, 3.0, 4, 6.0]
