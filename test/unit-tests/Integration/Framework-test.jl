@@ -20,7 +20,7 @@ cgto5 = CompositeOrb([pgto4], [1.0], renormalize=true)
 bs = Quiqbox.genMemory([pgto1, pgto4, cgto1, cgto2, cgto3, cgto4, cgto5])
 data = MultiOrbitalData(bs)
 
-@test length(data.config) == 3
+@test length(data.source) == 3
 ptr1 = Quiqbox.PrimOrbPointer(Count(3), Float64, OneToIndex(1), true)
 ptr2 = Quiqbox.PrimOrbPointer(Count(3), Float64, OneToIndex(3), true)
 ptr3 = Quiqbox.PrimOrbPointer(Count(3), Float64, OneToIndex(2), true)
@@ -30,18 +30,19 @@ ptr6 = Quiqbox.CompOrbPointer(ptr5.inner, true)
 ptr7 = Quiqbox.CompOrbPointer(MemoryPair([ptr2, ptr1, ptr4], cons))
 ptr8 = Quiqbox.CompOrbPointer(ptr7.inner, true)
 ptr9 = Quiqbox.CompOrbPointer(MemoryPair([ptr4], [1.0]), true)
-@test data.format[1] == ptr1
-@test data.format[2] == ptr4
-@test markObj(data.format[3]) == markObj(ptr5)
-@test markObj(data.format[4]) == markObj(ptr6)
-@test markObj(data.format[5]) == markObj(ptr7)
-@test markObj(data.format[6]) == markObj(ptr8)
-@test markObj(data.format[7]) == markObj(ptr9)
+ptrs = data.format.first
+@test ptrs[1] == ptr1
+@test ptrs[2] == ptr4
+@test markObj(ptrs[3]) == markObj(ptr5)
+@test markObj(ptrs[4]) == markObj(ptr6)
+@test markObj(ptrs[5]) == markObj(ptr7)
+@test markObj(ptrs[6]) == markObj(ptr8)
+@test markObj(ptrs[7]) == markObj(ptr9)
 
 for bl in (Quiqbox.True(), Quiqbox.False())
 
     normInfo = Quiqbox.initializeOrbIntegral(Quiqbox.OneBodyIntegral{3, Float64}(), 
-                                             Quiqbox.genOverlapSampler(), data, bl)
+                                             Quiqbox.genOverlapSampler(), data.source, bl)
     @test absSqrtInv(overlap(pgto4, pgto4)) == buildOrbCoreWeight!(normInfo, ptr9)[] == 
                                                buildOrbCoreWeight!(normInfo, ptr3)[]
 

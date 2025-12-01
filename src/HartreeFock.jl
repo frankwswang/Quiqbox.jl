@@ -181,17 +181,20 @@ function initializeHartreeFock(coeffConfig::OrbCoeffInitialConfig{T, HFT, M},
     spinInfo, nucInfo = systemInfo
     style1B = OneBodyIntegral{D, T}()
     style2B = TwoBodyIntegral{D, T}()
-    normInfo, ovlp = computeOrbDataIntegral(style1B, genOverlapSampler(), basisData)
+
+    (cInfo, wInfo), ovlp = computeOrbDataIntegral(style1B, genOverlapSampler(), basisData)
+    normInfo = OrbitalSetIntegralInfo(cInfo, wInfo, 0)
     coreH = evalOrbIntegralInfo!(genCoreHamiltonianSampler(nucInfo), normInfo)
     eriOp = genCoulombInteractionSampler(T, Count(D))
     eriBasis = basisData #!> `normInfo.basis` will crash Julia as of 1.11.6
     _, eriH = computeOrbDataIntegral(style2B, eriOp, eriBasis)
     matOrth = getOrthonormalization(Val(:Symmetric), ovlp)
     sysConfig = ElecHamiltonianConfig(spinInfo, matOrth, ovlp, coreH, eriH)
+
     matInitCoeff = if coeffConfig.method isa Val{:Direct}
         coeffData = coeffConfig.data
         cSizeData = size.(coeffData)
-        nBasis = length(basisData.format)
+        nBasis = length(basisData.format.first)
         if !all(all(cSize .== nBasis) for cSize in cSizeData)
             throw(DimensionMismatch("The size/sizes of the input initial orbital"* 
                                     "coefficient matrix/matrices's size ($cSizeData)"*
@@ -201,11 +204,12 @@ function initializeHartreeFock(coeffConfig::OrbCoeffInitialConfig{T, HFT, M},
     else
         initializeOrbCoeffData(Val(M), HFT(), (nucInfo, sysConfig, normInfo))
     end
+
     sysConfig, matInitCoeff
 end
 
 const FullElecHamilInfo{R<:Real, D, T<:RealOrComplex{R}} = 
-      Tuple{NuclearCluster{R, D}, ElecHamiltonianConfig{T}, OrbitalOverlapInfo{R, D, T}}
+      Tuple{NuclearCluster{R, D}, ElecHamiltonianConfig{T}, OrbitalSetOverlapInfo{R, D, T}}
 
 function initializeOrbCoeffData(::Val{:CoreH}, ::HFT, info::FullElecHamilInfo) where 
                                {HFT<:HartreeFockType}
@@ -260,7 +264,7 @@ end
 
 function initializeOrbCoeffData(::Val{:SAD}, ::HFT, nucInfo::NuclearCluster{R, D}, 
                                 sysConfig::ElecHamiltonianConfig{T}, 
-                                normInfo::OrbitalOverlapInfo{R, D, T}, 
+                                normInfo::OrbitalSetOverlapInfo{R, D, T}, 
                                 atmSCFconfig=getDefaultSCFconfigForSAD(R)) where 
                                {HFT<:HartreeFockType, R<:Real, T<:RealOrComplex{R}, D}
     nAtm = length(nucInfo)
@@ -982,7 +986,7 @@ function runHartreeFock(systemInfo::ElectronicSysConfig{R, D}, basis::OrbBasisDa
         throw(DomainError(N, "$(HFtype) requires more than $(minElecNum) electrons."))
     end
     leastNb = (Int∘maximum)(spinInfo.layout)
-    nBasis = length(basisData.format)
+    nBasis = length(basisData.format.first)
     if nBasis < leastNb
         throw(DomainError(nBasis, "The basis-set size should be no less than $(leastNb)."))
     end

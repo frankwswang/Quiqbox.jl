@@ -264,6 +264,13 @@ function getOutputType(orbitals::OrbBasisCluster{T, D}) where {T<:Real, D}
     end::Type{<:RealOrComplex{T}}
 end
 
+@enum OrbitalCategory::Int8 begin
+    PrimGaussTypeOrb
+    ArbitraryTypeOrb
+end
+
+getOrbitalCategory(::FloatingPolyGaussField) = PrimGaussTypeOrb
+getOrbitalCategory(::StashedShiftedField) = ArbitraryTypeOrb
 
 struct PrimOrbPointer{D, C<:RealOrComplex} <: CustomAccessor
     inner::OneToIndex
@@ -290,19 +297,6 @@ function CompOrbPointer(innerPtr::PrimOrbPointer{D, C}, coeff::C,
     inner = MemoryPair(genMemory(innerPtr), genMemory(coeff))
     CompOrbPointer(inner, renormalize)
 end
-
-const OrbitalPointer{D, C<:RealOrComplex} = 
-      Union{PrimOrbPointer{D, C}, CompOrbPointer{D, C}}
-
-getOutputType(::OrbitalPointer{D, C}) where {D, C<:RealOrComplex} = C
-
-strictTypeJoin(::Type{CompOrbPointer{D, C}}, ::Type{PrimOrbPointer{D, C}}) where 
-              {D, C<:RealOrComplex}= 
-OrbitalPointer{D, C}
-
-strictTypeJoin(::Type{PrimOrbPointer{D, C}}, ::Type{CompOrbPointer{D, C}}) where 
-              {D, C<:RealOrComplex}= 
-OrbitalPointer{D, C}
 
 
 const StashedFieldPointerDict{T<:Real, D} = 
@@ -369,124 +363,108 @@ function indexGetOrbCore!(config::FieldPoolConfig{T, D}, field::ShiftedField{T, 
     (idx::OneToIndex) => (stashedFieldNew::MissingOr{StashedShiftedField{T, D}})
 end
 
-const PrimOrbPtrSrcPair{T<:Real, D, C<:RealOrComplex{T}, F<:StashedShiftedField{T, D}} = 
-      Pair{PrimOrbPointer{D, C}, Memory{F}}
 
-function prepareOrbitalPointer!(::Type{C}, config::FieldPoolConfig{T, D}, 
+const OrbitalPointerBox{D, C<:RealOrComplex} = 
+      MemorySplitter{PrimOrbPointer{D, C}, CompOrbPointer{D, C}}
+#> A deterministic initialization of `OrbitalPointerBox`
+function initializeOrbitalPointerBox(::Count{D}, ::Type{C}, nOrb::Int, 
+                                     switches=genMemory(true, nOrb)
+                                     ) where {D, C<:RealOrComplex}
+    initialPrimPtrs = genMemory([PrimOrbPointer(Count(D), C, i) for i in OneToRange(nOrb)])
+    initialCompPtrs = map(initialPrimPtrs) do ptr; CompOrbPointer(ptr, one(C)) end
+    MemorySplitter(MemoryPair(initialPrimPtrs, initialCompPtrs), switches)
+end
+
+function preparePrimOrbPointer!(::Type{C}, config::FieldPoolConfig{T, D}, 
                                 orbital::PrimitiveOrb{T, D}) where 
                                {T<:Real, D, C<:RealOrComplex{T}}
     field = orbital.field
     idx, fieldRes = indexGetOrbCore!(config, field)
-    pointer = PrimOrbPointer{D, C}(idx, orbital.renormalize)
-    stashedFields = ismissing(fieldRes) ? genBottomMemory() : genMemory(fieldRes)
-    (pointer => stashedFields)::PrimOrbPtrSrcPair{T, D, C}
+    ptr = PrimOrbPointer(Count(D), C, idx, orbital.renormalize)
+    ptr => fieldRes
 end
 
-const CompOrbPtrSrcPair{T<:Real, D, C<:RealOrComplex{T}, F<:StashedShiftedField{T, D}} = 
-      Pair{CompOrbPointer{D, C}, Memory{F}}
+function prepareOrbitalPointer!(box::OrbitalPointerBox{D, C}, counter::OneToIndex, 
+                                config::FieldPoolConfig{T, D}, orbital::PrimitiveOrb{T, D}
+                                ) where {T<:Real, D, C<:RealOrComplex{T}}
+    ptr, fieldRes = preparePrimOrbPointer!(C, config, orbital)
+    stashedFields = ismissing(fieldRes) ? genBottomMemory() : genMemory(fieldRes)
 
-function prepareOrbitalPointer!(::Type{C}, config::FieldPoolConfig{T, D}, 
+    setindex!(box, ptr, counter, true)
+
+    stashedFields::Memory{<:StashedShiftedField{T, D}}
+end
+
+function prepareOrbitalPointer!(box::OrbitalPointerBox{D, C}, counter::OneToIndex, 
+                                config::FieldPoolConfig{T, D}, 
                                 orbital::CompositeOrb{T, D}) where 
                                {T<:Real, D, C<:RealOrComplex{T}}
     paramCache = config.cache
     weightValue = Memory{C}(obtainCore!(paramCache, orbital.weight))
-    pairs = map(orbital.basis) do primOrb
-        prepareOrbitalPointer!(C, config, primOrb)::PrimOrbPtrSrcPair{T, D, C}
+    primPtrs = Memory{PrimOrbPointer{D, C}}(undef, length(orbital.basis))
+    stashedFields = mapreduce(strictVerticalCat, orbital.basis, 
+                              eachindex(primPtrs)) do primOrb, i
+        ptr, fieldRes = preparePrimOrbPointer!(C, config, primOrb)
+        primPtrs[i] = ptr
+        ismissing(fieldRes) ? genBottomMemory() : genMemory(fieldRes)
     end
-    weightedPtrs = MemoryPair(map(first, pairs), weightValue)
-    pointer = CompOrbPointer{D, C}(weightedPtrs, orbital.renormalize)
-    stashedFields = mapreduce(last, strictVerticalCat, pairs, init=genBottomMemory())
-    (pointer => stashedFields)::CompOrbPtrSrcPair{T, D, C}
-end
 
-const OrbitalPtrSrcPair{T<:Real, D, C<:RealOrComplex{T}} = 
-      Union{PrimOrbPtrSrcPair{T, D, C}, CompOrbPtrSrcPair{T, D, C}}
+    ptr = CompOrbPointer(MemoryPair(primPtrs, weightValue), orbital.renormalize)
+    setindex!(box, ptr, counter, false)
+
+    stashedFields::Memory{<:StashedShiftedField{T, D}}
+end
 
 function cacheOrbitalData!(::Type{C}, 
                            orbitals::OrbBasisCluster{T, D}, directUnpack::Boolean, 
                            cache!Self::OptParamDataCache=initializeParamDataCache(); 
                            maxSize::Int=100) where {T<:Real, D, C<:RealOrComplex{T}}
-    checkEmptiness(orbitals, :orbitals)
     paramSet = initializeSpanParamSet()
     idxBox = FieldIndexBox{T, D}(maxSize)
-    pairs = let config=FieldPoolConfig(idxBox, directUnpack, paramSet, cache!Self)
-        map(orbitals) do orb
-            prepareOrbitalPointer!(C, config, orb)::OrbitalPtrSrcPair{T, D, C}
+    nOrb = checkEmptiness(orbitals, :orbitals)
+    ptrBox = initializeOrbitalPointerBox(Count(D), C, nOrb)
+
+    stashedFields = let config=FieldPoolConfig(idxBox, directUnpack, paramSet, cache!Self)
+        mapreduce(strictVerticalCat, orbitals, OneToRange(nOrb)) do orb, counter
+            prepareOrbitalPointer!(ptrBox, counter, config, orb)
         end
     end
-    stashedFields = mapreduce(last, strictVerticalCat, pairs)
-    map(first, pairs) => (stashedFields::Memory{<:StashedShiftedField{T, D}})
+
+    ptrBox => (stashedFields::Memory{<:StashedShiftedField{T, D}})
 end
 
 
-struct OrbCorePointer{D, C<:RealOrComplex}
-    inner::MemoryPair{OneToIndex, C}
-
-    function OrbCorePointer(::Count{D}, inner::MemoryPair{OneToIndex, C}) where 
-                           {D, C<:RealOrComplex}
-        new{D, C}(inner)
-    end
-end
-
-function OrbCorePointer(pointer::PrimOrbPointer{D, C}, weight::C
-                        ) where {D, C<:RealOrComplex}
-    innerPair = MemoryPair(genMemory(pointer.inner), genMemory(weight))
-    OrbCorePointer(Count(D), innerPair)
-end
-
-function OrbCorePointer(pointer::CompOrbPointer{D, C}, weight::AbstractArray{C, 1}
-                        ) where {D, C<:RealOrComplex}
-    innerPair = MemoryPair(map(x->x.inner, pointer.inner.left), extractMemory(weight))
-    OrbCorePointer(Count(D), innerPair)
-end
-
-
-const OrbPairLayoutFormat{D, C} = 
-      Union{NTuple{2, OrbitalPointer{D, C}}, NTuple{ 2, OrbCorePointer{D, C} }}
-
-const OrbQuadLayoutFormat{D, C} = 
-      Union{NTuple{4, OrbitalPointer{D, C}}, NTuple{ 4, OrbCorePointer{D, C} }}
-
-const OrbitalLayoutFormat{D, C} = 
-      Union{OrbPairLayoutFormat{D, C}, OrbQuadLayoutFormat{D, C}}
-
-const OrbitalVectorFormat{D, C} = 
-      Union{Memory{<:OrbitalPointer{D, C}}, Memory{ OrbCorePointer{D, C} }}
-
-const OrbFormatCollection{D, C<:RealOrComplex} = 
-      Union{OrbitalLayoutFormat{D, C}, OrbitalVectorFormat{D, C}}
-
-
-struct MultiOrbitalData{T<:Real, D, C<:RealOrComplex{T}, F<:StashedShiftedField{T, D}, 
-                        P<:OrbFormatCollection{D, C}} <: QueryBox{F}
-    config::Memory{F}
-    format::P
+struct MultiOrbitalData{T<:Real, D, C<:RealOrComplex{T}, L<:Boolean, 
+                        F<:StashedShiftedField{T, D}} <: QueryBox{Pair{F, OrbitalCategory}}
+    source::MemoryPair{F, OrbitalCategory}
+    format::Pair{OrbitalPointerBox{D, C}, L}
 
     function MultiOrbitalData(orbitals::OrbBasisCluster{T, D}, 
                               directUnpack::Boolean=False(); 
                               cache!Self::OptParamDataCache=initializeParamDataCache()
                               ) where {T<:Real, D}
         outputType = getOutputType(orbitals)
-        format, config = cacheOrbitalData!(outputType, orbitals, directUnpack, cache!Self)
-        orbitals isa AbstractVector && (format = genMemory(format))
-        new{T, D, outputType, eltype(config), typeof(format)}(config, format)
+        ptrs, fields = cacheOrbitalData!(outputType, orbitals, directUnpack, cache!Self)
+        source = MemoryPair(fields, map(getOrbitalCategory, fields))
+        isLayout = toBoolean(orbitals isa Tuple)
+        new{T, D, outputType, typeof(isLayout), eltype(fields)}(source, ptrs=>isLayout)
     end
 
     function MultiOrbitalData(data::MultiOrbitalData{T, D, C}, 
-                              format::OrbFormatCollection{D, C}) where 
-                             {T<:Real, D, C<:RealOrComplex{T}}
-        config = data.config
-        new{T, D, C, eltype(config), typeof(format)}(config, format)
+                              format::Pair{OrbitalPointerBox{D, C}, L}) where 
+                             {T<:Real, D, C<:RealOrComplex{T}, L<:Boolean}
+        source = data.source
+        nPtr = checkEmptiness(format.first, Symbol("format.first"))
+        if evalTypedData(L)
+            if !(nPtr == 2 || nPtr == 4)
+                throw(AssertionError("The allowed orbital number for layout data can "*
+                                     "only be two or four."))
+            end
+        end
+        new{T, D, C, L, eltype(source.left)}(source, format)
     end
 end
 
-const OrbitalLayoutData{T<:Real, D, C<:RealOrComplex{T}, F<:StashedShiftedField{T, D}, 
-                        P<:OrbitalLayoutFormat{D, C}} = 
-      MultiOrbitalData{T, D, C, F, P}
-
-const OrbitalVectorData{T<:Real, D, C<:RealOrComplex{T}, F<:StashedShiftedField{T, D}, 
-                        P<:OrbitalVectorFormat{D, C}} = 
-      MultiOrbitalData{T, D, C, F, P}
 
 getOutputType(::MultiOrbitalData{T, D, C}) where {T<:Real, D, C<:RealOrComplex{T}} = C
 
