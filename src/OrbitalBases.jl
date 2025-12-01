@@ -268,11 +268,27 @@ end
 struct PrimOrbPointer{D, C<:RealOrComplex} <: CustomAccessor
     inner::OneToIndex
     renormalize::Bool
+
+    function PrimOrbPointer(::Count{D}, ::Type{C}, inner::OneToIndex, 
+                            renormalize::Bool=false) where {D, C<:RealOrComplex}
+        new{D, C}(inner, renormalize)
+    end
 end
 
 struct CompOrbPointer{D, C<:RealOrComplex} <: CustomAccessor
     inner::MemoryPair{PrimOrbPointer{D, C}, C}
     renormalize::Bool
+
+    function CompOrbPointer(inner::MemoryPair{PrimOrbPointer{D, C}, C}, 
+                            renormalize::Bool=false) where {D, C<:RealOrComplex}
+        new{D, C}(inner, renormalize)
+    end
+end
+
+function CompOrbPointer(innerPtr::PrimOrbPointer{D, C}, coeff::C, 
+                        renormalize::Bool=false) where {D, C<:RealOrComplex}
+    inner = MemoryPair(genMemory(innerPtr), genMemory(coeff))
+    CompOrbPointer(inner, renormalize)
 end
 
 const OrbitalPointer{D, C<:RealOrComplex} = 
