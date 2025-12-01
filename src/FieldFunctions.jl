@@ -23,13 +23,13 @@ end
 (f::FieldAmplitude)(input) = evalFieldAmplitude(f, formatInput(f, input))
 
 
-struct FieldParamFunc{T, D, C<:RealOrComplex{T}, F<:AbstractParamFunc, S<:SpanSetFilter
-                      } <: TypedParamFunc{C}
+struct FieldParamFunc{T<:Real, D, C<:RealOrComplex{T}, F<:AbstractParamFunc, 
+                      S<:SpanSetFilter} <: TypedParamFunc{C}
     core::TypedReturn{C, ContextParamFunc{ F, CartesianFormatter{D, NTuple{D, T}}, 
                                            GetEntry{TaggedSpanSetFilter{S}} }}
 
     function FieldParamFunc{T, D, C}(f::F, scope::TaggedSpanSetFilter{S}) where 
-                                    {T, C<:RealOrComplex{T}, D, F<:AbstractParamFunc, 
+                                    {T<:Real, C<:RealOrComplex{T}, D, F<:AbstractParamFunc, 
                                      S<:SpanSetFilter}
         checkPositivity(D)
         if F <: InputConverter && !(S <: VoidSetFilter)
@@ -43,17 +43,17 @@ end
 
 FieldParamFunc(f::TypedCarteFunc{C, D, <:AbstractParamFunc}, 
                scope::TaggedSpanSetFilter{<:SpanSetFilter}) where 
-              {T, C<:RealOrComplex{T}, D} = 
+              {T<:Real, C<:RealOrComplex{T}, D} = 
 FieldParamFunc{T, D, C}(f.f.f, scope)
 
 function evalFieldParamFunc(f::FieldParamFunc{T, D, C, F}, input, params::OptSpanValueSet
-                            ) where {T, C<:RealOrComplex{T}, D, F<:AbstractParamFunc}
+                            ) where {T<:Real, C<:RealOrComplex{T}, D, F<:AbstractParamFunc}
     f.core(input, params)
 end
 
 (f::FieldParamFunc)(input, params::OptSpanValueSet) = evalFieldParamFunc(f, input, params)
 
-getOutputType(::Type{<:FieldParamFunc{T, D, C}}) where {T, D, C<:RealOrComplex{T}} = C
+getOutputType(::Type{<:FieldParamFunc{T, D, C}}) where {T<:Real, D, C<:RealOrComplex{T}} = C
 
 const NullaryFieldFunc{T<:Real, D, C<:RealOrComplex{T}, F<:AbstractParamFunc} = 
       FieldParamFunc{T, D, C, F, VoidSetFilter}
@@ -66,7 +66,7 @@ struct StashedField{T<:Real, D, C<:RealOrComplex{T}, F<:AbstractParamFunc,
 
     function StashedField(f::FieldParamFunc{T, D, C}, paramSet::OptSpanParamSet, 
                           cache!Self::OptParamDataCache=initializeParamDataCache()) where 
-                         {T, D, C<:RealOrComplex{T}}
+                         {T<:Real, D, C<:RealOrComplex{T}}
         fInner = f.core.f
         core = TypedCarteFunc(fInner.binder, C, Count(D))
         encoder = last(fInner.encode)
@@ -86,8 +86,9 @@ function evalFieldAmplitudeCore(f::StashedField, input)
     f.core(formatInput(f, input), f.data)
 end
 
-function unpackFieldFunc!(f::F, ::Pair{<:OptSpanParamSet, Identifier}, ::Boolean=False()
-                          ) where {T, C<:RealOrComplex{T}, D, F<:StashedField{T, D, C}}
+function unpackFieldFunc!(f::F, ::Pair{<:OptSpanParamSet, Identifier}, 
+                          ::Boolean=False()) where 
+                         {T<:Real, C<:RealOrComplex{T}, D, F<:StashedField{T, D, C}}
     TypedCarteFunc(RPartial(f.core.f.f, f.data), C, Count(D))
 end
 
@@ -104,7 +105,7 @@ end
 #>> computation graphs.
 function unpackFunc!(f::F, paramSet::OptSpanParamSet, directUnpack::Boolean=False(); 
                      paramSetId::Identifier=Identifier(paramSet)) where 
-                    {T, C<:RealOrComplex{T}, D, F<:FieldAmplitude{C, D}}
+                    {T<:Real, C<:RealOrComplex{T}, D, F<:FieldAmplitude{C, D}}
     localParamInfo = initializeFieldParamInfo(f, Identifier())
     fCore = unpackFieldFunc!(f, localParamInfo, directUnpack)
     idxFilter = locateParam!(paramSet, localParamInfo.first)
@@ -113,7 +114,7 @@ function unpackFunc!(f::F, paramSet::OptSpanParamSet, directUnpack::Boolean=Fals
 end
 
 function unpackFunc(f::F, directUnpack::Boolean=False()) where 
-                   {T, C<:RealOrComplex{T}, D, F<:FieldAmplitude{C, D}}
+                   {T<:Real, C<:RealOrComplex{T}, D, F<:FieldAmplitude{C, D}}
     paramInfo = initializeFieldParamInfo(f)
     paramSet = paramInfo.first
     fCore = unpackFieldFunc!(f, paramInfo, directUnpack)
@@ -410,7 +411,7 @@ const PolyGaussFieldFunc{T<:Real, D, F<:PolyGaussFieldCore{T, D}, S<:SpanSetFilt
       PolyRadialFieldFunc{T, D, T, F, S}
 
 
-struct ShiftedField{T, D, C<:RealOrComplex{T}, F<:FieldAmplitude{C, D}, 
+struct ShiftedField{T<:Real, D, C<:RealOrComplex{T}, F<:FieldAmplitude{C, D}, 
                     R<:NTuple{ D, UnitParam{T} }} <: FieldAmplitude{C, D}
     center::R
     core::F
@@ -423,7 +424,7 @@ struct ShiftedField{T, D, C<:RealOrComplex{T}, F<:FieldAmplitude{C, D},
     end
 end
 
-getOutputType(::Type{<:ShiftedField{T, D, C}}) where {T, D, C<:RealOrComplex{T}} = C
+getOutputType(::Type{<:ShiftedField{T, D, C}}) where {T<:Real, D, C<:RealOrComplex{T}} = C
 
 needFieldAmpEvalCache(::ShiftedField) = true
 
@@ -436,7 +437,7 @@ end
 
 function unpackFieldFunc!(f::F, paramInfo::Pair{<:OptSpanParamSet, Identifier}, 
                           directUnpack::Boolean=False()) where 
-                         {T, C<:RealOrComplex{T}, D, F<:ShiftedField{C, D}}
+                         {T<:Real, C<:RealOrComplex{T}, D, F<:ShiftedField{C, D}}
     paramSet = paramInfo.first
     fInner = unpackFieldFunc!(f.core, paramInfo, directUnpack)
     mapper, _ = genParamMapper(f.center, negate(directUnpack), paramSet!Self=paramSet)
