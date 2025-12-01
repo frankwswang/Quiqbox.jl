@@ -424,6 +424,19 @@ function genMemory(obj::T) where {T}
     mem
 end
 
+"""
+
+    genMemory(val::T, len::Int) where {T} -> Memory{T}
+
+Generate a `Memory{T}` of length `len` and its each element is set to `val`.
+"""
+function genMemory(val::T, len::Int) where {T}
+    checkPositivity(len, true)
+    mem = Memory{T}(undef, len)
+    mem .= Ref(val)
+    mem
+end
+
 
 """
 

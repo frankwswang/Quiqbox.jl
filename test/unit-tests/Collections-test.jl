@@ -1,7 +1,7 @@
 using Test
 using Quiqbox
 using Quiqbox: PackedMemory, indexedPerturb, OneToIndex, setIndex, MemoryLinker, 
-               getNestedLevel, decoupledCopy
+               getNestedLevel, decoupledCopy, extractMemory, genMemory
 
 @testset "Collections.jl" begin
 
@@ -160,5 +160,17 @@ v2_2 = decoupledCopy(v2)
 v2_2[2][] = 3
 @test v2_2 == [[2], [3], [2]]
 @test !any(v2_2 .=== Ref(v1))
+
+mem1 = Memory{Real}([1, 2, 3.0])
+@test extractMemory(mem1) === mem1
+@test genMemory(mem1) !== mem1
+@test all(genMemory(mem1) .== [1., 2., 3.])
+@test typeof(genMemory(1)) == Memory{Int}
+@test genMemory(1)[] === 1
+mem2 = genMemory(true, 5)
+@test mem2 == fill(true, 5)
+@test genMemory(mem2) !== mem2
+@test extractMemory(mem2) === mem2
+@test extractMemory(mem2) === mem2
 
 end
