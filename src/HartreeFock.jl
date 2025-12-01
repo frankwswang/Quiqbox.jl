@@ -186,7 +186,7 @@ function initializeHartreeFock(coeffConfig::OrbCoeffInitialConfig{T, HFT, M},
     normInfo = OrbitalSetIntegralInfo(cInfo, wInfo, 0)
     coreH = evalOrbIntegralInfo!(genCoreHamiltonianSampler(nucInfo), normInfo)
     eriOp = genCoulombInteractionSampler(T, Count(D))
-    eriBasis = basisData #!> `normInfo.basis` will crash Julia as of 1.11.6
+    eriBasis = OrbitalCoreData(basisData.source, wInfo)
     _, eriH = computeOrbDataIntegral(style2B, eriOp, eriBasis)
     matOrth = getOrthonormalization(Val(:Symmetric), ovlp)
     sysConfig = ElecHamiltonianConfig(spinInfo, matOrth, ovlp, coreH, eriH)
