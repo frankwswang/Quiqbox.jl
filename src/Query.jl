@@ -162,49 +162,47 @@ const OptionalCache{V} = OptQueryCache{<:Any, V}
 const OptionalLRU{K, V} = Union{EmptyDict{K, V}, LRU{K, V}}
 
 
-struct EncodedDict{K, V, M, F} <: EqualityDict{K, V}
+struct EncodedDict{K, V, T, F} <: EqualityDict{K, V}
     encoder::F
-    cache::LRU{EgalBox{K}, M}
-    value::Dict{M, V}
+    cache::LRU{EgalBox{T}, K}
+    value::Dict{K, V}
 
-    function EncodedDict{K, V}(config::Pair{F, TypeBox{M}}, maxSize::Int=100
-                               ) where {K, V, F, M}
-        cacheDict = LRU{EgalBox{K}, M}(maxsize=maxSize)
-        valueDict = Dict{M, V}()
-        new{K, V, M, F}(config.first, cacheDict, valueDict)
+    function EncodedDict{K, V, T}(encoder::F, maxSize::Int=100) where {K, V, T, F}
+        cacheDict = LRU{EgalBox{T}, K}(maxsize=maxSize)
+        valueDict = Dict{K, V}()
+        new{K, V, T, F}(encoder, cacheDict, valueDict)
     end
+end
+
+function getEncodedKey(d::EncodedDict{K, <:Any, T}, cacheKey::T, 
+                       store!EncodedKey::Bool=false) where {K, T}
+    cacheDict = d.cache
+    tracker = EgalBox{T}(cacheKey)
+    if haskey(cacheDict, tracker)
+        getindex(cacheDict, tracker)
+    else
+        encodedKey = d.encoder(cacheKey)::K
+        store!EncodedKey && setindex!(cacheDict, encodedKey, tracker)
+        encodedKey
+    end
+end
+
+function encodeGet(d::EncodedDict{<:Any, <:Any, T}, cacheKey::T, default, 
+                   store!EncodedKey::Bool=false) where {T}
+    encodedKey = getEncodedKey(d, cacheKey, store!EncodedKey)
+    value = get(d, encodedKey, default)
+    encodedKey => value
 end
 
 length(d::EncodedDict) = length(d.value)
 
 collect(d::EncodedDict) = collect(d.value)
 
-function getEncodedKey(d::EncodedDict{K, V, M, F}, key::K, store!EncodedKey::Bool=false
-                       ) where {K, V, M, F}
-    cacheDict = d.cache
-    cacheKey = EgalBox{K}(key)
-    if haskey(cacheDict, cacheKey)
-        getindex(cacheDict, cacheKey)
-    else
-        encodedKey = d.encoder(key)::M
-        store!EncodedKey && setindex!(cacheDict, encodedKey, cacheKey)
-        encodedKey
-    end
-end
+haskey(d::EncodedDict{K}, encodedKey::K) where {K} = haskey(d.value, encodedKey)
 
-function haskey(d::EncodedDict{K, V, M}, key::K) where {K, V, M}
-    encodedKey = getEncodedKey(d, key)
-    haskey(d.value, encodedKey)
-end
+get(d::EncodedDict{K}, encodedKey::K, default) where {K} = get(d.value, encodedKey, default)
 
-function get(d::EncodedDict{K}, key::K, default; update!Cache::Bool=true) where {K}
-    encodedKey = getEncodedKey(d, key, update!Cache)
-    get(d.value, encodedKey, default)
-end
-
-function get!(d::EncodedDict{K, V}, key::K, default::V; 
-              update!Cache::Bool=true) where {K, V}
-    encodedKey = getEncodedKey(d, key, update!Cache)
+function get!(d::EncodedDict{K, V}, encodedKey::K, default::V) where {K, V}
     valueDict = d.value
     if haskey(valueDict, encodedKey)
         getindex(valueDict, encodedKey)
@@ -214,16 +212,15 @@ function get!(d::EncodedDict{K, V}, key::K, default::V;
     end
 end
 
-function getindex(d::EncodedDict{K}, key::K) where {K}
-    encodedKey = getEncodedKey(d, key, false).first
-    getindex(d.value, encodedKey)
-end
+getindex(d::EncodedDict{K}, encodedKey::K) where {K} = 
+getindex(d.value, encodedKey)
 
-function setindex!(d::EncodedDict{K, V}, value::V, key::K) where {K, V}
-    encodedKey = getEncodedKey(d, key, true)
-    setindex!(d.value, value, encodedKey)
-end
-#!!! iterate and collect, should M be the key?
+setindex!(d::EncodedDict{K, V}, value::V, encodedKey::K) where {K, V} = 
+setindex!(d.value, value, encodedKey)
+
+iterate(d::EncodedDict, state) = iterate(d.value, state)
+iterate(d::EncodedDict) = iterate(d.value)
+
 
 struct IndexDict{K, T} <: EqualityDict{K, T}
     indexer::Dict{K, OneToIndex}

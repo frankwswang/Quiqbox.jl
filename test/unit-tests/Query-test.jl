@@ -1,7 +1,7 @@
 using Test
 using Quiqbox
 using Quiqbox: OneToIndex, ChainedAccess, markObj, MemoryPair, AtomicUnit, AtomicGrid, 
-               Identifier, MemorySplitter
+               Identifier, EncodedDict, MemorySplitter
 
 @testset "Query.jl" begin
 
@@ -71,6 +71,25 @@ g2 = AtomicGrid( Quiqbox.genMemory([1.0]) )
 @test g1 == g2 && g1 !== g2
 @test Identifier(g1) != Identifier(g2)
 @test markObj(g1) == markObj(g2)
+
+function edEncoder(a::Int)
+    iseven(a) && a > 0
+end
+ed1 = EncodedDict{Bool, Float64, Int}(edEncoder)
+pair = Quiqbox.encodeGet(ed1, 1, nothing, true)
+@test haskey(ed1, pair.first) == !(pair.second === nothing)
+@test pair == (edEncoder(1) => nothing)
+@test length(ed1) == 0
+@test let v=collect(ed1); v == [] && eltype(v) == Pair{Bool, Float64} end
+@test get(ed1, pair.first, nothing) === nothing
+get!(ed1, pair.first, 1.1)
+@test ed1[false] == 1.1
+@test length(ed1) == 1
+@test collect(ed1) == [false=>1.1]
+setindex!(ed1, 1.0, false)
+setindex!(ed1, 2.0, true)
+@test collect(ed1) == [false=>1.0, true=>2.0]
+@test all(ele==Pair(Bool(i-1), i) for (ele, i) in zip( ed1, 1:length(ed1) ))
 
 v2 = Memory{Bool}([true, true, false, true, false])
 ms1 = MemorySplitter(MemoryPair(rand(Int, 5), rand(Float64, 5)), v2)

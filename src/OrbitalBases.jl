@@ -300,18 +300,18 @@ end
 
 
 const StashedFieldPointerDict{T<:Real, D} = 
-      EncodedDict{StashedShiftedField{T, D}, OneToIndex, FieldMarker{:StashedField, 2}, 
-                 typeof(markObj)}
+      EncodedDict{FieldMarker{:StashedField, 2}, OneToIndex, StashedShiftedField{T, D}, 
+                  typeof(markObj)}
 
-struct FieldIndexBox{T, D} <: QueryBox{OneToIndex}
+struct FieldIndexBox{T<:Real, D} <: QueryBox{OneToIndex}
     direct::Dict{EgalBox{ShiftedField{T, D}}, OneToIndex}
     latent::StashedFieldPointerDict{T, D}
 
     function FieldIndexBox{T, D}(maxSize::Int=100) where {T, D}
         directDict = Dict{EgalBox{ShiftedField{T, D}}, OneToIndex}()
-        latentDict = EncodedDict{StashedShiftedField{T, D}, OneToIndex}(
-            (markObj => TypeBox(FieldMarker{:StashedField, 2})), maxSize
-        )
+        builder = EncodedDict{FieldMarker{:StashedField, 2}, OneToIndex, 
+                              StashedShiftedField{T, D}}
+        latentDict = builder(markObj, maxSize)
         new{T, D}(directDict, latentDict)
     end
 end
@@ -346,11 +346,11 @@ function indexGetOrbCore!(config::FieldPoolConfig{T, D}, field::ShiftedField{T, 
         paramSet = config.param
         fieldFunc = unpackFunc!(field, paramSet, config.depth)
         fieldCore = StashedField(fieldFunc, paramSet, config.cache)
-        idx = get(ptrIdxDict, fieldCore, nothing)
+        fieldMarker, idx = encodeGet(ptrIdxDict, fieldCore, nothing, true)
         if idx === nothing
             idx = OneToIndex(config.count += 1)
             stashedFieldNew = fieldCore
-            setindex!(ptrIdxDict, idx, fieldCore)
+            setindex!(ptrIdxDict, idx, fieldMarker)
         end
         setindex!(trackerDict, idx, tracker)
     end
