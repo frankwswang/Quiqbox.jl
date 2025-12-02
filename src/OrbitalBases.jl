@@ -346,7 +346,7 @@ function indexGetOrbCore!(config::FieldPoolConfig{T, D}, field::ShiftedField{T, 
         paramSet = config.param
         fieldFunc = unpackFunc!(field, paramSet, config.depth)
         fieldCore = StashedField(fieldFunc, paramSet, config.cache)
-        fieldMarker, idx = encodeGet(ptrIdxDict, fieldCore, nothing, true)
+        fieldMarker, idx = encodeGet(ptrIdxDict, fieldCore, nothing, false)
         if idx === nothing
             idx = OneToIndex(config.count += 1)
             stashedFieldNew = fieldCore
