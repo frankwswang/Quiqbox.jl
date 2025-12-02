@@ -381,6 +381,8 @@ end
 
 const ScreenParam{T, E<:Pack{T}, P<:ParamBox{T, E}} = ReduceParam{T, E, ItsType, Tuple{P}}
 const SimpleParam{T, E<:Span{T}, P<:PrimitiveParam{T, E}} = ScreenParam{T, E, P}
+const SimpleUnitPar{T} = SimpleParam{T, T, UnitVar{T}}
+const SimpleGirdPar{T, N} = SimpleParam{T, DirectMemory{T, N}, GridVar{T, N}}
 
 function genCellParam(func::Function, input::CoreFixedParIn, marker::SymOrIndexedSym)
     lambda = formatTensorFunc(func, TypedReduce, input)

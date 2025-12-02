@@ -97,6 +97,40 @@ function getEntry(obj, acc::ChainedAccess)
 end
 
 
+struct EgalBox{T} <: QueryBox{T}
+    value::T
+end
+
+const BlackBox = EgalBox{Any}
+
+==(bb1::EgalBox, bb2::EgalBox) = (bb1.value === bb2.value)
+
+function hash(bb::EgalBox, hashCode::UInt)
+    hash(objectid(bb.value), hash(typeof(bb), hashCode))
+end
+
+
+struct TypeBox{T} <: QueryBox{Type{T}}
+    value::Type{T}
+
+    TypeBox(::Type{T}) where {T} = new{T::Type}()
+end
+
+TypeBox(::Type{Union{}}) = 
+throw(AssertionError("`TypeBox` cannot be instantiated with `Union{}` as it may trigger "*
+                     "access to undefined reference."))
+
+==(::TypeBox{T1}, ::TypeBox{T2}) where {T1, T2} = (T1 <: T2) && (T2 <: T1)
+
+function hash(::TypeBox{T}, hashCode::UInt) where {T}
+    hash(hash(T), hash(TypeBox, hashCode))
+end
+
+#= Additional Method =#
+strictTypeJoin(::TypeBox{T1}, ::TypeBox{T2}) where {T1, T2} = 
+(TypeBox∘strictTypeJoin)(T1, T2)
+
+
 struct EmptyDict{K, V} <: EqualityDict{K, V} end
 
 EmptyDict() = EmptyDict{Union{}, Union{}}()
@@ -128,12 +162,72 @@ const OptionalCache{V} = OptQueryCache{<:Any, V}
 const OptionalLRU{K, V} = Union{EmptyDict{K, V}, LRU{K, V}}
 
 
+struct EncodedDict{K, V, T, F} <: EqualityDict{K, V}
+    encoder::F
+    cache::LRU{EgalBox{T}, K}
+    value::Dict{K, V}
+
+    function EncodedDict{K, V, T}(encoder::F, maxSize::Int=100) where {K, V, T, F}
+        cacheDict = LRU{EgalBox{T}, K}(maxsize=maxSize)
+        valueDict = Dict{K, V}()
+        new{K, V, T, F}(encoder, cacheDict, valueDict)
+    end
+end
+
+function getEncodedKey(d::EncodedDict{K, <:Any, T}, cacheKey::T, 
+                       store!EncodedKey::Bool=false) where {K, T}
+    cacheDict = d.cache
+    tracker = EgalBox{T}(cacheKey)
+    if haskey(cacheDict, tracker)
+        getindex(cacheDict, tracker)
+    else
+        encodedKey = d.encoder(cacheKey)::K
+        store!EncodedKey && setindex!(cacheDict, encodedKey, tracker)
+        encodedKey
+    end
+end
+
+function encodeGet(d::EncodedDict{<:Any, <:Any, T}, cacheKey::T, default, 
+                   store!EncodedKey::Bool=false) where {T}
+    encodedKey = getEncodedKey(d, cacheKey, store!EncodedKey)
+    value = get(d, encodedKey, default)
+    encodedKey => value
+end
+
+length(d::EncodedDict) = length(d.value)
+
+collect(d::EncodedDict) = collect(d.value)
+
+haskey(d::EncodedDict{K}, encodedKey::K) where {K} = haskey(d.value, encodedKey)
+
+get(d::EncodedDict{K}, encodedKey::K, default) where {K} = get(d.value, encodedKey, default)
+
+function get!(d::EncodedDict{K, V}, encodedKey::K, default::V) where {K, V}
+    valueDict = d.value
+    if haskey(valueDict, encodedKey)
+        getindex(valueDict, encodedKey)
+    else
+        setindex!(valueDict, default, encodedKey)
+        default
+    end
+end
+
+getindex(d::EncodedDict{K}, encodedKey::K) where {K} = 
+getindex(d.value, encodedKey)
+
+setindex!(d::EncodedDict{K, V}, value::V, encodedKey::K) where {K, V} = 
+setindex!(d.value, value, encodedKey)
+
+iterate(d::EncodedDict, state) = iterate(d.value, state)
+iterate(d::EncodedDict) = iterate(d.value)
+
+
 struct IndexDict{K, T} <: EqualityDict{K, T}
     indexer::Dict{K, OneToIndex}
     storage::Vector{Pair{K, T}}
 
     function IndexDict{K, T}() where {K, T}
-        (K <: OneToIndex) && throw(ArgumentError("K::Type{$K} cannot be `OneToIndex`."))
+        (K <: OneToIndex) && throw(ArgumentError("`K::Type{$K}` cannot be `OneToIndex`."))
         new{K, T}(Dict{K, OneToIndex}(), Pair{K, T}[])
     end
 end
@@ -146,7 +240,7 @@ function haskey(d::IndexDict{K}, key::K) where {K}
     haskey(d.indexer, key)
 end
 
-function get(d::IndexDict{K, V}, key::K, default::V) where {K, V}
+function get(d::IndexDict{K}, key::K, default) where {K}
     res = get(d.indexer, key, nothing)
     res === nothing ? default : getEntry(d.storage, res).second
 end
@@ -200,35 +294,6 @@ iterate(d::IndexDict) = iterate(d.storage)
 indexKey(d::IndexDict, index::OneToIndex) = getindex(d.storage, index).first
 
 keyIndex(d::IndexDict{K}, key::K) where {K} = getindex(d.indexer, key)
-
-
-struct EgalBox{T} <: QueryBox{T}
-    value::T
-end
-
-const BlackBox = EgalBox{Any}
-
-==(bb1::EgalBox, bb2::EgalBox) = (bb1.value === bb2.value)
-
-function hash(bb::EgalBox, hashCode::UInt)
-    hash(objectid(bb.value), hash(typeof(bb), hashCode))
-end
-
-
-struct TypeBox{T} <: QueryBox{Type{T}}
-    value::Type{T}
-
-    TypeBox(::Type{T}) where {T} = new{T::Type}()
-end
-
-TypeBox(::Type{Union{}}) = 
-throw(AssertionError("`TypeBox` cannot be instantiated with `Union{}`."))
-
-==(::TypeBox{T1}, ::TypeBox{T2}) where {T1, T2} = (T1 <: T2) && (T2 <: T1)
-
-function hash(::TypeBox{T}, hashCode::UInt) where {T}
-    hash(hash(T), hash(TypeBox, hashCode))
-end
 
 
 function canDirectlyStoreInstanceOf(::Type{T}) where {T}
@@ -572,17 +637,79 @@ length(mp::MemoryPair) = length(mp.left)
 
 eltype(::MemoryPair{L, R}) where {L, R} = Pair{L, R}
 
-getindex(mp::MemoryPair, index::Int) = mp.left[index] => mp.right[index]
+getindex(mp::MemoryPair, oneToIdx::Int) = 
+mp.left[begin+oneToIdx-1] => mp.right[begin+oneToIdx-1]
 
-function setindex!(mp::MemoryPair{L, R}, val::Pair{<:L, <:R}, index::Int) where {L, R}
+getindex(mp::MemoryPair, idx::OneToIndex) = getindex(mp, idx.idx)
+
+function setindex!(mp::MemoryPair{L, R}, val::Pair{<:L, <:R}, oneToIdx::Int) where {L, R}
     l, r = val
-    mp.left[begin+index-1] = l
-    mp.right[begin+index-1] = r
+    mp.left[begin+oneToIdx-1] = l
+    mp.right[begin+oneToIdx-1] = r
     mp
 end
+
+setindex!(mp::MemoryPair{L, R}, val::Pair{<:L, <:R}, idx::OneToIndex) where {L, R} = 
+setindex!(mp, val, idx.idx)
 
 firstindex(::MemoryPair) = 1
 
 lastindex(mp::MemoryPair) = length(mp)
 
 eachindex(mp::MemoryPair) = firstindex(mp):lastindex(mp)
+
+
+struct MemorySplitter{L, R} <: QueryBox{Union{L, R}}
+    sector::MemoryPair{L, R}
+    switch::Memory{Bool} #> true => .sector.left
+
+    function MemorySplitter(sectors::MemoryPair{L, R}, 
+                            switches::AbstractVector{Bool}=genMemory(true, length(sectors))
+                            ) where {L, R}
+        new{L, R}(sectors, extractMemory(switches))
+    end
+end
+
+function iterate(splitter::MemorySplitter, state::OneToIndex=OneToIndex())
+    switches = splitter.switch
+    sectors = splitter.sector
+    if length(splitter) < state.idx
+        nothing
+    else
+        switch = getEntry(switches, state)
+        sector = ifelse(switch, sectors.left, sectors.right)
+        getEntry(sector, state), OneToIndex(state, Count(1))
+    end
+end
+
+length(splitter::MemorySplitter) = length(splitter.switch)
+
+eltype(::MemorySplitter{L, R}) where {L, R} = Union{L, R}
+
+function getindex(splitter::MemorySplitter, oneToIdx::Int)
+    switch = splitter.switch[begin+oneToIdx-1]
+    sectorPair = splitter.sector
+    sector = ifelse(switch, sectorPair.left, sectorPair.right)
+    sector[begin+oneToIdx-1]
+end
+
+getindex(splitter::MemorySplitter, idx::OneToIndex) = getindex(splitter, idx.idx)
+
+function setindex!(splitter::MemorySplitter{L}, val::T, 
+                   oneToIdx::Int, inLeftSector::Bool=(T <: L)) where {L, T}
+    splitter.switch[begin+oneToIdx-1] = inLeftSector
+    sectorPair = splitter.sector
+    sector = ifelse(inLeftSector, sectorPair.left, sectorPair.right)
+    sector[begin+oneToIdx-1] = val
+    splitter
+end
+
+setindex!(splitter::MemorySplitter{L}, val::T, idx::OneToIndex, 
+          inSecNil::Bool=(T <: L)) where {L, T} = 
+setindex!(splitter, val, idx.idx, inSecNil)
+
+firstindex(::MemorySplitter) = 1
+
+lastindex(mp::MemorySplitter) = length(mp)
+
+eachindex(mp::MemorySplitter) = firstindex(mp):lastindex(mp)
