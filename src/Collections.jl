@@ -424,6 +424,15 @@ function genMemory(obj::T) where {T}
     mem
 end
 
+function genMemory(encoder::F, ::Type{T}, len::Int) where {F<:Function, T}
+    Quiqbox.checkPositivity(len, true)
+    mem = Memory{T}(undef, len)
+    for (idx, i) in zip(eachindex(mem), 1:len)
+        mem[idx] = encoder(i)
+    end
+    mem
+end
+
 """
 
     genMemory(val::T, len::Int) where {T} -> Memory{T}
@@ -431,10 +440,8 @@ end
 Generate a `Memory{T}` of length `len` and its each element is set to `val`.
 """
 function genMemory(val::T, len::Int) where {T}
-    checkPositivity(len, true)
-    mem = Memory{T}(undef, len)
-    mem .= Ref(val)
-    mem
+    encoder = Quiqbox.Storage(val)
+    genMemory(encoder, T, len)
 end
 
 

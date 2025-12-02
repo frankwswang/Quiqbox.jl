@@ -370,7 +370,9 @@ const OrbitalPointerBox{D, C<:RealOrComplex} =
 function initializeOrbitalPointerBox(::Count{D}, ::Type{C}, nOrb::Int, 
                                      switches=genMemory(true, nOrb)
                                      ) where {D, C<:RealOrComplex}
-    initialPrimPtrs = genMemory([PrimOrbPointer(Count(D), C, i) for i in OneToRange(nOrb)])
+    initialPrimPtrs = genMemory(PrimOrbPointer{D, C}, nOrb) do i
+        PrimOrbPointer(Count(D), C, OneToIndex(i))
+    end
     initialCompPtrs = map(initialPrimPtrs) do ptr; CompOrbPointer(ptr, one(C)) end
     MemorySplitter(MemoryPair(initialPrimPtrs, initialCompPtrs), switches)
 end
@@ -396,15 +398,14 @@ function prepareOrbitalPointer!(box::OrbitalPointerBox{D, C}, counter::OneToInde
 end
 
 function prepareOrbitalPointer!(box::OrbitalPointerBox{D, C}, counter::OneToIndex, 
-                                config::FieldPoolConfig{T, D}, 
-                                orbital::CompositeOrb{T, D}) where 
-                               {T<:Real, D, C<:RealOrComplex{T}}
-    paramCache = config.cache
-    weightValue = Memory{C}(obtainCore!(paramCache, orbital.weight))
-    primPtrs = Memory{PrimOrbPointer{D, C}}(undef, length(orbital.basis))
-    stashedFields = mapreduce(strictVerticalCat, orbital.basis, 
-                              eachindex(primPtrs)) do primOrb, i
-        ptr, fieldRes = preparePrimOrbPointer!(C, config, primOrb)
+                                config::FieldPoolConfig{T, D}, orbital::CompositeOrb{T, D}
+                                ) where {T<:Real, D, C<:RealOrComplex{T}}
+    primOrbs = orbital.basis
+    primPtrs = Memory{PrimOrbPointer{D, C}}(undef, length(primOrbs))
+    weightValue = Memory{C}(obtainCore!(config.cache, orbital.weight))
+
+    stashedFields = mapreduce(strictVerticalCat, primOrbs, eachindex(primPtrs)) do orb, i
+        ptr, fieldRes = preparePrimOrbPointer!(C, config, orb)
         primPtrs[i] = ptr
         ismissing(fieldRes) ? genBottomMemory() : genMemory(fieldRes)
     end

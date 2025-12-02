@@ -172,5 +172,7 @@ mem2 = genMemory(true, 5)
 @test genMemory(mem2) !== mem2
 @test extractMemory(mem2) === mem2
 @test extractMemory(mem2) === mem2
+@test all(genMemory(itself, Float64, 10) .=== collect(1:1.0:10))
+@test genMemory(x->x^2, Int, 10) == [x^2 for x in 1:10]
 
 end
