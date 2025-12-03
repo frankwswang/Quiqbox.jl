@@ -752,10 +752,10 @@ const GaussCoulombFieldSampler{T<:Real} = Union{
 }
 
 #= Additional Method =#
-function prepareInteComponent!(config::OrbitalIntegrationConfig{T, D, C, N, F}, 
-                               ::NTuple{N, NTuple{ 2, FloatingPolyGaussField{T, D} }}
-                               ) where {T<:Real, D, C<:RealOrComplex{T}, N, 
-                                        F<:AxialGaussOverlapSampler{T, D}}
+function getInteComponentCore!(::Val{PrimGaussTypeOrb}, 
+                               config::OrbitalIntegrationConfig{T, D, C, N, F}) where 
+                              {T<:Real, D, C<:RealOrComplex{T}, N, 
+                               F<:AxialGaussOverlapSampler{T, D}}
     if config.cache isa EmptyDict
         AxialGaussOverlapCache(T, Count(D))
     else
@@ -766,10 +766,16 @@ function prepareInteComponent!(config::OrbitalIntegrationConfig{T, D, C, N, F},
     end::AxialGaussOverlapCache{T, D}
 end
 
-function prepareInteComponent!(config::OrbitalIntegrationConfig{T, 3, C, N, F}, 
-                               ::NTuple{N, NTuple{ 2, FloatingPolyGaussField{T, 3} }}
-                               ) where {T<:Real, C<:RealOrComplex{T}, N, 
-                                        F<:GaussCoulombFieldSampler{T}}
+function genInteMethodSwitcher(::Count{D}, ::Type{C}, ::Count{N}, 
+                               ::GaussBasedIntegralCache{T, D}) where 
+                              {T<:Real, D, C<:RealOrComplex{T}, N}
+    GaussTypeIntegration{D, C, N}()
+end
+
+function getInteComponentCore!(::Val{PrimGaussTypeOrb}, 
+                               config::OrbitalIntegrationConfig{T, 3, C, N, F}) where 
+                              {T<:Real, C<:RealOrComplex{T}, N, 
+                               F<:GaussCoulombFieldSampler{T}}
     if config.cache isa EmptyDict
         GaussCoulombFieldCache(T, Count(3), False())
     else
@@ -780,9 +786,11 @@ function prepareInteComponent!(config::OrbitalIntegrationConfig{T, 3, C, N, F},
     end::GaussCoulombFieldCache{T, 3}
 end
 
-function evaluateIntegralCore!(formattedOp::TypedOperator{C}, 
+function evaluateIntegralCore!(::GaussTypeIntegration{D, C, N}, op::DirectOperator, 
                                cache::GaussBasedIntegralCache{T, D}, 
-                               layout::N12N2Tuple{FloatingPolyGaussField{T, D}}, 
-                               ) where {T, C<:RealOrComplex{T}, D}
-    convert(C, computePGTOrbIntegral(formattedOp.core, layout, cache))
+                               source::AbstractVector{F}, 
+                               layout::NTuple{N, NTuple{2, OneToIndex}}) where 
+                              {T, C<:RealOrComplex{T}, D, N, F<:StashedShiftedField{T, D}}
+    fieldLayout = map(x->getEntry.(Ref(source), x), layout)
+    convert(C, computePGTOrbIntegral(op, fieldLayout, cache))
 end
