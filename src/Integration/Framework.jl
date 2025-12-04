@@ -235,7 +235,7 @@ function initializeOrbNormalization(inteInfo::OrbitalInteCoreInfo{T, D, C, N},
                         OneBodyIntegralValCache(style) end
     else
         normConfig = OrbitalIntegrationConfig(style, op, False(), estConfig)
-        normMemory = genFauxIntegralValCache(Count(N), C)
+        normMemory = genFauxIntegralValCache(Count(1), C)
     end
     OrbitalInteCoreInfo(normConfig, normMemory, basisData)
 end

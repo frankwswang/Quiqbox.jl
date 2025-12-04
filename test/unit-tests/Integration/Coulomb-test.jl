@@ -97,8 +97,11 @@ V1 = nucAttractions(nucs1, coords1, [bf1, bf2])
 @test V1[4] == nucAttraction(nucs1, coords1, bf2, bf2) == 
       -3computePGTOrbOneBodyRepulsion!(emptyCache, coord, gtoProd22)
 
-ERI1 = elecRepulsions([bf1, bf3, bf4, bf5])
+bfs1 = [bf1, bf3, bf4, bf5]
+ERI1 = elecRepulsions(bfs1)
+@test elecRepulsions(bfs1, lazyCompute=Quiqbox.False()) == ERI1
 @test ERI1[1, 2, 3, 4] == 
+      elecRepulsion(bf1, bf3, bf4, bf5, lazyCompute=false) == 
       elecRepulsion(bf1, bf3, bf4, bf5) ≈ 
       elecRepulsion(bf1, bf3, bf5, bf4) ≈ 
       elecRepulsion(bf3, bf1, bf5, bf4) ≈ 
@@ -143,6 +146,7 @@ V2 = nucAttractions(nucs2, coords2, bsLiH)
                        0.0, 0.0, 0.0, 0.0, 0.0, -1.546580055447794, 0.0, 0.0, 0.0, 0.0, 
                        0.0, 0.0, -1.546580055447794])
 ERI2 = elecRepulsions(bsLiH)
+@test elecRepulsions(bsLiH, lazyCompute=Quiqbox.False()) == ERI2
 for n in 1:Quiqbox.symmetric4DArrEleNum(bsLiH|>length)
     i, j, k, l = Quiqbox.convertIndex1DtoTri4D(n)
     @test ERI2[i, j, k, l] == ERI2[i, j, l, k] == ERI2[j, i, l, k] == ERI2[j, i, k, l] == 

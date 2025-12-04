@@ -182,6 +182,8 @@ ClmbInteSuite["ElectRI"]["GFO1D"]["Cached"] =
 @benchmarkable elecRepulsion(gfo1D1, gfo1D1, gfo1D2, gfo1D2) evals=1
 ClmbInteSuite["ElectRI"]["cc-pVTZ"]["Cached"] = 
 @benchmarkable elecRepulsions(bSet1) evals=1
+ClmbInteSuite["ElectRI"]["cc-pVTZ"]["Direct"] = 
+@benchmarkable elecRepulsions(bSet1, lazyCompute=false) evals=1
 
 #>> Differentiation-Function Benchmark Group
 DiffFuncBSuite["df1"]["Numerical"] = @benchmarkable ($df1_fd1)($coord2)
