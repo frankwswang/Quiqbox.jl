@@ -614,7 +614,7 @@ function getOrbCoreOverlap!(info::OrbitalOverlapInfo{T, D, C},
                             orbPointer::CompOrbPointer{D, C}
                             ) where {T<:Real, D, C<:RealOrComplex{T}}
     primPtrs = orbPointer.inner.left
-    overlapSum = zero(C)
+    overlapSum = (fill∘zero)(C)
 
     normalizedWeights = map(orbPointer.inner) do (primPtr, weightOld)
         weightNew = weightOld
@@ -627,10 +627,10 @@ function getOrbCoreOverlap!(info::OrbitalOverlapInfo{T, D, C},
             diagOverlap *= coreOverlap
         end
 
-        overlapSum += diagOverlap
+        overlapSum[] += diagOverlap::C
 
         weightNew
-    end
+    end::Memory{C}
 
     for n in 1:symmetric2DArrEleNum(length(orbPointer.inner) - 1)
         i, j = convertIndex1DtoTri2D(n)
@@ -639,10 +639,10 @@ function getOrbCoreOverlap!(info::OrbitalOverlapInfo{T, D, C},
         weightProd = conj(weightL) * weightR
         primPtrPair = getTuple(primPtrs, idxPair)
         offDiagOverlap = getOrbCoreOverlap!(info, primPtrPair...) * weightProd
-        overlapSum += offDiagOverlap + conj(offDiagOverlap)
+        overlapSum[] += offDiagOverlap + conj(offDiagOverlap)
     end
 
-    overlapSum::C
+    overlapSum[]::C
 end
 
 
