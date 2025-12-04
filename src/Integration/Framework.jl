@@ -52,7 +52,7 @@ struct OneBodyIntegralValCache{C<:RealOrComplex} <: QueryBox{C}
     threshold::Int
 
     function OneBodyIntegralValCache(::OneBodyIntegral{D, C}, 
-                                     threshold::Int=5CONSTVAR_inteValCacheSize) where 
+                                     threshold::Int=10CONSTVAR_inteValCacheSize) where 
                                     {D, C<:RealOrComplex}
         checkPositivity(threshold)
         maxPairNum = threshold * (threshold - 1)
@@ -775,7 +775,7 @@ struct OrbitalSetIntegralInfo{T<:Real, D, C<:RealOrComplex{T}, N,
     memory::LRU{NTuple{N, NTuple{2, OneToIndex}}, C}
 
     function OrbitalSetIntegralInfo(coreInfo::M, weightInfo::OrbCorePointerVector{D, C}, 
-                                    maxSize::Int=CONSTVAR_inteValCacheSize^2) where 
+                                    maxSize::Int=(10^N)*CONSTVAR_inteValCacheSize) where 
                                    {T<:Real, D, C<:RealOrComplex{T}, N, 
                                     M<:OrbitalInteCoreInfo{T, D, C, N}}
         memory = LRU{NTuple{N, NTuple{2, OneToIndex}}, C}(maxsize=maxSize)
