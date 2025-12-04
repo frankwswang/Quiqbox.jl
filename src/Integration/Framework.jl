@@ -629,8 +629,8 @@ function getOrbCoreOverlap!(info::OrbitalOverlapInfo{T, D, C},
 
         overlapSum[] += diagOverlap::C
 
-        weightNew
-    end::Memory{C}
+        weightNew::C
+    end
 
     for n in 1:symmetric2DArrEleNum(length(orbPointer.inner) - 1)
         i, j = convertIndex1DtoTri2D(n)
