@@ -237,43 +237,8 @@ function initializeOrbNormalization(inteInfo::OrbitalInteCoreInfo{T, D, C, N},
 end
 
 
-# getOrbitalCategory(::TypeBox{<:FloatingPolyGaussField}) = PrimGaussTypeOrb
-# getOrbitalCategory(::TypeBox{<:StashedShiftedField}) = ArbitraryTypeOrb
-
-# function genOrbCategoryLayout(data::N12N2Tuple{StashedShiftedField{T, D}}
-#                               ) where {T<:Real, D}
-#     map(data) do pair
-#         map(pair) do field
-#             getOrbitalCategory(field|>typeof|>TypeBox)
-#         end
-#     end
-# end
-
-# const MultiBodyOrbCorePair{T<:Real, D, N} = 
-#       Pair{ <:NTuple{N, NTuple{ 2, StashedShiftedField{T, D} }}, 
-#               NTuple{N, NTuple{ 2, OneToIndex                }} }
-
-
-toSingleBool(num::OctalNumber) = Bool(num)
-
-function toTripleBool(num::OctalNumber)
-    val = Int(num)
-    bit1 = (val & 1) != 0
-    bit2 = (val & 2) != 0
-    bit3 = (val & 4) != 0
-    (bit1, bit2, bit3)
-end
-
-toOctalNumber(val::Bool) = OctalNumber(val)
-
-function toOctalNumber(val::NTuple{3, Bool})
-    bit1, bit2, bit3 = val
-    OctalNumber(Int(bit1) + 2Int(bit2) + 4Int(bit3))
-end
-
-
-#>> Operator-orbital layout symmetry
-#> One-Body (i|O|j) symmetry across O: (i|O|j)' == (j|O|i) when i != j
+#> Operator-orbital layout symmetry
+#>> One-Body (i|O|j) symmetry across O: (i|O|j)' == (j|O|i) when i != j
 getIntegralOpOrbSymmetry(::DirectOperator, ::N1N2Tuple{OrbitalCategory}) = false
 getIntegralOpOrbSymmetry(::OverlapSampler, ::N1N2Tuple{OrbitalCategory}) = true
 getIntegralOpOrbSymmetry(::MultipoleMomentSampler, ::N1N2Tuple{OrbitalCategory}) = true
@@ -282,9 +247,9 @@ function getIntegralOpOrbSymmetry(::DiagDirectionalDiffSampler,
     all(layout|>first) do c; (c == PrimGaussTypeOrb) end
 end
 getIntegralOpOrbSymmetry(::CoulombMultiPointSampler, ::N1N2Tuple{OrbitalCategory}) = true
-#> Two-body (ij|O|kl) symmetry between ij: (ij|O|kl)' == (ji|O|kl) when  i != j
-#> Two-body (ij|O|kl) symmetry between kl: (ij|O|kl)' == (ij|O|lk) when  k != l
-#> Two-body (ij|O|kl) symmetry across O:   (ij|O|kl)  == (kl|O|ij) when ij != kl
+#>> Two-body (ij|O|kl) symmetry between ij: (ij|O|kl)' == (ji|O|kl) when  i != j
+#>> Two-body (ij|O|kl) symmetry between kl: (ij|O|kl)' == (ij|O|lk) when  k != l
+#>> Two-body (ij|O|kl) symmetry across O:   (ij|O|kl)  == (kl|O|ij) when ij != kl
 getIntegralOpOrbSymmetry(::DirectOperator, ::N2N2Tuple{OrbitalCategory}) = 
 (false, false, false)
 
@@ -300,24 +265,22 @@ function getIntegralIndexSymmetry((partL, partR)::N2N2Tuple{OneToIndex})
 end
 
 
-function prepareInteValCache(cache::FauxIntegralValCache{1}, layout::N1N2Tuple{OneToIndex})
-    layout=>cache, getIntegralIndexSymmetry(layout)
+#>> `indexSymmetry` should be index layout symmetry -> find correct layout sector
+#>> `layoutSymmetry` should be operator-orbital layout symmetry -> reuse integral result
+getInteValCacheSector(cache::FauxIntegralValCache{1}, ::Bool) = itself(cache)
+
+getInteValCacheSector(cache::FauxIntegralValCache{2}, ::NTuple{3, Bool}) = itself(cache)
+
+function getInteValCacheSector(cache::OneBodyIntegralValCache{C}, 
+                               indexSymmetry::Bool) where {C<:RealOrComplex}
+    ifelse(indexSymmetry, cache.aa, cache.ab)::LRU{N1N2Tuple{OneToIndex}, C}
 end
 
-function prepareInteValCache(cache::OneBodyIntegralValCache, layout::N1N2Tuple{OneToIndex})
-    indexSymmetry = getIntegralIndexSymmetry(layout)
-    keySectorPair = layout => ifelse(indexSymmetry, cache.aa, cache.ab)
-    keySectorPair, indexSymmetry
-end
+function getInteValCacheSector(cache::TwoBodyIntegralValCache{C}, 
+                               indexSymmetry::NTuple{3, Bool}) where {C<:RealOrComplex}
+    symmetryL, symmetryR, _ = indexSymmetry
 
-function prepareInteValCache(cache::FauxIntegralValCache{2}, layout::N2N2Tuple{OneToIndex})
-    layout=>cache, getIntegralIndexSymmetry(layout)
-end
-
-function prepareInteValCache(cache::TwoBodyIntegralValCache, layout::N2N2Tuple{OneToIndex})
-    symmetryL, symmetryR, _ = indexSymmetry = getIntegralIndexSymmetry(layout)
-
-    keySector = if all(indexSymmetry)
+    if all(indexSymmetry)
         cache.aaaa
     elseif symmetryL && symmetryR
         cache.aabb
@@ -327,67 +290,47 @@ function prepareInteValCache(cache::TwoBodyIntegralValCache, layout::N2N2Tuple{O
         cache.half #> xyaa
     else
         cache.misc #> abxy
-    end
-
-    (layout => keySector), indexSymmetry
+    end::LRU{N2N2Tuple{OneToIndex}, C}
 end
 
-#> ab
-function formatIntegralCacheKey(key::N1N2Tuple{OneToIndex}, permuteControl::Bool)
+
+#> Reordered-integral-index-layout => whether-need-to-needToConjugate
+#>> One-body
+function getIntegralIndexPair(key::N1N2Tuple{OneToIndex}, permuteControl::Bool)
     (i, j), = key
-    if i > j && permuteControl
-        ((j, i),) => true
+    if permuteControl && i > j
+        Pair(tuple((j, i)), true)
     else
-        key => false
+        Pair(key, false)
     end
 end
 
-#> abcd
-function formatIntegralCacheKey(key::N2N2Tuple{OneToIndex}, permuteControl::NTuple{3, Bool})
-    needToConjugate = false
+#>> Two-body
+function getIntegralIndexPair(key::N2N2Tuple{OneToIndex}, permuteControl::NTuple{3, Bool})
+    needToConjugate::Bool = false
     permuteL, permuteR, permuteLR = permuteControl
 
     (i, j), partR = key
-    if i > j && permuteL
+    if permuteL && i > j
         key = ((j, i), partR)
         needToConjugate = !needToConjugate
     end
 
     partL, (k, l) = key
-    if k > l && permuteR
+    if permuteR && k > l
         key = (partL, (l, k))
         needToConjugate = !needToConjugate
     end
 
     partL, partR = key
-    if partL > partR && permuteLR
+    if permuteLR && partL > partR
         key = (partR, partL)
     end
 
-    key => needToConjugate
+    Pair(key, needToConjugate)
 end
-#> `indexSymmetry` should be index based symmetry -> find correct layout sector
-#> `layoutSymmetry` should be operator--orbital based symmetry -> reuse integral result
-# function getIntegralValue!(cache::MultiBodyIntegralValCache{C}, 
-#                            method::OrbitalIntegrationConfig{T, D, C, N}, 
-#                            pair::MultiBodyOrbCorePair{T, D, N}) where 
-#                           {T<:Real, D, C<:RealOrComplex{T}, N}
-#     fieldLayout, indexLayout = pair
-#     (key, sector), indexSymmetry = prepareInteValCache(cache, indexLayout)
-#     categoryLayout = genOrbCategoryLayout(fieldLayout)
-#     layoutSymmetry = getIntegralOpOrbSymmetry(method.operator, categoryLayout)
-#     permuteControl = .!(indexSymmetry) .&& layoutSymmetry
-#     orderedIdsKey, needToConjugate = formatIntegralCacheKey(key, permuteControl)
 
-#     res = get(sector, orderedIdsKey, nothing)::NothingOr{C}
-#     if res === nothing
-#         inteVal = evaluateIntegral!(method, fieldLayout)::C
-#         res = needToConjugate ? conj(inteVal) : inteVal
-#         setindex!(sector, res, orderedIdsKey)
-#     end #> Fewer allocations than using `get!`
 
-#     needToConjugate ? conj(res) : res
-# end
 struct OrbPointerLayoutConfig{N} <: ConfigBox
     idx::NTuple{N, NTuple{2, OneToIndex}}
     orb::NTuple{N, NTuple{2, OrbitalCategory}}
@@ -399,17 +342,34 @@ struct OrbPointerLayoutConfig{N} <: ConfigBox
     end
 end
 
+function OrbPointerLayoutConfig(categorySource::AbstractVector{OrbitalCategory}, 
+                                idxLayout::NonEmptyTuple{NTuple{2, OneToIndex}})
+    orbLayout = getPairTuple(categorySource, idxLayout)
+    OrbPointerLayoutConfig(idxLayout, orbLayout)
+end
+
+function prepareInteValCache(op::DirectOperator, layoutInfoOld::OrbPointerLayoutConfig, 
+                             cache::MultiBodyIntegralValCache)
+    idxLayoutOld = layoutInfoOld.idx
+    orbLayoutOld = layoutInfoOld.orb
+    indexSymmOld = getIntegralIndexSymmetry(idxLayoutOld)
+    opOrbSymmOld = getIntegralOpOrbSymmetry(op, orbLayoutOld)
+    inteCacheSec = getInteValCacheSector(cache, indexSymmOld)
+    permuteControl = .!(indexSymmOld) .&& opOrbSymmOld
+    idxLayoutNew, needToConjugate = getIntegralIndexPair(idxLayoutOld, permuteControl)
+
+    (idxLayoutNew => inteCacheSec), needToConjugate
+end
+
 function prepareOrbPointerLayoutCache(info::OrbitalInteCoreInfo{T, D, C, N}, 
                                       idxLayoutOld::NTuple{N, NTuple{2, OneToIndex}}
                                       ) where {T<:Real, D, C<:RealOrComplex{T}, N}
+    operator = info.method.operator
     fieldCateSource = info.source.right
-    (key, cacheSector), indexSymmetry = prepareInteValCache(info.memory, idxLayoutOld)
-    orbLayoutOld = map(idxLayoutOld) do pair; getEntry.(Ref(fieldCateSource), pair) end
-    layoutSymmetry = getIntegralOpOrbSymmetry(info.method.operator, orbLayoutOld)
-    permuteControl = .!(indexSymmetry) .&& layoutSymmetry
-    idxLayoutNew, needToConjugate = formatIntegralCacheKey(key, permuteControl)
-    orbLayoutNew = map(idxLayoutNew) do pair; getEntry.(Ref(fieldCateSource), pair) end
-    OrbPointerLayoutConfig(idxLayoutNew, orbLayoutNew)=>needToConjugate, cacheSector
+    layoutInfoOld = OrbPointerLayoutConfig(fieldCateSource, idxLayoutOld)
+    config, needToConjugate = prepareInteValCache(operator, layoutInfoOld, info.memory)
+    layoutInfoNew = OrbPointerLayoutConfig(fieldCateSource, config.first)
+    (layoutInfoNew => needToConjugate), config.second
 end
 
 
@@ -467,7 +427,7 @@ function evaluateIntegralCore!(::NumericalIntegration{D, C, N}, op::DirectOperat
                                layout::NTuple{N, NTuple{2, OneToIndex}}) where 
                               {T, D, C<:RealOrComplex{T}, N, F<:StashedShiftedField{T, D}}
     formattedOp = TypedOperator(op, C)
-    fieldLayout = map(x->getEntry.(Ref(source), x), layout)
+    fieldLayout = getPairTuple(source, layout)
     convert(C, estimateOrbIntegral(formattedOp, fieldLayout, component))
 end
 
@@ -543,7 +503,7 @@ function evalSetInteTensorEntry!(tensor::AbstractArray{C, N},
                                  ptrVector::OrbCorePointerVector{D, C}, 
                                  idxTpl::NTuple{N, OneToIndex}) where 
                                 {T<:Real, D, C<:RealOrComplex{T}, N}
-    ptrTpl = getEntry.(Ref(ptrVector), idxTpl)
+    ptrTpl = getTuple(ptrVector, idxTpl)
     val = getOrbLayoutIntegralCore!(inteInfo, ptrTpl)
     setInteTensorEntry!(tensor, val, idxTpl)
     val
@@ -675,9 +635,9 @@ function getOrbCoreOverlap!(info::OrbitalOverlapInfo{T, D, C},
     for n in 1:symmetric2DArrEleNum(length(orbPointer.inner) - 1)
         i, j = convertIndex1DtoTri2D(n)
         idxPair = OneToIndex.((i, j+1))
-        weightL, weightR = getEntry.(Ref(normalizedWeights), idxPair)
+        weightL, weightR = getTuple(normalizedWeights, idxPair)
         weightProd = conj(weightL) * weightR
-        primPtrPair = getEntry.(Ref(primPtrs), idxPair)
+        primPtrPair = getTuple(primPtrs, idxPair)
         offDiagOverlap = getOrbCoreOverlap!(info, primPtrPair...) * weightProd
         overlapSum += offDiagOverlap + conj(offDiagOverlap)
     end

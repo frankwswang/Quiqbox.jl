@@ -271,10 +271,7 @@ end
 
 getOrbitalCategory(::TypeBox{<:FloatingPolyGaussField}) = PrimGaussTypeOrb
 getOrbitalCategory(::TypeBox{<:StashedShiftedField}) = ArbitraryTypeOrb
-function getOrbitalCategory(f::StashedShiftedField)
-    fType = TypeBox(f|>typeof)
-    getOrbitalCategory(fType)
-end
+getOrbitalCategory(f::StashedShiftedField) = getOrbitalCategory(f|>typeof|>TypeBox)
 
 struct PrimOrbPointer{D, C<:RealOrComplex} <: CustomAccessor
     inner::OneToIndex
