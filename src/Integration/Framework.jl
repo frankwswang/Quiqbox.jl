@@ -52,7 +52,8 @@ struct OneBodyIntegralValCache{C<:RealOrComplex} <: QueryBox{C}
     threshold::Int
 
     function OneBodyIntegralValCache(::OneBodyIntegral{D, C}, 
-                                     threshold::Int=1024) where {D, C<:RealOrComplex}
+                                     threshold::Int=5CONSTVAR_inteValCacheSize) where 
+                                    {D, C<:RealOrComplex}
         checkPositivity(threshold)
         maxPairNum = threshold * (threshold - 1)
         aaSector = LRU{N1N2Tuple{OneToIndex}, C}(maxsize=threshold )
