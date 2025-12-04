@@ -1,7 +1,7 @@
 using Test
 using Quiqbox
 using Quiqbox: OneToIndex, ChainedAccess, markObj, MemoryPair, AtomicUnit, AtomicGrid, 
-               Identifier, EncodedDict, MemorySplitter
+               Identifier, EncodedDict, MemorySplitter, getPairTuple
 
 @testset "Query.jl" begin
 
@@ -105,5 +105,9 @@ v2Ref = Real[1, 2, 3.0, 4, 6.0]
 @test lastindex(ms1) == 5
 ms1[end] = 5
 @test all(ms1 .== 1:5)
+
+v3 = [1, 2, 3, 4, 5]
+idxPairs = ((1, 2), (4, 2), (3, 5))
+@test getPairTuple(v3, idxPairs) == idxPairs
 
 end

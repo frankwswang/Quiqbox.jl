@@ -713,3 +713,17 @@ firstindex(::MemorySplitter) = 1
 lastindex(mp::MemorySplitter) = length(mp)
 
 eachindex(mp::MemorySplitter) = firstindex(mp):lastindex(mp)
+
+
+function getTuple(source::S, accessors::T) where {S, T<:NonEmptyTuple{Any}}
+    map(accessors) do accessor
+        getEntry(source, accessor)
+    end
+end
+
+
+function getPairTuple(source::S, accessors::NonEmptyTuple{T}) where {S, T<:NTuple{2, Any}}
+    map(accessors) do pair
+        getTuple(source, pair)
+    end
+end
