@@ -742,38 +742,46 @@ const GaussCoulombFieldSampler{T<:Real} = Union{
 }
 
 #= Additional Method =#
-function getInteComponentCore!(::Val{PrimGaussTypeOrb}, 
-                               config::OrbitalIntegrationConfig{T, D, C, N, F}) where 
-                              {T<:Real, D, C<:RealOrComplex{T}, N, 
-                               F<:AxialGaussOverlapSampler{T, D}}
-    if config.cache isa EmptyDict
-        AxialGaussOverlapCache(T, Count(D))
+@generated function getInteComponentCore!(::Val{PrimGaussTypeOrb}, 
+                                          config::OrbitalIntegrationConfig{T, D, C, N, O, M}
+                                          ) where {T<:Real, D, C<:RealOrComplex{T}, N, 
+                                                   O<:AxialGaussOverlapSampler{T, D}, 
+                                                   M<:OptOrbIntLayoutCache{T, C, N}}
+    if M <: EmptyDict
+        return :(AxialGaussOverlapCache( $T, Count($D) ))
     else
-        key = (TypeBox(F), ntuple( _->(PrimGaussTypeOrb, PrimGaussTypeOrb), Val(N) ))
-        get!(config.cache, key) do
-            AxialGaussOverlapCache(T, ntuple( _->True(), Val(D) ))
+        key = (TypeBox(O), ntuple( _->(PrimGaussTypeOrb, PrimGaussTypeOrb), Val(N) ))
+        cache = AxialGaussOverlapCache(T, ntuple( _->True(), Val(D) ))
+        return quote
+            cacheDict = config.cache
+            haskey(cacheDict, $key) || setindex!(cacheDict, $cache, $key)
+            $cache
         end
-    end::AxialGaussOverlapCache{T, D}
+    end
+end
+
+@generated function getInteComponentCore!(::Val{PrimGaussTypeOrb}, 
+                                          config::OrbitalIntegrationConfig{T, 3, C, N, O, M}
+                                          ) where {T<:Real, C<:RealOrComplex{T}, N, 
+                                                   O<:GaussCoulombFieldSampler{T}, 
+                                                   M<:OptOrbIntLayoutCache{T, C, N}}
+    if M <: EmptyDict
+        return :(GaussCoulombFieldCache( $T, Count(3), False() ))
+    else
+        key = (TypeBox(O), ntuple( _->(PrimGaussTypeOrb, PrimGaussTypeOrb), Val(N) ))
+        cache = GaussCoulombFieldCache(T, Count(3), True())
+        return quote
+            cacheDict = config.cache
+            haskey(cacheDict, $key) || setindex!(cacheDict, $cache, $key)
+            $cache
+        end
+    end
 end
 
 function genInteMethodSwitcher(::Count{D}, ::Type{C}, ::Count{N}, 
                                ::GaussBasedIntegralCache{T, D}) where 
                               {T<:Real, D, C<:RealOrComplex{T}, N}
     GaussTypeIntegration{D, C, N}()
-end
-
-function getInteComponentCore!(::Val{PrimGaussTypeOrb}, 
-                               config::OrbitalIntegrationConfig{T, 3, C, N, F}) where 
-                              {T<:Real, C<:RealOrComplex{T}, N, 
-                               F<:GaussCoulombFieldSampler{T}}
-    if config.cache isa EmptyDict
-        GaussCoulombFieldCache(T, Count(3), False())
-    else
-        key = (TypeBox(F), ntuple( _->(PrimGaussTypeOrb, PrimGaussTypeOrb), Val(N) ))
-        get!(config.cache, key) do
-            GaussCoulombFieldCache(T, Count(3), True())
-        end
-    end::GaussCoulombFieldCache{T, 3}
 end
 
 function evaluateIntegralCore!(::GaussTypeIntegration{D, C, N}, op::DirectOperator, 
