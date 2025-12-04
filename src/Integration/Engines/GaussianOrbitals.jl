@@ -1,6 +1,8 @@
 using LinearAlgebra: norm
 using LRUCache
 
+const CONSTVAR_GTOrbInteCacheSize::Int = 1024
+
 #>-- Basic data structure --<#
 struct PrimGaussTypeOrbInfo{T<:Real, D} <: QueryBox{T}
     cen::NTuple{D, T}
@@ -43,7 +45,8 @@ struct AxialGaussOverlapCache{T<:Real, D, M<:NTuple{D, OptionalLRU{T4Int2Tuple{T
     axis::M
 
     function AxialGaussOverlapCache(::Type{T}, configs::NTuple{D, Boolean}, 
-                                    axialMaxSize::Int=128) where {T<:Real, D}
+                                    axialMaxSize::Int=CONSTVAR_GTOrbInteCacheSize) where 
+                                   {T<:Real, D}
         axialCache = map(configs) do config
             if evalTypedData(config); LRU{T4Int2Tuple{T}, T}(maxsize=axialMaxSize) else
                EmptyDict{T4Int2Tuple{T}, T}() end
@@ -461,7 +464,8 @@ struct GaussCoulombFieldCache{T<:Real, D, M<:OptionalLRU{Tuple{T, Int}, Memory{T
     initial::M #> For `computeBoysSequence`` when D==3
 
     function GaussCoulombFieldCache(::Type{T}, ::Count{D}, config::Boolean=False(), 
-                                    axialMaxSize::Int=128) where {T<:Real, D}
+                                    axialMaxSize::Int=CONSTVAR_GTOrbInteCacheSize) where 
+                                   {T<:Real, D}
         checkPositivity(D)
         flag = evalTypedData(config)
         iCache = if flag; LRU{Tuple{T, Int}, Memory{T}}(maxsize=axialMaxSize) else

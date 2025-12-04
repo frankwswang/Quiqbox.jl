@@ -10,6 +10,8 @@ const OptOrbIntLayoutCache{T<:Real, C<:RealOrComplex{T}, N} =
 
 const OptEstimatorConfig{T} = MissingOr{EstimatorConfig{T}}
 
+const CONSTVAR_inteValCacheSize::Int = 100
+
 
 struct OrbitalIntegrationConfig{T<:Real, D, C<:RealOrComplex{T}, N, O<:DirectOperator, 
                                 M<:OptOrbIntLayoutCache{T, C, N}, E<:OptEstimatorConfig{T}
@@ -69,7 +71,8 @@ struct TwoBodyIntegralValCache{C<:RealOrComplex} <: QueryBox{C}
     threshold::Int
 
     function TwoBodyIntegralValCache(::TwoBodyIntegral{D, C}, 
-                                     threshold::Int=128) where {D, C<:RealOrComplex}
+                                     threshold::Int=CONSTVAR_inteValCacheSize) where 
+                                    {D, C<:RealOrComplex}
         checkPositivity(threshold)
         threshold2 = threshold * (threshold - 1)
         threshold3 = threshold * threshold2 * 2
@@ -771,7 +774,7 @@ struct OrbitalSetIntegralInfo{T<:Real, D, C<:RealOrComplex{T}, N,
     memory::LRU{NTuple{N, NTuple{2, OneToIndex}}, C}
 
     function OrbitalSetIntegralInfo(coreInfo::M, weightInfo::OrbCorePointerVector{D, C}, 
-                                    maxSize::Int=10000) where 
+                                    maxSize::Int=CONSTVAR_inteValCacheSize^2) where 
                                    {T<:Real, D, C<:RealOrComplex{T}, N, 
                                     M<:OrbitalInteCoreInfo{T, D, C, N}}
         memory = LRU{NTuple{N, NTuple{2, OneToIndex}}, C}(maxsize=maxSize)
