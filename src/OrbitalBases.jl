@@ -265,12 +265,13 @@ function getOutputType(orbitals::OrbBasisCluster{T, D}) where {T<:Real, D}
 end
 
 @enum OrbitalCategory::Int8 begin
-    PrimGaussTypeOrb
-    ArbitraryTypeOrb
+    ArbitraryTypeOrb=0
+    PrimGaussTypeOrb=1
 end
 
-getOrbitalCategory(::FloatingPolyGaussField) = PrimGaussTypeOrb
-getOrbitalCategory(::StashedShiftedField) = ArbitraryTypeOrb
+getOrbitalCategory(::TypeBox{<:FloatingPolyGaussField}) = PrimGaussTypeOrb
+getOrbitalCategory(::TypeBox{<:StashedShiftedField}) = ArbitraryTypeOrb
+getOrbitalCategory(f::StashedShiftedField) = getOrbitalCategory(f|>typeof|>TypeBox)
 
 struct PrimOrbPointer{D, C<:RealOrComplex} <: CustomAccessor
     inner::OneToIndex

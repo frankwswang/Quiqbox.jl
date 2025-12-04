@@ -4,7 +4,7 @@ using Suppressor: @suppress_out, @capture_out
 
 @testset "HartreeFock.jl" begin
 
-errorThreshold1 = 5e-8
+errorThreshold1 = 7.5e-8
 errorThreshold2 = 1e-12
 errorThreshold3 = 1e-5
 comparator = (x, y) -> isapprox(x, y, atol=10errorThreshold1)

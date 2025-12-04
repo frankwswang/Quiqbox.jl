@@ -107,9 +107,9 @@ function getIntegratorConfig(::Type{T}, ::ParticleFunction) where {T<:Real}
 end
 
 
-function estimateOrbIntegral(config::MissingOr{EstimatorConfig{T}}, 
-                             op::TypedOperator{C}, 
-                             layout::N12N2Tuple{StashedShiftedField{T, D}}
+function estimateOrbIntegral(op::TypedOperator{C}, 
+                             layout::N12N2Tuple{StashedShiftedField{T, D}}, 
+                             config::MissingOr{EstimatorConfig{T}}, 
                              ) where {T<:Real, C<:RealOrComplex{T}, D}
     combiner, sectors = genIntegralSectors(op.core, layout)
     noGlobalConfig = ismissing(config)

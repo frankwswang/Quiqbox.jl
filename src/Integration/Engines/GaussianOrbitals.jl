@@ -1,6 +1,8 @@
 using LinearAlgebra: norm
 using LRUCache
 
+const CONSTVAR_GTOrbInteCacheSize::Int = 1024
+
 #>-- Basic data structure --<#
 struct PrimGaussTypeOrbInfo{T<:Real, D} <: QueryBox{T}
     cen::NTuple{D, T}
@@ -43,7 +45,8 @@ struct AxialGaussOverlapCache{T<:Real, D, M<:NTuple{D, OptionalLRU{T4Int2Tuple{T
     axis::M
 
     function AxialGaussOverlapCache(::Type{T}, configs::NTuple{D, Boolean}, 
-                                    axialMaxSize::Int=128) where {T<:Real, D}
+                                    axialMaxSize::Int=CONSTVAR_GTOrbInteCacheSize) where 
+                                   {T<:Real, D}
         axialCache = map(configs) do config
             if evalTypedData(config); LRU{T4Int2Tuple{T}, T}(maxsize=axialMaxSize) else
                EmptyDict{T4Int2Tuple{T}, T}() end
@@ -75,21 +78,16 @@ function prepareOrbitalInfoCore(field::FloatingPolyGaussField{T, D}) where {T<:R
     PrimGaussTypeOrbInfo(center, xpn, ang)
 end
 
-function prepareOrbitalInfo((data,)::N1N2Tuple{FloatingPolyGaussField{T, D}}) where 
-                           {T<:Real, D}
-    lazyMap(data) do orbData
-        prepareOrbitalInfoCore(orbData)
-    end |> GaussProductInfo
-end
-
-function prepareOrbitalInfo((data1, data2)::N2N2Tuple{FloatingPolyGaussField{T, D}}) where 
-                           {T<:Real, D}
-    i, j, k, l = lazyMap((data1..., data2...)) do orbData
-        prepareOrbitalInfoCore(orbData)
+function prepareOrbitalInfo(source::AbstractVector{F}, 
+                            indexLayout::N12N2Tuple{OneToIndex}) where 
+                           {T<:Real, D, F<:StashedShiftedField{T, D}}
+    lazyMap(indexLayout) do idxPair
+        lazyMap(idxPair) do idx
+            field = getEntry(source, idx)
+            prepareOrbitalInfoCore(field)
+        end |> GaussProductInfo
     end
-    GaussProductInfo((i, j)), GaussProductInfo((k, l))
 end
-
 
 
 #>-- Cartesian PGTO overlap computation --<#
@@ -466,7 +464,8 @@ struct GaussCoulombFieldCache{T<:Real, D, M<:OptionalLRU{Tuple{T, Int}, Memory{T
     initial::M #> For `computeBoysSequence`` when D==3
 
     function GaussCoulombFieldCache(::Type{T}, ::Count{D}, config::Boolean=False(), 
-                                    axialMaxSize::Int=128) where {T<:Real, D}
+                                    axialMaxSize::Int=CONSTVAR_GTOrbInteCacheSize) where 
+                                   {T<:Real, D}
         checkPositivity(D)
         flag = evalTypedData(config)
         iCache = if flag; LRU{Tuple{T, Int}, Memory{T}}(maxsize=axialMaxSize) else
@@ -677,60 +676,55 @@ end
 
 #>-- Core integral-evaluation function --<#
 #> Overlap
-function computePGTOrbIntegral(::OverlapSampler, 
-                               layout::N1N2Tuple{FloatingPolyGaussField{T, D}}, 
+function computePGTOrbIntegral(::OverlapSampler, (data,)::Tuple{GaussProductInfo{T, D}}, 
                                cache!Self::AxialGaussOverlapCache{T}=
                                            AxialGaussOverlapCache(T, Count(D))
                                ) where {T<:Real, D}
-    formattedData = prepareOrbitalInfo(layout)
-    computePGTOrbOverlap!(cache!Self, formattedData)
+    computePGTOrbOverlap!(cache!Self, data)
 end
 
 #> Multipole moment
 function computePGTOrbIntegral(op::MultipoleMomentSampler{T, D}, 
-                               layout::N1N2Tuple{FloatingPolyGaussField{T, D}}, 
+                               (data,)::Tuple{GaussProductInfo{T, D}}, 
                                cache!Self::AxialGaussOverlapCache{T}=
                                            AxialGaussOverlapCache(T, Count(D))
                                ) where {T<:Real, D}
-    formattedData = prepareOrbitalInfo(layout)
-    computePGTOrbMultipoleMoment!(cache!Self, last(op.dresser).term, formattedData)
+    computePGTOrbMultipoleMoment!(cache!Self, last(op.dresser).term, data)
 end
 
 #> Diagonal-directional differentiation (∑ᵢ(cᵢ ⋅ ∂ᵐ/∂xᵢᵐ))
 function computePGTOrbIntegral(op::DiagDirectionalDiffSampler{T, D, M}, 
-                               layout::N1N2Tuple{FloatingPolyGaussField{T, D}}, 
+                               (data,)::Tuple{GaussProductInfo{T, D}}, 
                                cache!Self::AxialGaussOverlapCache{T}=
                                            AxialGaussOverlapCache(T, Count(D))
                                ) where {T<:Real, D, M}
-    formattedData = prepareOrbitalInfo(layout)
-    diffVec = computePGTOrbCoordDiff!(cache!Self, ntuple(_->M, Val(D)), formattedData)
+    diffVec = computePGTOrbCoordDiff!(cache!Self, ntuple(_->M, Val(D)), data)
     direction = last(op.dresser).direction
     mapreduce(StableMul(T), StableAdd(T), direction, diffVec)
 end
 
 #> One-body Coulomb integral
 function computePGTOrbIntegral(op::CoulombMultiPointSampler{T, 3}, 
-                               layout::N1N2Tuple{FloatingPolyGaussField{T, 3}}, 
+                               (data,)::Tuple{GaussProductInfo{T, 3}}, 
                                cache!Self::GaussCoulombFieldCache{T, 3}=
                                            GaussCoulombFieldCache(T, Count(3))
                                ) where {T<:Real}
-    orbInfo = prepareOrbitalInfo(layout)
     opCore = last(op.dresser)
     res = zero(T)
     for (charge, coord) in opCore.source
-        res += charge * computePGTOrbOneBodyRepulsion!(cache!Self, coord, orbInfo)
+        res += charge * computePGTOrbOneBodyRepulsion!(cache!Self, coord, data)
     end
     res * opCore.charge
 end
 
 #> Two-body Coulomb integral
 function computePGTOrbIntegral(::CoulombInteractionSampler{T, 3}, 
-                               layout::N2N2Tuple{FloatingPolyGaussField{T, 3}}, 
+                               dataPair::NTuple{2, GaussProductInfo{T, 3}}, 
                                cache!Self::GaussCoulombFieldCache{T, 3}=
                                            GaussCoulombFieldCache(T, Count(3))
                                ) where {T<:Real}
-    orb1Info, orb2Info = prepareOrbitalInfo(layout)
-    computePGTOrbTwoBodyRepulsion!(cache!Self, orb1Info, orb2Info)
+    data1, data2 = dataPair
+    computePGTOrbTwoBodyRepulsion!(cache!Self, data1, data2)
 end
 
 
@@ -752,37 +746,53 @@ const GaussCoulombFieldSampler{T<:Real} = Union{
 }
 
 #= Additional Method =#
-function prepareInteComponent!(config::OrbitalIntegrationConfig{T, D, C, N, F}, 
-                               ::NTuple{N, NTuple{ 2, FloatingPolyGaussField{T, D} }}
-                               ) where {T<:Real, D, C<:RealOrComplex{T}, N, 
-                                        F<:AxialGaussOverlapSampler{T, D}}
-    if config.cache isa EmptyDict
-        AxialGaussOverlapCache(T, Count(D))
+@generated function getInteComponentCore!(::Val{PrimGaussTypeOrb}, 
+                                          config::OrbitalIntegrationConfig{T, D, C, N, O, M}
+                                          ) where {T<:Real, D, C<:RealOrComplex{T}, N, 
+                                                   O<:AxialGaussOverlapSampler{T, D}, 
+                                                   M<:OptOrbIntLayoutCache{T, C, N}}
+    if M <: EmptyDict
+        return :(AxialGaussOverlapCache( $T, Count($D) ))
     else
-        key = (TypeBox(F), ntuple( _->(PrimGaussTypeOrb, PrimGaussTypeOrb), Val(N) ))
-        get!(config.cache, key) do
-            AxialGaussOverlapCache(T, ntuple( _->True(), Val(D) ))
+        key = (TypeBox(O), ntuple( _->(PrimGaussTypeOrb, PrimGaussTypeOrb), Val(N) ))
+        cache = AxialGaussOverlapCache(T, ntuple( _->True(), Val(D) ))
+        return quote
+            cacheDict = config.cache
+            haskey(cacheDict, $key) || setindex!(cacheDict, $cache, $key)
+            $cache
         end
-    end::AxialGaussOverlapCache{T, D}
+    end
 end
 
-function prepareInteComponent!(config::OrbitalIntegrationConfig{T, 3, C, N, F}, 
-                               ::NTuple{N, NTuple{ 2, FloatingPolyGaussField{T, 3} }}
-                               ) where {T<:Real, C<:RealOrComplex{T}, N, 
-                                        F<:GaussCoulombFieldSampler{T}}
-    if config.cache isa EmptyDict
-        GaussCoulombFieldCache(T, Count(3), False())
+@generated function getInteComponentCore!(::Val{PrimGaussTypeOrb}, 
+                                          config::OrbitalIntegrationConfig{T, 3, C, N, O, M}
+                                          ) where {T<:Real, C<:RealOrComplex{T}, N, 
+                                                   O<:GaussCoulombFieldSampler{T}, 
+                                                   M<:OptOrbIntLayoutCache{T, C, N}}
+    if M <: EmptyDict
+        return :(GaussCoulombFieldCache( $T, Count(3), False() ))
     else
-        key = (TypeBox(F), ntuple( _->(PrimGaussTypeOrb, PrimGaussTypeOrb), Val(N) ))
-        get!(config.cache, key) do
-            GaussCoulombFieldCache(T, Count(3), True())
+        key = (TypeBox(O), ntuple( _->(PrimGaussTypeOrb, PrimGaussTypeOrb), Val(N) ))
+        cache = GaussCoulombFieldCache(T, Count(3), True())
+        return quote
+            cacheDict = config.cache
+            haskey(cacheDict, $key) || setindex!(cacheDict, $cache, $key)
+            $cache
         end
-    end::GaussCoulombFieldCache{T, 3}
+    end
 end
 
-function evaluateIntegralCore!(formattedOp::TypedOperator{C}, 
+function genInteMethodSwitcher(::Count{D}, ::Type{C}, ::Count{N}, 
+                               ::GaussBasedIntegralCache{T, D}) where 
+                              {T<:Real, D, C<:RealOrComplex{T}, N}
+    GaussTypeIntegration{D, C, N}()
+end
+
+function evaluateIntegralCore!(::GaussTypeIntegration{D, C, N}, op::DirectOperator, 
                                cache::GaussBasedIntegralCache{T, D}, 
-                               layout::N12N2Tuple{FloatingPolyGaussField{T, D}}, 
-                               ) where {T, C<:RealOrComplex{T}, D}
-    convert(C, computePGTOrbIntegral(formattedOp.core, layout, cache))
+                               source::AbstractVector{F}, 
+                               layout::NTuple{N, NTuple{2, OneToIndex}}) where 
+                              {T, C<:RealOrComplex{T}, D, N, F<:StashedShiftedField{T, D}}
+    formattedData = prepareOrbitalInfo(source, layout)
+    convert(C, computePGTOrbIntegral(op, formattedData, cache))
 end
