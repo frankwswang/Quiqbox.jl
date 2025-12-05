@@ -89,8 +89,22 @@ end
 const FauxIntegralValCache{N, C<:RealOrComplex} = 
       EmptyDict{NTuple{N, NTuple{2, OneToIndex}}, C}
 
-genFauxIntegralValCache(::Count{N}, ::Type{C}) where {N, C<:RealOrComplex} = 
-EmptyDict{NTuple{N, NTuple{2, OneToIndex}}, C}()::FauxIntegralValCache{N, C}
+function genMultiBodyIntegralValCache(::MultiBodyIntegral{D, C, N}, caching::Boolean=True()
+                                      ) where {D, C<:RealOrComplex, N}
+    if !(N in (1, 2))
+        throw(AssertionError("`$(MultiBodyIntegral{D, C, N})` is not supported."))
+    end
+
+    if evalTypedData(caching)
+        if N == 1
+            OneBodyIntegralValCache(OneBodyIntegral{D, C}())
+        else
+            TwoBodyIntegralValCache(TwoBodyIntegral{D, C}())
+        end
+    else
+        EmptyDict{NTuple{N, NTuple{2, OneToIndex}}, C}()::FauxIntegralValCache{N, C}
+    end
+end
 
 const OneBodyInteValCacheUnion{C<:RealOrComplex} = Union{
     OneBodyIntegralValCache{C}, 
@@ -189,56 +203,53 @@ const TwoBodyOrbIntegralInfo{T<:Real, D, C<:RealOrComplex{T}, O<:DirectOperator,
 
 function initializeOrbIntegral(::MultiBodyIntegral{D, C, N}, op::DirectOperator, 
                                orbCoreSource::MemoryPair{F, OrbitalCategory}, 
-                               cacheConfig::Union{Boolean, OptOrbIntLayoutCache{T, C, N}}, 
+                               cachingMethod::Union{Boolean, OptOrbIntLayoutCache{T, C, N}}, 
+                               cachingResult::Union{Boolean, MultiBodyIntegralValCache{C}}, 
                                estimatorConfig::OptEstimatorConfig{T}=missing) where 
                               {D, T<:Real, C<:RealOrComplex{T}, N, 
                                F<:StashedShiftedField{T, D}}
     inteStyle = MultiBodyIntegral{D, C, N}()
-    methodConfig = OrbitalIntegrationConfig(inteStyle, op, cacheConfig, estimatorConfig)
-    if N==1
-        resultConfig = OneBodyIntegralValCache(inteStyle)
-    elseif N==2
-        resultConfig = TwoBodyIntegralValCache(inteStyle)
-    else
-        throw(AssertionError("$(MultiBodyIntegral{D, C, N}) is not supported."))
-    end
+
+    methodConfig = OrbitalIntegrationConfig(inteStyle, op, cachingMethod, estimatorConfig)
+    resultConfig = if !(cachingResult isa Boolean); cachingResult
+                   else; genMultiBodyIntegralValCache(inteStyle, cachingResult) end
+
     OrbitalInteCoreInfo(methodConfig, resultConfig, orbCoreSource)
 end
 
-function reformatOrbIntegral(info::OrbitalInteCoreInfo{T, D, C, N}, 
-                             op::O) where {T, D, C<:RealOrComplex{T}, N, O<:DirectOperator}
-    inteStyle = MultiBodyIntegral{D, C, N}()
+initializeOrbIntegral(::MultiBodyIntegral{D, C, N}, op::DirectOperator, 
+                      orbCoreSource::MemoryPair{F, OrbitalCategory}, caching::Boolean, 
+                      estimatorConfig::OptEstimatorConfig{T}=missing) where 
+                     {D, T<:Real, C<:RealOrComplex{T}, N, F<:StashedShiftedField{T, D}} = 
+initializeOrbIntegral(MultiBodyIntegral{D, C, N}(), op, orbCoreSource, caching, caching, 
+                      estimatorConfig)
+
+
+function reformatOrbIntegral(op::O, info::OrbitalInteCoreInfo{T, D, C, N}, 
+                             activeCaching::Boolean, ::Count{NO}=Count(N)) where 
+                            {T<:Real, D, C<:RealOrComplex{T}, NO, N, O<:DirectOperator}
     method = info.method
-    defaultCache = method.cache
-    cacheConfig = if method.operator isa O; defaultCache else
-                     defaultCache isa EmptyDict ? False() : True() end
-    initializeOrbIntegral(inteStyle, op, info.source, cacheConfig, method.estimator)
-end
+    methodCache = method.cache
+    resultCache = info.memory
+    activeMCache = !(methodCache isa EmptyDict)
+    activeRCache = !(resultCache isa EmptyDict)
+    equalPtclNum = NO == N
+    sameIntegral = equalPtclNum && op === method.operator
 
-
-function initializeOrbNormalization(inteInfo::OrbitalInteCoreInfo{T, D, C, N}, 
-                                    caching::Boolean) where 
-                                   {T<:Real, D, C<:RealOrComplex{T}, N}
-    inteMethod = inteInfo.method
-    inteMemory = inteInfo.memory
-     basisData = inteInfo.source
-     estConfig = inteMethod.estimator
-     isOverlap = N==1 && inteMethod.operator isa OverlapSampler
-
-    op = genOverlapSampler()
-    style = OneBodyIntegral{D, C}()
-
-    if evalTypedData(caching)
-        normConfig = if isOverlap && !(inteMethod.cache isa EmptyDict); inteMethod else
-                        OrbitalIntegrationConfig(style, op, True(), estConfig) end
-        normMemory = if isOverlap && !(inteMemory isa FauxIntegralValCache); inteMemory else
-                        OneBodyIntegralValCache(style) end
+    if evalTypedData(activeCaching)
+        cachingMethod = (equalPtclNum && activeMCache) ? methodCache : True()
+        cachingResult = (sameIntegral && activeRCache) ? resultCache : True()
     else
-        normConfig = OrbitalIntegrationConfig(style, op, False(), estConfig)
-        normMemory = genFauxIntegralValCache(Count(1), C)
+        cachingMethod = equalPtclNum ? methodCache : toBoolean(activeMCache)
+        cachingResult = sameIntegral ? resultCache : toBoolean(activeRCache)
     end
-    OrbitalInteCoreInfo(normConfig, normMemory, basisData)
+
+    initializeOrbIntegral(MultiBodyIntegral{D, C, NO}(), op, info.source, 
+                          cachingMethod, cachingResult, method.estimator)
 end
+
+initializeOrbNormalization(info::OrbitalInteCoreInfo, caching::Boolean) = 
+reformatOrbIntegral(genOverlapSampler(), info, caching, Count(1))
 
 
 #> Operator-orbital layout symmetry
@@ -762,7 +773,7 @@ function evalOrbIntegralInfo!(op::O, inteInfo::OrbitalInteCoreInfo{T, D, C},
             bundler(res1, res2)
         end
     else
-        finalInfo = reformatOrbIntegral(inteInfo, op)
+        finalInfo = reformatOrbIntegral(op, inteInfo, False())
         evalOrbIntegralInfo!(finalInfo, weightInfo)
     end
 end
@@ -802,9 +813,8 @@ function computeOrbDataIntegral(style::MultiBodyIntegral{D, C}, op::O,
                                 lazyCompute::Boolean=True(), 
                                 estimatorConfig::OptEstimatorConfig{T}=missing) where 
                                {T<:Real, C<:RealOrComplex{T}, D, O<:Summator}
-    opStart = first(op.dresser)
-    initInfo = initializeOrbIntegral(style, opStart, data.source, lazyCompute, 
-                                     estimatorConfig)
+    head = first(op.dresser)
+    initInfo = initializeOrbIntegral(style, head, data.source, lazyCompute, estimatorConfig)
     weightInfo = getOrbCorePointers(initInfo, data.format, lazyCompute)
     infoData = evalOrbIntegralInfo!(op, initInfo, weightInfo)
     (initInfo, weightInfo) => infoData
