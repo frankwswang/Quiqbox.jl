@@ -503,10 +503,10 @@ function setScreenLevel!(p::AdaptableParam, level::Int)
     levelOld = screenLevelOf(p)
     if levelOld == level
     elseif levelOld == 0
-        safelySetVal!(p.offset, obtain(p))
+        passVal!(p.offset, obtain(p))
     elseif level == 0
         newVal = p.lambda((obtain(arg) for arg in p.input)...)
-        safelySetVal!(p.offset, genStableBinaryOp(-, outType)(p.offset[], newVal))
+        passVal!(p.offset, genStableBinaryOp(-, outType)(p.offset[], newVal))
     end
     @atomic p.screen = TernaryNumber(level)
     p
@@ -690,14 +690,14 @@ function setVal!(par::TensorVar, val, modifyFrozenVariable::Bool=false)
     if !(modifyFrozenVariable && isFrozenVariable(par)) && !isPrimitiveInput(par)
         throw(AssertionError("Cannot assign a new value directly to `par`."))
     end
-    safelySetVal!(par.data, val)
+    copyVal!(par.data, val)
 end
 
 function setVal!(par::AdaptableParam, val, modifyFrozenVariable::Bool=false)
     if !(modifyFrozenVariable && isFrozenVariable(par)) && !isPrimitiveInput(par)
         throw(AssertionError("Cannot assign a new value directly to `par`."))
     end
-    safelySetVal!(par.offset, val)
+    copyVal!(par.offset, val)
 end
 
 

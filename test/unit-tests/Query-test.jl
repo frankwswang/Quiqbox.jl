@@ -65,12 +65,43 @@ u2 = AtomicUnit(1)
 @test u1 == u2 && u1 !== u2
 @test Identifier(u1) != Identifier(u2)
 @test markObj(u1) == markObj(u2)
+@test u1 !== u2
+@test u1.value === u2.value
 
-g1 = AtomicGrid( Quiqbox.genMemory([1])   )
-g2 = AtomicGrid( Quiqbox.genMemory([1.0]) )
+g1 = AtomicGrid(Quiqbox.genMemory([1])  )
+g2 = AtomicGrid(Quiqbox.genMemory([1.0]))
 @test g1 == g2 && g1 !== g2
 @test Identifier(g1) != Identifier(g2)
-@test markObj(g1) == markObj(g2)
+g1mark = markObj(g1)
+@test g1mark isa Quiqbox.FieldMarker && length(g1mark.data) == 2
+@test g1mark.data[end] == Pair(:mutex, Quiqbox.EmptyMarker())
+@test g1mark == markObj(g2)
+@test g1 !== g2
+@test g1.value !== g2.value
+g1[] = g2.value
+@test g1 !== g2
+@test g1.value !== g2.value
+
+g3data = Quiqbox.genMemory([1.0;;])
+g3 = AtomicGrid(g3data)
+g4 = AtomicGrid(Quiqbox.genMemory([1.0;;]))
+@test g3 == g4 && g3 !== g4
+@test g3[] === g3.value
+g3[] = g4.value
+@test g3 == g4 && g3.value !== g4.value
+@test g3.value === g3data
+
+g5 = AtomicUnit(Quiqbox.genMemory([1.0;;]))
+g6data = Quiqbox.genMemory([1.0;;])
+g6 = AtomicUnit(g6data)
+@test g5 == g6 && g5 !== g6
+@test g5[] === g5.value
+g5[] = g6.value
+@test g5 == g6 && g5.value === g6.value === g6data
+Quiqbox.copyVal!(g5, g6data)
+@test g5 == g6 && g5.value !== g6.value === g6data
+Quiqbox.copyVal!(g5, [3.0;;])
+@test g5[][] == 3.0
 
 function edEncoder(a::Int)
     iseven(a) && a > 0
