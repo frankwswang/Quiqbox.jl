@@ -417,6 +417,15 @@ function ==(marker1::BottomArrayMarker, marker2::BottomArrayMarker)
 end
 
 
+struct EmptyMarker <: IdentityMarker{Union{}} end
+
+==(::EmptyMarker, ::EmptyMarker) = true
+
+function hash(id::EmptyMarker, hashCode::UInt)
+    hash(objectid(id), hashCode)
+end
+
+
 const IdMarkerPair{M<:IdentityMarker} = Pair{Symbol, M}
 
 const ValMkrPair{T} = IdMarkerPair{ValueMarker{T}}
@@ -425,12 +434,20 @@ struct FieldMarker{S, N} <: IdentityMarker{S}
     code::UInt
     data::NTuple{N, IdMarkerPair}
 
-    function FieldMarker(input::T) where {T}
+    function FieldMarker(input::T, ignoredFields::MissingOr{NonEmptyTuple{Symbol}}=missing
+                         ) where {T}
         fieldSyms = fieldnames(T)
         issingletontype(T) && (return ValueMarker(input))
+        ignoreFlag = !ismissing(ignoredFields)
+
         markers = map(fieldSyms) do sym
-            markObj(getfield(input, sym))
+            if ignoreFlag && sym in ignoredFields
+                EmptyMarker()
+            else
+                markObj(getfield(input, sym))
+            end
         end
+
         inputName = nameof(T)
         data = map(=>, fieldSyms, markers)
         new{inputName, length(fieldSyms)}(leftFoldHash(hash(inputName), markers), data)
@@ -540,25 +557,38 @@ function hash(id::IdentityMarker, hashCode::UInt)
     hash(id.code, hashCode)
 end
 
-function compareObj(obj1::T1, obj2::T2) where {T1, T2}
-    obj1 === obj2 || markObj(obj1) == markObj(obj2)
+function compareObj(obj1::T1, obj2::T2)::Bool where {T1, T2}
+    obj1 === obj2 || isequal(markObj(obj1), markObj(obj2))
 end
 
 
+function needAtomicUnitMutex(val) #> May be extended to support other types
+    val isa AbstractArray
+end
+
 mutable struct AtomicUnit{T} <: QueryBox{T}
     @atomic value::T
+    mutex::MissingOr{ReentrantLock}
 
-    function AtomicUnit(input::T) where {T}
-        new{T}(input)
+    function AtomicUnit(value::T, 
+                        mutex::MissingOr{ReentrantLock}=let bl=needAtomicUnitMutex(value)
+                               bl ? ReentrantLock() : missing end) where {T}
+        new{T}(value, mutex)
     end
 end
 
 struct AtomicGrid{E<:AbstractMemory} <: QueryBox{E}
     value::E
+    mutex::ReentrantLock
+
+    AtomicGrid(value::E, mutex::ReentrantLock=ReentrantLock()) where {E} = 
+    new{E}(value, mutex)
 end
 
-
 const AtomicLocker{T} = Union{AtomicUnit{T}, AtomicGrid{T}}
+
+markObj(al::AtomicLocker) = FieldMarker(al, (:mutex,))
+
 
 ==(ab1::AtomicLocker, ab2::AtomicLocker) = (ab1.value == ab2.value)
 
@@ -568,34 +598,36 @@ end
 
 getindex(l::AtomicLocker) = l.value
 
+setindex!(al::AtomicLocker, val) = passVal!(al, val)
 
-atomicEval(obj) = itself(obj)
-
-atomicEval(box::AtomicLocker) = box[]
-
-
-function safelySetVal!(box::AtomicUnit{T}, val::T) where {T}
-    @atomic box.value = val
-end
-
-function safelySetVal!(box::AtomicUnit{<:AbstractVector{T}}, 
-                       val::AbstractVector{T}) where {T}
-    safelySetVal!(box.value, val)
-end
-
-function safelySetVal!(box::AtomicGrid, val)
-    safelySetVal!(box.value, val)
-end
-
-function safelySetVal!(box::AbstractArray, val)
-    lk = ReentrantLock()
-    lock(lk) do
-        box .= val
+#> Directly pass in `val` without making copy if possible
+function passVal!(box::AtomicUnit{T}, val) where {T}
+    if !(val isa T) && needAtomicUnitMutex(val)
+        passValCore!(box.mutex, box.value, val)
+    else
+        @atomic box.value = val
     end
+
     box
 end
 
-setindex!(al::AtomicLocker, val) = safelySetVal!(al, val)
+function passVal!(box::AtomicGrid, val)
+    passValCore!(box.mutex, box.value, val)
+    box
+end
+
+function passValCore!(lk::Base.AbstractLock, data::AbstractArray, val)
+    @lock lk data .= val
+end
+
+#> Deep copy `val` and then pass it in to `box`.
+function copyVal!(box::AtomicLocker{T}, val) where {T}
+    flag = canDirectlyStore(val)
+    flag || (flag = ( val isa AbstractArray && (canDirectlyStoreInstanceOf∘eltype)(val) ))
+    box isa AtomicUnit && flag && (flag = !(val isa T))
+    valLocal = flag ? val : deepcopy(val)
+    passVal!(box, valLocal)
+end
 
 
 struct MemoryPair{L, R} <: QueryBox{Pair{L, R}}
