@@ -234,7 +234,7 @@ function reformatOrbIntegral(op::O, info::OrbitalInteCoreInfo{T, D, C, N},
     activeMCache = !(methodCache isa EmptyDict)
     activeRCache = !(resultCache isa EmptyDict)
     equalPtclNum = NO == N
-    sameIntegral = equalPtclNum && op === method.operator
+    sameIntegral = equalPtclNum && compareObj(op, method.operator)
 
     if evalTypedData(activeCaching)
         cachingMethod = (equalPtclNum && activeMCache) ? methodCache : True()
