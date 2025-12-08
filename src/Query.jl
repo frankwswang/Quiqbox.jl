@@ -86,14 +86,19 @@ getEntry(obj, entry::Symbol) = getproperty(obj, entry)
 
 getEntry(obj, ::AllPassAccess) = itself(obj)
 
-function getEntry(obj, acc::DirectAccess)
+function getEntry(obj::T, acc::DirectAccess) where {T}
     getEntry(obj, first(acc.chain))
 end
 
-function getEntry(obj, acc::ChainedAccess)
-    head, body... = acc.chain
-    temp = getEntry(obj, head)
-    getEntry(temp, ChainedAccess(body))
+function getEntry(obj::T, acc::ChainedAccess) where {T}
+    fields = acc.chain
+    fieldCount = length(fields)
+    res = getEntry(obj, first(fields))
+    if fieldCount == 2
+        getEntry(res, last(fields))
+    else
+        getEntry(res, ChainedAccess(fields[begin+1:end]))
+    end
 end
 
 
