@@ -6,6 +6,7 @@ using Random: MersenneTwister
 
 @testset "`AtomicLRU`" begin
     genSafeCache = capacity -> AtomicLRU{Int, Int}(capacity, capacity-1)
+    mutable struct Atomic{T}; @atomic val::T; end
 
     @testset "`haskey`, `getindex`, `setindex!`" begin
         cache = genSafeCache(4)
@@ -88,19 +89,19 @@ using Random: MersenneTwister
         @test length(cache) == 1
 
         #> `get!(f, d, key)`
-        calls = Ref(0)
-        f2() = (calls[] += 1; 99)
+        callCount = Ref(0)
+        f2() = (callCount[] += 1; 99)
 
         v3 = get!(f2, cache, 2)
         @test v3 == 99
-        @test calls[] == 1
+        @test callCount[] == 1
         @test cache[2] == 99
         @test length(cache) == 2
 
         #> On a hit, `f2` must not be called again
         v4 = get!(f2, cache, 2)
         @test v4 == 99
-        @test calls[] == 1
+        @test callCount[] == 1
         @test cache[2] == 99
         @test length(cache) == 2
     end
@@ -256,9 +257,9 @@ using Random: MersenneTwister
                 monoKey = 1
 
                 defaultVal = 12345
-                calls = Threads.Atomic{Int}(0) #> Counter for calling `getDefaultVal`
+                defaultCount = Atomic(0) #> Counter for calling `getDefaultVal`
                 function getDefaultVal()
-                    Threads.atomic_add!(calls, 1)
+                    @atomic defaultCount.val += 1
                     defaultVal
                 end
 
@@ -275,7 +276,7 @@ using Random: MersenneTwister
                 @test all(r->(r == final == defaultVal), results)
 
                 #> After invocations of `get!`, `getDefaultVal` should execute only once
-                @test calls[] == 1
+                @test defaultCount.val == 1
 
                 #> Capacity is invariant
                 @test length(cache1) == 1
@@ -297,8 +298,8 @@ using Random: MersenneTwister
 
             @testset "Concurrent mixed read/write stress test" begin
                 cap = max(64, 4 * n)
-                niter = 1000
                 keyMax = 2 * cap
+                niter = 1000
 
                 flag1 = true
                 flag2 = true
@@ -306,7 +307,7 @@ using Random: MersenneTwister
                 #> Repeat the test to reduce the chance of getting false-positive results
                 for _ in 1:100
                     cache = genSafeCache(cap)
-                    errCount = Threads.Atomic{Int}(0)
+                    errorCount = Atomic(0)
 
                     @sync for id in 1:n
                         Threads.@spawn begin
@@ -317,14 +318,14 @@ using Random: MersenneTwister
                                     cache[k] = id #> Write
                                 else
                                     v = get(cache, k, 0) #> Read
-                                    (0 <= v <= n) || Threads.atomic_add!(errCount, 1)
+                                    (0 <= v <= n) || (@atomic errorCount.val += 1)
                                 end
                             end
                         end
                     end
 
                     #> No invalid values should have been observed
-                    flag1 *= iszero(errCount[])
+                    flag1 *= iszero(errorCount.val)
 
                     #> Capacity invariant under stress
                     flag2 *= (length(cache) <= 2cap - 1)
