@@ -32,7 +32,7 @@ mutable struct AtomicLRU{K, V} <: AbstractDict{K, V}
         hSec = genMemory(generator, StampedPair{K, V}, hiddenSpace)
         entryLocks = AtomicMemory{ReentrantLock}(undef, directSpace)
         for i in eachindex(entryLocks)
-            @atomic entryLocks[i] = ReentrantLock()
+            setEntry!(entryLocks, ReentrantLock(), i)
         end
 
         new{K, V}(dSec, hSec, Pair(entryLocks, ReentrantLock()), directSpace, 0, 0, 0, 0)
@@ -264,7 +264,9 @@ function setindex!(d::AtomicLRU{K, V}, val::V, key::K) where {K, V}
 end
 
 function empty!(d::AtomicLRU{K, V}) where {K, V}
-    for (i, lk) in zip(eachindex(d.direct), d.mutex.first)
+    atomicLocks = d.mutex.first
+    for (i, j) in zip(eachindex(d.direct), eachindex(atomicLocks))
+        lk = getEntry(atomicLocks, j)
         @lock lk d.direct[i] = StampedPair{K, V}()
     end
 
