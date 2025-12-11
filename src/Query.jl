@@ -4,9 +4,9 @@ using Base: issingletontype
 struct OneToIndex <: CustomAccessor
     idx::Int
 
-    function OneToIndex(idx::Int)
+    function OneToIndex(idx::Integer)
         checkPositivity(idx)
-        new(idx)
+        new(idx|>Int)
     end
 
     function OneToIndex(idx::OneToIndex, ::Count{N}) where {N}
@@ -72,7 +72,7 @@ Base.broadcastable(c::ChainedAccess) = Ref(c)
 
 getEntry(obj, ::PointEntry) = getindex(obj)
 
-getEntry(obj, entry::Int) = getindex(obj, entry)
+getEntry(obj, entry::Integer) = getindex(obj, entry)
 
 getEntry(obj::GeneralCollection, i::OneToIndex) = getindex(obj, shiftLinearIndex(obj, i))
 
@@ -84,9 +84,11 @@ getEntry(obj, ::GridSector) = obj.grid
 
 getEntry(obj, entry::Symbol) = getproperty(obj, entry)
 
+getEntry(obj::AtomicMemory, i::Integer) = (@atomic obj[i|>Int])
+
 function getEntry(obj::AtomicMemory, i::OneToIndex)
     idx = firstindex(obj) + i.idx - 1
-    @atomic obj[idx]
+    getEntry(obj, idx)
 end
 
 getEntry(obj, ::AllPassAccess) = itself(obj)
@@ -111,9 +113,11 @@ function setEntry!(obj::AbstractArray, val, i::OneToIndex)
     obj[begin+i.idx-1] = val
 end
 
+setEntry!(obj::AtomicMemory, val, i::Integer) = (@atomic obj[i|>Int] = val)
+
 function setEntry!(obj::AtomicMemory, val, i::OneToIndex)
     idx = firstindex(obj) + i.idx - 1
-    @atomic obj[idx] = val
+    setEntry!(obj, val, idx)
 end
 
 
@@ -689,15 +693,19 @@ length(mp::MemoryPair) = length(mp.left)
 
 eltype(::MemoryPair{L, R}) where {L, R} = Pair{L, R}
 
-getindex(mp::MemoryPair, oneToIdx::Int) = 
-mp.left[begin+oneToIdx-1] => mp.right[begin+oneToIdx-1]
+function getindex(mp::MemoryPair, oneToIdx::Integer)
+    idx = Int(oneToIdx)
+    mp.left[begin+idx-1] => mp.right[begin+idx-1]
+end
 
 getindex(mp::MemoryPair, idx::OneToIndex) = getindex(mp, idx.idx)
 
-function setindex!(mp::MemoryPair{L, R}, val::Pair{<:L, <:R}, oneToIdx::Int) where {L, R}
+function setindex!(mp::MemoryPair{L, R}, val::Pair{<:L, <:R}, 
+                   oneToIdx::Integer) where {L, R}
     l, r = val
-    mp.left[begin+oneToIdx-1] = l
-    mp.right[begin+oneToIdx-1] = r
+    idx = Int(oneToIdx)
+    mp.left[begin+idx-1] = l
+    mp.right[begin+idx-1] = r
     mp
 end
 
@@ -738,21 +746,23 @@ length(splitter::MemorySplitter) = length(splitter.switch)
 
 eltype(::MemorySplitter{L, R}) where {L, R} = Union{L, R}
 
-function getindex(splitter::MemorySplitter, oneToIdx::Int)
-    switch = splitter.switch[begin+oneToIdx-1]
+function getindex(splitter::MemorySplitter, oneToIdx::Integer)
+    idx = Int(oneToIdx)
+    switch = splitter.switch[begin+idx-1]
     sectorPair = splitter.sector
     sector = ifelse(switch, sectorPair.left, sectorPair.right)
-    sector[begin+oneToIdx-1]
+    sector[begin+idx-1]
 end
 
 getindex(splitter::MemorySplitter, idx::OneToIndex) = getindex(splitter, idx.idx)
 
 function setindex!(splitter::MemorySplitter{L}, val::T, 
-                   oneToIdx::Int, inLeftSector::Bool=(T <: L)) where {L, T}
-    splitter.switch[begin+oneToIdx-1] = inLeftSector
+                   oneToIdx::Integer, inLeftSector::Bool=(T <: L)) where {L, T}
+    idx = Int(oneToIdx)
+    splitter.switch[begin+idx-1] = inLeftSector
     sectorPair = splitter.sector
     sector = ifelse(inLeftSector, sectorPair.left, sectorPair.right)
-    sector[begin+oneToIdx-1] = val
+    sector[begin+idx-1] = val
     splitter
 end
 
