@@ -424,7 +424,7 @@ function genMemory(obj::T) where {T}
     mem
 end
 
-function genMemory(encoder::F, ::Type{T}, len::Int) where {F<:Function, T}
+function genMemory(encoder::F, ::Type{T}, len::Int) where {F<:AbstractCallable, T}
     Quiqbox.checkPositivity(len, true)
     mem = Memory{T}(undef, len)
     for (idx, i) in zip(eachindex(mem), 1:len)

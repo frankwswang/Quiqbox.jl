@@ -84,6 +84,11 @@ getEntry(obj, ::GridSector) = obj.grid
 
 getEntry(obj, entry::Symbol) = getproperty(obj, entry)
 
+function getEntry(obj::AtomicMemory, i::OneToIndex)
+    idx = firstindex(obj) + i.idx - 1
+    @atomic obj[idx]
+end
+
 getEntry(obj, ::AllPassAccess) = itself(obj)
 
 function getEntry(obj::T, acc::DirectAccess) where {T}
@@ -99,6 +104,16 @@ function getEntry(obj::T, acc::ChainedAccess) where {T}
     else
         getEntry(res, ChainedAccess(fields[begin+1:end]))
     end
+end
+
+
+function setEntry!(obj::AbstractArray, val, i::OneToIndex)
+    obj[begin+i.idx-1] = val
+end
+
+function setEntry!(obj::AtomicMemory, val, i::OneToIndex)
+    idx = firstindex(obj) + i.idx - 1
+    @atomic obj[idx] = val
 end
 
 
@@ -603,12 +618,12 @@ end
 
 getindex(l::AtomicLocker) = l.value
 
-setindex!(al::AtomicLocker, val) = passVal!(al, val)
+setindex!(al::AtomicLocker, val) = setEntry!(al, val)
 
 #> Directly pass in `val` without making copy if possible
-function passVal!(box::AtomicUnit{T}, val) where {T}
+function setEntry!(box::AtomicUnit{T}, val) where {T}
     if !(val isa T) && needAtomicUnitMutex(val)
-        passValCore!(box.mutex, box.value, val)
+        setEntryCore!(box.mutex, box.value, val)
     else
         @atomic box.value = val
     end
@@ -616,12 +631,12 @@ function passVal!(box::AtomicUnit{T}, val) where {T}
     box
 end
 
-function passVal!(box::AtomicGrid, val)
-    passValCore!(box.mutex, box.value, val)
+function setEntry!(box::AtomicGrid, val)
+    setEntryCore!(box.mutex, box.value, val)
     box
 end
 
-function passValCore!(lk::Base.AbstractLock, data::AbstractArray, val)
+function setEntryCore!(lk::Base.AbstractLock, data::AbstractArray, val)
     @lock lk data .= val
 end
 
@@ -631,7 +646,7 @@ function copyVal!(box::AtomicLocker{T}, val) where {T}
     flag || (flag = ( val isa AbstractArray && (canDirectlyStoreInstanceOf∘eltype)(val) ))
     box isa AtomicUnit && flag && (flag = !(val isa T))
     valLocal = flag ? val : deepcopy(val)
-    passVal!(box, valLocal)
+    setEntry!(box, valLocal)
 end
 
 
