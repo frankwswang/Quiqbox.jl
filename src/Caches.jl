@@ -283,3 +283,6 @@ function empty!(d::AtomicLRU{K, V}) where {K, V}
     d
 end
 #>\ Custom LRU (least-recent used) cache /<#
+
+
+const OptAtomicLRU{K, V} = Union{EmptyDict{K, V}, AtomicLRU{K, V}}
