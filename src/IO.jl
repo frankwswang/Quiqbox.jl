@@ -148,7 +148,11 @@ function customShow(io::IO, typeInfo) #> `typeInfo` can be a non-`Type` type par
     end
 end
 
-customShowCore(io::IO, type::Type) = show(io, type)
+function customShowCore(io::IO, type::Type)
+    str = string(type)
+    subStr = startswith("Quiqbox.", str) ? str[begin+8:end] : str
+    print(io, subStr)
+end
 
 function customShowCore(io::IO, ::Type{StableAdd{T}}) where {T}
     print(io, "StableAdd{")
