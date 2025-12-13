@@ -1,14 +1,16 @@
 const OrbIntLayoutInfo{N} = 
-      Tuple{TypeBox{<:DirectOperator}, NTuple{N, NTuple{2, OrbitalCategory}}}
+      Tuple{TypeUnion{DirectOperator}, NTuple{ N, NTuple{2, OrbitalCategory} }}
 
 const OrbIntLayoutCache{T<:Real, C<:RealOrComplex{T}, N, 
                         M<:Union{OptionalCache{T}, OptionalCache{C}}} = 
-      LRU{OrbIntLayoutInfo{N}, M}
+      AtomicLRU{OrbIntLayoutInfo{N}, M}
 
 const OptOrbIntLayoutCache{T<:Real, C<:RealOrComplex{T}, N} = 
       Union{EmptyDict{OrbIntLayoutInfo{N}, C}, OrbIntLayoutCache{T, C, N}}
 
 const OptEstimatorConfig{T} = MissingOr{EstimatorConfig{T}}
+
+const CONSTVAR_inteLayoutCacheSize::Int = 32
 
 const CONSTVAR_inteValCacheSize::Int = 100
 
@@ -34,7 +36,7 @@ function OrbitalIntegrationConfig(style::MultiBodyIntegral{D, C, N}, operator::O
                                            O<:DirectOperator}
     cache = if evalTypedData(caching)
         valueTypeBound = Union{OptionalCache{T}, OptionalCache{C}}
-        LRU{OrbIntLayoutInfo{N}, valueTypeBound}(maxsize=20)
+        AtomicLRU{OrbIntLayoutInfo{N}, valueTypeBound}(CONSTVAR_inteLayoutCacheSize)
     else
         EmptyDict{OrbIntLayoutInfo{N}, C}()
     end

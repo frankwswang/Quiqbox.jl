@@ -144,6 +144,26 @@ TypeBox(::Type{Union{}}) =
 throw(AssertionError("`TypeBox` cannot be instantiated with `Union{}` as it may trigger "*
                      "access to undefined reference."))
 
+
+struct TypeUnion{T} <: QueryBox{Type{<:T}}
+    value::Type{<:T}
+
+    TypeUnion(::Type{T}, type::Type{<:T}) where {T} = new{T}(type)
+end
+
+function ==(ts1::TypeUnion{T}, ts2::TypeUnion{T}) where {T}
+    type1 = ts1.value
+    type2 = ts2.value
+    (type1 <: type2) && (type2 <: type1)
+end
+
+==(::TypeUnion, ::TypeUnion) = false
+
+function hash(ts::TypeUnion{T}, hashCode::UInt) where {T}
+    hash(hash(ts.value), hash(TypeUnion, hashCode))
+end
+
+
 ==(::TypeBox{T1}, ::TypeBox{T2}) where {T1, T2} = (T1 <: T2) && (T2 <: T1)
 
 function hash(::TypeBox{T}, hashCode::UInt) where {T}

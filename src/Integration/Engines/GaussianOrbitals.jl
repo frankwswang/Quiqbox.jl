@@ -744,11 +744,12 @@ const GaussCoulombFieldSampler{T<:Real} = Union{
     if M <: EmptyDict
         return :(AxialGaussOverlapCache( $T, Count($D) ))
     else
-        key = (TypeBox(O), ntuple( _->(PrimGaussTypeOrb, PrimGaussTypeOrb), Val(N) ))
+        opType = TypeUnion(DirectOperator, O)
+        key = (opType, ntuple( _->(PrimGaussTypeOrb, PrimGaussTypeOrb), Val(N) ))
         cache = AxialGaussOverlapCache(T, ntuple( _->True(), Val(D) ))
         return quote
             cacheDict = config.cache
-            haskey(cacheDict, $key) || setindex!(cacheDict, $cache, $key)
+            get!(cacheDict, $key, $cache)
             $cache
         end
     end
@@ -762,11 +763,12 @@ end
     if M <: EmptyDict
         return :(GaussCoulombFieldCache( $T, Count(3), False() ))
     else
-        key = (TypeBox(O), ntuple( _->(PrimGaussTypeOrb, PrimGaussTypeOrb), Val(N) ))
+        opType = TypeUnion(DirectOperator, O)
+        key = (opType, ntuple( _->(PrimGaussTypeOrb, PrimGaussTypeOrb), Val(N) ))
         cache = GaussCoulombFieldCache(T, Count(3), True())
         return quote
             cacheDict = config.cache
-            haskey(cacheDict, $key) || setindex!(cacheDict, $cache, $key)
+            get!(cacheDict, $key, $cache)
             $cache
         end
     end
