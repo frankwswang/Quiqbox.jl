@@ -502,9 +502,8 @@ end
 
 
 function getOrbInteTensorSymmetry(::MultiBodyIntegral{D, C, N}, op::DirectOperator, 
-                                  type::TypePiece{<:StashedShiftedField{T, D, C}}) where 
+                                  orbCate::OrbitalCategory) where 
                                  {D, T, C<:RealOrComplex{T}, N}
-    orbCate = getOrbitalCategory(type)
     layout = ntuple(_->(orbCate, orbCate), Val(N))
     getIntegralOpOrbSymmetry(op, layout)
 end
@@ -533,8 +532,8 @@ function getOrbVectorIntegralCore!(inteInfo::OneBodyOrbIntegralInfo{T, D, C},
     op = inteInfo.method.operator
     style = OneBodyIntegral{D, C}()
     tensor = Array{C}(undef, (len, len))
-    typeInfo = (TypePiece∘eltype)(inteInfo.source.left)
-    symmetry = getOrbInteTensorSymmetry(style, op, typeInfo)
+    orbCate = (getOrbitalCategory∘eltype)(inteInfo.source.left)
+    symmetry = getOrbInteTensorSymmetry(style, op, orbCate)
 
     if symmetry
         for n in 1:symmetric2DArrEleNum(len)
@@ -562,8 +561,8 @@ function getOrbVectorIntegralCore!(inteInfo::TwoBodyOrbIntegralInfo{T, D, C},
     op = inteInfo.method.operator
     style = TwoBodyIntegral{D, C}()
     tensor = Array{C}(undef, (len, len, len, len))
-    typeInfo = (TypePiece∘eltype)(inteInfo.source.left)
-    symL, symR, symO = getOrbInteTensorSymmetry(style, op, typeInfo)
+    orbCate = (getOrbitalCategory∘eltype)(inteInfo.source.left)
+    symL, symR, symO = getOrbInteTensorSymmetry(style, op, orbCate)
 
     if symL && symR && symO
         for n in 1:symmetric4DArrEleNum(len)
