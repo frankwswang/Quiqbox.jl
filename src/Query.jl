@@ -134,15 +134,21 @@ function hash(bb::EgalBox, hashCode::UInt)
 end
 
 
-struct TypeBox{T} <: QueryBox{Type{T}}
+struct TypePiece{T} <: QueryBox{Type{T}}
     value::Type{T}
 
-    TypeBox(::Type{T}) where {T} = new{T::Type}()
+    TypePiece(type::Type{T}) where {T} = new{T}(type)
 end
 
-TypeBox(::Type{Union{}}) = 
-throw(AssertionError("`TypeBox` cannot be instantiated with `Union{}` as it may trigger "*
-                     "access to undefined reference."))
+==(::TypePiece{T1}, ::TypePiece{T2}) where {T1, T2} = (T1 <: T2) && (T2 <: T1)
+
+function hash(::TypePiece{T}, hashCode::UInt) where {T}
+    hash(hash(T), hash(TypePiece, hashCode))
+end
+
+#= Additional Method =#
+strictTypeJoin(::TypePiece{T1}, ::TypePiece{T2}) where {T1, T2} = 
+(TypePiece∘strictTypeJoin)(T1, T2)
 
 
 struct TypeUnion{T} <: QueryBox{Type{<:T}}
@@ -162,17 +168,6 @@ end
 function hash(ts::TypeUnion{T}, hashCode::UInt) where {T}
     hash(hash(ts.value), hash(TypeUnion, hashCode))
 end
-
-
-==(::TypeBox{T1}, ::TypeBox{T2}) where {T1, T2} = (T1 <: T2) && (T2 <: T1)
-
-function hash(::TypeBox{T}, hashCode::UInt) where {T}
-    hash(hash(T), hash(TypeBox, hashCode))
-end
-
-#= Additional Method =#
-strictTypeJoin(::TypeBox{T1}, ::TypeBox{T2}) where {T1, T2} = 
-(TypeBox∘strictTypeJoin)(T1, T2)
 
 
 struct EmptyDict{K, V} <: EqualityDict{K, V} end

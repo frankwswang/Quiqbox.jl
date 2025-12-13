@@ -268,7 +268,7 @@ function checkPackedMemoryElement(::T) where {T<:ShapedMemory}
     nucType = getCoreType(shellLevel)
     eleType = eltype(T)
     isAllowedEle = if shellLevel.level == 1
-        TypeBox(nucType) == TypeBox(eleType)
+        TypePiece(nucType) == TypePiece(eleType)
     else
         eleType <: PackedMemory{nucType}
     end

@@ -502,7 +502,7 @@ end
 
 
 function getOrbInteTensorSymmetry(::MultiBodyIntegral{D, C, N}, op::DirectOperator, 
-                                  type::TypeBox{<:StashedShiftedField{T, D, C}}) where 
+                                  type::TypePiece{<:StashedShiftedField{T, D, C}}) where 
                                  {D, T, C<:RealOrComplex{T}, N}
     orbCate = getOrbitalCategory(type)
     layout = ntuple(_->(orbCate, orbCate), Val(N))
@@ -533,7 +533,7 @@ function getOrbVectorIntegralCore!(inteInfo::OneBodyOrbIntegralInfo{T, D, C},
     op = inteInfo.method.operator
     style = OneBodyIntegral{D, C}()
     tensor = Array{C}(undef, (len, len))
-    typeInfo = (TypeBox∘eltype)(inteInfo.source.left)
+    typeInfo = (TypePiece∘eltype)(inteInfo.source.left)
     symmetry = getOrbInteTensorSymmetry(style, op, typeInfo)
 
     if symmetry
@@ -562,7 +562,7 @@ function getOrbVectorIntegralCore!(inteInfo::TwoBodyOrbIntegralInfo{T, D, C},
     op = inteInfo.method.operator
     style = TwoBodyIntegral{D, C}()
     tensor = Array{C}(undef, (len, len, len, len))
-    typeInfo = (TypeBox∘eltype)(inteInfo.source.left)
+    typeInfo = (TypePiece∘eltype)(inteInfo.source.left)
     symL, symR, symO = getOrbInteTensorSymmetry(style, op, typeInfo)
 
     if symL && symR && symO
