@@ -23,8 +23,7 @@ mutable struct AtomicLRU{K, V} <: AbstractDict{K, V}
     @atomic epoch::UInt #> Counter for updating the stamps
     @atomic clash::UInt #> Counter for hash collisions
 
-    function AtomicLRU{K, V}(directSpace::Int, 
-                             hiddenSpace::Int=max(1, directSpace÷4)) where {K, V}
+    function AtomicLRU{K, V}(directSpace::Int, hiddenSpace::Int=directSpace-1) where {K, V}
         checkPositivity(directSpace)
         checkPositivity(hiddenSpace, true)
         generator = _->StampedPair{K, V}()
@@ -52,7 +51,7 @@ end
 
 const KeyStatus = Pair{Bool, Tuple{Bool, OneToIndex}} #> `hasKey => (isDirectSec, secIdx)`
 
-function checkHiddenSlot(d::AtomicLRU{K}, keyInfo::Pair{K, Tuple{UInt, OneToIndex}}, 
+function checkHiddenSlot(d::AtomicLRU{K}, keyInfo::Pair{<:K, Tuple{UInt, OneToIndex}}, 
                          finalizer::F=itself) where {K, F<:AbstractCallable}
     key, (directSecStamp, directSecIndex) = keyInfo
     hiddenSector = d.hidden
