@@ -90,8 +90,8 @@ function showParamBox(::B, io::IO, p::ParamBox) where {B<:Boolean}
 end
 
 
-function show(io::IO, ::TypeBox{T}) where {T}
-    print(io, getOwnedObjNameStr(nameof(T), "TypeBox{"))
+function show(io::IO, ::TypePiece{T}) where {T}
+    print(io, getOwnedObjNameStr(nameof(T), "TypePiece{"))
     customShow(io, T)
     print(io, "}")
 end

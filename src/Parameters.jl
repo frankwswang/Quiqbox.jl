@@ -503,10 +503,10 @@ function setScreenLevel!(p::AdaptableParam, level::Int)
     levelOld = screenLevelOf(p)
     if levelOld == level
     elseif levelOld == 0
-        passVal!(p.offset, obtain(p))
+        setEntry!(p.offset, obtain(p))
     elseif level == 0
         newVal = p.lambda((obtain(arg) for arg in p.input)...)
-        passVal!(p.offset, genStableBinaryOp(-, outType)(p.offset[], newVal))
+        setEntry!(p.offset, genStableBinaryOp(-, outType)(p.offset[], newVal))
     end
     @atomic p.screen = TernaryNumber(level)
     p

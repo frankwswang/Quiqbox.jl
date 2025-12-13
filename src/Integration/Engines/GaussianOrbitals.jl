@@ -1,7 +1,6 @@
 using LinearAlgebra: norm
-using LRUCache
 
-const CONSTVAR_GTOrbInteCacheSize::Int = 1024
+const CONSTVAR_GTOrbInteCacheSize::Int = 2048
 
 #>-- Basic data structure --<#
 struct PrimGaussTypeOrbInfo{T<:Real, D} <: QueryBox{T}
@@ -40,7 +39,7 @@ end
 
 const T4Int2Tuple{T} = Tuple{T, T, T, T, Int, Int}
 
-struct AxialGaussOverlapCache{T<:Real, D, M<:NTuple{D, OptionalLRU{T4Int2Tuple{T}, T}}, 
+struct AxialGaussOverlapCache{T<:Real, D, M<:NTuple{D, OptAtomicLRU{T4Int2Tuple{T}, T}}, 
                               } <: QueryCache{T4Int2Tuple{T}, T}
     axis::M
 
@@ -48,7 +47,7 @@ struct AxialGaussOverlapCache{T<:Real, D, M<:NTuple{D, OptionalLRU{T4Int2Tuple{T
                                     axialMaxSize::Int=CONSTVAR_GTOrbInteCacheSize) where 
                                    {T<:Real, D}
         axialCache = map(configs) do config
-            if evalTypedData(config); LRU{T4Int2Tuple{T}, T}(maxsize=axialMaxSize) else
+            if evalTypedData(config); AtomicLRU{T4Int2Tuple{T}, T}(axialMaxSize, 0) else
                EmptyDict{T4Int2Tuple{T}, T}() end
         end
         new{T, D, typeof(axialCache)}(axialCache)
@@ -139,14 +138,9 @@ function computeAxialPGTOrbOverlap(input::T4Int2Tuple{T}) where {T<:Real}
 end
 
 #> Cache-based axial-PGTO overlap computation
-function computeAxialPGTOrbOverlap!(cache::OptionalLRU{T4Int2Tuple{T}, T}, 
+function computeAxialPGTOrbOverlap!(cache::OptAtomicLRU{T4Int2Tuple{T}, T}, 
                                     input::T4Int2Tuple{T}) where {T<:Real}
-    res = get(cache, input, nothing) # Fewer allocations than using `get!`
-    if res === nothing
-        res = computeAxialPGTOrbOverlap(input)
-        setindex!(cache, res, input)
-    end
-    res
+    get!(cache, input) do; computeAxialPGTOrbOverlap(input) end
 end
 
 #> Internal overlap computation
@@ -262,7 +256,7 @@ function shiftRightAngularNum(data::T4Int2Tuple{T}, shift::Int) where {T}
 end
 #> Coordinate differentiation for arbitrary axial PGTO pair
 function computeAxialPGTOrbCoordDiff!(degree::Int, 
-                                      cache::OptionalLRU{T4Int2Tuple{T}, T}, 
+                                      cache::OptAtomicLRU{T4Int2Tuple{T}, T}, 
                                       input::T4Int2Tuple{T}) where {T<:Real}
     xpnL, xpnR, xML, xMR, iL, iR = input
 
@@ -459,7 +453,7 @@ function angularShift!(holder::AbstractVector{T}, iR::Int, xLR::T) where {T<:Rea
     first(segment)
 end
 
-struct GaussCoulombFieldCache{T<:Real, D, M<:OptionalLRU{Tuple{T, Int}, Memory{T}}
+struct GaussCoulombFieldCache{T<:Real, D, M<:OptAtomicLRU{Tuple{T, Int}, Memory{T}}
                               } <: QueryCache{Tuple{T, Int}, T}
     initial::M #> For `computeBoysSequence`` when D==3
 
@@ -468,20 +462,16 @@ struct GaussCoulombFieldCache{T<:Real, D, M<:OptionalLRU{Tuple{T, Int}, Memory{T
                                    {T<:Real, D}
         checkPositivity(D)
         flag = evalTypedData(config)
-        iCache = if flag; LRU{Tuple{T, Int}, Memory{T}}(maxsize=axialMaxSize) else
+        iCache = if flag; AtomicLRU{Tuple{T, Int}, Memory{T}}(axialMaxSize, 0) else
                     EmptyDict{Tuple{T, Int}, Memory{T}}() end
 
         new{T, D, typeof(iCache)}(iCache)
     end
 end
 
-function getInitialBuffer!(cache::OptionalLRU{Tuple{T, Int}, Memory{T}}, 
+function getInitialBuffer!(cache::OptAtomicLRU{Tuple{T, Int}, Memory{T}}, 
                            input::Tuple{T, Int}) where {T<:Real}
-    res = get(cache, input, nothing)
-    if res === nothing
-        res = computeBoysSequence(first(input), last(input))
-        setindex!(cache, res, input)
-    end
+    res = get!(cache, input) do; computeBoysSequence(first(input), last(input)) end
     cache isa EmptyDict ? res : copy(res)
 end
 
@@ -754,11 +744,12 @@ const GaussCoulombFieldSampler{T<:Real} = Union{
     if M <: EmptyDict
         return :(AxialGaussOverlapCache( $T, Count($D) ))
     else
-        key = (TypeBox(O), ntuple( _->(PrimGaussTypeOrb, PrimGaussTypeOrb), Val(N) ))
+        opType = TypeUnion(DirectOperator, O)
+        key = (opType, ntuple( _->(PrimGaussTypeOrb, PrimGaussTypeOrb), Val(N) ))
         cache = AxialGaussOverlapCache(T, ntuple( _->True(), Val(D) ))
         return quote
             cacheDict = config.cache
-            haskey(cacheDict, $key) || setindex!(cacheDict, $cache, $key)
+            get!(cacheDict, $key, $cache)
             $cache
         end
     end
@@ -772,11 +763,12 @@ end
     if M <: EmptyDict
         return :(GaussCoulombFieldCache( $T, Count(3), False() ))
     else
-        key = (TypeBox(O), ntuple( _->(PrimGaussTypeOrb, PrimGaussTypeOrb), Val(N) ))
+        opType = TypeUnion(DirectOperator, O)
+        key = (opType, ntuple( _->(PrimGaussTypeOrb, PrimGaussTypeOrb), Val(N) ))
         cache = GaussCoulombFieldCache(T, Count(3), True())
         return quote
             cacheDict = config.cache
-            haskey(cacheDict, $key) || setindex!(cacheDict, $cache, $key)
+            get!(cacheDict, $key, $cache)
             $cache
         end
     end

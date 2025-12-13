@@ -106,6 +106,8 @@ const AbstractRealCoordVector{T<:Real} = Union{
     AbstractVector{<:AbstractVector{T}}, (AbstractVector{NonEmptyTuple{T, D}} where {D})
 }
 
+const CommonCallable = Union{Function, Type}
+const AbstractCallable = Union{CommonCallable, CallableObject}
 
 const RefVal = Base.RefValue
 
@@ -114,7 +116,7 @@ const ArithmeticOperator = Union{typeof(+), typeof(-), typeof(*), typeof(/)}
 
 import Base: iterate, size, getindex, setindex!, IndexStyle, zero, similar
 
-import Base: get, get!, haskey, hash, collect, length, eltype
+import Base: get, get!, haskey, hash, collect, length, eltype, empty!
 
 import Base: eachindex, firstindex, lastindex
 

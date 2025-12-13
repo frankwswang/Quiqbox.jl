@@ -21,6 +21,7 @@ using Documenter
     t2 = @elapsed @testset "$(unit2)" begin
         include("unit-tests/Types-test.jl")
         include("unit-tests/Query-test.jl")
+        include("unit-tests/Caches-test.jl")
     end
     println("$(unit2) test finished in $t2 seconds.\n")
 

@@ -268,7 +268,7 @@ function checkPackedMemoryElement(::T) where {T<:ShapedMemory}
     nucType = getCoreType(shellLevel)
     eleType = eltype(T)
     isAllowedEle = if shellLevel.level == 1
-        TypeBox(nucType) == TypeBox(eleType)
+        TypePiece(nucType) == TypePiece(eleType)
     else
         eleType <: PackedMemory{nucType}
     end
@@ -424,7 +424,7 @@ function genMemory(obj::T) where {T}
     mem
 end
 
-function genMemory(encoder::F, ::Type{T}, len::Int) where {F<:Function, T}
+function genMemory(encoder::F, ::Type{T}, len::Int) where {F<:AbstractCallable, T}
     Quiqbox.checkPositivity(len, true)
     mem = Memory{T}(undef, len)
     for (idx, i) in zip(eachindex(mem), 1:len)

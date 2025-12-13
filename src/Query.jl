@@ -4,9 +4,9 @@ using Base: issingletontype
 struct OneToIndex <: CustomAccessor
     idx::Int
 
-    function OneToIndex(idx::Int)
+    function OneToIndex(idx::Integer)
         checkPositivity(idx)
-        new(idx)
+        new(idx|>Int)
     end
 
     function OneToIndex(idx::OneToIndex, ::Count{N}) where {N}
@@ -72,7 +72,7 @@ Base.broadcastable(c::ChainedAccess) = Ref(c)
 
 getEntry(obj, ::PointEntry) = getindex(obj)
 
-getEntry(obj, entry::Int) = getindex(obj, entry)
+getEntry(obj, entry::Integer) = getindex(obj, entry)
 
 getEntry(obj::GeneralCollection, i::OneToIndex) = getindex(obj, shiftLinearIndex(obj, i))
 
@@ -83,6 +83,13 @@ getEntry(obj, ::UnitSector) = obj.unit
 getEntry(obj, ::GridSector) = obj.grid
 
 getEntry(obj, entry::Symbol) = getproperty(obj, entry)
+
+getEntry(obj::AtomicMemory, i::Integer) = (@atomic obj[i|>Int])
+
+function getEntry(obj::AtomicMemory, i::OneToIndex)
+    idx = firstindex(obj) + i.idx - 1
+    getEntry(obj, idx)
+end
 
 getEntry(obj, ::AllPassAccess) = itself(obj)
 
@@ -102,6 +109,18 @@ function getEntry(obj::T, acc::ChainedAccess) where {T}
 end
 
 
+function setEntry!(obj::AbstractArray, val, i::OneToIndex)
+    obj[begin+i.idx-1] = val
+end
+
+setEntry!(obj::AtomicMemory, val, i::Integer) = (@atomic obj[i|>Int] = val)
+
+function setEntry!(obj::AtomicMemory, val, i::OneToIndex)
+    idx = firstindex(obj) + i.idx - 1
+    setEntry!(obj, val, idx)
+end
+
+
 struct EgalBox{T} <: QueryBox{T}
     value::T
 end
@@ -115,25 +134,40 @@ function hash(bb::EgalBox, hashCode::UInt)
 end
 
 
-struct TypeBox{T} <: QueryBox{Type{T}}
+struct TypePiece{T} <: QueryBox{Type{T}}
     value::Type{T}
 
-    TypeBox(::Type{T}) where {T} = new{T::Type}()
+    TypePiece(type::Type{T}) where {T} = new{T}(type)
 end
 
-TypeBox(::Type{Union{}}) = 
-throw(AssertionError("`TypeBox` cannot be instantiated with `Union{}` as it may trigger "*
-                     "access to undefined reference."))
+==(::TypePiece{T1}, ::TypePiece{T2}) where {T1, T2} = (T1 <: T2) && (T2 <: T1)
 
-==(::TypeBox{T1}, ::TypeBox{T2}) where {T1, T2} = (T1 <: T2) && (T2 <: T1)
-
-function hash(::TypeBox{T}, hashCode::UInt) where {T}
-    hash(hash(T), hash(TypeBox, hashCode))
+function hash(::TypePiece{T}, hashCode::UInt) where {T}
+    hash(hash(T), hash(TypePiece, hashCode))
 end
 
 #= Additional Method =#
-strictTypeJoin(::TypeBox{T1}, ::TypeBox{T2}) where {T1, T2} = 
-(TypeBox∘strictTypeJoin)(T1, T2)
+strictTypeJoin(::TypePiece{T1}, ::TypePiece{T2}) where {T1, T2} = 
+(TypePiece∘strictTypeJoin)(T1, T2)
+
+
+struct TypeUnion{T} <: QueryBox{Type{<:T}}
+    value::Type{<:T}
+
+    TypeUnion(::Type{T}, type::Type{<:T}) where {T} = new{T}(type)
+end
+
+function ==(ts1::TypeUnion{T}, ts2::TypeUnion{T}) where {T}
+    type1 = ts1.value
+    type2 = ts2.value
+    (type1 <: type2) && (type2 <: type1)
+end
+
+==(::TypeUnion, ::TypeUnion) = false
+
+function hash(ts::TypeUnion{T}, hashCode::UInt) where {T}
+    hash(hash(ts.value), hash(TypeUnion, hashCode))
+end
 
 
 struct EmptyDict{K, V} <: EqualityDict{K, V} end
@@ -150,7 +184,7 @@ get(::EmptyDict{K}, ::K, default::Any) where {K} = itself(default)
 
 get!(::EmptyDict{K, V}, ::K, default::V) where {K, V} = itself(default)
 
-get!(f::Function, ::EmptyDict{K}, ::K) where {K} = f()
+get!(f::CommonCallable, ::EmptyDict{K}, ::K) where {K} = f()
 
 setindex!(d::EmptyDict{K, V}, ::V, ::K) where {K, V} = itself(d)
 
@@ -603,12 +637,12 @@ end
 
 getindex(l::AtomicLocker) = l.value
 
-setindex!(al::AtomicLocker, val) = passVal!(al, val)
+setindex!(al::AtomicLocker, val) = setEntry!(al, val)
 
 #> Directly pass in `val` without making copy if possible
-function passVal!(box::AtomicUnit{T}, val) where {T}
+function setEntry!(box::AtomicUnit{T}, val) where {T}
     if !(val isa T) && needAtomicUnitMutex(val)
-        passValCore!(box.mutex, box.value, val)
+        setEntryCore!(box.mutex, box.value, val)
     else
         @atomic box.value = val
     end
@@ -616,12 +650,12 @@ function passVal!(box::AtomicUnit{T}, val) where {T}
     box
 end
 
-function passVal!(box::AtomicGrid, val)
-    passValCore!(box.mutex, box.value, val)
+function setEntry!(box::AtomicGrid, val)
+    setEntryCore!(box.mutex, box.value, val)
     box
 end
 
-function passValCore!(lk::Base.AbstractLock, data::AbstractArray, val)
+function setEntryCore!(lk::Base.AbstractLock, data::AbstractArray, val)
     @lock lk data .= val
 end
 
@@ -631,7 +665,7 @@ function copyVal!(box::AtomicLocker{T}, val) where {T}
     flag || (flag = ( val isa AbstractArray && (canDirectlyStoreInstanceOf∘eltype)(val) ))
     box isa AtomicUnit && flag && (flag = !(val isa T))
     valLocal = flag ? val : deepcopy(val)
-    passVal!(box, valLocal)
+    setEntry!(box, valLocal)
 end
 
 
@@ -674,15 +708,19 @@ length(mp::MemoryPair) = length(mp.left)
 
 eltype(::MemoryPair{L, R}) where {L, R} = Pair{L, R}
 
-getindex(mp::MemoryPair, oneToIdx::Int) = 
-mp.left[begin+oneToIdx-1] => mp.right[begin+oneToIdx-1]
+function getindex(mp::MemoryPair, oneToIdx::Integer)
+    idx = Int(oneToIdx)
+    mp.left[begin+idx-1] => mp.right[begin+idx-1]
+end
 
 getindex(mp::MemoryPair, idx::OneToIndex) = getindex(mp, idx.idx)
 
-function setindex!(mp::MemoryPair{L, R}, val::Pair{<:L, <:R}, oneToIdx::Int) where {L, R}
+function setindex!(mp::MemoryPair{L, R}, val::Pair{<:L, <:R}, 
+                   oneToIdx::Integer) where {L, R}
     l, r = val
-    mp.left[begin+oneToIdx-1] = l
-    mp.right[begin+oneToIdx-1] = r
+    idx = Int(oneToIdx)
+    mp.left[begin+idx-1] = l
+    mp.right[begin+idx-1] = r
     mp
 end
 
@@ -723,21 +761,23 @@ length(splitter::MemorySplitter) = length(splitter.switch)
 
 eltype(::MemorySplitter{L, R}) where {L, R} = Union{L, R}
 
-function getindex(splitter::MemorySplitter, oneToIdx::Int)
-    switch = splitter.switch[begin+oneToIdx-1]
+function getindex(splitter::MemorySplitter, oneToIdx::Integer)
+    idx = Int(oneToIdx)
+    switch = splitter.switch[begin+idx-1]
     sectorPair = splitter.sector
     sector = ifelse(switch, sectorPair.left, sectorPair.right)
-    sector[begin+oneToIdx-1]
+    sector[begin+idx-1]
 end
 
 getindex(splitter::MemorySplitter, idx::OneToIndex) = getindex(splitter, idx.idx)
 
 function setindex!(splitter::MemorySplitter{L}, val::T, 
-                   oneToIdx::Int, inLeftSector::Bool=(T <: L)) where {L, T}
-    splitter.switch[begin+oneToIdx-1] = inLeftSector
+                   oneToIdx::Integer, inLeftSector::Bool=(T <: L)) where {L, T}
+    idx = Int(oneToIdx)
+    splitter.switch[begin+idx-1] = inLeftSector
     sectorPair = splitter.sector
     sector = ifelse(inLeftSector, sectorPair.left, sectorPair.right)
-    sector[begin+oneToIdx-1] = val
+    sector[begin+idx-1] = val
     splitter
 end
 
