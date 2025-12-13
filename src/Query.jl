@@ -157,6 +157,8 @@ struct TypeUnion{T} <: QueryBox{Type{<:T}}
     TypeUnion(::Type{T}, type::Type{<:T}) where {T} = new{T}(type)
 end
 
+TypeUnion(type::Type) = TypeUnion(Any, type)
+
 function ==(ts1::TypeUnion{T}, ts2::TypeUnion{T}) where {T}
     type1 = ts1.value
     type2 = ts2.value

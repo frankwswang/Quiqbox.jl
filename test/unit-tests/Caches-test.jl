@@ -58,12 +58,12 @@ using Random: MersenneTwister
         cache = genSafeCache(3)
         cache[1] = 1
         cache[2] = 2
-        f1 = sec->findfirst(x->x.value.second==2, sec)
+        f1 = sec->findfirst(x->(x.valid && x.value.second==2), sec)
         idx = f1(cache.direct)
-        node = idx === nothing ? cache.hidden[f1(cache.hidden)] : cache.direct[idx]
-        @test node.stamp == cache.epoch == 2
+        pair = idx === nothing ? cache.hidden[f1(cache.hidden)] : cache.direct[idx]
+        @test pair.stamp == cache.epoch == 2
         @test get(cache, 2, nothing) == cache[2]
-        @test node.stamp == cache.epoch == 4
+        @test pair.stamp == cache.epoch == 4
 
         len = length(cache)
         @test get(cache, 999, -1) == -1
@@ -198,14 +198,14 @@ using Random: MersenneTwister
         cache = genSpaceStrictCache(cap)
 
         cache[1] = 1
-        node = cache.direct[findfirst(x->x.value.second==1, cache.direct)]
-        @test node.stamp == cache.epoch == 1
+        pair = cache.direct[findfirst(x->(x.valid && x.value.second==1), cache.direct)]
+        @test pair.stamp == cache.epoch == 1
         cache[2] = 2
         cache[3] = 3
 
         #> Access key `1` to make it most recently used
         cache[1]
-        @test node.stamp == cache.epoch == 4
+        @test pair.stamp == cache.epoch == 4
 
         #> Trigger eviction
         cache[4] = 4 #> `2` was the least recently used among (1, 2, 3)
