@@ -91,9 +91,9 @@ end
 
 
 function show(io::IO, ::TypePiece{T}) where {T}
-    print(io, getOwnedObjNameStr(nameof(T), "TypePiece{"))
+    print(io, "(::$(getOwnedObjNameStr(:TypePiece)){")
     customShow(io, T)
-    print(io, "}")
+    print(io, "})")
 end
 
 
