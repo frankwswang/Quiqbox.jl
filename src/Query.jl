@@ -602,18 +602,14 @@ function compareObj(obj1::T1, obj2::T2)::Bool where {T1, T2}
     obj1 === obj2 || isequal(markObj(obj1), markObj(obj2))
 end
 
-
-function needAtomicUnitMutex(val) #> May be extended to support other types
-    val isa AbstractArray
-end
-
 mutable struct AtomicUnit{T} <: QueryBox{T}
     @atomic value::T
-    mutex::MissingOr{ReentrantLock}
+    const mutex::MissingOr{ReentrantLock}
 
-    function AtomicUnit(value::T, 
-                        mutex::MissingOr{ReentrantLock}=let bl=needAtomicUnitMutex(value)
-                               bl ? ReentrantLock() : missing end) where {T}
+    function AtomicUnit(value::T, mutex::MissingOr{ReentrantLock}=missing) where {T}
+        if ismissing(mutex) && requireNonAtomicMutex(AtomicUnit{T})
+            mutex = ReentrantLock()
+        end
         new{T}(value, mutex)
     end
 end
@@ -626,10 +622,13 @@ struct AtomicGrid{E<:AbstractMemory} <: QueryBox{E}
     new{E}(value, mutex)
 end
 
+requireNonAtomicMutex(::Type{AtomicUnit{T}}) where {T} = (T <: AbstractArray)
+requireNonAtomicMutex(::Type{AtomicGrid{T}}) where {T} = true
+
+
 const AtomicLocker{T} = Union{AtomicUnit{T}, AtomicGrid{T}}
 
 markObj(al::AtomicLocker) = FieldMarker(al, (:mutex,))
-
 
 ==(ab1::AtomicLocker, ab2::AtomicLocker) = (ab1.value == ab2.value)
 
@@ -637,13 +636,21 @@ function hash(ab::AtomicLocker, hashCode::UInt)
     hash(objectid(ab.value), hash(typeof(ab), hashCode))
 end
 
-getindex(l::AtomicLocker) = l.value
+@generated function getindex(al::L) where {L<:AtomicLocker}
+    if requireNonAtomicMutex(L) #> Can potentially bypass planted lock in `AtomicUnit`
+        return :(@lock al.mutex al.value)
+    elseif L <: AtomicUnit
+        return :(@atomic al.value)
+    else
+        return :(al.value)
+    end
+end
 
 setindex!(al::AtomicLocker, val) = setEntry!(al, val)
 
 #> Directly pass in `val` without making copy if possible
 function setEntry!(box::AtomicUnit{T}, val) where {T}
-    if !(val isa T) && needAtomicUnitMutex(val)
+    if requireNonAtomicMutex(AtomicUnit{T}) && !(val isa T)
         setEntryCore!(box.mutex, box.value, val)
     else
         @atomic box.value = val
