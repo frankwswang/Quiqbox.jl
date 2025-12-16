@@ -70,7 +70,7 @@ end
 struct OneToRange <: CustomRange
     endpoint::Int
 
-    function OneToRange(endpoint::Int)
+    function OneToRange(endpoint::Integer)
         checkPositivity(endpoint, true)
         new(endpoint|>Int)
     end
