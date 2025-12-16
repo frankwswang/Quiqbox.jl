@@ -72,7 +72,7 @@ struct OneToRange <: CustomRange
 
     function OneToRange(endpoint::Int)
         checkPositivity(endpoint, true)
-        new(endpoint)
+        new(endpoint|>Int)
     end
 
     function OneToRange(idx::OneToIndex)
