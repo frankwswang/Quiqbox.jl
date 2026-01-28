@@ -345,6 +345,10 @@ canDirectlyStoreInstanceOf(::Type{Symbol}) = true
 
 canDirectlyStoreInstanceOf(::Type{String}) = true
 
+canDirectlyStoreInstanceOf(::Type{BigInt}) = true
+
+canDirectlyStoreInstanceOf(::Type{BigFloat}) = true
+
 canDirectlyStoreInstanceOf(::Type{<:IdentityMarker}) = true
 
 canDirectlyStore(::T) where {T} = canDirectlyStoreInstanceOf(T)
