@@ -121,11 +121,12 @@ function stressGet!(d::AbstractDict, keys, vals)
     d
 end
 
-cache1 = Quiqbox.PseudoLRU{Tuple{Int, Int, Float64}, Float64}(nKey1)
-cache2 = Quiqbox.PseudoLRU{Tuple{Int, Int, Float64}, Float64}(max( 1, Int(nKey1÷3) ))
+cache1 = Quiqbox.PseudoLRU{Tuple{Int, Int, Float64}, Float64}(max( 1, Int(nKey1÷3) ))
+cache2 = Quiqbox.PseudoLRU{Tuple{Int, Int, Float64}, Float64}(nKey1)
 cache3 = Quiqbox.PseudoLRU{Tuple{Int, Int, Float64}, Float64}(round(1.2nKey1)|>Int)
 cache4 = Quiqbox.PseudoLRU{Tuple{Int, Int, Float64}, Float64}(nKey1, nKey1)
 cache5 = Quiqbox.PseudoLRU{Tuple{Int, Int, Float64}, Float64}(nKey1, (nKey1+1)÷2)
+cache6 = Quiqbox.PseudoLRU{Tuple{Int, Int, Float64}, Float64}((nKey1+1)÷2, (nKey1+1)÷2)
 
 
 #> Benchmark Groups
@@ -221,6 +222,7 @@ PseudoLRUSuite["get!"]["cache2"] = @benchmarkable stressGet!($cache2, $keys1, $v
 PseudoLRUSuite["get!"]["cache3"] = @benchmarkable stressGet!($cache3, $keys1, $vals1)
 PseudoLRUSuite["get!"]["cache4"] = @benchmarkable stressGet!($cache4, $keys1, $vals1)
 PseudoLRUSuite["get!"]["cache5"] = @benchmarkable stressGet!($cache5, $keys1, $vals1)
+PseudoLRUSuite["get!"]["cache6"] = @benchmarkable stressGet!($cache6, $keys1, $vals1)
 
 
 #> Finalized Benchmarkable Suite
