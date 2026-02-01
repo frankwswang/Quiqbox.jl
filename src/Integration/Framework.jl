@@ -3,7 +3,7 @@ const OrbIntLayoutInfo{N} =
 
 const OrbIntLayoutCache{T<:Real, C<:RealOrComplex{T}, N, 
                         M<:Union{OptionalCache{T}, OptionalCache{C}}} = 
-      AtomicLRU{OrbIntLayoutInfo{N}, M}
+      PseudoLRU{OrbIntLayoutInfo{N}, M}
 
 const OptOrbIntLayoutCache{T<:Real, C<:RealOrComplex{T}, N} = 
       Union{EmptyDict{OrbIntLayoutInfo{N}, C}, OrbIntLayoutCache{T, C, N}}
@@ -36,7 +36,7 @@ function OrbitalIntegrationConfig(style::MultiBodyIntegral{D, C, N}, operator::O
                                            O<:DirectOperator}
     cache = if evalTypedData(caching)
         valueTypeBound = Union{OptionalCache{T}, OptionalCache{C}}
-        AtomicLRU{OrbIntLayoutInfo{N}, valueTypeBound}(CONSTVAR_inteLayoutCacheSize)
+        PseudoLRU{OrbIntLayoutInfo{N}, valueTypeBound}(CONSTVAR_inteLayoutCacheSize)
     else
         EmptyDict{OrbIntLayoutInfo{N}, C}()
     end
@@ -527,6 +527,35 @@ end
 
 function getOrbVectorIntegralCore!(inteInfo::OneBodyOrbIntegralInfo{T, D, C}, 
                                    ptrVector::OrbCorePointerVector{D, C}
+                                   ) where {T<:Real, D, C<:RealOrComplex{T}}
+    len = length(ptrVector)
+    op = inteInfo.method.operator
+    style = OneBodyIntegral{D, C}()
+    tensor = Array{C}(undef, (len, len))
+    orbCate = (getOrbitalCategory∘eltype)(inteInfo.source.left)
+    symmetry = getOrbInteTensorSymmetry(style, op, orbCate)
+
+    if symmetry
+        for n in 1:symmetric2DArrEleNum(len)
+            ijIdx = OneToIndex.(n|>convertIndex1DtoTri2D)
+            ijVal = evalSetInteTensorEntry!(tensor, inteInfo, ptrVector, ijIdx)
+            if !getIntegralIndexSymmetry(ijIdx|>tuple)
+                setInteTensorEntry!(tensor, conj(ijVal), reverse(ijIdx))
+            end
+        end
+    else
+        idxRange = OneToRange(len)
+        for j in idxRange, i in idxRange
+            evalSetInteTensorEntry!(tensor, inteInfo, ptrVector, (i, j))
+        end
+    end
+
+    tensor
+end
+
+function getOrbVectorIntegralCore!(inteInfo::OneBodyOrbIntegralInfo{T, D, C}, 
+                                   ptrVector::OrbCorePointerVector{D, C}, 
+                                   cutIdx::OneToIndex #> separate the basis set into two subsets and only compute integrals between those two subsets
                                    ) where {T<:Real, D, C<:RealOrComplex{T}}
     len = length(ptrVector)
     op = inteInfo.method.operator

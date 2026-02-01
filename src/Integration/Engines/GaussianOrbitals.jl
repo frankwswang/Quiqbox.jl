@@ -39,7 +39,7 @@ end
 
 const T4Int2Tuple{T} = Tuple{T, T, T, T, Int, Int}
 
-struct AxialGaussOverlapCache{T<:Real, D, M<:NTuple{D, OptAtomicLRU{T4Int2Tuple{T}, T}}, 
+struct AxialGaussOverlapCache{T<:Real, D, M<:NTuple{D, OptPseudoLRU{T4Int2Tuple{T}, T}}, 
                               } <: QueryCache{T4Int2Tuple{T}, T}
     axis::M
 
@@ -47,7 +47,7 @@ struct AxialGaussOverlapCache{T<:Real, D, M<:NTuple{D, OptAtomicLRU{T4Int2Tuple{
                                     axialMaxSize::Int=CONSTVAR_GTOrbInteCacheSize) where 
                                    {T<:Real, D}
         axialCache = map(configs) do config
-            if evalTypedData(config); AtomicLRU{T4Int2Tuple{T}, T}(axialMaxSize, 0) else
+            if evalTypedData(config); PseudoLRU{T4Int2Tuple{T}, T}(axialMaxSize) else
                EmptyDict{T4Int2Tuple{T}, T}() end
         end
         new{T, D, typeof(axialCache)}(axialCache)
@@ -138,7 +138,7 @@ function computeAxialPGTOrbOverlap(input::T4Int2Tuple{T}) where {T<:Real}
 end
 
 #> Cache-based axial-PGTO overlap computation
-function computeAxialPGTOrbOverlap!(cache::OptAtomicLRU{T4Int2Tuple{T}, T}, 
+function computeAxialPGTOrbOverlap!(cache::OptPseudoLRU{T4Int2Tuple{T}, T}, 
                                     input::T4Int2Tuple{T}) where {T<:Real}
     get!(cache, input) do; computeAxialPGTOrbOverlap(input) end
 end
@@ -256,7 +256,7 @@ function shiftRightAngularNum(data::T4Int2Tuple{T}, shift::Int) where {T}
 end
 #> Coordinate differentiation for arbitrary axial PGTO pair
 function computeAxialPGTOrbCoordDiff!(degree::Int, 
-                                      cache::OptAtomicLRU{T4Int2Tuple{T}, T}, 
+                                      cache::OptPseudoLRU{T4Int2Tuple{T}, T}, 
                                       input::T4Int2Tuple{T}) where {T<:Real}
     xpnL, xpnR, xML, xMR, iL, iR = input
 
@@ -453,7 +453,7 @@ function angularShift!(holder::AbstractVector{T}, iR::Int, xLR::T) where {T<:Rea
     first(segment)
 end
 
-struct GaussCoulombFieldCache{T<:Real, D, M<:OptAtomicLRU{Tuple{T, Int}, Memory{T}}
+struct GaussCoulombFieldCache{T<:Real, D, M<:OptPseudoLRU{Tuple{T, Int}, Memory{T}}
                               } <: QueryCache{Tuple{T, Int}, T}
     initial::M #> For `computeBoysSequence`` when D==3
 
@@ -462,14 +462,14 @@ struct GaussCoulombFieldCache{T<:Real, D, M<:OptAtomicLRU{Tuple{T, Int}, Memory{
                                    {T<:Real, D}
         checkPositivity(D)
         flag = evalTypedData(config)
-        iCache = if flag; AtomicLRU{Tuple{T, Int}, Memory{T}}(axialMaxSize, 0) else
+        iCache = if flag; PseudoLRU{Tuple{T, Int}, Memory{T}}(axialMaxSize) else
                     EmptyDict{Tuple{T, Int}, Memory{T}}() end
 
         new{T, D, typeof(iCache)}(iCache)
     end
 end
 
-function getInitialBuffer!(cache::OptAtomicLRU{Tuple{T, Int}, Memory{T}}, 
+function getInitialBuffer!(cache::OptPseudoLRU{Tuple{T, Int}, Memory{T}}, 
                            input::Tuple{T, Int}) where {T<:Real}
     res = get!(cache, input) do; computeBoysSequence(first(input), last(input)) end
     cache isa EmptyDict ? res : copy(res)

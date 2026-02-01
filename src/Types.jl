@@ -59,7 +59,7 @@ abstract type SymbolType <: ValueType end
 end
 
 
-@enum OctalNumber::Int8 begin
+@enum OctalNumber::UInt8 begin
     OUS0 = 0 # (false, false, false)
     OPS1 = 1 # (true,  false, false)
     OPS2 = 2 # (false, true,  false)
@@ -116,7 +116,7 @@ const ArithmeticOperator = Union{typeof(+), typeof(-), typeof(*), typeof(/)}
 
 import Base: iterate, size, getindex, setindex!, IndexStyle, zero, similar
 
-import Base: get, get!, haskey, hash, collect, length, eltype, empty!
+import Base: get, get!, haskey, hash, collect, length, eltype, empty!, delete!
 
 import Base: eachindex, firstindex, lastindex
 
