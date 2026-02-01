@@ -1,5 +1,5 @@
 using Test
-using Quiqbox: PseudoLRU, isValidPair, locateHashBlock, CreditPair
+using Quiqbox: PseudoLRU, isValidPair, locateHashBlock, CreditPair, isEmptyPair, asTombstone
 using Random: MersenneTwister
 
 @testset "Caches.jl" begin
@@ -116,28 +116,41 @@ using Random: MersenneTwister
                 cache[i] = i
             end
 
+            #> Deleting the tail key resets the slot to be empty
             idxEdge = findfirst(x->x.value==(d=>d), storage)
-            delete!(cache, d)
-            @test length(cache) == 3
-            storage
-            @test storage[idxEdge] == CreditPair{Int, Int}()
-            delete!(cache, d)
-            @test length(cache) == 3
+            for _ in 1:2 #>> The second time should have not effect
+                delete!(cache, d)
+                @test length(cache) == 3
+                @test isEmptyPair(storage[idxEdge])
+            end
+
+            #> Deleting the body key marks the slot as a tombstone
             idxBody = findfirst(x->x.value==(b=>b), storage)
             pairBody = storage[idxBody]
-            delete!(cache, b)
-            @test length(cache) == 2
-            @test storage[idxBody] === pairBody
-            @test Integer(pairBody.credit) == 0
+            for _ in 1:2
+                delete!(cache, b)
+                @test length(cache) == 2
+                @test storage[idxBody] === pairBody
+                @test asTombstone(pairBody)
+            end
+
+            #> Refilling the slots
+            @assert idxBody < idxEdge
             @test haskey(cache, c)
             cache[d] = d + 1
             @test haskey(cache, d)
-            @test storage[idxBody].value == (d => d+1)
+            @test storage[idxBody].value == (d => d+1) #>> The tombstone is replaced
             @test length(cache) == 3
             cache[b] = b + 1
             @test haskey(cache, b)
-            @test storage[idxEdge].value == (b => b+1)
+            @test storage[idxEdge].value == (b => b+1) #>> The empty slot is filled
             @test length(cache) == 4
+
+            #> Raiding removable tombstones when deleting keys
+            delete!(cache, c)
+            delete!(cache, b)
+            @test isEmptyPair(storage[idxEdge]) && isEmptyPair(storage[idxEdge-1])
+            @test Int(storage[idxEdge].credit) == 0 && Int(storage[idxEdge-1].credit) == 0
         end
     end
 
@@ -153,6 +166,7 @@ using Random: MersenneTwister
 
             len = length(cache)
             @test get(cache, 999, -1) == -1
+            @test get(()->nothing, cache, 999) === nothing
             @test length(cache) == len
             @test !haskey(cache, 999)
 
