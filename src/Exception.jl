@@ -8,6 +8,7 @@ function checkCollectionMinLen(data, dataSym::Symbol, minLen::Int)
     dataLen == minLen
 end
 
+
 function checkEmptiness(obj, name::Symbol; reverseCheck::Bool=false)
     str = reverseCheck ? "" : " not"
     if ifelse(reverseCheck, !, itself)(obj|>isempty)
@@ -16,6 +17,7 @@ function checkEmptiness(obj, name::Symbol; reverseCheck::Bool=false)
 
     length(obj)
 end
+
 
 function checkLengthCore(objLen::Int, objName::Symbol, 
                          len::Int, lenName::Union{Missing, String}=missing)
@@ -31,12 +33,14 @@ function checkLength(obj, name::Symbol, len::Int, lenName::Union{Missing, String
     checkLengthCore(length(obj), name, len, lenName)
 end
 
+
 function checkPositivity(num::Real, allowZero::Bool=false)
     subStr = ifelse(allowZero, "non-negative", "positive")
     (num + Int(allowZero)) > 0 || throw(AssertionError("`num` should be $subStr."))
 
     num
 end
+
 
 function checkBottomType(::Type{T}) where {T}
     if T <: Union{}
