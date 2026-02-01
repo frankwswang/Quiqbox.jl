@@ -402,20 +402,18 @@ const IntegrationMethod{D, C<:RealOrComplex, N} =
 function getIntegralValue!(info::OrbitalInteCoreInfo{T, D, C, N}, 
                            indexLayout::NTuple{N, NTuple{2, OneToIndex}}) where 
                           {T<:Real, D, C<:RealOrComplex{T}, N}
-    inteConfig = info.method
     (layoutInfo, needToConjugate), sector = prepareOrbPointerLayoutCache(info, indexLayout)
     reorderedIdsKey = layoutInfo.idx
-    res = get(sector, reorderedIdsKey, nothing)::NothingOr{C}
-    if res === nothing
+
+    val = get!(sector, reorderedIdsKey) do #> No noticeable performance hit from the closure
+        inteConfig = info.method
         component = configureIntegration!(inteConfig, layoutInfo.orb)
         switcher = genInteMethodSwitcher(Count(D), C, Count(N), component)
-        res = evaluateIntegralCore!(switcher::IntegrationMethod{D, C, N}, 
-                                    inteConfig.operator, component, info.source.left, 
-                                    reorderedIdsKey)::C
-        setindex!(sector, res, reorderedIdsKey)
-    end #> Fewer allocations than using `get!`
+        evaluateIntegralCore!(switcher::IntegrationMethod{D, C, N}, inteConfig.operator, 
+                              component, info.source.left, reorderedIdsKey)::C
+    end
 
-    ifelse(needToConjugate, conj(res), res)::C
+    ifelse(needToConjugate, conj(val), val)::C
 end
 
 
