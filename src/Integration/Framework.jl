@@ -10,7 +10,7 @@ const OptOrbIntLayoutCache{T<:Real, C<:RealOrComplex{T}, N} =
 
 const OptEstimatorConfig{T} = MissingOr{EstimatorConfig{T}}
 
-const CONSTVAR_inteLayoutCacheSize::Int = 32
+const CONSTVAR_inteLayoutCacheScale::Int = 4
 
 const CONSTVAR_inteValCacheSize::Int = 100
 
@@ -36,7 +36,9 @@ function OrbitalIntegrationConfig(style::MultiBodyIntegral{D, C, N}, operator::O
                                            O<:DirectOperator}
     cache = if evalTypedData(caching)
         valueTypeBound = Union{OptionalCache{T}, OptionalCache{C}}
-        PseudoLRU{OrbIntLayoutInfo{N}, valueTypeBound}(CONSTVAR_inteLayoutCacheSize)
+        partition = 2^(2N)
+        maxCapacity = checkPositivity(CONSTVAR_inteLayoutCacheScale) * partition
+        PseudoLRU{OrbIntLayoutInfo{N}, valueTypeBound}(maxCapacity, partition)
     else
         EmptyDict{OrbIntLayoutInfo{N}, C}()
     end
