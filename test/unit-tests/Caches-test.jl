@@ -259,6 +259,35 @@ using Random: MersenneTwister
         end
     end
 
+    @testset "Zero-slot cache" begin
+        cache = genCache(0)
+        @test length(cache) == 0
+        @test get(cache, 1, nothing) === nothing
+        @test get!(cache, 1, nothing) === nothing
+        cache[1] = 2
+        @test !haskey(cache, 1)
+        @test length(cache) == 0
+        delete!(cache, 1)
+        @test length(cache) == 0
+        @test isempty(cache|>collect)
+    end
+
+    @testset "One-slot cache" begin
+        cache = genCache(1)
+        @test length(cache) == 0
+        @test get(cache, 1, nothing) === nothing
+        cache[1] = 2
+        @test haskey(cache, 1)
+        @test length(cache) == 1
+        @test cache[1] == 2
+        @test get(cache, 1, nothing) == 2
+        @test get!(cache, 1, 1) == 2
+        delete!(cache, 1)
+        @test length(cache) == 0
+        @test get!(cache, 1, 3) == 3
+        @test collect(cache)[] == (1 => 3)
+    end
+
     @testset "Max capacity" begin
         cap = 20
         cache = genCache(cap)

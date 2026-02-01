@@ -231,6 +231,8 @@ function haskey(d::PseudoLRU{K}, key::K) where {K}
 
         if isValidPair(cPair) && getPairKey(cPair) == key
             true
+        elseif block.space == 1
+            false
         else
             @lock block.mutex linearProbe(block, key=>startIdx, false)[begin]
         end::Bool
@@ -267,6 +269,9 @@ function checkEval(callObj::Boolean, obj, d::PseudoLRU{K}, key::K,
         @atomic :monotonic cPair.credit dialUp cPair.ceiling
         matched = true
         getPairVal(cPair)
+    elseif block.space == 1
+        matched = false
+        evalObj(callObj, obj)
     else
         matched, evictInfo = @lock block.mutex linearProbe(block, key=>startIdx, true)
         matched ? getPairVal(evictInfo.second) : evalObj(callObj, obj)
@@ -284,6 +289,16 @@ get(d::PseudoLRU{K}, key::K, default) where {K} = checkEval(False(), default, d,
 get(f::CommonCallable, d::PseudoLRU{K}, key::K) where {K} = checkEval(True(), f, d, key)
 
 
+function directSet!(callObj::Boolean, obj, block::CacheBlock{K, V}, 
+                    info::Pair{K, OneToIndex}, creditQuota::Pair{OctalNumber, OctalNumber}
+                    ) where {K, V}
+    key, idx = info
+    objVal = evalObj(callObj, obj)
+    cPair = CreditPair{K, V}(key=>objVal, creditQuota)
+    setEntry!(block.storage, cPair, idx)
+    objVal
+end
+
 function checkSet!(callObj::Boolean, obj, d::PseudoLRU{K, V}, key::K, 
                    trackStatistic::MissingOr{Bool}=missing) where {K, V}
     d.shape.first > 0 || (return evalObj(callObj, obj))
@@ -299,18 +314,22 @@ function checkSet!(callObj::Boolean, obj, d::PseudoLRU{K, V}, key::K,
         getPairVal(cPair)
     else
         @lock block.mutex begin
-            matched, evictInfo = linearProbe(block, key=>startIdx, true)
-
-            if matched
-                getPairVal(evictInfo.second)
+            if block.space == 1
+                matched = false
+                directSet!(callObj, obj, block, key=>startIdx, d.quota)
             else
-                if trackStatistic && evictInfo.first != startIdx
-                    (@atomic :monotonic block.shift += 1)
+                matched, evictInfo = linearProbe(block, key=>startIdx, true)
+                evictIdx, pickedPair = evictInfo
+
+                if matched
+                    getPairVal(pickedPair)
+                else
+                    if trackStatistic && evictIdx != startIdx
+                        (@atomic :monotonic block.shift += 1)
+                    end
+
+                    directSet!(callObj, obj, block, key=>evictIdx, d.quota)
                 end
-                objVal = evalObj(callObj, obj)
-                cPairNew = CreditPair{K, V}(key=>objVal, d.quota)
-                setEntry!(cPairs, cPairNew, evictInfo.first)
-                objVal
             end
         end
     end
