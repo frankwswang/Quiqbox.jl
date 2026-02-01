@@ -84,10 +84,12 @@ getEntry(obj, ::GridSector) = obj.grid
 
 getEntry(obj, entry::Symbol) = getproperty(obj, entry)
 
-getEntry(obj::AtomicMemory, i::Integer) = (@atomic obj[i|>Int])
+function getEntry(obj::AtomicMemory, i::Integer, order::Symbol=:monotonic)
+    @atomic order obj[i|>Int]
+end
 
 function getEntry(obj::AtomicMemory, i::OneToIndex)
-    idx = firstindex(obj) + i.idx - 1
+    idx = shiftLinearIndex(obj, i)
     getEntry(obj, idx)
 end
 
@@ -113,10 +115,12 @@ function setEntry!(obj::AbstractArray, val, i::OneToIndex)
     obj[begin+i.idx-1] = val
 end
 
-setEntry!(obj::AtomicMemory, val, i::Integer) = (@atomic obj[i|>Int] = val)
+function setEntry!(obj::AtomicMemory, val, i::Integer, order::Symbol=:release)
+    @atomic order obj[i|>Int] = val
+end
 
 function setEntry!(obj::AtomicMemory, val, i::OneToIndex)
-    idx = firstindex(obj) + i.idx - 1
+    idx = shiftLinearIndex(obj, i)
     setEntry!(obj, val, idx)
 end
 
@@ -640,11 +644,11 @@ function hash(ab::AtomicLocker, hashCode::UInt)
     hash(objectid(ab.value), hash(typeof(ab), hashCode))
 end
 
-@generated function getindex(al::L) where {L<:AtomicLocker}
+@generated function getindex(al::L, order::Symbol=:acquire) where {L<:AtomicLocker}
     if requireNonAtomicMutex(L) #> Can potentially bypass planted lock in `AtomicUnit`
         return :(@lock al.mutex al.value)
     elseif L <: AtomicUnit
-        return :(@atomic al.value)
+        return :(@atomic order al.value)
     else
         return :(al.value)
     end
@@ -653,11 +657,11 @@ end
 setindex!(al::AtomicLocker, val) = setEntry!(al, val)
 
 #> Directly pass in `val` without making copy if possible
-function setEntry!(box::AtomicUnit{T}, val) where {T}
+function setEntry!(box::AtomicUnit{T}, val, order::Symbol=:release) where {T}
     if requireNonAtomicMutex(AtomicUnit{T}) && !(val isa T)
         setEntryCore!(box.mutex, box.value, val)
     else
-        @atomic box.value = val
+        @atomic order box.value = val
     end
 
     box
