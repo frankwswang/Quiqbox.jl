@@ -83,7 +83,7 @@ struct PseudoLRU{K, V} <: AbstractDict{K, V}
     shape::Pair{Int, Int}                 #> `capacity` => `partition`
     quota::Pair{OctalNumber, OctalNumber} #>  initial   =>  ceiling
 
-    function PseudoLRU{K, V}(capacity::Integer, partition::Integer=16; track::Bool=true, 
+    function PseudoLRU{K, V}(capacity::Integer, partition::Integer=32; track::Bool=true, 
                              quota::Pair{<:Integer, <:Integer}=Pair(4, 7)) where {K, V}
         checkPositivity(capacity, true)
         blockSpace = min(checkPositivity(partition, iszero(capacity)), capacity)
