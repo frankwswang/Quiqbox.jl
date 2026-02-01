@@ -1,20 +1,26 @@
 using BenchmarkTools #> `using Pkg; Pkg.add("BenchmarkTools")` to install BenchmarkTools.jl
 using Quiqbox
+using Random
+
+Random.seed!(1234)
+println("Number of threads used for benchmarking: ", Threads.nthreads(), "\n")
 
 #> Benchmark Structure
-const SUITE = BenchmarkGroup(["Basis", "Integration", "CompositeFunction"])
-const OrbInteBSuite = BenchmarkGroup()
+const SUITE = BenchmarkGroup(["Basis", "Integration", "CompositeFunction", "Query"])
 
+const OrbInteBSuite = BenchmarkGroup()
 const OrbEvalBSuite = BenchmarkGroup()
 const OvlpInteSuite = BenchmarkGroup()
 const ClmbInteSuite = BenchmarkGroup()
 const DiffFuncBSuite = BenchmarkGroup(["Symbolic", "Automatic", "Numerical"])
+const PseudoLRUSuite = BenchmarkGroup()
 
 OrbInteBSuite["Overlap"] = OvlpInteSuite
 OrbInteBSuite["Coulomb"] = ClmbInteSuite
 SUITE["Basis"]["Orbital"] = OrbEvalBSuite
 SUITE["Integration"]["Orbital"] = OrbInteBSuite
 SUITE["CompositeFunction"]["Differentiation"] = DiffFuncBSuite
+SUITE["Query"]["PseudoLRU"] = PseudoLRUSuite
 
 
 #> Benchmark Objects
@@ -103,6 +109,26 @@ ap2D = Quiqbox.AxialProdField((stf1D, gf1D1))
 apOrb = Quiqbox.PrimitiveOrb((1.0, 2.0), ap2D, renormalize=false)
 
 
+keys1 = [(rand(1:10), rand(-3:15), rand(0:0.15:6)) for _ in 1:2000]
+vals1 = rand(length(keys1))
+nKey1 = length(keys1|>unique)
+
+function stressGet!(d::AbstractDict, keys, vals)
+    for (k, v) in zip(keys, vals)
+        get!(d, k, v)
+    end
+
+    d
+end
+
+cache1 = Quiqbox.PseudoLRU{Tuple{Int, Int, Float64}, Float64}(max( 1, Int(nKey1÷3) ))
+cache2 = Quiqbox.PseudoLRU{Tuple{Int, Int, Float64}, Float64}(nKey1)
+cache3 = Quiqbox.PseudoLRU{Tuple{Int, Int, Float64}, Float64}(round(1.2nKey1)|>Int)
+cache4 = Quiqbox.PseudoLRU{Tuple{Int, Int, Float64}, Float64}(nKey1, nKey1)
+cache5 = Quiqbox.PseudoLRU{Tuple{Int, Int, Float64}, Float64}(nKey1, (nKey1+1)÷2)
+cache6 = Quiqbox.PseudoLRU{Tuple{Int, Int, Float64}, Float64}((nKey1+1)÷2, (nKey1+1)÷2)
+
+
 #> Benchmark Groups
 #>> Orbital-Evaluation Benchmark Group
 OrbEvalBSuite["PGTO"]["Direct"] = @benchmarkable ($pgto1 )($coord1) evals=1
@@ -189,6 +215,14 @@ ClmbInteSuite["ElectRI"]["cc-pVTZ"]["Direct"] =
 DiffFuncBSuite["df1"]["Numerical"] = @benchmarkable ($df1_fd1)($coord2)
 DiffFuncBSuite["df2"]["Numerical"] = @benchmarkable ($df1_fd2)($coord2)
 DiffFuncBSuite["df3"]["Numerical"] = @benchmarkable ($df1_fd3)($coord2)
+
+#>> `PseudoLRU` Benchmark Group
+PseudoLRUSuite["get!"]["cache1"] = @benchmarkable stressGet!($cache1, $keys1, $vals1)
+PseudoLRUSuite["get!"]["cache2"] = @benchmarkable stressGet!($cache2, $keys1, $vals1)
+PseudoLRUSuite["get!"]["cache3"] = @benchmarkable stressGet!($cache3, $keys1, $vals1)
+PseudoLRUSuite["get!"]["cache4"] = @benchmarkable stressGet!($cache4, $keys1, $vals1)
+PseudoLRUSuite["get!"]["cache5"] = @benchmarkable stressGet!($cache5, $keys1, $vals1)
+PseudoLRUSuite["get!"]["cache6"] = @benchmarkable stressGet!($cache6, $keys1, $vals1)
 
 
 #> Finalized Benchmarkable Suite

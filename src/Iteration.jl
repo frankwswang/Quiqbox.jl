@@ -70,9 +70,9 @@ end
 struct OneToRange <: CustomRange
     endpoint::Int
 
-    function OneToRange(endpoint::Int)
+    function OneToRange(endpoint::Integer)
         checkPositivity(endpoint, true)
-        new(endpoint)
+        new(endpoint|>Int)
     end
 
     function OneToRange(idx::OneToIndex)

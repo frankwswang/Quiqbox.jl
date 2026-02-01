@@ -84,10 +84,12 @@ getEntry(obj, ::GridSector) = obj.grid
 
 getEntry(obj, entry::Symbol) = getproperty(obj, entry)
 
-getEntry(obj::AtomicMemory, i::Integer) = (@atomic obj[i|>Int])
+function getEntry(obj::AtomicMemory, i::Integer, order::Symbol=:monotonic)
+    @atomic order obj[i|>Int]
+end
 
 function getEntry(obj::AtomicMemory, i::OneToIndex)
-    idx = firstindex(obj) + i.idx - 1
+    idx = shiftLinearIndex(obj, i)
     getEntry(obj, idx)
 end
 
@@ -113,10 +115,12 @@ function setEntry!(obj::AbstractArray, val, i::OneToIndex)
     obj[begin+i.idx-1] = val
 end
 
-setEntry!(obj::AtomicMemory, val, i::Integer) = (@atomic obj[i|>Int] = val)
+function setEntry!(obj::AtomicMemory, val, i::Integer, order::Symbol=:release)
+    @atomic order obj[i|>Int] = val
+end
 
 function setEntry!(obj::AtomicMemory, val, i::OneToIndex)
-    idx = firstindex(obj) + i.idx - 1
+    idx = shiftLinearIndex(obj, i)
     setEntry!(obj, val, idx)
 end
 
@@ -344,6 +348,10 @@ end
 canDirectlyStoreInstanceOf(::Type{Symbol}) = true
 
 canDirectlyStoreInstanceOf(::Type{String}) = true
+
+canDirectlyStoreInstanceOf(::Type{BigInt}) = true
+
+canDirectlyStoreInstanceOf(::Type{BigFloat}) = true
 
 canDirectlyStoreInstanceOf(::Type{<:IdentityMarker}) = true
 
@@ -602,18 +610,14 @@ function compareObj(obj1::T1, obj2::T2)::Bool where {T1, T2}
     obj1 === obj2 || isequal(markObj(obj1), markObj(obj2))
 end
 
-
-function needAtomicUnitMutex(val) #> May be extended to support other types
-    val isa AbstractArray
-end
-
 mutable struct AtomicUnit{T} <: QueryBox{T}
     @atomic value::T
-    mutex::MissingOr{ReentrantLock}
+    const mutex::MissingOr{ReentrantLock}
 
-    function AtomicUnit(value::T, 
-                        mutex::MissingOr{ReentrantLock}=let bl=needAtomicUnitMutex(value)
-                               bl ? ReentrantLock() : missing end) where {T}
+    function AtomicUnit(value::T, mutex::MissingOr{ReentrantLock}=missing) where {T}
+        if ismissing(mutex) && requireNonAtomicMutex(AtomicUnit{T})
+            mutex = ReentrantLock()
+        end
         new{T}(value, mutex)
     end
 end
@@ -626,10 +630,13 @@ struct AtomicGrid{E<:AbstractMemory} <: QueryBox{E}
     new{E}(value, mutex)
 end
 
+requireNonAtomicMutex(::Type{AtomicUnit{T}}) where {T} = (T <: AbstractArray)
+requireNonAtomicMutex(::Type{AtomicGrid{T}}) where {T} = true
+
+
 const AtomicLocker{T} = Union{AtomicUnit{T}, AtomicGrid{T}}
 
 markObj(al::AtomicLocker) = FieldMarker(al, (:mutex,))
-
 
 ==(ab1::AtomicLocker, ab2::AtomicLocker) = (ab1.value == ab2.value)
 
@@ -637,16 +644,24 @@ function hash(ab::AtomicLocker, hashCode::UInt)
     hash(objectid(ab.value), hash(typeof(ab), hashCode))
 end
 
-getindex(l::AtomicLocker) = l.value
+@generated function getindex(al::L, order::Symbol=:acquire) where {L<:AtomicLocker}
+    if requireNonAtomicMutex(L) #> Can potentially bypass planted lock in `AtomicUnit`
+        return :(@lock al.mutex al.value)
+    elseif L <: AtomicUnit
+        return :(@atomic order al.value)
+    else
+        return :(al.value)
+    end
+end
 
 setindex!(al::AtomicLocker, val) = setEntry!(al, val)
 
 #> Directly pass in `val` without making copy if possible
-function setEntry!(box::AtomicUnit{T}, val) where {T}
-    if !(val isa T) && needAtomicUnitMutex(val)
+function setEntry!(box::AtomicUnit{T}, val, order::Symbol=:release) where {T}
+    if requireNonAtomicMutex(AtomicUnit{T}) && !(val isa T)
         setEntryCore!(box.mutex, box.value, val)
     else
-        @atomic box.value = val
+        @atomic order box.value = val
     end
 
     box
