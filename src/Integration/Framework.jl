@@ -81,7 +81,7 @@ struct TwoBodyIntegralValCache{C<:RealOrComplex} <: QueryBox{C}
         checkPositivity(threshold)
         threshold2 = threshold * (threshold - 1)
         threshold3 = threshold * threshold2 * 2
-        threshold4 = threshold^4 - threshold - threshold2 - threshold3
+        threshold4 = threshold2^2 #> `== threshold^4 - threshold - threshold2 - threshold3`
         aaaaSector = PseudoLRU{N2N2Tuple{OneToIndex}, C}(threshold,  threshold )
         aabbSector = PseudoLRU{N2N2Tuple{OneToIndex}, C}(threshold2, threshold2)
         halfSector = PseudoLRU{N2N2Tuple{OneToIndex}, C}(threshold3, threshold3)
@@ -407,8 +407,9 @@ function indexLayoutHash(layout::N1N2Tuple{OneToIndex}, orbCoreNum::Int)
     if i == j
         i.idx
     else
-        linearIds = LinearIndices((orbCoreNum, orbCoreNum))
-        linearIds[i.idx, j.idx]
+        linearIds = LinearIndices((orbCoreNum, orbCoreNum-1))
+        m = j.idx - (j > i)
+        linearIds[i.idx, m]
     end |> UInt
 end
 
@@ -421,11 +422,23 @@ function indexLayoutHash(layout::N2N2Tuple{OneToIndex}, orbCoreNum::Int)
     if bl1 && bl2 && bl3
         i.idx
     elseif bl1 && bl2
-        linearIds = LinearIndices((orbCoreNum, orbCoreNum))
-        linearIds[i.idx, k.idx]
+        linearIds = LinearIndices((orbCoreNum, orbCoreNum-1))
+        o = k.idx - (k > i)
+        linearIds[i.idx, o]
+    elseif bl1 || bl2
+        linearIds = LinearIndices((2orbCoreNum, orbCoreNum, orbCoreNum-1))
+        if bl1
+            n = l.idx - (l > k)
+            linearIds[2i.idx-1, k.idx, n]
+        else
+            m = j.idx - (j > i)
+            linearIds[2k.idx,   i.idx, m]
+        end
     else
-        linearIds = LinearIndices((orbCoreNum, orbCoreNum, orbCoreNum, orbCoreNum))
-        linearIds[i.idx, j.idx, k.idx, l.idx]
+        linearIds = LinearIndices((orbCoreNum, orbCoreNum-1, orbCoreNum, orbCoreNum-1))
+        m = j.idx - (j > i)
+        n = l.idx - (l > k)
+        linearIds[i.idx, m, k.idx, n]
     end |> UInt
 end
 
