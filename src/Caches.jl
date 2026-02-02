@@ -1,5 +1,3 @@
-const baseHash = Base.hash
-
 #>/ Custom pseudo LRU (least-recent used) cache \<#
 function checkCreditQuota(initial::Union{Integer, OctalNumber}, 
                           ceiling::Union{Integer, OctalNumber})
@@ -263,8 +261,8 @@ function recordInputKey!(b::CacheBlock, hasKey::Bool)
 end
 
 
-function checkEval(hashFunc::F, callObj::Boolean, obj, d::PseudoLRU{K}, key::K, 
-                   trackStatistic::MissingOr{Bool}=missing) where {K, F<:CommonCallable}
+function checkEval(hashFunc::F, callObj::Boolean, obj::T, d::PseudoLRU{K}, key::K, 
+                   trackStatistic::MissingOr{Bool}=missing) where {F<:CommonCallable, T, K}
     d.shape.first > 0 || (return evalObj(callObj, obj))
 
     block, startIdx = locateHashBlock(d, key, hashFunc)
@@ -300,9 +298,9 @@ function get(f::CommonCallable, d::PseudoLRU{K}, key::K, hashFunc::F=baseHash) w
 end
 
 
-function directSet!(callObj::Boolean, obj, block::CacheBlock{K, V}, 
+function directSet!(callObj::Boolean, obj::T, block::CacheBlock{K, V}, 
                     info::Pair{K, OneToIndex}, creditQuota::Pair{OctalNumber, OctalNumber}
-                    ) where {K, V}
+                    ) where {T, K, V}
     key, idx = info
     objVal = evalObj(callObj, obj)
     cPair = CreditPair{K, V}(key=>objVal, creditQuota)
@@ -310,8 +308,9 @@ function directSet!(callObj::Boolean, obj, block::CacheBlock{K, V},
     objVal
 end
 
-function checkSet!(hashFunc::F, callObj::Boolean, obj, d::PseudoLRU{K, V}, key::K, 
-                   trackStatistic::MissingOr{Bool}=missing) where {K, V, F<:CommonCallable}
+function checkSet!(hashFunc::F, callObj::Boolean, obj::T, d::PseudoLRU{K, V}, key::K, 
+                   trackStatistic::MissingOr{Bool}=missing) where 
+                  {F<:CommonCallable, T, K, V}
     d.shape.first > 0 || (return evalObj(callObj, obj))
 
     block, startIdx = locateHashBlock(d, key, hashFunc)

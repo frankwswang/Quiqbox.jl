@@ -1,5 +1,5 @@
 using LRUCache
-using Base: issingletontype
+using Base: issingletontype, hash as baseHash
 
 struct OneToIndex <: CustomAccessor
     idx::Int
@@ -186,11 +186,14 @@ collect(::EmptyDict{K, V}) where {K, V} = Memory{Pair{K, V}}(undef, 0)
 
 haskey(::EmptyDict{K}, ::K) where {K} = false
 
-get(::EmptyDict{K}, ::K, default::Any) where {K} = itself(default)
+get(::EmptyDict{K}, ::K, default::Any, _::CommonCallable=baseHash) where {K} = 
+itself(default)
 
-get!(::EmptyDict{K, V}, ::K, default::V) where {K, V} = itself(default)
+get!(::EmptyDict{K, V}, ::K, default::V, _::CommonCallable=baseHash) where {K, V} = 
+itself(default)
 
-get!(f::CommonCallable, ::EmptyDict{K}, ::K) where {K} = f()
+get!(f::CommonCallable, ::EmptyDict{K}, ::K, _::CommonCallable=baseHash) where {K} = 
+f()
 
 setindex!(d::EmptyDict{K, V}, ::V, ::K) where {K, V} = itself(d)
 
