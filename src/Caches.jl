@@ -1,5 +1,3 @@
-const baseHash = Base.hash
-
 #>/ Custom pseudo LRU (least-recent used) cache \<#
 function checkCreditQuota(initial::Union{Integer, OctalNumber}, 
                           ceiling::Union{Integer, OctalNumber})
