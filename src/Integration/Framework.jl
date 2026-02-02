@@ -50,8 +50,8 @@ const OrbitalOverlapConfig{T<:Real, D, C<:RealOrComplex{T},
       OrbitalIntegrationConfig{T, D, C, 1, OverlapSampler, M, E}
 
 struct OneBodyIntegralValCache{C<:RealOrComplex} <: QueryBox{C}
-    aa::LRU{N1N2Tuple{OneToIndex}, C}
-    ab::LRU{N1N2Tuple{OneToIndex}, C}
+    aa::PseudoLRU{N1N2Tuple{OneToIndex}, C}
+    ab::PseudoLRU{N1N2Tuple{OneToIndex}, C}
     dimension::Int
     threshold::Int
 
@@ -60,18 +60,18 @@ struct OneBodyIntegralValCache{C<:RealOrComplex} <: QueryBox{C}
                                     {D, C<:RealOrComplex}
         checkPositivity(threshold)
         maxPairNum = threshold * (threshold - 1)
-        aaSector = LRU{N1N2Tuple{OneToIndex}, C}(maxsize=threshold )
-        abSector = LRU{N1N2Tuple{OneToIndex}, C}(maxsize=maxPairNum)
+        aaSector = PseudoLRU{N1N2Tuple{OneToIndex}, C}(threshold,  threshold )
+        abSector = PseudoLRU{N1N2Tuple{OneToIndex}, C}(maxPairNum, maxPairNum)
         new{C}(aaSector, abSector, Int(D), threshold)
     end
 end
 
 
 struct TwoBodyIntegralValCache{C<:RealOrComplex} <: QueryBox{C}
-    aaaa::LRU{N2N2Tuple{OneToIndex}, C}
-    aabb::LRU{N2N2Tuple{OneToIndex}, C}
-    half::LRU{N2N2Tuple{OneToIndex}, C} # aaxy or xyaa
-    misc::LRU{N2N2Tuple{OneToIndex}, C} # abxy
+    aaaa::PseudoLRU{N2N2Tuple{OneToIndex}, C}
+    aabb::PseudoLRU{N2N2Tuple{OneToIndex}, C}
+    half::PseudoLRU{N2N2Tuple{OneToIndex}, C} # aaxy or xyaa
+    misc::PseudoLRU{N2N2Tuple{OneToIndex}, C} # abxy
     dimension::Int
     threshold::Int
 
@@ -82,10 +82,10 @@ struct TwoBodyIntegralValCache{C<:RealOrComplex} <: QueryBox{C}
         threshold2 = threshold * (threshold - 1)
         threshold3 = threshold * threshold2 * 2
         threshold4 = threshold^4 - threshold - threshold2 - threshold3
-        aaaaSector = LRU{N2N2Tuple{OneToIndex}, C}(maxsize=threshold )
-        aabbSector = LRU{N2N2Tuple{OneToIndex}, C}(maxsize=threshold2)
-        halfSector = LRU{N2N2Tuple{OneToIndex}, C}(maxsize=threshold3)
-        miscSector = LRU{N2N2Tuple{OneToIndex}, C}(maxsize=threshold4)
+        aaaaSector = PseudoLRU{N2N2Tuple{OneToIndex}, C}(threshold,  threshold )
+        aabbSector = PseudoLRU{N2N2Tuple{OneToIndex}, C}(threshold2, threshold2)
+        halfSector = PseudoLRU{N2N2Tuple{OneToIndex}, C}(threshold3, threshold3)
+        miscSector = PseudoLRU{N2N2Tuple{OneToIndex}, C}(threshold4, threshold4)
         new{C}(aaaaSector, aabbSector, halfSector, miscSector, Int(D), threshold)
     end
 end
@@ -292,7 +292,7 @@ getInteValCacheSector(cache::FauxIntegralValCache{2}, ::NTuple{3, Bool}) = itsel
 
 function getInteValCacheSector(cache::OneBodyIntegralValCache{C}, 
                                indexSymmetry::Bool) where {C<:RealOrComplex}
-    ifelse(indexSymmetry, cache.aa, cache.ab)::LRU{N1N2Tuple{OneToIndex}, C}
+    ifelse(indexSymmetry, cache.aa, cache.ab)::PseudoLRU{N1N2Tuple{OneToIndex}, C}
 end
 
 function getInteValCacheSector(cache::TwoBodyIntegralValCache{C}, 
@@ -309,7 +309,7 @@ function getInteValCacheSector(cache::TwoBodyIntegralValCache{C},
         cache.half #> xyaa
     else
         cache.misc #> abxy
-    end::LRU{N2N2Tuple{OneToIndex}, C}
+    end::PseudoLRU{N2N2Tuple{OneToIndex}, C}
 end
 
 
@@ -317,11 +317,11 @@ end
 #>> One-body
 function getIntegralIndexPair(key::N1N2Tuple{OneToIndex}, permuteControl::Bool)
     (i, j), = key
-    if permuteControl && i > j
+    if permuteControl && i < j
         Pair(tuple((j, i)), true)
     else
         Pair(key, false)
-    end
+    end #>> Resulting order: `i >= j`
 end
 
 #>> Two-body
@@ -330,23 +330,23 @@ function getIntegralIndexPair(key::N2N2Tuple{OneToIndex}, permuteControl::NTuple
     permuteL, permuteR, permuteLR = permuteControl
 
     (i, j), partR = key
-    if permuteL && i > j
+    if permuteL && i < j
         key = ((j, i), partR)
         needToConjugate = !needToConjugate
     end
 
     partL, (k, l) = key
-    if permuteR && k > l
+    if permuteR && k < l
         key = (partL, (l, k))
         needToConjugate = !needToConjugate
     end
 
     partL, partR = key
-    if permuteLR && partL > partR
+    if permuteLR && partL < partR
         key = (partR, partL)
     end
 
-    Pair(key, needToConjugate)
+    Pair(key, needToConjugate) #>> Resulting order: `i >= j; k >= l; (i, j) >= (k, l)`
 end
 
 
@@ -398,19 +398,31 @@ struct GaussTypeIntegration{D, C<:RealOrComplex, N} <: IntegralStyle end
 const IntegrationMethod{D, C<:RealOrComplex, N} = 
       Union{NumericalIntegration{D, C, N}, GaussTypeIntegration{D, C, N}}
 
+#>> Consistent with the reverse-ordered index layout such that the left index contributes 
+#>> less than the right index to incrementing the linear index. This results in a better 
+#>> locality of the hash index.
+function indexLayoutHash(layout::NTuple{N, NTuple{2, OneToIndex}}, 
+                         orbCoreNum::Int) where {N}
+    linearIds = LinearIndices(ntuple( _->orbCoreNum, Val(2N) ))
+    cartesIds = mapreduce(x->getfield.(x, :idx), (x, y)->(x..., y...), layout, init=())
+    UInt(linearIds[cartesIds...])
+end
 
 function getIntegralValue!(info::OrbitalInteCoreInfo{T, D, C, N}, 
                            indexLayout::NTuple{N, NTuple{2, OneToIndex}}) where 
                           {T<:Real, D, C<:RealOrComplex{T}, N}
     (layoutInfo, needToConjugate), sector = prepareOrbPointerLayoutCache(info, indexLayout)
     reorderedIdsKey = layoutInfo.idx
+    orbSource = info.source.left
+    orbCoreNum = length(orbSource)
 
-    val = get!(sector, reorderedIdsKey) do #> No noticeable performance hit from the closure
+    #> No noticeable performance hit from the closure
+    val = get!(sector, reorderedIdsKey, RPartial( indexLayoutHash, (orbCoreNum,) )) do
         inteConfig = info.method
         component = configureIntegration!(inteConfig, layoutInfo.orb)
         switcher = genInteMethodSwitcher(Count(D), C, Count(N), component)
         evaluateIntegralCore!(switcher::IntegrationMethod{D, C, N}, inteConfig.operator, 
-                              component, info.source.left, reorderedIdsKey)::C
+                              component, orbSource, reorderedIdsKey)::C
     end
 
     ifelse(needToConjugate, conj(val), val)::C
