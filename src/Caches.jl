@@ -1,3 +1,5 @@
+const baseHash = Base.hash
+
 #>/ Custom pseudo LRU (least-recent used) cache \<#
 function checkCreditQuota(initial::Union{Integer, OctalNumber}, 
                           ceiling::Union{Integer, OctalNumber})
@@ -100,16 +102,17 @@ struct PseudoLRU{K, V} <: AbstractDict{K, V}
     end
 end
 
-function genHashIndex(key::K, maxIndex::Unsigned) where {K}
+function genHashIndex(hashFunc::F, key::K, maxIndex::Unsigned) where {K, F<:CommonCallable}
     maxIndex = (Int∘max)(1, maxIndex)
     hashBranch = ispow2(maxIndex)
-    hashVal = convert(UInt, hash(key))
+    hashVal = convert(UInt, hashFunc(key))
     (hashBranch ? (hashVal & (maxIndex - 1)) : (hashVal % maxIndex)) + 1
 end
 
-function locateHashBlock(d::PseudoLRU{K}, key::K) where {K}
+function locateHashBlock(d::PseudoLRU{K}, key::K, hashFunc::F=baseHash) where 
+                        {K, F<:CommonCallable}
     capacity, divider = d.shape
-    hashIndex = genHashIndex(key, UInt(capacity))
+    hashIndex = genHashIndex(hashFunc, key, UInt(capacity))
     secNum, rawIdx = fldmod1(hashIndex, divider)
     getEntry(d.block, OneToIndex(secNum)) => OneToIndex(rawIdx)
 end
@@ -169,9 +172,10 @@ function linearProbe(b::CacheBlock{K}, info::Pair{K, OneToIndex},
 end
 
 
-function delete!(d::PseudoLRU{K, V}, key::K) where {K, V}
+function delete!(d::PseudoLRU{K, V}, key::K, hashFunc::F=baseHash) where 
+                {K, V, F<:CommonCallable}
     if d.shape.first > 0
-        block, startIdx = locateHashBlock(d, key)
+        block, startIdx = locateHashBlock(d, key, hashFunc)
         cPairs = block.storage
         space = block.space
         upperIndex = OneToIndex(space)
@@ -208,9 +212,10 @@ function delete!(d::PseudoLRU{K, V}, key::K) where {K, V}
 end
 
 
-function setindex!(d::PseudoLRU{K, V}, val::V, key::K) where {K, V}
+function setindex!(d::PseudoLRU{K, V}, val::V, key::K, hashFunc::F=baseHash) where 
+                  {K, V, F<:CommonCallable}
     if d.shape.first > 0
-        block, startIdx = locateHashBlock(d, key)
+        block, startIdx = locateHashBlock(d, key, hashFunc)
         pNew = CreditPair{K, V}(key=>val, d.quota)
 
         @lock block.mutex begin
@@ -224,13 +229,15 @@ function setindex!(d::PseudoLRU{K, V}, val::V, key::K) where {K, V}
 end
 
 
-function haskey(d::PseudoLRU{K}, key::K) where {K}
+function haskey(d::PseudoLRU{K}, key::K, hashFunc::F=baseHash) where {K, F}
     if d.shape.first > 0
-        block, startIdx = locateHashBlock(d, key)
+        block, startIdx = locateHashBlock(d, key, hashFunc)
         cPair = getEntry(block.storage, startIdx)
 
         if isValidPair(cPair) && getPairKey(cPair) == key
             true
+        elseif block.space == 1
+            false
         else
             @lock block.mutex linearProbe(block, key=>startIdx, false)[begin]
         end::Bool
@@ -256,17 +263,20 @@ function recordInputKey!(b::CacheBlock, hasKey::Bool)
 end
 
 
-function checkEval(callObj::Boolean, obj, d::PseudoLRU{K}, key::K, 
-                   trackStatistic::MissingOr{Bool}=missing) where {K}
+function checkEval(hashFunc::F, callObj::Boolean, obj, d::PseudoLRU{K}, key::K, 
+                   trackStatistic::MissingOr{Bool}=missing) where {K, F<:CommonCallable}
     d.shape.first > 0 || (return evalObj(callObj, obj))
 
-    block, startIdx = locateHashBlock(d, key)
+    block, startIdx = locateHashBlock(d, key, hashFunc)
     cPair = getEntry(block.storage, startIdx)
 
     val = if isValidPair(cPair) && getPairKey(cPair) == key
         @atomic :monotonic cPair.credit dialUp cPair.ceiling
         matched = true
         getPairVal(cPair)
+    elseif block.space == 1
+        matched = false
+        evalObj(callObj, obj)
     else
         matched, evictInfo = @lock block.mutex linearProbe(block, key=>startIdx, true)
         matched ? getPairVal(evictInfo.second) : evalObj(callObj, obj)
@@ -279,16 +289,32 @@ function checkEval(callObj::Boolean, obj, d::PseudoLRU{K}, key::K,
     val
 end
 
-get(d::PseudoLRU{K}, key::K, default) where {K} = checkEval(False(), default, d, key)
+function get(d::PseudoLRU{K}, key::K, default, hashFunc::F=baseHash) where 
+            {K, F<:CommonCallable}
+    checkEval(hashFunc, False(), default, d, key)
+end
 
-get(f::CommonCallable, d::PseudoLRU{K}, key::K) where {K} = checkEval(True(), f, d, key)
+function get(f::CommonCallable, d::PseudoLRU{K}, key::K, hashFunc::F=baseHash) where 
+            {K, F<:CommonCallable}
+    checkEval(hashFunc, True(), f, d, key)
+end
 
 
-function checkSet!(callObj::Boolean, obj, d::PseudoLRU{K, V}, key::K, 
-                   trackStatistic::MissingOr{Bool}=missing) where {K, V}
+function directSet!(callObj::Boolean, obj, block::CacheBlock{K, V}, 
+                    info::Pair{K, OneToIndex}, creditQuota::Pair{OctalNumber, OctalNumber}
+                    ) where {K, V}
+    key, idx = info
+    objVal = evalObj(callObj, obj)
+    cPair = CreditPair{K, V}(key=>objVal, creditQuota)
+    setEntry!(block.storage, cPair, idx)
+    objVal
+end
+
+function checkSet!(hashFunc::F, callObj::Boolean, obj, d::PseudoLRU{K, V}, key::K, 
+                   trackStatistic::MissingOr{Bool}=missing) where {K, V, F<:CommonCallable}
     d.shape.first > 0 || (return evalObj(callObj, obj))
 
-    block, startIdx = locateHashBlock(d, key)
+    block, startIdx = locateHashBlock(d, key, hashFunc)
     cPairs = block.storage
     cPair = getEntry(cPairs, startIdx)
     ismissing(trackStatistic) && (trackStatistic = block.track)
@@ -299,18 +325,22 @@ function checkSet!(callObj::Boolean, obj, d::PseudoLRU{K, V}, key::K,
         getPairVal(cPair)
     else
         @lock block.mutex begin
-            matched, evictInfo = linearProbe(block, key=>startIdx, true)
-
-            if matched
-                getPairVal(evictInfo.second)
+            if block.space == 1
+                matched = false
+                directSet!(callObj, obj, block, key=>startIdx, d.quota)
             else
-                if trackStatistic && evictInfo.first != startIdx
-                    (@atomic :monotonic block.shift += 1)
+                matched, evictInfo = linearProbe(block, key=>startIdx, true)
+                evictIdx, pickedPair = evictInfo
+
+                if matched
+                    getPairVal(pickedPair)
+                else
+                    if trackStatistic && evictIdx != startIdx
+                        (@atomic :monotonic block.shift += 1)
+                    end
+
+                    directSet!(callObj, obj, block, key=>evictIdx, d.quota)
                 end
-                objVal = evalObj(callObj, obj)
-                cPairNew = CreditPair{K, V}(key=>objVal, d.quota)
-                setEntry!(cPairs, cPairNew, evictInfo.first)
-                objVal
             end
         end
     end
@@ -320,14 +350,21 @@ function checkSet!(callObj::Boolean, obj, d::PseudoLRU{K, V}, key::K,
 end
 
 
-get!(d::PseudoLRU{K}, key::K, default) where {K} = checkSet!(False(), default, d, key)
+function get!(d::PseudoLRU{K}, key::K, default, hashFunc::F=baseHash) where 
+             {K, F<:CommonCallable}
+    checkSet!(hashFunc, False(), default, d, key)
+end
 
-get!(f::CommonCallable, d::PseudoLRU{K}, key::K) where {K} = checkSet!(True(), f, d, key)
+function get!(f::CommonCallable, d::PseudoLRU{K}, key::K, hashFunc::F=baseHash) where 
+             {K, F<:CommonCallable}
+    checkSet!(hashFunc, True(), f, d, key)
+end
 
 
-function getindex(d::PseudoLRU{K, V}, key::K) where {K, V}
+function getindex(d::PseudoLRU{K, V}, key::K, hashFunc::F=Base.hash) where 
+                 {K, V, F<:CommonCallable}
     finalizer = ()->throw(KeyError("`key = $key` is not found."))
-    checkEval(True(), finalizer, d, key, false)::V
+    checkEval(hashFunc, True(), finalizer, d, key, false)::V
 end
 
 

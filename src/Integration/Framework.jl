@@ -10,7 +10,7 @@ const OptOrbIntLayoutCache{T<:Real, C<:RealOrComplex{T}, N} =
 
 const OptEstimatorConfig{T} = MissingOr{EstimatorConfig{T}}
 
-const CONSTVAR_inteLayoutCacheSize::Int = 32
+const CONSTVAR_inteLayoutCacheScale::Int = 4
 
 const CONSTVAR_inteValCacheSize::Int = 100
 
@@ -36,7 +36,9 @@ function OrbitalIntegrationConfig(style::MultiBodyIntegral{D, C, N}, operator::O
                                            O<:DirectOperator}
     cache = if evalTypedData(caching)
         valueTypeBound = Union{OptionalCache{T}, OptionalCache{C}}
-        PseudoLRU{OrbIntLayoutInfo{N}, valueTypeBound}(CONSTVAR_inteLayoutCacheSize)
+        partition = 2^(2N)
+        maxCapacity = checkPositivity(CONSTVAR_inteLayoutCacheScale) * partition
+        PseudoLRU{OrbIntLayoutInfo{N}, valueTypeBound}(maxCapacity, partition)
     else
         EmptyDict{OrbIntLayoutInfo{N}, C}()
     end
@@ -400,20 +402,18 @@ const IntegrationMethod{D, C<:RealOrComplex, N} =
 function getIntegralValue!(info::OrbitalInteCoreInfo{T, D, C, N}, 
                            indexLayout::NTuple{N, NTuple{2, OneToIndex}}) where 
                           {T<:Real, D, C<:RealOrComplex{T}, N}
-    inteConfig = info.method
     (layoutInfo, needToConjugate), sector = prepareOrbPointerLayoutCache(info, indexLayout)
     reorderedIdsKey = layoutInfo.idx
-    res = get(sector, reorderedIdsKey, nothing)::NothingOr{C}
-    if res === nothing
+
+    val = get!(sector, reorderedIdsKey) do #> No noticeable performance hit from the closure
+        inteConfig = info.method
         component = configureIntegration!(inteConfig, layoutInfo.orb)
         switcher = genInteMethodSwitcher(Count(D), C, Count(N), component)
-        res = evaluateIntegralCore!(switcher::IntegrationMethod{D, C, N}, 
-                                    inteConfig.operator, component, info.source.left, 
-                                    reorderedIdsKey)::C
-        setindex!(sector, res, reorderedIdsKey)
-    end #> Fewer allocations than using `get!`
+        evaluateIntegralCore!(switcher::IntegrationMethod{D, C, N}, inteConfig.operator, 
+                              component, info.source.left, reorderedIdsKey)::C
+    end
 
-    ifelse(needToConjugate, conj(res), res)::C
+    ifelse(needToConjugate, conj(val), val)::C
 end
 
 
