@@ -401,11 +401,32 @@ const IntegrationMethod{D, C<:RealOrComplex, N} =
 #>> Consistent with the reverse-ordered index layout such that the left index contributes 
 #>> less than the right index to incrementing the linear index. This results in a better 
 #>> locality of the hash index.
-function indexLayoutHash(layout::NTuple{N, NTuple{2, OneToIndex}}, 
-                         orbCoreNum::Int) where {N}
-    linearIds = LinearIndices(ntuple( _->orbCoreNum, Val(2N) ))
-    cartesIds = mapreduce(x->getfield.(x, :idx), (x, y)->(x..., y...), layout, init=())
-    UInt(linearIds[cartesIds...])
+function indexLayoutHash(layout::N1N2Tuple{OneToIndex}, orbCoreNum::Int)
+    (i, j), = layout
+
+    if i == j
+        i.idx
+    else
+        linearIds = LinearIndices((orbCoreNum, orbCoreNum))
+        linearIds[i.idx, j.idx]
+    end |> UInt
+end
+
+function indexLayoutHash(layout::N2N2Tuple{OneToIndex}, orbCoreNum::Int)
+    (i, j), (k, l) = L, R = layout
+    bl1 = (i == j)
+    bl2 = (k == l)
+    bl3 = (L == R)
+
+    if bl1 && bl2 && bl3
+        i.idx
+    elseif bl1 && bl2
+        linearIds = LinearIndices((orbCoreNum, orbCoreNum))
+        linearIds[i.idx, k.idx]
+    else
+        linearIds = LinearIndices((orbCoreNum, orbCoreNum, orbCoreNum, orbCoreNum))
+        linearIds[i.idx, j.idx, k.idx, l.idx]
+    end |> UInt
 end
 
 function getIntegralValue!(info::OrbitalInteCoreInfo{T, D, C, N}, 
