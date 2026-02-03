@@ -866,13 +866,13 @@ struct OrbitalSetIntegralInfo{T<:Real, D, C<:RealOrComplex{T}, N,
                               } <: FieldIntegralInfo{D, C, N}
     config::M
     weight::OrbCorePointerVector{D, C}
-    memory::LRU{NTuple{N, NTuple{2, OneToIndex}}, C}
+    memory::PseudoLRU{NTuple{N, NTuple{2, OneToIndex}}, C}
 
     function OrbitalSetIntegralInfo(coreInfo::M, weightInfo::OrbCorePointerVector{D, C}, 
-                                    maxSize::Int=(10^N)*CONSTVAR_inteValCacheSize) where 
+                                    maxSize::Int=0, minSize::Int=maxSize) where 
                                    {T<:Real, D, C<:RealOrComplex{T}, N, 
                                     M<:OrbitalInteCoreInfo{T, D, C, N}}
-        memory = LRU{NTuple{N, NTuple{2, OneToIndex}}, C}(maxsize=maxSize)
+        memory = PseudoLRU{NTuple{N, NTuple{2, OneToIndex}}, C}(maxSize, minSize)
         new{T, D, C, N, M}(coreInfo, weightInfo, memory)
     end
 end
