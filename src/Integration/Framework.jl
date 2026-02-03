@@ -12,7 +12,7 @@ const OptEstimatorConfig{T} = MissingOr{EstimatorConfig{T}}
 
 const CONSTVAR_inteLayoutCacheScale::Int = 4
 
-const CONSTVAR_inteValCacheSize::Int = 64
+const CONSTVAR_inteValCacheSize::Int = 100
 
 
 struct OrbitalIntegrationConfig{T<:Real, D, C<:RealOrComplex{T}, N, O<:DirectOperator, 
@@ -55,8 +55,8 @@ struct OneBodyIntegralValCache{C<:RealOrComplex} <: QueryBox{C}
     dimension::Int
     threshold::Int
 
-    function OneBodyIntegralValCache(::OneBodyIntegral{D, C}, 
-                                     threshold::Int=CONSTVAR_inteValCacheSize) where {D, C<:RealOrComplex}
+    function OneBodyIntegralValCache(::OneBodyIntegral{D, C}, threshold::Int) where 
+                                    {D, C<:RealOrComplex}
         checkPositivity(threshold)
         threshold0 = (Int∘ceil∘sqrt)(threshold)
         threshold2 = threshold * (threshold - 1)
@@ -75,8 +75,7 @@ struct TwoBodyIntegralValCache{C<:RealOrComplex} <: QueryBox{C}
     dimension::Int
     threshold::Int
 
-    function TwoBodyIntegralValCache(::TwoBodyIntegral{D, C}, 
-                                     threshold::Int=CONSTVAR_inteValCacheSize) where 
+    function TwoBodyIntegralValCache(::TwoBodyIntegral{D, C}, threshold::Int) where 
                                     {D, C<:RealOrComplex}
         checkPositivity(threshold)
         threshold0 = (Int∘ceil∘sqrt)(threshold)
@@ -94,17 +93,20 @@ end
 const FauxIntegralValCache{N, C<:RealOrComplex} = 
       EmptyDict{NTuple{N, NTuple{2, OneToIndex}}, C}
 
-function genMultiBodyIntegralValCache(::MultiBodyIntegral{D, C, N}, caching::Boolean=True()
+function genMultiBodyIntegralValCache(::MultiBodyIntegral{D, C, N}, requiredSpace::Int, 
+                                      caching::Boolean=True(), unboundSpace::Bool=false
                                       ) where {D, C<:RealOrComplex, N}
     if !(N in (1, 2))
         throw(AssertionError("`$(MultiBodyIntegral{D, C, N})` is not supported."))
     end
 
+    space = unboundSpace ? requiredSpace : min(CONSTVAR_inteValCacheSize, requiredSpace)
+
     if evalTypedData(caching)
         if N == 1
-            OneBodyIntegralValCache(OneBodyIntegral{D, C}())
+            OneBodyIntegralValCache(OneBodyIntegral{D, C}(), space)
         else
-            TwoBodyIntegralValCache(TwoBodyIntegral{D, C}())
+            TwoBodyIntegralValCache(TwoBodyIntegral{D, C}(), space)
         end
     else
         EmptyDict{NTuple{N, NTuple{2, OneToIndex}}, C}()::FauxIntegralValCache{N, C}
@@ -214,11 +216,14 @@ function initializeOrbIntegral(::MultiBodyIntegral{D, C, N}, op::DirectOperator,
                               {D, T<:Real, C<:RealOrComplex{T}, N, 
                                F<:StashedShiftedField{T, D}}
     inteStyle = MultiBodyIntegral{D, C, N}()
+    orbCoreNum = length(orbCoreSource)
 
     methodConfig = OrbitalIntegrationConfig(inteStyle, op, cachingMethod, estimatorConfig)
-    resultConfig = if !(cachingResult isa Boolean); cachingResult
-                   else; genMultiBodyIntegralValCache(inteStyle, cachingResult) end
-
+    resultConfig = if cachingResult isa Boolean
+        genMultiBodyIntegralValCache(inteStyle, orbCoreNum, cachingResult)
+    else
+        cachingResult
+    end
     OrbitalInteCoreInfo(methodConfig, resultConfig, orbCoreSource)
 end
 
