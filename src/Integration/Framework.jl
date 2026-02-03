@@ -83,10 +83,10 @@ struct TwoBodyIntegralValCache{C<:RealOrComplex} <: QueryBox{C}
         threshold2 = threshold * (threshold - 1)
         threshold3 = threshold * threshold2 * 2
         threshold4 = threshold2^2 #> `== threshold^4 - threshold - threshold2 - threshold3`
-        aaaaSector = PseudoLRU{N2N2Tuple{OneToIndex}, C}(threshold,  threshold0 )
-        aabbSector = PseudoLRU{N2N2Tuple{OneToIndex}, C}(threshold2, threshold  )
-        halfSector = PseudoLRU{N2N2Tuple{OneToIndex}, C}(threshold3, threshold^2)
-        miscSector = PseudoLRU{N2N2Tuple{OneToIndex}, C}(threshold4, threshold^3)
+        aaaaSector = PseudoLRU{N2N2Tuple{OneToIndex}, C}(threshold,  threshold0)
+        aabbSector = PseudoLRU{N2N2Tuple{OneToIndex}, C}(threshold2, threshold )
+        halfSector = PseudoLRU{N2N2Tuple{OneToIndex}, C}(threshold3, threshold*threshold )
+        miscSector = PseudoLRU{N2N2Tuple{OneToIndex}, C}(threshold4, threshold*threshold2)
         new{C}(aaaaSector, aabbSector, halfSector, miscSector, Int(D), threshold)
     end
 end
