@@ -12,8 +12,6 @@ const OptEstimatorConfig{T} = MissingOr{EstimatorConfig{T}}
 
 const CONSTVAR_inteLayoutCacheScale::Int = 4
 
-const CONSTVAR_inteValCacheSize::Int = 100
-
 
 struct OrbitalIntegrationConfig{T<:Real, D, C<:RealOrComplex{T}, N, O<:DirectOperator, 
                                 M<:OptOrbIntLayoutCache{T, C, N}, E<:OptEstimatorConfig{T}
@@ -93,14 +91,17 @@ end
 const FauxIntegralValCache{N, C<:RealOrComplex} = 
       EmptyDict{NTuple{N, NTuple{2, OneToIndex}}, C}
 
-function genMultiBodyIntegralValCache(::MultiBodyIntegral{D, C, N}, requiredSpace::Int, 
+getOrbInteValCacheSizeBound(::Count) = 100
+getOrbInteValCacheSizeBound(::Count{1}) = 1000
+
+function genMultiBodyIntegralValCache(::MultiBodyIntegral{D, C, N}, space::Int, 
                                       caching::Boolean=True(), unboundSpace::Bool=false
                                       ) where {D, C<:RealOrComplex, N}
     if !(N in (1, 2))
         throw(AssertionError("`$(MultiBodyIntegral{D, C, N})` is not supported."))
     end
 
-    space = unboundSpace ? requiredSpace : min(CONSTVAR_inteValCacheSize, requiredSpace)
+    unboundSpace || (space = min(getOrbInteValCacheSizeBound(Count(N))::Int, space))
 
     if evalTypedData(caching)
         if N == 1
