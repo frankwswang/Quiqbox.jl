@@ -269,7 +269,7 @@ for guess in (:CoreH, :SAD)
         bs = reduce(vcat, genGaussTypeOrbSeq.(nucCoords2, :H, "3-21G"))
 
         for (HFT, Et, Eref) in zip(HFtypes, Ets, Erefs)
-            config = HFconfig(Float64, HFT, initial=guess)
+            config = HFconfig(Float64, HFT, initial=guess, maxStep=300)
             info = @capture_out begin
                 res = runHartreeFock(nucInfoLocal, bs, config, printInfo=true, infoLevel=5)
                 push!(Et, sum(res.energy))

@@ -10,9 +10,7 @@ const OptOrbIntLayoutCache{T<:Real, C<:RealOrComplex{T}, N} =
 
 const OptEstimatorConfig{T} = MissingOr{EstimatorConfig{T}}
 
-const CONSTVAR_inteLayoutCacheScale::Int = 4
-
-const CONSTVAR_inteValCacheSize::Int = 100
+const CONSTVAR!!InteLayoutCacheScale::Int = 4
 
 
 struct OrbitalIntegrationConfig{T<:Real, D, C<:RealOrComplex{T}, N, O<:DirectOperator, 
@@ -37,7 +35,7 @@ function OrbitalIntegrationConfig(style::MultiBodyIntegral{D, C, N}, operator::O
     cache = if evalTypedData(caching)
         valueTypeBound = Union{OptionalCache{T}, OptionalCache{C}}
         partition = 2^(2N)
-        maxCapacity = checkPositivity(CONSTVAR_inteLayoutCacheScale) * partition
+        maxCapacity = checkPositivity(CONSTVAR!!InteLayoutCacheScale) * partition
         PseudoLRU{OrbIntLayoutInfo{N}, valueTypeBound}(maxCapacity, partition)
     else
         EmptyDict{OrbIntLayoutInfo{N}, C}()
@@ -50,42 +48,42 @@ const OrbitalOverlapConfig{T<:Real, D, C<:RealOrComplex{T},
       OrbitalIntegrationConfig{T, D, C, 1, OverlapSampler, M, E}
 
 struct OneBodyIntegralValCache{C<:RealOrComplex} <: QueryBox{C}
-    aa::LRU{N1N2Tuple{OneToIndex}, C}
-    ab::LRU{N1N2Tuple{OneToIndex}, C}
+    aa::PseudoLRU{N1N2Tuple{OneToIndex}, C}
+    ab::PseudoLRU{N1N2Tuple{OneToIndex}, C}
     dimension::Int
     threshold::Int
 
-    function OneBodyIntegralValCache(::OneBodyIntegral{D, C}, 
-                                     threshold::Int=10CONSTVAR_inteValCacheSize) where 
+    function OneBodyIntegralValCache(::OneBodyIntegral{D, C}, threshold::Int) where 
                                     {D, C<:RealOrComplex}
         checkPositivity(threshold)
-        maxPairNum = threshold * (threshold - 1)
-        aaSector = LRU{N1N2Tuple{OneToIndex}, C}(maxsize=threshold )
-        abSector = LRU{N1N2Tuple{OneToIndex}, C}(maxsize=maxPairNum)
+        threshold0 = (Int∘ceil∘sqrt)(threshold)
+        threshold2 = threshold * (threshold - 1)
+        aaSector = PseudoLRU{N1N2Tuple{OneToIndex}, C}(threshold,  threshold0)
+        abSector = PseudoLRU{N1N2Tuple{OneToIndex}, C}(threshold2, threshold )
         new{C}(aaSector, abSector, Int(D), threshold)
     end
 end
 
 
 struct TwoBodyIntegralValCache{C<:RealOrComplex} <: QueryBox{C}
-    aaaa::LRU{N2N2Tuple{OneToIndex}, C}
-    aabb::LRU{N2N2Tuple{OneToIndex}, C}
-    half::LRU{N2N2Tuple{OneToIndex}, C} # aaxy or xyaa
-    misc::LRU{N2N2Tuple{OneToIndex}, C} # abxy
+    aaaa::PseudoLRU{N2N2Tuple{OneToIndex}, C}
+    aabb::PseudoLRU{N2N2Tuple{OneToIndex}, C}
+    half::PseudoLRU{N2N2Tuple{OneToIndex}, C} # aaxy or xyaa
+    misc::PseudoLRU{N2N2Tuple{OneToIndex}, C} # abxy
     dimension::Int
     threshold::Int
 
-    function TwoBodyIntegralValCache(::TwoBodyIntegral{D, C}, 
-                                     threshold::Int=CONSTVAR_inteValCacheSize) where 
+    function TwoBodyIntegralValCache(::TwoBodyIntegral{D, C}, threshold::Int) where 
                                     {D, C<:RealOrComplex}
         checkPositivity(threshold)
+        threshold0 = (Int∘ceil∘sqrt)(threshold)
         threshold2 = threshold * (threshold - 1)
         threshold3 = threshold * threshold2 * 2
-        threshold4 = threshold^4 - threshold - threshold2 - threshold3
-        aaaaSector = LRU{N2N2Tuple{OneToIndex}, C}(maxsize=threshold )
-        aabbSector = LRU{N2N2Tuple{OneToIndex}, C}(maxsize=threshold2)
-        halfSector = LRU{N2N2Tuple{OneToIndex}, C}(maxsize=threshold3)
-        miscSector = LRU{N2N2Tuple{OneToIndex}, C}(maxsize=threshold4)
+        threshold4 = threshold2^2 #> `== threshold^4 - threshold - threshold2 - threshold3`
+        aaaaSector = PseudoLRU{N2N2Tuple{OneToIndex}, C}(threshold,  threshold0)
+        aabbSector = PseudoLRU{N2N2Tuple{OneToIndex}, C}(threshold2, threshold )
+        halfSector = PseudoLRU{N2N2Tuple{OneToIndex}, C}(threshold3, threshold*threshold )
+        miscSector = PseudoLRU{N2N2Tuple{OneToIndex}, C}(threshold4, threshold*threshold2)
         new{C}(aaaaSector, aabbSector, halfSector, miscSector, Int(D), threshold)
     end
 end
@@ -93,17 +91,23 @@ end
 const FauxIntegralValCache{N, C<:RealOrComplex} = 
       EmptyDict{NTuple{N, NTuple{2, OneToIndex}}, C}
 
-function genMultiBodyIntegralValCache(::MultiBodyIntegral{D, C, N}, caching::Boolean=True()
+getOrbInteValCacheSizeBound(::Count) = 100
+getOrbInteValCacheSizeBound(::Count{1}) = 1000
+
+function genMultiBodyIntegralValCache(::MultiBodyIntegral{D, C, N}, space::Int, 
+                                      caching::Boolean=True(), unboundSpace::Bool=false
                                       ) where {D, C<:RealOrComplex, N}
     if !(N in (1, 2))
         throw(AssertionError("`$(MultiBodyIntegral{D, C, N})` is not supported."))
     end
 
+    unboundSpace || (space = min(getOrbInteValCacheSizeBound(Count(N))::Int, space))
+
     if evalTypedData(caching)
         if N == 1
-            OneBodyIntegralValCache(OneBodyIntegral{D, C}())
+            OneBodyIntegralValCache(OneBodyIntegral{D, C}(), space)
         else
-            TwoBodyIntegralValCache(TwoBodyIntegral{D, C}())
+            TwoBodyIntegralValCache(TwoBodyIntegral{D, C}(), space)
         end
     else
         EmptyDict{NTuple{N, NTuple{2, OneToIndex}}, C}()::FauxIntegralValCache{N, C}
@@ -213,11 +217,14 @@ function initializeOrbIntegral(::MultiBodyIntegral{D, C, N}, op::DirectOperator,
                               {D, T<:Real, C<:RealOrComplex{T}, N, 
                                F<:StashedShiftedField{T, D}}
     inteStyle = MultiBodyIntegral{D, C, N}()
+    orbCoreNum = length(orbCoreSource)
 
     methodConfig = OrbitalIntegrationConfig(inteStyle, op, cachingMethod, estimatorConfig)
-    resultConfig = if !(cachingResult isa Boolean); cachingResult
-                   else; genMultiBodyIntegralValCache(inteStyle, cachingResult) end
-
+    resultConfig = if cachingResult isa Boolean
+        genMultiBodyIntegralValCache(inteStyle, orbCoreNum, cachingResult)
+    else
+        cachingResult
+    end
     OrbitalInteCoreInfo(methodConfig, resultConfig, orbCoreSource)
 end
 
@@ -237,7 +244,7 @@ function reformatOrbIntegral(op::O, info::OrbitalInteCoreInfo{T, D, C, N},
     resultCache = info.memory
     activeMCache = !(methodCache isa EmptyDict)
     activeRCache = !(resultCache isa EmptyDict)
-    equalPtclNum = NO == N
+    equalPtclNum = (NO == N)
     sameIntegral = equalPtclNum && compareObj(op, method.operator)
 
     if evalTypedData(activeCaching)
@@ -276,7 +283,7 @@ getIntegralOpOrbSymmetry(::CoulombInteractionSampler, ::N2N2Tuple{OrbitalCategor
 (true, true, true)
 
 #>> Index layout symmetry
-getIntegralIndexSymmetry((part,)::N1N2Tuple{OneToIndex}) = first(part) == last(part)
+getIntegralIndexSymmetry((part,)::N1N2Tuple{OneToIndex}) = (first(part) == last(part))
 function getIntegralIndexSymmetry((partL, partR)::N2N2Tuple{OneToIndex})
     idxL1, idxR1 = partL
     idxL2, idxR2 = partR
@@ -292,7 +299,7 @@ getInteValCacheSector(cache::FauxIntegralValCache{2}, ::NTuple{3, Bool}) = itsel
 
 function getInteValCacheSector(cache::OneBodyIntegralValCache{C}, 
                                indexSymmetry::Bool) where {C<:RealOrComplex}
-    ifelse(indexSymmetry, cache.aa, cache.ab)::LRU{N1N2Tuple{OneToIndex}, C}
+    ifelse(indexSymmetry, cache.aa, cache.ab)::PseudoLRU{N1N2Tuple{OneToIndex}, C}
 end
 
 function getInteValCacheSector(cache::TwoBodyIntegralValCache{C}, 
@@ -309,7 +316,7 @@ function getInteValCacheSector(cache::TwoBodyIntegralValCache{C},
         cache.half #> xyaa
     else
         cache.misc #> abxy
-    end::LRU{N2N2Tuple{OneToIndex}, C}
+    end::PseudoLRU{N2N2Tuple{OneToIndex}, C}
 end
 
 
@@ -317,11 +324,11 @@ end
 #>> One-body
 function getIntegralIndexPair(key::N1N2Tuple{OneToIndex}, permuteControl::Bool)
     (i, j), = key
-    if permuteControl && i > j
+    if permuteControl && i < j
         Pair(tuple((j, i)), true)
     else
         Pair(key, false)
-    end
+    end #>> Resulting order: `i >= j`
 end
 
 #>> Two-body
@@ -330,23 +337,23 @@ function getIntegralIndexPair(key::N2N2Tuple{OneToIndex}, permuteControl::NTuple
     permuteL, permuteR, permuteLR = permuteControl
 
     (i, j), partR = key
-    if permuteL && i > j
+    if permuteL && i < j
         key = ((j, i), partR)
         needToConjugate = !needToConjugate
     end
 
     partL, (k, l) = key
-    if permuteR && k > l
+    if permuteR && k < l
         key = (partL, (l, k))
         needToConjugate = !needToConjugate
     end
 
     partL, partR = key
-    if permuteLR && partL > partR
+    if permuteLR && partL < partR
         key = (partR, partL)
     end
 
-    Pair(key, needToConjugate)
+    Pair(key, needToConjugate) #>> Resulting order: `i >= j; k >= l; (i, j) >= (k, l)`
 end
 
 
@@ -398,19 +405,65 @@ struct GaussTypeIntegration{D, C<:RealOrComplex, N} <: IntegralStyle end
 const IntegrationMethod{D, C<:RealOrComplex, N} = 
       Union{NumericalIntegration{D, C, N}, GaussTypeIntegration{D, C, N}}
 
+#>> Consistent with the reverse-ordered index layout such that the left index contributes 
+#>> less than the right index to incrementing the linear index. This results in a better 
+#>> locality of the hash index.
+function indexLayoutHash(layout::N1N2Tuple{OneToIndex}, orbCoreNum::Int)
+    (i, j), = layout
+
+    if i == j
+        i.idx
+    else
+        linearIds = LinearIndices((orbCoreNum, orbCoreNum-1))
+        m = j.idx - (j > i)
+        linearIds[i.idx, m]
+    end |> UInt
+end
+
+function indexLayoutHash(layout::N2N2Tuple{OneToIndex}, orbCoreNum::Int)
+    (i, j), (k, l) = L, R = layout
+    bl1 = (i == j)
+    bl2 = (k == l)
+    bl3 = (L == R)
+
+    if bl1 && bl2 && bl3
+        i.idx
+    elseif bl1 && bl2
+        linearIds = LinearIndices((orbCoreNum, orbCoreNum-1))
+        o = k.idx - (k > i)
+        linearIds[i.idx, o]
+    elseif bl1 || bl2
+        linearIds = LinearIndices((2orbCoreNum, orbCoreNum, orbCoreNum-1))
+        if bl1
+            n = l.idx - (l > k)
+            linearIds[2i.idx-1, k.idx, n]
+        else
+            m = j.idx - (j > i)
+            linearIds[2k.idx,   i.idx, m]
+        end
+    else
+        linearIds = LinearIndices((orbCoreNum, orbCoreNum-1, orbCoreNum, orbCoreNum-1))
+        m = j.idx - (j > i)
+        n = l.idx - (l > k)
+        linearIds[i.idx, m, k.idx, n]
+    end |> UInt
+end
 
 function getIntegralValue!(info::OrbitalInteCoreInfo{T, D, C, N}, 
                            indexLayout::NTuple{N, NTuple{2, OneToIndex}}) where 
                           {T<:Real, D, C<:RealOrComplex{T}, N}
     (layoutInfo, needToConjugate), sector = prepareOrbPointerLayoutCache(info, indexLayout)
     reorderedIdsKey = layoutInfo.idx
+    orbSource = info.source.left
+    orbCoreNum = length(orbSource)
 
-    val = get!(sector, reorderedIdsKey) do #> No noticeable performance hit from the closure
+    #> No noticeable performance hit from the closure
+    val = get!(sector, reorderedIdsKey, RPartial( indexLayoutHash, (orbCoreNum,) )) do
         inteConfig = info.method
         component = configureIntegration!(inteConfig, layoutInfo.orb)
         switcher = genInteMethodSwitcher(Count(D), C, Count(N), component)
         evaluateIntegralCore!(switcher::IntegrationMethod{D, C, N}, inteConfig.operator, 
-                              component, info.source.left, reorderedIdsKey)::C
+                              component, orbSource, reorderedIdsKey)::C
     end
 
     ifelse(needToConjugate, conj(val), val)::C
@@ -614,11 +667,11 @@ function getOrbVectorIntegralCore!(inteInfo::TwoBodyOrbIntegralInfo{T, D, C},
     elseif symL && symR && !symO
         for n in 1:symmetric2DArrEleNum(len)
             k, l = OneToIndex.(n|>convertIndex1DtoTri2D)
-            sym2 = k == l
+            sym2 = (k == l)
 
             for m in 1:symmetric2DArrEleNum(len)
                 i, j = OneToIndex.(m|>convertIndex1DtoTri2D)
-                sym1 = i == j
+                sym1 = (i == j)
 
                 ijklVal = evalSetInteTensorEntry!(tensor, inteInfo, ptrVector, (i, j, k, l))
                 ijklValConj = conj(ijklVal)
@@ -814,13 +867,13 @@ struct OrbitalSetIntegralInfo{T<:Real, D, C<:RealOrComplex{T}, N,
                               } <: FieldIntegralInfo{D, C, N}
     config::M
     weight::OrbCorePointerVector{D, C}
-    memory::LRU{NTuple{N, NTuple{2, OneToIndex}}, C}
+    memory::PseudoLRU{NTuple{N, NTuple{2, OneToIndex}}, C}
 
     function OrbitalSetIntegralInfo(coreInfo::M, weightInfo::OrbCorePointerVector{D, C}, 
-                                    maxSize::Int=(10^N)*CONSTVAR_inteValCacheSize) where 
+                                    maxSize::Int=0, minSize::Int=maxSize) where 
                                    {T<:Real, D, C<:RealOrComplex{T}, N, 
                                     M<:OrbitalInteCoreInfo{T, D, C, N}}
-        memory = LRU{NTuple{N, NTuple{2, OneToIndex}}, C}(maxsize=maxSize)
+        memory = PseudoLRU{NTuple{N, NTuple{2, OneToIndex}}, C}(maxSize, minSize)
         new{T, D, C, N, M}(coreInfo, weightInfo, memory)
     end
 end

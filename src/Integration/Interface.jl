@@ -4,15 +4,15 @@ export overlap, overlaps, multipoleMoment, multipoleMoments, elecKinetic, elecKi
 
 using TensorOperations: @tensor as @TOtensor
 
-const CONST_typeStrOfOrbBasisVector = shortUnionAllString(OrbBasisVector)
+const CONSTVAR!!TypeStrOfOrbBasisVector = shortUnionAllString(OrbBasisVector)
 
 """
 
     overlap(orbL::$OrbitalBasis{CL, D}, orbR::$OrbitalBasis{CR, D}; 
             lazyCompute::Bool=true
-            ) where {T<:Real, CL<:$CONST_typeStrOfRealOrComplex, 
-                              CR<:$CONST_typeStrOfRealOrComplex, D} -> 
-    $CONST_typeStrOfRealOrComplex
+            ) where {T<:Real, CL<:$CONSTVAR!!TypeStrOfRealOrComplex, 
+                              CR<:$CONSTVAR!!TypeStrOfRealOrComplex, D} -> 
+    $CONSTVAR!!TypeStrOfRealOrComplex
 
 Compute the overlap integral between two orbital basis functions `orbL` and `orbR`. If 
 `lazyCompute` is set to `true`, the integral will be computed in a lazy manner to avoid 
@@ -34,10 +34,10 @@ end
 
 """
 
-    overlaps(basisSet::$CONST_typeStrOfOrbBasisVector; 
+    overlaps(basisSet::$CONSTVAR!!TypeStrOfOrbBasisVector; 
              lazyCompute::Bool=true
              ) where {T<:Real, D} -> 
-    AbstractMatrix{<:$CONST_typeStrOfRealOrComplex}
+    AbstractMatrix{<:$CONSTVAR!!TypeStrOfRealOrComplex}
 
 Compute the overlap integrals for all pairs of orbital basis functions in `basisSet`. If 
 `lazyCompute` is set to `true`, the integrals will be computed in a lazy manner to avoid 
@@ -59,9 +59,9 @@ end
     multipoleMoment(center::NTuple{D, Real}, degrees::NTuple{D, Int}, 
                     orbL::$OrbitalBasis{CL, D}, orbR::$OrbitalBasis{CR, D}; 
                     lazyCompute::Bool=true
-                    ) where {T<:Real, CL<:$CONST_typeStrOfRealOrComplex, 
-                                      CR<:$CONST_typeStrOfRealOrComplex, D} -> 
-    $CONST_typeStrOfRealOrComplex
+                    ) where {T<:Real, CL<:$CONSTVAR!!TypeStrOfRealOrComplex, 
+                                      CR<:$CONSTVAR!!TypeStrOfRealOrComplex, D} -> 
+    $CONSTVAR!!TypeStrOfRealOrComplex
 
 Compute the multipole-moment integral between two orbital basis functions `orbL` and `orbR` 
 at the `D`-dimensional `center` with `degrees` specified for its axes. If `lazyCompute` is 
@@ -82,10 +82,10 @@ end
 """
 
     multipoleMoments(center::NTuple{D, Real}, degrees::NTuple{D, Int}, 
-                     basisSet::$CONST_typeStrOfOrbBasisVector; 
+                     basisSet::$CONSTVAR!!TypeStrOfOrbBasisVector; 
                      lazyCompute::Bool=true
                      ) where {T<:Real, D} -> 
-    AbstractMatrix{<:$CONST_typeStrOfRealOrComplex}
+    AbstractMatrix{<:$CONSTVAR!!TypeStrOfRealOrComplex}
 
 Compute the multipole-moment integrals for all pairs of orbital basis functions in 
 `basisSet` at the `D`-dimensional `center` with `degrees` specified for its axes. If 
@@ -109,9 +109,9 @@ end
 
     elecKinetic(orbL::$OrbitalBasis{CL, D}, orbR::$OrbitalBasis{CR, D}; 
                 lazyCompute::Bool=true
-                ) where {T<:Real, CL<:$CONST_typeStrOfRealOrComplex, 
-                                  CR<:$CONST_typeStrOfRealOrComplex, D} -> 
-    $CONST_typeStrOfRealOrComplex
+                ) where {T<:Real, CL<:$CONSTVAR!!TypeStrOfRealOrComplex, 
+                                  CR<:$CONSTVAR!!TypeStrOfRealOrComplex, D} -> 
+    $CONSTVAR!!TypeStrOfRealOrComplex
 
 Compute the electronic kinetic-energy integral between two orbital basis functions `orbL` 
 and `orbR`. If `lazyCompute` is set to `true`, the integral will be computed in a lazy 
@@ -131,10 +131,10 @@ end
 
 """
 
-    elecKinetics(basisSet::$CONST_typeStrOfOrbBasisVector; 
+    elecKinetics(basisSet::$CONSTVAR!!TypeStrOfOrbBasisVector; 
                  lazyCompute::Bool=true
                  ) where {T<:Real, D} -> 
-    AbstractMatrix{<:$CONST_typeStrOfRealOrComplex}
+    AbstractMatrix{<:$CONSTVAR!!TypeStrOfRealOrComplex}
 
 Compute the electronic kinetic-energy integrals for all pairs of orbital basis functions in 
 `basisSet`. If `lazyCompute` is set to `true`, the integrals will be computed in a lazy 
@@ -158,16 +158,16 @@ end
     nucAttraction(nucs::AbstractVector{Symbol}, nucCoords::AbstractVector{NTuple{D, T}}, 
                   orbL::$OrbitalBasis{CL, D}, orbR::$OrbitalBasis{CR, D}; 
                   lazyCompute::Bool=true
-                  ) where {T<:Real, CL<:$CONST_typeStrOfRealOrComplex, 
-                                    CR<:$CONST_typeStrOfRealOrComplex, D} ->
-    $CONST_typeStrOfRealOrComplex
+                  ) where {T<:Real, CL<:$CONSTVAR!!TypeStrOfRealOrComplex, 
+                                    CR<:$CONSTVAR!!TypeStrOfRealOrComplex, D} ->
+    $CONSTVAR!!TypeStrOfRealOrComplex
 
     nucAttraction(nucInfo::$NuclearCluster{T, D}, 
                   orbL::$OrbitalBasis{CL, D}, orbR::$OrbitalBasis{CR, D}; 
                   lazyCompute::Bool=true
-                  ) where {T<:Real, CL<:$CONST_typeStrOfRealOrComplex, 
-                                    CR<:$CONST_typeStrOfRealOrComplex, D} ->
-    $CONST_typeStrOfRealOrComplex
+                  ) where {T<:Real, CL<:$CONSTVAR!!TypeStrOfRealOrComplex, 
+                                    CR<:$CONSTVAR!!TypeStrOfRealOrComplex, D} ->
+    $CONSTVAR!!TypeStrOfRealOrComplex
 
 Compute the nuclear-attraction integral between two orbital basis functions `orbL` and 
 `orbR`. If `lazyCompute` is set to `true`, the integral will be computed in a lazy manner 
@@ -208,16 +208,16 @@ nucAttraction(nucInfo.layout.left, nucInfo.layout.right, orbL, orbR;
 """
 
     nucAttractions(nucs::AbstractVector{Symbol}, nucCoords::AbstractVector{NTuple{D, T}}, 
-                   basisSet::$CONST_typeStrOfOrbBasisVector; 
+                   basisSet::$CONSTVAR!!TypeStrOfOrbBasisVector; 
                    lazyCompute::Bool=true
                    ) where {T<:Real, D} -> 
-    AbstractMatrix{<:$CONST_typeStrOfRealOrComplex}
+    AbstractMatrix{<:$CONSTVAR!!TypeStrOfRealOrComplex}
 
     nucAttractions(nucInfo::NuclearCluster{T, D}, 
-                   basisSet::$CONST_typeStrOfOrbBasisVector; 
+                   basisSet::$CONSTVAR!!TypeStrOfOrbBasisVector; 
                    lazyCompute::Bool=true
                    ) where {T<:Real, D} -> 
-    AbstractMatrix{<:$CONST_typeStrOfRealOrComplex}
+    AbstractMatrix{<:$CONSTVAR!!TypeStrOfRealOrComplex}
 
 Compute the nuclear-attraction integrals for all pairs of orbital basis functions in 
 `basisSet`. If `lazyCompute` is set to `true`, the integrals will be computed in a lazy 
@@ -259,16 +259,16 @@ nucAttractions(nucInfo.layout.left, nucInfo.layout.right, basisSet;
 """
 
     coreHamiltonian(nucs::AbstractVector{Symbol}, nucCoords::AbstractVector{NTuple{D, T}}, 
-                    basisSet::$CONST_typeStrOfOrbBasisVector; 
+                    basisSet::$CONSTVAR!!TypeStrOfOrbBasisVector; 
                     lazyCompute::Bool=true
                     ) where {T<:Real, D} -> 
-    AbstractMatrix{<:$CONST_typeStrOfRealOrComplex}
+    AbstractMatrix{<:$CONSTVAR!!TypeStrOfRealOrComplex}
 
     coreHamiltonian(nucInfo::NuclearCluster{T, D}, 
-                    basisSet::$CONST_typeStrOfOrbBasisVector; 
+                    basisSet::$CONSTVAR!!TypeStrOfOrbBasisVector; 
                     lazyCompute::Bool=true
                     ) where {T<:Real, D} -> 
-    AbstractMatrix{<:$CONST_typeStrOfRealOrComplex}
+    AbstractMatrix{<:$CONSTVAR!!TypeStrOfRealOrComplex}
 
 Compute the core-Hamiltonian integrals for all pairs of orbital basis functions in 
 `basisSet`, which is the matrix addition of the electronic kinetic-energy integrals and the 
@@ -317,11 +317,11 @@ coreHamiltonian(nucInfo.layout.left, nucInfo.layout.right, basisSet, kineticOper
     elecRepulsion(orbL1::$OrbitalBasis{CL1, D}, orbR1::$OrbitalBasis{CR1, D}, 
                   orbL2::$OrbitalBasis{CL2, D}, orbR2::$OrbitalBasis{CR2, D}; 
                   lazyCompute::Bool=true
-                  ) where {T<:Real, CL1<:$CONST_typeStrOfRealOrComplex, 
-                                    CR1<:$CONST_typeStrOfRealOrComplex, 
-                                    CL2<:$CONST_typeStrOfRealOrComplex, 
-                                    CR2<:$CONST_typeStrOfRealOrComplex, D} -> 
-    $CONST_typeStrOfRealOrComplex
+                  ) where {T<:Real, CL1<:$CONSTVAR!!TypeStrOfRealOrComplex, 
+                                    CR1<:$CONSTVAR!!TypeStrOfRealOrComplex, 
+                                    CL2<:$CONSTVAR!!TypeStrOfRealOrComplex, 
+                                    CR2<:$CONSTVAR!!TypeStrOfRealOrComplex, D} -> 
+    $CONSTVAR!!TypeStrOfRealOrComplex
 
 Compute the electron-repulsion integral between two pairs of orbital basis functions
 `(orbL1, orbR1)` and `(orbL2, orbR2)` (ordered by the chemists' notation). If `lazyCompute` 
@@ -343,10 +343,10 @@ end
 
 """
 
-    elecRepulsions(basisSet::$CONST_typeStrOfOrbBasisVector; 
+    elecRepulsions(basisSet::$CONSTVAR!!TypeStrOfOrbBasisVector; 
                    lazyCompute::Bool=true
                    ) where {T<:Real, D} -> 
-    AbstractArray{<:$CONST_typeStrOfRealOrComplex, 4}
+    AbstractArray{<:$CONSTVAR!!TypeStrOfRealOrComplex, 4}
 
 Compute the electron-repulsion integrals for all double pairs of orbital basis functions 
 in `basisSet` (tensor indices are ordered by the chemists' notation). If `lazyCompute` is 

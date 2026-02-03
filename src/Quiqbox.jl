@@ -44,12 +44,19 @@ include("Precompilation.jl")
 
 end
 
-## Development comment guideline
+## Development comment style guide
 #!! Urgent issue
 #! Non-urgent issue
 #? Consideration for change or new implementation
-#> Code mechanism explanation
+#> Code explanation
 #- Code method reference
 
 ## Footnote comment template
 #= Additional Method =#
+
+## Variable naming style guide
+#> functions and variables: `oneTT`, `OneTThree`, `oneTwoThree`
+#> functions that always modify their inputs: `oneTwo!`
+#> function arguments that may be modified: `name!Self`
+#> Types (including constant type aliases): `OneTT`, `OneTThree`, `OneTwoThree`
+#> Global constant variables: `CONSTVAR!!NameOfTheVariable`

@@ -1,6 +1,6 @@
 using LinearAlgebra: norm
 
-const CONSTVAR_GTOrbInteCacheSize::Int = 2048
+const CONSTVAR!!GTOrbInteCacheSize::Int = 2048
 
 #>-- Basic data structure --<#
 struct PrimGaussTypeOrbInfo{T<:Real, D} <: QueryBox{T}
@@ -44,7 +44,7 @@ struct AxialGaussOverlapCache{T<:Real, D, M<:NTuple{D, OptPseudoLRU{T4Int2Tuple{
     axis::M
 
     function AxialGaussOverlapCache(::Type{T}, configs::NTuple{D, Boolean}, 
-                                    axialMaxSize::Int=CONSTVAR_GTOrbInteCacheSize) where 
+                                    axialMaxSize::Int=CONSTVAR!!GTOrbInteCacheSize) where 
                                    {T<:Real, D}
         axialCache = map(configs) do config
             if evalTypedData(config); PseudoLRU{T4Int2Tuple{T}, T}(axialMaxSize) else
@@ -458,7 +458,7 @@ struct GaussCoulombFieldCache{T<:Real, D, M<:OptPseudoLRU{Tuple{T, Int}, Memory{
     initial::M #> For `computeBoysSequence`` when D==3
 
     function GaussCoulombFieldCache(::Type{T}, ::Count{D}, config::Boolean=False(), 
-                                    axialMaxSize::Int=CONSTVAR_GTOrbInteCacheSize) where 
+                                    axialMaxSize::Int=CONSTVAR!!GTOrbInteCacheSize) where 
                                    {T<:Real, D}
         checkPositivity(D)
         flag = evalTypedData(config)
