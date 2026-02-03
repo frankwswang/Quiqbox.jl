@@ -1,15 +1,16 @@
 export SCFconfig, HFconfig, runHartreeFock, RCHartreeFock, UOHartreeFock
 public HFfinalInfo
-#!! Need to standardize the format for global values, types (aliases), and type parameters
+#! Need to standardize the format for global values, types (aliases), and type parameters
 using LinearAlgebra: dot, Hermitian, \, det, I, ishermitian, diag, norm, eigen, normalize!
 using Base: OneTo
 using Combinatorics: powerset
 using SPGBox: spgbox!
 using LBFGSB: lbfgsb
 
-const CONST_typeStrV2OfRealOrComplex = replace(CONST_typeStrOfRealOrComplex, 'T'=>'R')
+const CONSTVAR!!typeStrV2OfRealOrComplex = 
+      replace(CONSTVAR!!TypeStrOfRealOrComplex, 'T'=>'R')
 
-const CONSTVAR_defaultHFinfoDigits = 10
+const CONSTVAR!!DefaultHFinfoDigits = 10
 const FullHFStepLevel = 5
 const defaultDS = 0.75
 const defaultDIISsize = 15
@@ -60,8 +61,8 @@ getC(X::AbstractMatrix{T}, Fˢ::AbstractMatrix{T}, stabilizeSign::Bool=true) whe
 
 struct RCHartreeFock <: SymbolType end #> Restricted closed-shell Hartree–Fock
 struct UOHartreeFock <: SymbolType end #> Unrestricted open-shell Hartree–Fock
-const CONSTVAR_HartreeFockTypes = (RCHartreeFock, UOHartreeFock)
-const HartreeFockType = Union{CONSTVAR_HartreeFockTypes...}
+const CONSTVAR!!HartreeFockTypes = (RCHartreeFock, UOHartreeFock)
+const HartreeFockType = Union{CONSTVAR!!HartreeFockTypes...}
 
 getHartreeFockName(::RCHartreeFock) = "Restricted closed-shell (RHF)"
 getHartreeFockName(::UOHartreeFock) = "Unrestricted open-shell (UHF)"
@@ -150,7 +151,7 @@ struct ElecHamiltonianConfig{T<:RealOrComplex, A1<:AbstractMatrix{T},
 end
 
 
-const CONSTVAR_OrbCoeffInitializationMethods::NTuple{4, Val} = 
+const CONSTVAR!!OrbCoeffInitializationMethods::NTuple{4, Val} = 
       (Val(:Direct), Val(:CoreH), Val(:GWH), Val(:SAD))
 
 struct OrbCoeffInitialConfig{T<:RealOrComplex, HFT<:HartreeFockType, M, 
@@ -751,7 +752,7 @@ end
 
 """
 
-    HFfinalInfo{R<:Real, D, T<:$CONST_typeStrV2OfRealOrComplex, HFT<:$HartreeFockType, 
+    HFfinalInfo{R<:Real, D, T<:$CONSTVAR!!typeStrV2OfRealOrComplex, HFT<:$HartreeFockType, 
                 HFTS, B<:$MultiOrbitalData{R, D, T}} <: StateBox{T}
 
 The container of the final values after a Hartree–Fock SCF procedure. `HFTS` specifies the 
@@ -820,20 +821,20 @@ end
 
 """
 
-    HFconfig{R<:Real, T<:$CONST_typeStrV2OfRealOrComplex, HFT<:$HartreeFockType, 
+    HFconfig{R<:Real, T<:$CONSTVAR!!typeStrV2OfRealOrComplex, HFT<:$HartreeFockType, 
              CM<:$OrbCoeffInitialConfig{T, HFT}, SCFM<:$SCFconfig, S} <: $ConfigBox
 
 The container of a Hartree–Fock method's configuration.
 
 ≡≡≡ Property/Properties ≡≡≡
 
-`type::HFT`: Hartree–Fock method type. Available types are $CONSTVAR_HartreeFockTypes 
-$(getHartreeFockName.( map(x->x(), CONSTVAR_HartreeFockTypes) )).
+`type::HFT`: Hartree–Fock method type. Available types are $CONSTVAR!!HartreeFockTypes 
+$(getHartreeFockName.( map(x->x(), CONSTVAR!!HartreeFockTypes) )).
 
 `initial::CM`: Initial guess of the orbital coefficient matrix/matrices of the canonical 
 orbitals. When `initial` is as an argument of `HFconfig`'s constructor, it can be set 
 to `sym::Symbol` where available values of `sym` are 
-`$(CONSTVAR_OrbCoeffInitializationMethods.|>evalTypedData)`.
+`$(CONSTVAR!!OrbCoeffInitializationMethods.|>evalTypedData)`.
 
 `strategy::SCFM`: SCF iteration strategy. For more information please refer to 
 [`SCFconfig`](@ref).
@@ -861,7 +862,7 @@ information from all the iterations steps to the field `.temp` of the output
              strategy::$SCFconfig=SCFconfig(), 
              maxStep::Int=$defaultHFmaxStep, earlyStop::Bool=true, 
              saveTrace::NTuple{4, Bool}=$defaultHFsaveTrace) where 
-            {R<:Real, T<:$CONST_typeStrV2OfRealOrComplex, HFT<:$HartreeFockType} -> 
+            {R<:Real, T<:$CONSTVAR!!typeStrV2OfRealOrComplex, HFT<:$HartreeFockType} -> 
     HFconfig{R, T, HFT}
 
 ≡≡≡ Initialization Example(s) ≡≡≡
@@ -905,18 +906,20 @@ end
 
 const ElectronSpinConfig = Union{NTuple{2, Int}, OccupationState{2}}
 
-const CONST_typeStrV2OfOrbBasisVector = replace(CONST_typeStrOfOrbBasisVector, 'T'=>'R')
+const CONSTVAR!!TypeStrV2OfOrbBasisVector = 
+      replace(CONSTVAR!!TypeStrOfOrbBasisVector, 'T'=>'R')
 
 """
 
-    runHartreeFock(nucInfo::$NuclearCluster{R, D}, basis::$CONST_typeStrV2OfOrbBasisVector, 
+    runHartreeFock(nucInfo::$NuclearCluster{R, D}, 
+                   basis::$CONSTVAR!!TypeStrV2OfOrbBasisVector, 
                    config::MissingOr{$HFconfig{R}}=missing; 
                    printInfo::Bool=true, infoLevel::Int=$defaultHFinfoLevel) where 
                   {R<:Real, D} -> 
     HFfinalInfo{R, D}
 
     runHartreeFock(systemInfo::Pair{<:$ElectronSpinConfig, $NuclearCluster{R, D}}, 
-                   basis::$CONST_typeStrV2OfOrbBasisVector, 
+                   basis::$CONSTVAR!!TypeStrV2OfOrbBasisVector, 
                    config::MissingOr{$HFconfig{R}}=missing; 
                    printInfo::Bool=true, infoLevel::Int=$defaultHFinfoLevel) where 
                   {R<:Real, D} -> 
@@ -934,7 +937,7 @@ charge neutral and maximizing pairing electron spins.
 `systemInfoPair{<:$ElectronSpinConfig, $NuclearCluster{R, D}}`: A `Pair` information used 
 to specify both the spin and nuclear-geometry configuration of the target system.
 
-`basis::$CONST_typeStrV2OfOrbBasisVector`: The input orbital basis set.
+`basis::$CONSTVAR!!TypeStrV2OfOrbBasisVector`: The input orbital basis set.
 
 `config::HFconfig`: The Configuration of the Hartree–Fock method. For more information 
 please refer to [`HFconfig`](@ref).
@@ -995,7 +998,7 @@ function runHartreeFock(systemInfo::ElectronicSysConfig{R, D}, basis::OrbBasisDa
 
     timerBool && (tEnd = time_ns())
     if printInfo && infoLevel > 3
-        roundDigits = min(CONSTVAR_defaultHFinfoDigits, getAtolDigits(R))
+        roundDigits = min(CONSTVAR!!DefaultHFinfoDigits, getAtolDigits(R))
         nucNum = length(nucInfo)
         println("System Information: ")
         println("•Number of Electrons: ", totalElecNum)
@@ -1026,7 +1029,7 @@ function runHartreeFock(systemInfo::ElectronicSysConfig{R, D}, basis::OrbBasisDa
     matOrth = hamilConfig.orthonormalization
     resHolder = HFfinalInfo(vars, systemInfo, basisData, matOrth, converged)
 
-    roundDigits = min(CONSTVAR_defaultHFinfoDigits, getAtolDigits(R))
+    roundDigits = min(CONSTVAR!!DefaultHFinfoDigits, getAtolDigits(R))
     if printInfo
         eleE, nucE = resHolder.energy
         EhfStr  = alignNum(eleE, 0; roundDigits)

@@ -10,7 +10,7 @@ const OptOrbIntLayoutCache{T<:Real, C<:RealOrComplex{T}, N} =
 
 const OptEstimatorConfig{T} = MissingOr{EstimatorConfig{T}}
 
-const CONSTVAR_inteLayoutCacheScale::Int = 4
+const CONSTVAR!!InteLayoutCacheScale::Int = 4
 
 
 struct OrbitalIntegrationConfig{T<:Real, D, C<:RealOrComplex{T}, N, O<:DirectOperator, 
@@ -35,7 +35,7 @@ function OrbitalIntegrationConfig(style::MultiBodyIntegral{D, C, N}, operator::O
     cache = if evalTypedData(caching)
         valueTypeBound = Union{OptionalCache{T}, OptionalCache{C}}
         partition = 2^(2N)
-        maxCapacity = checkPositivity(CONSTVAR_inteLayoutCacheScale) * partition
+        maxCapacity = checkPositivity(CONSTVAR!!InteLayoutCacheScale) * partition
         PseudoLRU{OrbIntLayoutInfo{N}, valueTypeBound}(maxCapacity, partition)
     else
         EmptyDict{OrbIntLayoutInfo{N}, C}()
@@ -244,7 +244,7 @@ function reformatOrbIntegral(op::O, info::OrbitalInteCoreInfo{T, D, C, N},
     resultCache = info.memory
     activeMCache = !(methodCache isa EmptyDict)
     activeRCache = !(resultCache isa EmptyDict)
-    equalPtclNum = NO == N
+    equalPtclNum = (NO == N)
     sameIntegral = equalPtclNum && compareObj(op, method.operator)
 
     if evalTypedData(activeCaching)
@@ -283,7 +283,7 @@ getIntegralOpOrbSymmetry(::CoulombInteractionSampler, ::N2N2Tuple{OrbitalCategor
 (true, true, true)
 
 #>> Index layout symmetry
-getIntegralIndexSymmetry((part,)::N1N2Tuple{OneToIndex}) = first(part) == last(part)
+getIntegralIndexSymmetry((part,)::N1N2Tuple{OneToIndex}) = (first(part) == last(part))
 function getIntegralIndexSymmetry((partL, partR)::N2N2Tuple{OneToIndex})
     idxL1, idxR1 = partL
     idxL2, idxR2 = partR
@@ -667,11 +667,11 @@ function getOrbVectorIntegralCore!(inteInfo::TwoBodyOrbIntegralInfo{T, D, C},
     elseif symL && symR && !symO
         for n in 1:symmetric2DArrEleNum(len)
             k, l = OneToIndex.(n|>convertIndex1DtoTri2D)
-            sym2 = k == l
+            sym2 = (k == l)
 
             for m in 1:symmetric2DArrEleNum(len)
                 i, j = OneToIndex.(m|>convertIndex1DtoTri2D)
-                sym1 = i == j
+                sym1 = (i == j)
 
                 ijklVal = evalSetInteTensorEntry!(tensor, inteInfo, ptrVector, (i, j, k, l))
                 ijklValConj = conj(ijklVal)
