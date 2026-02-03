@@ -12,7 +12,7 @@ const OptEstimatorConfig{T} = MissingOr{EstimatorConfig{T}}
 
 const CONSTVAR_inteLayoutCacheScale::Int = 4
 
-const CONSTVAR_inteValCacheSize::Int = 100
+const CONSTVAR_inteValCacheSize::Int = 64
 
 
 struct OrbitalIntegrationConfig{T<:Real, D, C<:RealOrComplex{T}, N, O<:DirectOperator, 
@@ -56,12 +56,12 @@ struct OneBodyIntegralValCache{C<:RealOrComplex} <: QueryBox{C}
     threshold::Int
 
     function OneBodyIntegralValCache(::OneBodyIntegral{D, C}, 
-                                     threshold::Int=10CONSTVAR_inteValCacheSize) where 
-                                    {D, C<:RealOrComplex}
+                                     threshold::Int=CONSTVAR_inteValCacheSize) where {D, C<:RealOrComplex}
         checkPositivity(threshold)
-        maxPairNum = threshold * (threshold - 1)
-        aaSector = PseudoLRU{N1N2Tuple{OneToIndex}, C}(threshold,  threshold )
-        abSector = PseudoLRU{N1N2Tuple{OneToIndex}, C}(maxPairNum, maxPairNum)
+        threshold0 = (Int∘ceil∘sqrt)(threshold)
+        threshold2 = threshold * (threshold - 1)
+        aaSector = PseudoLRU{N1N2Tuple{OneToIndex}, C}(threshold,  threshold0)
+        abSector = PseudoLRU{N1N2Tuple{OneToIndex}, C}(threshold2, threshold )
         new{C}(aaSector, abSector, Int(D), threshold)
     end
 end
@@ -79,13 +79,14 @@ struct TwoBodyIntegralValCache{C<:RealOrComplex} <: QueryBox{C}
                                      threshold::Int=CONSTVAR_inteValCacheSize) where 
                                     {D, C<:RealOrComplex}
         checkPositivity(threshold)
+        threshold0 = (Int∘ceil∘sqrt)(threshold)
         threshold2 = threshold * (threshold - 1)
         threshold3 = threshold * threshold2 * 2
         threshold4 = threshold2^2 #> `== threshold^4 - threshold - threshold2 - threshold3`
-        aaaaSector = PseudoLRU{N2N2Tuple{OneToIndex}, C}(threshold,  threshold )
-        aabbSector = PseudoLRU{N2N2Tuple{OneToIndex}, C}(threshold2, threshold2)
-        halfSector = PseudoLRU{N2N2Tuple{OneToIndex}, C}(threshold3, threshold3)
-        miscSector = PseudoLRU{N2N2Tuple{OneToIndex}, C}(threshold4, threshold4)
+        aaaaSector = PseudoLRU{N2N2Tuple{OneToIndex}, C}(threshold,  threshold0 )
+        aabbSector = PseudoLRU{N2N2Tuple{OneToIndex}, C}(threshold2, threshold  )
+        halfSector = PseudoLRU{N2N2Tuple{OneToIndex}, C}(threshold3, threshold^2)
+        miscSector = PseudoLRU{N2N2Tuple{OneToIndex}, C}(threshold4, threshold^3)
         new{C}(aaaaSector, aabbSector, halfSector, miscSector, Int(D), threshold)
     end
 end
